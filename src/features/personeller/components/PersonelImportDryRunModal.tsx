@@ -10,7 +10,10 @@ import {
   type PersonelImportDryRunResult
 } from "../../../api/personeller.api";
 import { downloadReportCsv } from "../../../reports/export-report";
-import { ApiRequestError } from "../../../api/api-client";
+import {
+  importErrorMessage,
+  visibleImportError
+} from "../personel-import-error-messages";
 
 type PersonelImportDryRunModalProps = {
   open: boolean;
@@ -106,7 +109,7 @@ export function PersonelImportDryRunModal({
     try {
       await downloadPersonelImportTemplateCsv();
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Şablon indirilemedi.");
+      setErrorMessage(visibleImportError(error, "Şablon indirilemedi."));
     }
   }
 
@@ -120,11 +123,7 @@ export function PersonelImportDryRunModal({
     try {
       await downloadPersonelImportReferencesCsv();
     } catch (error) {
-      if (error instanceof ApiRequestError) {
-        setErrorMessage(error.message);
-      } else {
-        setErrorMessage(error instanceof Error ? error.message : "Referans paketi indirilemedi.");
-      }
+      setErrorMessage(visibleImportError(error, "Referans paketi indirilemedi."));
     } finally {
       setIsDownloadingReferences(false);
       referencesDownloadGuardRef.current = false;
@@ -144,11 +143,7 @@ export function PersonelImportDryRunModal({
       setResult(dryRunResult);
       setIdempotencyKey(createIdempotencyKey());
     } catch (error) {
-      if (error instanceof ApiRequestError) {
-        setErrorMessage(error.message);
-      } else {
-        setErrorMessage(error instanceof Error ? error.message : "Dry-run başarısız.");
-      }
+      setErrorMessage(visibleImportError(error, "Doğrulama tamamlanamadı."));
       setResult(null);
       setIdempotencyKey(null);
     } finally {
@@ -179,11 +174,7 @@ export function PersonelImportDryRunModal({
       setConfirmText("");
       onApplied?.();
     } catch (error) {
-      if (error instanceof ApiRequestError) {
-        setErrorMessage(error.message);
-      } else {
-        setErrorMessage(error instanceof Error ? error.message : "Personel aktarımı başarısız.");
-      }
+      setErrorMessage(visibleImportError(error, "Personel aktarımı yapılamadı."));
     } finally {
       setIsApplying(false);
     }
@@ -202,7 +193,9 @@ export function PersonelImportDryRunModal({
         sicil_no: row.sicil_no,
         tc_kimlik_no_masked: row.tc_kimlik_no_masked,
         durum: row.durum,
-        hata_kodlari: row.hata_kodlari.join("|")
+        hata_kodlari: row.hata_kodlari
+          .map((code) => `${code}: ${importErrorMessage(code)}`)
+          .join("|")
       }))
     );
   }
@@ -413,7 +406,7 @@ export function PersonelImportDryRunModal({
                         <td>{row.sicil_no || "-"}</td>
                         <td>{row.tc_kimlik_no_masked}</td>
                         <td>{row.durum}</td>
-                        <td>{row.hata_kodlari.join(", ")}</td>
+                        <td>{row.hata_kodlari.map(importErrorMessage).join(", ")}</td>
                       </tr>
                     ))}
                 </tbody>

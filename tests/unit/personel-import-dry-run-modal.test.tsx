@@ -80,7 +80,8 @@ describe("PersonelImportDryRunModal", () => {
       expect(dryRunPersonelImport).toHaveBeenCalledTimes(1);
       expect(screen.getByTestId("personel-import-dry-run-summary")).toBeInTheDocument();
       expect(screen.getByText("100******46")).toBeInTheDocument();
-      expect(screen.getByText(/PERSONEL_IMPORT_GECERSIZ_TARIH/)).toBeInTheDocument();
+      expect(screen.getByText(/Tarih bilgisi geçersiz\./)).toBeInTheDocument();
+      expect(screen.queryByText(/PERSONEL_IMPORT_GECERSIZ_TARIH/)).toBeNull();
     });
   });
 });

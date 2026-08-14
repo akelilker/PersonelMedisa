@@ -17,6 +17,7 @@ describe("S97-C personel import history source locks", () => {
     const controller = read("api/src/Controllers/PersonellerController.php");
     const page = read("src/features/personeller/pages/PersonellerPage.tsx");
     const modal = read("src/features/personeller/components/PersonelImportHistoryModal.tsx");
+    const messages = read("src/features/personeller/personel-import-error-messages.ts");
 
     expect(endpoints).toContain('importRuns: "/personeller/import/runs"');
     expect(endpoints).toContain("importRunDetail:");
@@ -54,6 +55,9 @@ describe("S97-C personel import history source locks", () => {
     expect(modal).not.toContain("Retry import");
     expect(modal).not.toContain("Tekrar çalıştır");
     expect(modal).not.toContain("Personelleri Sisteme Aktar");
+    expect(modal).toContain("visibleImportError");
+    expect(messages).toContain("Sistem bu işlem için henüz hazır değil.");
+    expect(messages).toContain("Bilgiler doğrulanamadı.");
   });
 
   it("keeps list query join shape free of N+1 and raw PII response fields", () => {

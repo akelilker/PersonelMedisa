@@ -16,9 +16,11 @@ Join rule: 11-digit TC, exactly one canonical row, exactly one secondary row per
 
 ## Recovery result
 
+These Pack7D counts are **identity-validator** metrics, not operational import-apply readiness.
+
 | Metric | Before (Pack7C) | After (Pack7D) |
 | --- | --- | --- |
-| FULL_READY | **67** | **76** |
+| IDENTITY_VALIDATOR_READY | **67** | **76** |
 | UNIQUE_BLOCKED | **55** | **46** |
 | READINESS_PERCENT | 54.92 | **62.30** |
 | SICIL blocked | 24 | **24** |
@@ -47,7 +49,7 @@ Doğum tarihi: the 5 remaining TCs have no valid calendar date in any exact-TC s
 
 ## Local validator (current main contract)
 
-`PersonelCanonicalValidator::validateImportAnaVeriRow` on the rebuilt 122-row candidate. Validation was not weakened.
+`PersonelCanonicalValidator::validateImportAnaVeriRow` on the rebuilt 122-row candidate. Validation was not weakened. These local counts are identity-validator results (`IDENTITY_VALIDATOR_READY`), not operational apply-ready counts.
 
 | Metric | Value |
 | --- | --- |
@@ -111,12 +113,28 @@ Workspace: `Documents/medisa-ops-tmp/personel-import-122/`
 
 User workbook sort: 32 rows with 1 missing field, then 9 / 4 / 1 with 2 / 3 / 4 missing fields.
 
+The 46 rows are **canonical internal** identity gaps (`USER_RESOLUTION_INTERNAL_SAFE_TO_FILL = 46`). Do not add external workers into this workbook.
+
+---
+
+## Readiness reclassification (after Pack7D)
+
+Pack7D recovered identity fields only. A later business fact (Pack7E) is that MEDISA also has directory-only workers whose SGK/payroll belongs to another employer (`DIS_KAYNAK`). That model was **not** part of Pack7D.
+
+- **76** = internal identity-validator-ready rows (`IDENTITY_VALIDATOR_READY`). Not operational apply-ready.
+- **46** = canonical **internal** identity gaps still needing İlker fill for sicil / ad-soyad / telefon / doğum tarihi.
+- Canonical 122 contains **0** confirmed external workers.
+- **13** confirmed TC-blank external workers exist on the current personnel list (`Personel Listesi.xls`, 142 rows). They are **outside** canonical 122 and are a separate stream.
+- Blank TC is **not** a global external classifier. External status is SGK/payroll ownership. An external worker may have a TC; if known, store it.
+- Operational personnel import apply is **not** the next step.
+
 ---
 
 ## Recommended next user action
 
-1. Fill the private `personel-import-122-user-resolution.xlsx` (46 people only). Start at the top (single-field rows).
-2. Remaining gaps that local files cannot supply: sicil **24**, separate ad/soyad **17**, telefon **20**, doğum tarihi **5**.
-3. After İlker entry, rebuild candidate and re-run production dry-run. Import apply remains a **separate explicit authorization**.
+1. Fill the private `personel-import-122-user-resolution.xlsx` for the **46 canonical internals** only (identity completion). Start at the top (single-field rows).
+2. Remaining internal gaps that local files cannot supply: sicil **24**, separate ad/soyad **17**, telefon **20**, doğum tarihi **5**.
+3. Do **not** import apply. Do **not** treat the 76 validator-valid internals as apply-ready. External-worker / directory-only model (`calisan_kapsami`) must land first.
+4. The 13 confirmed external workers are not in the 46 workbook and must not be mixed into that identity-fill stream.
 
-**FINAL_STATUS:** **PARTIAL** — 9 additional personnel are now dry-run valid (67→76). 46 identity-blocked rows remain. Apply is not authorized.
+**FINAL_STATUS:** **PARTIAL** — 9 additional personnel are now identity-validator-valid (67→76). 46 canonical internal identity-blocked rows remain. Operational import apply is not authorized.

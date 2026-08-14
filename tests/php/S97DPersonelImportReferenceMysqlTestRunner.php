@@ -187,7 +187,8 @@ try {
       (2, 'Klinik', 'AKTIF'),
       (1, 'Idari', 'AKTIF'),
       (3, 'Pasif Dep', 'PASIF'),
-      (4, '=FormulaDept', 'AKTIF')
+      (4, '=FormulaDept', 'AKTIF'),
+      (5, 'Pazarlama', 'AKTIF')
     ");
     $pdo->exec("INSERT INTO gorevler (id, ad, durum) VALUES
       (2, 'Asistan', 'AKTIF'),
@@ -367,6 +368,56 @@ try {
     s97dAssert($formula !== null, 'formula dept present');
     s97dAssert(strpos($formula['deger'], "'=") === 0, 'formula injection guarded');
 
+    $idariDept = null;
+    $pazarlamaDept = null;
+    $klinikDept = null;
+    foreach ($parsed['rows'] as $row) {
+        if ($row['referans_turu'] !== 'DEPARTMAN') {
+            continue;
+        }
+        if ($row['deger'] === 'Idari') {
+            $idariDept = $row;
+        }
+        if ($row['deger'] === 'Pazarlama') {
+            $pazarlamaDept = $row;
+        }
+        if ($row['deger'] === 'Klinik') {
+            $klinikDept = $row;
+        }
+    }
+    s97dAssert($idariDept !== null && $idariDept['kullanilabilir'] === 'EVET', 'sparse matrix Idari usable');
+    s97dAssert($idariDept['bagli_sube'] === 'TUM_YETKILI_SUBELER', 'sparse matrix Idari open bagli_sube');
+    s97dAssert($pazarlamaDept !== null && $pazarlamaDept['kullanilabilir'] === 'EVET', 'unmapped Pazarlama still usable');
+    s97dAssert($pazarlamaDept['bagli_sube'] === 'TUM_YETKILI_SUBELER', 'unmapped Pazarlama open bagli_sube');
+    s97dAssert($klinikDept !== null && $klinikDept['bagli_sube'] === 'TUM_YETKILI_SUBELER', 'Klinik open not pair-scoped');
+    echo '[PASS] REFERENCE_EXPORT_OPEN_MODEL = PASS' . PHP_EOL;
+
+    $pazarlamaCsv = implode(';', PersonelImportDryRunService::TEMPLATE_COLUMNS) . "\r\n"
+        . implode(';', [
+            '10000000250',
+            'IMP-PAZ-001',
+            'Ayse',
+            'Yilmaz',
+            '1990-05-15',
+            'Ankara',
+            '05321112233',
+            'A Rh+',
+            'Ali',
+            '05324445566',
+            '2024-01-10',
+            'Merkez',
+            'Pazarlama',
+            'Asistan',
+            'Tam Zamanli',
+        ]) . "\r\n";
+    $pazDry = PersonelImportDryRunService::dryRun($pdo, $pazarlamaCsv, $gyUser, null);
+    s97dAssert(($pazDry['satirlar'][0]['durum'] ?? '') === 'GECERLI', 'dry-run accepts unmapped Pazarlama');
+    s97dAssert(
+        !in_array('PERSONEL_IMPORT_SUBE_DEPARTMAN_ILISKISI', $pazDry['satirlar'][0]['hata_kodlari'] ?? [], true),
+        'no ILISKISI for unmapped Pazarlama'
+    );
+    echo '[PASS] IMPORT_REFERENCE_PARITY = PASS' . PHP_EOL;
+
     s97dAssert(strpos($export1['csv'], 'tc_kimlik_no') === false, 'no tc column');
     s97dAssert(strpos($export1['csv'], '11111111110') === false, 'no raw TC digits');
     s97dAssert(strpos($export1['csv'], 'Gizli') === false, 'no personel names');
@@ -471,29 +522,21 @@ try {
     s97dAssert($openDept !== null, 'open model Idari row');
     s97dAssert($openDept['bagli_sube'] === 'TUM_YETKILI_SUBELER', 'open model bagli_sube sentinel');
 
-    // Mapping query error must fail-closed (not silent open model) for export and dry-run.
+    // Import catalog must not depend on sube_departmanlar (sparse, empty, or missing table).
     $pdo->exec('RENAME TABLE sube_departmanlar TO sube_departmanlar_hidden');
-    try {
-        PersonelImportReferenceCatalogService::buildExport($pdo, $gyUser, null);
-        s97dAssert(false, 'mapping query error export should throw');
-    } catch (PersonelImportException $e) {
-        s97dAssert(
-            $e->getCodeString() === 'PERSONEL_IMPORT_REFERANS_PAKETI_HAZIRLANAMADI',
-            'mapping error export canonical code'
-        );
-        s97dAssert($e->getHttpStatus() === 409, 'mapping error export http 409');
-        s97dAssert(stripos($e->getMessage(), 'SQLSTATE') === false, 'mapping error no SQLSTATE leak');
+    $hiddenExport = PersonelImportReferenceCatalogService::buildExport($pdo, $gyUser, null);
+    $hiddenPazarlama = null;
+    foreach (s97dParseCsvBody($hiddenExport['csv'])['rows'] as $row) {
+        if ($row['referans_turu'] === 'DEPARTMAN' && $row['deger'] === 'Pazarlama') {
+            $hiddenPazarlama = $row;
+            break;
+        }
     }
-    try {
-        PersonelImportDryRunService::dryRun($pdo, $parityCsv, $gyUser, null);
-        s97dAssert(false, 'mapping query error dry-run should throw');
-    } catch (PersonelImportException $e) {
-        s97dAssert(
-            $e->getCodeString() === 'PERSONEL_IMPORT_REFERANS_PAKETI_HAZIRLANAMADI',
-            'mapping error dry-run fail-closed'
-        );
-    }
-    echo '[PASS] MAPPING_EMPTY_ERROR_DISTINCTION = VERIFIED' . PHP_EOL;
+    s97dAssert($hiddenPazarlama !== null && $hiddenPazarlama['kullanilabilir'] === 'EVET', 'missing mapping table still exports Pazarlama');
+    s97dAssert($hiddenPazarlama['bagli_sube'] === 'TUM_YETKILI_SUBELER', 'missing mapping table still open bagli_sube');
+    $hiddenDry = PersonelImportDryRunService::dryRun($pdo, $parityCsv, $gyUser, null);
+    s97dAssert(($hiddenDry['satirlar'][0]['durum'] ?? '') === 'GECERLI', 'missing mapping table dry-run still GECERLI');
+    echo '[PASS] IMPORT_INDEPENDENT_OF_SUBE_DEPARTMANLAR = VERIFIED' . PHP_EOL;
     $pdo->exec('RENAME TABLE sube_departmanlar_hidden TO sube_departmanlar');
     $pdo->exec('INSERT INTO sube_departmanlar (sube_id, departman_id) VALUES (1, 1), (1, 2), (2, 2)');
     $csv = implode(';', PersonelImportDryRunService::TEMPLATE_COLUMNS) . "\r\n"

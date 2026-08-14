@@ -51,6 +51,11 @@ describe("S97-B personel import apply MariaDB", () => {
     expect(result.stdout).toContain("[PASS] deterministic manifest hash on repeat dry-run");
     expect(result.stdout).toContain("[PASS] apply success personel delta +2");
     expect(result.stdout).toContain("[PASS] apply success salary delta 0");
+    expect(result.stdout).toContain("[PASS] open pair apply dry-run can_apply true");
+    expect(result.stdout).toContain("[PASS] open pair apply dry-run no ILISKISI");
+    expect(result.stdout).toContain("[PASS] open pair apply status COMPLETED");
+    expect(result.stdout).toContain("[PASS] open pair apply personel delta +1");
+    expect(result.stdout).toContain("[PASS] create regression unmapped departman_id 1");
     expect(result.stdout).toContain("[PASS] idempotency idempotent_replay true");
     expect(result.stdout).toContain("[PASS] schema missing SCHEMA_NOT_READY");
     expect(result.stdout).toContain("[PASS] no durable CLAIMED after rollback");

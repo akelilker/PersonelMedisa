@@ -57,6 +57,11 @@ describe("S97 personel import dry-run MariaDB", () => {
     expect(result.stdout).toContain("[PASS] unknown reference");
     expect(result.stdout).toContain("[PASS] ambiguous reference");
     expect(result.stdout).toContain("[PASS] sube scope ihlali");
+    expect(result.stdout).toContain("[PASS] open pair unmapped ACTIVE dry-run PASS");
+    expect(result.stdout).toContain("[PASS] no ILISKISI for unmapped ACTIVE pair");
+    expect(result.stdout).toContain("[PASS] open pair still sube scope ihlali");
+    expect(result.stdout).toContain("[PASS] open pair still existing TC");
+    expect(result.stdout).toContain("[PASS] open pair still rejects inactive department");
     expect(result.stdout).toContain("[PASS] wage field reject");
     expect(result.stdout).toContain("[PASS] mixed-case headers accepted");
     expect(result.stdout).toContain("[PASS] jagged row fail-closed");

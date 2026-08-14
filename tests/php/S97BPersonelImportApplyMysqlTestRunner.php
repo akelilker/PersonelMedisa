@@ -568,6 +568,38 @@ try {
         );
     }
 
+    // Pack7B TEST_C: apply uses the same OPEN_BRANCH_DEPARTMENT contract as dry-run.
+    $openApplyCsv = s97bHeaderCsv() . "\r\n"
+        . s97bValidRow([
+            'sube' => 'Sube 2',
+            'departman' => 'İdari İşler',
+            'gorev' => 'Asistan',
+            'tc_kimlik_no' => '10000000250',
+            'sicil_no' => 'IMP-OPEN01',
+        ]) . "\r\n";
+    $openApplyDry = PersonelImportDryRunService::dryRun($pdo, $openApplyCsv, $gyUser, null);
+    s97bAssert(($openApplyDry['can_apply'] ?? false) === true, 'open pair apply dry-run can_apply true');
+    s97bAssert(
+        !in_array('PERSONEL_IMPORT_SUBE_DEPARTMAN_ILISKISI', $openApplyDry['satirlar'][0]['hata_kodlari'] ?? [], true),
+        'open pair apply dry-run no ILISKISI'
+    );
+    $beforeOpenApply = s97bCountPersonel($pdo);
+    $openApplyResult = PersonelImportApplyService::apply(
+        $pdo,
+        $openApplyCsv,
+        $gyUser,
+        s97bApplyInput('s97b.apply.open01', (string) $openApplyDry['manifest_hash']),
+        null
+    );
+    s97bAssert(($openApplyResult['status'] ?? '') === 'COMPLETED', 'open pair apply status COMPLETED');
+    s97bAssert(($openApplyResult['created_count'] ?? 0) === 1, 'open pair apply created_count 1');
+    s97bAssert(s97bCountPersonel($pdo) - $beforeOpenApply === 1, 'open pair apply personel delta +1');
+    $openInserted = $pdo->query(
+        "SELECT sube_id, departman_id FROM personeller WHERE sicil_no = 'IMP-OPEN01' LIMIT 1"
+    )->fetch(PDO::FETCH_ASSOC);
+    s97bAssert(is_array($openInserted) && (int) $openInserted['sube_id'] === 2, 'open pair apply stored sube_id 2');
+    s97bAssert((int) ($openInserted['departman_id'] ?? 0) === 1, 'open pair apply stored unmapped departman_id 1');
+
     // 12) Response has no raw tc_kimlik_no key; has masked
     s97bAssertNoRawTcKey($applyResult, 'apply response no raw tc_kimlik_no key');
     s97bAssert(
@@ -676,7 +708,7 @@ try {
         'acil_durum_telefon' => '05329990001',
         'sicil_no' => 'REG-001',
         'ise_giris_tarihi' => '2025-06-01',
-        'sube_id' => 1,
+        'sube_id' => 2,
         'departman_id' => 1,
         'gorev_id' => 2,
         'personel_tipi_id' => 1,
@@ -687,10 +719,15 @@ try {
     PersonelCreateService::insertPersonel($pdo, $createPayload);
     s97bAssert(s97bCountPersonel($pdo) - $beforeCreatePersonel === 1, 'create regression personel +1');
     s97bAssert(s97bCountSalary($pdo) === $beforeCreateSalary, 'create regression salary unchanged');
+    $createRow = $pdo->query(
+        "SELECT sube_id, departman_id FROM personeller WHERE sicil_no = 'REG-001' LIMIT 1"
+    )->fetch(PDO::FETCH_ASSOC);
+    s97bAssert(is_array($createRow) && (int) $createRow['sube_id'] === 2, 'create regression unmapped sube_id 2');
+    s97bAssert((int) ($createRow['departman_id'] ?? 0) === 1, 'create regression unmapped departman_id 1');
 
     s97bAssert(
-        s97bCountPersonel($pdo) === $baselinePersonel + 6,
-        'final personel count baseline+6 (apply +2, drift +1, retry +2, create +1)'
+        s97bCountPersonel($pdo) === $baselinePersonel + 7,
+        'final personel count baseline+7 (apply +2, drift +1, open-apply +1, retry +2, create +1)'
     );
 
     echo 'verify-s97b-personel-import-apply-mysql: OK' . PHP_EOL;

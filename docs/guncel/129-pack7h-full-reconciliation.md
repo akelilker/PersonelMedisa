@@ -650,3 +650,73 @@ RELEVANT_E2E = FAIL (local demo parser rejects v4 optional/scope columns; real p
 The approved browser smoke verified login, the dry-run safety message, file selection,
 and no console errors. The local demo-only parser limitation was not worked around in
 the validator or production path.
+
+## External user decisions continuation — 2026-08-15
+
+The user-authoritative External decisions were applied with
+`USER_AUTHORIZED_BUSINESS_VALUE` provenance. `Mavi Yaka` resolved to the unique active
+Personel Tipi catalog row (id 5) for all 13 External rows. `İskelet` (Birim id 3),
+`Çakım` (Birim id 1), and `Panel Atölyesi` (Bölüm id 2 / linked Birim id 14) were
+resolved only through exact active matches and established hierarchy; no fuzzy,
+neighbor-row, or new-reference mapping was used. The composite or non-catalog values
+remain fail-closed.
+
+```text
+MODE = EXTERNAL_USER_DECISIONS_FAST_CLEANUP
+EXTERNAL_TOTAL = 13
+EXTERNAL_PERSONEL_TIPI_USER_DECISION = Mavi Yaka
+EXTERNAL_PERSONEL_TIPI_RESOLVED = 13/13
+EXTERNAL_PERSONEL_TIPI_BLOCKERS_AFTER = 0
+USER_WORK_AREA_DECISIONS_APPLIED = 13/13
+EXTERNAL_DEPARTMAN_RESOLVED = 3/13
+EXTERNAL_BOLUM_RESOLVED = 3/13
+EXTERNAL_BIRIM_RESOLVED = 3/13
+EXTERNAL_GOREV_RESOLVED = 0/13
+EXTERNAL_DEPARTMAN_BLOCKERS = 10
+EXTERNAL_BOLUM_BLOCKERS = 10
+EXTERNAL_BIRIM_BLOCKERS = 10
+EXTERNAL_GOREV_BLOCKERS = 13
+REMAINING_EXTERNAL_FIELD_BLOCKERS = 43
+```
+
+The successor files preserve v5 and contain only the current blocker set:
+
+```text
+ARTIFACT_V6_CREATED = YES
+ARTIFACT_V6_PATH = C:\Users\Akel\Documents\medisa-ops-tmp\personel-import-122\pack7h-final-reconciliation-v6.json
+ARTIFACT_V6_SHA256 = 84849814ff99163de0e01212ed8e0eb4052a7996a4f63c1343a9bc278ebb859e
+WORKBOOK_V4_CREATED = YES
+WORKBOOK_V4_PATH = C:\Users\Akel\Documents\medisa-ops-tmp\personel-import-122\pack7h-kullanici-tamamlamasi-gerekenler-v4.xlsx
+WORKBOOK_V4_SHA256 = 4fb7449e24f034d560d13b7dffb3c06cde5f3da7496f1e91d7482a0d517f73a4
+WORKBOOK_V4_ROWS = 78
+WORKBOOK_COVERS_ALL_CURRENT_HUMAN_BLOCKERS = YES
+STALE_WORKBOOK_ROWS = 0
+```
+
+The real read-only v6 dry-run used the corrected staging projection and returned:
+
+```text
+REAL_DRY_RUN_TOTAL = 135
+REAL_DRY_RUN_VALID_IC = 96
+REAL_DRY_RUN_INVALID_IC = 26
+REAL_DRY_RUN_VALID_DIS = 0
+REAL_DRY_RUN_INVALID_DIS = 13
+INVALID_DIS_ROWS = 13
+INVALID_DIS_ERROR_CODES = PERSONEL_IMPORT_REFERANS_BULUNAMADI, PERSONEL_IMPORT_EKSIK_ALAN
+FINAL_TECHNICAL_BLOCKERS = 0
+PRODUCTION_MUTATED = NO
+PRODUCTION_REFERENCE_MUTATED = NO
+IMPORT_APPLY = NO
+IMPORT_READY = NO
+FINAL_STATUS = PASS_WITH_HUMAN_DATA_PENDING
+```
+
+The local demo parser now accepts `calisan_kapsami` and the current optional staging
+columns, with a focused regression fixture in the S97 dry-run E2E. Full tests and full
+E2E remain intentionally skipped under FAST_VALIDATION_MODE. The remaining blockers are
+the 26 IC human-data fields plus 43 unresolved External reference fields.
+
+```text
+DEMO_PARSER_ROOT_CAUSE_FIXED = YES
+RELEVANT_E2E = PASS
+```

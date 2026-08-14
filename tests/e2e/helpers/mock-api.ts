@@ -4840,7 +4840,19 @@ let personelBelgeKaydiIdCounter = 903;
           return;
         }
       }
-      const allowed = new Set([...required, "dogum_yeri", "kan_grubu"]);
+      const allowed = new Set([
+        ...required,
+        "dogum_yeri",
+        "kan_grubu",
+        "acil_durum_kisi",
+        "acil_durum_telefon",
+        "sgk_isveren",
+        "calisma_lokasyonu",
+        "bolum",
+        "birim",
+        "pozisyon",
+        "calisan_kapsami"
+      ]);
       for (const header of headers) {
         if (!allowed.has(header)) {
           await fulfillJson(route, 400, errorBody("PERSONEL_IMPORT_BILINMEYEN_KOLON", `Bilinmeyen kolon: ${header}`));

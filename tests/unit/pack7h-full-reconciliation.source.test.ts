@@ -78,4 +78,24 @@ describe("Pack7H full reconciliation source locks", () => {
     expect(evidence).toContain("IMPORT_APPLY = NO");
     expect(evidence).toContain("EXPECTED_TOTAL_AFTER_IMPORT = 139");
   });
+
+  it("locks the External user-decision successor state", () => {
+    const evidence = read("docs/guncel/129-pack7h-full-reconciliation.md");
+
+    expect(evidence).toContain("MODE = EXTERNAL_USER_DECISIONS_FAST_CLEANUP");
+    expect(evidence).toContain("EXTERNAL_PERSONEL_TIPI_RESOLVED = 13/13");
+    expect(evidence).toContain("EXTERNAL_PERSONEL_TIPI_BLOCKERS_AFTER = 0");
+    expect(evidence).toContain("USER_WORK_AREA_DECISIONS_APPLIED = 13/13");
+    expect(evidence).toContain("EXTERNAL_DEPARTMAN_RESOLVED = 3/13");
+    expect(evidence).toContain("EXTERNAL_BOLUM_RESOLVED = 3/13");
+    expect(evidence).toContain("EXTERNAL_BIRIM_RESOLVED = 3/13");
+    expect(evidence).toContain("EXTERNAL_GOREV_RESOLVED = 0/13");
+    expect(evidence).toContain("REMAINING_EXTERNAL_FIELD_BLOCKERS = 43");
+    expect(evidence).toContain("REAL_DRY_RUN_VALID_DIS = 0");
+    expect(evidence).toContain("REAL_DRY_RUN_INVALID_DIS = 13");
+    expect(evidence).toContain("ARTIFACT_V6_CREATED = YES");
+    expect(evidence).toContain("WORKBOOK_V4_ROWS = 78");
+    expect(evidence).toContain("RELEVANT_E2E = PASS");
+    expect(evidence).toContain("FINAL_STATUS = PASS_WITH_HUMAN_DATA_PENDING");
+  });
 });

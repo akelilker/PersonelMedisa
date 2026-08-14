@@ -36,8 +36,8 @@
 | --- | --- |
 | MIGRATION_065 | `api/migrations/065_personel_org_structure.sql` |
 | CODE_MIGRATION_TIP | **065** |
-| PRODUCTION_MIGRATION_TIP | **064** (unchanged by this PR) |
-| PRODUCTION_065_APPLIED | **NO** |
+| PRODUCTION_MIGRATION_TIP | **065** (applied — see `121`) |
+| PRODUCTION_065_APPLIED | **YES** (`121`) |
 | PROD_COMPAT_064 | **YES** — readiness owner `PersonelOrgStructureSchema` |
 | Error code | `ORG_STRUCTURE_SCHEMA_NOT_READY` (409) |
 | Pack5 gate | `ORG_LOCATION_SCHEMA_NOT_READY` **not weakened** |
@@ -58,22 +58,22 @@ Post-065:
 
 ---
 
-## Future production rollout (PREPARE ONLY — NOT EXECUTED)
+## Future production rollout (EXECUTED — see `121`)
 
-See ops runbook section in this PR docs sync / private readiness artifact.
+Ops evidence: `docs/guncel/121-pack6-production-rollout.md`.
 
-| STEP | Action |
-| --- | --- |
-| 1 | Fresh DB backup |
-| 2 | Apply migration `065` |
-| 3 | Verify schema readiness |
-| 4 | Seed taxonomy (Bölüm/Birim/Pozisyon) from verified inventory |
-| 5 | Complete/update system branch set |
-| 6 | Set `subeler.sgk_isveren_id` ownership |
-| 7 | Rename MRK display `Merkez` → `Medisa` (keep id/code) |
-| 8 | Read-only mapping preview |
-| 9 | Apply exact personnel FK mapping (separate auth) |
-| 10 | Real personel import (separate auth) |
+| STEP | Action | Result (`121`) |
+| --- | --- | --- |
+| 1 | Fresh DB backup | PASS |
+| 2 | Apply migration `065` | PASS |
+| 3 | Verify schema readiness | TRUE |
+| 4 | Seed taxonomy (Bölüm/Birim/Pozisyon) | PARTIAL (6/22 Bölüm; 14/33 Birim; 12/12 Pozisyon) |
+| 5 | Complete/update system branch set | PASS (10/10) |
+| 6 | Set `subeler.sgk_isveren_id` ownership | PASS |
+| 7 | Rename MRK display `Merkez` → `Medisa` | PASS |
+| 8 | Read-only mapping preview | PASS (SGK exact via branch; location/org attrs identity-blocked on current prod set) |
+| 9 | Apply exact personnel FK mapping | **NOT AUTHORIZED** |
+| 10 | Real personel import | **NO** |
 
 ### Locked branch inventory (future)
 
@@ -92,8 +92,8 @@ Branch ownership after Step 6: MRK/GRS/MDS-* → MEDISA; KRP-* → KARYAPI; SNY 
 | ID | Status |
 | --- | --- |
 | MG-ORG-ATTR-001 | **CLOSED** |
-| MG-ORG-ATTR-ROLL-001 | **OPS_ROLLOUT** / `USER_GATED` (code ready; prod 065 not applied) |
-| MG-OPS-ORG-001 | **PARTIAL** / `USER_GATED` |
+| MG-ORG-ATTR-ROLL-001 | **OPS_ROLLOUT** — production schema ready (`121`); personnel FK apply `USER_GATED` |
+| MG-OPS-ORG-001 | **ADVANCED** / `USER_GATED` (locked branches+ownership done; Departman catalog + personnel mapping remain) |
 | MG-ORG-LOC-001 | **OPS_ROLLOUT** / `USER_GATED` |
 | MG-IMPORT-MAP-001 | business mapping CLOSED for org attrs; remaining → `MG-IMPORT-DATA-001` |
 | MG-IMPORT-DATA-001 | `USER_GATED` source-data gaps |

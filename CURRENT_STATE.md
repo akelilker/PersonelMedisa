@@ -11,7 +11,7 @@ Her registry kaydı **tek** zorunlu statü taşır: `CLOSED` · `CODE_GAP` · `B
 
 - **Ürün beyni:** `FROZEN` (domain owner / paralel motor yalnız ayrı teşhis + açık onay)
 - **Görsel düzenleme aşaması:** `GO`
-- **Production migration tip:** `064` (code tip `065`; Pack6 schema awaiting explicit prod apply — `120`)
+- **Production migration tip:** `065` (Pack6 schema applied 2026-08-14 — `121`; personnel org FK apply still `USER_GATED`)
 - **S3F:** `CLOSED_PRODUCTION` (PR #148 merge `9e1b5c85049d5f2aada84ae59b2be926f0bc6441`; docs closure `72818720ae9dad9a77c31c933806a72acdc7bafd`)
 - **QR pipeline:** S3C–S3F `CLOSED`
 - **QR algorithms (locked):** `QR_INTERVAL_V1`, `QR_PUANTAJ_CANDIDATE_V1`, `QR_PUANTAJ_DECISION_V1`, `QR_CANDIDATE_HASH_V2`
@@ -20,7 +20,7 @@ Her registry kaydı **tek** zorunlu statü taşır: `CLOSED` · `CODE_GAP` · `B
 - **Serbest Zaman Pack 4B:** allocation-aware destroy + 6M deadline ops surface (`061`/`062` + `116` + `118`); **OPS_ROLLOUT** (`MG-SZ-6M-001`); production schema rollout **COMPLETE**; ops follow-up `USER_GATED`
 - **Pack5 Final Code Gap:** rolling OT policy + org location schema (`063`/`064` + `117` + `118`); `MG-OT-YEAR-POL/PATH` CLOSED; `MG-ORG-LOC-001` OPS_ROLLOUT USER_GATED (schema production-ready; personnel mapping still gated)
 - **Org reference seed (`119`, 2026-08-13):** SGK employers `MEDISA`/`KARYAPI`/`SENAY_MOBILYA` + 7 verified work locations seeded; personnel org FK mapping **not** applied
-- **Pack6 org structure (`120`):** native Bölüm/Birim/Pozisyon + `subeler.sgk_isveren_id`; `MG-ORG-ATTR-001` CLOSED; production `065` **not** applied
+- **Pack6 org structure (`120`/`121`):** native Bölüm/Birim/Pozisyon + `subeler.sgk_isveren_id`; `MG-ORG-ATTR-001` CLOSED; production `065` **applied**; locked 10-branch model + MRK=`Medisa` + ownership complete; personnel FK mapping **not** applied
 
 Görsel sistem çalışmaları mevcut component/owner içinde yapılabilir. Yeni domain özelliği freeze kapısından geçer.
 
@@ -28,11 +28,11 @@ Görsel sistem çalışmaları mevcut component/owner içinde yapılabilir. Yeni
 
 | Flag | Statü / değer | Metadata |
 | --- | --- | --- |
-| `PRODUCTION_MIGRATION_TIP` | **064** | code tip `065`; Pack6 prod apply `USER_GATED` (`120`) |
+| `PRODUCTION_MIGRATION_TIP` | **065** | Pack6 applied (`121`); personnel FK apply `USER_GATED` |
 | `CODE_MIGRATION_TIP` | **065** | — |
 | `S3F` | **CLOSED_PRODUCTION** | — |
 | `QR_PIPELINE` | **S3C–S3F CLOSED** | — |
-| `REAL_REFERENCE_DATA` | **PARTIAL** — SGK employers + verified work locations seeded (`119`); personnel mapping still gated | `USER_GATED` |
+| `REAL_REFERENCE_DATA` | **PARTIAL** — SGK employers + locations (`119`) + Pack6 taxonomy/branches (`121`); personnel mapping still gated | `USER_GATED` |
 | `REAL_PERSONNEL_DATASET` | USER_GATED | `NO_PII_COMMITTED` |
 | `REAL_PERSONNEL_IMPORTED` | **NO** | `USER_GATED` |
 | `SOURCE_DATA_REQUIRES_COMPLETION` | yes | ops details outside public repo |
@@ -52,16 +52,16 @@ Görsel sistem çalışmaları mevcut component/owner içinde yapılabilir. Yeni
 | `ORG_LOCATION_SCHEMA` | **OPS_ROLLOUT** (`MG-ORG-LOC-001`) | schema production-ready (`064` via `118`); SGK + verified location refs seeded (`119`); personnel mapping `USER_GATED` |
 | `SGK_EMPLOYER_REAL_REFERENCE` | **PRODUCTION_READY** | codes `MEDISA`/`KARYAPI`/`SENAY_MOBILYA` (`119`) |
 | `WORK_LOCATION_REAL_REFERENCE` | **PRODUCTION_READY** | 7 verified location codes seeded (`119`) |
-| `ORG_ATTRIBUTES_BOLUM_BIRIM_POZISYON` | **CLOSED** (`MG-ORG-ATTR-001`) | native fields via Pack6 `065` (`120`); prod apply `USER_GATED` |
-| `ORG_STRUCTURE_SCHEMA` | **CODE_READY** (`MG-ORG-ATTR-ROLL-001`) | prod tip still `064` until explicit `065` apply |
+| `ORG_ATTRIBUTES_BOLUM_BIRIM_POZISYON` | **CLOSED** (`MG-ORG-ATTR-001`) | native fields via Pack6 `065` (`120`/`121`) |
+| `ORG_STRUCTURE_SCHEMA` | **PRODUCTION_READY** (`MG-ORG-ATTR-ROLL-001`) | prod tip `065` (`121`); personnel FK apply `USER_GATED` |
 | `CANONICAL_DOC_STALE` | **0** | historical snapshots preserved, not backlog |
 
 ## Doğrulanmış teknik temel
 
-- `main` / `origin/main` baseline for Pack6: `c840e180275d47a136092f41802986e724e9d863`.
-- Migration tip: code **065** / production **064** until Pack6 apply gate (`120`).
-- Org references: `sgk_isverenler` = 3, `calisma_lokasyonlari` = 7 (verified); existing personnel org FKs remain NULL until mapping gate (`119`).
-- Pack6 adds native `bolumler` / `birimler` / `pozisyonlar` + `subeler.sgk_isveren_id` (authorization still `personeller.sube_id`).
+- `main` / `origin/main` baseline for Pack6 rollout: `e92be2b957f0a3c2e91b5dae5dd703cde4cc1bb4`.
+- Migration tip: code **065** / production **065** (`121`).
+- Org references: `sgk_isverenler` = 3, `calisma_lokasyonlari` = 7, `bolumler`/`birimler`/`pozisyonlar` seeded (`121`); locked 10 branches with company ownership; personnel org FKs remain NULL until mapping gate.
+- Pack6: `bolumler` / `birimler` / `pozisyonlar` + `subeler.sgk_isveren_id` (authorization still `personeller.sube_id`).
 - SGK, şirket politikası kanıtı, bordro preflight, personel importu, revizyon, dual-control, retention request/approve/evaluate/execute (flag OFF), QR S3C–S3F owner’ları mevcut ve fail-closed çalışır.
 - PERSONEL self-service: `/me` puantaj / yıllık izin / FM / QR yüzeyleri; maaş/bordro self-view **OUT_OF_SCOPE** (S3A).
 - Smoke/test personeller korunur; gerçek personel dataset’i **kullanıcı onayı olmadan import edilmez**.

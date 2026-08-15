@@ -301,7 +301,7 @@
 }
 
 .kayit-workspace-grid--personel-form .personel-form-column {
-  gap: 5px;
+  gap: 2px;
 }
 
 .kayit-workspace-grid--personel-form .form-section {
@@ -636,6 +636,7 @@
 }
 
 .kayit-workspace .form-input {
+  height: 30px;
   min-height: 30px;
   padding: 0 9px;
   border-radius: 10px;
@@ -643,7 +644,7 @@
 }
 
 .kayit-workspace select.form-input {
-  padding: 4px 9px;
+  padding: 0 9px;
 }
 
 .kayit-workspace input[type="date"].form-input {

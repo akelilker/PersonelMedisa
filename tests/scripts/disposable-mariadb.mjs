@@ -1,24 +1,26 @@
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { randomUUID } from "node:crypto";
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { createConnection } from "node:net";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, "../..");
-const dataRoot = join(repoRoot, ".test-mariadb");
+const dataRoot = resolve(process.env.MEDISA_TEST_MARIADB_ROOT ?? join(repoRoot, ".test-mariadb"));
 const dataDir = join(dataRoot, "data");
 const startupLockDir = join(dataRoot, "startup.lock");
 const executionLockDir = join(dataRoot, "execution.lock");
-const executionLockOwner = join(executionLockDir, "owner.pid");
+const executionLockOwner = join(executionLockDir, "owner.json");
+const legacyExecutionLockOwner = join(executionLockDir, "owner.pid");
 const managedPidFile = join(dataRoot, "mysqld.pid");
 const defaultPort = Number.parseInt(process.env.MEDISA_TEST_MYSQL_PORT ?? "3307", 10);
 const defaultUser = process.env.MEDISA_TEST_MYSQL_USER ?? "root";
 const defaultPassword = process.env.MEDISA_TEST_MYSQL_PASSWORD ?? "";
 const LOCAL_TEST_MYSQL_HOSTS = new Set(["127.0.0.1", "localhost", "::1"]);
 const STALE_STARTUP_LOCK_MS = 60_000;
-const STALE_EXECUTION_LOCK_MS = 900_000;
 const ORPHAN_EXECUTION_LOCK_MS = 60_000;
+const DEFAULT_PHP_RUNNER_TIMEOUT_MS = 300_000;
 
 /** @type {import('node:child_process').ChildProcess | null} */
 let managedProcess = null;
@@ -123,32 +125,71 @@ function isProcessAlive(pid) {
   }
 }
 
-function acquireExecutionLock(timeoutMs = 600_000) {
+function readExecutionLockOwner() {
+  try {
+    const metadata = JSON.parse(readFileSync(executionLockOwner, "utf8"));
+    const pid = Number.parseInt(String(metadata?.pid ?? ""), 10);
+    return {
+      pid: Number.isInteger(pid) && pid > 0 ? pid : 0,
+      token: typeof metadata?.token === "string" ? metadata.token : ""
+    };
+  } catch {
+    try {
+      const pid = Number.parseInt(readFileSync(legacyExecutionLockOwner, "utf8").trim(), 10);
+      return { pid: Number.isInteger(pid) && pid > 0 ? pid : 0, token: "" };
+    } catch {
+      return { pid: 0, token: "" };
+    }
+  }
+}
+
+function quarantineExecutionLock() {
+  const quarantineDir = join(dataRoot, `execution.lock.quarantine-${process.pid}-${randomUUID()}`);
+  try {
+    renameSync(executionLockDir, quarantineDir);
+    rmSync(quarantineDir, { recursive: true, force: true });
+    return true;
+  } catch (error) {
+    if (["ENOENT", "EEXIST", "EPERM", "EACCES"].includes(error?.code)) {
+      return false;
+    }
+    throw error;
+  }
+}
+
+function releaseExecutionLock(token) {
+  const owner = readExecutionLockOwner();
+  if (owner.token === token) {
+    rmSync(executionLockDir, { recursive: true, force: true });
+  }
+}
+
+function acquireExecutionLock(runnerPath, timeoutMs = 600_000) {
   mkdirSync(dataRoot, { recursive: true });
   const started = Date.now();
   while (Date.now() - started <= timeoutMs) {
     try {
       mkdirSync(executionLockDir);
-      writeFileSync(executionLockOwner, String(process.pid), "utf8");
-      return () => rmSync(executionLockDir, { recursive: true, force: true });
+      const token = randomUUID();
+      writeFileSync(
+        executionLockOwner,
+        JSON.stringify({ pid: process.pid, token, runnerPath, acquiredAt: new Date().toISOString() }),
+        "utf8"
+      );
+      return () => releaseExecutionLock(token);
     } catch (error) {
       // Windows can surface EPERM/EACCES instead of EEXIST during concurrent mkdir races.
       if (error?.code !== "EEXIST" && error?.code !== "EPERM" && error?.code !== "EACCES") {
         throw error;
       }
 
-      let ownerPid = 0;
-      try {
-        ownerPid = Number.parseInt(readFileSync(executionLockOwner, "utf8").trim(), 10);
-      } catch {
-        // Lock directory creation and owner file write are not atomic together.
-      }
+      const owner = readExecutionLockOwner();
       try {
         const lockAgeMs = Date.now() - statSync(executionLockDir).mtimeMs;
-        const ownerDead = ownerPid > 0 && !isProcessAlive(ownerPid);
-        const ownerMissing = !(ownerPid > 0);
-        if (ownerDead || lockAgeMs > STALE_EXECUTION_LOCK_MS || (ownerMissing && lockAgeMs > ORPHAN_EXECUTION_LOCK_MS)) {
-          rmSync(executionLockDir, { recursive: true, force: true });
+        const ownerDead = owner.pid > 0 && !isProcessAlive(owner.pid);
+        const ownerMissing = owner.pid === 0;
+        if (ownerDead || (ownerMissing && lockAgeMs > ORPHAN_EXECUTION_LOCK_MS)) {
+          quarantineExecutionLock();
           continue;
         }
       } catch {
@@ -354,13 +395,19 @@ export async function stopDisposableMariaDb() {
 }
 
 export function runPhpMysqlRunner(runnerPath) {
-  const releaseExecutionLock = acquireExecutionLock();
+  const releaseExecutionLock = acquireExecutionLock(runnerPath);
   try {
-    return spawnSync("php", [...phpMysqlBootstrapArgs(), runnerPath], {
+    const timeout = Number.parseInt(process.env.MEDISA_TEST_PHP_RUNNER_TIMEOUT_MS ?? "", 10) || DEFAULT_PHP_RUNNER_TIMEOUT_MS;
+    const result = spawnSync("php", [...phpMysqlBootstrapArgs(), runnerPath], {
       encoding: "utf8",
       cwd: repoRoot,
-      env: process.env
+      env: process.env,
+      timeout
     });
+    if (result.error?.code === "ETIMEDOUT") {
+      throw new Error(`PHP MariaDB runner exceeded ${timeout}ms: ${runnerPath}`);
+    }
+    return result;
   } finally {
     releaseExecutionLock();
   }

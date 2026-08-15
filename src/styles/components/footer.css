@@ -18,7 +18,7 @@
   border-top: 0.8px solid var(--footer-top-border);
   border-left: 0.5px solid var(--footer-side-border);
   border-right: 0.5px solid var(--footer-side-border);
-  box-shadow: var(--footer-red-glow);
+  box-shadow: var(--shadow-sm);
   overflow: visible;
   display: flex;
   align-items: center;
@@ -39,9 +39,7 @@
 
 body:not(.app-home-route):not(.login-page):not(.admin-report-page) #app-footer {
   border-top: 1px solid var(--footer-top-border);
-  box-shadow:
-    0 -1px 0 var(--footer-top-highlight),
-    var(--footer-red-glow);
+  box-shadow: 0 -1px 0 var(--footer-top-highlight), var(--shadow-sm);
 }
 
 .footer-content {
@@ -113,13 +111,11 @@ body:not(.app-home-route):not(.login-page):not(.admin-report-page) #app-footer {
 }
 
 .status-ready {
-  color: var(--green);
-  text-shadow: 0 0 8px rgba(74, 222, 128, 0.4);
+  color: var(--success);
 }
 
 .status-error {
-  color: var(--red);
-  text-shadow: 0 0 8px rgba(239, 68, 68, 0.4);
+  color: var(--danger);
 }
 
 #app-footer.dimmed .version,

@@ -101,6 +101,7 @@ export const endpoints = {
     approve: "/genel-yonetici-bildirim-onaylari"
   },
   puantaj: {
+    qrHareketleri: "/puantaj/qr-hareketleri",
     detail: (personelId: number | string, tarih: string) =>
       `/gunluk-puantaj/${personelId}/${encodeURIComponent(tarih)}`,
     qrAdaylari: (personelId: number | string) => `/puantaj/qr-adaylari/${personelId}`,

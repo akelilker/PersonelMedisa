@@ -12,6 +12,8 @@ use PDO;
  */
 class QrAttendanceIntervalReadService
 {
+    public const MANAGER_MAX_RANGE_DAYS = 31;
+
     /**
      * @return array<string,mixed>
      */
@@ -36,6 +38,200 @@ class QrAttendanceIntervalReadService
         );
 
         return self::publicResponse($filtered, $range['from'], $range['to']);
+    }
+
+    /**
+     * Manager operational read model. It derives intervals from the same raw
+     * events as self-service and never writes events, intervals, or puantaj.
+     *
+     * @param array<int,int> $allowedSubeIds
+     * @return array<string,mixed>
+     */
+    public static function listForManager(PDO $pdo, $scopeSubeId, array $allowedSubeIds, $personelId, $from, $to, $limit, $offset)
+    {
+        QrAttendanceEventService::assertSchemaReady($pdo);
+        $range = self::resolveManagerRange($from, $to);
+        $limit = max(1, min(100, (int) $limit));
+        $offset = max(0, (int) $offset);
+        $rangeFrom = (new \DateTimeImmutable($range['from']))->modify('-1 day')->format('Y-m-d');
+        $rangeTo = (new \DateTimeImmutable($range['to']))->modify('+1 day')->format('Y-m-d');
+        $utc = QrAttendanceEventService::businessDateRangeToUtc($rangeFrom, $rangeTo);
+
+        $where = [
+            'p.aktif_durum = \'AKTIF\'',
+            'e.occurred_at_utc >= :from_utc',
+            'e.occurred_at_utc < :to_utc',
+        ];
+        $params = [
+            'from_utc' => $utc['from_utc'],
+            'to_utc' => $utc['to_exclusive_utc'],
+        ];
+        if ((int) $personelId > 0) {
+            $where[] = 'p.id = :personel_id';
+            $params['personel_id'] = (int) $personelId;
+        }
+        if ($scopeSubeId !== null) {
+            $where[] = 'p.sube_id = :scope_sube_id';
+            $params['scope_sube_id'] = (int) $scopeSubeId;
+        } elseif ($allowedSubeIds) {
+            $keys = [];
+            foreach (array_values($allowedSubeIds) as $index => $subeId) {
+                $key = 'allowed_sube_' . $index;
+                $keys[] = ':' . $key;
+                $params[$key] = (int) $subeId;
+            }
+            $where[] = 'p.sube_id IN (' . implode(', ', $keys) . ')';
+        }
+
+        $baseSql = ' FROM qr_attendance_events e
+            INNER JOIN personeller p ON p.id = e.personel_id
+            LEFT JOIN subeler event_s ON event_s.id = e.sube_id
+            LEFT JOIN subeler personel_s ON personel_s.id = p.sube_id
+            WHERE ' . implode(' AND ', $where);
+        $countStmt = $pdo->prepare('SELECT COUNT(DISTINCT p.id)' . $baseSql);
+        $countStmt->execute($params);
+        $total = (int) $countStmt->fetchColumn();
+
+        $personStmt = $pdo->prepare(
+            'SELECT DISTINCT p.id ' . $baseSql . ' ORDER BY p.id ASC LIMIT :limit OFFSET :offset'
+        );
+        foreach ($params as $key => $value) {
+            $personStmt->bindValue(':' . $key, $value, is_int($value) ? PDO::PARAM_INT : PDO::PARAM_STR);
+        }
+        $personStmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $personStmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+        $personStmt->execute();
+        $personIds = array_map('intval', $personStmt->fetchAll(PDO::FETCH_COLUMN));
+        if (!$personIds) {
+            return [
+                'from' => $range['from'], 'to' => $range['to'], 'items' => [], 'total' => $total,
+                'limit' => $limit, 'offset' => $offset, 'has_next' => false,
+                'algorithm_version' => QrAttendanceIntervalDerivationService::ALGORITHM_VERSION,
+            ];
+        }
+        $personKeys = [];
+        $eventParams = $params;
+        foreach ($personIds as $index => $id) {
+            $key = 'page_personel_' . $index;
+            $personKeys[] = ':' . $key;
+            $eventParams[$key] = $id;
+        }
+        $stmt = $pdo->prepare(
+            'SELECT e.id, e.personel_id, e.event_type, e.occurred_at_utc, e.sube_id,
+                    e.user_id, event_s.ad AS event_sube_ad,
+                    p.ad, p.soyad, p.sicil_no, p.sube_id AS personel_sube_id,
+                    personel_s.ad AS personel_sube_ad
+             ' . $baseSql . ' AND p.id IN (' . implode(', ', $personKeys) . ')
+             ORDER BY e.personel_id ASC, e.occurred_at_utc ASC, e.id ASC'
+        );
+        foreach ($eventParams as $key => $value) {
+            $stmt->bindValue(':' . $key, $value, is_int($value) ? PDO::PARAM_INT : PDO::PARAM_STR);
+        }
+        $stmt->execute();
+
+        $eventsByPersonel = [];
+        $people = [];
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $id = (int) $row['personel_id'];
+            $people[$id] = [
+                'personel_id' => $id,
+                'ad_soyad' => trim((string) $row['ad'] . ' ' . (string) $row['soyad']),
+                'sicil_no' => $row['sicil_no'] ?? null,
+                'sube_id' => (int) $row['personel_sube_id'],
+                'sube' => (string) ($row['personel_sube_ad'] ?? ''),
+            ];
+            $eventsByPersonel[$id][] = [
+                'id' => (int) $row['id'],
+                'event_type' => (string) $row['event_type'],
+                'occurred_at_utc' => (string) $row['occurred_at_utc'],
+                'sube_id' => (int) $row['sube_id'],
+                'sube_ad' => (string) ($row['event_sube_ad'] ?? ''),
+                'user_id' => (int) $row['user_id'],
+            ];
+        }
+
+        $items = [];
+        foreach ($people as $id => $person) {
+            $derived = QrAttendanceIntervalDerivationService::filterToBusinessRange(
+                QrAttendanceIntervalDerivationService::derive($eventsByPersonel[$id] ?? []),
+                $range['from'],
+                $range['to']
+            );
+            $events = $eventsByPersonel[$id] ?? [];
+            $last = $events ? $events[count($events) - 1] : null;
+            $anomalyTypes = array_values(array_unique(array_map(
+                static fn (array $anomaly): string => (string) ($anomaly['type'] ?? ''),
+                $derived['anomalies']
+            )));
+            $items[] = $person + [
+                'date_from' => $range['from'],
+                'date_to' => $range['to'],
+                'first_entry' => self::firstIntervalTime($derived['intervals']),
+                'last_exit' => self::lastIntervalTime($derived['intervals']),
+                'last_movement' => $last ? self::eventLocalIso($last['occurred_at_utc']) : null,
+                'last_movement_type' => $last['event_type'] ?? null,
+                'inside' => $last !== null && $last['event_type'] === 'GIRIS',
+                'interval_count' => count($derived['intervals']),
+                'missing_entry' => in_array('MISSING_GIRIS', $anomalyTypes, true),
+                'missing_exit' => in_array('MISSING_CIKIS', $anomalyTypes, true),
+                'branch_mismatch' => in_array('BRANCH_MISMATCH', $anomalyTypes, true),
+                'anomalies' => $anomalyTypes,
+                'matched_seconds' => (int) ($derived['summary']['complete_duration_seconds'] ?? 0),
+                'source_event_count' => count($events),
+            ];
+        }
+
+        return [
+            'from' => $range['from'],
+            'to' => $range['to'],
+            'items' => $items,
+            'total' => $total,
+            'limit' => $limit,
+            'offset' => $offset,
+            'has_next' => $offset + count($items) < $total,
+            'algorithm_version' => QrAttendanceIntervalDerivationService::ALGORITHM_VERSION,
+        ];
+    }
+
+    private static function resolveManagerRange($from, $to)
+    {
+        $tz = new \DateTimeZone('Europe/Istanbul');
+        $today = (new \DateTimeImmutable('now', $tz))->format('Y-m-d');
+        $from = trim((string) $from) !== '' ? trim((string) $from) : $today;
+        $to = trim((string) $to) !== '' ? trim((string) $to) : $from;
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $from)
+            || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $to)
+            || !checkdate((int) substr($from, 5, 2), (int) substr($from, 8, 2), (int) substr($from, 0, 4))
+            || !checkdate((int) substr($to, 5, 2), (int) substr($to, 8, 2), (int) substr($to, 0, 4))
+            || $from > $to
+        ) {
+            throw new \InvalidArgumentException('QR tarih araligi gecersiz.');
+        }
+        $days = (int) (new \DateTimeImmutable($from))->diff(new \DateTimeImmutable($to))->days + 1;
+        if ($days > self::MANAGER_MAX_RANGE_DAYS) {
+            throw new \InvalidArgumentException('QR tarih araligi en fazla 31 gun olabilir.');
+        }
+        return ['from' => $from, 'to' => $to];
+    }
+
+    private static function firstIntervalTime(array $intervals)
+    {
+        return $intervals ? (string) $intervals[0]['entry_at'] : null;
+    }
+
+    private static function lastIntervalTime(array $intervals)
+    {
+        return $intervals ? (string) $intervals[count($intervals) - 1]['exit_at'] : null;
+    }
+
+    private static function eventLocalIso($utc)
+    {
+        return (new \DateTimeImmutable((string) $utc, new \DateTimeZone('UTC')))
+            ->setTimezone(new \DateTimeZone('Europe/Istanbul'))
+            ->format('c');
     }
 
     /**

@@ -4458,6 +4458,73 @@ export function resolveDemoApiResponse(
     });
   }
 
+  if (pathname === "/puantaj/qr-hareketleri" && method === "GET") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "puantaj.view");
+    if (permissionError) return permissionError;
+
+    const from = requestUrl.searchParams.get("from") ?? new Date().toISOString().slice(0, 10);
+    const to = requestUrl.searchParams.get("to") ?? from;
+    const personelId = toNumber(requestUrl.searchParams.get("personel_id"));
+    const subeId = toNumber(requestUrl.searchParams.get("sube_id"));
+    const rows = [
+      {
+        personel_id: 1,
+        ad_soyad: "Ayşe Yılmaz",
+        sicil_no: "MED-001",
+        sube_id: 1,
+        sube: "Merkez",
+        date_from: from,
+        date_to: to,
+        first_entry: `${from}T08:54:00+03:00`,
+        last_exit: null,
+        last_movement: `${from}T08:54:00+03:00`,
+        last_movement_type: "GIRIS",
+        inside: true,
+        interval_count: 0,
+        missing_entry: false,
+        missing_exit: true,
+        branch_mismatch: false,
+        anomalies: ["MISSING_CIKIS"],
+        matched_seconds: 0,
+        source_event_count: 1
+      },
+      {
+        personel_id: 2,
+        ad_soyad: "Mehmet Kaya",
+        sicil_no: "MED-002",
+        sube_id: 1,
+        sube: "Merkez",
+        date_from: from,
+        date_to: to,
+        first_entry: `${from}T08:47:00+03:00`,
+        last_exit: `${from}T17:42:00+03:00`,
+        last_movement: `${from}T17:42:00+03:00`,
+        last_movement_type: "CIKIS",
+        inside: false,
+        interval_count: 1,
+        missing_entry: false,
+        missing_exit: false,
+        branch_mismatch: false,
+        anomalies: [],
+        matched_seconds: 32100,
+        source_event_count: 2
+      }
+    ].filter((row) => (personelId === null || row.personel_id === personelId)
+      && (subeId === null || row.sube_id === subeId));
+
+    return ok({
+      from,
+      to,
+      items: rows,
+      total: rows.length,
+      limit: toNumber(requestUrl.searchParams.get("limit")) ?? 50,
+      offset: toNumber(requestUrl.searchParams.get("offset")) ?? 0,
+      has_next: false,
+      algorithm_version: "QR_INTERVAL_V1"
+    });
+  }
+
   if (pathname === "/haftalik-bildirim-mutabakatlari/ozet" && method === "GET") {
     const actor = readDemoApiActor(init);
     const permissionError = enforceDemoPermission(actor, "haftalik_mutabakat.view");

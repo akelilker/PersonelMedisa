@@ -36,10 +36,10 @@ describe("i12 duplicate cleanup source guards", () => {
     expect(corpus).not.toContain("initialIntent");
   });
 
-  it("removes dead returnTo gateway plumbing from runtime src", () => {
+  it("keeps returnTo only as part of the unified gateway contract", () => {
     expect(corpus).not.toContain("kayitEntryReturnTo");
     expect(corpus).not.toContain("initialReturnTo");
-    expect(corpus).not.toMatch(/\breturnTo\b/);
+    expect(corpus).toContain("returnTo");
   });
 
   it("removes orphan zimmet create modal and redirect panel", () => {

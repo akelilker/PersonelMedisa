@@ -1,26 +1,32 @@
 .form-section {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--space-1);
 }
 
 .form-label {
   font-size: 13px;
   line-height: 1.25;
-  font-weight: 700;
-  color: #f5f7ff;
+  font-weight: 600;
+  color: var(--text-secondary);
 }
 
 .form-input {
   width: 100%;
   box-sizing: border-box;
-  min-height: 40px;
-  padding: 0 12px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 12px;
-  background: rgba(15, 20, 31, 0.92);
-  color: #f8fbff;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  height: 40px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface-elevated);
+  color: var(--text-primary);
+  box-shadow: none;
+  font: inherit;
+  transition: border-color 0.16s ease, background-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.form-input::placeholder {
+  color: var(--text-muted);
 }
 
 input.form-input[type="date"],
@@ -31,18 +37,31 @@ input.form-input[type="time"] {
 }
 
 textarea.form-input {
+  height: auto;
   min-height: 96px;
-  padding: 10px 12px;
+  padding: 10px var(--space-3);
   resize: vertical;
 }
 
 select.form-input {
-  padding: 8px 10px;
+  padding: 0 var(--space-2);
 }
 
-.form-input:focus {
+.form-input:focus,
+.form-input:focus-visible {
   outline: none;
-  border-color: rgba(var(--theme-color-rgb), 0.42);
+  border-color: var(--brand-red);
+  box-shadow: 0 0 0 2px rgba(var(--theme-color-rgb), 0.16);
+}
+
+.form-input:disabled {
+  opacity: 0.58;
+  cursor: not-allowed;
+}
+
+.form-input:-webkit-autofill {
+  -webkit-text-fill-color: var(--text-primary);
+  box-shadow: 0 0 0 1000px var(--bg-surface-elevated) inset;
 }
 
 .form-filter-panel {

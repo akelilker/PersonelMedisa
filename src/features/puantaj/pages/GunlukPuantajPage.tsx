@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { muhurleAylikPuantaj } from "../../../api/puantaj.api";
 import {
   buildRaporlarPrefillUrl,
@@ -20,6 +20,7 @@ import {
 import { BildirimPuantajEtkiAdaylariSection } from "../components/BildirimPuantajEtkiAdaylariSection";
 import { PuantajOlayKararPanel } from "../components/PuantajOlayKararPanel";
 import { QrPuantajAdayiSection } from "../components/QrPuantajAdayiSection";
+import { QrGirisCikisOperationSection } from "../components/QrGirisCikisOperationSection";
 import { formatComplianceLevelLabel } from "../../../lib/display/enum-display";
 import type {
   PuantajGunTipi,
@@ -178,6 +179,7 @@ export function GunlukPuantajPage() {
   const canViewRaporlar = hasPermission("raporlar.view");
   const location = useLocation();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   const {
     formState,
@@ -261,13 +263,17 @@ export function GunlukPuantajPage() {
         ? String(currentState.prefillPersonelId)
         : typeof currentState?.prefillPersonelId === "string"
           ? currentState.prefillPersonelId
-          : "";
+          : searchParams.get("personel_id") ?? "";
+    const prefillTarih = searchParams.get("tarih") ?? "";
 
-    if (!prefillPersonelId) {
+    if (!prefillPersonelId && !prefillTarih) {
       return;
     }
 
-    patchFormState({ queryPersonelId: prefillPersonelId });
+    patchFormState({
+      ...(prefillPersonelId ? { queryPersonelId: prefillPersonelId } : {}),
+      ...(prefillTarih ? { queryTarih: prefillTarih } : {})
+    });
 
     const nextState = { ...currentState };
     delete nextState.prefillPersonelId;
@@ -276,7 +282,7 @@ export function GunlukPuantajPage() {
       replace: true,
       state: Object.keys(nextState).length > 0 ? nextState : null
     });
-  }, [location.pathname, location.state, navigate, patchFormState]);
+  }, [location.pathname, location.state, navigate, patchFormState, searchParams]);
 
   function handleQuerySubmit(event: FormEvent<HTMLFormElement>) {
     void submitQuery(event);
@@ -305,6 +311,7 @@ export function GunlukPuantajPage() {
 
   return (
     <section className="puantaj-page">
+      <QrGirisCikisOperationSection />
       <div className="puantaj-header-row">
         <h2>Günlük Kayıt ve Puantaj</h2>
       </div>

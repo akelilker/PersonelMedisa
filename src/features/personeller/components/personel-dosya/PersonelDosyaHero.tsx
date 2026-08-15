@@ -35,6 +35,10 @@ export function PersonelDosyaHero({
           </h3>
           <p className="personel-dosya-sub">{heroSummary || "Kurumsal personel kaydı"}</p>
         </div>
+        <div className={`personel-dosya-status${personel.aktif_durum === "PASIF" ? " is-passive" : ""}`}>
+          <span className="personel-dosya-status-dot" aria-hidden="true" />
+          <span>{durumLabel}</span>
+        </div>
       </div>
 
       <div className="personel-dosya-hero-grid">

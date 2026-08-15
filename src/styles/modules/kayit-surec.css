@@ -96,6 +96,104 @@
   overscroll-behavior: contain;
 }
 
+.kayit-personel-context {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface-elevated);
+}
+
+.kayit-personel-context-avatar {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid rgba(var(--theme-color-rgb), 0.5);
+  border-radius: var(--radius-md);
+  background: rgba(var(--theme-color-rgb), 0.1);
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.kayit-personel-context-copy {
+  min-width: 0;
+}
+
+.kayit-personel-context-copy h3,
+.kayit-personel-context-copy p {
+  margin: 0;
+}
+
+.kayit-personel-context-kicker {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.kayit-personel-context-copy h3 {
+  margin-top: 2px;
+  color: var(--text-primary);
+  font-size: 16px;
+  line-height: 1.25;
+}
+
+.kayit-personel-context-meta {
+  margin-top: 3px !important;
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kayit-personel-context-facts {
+  display: flex;
+  gap: var(--space-4);
+  margin: 0;
+}
+
+.kayit-personel-context-facts div {
+  display: grid;
+  gap: 2px;
+  min-width: 82px;
+}
+
+.kayit-personel-context-facts dt {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.kayit-personel-context-facts dd {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.kayit-personel-context.is-passive {
+  border-color: rgba(248, 113, 113, 0.5);
+}
+
+@media (max-width: 560px) {
+  .kayit-personel-context {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .kayit-personel-context-facts {
+    grid-column: 1 / -1;
+    padding-top: var(--space-2);
+    border-top: 1px solid var(--border-default);
+  }
+}
+
 .kayit-workspace-tab {
   width: 100%;
   min-width: 0;

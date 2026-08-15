@@ -6,6 +6,8 @@ import type {
   MeQrInterval,
   MeQrIntervalAnomaly,
   MeQrScanResponse,
+  ManagerQrAttendanceItem,
+  ManagerQrAttendanceResponse,
   QrEventType,
   QrKioskTokenResponse
 } from "../types/self-service";
@@ -248,6 +250,96 @@ function normalizeAnomaly(raw: unknown): MeQrIntervalAnomaly {
   };
 }
 
+function normalizeManagerQrAttendanceItem(raw: unknown): ManagerQrAttendanceItem {
+  const row = toRecord(raw);
+  if (!row) {
+    throw new ApiRequestError("QR personel satiri gecersiz.", 500, { code: "INVALID_RESPONSE" });
+  }
+
+  const personelId = readNumber(row.personel_id);
+  const subeId = readNumber(row.sube_id);
+  const adSoyad = readString(row.ad_soyad);
+  const dateFrom = readString(row.date_from);
+  const dateTo = readString(row.date_to);
+  const intervalCount = readNumber(row.interval_count);
+  const matchedSeconds = readNumber(row.matched_seconds);
+  const sourceEventCount = readNumber(row.source_event_count);
+  if (
+    personelId == null ||
+    subeId == null ||
+    !adSoyad ||
+    !dateFrom ||
+    !dateTo ||
+    intervalCount == null ||
+    matchedSeconds == null ||
+    sourceEventCount == null ||
+    typeof row.inside !== "boolean" ||
+    typeof row.missing_entry !== "boolean" ||
+    typeof row.missing_exit !== "boolean" ||
+    typeof row.branch_mismatch !== "boolean" ||
+    !Array.isArray(row.anomalies)
+  ) {
+    throw new ApiRequestError("QR personel satiri alanlari eksik.", 500, { code: "INVALID_RESPONSE" });
+  }
+
+  const lastMovementType =
+    row.last_movement_type === null || row.last_movement_type === "GIRIS" || row.last_movement_type === "CIKIS"
+      ? row.last_movement_type
+      : null;
+
+  return {
+    personel_id: personelId,
+    ad_soyad: adSoyad,
+    sicil_no: row.sicil_no === null ? null : readString(row.sicil_no),
+    sube_id: subeId,
+    sube: readString(row.sube) ?? "",
+    date_from: dateFrom,
+    date_to: dateTo,
+    first_entry: row.first_entry === null ? null : readString(row.first_entry),
+    last_exit: row.last_exit === null ? null : readString(row.last_exit),
+    last_movement: row.last_movement === null ? null : readString(row.last_movement),
+    last_movement_type: lastMovementType,
+    inside: row.inside,
+    interval_count: intervalCount,
+    missing_entry: row.missing_entry,
+    missing_exit: row.missing_exit,
+    branch_mismatch: row.branch_mismatch,
+    anomalies: row.anomalies.filter((value): value is string => typeof value === "string"),
+    matched_seconds: matchedSeconds,
+    source_event_count: sourceEventCount
+  };
+}
+
+export function normalizeManagerQrAttendanceResponse(response: ApiResponse<unknown>): ManagerQrAttendanceResponse {
+  const data = toRecord(unwrapData(response, "/puantaj/qr-hareketleri yaniti gecersiz."));
+  if (
+    !data ||
+    !readString(data.from) ||
+    !readString(data.to) ||
+    !Array.isArray(data.items) ||
+    readNumber(data.total) == null ||
+    readNumber(data.limit) == null ||
+    readNumber(data.offset) == null ||
+    typeof data.has_next !== "boolean" ||
+    !readString(data.algorithm_version)
+  ) {
+    throw new ApiRequestError("/puantaj/qr-hareketleri yaniti gecersiz.", 500, {
+      code: "INVALID_RESPONSE"
+    });
+  }
+
+  return {
+    from: readString(data.from) as string,
+    to: readString(data.to) as string,
+    items: data.items.map(normalizeManagerQrAttendanceItem),
+    total: readNumber(data.total) as number,
+    limit: readNumber(data.limit) as number,
+    offset: readNumber(data.offset) as number,
+    has_next: data.has_next,
+    algorithm_version: readString(data.algorithm_version) as string
+  };
+}
+
 export async function fetchMeQrAraliklari(params?: {
   from?: string;
   to?: string;
@@ -283,6 +375,26 @@ export async function fetchMeQrAraliklari(params?: {
     source_event_count: readNumber(data.source_event_count) ?? 0,
     source_max_event_id: readNumber(data.source_max_event_id)
   };
+}
+
+export async function fetchManagerQrAttendance(params?: {
+  from?: string;
+  to?: string;
+  personel_id?: number;
+  sube_id?: number;
+  limit?: number;
+  offset?: number;
+}): Promise<ManagerQrAttendanceResponse> {
+  const path = appendQueryParams(endpoints.puantaj.qrHareketleri, {
+    from: params?.from,
+    to: params?.to,
+    personel_id: params?.personel_id,
+    sube_id: params?.sube_id,
+    limit: params?.limit,
+    offset: params?.offset
+  });
+  const response = await apiRequest<ApiResponse<unknown>>(path);
+  return normalizeManagerQrAttendanceResponse(response);
 }
 
 export async function fetchQrKioskToken(): Promise<QrKioskTokenResponse> {

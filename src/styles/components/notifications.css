@@ -10,14 +10,9 @@
   max-height: min(60vh, 440px);
   padding: 4px 8px 8px;
   border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 18px;
-  background: linear-gradient(180deg, rgba(4, 8, 14, 0.98) 0%, rgba(8, 13, 22, 0.97) 100%);
-  box-shadow:
-    0 22px 44px rgba(0, 0, 0, 0.46),
-    0 0 0 1px rgba(var(--theme-color-rgb), 0.12),
-    inset 0 1px 0 rgba(255, 255, 255, 0.04);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface-elevated);
+  box-shadow: var(--shadow-md);
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
   isolation: isolate;
@@ -40,12 +35,7 @@
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   border-top-left-radius: 18px;
   border-top-right-radius: 18px;
-  background: linear-gradient(
-    180deg,
-    rgba(7, 12, 19, 0.99) 0%,
-    rgba(7, 12, 19, 0.96) 78%,
-    rgba(7, 12, 19, 0.88) 100%
-  );
+  background: var(--bg-surface-elevated);
 }
 
 .notifications-dropdown .notifications-mark-all-read-btn {
@@ -195,8 +185,8 @@ body:not(.modal-open):has(.icons-row .settings-dropdown.open) .content-wrap::aft
   inset: 0 0 calc(var(--app-footer-real-height) + var(--app-footer-gap) + 8px + env(safe-area-inset-bottom, 0px))
     0;
   background: linear-gradient(180deg, rgba(5, 9, 15, 0.18) 0%, rgba(5, 9, 15, 0.42) 100%);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   pointer-events: auto;
   z-index: 1;
 }

@@ -29,8 +29,16 @@ describe("067 canonical reference migration MariaDB", () => {
     expect(result.stdout).toContain("[PASS] 067 canonical state tolerates personnel usage");
     expect(result.stdout).toContain("[PASS] 067 mixed legacy parent with passive section fails closed");
     expect(result.stdout).toContain("[PASS] 067 canonical parent with active legacy section fails closed");
+    expect(result.stdout).toContain("[PASS] 067 legacy personnel usage fails closed");
+    expect(result.stdout).toContain("[PASS] 067 legacy personnel usage leaves legacy state unchanged");
     expect(result.stdout).toContain("[PASS] 067 unsafe active child fails closed");
     expect(result.stdout).toContain("[PASS] 067 failed precondition leaves parent unchanged");
+    expect(result.stdout).toContain("[PASS] 067 first update affected-row failure");
+    expect(result.stdout).toContain("[PASS] 067 first update failure rolls back full transaction");
+    expect(result.stdout).toContain("[PASS] 067 second update affected-row failure");
+    expect(result.stdout).toContain("[PASS] 067 second update failure rolls back first update");
+    expect(result.stdout).toContain("[PASS] 067 canonical readback failure");
+    expect(result.stdout).toContain("[PASS] 067 readback failure rolls back full transaction");
     expect(result.stdout).toContain("[PASS] 067 wrong department root fails closed");
     expect(result.stdout).toContain("[PASS] 067 duplicate active Güvenlik fails closed");
   });

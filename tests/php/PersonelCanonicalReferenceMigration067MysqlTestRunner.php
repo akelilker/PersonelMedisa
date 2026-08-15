@@ -217,8 +217,16 @@ try {
         '067 mixed active failure leaves parent unchanged'
     );
 
-    $pdo->exec("DELETE FROM personeller WHERE id = 1");
     $pdo->exec("UPDATE birimler SET bolum_id = 5 WHERE id = 10");
+    $pdo->exec("UPDATE personeller SET bolum_id = 5 WHERE id = 1");
+    $blockedLegacyUsage = p067RunMigration($pdo, '067_personel_canonical_reference_gate.sql');
+    p067Assert($blockedLegacyUsage !== null, '067 legacy personnel usage fails closed');
+    p067Assert(
+        (int) $pdo->query("SELECT bolum_id FROM birimler WHERE id = 10")->fetchColumn() === 5
+        && (string) $pdo->query("SELECT durum FROM bolumler WHERE id = 5")->fetchColumn() === 'AKTIF',
+        '067 legacy personnel usage leaves legacy state unchanged'
+    );
+    $pdo->exec("DELETE FROM personeller WHERE id = 1");
     $pdo->exec("INSERT INTO birimler (id, bolum_id, ad, durum) VALUES (11, 5, 'Legacy Child', 'AKTIF')");
     $blocked = p067RunMigration($pdo, '067_personel_canonical_reference_gate.sql');
     p067Assert($blocked !== null, '067 unsafe active child fails closed');
@@ -231,6 +239,60 @@ try {
         '067 failed precondition leaves legacy status unchanged'
     );
     $pdo->exec('DELETE FROM birimler WHERE id = 11');
+
+    $pdo->exec(
+        "CREATE TRIGGER p067_test_first_update_noop
+         BEFORE UPDATE ON birimler
+         FOR EACH ROW
+         SET NEW.bolum_id = OLD.bolum_id"
+    );
+    try {
+        $blockedFirstRowCount = p067RunMigration($pdo, '067_personel_canonical_reference_gate.sql');
+        p067Assert($blockedFirstRowCount !== null, '067 first update affected-row failure');
+        p067Assert(
+            (int) $pdo->query("SELECT bolum_id FROM birimler WHERE id = 10")->fetchColumn() === 5
+            && (string) $pdo->query("SELECT durum FROM bolumler WHERE id = 5")->fetchColumn() === 'AKTIF',
+            '067 first update failure rolls back full transaction'
+        );
+    } finally {
+        $pdo->exec('DROP TRIGGER IF EXISTS p067_test_first_update_noop');
+    }
+
+    $pdo->exec(
+        "CREATE TRIGGER p067_test_second_update_noop
+         BEFORE UPDATE ON bolumler
+         FOR EACH ROW
+         SET NEW.durum = OLD.durum"
+    );
+    try {
+        $blockedSecondRowCount = p067RunMigration($pdo, '067_personel_canonical_reference_gate.sql');
+        p067Assert($blockedSecondRowCount !== null, '067 second update affected-row failure');
+        p067Assert(
+            (int) $pdo->query("SELECT bolum_id FROM birimler WHERE id = 10")->fetchColumn() === 5
+            && (string) $pdo->query("SELECT durum FROM bolumler WHERE id = 5")->fetchColumn() === 'AKTIF',
+            '067 second update failure rolls back first update'
+        );
+    } finally {
+        $pdo->exec('DROP TRIGGER IF EXISTS p067_test_second_update_noop');
+    }
+
+    $pdo->exec(
+        "CREATE TRIGGER p067_test_readback_corruption
+         AFTER UPDATE ON bolumler
+         FOR EACH ROW
+         UPDATE birimler SET bolum_id = 5 WHERE id = 10"
+    );
+    try {
+        $blockedReadback = p067RunMigration($pdo, '067_personel_canonical_reference_gate.sql');
+        p067Assert($blockedReadback !== null, '067 canonical readback failure');
+        p067Assert(
+            (int) $pdo->query("SELECT bolum_id FROM birimler WHERE id = 10")->fetchColumn() === 5
+            && (string) $pdo->query("SELECT durum FROM bolumler WHERE id = 5")->fetchColumn() === 'AKTIF',
+            '067 readback failure rolls back full transaction'
+        );
+    } finally {
+        $pdo->exec('DROP TRIGGER IF EXISTS p067_test_readback_corruption');
+    }
 
     $pdo->exec("UPDATE birimler SET bolum_id = 3 WHERE id = 10");
     $pdo->exec("UPDATE bolumler SET durum = 'PASIF' WHERE id = 5");

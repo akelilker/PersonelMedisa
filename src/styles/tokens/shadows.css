@@ -1,6 +1,6 @@
 :root {
-  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.22);
-  --shadow-md: 0 10px 24px rgba(0, 0, 0, 0.28);
+  --shadow-sm: 0 4px 10px rgba(0, 0, 0, 0.22);
+  --shadow-md: 0 12px 28px rgba(0, 0, 0, 0.48);
   --shadow-panel: var(--shadow-sm);
   --shadow-glow-red: 0 4px 14px rgba(var(--theme-color-rgb), 0.05);
 }

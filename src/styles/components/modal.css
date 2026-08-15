@@ -61,10 +61,10 @@
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
   column-gap: 12px;
-  background: var(--bg-surface-elevated);
+  background: var(--modal-header-red-gradient);
   border-top-left-radius: inherit;
   border-top-right-radius: inherit;
-  border-bottom: 1px solid var(--border-default);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   background-clip: padding-box;
   box-shadow: none;
   overflow: hidden;
@@ -85,7 +85,7 @@
   font-weight: var(--modal-title-weight);
   letter-spacing: 0.04em;
   text-transform: none;
-  text-shadow: none;
+  text-shadow: var(--modal-title-shadow);
 }
 
 .modal-header h2.premium-title {
@@ -108,7 +108,7 @@
   flex-shrink: 0;
   padding: var(--space-3) var(--space-4);
   border-top: 1px solid var(--border-default);
-  background: var(--bg-surface);
+  background: var(--modal-bg);
 }
 
 .modal-footer .modal-footer-actions {

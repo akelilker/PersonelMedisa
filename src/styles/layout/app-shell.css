@@ -15,7 +15,7 @@
   border-top-right-radius: var(--radius-lg);
   overflow: hidden;
   overflow-x: hidden;
-  box-shadow: var(--shadow-sm);
+  box-shadow: none;
   /*
    * Modal shell contract:
    * - modal ustten app shell ust cercevesine kadar cikar
@@ -50,7 +50,7 @@
   content: "";
   position: absolute;
   inset: 0;
-  box-shadow: none;
+  box-shadow: 0 0 16px rgba(var(--theme-color-rgb), 0.24), inset 0 0 18px rgba(var(--theme-color-rgb), 0.1);
   pointer-events: none;
   z-index: 0;
 }
@@ -152,15 +152,15 @@ body.modal-open .app-shell::before {
   width: 100%;
   margin: 0 auto;
   padding: 0 var(--space-4);
-  background: var(--bg-surface);
+  background: linear-gradient(180deg, var(--hero-gradient-start), var(--hero-gradient-end));
   border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
+  border-radius: 12px;
   cursor: pointer;
   text-align: center;
   transition: border-color 0.2s, background 0.2s, transform 0.2s, box-shadow 0.2s;
-  box-shadow: var(--shadow-sm);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.22);
   margin-bottom: 5px;
-  height: 54px;
+  height: 50px;
   overflow: hidden;
   box-sizing: border-box;
   display: flex;
@@ -180,13 +180,18 @@ body.modal-open .app-shell::before {
 
 #main-menu .menu-btn .ttl {
   font-size: clamp(13px, 2.8vw, 15px);
-  font-weight: 600;
-  color: var(--text-primary);
-  letter-spacing: 0.02em;
+  font-weight: var(--premium-title-weight);
+  color: #d1dbe4;
+  letter-spacing: var(--premium-title-letter-spacing);
   text-transform: uppercase;
   transition: color 0.2s, transform 0.2s, text-shadow 0.24s ease, background-position 0.32s ease, filter 0.32s ease;
-  background: none;
-  text-shadow: none;
+  background: var(--premium-title-gradient);
+  background-size: 100% 180%;
+  background-position: 50% 54%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: var(--premium-title-shadow);
   transform-origin: center;
   max-width: 100%;
   min-width: 0;
@@ -207,14 +212,14 @@ body.modal-open .app-shell::before {
 
   #main-menu .menu-btn {
     border-color: rgba(196, 210, 228, 0.56);
-    box-shadow: var(--shadow-sm);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.1);
   }
 }
 
 @media (hover: hover) {
   .menu-btn:hover:not(:disabled) {
     border-color: rgba(255, 255, 255, 0.68);
-    background: var(--bg-surface-elevated);
+    background: linear-gradient(180deg, var(--hero-gradient-start), var(--hero-gradient-end));
     transform: none;
     box-shadow: var(--shadow-md);
   }

@@ -96,6 +96,31 @@ export const PERSONEL_SUREC_TABS: Array<{ id: PersonelSurecTab; label: string }>
   { id: "ayrilma", label: "Ayrılma" }
 ];
 
+export function resolvePersonelSurecTabForSurecTuru(surecTuru: string): PersonelSurecTab {
+  const normalized = surecTuru.trim().toUpperCase();
+
+  if (["IZIN", "RAPOR", "IS_KAZASI", "DEVAMSIZLIK"].includes(normalized)) {
+    return "izin-devamsizlik";
+  }
+  if (["POZISYON_DEGISTI", "GOREV_DEGISTI", "BOLUM_DEGISTI", "DEPARTMAN_DEGISTI"].includes(normalized)) {
+    return "pozisyon";
+  }
+  if (normalized.includes("BELGE") || normalized.includes("SERTIFIKA")) {
+    return "belgeler";
+  }
+  if (normalized.includes("ZIMMET")) {
+    return "zimmet";
+  }
+  if (normalized.includes("CEZA") || normalized.includes("DISIPLIN")) {
+    return "ceza";
+  }
+  if (normalized === "ISTEN_AYRILMA") {
+    return "ayrilma";
+  }
+
+  return "genel";
+}
+
 export const DEVAMSIZLIK_ALT_TUR_CONFIG: Record<DevamsizlikSubId, DevamsizlikAltTurConfig> = {
   izin: {
     label: "İzin Türü",

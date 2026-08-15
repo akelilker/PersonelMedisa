@@ -9,7 +9,8 @@ export const RAPORLAR_PANEL_IDS = [
   "etki-adayi",
   "maas-hesaplama",
   "bordro-hazirlik",
-  "serbest-zaman-takip"
+  "serbest-zaman-takip",
+  "qr-giris-cikis"
 ] as const;
 
 export type RaporlarPanel = (typeof RAPORLAR_PANEL_IDS)[number];
@@ -25,7 +26,8 @@ export type RaporlarSurfaceId =
   | "etki-adayi"
   | "maas-hesaplama"
   | "bordro-hazirlik"
-  | "serbest-zaman-takip";
+  | "serbest-zaman-takip"
+  | "qr-giris-cikis";
 
 export type RaporlarNavItemId = RaporlarSurfaceId;
 
@@ -59,6 +61,13 @@ export const RAPORLAR_NAV_ITEMS: RaporlarNavItemDef[] = [
     label: "Etki Adayı Raporu",
     testId: "raporlar-panel-etki-adayi",
     panel: "etki-adayi"
+  },
+  {
+    id: "qr-giris-cikis",
+    group: "raporlar",
+    label: "Giriş / Çıkış Raporu",
+    testId: "raporlar-panel-qr-giris-cikis",
+    panel: "qr-giris-cikis"
   },
   {
     id: "serbest-zaman-takip",
@@ -106,7 +115,8 @@ export const RAPORLAR_SURFACE_LEADS: Record<RaporlarSurfaceId, string> = {
   "serbest-zaman-takip":
     "Serbest zaman 6 aylık kullanım deadline takibi (operasyonel uyarı; otomatik bordro blokajı yoktur).",
   "maas-hesaplama": "Deterministik maaş hesaplama çalıştırmalarını yönetin.",
-  "bordro-hazirlik": "Bordro hazırlık, ön kontrol ve personel kapsamını yönetin."
+  "bordro-hazirlik": "Bordro hazırlık, ön kontrol ve personel kapsamını yönetin.",
+  "qr-giris-cikis": "QR giriş/çıkış geçmişini filtreleyin ve inceleyin."
 };
 
 /** Legacy flat-nav label that must not appear after I11. */
@@ -119,6 +129,7 @@ export function parseRaporlarPanel(value: string | null): RaporlarPanel {
     value === "maas-hesaplama" ||
     value === "bordro-hazirlik" ||
     value === "serbest-zaman-takip"
+    || value === "qr-giris-cikis"
   ) {
     return value;
   }
@@ -207,6 +218,8 @@ export function isRaporlarNavItemVisible(
       return visibility.canViewMaasHesaplama;
     case "bordro-hazirlik":
       return visibility.canViewBordroHazirlik;
+    case "qr-giris-cikis":
+      return visibility.canViewListe;
     default:
       return false;
   }

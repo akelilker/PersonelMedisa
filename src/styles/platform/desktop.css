@@ -10,8 +10,6 @@
 
 @media (min-width: 769px) {
   body:not(.app-home-route):not(.login-page):not(.admin-report-page) .content-wrap {
-    box-shadow:
-      0 0 28px rgba(var(--theme-color-rgb), 0.16),
-      inset 0 0 18px rgba(var(--theme-color-rgb), 0.05);
+    box-shadow: var(--shadow-sm);
   }
 }

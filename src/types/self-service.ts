@@ -159,6 +159,39 @@ export type MeQrAraliklariResponse = {
   source_max_event_id: number | null;
 };
 
+export type ManagerQrAttendanceItem = {
+  personel_id: number;
+  ad_soyad: string;
+  sicil_no: string | null;
+  sube_id: number;
+  sube: string;
+  date_from: string;
+  date_to: string;
+  first_entry: string | null;
+  last_exit: string | null;
+  last_movement: string | null;
+  last_movement_type: QrEventType | null;
+  inside: boolean;
+  interval_count: number;
+  missing_entry: boolean;
+  missing_exit: boolean;
+  branch_mismatch: boolean;
+  anomalies: string[];
+  matched_seconds: number;
+  source_event_count: number;
+};
+
+export type ManagerQrAttendanceResponse = {
+  from: string;
+  to: string;
+  items: ManagerQrAttendanceItem[];
+  total: number;
+  limit: number;
+  offset: number;
+  has_next: boolean;
+  algorithm_version: string;
+};
+
 export type QrKioskTokenResponse = {
   token: string;
   issued_at: number;

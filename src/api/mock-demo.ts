@@ -4458,6 +4458,88 @@ export function resolveDemoApiResponse(
     });
   }
 
+  if (pathname === "/puantaj/qr-hareketleri" && method === "GET") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "puantaj.view");
+    if (permissionError) return permissionError;
+
+    const from = requestUrl.searchParams.get("from") ?? new Date().toISOString().slice(0, 10);
+    const to = requestUrl.searchParams.get("to") ?? from;
+    const personelId = toNumber(requestUrl.searchParams.get("personel_id"));
+    const subeId = toNumber(requestUrl.searchParams.get("sube_id"));
+    const rows: Array<Record<string, unknown>> = [];
+    const cursor = new Date(`${from}T00:00:00Z`);
+    const end = new Date(`${to}T00:00:00Z`);
+    while (cursor <= end) {
+      const date = cursor.toISOString().slice(0, 10);
+      const isLatestDate = date === to;
+      rows.push({
+        personel_id: 1,
+        ad_soyad: "Ayşe Yılmaz",
+        sicil_no: "MED-001",
+        sube_id: 1,
+        sube: "Merkez",
+        date_from: date,
+        date_to: date,
+        first_entry: `${date}T08:54:00+03:00`,
+        last_exit: isLatestDate ? null : `${date}T17:36:00+03:00`,
+        last_movement: `${date}T${isLatestDate ? "08:54" : "17:36"}:00+03:00`,
+        last_movement_type: isLatestDate ? "GIRIS" : "CIKIS",
+        inside: isLatestDate,
+        interval_count: isLatestDate ? 0 : 1,
+        missing_entry: false,
+        missing_exit: isLatestDate,
+        branch_mismatch: false,
+        anomalies: isLatestDate ? ["MISSING_CIKIS"] : [],
+        matched_seconds: isLatestDate ? 0 : 31320,
+        source_event_count: isLatestDate ? 1 : 2
+      });
+      rows.push({
+        personel_id: 2,
+        ad_soyad: "Mehmet Kaya",
+        sicil_no: "MED-002",
+        sube_id: 1,
+        sube: "Merkez",
+        date_from: date,
+        date_to: date,
+        first_entry: `${date}T08:47:00+03:00`,
+        last_exit: `${date}T17:42:00+03:00`,
+        last_movement: `${date}T17:42:00+03:00`,
+        last_movement_type: "CIKIS",
+        inside: false,
+        interval_count: 1,
+        missing_entry: false,
+        missing_exit: false,
+        branch_mismatch: false,
+        anomalies: [],
+        matched_seconds: 32100,
+        source_event_count: 2
+      });
+      cursor.setUTCDate(cursor.getUTCDate() + 1);
+    }
+
+    const filteredRows = rows
+      .filter((row) => (personelId === null || row.personel_id === personelId)
+        && (subeId === null || row.sube_id === subeId))
+      .sort((a, b) => String(b.date_from).localeCompare(String(a.date_from))
+        || Number(a.personel_id) - Number(b.personel_id));
+    const total = filteredRows.length;
+    const limit = toNumber(requestUrl.searchParams.get("limit")) ?? 50;
+    const offset = toNumber(requestUrl.searchParams.get("offset")) ?? 0;
+    const items = filteredRows.slice(offset, offset + limit);
+
+    return ok({
+      from,
+      to,
+      items,
+      total,
+      limit,
+      offset,
+      has_next: offset + items.length < total,
+      algorithm_version: "QR_INTERVAL_V1"
+    });
+  }
+
   if (pathname === "/haftalik-bildirim-mutabakatlari/ozet" && method === "GET") {
     const actor = readDemoApiActor(init);
     const permissionError = enforceDemoPermission(actor, "haftalik_mutabakat.view");

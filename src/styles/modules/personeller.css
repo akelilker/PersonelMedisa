@@ -463,7 +463,8 @@
 
 .personel-dosya-hero-head {
   display: flex;
-  align-items: flex-end;
+  align-items: flex-start;
+  justify-content: space-between;
   gap: var(--space-2);
 }
 
@@ -484,6 +485,32 @@
 .personel-dosya-hero-copy h3 {
   margin: 0;
   font-size: 1.3rem;
+}
+
+.personel-dosya-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  padding: 5px 9px;
+  border: 1px solid rgba(74, 222, 128, 0.42);
+  border-radius: 999px;
+  color: var(--success);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.personel-dosya-status.is-passive {
+  border-color: rgba(248, 113, 113, 0.5);
+  color: var(--danger);
+}
+
+.personel-dosya-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
 }
 
 .personel-dosya-sub {
@@ -1077,6 +1104,10 @@
   .personel-dosya-hero-head {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .personel-dosya-status {
+    justify-self: start;
   }
 
   .personel-dosya-actions-row {

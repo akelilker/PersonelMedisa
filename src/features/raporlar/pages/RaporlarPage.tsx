@@ -38,6 +38,7 @@ import {
   type RaporQueryExtraFilters
 } from "../rapor-query-prefill";
 import { RaporlarGroupedNav } from "../components/RaporlarGroupedNav";
+import { QrGirisCikisReportSection } from "../components/QrGirisCikisReportSection";
 import {
   parseRaporlarPanel,
   parseRaporlarStandartView,
@@ -744,13 +745,20 @@ export function RaporlarPage() {
       ) : null}
       {activePanel === "maas-hesaplama" && canViewMaasHesaplama ? <MaasHesaplamaMerkeziPage /> : null}
       {activePanel === "bordro-hazirlik" && canViewBordroHazirlik ? <BordroHazirlikMerkeziPage /> : null}
+      {activePanel === "qr-giris-cikis" && canViewListe ? <QrGirisCikisReportSection /> : null}
 
       {activeSurface === "aylik-kapanis" && canViewAylikOzet ? <AylikKapanisOzetiSection /> : null}
 
       {activeSurface === "liste" ? (
         <>
       <div className="raporlar-standart-panel" data-testid="raporlar-liste-panel">
-        <h3 className="raporlar-panel-title">Liste Raporları</h3>
+        <div className="raporlar-panel-heading">
+          <div>
+            <p className="raporlar-panel-eyebrow">Filtrele ve çalıştır</p>
+            <h3 className="raporlar-panel-title">Liste Raporları</h3>
+          </div>
+          <p className="raporlar-panel-hint">Filtreleri seçerek sonuçları aşağıda inceleyin.</p>
+        </div>
         <form className="form-filter-panel raporlar-standart-form" onSubmit={handleSubmit}>
         <div className="form-field-grid raporlar-standart-grid">
           <FormField
@@ -831,6 +839,10 @@ export function RaporlarPage() {
 
       {!isLoading && !errorMessage && rows.length > 0 ? (
         <div className="raporlar-result-card" data-testid="raporlar-resmi-sonuc">
+          <div className="raporlar-result-heading">
+            <h3>Sonuçlar</h3>
+            <span>Detay satırından Personel Kartı’na geçebilirsiniz.</span>
+          </div>
           <RaporKaynakMetaBand reportMeta={reportMeta} kayitSayisi={total ?? rows.length} />
           <div className="raporlar-table-wrap raporlar-table-wrap--premium">
             <table className="raporlar-table raporlar-table--premium">

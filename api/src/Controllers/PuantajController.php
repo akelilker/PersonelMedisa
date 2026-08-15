@@ -21,6 +21,7 @@ use Medisa\Api\Services\Qr\QrPuantajCandidateDecisionException;
 use Medisa\Api\Services\Qr\QrPuantajCandidateDecisionLedgerService;
 use Medisa\Api\Services\Qr\QrPuantajCandidateDecisionService;
 use Medisa\Api\Services\Qr\QrPuantajCandidateReadService;
+use Medisa\Api\Services\Qr\QrAttendanceIntervalReadService;
 use Medisa\Api\Services\ResmiTatilTakvimProjectionService;
 use PDO;
 
@@ -98,6 +99,39 @@ class PuantajController
             JsonResponse::badRequest($e->getMessage());
         } catch (\Throwable $e) {
             JsonResponse::serverError('QR puantaj adaylari okunamadi.');
+        }
+
+        JsonResponse::success($payload);
+    }
+
+    public static function qrHareketleri(Request $request)
+    {
+        $user = AuthMiddleware::authenticate($request, true);
+        RolePermissions::assert($user, 'puantaj.view');
+        $pdo = self::getConnection();
+        $scope = SubeScope::resolveScope($user, $request);
+        $allowed = SubeScope::allowedSubeIds($user);
+        $from = trim((string) $request->getQuery('from', ''));
+        $to = trim((string) $request->getQuery('to', ''));
+        $personelId = (int) $request->getQuery('personel_id', 0);
+        $limit = (int) $request->getQuery('limit', 50);
+        $offset = (int) $request->getQuery('offset', 0);
+
+        try {
+            $payload = QrAttendanceIntervalReadService::listForManager(
+                $pdo,
+                $scope,
+                $allowed,
+                $personelId,
+                $from,
+                $to,
+                $limit,
+                $offset
+            );
+        } catch (\InvalidArgumentException $e) {
+            JsonResponse::badRequest($e->getMessage());
+        } catch (\Throwable $e) {
+            JsonResponse::serverError('QR hareketleri okunamadi.');
         }
 
         JsonResponse::success($payload);

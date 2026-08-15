@@ -21,7 +21,10 @@ describe("usePersonelKartGatewayReturn", () => {
       state: {
         kayitModal: {
           tab: "surec",
-          personelId: 3
+          personelId: 3,
+          targetTab: "izin-devamsizlik",
+          intent: "personel-surec-gateway",
+          returnTo: "/personeller/3"
         }
       }
     });
@@ -62,7 +65,8 @@ describe("usePersonelKartGatewayReturn", () => {
         kayitModal: {
           tab: "surec",
           personelId: 9,
-          personelTab: "izin-devamsizlik",
+          targetTab: "izin-devamsizlik",
+          intent: "yillik-izin-hak-duzeltme-gateway",
           operation: "yillik-izin-hak-duzeltme"
         }
       }

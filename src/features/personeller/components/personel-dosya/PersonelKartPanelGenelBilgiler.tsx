@@ -6,6 +6,7 @@ import { PersonelIzinOzetSection } from "./PersonelIzinOzetSection";
 import { PersonelPuantajOzetSection } from "./PersonelPuantajOzetSection";
 import { PersonelUcretGecmisiSection } from "./PersonelUcretGecmisiSection";
 import { PersonelBordroKapsamSection } from "./PersonelBordroKapsamSection";
+import { PersonelQrHistorySection } from "./PersonelQrHistorySection";
 
 export function PersonelKartPanelGenelBilgiler({
   personel,
@@ -100,6 +101,8 @@ export function PersonelKartPanelGenelBilgiler({
         canViewBordro={canViewBordro}
         isActive={isActive}
       />
+
+      {canViewPuantaj ? <PersonelQrHistorySection personel={personel} /> : null}
 
       {canViewUcret ? (
         <PersonelUcretGecmisiSection

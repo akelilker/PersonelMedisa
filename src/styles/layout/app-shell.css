@@ -11,13 +11,11 @@
   margin: 0 auto;
   background: var(--bg);
   border-top: 0.5px solid var(--border-red-tech);
-  border-top-left-radius: 20px;
-  border-top-right-radius: 20px;
+  border-top-left-radius: var(--radius-lg);
+  border-top-right-radius: var(--radius-lg);
   overflow: hidden;
   overflow-x: hidden;
-  box-shadow:
-    0 2px 14px rgba(var(--theme-color-rgb), 0.1),
-    inset 0 0 80px rgba(10, 13, 28, 0.22);
+  box-shadow: var(--shadow-sm);
   /*
    * Modal shell contract:
    * - modal ustten app shell ust cercevesine kadar cikar
@@ -42,8 +40,8 @@
   border-top: 0.5px solid var(--border-red-tech);
   border-left: 0.5px solid var(--border-red-side);
   border-right: 0.5px solid var(--border-red-side);
-  border-top-left-radius: 20px;
-  border-top-right-radius: 20px;
+  border-top-left-radius: var(--radius-lg);
+  border-top-right-radius: var(--radius-lg);
   pointer-events: none;
   z-index: 2;
 }
@@ -52,7 +50,7 @@
   content: "";
   position: absolute;
   inset: 0;
-  box-shadow: inset 0 0 25px var(--red-glow-subtle);
+  box-shadow: none;
   pointer-events: none;
   z-index: 0;
 }
@@ -153,14 +151,14 @@ body.modal-open .app-shell::before {
   max-width: var(--app-shell-max-width);
   width: 100%;
   margin: 0 auto;
-  padding: 18px;
-  background: linear-gradient(180deg, var(--hero-gradient-start), var(--hero-gradient-end));
+  padding: 0 var(--space-4);
+  background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   cursor: pointer;
   text-align: center;
   transition: border-color 0.2s, background 0.2s, transform 0.2s, box-shadow 0.2s;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--shadow-sm);
   margin-bottom: 5px;
   height: 54px;
   overflow: hidden;
@@ -172,12 +170,8 @@ body.modal-open .app-shell::before {
 }
 
 .menu-btn.is-active {
-  border-color: rgba(var(--theme-color-rgb), 0.95);
-  box-shadow:
-    0 4px 10px rgba(0, 0, 0, 0.22),
-    0 4px 16px rgba(var(--theme-color-rgb), 0.14),
-    0 0 0 1px rgba(var(--theme-color-rgb), 0.55),
-    0 0 24px rgba(var(--theme-color-rgb), 0.38);
+  border-color: var(--brand-red);
+  box-shadow: 0 0 0 2px rgba(var(--theme-color-rgb), 0.12);
 }
 
 .menu-btn:last-child {
@@ -186,19 +180,13 @@ body.modal-open .app-shell::before {
 
 #main-menu .menu-btn .ttl {
   font-size: clamp(13px, 2.8vw, 15px);
-  font-weight: var(--premium-title-weight);
-  color: #d1dbe4;
-  letter-spacing: var(--premium-title-letter-spacing);
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: 0.02em;
   text-transform: uppercase;
   transition: color 0.2s, transform 0.2s, text-shadow 0.24s ease, background-position 0.32s ease, filter 0.32s ease;
-  background: var(--premium-title-gradient);
-  background-size: 100% 180%;
-  background-position: 50% 54%;
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  filter: brightness(1.01);
-  text-shadow: var(--premium-title-shadow);
+  background: none;
+  text-shadow: none;
   transform-origin: center;
   max-width: 100%;
   min-width: 0;
@@ -219,18 +207,16 @@ body.modal-open .app-shell::before {
 
   #main-menu .menu-btn {
     border-color: rgba(196, 210, 228, 0.56);
-    box-shadow:
-      0 4px 10px rgba(0, 0, 0, 0.22),
-      inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    box-shadow: var(--shadow-sm);
   }
 }
 
 @media (hover: hover) {
   .menu-btn:hover:not(:disabled) {
     border-color: rgba(255, 255, 255, 0.68);
-    background: linear-gradient(180deg, var(--hero-gradient-start), var(--hero-gradient-end));
+    background: var(--bg-surface-elevated);
     transform: none;
-    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.25);
+    box-shadow: var(--shadow-md);
   }
 
   #main-menu .menu-btn:hover:not(:disabled) .ttl {
@@ -349,13 +335,13 @@ body.modal-open .app-shell::before {
 
 @media (max-width: 640px) {
   .app-shell {
-    border-top-left-radius: 18px;
-    border-top-right-radius: 18px;
+    border-top-left-radius: var(--radius-lg);
+    border-top-right-radius: var(--radius-lg);
   }
 
   .app-shell::before {
-    border-top-left-radius: 18px;
-    border-top-right-radius: 18px;
+    border-top-left-radius: var(--radius-lg);
+    border-top-right-radius: var(--radius-lg);
   }
 
   .user-chip strong,
@@ -383,14 +369,11 @@ body.modal-open .app-shell::before {
   }
 
   #main-menu .menu-btn .ttl {
-    font-size: clamp(16.5px, 3.35vw, 18.5px);
-    letter-spacing: 1.5px;
-    color: #d1dbe4;
-    -webkit-text-fill-color: transparent;
-    text-shadow:
-      0 1px 2px rgba(0, 0, 0, 0.22),
-      0 0 7px rgba(214, 224, 232, 0.24),
-      0 0 9px rgba(214, 188, 132, 0.12);
+    font-size: 16px;
+    letter-spacing: 0.02em;
+    color: var(--text-primary);
+    -webkit-text-fill-color: currentColor;
+    text-shadow: none;
   }
 
   .kayit-tab-btn {

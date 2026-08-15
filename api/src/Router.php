@@ -116,6 +116,9 @@ class Router
         if ($method === 'GET' && preg_match('#^/puantaj/qr-adaylari/(\d+)$#', $path, $matches)) {
             PuantajController::qrAdaylari($this->request, $matches[1]);
         }
+        if ($path === '/puantaj/qr-hareketleri' && $method === 'GET') {
+            PuantajController::qrHareketleri($this->request);
+        }
         if ($method === 'POST' && preg_match('#^/puantaj/qr-adaylari/(\d+)/([^/]+)/karar$#', $path, $matches)) {
             PuantajController::qrAdayKarar($this->request, $matches[1], $matches[2]);
         }

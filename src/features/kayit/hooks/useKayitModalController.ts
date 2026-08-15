@@ -5,6 +5,7 @@ import {
   KAYIT_SUREC_PERSONEL_FORM_ID,
   KAYIT_SUREC_SUREC_FORM_ID
 } from "../kayit-surec-constants";
+import type { PersonelSurecTab } from "../kayit-surec-constants";
 import { resolveKayitModalRouteConfig } from "../kayit-modal-contract";
 
 export function useKayitModalController(pathname: string, locationState: unknown) {
@@ -12,9 +13,7 @@ export function useKayitModalController(pathname: string, locationState: unknown
   const [isKayitModalOpen, setIsKayitModalOpen] = useState(false);
   const [kayitTab, setKayitTab] = useState<KayitTab>("yeni-kayit");
   const [kayitInitialSurecPersonelId, setKayitInitialSurecPersonelId] = useState<string | null>(null);
-  const [kayitInitialPersonelTab, setKayitInitialPersonelTab] = useState<"izin-devamsizlik" | null>(
-    null
-  );
+  const [kayitInitialPersonelTab, setKayitInitialPersonelTab] = useState<PersonelSurecTab | null>(null);
   const [kayitInitialOperation, setKayitInitialOperation] = useState<
     "yillik-izin-hak-duzeltme" | null
   >(null);

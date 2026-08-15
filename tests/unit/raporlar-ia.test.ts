@@ -31,7 +31,8 @@ describe("raporlar-ia", () => {
       "etki-adayi",
       "maas-hesaplama",
       "bordro-hazirlik",
-      "serbest-zaman-takip"
+      "serbest-zaman-takip",
+      "qr-giris-cikis"
     ]);
   });
 
@@ -46,6 +47,7 @@ describe("raporlar-ia", () => {
     expect(groups[0].items.map((item) => item.label)).toEqual([
       "Liste Raporları",
       "Etki Adayı Raporu",
+      "Giriş / Çıkış Raporu",
       "Serbest Zaman Takibi"
     ]);
     expect(groups[1].items.map((item) => item.label)).toEqual([
@@ -109,6 +111,7 @@ describe("raporlar-ia", () => {
     expect(groups[0].items.map((item) => item.id)).toEqual([
       "liste",
       "etki-adayi",
+      "qr-giris-cikis",
       "serbest-zaman-takip"
     ]);
   });

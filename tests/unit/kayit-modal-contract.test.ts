@@ -19,7 +19,11 @@ describe("resolveKayitModalRouteConfig", () => {
     ).toEqual({
       tab: "surec",
       personelId: "42",
+      targetTab: null,
       personelTab: null,
+      intent: null,
+      recordId: null,
+      returnTo: null,
       operation: null
     });
   });
@@ -37,7 +41,11 @@ describe("resolveKayitModalRouteConfig", () => {
     ).toEqual({
       tab: "surec",
       personelId: "7",
+      targetTab: "izin-devamsizlik",
       personelTab: "izin-devamsizlik",
+      intent: null,
+      recordId: null,
+      returnTo: null,
       operation: "yillik-izin-hak-duzeltme"
     });
   });
@@ -54,7 +62,11 @@ describe("resolveKayitModalRouteConfig", () => {
     ).toEqual({
       tab: "yeni-kayit",
       personelId: null,
+      targetTab: null,
       personelTab: null,
+      intent: "personel-edit-gateway",
+      recordId: null,
+      returnTo: "/personeller/7",
       operation: null
     });
   });

@@ -96,6 +96,7 @@ export function PersonelInlineEditForm({
           name="edit-sicil-no"
           value={editForm.sicilNo ?? ""}
           onChange={(value) => setEditForm((prev) => ({ ...prev, sicilNo: value }))}
+          required
         />
         <FormField
           label="İşe Giriş Tarihi"
@@ -103,6 +104,7 @@ export function PersonelInlineEditForm({
           type="date"
           value={editForm.iseGirisTarihi ?? ""}
           onChange={(value) => setEditForm((prev) => ({ ...prev, iseGirisTarihi: value }))}
+          required
         />
         {personelRefs.bagliAmirOptions.length > 0 ? (
           <>

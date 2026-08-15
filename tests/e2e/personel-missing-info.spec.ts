@@ -37,5 +37,8 @@ test.describe("personel eksik bilgi UX", () => {
     await kayitModal.getByTestId("kayit-surec-personel-duzenle").click();
     await expect(kayitModal.getByLabel("Sicil No")).toBeVisible();
     await expect(kayitModal.getByLabel("İşe Giriş Tarihi")).toBeVisible();
+
+    await kayitModal.getByRole("button", { name: "Kapat" }).click();
+    await expect(page).toHaveURL(/\/personeller\/1$/);
   });
 });

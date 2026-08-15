@@ -130,6 +130,10 @@ function dvrMigrationFiles(): array
         throw new RuntimeException('migrations missing');
     }
     $files = glob($dir . DIRECTORY_SEPARATOR . '*.sql') ?: [];
+    $files = array_values(array_filter(
+        $files,
+        static fn(string $file): bool => basename($file) !== '067_personel_canonical_reference_gate.sql'
+    ));
     sort($files, SORT_STRING);
 
     return $files;

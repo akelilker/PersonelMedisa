@@ -290,6 +290,7 @@ final class PersonelImportDryRunService
             $satirNo = (int) $entry['raw_line_no'];
             $cells = self::parseCsvLine($entry['line']);
             $hataKodlari = [];
+            $uyarilar = [];
 
             if (count($cells) !== count($headers)) {
                 $hataKodlari[] = 'PERSONEL_IMPORT_SATIR_KOLON_UYUMSUZ';
@@ -310,7 +311,7 @@ final class PersonelImportDryRunService
                     'tc_kimlik_no_masked' => PersonelCanonicalValidator::maskTcKimlikNo($tcProbe),
                     'durum' => 'HATALI',
                     'hata_kodlari' => $hataKodlari,
-                    'uyarilar' => [],
+                    'uyarilar' => $uyarilar,
                 ];
                 continue;
             }
@@ -428,6 +429,8 @@ final class PersonelImportDryRunService
             if ($isValid && $payload !== null) {
                 $gecerli++;
                 $aday++;
+                $uyarilar = self::buildImportWarnings($payload);
+                $warningSayisi += count($uyarilar);
                 $durum = 'GECERLI';
                 // Ham TC yalniz bellek-ici manifest hesabina girer; saklanmaz/response'a cikmaz.
                 $manifestRows[] = [
@@ -512,7 +515,7 @@ final class PersonelImportDryRunService
                 'tc_kimlik_no_masked' => $maskedTc,
                 'durum' => $durum,
                 'hata_kodlari' => $hataKodlari,
-                'uyarilar' => [],
+                'uyarilar' => $uyarilar,
             ];
         }
 
@@ -618,6 +621,21 @@ final class PersonelImportDryRunService
                 'wage_model_assumption' => false,
             ],
         ];
+    }
+
+    /** @param array<string, mixed> $payload
+     *  @return list<string>
+     */
+    private static function buildImportWarnings(array $payload)
+    {
+        if (($payload['calisan_kapsami'] ?? PersonelCalisanKapsamService::IC_PERSONEL)
+            === PersonelCalisanKapsamService::IC_PERSONEL
+            && ($payload['telefon'] ?? null) === null
+        ) {
+            return ['PERSONEL_IMPORT_EKSIK_TELEFON'];
+        }
+
+        return [];
     }
 
     /**

@@ -10,6 +10,38 @@
 **Docs closure SHA (baseline):** `72818720ae9dad9a77c31c933806a72acdc7bafd`
 **Faz adı uydurulmadı:** Roadmap zinciri S3A→S3F; `S3G`/`S4` repo’da yok. Sonraki ürün aşaması = görsel sistem + bu registry üzerinden kapanış.
 
+## 2026-08-15 final preflight sync
+
+| Alan | Canonical sonuç |
+| --- | --- |
+| Current main / PR base | `416fb40fd5aa2ad5b472219e4b9b02300c86083e` |
+| Code migration tip | `067` |
+| Production migration tip | **066 VERIFIED** by authenticated read-only schema fingerprint |
+| Migration 067 prepared | **YES** — code tip is 067; production tip remains 066 |
+| Schema 066 readiness | **YES** — authenticated live read-only probe |
+| IC / DIS source model | `IC_PERSONEL` internal + first-class directory-only `DIS_KAYNAK` |
+| Canonical production tree contract | `Üretim → Üretim → Güvenlik`; legacy `Üretim Genel → Güvenlik` is not canonical; live path verified as legacy and blocked |
+| Ownership | Personel Kartı read-only; Kayıt ve Süreç owns personnel writes |
+| Source lock | Exact user-authoritative workbook lineage and 122-row field mapping re-locked privately; exact data remains private |
+| Auth contract | `AUTH_SMOKE_READONLY` is smoke-only (`ops.auth_smoke.read`); it is insufficient for references, personnel list, schema probe, or import dry-run |
+| Real import | Authenticated production preflight dry-run completed previously and remains blocked; post-067 122-row IC-only REAL production dry-run not yet performed; apply remains blocked |
+| Production mutation | **NO** — personnel, reference, and migration writes were not performed |
+| Public PII policy | Exact source rows, person-level data, and blocker tallies remain private |
+
+Live reference verification found the legacy `Üretim Genel → Güvenlik` branch. The canonical tree check is
+**FAIL**; `REFERENCE_MUTATION_REQUIRED=YES`, and no reference mutation was performed.
+
+The latest source reconciliation, candidate preview, and blocker successor workbook are private
+artifacts. Historical Pack7F/Pack7G/Pack7H snapshots remain preserved and are not rewritten.
+
+Source reconciliation remains private; raw blanks, candidate values, and importer errors stay
+separate. No production personnel import has been performed.
+
+Business decision (2026-08-15): 20 IC phone values are deferred user data. Missing-info UX
+continues to flag the field, while phone absence is non-blocking for import and daily
+operations; completion is allowed later through Kayıt ve Süreç. Exact person-level values
+remain private.
+
 **Statü sözlüğü (zorunlu tek değer — çift statü yasak):**
 `CLOSED` · `CODE_GAP` · `BUSINESS_DECISION_REQUIRED` · `OPS_ROLLOUT` · `INTENTIONAL_DEFER` · `NOT_APPLICABLE` · `DOC_STALE`
 
@@ -40,8 +72,8 @@
 
 | Invariant | Değer |
 | --- | --- |
-| PRODUCTION_MIGRATION_TIP | **064** (rollout `118`; Pack6 `065` not yet applied — `120`) |
-| CODE_MIGRATION_TIP | **065** |
+| PRODUCTION_MIGRATION_TIP | **066 VERIFIED** (authenticated live read-only schema fingerprint) |
+| CODE_MIGRATION_TIP | **067** |
 | S3F | **CLOSED_PRODUCTION** |
 | QR_PIPELINE | S3C–S3F **CLOSED** |
 | QR algorithms | `QR_INTERVAL_V1`, `QR_PUANTAJ_CANDIDATE_V1`, `QR_PUANTAJ_DECISION_V1`, `QR_CANDIDATE_HASH_V2` |
@@ -259,7 +291,7 @@ Aşağıdakiler CURRENT MAIN’de bozulmuş değilse OPEN yapılmaz:
 | Öncelik | **P1** |
 | Domain | Personel import |
 | Closed mapping | Departman→departman; Bölüm→bolum; Birim→birim; Unvan→gorev; Pozisyon→pozisyon; central MRK display **Medisa** |
-| Remaining data work | After `122`: org refs resolve 122/122. Remaining = `sicil_no` (missing in canonical workbook) + ambiguous Ad Soyad split + missing birth/phone subsets (`MG-IMPORT-DATA-001`) |
+| Remaining data work | Phase 1 prepares 122 `IC_PERSONEL`; 20 missing phone values are deferred/non-blocking; candidate-level Sicil and birth-date blockers are 0. 13 `DIS_KAYNAK` rows remain Phase 2 / `DEFERRED_REFERENCE_DECISION` |
 | Yasak | Validator gevşetme; sicil uydurma; güvenilmez auto-split; telefon/doğum uydurma; ücret/SGK’yı master import’a zorlama; PII’nin public repo’ya yazılması |
 | Kanıt contract | `PersonelImportDryRunService` REQUIRED unchanged; OPTIONAL adds `bolum`/`birim`/`pozisyon` (blank-safe pre-065) |
 
@@ -270,7 +302,7 @@ Aşağıdakiler CURRENT MAIN’de bozulmuş değilse OPEN yapılmaz:
 | ID | Başlık | Öncelik | Metadata | Durum özeti | Owner |
 | --- | --- | --- | --- | --- | --- |
 | MG-OPS-PERSONEL-001 | Gerçek personel import | P0 | `USER_GATED` | Onay olmadan import yok; `REAL_PERSONNEL_IMPORTED=NO` | Ops + kullanıcı |
-| MG-IMPORT-DATA-001 | Kaynak personel dataset completion | P1 | `USER_GATED_DATA_COMPLETION` | After `122`: org taxonomy complete; remaining blockers = missing sicil (122) + ambiguous name split (23) + birth(15)/phone(35); validator gevşetilmez | Ops + İK |
+| MG-IMPORT-DATA-001 | Kaynak personel dataset completion | P1 | `USER_GATED_DATA_COMPLETION` | Internal Phase 1 = 122 `IC_PERSONEL`; 20 missing phone values are deferred/non-blocking; Sicil and birth-date candidate blockers = 0; 13 `DIS_KAYNAK` remain deferred to Phase 2 | Ops + İK |
 | MG-OPS-ORG-001 | Gerçek org/şube/referans rollout | P0 | `CLOSED_REFERENCE_ROLLOUT` | Canonical 122-row org catalogs resolve in production (`122`); personnel FK mapping/import remain under `MG-ORG-LOC-001` / `MG-OPS-PERSONEL-001` | Ops |
 | MG-OPS-BIND-001 | PERSONEL binding gerçek rollout | P1 | `USER_GATED` | Schema `056` var; rollout NOT_STARTED | Ops / İK |
 | MG-OPS-QR-001 | Gerçek çalışan QR rollout | P1 | `USER_GATED` | Pipeline CLOSED; employee rollout NOT_STARTED | Ops |
@@ -367,7 +399,7 @@ Import contract (kod):
 1. CODE_GAP = 0 olmadan “ürün tamam” denmez.
 2. `CANONICAL_DOC_STALE = 0` (sağlandı).
 3. Gerçek personel/org/SGK/UBGT write yalnız `95` + kullanıcı onayı.
-4. Migration tip production = **064** (`118`); yeni migration yalnız ayrı onay.
+4. Migration tip production = **UNVERIFIED** in the final preflight; migration `066` is not assumed applied and requires an authenticated read-only probe before any apply gate.
 5. Physical destruction yalnız feature enable + manifest + S3F fingerprint coverage + handler + legal review sonrası (schema ready; flag OFF).
 6. Stash / force-push / hard reset yasak (audit protokolü).
 7. Public repo’ya PII / exact personnel tallies yazılmaz.

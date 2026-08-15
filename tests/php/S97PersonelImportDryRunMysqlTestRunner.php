@@ -196,6 +196,14 @@ try {
           PRIMARY KEY (id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     ");
+    $pdo->exec("
+        ALTER TABLE personeller
+          MODIFY tc_kimlik_no CHAR(11) NULL,
+          MODIFY soyad VARCHAR(80) NULL,
+          MODIFY dogum_tarihi DATE NULL,
+          MODIFY telefon VARCHAR(32) NULL,
+          ADD calisan_kapsami VARCHAR(20) NOT NULL DEFAULT 'IC_PERSONEL'
+    ");
 
     $pdo->exec("INSERT INTO subeler (id, kod, ad) VALUES (1, 'MRK', 'Merkez'), (2, 'SB2', 'Sube 2')");
     $pdo->exec("INSERT INTO departmanlar (id, ad) VALUES (1, 'İdari İşler'), (2, 'Klinik')");
@@ -228,6 +236,33 @@ try {
     s97Assert(($result['yazma']['personel_write'] ?? true) === false, 'personel_write false');
     s97Assert(($result['yazma']['salary_write'] ?? true) === false, 'salary_write false');
     s97Assert(($result['satirlar'][0]['tc_kimlik_no_masked'] ?? '') === '100******46', 'turkish/valid row masked TC');
+
+    // IC phone is a missing-info warning, not an import blocker.
+    $missingPhoneCsv = s97HeaderCsv() . "\r\n" . s97ValidRow([
+        'tc_kimlik_no' => '10000000276',
+        'sicil_no' => 'PHONE-DEFER',
+        'telefon' => '',
+    ]) . "\r\n";
+    $missingPhone = PersonelImportDryRunService::dryRun($pdo, $missingPhoneCsv, $gyUser, null);
+    s97Assert(($missingPhone['ozet']['gecerli_satir'] ?? 0) === 1, 'missing IC phone remains import-valid');
+    s97Assert(($missingPhone['ozet']['hatali_satir'] ?? 1) === 0, 'missing IC phone has no hard error');
+    s97Assert(($missingPhone['ozet']['warning_sayisi'] ?? 0) === 1, 'missing IC phone warning counted');
+    s97Assert(
+        in_array('PERSONEL_IMPORT_EKSIK_TELEFON', $missingPhone['satirlar'][0]['uyarilar'] ?? [], true),
+        'missing IC phone deferred warning'
+    );
+    s97Assert(($missingPhone['can_apply'] ?? false) === true, 'missing IC phone can_apply');
+
+    $nullableExternalCsv = s97HeaderCsv() . ";calisan_kapsami\r\n" . s97ValidRow([
+        'tc_kimlik_no' => '',
+        'sicil_no' => 'DIS-NULLABLE',
+        'soyad' => '',
+        'dogum_tarihi' => '',
+        'telefon' => '',
+    ]) . ";DIS_KAYNAK\r\n";
+    $nullableExternal = PersonelImportDryRunService::dryRun($pdo, $nullableExternalCsv, $gyUser, null);
+    s97Assert(($nullableExternal['ozet']['gecerli_satir'] ?? 0) === 1, 'DIS_KAYNAK nullable phone remains valid');
+    s97Assert(($nullableExternal['ozet']['warning_sayisi'] ?? 1) === 0, 'DIS_KAYNAK phone has no IC warning');
 
     // 2) Zero-write deltas
     s97Assert(s97CountPersonel($pdo) === $beforePersonel, 'PERSONEL_ROW_DELTA = 0');

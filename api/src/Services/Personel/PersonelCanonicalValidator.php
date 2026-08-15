@@ -71,7 +71,7 @@ final class PersonelCanonicalValidator
      * @param array<string, mixed> $body
      * @return array<string, mixed>
      */
-    public static function normalizeAndValidateCreatePayload(array $body)
+    public static function normalizeAndValidateCreatePayload(array $body, bool $allowDeferredIcTelefon = false)
     {
         $identity = PersonelCalisanKapsamService::normalizeCreateIdentity($body);
         $kapsam = $identity['kapsam'];
@@ -81,7 +81,9 @@ final class PersonelCanonicalValidator
         if ($kapsam === PersonelCalisanKapsamService::IC_PERSONEL) {
             $soyad = self::requireTrimmedString($body, 'soyad', 'Soyad zorunludur.');
             $dogumTarihi = self::requireValidDate($body, 'dogum_tarihi', 'Dogum tarihi zorunludur.');
-            $telefon = self::requireTrimmedString($body, 'telefon', 'Telefon zorunludur.');
+            $telefon = $allowDeferredIcTelefon
+                ? self::optionalTrimmedString($body, 'telefon')
+                : self::requireTrimmedString($body, 'telefon', 'Telefon zorunludur.');
         } else {
             $soyad = self::optionalTrimmedString($body, 'soyad');
             $dogumTarihi = self::optionalValidDate($body, 'dogum_tarihi');
@@ -376,7 +378,7 @@ final class PersonelCanonicalValidator
         $telefon = trim((string) ($row['telefon'] ?? ''));
         if ($telefon === '') {
             if ($kapsam === PersonelCalisanKapsamService::IC_PERSONEL) {
-                $errors[] = self::importError('PERSONEL_IMPORT_EKSIK_ALAN', 'telefon', 'Telefon zorunludur.');
+                $payload['telefon'] = null;
             } else {
                 $payload['telefon'] = null;
             }
@@ -481,7 +483,7 @@ final class PersonelCanonicalValidator
         }
 
         try {
-            $normalized = self::normalizeAndValidateCreatePayload($payload);
+            $normalized = self::normalizeAndValidateCreatePayload($payload, true);
             if (!$scopeExplicit) {
                 unset($normalized['calisan_kapsami']);
             }

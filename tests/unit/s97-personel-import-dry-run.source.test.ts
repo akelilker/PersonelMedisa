@@ -63,6 +63,8 @@ describe("S97 personel import dry-run source locks", () => {
     expect(validator).not.toContain("Acil durum telefonu zorunludur.");
     expect(migration).toContain("MODIFY COLUMN acil_durum_kisi VARCHAR(120) NULL");
     expect(migration).toContain("MODIFY COLUMN acil_durum_telefon VARCHAR(32) NULL");
-    expect(panel).toContain("Acil durum bilgisi eksik");
+    expect(panel).toContain("Acil Durum Bilgisi");
+    expect(panel).toContain("Bilgi eksik");
+    expect(panel).toContain("import/bordro engeli değildir");
   });
 });

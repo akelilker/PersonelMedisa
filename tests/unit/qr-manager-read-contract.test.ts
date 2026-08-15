@@ -4,6 +4,7 @@ import {
   normalizeManagerQrAttendanceResponse
 } from "../../src/api/qr.api";
 import { resolveDemoApiResponse } from "../../src/api/mock-demo";
+import { qrAttendanceStatus } from "../../src/features/puantaj/qr-read-utils";
 
 const item = {
   personel_id: 1,
@@ -110,5 +111,19 @@ describe("manager QR read contract", () => {
       branch_mismatch: true,
       anomalies: ["BRANCH_MISMATCH"]
     });
+  });
+
+  it("uses historical status semantics instead of today's inside state", () => {
+    expect(qrAttendanceStatus({ ...item, date_from: "2026-08-14", date_to: "2026-08-14", inside: true }, "2026-08-15")).toBe(
+      "Eksik çıkış"
+    );
+    expect(qrAttendanceStatus({
+      ...item,
+      date_from: "2026-08-14",
+      date_to: "2026-08-14",
+      inside: true,
+      missing_exit: false,
+      anomalies: []
+    }, "2026-08-15")).toBe("Tamamlandı");
   });
 });

@@ -88,23 +88,17 @@ class QrAttendanceIntervalReadService
             LEFT JOIN subeler event_s ON event_s.id = e.sube_id
             LEFT JOIN subeler personel_s ON personel_s.id = p.sube_id
             WHERE ' . implode(' AND ', $where);
-        $countStmt = $pdo->prepare('SELECT COUNT(DISTINCT p.id)' . $baseSql);
-        $countStmt->execute($params);
-        $total = (int) $countStmt->fetchColumn();
-
         $personStmt = $pdo->prepare(
-            'SELECT DISTINCT p.id ' . $baseSql . ' ORDER BY p.id ASC LIMIT :limit OFFSET :offset'
+            'SELECT DISTINCT p.id ' . $baseSql . ' ORDER BY p.id ASC'
         );
         foreach ($params as $key => $value) {
             $personStmt->bindValue(':' . $key, $value, is_int($value) ? PDO::PARAM_INT : PDO::PARAM_STR);
         }
-        $personStmt->bindValue(':limit', $limit, PDO::PARAM_INT);
-        $personStmt->bindValue(':offset', $offset, PDO::PARAM_INT);
         $personStmt->execute();
         $personIds = array_map('intval', $personStmt->fetchAll(PDO::FETCH_COLUMN));
         if (!$personIds) {
             return [
-                'from' => $range['from'], 'to' => $range['to'], 'items' => [], 'total' => $total,
+                'from' => $range['from'], 'to' => $range['to'], 'items' => [], 'total' => 0,
                 'limit' => $limit, 'offset' => $offset, 'has_next' => false,
                 'algorithm_version' => QrAttendanceIntervalDerivationService::ALGORITHM_VERSION,
             ];
@@ -154,35 +148,30 @@ class QrAttendanceIntervalReadService
         }
 
         $items = [];
+        $today = (new \DateTimeImmutable('now', new \DateTimeZone('Europe/Istanbul')))->format('Y-m-d');
+        $businessDates = self::managerBusinessDates($range['from'], $range['to']);
         foreach ($people as $id => $person) {
-            $derived = QrAttendanceIntervalDerivationService::filterToBusinessRange(
-                QrAttendanceIntervalDerivationService::derive($eventsByPersonel[$id] ?? []),
-                $range['from'],
-                $range['to']
-            );
-            $events = $eventsByPersonel[$id] ?? [];
-            $last = $events ? $events[count($events) - 1] : null;
-            $anomalyTypes = array_values(array_unique(array_map(
-                static fn (array $anomaly): string => (string) ($anomaly['type'] ?? ''),
-                $derived['anomalies']
-            )));
-            $items[] = $person + [
-                'date_from' => $range['from'],
-                'date_to' => $range['to'],
-                'first_entry' => self::firstIntervalTime($derived['intervals']),
-                'last_exit' => self::lastIntervalTime($derived['intervals']),
-                'last_movement' => $last ? self::eventLocalIso($last['occurred_at_utc']) : null,
-                'last_movement_type' => $last['event_type'] ?? null,
-                'inside' => $last !== null && $last['event_type'] === 'GIRIS',
-                'interval_count' => count($derived['intervals']),
-                'missing_entry' => in_array('MISSING_GIRIS', $anomalyTypes, true),
-                'missing_exit' => in_array('MISSING_CIKIS', $anomalyTypes, true),
-                'branch_mismatch' => in_array('BRANCH_MISMATCH', $anomalyTypes, true),
-                'anomalies' => $anomalyTypes,
-                'matched_seconds' => (int) ($derived['summary']['complete_duration_seconds'] ?? 0),
-                'source_event_count' => count($events),
-            ];
+            foreach ($businessDates as $businessDate) {
+                $items[] = self::mapManagerBusinessDateRow(
+                    $person,
+                    $eventsByPersonel[$id] ?? [],
+                    $businessDate,
+                    $today
+                );
+            }
         }
+
+        $items = array_values(array_filter($items));
+        usort($items, static function (array $a, array $b): int {
+            $dateCompare = strcmp((string) $b['date_from'], (string) $a['date_from']);
+            if ($dateCompare !== 0) {
+                return $dateCompare;
+            }
+
+            return (int) $a['personel_id'] <=> (int) $b['personel_id'];
+        });
+        $total = count($items);
+        $items = array_slice($items, $offset, $limit);
 
         return [
             'from' => $range['from'],
@@ -193,6 +182,81 @@ class QrAttendanceIntervalReadService
             'offset' => $offset,
             'has_next' => $offset + count($items) < $total,
             'algorithm_version' => QrAttendanceIntervalDerivationService::ALGORITHM_VERSION,
+        ];
+    }
+
+    /** @return list<string> */
+    private static function managerBusinessDates(string $from, string $to): array
+    {
+        $dates = [];
+        $cursor = new \DateTimeImmutable($from, new \DateTimeZone('Europe/Istanbul'));
+        $end = new \DateTimeImmutable($to, new \DateTimeZone('Europe/Istanbul'));
+        while ($cursor <= $end) {
+            $dates[] = $cursor->format('Y-m-d');
+            $cursor = $cursor->modify('+1 day');
+        }
+
+        return $dates;
+    }
+
+    /** @param list<array<string,mixed>> $events @return array<string,mixed>|null */
+    private static function mapManagerBusinessDateRow(array $person, array $events, string $businessDate, string $today): ?array
+    {
+        $windowStart = (new \DateTimeImmutable($businessDate, new \DateTimeZone('Europe/Istanbul')))
+            ->modify('-1 day')
+            ->format('Y-m-d');
+        $windowEnd = (new \DateTimeImmutable($businessDate, new \DateTimeZone('Europe/Istanbul')))
+            ->modify('+1 day')
+            ->format('Y-m-d');
+        $dayEvents = array_values(array_filter($events, static function (array $event) use ($windowStart, $windowEnd): bool {
+            $localDate = self::eventLocalDate($event['occurred_at_utc'] ?? '');
+
+            return $localDate >= $windowStart && $localDate <= $windowEnd;
+        }));
+        $localEvents = array_values(array_filter($events, static function (array $event) use ($businessDate): bool {
+            return self::eventLocalDate($event['occurred_at_utc'] ?? '') === $businessDate;
+        }));
+
+        $derived = QrAttendanceIntervalDerivationService::filterToBusinessRange(
+            QrAttendanceIntervalDerivationService::derive($dayEvents),
+            $businessDate,
+            $businessDate
+        );
+        if ($localEvents === [] && $derived['intervals'] === [] && $derived['anomalies'] === []) {
+            return null;
+        }
+
+        $anomalyTypes = array_values(array_unique(array_map(
+            static fn (array $anomaly): string => (string) ($anomaly['type'] ?? ''),
+            $derived['anomalies']
+        )));
+        usort($localEvents, static fn (array $a, array $b): int =>
+            strcmp((string) ($a['occurred_at_utc'] ?? ''), (string) ($b['occurred_at_utc'] ?? ''))
+        );
+        $last = $localEvents ? $localEvents[count($localEvents) - 1] : null;
+        $stateEvents = array_values(array_filter($dayEvents, static function (array $event) use ($businessDate): bool {
+            return self::eventLocalDate($event['occurred_at_utc'] ?? '') <= $businessDate;
+        }));
+        usort($stateEvents, static fn (array $a, array $b): int =>
+            strcmp((string) ($a['occurred_at_utc'] ?? ''), (string) ($b['occurred_at_utc'] ?? ''))
+        );
+        $stateLast = $stateEvents ? $stateEvents[count($stateEvents) - 1] : null;
+
+        return $person + [
+            'date_from' => $businessDate,
+            'date_to' => $businessDate,
+            'first_entry' => self::firstIntervalTime($derived['intervals']),
+            'last_exit' => self::lastIntervalTime($derived['intervals']),
+            'last_movement' => $last ? self::eventLocalIso($last['occurred_at_utc']) : null,
+            'last_movement_type' => $last['event_type'] ?? null,
+            'inside' => $businessDate === $today && $stateLast !== null && $stateLast['event_type'] === 'GIRIS',
+            'interval_count' => count($derived['intervals']),
+            'missing_entry' => in_array('MISSING_GIRIS', $anomalyTypes, true),
+            'missing_exit' => in_array('MISSING_CIKIS', $anomalyTypes, true),
+            'branch_mismatch' => in_array('BRANCH_MISMATCH', $anomalyTypes, true),
+            'anomalies' => $anomalyTypes,
+            'matched_seconds' => (int) ($derived['summary']['complete_duration_seconds'] ?? 0),
+            'source_event_count' => count($localEvents),
         ];
     }
 
@@ -232,6 +296,13 @@ class QrAttendanceIntervalReadService
         return (new \DateTimeImmutable((string) $utc, new \DateTimeZone('UTC')))
             ->setTimezone(new \DateTimeZone('Europe/Istanbul'))
             ->format('c');
+    }
+
+    private static function eventLocalDate($utc): string
+    {
+        return (new \DateTimeImmutable((string) $utc, new \DateTimeZone('UTC')))
+            ->setTimezone(new \DateTimeZone('Europe/Istanbul'))
+            ->format('Y-m-d');
     }
 
     /**

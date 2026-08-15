@@ -1,0 +1,66 @@
+name: Full CI (manual)
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: full-ci-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  full-quality:
+    name: Full MariaDB + Runtime Suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    services:
+      mariadb:
+        image: mariadb:11.4
+        env:
+          MARIADB_ROOT_PASSWORD: medisa_ci_root_pw
+          MARIADB_DATABASE: medisa_ci
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=12
+          --health-start-period=30s
+
+    env:
+      MEDISA_TEST_MYSQL_DSN: "mysql:host=127.0.0.1;port=3306;dbname=medisa_ci;charset=utf8mb4"
+      MEDISA_TEST_MYSQL_USER: root
+      MEDISA_TEST_MYSQL_PASSWORD: medisa_ci_root_pw
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+          extensions: pdo_mysql, mysqli, pdo_sqlite
+          coverage: none
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run API parity gate
+        run: npm run check:api-parity
+
+      - name: Run type check
+        run: npm run typecheck
+
+      - name: Run full unit and integration suite serially
+        run: npm run test:ci-full
+
+      - name: Run build
+        run: npm run build

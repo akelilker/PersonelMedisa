@@ -3,7 +3,9 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const runnerPath = resolve(process.cwd(), "tests/php/PuantajControllerGecErkenDakikaTestRunner.php");
-const phpArgs = ["-d", "extension=php_sqlite3", "-d", "extension=php_pdo_sqlite", runnerPath];
+const phpArgs = process.platform === "win32"
+  ? ["-d", "extension=php_sqlite3.dll", "-d", "extension=php_pdo_sqlite.dll", runnerPath]
+  : [runnerPath];
 
 const expectedScenarios = [
   "SCENARIO:1:PASS",

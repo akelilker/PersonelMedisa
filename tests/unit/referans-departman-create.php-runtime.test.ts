@@ -36,7 +36,7 @@ describe("ReferansController createDepartman validation (SQLite helper)", () => 
 
     const phpArgs = isWindows
       ? ["-d", `extension_dir=${resolve(dirname(phpPath), "ext")}`, "-d", "extension=php_pdo_sqlite.dll", runnerPath]
-      : ["-d", "extension=php_pdo_sqlite", runnerPath];
+      : [runnerPath];
     const result = spawnSync(phpPath, phpArgs, { encoding: "utf8", cwd: process.cwd() });
 
     expect(result.status, result.stderr || result.stdout).toBe(0);

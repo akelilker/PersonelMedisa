@@ -14,28 +14,8 @@ concurrency:
 
 jobs:
   quality:
-    name: Unit + Typecheck + Build
+    name: Fast CI
     runs-on: ubuntu-latest
-
-    services:
-      mariadb:
-        image: mariadb:11.4
-        env:
-          MARIADB_ROOT_PASSWORD: medisa_ci_root_pw
-          MARIADB_DATABASE: medisa_ci
-        ports:
-          - 3306:3306
-        options: >-
-          --health-cmd="healthcheck.sh --connect --innodb_initialized"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=12
-          --health-start-period=30s
-
-    env:
-      MEDISA_TEST_MYSQL_DSN: "mysql:host=127.0.0.1;port=3306;dbname=medisa_ci;charset=utf8mb4"
-      MEDISA_TEST_MYSQL_USER: root
-      MEDISA_TEST_MYSQL_PASSWORD: medisa_ci_root_pw
 
     steps:
       - name: Checkout
@@ -51,34 +31,11 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: "8.3"
-          extensions: pdo_mysql, mysqli
+          extensions: pdo_sqlite
           coverage: none
 
       - name: Install dependencies
         run: npm ci
-
-      - name: Wait for MariaDB and print version
-        run: |
-          php -r '
-            $dsn = getenv("MEDISA_TEST_MYSQL_DSN");
-            $user = getenv("MEDISA_TEST_MYSQL_USER");
-            $pass = getenv("MEDISA_TEST_MYSQL_PASSWORD");
-            $lastError = "";
-            for ($i = 0; $i < 30; $i++) {
-              try {
-                $pdo = new PDO($dsn, $user, $pass, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
-                $version = $pdo->query("SELECT VERSION()")->fetchColumn();
-                $one = $pdo->query("SELECT 1")->fetchColumn();
-                echo "MariaDB ready: version=" . $version . " select1=" . $one . PHP_EOL;
-                exit(0);
-              } catch (Throwable $e) {
-                $lastError = $e->getMessage();
-                sleep(2);
-              }
-            }
-            fwrite(STDERR, "MariaDB readiness failed: " . $lastError . PHP_EOL);
-            exit(1);
-          '
 
       - name: Run API parity gate
         run: npm run check:api-parity
@@ -86,18 +43,8 @@ jobs:
       - name: Run type check
         run: npm run typecheck
 
-      - name: Run unit and integration tests
-        run: npm run test
-
-      - name: Prove S83 MariaDB carryover import acceptance
-        run: |
-          set -euo pipefail
-          OUT="$(php tests/php/S83BordroDevirImportMysqlTestRunner.php)"
-          echo "$OUT"
-          echo "$OUT" | grep -F "verify-s83-devir-import-mysql: OK"
-          echo "$OUT" | grep -F "[PASS] dry_run: eklenecek for valid sicil"
-          echo "$OUT" | grep -F "[PASS] commit dry_run=false with all-valid rows inserts AKTIF row"
-          echo "$OUT" | grep -F "[PASS] commit with any invalid row throws DEVIR_IMPORT_VALIDATION_FAILED"
+      - name: Run deterministic fast tests
+        run: npm run test:ci-fast
 
       - name: Run build
         run: npm run build

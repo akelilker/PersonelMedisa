@@ -33,7 +33,7 @@ describe("S2B yillik izin ledger mysql/php runtime", () => {
           "extension=php_pdo_sqlite.dll",
           runnerPath
         ]
-      : ["-d", "extension=pdo_sqlite", runnerPath];
+      : [runnerPath];
     const result = spawnSync(phpPath, phpArgs, { encoding: "utf8", cwd: process.cwd() });
 
     expect(result.status, result.stderr || result.stdout).toBe(0);

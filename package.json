@@ -12,6 +12,8 @@
     "typecheck": "tsc --noEmit",
     "check:api-parity": "node scripts/check-api-parity.mjs",
     "test": "vitest run --minWorkers=1 --maxWorkers=4",
+    "test:ci-fast": "vitest run --config vitest.fast.config.ts --minWorkers=1 --maxWorkers=4",
+    "test:ci-full": "vitest run --minWorkers=1 --maxWorkers=1",
     "test:watch": "vitest",
     "e2e": "playwright test",
     "e2e:s80": "playwright test tests/e2e/revizyon-merkezi.spec.ts",

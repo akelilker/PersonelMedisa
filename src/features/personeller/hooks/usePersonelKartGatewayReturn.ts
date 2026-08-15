@@ -22,6 +22,20 @@ export function usePersonelKartGatewayReturn({
     });
   }, [navigate, parsedPersonelId]);
 
+  const handleOpenMissingInfo = useCallback((targetTab: "genel" | "pozisyon" = "genel") => {
+    navigate("/", {
+      state: {
+        kayitModal: {
+          tab: "surec",
+          personelId: parsedPersonelId,
+          targetTab,
+          intent: "personel-missing-info-gateway",
+          returnTo: `/personeller/${parsedPersonelId}`
+        }
+      }
+    });
+  }, [navigate, parsedPersonelId]);
+
   const handleOpenYillikIzinHakDuzeltme = useCallback(() => {
     navigate("/", {
       state: {
@@ -38,6 +52,7 @@ export function usePersonelKartGatewayReturn({
 
   return {
     handleOpenSurecModal,
+    handleOpenMissingInfo,
     handleOpenYillikIzinHakDuzeltme
   };
 }

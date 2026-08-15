@@ -42,7 +42,8 @@ describe("usePersonelKartGatewayReturn", () => {
 
     expect(result.current).toEqual({
       handleOpenSurecModal: expect.any(Function),
-      handleOpenYillikIzinHakDuzeltme: expect.any(Function)
+      handleOpenYillikIzinHakDuzeltme: expect.any(Function),
+      handleOpenMissingInfo: expect.any(Function)
     });
     expect(result.current).not.toHaveProperty("handleOpenPersonelEditGateway");
     expect(result.current).not.toHaveProperty("handleOpenPersonelZimmetGateway");

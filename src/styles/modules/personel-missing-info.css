@@ -1,0 +1,74 @@
+/* Personel profil tamligi: kontrollu MEDISA kirmizisi, glow/gradient yok. */
+.personeller-missing-badge {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  margin-left: 6px;
+  padding: 2px 7px;
+  border: 1px solid rgba(var(--theme-color-rgb), 0.58);
+  border-radius: 999px;
+  background: rgba(var(--theme-color-rgb), 0.08);
+  color: var(--brand-red);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: 0.025em;
+  white-space: nowrap;
+}
+
+.personeller-item-content--grid .personeller-missing-badge {
+  margin-left: 0;
+}
+
+.personel-dosya-completeness-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: 8px 10px;
+  border: 1px solid rgba(var(--theme-color-rgb), 0.46);
+  border-radius: var(--radius-sm);
+  background: rgba(var(--theme-color-rgb), 0.055);
+}
+
+.personel-dosya-missing-count {
+  color: var(--brand-red);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.personel-dosya-missing-action {
+  flex: 0 0 auto;
+}
+
+.personel-dosya-field.is-missing,
+.personel-dosya-record.is-missing {
+  border: 1px solid var(--brand-red);
+  border-radius: var(--radius-sm);
+  background: rgba(var(--theme-color-rgb), 0.045);
+}
+
+.personel-dosya-field.is-missing {
+  padding: 7px 8px;
+}
+
+.personel-dosya-record.is-missing {
+  margin: 4px 0;
+  padding: 8px 10px;
+}
+
+.personel-dosya-field.is-missing .personel-dosya-field-label,
+.personel-dosya-record.is-missing .personel-dosya-record-label {
+  color: var(--brand-red);
+}
+
+@media (max-width: 640px) {
+  .personel-dosya-completeness-summary {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .personel-dosya-missing-action {
+    width: 100%;
+  }
+}

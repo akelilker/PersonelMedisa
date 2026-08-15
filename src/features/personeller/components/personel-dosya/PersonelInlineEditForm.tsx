@@ -81,7 +81,7 @@ export function PersonelInlineEditForm({
           name="edit-soyad"
           value={editForm.soyad}
           onChange={(value) => setEditForm((prev) => ({ ...prev, soyad: value }))}
-          required
+          required={editForm.calisanKapsami === "IC_PERSONEL"}
         />
         <FormField
           label="Telefon"
@@ -90,6 +90,21 @@ export function PersonelInlineEditForm({
           value={editForm.telefon}
           onChange={(value) => setEditForm((prev) => ({ ...prev, telefon: value }))}
           required={editForm.calisanKapsami === "IC_PERSONEL"}
+        />
+        <FormField
+          label="Sicil No"
+          name="edit-sicil-no"
+          value={editForm.sicilNo ?? ""}
+          onChange={(value) => setEditForm((prev) => ({ ...prev, sicilNo: value }))}
+          required
+        />
+        <FormField
+          label="İşe Giriş Tarihi"
+          name="edit-ise-giris-tarihi"
+          type="date"
+          value={editForm.iseGirisTarihi ?? ""}
+          onChange={(value) => setEditForm((prev) => ({ ...prev, iseGirisTarihi: value }))}
+          required
         />
         {personelRefs.bagliAmirOptions.length > 0 ? (
           <>

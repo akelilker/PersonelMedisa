@@ -3,14 +3,16 @@ import type { ReactNode } from "react";
 export function DossierField({
   label,
   value,
-  valueClassName
+  valueClassName,
+  missing = false
 }: {
   label: string;
   value: string;
   valueClassName?: string;
+  missing?: boolean;
 }) {
   return (
-    <div className="personel-dosya-field">
+    <div className={`personel-dosya-field${missing ? " is-missing" : ""}`} data-missing={missing ? "true" : undefined}>
       <span className="personel-dosya-field-label">{label}</span>
       <strong className={valueClassName ?? "personel-dosya-field-value"}>{value}</strong>
     </div>
@@ -19,13 +21,15 @@ export function DossierField({
 
 export function DossierRecord({
   label,
-  value
+  value,
+  missing = false
 }: {
   label: string;
   value: string;
+  missing?: boolean;
 }) {
   return (
-    <div className="personel-dosya-record">
+    <div className={`personel-dosya-record${missing ? " is-missing" : ""}`} data-missing={missing ? "true" : undefined}>
       <span className="personel-dosya-record-label">{label}</span>
       <span className="personel-dosya-record-value">{value}</span>
     </div>

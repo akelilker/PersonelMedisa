@@ -37,6 +37,7 @@ export function PersonelDetayPage() {
   const canViewFinans = hasPermission("finans.view");
   const canViewBordro = hasPermission("bordro_on_izleme.view");
   const canViewUcret = hasPermission("personeller.ucret.view");
+  const canUpdatePersonel = hasPermission("personeller.update");
   const canViewBordroKapsam = hasPermission("personel_bordro_kapsam.view");
 
   const initialTab = resolvePersonelTab(searchParams.get("tab")) ?? "genel-bilgiler";
@@ -74,7 +75,7 @@ export function PersonelDetayPage() {
     !isArchived && !isDirectoryOnly && (canCreateSurecEffective || canViewSurecler)
   );
 
-  const { handleOpenSurecModal } = usePersonelKartGatewayReturn({
+  const { handleOpenSurecModal, handleOpenMissingInfo } = usePersonelKartGatewayReturn({
     navigate,
     parsedPersonelId
   });
@@ -126,7 +127,11 @@ export function PersonelDetayPage() {
             </div>
           ) : null}
 
-          <PersonelDosyaHero personel={personel} canViewUcret={canViewUcret} />
+          <PersonelDosyaHero
+            personel={personel}
+            canViewUcret={canViewUcret}
+            onOpenMissingInfo={canUpdatePersonel && !isArchived ? handleOpenMissingInfo : undefined}
+          />
 
           {!isArchived && !isDirectoryOnly ? (
             <PersonelDosyaActionRow

@@ -12,6 +12,7 @@ import type { Personel } from "../../../types/personel";
 import type { IdOption } from "../../../types/referans";
 import { PersonelImportDryRunModal } from "../components/PersonelImportDryRunModal";
 import { PersonelImportHistoryModal } from "../components/PersonelImportHistoryModal";
+import { getPersonelMissingFields } from "../personel-missing-info";
 
 function IconSearch(props: { className?: string }) {
   return (
@@ -446,6 +447,7 @@ export function PersonellerPage() {
                 const emergencyCallHref = buildTelHref(personel.acil_durum_telefon);
                 const detailTo = `/personeller/${personel.id}`;
                 const personelName = formatPersonelName(personel);
+                const missingFieldCount = getPersonelMissingFields(personel).length;
                 const previewLabel = `${personelName} kişisinin kartını aç`;
 
                 function rowActivate() {
@@ -499,6 +501,15 @@ export function PersonellerPage() {
                       {personel.calisan_kapsami === "DIS_KAYNAK" ? (
                         <span className="personeller-status-badge">DIŞ KAYNAK</span>
                       ) : null}
+                      {missingFieldCount > 0 ? (
+                        <span
+                          className="personeller-missing-badge"
+                          title={`${missingFieldCount} kritik bilgi eksik`}
+                          data-testid={`personel-eksik-bilgi-${personel.id}`}
+                        >
+                          Eksik Bilgi
+                        </span>
+                      ) : null}
                     </td>
                     <td title={formatReferenceValue(personel.departman_adi, personel.departman_id)}>
                       {formatReferenceValue(personel.departman_adi, personel.departman_id)}
@@ -547,6 +558,7 @@ export function PersonellerPage() {
               const hasQuickActions = Boolean(personelCallHref || emergencyCallHref);
               const detailTo = `/personeller/${personel.id}`;
               const personelName = formatPersonelName(personel);
+              const missingFieldCount = getPersonelMissingFields(personel).length;
               const previewLabel = `${personelName} kişisinin kartını aç`;
 
               const previewInner = (
@@ -554,6 +566,15 @@ export function PersonellerPage() {
                   <span className="personeller-card-title">{personelName}</span>
                   {personel.calisan_kapsami === "DIS_KAYNAK" ? (
                     <span className="personeller-status-badge">DIŞ KAYNAK</span>
+                  ) : null}
+                  {missingFieldCount > 0 ? (
+                    <span
+                      className="personeller-missing-badge"
+                      title={`${missingFieldCount} kritik bilgi eksik`}
+                      data-testid={`personel-eksik-bilgi-${personel.id}`}
+                    >
+                      Eksik Bilgi
+                    </span>
                   ) : null}
                   <span className="personeller-card-sub">{personelGridSubtitle(personel)}</span>
                   <span className="personeller-card-muted">{personelGridMutedLine(personel)}</span>

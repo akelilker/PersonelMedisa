@@ -34,6 +34,8 @@ export type EditPersonelFormState = {
   soyad: string;
   dogumTarihi: string;
   telefon: string;
+  sicilNo?: string;
+  iseGirisTarihi?: string;
   departmanId: string;
   bolumId: string;
   birimId: string;
@@ -203,6 +205,8 @@ export function personelToEditForm(personel: Personel): EditPersonelFormState {
     soyad: personel.soyad ?? "",
     dogumTarihi: personel.dogum_tarihi ?? "",
     telefon: personel.telefon ?? "",
+    sicilNo: personel.sicil_no ?? "",
+    iseGirisTarihi: personel.ise_giris_tarihi ?? "",
     departmanId: personel.departman_id != null ? String(personel.departman_id) : "",
     bolumId: personel.bolum_id != null ? String(personel.bolum_id) : "",
     birimId: personel.birim_id != null ? String(personel.birim_id) : "",
@@ -224,6 +228,8 @@ export type BuildPersonelUpdatePayloadOptions = {
    * Default false so pre-065 forms omit keys (no ORG_STRUCTURE_SCHEMA_NOT_READY).
    */
   includeOrgStructureFields?: boolean;
+  /** Existing row used to avoid sending unchanged legacy blanks as required-field writes. */
+  currentPersonel?: Personel;
 };
 
 export function buildPersonelUpdatePayload(
@@ -237,6 +243,8 @@ export function buildPersonelUpdatePayload(
   const soyad = String(editForm.soyad ?? "").trim();
   const dogumTarihi = String(editForm.dogumTarihi ?? "").trim();
   const telefon = String(editForm.telefon ?? "").trim();
+  const sicilNo = String(editForm.sicilNo ?? "").trim();
+  const iseGirisTarihi = String(editForm.iseGirisTarihi ?? "").trim();
   const payload: UpdatePersonelPayload = {
     calisan_kapsami: editForm.calisanKapsami ?? "IC",
     tc_kimlik_no: tcKimlikNo || null,
@@ -245,6 +253,17 @@ export function buildPersonelUpdatePayload(
     dogum_tarihi: dogumTarihi || null,
     telefon: telefon ? normalizeTurkishMobilePhone(telefon, "Telefon") : null
   };
+
+  if (options.currentPersonel) {
+    const currentSicilNo = String(options.currentPersonel.sicil_no ?? "").trim();
+    const currentIseGirisTarihi = String(options.currentPersonel.ise_giris_tarihi ?? "").trim();
+    if (sicilNo !== currentSicilNo) {
+      payload.sicil_no = sicilNo;
+    }
+    if (iseGirisTarihi !== currentIseGirisTarihi) {
+      payload.ise_giris_tarihi = iseGirisTarihi;
+    }
+  }
 
   if (!hasLifecycleDiff) {
     return payload;

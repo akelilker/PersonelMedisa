@@ -228,7 +228,8 @@ export function KayitSurecPersonelGenelPanel({
       includeOrgStructureFields:
         personelRefs.bolumOptions.length > 0 ||
         personelRefs.birimOptions.length > 0 ||
-        personelRefs.pozisyonOptions.length > 0
+        personelRefs.pozisyonOptions.length > 0,
+      currentPersonel: personel
     });
     const lifecycleSnap = snapshotFromLifecycleForm(genelLifecycleFields);
     const optimistic: Personel = {
@@ -236,6 +237,8 @@ export function KayitSurecPersonelGenelPanel({
       ad: body.ad ?? personel.ad,
       soyad: body.soyad ?? personel.soyad,
       telefon: body.telefon ?? personel.telefon,
+      sicil_no: body.sicil_no ?? personel.sicil_no,
+      ise_giris_tarihi: body.ise_giris_tarihi ?? personel.ise_giris_tarihi,
       ...lifecycleSnapshotToPersonelPatch(lifecycleSnap)
     };
     onPersonelUpdated(optimistic);

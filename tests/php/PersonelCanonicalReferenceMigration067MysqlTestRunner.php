@@ -139,7 +139,7 @@ try {
         }
     }
 
-    $pdo->exec("INSERT INTO departmanlar (id, ad, durum) VALUES (1, 'Uretim', 'AKTIF')");
+    $pdo->exec("INSERT INTO departmanlar (id, ad, durum) VALUES (1, 'Üretim', 'AKTIF')");
     $pdo->exec(
         "INSERT INTO bolumler (id, departman_id, ad, durum) VALUES
          (3, 1, 'Üretim', 'AKTIF'),
@@ -170,14 +170,55 @@ try {
         '067 no duplicate active Güvenlik'
     );
 
+    $pdo->exec(
+        "INSERT INTO subeler (id, kod, ad) VALUES (1, 'TEST', 'Test Şubesi')"
+    );
+    $pdo->exec(
+        "INSERT INTO personeller (
+            id, tc_kimlik_no, ad, soyad, dogum_tarihi, telefon,
+            acil_durum_kisi, acil_durum_telefon, sicil_no, ise_giris_tarihi,
+            sube_id, departman_id, bolum_id, birim_id
+        ) VALUES (
+            1, '10000000001', 'Test', 'Personel', '1990-01-01', '555',
+            'Acil', '555', 'S-1', '2020-01-01',
+            1, 1, 3, 10
+        )"
+    );
     p067Assert(p067RunMigration($pdo, '067_personel_canonical_reference_gate.sql') === null, '067 reapply idempotent');
     p067Assert(
         (int) $pdo->query("SELECT COUNT(*) FROM birimler WHERE id = 10 AND bolum_id = 3")->fetchColumn() === 1,
         '067 idempotent target remains stable'
     );
 
+    p067Assert(
+        (int) $pdo->query("SELECT COUNT(*) FROM personeller WHERE birim_id = 10")->fetchColumn() === 1,
+        '067 canonical state tolerates personnel usage'
+    );
+
     $pdo->exec("UPDATE birimler SET bolum_id = 5 WHERE id = 10");
+    $pdo->exec("UPDATE bolumler SET durum = 'PASIF' WHERE id = 5");
+    $blockedMixedPasif = p067RunMigration($pdo, '067_personel_canonical_reference_gate.sql');
+    p067Assert($blockedMixedPasif !== null, '067 mixed legacy parent with passive section fails closed');
+    p067Assert(
+        (int) $pdo->query("SELECT bolum_id FROM birimler WHERE id = 10")->fetchColumn() === 5,
+        '067 mixed passive failure leaves parent unchanged'
+    );
+    p067Assert(
+        (string) $pdo->query("SELECT durum FROM bolumler WHERE id = 5")->fetchColumn() === 'PASIF',
+        '067 mixed passive failure leaves section unchanged'
+    );
+
+    $pdo->exec("UPDATE birimler SET bolum_id = 3 WHERE id = 10");
     $pdo->exec("UPDATE bolumler SET durum = 'AKTIF' WHERE id = 5");
+    $blockedMixedActive = p067RunMigration($pdo, '067_personel_canonical_reference_gate.sql');
+    p067Assert($blockedMixedActive !== null, '067 canonical parent with active legacy section fails closed');
+    p067Assert(
+        (int) $pdo->query("SELECT bolum_id FROM birimler WHERE id = 10")->fetchColumn() === 3,
+        '067 mixed active failure leaves parent unchanged'
+    );
+
+    $pdo->exec("DELETE FROM personeller WHERE id = 1");
+    $pdo->exec("UPDATE birimler SET bolum_id = 5 WHERE id = 10");
     $pdo->exec("INSERT INTO birimler (id, bolum_id, ad, durum) VALUES (11, 5, 'Legacy Child', 'AKTIF')");
     $blocked = p067RunMigration($pdo, '067_personel_canonical_reference_gate.sql');
     p067Assert($blocked !== null, '067 unsafe active child fails closed');
@@ -190,7 +231,31 @@ try {
         '067 failed precondition leaves legacy status unchanged'
     );
     $pdo->exec('DELETE FROM birimler WHERE id = 11');
+
+    $pdo->exec("UPDATE birimler SET bolum_id = 3 WHERE id = 10");
+    $pdo->exec("UPDATE bolumler SET durum = 'PASIF' WHERE id = 5");
+    $pdo->exec("UPDATE departmanlar SET ad = 'Yanlış' WHERE id = 1");
+    $blockedRoot = p067RunMigration($pdo, '067_personel_canonical_reference_gate.sql');
+    p067Assert($blockedRoot !== null, '067 wrong department root fails closed');
+    p067Assert(
+        (string) $pdo->query("SELECT ad FROM departmanlar WHERE id = 1")->fetchColumn() === 'Yanlış',
+        '067 wrong root failure leaves root unchanged'
+    );
+    $pdo->exec("UPDATE departmanlar SET ad = 'Üretim' WHERE id = 1");
+
+    $pdo->exec("INSERT INTO birimler (id, bolum_id, ad, durum) VALUES (11, 5, 'Güvenlik', 'AKTIF')");
+    $blockedDuplicate = p067RunMigration($pdo, '067_personel_canonical_reference_gate.sql');
+    p067Assert($blockedDuplicate !== null, '067 duplicate active Güvenlik fails closed');
+    p067Assert(
+        (int) $pdo->query("SELECT COUNT(*) FROM birimler WHERE ad = 'Güvenlik' AND durum = 'AKTIF'")->fetchColumn() === 2,
+        '067 duplicate failure leaves duplicate rows unchanged'
+    );
+    $pdo->exec('DELETE FROM birimler WHERE id = 11');
 } finally {
+    if ($pdo->inTransaction()) {
+        $pdo->rollBack();
+    }
+    $pdo = null;
     $root->exec('DROP DATABASE IF EXISTS `' . $database . '`');
 }
 

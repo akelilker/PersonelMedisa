@@ -28,9 +28,9 @@
   --bg: var(--bg-app);
   --modal-bg: var(--bg-app);
   --modal-header-red-gradient:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.02) 7%, rgba(255, 255, 255, 0) 15%),
-    linear-gradient(180deg, rgba(var(--theme-color-rgb), 0.12) 0%, rgba(var(--theme-color-rgb), 0.04) 20%, rgba(var(--theme-color-rgb), 0) 34%),
-    linear-gradient(180deg, #151a21 0%, #10151d 100%);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.02) 5%, rgba(255, 255, 255, 0) 12%),
+    linear-gradient(180deg, rgba(var(--theme-color-rgb), 0.22) 0%, rgba(var(--theme-color-rgb), 0.08) 34%, rgba(var(--theme-color-rgb), 0) 52%),
+    linear-gradient(180deg, #1a1015 0%, #100f16 64%, var(--modal-bg) 100%);
   --modal-title-color: #d1dbe4;
   --modal-title-shadow: 0 1px 0 rgba(0, 0, 0, 0.55), 0 0 5px rgba(214, 224, 232, 0.12);
   --modal-title-weight: 700;

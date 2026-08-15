@@ -14,7 +14,7 @@
 
 | Alan | Canonical sonuç |
 | --- | --- |
-| Current main / PR #170 merge | `ce9775bf3fcbca48bbd3ca80e4721e913a8e2f56` |
+| Current main / PR base | `416fb40fd5aa2ad5b472219e4b9b02300c86083e` |
 | Code migration tip | `067` |
 | Production migration tip | **066 VERIFIED** by authenticated read-only schema fingerprint |
 | Migration 067 prepared | **YES** — code tip is 067; production tip remains 066 |
@@ -24,7 +24,7 @@
 | Ownership | Personel Kartı read-only; Kayıt ve Süreç owns personnel writes |
 | Source lock | Exact user-authoritative workbook lineage and 122-row field mapping re-locked privately; exact data remains private |
 | Auth contract | `AUTH_SMOKE_READONLY` is smoke-only (`ops.auth_smoke.read`); it is insufficient for references, personnel list, schema probe, or import dry-run |
-| Real import | Not applied; no real production dry-run has been completed; apply remains blocked |
+| Real import | Authenticated production preflight dry-run completed previously and remains blocked; post-067 122-row IC-only REAL production dry-run not yet performed; apply remains blocked |
 | Production mutation | **NO** — personnel, reference, and migration writes were not performed |
 | Public PII policy | Exact source rows, person-level data, and blocker tallies remain private |
 

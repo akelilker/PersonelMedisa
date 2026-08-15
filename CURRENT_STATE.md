@@ -59,7 +59,7 @@ Görsel sistem çalışmaları mevcut component/owner içinde yapılabilir. Yeni
 
 ## Doğrulanmış teknik temel
 
-- `main` / `origin/main` after PR #170: `ce9775bf3fcbca48bbd3ca80e4721e913a8e2f56`.
+- Current PR base / current `main`: `416fb40fd5aa2ad5b472219e4b9b02300c86083e`.
 - Migration tip: code **067**; production **066 VERIFIED** by authenticated read-only schema probe. Migration `067` production'a uygulanmadı.
 - Org references: SGK=3, locations=7, locked 10 branches (`121`); canonical catalogs completed (`122`: departmanlar=10 incl. legacy, bolumler=22, birimler=32, gorevler=39, pozisyonlar=12, personel_tipleri=5); personnel org FKs remain NULL until mapping/import gate.
 - Pack6: `bolumler` / `birimler` / `pozisyonlar` + `subeler.sgk_isveren_id` (authorization still `personeller.sube_id`).
@@ -142,7 +142,7 @@ Bu dosya backlog değildir. Açık maddeler `110` registry’dedir. Canlı param
 - PR #170 UX closure is represented by merge SHA `ce9775bf3fcbca48bbd3ca80e4721e913a8e2f56`; CI/deploy/smoke closure is retained.
 - Internal Phase 1 scope is 122 `IC_PERSONEL`; 20 missing phone values are `DEFERRED_USER_DATA` and non-blocking. Candidate-level Sicil and birth-date blockers are both 0; 13 `DIS_KAYNAK` rows remain Phase 2 / `DEFERRED_REFERENCE_DECISION`.
 - The dedicated `AUTH_SMOKE_READONLY` contract remains smoke-only (`ops.auth_smoke.read`); it does not authorize production import or mutation.
-- No real production dry-run has been completed. Import/apply was not called; no production personnel, reference, or migration mutation occurred.
+- Authenticated production preflight dry-run was previously completed and remains blocked; the post-067 122-row IC-only REAL production dry-run has not yet been performed. Import/apply was not called; no production personnel, reference, or migration mutation occurred.
 - Live reference probe found the legacy `Üretim Genel → Güvenlik` branch; canonical tree check is **FAIL** and reference mutation is required, but was not performed.
 - Source reconciliation remains private; raw blanks, candidate values, and importer errors stay separate. No production personnel import has been performed.
 - Business decision: 20 IC phone values are deferred; missing-info UX continues to flag them, but phone absence is non-blocking for import and daily operations. Completion remains allowed later through Kayıt ve Süreç.

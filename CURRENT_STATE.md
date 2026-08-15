@@ -11,7 +11,8 @@ Her registry kaydı **tek** zorunlu statü taşır: `CLOSED` · `CODE_GAP` · `B
 
 - **Ürün beyni:** `FROZEN` (domain owner / paralel motor yalnız ayrı teşhis + açık onay)
 - **Görsel düzenleme aşaması:** `GO`
-- **Production migration tip:** `065` (Pack6 schema applied 2026-08-14 — `121`; personnel org FK apply still `USER_GATED`)
+- **Code migration tip:** `067` (`067_personel_canonical_reference_gate.sql`)
+- **Production migration tip:** **066 VERIFIED** by authenticated read-only schema fingerprint; no migration was applied in this run.
 - **S3F:** `CLOSED_PRODUCTION` (PR #148 merge `9e1b5c85049d5f2aada84ae59b2be926f0bc6441`; docs closure `72818720ae9dad9a77c31c933806a72acdc7bafd`)
 - **QR pipeline:** S3C–S3F `CLOSED`
 - **QR algorithms (locked):** `QR_INTERVAL_V1`, `QR_PUANTAJ_CANDIDATE_V1`, `QR_PUANTAJ_DECISION_V1`, `QR_CANDIDATE_HASH_V2`
@@ -20,7 +21,7 @@ Her registry kaydı **tek** zorunlu statü taşır: `CLOSED` · `CODE_GAP` · `B
 - **Serbest Zaman Pack 4B:** allocation-aware destroy + 6M deadline ops surface (`061`/`062` + `116` + `118`); **OPS_ROLLOUT** (`MG-SZ-6M-001`); production schema rollout **COMPLETE**; ops follow-up `USER_GATED`
 - **Pack5 Final Code Gap:** rolling OT policy + org location schema (`063`/`064` + `117` + `118`); `MG-OT-YEAR-POL/PATH` CLOSED; `MG-ORG-LOC-001` OPS_ROLLOUT USER_GATED (schema production-ready; personnel mapping still gated)
 - **Org reference seed (`119`, 2026-08-13):** SGK employers `MEDISA`/`KARYAPI`/`SENAY_MOBILYA` + 7 verified work locations seeded; personnel org FK mapping **not** applied
-- **Pack6 org structure (`120`/`121`/`122`):** native Bölüm/Birim/Pozisyon + `subeler.sgk_isveren_id`; `MG-ORG-ATTR-001` CLOSED; production `065` **applied**; locked 10-branch model + MRK=`Medisa` + ownership complete; canonical HR catalogs completed from 122-row workbook (`122`); personnel FK mapping / import **not** applied
+- **Pack6 org structure (`120`/`121`/`122`):** native Bölüm/Birim/Pozisyon + `subeler.sgk_isveren_id`; production read-only schema/reference probe **VERIFIED**; locked 10-branch model + MRK=`Medisa` + ownership complete; personnel FK mapping / import **not** applied
 
 Görsel sistem çalışmaları mevcut component/owner içinde yapılabilir. Yeni domain özelliği freeze kapısından geçer.
 
@@ -28,14 +29,14 @@ Görsel sistem çalışmaları mevcut component/owner içinde yapılabilir. Yeni
 
 | Flag | Statü / değer | Metadata |
 | --- | --- | --- |
-| `PRODUCTION_MIGRATION_TIP` | **065** | Pack6 applied (`121`); personnel FK apply `USER_GATED` |
-| `CODE_MIGRATION_TIP` | **065** | — |
+| `PRODUCTION_MIGRATION_TIP` | **066 VERIFIED** | Authenticated read-only schema fingerprint; no migration write performed |
+| `CODE_MIGRATION_TIP` | **067** | `067_personel_canonical_reference_gate.sql` |
 | `S3F` | **CLOSED_PRODUCTION** | — |
 | `QR_PIPELINE` | **S3C–S3F CLOSED** | — |
 | `REAL_REFERENCE_DATA` | **READY** — SGK/locations (`119`) + branches (`121`) + canonical Departman/Unvan/PersonelTipi/Bölüm/Birim/Pozisyon (`122`); personnel mapping still gated | `USER_GATED` |
-| `REAL_PERSONNEL_DATASET` | USER_GATED | `NO_PII_COMMITTED` |
+| `REAL_PERSONNEL_DATASET` | USER_GATED / **BLOCKED** | Latest private preflight artifact; `NO_PII_COMMITTED` |
 | `REAL_PERSONNEL_IMPORTED` | **NO** | `USER_GATED` |
-| `SOURCE_DATA_REQUIRES_COMPLETION` | yes — org refs complete (`122`); identity blockers remain (sicil / name-split / birth / phone) | ops details outside public repo |
+| `SOURCE_DATA_REQUIRES_COMPLETION` | yes — latest private preflight still has human/reference blockers | exact tallies and row-level details stay private |
 | `PERSONEL_BINDING_REAL_ROLLOUT` | **NOT_STARTED** (schema `056` mevcut) | `USER_GATED` |
 | `REAL_QR_EMPLOYEE_ROLLOUT` | **NOT_STARTED** | `USER_GATED` |
 | `RETENTION_PHYSICAL_DESTRUCTION` | **OPS_ROLLOUT** (`MG-RET-PHYS-001`) | schema production-ready (`059`/`060`/`062` via `118`); flag default **OFF**; real destruction **NO** |
@@ -53,13 +54,13 @@ Görsel sistem çalışmaları mevcut component/owner içinde yapılabilir. Yeni
 | `SGK_EMPLOYER_REAL_REFERENCE` | **PRODUCTION_READY** | codes `MEDISA`/`KARYAPI`/`SENAY_MOBILYA` (`119`) |
 | `WORK_LOCATION_REAL_REFERENCE` | **PRODUCTION_READY** | 7 verified location codes seeded (`119`) |
 | `ORG_ATTRIBUTES_BOLUM_BIRIM_POZISYON` | **CLOSED** (`MG-ORG-ATTR-001`) | native fields via Pack6 `065` (`120`/`121`) |
-| `ORG_STRUCTURE_SCHEMA` | **PRODUCTION_READY** (`MG-ORG-ATTR-ROLL-001`) | prod tip `065` (`121`); canonical catalogs complete (`122`); personnel FK apply `USER_GATED` |
+| `ORG_STRUCTURE_SCHEMA` | **VERIFIED_PRODUCTION** | Authenticated read-only probe confirmed personel org fields and active catalogs; personnel FK mapping remains gated |
 | `CANONICAL_DOC_STALE` | **0** | historical snapshots preserved, not backlog |
 
 ## Doğrulanmış teknik temel
 
-- `main` / `origin/main` docs tip after PR #160: `214e93f47c7ae1c6ee6c1eaac15586c9d3d5a88d`; code baseline still `e92be2b957f0a3c2e91b5dae5dd703cde4cc1bb4`.
-- Migration tip: code **065** / production **065** (`121`/`122`).
+- `main` / `origin/main` after PR #170: `ce9775bf3fcbca48bbd3ca80e4721e913a8e2f56`.
+- Migration tip: code **067**; production **066 VERIFIED** by authenticated read-only schema probe. Migration `067` production'a uygulanmadı.
 - Org references: SGK=3, locations=7, locked 10 branches (`121`); canonical catalogs completed (`122`: departmanlar=10 incl. legacy, bolumler=22, birimler=32, gorevler=39, pozisyonlar=12, personel_tipleri=5); personnel org FKs remain NULL until mapping/import gate.
 - Pack6: `bolumler` / `birimler` / `pozisyonlar` + `subeler.sgk_isveren_id` (authorization still `personeller.sube_id`).
 - SGK, şirket politikası kanıtı, bordro preflight, personel importu, revizyon, dual-control, retention request/approve/evaluate/execute (flag OFF), QR S3C–S3F owner’ları mevcut ve fail-closed çalışır.
@@ -133,3 +134,15 @@ Bu dosya backlog değildir. Açık maddeler `110` registry’dedir. Canlı param
 3. Faz adı uydurulmaz; repo’da `S3G`/`S4` yok.
 
 **“PersonelMedisa tamamlandı”** yalnız `110` final completion tanımı sağlandığında kullanılır: `CODE_GAP=0`, `UNVERIFIED_CRITICAL=0`, `CANONICAL_DOC_STALE=0`, kalan yalnız `CLOSED` / `NOT_APPLICABLE` / `INTENTIONAL_DEFER` / USER_GATED `OPS_ROLLOUT`.
+
+## 2026-08-15 final personel preflight
+
+- Canonical internal scope remains `IC_PERSONEL`; external directory-only scope remains first-class `DIS_KAYNAK`.
+- `Personel Kartı` is read-only for ownership; `Kayıt ve Süreç` owns personnel writes.
+- PR #170 UX closure is represented by merge SHA `ce9775bf3fcbca48bbd3ca80e4721e913a8e2f56`; CI/deploy/smoke closure is retained.
+- Internal Phase 1 scope is 122 `IC_PERSONEL`; 20 missing phone values are `DEFERRED_USER_DATA` and non-blocking. Candidate-level Sicil and birth-date blockers are both 0; 13 `DIS_KAYNAK` rows remain Phase 2 / `DEFERRED_REFERENCE_DECISION`.
+- The dedicated `AUTH_SMOKE_READONLY` contract remains smoke-only (`ops.auth_smoke.read`); it does not authorize production import or mutation.
+- No real production dry-run has been completed. Import/apply was not called; no production personnel, reference, or migration mutation occurred.
+- Live reference probe found the legacy `Üretim Genel → Güvenlik` branch; canonical tree check is **FAIL** and reference mutation is required, but was not performed.
+- Source reconciliation remains private; raw blanks, candidate values, and importer errors stay separate. No production personnel import has been performed.
+- Business decision: 20 IC phone values are deferred; missing-info UX continues to flag them, but phone absence is non-blocking for import and daily operations. Completion remains allowed later through Kayıt ve Süreç.

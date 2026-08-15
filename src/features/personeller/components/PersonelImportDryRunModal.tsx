@@ -347,6 +347,12 @@ export function PersonelImportDryRunModal({
           </div>
         ) : null}
 
+        {ozet && ozet.warning_sayisi > 0 ? (
+          <p className="personel-import-warning" data-testid="personel-import-dry-run-warnings">
+            {ozet.warning_sayisi} uyarı: Telefon eksikleri aktarımı engellemez; daha sonra Kayıt ve Süreç üzerinden tamamlanabilir.
+          </p>
+        ) : null}
+
         {result?.can_apply && !applyResult ? (
           <p
             className="personel-import-ready"

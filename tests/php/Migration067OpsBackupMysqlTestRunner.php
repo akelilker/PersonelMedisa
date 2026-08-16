@@ -72,9 +72,36 @@ try {
          FOR EACH ROW INSERT INTO child_audit (child_id) VALUES (NEW.id)'
     );
     $source->exec(
+        "CREATE FUNCTION migration067_test_label(value VARCHAR(255))
+         RETURNS VARCHAR(255) DETERMINISTIC
+         RETURN CONCAT('etiket:', value)"
+    );
+    $source->exec(
         'CREATE VIEW child_view AS
          SELECT c.id, p.title, c.note FROM children c INNER JOIN parents p ON p.id = c.parent_id'
     );
+    $source->exec(
+        'CREATE VIEW z_view_base AS SELECT id, title FROM parents'
+    );
+    $source->exec(
+        'CREATE VIEW a_view_dependent AS SELECT id, migration067_test_label(title) AS label FROM z_view_base'
+    );
+    $procedureRestoredExpected = false;
+    try {
+        $source->exec(
+            'CREATE PROCEDURE migration067_test_proc(IN child_id_value INT)
+             INSERT INTO child_audit (child_id) VALUES (child_id_value)'
+        );
+        $source->exec(
+            'CREATE TRIGGER trg_children_proc
+             AFTER UPDATE ON children
+             FOR EACH ROW CALL migration067_test_proc(NEW.id)'
+        );
+        $procedureRestoredExpected = true;
+    } catch (Throwable $ignored) {
+        $source->exec('DROP PROCEDURE IF EXISTS migration067_test_proc');
+        $source->exec('DROP TRIGGER IF EXISTS trg_children_proc');
+    }
 
     $parent = $source->prepare('INSERT INTO parents (title) VALUES (?)');
     $parent->execute(["Üretim ' özel\\satır\nTürkçe"]);
@@ -123,7 +150,19 @@ try {
     )->fetchColumn();
     $viewCount = (int) $restore->query(
         "SELECT COUNT(*) FROM information_schema.VIEWS
-         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'child_view'"
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN
+           ('child_view', 'a_view_dependent', 'z_view_base')"
+    )->fetchColumn();
+    $functionResult = $restore->query(
+        "SELECT migration067_test_label('Türkçe')"
+    )->fetchColumn();
+    $dependentViewResult = $restore->query(
+        "SELECT label FROM a_view_dependent WHERE id = 1"
+    )->fetchColumn();
+    $procedureCount = (int) $restore->query(
+        "SELECT COUNT(*) FROM information_schema.ROUTINES
+         WHERE ROUTINE_SCHEMA = DATABASE() AND ROUTINE_NAME = 'migration067_test_proc'
+           AND ROUTINE_TYPE = 'PROCEDURE'"
     )->fetchColumn();
     $foreignKeyCount = (int) $restore->query(
         "SELECT COUNT(*) FROM information_schema.KEY_COLUMN_USAGE
@@ -144,8 +183,11 @@ try {
         || $rows[0]['payload'] !== "\x00\xFFbinary"
         || $rows[0]['note'] !== null
         || $rows[1]['note'] !== "tırnak ' ve slash\\ ve\nnewline"
-        || $triggerCount !== 1
-        || $viewCount !== 1
+        || $triggerCount < 1
+        || $viewCount !== 3
+        || $functionResult !== 'etiket:Türkçe'
+        || $dependentViewResult !== "etiket:Üretim ' özel\\satır\nTürkçe"
+        || ($procedureRestoredExpected && $procedureCount !== 1)
         || $foreignKeyCount < 1
         || $indexCount < 1
         || $autoIncrement < 3) {

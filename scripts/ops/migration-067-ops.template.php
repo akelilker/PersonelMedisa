@@ -200,24 +200,135 @@ function migration_067_write($handle, string $content): void
     }
 }
 
-function migration_067_php_dump(PDO $pdo, string $path): void
+function migration_067_view_order(PDO $pdo, array $views): array
 {
-    $handle = fopen($path, 'wb');
-    if ($handle === false) {
-        migration_067_fail('BACKUP_OPEN_FAILED');
-    }
-    if (!@chmod($path, 0600)) {
-        fclose($handle);
-        throw new RuntimeException('BACKUP_FILE_NOT_PRIVATE');
-    }
+    $viewNames = array_fill_keys(array_map('strval', $views), true);
+    $dependencies = array_fill_keys(array_keys($viewNames), []);
+    $dependents = array_fill_keys(array_keys($viewNames), []);
     try {
+        $usage = $pdo->query(
+            "SELECT VIEW_NAME, VIEW_SCHEMA, TABLE_SCHEMA, TABLE_NAME
+             FROM information_schema.VIEW_TABLE_USAGE
+             WHERE VIEW_SCHEMA = DATABASE()
+             ORDER BY VIEW_NAME, TABLE_SCHEMA, TABLE_NAME"
+        )->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Throwable $exception) {
+        try {
+            $definitions = $pdo->query(
+                "SELECT TABLE_NAME AS VIEW_NAME, VIEW_DEFINITION
+                 FROM information_schema.VIEWS
+                 WHERE TABLE_SCHEMA = DATABASE()
+                 ORDER BY TABLE_NAME"
+            )->fetchAll(PDO::FETCH_ASSOC);
+        } catch (Throwable $definitionException) {
+            throw new RuntimeException('VIEW_DEPENDENCY_METADATA_UNAVAILABLE', 0, $definitionException);
+        }
+        $usage = [];
+        foreach ($definitions as $definition) {
+            $view = (string) ($definition['VIEW_NAME'] ?? '');
+            $sql = (string) ($definition['VIEW_DEFINITION'] ?? '');
+            $schemas = $pdo->query('SELECT SCHEMA_NAME FROM information_schema.SCHEMATA')
+                ->fetchAll(PDO::FETCH_COLUMN);
+            foreach ($schemas as $schema) {
+                if ((string) $schema !== (string) $pdo->query('SELECT DATABASE()')->fetchColumn()
+                    && preg_match(
+                        '/`?' . preg_quote((string) $schema, '/') . '`?\s*\.\s*(?:`[^`]+`|[A-Za-z0-9_$]+)/i',
+                        $sql
+                    ) === 1) {
+                    throw new RuntimeException('VIEW_CROSS_DATABASE_DEPENDENCY');
+                }
+            }
+            foreach (array_keys($viewNames) as $dependency) {
+                if ($dependency !== $view
+                    && preg_match(
+                        '/(?<![A-Za-z0-9_$])`?' . preg_quote($dependency, '/') . '`?(?![A-Za-z0-9_$])/i',
+                        $sql
+                    ) === 1) {
+                    $usage[] = [
+                        'VIEW_NAME' => $view,
+                        'TABLE_SCHEMA' => (string) $pdo->query('SELECT DATABASE()')->fetchColumn(),
+                        'TABLE_NAME' => $dependency,
+                    ];
+                }
+            }
+        }
+    }
+    $database = (string) $pdo->query('SELECT DATABASE()')->fetchColumn();
+    foreach ($usage as $row) {
+        $view = (string) ($row['VIEW_NAME'] ?? '');
+        $schema = (string) ($row['TABLE_SCHEMA'] ?? '');
+        $table = (string) ($row['TABLE_NAME'] ?? '');
+        if (!isset($viewNames[$view])) {
+            continue;
+        }
+        if ($schema !== $database) {
+            throw new RuntimeException('VIEW_CROSS_DATABASE_DEPENDENCY');
+        }
+        if (isset($viewNames[$table]) && $table !== $view) {
+            $dependencies[$view][$table] = true;
+            $dependents[$table][$view] = true;
+        }
+    }
+    $order = [];
+    $ready = [];
+    foreach ($dependencies as $view => $viewDependencies) {
+        if ($viewDependencies === []) {
+            $ready[] = $view;
+        }
+    }
+    sort($ready, SORT_STRING);
+    while ($ready !== []) {
+        $view = array_shift($ready);
+        $order[] = $view;
+        foreach (array_keys($dependents[$view]) as $dependent) {
+            unset($dependencies[$dependent][$view]);
+            if ($dependencies[$dependent] === []) {
+                $ready[] = $dependent;
+            }
+        }
+        sort($ready, SORT_STRING);
+    }
+    if (count($order) !== count($views)) {
+        throw new RuntimeException('VIEW_DEPENDENCY_UNRESOLVED');
+    }
+    return $order;
+}
+
+function migration_067_php_dump(PDO $pdo, string $path): array
+{
+    $handle = null;
+    $transactionStarted = false;
+    try {
+        $pdo->exec('SET SESSION TRANSACTION ISOLATION LEVEL REPEATABLE READ');
+        $pdo->exec('START TRANSACTION WITH CONSISTENT SNAPSHOT');
+        $transactionStarted = true;
+        $handle = fopen($path, 'wb');
+        if ($handle === false) {
+            throw new RuntimeException('BACKUP_OPEN_FAILED');
+        }
+        if (!@chmod($path, 0600)) {
+            throw new RuntimeException('BACKUP_FILE_NOT_PRIVATE');
+        }
         migration_067_write($handle, "-- Migration 067 full SQL backup\nSET NAMES utf8mb4;\nSET FOREIGN_KEY_CHECKS=0;\n\n");
         $objects = $pdo->query(
-            "SELECT TABLE_NAME, TABLE_TYPE FROM information_schema.TABLES
+            "SELECT TABLE_NAME, TABLE_TYPE, ENGINE FROM information_schema.TABLES
              WHERE TABLE_SCHEMA = DATABASE() AND TABLE_TYPE = 'BASE TABLE' ORDER BY TABLE_NAME"
         )->fetchAll();
+        $inventory = [
+            'base_tables' => [],
+            'views' => [],
+            'triggers' => [],
+            'routines' => [],
+            'events' => [],
+            'row_counts' => [],
+        ];
         foreach ($objects as $object) {
             $table = (string) $object['TABLE_NAME'];
+            $engine = strtoupper((string) ($object['ENGINE'] ?? ''));
+            if (!in_array($engine, ['INNODB', 'XTRADB'], true)) {
+                throw new RuntimeException('BACKUP_FALLBACK_UNSUPPORTED_ENGINE');
+            }
+            $inventory['base_tables'][] = $table;
             $quoted = '`' . str_replace('`', '``', $table) . '`';
             try {
                 $create = $pdo->query('SHOW CREATE TABLE ' . $quoted)->fetch(PDO::FETCH_ASSOC);
@@ -252,6 +363,7 @@ function migration_067_php_dump(PDO $pdo, string $path): void
                 }
                 migration_067_write($handle, 'INSERT INTO ' . $quoted . ' VALUES (' . implode(', ', $values) . ");\n");
             }
+            $inventory['row_counts'][$table] = (int) $pdo->query('SELECT COUNT(*) FROM ' . $quoted)->fetchColumn();
             migration_067_write($handle, "\n");
         }
 
@@ -259,7 +371,31 @@ function migration_067_php_dump(PDO $pdo, string $path): void
             "SELECT TABLE_NAME FROM information_schema.TABLES
              WHERE TABLE_SCHEMA = DATABASE() AND TABLE_TYPE = 'VIEW' ORDER BY TABLE_NAME"
         )->fetchAll(PDO::FETCH_COLUMN);
-        foreach ($views as $view) {
+        $inventory['views'] = array_map('strval', $views);
+        foreach (['PROCEDURE', 'FUNCTION'] as $routineType) {
+            $routines = $pdo->prepare(
+                'SELECT ROUTINE_NAME FROM information_schema.ROUTINES
+                 WHERE ROUTINE_SCHEMA = DATABASE() AND ROUTINE_TYPE = :type ORDER BY ROUTINE_NAME'
+            );
+            $routines->execute(['type' => $routineType]);
+            foreach ($routines->fetchAll(PDO::FETCH_COLUMN) as $routine) {
+                $inventory['routines'][] = $routineType . ':' . (string) $routine;
+                try {
+                    $row = $pdo->query(
+                        'SHOW CREATE ' . $routineType . ' `' . str_replace('`', '``', (string) $routine) . '`'
+                    )->fetch(PDO::FETCH_ASSOC);
+                } catch (Throwable $exception) {
+                    throw new RuntimeException('ROUTINE_DEFINITION_UNREADABLE', 0, $exception);
+                }
+                $key = 'Create ' . ucfirst(strtolower($routineType));
+                $statement = migration_067_strip_definer((string) ($row[$key] ?? ''));
+                if ($statement === '') {
+                    throw new RuntimeException('ROUTINE_DEFINITION_UNREADABLE');
+                }
+                migration_067_write($handle, "DELIMITER $$\n" . $statement . " $$\nDELIMITER ;\n\n");
+            }
+        }
+        foreach (migration_067_view_order($pdo, $views) as $view) {
             $quoted = '`' . str_replace('`', '``', (string) $view) . '`';
             try {
                 $create = $pdo->query('SHOW CREATE TABLE ' . $quoted)->fetch(PDO::FETCH_ASSOC);
@@ -278,6 +414,7 @@ function migration_067_php_dump(PDO $pdo, string $path): void
             "SELECT TRIGGER_NAME FROM information_schema.TRIGGERS
              WHERE TRIGGER_SCHEMA = DATABASE() ORDER BY TRIGGER_NAME"
         )->fetchAll(PDO::FETCH_COLUMN);
+        $inventory['triggers'] = array_map('strval', $triggers);
         foreach ($triggers as $trigger) {
             try {
                 $row = $pdo->query(
@@ -294,34 +431,11 @@ function migration_067_php_dump(PDO $pdo, string $path): void
             migration_067_write($handle, "DELIMITER $$\n" . $statement . " $$\nDELIMITER ;\n\n");
         }
 
-        foreach (['PROCEDURE', 'FUNCTION'] as $routineType) {
-            $routines = $pdo->prepare(
-                'SELECT ROUTINE_NAME FROM information_schema.ROUTINES
-                 WHERE ROUTINE_SCHEMA = DATABASE() AND ROUTINE_TYPE = :type ORDER BY ROUTINE_NAME'
-            );
-            $routines->execute(['type' => $routineType]);
-            foreach ($routines->fetchAll(PDO::FETCH_COLUMN) as $routine) {
-                try {
-                    $row = $pdo->query(
-                        'SHOW CREATE ' . $routineType . ' `' . str_replace('`', '``', (string) $routine) . '`'
-                    )->fetch(PDO::FETCH_ASSOC);
-                } catch (Throwable $exception) {
-                    throw new RuntimeException('ROUTINE_DEFINITION_UNREADABLE', 0, $exception);
-                }
-                $key = 'Create ' . ucfirst(strtolower($routineType));
-                $statement = (string) ($row[$key] ?? '');
-                if ($statement === '') {
-                    throw new RuntimeException('ROUTINE_DEFINITION_UNREADABLE');
-                }
-                $statement = migration_067_strip_definer($statement);
-                migration_067_write($handle, "DELIMITER $$\n" . $statement . " $$\nDELIMITER ;\n\n");
-            }
-        }
-
         $events = $pdo->query(
             "SELECT EVENT_NAME FROM information_schema.EVENTS
              WHERE EVENT_SCHEMA = DATABASE() ORDER BY EVENT_NAME"
         )->fetchAll(PDO::FETCH_COLUMN);
+        $inventory['events'] = array_map('strval', $events);
         foreach ($events as $event) {
             try {
                 $row = $pdo->query(
@@ -338,8 +452,16 @@ function migration_067_php_dump(PDO $pdo, string $path): void
             migration_067_write($handle, "DELIMITER $$\n" . $statement . " $$\nDELIMITER ;\n\n");
         }
         migration_067_write($handle, "SET FOREIGN_KEY_CHECKS=1;\n");
+        $pdo->commit();
+        $transactionStarted = false;
+        return $inventory;
     } finally {
-        fclose($handle);
+        if (is_resource($handle)) {
+            fclose($handle);
+        }
+        if ($transactionStarted && $pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
     }
 }
 
@@ -405,7 +527,12 @@ function migration_067_backup_contains(string $path, string $needle): bool
     return false;
 }
 
-function migration_067_validate_backup(string $path, array $inventory): array
+function migration_067_validate_backup(
+    string $path,
+    array $inventory,
+    string $consistency = 'CONSISTENT_SNAPSHOT',
+    string $engineGuard = 'PASS'
+): array
 {
     if (!is_file($path) || filesize($path) <= 0) {
         throw new RuntimeException('BACKUP_EMPTY');
@@ -473,6 +600,8 @@ function migration_067_validate_backup(string $path, array $inventory): array
         'backup_trigger_count' => count($inventory['triggers']),
         'backup_routine_count' => count($inventory['routines']),
         'backup_event_count' => count($inventory['events']),
+        'backup_consistency' => $consistency,
+        'backup_engine_guard' => $engineGuard,
     ];
 }
 
@@ -487,8 +616,8 @@ function migration_067_backup(PDO $pdo): array
     $dumpPath = trim((string) shell_exec('command -v mysqldump 2>/dev/null'));
     $config = migration_067_config();
     try {
-        $inventory = migration_067_backup_inventory($pdo);
         if ($dumpPath !== '') {
+            $inventory = migration_067_backup_inventory($pdo);
             $command = escapeshellarg($dumpPath)
                 . ' --single-transaction --routines --events --triggers --hex-blob'
                 . ' -h ' . escapeshellarg((string) $config['db_host'])
@@ -507,7 +636,7 @@ function migration_067_backup(PDO $pdo): array
                 throw new RuntimeException('BACKUP_MYSQLDUMP_FAILED');
             }
         } else {
-            migration_067_php_dump($pdo, $temporaryPath);
+            $inventory = migration_067_php_dump($pdo, $temporaryPath);
         }
         if (!is_file($temporaryPath)
             || !@chmod($temporaryPath, 0600)
@@ -520,12 +649,21 @@ function migration_067_backup(PDO $pdo): array
         if (!@chmod($path, 0600) || ((fileperms($path) & 0777) & 0077) !== 0) {
             throw new RuntimeException('BACKUP_FILE_NOT_PRIVATE');
         }
-        return migration_067_validate_backup($path, $inventory);
+        return migration_067_validate_backup(
+            $path,
+            $inventory,
+            $dumpPath !== '' ? 'MYSQLDUMP_SINGLE_TRANSACTION' : 'CONSISTENT_SNAPSHOT',
+            $dumpPath !== '' ? 'NOT_APPLICABLE' : 'PASS'
+        );
     } catch (Throwable $exception) {
         @unlink($temporaryPath);
         @unlink($path);
         $safeErrors = [
             'BACKUP_MYSQLDUMP_FAILED',
+            'BACKUP_FALLBACK_UNSUPPORTED_ENGINE',
+            'VIEW_DEPENDENCY_METADATA_UNAVAILABLE',
+            'VIEW_CROSS_DATABASE_DEPENDENCY',
+            'VIEW_DEPENDENCY_UNRESOLVED',
             'BACKUP_INVENTORY_UNREADABLE',
             'TABLE_DEFINITION_UNREADABLE',
             'TABLE_DATA_UNREADABLE',

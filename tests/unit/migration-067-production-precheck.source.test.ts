@@ -96,6 +96,16 @@ describe("Migration 067 production ops contract", () => {
     expect(endpoint).toContain("'SHOW CREATE ' . $routineType");
     expect(endpoint).toContain("SHOW CREATE EVENT");
     expect(endpoint).toContain("migration_067_backup_inventory");
+    expect(endpoint).toContain("SET SESSION TRANSACTION ISOLATION LEVEL REPEATABLE READ");
+    expect(endpoint).toContain("START TRANSACTION WITH CONSISTENT SNAPSHOT");
+    expect(endpoint).toContain("BACKUP_FALLBACK_UNSUPPORTED_ENGINE");
+    expect(endpoint).toContain("VIEW_DEPENDENCY_METADATA_UNAVAILABLE");
+    expect(endpoint).toContain("VIEW_CROSS_DATABASE_DEPENDENCY");
+    expect(endpoint).toContain("VIEW_DEPENDENCY_UNRESOLVED");
+    expect(endpoint).toContain("if ($transactionStarted && $pdo->inTransaction())");
+    expect(endpoint).toContain("--single-transaction");
+    expect(endpoint).toContain("'backup_consistency'");
+    expect(endpoint).toContain("'backup_engine_guard'");
   });
 
   it("has no apply action and always retires the endpoint", () => {
@@ -113,5 +123,7 @@ describe("Migration 067 production ops contract", () => {
     expect(workflow).not.toContain("workflow_run:");
     expect(workflow).not.toContain("pull_request:");
     expect(workflow).not.toMatch(/^\s+push:/m);
+    expect(workflow).toContain('test "${GITHUB_REF}" = "refs/heads/main"');
+    expect(workflow).toContain('test "$MAIN_SHA" = "${GITHUB_SHA}"');
   });
 });

@@ -58,6 +58,8 @@ function sanitize_result(string $path): void
         'backup_trigger_count',
         'backup_routine_count',
         'backup_event_count',
+        'backup_consistency',
+        'backup_engine_guard',
         'error',
     ];
     if (!array_key_exists('ok', $decoded)) {

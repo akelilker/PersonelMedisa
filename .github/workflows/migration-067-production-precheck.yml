@@ -1,0 +1,210 @@
+name: Migration 067 production ops precheck
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Read-only operation to run"
+        required: true
+        type: choice
+        options:
+          - backup
+          - precheck
+
+concurrency:
+  group: migration-067-production-ops
+  cancel-in-progress: false
+
+jobs:
+  ops:
+    name: Authenticated Migration 067 ${{ inputs.mode }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact main
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+
+      - name: Fail closed unless exact main ref
+        run: |
+          set -euo pipefail
+          test "${GITHUB_REF}" = "refs/heads/main" || (echo "Migration 067 production ops require refs/heads/main" && exit 1)
+          MAIN_SHA="$(git ls-remote origin refs/heads/main | awk '{print $1}')"
+          test -n "$MAIN_SHA" && test "$MAIN_SHA" = "${GITHUB_SHA}" || (echo "Workflow SHA is not the current main SHA" && exit 1)
+
+      - name: Verify Migration 067 source
+        run: |
+          set -euo pipefail
+          php scripts/migration-067-production-precheck.php --verify-source
+
+      - name: Validate FTP secrets and install lftp
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+          FTP_PORT: ${{ secrets.FTP_PORT }}
+          MODE: ${{ inputs.mode }}
+          MIGRATION_067_BACKUP_ROOT: ${{ secrets.MIGRATION_067_BACKUP_ROOT }}
+        run: |
+          set -euo pipefail
+          test -n "$FTP_SERVER" || (echo "FTP_SERVER missing" && exit 1)
+          test -n "$FTP_USERNAME" || (echo "FTP_USERNAME missing" && exit 1)
+          test -n "$FTP_PASSWORD" || (echo "FTP_PASSWORD missing" && exit 1)
+          test "$FTP_PORT" = "21" || (echo "FTP_PORT must be 21" && exit 1)
+          if [[ "$MODE" = "backup" ]]; then
+            test -n "$MIGRATION_067_BACKUP_ROOT" || (echo "MIGRATION_067_BACKUP_ROOT missing for backup mode" && exit 1)
+          fi
+          sudo apt-get update
+          sudo apt-get install -y lftp
+
+      - name: Prepare one-shot authenticated endpoint
+        id: prepare
+        env:
+          OPS_TOKEN_SECRET: ${{ secrets.MIGRATION_067_OPS_TOKEN }}
+          BACKUP_ROOT: ${{ secrets.MIGRATION_067_BACKUP_ROOT }}
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/migration-067-ops
+          if [[ -n "${OPS_TOKEN_SECRET}" ]]; then
+            TOKEN="${OPS_TOKEN_SECRET}"
+          else
+            TOKEN="$(openssl rand -hex 32)"
+          fi
+          [[ "$TOKEN" != *$'\r'* && "$TOKEN" != *$'\n'* ]] || (echo "Invalid runtime token" && exit 1)
+          SOURCE_FILE="067_personel_canonical_reference_gate_${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT}.sql"
+          printf '%s' "$TOKEN" > /tmp/migration-067-ops/token
+          OPS_TOKEN="$TOKEN" SOURCE_FILE="$SOURCE_FILE" BACKUP_ROOT="$BACKUP_ROOT" python3 - <<'PY'
+          import os
+          import base64
+          from pathlib import Path
+          source = Path("scripts/ops/migration-067-ops.template.php").read_text(encoding="utf-8")
+          token = os.environ["OPS_TOKEN"]
+          source_file = os.environ["SOURCE_FILE"]
+          backup_root = os.environ.get("BACKUP_ROOT", "")
+          encoded = {
+              "REPLACE_MIGRATION_067_RUNTIME_TOKEN_B64": base64.b64encode(token.encode()).decode(),
+              "REPLACE_MIGRATION_067_SOURCE_FILE_B64": base64.b64encode(source_file.encode()).decode(),
+              "REPLACE_MIGRATION_067_BACKUP_ROOT_B64": base64.b64encode(backup_root.encode()).decode(),
+          }
+          rendered = source
+          for placeholder, value in encoded.items():
+              rendered = rendered.replace(placeholder, value)
+          Path("/tmp/migration-067-ops/_migration_067_ops.php").write_text(rendered, encoding="utf-8")
+          PY
+          cp api/migrations/067_personel_canonical_reference_gate.sql \
+            "/tmp/migration-067-ops/${SOURCE_FILE}"
+          printf '%s' "$SOURCE_FILE" > /tmp/migration-067-ops/source-file
+          chmod 600 /tmp/migration-067-ops/token /tmp/migration-067-ops/_migration_067_ops.php
+
+      - name: Upload temporary endpoint
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+          FTP_PORT: ${{ secrets.FTP_PORT }}
+        run: |
+          set -euo pipefail
+          SOURCE_FILE="$(< /tmp/migration-067-ops/source-file)"
+          upload() {
+            local use_ftps="$1"
+            lftp -u "${FTP_USERNAME}","${FTP_PASSWORD}" -p "${FTP_PORT}" "ftp://${FTP_SERVER}" -e "
+              set cmd:fail-exit true;
+              set net:max-retries 3;
+              set net:timeout 30;
+              set ftp:passive-mode on;
+              set ftp:ssl-allow ${use_ftps};
+              set ftp:ssl-force ${use_ftps};
+              set ftp:ssl-protect-data ${use_ftps};
+              set ssl:verify-certificate yes;
+              set ssl:check-hostname yes;
+              mkdir -p api/migrations;
+              cd api/public;
+              lcd /tmp/migration-067-ops;
+              put _migration_067_ops.php;
+              put -O ../migrations "${SOURCE_FILE}";
+              bye
+            "
+          }
+          upload true
+
+      - name: Invoke authenticated read-only action
+        id: invoke
+        env:
+          MODE: ${{ inputs.mode }}
+        run: |
+          set -euo pipefail
+          TOKEN="$(< /tmp/migration-067-ops/token)"
+          BASE="https://www.karmotors.com.tr/personelmedisa/api/_migration_067_ops.php"
+          curl --fail-with-body --silent --show-error \
+            --request POST \
+            --header "Authorization: Bearer ${TOKEN}" \
+            --data-urlencode "action=${MODE}" \
+            "$BASE" > /tmp/migration-067-${MODE}.json
+          php scripts/migration-067-production-precheck.php \
+            --sanitize-result "/tmp/migration-067-${MODE}.json" \
+            > "/tmp/migration-067-${MODE}-sanitized.json"
+          cat "/tmp/migration-067-${MODE}-sanitized.json"
+          python3 - "$MODE" "/tmp/migration-067-${MODE}-sanitized.json" <<'PY'
+          import json
+          import sys
+          mode, path = sys.argv[1], sys.argv[2]
+          data = json.load(open(path, encoding="utf-8"))
+          if not data.get("ok"):
+              raise SystemExit("operation did not report ok")
+          if mode == "backup" and data.get("backup_location_class") != "OUTSIDE_WEBROOT_PERSISTENT":
+              raise SystemExit("backup location guard failed")
+          if mode == "precheck" and data.get("classification") not in {
+              "LEGACY_EXACT", "CANONICAL_EXACT", "DRIFT", "BELOW_066_OR_DRIFT"
+          }:
+              raise SystemExit("unexpected precheck classification")
+          PY
+
+      - name: Remove temporary endpoint
+        if: always()
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+          FTP_PORT: ${{ secrets.FTP_PORT }}
+        run: |
+          set -euo pipefail
+          SOURCE_FILE="$(< /tmp/migration-067-ops/source-file)"
+          cleanup() {
+            local use_ftps="$1"
+            lftp -u "${FTP_USERNAME}","${FTP_PASSWORD}" -p "${FTP_PORT}" "ftp://${FTP_SERVER}" -e "
+              set cmd:fail-exit true;
+              set net:max-retries 3;
+              set net:timeout 30;
+              set ftp:passive-mode on;
+              set ftp:ssl-allow ${use_ftps};
+              set ftp:ssl-force ${use_ftps};
+              set ftp:ssl-protect-data ${use_ftps};
+              set ssl:verify-certificate yes;
+              set ssl:check-hostname yes;
+              cd api/public;
+              rm -f _migration_067_ops.php;
+              cd ../migrations;
+              rm -f "${SOURCE_FILE}";
+              bye
+            "
+          }
+          cleanup true
+
+      - name: Verify endpoint retired
+        if: always()
+        run: |
+          set -euo pipefail
+          BASE="https://www.karmotors.com.tr/personelmedisa/api/_migration_067_ops.php"
+          code="$(curl --silent --output /tmp/migration-067-retired.txt --write-out '%{http_code}' "$BASE" || true)"
+          echo "post-cleanup HTTP=${code}"
+          test "$code" = "404" || test "$code" = "410"
+
+      - name: Upload sanitized evidence only
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: migration-067-${{ inputs.mode }}-evidence
+          path: /tmp/migration-067-${{ inputs.mode }}-sanitized.json
+          if-no-files-found: warn

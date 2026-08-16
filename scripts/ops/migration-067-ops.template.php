@@ -15,6 +15,7 @@ const MIGRATION_067_SOURCE_SHA256 = 'afa8e99867b9c670af9f8ab84a814d72231f602fa2c
 const MIGRATION_067_RUNTIME_TOKEN_B64 = 'REPLACE_MIGRATION_067_RUNTIME_TOKEN_B64';
 const MIGRATION_067_SOURCE_FILE_B64 = 'REPLACE_MIGRATION_067_SOURCE_FILE_B64';
 const MIGRATION_067_BACKUP_ROOT_B64 = 'REPLACE_MIGRATION_067_BACKUP_ROOT_B64';
+const MIGRATION_067_INSTANCE_ID_B64 = 'REPLACE_MIGRATION_067_INSTANCE_ID_B64';
 const MIGRATION_067_TEMPLATE_PLACEHOLDER = 'REPLACE_MIGRATION_067_';
 
 function migration_067_rendered_value(string $encoded): string
@@ -39,6 +40,16 @@ function migration_067_token_is_valid(string $expected, string $provided): bool
     return $expected !== ''
         && $provided !== ''
         && hash_equals($expected, $provided);
+}
+
+function migration_067_instance_id(): string
+{
+    $instanceId = migration_067_rendered_value(MIGRATION_067_INSTANCE_ID_B64);
+    if (preg_match('/^m067-[0-9]+-[0-9]+-[a-f0-9]{16}$/', $instanceId) !== 1) {
+        migration_067_fail('INSTANCE_ID_INVALID', 500);
+    }
+
+    return $instanceId;
 }
 
 function migration_067_request_token(): string
@@ -813,5 +824,6 @@ if (!defined('MIGRATION_067_TEST_IMPORT')) {
         migration_067_fail('MIGRATION_SOURCE_HASH_FAILED', 500);
     }
     $result = $action === 'backup' ? migration_067_backup($pdo) : migration_067_precheck($pdo);
+    $result['ops_instance_id'] = migration_067_instance_id();
     echo json_encode($result, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 }

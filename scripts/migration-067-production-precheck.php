@@ -26,7 +26,7 @@ function verify_source(): void
     fwrite(STDOUT, "MIGRATION_067_SOURCE_SHA256=PASS\n");
 }
 
-function sanitize_result(string $path): void
+function sanitize_result(string $path, string $expectedInstanceId): void
 {
     if (!is_file($path)) {
         fail('Result file is missing.');
@@ -37,6 +37,7 @@ function sanitize_result(string $path): void
     }
     $allowed = [
         'ok',
+        'ops_instance_id',
         'DB_NAME',
         'SCHEMA_066_FINGERPRINT',
         'DEPARTMAN_1',
@@ -64,6 +65,10 @@ function sanitize_result(string $path): void
     ];
     if (!array_key_exists('ok', $decoded)) {
         fail('Endpoint result is missing ok.');
+    }
+    if (preg_match('/^m067-[0-9]+-[0-9]+-[a-f0-9]{16}$/', $expectedInstanceId) !== 1
+        || ($decoded['ops_instance_id'] ?? null) !== $expectedInstanceId) {
+        fail('Endpoint instance identity mismatch.');
     }
     if ($decoded['ok'] !== true) {
         fail('Endpoint operation failed.');
@@ -99,8 +104,10 @@ if ($command === '--verify-source') {
     verify_source();
     exit(0);
 }
-if ($command === '--sanitize-result' && isset($argv[2])) {
-    sanitize_result($argv[2]);
+if ($command === '--sanitize-result'
+    && isset($argv[2], $argv[3], $argv[4])
+    && $argv[3] === '--expected-instance-id') {
+    sanitize_result($argv[2], $argv[4]);
     exit(0);
 }
 fail('Usage: php scripts/migration-067-production-precheck.php --verify-source|--sanitize-result FILE');

@@ -57,8 +57,11 @@ describe("Migration 067 production ops contract", () => {
   it("keeps the live-capable endpoint out of normal cPanel deployment ownership", () => {
     expect(existsSync(endpointPath)).toBe(false);
     expect(workflow).toContain("scripts/ops/migration-067-ops.template.php");
-    expect(workflow).toContain("put _migration_067_ops.php");
-    expect(workflow).toContain("rm -f _migration_067_ops.php");
+    expect(workflow).toContain("REMOTE_ENDPOINT_PATH: api/public/_migration_067_ops.php");
+    expect(workflow).toContain("PUBLIC_ENDPOINT_URL: https://www.karmotors.com.tr/personelmedisa/api/public/_migration_067_ops.php");
+    expect(workflow).toContain('put -o "${REMOTE_ENDPOINT_DIR}/${ENDPOINT_TEMP}"');
+    expect(workflow).toContain('mv "${REMOTE_ENDPOINT_DIR}/${ENDPOINT_TEMP}" "${REMOTE_ENDPOINT_PATH}"');
+    expect(workflow).toContain('rm -f "${REMOTE_ENDPOINT_PATH}"');
     expect(workflow).toContain("base64.b64encode");
     expect(workflow).not.toContain("REPLACE_MIGRATION_067_OPS_TOKEN\", token");
     expect(deployWorkflow).toContain("mirror -R --verbose api/public api/public");
@@ -111,19 +114,44 @@ describe("Migration 067 production ops contract", () => {
   it("has no apply action and always retires the endpoint", () => {
     expect(endpoint).not.toMatch(/['"]apply['"]/i);
     expect(workflow).toContain("if: always()");
-    expect(workflow).toContain("rm -f _migration_067_ops.php");
-    expect(workflow).toContain('test "$code" = "404" || test "$code" = "410"');
+    expect(workflow).toContain("if: always()");
+    expect(workflow).toContain("REMOTE_ENDPOINT_ABSENT = YES");
+    expect(workflow).toContain("REMOTE_SOURCE_ABSENT = YES");
+    expect(workflow).toContain('retirement_http = 401_ROUTER_MASK');
+    expect(workflow).toContain('[[ "$code" = "404" || "$code" = "410" ]]');
     expect(workflow).toContain("set ssl:verify-certificate yes;");
     expect(workflow).toContain("set ssl:check-hostname yes;");
     expect(workflow).not.toContain("upload true || upload false");
     expect(workflow).not.toContain("set ssl:verify-certificate no;");
     expect(workflow).not.toContain("path: /tmp/migration-067-${{ inputs.mode }}.sql");
     expect(workflow).toContain("GITHUB_RUN_ID");
-    expect(workflow).toContain('rm -f "${SOURCE_FILE}"');
+    expect(workflow).toContain('rm -f "api/migrations/${SOURCE_FILE}"');
     expect(workflow).not.toContain("workflow_run:");
     expect(workflow).not.toContain("pull_request:");
     expect(workflow).not.toMatch(/^\s+push:/m);
     expect(workflow).toContain('test "${GITHUB_REF}" = "refs/heads/main"');
     expect(workflow).toContain('test "$MAIN_SHA" = "${GITHUB_SHA}"');
+  });
+
+  it("uses the physical endpoint and fails closed on exact remote path state", () => {
+    expect(workflow).toContain("Verify exact remote paths absent before rendering");
+    expect(workflow).toContain("quote SIZE ${path};");
+    expect(workflow).toContain("STALE_MIGRATION_067_ENDPOINT_PRESENT");
+    expect(workflow).toContain("STALE_MIGRATION_067_SOURCE_PRESENT");
+    expect(workflow).toContain("FTP_CHECK_FAILED");
+    expect(workflow).not.toContain("/personelmedisa/api/_migration_067_ops.php");
+    expect(workflow).toContain('"$PUBLIC_ENDPOINT_URL"');
+  });
+
+  it("binds, validates, and sanitizes a run-bound endpoint identity", () => {
+    expect(endpoint).toContain("MIGRATION_067_INSTANCE_ID_B64");
+    expect(endpoint).toContain("ops_instance_id");
+    expect(endpoint).toContain("INSTANCE_ID_INVALID");
+    expect(workflow).toContain("OPS_INSTANCE_ID=");
+    expect(workflow).toContain("--expected-instance-id");
+    expect(driver).toContain("Endpoint instance identity mismatch.");
+    expect(driver).toContain("'ops_instance_id'");
+    expect(endpoint).not.toMatch(/['"]identity['"]/i);
+    expect(endpoint).not.toMatch(/['"]status['"]/i);
   });
 });

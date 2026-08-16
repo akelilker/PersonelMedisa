@@ -20,6 +20,11 @@ jobs:
     name: Authenticated Migration 067 ${{ inputs.mode }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      REMOTE_ENDPOINT_DIR: api/public
+      REMOTE_ENDPOINT_FILE: _migration_067_ops.php
+      REMOTE_ENDPOINT_PATH: api/public/_migration_067_ops.php
+      PUBLIC_ENDPOINT_URL: https://www.karmotors.com.tr/personelmedisa/api/public/_migration_067_ops.php
     steps:
       - name: Checkout exact main
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
@@ -59,6 +64,58 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y lftp
 
+      - name: Verify exact remote paths absent before rendering
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+          FTP_PORT: ${{ secrets.FTP_PORT }}
+        run: |
+          set -euo pipefail
+          SOURCE_FILE="067_personel_canonical_reference_gate_${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT}.sql"
+          check_exact_file() {
+            local path="$1"
+            local output status
+            set +e
+            output="$(lftp -u "${FTP_USERNAME}","${FTP_PASSWORD}" -p "${FTP_PORT}" "ftp://${FTP_SERVER}" -e "
+              set cmd:fail-exit true;
+              set net:max-retries 3;
+              set net:timeout 30;
+              set ftp:passive-mode on;
+              set ftp:ssl-allow true;
+              set ftp:ssl-force true;
+              set ftp:ssl-protect-data true;
+              set ssl:verify-certificate yes;
+              set ssl:check-hostname yes;
+              quote SIZE ${path};
+              bye
+            " 2>&1)"
+            status=$?
+            set -e
+            if [[ "$status" -eq 0 ]]; then
+              return 0
+            fi
+            if [[ "$output" == *"550"* ]]; then
+              return 1
+            fi
+            echo "$output" >&2
+            return 2
+          }
+          if check_exact_file "${REMOTE_ENDPOINT_PATH}"; then
+            echo "STALE_MIGRATION_067_ENDPOINT_PRESENT"
+            exit 1
+          else
+            status=$?
+            [[ "$status" -eq 1 ]] || { echo "FTP_CHECK_FAILED for ${REMOTE_ENDPOINT_PATH}"; exit 1; }
+          fi
+          if check_exact_file "api/migrations/${SOURCE_FILE}"; then
+            echo "STALE_MIGRATION_067_SOURCE_PRESENT"
+            exit 1
+          else
+            status=$?
+            [[ "$status" -eq 1 ]] || { echo "FTP_CHECK_FAILED for api/migrations/${SOURCE_FILE}"; exit 1; }
+          fi
+
       - name: Prepare one-shot authenticated endpoint
         id: prepare
         env:
@@ -74,8 +131,10 @@ jobs:
           fi
           [[ "$TOKEN" != *$'\r'* && "$TOKEN" != *$'\n'* ]] || (echo "Invalid runtime token" && exit 1)
           SOURCE_FILE="067_personel_canonical_reference_gate_${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT}.sql"
+          OPS_INSTANCE_ID="m067-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-$(openssl rand -hex 8)"
           printf '%s' "$TOKEN" > /tmp/migration-067-ops/token
-          OPS_TOKEN="$TOKEN" SOURCE_FILE="$SOURCE_FILE" BACKUP_ROOT="$BACKUP_ROOT" python3 - <<'PY'
+          printf '%s' "$OPS_INSTANCE_ID" > /tmp/migration-067-ops/instance-id
+          OPS_TOKEN="$TOKEN" SOURCE_FILE="$SOURCE_FILE" BACKUP_ROOT="$BACKUP_ROOT" OPS_INSTANCE_ID="$OPS_INSTANCE_ID" python3 - <<'PY'
           import os
           import base64
           from pathlib import Path
@@ -83,10 +142,12 @@ jobs:
           token = os.environ["OPS_TOKEN"]
           source_file = os.environ["SOURCE_FILE"]
           backup_root = os.environ.get("BACKUP_ROOT", "")
+          instance_id = os.environ["OPS_INSTANCE_ID"]
           encoded = {
               "REPLACE_MIGRATION_067_RUNTIME_TOKEN_B64": base64.b64encode(token.encode()).decode(),
               "REPLACE_MIGRATION_067_SOURCE_FILE_B64": base64.b64encode(source_file.encode()).decode(),
               "REPLACE_MIGRATION_067_BACKUP_ROOT_B64": base64.b64encode(backup_root.encode()).decode(),
+              "REPLACE_MIGRATION_067_INSTANCE_ID_B64": base64.b64encode(instance_id.encode()).decode(),
           }
           rendered = source
           for placeholder, value in encoded.items():
@@ -107,6 +168,50 @@ jobs:
         run: |
           set -euo pipefail
           SOURCE_FILE="$(< /tmp/migration-067-ops/source-file)"
+          ENDPOINT_TEMP="${REMOTE_ENDPOINT_FILE}.${GITHUB_RUN_ID}.${GITHUB_RUN_ATTEMPT}.part"
+          SOURCE_TEMP="${SOURCE_FILE}.${GITHUB_RUN_ID}.${GITHUB_RUN_ATTEMPT}.part"
+          check_exact_file() {
+            local path="$1"
+            local output status
+            set +e
+            output="$(lftp -u "${FTP_USERNAME}","${FTP_PASSWORD}" -p "${FTP_PORT}" "ftp://${FTP_SERVER}" -e "
+              set cmd:fail-exit true;
+              set net:max-retries 3;
+              set net:timeout 30;
+              set ftp:passive-mode on;
+              set ftp:ssl-allow true;
+              set ftp:ssl-force true;
+              set ftp:ssl-protect-data true;
+              set ssl:verify-certificate yes;
+              set ssl:check-hostname yes;
+              quote SIZE ${path};
+              bye
+            " 2>&1)"
+            status=$?
+            set -e
+            if [[ "$status" -eq 0 ]]; then
+              return 0
+            fi
+            if [[ "$output" == *"550"* ]]; then
+              return 1
+            fi
+            echo "$output" >&2
+            return 2
+          }
+          if check_exact_file "${REMOTE_ENDPOINT_PATH}"; then
+            echo "STALE_MIGRATION_067_ENDPOINT_PRESENT"
+            exit 1
+          else
+            status=$?
+            [[ "$status" -eq 1 ]] || { echo "FTP_CHECK_FAILED for ${REMOTE_ENDPOINT_PATH}"; exit 1; }
+          fi
+          if check_exact_file "api/migrations/${SOURCE_FILE}"; then
+            echo "STALE_MIGRATION_067_SOURCE_PRESENT"
+            exit 1
+          else
+            status=$?
+            [[ "$status" -eq 1 ]] || { echo "FTP_CHECK_FAILED for api/migrations/${SOURCE_FILE}"; exit 1; }
+          fi
           upload() {
             local use_ftps="$1"
             lftp -u "${FTP_USERNAME}","${FTP_PASSWORD}" -p "${FTP_PORT}" "ftp://${FTP_SERVER}" -e "
@@ -120,10 +225,11 @@ jobs:
               set ssl:verify-certificate yes;
               set ssl:check-hostname yes;
               mkdir -p api/migrations;
-              cd api/public;
               lcd /tmp/migration-067-ops;
-              put _migration_067_ops.php;
-              put -O ../migrations "${SOURCE_FILE}";
+              put -o "${REMOTE_ENDPOINT_DIR}/${ENDPOINT_TEMP}" ${REMOTE_ENDPOINT_FILE};
+              put -o "api/migrations/${SOURCE_TEMP}" "${SOURCE_FILE}";
+              mv "${REMOTE_ENDPOINT_DIR}/${ENDPOINT_TEMP}" "${REMOTE_ENDPOINT_PATH}";
+              mv "api/migrations/${SOURCE_TEMP}" "api/migrations/${SOURCE_FILE}";
               bye
             "
           }
@@ -136,14 +242,15 @@ jobs:
         run: |
           set -euo pipefail
           TOKEN="$(< /tmp/migration-067-ops/token)"
-          BASE="https://www.karmotors.com.tr/personelmedisa/api/_migration_067_ops.php"
+          EXPECTED_INSTANCE_ID="$(< /tmp/migration-067-ops/instance-id)"
           curl --fail-with-body --silent --show-error \
             --request POST \
             --header "Authorization: Bearer ${TOKEN}" \
             --data-urlencode "action=${MODE}" \
-            "$BASE" > /tmp/migration-067-${MODE}.json
+            "$PUBLIC_ENDPOINT_URL" > /tmp/migration-067-${MODE}.json
           php scripts/migration-067-production-precheck.php \
             --sanitize-result "/tmp/migration-067-${MODE}.json" \
+            --expected-instance-id "$EXPECTED_INSTANCE_ID" \
             > "/tmp/migration-067-${MODE}-sanitized.json"
           cat "/tmp/migration-067-${MODE}-sanitized.json"
           python3 - "$MODE" "/tmp/migration-067-${MODE}-sanitized.json" <<'PY'
@@ -153,6 +260,8 @@ jobs:
           data = json.load(open(path, encoding="utf-8"))
           if not data.get("ok"):
               raise SystemExit("operation did not report ok")
+          if data.get("ops_instance_id") != open("/tmp/migration-067-ops/instance-id", encoding="utf-8").read().strip():
+              raise SystemExit("endpoint instance identity mismatch")
           if mode == "backup" and data.get("backup_location_class") != "OUTSIDE_WEBROOT_PERSISTENT":
               raise SystemExit("backup location guard failed")
           if mode == "precheck" and data.get("classification") not in {
@@ -171,6 +280,8 @@ jobs:
         run: |
           set -euo pipefail
           SOURCE_FILE="$(< /tmp/migration-067-ops/source-file)"
+          ENDPOINT_TEMP="${REMOTE_ENDPOINT_FILE}.${GITHUB_RUN_ID}.${GITHUB_RUN_ATTEMPT}.part"
+          SOURCE_TEMP="${SOURCE_FILE}.${GITHUB_RUN_ID}.${GITHUB_RUN_ATTEMPT}.part"
           cleanup() {
             local use_ftps="$1"
             lftp -u "${FTP_USERNAME}","${FTP_PASSWORD}" -p "${FTP_PORT}" "ftp://${FTP_SERVER}" -e "
@@ -183,10 +294,10 @@ jobs:
               set ftp:ssl-protect-data ${use_ftps};
               set ssl:verify-certificate yes;
               set ssl:check-hostname yes;
-              cd api/public;
-              rm -f _migration_067_ops.php;
-              cd ../migrations;
-              rm -f "${SOURCE_FILE}";
+              rm -f "${REMOTE_ENDPOINT_PATH}";
+              rm -f "${REMOTE_ENDPOINT_DIR}/${ENDPOINT_TEMP}";
+              rm -f "api/migrations/${SOURCE_FILE}";
+              rm -f "api/migrations/${SOURCE_TEMP}";
               bye
             "
           }
@@ -196,10 +307,48 @@ jobs:
         if: always()
         run: |
           set -euo pipefail
-          BASE="https://www.karmotors.com.tr/personelmedisa/api/_migration_067_ops.php"
-          code="$(curl --silent --output /tmp/migration-067-retired.txt --write-out '%{http_code}' "$BASE" || true)"
+          SOURCE_FILE="$(< /tmp/migration-067-ops/source-file)"
+          ENDPOINT_TEMP="${REMOTE_ENDPOINT_FILE}.${GITHUB_RUN_ID}.${GITHUB_RUN_ATTEMPT}.part"
+          SOURCE_TEMP="${SOURCE_FILE}.${GITHUB_RUN_ID}.${GITHUB_RUN_ATTEMPT}.part"
+          check_absent() {
+            local path="$1"
+            local output status
+            set +e
+            output="$(lftp -u "${{ secrets.FTP_USERNAME }}","${{ secrets.FTP_PASSWORD }}" -p "${{ secrets.FTP_PORT }}" "ftp://${{ secrets.FTP_SERVER }}" -e "
+              set cmd:fail-exit true;
+              set net:max-retries 3;
+              set net:timeout 30;
+              set ftp:passive-mode on;
+              set ftp:ssl-allow true;
+              set ftp:ssl-force true;
+              set ftp:ssl-protect-data true;
+              set ssl:verify-certificate yes;
+              set ssl:check-hostname yes;
+              quote SIZE ${path};
+              bye
+            " 2>&1)"
+            status=$?
+            set -e
+            [[ "$status" -ne 0 && "$output" == *"550"* ]] && return 0
+            echo "$output" >&2
+            return 1
+          }
+          check_absent "${REMOTE_ENDPOINT_PATH}"
+          check_absent "api/migrations/${SOURCE_FILE}"
+          echo "REMOTE_ENDPOINT_ABSENT = YES"
+          echo "REMOTE_SOURCE_ABSENT = YES"
+          code="$(curl --silent --output /tmp/migration-067-retired.txt --write-out '%{http_code}' "$PUBLIC_ENDPOINT_URL" || true)"
           echo "post-cleanup HTTP=${code}"
-          test "$code" = "404" || test "$code" = "410"
+          if [[ "$code" = "404" || "$code" = "410" ]]; then
+            echo "retirement_filesystem = ABSENT"
+            echo "retirement_http = ${code}"
+          elif [[ "$code" = "401" ]]; then
+            echo "retirement_filesystem = ABSENT"
+            echo "retirement_http = 401_ROUTER_MASK"
+          else
+            echo "unexpected post-cleanup HTTP status: ${code}"
+            exit 1
+          fi
 
       - name: Upload sanitized evidence only
         if: always()

@@ -53,8 +53,37 @@ function sanitize_result(string $path): void
         'backup_size_bytes',
         'backup_sha256',
         'backup_location_class',
+        'backup_table_count',
+        'backup_view_count',
+        'backup_trigger_count',
+        'backup_routine_count',
+        'backup_event_count',
         'error',
     ];
+    if (!array_key_exists('ok', $decoded)) {
+        fail('Endpoint result is missing ok.');
+    }
+    if ($decoded['ok'] !== true) {
+        fail('Endpoint operation failed.');
+    }
+    if (array_key_exists('backup_created', $decoded)) {
+        if ($decoded['backup_created'] !== true
+            || !is_string($decoded['backup_filename'] ?? null)
+            || !preg_match('/^karmotor_medisa_pre_067_[0-9]{8}_[0-9]{6}\.sql$/', $decoded['backup_filename'])
+            || (int) ($decoded['backup_size_bytes'] ?? 0) <= 0
+            || !is_string($decoded['backup_sha256'] ?? null)
+            || preg_match('/^[a-f0-9]{64}$/i', $decoded['backup_sha256']) !== 1
+            || ($decoded['backup_location_class'] ?? '') !== 'OUTSIDE_WEBROOT_PERSISTENT') {
+            fail('Backup result failed validation.');
+        }
+    } elseif (!in_array($decoded['classification'] ?? '', [
+        'LEGACY_EXACT',
+        'CANONICAL_EXACT',
+        'DRIFT',
+        'BELOW_066_OR_DRIFT',
+    ], true)) {
+        fail('Precheck classification is missing or invalid.');
+    }
     $sanitized = array_intersect_key($decoded, array_flip($allowed));
     $json = json_encode($sanitized, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
     if ($json === false) {

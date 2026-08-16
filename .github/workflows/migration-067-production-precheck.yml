@@ -38,12 +38,17 @@ jobs:
           FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
           FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
           FTP_PORT: ${{ secrets.FTP_PORT }}
+          MODE: ${{ inputs.mode }}
+          MIGRATION_067_BACKUP_ROOT: ${{ secrets.MIGRATION_067_BACKUP_ROOT }}
         run: |
           set -euo pipefail
           test -n "$FTP_SERVER" || (echo "FTP_SERVER missing" && exit 1)
           test -n "$FTP_USERNAME" || (echo "FTP_USERNAME missing" && exit 1)
           test -n "$FTP_PASSWORD" || (echo "FTP_PASSWORD missing" && exit 1)
           test "$FTP_PORT" = "21" || (echo "FTP_PORT must be 21" && exit 1)
+          if [[ "$MODE" = "backup" ]]; then
+            test -n "$MIGRATION_067_BACKUP_ROOT" || (echo "MIGRATION_067_BACKUP_ROOT missing for backup mode" && exit 1)
+          fi
           sudo apt-get update
           sudo apt-get install -y lftp
 
@@ -51,6 +56,7 @@ jobs:
         id: prepare
         env:
           OPS_TOKEN_SECRET: ${{ secrets.MIGRATION_067_OPS_TOKEN }}
+          BACKUP_ROOT: ${{ secrets.MIGRATION_067_BACKUP_ROOT }}
         run: |
           set -euo pipefail
           mkdir -p /tmp/migration-067-ops
@@ -62,14 +68,22 @@ jobs:
           [[ "$TOKEN" != *$'\r'* && "$TOKEN" != *$'\n'* ]] || (echo "Invalid runtime token" && exit 1)
           SOURCE_FILE="067_personel_canonical_reference_gate_${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT}.sql"
           printf '%s' "$TOKEN" > /tmp/migration-067-ops/token
-          OPS_TOKEN="$TOKEN" SOURCE_FILE="$SOURCE_FILE" python3 - <<'PY'
+          OPS_TOKEN="$TOKEN" SOURCE_FILE="$SOURCE_FILE" BACKUP_ROOT="$BACKUP_ROOT" python3 - <<'PY'
           import os
+          import base64
           from pathlib import Path
-          source = Path("api/public/_migration_067_ops.php").read_text(encoding="utf-8")
+          source = Path("scripts/ops/migration-067-ops.template.php").read_text(encoding="utf-8")
           token = os.environ["OPS_TOKEN"]
           source_file = os.environ["SOURCE_FILE"]
-          rendered = source.replace("REPLACE_MIGRATION_067_OPS_TOKEN", token)
-          rendered = rendered.replace("REPLACE_MIGRATION_067_SOURCE_FILE", source_file)
+          backup_root = os.environ.get("BACKUP_ROOT", "")
+          encoded = {
+              "REPLACE_MIGRATION_067_RUNTIME_TOKEN_B64": base64.b64encode(token.encode()).decode(),
+              "REPLACE_MIGRATION_067_SOURCE_FILE_B64": base64.b64encode(source_file.encode()).decode(),
+              "REPLACE_MIGRATION_067_BACKUP_ROOT_B64": base64.b64encode(backup_root.encode()).decode(),
+          }
+          rendered = source
+          for placeholder, value in encoded.items():
+              rendered = rendered.replace(placeholder, value)
           Path("/tmp/migration-067-ops/_migration_067_ops.php").write_text(rendered, encoding="utf-8")
           PY
           cp api/migrations/067_personel_canonical_reference_gate.sql \
@@ -132,7 +146,7 @@ jobs:
           data = json.load(open(path, encoding="utf-8"))
           if not data.get("ok"):
               raise SystemExit("operation did not report ok")
-          if mode == "backup" and data.get("backup_location_class") != "OUTSIDE_WEBROOT":
+          if mode == "backup" and data.get("backup_location_class") != "OUTSIDE_WEBROOT_PERSISTENT":
               raise SystemExit("backup location guard failed")
           if mode == "precheck" and data.get("classification") not in {
               "LEGACY_EXACT", "CANONICAL_EXACT", "DRIFT", "BELOW_066_OR_DRIFT"

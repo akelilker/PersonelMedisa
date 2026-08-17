@@ -680,6 +680,27 @@ try {
     s98Assert(count($readCollection) === 3, 'read collection returns all active branches');
     s98Assert(($readCollection[0]['state'] ?? '') === SgkSirketPolitikaReadService::STATE_APPROVED, 'collection approved state');
 
+    $pdo->exec("INSERT INTO sgk_sirket_politika_surumleri
+        (sube_id, surum_kodu, gecerlilik_baslangic, gecerlilik_bitis, bildirim_donem_tipi, state, politika_hash, aciklama, hazirlayan_id)
+        VALUES (2, 'POL-FUTURE-PENDING', '2026-09-01', NULL, 'AY_1_SON_GUN', 'ONAY_BEKLIYOR', '" . str_repeat('f', 64) . "', 'future pending inventory fixture', 1)");
+
+    $emptyInventory = SgkSirketPolitikaReadService::listRevisionInventory($pdo, 3, '2026-08-01', '2026-08-31');
+    s98Assert($emptyInventory === [], 'revision inventory empty branch is safe-no-policy compatible');
+
+    $branchOneInventory = SgkSirketPolitikaReadService::listRevisionInventory($pdo, 1, '2026-03-01', '2026-03-31');
+    s98Assert(count($branchOneInventory) === 2, 'approved and newer draft both visible in inventory');
+    s98Assert($branchOneInventory[0]['state'] === 'ONAYLANDI', 'inventory approved state');
+    s98Assert($branchOneInventory[0]['effective_for_requested_period'] === true, 'approved row remains effective independently');
+    s98Assert($branchOneInventory[1]['state'] === 'TASLAK', 'inventory draft state');
+    s98Assert($branchOneInventory[1]['overlaps_requested_period'] === true, 'draft overlap is reported');
+
+    $branchTwoInventory = SgkSirketPolitikaReadService::listRevisionInventory($pdo, 2, '2026-08-01', '2026-08-31');
+    s98Assert(count($branchTwoInventory) === 2, 'inventory isolates branch revisions');
+    s98Assert($branchTwoInventory[0]['state'] === 'ONAYLANDI', 'inventory approved branch two state');
+    s98Assert($branchTwoInventory[1]['state'] === 'ONAY_BEKLIYOR', 'inventory pending state');
+    s98Assert($branchTwoInventory[1]['overlaps_requested_period'] === false, 'future pending period does not overlap requested period');
+    s98Assert($branchTwoInventory[1]['gecerlilik_baslangic'] === '2026-09-01', 'future revision period preserved');
+
     $overlapDry = SgkSirketPolitikaImportValidator::dryRun($pdo, [
         'sube_id' => 1,
         'surum_kodu' => 'POL-OVERLAP',

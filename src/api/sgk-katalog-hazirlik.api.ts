@@ -138,6 +138,13 @@ export type SgkSirketPolitikaReadItem = {
   degerler?: Record<string, string>;
 };
 
+export type SgkSirketPolitikaRevisionItem = SgkSirketPolitikaReadItem & {
+  policy_id: number;
+  created_at?: string | null;
+  effective_for_requested_period: boolean;
+  overlaps_requested_period: boolean;
+};
+
 function unwrapData<T>(payload: ApiResponse<T> | T): T {
   if (typeof payload === "object" && payload !== null && "data" in payload) {
     return (payload as ApiResponse<T>).data;
@@ -166,6 +173,24 @@ export async function fetchSgkSirketPolitikasi(params?: { sube_id?: number; yil?
       period: { baslangic: string; bitis: string };
     }>
   >(appendQueryParams(endpoints.sgkKatalogHazirlik.sirketPolitikasi, params ?? {}));
+
+  return unwrapData(response);
+}
+
+export async function fetchSgkSirketPolitikasiSurumler(params: {
+  sube_id: number;
+  baslangic?: string;
+  bitis?: string;
+  yil?: number;
+  ay?: number;
+}) {
+  const response = await apiRequest<
+    ApiResponse<{
+      sube_id: number;
+      items: SgkSirketPolitikaRevisionItem[];
+      period: { baslangic: string; bitis: string };
+    }>
+  >(appendQueryParams(endpoints.sgkKatalogHazirlik.sirketPolitikasiSurumler, params));
 
   return unwrapData(response);
 }

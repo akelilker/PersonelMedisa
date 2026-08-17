@@ -225,6 +225,7 @@ export const endpoints = {
     surecEslemeDryRun: "/sgk-katalog-hazirlik/surec-esleme/dry-run",
     surecEslemeImport: "/sgk-katalog-hazirlik/surec-esleme/import",
     sirketPolitikasi: "/sgk-katalog-hazirlik/sirket-politikasi",
+    sirketPolitikasiSurumler: "/sgk-katalog-hazirlik/sirket-politikasi/surumler",
     sirketPolitikasiSablonCsv: "/sgk-katalog-hazirlik/sirket-politikasi/sablon.csv",
     sirketPolitikasiDryRun: "/sgk-katalog-hazirlik/sirket-politikasi/dry-run",
     sirketPolitikasiImport: "/sgk-katalog-hazirlik/sirket-politikasi/import",

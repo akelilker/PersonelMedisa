@@ -288,6 +288,36 @@ class SgkKatalogHazirlikController
         ]);
     }
 
+    public static function sirketPolitikasiSurumler(Request $request)
+    {
+        [$pdo, $user, $subeId] = self::context($request, 'mevzuat_parametreleri.view');
+        if ($subeId === null) {
+            JsonResponse::error(400, 'SGK_POLITIKA_SUBE_ZORUNLU', 'Revision inventory icin sube_id zorunludur.');
+            return;
+        }
+
+        [$from, $to] = self::readPolicyPeriod($request);
+        try {
+            $items = SgkSirketPolitikaReadService::listRevisionInventory($pdo, $subeId, $from, $to);
+        } catch (\Throwable $e) {
+            JsonResponse::error(
+                503,
+                'SGK_POLITIKA_REVIZYON_OKUMA_HATASI',
+                'SGK sirket politikasi revizyonlari okunamadi.'
+            );
+            return;
+        }
+
+        JsonResponse::success([
+            'sube_id' => $subeId,
+            'items' => $items,
+            'period' => [
+                'baslangic' => $from,
+                'bitis' => $to,
+            ],
+        ]);
+    }
+
     public static function sirketPolitikasiDryRun(Request $request)
     {
         [$pdo] = self::context($request, 'mevzuat_parametreleri.view');
@@ -553,6 +583,12 @@ class SgkKatalogHazirlikController
     /** @return array{0:string,1:string} */
     private static function readPolicyPeriod(Request $request): array
     {
+        $requestedFrom = trim((string) $request->getQuery('baslangic', ''));
+        $requestedTo = trim((string) $request->getQuery('bitis', ''));
+        if (self::isIsoDate($requestedFrom) && self::isIsoDate($requestedTo) && $requestedTo >= $requestedFrom) {
+            return [$requestedFrom, $requestedTo];
+        }
+
         $yil = (int) $request->getQuery('yil', 0);
         $ay = (int) $request->getQuery('ay', 0);
         if ($yil >= 2000 && $yil <= 2100 && $ay >= 1 && $ay <= 12) {
@@ -568,5 +604,12 @@ class SgkKatalogHazirlikController
             $today->modify('first day of this month')->format('Y-m-d'),
             $today->modify('last day of this month')->format('Y-m-d'),
         ];
+    }
+
+    private static function isIsoDate(string $value): bool
+    {
+        $date = \DateTimeImmutable::createFromFormat('!Y-m-d', $value);
+
+        return $date !== false && $date->format('Y-m-d') === $value;
     }
 }

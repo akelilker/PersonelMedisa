@@ -89,9 +89,17 @@
 }
 
 .modal-header h2.premium-title {
-  color: var(--text-primary);
   font-weight: var(--premium-title-weight);
   letter-spacing: var(--premium-title-letter-spacing);
+  background: var(--modal-premium-title-gradient);
+  background-size: 100% 180%;
+  background-position: 50% 54%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  filter: brightness(1.01);
+  text-shadow: var(--modal-premium-title-shadow);
 }
 
 .modal-body {
@@ -186,6 +194,33 @@
   font-weight: 500;
   cursor: pointer;
   transition: color 0.2s ease;
+}
+
+.modal-home-btn {
+  grid-column: 1;
+  justify-self: start;
+  display: inline-grid;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  place-items: center;
+  border: none;
+  background: transparent;
+  color: rgba(226, 232, 240, 0.78);
+  cursor: pointer;
+  transition: color 0.2s ease, transform 0.2s ease;
+}
+
+.modal-home-btn:hover {
+  color: #ffffff;
+  transform: scale(1.02);
+}
+
+.modal-home-btn svg {
+  width: 27px;
+  height: 27px;
+  stroke: currentcolor;
+  stroke-width: 2;
 }
 
 .modal-back-btn:hover {

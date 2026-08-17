@@ -29,11 +29,13 @@
   --modal-bg: var(--bg-app);
   --modal-header-red-gradient:
     linear-gradient(180deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.02) 5%, rgba(255, 255, 255, 0) 12%),
-    linear-gradient(180deg, rgba(var(--theme-color-rgb), 0.22) 0%, rgba(var(--theme-color-rgb), 0.08) 34%, rgba(var(--theme-color-rgb), 0) 52%),
-    linear-gradient(180deg, #1a1015 0%, #100f16 64%, var(--modal-bg) 100%);
+    linear-gradient(180deg, rgba(212, 0, 0, 0.36) 0%, rgba(212, 0, 0, 0.22) 18%, rgba(212, 0, 0, 0.08) 34%, rgba(212, 0, 0, 0) 48%),
+    linear-gradient(180deg, #790000 0%, #700000 30%, #580000 52%, #420205 72%, #32050a 82%, #20080f 90%, #120b14 96%, var(--modal-bg) 100%);
   --modal-title-color: #d1dbe4;
   --modal-title-shadow: 0 1px 0 rgba(0, 0, 0, 0.55), 0 0 5px rgba(214, 224, 232, 0.12);
   --modal-title-weight: 700;
+  --modal-premium-title-gradient: linear-gradient(to bottom, #f8fbfd 0%, #ffffff 38%, #dce6ed 57%, #f5f9fc 100%);
+  --modal-premium-title-shadow: 0 1px 1px rgba(0, 0, 0, 0.38), 0 0 2px rgba(255, 255, 255, 0.2);
   --modal-border: rgba(255, 255, 255, 0.35);
   --bg-content: var(--bg-surface);
   --txt: var(--text-primary);
@@ -50,6 +52,13 @@
   --premium-title-letter-spacing: 0.085em;
   --green: var(--success);
   --red: var(--danger);
+}
+
+@media (min-width: 641px) {
+  :root {
+    --modal-premium-title-gradient: linear-gradient(to bottom, #ffffff 0%, #ffffff 42%, #f6fbff 58%, #ffffff 100%);
+    --modal-premium-title-shadow: 0 1px 1px rgba(0, 0, 0, 0.46), 0 0 6px rgba(255, 255, 255, 0.42), 0 0 12px rgba(255, 255, 255, 0.14);
+  }
 }
 
 @media (max-width: 640px) {

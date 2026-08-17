@@ -11,6 +11,7 @@ type AppModalProps = {
   backLabel?: string;
   onBack?: () => void;
   backTestId?: string;
+  headerStart?: ReactNode;
   className?: string;
   bodyClassName?: string;
   titleVariant?: "default" | "premium";
@@ -213,6 +214,7 @@ export function AppModal({
   backLabel,
   onBack,
   backTestId,
+  headerStart,
   className,
   bodyClassName,
   titleVariant = "default"
@@ -411,7 +413,9 @@ export function AppModal({
         tabIndex={-1}
       >
         <div className="modal-header">
-          {onBack && backLabel ? (
+          {headerStart ? (
+            headerStart
+          ) : onBack && backLabel ? (
             <button type="button" className="modal-back-btn" onClick={onBack} data-testid={backTestId}>
               <span className="modal-back-btn-icon" aria-hidden="true">
                 ←

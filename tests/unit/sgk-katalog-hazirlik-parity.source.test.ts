@@ -92,6 +92,12 @@ describe("S85-C1 SGK katalog hazirlik parity", () => {
     expect(surumMatch?.[0]).not.toContain("loadManifests");
     expect(surumMatch?.[0]).toContain("sgk_eksik_gun_katalog_surumleri");
     expect(controller).toContain("storedApprovedTamlik");
+    const blockerMatch = controller.match(/function blockerReport\(Request \$request\)\s*\{[\s\S]*?\n    \}/);
+    expect(blockerMatch?.[0]).toBeTruthy();
+    expect(blockerMatch?.[0]).toContain("SgkKatalogWriteService::storedApprovedTamlik($pdo)");
+    expect(blockerMatch?.[0]).toContain("$catalogBlockers = []");
+    expect(blockerMatch?.[0]).toContain("'blocker_raporu'");
+    expect(blockerMatch?.[0]).toContain("'blocker_detaylari' => $all");
     expect(controller).toContain("operasyonel_kanit_max_decoded_bytes");
     expect(controller).not.toMatch(/base64_decode\(\$body/);
 

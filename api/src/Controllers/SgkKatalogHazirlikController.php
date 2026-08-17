@@ -323,18 +323,25 @@ class SgkKatalogHazirlikController
     public static function blockerReport(Request $request)
     {
         [$pdo] = self::context($request, 'bordro_on_izleme.view');
-        $tamlik = SgkKatalogTamlikService::evaluate([
-            'manifests' => self::loadManifests($pdo, 'blocker_raporu'),
-            'kod_satirlari' => [],
-            'ebildirge_guncel_gorunum_dogrulandi_mi' => false,
-        ]);
+        $storedTamlik = SgkKatalogWriteService::storedApprovedTamlik($pdo);
+        if ($storedTamlik !== null) {
+            $tamlik = $storedTamlik;
+            $catalogBlockers = [];
+        } else {
+            $tamlik = SgkKatalogTamlikService::evaluate([
+                'manifests' => self::loadManifests($pdo, 'blocker_raporu'),
+                'kod_satirlari' => [],
+                'ebildirge_guncel_gorunum_dogrulandi_mi' => false,
+            ]);
+            $catalogBlockers = $tamlik['blocker_detaylari'] ?? [];
+        }
         $kismi = SgkKatalogPreviewService::kismiSureliPreview([]);
         $bildirim = SgkKatalogPreviewService::bildirimDonemiPreview([]);
         $esleme = SgkSurecKodEslemeValidator::validate(['surec_turu' => 'RAPOR', 'alt_tur' => 'Raporlu_Hastalik', 'mappings' => []]);
         $coklu = SgkCokluNedenValidator::validate(['kodlar' => ['01', '15'], 'kurallar' => []]);
 
         $all = array_merge(
-            $tamlik['blocker_detaylari'] ?? [],
+            $catalogBlockers,
             $kismi['blocker_detaylari'] ?? [],
             $bildirim['blocker_detaylari'] ?? [],
             $esleme['blocker_detaylari'] ?? [],

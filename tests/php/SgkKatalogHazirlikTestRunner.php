@@ -775,6 +775,13 @@ assertTrue(strpos($surumChunk, 'self::context(') !== false, 'surumler context ku
 assertTrue(strpos($surumChunk, 'sgk_eksik_gun_katalog_surumleri') !== false, 'surumler DB surum tablosunu okur');
 assertTrue(strpos($controllerSrc, 'storedApprovedTamlik') !== false, 'tamlik kayitli ONAYLANDI snapshot okur');
 assertTrue(strpos($writeSrc, 'function storedApprovedTamlik') !== false, 'WriteService storedApprovedTamlik');
+$blockerMethodPos = strpos($controllerSrc, 'function blockerReport(Request $request)');
+assertTrue($blockerMethodPos !== false, 'blocker report owner mevcut');
+$blockerMethodSrc = substr($controllerSrc, $blockerMethodPos, 2200);
+assertTrue(strpos($blockerMethodSrc, 'SgkKatalogWriteService::storedApprovedTamlik($pdo)') !== false, 'blocker report effective approved snapshot okur');
+assertTrue(strpos($blockerMethodSrc, '$catalogBlockers = [];') !== false, 'approved catalog catalog blocker downgrade yok');
+assertTrue(strpos($blockerMethodSrc, "'blocker_raporu'") !== false, 'no approved catalog fail-closed evaluation korunur');
+assertTrue(strpos($blockerMethodSrc, '$catalogBlockers,') !== false, 'independent blocker merge korunur');
 
 // --- S106 canonical 19-pack dry-run ---
 $canonicalPath = __DIR__ . '/../../ops/sgk/S106-SGK-EKSIK-GUN-19-CANONICAL.json';

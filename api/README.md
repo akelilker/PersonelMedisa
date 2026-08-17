@@ -15,6 +15,8 @@ Bu repoda migration/seed SQL dosyalari vardir; canliya calistirma deploy sprinti
 api/
   .htaccess              # Apache rewrite -> public/index.php
   public/index.php       # Front controller
+  bin/migrate.php        # CLI-only canonical migration runner
+  bin/run-production-migrations.sh # SSH deploy owner
   src/                   # PHP uygulama kodu
   migrations/            # SQL schema
   seeds/                 # Smoke seed template
@@ -26,15 +28,20 @@ Canli deploy hedefi:
 public_html/personelmedisa/api/
 ```
 
-GitHub Actions deploy workflow'u frontend `dist/` ile birlikte PHP API icin yalnizca
+GitHub Actions deploy workflow'u frontend `dist/` ile birlikte PHP API icin
 asagidaki runtime yuzeyini gonderir:
 
 - `api/.htaccess`
 - `api/public/`
 - `api/src/`
+- `api/bin/`
+- `api/migrations/`
 
-`config.local.php`, `migrations/` ve `seeds/` workflow tarafindan gonderilmez.
-Migration dosyalari canlida otomatik calistirilmaz.
+`config.local.php` ve `seeds/` workflow tarafindan gonderilmez.
+FTP upload tamamlandiktan sonra workflow, SSH ile `api/bin/run-production-migrations.sh`
+calistirir. Bu script sunucudaki `config.local.php` DB ayarlarini kullanarak
+pending migration'lari ledger'a yazar ve schema-ready kontrolu yapar.
+Migration SQL dosyalari web'den `.htaccess` ile engellenir.
 
 `api/.htaccess`, canli `config.local.php` ile backup/temp turevlerini
 (`config.local.php.*`, `config.local.php~`, slash-path) web'den fail-closed engeller.
@@ -69,10 +76,18 @@ return [
 
 ## Migration / seed
 
-phpMyAdmin veya MySQL CLI ile sirasiyla:
+Migration'lar phpMyAdmin veya manuel MySQL CLI ile calistirilmaz. Uretimde
+yalnizca SSH ile cagrilan canonical runner kullanilir:
 
-1. `migrations/001_initial_schema.sql` — `karmotor_medisa` secili iken calistirin
-2. `seeds/001_smoke_seed.example.sql` — smoke verisi (password hash canlida uretilecek)
+```bash
+php api/bin/migrate.php
+php api/bin/migrate.php --verify
+```
+
+Ilk mevcut production kurulumu icin SSH ortaminda `MEDISA_MIGRATION_BASELINE`
+yalnizca zaten uygulanmis son migration surumune ayarlanir; runner bu surum ve
+oncekileri tekrar calistirmadan ledger'a kaydeder. Sonraki deploy'larda baseline
+gerekmez. `seeds/` production deploy kapsaminda degildir.
 
 Password hash uretimi:
 

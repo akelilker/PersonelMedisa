@@ -14,6 +14,11 @@ Ana deploy yolu GitHub Actions üzerindendir. cPanel üzerinde `npm build` çal�
    - `FTP_USERNAME`
    - `FTP_PASSWORD`
    - `FTP_PORT` (`Deploy cPanel` workflow'u bu proje için `21` bekler; SFTP/`22` kullanılacaksa workflow ayrıca güncellenmelidir)
+   - `CPANEL_SSH_HOST`
+   - `CPANEL_SSH_PORT`
+   - `CPANEL_SSH_USER`
+   - `CPANEL_SSH_PRIVATE_KEY`
+   - `CPANEL_SSH_KNOWN_HOSTS`
 2. Workflow dosyası: `.github/workflows/deploy-cpanel.yml`
 3. `main` branch'e push sonrası deploy doğrudan başlamaz. Önce `CI` workflow'u (`typecheck + unit test + build`) başarıyla tamamlanır; ardından `Deploy cPanel` workflow'u `workflow_run` ile tetiklenir.
 4. Yalnızca `CI` fail olursa otomatik deploy çalışmaz. **E2E workflow deploy gate değildir**; E2E ayrı `workflow_dispatch` ile manuel çalıştırılır (son doğrulamada 193 test).
@@ -46,9 +51,10 @@ Kontrol notları:
 2. `CI` success → `Deploy cPanel` workflow başlar.
 3. Deploy, CI'da test edilen commit SHA ile checkout yapar (`github.event.workflow_run.head_sha`).
 4. Deploy içinde: `npm ci` → `npm run build` (`VITE_APP_BASE_PATH=/personelmedisa/`) → `dist/` içeriğini hedef klasöre yükler. Deploy workflow **tekrar typecheck veya unit test çalıştırmaz**.
-5. Aynı workflow ayrıca `api/.htaccess`, `api/public/` ve `api/src/` dosyalarını `public_html/personelmedisa/api/` altına gönderir.
-6. `api/config.local.php`, `api/migrations/` ve `api/seeds/` deploy kapsamı dışındadır; migration otomatik çalıştırılmaz.
-7. Deploy workflow **deploy sonrası otomatik health/smoke çalıştırmaz**; smoke manuel checklist ile yapılır.
+5. Aynı workflow ayrıca `api/.htaccess`, `api/public/`, `api/src/`, `api/bin/` ve `api/migrations/` dosyalarını `public_html/personelmedisa/api/` altına gönderir.
+6. FTP upload tamamlandıktan sonra workflow, pinned known-hosts ile SSH üzerinden `api/bin/run-production-migrations.sh` çalıştırır. Migration veya schema-ready kontrolü başarısız olursa deploy durur.
+7. `api/config.local.php` ve `api/seeds/` deploy kapsamı dışındadır; DB credential yalnız sunucudaki config'ten okunur.
+8. Migration runner tamamlandıktan sonra deploy workflow otomatik health/smoke çalıştırır.
 
 Manuel deploy (`workflow_dispatch`) korunur; checkout seçilen branch/ref üzerinden yapılır.
 
@@ -75,8 +81,8 @@ Kontrol:
 - `dist/assets/` var
 - `dist/.htaccess` var
 - Build çıktısı içinde `src`, `tests`, `.git`, `node_modules` yok
-- PHP API deploy kapsamı yalnızca `api/.htaccess`, `api/public/`, `api/src/`
-- `api/config.local.php`, `api/migrations/`, `api/seeds/` otomatik deploy edilmez
+- PHP API deploy kapsamı `api/.htaccess`, `api/public/`, `api/src/`, `api/bin/`, `api/migrations/`
+- `api/config.local.php` ve `api/seeds/` otomatik deploy edilmez
 
 ## 2) Sunucuyu temizle (manuel yedek yol)
 
@@ -107,14 +113,18 @@ GitHub Actions deploy workflow'u şu dosyaları ayrıca gönderir:
 - `api/.htaccess` → `public_html/personelmedisa/api/.htaccess`
 - `api/public/` → `public_html/personelmedisa/api/public/`
 - `api/src/` → `public_html/personelmedisa/api/src/`
+- `api/bin/` → `public_html/personelmedisa/api/bin/`
+- `api/migrations/` → `public_html/personelmedisa/api/migrations/`
 
-Şunlar workflow tarafından gönderilmez ve otomatik çalıştırılmaz:
+Şunlar workflow tarafından gönderilmez:
 
 - `api/config.local.php`
-- `api/migrations/`
 - `api/seeds/`
 
 Canlı `config.local.php` sunucuda kalmalı; gerçek DB secret bilgileri repodan gelmemelidir.
+İlk mevcut production kurulumu için SSH ortamında zaten uygulanmış son migration
+sürümü `MEDISA_MIGRATION_BASELINE` ile sağlanır; sonrasında runner yalnız pending
+dosyaları uygular ve ledger üzerinden idempotent çalışır.
 
 `api/.htaccess` canlı `config.local.php` ve backup/temp türevlerini (`*.bak`, `*.old`, `*.tmp`, `~`,
 suffix/path varyantları) web’den engeller. Config yedeği yalnız web root dışında tutulur

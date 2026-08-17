@@ -31,6 +31,9 @@ jobs:
       LOCAL_DIST_DIR: ./dist/
       LOCAL_REPO_DIR: ${{ github.workspace }}
       REMOTE_TARGET_DIR: .
+      REMOTE_APP_PATH: public_html/personelmedisa
+      MEDISA_MIGRATION_BASELINE: "067"
+      DEPLOY_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
     steps:
       - name: Checkout tested commit
         if: github.event_name == 'workflow_run'
@@ -80,6 +83,11 @@ jobs:
           FTP_PORT: ${{ secrets.FTP_PORT }}
           SMOKE_AUTH_USERNAME: ${{ secrets.SMOKE_AUTH_USERNAME }}
           SMOKE_AUTH_PASSWORD: ${{ secrets.SMOKE_AUTH_PASSWORD }}
+          CPANEL_SSH_HOST: ${{ secrets.CPANEL_SSH_HOST }}
+          CPANEL_SSH_PORT: ${{ secrets.CPANEL_SSH_PORT }}
+          CPANEL_SSH_USER: ${{ secrets.CPANEL_SSH_USER }}
+          CPANEL_SSH_PRIVATE_KEY: ${{ secrets.CPANEL_SSH_PRIVATE_KEY }}
+          CPANEL_SSH_KNOWN_HOSTS: ${{ secrets.CPANEL_SSH_KNOWN_HOSTS }}
         run: |
           test -n "$FTP_SERVER" || (echo "FTP_SERVER secret is missing." && exit 1)
           test -n "$FTP_USERNAME" || (echo "FTP_USERNAME secret is missing." && exit 1)
@@ -88,6 +96,12 @@ jobs:
           test "$FTP_PORT" = "21" || (echo "FTP_PORT must be 21 for this cPanel FTP deploy." && exit 1)
           test -n "$SMOKE_AUTH_USERNAME" || (echo "SMOKE_AUTH_USERNAME secret is missing." && exit 1)
           test -n "$SMOKE_AUTH_PASSWORD" || (echo "SMOKE_AUTH_PASSWORD secret is missing." && exit 1)
+          test -n "$CPANEL_SSH_HOST" || (echo "CPANEL_SSH_HOST secret is missing." && exit 1)
+          test -n "$CPANEL_SSH_PORT" || (echo "CPANEL_SSH_PORT secret is missing." && exit 1)
+          test -n "$CPANEL_SSH_USER" || (echo "CPANEL_SSH_USER secret is missing." && exit 1)
+          test -n "$CPANEL_SSH_PRIVATE_KEY" || (echo "CPANEL_SSH_PRIVATE_KEY secret is missing." && exit 1)
+          test -n "$CPANEL_SSH_KNOWN_HOSTS" || (echo "CPANEL_SSH_KNOWN_HOSTS secret is missing." && exit 1)
+          case "$CPANEL_SSH_PORT" in (*[!0-9]*|'') echo "CPANEL_SSH_PORT must be numeric." && exit 1;; esac
 
       - name: Install deploy client
         run: |
@@ -103,8 +117,10 @@ jobs:
           LOCAL_DIST_DIR: ${{ env.LOCAL_DIST_DIR }}
           LOCAL_REPO_DIR: ${{ env.LOCAL_REPO_DIR }}
           REMOTE_TARGET_DIR: ${{ env.REMOTE_TARGET_DIR }}
+          DEPLOY_SHA: ${{ env.DEPLOY_SHA }}
         run: |
           set -euo pipefail
+          printf '%s\n' "$DEPLOY_SHA" > "$RUNNER_TEMP/.deploy-sha"
 
           deploy_with_ftp_mode() {
             local mode_name="$1"
@@ -137,6 +153,9 @@ jobs:
               put -O api api/.htaccess;
               mirror -R --verbose api/public api/public;
               mirror -R --verbose api/src api/src;
+              mirror -R --verbose api/bin api/bin;
+              mirror -R --verbose api/migrations api/migrations;
+              put -O api ${RUNNER_TEMP}/.deploy-sha;
               !echo 'upload tamamlandi';
               bye
             "
@@ -149,6 +168,35 @@ jobs:
 
           echo "Explicit FTPS basarisiz oldu, plain FTP fallback deneniyor..."
           deploy_with_ftp_mode "plain-ftp" "false"
+
+      - name: Apply pending migrations over pinned SSH
+        env:
+          CPANEL_SSH_HOST: ${{ secrets.CPANEL_SSH_HOST }}
+          CPANEL_SSH_PORT: ${{ secrets.CPANEL_SSH_PORT }}
+          CPANEL_SSH_USER: ${{ secrets.CPANEL_SSH_USER }}
+          CPANEL_SSH_PRIVATE_KEY: ${{ secrets.CPANEL_SSH_PRIVATE_KEY }}
+          CPANEL_SSH_KNOWN_HOSTS: ${{ secrets.CPANEL_SSH_KNOWN_HOSTS }}
+          REMOTE_APP_PATH: ${{ env.REMOTE_APP_PATH }}
+          MEDISA_MIGRATION_BASELINE: ${{ env.MEDISA_MIGRATION_BASELINE }}
+          DEPLOY_SHA: ${{ env.DEPLOY_SHA }}
+        run: |
+          set -euo pipefail
+          key_file="$RUNNER_TEMP/cpanel-deploy-key"
+          known_hosts_file="$RUNNER_TEMP/cpanel-known-hosts"
+          trap 'rm -f "$key_file" "$known_hosts_file"' EXIT
+          umask 077
+          printf '%s\n' "$CPANEL_SSH_PRIVATE_KEY" > "$key_file"
+          printf '%s\n' "$CPANEL_SSH_KNOWN_HOSTS" > "$known_hosts_file"
+          chmod 600 "$key_file" "$known_hosts_file"
+          ssh \
+            -i "$key_file" \
+            -p "$CPANEL_SSH_PORT" \
+            -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile="$known_hosts_file" \
+            "${CPANEL_SSH_USER}@${CPANEL_SSH_HOST}" \
+            "MEDISA_APP_PATH='${REMOTE_APP_PATH}' MEDISA_MIGRATION_BASELINE='${MEDISA_MIGRATION_BASELINE}' bash api/bin/run-production-migrations.sh '${DEPLOY_SHA}'"
 
       - name: Verify deployed app with anonymous and authenticated read-only smoke
         env:

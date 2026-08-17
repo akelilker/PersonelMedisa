@@ -6,6 +6,7 @@ namespace Medisa\Api\Services;
 
 use Medisa\Api\Services\Payroll\SgkManuelKodOverrideService;
 use Medisa\Api\Services\Payroll\SgkPrimGunuEngine;
+use Medisa\Api\Services\Payroll\SgkSirketPolitikaReadService;
 use PDO;
 use PDOException;
 
@@ -23,7 +24,20 @@ final class SgkPrimGunuService
         $periodStart = (string) $resolution['donem_baslangic'];
         $periodEnd = (string) $resolution['donem_bitis'];
         $catalog = self::loadCatalog($pdo, $periodStart, $periodEnd);
-        $companyPolicy = self::loadCompanyPolicy($pdo, (int) $resolution['sube_id'], $periodStart, $periodEnd);
+        try {
+            $companyPolicy = SgkSirketPolitikaReadService::resolveForPeriod(
+                $pdo,
+                (int) $resolution['sube_id'],
+                $periodStart,
+                $periodEnd
+            );
+        } catch (PDOException $e) {
+            $companyPolicy = [
+                'politika' => null,
+                'degerler' => [],
+                'state' => SgkSirketPolitikaReadService::STATE_NO_APPROVED_POLICY,
+            ];
+        }
         $statuses = self::loadPersonnelStatuses($pdo, array_keys($resolution['personeller']), $periodStart, $periodEnd);
         $mapping = self::loadProcessMappings($pdo, $catalog['surum_id'] ?? null);
         $documents = self::loadDocuments($pdo, $resolution['izinler']);
@@ -480,36 +494,6 @@ final class SgkPrimGunuService
             'kodlar' => $codes,
             'cakismalar' => $conflicts,
         ];
-    }
-
-    /** @return array<string, mixed> */
-    private static function loadCompanyPolicy(PDO $pdo, $subeId, $from, $to)
-    {
-        try {
-            $stmt = $pdo->prepare(
-                "SELECT * FROM sgk_sirket_politika_surumleri
-                 WHERE sube_id = :sube_id AND state = 'ONAYLANDI'
-                   AND gecerlilik_baslangic <= :bitis
-                   AND (gecerlilik_bitis IS NULL OR gecerlilik_bitis >= :baslangic)
-                 ORDER BY gecerlilik_baslangic DESC, id DESC"
-            );
-            $stmt->execute(['sube_id' => $subeId, 'baslangic' => $from, 'bitis' => $to]);
-            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        } catch (PDOException $e) {
-            $rows = [];
-        }
-        if (count($rows) !== 1) {
-            return ['politika' => null, 'degerler' => []];
-        }
-        $policy = $rows[0];
-        $valueStmt = $pdo->prepare('SELECT politika_kodu, deger FROM sgk_sirket_politika_degerleri WHERE politika_surum_id = :id ORDER BY politika_kodu ASC');
-        $valueStmt->execute(['id' => (int) $policy['id']]);
-        $values = [];
-        foreach ($valueStmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
-            $values[(string) $row['politika_kodu']] = (string) $row['deger'];
-        }
-
-        return ['politika' => $policy, 'degerler' => $values];
     }
 
     /** @return array<int, array<int, array<string, mixed>>> */

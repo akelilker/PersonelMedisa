@@ -20,6 +20,7 @@ use Medisa\Api\Services\Payroll\SgkKatalogWriteService;
 use Medisa\Api\Services\Payroll\SgkOperasyonelKanitBase64Guard;
 use Medisa\Api\Services\Payroll\SgkOperasyonelKanitValidator;
 use Medisa\Api\Services\Payroll\SgkSirketPolitikaImportValidator;
+use Medisa\Api\Services\Payroll\SgkSirketPolitikaReadService;
 use Medisa\Api\Services\Payroll\SgkSirketPolitikaWriteService;
 use Medisa\Api\Services\Payroll\SgkSurecEslemeImportValidator;
 use Medisa\Api\Services\Payroll\SgkSurecEslemeWriteService;
@@ -255,6 +256,36 @@ class SgkKatalogHazirlikController
         }
         echo $export['csv'];
         exit;
+    }
+
+    public static function sirketPolitikasi(Request $request)
+    {
+        [$pdo, $user, $subeId] = self::context($request, 'mevzuat_parametreleri.view');
+        [$from, $to] = self::readPolicyPeriod($request);
+
+        try {
+            $items = SgkSirketPolitikaReadService::listEffective(
+                $pdo,
+                $subeId,
+                SubeScope::allowedSubeIds($user),
+                $from,
+                $to
+            );
+        } catch (\Throwable $e) {
+            JsonResponse::error(
+                503,
+                'SGK_POLITIKA_OKUMA_HATASI',
+                'SGK sirket politikasi okunamadi.'
+            );
+        }
+
+        JsonResponse::success([
+            'items' => $items,
+            'period' => [
+                'baslangic' => $from,
+                'bitis' => $to,
+            ],
+        ]);
     }
 
     public static function sirketPolitikasiDryRun(Request $request)
@@ -517,5 +548,25 @@ class SgkKatalogHazirlikController
     {
         $body = $request->getJsonBody();
         return is_array($body) ? $body : [];
+    }
+
+    /** @return array{0:string,1:string} */
+    private static function readPolicyPeriod(Request $request): array
+    {
+        $yil = (int) $request->getQuery('yil', 0);
+        $ay = (int) $request->getQuery('ay', 0);
+        if ($yil >= 2000 && $yil <= 2100 && $ay >= 1 && $ay <= 12) {
+            $from = sprintf('%04d-%02d-01', $yil, $ay);
+            $to = (new \DateTimeImmutable($from))->modify('last day of this month')->format('Y-m-d');
+
+            return [$from, $to];
+        }
+
+        $today = new \DateTimeImmutable('today');
+
+        return [
+            $today->modify('first day of this month')->format('Y-m-d'),
+            $today->modify('last day of this month')->format('Y-m-d'),
+        ];
     }
 }

@@ -14,6 +14,15 @@
 
 ## 2026-08-17 Priority A closure sync
 
+## 2026-08-17 Business decision reconciliation
+
+| Alan | Canonical sonuç |
+| --- | --- |
+| Retention duration policy | **CLOSED_CONFIRMED** — `RETENTION_POLICY_YEARS=10`; provenance `USER_CONFIRMED_BUSINESS_DECISION` |
+| Physical destruction | **INTENTIONAL_DEFER** — feature remains OFF; no execution, request, approval, deletion, or legal-hold change |
+| SGK reporting period decision | **CLOSED_CONFIRMED** — all target branches `1,4,5,6,7,8,9,10,11` use runtime enum `AY_1_SON_GUN`; `15_TO_NEXT_MONTH_14` and `MIXED_BY_INSURED` are not used |
+| SGK production rollout | **OPS_ROLLOUT** — local authenticated read surface is ready; production read → compare → draft → submit → separate approval awaits release |
+
 | Alan | Canonical sonuç |
 | --- | --- |
 | Migration067 | **CLOSED_CONFIRMED**; production tip **067**; workflow `WORKFLOW_SHOULD_BE_RETIRED` |
@@ -43,8 +52,8 @@
 | Production mutation | Policy approval and requested personnel rollout are complete; no unrelated mutation performed |
 | Public PII policy | Exact source rows, person-level data, and blocker tallies remain private |
 
-Historical reference verification recorded the legacy branch. The accepted production tree is now canonical:
-`Üretim → Üretim → Güvenlik`.
+Live reference verification found the legacy `Üretim Genel → Güvenlik` branch. The canonical tree check is
+**FAIL**; `REFERENCE_MUTATION_REQUIRED=YES`, and no reference mutation was performed.
 
 The latest source reconciliation, candidate preview, and blocker successor workbook are private
 artifacts. Historical Pack7F/Pack7G/Pack7H snapshots remain preserved and are not rewritten.
@@ -66,7 +75,7 @@ remain private.
 
 ---
 
-## 1. Historical audit baseline (preserved)
+## 1. Audit baseline
 
 | Alan | Değer |
 | --- | --- |
@@ -104,7 +113,7 @@ remain private.
 | OT_ACTUAL_DATE_PROVENANCE_SCHEMA | PRODUCTION_READY (`063`); legacy backfill **NO** |
 | ORG_LOCATION_SCHEMA | **CLOSED** — production references resolved; binding rollout remains NOT_STARTED |
 
-Smoke/test personeller korunur; gerçek personel rollout’u kapanmıştır. Yetkisiz eski gerçek personel importu geri alınmıştır.
+Smoke/test personeller korunur; gerçek personel sayılmaz. Yetkisiz eski gerçek personel importu geri alınmıştır. Gerçek personel kullanıcı onayı olmadan import edilmez.
 
 ---
 
@@ -221,16 +230,16 @@ Aşağıdakiler CURRENT MAIN’de bozulmuş değilse OPEN yapılmaz:
 
 | Alan | Değer |
 | --- | --- |
-| Statü | **CLOSED_CONFIRMED** |
-| Metadata | — |
+| Statü | **OPS_ROLLOUT** |
+| Metadata | `USER_GATED` |
 | Öncelik | **P1** |
 | Domain | Organizasyon / SGK |
 | Code/schema | Migration `064` — `sgk_isverenler`, `calisma_lokasyonlari`; `personeller` nullable FKs; `sube_id` korunur |
 | Pre-064 | Explicit new-field write → `409 ORG_LOCATION_SCHEMA_NOT_READY` |
-| Production | tip **067**; schema and references applied; personnel rollout closed |
+| Production | tip **064** (`118`); schema applied; SGK + verified location refs seeded (`119`); personnel org mapping **NO** |
 | Kanıt | `117-final-code-gap-pack5.md`; Pack5 MariaDB B1–B11; rollout `118`; org seed `119` |
 | Acceptance (code) | Üç kavram bağımsız persist; SubeScope `sube_id` |
-| Remaining ops | None for the closed reference/personnel rollout; locked branch + catalog reference rollout completed (`121`/`122`) |
+| Remaining ops | Personnel mapping apply / import = `USER_GATED` (`MG-ORG-LOC-001`); locked branch + catalog reference rollout completed (`121`/`122`) |
 
 ---
 
@@ -256,13 +265,13 @@ Aşağıdakiler CURRENT MAIN’de bozulmuş değilse OPEN yapılmaz:
 
 | Alan | Değer |
 | --- | --- |
-| Statü | **BUSINESS_DECISION_REQUIRED** |
-| Metadata | `CONDITIONAL_SCOPE` |
-| Öncelik | **P1** |
+| Statü | **CLOSED_CONFIRMED** |
+| Metadata | `USER_CONFIRMED_BUSINESS_DECISION`; production rollout `OPS_ROLLOUT` |
+| Öncelik | **closed; release gate remains** |
 | Domain | SGK |
 | Soru | Medisa/Karyapı/Şenay için dönem ayın 1–son mu, 15–sonraki ay 14 mü? Sigortalı bazında 15–14 var mı? |
 | Mevcut | `SgkKatalogPreviewService`: `preview_modu=BLOCKER_ONLY`, `aktif_edildi_mi=false`, dönem null; motor tip string kabul eder ama preview aktive etmez |
-| Not | Generic 15–14 motor yazılmaz; ihtiyaç doğrulanana kadar scope conditional |
+| Not | User decision is `1_TO_MONTH_END` for all three companies; runtime enum is `AY_1_SON_GUN`; `15_TO_NEXT_MONTH_14` and `MIXED_BY_INSURED` are not used. New canonical per-`sube_id` read surface is local and production rollout remains pending release/apply. |
 | Kanıt | `SgkKatalogPreviewService.php`; `94` madde 6 |
 
 ### MG-ZORUNLU-001 — Zorunlu / olağanüstü çalışma istisna modeli ihtiyacı
@@ -322,10 +331,10 @@ Aşağıdakiler CURRENT MAIN’de bozulmuş değilse OPEN yapılmaz:
 | MG-OPS-BIND-001 | PERSONEL binding gerçek rollout | P1 | `USER_GATED` | Schema `056` var; rollout NOT_STARTED | Ops / İK |
 | MG-OPS-QR-001 | Gerçek çalışan QR rollout | P1 | `USER_GATED` | Pipeline CLOSED; employee rollout NOT_STARTED | Ops |
 | MG-OPS-SGK-CAT-001 | SGK resmi katalog / DOGRULANMIS_TAM / şirket politikası | P0 | **CLOSED_CONFIRMED** | Production catalog confirmed | Ops + `94`/`95` |
-| MG-OPS-UBGT-001 | UBGT authoritative calendar seed | P0 | **CLOSED_CONFIRMED** | Production calendar confirmed: UBGT_2026 `17 rows` (`14 TAM_GUN`, `3 YARIM_GUN`, `0 duplicates`, `0 invalid`) | Ops |
+| MG-OPS-UBGT-001 | UBGT authoritative calendar seed | P0 | **CLOSED_CONFIRMED** | Production calendar confirmed | Ops |
 | MG-OPS-POLICY-001 | Bordro çalışma politikası canlı parametre onayı | P1 | **CLOSED_CONFIRMED** | Active revision `3`; 14/14; Pazar (`0`); dual control passed | Ops / yönetim |
-| MG-OPS-ENUM-INV-001 | Legacy role production inventory (shrink öncesi) | P2 | **INTENTIONAL_DEFER** | Legacy enum cleanup is intentionally deferred | Ops + DBA |
-| MG-OPS-DEPLOY-001 | Exact-SHA cPanel yayın kanıtı / manuel upload | P2 | **CLOSED_CONFIRMED** | Exact-SHA release/deploy evidence accepted | Ops |
+| MG-OPS-ENUM-INV-001 | Legacy role production inventory (shrink öncesi) | P2 | `VERIFY_REQUIRED` | `SGK_KARAR_ONAY_YETKILISI` / `IDARI_ISLER` inventory | Ops + DBA |
+| MG-OPS-DEPLOY-001 | Exact-SHA cPanel yayın kanıtı / manuel upload | P2 | — | FTP/sunucu tarihsel blocker; ürün beyni değil | Ops |
 
 ---
 
@@ -364,6 +373,7 @@ Aşağıdakiler CURRENT MAIN’de bozulmuş değilse OPEN yapılmaz:
 | MG-DOC-101-001 | `101` I13 checkpoint | **CLOSED** | `HISTORICAL_SNAPSHOT_PRESERVED` | Bugün SoT değil; bilinçli tarihsel |
 | MG-DOC-103-001 | `103` role consolidation checkpoint | **CLOSED** | `HISTORICAL_SNAPSHOT_PRESERVED` | Bugün SoT değil |
 | MG-DOC-105-TIP | `105` S3A discovery header tip | **CLOSED** | `HISTORICAL_SNAPSHOT_PRESERVED` | Faz anı korunur |
+| MG-RET-POLICY-001 | Medisa retention duration policy | **CLOSED_CONFIRMED** | — | `RETENTION_POLICY_YEARS=10`; user-confirmed company policy; physical destruction remains `MG-RET-PHYS-001` |
 | MG-RET-MAN-001 | Archive manifest CREATE/LIFECYCLE 15/15 | **CLOSED** | — | Integrity Pack 1 |
 | MG-RET-S3F-001 | S3F ledger → ONAY_AUDIT fingerprint | **CLOSED** | — | Integrity Pack 1 |
 
@@ -389,13 +399,13 @@ DİĞER: Şenay Mobilya
 
 ```text
 MG-ORG-MODEL-001 (CLOSED — karar kilitli)
-  → MG-ORG-LOC-001 (CLOSED_CONFIRMED — production references and personnel rollout closed)
+  → MG-ORG-LOC-001 (OPS_ROLLOUT — schema `064`/`118`; refs seeded `119`; personnel mapping USER_GATED)
   → MG-ORG-ATTR-001 (CLOSED — native Bölüm/Birim/Pozisyon + Unvan=gorev; `120`)
   → MG-ORG-ATTR-ROLL-001 (CLOSED_REFERENCE_ROLLOUT — schema `065`/`121` + catalogs `122`; personnel FK apply USER_GATED)
   → MG-OPS-ORG-001 (CLOSED_REFERENCE_ROLLOUT — catalogs+branches complete `121`/`122`; personnel mapping separate)
   → MG-IMPORT-MAP-001 (CLOSED business mapping — remaining → MG-IMPORT-DATA-001)
-  → MG-IMPORT-DATA-001 (CLOSED — Phase1 `122 CLOSED`, Phase2 `11 CLOSED`)
-  → MG-OPS-PERSONEL-001 (CLOSED — production total `137`)
+  → MG-IMPORT-DATA-001 (OPS_ROLLOUT — USER_GATED_DATA_COMPLETION; identity blockers only after `122`)
+  → MG-OPS-PERSONEL-001 (real personnel import, USER_GATED)
   → MG-OPS-BIND-001 → MG-OPS-QR-001
 ```
 
@@ -414,7 +424,7 @@ Import contract (kod):
 1. CODE_GAP = 0 olmadan “ürün tamam” denmez.
 2. `CANONICAL_DOC_STALE = 0` (sağlandı).
 3. Gerçek personel/org/SGK/UBGT write yalnız `95` + kullanıcı onayı.
-4. Migration tip production = **067**; Migration067 `CLOSED_CONFIRMED`; workflow `WORKFLOW_SHOULD_BE_RETIRED`.
+4. Migration tip production = **UNVERIFIED** in the final preflight; migration `066` is not assumed applied and requires an authenticated read-only probe before any apply gate.
 5. Physical destruction yalnız feature enable + manifest + S3F fingerprint coverage + handler + legal review sonrası (schema ready; flag OFF).
 6. Stash / force-push / hard reset yasak (audit protokolü).
 7. Public repo’ya PII / exact personnel tallies yazılmaz.
@@ -426,10 +436,10 @@ Import contract (kod):
 1. Canonical docs (PR #149): `CURRENT_STATE` + `102` + bu registry
 2. Business inputs: `MG-SGK-1514`, `MG-OT-YEAR-POL`, `MG-IMPORT-MAP`, `MG-ORG-ATTR`, `MG-ZORUNLU`
 3. Code P1: `MG-OT-YEAR-PATH-001` (policy sonrası veya tutarlılık fix)
-4. Ops P1: `MG-SZ-6M-001` — **OPS_ROLLOUT_ACTIVE** / `USER_GATED` (schema `061`/`062` production-ready `118`; İK ops follow-up açık)
-5. Priority C: `MG-RET-PHYS-001` — **INTENTIONAL_DEFER** (schema `059`/`060`/`062` production-ready `118`; feature enable + real destroy açık)
-6. `MG-ORG-LOC-001` — **CLOSED_CONFIRMED** (production references resolved; personnel rollout closed)
-7. Remaining operational scope: personel binding and QR employee rollout; SGK/UBGT/org/personnel closure is complete
+4. Ops P1: `MG-SZ-6M-001` — **OPS_ROLLOUT** / `USER_GATED` (schema `061`/`062` production-ready `118`; İK ops follow-up açık)
+5. Ops P1: `MG-RET-PHYS-001` — **OPS_ROLLOUT** / `USER_GATED` (schema `059`/`060`/`062` production-ready `118`; feature enable + real destroy açık)
+6. Ops P1: `MG-ORG-LOC-001` — **OPS_ROLLOUT** / `USER_GATED` (schema `064`/`118`; refs seeded `119`; personnel mapping açık)
+7. Ops: UBGT seed, SGK catalog, org seed, dataset completion, personel import, binding, QR employee
 8. Defer pack: QR correction UX, I13 fields, ENUM shrink, payroll self-view, pay outputs
 
 ---
@@ -462,7 +472,7 @@ Destroy eligibility: Pack 3C (`114`) — **15/15 typed handlers**; SERBEST used-
 | BORDRO | CLOSED | CLOSED | CLOSED | CLOSED | CLOSED | CLOSED (Pack3B) |
 | SGK_EKSIK_GUN | CLOSED | CLOSED | CLOSED | CLOSED | CLOSED | CLOSED (Pack3B) |
 | FAZLA_CALISMA | CLOSED | CLOSED | CLOSED | CLOSED | CLOSED | CLOSED (Pack3C; shared notes preserved) |
-| SERBEST_ZAMAN | CLOSED | CLOSED | CLOSED | CLOSED | CLOSED | **OPS_ROLLOUT_ACTIVE** Pack4B allocation-aware destroy code (`116`); schema `061`/`062` production-ready (`118`); legacy/cross-scope fail-closed; flag OFF; real destroy YOK |
+| SERBEST_ZAMAN | CLOSED | CLOSED | CLOSED | CLOSED | CLOSED | **OPS_ROLLOUT** Pack4B allocation-aware destroy code (`116`); schema `061`/`062` production-ready (`118`); legacy/cross-scope fail-closed; flag OFF; real destroy YOK |
 | ONAY_AUDIT | CLOSED | CLOSED | CLOSED | CLOSED | CLOSED | CLOSED (Pack2 typed + Pack3C generic no-op) |
 | IZIN | CLOSED | CLOSED | CLOSED | CLOSED | CLOSED | CLOSED (Pack2) |
 | RAPOR | CLOSED | CLOSED | CLOSED | CLOSED | CLOSED | CLOSED (Pack3C + PERSONEL_BELGE gate) |
@@ -479,8 +489,8 @@ Destroy eligibility: Pack 3C (`114`) — **15/15 typed handlers**; SERBEST used-
 | --- | --- | --- |
 | **CODE_GAP** | **0** | — |
 | **BUSINESS_DECISION_REQUIRED** | **4** | SGK-1514, ZORUNLU, ORG-ATTR, IMPORT-MAP |
-| **OPS_ROLLOUT** | **2** | BIND, QR |
-| **INTENTIONAL_DEFER** | **8** | QR-CORR, PAY-SELF, I13, ENUM, FSC, PAY-OUT, RET-HTTP, RET-PHYS |
+| **OPS_ROLLOUT** | **13** | OPS-PERSONEL, IMPORT-DATA, OPS-ORG, OPS-BIND, OPS-QR, OPS-SGK-CAT, OPS-UBGT, OPS-POLICY, OPS-ENUM-INV, OPS-DEPLOY, **RET-PHYS**, **SZ-6M**, **ORG-LOC** |
+| **INTENTIONAL_DEFER** | **7** | QR-CORR, PAY-SELF, I13, ENUM, FSC, PAY-OUT, RET-HTTP |
 | **NOT_APPLICABLE** | **4** | SECOND-ENGINE, AUTO-QR-CORR, AUTO-APPLY, IMPORT-UCRET |
 | **DOC_STALE** | **0** | — |
 | **CLOSED** (registry section 9 + retention + Pack5 OT) | **10** | ORG-MODEL, DOC-CS, DOC-102, DOC-101, DOC-103, DOC-105, RET-MAN, RET-S3F, **OT-YEAR-POL**, **OT-YEAR-PATH** |
@@ -489,7 +499,9 @@ Destroy eligibility: Pack 3C (`114`) — **15/15 typed handlers**; SERBEST used-
 **MUST_FIX_NOW (= CODE_GAP P1 listesi):** *(empty — Pack5 closed code gaps)*
 
 **OPS_ROLLOUT (code closed, prod gated):**
+- `MG-RET-PHYS-001` — Pack 4B code + schema production-ready (`116`/`118`); feature enable + real destroy `USER_GATED`
 - `MG-SZ-6M-001` — Pack 4B ops surface (`116`); allocation schema production-ready (`118`); İK follow-up `USER_GATED`
+- `MG-ORG-LOC-001` — Pack5 schema production-ready (`117`/`118`); refs seeded (`119`); personnel mapping `USER_GATED`
 
 P2 BUSINESS (`MG-ORG-ATTR`, `MG-ZORUNLU`) final completion için açık kalabilir ama CODE_GAP değildir; karar sonrası gerekirse CODE_GAP’e çevrilir.
 

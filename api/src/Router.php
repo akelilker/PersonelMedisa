@@ -556,6 +556,9 @@ class Router
         if ($path === '/sgk-katalog-hazirlik/sirket-politikasi/sablon.csv' && $method === 'GET') {
             SgkKatalogHazirlikController::sirketPolitikasiSablonCsv($this->request);
         }
+        if ($path === '/sgk-katalog-hazirlik/sirket-politikasi' && $method === 'GET') {
+            SgkKatalogHazirlikController::sirketPolitikasi($this->request);
+        }
         if ($path === '/sgk-katalog-hazirlik/sirket-politikasi/dry-run' && $method === 'POST') {
             SgkKatalogHazirlikController::sirketPolitikasiDryRun($this->request);
         }

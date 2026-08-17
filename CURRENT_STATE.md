@@ -46,7 +46,8 @@ Görsel sistem çalışmaları mevcut component/owner içinde yapılabilir. Yeni
 | `RETENTION_MANIFEST_COVERAGE` | **CLOSED** (`MG-RET-MAN-001`) | Pack 1 — creators 15/15 |
 | `RETENTION_S3F_LEDGER_FINGERPRINT` | **CLOSED** (`MG-RET-S3F-001`) | Pack 1 — typed ONAY_AUDIT |
 | `SERBEST_ZAMAN_6_MONTH_TRACKING` | **OPS_ROLLOUT_ACTIVE** (`MG-SZ-6M-001`) | Pack 4B ops surface (`116`); allocation schema production-ready (`061`/`062` via `118`); ops follow-up `USER_GATED` |
-| `SGK_15_14` | **BUSINESS_DECISION_REQUIRED** (`MG-SGK-1514-001`) | `CONDITIONAL_SCOPE`; preview BLOCKER_ONLY |
+| `SGK_PERIOD_BUSINESS_DECISION` | **CLOSED_CONFIRMED** (`MG-SGK-1514-001`) | Medisa/Karyapı/Şenay Mobilya branches `1,4,5,6,7,8,9,10,11` → `AY_1_SON_GUN`; `15_TO_NEXT_MONTH_14` and `MIXED_BY_INSURED` not used |
+| `SGK_PERIOD_PRODUCTION_ROLLOUT` | **OPS_ROLLOUT** | canonical read surface implemented locally; production read → compare → draft → submit → separate approval pending release |
 | `YEAR_CROSSING_OT_POLICY` | **CLOSED** (`MG-OT-YEAR-POL-001`) | `ROLLING_12_MONTH_ACTUAL_DATE_V1` |
 | `YEAR_CROSSING_OT_PATH` | **CLOSED** (`MG-OT-YEAR-PATH-001`) | Pack5 rolling owner (`117`); provenance schema production-ready (`063` via `118`) |
 | `LEGACY_ROLE_ENUM_SHRINK` | **INTENTIONAL_DEFER** (`MG-DEF-ENUM-001`) | — |
@@ -65,11 +66,11 @@ Görsel sistem çalışmaları mevcut component/owner içinde yapılabilir. Yeni
 
 - Current PR base / current `main`: `416fb40fd5aa2ad5b472219e4b9b02300c86083e`.
 - Migration tip: code **067**; production **067**. Migration067 `CLOSED_CONFIRMED`; workflow retired.
-- Org references: SGK=3, locations=7, locked 10 branches (`121`); canonical catalogs completed (`122`: departmanlar=10 incl. legacy, bolumler=22, birimler=32, gorevler=39, pozisyonlar=12, personel_tipleri=5); personnel rollout closed.
+- Org references: SGK=3, locations=7, locked 10 branches (`121`); canonical catalogs completed (`122`: departmanlar=10 incl. legacy, bolumler=22, birimler=32, gorevler=39, pozisyonlar=12, personel_tipleri=5); personnel org FKs remain NULL until mapping/import gate.
 - Pack6: `bolumler` / `birimler` / `pozisyonlar` + `subeler.sgk_isveren_id` (authorization still `personeller.sube_id`).
 - SGK, şirket politikası kanıtı, bordro preflight, personel importu, revizyon, dual-control, retention request/approve/evaluate/execute (flag OFF), QR S3C–S3F owner’ları mevcut ve fail-closed çalışır.
 - PERSONEL self-service: `/me` puantaj / yıllık izin / FM / QR yüzeyleri; maaş/bordro self-view **OUT_OF_SCOPE** (S3A).
-- Smoke/test personeller korunur; production personnel rollout is closed.
+- Smoke/test personeller korunur; gerçek personel dataset’i **kullanıcı onayı olmadan import edilmez**.
 - Public repo’ya PII / exact personnel tallies yazılmaz.
 
 ## Birbirine karıştırılmaması gereken durumlar
@@ -80,9 +81,9 @@ Görsel sistem çalışmaları mevcut component/owner içinde yapılabilir. Yeni
 | QR S3C–S3F | CLOSED_PRODUCTION | Hayır |
 | Canonical docs / gap registry | Güncel (`110`); `CANONICAL_DOC_STALE=0` | Hayır |
 | CODE_GAP | **0** — Pack5 closed (`117`) | Hayır |
-| Retention / SZ-6M / Org-LOC | INTENTIONAL_DEFER / OPS_ROLLOUT_ACTIVE / CLOSED_CONFIRMED | Hayır |
-| SGK/UBGT/hukuki kanıtlar | CLOSED_CONFIRMED | Hayır |
-| Gerçek personel / org rollout | CLOSED | Hayır |
+| Retention / SZ-6M / Org-LOC | OPS_ROLLOUT (`USER_GATED`) — schema production-ready (`118`); feature/seed/mapping gated | Hayır |
+| SGK/UBGT/hukuki kanıtlar | OPS_ROLLOUT + insan kararı | Hayır |
+| Gerçek personel / org rollout | USER_GATED OPS_ROLLOUT | Hayır |
 | Exact-SHA cPanel yayın | Ops / manuel upload | Tasarımı engellemez; canlıya çıkışı ops kapısına bağlar |
 
 ## Freeze kuralı
@@ -143,13 +144,14 @@ Bu dosya backlog değildir. Açık maddeler `110` registry’dedir. Canlı param
 
 - **SGK catalog:** `CLOSED_CONFIRMED`; UBGT: `CLOSED_CONFIRMED`.
 - **Payroll company policy:** `CLOSED_CONFIRMED`; active policy revision `3`, state `ONAYLANDI`, required/resolved keys `14/14`, missing `0`.
-- **HAFTA_TATILI_GUNLERI:** `0` / Pazar.
-- **HAFTA_TATILI_PROVENANCE:** `USER_CONFIRMED_BUSINESS_DECISION`. Other 13 policy values unchanged from revision 2.
+- **HAFTA_TATILI_GUNLERI:** `0` / Pazar. Other 13 policy values unchanged from revision 2.
 - **Policy dual control:** submitter user ID `1`; approver `ilkerA` user ID `10`; self-approval `NO`.
 - **Payroll policy read-only preflight:** `HAFTA_TATILI_GUNLERI_MISSING_BLOCKER=NO`; `PAYROLL_POLICY_RUNTIME_READY=YES`.
 - **MG-OPS-POLICY-001:** `CLOSED_CONFIRMED`; `PRIORITY_A_REMAINING=NONE`.
+- **Retention duration policy:** `CLOSED_CONFIRMED`; `POLICY_RETENTION_YEARS=10`; provenance `USER_CONFIRMED_BUSINESS_DECISION`. Physical destruction remains `INTENTIONAL_DEFER`; execution was not authorized.
+- **SGK reporting period decision:** **CLOSED_CONFIRMED**; Medisa/Karyapı/Şenay Mobilya branches `1,4,5,6,7,8,9,10,11` target runtime enum `AY_1_SON_GUN`; local read-surface fix is ready, production rollout remains `OPS_ROLLOUT` pending release/apply.
 
-## Historical 2026-08-15 final personel preflight (superseded by 2026-08-17 closure)
+## 2026-08-15 final personel preflight
 
 - Canonical internal scope remains `IC_PERSONEL`; external directory-only scope remains first-class `DIS_KAYNAK`.
 - `Personel Kartı` is read-only for ownership; `Kayıt ve Süreç` owns personnel writes.

@@ -9,6 +9,14 @@
 
 **2026-08-17 closure reconciliation:** SGK catalog `CLOSED_CONFIRMED`; UBGT `CLOSED_CONFIRMED`; payroll company policy `CLOSED_CONFIRMED`; active policy revision `3`, required/resolved `14/14`, missing `0`; `HAFTA_TATILI_GUNLERI=0` / Pazar; payroll policy preflight ready.
 
+**Business decision reconciliation:** Retention duration is `10 YEARS` through the canonical
+`RetentionCategories::POLICY_RETENTION_YEARS` owner, provenance
+`USER_CONFIRMED_BUSINESS_DECISION`; physical destruction remains `INTENTIONAL_DEFER`.
+The SGK period decision is user-confirmed as `1_TO_MONTH_END` for Medisa, Karyapı, and
+Şenay Mobilya; runtime enum `AY_1_SON_GUN` for branches `1,4,5,6,7,8,9,10,11`;
+local canonical approved-policy read surface is ready, production rollout remains
+pending release/apply.
+
 ---
 
 ## 1. Bu belge ne işe yarar?
@@ -274,8 +282,8 @@ Kaynak: masaüstü `puantaj resmi durum.docx` (toplantı mevzuat özeti).
 | Serbest zaman 6 aylık deadline compliance / ops follow-up | OPS_ROLLOUT_ACTIVE (`110` MG-SZ-6M-001) — Pack 4B code owner + Raporlar yüzeyi tamam; production schema ready |
 | Yıl değiştiren hafta FM politikası | CLOSED (`110` MG-OT-YEAR-POL-001) — `ROLLING_12_MONTH_ACTUAL_DATE_V1` (`117`) |
 | Yıl değiştiren hafta FM path tutarlılığı | CLOSED (`110` MG-OT-YEAR-PATH-001) — Pack5 rolling owner |
-| Org location schema | CLOSED_CONFIRMED (`110` MG-ORG-LOC-001) — production references and personnel rollout closed |
-| SGK 15–14 dönem | BUSINESS_DECISION_REQUIRED (`110` MG-SGK-1514-001); metadata CONDITIONAL_SCOPE; preview BLOCKER_ONLY |
+| Org location schema | OPS_ROLLOUT (`110` MG-ORG-LOC-001) — Pack5 code/schema; prod apply + real seed USER_GATED |
+| SGK reporting period | **CLOSED_CONFIRMED** business decision: `AY_1_SON_GUN` for Medisa/Karyapı/Şenay branches `1,4,5,6,7,8,9,10,11`; `15_TO_NEXT_MONTH_14` and `MIXED_BY_INSURED` not used; production rollout `OPS_ROLLOUT` pending release/apply |
 | FSC (%25) aktif bant | S87 ile kapalı (INTENTIONAL_DEFER) |
 | Zorunlu/olağanüstü çalışma istisna modeli | Bilinçli kapsam dışı / karar bekler |
 | Bordro PDF / banka dosyası / SGK bildirgesi çıktısı | FUTURE (kısmi CSV var) |

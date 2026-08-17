@@ -4,7 +4,8 @@
 
   # Deny live config and backup/temp derivatives (exact, suffix, tilde, slash-path).
   RewriteRule ^config\.local\.php(?:$|[./~_-].*) - [F,L,NC]
-  RewriteRule ^(src|bin|migrations|seeds)/ - [F,L]
+  RewriteRule ^\.deploy-sha(?:$|[./~_-].*) - [F,L,NC]
+  RewriteRule ^(src|bin|migrations|seeds|runtime)/ - [F,L]
 
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} !-d

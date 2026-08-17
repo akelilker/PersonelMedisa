@@ -1,0 +1,119 @@
+name: Apply cPanel migrations
+
+on:
+  workflow_dispatch:
+    inputs:
+      deployed_sha:
+        description: Exact deployed commit SHA shown by Deploy cPanel
+        required: true
+        type: string
+      confirmation:
+        description: Type APPLY_CANONICAL_MIGRATIONS to authorize this request
+        required: true
+        type: string
+
+concurrency:
+  group: cpanel-canonical-migration-control
+  cancel-in-progress: false
+
+jobs:
+  request:
+    name: Request canonical cPanel migration worker
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      FTP_SERVER: ${{ secrets.FTP_SERVER }}
+      FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+      FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+      FTP_PORT: ${{ secrets.FTP_PORT }}
+      DEPLOYED_SHA: ${{ inputs.deployed_sha }}
+      CONFIRMATION: ${{ inputs.confirmation }}
+    steps:
+      - name: Validate explicit request
+        run: |
+          set -euo pipefail
+          test "$CONFIRMATION" = "APPLY_CANONICAL_MIGRATIONS" || {
+            echo "Explicit migration confirmation is required."
+            exit 1
+          }
+          [[ "$DEPLOYED_SHA" =~ ^[0-9a-fA-F]{40}$ ]] || {
+            echo "deployed_sha must be a full 40-character commit SHA."
+            exit 1
+          }
+          test -n "$FTP_SERVER" || (echo "FTP_SERVER secret is missing." && exit 1)
+          test -n "$FTP_USERNAME" || (echo "FTP_USERNAME secret is missing." && exit 1)
+          test -n "$FTP_PASSWORD" || (echo "FTP_PASSWORD secret is missing." && exit 1)
+          test "$FTP_PORT" = "21" || (echo "FTP_PORT must be 21 for this cPanel FTP deploy." && exit 1)
+
+      - name: Install FTP client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lftp
+
+      - name: Upload one atomic migration request
+        env:
+          REQUEST_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          set -euo pipefail
+          request_dir="$RUNNER_TEMP/cpanel-migration-request"
+          mkdir -p "$request_dir"
+          request_file="$request_dir/request.${REQUEST_ID}.tmp"
+          jq -n \
+            --arg request_id "$REQUEST_ID" \
+            --arg deployed_sha "$DEPLOYED_SHA" \
+            --arg requested_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            '{schema_version: 1, request_id: $request_id, deployed_sha: $deployed_sha, requested_at: $requested_at}' \
+            > "$request_file"
+
+          lftp -u "${FTP_USERNAME}","${FTP_PASSWORD}" -p "${FTP_PORT}" "ftp://${FTP_SERVER}" -e "
+            set cmd:fail-exit true;
+            set net:max-retries 3;
+            set net:timeout 30;
+            set ftp:passive-mode on;
+            set ftp:ssl-allow true;
+            set ftp:ssl-force true;
+            set ftp:ssl-protect-data true;
+            set ssl:verify-certificate yes;
+            set ssl:check-hostname yes;
+            mkdir -p api/runtime/migration-control;
+            lcd ${request_dir};
+            put request.${REQUEST_ID}.tmp -O api/runtime/migration-control;
+            mv api/runtime/migration-control/request.${REQUEST_ID}.tmp api/runtime/migration-control/request.pending.${REQUEST_ID}.json;
+            bye
+          "
+
+      - name: Wait for protected worker result
+        env:
+          REQUEST_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          set -euo pipefail
+          status_file="$RUNNER_TEMP/cpanel-migration-status.json"
+          for attempt in $(seq 1 60); do
+            rm -f "$status_file"
+            if lftp -u "${FTP_USERNAME}","${FTP_PASSWORD}" -p "${FTP_PORT}" "ftp://${FTP_SERVER}" -e "
+              set cmd:fail-exit true;
+              set net:timeout 30;
+              set ftp:passive-mode on;
+              set ftp:ssl-allow true;
+              set ftp:ssl-force true;
+              set ftp:ssl-protect-data true;
+              set ssl:verify-certificate yes;
+              set ssl:check-hostname yes;
+              get api/runtime/migration-control/status.json -o ${status_file};
+              bye
+            " >/dev/null 2>&1; then
+              status_request="$(jq -r '.request_id // empty' "$status_file" 2>/dev/null || true)"
+              status_state="$(jq -r '.state // empty' "$status_file" 2>/dev/null || true)"
+              if [[ "$status_request" == "$REQUEST_ID" && "$status_state" == "SUCCEEDED" ]]; then
+                echo "Canonical migration worker completed."
+                exit 0
+              fi
+              if [[ "$status_request" == "$REQUEST_ID" && "$status_state" == "FAILED" ]]; then
+                echo "Canonical migration worker failed closed."
+                exit 1
+              fi
+            fi
+            sleep 10
+          done
+          echo "Timed out waiting for the protected migration worker result."
+          exit 1

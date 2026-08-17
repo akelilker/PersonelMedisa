@@ -16,7 +16,7 @@ api/
   .htaccess              # Apache rewrite -> public/index.php
   public/index.php       # Front controller
   bin/migrate.php        # CLI-only canonical migration runner
-  bin/run-production-migrations.sh # SSH deploy owner
+  bin/cpanel-migration-cron.php # cPanel Cron CLI worker
   src/                   # PHP uygulama kodu
   migrations/            # SQL schema
   seeds/                 # Smoke seed template
@@ -38,10 +38,12 @@ asagidaki runtime yuzeyini gonderir:
 - `api/migrations/`
 
 `config.local.php` ve `seeds/` workflow tarafindan gonderilmez.
-FTP upload tamamlandiktan sonra workflow, SSH ile `api/bin/run-production-migrations.sh`
-calistirir. Bu script sunucudaki `config.local.php` DB ayarlarini kullanarak
-pending migration'lari ledger'a yazar ve schema-ready kontrolu yapar.
-Migration SQL dosyalari web'den `.htaccess` ile engellenir.
+Normal deploy migration calistirmaz. FTP ile `api/bin/`, `api/migrations/`,
+`api/.deploy-sha` ve protected `api/runtime/.htaccess` gonderilir. Ayrı
+`Apply cPanel migrations` workflow'u FTP ile atomik bir control request bırakır;
+kalıcı cPanel Cron worker bu request'i CLI-only olarak claim eder, pending
+migration'lari ledger'a yazar ve schema-ready kontrolu yapar.
+Migration SQL, worker ve runtime status dosyalari web'den `.htaccess` ile engellenir.
 
 `api/.htaccess`, canli `config.local.php` ile backup/temp turevlerini
 (`config.local.php.*`, `config.local.php~`, slash-path) web'den fail-closed engeller.
@@ -76,18 +78,18 @@ return [
 
 ## Migration / seed
 
-Migration'lar phpMyAdmin veya manuel MySQL CLI ile calistirilmaz. Uretimde
-yalnizca SSH ile cagrilan canonical runner kullanilir:
+Migration'lar phpMyAdmin veya manuel MySQL CLI ile calistirilmaz. Üretimde
+yalnizca cPanel Cron tarafindan CLI ile cagrilan canonical runner kullanilir:
 
 ```bash
 php api/bin/migrate.php
 php api/bin/migrate.php --verify
 ```
 
-Ilk mevcut production kurulumu icin SSH ortaminda `MEDISA_MIGRATION_BASELINE`
-yalnizca zaten uygulanmis son migration surumune ayarlanir; runner bu surum ve
-oncekileri tekrar calistirmadan ledger'a kaydeder. Sonraki deploy'larda baseline
-gerekmez. `seeds/` production deploy kapsaminda degildir.
+Ilk mevcut production kurulumu icin Cron command ortaminda
+`MEDISA_MIGRATION_BASELINE=067` yalnizca ledger bootstrap asamasinda kullanilir;
+runner bu surum ve oncekileri tekrar calistirmadan ledger'a kaydeder. Sonraki
+deploy'larda baseline etkisizdir. `seeds/` production deploy kapsaminda degildir.
 
 Password hash uretimi:
 

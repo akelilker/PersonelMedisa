@@ -54,6 +54,7 @@ describe('canonical cPanel migration FTP transport contract', () => {
     expect(migration).toContain('test "$CONFIRMATION" = "APPLY_CANONICAL_MIGRATIONS"');
     expect(migration).toMatch(/\[\[ "\$DEPLOYED_SHA" =~ \^\[0-9a-fA-F\]\{40\}\$ \]\]/);
     expect(migration).toContain('api/runtime/migration-control');
+    expect(migration).toContain('put -O api/runtime/migration-control request.${REQUEST_ID}.tmp');
     expect(migration).toContain('request.pending.${REQUEST_ID}.json');
     expect(migration).toContain('status_state" == "FAILED"');
     expect(migration).not.toMatch(/\bssh\b/i);

@@ -105,7 +105,7 @@ jobs:
           request_commands="
             mkdir -p api/runtime/migration-control;
             lcd ${request_dir};
-            put request.${REQUEST_ID}.tmp -O api/runtime/migration-control;
+            put -O api/runtime/migration-control request.${REQUEST_ID}.tmp;
             mv api/runtime/migration-control/request.${REQUEST_ID}.tmp api/runtime/migration-control/request.pending.${REQUEST_ID}.json;
           "
           run_cpanel_ftp "$request_commands"

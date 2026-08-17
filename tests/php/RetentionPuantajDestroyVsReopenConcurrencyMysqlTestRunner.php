@@ -133,6 +133,7 @@ function dvrMigrationFiles(): array
     $files = array_values(array_filter(
         $files,
         static fn(string $file): bool => basename($file) !== '067_personel_canonical_reference_gate.sql'
+            && basename($file) !== '068_sgk_actor_identity_lifecycle_audit.sql'
     ));
     sort($files, SORT_STRING);
 

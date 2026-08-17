@@ -23,7 +23,7 @@ describe("S87 policy evidence 045 migration source", () => {
       .filter((name) => /^\d{3}_.+\.sql$/.test(name))
       .sort();
     expect(migrations).toContain("045_sirket_politikasi_kanit_owner.sql");
-    expect(migrations.at(-1)).toBe("067_personel_canonical_reference_gate.sql");
+    expect(migrations.at(-1)).toBe("068_sgk_actor_identity_lifecycle_audit.sql");
   });
 
   it("reports bytes and sha256 for the migration artifact", () => {

@@ -76,6 +76,46 @@ final class SgkKararPaketiAuthz
         }
     }
 
+    public static function isFormalUsername($username): bool
+    {
+        $username = strtolower(trim((string) $username));
+        if ($username === '' || in_array($username, self::$genericUsernames, true)) {
+            return false;
+        }
+
+        return strpos($username, 'smoke') === false
+            && strpos($username, 'probe') === false
+            && strpos($username, 'test') === false
+            && strpos($username, 'demo') === false;
+    }
+
+    /**
+     * Canonical readiness projection used by management readback and SGK writes.
+     *
+     * @param array<string,mixed> $actor
+     * @return array{ready: bool, code?: string}
+     */
+    public static function formalActorReadiness(PDO $pdo, array $actor): array
+    {
+        try {
+            self::assertFormalActorIdentity($actor);
+            self::assertPermission($actor, self::PERM_PREPARE, 'SGK_PREPARE_FORBIDDEN');
+            self::assertActorIdentitySchemaRequired($pdo);
+            self::assertActorIdentityLinkedAndVerified($pdo, $actor);
+            if (!isset($actor['sube_ids']) || !is_array($actor['sube_ids']) || count($actor['sube_ids']) === 0) {
+                throw new RuntimeException('SGK_ACTOR_SCOPE_NOT_READY');
+            }
+            self::assertActiveActorScope($pdo, $actor['sube_ids']);
+
+            return ['ready' => true];
+        } catch (RuntimeException $e) {
+            return [
+                'ready' => false,
+                'code' => $e->getMessage(),
+            ];
+        }
+    }
+
     /**
      * @param array<string,mixed> $actor
      * @return array{ok: bool, code?: string, message?: string}
@@ -233,18 +273,7 @@ final class SgkKararPaketiAuthz
             throw new RuntimeException('SGK_ACTOR_IDENTITY_INVALID');
         }
 
-        $username = strtolower(trim((string) ($actor['username'] ?? '')));
-        if ($username === '' || in_array($username, self::$genericUsernames, true)) {
-            throw new RuntimeException('SGK_ACTOR_IDENTITY_NOT_READY');
-        }
-
-        // Technical / smoke / probe / demo / test username patterns are not formal actors.
-        if (
-            strpos($username, 'smoke') !== false
-            || strpos($username, 'probe') !== false
-            || strpos($username, 'test') !== false
-            || strpos($username, 'demo') !== false
-        ) {
+        if (!self::isFormalUsername((string) ($actor['username'] ?? ''))) {
             throw new RuntimeException('SGK_ACTOR_IDENTITY_NOT_READY');
         }
 
@@ -306,6 +335,30 @@ final class SgkKararPaketiAuthz
     {
         if (!self::actorIdentitySchemaSupported($pdo)) {
             throw new RuntimeException('SGK_ACTOR_IDENTITY_SCHEMA_REQUIRED');
+        }
+    }
+
+    /** @param array<int, mixed> $subeIds */
+    private static function assertActiveActorScope(PDO $pdo, array $subeIds): void
+    {
+        $normalized = [];
+        foreach ($subeIds as $subeId) {
+            $id = (int) $subeId;
+            if ($id > 0) {
+                $normalized[$id] = $id;
+            }
+        }
+        if ($normalized === []) {
+            throw new RuntimeException('SGK_ACTOR_SCOPE_NOT_READY');
+        }
+
+        $placeholders = implode(', ', array_fill(0, count($normalized), '?'));
+        $stmt = $pdo->prepare(
+            "SELECT COUNT(*) FROM subeler WHERE id IN ($placeholders) AND durum = 'AKTIF'"
+        );
+        $stmt->execute(array_values($normalized));
+        if ((int) $stmt->fetchColumn() !== count($normalized)) {
+            throw new RuntimeException('SGK_ACTOR_SCOPE_NOT_READY');
         }
     }
 

@@ -287,6 +287,10 @@ export const endpoints = {
   yonetim: {
     kullanicilar: "/yonetim/kullanicilar",
     kullaniciDetail: (id: number | string) => `/yonetim/kullanicilar/${id}`,
+    actorIdentities: "/yonetim/actor-identities",
+    actorIdentityDetail: (id: number | string) => `/yonetim/actor-identities/${id}`,
+    actorIdentityVerify: (id: number | string) => `/yonetim/actor-identities/${id}/verify`,
+    kullaniciActorIdentity: (id: number | string) => `/yonetim/kullanicilar/${id}/actor-identity`,
     subeler: "/yonetim/subeler",
     subeDetail: (id: number | string) => `/yonetim/subeler/${id}`,
     aylikOzet: "/yonetim/aylik-ozet",

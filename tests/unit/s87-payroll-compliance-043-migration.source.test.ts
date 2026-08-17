@@ -11,7 +11,7 @@ describe("S87 migration 043 source contracts", () => {
       .filter((n) => /^\d{3}_.+\.sql$/.test(n))
       .sort();
     expect(files).toContain("043_payroll_compliance_critical_gaps.sql");
-    expect(files.at(-1)).toBe("067_personel_canonical_reference_gate.sql");
+    expect(files.at(-1)).toBe("068_sgk_actor_identity_lifecycle_audit.sql");
   });
 
   it("is additive: alters tercih + audit, creates yillik kilit, references surecler belge id", () => {

@@ -12,12 +12,95 @@ use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
 use Medisa\Api\Scope\SubeScope;
 use Medisa\Api\Services\Auth\UserPersonelBindingService;
+use Medisa\Api\Services\Auth\ActorIdentityException;
+use Medisa\Api\Services\Auth\ActorIdentityService;
 use PDO;
 use PDOException;
 
 class YonetimController
 {
     private const SUBE_DELETE_BLOCKED_MESSAGE = 'Şubede Kayıtlı Personel Gözükmektedir. Kayıtlı Personel Varken Silme İşlemi Yapılamaz.';
+
+    public static function actorIdentityCreate(Request $request)
+    {
+        $admin = AuthMiddleware::authenticate($request, true);
+        $body = $request->getJsonBody();
+        $userId = $body['user_id'] ?? null;
+
+        try {
+            $pdo = Connection::get();
+            JsonResponse::success(ActorIdentityService::create($pdo, $admin, $userId), [], 201);
+        } catch (ActorIdentityException $e) {
+            self::actorIdentityError($e);
+        } catch (\Throwable $e) {
+            JsonResponse::serverError('Actor identity olusturulamadi.');
+        }
+    }
+
+    public static function actorIdentityVerify(Request $request, $identityId)
+    {
+        $admin = AuthMiddleware::authenticate($request, true);
+
+        try {
+            $pdo = Connection::get();
+            JsonResponse::success(ActorIdentityService::verify($pdo, $admin, $identityId));
+        } catch (ActorIdentityException $e) {
+            self::actorIdentityError($e);
+        } catch (\Throwable $e) {
+            JsonResponse::serverError('Actor identity dogrulanamadi.');
+        }
+    }
+
+    public static function actorIdentityBind(Request $request, $userId)
+    {
+        $admin = AuthMiddleware::authenticate($request, true);
+        $body = $request->getJsonBody();
+        $identityId = $body['actor_identity_id'] ?? null;
+
+        try {
+            $pdo = Connection::get();
+            JsonResponse::success(ActorIdentityService::bind($pdo, $admin, $userId, $identityId));
+        } catch (ActorIdentityException $e) {
+            self::actorIdentityError($e);
+        } catch (\Throwable $e) {
+            JsonResponse::serverError('Actor identity kullaniciya baglanamadi.');
+        }
+    }
+
+    public static function actorIdentityRead(Request $request, $userId)
+    {
+        $admin = AuthMiddleware::authenticate($request, true);
+
+        try {
+            $pdo = Connection::get();
+            RolePermissions::assert($admin, ActorIdentityService::MANAGEMENT_PERMISSION);
+            JsonResponse::success(ActorIdentityService::readForUser($pdo, $userId));
+        } catch (ActorIdentityException $e) {
+            self::actorIdentityError($e);
+        } catch (\Throwable $e) {
+            JsonResponse::serverError('Actor identity okunamadi.');
+        }
+    }
+
+    public static function actorIdentityReadById(Request $request, $identityId)
+    {
+        $admin = AuthMiddleware::authenticate($request, true);
+
+        try {
+            $pdo = Connection::get();
+            RolePermissions::assert($admin, ActorIdentityService::MANAGEMENT_PERMISSION);
+            JsonResponse::success(ActorIdentityService::readIdentity($pdo, $identityId));
+        } catch (ActorIdentityException $e) {
+            self::actorIdentityError($e);
+        } catch (\Throwable $e) {
+            JsonResponse::serverError('Actor identity okunamadi.');
+        }
+    }
+
+    private static function actorIdentityError(ActorIdentityException $e)
+    {
+        JsonResponse::error($e->httpStatus, $e->errorCode, $e->getMessage(), $e->field);
+    }
 
     public static function subeler(Request $request)
     {

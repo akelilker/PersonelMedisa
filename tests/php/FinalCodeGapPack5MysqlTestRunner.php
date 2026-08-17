@@ -141,7 +141,8 @@ function p5MigrationFiles(): array
     $dir = __DIR__ . '/../../api/migrations';
     $files = array_values(array_filter(scandir($dir) ?: [], static function ($name) {
         return (bool) preg_match('/^\d{3}_.+\.sql$/', (string) $name)
-            && $name !== '067_personel_canonical_reference_gate.sql';
+            && $name !== '067_personel_canonical_reference_gate.sql'
+            && $name !== '068_sgk_actor_identity_lifecycle_audit.sql';
     }));
     sort($files, SORT_STRING);
 

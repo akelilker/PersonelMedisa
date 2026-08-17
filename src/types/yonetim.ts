@@ -32,6 +32,18 @@ export type UpsertYonetimKullaniciPayload = {
   notlar?: string;
 };
 
+export type ActorIdentityStatus = "PENDING" | "VERIFIED" | "REVOKED";
+
+export type YonetimActorIdentityRead = {
+  user_id: number | null;
+  actor_identity_id: number | null;
+  actor_status: ActorIdentityStatus | null;
+  personel_id: number | null;
+  branch_scope: number[];
+  ready: boolean;
+  readiness_code?: string | null;
+};
+
 export type YonetimSube = {
   id: number;
   kod: string;

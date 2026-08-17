@@ -150,6 +150,9 @@ jobs:
               mkdir -p api/runtime;
               put -O api/runtime api/runtime/.htaccess;
               put -O api ${RUNNER_TEMP}/.deploy-sha;
+              set cmd:fail-exit false;
+              rm api/public/_migration_*.php;
+              set cmd:fail-exit true;
               !echo 'upload tamamlandi';
               bye
             "

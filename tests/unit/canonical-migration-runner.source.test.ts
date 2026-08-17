@@ -48,6 +48,7 @@ describe('SSHless cPanel cron control contract', () => {
     expect(deployWorkflow).toContain('mirror -R --verbose api/migrations api/migrations');
     expect(deployWorkflow).toContain('put -O api ${RUNNER_TEMP}/.deploy-sha');
     expect(deployWorkflow).toContain('put -O api/runtime api/runtime/.htaccess');
+    expect(deployWorkflow).toContain('rm api/public/_migration_*.php');
     expect(deployWorkflow).not.toMatch(/CPANEL_SSH_/);
     expect(deployWorkflow).not.toMatch(/\bssh\b/i);
     expect(deployWorkflow).not.toContain('run-production-migrations');

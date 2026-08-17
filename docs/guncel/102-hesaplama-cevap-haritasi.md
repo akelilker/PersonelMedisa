@@ -5,7 +5,9 @@
 **Tarih:** 2026-08-11 (refresh 2026-08-12 — master closure audit / S3F sonrası)
 **Motor sürümü (kod):** `S91C2_PAYROLL_ENGINE_V2`
 **Compliance kontratı:** `S87_PAYROLL_COMPLIANCE_V1`
-**Not:** Bu belge hesaplama haritasıdır. Production migration tip: **064** (`118`). QR pipeline S3C–S3F **CLOSED_PRODUCTION** (algoritmalar: `QR_INTERVAL_V1`, `QR_PUANTAJ_CANDIDATE_V1`, `QR_PUANTAJ_DECISION_V1`, `QR_CANDIDATE_HASH_V2`).
+**Not:** Bu belge hesaplama haritasıdır. Production migration tip: **067** (`Migration067=CLOSED_CONFIRMED`). QR pipeline S3C–S3F **CLOSED_PRODUCTION** (algoritmalar: `QR_INTERVAL_V1`, `QR_PUANTAJ_CANDIDATE_V1`, `QR_PUANTAJ_DECISION_V1`, `QR_CANDIDATE_HASH_V2`).
+
+**2026-08-17 closure reconciliation:** SGK catalog `CLOSED_CONFIRMED`; UBGT `CLOSED_CONFIRMED`; payroll company policy `CLOSED_CONFIRMED`; active policy revision `3`, required/resolved `14/14`, missing `0`; `HAFTA_TATILI_GUNLERI=0` / Pazar; payroll policy preflight ready.
 
 ---
 
@@ -18,7 +20,7 @@
 | SGK prim günü ve eksik gün kodları? | Evet |
 | 18 yaş / 270 saat / gece yasağı? | Evet |
 | Hangi dosya owner? | Evet |
-| Canlıda parametre dolduruldu mu? | Hayır → `91` formu + `95` runbook |
+| Canlıda parametre dolduruldu mu? | Evet → active company policy revision `3` (`14/14`) |
 | Görsel / deploy / rollout flags? | Hayır → `CURRENT_STATE.md` |
 | Açık gap / backlog? | Hayır → `110-master-closure-gap-registry.md` |
 
@@ -114,7 +116,7 @@ Canlıya `30` / `225` yazmak için onay formu: `91-bordro-hesaplama-calisma-poli
 | FM ücreti | `SERBEST_ZAMAN` seçildiyse FM `ARTI` üretilmez (çift etki yasak) |
 | Karar mercii | Çalışanın **imzalı yazılı talebi** zorunlu; kanıt yoksa blocker |
 | Event modeli | Oluşum / kullanım / düzeltme / iptal |
-| **6 aylık deadline compliance / ops follow-up** | **OPS_ROLLOUT** (`110` MG-SZ-6M-001) — Pack 4B: `SerbestZamanDeadlineService` + `GET /serbest-zaman/deadline-takip` + Raporlar `serbest-zaman-takip`; warning 30g; `WARNING_AND_OPERATIONAL_FOLLOWUP`; payroll hard block **yok**; production allocation schema ready (`061`/`062` via `118`); İK ops follow-up `USER_GATED` |
+| **6 aylık deadline compliance / ops follow-up** | **OPS_ROLLOUT_ACTIVE** (`110` MG-SZ-6M-001) — Pack 4B: `SerbestZamanDeadlineService` + `GET /serbest-zaman/deadline-takip` + Raporlar `serbest-zaman-takip`; warning 30g; `WARNING_AND_OPERATIONAL_FOLLOWUP`; payroll hard block **yok**; production allocation schema ready (`061`/`062` via `118`) |
 
 ---
 
@@ -250,12 +252,12 @@ Kaynak: masaüstü `puantaj resmi durum.docx` (toplantı mevzuat özeti).
 | Madde | Kod cevabı | Açık / dikkat |
 | --- | --- | --- |
 | 1 Ücret /30 /225 / brüt | Var (parametreli) | Canlı onay formu |
-| 2 SGK gün + 01/15/07 | Var | Resmî katalog ops kapısı |
+| 2 SGK gün + 01/15/07 | Var | Resmî katalog **CLOSED_CONFIRMED** |
 | 3 İzin yaş 20 gün | Var | Band + yaş min 20; bakiye owner kümülatif + ledger + kullanım (`YillikIzinBakiyeService` / doc `104`) |
 | 4 18 yaş FM/gece blok | Var | — |
 | 5 FM 1.5 + 270 saat | Var | FSC %25 **kapalı** |
-| 6 Serbest zaman | Var (dönüşüm+kanıt+son_kullanim+deadline ops) | **Deadline ops surface** Pack 4B OPS_ROLLOUT (`110` MG-SZ-6M-001); prod rollout pending |
-| 7 UBGT | Var | Politika/mod onayı |
+| 6 Serbest zaman | Var (dönüşüm+kanıt+son_kullanim+deadline ops) | **Deadline ops surface** Pack 4B OPS_ROLLOUT_ACTIVE (`110` MG-SZ-6M-001); production schema/ops closure accepted |
+| 7 UBGT | Var | Politika/mod **CLOSED_CONFIRMED** |
 | 8 HT / Pazar 1.5 | Var | — |
 | 9 Geç/erken | Var | Tolerans firma kararı |
 | 10 Devamsızlık + HT | Var | — |
@@ -269,10 +271,10 @@ Kaynak: masaüstü `puantaj resmi durum.docx` (toplantı mevzuat özeti).
 
 | Konu | Durum |
 | --- | --- |
-| Serbest zaman 6 aylık deadline compliance / ops follow-up | OPS_ROLLOUT (`110` MG-SZ-6M-001) — Pack 4B code owner + Raporlar yüzeyi tamam; production schema/ops pending |
+| Serbest zaman 6 aylık deadline compliance / ops follow-up | OPS_ROLLOUT_ACTIVE (`110` MG-SZ-6M-001) — Pack 4B code owner + Raporlar yüzeyi tamam; production schema ready |
 | Yıl değiştiren hafta FM politikası | CLOSED (`110` MG-OT-YEAR-POL-001) — `ROLLING_12_MONTH_ACTUAL_DATE_V1` (`117`) |
 | Yıl değiştiren hafta FM path tutarlılığı | CLOSED (`110` MG-OT-YEAR-PATH-001) — Pack5 rolling owner |
-| Org location schema | OPS_ROLLOUT (`110` MG-ORG-LOC-001) — Pack5 code/schema; prod apply + real seed USER_GATED |
+| Org location schema | CLOSED_CONFIRMED (`110` MG-ORG-LOC-001) — production references and personnel rollout closed |
 | SGK 15–14 dönem | BUSINESS_DECISION_REQUIRED (`110` MG-SGK-1514-001); metadata CONDITIONAL_SCOPE; preview BLOCKER_ONLY |
 | FSC (%25) aktif bant | S87 ile kapalı (INTENTIONAL_DEFER) |
 | Zorunlu/olağanüstü çalışma istisna modeli | Bilinçli kapsam dışı / karar bekler |

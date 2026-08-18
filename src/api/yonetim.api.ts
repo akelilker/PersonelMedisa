@@ -10,6 +10,7 @@ import type {
   KullaniciTipi,
   UpsertYonetimKullaniciPayload,
   UpsertYonetimSubePayload,
+  YonetimActorIdentityRead,
   YonetimKullanici,
   YonetimSube
 } from "../types/yonetim";
@@ -263,6 +264,42 @@ export async function updateYonetimKullanici(
     body: JSON.stringify(sanitizeYonetimKullaniciPayloadForApi(payload))
   });
   return normalizeYonetimKullanici(response.data);
+}
+
+export async function createYonetimActorIdentity(userId: number | string): Promise<YonetimActorIdentityRead> {
+  const response = await apiRequest<ApiResponse<YonetimActorIdentityRead>>(endpoints.yonetim.actorIdentities, {
+    method: "POST",
+    body: JSON.stringify({ user_id: userId })
+  });
+  return response.data;
+}
+
+export async function verifyYonetimActorIdentity(
+  actorIdentityId: number | string
+): Promise<YonetimActorIdentityRead> {
+  const response = await apiRequest<ApiResponse<YonetimActorIdentityRead>>(
+    endpoints.yonetim.actorIdentityVerify(actorIdentityId),
+    { method: "POST", body: JSON.stringify({}) }
+  );
+  return response.data;
+}
+
+export async function bindYonetimActorIdentity(
+  userId: number | string,
+  actorIdentityId: number | string
+): Promise<YonetimActorIdentityRead> {
+  const response = await apiRequest<ApiResponse<YonetimActorIdentityRead>>(
+    endpoints.yonetim.kullaniciActorIdentity(userId),
+    { method: "POST", body: JSON.stringify({ actor_identity_id: actorIdentityId }) }
+  );
+  return response.data;
+}
+
+export async function fetchYonetimActorIdentity(userId: number | string): Promise<YonetimActorIdentityRead> {
+  const response = await apiRequest<ApiResponse<YonetimActorIdentityRead>>(
+    endpoints.yonetim.kullaniciActorIdentity(userId)
+  );
+  return response.data;
 }
 
 export async function fetchYonetimSubeleri(): Promise<YonetimSube[]> {

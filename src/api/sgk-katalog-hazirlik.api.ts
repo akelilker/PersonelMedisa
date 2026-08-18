@@ -122,6 +122,29 @@ export type SgkKatalogBlockerRaporu = {
   response_hash: string;
 };
 
+export type SgkSirketPolitikaReadItem = {
+  sube_id: number;
+  state: "ONAYLANDI" | "NO_APPROVED_POLICY" | "CONFLICT" | string;
+  approved_policy_id?: number;
+  surum_kodu?: string;
+  status?: string;
+  bildirim_donem_tipi?: string;
+  gecerlilik_baslangic?: string | null;
+  gecerlilik_bitis?: string | null;
+  politika_hash?: string | null;
+  hazirlayan_id?: number | null;
+  onaylayan_id?: number | null;
+  onay_zamani?: string | null;
+  degerler?: Record<string, string>;
+};
+
+export type SgkSirketPolitikaRevisionItem = SgkSirketPolitikaReadItem & {
+  policy_id: number;
+  created_at?: string | null;
+  effective_for_requested_period: boolean;
+  overlaps_requested_period: boolean;
+};
+
 function unwrapData<T>(payload: ApiResponse<T> | T): T {
   if (typeof payload === "object" && payload !== null && "data" in payload) {
     return (payload as ApiResponse<T>).data;
@@ -140,6 +163,35 @@ export async function fetchSgkKatalogTamlik(body?: Record<string, unknown>) {
   const response = await apiRequest<ApiResponse<SgkKatalogTamlik> | SgkKatalogTamlik>(
     endpoints.sgkKatalogHazirlik.tamlik
   );
+  return unwrapData(response);
+}
+
+export async function fetchSgkSirketPolitikasi(params?: { sube_id?: number; yil?: number; ay?: number }) {
+  const response = await apiRequest<
+    ApiResponse<{
+      items: SgkSirketPolitikaReadItem[];
+      period: { baslangic: string; bitis: string };
+    }>
+  >(appendQueryParams(endpoints.sgkKatalogHazirlik.sirketPolitikasi, params ?? {}));
+
+  return unwrapData(response);
+}
+
+export async function fetchSgkSirketPolitikasiSurumler(params: {
+  sube_id: number;
+  baslangic?: string;
+  bitis?: string;
+  yil?: number;
+  ay?: number;
+}) {
+  const response = await apiRequest<
+    ApiResponse<{
+      sube_id: number;
+      items: SgkSirketPolitikaRevisionItem[];
+      period: { baslangic: string; bitis: string };
+    }>
+  >(appendQueryParams(endpoints.sgkKatalogHazirlik.sirketPolitikasiSurumler, params));
+
   return unwrapData(response);
 }
 

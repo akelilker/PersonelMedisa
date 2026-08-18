@@ -20,6 +20,7 @@ use Medisa\Api\Services\Payroll\SgkKatalogWriteService;
 use Medisa\Api\Services\Payroll\SgkOperasyonelKanitBase64Guard;
 use Medisa\Api\Services\Payroll\SgkOperasyonelKanitValidator;
 use Medisa\Api\Services\Payroll\SgkSirketPolitikaImportValidator;
+use Medisa\Api\Services\Payroll\SgkSirketPolitikaReadService;
 use Medisa\Api\Services\Payroll\SgkSirketPolitikaWriteService;
 use Medisa\Api\Services\Payroll\SgkSurecEslemeImportValidator;
 use Medisa\Api\Services\Payroll\SgkSurecEslemeWriteService;
@@ -257,6 +258,66 @@ class SgkKatalogHazirlikController
         exit;
     }
 
+    public static function sirketPolitikasi(Request $request)
+    {
+        [$pdo, $user, $subeId] = self::context($request, 'mevzuat_parametreleri.view');
+        [$from, $to] = self::readPolicyPeriod($request);
+
+        try {
+            $items = SgkSirketPolitikaReadService::listEffective(
+                $pdo,
+                $subeId,
+                SubeScope::allowedSubeIds($user),
+                $from,
+                $to
+            );
+        } catch (\Throwable $e) {
+            JsonResponse::error(
+                503,
+                'SGK_POLITIKA_OKUMA_HATASI',
+                'SGK sirket politikasi okunamadi.'
+            );
+        }
+
+        JsonResponse::success([
+            'items' => $items,
+            'period' => [
+                'baslangic' => $from,
+                'bitis' => $to,
+            ],
+        ]);
+    }
+
+    public static function sirketPolitikasiSurumler(Request $request)
+    {
+        [$pdo, $user, $subeId] = self::context($request, 'mevzuat_parametreleri.view');
+        if ($subeId === null) {
+            JsonResponse::error(400, 'SGK_POLITIKA_SUBE_ZORUNLU', 'Revision inventory icin sube_id zorunludur.');
+            return;
+        }
+
+        [$from, $to] = self::readPolicyPeriod($request);
+        try {
+            $items = SgkSirketPolitikaReadService::listRevisionInventory($pdo, $subeId, $from, $to);
+        } catch (\Throwable $e) {
+            JsonResponse::error(
+                503,
+                'SGK_POLITIKA_REVIZYON_OKUMA_HATASI',
+                'SGK sirket politikasi revizyonlari okunamadi.'
+            );
+            return;
+        }
+
+        JsonResponse::success([
+            'sube_id' => $subeId,
+            'items' => $items,
+            'period' => [
+                'baslangic' => $from,
+                'bitis' => $to,
+            ],
+        ]);
+    }
+
     public static function sirketPolitikasiDryRun(Request $request)
     {
         [$pdo] = self::context($request, 'mevzuat_parametreleri.view');
@@ -323,18 +384,25 @@ class SgkKatalogHazirlikController
     public static function blockerReport(Request $request)
     {
         [$pdo] = self::context($request, 'bordro_on_izleme.view');
-        $tamlik = SgkKatalogTamlikService::evaluate([
-            'manifests' => self::loadManifests($pdo, 'blocker_raporu'),
-            'kod_satirlari' => [],
-            'ebildirge_guncel_gorunum_dogrulandi_mi' => false,
-        ]);
+        $storedTamlik = SgkKatalogWriteService::storedApprovedTamlik($pdo);
+        if ($storedTamlik !== null) {
+            $tamlik = $storedTamlik;
+            $catalogBlockers = [];
+        } else {
+            $tamlik = SgkKatalogTamlikService::evaluate([
+                'manifests' => self::loadManifests($pdo, 'blocker_raporu'),
+                'kod_satirlari' => [],
+                'ebildirge_guncel_gorunum_dogrulandi_mi' => false,
+            ]);
+            $catalogBlockers = $tamlik['blocker_detaylari'] ?? [];
+        }
         $kismi = SgkKatalogPreviewService::kismiSureliPreview([]);
         $bildirim = SgkKatalogPreviewService::bildirimDonemiPreview([]);
         $esleme = SgkSurecKodEslemeValidator::validate(['surec_turu' => 'RAPOR', 'alt_tur' => 'Raporlu_Hastalik', 'mappings' => []]);
         $coklu = SgkCokluNedenValidator::validate(['kodlar' => ['01', '15'], 'kurallar' => []]);
 
         $all = array_merge(
-            $tamlik['blocker_detaylari'] ?? [],
+            $catalogBlockers,
             $kismi['blocker_detaylari'] ?? [],
             $bildirim['blocker_detaylari'] ?? [],
             $esleme['blocker_detaylari'] ?? [],
@@ -510,5 +578,38 @@ class SgkKatalogHazirlikController
     {
         $body = $request->getJsonBody();
         return is_array($body) ? $body : [];
+    }
+
+    /** @return array{0:string,1:string} */
+    private static function readPolicyPeriod(Request $request): array
+    {
+        $requestedFrom = trim((string) $request->getQuery('baslangic', ''));
+        $requestedTo = trim((string) $request->getQuery('bitis', ''));
+        if (self::isIsoDate($requestedFrom) && self::isIsoDate($requestedTo) && $requestedTo >= $requestedFrom) {
+            return [$requestedFrom, $requestedTo];
+        }
+
+        $yil = (int) $request->getQuery('yil', 0);
+        $ay = (int) $request->getQuery('ay', 0);
+        if ($yil >= 2000 && $yil <= 2100 && $ay >= 1 && $ay <= 12) {
+            $from = sprintf('%04d-%02d-01', $yil, $ay);
+            $to = (new \DateTimeImmutable($from))->modify('last day of this month')->format('Y-m-d');
+
+            return [$from, $to];
+        }
+
+        $today = new \DateTimeImmutable('today');
+
+        return [
+            $today->modify('first day of this month')->format('Y-m-d'),
+            $today->modify('last day of this month')->format('Y-m-d'),
+        ];
+    }
+
+    private static function isIsoDate(string $value): bool
+    {
+        $date = \DateTimeImmutable::createFromFormat('!Y-m-d', $value);
+
+        return $date !== false && $date->format('Y-m-d') === $value;
     }
 }

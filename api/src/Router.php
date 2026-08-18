@@ -556,6 +556,12 @@ class Router
         if ($path === '/sgk-katalog-hazirlik/sirket-politikasi/sablon.csv' && $method === 'GET') {
             SgkKatalogHazirlikController::sirketPolitikasiSablonCsv($this->request);
         }
+        if ($path === '/sgk-katalog-hazirlik/sirket-politikasi' && $method === 'GET') {
+            SgkKatalogHazirlikController::sirketPolitikasi($this->request);
+        }
+        if ($path === '/sgk-katalog-hazirlik/sirket-politikasi/surumler' && $method === 'GET') {
+            SgkKatalogHazirlikController::sirketPolitikasiSurumler($this->request);
+        }
         if ($path === '/sgk-katalog-hazirlik/sirket-politikasi/dry-run' && $method === 'POST') {
             SgkKatalogHazirlikController::sirketPolitikasiDryRun($this->request);
         }
@@ -828,6 +834,15 @@ class Router
         if ($method === 'DELETE' && preg_match('#^/yonetim/subeler/(\d+)$#', $path, $matches)) {
             YonetimController::subeSil($this->request, $matches[1]);
         }
+        if ($path === '/yonetim/actor-identities' && $method === 'POST') {
+            YonetimController::actorIdentityCreate($this->request);
+        }
+        if ($method === 'GET' && preg_match('#^/yonetim/actor-identities/(\d+)$#', $path, $matches)) {
+            YonetimController::actorIdentityReadById($this->request, $matches[1]);
+        }
+        if ($method === 'POST' && preg_match('#^/yonetim/actor-identities/(\d+)/verify$#', $path, $matches)) {
+            YonetimController::actorIdentityVerify($this->request, $matches[1]);
+        }
         if ($path === '/yonetim/kullanicilar' && $method === 'GET') {
             YonetimController::kullanicilar($this->request);
         }
@@ -836,6 +851,12 @@ class Router
         }
         if ($method === 'PUT' && preg_match('#^/yonetim/kullanicilar/(\d+)$#', $path, $matches)) {
             YonetimController::kullaniciGuncelle($this->request, $matches[1]);
+        }
+        if ($method === 'GET' && preg_match('#^/yonetim/kullanicilar/(\d+)/actor-identity$#', $path, $matches)) {
+            YonetimController::actorIdentityRead($this->request, $matches[1]);
+        }
+        if ($method === 'POST' && preg_match('#^/yonetim/kullanicilar/(\d+)/actor-identity$#', $path, $matches)) {
+            YonetimController::actorIdentityBind($this->request, $matches[1]);
         }
         if ($path === '/yonetim/aylik-ozet' && $method === 'GET') {
             YonetimController::aylikOzet($this->request);

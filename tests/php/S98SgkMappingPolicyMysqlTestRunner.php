@@ -11,6 +11,7 @@ require_once __DIR__ . '/../../api/src/Services/Payroll/SgkKatalogOnayService.ph
 require_once __DIR__ . '/../../api/src/Services/Payroll/SgkKatalogWriteService.php';
 require_once __DIR__ . '/../../api/src/Services/Payroll/SgkSirketPolitikaCatalog.php';
 require_once __DIR__ . '/../../api/src/Services/Payroll/SgkSirketPolitikaImportValidator.php';
+require_once __DIR__ . '/../../api/src/Services/Payroll/SgkSirketPolitikaReadService.php';
 require_once __DIR__ . '/../../api/src/Services/Payroll/SgkSirketPolitikaWriteService.php';
 require_once __DIR__ . '/../../api/src/Services/Payroll/SgkSurecEslemeImportValidator.php';
 require_once __DIR__ . '/../../api/src/Services/Payroll/SgkSurecEslemeWriteService.php';
@@ -22,6 +23,7 @@ use Medisa\Api\Services\Payroll\SgkKararPaketiAuthz;
 use Medisa\Api\Services\Payroll\SgkKatalogOnayService;
 use Medisa\Api\Services\Payroll\SgkKatalogWriteService;
 use Medisa\Api\Services\Payroll\SgkSirketPolitikaImportValidator;
+use Medisa\Api\Services\Payroll\SgkSirketPolitikaReadService;
 use Medisa\Api\Services\Payroll\SgkSirketPolitikaWriteService;
 use Medisa\Api\Services\Payroll\SgkSurecEslemeImportValidator;
 use Medisa\Api\Services\Payroll\SgkSurecEslemeWriteService;
@@ -643,6 +645,61 @@ try {
 
     $polApprove = SgkSirketPolitikaWriteService::approve($pdo, $gy2, ['sube_id' => 1, 'surum_kodu' => 'POL-2026', 'politika_hash' => $politikaHash]);
     s98Assert(($polApprove['http_status'] ?? 0) === 200, 'policy approved by other user');
+
+    $pdo->exec("INSERT INTO sgk_sirket_politika_surumleri
+        (sube_id, surum_kodu, gecerlilik_baslangic, gecerlilik_bitis, bildirim_donem_tipi, state, politika_hash, aciklama, hazirlayan_id)
+        VALUES (1, 'POL-DRAFT', '2026-03-01', NULL, 'AY_1_SON_GUN', 'TASLAK', '" . str_repeat('d', 64) . "', 'read selector draft fixture', 1)");
+    $pdo->exec("INSERT INTO subeler (id, kod, ad, durum) VALUES
+        (2, 'BR2', 'Branch 2', 'AKTIF'),
+        (3, 'BR3', 'Branch 3', 'AKTIF')");
+    $pdo->exec("INSERT INTO sgk_sirket_politika_surumleri
+        (sube_id, surum_kodu, gecerlilik_baslangic, gecerlilik_bitis, bildirim_donem_tipi, state, politika_hash, aciklama, hazirlayan_id, onaylayan_id, onay_zamani)
+        VALUES (2, 'POL-BR2', '2026-01-01', NULL, 'AY_1_SON_GUN', 'ONAYLANDI', '" . str_repeat('e', 64) . "', 'read selector branch fixture', 1, 2, '2026-01-01 00:00:00')");
+    $branchTwoPolicyId = (int) $pdo->lastInsertId();
+    $pdo->prepare(
+        "INSERT INTO sgk_sirket_politika_degerleri
+         (politika_surum_id, politika_kodu, deger_turu, deger)
+         VALUES (:id, 'SGK_ODENEK_MAHSUP_MODU', 'METIN', 'UCRET_MODELINE_GORE')"
+    )->execute(['id' => $branchTwoPolicyId]);
+
+    $readBranchOne = SgkSirketPolitikaReadService::resolveForPeriod($pdo, 1, '2026-03-01', '2026-03-31');
+    s98Assert($readBranchOne['state'] === SgkSirketPolitikaReadService::STATE_APPROVED, 'read approved branch state');
+    s98Assert(($readBranchOne['politika']['id'] ?? 0) > 0, 'read approved branch id');
+    s98Assert(($readBranchOne['politika']['bildirim_donem_tipi'] ?? '') === 'AY_15_SONRAKI_AY_14', 'read approved period');
+
+    $readBranchTwo = SgkSirketPolitikaReadService::resolveForPeriod($pdo, 2, '2026-03-01', '2026-03-31');
+    s98Assert($readBranchTwo['state'] === SgkSirketPolitikaReadService::STATE_APPROVED, 'read branch two state');
+    s98Assert(($readBranchTwo['politika']['bildirim_donem_tipi'] ?? '') === 'AY_1_SON_GUN', 'read branch two period');
+    s98Assert($readBranchOne['politika']['bildirim_donem_tipi'] !== $readBranchTwo['politika']['bildirim_donem_tipi'], 'branch-specific periods remain distinct');
+
+    $readBranchThree = SgkSirketPolitikaReadService::resolveForPeriod($pdo, 3, '2026-03-01', '2026-03-31');
+    s98Assert($readBranchThree['state'] === SgkSirketPolitikaReadService::STATE_NO_APPROVED_POLICY, 'no approved policy fails closed');
+    s98Assert($readBranchThree['politika'] === null, 'no approved policy does not fabricate default');
+
+    $readCollection = SgkSirketPolitikaReadService::listEffective($pdo, null, [], '2026-03-01', '2026-03-31');
+    s98Assert(count($readCollection) === 3, 'read collection returns all active branches');
+    s98Assert(($readCollection[0]['state'] ?? '') === SgkSirketPolitikaReadService::STATE_APPROVED, 'collection approved state');
+
+    $pdo->exec("INSERT INTO sgk_sirket_politika_surumleri
+        (sube_id, surum_kodu, gecerlilik_baslangic, gecerlilik_bitis, bildirim_donem_tipi, state, politika_hash, aciklama, hazirlayan_id)
+        VALUES (2, 'POL-FUTURE-PENDING', '2026-09-01', NULL, 'AY_1_SON_GUN', 'ONAY_BEKLIYOR', '" . str_repeat('f', 64) . "', 'future pending inventory fixture', 1)");
+
+    $emptyInventory = SgkSirketPolitikaReadService::listRevisionInventory($pdo, 3, '2026-08-01', '2026-08-31');
+    s98Assert($emptyInventory === [], 'revision inventory empty branch is safe-no-policy compatible');
+
+    $branchOneInventory = SgkSirketPolitikaReadService::listRevisionInventory($pdo, 1, '2026-03-01', '2026-03-31');
+    s98Assert(count($branchOneInventory) === 2, 'approved and newer draft both visible in inventory');
+    s98Assert($branchOneInventory[0]['state'] === 'ONAYLANDI', 'inventory approved state');
+    s98Assert($branchOneInventory[0]['effective_for_requested_period'] === true, 'approved row remains effective independently');
+    s98Assert($branchOneInventory[1]['state'] === 'TASLAK', 'inventory draft state');
+    s98Assert($branchOneInventory[1]['overlaps_requested_period'] === true, 'draft overlap is reported');
+
+    $branchTwoInventory = SgkSirketPolitikaReadService::listRevisionInventory($pdo, 2, '2026-08-01', '2026-08-31');
+    s98Assert(count($branchTwoInventory) === 2, 'inventory isolates branch revisions');
+    s98Assert($branchTwoInventory[0]['state'] === 'ONAYLANDI', 'inventory approved branch two state');
+    s98Assert($branchTwoInventory[1]['state'] === 'ONAY_BEKLIYOR', 'inventory pending state');
+    s98Assert($branchTwoInventory[1]['overlaps_requested_period'] === false, 'future pending period does not overlap requested period');
+    s98Assert($branchTwoInventory[1]['gecerlilik_baslangic'] === '2026-09-01', 'future revision period preserved');
 
     $overlapDry = SgkSirketPolitikaImportValidator::dryRun($pdo, [
         'sube_id' => 1,

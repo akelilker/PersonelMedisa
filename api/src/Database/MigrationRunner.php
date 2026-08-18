@@ -13,16 +13,16 @@ final class MigrationRunner
     private const LOCK_NAME = 'medisa_canonical_migrations';
 
     /**
-     * @param string $migrationDirectory
+     * @param MigrationSourceProvider|string $source
      * @param string|null $baselineVersion
      * @return array{applied: list<string>, pending: list<string>, latest: string|null}
      */
     public static function run(
         PDO $pdo,
-        string $migrationDirectory,
+        MigrationSourceProvider|string $source,
         ?string $baselineVersion = null
     ): array {
-        $migrations = self::discover($migrationDirectory);
+        $migrations = self::resolve($source);
         if ($migrations === []) {
             throw new RuntimeException('No canonical migration files were discovered.');
         }
@@ -84,78 +84,31 @@ final class MigrationRunner
 
     /**
      * @param string $migrationDirectory
-     * @return list<array{version: string, name: string, path: string, checksum: string}>
+     * @return list<array{version: string, name: string, checksum: string, sql: string}>
      */
     public static function discover(string $migrationDirectory): array
     {
-        $paths = [];
-        $bootstrapPath = dirname($migrationDirectory)
-            . DIRECTORY_SEPARATOR . 'src'
-            . DIRECTORY_SEPARATOR . 'Database'
-            . DIRECTORY_SEPARATOR . 'migration_ledger.sql';
-        if (is_file($bootstrapPath)) {
-            $paths[] = $bootstrapPath;
-        }
-        $paths = array_merge(
-            $paths,
-            array_values(array_filter(
-                glob(rtrim($migrationDirectory, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . '*.sql') ?: [],
-                static fn (string $path): bool => basename($path) !== 'migration_ledger.sql'
-            ))
-        );
-        $migrations = [];
-
-        foreach ($paths as $path) {
-            $name = basename($path);
-            if ($name === 'migration_ledger.sql') {
-                $migrations[] = [
-                    'version' => '000',
-                    'name' => $name,
-                    'path' => $path,
-                    'checksum' => hash_file('sha256', $path),
-                ];
-                continue;
-            }
-            if (preg_match('/^(\d+)_([A-Za-z0-9_-]+)\.sql$/', $name, $matches) !== 1) {
-                continue;
-            }
-            $migrations[] = [
-                'version' => str_pad($matches[1], 3, '0', STR_PAD_LEFT),
-                'name' => $name,
-                'path' => $path,
-                'checksum' => hash_file('sha256', $path),
-            ];
-        }
-
-        usort(
-            $migrations,
-            static fn (array $left, array $right): int => [
-                (int) $left['version'],
-                $left['name'],
-            ] <=> [
-                (int) $right['version'],
-                $right['name'],
-            ]
-        );
-
-        for ($index = 1, $count = count($migrations); $index < $count; $index++) {
-            if ($migrations[$index - 1]['version'] === $migrations[$index]['version']) {
-                throw new RuntimeException(
-                    "Duplicate canonical migration version: {$migrations[$index]['version']}"
-                );
-            }
-        }
-
-        return $migrations;
+        return (new FilesystemMigrationSourceProvider($migrationDirectory))->all();
     }
 
     /**
-     * @param array{version: string, name: string, path: string, checksum: string} $migration
+     * @param MigrationSourceProvider|string $source
+     * @return list<array{version: string, name: string, checksum: string, sql: string}>
+     */
+    private static function resolve(MigrationSourceProvider|string $source): array
+    {
+        return is_string($source)
+            ? self::discover($source)
+            : $source->all();
+    }
+
+    /**
+     * @param array{version: string, name: string, checksum: string, sql: string} $migration
      */
     private static function applyOne(PDO $pdo, array $migration): void
     {
-        $sql = file_get_contents($migration['path']);
-        if ($sql === false || trim($sql) === '') {
+        $sql = $migration['sql'];
+        if ($sql === '') {
             throw new RuntimeException("Migration source is unreadable: {$migration['name']}");
         }
 
@@ -189,7 +142,7 @@ final class MigrationRunner
     }
 
     /**
-     * @param list<array{version: string, name: string, path: string, checksum: string}> $migrations
+     * @param list<array{version: string, name: string, checksum: string, sql: string}> $migrations
      */
     private static function recordBaseline(PDO $pdo, array $migrations, string $baselineVersion): void
     {
@@ -247,12 +200,12 @@ final class MigrationRunner
     }
 
     /**
-     * @param string $migrationDirectory
+     * @param MigrationSourceProvider|string $source
      * @return array{applied_count: int, pending: list<string>, latest: string|null}
      */
-    public static function verify(PDO $pdo, string $migrationDirectory): array
+    public static function verify(PDO $pdo, MigrationSourceProvider|string $source): array
     {
-        $migrations = self::discover($migrationDirectory);
+        $migrations = self::resolve($source);
         if ($migrations === [] || !self::tableExists($pdo, 'medisa_schema_migrations')) {
             throw new RuntimeException('Canonical migration schema is not ready.');
         }
@@ -287,7 +240,7 @@ final class MigrationRunner
     }
 
     /**
-     * @param list<array{version: string, name: string, path: string, checksum: string}> $migrations
+     * @param list<array{version: string, name: string, checksum: string, sql: string}> $migrations
      * @param array<string, array{checksum: string}> $ledger
      */
     private static function ensureLedgerOrder(array $migrations, array $ledger): void

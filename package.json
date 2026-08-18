@@ -8,6 +8,7 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "pack:cpanel": "npm run build && node scripts/zip-dist.mjs",
+    "generate:migration-bundle": "node scripts/generate-canonical-migration-bundle.mjs",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "check:api-parity": "node scripts/check-api-parity.mjs",

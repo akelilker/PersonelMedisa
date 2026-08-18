@@ -7,7 +7,7 @@ require dirname(__DIR__) . '/src/bootstrap.php';
 use Medisa\Api\Database\Connection;
 use Medisa\Api\Database\MigrationExecutionService;
 
-$migrationDirectory = dirname(__DIR__) . '/migrations';
+$apiDirectory = dirname(__DIR__);
 $verifyOnly = in_array('--verify', $argv, true);
 $baseline = null;
 
@@ -18,9 +18,10 @@ foreach ($argv as $argument) {
 }
 
 try {
+    $migrationSource = MigrationExecutionService::sourceForRuntime($apiDirectory, true);
     $pdo = Connection::get();
     if ($verifyOnly) {
-        $result = MigrationExecutionService::verify($pdo, $migrationDirectory);
+        $result = MigrationExecutionService::verify($pdo, $migrationSource);
         fwrite(STDOUT, sprintf(
             "schema_ready=true applied_count=%d latest=%s\n",
             $result['applied_count'],
@@ -29,7 +30,7 @@ try {
         exit(0);
     }
 
-    $result = MigrationExecutionService::apply($pdo, $migrationDirectory, $baseline);
+    $result = MigrationExecutionService::apply($pdo, $migrationSource, $baseline);
     fwrite(STDOUT, sprintf(
         "migration_apply=ok applied_count=%d pending_count=%d latest=%s\n",
         count($result['applied']),

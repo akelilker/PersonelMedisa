@@ -13,17 +13,41 @@ final class MigrationExecutionService
     /**
      * @return array{applied: list<string>, pending: list<string>, latest: string|null}
      */
-    public static function apply(PDO $pdo, string $migrationDirectory, ?string $baseline): array
+    public static function apply(
+        PDO $pdo,
+        MigrationSourceProvider|string $source,
+        ?string $baseline
+    ): array
     {
-        return MigrationRunner::run($pdo, $migrationDirectory, $baseline);
+        return MigrationRunner::run($pdo, $source, $baseline);
     }
 
     /**
      * @return array{applied_count: int, pending: list<string>, latest: string|null}
      */
-    public static function verify(PDO $pdo, string $migrationDirectory): array
+    public static function verify(PDO $pdo, MigrationSourceProvider|string $source): array
     {
-        return MigrationRunner::verify($pdo, $migrationDirectory);
+        return MigrationRunner::verify($pdo, $source);
+    }
+
+    public static function sourceForRuntime(
+        string $apiDirectory,
+        bool $requireBundle = false
+    ): MigrationSourceProvider
+    {
+        $bundlePath = rtrim($apiDirectory, DIRECTORY_SEPARATOR)
+            . DIRECTORY_SEPARATOR . 'runtime-build'
+            . DIRECTORY_SEPARATOR . 'canonical-migrations.php';
+        if (is_file($bundlePath)) {
+            return new BundledMigrationSourceProvider($bundlePath);
+        }
+        if ($requireBundle) {
+            throw new \RuntimeException('Canonical migration bundle is missing.');
+        }
+
+        return new FilesystemMigrationSourceProvider(
+            rtrim($apiDirectory, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'migrations'
+        );
     }
 
     public static function classify(Throwable $exception): string
@@ -66,6 +90,8 @@ final class MigrationExecutionService
         if (
             str_contains($message, 'no canonical migration files')
             || str_contains($message, 'migration source is unreadable')
+            || str_contains($message, 'canonical migration bundle')
+            || str_contains($message, 'migration ledger bootstrap is missing')
         ) {
             return 'MIGRATION_SOURCE_MISSING';
         }

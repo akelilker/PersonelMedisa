@@ -19,7 +19,6 @@ $controlDirectory = is_string($controlDirectory) && $controlDirectory !== ''
     : $apiDirectory . '/runtime/migration-control';
 $statusPath = $controlDirectory . '/status.json';
 $lockPath = $controlDirectory . '/worker.lock';
-$migrationDirectory = $apiDirectory . '/migrations';
 $deployShaPath = getenv('MEDISA_DEPLOY_SHA_PATH');
 $deployShaPath = is_string($deployShaPath) && $deployShaPath !== ''
     ? $deployShaPath
@@ -98,14 +97,15 @@ try {
 
         $stage = 'APPLY';
         try {
+            $migrationSource = MigrationExecutionService::sourceForRuntime($apiDirectory, true);
             $pdo = Connection::get();
-            MigrationExecutionService::apply($pdo, $migrationDirectory, $baseline);
+            MigrationExecutionService::apply($pdo, $migrationSource, $baseline);
         } catch (\Throwable $exception) {
             throw MigrationWorkerFailure::fromThrowable($stage, $exception);
         }
         $stage = 'VERIFY';
         try {
-            MigrationExecutionService::verify($pdo, $migrationDirectory);
+            MigrationExecutionService::verify($pdo, $migrationSource);
         } catch (\Throwable $exception) {
             throw MigrationWorkerFailure::fromThrowable($stage, $exception);
         }

@@ -49,6 +49,12 @@ function makeFixture() {
     `<?php
 $log = getenv('MEDISA_FAKE_MIGRATION_LOG');
 file_put_contents($log, ($argv[1] ?? 'apply') . PHP_EOL, FILE_APPEND);
+if (getenv('MEDISA_FAKE_MIGRATION_STDOUT') !== false) {
+  fwrite(STDOUT, getenv('MEDISA_FAKE_MIGRATION_STDOUT'));
+}
+if (getenv('MEDISA_FAKE_MIGRATION_STDERR') !== false) {
+  fwrite(STDERR, getenv('MEDISA_FAKE_MIGRATION_STDERR'));
+}
 if (getenv('MEDISA_FAKE_MIGRATION_FAIL') === '1') { exit(1); }
 `,
   );
@@ -89,7 +95,9 @@ describe('cPanel migration cron worker runtime', () => {
       ).toBe(1);
       const status = JSON.parse(readFileSync(join(fixture.controlDirectory, 'status.json'), 'utf8'));
       expect(status.state).toBe('FAILED');
-      expect(status.reason).toBe('REQUEST_FAILED');
+      expect(status.reason).toBe('REQUEST_INVALID');
+      expect(status.stage).toBe('REQUEST_PARSE');
+      expect(status.exit_code).toBe(1);
       expect(readdirSync(fixture.controlDirectory).some((name) => name.startsWith('request.failed.'))).toBe(
         true,
       );
@@ -161,17 +169,46 @@ describe('cPanel migration cron worker runtime', () => {
         runWorker(fixture.controlDirectory, fixture.deployShaPath, fixture.migrationScript, {
           MEDISA_FAKE_MIGRATION_LOG: logPath,
           MEDISA_FAKE_MIGRATION_FAIL: '1',
+          MEDISA_FAKE_MIGRATION_STDERR: 'migration_apply=failed reason_code=MIGRATION_APPLY_FAILED\n',
         }),
       ).toBe(1);
       const status = JSON.parse(readFileSync(join(fixture.controlDirectory, 'status.json'), 'utf8'));
       expect(status.state).toBe('FAILED');
       expect(status.reason).toBe('MIGRATION_APPLY_FAILED');
+      expect(status.stage).toBe('APPLY');
+      expect(status.exit_code).toBe(1);
+      expect(status.detail).toContain('reason_code=MIGRATION_APPLY_FAILED');
       expect(readdirSync(fixture.controlDirectory).some((name) => name.startsWith('request.failed.'))).toBe(
         true,
       );
       expect(readdirSync(fixture.controlDirectory).some((name) => name.startsWith('request.pending.'))).toBe(
         false,
       );
+    } finally {
+      rmSync(fixture.directory, { recursive: true, force: true });
+    }
+  });
+
+  it('captures bounded safe child output and classifies unknown failures', () => {
+    const fixture = makeFixture();
+    const deployedSha = 'e'.repeat(40);
+    try {
+      mkdirSync(fixture.controlDirectory, { recursive: true });
+      writeFileSync(fixture.deployShaPath, deployedSha);
+      writeRequest(fixture.controlDirectory, 'unknown-1', deployedSha);
+      expect(
+        runWorker(fixture.controlDirectory, fixture.deployShaPath, fixture.migrationScript, {
+          MEDISA_FAKE_MIGRATION_LOG: join(fixture.directory, 'calls.log'),
+          MEDISA_FAKE_MIGRATION_FAIL: '1',
+          MEDISA_FAKE_MIGRATION_STDOUT: 'safe stdout\n',
+          MEDISA_FAKE_MIGRATION_STDERR: `${'x'.repeat(12000)}\n`,
+        }),
+      ).toBe(1);
+      const status = JSON.parse(readFileSync(join(fixture.controlDirectory, 'status.json'), 'utf8'));
+      expect(status.reason).toBe('UNKNOWN_MIGRATION_FAILURE');
+      expect(status.stage).toBe('APPLY');
+      expect(status.detail ?? '').not.toContain('x'.repeat(12000));
+      expect(JSON.stringify(status)).not.toMatch(/password|dsn|stack trace/i);
     } finally {
       rmSync(fixture.directory, { recursive: true, force: true });
     }

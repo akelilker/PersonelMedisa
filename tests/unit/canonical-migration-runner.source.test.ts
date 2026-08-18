@@ -6,6 +6,7 @@ const root = resolve(process.cwd());
 const deployWorkflow = readFileSync(resolve(root, '.github/workflows/deploy-cpanel.yml'), 'utf8');
 const controlWorkflow = readFileSync(resolve(root, '.github/workflows/apply-cpanel-migrations.yml'), 'utf8');
 const runner = readFileSync(resolve(root, 'api/src/Database/MigrationRunner.php'), 'utf8');
+const executor = readFileSync(resolve(root, 'api/src/Database/MigrationExecutionService.php'), 'utf8');
 const cli = readFileSync(resolve(root, 'api/bin/migrate.php'), 'utf8');
 const worker = readFileSync(resolve(root, 'api/bin/cpanel-migration-cron.php'), 'utf8');
 const apiHtaccess = readFileSync(resolve(root, 'api/.htaccess'), 'utf8');
@@ -35,8 +36,10 @@ describe('canonical migration runner contract', () => {
   });
 
   it('supports pending-only apply and a separate schema-ready verify call', () => {
-    expect(cli).toContain('MigrationRunner::run');
-    expect(cli).toContain('MigrationRunner::verify');
+    expect(executor).toContain('MigrationRunner::run');
+    expect(executor).toContain('MigrationRunner::verify');
+    expect(cli).toContain('MigrationExecutionService::apply');
+    expect(cli).toContain('MigrationExecutionService::verify');
     expect(runner).toContain('ensureLedgerOrder');
     expect(runner).toContain('Applied migration checksum mismatch');
   });
@@ -82,6 +85,6 @@ describe('SSHless cPanel cron control contract', () => {
     expect(worker).toContain('request.pending.*.json');
     expect(worker).toContain('request.failed.');
     expect(worker.slice(worker.indexOf('request.failed.'))).not.toContain('request.pending.json');
-    expect(worker).not.toMatch(/\b(?:PDO|SELECT|INSERT|UPDATE|DELETE|ALTER)\s/i);
+    expect(worker).not.toMatch(/->(?:exec|query|prepare)\s*\(/i);
   });
 });

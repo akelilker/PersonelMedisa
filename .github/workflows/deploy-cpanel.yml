@@ -31,6 +31,7 @@ jobs:
       LOCAL_DIST_DIR: ./dist/
       LOCAL_REPO_DIR: ${{ github.workspace }}
       REMOTE_TARGET_DIR: .
+      DEPLOY_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
     steps:
       - name: Checkout tested commit
         if: github.event_name == 'workflow_run'
@@ -70,7 +71,20 @@ jobs:
           test -f api/.htaccess || (echo "api/.htaccess missing." && exit 1)
           test -f api/public/index.php || (echo "api/public/index.php missing." && exit 1)
           test -f api/src/Router.php || (echo "api/src/Router.php missing." && exit 1)
+          test -f api/src/Database/migration_ledger.sql || (echo "Migration ledger bootstrap missing." && exit 1)
+          test -f api/migrations/067_personel_canonical_reference_gate.sql || (echo "Migration 067 missing." && exit 1)
+          test -f api/migrations/068_sgk_actor_identity_lifecycle_audit.sql || (echo "Migration 068 missing." && exit 1)
           test ! -f api/config.local.php || (echo "api/config.local.php must not be committed or deployed from repo." && exit 1)
+
+      - name: Generate canonical migration bundle
+        run: npm run generate:migration-bundle
+
+      - name: Validate canonical migration bundle
+        run: |
+          test -s api/runtime-build/canonical-migrations.php || (echo "Canonical migration bundle missing." && exit 1)
+          rg -q "'version' => '000'" api/runtime-build/canonical-migrations.php
+          rg -q "'name' => '067_personel_canonical_reference_gate.sql'" api/runtime-build/canonical-migrations.php
+          rg -q "'name' => '068_sgk_actor_identity_lifecycle_audit.sql'" api/runtime-build/canonical-migrations.php
 
       - name: Validate deploy secrets
         env:
@@ -93,6 +107,9 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y lftp
+
+      - name: Prepare deploy marker
+        run: printf '%s\n' "$DEPLOY_SHA" > api/.deploy-sha
 
       - name: Upload dist and PHP API to cPanel personelmedisa FTP root
         env:
@@ -135,11 +152,39 @@ jobs:
               lcd ${LOCAL_REPO_DIR};
               mkdir -p api;
               put -O api api/.htaccess;
+              put -O api api/.deploy-sha;
               mirror -R --verbose api/public api/public;
               mirror -R --verbose api/src api/src;
+              mirror -R --verbose api/bin api/bin;
+              mirror -R --verbose api/migrations api/migrations;
+              mirror -R --verbose api/runtime-build api/runtime-build;
               !echo 'upload tamamlandi';
               bye
             "
+
+            local remote_bundle_path
+            local remote_sha_path
+            remote_bundle_path="$(mktemp)"
+            remote_sha_path="$(mktemp)"
+            lftp -u "${FTP_USERNAME}","${FTP_PASSWORD}" -p "${FTP_PORT}" "ftp://${FTP_SERVER}" -e "
+              set cmd:fail-exit true;
+              set net:max-retries 2;
+              set net:timeout 20;
+              set ssl:verify-certificate no;
+              set ssl:check-hostname no;
+              set ftp:passive-mode on;
+              set ftp:ssl-allow ${use_ftps};
+              set ftp:ssl-force ${use_ftps};
+              set ftp:ssl-protect-data ${use_ftps};
+              cd ${REMOTE_TARGET_DIR};
+              get -o ${remote_bundle_path} api/runtime-build/canonical-migrations.php;
+              get -o ${remote_sha_path} .deploy-sha;
+              bye
+            "
+            test "$(sha256sum "${remote_bundle_path}" | cut -d' ' -f1)" = \
+              "$(sha256sum "${LOCAL_REPO_DIR}/api/runtime-build/canonical-migrations.php" | cut -d' ' -f1)"
+            test "$(tr -d '\r\n' < "${remote_sha_path}")" = "${DEPLOY_SHA}"
+            rm -f "${remote_bundle_path}" "${remote_sha_path}"
           }
 
           echo "Explicit FTPS port 21 deneniyor..."

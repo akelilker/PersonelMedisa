@@ -5,6 +5,7 @@ node_modules.zip
 # Build outputs
 dist/
 build/
+api/runtime-build/
 coverage/
 playwright-report/
 test-results/

@@ -7,6 +7,40 @@ const deployPath = resolve(process.cwd(), '.github/workflows/deploy-cpanel.yml')
 const migration = readFileSync(migrationPath, 'utf8');
 const deploy = readFileSync(deployPath, 'utf8');
 
+function workflowNumber(name: string): number {
+  const match = migration.match(new RegExp(`^\\s+${name}: "?([0-9]+)"?$`, 'm'));
+  if (!match) {
+    throw new Error(`Missing numeric workflow contract: ${name}`);
+  }
+  return Number(match[1]);
+}
+
+type ObservedStatus = {
+  atSeconds: number;
+  requestId: string;
+  state: 'RUNNING' | 'SUCCEEDED' | 'FAILED';
+};
+
+function observeTerminalState(events: ObservedStatus[], requestId: string): ObservedStatus | null {
+  const attempts = workflowNumber('POLL_ATTEMPTS');
+  const intervalSeconds = workflowNumber('POLL_INTERVAL_SECONDS');
+
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    const observedAt = attempt * intervalSeconds;
+    const latest = events
+      .filter((event) => event.atSeconds <= observedAt)
+      .sort((left, right) => right.atSeconds - left.atSeconds)[0];
+    if (
+      latest &&
+      latest.requestId === requestId &&
+      (latest.state === 'SUCCEEDED' || latest.state === 'FAILED')
+    ) {
+      return latest;
+    }
+  }
+  return null;
+}
+
 describe('canonical cPanel migration FTP transport contract', () => {
   it('matches deploy FTPS compatibility semantics', () => {
     for (const setting of [
@@ -94,5 +128,96 @@ describe('canonical cPanel migration FTP transport contract', () => {
     expect(migration).toContain('FTP_PASSWORD');
     expect(migration).toContain('run_ftp_mode "explicit-ftps" "true"');
     expect(migration).toContain('run_ftp_mode "plain-ftp" "false"');
+  });
+
+  it('covers the 15-minute Cron worst case with a bounded 25-minute observation window', () => {
+    const jobTimeoutSeconds = workflowNumber('timeout-minutes') * 60;
+    const maximumScheduledPollSeconds =
+      (workflowNumber('POLL_ATTEMPTS') - 1) * workflowNumber('POLL_INTERVAL_SECONDS');
+    const pollWindowSeconds = workflowNumber('TOTAL_POLL_WINDOW_SECONDS');
+    const cronWorstCaseWaitSeconds = workflowNumber('CRON_INTERVAL_MINUTES') * 60;
+    const reasonableWorkerSeconds = 5 * 60;
+    const ftpJitterSeconds = 5 * 60;
+
+    expect(workflowNumber('timeout-minutes')).toBe(35);
+    expect(cronWorstCaseWaitSeconds).toBe(15 * 60);
+    expect(pollWindowSeconds).toBe(25 * 60);
+    expect(maximumScheduledPollSeconds).toBeGreaterThanOrEqual(pollWindowSeconds);
+    expect(pollWindowSeconds).toBeGreaterThanOrEqual(
+      cronWorstCaseWaitSeconds + reasonableWorkerSeconds + ftpJitterSeconds,
+    );
+    expect(jobTimeoutSeconds - pollWindowSeconds).toBeGreaterThanOrEqual(10 * 60);
+    expect(migration).toContain('poll_deadline_epoch="$(( poll_started_epoch + TOTAL_POLL_WINDOW_SECONDS ))"');
+  });
+
+  it('recognizes the real-world late success after the next Cron tick', () => {
+    const requestId = 'current-request';
+    const result = observeTerminalState(
+      [
+        { atSeconds: 14 * 60, requestId: 'older-request', state: 'SUCCEEDED' },
+        { atSeconds: 15 * 60, requestId, state: 'RUNNING' },
+        { atSeconds: 16 * 60, requestId, state: 'SUCCEEDED' },
+      ],
+      requestId,
+    );
+
+    expect(result).toMatchObject({ atSeconds: 16 * 60, requestId, state: 'SUCCEEDED' });
+  });
+
+  it('fails immediately for a matching failure and ignores another request status', () => {
+    const requestId = 'current-request';
+    const result = observeTerminalState(
+      [
+        { atSeconds: 0, requestId: 'older-request', state: 'FAILED' },
+        { atSeconds: 20, requestId, state: 'FAILED' },
+      ],
+      requestId,
+    );
+
+    expect(result).toMatchObject({ atSeconds: 20, requestId, state: 'FAILED' });
+    expect(migration).toMatch(
+      /status_request" == "\$REQUEST_ID" && "\$status_state" == "FAILED"[\s\S]*?emit_matching_failure[\s\S]*?exit 1/,
+    );
+  });
+
+  it('performs one final read-only diagnostic and recognizes canonical archives', () => {
+    expect(migration).toContain('One final read-only inspection');
+    expect(migration).toContain('mirror --verbose=0');
+    expect(migration).toContain('request.processing.*.json');
+    expect(migration).toContain('request.completed.${REQUEST_ID}.json');
+    expect(migration).toContain('request.failed.${REQUEST_ID}.json');
+    expect(migration).toContain('MIGRATION_DIAG_PENDING_MATCH=${pending_match}');
+    expect(migration).toContain('MIGRATION_DIAG_PROCESSING_MATCH=${processing_match}');
+    expect(migration).toContain('MIGRATION_DIAG_COMPLETED_MATCH=${completed_match}');
+    expect(migration).toContain('MIGRATION_DIAG_FAILED_MATCH=${failed_match}');
+    expect(migration).toContain('MIGRATION_DIAG_STATUS_EXISTS=${status_exists}');
+    expect(migration).toContain('MIGRATION_DIAG_STATUS_REQUEST_ID=${diagnostic_status_request}');
+    expect(migration).toContain('MIGRATION_DIAG_STATUS_STATE=${diagnostic_status_state}');
+    expect(migration).toContain('MIGRATION_DIAG_STATUS_UPDATED_AT=${diagnostic_status_updated_at}');
+    expect(migration).toContain('MIGRATION_WORKER_TIMEOUT');
+    expect(migration).toContain('WORKER_RUNNING_TIMEOUT');
+    expect(migration).toContain('REQUEST_NOT_CLAIMED');
+    expect(migration).toContain('STATUS_TERMINAL_NOT_OBSERVED');
+    expect(migration).toContain('UNKNOWN_CONTROL_PLANE_TIMEOUT');
+    expect(migration).not.toMatch(/diagnostic_commands="[\s\S]*?\b(?:put|mput|mv|rm)\b/);
+  });
+
+  it('keeps one queued control-plane owner and never creates an automatic retry request', () => {
+    expect(migration).toContain('group: cpanel-canonical-migration-control');
+    expect(migration).toContain('cancel-in-progress: false');
+    const preflightIndex = migration.indexOf('preflight_commands="mirror --verbose=0');
+    const uploadIndex = migration.indexOf('put -O api/runtime/migration-control request.${REQUEST_ID}.tmp');
+    expect(preflightIndex).toBeGreaterThanOrEqual(0);
+    expect(uploadIndex).toBeGreaterThan(preflightIndex);
+    expect(migration).toContain('--include-glob status.json');
+    expect(migration).toContain('--include-glob request.pending.*.json');
+    expect(migration).toContain('--include-glob request.processing.*.json');
+    expect(migration).toContain('MIGRATION_CONTROL_PLANE_BUSY');
+    expect(migration).toContain('MIGRATION_DIAG_RUNNING_STATUS_EXISTS=${preflight_running}');
+    expect(migration.match(/put -O api\/runtime\/migration-control request\.\$\{REQUEST_ID\}\.tmp/g)).toHaveLength(1);
+    expect(migration.match(/request\.pending\.\$\{REQUEST_ID\}\.json/g)?.length).toBeGreaterThanOrEqual(1);
+    expect(migration).not.toMatch(/request\.failed\.[^\n]*request\.pending/);
+    expect(migration).not.toContain('gh workflow run');
+    expect(migration).not.toContain('workflow_run:');
   });
 });

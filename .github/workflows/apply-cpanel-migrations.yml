@@ -20,7 +20,7 @@ jobs:
   request:
     name: Request canonical cPanel migration worker
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 35
     env:
       FTP_SERVER: ${{ secrets.FTP_SERVER }}
       FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
@@ -28,6 +28,10 @@ jobs:
       FTP_PORT: ${{ secrets.FTP_PORT }}
       DEPLOYED_SHA: ${{ inputs.deployed_sha }}
       CONFIRMATION: ${{ inputs.confirmation }}
+      POLL_ATTEMPTS: "151"
+      POLL_INTERVAL_SECONDS: "10"
+      TOTAL_POLL_WINDOW_SECONDS: "1500"
+      CRON_INTERVAL_MINUTES: "15"
     steps:
       - name: Validate explicit request
         run: |
@@ -92,6 +96,41 @@ jobs:
             run_ftp_mode "plain-ftp" "false" "$ftp_commands"
           }
 
+          preflight_dir="$RUNNER_TEMP/cpanel-migration-preflight"
+          rm -rf "$preflight_dir"
+          mkdir -p "$preflight_dir"
+          preflight_commands="mirror --verbose=0 --include-glob status.json --include-glob request.pending.*.json --include-glob request.processing.*.json --exclude-glob * api/runtime/migration-control ${preflight_dir};"
+          if ! run_cpanel_ftp "$preflight_commands" >/dev/null 2>&1; then
+            echo "MIGRATION_CONTROL_PLANE_PREFLIGHT_FAILED"
+            exit 1
+          fi
+          shopt -s nullglob
+          pending_requests=("$preflight_dir"/request.pending.*.json)
+          processing_requests=("$preflight_dir"/request.processing.*.json)
+          shopt -u nullglob
+          preflight_running="NO"
+          if [[ -f "$preflight_dir/status.json" ]]; then
+            preflight_state="$(jq -r '.state // empty' "$preflight_dir/status.json" 2>/dev/null || true)"
+            if [[ "$preflight_state" == "RUNNING" ]]; then
+              preflight_running="YES"
+            fi
+          fi
+          if (( ${#pending_requests[@]} > 0 || ${#processing_requests[@]} > 0 )) || [[ "$preflight_running" == "YES" ]]; then
+            echo "MIGRATION_CONTROL_PLANE_BUSY"
+            if [[ ${#pending_requests[@]} -gt 0 ]]; then
+              echo "MIGRATION_DIAG_PENDING_EXISTS=YES"
+            else
+              echo "MIGRATION_DIAG_PENDING_EXISTS=NO"
+            fi
+            if [[ ${#processing_requests[@]} -gt 0 ]]; then
+              echo "MIGRATION_DIAG_PROCESSING_EXISTS=YES"
+            else
+              echo "MIGRATION_DIAG_PROCESSING_EXISTS=NO"
+            fi
+            echo "MIGRATION_DIAG_RUNNING_STATUS_EXISTS=${preflight_running}"
+            exit 1
+          fi
+
           request_dir="$RUNNER_TEMP/cpanel-migration-request"
           mkdir -p "$request_dir"
           request_file="$request_dir/request.${REQUEST_ID}.tmp"
@@ -152,8 +191,40 @@ jobs:
             run_ftp_mode "plain-ftp" "false" "$ftp_commands"
           }
 
+          emit_matching_failure() {
+            local failure_file="$1"
+            local status_reason
+            local status_stage
+            local status_exit_code
+            local status_detail
+
+            status_reason="$(jq -r 'if (.reason | type) == "string" and (.reason | test("^[A-Z0-9_]+$")) then .reason else "UNKNOWN_MIGRATION_FAILURE" end' "$failure_file" 2>/dev/null || true)"
+            status_stage="$(jq -r 'if (.stage | type) == "string" and (.stage | test("^[A-Z0-9_]+$")) then .stage else "UNKNOWN" end' "$failure_file" 2>/dev/null || true)"
+            status_exit_code="$(jq -r 'if (.exit_code | type) == "number" and (.exit_code | floor) == .exit_code then (.exit_code | tostring) else "1" end' "$failure_file" 2>/dev/null || true)"
+            status_detail="$(jq -r 'if (.detail | type) == "string" and .detail != "" then .detail else "NONE" end' "$failure_file" 2>/dev/null | tr '\r\n\t' ' ' | cut -c1-512 || true)"
+            [[ "$status_reason" =~ ^[A-Z0-9_]+$ ]] || status_reason="UNKNOWN_MIGRATION_FAILURE"
+            [[ "$status_stage" =~ ^[A-Z0-9_]+$ ]] || status_stage="UNKNOWN"
+            [[ "$status_exit_code" =~ ^[0-9]+$ ]] || status_exit_code="1"
+            [[ -n "$status_detail" ]] || status_detail="NONE"
+            if [[ "$status_detail" == "NONE" || "$status_detail" =~ [Pp][Aa][Ss][Ss][Ww][Oo][Rr][Dd]|[Pp][Aa][Ss][Ss][Ww][Dd]|[Ss][Ee][Cc][Rr][Ee][Tt]|[Tt][Oo][Kk][Ee][Nn]|[Aa][Uu][Tt][Hh][Oo][Rr][Ii][Zz][Aa][Tt][Ii][Oo][Nn]|[Bb][Ee][Aa][Rr][Ee][Rr]|[Dd][Ss][Nn] ]]; then
+              status_detail="NONE"
+            fi
+            echo "MIGRATION_WORKER_STATE=FAILED"
+            echo "MIGRATION_REASON=${status_reason}"
+            echo "MIGRATION_STAGE=${status_stage}"
+            echo "MIGRATION_EXIT_CODE=${status_exit_code}"
+            echo "MIGRATION_SAFE_DETAIL=${status_detail}"
+          }
+
+          json_matches_request() {
+            local candidate="$1"
+            [[ -f "$candidate" ]] && jq -e --arg request_id "$REQUEST_ID" '.request_id == $request_id' "$candidate" >/dev/null 2>&1
+          }
+
           status_file="$RUNNER_TEMP/cpanel-migration-status.json"
-          for attempt in $(seq 1 60); do
+          poll_started_epoch="$(date +%s)"
+          poll_deadline_epoch="$(( poll_started_epoch + TOTAL_POLL_WINDOW_SECONDS ))"
+          for attempt in $(seq 1 "$POLL_ATTEMPTS"); do
             rm -f "$status_file"
             status_commands="get api/runtime/migration-control/status.json -o ${status_file};"
             if run_cpanel_ftp "$status_commands" >/dev/null 2>&1; then
@@ -164,26 +235,118 @@ jobs:
                 exit 0
               fi
               if [[ "$status_request" == "$REQUEST_ID" && "$status_state" == "FAILED" ]]; then
-                status_reason="$(jq -r 'if (.reason | type) == "string" and (.reason | test("^[A-Z0-9_]+$")) then .reason else "UNKNOWN_MIGRATION_FAILURE" end' "$status_file" 2>/dev/null || true)"
-                status_stage="$(jq -r 'if (.stage | type) == "string" and (.stage | test("^[A-Z0-9_]+$")) then .stage else "UNKNOWN" end' "$status_file" 2>/dev/null || true)"
-                status_exit_code="$(jq -r 'if (.exit_code | type) == "number" and (.exit_code | floor) == .exit_code then (.exit_code | tostring) else "1" end' "$status_file" 2>/dev/null || true)"
-                status_detail="$(jq -r 'if (.detail | type) == "string" and .detail != "" then .detail else "NONE" end' "$status_file" 2>/dev/null | tr '\r\n\t' ' ' | cut -c1-512 || true)"
-                [[ "$status_reason" =~ ^[A-Z0-9_]+$ ]] || status_reason="UNKNOWN_MIGRATION_FAILURE"
-                [[ "$status_stage" =~ ^[A-Z0-9_]+$ ]] || status_stage="UNKNOWN"
-                [[ "$status_exit_code" =~ ^[0-9]+$ ]] || status_exit_code="1"
-                [[ -n "$status_detail" ]] || status_detail="NONE"
-                if [[ "$status_detail" == "NONE" || "$status_detail" =~ [Pp][Aa][Ss][Ss][Ww][Oo][Rr][Dd]|[Pp][Aa][Ss][Ss][Ww][Dd]|[Ss][Ee][Cc][Rr][Ee][Tt]|[Tt][Oo][Kk][Ee][Nn]|[Aa][Uu][Tt][Hh][Oo][Rr][Ii][Zz][Aa][Tt][Ii][Oo][Nn]|[Bb][Ee][Aa][Rr][Ee][Rr]|[Dd][Ss][Nn] ]]; then
-                  status_detail="NONE"
-                fi
-                echo "MIGRATION_WORKER_STATE=FAILED"
-                echo "MIGRATION_REASON=${status_reason}"
-                echo "MIGRATION_STAGE=${status_stage}"
-                echo "MIGRATION_EXIT_CODE=${status_exit_code}"
-                echo "MIGRATION_SAFE_DETAIL=${status_detail}"
+                emit_matching_failure "$status_file"
                 exit 1
               fi
             fi
-            sleep 10
+            now_epoch="$(date +%s)"
+            if (( now_epoch >= poll_deadline_epoch )); then
+              break
+            fi
+            remaining_seconds="$(( poll_deadline_epoch - now_epoch ))"
+            sleep_seconds="$POLL_INTERVAL_SECONDS"
+            if (( remaining_seconds < sleep_seconds )); then
+              sleep_seconds="$remaining_seconds"
+            fi
+            sleep "$sleep_seconds"
           done
-          echo "Timed out waiting for the protected migration worker result."
+
+          # One final read-only inspection closes the observation race without
+          # creating, moving, deleting, or retrying a migration request.
+          diagnostic_dir="$RUNNER_TEMP/cpanel-migration-final-diagnostic"
+          rm -rf "$diagnostic_dir"
+          mkdir -p "$diagnostic_dir"
+          diagnostic_commands="
+            mirror --verbose=0 --include-glob status.json --include-glob request.pending.${REQUEST_ID}.json --include-glob request.processing.*.json --include-glob request.completed.${REQUEST_ID}.json --include-glob request.failed.${REQUEST_ID}.json --exclude-glob * api/runtime/migration-control ${diagnostic_dir};
+          "
+          diagnostic_ftp_ok="YES"
+          if ! run_cpanel_ftp "$diagnostic_commands" >/dev/null 2>&1; then
+            diagnostic_ftp_ok="NO"
+          fi
+
+          pending_match="NO"
+          processing_match="NO"
+          completed_match="NO"
+          failed_match="NO"
+          status_exists="NO"
+          diagnostic_status_request=""
+          diagnostic_status_state=""
+          diagnostic_status_updated_at=""
+
+          json_matches_request "$diagnostic_dir/request.pending.${REQUEST_ID}.json" && pending_match="YES"
+          json_matches_request "$diagnostic_dir/request.completed.${REQUEST_ID}.json" && completed_match="YES"
+          json_matches_request "$diagnostic_dir/request.failed.${REQUEST_ID}.json" && failed_match="YES"
+          shopt -s nullglob
+          for processing_file in "$diagnostic_dir"/request.processing.*.json; do
+            if json_matches_request "$processing_file"; then
+              processing_match="YES"
+              break
+            fi
+          done
+          shopt -u nullglob
+
+          diagnostic_status_file="$diagnostic_dir/status.json"
+          if [[ -f "$diagnostic_status_file" ]]; then
+            status_exists="YES"
+            diagnostic_status_request="$(jq -r '.request_id // empty' "$diagnostic_status_file" 2>/dev/null || true)"
+            diagnostic_status_state="$(jq -r '.state // empty' "$diagnostic_status_file" 2>/dev/null || true)"
+            diagnostic_status_updated_at="$(jq -r '.updated_at // empty' "$diagnostic_status_file" 2>/dev/null || true)"
+          fi
+          [[ "$diagnostic_status_request" =~ ^[A-Za-z0-9._-]{1,128}$ ]] || diagnostic_status_request="NONE"
+          [[ "$diagnostic_status_state" =~ ^(RUNNING|SUCCEEDED|FAILED)$ ]] || diagnostic_status_state="NONE"
+          [[ "$diagnostic_status_updated_at" =~ ^[0-9TZ:._+-]{1,64}$ ]] || diagnostic_status_updated_at="NONE"
+
+          echo "REQUEST_ID=${REQUEST_ID}"
+          echo "MIGRATION_DIAG_PENDING_MATCH=${pending_match}"
+          echo "MIGRATION_DIAG_PROCESSING_MATCH=${processing_match}"
+          echo "MIGRATION_DIAG_COMPLETED_MATCH=${completed_match}"
+          echo "MIGRATION_DIAG_FAILED_MATCH=${failed_match}"
+          echo "MIGRATION_DIAG_STATUS_EXISTS=${status_exists}"
+          echo "MIGRATION_DIAG_STATUS_REQUEST_ID=${diagnostic_status_request}"
+          echo "MIGRATION_DIAG_STATUS_STATE=${diagnostic_status_state}"
+          echo "MIGRATION_DIAG_STATUS_UPDATED_AT=${diagnostic_status_updated_at}"
+
+          if [[ "$diagnostic_status_request" == "$REQUEST_ID" && "$diagnostic_status_state" == "FAILED" ]]; then
+            emit_matching_failure "$diagnostic_status_file"
+            exit 1
+          fi
+          if [[ "$failed_match" == "YES" ]]; then
+            echo "MIGRATION_WORKER_STATE=FAILED"
+            echo "MIGRATION_REASON=FAILED_ARCHIVE_OBSERVED"
+            echo "MIGRATION_STAGE=UNKNOWN"
+            echo "MIGRATION_EXIT_CODE=1"
+            echo "MIGRATION_SAFE_DETAIL=NONE"
+            exit 1
+          fi
+          if [[ "$diagnostic_status_request" == "$REQUEST_ID"
+            && "$diagnostic_status_state" == "SUCCEEDED"
+            && "$pending_match" == "NO" ]]; then
+            echo "Canonical migration worker completed during final inspection."
+            exit 0
+          fi
+          if [[ "$completed_match" == "YES"
+            && "$failed_match" == "NO"
+            && "$pending_match" == "NO"
+            && "$processing_match" == "NO" ]]; then
+            echo "Canonical migration completion archive matched during final inspection."
+            exit 0
+          fi
+
+          elapsed_seconds="$(( $(date +%s) - poll_started_epoch ))"
+          timeout_reason="UNKNOWN_CONTROL_PLANE_TIMEOUT"
+          cron_worst_case_wait_seconds="$(( CRON_INTERVAL_MINUTES * 60 ))"
+          if [[ "$processing_match" == "YES"
+            || ( "$diagnostic_status_request" == "$REQUEST_ID" && "$diagnostic_status_state" == "RUNNING" ) ]]; then
+            timeout_reason="WORKER_RUNNING_TIMEOUT"
+          elif [[ "$pending_match" == "YES" && "$elapsed_seconds" -lt "$cron_worst_case_wait_seconds" ]]; then
+            timeout_reason="WAITING_FOR_CRON_TICK"
+          elif [[ "$pending_match" == "YES" ]]; then
+            timeout_reason="REQUEST_NOT_CLAIMED"
+          elif [[ "$status_exists" == "YES" && "$diagnostic_status_request" != "$REQUEST_ID" ]]; then
+            timeout_reason="STATUS_TERMINAL_NOT_OBSERVED"
+          elif [[ "$diagnostic_ftp_ok" == "YES" ]]; then
+            timeout_reason="STATUS_TERMINAL_NOT_OBSERVED"
+          fi
+          echo "MIGRATION_WORKER_TIMEOUT"
+          echo "MIGRATION_TIMEOUT_REASON=${timeout_reason}"
           exit 1

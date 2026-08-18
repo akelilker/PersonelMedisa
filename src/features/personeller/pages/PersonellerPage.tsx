@@ -172,7 +172,6 @@ export function PersonellerPage() {
     errorMessage,
     refetch,
     refs,
-    referenceError,
     submitFilters,
     clearFilters,
     setDraftSearch,
@@ -582,7 +581,12 @@ export function PersonellerPage() {
               );
 
               return (
-                <li key={personel.id} className="personeller-item personeller-item--grid">
+                <li
+                  key={personel.id}
+                  className={`personeller-item personeller-item--grid ${
+                    missingFieldCount > 0 ? "personeller-item--has-missing" : ""
+                  }`}
+                >
                   {canOpenDetail ? (
                     <Link className="personeller-card-preview" to={detailTo} aria-label={previewLabel}>
                       {previewInner}

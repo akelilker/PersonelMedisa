@@ -1,13 +1,16 @@
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 const root = resolve(process.cwd());
 const worker = resolve(root, 'api/bin/cpanel-migration-cron.php');
+const generator = resolve(root, 'scripts/generate-canonical-migration-bundle.mjs');
+const bundleDirectory = resolve(root, 'api/runtime-build');
 
-function runWorker(controlDirectory: string, deployShaPath: string): number {
+function runWorker(controlDirectory: string, deployShaPath: string, bundlePath: string): number {
   try {
     execFileSync('php', [worker], {
       cwd: root,
@@ -15,6 +18,7 @@ function runWorker(controlDirectory: string, deployShaPath: string): number {
         ...process.env,
         MEDISA_MIGRATION_CONTROL_DIR: controlDirectory,
         MEDISA_DEPLOY_SHA_PATH: deployShaPath,
+        MEDISA_MIGRATION_BUNDLE_PATH: bundlePath,
       },
       stdio: 'ignore',
     });
@@ -31,7 +35,22 @@ function makeFixture() {
     directory,
     controlDirectory: join(directory, 'migration-control'),
     deployShaPath: join(directory, '.deploy-sha'),
+    bundlePath: join(directory, 'canonical-migrations.php'),
   };
+}
+
+function writeBundle(bundlePath: string) {
+  const sql = '-- test ledger bootstrap\n';
+  const checksum = createHash('sha256').update(sql).digest('hex');
+  writeFileSync(
+    bundlePath,
+    `<?php declare(strict_types=1); return [[
+      'version' => '000',
+      'name' => 'migration_ledger.sql',
+      'checksum' => '${checksum}',
+      'sql_base64' => '${Buffer.from(sql).toString('base64')}',
+    ]];`,
+  );
 }
 
 function writeRequest(controlDirectory: string, requestId: string, deployedSha: string) {
@@ -47,10 +66,18 @@ function writeRequest(controlDirectory: string, requestId: string, deployedSha: 
 }
 
 describe('cPanel migration cron worker runtime', () => {
+  beforeAll(() => {
+    execFileSync(process.execPath, [generator, root], { stdio: 'pipe' });
+  });
+
+  afterAll(() => {
+    rmSync(bundleDirectory, { recursive: true, force: true });
+  });
+
   it('is a cheap no-op without a request', () => {
     const fixture = makeFixture();
     try {
-      expect(runWorker(fixture.controlDirectory, fixture.deployShaPath)).toBe(0);
+      expect(runWorker(fixture.controlDirectory, fixture.deployShaPath, fixture.bundlePath)).toBe(0);
     } finally {
       rmSync(fixture.directory, { recursive: true, force: true });
     }
@@ -61,7 +88,7 @@ describe('cPanel migration cron worker runtime', () => {
     try {
       mkdirSync(fixture.controlDirectory, { recursive: true });
       writeFileSync(join(fixture.controlDirectory, 'request.pending.bad.json'), '{bad');
-      expect(runWorker(fixture.controlDirectory, fixture.deployShaPath)).toBe(1);
+      expect(runWorker(fixture.controlDirectory, fixture.deployShaPath, fixture.bundlePath)).toBe(1);
       const status = JSON.parse(readFileSync(join(fixture.controlDirectory, 'status.json'), 'utf8'));
       expect(status.reason).toBe('REQUEST_INVALID');
       expect(status.stage).toBe('REQUEST_PARSE');
@@ -78,7 +105,7 @@ describe('cPanel migration cron worker runtime', () => {
       mkdirSync(fixture.controlDirectory, { recursive: true });
       writeFileSync(fixture.deployShaPath, 'b'.repeat(40));
       writeRequest(fixture.controlDirectory, 'sha-drift', 'a'.repeat(40));
-      expect(runWorker(fixture.controlDirectory, fixture.deployShaPath)).toBe(1);
+      expect(runWorker(fixture.controlDirectory, fixture.deployShaPath, fixture.bundlePath)).toBe(1);
       const status = JSON.parse(readFileSync(join(fixture.controlDirectory, 'status.json'), 'utf8'));
       expect(status.reason).toBe('DEPLOY_SHA_MISMATCH');
       expect(status.stage).toBe('DEPLOY_SHA_CHECK');
@@ -92,9 +119,10 @@ describe('cPanel migration cron worker runtime', () => {
     const deployedSha = 'c'.repeat(40);
     try {
       mkdirSync(fixture.controlDirectory, { recursive: true });
+      writeBundle(fixture.bundlePath);
       writeFileSync(fixture.deployShaPath, deployedSha);
       writeRequest(fixture.controlDirectory, 'in-process-1', deployedSha);
-      expect(runWorker(fixture.controlDirectory, fixture.deployShaPath)).toBe(1);
+      expect(runWorker(fixture.controlDirectory, fixture.deployShaPath, fixture.bundlePath)).toBe(1);
       const status = JSON.parse(readFileSync(join(fixture.controlDirectory, 'status.json'), 'utf8'));
       expect(status.state).toBe('FAILED');
       expect(status.reason).toBe('DB_CONNECTION_FAILED');
@@ -102,7 +130,7 @@ describe('cPanel migration cron worker runtime', () => {
       expect(status.exit_code).toBe(1);
       expect(JSON.stringify(status)).not.toMatch(/password|dsn|stack trace/i);
       expect(readdirSync(fixture.controlDirectory).filter((name) => name.startsWith('request.failed.'))).toHaveLength(1);
-      expect(runWorker(fixture.controlDirectory, fixture.deployShaPath)).toBe(0);
+      expect(runWorker(fixture.controlDirectory, fixture.deployShaPath, fixture.bundlePath)).toBe(0);
       expect(readdirSync(fixture.controlDirectory).filter((name) => name.startsWith('request.failed.'))).toHaveLength(1);
     } finally {
       rmSync(fixture.directory, { recursive: true, force: true });

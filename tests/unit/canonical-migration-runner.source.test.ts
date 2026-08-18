@@ -17,10 +17,9 @@ const migrations = readdirSync(resolve(root, 'api/migrations'))
 
 describe('canonical migration runner contract', () => {
   it('discovers ordered SQL files and records a checksum ledger', () => {
-    expect(runner).toContain('glob(');
-    expect(runner).toContain('usort(');
+    expect(runner).toContain('MigrationSourceProvider');
+    expect(runner).toContain('FilesystemMigrationSourceProvider');
     expect(runner).toContain('medisa_schema_migrations');
-    expect(runner).toContain("hash_file('sha256'");
     expect(runner).toContain('hash_equals(');
     expect(runner).toContain('beginTransaction()');
     expect(runner).toContain('rollBack()');
@@ -42,6 +41,21 @@ describe('canonical migration runner contract', () => {
     expect(cli).toContain('MigrationExecutionService::verify');
     expect(runner).toContain('ensureLedgerOrder');
     expect(runner).toContain('Applied migration checksum mismatch');
+  });
+
+  it('keeps filesystem and bundled source contracts separate from runner semantics', () => {
+    const filesystemProvider = readFileSync(
+      resolve(root, 'api/src/Database/FilesystemMigrationSourceProvider.php'),
+      'utf8',
+    );
+    const bundledProvider = readFileSync(
+      resolve(root, 'api/src/Database/BundledMigrationSourceProvider.php'),
+      'utf8',
+    );
+    expect(filesystemProvider).toContain("hash('sha256'");
+    expect(bundledProvider).toContain('base64_decode');
+    expect(bundledProvider).toContain("hash('sha256'");
+    expect(runner).not.toContain('file_get_contents($migration');
   });
 });
 

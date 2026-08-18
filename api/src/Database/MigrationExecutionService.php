@@ -35,9 +35,12 @@ final class MigrationExecutionService
         bool $requireBundle = false
     ): MigrationSourceProvider
     {
-        $bundlePath = rtrim($apiDirectory, DIRECTORY_SEPARATOR)
-            . DIRECTORY_SEPARATOR . 'runtime-build'
-            . DIRECTORY_SEPARATOR . 'canonical-migrations.php';
+        $configuredBundlePath = getenv('MEDISA_MIGRATION_BUNDLE_PATH');
+        $bundlePath = is_string($configuredBundlePath) && $configuredBundlePath !== ''
+            ? $configuredBundlePath
+            : rtrim($apiDirectory, DIRECTORY_SEPARATOR)
+                . DIRECTORY_SEPARATOR . 'runtime-build'
+                . DIRECTORY_SEPARATOR . 'canonical-migrations.php';
         if (is_file($bundlePath)) {
             return new BundledMigrationSourceProvider($bundlePath);
         }

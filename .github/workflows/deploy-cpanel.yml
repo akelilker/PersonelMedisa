@@ -86,9 +86,7 @@ jobs:
       - name: Validate canonical migration bundle
         run: |
           test -s api/runtime-build/canonical-migrations.php || (echo "Canonical migration bundle missing." && exit 1)
-          rg -q "'version' => '000'" api/runtime-build/canonical-migrations.php
-          rg -q "'name' => '067_personel_canonical_reference_gate.sql'" api/runtime-build/canonical-migrations.php
-          rg -q "'name' => '068_sgk_actor_identity_lifecycle_audit.sql'" api/runtime-build/canonical-migrations.php
+          node --input-type=module -e "import { readFileSync } from 'node:fs'; const bundle = readFileSync('api/runtime-build/canonical-migrations.php', 'utf8'); for (const marker of [\"'version' => '000'\", \"'name' => '067_personel_canonical_reference_gate.sql'\", \"'name' => '068_sgk_actor_identity_lifecycle_audit.sql'\"]) { if (!bundle.includes(marker)) throw new Error('Canonical migration bundle marker missing: ' + marker); }"
 
       - name: Validate deploy secrets
         env:

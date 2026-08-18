@@ -2,6 +2,7 @@
 // MEDISA_TEST_MYSQL. The fast CI manifest test verifies this list so a new
 // DB-dependent test cannot silently enter fast CI.
 export const heavyMariaDbTestFiles = [
+  "tests/unit/actor-identity-lifecycle-mysql.php-runtime.test.ts",
   "tests/unit/attendance-discipline-052-mysql.php-runtime.test.ts",
   "tests/unit/bildirim-puantaj-etki-conflict-resolution-mysql.php-runtime.test.ts",
   "tests/unit/disposable-mariadb-lock.php-runtime.test.ts",

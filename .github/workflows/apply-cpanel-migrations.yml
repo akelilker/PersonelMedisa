@@ -164,7 +164,22 @@ jobs:
                 exit 0
               fi
               if [[ "$status_request" == "$REQUEST_ID" && "$status_state" == "FAILED" ]]; then
-                echo "Canonical migration worker failed closed."
+                status_reason="$(jq -r 'if (.reason | type) == "string" and (.reason | test("^[A-Z0-9_]+$")) then .reason else "UNKNOWN_MIGRATION_FAILURE" end' "$status_file" 2>/dev/null || true)"
+                status_stage="$(jq -r 'if (.stage | type) == "string" and (.stage | test("^[A-Z0-9_]+$")) then .stage else "UNKNOWN" end' "$status_file" 2>/dev/null || true)"
+                status_exit_code="$(jq -r 'if (.exit_code | type) == "number" and (.exit_code | floor) == .exit_code then (.exit_code | tostring) else "1" end' "$status_file" 2>/dev/null || true)"
+                status_detail="$(jq -r 'if (.detail | type) == "string" and .detail != "" then .detail else "NONE" end' "$status_file" 2>/dev/null | tr '\r\n\t' ' ' | cut -c1-512 || true)"
+                [[ "$status_reason" =~ ^[A-Z0-9_]+$ ]] || status_reason="UNKNOWN_MIGRATION_FAILURE"
+                [[ "$status_stage" =~ ^[A-Z0-9_]+$ ]] || status_stage="UNKNOWN"
+                [[ "$status_exit_code" =~ ^[0-9]+$ ]] || status_exit_code="1"
+                [[ -n "$status_detail" ]] || status_detail="NONE"
+                if [[ "$status_detail" == "NONE" || "$status_detail" =~ [Pp][Aa][Ss][Ss][Ww][Oo][Rr][Dd]|[Pp][Aa][Ss][Ss][Ww][Dd]|[Ss][Ee][Cc][Rr][Ee][Tt]|[Tt][Oo][Kk][Ee][Nn]|[Aa][Uu][Tt][Hh][Oo][Rr][Ii][Zz][Aa][Tt][Ii][Oo][Nn]|[Bb][Ee][Aa][Rr][Ee][Rr]|[Dd][Ss][Nn] ]]; then
+                  status_detail="NONE"
+                fi
+                echo "MIGRATION_WORKER_STATE=FAILED"
+                echo "MIGRATION_REASON=${status_reason}"
+                echo "MIGRATION_STAGE=${status_stage}"
+                echo "MIGRATION_EXIT_CODE=${status_exit_code}"
+                echo "MIGRATION_SAFE_DETAIL=${status_detail}"
                 exit 1
               fi
             fi

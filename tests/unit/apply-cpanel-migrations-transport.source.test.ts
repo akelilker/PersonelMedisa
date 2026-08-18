@@ -62,4 +62,37 @@ describe('canonical cPanel migration FTP transport contract', () => {
     expect(migration).not.toMatch(/\b(?:mysql|psql|sqlite3)\b/i);
     expect(migration).not.toContain('068');
   });
+
+  it('exposes only bounded safe diagnostics for a matching failed worker status', () => {
+    expect(migration).toContain('MIGRATION_WORKER_STATE=FAILED');
+    expect(migration).toContain('MIGRATION_REASON=${status_reason}');
+    expect(migration).toContain('MIGRATION_STAGE=${status_stage}');
+    expect(migration).toContain('MIGRATION_EXIT_CODE=${status_exit_code}');
+    expect(migration).toContain('MIGRATION_SAFE_DETAIL=${status_detail}');
+    expect(migration).toContain('cut -c1-512');
+    expect(migration).toContain('status_request" == "$REQUEST_ID"');
+    expect(migration).not.toContain('cat "$status_file"');
+    expect(migration).not.toContain('echo "$status_file"');
+  });
+
+  it('keeps stale status ignored, success unchanged, and failure fail-closed', () => {
+    expect(migration).toMatch(
+      /if \[\[ "\$status_request" == "\$REQUEST_ID" && "\$status_state" == "SUCCEEDED" \]\]; then[\s\S]*?exit 0/,
+    );
+    expect(migration).toMatch(
+      /if \[\[ "\$status_request" == "\$REQUEST_ID" && "\$status_state" == "FAILED" \]\]; then[\s\S]*?exit 1/,
+    );
+    expect(migration).toContain('if run_cpanel_ftp "$status_commands" >/dev/null 2>&1; then');
+  });
+
+  it('defensively suppresses secret-like diagnostic detail without changing FTP transport', () => {
+    expect(migration).toContain('status_detail" == "NONE"');
+    expect(migration).toContain('[Pp][Aa][Ss][Ss][Ww][Oo][Rr][Dd]');
+    expect(migration).toContain('[Ss][Ee][Cc][Rr][Ee][Tt]');
+    expect(migration).toContain('[Tt][Oo][Kk][Ee][Nn]');
+    expect(migration).toContain('[Dd][Ss][Nn]');
+    expect(migration).toContain('FTP_PASSWORD');
+    expect(migration).toContain('run_ftp_mode "explicit-ftps" "true"');
+    expect(migration).toContain('run_ftp_mode "plain-ftp" "false"');
+  });
 });

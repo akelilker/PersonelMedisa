@@ -55,32 +55,35 @@ final class ActorIdentityService
             self::assertActiveUser($user);
             self::assertFormalUsername($user);
 
-            $personelId = (int) ($user['personel_id'] ?? 0);
-            if ($personelId <= 0) {
-                throw new ActorIdentityException(
-                    409,
-                    'ACTOR_PERSONEL_LINK_REQUIRED',
-                    'Formal actor identity icin aktif personel baglantisi zorunludur.',
-                    'user_id'
-                );
-            }
-
-            $personel = self::loadActivePersonel($pdo, $personelId);
             self::assertUserBranchScope($pdo, $userId);
+            $personelId = self::nullableId($user['personel_id'] ?? null);
+            $personel = $personelId !== null ? self::loadActivePersonel($pdo, $personelId) : null;
+            $displayName = $personel !== null
+                ? self::formalDisplayName((string) $personel['ad'] . ' ' . (string) $personel['soyad'])
+                : self::formalDisplayName($user['ad_soyad'] ?? '');
+            $verificationSource = $personel !== null ? 'PERSONEL_LINKED' : 'HUMAN_CONFIRMED';
+            $identityCode = self::generatedIdentityCode($userId, $personelId);
 
             $linkedIdentityId = self::nullableId($user['actor_identity_id'] ?? null);
             if ($linkedIdentityId !== null) {
                 $existing = self::loadIdentity($pdo, $linkedIdentityId);
-                self::assertIdentityPersonel($existing, $personelId);
+                self::assertIdentityOwner($pdo, $existing, $user);
                 $pdo->commit();
 
                 return self::readForUser($pdo, $userId);
             }
 
-            $existingStmt = $pdo->prepare(
-                'SELECT id FROM actor_identities WHERE personel_id = :personel_id LIMIT 1 FOR UPDATE'
-            );
-            $existingStmt->execute(['personel_id' => $personelId]);
+            if ($personelId !== null) {
+                $existingStmt = $pdo->prepare(
+                    'SELECT id FROM actor_identities WHERE personel_id = :personel_id LIMIT 1 FOR UPDATE'
+                );
+                $existingStmt->execute(['personel_id' => $personelId]);
+            } else {
+                $existingStmt = $pdo->prepare(
+                    'SELECT id FROM actor_identities WHERE identity_code = :identity_code LIMIT 1 FOR UPDATE'
+                );
+                $existingStmt->execute(['identity_code' => $identityCode]);
+            }
             $existingId = $existingStmt->fetchColumn();
             if ($existingId !== false && $existingId !== null) {
                 throw new ActorIdentityException(
@@ -91,8 +94,6 @@ final class ActorIdentityService
                 );
             }
 
-            $identityCode = self::generatedIdentityCode($personelId);
-            $displayName = trim((string) $personel['ad'] . ' ' . (string) $personel['soyad']);
             $normalizedName = self::normalizeName($displayName);
             $insert = $pdo->prepare(
                 'INSERT INTO actor_identities
@@ -105,7 +106,7 @@ final class ActorIdentityService
                 'display_name' => $displayName,
                 'normalized_name' => $normalizedName,
                 'status' => 'PENDING',
-                'verification_source' => 'PERSONEL_LINKED',
+                'verification_source' => $verificationSource,
                 'personel_id' => $personelId,
             ]);
 
@@ -116,7 +117,11 @@ final class ActorIdentityService
                 $userId,
                 'CREATE',
                 (int) ($admin['id'] ?? 0),
-                ['personel_id' => $personelId, 'status' => 'PENDING']
+                [
+                    'personel_id' => $personelId,
+                    'identity_code' => $identityCode,
+                    'status' => 'PENDING',
+                ]
             );
             $pdo->commit();
         } catch (\Throwable $e) {
@@ -153,7 +158,10 @@ final class ActorIdentityService
         try {
             $identity = self::loadIdentityForUpdate($pdo, $identityId);
             $boundUserId = self::boundUserId($pdo, $identityId);
-            if ($boundUserId !== null && $boundUserId === (int) ($admin['id'] ?? 0)) {
+            $intendedOwnerId = self::intendedOwnerUserId($pdo, $identityId);
+            $adminId = (int) ($admin['id'] ?? 0);
+            if (($boundUserId !== null && $boundUserId === $adminId)
+                || ($intendedOwnerId !== null && $intendedOwnerId === $adminId)) {
                 throw new ActorIdentityException(
                     403,
                     'ACTOR_IDENTITY_SELF_VERIFY_FORBIDDEN',
@@ -184,7 +192,7 @@ final class ActorIdentityService
                 self::writeAudit(
                     $pdo,
                     $identityId,
-                    $boundUserId,
+                    $intendedOwnerId,
                     'VERIFY',
                     (int) ($admin['id'] ?? 0),
                     ['from_status' => 'PENDING', 'to_status' => 'VERIFIED']
@@ -223,19 +231,14 @@ final class ActorIdentityService
             $user = self::loadUserForUpdate($pdo, $userId);
             self::assertActiveUser($user);
             self::assertFormalUsername($user);
-            $personelId = (int) ($user['personel_id'] ?? 0);
-            if ($personelId <= 0) {
-                throw new ActorIdentityException(
-                    409,
-                    'ACTOR_PERSONEL_LINK_REQUIRED',
-                    'Kullanici aktif personel kaydina bagli degil.',
-                    'user_id'
-                );
-            }
 
             $identity = self::loadIdentityForUpdate($pdo, $identityId);
-            self::assertIdentityPersonel($identity, $personelId);
-            self::loadActivePersonel($pdo, $personelId);
+            self::assertIdentityOwner($pdo, $identity, $user);
+            self::assertVerifiedIdentity($identity);
+            $personelId = self::nullableId($user['personel_id'] ?? null);
+            if ($personelId !== null) {
+                self::loadActivePersonel($pdo, $personelId);
+            }
             self::assertUserBranchScope($pdo, $userId);
 
             $boundUserId = self::boundUserId($pdo, $identityId);
@@ -295,7 +298,7 @@ final class ActorIdentityService
     {
         $userId = self::positiveId($userId, 'user_id');
         $stmt = $pdo->prepare(
-            'SELECT u.id AS user_id, u.username, u.durum, u.personel_id,
+            'SELECT u.id AS user_id, u.username, u.rol, u.durum, u.personel_id,
                     u.actor_identity_id, ai.status, ai.personel_id AS identity_personel_id
              FROM users u
              LEFT JOIN actor_identities ai ON ai.id = u.actor_identity_id
@@ -317,7 +320,7 @@ final class ActorIdentityService
         $identityId = self::positiveId($identityId, 'id');
         $stmt = $pdo->prepare(
             'SELECT ai.id AS actor_identity_id, ai.status, ai.personel_id,
-                    u.id AS user_id, u.username, u.durum
+                    u.id AS user_id, u.username, u.rol, u.durum
              FROM actor_identities ai
              LEFT JOIN users u ON u.actor_identity_id = ai.id
              WHERE ai.id = :id
@@ -425,11 +428,71 @@ final class ActorIdentityService
         }
     }
 
-    private static function assertIdentityPersonel(array $identity, $personelId): void
+    /**
+     * Personel-linked identities are owned by the shared personel bridge.
+     * NULL-personel identities are owned by their attributable CREATE audit
+     * and deterministic USER-{id} code, never by NULL equality alone.
+     *
+     * @param array<string, mixed> $identity
+     * @param array<string, mixed> $user
+     */
+    private static function assertIdentityOwner(PDO $pdo, array $identity, array $user): void
     {
-        if ((int) ($identity['personel_id'] ?? 0) !== (int) $personelId) {
-            throw new ActorIdentityException(409, 'ACTOR_PERSONEL_MISMATCH', 'Actor identity personel ile eslesmiyor.');
+        $userPersonelId = self::nullableId($user['personel_id'] ?? null);
+        $identityPersonelId = self::nullableId($identity['personel_id'] ?? null);
+        if ($userPersonelId !== null || $identityPersonelId !== null) {
+            if ($userPersonelId === null
+                || $identityPersonelId === null
+                || $identityPersonelId !== $userPersonelId) {
+                throw new ActorIdentityException(409, 'ACTOR_PERSONEL_MISMATCH', 'Actor identity personel ile eslesmiyor.');
+            }
+
+            return;
         }
+
+        $userId = (int) ($user['id'] ?? 0);
+        $intendedOwnerId = self::intendedOwnerUserId($pdo, (int) ($identity['id'] ?? 0));
+        $expectedCode = self::generatedIdentityCode($userId, null);
+        $actualCode = (string) ($identity['identity_code'] ?? '');
+        if ($userId <= 0
+            || $intendedOwnerId === null
+            || $intendedOwnerId !== $userId
+            || !hash_equals($expectedCode, $actualCode)) {
+            throw new ActorIdentityException(
+                409,
+                'ACTOR_IDENTITY_OWNER_MISMATCH',
+                'Personel baglantisi olmayan actor identity hedef kullanici ile eslesmiyor.'
+            );
+        }
+    }
+
+    /** @param array<string, mixed> $identity */
+    private static function assertVerifiedIdentity(array $identity): void
+    {
+        if (strtoupper(trim((string) ($identity['status'] ?? ''))) !== 'VERIFIED') {
+            throw new ActorIdentityException(
+                409,
+                'ACTOR_IDENTITY_NOT_VERIFIED',
+                'Yalniz dogrulanmis actor identity kullaniciya baglanabilir.'
+            );
+        }
+    }
+
+    private static function intendedOwnerUserId(PDO $pdo, $identityId)
+    {
+        $stmt = $pdo->prepare(
+            "SELECT target_user_id
+             FROM actor_identity_audits
+             WHERE actor_identity_id = :actor_identity_id
+               AND action = 'CREATE'
+               AND target_user_id IS NOT NULL
+             ORDER BY id ASC
+             LIMIT 1"
+        );
+        $stmt->execute(['actor_identity_id' => (int) $identityId]);
+        $value = $stmt->fetchColumn();
+
+        return $value === false ? null : (int) $value;
     }
 
     private static function assertUserBranchScope(PDO $pdo, $userId): void
@@ -483,6 +546,7 @@ final class ActorIdentityService
             $actor = [
                 'id' => $userId,
                 'username' => (string) ($row['username'] ?? ''),
+                'rol' => (string) ($row['rol'] ?? ''),
                 'durum' => (string) ($row['durum'] ?? ''),
                 'sube_ids' => $scope,
                 'actor_identity_id' => $identityId,
@@ -534,9 +598,28 @@ final class ActorIdentityService
         ]);
     }
 
-    private static function generatedIdentityCode($personelId): string
+    private static function generatedIdentityCode($userId, $personelId): string
     {
-        return 'PERSONEL-' . (int) $personelId;
+        if ($personelId !== null && (int) $personelId > 0) {
+            return 'PERSONEL-' . (int) $personelId;
+        }
+
+        return 'USER-' . (int) $userId;
+    }
+
+    private static function formalDisplayName($value): string
+    {
+        $displayName = preg_replace('/\s+/u', ' ', trim((string) $value));
+        if (!is_string($displayName) || $displayName === '') {
+            throw new ActorIdentityException(
+                409,
+                'ACTOR_DISPLAY_NAME_REQUIRED',
+                'Formal actor identity icin kullanilabilir ad soyad zorunludur.',
+                'user_id'
+            );
+        }
+
+        return $displayName;
     }
 
     private static function normalizeName($value): string

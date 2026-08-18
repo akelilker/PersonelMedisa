@@ -27,11 +27,16 @@ describe("formal SGK actor identity lifecycle", () => {
     expect(service).not.toContain("GENEL_YONETICI");
   });
 
-  it("owns the real user/person relationship and rejects unsafe identities", () => {
+  it("supports both optional-personel and personel-linked formal identities", () => {
     expect(service).toContain("personel_id");
     expect(service).toContain("aktif_durum");
-    expect(service).toContain("ACTOR_PERSONEL_LINK_REQUIRED");
+    expect(service).toContain("self::formalDisplayName($user['ad_soyad'] ?? '')");
+    expect(service).toContain("'USER-' . (int) $userId");
+    expect(service).toContain("'PERSONEL-' . (int) $personelId");
+    expect(service).toContain("$personelId !== null ? self::loadActivePersonel");
+    expect(service).not.toContain("ACTOR_PERSONEL_LINK_REQUIRED");
     expect(service).toContain("ACTOR_GENERIC_USER_FORBIDDEN");
+    expect(service).toContain("ACTOR_DISPLAY_NAME_REQUIRED");
     expect(service).toContain("assertFormalUsername");
     expect(authz).toContain("isFormalUsername");
   });
@@ -71,8 +76,18 @@ describe("formal SGK actor identity lifecycle", () => {
     expect(service).toContain("ACTOR_IDENTITY_ALREADY_EXISTS");
     expect(service).toContain("ACTOR_IDENTITY_ALREADY_BOUND");
     expect(service).toContain("ACTOR_PERSONEL_MISMATCH");
+    expect(service).toContain("ACTOR_IDENTITY_OWNER_MISMATCH");
+    expect(service).toContain("intendedOwnerUserId");
+    expect(service).toContain("action = 'CREATE'");
     expect(service).toContain("USER_ACTOR_IDENTITY_CONFLICT");
     expect(service).toContain("$currentIdentityId !== $identityId");
+  });
+
+  it("forbids self-verification before and after binding", () => {
+    expect(service).toContain("$intendedOwnerId = self::intendedOwnerUserId");
+    expect(service).toContain("$boundUserId === $adminId");
+    expect(service).toContain("$intendedOwnerId === $adminId");
+    expect(service).toContain("ACTOR_IDENTITY_SELF_VERIFY_FORBIDDEN");
   });
 
   it("exposes a minimal readback contract and frontend owner", () => {
@@ -80,6 +95,8 @@ describe("formal SGK actor identity lifecycle", () => {
     expect(service).toContain("'actor_status'");
     expect(service).toContain("'branch_scope'");
     expect(service).toContain("'ready'");
+    expect(service).toContain("u.username, u.rol, u.durum");
+    expect(service).toContain("'rol' => (string) ($row['rol'] ?? '')");
     expect(endpoints).toContain("actorIdentityDetail");
     expect(endpoints).toContain("actorIdentityVerify");
     expect(endpoints).toContain("kullaniciActorIdentity");

@@ -55,60 +55,63 @@ final class MigrationExecutionService
 
     public static function classify(Throwable $exception): string
     {
-        $message = strtolower($exception->getMessage());
+        // Walk the exception chain to find the most specific cause (PDOException or matching message)
+        for ($e = $exception; $e !== null; $e = $e->getPrevious()) {
+            $message = strtolower($e->getMessage());
 
-        if (
-            str_contains($message, 'database configuration is incomplete')
-            || str_contains($message, 'sqlstate')
-            || str_contains($message, 'could not find driver')
-            || $exception instanceof PDOException
-        ) {
-            return 'DB_CONNECTION_FAILED';
-        }
-        if (
-            str_contains($message, 'undefined function')
-            || str_contains($message, 'undefined class')
-            || str_contains($message, 'extension')
-        ) {
-            return 'PHP_EXTENSION_MISSING';
-        }
-        if (str_contains($message, 'migration ledger bootstrap is missing')) {
-            return 'MIGRATION_LEDGER_BOOTSTRAP_FAILED';
-        }
-        if (str_contains($message, 'migration ledger was initialized without')) {
-            return 'MIGRATION_BASELINE_REQUIRED';
-        }
-        if (
-            str_contains($message, 'migration baseline must')
-            || str_contains($message, 'requested migration baseline')
-        ) {
-            return 'MIGRATION_BASELINE_INVALID';
-        }
-        if (str_contains($message, 'checksum mismatch')) {
-            return 'MIGRATION_CHECKSUM_MISMATCH';
-        }
-        if (str_contains($message, 'ledger has a gap')) {
-            return 'MIGRATION_LEDGER_GAP';
-        }
-        if (
-            str_contains($message, 'no canonical migration files')
-            || str_contains($message, 'migration source is unreadable')
-            || str_contains($message, 'canonical migration bundle')
-            || str_contains($message, 'migration ledger bootstrap is missing')
-        ) {
-            return 'MIGRATION_SOURCE_MISSING';
-        }
-        if (str_contains($message, 'could not acquire canonical migration lock')) {
-            return 'MIGRATION_LOCK_FAILED';
-        }
-        if (
-            str_contains($message, 'canonical migration schema is not ready')
-            || str_contains($message, 'schema is not ready')
-        ) {
-            return 'SCHEMA_VERIFY_FAILED';
-        }
-        if (str_contains($message, 'canonical migration failed')) {
-            return 'MIGRATION_APPLY_FAILED';
+            if (
+                str_contains($message, 'database configuration is incomplete')
+                || str_contains($message, 'sqlstate')
+                || str_contains($message, 'could not find driver')
+                || $e instanceof PDOException
+            ) {
+                return 'DB_CONNECTION_FAILED';
+            }
+            if (
+                str_contains($message, 'undefined function')
+                || str_contains($message, 'undefined class')
+                || str_contains($message, 'extension')
+            ) {
+                return 'PHP_EXTENSION_MISSING';
+            }
+            if (str_contains($message, 'migration ledger bootstrap is missing')) {
+                return 'MIGRATION_LEDGER_BOOTSTRAP_FAILED';
+            }
+            if (str_contains($message, 'migration ledger was initialized without')) {
+                return 'MIGRATION_BASELINE_REQUIRED';
+            }
+            if (
+                str_contains($message, 'migration baseline must')
+                || str_contains($message, 'requested migration baseline')
+            ) {
+                return 'MIGRATION_BASELINE_INVALID';
+            }
+            if (str_contains($message, 'checksum mismatch')) {
+                return 'MIGRATION_CHECKSUM_MISMATCH';
+            }
+            if (str_contains($message, 'ledger has a gap')) {
+                return 'MIGRATION_LEDGER_GAP';
+            }
+            if (
+                str_contains($message, 'no canonical migration files')
+                || str_contains($message, 'migration source is unreadable')
+                || str_contains($message, 'canonical migration bundle')
+                || str_contains($message, 'migration ledger bootstrap is missing')
+            ) {
+                return 'MIGRATION_SOURCE_MISSING';
+            }
+            if (str_contains($message, 'could not acquire canonical migration lock')) {
+                return 'MIGRATION_LOCK_FAILED';
+            }
+            if (
+                str_contains($message, 'canonical migration schema is not ready')
+                || str_contains($message, 'schema is not ready')
+            ) {
+                return 'SCHEMA_VERIFY_FAILED';
+            }
+            if (str_contains($message, 'canonical migration failed')) {
+                return 'MIGRATION_APPLY_FAILED';
+            }
         }
 
         return 'UNKNOWN_MIGRATION_FAILURE';
@@ -116,12 +119,25 @@ final class MigrationExecutionService
 
     public static function safeDetail(Throwable $exception): ?string
     {
+        // Walk the exception chain to surface a useful, non-secret detail (prefer PDO messages)
+        for ($e = $exception; $e !== null; $e = $e->getPrevious()) {
+            $msg = $e->getMessage();
+            if (preg_match('/password|passwd|secret|token|dsn|authorization|bearer/i', $msg) === 1) {
+                // avoid returning credentials
+                return null;
+            }
+
+            // Prefer SQL/PDO-related messages
+            if ($e instanceof PDOException || preg_match('/sqlstate|syntax error|duplicate entry|foreign key constraint/i', strtolower($msg)) === 1) {
+                // Return the first matching database error message
+                return trim(preg_replace('/\s+/',' ', $msg));
+            }
+        }
+
+        // Fall back to previous logic based on outer exception classification
         $reason = self::classify($exception);
         $message = $exception->getMessage();
 
-        if (preg_match('/password|passwd|secret|token|dsn|authorization|bearer/i', $message) === 1) {
-            return null;
-        }
         if (in_array($reason, ['DB_CONNECTION_FAILED', 'PHP_EXTENSION_MISSING'], true)) {
             return null;
         }

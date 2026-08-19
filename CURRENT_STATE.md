@@ -11,9 +11,11 @@ Her registry kaydı **tek** zorunlu statü taşır: `CLOSED` · `CODE_GAP` · `B
 
 - **Ürün beyni:** `FROZEN` (domain owner / paralel motor yalnız ayrı teşhis + açık onay)
 - **Görsel düzenleme aşaması:** `GO`
-- **Code migration tip:** `067` (`067_personel_canonical_reference_gate.sql`)
-- **Production migration tip:** **067**
-- **Migration067:** `CLOSED_CONFIRMED`; workflow `WORKFLOW_SHOULD_BE_RETIRED` (active blocker değil)
+- **Code migration tip:** `068` (`068_sgk_actor_identity_lifecycle_audit.sql`)
+- **Production migration tip:** **068**
+- **Migration067:** `CLOSED_CONFIRMED` (canonical SQL); legacy `migration-067-production-precheck` ops yolu **RETIRED/REMOVED**
+- **Migration068:** `CLOSED_CONFIRMED` (code + production schema); formal SGK actor create/verify/bind audit owner (`actor_identity_audits`)
+- **Canonical migration execution:** `.github/workflows/apply-cpanel-migrations.yml` → FTP control-plane → protected cPanel cron worker (`api/bin/cpanel-migration-cron.php`); SSH migration dependency **yok**
 - **Production personnel total:** `137`; personnel rollout `CLOSED` (Phase1 `122 CLOSED`, Phase2 `11 CLOSED`)
 - **Canonical Güvenlik:** `Üretim → Üretim → Güvenlik`
 - **S3F:** `CLOSED_PRODUCTION` (PR #148 merge `9e1b5c85049d5f2aada84ae59b2be926f0bc6441`; docs closure `72818720ae9dad9a77c31c933806a72acdc7bafd`)
@@ -23,8 +25,10 @@ Her registry kaydı **tek** zorunlu statü taşır: `CLOSED` · `CODE_GAP` · `B
 - **Retention Pack 2–4B:** physical destruction **INTENTIONAL_DEFER**; schema `059`/`060`/`062` production-ready; feature flag default **OFF**; real destruction **NO**
 - **Serbest Zaman Pack 4B:** allocation-aware destroy + 6M deadline ops surface (`061`/`062` + `116` + `118`); **OPS_ROLLOUT_ACTIVE** (`MG-SZ-6M-001`); production schema rollout **COMPLETE**; ops follow-up `USER_GATED`
 - **Pack5 Final Code Gap:** rolling OT policy + org location schema (`063`/`064` + `117` + `118`); `MG-OT-YEAR-POL/PATH` CLOSED; `MG-ORG-LOC-001` OPS_ROLLOUT USER_GATED (schema production-ready; personnel mapping still gated)
-- **Org reference seed (`119`, 2026-08-13):** SGK employers `MEDISA`/`KARYAPI`/`SENAY_MOBILYA` + 7 verified work locations seeded; personnel rollout closed
-- **Pack6 org structure (`120`/`121`/`122`):** native Bölüm/Birim/Pozisyon + `subeler.sgk_isveren_id`; production read-only schema/reference probe **VERIFIED**; locked 10-branch model + MRK=`Medisa` + ownership complete; personnel rollout closed
+- **Org reference seed (`119`, 2026-08-13):** SGK employers `MEDISA`/`KARYAPI`/`SENAY_MOBILYA` + 7 verified work locations seeded
+- **Pack6 org structure (`120`/`121`/`122`):** native Bölüm/Birim/Pozisyon + `subeler.sgk_isveren_id`; production schema/reference catalogs **VERIFIED**; locked 10-branch model + MRK=`Medisa` + ownership complete
+- **Personnel count rollout:** production total `137` (`Phase1=122 CLOSED`, `Phase2=11 CLOSED`); personel org FK alanları (`sgk_isveren_id`, `calisma_lokasyonu_id`, `bolum_id`, `birim_id`, `pozisyon_id`) **VERIFY_REQUIRED** / `USER_GATED` — kanıtsız CLOSED yazılmaz
+- **SGK actor lifecycle (code):** `ActorIdentityService` create/verify/bind + readback + `actor_identity_audits`; production schema via migration `068` (run [#32217771186](https://github.com/akelilker/PersonelMedisa/actions/runs/32217771186) @ `cd92d24…`, worker verify pass)
 
 Görsel sistem çalışmaları mevcut component/owner içinde yapılabilir. Yeni domain özelliği freeze kapısından geçer.
 
@@ -32,11 +36,15 @@ Görsel sistem çalışmaları mevcut component/owner içinde yapılabilir. Yeni
 
 | Flag | Statü / değer | Metadata |
 | --- | --- | --- |
-| `PRODUCTION_MIGRATION_TIP` | **067** | Migration067 `CLOSED_CONFIRMED`; workflow retired |
-| `CODE_MIGRATION_TIP` | **067** | `067_personel_canonical_reference_gate.sql` |
+| `PRODUCTION_MIGRATION_TIP` | **068** | Apply cPanel migrations run [#32217771186](https://github.com/akelilker/PersonelMedisa/actions/runs/32217771186) @ `cd92d24…`; bundle+verify pass |
+| `CODE_MIGRATION_TIP` | **068** | `068_sgk_actor_identity_lifecycle_audit.sql` |
+| `MIGRATION067_LEGACY_OPS` | **RETIRED/REMOVED** | Generic canonical control-plane only |
+| `MIGRATION068` | **CLOSED_CONFIRMED** | Code + production `actor_identity_audits` schema |
+| `SSH_MIGRATION_DEPENDENCY` | **NO** | cPanel SSH yok; FTP request + protected cron worker |
 | `S3F` | **CLOSED_PRODUCTION** | — |
 | `QR_PIPELINE` | **S3C–S3F CLOSED** | — |
-| `REAL_REFERENCE_DATA` | **READY** — SGK/locations (`119`) + branches (`121`) + canonical Departman/Unvan/PersonelTipi/Bölüm/Birim/Pozisyon (`122`); personnel mapping still gated | `USER_GATED` |
+| `REAL_REFERENCE_DATA` | **READY** — SGK/locations (`119`) + branches (`121`) + canonical catalogs (`122`); personnel org FK apply gated | `USER_GATED` |
+| `PERSONNEL_ORG_FK_ROLLOUT` | **NOT_STARTED** | `sgk_isveren_id` / `calisma_lokasyonu_id` / `bolum_id` / `birim_id` / `pozisyon_id` — `VERIFY_REQUIRED` |
 | `REAL_PERSONNEL_DATASET` | **CLOSED** | Production personnel rollout complete; `NO_PII_COMMITTED` |
 | `REAL_PERSONNEL_IMPORTED` | **YES** | 137 production personnel |
 | `SOURCE_DATA_REQUIRES_COMPLETION` | **NO** for closed rollout | exact person-level source details stay private |
@@ -54,19 +62,21 @@ Görsel sistem çalışmaları mevcut component/owner içinde yapılabilir. Yeni
 | `UBGT_AUTHORITATIVE_CALENDAR` | **CLOSED_CONFIRMED** (`MG-OPS-UBGT-001`) | — |
 | `SGK_OFFICIAL_CATALOG_PROD` | **CLOSED_CONFIRMED** (`MG-OPS-SGK-CAT-001`) | — |
 | `ORG_BUSINESS_MODEL` | **CLOSED** (`MG-ORG-MODEL-001`) | karar kilitli 2026-08-12 |
-| `ORG_LOCATION_SCHEMA` | **CLOSED_CONFIRMED** (`MG-ORG-LOC-001`) | production references resolved; personnel rollout closed |
+| `ORG_LOCATION_SCHEMA` | **CLOSED_CONFIRMED** (`MG-ORG-LOC-001`) | production references resolved; personnel org FK apply `USER_GATED` |
 | `SGK_EMPLOYER_REAL_REFERENCE` | **PRODUCTION_READY** | codes `MEDISA`/`KARYAPI`/`SENAY_MOBILYA` (`119`) |
 | `WORK_LOCATION_REAL_REFERENCE` | **PRODUCTION_READY** | 7 verified location codes seeded (`119`) |
 | `ORG_ATTRIBUTES_BOLUM_BIRIM_POZISYON` | **CLOSED** (`MG-ORG-ATTR-001`) | native fields via Pack6 `065` (`120`/`121`) |
-| `ORG_STRUCTURE_SCHEMA` | **VERIFIED_PRODUCTION** | Authenticated read-only probe confirmed personel org fields and active catalogs; personnel FK mapping remains gated |
+| `ORG_STRUCTURE_SCHEMA` | **VERIFIED_PRODUCTION** | Schema + reference catalogs verified; personnel org FK values remain `VERIFY_REQUIRED` |
+| `SGK_ACTOR_LIFECYCLE_CODE` | **CLOSED** | `ActorIdentityService` + migration `068` audit schema; ops business rollout ayrı kapı |
 | `MG-OPS-POLICY-001` | **CLOSED_CONFIRMED** | Active revision `3`; 14/14; Pazar (`0`) |
 | `CANONICAL_DOC_STALE` | **0** | historical snapshots preserved, not backlog |
 
 ## Doğrulanmış teknik temel
 
-- Current PR base / current `main`: `416fb40fd5aa2ad5b472219e4b9b02300c86083e`.
-- Migration tip: code **067**; production **067**. Migration067 `CLOSED_CONFIRMED`; workflow retired.
-- Org references: SGK=3, locations=7, locked 10 branches (`121`); canonical catalogs completed (`122`: departmanlar=10 incl. legacy, bolumler=22, birimler=32, gorevler=39, pozisyonlar=12, personel_tipleri=5); personnel org FKs remain NULL until mapping/import gate.
+- Current `origin/main`: `259cc6ccca110248198f3f6ccd0602cadaafee30`.
+- Migration tip: code **068**; production **068**. Migration067 canonical SQL `CLOSED_CONFIRMED`; legacy ops workflow **RETIRED/REMOVED**. Migration068 `CLOSED_CONFIRMED`.
+- Canonical migration owner: `apply-cpanel-migrations.yml` + `cpanel-migration-cron.php`; public HTTP migration endpoint ve direct SQL canonical yol değil; SSH blocker **yok**.
+- Org references: SGK=3, locations=7, locked 10 branches (`121`); canonical catalogs completed (`122`); personnel org FK alanları production'da bulk apply edilmedi — `VERIFY_REQUIRED` / `USER_GATED`.
 - Pack6: `bolumler` / `birimler` / `pozisyonlar` + `subeler.sgk_isveren_id` (authorization still `personeller.sube_id`).
 - SGK, şirket politikası kanıtı, bordro preflight, personel importu, revizyon, dual-control, retention request/approve/evaluate/execute (flag OFF), QR S3C–S3F owner’ları mevcut ve fail-closed çalışır.
 - PERSONEL self-service: `/me` puantaj / yıllık izin / FM / QR yüzeyleri; maaş/bordro self-view **OUT_OF_SCOPE** (S3A).

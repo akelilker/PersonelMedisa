@@ -169,11 +169,20 @@ function normalizeAuthSession(payload: unknown): AuthSession | null {
       ? null
       : personelIdRaw ?? null;
 
+  const mustChangeRaw = source.must_change_password ?? source.mustChangePassword;
+  const must_change_password =
+    mustChangeRaw === true || mustChangeRaw === 1 || mustChangeRaw === "1" || mustChangeRaw === "true"
+      ? true
+      : mustChangeRaw === false || mustChangeRaw === 0 || mustChangeRaw === "0" || mustChangeRaw === "false"
+        ? false
+        : undefined;
+
   const draft: AuthSession = {
     token,
     ui_profile: uiProfile,
     sube_list,
     active_sube_id: preferredActive,
+    must_change_password,
     user: {
       id: userId,
       ad_soyad: fullName,
@@ -304,6 +313,21 @@ export async function login(credentials: LoginCredentials): Promise<AuthSession>
 
     throw error;
   }
+}
+
+export type ChangePasswordInput = {
+  currentPassword: string;
+  newPassword: string;
+};
+
+export async function changePassword(input: ChangePasswordInput): Promise<void> {
+  await apiRequest<unknown>(endpoints.auth.changePassword, {
+    method: "POST",
+    body: JSON.stringify({
+      current_password: input.currentPassword,
+      new_password: input.newPassword
+    })
+  });
 }
 
 function responseLooksLikeAuthPayload(payload: unknown): boolean {

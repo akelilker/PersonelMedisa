@@ -42,6 +42,10 @@ class LoginController
         if ($hasPersonelId) {
             $loginCols[] = 'personel_id';
         }
+        $hasMustChange = UsersSchema::hasMustChangePassword($pdo);
+        if ($hasMustChange) {
+            $loginCols[] = 'must_change_password';
+        }
         $selectSql = 'SELECT ' . implode(', ', $loginCols) . ' FROM users WHERE username = :username LIMIT 1';
         $stmt = $pdo->prepare($selectSql);
         $stmt->execute(['username' => $username]);
@@ -104,13 +108,18 @@ class LoginController
             $userPayload['personel_id'] = $personelIdPayload;
         }
 
-        JsonResponse::success([
+        $response = [
             'token' => $token,
             'user' => $userPayload,
             'ui_profile' => $rol === 'BIRIM_AMIRI' ? 'birim_amiri' : 'yonetim',
             'sube_list' => $subeList,
             'active_sube_id' => $activeSubeId,
-        ]);
+        ];
+        if ($hasMustChange) {
+            $response['must_change_password'] = ((int) ($user['must_change_password'] ?? 0)) === 1;
+        }
+
+        JsonResponse::success($response);
     }
 
     /** @return array<int, int> */

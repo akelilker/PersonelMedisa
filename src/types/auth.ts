@@ -36,6 +36,8 @@ export type AuthSession = {
   active_sube_id: number | null;
   /** Opsiyonel etiketler (login yaniti) */
   sube_list?: SubeInfo[];
+  /** Admin geçici şifre sonrası kullanıcının kendi şifresini belirlemesi gerekir. */
+  must_change_password?: boolean;
 };
 
 export type LoginCredentials = {

@@ -1001,6 +1001,7 @@ class YonetimController
 
         $hasVarsayilan = UsersSchema::hasVarsayilanSubeId($pdo);
         $hasPersonelId = UsersSchema::hasPersonelId($pdo);
+        $hasMustChange = UsersSchema::hasMustChangePassword($pdo);
         if ($finalVarsayilanSubeId !== null && !$hasVarsayilan) {
             JsonResponse::error(
                 409,
@@ -1023,9 +1024,14 @@ class YonetimController
         $pdo->beginTransaction();
         try {
             if ($hasVarsayilan) {
+                $insertCols = 'username, password_hash, ad_soyad, rol, durum, varsayilan_sube_id';
+                $insertVals = ':username, :password_hash, :ad_soyad, :rol, :durum, :varsayilan_sube_id';
+                if ($hasMustChange) {
+                    $insertCols .= ', must_change_password';
+                    $insertVals .= ', 1';
+                }
                 $stmt = $pdo->prepare(
-                    'INSERT INTO users (username, password_hash, ad_soyad, rol, durum, varsayilan_sube_id)
-                     VALUES (:username, :password_hash, :ad_soyad, :rol, :durum, :varsayilan_sube_id)'
+                    "INSERT INTO users ($insertCols) VALUES ($insertVals)"
                 );
                 $stmt->execute([
                     'username' => $username,
@@ -1036,9 +1042,14 @@ class YonetimController
                     'varsayilan_sube_id' => $finalVarsayilanSubeId,
                 ]);
             } else {
+                $insertCols = 'username, password_hash, ad_soyad, rol, durum';
+                $insertVals = ':username, :password_hash, :ad_soyad, :rol, :durum';
+                if ($hasMustChange) {
+                    $insertCols .= ', must_change_password';
+                    $insertVals .= ', 1';
+                }
                 $stmt = $pdo->prepare(
-                    'INSERT INTO users (username, password_hash, ad_soyad, rol, durum)
-                     VALUES (:username, :password_hash, :ad_soyad, :rol, :durum)'
+                    "INSERT INTO users ($insertCols) VALUES ($insertVals)"
                 );
                 $stmt->execute([
                     'username' => $username,
@@ -1162,6 +1173,7 @@ class YonetimController
 
         $hasVarsayilan = UsersSchema::hasVarsayilanSubeId($pdo);
         $hasPersonelId = UsersSchema::hasPersonelId($pdo);
+        $hasMustChange = UsersSchema::hasMustChangePassword($pdo);
         $needsVarsayilanWrite = $varsayilanProvided
             || ($subeIdsProvided && $finalVarsayilanSubeId !== $currentStoredDefault);
         if ($needsVarsayilanWrite && !$hasVarsayilan) {
@@ -1204,6 +1216,9 @@ class YonetimController
             if ($password !== '') {
                 $sql .= ', password_hash = :password_hash';
                 $params['password_hash'] = password_hash($password, PASSWORD_BCRYPT);
+                if ($hasMustChange) {
+                    $sql .= ', must_change_password = 1';
+                }
             }
             if ($hasVarsayilan && ($needsVarsayilanWrite || $varsayilanProvided || $subeIdsProvided)) {
                 $sql .= ', varsayilan_sube_id = :varsayilan_sube_id';

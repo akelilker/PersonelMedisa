@@ -19,6 +19,11 @@ export function ProtectedRoute({ children, requirePermission, requireAll, requir
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   }
 
+  const onChangePassword = location.pathname === "/change-password";
+  if (session.must_change_password === true && !onChangePassword) {
+    return <Navigate to="/change-password" replace />;
+  }
+
   if (requireAny && requireAny.length > 0) {
     const allowed = requireAny.some((p) => hasRolePermission(session.user.rol, p));
     if (!allowed) {

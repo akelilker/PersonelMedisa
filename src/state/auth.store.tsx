@@ -12,6 +12,7 @@ import {
   login as loginWithStorage,
   clearSession as clearAuthEverywhere,
   getSession,
+  patchSession,
   setActiveSubeId as persistActiveSubeId
 } from "../auth/auth-manager";
 import { logAction } from "../audit/audit-service";
@@ -26,6 +27,7 @@ type AuthContextValue = {
   login: (credentials: LoginCredentials) => Promise<void>;
   logout: () => void;
   setActiveSubeId: (subeId: number | null) => void;
+  clearMustChangePassword: () => void;
 };
 
 type AuthProviderProps = {
@@ -109,15 +111,21 @@ export function AuthProvider({ children }: AuthProviderProps) {
     });
   }, [forceLogout]);
 
+  const clearMustChangePassword = useCallback(() => {
+    const next = patchSession({ must_change_password: false });
+    setSession(next);
+  }, []);
+
   const value = useMemo<AuthContextValue>(
     () => ({
       session,
       isAuthenticated: session !== null,
       login,
       logout,
-      setActiveSubeId
+      setActiveSubeId,
+      clearMustChangePassword
     }),
-    [login, logout, session, setActiveSubeId]
+    [clearMustChangePassword, login, logout, session, setActiveSubeId]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

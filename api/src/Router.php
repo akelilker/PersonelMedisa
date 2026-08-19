@@ -6,6 +6,7 @@ namespace Medisa\Api;
 
 use Medisa\Api\Auth\AuthMiddleware;
 use Medisa\Api\Auth\AuthSmokeController;
+use Medisa\Api\Auth\ChangePasswordController;
 use Medisa\Api\Auth\LoginController;
 use Medisa\Api\Controllers\AylikBildirimOnaylariController;
 use Medisa\Api\Controllers\GenelYoneticiBildirimOnaylariController;
@@ -74,6 +75,9 @@ class Router
 
         if ($path === '/auth/login' && $method === 'POST') {
             LoginController::login($this->request);
+        }
+        if ($path === '/auth/change-password' && $method === 'POST') {
+            ChangePasswordController::change($this->request);
         }
         if ($path === '/auth/smoke-read' && $method === 'GET') {
             AuthSmokeController::smokeRead($this->request);

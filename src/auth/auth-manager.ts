@@ -177,6 +177,22 @@ export function setToken(nextToken: string): void {
   }
 }
 
+export function patchSession(patch: Partial<AuthSession>): AuthSession | null {
+  const located = readRawFromStorages();
+  const current = located ? parseStored(located.raw) : null;
+  if (!current || !located) {
+    return null;
+  }
+
+  const next = finalizeAuthSessionSube({ ...current, ...patch });
+  try {
+    located.storage.setItem(MEDISA_AUTH_SESSION_KEY, JSON.stringify(next));
+  } catch {
+    /* quota */
+  }
+  return next;
+}
+
 function writeSession(session: AuthSession, rememberMe: boolean): void {
   if (typeof window === "undefined") {
     return;

@@ -39,7 +39,10 @@
 
 | Alan | Canonical sonuç |
 | --- | --- |
-| Current main / PR base | `259cc6ccca110248198f3f6ccd0602cadaafee30` |
+| Current main / PR base | `5f9eca7e89165a175dfbae48a881daeba934b698` (PR #180) |
+| User management (code) | **CLOSED** — unified kullanıcı workspace in `YonetimPaneliPage` |
+| Personel binding (code) | **CLOSED** — real rollout **USER_GATED** (`MG-OPS-BIND-001`) |
+| Real QR employee (code) | **CLOSED** — pipeline S3C–S3F; rollout **USER_GATED** (`MG-OPS-QR-001`) |
 | Code migration tip | `068` |
 | Production migration tip | **068** — Apply cPanel migrations run [#32217771186](https://github.com/akelilker/PersonelMedisa/actions/runs/32217771186) @ `cd92d24e38904c76daeba31a53a8a10711c1ba6b`; worker apply+verify pass |
 | Migration 067 | **CLOSED_CONFIRMED** — canonical SQL; legacy ops workflow **RETIRED/REMOVED** |
@@ -335,8 +338,8 @@ Aşağıdakiler CURRENT MAIN’de bozulmuş değilse OPEN yapılmaz:
 | MG-OPS-PERSONEL-001 | Gerçek personel import | P0 | **CLOSED** | Production total `137`; personnel rollout closed | Ops + kullanıcı |
 | MG-IMPORT-DATA-001 | Kaynak personel dataset completion | P1 | **CLOSED** | Phase1 `122 CLOSED`; Phase2 `11 CLOSED`; deferred user data remains non-blocking | Ops + İK |
 | MG-OPS-ORG-001 | Gerçek org/şube/referans rollout | P0 | **CLOSED** | Canonical catalogs and production references resolved; binding rollout remains separate | Ops |
-| MG-OPS-BIND-001 | PERSONEL binding gerçek rollout | P1 | `USER_GATED` | Schema `056` var; rollout NOT_STARTED | Ops / İK |
-| MG-OPS-QR-001 | Gerçek çalışan QR rollout | P1 | `USER_GATED` | Pipeline CLOSED; employee rollout NOT_STARTED | Ops |
+| MG-OPS-BIND-001 | PERSONEL binding gerçek rollout | P1 | `USER_GATED` | Code **CLOSED** (`UserPersonelBindingService` + Yönetim UI); rollout NOT_STARTED | Ops / İK |
+| MG-OPS-QR-001 | Gerçek çalışan QR rollout | P1 | `USER_GATED` | Pipeline CLOSED; code ready; employee rollout NOT_STARTED | Ops |
 | MG-OPS-SGK-CAT-001 | SGK resmi katalog / DOGRULANMIS_TAM / şirket politikası | P0 | **CLOSED_CONFIRMED** | Production catalog confirmed | Ops + `94`/`95` |
 | MG-OPS-UBGT-001 | UBGT authoritative calendar seed | P0 | **CLOSED_CONFIRMED** | Production calendar confirmed | Ops |
 | MG-OPS-POLICY-001 | Bordro çalışma politikası canlı parametre onayı | P1 | **CLOSED_CONFIRMED** | Active revision `3`; 14/14; Pazar (`0`); dual control passed | Ops / yönetim |
@@ -375,7 +378,7 @@ Aşağıdakiler CURRENT MAIN’de bozulmuş değilse OPEN yapılmaz:
 | ID | Konu | Statü | Metadata | Not |
 | --- | --- | --- | --- | --- |
 | MG-ORG-MODEL-001 | Şirket / SGK / sistem şubesi / çalışma lokasyonu işletme modeli | **CLOSED** | — | Canonical business decision locked 2026-08-12. Schema uygulaması `MG-ORG-LOC-001`. |
-| MG-DOC-CS-001 | `CURRENT_STATE.md` reconciliation | **CLOSED** | — | PR #149 ile güncellendi |
+| MG-DOC-CS-001 | `CURRENT_STATE.md` reconciliation | **CLOSED** | — | PR #180 + final reversible closure |
 | MG-DOC-102-001 | `102` tip/QR/S3F header reconciliation | **CLOSED** | — | PR #149 ile güncellendi |
 | MG-DOC-101-001 | `101` I13 checkpoint | **CLOSED** | `HISTORICAL_SNAPSHOT_PRESERVED` | Bugün SoT değil; bilinçli tarihsel |
 | MG-DOC-103-001 | `103` role consolidation checkpoint | **CLOSED** | `HISTORICAL_SNAPSHOT_PRESERVED` | Bugün SoT değil |
@@ -495,12 +498,12 @@ Destroy eligibility: Pack 3C (`114`) — **15/15 typed handlers**; SERBEST used-
 | Statü | Adet (unique registry ID) | IDs |
 | --- | --- | --- |
 | **CODE_GAP** | **0** | — |
-| **BUSINESS_DECISION_REQUIRED** | **4** | SGK-1514, ZORUNLU, ORG-ATTR, IMPORT-MAP |
+| **BUSINESS_DECISION_REQUIRED** | **1** | ZORUNLU |
 | **OPS_ROLLOUT** | **13** | OPS-PERSONEL, IMPORT-DATA, OPS-ORG, OPS-BIND, OPS-QR, OPS-SGK-CAT, OPS-UBGT, OPS-POLICY, OPS-ENUM-INV, OPS-DEPLOY, **RET-PHYS**, **SZ-6M**, **ORG-LOC** |
 | **INTENTIONAL_DEFER** | **7** | QR-CORR, PAY-SELF, I13, ENUM, FSC, PAY-OUT, RET-HTTP |
 | **NOT_APPLICABLE** | **4** | SECOND-ENGINE, AUTO-QR-CORR, AUTO-APPLY, IMPORT-UCRET |
 | **DOC_STALE** | **0** | — |
-| **CLOSED** (registry section 9 + retention + Pack5 OT) | **10** | ORG-MODEL, DOC-CS, DOC-102, DOC-101, DOC-103, DOC-105, RET-MAN, RET-S3F, **OT-YEAR-POL**, **OT-YEAR-PATH** |
+| **CLOSED** (registry section 9 + retention + Pack5 OT + user mgmt) | **11** | ORG-MODEL, DOC-CS, DOC-102, DOC-101, DOC-103, DOC-105, RET-MAN, RET-S3F, **OT-YEAR-POL**, **OT-YEAR-PATH**, **USER-MGMT** |
 | Closed systems (section 3) | 18 | yeniden açılmadı |
 
 **MUST_FIX_NOW (= CODE_GAP P1 listesi):** *(empty — Pack5 closed code gaps)*
@@ -510,7 +513,17 @@ Destroy eligibility: Pack 3C (`114`) — **15/15 typed handlers**; SERBEST used-
 - `MG-SZ-6M-001` — Pack 4B ops surface (`116`); allocation schema production-ready (`118`); İK follow-up `USER_GATED`
 - `MG-ORG-LOC-001` — Pack5 schema production-ready (`117`/`118`); refs seeded (`119`); personnel mapping `USER_GATED`
 
-P2 BUSINESS (`MG-ORG-ATTR`, `MG-ZORUNLU`) final completion için açık kalabilir ama CODE_GAP değildir; karar sonrası gerekirse CODE_GAP’e çevrilir.
+P2 BUSINESS (`MG-ZORUNLU`) final completion için açık kalabilir ama CODE_GAP değildir.
+
+### MG-USER-MGMT-001 — Unified kullanıcı yönetimi workspace
+
+| Alan | Değer |
+| --- | --- |
+| Statü | **CLOSED** |
+| Owner | `YonetimPaneliPage` + `YonetimController` |
+| Mevcut | Tek modal workspace: kimlik/rol özeti, şube kapsamı (`YonetimSubeScopeField`), personel bağlantısı, actor lifecycle readback + create/verify/bind |
+| Kanıt | `KullaniciRoleSummaryPanel`, `KullaniciActorIdentityPanel`, `tests/unit/kullanici-role-summary.test.ts` |
+| Ayrım | Actor formal identity ayrı owner (ADR-0001); authorization weakening yok |
 
 **UNVERIFIED_CRITICAL = 0**
 **CANONICAL_DOC_STALE = 0**

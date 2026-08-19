@@ -20,8 +20,11 @@ import {
   updateYonetimSube
 } from "../../../api/yonetim.api";
 import { useRoleAccess } from "../../../hooks/use-role-access";
+import { KullaniciActorIdentityPanel } from "../components/KullaniciActorIdentityPanel";
+import { KullaniciRoleSummaryPanel } from "../components/KullaniciRoleSummaryPanel";
 import { MevzuatParametreleriPanel } from "../components/MevzuatParametreleriPanel";
 import { SaklamaLegalHoldPanel } from "../components/SaklamaLegalHoldPanel";
+import { YonetimSubeScopeField } from "../components/YonetimSubeScopeField";
 import { isRealYonetimKullaniciApi } from "../../../lib/yonetim/kullanici-api-contract";
 import type { UserRole } from "../../../types/auth";
 import { ASSIGNABLE_USER_ROLES } from "../../../types/auth";
@@ -1036,13 +1039,19 @@ export function YonetimPaneliPage() {
 
       {isKullaniciFormOpen ? (
         <AppModal
-          title={editingKullaniciId != null ? "Kullanıcı Düzenle" : "Yeni Kullanıcı"}
+          title={editingKullaniciId != null ? "Kullanıcı Workspace" : "Yeni Kullanıcı"}
           backLabel="Kullanıcı Yönetimi"
           onBack={resetKullaniciEditor}
           onClose={resetKullaniciEditor}
         >
-          <form className="yonetim-form-stack" id={YONETIM_KULLANICI_FORM_ID} onSubmit={handleKullaniciSubmit}>
-            <div className="form-field-grid">
+          <form
+            className="yonetim-form-stack yonetim-kullanici-workspace"
+            id={YONETIM_KULLANICI_FORM_ID}
+            onSubmit={handleKullaniciSubmit}
+          >
+            <fieldset className="yonetim-workspace-section">
+              <legend>Kimlik ve erişim</legend>
+              <div className="form-field-grid">
               <FormField
                 label="Kullanıcı Adı"
                 name="yonetim-kullanici-username"
@@ -1131,6 +1140,22 @@ export function YonetimPaneliPage() {
                   disabled={kullaniciForm.kullaniciTipi === "IC_PERSONEL" && kullaniciForm.personelId !== ""}
                 />
               ) : null}
+              {!realKullaniciApi ? (
+                <FormField
+                  as="textarea"
+                  label="Notlar"
+                  name="yonetim-kullanici-notlar"
+                  value={kullaniciForm.notlar}
+                  onChange={(value) => setKullaniciForm((prev) => ({ ...prev, notlar: value }))}
+                  placeholder="Opsiyonel açıklama"
+                />
+              ) : null}
+              </div>
+              <KullaniciRoleSummaryPanel role={kullaniciForm.rol} />
+            </fieldset>
+
+            <fieldset className="yonetim-workspace-section">
+              <legend>Şube kapsamı</legend>
               <FormField
                 as="select"
                 label="Varsayılan Şube"
@@ -1142,35 +1167,23 @@ export function YonetimPaneliPage() {
                   .filter((sube) => kullaniciForm.subeIds.includes(sube.id))
                   .map((sube) => ({ value: String(sube.id), label: sube.ad }))}
               />
-              {!realKullaniciApi ? (
-                <FormField
-                  as="textarea"
-                  label="Notlar"
-                  name="yonetim-kullanici-notlar"
-                  value={kullaniciForm.notlar}
-                  onChange={(value) => setKullaniciForm((prev) => ({ ...prev, notlar: value }))}
-                  placeholder="Opsiyonel açıklama"
-                />
-              ) : null}
-            </div>
+              <YonetimSubeScopeField
+                subeler={subeler}
+                selectedSubeIds={kullaniciForm.subeIds}
+                onToggleSube={toggleSubeSelection}
+              />
+            </fieldset>
 
-            <div className="yonetim-checkbox-section">
-              <p className="yonetim-checkbox-title">Şube Yetkisi</p>
-              <p className="yonetim-hint">Boş bırakırsan kullanıcı tüm şubelerde çalışır.</p>
-              <div className="yonetim-selection-grid">
-                {subeler.map((sube) => (
-                  <button
-                    key={sube.id}
-                    type="button"
-                    className={`yonetim-selection-pill${kullaniciForm.subeIds.includes(sube.id) ? " is-selected" : ""}`}
-                    onClick={() => toggleSubeSelection(sube.id)}
-                  >
-                    <strong>{sube.ad}</strong>
-                    <span>{sube.departman_adlari.join(", ") || "Departman tanımlı değil"}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
+            {editingKullaniciId != null ? (
+              <fieldset className="yonetim-workspace-section">
+                <legend>SGK actor lifecycle</legend>
+                <KullaniciActorIdentityPanel
+                  userId={editingKullaniciId}
+                  canManage={canManageYonetimPanel}
+                  formatSubeScope={(subeIds) => formatSubeScopeLabel(subeIds, subeNameMap)}
+                />
+              </fieldset>
+            ) : null}
 
             <div className="form-actions-row">
               <button type="submit" className="universal-btn-save" data-testid="yonetim-kullanici-kaydet">

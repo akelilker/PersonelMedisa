@@ -28,7 +28,9 @@ Her registry kaydı **tek** zorunlu statü taşır: `CLOSED` · `CODE_GAP` · `B
 - **Org reference seed (`119`, 2026-08-13):** SGK employers `MEDISA`/`KARYAPI`/`SENAY_MOBILYA` + 7 verified work locations seeded
 - **Pack6 org structure (`120`/`121`/`122`):** native Bölüm/Birim/Pozisyon + `subeler.sgk_isveren_id`; production schema/reference catalogs **VERIFIED**; locked 10-branch model + MRK=`Medisa` + ownership complete
 - **Personnel count rollout:** production total `137` (`Phase1=122 CLOSED`, `Phase2=11 CLOSED`); personel org FK alanları (`sgk_isveren_id`, `calisma_lokasyonu_id`, `bolum_id`, `birim_id`, `pozisyon_id`) **VERIFY_REQUIRED** / `USER_GATED` — kanıtsız CLOSED yazılmaz
+- **Kullanıcı Yönetimi (code):** `YonetimPaneliPage` unified kullanıcı workspace — rol özeti, şube kapsamı owner'ı, actor lifecycle readback/actions; authorization weakening yok
 - **SGK actor lifecycle (code):** `ActorIdentityService` create/verify/bind + readback + `actor_identity_audits`; production schema via migration `068` (run [#32217771186](https://github.com/akelilker/PersonelMedisa/actions/runs/32217771186) @ `cd92d24…`, worker verify pass)
+- **Personel binding / QR (code):** schema `056` + S3C–S3F pipeline **CLOSED**; gerçek rollout **USER_GATED**
 
 Görsel sistem çalışmaları mevcut component/owner içinde yapılabilir. Yeni domain özelliği freeze kapısından geçer.
 
@@ -67,13 +69,16 @@ Görsel sistem çalışmaları mevcut component/owner içinde yapılabilir. Yeni
 | `WORK_LOCATION_REAL_REFERENCE` | **PRODUCTION_READY** | 7 verified location codes seeded (`119`) |
 | `ORG_ATTRIBUTES_BOLUM_BIRIM_POZISYON` | **CLOSED** (`MG-ORG-ATTR-001`) | native fields via Pack6 `065` (`120`/`121`) |
 | `ORG_STRUCTURE_SCHEMA` | **VERIFIED_PRODUCTION** | Schema + reference catalogs verified; personnel org FK values remain `VERIFY_REQUIRED` |
-| `SGK_ACTOR_LIFECYCLE_CODE` | **CLOSED** | `ActorIdentityService` + migration `068` audit schema; ops business rollout ayrı kapı |
+| `SGK_ACTOR_LIFECYCLE_CODE` | **CLOSED** | `ActorIdentityService` + migration `068` audit schema; UI readback/actions in kullanıcı workspace |
+| `USER_MANAGEMENT_CODE` | **CLOSED** | Unified kullanıcı workspace owner: `YonetimPaneliPage` |
+| `PERSONEL_BINDING_CODE` | **CLOSED** | `UserPersonelBindingService` + Yönetim UI; real rollout **USER_GATED** |
+| `REAL_QR_EMPLOYEE_CODE` | **CLOSED** | S3C–S3F pipeline; employee rollout **USER_GATED** |
 | `MG-OPS-POLICY-001` | **CLOSED_CONFIRMED** | Active revision `3`; 14/14; Pazar (`0`) |
 | `CANONICAL_DOC_STALE` | **0** | historical snapshots preserved, not backlog |
 
 ## Doğrulanmış teknik temel
 
-- Current `origin/main`: `259cc6ccca110248198f3f6ccd0602cadaafee30`.
+- Current `origin/main`: `5f9eca7e89165a175dfbae48a881daeba934b698` (PR #180 merged).
 - Migration tip: code **068**; production **068**. Migration067 canonical SQL `CLOSED_CONFIRMED`; legacy ops workflow **RETIRED/REMOVED**. Migration068 `CLOSED_CONFIRMED`.
 - Canonical migration owner: `apply-cpanel-migrations.yml` + `cpanel-migration-cron.php`; public HTTP migration endpoint ve direct SQL canonical yol değil; SSH blocker **yok**.
 - Org references: SGK=3, locations=7, locked 10 branches (`121`); canonical catalogs completed (`122`); personnel org FK alanları production'da bulk apply edilmedi — `VERIFY_REQUIRED` / `USER_GATED`.

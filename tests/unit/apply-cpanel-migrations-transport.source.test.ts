@@ -116,6 +116,9 @@ describe('canonical cPanel migration FTP transport contract', () => {
     expect(migration).toMatch(
       /if \[\[ "\$status_request" == "\$REQUEST_ID" && "\$status_state" == "FAILED" \]\]; then[\s\S]*?exit 1/,
     );
+    expect(migration).toMatch(
+      /if \[\[ "\$failed_match" == "YES" \]\]; then[\s\S]*?emit_failed_archive_failure[\s\S]*?exit 1/,
+    );
     expect(migration).toContain('if run_cpanel_ftp "$status_commands" >/dev/null 2>&1; then');
   });
 

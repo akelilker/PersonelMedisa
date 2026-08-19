@@ -216,6 +216,19 @@ jobs:
             echo "MIGRATION_SAFE_DETAIL=${status_detail}"
           }
 
+          emit_failed_archive_failure() {
+            local archive_file="$1"
+            if [[ ! -f "$archive_file" ]]; then
+              echo "MIGRATION_WORKER_STATE=FAILED"
+              echo "MIGRATION_REASON=FAILED_ARCHIVE_OBSERVED"
+              echo "MIGRATION_STAGE=UNKNOWN"
+              echo "MIGRATION_EXIT_CODE=1"
+              echo "MIGRATION_SAFE_DETAIL=NONE"
+              return
+            fi
+            emit_matching_failure "$archive_file"
+          }
+
           json_matches_request() {
             local candidate="$1"
             [[ -f "$candidate" ]] && jq -e --arg request_id "$REQUEST_ID" '.request_id == $request_id' "$candidate" >/dev/null 2>&1
@@ -311,11 +324,7 @@ jobs:
             exit 1
           fi
           if [[ "$failed_match" == "YES" ]]; then
-            echo "MIGRATION_WORKER_STATE=FAILED"
-            echo "MIGRATION_REASON=FAILED_ARCHIVE_OBSERVED"
-            echo "MIGRATION_STAGE=UNKNOWN"
-            echo "MIGRATION_EXIT_CODE=1"
-            echo "MIGRATION_SAFE_DETAIL=NONE"
+            emit_failed_archive_failure "$diagnostic_dir/request.failed.${REQUEST_ID}.json"
             exit 1
           fi
           if [[ "$diagnostic_status_request" == "$REQUEST_ID"

@@ -39,9 +39,13 @@ try {
     ));
     exit(0);
 } catch (\Throwable $exception) {
-    fwrite(
-        STDERR,
-        "migration_apply=failed reason_code=" . MigrationExecutionService::classify($exception) . "\n"
-    );
+    $reason = MigrationExecutionService::classify($exception);
+    $detail = MigrationExecutionService::safeDetail($exception);
+    $line = "migration_apply=failed reason_code=" . $reason;
+    if ($detail !== null) {
+        // detail is already sanitized by safeDetail
+        $line .= " detail=" . $detail;
+    }
+    fwrite(STDERR, $line . "\n");
     exit(1);
 }

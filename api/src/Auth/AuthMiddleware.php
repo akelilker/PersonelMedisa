@@ -15,10 +15,19 @@ class AuthMiddleware
     /** @var array<string, mixed>|null */
     private static $user = null;
 
-    /** @return array<string, mixed>|null */
-    public static function authenticate(Request $request, $required = true)
+    /** Clears request-scoped cached user (e.g. after password change). */
+    public static function markPasswordChanged()
     {
         if (self::$user !== null) {
+            self::$user['must_change_password'] = false;
+        }
+    }
+
+    /** @return array<string, mixed>|null */
+    public static function authenticate(Request $request, $required = true, $allowPasswordChangeRequired = false)
+    {
+        if (self::$user !== null) {
+            self::enforceMustChangePasswordIfRequired($required, $allowPasswordChangeRequired);
             return self::$user;
         }
 
@@ -94,7 +103,23 @@ class AuthMiddleware
             self::$user['actor_identity_status'] = null;
         }
 
+        if (array_key_exists('must_change_password', $row)) {
+            self::$user['must_change_password'] = ((int) ($row['must_change_password'] ?? 0)) === 1;
+        }
+
+        self::enforceMustChangePasswordIfRequired($required, $allowPasswordChangeRequired);
+
         return self::$user;
+    }
+
+    private static function enforceMustChangePasswordIfRequired($required, $allowPasswordChangeRequired)
+    {
+        if (!$required || $allowPasswordChangeRequired || self::$user === null) {
+            return;
+        }
+        if (!empty(self::$user['must_change_password'])) {
+            JsonResponse::error(403, 'PASSWORD_CHANGE_REQUIRED', 'Sifre degistirme zorunludur.');
+        }
     }
 
     private static function usersSelectSql(PDO $pdo)
@@ -112,6 +137,7 @@ class AuthMiddleware
         }
 
         $hasPersonelId = UsersSchema::hasPersonelId($pdo);
+        $hasMustChangePassword = UsersSchema::hasMustChangePassword($pdo);
 
         $cols = ['id', 'username', 'ad_soyad', 'rol', 'durum'];
         if ($hasActorIdentity) {
@@ -119,6 +145,9 @@ class AuthMiddleware
         }
         if ($hasPersonelId) {
             $cols[] = 'personel_id';
+        }
+        if ($hasMustChangePassword) {
+            $cols[] = 'must_change_password';
         }
 
         return 'SELECT ' . implode(', ', $cols) . ' FROM users WHERE id = :id LIMIT 1';

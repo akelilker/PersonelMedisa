@@ -18,7 +18,7 @@ class ChangePasswordController
 {
     public static function change(Request $request)
     {
-        $user = AuthMiddleware::authenticate($request, true);
+        $user = AuthMiddleware::authenticate($request, true, true);
         $userId = isset($user['id']) ? (int) $user['id'] : 0;
         if ($userId <= 0) {
             JsonResponse::unauthorized();
@@ -74,6 +74,8 @@ class ChangePasswordController
             'id' => $userId,
             'password_hash' => PasswordHasher::hash($next),
         ]);
+
+        AuthMiddleware::markPasswordChanged();
 
         JsonResponse::success([
             'must_change_password' => false,

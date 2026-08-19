@@ -25,8 +25,9 @@
 
 | Alan | Canonical sonuç |
 | --- | --- |
-| Migration067 | **CLOSED_CONFIRMED**; production tip **067**; workflow `WORKFLOW_SHOULD_BE_RETIRED` |
-| Production personnel | **137**; rollout **CLOSED** (`Phase1=122 CLOSED`, `Phase2=11 CLOSED`) |
+| Migration067 | **CLOSED_CONFIRMED** (canonical SQL); legacy `migration-067-production-precheck` **RETIRED/REMOVED** |
+| Migration068 | **CLOSED_CONFIRMED** (code + production schema); `actor_identity_audits` audit owner |
+| Production personnel | **137**; count rollout **CLOSED** (`Phase1=122 CLOSED`, `Phase2=11 CLOSED`); org FK apply **USER_GATED** / `VERIFY_REQUIRED` |
 | Canonical Güvenlik | `Üretim → Üretim → Güvenlik` |
 | SGK catalog | **CLOSED_CONFIRMED** |
 | UBGT | **CLOSED_CONFIRMED** |
@@ -38,17 +39,19 @@
 
 | Alan | Canonical sonuç |
 | --- | --- |
-| Current main / PR base | `416fb40fd5aa2ad5b472219e4b9b02300c86083e` |
-| Code migration tip | `067` |
-| Production migration tip | **067** — Migration067 `CLOSED_CONFIRMED` |
-| Migration 067 | **CLOSED_CONFIRMED** — workflow `WORKFLOW_SHOULD_BE_RETIRED` |
-| Schema 067 readiness | **YES** — production read-back confirmed |
+| Current main / PR base | `259cc6ccca110248198f3f6ccd0602cadaafee30` |
+| Code migration tip | `068` |
+| Production migration tip | **068** — Apply cPanel migrations run [#32217771186](https://github.com/akelilker/PersonelMedisa/actions/runs/32217771186) @ `cd92d24e38904c76daeba31a53a8a10711c1ba6b`; worker apply+verify pass |
+| Migration 067 | **CLOSED_CONFIRMED** — canonical SQL; legacy ops workflow **RETIRED/REMOVED** |
+| Migration 068 | **CLOSED_CONFIRMED** — `068_sgk_actor_identity_lifecycle_audit.sql`; production schema applied (bundle @ `cd92d24…` includes `068`; verify fail-closed) |
+| Canonical migration owner | `apply-cpanel-migrations.yml` + protected cron worker; SSH migration dependency **NO** |
+| Schema 067 readiness | **YES** — production read-back confirmed (superseded by tip **068**) |
 | IC / DIS source model | `IC_PERSONEL` internal + first-class directory-only `DIS_KAYNAK` |
 | Canonical production tree contract | `Üretim → Üretim → Güvenlik`; legacy `Üretim Genel → Güvenlik` is not canonical; live path verified as legacy and blocked |
 | Ownership | Personel Kartı read-only; Kayıt ve Süreç owns personnel writes |
 | Source lock | Exact user-authoritative workbook lineage and 122-row field mapping re-locked privately; exact data remains private |
 | Auth contract | `AUTH_SMOKE_READONLY` is smoke-only (`ops.auth_smoke.read`); it is insufficient for references, personnel list, schema probe, or import dry-run |
-| Real personnel rollout | **CLOSED** — production total `137`; Phase1 `122 CLOSED`, Phase2 `11 CLOSED` |
+| Real personnel rollout | **CLOSED** (count) — production total `137`; Phase1 `122 CLOSED`, Phase2 `11 CLOSED`; org FK bulk apply **NOT_STARTED** / `VERIFY_REQUIRED` |
 | Production mutation | Policy approval and requested personnel rollout are complete; no unrelated mutation performed |
 | Public PII policy | Exact source rows, person-level data, and blocker tallies remain private |
 
@@ -96,12 +99,15 @@ remain private.
 
 | Invariant | Değer |
 | --- | --- |
-| PRODUCTION_MIGRATION_TIP | **067** (`Migration067=CLOSED_CONFIRMED`) |
-| CODE_MIGRATION_TIP | **067** |
+| PRODUCTION_MIGRATION_TIP | **068** |
+| CODE_MIGRATION_TIP | **068** |
+| CANONICAL_MIGRATION_OWNER | `apply-cpanel-migrations.yml` + `cpanel-migration-cron.php` |
+| SSH_MIGRATION_DEPENDENCY | **NO** |
 | S3F | **CLOSED_PRODUCTION** |
 | QR_PIPELINE | S3C–S3F **CLOSED** |
 | QR algorithms | `QR_INTERVAL_V1`, `QR_PUANTAJ_CANDIDATE_V1`, `QR_PUANTAJ_DECISION_V1`, `QR_CANDIDATE_HASH_V2` |
-| REAL_REFERENCE_DATA | **CLOSED** — canonical catalogs and production references resolved |
+| REAL_REFERENCE_DATA | **READY** — SGK/locations/branches/catalogs seeded; personnel org FK apply gated |
+| PERSONNEL_ORG_FK_ROLLOUT | **NOT_STARTED** / `VERIFY_REQUIRED` |
 | REAL_PERSONNEL_DATASET | **CLOSED** |
 | REAL_PERSONNEL_IMPORTED | **YES** — 137 production personnel |
 | SOURCE_DATA_REQUIRES_COMPLETION | **NO** for closed personnel rollout |
@@ -111,7 +117,7 @@ remain private.
 | RETENTION_PHYSICAL_SCHEMA | PRODUCTION_READY (`059`/`060`/`062`); feature **OFF**; real destruction **NO** |
 | SERBEST_ZAMAN_ALLOCATION_SCHEMA | PRODUCTION_READY (`061`/`062`) |
 | OT_ACTUAL_DATE_PROVENANCE_SCHEMA | PRODUCTION_READY (`063`); legacy backfill **NO** |
-| ORG_LOCATION_SCHEMA | **CLOSED** — production references resolved; binding rollout remains NOT_STARTED |
+| ORG_LOCATION_SCHEMA | **CLOSED** — production references resolved; personnel org FK apply **USER_GATED** / `VERIFY_REQUIRED` |
 
 Smoke/test personeller korunur; gerçek personel sayılmaz. Yetkisiz eski gerçek personel importu geri alınmıştır. Gerçek personel kullanıcı onayı olmadan import edilmez.
 
@@ -137,6 +143,7 @@ Aşağıdakiler CURRENT MAIN’de bozulmuş değilse OPEN yapılmaz:
 | S3F reviewed QR candidate decision/apply | `109` / PR #148 |
 | Partial-time SGK sealed-hours integration | payroll compliance owners |
 | SGK mapping/policy dual control | mig `047`/`048` owners |
+| SGK formal actor identity lifecycle (code) | `ActorIdentityService` + mig `068` `actor_identity_audits`; create/verify/bind/readback/audit **CLOSED** |
 | Personel import dry-run / apply / history / reference pack | mig `046` + import services |
 | Payroll engine / salary snapshot/revision/preflight/compliance | engine + `99` |
 | Holiday/FSC/FM collision calculation owner | payroll owners |
@@ -165,7 +172,7 @@ Aşağıdakiler CURRENT MAIN’de bozulmuş değilse OPEN yapılmaz:
 | Neden OPS | Code + production schema hazır; feature flag OFF; real destruction henüz yok |
 | Runtime | Flag OFF → `DESTRUCTION_EXECUTION_DISABLED`; legacy unallocated → `SERBEST_ZAMAN_USAGE_ALLOCATION_UNRESOLVED`; cross-scope → `SERBEST_ZAMAN_CROSS_SCOPE_ALLOCATION_REMAINS` |
 | Prod veri | Write yok (rollout mutation yok); execution rows = 0; open destroy gates = 0 |
-| Migration | `059`/`060`/`061`/`062` **production-applied** (`118`); production tip **067** |
+| Migration | `059`/`060`/`061`/`062` **production-applied** (`118`); production tip **068** |
 | Prod write | Schema-only rollout; feature enable / real destroy **NO** |
 | Owner | Retention |
 | Acceptance | Onaylı talepte güvenli kategoriler imha edilir; SERBEST lot-provenance destroy veya legacy fail-closed; audit/evidence; flag default OFF |
@@ -236,10 +243,10 @@ Aşağıdakiler CURRENT MAIN’de bozulmuş değilse OPEN yapılmaz:
 | Domain | Organizasyon / SGK |
 | Code/schema | Migration `064` — `sgk_isverenler`, `calisma_lokasyonlari`; `personeller` nullable FKs; `sube_id` korunur |
 | Pre-064 | Explicit new-field write → `409 ORG_LOCATION_SCHEMA_NOT_READY` |
-| Production | tip **064** (`118`); schema applied; SGK + verified location refs seeded (`119`); personnel org mapping **NO** |
+| Production | tip **068**; schema applied; SGK + verified location refs seeded (`119`); personnel org FK bulk apply **NO** / `VERIFY_REQUIRED` |
 | Kanıt | `117-final-code-gap-pack5.md`; Pack5 MariaDB B1–B11; rollout `118`; org seed `119` |
 | Acceptance (code) | Üç kavram bağımsız persist; SubeScope `sube_id` |
-| Remaining ops | Personnel mapping apply / import = `USER_GATED` (`MG-ORG-LOC-001`); locked branch + catalog reference rollout completed (`121`/`122`) |
+| Remaining ops | Personnel org FK apply (`sgk_isveren_id`, `calisma_lokasyonu_id`, `bolum_id`, `birim_id`, `pozisyon_id`) = `USER_GATED` / `VERIFY_REQUIRED`; locked branch + catalog reference rollout completed (`121`/`122`) |
 
 ---
 
@@ -424,7 +431,7 @@ Import contract (kod):
 1. CODE_GAP = 0 olmadan “ürün tamam” denmez.
 2. `CANONICAL_DOC_STALE = 0` (sağlandı).
 3. Gerçek personel/org/SGK/UBGT write yalnız `95` + kullanıcı onayı.
-4. Migration tip production = **UNVERIFIED** in the final preflight; migration `066` is not assumed applied and requires an authenticated read-only probe before any apply gate.
+4. Migration tip production = **068** (run [#32217771186](https://github.com/akelilker/PersonelMedisa/actions/runs/32217771186) @ `cd92d24…`; bundle marker `068` + worker verify pass). Legacy `migration-067-production-precheck` **RETIRED/REMOVED**.
 5. Physical destruction yalnız feature enable + manifest + S3F fingerprint coverage + handler + legal review sonrası (schema ready; flag OFF).
 6. Stash / force-push / hard reset yasak (audit protokolü).
 7. Public repo’ya PII / exact personnel tallies yazılmaz.

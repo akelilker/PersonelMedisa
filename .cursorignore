@@ -1,0 +1,21 @@
+﻿# Cursor index dışında kalacak geçici/runtime/generated dosyalar
+.cursor/debug-*.log
+.cursor/plans/
+.cursor/sessions/
+.vscode/
+node_modules/
+outputs/
+tmp/
+.tmp/
+.tmp-playwright/
+
+# Build / deploy artifacts
+dist/
+personelmedisa-cpanel-upload.zip
+
+# Test runtime
+test-results/
+.test-mariadb/
+
+# Backend runtime storage (user uploads)
+api/storage/

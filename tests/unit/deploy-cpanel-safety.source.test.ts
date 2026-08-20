@@ -3,14 +3,17 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const workflowPath = resolve(process.cwd(), '.github/workflows/deploy-cpanel.yml');
+const plannerPath = resolve(process.cwd(), 'scripts/deploy/plan-cpanel-incremental.mjs');
 const apiHtaccessPath = resolve(process.cwd(), 'api/.htaccess');
 const workflow = readFileSync(workflowPath, 'utf8');
+const planner = readFileSync(plannerPath, 'utf8');
 const apiHtaccess = readFileSync(apiHtaccessPath, 'utf8');
 const lines = workflow.split(/\r?\n/);
 const htaccessLines = apiHtaccess.split(/\r?\n/);
-const staticMirror = lines.find(
-  (line) => /\bmirror\s+-R\b/.test(line) && /\s\.\s+\.;\s*$/.test(line),
-) ?? '';
+const staticMirror =
+  [...workflow.split(/\r?\n/), ...planner.split(/\r?\n/)].find(
+    (line) => /\bmirror\s+-R\b/.test(line) && /\s\.\s+\.;\s*$/.test(line),
+  ) ?? '';
 
 function extractRewritePattern(ruleLine: string): string | null {
   const match = ruleLine.match(/RewriteRule\s+(\S+)\s+/);
@@ -47,10 +50,14 @@ describe('cPanel deploy server-state safety contract', () => {
 
   it('keeps the narrow PHP API upload contract', () => {
     expect(workflow).toMatch(/test\s+!\s+-f\s+api\/config\.local\.php/);
-    expect(workflow).toMatch(/put\s+-O\s+api\s+api\/\.htaccess/);
-    expect(workflow).toMatch(/mirror\s+-R\s+--verbose\s+api\/public\s+api\/public/);
-    expect(workflow).toMatch(/mirror\s+-R\s+--verbose\s+api\/src\s+api\/src/);
+    expect(workflow).toContain('plan-cpanel-incremental.mjs');
+    expect(planner).toMatch(/put\s+-O\s+api\s+api\/\.htaccess/);
+    expect(planner).toMatch(/mirror\s+-R\s+--verbose\s+api\/public\s+api\/public/);
+    expect(planner).toMatch(/mirror\s+-R\s+--verbose\s+api\/src\s+api\/src/);
     expect(workflow).not.toMatch(/(?:put|mirror)\b[^\n]*config\.local\.php/);
+    expect(planner).not.toMatch(/(?:put|mirror)\b[^\n]*config\.local\.php/);
+    expect(workflow).not.toMatch(/--only-newer\b/);
+    expect(planner).not.toMatch(/--only-newer\b/);
   });
 
   it('does not echo deploy or smoke secret values', () => {
@@ -148,7 +155,8 @@ describe('api/.htaccess config.local.php web deny contract', () => {
 
   it('keeps deploy config protection and uploads api/.htaccess', () => {
     expect(workflow).toMatch(/test\s+!\s+-f\s+api\/config\.local\.php/);
-    expect(workflow).toMatch(/put\s+-O\s+api\s+api\/\.htaccess/);
+    expect(planner).toMatch(/put\s+-O\s+api\s+api\/\.htaccess/);
     expect(workflow).not.toMatch(/mirror\s+-R\s+--verbose\s+api\/config\.local\.php/);
+    expect(planner).not.toMatch(/mirror\s+-R\s+--verbose\s+api\/config\.local\.php/);
   });
 });

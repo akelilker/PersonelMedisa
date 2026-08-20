@@ -65,11 +65,16 @@ describe('canonical migration runner contract', () => {
 
 describe('SSHless cPanel cron control contract', () => {
   it('removes SSH from normal deploy and uploads the CLI worker assets', () => {
-    expect(deployWorkflow).toContain('mirror -R --verbose api/bin api/bin');
-    expect(deployWorkflow).toContain('mirror -R --verbose api/migrations api/migrations');
-    expect(deployWorkflow).toContain('put -O api ${RUNNER_TEMP}/.deploy-sha');
-    expect(deployWorkflow).toContain('put -O api/runtime api/runtime/.htaccess');
-    expect(deployWorkflow).toContain('rm api/public/_migration_*.php');
+    const planner = readFileSync(
+      resolve(root, 'scripts/deploy/plan-cpanel-incremental.mjs'),
+      'utf8',
+    );
+    expect(deployWorkflow).toContain('plan-cpanel-incremental.mjs');
+    expect(planner).toContain('mirror -R --verbose api/bin api/bin');
+    expect(planner).toContain('mirror -R --verbose api/migrations api/migrations');
+    expect(planner).toContain('put -O api/runtime api/runtime/.htaccess');
+    expect(planner).toContain('glob -a rm api/public/_migration_*.php');
+    expect(deployWorkflow).toContain('api/.deploy-sha');
     expect(deployWorkflow).not.toMatch(/CPANEL_SSH_/);
     expect(deployWorkflow).not.toMatch(/\bssh\b/i);
     expect(deployWorkflow).not.toContain('run-production-migrations');

@@ -163,6 +163,19 @@ jobs:
           DEPLOY_SHA_LOCAL="$PLAN_DIR/.deploy-sha"
           printf '%s\n' "$DEPLOY_SHA" > "$DEPLOY_SHA_LOCAL"
 
+          render_lftp_get() {
+            local remote_path="$1"
+            local local_path="$2"
+            node --input-type=module -e "import { renderLftpGetCommand } from './scripts/deploy/plan-cpanel-incremental.mjs'; process.stdout.write(renderLftpGetCommand({ remotePath: process.argv[1], localPath: process.argv[2] }));" "$remote_path" "$local_path"
+          }
+
+          classify_lftp_read_log() {
+            local log_file="$1"
+            local local_path="$2"
+            local exit_code="$3"
+            node --input-type=module -e "import { classifyLftpReadLog } from './scripts/deploy/plan-cpanel-incremental.mjs'; const fs = await import('node:fs'); const text = fs.readFileSync(process.argv[1], 'utf8'); process.stdout.write(classifyLftpReadLog(text, { localPath: process.argv[2], exitCode: Number(process.argv[3]) }));" "$log_file" "$local_path" "$exit_code"
+          }
+
           deploy_with_ftp_mode() {
             local mode_name="$1"
             local use_ftps="$2"
@@ -187,55 +200,119 @@ jobs:
             "
           }
 
-          run_cpanel_ftp() {
+          # Runs FTPS then plain FTP. Prints privacy-safe FTPS_RESULT / PLAIN_FTP_RESULT.
+          # Sets globals: LAST_FTP_LOG, LAST_FTPS_RESULT, LAST_PLAIN_RESULT, LAST_READ_CLASS
+          run_cpanel_ftp_diagnosed() {
             local ftp_commands="$1"
+            local local_out_hint="${2:-}"
+            local log_file
+            log_file="$(mktemp)"
+            LAST_FTP_LOG="$log_file"
+            LAST_FTPS_RESULT="NOT_RUN"
+            LAST_PLAIN_RESULT="NOT_RUN"
+            LAST_READ_CLASS="LFTP_COMMAND_ERROR"
+
             echo "Explicit FTPS port 21 deneniyor..."
-            if deploy_with_ftp_mode "explicit-ftps" "true" "$ftp_commands"; then
+            set +e
+            deploy_with_ftp_mode "explicit-ftps" "true" "$ftp_commands" >"$log_file" 2>&1
+            local ftps_rc=$?
+            set -e
+            if [[ "$ftps_rc" -eq 0 ]]; then
+              LAST_FTPS_RESULT="SUCCESS"
+              LAST_PLAIN_RESULT="SKIPPED"
+              LAST_READ_CLASS="SUCCESS"
+              echo "FTPS_RESULT=SUCCESS"
+              echo "PLAIN_FTP_RESULT=SKIPPED"
               return 0
             fi
+            LAST_FTPS_RESULT="$(classify_lftp_read_log "$log_file" "$local_out_hint" "$ftps_rc")"
+            echo "FTPS_RESULT=${LAST_FTPS_RESULT}"
             echo "Explicit FTPS basarisiz oldu, plain FTP fallback deneniyor..."
-            deploy_with_ftp_mode "plain-ftp" "false" "$ftp_commands"
+
+            : >"$log_file"
+            set +e
+            deploy_with_ftp_mode "plain-ftp" "false" "$ftp_commands" >"$log_file" 2>&1
+            local plain_rc=$?
+            set -e
+            if [[ "$plain_rc" -eq 0 ]]; then
+              LAST_PLAIN_RESULT="SUCCESS"
+              LAST_READ_CLASS="SUCCESS"
+              echo "PLAIN_FTP_RESULT=SUCCESS"
+              return 0
+            fi
+            LAST_PLAIN_RESULT="$(classify_lftp_read_log "$log_file" "$local_out_hint" "$plain_rc")"
+            LAST_READ_CLASS="$LAST_PLAIN_RESULT"
+            echo "PLAIN_FTP_RESULT=${LAST_PLAIN_RESULT}"
+            return 1
+          }
+
+          run_cpanel_ftp() {
+            local ftp_commands="$1"
+            run_cpanel_ftp_diagnosed "$ftp_commands" ""
+          }
+
+          # Canonical GET owner used by previous-SHA, payload verify, and final SHA read-back.
+          lftp_get_remote_to_local() {
+            local remote_path="$1"
+            local local_path="$2"
+            local get_cmd
+            get_cmd="$(render_lftp_get "$remote_path" "$local_path")"
+            echo "LFTP_GET_CMD=${get_cmd}"
+            run_cpanel_ftp_diagnosed "cd ${REMOTE_TARGET_DIR}; ${get_cmd};" "$local_path"
           }
 
           PREVIOUS_DEPLOY_SHA="NONE"
           PREVIOUS_SHA_READ="NOT_FOUND"
+          PREVIOUS_SHA_FAILURE_CLASS="NONE"
           previous_sha_file="$PLAN_DIR/previous.deploy-sha"
-          previous_sha_log="$PLAN_DIR/previous-sha-read.log"
-          rm -f "$previous_sha_file" "$previous_sha_log"
+          rm -f "$previous_sha_file"
 
+          echo "FTP read-back capability + previous SHA probe starting"
           set +e
-          run_cpanel_ftp "cd ${REMOTE_TARGET_DIR}; get -o ${previous_sha_file} api/.deploy-sha;" >"$previous_sha_log" 2>&1
+          lftp_get_remote_to_local "api/.deploy-sha" "$previous_sha_file"
           previous_sha_rc=$?
           set -e
+          PREVIOUS_SHA_FAILURE_CLASS="$LAST_READ_CLASS"
 
-          if [[ "$previous_sha_rc" -ne 0 ]]; then
-            # Privacy-safe classification only — never echo FTP credentials or raw auth lines.
-            if grep -qiE '550|No such file|not found|does not exist|File not found' "$previous_sha_log"; then
-              PREVIOUS_SHA_READ="NOT_FOUND"
-            else
-              PREVIOUS_SHA_READ="TRANSPORT_FAILED"
-            fi
-            PREVIOUS_DEPLOY_SHA="NONE"
-          elif [[ ! -s "$previous_sha_file" ]]; then
-            PREVIOUS_SHA_READ="NOT_FOUND"
-            PREVIOUS_DEPLOY_SHA="NONE"
-          else
+          if [[ "$previous_sha_rc" -eq 0 && -s "$previous_sha_file" ]]; then
             PREVIOUS_DEPLOY_SHA="$(tr -d '\r\n' < "$previous_sha_file" || true)"
             if [[ "$PREVIOUS_DEPLOY_SHA" =~ ^[0-9a-fA-F]{40}$ ]]; then
               PREVIOUS_SHA_READ="SUCCESS"
+              PREVIOUS_SHA_FAILURE_CLASS="SUCCESS"
             else
               PREVIOUS_SHA_READ="INVALID_CONTENT"
               PREVIOUS_DEPLOY_SHA="NONE"
+              PREVIOUS_SHA_FAILURE_CLASS="SUCCESS"
             fi
+          elif [[ "$LAST_READ_CLASS" == "REMOTE_NOT_FOUND" ]]; then
+            PREVIOUS_SHA_READ="NOT_FOUND"
+            PREVIOUS_DEPLOY_SHA="NONE"
+            PREVIOUS_SHA_FAILURE_CLASS="REMOTE_NOT_FOUND"
+          else
+            PREVIOUS_SHA_READ="TRANSPORT_FAILED"
+            PREVIOUS_DEPLOY_SHA="NONE"
+            PREVIOUS_SHA_FAILURE_CLASS="$LAST_READ_CLASS"
           fi
 
           echo "PREVIOUS_SHA_READ=${PREVIOUS_SHA_READ}"
+          echo "PREVIOUS_SHA_FAILURE_CLASS=${PREVIOUS_SHA_FAILURE_CLASS}"
           if [[ "$PREVIOUS_SHA_READ" == "SUCCESS" ]]; then
             echo "PREVIOUS_SHA_VALUE=${PREVIOUS_DEPLOY_SHA}"
           fi
 
+          # Transport/protocol/local-output GET failure is fatal BEFORE bulk upload.
+          # REMOTE_NOT_FOUND is not fatal: GET reached the server (capability proven).
+          if [[ "$PREVIOUS_SHA_READ" == "TRANSPORT_FAILED" ]]; then
+            echo "FTP_READBACK_PREFLIGHT=FAIL"
+            echo "REFUSING_BULK_UPLOAD=YES"
+            echo "READBACK_FAILURE_CLASS=${PREVIOUS_SHA_FAILURE_CLASS}"
+            exit 1
+          fi
+          echo "FTP_READBACK_PREFLIGHT=PASS"
+
           node scripts/deploy/plan-cpanel-incremental.mjs \
             --previous-sha="$PREVIOUS_DEPLOY_SHA" \
+            --previous-sha-read-status="$PREVIOUS_SHA_READ" \
             --current-sha="$DEPLOY_SHA" \
             --repo-root="$LOCAL_REPO_DIR" \
             --dist-dir="${LOCAL_DIST_DIR%/}" \
@@ -277,13 +354,12 @@ jobs:
           verify_payload_before_sha() {
             local remote_bundle_path
             remote_bundle_path="$(mktemp)"
-            run_cpanel_ftp "
-              cd ${REMOTE_TARGET_DIR};
-              get -o ${remote_bundle_path} api/runtime-build/canonical-migrations.php;
-            "
+            echo "REMOTE_BUNDLE_GET starting"
+            lftp_get_remote_to_local "api/runtime-build/canonical-migrations.php" "$remote_bundle_path"
             test "$(sha256sum "${remote_bundle_path}" | cut -d' ' -f1)" = \
               "$(sha256sum "${LOCAL_REPO_DIR}/api/runtime-build/canonical-migrations.php" | cut -d' ' -f1)"
             rm -f "${remote_bundle_path}"
+            echo "REMOTE_BUNDLE_GET=SUCCESS"
           }
 
           finalize_deploy_sha() {
@@ -291,12 +367,11 @@ jobs:
             run_cpanel_ftp "$FINALIZE_SHA_COMMANDS"
             local remote_sha_path
             remote_sha_path="$(mktemp)"
-            run_cpanel_ftp "
-              cd ${REMOTE_TARGET_DIR};
-              get -o ${remote_sha_path} api/.deploy-sha;
-            "
+            echo "FINAL_SHA_GET starting"
+            lftp_get_remote_to_local "api/.deploy-sha" "$remote_sha_path"
             test "$(tr -d '\r\n' < "${remote_sha_path}")" = "${DEPLOY_SHA}"
             rm -f "${remote_sha_path}"
+            echo "FINAL_SHA_GET=SUCCESS"
             echo "Deploy SHA finalization verified"
           }
 

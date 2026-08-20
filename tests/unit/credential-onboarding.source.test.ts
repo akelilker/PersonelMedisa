@@ -28,6 +28,37 @@ describe("credential onboarding owners (MG-CRED-ONBOARD-001)", () => {
     expect(yonetim).toContain("must_change_password = 1");
   });
 
+  it("exposes must_change_password boolean on kullanicilar list/detail map without secrets", () => {
+    const yonetim = read("api/src/Controllers/YonetimController.php");
+    expect(yonetim).toMatch(/\$selectCols\[\] = 'must_change_password'/);
+    expect(yonetim).toMatch(/\$cols\[\] = 'must_change_password'/);
+    expect(yonetim).toContain("readStoredMustChangePasswordFromRow");
+    expect(yonetim).toContain("\$mapped['must_change_password']");
+    expect(yonetim).not.toMatch(/\$mapped\[['\"]password['\"]\]/);
+    expect(yonetim).not.toMatch(/\$mapped\[['\"]password_hash['\"]\]/);
+    expect(yonetim).not.toMatch(/\$mapped\[['\"]temporary_password['\"]\]/);
+    expect(yonetim).not.toMatch(/\$mapped\[['\"]gecici_sifre['\"]\]/);
+  });
+
+  it("D: kullanicilar list auth gate remains yonetim-paneli.manage only", () => {
+    const yonetim = read("api/src/Controllers/YonetimController.php");
+    const kullanicilarFn = yonetim.match(
+      /public static function kullanicilar\(Request \$request\)[\s\S]*?public static function kullaniciOlustur/
+    )?.[0];
+    expect(kullanicilarFn).toBeTruthy();
+    expect(kullanicilarFn).toContain("assertKullaniciYonetimi");
+    expect(kullanicilarFn).toContain("must_change_password");
+    expect(kullanicilarFn).not.toContain("CROSS_BRANCH");
+    expect(kullanicilarFn).not.toContain("filterByCallerSube");
+    expect(kullanicilarFn).not.toContain("assertSameBranch");
+
+    const assertFn = yonetim.match(
+      /private static function assertKullaniciYonetimi\([\s\S]*?\n    \}/
+    )?.[0];
+    expect(assertFn).toBeTruthy();
+    expect(assertFn).toContain("yonetim-paneli.manage");
+  });
+
   it("routes authenticated users with must_change_password to change-password page", () => {
     const route = read("src/router/ProtectedRoute.tsx");
     expect(route).toContain("/change-password");

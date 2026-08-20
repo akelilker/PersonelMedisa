@@ -12,6 +12,8 @@ export type YonetimKullanici = {
   rol: UserRole;
   personel_id?: number | null;
   personel_ad_soyad?: string | null;
+  /** Canonical DB flag; omitted when schema column absent. Never a credential secret. */
+  must_change_password?: boolean;
   sube_ids: number[];
   varsayilan_sube_id: number | null;
   durum: KayitDurumu;

@@ -350,6 +350,7 @@ type DemoYonetimKullanici = {
   kullanici_tipi: "IC_PERSONEL" | "HARICI";
   rol: UserRole;
   personel_id?: number | null;
+  must_change_password?: boolean;
   sube_ids: number[];
   varsayilan_sube_id: number | null;
   durum: "AKTIF" | "PASIF";
@@ -851,6 +852,7 @@ const demoState: {
       kullanici_tipi: "HARICI",
       rol: "GENEL_YONETICI",
       personel_id: null,
+      must_change_password: false,
       sube_ids: [],
       varsayilan_sube_id: null,
       durum: "AKTIF",
@@ -863,6 +865,7 @@ const demoState: {
       kullanici_tipi: "HARICI",
       rol: "BOLUM_YONETICISI",
       personel_id: null,
+      must_change_password: false,
       sube_ids: [2],
       varsayilan_sube_id: 2,
       durum: "AKTIF",
@@ -875,6 +878,7 @@ const demoState: {
       kullanici_tipi: "IC_PERSONEL",
       rol: "BIRIM_AMIRI",
       personel_id: 1,
+      must_change_password: true,
       sube_ids: [1],
       varsayilan_sube_id: 1,
       durum: "AKTIF",
@@ -8141,6 +8145,7 @@ export function resolveDemoApiResponse(
           ? body.rol
           : "BIRIM_AMIRI",
       personel_id: personelId,
+      must_change_password: Boolean(toStringValue(body.password)),
       sube_ids: Array.isArray(body.sube_ids)
         ? body.sube_ids
             .map((item) => toNumber(item))
@@ -8185,6 +8190,9 @@ export function resolveDemoApiResponse(
           ? body.rol
           : target.rol,
       personel_id: personelId,
+      must_change_password: toStringValue(body.password)
+        ? true
+        : (target.must_change_password ?? false),
       sube_ids: Array.isArray(body.sube_ids)
         ? body.sube_ids
             .map((item) => toNumber(item))

@@ -43,6 +43,31 @@ test.describe("yonetim kullanicilar API (S44)", () => {
     expect(items.length).toBeGreaterThan(0);
     expect(JSON.stringify(result.json)).not.toContain("password_hash");
     expect(JSON.stringify(result.json)).not.toMatch(/"password"\s*:/);
+    expect(JSON.stringify(result.json)).not.toContain("temporary_password");
+    expect(JSON.stringify(result.json)).not.toContain("gecici_sifre");
+
+    const bound = items.find((item) => item.personel_id != null);
+    expect(bound).toBeTruthy();
+    expect(bound?.must_change_password).toBe(true);
+  });
+
+  test("UI shows PERSONEL first-login badge/filter without labeling unbound admins", async ({ page }) => {
+    await mockApi(page, "GENEL_YONETICI");
+    await login(page, { username: "yonetici", password: "secret" });
+    await page.goto("/yonetim-paneli?tab=kullanicilar");
+
+    await expect(page.getByTestId("yonetim-section-kullanicilar")).toBeVisible();
+    await expect(page.getByTestId("yonetim-kullanici-first-login-pending-count")).toHaveText("1");
+    await expect(page.getByTestId("yonetim-kullanici-first-login-completed-count")).toHaveText("0");
+    await expect(page.getByTestId("yonetim-kullanici-first-login-badge-3")).toHaveText("İlk Giriş Bekliyor");
+    await expect(page.getByTestId("yonetim-kullanici-first-login-badge-1")).toHaveCount(0);
+
+    await page.getByLabel("İlk giriş durumu").selectOption("pending");
+    await expect(page.locator(".yonetim-card-grid--users")).toContainText("İlk Giriş Bekliyor");
+    await expect(page.locator(".yonetim-card-grid--users article")).toHaveCount(1);
+
+    await page.getByLabel("İlk giriş durumu").selectOption("completed");
+    await expect(page.getByText("Filtreye uygun kullanıcı yok")).toBeVisible();
   });
 
   test("GENEL_YONETICI creates kullanici with username/password fields in UI", async ({ page }) => {

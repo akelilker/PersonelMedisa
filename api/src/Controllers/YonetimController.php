@@ -921,12 +921,16 @@ class YonetimController
 
         $hasVarsayilan = UsersSchema::hasVarsayilanSubeId($pdo);
         $hasPersonelId = UsersSchema::hasPersonelId($pdo);
+        $hasMustChangePassword = UsersSchema::hasMustChangePassword($pdo);
         $selectCols = ['id', 'username', 'ad_soyad', 'rol', 'durum'];
         if ($hasVarsayilan) {
             $selectCols[] = 'varsayilan_sube_id';
         }
         if ($hasPersonelId) {
             $selectCols[] = 'personel_id';
+        }
+        if ($hasMustChangePassword) {
+            $selectCols[] = 'must_change_password';
         }
         $selectSql = 'SELECT ' . implode(', ', $selectCols) . ' FROM users ORDER BY id ASC';
         $stmt = $pdo->query($selectSql);
@@ -946,7 +950,8 @@ class YonetimController
                 $subeIdsByUser[$id] ?? [],
                 $hasVarsayilan,
                 $hasPersonelId,
-                $personelAdById
+                $personelAdById,
+                $hasMustChangePassword
             );
         }
 
@@ -1288,7 +1293,8 @@ class YonetimController
         array $subeIds,
         $hasVarsayilanColumn = false,
         $hasPersonelIdColumn = false,
-        array $personelAdById = []
+        array $personelAdById = [],
+        $hasMustChangePasswordColumn = false
     ) {
         $rol = (string) $row['rol'];
         $storedDefault = null;
@@ -1305,7 +1311,7 @@ class YonetimController
             }
         }
 
-        return [
+        $mapped = [
             'id' => (int) $row['id'],
             'username' => (string) $row['username'],
             'ad_soyad' => (string) $row['ad_soyad'],
@@ -1319,6 +1325,22 @@ class YonetimController
             'kullanici_tipi' => $rol === 'GENEL_YONETICI' ? 'HARICI' : 'IC_PERSONEL',
             'notlar' => null,
         ];
+
+        if ($hasMustChangePasswordColumn) {
+            $mapped['must_change_password'] = self::readStoredMustChangePasswordFromRow($row);
+        }
+
+        return $mapped;
+    }
+
+    /** @param array<string, mixed> $row */
+    private static function readStoredMustChangePasswordFromRow(array $row)
+    {
+        if (!array_key_exists('must_change_password', $row) || $row['must_change_password'] === null || $row['must_change_password'] === '') {
+            return false;
+        }
+
+        return ((int) $row['must_change_password']) === 1;
     }
 
     /** @param array<string, mixed> $row */
@@ -1405,12 +1427,16 @@ class YonetimController
     {
         $hasVarsayilan = UsersSchema::hasVarsayilanSubeId($pdo);
         $hasPersonelId = UsersSchema::hasPersonelId($pdo);
+        $hasMustChangePassword = UsersSchema::hasMustChangePassword($pdo);
         $cols = ['id', 'username', 'ad_soyad', 'rol', 'durum'];
         if ($hasVarsayilan) {
             $cols[] = 'varsayilan_sube_id';
         }
         if ($hasPersonelId) {
             $cols[] = 'personel_id';
+        }
+        if ($hasMustChangePassword) {
+            $cols[] = 'must_change_password';
         }
         $sql = 'SELECT ' . implode(', ', $cols) . ' FROM users WHERE id = :id LIMIT 1';
         $stmt = $pdo->prepare($sql);
@@ -1430,10 +1456,18 @@ class YonetimController
 
         $hasVarsayilan = UsersSchema::hasVarsayilanSubeId($pdo);
         $hasPersonelId = UsersSchema::hasPersonelId($pdo);
+        $hasMustChangePassword = UsersSchema::hasMustChangePassword($pdo);
         $subeIds = self::loadSubeIdsByUserIds($pdo, [(int) $userId])[(int) $userId] ?? [];
         $personelAdById = $hasPersonelId ? self::loadPersonelAdSoyadByIds($pdo, [$row]) : [];
 
-        return self::mapKullaniciRow($row, $subeIds, $hasVarsayilan, $hasPersonelId, $personelAdById);
+        return self::mapKullaniciRow(
+            $row,
+            $subeIds,
+            $hasVarsayilan,
+            $hasPersonelId,
+            $personelAdById,
+            $hasMustChangePassword
+        );
     }
 
     private static function usernameExists(PDO $pdo, $username, $excludeUserId = null)

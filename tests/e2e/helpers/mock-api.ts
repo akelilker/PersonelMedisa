@@ -3589,6 +3589,7 @@ export async function mockApi(page: Page, role: MockUserRole, options: MockApiOp
     kullanici_tipi: "IC_PERSONEL" | "HARICI";
     rol: MockUserRole;
     personel_id: number | null;
+    must_change_password: boolean;
     sube_ids: number[];
     varsayilan_sube_id: number | null;
     durum: "AKTIF" | "PASIF";
@@ -3602,6 +3603,7 @@ export async function mockApi(page: Page, role: MockUserRole, options: MockApiOp
       kullanici_tipi: "HARICI",
       rol: "GENEL_YONETICI",
       personel_id: null,
+      must_change_password: false,
       sube_ids: [],
       varsayilan_sube_id: null,
       durum: "AKTIF",
@@ -3615,6 +3617,7 @@ export async function mockApi(page: Page, role: MockUserRole, options: MockApiOp
       kullanici_tipi: "HARICI",
       rol: "BOLUM_YONETICISI",
       personel_id: null,
+      must_change_password: false,
       sube_ids: [2],
       varsayilan_sube_id: 2,
       durum: "AKTIF",
@@ -3628,6 +3631,7 @@ export async function mockApi(page: Page, role: MockUserRole, options: MockApiOp
       kullanici_tipi: "IC_PERSONEL",
       rol: "BIRIM_AMIRI",
       personel_id: 1,
+      must_change_password: true,
       sube_ids: [1],
       varsayilan_sube_id: 1,
       durum: "AKTIF",
@@ -12357,6 +12361,7 @@ let personelBelgeKaydiIdCounter = 903;
         kullanici_tipi: payload.kullanici_tipi,
         rol: payload.rol,
         personel_id: payload.personel_id ?? null,
+        must_change_password: true,
         sube_ids: uniqueSubeIds,
         varsayilan_sube_id: resolvedVarsayilan,
         durum: payload.durum,
@@ -12446,6 +12451,10 @@ let personelBelgeKaydiIdCounter = 903;
         kullanici_tipi: payload.kullanici_tipi ?? target.kullanici_tipi,
         rol: payload.rol ?? target.rol,
         personel_id: payload.personel_id ?? null,
+        must_change_password:
+          typeof payload.password === "string" && payload.password.trim() !== ""
+            ? true
+            : target.must_change_password,
         sube_ids: nextSubeIds,
         varsayilan_sube_id: nextVarsayilan,
         durum: payload.durum ?? target.durum,

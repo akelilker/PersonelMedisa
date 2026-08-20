@@ -3,6 +3,7 @@ export const endpoints = {
     login: "/auth/login",
     changePassword: "/auth/change-password"
   },
+  clientTelemetry: "/client-telemetry",
   me: {
     identity: "/me",
     puantaj: "/me/puantaj",

@@ -165,10 +165,11 @@ export async function completeGunlukTamamlama(
   return created;
 }
 
-export async function createBildirim(payload: CreateBildirimPayload): Promise<Bildirim> {
+export async function createBildirim(payload: CreateBildirimPayload, options?: { idempotencyKey?: string }): Promise<Bildirim> {
   const response = await apiRequest<ApiResponse<unknown>>(endpoints.bildirimler.list, {
     method: "POST",
-    body: JSON.stringify(payload)
+    body: JSON.stringify(payload),
+    idempotencyKey: options?.idempotencyKey,
   });
   const created = normalizeBildirim(response.data);
   logAction({ action: "BILDIRIM_CREATE", payload: { bildirim_id: created.id } });
@@ -182,11 +183,13 @@ export async function fetchBildirimDetail(bildirimId: number | string): Promise<
 
 export async function updateBildirim(
   bildirimId: number | string,
-  payload: UpdateBildirimPayload
+  payload: UpdateBildirimPayload,
+  options?: { idempotencyKey?: string }
 ): Promise<Bildirim> {
   const response = await apiRequest<ApiResponse<unknown>>(endpoints.bildirimler.detail(bildirimId), {
     method: "PUT",
-    body: JSON.stringify(payload)
+    body: JSON.stringify(payload),
+    idempotencyKey: options?.idempotencyKey,
   });
   const updated = normalizeBildirim(response.data);
   if (payload.okundu_mi === true) {
@@ -197,9 +200,10 @@ export async function updateBildirim(
   return updated;
 }
 
-export async function cancelBildirim(bildirimId: number | string): Promise<void> {
+export async function cancelBildirim(bildirimId: number | string, options?: { idempotencyKey?: string }): Promise<void> {
   await apiRequest<ApiResponse<unknown>>(endpoints.bildirimler.detail(bildirimId) + "/iptal", {
-    method: "POST"
+    method: "POST",
+    idempotencyKey: options?.idempotencyKey,
   });
   logAction({ action: "BILDIRIM_CANCEL", payload: { bildirim_id: bildirimId } });
 }

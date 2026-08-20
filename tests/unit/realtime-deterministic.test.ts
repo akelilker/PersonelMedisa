@@ -18,6 +18,7 @@ import { generateReport } from "../../src/reports/report-engine";
 function resetAppDataCache(): void {
   window.appData = {
     schemaVersion: APP_DATA_SCHEMA_VERSION,
+    ownerFingerprint: null,
     revision: 0,
     updatedAt: null,
     cache: {}
@@ -188,6 +189,47 @@ describe("handleRealtimeEnvelope + matrix + report stale", () => {
     });
     expect(getCacheEntry<Personel>(otherKey)?.ad).toBe("Other");
     expect(getCacheEntry<Personel>(activeKey)?.ad).toBe("Ten");
+  });
+
+  it("preserves org fields when realtime PERSONEL patch is sparse", () => {
+    const detailKey = dataCacheKeys.personelDetail(10, 42);
+    setCacheEntry(detailKey, {
+      id: 42,
+      tc_kimlik_no: "111",
+      ad: "Old",
+      soyad: "Name",
+      aktif_durum: "AKTIF",
+      departman_id: 7,
+      bolum_id: 3,
+      birim_id: 2,
+      pozisyon_id: 9,
+      departman_adi: "IK",
+      bolum_adi: "Bordro",
+      birim_adi: "Operasyon",
+      pozisyon_adi: "Uzman"
+    } satisfies Personel);
+
+    handleRealtimeEnvelope({
+      type: "PERSONEL_GUNCELLENDI",
+      sube_id: 10,
+      payload: {
+        id: 42,
+        tc_kimlik_no: "111",
+        ad: "New",
+        soyad: "Name",
+        aktif_durum: "AKTIF",
+        updated_at: "2030-01-01T00:00:00.000Z"
+      }
+    });
+
+    const merged = getCacheEntry<Personel>(detailKey);
+    expect(merged?.ad).toBe("New");
+    expect(merged?.departman_id).toBe(7);
+    expect(merged?.bolum_id).toBe(3);
+    expect(merged?.birim_id).toBe(2);
+    expect(merged?.pozisyon_id).toBe(9);
+    expect(merged?.departman_adi).toBe("IK");
+    expect(merged?.bolum_adi).toBe("Bordro");
   });
 
   it("generateReport clears offline stale flag", () => {

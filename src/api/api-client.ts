@@ -1,20 +1,16 @@
+import { getApiMode, isDemoApiFallbackEnabled } from "../config/app-env";
+import { getAppPublicPath } from "../config/public-base";
 import { shouldEmitGlobalAuthForbidden } from "../lib/api-forbidden-policy";
+import { emitApiServerError } from "../lib/storage/api-global-events";
+import { emitAuthForbidden, emitAuthUnauthorized } from "../lib/storage/auth-events";
+import type { ApiError, ApiResponse } from "../types/api";
 import { getActiveSubeIdForApiHeader } from "../auth/auth-manager";
 import { getAuthTokenForApi } from "../auth/auth-token-provider";
-import { emitAuthForbidden, emitAuthUnauthorized } from "../lib/storage/auth-events";
-import { emitApiServerError } from "../lib/storage/api-global-events";
-import type { ApiError, ApiResponse } from "../types/api";
+import { logApiFailure5xx } from "../logging/error-logger";
 import { resolveDemoApiResponse } from "./mock-demo";
-import { logApiFailure5xx, summarizeRequestBodyForLogs } from "../logging/error-logger";
-import { getAppPublicPath } from "../config/public-base";
 
 const ENV_META = (import.meta as ImportMeta & { env?: Record<string, string | boolean | undefined> }).env;
 const ENV_API_BASE_URL = typeof ENV_META?.VITE_API_BASE_URL === "string" ? ENV_META.VITE_API_BASE_URL : undefined;
-const ENV_API_MODE = typeof ENV_META?.VITE_API_MODE === "string" ? ENV_META.VITE_API_MODE : undefined;
-const DEMO_API_FALLBACK_DEFAULT =
-  ENV_META?.PROD === true || ENV_META?.MODE === "production" ? "false" : "true";
-const DEMO_API_FALLBACK_ENABLED =
-  String(ENV_META?.VITE_DEMO_API_FALLBACK ?? DEMO_API_FALLBACK_DEFAULT).toLowerCase() !== "false";
 
 function normalizeBase(base: string) {
   const trimmed = base.trim();
@@ -45,25 +41,12 @@ function isLocalDemoHost() {
   return (hostname === "localhost" || hostname === "127.0.0.1") && port !== "4173";
 }
 
-function resolveApiMode() {
-  const normalized = (ENV_API_MODE ?? "").trim().toLowerCase();
-  if (normalized === "real") {
-    return "real";
-  }
-
-  if (normalized === "demo" || normalized === "mock") {
-    return "demo";
-  }
-
-  return "auto";
-}
-
 export function shouldPreferDemoApi() {
-  if (!DEMO_API_FALLBACK_ENABLED) {
+  if (!isDemoApiFallbackEnabled()) {
     return false;
   }
 
-  const mode = resolveApiMode();
+  const mode = getApiMode();
   if (mode === "real") {
     return false;
   }
@@ -72,6 +55,7 @@ export function shouldPreferDemoApi() {
     return true;
   }
 
+  // auto mode logic
   const envBase = normalizeBase(ENV_API_BASE_URL ?? "");
   if (envBase) {
     return false;
@@ -281,7 +265,141 @@ function isForbiddenStatus(status: number) {
   return status === 403;
 }
 
-function buildRequestHeaders(path: string, init?: RequestInit): Headers {
+export type ApiRequestInit = RequestInit & {
+  /** Caller-owned stable key; transport never generates one. */
+  idempotencyKey?: string;
+  /** Per-request timeout override (ms). */
+  timeoutMs?: number;
+};
+
+const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
+const MAX_SAFE_TRANSPORT_ATTEMPTS = 3;
+const MAX_RETRY_DELAY_MS = 2_000;
+
+export function isSafeHttpMethod(method: string): boolean {
+  const normalized = method.trim().toUpperCase();
+  return normalized === "GET" || normalized === "HEAD";
+}
+
+export function isTransientReadStatus(status: number): boolean {
+  return status === 408 || status === 429 || status === 502 || status === 503 || status === 504;
+}
+
+export function resolveRequestTimeoutMs(init?: Pick<ApiRequestInit, "timeoutMs">): number {
+  if (typeof init?.timeoutMs === "number" && Number.isFinite(init.timeoutMs) && init.timeoutMs > 0) {
+    return Math.floor(init.timeoutMs);
+  }
+  return DEFAULT_REQUEST_TIMEOUT_MS;
+}
+
+type SleepFn = (ms: number) => Promise<void>;
+
+let transportSleep: SleepFn = (ms) =>
+  new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+
+/** Test-only: replace sleep to keep retry tests fast. Pass null to restore. */
+export function __setTransportSleepForTests(fn: SleepFn | null): void {
+  transportSleep =
+    fn ??
+    ((ms) =>
+      new Promise((resolve) => {
+        setTimeout(resolve, ms);
+      }));
+}
+
+function parseRetryAfterMs(response: Response): number | null {
+  const raw = response.headers.get("Retry-After");
+  if (!raw) {
+    return null;
+  }
+
+  const asSeconds = Number(raw);
+  if (Number.isFinite(asSeconds) && asSeconds >= 0) {
+    return Math.min(asSeconds * 1000, MAX_RETRY_DELAY_MS);
+  }
+
+  const asDate = Date.parse(raw);
+  if (!Number.isNaN(asDate)) {
+    return Math.min(Math.max(0, asDate - Date.now()), MAX_RETRY_DELAY_MS);
+  }
+
+  return null;
+}
+
+export function computeTransportBackoffMs(attemptIndex: number, retryAfterMs: number | null = null): number {
+  if (retryAfterMs != null) {
+    return retryAfterMs;
+  }
+  const exponential = Math.min(100 * 2 ** Math.max(0, attemptIndex), MAX_RETRY_DELAY_MS);
+  const jitter = Math.floor(Math.random() * 50);
+  return Math.min(exponential + jitter, MAX_RETRY_DELAY_MS);
+}
+
+function composeTimeoutSignal(
+  external: AbortSignal | null | undefined,
+  timeoutMs: number
+): { signal: AbortSignal; didTimeout: () => boolean; cleanup: () => void } {
+  const controller = new AbortController();
+  let timedOut = false;
+
+  const timeoutId = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, timeoutMs);
+
+  const onExternalAbort = () => {
+    controller.abort();
+  };
+
+  if (external) {
+    if (external.aborted) {
+      controller.abort();
+    } else {
+      external.addEventListener("abort", onExternalAbort, { once: true });
+    }
+  }
+
+  return {
+    signal: controller.signal,
+    didTimeout: () => timedOut,
+    cleanup: () => {
+      clearTimeout(timeoutId);
+      if (external) {
+        external.removeEventListener("abort", onExternalAbort);
+      }
+    }
+  };
+}
+
+function classifyFetchAbortError(
+  error: unknown,
+  didTimeout: boolean,
+  externalSignal: AbortSignal | null | undefined
+): ApiRequestError {
+  if (didTimeout) {
+    return new ApiRequestError("İstek zaman aşımına uğradı.", 0, { code: "REQUEST_TIMEOUT" });
+  }
+
+  if (externalSignal?.aborted) {
+    return new ApiRequestError("İstek iptal edildi.", 0, { code: "REQUEST_ABORTED" });
+  }
+
+  const message =
+    error instanceof Error && error.message.trim() ? error.message : "API request failed.";
+  return new ApiRequestError(message, 0);
+}
+
+function isAbortError(error: unknown): boolean {
+  if (!error || typeof error !== "object") {
+    return false;
+  }
+  const name = (error as { name?: string }).name;
+  return name === "AbortError" || name === "TimeoutError";
+}
+
+function buildRequestHeaders(path: string, init?: ApiRequestInit): Headers {
   const headers = new Headers(init?.headers ?? {});
   const hasJsonBody = init?.body !== undefined && !(init.body instanceof FormData);
 
@@ -303,10 +421,69 @@ function buildRequestHeaders(path: string, init?: RequestInit): Headers {
     }
   }
 
+  // Preserve caller Idempotency-Key; never mint one in transport.
+  if (init?.idempotencyKey && !headers.has("Idempotency-Key")) {
+    headers.set("Idempotency-Key", init.idempotencyKey);
+  }
+
   return headers;
 }
 
-export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
+function toFetchInit(init: ApiRequestInit | undefined, headers: Headers, signal: AbortSignal): RequestInit {
+  const { idempotencyKey: _key, timeoutMs: _timeout, signal: _signal, ...rest } = init ?? {};
+  return {
+    ...rest,
+    headers,
+    signal
+  };
+}
+
+function emitStatusSideEffects(
+  path: string,
+  method: string,
+  status: number,
+  payload: unknown,
+  options: { logServerError: boolean; attemptCount: number }
+): void {
+  if (isUnauthorizedStatus(status)) {
+    if (getAuthTokenForApi()) {
+      emitAuthUnauthorized({ status, path });
+    }
+    return;
+  }
+
+  if (isForbiddenStatus(status)) {
+    if (shouldEmitGlobalAuthForbidden(path, method)) {
+      emitAuthForbidden({ status, path });
+    }
+    return;
+  }
+
+  if (status >= 500 && options.logServerError) {
+    logApiFailure5xx({
+      endpoint: path,
+      status,
+      method,
+      attempt_count: options.attemptCount
+    });
+    const apiError = extractFirstApiError(payload);
+    emitApiServerError({
+      message: apiError?.message ?? "Sunucu hatasi. Lutfen daha sonra tekrar deneyin.",
+      status
+    });
+  }
+}
+
+/**
+ * Transport owner for all HTTP API calls.
+ *
+ * Security: attaches Authorization + X-Active-Sube-Id except `/auth/login`; never mints Idempotency-Key.
+ * Retry: GET/HEAD only — bounded base failover + transient status retry (408/429/502/503/504).
+ * Mutations (POST/PUT/PATCH/DELETE): fail-closed — no blind cross-base retry after uncertain network.
+ * Timeout/abort: AbortController timeout → REQUEST_TIMEOUT; caller AbortSignal → REQUEST_ABORTED (no retry).
+ * Privacy: 5xx telemetry is metadata-only (no request/response bodies).
+ */
+export async function apiRequest<T>(path: string, init?: ApiRequestInit): Promise<T> {
   if (shouldPreferDemoApi()) {
     const mock = resolveDemoApiResponse(path, init);
     if (mock !== null) {
@@ -314,71 +491,149 @@ export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T
     }
   }
 
+  const method = (init?.method ?? "GET").toUpperCase();
+  const safe = isSafeHttpMethod(method);
   const baseCandidates = resolveApiBaseCandidates();
+  const bases = safe ? baseCandidates : baseCandidates.slice(0, 1);
   const requestHeaders = buildRequestHeaders(path, init);
+  const timeoutMs = resolveRequestTimeoutMs(init);
+  const externalSignal = init?.signal ?? undefined;
 
   let lastError: ApiRequestError | null = null;
+  let attemptCount = 0;
+  let pendingServerError: { status: number; payload: unknown } | null = null;
 
-  for (const base of baseCandidates) {
-    let response: Response;
-    try {
-      response = await fetch(buildApiUrl(path, base), {
-        ...init,
-        headers: requestHeaders
-      });
-    } catch (error) {
-      lastError = new ApiRequestError(
-        error instanceof Error ? error.message : "API request failed.",
-        0
-      );
-      continue;
+  const flushFinalServerError = () => {
+    if (!pendingServerError) {
+      return;
     }
+    emitStatusSideEffects(path, method, pendingServerError.status, pendingServerError.payload, {
+      logServerError: true,
+      attemptCount
+    });
+    pendingServerError = null;
+  };
 
-    const payload = await parseResponseBody(response);
+  for (let baseIndex = 0; baseIndex < bases.length; baseIndex += 1) {
+    const base = bases[baseIndex];
+    let retryOnSameBase = 0;
 
-    if (response.ok) {
-      return payload as T;
-    }
-
-    const requestMethod = (init?.method ?? "GET").toUpperCase();
-
-    if (isUnauthorizedStatus(response.status)) {
-      // Session yokken bootstrap 401'leri logout/yönlendirme döngüsü üretmesin.
-      if (getAuthTokenForApi()) {
-        emitAuthUnauthorized({ status: response.status, path });
+    while (true) {
+      if (attemptCount >= MAX_SAFE_TRANSPORT_ATTEMPTS && safe) {
+        flushFinalServerError();
+        throw lastError ?? new ApiRequestError("API request failed.", 500);
       }
-    } else if (isForbiddenStatus(response.status)) {
-      if (shouldEmitGlobalAuthForbidden(path, requestMethod)) {
-        emitAuthForbidden({ status: response.status, path });
+
+      attemptCount += 1;
+      const composed = composeTimeoutSignal(externalSignal, timeoutMs);
+
+      let response: Response;
+      try {
+        response = await fetch(buildApiUrl(path, base), toFetchInit(init, requestHeaders, composed.signal));
+        composed.cleanup();
+      } catch (error) {
+        composed.cleanup();
+        const classified = isAbortError(error)
+          ? classifyFetchAbortError(error, composed.didTimeout(), externalSignal)
+          : new ApiRequestError(
+              error instanceof Error && error.message.trim() ? error.message : "API request failed.",
+              0
+            );
+
+        lastError = classified;
+
+        if (classified.code === "REQUEST_ABORTED" || classified.code === "REQUEST_TIMEOUT") {
+          flushFinalServerError();
+          throw classified;
+        }
+
+        // Mutation: never blind-failover to another base after uncertain network.
+        if (!safe) {
+          flushFinalServerError();
+          throw classified;
+        }
+
+        // Safe: move to next base candidate (bounded by outer loop + attempt cap).
+        break;
       }
-    } else if (response.status >= 500) {
-      const method = requestMethod;
-      logApiFailure5xx({
-        endpoint: path,
-        status: response.status,
-        method,
-        payload_summary: summarizeRequestBodyForLogs(init)
-      });
+
+      const payload = await parseResponseBody(response);
+
+      if (response.ok) {
+        return payload as T;
+      }
+
       const apiError = extractFirstApiError(payload);
-      emitApiServerError({
-        message: apiError?.message ?? "Sunucu hatasi. Lutfen daha sonra tekrar deneyin.",
-        status: response.status
-      });
-    }
+      lastError = new ApiRequestError(
+        apiError?.message ?? `API request failed: ${response.status}`,
+        response.status,
+        apiError ?? undefined
+      );
 
-    const apiError = extractFirstApiError(payload);
-    lastError = new ApiRequestError(
-      apiError?.message ?? `API request failed: ${response.status}`,
-      response.status,
-      apiError ?? undefined
-    );
+      if (isUnauthorizedStatus(response.status) || isForbiddenStatus(response.status)) {
+        emitStatusSideEffects(path, method, response.status, payload, {
+          logServerError: false,
+          attemptCount
+        });
+        throw lastError;
+      }
 
-    if (response.status !== 404) {
+      if (!safe) {
+        // Mutations: no cross-base failover (including 404 discovery).
+        if (response.status >= 500) {
+          emitStatusSideEffects(path, method, response.status, payload, {
+            logServerError: true,
+            attemptCount
+          });
+        }
+        throw lastError;
+      }
+
+      // SAFE path from here.
+      if (response.status === 404) {
+        // Subfolder API discovery: try next base.
+        break;
+      }
+
+      if (isTransientReadStatus(response.status)) {
+        if (response.status >= 500) {
+          pendingServerError = { status: response.status, payload };
+        }
+
+        const canRetrySameBase =
+          retryOnSameBase + 1 < MAX_SAFE_TRANSPORT_ATTEMPTS &&
+          attemptCount < MAX_SAFE_TRANSPORT_ATTEMPTS;
+
+        if (canRetrySameBase) {
+          const delayMs = computeTransportBackoffMs(retryOnSameBase, parseRetryAfterMs(response));
+          retryOnSameBase += 1;
+          await transportSleep(delayMs);
+          continue;
+        }
+
+        // Exhausted same-base retries → failover to next candidate if any.
+        if (baseIndex + 1 < bases.length && attemptCount < MAX_SAFE_TRANSPORT_ATTEMPTS) {
+          break;
+        }
+
+        flushFinalServerError();
+        throw lastError;
+      }
+
+      if (response.status >= 500) {
+        emitStatusSideEffects(path, method, response.status, payload, {
+          logServerError: true,
+          attemptCount
+        });
+      }
+
       throw lastError;
     }
   }
 
-  if (DEMO_API_FALLBACK_ENABLED) {
+  flushFinalServerError();
+
+  if (isDemoApiFallbackEnabled()) {
     const mock = resolveDemoApiResponse(path, init);
     if (mock !== null) {
       return mock as T;

@@ -18,7 +18,7 @@ import type { Surec } from "../types/surec";
 
 export const APP_DATA_STORAGE_KEY = "medisa_app_data";
 export const APP_SYNC_QUEUE_KEY = "medisa_sync_queue";
-export const APP_DATA_SCHEMA_VERSION = 4;
+export const APP_DATA_SCHEMA_VERSION = 5;
 
 export type CacheEnvelope<T> = {
   data: T;
@@ -39,14 +39,26 @@ export type PersonelReferenceBundle = {
 
 export type AppData = {
   schemaVersion: number;
+  ownerFingerprint: string | null;
   revision: number;
   updatedAt: string | null;
   cache: Record<string, CacheEnvelope<unknown>>;
 };
 
+export type SyncQueueState = "PENDING" | "PROCESSING" | "COMPLETED" | "FAILED_RETRYABLE" | "BLOCKED_AUTH" | "CONFLICT" | "DEAD_LETTER";
+
 export type SyncQueueItemBase = {
   id: string;
   createdAt: string;
+  ownerFingerprint: string;
+  state: SyncQueueState;
+  attemptCount: number;
+  lastAttemptAt: string | null;
+  lastError: {
+    code?: string;
+    status?: number;
+    message?: string;
+  } | null;
   meta?: {
     listKey?: string;
     tempId?: number;

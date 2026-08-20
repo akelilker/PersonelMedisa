@@ -20,9 +20,12 @@ describe("S94 download demo gate contract", () => {
   }
 
   it("api-client production'da demo fallback varsayılanı false'tur", () => {
-    const source = readFileSync(resolve(process.cwd(), "src/api/api-client.ts"), "utf8");
-    expect(source).toContain('MODE === "production" ? "false" : "true"');
-    expect(source).toContain("export function shouldPreferDemoApi");
+    const apiClient = readFileSync(resolve(process.cwd(), "src/api/api-client.ts"), "utf8");
+    const appEnv = readFileSync(resolve(process.cwd(), "src/config/app-env.ts"), "utf8");
+    expect(apiClient).toContain("export function shouldPreferDemoApi");
+    expect(apiClient).toContain("isDemoApiFallbackEnabled");
+    expect(appEnv).toContain('VITE_DEMO_API_FALLBACK ?? "false"');
+    expect(appEnv).toContain("isProductionBuild()");
   });
 
   it("LoginPage rememberMe bilgisini login'e iletir", () => {

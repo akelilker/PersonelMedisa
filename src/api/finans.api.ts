@@ -97,10 +97,11 @@ export async function fetchFinansKalemList(
   };
 }
 
-export async function createFinansKalem(payload: CreateFinansKalemPayload): Promise<FinansKalem> {
+export async function createFinansKalem(payload: CreateFinansKalemPayload, options?: { idempotencyKey?: string }): Promise<FinansKalem> {
   const response = await apiRequest<ApiResponse<unknown>>(endpoints.finans.list, {
     method: "POST",
-    body: JSON.stringify(payload)
+    body: JSON.stringify(payload),
+    idempotencyKey: options?.idempotencyKey,
   });
 
   const created = normalizeFinansKalem(response.data);
@@ -110,11 +111,13 @@ export async function createFinansKalem(payload: CreateFinansKalemPayload): Prom
 
 export async function updateFinansKalem(
   kalemId: number | string,
-  payload: UpdateFinansKalemPayload
+  payload: UpdateFinansKalemPayload,
+  options?: { idempotencyKey?: string }
 ): Promise<FinansKalem> {
   const response = await apiRequest<ApiResponse<unknown>>(endpoints.finans.detail(kalemId), {
     method: "PUT",
-    body: JSON.stringify(payload)
+    body: JSON.stringify(payload),
+    idempotencyKey: options?.idempotencyKey,
   });
 
   const updated = normalizeFinansKalem(response.data);
@@ -122,9 +125,10 @@ export async function updateFinansKalem(
   return updated;
 }
 
-export async function cancelFinansKalem(kalemId: number | string): Promise<void> {
+export async function cancelFinansKalem(kalemId: number | string, options?: { idempotencyKey?: string }): Promise<void> {
   await apiRequest<ApiResponse<unknown>>(`${endpoints.finans.detail(kalemId)}/iptal`, {
-    method: "POST"
+    method: "POST",
+    idempotencyKey: options?.idempotencyKey,
   });
   logAction({ action: "FINANS_CANCEL", payload: { finans_id: kalemId } });
 }

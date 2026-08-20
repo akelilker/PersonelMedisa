@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react";
-import { getActiveSubeId, getToken } from "../auth/auth-manager";
+import { getActiveSubeId, getActorFingerprint, getSession, getToken } from "../auth/auth-manager";
 import { ApiRequestError } from "../api/api-client";
 import {
   cancelBildirim,
@@ -55,6 +55,9 @@ import {
 
 const listeners = new Set<() => void>();
 const BILDIRIM_PERSONEL_FETCH_LIMIT = 250;
+const MAX_SYNC_ATTEMPTS = 5;
+/** PROCESSING stuck beyond this age is recovered to FAILED_RETRYABLE (same Idempotency-Key). */
+export const STALE_PROCESSING_MS = 5 * 60 * 1000;
 
 export function subscribeAppData(onStoreChange: () => void): () => void {
   listeners.add(onStoreChange);
@@ -77,36 +80,56 @@ export function useAppDataRevision(): number {
   return useSyncExternalStore(subscribeAppData, getAppDataRevision, getAppDataRevision);
 }
 
-function createEmptyAppData(): AppData {
+function createEmptyAppData(fingerprint: string | null): AppData {
   return {
     schemaVersion: APP_DATA_SCHEMA_VERSION,
+    ownerFingerprint: fingerprint,
     revision: 0,
     updatedAt: null,
-    cache: {}
+    cache: {},
   };
 }
 
 export function getFallbackData(): AppData {
-  return createEmptyAppData();
+  return createEmptyAppData(null);
 }
 
 export function getSafeAppDataFallback(): AppData {
-  return createEmptyAppData();
+  return createEmptyAppData(getActorFingerprint(getSession()));
+}
+
+function purgePersistentData() {
+ if (typeof window === "undefined") {
+  return;
+}
+try {
+  window.localStorage.removeItem(APP_DATA_STORAGE_KEY);
+  window.localStorage.removeItem(APP_SYNC_QUEUE_KEY);
+} catch {
+  /* ignore */
+}
 }
 
 export function ensureAppData(): AppData {
   if (typeof window === "undefined") {
-    return createEmptyAppData();
+    return createEmptyAppData(null);
   }
 
   if (!window.appData) {
-    window.appData = createEmptyAppData();
-    return window.appData;
+    window.appData = createEmptyAppData(getActorFingerprint(getSession()));
   }
 
-  if (window.appData.schemaVersion !== APP_DATA_SCHEMA_VERSION) {
-    window.appData = createEmptyAppData();
-    return window.appData;
+  // Guvenlik: Oturum degisti mi? Cache'in sahibi mevcut kullanici mi?
+  // Sync queue is actor-scoped via ownerFingerprint filter — do not wipe it on
+  // session flip so same-actor 401 BLOCKED_AUTH can resume after re-auth.
+  const currentFingerprint = getActorFingerprint(getSession());
+  if (window.appData.ownerFingerprint !== currentFingerprint) {
+    try {
+      window.localStorage.removeItem(APP_DATA_STORAGE_KEY);
+    } catch {
+      /* ignore */
+    }
+    window.appData = createEmptyAppData(currentFingerprint);
   }
 
   return window.appData;
@@ -119,6 +142,11 @@ export function getAppData(): AppData {
 export function hasUsableData(): boolean {
   const data = ensureAppData();
   if (data.schemaVersion !== APP_DATA_SCHEMA_VERSION) {
+    return false;
+  }
+
+  const currentFingerprint = getActorFingerprint(getSession());
+  if (data.ownerFingerprint !== currentFingerprint) {
     return false;
   }
 
@@ -150,15 +178,16 @@ export function clearAllAppPersistence(): void {
 
   resetProtectedDataLoadGate();
 
-  const empty = createEmptyAppData();
-  window.appData = empty;
-
+  // Clear protected cache; keep actor-scoped sync queue so 401 BLOCKED_AUTH
+  // items can resume after same-actor re-auth (cross-user still filtered).
   try {
     window.localStorage.removeItem(APP_DATA_STORAGE_KEY);
-    window.localStorage.removeItem(APP_SYNC_QUEUE_KEY);
   } catch {
     /* ignore */
   }
+
+  const empty = createEmptyAppData(getActorFingerprint(getSession()));
+  window.appData = empty;
 
   notifyAppData();
 }
@@ -186,14 +215,25 @@ export function safeParseStoredAppData(raw: string | null): AppData | null {
 
   const record = parsed as Record<string, unknown>;
   if (record.schemaVersion === 2) {
-    record.schemaVersion = APP_DATA_SCHEMA_VERSION;
+    record.schemaVersion = 3; // Migration path step
     delete record.activeSubeId;
   }
+
+  if (record.schemaVersion === 3 || record.schemaVersion === 4) {
+     record.schemaVersion = APP_DATA_SCHEMA_VERSION;
+     record.ownerFingerprint = null;
+  }
+
   if (record.schemaVersion !== APP_DATA_SCHEMA_VERSION) {
     return null;
   }
 
-  if (typeof record.revision !== "number" || typeof record.cache !== "object" || record.cache === null) {
+  if (
+    typeof record.revision !== "number" ||
+    typeof record.cache !== "object" ||
+    record.cache === null ||
+    (record.ownerFingerprint !== null && typeof record.ownerFingerprint !== "string")
+  ) {
     return null;
   }
 
@@ -202,11 +242,23 @@ export function safeParseStoredAppData(raw: string | null): AppData | null {
 
 export function initAppDataFromStorage(): AppData {
   if (typeof window === "undefined") {
-    return createEmptyAppData();
+    return createEmptyAppData(null);
   }
 
   const raw = window.localStorage.getItem(APP_DATA_STORAGE_KEY);
-  const parsed = safeParseStoredAppData(raw);
+  let parsed = safeParseStoredAppData(raw);
+
+  const currentFingerprint = getActorFingerprint(getSession());
+
+  if (parsed && parsed.ownerFingerprint !== currentFingerprint) {
+    try {
+      window.localStorage.removeItem(APP_DATA_STORAGE_KEY);
+    } catch {
+      /* ignore */
+    }
+    parsed = null;
+  }
+
   if (parsed) {
     window.appData = parsed;
   } else {
@@ -339,14 +391,29 @@ export function mergeCacheEntry<T>(key: string, updater: (prev: T | undefined) =
   setCacheEntry(key, updater(prev));
 }
 
+/**
+ * Cache read-through with fail-closed classification.
+ * Auth/business errors (401/403/404/409/422) and REQUEST_ABORTED never serve stale cache.
+ * Transport/5xx/offline may return cached or empty list fallbacks — never invents privileged data.
+ */
 export async function fetchWithCacheMerge<T>(key: string, fetcher: () => Promise<T>): Promise<T> {
   try {
     const data = await fetcher();
     setCacheEntry(key, data);
     return data;
   } catch (error) {
-    if (error instanceof ApiRequestError && (error.status === 403 || error.status === 404)) {
-      throw error;
+    // Auth / business / caller-cancel: stale cache ile maskeleme.
+    if (error instanceof ApiRequestError) {
+      const failClosed =
+        error.status === 401 ||
+        error.status === 403 ||
+        error.status === 404 ||
+        error.status === 409 ||
+        error.status === 422 ||
+        error.code === "REQUEST_ABORTED";
+      if (failClosed) {
+        throw error;
+      }
     }
 
     const cached = getCacheEntry<T>(key);
@@ -414,58 +481,167 @@ function resolveFallbackForKey(key: string): unknown {
   return undefined;
 }
 
-function readQueue(): SyncQueueItem[] {
+function readAllQueueRaw(): SyncQueueItem[] {
   if (typeof window === "undefined") {
     return [];
   }
-
   try {
     const raw = window.localStorage.getItem(APP_SYNC_QUEUE_KEY);
     if (!raw) {
       return [];
     }
-
     const parsed = JSON.parse(raw) as unknown;
     if (!Array.isArray(parsed)) {
       return [];
     }
-
-    return parsed as SyncQueueItem[];
+    return (parsed as SyncQueueItem[]).filter((item) => item && typeof item === "object" && typeof item.id === "string");
   } catch {
     return [];
   }
 }
 
-function writeQueue(items: SyncQueueItem[]): void {
-  if (typeof window === "undefined") {
-    return;
+function readQueue(): SyncQueueItem[] {
+  const currentFingerprint = getActorFingerprint(getSession());
+  if (!currentFingerprint) {
+    return [];
   }
+  return readAllQueueRaw().filter((item) => item.ownerFingerprint === currentFingerprint);
+}
+
+/** Persist full queue. Merges current-actor items with other actors' items. Returns false on quota/storage failure. */
+function writeQueue(itemsForCurrentActor: SyncQueueItem[]): boolean {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  const currentFingerprint = getActorFingerprint(getSession());
+  const others = currentFingerprint
+    ? readAllQueueRaw().filter((item) => item.ownerFingerprint !== currentFingerprint)
+    : readAllQueueRaw();
+  const merged = [...others, ...itemsForCurrentActor];
 
   try {
-    window.localStorage.setItem(APP_SYNC_QUEUE_KEY, JSON.stringify(items));
+    window.localStorage.setItem(APP_SYNC_QUEUE_KEY, JSON.stringify(merged));
+    return true;
   } catch {
-    /* ignore */
+    return false;
   }
 }
 
-export function enqueueSyncOperation(item: Omit<SyncQueueItem, "id" | "createdAt"> & { id?: string }): void {
+export type QueuePersistResult = "ok" | "quota-error";
+
+export function enqueueSyncOperation(
+  item: Omit<SyncQueueItem, "id" | "createdAt" | "ownerFingerprint" | "state" | "attemptCount" | "lastAttemptAt" | "lastError"> & { id?: string }
+): "queued" | "quota-error" {
+  const fingerprint = getActorFingerprint(getSession());
+  if (!fingerprint) {
+    return "quota-error";
+  }
+
   const queue = readQueue();
   const id = item.id ?? `q_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
-  const next: SyncQueueItem = {
-    ...(item as SyncQueueItem),
+  const next = {
+    ...item,
     id,
-    createdAt: new Date().toISOString()
-  };
-  queue.push(next);
-  writeQueue(queue);
+    createdAt: new Date().toISOString(),
+    ownerFingerprint: fingerprint,
+    state: "PENDING" as const,
+    attemptCount: 0,
+    lastAttemptAt: null,
+    lastError: null,
+  } as SyncQueueItem;
+
+  if (!writeQueue([...queue, next])) {
+    return "quota-error";
+  }
+  notifyAppData();
+  return "queued";
 }
 
-function dequeueSyncOperation(id: string): void {
-  writeQueue(readQueue().filter((entry) => entry.id !== id));
+function updateQueueItem(id: string, update: Partial<Omit<SyncQueueItem, "id">>): QueuePersistResult {
+  const queue = readQueue();
+  const index = queue.findIndex((item) => item.id === id);
+  if (index === -1) {
+    return "ok";
+  }
+  queue[index] = { ...queue[index], ...update } as SyncQueueItem;
+  return writeQueue(queue) ? "ok" : "quota-error";
 }
 
+function removeQueueItem(id: string): QueuePersistResult {
+  const queue = readQueue().filter((item) => item.id !== id);
+  return writeQueue(queue) ? "ok" : "quota-error";
+}
+
+/**
+ * Recover stale PROCESSING → FAILED_RETRYABLE (same item.id / Idempotency-Key).
+ * Fresh PROCESSING (within STALE_PROCESSING_MS) is left alone.
+ */
+export function recoverStaleProcessingItems(nowMs: number = Date.now()): number {
+  const queue = readQueue();
+  let recovered = 0;
+  const next = queue.map((item) => {
+    if (item.state !== "PROCESSING") {
+      return item;
+    }
+    const attempted = item.lastAttemptAt ? Date.parse(item.lastAttemptAt) : NaN;
+    if (!Number.isFinite(attempted) || nowMs - attempted < STALE_PROCESSING_MS) {
+      return item;
+    }
+    recovered += 1;
+    return {
+      ...item,
+      state: "FAILED_RETRYABLE" as const,
+      lastError: {
+        code: "STALE_PROCESSING_RECOVERED",
+        message: "Stale PROCESSING recovered after crash/restart."
+      }
+    };
+  });
+  if (recovered > 0) {
+    writeQueue(next);
+  }
+  return recovered;
+}
+
+/**
+ * Same-actor re-auth: BLOCKED_AUTH → PENDING. BLOCKED_PERMISSION is never auto-resumed.
+ * Cross-user items are never touched (filtered by fingerprint).
+ */
+export function resumeAuthBlockedQueueForCurrentActor(): number {
+  const fingerprint = getActorFingerprint(getSession());
+  if (!fingerprint) {
+    return 0;
+  }
+  const queue = readQueue();
+  let resumed = 0;
+  const next = queue.map((item) => {
+    if (item.ownerFingerprint !== fingerprint || item.state !== "BLOCKED_AUTH") {
+      return item;
+    }
+    resumed += 1;
+    return {
+      ...item,
+      state: "PENDING" as const,
+      lastError: null
+    };
+  });
+  if (resumed > 0) {
+    writeQueue(next);
+  }
+  return resumed;
+}
+
+/**
+ * Offline sync queue processor (state machine).
+ * 401 → BLOCKED_AUTH (same-actor resume after re-auth); 403 → BLOCKED_PERMISSION (no auto-retry);
+ * 409/422 → CONFLICT; retryable → FAILED_RETRYABLE; max attempts → DEAD_LETTER.
+ * Success removes the item (COMPLETED pruned; payload not retained).
+ * Replay always uses stable queue item id as Idempotency-Key.
+ */
 export async function processSyncQueue(): Promise<void> {
-  if (!getToken()) {
+  const fingerprint = getActorFingerprint(getSession());
+  if (!fingerprint) {
     return;
   }
 
@@ -473,20 +649,58 @@ export async function processSyncQueue(): Promise<void> {
     return;
   }
 
-  const queue = readQueue();
+  recoverStaleProcessingItems();
+
+  const queue = readQueue().filter(
+    (item) => item.state === "PENDING" || item.state === "FAILED_RETRYABLE"
+  );
   if (queue.length === 0) {
     return;
   }
 
   for (const item of queue) {
+    if (item.ownerFingerprint !== fingerprint) {
+      continue;
+    }
+
+    const processingWrite = updateQueueItem(item.id, {
+      state: "PROCESSING",
+      attemptCount: item.attemptCount + 1,
+      lastAttemptAt: new Date().toISOString(),
+    });
+    if (processingWrite === "quota-error") {
+      // Fail closed: do not dispatch if PROCESSING cannot be persisted.
+      break;
+    }
+
     try {
       await dispatchSyncItem(item);
-      dequeueSyncOperation(item.id);
+      // Prune successful payload-bearing items (no permanent COMPLETED retention).
+      removeQueueItem(item.id);
     } catch (error) {
-      if (error instanceof ApiRequestError && (error.status === 401 || error.status === 403)) {
-        dequeueSyncOperation(item.id);
-        continue;
+      const apiError = error instanceof ApiRequestError ? error : null;
+      const status = apiError?.status ?? -1;
+
+      const lastError = {
+        code: apiError?.code,
+        status: apiError?.status,
+        message: apiError?.message,
+      };
+
+      let nextState: SyncQueueItem["state"];
+      if (status === 401) {
+        nextState = "BLOCKED_AUTH";
+      } else if (status === 403) {
+        nextState = "BLOCKED_PERMISSION";
+      } else if (status === 409 || status === 422) {
+        nextState = "CONFLICT";
+      } else if (item.attemptCount + 1 >= MAX_SYNC_ATTEMPTS) {
+        nextState = "DEAD_LETTER";
+      } else {
+        nextState = "FAILED_RETRYABLE";
       }
+
+      updateQueueItem(item.id, { state: nextState, lastError });
       break;
     }
   }
@@ -495,55 +709,57 @@ export async function processSyncQueue(): Promise<void> {
 }
 
 async function dispatchSyncItem(item: SyncQueueItem): Promise<void> {
+  const idempotencyKey = item.id;
+
   switch (item.op) {
     case "personeller.create": {
-      const created = await createPersonel(item.payload);
+      const created = await createPersonel(item.payload, { idempotencyKey });
       finalizePersonelCreateInCache(item, created);
       return;
     }
     case "personeller.update": {
-      const updated = await updatePersonel(item.payload.personelId, item.payload.body);
+      const updated = await updatePersonel(item.payload.personelId, item.payload.body, { idempotencyKey });
       commitPersonelUpdateToCaches(updated);
       return;
     }
     case "surecler.create": {
-      const createdSurec = await createSurec(item.payload);
+      const createdSurec = await createSurec(item.payload, { idempotencyKey });
       finalizeSurecCreateInCache(item, createdSurec);
       return;
     }
     case "surecler.update": {
-      await updateSurec(item.payload.surecId, item.payload.body);
+      await updateSurec(item.payload.surecId, item.payload.body, { idempotencyKey });
       return;
     }
     case "surecler.cancel": {
-      await cancelSurec(item.payload.surecId);
+      await cancelSurec(item.payload.surecId, { idempotencyKey });
       return;
     }
     case "bildirimler.create": {
-      const createdBildirim = await createBildirim(item.payload);
+      const createdBildirim = await createBildirim(item.payload, { idempotencyKey });
       finalizeBildirimCreateInCache(item, createdBildirim);
       return;
     }
     case "bildirimler.update": {
-      await updateBildirim(item.payload.bildirimId, item.payload.body);
+      await updateBildirim(item.payload.bildirimId, item.payload.body, { idempotencyKey });
       return;
     }
     case "bildirimler.cancel": {
-      await cancelBildirim(item.payload.bildirimId);
+      await cancelBildirim(item.payload.bildirimId, { idempotencyKey });
       return;
     }
     case "finans.create": {
-      const createdFinans = await createFinansKalem(item.payload);
+      const createdFinans = await createFinansKalem(item.payload, { idempotencyKey });
       finalizeFinansCreateInCache(item, createdFinans);
       return;
     }
     case "finans.update": {
-      const updatedFinans = await updateFinansKalem(item.payload.kalemId, item.payload.body);
+      const updatedFinans = await updateFinansKalem(item.payload.kalemId, item.payload.body, { idempotencyKey });
       finalizeFinansUpdateInCache(item, updatedFinans);
       return;
     }
     case "finans.cancel": {
-      await cancelFinansKalem(item.payload.kalemId);
+      await cancelFinansKalem(item.payload.kalemId, { idempotencyKey });
       finalizeFinansCancelInCache(item);
       return;
     }
@@ -551,7 +767,8 @@ async function dispatchSyncItem(item: SyncQueueItem): Promise<void> {
       const updatedPuantaj = await upsertGunlukPuantaj(
         item.payload.personelId,
         item.payload.tarih,
-        item.payload.body
+        item.payload.body,
+        { idempotencyKey }
       );
       mergePuantajCache(item.payload.personelId, item.payload.tarih, updatedPuantaj);
       return;
@@ -1038,6 +1255,36 @@ export function getRealtimeCacheImpact(
   }
 }
 
+function readOptionalNumber(p: Record<string, unknown>, key: string): number | undefined {
+  const v = p[key];
+  return typeof v === "number" ? v : undefined;
+}
+
+function readOptionalNullableNumber(p: Record<string, unknown>, key: string): number | null | undefined {
+  const v = p[key];
+  if (v === null) {
+    return null;
+  }
+  return typeof v === "number" ? v : undefined;
+}
+
+function readOptionalString(p: Record<string, unknown>, key: string): string | undefined {
+  const v = p[key];
+  return typeof v === "string" ? v : undefined;
+}
+
+function readOptionalNullableString(p: Record<string, unknown>, key: string): string | null | undefined {
+  const v = p[key];
+  if (v === null) {
+    return null;
+  }
+  return typeof v === "string" ? v : undefined;
+}
+
+/**
+ * Realtime PERSONEL payload'unu canonical Personel alanlarina cevirir.
+ * Eksik org alanlari undefined kalir; mergePersonelCanonical onceki cache ile birlestirir.
+ */
 function parsePersonelRealtimePayload(p: unknown): Personel | null {
   if (!isRecord(p) || typeof p.id !== "number") {
     return null;
@@ -1061,35 +1308,58 @@ function parsePersonelRealtimePayload(p: unknown): Personel | null {
     ad,
     soyad,
     aktif_durum: durum,
-    sube_id: typeof p.sube_id === "number" ? p.sube_id : undefined,
-    telefon: typeof p.telefon === "string" ? p.telefon : undefined,
-    dogum_tarihi: typeof p.dogum_tarihi === "string" ? p.dogum_tarihi : undefined,
-    sicil_no: typeof p.sicil_no === "string" ? p.sicil_no : undefined,
-    dogum_yeri: typeof p.dogum_yeri === "string" ? p.dogum_yeri : undefined,
-    kan_grubu: typeof p.kan_grubu === "string" ? p.kan_grubu : undefined,
-    ise_giris_tarihi: typeof p.ise_giris_tarihi === "string" ? p.ise_giris_tarihi : undefined,
-    acil_durum_kisi: typeof p.acil_durum_kisi === "string" ? p.acil_durum_kisi : undefined,
-    acil_durum_telefon:
-      typeof p.acil_durum_telefon === "string" ? p.acil_durum_telefon : undefined,
-    departman_id: typeof p.departman_id === "number" ? p.departman_id : undefined,
-    gorev_id: typeof p.gorev_id === "number" ? p.gorev_id : undefined,
-    personel_tipi_id: typeof p.personel_tipi_id === "number" ? p.personel_tipi_id : undefined,
-    bagli_amir_id: typeof p.bagli_amir_id === "number" ? p.bagli_amir_id : undefined,
-    sube_adi: typeof p.sube_adi === "string" ? p.sube_adi : undefined,
-    departman_adi: typeof p.departman_adi === "string" ? p.departman_adi : undefined,
-    gorev_adi: typeof p.gorev_adi === "string" ? p.gorev_adi : undefined,
-    personel_tipi_adi: typeof p.personel_tipi_adi === "string" ? p.personel_tipi_adi : undefined,
-    bagli_amir_adi: typeof p.bagli_amir_adi === "string" ? p.bagli_amir_adi : undefined,
-    hizmet_suresi: typeof p.hizmet_suresi === "string" ? p.hizmet_suresi : undefined,
-    toplam_izin_hakki:
-      typeof p.toplam_izin_hakki === "number" ? p.toplam_izin_hakki : undefined,
-    kullanilan_izin: typeof p.kullanilan_izin === "number" ? p.kullanilan_izin : undefined,
-    kalan_izin: typeof p.kalan_izin === "number" ? p.kalan_izin : undefined,
-    pasiflik_durumu_etiketi:
-      typeof p.pasiflik_durumu_etiketi === "string" || p.pasiflik_durumu_etiketi === null
-        ? p.pasiflik_durumu_etiketi
-        : undefined
+    calisan_kapsami:
+      p.calisan_kapsami === "IC_PERSONEL" || p.calisan_kapsami === "DIS_KAYNAK"
+        ? p.calisan_kapsami
+        : undefined,
+    sube_id: readOptionalNumber(p, "sube_id"),
+    telefon: readOptionalNullableString(p, "telefon"),
+    dogum_tarihi: readOptionalNullableString(p, "dogum_tarihi"),
+    sicil_no: readOptionalString(p, "sicil_no"),
+    dogum_yeri: readOptionalString(p, "dogum_yeri"),
+    kan_grubu: readOptionalString(p, "kan_grubu"),
+    ise_giris_tarihi: readOptionalString(p, "ise_giris_tarihi"),
+    acil_durum_kisi: readOptionalString(p, "acil_durum_kisi"),
+    acil_durum_telefon: readOptionalString(p, "acil_durum_telefon"),
+    departman_id: readOptionalNumber(p, "departman_id"),
+    bolum_id: readOptionalNullableNumber(p, "bolum_id"),
+    bolum_adi: readOptionalNullableString(p, "bolum_adi"),
+    birim_id: readOptionalNullableNumber(p, "birim_id"),
+    birim_adi: readOptionalNullableString(p, "birim_adi"),
+    gorev_id: readOptionalNumber(p, "gorev_id"),
+    pozisyon_id: readOptionalNullableNumber(p, "pozisyon_id"),
+    pozisyon_adi: readOptionalNullableString(p, "pozisyon_adi"),
+    personel_tipi_id: readOptionalNumber(p, "personel_tipi_id"),
+    bagli_amir_id: readOptionalNumber(p, "bagli_amir_id"),
+    sgk_isveren_id: readOptionalNullableNumber(p, "sgk_isveren_id"),
+    sgk_isveren_adi: readOptionalNullableString(p, "sgk_isveren_adi"),
+    calisma_lokasyonu_id: readOptionalNullableNumber(p, "calisma_lokasyonu_id"),
+    calisma_lokasyonu_adi: readOptionalNullableString(p, "calisma_lokasyonu_adi"),
+    sube_adi: readOptionalString(p, "sube_adi"),
+    departman_adi: readOptionalString(p, "departman_adi"),
+    gorev_adi: readOptionalString(p, "gorev_adi"),
+    personel_tipi_adi: readOptionalString(p, "personel_tipi_adi"),
+    bagli_amir_adi: readOptionalString(p, "bagli_amir_adi"),
+    hizmet_suresi: readOptionalString(p, "hizmet_suresi"),
+    toplam_izin_hakki: readOptionalNumber(p, "toplam_izin_hakki"),
+    kullanilan_izin: readOptionalNumber(p, "kullanilan_izin"),
+    kalan_izin: readOptionalNumber(p, "kalan_izin"),
+    pasiflik_durumu_etiketi: readOptionalNullableString(p, "pasiflik_durumu_etiketi")
   };
+}
+
+/** Sparse realtime patch: undefined alanlar onceki canonical degeri korur. */
+export function mergePersonelCanonical(existing: Personel | undefined, incoming: Personel): Personel {
+  if (!existing) {
+    return incoming;
+  }
+  const merged: Personel = { ...existing };
+  for (const [key, value] of Object.entries(incoming) as [keyof Personel, Personel[keyof Personel]][]) {
+    if (value !== undefined) {
+      (merged as Record<string, unknown>)[key as string] = value;
+    }
+  }
+  return merged;
 }
 
 function parseSurecRealtimePayload(p: unknown): Surec | null {
@@ -1160,13 +1430,14 @@ function mergePersonelIntoListCachesForSube(row: Personel, subeKey: number | nul
       continue;
     }
     const curRow = prev.items[idx];
-    if (!shouldApplyRealtimeUpdate(curRow, row, incomingRaw)) {
+    const merged = mergePersonelCanonical(curRow, row);
+    if (!shouldApplyRealtimeUpdate(curRow, merged, incomingRaw)) {
       continue;
     }
     mergeCacheEntry<PaginatedResult<Personel>>(key, (base) => {
       const cur = base!;
       const items = [...cur.items];
-      items[idx] = row;
+      items[idx] = merged;
       return { ...cur, items };
     });
   }
@@ -1244,6 +1515,11 @@ function prependBildirimToFirstPageLists(sube: number | null, b: Bildirim, incom
  * Sunucu / WebSocket pusundan gelen olaylari tek veri kaynagina yazar.
  * Optimistic gecici id'ler degistirilmez; eslesen kalici id'ler uzerine yazilir.
  */
+/**
+ * Realtime PERSONEL/SUREC/BILDIRIM cache writer.
+ * PERSONEL sparse patches merge via mergePersonelCanonical so org fields are retained.
+ * Sube mismatch vs active scope is ignored (no cross-sube cache write).
+ */
 export function handleRealtimeEnvelope(env: RealtimeEnvelope): void {
   if (!realtimeSubeMatchesActive(env.sube_id)) {
     return;
@@ -1258,10 +1534,11 @@ export function handleRealtimeEnvelope(env: RealtimeEnvelope): void {
       }
       const impact = getRealtimeCacheImpact("PERSONEL_GUNCELLENDI", keySube, row.id);
       const prevDetail = getCacheEntry<Personel>(impact.detailCacheKey);
-      if (shouldApplyRealtimeUpdate(prevDetail, row, env.payload)) {
-        setCacheEntry(impact.detailCacheKey, row);
+      const merged = mergePersonelCanonical(prevDetail, row);
+      if (shouldApplyRealtimeUpdate(prevDetail, merged, env.payload)) {
+        setCacheEntry(impact.detailCacheKey, merged);
       }
-      mergePersonelIntoListCachesForSube(row, keySube, env.payload);
+      mergePersonelIntoListCachesForSube(merged, keySube, env.payload);
       markReportCacheStale();
       return;
     }
@@ -1414,6 +1691,8 @@ export async function loadDataFromServer(options?: LoadDataFromServerOptions): P
     await Promise.allSettled(tasks);
     persistAppData();
     notifyAppData();
+    // Same-actor re-auth: unblock 401 items (stable Idempotency-Key = item.id).
+    resumeAuthBlockedQueueForCurrentActor();
     void processSyncQueue();
   })().finally(() => {
     protectedDataLoadInFlight = null;

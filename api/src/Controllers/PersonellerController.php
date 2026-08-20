@@ -22,6 +22,7 @@ use Medisa\Api\Services\Personel\PersonelImportReferenceCatalogService;
 use Medisa\Api\Services\Personel\PersonelOrgLocationSchema;
 use Medisa\Api\Services\Personel\PersonelOrgStructureSchema;
 use Medisa\Api\Services\Personel\PersonelValidationException;
+use Medisa\Api\Services\OfflineMutationIdempotencyService;
 use Medisa\Api\Services\PersonelUcretException;
 use Medisa\Api\Services\PersonelUcretService;
 use Medisa\Api\Services\Retention\PersonelArchiveGate;
@@ -279,8 +280,53 @@ class PersonellerController
         self::assertTcAvailable($pdo, $payload['tc_kimlik_no'] ?? null);
         self::assertSicilAvailable($pdo, (string) $payload['sicil_no']);
 
+        $actorId = (int) ($user['id'] ?? 0);
+        $idemKey = OfflineMutationIdempotencyService::readKey($request);
+        $idemScope = 'personeller.create';
+        $idemHash = OfflineMutationIdempotencyService::hashPayload([
+            'op' => $idemScope,
+            'payload' => $payload,
+        ]);
+        if ($idemKey !== null) {
+            $replay = OfflineMutationIdempotencyService::findCompletedReplay(
+                $pdo,
+                $actorId,
+                $idemScope,
+                $idemKey,
+                $idemHash
+            );
+            if (is_array($replay) && !empty($replay['result_entity_id'])) {
+                $existing = self::fetchPersonelRowById($pdo, (int) $replay['result_entity_id']);
+                if ($existing) {
+                    JsonResponse::success(self::mapPersonelRow($existing, $user), [], (int) ($replay['http_status'] ?? 201));
+                }
+            }
+        }
+
         $pdo->beginTransaction();
         try {
+            if ($idemKey !== null) {
+                $claimedReplay = OfflineMutationIdempotencyService::claimInTransaction(
+                    $pdo,
+                    $actorId,
+                    $idemScope,
+                    $idemKey,
+                    $idemHash
+                );
+                if (is_array($claimedReplay) && !empty($claimedReplay['result_entity_id'])) {
+                    $pdo->commit();
+                    $existing = self::fetchPersonelRowById($pdo, (int) $claimedReplay['result_entity_id']);
+                    if ($existing) {
+                        JsonResponse::success(
+                            self::mapPersonelRow($existing, $user),
+                            [],
+                            (int) ($claimedReplay['http_status'] ?? 201)
+                        );
+                    }
+                    JsonResponse::serverError('Idempotent replay sonucu yuklenemedi.');
+                }
+            }
+
             $insertId = PersonelCreateService::insertPersonel($pdo, $payload);
             if ($hasSalary && $payload['maas_tutari'] !== null) {
                 PersonelUcretService::createSalaryRecord($pdo, $insertId, [
@@ -295,6 +341,19 @@ class PersonellerController
             if (!$row) {
                 $pdo->rollBack();
                 JsonResponse::serverError('Kayit olusturulamadi.');
+            }
+
+            if ($idemKey !== null) {
+                OfflineMutationIdempotencyService::completeInTransaction(
+                    $pdo,
+                    $actorId,
+                    $idemScope,
+                    $idemKey,
+                    201,
+                    'personel',
+                    $insertId,
+                    null
+                );
             }
 
             $pdo->commit();
@@ -438,8 +497,54 @@ class PersonellerController
         $salaryAmount = $payload['maas_tutari'] ?? null;
         unset($payload['maas_tutari']);
 
+        $actorId = (int) ($user['id'] ?? 0);
+        $idemKey = OfflineMutationIdempotencyService::readKey($request);
+        $idemScope = 'personeller.update:' . $personelId;
+        $idemHash = OfflineMutationIdempotencyService::hashPayload([
+            'op' => $idemScope,
+            'personel_id' => $personelId,
+            'payload' => $payload,
+            'salary' => $salaryChanged ? $salaryAmount : null,
+        ]);
+        if ($idemKey !== null) {
+            $replay = OfflineMutationIdempotencyService::findCompletedReplay(
+                $pdo,
+                $actorId,
+                $idemScope,
+                $idemKey,
+                $idemHash
+            );
+            if (is_array($replay)) {
+                $existing = self::fetchPersonelRowById($pdo, $personelId);
+                if ($existing) {
+                    JsonResponse::success(self::mapPersonelRow($existing, $user), [], (int) ($replay['http_status'] ?? 200));
+                }
+            }
+        }
+
         $pdo->beginTransaction();
         try {
+            if ($idemKey !== null) {
+                $claimedReplay = OfflineMutationIdempotencyService::claimInTransaction(
+                    $pdo,
+                    $actorId,
+                    $idemScope,
+                    $idemKey,
+                    $idemHash
+                );
+                if (is_array($claimedReplay)) {
+                    $pdo->commit();
+                    $existing = self::fetchPersonelRowById($pdo, $personelId);
+                    if ($existing) {
+                        JsonResponse::success(
+                            self::mapPersonelRow($existing, $user),
+                            [],
+                            (int) ($claimedReplay['http_status'] ?? 200)
+                        );
+                    }
+                }
+            }
+
             self::updatePersonelRow($pdo, $personelId, $payload);
             if ($salaryChanged) {
                 PersonelUcretService::createSalaryRecord($pdo, $personelId, [
@@ -456,6 +561,19 @@ class PersonellerController
             if (!$row) {
                 $pdo->rollBack();
                 JsonResponse::serverError('Kayit guncellenemedi.');
+            }
+
+            if ($idemKey !== null) {
+                OfflineMutationIdempotencyService::completeInTransaction(
+                    $pdo,
+                    $actorId,
+                    $idemScope,
+                    $idemKey,
+                    200,
+                    'personel',
+                    $personelId,
+                    null
+                );
             }
 
             $pdo->commit();

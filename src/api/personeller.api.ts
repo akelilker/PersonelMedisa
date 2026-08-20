@@ -376,10 +376,11 @@ export async function fetchPersonellerList(
   });
 }
 
-export async function createPersonel(payload: CreatePersonelPayload): Promise<Personel> {
+export async function createPersonel(payload: CreatePersonelPayload, options?: { idempotencyKey?: string }): Promise<Personel> {
   const response = await apiRequest<ApiResponse<unknown>>(endpoints.personeller.list, {
     method: "POST",
-    body: JSON.stringify(payload)
+    body: JSON.stringify(payload),
+    idempotencyKey: options?.idempotencyKey
   });
 
   const created = normalizePersonel(response.data);
@@ -394,11 +395,13 @@ export async function fetchPersonelDetail(personelId: number | string): Promise<
 
 export async function updatePersonel(
   personelId: number | string,
-  payload: UpdatePersonelPayload
+  payload: UpdatePersonelPayload,
+  options?: { idempotencyKey?: string }
 ): Promise<Personel> {
   const response = await apiRequest<ApiResponse<unknown>>(endpoints.personeller.detail(personelId), {
     method: "PUT",
-    body: JSON.stringify(payload)
+    body: JSON.stringify(payload),
+    idempotencyKey: options?.idempotencyKey
   });
   const updated = normalizePersonel(response.data);
   logAction({ action: "PERSONEL_UPDATE", payload: { personel_id: updated.id } });

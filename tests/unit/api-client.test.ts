@@ -3,16 +3,29 @@ import { AUTH_FORBIDDEN_EVENT, AUTH_UNAUTHORIZED_EVENT } from "../../src/lib/sto
 import { shouldEmitGlobalAuthForbidden } from "../../src/lib/api-forbidden-policy";
 import {
   ApiRequestError,
+  __setTransportSleepForTests,
   apiRequest,
   getApiErrorDetail,
   getApiErrorMessage,
-  isApiRequestError
+  isApiRequestError,
+  isSafeHttpMethod,
+  isTransientReadStatus
 } from "../../src/api/api-client";
 import { getAuthTokenForApi } from "../../src/auth/auth-token-provider";
 
-const { mockActiveSubeHeader } = vi.hoisted(() => ({
-  mockActiveSubeHeader: vi.fn<[], string | null>(() => null)
+const { mockActiveSubeHeader, mockIsDemoApiFallbackEnabled } = vi.hoisted(() => ({
+  mockActiveSubeHeader: vi.fn<[], string | null>(() => null),
+  mockIsDemoApiFallbackEnabled: vi.fn(() => false)
 }));
+
+vi.mock("../../src/config/app-env", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../src/config/app-env")>();
+  return {
+    ...actual,
+    isDemoApiFallbackEnabled: mockIsDemoApiFallbackEnabled,
+    getApiMode: () => "real" as const
+  };
+});
 
 vi.mock("../../src/auth/auth-token-provider", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../src/auth/auth-token-provider")>();
@@ -30,17 +43,26 @@ vi.mock("../../src/auth/auth-manager", async (importOriginal) => {
   };
 });
 
-type WindowLike = EventTarget;
+type WindowLike = EventTarget & {
+  location: { pathname: string; hostname: string; port: string };
+};
 
-function createWindowLike() {
-  return new EventTarget() as WindowLike;
+function createWindowLike(pathname = "/personelmedisa/") {
+  const target = new EventTarget() as WindowLike;
+  target.location = {
+    pathname,
+    hostname: "example.test",
+    port: ""
+  };
+  return target;
 }
 
-function createJsonResponse(body: unknown, status: number) {
+function createJsonResponse(body: unknown, status: number, headers?: Record<string, string>) {
   return new Response(JSON.stringify(body), {
     status,
     headers: {
-      "Content-Type": "application/json"
+      "Content-Type": "application/json",
+      ...headers
     }
   });
 }
@@ -54,11 +76,17 @@ describe("apiRequest", () => {
     getAuthTokenForApiMock.mockReturnValue("test-token");
     mockActiveSubeHeader.mockReset();
     mockActiveSubeHeader.mockReturnValue(null);
+    mockIsDemoApiFallbackEnabled.mockReturnValue(false);
+    __setTransportSleepForTests(async () => undefined);
   });
 
   afterEach(() => {
+    __setTransportSleepForTests(null);
     vi.unstubAllGlobals();
-    vi.restoreAllMocks();
+    mockIsDemoApiFallbackEnabled.mockReset();
+    mockIsDemoApiFallbackEnabled.mockReturnValue(false);
+    mockActiveSubeHeader.mockReset();
+    mockActiveSubeHeader.mockReturnValue(null);
   });
 
   it("attaches X-Active-Sube-Id when session sube header provider returns a value", async () => {
@@ -106,6 +134,190 @@ describe("apiRequest", () => {
     const headers = new Headers(init?.headers);
     expect(headers.get("Authorization")).toBeNull();
     expect(getAuthTokenForApiMock).not.toHaveBeenCalled();
+  });
+
+  it("preserves caller Idempotency-Key and does not mint one", async () => {
+    const fetchMock = vi.fn(async () =>
+      createJsonResponse({ data: { ok: true }, meta: {}, errors: [] }, 200)
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await apiRequest("/personeller", {
+      method: "POST",
+      body: JSON.stringify({ ad: "x" }),
+      idempotencyKey: "queue-item-stable-1"
+    });
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const headers = new Headers(init?.headers);
+    expect(headers.get("Idempotency-Key")).toBe("queue-item-stable-1");
+    expect((init as { idempotencyKey?: string }).idempotencyKey).toBeUndefined();
+  });
+
+  it("GET network fail on first base retries second candidate", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockRejectedValueOnce(new TypeError("Failed to fetch"))
+      .mockResolvedValueOnce(createJsonResponse({ data: { ok: true }, meta: {}, errors: [] }, 200));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(apiRequest("/personeller")).resolves.toMatchObject({ data: { ok: true } });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(String(fetchMock.mock.calls[0][0])).toContain("/personelmedisa/api/");
+    expect(String(fetchMock.mock.calls[1][0])).toMatch(/\/api\/personeller$/);
+  });
+
+  it("POST network fail does not blind-failover to second base", async () => {
+    const fetchMock = vi.fn().mockRejectedValue(new TypeError("Failed to fetch"));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      apiRequest("/personeller", {
+        method: "POST",
+        body: JSON.stringify({ ad: "x" })
+      })
+    ).rejects.toMatchObject({ status: 0 });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(["PUT", "PATCH", "DELETE"] as const)(
+    "%s network fail does not blind-failover to second base",
+    async (method) => {
+      const fetchMock = vi.fn().mockRejectedValue(new TypeError("Failed to fetch"));
+      vi.stubGlobal("fetch", fetchMock);
+
+      await expect(apiRequest("/personeller/1", { method })).rejects.toMatchObject({ status: 0 });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  it("GET 503 retries with bounded attempts then fails", async () => {
+    const fetchMock = vi.fn(async () =>
+      createJsonResponse(
+        { data: null, meta: {}, errors: [{ code: "UNAVAILABLE", message: "busy" }] },
+        503,
+        { "Retry-After": "0" }
+      )
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(apiRequest("/personeller")).rejects.toMatchObject({ status: 503 });
+    const personelCalls = fetchMock.mock.calls.filter((call) =>
+      String(call[0]).includes("/personeller")
+    );
+    expect(personelCalls.length).toBeGreaterThanOrEqual(2);
+    expect(personelCalls.length).toBeLessThanOrEqual(3);
+  });
+
+  it("GET 401 does not retry", async () => {
+    const fetchMock = vi.fn(async () =>
+      createJsonResponse(
+        {
+          data: null,
+          meta: {},
+          errors: [{ code: "UNAUTHORIZED", message: "Oturum suresi doldu." }]
+        },
+        401
+      )
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(apiRequest("/personeller")).rejects.toMatchObject({ status: 401 });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("GET 403 does not retry", async () => {
+    const fetchMock = vi.fn(async () =>
+      createJsonResponse(
+        {
+          data: null,
+          meta: {},
+          errors: [{ code: "FORBIDDEN", message: "yetki yok" }]
+        },
+        403
+      )
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(apiRequest("/personeller?page=1")).rejects.toMatchObject({ status: 403 });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("GET 422 does not retry", async () => {
+    const fetchMock = vi.fn(async () =>
+      createJsonResponse(
+        {
+          data: null,
+          meta: {},
+          errors: [{ code: "VALIDATION_ERROR", message: "gecersiz", field: "q" }]
+        },
+        422
+      )
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(apiRequest("/personeller")).rejects.toMatchObject({
+      status: 422,
+      code: "VALIDATION_ERROR"
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("timeout yields ApiRequestError REQUEST_TIMEOUT status 0", async () => {
+    const fetchMock = vi.fn((_url: string, init?: RequestInit) => {
+      return new Promise((_resolve, reject) => {
+        const signal = init?.signal;
+        if (!signal) {
+          reject(new Error("missing signal"));
+          return;
+        }
+        signal.addEventListener(
+          "abort",
+          () => {
+            const err = new Error("Aborted");
+            err.name = "AbortError";
+            reject(err);
+          },
+          { once: true }
+        );
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(apiRequest("/personeller", { timeoutMs: 5 })).rejects.toMatchObject({
+      status: 0,
+      code: "REQUEST_TIMEOUT",
+      message: "İstek zaman aşımına uğradı."
+    });
+  });
+
+  it("caller AbortSignal abort is REQUEST_ABORTED and does not retry", async () => {
+    const controller = new AbortController();
+    const fetchMock = vi.fn((_url: string, init?: RequestInit) => {
+      return new Promise((_resolve, reject) => {
+        const signal = init?.signal;
+        signal?.addEventListener(
+          "abort",
+          () => {
+            const err = new Error("Aborted");
+            err.name = "AbortError";
+            reject(err);
+          },
+          { once: true }
+        );
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const pending = apiRequest("/personeller", { signal: controller.signal, timeoutMs: 30_000 });
+    controller.abort();
+
+    await expect(pending).rejects.toMatchObject({
+      status: 0,
+      code: "REQUEST_ABORTED"
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it("emits unauthorized event and throws ApiRequestError for 401 response", async () => {
@@ -399,6 +611,25 @@ describe("apiRequest", () => {
     });
 
     expect(forbiddenListener).not.toHaveBeenCalled();
+  });
+});
+
+describe("transport helpers", () => {
+  it("classifies safe vs unsafe methods", () => {
+    expect(isSafeHttpMethod("GET")).toBe(true);
+    expect(isSafeHttpMethod("head")).toBe(true);
+    expect(isSafeHttpMethod("POST")).toBe(false);
+    expect(isSafeHttpMethod("PUT")).toBe(false);
+    expect(isSafeHttpMethod("PATCH")).toBe(false);
+    expect(isSafeHttpMethod("DELETE")).toBe(false);
+  });
+
+  it("classifies transient read statuses", () => {
+    expect(isTransientReadStatus(503)).toBe(true);
+    expect(isTransientReadStatus(429)).toBe(true);
+    expect(isTransientReadStatus(401)).toBe(false);
+    expect(isTransientReadStatus(422)).toBe(false);
+    expect(isTransientReadStatus(500)).toBe(false);
   });
 });
 

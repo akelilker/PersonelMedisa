@@ -1,10 +1,10 @@
 import { finalizeAuthSessionSube } from "../auth/auth-session-sube";
+import { isRealBackendOnlyMode } from "../config/app-env";
 import { canonicalizeUserRole } from "../lib/authorization/canonicalize-user-role";
+import { flushPreAuthTelemetry } from "../logging/client-telemetry";
 import type { AuthSession, LoginCredentials } from "../types/auth";
 import { apiRequest, ApiRequestError } from "./api-client";
 import { endpoints } from "./endpoints";
-
-const DEMO_LOGIN_ENABLED = true;
 
 function toRecord(value: unknown): Record<string, unknown> | null {
   if (typeof value !== "object" || value === null) {
@@ -259,15 +259,17 @@ function createDemoSession(credentials: LoginCredentials): AuthSession {
   });
 }
 
-function shouldUseDemoFallback(error: unknown): boolean {
-  if (!DEMO_LOGIN_ENABLED) {
+function shouldUseDemoLoginFallback(error: unknown): boolean {
+  if (isRealBackendOnlyMode()) {
     return false;
   }
 
   if (error instanceof ApiRequestError) {
-    return [404, 502, 503, 504].includes(error.status);
+    // Demo/mock modda 404/5xx gibi hatalarda demo session'a dus.
+    return [0, 404, 500, 502, 503, 504].includes(error.status);
   }
 
+  // Demo/mock modda JSON parse hatasinda demo session'a dus.
   if (error instanceof TypeError) {
     return true;
   }
@@ -287,6 +289,7 @@ export async function login(credentials: LoginCredentials): Promise<AuthSession>
 
     const session = normalizeAuthSession(response);
     if (session) {
+      flushPreAuthTelemetry();
       return session;
     }
 
@@ -295,20 +298,20 @@ export async function login(credentials: LoginCredentials): Promise<AuthSession>
       throw new ApiRequestError(backendMessage, 200);
     }
 
-    // Real auth payload that failed role/session normalization must fail-closed.
-    // Never invent a demo session over an unusable 200 login body.
-    if (responseLooksLikeAuthPayload(response)) {
-      throw new ApiRequestError("Login yaniti beklenen oturum formatinda degil.", 200);
+    // Auth-benzeri payload (token var, rol bozuk vb.) her zaman fail-closed.
+    // Yalnizca HTML/beklenmeyen non-auth 200'lerde demo session'a dus.
+    if (!isRealBackendOnlyMode() && !responseLooksLikeAuthPayload(response)) {
+      const demo = createDemoSession(credentials);
+      flushPreAuthTelemetry();
+      return demo;
     }
 
-    if (DEMO_LOGIN_ENABLED) {
-      return createDemoSession(credentials);
-    }
-
-    throw new ApiRequestError("Login yaniti beklenen oturum formatinda degil.", 200);
+    throw new ApiRequestError("Login yanıtı beklenen oturum formatında değil.", 200);
   } catch (error) {
-    if (shouldUseDemoFallback(error)) {
-      return createDemoSession(credentials);
+    if (shouldUseDemoLoginFallback(error)) {
+      const demo = createDemoSession(credentials);
+      flushPreAuthTelemetry();
+      return demo;
     }
 
     throw error;

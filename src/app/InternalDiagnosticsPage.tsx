@@ -30,7 +30,7 @@ export function InternalDiagnosticsPage() {
         <ul>
           {errors.map((e, i) => (
             <li key={`${e.timestamp}-${i}`}>
-              <code>{e.timestamp}</code> — {e.message} — {e.route}
+                  <code>{e.timestamp}</code> — {e.message} — {e.route_template ?? e.route}
             </li>
           ))}
         </ul>

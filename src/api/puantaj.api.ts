@@ -424,7 +424,8 @@ export async function fetchGunlukPuantaj(
 export async function upsertGunlukPuantaj(
   personelId: number,
   tarih: string,
-  payload: UpsertGunlukPuantajPayload
+  payload: UpsertGunlukPuantajPayload,
+  options?: { idempotencyKey?: string }
 ): Promise<GunlukPuantaj> {
   const requestBody: UpsertGunlukPuantajPayload = {
     ...payload,
@@ -433,7 +434,8 @@ export async function upsertGunlukPuantaj(
   };
   const response = await apiRequest<ApiResponse<unknown>>(endpoints.puantaj.detail(personelId, tarih), {
     method: "PUT",
-    body: JSON.stringify(requestBody)
+    body: JSON.stringify(requestBody),
+    idempotencyKey: options?.idempotencyKey,
   });
 
   const row = normalizeGunlukPuantaj(response.data, personelId, tarih);

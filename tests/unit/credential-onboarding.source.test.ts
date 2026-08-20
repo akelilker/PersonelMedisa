@@ -103,12 +103,13 @@ describe("credential onboarding owners (MG-CRED-ONBOARD-001)", () => {
     expect(change).not.toMatch(/WHERE id = :id.*\$body/);
   });
 
-  it("migration 069 is canonical tip after 068 with bundle/runner parity", () => {
+  it("migration 069 remains in chain; tip is 070 with bundle/runner parity", () => {
     const migrations = readdirSync(resolve("api/migrations"))
       .filter((name) => /^\d{3}_.+\.sql$/.test(name))
       .sort();
-    expect(migrations.at(-2)).toBe("068_sgk_actor_identity_lifecycle_audit.sql");
-    expect(migrations.at(-1)).toBe("069_personel_credential_onboarding.sql");
+    expect(migrations.at(-3)).toBe("068_sgk_actor_identity_lifecycle_audit.sql");
+    expect(migrations.at(-2)).toBe("069_personel_credential_onboarding.sql");
+    expect(migrations.at(-1)).toBe("070_offline_mutation_idempotency.sql");
 
     const migration069 = read("api/migrations/069_personel_credential_onboarding.sql");
     const checksum069 = createHash("sha256").update(migration069).digest("hex");
@@ -126,9 +127,11 @@ describe("credential onboarding owners (MG-CRED-ONBOARD-001)", () => {
 
     const bundleTest = read("tests/unit/canonical-migration-bundle.source.test.ts");
     expect(bundleTest).toContain("'name' => '069_personel_credential_onboarding.sql'");
+    expect(bundleTest).toContain("'name' => '070_offline_mutation_idempotency.sql'");
     expect(bundleTest).toContain("checksum069");
-    expect(bundleTest).toContain("count($rows) !== 70");
+    expect(bundleTest).toContain("checksum070");
+    expect(bundleTest).toContain("count($rows) !== 71");
+    expect(bundleTest).toContain("rows[70]['version'] !== '070'");
     expect(bundleTest).toContain("rows[69]['version'] !== '069'");
-    expect(bundleTest).toContain("rows[68]['version'] !== '068'");
   });
 });

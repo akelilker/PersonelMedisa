@@ -10,6 +10,7 @@ use Medisa\Api\Database\Connection;
 use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
 use Medisa\Api\Scope\SubeScope;
+use Medisa\Api\Services\OfflineMutationIdempotencyService;
 use PDO;
 
 class SureclerController
@@ -145,12 +146,56 @@ class SureclerController
             );
         }
 
+        $actorId = (int) ($user['id'] ?? 0);
+        $idemKey = OfflineMutationIdempotencyService::readKey($request);
+        $idemScope = 'surecler.create';
+        $idemHash = OfflineMutationIdempotencyService::hashPayload([
+            'op' => $idemScope,
+            'payload' => $payload,
+        ]);
+        if ($idemKey !== null) {
+            $replay = OfflineMutationIdempotencyService::findCompletedReplay(
+                $pdo,
+                $actorId,
+                $idemScope,
+                $idemKey,
+                $idemHash
+            );
+            if (is_array($replay) && !empty($replay['result_entity_id'])) {
+                $existing = self::fetchSurecRowById($pdo, (int) $replay['result_entity_id']);
+                if ($existing) {
+                    JsonResponse::success(self::mapSurecRow($existing), [], (int) ($replay['http_status'] ?? 201));
+                }
+            }
+        }
+
         $pdo->beginTransaction();
         try {
+            if ($idemKey !== null) {
+                $claimedReplay = OfflineMutationIdempotencyService::claimInTransaction(
+                    $pdo,
+                    $actorId,
+                    $idemScope,
+                    $idemKey,
+                    $idemHash
+                );
+                if (is_array($claimedReplay) && !empty($claimedReplay['result_entity_id'])) {
+                    $pdo->commit();
+                    $existing = self::fetchSurecRowById($pdo, (int) $claimedReplay['result_entity_id']);
+                    if ($existing) {
+                        JsonResponse::success(
+                            self::mapSurecRow($existing),
+                            [],
+                            (int) ($claimedReplay['http_status'] ?? 201)
+                        );
+                    }
+                    JsonResponse::serverError('Idempotent replay sonucu yuklenemedi.');
+                }
+            }
+
             $insertId = self::insertSurec($pdo, $payload);
             if ($payload['surec_turu'] === 'ISTEN_AYRILMA') {
                 self::deactivatePersonel($pdo, $payload['personel_id']);
-                $actorId = (int) ($user['id'] ?? 0);
                 // Baseline tip 058: retention schema (053) is required — SCHEMA_NOT_READY fails closed.
                 \Medisa\Api\Services\Retention\ArchiveManifestService::createPersonelLifecycleManifests(
                     $pdo,
@@ -163,6 +208,19 @@ class SureclerController
             if (!$row) {
                 $pdo->rollBack();
                 JsonResponse::serverError('Kayit olusturulamadi.');
+            }
+
+            if ($idemKey !== null) {
+                OfflineMutationIdempotencyService::completeInTransaction(
+                    $pdo,
+                    $actorId,
+                    $idemScope,
+                    $idemKey,
+                    201,
+                    'surec',
+                    $insertId,
+                    null
+                );
             }
 
             $pdo->commit();
@@ -251,8 +309,53 @@ class SureclerController
 
         $payload = self::normalizeAndValidateUpdatePayload($body, $existing);
 
+        $actorId = (int) ($user['id'] ?? 0);
+        $idemKey = OfflineMutationIdempotencyService::readKey($request);
+        $idemScope = 'surecler.update:' . $surecId;
+        $idemHash = OfflineMutationIdempotencyService::hashPayload([
+            'op' => $idemScope,
+            'surec_id' => $surecId,
+            'payload' => $payload,
+        ]);
+        if ($idemKey !== null) {
+            $replay = OfflineMutationIdempotencyService::findCompletedReplay(
+                $pdo,
+                $actorId,
+                $idemScope,
+                $idemKey,
+                $idemHash
+            );
+            if (is_array($replay)) {
+                $existingRow = self::fetchSurecRowById($pdo, $surecId);
+                if ($existingRow) {
+                    JsonResponse::success(self::mapSurecRow($existingRow), [], (int) ($replay['http_status'] ?? 200));
+                }
+            }
+        }
+
         $pdo->beginTransaction();
         try {
+            if ($idemKey !== null) {
+                $claimedReplay = OfflineMutationIdempotencyService::claimInTransaction(
+                    $pdo,
+                    $actorId,
+                    $idemScope,
+                    $idemKey,
+                    $idemHash
+                );
+                if (is_array($claimedReplay)) {
+                    $pdo->commit();
+                    $existingRow = self::fetchSurecRowById($pdo, $surecId);
+                    if ($existingRow) {
+                        JsonResponse::success(
+                            self::mapSurecRow($existingRow),
+                            [],
+                            (int) ($claimedReplay['http_status'] ?? 200)
+                        );
+                    }
+                }
+            }
+
             $stmt = $pdo->prepare('
                 UPDATE surecler
                 SET surec_turu = :surec_turu,
@@ -301,6 +404,18 @@ class SureclerController
                     $pdo->rollBack();
                     JsonResponse::serverError('Kayit guncellenemedi.');
                 }
+                if ($idemKey !== null) {
+                    OfflineMutationIdempotencyService::completeInTransaction(
+                        $pdo,
+                        $actorId,
+                        $idemScope,
+                        $idemKey,
+                        200,
+                        'surec',
+                        $surecId,
+                        null
+                    );
+                }
                 $pdo->commit();
                 JsonResponse::success(self::mapSurecRow($row));
             }
@@ -311,6 +426,19 @@ class SureclerController
             if (!$row) {
                 $pdo->rollBack();
                 JsonResponse::serverError('Kayit guncellenemedi.');
+            }
+
+            if ($idemKey !== null) {
+                OfflineMutationIdempotencyService::completeInTransaction(
+                    $pdo,
+                    $actorId,
+                    $idemScope,
+                    $idemKey,
+                    200,
+                    'surec',
+                    $surecId,
+                    null
+                );
             }
 
             $pdo->commit();
@@ -359,36 +487,113 @@ class SureclerController
             JsonResponse::error(409, 'CONFLICT', 'Tamamlanmis surec iptal edilemez.');
         }
 
-        $stmt = $pdo->prepare("
-            UPDATE surecler
-            SET state = 'IPTAL'
-            WHERE id = :id
-              AND state NOT IN ('IPTAL', 'TAMAMLANDI')
-        ");
-        $stmt->execute(['id' => $surecId]);
-
-        if ($stmt->rowCount() === 0) {
-            $fresh = self::fetchSurecWithPersonel($pdo, $surecId);
-            if (!$fresh) {
-                JsonResponse::notFound('Surec bulunamadi.');
-            }
-            $freshState = strtoupper((string) ($fresh['state'] ?? ''));
-            if ($freshState === 'IPTAL') {
+        $actorId = (int) ($user['id'] ?? 0);
+        $idemKey = OfflineMutationIdempotencyService::readKey($request);
+        $idemScope = 'surecler.cancel:' . $surecId;
+        $idemHash = OfflineMutationIdempotencyService::hashPayload([
+            'op' => $idemScope,
+            'surec_id' => $surecId,
+        ]);
+        if ($idemKey !== null) {
+            $replay = OfflineMutationIdempotencyService::findCompletedReplay(
+                $pdo,
+                $actorId,
+                $idemScope,
+                $idemKey,
+                $idemHash
+            );
+            if (is_array($replay)) {
                 JsonResponse::success([
-                    'id' => (int) $fresh['id'],
+                    'id' => $surecId,
                     'state' => 'IPTAL',
-                ]);
+                ], [], (int) ($replay['http_status'] ?? 200));
             }
-            if ($freshState === 'TAMAMLANDI') {
-                JsonResponse::error(409, 'CONFLICT', 'Tamamlanmis surec iptal edilemez.');
-            }
-            JsonResponse::error(409, 'CONFLICT', 'Surec iptal edilemedi.');
         }
 
-        JsonResponse::success([
-            'id' => $surecId,
-            'state' => 'IPTAL',
-        ]);
+        $pdo->beginTransaction();
+        try {
+            if ($idemKey !== null) {
+                $claimedReplay = OfflineMutationIdempotencyService::claimInTransaction(
+                    $pdo,
+                    $actorId,
+                    $idemScope,
+                    $idemKey,
+                    $idemHash
+                );
+                if (is_array($claimedReplay)) {
+                    $pdo->commit();
+                    JsonResponse::success([
+                        'id' => $surecId,
+                        'state' => 'IPTAL',
+                    ], [], (int) ($claimedReplay['http_status'] ?? 200));
+                }
+            }
+
+            $stmt = $pdo->prepare("
+                UPDATE surecler
+                SET state = 'IPTAL'
+                WHERE id = :id
+                  AND state NOT IN ('IPTAL', 'TAMAMLANDI')
+            ");
+            $stmt->execute(['id' => $surecId]);
+
+            if ($stmt->rowCount() === 0) {
+                $fresh = self::fetchSurecWithPersonel($pdo, $surecId);
+                if (!$fresh) {
+                    $pdo->rollBack();
+                    JsonResponse::notFound('Surec bulunamadi.');
+                }
+                $freshState = strtoupper((string) ($fresh['state'] ?? ''));
+                if ($freshState === 'IPTAL') {
+                    if ($idemKey !== null) {
+                        OfflineMutationIdempotencyService::completeInTransaction(
+                            $pdo,
+                            $actorId,
+                            $idemScope,
+                            $idemKey,
+                            200,
+                            'surec',
+                            $surecId,
+                            null
+                        );
+                    }
+                    $pdo->commit();
+                    JsonResponse::success([
+                        'id' => (int) $fresh['id'],
+                        'state' => 'IPTAL',
+                    ]);
+                }
+                $pdo->rollBack();
+                if ($freshState === 'TAMAMLANDI') {
+                    JsonResponse::error(409, 'CONFLICT', 'Tamamlanmis surec iptal edilemez.');
+                }
+                JsonResponse::error(409, 'CONFLICT', 'Surec iptal edilemedi.');
+            }
+
+            if ($idemKey !== null) {
+                OfflineMutationIdempotencyService::completeInTransaction(
+                    $pdo,
+                    $actorId,
+                    $idemScope,
+                    $idemKey,
+                    200,
+                    'surec',
+                    $surecId,
+                    null
+                );
+            }
+
+            $pdo->commit();
+            JsonResponse::success([
+                'id' => $surecId,
+                'state' => 'IPTAL',
+            ]);
+        } catch (\PDOException $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            JsonResponse::serverError('Surec iptal edilemedi.');
+        }
     }
 
     /** @param array<string, mixed> $body @param array<string, mixed> $existing @return array<string, mixed> */

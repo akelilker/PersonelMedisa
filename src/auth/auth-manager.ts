@@ -1,11 +1,33 @@
 import type { AuthSession, AuthUser, LoginCredentials } from "../types/auth";
+import { apiRequest } from "../api/api-client";
 import { login as requestLoginSession } from "../api/auth.api";
+import { endpoints } from "../api/endpoints";
 import { MEDISA_AUTH_SESSION_KEY } from "./auth-constants";
 import { finalizeAuthSessionSube } from "./auth-session-sube";
 import { registerAuthTokenSource } from "./auth-token-provider";
 
 export { MEDISA_AUTH_SESSION_KEY };
 const LEGACY_AUTH_SESSION_KEY = "medisa.auth.session.v1";
+
+/**
+ * Oturuma ozel, protected cache ve offline queue'yu scopelayan kimlik.
+ * user id + izin verilen subelerin normalize listesi.
+ * Bu degistiginde, eski kullaniciya ait cache/queue kullanilamaz.
+ */
+/**
+ * Actor-scoped offline ownership fingerprint (`userId|role|sortedSubeIds`).
+ * Used to isolate protected cache + sync queue across users on a shared browser.
+ */
+export function getActorFingerprint(session: AuthSession | null): string | null {
+  if (!session) {
+    return null;
+  }
+  const userId = session.user.id;
+  const allowedSubes = [...(session.user.sube_ids ?? [])].sort((a, b) => a - b).join(",");
+  const role = session.user.rol;
+
+  return `${userId}|${role}|${allowedSubes}`;
+}
 
 function migrateLegacyAuthIfNeeded(): void {
   if (typeof window === "undefined") {

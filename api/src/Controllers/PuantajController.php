@@ -12,6 +12,7 @@ use Medisa\Api\Http\Request;
 use Medisa\Api\Scope\SubeScope;
 use Medisa\Api\Services\DonemKapanisAuditService;
 use Medisa\Api\Services\DonemKapanisPreflightService;
+use Medisa\Api\Services\OfflineMutationIdempotencyService;
 use Medisa\Api\Services\Payroll\PayrollComplianceGuard;
 use Medisa\Api\Services\PuantajDonemKilidiService;
 use Medisa\Api\Services\PuantajDonemPeriodService;
@@ -284,8 +285,55 @@ class PuantajController
             $personelId
         );
 
+        $actorId = (int) ($user['id'] ?? 0);
+        $idemKey = OfflineMutationIdempotencyService::readKey($request);
+        $idemScope = 'puantaj.upsert:' . $personelId . ':' . $tarih;
+        $idemHash = OfflineMutationIdempotencyService::hashPayload([
+            'op' => $idemScope,
+            'personel_id' => $personelId,
+            'tarih' => $tarih,
+            'payload' => is_array($payload) ? $payload : [],
+        ]);
+        if ($idemKey !== null) {
+            $replay = OfflineMutationIdempotencyService::findCompletedReplay(
+                $pdo,
+                $actorId,
+                $idemScope,
+                $idemKey,
+                $idemHash
+            );
+            if (is_array($replay)) {
+                $existingRow = self::findPuantajRow($pdo, $personelId, $tarih);
+                if ($existingRow) {
+                    JsonResponse::success(self::mapRow($existingRow), [], (int) ($replay['http_status'] ?? 200));
+                }
+            }
+        }
+
         try {
             $pdo->beginTransaction();
+            if ($idemKey !== null) {
+                $claimedReplay = OfflineMutationIdempotencyService::claimInTransaction(
+                    $pdo,
+                    $actorId,
+                    $idemScope,
+                    $idemKey,
+                    $idemHash
+                );
+                if (is_array($claimedReplay)) {
+                    $pdo->commit();
+                    $existingRow = self::findPuantajRow($pdo, $personelId, $tarih);
+                    if ($existingRow) {
+                        JsonResponse::success(
+                            self::mapRow($existingRow),
+                            [],
+                            (int) ($claimedReplay['http_status'] ?? 200)
+                        );
+                    }
+                    JsonResponse::serverError('Idempotent replay sonucu yuklenemedi.');
+                }
+            }
+
             $periodLock = PuantajDonemKilidiService::acquireForDate($pdo, (int) $personel['sube_id'], $tarih);
             try {
                 PuantajDonemPeriodService::assertCanonicalWriteAllowed(
@@ -322,6 +370,18 @@ class PuantajController
             }
 
             $row = self::findPuantajRow($pdo, $personelId, $tarih);
+            if ($idemKey !== null) {
+                OfflineMutationIdempotencyService::completeInTransaction(
+                    $pdo,
+                    $actorId,
+                    $idemScope,
+                    $idemKey,
+                    200,
+                    'puantaj',
+                    $row ? (int) $row['id'] : null,
+                    $personelId . ':' . $tarih
+                );
+            }
             $pdo->commit();
             JsonResponse::success(self::mapRow($row ?: $values));
         } catch (\Throwable $e) {

@@ -13,6 +13,7 @@ use Medisa\Api\Controllers\GenelYoneticiBildirimOnaylariController;
 use Medisa\Api\Controllers\BildirimlerController;
 use Medisa\Api\Controllers\BildirimPuantajEtkiAdaylariController;
 use Medisa\Api\Controllers\BordroHazirlikController;
+use Medisa\Api\Controllers\ClientTelemetryController;
 use Medisa\Api\Controllers\SgkKatalogHazirlikController;
 use Medisa\Api\Controllers\SgkManuelKodOverrideController;
 use Medisa\Api\Controllers\SirketCalismaPolitikasiController;
@@ -81,6 +82,10 @@ class Router
         }
         if ($path === '/auth/smoke-read' && $method === 'GET') {
             AuthSmokeController::smokeRead($this->request);
+        }
+
+        if ($path === '/client-telemetry' && $method === 'POST') {
+            ClientTelemetryController::ingest($this->request);
         }
 
         if ($path === '/me' && $method === 'GET') {

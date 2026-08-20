@@ -70,10 +70,11 @@ export async function fetchSureclerList(
   });
 }
 
-export async function createSurec(payload: CreateSurecPayload): Promise<Surec> {
+export async function createSurec(payload: CreateSurecPayload, options?: { idempotencyKey?: string }): Promise<Surec> {
   const response = await apiRequest<ApiResponse<unknown>>(endpoints.surecler.list, {
     method: "POST",
-    body: JSON.stringify(payload)
+    body: JSON.stringify(payload),
+    idempotencyKey: options?.idempotencyKey,
   });
   const created = normalizeSurec(response.data);
   logAction({ action: "SUREC_CREATE", payload: { surec_id: created.id } });
@@ -87,20 +88,23 @@ export async function fetchSurecDetail(surecId: number | string): Promise<Surec>
 
 export async function updateSurec(
   surecId: number | string,
-  payload: UpdateSurecPayload
+  payload: UpdateSurecPayload,
+  options?: { idempotencyKey?: string }
 ): Promise<Surec> {
   const response = await apiRequest<ApiResponse<unknown>>(endpoints.surecler.detail(surecId), {
     method: "PUT",
-    body: JSON.stringify(payload)
+    body: JSON.stringify(payload),
+    idempotencyKey: options?.idempotencyKey,
   });
   const updated = normalizeSurec(response.data);
   logAction({ action: "SUREC_UPDATE", payload: { surec_id: updated.id } });
   return updated;
 }
 
-export async function cancelSurec(surecId: number | string): Promise<void> {
+export async function cancelSurec(surecId: number | string, options?: { idempotencyKey?: string }): Promise<void> {
   await apiRequest<ApiResponse<unknown>>(`${endpoints.surecler.detail(surecId)}/iptal`, {
-    method: "POST"
+    method: "POST",
+    idempotencyKey: options?.idempotencyKey,
   });
   logAction({ action: "SUREC_CANCEL", payload: { surec_id: surecId } });
 }

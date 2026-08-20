@@ -127,7 +127,8 @@ function p3bMigrationFiles(): array
         return (bool) preg_match('/^\d{3}_.+\.sql$/', (string) $name)
             && $name !== '067_personel_canonical_reference_gate.sql'
             && $name !== '068_sgk_actor_identity_lifecycle_audit.sql'
-            && $name !== '069_personel_credential_onboarding.sql';
+            && $name !== '069_personel_credential_onboarding.sql'
+            && $name !== '070_offline_mutation_idempotency.sql';
     }));
     sort($files, SORT_STRING);
 

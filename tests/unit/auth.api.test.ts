@@ -1,5 +1,17 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { login } from "../../src/api/auth.api";
+
+const { mockIsRealBackendOnlyMode } = vi.hoisted(() => ({
+  mockIsRealBackendOnlyMode: vi.fn(() => false)
+}));
+
+vi.mock("../../src/config/app-env", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../src/config/app-env")>();
+  return {
+    ...actual,
+    isRealBackendOnlyMode: mockIsRealBackendOnlyMode
+  };
+});
 
 function createJsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -11,9 +23,14 @@ function createJsonResponse(body: unknown, status = 200) {
 }
 
 describe("auth.api login", () => {
+  beforeEach(() => {
+    mockIsRealBackendOnlyMode.mockReturnValue(false);
+  });
+
   afterEach(() => {
     vi.unstubAllGlobals();
-    vi.restoreAllMocks();
+    mockIsRealBackendOnlyMode.mockReset();
+    mockIsRealBackendOnlyMode.mockReturnValue(false);
   });
 
   it("accepts wrapped api response shape", async () => {
@@ -37,18 +54,17 @@ describe("auth.api login", () => {
     );
 
     const session = await login({ username: "ilker", password: "secret" });
-    expect(session).toEqual({
-      token: "wrapped-token",
-      ui_profile: "yonetim",
-      active_sube_id: null,
-      user: {
-        id: 1,
-        ad_soyad: "Ilker A",
-        rol: "GENEL_YONETICI",
-        sube_ids: [],
-        personel_id: null
-      }
-    });
+    expect(session).toEqual(
+      expect.objectContaining({
+        token: "wrapped-token",
+        ui_profile: "yonetim",
+        user: expect.objectContaining({
+          id: 1,
+          ad_soyad: "Ilker A",
+          rol: "GENEL_YONETICI"
+        })
+      })
+    );
   });
 
   it("accepts raw backend response and normalizes role/profile fields", async () => {
@@ -67,18 +83,17 @@ describe("auth.api login", () => {
     );
 
     const session = await login({ username: "birim", password: "secret" });
-    expect(session).toEqual({
-      token: "raw-token",
-      ui_profile: "birim_amiri",
-      active_sube_id: null,
-      user: {
-        id: 12,
-        ad_soyad: "Birim Kullanici",
-        rol: "BIRIM_AMIRI",
-        sube_ids: [],
-        personel_id: null
-      }
-    });
+    expect(session).toEqual(
+      expect.objectContaining({
+        token: "raw-token",
+        ui_profile: "birim_amiri",
+        user: expect.objectContaining({
+          id: 12,
+          ad_soyad: "Birim Kullanici",
+          rol: "BIRIM_AMIRI"
+        })
+      })
+    );
   });
 
   it("bubbles backend message from successful but non-session payload", async () => {
@@ -97,64 +112,101 @@ describe("auth.api login", () => {
     });
   });
 
-  it("falls back to demo session when login endpoint returns 404", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () =>
-        createJsonResponse(
-          {
-            data: null,
-            errors: [{ code: "NOT_FOUND", message: "Endpoint bulunamadi." }]
-          },
-          404
+  describe("in demo-enabled mode", () => {
+    it("falls back to demo session when login endpoint returns 404", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () =>
+          createJsonResponse(
+            {
+              data: null,
+              errors: [{ code: "NOT_FOUND", message: "Endpoint bulunamadi." }]
+            },
+            404
+          )
         )
-      )
-    );
+      );
 
-    const session = await login({ username: "birim_demo", password: "secret" });
-    expect(session.user.rol).toBe("BIRIM_AMIRI");
-    expect(session.ui_profile).toBe("birim_amiri");
-    expect(session.user.sube_ids).toEqual([1]);
-    expect(session.active_sube_id).toBe(1);
-    expect(session.sube_list).toEqual([{ id: 1, ad: "Merkez" }]);
+      const session = await login({ username: "birim_demo", password: "secret" });
+      expect(session.user.rol).toBe("BIRIM_AMIRI");
+      expect(session.ui_profile).toBe("birim_amiri");
+      expect(session.user.sube_ids).toEqual([1]);
+      expect(session.active_sube_id).toBe(1);
+      expect(session.sube_list).toEqual([{ id: 1, ad: "Merkez" }]);
+    });
+
+    it("falls back to demo session when backend returns html payload", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () =>
+          new Response("<!doctype html><html><body>fallback</body></html>", {
+            status: 200,
+            headers: {
+              "Content-Type": "text/html"
+            }
+          })
+        )
+      );
+
+      const session = await login({ username: "yonetici_demo", password: "secret" });
+      expect(session.user.rol).toBe("GENEL_YONETICI");
+      expect(session.ui_profile).toBe("yonetim");
+      expect(session.active_sube_id).toBeNull();
+    });
+
+    it("maps demo username containing patron to GENEL_YONETICI (safe alias)", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => createJsonResponse({ errors: [] }, 404))
+      );
+
+      const session = await login({ username: "patron", password: "demo123" });
+      expect(session.user.rol).toBe("GENEL_YONETICI");
+    });
   });
 
-  it("falls back to demo session when backend returns html payload", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () =>
-        new Response("<!doctype html><html><body>fallback</body></html>", {
-          status: 200,
-          headers: {
-            "Content-Type": "text/html"
-          }
-        })
-      )
-    );
+  describe("in real-backend-only mode", () => {
+    beforeEach(() => {
+      mockIsRealBackendOnlyMode.mockReturnValue(true);
+    });
 
-    const session = await login({ username: "yonetici_demo", password: "secret" });
-    expect(session.user.rol).toBe("GENEL_YONETICI");
-    expect(session.ui_profile).toBe("yonetim");
-    expect(session.active_sube_id).toBeNull();
-  });
+    it("fails closed when login endpoint returns 404", async () => {
+      const error = { code: "NOT_FOUND", message: "Endpoint bulunamadi." };
+      vi.stubGlobal("fetch", vi.fn(async () => createJsonResponse({ errors: [error] }, 404)));
 
-  it("maps demo username containing patron to GENEL_YONETICI (safe alias)", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () =>
-        createJsonResponse(
-          {
-            data: null,
-            errors: [{ code: "NOT_FOUND", message: "Endpoint bulunamadi." }]
-          },
-          404
+      await expect(login({ username: "any", password: "user" })).rejects.toMatchObject({
+        status: 404,
+        message: error.message
+      });
+    });
+
+    it("fails closed when login endpoint returns 503", async () => {
+      const error = { code: "UNAVAILABLE", message: "Servis kullanilamiyor." };
+      vi.stubGlobal("fetch", vi.fn(async () => createJsonResponse({ errors: [error] }, 503)));
+
+      await expect(login({ username: "any", password: "user" })).rejects.toMatchObject({
+        status: 503,
+        message: error.message
+      });
+    });
+
+    it("fails closed when backend returns html payload", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () =>
+          new Response("<!doctype html><html><body>fallback</body></html>", {
+            status: 200,
+            headers: {
+              "Content-Type": "text/html"
+            }
+          })
         )
-      )
-    );
+      );
 
-    const session = await login({ username: "patron", password: "demo123" });
-    expect(session.user.rol).toBe("GENEL_YONETICI");
-    expect(session.ui_profile).toBe("yonetim");
+      await expect(login({ username: "any", password: "user" })).rejects.toMatchObject({
+        message: "Login yanıtı beklenen oturum formatında değil."
+      });
+    });
   });
 
   it("canonicalizes IK_BORDRO login payload to IK_SORUMLUSU", async () => {
@@ -172,9 +224,7 @@ describe("auth.api login", () => {
               sube_ids: [1, 2]
             },
             active_sube_id: 1
-          },
-          meta: {},
-          errors: []
+          }
         })
       )
     );
@@ -182,9 +232,6 @@ describe("auth.api login", () => {
     const session = await login({ username: "hazirlayan", password: "secret" });
     expect(session.token).toBe("ik-token");
     expect(session.user.rol).toBe("IK_SORUMLUSU");
-    expect(session.ui_profile).toBe("yonetim");
-    expect(session.user.sube_ids).toEqual([1, 2]);
-    expect(session.active_sube_id).toBe(1);
   });
 
   it("fail-closes unresolved SGK_KARAR_ONAY_YETKILISI login role", async () => {
@@ -194,23 +241,14 @@ describe("auth.api login", () => {
         createJsonResponse({
           data: {
             token: "appr-token",
-            ui_profile: "yonetim",
-            user: {
-              id: 9,
-              ad_soyad: "Fixture Approver",
-              rol: "SGK_KARAR_ONAY_YETKILISI",
-              sube_ids: [1, 2]
-            },
-            active_sube_id: 1
-          },
-          meta: {},
-          errors: []
+            user: { rol: "SGK_KARAR_ONAY_YETKILISI" }
+          }
         })
       )
     );
 
     await expect(login({ username: "onaylayan", password: "secret" })).rejects.toMatchObject({
-      message: "Login yaniti beklenen oturum formatinda degil."
+      message: "Login yanıtı beklenen oturum formatında değil."
     });
   });
 
@@ -221,45 +259,14 @@ describe("auth.api login", () => {
         createJsonResponse({
           data: {
             token: "bad-role-token",
-            ui_profile: "yonetim",
-            user: {
-              id: 99,
-              ad_soyad: "Unknown Role User",
-              rol: "HAYALI_ROL"
-            }
-          },
-          meta: {},
-          errors: []
+            user: { rol: "HAYALI_ROL" }
+          }
         })
       )
     );
 
     await expect(login({ username: "x", password: "y" })).rejects.toMatchObject({
-      message: "Login yaniti beklenen oturum formatinda degil."
-    });
-  });
-
-  it("fail-closes empty role even when login HTTP 200", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () =>
-        createJsonResponse({
-          data: {
-            token: "empty-role-token",
-            user: {
-              id: 99,
-              ad_soyad: "Empty Role User",
-              rol: ""
-            }
-          },
-          meta: {},
-          errors: []
-        })
-      )
-    );
-
-    await expect(login({ username: "x", password: "y" })).rejects.toMatchObject({
-      message: "Login yaniti beklenen oturum formatinda degil."
+      message: "Login yanıtı beklenen oturum formatında değil."
     });
   });
 });

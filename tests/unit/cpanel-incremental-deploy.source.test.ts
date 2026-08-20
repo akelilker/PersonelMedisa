@@ -29,12 +29,16 @@ import {
   renderFullMirrorFtpCommands,
   renderIncrementalFtpCommands,
   renderLftpGetCommand,
+  renderBrokenLftpGetCommandLeadingDashO,
   renderLftpGitPath,
   renderLocalLftpPreflightCommands,
   renderLftpLocalDir,
+  resolveLftpBin,
   resolveVerifiedLocalDeployDirs,
   runLocalLftpPreflight,
   sanitizeLftpErrorDetail,
+  toPosixLftpPath,
+  validateLftpCommandMatrix,
   validateLftpGetSyntaxForms,
 } from '../../scripts/deploy/plan-cpanel-incremental.mjs';
 
@@ -646,39 +650,39 @@ describe('cPanel incremental deploy planner', () => {
       remotePath: 'api/.deploy-sha',
       localPath: local,
     });
-    expect(cmd).toBe(`get -o ${local} api/.deploy-sha`);
+    expect(cmd).toBe(`get api/.deploy-sha -o ${local}`);
+    expect(cmd).not.toMatch(/^get -o /);
     expect(cmd).not.toContain('"');
     expect(renderBrokenQuotedLftpGitPath('api/.deploy-sha')).toBe('"api/.deploy-sha"');
+    expect(
+      renderBrokenLftpGetCommandLeadingDashO({
+        remotePath: 'api/.deploy-sha',
+        localPath: local,
+      }),
+    ).toBe(`get -o ${local} api/.deploy-sha`);
 
-    // Optional live parser check via lftp file: backend when available.
     const fixtureRoot = mkdtempSync(join(tmpdir(), 'medisa-lftp-get-'));
     temporaryDirectories.push(fixtureRoot);
     mkdirSync(join(fixtureRoot, 'api'), { recursive: true });
     writeFileSync(join(fixtureRoot, 'api', '.deploy-sha'), 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n');
     const outFile = join(fixtureRoot, 'out.sha');
-    const result = runLocalLftpPreflight({
-      distAbs: fixtureRoot,
-      repoAbs: fixtureRoot,
-    });
-    // Reuse spawn path: if lftp missing, skip live get; syntax contract still asserted above.
-    if (!result.skipped) {
-      const getCmd = renderLftpGetCommand({
-        remotePath: 'api/.deploy-sha',
-        localPath: outFile.replace(/\\/g, '/'),
-      });
-      const live = spawnSync(
-        'lftp',
-        ['file:' + fixtureRoot.replace(/\\/g, '/'), '-e', `set cmd:fail-exit true; ${getCmd}; bye`],
-        { encoding: 'utf8' },
-      );
-      if (live.error && (live.error as NodeJS.ErrnoException).code === 'ENOENT') {
-        return;
-      }
-      expect(live.status).toBe(0);
-      expect(readFileSync(outFile, 'utf8').trim()).toBe(
-        'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-      );
+    const bin = resolveLftpBin();
+    if (!bin) {
+      return;
     }
+    const getCmd = renderLftpGetCommand({
+      remotePath: 'api/.deploy-sha',
+      localPath: toPosixLftpPath(outFile),
+    });
+    const live = spawnSync(
+      bin,
+      ['file:' + toPosixLftpPath(fixtureRoot), '-e', `set cmd:fail-exit true; ${getCmd}; bye`],
+      { encoding: 'utf8' },
+    );
+    expect(live.status).toBe(0);
+    expect(readFileSync(outFile, 'utf8').trim()).toBe(
+      'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    );
   });
 
   it('Z2) valid remote deploy SHA → PREVIOUS_SHA_READ=SUCCESS', () => {
@@ -892,14 +896,116 @@ describe('cPanel incremental deploy planner', () => {
 
   it('AA7) valid GET success returns downloaded SHA (lftp file: when available)', () => {
     const probe = validateLftpGetSyntaxForms();
-    expect(probe.canonical.startsWith('get -o ')).toBe(true);
-    expect(probe.remoteFirst.startsWith('get api/.deploy-sha -o ')).toBe(true);
+    expect(probe.canonical.startsWith('get api/.deploy-sha -o ')).toBe(true);
+    expect(probe.brokenLeadingDashO.startsWith('get -o ')).toBe(true);
     if (probe.skipped) {
       expect(probe.preferred).toBeNull();
       return;
     }
     expect(probe.canonicalOk).toBe(true);
+    expect(probe.brokenLeadingDashOOk).toBe(false);
     expect(probe.preferred).toBe('canonical');
+    expect(probe.brokenStderr).toMatch(/invalid option -- 'o'|unknown option -- o/i);
+  });
+
+  it('AB1-AB12) real lftp file: backend command matrix + fail-closed contracts', () => {
+    const matrix = validateLftpCommandMatrix();
+    if (matrix.skipped) {
+      // Source contracts still enforced without a local binary.
+      expect(renderLftpGetCommand({ remotePath: 'api/.deploy-sha', localPath: '/tmp/x' })).toBe(
+        'get api/.deploy-sha -o /tmp/x',
+      );
+      expect(
+        renderBrokenLftpGetCommandLeadingDashO({
+          remotePath: 'api/.deploy-sha',
+          localPath: '/tmp/x',
+        }),
+      ).toBe('get -o /tmp/x api/.deploy-sha');
+      return;
+    }
+    expect(matrix.results.lcd).toBe(true);
+    expect(matrix.results.get).toBe(true); // AB4
+    expect(matrix.results.brokenGetRejected).toBe(true); // AB1 broken form
+    expect(matrix.results.putIndex).toBe(true); // AB2
+    expect(matrix.results.excludeIndex).toBe(true); // AB3
+    expect(matrix.results.putO).toBe(true);
+    expect(matrix.results.mkdir).toBe(true);
+    expect(matrix.results.mirror).toBe(true);
+    expect(matrix.results.exactRm).toBe(true);
+    expect(matrix.allOk).toBe(true);
+
+    // AB5
+    expect(
+      classifyLftpReadLog('get: Access failed: 550 Failed to open file. (api/.deploy-sha)\n', {
+        exitCode: 1,
+      }),
+    ).toBe('REMOTE_NOT_FOUND');
+
+    // AB6 / AB7 — transport/syntax stays fatal + refuse-before-bulk
+    expect(
+      classifyLftpReadLog("get: invalid option -- 'o'\nTry `help get' for more information.\n", {
+        exitCode: 1,
+      }),
+    ).toBe('LFTP_SYNTAX_ERROR');
+    expect(isFatalFtpReadCapabilityFailure('LFTP_SYNTAX_ERROR')).toBe(true);
+    const source = readFileSync(
+      resolve(process.cwd(), '.github/workflows/deploy-cpanel.yml'),
+      'utf8',
+    );
+    expect(source.indexOf('REFUSING_BULK_UPLOAD=YES')).toBeLessThan(
+      source.indexOf('Deploy payload transfer path'),
+    );
+
+    // AB8–AB10 source order: payload verify before finalize, finalize once
+    expect(source.indexOf('verify_payload_before_sha')).toBeLessThan(
+      source.indexOf('finalize_deploy_sha'),
+    );
+    expect(source).toContain('ftp-finalize-sha.commands');
+    const finalizeOccurrences = source.split('run_cpanel_ftp "$FINALIZE_SHA_COMMANDS"').length - 1;
+    expect(finalizeOccurrences).toBe(1);
+
+    // AB11 / AB12 — API-only incremental plan omits bulk api/src mirror
+    const repo = makeRepoSkeleton();
+    const dist = makeDist();
+    const plan = createDeployPlan({
+      previousSha: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      currentSha: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+      repoRoot: repo,
+      distDir: dist,
+      previousShaReadStatus: 'SUCCESS',
+      fetchOk: true,
+      ancestryOk: true,
+      diffLines: ['M\tapi/src/A.php'],
+    });
+    expect(plan.mode).toBe('INCREMENTAL');
+    expect(plan.apiUploads).toEqual(['api/src/A.php']);
+    expect(plan.unchangedApiFilesSkipped).toBeGreaterThan(0);
+    const cmds = renderIncrementalFtpCommands(plan, {
+      localDistDir: dist,
+      localRepoDir: repo,
+      remoteTargetDir: '.',
+      deployShaLocalPath: join(dist, '.deploy-sha'),
+    });
+    expect(cmds).toContain('put -O api/src api/src/A.php');
+    expect(cmds).not.toContain('mirror -R --verbose api/src api/src');
+
+    const noDiff = createDeployPlan({
+      previousSha: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      currentSha: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+      repoRoot: repo,
+      distDir: dist,
+      previousShaReadStatus: 'SUCCESS',
+      fetchOk: true,
+      ancestryOk: true,
+      diffLines: [],
+    });
+    const noDiffCmds = renderIncrementalFtpCommands(noDiff, {
+      localDistDir: dist,
+      localRepoDir: repo,
+      remoteTargetDir: '.',
+      deployShaLocalPath: join(dist, '.deploy-sha'),
+    });
+    expect(noDiffCmds).not.toContain('mirror -R --verbose api/src api/src');
   });
 
   it('AA8) sanitizeLftpErrorDetail never leaks credentials', () => {

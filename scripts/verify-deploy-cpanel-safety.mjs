@@ -98,6 +98,24 @@ check(
   'canonical lftp GET remote→local helper contract is missing',
 );
 check(
+  /get \$\{remote\} -o \$\{local\}/.test(planner) ||
+    /return `get \$\{remote\} -o \$\{local\}`/.test(planner),
+  'canonical GET must use remote-first form: get <remote> -o <local>',
+);
+check(
+  /renderBrokenLftpGetCommandLeadingDashO/.test(planner),
+  'broken leading -o GET form must remain available for regression fixtures only',
+);
+check(
+  !/return `get -o \$\{local\} \$\{remote\}`/.test(
+    planner.slice(
+      planner.indexOf('export function renderLftpGetCommand'),
+      planner.indexOf('export function renderBrokenLftpGetCommandLeadingDashO'),
+    ),
+  ),
+  'production renderLftpGetCommand must not emit leading get -o (Deploy #837 failure class)',
+);
+check(
   /FTP_READBACK_PREFLIGHT/.test(workflow) && /REFUSING_BULK_UPLOAD=YES/.test(workflow),
   'FTP read-back preflight stop-before-bulk contract is missing',
 );

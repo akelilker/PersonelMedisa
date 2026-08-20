@@ -622,26 +622,40 @@ export function renderBrokenQuotedLftpGitPath(path) {
 }
 
 /**
- * Canonical lftp GET remote→local (matches last known-working a541afa form):
- *   get -o <localAbs> <remoteRel>
- * Alternate documented form `get <remote> -o <local>` is also probed by
- * validateLftpGetSyntaxForms when lftp is available.
+ * Canonical lftp GET remote→local.
+ *
+ * Production (Ubuntu lftp 4.9.2 / Deploy #837) rejects leading `-o`:
+ *   get -o <local> <remote>  →  "get: invalid option -- 'o'"
+ *
+ * Correct Usage form (`help get`):
+ *   get <remoteRel> -o <localAbs>
+ *
  * @param {{ remotePath: string, localPath: string }} args
  */
 export function renderLftpGetCommand(args) {
+  const remote = renderLftpGitPath(args.remotePath);
+  const local = renderLftpLocalDir(args.localPath);
+  return `get ${remote} -o ${local}`;
+}
+
+/**
+ * Broken leading-dash-O form retained only for regression fixtures.
+ * Matches a541afa / #837 failure class — never use in production.
+ * @param {{ remotePath: string, localPath: string }} args
+ * @deprecated
+ */
+export function renderBrokenLftpGetCommandLeadingDashO(args) {
   const remote = renderLftpGitPath(args.remotePath);
   const local = renderLftpLocalDir(args.localPath);
   return `get -o ${local} ${remote}`;
 }
 
 /**
- * Alternate get operand order (documented in some lftp examples).
+ * @deprecated Alias of renderLftpGetCommand (canonical is already remote-first).
  * @param {{ remotePath: string, localPath: string }} args
  */
 export function renderLftpGetCommandRemoteFirst(args) {
-  const remote = renderLftpGitPath(args.remotePath);
-  const local = renderLftpLocalDir(args.localPath);
-  return `get ${remote} -o ${local}`;
+  return renderLftpGetCommand(args);
 }
 
 /**
@@ -696,7 +710,7 @@ export function classifyLftpReadLog(logText, opts = {}) {
   ) {
     return 'LOCAL_OUTPUT_ERROR';
   }
-  if (/Unknown command|Usage:|parse error|syntax error|invalid option/i.test(text)) {
+  if (/Unknown command|Usage:|parse error|syntax error|invalid option|unknown option -- o/i.test(text)) {
     return 'LFTP_SYNTAX_ERROR';
   }
   if (/550|No such file|not found|does not exist|File not found|Failed to open file/i.test(text)) {
@@ -745,9 +759,89 @@ export function isFatalFtpReadCapabilityFailure(readClass) {
 }
 
 /**
- * Probe which get operand order the installed lftp accepts (file: backend).
+ * Convert an absolute OS path into a form MSYS/Unix lftp accepts.
+ * Linux paths pass through; `C:\Users\...` → `/c/Users/...`.
+ * @param {string} absPath
+ */
+export function toPosixLftpPath(absPath) {
+  let p = String(absPath).replace(/\\/g, '/');
+  const m = /^([A-Za-z]):\//.exec(p);
+  if (m) {
+    p = `/${m[1].toLowerCase()}/${p.slice(3)}`;
+  }
+  return p;
+}
+
+/**
+ * Resolve an installed lftp binary (PATH + common MSYS2 locations on Windows).
+ * @param {string} [explicit]
+ * @returns {string|null}
+ */
+export function resolveLftpBin(explicit) {
+  if (explicit) {
+    return explicit;
+  }
+  const which = spawnSync(process.platform === 'win32' ? 'where.exe' : 'which', ['lftp'], {
+    encoding: 'utf8',
+    env: process.env,
+  });
+  if ((which.status ?? 1) === 0) {
+    const first = String(which.stdout ?? '')
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .find(Boolean);
+    if (first) return first;
+  }
+  const candidates = [
+    'C:/msys64/usr/bin/lftp.exe',
+    'C:/msys64/usr/bin/lftp',
+    '/usr/bin/lftp',
+    '/usr/local/bin/lftp',
+  ];
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) return candidate;
+  }
+  return null;
+}
+
+/**
+ * Run an lftp -e script against a local file: backend root.
+ * @param {{ lftpBin?: string|null, fixtureRoot: string, script: string }} args
+ */
+export function runLftpFileBackendScript(args) {
+  const bin = resolveLftpBin(args.lftpBin ?? undefined);
+  if (!bin) {
+    return { skipped: true, status: null, stdout: '', stderr: '', error: null };
+  }
+  const rootPosix = toPosixLftpPath(args.fixtureRoot);
+  const result = spawnSync(bin, [`file:${rootPosix}`, '-e', `set cmd:fail-exit true; ${args.script}; bye`], {
+    encoding: 'utf8',
+    env: process.env,
+  });
+  if (result.error && /** @type {NodeJS.ErrnoException} */ (result.error).code === 'ENOENT') {
+    return { skipped: true, status: null, stdout: '', stderr: '', error: result.error };
+  }
+  return {
+    skipped: false,
+    status: result.status ?? 1,
+    stdout: String(result.stdout ?? ''),
+    stderr: String(result.stderr ?? ''),
+    error: result.error ?? null,
+  };
+}
+
+/**
+ * Prove canonical GET works and broken leading `-o` fails on installed lftp (file: backend).
  * @param {{ lftpBin?: string }} [opts]
- * @returns {{ skipped: boolean, canonicalOk: boolean, remoteFirstOk: boolean, canonical: string, remoteFirst: string, preferred: 'canonical'|'remote-first'|null }}
+ * @returns {{
+ *   skipped: boolean,
+ *   canonicalOk: boolean,
+ *   brokenLeadingDashOOk: boolean,
+ *   canonical: string,
+ *   brokenLeadingDashO: string,
+ *   preferred: 'canonical'|null,
+ *   brokenStderr: string,
+ * }}
  */
 export function validateLftpGetSyntaxForms(opts = {}) {
   const fixtureRoot = mkdtempSync(join(tmpdir(), 'medisa-lftp-get-syntax-'));
@@ -758,55 +852,175 @@ export function validateLftpGetSyntaxForms(opts = {}) {
     'utf8',
   );
   const outCanonical = join(fixtureRoot, 'out-canonical.sha');
-  const outRemoteFirst = join(fixtureRoot, 'out-remote-first.sha');
-  const rootPosix = fixtureRoot.replace(/\\/g, '/');
+  const outBroken = join(fixtureRoot, 'out-broken.sha');
   const canonical = renderLftpGetCommand({
     remotePath: 'api/.deploy-sha',
-    localPath: outCanonical.replace(/\\/g, '/'),
+    localPath: toPosixLftpPath(outCanonical),
   });
-  const remoteFirst = renderLftpGetCommandRemoteFirst({
+  const brokenLeadingDashO = renderBrokenLftpGetCommandLeadingDashO({
     remotePath: 'api/.deploy-sha',
-    localPath: outRemoteFirst.replace(/\\/g, '/'),
+    localPath: toPosixLftpPath(outBroken),
   });
-  const bin = opts.lftpBin ?? 'lftp';
-
-  const runForm = (script, outPath) => {
-    const result = spawnSync(bin, [`file:${rootPosix}`, '-e', `set cmd:fail-exit true; ${script}; bye`], {
-      encoding: 'utf8',
-      env: process.env,
-    });
-    if (result.error && /** @type {NodeJS.ErrnoException} */ (result.error).code === 'ENOENT') {
-      return { skipped: true, ok: false };
-    }
-    const ok =
-      (result.status ?? 1) === 0 &&
-      existsSync(outPath) &&
-      readFileSync(outPath, 'utf8').trim() === 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
-    return { skipped: false, ok };
-  };
 
   try {
-    const a = runForm(canonical, outCanonical);
+    const a = runLftpFileBackendScript({
+      lftpBin: opts.lftpBin,
+      fixtureRoot,
+      script: canonical,
+    });
     if (a.skipped) {
       return {
         skipped: true,
         canonicalOk: false,
-        remoteFirstOk: false,
+        brokenLeadingDashOOk: false,
         canonical,
-        remoteFirst,
+        brokenLeadingDashO,
         preferred: null,
+        brokenStderr: '',
       };
     }
-    const b = runForm(remoteFirst, outRemoteFirst);
-    const preferred = a.ok ? 'canonical' : b.ok ? 'remote-first' : null;
+    const canonicalOk =
+      a.status === 0 &&
+      existsSync(outCanonical) &&
+      readFileSync(outCanonical, 'utf8').trim() === 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+
+    const b = runLftpFileBackendScript({
+      lftpBin: opts.lftpBin,
+      fixtureRoot,
+      script: brokenLeadingDashO,
+    });
+    const brokenLeadingDashOOk =
+      b.status === 0 &&
+      existsSync(outBroken) &&
+      readFileSync(outBroken, 'utf8').trim() === 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+    const brokenStderr = `${b.stderr}\n${b.stdout}`;
+
     return {
       skipped: false,
-      canonicalOk: a.ok,
-      remoteFirstOk: b.ok,
+      canonicalOk,
+      brokenLeadingDashOOk,
       canonical,
-      remoteFirst,
-      preferred,
+      brokenLeadingDashO,
+      preferred: canonicalOk ? 'canonical' : null,
+      brokenStderr,
+      // Back-compat aliases for older tests
+      remoteFirstOk: canonicalOk,
+      remoteFirst: canonical,
     };
+  } finally {
+    rmSync(fixtureRoot, { recursive: true, force: true });
+  }
+}
+
+/**
+ * Real lftp file: backend matrix for lcd/get/put/put -O/mirror/exclude/mkdir/rm.
+ * Does not touch production FTP.
+ * @param {{ lftpBin?: string }} [opts]
+ */
+export function validateLftpCommandMatrix(opts = {}) {
+  const fixtureRoot = mkdtempSync(join(tmpdir(), 'medisa-lftp-matrix-'));
+  const remoteRoot = join(fixtureRoot, 'remote');
+  const localRoot = join(fixtureRoot, 'local');
+  mkdirSync(join(remoteRoot, 'api'), { recursive: true });
+  mkdirSync(join(localRoot, 'dist'), { recursive: true });
+  mkdirSync(join(localRoot, 'api', 'src'), { recursive: true });
+  writeFileSync(join(remoteRoot, 'api', '.deploy-sha'), 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\n');
+  writeFileSync(join(localRoot, 'dist', 'index.html'), '<html>ok</html>\n');
+  writeFileSync(join(localRoot, 'dist', 'keep.txt'), 'keep\n');
+  writeFileSync(join(localRoot, 'api', 'src', 'hello.php'), '<?php\n');
+  writeFileSync(join(localRoot, 'api', '.htaccess'), 'Require all denied\n');
+
+  const outGet = toPosixLftpPath(join(fixtureRoot, 'got.sha'));
+
+  /** @type {Record<string, boolean>} */
+  const results = {};
+
+  try {
+    const lcd = runLftpFileBackendScript({
+      lftpBin: opts.lftpBin,
+      fixtureRoot: localRoot,
+      script: `lcd ${renderLftpLocalDir(toPosixLftpPath(join(localRoot, 'dist')))}; lpwd`,
+    });
+    if (lcd.skipped) {
+      return { skipped: true, results: {} };
+    }
+    results.lcd = lcd.status === 0 && /dist/.test(`${lcd.stdout}\n${lcd.stderr}`);
+
+    const getCmd = renderLftpGetCommand({
+      remotePath: 'api/.deploy-sha',
+      localPath: outGet,
+    });
+    const get = runLftpFileBackendScript({
+      lftpBin: opts.lftpBin,
+      fixtureRoot: remoteRoot,
+      script: getCmd,
+    });
+    results.get = get.status === 0 && existsSync(join(fixtureRoot, 'got.sha')) &&
+      readFileSync(join(fixtureRoot, 'got.sha'), 'utf8').trim() === 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+
+    const brokenGet = runLftpFileBackendScript({
+      lftpBin: opts.lftpBin,
+      fixtureRoot: remoteRoot,
+      script: renderBrokenLftpGetCommandLeadingDashO({
+        remotePath: 'api/.deploy-sha',
+        localPath: toPosixLftpPath(join(fixtureRoot, 'broken.sha')),
+      }),
+    });
+    results.brokenGetRejected =
+      brokenGet.status !== 0 ||
+      /invalid option -- 'o'|unknown option -- o/i.test(`${brokenGet.stderr}\n${brokenGet.stdout}`);
+
+    const putIndex = runLftpFileBackendScript({
+      lftpBin: opts.lftpBin,
+      fixtureRoot: remoteRoot,
+      script: `lcd ${renderLftpLocalDir(toPosixLftpPath(join(localRoot, 'dist')))}; put ${renderLftpGitPath('index.html')}`,
+    });
+    results.putIndex =
+      putIndex.status === 0 && existsSync(join(remoteRoot, 'index.html'));
+
+    const putO = runLftpFileBackendScript({
+      lftpBin: opts.lftpBin,
+      fixtureRoot: remoteRoot,
+      // api/ already exists in the fixture remote root (mirrors production mkdir -p tolerance).
+      script: `lcd ${renderLftpLocalDir(toPosixLftpPath(localRoot))}; put -O api ${renderLftpGitPath('api/.htaccess')}`,
+    });
+    results.putO = putO.status === 0 && existsSync(join(remoteRoot, 'api', '.htaccess'));
+
+    const mkdir = runLftpFileBackendScript({
+      lftpBin: opts.lftpBin,
+      fixtureRoot: remoteRoot,
+      script: `mkdir -p api/src/nested`,
+    });
+    results.mkdir = mkdir.status === 0 && existsSync(join(remoteRoot, 'api', 'src', 'nested'));
+
+    const mirror = runLftpFileBackendScript({
+      lftpBin: opts.lftpBin,
+      fixtureRoot: remoteRoot,
+      script: `lcd ${renderLftpLocalDir(toPosixLftpPath(localRoot))}; mirror -R --verbose api/src api/src`,
+    });
+    results.mirror =
+      mirror.status === 0 && existsSync(join(remoteRoot, 'api', 'src', 'hello.php'));
+
+    const exclude = runLftpFileBackendScript({
+      lftpBin: opts.lftpBin,
+      fixtureRoot: remoteRoot,
+      script: `lcd ${renderLftpLocalDir(toPosixLftpPath(join(localRoot, 'dist')))}; mirror -R --verbose --exclude ${renderLftpGitPath('index.html')} . assets-out`,
+    });
+    results.excludeIndex =
+      exclude.status === 0 &&
+      existsSync(join(remoteRoot, 'assets-out', 'keep.txt')) &&
+      !existsSync(join(remoteRoot, 'assets-out', 'index.html'));
+
+    writeFileSync(join(remoteRoot, 'api', 'tmp-delete.php'), 'x\n');
+    const rm = runLftpFileBackendScript({
+      lftpBin: opts.lftpBin,
+      fixtureRoot: remoteRoot,
+      script: `rm ${renderLftpGitPath('api/tmp-delete.php')}`,
+    });
+    results.exactRm = rm.status === 0 && !existsSync(join(remoteRoot, 'api', 'tmp-delete.php'));
+
+    const allOk = Object.values(results).every(Boolean);
+    return { skipped: false, results, allOk };
   } finally {
     rmSync(fixtureRoot, { recursive: true, force: true });
   }
@@ -1065,7 +1279,7 @@ export function runLocalLftpPreflight(input) {
   const script = input.useBrokenQuotedRender
     ? renderBrokenQuotedLocalLftpPreflightCommands(input)
     : renderLocalLftpPreflightCommands(input);
-  const bin = input.lftpBin ?? 'lftp';
+  const bin = resolveLftpBin(input.lftpBin) ?? 'lftp';
   const result = spawnSync(bin, ['-e', script], {
     encoding: 'utf8',
     env: process.env,

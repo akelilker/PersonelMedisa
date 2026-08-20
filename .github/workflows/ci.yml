@@ -34,6 +34,11 @@ jobs:
           extensions: pdo_sqlite
           coverage: none
 
+      - name: Install lftp for deploy fixture tests
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lftp
+
       - name: Install dependencies
         run: npm ci
 
@@ -42,6 +47,9 @@ jobs:
 
       - name: Run type check
         run: npm run typecheck
+
+      - name: Verify cPanel deploy safety contracts
+        run: npm run verify:deploy-cpanel-safety
 
       - name: Run deterministic fast tests
         run: npm run test:ci-fast

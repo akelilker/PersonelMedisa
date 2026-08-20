@@ -55,6 +55,89 @@ describe("yonetim.api kullanicilar", () => {
     expect(items[0]?.sube_ids).toEqual([1, 2]);
     expect(items[0]).not.toHaveProperty("password");
     expect(items[0]).not.toHaveProperty("password_hash");
+    expect(items[0]).not.toHaveProperty("temporary_password");
+    expect(items[0]).not.toHaveProperty("gecici_sifre");
+  });
+
+  it("A/B: normalizes must_change_password 1/0 to boolean true/false", async () => {
+    const fetchMock = vi.fn(async () =>
+      createJsonResponse({
+        data: {
+          items: [
+            {
+              id: 3,
+              username: "personel_pending",
+              ad_soyad: "Bekleyen Personel",
+              rol: "PERSONEL",
+              durum: "AKTIF",
+              sube_ids: [1],
+              varsayilan_sube_id: 1,
+              personel_id: 11,
+              kullanici_tipi: "IC_PERSONEL",
+              must_change_password: 1
+            },
+            {
+              id: 4,
+              username: "personel_done",
+              ad_soyad: "Tamamlayan Personel",
+              rol: "PERSONEL",
+              durum: "AKTIF",
+              sube_ids: [1],
+              varsayilan_sube_id: 1,
+              personel_id: 12,
+              kullanici_tipi: "IC_PERSONEL",
+              must_change_password: 0
+            }
+          ]
+        },
+        meta: [],
+        errors: []
+      })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const items = await fetchYonetimKullanicilari();
+    expect(items[0]?.must_change_password).toBe(true);
+    expect(items[1]?.must_change_password).toBe(false);
+  });
+
+  it("C: must_change_password read-model does not carry credential secrets", async () => {
+    const fetchMock = vi.fn(async () =>
+      createJsonResponse({
+        data: {
+          items: [
+            {
+              id: 5,
+              username: "bound",
+              ad_soyad: "Bound User",
+              rol: "PERSONEL",
+              durum: "AKTIF",
+              sube_ids: [1],
+              varsayilan_sube_id: 1,
+              personel_id: 20,
+              kullanici_tipi: "IC_PERSONEL",
+              must_change_password: true,
+              password: "secret",
+              password_hash: "hash",
+              temporary_password: "tmp",
+              gecici_sifre: "tmp2",
+              token: "tok"
+            }
+          ]
+        },
+        meta: [],
+        errors: []
+      })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const items = await fetchYonetimKullanicilari();
+    expect(items[0]?.must_change_password).toBe(true);
+    expect(items[0]).not.toHaveProperty("password");
+    expect(items[0]).not.toHaveProperty("password_hash");
+    expect(items[0]).not.toHaveProperty("temporary_password");
+    expect(items[0]).not.toHaveProperty("gecici_sifre");
+    expect(items[0]).not.toHaveProperty("token");
   });
 
   it("createYonetimKullanici sends username and password in request body", async () => {

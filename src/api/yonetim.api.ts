@@ -76,6 +76,38 @@ function readBoolean(value: unknown): boolean {
   return false;
 }
 
+function readOptionalBoolean(value: unknown): boolean | undefined {
+  if (value === undefined || value === null || value === "") {
+    return undefined;
+  }
+
+  if (typeof value === "boolean") {
+    return value;
+  }
+
+  if (typeof value === "number") {
+    if (value === 1) {
+      return true;
+    }
+    if (value === 0) {
+      return false;
+    }
+    return undefined;
+  }
+
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === "true" || normalized === "1") {
+      return true;
+    }
+    if (normalized === "false" || normalized === "0") {
+      return false;
+    }
+  }
+
+  return undefined;
+}
+
 function normalizeKayitDurumu(value: unknown): KayitDurumu {
   return value === "PASIF" ? "PASIF" : "AKTIF";
 }
@@ -110,6 +142,10 @@ function normalizeYonetimKullanici(data: unknown): YonetimKullanici {
     throw new Error("Kullanici yaniti zorunlu alanlari icermiyor.");
   }
 
+  const mustChangePassword = readOptionalBoolean(
+    record.must_change_password ?? record.mustChangePassword
+  );
+
   return {
     id,
     username: readString(record.username),
@@ -119,6 +155,7 @@ function normalizeYonetimKullanici(data: unknown): YonetimKullanici {
     rol: normalizeUserRole(record.rol),
     personel_id: readNumber(record.personel_id) ?? null,
     personel_ad_soyad: readStringOrNull(record.personel_ad_soyad),
+    ...(mustChangePassword === undefined ? {} : { must_change_password: mustChangePassword }),
     sube_ids: readNumberArray(record.sube_ids),
     varsayilan_sube_id: readNumber(record.varsayilan_sube_id) ?? null,
     durum: normalizeKayitDurumu(record.durum),

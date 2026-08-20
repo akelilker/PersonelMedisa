@@ -26,6 +26,14 @@ import { MevzuatParametreleriPanel } from "../components/MevzuatParametreleriPan
 import { SaklamaLegalHoldPanel } from "../components/SaklamaLegalHoldPanel";
 import { YonetimSubeScopeField } from "../components/YonetimSubeScopeField";
 import { isRealYonetimKullaniciApi } from "../../../lib/yonetim/kullanici-api-contract";
+import {
+  PERSONEL_FIRST_LOGIN_COMPLETE_LABEL,
+  PERSONEL_FIRST_LOGIN_PENDING_LABEL,
+  countPersonelFirstLoginStatus,
+  matchesPersonelFirstLoginFilter,
+  resolvePersonelFirstLoginLabel,
+  type PersonelFirstLoginFilter
+} from "../../../lib/yonetim/personel-first-login-status";
 import type { UserRole } from "../../../types/auth";
 import { ASSIGNABLE_USER_ROLES } from "../../../types/auth";
 import type { Personel } from "../../../types/personel";
@@ -97,6 +105,12 @@ const DURUM_LABELS: Record<KayitDurumu, string> = {
   AKTIF: "Aktif",
   PASIF: "Pasif"
 };
+
+const FIRST_LOGIN_FILTER_OPTIONS: Array<{ value: PersonelFirstLoginFilter; label: string }> = [
+  { value: "all", label: "Tümü" },
+  { value: "pending", label: PERSONEL_FIRST_LOGIN_PENDING_LABEL },
+  { value: "completed", label: PERSONEL_FIRST_LOGIN_COMPLETE_LABEL }
+];
 
 const INITIAL_KULLANICI_FORM: KullaniciFormState = {
   username: "",
@@ -486,6 +500,7 @@ export function YonetimPaneliPage() {
   const [subeDeleteDialogError, setSubeDeleteDialogError] = useState<string | null>(null);
 
   const [kullanicilar, setKullanicilar] = useState<YonetimKullanici[]>([]);
+  const [firstLoginFilter, setFirstLoginFilter] = useState<PersonelFirstLoginFilter>("all");
   const [subeler, setSubeler] = useState<YonetimSube[]>([]);
   const [personeller, setPersoneller] = useState<Personel[]>([]);
   const [departmanOptions, setDepartmanOptions] = useState<IdOption[]>([]);
@@ -532,6 +547,12 @@ export function YonetimPaneliPage() {
     [departmanOptions, subeForm.departmanIds]
   );
   const selectedDepartmanSummary = selectedDepartmanLabels.length > 0 ? selectedDepartmanLabels.join(", ") : "Departman seçimi";
+
+  const firstLoginSummary = useMemo(() => countPersonelFirstLoginStatus(kullanicilar), [kullanicilar]);
+  const filteredKullanicilar = useMemo(
+    () => kullanicilar.filter((item) => matchesPersonelFirstLoginFilter(item, firstLoginFilter)),
+    [kullanicilar, firstLoginFilter]
+  );
 
   function formatKullaniciDisplayName(item: YonetimKullanici) {
     if (item.kullanici_tipi === "IC_PERSONEL" && item.personel_id != null) {
@@ -858,6 +879,32 @@ export function YonetimPaneliPage() {
             </div>
           </div>
 
+          <div className="yonetim-summary-grid" data-testid="yonetim-kullanici-first-login-summary">
+            <article className="yonetim-summary-card">
+              <span>{PERSONEL_FIRST_LOGIN_PENDING_LABEL}</span>
+              <strong data-testid="yonetim-kullanici-first-login-pending-count">{firstLoginSummary.pending}</strong>
+            </article>
+            <article className="yonetim-summary-card">
+              <span>{PERSONEL_FIRST_LOGIN_COMPLETE_LABEL}</span>
+              <strong data-testid="yonetim-kullanici-first-login-completed-count">{firstLoginSummary.completed}</strong>
+            </article>
+          </div>
+
+          <div className="yonetim-kullanici-first-login-filter" data-testid="yonetim-kullanici-first-login-filter">
+            <FormField
+              as="select"
+              label="İlk giriş durumu"
+              name="yonetim-kullanici-first-login-filter"
+              value={firstLoginFilter}
+              onChange={(value) =>
+                setFirstLoginFilter(
+                  value === "pending" || value === "completed" ? value : "all"
+                )
+              }
+              selectOptions={FIRST_LOGIN_FILTER_OPTIONS}
+            />
+          </div>
+
           <div className="yonetim-create-row">
             <button
               type="button"
@@ -869,11 +916,20 @@ export function YonetimPaneliPage() {
             </button>
           </div>
 
-          {kullanicilar.length === 0 ? (
-            <EmptyState title="Kullanıcı kaydı yok" message="İlk kullanıcı atamasını buradan oluşturabilirsin." />
+          {filteredKullanicilar.length === 0 ? (
+            <EmptyState
+              title={kullanicilar.length === 0 ? "Kullanıcı kaydı yok" : "Filtreye uygun kullanıcı yok"}
+              message={
+                kullanicilar.length === 0
+                  ? "İlk kullanıcı atamasını buradan oluşturabilirsin."
+                  : "İlk giriş filtresini değiştirerek diğer kullanıcıları görebilirsin."
+              }
+            />
           ) : kullaniciViewMode === "card" ? (
             <div className="yonetim-card-grid yonetim-card-grid--users">
-              {kullanicilar.map((item) => (
+              {filteredKullanicilar.map((item) => {
+                const firstLoginLabel = resolvePersonelFirstLoginLabel(item);
+                return (
                 <article
                   key={item.id}
                   className="yonetim-entity-card yonetim-entity-card--interactive"
@@ -890,9 +946,22 @@ export function YonetimPaneliPage() {
                   <div className="yonetim-card-meta">
                     <strong>{formatKullaniciCardLabel(item)}</strong>
                     <span>{formatSubeScopeLabel(item.sube_ids, subeNameMap)}</span>
+                    {firstLoginLabel ? (
+                      <span
+                        className={
+                          item.must_change_password === true
+                            ? "yonetim-first-login-badge yonetim-first-login-badge--pending"
+                            : "yonetim-first-login-badge yonetim-first-login-badge--complete"
+                        }
+                        data-testid={`yonetim-kullanici-first-login-badge-${item.id}`}
+                      >
+                        {firstLoginLabel}
+                      </span>
+                    ) : null}
                   </div>
                 </article>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <div className="yonetim-list-table-wrap">
@@ -905,10 +974,13 @@ export function YonetimPaneliPage() {
                     <th>Şube Yetkisi</th>
                     <th>Varsayılan Şube</th>
                     <th>Durum</th>
+                    <th>İlk Giriş</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {kullanicilar.map((item) => (
+                  {filteredKullanicilar.map((item) => {
+                    const firstLoginLabel = resolvePersonelFirstLoginLabel(item);
+                    return (
                     <tr
                       key={item.id}
                       className="yonetim-list-table-row"
@@ -930,8 +1002,25 @@ export function YonetimPaneliPage() {
                       </td>
                       <td>{formatVarsayilanSubeLabel(item.varsayilan_sube_id, subeNameMap)}</td>
                       <td>{DURUM_LABELS[item.durum]}</td>
+                      <td>
+                        {firstLoginLabel ? (
+                          <span
+                            className={
+                              item.must_change_password === true
+                                ? "yonetim-first-login-badge yonetim-first-login-badge--pending"
+                                : "yonetim-first-login-badge yonetim-first-login-badge--complete"
+                            }
+                            data-testid={`yonetim-kullanici-first-login-badge-${item.id}`}
+                          >
+                            {firstLoginLabel}
+                          </span>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

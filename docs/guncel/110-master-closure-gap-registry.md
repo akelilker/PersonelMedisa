@@ -10,6 +10,20 @@
 **Docs closure SHA (baseline):** `72818720ae9dad9a77c31c933806a72acdc7bafd`
 **Faz adı uydurulmadı:** Roadmap zinciri S3A→S3F; `S3G`/`S4` repo’da yok. Sonraki ürün aşaması = görsel sistem + bu registry üzerinden kapanış.
 
+## 2026-08-20 final production rollout execution sync
+
+| Alan | Canonical sonuç |
+| --- | --- |
+| Deploy SHA | `7a20da3722d90bec0a8195e5934fd3facf07ddf6` — Deploy cPanel [#32312925576](https://github.com/akelilker/PersonelMedisa/actions/runs/32312925576) **success** |
+| PERSONEL user provisioning | **CLOSED** — 136 `PASIF` users; username=sicil_no; throwaway passwords not retained |
+| PERSONEL binding rollout | **CLOSED** — 136 bound + 1 existing = 137; duplicate `0` |
+| QR config / kiosk | **READY** — smoke: token mint OK, PASIF login deny, admin scan deny |
+| QR employee rollout | **USER_HANDOFF_REQUIRED** — blocked by `MG-CRED-ONBOARD-001`; accounts stay `PASIF` |
+| Org FK IC | **CLOSED** — `122/122` |
+| Org FK DIS_KAYNAK | **DEFERRED_MISSING_REAL_DATA** — 11 personnel (ids 200–210); source bölüm/birim/pozisyon blanks; no mutation |
+| SGK period production | **CLOSED** — branches `1,4,5,6,7,8,9,10,11` `AY_1_SON_GUN` + `ONAYLANDI`; mutation **NOT_REQUIRED** |
+| Production mutation (this phase) | **NO** |
+
 ## 2026-08-15 final preflight sync
 
 ## 2026-08-17 Priority A closure sync
@@ -39,10 +53,10 @@
 
 | Alan | Canonical sonuç |
 | --- | --- |
-| Current main / PR base | `5f9eca7e89165a175dfbae48a881daeba934b698` (PR #180) |
+| Current main / PR base | `7a20da3722d90bec0a8195e5934fd3facf07ddf6` (PR #181) |
 | User management (code) | **CLOSED** — unified kullanıcı workspace in `YonetimPaneliPage` |
-| Personel binding (code) | **CLOSED** — real rollout **USER_GATED** (`MG-OPS-BIND-001`) |
-| Real QR employee (code) | **CLOSED** — pipeline S3C–S3F; rollout **USER_GATED** (`MG-OPS-QR-001`) |
+| Personel binding (code) | **CLOSED** — production rollout **CLOSED** (`MG-OPS-BIND-001`) |
+| Real QR employee (code) | **CLOSED** — pipeline S3C–S3F; production activation **USER_HANDOFF_REQUIRED** (`MG-OPS-QR-001` / `MG-CRED-ONBOARD-001`) |
 | Code migration tip | `068` |
 | Production migration tip | **068** — Apply cPanel migrations run [#32217771186](https://github.com/akelilker/PersonelMedisa/actions/runs/32217771186) @ `cd92d24e38904c76daeba31a53a8a10711c1ba6b`; worker apply+verify pass |
 | Migration 067 | **CLOSED_CONFIRMED** — canonical SQL; legacy ops workflow **RETIRED/REMOVED** |
@@ -54,7 +68,7 @@
 | Ownership | Personel Kartı read-only; Kayıt ve Süreç owns personnel writes |
 | Source lock | Exact user-authoritative workbook lineage and 122-row field mapping re-locked privately; exact data remains private |
 | Auth contract | `AUTH_SMOKE_READONLY` is smoke-only (`ops.auth_smoke.read`); it is insufficient for references, personnel list, schema probe, or import dry-run |
-| Real personnel rollout | **CLOSED** (count) — production total `137`; Phase1 `122 CLOSED`, Phase2 `11 CLOSED`; org FK bulk apply **NOT_STARTED** / `VERIFY_REQUIRED` |
+| Real personnel rollout | **CLOSED** (count) — production total `137`; Phase1 `122 CLOSED`, Phase2 `11 CLOSED`; IC org FK **CLOSED**; DIS org FK partial **DEFERRED_MISSING_REAL_DATA** |
 | Production mutation | Policy approval and requested personnel rollout are complete; no unrelated mutation performed |
 | Public PII policy | Exact source rows, person-level data, and blocker tallies remain private |
 
@@ -115,8 +129,8 @@ remain private.
 | REAL_PERSONNEL_IMPORTED | **YES** — 137 production personnel |
 | SOURCE_DATA_REQUIRES_COMPLETION | **NO** for closed personnel rollout |
 | NO_PII_COMMITTED | **YES** |
-| PERSONEL_BINDING_REAL_ROLLOUT | NOT_STARTED (schema `056` mevcut) |
-| REAL_QR_EMPLOYEE_ROLLOUT | NOT_STARTED |
+| PERSONEL_BINDING_REAL_ROLLOUT | **CLOSED** |
+| REAL_QR_EMPLOYEE_ROLLOUT | **USER_HANDOFF_REQUIRED** (`MG-CRED-ONBOARD-001`) |
 | RETENTION_PHYSICAL_SCHEMA | PRODUCTION_READY (`059`/`060`/`062`); feature **OFF**; real destruction **NO** |
 | SERBEST_ZAMAN_ALLOCATION_SCHEMA | PRODUCTION_READY (`061`/`062`) |
 | OT_ACTUAL_DATE_PROVENANCE_SCHEMA | PRODUCTION_READY (`063`); legacy backfill **NO** |
@@ -155,6 +169,20 @@ Aşağıdakiler CURRENT MAIN’de bozulmuş değilse OPEN yapılmaz:
 ---
 
 ## 4. CODE_GAP registry
+
+### MG-CRED-ONBOARD-001 — PERSONEL credential onboarding (first-login / self-service password)
+
+| Alan | Değer |
+| --- | --- |
+| Statü | **CODE_GAP** |
+| Öncelik | **P1** |
+| Domain | Auth / PERSONEL self-service |
+| Mevcut | Admin `YonetimController` geçici şifre set; login `AKTIF` zorunlu; **no** `/auth/change-password`, **no** first-login forced change, **no** invitation/reset token |
+| Blocker kanıt | Production: 136 `PASIF` PERSONEL bound; provisioning passwords not retained; blind `AKTIF` forbidden |
+| Beklenen | Minimal owner: authenticated password change + `must_change_password` flag; admin reset sets flag; user sets own password before QR self-service |
+| QR etkisi | `MG-OPS-QR-001` activation **USER_HANDOFF_REQUIRED** until closed + deploy |
+| Prod write | **NO** until code deployed and credential handoff process defined |
+| Owner | Auth (`LoginController` / `YonetimController`) + self-service route |
 
 ### MG-RET-PHYS-001 — Retention physical destruction executor
 
@@ -338,8 +366,8 @@ Aşağıdakiler CURRENT MAIN’de bozulmuş değilse OPEN yapılmaz:
 | MG-OPS-PERSONEL-001 | Gerçek personel import | P0 | **CLOSED** | Production total `137`; personnel rollout closed | Ops + kullanıcı |
 | MG-IMPORT-DATA-001 | Kaynak personel dataset completion | P1 | **CLOSED** | Phase1 `122 CLOSED`; Phase2 `11 CLOSED`; deferred user data remains non-blocking | Ops + İK |
 | MG-OPS-ORG-001 | Gerçek org/şube/referans rollout | P0 | **CLOSED** | Canonical catalogs and production references resolved; binding rollout remains separate | Ops |
-| MG-OPS-BIND-001 | PERSONEL binding gerçek rollout | P1 | `USER_GATED` | Code **CLOSED** (`UserPersonelBindingService` + Yönetim UI); rollout NOT_STARTED | Ops / İK |
-| MG-OPS-QR-001 | Gerçek çalışan QR rollout | P1 | `USER_GATED` | Pipeline CLOSED; code ready; employee rollout NOT_STARTED | Ops |
+| MG-OPS-BIND-001 | PERSONEL binding gerçek rollout | P1 | **CLOSED** | 136 bound + 1 existing = 137 @ `7a20da3…` | Ops / İK |
+| MG-OPS-QR-001 | Gerçek çalışan QR rollout | P1 | **USER_HANDOFF_REQUIRED** | Pipeline + config READY; activation blocked `MG-CRED-ONBOARD-001` | Ops / İK |
 | MG-OPS-SGK-CAT-001 | SGK resmi katalog / DOGRULANMIS_TAM / şirket politikası | P0 | **CLOSED_CONFIRMED** | Production catalog confirmed | Ops + `94`/`95` |
 | MG-OPS-UBGT-001 | UBGT authoritative calendar seed | P0 | **CLOSED_CONFIRMED** | Production calendar confirmed | Ops |
 | MG-OPS-POLICY-001 | Bordro çalışma politikası canlı parametre onayı | P1 | **CLOSED_CONFIRMED** | Active revision `3`; 14/14; Pazar (`0`); dual control passed | Ops / yönetim |

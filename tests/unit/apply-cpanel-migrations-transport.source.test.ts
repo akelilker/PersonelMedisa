@@ -69,11 +69,17 @@ describe('canonical cPanel migration FTP transport contract', () => {
   it('tries explicit FTPS before the deploy-compatible plain FTP fallback', () => {
     const ftpsIndex = migration.indexOf('run_ftp_mode "explicit-ftps" "true"');
     const fallbackIndex = migration.indexOf('run_ftp_mode "plain-ftp" "false"');
+    const deployLib = readFileSync(
+      resolve(process.cwd(), 'scripts/deploy/cpanel-ftp-readback-lib.sh'),
+      'utf8',
+    );
 
     expect(ftpsIndex).toBeGreaterThanOrEqual(0);
     expect(fallbackIndex).toBeGreaterThan(ftpsIndex);
-    expect(deploy).toContain('deploy_with_ftp_mode "explicit-ftps" "true"');
-    expect(deploy).toContain('deploy_with_ftp_mode "plain-ftp" "false"');
+    expect(deploy).toContain('deploy_with_ftp_mode');
+    expect(deployLib).toContain('deploy_with_ftp_mode "explicit-ftps" "true"');
+    expect(deployLib).toContain('deploy_with_ftp_mode "plain-ftp" "false"');
+    expect(deployLib.indexOf('explicit-ftps')).toBeLessThan(deployLib.indexOf('plain-ftp'));
   });
 
   it('keeps the existing FTP secret names and never logs the password', () => {

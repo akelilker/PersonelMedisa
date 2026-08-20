@@ -19,11 +19,15 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import {
   existsSync,
   mkdirSync,
+  mkdtempSync,
+  readFileSync,
   readdirSync,
   realpathSync,
+  rmSync,
   statSync,
   writeFileSync,
 } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -620,6 +624,8 @@ export function renderBrokenQuotedLftpGitPath(path) {
 /**
  * Canonical lftp GET remote→local (matches last known-working a541afa form):
  *   get -o <localAbs> <remoteRel>
+ * Alternate documented form `get <remote> -o <local>` is also probed by
+ * validateLftpGetSyntaxForms when lftp is available.
  * @param {{ remotePath: string, localPath: string }} args
  */
 export function renderLftpGetCommand(args) {
@@ -629,10 +635,49 @@ export function renderLftpGetCommand(args) {
 }
 
 /**
+ * Alternate get operand order (documented in some lftp examples).
+ * @param {{ remotePath: string, localPath: string }} args
+ */
+export function renderLftpGetCommandRemoteFirst(args) {
+  const remote = renderLftpGitPath(args.remotePath);
+  const local = renderLftpLocalDir(args.localPath);
+  return `get ${remote} -o ${local}`;
+}
+
+/**
+ * Privacy-safe one-line detail from an lftp log. Never returns credentials.
+ * @param {string} logText
+ */
+export function sanitizeLftpErrorDetail(logText) {
+  const text = String(logText ?? '');
+  const redacted = text
+    .replace(/-u\s+\S+/gi, '-u ***')
+    .replace(/ftp:\/\/[^/\s]+/gi, 'ftp://***')
+    .replace(/(FTP_PASSWORD|password|Password|PASS)\s*[:=]\s*\S+/gi, '$1=***')
+    .replace(/Authorization:\s*\S+/gi, 'Authorization: ***');
+
+  const lines = redacted
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .filter((line) => !/^Deploy transport mode:/.test(line))
+    .filter((line) => !/^Explicit FTPS/.test(line))
+    .filter((line) => !/basarisiz oldu/i.test(line));
+
+  const preferred = lines.find((line) =>
+    /get:|put:|Access failed|Login|550|530|421|425|Connection|SSL|TLS|certificate|Unknown command|Usage:|syntax|Fatal error|No such file|Permission denied|Timed out|refused/i.test(
+      line,
+    ),
+  );
+  const chosen = preferred ?? lines.find((line) => /error|fail|denied/i.test(line)) ?? lines[0] ?? '';
+  return chosen.slice(0, 240);
+}
+
+/**
  * Privacy-safe classification of an lftp GET/read-back log (no secrets).
  * @param {string} logText
  * @param {{ localPath?: string, exitCode?: number | null }} [opts]
- * @returns {'SUCCESS'|'REMOTE_NOT_FOUND'|'LOCAL_OUTPUT_ERROR'|'FTP_AUTH_ERROR'|'FTP_CONNECTION_ERROR'|'FTP_PROTOCOL_ERROR'|'LFTP_COMMAND_ERROR'}
+ * @returns {'SUCCESS'|'REMOTE_NOT_FOUND'|'LOCAL_OUTPUT_ERROR'|'FTP_AUTH_ERROR'|'FTP_CONNECTION_ERROR'|'FTP_PROTOCOL_ERROR'|'LFTP_SYNTAX_ERROR'|'LFTP_COMMAND_ERROR'}
  */
 export function classifyLftpReadLog(logText, opts = {}) {
   const text = String(logText ?? '');
@@ -651,20 +696,20 @@ export function classifyLftpReadLog(logText, opts = {}) {
   ) {
     return 'LOCAL_OUTPUT_ERROR';
   }
+  if (/Unknown command|Usage:|parse error|syntax error|invalid option/i.test(text)) {
+    return 'LFTP_SYNTAX_ERROR';
+  }
   if (/550|No such file|not found|does not exist|File not found|Failed to open file/i.test(text)) {
     return 'REMOTE_NOT_FOUND';
   }
   if (/530|Login failed|Login incorrect|Authentication failed|AUTH.*fail/i.test(text)) {
     return 'FTP_AUTH_ERROR';
   }
-  if (/Connection refused|Connection timed out|Timed out|Could not connect|resolve host|Temporary failure in name resolution/i.test(text)) {
+  if (/Connection refused|Connection timed out|Timed out|Could not connect|resolve host|Temporary failure in name resolution|Connection reset|421 Service not available/i.test(text)) {
     return 'FTP_CONNECTION_ERROR';
   }
-  if (/SSL|TLS|certificate|FTPES|secure control/i.test(text) && /fail|error|denied|unable/i.test(text)) {
+  if (/SSL|TLS|certificate|FTPES|secure control|handshake/i.test(text) && /fail|error|denied|unable|fatal/i.test(text)) {
     return 'FTP_PROTOCOL_ERROR';
-  }
-  if (/Unknown command|Usage:|parse error|syntax/i.test(text)) {
-    return 'LFTP_COMMAND_ERROR';
   }
   return 'LFTP_COMMAND_ERROR';
 }
@@ -694,8 +739,77 @@ export function isFatalFtpReadCapabilityFailure(readClass) {
     readClass === 'FTP_AUTH_ERROR' ||
     readClass === 'FTP_CONNECTION_ERROR' ||
     readClass === 'FTP_PROTOCOL_ERROR' ||
+    readClass === 'LFTP_SYNTAX_ERROR' ||
     readClass === 'LFTP_COMMAND_ERROR'
   );
+}
+
+/**
+ * Probe which get operand order the installed lftp accepts (file: backend).
+ * @param {{ lftpBin?: string }} [opts]
+ * @returns {{ skipped: boolean, canonicalOk: boolean, remoteFirstOk: boolean, canonical: string, remoteFirst: string, preferred: 'canonical'|'remote-first'|null }}
+ */
+export function validateLftpGetSyntaxForms(opts = {}) {
+  const fixtureRoot = mkdtempSync(join(tmpdir(), 'medisa-lftp-get-syntax-'));
+  mkdirSync(join(fixtureRoot, 'api'), { recursive: true });
+  writeFileSync(
+    join(fixtureRoot, 'api', '.deploy-sha'),
+    'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n',
+    'utf8',
+  );
+  const outCanonical = join(fixtureRoot, 'out-canonical.sha');
+  const outRemoteFirst = join(fixtureRoot, 'out-remote-first.sha');
+  const rootPosix = fixtureRoot.replace(/\\/g, '/');
+  const canonical = renderLftpGetCommand({
+    remotePath: 'api/.deploy-sha',
+    localPath: outCanonical.replace(/\\/g, '/'),
+  });
+  const remoteFirst = renderLftpGetCommandRemoteFirst({
+    remotePath: 'api/.deploy-sha',
+    localPath: outRemoteFirst.replace(/\\/g, '/'),
+  });
+  const bin = opts.lftpBin ?? 'lftp';
+
+  const runForm = (script, outPath) => {
+    const result = spawnSync(bin, [`file:${rootPosix}`, '-e', `set cmd:fail-exit true; ${script}; bye`], {
+      encoding: 'utf8',
+      env: process.env,
+    });
+    if (result.error && /** @type {NodeJS.ErrnoException} */ (result.error).code === 'ENOENT') {
+      return { skipped: true, ok: false };
+    }
+    const ok =
+      (result.status ?? 1) === 0 &&
+      existsSync(outPath) &&
+      readFileSync(outPath, 'utf8').trim() === 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+    return { skipped: false, ok };
+  };
+
+  try {
+    const a = runForm(canonical, outCanonical);
+    if (a.skipped) {
+      return {
+        skipped: true,
+        canonicalOk: false,
+        remoteFirstOk: false,
+        canonical,
+        remoteFirst,
+        preferred: null,
+      };
+    }
+    const b = runForm(remoteFirst, outRemoteFirst);
+    const preferred = a.ok ? 'canonical' : b.ok ? 'remote-first' : null;
+    return {
+      skipped: false,
+      canonicalOk: a.ok,
+      remoteFirstOk: b.ok,
+      canonical,
+      remoteFirst,
+      preferred,
+    };
+  } finally {
+    rmSync(fixtureRoot, { recursive: true, force: true });
+  }
 }
 
 function renderCommonPreamble(dist, remote) {

@@ -34,6 +34,8 @@ import {
   renderLftpLocalDir,
   resolveVerifiedLocalDeployDirs,
   runLocalLftpPreflight,
+  sanitizeLftpErrorDetail,
+  validateLftpGetSyntaxForms,
 } from '../../scripts/deploy/plan-cpanel-incremental.mjs';
 
 const temporaryDirectories: string[] = [];
@@ -809,6 +811,112 @@ describe('cPanel incremental deploy planner', () => {
     expect(plan.apiUploads).toEqual(['api/src/Router.php']);
     expect(renderLftpGitPath('index.html')).toBe('index.html');
     expect(renderLftpGitPath('index.html')).not.toContain('"');
+  });
+
+  it('AA1-AA8) read-back lib preserves errexit and classifies failures', () => {
+    const script = resolve(
+      process.cwd(),
+      'scripts/deploy/test-cpanel-ftp-readback-errexit.sh',
+    );
+    const bashCandidates = [
+      'C:/Program Files/Git/bin/bash.exe',
+      '/usr/bin/bash',
+      'bash',
+    ];
+    let result: ReturnType<typeof spawnSync> | null = null;
+    let output = '';
+    for (const bin of bashCandidates) {
+      const attempt = spawnSync(bin, [script], {
+        encoding: 'utf8',
+        cwd: process.cwd(),
+        env: process.env,
+      });
+      if (attempt.error && (attempt.error as NodeJS.ErrnoException).code === 'ENOENT') {
+        continue;
+      }
+      output = `${attempt.stdout ?? ''}\n${attempt.stderr ?? ''}`;
+      if (attempt.status === 0 && output.includes('HARNESS_FAIL=0')) {
+        result = attempt;
+        break;
+      }
+      // Keep last attempt for assertion diagnostics if none succeed.
+      result = attempt;
+    }
+    expect(result).not.toBeNull();
+    expect(output).toContain('AA1_ERREXIT_PRESERVED=PASS');
+    expect(output).toContain('AA2_RC_CAPTURED=PASS');
+    expect(output).toContain('AA3_CLASS=PASS');
+    expect(output).toContain('AA3_CAPABILITY_PASS=PASS');
+    expect(output).toContain('AA4_SYNTAX=PASS');
+    expect(output).toContain('AA5_TRANSPORT_FAILED=PASS');
+    expect(output).toContain('AA5_REFUSE=PASS');
+    expect(output).toContain('AA8_NO_SECRET=PASS');
+    expect(output).toMatch(/HARNESS_FAIL=0/);
+    expect(result?.status).toBe(0);
+
+    const source = readFileSync(
+      resolve(process.cwd(), '.github/workflows/deploy-cpanel.yml'),
+      'utf8',
+    );
+    const lib = readFileSync(
+      resolve(process.cwd(), 'scripts/deploy/cpanel-ftp-readback-lib.sh'),
+      'utf8',
+    );
+    const libCode = lib
+      .split(/\r?\n/)
+      .filter((line) => !/^\s*#/.test(line))
+      .join('\n');
+    expect(libCode).not.toMatch(/(^|\n)\s*set \+e/);
+    expect(libCode).not.toMatch(/(^|\n)\s*set -[^\n]*e/);
+    expect(source).toContain('cpanel-ftp-readback-lib.sh');
+    expect(lib).toContain('FTPS_ERROR_DETAIL');
+    expect(lib).toContain('PLAIN_FTP_ERROR_DETAIL');
+    // AA6: refuse gate remains before bulk transfer path
+    expect(source.indexOf('REFUSING_BULK_UPLOAD=YES')).toBeLessThan(
+      source.indexOf('Deploy payload transfer path'),
+    );
+  });
+
+  it('AA6) failure path does not reach bulk mirror (workflow gate)', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), '.github/workflows/deploy-cpanel.yml'),
+      'utf8',
+    );
+    const refuseIdx = source.indexOf('REFUSING_BULK_UPLOAD=YES');
+    const exitIdx = source.indexOf('exit 1', refuseIdx);
+    const bulkIdx = source.indexOf('Deploy payload transfer path');
+    expect(refuseIdx).toBeGreaterThanOrEqual(0);
+    expect(exitIdx).toBeGreaterThan(refuseIdx);
+    expect(bulkIdx).toBeGreaterThan(exitIdx);
+  });
+
+  it('AA7) valid GET success returns downloaded SHA (lftp file: when available)', () => {
+    const probe = validateLftpGetSyntaxForms();
+    expect(probe.canonical.startsWith('get -o ')).toBe(true);
+    expect(probe.remoteFirst.startsWith('get api/.deploy-sha -o ')).toBe(true);
+    if (probe.skipped) {
+      expect(probe.preferred).toBeNull();
+      return;
+    }
+    expect(probe.canonicalOk).toBe(true);
+    expect(probe.preferred).toBe('canonical');
+  });
+
+  it('AA8) sanitizeLftpErrorDetail never leaks credentials', () => {
+    const detail = sanitizeLftpErrorDetail(
+      [
+        'Deploy transport mode: explicit-ftps',
+        'lftp -u secretuser,super-secret-password ftp://ftp.example.com',
+        'get: Access failed: 550 Failed to open file. (api/.deploy-sha)',
+      ].join('\n'),
+    );
+    expect(detail).toContain('550');
+    expect(detail).not.toContain('super-secret-password');
+    expect(detail).not.toContain('secretuser');
+    expect(classifyLftpReadLog('Unknown command `getx\'\nUsage: get [OPTS] files\n', { exitCode: 1 })).toBe(
+      'LFTP_SYNTAX_ERROR',
+    );
+    expect(isFatalFtpReadCapabilityFailure('LFTP_SYNTAX_ERROR')).toBe(true);
   });
 
   it('emits secret-free deploy summary lines', () => {

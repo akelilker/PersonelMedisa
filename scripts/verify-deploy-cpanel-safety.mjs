@@ -115,6 +115,27 @@ check(
     ),
   'git-controlled lftp paths must render unquoted (quote-literal put failure class)',
 );
+const readbackLibPath = resolve(repoRoot, 'scripts/deploy/cpanel-ftp-readback-lib.sh');
+const readbackLib = readFileSync(readbackLibPath, 'utf8');
+const readbackLibCode = readbackLib
+  .split(/\r?\n/)
+  .filter((line) => !/^\s*#/.test(line))
+  .join('\n');
+
+check(
+  /cpanel-ftp-readback-lib\.sh/.test(workflow) &&
+    /FTPS_ERROR_DETAIL/.test(readbackLib) &&
+    /PLAIN_FTP_ERROR_DETAIL/.test(readbackLib),
+  'read-back lib + sanitized error detail contract is missing',
+);
+check(
+  !/(^|\n)\s*set \+e/.test(readbackLibCode) && !/(^|\n)\s*set -[^\n]*e/.test(readbackLibCode),
+  'cpanel-ftp-readback-lib.sh must not mutate errexit (set -e/+e leak)',
+);
+check(
+  /LFTP_SYNTAX_ERROR/.test(planner) && /sanitizeLftpErrorDetail/.test(planner),
+  'lftp syntax error class + sanitize detail helpers are missing',
+);
 check(
   /API exact deletes basliyor/.test(planner) &&
     !/set cmd:fail-exit false;\s*\$\{deleteCmds/.test(planner.replace(/\n/g, ' ')),

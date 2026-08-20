@@ -297,10 +297,11 @@ try {
     omiApply($pdo, '070_offline_mutation_idempotency.sql'); // idempotent IF NOT EXISTS
 
     $uq = $pdo->query(
-        "SELECT COUNT(*) FROM information_schema.STATISTICS
+        "SELECT COUNT(DISTINCT INDEX_NAME) FROM information_schema.STATISTICS
          WHERE TABLE_SCHEMA = DATABASE()
            AND TABLE_NAME = 'offline_mutation_idempotency'
-           AND INDEX_NAME = 'uq_omi_actor_scope_key'"
+           AND INDEX_NAME = 'uq_omi_actor_scope_key'
+           AND NON_UNIQUE = 0"
     )->fetchColumn();
     omiAssert((int) $uq === 1, 'unique actor/scope/key constraint');
 

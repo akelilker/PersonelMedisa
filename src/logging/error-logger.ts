@@ -1,9 +1,20 @@
 import { MEDISA_AUTH_SESSION_KEY } from "../auth/auth-constants";
 import type { AuthSession } from "../types/auth";
 import { getAppEnv, getAppVersion, isDevRuntime } from "../config/app-env";
+import {
+  API_FAIL_STORE_KEY,
+  ERROR_STORE_KEY,
+  TELEMETRY_SCHEMA_KEY,
+  TELEMETRY_SCHEMA_VERSION,
+  buildBaseTelemetryFields,
+  buildErrorFingerprint,
+  sanitizeStackForLocal,
+  sanitizeTelemetryText,
+  sendPrivacySafeTelemetry,
+  toEndpointTemplate,
+  toRouteTemplate
+} from "./client-telemetry";
 
-const ERROR_STORE_KEY = "medisa_client_errors";
-const API_FAIL_STORE_KEY = "medisa_client_api_fails";
 const MAX_ERRORS = 50;
 const MAX_API_FAILS = 50;
 
@@ -16,12 +27,18 @@ export type LogUserContext = {
 export type ClientErrorLogEntry = {
   kind: "client_error";
   message: string;
-  stack?: string;
+  /** Sanitized error stack (never raw secrets). */
+  error_stack?: string;
+  /** Sanitized React component stack — separate from error_stack. */
+  component_stack?: string;
   source?: string;
+  error_fingerprint?: string;
+  error_code?: string;
   user_id: number | null;
   active_sube_id: number | null;
   ui_profile: string | null;
   route: string;
+  route_template?: string;
   app_version: string;
   app_env: string;
   timestamp: string;
@@ -30,16 +47,19 @@ export type ClientErrorLogEntry = {
 export type ApiFailureLogEntry = {
   kind: "api_fail";
   endpoint: string;
+  endpoint_template?: string;
   status: number;
   method: string;
-  payload_summary?: string;
+  error_fingerprint?: string;
   user_id: number | null;
   active_sube_id: number | null;
   ui_profile: string | null;
   route: string;
+  route_template?: string;
   app_version: string;
   app_env: string;
   timestamp: string;
+  attempt_count?: number;
 };
 
 function readRoute(): string {
@@ -54,11 +74,16 @@ function readRoute(): string {
 }
 
 function isAuthSession(value: unknown): value is AuthSession {
-  if (typeof value !== "object" || value === null) {
-    return false;
+  if (typeof value === "object" && value !== null) {
+    const s = value as Partial<AuthSession>;
+    return (
+      typeof s.token === "string" &&
+      typeof s.ui_profile === "string" &&
+      typeof s.user === "object" &&
+      s.user !== null
+    );
   }
-  const s = value as Partial<AuthSession>;
-  return typeof s.token === "string" && typeof s.ui_profile === "string" && typeof s.user === "object" && s.user !== null;
+  return false;
 }
 
 export function readAuthContextForLogging(): LogUserContext {
@@ -95,11 +120,36 @@ export function readAuthContextForLogging(): LogUserContext {
 let errorBuffer: ClientErrorLogEntry[] = [];
 let apiFailBuffer: ApiFailureLogEntry[] = [];
 
+/**
+ * Idempotent purge of legacy unsafe local telemetry (schema v1 payload_summary era).
+ * Does not print secret contents to console.
+ */
+export function purgeUnsafeLegacyLogs(): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+  try {
+    window.localStorage.removeItem(ERROR_STORE_KEY);
+    window.localStorage.removeItem(API_FAIL_STORE_KEY);
+    window.localStorage.setItem(TELEMETRY_SCHEMA_KEY, String(TELEMETRY_SCHEMA_VERSION));
+  } catch {
+    /* ignore quota errors */
+  }
+}
+
 function loadBuffersFromStorage(): void {
   if (typeof window === "undefined") {
     return;
   }
   try {
+    const storedVersion = Number.parseInt(window.localStorage.getItem(TELEMETRY_SCHEMA_KEY) ?? "0", 10);
+    if (storedVersion < TELEMETRY_SCHEMA_VERSION) {
+      purgeUnsafeLegacyLogs();
+      errorBuffer = [];
+      apiFailBuffer = [];
+      return;
+    }
+
     const e = window.localStorage.getItem(ERROR_STORE_KEY);
     if (e) {
       const p = JSON.parse(e) as unknown;
@@ -150,8 +200,12 @@ loadBuffersFromStorage();
 
 export type LogErrorInput = {
   message: string;
+  /** @deprecated Prefer error_stack / component_stack. */
   stack?: string;
+  error_stack?: string;
+  component_stack?: string;
   source?: string;
+  error_code?: string;
   user_id?: number | null;
   active_sube_id?: number | null;
   ui_profile?: string | null;
@@ -159,59 +213,141 @@ export type LogErrorInput = {
 };
 
 /**
- * Islem (audit) kanalindan ayri: istemci ve yakalanmamis hatalar.
+ * Client/uncaught errors — PII-free local buffer + best-effort central telemetry.
+ * Never stores request bodies, tokens, or credentials.
  */
 export function logError(input: LogErrorInput): void {
-  const ctx = readAuthContextForLogging();
+  const base = buildBaseTelemetryFields(input.source);
+  const route = input.route ?? readRoute();
+  const routeTemplate = toRouteTemplate(route);
+  const message = sanitizeTelemetryText(input.message, 256) || "client_error";
+  const errorStack = sanitizeStackForLocal(input.error_stack ?? input.stack);
+  const componentStack = sanitizeStackForLocal(input.component_stack);
+  const eventType =
+    input.source === "ErrorBoundary" || input.source === "RootErrorBoundary"
+      ? "react_boundary"
+      : input.source === "window.onerror"
+        ? "window_error"
+        : input.source === "window.onunhandledrejection"
+          ? "unhandled_rejection"
+          : "client_error";
+  const fingerprint = buildErrorFingerprint({
+    event_type: eventType,
+    error_code: input.error_code,
+    source: input.source,
+    route_template: routeTemplate
+  });
+
   const entry: ClientErrorLogEntry = {
     kind: "client_error",
-    message: input.message,
-    stack: input.stack,
+    message,
+    error_stack: errorStack,
+    component_stack: componentStack,
     source: input.source,
-    user_id: input.user_id ?? ctx.user_id,
-    active_sube_id: input.active_sube_id ?? ctx.active_sube_id,
-    ui_profile: input.ui_profile ?? ctx.ui_profile,
-    route: input.route ?? readRoute(),
-    app_version: getAppVersion(),
-    app_env: getAppEnv(),
-    timestamp: new Date().toISOString()
+    error_fingerprint: fingerprint,
+    error_code: input.error_code,
+    user_id: input.user_id ?? base.user_id,
+    active_sube_id: input.active_sube_id ?? base.active_sube_id,
+    ui_profile: input.ui_profile ?? base.ui_profile,
+    route,
+    route_template: routeTemplate,
+    app_version: base.app_version,
+    app_env: base.app_env,
+    timestamp: base.timestamp
   };
 
   errorBuffer = [...errorBuffer.slice(-(MAX_ERRORS - 1)), entry];
   persistErrors();
 
+  sendPrivacySafeTelemetry({
+    event_type: eventType,
+    error_fingerprint: fingerprint,
+    error_code: input.error_code,
+    source: input.source,
+    route_template: routeTemplate,
+    app_version: entry.app_version,
+    app_env: entry.app_env,
+    timestamp: entry.timestamp,
+    user_id: entry.user_id,
+    active_sube_id: entry.active_sube_id,
+    ui_profile: entry.ui_profile
+  });
+
   if (isDevRuntime()) {
-    console.error("[medisa-error]", entry);
+    console.error("[medisa-error]", {
+      message: entry.message,
+      source: entry.source,
+      error_fingerprint: entry.error_fingerprint,
+      route_template: entry.route_template
+    });
   }
 }
 
+/**
+ * 5xx API failures — endpoint/status/method metadata only (no bodies).
+ */
 export function logApiFailure5xx(input: {
   endpoint: string;
   status: number;
   method?: string;
-  payload_summary?: string;
+  attempt_count?: number;
 }): void {
-  const ctx = readAuthContextForLogging();
+  const base = buildBaseTelemetryFields("api_fail");
+  const method = (input.method ?? "GET").toUpperCase();
+  const endpointTemplate = toEndpointTemplate(input.endpoint);
+  const fingerprint = buildErrorFingerprint({
+    event_type: "api_fail",
+    source: "api_fail",
+    endpoint_template: endpointTemplate,
+    status: input.status
+  });
+
   const entry: ApiFailureLogEntry = {
     kind: "api_fail",
-    endpoint: input.endpoint,
+    endpoint: sanitizeTelemetryText(input.endpoint, 200),
+    endpoint_template: endpointTemplate,
     status: input.status,
-    method: (input.method ?? "GET").toUpperCase(),
-    payload_summary: input.payload_summary,
-    user_id: ctx.user_id,
-    active_sube_id: ctx.active_sube_id,
-    ui_profile: ctx.ui_profile,
+    method,
+    error_fingerprint: fingerprint,
+    user_id: base.user_id,
+    active_sube_id: base.active_sube_id,
+    ui_profile: base.ui_profile,
     route: readRoute(),
-    app_version: getAppVersion(),
-    app_env: getAppEnv(),
-    timestamp: new Date().toISOString()
+    route_template: base.route_template,
+    app_version: base.app_version,
+    app_env: base.app_env,
+    timestamp: base.timestamp,
+    ...(typeof input.attempt_count === "number" ? { attempt_count: input.attempt_count } : {})
   };
 
   apiFailBuffer = [...apiFailBuffer.slice(-(MAX_API_FAILS - 1)), entry];
   persistApiFails();
 
+  sendPrivacySafeTelemetry({
+    event_type: "api_fail",
+    error_fingerprint: fingerprint,
+    source: "api_fail",
+    endpoint_template: endpointTemplate,
+    status: input.status,
+    method,
+    attempt_count: input.attempt_count,
+    app_version: entry.app_version,
+    app_env: entry.app_env,
+    timestamp: entry.timestamp,
+    user_id: entry.user_id,
+    active_sube_id: entry.active_sube_id,
+    ui_profile: entry.ui_profile,
+    route_template: entry.route_template
+  });
+
   if (isDevRuntime()) {
-    console.warn("[medisa-api-fail]", entry);
+    console.warn("[medisa-api-fail]", {
+      endpoint_template: entry.endpoint_template,
+      status: entry.status,
+      method: entry.method,
+      attempt_count: entry.attempt_count,
+      error_fingerprint: entry.error_fingerprint
+    });
   }
 }
 
@@ -223,16 +359,8 @@ export function getRecentApiFailures(): readonly ApiFailureLogEntry[] {
   return apiFailBuffer;
 }
 
-export function summarizeRequestBodyForLogs(init?: RequestInit): string | undefined {
-  if (!init?.body) {
-    return undefined;
-  }
-  if (typeof init.body === "string") {
-    const t = init.body.trim();
-    if (!t) {
-      return undefined;
-    }
-    return t.length > 400 ? `${t.slice(0, 400)}…` : t;
-  }
-  return "[binary-or-form-body]";
+/** Test helper: clear in-memory buffers without touching unrelated storage. */
+export function __resetErrorLoggerBuffersForTests(): void {
+  errorBuffer = [];
+  apiFailBuffer = [];
 }

@@ -4,10 +4,12 @@ import { ErrorBoundary } from "./ErrorBoundary";
 
 export function App() {
   return (
-    <AppProviders>
-      <ErrorBoundary>
-        <AppRoutes />
-      </ErrorBoundary>
-    </AppProviders>
+    <ErrorBoundary rootLevel>
+      <AppProviders>
+        <ErrorBoundary>
+          <AppRoutes />
+        </ErrorBoundary>
+      </AppProviders>
+    </ErrorBoundary>
   );
 }

@@ -75,6 +75,25 @@ check(
 );
 check(/isLftpSafePath/.test(planner) && /UNSAFE_LFTP_PATH/.test(planner), 'lftp path safety contract is missing');
 check(
+  /renderLftpLocalDir/.test(planner) && /isSafeLftpLocalDir/.test(planner),
+  'local runner directory lftp renderer contract is missing',
+);
+check(
+  /renderLftpRemotePath/.test(planner) && /isSafeLftpRemotePath/.test(planner),
+  'remote FTP path lftp renderer contract is missing',
+);
+check(
+  /Local lftp directory preflight/.test(workflow) && /LOCAL_LFTP_PREFLIGHT=PASS/.test(workflow),
+  'local lftp directory preflight step is missing',
+);
+check(
+  /PREVIOUS_SHA_READ/.test(workflow) &&
+    /TRANSPORT_FAILED/.test(workflow) &&
+    /NOT_FOUND/.test(workflow) &&
+    /INVALID_CONTENT/.test(workflow),
+  'previous deploy SHA read diagnostics contract is missing',
+);
+check(
   /API exact deletes basliyor/.test(planner) &&
     !/set cmd:fail-exit false;\s*\$\{deleteCmds/.test(planner.replace(/\n/g, ' ')),
   'exact API deletes must remain fail-closed',

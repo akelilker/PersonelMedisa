@@ -15,11 +15,12 @@
  *     [--deploy-sha-local-path=/tmp/.deploy-sha]
  */
 
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import {
   existsSync,
   mkdirSync,
   readdirSync,
+  realpathSync,
   statSync,
   writeFileSync,
 } from 'node:fs';
@@ -152,7 +153,7 @@ export function isSafeExactDeletePath(path) {
 }
 
 /**
- * Strict allowlist for paths embedded into lftp -e scripts.
+ * Strict allowlist for git-controlled relative paths embedded into lftp -e scripts.
  * Rejects whitespace, quotes, and shell/lftp command separators.
  * @param {string} path
  */
@@ -163,6 +164,79 @@ export function isLftpSafePath(path) {
   }
   // Keep incremental command generation boring and unambiguous.
   return /^[A-Za-z0-9._/-]+$/.test(normalized);
+}
+
+/**
+ * Local runner directories are workflow-derived absolute paths (dist, repo, temp),
+ * not git-controlled filenames. Must never use the git-path quoter for these:
+ * wrapping in double quotes makes lftp lcd pass quotes to chdir() and fail with
+ * `"/abs/path": No such file or directory` even when the directory exists.
+ *
+ * Charset matches GitHub Actions runner workspaces (no spaces) plus Windows drive
+ * letters for local unit fixtures.
+ * @param {string} path
+ */
+export function isSafeLftpLocalDir(path) {
+  if (typeof path !== 'string' || path.trim() === '') {
+    return false;
+  }
+  const normalized = path.replace(/\\/g, '/').replace(/\/$/, '') || '/';
+  if (/[\0\r\n\x00-\x1f\x7f]/.test(normalized)) {
+    return false;
+  }
+  if (/["'`$;&|<>(){}[\]\\]/.test(normalized)) {
+    return false;
+  }
+  if (/\s/.test(normalized)) {
+    return false;
+  }
+  // Absolute Unix or Windows drive path only.
+  if (!(normalized.startsWith('/') || /^[A-Za-z]:\//.test(normalized))) {
+    return false;
+  }
+  return /^[A-Za-z0-9._/:+-]+$/.test(normalized);
+}
+
+/**
+ * Render a local runner directory for lftp lcd / local put operands.
+ * Proven-working form on GHA: unquoted absolute path (same as pre-incremental deploy).
+ * @param {string} path
+ */
+export function renderLftpLocalDir(path) {
+  const normalized = String(path).replace(/\\/g, '/').replace(/\/$/, '') || '/';
+  if (!isSafeLftpLocalDir(normalized)) {
+    throw new Error(`UNSAFE_LFTP_LOCAL_DIR:${path}`);
+  }
+  return normalized;
+}
+
+/**
+ * Remote FTP path (cd target). Keep unquoted for safe boring roots like `.`.
+ * @param {string} path
+ */
+export function isSafeLftpRemotePath(path) {
+  if (typeof path !== 'string' || path.trim() === '') {
+    return false;
+  }
+  const normalized = path.replace(/\\/g, '/');
+  if (/[\0\r\n\x00-\x1f\x7f]/.test(normalized) || /\s/.test(normalized)) {
+    return false;
+  }
+  if (/["'`$;&|<>(){}[\]\\]/.test(normalized)) {
+    return false;
+  }
+  return /^[A-Za-z0-9._/-]+$/.test(normalized);
+}
+
+/**
+ * @param {string} path
+ */
+export function renderLftpRemotePath(path) {
+  const normalized = String(path).replace(/\\/g, '/');
+  if (!isSafeLftpRemotePath(normalized)) {
+    throw new Error(`UNSAFE_LFTP_REMOTE_PATH:${path}`);
+  }
+  return normalized;
 }
 
 /**
@@ -486,12 +560,29 @@ export function createDeployPlan(input) {
 }
 
 /**
- * Quote a path for lftp -e scripts. Caller must pass isLftpSafePath-approved paths
- * for incremental-owned git paths; local absolute dirs are quoted literally.
+ * Quote a git-controlled relative path for lftp -e scripts.
+ * Do NOT use for local runner directories — use renderLftpLocalDir instead.
+ * Caller must pass isLftpSafePath-approved paths.
  * @param {string} path
  */
 export function lftpQuote(path) {
   const normalized = String(path).replace(/\\/g, '/');
+  if (!isLftpSafePath(normalized)) {
+    throw new Error(`UNSAFE_LFTP_QUOTE:${path}`);
+  }
+  if (normalized.includes('"') || normalized.includes('\n') || normalized.includes('\r')) {
+    throw new Error(`UNSAFE_LFTP_QUOTE:${path}`);
+  }
+  return `"${normalized}"`;
+}
+
+/**
+ * Broken rendering retained only for regression tests that prove quoted local lcd fails.
+ * @param {string} path
+ * @deprecated Never use in production command generation.
+ */
+export function renderBrokenQuotedLftpLocalDir(path) {
+  const normalized = String(path).replace(/\\/g, '/').replace(/\/$/, '') || '/';
   if (normalized.includes('"') || normalized.includes('\n') || normalized.includes('\r')) {
     throw new Error(`UNSAFE_LFTP_QUOTE:${path}`);
   }
@@ -529,9 +620,9 @@ function renderCommonPreamble(dist, remote) {
  * }} ctx
  */
 export function renderFullMirrorPayloadCommands(plan, ctx) {
-  const dist = lftpQuote(ctx.localDistDir.replace(/\/$/, ''));
-  const repo = lftpQuote(ctx.localRepoDir);
-  const remote = lftpQuote(ctx.remoteTargetDir);
+  const dist = renderLftpLocalDir(ctx.localDistDir);
+  const repo = renderLftpLocalDir(ctx.localRepoDir);
+  const remote = renderLftpRemotePath(ctx.remoteTargetDir);
 
   const entryExcludes = plan.frontendEntrypoints
     .map((name) => `--exclude ${lftpQuote(name)}`)
@@ -589,9 +680,9 @@ export function renderIncrementalPayloadCommands(plan, ctx) {
     return renderFullMirrorPayloadCommands(plan, ctx);
   }
 
-  const dist = lftpQuote(ctx.localDistDir.replace(/\/$/, ''));
-  const repo = lftpQuote(ctx.localRepoDir);
-  const remote = lftpQuote(ctx.remoteTargetDir);
+  const dist = renderLftpLocalDir(ctx.localDistDir);
+  const repo = renderLftpLocalDir(ctx.localRepoDir);
+  const remote = renderLftpRemotePath(ctx.remoteTargetDir);
 
   const entryExcludes = plan.frontendEntrypoints
     .map((name) => `--exclude ${lftpQuote(name)}`)
@@ -669,8 +760,8 @@ export function renderIncrementalFtpCommands(plan, ctx) {
  * }} ctx
  */
 export function renderFinalizeShaFtpCommands(ctx) {
-  const remote = lftpQuote(ctx.remoteTargetDir);
-  const shaLocal = lftpQuote(ctx.deployShaLocalPath);
+  const remote = renderLftpRemotePath(ctx.remoteTargetDir);
+  const shaLocal = renderLftpLocalDir(ctx.deployShaLocalPath);
   return `
               set cmd:fail-exit true;
               set net:max-retries 2;
@@ -684,6 +775,97 @@ export function renderFinalizeShaFtpCommands(ctx) {
               put -O api ${shaLocal};
               !echo 'deploy-sha finalization tamamlandi';
 `.trim();
+}
+
+/**
+ * Build the no-network lftp -e script that proves local directory parsing.
+ * @param {{ distAbs: string, repoAbs: string }} paths
+ */
+export function renderLocalLftpPreflightCommands(paths) {
+  const dist = renderLftpLocalDir(paths.distAbs);
+  const repo = renderLftpLocalDir(paths.repoAbs);
+  return [
+    'set cmd:fail-exit true;',
+    `lcd ${dist};`,
+    'lpwd;',
+    `lcd ${repo};`,
+    'lpwd;',
+    'bye',
+  ].join('\n');
+}
+
+/**
+ * Intentional broken preflight script (quoted local dirs) for regression coverage.
+ * @param {{ distAbs: string, repoAbs: string }} paths
+ */
+export function renderBrokenQuotedLocalLftpPreflightCommands(paths) {
+  const dist = renderBrokenQuotedLftpLocalDir(paths.distAbs);
+  const repo = renderBrokenQuotedLftpLocalDir(paths.repoAbs);
+  return [
+    'set cmd:fail-exit true;',
+    `lcd ${dist};`,
+    'lpwd;',
+    `lcd ${repo};`,
+    'lpwd;',
+    'bye',
+  ].join('\n');
+}
+
+/**
+ * Resolve + existence-check local runner dirs before any lftp network use.
+ * @param {{ distDir: string, repoDir: string }} input
+ */
+export function resolveVerifiedLocalDeployDirs(input) {
+  if (!existsSync(resolve(input.repoDir)) || !statSync(resolve(input.repoDir)).isDirectory()) {
+    throw new Error(`LOCAL_REPO_MISSING:${input.repoDir}`);
+  }
+  if (!existsSync(resolve(input.distDir)) || !statSync(resolve(input.distDir)).isDirectory()) {
+    throw new Error(`LOCAL_DIST_MISSING:${input.distDir}`);
+  }
+  const repoAbs = realpathSync(resolve(input.repoDir));
+  const distAbs = realpathSync(resolve(input.distDir));
+  const indexHtml = join(distAbs, 'index.html');
+  if (!existsSync(indexHtml) || !statSync(indexHtml).isFile()) {
+    throw new Error(`LOCAL_DIST_INDEX_MISSING:${indexHtml}`);
+  }
+  // Validate render contract early (throws on unsafe charset).
+  renderLftpLocalDir(distAbs);
+  renderLftpLocalDir(repoAbs);
+  return { distAbs, repoAbs };
+}
+
+/**
+ * Run no-network lftp lcd preflight. Returns { ok, code, stdout, stderr, skipped? }.
+ * @param {{ distAbs: string, repoAbs: string, lftpBin?: string, useBrokenQuotedRender?: boolean }} input
+ */
+export function runLocalLftpPreflight(input) {
+  const script = input.useBrokenQuotedRender
+    ? renderBrokenQuotedLocalLftpPreflightCommands(input)
+    : renderLocalLftpPreflightCommands(input);
+  const bin = input.lftpBin ?? 'lftp';
+  const result = spawnSync(bin, ['-e', script], {
+    encoding: 'utf8',
+    env: process.env,
+  });
+  if (result.error && /** @type {NodeJS.ErrnoException} */ (result.error).code === 'ENOENT') {
+    return {
+      ok: false,
+      skipped: true,
+      code: null,
+      stdout: '',
+      stderr: String(result.error.message),
+      script,
+    };
+  }
+  const code = result.status ?? 1;
+  return {
+    ok: code === 0,
+    skipped: false,
+    code,
+    stdout: result.stdout ?? '',
+    stderr: result.stderr ?? '',
+    script,
+  };
 }
 
 /**
@@ -738,16 +920,22 @@ function parseArgs(argv) {
 
 function main() {
   const args = parseArgs(process.argv.slice(2));
-  const repoRoot = resolve(args['repo-root'] ?? process.cwd());
-  const distDir = resolve(repoRoot, args['dist-dir'] ?? 'dist');
-  const outDir = resolve(args['out-dir'] ?? join(repoRoot, '.deploy-plan'));
+  const repoRootInput = resolve(args['repo-root'] ?? process.cwd());
+  const distDirInput = resolve(repoRootInput, args['dist-dir'] ?? 'dist');
+  const { distAbs, repoAbs } = resolveVerifiedLocalDeployDirs({
+    distDir: distDirInput,
+    repoDir: repoRootInput,
+  });
+  const outDir = resolve(args['out-dir'] ?? join(repoAbs, '.deploy-plan'));
   const currentSha = (args['current-sha'] ?? '').trim().toLowerCase();
   const previousArg = (args['previous-sha'] ?? 'NONE').trim();
   const previousSha =
     !previousArg || previousArg.toUpperCase() === 'NONE' ? null : previousArg.toLowerCase();
-  const deployShaLocalPath = resolve(
+  const deployShaLocalPathOs = resolve(
     args['deploy-sha-local-path'] ?? join(outDir, '.deploy-sha'),
   );
+  // Validate local-path charset early; renderers re-apply at command emit time.
+  renderLftpLocalDir(deployShaLocalPathOs);
 
   mkdirSync(outDir, { recursive: true });
 
@@ -758,12 +946,12 @@ function main() {
 
   if (previousSha && isValidSha(previousSha) && isValidSha(currentSha)) {
     try {
-      runGit(repoRoot, ['cat-file', '-e', `${previousSha}^{commit}`]);
+      runGit(repoAbs, ['cat-file', '-e', `${previousSha}^{commit}`]);
       fetchOk = true;
     } catch {
       try {
-        runGit(repoRoot, ['fetch', '--no-tags', '--depth=1', 'origin', previousSha]);
-        runGit(repoRoot, ['cat-file', '-e', `${previousSha}^{commit}`]);
+        runGit(repoAbs, ['fetch', '--no-tags', '--depth=1', 'origin', previousSha]);
+        runGit(repoAbs, ['cat-file', '-e', `${previousSha}^{commit}`]);
         fetchOk = true;
       } catch {
         fetchOk = false;
@@ -772,7 +960,7 @@ function main() {
 
     if (fetchOk) {
       try {
-        runGit(repoRoot, ['merge-base', '--is-ancestor', previousSha, currentSha]);
+        runGit(repoAbs, ['merge-base', '--is-ancestor', previousSha, currentSha]);
         ancestryOk = true;
       } catch {
         ancestryOk = false;
@@ -781,7 +969,7 @@ function main() {
 
     if (fetchOk && ancestryOk) {
       try {
-        const diff = runGit(repoRoot, [
+        const diff = runGit(repoAbs, [
           'diff',
           '--name-status',
           '--find-renames',
@@ -797,8 +985,8 @@ function main() {
   const plan = createDeployPlan({
     previousSha,
     currentSha,
-    repoRoot,
-    distDir,
+    repoRoot: repoAbs,
+    distDir: distAbs,
     diffLines,
     ancestryOk,
     fetchOk,
@@ -806,13 +994,13 @@ function main() {
 
   writeFileSync(join(outDir, 'plan.json'), `${JSON.stringify(plan, null, 2)}\n`, 'utf8');
   writeFileSync(join(outDir, 'summary.env'), formatDeploySummary(plan), 'utf8');
-  writeFileSync(deployShaLocalPath, `${currentSha}\n`, 'utf8');
+  writeFileSync(deployShaLocalPathOs, `${currentSha}\n`, 'utf8');
 
   const ctx = {
-    localDistDir: resolve(repoRoot, args['dist-dir'] ?? 'dist'),
-    localRepoDir: repoRoot,
+    localDistDir: distAbs,
+    localRepoDir: repoAbs,
     remoteTargetDir: args['remote-target-dir'] ?? '.',
-    deployShaLocalPath,
+    deployShaLocalPath: deployShaLocalPathOs,
   };
 
   writeFileSync(
@@ -832,6 +1020,11 @@ function main() {
   writeFileSync(
     join(outDir, 'ftp-finalize-sha.commands'),
     `${renderFinalizeShaFtpCommands(ctx)}\n`,
+    'utf8',
+  );
+  writeFileSync(
+    join(outDir, 'local-lftp-preflight.commands'),
+    `${renderLocalLftpPreflightCommands({ distAbs, repoAbs })}\n`,
     'utf8',
   );
 

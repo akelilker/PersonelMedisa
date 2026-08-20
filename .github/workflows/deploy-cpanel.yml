@@ -112,6 +112,39 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y lftp
 
+      - name: Local lftp directory preflight
+        env:
+          LOCAL_DIST_DIR: ${{ env.LOCAL_DIST_DIR }}
+          LOCAL_REPO_DIR: ${{ env.LOCAL_REPO_DIR }}
+        run: |
+          set -euo pipefail
+
+          DIST_ABS="$(realpath "${LOCAL_DIST_DIR%/}")"
+          REPO_ABS="$(realpath "$LOCAL_REPO_DIR")"
+
+          test -d "$DIST_ABS"
+          test -d "$REPO_ABS"
+          test -f "$DIST_ABS/index.html"
+
+          DIST_LCD="$(node --input-type=module -e "import { renderLftpLocalDir } from './scripts/deploy/plan-cpanel-incremental.mjs'; process.stdout.write(renderLftpLocalDir(process.argv[1]));" "$DIST_ABS")"
+          REPO_LCD="$(node --input-type=module -e "import { renderLftpLocalDir } from './scripts/deploy/plan-cpanel-incremental.mjs'; process.stdout.write(renderLftpLocalDir(process.argv[1]));" "$REPO_ABS")"
+
+          echo "LOCAL_DIST_ABS=${DIST_ABS}"
+          echo "LOCAL_REPO_ABS=${REPO_ABS}"
+          echo "LOCAL_DIST_LCD=${DIST_LCD}"
+          echo "LOCAL_REPO_LCD=${REPO_LCD}"
+
+          # No FTP credentials: proves lftp local-directory parser accepts rendered lcd paths.
+          lftp -e "
+            set cmd:fail-exit true;
+            lcd ${DIST_LCD};
+            lpwd;
+            lcd ${REPO_LCD};
+            lpwd;
+            bye
+          "
+          echo "LOCAL_LFTP_PREFLIGHT=PASS"
+
       - name: Upload dist and PHP API to cPanel personelmedisa FTP root
         env:
           FTP_SERVER: ${{ secrets.FTP_SERVER }}
@@ -165,13 +198,40 @@ jobs:
           }
 
           PREVIOUS_DEPLOY_SHA="NONE"
+          PREVIOUS_SHA_READ="NOT_FOUND"
           previous_sha_file="$PLAN_DIR/previous.deploy-sha"
-          rm -f "$previous_sha_file"
-          if run_cpanel_ftp "cd ${REMOTE_TARGET_DIR}; get -o ${previous_sha_file} api/.deploy-sha;" >/dev/null 2>&1; then
-            PREVIOUS_DEPLOY_SHA="$(tr -d '\r\n' < "$previous_sha_file" || true)"
-          fi
-          if [[ ! "$PREVIOUS_DEPLOY_SHA" =~ ^[0-9a-fA-F]{40}$ ]]; then
+          previous_sha_log="$PLAN_DIR/previous-sha-read.log"
+          rm -f "$previous_sha_file" "$previous_sha_log"
+
+          set +e
+          run_cpanel_ftp "cd ${REMOTE_TARGET_DIR}; get -o ${previous_sha_file} api/.deploy-sha;" >"$previous_sha_log" 2>&1
+          previous_sha_rc=$?
+          set -e
+
+          if [[ "$previous_sha_rc" -ne 0 ]]; then
+            # Privacy-safe classification only — never echo FTP credentials or raw auth lines.
+            if grep -qiE '550|No such file|not found|does not exist|File not found' "$previous_sha_log"; then
+              PREVIOUS_SHA_READ="NOT_FOUND"
+            else
+              PREVIOUS_SHA_READ="TRANSPORT_FAILED"
+            fi
             PREVIOUS_DEPLOY_SHA="NONE"
+          elif [[ ! -s "$previous_sha_file" ]]; then
+            PREVIOUS_SHA_READ="NOT_FOUND"
+            PREVIOUS_DEPLOY_SHA="NONE"
+          else
+            PREVIOUS_DEPLOY_SHA="$(tr -d '\r\n' < "$previous_sha_file" || true)"
+            if [[ "$PREVIOUS_DEPLOY_SHA" =~ ^[0-9a-fA-F]{40}$ ]]; then
+              PREVIOUS_SHA_READ="SUCCESS"
+            else
+              PREVIOUS_SHA_READ="INVALID_CONTENT"
+              PREVIOUS_DEPLOY_SHA="NONE"
+            fi
+          fi
+
+          echo "PREVIOUS_SHA_READ=${PREVIOUS_SHA_READ}"
+          if [[ "$PREVIOUS_SHA_READ" == "SUCCESS" ]]; then
+            echo "PREVIOUS_SHA_VALUE=${PREVIOUS_DEPLOY_SHA}"
           fi
 
           node scripts/deploy/plan-cpanel-incremental.mjs \
@@ -191,6 +251,7 @@ jobs:
 
           echo "DEPLOY_MODE=${DEPLOY_MODE}"
           echo "PREVIOUS_DEPLOY_SHA=${PREVIOUS_DEPLOY_SHA}"
+          echo "PREVIOUS_SHA_READ=${PREVIOUS_SHA_READ}"
           echo "CURRENT_DEPLOY_SHA=${CURRENT_DEPLOY_SHA}"
           echo "API_CHANGED_FILES=${API_CHANGED_FILES}"
           echo "API_UPLOADED_FILES=${API_UPLOADED_FILES}"

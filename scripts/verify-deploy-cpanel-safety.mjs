@@ -5,14 +5,18 @@ import { fileURLToPath } from 'node:url';
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(scriptDir, '..');
 const workflowPath = resolve(repoRoot, '.github/workflows/deploy-cpanel.yml');
+const plannerPath = resolve(repoRoot, 'scripts/deploy/plan-cpanel-incremental.mjs');
 const apiHtaccessPath = resolve(repoRoot, 'api/.htaccess');
 const workflow = readFileSync(workflowPath, 'utf8');
+const planner = readFileSync(plannerPath, 'utf8');
 const apiHtaccess = readFileSync(apiHtaccessPath, 'utf8');
 const lines = workflow.split(/\r?\n/);
+const plannerLines = planner.split(/\r?\n/);
 const htaccessLines = apiHtaccess.split(/\r?\n/);
-const staticMirror = lines.find(
-  (line) => /\bmirror\s+-R\b/.test(line) && /\s\.\s+\.;\s*$/.test(line),
-) ?? '';
+const staticMirror =
+  [...lines, ...plannerLines].find(
+    (line) => /\bmirror\s+-R\b/.test(line) && /\s\.\s+\.;\s*$/.test(line),
+  ) ?? '';
 
 const failures = [];
 
@@ -47,10 +51,36 @@ check(
 check(/--exclude\s+api\//.test(staticMirror), 'static mirror must exclude api/');
 check(/--exclude-glob\s+['"]\.git\*['"]/.test(staticMirror), 'static mirror must exclude .git*');
 check(/--exclude-glob\s+['"]\.cpanel\*['"]/.test(staticMirror), 'static mirror must exclude .cpanel*');
-check(/put\s+-O\s+api\s+api\/\.htaccess/.test(workflow), 'api/.htaccess upload contract is missing');
-check(/mirror\s+-R\s+--verbose\s+api\/public\s+api\/public/.test(workflow), 'api/public upload contract is missing');
-check(/mirror\s+-R\s+--verbose\s+api\/src\s+api\/src/.test(workflow), 'api/src upload contract is missing');
+check(
+  /plan-cpanel-incremental\.mjs/.test(workflow),
+  'incremental deploy planner invocation is missing',
+);
+check(/put\s+-O\s+api\s+api\/\.htaccess/.test(planner), 'api/.htaccess upload contract is missing');
+check(/mirror\s+-R\s+--verbose\s+api\/public\s+api\/public/.test(planner), 'api/public upload contract is missing');
+check(/mirror\s+-R\s+--verbose\s+api\/src\s+api\/src/.test(planner), 'api/src upload contract is missing');
+check(/FULL_MIRROR_FALLBACK/.test(workflow) && /FULL_MIRROR_FALLBACK/.test(planner), 'full mirror fallback contract is missing');
+check(/ftp-finalize-sha\.commands/.test(workflow), 'deploy SHA finalization command file wiring is missing');
+check(/verify_payload_before_sha/.test(workflow), 'payload verify-before-SHA-finalization contract is missing');
+check(/finalize_deploy_sha/.test(workflow), 'deploy SHA finalization step is missing');
+check(/upload_verify_finalize/.test(workflow), 'unified payload→verify→finalize path is missing');
+check(
+  /renderFinalizeShaFtpCommands/.test(planner) && /deploy-sha finalization/.test(planner),
+  'planner must emit a separate deploy-sha finalization command',
+);
+check(
+  !/put\s+-O\s+api[^\n]*\.deploy-sha/.test(
+    planner.split('export function renderFinalizeShaFtpCommands')[0],
+  ),
+  'payload transfer renderers must not write api/.deploy-sha',
+);
+check(/isLftpSafePath/.test(planner) && /UNSAFE_LFTP_PATH/.test(planner), 'lftp path safety contract is missing');
+check(
+  /API exact deletes basliyor/.test(planner) &&
+    !/set cmd:fail-exit false;\s*\$\{deleteCmds/.test(planner.replace(/\n/g, ' ')),
+  'exact API deletes must remain fail-closed',
+);
 check(/test\s+!\s+-f\s+api\/config\.local\.php/.test(workflow), 'api/config.local.php deploy guard is missing');
+check(!/--only-newer\b/.test(workflow) && !/--only-newer\b/.test(planner), 'mtime-only --only-newer must not be the deploy decision mechanism');
 
 const configLocalDenyRule =
   htaccessLines.find((line) => /RewriteRule\s+\^config\\\.local\\\.php/.test(line)) ?? '';
@@ -136,10 +166,11 @@ check(
   'deploy must not mirror api/config.local.php',
 );
 check(
-  /put\s+-O\s+api\s+api\/\.htaccess/.test(workflow) &&
-    /mirror\s+-R\s+--verbose\s+api\/public\s+api\/public/.test(workflow) &&
-    /mirror\s+-R\s+--verbose\s+api\/src\s+api\/src/.test(workflow) &&
-    !/put\s+-O\s+api\s+api\/config\.local\.php/.test(workflow),
+  /put\s+-O\s+api\s+api\/\.htaccess/.test(planner) &&
+    /mirror\s+-R\s+--verbose\s+api\/public\s+api\/public/.test(planner) &&
+    /mirror\s+-R\s+--verbose\s+api\/src\s+api\/src/.test(planner) &&
+    !/put\s+-O\s+api\s+api\/config\.local\.php/.test(workflow) &&
+    !/put\s+-O\s+api\s+api\/config\.local\.php/.test(planner),
   'deploy payload must stay limited to .htaccess + public + src (no config.local.php~ / backups)',
 );
 

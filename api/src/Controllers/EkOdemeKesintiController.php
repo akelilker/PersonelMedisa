@@ -10,6 +10,7 @@ use Medisa\Api\Database\Connection;
 use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
 use Medisa\Api\Scope\SubeScope;
+use Medisa\Api\Services\OfflineMutationIdempotencyService;
 use PDO;
 
 class EkOdemeKesintiController
@@ -146,7 +147,53 @@ class EkOdemeKesintiController
 
         SubeScope::assertPersonelAccess($user, $request, (int) $personel['sube_id']);
 
+        $actorId = (int) ($user['id'] ?? 0);
+        $idemKey = OfflineMutationIdempotencyService::readKey($request);
+        $idemScope = 'finans.create';
+        $idemHash = OfflineMutationIdempotencyService::hashPayload([
+            'op' => $idemScope,
+            'payload' => $payload,
+        ]);
+        if ($idemKey !== null) {
+            $replay = OfflineMutationIdempotencyService::findCompletedReplay(
+                $pdo,
+                $actorId,
+                $idemScope,
+                $idemKey,
+                $idemHash
+            );
+            if (is_array($replay) && !empty($replay['result_entity_id'])) {
+                $existing = self::fetchRowById($pdo, (int) $replay['result_entity_id']);
+                if ($existing) {
+                    JsonResponse::success(self::mapRow($existing), [], (int) ($replay['http_status'] ?? 201));
+                }
+            }
+        }
+
+        $pdo->beginTransaction();
         try {
+            if ($idemKey !== null) {
+                $claimedReplay = OfflineMutationIdempotencyService::claimInTransaction(
+                    $pdo,
+                    $actorId,
+                    $idemScope,
+                    $idemKey,
+                    $idemHash
+                );
+                if (is_array($claimedReplay) && !empty($claimedReplay['result_entity_id'])) {
+                    $pdo->commit();
+                    $existing = self::fetchRowById($pdo, (int) $claimedReplay['result_entity_id']);
+                    if ($existing) {
+                        JsonResponse::success(
+                            self::mapRow($existing),
+                            [],
+                            (int) ($claimedReplay['http_status'] ?? 201)
+                        );
+                    }
+                    JsonResponse::serverError('Idempotent replay sonucu yuklenemedi.');
+                }
+            }
+
             $stmt = $pdo->prepare('
                 INSERT INTO ek_odeme_kesinti (
                     personel_id, donem, kalem_turu, tutar, gun_sayisi, aciklama, state, created_by, updated_by
@@ -168,11 +215,29 @@ class EkOdemeKesintiController
             $insertId = (int) $pdo->lastInsertId();
             $row = self::fetchRowById($pdo, $insertId);
             if (!$row) {
+                $pdo->rollBack();
                 JsonResponse::serverError('Kayit olusturulamadi.');
             }
 
+            if ($idemKey !== null) {
+                OfflineMutationIdempotencyService::completeInTransaction(
+                    $pdo,
+                    $actorId,
+                    $idemScope,
+                    $idemKey,
+                    201,
+                    'finans',
+                    $insertId,
+                    null
+                );
+            }
+
+            $pdo->commit();
             JsonResponse::success(self::mapRow($row), [], 201);
         } catch (\PDOException $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
             JsonResponse::serverError('Kayit olusturulamadi.');
         }
     }
@@ -251,17 +316,81 @@ class EkOdemeKesintiController
 
         $fields[] = 'updated_by = :updated_by';
 
+        $actorId = (int) ($user['id'] ?? 0);
+        $idemKey = OfflineMutationIdempotencyService::readKey($request);
+        $idemScope = 'finans.update:' . $kalemId;
+        $idemHash = OfflineMutationIdempotencyService::hashPayload([
+            'op' => $idemScope,
+            'kalem_id' => $kalemId,
+            'payload' => $payload,
+        ]);
+        if ($idemKey !== null) {
+            $replay = OfflineMutationIdempotencyService::findCompletedReplay(
+                $pdo,
+                $actorId,
+                $idemScope,
+                $idemKey,
+                $idemHash
+            );
+            if (is_array($replay)) {
+                $existingRow = self::fetchRowById($pdo, $kalemId);
+                if ($existingRow) {
+                    JsonResponse::success(self::mapRow($existingRow), [], (int) ($replay['http_status'] ?? 200));
+                }
+            }
+        }
+
+        $pdo->beginTransaction();
         try {
+            if ($idemKey !== null) {
+                $claimedReplay = OfflineMutationIdempotencyService::claimInTransaction(
+                    $pdo,
+                    $actorId,
+                    $idemScope,
+                    $idemKey,
+                    $idemHash
+                );
+                if (is_array($claimedReplay)) {
+                    $pdo->commit();
+                    $existingRow = self::fetchRowById($pdo, $kalemId);
+                    if ($existingRow) {
+                        JsonResponse::success(
+                            self::mapRow($existingRow),
+                            [],
+                            (int) ($claimedReplay['http_status'] ?? 200)
+                        );
+                    }
+                }
+            }
+
             $sql = 'UPDATE ek_odeme_kesinti SET ' . implode(', ', $fields) . ' WHERE id = :id';
             $stmt = $pdo->prepare($sql);
             $stmt->execute($params);
             $row = self::fetchRowById($pdo, $kalemId);
             if (!$row) {
+                $pdo->rollBack();
                 JsonResponse::serverError('Kayit guncellenemedi.');
             }
 
+            if ($idemKey !== null) {
+                OfflineMutationIdempotencyService::completeInTransaction(
+                    $pdo,
+                    $actorId,
+                    $idemScope,
+                    $idemKey,
+                    200,
+                    'finans',
+                    $kalemId,
+                    null
+                );
+            }
+
+            $pdo->commit();
             JsonResponse::success(self::mapRow($row));
         } catch (\PDOException $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
             JsonResponse::serverError('Kayit guncellenemedi.');
         }
     }
@@ -294,7 +423,52 @@ class EkOdemeKesintiController
             JsonResponse::success(self::mapRow($existing));
         }
 
+        $actorId = (int) ($user['id'] ?? 0);
+        $idemKey = OfflineMutationIdempotencyService::readKey($request);
+        $idemScope = 'finans.cancel:' . $kalemId;
+        $idemHash = OfflineMutationIdempotencyService::hashPayload([
+            'op' => $idemScope,
+            'kalem_id' => $kalemId,
+        ]);
+        if ($idemKey !== null) {
+            $replay = OfflineMutationIdempotencyService::findCompletedReplay(
+                $pdo,
+                $actorId,
+                $idemScope,
+                $idemKey,
+                $idemHash
+            );
+            if (is_array($replay)) {
+                $existingRow = self::fetchRowById($pdo, $kalemId);
+                if ($existingRow) {
+                    JsonResponse::success(self::mapRow($existingRow), [], (int) ($replay['http_status'] ?? 200));
+                }
+            }
+        }
+
+        $pdo->beginTransaction();
         try {
+            if ($idemKey !== null) {
+                $claimedReplay = OfflineMutationIdempotencyService::claimInTransaction(
+                    $pdo,
+                    $actorId,
+                    $idemScope,
+                    $idemKey,
+                    $idemHash
+                );
+                if (is_array($claimedReplay)) {
+                    $pdo->commit();
+                    $existingRow = self::fetchRowById($pdo, $kalemId);
+                    if ($existingRow) {
+                        JsonResponse::success(
+                            self::mapRow($existingRow),
+                            [],
+                            (int) ($claimedReplay['http_status'] ?? 200)
+                        );
+                    }
+                }
+            }
+
             $stmt = $pdo->prepare('
                 UPDATE ek_odeme_kesinti
                 SET state = :state, updated_by = :updated_by
@@ -307,11 +481,29 @@ class EkOdemeKesintiController
             ]);
             $row = self::fetchRowById($pdo, $kalemId);
             if (!$row) {
+                $pdo->rollBack();
                 JsonResponse::serverError('Kayit iptal edilemedi.');
             }
 
+            if ($idemKey !== null) {
+                OfflineMutationIdempotencyService::completeInTransaction(
+                    $pdo,
+                    $actorId,
+                    $idemScope,
+                    $idemKey,
+                    200,
+                    'finans',
+                    $kalemId,
+                    null
+                );
+            }
+
+            $pdo->commit();
             JsonResponse::success(self::mapRow($row));
         } catch (\PDOException $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
             JsonResponse::serverError('Kayit iptal edilemedi.');
         }
     }

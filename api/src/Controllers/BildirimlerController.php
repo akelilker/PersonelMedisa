@@ -10,6 +10,7 @@ use Medisa\Api\Database\Connection;
 use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
 use Medisa\Api\Scope\SubeScope;
+use Medisa\Api\Services\OfflineMutationIdempotencyService;
 use PDO;
 
 class BildirimlerController
@@ -232,7 +233,54 @@ class BildirimlerController
         // Her iki HH:MM de verilmisse dakika sunucuda abs fark olarak hesaplanir.
         $dakika = self::resolveDakikaForCreate($payload);
 
+        $actorId = (int) ($user['id'] ?? 0);
+        $idemKey = OfflineMutationIdempotencyService::readKey($request);
+        $idemScope = 'bildirimler.create';
+        $idemHash = OfflineMutationIdempotencyService::hashPayload([
+            'op' => $idemScope,
+            'payload' => $payload,
+            'dakika' => $dakika,
+        ]);
+        if ($idemKey !== null) {
+            $replay = OfflineMutationIdempotencyService::findCompletedReplay(
+                $pdo,
+                $actorId,
+                $idemScope,
+                $idemKey,
+                $idemHash
+            );
+            if (is_array($replay) && !empty($replay['result_entity_id'])) {
+                $existing = self::fetchRowById($pdo, (int) $replay['result_entity_id']);
+                if ($existing) {
+                    JsonResponse::success(self::mapRow($existing), [], (int) ($replay['http_status'] ?? 201));
+                }
+            }
+        }
+
+        $pdo->beginTransaction();
         try {
+            if ($idemKey !== null) {
+                $claimedReplay = OfflineMutationIdempotencyService::claimInTransaction(
+                    $pdo,
+                    $actorId,
+                    $idemScope,
+                    $idemKey,
+                    $idemHash
+                );
+                if (is_array($claimedReplay) && !empty($claimedReplay['result_entity_id'])) {
+                    $pdo->commit();
+                    $existing = self::fetchRowById($pdo, (int) $claimedReplay['result_entity_id']);
+                    if ($existing) {
+                        JsonResponse::success(
+                            self::mapRow($existing),
+                            [],
+                            (int) ($claimedReplay['http_status'] ?? 201)
+                        );
+                    }
+                    JsonResponse::serverError('Idempotent replay sonucu yuklenemedi.');
+                }
+            }
+
             $stmt = $pdo->prepare('
                 INSERT INTO gunluk_bildirimler (
                     personel_id, tarih, sube_id, departman_id, bildirim_turu, alt_tur,
@@ -262,11 +310,29 @@ class BildirimlerController
             $insertId = (int) $pdo->lastInsertId();
             $row = self::fetchRowById($pdo, $insertId);
             if (!$row) {
+                $pdo->rollBack();
                 JsonResponse::serverError('Kayit olusturulamadi.');
             }
 
+            if ($idemKey !== null) {
+                OfflineMutationIdempotencyService::completeInTransaction(
+                    $pdo,
+                    $actorId,
+                    $idemScope,
+                    $idemKey,
+                    201,
+                    'bildirim',
+                    $insertId,
+                    null
+                );
+            }
+
+            $pdo->commit();
             JsonResponse::success(self::mapRow($row), [], 201);
         } catch (\PDOException $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
             if ((string) $e->getCode() === '23000') {
                 JsonResponse::error(409, 'CONFLICT', 'Bu personel/tarih/olay için açık bildirim zaten var.');
             }
@@ -358,17 +424,81 @@ class BildirimlerController
 
         $fields[] = 'updated_by = :updated_by';
 
+        $actorId = (int) ($user['id'] ?? 0);
+        $idemKey = OfflineMutationIdempotencyService::readKey($request);
+        $idemScope = 'bildirimler.update:' . $bildirimId;
+        $idemHash = OfflineMutationIdempotencyService::hashPayload([
+            'op' => $idemScope,
+            'bildirim_id' => $bildirimId,
+            'payload' => $payload,
+        ]);
+        if ($idemKey !== null) {
+            $replay = OfflineMutationIdempotencyService::findCompletedReplay(
+                $pdo,
+                $actorId,
+                $idemScope,
+                $idemKey,
+                $idemHash
+            );
+            if (is_array($replay)) {
+                $existingRow = self::fetchRowById($pdo, $bildirimId);
+                if ($existingRow) {
+                    JsonResponse::success(self::mapRow($existingRow), [], (int) ($replay['http_status'] ?? 200));
+                }
+            }
+        }
+
+        $pdo->beginTransaction();
         try {
+            if ($idemKey !== null) {
+                $claimedReplay = OfflineMutationIdempotencyService::claimInTransaction(
+                    $pdo,
+                    $actorId,
+                    $idemScope,
+                    $idemKey,
+                    $idemHash
+                );
+                if (is_array($claimedReplay)) {
+                    $pdo->commit();
+                    $existingRow = self::fetchRowById($pdo, $bildirimId);
+                    if ($existingRow) {
+                        JsonResponse::success(
+                            self::mapRow($existingRow),
+                            [],
+                            (int) ($claimedReplay['http_status'] ?? 200)
+                        );
+                    }
+                }
+            }
+
             $sql = 'UPDATE gunluk_bildirimler SET ' . implode(', ', $fields) . ' WHERE id = :id';
             $stmt = $pdo->prepare($sql);
             $stmt->execute($params);
             $row = self::fetchRowById($pdo, $bildirimId);
             if (!$row) {
+                $pdo->rollBack();
                 JsonResponse::serverError('Kayit guncellenemedi.');
             }
 
+            if ($idemKey !== null) {
+                OfflineMutationIdempotencyService::completeInTransaction(
+                    $pdo,
+                    $actorId,
+                    $idemScope,
+                    $idemKey,
+                    200,
+                    'bildirim',
+                    $bildirimId,
+                    null
+                );
+            }
+
+            $pdo->commit();
             JsonResponse::success(self::mapRow($row));
         } catch (\PDOException $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
             JsonResponse::serverError('Kayit guncellenemedi.');
         }
     }
@@ -532,7 +662,52 @@ class BildirimlerController
             JsonResponse::error(409, 'CONFLICT', 'Bu durumdaki bildirim iptal edilemez.');
         }
 
+        $actorId = (int) ($user['id'] ?? 0);
+        $idemKey = OfflineMutationIdempotencyService::readKey($request);
+        $idemScope = 'bildirimler.cancel:' . $bildirimId;
+        $idemHash = OfflineMutationIdempotencyService::hashPayload([
+            'op' => $idemScope,
+            'bildirim_id' => $bildirimId,
+        ]);
+        if ($idemKey !== null) {
+            $replay = OfflineMutationIdempotencyService::findCompletedReplay(
+                $pdo,
+                $actorId,
+                $idemScope,
+                $idemKey,
+                $idemHash
+            );
+            if (is_array($replay)) {
+                $existingRow = self::fetchRowById($pdo, $bildirimId);
+                if ($existingRow) {
+                    JsonResponse::success(self::mapRow($existingRow), [], (int) ($replay['http_status'] ?? 200));
+                }
+            }
+        }
+
+        $pdo->beginTransaction();
         try {
+            if ($idemKey !== null) {
+                $claimedReplay = OfflineMutationIdempotencyService::claimInTransaction(
+                    $pdo,
+                    $actorId,
+                    $idemScope,
+                    $idemKey,
+                    $idemHash
+                );
+                if (is_array($claimedReplay)) {
+                    $pdo->commit();
+                    $existingRow = self::fetchRowById($pdo, $bildirimId);
+                    if ($existingRow) {
+                        JsonResponse::success(
+                            self::mapRow($existingRow),
+                            [],
+                            (int) ($claimedReplay['http_status'] ?? 200)
+                        );
+                    }
+                }
+            }
+
             $stmt = $pdo->prepare('
                 UPDATE gunluk_bildirimler
                 SET state = :state, updated_by = :updated_by
@@ -545,11 +720,29 @@ class BildirimlerController
             ]);
             $row = self::fetchRowById($pdo, $bildirimId);
             if (!$row) {
+                $pdo->rollBack();
                 JsonResponse::serverError('Kayit iptal edilemedi.');
             }
 
+            if ($idemKey !== null) {
+                OfflineMutationIdempotencyService::completeInTransaction(
+                    $pdo,
+                    $actorId,
+                    $idemScope,
+                    $idemKey,
+                    200,
+                    'bildirim',
+                    $bildirimId,
+                    null
+                );
+            }
+
+            $pdo->commit();
             JsonResponse::success(self::mapRow($row));
         } catch (\PDOException $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
             JsonResponse::serverError('Kayit iptal edilemedi.');
         }
     }

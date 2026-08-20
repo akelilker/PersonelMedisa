@@ -24,7 +24,7 @@ const GLOBAL_MAX_EVENTS = 20;
 
 export type TelemetryEventType = "client_error" | "api_fail" | "react_boundary" | "window_error" | "unhandled_rejection";
 
-/** Strict allowlist contract for central + local telemetry metadata. */
+/** Strict allowlist contract for central telemetry wire payload (server allowlist). */
 export type PrivacySafeTelemetryPayload = {
   event_type: TelemetryEventType;
   error_fingerprint: string;
@@ -40,9 +40,9 @@ export type PrivacySafeTelemetryPayload = {
   timestamp: string;
   request_id?: string;
   attempt_count?: number;
-  user_id: number | null;
-  active_sube_id: number | null;
-  ui_profile: string | null;
+  /** Non-authoritative client context only — server derives actor_user_id from auth. */
+  client_active_sube_id: number | null;
+  client_ui_profile: string | null;
 };
 
 const ALLOWED_PAYLOAD_KEYS = new Set([
@@ -60,9 +60,8 @@ const ALLOWED_PAYLOAD_KEYS = new Set([
   "timestamp",
   "request_id",
   "attempt_count",
-  "user_id",
-  "active_sube_id",
-  "ui_profile"
+  "client_active_sube_id",
+  "client_ui_profile"
 ]);
 
 type ClockFn = () => number;
@@ -173,6 +172,11 @@ export function pickAllowlistedTelemetry(
     return null;
   }
 
+  const clientSubeRaw =
+    input.client_active_sube_id ?? input.active_sube_id;
+  const clientProfileRaw =
+    input.client_ui_profile ?? input.ui_profile;
+
   const out: PrivacySafeTelemetryPayload = {
     event_type: eventType,
     error_fingerprint: sanitizeTelemetryText(input.error_fingerprint, 64),
@@ -182,13 +186,13 @@ export function pickAllowlistedTelemetry(
       typeof input.timestamp === "string" && input.timestamp
         ? sanitizeTelemetryText(input.timestamp, 40)
         : new Date(nowFn()).toISOString(),
-    user_id: typeof input.user_id === "number" && Number.isFinite(input.user_id) ? input.user_id : null,
-    active_sube_id:
-      typeof input.active_sube_id === "number" && Number.isFinite(input.active_sube_id)
-        ? input.active_sube_id
-        : null,
-    ui_profile:
-      typeof input.ui_profile === "string" ? sanitizeTelemetryText(input.ui_profile, 64) || null : null
+    // Never wire client user_id / actor_user_id — server auth is authoritative.
+    client_active_sube_id:
+      typeof clientSubeRaw === "number" && Number.isFinite(clientSubeRaw) ? clientSubeRaw : null,
+    client_ui_profile:
+      typeof clientProfileRaw === "string"
+        ? sanitizeTelemetryText(clientProfileRaw, 64) || null
+        : null
   };
 
   if (typeof input.error_code === "string") {
@@ -395,9 +399,8 @@ export function buildBaseTelemetryFields(source?: string): {
   app_version: string;
   app_env: string;
   timestamp: string;
-  user_id: number | null;
-  active_sube_id: number | null;
-  ui_profile: string | null;
+  client_active_sube_id: number | null;
+  client_ui_profile: string | null;
   route_template: string;
   source?: string;
 } {
@@ -414,9 +417,8 @@ export function buildBaseTelemetryFields(source?: string): {
     app_version: getAppVersion(),
     app_env: getAppEnv(),
     timestamp: new Date(nowFn()).toISOString(),
-    user_id: ctx.user_id,
-    active_sube_id: ctx.active_sube_id,
-    ui_profile: ctx.ui_profile,
+    client_active_sube_id: ctx.active_sube_id,
+    client_ui_profile: ctx.ui_profile,
     route_template: toRouteTemplate(route),
     ...(source ? { source: sanitizeTelemetryText(source, 64) } : {})
   };

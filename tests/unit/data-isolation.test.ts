@@ -61,7 +61,6 @@ describe("data-isolation", () => {
           delete localStorageMock[key];
         },
       },
-      // appData'yi her test oncesi sifirla
       appData: undefined
     });
     mockGetSession.mockReturnValue(null);
@@ -73,7 +72,6 @@ describe("data-isolation", () => {
   });
 
   it("should purge app data when actor fingerprint changes between sessions", () => {
-    // 1. User A olarak basla ve cache'e veri yaz
     mockGetSession.mockReturnValue(USER_A_SESSION);
     initAppDataFromStorage();
     setCacheEntry("test_key", "user_a_data");
@@ -82,10 +80,8 @@ describe("data-isolation", () => {
     const fingerprintA = getActorFingerprint(USER_A_SESSION);
     expect(getAppData().ownerFingerprint).toBe(fingerprintA);
 
-    // 2. Oturum degistir (User B)
     mockGetSession.mockReturnValue(USER_B_SESSION);
 
-    // 3. ensureAppData, degisikligi algilamali ve veriyi temizlemeli
     const appData = ensureAppData();
     const fingerprintB = getActorFingerprint(USER_B_SESSION);
     expect(appData.ownerFingerprint).toBe(fingerprintB);
@@ -93,36 +89,30 @@ describe("data-isolation", () => {
     expect(Object.keys(appData.cache)).toHaveLength(0);
   });
 
-  it("should not allow enqueuing operations for a different user's queue", () => {
-    // 1. User A olarak basla ve bir item enqueue et
+  it("keeps other actors queue items but never exposes them to current actor", () => {
     mockGetSession.mockReturnValue(USER_A_SESSION);
     initAppDataFromStorage();
     const resultA = enqueueSyncOperation({ op: "personeller.create", payload: {} as any });
     expect(resultA).toBe("queued");
-    
-    // localStorage'da User A'nin queue'su var
+
     const queueA = JSON.parse(localStorageMock["medisa_sync_queue"] || "[]");
     expect(queueA).toHaveLength(1);
     expect(queueA[0].ownerFingerprint).toBe(getActorFingerprint(USER_A_SESSION));
 
-    // 2. User B olarak oturum ac
     mockGetSession.mockReturnValue(USER_B_SESSION);
-    
-    // ensureAppData, User A'nin verilerini temizlemis olmali
     ensureAppData();
-    expect(localStorageMock["medisa_sync_queue"]).toBeUndefined();
 
-    // 3. User B yeni bir item enqueue ettiginde, eski item'larin uzerine yazmamali
     const resultB = enqueueSyncOperation({ op: "personeller.create", payload: {} as any });
     expect(resultB).toBe("queued");
 
-    const queueB = JSON.parse(localStorageMock["medisa_sync_queue"] || "[]");
-    expect(queueB).toHaveLength(1);
-    expect(queueB[0].ownerFingerprint).toBe(getActorFingerprint(USER_B_SESSION));
+    const queueAll = JSON.parse(localStorageMock["medisa_sync_queue"] || "[]");
+    expect(queueAll).toHaveLength(2);
+    expect(queueAll.map((i: { ownerFingerprint: string }) => i.ownerFingerprint).sort()).toEqual(
+      [getActorFingerprint(USER_A_SESSION), getActorFingerprint(USER_B_SESSION)].sort()
+    );
   });
 
-  it("should clear all persistence on logout, including user-scoped data", () => {
-    // User A olarak basla ve veri olustur
+  it("clears protected cache on logout but keeps sync queue for same-actor 401 resume", () => {
     mockGetSession.mockReturnValue(USER_A_SESSION);
     initAppDataFromStorage();
     setCacheEntry("test_key", "user_a_data");
@@ -130,16 +120,13 @@ describe("data-isolation", () => {
 
     expect(localStorageMock["medisa_app_data"]).toBeDefined();
     expect(localStorageMock["medisa_sync_queue"]).toBeDefined();
-    
-    // Logout ol
+
     mockGetSession.mockReturnValue(null);
     clearAllAppPersistence();
-    
-    // Tum ilgili localStorage verilerinin temizlendigini dogrula
-    expect(localStorageMock["medisa_app_data"]).toBeUndefined();
-    expect(localStorageMock["medisa_sync_queue"]).toBeUndefined();
 
-    // appData'nin da sifirlandigini dogrula
+    expect(localStorageMock["medisa_app_data"]).toBeUndefined();
+    expect(localStorageMock["medisa_sync_queue"]).toBeDefined();
+
     const appData = getAppData();
     expect(appData.ownerFingerprint).toBeNull();
     expect(Object.keys(appData.cache)).toHaveLength(0);

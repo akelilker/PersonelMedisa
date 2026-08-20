@@ -11,6 +11,10 @@ use Medisa\Api\Http\Request;
 /**
  * Authenticated, allowlisted client telemetry ingestion.
  * No DB persistence — privacy-safe server log only. Rejects unknown fields / oversized bodies.
+ *
+ * Actor attribution is server-authoritative (AuthMiddleware). Client user_id is rejected.
+ * client_ui_profile / client_active_sube_id are non-authoritative diagnostic context only —
+ * this endpoint is never an audit trail.
  */
 class ClientTelemetryController
 {
@@ -43,9 +47,9 @@ class ClientTelemetryController
         'timestamp',
         'request_id',
         'attempt_count',
-        'user_id',
-        'active_sube_id',
-        'ui_profile',
+        // Non-authoritative client context only (never actor identity):
+        'client_active_sube_id',
+        'client_ui_profile',
     ];
 
     public static function ingest(Request $request)
@@ -67,6 +71,23 @@ class ClientTelemetryController
             JsonResponse::badRequest('Telemetry payload must be an object.', 'INVALID_TELEMETRY');
         }
 
+        // Authoritative identity must never be client-supplied.
+        if (array_key_exists('user_id', $body) || array_key_exists('actor_user_id', $body)) {
+            JsonResponse::badRequest(
+                'Client must not supply actor identity fields.',
+                'TELEMETRY_CLIENT_ACTOR_FORBIDDEN',
+                array_key_exists('user_id', $body) ? 'user_id' : 'actor_user_id'
+            );
+        }
+        // Legacy non-authoritative names rejected so clients cannot spoof via rename confusion.
+        if (array_key_exists('active_sube_id', $body) || array_key_exists('ui_profile', $body)) {
+            JsonResponse::badRequest(
+                'Use client_active_sube_id / client_ui_profile for non-authoritative context.',
+                'TELEMETRY_LEGACY_CONTEXT_FIELD',
+                array_key_exists('active_sube_id', $body) ? 'active_sube_id' : 'ui_profile'
+            );
+        }
+
         foreach (array_keys($body) as $key) {
             if (!is_string($key) || !in_array($key, self::$allowedKeys, true)) {
                 JsonResponse::badRequest('Unknown telemetry field.', 'TELEMETRY_UNKNOWN_FIELD', is_string($key) ? $key : null);
@@ -85,13 +106,16 @@ class ClientTelemetryController
             JsonResponse::badRequest('Invalid error_fingerprint.', 'TELEMETRY_FINGERPRINT', 'error_fingerprint');
         }
 
+        $actorUserId = isset($user['id']) ? (int) $user['id'] : null;
+
         $safe = [
             'event_type' => $eventType,
             'error_fingerprint' => self::clip($fingerprint, self::MAX_FINGERPRINT),
-            'actor_user_id' => isset($user['id']) ? (int) $user['id'] : null,
+            // Server-authenticated only — never taken from body.
+            'actor_user_id' => $actorUserId,
         ];
 
-        foreach (['error_code', 'source', 'route_template', 'endpoint_template', 'method', 'app_version', 'app_env', 'release_sha', 'timestamp', 'request_id', 'ui_profile'] as $strKey) {
+        foreach (['error_code', 'source', 'route_template', 'endpoint_template', 'method', 'app_version', 'app_env', 'release_sha', 'timestamp', 'request_id'] as $strKey) {
             if (!array_key_exists($strKey, $body)) {
                 continue;
             }
@@ -105,7 +129,15 @@ class ClientTelemetryController
             $safe[$strKey] = self::clip($body[$strKey], self::MAX_STRING);
         }
 
-        foreach (['status', 'attempt_count', 'user_id', 'active_sube_id'] as $numKey) {
+        if (array_key_exists('client_ui_profile', $body) && $body['client_ui_profile'] !== null) {
+            if (!is_string($body['client_ui_profile'])) {
+                JsonResponse::badRequest('Invalid string field.', 'TELEMETRY_FIELD_TYPE', 'client_ui_profile');
+            }
+            // Non-authoritative diagnostic context only.
+            $safe['client_ui_profile'] = self::clip($body['client_ui_profile'], self::MAX_STRING);
+        }
+
+        foreach (['status', 'attempt_count'] as $numKey) {
             if (!array_key_exists($numKey, $body) || $body[$numKey] === null) {
                 continue;
             }
@@ -115,10 +147,52 @@ class ClientTelemetryController
             $safe[$numKey] = (int) $body[$numKey];
         }
 
+        if (array_key_exists('client_active_sube_id', $body) && $body['client_active_sube_id'] !== null) {
+            if (!is_int($body['client_active_sube_id']) && !(is_float($body['client_active_sube_id']) && (int) $body['client_active_sube_id'] == $body['client_active_sube_id'])) {
+                JsonResponse::badRequest('Invalid numeric field.', 'TELEMETRY_FIELD_TYPE', 'client_active_sube_id');
+            }
+            $clientSube = (int) $body['client_active_sube_id'];
+            $scopeIds = self::actorSubeIds($user);
+            if (count($scopeIds) > 0 && !in_array($clientSube, $scopeIds, true)) {
+                JsonResponse::badRequest(
+                    'client_active_sube_id is outside authenticated scope.',
+                    'TELEMETRY_SUBE_OUT_OF_SCOPE',
+                    'client_active_sube_id'
+                );
+            }
+            // Non-authoritative; only attach when scope is empty (cannot validate) or in-scope.
+            if (count($scopeIds) === 0 || in_array($clientSube, $scopeIds, true)) {
+                $safe['client_active_sube_id'] = $clientSube;
+            }
+        }
+
         // Never echo stack/body/internals to client.
         error_log('[medisa-client-telemetry] ' . json_encode($safe, JSON_UNESCAPED_UNICODE));
 
         JsonResponse::success(['accepted' => true]);
+    }
+
+    /**
+     * @param array<string, mixed> $user
+     * @return array<int, int>
+     */
+    private static function actorSubeIds(array $user)
+    {
+        $ids = [];
+        if (isset($user['sube_ids']) && is_array($user['sube_ids'])) {
+            $raw = $user['sube_ids'];
+        } elseif (isset($user['subeler']) && is_array($user['subeler'])) {
+            $raw = $user['subeler'];
+        } else {
+            $raw = [];
+        }
+        foreach ($raw as $id) {
+            $n = (int) $id;
+            if ($n > 0) {
+                $ids[] = $n;
+            }
+        }
+        return array_values(array_unique($ids));
     }
 
     private static function clip($value, $max)

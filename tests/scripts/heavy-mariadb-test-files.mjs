@@ -16,6 +16,7 @@ export const heavyMariaDbTestFiles = [
   "tests/unit/maas-hesaplama-concurrency.php-runtime.test.ts",
   "tests/unit/maas-hesaplama-migration.php-runtime.test.ts",
   "tests/unit/manager-qr-read.source.test.ts",
+  "tests/unit/offline-mutation-idempotency-mysql.php-runtime.test.ts",
   "tests/unit/org-structure-pack6-mysql.php-runtime.test.ts",
   "tests/unit/pack7f-external-worker-mysql.php-runtime.test.ts",
   "tests/unit/personel-belge-038-migration-mysql.php-runtime.test.ts",

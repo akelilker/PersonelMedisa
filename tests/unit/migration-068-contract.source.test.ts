@@ -11,9 +11,9 @@ describe("migration 068 actor identity audit contract", () => {
   it("keeps a unique, numeric, ordered migration chain", () => {
     expect(new Set(migrationNumbers).size).toBe(migrationNumbers.length);
     expect(migrationNumbers).toEqual([...migrationNumbers].sort((a, b) => a - b));
-    expect(migrationNames.at(-3)).toBe("067_personel_canonical_reference_gate.sql");
-    expect(migrationNames.at(-2)).toBe("068_sgk_actor_identity_lifecycle_audit.sql");
-    expect(migrationNames.at(-1)).toBe("069_personel_credential_onboarding.sql");
+    expect(migrationNames.at(-3)).toBe("068_sgk_actor_identity_lifecycle_audit.sql");
+    expect(migrationNames.at(-2)).toBe("069_personel_credential_onboarding.sql");
+    expect(migrationNames.at(-1)).toBe("070_offline_mutation_idempotency.sql");
   });
 
   it("keeps 068 append-only and attributable", () => {

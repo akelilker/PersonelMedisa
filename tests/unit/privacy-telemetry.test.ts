@@ -118,7 +118,7 @@ describe("privacy-safe telemetry", () => {
     expect(blob).not.toContain(amount);
   });
 
-  it("central telemetry payload is allowlisted only", () => {
+  it("central telemetry payload is allowlisted only and omits client user_id", () => {
     const picked = pickAllowlistedTelemetry({
       event_type: "api_fail",
       error_fingerprint: "fp_abc",
@@ -132,7 +132,7 @@ describe("privacy-safe telemetry", () => {
       app_version: "1.0.0",
       app_env: "test",
       timestamp: "2026-01-01T00:00:00.000Z",
-      user_id: 1,
+      user_id: 99,
       active_sube_id: 2,
       ui_profile: "yonetim"
     });
@@ -141,19 +141,23 @@ describe("privacy-safe telemetry", () => {
     expect(picked).not.toHaveProperty("token");
     expect(picked).not.toHaveProperty("Authorization");
     expect(picked).not.toHaveProperty("body");
+    expect(picked).not.toHaveProperty("user_id");
+    expect(picked).not.toHaveProperty("active_sube_id");
+    expect(picked).not.toHaveProperty("ui_profile");
+    expect(picked!.client_active_sube_id).toBe(2);
+    expect(picked!.client_ui_profile).toBe("yonetim");
     expect(Object.keys(picked!).sort()).toEqual(
       [
-        "active_sube_id",
         "app_env",
         "app_version",
+        "client_active_sube_id",
+        "client_ui_profile",
         "endpoint_template",
         "error_fingerprint",
         "event_type",
         "method",
         "status",
-        "timestamp",
-        "ui_profile",
-        "user_id"
+        "timestamp"
       ].sort()
     );
   });
@@ -185,9 +189,8 @@ describe("privacy-safe telemetry", () => {
         app_version: "1",
         app_env: "test",
         timestamp: "t",
-        user_id: null,
-        active_sube_id: null,
-        ui_profile: null
+        client_active_sube_id: null,
+        client_ui_profile: null
       })
     ).toBe(true);
 
@@ -218,9 +221,8 @@ describe("privacy-safe telemetry", () => {
       app_version: "1",
       app_env: "test",
       timestamp: "t",
-      user_id: null,
-      active_sube_id: null,
-      ui_profile: null
+      client_active_sube_id: null,
+      client_ui_profile: null
     };
     expect(sendPrivacySafeTelemetry(payload)).toBe(true);
     expect(sendPrivacySafeTelemetry(payload)).toBe(false);
@@ -238,9 +240,8 @@ describe("privacy-safe telemetry", () => {
         app_version: "1",
         app_env: "test",
         timestamp: "t",
-        user_id: null,
-        active_sube_id: null,
-        ui_profile: null
+        client_active_sube_id: null,
+        client_ui_profile: null
       });
       if (ok) accepted += 1;
     }

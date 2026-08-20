@@ -56,6 +56,8 @@ import {
 const listeners = new Set<() => void>();
 const BILDIRIM_PERSONEL_FETCH_LIMIT = 250;
 const MAX_SYNC_ATTEMPTS = 5;
+/** PROCESSING stuck beyond this age is recovered to FAILED_RETRYABLE (same Idempotency-Key). */
+export const STALE_PROCESSING_MS = 5 * 60 * 1000;
 
 export function subscribeAppData(onStoreChange: () => void): () => void {
   listeners.add(onStoreChange);
@@ -118,9 +120,15 @@ export function ensureAppData(): AppData {
   }
 
   // Guvenlik: Oturum degisti mi? Cache'in sahibi mevcut kullanici mi?
+  // Sync queue is actor-scoped via ownerFingerprint filter — do not wipe it on
+  // session flip so same-actor 401 BLOCKED_AUTH can resume after re-auth.
   const currentFingerprint = getActorFingerprint(getSession());
   if (window.appData.ownerFingerprint !== currentFingerprint) {
-    purgePersistentData();
+    try {
+      window.localStorage.removeItem(APP_DATA_STORAGE_KEY);
+    } catch {
+      /* ignore */
+    }
     window.appData = createEmptyAppData(currentFingerprint);
   }
 
@@ -170,7 +178,13 @@ export function clearAllAppPersistence(): void {
 
   resetProtectedDataLoadGate();
 
-  purgePersistentData();
+  // Clear protected cache; keep actor-scoped sync queue so 401 BLOCKED_AUTH
+  // items can resume after same-actor re-auth (cross-user still filtered).
+  try {
+    window.localStorage.removeItem(APP_DATA_STORAGE_KEY);
+  } catch {
+    /* ignore */
+  }
 
   const empty = createEmptyAppData(getActorFingerprint(getSession()));
   window.appData = empty;
@@ -237,7 +251,11 @@ export function initAppDataFromStorage(): AppData {
   const currentFingerprint = getActorFingerprint(getSession());
 
   if (parsed && parsed.ownerFingerprint !== currentFingerprint) {
-    purgePersistentData();
+    try {
+      window.localStorage.removeItem(APP_DATA_STORAGE_KEY);
+    } catch {
+      /* ignore */
+    }
     parsed = null;
   }
 
@@ -463,54 +481,60 @@ function resolveFallbackForKey(key: string): unknown {
   return undefined;
 }
 
-function readQueue(): SyncQueueItem[] {
+function readAllQueueRaw(): SyncQueueItem[] {
   if (typeof window === "undefined") {
     return [];
   }
-
-  const currentFingerprint = getActorFingerprint(getSession());
-  if (!currentFingerprint) {
-    return [];
-  }
-
   try {
     const raw = window.localStorage.getItem(APP_SYNC_QUEUE_KEY);
     if (!raw) {
       return [];
     }
-
     const parsed = JSON.parse(raw) as unknown;
     if (!Array.isArray(parsed)) {
       return [];
     }
-
-    // Guvenlik: Yalnizca mevcut kullaniciya ait islemleri yukle.
-    return (parsed as SyncQueueItem[]).filter(
-      (item) => item && typeof item === "object" && item.ownerFingerprint === currentFingerprint
-    );
+    return (parsed as SyncQueueItem[]).filter((item) => item && typeof item === "object" && typeof item.id === "string");
   } catch {
     return [];
   }
 }
 
-function writeQueue(items: SyncQueueItem[]): void {
+function readQueue(): SyncQueueItem[] {
+  const currentFingerprint = getActorFingerprint(getSession());
+  if (!currentFingerprint) {
+    return [];
+  }
+  return readAllQueueRaw().filter((item) => item.ownerFingerprint === currentFingerprint);
+}
+
+/** Persist full queue. Merges current-actor items with other actors' items. Returns false on quota/storage failure. */
+function writeQueue(itemsForCurrentActor: SyncQueueItem[]): boolean {
   if (typeof window === "undefined") {
-    return;
+    return false;
   }
 
+  const currentFingerprint = getActorFingerprint(getSession());
+  const others = currentFingerprint
+    ? readAllQueueRaw().filter((item) => item.ownerFingerprint !== currentFingerprint)
+    : readAllQueueRaw();
+  const merged = [...others, ...itemsForCurrentActor];
+
   try {
-    window.localStorage.setItem(APP_SYNC_QUEUE_KEY, JSON.stringify(items));
+    window.localStorage.setItem(APP_SYNC_QUEUE_KEY, JSON.stringify(merged));
+    return true;
   } catch {
-    /* ignore */
+    return false;
   }
 }
+
+export type QueuePersistResult = "ok" | "quota-error";
 
 export function enqueueSyncOperation(
   item: Omit<SyncQueueItem, "id" | "createdAt" | "ownerFingerprint" | "state" | "attemptCount" | "lastAttemptAt" | "lastError"> & { id?: string }
 ): "queued" | "quota-error" {
   const fingerprint = getActorFingerprint(getSession());
   if (!fingerprint) {
-    // Oturum yokken offline islem yapilamaz.
     return "quota-error";
   }
 
@@ -527,32 +551,93 @@ export function enqueueSyncOperation(
     lastError: null,
   } as SyncQueueItem;
 
-  const tempQueue = [...queue, next];
-
-  try {
-    // Once yazmayi dene, eger quota doluysa UI'a aninda bildir.
-    window.localStorage.setItem(APP_SYNC_QUEUE_KEY, JSON.stringify(tempQueue));
-    writeQueue(tempQueue);
-    return "queued";
-  } catch (e) {
+  if (!writeQueue([...queue, next])) {
     return "quota-error";
   }
+  notifyAppData();
+  return "queued";
 }
 
-function updateQueueItem(id: string, update: Partial<Omit<SyncQueueItem, "id">>): void {
+function updateQueueItem(id: string, update: Partial<Omit<SyncQueueItem, "id">>): QueuePersistResult {
   const queue = readQueue();
   const index = queue.findIndex((item) => item.id === id);
   if (index === -1) {
-    return;
+    return "ok";
   }
   queue[index] = { ...queue[index], ...update } as SyncQueueItem;
-  writeQueue(queue);
+  return writeQueue(queue) ? "ok" : "quota-error";
+}
+
+function removeQueueItem(id: string): QueuePersistResult {
+  const queue = readQueue().filter((item) => item.id !== id);
+  return writeQueue(queue) ? "ok" : "quota-error";
+}
+
+/**
+ * Recover stale PROCESSING → FAILED_RETRYABLE (same item.id / Idempotency-Key).
+ * Fresh PROCESSING (within STALE_PROCESSING_MS) is left alone.
+ */
+export function recoverStaleProcessingItems(nowMs: number = Date.now()): number {
+  const queue = readQueue();
+  let recovered = 0;
+  const next = queue.map((item) => {
+    if (item.state !== "PROCESSING") {
+      return item;
+    }
+    const attempted = item.lastAttemptAt ? Date.parse(item.lastAttemptAt) : NaN;
+    if (!Number.isFinite(attempted) || nowMs - attempted < STALE_PROCESSING_MS) {
+      return item;
+    }
+    recovered += 1;
+    return {
+      ...item,
+      state: "FAILED_RETRYABLE" as const,
+      lastError: {
+        code: "STALE_PROCESSING_RECOVERED",
+        message: "Stale PROCESSING recovered after crash/restart."
+      }
+    };
+  });
+  if (recovered > 0) {
+    writeQueue(next);
+  }
+  return recovered;
+}
+
+/**
+ * Same-actor re-auth: BLOCKED_AUTH → PENDING. BLOCKED_PERMISSION is never auto-resumed.
+ * Cross-user items are never touched (filtered by fingerprint).
+ */
+export function resumeAuthBlockedQueueForCurrentActor(): number {
+  const fingerprint = getActorFingerprint(getSession());
+  if (!fingerprint) {
+    return 0;
+  }
+  const queue = readQueue();
+  let resumed = 0;
+  const next = queue.map((item) => {
+    if (item.ownerFingerprint !== fingerprint || item.state !== "BLOCKED_AUTH") {
+      return item;
+    }
+    resumed += 1;
+    return {
+      ...item,
+      state: "PENDING" as const,
+      lastError: null
+    };
+  });
+  if (resumed > 0) {
+    writeQueue(next);
+  }
+  return resumed;
 }
 
 /**
  * Offline sync queue processor (state machine).
- * 401/403 → BLOCKED_AUTH (no silent delete); 409/422 → CONFLICT; retryable → FAILED_RETRYABLE;
- * max attempts → DEAD_LETTER. Replay uses queue item id as caller-owned Idempotency-Key.
+ * 401 → BLOCKED_AUTH (same-actor resume after re-auth); 403 → BLOCKED_PERMISSION (no auto-retry);
+ * 409/422 → CONFLICT; retryable → FAILED_RETRYABLE; max attempts → DEAD_LETTER.
+ * Success removes the item (COMPLETED pruned; payload not retained).
+ * Replay always uses stable queue item id as Idempotency-Key.
  */
 export async function processSyncQueue(): Promise<void> {
   const fingerprint = getActorFingerprint(getSession());
@@ -563,6 +648,8 @@ export async function processSyncQueue(): Promise<void> {
   if (typeof navigator !== "undefined" && navigator.onLine === false) {
     return;
   }
+
+  recoverStaleProcessingItems();
 
   const queue = readQueue().filter(
     (item) => item.state === "PENDING" || item.state === "FAILED_RETRYABLE"
@@ -576,17 +663,20 @@ export async function processSyncQueue(): Promise<void> {
       continue;
     }
 
-    updateQueueItem(item.id, {
+    const processingWrite = updateQueueItem(item.id, {
       state: "PROCESSING",
       attemptCount: item.attemptCount + 1,
       lastAttemptAt: new Date().toISOString(),
     });
+    if (processingWrite === "quota-error") {
+      // Fail closed: do not dispatch if PROCESSING cannot be persisted.
+      break;
+    }
 
     try {
       await dispatchSyncItem(item);
-      // Basarili olunca silmek yerine durumunu guncelle, sonra ayri bir adimda sil.
-      // Simdilik sadece state'i guncelliyoruz.
-      updateQueueItem(item.id, { state: "COMPLETED" });
+      // Prune successful payload-bearing items (no permanent COMPLETED retention).
+      removeQueueItem(item.id);
     } catch (error) {
       const apiError = error instanceof ApiRequestError ? error : null;
       const status = apiError?.status ?? -1;
@@ -597,16 +687,20 @@ export async function processSyncQueue(): Promise<void> {
         message: apiError?.message,
       };
 
-      if (status === 401 || status === 403) {
-        updateQueueItem(item.id, { state: "BLOCKED_AUTH", lastError });
+      let nextState: SyncQueueItem["state"];
+      if (status === 401) {
+        nextState = "BLOCKED_AUTH";
+      } else if (status === 403) {
+        nextState = "BLOCKED_PERMISSION";
       } else if (status === 409 || status === 422) {
-        updateQueueItem(item.id, { state: "CONFLICT", lastError });
+        nextState = "CONFLICT";
       } else if (item.attemptCount + 1 >= MAX_SYNC_ATTEMPTS) {
-        updateQueueItem(item.id, { state: "DEAD_LETTER", lastError });
+        nextState = "DEAD_LETTER";
       } else {
-        updateQueueItem(item.id, { state: "FAILED_RETRYABLE", lastError });
+        nextState = "FAILED_RETRYABLE";
       }
-      // Bir hata durumunda donguden cik, bir sonraki processSyncQueue cagrisinda devam et.
+
+      updateQueueItem(item.id, { state: nextState, lastError });
       break;
     }
   }
@@ -1597,6 +1691,8 @@ export async function loadDataFromServer(options?: LoadDataFromServerOptions): P
     await Promise.allSettled(tasks);
     persistAppData();
     notifyAppData();
+    // Same-actor re-auth: unblock 401 items (stable Idempotency-Key = item.id).
+    resumeAuthBlockedQueueForCurrentActor();
     void processSyncQueue();
   })().finally(() => {
     protectedDataLoadInFlight = null;

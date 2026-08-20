@@ -1,25 +1,36 @@
 # Core data security, offline correctness, and telemetry semantics
 
-Canonical decisions for PersonelMedisa frontend core hardening (branch `feat/core-data-security-hardening`).
+Canonical decisions for PersonelMedisa frontend + API hardening (branch `feat/core-data-security-hardening`).
 
 ## 1. Protected cache ownership
 
-`AppData` and sync-queue items carry `ownerFingerprint` derived from `getActorFingerprint(session)` (`userId|role|sorted sube_ids`). Actor mismatch on load/ensure **purges** protected localStorage (`medisa_app_data`, `medisa_sync_queue`) and resets in-memory cache. Cross-user cache reuse is denied.
+`AppData` carries `ownerFingerprint` derived from `getActorFingerprint(session)` (`userId|role|sorted sube_ids`). Actor mismatch on load/ensure **purges** protected cache (`medisa_app_data`) and resets in-memory cache. Sync queue is **not** wiped on session flip; items remain actor-scoped via `ownerFingerprint` filtering so same-actor re-auth can resume. Cross-user cache reuse and cross-user queue replay are denied.
 
 ## 2. Offline queue state machine
 
-Queue items are stateful: `PENDING | PROCESSING | COMPLETED | FAILED_RETRYABLE | BLOCKED_AUTH | CONFLICT | DEAD_LETTER`.
+Queue items are stateful: `PENDING | PROCESSING | FAILED_RETRYABLE | BLOCKED_AUTH | BLOCKED_PERMISSION | CONFLICT | DEAD_LETTER`.
 
-- `401/403` → `BLOCKED_AUTH` (no silent delete)
+- `401` → `BLOCKED_AUTH` — after same-actor successful re-auth / `loadDataFromServer`, resume to `PENDING` (stable `item.id` = `Idempotency-Key`)
+- `403` → `BLOCKED_PERMISSION` — **no** automatic retry after login; requires permission/business resolution
 - `409/422` → `CONFLICT`
 - retryable transport/5xx → `FAILED_RETRYABLE` until `MAX_SYNC_ATTEMPTS` → `DEAD_LETTER`
-- success → `COMPLETED`
+- success → item is **pruned** from queue (no permanent COMPLETED payload retention)
+- stale `PROCESSING` (age ≥ `STALE_PROCESSING_MS`) → `FAILED_RETRYABLE` for same-key replay
+- queue write failure (quota): PENDING→PROCESSING fail-closed (no dispatch); never silent-ignore on state transitions
 
-Quota failure on enqueue returns `"quota-error"` to the caller.
+## 3. Mutation idempotency (server ledger)
 
-## 3. Mutation idempotency
+Frontend: offline queue item `id` → `Idempotency-Key` header. Transport **never mints** keys.
 
-Frontend owner: offline queue item `id` passed as `idempotencyKey` → `Idempotency-Key` header. Transport **never mints** keys. Backend ledger for generic offline replay is not introduced in this phase; domain-specific idempotency tables elsewhere remain unchanged. No new migration for this plumbing.
+Backend owner: `OfflineMutationIdempotencyService` + migration `070_offline_mutation_idempotency.sql` table `offline_mutation_idempotency`.
+
+- Identity: authenticated `actor_user_id` + `operation_scope` + `Idempotency-Key` (UNIQUE)
+- Scopes: `personeller.create|update:{id}`, `surecler.*`, `bildirimler.*`, `finans.*`, `puantaj.upsert:{personel_id}:{tarih}`
+- `payload_hash` over allowlisted canonical business payload (no raw body / password / token storage)
+- same hash → idempotent replay (re-read entity by result locator)
+- different hash → HTTP 409 `IDEMPOTENCY_KEY_CONFLICT` (fail-closed)
+- claim + business mutation + complete in the **same DB transaction**; concurrent same-key → business mutation once
+- Auth/login/read-only endpoints are not wrapped
 
 ## 4. Safe HTTP retry / failover
 
@@ -46,14 +57,18 @@ All requests use AbortController timeout (default 30s, overridable via `timeoutM
 
 `isRealBackendOnlyMode()` is always true in production builds. Demo login / HTML demo fallback is denied. Non-production demo fallback remains gated and never treats auth-shaped invalid roles as demo success.
 
-## 9. Telemetry privacy contract
+## 9. Telemetry privacy contract (diagnostic ≠ audit)
 
-Owner: `src/logging/client-telemetry.ts` (+ `error-logger.ts` local buffer).
+Owner: `src/logging/client-telemetry.ts` (+ `error-logger.ts` local buffer) and `ClientTelemetryController`.
 
-- **Allowed**: event_type, fingerprint, codes, templates, status/method, app meta, opaque user_id / active_sube_id / ui_profile, attempt_count.
+- Client telemetry is **diagnostic only** — never an authoritative security/business audit trail.
+- Server log `actor_user_id` is derived **only** from `AuthMiddleware::authenticate` (never from body).
+- Client must **not** send `user_id` / `actor_user_id` (rejected: `TELEMETRY_CLIENT_ACTOR_FORBIDDEN`).
+- Non-authoritative context only: `client_ui_profile`, `client_active_sube_id` (validated against auth sube scope when scope is non-empty).
+- **Allowed wire fields**: event_type, fingerprint, codes, templates, status/method, app meta, attempt_count, client_* context.
 - **Prohibited**: passwords, tokens, Authorization, Cookie, request/response bodies, TC/ad/telefon/maaş and other HR payloads.
 - Central delivery: authenticated `POST /client-telemetry` (strict PHP allowlist, body size limits, `error_log` only — no DB). Pre-auth events stay in a bounded privacy-safe client buffer until login flush.
-- Dedupe window + global rate limit; recursion mute on delivery failure. Schema v3 purges legacy `medisa_client_errors` / `medisa_client_api_fails` on startup.
+- Dedupe window + global rate limit; recursion mute on delivery failure. Schema v3 purges legacy unsafe local stores on startup.
 
 ## 10. Error recovery architecture
 

@@ -84,7 +84,7 @@ describe("S106 RESMI_KAYNAKLI_KISITLI katalog", () => {
     const names = readdirSync(resolve("api/migrations"))
       .filter((n) => n.endsWith(".sql"))
       .sort();
-    expect(names.at(-1)).toBe("069_personel_credential_onboarding.sql");
+    expect(names.at(-1)).toBe("070_offline_mutation_idempotency.sql");
   });
 
   it("contracts/validators expose S106 enums and write path", () => {

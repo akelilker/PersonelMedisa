@@ -45,7 +45,15 @@ export type AppData = {
   cache: Record<string, CacheEnvelope<unknown>>;
 };
 
-export type SyncQueueState = "PENDING" | "PROCESSING" | "COMPLETED" | "FAILED_RETRYABLE" | "BLOCKED_AUTH" | "CONFLICT" | "DEAD_LETTER";
+export type SyncQueueState =
+  | "PENDING"
+  | "PROCESSING"
+  | "COMPLETED"
+  | "FAILED_RETRYABLE"
+  | "BLOCKED_AUTH"
+  | "BLOCKED_PERMISSION"
+  | "CONFLICT"
+  | "DEAD_LETTER";
 
 export type SyncQueueItemBase = {
   id: string;

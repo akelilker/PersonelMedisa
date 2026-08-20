@@ -218,6 +218,7 @@ export type LogErrorInput = {
  */
 export function logError(input: LogErrorInput): void {
   const base = buildBaseTelemetryFields(input.source);
+  const localCtx = readAuthContextForLogging();
   const route = input.route ?? readRoute();
   const routeTemplate = toRouteTemplate(route);
   const message = sanitizeTelemetryText(input.message, 256) || "client_error";
@@ -246,9 +247,9 @@ export function logError(input: LogErrorInput): void {
     source: input.source,
     error_fingerprint: fingerprint,
     error_code: input.error_code,
-    user_id: input.user_id ?? base.user_id,
-    active_sube_id: input.active_sube_id ?? base.active_sube_id,
-    ui_profile: input.ui_profile ?? base.ui_profile,
+    user_id: input.user_id ?? localCtx.user_id,
+    active_sube_id: input.active_sube_id ?? localCtx.active_sube_id,
+    ui_profile: input.ui_profile ?? localCtx.ui_profile,
     route,
     route_template: routeTemplate,
     app_version: base.app_version,
@@ -268,9 +269,8 @@ export function logError(input: LogErrorInput): void {
     app_version: entry.app_version,
     app_env: entry.app_env,
     timestamp: entry.timestamp,
-    user_id: entry.user_id,
-    active_sube_id: entry.active_sube_id,
-    ui_profile: entry.ui_profile
+    client_active_sube_id: entry.active_sube_id,
+    client_ui_profile: entry.ui_profile
   });
 
   if (isDevRuntime()) {
@@ -293,6 +293,7 @@ export function logApiFailure5xx(input: {
   attempt_count?: number;
 }): void {
   const base = buildBaseTelemetryFields("api_fail");
+  const localCtx = readAuthContextForLogging();
   const method = (input.method ?? "GET").toUpperCase();
   const endpointTemplate = toEndpointTemplate(input.endpoint);
   const fingerprint = buildErrorFingerprint({
@@ -309,9 +310,9 @@ export function logApiFailure5xx(input: {
     status: input.status,
     method,
     error_fingerprint: fingerprint,
-    user_id: base.user_id,
-    active_sube_id: base.active_sube_id,
-    ui_profile: base.ui_profile,
+    user_id: localCtx.user_id,
+    active_sube_id: localCtx.active_sube_id,
+    ui_profile: localCtx.ui_profile,
     route: readRoute(),
     route_template: base.route_template,
     app_version: base.app_version,
@@ -334,9 +335,8 @@ export function logApiFailure5xx(input: {
     app_version: entry.app_version,
     app_env: entry.app_env,
     timestamp: entry.timestamp,
-    user_id: entry.user_id,
-    active_sube_id: entry.active_sube_id,
-    ui_profile: entry.ui_profile,
+    client_active_sube_id: entry.active_sube_id,
+    client_ui_profile: entry.ui_profile,
     route_template: entry.route_template
   });
 

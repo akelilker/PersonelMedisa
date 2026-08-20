@@ -27,10 +27,13 @@ Her registry kaydı **tek** zorunlu statü taşır: `CLOSED` · `CODE_GAP` · `B
 - **Pack5 Final Code Gap:** rolling OT policy + org location schema (`063`/`064` + `117` + `118`); `MG-OT-YEAR-POL/PATH` CLOSED; `MG-ORG-LOC-001` OPS_ROLLOUT USER_GATED (schema production-ready; personnel mapping still gated)
 - **Org reference seed (`119`, 2026-08-13):** SGK employers `MEDISA`/`KARYAPI`/`SENAY_MOBILYA` + 7 verified work locations seeded
 - **Pack6 org structure (`120`/`121`/`122`):** native Bölüm/Birim/Pozisyon + `subeler.sgk_isveren_id`; production schema/reference catalogs **VERIFIED**; locked 10-branch model + MRK=`Medisa` + ownership complete
-- **Personnel count rollout:** production total `137` (`Phase1=122 CLOSED`, `Phase2=11 CLOSED`); personel org FK alanları (`sgk_isveren_id`, `calisma_lokasyonu_id`, `bolum_id`, `birim_id`, `pozisyon_id`) **VERIFY_REQUIRED** / `USER_GATED` — kanıtsız CLOSED yazılmaz
+- **Personnel count rollout:** production total `137` (`Phase1=122 CLOSED`, `Phase2=11 CLOSED`); IC org FK **CLOSED** (`122/122`); DIS_KAYNAK org FK kısmi — kaynak alan boşlukları `DEFERRED_MISSING_REAL_DATA` (11 kişi; approval/code blocker değil)
+- **PERSONEL user provisioning (production):** **CLOSED** — 136 `PERSONEL` hesabı oluşturuldu (`PASIF`, sicil_no=username); throwaway şifreler saklanmadı
+- **PERSONEL binding (production):** **CLOSED** — 136 bound + 1 mevcut = 137 binding; duplicate `0`
+- **QR employee rollout (production):** **USER_HANDOFF_REQUIRED** — pipeline/config **READY**; kullanılabilirlik credential onboarding’e bağlı (`MG-CRED-ONBOARD-001`)
 - **Kullanıcı Yönetimi (code):** `YonetimPaneliPage` unified kullanıcı workspace — rol özeti, şube kapsamı owner'ı, actor lifecycle readback/actions; authorization weakening yok
 - **SGK actor lifecycle (code):** `ActorIdentityService` create/verify/bind + readback + `actor_identity_audits`; production schema via migration `068` (run [#32217771186](https://github.com/akelilker/PersonelMedisa/actions/runs/32217771186) @ `cd92d24…`, worker verify pass)
-- **Personel binding / QR (code):** schema `056` + S3C–S3F pipeline **CLOSED**; gerçek rollout **USER_GATED**
+- **Personel binding / QR (code):** schema `056` + S3C–S3F pipeline **CLOSED**; production binding **CLOSED**; QR activation **USER_HANDOFF_REQUIRED** (`MG-CRED-ONBOARD-001`)
 
 Görsel sistem çalışmaları mevcut component/owner içinde yapılabilir. Yeni domain özelliği freeze kapısından geçer.
 
@@ -46,18 +49,19 @@ Görsel sistem çalışmaları mevcut component/owner içinde yapılabilir. Yeni
 | `S3F` | **CLOSED_PRODUCTION** | — |
 | `QR_PIPELINE` | **S3C–S3F CLOSED** | — |
 | `REAL_REFERENCE_DATA` | **READY** — SGK/locations (`119`) + branches (`121`) + canonical catalogs (`122`); personnel org FK apply gated | `USER_GATED` |
-| `PERSONNEL_ORG_FK_ROLLOUT` | **NOT_STARTED** | `sgk_isveren_id` / `calisma_lokasyonu_id` / `bolum_id` / `birim_id` / `pozisyon_id` — `VERIFY_REQUIRED` |
+| `PERSONNEL_ORG_FK_ROLLOUT` | **PARTIAL** | IC `122/122` **CLOSED**; DIS_KAYNAK `11` — eksik bölüm/birim/pozisyon kaynak alanları `DEFERRED_MISSING_REAL_DATA` |
 | `REAL_PERSONNEL_DATASET` | **CLOSED** | Production personnel rollout complete; `NO_PII_COMMITTED` |
 | `REAL_PERSONNEL_IMPORTED` | **YES** | 137 production personnel |
 | `SOURCE_DATA_REQUIRES_COMPLETION` | **NO** for closed rollout | exact person-level source details stay private |
-| `PERSONEL_BINDING_REAL_ROLLOUT` | **NOT_STARTED** (schema `056` mevcut) | `USER_GATED` |
-| `REAL_QR_EMPLOYEE_ROLLOUT` | **NOT_STARTED** | `USER_GATED` |
+| `PERSONEL_BINDING_REAL_ROLLOUT` | **CLOSED** | 136 PERSONEL bound @ deploy `7a20da3…` |
+| `REAL_QR_EMPLOYEE_ROLLOUT` | **USER_HANDOFF_REQUIRED** | QR config READY; 136 PASIF; activation blocked by `MG-CRED-ONBOARD-001` |
+| `PERSONEL_CREDENTIAL_ONBOARDING` | **CODE_GAP** (`MG-CRED-ONBOARD-001`) | Admin geçici şifre var; first-login / self-service şifre belirleme yok |
 | `RETENTION_PHYSICAL_DESTRUCTION` | **INTENTIONAL_DEFER** (`MG-RET-PHYS-001`) | schema production-ready (`059`/`060`/`062` via `118`); flag default **OFF**; real destruction **NO** |
 | `RETENTION_MANIFEST_COVERAGE` | **CLOSED** (`MG-RET-MAN-001`) | Pack 1 — creators 15/15 |
 | `RETENTION_S3F_LEDGER_FINGERPRINT` | **CLOSED** (`MG-RET-S3F-001`) | Pack 1 — typed ONAY_AUDIT |
 | `SERBEST_ZAMAN_6_MONTH_TRACKING` | **OPS_ROLLOUT_ACTIVE** (`MG-SZ-6M-001`) | Pack 4B ops surface (`116`); allocation schema production-ready (`061`/`062` via `118`); ops follow-up `USER_GATED` |
 | `SGK_PERIOD_BUSINESS_DECISION` | **CLOSED_CONFIRMED** (`MG-SGK-1514-001`) | Medisa/Karyapı/Şenay Mobilya branches `1,4,5,6,7,8,9,10,11` → `AY_1_SON_GUN`; `15_TO_NEXT_MONTH_14` and `MIXED_BY_INSURED` not used |
-| `SGK_PERIOD_PRODUCTION_ROLLOUT` | **OPS_ROLLOUT** | canonical read surface implemented locally; production read → compare → draft → submit → separate approval pending release |
+| `SGK_PERIOD_PRODUCTION_ROLLOUT` | **CLOSED** | hedef şubeler `1,4,5,6,7,8,9,10,11` → `AY_1_SON_GUN` + `ONAYLANDI`; mutation **NOT_REQUIRED** |
 | `YEAR_CROSSING_OT_POLICY` | **CLOSED** (`MG-OT-YEAR-POL-001`) | `ROLLING_12_MONTH_ACTUAL_DATE_V1` |
 | `YEAR_CROSSING_OT_PATH` | **CLOSED** (`MG-OT-YEAR-PATH-001`) | Pack5 rolling owner (`117`); provenance schema production-ready (`063` via `118`) |
 | `LEGACY_ROLE_ENUM_SHRINK` | **INTENTIONAL_DEFER** (`MG-DEF-ENUM-001`) | — |
@@ -71,17 +75,17 @@ Görsel sistem çalışmaları mevcut component/owner içinde yapılabilir. Yeni
 | `ORG_STRUCTURE_SCHEMA` | **VERIFIED_PRODUCTION** | Schema + reference catalogs verified; personnel org FK values remain `VERIFY_REQUIRED` |
 | `SGK_ACTOR_LIFECYCLE_CODE` | **CLOSED** | `ActorIdentityService` + migration `068` audit schema; UI readback/actions in kullanıcı workspace |
 | `USER_MANAGEMENT_CODE` | **CLOSED** | Unified kullanıcı workspace owner: `YonetimPaneliPage` |
-| `PERSONEL_BINDING_CODE` | **CLOSED** | `UserPersonelBindingService` + Yönetim UI; real rollout **USER_GATED** |
-| `REAL_QR_EMPLOYEE_CODE` | **CLOSED** | S3C–S3F pipeline; employee rollout **USER_GATED** |
+| `PERSONEL_BINDING_CODE` | **CLOSED** | `UserPersonelBindingService` + Yönetim UI; production rollout **CLOSED** |
+| `REAL_QR_EMPLOYEE_CODE` | **CLOSED** | S3C–S3F pipeline; production activation **USER_HANDOFF_REQUIRED** |
 | `MG-OPS-POLICY-001` | **CLOSED_CONFIRMED** | Active revision `3`; 14/14; Pazar (`0`) |
 | `CANONICAL_DOC_STALE` | **0** | historical snapshots preserved, not backlog |
 
 ## Doğrulanmış teknik temel
 
-- Current `origin/main`: `5f9eca7e89165a175dfbae48a881daeba934b698` (PR #180 merged).
+- Current `origin/main`: `7a20da3722d90bec0a8195e5934fd3facf07ddf6` (PR #181 merged); Deploy cPanel run [#32312925576](https://github.com/akelilker/PersonelMedisa/actions/runs/32312925576) **success** @ same SHA.
 - Migration tip: code **068**; production **068**. Migration067 canonical SQL `CLOSED_CONFIRMED`; legacy ops workflow **RETIRED/REMOVED**. Migration068 `CLOSED_CONFIRMED`.
 - Canonical migration owner: `apply-cpanel-migrations.yml` + `cpanel-migration-cron.php`; public HTTP migration endpoint ve direct SQL canonical yol değil; SSH blocker **yok**.
-- Org references: SGK=3, locations=7, locked 10 branches (`121`); canonical catalogs completed (`122`); personnel org FK alanları production'da bulk apply edilmedi — `VERIFY_REQUIRED` / `USER_GATED`.
+- Org references: SGK=3, locations=7, locked 10 branches (`121`); canonical catalogs completed (`122`); IC personnel org FK production **CLOSED** (`122/122`); DIS_KAYNAK partial — kaynak boş alanlar `DEFERRED_MISSING_REAL_DATA`.
 - Pack6: `bolumler` / `birimler` / `pozisyonlar` + `subeler.sgk_isveren_id` (authorization still `personeller.sube_id`).
 - SGK, şirket politikası kanıtı, bordro preflight, personel importu, revizyon, dual-control, retention request/approve/evaluate/execute (flag OFF), QR S3C–S3F owner’ları mevcut ve fail-closed çalışır.
 - PERSONEL self-service: `/me` puantaj / yıllık izin / FM / QR yüzeyleri; maaş/bordro self-view **OUT_OF_SCOPE** (S3A).
@@ -95,10 +99,12 @@ Görsel sistem çalışmaları mevcut component/owner içinde yapılabilir. Yeni
 | Ürün/domain beyni | Frozen | Hayır |
 | QR S3C–S3F | CLOSED_PRODUCTION | Hayır |
 | Canonical docs / gap registry | Güncel (`110`); `CANONICAL_DOC_STALE=0` | Hayır |
-| CODE_GAP | **0** — Pack5 closed (`117`) | Hayır |
+| CODE_GAP | **1** — `MG-CRED-ONBOARD-001` (PERSONEL credential onboarding) | QR activation için evet |
 | Retention / SZ-6M / Org-LOC | OPS_ROLLOUT (`USER_GATED`) — schema production-ready (`118`); feature/seed/mapping gated | Hayır |
 | SGK/UBGT/hukuki kanıtlar | OPS_ROLLOUT + insan kararı | Hayır |
-| Gerçek personel / org rollout | USER_GATED OPS_ROLLOUT | Hayır |
+| Gerçek personel / binding rollout | **CLOSED** | Hayır |
+| DIS org FK kaynak tamamlama | DEFERRED_MISSING_REAL_DATA | Hayır |
+| QR employee activation | USER_HANDOFF_REQUIRED (`MG-CRED-ONBOARD-001`) | Evet (credential) |
 | Exact-SHA cPanel yayın | Ops / manuel upload | Tasarımı engellemez; canlıya çıkışı ops kapısına bağlar |
 
 ## Freeze kuralı
@@ -177,3 +183,15 @@ Bu dosya backlog değildir. Açık maddeler `110` registry’dedir. Canlı param
 - Live reference probe found the legacy `Üretim Genel → Güvenlik` branch; canonical tree check is **FAIL** and reference mutation is required, but was not performed.
 - Source reconciliation remains private; raw blanks, candidate values, and importer errors stay separate. No production personnel import has been performed.
 - Business decision: 20 IC phone values are deferred; missing-info UX continues to flag them, but phone absence is non-blocking for import and daily operations. Completion remains allowed later through Kayıt ve Süreç.
+
+## 2026-08-20 final production rollout execution
+
+- **Deploy SHA:** `7a20da3722d90bec0a8195e5934fd3facf07ddf6` (Deploy cPanel [#32312925576](https://github.com/akelilker/PersonelMedisa/actions/runs/32312925576) success).
+- **PERSONEL provisioning:** **CLOSED** — 136 `PASIF` users created (username=sicil_no); provisioning passwords not retained.
+- **PERSONEL binding:** **CLOSED** — 136 new binds + 1 existing = 137 total; duplicate binding `0`.
+- **QR infrastructure smoke:** kiosk token HTTP 200; `mqr1` format + TTL OK; PASIF login deny OK; admin self-scan deny OK; **no attendance mutation**.
+- **QR employee rollout:** **USER_HANDOFF_REQUIRED** — accounts remain `PASIF`; blocker `MG-CRED-ONBOARD-001` (no secure self-service password onboarding).
+- **Org FK IC:** **CLOSED** (`122/122` complete).
+- **Org FK DIS_KAYNAK (ids 200–210):** **DEFERRED_MISSING_REAL_DATA** — 11 personnel; missing bölüm/birim/pozisyon source fields in authoritative import row; **no mutation applied**.
+- **SGK period policy:** **CLOSED** — branches `1,4,5,6,7,8,9,10,11` remain `AY_1_SON_GUN` + `ONAYLANDI`; `SGK_POLICY_MUTATION=NOT_REQUIRED`.
+- **Production mutation this phase:** **NO** (read-only verify + deferred org FK only).

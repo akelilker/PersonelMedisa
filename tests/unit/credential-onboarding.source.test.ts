@@ -1,4 +1,5 @@
-import { readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -100,5 +101,34 @@ describe("credential onboarding owners (MG-CRED-ONBOARD-001)", () => {
     expect(change).toContain('$userId = isset($user[\'id\'])');
     expect(change).not.toMatch(/\$body\[['"]user_id['"]\]/);
     expect(change).not.toMatch(/WHERE id = :id.*\$body/);
+  });
+
+  it("migration 069 is canonical tip after 068 with bundle/runner parity", () => {
+    const migrations = readdirSync(resolve("api/migrations"))
+      .filter((name) => /^\d{3}_.+\.sql$/.test(name))
+      .sort();
+    expect(migrations.at(-2)).toBe("068_sgk_actor_identity_lifecycle_audit.sql");
+    expect(migrations.at(-1)).toBe("069_personel_credential_onboarding.sql");
+
+    const migration069 = read("api/migrations/069_personel_credential_onboarding.sql");
+    const checksum069 = createHash("sha256").update(migration069).digest("hex");
+    expect(checksum069).toMatch(/^[a-f0-9]{64}$/);
+    expect(migration069).toContain("must_change_password");
+    expect(migration069).not.toContain("DROP TABLE");
+
+    const generator = read("scripts/generate-canonical-migration-bundle.mjs");
+    expect(generator).not.toContain("069_personel_credential_onboarding");
+    expect(generator).toContain("readdir(migrationsDirectory)");
+
+    const runner = read("api/src/Database/MigrationRunner.php");
+    expect(runner).not.toContain("069");
+    expect(runner).not.toContain("068");
+
+    const bundleTest = read("tests/unit/canonical-migration-bundle.source.test.ts");
+    expect(bundleTest).toContain("'name' => '069_personel_credential_onboarding.sql'");
+    expect(bundleTest).toContain("checksum069");
+    expect(bundleTest).toContain("count($rows) !== 70");
+    expect(bundleTest).toContain("rows[69]['version'] !== '069'");
+    expect(bundleTest).toContain("rows[68]['version'] !== '068'");
   });
 });

@@ -12,6 +12,10 @@ const migration068 = resolve(
   root,
   "api/migrations/068_sgk_actor_identity_lifecycle_audit.sql",
 );
+const migration069 = resolve(
+  root,
+  "api/migrations/069_personel_credential_onboarding.sql",
+);
 const phpAvailable = spawnSync("php", ["-r", "echo PHP_VERSION;"]).status === 0;
 
 describe("canonical migration bundle", () => {
@@ -27,13 +31,16 @@ describe("canonical migration bundle", () => {
       expect(firstBytes.equals(readFileSync(second))).toBe(true);
 
       const bundle = firstBytes.toString("utf8");
-      expect((bundle.match(/'version' => '/g) ?? []).length).toBe(69);
+      expect((bundle.match(/'version' => '/g) ?? []).length).toBe(70);
       expect(bundle).toContain("'name' => 'migration_ledger.sql'");
       expect(bundle).toContain(
         "'name' => '067_personel_canonical_reference_gate.sql'",
       );
       expect(bundle).toContain(
         "'name' => '068_sgk_actor_identity_lifecycle_audit.sql'",
+      );
+      expect(bundle).toContain(
+        "'name' => '069_personel_credential_onboarding.sql'",
       );
 
       const checksum068 = createHash("sha256")
@@ -43,6 +50,15 @@ describe("canonical migration bundle", () => {
         /'name' => '068_sgk_actor_identity_lifecycle_audit\.sql',[\s\S]*?'checksum' => '([a-f0-9]{64})'/,
       );
       expect(entry068?.[1]).toBe(checksum068);
+
+      const checksum069 = createHash("sha256")
+        .update(readFileSync(migration069))
+        .digest("hex");
+      const entry069 = bundle.match(
+        /'name' => '069_personel_credential_onboarding\.sql',[\s\S]*?'checksum' => '([a-f0-9]{64})'/,
+      );
+      expect(entry069?.[1]).toBe(checksum069);
+
       expect(bundle).toContain(
         createHash("sha256").update(readFileSync(ledger)).digest("hex"),
       );
@@ -85,7 +101,7 @@ describe("canonical migration bundle", () => {
           `require '${phpRoot}/api/src/bootstrap.php';`,
           `$provider = new Medisa\\Api\\Database\\BundledMigrationSourceProvider('${phpBundle}');`,
           `$rows = $provider->all();`,
-          `if (count($rows) !== 69 || $rows[0]['version'] !== '000' || $rows[68]['version'] !== '068') { exit(1); }`,
+          `if (count($rows) !== 70 || $rows[0]['version'] !== '000' || $rows[68]['version'] !== '068' || $rows[69]['version'] !== '069') { exit(1); }`,
           "echo 'RAW_SQL_MISSING_PRODUCTION_SIMULATION=PASS';",
         ].join(" ");
         const result = spawnSync("php", ["-r", script], {

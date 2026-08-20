@@ -38,7 +38,7 @@ describe("Final Code Gap Pack5 MariaDB runtime", () => {
       .sort();
     expect(migrations).toContain("063_fazla_calisma_actual_date_provenance.sql");
     expect(migrations).toContain("064_personel_org_location_model.sql");
-    expect(migrations.at(-1)).toBe("068_sgk_actor_identity_lifecycle_audit.sql");
+    expect(migrations.at(-1)).toBe("069_personel_credential_onboarding.sql");
 
     expect(otServiceSource).toContain("ROLLING_12_MONTH_ACTUAL_DATE_V1");
     expect(otServiceSource).toContain("ISO/calendar year is NOT the 270h owner");

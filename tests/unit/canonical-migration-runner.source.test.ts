@@ -26,12 +26,16 @@ describe('canonical migration runner contract', () => {
     expect(runner).toContain('GET_LOCK');
   });
 
-  it('keeps the runner generic and migration 068 data-driven', () => {
-    expect(migrations.at(-1)).toBe('068_sgk_actor_identity_lifecycle_audit.sql');
+  it('keeps the runner generic and migration tip data-driven', () => {
+    expect(migrations.at(-1)).toBe('069_personel_credential_onboarding.sql');
     expect(runner).not.toContain('068');
+    expect(runner).not.toContain('069');
     expect(cli).not.toContain('068');
+    expect(cli).not.toContain('069');
     expect(worker).not.toContain('068');
+    expect(worker).not.toContain('069');
     expect(controlWorkflow).not.toContain('068');
+    expect(controlWorkflow).not.toContain('069');
   });
 
   it('supports pending-only apply and a separate schema-ready verify call', () => {

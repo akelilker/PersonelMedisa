@@ -15,12 +15,18 @@ import {
   isApiOwnedPath,
   isLftpSafePath,
   isSafeExactDeletePath,
+  isSafeLftpLocalDir,
   normalizeRelativePath,
   parseNameStatusLine,
   planApiTransfers,
+  renderBrokenQuotedLftpLocalDir,
   renderFinalizeShaFtpCommands,
   renderFullMirrorFtpCommands,
   renderIncrementalFtpCommands,
+  renderLocalLftpPreflightCommands,
+  renderLftpLocalDir,
+  resolveVerifiedLocalDeployDirs,
+  runLocalLftpPreflight,
 } from '../../scripts/deploy/plan-cpanel-incremental.mjs';
 
 const temporaryDirectories: string[] = [];
@@ -252,7 +258,7 @@ describe('cPanel incremental deploy planner', () => {
     expect(payload.indexOf('put "index.html"')).toBeGreaterThan(
       payload.indexOf('PHP API full mirror'),
     );
-    expect(finalize).toContain('put -O api "/tmp/.deploy-sha"');
+    expect(finalize).toContain('put -O api /tmp/.deploy-sha');
     expect(finalize).toContain('deploy-sha finalization');
   });
 
@@ -415,7 +421,7 @@ describe('cPanel incremental deploy planner', () => {
       remoteTargetDir: '.',
       deployShaLocalPath: '/tmp/.deploy-sha',
     });
-    expect(finalize.match(/put -O api "\/tmp\/\.deploy-sha"/g)).toHaveLength(1);
+    expect(finalize.match(/put -O api \/tmp\/\.deploy-sha/g)).toHaveLength(1);
     const source = readFileSync(
       resolve(process.cwd(), '.github/workflows/deploy-cpanel.yml'),
       'utf8',
@@ -450,6 +456,166 @@ describe('cPanel incremental deploy planner', () => {
     });
     expect(cmds).not.toContain('x;rm-something.php');
     expect(cmds).toContain('PHP API full mirror upload');
+  });
+
+  it('S) generated LOCAL dist lcd works with GitHub runner-style absolute path', () => {
+    const dist =
+      '/home/runner/work/PersonelMedisa/PersonelMedisa/dist';
+    const rendered = renderLftpLocalDir(dist);
+    expect(rendered).toBe(dist);
+    expect(rendered.startsWith('"')).toBe(false);
+    expect(isSafeLftpLocalDir(dist)).toBe(true);
+
+    const plan = createDeployPlan({
+      previousSha: null,
+      currentSha: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+      repoRoot: makeRepoSkeleton(),
+      distDir: makeDist(),
+    });
+    const cmds = renderFullMirrorFtpCommands(plan, {
+      localDistDir: dist,
+      localRepoDir: '/home/runner/work/PersonelMedisa/PersonelMedisa',
+      remoteTargetDir: '.',
+      deployShaLocalPath: '/home/runner/work/_temp/.deploy-sha',
+    });
+    expect(cmds).toContain(`lcd ${dist};`);
+    expect(cmds).not.toContain(`lcd "${dist}"`);
+    expect(renderBrokenQuotedLftpLocalDir(dist)).toBe(`"${dist}"`);
+  });
+
+  it('T) generated LOCAL repo lcd works', () => {
+    const repo = '/home/runner/work/PersonelMedisa/PersonelMedisa';
+    expect(renderLftpLocalDir(repo)).toBe(repo);
+    const plan = createDeployPlan({
+      previousSha: null,
+      currentSha: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+      repoRoot: makeRepoSkeleton(),
+      distDir: makeDist(),
+    });
+    const cmds = renderFullMirrorFtpCommands(plan, {
+      localDistDir: `${repo}/dist`,
+      localRepoDir: repo,
+      remoteTargetDir: '.',
+      deployShaLocalPath: '/tmp/.deploy-sha',
+    });
+    expect(cmds).toContain(`lcd ${repo};`);
+    expect(cmds).not.toContain(`lcd "${repo}"`);
+  });
+
+  it('U) real temp dist + index.html local lftp preflight succeeds (or skips without lftp)', () => {
+    const dist = makeDist();
+    const repo = makeRepoSkeleton();
+    const verified = resolveVerifiedLocalDeployDirs({ distDir: dist, repoDir: repo });
+    const script = renderLocalLftpPreflightCommands(verified);
+    expect(script).toContain(`lcd ${renderLftpLocalDir(verified.distAbs)};`);
+    expect(script).not.toMatch(/lcd\s+"/);
+
+    const result = runLocalLftpPreflight(verified);
+    if (result.skipped) {
+      expect(result.script).toContain('lcd ');
+      expect(result.script).not.toMatch(/lcd\s+"/);
+      return;
+    }
+    expect(result.ok).toBe(true);
+    expect(result.code).toBe(0);
+
+    const broken = runLocalLftpPreflight({
+      ...verified,
+      useBrokenQuotedRender: true,
+    });
+    if (!broken.skipped) {
+      expect(broken.ok).toBe(false);
+      expect(broken.script).toMatch(/lcd\s+"/);
+      expect(`${broken.stderr}${broken.stdout}`).toMatch(/No such file or directory|"\//);
+    }
+  });
+
+  it('V) missing local dist fails before FTP/network attempt', () => {
+    const repo = makeRepoSkeleton();
+    const missing = join(repo, 'no-such-dist-dir');
+    expect(() =>
+      resolveVerifiedLocalDeployDirs({ distDir: missing, repoDir: repo }),
+    ).toThrow(/LOCAL_DIST_MISSING/);
+
+    const source = readFileSync(
+      resolve(process.cwd(), '.github/workflows/deploy-cpanel.yml'),
+      'utf8',
+    );
+    const preflightIdx = source.indexOf('Local lftp directory preflight');
+    const uploadIdx = source.indexOf('Upload dist and PHP API to cPanel personelmedisa FTP root');
+    expect(preflightIdx).toBeGreaterThanOrEqual(0);
+    expect(uploadIdx).toBeGreaterThan(preflightIdx);
+    expect(source).toContain('test -d "$DIST_ABS"');
+    expect(source).toContain('test -f "$DIST_ABS/index.html"');
+    expect(source).toContain('LOCAL_LFTP_PREFLIGHT=PASS');
+  });
+
+  it('W) PREVIOUS_SHA read failure → FULL_MIRROR_FALLBACK', () => {
+    const plan = createDeployPlan({
+      previousSha: 'NONE',
+      currentSha: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+      repoRoot: makeRepoSkeleton(),
+      distDir: makeDist(),
+    });
+    expect(plan.mode).toBe('FULL_MIRROR_FALLBACK');
+    expect(plan.fallbackReason).toBe('PREVIOUS_SHA_MISSING');
+
+    const source = readFileSync(
+      resolve(process.cwd(), '.github/workflows/deploy-cpanel.yml'),
+      'utf8',
+    );
+    expect(source).toContain('PREVIOUS_SHA_READ');
+    expect(source).toContain('TRANSPORT_FAILED');
+    expect(source).toContain('NOT_FOUND');
+    expect(source).toContain('INVALID_CONTENT');
+    expect(source).toContain('PREVIOUS_SHA_VALUE');
+    // Missing previous SHA must remain non-fatal fallback, not hard fail.
+    expect(source).not.toMatch(/PREVIOUS_SHA_READ=TRANSPORT_FAILED[\s\S]{0,80}exit 1/);
+  });
+
+  it('X) full mirror fallback uses valid local lcd syntax', () => {
+    const dist =
+      '/home/runner/work/PersonelMedisa/PersonelMedisa/dist';
+    const repo = '/home/runner/work/PersonelMedisa/PersonelMedisa';
+    const plan = createDeployPlan({
+      previousSha: null,
+      currentSha: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+      repoRoot: makeRepoSkeleton(),
+      distDir: makeDist(),
+    });
+    expect(plan.mode).toBe('FULL_MIRROR_FALLBACK');
+    const cmds = renderFullMirrorFtpCommands(plan, {
+      localDistDir: dist,
+      localRepoDir: repo,
+      remoteTargetDir: '.',
+      deployShaLocalPath: '/home/runner/work/_temp/cpanel-deploy-plan/.deploy-sha',
+    });
+    expect(cmds).toContain(`lcd ${dist};`);
+    expect(cmds).toContain(`lcd ${repo};`);
+    expect(cmds).toContain('cd .;');
+    expect(cmds).not.toContain(`lcd "${dist}"`);
+    expect(cmds).not.toContain('cd ".";');
+    expect(cmds).toContain('PHP API full mirror upload');
+    assertPayloadHasNoDeploySha(cmds);
+  });
+
+  it('Y) no .deploy-sha finalize on local-preflight failure', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), '.github/workflows/deploy-cpanel.yml'),
+      'utf8',
+    );
+    const preflightBlock = source.slice(
+      source.indexOf('Local lftp directory preflight'),
+      source.indexOf('Upload dist and PHP API to cPanel personelmedisa FTP root'),
+    );
+    expect(preflightBlock).toContain('lftp -e');
+    expect(preflightBlock).toContain('lcd ${DIST_LCD}');
+    expect(preflightBlock).not.toContain('ftp-finalize-sha');
+    expect(preflightBlock).not.toContain('.deploy-sha');
+    expect(preflightBlock).not.toContain('FTP_PASSWORD');
+    expect(source.indexOf('finalize_deploy_sha')).toBeGreaterThan(
+      source.indexOf('LOCAL_LFTP_PREFLIGHT=PASS'),
+    );
   });
 
   it('emits secret-free deploy summary lines', () => {
@@ -498,5 +664,10 @@ describe('cPanel incremental deploy workflow wiring', () => {
     expect(planner).toContain('renderFinalizeShaFtpCommands');
     expect(source).toContain('.deploy-sha');
     expect(source).toContain('ftp-finalize-sha.commands');
+    expect(source).toContain('Local lftp directory preflight');
+    expect(planner).toContain('renderLftpLocalDir');
+    expect(planner).not.toMatch(
+      /export function renderFullMirrorPayloadCommands[\s\S]*lftpQuote\(ctx\.localDistDir/,
+    );
   });
 });

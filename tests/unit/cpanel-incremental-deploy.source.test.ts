@@ -13,10 +13,12 @@ import {
   createDeployPlan,
   formatDeploySummary,
   isApiOwnedPath,
+  isLftpSafePath,
   isSafeExactDeletePath,
   normalizeRelativePath,
   parseNameStatusLine,
   planApiTransfers,
+  renderFinalizeShaFtpCommands,
   renderFullMirrorFtpCommands,
   renderIncrementalFtpCommands,
 } from '../../scripts/deploy/plan-cpanel-incremental.mjs';
@@ -63,6 +65,11 @@ function makeRepoSkeleton() {
   );
   writeFileSync(join(directory, 'api/runtime/.htaccess'), 'Require all denied\n', 'utf8');
   return directory;
+}
+
+function assertPayloadHasNoDeploySha(commands: string) {
+  expect(commands).not.toMatch(/put\s+-O\s+"?api"?\s+[^\n]*\.deploy-sha/);
+  expect(commands).not.toContain('deploy-sha finalization');
 }
 
 afterEach(() => {
@@ -215,15 +222,14 @@ describe('cPanel incremental deploy planner', () => {
     });
     const assetIdx = cmds.indexOf('SPA assets+supporting');
     const entryIdx = cmds.indexOf('SPA entrypoint upload');
-    const shaIdx = cmds.lastIndexOf('put -O api');
     expect(assetIdx).toBeGreaterThanOrEqual(0);
     expect(entryIdx).toBeGreaterThan(assetIdx);
-    expect(cmds.indexOf('put index.html')).toBeGreaterThan(entryIdx);
-    expect(cmds.indexOf('--exclude index.html')).toBeGreaterThan(assetIdx);
-    expect(shaIdx).toBeGreaterThan(cmds.indexOf('put index.html'));
+    expect(cmds.indexOf('put "index.html"')).toBeGreaterThan(entryIdx);
+    expect(cmds.indexOf('--exclude "index.html"')).toBeGreaterThan(assetIdx);
+    assertPayloadHasNoDeploySha(cmds);
   });
 
-  it('J) entrypoint publish failure leaves deploy-sha as last put (not early)', () => {
+  it('J) payload transfer never writes deploy-sha; finalize is separate and last', () => {
     const dist = makeDist(['index.html']);
     const repo = makeRepoSkeleton();
     const plan = createDeployPlan({
@@ -232,21 +238,25 @@ describe('cPanel incremental deploy planner', () => {
       repoRoot: repo,
       distDir: dist,
     });
-    const cmds = renderFullMirrorFtpCommands(plan, {
+    const payload = renderFullMirrorFtpCommands(plan, {
       localDistDir: dist,
       localRepoDir: repo,
       remoteTargetDir: '.',
       deployShaLocalPath: '/tmp/.deploy-sha',
     });
-    const entryPut = cmds.indexOf('put index.html');
-    const shaPut = cmds.lastIndexOf('put -O api /tmp/.deploy-sha');
-    expect(entryPut).toBeGreaterThanOrEqual(0);
-    expect(shaPut).toBeGreaterThan(entryPut);
-    // Fail-exit remains true around entrypoint puts; sha is after API mirrors.
-    expect(cmds.indexOf('set cmd:fail-exit true')).toBeGreaterThanOrEqual(0);
+    const finalize = renderFinalizeShaFtpCommands({
+      remoteTargetDir: '.',
+      deployShaLocalPath: '/tmp/.deploy-sha',
+    });
+    assertPayloadHasNoDeploySha(payload);
+    expect(payload.indexOf('put "index.html"')).toBeGreaterThan(
+      payload.indexOf('PHP API full mirror'),
+    );
+    expect(finalize).toContain('put -O api "/tmp/.deploy-sha"');
+    expect(finalize).toContain('deploy-sha finalization');
   });
 
-  it('K) incremental transfer script does not write deploy-sha before API puts', () => {
+  it('K) incremental payload never writes deploy-sha (API puts stay in transfer phase)', () => {
     const dist = makeDist();
     const repo = makeRepoSkeleton();
     const plan = createDeployPlan({
@@ -264,10 +274,182 @@ describe('cPanel incremental deploy planner', () => {
       remoteTargetDir: '.',
       deployShaLocalPath: '/tmp/.deploy-sha',
     });
-    const routerPut = cmds.indexOf('put -O api/src api/src/Router.php');
-    const shaPut = cmds.lastIndexOf('put -O api /tmp/.deploy-sha');
-    expect(routerPut).toBeGreaterThanOrEqual(0);
-    expect(shaPut).toBeGreaterThan(routerPut);
+    expect(cmds).toContain('put -O "api/src" "api/src/Router.php"');
+    assertPayloadHasNoDeploySha(cmds);
+  });
+
+  it('L) exact owned deletes run fail-closed (not under fail-exit false)', () => {
+    const dist = makeDist();
+    const repo = makeRepoSkeleton();
+    const plan = createDeployPlan({
+      previousSha: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      currentSha: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+      repoRoot: repo,
+      distDir: dist,
+      fetchOk: true,
+      ancestryOk: true,
+      diffLines: ['D\tapi/src/Obsolete.php'],
+    });
+    expect(plan.mode).toBe('INCREMENTAL');
+    expect(plan.apiDeletes).toEqual(['api/src/Obsolete.php']);
+    const cmds = renderIncrementalFtpCommands(plan, {
+      localDistDir: dist,
+      localRepoDir: repo,
+      remoteTargetDir: '.',
+      deployShaLocalPath: '/tmp/.deploy-sha',
+    });
+    const deleteIdx = cmds.indexOf('rm "api/src/Obsolete.php"');
+    const failOpenIdx = cmds.indexOf('set cmd:fail-exit false');
+    const legacyCleanupIdx = cmds.indexOf('glob -a rm api/public/_migration_*.php');
+    expect(deleteIdx).toBeGreaterThanOrEqual(0);
+    expect(failOpenIdx).toBeGreaterThan(deleteIdx);
+    expect(legacyCleanupIdx).toBeGreaterThan(failOpenIdx);
+    expect(cmds.indexOf('API exact deletes')).toBeGreaterThan(
+      cmds.indexOf('PHP API incremental upload'),
+    );
+  });
+
+  it('M) entrypoint publish is strictly after API operations', () => {
+    const dist = makeDist(['index.html']);
+    const repo = makeRepoSkeleton();
+    const incremental = createDeployPlan({
+      previousSha: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      currentSha: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+      repoRoot: repo,
+      distDir: dist,
+      fetchOk: true,
+      ancestryOk: true,
+      diffLines: ['M\tapi/src/Router.php'],
+    });
+    const incCmds = renderIncrementalFtpCommands(incremental, {
+      localDistDir: dist,
+      localRepoDir: repo,
+      remoteTargetDir: '.',
+      deployShaLocalPath: '/tmp/.deploy-sha',
+    });
+    expect(incCmds.indexOf('SPA entrypoint upload')).toBeGreaterThan(
+      incCmds.indexOf('put -O "api/src" "api/src/Router.php"'),
+    );
+    expect(incCmds.indexOf('SPA entrypoint upload')).toBeGreaterThan(
+      incCmds.indexOf('PHP API incremental upload'),
+    );
+
+    const full = createDeployPlan({
+      previousSha: null,
+      currentSha: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+      repoRoot: repo,
+      distDir: dist,
+    });
+    const fullCmds = renderFullMirrorFtpCommands(full, {
+      localDistDir: dist,
+      localRepoDir: repo,
+      remoteTargetDir: '.',
+      deployShaLocalPath: '/tmp/.deploy-sha',
+    });
+    expect(fullCmds.indexOf('SPA entrypoint upload')).toBeGreaterThan(
+      fullCmds.indexOf('PHP API full mirror'),
+    );
+    expect(fullCmds.indexOf('put "index.html"')).toBeGreaterThan(
+      fullCmds.indexOf('mirror -R --verbose api/src api/src'),
+    );
+  });
+
+  it('N) payload verify happens before .deploy-sha finalization in workflow', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), '.github/workflows/deploy-cpanel.yml'),
+      'utf8',
+    );
+    const verifyIdx = source.indexOf('verify_payload_before_sha');
+    const finalizeIdx = source.indexOf('finalize_deploy_sha');
+    const callVerify = source.indexOf('verify_payload_before_sha\n');
+    const callFinalize = source.indexOf('finalize_deploy_sha\n');
+    expect(verifyIdx).toBeGreaterThanOrEqual(0);
+    expect(finalizeIdx).toBeGreaterThan(verifyIdx);
+    expect(callVerify).toBeGreaterThanOrEqual(0);
+    expect(callFinalize).toBeGreaterThan(callVerify);
+    expect(source).toContain('ftp-finalize-sha.commands');
+    expect(source).toContain('Payload transfer NEVER writes api/.deploy-sha');
+  });
+
+  it('O) incremental failure leaves marker unchanged until fallback finalize', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), '.github/workflows/deploy-cpanel.yml'),
+      'utf8',
+    );
+    expect(source).toContain('INCREMENTAL transfer/verify/finalize failed');
+    expect(source).toContain(
+      'production marker must remain the previous SHA',
+    );
+    expect(source).toMatch(
+      /if ! upload_verify_finalize "INCREMENTAL"[\s\S]*upload_verify_finalize "FULL_MIRROR_FALLBACK"/,
+    );
+    // Payload commands themselves never finalize the marker.
+    const planner = readFileSync(
+      resolve(process.cwd(), 'scripts/deploy/plan-cpanel-incremental.mjs'),
+      'utf8',
+    );
+    const payloadFn = planner.slice(
+      planner.indexOf('export function renderIncrementalPayloadCommands'),
+      planner.indexOf('export function renderFinalizeShaFtpCommands'),
+    );
+    expect(payloadFn).not.toMatch(/put\s+-O\s+api[^\n]*deploy-sha/);
+  });
+
+  it('P) fallback failure also keeps marker unchanged (finalize only after verify)', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), '.github/workflows/deploy-cpanel.yml'),
+      'utf8',
+    );
+    // Single shared path: transfer → verify_payload_before_sha → finalize_deploy_sha
+    const fnStart = source.indexOf('upload_verify_finalize()');
+    const fnBody = source.slice(fnStart, source.indexOf('if [[ "$DEPLOY_MODE"'));
+    expect(fnBody).toContain('run_cpanel_ftp "$commands"');
+    expect(fnBody.indexOf('verify_payload_before_sha')).toBeLessThan(
+      fnBody.indexOf('finalize_deploy_sha'),
+    );
+    expect(fnBody).not.toContain('get -o ${remote_sha_path} api/.deploy-sha');
+  });
+
+  it('Q) successful path finalizes marker exactly once after payload verify', () => {
+    const finalize = renderFinalizeShaFtpCommands({
+      remoteTargetDir: '.',
+      deployShaLocalPath: '/tmp/.deploy-sha',
+    });
+    expect(finalize.match(/put -O api "\/tmp\/\.deploy-sha"/g)).toHaveLength(1);
+    const source = readFileSync(
+      resolve(process.cwd(), '.github/workflows/deploy-cpanel.yml'),
+      'utf8',
+    );
+    expect(source.match(/run_cpanel_ftp "\$FINALIZE_SHA_COMMANDS"/g)).toHaveLength(1);
+    expect(source).toContain('test "$(tr -d \'\\r\\n\' < "${remote_sha_path}")" = "${DEPLOY_SHA}"');
+  });
+
+  it('R) unsafe lftp command-separator path denies incremental / forces fallback', () => {
+    expect(isLftpSafePath('api/src/x;rm-something.php')).toBe(false);
+    expect(isLftpSafePath('api/src/Router.php')).toBe(true);
+    expect(isLftpSafePath('api/src/bad path.php')).toBe(false);
+    expect(isLftpSafePath('api/src/bad`tick`.php')).toBe(false);
+
+    const plan = createDeployPlan({
+      previousSha: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      currentSha: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+      repoRoot: makeRepoSkeleton(),
+      distDir: makeDist(),
+      fetchOk: true,
+      ancestryOk: true,
+      diffLines: ['M\tapi/src/x;rm-something.php'],
+    });
+    expect(plan.mode).toBe('FULL_MIRROR_FALLBACK');
+    expect(plan.fallbackReason).toBe('UNSAFE_LFTP_PATH');
+
+    const cmds = renderIncrementalFtpCommands(plan, {
+      localDistDir: makeDist(),
+      localRepoDir: makeRepoSkeleton(),
+      remoteTargetDir: '.',
+      deployShaLocalPath: '/tmp/.deploy-sha',
+    });
+    expect(cmds).not.toContain('x;rm-something.php');
+    expect(cmds).toContain('PHP API full mirror upload');
   });
 
   it('emits secret-free deploy summary lines', () => {
@@ -313,7 +495,8 @@ describe('cPanel incremental deploy workflow wiring', () => {
   it('publishes frontend entrypoints after assets and finalizes deploy-sha last', () => {
     expect(planner).toContain('SPA assets+supporting');
     expect(planner).toContain('SPA entrypoint');
-    expect(planner).toContain('put -O api');
+    expect(planner).toContain('renderFinalizeShaFtpCommands');
     expect(source).toContain('.deploy-sha');
+    expect(source).toContain('ftp-finalize-sha.commands');
   });
 });

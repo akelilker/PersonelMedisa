@@ -202,6 +202,7 @@ jobs:
 
           ACTIVE_COMMANDS="$(cat "$PLAN_DIR/ftp-active.commands")"
           FULL_COMMANDS="$(cat "$PLAN_DIR/ftp-full.commands")"
+          FINALIZE_SHA_COMMANDS="$(cat "$PLAN_DIR/ftp-finalize-sha.commands")"
 
           # Keep full-mirror command strings discoverable for safety/source contracts:
           # mirror -R --verbose api/public api/public
@@ -209,37 +210,55 @@ jobs:
           # mirror -R --verbose api/bin api/bin
           # mirror -R --verbose api/migrations api/migrations
           # mirror -R --verbose api/runtime-build api/runtime-build
-          # put -O api ${RUNNER_TEMP}/.deploy-sha  (planner uses PLAN_DIR/.deploy-sha)
+          # Payload transfer NEVER writes api/.deploy-sha.
+          # Finalization is a separate FTP operation after payload verify PASS.
 
-          upload_and_verify() {
-            local label="$1"
-            local commands="$2"
-            echo "Deploy upload path: ${label}"
-            run_cpanel_ftp "$commands"
-
+          verify_payload_before_sha() {
             local remote_bundle_path
-            local remote_sha_path
             remote_bundle_path="$(mktemp)"
-            remote_sha_path="$(mktemp)"
             run_cpanel_ftp "
               cd ${REMOTE_TARGET_DIR};
               get -o ${remote_bundle_path} api/runtime-build/canonical-migrations.php;
-              get -o ${remote_sha_path} api/.deploy-sha;
             "
             test "$(sha256sum "${remote_bundle_path}" | cut -d' ' -f1)" = \
               "$(sha256sum "${LOCAL_REPO_DIR}/api/runtime-build/canonical-migrations.php" | cut -d' ' -f1)"
+            rm -f "${remote_bundle_path}"
+          }
+
+          finalize_deploy_sha() {
+            echo "Deploy SHA finalization starting (marker write after payload verify)"
+            run_cpanel_ftp "$FINALIZE_SHA_COMMANDS"
+            local remote_sha_path
+            remote_sha_path="$(mktemp)"
+            run_cpanel_ftp "
+              cd ${REMOTE_TARGET_DIR};
+              get -o ${remote_sha_path} api/.deploy-sha;
+            "
             test "$(tr -d '\r\n' < "${remote_sha_path}")" = "${DEPLOY_SHA}"
-            rm -f "${remote_bundle_path}" "${remote_sha_path}"
+            rm -f "${remote_sha_path}"
+            echo "Deploy SHA finalization verified"
+          }
+
+          upload_verify_finalize() {
+            local label="$1"
+            local commands="$2"
+            echo "Deploy payload transfer path: ${label}"
+            run_cpanel_ftp "$commands"
+            echo "Deploy payload pre-finalization verify: ${label}"
+            verify_payload_before_sha
+            finalize_deploy_sha
           }
 
           if [[ "$DEPLOY_MODE" == "INCREMENTAL" ]]; then
-            if ! upload_and_verify "INCREMENTAL" "$ACTIVE_COMMANDS"; then
-              echo "INCREMENTAL upload/verify failed; switching to FULL_MIRROR_FALLBACK"
+            if ! upload_verify_finalize "INCREMENTAL" "$ACTIVE_COMMANDS"; then
+              echo "INCREMENTAL transfer/verify/finalize failed; switching to FULL_MIRROR_FALLBACK"
               echo "FALLBACK_REASON=INCREMENTAL_TRANSFER_OR_VERIFY_FAILED"
-              upload_and_verify "FULL_MIRROR_FALLBACK" "$FULL_COMMANDS"
+              # On incremental failure the production marker must remain the previous SHA
+              # until fallback payload verify PASS and a successful finalize.
+              upload_verify_finalize "FULL_MIRROR_FALLBACK" "$FULL_COMMANDS"
             fi
           else
-            upload_and_verify "FULL_MIRROR_FALLBACK" "$FULL_COMMANDS"
+            upload_verify_finalize "FULL_MIRROR_FALLBACK" "$FULL_COMMANDS"
           fi
 
       - name: Verify deployed app with anonymous and authenticated read-only smoke

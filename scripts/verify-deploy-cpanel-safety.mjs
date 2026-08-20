@@ -59,6 +59,26 @@ check(/put\s+-O\s+api\s+api\/\.htaccess/.test(planner), 'api/.htaccess upload co
 check(/mirror\s+-R\s+--verbose\s+api\/public\s+api\/public/.test(planner), 'api/public upload contract is missing');
 check(/mirror\s+-R\s+--verbose\s+api\/src\s+api\/src/.test(planner), 'api/src upload contract is missing');
 check(/FULL_MIRROR_FALLBACK/.test(workflow) && /FULL_MIRROR_FALLBACK/.test(planner), 'full mirror fallback contract is missing');
+check(/ftp-finalize-sha\.commands/.test(workflow), 'deploy SHA finalization command file wiring is missing');
+check(/verify_payload_before_sha/.test(workflow), 'payload verify-before-SHA-finalization contract is missing');
+check(/finalize_deploy_sha/.test(workflow), 'deploy SHA finalization step is missing');
+check(/upload_verify_finalize/.test(workflow), 'unified payload→verify→finalize path is missing');
+check(
+  /renderFinalizeShaFtpCommands/.test(planner) && /deploy-sha finalization/.test(planner),
+  'planner must emit a separate deploy-sha finalization command',
+);
+check(
+  !/put\s+-O\s+api[^\n]*\.deploy-sha/.test(
+    planner.split('export function renderFinalizeShaFtpCommands')[0],
+  ),
+  'payload transfer renderers must not write api/.deploy-sha',
+);
+check(/isLftpSafePath/.test(planner) && /UNSAFE_LFTP_PATH/.test(planner), 'lftp path safety contract is missing');
+check(
+  /API exact deletes basliyor/.test(planner) &&
+    !/set cmd:fail-exit false;\s*\$\{deleteCmds/.test(planner.replace(/\n/g, ' ')),
+  'exact API deletes must remain fail-closed',
+);
 check(/test\s+!\s+-f\s+api\/config\.local\.php/.test(workflow), 'api/config.local.php deploy guard is missing');
 check(!/--only-newer\b/.test(workflow) && !/--only-newer\b/.test(planner), 'mtime-only --only-newer must not be the deploy decision mechanism');
 

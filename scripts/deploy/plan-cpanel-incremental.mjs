@@ -152,6 +152,20 @@ export function isSafeExactDeletePath(path) {
 }
 
 /**
+ * Strict allowlist for paths embedded into lftp -e scripts.
+ * Rejects whitespace, quotes, and shell/lftp command separators.
+ * @param {string} path
+ */
+export function isLftpSafePath(path) {
+  const normalized = normalizeRelativePath(path);
+  if (!normalized) {
+    return false;
+  }
+  // Keep incremental command generation boring and unambiguous.
+  return /^[A-Za-z0-9._/-]+$/.test(normalized);
+}
+
+/**
  * @param {string} line
  * @returns {ApiChange | { error: string }}
  */
@@ -450,6 +464,13 @@ export function createDeployPlan(input) {
     }
   }
 
+  const commandPaths = [...transfers.uploads, ...transfers.deletes, ...alwaysUploads];
+  for (const path of commandPaths) {
+    if (!isLftpSafePath(path)) {
+      return { ...base, fallbackReason: 'UNSAFE_LFTP_PATH' };
+    }
+  }
+
   const touched = new Set([...transfers.uploads, ...transfers.deletes]);
   const skipped = Math.max(0, ownedCount - touched.size);
 
@@ -465,36 +486,19 @@ export function createDeployPlan(input) {
 }
 
 /**
- * Escape a path for embedding inside an lftp -e double-quoted script.
+ * Quote a path for lftp -e scripts. Caller must pass isLftpSafePath-approved paths
+ * for incremental-owned git paths; local absolute dirs are quoted literally.
  * @param {string} path
  */
 export function lftpQuote(path) {
-  return path.replace(/\\/g, '/').replace(/"/g, '\\"');
+  const normalized = String(path).replace(/\\/g, '/');
+  if (normalized.includes('"') || normalized.includes('\n') || normalized.includes('\r')) {
+    throw new Error(`UNSAFE_LFTP_QUOTE:${path}`);
+  }
+  return `"${normalized}"`;
 }
 
-/**
- * @param {DeployPlan} plan
- * @param {{
- *   localDistDir: string,
- *   localRepoDir: string,
- *   remoteTargetDir: string,
- *   deployShaLocalPath: string,
- * }} ctx
- */
-export function renderFullMirrorFtpCommands(plan, ctx) {
-  const dist = lftpQuote(ctx.localDistDir.replace(/\/$/, ''));
-  const repo = lftpQuote(ctx.localRepoDir);
-  const remote = lftpQuote(ctx.remoteTargetDir);
-  const shaLocal = lftpQuote(ctx.deployShaLocalPath);
-
-  const entryExcludes = plan.frontendEntrypoints
-    .map((name) => `--exclude ${lftpQuote(name)}`)
-    .join(' ');
-
-  const entryPuts = plan.frontendEntrypoints
-    .map((name) => `put ${lftpQuote(name)};`)
-    .join('\n              ');
-
+function renderCommonPreamble(dist, remote) {
   return `
               set cmd:fail-exit true;
               set cmd:verbose on;
@@ -509,10 +513,38 @@ export function renderFullMirrorFtpCommands(plan, ctx) {
               lcd ${dist};
               !echo 'FTP root hedefleniyor';
               cd ${remote};
+`.trim();
+}
+
+/**
+ * Payload transfer only — never writes api/.deploy-sha.
+ * Order: FE assets → API → exact deletes → FE entrypoints → optional legacy cleanup.
+ *
+ * @param {DeployPlan} plan
+ * @param {{
+ *   localDistDir: string,
+ *   localRepoDir: string,
+ *   remoteTargetDir: string,
+ *   deployShaLocalPath: string,
+ * }} ctx
+ */
+export function renderFullMirrorPayloadCommands(plan, ctx) {
+  const dist = lftpQuote(ctx.localDistDir.replace(/\/$/, ''));
+  const repo = lftpQuote(ctx.localRepoDir);
+  const remote = lftpQuote(ctx.remoteTargetDir);
+
+  const entryExcludes = plan.frontendEntrypoints
+    .map((name) => `--exclude ${lftpQuote(name)}`)
+    .join(' ');
+
+  const entryPuts = plan.frontendEntrypoints
+    .map((name) => `put ${lftpQuote(name)};`)
+    .join('\n              ');
+
+  return `
+              ${renderCommonPreamble(dist, remote)}
               !echo 'SPA assets+supporting (entrypoint haric) upload basliyor';
               mirror -R --verbose --exclude api/ --exclude-glob '.git*' --exclude-glob '.cpanel*' ${entryExcludes} . .;
-              !echo 'SPA entrypoint upload basliyor';
-              ${entryPuts || '!echo no-entrypoint;'}
               !echo 'PHP API full mirror upload basliyor';
               lcd ${repo};
               mkdir -p api;
@@ -524,15 +556,26 @@ export function renderFullMirrorFtpCommands(plan, ctx) {
               mirror -R --verbose api/runtime-build api/runtime-build;
               mkdir -p api/runtime;
               put -O api/runtime api/runtime/.htaccess;
-              put -O api ${shaLocal};
+              !echo 'SPA entrypoint upload basliyor';
+              lcd ${dist};
+              ${entryPuts || '!echo no-entrypoint;'}
               set cmd:fail-exit false;
               glob -a rm api/public/_migration_*.php;
               set cmd:fail-exit true;
-              !echo 'upload tamamlandi';
+              !echo 'payload transfer tamamlandi';
 `.trim();
 }
 
 /**
+ * @deprecated Use renderFullMirrorPayloadCommands — kept name for source contracts.
+ */
+export function renderFullMirrorFtpCommands(plan, ctx) {
+  return renderFullMirrorPayloadCommands(plan, ctx);
+}
+
+/**
+ * Payload transfer only — never writes api/.deploy-sha.
+ *
  * @param {DeployPlan} plan
  * @param {{
  *   localDistDir: string,
@@ -541,15 +584,14 @@ export function renderFullMirrorFtpCommands(plan, ctx) {
  *   deployShaLocalPath: string,
  * }} ctx
  */
-export function renderIncrementalFtpCommands(plan, ctx) {
+export function renderIncrementalPayloadCommands(plan, ctx) {
   if (plan.mode !== 'INCREMENTAL') {
-    return renderFullMirrorFtpCommands(plan, ctx);
+    return renderFullMirrorPayloadCommands(plan, ctx);
   }
 
   const dist = lftpQuote(ctx.localDistDir.replace(/\/$/, ''));
   const repo = lftpQuote(ctx.localRepoDir);
   const remote = lftpQuote(ctx.remoteTargetDir);
-  const shaLocal = lftpQuote(ctx.deployShaLocalPath);
 
   const entryExcludes = plan.frontendEntrypoints
     .map((name) => `--exclude ${lftpQuote(name)}`)
@@ -560,6 +602,9 @@ export function renderIncrementalFtpCommands(plan, ctx) {
 
   const mkdirCmds = new Set();
   for (const path of [...plan.apiUploads, ...plan.alwaysUploads]) {
+    if (!isLftpSafePath(path)) {
+      throw new Error(`UNSAFE_LFTP_PATH:${path}`);
+    }
     const dir = dirname(path).replace(/\\/g, '/');
     if (dir && dir !== '.') {
       mkdirCmds.add(`mkdir -p ${lftpQuote(dir)};`);
@@ -572,43 +617,72 @@ export function renderIncrementalFtpCommands(plan, ctx) {
     uploadCmds.push(`put -O ${lftpQuote(dir)} ${lftpQuote(path)};`);
   }
   for (const path of plan.alwaysUploads) {
+    if (!isLftpSafePath(path)) {
+      throw new Error(`UNSAFE_LFTP_PATH:${path}`);
+    }
     const dir = dirname(path).replace(/\\/g, '/');
     uploadCmds.push(`put -O ${lftpQuote(dir)} ${lftpQuote(path)};`);
   }
 
-  const deleteCmds = plan.apiDeletes.map((path) => `rm ${lftpQuote(path)};`);
+  const deleteCmds = [];
+  for (const path of plan.apiDeletes) {
+    if (!isLftpSafePath(path) || !isSafeExactDeletePath(path)) {
+      throw new Error(`UNSAFE_LFTP_DELETE:${path}`);
+    }
+    // Exact owned deletes are fail-closed (cmd:fail-exit remains true).
+    deleteCmds.push(`rm ${lftpQuote(path)};`);
+  }
 
   return `
-              set cmd:fail-exit true;
-              set cmd:verbose on;
-              set net:max-retries 2;
-              set net:timeout 20;
-              set net:reconnect-interval-base 5;
-              set net:reconnect-interval-max 10;
-              set xfer:clobber true;
-              set ssl:verify-certificate no;
-              set ssl:check-hostname no;
-              set ftp:passive-mode on;
-              lcd ${dist};
-              !echo 'FTP root hedefleniyor';
-              cd ${remote};
+              ${renderCommonPreamble(dist, remote)}
               !echo 'SPA assets+supporting (entrypoint haric) upload basliyor';
               mirror -R --verbose --exclude api/ --exclude-glob '.git*' --exclude-glob '.cpanel*' ${entryExcludes} . .;
-              !echo 'SPA entrypoint upload basliyor';
-              ${entryPuts || '!echo no-entrypoint;'}
               !echo 'PHP API incremental upload basliyor';
               lcd ${repo};
               mkdir -p api;
               ${[...mkdirCmds].join('\n              ')}
               ${uploadCmds.join('\n              ') || '!echo no-api-uploads;'}
-              set cmd:fail-exit false;
+              !echo 'API exact deletes basliyor';
               ${deleteCmds.join('\n              ') || '!echo no-api-deletes;'}
-              set cmd:fail-exit true;
-              put -O api ${shaLocal};
+              !echo 'SPA entrypoint upload basliyor';
+              lcd ${dist};
+              ${entryPuts || '!echo no-entrypoint;'}
               set cmd:fail-exit false;
               glob -a rm api/public/_migration_*.php;
               set cmd:fail-exit true;
-              !echo 'upload tamamlandi';
+              !echo 'payload transfer tamamlandi';
+`.trim();
+}
+
+/**
+ * @deprecated Use renderIncrementalPayloadCommands.
+ */
+export function renderIncrementalFtpCommands(plan, ctx) {
+  return renderIncrementalPayloadCommands(plan, ctx);
+}
+
+/**
+ * Separate finalization: write api/.deploy-sha only after payload verify PASS.
+ * @param {{
+ *   remoteTargetDir: string,
+ *   deployShaLocalPath: string,
+ * }} ctx
+ */
+export function renderFinalizeShaFtpCommands(ctx) {
+  const remote = lftpQuote(ctx.remoteTargetDir);
+  const shaLocal = lftpQuote(ctx.deployShaLocalPath);
+  return `
+              set cmd:fail-exit true;
+              set net:max-retries 2;
+              set net:timeout 20;
+              set xfer:clobber true;
+              set ssl:verify-certificate no;
+              set ssl:check-hostname no;
+              set ftp:passive-mode on;
+              cd ${remote};
+              !echo 'deploy-sha finalization basliyor';
+              put -O api ${shaLocal};
+              !echo 'deploy-sha finalization tamamlandi';
 `.trim();
 }
 
@@ -743,16 +817,21 @@ function main() {
 
   writeFileSync(
     join(outDir, 'ftp-full.commands'),
-    `${renderFullMirrorFtpCommands(plan, ctx)}\n`,
+    `${renderFullMirrorPayloadCommands(plan, ctx)}\n`,
     'utf8',
   );
   writeFileSync(
     join(outDir, 'ftp-active.commands'),
     `${
       plan.mode === 'INCREMENTAL'
-        ? renderIncrementalFtpCommands(plan, ctx)
-        : renderFullMirrorFtpCommands(plan, ctx)
+        ? renderIncrementalPayloadCommands(plan, ctx)
+        : renderFullMirrorPayloadCommands(plan, ctx)
     }\n`,
+    'utf8',
+  );
+  writeFileSync(
+    join(outDir, 'ftp-finalize-sha.commands'),
+    `${renderFinalizeShaFtpCommands(ctx)}\n`,
     'utf8',
   );
 

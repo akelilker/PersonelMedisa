@@ -94,6 +94,28 @@ check(
   'previous deploy SHA read diagnostics contract is missing',
 );
 check(
+  /renderLftpGetCommand/.test(planner) && /lftp_get_remote_to_local/.test(workflow),
+  'canonical lftp GET remote→local helper contract is missing',
+);
+check(
+  /FTP_READBACK_PREFLIGHT/.test(workflow) && /REFUSING_BULK_UPLOAD=YES/.test(workflow),
+  'FTP read-back preflight stop-before-bulk contract is missing',
+);
+check(
+  /PREVIOUS_SHA_TRANSPORT_FAILED/.test(planner),
+  'transport failure must not masquerade as PREVIOUS_SHA_MISSING',
+);
+check(
+  /renderLftpGitPath/.test(planner) &&
+    !/return `"\$\{normalized\}"`/.test(
+      planner.slice(
+        planner.indexOf('export function renderLftpGitPath'),
+        planner.indexOf('export function lftpQuote'),
+      ),
+    ),
+  'git-controlled lftp paths must render unquoted (quote-literal put failure class)',
+);
+check(
   /API exact deletes basliyor/.test(planner) &&
     !/set cmd:fail-exit false;\s*\$\{deleteCmds/.test(planner.replace(/\n/g, ' ')),
   'exact API deletes must remain fail-closed',

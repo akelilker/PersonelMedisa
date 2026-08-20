@@ -457,6 +457,7 @@ export function countOwnedApiFiles(args) {
  *   diffLines?: string[] | null,
  *   ancestryOk?: boolean | null,
  *   fetchOk?: boolean | null,
+ *   previousShaReadStatus?: 'SUCCESS' | 'NOT_FOUND' | 'TRANSPORT_FAILED' | 'INVALID_CONTENT' | null,
  * }} input
  * @returns {DeployPlan}
  */
@@ -465,6 +466,7 @@ export function createDeployPlan(input) {
   const previousRaw = input.previousSha == null ? '' : String(input.previousSha).trim();
   const previousSha =
     previousRaw && previousRaw !== 'NONE' ? previousRaw.toLowerCase() : null;
+  const readStatus = input.previousShaReadStatus ?? null;
 
   const frontend = classifyFrontendArtifacts(input.distDir);
   const ownedCount = countOwnedApiFiles({ repoRoot: input.repoRoot });
@@ -493,6 +495,12 @@ export function createDeployPlan(input) {
     return { ...base, fallbackReason: 'CURRENT_SHA_INVALID' };
   }
   if (!previousSha) {
+    if (readStatus === 'TRANSPORT_FAILED') {
+      return { ...base, fallbackReason: 'PREVIOUS_SHA_TRANSPORT_FAILED' };
+    }
+    if (readStatus === 'INVALID_CONTENT') {
+      return { ...base, fallbackReason: 'PREVIOUS_SHA_INVALID' };
+    }
     return { ...base, fallbackReason: 'PREVIOUS_SHA_MISSING' };
   }
   if (!isValidSha(previousSha)) {
@@ -560,24 +568,31 @@ export function createDeployPlan(input) {
 }
 
 /**
- * Quote a git-controlled relative path for lftp -e scripts.
- * Do NOT use for local runner directories — use renderLftpLocalDir instead.
- * Caller must pass isLftpSafePath-approved paths.
+ * Render a git-controlled / remote-relative path for lftp -e scripts.
+ * Must stay UNQUOTED: GHA lftp treats double quotes as literal path characters
+ * (production failure: put .../dist/"index.html": No such file or directory).
+ * Safety is enforced by isLftpSafePath (no spaces / metacharacters).
  * @param {string} path
  */
-export function lftpQuote(path) {
+export function renderLftpGitPath(path) {
   const normalized = String(path).replace(/\\/g, '/');
   if (!isLftpSafePath(normalized)) {
-    throw new Error(`UNSAFE_LFTP_QUOTE:${path}`);
+    throw new Error(`UNSAFE_LFTP_GIT_PATH:${path}`);
   }
-  if (normalized.includes('"') || normalized.includes('\n') || normalized.includes('\r')) {
-    throw new Error(`UNSAFE_LFTP_QUOTE:${path}`);
-  }
-  return `"${normalized}"`;
+  return normalized;
 }
 
 /**
- * Broken rendering retained only for regression tests that prove quoted local lcd fails.
+ * @deprecated Use renderLftpGitPath — name kept for call-site compatibility.
+ * Historically wrapped paths in double quotes; that breaks this lftp -e style.
+ * @param {string} path
+ */
+export function lftpQuote(path) {
+  return renderLftpGitPath(path);
+}
+
+/**
+ * Broken rendering retained only for regression tests that prove quoted paths fail.
  * @param {string} path
  * @deprecated Never use in production command generation.
  */
@@ -587,6 +602,100 @@ export function renderBrokenQuotedLftpLocalDir(path) {
     throw new Error(`UNSAFE_LFTP_QUOTE:${path}`);
   }
   return `"${normalized}"`;
+}
+
+/**
+ * Broken quoted git-path form (production put/exclude failure class).
+ * @param {string} path
+ * @deprecated Never use in production.
+ */
+export function renderBrokenQuotedLftpGitPath(path) {
+  const normalized = String(path).replace(/\\/g, '/');
+  if (normalized.includes('"') || normalized.includes('\n') || normalized.includes('\r')) {
+    throw new Error(`UNSAFE_LFTP_QUOTE:${path}`);
+  }
+  return `"${normalized}"`;
+}
+
+/**
+ * Canonical lftp GET remote→local (matches last known-working a541afa form):
+ *   get -o <localAbs> <remoteRel>
+ * @param {{ remotePath: string, localPath: string }} args
+ */
+export function renderLftpGetCommand(args) {
+  const remote = renderLftpGitPath(args.remotePath);
+  const local = renderLftpLocalDir(args.localPath);
+  return `get -o ${local} ${remote}`;
+}
+
+/**
+ * Privacy-safe classification of an lftp GET/read-back log (no secrets).
+ * @param {string} logText
+ * @param {{ localPath?: string, exitCode?: number | null }} [opts]
+ * @returns {'SUCCESS'|'REMOTE_NOT_FOUND'|'LOCAL_OUTPUT_ERROR'|'FTP_AUTH_ERROR'|'FTP_CONNECTION_ERROR'|'FTP_PROTOCOL_ERROR'|'LFTP_COMMAND_ERROR'}
+ */
+export function classifyLftpReadLog(logText, opts = {}) {
+  const text = String(logText ?? '');
+  const code = opts.exitCode;
+  if (code === 0) {
+    return 'SUCCESS';
+  }
+  // Quote-literal local path class: .../"file": No such file or directory
+  if (/"[^"\n]+":\s*No such file or directory/.test(text)) {
+    return 'LOCAL_OUTPUT_ERROR';
+  }
+  if (
+    opts.localPath &&
+    /cannot create|Permission denied|failed to open local|local file/i.test(text) &&
+    text.includes(String(opts.localPath).replace(/\\/g, '/'))
+  ) {
+    return 'LOCAL_OUTPUT_ERROR';
+  }
+  if (/550|No such file|not found|does not exist|File not found|Failed to open file/i.test(text)) {
+    return 'REMOTE_NOT_FOUND';
+  }
+  if (/530|Login failed|Login incorrect|Authentication failed|AUTH.*fail/i.test(text)) {
+    return 'FTP_AUTH_ERROR';
+  }
+  if (/Connection refused|Connection timed out|Timed out|Could not connect|resolve host|Temporary failure in name resolution/i.test(text)) {
+    return 'FTP_CONNECTION_ERROR';
+  }
+  if (/SSL|TLS|certificate|FTPES|secure control/i.test(text) && /fail|error|denied|unable/i.test(text)) {
+    return 'FTP_PROTOCOL_ERROR';
+  }
+  if (/Unknown command|Usage:|parse error|syntax/i.test(text)) {
+    return 'LFTP_COMMAND_ERROR';
+  }
+  return 'LFTP_COMMAND_ERROR';
+}
+
+/**
+ * Map a read-class to PREVIOUS_SHA_READ contract values.
+ * @param {ReturnType<typeof classifyLftpReadLog>} readClass
+ */
+export function previousShaReadFromClass(readClass) {
+  if (readClass === 'SUCCESS') {
+    return 'SUCCESS';
+  }
+  if (readClass === 'REMOTE_NOT_FOUND') {
+    return 'NOT_FOUND';
+  }
+  return 'TRANSPORT_FAILED';
+}
+
+/**
+ * Whether a GET failure class proves read-back is broken (must stop before bulk upload).
+ * REMOTE_NOT_FOUND is NOT fatal for capability — it proves the GET reached the server.
+ * @param {string} readClass
+ */
+export function isFatalFtpReadCapabilityFailure(readClass) {
+  return (
+    readClass === 'LOCAL_OUTPUT_ERROR' ||
+    readClass === 'FTP_AUTH_ERROR' ||
+    readClass === 'FTP_CONNECTION_ERROR' ||
+    readClass === 'FTP_PROTOCOL_ERROR' ||
+    readClass === 'LFTP_COMMAND_ERROR'
+  );
 }
 
 function renderCommonPreamble(dist, remote) {
@@ -931,6 +1040,17 @@ function main() {
   const previousArg = (args['previous-sha'] ?? 'NONE').trim();
   const previousSha =
     !previousArg || previousArg.toUpperCase() === 'NONE' ? null : previousArg.toLowerCase();
+  const previousShaReadStatusRaw = (args['previous-sha-read-status'] ?? '').trim().toUpperCase();
+  /** @type {'SUCCESS' | 'NOT_FOUND' | 'TRANSPORT_FAILED' | 'INVALID_CONTENT' | null} */
+  let previousShaReadStatus = null;
+  if (
+    previousShaReadStatusRaw === 'SUCCESS' ||
+    previousShaReadStatusRaw === 'NOT_FOUND' ||
+    previousShaReadStatusRaw === 'TRANSPORT_FAILED' ||
+    previousShaReadStatusRaw === 'INVALID_CONTENT'
+  ) {
+    previousShaReadStatus = previousShaReadStatusRaw;
+  }
   const deployShaLocalPathOs = resolve(
     args['deploy-sha-local-path'] ?? join(outDir, '.deploy-sha'),
   );
@@ -990,6 +1110,7 @@ function main() {
     diffLines,
     ancestryOk,
     fetchOk,
+    previousShaReadStatus,
   });
 
   writeFileSync(join(outDir, 'plan.json'), `${JSON.stringify(plan, null, 2)}\n`, 'utf8');

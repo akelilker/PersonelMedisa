@@ -5,24 +5,31 @@ import {
   rmSync,
   writeFileSync,
 } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
+  classifyLftpReadLog,
   collectApiChangesFromDiffLines,
   createDeployPlan,
   formatDeploySummary,
   isApiOwnedPath,
+  isFatalFtpReadCapabilityFailure,
   isLftpSafePath,
   isSafeExactDeletePath,
   isSafeLftpLocalDir,
   normalizeRelativePath,
   parseNameStatusLine,
   planApiTransfers,
+  previousShaReadFromClass,
+  renderBrokenQuotedLftpGitPath,
   renderBrokenQuotedLftpLocalDir,
   renderFinalizeShaFtpCommands,
   renderFullMirrorFtpCommands,
   renderIncrementalFtpCommands,
+  renderLftpGetCommand,
+  renderLftpGitPath,
   renderLocalLftpPreflightCommands,
   renderLftpLocalDir,
   resolveVerifiedLocalDeployDirs,
@@ -230,8 +237,8 @@ describe('cPanel incremental deploy planner', () => {
     const entryIdx = cmds.indexOf('SPA entrypoint upload');
     expect(assetIdx).toBeGreaterThanOrEqual(0);
     expect(entryIdx).toBeGreaterThan(assetIdx);
-    expect(cmds.indexOf('put "index.html"')).toBeGreaterThan(entryIdx);
-    expect(cmds.indexOf('--exclude "index.html"')).toBeGreaterThan(assetIdx);
+    expect(cmds.indexOf('put index.html')).toBeGreaterThan(entryIdx);
+    expect(cmds.indexOf('--exclude index.html')).toBeGreaterThan(assetIdx);
     assertPayloadHasNoDeploySha(cmds);
   });
 
@@ -255,7 +262,7 @@ describe('cPanel incremental deploy planner', () => {
       deployShaLocalPath: '/tmp/.deploy-sha',
     });
     assertPayloadHasNoDeploySha(payload);
-    expect(payload.indexOf('put "index.html"')).toBeGreaterThan(
+    expect(payload.indexOf('put index.html')).toBeGreaterThan(
       payload.indexOf('PHP API full mirror'),
     );
     expect(finalize).toContain('put -O api /tmp/.deploy-sha');
@@ -280,7 +287,7 @@ describe('cPanel incremental deploy planner', () => {
       remoteTargetDir: '.',
       deployShaLocalPath: '/tmp/.deploy-sha',
     });
-    expect(cmds).toContain('put -O "api/src" "api/src/Router.php"');
+    expect(cmds).toContain('put -O api/src api/src/Router.php');
     assertPayloadHasNoDeploySha(cmds);
   });
 
@@ -304,7 +311,7 @@ describe('cPanel incremental deploy planner', () => {
       remoteTargetDir: '.',
       deployShaLocalPath: '/tmp/.deploy-sha',
     });
-    const deleteIdx = cmds.indexOf('rm "api/src/Obsolete.php"');
+    const deleteIdx = cmds.indexOf('rm api/src/Obsolete.php');
     const failOpenIdx = cmds.indexOf('set cmd:fail-exit false');
     const legacyCleanupIdx = cmds.indexOf('glob -a rm api/public/_migration_*.php');
     expect(deleteIdx).toBeGreaterThanOrEqual(0);
@@ -334,7 +341,7 @@ describe('cPanel incremental deploy planner', () => {
       deployShaLocalPath: '/tmp/.deploy-sha',
     });
     expect(incCmds.indexOf('SPA entrypoint upload')).toBeGreaterThan(
-      incCmds.indexOf('put -O "api/src" "api/src/Router.php"'),
+      incCmds.indexOf('put -O api/src api/src/Router.php'),
     );
     expect(incCmds.indexOf('SPA entrypoint upload')).toBeGreaterThan(
       incCmds.indexOf('PHP API incremental upload'),
@@ -355,7 +362,7 @@ describe('cPanel incremental deploy planner', () => {
     expect(fullCmds.indexOf('SPA entrypoint upload')).toBeGreaterThan(
       fullCmds.indexOf('PHP API full mirror'),
     );
-    expect(fullCmds.indexOf('put "index.html"')).toBeGreaterThan(
+    expect(fullCmds.indexOf('put index.html')).toBeGreaterThan(
       fullCmds.indexOf('mirror -R --verbose api/src api/src'),
     );
   });
@@ -551,14 +558,26 @@ describe('cPanel incremental deploy planner', () => {
   });
 
   it('W) PREVIOUS_SHA read failure → FULL_MIRROR_FALLBACK', () => {
-    const plan = createDeployPlan({
+    const missing = createDeployPlan({
       previousSha: 'NONE',
       currentSha: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
       repoRoot: makeRepoSkeleton(),
       distDir: makeDist(),
+      previousShaReadStatus: 'NOT_FOUND',
     });
-    expect(plan.mode).toBe('FULL_MIRROR_FALLBACK');
-    expect(plan.fallbackReason).toBe('PREVIOUS_SHA_MISSING');
+    expect(missing.mode).toBe('FULL_MIRROR_FALLBACK');
+    expect(missing.fallbackReason).toBe('PREVIOUS_SHA_MISSING');
+
+    const transport = createDeployPlan({
+      previousSha: 'NONE',
+      currentSha: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+      repoRoot: makeRepoSkeleton(),
+      distDir: makeDist(),
+      previousShaReadStatus: 'TRANSPORT_FAILED',
+    });
+    expect(transport.mode).toBe('FULL_MIRROR_FALLBACK');
+    expect(transport.fallbackReason).toBe('PREVIOUS_SHA_TRANSPORT_FAILED');
+    expect(transport.fallbackReason).not.toBe('PREVIOUS_SHA_MISSING');
 
     const source = readFileSync(
       resolve(process.cwd(), '.github/workflows/deploy-cpanel.yml'),
@@ -569,8 +588,8 @@ describe('cPanel incremental deploy planner', () => {
     expect(source).toContain('NOT_FOUND');
     expect(source).toContain('INVALID_CONTENT');
     expect(source).toContain('PREVIOUS_SHA_VALUE');
-    // Missing previous SHA must remain non-fatal fallback, not hard fail.
-    expect(source).not.toMatch(/PREVIOUS_SHA_READ=TRANSPORT_FAILED[\s\S]{0,80}exit 1/);
+    expect(source).toContain('FTP_READBACK_PREFLIGHT');
+    expect(source).toContain('REFUSING_BULK_UPLOAD=YES');
   });
 
   it('X) full mirror fallback uses valid local lcd syntax', () => {
@@ -616,6 +635,180 @@ describe('cPanel incremental deploy planner', () => {
     expect(source.indexOf('finalize_deploy_sha')).toBeGreaterThan(
       source.indexOf('LOCAL_LFTP_PREFLIGHT=PASS'),
     );
+  });
+
+  it('Z1) canonical lftp GET remote→local syntax executes correctly', () => {
+    const local =
+      '/home/runner/work/_temp/cpanel-deploy-plan/previous.deploy-sha';
+    const cmd = renderLftpGetCommand({
+      remotePath: 'api/.deploy-sha',
+      localPath: local,
+    });
+    expect(cmd).toBe(`get -o ${local} api/.deploy-sha`);
+    expect(cmd).not.toContain('"');
+    expect(renderBrokenQuotedLftpGitPath('api/.deploy-sha')).toBe('"api/.deploy-sha"');
+
+    // Optional live parser check via lftp file: backend when available.
+    const fixtureRoot = mkdtempSync(join(tmpdir(), 'medisa-lftp-get-'));
+    temporaryDirectories.push(fixtureRoot);
+    mkdirSync(join(fixtureRoot, 'api'), { recursive: true });
+    writeFileSync(join(fixtureRoot, 'api', '.deploy-sha'), 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n');
+    const outFile = join(fixtureRoot, 'out.sha');
+    const result = runLocalLftpPreflight({
+      distAbs: fixtureRoot,
+      repoAbs: fixtureRoot,
+    });
+    // Reuse spawn path: if lftp missing, skip live get; syntax contract still asserted above.
+    if (!result.skipped) {
+      const getCmd = renderLftpGetCommand({
+        remotePath: 'api/.deploy-sha',
+        localPath: outFile.replace(/\\/g, '/'),
+      });
+      const live = spawnSync(
+        'lftp',
+        ['file:' + fixtureRoot.replace(/\\/g, '/'), '-e', `set cmd:fail-exit true; ${getCmd}; bye`],
+        { encoding: 'utf8' },
+      );
+      if (live.error && (live.error as NodeJS.ErrnoException).code === 'ENOENT') {
+        return;
+      }
+      expect(live.status).toBe(0);
+      expect(readFileSync(outFile, 'utf8').trim()).toBe(
+        'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      );
+    }
+  });
+
+  it('Z2) valid remote deploy SHA → PREVIOUS_SHA_READ=SUCCESS', () => {
+    expect(previousShaReadFromClass('SUCCESS')).toBe('SUCCESS');
+    const plan = createDeployPlan({
+      previousSha: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      currentSha: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+      repoRoot: makeRepoSkeleton(),
+      distDir: makeDist(),
+      previousShaReadStatus: 'SUCCESS',
+      fetchOk: true,
+      ancestryOk: true,
+      diffLines: [],
+    });
+    expect(plan.mode).toBe('INCREMENTAL');
+  });
+
+  it('Z3) actual 550/not-found → NOT_FOUND', () => {
+    const klass = classifyLftpReadLog(
+      'get: Access failed: 550 Failed to open file. (api/.deploy-sha)\n',
+      { exitCode: 1 },
+    );
+    expect(klass).toBe('REMOTE_NOT_FOUND');
+    expect(previousShaReadFromClass(klass)).toBe('NOT_FOUND');
+    expect(isFatalFtpReadCapabilityFailure(klass)).toBe(false);
+  });
+
+  it('Z4) local output/path error → correct failure classification', () => {
+    const klass = classifyLftpReadLog(
+      'get: /home/runner/work/_temp/plan/"previous.deploy-sha": No such file or directory\n',
+      {
+        exitCode: 1,
+        localPath: '/home/runner/work/_temp/plan/previous.deploy-sha',
+      },
+    );
+    expect(klass).toBe('LOCAL_OUTPUT_ERROR');
+    expect(previousShaReadFromClass(klass)).toBe('TRANSPORT_FAILED');
+    expect(isFatalFtpReadCapabilityFailure(klass)).toBe(true);
+  });
+
+  it('Z5) transport failure does not masquerade as PREVIOUS_SHA_MISSING', () => {
+    const plan = createDeployPlan({
+      previousSha: null,
+      currentSha: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+      repoRoot: makeRepoSkeleton(),
+      distDir: makeDist(),
+      previousShaReadStatus: 'TRANSPORT_FAILED',
+    });
+    expect(plan.fallbackReason).toBe('PREVIOUS_SHA_TRANSPORT_FAILED');
+    expect(plan.fallbackReason).not.toBe('PREVIOUS_SHA_MISSING');
+  });
+
+  it('Z6) transport/read capability failure stops before bulk mirror', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), '.github/workflows/deploy-cpanel.yml'),
+      'utf8',
+    );
+    const probeIdx = source.indexOf('FTP read-back capability + previous SHA probe starting');
+    const refuseIdx = source.indexOf('REFUSING_BULK_UPLOAD=YES');
+    const bulkIdx = source.indexOf('Deploy payload transfer path');
+    expect(probeIdx).toBeGreaterThanOrEqual(0);
+    expect(refuseIdx).toBeGreaterThan(probeIdx);
+    expect(bulkIdx).toBeGreaterThan(refuseIdx);
+    expect(source).toContain('FTP_READBACK_PREFLIGHT=PASS');
+    expect(isFatalFtpReadCapabilityFailure('FTP_CONNECTION_ERROR')).toBe(true);
+    expect(isFatalFtpReadCapabilityFailure('REMOTE_NOT_FOUND')).toBe(false);
+  });
+
+  it('Z7) remote bundle read uses same canonical GET helper', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), '.github/workflows/deploy-cpanel.yml'),
+      'utf8',
+    );
+    expect(source).toContain('lftp_get_remote_to_local');
+    expect(source).toContain('renderLftpGetCommand');
+    const verifyFn = source.slice(
+      source.indexOf('verify_payload_before_sha()'),
+      source.indexOf('finalize_deploy_sha()'),
+    );
+    expect(verifyFn).toContain(
+      'lftp_get_remote_to_local "api/runtime-build/canonical-migrations.php"',
+    );
+    expect(verifyFn).not.toMatch(/get -o \$\{remote_bundle_path\}/);
+  });
+
+  it('Z8) final SHA read-back uses same canonical GET helper', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), '.github/workflows/deploy-cpanel.yml'),
+      'utf8',
+    );
+    const finalizeFn = source.slice(
+      source.indexOf('finalize_deploy_sha()'),
+      source.indexOf('upload_verify_finalize()'),
+    );
+    expect(finalizeFn).toContain('lftp_get_remote_to_local "api/.deploy-sha"');
+    expect(finalizeFn).toContain('FINAL_SHA_GET=SUCCESS');
+  });
+
+  it('Z9) read-back failure leaves deploy SHA marker unfinalized', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), '.github/workflows/deploy-cpanel.yml'),
+      'utf8',
+    );
+    const refuseBlock = source.slice(
+      source.indexOf('PREVIOUS_SHA_READ" == "TRANSPORT_FAILED"'),
+      source.indexOf('FTP_READBACK_PREFLIGHT=PASS'),
+    );
+    expect(refuseBlock).toContain('REFUSING_BULK_UPLOAD=YES');
+    expect(refuseBlock).toContain('exit 1');
+    expect(refuseBlock).not.toContain('finalize_deploy_sha');
+    expect(refuseBlock).not.toContain('ftp-finalize-sha');
+    // Finalize remains after verify only.
+    expect(source.indexOf('finalize_deploy_sha')).toBeGreaterThan(
+      source.indexOf('verify_payload_before_sha'),
+    );
+  });
+
+  it('Z10) valid previous SHA + ancestor → INCREMENTAL mode', () => {
+    const plan = createDeployPlan({
+      previousSha: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      currentSha: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+      repoRoot: makeRepoSkeleton(),
+      distDir: makeDist(),
+      previousShaReadStatus: 'SUCCESS',
+      fetchOk: true,
+      ancestryOk: true,
+      diffLines: ['M\tapi/src/Router.php'],
+    });
+    expect(plan.mode).toBe('INCREMENTAL');
+    expect(plan.apiUploads).toEqual(['api/src/Router.php']);
+    expect(renderLftpGitPath('index.html')).toBe('index.html');
+    expect(renderLftpGitPath('index.html')).not.toContain('"');
   });
 
   it('emits secret-free deploy summary lines', () => {

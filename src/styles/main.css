@@ -51,6 +51,9 @@
 @import "./modules/auth.css";
 @import "../features/self-service/self-service.css";
 
+/* 5.1 Canonical veri yüzeyi owner'ı — feature layout kurallarından sonra uygulanır */
+@import "./components/table.css";
+
 /* 6. Platforma Özel Stiller */
 @import "./platform/mobile.css";
 @import "./platform/desktop.css";

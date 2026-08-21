@@ -1,0 +1,409 @@
+﻿2026-08-21T02:04:42.5950557Z Current runner version: '2.336.0'
+2026-08-21T02:04:42.5983115Z ##[group]Runner Image Provisioner
+2026-08-21T02:04:42.5984375Z Hosted Compute Agent
+2026-08-21T02:04:42.5985309Z Version: 20260729.566
+2026-08-21T02:04:42.5986416Z Commit: cf7153fe6e25b664e8693c24944bf2b00355d109
+2026-08-21T02:04:42.5987519Z Build Date: 2026-07-29T19:17:02Z
+2026-08-21T02:04:42.5988834Z Worker ID: {301640e7-3754-4aae-b282-89ba70a12dbc}
+2026-08-21T02:04:42.5989952Z Azure Region: eastus
+2026-08-21T02:04:42.5990837Z ##[endgroup]
+2026-08-21T02:04:42.5993301Z ##[group]Operating System
+2026-08-21T02:04:42.5994291Z Ubuntu
+2026-08-21T02:04:42.5995121Z 24.04.4
+2026-08-21T02:04:42.5995914Z LTS
+2026-08-21T02:04:42.5996711Z ##[endgroup]
+2026-08-21T02:04:42.5997829Z ##[group]Runner Image
+2026-08-21T02:04:42.5998808Z Image: ubuntu-24.04
+2026-08-21T02:04:42.6000253Z Version: 20260816.277.1
+2026-08-21T02:04:42.6002254Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20260816.277/images/ubuntu/Ubuntu2404-Readme.md
+2026-08-21T02:04:42.6004828Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20260816.277
+2026-08-21T02:04:42.6006307Z ##[endgroup]
+2026-08-21T02:04:42.6008427Z ##[group]GITHUB_TOKEN Permissions
+2026-08-21T02:04:42.6011391Z Contents: read
+2026-08-21T02:04:42.6012420Z Metadata: read
+2026-08-21T02:04:42.6013260Z Packages: read
+2026-08-21T02:04:42.6014144Z ##[endgroup]
+2026-08-21T02:04:42.6017030Z Secret source: Actions
+2026-08-21T02:04:42.6019415Z Prepare workflow directory
+2026-08-21T02:04:42.6474214Z Prepare all required actions
+2026-08-21T02:04:42.6541981Z Getting action download info
+2026-08-21T02:04:42.8548306Z Download action repository 'actions/checkout@v6' (SHA:d23441a48e516b6c34aea4fa41551a30e30af803)
+2026-08-21T02:04:42.9755115Z Download action repository 'actions/setup-node@v6' (SHA:249970729cb0ef3589644e2896645e5dc5ba9c38)
+2026-08-21T02:04:43.0586511Z Download action repository 'shivammathur/setup-php@v2' (SHA:f3e473d116dcccaddc5834248c87452386958240)
+2026-08-21T02:04:43.2760488Z Complete job name: Fast CI
+2026-08-21T02:04:43.3513972Z ##[group]Run actions/checkout@v6
+2026-08-21T02:04:43.3514796Z with:
+2026-08-21T02:04:43.3515259Z   repository: akelilker/PersonelMedisa
+2026-08-21T02:04:43.3519384Z   token: ***
+2026-08-21T02:04:43.3519833Z   ssh-strict: true
+2026-08-21T02:04:43.3520271Z   ssh-user: git
+2026-08-21T02:04:43.3520722Z   persist-credentials: true
+2026-08-21T02:04:43.3521209Z   clean: true
+2026-08-21T02:04:43.3521655Z   sparse-checkout-cone-mode: true
+2026-08-21T02:04:43.3522162Z   fetch-depth: 1
+2026-08-21T02:04:43.3522581Z   fetch-tags: false
+2026-08-21T02:04:43.3523016Z   show-progress: true
+2026-08-21T02:04:43.3523445Z   lfs: false
+2026-08-21T02:04:43.3523853Z   submodules: false
+2026-08-21T02:04:43.3524290Z   set-safe-directory: true
+2026-08-21T02:04:43.3524789Z   allow-unsafe-pr-checkout: false
+2026-08-21T02:04:43.3525541Z ##[endgroup]
+2026-08-21T02:04:43.4523179Z Syncing repository: akelilker/PersonelMedisa
+2026-08-21T02:04:43.4525128Z ##[group]Getting Git version info
+2026-08-21T02:04:43.4526014Z Working directory is '/home/runner/work/PersonelMedisa/PersonelMedisa'
+2026-08-21T02:04:43.4527109Z [command]/usr/bin/git version
+2026-08-21T02:04:43.4620395Z git version 2.55.0
+2026-08-21T02:04:43.4674506Z ##[endgroup]
+2026-08-21T02:04:43.4691393Z Temporarily overriding HOME='/home/runner/work/_temp/076673c4-a7b3-4c57-a0b0-26c6bcbba2d8' before making global git config changes
+2026-08-21T02:04:43.4693604Z Adding repository directory to the temporary git global config as a safe directory
+2026-08-21T02:04:43.4697136Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/PersonelMedisa/PersonelMedisa
+2026-08-21T02:04:43.4749756Z Deleting the contents of '/home/runner/work/PersonelMedisa/PersonelMedisa'
+2026-08-21T02:04:43.4762440Z ##[group]Determining repository object format
+2026-08-21T02:04:43.4763901Z ##[endgroup]
+2026-08-21T02:04:43.4769406Z ##[group]Initializing the repository
+2026-08-21T02:04:43.4770885Z [command]/usr/bin/git init /home/runner/work/PersonelMedisa/PersonelMedisa
+2026-08-21T02:04:43.4848793Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-08-21T02:04:43.4850416Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-08-21T02:04:43.4851623Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-08-21T02:04:43.4852364Z hint: call:
+2026-08-21T02:04:43.4852774Z hint:
+2026-08-21T02:04:43.4853273Z hint: 	git config --global init.defaultBranch <name>
+2026-08-21T02:04:43.4853877Z hint:
+2026-08-21T02:04:43.4854447Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-08-21T02:04:43.4855344Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-08-21T02:04:43.4856055Z hint:
+2026-08-21T02:04:43.4856492Z hint: 	git branch -m <name>
+2026-08-21T02:04:43.4856990Z hint:
+2026-08-21T02:04:43.4857829Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-08-21T02:04:43.4864062Z Initialized empty Git repository in /home/runner/work/PersonelMedisa/PersonelMedisa/.git/
+2026-08-21T02:04:43.4873721Z [command]/usr/bin/git remote add origin https://github.com/akelilker/PersonelMedisa
+2026-08-21T02:04:43.4928559Z ##[endgroup]
+2026-08-21T02:04:43.4929848Z ##[group]Disabling automatic garbage collection
+2026-08-21T02:04:43.4933578Z [command]/usr/bin/git config --local gc.auto 0
+2026-08-21T02:04:43.4966893Z ##[endgroup]
+2026-08-21T02:04:43.4968232Z ##[group]Setting up auth
+2026-08-21T02:04:43.4969303Z Removing SSH command configuration
+2026-08-21T02:04:43.4975772Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-08-21T02:04:43.5016608Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-08-21T02:04:43.5396370Z Removing HTTP extra header
+2026-08-21T02:04:43.5419722Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-08-21T02:04:43.5446861Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-08-21T02:04:43.5700565Z Removing includeIf entries pointing to credentials config files
+2026-08-21T02:04:43.5708261Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-08-21T02:04:43.5746127Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-08-21T02:04:43.6011231Z [command]/usr/bin/git config --file /home/runner/work/_temp/git-credentials-3c683757-9fd5-4ef5-8478-fd381e940a54.config http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-08-21T02:04:43.6057464Z [command]/usr/bin/git config --local includeIf.gitdir:/home/runner/work/PersonelMedisa/PersonelMedisa/.git.path /home/runner/work/_temp/git-credentials-3c683757-9fd5-4ef5-8478-fd381e940a54.config
+2026-08-21T02:04:43.6094791Z [command]/usr/bin/git config --local includeIf.gitdir:/home/runner/work/PersonelMedisa/PersonelMedisa/.git/worktrees/*.path /home/runner/work/_temp/git-credentials-3c683757-9fd5-4ef5-8478-fd381e940a54.config
+2026-08-21T02:04:43.6139865Z [command]/usr/bin/git config --local includeIf.gitdir:/github/workspace/.git.path /github/runner_temp/git-credentials-3c683757-9fd5-4ef5-8478-fd381e940a54.config
+2026-08-21T02:04:43.6182462Z [command]/usr/bin/git config --local includeIf.gitdir:/github/workspace/.git/worktrees/*.path /github/runner_temp/git-credentials-3c683757-9fd5-4ef5-8478-fd381e940a54.config
+2026-08-21T02:04:43.6220247Z ##[endgroup]
+2026-08-21T02:04:43.6221947Z ##[group]Fetching the repository
+2026-08-21T02:04:43.6229820Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +fa992dcb5e1c98a14cbe8c7996ecfe1b5582a504:refs/remotes/origin/main
+2026-08-21T02:04:44.5163863Z From https://github.com/akelilker/PersonelMedisa
+2026-08-21T02:04:44.5165664Z  * [new ref]         fa992dcb5e1c98a14cbe8c7996ecfe1b5582a504 -> origin/main
+2026-08-21T02:04:44.5179842Z [command]/usr/bin/git branch --list --remote origin/main
+2026-08-21T02:04:44.5206475Z   origin/main
+2026-08-21T02:04:44.5216653Z [command]/usr/bin/git rev-parse refs/remotes/origin/main
+2026-08-21T02:04:44.5246130Z fa992dcb5e1c98a14cbe8c7996ecfe1b5582a504
+2026-08-21T02:04:44.5251198Z ##[endgroup]
+2026-08-21T02:04:44.5252486Z ##[group]Determining the checkout info
+2026-08-21T02:04:44.5253913Z ##[endgroup]
+2026-08-21T02:04:44.5258449Z [command]/usr/bin/git sparse-checkout disable
+2026-08-21T02:04:44.5312634Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-08-21T02:04:44.5346034Z ##[group]Checking out the ref
+2026-08-21T02:04:44.5348805Z [command]/usr/bin/git checkout --progress --force -B main refs/remotes/origin/main
+2026-08-21T02:04:44.6391530Z Switched to a new branch 'main'
+2026-08-21T02:04:44.6394073Z branch 'main' set up to track 'origin/main'.
+2026-08-21T02:04:44.6406004Z ##[endgroup]
+2026-08-21T02:04:44.6455515Z [command]/usr/bin/git log -1 --format=%H
+2026-08-21T02:04:44.6485402Z fa992dcb5e1c98a14cbe8c7996ecfe1b5582a504
+2026-08-21T02:04:44.6935633Z ##[group]Run actions/setup-node@v6
+2026-08-21T02:04:44.6936911Z with:
+2026-08-21T02:04:44.6938002Z   node-version: 24
+2026-08-21T02:04:44.6939002Z   cache: npm
+2026-08-21T02:04:44.6939973Z   check-latest: false
+2026-08-21T02:04:44.6949414Z   token: ***
+2026-08-21T02:04:44.6950446Z   package-manager-cache: true
+2026-08-21T02:04:44.6951638Z ##[endgroup]
+2026-08-21T02:04:44.8354563Z Found in cache @ /opt/hostedtoolcache/node/24.19.0/x64
+2026-08-21T02:04:44.8358451Z ##[group]Environment details
+2026-08-21T02:04:45.2246508Z node: v24.19.0
+2026-08-21T02:04:45.2247050Z npm: 11.17.0
+2026-08-21T02:04:45.2247517Z yarn: 1.22.22
+2026-08-21T02:04:45.2248784Z ##[endgroup]
+2026-08-21T02:04:45.2265434Z [command]/opt/hostedtoolcache/node/24.19.0/x64/bin/npm config get cache
+2026-08-21T02:04:45.3413567Z /home/runner/.npm
+2026-08-21T02:04:45.4237262Z Cache hit for: node-cache-Linux-x64-npm-50fcb6795cdab905f28ae22ba0a85f89a79d127b8807542e91eba1bb9e8a48bb
+2026-08-21T02:04:45.7727839Z Received 47006025 of 47006025 (100.0%), 147.5 MBs/sec
+2026-08-21T02:04:45.7728611Z Cache Size: ~45 MB (47006025 B)
+2026-08-21T02:04:45.7756120Z [command]/usr/bin/tar -xf /home/runner/work/_temp/86d9c0b0-6302-42bb-b9ee-71792a245ebf/cache.tzst -P -C /home/runner/work/PersonelMedisa/PersonelMedisa --use-compress-program unzstd
+2026-08-21T02:04:45.9392718Z Cache restored successfully
+2026-08-21T02:04:45.9418665Z Cache restored from key: node-cache-Linux-x64-npm-50fcb6795cdab905f28ae22ba0a85f89a79d127b8807542e91eba1bb9e8a48bb
+2026-08-21T02:04:45.9662157Z ##[group]Run shivammathur/setup-php@v2
+2026-08-21T02:04:45.9662491Z with:
+2026-08-21T02:04:45.9662718Z   php-version: 8.3
+2026-08-21T02:04:45.9662970Z   extensions: pdo_sqlite
+2026-08-21T02:04:45.9663216Z   coverage: none
+2026-08-21T02:04:45.9663456Z   ini-file: production
+2026-08-21T02:04:45.9665840Z   github-token: ***
+2026-08-21T02:04:45.9666078Z ##[endgroup]
+2026-08-21T02:04:46.0103811Z [command]/usr/bin/bash /home/runner/work/_actions/shivammathur/setup-php/v2/src/scripts/run.sh
+2026-08-21T02:04:46.0552980Z 
+2026-08-21T02:04:46.0554026Z [90;1m==> [0m[37;1mSetup PHP[0m
+2026-08-21T02:04:50.4356550Z [32;1m✓ [0m[34;1mPHP [0m[90;1mUpdated to PHP 8.3.33[0m
+2026-08-21T02:04:50.4357117Z 
+2026-08-21T02:04:50.4357404Z [90;1m==> [0m[37;1mSetup Extensions[0m
+2026-08-21T02:04:50.4856476Z [32;1m✓ [0m[34;1mpdo_sqlite [0m[90;1mEnabled[0m
+2026-08-21T02:04:50.4857291Z 
+2026-08-21T02:04:50.4858013Z [90;1m==> [0m[37;1mSetup Tools[0m
+2026-08-21T02:04:50.7391735Z [32;1m✓ [0m[34;1mcomposer [0m[90;1mAdded composer 2.10.2[0m
+2026-08-21T02:04:50.7392312Z 
+2026-08-21T02:04:50.7399099Z [90;1m==> [0m[37;1mSetup Coverage[0m
+2026-08-21T02:04:50.9710167Z [32;1m✓ [0m[34;1mnone [0m[90;1mDisabled Xdebug and PCOV[0m
+2026-08-21T02:04:50.9711599Z 
+2026-08-21T02:04:50.9712369Z [90;1m==> [0m[37;1mSponsor setup-php[0m
+2026-08-21T02:04:50.9713260Z [32;1m✓ [0m[34;1msetup-php [0m[90;1mhttps://setup-php.com/sponsor[0m
+2026-08-21T02:04:50.9909083Z ##[group]Run sudo apt-get update
+2026-08-21T02:04:50.9909451Z [36;1msudo apt-get update[0m
+2026-08-21T02:04:50.9909754Z [36;1msudo apt-get install -y lftp[0m
+2026-08-21T02:04:50.9961309Z shell: /usr/bin/bash -e {0}
+2026-08-21T02:04:50.9961600Z env:
+2026-08-21T02:04:50.9961824Z   COMPOSER_PROCESS_TIMEOUT: 0
+2026-08-21T02:04:50.9962142Z   COMPOSER_NO_INTERACTION: 1
+2026-08-21T02:04:50.9962407Z   COMPOSER_NO_AUDIT: 1
+2026-08-21T02:04:50.9962635Z ##[endgroup]
+2026-08-21T02:04:51.0748893Z Get:1 file:/etc/apt/apt-mirrors.txt Mirrorlist [144 B]
+2026-08-21T02:04:51.1104299Z Hit:2 http://azure.archive.ubuntu.com/ubuntu noble InRelease
+2026-08-21T02:04:51.1105684Z Hit:6 https://packages.microsoft.com/repos/azure-cli noble InRelease
+2026-08-21T02:04:51.1106933Z Get:7 https://packages.microsoft.com/ubuntu/24.04/prod noble InRelease [3600 B]
+2026-08-21T02:04:51.1128063Z Get:3 http://azure.archive.ubuntu.com/ubuntu noble-updates InRelease [126 kB]
+2026-08-21T02:04:51.1193745Z Get:4 http://azure.archive.ubuntu.com/ubuntu noble-backports InRelease [126 kB]
+2026-08-21T02:04:51.1212105Z Get:5 http://azure.archive.ubuntu.com/ubuntu noble-security InRelease [126 kB]
+2026-08-21T02:04:51.1213641Z Get:8 https://dl.google.com/linux/chrome-stable/deb stable InRelease [2548 B]
+2026-08-21T02:04:51.2811781Z Get:9 https://packages.microsoft.com/ubuntu/24.04/prod noble/main arm64 Packages [350 kB]
+2026-08-21T02:04:51.2928606Z Get:10 https://packages.microsoft.com/ubuntu/24.04/prod noble/main amd64 Packages [396 kB]
+2026-08-21T02:04:51.3329875Z Get:11 http://azure.archive.ubuntu.com/ubuntu noble-updates/main amd64 Packages [1227 kB]
+2026-08-21T02:04:51.3409615Z Get:12 http://azure.archive.ubuntu.com/ubuntu noble-updates/main Translation-en [286 kB]
+2026-08-21T02:04:51.3435999Z Get:13 http://azure.archive.ubuntu.com/ubuntu noble-updates/main amd64 Components [181 kB]
+2026-08-21T02:04:51.3459797Z Get:14 http://azure.archive.ubuntu.com/ubuntu noble-updates/universe amd64 Packages [1687 kB]
+2026-08-21T02:04:51.3559202Z Get:15 http://azure.archive.ubuntu.com/ubuntu noble-updates/universe Translation-en [337 kB]
+2026-08-21T02:04:51.3589392Z Get:16 http://azure.archive.ubuntu.com/ubuntu noble-updates/universe amd64 Components [388 kB]
+2026-08-21T02:04:51.3649053Z Get:17 http://azure.archive.ubuntu.com/ubuntu noble-updates/restricted amd64 Packages [1483 kB]
+2026-08-21T02:04:51.3730099Z Get:18 http://azure.archive.ubuntu.com/ubuntu noble-updates/restricted Translation-en [339 kB]
+2026-08-21T02:04:51.3759752Z Get:19 http://azure.archive.ubuntu.com/ubuntu noble-updates/multiverse Translation-en [12.8 kB]
+2026-08-21T02:04:51.3776696Z Get:20 http://azure.archive.ubuntu.com/ubuntu noble-updates/multiverse amd64 Components [940 B]
+2026-08-21T02:04:51.4390063Z Get:21 http://azure.archive.ubuntu.com/ubuntu noble-backports/main amd64 Components [5776 B]
+2026-08-21T02:04:51.4417524Z Get:22 http://azure.archive.ubuntu.com/ubuntu noble-backports/universe amd64 Components [12.6 kB]
+2026-08-21T02:04:51.5118480Z Get:23 http://azure.archive.ubuntu.com/ubuntu noble-security/main amd64 Packages [967 kB]
+2026-08-21T02:04:51.5178858Z Get:24 http://azure.archive.ubuntu.com/ubuntu noble-security/main Translation-en [205 kB]
+2026-08-21T02:04:51.5197257Z Get:31 https://dl.google.com/linux/chrome-stable/deb stable/main amd64 Packages [1416 B]
+2026-08-21T02:04:51.5207991Z Get:25 http://azure.archive.ubuntu.com/ubuntu noble-security/main amd64 Components [46.4 kB]
+2026-08-21T02:04:51.5222925Z Get:26 http://azure.archive.ubuntu.com/ubuntu noble-security/universe amd64 Packages [1201 kB]
+2026-08-21T02:04:51.5296511Z Get:27 http://azure.archive.ubuntu.com/ubuntu noble-security/universe Translation-en [240 kB]
+2026-08-21T02:04:51.5323162Z Get:28 http://azure.archive.ubuntu.com/ubuntu noble-security/universe amd64 Components [76.2 kB]
+2026-08-21T02:04:51.5341161Z Get:29 http://azure.archive.ubuntu.com/ubuntu noble-security/restricted amd64 Packages [1385 kB]
+2026-08-21T02:04:51.5424577Z Get:30 http://azure.archive.ubuntu.com/ubuntu noble-security/restricted Translation-en [320 kB]
+2026-08-21T02:04:55.5534045Z Fetched 11.5 MB in 1s (8194 kB/s)
+2026-08-21T02:04:56.2969437Z Reading package lists...
+2026-08-21T02:04:56.3294885Z Reading package lists...
+2026-08-21T02:04:56.4934299Z Building dependency tree...
+2026-08-21T02:04:56.4936544Z Reading state information...
+2026-08-21T02:04:56.6569937Z The following NEW packages will be installed:
+2026-08-21T02:04:56.6573872Z   lftp
+2026-08-21T02:04:56.6750113Z 0 upgraded, 1 newly installed, 0 to remove and 28 not upgraded.
+2026-08-21T02:04:56.6750813Z Need to get 704 kB of archives.
+2026-08-21T02:04:56.6751505Z After this operation, 1892 kB of additional disk space will be used.
+2026-08-21T02:04:56.6752283Z Get:1 file:/etc/apt/apt-mirrors.txt Mirrorlist [144 B]
+2026-08-21T02:04:56.7146605Z Get:2 http://azure.archive.ubuntu.com/ubuntu noble-updates/main amd64 lftp amd64 4.9.2-2ubuntu1.1 [704 kB]
+2026-08-21T02:04:56.9802413Z Fetched 704 kB in 0s (11.1 MB/s)
+2026-08-21T02:04:57.0002193Z Selecting previously unselected package lftp.
+2026-08-21T02:04:57.0158040Z (Reading database ... 
+2026-08-21T02:04:57.0161584Z (Reading database ... 5%
+2026-08-21T02:04:57.0162215Z (Reading database ... 10%
+2026-08-21T02:04:57.0164510Z (Reading database ... 15%
+2026-08-21T02:04:57.0167885Z (Reading database ... 20%
+2026-08-21T02:04:57.0170545Z (Reading database ... 25%
+2026-08-21T02:04:57.0172855Z (Reading database ... 30%
+2026-08-21T02:04:57.0178720Z (Reading database ... 35%
+2026-08-21T02:04:57.0179142Z (Reading database ... 40%
+2026-08-21T02:04:57.0179532Z (Reading database ... 45%
+2026-08-21T02:04:57.0180409Z (Reading database ... 50%
+2026-08-21T02:04:57.0181247Z (Reading database ... 55%
+2026-08-21T02:04:57.0318804Z (Reading database ... 60%
+2026-08-21T02:04:57.1294679Z (Reading database ... 65%
+2026-08-21T02:04:57.3726627Z (Reading database ... 70%
+2026-08-21T02:04:57.5793526Z (Reading database ... 75%
+2026-08-21T02:04:57.7751323Z (Reading database ... 80%
+2026-08-21T02:04:57.9301255Z (Reading database ... 85%
+2026-08-21T02:04:58.1475988Z (Reading database ... 90%
+2026-08-21T02:04:58.3364035Z (Reading database ... 95%
+2026-08-21T02:04:58.3364561Z (Reading database ... 100%
+2026-08-21T02:04:58.3365225Z (Reading database ... 204600 files and directories currently installed.)
+2026-08-21T02:04:58.3411041Z Preparing to unpack .../lftp_4.9.2-2ubuntu1.1_amd64.deb ...
+2026-08-21T02:04:58.3436489Z Unpacking lftp (4.9.2-2ubuntu1.1) ...
+2026-08-21T02:04:58.4072398Z Setting up lftp (4.9.2-2ubuntu1.1) ...
+2026-08-21T02:04:59.0050333Z 
+2026-08-21T02:04:59.0050976Z Running kernel seems to be up-to-date.
+2026-08-21T02:04:59.0051363Z 
+2026-08-21T02:04:59.0051543Z Restarting services...
+2026-08-21T02:04:59.0129985Z  systemctl restart php8.3-fpm.service
+2026-08-21T02:04:59.2098637Z 
+2026-08-21T02:04:59.2128869Z No containers need to be restarted.
+2026-08-21T02:04:59.2129241Z 
+2026-08-21T02:04:59.2129594Z No user sessions are running outdated binaries.
+2026-08-21T02:04:59.2129978Z 
+2026-08-21T02:04:59.2130478Z No VM guests are running outdated hypervisor (qemu) binaries on this host.
+2026-08-21T02:05:00.0609750Z ##[group]Run npm ci
+2026-08-21T02:05:00.0610028Z [36;1mnpm ci[0m
+2026-08-21T02:05:00.0652109Z shell: /usr/bin/bash -e {0}
+2026-08-21T02:05:00.0652383Z env:
+2026-08-21T02:05:00.0652616Z   COMPOSER_PROCESS_TIMEOUT: 0
+2026-08-21T02:05:00.0652895Z   COMPOSER_NO_INTERACTION: 1
+2026-08-21T02:05:00.0653161Z   COMPOSER_NO_AUDIT: 1
+2026-08-21T02:05:00.0653390Z ##[endgroup]
+2026-08-21T02:05:01.9715441Z npm warn deprecated phin@3.7.1: Package no longer supported. Contact Support at https://www.npmjs.com/support for more info.
+2026-08-21T02:05:02.0251994Z npm warn deprecated har-validator@5.1.5: this library is no longer supported
+2026-08-21T02:05:02.3088740Z npm warn deprecated uuid@3.4.0: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
+2026-08-21T02:05:02.3811144Z npm warn deprecated request@2.88.2: request has been deprecated, see https://github.com/request/request/issues/3142
+2026-08-21T02:05:02.3984023Z npm warn deprecated mkdirp@0.5.1: Legacy versions of mkdirp are no longer supported. Please update to mkdirp 1.x. (Note that the API surface has changed to use Promises in 1.x.)
+2026-08-21T02:05:02.9946966Z npm warn deprecated glob@10.5.0: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+2026-08-21T02:05:04.8327290Z 
+2026-08-21T02:05:04.8328138Z added 381 packages, and audited 382 packages in 5s
+2026-08-21T02:05:04.8328467Z 
+2026-08-21T02:05:04.8329308Z 50 packages are looking for funding
+2026-08-21T02:05:04.8330082Z   run `npm fund` for details
+2026-08-21T02:05:04.8892168Z 
+2026-08-21T02:05:04.8894463Z 28 vulnerabilities (1 low, 10 moderate, 11 high, 6 critical)
+2026-08-21T02:05:04.8894904Z 
+2026-08-21T02:05:04.8895251Z To address issues that do not require attention, run:
+2026-08-21T02:05:04.8895733Z   npm audit fix
+2026-08-21T02:05:04.8895940Z 
+2026-08-21T02:05:04.8896284Z To address all issues (including breaking changes), run:
+2026-08-21T02:05:04.8896805Z   npm audit fix --force
+2026-08-21T02:05:04.8896965Z 
+2026-08-21T02:05:04.8897098Z Run `npm audit` for details.
+2026-08-21T02:05:04.8903697Z npm warn allow-scripts 2 packages have install scripts not yet covered by allowScripts:
+2026-08-21T02:05:04.8904726Z npm warn allow-scripts   esbuild@0.21.5 (postinstall: node install.js)
+2026-08-21T02:05:04.8905397Z npm warn allow-scripts   sharp@0.34.5 (install: node install/check.js || npm run build)
+2026-08-21T02:05:04.8905838Z npm warn allow-scripts
+2026-08-21T02:05:04.8906541Z npm warn allow-scripts Run `npm approve-scripts --allow-scripts-pending` to review, or `npm approve-scripts <pkg>` to allow.
+2026-08-21T02:05:04.9619824Z ##[group]Run npm run check:api-parity
+2026-08-21T02:05:04.9620177Z [36;1mnpm run check:api-parity[0m
+2026-08-21T02:05:04.9666944Z shell: /usr/bin/bash -e {0}
+2026-08-21T02:05:04.9667224Z env:
+2026-08-21T02:05:04.9667459Z   COMPOSER_PROCESS_TIMEOUT: 0
+2026-08-21T02:05:04.9667995Z   COMPOSER_NO_INTERACTION: 1
+2026-08-21T02:05:04.9668282Z   COMPOSER_NO_AUDIT: 1
+2026-08-21T02:05:04.9668519Z ##[endgroup]
+2026-08-21T02:05:05.0701596Z 
+2026-08-21T02:05:05.0702258Z > medisa-personel@0.1.0 check:api-parity
+2026-08-21T02:05:05.0702758Z > node scripts/check-api-parity.mjs
+2026-08-21T02:05:05.0702970Z 
+2026-08-21T02:05:05.6180617Z Warnings (70):
+2026-08-21T02:05:05.6181221Z   [PHP_ONLY] GET /arsiv/personeller
+2026-08-21T02:05:05.6181801Z   [PHP_ONLY] GET /arsiv/personeller/:id
+2026-08-21T02:05:05.6182351Z   [PHP_ONLY] GET /auth/smoke-read
+2026-08-21T02:05:05.6183370Z   [PHP_ONLY] GET /belge-kayitlari/:id/indir — php+mock without client
+2026-08-21T02:05:05.6184359Z   [PHP_ONLY] GET /belge-takip — php+mock without client
+2026-08-21T02:05:05.6184995Z   [PHP_ONLY] GET /bordro-hazirlik/adaylar/:id
+2026-08-21T02:05:05.6185889Z   [PHP_ONLY] GET /bordro-hazirlik/devirler/sablon.csv — php+mock without client
+2026-08-21T02:05:05.6186724Z   [PHP_ONLY] GET /bordro-hazirlik/readiness/export.csv — php+mock without client
+2026-08-21T02:05:05.6187366Z   [CLIENT_AND_PHP_NO_DEMO] GET /disiplin-vakalar — demo and e2e mock missing
+2026-08-21T02:05:05.6188387Z   [CLIENT_AND_PHP_NO_DEMO] GET /disiplin-vakalar/:id — demo and e2e mock missing
+2026-08-21T02:05:05.6189346Z   [PHP_ONLY] GET /ek-odeme-kesinti/:id — allowlisted:php_external_or_ops
+2026-08-21T02:05:05.6190158Z   [PHP_ONLY] GET /health — allowlisted:php_external_or_ops
+2026-08-21T02:05:05.6190926Z   [CLIENT_AND_PHP_NO_DEMO] GET /legal-holdlar — demo and e2e mock missing
+2026-08-21T02:05:05.6191555Z   [PHP_ONLY] GET /maas-hesaplama/sgk-sonuclari/export.csv — php+mock without client
+2026-08-21T02:05:05.6192579Z   [PHP_ONLY] GET /maas-hesaplama/snapshotlar/:id/audit — allowlisted:php_external_or_ops
+2026-08-21T02:05:05.6193930Z   [CLIENT_AND_PHP_NO_DEMO] GET /me — demo and e2e mock missing
+2026-08-21T02:05:05.6194753Z   [CLIENT_AND_PHP_NO_DEMO] GET /me/fazla-calisma — demo and e2e mock missing
+2026-08-21T02:05:05.6195644Z   [CLIENT_AND_PHP_NO_DEMO] GET /me/puantaj — demo and e2e mock missing
+2026-08-21T02:05:05.6196524Z   [CLIENT_AND_PHP_NO_DEMO] GET /me/qr-araliklari — demo and e2e mock missing
+2026-08-21T02:05:05.6197397Z   [CLIENT_AND_PHP_NO_DEMO] GET /me/qr-hareketleri — demo and e2e mock missing
+2026-08-21T02:05:05.6198484Z   [CLIENT_AND_PHP_NO_DEMO] GET /me/yillik-izin-bakiye — demo and e2e mock missing
+2026-08-21T02:05:05.6199500Z   [PHP_ONLY] GET /personeller/:personelId/belge-kayitlari — allowlisted:php_external_or_ops
+2026-08-21T02:05:05.6200507Z   [PHP_ONLY] GET /personeller/import/references.csv — php+mock without client
+2026-08-21T02:05:05.6201085Z   [PHP_ONLY] GET /personeller/import/runs — php+mock without client
+2026-08-21T02:05:05.6201710Z   [PHP_ONLY] GET /personeller/import/runs/:id/evidence.csv — php+mock without client
+2026-08-21T02:05:05.6202323Z   [PHP_ONLY] GET /personeller/import/template.csv — php+mock without client
+2026-08-21T02:05:05.6202967Z   [CLIENT_AND_PHP_NO_DEMO] GET /puantaj-olay-kararlari — demo and e2e mock missing
+2026-08-21T02:05:05.6203680Z   [PHP_ONLY] GET /puantaj/bildirim-etki-adaylari/rapor/export.csv — allowlisted:php_external_or_ops
+2026-08-21T02:05:05.6204210Z   [PHP_ONLY] GET /puantaj/qr-adaylari/:id
+2026-08-21T02:05:05.6204896Z   [CLIENT_AND_PHP_NO_DEMO] GET /puantaj/qr-adaylari/:personelId/:candidateDate/kararlar — demo and e2e mock missing
+2026-08-21T02:05:05.6205603Z   [CLIENT_AND_PHP_NO_DEMO] GET /qr-kiosk/token — demo and e2e mock missing
+2026-08-21T02:05:05.6206132Z   [PHP_ONLY] GET /referans/birimler — php+mock without client
+2026-08-21T02:05:05.6206608Z   [PHP_ONLY] GET /referans/bolumler — php+mock without client
+2026-08-21T02:05:05.6207424Z   [CLIENT_AND_PHP_NO_DEMO] GET /retention/eligibility — demo and e2e mock missing
+2026-08-21T02:05:05.6208192Z   [PHP_ONLY] GET /retention/imha-auditleri
+2026-08-21T02:05:05.6208734Z   [CLIENT_AND_PHP_NO_DEMO] GET /retention/imha-talepleri — demo and e2e mock missing
+2026-08-21T02:05:05.6209218Z   [PHP_ONLY] GET /retention/imha-talepleri/:id/evaluate
+2026-08-21T02:05:05.6209620Z   [PHP_ONLY] GET /sgk-katalog-hazirlik/kaynaklar/:id
+2026-08-21T02:05:05.6210228Z   [CLIENT_AND_PHP_NO_DEMO] GET /sgk-katalog-hazirlik/sirket-politikasi — demo and e2e mock missing
+2026-08-21T02:05:05.6210970Z   [PHP_ONLY] GET /sgk-katalog-hazirlik/sirket-politikasi/sablon.csv — php+mock without client
+2026-08-21T02:05:05.6211430Z   ... +30 more
+2026-08-21T02:05:05.6211563Z 
+2026-08-21T02:05:05.6211691Z API parity gate PASS
+2026-08-21T02:05:05.6211954Z Client endpoints: 241
+2026-08-21T02:05:05.6212237Z PHP routes: 269
+2026-08-21T02:05:05.6212472Z Demo handlers: 219
+2026-08-21T02:05:05.6212710Z E2E handlers: 219
+2026-08-21T02:05:05.6212931Z Known gaps: 0
+2026-08-21T02:05:05.6213163Z Deferred: 0
+2026-08-21T02:05:05.6213377Z Warnings: 70
+2026-08-21T02:05:05.6213587Z Fatal: 0
+2026-08-21T02:05:05.6340663Z ##[group]Run npm run typecheck
+2026-08-21T02:05:05.6340977Z [36;1mnpm run typecheck[0m
+2026-08-21T02:05:05.6382003Z shell: /usr/bin/bash -e {0}
+2026-08-21T02:05:05.6382275Z env:
+2026-08-21T02:05:05.6382484Z   COMPOSER_PROCESS_TIMEOUT: 0
+2026-08-21T02:05:05.6382751Z   COMPOSER_NO_INTERACTION: 1
+2026-08-21T02:05:05.6382996Z   COMPOSER_NO_AUDIT: 1
+2026-08-21T02:05:05.6383223Z ##[endgroup]
+2026-08-21T02:05:05.7358477Z 
+2026-08-21T02:05:05.7359222Z > medisa-personel@0.1.0 typecheck
+2026-08-21T02:05:05.7359786Z > tsc --noEmit
+2026-08-21T02:05:05.7360009Z 
+2026-08-21T02:05:15.5753247Z ##[error]src/features/raporlar/pages/SerbestZamanTakipPage.tsx(63,5): error TS2322: Type 'string' is not assignable to type 'number'.
+2026-08-21T02:05:15.5763991Z ##[error]src/features/raporlar/pages/SerbestZamanTakipPage.tsx(72,7): error TS2322: Type 'string' is not assignable to type 'number'.
+2026-08-21T02:05:15.5767184Z ##[error]src/features/raporlar/pages/SerbestZamanTakipPage.tsx(376,15): error TS2322: Type 'string | number' is not assignable to type 'string'.
+2026-08-21T02:05:15.5769151Z   Type 'number' is not assignable to type 'string'.
+2026-08-21T02:05:15.5770726Z ##[error]src/features/raporlar/pages/SerbestZamanTakipPage.tsx(397,15): error TS2322: Type 'number' is not assignable to type 'string'.
+2026-08-21T02:05:15.5775612Z ##[error]src/features/raporlar/pages/SerbestZamanTakipPage.tsx(399,33): error TS2345: Argument of type '(prev: KullanimFormState) => { dakika: string; aciklama?: string | undefined; personel_id: string | number; event_tarihi: string; }' is not assignable to parameter of type 'SetStateAction<KullanimFormState>'.
+2026-08-21T02:05:15.5779417Z   Type '(prev: KullanimFormState) => { dakika: string; aciklama?: string | undefined; personel_id: string | number; event_tarihi: string; }' is not assignable to type '(prevState: KullanimFormState) => KullanimFormState'.
+2026-08-21T02:05:15.5781676Z     Call signature return types '{ dakika: string; aciklama?: string | undefined; personel_id: string | number; event_tarihi: string; }' and 'KullanimFormState' are incompatible.
+2026-08-21T02:05:15.5782984Z       The types of 'dakika' are incompatible between these types.
+2026-08-21T02:05:15.5783665Z         Type 'string' is not assignable to type 'number'.
+2026-08-21T02:05:15.6304885Z ##[error]Process completed with exit code 2.
+2026-08-21T02:05:15.6425679Z Post job cleanup.
+2026-08-21T02:05:15.7278672Z [command]/usr/bin/git version
+2026-08-21T02:05:15.7353141Z git version 2.55.0
+2026-08-21T02:05:15.7396836Z Temporarily overriding HOME='/home/runner/work/_temp/a1d3b5bb-4a54-4761-9284-f9910175f994' before making global git config changes
+2026-08-21T02:05:15.7398262Z Adding repository directory to the temporary git global config as a safe directory
+2026-08-21T02:05:15.7402976Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/PersonelMedisa/PersonelMedisa
+2026-08-21T02:05:15.7435646Z Removing SSH command configuration
+2026-08-21T02:05:15.7442875Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-08-21T02:05:15.7481208Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-08-21T02:05:15.7749364Z Removing HTTP extra header
+2026-08-21T02:05:15.7756748Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-08-21T02:05:15.7811762Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-08-21T02:05:15.8148536Z Removing includeIf entries pointing to credentials config files
+2026-08-21T02:05:15.8154539Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-08-21T02:05:15.8198488Z includeif.gitdir:/home/runner/work/PersonelMedisa/PersonelMedisa/.git.path
+2026-08-21T02:05:15.8199638Z includeif.gitdir:/home/runner/work/PersonelMedisa/PersonelMedisa/.git/worktrees/*.path
+2026-08-21T02:05:15.8200505Z includeif.gitdir:/github/workspace/.git.path
+2026-08-21T02:05:15.8201178Z includeif.gitdir:/github/workspace/.git/worktrees/*.path
+2026-08-21T02:05:15.8202942Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/home/runner/work/PersonelMedisa/PersonelMedisa/.git.path
+2026-08-21T02:05:15.8233193Z /home/runner/work/_temp/git-credentials-3c683757-9fd5-4ef5-8478-fd381e940a54.config
+2026-08-21T02:05:15.8261433Z [command]/usr/bin/git config --local --unset includeif.gitdir:/home/runner/work/PersonelMedisa/PersonelMedisa/.git.path /home/runner/work/_temp/git-credentials-3c683757-9fd5-4ef5-8478-fd381e940a54.config
+2026-08-21T02:05:15.8296031Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/home/runner/work/PersonelMedisa/PersonelMedisa/.git/worktrees/*.path
+2026-08-21T02:05:15.8328209Z /home/runner/work/_temp/git-credentials-3c683757-9fd5-4ef5-8478-fd381e940a54.config
+2026-08-21T02:05:15.8339595Z [command]/usr/bin/git config --local --unset includeif.gitdir:/home/runner/work/PersonelMedisa/PersonelMedisa/.git/worktrees/*.path /home/runner/work/_temp/git-credentials-3c683757-9fd5-4ef5-8478-fd381e940a54.config
+2026-08-21T02:05:15.8382079Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/github/workspace/.git.path
+2026-08-21T02:05:15.8412179Z /github/runner_temp/git-credentials-3c683757-9fd5-4ef5-8478-fd381e940a54.config
+2026-08-21T02:05:15.8422031Z [command]/usr/bin/git config --local --unset includeif.gitdir:/github/workspace/.git.path /github/runner_temp/git-credentials-3c683757-9fd5-4ef5-8478-fd381e940a54.config
+2026-08-21T02:05:15.8464469Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/github/workspace/.git/worktrees/*.path
+2026-08-21T02:05:15.8491670Z /github/runner_temp/git-credentials-3c683757-9fd5-4ef5-8478-fd381e940a54.config
+2026-08-21T02:05:15.8502680Z [command]/usr/bin/git config --local --unset includeif.gitdir:/github/workspace/.git/worktrees/*.path /github/runner_temp/git-credentials-3c683757-9fd5-4ef5-8478-fd381e940a54.config
+2026-08-21T02:05:15.8542349Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-08-21T02:05:15.8786853Z Removing credentials config '/home/runner/work/_temp/git-credentials-3c683757-9fd5-4ef5-8478-fd381e940a54.config'
+2026-08-21T02:05:15.8935528Z Cleaning up orphan processes

@@ -279,7 +279,8 @@ test.describe("Kayit Surec Pozisyon", () => {
 
     const kayitModal = page.locator(".modal-container--kayit-surec").last();
     await expect(kayitModal.getByRole("heading", { name: /Kayıt ve Süreç/i })).toBeVisible();
-    await expect(kayitModal.getByRole("combobox", { name: "Personel" })).toContainText(/Ayşe Yılmaz/i);
+    await expect(kayitModal.getByTestId("kayit-surec-personel-context")).toContainText(/Ayşe Yılmaz/i);
+    await expect(kayitModal.getByRole("combobox", { name: "Personel" })).toHaveCount(0);
     await kayitModal.getByRole("tab", { name: "Pozisyon" }).click();
     await expect(kayitModal.locator("form.surec-position-form")).toBeVisible();
     await expect(kayitModal.getByRole("combobox", { name: "Departman" })).toContainText(/Döşeme|Doseme/i);
@@ -319,9 +320,10 @@ test.describe("Kayit Surec Pozisyon", () => {
       }
     });
 
-    const personelCombo = kayitModal.getByRole("combobox", { name: "Personel" });
-    await expect(personelCombo).toContainText(/Ayşe Yılmaz/i);
-    await expect(personelCombo).toBeEnabled();
+    const personelChange = kayitModal.getByTestId("kayit-surec-personel-degistir");
+    await expect(kayitModal.getByTestId("kayit-surec-personel-context")).toContainText(/Ayşe Yılmaz/i);
+    await expect(personelChange).toBeEnabled();
+    await expect(kayitModal.getByRole("combobox", { name: "Personel" })).toHaveCount(0);
 
     const pozisyonKaydet = kayitModal.getByTestId("kayit-modal-footer-primary");
     await expect(pozisyonKaydet).toBeEnabled({ timeout: 5000 });
@@ -331,10 +333,10 @@ test.describe("Kayit Surec Pozisyon", () => {
     const postSurecPromise = page.waitForResponse(isPozisyonSurecPost);
     await pozisyonKaydet.click();
 
-    await expect(personelCombo).toBeDisabled();
+    await expect(personelChange).toBeDisabled();
     await expect(pozisyonKaydet).toBeDisabled();
-    await expect(personelCombo).toContainText(/Ayşe Yılmaz/i);
-    await personelCombo.click({ force: true });
+    await expect(kayitModal.getByTestId("kayit-surec-personel-context")).toContainText(/Ayşe Yılmaz/i);
+    await personelChange.click({ force: true });
     await expect(kayitModal.getByRole("listbox", { name: "Personel listesi" })).toHaveCount(0);
     await expect(kayitModal.getByRole("option", { name: /Mehmet Kaya/i })).toHaveCount(0);
 
@@ -342,8 +344,8 @@ test.describe("Kayit Surec Pozisyon", () => {
     expect(putResp.ok()).toBe(true);
     expect(postResp.ok()).toBe(true);
 
-    await expect(personelCombo).toBeEnabled({ timeout: 5000 });
-    await expect(personelCombo).toContainText(/Ayşe Yılmaz/i);
+    await expect(personelChange).toBeEnabled({ timeout: 5000 });
+    await expect(kayitModal.getByTestId("kayit-surec-personel-context")).toContainText(/Ayşe Yılmaz/i);
     await expect(kayitModal.getByRole("combobox", { name: "Unvan" })).toContainText("Üretim Müdürü");
     expect(putCount).toBe(1);
     expect(postCount).toBe(1);

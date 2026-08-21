@@ -38,7 +38,12 @@ function todayYmd(): string {
 
 const KULLANIM_FORM_ID = "serbest-zaman-kullanim-form";
 
-type KullanimFormState = Omit<PostSerbestZamanKullanimPayload, "islem_anahtari">;
+type KullanimFormState = {
+  personel_id: string;
+  event_tarihi: string;
+  dakika: string;
+  aciklama?: string;
+};
 
 export function SerbestZamanTakipPage() {
   const [referansTarih, setReferansTarih] = useState(todayYmd);
@@ -122,10 +127,18 @@ aciklama: "Serbest zaman kullanımı."
       setSubmitError(null);
 
       try {
-        await postSerbestZamanKullanim({
+        const payload: PostSerbestZamanKullanimPayload = {
           ...kullanimForm,
+          personel_id: Number(kullanimForm.personel_id),
+          dakika: Number(kullanimForm.dakika),
           islem_anahtari: crypto.randomUUID()
-        });
+        };
+
+        if (!payload.personel_id || !payload.dakika) {
+          throw new Error("Personel ID ve Dakika alanları zorunludur.");
+        }
+
+        await postSerbestZamanKullanim(payload);
         closeKullanimModal();
         // Listeyi yenilemek için load fonksiyonunu çağır.
         await load(1);

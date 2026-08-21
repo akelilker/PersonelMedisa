@@ -38,7 +38,8 @@
   z-index: 0;
 }
 
-body:not(.app-home-route):not(.login-page):not(.admin-report-page) #app-footer {
+/* Top divider: border-top + hairline highlight (Taşıt style-core #app-footer). Home included. */
+body:not(.login-page):not(.admin-report-page) #app-footer {
   border-top: 1px solid var(--footer-top-border);
   box-shadow: 0 -1px 0 var(--footer-top-highlight), var(--footer-red-glow);
 }
@@ -137,9 +138,13 @@ body:not(.app-home-route):not(.login-page):not(.admin-report-page) #app-footer {
 }
 
 @media (min-width: 769px) {
-  body:not(.app-home-route):not(.login-page):not(.admin-report-page) #app-footer {
+  body:not(.login-page):not(.admin-report-page) #app-footer {
     border-top: 1px solid var(--footer-top-border);
+    border-top-color: rgba(156, 166, 180, 0.68);
     border-left: 0.6px solid var(--footer-side-border);
     border-right: 0.6px solid var(--footer-side-border);
+    box-shadow:
+      0 -1px 0 rgba(235, 240, 248, 0.22),
+      var(--footer-red-glow);
   }
 }

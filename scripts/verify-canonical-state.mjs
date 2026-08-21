@@ -1,26 +1,22 @@
-import fs from "fs/promises";
-import path from "path";
+import fs from 'fs/promises';
+import path from 'path';
+
+// STRICT FAIL-CLOSED SCRIPT
+// Herhangi bir dosya okunamazsa, parse edilemezse veya değerler eşleşmezse non-zero exit verir.
 
 const ANSI_RED = "\x1b[31m";
 const ANSI_GREEN = "\x1b[32m";
-const ANSI_YELLOW = "\x1b[33m";
 const ANSI_RESET = "\x1b[0m";
 
 let hasError = false;
 
 function reportError(checker, message) {
-  console.error(`${ANSI_RED}❌ [${checker}] HATA: ${message}${ANSI_RESET}`);
+  console.error(`${ANSI_RED}[FAIL] ${checker}: ${message}${ANSI_RESET}`);
   hasError = true;
 }
 
 function reportSuccess(checker, message) {
-  console.log(`${ANSI_GREEN}✅ [${checker}] BAŞARILI: ${message}${ANSI_RESET}`);
-}
-
-function normalizeVersion(versionStr) {
-    if (versionStr === null || versionStr === undefined) return null;
-    const padded = String(versionStr).padStart(3, '0');
-    return /^\d{3}$/.test(padded) ? padded : null;
+  console.log(`${ANSI_GREEN}[PASS] ${checker}: ${message}${ANSI_RESET}`);
 }
 
 async function getLatestFilesystemMigration() {
@@ -36,64 +32,49 @@ async function getLatestFilesystemMigration() {
       .filter((num) => num > 0);
 
     if (versions.length === 0) {
-      reportError(checker, "api/migrations/ içinde hiçbir migration dosyası bulunamadı.");
+      reportError(checker, "api/migrations/ içinde migration dosyası bulunamadı.");
       return null;
     }
     const maxVersion = Math.max(...versions);
-    const normalized = normalizeVersion(maxVersion);
-    if (!normalized) {
-        reportError(checker, `Geçersiz migration versiyonu bulundu: ${maxVersion}`);
-        return null;
-    }
-    reportSuccess(checker, `En son migration versiyonu: ${normalized}`);
-    return normalized;
+    const paddedVersion = String(maxVersion).padStart(3, '0');
+    reportSuccess(checker, `En son migration: ${paddedVersion}`);
+    return paddedVersion;
   } catch (error) {
-    reportError(checker, `Migration dosyaları okunurken hata oluştu: ${error.message}`);
+    reportError(checker, `Okuma hatası: ${error.message}`);
     return null;
   }
 }
 
-async function parseDocVersion(filePath, type) {
-    const checker = `DOCS:${path.basename(filePath)}`;
-    try {
-        const fullPath = path.resolve(process.cwd(), filePath);
-        const content = await fs.readFile(fullPath, "utf-8");
-        const regex = new RegExp(`^${type}:\\s*(\\d+)`, "im");
-        const match = content.match(regex);
+async function parseDocVersion(filePath, keyName) {
+  const checker = `DOCS:${path.basename(filePath)} (${keyName})`;
+  try {
+    const fullPath = path.resolve(process.cwd(), filePath);
+    const content = await fs.readFile(fullPath, "utf-8");
+    
+    // Exact match arıyoruz: "CODE_MIGRATION_TIP: 070" vb.
+    const regex = new RegExp(`^${keyName}:\\s*(\\d{3})$`, "im");
+    const match = content.match(regex);
 
-        if (!match || !match[1]) {
-            reportError(checker, `'${type}' tipi için versiyon bilgisi bulunamadı.`);
-            return null;
-        }
-
-        const version = normalizeVersion(match[1]);
-        if (!version) {
-            reportError(checker, `'${type}' tipi için geçerli bir versiyon numarası bulunamadı: "${match[1]}"`);
-            return null;
-        }
-        reportSuccess(checker, `'${type}' tipi için bulunan versiyon: ${version}`);
-        return version;
-
-    } catch (error) {
-        if (error.code === 'ENOENT') {
-            reportError(checker, "Dosya bulunamadı. Bu dosyanın varlığı zorunludur.");
-        } else {
-            reportError(checker, `Dosya okunurken hata: ${error.message}`);
-        }
-        return null;
+    if (!match || !match[1]) {
+      reportError(checker, `Değer bulunamadı veya '000' formatında değil.`);
+      return null;
     }
+
+    const version = match[1];
+    reportSuccess(checker, `Okunan versiyon: ${version}`);
+    return version;
+
+  } catch (error) {
+    reportError(checker, `Dosya okunamadı/bulunamadı: ${error.message}`);
+    return null;
+  }
 }
 
-
 async function main() {
-  console.log("Proje durumu senkronizasyon kontrolü başlıyor...\n");
+  console.log("Canonical State Verification Başlıyor...\n");
 
-  const codeMigrationTipFs = await getLatestFilesystemMigration();
-  if (!codeMigrationTipFs) {
-    process.exit(1);
-  }
-
-  console.log("\n--- Canonical Doküman Kontrolleri ---");
+  const fsMigrationTip = await getLatestFilesystemMigration();
+  
   const registryPath = "docs/guncel/110-master-closure-gap-registry.md";
   const currentStatePath = "CURRENT_STATE.md";
 
@@ -103,47 +84,52 @@ async function main() {
   const currentStateCodeTip = await parseDocVersion(currentStatePath, "CODE_MIGRATION_TIP");
   const currentStateProdTip = await parseDocVersion(currentStatePath, "PRODUCTION_MIGRATION_TIP");
 
-  if ([registryCodeTip, registryProdTip, currentStateCodeTip, currentStateProdTip].includes(null)) {
-    hasError = true;
-  } else {
-    console.log("\n--- Mantıksal Tutarlılık Kontrolleri ---");
-    // Invariant 1: Dokümanlar kendi içinde ve birbiriyle tutarlı olmalı.
-    if (registryCodeTip !== currentStateCodeTip) {
-      reportError("TUTARLILIK", `Registry CODE_TIP (${registryCodeTip}) ile CURRENT_STATE CODE_TIP (${currentStateCodeTip}) çelişiyor.`);
-    } else {
-      reportSuccess("TUTARLILIK", `CODE_TIP dokümanlar arası tutarlı: ${registryCodeTip}`);
-    }
-    if (registryProdTip !== currentStateProdTip) {
-      reportError("TUTARLILIK", `Registry PROD_TIP (${registryProdTip}) ile CURRENT_STATE PROD_TIP (${currentStateProdTip}) çelişiyor.`);
-    } else {
-      reportSuccess("TUTARLILIK", `PROD_TIP dokümanlar arası tutarlı: ${registryProdTip}`);
-    }
-
-    // Invariant 2: Dokümanlardaki CODE_TIP, dosya sistemindeki en son migration ile eşleşmeli.
-    if (currentStateCodeTip !== codeMigrationTipFs) {
-        reportError("CODE_SYNC", `CURRENT_STATE CODE_TIP (${currentStateCodeTip}), dosya sistemindeki en son migration (${codeMigrationTipFs}) ile eşleşmiyor.`);
-    } else {
-        reportSuccess("CODE_SYNC", "Dokümanlardaki CODE_TIP, dosya sistemi ile senkronize.");
-    }
-
-    // Invariant 3: PRODUCTION_TIP, CODE_TIP'ten büyük olamaz.
-    if (parseInt(currentStateProdTip, 10) > parseInt(currentStateCodeTip, 10)) {
-        reportError("MANTIK", `PRODUCTION_TIP (${currentStateProdTip}), CODE_TIP'ten (${currentStateCodeTip}) büyük olamaz.`);
-    } else {
-        reportSuccess("MANTIK", "PRODUCTION_TIP <= CODE_TIP kuralı sağlanıyor.");
-    }
+  // Eğer değerlerden biri null ise, eksik/okunamamış demektir (Fail-Closed)
+  if ([fsMigrationTip, registryCodeTip, registryProdTip, currentStateCodeTip, currentStateProdTip].includes(null)) {
+    console.error(`\n${ANSI_RED}KRİTİK HATA: Okunamayan canonical dosyalar var.${ANSI_RESET}`);
+    process.exit(1);
   }
 
+  console.log("\n--- Invariant Kontrolleri ---");
+
+  // 1. fs_latest == CURRENT_STATE.CODE == REGISTRY.CODE
+  if (fsMigrationTip !== currentStateCodeTip) {
+    reportError("CODE_SYNC", `FS Tip (${fsMigrationTip}) != CURRENT_STATE CODE (${currentStateCodeTip})`);
+  } else {
+    reportSuccess("CODE_SYNC", "FS Tip == CURRENT_STATE CODE");
+  }
+
+  if (fsMigrationTip !== registryCodeTip) {
+    reportError("CODE_SYNC", `FS Tip (${fsMigrationTip}) != REGISTRY CODE (${registryCodeTip})`);
+  } else {
+    reportSuccess("CODE_SYNC", "FS Tip == REGISTRY CODE");
+  }
+
+  // 2. CURRENT_STATE.PROD == REGISTRY.PROD
+  if (currentStateProdTip !== registryProdTip) {
+    reportError("PROD_SYNC", `CURRENT_STATE PROD (${currentStateProdTip}) != REGISTRY PROD (${registryProdTip})`);
+  } else {
+    reportSuccess("PROD_SYNC", "CURRENT_STATE PROD == REGISTRY PROD");
+  }
+
+  // 3. PROD <= CODE
+  const prodVal = parseInt(currentStateProdTip, 10);
+  const codeVal = parseInt(currentStateCodeTip, 10);
+  if (prodVal > codeVal) {
+    reportError("INVARIANT", `PROD TIP (${prodVal}) > CODE TIP (${codeVal}) olamaz.`);
+  } else {
+    reportSuccess("INVARIANT", "PROD TIP <= CODE TIP");
+  }
 
   if (hasError) {
-    console.error(`\n${ANSI_RED}‼️  Senkronizasyon kontrolü BAŞARISIZ oldu. Lütfen yukarıdaki hataları düzeltin.${ANSI_RESET}`);
+    console.error(`\n${ANSI_RED}‼️  Canonical state doğrulama BAŞARISIZ.${ANSI_RESET}`);
     process.exit(1);
   } else {
-    console.log(`\n${ANSI_GREEN}🎉 Tüm durum dosyaları ve migration'lar birbiriyle tutarlı.${ANSI_RESET}`);
+    console.log(`\n${ANSI_GREEN}🎉 Tüm durum dosyaları TUTARLI ve GEÇERLİ.${ANSI_RESET}`);
   }
 }
 
 main().catch(err => {
-    console.error("Beklenmedik bir hata oluştu:", err);
-    process.exit(1);
+  console.error("Beklenmeyen hata:", err);
+  process.exit(1);
 });

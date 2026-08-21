@@ -50,8 +50,11 @@
   --border-subtle: var(--border-default);
   --hero-gradient-start: #060d16;
   --hero-gradient-end: #08090c;
+  /* Hero main title: crisp chrome (Taşıt parity). Wider/softer premium gradient stays for menu cards. */
+  --hero-title-gradient: linear-gradient(to bottom, #c6d2dc 0%, #f4f8fb 36%, #aab8c5 56%, #dce5ec 100%);
   --premium-title-gradient: linear-gradient(to bottom, #ccd7e1 0%, #f4f8fb 38%, #adbdca 56%, #e2ebf2 100%);
-  --premium-title-shadow: 0 1px 1px rgba(0, 0, 0, 0.26), 0 0 7px rgba(214, 224, 232, 0.22);
+  /* Tighter halo than prior 7px/0.22 — depth without letter-edge haze (menu resting). */
+  --premium-title-shadow: 0 1px 1px rgba(0, 0, 0, 0.28), 0 0 4px rgba(214, 224, 232, 0.14);
   --premium-title-weight: 700;
   --premium-title-letter-spacing: 0.085em;
   --green: var(--success);

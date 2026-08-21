@@ -63,8 +63,10 @@
   font-weight: 700;
   line-height: 1.1;
   letter-spacing: 0.01em;
-  color: rgba(238, 246, 255, 0.96);
+  color: var(--text-inverse);
   -webkit-font-smoothing: antialiased;
+  text-shadow: none;
+  filter: none;
   font-size: clamp(8px, 1.55vw, 10px);
 }
 
@@ -114,15 +116,18 @@
   padding: 0 4px;
   line-height: 1.1;
   transform: none;
-  color: var(--modal-title-color);
-  background: var(--premium-title-gradient);
-  background-size: 100% 180%;
-  background-position: 50% 54%;
+  color: transparent;
+  background: var(--hero-title-gradient);
+  background-size: 100% 100%;
+  background-position: 50% 50%;
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
-  text-shadow: var(--premium-title-shadow);
+  /* Taşıt hero: no text-shadow — clipped metallic stays sharp (shadow = edge haze). */
+  text-shadow: none;
   filter: none;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 .hero-spacer {
@@ -231,6 +236,13 @@ body.login-page .hero .animated-line {
     column-gap: var(--space-2);
   }
 
+  /* Session hero: equal side tracks keep title centered; 76px meta overflows
+     without inflating the grid track. 48/48 avoids user↔accent-line collision. */
+  .hero.hero-with-session {
+    --hero-logo-width: 48px;
+    --hero-spacer-width: 48px;
+  }
+
   .hero h1 {
     font-size: clamp(18.5px, 5.15vw, 23px);
     letter-spacing: 1.8px;
@@ -247,22 +259,35 @@ body.login-page .hero .animated-line {
   }
 
   .hero-with-session .hero-logo {
+    overflow: visible;
+    width: var(--hero-logo-width);
     flex: 0 0 var(--hero-logo-width);
     gap: 3px;
     align-self: center;
+    align-items: center;
     transform: translate(-1px, 1px);
+    margin-right: 0;
+  }
+
+  .hero-with-session .hero-logo picture {
+    width: 43px;
+    max-width: 43px;
+    flex-shrink: 0;
   }
 
   .hero-with-session .hero-session-meta {
-    width: 82px;
-    max-width: 82px;
-    transform: translate(13px, 2px);
+    width: 76px;
+    max-width: 76px;
+    align-self: flex-start;
+    overflow: visible;
+    transform: none;
   }
 
   .hero-with-session .hero-session-user {
     font-size: 9.5px;
     line-height: 1.06;
     max-height: 1.06em;
+    max-width: 76px;
   }
 
   .hero-with-session .hero-session-sube {
@@ -281,6 +306,13 @@ body.login-page .hero .animated-line {
 
   .animated-line {
     width: 88%;
+  }
+
+  /* Session hero: keep line as wide as possible without intersecting
+     the overflow-visible 76px username meta (48/48 grid).
+     Measured: 84–80% still collide on 320; 79% clears 390/360/320. */
+  .hero.hero-with-session .animated-line {
+    width: 79%;
   }
 
   body.login-page .hero .animated-line {

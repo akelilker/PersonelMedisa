@@ -582,7 +582,10 @@ export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeade
           </svg>
         </button>
 
-        <div id="settings-menu" className={`settings-dropdown${isSettingsOpen ? " open" : ""}`}>
+        <div
+          id="settings-menu"
+          className={`settings-dropdown settings-menu-dropdown${isSettingsOpen ? " open" : ""}`}
+        >
           {canViewYonetimPanel ? (
             <button
               type="button"

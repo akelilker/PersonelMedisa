@@ -145,8 +145,9 @@ body {
     min-height: 44px;
   }
 
-  /* Shell-safe overlay widths (avoid full-viewport page scroll). */
-  .settings-dropdown,
+  /* Shell-safe overlay widths (avoid full-viewport page scroll).
+   * settings-menu-dropdown owns viewport caps in dropdown.css. */
+  .settings-dropdown:not(.settings-menu-dropdown),
   .modules-dropdown,
   .notifications-dropdown {
     width: min(300px, calc(var(--app-shell-max-width) - 28px));
@@ -158,10 +159,12 @@ body {
     padding-right: max(12px, env(safe-area-inset-right, 0px));
   }
 
-  /* Hero session chip: keep inside shell on narrow phones */
+  /* Hero session chip: wider than compact logo track; ellipsis only for very long names */
   .hero-with-session .hero-session-meta {
     transform: none;
-    max-width: min(82px, 28%);
+    width: 76px;
+    max-width: 76px;
+    overflow: visible;
   }
 
   /* Yönetim dense card grids: readable on phone */

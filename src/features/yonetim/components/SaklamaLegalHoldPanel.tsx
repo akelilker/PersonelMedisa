@@ -152,7 +152,7 @@ export function SaklamaLegalHoldPanel() {
 
   return (
     <section className="yonetim-list-surface" aria-label="Saklama / Legal Hold" data-testid="yonetim-section-saklama">
-      <p className="yonetim-success" style={{ marginBottom: "0.75rem" }}>
+      <p className="yonetim-success yonetim-success--mb">
         Medisa saklama politikası — minimum 10 takvim yılı. Otomatik silme yoktur.
       </p>
 
@@ -161,7 +161,7 @@ export function SaklamaLegalHoldPanel() {
       {!isLoading && successMessage ? <p className="yonetim-success">{successMessage}</p> : null}
 
       {!isLoading ? (
-        <div className="yonetim-form-stack" style={{ gap: "1.5rem" }}>
+        <div className="yonetim-form-stack yonetim-form-stack--gap-lg">
           {canManageHold ? (
             <form className="form-field-grid" onSubmit={handleCreateHold}>
               <h3>Legal hold oluştur</h3>
@@ -204,8 +204,7 @@ export function SaklamaLegalHoldPanel() {
                   {canManageHold ? (
                     <button
                       type="button"
-                      className="universal-btn-aux"
-                      style={{ marginLeft: "0.5rem" }}
+                      className="universal-btn-aux yonetim-inline-action-gap"
                       onClick={() => void handleRelease(hold.id)}
                     >
                       Serbest bırak
@@ -295,16 +294,14 @@ export function SaklamaLegalHoldPanel() {
                     <>
                       <button
                         type="button"
-                        className="universal-btn-aux"
-                        style={{ marginLeft: "0.5rem" }}
+                        className="universal-btn-aux yonetim-inline-action-gap"
                         onClick={() => void handleApprove(talep.id, true)}
                       >
                         Onayla
                       </button>
                       <button
                         type="button"
-                        className="universal-btn-aux"
-                        style={{ marginLeft: "0.25rem" }}
+                        className="universal-btn-aux yonetim-inline-action-gap-sm"
                         onClick={() => void handleApprove(talep.id, false)}
                       >
                         Reddet

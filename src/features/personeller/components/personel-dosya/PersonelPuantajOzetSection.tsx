@@ -194,7 +194,7 @@ function PersonelRevizyonCorrectionPanel({
             }
           />
 
-          <div className="universal-btn-group" style={{ marginBottom: "0.75rem", flexWrap: "wrap" }}>
+          <div className="universal-btn-group universal-btn-group--mb-sm universal-btn-group--wrap personel-puantaj-ozet-actions">
             <Link
               className="universal-btn-aux"
               to={`/haftalik-kapanis/revizyonlar?personel_id=${personelId}`}

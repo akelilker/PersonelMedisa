@@ -22,7 +22,7 @@
 }
 
 .universal-back-btn:hover {
-  color: #ffffff;
+  color: var(--text-inverse);
 }
 
 .universal-back-label {
@@ -38,5 +38,5 @@
 }
 
 .universal-back-btn:hover .back-icon-svg {
-  color: #ffffff;
+  color: var(--text-inverse);
 }

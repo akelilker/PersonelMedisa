@@ -53,7 +53,7 @@
 }
 
 .yonetim-header-row h2 {
-  color: #f8fbff;
+  color: var(--text-primary);
   font-size: clamp(1.2rem, 3vw, 1.7rem);
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -92,14 +92,14 @@
 }
 
 .yonetim-toolbar-back:hover {
-  color: #ffffff;
+  color: var(--text-inverse);
 }
 
 .yonetim-toolbar-meta {
   display: inline-flex;
   flex-wrap: wrap;
   justify-content: flex-end;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .yonetim-toolbar-pill {
@@ -147,18 +147,18 @@
 }
 
 .yonetim-tab-btn:hover {
-  color: #ffffff;
+  color: var(--text-inverse);
 }
 
 .yonetim-tab-btn.is-active {
   border-bottom-color: rgba(var(--theme-color-rgb), 0.92);
-  color: #ffffff;
+  color: var(--text-inverse);
 }
 
 .yonetim-panel-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
-  gap: 16px;
+  gap: var(--space-4);
   align-items: start;
 }
 
@@ -253,7 +253,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .yonetim-view-toggle {
@@ -276,7 +276,7 @@
   border: none;
   background: transparent;
   box-shadow: none;
-  color: #ffffff;
+  color: var(--text-inverse);
   filter: brightness(1.12);
   transform: scale(1.06);
 }
@@ -314,7 +314,7 @@
 .yonetim-create-link:hover {
   border: none;
   background: transparent;
-  color: #ffffff;
+  color: var(--text-inverse);
   box-shadow: none;
   transform: scale(1.06);
 }
@@ -322,14 +322,14 @@
 .yonetim-section-copy--row {
   display: flex;
   justify-content: space-between;
-  gap: 16px;
+  gap: var(--space-4);
   align-items: flex-start;
 }
 
 .yonetim-form-stack .form-field-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px 14px;
+  gap: var(--space-3) 14px;
 }
 
 .yonetim-form-stack--sube .form-field-grid {
@@ -341,7 +341,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-3);
   min-height: 46px;
 }
 
@@ -355,7 +355,7 @@
 .yonetim-durum-toggle {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .yonetim-durum-btn {
@@ -363,7 +363,7 @@
   min-height: 40px;
   padding: 0 14px;
   border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   background: rgba(10, 14, 22, 0.86);
   color: rgba(244, 246, 250, 0.78);
   font-size: 0.9rem;
@@ -374,19 +374,19 @@
 
 .yonetim-durum-btn:hover {
   border-color: rgba(255, 255, 255, 0.3);
-  color: #ffffff;
+  color: var(--text-inverse);
 }
 
 .yonetim-durum-btn.is-active {
   border-color: rgba(var(--theme-color-rgb), 0.82);
   background: rgba(12, 17, 26, 0.94);
-  color: #ffffff;
+  color: var(--text-inverse);
   box-shadow: inset 0 0 0 1px rgba(var(--theme-color-rgb), 0.24);
 }
 
 .yonetim-departman-section-head {
   display: grid;
-  gap: 4px;
+  gap: var(--space-1);
 }
 
 .yonetim-departman-section-head .yonetim-hint {
@@ -403,11 +403,11 @@
 
 .yonetim-checkbox-section {
   display: grid;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .yonetim-checkbox-title {
-  color: #ffffff;
+  color: var(--text-inverse);
   font-size: 0.95rem;
   font-weight: 700;
 }
@@ -415,24 +415,24 @@
 .yonetim-selection-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .yonetim-kullanici-workspace {
-  gap: 20px;
+  gap: var(--space-5);
 }
 
 .yonetim-workspace-section {
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 12px;
   margin: 0;
-  padding: 16px;
+  padding: var(--space-4);
   display: grid;
   gap: 14px;
 }
 
 .yonetim-workspace-section > legend {
-  color: #ffffff;
+  color: var(--text-inverse);
   font-size: 0.95rem;
   font-weight: 700;
   padding: 0 6px;
@@ -441,21 +441,21 @@
 .yonetim-workspace-panel {
   display: grid;
   gap: 10px;
-  padding: 12px;
-  border-radius: 10px;
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
   background: rgba(255, 255, 255, 0.03);
 }
 
 .yonetim-workspace-panel-title {
   margin: 0;
-  color: #ffffff;
+  color: var(--text-inverse);
   font-size: 0.9rem;
   font-weight: 700;
 }
 
 .yonetim-role-summary-grid {
   display: grid;
-  gap: 12px;
+  gap: var(--space-3);
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
 }
 
@@ -474,14 +474,14 @@
 
 .yonetim-actor-readback {
   display: grid;
-  gap: 8px;
+  gap: var(--space-2);
   margin: 0;
 }
 
 .yonetim-actor-readback > div {
   display: grid;
   grid-template-columns: minmax(120px, 38%) 1fr;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .yonetim-actor-readback dt {
@@ -499,12 +499,12 @@
 .yonetim-actor-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .yonetim-inline-error {
   margin: 0;
-  color: #ffb4b4;
+  color: var(--danger);
   font-size: 0.85rem;
 }
 
@@ -531,7 +531,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-3);
   width: 100%;
   min-height: 52px;
   text-align: left;
@@ -569,7 +569,7 @@
 
 .yonetim-selection-panel {
   display: grid;
-  gap: 12px;
+  gap: var(--space-3);
   padding: 14px;
   border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: 16px;
@@ -578,7 +578,7 @@
 
 .yonetim-form-stack--sube .yonetim-selection-panel {
   gap: 10px;
-  padding: 12px;
+  padding: var(--space-3);
 }
 
 .yonetim-selection-panel-head {
@@ -598,20 +598,20 @@
 }
 
 .yonetim-panel-action:hover {
-  color: #ffffff;
+  color: var(--text-inverse);
 }
 
 .yonetim-selection-pill {
   min-height: 56px;
   padding: 12px 14px;
   border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
   background: rgba(10, 14, 22, 0.86);
   color: rgba(244, 246, 250, 0.88);
   text-align: left;
   cursor: pointer;
   display: grid;
-  gap: 4px;
+  gap: var(--space-1);
   transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
 }
 
@@ -650,20 +650,20 @@
 
 .yonetim-card-grid--users {
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 12px;
+  gap: var(--space-3);
   align-content: start;
   justify-items: stretch;
 }
 
 .yonetim-card-grid--branches {
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .yonetim-list-surface .yonetim-list-table-wrap {
   overflow: auto;
   border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
   background: rgba(9, 13, 22, 0.86);
 }
 
@@ -715,17 +715,17 @@
 }
 
 .yonetim-list-surface .yonetim-list-table-cell-strong {
-  color: #ffffff;
+  color: var(--text-inverse);
   font-weight: 700;
 }
 
 .yonetim-entity-card {
   display: grid;
-  gap: 8px;
+  gap: var(--space-2);
   min-height: 100%;
   padding: 16px 18px;
   border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
   background: rgba(9, 13, 22, 0.86);
 }
 
@@ -760,7 +760,7 @@
 }
 
 .yonetim-entity-card--branch-preview .yonetim-card-meta {
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .yonetim-entity-card--branch-preview .yonetim-card-meta strong {
@@ -855,7 +855,7 @@
 }
 
 .yonetim-card-meta strong {
-  color: #ffffff;
+  color: var(--text-inverse);
   font-size: 1.02rem;
 }
 
@@ -886,7 +886,7 @@
 }
 
 .yonetim-back-link:hover {
-  color: #ffffff;
+  color: var(--text-inverse);
 }
 
 .yonetim-inline-add-row {
@@ -943,7 +943,7 @@
   border: 1px solid rgba(52, 211, 153, 0.36);
   border-radius: 12px;
   background: rgba(16, 77, 54, 0.28);
-  color: #dbffea;
+  color: var(--success);
 }
 
 .yonetim-inline-error {
@@ -952,7 +952,7 @@
   border: 1px solid rgba(239, 68, 68, 0.45);
   border-radius: 12px;
   background: rgba(127, 29, 29, 0.28);
-  color: #ffe4e6;
+  color: var(--danger);
 }
 
 .form-actions-row--sube-delete {
@@ -962,7 +962,7 @@
 .yonetim-summary-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .yonetim-summary-card {
@@ -975,7 +975,7 @@
 }
 
 .yonetim-summary-card strong {
-  color: #ffffff;
+  color: var(--text-inverse);
   font-size: 1.14rem;
 }
 
@@ -1000,13 +1000,13 @@
 
 .yonetim-first-login-badge--pending {
   border-color: rgba(234, 179, 8, 0.42);
-  color: #f6e7a4;
+  color: var(--warning);
   background: rgba(234, 179, 8, 0.12);
 }
 
 .yonetim-first-login-badge--complete {
   border-color: rgba(74, 222, 128, 0.36);
-  color: #b7f0c8;
+  color: var(--success);
   background: rgba(74, 222, 128, 0.1);
 }
 
@@ -1017,13 +1017,13 @@
 .aylik-ozet-page .form-filter-panel {
   display: grid;
   gap: 14px;
-  padding: 16px;
+  padding: var(--space-4);
 }
 
 .aylik-ozet-page .form-field-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px 14px;
+  gap: var(--space-3) 14px;
 }
 
 @media (max-width: 720px) {
@@ -1068,4 +1068,21 @@
   .yonetim-card-grid--users {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
+}
+
+/* PACK V1 static presentation owners (inline style cleanup) */
+.yonetim-success--mb {
+  margin-bottom: var(--space-3);
+}
+
+.yonetim-form-stack--gap-lg {
+  gap: 24px;
+}
+
+.yonetim-inline-action-gap {
+  margin-left: var(--space-2);
+}
+
+.yonetim-inline-action-gap-sm {
+  margin-left: var(--space-1);
 }

@@ -2,11 +2,14 @@
   --bg-app: #080d16;
   --bg-surface: #0d131f;
   --bg-surface-elevated: #151515;
+  --bg-panel: #10151f;
+  --bg-field: #0f1418;
   --border-default: rgba(255, 255, 255, 0.3);
   --border-strong: rgba(184, 192, 201, 0.77);
   --text-primary: #f2f5f7;
   --text-secondary: #c1cbd4;
   --text-muted: #8d99a5;
+  --text-inverse: #ffffff;
   --brand-red: #e00000;
   --brand-red-hover: #f01a1a;
   --brand-red-active: #b00000;
@@ -51,6 +54,7 @@
   --premium-title-weight: 700;
   --premium-title-letter-spacing: 0.085em;
   --green: var(--success);
+  --orange: var(--warning);
   --red: var(--danger);
 }
 

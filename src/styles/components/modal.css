@@ -60,7 +60,7 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
-  column-gap: 12px;
+  column-gap: var(--space-3);
   background: var(--modal-header-red-gradient);
   border-top-left-radius: inherit;
   border-top-right-radius: inherit;
@@ -131,7 +131,7 @@
 
 .modal-footer .app-action-dialog-actions [data-modal-initial-focus="true"]:focus {
   border-color: rgba(var(--theme-color-rgb), 0.65);
-  color: #fff;
+  color: var(--text-inverse);
   background: rgba(var(--theme-color-rgb), 0.12);
   box-shadow: inset 0 0 0 1px rgba(var(--theme-color-rgb), 0.2);
 }
@@ -184,7 +184,7 @@
   justify-self: start;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   max-width: 100%;
   padding: 0;
   border: none;
@@ -212,7 +212,7 @@
 }
 
 .modal-home-btn:hover {
-  color: #ffffff;
+  color: var(--text-inverse);
   transform: scale(1.02);
 }
 
@@ -224,7 +224,7 @@
 }
 
 .modal-back-btn:hover {
-  color: #ffffff;
+  color: var(--text-inverse);
 }
 
 .modal-back-btn-icon {
@@ -260,7 +260,7 @@
 }
 
 .modal-close-btn:hover {
-  color: #ffffff;
+  color: var(--text-inverse);
   transform: scale(1.02);
 }
 

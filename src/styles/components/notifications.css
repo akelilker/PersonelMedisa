@@ -73,7 +73,7 @@
   text-align: left;
   white-space: normal;
   border: 1.15px solid rgba(255, 255, 255, 0.28);
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
   background: rgba(7, 12, 20, 0.94);
   box-shadow:
     0 6px 12px rgba(0, 0, 0, 0.16),
@@ -121,7 +121,7 @@
 
 .notifications-dropdown .notif-line1 {
   width: 100%;
-  color: #ffffff;
+  color: var(--text-inverse);
   font-size: 13px;
   font-weight: 600;
   line-height: 1.35;
@@ -140,7 +140,7 @@
 }
 
 .notifications-dropdown .notification-item:hover .notif-line1 {
-  color: #ffffff;
+  color: var(--text-inverse);
 }
 
 .notifications-dropdown .notification-item:hover .notif-line2 {

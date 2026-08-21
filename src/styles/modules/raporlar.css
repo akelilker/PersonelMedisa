@@ -32,7 +32,7 @@
 .raporlar-page-lead {
   margin: 0;
   font-size: 0.9rem;
-  color: var(--text-muted, #5c5c5c);
+  color: var(--text-muted);
   line-height: 1.45;
 }
 
@@ -45,7 +45,7 @@
   margin: 0;
   max-width: 42rem;
   font-size: 0.9rem;
-  color: var(--text-muted, #5c5c5c);
+  color: var(--text-muted);
   line-height: 1.45;
 }
 
@@ -91,7 +91,7 @@
   display: grid;
   gap: var(--space-3);
   padding: var(--space-4);
-  background: var(--surface-elevated, var(--surface, #fafafa));
+  background: var(--bg-surface-elevated);
   border: 1px solid var(--line-soft);
   border-radius: var(--radius-md);
 }
@@ -119,7 +119,7 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: var(--text-muted, #5c5c5c);
+  color: var(--text-muted);
 }
 
 .raporlar-panel-hint,
@@ -152,7 +152,7 @@
 .raporlar-result-meta {
   margin: 0;
   font-size: 0.875rem;
-  color: var(--text-muted, #5c5c5c);
+  color: var(--text-muted);
 }
 
 .raporlar-result-heading {
@@ -173,7 +173,7 @@
 .raporlar-table-wrap--premium {
   border-radius: var(--radius-sm);
   border: 1px solid var(--line-soft);
-  background: #fff;
+  background: var(--text-inverse);
 }
 
 .raporlar-table--premium th {
@@ -181,7 +181,7 @@
   text-transform: uppercase;
   letter-spacing: 0.04em;
   font-weight: 600;
-  color: var(--text-muted, #5c5c5c);
+  color: var(--text-muted);
   background: rgba(0, 0, 0, 0.02);
 }
 
@@ -226,7 +226,7 @@
 }
 
 .raporlar-quick-nav a {
-  color: var(--text-muted, #5c5c5c);
+  color: var(--text-muted);
   text-decoration: none;
 }
 
@@ -266,7 +266,7 @@
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--text-muted, #5c5c5c);
+  color: var(--text-muted);
 }
 
 .raporlar-panel-nav-group-items {
@@ -286,7 +286,7 @@
 
 .raporlar-panel-nav a {
   font-size: 0.9rem;
-  color: var(--text-muted, #5c5c5c);
+  color: var(--text-muted);
   text-decoration: none;
   padding-bottom: 0.25rem;
   border-bottom: 2px solid transparent;
@@ -298,7 +298,7 @@
 .raporlar-panel-nav a.is-active {
   color: var(--text, inherit);
   font-weight: 600;
-  border-bottom-color: var(--accent, #2563eb);
+  border-bottom-color: var(--theme-color);
 }
 
 @media (max-width: 720px) {
@@ -323,7 +323,7 @@
   padding: var(--space-3);
   border-radius: var(--radius-sm);
   border: 1px solid var(--line-soft);
-  background: #fff;
+  background: var(--text-inverse);
 }
 
 .donem-durum-bandi--ready {
@@ -344,7 +344,7 @@
 
 .donem-durum-bandi-meta {
   font-size: 0.85rem;
-  color: var(--text-muted, #5c5c5c);
+  color: var(--text-muted);
 }
 
 .kapanis-severity {
@@ -361,19 +361,19 @@
 }
 
 .kapanis-severity--blocker {
-  color: #c0392b;
+  color: var(--danger);
   border-color: rgba(192, 57, 43, 0.35);
   background: rgba(231, 76, 60, 0.08);
 }
 
 .kapanis-severity--warning {
-  color: #b7791f;
+  color: var(--warning);
   border-color: rgba(243, 156, 18, 0.45);
   background: rgba(243, 156, 18, 0.1);
 }
 
 .kapanis-severity--info {
-  color: var(--text-muted, #5c5c5c);
+  color: var(--text-muted);
   background: rgba(0, 0, 0, 0.03);
 }
 
@@ -396,7 +396,7 @@
   padding: var(--space-3);
   border: 1px solid var(--line-soft);
   border-radius: var(--radius-sm);
-  background: #fff;
+  background: var(--text-inverse);
 }
 
 .kapanis-issue-head {
@@ -413,7 +413,7 @@
 
 .kapanis-issue-message {
   margin: 0.5rem 0 0;
-  color: var(--text-muted, #5c5c5c);
+  color: var(--text-muted);
 }
 
 .kapanis-issue-actions {
@@ -447,4 +447,41 @@
 .etki-adayi-rapor-page {
   display: grid;
   gap: var(--space-3);
+}
+
+/* PACK V1 static presentation owners (inline style cleanup) */
+.hk-close-panel {
+  margin-top: 24px;
+}
+
+.hk-close-scope-fieldset {
+  border: none;
+  padding: 0;
+  margin: var(--space-4) 0 0;
+}
+
+.hk-close-scope-option {
+  display: block;
+  margin-bottom: 0.35rem;
+}
+
+.hk-close-success {
+  margin-top: var(--space-4);
+}
+
+.hk-kaynak-prefill-panel {
+  margin-top: 24px;
+}
+
+.hk-overlay-uyari {
+  margin-top: var(--space-5);
+}
+
+.bordro-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.bordro-mono--sm {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.85em;
 }

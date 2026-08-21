@@ -202,7 +202,7 @@ export function RevizyonTalebiCreatePage() {
 
   return (
     <section className="states-page" data-testid="revizyon-talep-create">
-      <div className="universal-btn-group" style={{ marginBottom: "1rem" }}>
+      <div className="universal-btn-group universal-btn-group--mb">
         <Link className="universal-btn-aux" to="/haftalik-kapanis/revizyonlar">
           Listeye dön
         </Link>

@@ -98,7 +98,7 @@ export function RevizyonMerkeziPage() {
 
   return (
     <section className="states-page" data-testid="revizyon-merkezi-page">
-      <div className="universal-btn-group" style={{ marginBottom: "1rem", flexWrap: "wrap" }}>
+      <div className="universal-btn-group universal-btn-group--mb universal-btn-group--wrap">
         <Link className="universal-btn-aux" to="/haftalik-kapanis">
           Haftalık Kapanış
         </Link>

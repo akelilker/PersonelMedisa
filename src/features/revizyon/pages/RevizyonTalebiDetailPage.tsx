@@ -235,7 +235,7 @@ export function RevizyonTalebiDetailPage() {
 
   return (
     <section className="states-page" data-testid="revizyon-talep-detay">
-      <div className="universal-btn-group" style={{ marginBottom: "1rem" }}>
+      <div className="universal-btn-group universal-btn-group--mb">
         <Link className="universal-btn-aux" to="/haftalik-kapanis/revizyonlar">
           Listeye dön
         </Link>
@@ -373,7 +373,7 @@ export function RevizyonTalebiDetailPage() {
         />
       )}
 
-      <div className="universal-btn-group" style={{ flexWrap: "wrap", gap: "0.5rem" }}>
+      <div className="universal-btn-group universal-btn-group--wrap universal-btn-group--gap-2">
         {showSubmit ? (
           <button
             type="button"

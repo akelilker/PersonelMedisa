@@ -121,7 +121,7 @@ export function HaftalikKapanisPage() {
         <p role="alert">Revizyon Merkezi görüntüleme yetkiniz yok.</p>
       ) : (
         <>
-          <div className="universal-btn-group" style={{ flexWrap: "wrap", gap: "0.75rem" }}>
+          <div className="universal-btn-group universal-btn-group--wrap universal-btn-group--gap-3">
             <Link
               className="universal-btn-save"
               to={
@@ -167,7 +167,7 @@ export function HaftalikKapanisPage() {
           <HaftalikKapanisClosePanel />
 
           {canCreate ? (
-            <div style={{ marginTop: "1.5rem" }} data-testid="hk-kaynak-prefill-panel">
+            <div className="hk-kaynak-prefill-panel" data-testid="hk-kaynak-prefill-panel">
               <h3>Kapalı hafta kaynak satırları</h3>
               <p className="form-hint">
                 Satırdaki “Revizyon Talebi Aç” create formunu personel, hafta ve kaynak ile doldurur.
@@ -263,7 +263,7 @@ export function HaftalikKapanisPage() {
         </>
       )}
 
-      <p className="form-hint" style={{ marginTop: "1.25rem" }} data-testid="hk-overlay-uyari">
+      <p className="form-hint hk-overlay-uyari" data-testid="hk-overlay-uyari">
         Aktif düzeltme kaydı görünürlüğü, rapor satırlarında gerçek katman etkisi anlamına gelmez. Ham
         kapanış kaydı değişmez.
       </p>

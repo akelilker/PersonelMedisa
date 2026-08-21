@@ -798,7 +798,7 @@ export function GunlukPuantajPage() {
         </div>
       ) : null}
 
-      <div className="universal-btn-group" style={{ marginTop: "1rem" }}>
+      <div className="universal-btn-group universal-btn-group--mt">
         {hasPermission("revizyon.view") ? (
           <>
             <Link

@@ -34,7 +34,7 @@
 
 .bildirimler-item-content {
   display: grid;
-  gap: 4px;
+  gap: var(--space-1);
 }
 
 .bildirimler-item p {
@@ -88,7 +88,7 @@
 
 .bildirim-model-card {
   display: grid;
-  gap: 4px;
+  gap: var(--space-1);
   padding: var(--space-2);
   border: 1px solid var(--line-soft);
   border-radius: var(--radius-sm);
@@ -96,7 +96,7 @@
 
 .bildirim-model-label,
 .bildirim-model-note {
-  color: var(--text-muted, #666);
+  color: var(--text-muted);
 }
 
 .bildirim-model-note {
@@ -118,7 +118,7 @@
 
 .bildirim-mutabakat-meta {
   margin: 0;
-  color: var(--text-muted, #666);
+  color: var(--text-muted);
 }
 
 .bildirim-mutabakat-status {
@@ -150,7 +150,7 @@
 
 .bildirim-aylik-hafta-item p {
   margin: 0;
-  color: var(--text-muted, #666);
+  color: var(--text-muted);
   font-size: 12px;
 }
 
@@ -184,7 +184,7 @@
 .bildirim-kayit-senaryosu-btn.is-active {
   border-color: rgba(255, 255, 255, 0.86);
   background: rgba(255, 255, 255, 0.12);
-  color: #ffffff;
+  color: var(--text-inverse);
 }
 
 .bildirim-detay-page {

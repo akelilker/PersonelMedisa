@@ -101,7 +101,7 @@ export function RevizyonCorrectionDetailPage() {
 
   return (
     <section className="states-page" data-testid="revizyon-correction-detay">
-      <div className="universal-btn-group" style={{ marginBottom: "1rem" }}>
+      <div className="universal-btn-group universal-btn-group--mb">
         <Link className="universal-btn-aux" to="/haftalik-kapanis/revizyonlar?gorunum=corrections">
           Listeye dön
         </Link>

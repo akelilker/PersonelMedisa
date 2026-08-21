@@ -776,8 +776,7 @@ export function BordroHazirlikMerkeziPage() {
                 Karar Belge SHA256
                 <input
                   data-testid="bordro-politika-belge-sha256"
-                  className="font-mono"
-                  style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" }}
+                  className="bordro-mono"
                   value={policyBelgeSha256}
                   onChange={(event) => {
                     setPolicyBelgeSha256(event.target.value.trim().toLowerCase());
@@ -803,7 +802,7 @@ export function BordroHazirlikMerkeziPage() {
                 {kararOzeti.gecerlilik_bitis ? ` → ${kararOzeti.gecerlilik_bitis}` : ""}
               </p>
               <p data-testid="bordro-politika-karar-belge-id">Belge ID: {kararOzeti.belge_id ?? "—"}</p>
-              <p data-testid="bordro-politika-karar-belge-sha" style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" }}>
+              <p data-testid="bordro-politika-karar-belge-sha" className="bordro-mono">
                 SHA256: {kararOzeti.belge_sha256 ?? "—"}
               </p>
               <p data-testid="bordro-politika-karar-evidence-status">
@@ -857,7 +856,7 @@ export function BordroHazirlikMerkeziPage() {
                       {politika.belge_sha256 ? (
                         <div
                           data-testid={`bordro-politika-belge-sha-${politika.id}`}
-                          style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace", fontSize: "0.85em" }}
+                          className="bordro-mono--sm"
                         >
                           {politika.belge_sha256}
                         </div>

@@ -256,7 +256,7 @@ export function HaftalikKapanisClosePanel() {
     .join(" ");
 
   return (
-    <div className="hk-close-panel" data-testid="hk-close-panel" style={{ marginTop: "1.5rem" }}>
+    <div className="hk-close-panel" data-testid="hk-close-panel">
       <h3>Haftayı Kapat</h3>
       <p className="form-hint">
         Haftalık kapanış, yalnızca ilgili şube ve hafta için tamamlanmış haftalık mutabakat sonrası
@@ -299,9 +299,9 @@ export function HaftalikKapanisClosePanel() {
         Hafta bitişi: {weekEnd ?? "—"}
       </p>
 
-      <fieldset style={{ border: "none", padding: 0, margin: "1rem 0 0" }}>
+      <fieldset className="hk-close-scope-fieldset">
         <legend className="form-label">Kapanış kapsamı</legend>
-        <label style={{ display: "block", marginBottom: "0.35rem" }}>
+        <label className="hk-close-scope-option">
           <input
             type="radio"
             name="hk-close-scope"
@@ -316,7 +316,7 @@ export function HaftalikKapanisClosePanel() {
           />{" "}
           Şube Geneli
         </label>
-        <label style={{ display: "block", marginBottom: "0.35rem" }}>
+        <label className="hk-close-scope-option">
           <input
             type="radio"
             name="hk-close-scope"
@@ -368,7 +368,7 @@ export function HaftalikKapanisClosePanel() {
         </>
       ) : null}
 
-      <div className="universal-btn-group" style={{ marginTop: "1rem" }}>
+      <div className="universal-btn-group universal-btn-group--mt">
         <button
           type="button"
           className="universal-btn-save"
@@ -387,7 +387,7 @@ export function HaftalikKapanisClosePanel() {
       ) : null}
 
       {successResult ? (
-        <div className="yonetim-success" data-testid="hk-close-success" style={{ marginTop: "1rem" }}>
+        <div className="yonetim-success hk-close-success" data-testid="hk-close-success">
           <p>
             <strong>Hafta kapatıldı</strong>
           </p>

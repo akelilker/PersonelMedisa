@@ -20,7 +20,7 @@
 .settings-dropdown button {
   width: 100%;
   margin: 0 0 2px;
-  padding: 12px;
+  padding: var(--space-3);
   min-height: 48px;
   text-align: center;
   background: var(--bg);
@@ -37,7 +37,7 @@
 
 .settings-dropdown button:hover {
   border-color: rgba(214, 225, 236, 0.5);
-  color: #ffffff;
+  color: var(--text-inverse);
 }
 
 .settings-dropdown .settings-logout-btn {
@@ -93,7 +93,7 @@
   display: block;
   width: 100%;
   margin: 0 0 2px;
-  padding: 12px;
+  padding: var(--space-3);
   min-height: 48px;
   box-sizing: border-box;
   text-align: center;
@@ -112,14 +112,14 @@
 .modules-dropdown .modules-nav-link:hover,
 .modules-dropdown .modules-nav-link:focus-visible {
   border-color: rgba(214, 225, 236, 0.5);
-  color: #ffffff;
+  color: var(--text-inverse);
   outline: none;
 }
 
 .modules-dropdown .modules-nav-link.is-active,
 .modules-dropdown .modules-nav-link[aria-current="page"] {
   border-color: rgba(var(--theme-color-rgb), 0.85);
-  color: #ffffff;
+  color: var(--text-inverse);
 }
 
 @media (max-width: 640px) {

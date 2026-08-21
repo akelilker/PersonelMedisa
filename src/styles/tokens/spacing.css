@@ -10,11 +10,11 @@
   --app-footer-height: 30px;
   --app-footer-real-height: 38px;
   --app-footer-gap: 17px;
-  --modal-footer-gap: 12px;
+  --modal-footer-gap: var(--space-3);
   --modal-footer-reserve: calc(var(--app-footer-height) + var(--modal-footer-gap));
   --modal-gap-above-footer: 8px;
   --modal-footer-optical-reserve: 8px;
-  --shell-top-stack-gap: 8px;
+  --shell-top-stack-gap: var(--space-2);
   --shell-top-stack-bottom-gap: 0px;
 }
 

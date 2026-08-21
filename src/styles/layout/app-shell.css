@@ -108,7 +108,7 @@ body.modal-open .app-shell::before {
   font-size: 20px;
   line-height: 1;
   font-weight: 700;
-  color: #f4f7ff;
+  color: var(--text-primary);
   text-transform: none;
 }
 
@@ -123,7 +123,7 @@ body.modal-open .app-shell::before {
 
 .logout-btn {
   border: 1px solid rgba(255, 255, 255, 0.28);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   background: transparent;
   color: var(--txt);
   padding: 6px 12px;
@@ -136,7 +136,7 @@ body.modal-open .app-shell::before {
 
 .logout-btn:hover {
   border-color: rgba(var(--theme-color-rgb), 0.82);
-  color: #fff;
+  color: var(--text-inverse);
 }
 
 .menu-container {
@@ -181,7 +181,7 @@ body.modal-open .app-shell::before {
 #main-menu .menu-btn .ttl {
   font-size: clamp(13px, 2.8vw, 15px);
   font-weight: var(--premium-title-weight);
-  color: #d1dbe4;
+  color: var(--modal-title-color);
   letter-spacing: var(--premium-title-letter-spacing);
   text-transform: uppercase;
   transition: color 0.2s, transform 0.2s, text-shadow 0.24s ease, background-position 0.32s ease, filter 0.32s ease;
@@ -225,7 +225,7 @@ body.modal-open .app-shell::before {
   }
 
   #main-menu .menu-btn:hover:not(:disabled) .ttl {
-    color: #d1dbe4;
+    color: var(--modal-title-color);
     transform: scale(1.03);
     background-position: 50% 52%;
     filter: brightness(1);
@@ -297,9 +297,9 @@ body.modal-open .app-shell::before {
 .kayit-tab-btn {
   min-height: 164px;
   border: 1px solid rgba(255, 255, 255, 0.28);
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
   background: transparent;
-  color: #f3f6fb;
+  color: var(--text-primary);
   font-size: 13px;
   line-height: 1;
   font-weight: 600;

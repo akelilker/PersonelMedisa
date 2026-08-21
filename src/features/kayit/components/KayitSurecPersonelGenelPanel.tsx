@@ -281,12 +281,7 @@ export function KayitSurecPersonelGenelPanel({
   return (
     <div className="surec-person-general-panel" data-testid="kayit-surec-personel-genel-panel">
       <div className="surec-person-general-head">
-        <div>
-          <p className="surec-shell-summary-kicker">Genel bilgiler</p>
-          <h4 className="surec-person-general-title">
-            {[personel.ad, personel.soyad].filter(Boolean).join(" ")}
-          </h4>
-        </div>
+        <h4 className="surec-shell-summary-kicker">Genel bilgiler</h4>
       </div>
 
       {canEdit && !isEditing ? (

@@ -237,8 +237,8 @@ test.describe("S77-B personel ücret geçmişi", () => {
     await createMaassizPersonel(page);
 
     const kayitModal = await openSurecMaliForPersonel(page, "Ucret", /Ucret Aday/i);
-    const personelCombo = kayitModal.getByRole("combobox", { name: "Personel" });
-    await expect(personelCombo).toBeEnabled();
+    const personelChange = kayitModal.getByTestId("kayit-surec-personel-degistir");
+    await expect(personelChange).toBeEnabled();
 
     await page.route(/\/api\/personeller\/\d+\/ucretler$/, async (route) => {
       if (route.request().method() === "POST") {
@@ -254,12 +254,12 @@ test.describe("S77-B personel ücret geçmişi", () => {
     await modal.locator('[name="ucret-tutar"]').fill("41000");
     await modal.locator('[name="ucret-baslangic"]').fill("2026-02-01");
     const savePromise = modal.getByTestId("personel-ucret-form-kaydet").click();
-    await expect(personelCombo).toBeDisabled({ timeout: 3000 });
+    await expect(personelChange).toBeDisabled({ timeout: 3000 });
     await expect(kayitModal.getByTestId("kayit-surec-ucret-tipi-kaydet")).toBeDisabled();
     await expect(kayitModal.locator('[name="kayit-surec-ucret-tipi"]')).toBeDisabled();
     await savePromise;
-    await expect(personelCombo).toBeEnabled({ timeout: 5000 });
-    await expect(personelCombo).toContainText(/Ucret Aday/i);
+    await expect(personelChange).toBeEnabled({ timeout: 5000 });
+    await expect(kayitModal.getByTestId("kayit-surec-personel-context")).toContainText(/Ucret Aday/i);
   });
 
   test("TEST C — ucret tipi PUT delay: salary actions + picker locked", async ({ page }) => {
@@ -293,7 +293,7 @@ test.describe("S77-B personel ücret geçmişi", () => {
     await createMaassizPersonel(page);
 
     const kayitModal = await openSurecMaliForPersonel(page, "Ucret", /Ucret Aday/i);
-    const personelCombo = kayitModal.getByRole("combobox", { name: "Personel" });
+    const personelChange = kayitModal.getByTestId("kayit-surec-personel-degistir");
 
     await page.route(/\/api\/personeller\/\d+$/, async (route) => {
       if (route.request().method() === "PUT") {
@@ -304,13 +304,13 @@ test.describe("S77-B personel ücret geçmişi", () => {
 
     await kayitModal.locator('[name="kayit-surec-ucret-tipi"]').selectOption({ index: 2 });
     const putPromise = kayitModal.getByTestId("kayit-surec-ucret-tipi-kaydet").click();
-    await expect(personelCombo).toBeDisabled({ timeout: 3000 });
+    await expect(personelChange).toBeDisabled({ timeout: 3000 });
     await expect(kayitModal.getByTestId("personel-ucret-yeni-donem")).toBeDisabled();
     await expect(kayitModal.locator('[name="kayit-surec-ucret-tipi"]')).toBeDisabled();
     expect(salaryCreateCount).toBe(0);
     expect(salaryCancelCount).toBe(0);
     await putPromise;
-    await expect(personelCombo).toBeEnabled({ timeout: 5000 });
+    await expect(personelChange).toBeEnabled({ timeout: 5000 });
     expect(ucretTipiPutCount).toBe(1);
     expect(salaryCreateCount).toBe(0);
     expect(salaryCancelCount).toBe(0);
@@ -335,7 +335,7 @@ test.describe("S77-B personel ücret geçmişi", () => {
     await createMaassizPersonel(page);
 
     const kayitModal = await openSurecMaliForPersonel(page, "Ucret", /Ucret Aday/i);
-    const personelCombo = kayitModal.getByRole("combobox", { name: "Personel" });
+    const personelChange = kayitModal.getByTestId("kayit-surec-personel-degistir");
 
     await page.route(/\/api\/personeller\/\d+\/ucretler$/, async (route) => {
       if (route.request().method() === "POST") {
@@ -352,7 +352,7 @@ test.describe("S77-B personel ücret geçmişi", () => {
     await createModal.locator('[name="ucret-tutar"]').fill("41000");
     await createModal.locator('[name="ucret-baslangic"]').fill("2026-03-01");
     await createModal.getByTestId("personel-ucret-form-kaydet").click();
-    await expect(personelCombo).toBeDisabled({ timeout: 3000 });
+    await expect(personelChange).toBeDisabled({ timeout: 3000 });
     await expect(kayitModal.locator('[name="kayit-surec-ucret-tipi"]')).toBeDisabled();
     await expect(kayitModal.getByTestId("kayit-surec-ucret-tipi-kaydet")).toBeDisabled();
 
@@ -360,12 +360,13 @@ test.describe("S77-B personel ücret geçmişi", () => {
     await expect(kayitModal.getByTestId("kayit-surec-subtab-genel")).toBeDisabled();
     await kayitModal.getByTestId("kayit-surec-subtab-genel").click({ force: true }).catch(() => undefined);
     await expect(kayitModal.getByTestId("kayit-surec-ucret-panel")).toBeVisible();
-    await expect(personelCombo).toBeDisabled();
-    await personelCombo.click({ force: true }).catch(() => undefined);
-    await expect(personelCombo).toContainText(/Ucret Aday/i);
+    await expect(personelChange).toBeDisabled();
+    await personelChange.click({ force: true }).catch(() => undefined);
+    await expect(kayitModal.getByRole("combobox", { name: "Personel" })).toHaveCount(0);
+    await expect(kayitModal.getByTestId("kayit-surec-personel-context")).toContainText(/Ucret Aday/i);
     expect(createSalaryCount).toBe(1);
 
-    await expect(personelCombo).toBeEnabled({ timeout: 8000 });
+    await expect(personelChange).toBeEnabled({ timeout: 8000 });
     expect(createSalaryCount).toBe(1);
 
     // After settle, Genel is reachable and shows reconciled salary
@@ -387,11 +388,11 @@ test.describe("S77-B personel ücret geçmişi", () => {
     const iptalButton = kayitModal.locator('[data-testid^="personel-ucret-iptal-"]').first();
     await iptalButton.click();
     await page.getByTestId("personel-ucret-action-dialog-confirm").click();
-    await expect(personelCombo).toBeDisabled({ timeout: 3000 });
+    await expect(personelChange).toBeDisabled({ timeout: 3000 });
     await expect(kayitModal.locator('[name="kayit-surec-ucret-tipi"]')).toBeDisabled();
     await expect(kayitModal.getByTestId("kayit-surec-ucret-tipi-kaydet")).toBeDisabled();
     await expect(kayitModal.getByTestId("kayit-surec-subtab-genel")).toBeDisabled();
-    await expect(personelCombo).toBeEnabled({ timeout: 8000 });
+    await expect(personelChange).toBeEnabled({ timeout: 8000 });
     expect(cancelSalaryCount).toBe(1);
   });
 

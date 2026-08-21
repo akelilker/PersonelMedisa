@@ -22,8 +22,10 @@ test.describe("I12 duplicate cleanup regression", () => {
     });
     await expect(modal).toBeVisible();
     await expect(modal.getByTestId("kayit-tab-surec")).toHaveAttribute("aria-selected", "true");
-    await expect(modal.getByRole("combobox", { name: "Personel" })).toBeVisible();
+    await expect(modal.getByTestId("kayit-surec-personel-context")).toBeVisible();
     await expect(modal.getByRole("heading", { name: /Ayşe Yılmaz|Ayse Yilmaz/i })).toBeVisible();
+    await expect(modal.getByTestId("kayit-surec-personel-degistir")).toBeVisible();
+    await expect(modal.getByRole("combobox", { name: "Personel" })).toHaveCount(0);
     await expect(modal.getByRole("tab", { name: "Genel" })).toBeVisible();
     expect(mutating.filter((entry) => !entry.includes("/auth/"))).toEqual([]);
   });

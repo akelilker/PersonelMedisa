@@ -134,7 +134,15 @@ function IconSearch(props: { className?: string }) {
   );
 }
 
-function KayitSurecPersonelContext({ personel }: { personel: Personel }) {
+function KayitSurecPersonelContext({
+  personel,
+  onChangePerson,
+  changeDisabled
+}: {
+  personel: Personel;
+  onChangePerson: () => void;
+  changeDisabled: boolean;
+}) {
   const fullName = [personel.ad, personel.soyad].filter(Boolean).join(" ") || "Personel";
   const initials = `${personel.ad?.[0] ?? ""}${personel.soyad?.[0] ?? ""}`.toUpperCase() || "P";
   const isPassive = personel.aktif_durum === "PASIF";
@@ -143,6 +151,7 @@ function KayitSurecPersonelContext({ personel }: { personel: Personel }) {
     <section
       className={`kayit-personel-context workspace-personel-preview--compact${isPassive ? " is-passive" : ""}`}
       aria-label="Seçili personel bağlamı"
+      data-testid="kayit-surec-personel-context"
     >
       <div className="kayit-personel-context-avatar" aria-hidden="true">
         {initials}
@@ -156,16 +165,31 @@ function KayitSurecPersonelContext({ personel }: { personel: Personel }) {
           Sicil {personel.sicil_no ?? "-"} · {personel.departman_adi ?? "-"} · {personel.gorev_adi ?? "-"}
         </p>
       </div>
-      <dl className="kayit-personel-context-facts">
-        <div>
-          <dt>Durum</dt>
-          <dd>{isPassive ? personel.pasiflik_durumu_etiketi ?? "Pasif" : formatAktifDurumLabel(personel.aktif_durum)}</dd>
+      <div className="kayit-personel-context-aside">
+        <dl className="kayit-personel-context-facts">
+          <div>
+            <dt>Durum</dt>
+            <dd>{isPassive ? personel.pasiflik_durumu_etiketi ?? "Pasif" : formatAktifDurumLabel(personel.aktif_durum)}</dd>
+          </div>
+          <div>
+            <dt>İşe giriş</dt>
+            <dd>{personel.ise_giris_tarihi ?? "-"}</dd>
+          </div>
+        </dl>
+        <div className="kayit-personel-context-actions">
+          <button
+            type="button"
+            className="universal-btn-aux"
+            data-testid="kayit-surec-personel-degistir"
+            aria-label="Personeli değiştir"
+            title="Personeli değiştir"
+            disabled={changeDisabled}
+            onClick={onChangePerson}
+          >
+            Personeli Değiştir
+          </button>
         </div>
-        <div>
-          <dt>İşe giriş</dt>
-          <dd>{personel.ise_giris_tarihi ?? "-"}</dd>
-        </div>
-      </dl>
+      </div>
     </section>
   );
 }
@@ -440,13 +464,13 @@ export function KayitSurecWorkspace({
     setSurecSearchExpanded((open) => {
       const next = !open;
 
-      if (next && !selectedSurecPersonel) {
+      if (next) {
         setSurecPersonelPickerOpen(true);
       }
 
       return next;
     });
-  }, [selectedSurecPersonel]);
+  }, []);
 
   const isSelectedPersonelPasif = selectedSurecPersonel?.aktif_durum === "PASIF";
   const isSelectedPersonelDirectoryOnly = selectedSurecPersonel?.calisan_kapsami === "DIS_KAYNAK";
@@ -553,6 +577,18 @@ export function KayitSurecWorkspace({
       setBelgeDurumError(null);
     }
   }
+
+  function beginChangeSurecPersonel() {
+    if (personelContextLocked) {
+      return;
+    }
+
+    setSurecPersonelPickerOpen(true);
+    setSurecSearchExpanded(true);
+  }
+
+  const showSurecPersonelPickerSurface =
+    !selectedSurecPersonel || (surecPersonelPickerOpen && !personelContextLocked);
 
   function setSurecFormGuarded(updater: SetStateAction<SurecFormState>) {
     setSurecForm((prev) => {
@@ -1204,14 +1240,20 @@ export function KayitSurecWorkspace({
   return (
     <div
       className={`kayit-workspace${activeTab === "yeni-kayit" ? " kayit-workspace--personel-kayit" : ""}${
-        activeTab === "surec" && !selectedSurecPersonel ? " kayit-workspace--surec-search" : ""
+        activeTab === "surec" && showSurecPersonelPickerSurface ? " kayit-workspace--surec-search" : ""
       }`}
     >
       <KayitSurecTabHeader activeTab={activeTab} onTabChange={onTabChange} />
 
       <div className="kayit-workspace-scroll-body" data-testid="kayit-workspace-scroll-body">
-      {activeTab === "surec" && selectedSurecPersonel ? <KayitSurecPersonelContext personel={selectedSurecPersonel} /> : null}
-      {activeTab === "surec" && !selectedSurecPersonel ? (
+      {activeTab === "surec" && selectedSurecPersonel ? (
+        <KayitSurecPersonelContext
+          personel={selectedSurecPersonel}
+          onChangePerson={beginChangeSurecPersonel}
+          changeDisabled={personelContextLocked}
+        />
+      ) : null}
+      {activeTab === "surec" && showSurecPersonelPickerSurface ? (
         <div className="surec-workspace-toolbar" ref={surecSearchToolbarRef}>
           <div className={`surec-workspace-search-field${surecSearchExpanded ? " is-expanded" : ""}`}>
             <input
@@ -1225,7 +1267,7 @@ export function KayitSurecWorkspace({
                 const nextValue = event.target.value;
                 setSurecPersonelSearch(nextValue);
 
-                if (nextValue.trim() && !selectedSurecPersonel) {
+                if (nextValue.trim()) {
                   setSurecPersonelPickerOpen(true);
                 }
               }}
@@ -1322,8 +1364,10 @@ export function KayitSurecWorkspace({
                         readOnly
                       />
                       {personelOptions.length > 0 ? (
+                        showSurecPersonelPickerSurface ? (
                         <div
                           className="surec-personel-combobox form-section"
+                          data-testid="kayit-surec-personel-picker"
                           onKeyDownCapture={handleSurecPersonelComboboxKeyDownCapture}
                         >
                           <label className="form-label" id="surec-personel-combobox-label">
@@ -1381,8 +1425,11 @@ export function KayitSurecWorkspace({
                             </div>
                           ) : null}
                         </div>
+                        ) : null
                       ) : (
-                        <p className="workspace-empty-hint">Personel listesi yüklenemedi veya boş.</p>
+                        !selectedSurecPersonel ? (
+                          <p className="workspace-empty-hint">Personel listesi yüklenemedi veya boş.</p>
+                        ) : null
                       )}
                     </div>
 

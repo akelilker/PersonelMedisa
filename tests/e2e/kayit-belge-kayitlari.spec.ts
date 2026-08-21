@@ -321,8 +321,8 @@ test.describe("Kayit Surec belge kayitlari", () => {
     await page.locator("#personel-belge-tipi").selectOption("SERTIFIKA");
     await page.getByTestId("personel-belge-create-submit").click();
 
-    const personelCombo = kayitModal.getByRole("combobox", { name: "Personel" });
-    await expect(personelCombo).toBeDisabled({ timeout: 5_000 });
+    const personelChange = kayitModal.getByTestId("kayit-surec-personel-degistir");
+    await expect(personelChange).toBeDisabled({ timeout: 5_000 });
     await expect(kayitModal.locator('input[name="belge-durum-KIMLIK"][value="VAR"]')).toBeDisabled();
     await expect(kayitModal.getByTestId("kayit-modal-footer-primary")).toBeDisabled();
 
@@ -331,7 +331,7 @@ test.describe("Kayit Surec belge kayitlari", () => {
     expect(statusWriteCount).toBe(0);
 
     await expect(kayitModal.getByText(/Belge kaydı eklendi/i)).toBeVisible({ timeout: 20_000 });
-    await expect(personelCombo).toBeEnabled({ timeout: 10_000 });
+    await expect(personelChange).toBeEnabled({ timeout: 10_000 });
     expect(fileWriteCount).toBe(1);
     expect(statusWriteCount).toBe(0);
   });
@@ -375,8 +375,8 @@ test.describe("Kayit Surec belge kayitlari", () => {
     await kayitModal.locator('input[name="belge-durum-KIMLIK"][value="VAR"]').check();
     await kayitModal.getByTestId("kayit-modal-footer-primary").click();
 
-    const personelCombo = kayitModal.getByRole("combobox", { name: "Personel" });
-    await expect(personelCombo).toBeDisabled({ timeout: 5_000 });
+    const personelChange = kayitModal.getByTestId("kayit-surec-personel-degistir");
+    await expect(personelChange).toBeDisabled({ timeout: 5_000 });
     await expect(kayitModal.getByTestId("kayit-surec-subtab-mali")).toBeDisabled();
     await expect(panel.getByTestId("personel-belge-yeni-btn")).toBeDisabled();
 
@@ -414,7 +414,7 @@ test.describe("Kayit Surec belge kayitlari", () => {
     expect(statusWriteCount).toBe(1);
     expect(fileWriteCount).toBe(0);
 
-    await expect(personelCombo).toBeEnabled({ timeout: 10_000 });
+    await expect(personelChange).toBeEnabled({ timeout: 10_000 });
     await expect(kayitModal.getByTestId("kayit-surec-subtab-mali")).toBeEnabled();
     await expect(panel.getByTestId("personel-belge-yeni-btn")).toBeEnabled();
   });

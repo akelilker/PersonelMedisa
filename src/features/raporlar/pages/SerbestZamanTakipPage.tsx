@@ -403,7 +403,7 @@ aciklama: "Serbest zaman kullanımı."
             <FormField
               label="Açıklama"
               name="kullanim-aciklama"
-              value={kullanimForm.aciklama}
+              value={kullanimForm.aciklama || ""}
               onChange={(value) =>
                 setKullanimForm((prev) => ({ ...prev, aciklama: value }))
               }

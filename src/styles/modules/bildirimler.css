@@ -27,9 +27,6 @@
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: start;
   gap: var(--space-2);
-  padding: var(--space-2);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius-sm);
 }
 
 .bildirimler-item-content {
@@ -46,18 +43,9 @@
   gap: var(--space-2);
 }
 
-.bildirim-form-error {
-  margin: 0;
-  color: var(--red);
-}
-
 .bildirim-personel-context {
   display: grid;
   gap: 6px;
-  padding: var(--space-2);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.02);
 }
 
 .bildirim-personel-context p {
@@ -67,10 +55,6 @@
 .bildirim-model-panel {
   display: grid;
   gap: var(--space-2);
-  padding: var(--space-2);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.02);
 }
 
 .bildirim-model-panel-head {
@@ -89,9 +73,6 @@
 .bildirim-model-card {
   display: grid;
   gap: var(--space-1);
-  padding: var(--space-2);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius-sm);
 }
 
 .bildirim-model-label,
@@ -195,9 +176,6 @@
 .bildirim-detail-card {
   display: grid;
   gap: var(--space-2);
-  padding: var(--space-3);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius-md);
 }
 
 .bildirim-detail-card p {

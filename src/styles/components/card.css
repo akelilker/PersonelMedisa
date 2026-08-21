@@ -1,0 +1,192 @@
+/* ==========================================================================
+   Shared card / panel visual owner (PACK V2)
+   Canonical soft-line + elevated (premium) surfaces for Taşıt visual language.
+   Feature CSS keeps layout, domain spacing, and status coloring.
+   ========================================================================== */
+
+.app-card {
+  --app-card-pad: var(--space-3);
+  --app-card-radius: var(--radius-md);
+  --app-card-border: 1px solid var(--line-soft);
+  --app-card-bg: transparent;
+  --app-card-shadow: none;
+
+  box-sizing: border-box;
+  border: var(--app-card-border);
+  border-radius: var(--app-card-radius);
+  padding: var(--app-card-pad);
+  background: var(--app-card-bg);
+  box-shadow: var(--app-card-shadow);
+}
+
+.app-card--compact {
+  --app-card-pad: var(--space-2);
+  --app-card-radius: var(--radius-sm);
+}
+
+.app-card--filter {
+  --app-card-pad: var(--space-2);
+  --app-card-radius: var(--radius-md);
+}
+
+.app-card--tinted {
+  --app-card-bg: rgba(255, 255, 255, 0.02);
+}
+
+.app-card--soft-lift {
+  --app-card-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.015));
+}
+
+.app-card--summary {
+  --app-card-pad: 14px 16px;
+  --app-card-border: 1px solid rgba(255, 255, 255, 0.12);
+  --app-card-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.015));
+}
+
+.app-card--elevated {
+  --app-card-pad: 14px 16px;
+  --app-card-radius: 18px;
+  --app-card-border: 1px solid rgba(255, 255, 255, 0.18);
+  --app-card-bg:
+    linear-gradient(180deg, rgba(10, 14, 23, 0.96) 0%, rgba(7, 10, 18, 0.94) 100%),
+    radial-gradient(circle at bottom center, rgba(var(--theme-color-rgb), 0.08) 0%, transparent 34%);
+  --app-card-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 14px 32px rgba(0, 0, 0, 0.28);
+}
+
+.app-card--interactive {
+  cursor: pointer;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
+}
+
+.app-card--interactive:hover,
+.app-card--interactive:focus-visible {
+  border-color: rgba(var(--theme-color-rgb), 0.55);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
+  outline: none;
+}
+
+.app-card--danger {
+  border-color: rgba(239, 68, 68, 0.6);
+}
+
+/* --------------------------------------------------------------------------
+   Soft detail family (padding space-3 / radius-md)
+   -------------------------------------------------------------------------- */
+.state-card,
+.states-page,
+.surec-detail-card,
+.puantaj-detail-card,
+.puantaj-edit-card,
+.bildirim-detail-card,
+.personel-dosya-hero {
+  box-sizing: border-box;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  background: transparent;
+  box-shadow: none;
+}
+
+.personel-dosya-hero {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.015));
+}
+
+/* --------------------------------------------------------------------------
+   Soft compact / list family (padding space-2 / radius-sm)
+   -------------------------------------------------------------------------- */
+.personeller-item,
+.surecler-item,
+.finans-item,
+.bildirimler-item,
+.bildirim-model-card,
+.bildirim-model-panel,
+.bildirim-personel-context,
+.puantaj-etki-aday-card,
+.personel-surec-item,
+.personel-surec-card,
+.personel-import-summary-card,
+.donem-durum-bandi,
+.kapanis-issue-row {
+  box-sizing: border-box;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2);
+  background: transparent;
+  box-shadow: none;
+}
+
+.bildirim-model-panel,
+.bildirim-personel-context,
+.personel-surec-item,
+.personel-surec-card {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.personel-import-summary-card {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.donem-durum-bandi,
+.kapanis-issue-row {
+  padding: var(--space-3);
+  background: var(--text-inverse);
+}
+
+/* Filter panel: compact pad, md radius */
+.form-filter-panel {
+  box-sizing: border-box;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-md);
+  padding: var(--space-2);
+  background: transparent;
+  box-shadow: none;
+}
+
+/* Elevated / premium panel family (yonetim + adopted summary tiles) */
+.yonetim-section-card,
+.yonetim-summary-card,
+.yonetim-table-wrap,
+.aylik-ozet-page .form-filter-panel,
+.kapanis-ozet-card {
+  box-sizing: border-box;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgba(10, 14, 23, 0.96) 0%, rgba(7, 10, 18, 0.94) 100%),
+    radial-gradient(circle at bottom center, rgba(var(--theme-color-rgb), 0.08) 0%, transparent 34%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 14px 32px rgba(0, 0, 0, 0.28);
+}
+
+.kapanis-ozet-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--space-3);
+}
+
+.kapanis-ozet-card {
+  display: grid;
+  gap: var(--space-1);
+  padding: 14px 16px;
+}
+
+.personel-puantaj-summary-card {
+  box-sizing: border-box;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.015));
+  box-shadow: none;
+}
+
+.raporlar-standart-panel {
+  box-sizing: border-box;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  background: var(--bg-surface-elevated);
+  box-shadow: none;
+}

@@ -210,9 +210,6 @@
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: start;
   gap: var(--space-2);
-  padding: var(--space-2);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius-sm);
 }
 
 .personeller-item--grid {
@@ -428,11 +425,6 @@
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
 }
 
-.personel-create-error {
-  margin: 0;
-  color: var(--red);
-}
-
 .personel-form-note {
   margin: -2px 0 0;
   font-size: 12px;
@@ -455,10 +447,6 @@
 .personel-dosya-hero {
   display: grid;
   gap: var(--space-3);
-  padding: var(--space-3);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius-md);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.015));
 }
 
 .personel-dosya-hero-head {
@@ -714,10 +702,6 @@
 .personel-puantaj-summary-card {
   display: grid;
   gap: 6px;
-  padding: 14px 16px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: var(--radius-md);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.015));
 }
 
 .personel-puantaj-summary-kicker {
@@ -915,13 +899,33 @@
   gap: var(--space-2);
 }
 
-.personel-surec-item {
+.personel-surec-item,
+.personel-surec-card {
   display: grid;
   gap: var(--space-1);
-  padding: var(--space-2);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.02);
+}
+
+.personel-surec-card-type,
+.personel-surec-card-dates,
+.personel-surec-card-state,
+.personel-surec-card-desc {
+  display: block;
+  min-width: 0;
+}
+
+.personel-surec-card-type {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.personel-surec-card-dates,
+.personel-surec-card-state {
+  font-size: 13px;
+  color: var(--txt-muted);
+}
+
+.personel-surec-card-desc {
+  color: var(--txt);
 }
 
 .personel-surec-item-head,
@@ -1263,10 +1267,6 @@
 .personel-import-summary-card {
   display: grid;
   gap: var(--space-1);
-  padding: var(--space-2, 8px);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.03);
 }
 
 .personel-import-summary-card span {

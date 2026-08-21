@@ -18,9 +18,6 @@
 .puantaj-edit-card {
   display: grid;
   gap: var(--space-2);
-  padding: var(--space-3);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius-md);
 }
 
 .puantaj-detail-card p,
@@ -83,16 +80,6 @@
   opacity: 0.62;
 }
 
-.puantaj-form-error {
-  margin: 0;
-  color: var(--red);
-}
-
-.puantaj-form-readonly {
-  margin: 0;
-  color: var(--txt-muted);
-}
-
 .puantaj-readonly-value {
   display: flex;
   align-items: center;
@@ -140,9 +127,6 @@
 .puantaj-etki-aday-card {
   display: grid;
   gap: var(--space-1);
-  padding: var(--space-2);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius-sm);
 }
 
 .puantaj-etki-aday-card p {
@@ -220,11 +204,6 @@
   margin: 0;
   color: var(--txt-muted);
   font-size: 12px;
-}
-
-.puantaj-form-success {
-  margin: 0;
-  color: var(--green);
 }
 
 @media (max-width: 720px) {

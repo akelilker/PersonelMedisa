@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* Raporlar — sade kurumsal düzen                                               */
+/* Raporlar ? sade kurumsal d?zen                                               */
 /* -------------------------------------------------------------------------- */
 
 .raporlar-page--premium {
@@ -36,7 +36,7 @@
   line-height: 1.45;
 }
 
-/* Aylık özet bölümü — başlık sadeleştirme */
+/* Ayl?k ?zet b?l?m? ? ba?l?k sadele?tirme */
 .raporlar-aylik-head h2 {
   margin: 0 0 0.35rem;
 }
@@ -90,10 +90,6 @@
 .raporlar-standart-panel {
   display: grid;
   gap: var(--space-3);
-  padding: var(--space-4);
-  background: var(--bg-surface-elevated);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius-md);
 }
 
 .raporlar-panel-heading,
@@ -320,10 +316,6 @@
 .donem-durum-bandi {
   display: grid;
   gap: 0.35rem;
-  padding: var(--space-3);
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--line-soft);
-  background: var(--text-inverse);
 }
 
 .donem-durum-bandi--ready {
@@ -390,13 +382,6 @@
 .kapanis-issue-list {
   display: grid;
   gap: var(--space-2);
-}
-
-.kapanis-issue-row {
-  padding: var(--space-3);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius-sm);
-  background: var(--text-inverse);
 }
 
 .kapanis-issue-head {

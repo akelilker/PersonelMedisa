@@ -136,6 +136,34 @@
   box-shadow: inset 0 0 0 1px rgba(var(--theme-color-rgb), 0.2);
 }
 
+.modal-footer .app-action-dialog-actions [data-modal-initial-focus="true"]:focus-visible {
+  outline: 2px solid rgba(var(--theme-color-rgb), 0.85);
+  outline-offset: 2px;
+}
+
+.app-action-dialog-body {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.app-action-dialog-body > p {
+  margin: 0;
+  color: var(--text-secondary);
+  line-height: 1.45;
+}
+
+.kapanis-detail-modal .modal-body > [data-testid="donem-kapanis-personel-detay-modal"] {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.modal-back-btn:focus-visible,
+.modal-home-btn:focus-visible,
+.modal-close-btn:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.72);
+  outline-offset: 2px;
+}
+
 .modal-body--yonetim {
   gap: 14px;
   padding-top: 16px;

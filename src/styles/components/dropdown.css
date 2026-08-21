@@ -17,12 +17,17 @@
   display: block;
 }
 
-.settings-dropdown button {
+/* Shared shell menu item surface (settings + modules) */
+.settings-dropdown button,
+.modules-dropdown .modules-nav-link {
+  display: block;
   width: 100%;
   margin: 0 0 2px;
   padding: var(--space-3);
   min-height: 48px;
+  box-sizing: border-box;
   text-align: center;
+  text-decoration: none;
   background: var(--bg);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-sm);
@@ -32,12 +37,21 @@
   cursor: pointer;
   transition: border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
   box-shadow: var(--shadow-sm);
-  box-sizing: border-box;
 }
 
-.settings-dropdown button:hover {
+.settings-dropdown button:hover,
+.modules-dropdown .modules-nav-link:hover,
+.modules-dropdown .modules-nav-link:focus-visible {
   border-color: rgba(214, 225, 236, 0.5);
   color: var(--text-inverse);
+  outline: none;
+}
+
+.settings-dropdown button:focus-visible {
+  border-color: rgba(214, 225, 236, 0.5);
+  color: var(--text-inverse);
+  outline: 2px solid rgba(var(--theme-color-rgb), 0.85);
+  outline-offset: 2px;
 }
 
 .settings-dropdown .settings-logout-btn {
@@ -87,33 +101,6 @@
   max-height: min(70vh, 420px);
   overflow-y: auto;
   overflow-x: hidden;
-}
-
-.modules-dropdown .modules-nav-link {
-  display: block;
-  width: 100%;
-  margin: 0 0 2px;
-  padding: var(--space-3);
-  min-height: 48px;
-  box-sizing: border-box;
-  text-align: center;
-  text-decoration: none;
-  background: var(--bg);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm);
-  color: var(--text-secondary);
-  font-weight: 600;
-  font-size: 14px;
-  cursor: pointer;
-  transition: border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
-  box-shadow: var(--shadow-sm);
-}
-
-.modules-dropdown .modules-nav-link:hover,
-.modules-dropdown .modules-nav-link:focus-visible {
-  border-color: rgba(214, 225, 236, 0.5);
-  color: var(--text-inverse);
-  outline: none;
 }
 
 .modules-dropdown .modules-nav-link.is-active,

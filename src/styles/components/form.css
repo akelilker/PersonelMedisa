@@ -67,9 +67,6 @@ select.form-input {
 .form-filter-panel {
   display: grid;
   gap: var(--space-2);
-  padding: var(--space-2);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius-md);
 }
 
 .form-field-grid {
@@ -82,4 +79,40 @@ select.form-input {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
+}
+
+/* Shared form message owners (feature aliases keep class names) */
+.form-error,
+.surec-form-error,
+.puantaj-form-error,
+.finans-form-error,
+.bildirim-form-error,
+.personel-create-error,
+.workspace-error {
+  margin: 0;
+  color: var(--red);
+}
+
+.form-readonly,
+.puantaj-form-readonly {
+  margin: 0;
+  color: var(--txt-muted);
+}
+
+.form-success,
+.puantaj-form-success {
+  margin: 0;
+  color: var(--green);
+}
+
+.form-help {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--txt-muted);
+}
+
+.form-input[readonly] {
+  opacity: 0.82;
+  cursor: default;
 }

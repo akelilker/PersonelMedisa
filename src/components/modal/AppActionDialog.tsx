@@ -102,7 +102,7 @@ export function AppActionDialog({
         </div>
       }
     >
-      <div data-testid={testId}>
+      <div className="app-action-dialog-body" data-testid={testId}>
         {description ? (
           <p id={descriptionId} data-testid={testId ? `${testId}-description` : undefined}>
             {description}
@@ -121,16 +121,16 @@ export function AppActionDialog({
               disabled={isSubmitting}
               rows={field.rows}
             />
-            {field.helpText ? <p>{field.helpText}</p> : null}
+            {field.helpText ? <p className="form-help">{field.helpText}</p> : null}
             {field.errorMessage ? (
-              <p className="workspace-error" role="alert">
+              <p className="form-error workspace-error" role="alert">
                 {field.errorMessage}
               </p>
             ) : null}
           </div>
         ) : null}
         {errorMessage ? (
-          <p className="workspace-error" role="alert" data-testid={errorTestId}>
+          <p className="form-error workspace-error" role="alert" data-testid={errorTestId}>
             <span data-testid={testId ? `${testId}-error` : undefined}>{errorMessage}</span>
           </p>
         ) : null}

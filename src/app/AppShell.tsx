@@ -278,6 +278,7 @@ export function AppShell() {
           className="modal-container--kayit-surec"
           bodyClassName="modal-body--kayit-surec"
           titleVariant="premium"
+          footerPlacement="flow"
           footer={kayitFooterModel ? <KayitModalFooter model={kayitFooterModel} /> : undefined}
         >
           <KayitSurecWorkspace

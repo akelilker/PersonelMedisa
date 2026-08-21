@@ -18,7 +18,7 @@
   padding: 0 var(--space-3);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-sm);
-  background: var(--bg-surface-elevated);
+  background: var(--bg-field);
   color: var(--text-primary);
   box-shadow: none;
   font: inherit;
@@ -61,7 +61,7 @@ select.form-input {
 
 .form-input:-webkit-autofill {
   -webkit-text-fill-color: var(--text-primary);
-  box-shadow: 0 0 0 1000px var(--bg-surface-elevated) inset;
+  box-shadow: 0 0 0 1000px var(--bg-field) inset;
 }
 
 .form-filter-panel {

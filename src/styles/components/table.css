@@ -1,0 +1,185 @@
+/* ==========================================================================
+   Shared table / list visual owner (PACK V3)
+   Taşıt visual language: dark surfaces, red accent, compact readable density.
+   Domain-specific widths, sticky behavior and table↔card breakpoints remain in feature CSS.
+   ========================================================================== */
+
+.app-table-wrap,
+.raporlar-table-wrap,
+.yonetim-table-wrap,
+.yonetim-list-table-wrap,
+.personeller-table-wrap,
+.personel-belge-kayit-table-wrap,
+.puantaj-etki-aday-table-wrap,
+.puantaj-etki-conflict-compare {
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface-elevated);
+}
+
+.app-table,
+.raporlar-table,
+.yonetim-table,
+.yonetim-list-table,
+.personeller-table,
+.personel-belge-kayit-table,
+.personel-zimmet-table,
+.puantaj-etki-aday-table,
+.puantaj-etki-conflict-compare-table {
+  width: 100%;
+  border-collapse: collapse;
+  border-spacing: 0;
+  color: var(--text-primary);
+}
+
+.app-table th,
+.raporlar-table th,
+.yonetim-table th,
+.yonetim-list-table th,
+.personeller-table th,
+.personel-belge-kayit-table th,
+.personel-zimmet-table th,
+.puantaj-etki-aday-table th,
+.puantaj-etki-conflict-compare-table th {
+  padding: 9px 11px;
+  text-align: left;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--line-soft);
+  color: var(--text-muted);
+  background: var(--bg-surface);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.app-table td,
+.raporlar-table td,
+.yonetim-table td,
+.yonetim-list-table td,
+.personeller-table td,
+.personel-belge-kayit-table td,
+.personel-zimmet-table td,
+.puantaj-etki-aday-table td,
+.puantaj-etki-conflict-compare-table td {
+  padding: 9px 11px;
+  text-align: left;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--line-soft);
+  color: var(--text-primary);
+}
+
+.app-table tbody tr:last-child td,
+.raporlar-table tbody tr:last-child td,
+.yonetim-table tbody tr:last-child td,
+.yonetim-list-table tbody tr:last-child td,
+.personeller-table tbody tr:last-child td,
+.personel-belge-kayit-table tbody tr:last-child td,
+.personel-zimmet-table tbody tr:last-child td,
+.puantaj-etki-aday-table tbody tr:last-child td,
+.puantaj-etki-conflict-compare-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.app-table tbody tr,
+.raporlar-table tbody tr,
+.yonetim-table tbody tr,
+.yonetim-list-table tbody tr,
+.personeller-table tbody tr,
+.personel-belge-kayit-table tbody tr,
+.personel-zimmet-table tbody tr,
+.puantaj-etki-aday-table tbody tr,
+.puantaj-etki-conflict-compare-table tbody tr {
+  transition: background-color 0.16s ease;
+}
+
+.app-table tbody tr:hover td,
+.raporlar-table tbody tr:hover td,
+.yonetim-table tbody tr:hover td,
+.yonetim-list-table tbody tr:hover td,
+.personeller-table tbody tr:hover td,
+.personel-belge-kayit-table tbody tr:hover td,
+.personel-zimmet-table tbody tr:hover td,
+.puantaj-etki-aday-table tbody tr:hover td,
+.puantaj-etki-conflict-compare-table tbody tr:hover td {
+  background: rgba(var(--theme-color-rgb), 0.035);
+}
+
+.app-table-row--interactive,
+.yonetim-list-table-row,
+.personeller-table-row-clickable {
+  cursor: pointer;
+}
+
+.app-table-row--interactive:focus-visible,
+.yonetim-list-table-row:focus-visible,
+.personeller-table-row-clickable:focus-visible {
+  outline: 2px solid rgba(var(--theme-color-rgb), 0.8);
+  outline-offset: -2px;
+}
+
+.app-table-cell--strong,
+.yonetim-list-table-cell-strong,
+.personeller-table-cell-strong {
+  color: var(--text-inverse);
+  font-weight: 700;
+}
+
+.app-table-actions,
+.personeller-table-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-1);
+}
+
+.app-table-col--actions,
+.personeller-table-col-actions {
+  width: 1%;
+  max-width: none;
+  white-space: nowrap;
+}
+
+.app-table--compact th,
+.app-table--compact td,
+.personel-belge-kayit-table th,
+.personel-belge-kayit-table td,
+.personel-zimmet-table th,
+.personel-zimmet-table td {
+  padding: 8px 10px;
+}
+
+/* Class-E list/card surfaces stay lists; they only share list rhythm. */
+.app-list,
+.personeller-list,
+.puantaj-etki-aday-card-list,
+.kapanis-issue-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.app-list {
+  display: grid;
+  gap: var(--space-2);
+}
+
+/* Keep feature-owned table↔card switch logic intact. */
+@media (max-width: 720px) {
+  .app-table-wrap,
+  .raporlar-table-wrap,
+  .yonetim-table-wrap,
+  .yonetim-list-table-wrap,
+  .personeller-table-wrap,
+  .personel-belge-kayit-table-wrap,
+  .puantaj-etki-conflict-compare {
+    border-radius: var(--radius-sm);
+  }
+}

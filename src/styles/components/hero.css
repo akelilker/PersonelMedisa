@@ -17,11 +17,16 @@
   min-height: 60px;
   display: grid;
   grid-template-columns: var(--hero-logo-width) minmax(0, 1fr) var(--hero-spacer-width);
+  grid-template-rows: auto auto;
   column-gap: 14px;
+  row-gap: 6px;
   align-items: center;
 }
 
 .hero-logo {
+  grid-column: 1;
+  grid-row: 1 / 3;
+  align-self: center;
   display: flex;
   align-items: center;
   width: var(--hero-logo-width);
@@ -93,6 +98,9 @@
 }
 
 .hero h1 {
+  grid-column: 2;
+  grid-row: 1;
+  align-self: end;
   min-width: 0;
   margin: 0;
   text-align: center;
@@ -105,7 +113,7 @@
   text-overflow: ellipsis;
   padding: 0 4px;
   line-height: 1.1;
-  transform: translateY(-2px);
+  transform: none;
   color: var(--modal-title-color);
   background: var(--premium-title-gradient);
   background-size: 100% 180%;
@@ -118,15 +126,22 @@
 }
 
 .hero-spacer {
+  grid-column: 3;
+  grid-row: 1 / 3;
+  align-self: center;
   display: block;
   min-width: 0;
 }
 
 .animated-line {
-  position: absolute;
-  bottom: 12px;
-  left: 50%;
-  transform: translateX(-50%);
+  grid-column: 2;
+  grid-row: 2;
+  position: static;
+  left: auto;
+  bottom: auto;
+  transform: none;
+  justify-self: center;
+  align-self: start;
   width: 74%;
   height: 2.5px;
   background: linear-gradient(90deg, transparent, var(--theme-color), transparent);
@@ -137,7 +152,7 @@
 
 body.login-page .hero {
   grid-template-rows: auto auto;
-  row-gap: var(--space-1);
+  row-gap: 6px;
   align-items: center;
 }
 
@@ -166,6 +181,7 @@ body.login-page .hero .animated-line {
   bottom: auto;
   transform: none;
   justify-self: center;
+  align-self: start;
 }
 
 @media (min-width: 641px) {
@@ -220,7 +236,7 @@ body.login-page .hero .animated-line {
     letter-spacing: 1.8px;
     line-height: 1.2;
     padding: 0 2px 0 0;
-    transform: translateY(-2px);
+    transform: none;
   }
 
   .hero-logo {
@@ -264,7 +280,6 @@ body.login-page .hero .animated-line {
   }
 
   .animated-line {
-    bottom: 8px;
     width: 88%;
   }
 
@@ -277,7 +292,6 @@ body.login-page .hero .animated-line {
   }
 
   body:not(.login-page) .hero .animated-line {
-    bottom: 12px;
     height: 2.5px;
     opacity: 0.72;
   }

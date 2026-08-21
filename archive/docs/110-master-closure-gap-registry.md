@@ -68,7 +68,7 @@
 | User management (code) | **CLOSED** — unified kullanıcı workspace in `YonetimPaneliPage` |
 | Personel binding (code) | **CLOSED** — production rollout **CLOSED** (`MG-OPS-BIND-001`) |
 | Real QR employee (code) | **CLOSED** — pipeline S3C–S3F; production technical onboarding **COMPLETE**; per-user password handoff **USER_HANDOFF_REQUIRED** |
-| Code migration tip | `069` |
+| Code migration tip | `070` |
 | Production migration tip | **70** — apply worker [#32340345337](https://github.com/akelilker/PersonelMedisa/actions/runs/32340345337) @ deploy `395bc1c…` |
 | Migration 067 | **CLOSED_CONFIRMED** — canonical SQL; legacy ops workflow **RETIRED/REMOVED** |
 | Migration 068 | **CLOSED_CONFIRMED** — `068_sgk_actor_identity_lifecycle_audit.sql`; production schema applied |

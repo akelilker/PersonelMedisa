@@ -15,7 +15,6 @@ import type {
   MePuantajResponse,
   MeYillikIzinBakiye
 } from "../../../types/self-service";
-import "../self-service.css";
 
 type PageStatus =
   | { kind: "loading" }

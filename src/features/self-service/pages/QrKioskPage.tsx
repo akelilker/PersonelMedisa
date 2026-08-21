@@ -4,7 +4,6 @@ import { isApiRequestError } from "../../../api/api-client";
 import { fetchQrKioskToken } from "../../../api/qr.api";
 import { LoadingState } from "../../../components/states/LoadingState";
 import type { QrKioskTokenResponse } from "../../../types/self-service";
-import "../self-service.css";
 
 const REFRESH_LEAD_SECONDS = 8;
 

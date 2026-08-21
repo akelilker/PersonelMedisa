@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "cross-env VITE_REALTIME_WS_URL=wss://your-domain.com/ws tsc --noEmit && vite build",
+    "build": "tsc --noEmit && vite build",
     "pack:cpanel": "npm run build && node scripts/zip-dist.mjs",
     "generate:migration-bundle": "node scripts/generate-canonical-migration-bundle.mjs",
     "preview": "vite preview",
@@ -48,7 +48,6 @@
     "@types/react-dom": "^18.2.22",
     "@vitejs/plugin-react": "^4.2.1",
     "archiver": "^7.0.1",
-    "cross-env": "^10.1.0",
     "jsdom": "^29.0.1",
     "sharp": "^0.34.5",
     "to-ico": "^1.1.5",

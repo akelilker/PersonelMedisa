@@ -11,9 +11,9 @@ Her registry kaydı **tek** zorunlu statü taşır: `CLOSED` · `CODE_GAP` · `B
 
 - **Ürün beyni:** `FROZEN` (domain owner / paralel motor yalnız ayrı teşhis + açık onay)
 - **Görsel düzenleme aşaması:** `GO`
-- **Code migration tip:** `069` (`069_personel_credential_onboarding.sql`)
-- **Production migration tip:** **069**
-- **Migration069:** `CLOSED_CONFIRMED` (production applied @ deploy `395bc1c…`; migration worker [#32340345337](https://github.com/akelilker/PersonelMedisa/actions/runs/32340345337))
+- **Code migration tip:** `070` (`070_offline_mutation_idempotency.sql`)
+- **Production migration tip:** **070** (Veritabanı sorgusu ile 2026-08-21 tarihinde doğrulandı)
+- **Migration070:** `CLOSED_CONFIRMED` (production applied @ deploy `395bc1c…`; migration worker [#32340345337](https://github.com/akelilker/PersonelMedisa/actions/runs/32340345337))
 - **Migration067:** `CLOSED_CONFIRMED` (canonical SQL); legacy `migration-067-production-precheck` ops yolu **RETIRED/REMOVED**
 - **Migration068:** `CLOSED_CONFIRMED` (code + production schema); formal SGK actor create/verify/bind audit owner (`actor_identity_audits`)
 - **Canonical migration execution:** `.github/workflows/apply-cpanel-migrations.yml` → FTP control-plane → protected cPanel cron worker (`api/bin/cpanel-migration-cron.php`); SSH migration dependency **yok**
@@ -31,7 +31,7 @@ Her registry kaydı **tek** zorunlu statü taşır: `CLOSED` · `CODE_GAP` · `B
 - **Personnel count rollout:** production total `137` (`Phase1=122 CLOSED`, `Phase2=11 CLOSED`); IC org FK **CLOSED** (`122/122`); DIS_KAYNAK org FK kısmi — kaynak alan boşlukları `DEFERRED_MISSING_REAL_DATA` (11 kişi; approval/code blocker değil)
 - **PERSONEL user provisioning (production):** **CLOSED** — 136 `PERSONEL` hesabı oluşturuldu (`PASIF`, sicil_no=username); throwaway şifreler saklanmadı
 - **PERSONEL binding (production):** **CLOSED** — 136 bound + 1 mevcut = 137 binding; duplicate `0`
-- **PERSONEL credential onboarding (production):** **CLOSED** — migration `069` applied; 136 `PERSONEL` **AKTIF** + `must_change_password=1`; unique geçici credential handoff repo dışı artifact (`USER_HANDOFF_REQUIRED`)
+- **PERSONEL credential onboarding (production):** **CLOSED** — migration `070` applied; 136 `PERSONEL` **AKTIF** + `must_change_password=1`; unique geçici credential handoff repo dışı artifact (`USER_HANDOFF_REQUIRED`)
 - **QR employee rollout (production):** **TECHNICAL_ONBOARDING_COMPLETE** — QR infra **READY**; security gate `must_change_password` aktif; kullanıcı başına ilk şifre değişimi bekleniyor (`USER_HANDOFF_REQUIRED`)
 - **Kullanıcı Yönetimi (code):** `YonetimPaneliPage` unified kullanıcı workspace — rol özeti, şube kapsamı owner'ı, actor lifecycle readback/actions; authorization weakening yok
 - **SGK actor lifecycle (code):** `ActorIdentityService` create/verify/bind + readback + `actor_identity_audits`; production schema via migration `068` (run [#32217771186](https://github.com/akelilker/PersonelMedisa/actions/runs/32217771186) @ `cd92d24…`, worker verify pass)
@@ -43,8 +43,8 @@ Görsel sistem çalışmaları mevcut component/owner içinde yapılabilir. Yeni
 
 | Flag | Statü / değer | Metadata |
 | --- | --- | --- |
-| `PRODUCTION_MIGRATION_TIP` | **069** | Apply cPanel migrations run [#32340345337](https://github.com/akelilker/PersonelMedisa/actions/runs/32340345337) @ deploy `395bc1c…` |
-| `CODE_MIGRATION_TIP` | **069** | `069_personel_credential_onboarding.sql` |
+| `PRODUCTION_MIGRATION_TIP` | **070** | Veritabanı sorgusu ile 2026-08-21 tarihinde doğrulandı |
+| `CODE_MIGRATION_TIP` | **070** | `api/migrations/070_offline_mutation_idempotency.sql` |
 | `MIGRATION067_LEGACY_OPS` | **RETIRED/REMOVED** | Generic canonical control-plane only |
 | `MIGRATION068` | **CLOSED_CONFIRMED** | Code + production `actor_identity_audits` schema |
 | `SSH_MIGRATION_DEPENDENCY` | **NO** | cPanel SSH yok; FTP request + protected cron worker |
@@ -57,7 +57,7 @@ Görsel sistem çalışmaları mevcut component/owner içinde yapılabilir. Yeni
 | `SOURCE_DATA_REQUIRES_COMPLETION` | **NO** for closed rollout | exact person-level source details stay private |
 | `PERSONEL_BINDING_REAL_ROLLOUT` | **CLOSED** | 136 PERSONEL bound @ deploy `7a20da3…` |
 | `REAL_QR_EMPLOYEE_ROLLOUT` | **USER_HANDOFF_REQUIRED** | QR infra READY; 136 AKTIF + forced first password change; QR scan blocked until user password change |
-| `PERSONEL_CREDENTIAL_ONBOARDING` | **CLOSED** (`MG-CRED-ONBOARD-001`) | migration `069` + `/auth/change-password` + backend `PASSWORD_CHANGE_REQUIRED` gate deployed |
+| `PERSONEL_CREDENTIAL_ONBOARDING` | **CLOSED** (`MG-CRED-ONBOARD-001`) | migration `070` + `/auth/change-password` + backend `PASSWORD_CHANGE_REQUIRED` gate deployed |
 | `RETENTION_PHYSICAL_DESTRUCTION` | **INTENTIONAL_DEFER** (`MG-RET-PHYS-001`) | schema production-ready (`059`/`060`/`062` via `118`); flag default **OFF**; real destruction **NO** |
 | `RETENTION_MANIFEST_COVERAGE` | **CLOSED** (`MG-RET-MAN-001`) | Pack 1 — creators 15/15 |
 | `RETENTION_S3F_LEDGER_FINGERPRINT` | **CLOSED** (`MG-RET-S3F-001`) | Pack 1 — typed ONAY_AUDIT |
@@ -85,7 +85,7 @@ Görsel sistem çalışmaları mevcut component/owner içinde yapılabilir. Yeni
 ## Doğrulanmış teknik temel
 
 - Current `origin/main`: `395bc1c75d653f201eca6e29f778e5c5fc2a19ca` (PR #183 merged); CI [#32339420748](https://github.com/akelilker/PersonelMedisa/actions/runs/32339420748) + Deploy cPanel [#32339534506](https://github.com/akelilker/PersonelMedisa/actions/runs/32339534506) **success** @ same SHA; migration apply [#32340345337](https://github.com/akelilker/PersonelMedisa/actions/runs/32340345337).
-- Migration tip: code **069**; production **069**. Migration068 `CLOSED_CONFIRMED`; Migration069 `CLOSED_CONFIRMED`.
+- Migration tip: code **070**; production **070**. Migration068 `CLOSED_CONFIRMED`; Migration070 `CLOSED_CONFIRMED`.
 - Canonical migration owner: `apply-cpanel-migrations.yml` + `cpanel-migration-cron.php`; public HTTP migration endpoint ve direct SQL canonical yol değil; SSH blocker **yok**.
 - Org references: SGK=3, locations=7, locked 10 branches (`121`); canonical catalogs completed (`122`); IC personnel org FK production **CLOSED** (`122/122`); DIS_KAYNAK partial — kaynak boş alanlar `DEFERRED_MISSING_REAL_DATA`.
 - Pack6: `bolumler` / `birimler` / `pozisyonlar` + `subeler.sgk_isveren_id` (authorization still `personeller.sube_id`).
@@ -189,7 +189,7 @@ Bu dosya backlog değildir. Açık maddeler `110` registry’dedir. Canlı param
 ## 2026-08-20 credential onboarding production close
 
 - **Deploy SHA:** `395bc1c75d653f201eca6e29f778e5c5fc2a19ca` (CI [#32339420748](https://github.com/akelilker/PersonelMedisa/actions/runs/32339420748) + Deploy [#32339534506](https://github.com/akelilker/PersonelMedisa/actions/runs/32339534506) success).
-- **Migration 069:** **CLOSED_CONFIRMED** — apply worker [#32340345337](https://github.com/akelilker/PersonelMedisa/actions/runs/32340345337) success.
+- **Migration 070:** **CLOSED_CONFIRMED** — apply worker [#32340345337](https://github.com/akelilker/PersonelMedisa/actions/runs/32340345337) success.
 - **MG-CRED-ONBOARD-001:** **CLOSED** — credential onboarding mechanism deployed; 136 PERSONEL **AKTIF** + `must_change_password=1`.
 - **PERSONEL binding:** **CLOSED** — 137 bindings unchanged; legacy user_id=11 / personel_id=160 unchanged.
 - **QR infrastructure smoke:** kiosk token HTTP 200; `PASSWORD_CHANGE_REQUIRED` on protected API + `/me/qr-scan`; **no attendance mutation**.

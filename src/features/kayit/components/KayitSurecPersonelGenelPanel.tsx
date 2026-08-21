@@ -24,7 +24,7 @@ import {
   type BagliAmirContext,
   type EditPersonelFormState
 } from "../../personeller/personel-edit-utils";
-import { formatGeneralField, formatMoneyField, getPersonelInitials } from "../kayit-surec-utils";
+import { formatGeneralField, formatMoneyField } from "../kayit-surec-utils";
 
 type KayitSurecPersonelGenelPanelProps = {
   personel: Personel;

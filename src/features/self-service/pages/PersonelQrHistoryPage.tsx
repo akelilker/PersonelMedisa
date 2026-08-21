@@ -8,7 +8,6 @@ import type {
   MeQrAttendanceEvent,
   MeQrIntervalAnomaly
 } from "../../../types/self-service";
-import "../self-service.css";
 
 type Status =
   | { kind: "loading" }

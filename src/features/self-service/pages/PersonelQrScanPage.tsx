@@ -4,7 +4,6 @@ import { isApiRequestError } from "../../../api/api-client";
 import { createQrRequestNonce, postMeQrScan } from "../../../api/qr.api";
 import type { MeQrAttendanceEvent, QrEventType } from "../../../types/self-service";
 import { startQrScanner, type QrScannerHandle } from "../qr/qr-scanner";
-import "../self-service.css";
 
 type Phase =
   | { kind: "idle" }

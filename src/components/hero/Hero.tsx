@@ -7,11 +7,9 @@ type HeroProps = {
   subeLabel?: string | null;
 };
 
-export function Hero({ title, userLabel, subeLabel }: HeroProps) {
+export function Hero({ title, userLabel }: HeroProps) {
   const trimmedUserLabel = userLabel?.trim() ?? "";
-  const trimmedSubeLabel = subeLabel?.trim() ?? "";
   const showUserLabel = trimmedUserLabel.length > 0;
-  const showSubeLabel = trimmedSubeLabel.length > 0;
 
   return (
     <section className={`hero${showUserLabel ? " hero-with-session" : ""}`}>
@@ -25,11 +23,6 @@ export function Hero({ title, userLabel, subeLabel }: HeroProps) {
             <span className="hero-session-user" data-testid="hero-session-user">
               {trimmedUserLabel}
             </span>
-            {showSubeLabel ? (
-              <span className="hero-session-sube" data-testid="hero-session-sube">
-                {trimmedSubeLabel}
-              </span>
-            ) : null}
           </div>
         ) : null}
       </div>

@@ -5,6 +5,8 @@ type AppModalProps = {
   title: string;
   children?: ReactNode;
   footer?: ReactNode;
+  /** fixed = sibling chrome under body (default). flow = last content inside body scroll. */
+  footerPlacement?: "fixed" | "flow";
   onClose?: () => void;
   ariaDescribedBy?: string;
   titleTestId?: string;
@@ -208,6 +210,7 @@ export function AppModal({
   title,
   children,
   footer,
+  footerPlacement = "fixed",
   onClose,
   ariaDescribedBy,
   titleTestId,
@@ -440,8 +443,13 @@ export function AppModal({
             <span className="modal-header-spacer" aria-hidden="true" />
           )}
         </div>
-        <div className={["modal-body", bodyClassName].filter(Boolean).join(" ")}>{children}</div>
-        {footer ? <div className="modal-footer">{footer}</div> : null}
+        <div className={["modal-body", bodyClassName].filter(Boolean).join(" ")}>
+          {children}
+          {footerPlacement === "flow" && footer ? (
+            <div className="modal-footer modal-footer--flow">{footer}</div>
+          ) : null}
+        </div>
+        {footerPlacement === "fixed" && footer ? <div className="modal-footer">{footer}</div> : null}
       </div>
     </div>
   );

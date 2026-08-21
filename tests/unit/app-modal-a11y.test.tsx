@@ -42,6 +42,40 @@ describe("AppModal dialog accessibility", () => {
     expect(document.getElementById(labelledBy ?? "")?.textContent).toBe("Personel Kartı");
   });
 
+  it("renders flow footer inside modal-body and keeps fixed footer as sibling", async () => {
+    const { rerender } = render(
+      <AppModal
+        title="Flow Modal"
+        footerPlacement="flow"
+        footer={<button type="button">Kaydet</button>}
+        onClose={() => undefined}
+      >
+        <p>İçerik</p>
+      </AppModal>
+    );
+
+    const flowDialog = await screen.findByRole("dialog", { name: "Flow Modal" });
+    const flowBody = flowDialog.querySelector(".modal-body");
+    const flowFooter = flowDialog.querySelector(".modal-footer--flow");
+    expect(flowBody).toBeTruthy();
+    expect(flowFooter).toBeTruthy();
+    expect(flowBody?.contains(flowFooter)).toBe(true);
+    expect(flowDialog.querySelectorAll(".modal-footer:not(.modal-footer--flow)")).toHaveLength(0);
+
+    rerender(
+      <AppModal title="Fixed Modal" footer={<button type="button">Tamam</button>} onClose={() => undefined}>
+        <p>İçerik</p>
+      </AppModal>
+    );
+
+    const fixedDialog = await screen.findByRole("dialog", { name: "Fixed Modal" });
+    const fixedBody = fixedDialog.querySelector(".modal-body");
+    const fixedFooter = fixedDialog.querySelector(".modal-footer");
+    expect(fixedFooter).toBeTruthy();
+    expect(fixedFooter?.classList.contains("modal-footer--flow")).toBe(false);
+    expect(fixedBody?.contains(fixedFooter)).toBe(false);
+  });
+
   it("selects an explicit data-modal-initial-focus target", async () => {
     render(
       <AppModal title="Explicit Focus" onClose={() => undefined}>

@@ -122,6 +122,14 @@
   background: var(--modal-bg);
 }
 
+/* Flow: actions live inside .modal-body and scroll with content (no chrome separator). */
+.modal-footer--flow {
+  border-top: none;
+  background: transparent;
+  padding-top: var(--space-4);
+  padding-bottom: var(--space-4);
+}
+
 .modal-footer .modal-footer-actions {
   margin: 0;
 }

@@ -172,6 +172,7 @@ describe("PACK V2 visual standardization invariants", () => {
     expect(modalSource.includes(".modal-container")).toBe(true);
     expect(modalSource.includes(".modal-header")).toBe(true);
     expect(modalSource.includes(".modal-footer")).toBe(true);
+    expect(modalSource.includes(".modal-footer--flow")).toBe(true);
     expect(modalSource.includes(".app-action-dialog-actions")).toBe(true);
     expect(modalSource.includes(".app-action-dialog-body")).toBe(true);
   });

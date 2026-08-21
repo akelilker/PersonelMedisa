@@ -27,52 +27,64 @@ async function assertNoHorizontalOverflow(page: Page, kayitModal: Locator) {
   }
 }
 
-async function assertFixedChromeWhileScrolling(kayitModal: Locator) {
+async function assertFlowActionsScrollWithContent(kayitModal: Locator) {
   const header = kayitModal.locator(".modal-header");
   const tabs = kayitModal.locator(".kayit-workspace-tabs");
   const footer = kayitModal.getByTestId("kayit-modal-footer");
-  const scrollBody = kayitModal.getByTestId("kayit-workspace-scroll-body");
+  const modalBody = kayitModal.locator(".modal-body--kayit-surec");
 
   await expect(header).toBeVisible();
   await expect(tabs).toBeVisible();
   await expect(footer).toBeVisible();
   await expect(kayitModal.getByTestId("kayit-modal-footer-primary")).toBeVisible();
 
+  const flowDom = await kayitModal.evaluate((modal) => {
+    const body = modal.querySelector(".modal-body--kayit-surec");
+    const flowFooter = modal.querySelector(".modal-footer.modal-footer--flow");
+    const fixedSibling = Array.from(modal.children).find(
+      (el) => el.classList.contains("modal-footer") && !el.classList.contains("modal-footer--flow")
+    );
+    const borderTop = flowFooter ? getComputedStyle(flowFooter).borderTopWidth : null;
+    return {
+      footerInBody: Boolean(body && flowFooter && body.contains(flowFooter)),
+      hasFixedSiblingFooter: Boolean(fixedSibling),
+      borderTopWidth: borderTop
+    };
+  });
+
+  expect(flowDom.footerInBody).toBe(true);
+  expect(flowDom.hasFixedSiblingFooter).toBe(false);
+  expect(flowDom.borderTopWidth === "0px" || flowDom.borderTopWidth === "0").toBeTruthy();
+
   const before = await Promise.all([header.boundingBox(), tabs.boundingBox(), footer.boundingBox()]);
   expect(before[0]).not.toBeNull();
   expect(before[1]).not.toBeNull();
   expect(before[2]).not.toBeNull();
 
-  const scrolled = await scrollBody.evaluate((el) => {
+  const scrolled = await modalBody.evaluate((el) => {
     const canScroll = el.scrollHeight > el.clientHeight + 2;
     if (canScroll) {
-      el.scrollTop = Math.min(el.scrollHeight - el.clientHeight, 120);
+      el.scrollTop = Math.min(el.scrollHeight - el.clientHeight, 160);
     }
     return {
       canScroll,
       scrollTop: el.scrollTop,
-      scrollHeight: el.scrollHeight,
-      clientHeight: el.clientHeight,
-      modalBodyOverflowY: (() => {
-        const body = el.closest(".modal-body");
-        return body ? getComputedStyle(body).overflowY : null;
-      })()
+      overflowY: getComputedStyle(el).overflowY
     };
   });
 
-  expect(scrolled.modalBodyOverflowY === "hidden" || scrolled.modalBodyOverflowY === "clip").toBeTruthy();
+  expect(scrolled.overflowY).toMatch(/auto|scroll/);
 
   if (scrolled.canScroll) {
     expect(scrolled.scrollTop).toBeGreaterThan(0);
-    const after = await Promise.all([header.boundingBox(), tabs.boundingBox(), footer.boundingBox()]);
+    const after = await Promise.all([header.boundingBox(), footer.boundingBox()]);
     expect(Math.abs((after[0]?.y ?? 0) - (before[0]?.y ?? 0))).toBeLessThanOrEqual(2);
-    expect(Math.abs((after[1]?.y ?? 0) - (before[1]?.y ?? 0))).toBeLessThanOrEqual(2);
-    expect(Math.abs((after[2]?.y ?? 0) - (before[2]?.y ?? 0))).toBeLessThanOrEqual(2);
+    expect((after[1]?.y ?? 0) + 1).toBeLessThan(before[2]?.y ?? 0);
   }
 }
 
 test.describe("I2 Kayit modal viewport layout", () => {
-  test("Kayıt modalı 1366x768'de header tabs ve footer'ı sabit tutar", async ({ page }) => {
+  test("Kayıt modalı flow actions ile body scroll kullanır", async ({ page }) => {
     await page.setViewportSize({ width: 1366, height: 768 });
     await mockApi(page, "GENEL_YONETICI");
     await login(page, { username: "yonetici", password: "secret" });
@@ -86,16 +98,15 @@ test.describe("I2 Kayit modal viewport layout", () => {
     );
     await expect(kayitModal.getByRole("button", { name: "Kapat" })).toBeVisible();
 
-    await assertFixedChromeWhileScrolling(kayitModal);
+    await assertFlowActionsScrollWithContent(kayitModal);
     await assertNoHorizontalOverflow(page, kayitModal);
 
-    // Package 1 regression: no local module bridges inside kayit surface.
     await expect(kayitModal.getByRole("link", { name: "Puantaj" })).toHaveCount(0);
     await expect(kayitModal.getByRole("link", { name: /Revizyon/i })).toHaveCount(0);
     await expect(kayitModal.getByText(/Modül menü/i)).toHaveCount(0);
   });
 
-  test("Kayıt modalında yalnız form body scroll eder ve footer submit formu tetikler", async ({ page }) => {
+  test("Kayıt modalında body scroll eder ve footer submit formu tetikler", async ({ page }) => {
     await page.setViewportSize({ width: 1366, height: 768 });
     await mockApi(page, "GENEL_YONETICI");
     await login(page, { username: "yonetici", password: "secret" });
@@ -128,19 +139,26 @@ test.describe("I2 Kayit modal viewport layout", () => {
     const scrollOwnerCheck = await kayitModal.evaluate((modal) => {
       const body = modal.querySelector(".modal-body--kayit-surec") as HTMLElement | null;
       const scroll = modal.querySelector('[data-testid="kayit-workspace-scroll-body"]') as HTMLElement | null;
+      const flowFooter = modal.querySelector(".modal-footer.modal-footer--flow") as HTMLElement | null;
+      const field = modal.querySelector(".form-input") as HTMLElement | null;
       return {
         bodyOverflowY: body ? getComputedStyle(body).overflowY : null,
         scrollOverflowY: scroll ? getComputedStyle(scroll).overflowY : null,
-        containerOverflow: getComputedStyle(modal).overflow
+        containerOverflow: getComputedStyle(modal).overflow,
+        footerInBody: Boolean(body && flowFooter && body.contains(flowFooter)),
+        fieldBackground: field ? getComputedStyle(field).backgroundColor : null
       };
     });
 
-    expect(scrollOwnerCheck.bodyOverflowY === "hidden" || scrollOwnerCheck.bodyOverflowY === "clip").toBeTruthy();
-    expect(scrollOwnerCheck.scrollOverflowY).toMatch(/auto|scroll/);
+    expect(scrollOwnerCheck.bodyOverflowY).toMatch(/auto|scroll/);
+    expect(scrollOwnerCheck.scrollOverflowY).toMatch(/visible/);
     expect(scrollOwnerCheck.containerOverflow).toMatch(/hidden|clip/);
+    expect(scrollOwnerCheck.footerInBody).toBe(true);
+    // --bg-field #0f1418 => rgb(15, 20, 24)
+    expect(scrollOwnerCheck.fieldBackground).toBe("rgb(15, 20, 24)");
   });
 
-  test("Süreç sekmesinde footer aktif süreç formuna bağlı kalır", async ({ page }) => {
+  test("Süreç sekmesinde footer flow ve form association korunur", async ({ page }) => {
     await page.setViewportSize({ width: 1366, height: 768 });
     await mockApi(page, "GENEL_YONETICI");
     await login(page, { username: "yonetici", password: "secret" });
@@ -149,7 +167,6 @@ test.describe("I2 Kayit modal viewport layout", () => {
     await kayitModal.getByTestId("kayit-tab-surec").click();
     await expect(kayitModal.getByTestId("kayit-tab-surec")).toHaveAttribute("aria-selected", "true");
 
-    // Personel picker state: no primary footer until an actionable form is active.
     await expect(kayitModal.getByTestId("kayit-modal-footer")).toHaveCount(0);
 
     await kayitModal.getByRole("combobox", { name: "Personel" }).click();
@@ -163,30 +180,49 @@ test.describe("I2 Kayit modal viewport layout", () => {
       "kayit-surec-surec-form"
     );
     await expect(kayitModal.getByTestId("kayit-workspace-tabs")).toBeVisible();
+
+    const surecFlow = await kayitModal.evaluate((modal) => {
+      const body = modal.querySelector(".modal-body--kayit-surec");
+      const flowFooter = modal.querySelector(".modal-footer.modal-footer--flow");
+      return Boolean(body && flowFooter && body.contains(flowFooter));
+    });
+    expect(surecFlow).toBe(true);
   });
 
-  test("Kayıt modalı 390x844 viewport'ta yatay taşma yapmaz", async ({ page }) => {
-    await page.setViewportSize({ width: 390, height: 844 });
-    await mockApi(page, "GENEL_YONETICI");
-    await login(page, { username: "yonetici", password: "secret" });
+  for (const viewport of [
+    { width: 390, height: 844 },
+    { width: 360, height: 800 },
+    { width: 320, height: 720 }
+  ] as const) {
+    test(`Kayıt modalı ${viewport.width}x${viewport.height} viewport'ta flow actions erişilebilir`, async ({
+      page
+    }) => {
+      await page.setViewportSize(viewport);
+      await mockApi(page, "GENEL_YONETICI");
+      await login(page, { username: "yonetici", password: "secret" });
 
-    const kayitModal = await openKayitModal(page);
-    await expect(kayitModal.getByTestId("kayit-tab-yeni-kayit")).toBeVisible();
-    await expect(kayitModal.getByTestId("kayit-tab-surec")).toBeVisible();
-    await expect(kayitModal.getByTestId("kayit-modal-footer-primary")).toBeVisible();
-    await expect(kayitModal.getByRole("button", { name: "Kapat" })).toBeVisible();
+      const kayitModal = await openKayitModal(page);
+      await expect(kayitModal.getByTestId("kayit-tab-yeni-kayit")).toBeVisible();
+      await expect(kayitModal.getByTestId("kayit-tab-surec")).toBeVisible();
+      await expect(kayitModal.getByTestId("kayit-modal-footer-primary")).toBeVisible();
+      await expect(kayitModal.getByRole("button", { name: "Kapat" })).toBeVisible();
 
-    await assertNoHorizontalOverflow(page, kayitModal);
+      await assertNoHorizontalOverflow(page, kayitModal);
 
-    const footerBox = await kayitModal.getByTestId("kayit-modal-footer").boundingBox();
-    const viewport = page.viewportSize();
-    expect(footerBox).not.toBeNull();
-    expect(viewport).not.toBeNull();
-    if (footerBox && viewport) {
-      expect(footerBox.y + footerBox.height).toBeLessThanOrEqual(viewport.height + 1);
-      expect(footerBox.y).toBeGreaterThanOrEqual(0);
-    }
-  });
+      const modalBody = kayitModal.locator(".modal-body--kayit-surec");
+      await modalBody.evaluate((el) => {
+        el.scrollTop = el.scrollHeight;
+      });
+      await expect(kayitModal.getByTestId("kayit-modal-footer-primary")).toBeVisible();
+
+      const flowOk = await kayitModal.evaluate((modal) => {
+        const body = modal.querySelector(".modal-body--kayit-surec");
+        const flow = modal.querySelector(".modal-footer.modal-footer--flow");
+        return Boolean(body && flow && body.contains(flow));
+      });
+      expect(flowOk).toBe(true);
+    });
+  }
 
   test("Personel Kartı modalı Kayıt layout değişikliğinden etkilenmez", async ({ page }) => {
     await page.setViewportSize({ width: 1366, height: 768 });
@@ -200,5 +236,6 @@ test.describe("I2 Kayit modal viewport layout", () => {
     await expect(personelModal.getByRole("heading", { name: "Personeller" })).toBeVisible();
     await expect(personelModal.getByRole("button", { name: "Kapat" })).toBeVisible();
     await expect(personelModal.getByTestId("kayit-workspace-scroll-body")).toHaveCount(0);
+    await expect(personelModal.locator(".modal-footer--flow")).toHaveCount(0);
   });
 });

@@ -14,6 +14,24 @@
   overflow: visible;
 }
 
+/*
+ * Settings gear menu owner: icons-row-right / icon anchors are narrow, so a
+ * "%" max-width collapses against that containing block and forces labels onto
+ * 3 lines. Cap against viewport + app shell instead (same pattern as
+ * notifications-dropdown). Shared .settings-dropdown base stays for other menus.
+ */
+.settings-dropdown.settings-menu-dropdown {
+  right: 0;
+  left: auto;
+  box-sizing: border-box;
+  width: min(
+    300px,
+    calc(100vw - 32px),
+    calc(var(--app-shell-max-width) - 24px)
+  );
+  max-width: calc(100vw - 32px);
+}
+
 .settings-dropdown.open {
   display: block;
 }
@@ -114,6 +132,15 @@
   .settings-dropdown {
     width: min(300px, calc(var(--app-shell-max-width) - 28px));
     max-width: calc(100% - 16px);
+  }
+
+  .settings-dropdown.settings-menu-dropdown {
+    width: min(
+      300px,
+      calc(100vw - 24px),
+      calc(var(--app-shell-max-width) - 24px)
+    );
+    max-width: calc(100vw - 24px);
   }
 
   .settings-dropdown button {

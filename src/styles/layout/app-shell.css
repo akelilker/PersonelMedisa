@@ -15,13 +15,16 @@
   border-top-right-radius: var(--radius-lg);
   overflow: hidden;
   overflow-x: hidden;
-  box-shadow: none;
+  /* Taşıt app-container depth: light lift + controlled dark inset (not outer red bloom). */
+  box-shadow:
+    0 2px 14px rgba(var(--theme-color-rgb), 0.1),
+    inset 0 0 48px rgba(10, 13, 28, 0.14);
   /*
-   * Modal shell contract:
-   * - modal ustten app shell ust cercevesine kadar cikar
-   * - hero ve header aksiyonlari modalin altinda kalir
-   * - alt bosluk footer ustunde sabit 8px olarak korunur
-   */
+    * Modal shell contract:
+    * - modal ustten app shell ust cercevesine kadar cikar
+    * - hero ve header aksiyonlari modalin altinda kalir
+    * - alt bosluk footer ustunde sabit 8px olarak korunur
+    */
   --shell-content-top-padding: max(12px, env(safe-area-inset-top, 0px));
   --shell-modal-top-inset: 0px;
   --shell-modal-top: var(--shell-modal-top-inset);
@@ -52,7 +55,8 @@
   content: "";
   position: absolute;
   inset: 0;
-  box-shadow: 0 0 16px rgba(var(--theme-color-rgb), 0.24), inset 0 0 18px rgba(var(--theme-color-rgb), 0.1);
+  /* Taşıt parity: inset red wash only — outer red bloom was washing the home surface. */
+  box-shadow: inset 0 0 25px var(--red-glow-subtle);
   pointer-events: none;
   z-index: 0;
 }
@@ -160,7 +164,7 @@ body.modal-open .app-shell::before {
   cursor: pointer;
   text-align: center;
   transition: border-color 0.2s, background 0.2s, transform 0.2s, box-shadow 0.2s;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.22);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
   margin-bottom: 5px;
   height: 50px;
   overflow: hidden;
@@ -193,6 +197,7 @@ body.modal-open .app-shell::before {
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
+  filter: brightness(1.01);
   text-shadow: var(--premium-title-shadow);
   transform-origin: center;
   max-width: 100%;
@@ -213,7 +218,7 @@ body.modal-open .app-shell::before {
   }
 
   #main-menu .menu-btn {
-    border-color: rgba(196, 210, 228, 0.56);
+    border-color: rgba(196, 210, 228, 0.62);
     box-shadow: 0 4px 10px rgba(0, 0, 0, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.1);
   }
 }
@@ -240,9 +245,8 @@ body.modal-open .app-shell::before {
   .menu-btn:hover:not(:disabled).is-active {
     box-shadow:
       0 6px 14px rgba(0, 0, 0, 0.25),
-      0 6px 22px rgba(var(--theme-color-rgb), 0.18),
-      0 0 0 1px rgba(var(--theme-color-rgb), 0.62),
-      0 0 28px rgba(var(--theme-color-rgb), 0.45);
+      0 6px 18px rgba(var(--theme-color-rgb), 0.14),
+      0 0 0 1px rgba(var(--theme-color-rgb), 0.55);
   }
 }
 
@@ -273,9 +277,8 @@ body.modal-open .app-shell::before {
   #main-menu .menu-btn:hover:not(:disabled).is-active {
     box-shadow:
       0 6px 16px rgba(0, 0, 0, 0.3),
-      0 8px 24px rgba(var(--theme-color-rgb), 0.18),
-      0 0 0 1px rgba(var(--theme-color-rgb), 0.62),
-      0 0 28px rgba(var(--theme-color-rgb), 0.45),
+      0 8px 20px rgba(var(--theme-color-rgb), 0.14),
+      0 0 0 1px rgba(var(--theme-color-rgb), 0.55),
       inset 0 1px 0 rgba(255, 255, 255, 0.12);
   }
 }
@@ -369,9 +372,9 @@ body.modal-open .app-shell::before {
     padding: 14px 18px;
     overflow: visible;
     box-shadow:
-      0 4px 14px rgba(0, 0, 0, 0.22),
-      inset 0 1px 0 rgba(184, 198, 212, 0.2);
-    border: 1px solid rgba(140, 158, 176, 0.6);
+      0 4px 12px rgba(0, 0, 0, 0.28),
+      inset 0 1px 0 rgba(184, 198, 212, 0.22);
+    border: 1px solid rgba(168, 184, 200, 0.72);
     margin-bottom: 0;
   }
 

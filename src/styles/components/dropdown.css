@@ -6,7 +6,8 @@
   background: transparent;
   border: none;
   border-radius: 0;
-  width: min(275px, calc(100vw - 32px));
+  width: min(275px, calc(var(--app-shell-max-width) - 32px));
+  max-width: calc(100% - 16px);
   z-index: var(--z-notifications);
   padding: 0;
   box-shadow: none;
@@ -111,7 +112,8 @@
 
 @media (max-width: 640px) {
   .settings-dropdown {
-    width: min(300px, calc(100vw - 28px));
+    width: min(300px, calc(var(--app-shell-max-width) - 28px));
+    max-width: calc(100% - 16px);
   }
 
   .settings-dropdown button {

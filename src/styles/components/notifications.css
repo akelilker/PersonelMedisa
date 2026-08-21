@@ -4,7 +4,8 @@
 }
 
 .notifications-dropdown {
-  width: min(360px, calc(100vw - 24px));
+  width: min(360px, calc(var(--app-shell-max-width) - 24px));
+  max-width: calc(100% - 16px);
   overflow-y: auto;
   overflow-x: hidden;
   max-height: min(60vh, 440px);

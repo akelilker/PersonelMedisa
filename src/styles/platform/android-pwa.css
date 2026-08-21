@@ -1,1 +1,38 @@
-/* Android PWA farklari gerektiginde burada izole tutulacak. */
+/* ==========================================================================
+   Android PWA / standalone presentation owner (PACK V4)
+   No device detection — display-mode + viewport units only.
+   ========================================================================== */
+
+@media (display-mode: standalone) {
+  .app-shell {
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+
+  .modal-overlay {
+    max-height: 100dvh;
+  }
+
+  .modal-container {
+    max-height: 100%;
+  }
+
+  .modal-body,
+  .app-table-wrap,
+  .raporlar-table-wrap,
+  .yonetim-list-table-wrap,
+  .personeller-table-wrap,
+  .personel-belge-kayit-table-wrap,
+  .puantaj-etki-aday-table-wrap,
+  .puantaj-etki-conflict-compare {
+    overscroll-behavior: contain;
+  }
+}
+
+@supports (height: 100svh) {
+  @media (display-mode: standalone) {
+    .app-shell {
+      min-height: 100svh;
+    }
+  }
+}

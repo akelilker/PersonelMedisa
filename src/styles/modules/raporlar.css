@@ -327,7 +327,7 @@
 }
 
 .donem-durum-bandi--sealed {
-  border-color: rgba(52, 152, 219, 0.45);
+  border-color: rgba(var(--info-rgb), 0.45);
 }
 
 .donem-durum-bandi--warning {

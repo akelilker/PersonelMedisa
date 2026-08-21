@@ -157,7 +157,7 @@
 }
 
 .puantaj-etki-state-uygulandi {
-  border-color: rgba(52, 152, 219, 0.55);
+  border-color: rgba(var(--info-rgb), 0.55);
 }
 
 .puantaj-etki-state-yok-sayildi {
@@ -213,6 +213,13 @@
 
   .puantaj-etki-aday-card-list {
     display: grid;
+    min-width: 0;
+    width: 100%;
+  }
+
+  .puantaj-etki-aday-card {
+    min-width: 0;
+    max-width: 100%;
   }
 
   .puantaj-etki-detail-row {

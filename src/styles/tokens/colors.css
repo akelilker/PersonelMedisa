@@ -17,6 +17,7 @@
   --warning: #fbbf24;
   --danger: #f87171;
   --info: #7dd3fc;
+  --info-rgb: 125, 211, 252;
   --theme-color: var(--brand-red);
   --theme-color-rgb: 224, 0, 0;
   --footer-glow-rgb: 224, 0, 0;

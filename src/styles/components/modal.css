@@ -2,7 +2,8 @@
   position: fixed;
   top: var(--shell-modal-top, 0px);
   bottom: calc(
-    var(--app-footer-real-height) + var(--modal-gap-above-footer) + var(--modal-footer-optical-reserve)
+    var(--app-footer-real-height) + var(--modal-gap-above-footer) + var(--modal-footer-optical-reserve) +
+      env(safe-area-inset-bottom, 0px)
   );
   left: 50%;
   right: auto;
@@ -17,6 +18,8 @@
   box-sizing: border-box;
   overflow: hidden;
   background: var(--bg);
+  max-height: 100vh;
+  max-height: 100dvh;
 }
 
 .modal-overlay.open,
@@ -169,11 +172,12 @@
   padding-top: 16px;
 }
 
-/* Module overlay: pass modal-body height to page roots without changing global .modal-body. */
+/* Module overlay: single scroll owner on nested list surfaces. */
 .modal-body:has(> .personeller-page),
 .modal-body:has(> .yonetim-page) {
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .modal-body > .personeller-page,
@@ -307,7 +311,9 @@ body.modal-open .modal-container {
 
 @media (max-width: 480px) {
   .modal-overlay {
-    bottom: calc(var(--app-footer-real-height) + env(safe-area-inset-bottom, 0px));
+    bottom: calc(
+      var(--app-footer-real-height) + var(--modal-gap-above-footer) + env(safe-area-inset-bottom, 0px)
+    );
   }
 
   .modal-container {

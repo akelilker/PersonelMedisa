@@ -51,7 +51,6 @@ body:not(.app-home-route):not(.login-page):not(.admin-report-page) #app-footer {
   height: 100%;
   margin: 0 auto;
   padding: 6px 12px;
-  padding-bottom: max(6px, env(safe-area-inset-bottom, 0px));
   box-sizing: border-box;
   display: flex;
   align-items: center;

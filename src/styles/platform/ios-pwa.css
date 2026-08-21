@@ -1,5 +1,51 @@
+/* ==========================================================================
+   iOS PWA / standalone presentation owner (PACK V4)
+   No UA sniffing — display-mode + safe-area only.
+   ========================================================================== */
+
 @supports (padding: max(0px)) {
   #app-footer {
-    padding-bottom: max(0px, env(safe-area-inset-bottom));
+    padding-bottom: max(2px, env(safe-area-inset-bottom, 0px));
+  }
+}
+
+@media (display-mode: standalone) {
+  html,
+  body {
+    overscroll-behavior-y: none;
+  }
+
+  .app-shell {
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+
+  .content-wrap {
+    padding-top: max(
+      var(--shell-content-top-padding, 12px),
+      env(safe-area-inset-top, 0px)
+    );
+    padding-left: max(0px, env(safe-area-inset-left, 0px));
+    padding-right: max(0px, env(safe-area-inset-right, 0px));
+  }
+
+  .modal-overlay {
+    bottom: calc(
+      var(--app-footer-real-height) + var(--modal-gap-above-footer) +
+        var(--modal-footer-optical-reserve) + env(safe-area-inset-bottom, 0px)
+    );
+  }
+
+  .modal-body,
+  .kayit-workspace-scroll-body,
+  .notifications-dropdown,
+  .modules-dropdown {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Avoid fixed-element jitter when keyboard opens */
+  .modal-container,
+  .modal-footer {
+    transform: translateZ(0);
   }
 }

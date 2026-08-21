@@ -1,5 +1,215 @@
+/* ==========================================================================
+   Mobile / narrow-viewport foundation (PACK V4)
+   Owner for shared responsive presentation. Feature-owned table↔card
+   breakpoints and domain layout stay in module CSS.
+   ========================================================================== */
+
+/* Page-level overflow containment (data surfaces keep their own overflow-x). */
+html,
+body {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+.app-shell,
+.content-wrap,
+.modal-container,
+.modal-body {
+  min-width: 0;
+}
+
+/* Prefer dynamic viewport units where supported (falls back via cascade). */
+@supports (height: 100dvh) {
+  .app-shell {
+    min-height: 100dvh;
+  }
+}
+
+@supports (height: 100svh) {
+  .qr-kiosk {
+    min-height: 100svh;
+  }
+}
+
+.global-api-error-banner {
+  padding-top: calc(var(--space-2) + env(safe-area-inset-top, 0px));
+  padding-left: calc(var(--space-3) + env(safe-area-inset-left, 0px));
+  padding-right: calc(var(--space-3) + env(safe-area-inset-right, 0px));
+}
+
+/* Shared 2-column / auto-fit form collapse */
 @media (max-width: 640px) {
-  .two-column-grid {
+  .two-column-grid,
+  .universal-btn-group,
+  .form-field-grid,
+  .yonetim-selection-grid--departmanlar,
+  .yonetim-form-stack .form-field-grid,
+  .aylik-ozet-page .form-field-grid,
+  .personel-create-grid,
+  .personel-detail-grid,
+  .personel-zimmet-form-grid,
+  .personel-surec-form-grid,
+  .bildirim-form-grid,
+  .finans-form-grid,
+  .puantaj-form-grid,
+  .puantaj-etki-detail-row,
+  .self-service-dl > div {
     grid-template-columns: 1fr;
+  }
+
+  .form-actions-row,
+  .yonetim-toolbar,
+  .yonetim-list-actions,
+  .yonetim-toolbar-meta,
+  .personeller-toolbar,
+  .personeller-toolbar-main,
+  .personeller-filter-secondary,
+  .personel-dosya-actions-row,
+  .raporlar-standart-actions,
+  .raporlar-quick-nav,
+  .puantaj-header-row,
+  .finans-header-row,
+  .self-service-home__actions,
+  .qr-scan-actions,
+  .app-table-actions,
+  .personeller-table-actions {
+    flex-wrap: wrap;
+    min-width: 0;
+  }
+
+  .universal-btn-group {
+    gap: var(--space-3);
+  }
+
+  .universal-btn-save,
+  .universal-btn-cancel,
+  .universal-btn-aux {
+    min-height: 44px;
+    height: auto;
+  }
+
+  .universal-back-bar {
+    min-height: 44px;
+  }
+
+  .universal-back-btn {
+    min-height: 44px;
+    min-width: 44px;
+    padding-inline: var(--space-1);
+  }
+
+  .icon-btn {
+    min-width: 44px;
+    min-height: 44px;
+    display: inline-grid;
+    place-items: center;
+    padding: var(--space-2);
+    box-sizing: border-box;
+  }
+
+  .icons-row--minimal .icon-btn {
+    padding: var(--space-2);
+  }
+
+  .modal-home-btn,
+  .modal-close-btn,
+  .modal-header-spacer {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .modal-back-btn {
+    min-height: 44px;
+  }
+
+  .modules-menu-bar,
+  .modal-modules-bar {
+    min-height: 44px;
+  }
+
+  .yonetim-tab-btn {
+    min-height: 44px;
+  }
+
+  .puantaj-choice-btn,
+  .bildirim-kayit-senaryosu-btn,
+  .surec-choice-btn,
+  .surec-workspace-search-toggle {
+    min-height: 44px;
+  }
+
+  .personeller-icon-btn {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  /* Shell-safe overlay widths (avoid full-viewport page scroll). */
+  .settings-dropdown,
+  .modules-dropdown,
+  .notifications-dropdown {
+    width: min(300px, calc(var(--app-shell-max-width) - 28px));
+    max-width: calc(100% - 16px);
+  }
+
+  .icons-row {
+    padding-left: max(6px, env(safe-area-inset-left, 0px));
+    padding-right: max(12px, env(safe-area-inset-right, 0px));
+  }
+
+  /* Hero session chip: keep inside shell on narrow phones */
+  .hero-with-session .hero-session-meta {
+    transform: none;
+    max-width: min(82px, 28%);
+  }
+
+  /* Yönetim dense card grids: readable on phone */
+  .yonetim-card-grid--users,
+  .yonetim-card-grid--branches {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* Negative bleed chrome must not escape modal padding */
+  .modal-body > .yonetim-page .yonetim-toolbar,
+  .modal-body > .yonetim-page .yonetim-tabs {
+    margin-left: 0;
+    margin-right: 0;
+  }
+
+  /* Modal footer actions stack for reachability */
+  .modal-footer .universal-btn-group,
+  .modal-footer .app-action-dialog-actions,
+  .app-action-dialog-actions {
+    grid-template-columns: 1fr;
+  }
+
+  /* Landscape phone: keep modal usable */
+  @media (orientation: landscape) and (max-height: 480px) {
+    .modal-header {
+      min-height: 48px;
+    }
+
+    .modal-body {
+      padding-block: var(--space-2);
+    }
+
+    .modal-footer {
+      padding-block: var(--space-2);
+    }
+  }
+}
+
+/* Very narrow phones */
+@media (max-width: 480px) {
+  .yonetim-card-grid--users,
+  .yonetim-card-grid--branches {
+    grid-template-columns: 1fr;
+  }
+
+  .personeller-filter-secondary,
+  .personeller-filter-primary {
+    min-width: 0;
+    width: 100%;
   }
 }

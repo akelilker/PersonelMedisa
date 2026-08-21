@@ -1,3 +1,10 @@
+> HISTORICAL / SUPERSEDED REPORT
+> Bu belge 21.08.2026 içindeki ara bir çalışma durumunu anlatır.
+> Güncel canonical state için CURRENT_STATE.md,
+> docs/guncel/110-master-closure-gap-registry.md
+> ve mevcut source/test invariantları esas alınmalıdır.
+> Bu belgede geçen AppHeader/mavi tema/yalnız Faz-1 görsel durum bilgileri güncel değildir.
+
 # Geliştirici Raporu: PersonelMedisa Projesi Sağlamlaştırma ve Yenileme Fazı
 
 **Tarih:** 21.08.2026
@@ -56,6 +63,8 @@ Yukarıdaki sorunları gidermek için aşağıdaki adımlar atılmıştır:
 ---
 
 ## 4. Mevcut Durum ve Sonraki Adımlar
+
+*(Güncel Not: Bu bölümdeki iddialar artık geçerli değildir. Görsel yenileme Faz 1-4 tamamen bitmiş olup, karanlık/kırmızı Taşıt Yönetimi canonical temasına dönülmüştür. AppHeader geçici bir denemeydi ve canonical owner değildir. CURRENT_STATE.md ve registry dosyaları aktiftir ve arşivlenmemiştir.)*
 
 Yapılan çalışmalar sonucunda PersonelMedisa projesi, CI/CD süreci başarıyla çalışan, bilinen kritik bir hatası veya tutarsızlığı olmayan, stabil ve sağlam bir temele kavuşturulmuştur. Projenin "bitirilememesine" neden olan temel belirsizlikler ortadan kaldırılmıştır.
 

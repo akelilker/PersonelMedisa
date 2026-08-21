@@ -76,12 +76,6 @@ export function formatMoneyField(value: number | null | undefined) {
   }).format(value);
 }
 
-export function getPersonelInitials(personel: Personel) {
-  const adInitial = String(personel.ad ?? "").trim().charAt(0);
-  const soyadInitial = String(personel.soyad ?? "").trim().charAt(0);
-  return `${adInitial}${soyadInitial}`.toLocaleUpperCase("tr-TR");
-}
-
 export function toOptionalIdValue(value: number | null | undefined) {
   return typeof value === "number" ? String(value) : "";
 }

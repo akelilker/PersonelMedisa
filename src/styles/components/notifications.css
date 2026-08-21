@@ -1,6 +1,10 @@
 .settings-dropdown.notifications-dropdown {
   top: 100%;
   right: 0;
+  left: auto;
+  width: min(360px, calc(100vw - 32px));
+  max-width: calc(100vw - 32px);
+  box-sizing: border-box;
 }
 
 .notifications-dropdown {
@@ -53,6 +57,7 @@
   font-weight: 600;
   text-align: left;
   justify-content: flex-start;
+  white-space: nowrap;
 }
 
 .notifications-dropdown .notifications-mark-all-read-btn:hover {
@@ -194,4 +199,11 @@ body:not(.modal-open):has(.icons-row .settings-dropdown.open) .content-wrap::aft
 
 body:not(.modal-open):has(.icons-row .settings-dropdown.open) .icons-row {
   z-index: 3;
+}
+
+@media (max-width: 640px) {
+  .settings-dropdown.notifications-dropdown {
+    width: min(300px, calc(100vw - 24px));
+    max-width: calc(100vw - 24px);
+  }
 }

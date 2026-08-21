@@ -287,14 +287,6 @@ export function KayitSurecPersonelGenelPanel({
             {[personel.ad, personel.soyad].filter(Boolean).join(" ")}
           </h4>
         </div>
-        <div className="surec-person-photo-box" aria-label="Personel fotoğrafı">
-          <div className="surec-person-photo-avatar" aria-hidden="true">
-            {getPersonelInitials(personel)}
-          </div>
-          <button type="button" className="surec-person-photo-action" disabled>
-            Fotoğraf yükle
-          </button>
-        </div>
       </div>
 
       {canEdit && !isEditing ? (

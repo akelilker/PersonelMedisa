@@ -1,0 +1,71 @@
+/* ==========================================================================
+   PersonelMedisa Ana Stil Dosyası (main.css)
+   ==========================================================================
+   Bu dosya, projedeki tüm stil dosyalarını doğru bir hiyerarşi ile
+   bir araya getiren ana giriş noktasıdır.
+   Yeni global stiller veya override'lar buraya eklenebilir.
+   ========================================================================== */
+
+/* 1. Reset ve Temel Tarayıcı Sıfırlamaları */
+@import "./base/reset.css";
+
+/* 2. Tasarım Token'ları (Değişkenler) */
+@import "./tokens/colors.css";
+@import "./tokens/spacing.css";
+@import "./tokens/radius.css";
+@import "./tokens/shadows.css";
+@import "./tokens/z-index.css";
+@import "./tokens/breakpoints.css";
+
+/* 3. Global Temel Stiller */
+@import "./base/globals.css";
+@import "./base/typography.css";
+
+/* 4. Sayfa Yerleşim Stilleri (Layout) */
+@import "./layout/grid.css";
+@import "./layout/app-shell.css";
+@import "./layout/content-wrap.css";
+
+/* 5. Yeniden Kullanılabilir Bileşen Stilleri */
+@import "./components/buttons.css";
+@import "./components/form.css";
+@import "./components/modal.css";
+@import "./components/states.css";
+@import "./components/badge.css";
+@import "./components/back-bar.css";
+@import "./components/dropdown.css";
+@import "./components/hero.css";
+@import "./components/icons-row.css";
+@import "./components/notifications.css";
+@import "./components/footer.css";
+
+/* 6. Modül/Sayfa Bazlı Stiller */
+@import "./modules/auth.css";
+@import "./modules/personeller.css";
+@import "./modules/personel-missing-info.css";
+@import "./modules/surecler.css";
+@import "./modules/bildirimler.css";
+@import "./modules/puantaj.css";
+@import "./modules/raporlar.css";
+@import "./modules/finans.css";
+@import "./modules/yonetim.css";
+@import "./modules/kayit-surec.css";
+
+/* 7. Platforma Özel Stiller (En son yüklenmeli) */
+@import "./platform/desktop.css";
+@import "./platform/mobile.css";
+@import "./platform/android-pwa.css";
+@import "./platform/ios-pwa.css";
+
+/* 8. Yazdırma Stilleri */
+@import "./print/report-print.css";
+
+/* Kök (root) elementine temel bir arkaplan rengi ve metin rengi atayalım.
+   Bu renkler, colors.css içindeki değişkenlerden gelmeli. */
+:root {
+  background-color: var(--color-background-base);
+  color: var(--color-text-base);
+
+  /* Referans tasarıma uygun global font ayarı */
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+}

@@ -1,15 +1,22 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { fetchSerbestZamanDeadlineTakip } from "../../../api/serbest-zaman.api";
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import {
+  fetchSerbestZamanDeadlineTakip,
+  postSerbestZamanKullanim
+} from "../../../api/serbest-zaman.api";
+import { AppModal } from "../../../components/modal/AppModal";
 import { EmptyState } from "../../../components/states/EmptyState";
 import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
 import { downloadReportCsv } from "../../../reports/export-report";
 import type {
+  PostSerbestZamanKullanimPayload,
   SerbestZamanDeadlineRow,
   SerbestZamanDeadlineState,
   SerbestZamanDeadlineSummary
 } from "../../../types/serbest-zaman";
 import { serbestZamanDeadlineStateLabel } from "../raporlar-ia";
+import { FormField } from "../../../components/form/FormField";
+import { getApiErrorMessage } from "../../../api/api-client";
 
 const PAGE_SIZE = 25;
 
@@ -29,6 +36,10 @@ function todayYmd(): string {
   return `${y}-${m}-${day}`;
 }
 
+const KULLANIM_FORM_ID = "serbest-zaman-kullanim-form";
+
+type KullanimFormState = Omit<PostSerbestZamanKullanimPayload, "islem_anahtari">;
+
 export function SerbestZamanTakipPage() {
   const [referansTarih, setReferansTarih] = useState(todayYmd);
   const [durum, setDurum] = useState<"" | SerbestZamanDeadlineState>("");
@@ -41,6 +52,33 @@ export function SerbestZamanTakipPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
+
+  // === Kullanım Formu State'leri ===
+  const [isKullanimModalOpen, setIsKullanimModalOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [kullanimForm, setKullanimForm] = useState<KullanimFormState>({
+    personel_id: "",
+    event_tarihi: todayYmd(),
+    dakika: "",
+    aciklama: ""
+  });
+
+  const openKullanimModal = useCallback(() => {
+    setSubmitError(null);
+    setKullanimForm({
+      personel_id: "",
+      event_tarihi: todayYmd(),
+      dakika: "",
+aciklama: "Serbest zaman kullanımı."
+    });
+    setIsKullanimModalOpen(true);
+  }, []);
+
+  const closeKullanimModal = useCallback(() => {
+    setIsKullanimModalOpen(false);
+  }, []);
+
 
   const load = useCallback(
     async (nextPage: number) => {
@@ -75,6 +113,29 @@ export function SerbestZamanTakipPage() {
       }
     },
     [durum, personelId, referansTarih]
+  );
+
+  const handleKullanimSubmit = useCallback(
+    async (event: FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      setIsSubmitting(true);
+      setSubmitError(null);
+
+      try {
+        await postSerbestZamanKullanim({
+          ...kullanimForm,
+          islem_anahtari: crypto.randomUUID()
+        });
+        closeKullanimModal();
+        // Listeyi yenilemek için load fonksiyonunu çağır.
+        await load(1);
+      } catch (error) {
+        setSubmitError(getApiErrorMessage(error, "Kullanım kaydı oluşturulamadı."));
+      } finally {
+        setIsSubmitting(false);
+      }
+    },
+    [kullanimForm, closeKullanimModal, load]
   );
 
   useEffect(() => {
@@ -152,10 +213,17 @@ export function SerbestZamanTakipPage() {
           <article key={card.key} className="raporlar-summary-card">
             <h3>{card.label}</h3>
             <p className="raporlar-summary-card__value">{card.value}</p>
-            <p className="raporlar-summary-card__hint">{card.hint}</p>
-          </article>
-        ))}
-      </div>
+          <p className="raporlar-summary-card__hint">{card.hint}</p>
+        </article>
+      ))}
+    </div>
+
+    <div className="raporlar-panel__actions">
+      <button type="button" className="universal-btn-aux" onClick={openKullanimModal}>
+        Serbest Zaman Kullanımı Ekle
+      </button>
+    </div>
+
 
       <form
         className="raporlar-filters"
@@ -269,6 +337,83 @@ export function SerbestZamanTakipPage() {
           </div>
         </div>
       ) : null}
+
+      {isKullanimModalOpen && (
+        <AppModal
+          title="Serbest Zaman Kullanımı Ekle"
+          onClose={closeKullanimModal}
+          footer={
+            <div className="universal-btn-group modal-footer-actions">
+              <button
+                type="submit"
+                form={KULLANIM_FORM_ID}
+                className="universal-btn-save"
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? "Kaydediliyor..." : "Kaydet"}
+              </button>
+              <button
+                type="button"
+                className="universal-btn-cancel"
+                onClick={closeKullanimModal}
+                disabled={isSubmitting}
+              >
+                Vazgeç
+              </button>
+            </div>
+          }
+        >
+          <form
+            id={KULLANIM_FORM_ID}
+            className="finans-form-grid"
+            onSubmit={handleKullanimSubmit}
+          >
+            <FormField
+              label="Personel ID"
+              name="kullanim-personel-id"
+              type="number"
+              min={1}
+              value={kullanimForm.personel_id}
+              onChange={(value) =>
+                setKullanimForm((prev) => ({ ...prev, personel_id: value }))
+              }
+              required
+            />
+            <FormField
+              label="Kullanım Tarihi"
+              name="kullanim-tarih"
+              type="date"
+              value={kullanimForm.event_tarihi}
+              onChange={(value) =>
+                setKullanimForm((prev) => ({ ...prev, event_tarihi: value }))
+              }
+              required
+            />
+            <FormField
+              label="Kullanılan Dakika"
+              name="kullanim-dakika"
+              type="number"
+              min={1}
+              value={kullanimForm.dakika}
+              onChange={(value) =>
+                setKullanimForm((prev) => ({ ...prev, dakika: value }))
+              }
+              required
+            />
+            <FormField
+              label="Açıklama"
+              name="kullanim-aciklama"
+              value={kullanimForm.aciklama}
+              onChange={(value) =>
+                setKullanimForm((prev) => ({ ...prev, aciklama: value }))
+              }
+            />
+            {submitError ? (
+              <p className="finans-form-error">{submitError}</p>
+            ) : null}
+          </form>
+        </AppModal>
+      )}
     </section>
   );
 }

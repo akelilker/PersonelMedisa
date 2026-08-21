@@ -19,10 +19,10 @@
   overflow-x: hidden;
   max-height: min(60vh, 440px);
   padding: 4px 8px 8px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: var(--radius-lg);
-  background: var(--bg-surface-elevated);
-  box-shadow: var(--shadow-md);
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
   isolation: isolate;
@@ -32,7 +32,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 3px;
+  gap: 6px;
 }
 
 .notifications-dropdown::-webkit-scrollbar {
@@ -41,16 +41,18 @@
 
 .notifications-dropdown .notifications-toolbar {
   flex-shrink: 0;
-  align-self: stretch;
+  align-self: center;
+  width: 100%;
+  max-width: 420px;
+  box-sizing: border-box;
   position: sticky;
   top: 0;
   z-index: 2;
-  margin: -4px -8px 0;
-  padding: 6px 8px 4px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  border-top-left-radius: 18px;
-  border-top-right-radius: 18px;
-  background: var(--bg-surface-elevated);
+  margin: 0;
+  padding: 2px 2px 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
 }
 
 .notifications-dropdown .notifications-mark-all-read-btn {
@@ -86,8 +88,9 @@
   justify-content: center;
   width: 100%;
   max-width: 420px;
+  box-sizing: border-box;
   min-height: 48px;
-  margin: 0 auto;
+  margin-inline: auto;
   padding: 10px 12px 8px;
   text-align: left;
   white-space: normal;
@@ -100,7 +103,8 @@
   transition:
     border-color 0.18s ease,
     background-color 0.18s ease,
-    box-shadow 0.18s ease;
+    box-shadow 0.18s ease,
+    color 0.18s ease;
 }
 
 .notifications-dropdown .notification-item:hover {
@@ -111,26 +115,27 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
-.notifications-dropdown .notification-item.notification-unread {
-  border-color: rgba(var(--theme-color-rgb), 0.92);
+/* Unread emphasis only for neutral cards — severity color owns border/text. */
+.notifications-dropdown .notification-item.notification-unread:not(.date-warning-red-border):not(.date-warning-orange-border) {
+  border-color: rgba(255, 255, 255, 0.55);
 }
 
 .notifications-dropdown .notification-item.date-warning-red-border {
-  border-color: rgba(var(--theme-color-rgb), 0.94);
+  border-color: var(--theme-color);
 }
 
 .notifications-dropdown .notification-item.date-warning-orange-border {
-  border-color: rgba(255, 159, 47, 0.94);
+  border-color: var(--warning);
 }
 
 .notifications-dropdown .notification-item.date-warning-red-border .notif-line1,
 .notifications-dropdown .notification-item.date-warning-red-border .notif-line2 {
-  color: rgba(255, 118, 118, 0.96);
+  color: var(--theme-color);
 }
 
 .notifications-dropdown .notification-item.date-warning-orange-border .notif-line1,
 .notifications-dropdown .notification-item.date-warning-orange-border .notif-line2 {
-  color: rgba(255, 183, 94, 0.96);
+  color: var(--warning);
 }
 
 .notifications-dropdown .notification-item.notification-empty {
@@ -166,21 +171,31 @@
   color: rgba(248, 248, 248, 0.88);
 }
 
+.notifications-dropdown .notification-item.date-warning-red-border:hover {
+  border-color: var(--brand-red-hover);
+}
+
 .notifications-dropdown .notification-item.date-warning-red-border:hover .notif-line1,
 .notifications-dropdown .notification-item.date-warning-red-border:hover .notif-line2 {
-  color: rgba(255, 138, 138, 0.98);
+  color: var(--brand-red-hover);
+}
+
+.notifications-dropdown .notification-item.date-warning-orange-border:hover {
+  border-color: color-mix(in srgb, var(--warning) 88%, white);
 }
 
 .notifications-dropdown .notification-item.date-warning-orange-border:hover .notif-line1,
 .notifications-dropdown .notification-item.date-warning-orange-border:hover .notif-line2 {
-  color: rgba(255, 196, 122, 0.98);
+  color: color-mix(in srgb, var(--warning) 88%, white);
 }
 
 .notifications-dropdown .notification-error {
   width: 100%;
   max-width: 420px;
+  box-sizing: border-box;
   flex-shrink: 0;
-  margin: 2px auto 0;
+  margin-inline: auto;
+  margin-block: 2px 0;
   padding: 8px 10px;
   border-radius: 8px;
   border: 1px solid rgba(var(--theme-color-rgb), 0.28);

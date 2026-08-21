@@ -58,10 +58,18 @@
   gap: 14px;
 }
 
-.sube-selector-wrap,
-.notification-wrap {
+.sube-selector-wrap {
   position: relative;
 }
+
+/*
+ * No position: relative here on purpose: the bell icon sits close to the
+ * trailing Modüller/Ayarlar icons, so anchoring the wide notifications panel
+ * to this narrow wrapper overflows past the viewport edge on phones. Letting
+ * it fall back to ".icons-row-right" (already positioned) as its containing
+ * block keeps it aligned with the other header dropdowns and inside the
+ * shell on narrow screens.
+ */
 
 .notification-wrap > .icon-btn {
   overflow: visible;

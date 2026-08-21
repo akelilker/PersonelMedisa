@@ -1,3 +1,13 @@
+/*
+ * Specificity note: ".notification-wrap" (the bell icon's positioning anchor) is
+ * only as wide as the icon button itself, so a plain ".notifications-dropdown"
+ * selector ties for specificity with the generic ".settings-dropdown" rule in
+ * dropdown.css and loses to it on import order (width/padding/background/etc.
+ * would silently collapse to the generic values, and any "%" based max-width
+ * would resolve against the tiny anchor instead of the viewport). The compound
+ * ".settings-dropdown.notifications-dropdown" selector guarantees this owner's
+ * rules win regardless of import order.
+ */
 .settings-dropdown.notifications-dropdown {
   top: 100%;
   right: 0;
@@ -5,11 +15,6 @@
   width: min(360px, calc(100vw - 32px));
   max-width: calc(100vw - 32px);
   box-sizing: border-box;
-}
-
-.notifications-dropdown {
-  width: min(360px, calc(var(--app-shell-max-width) - 24px));
-  max-width: calc(100% - 16px);
   overflow-y: auto;
   overflow-x: hidden;
   max-height: min(60vh, 440px);
@@ -23,15 +28,20 @@
   isolation: isolate;
 }
 
+.settings-dropdown.notifications-dropdown.open {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+
 .notifications-dropdown::-webkit-scrollbar {
   display: none;
 }
 
-.notifications-dropdown > * + * {
-  margin-top: 3px;
-}
-
 .notifications-dropdown .notifications-toolbar {
+  flex-shrink: 0;
+  align-self: stretch;
   position: sticky;
   top: 0;
   z-index: 2;
@@ -71,10 +81,13 @@
 .notifications-dropdown .notification-item {
   display: flex;
   flex-direction: column;
+  flex-shrink: 0;
   align-items: flex-start;
   justify-content: center;
+  width: 100%;
+  max-width: 420px;
   min-height: 48px;
-  margin: 0;
+  margin: 0 auto;
   padding: 10px 12px 8px;
   text-align: left;
   white-space: normal;
@@ -164,7 +177,10 @@
 }
 
 .notifications-dropdown .notification-error {
-  margin: 2px 2px 0;
+  width: 100%;
+  max-width: 420px;
+  flex-shrink: 0;
+  margin: 2px auto 0;
   padding: 8px 10px;
   border-radius: 8px;
   border: 1px solid rgba(var(--theme-color-rgb), 0.28);
@@ -195,6 +211,12 @@ body:not(.modal-open):has(.icons-row .settings-dropdown.open) .content-wrap::aft
   -webkit-backdrop-filter: none;
   pointer-events: auto;
   z-index: 1;
+}
+
+/* Bildirim paneli açıkken arka plan yüzeyi hafifçe bulanıklaşır (sadece notifications-dropdown). */
+body:not(.modal-open):has(.icons-row .notifications-dropdown.open) .content-wrap::after {
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
 }
 
 body:not(.modal-open):has(.icons-row .settings-dropdown.open) .icons-row {

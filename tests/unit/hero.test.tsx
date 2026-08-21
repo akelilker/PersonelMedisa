@@ -7,14 +7,14 @@ import { Hero } from "../../src/components/hero/Hero";
 describe("Hero session identity", () => {
   afterEach(() => cleanup());
 
-  it("renders the real session user and active branch labels", () => {
+  it("renders only the real session user under the logo", () => {
     render(<Hero title="Personel Yönetim Sistemi" userLabel="Birim Amiri" subeLabel="Merkez" />);
 
     expect(screen.getByTestId("hero-session-user").textContent).toBe("Birim Amiri");
-    expect(screen.getByTestId("hero-session-sube").textContent).toBe("Merkez");
+    expect(screen.queryByTestId("hero-session-sube")).toBeNull();
   });
 
-  it("does not invent a branch label when active branch metadata is unavailable", () => {
+  it("keeps the user label visible when branch metadata is unavailable", () => {
     render(<Hero title="Personel Yönetim Sistemi" userLabel="Genel Yönetici" />);
 
     expect(screen.getByTestId("hero-session-user").textContent).toBe("Genel Yönetici");

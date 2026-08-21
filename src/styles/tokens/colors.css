@@ -1,68 +1,57 @@
 :root {
-  /* Arkaplan Renkleri */
-  --color-background-base: #111827; /* Koyu Gri-Mavi */
-  --color-background-surface: #1f2937; /* Bir ton açığı */
-  --color-surface-elevated: #374151; /* Yükseltilmiş yüzeyler (kartlar vb.) */
-
-  /* Çizgi ve Kenarlık Renkleri */
-  --color-border-default: #374151; /* Standart kenarlık */
-  --color-border-muted: #4b5563; /* Daha soluk kenarlık */
-
-  /* Metin Renkleri */
-  --color-text-base: #f9fafb; /* Ana metin (beyaza yakın) */
-  --color-text-secondary: #d1d5db; /* İkincil metin */
-  --color-text-muted: #9ca3af; /* Soluk metin (placeholder, hint vb.) */
-
-  /* Marka Rengi (Mavi Tonları) */
-  --color-brand-primary: #3b82f6; /* Ana Mavi */
-  --color-brand-primary-hover: #2563eb; /* Hover */
-  --color-brand-primary-active: #1d4ed8; /* Tıklama */
-
-  /* Durum Renkleri */
-  --color-success: #22c55e;
-  --color-warning: #f59e0b;
-  --color-danger: #ef4444; /* Eski kırmızının yerini alır */
-  --color-info: #38bdf8;
-
-  /* Eski Değişkenler için Uyumluluk (yeni palete yönlendirme) */
-  --bg-app: var(--color-background-base);
-  --bg-surface: var(--color-background-surface);
-  --bg-surface-elevated: var(--color-surface-elevated);
-  --border-default: var(--color-border-default);
-  --border-strong: var(--color-border-muted);
-  --text-primary: var(--color-text-base);
-  --text-secondary: var(--color-text-secondary);
-  --text-muted: var(--color-text-muted);
-  --brand-red: var(--color-danger);
-  --brand-red-hover: #dc2626;
-  --brand-red-active: #b91c1c;
-  --success: var(--color-success);
-  --warning: var(--color-warning);
-  --danger: var(--color-danger);
-  --info: var(--color-info);
-  --theme-color: var(--color-brand-primary);
-  --theme-color-rgb: 59, 130, 246;
-
-  /* Karmaşık gradyan ve glow efektlerini şimdilik basitleştiriyoruz */
-  --footer-glow-rgb: 59, 130, 246;
-  --footer-glow-opacity: 0.3;
-  --footer-top-border: var(--color-border-default);
-  --footer-side-border: var(--color-border-muted);
-  --footer-top-highlight: rgba(255, 255, 255, 0.05);
-  --footer-red-glow: 0 -10px 20px rgba(var(--footer-glow-rgb), var(--footer-glow-opacity));
-  --border-red-tech: rgba(var(--theme-color-rgb), 0.3);
-  --border-red-side: rgba(var(--theme-color-rgb), 0.4);
-  --red-glow-subtle: rgba(var(--theme-color-rgb), 0.1);
+  --bg-app: #080d16;
+  --bg-surface: #0d131f;
+  --bg-surface-elevated: #151515;
+  --border-default: rgba(255, 255, 255, 0.3);
+  --border-strong: rgba(184, 192, 201, 0.77);
+  --text-primary: #f2f5f7;
+  --text-secondary: #c1cbd4;
+  --text-muted: #8d99a5;
+  --brand-red: #e00000;
+  --brand-red-hover: #f01a1a;
+  --brand-red-active: #b00000;
+  --success: #4ade80;
+  --warning: #fbbf24;
+  --danger: #f87171;
+  --info: #7dd3fc;
+  --theme-color: var(--brand-red);
+  --theme-color-rgb: 224, 0, 0;
+  --footer-glow-rgb: 224, 0, 0;
+  --footer-glow-opacity: 0.5;
+  --footer-top-border: rgba(190, 198, 208, 0.58);
+  --footer-side-border: rgba(255, 255, 255, 0.5);
+  --footer-top-highlight: rgba(255, 255, 255, 0.16);
+  --footer-red-glow: 0 -18px 34px rgba(var(--footer-glow-rgb), var(--footer-glow-opacity));
+  --border-red-tech: rgba(var(--theme-color-rgb), 0.4);
+  --border-red-side: rgba(var(--theme-color-rgb), 0.6);
+  --red-glow-subtle: rgba(var(--theme-color-rgb), 0.12);
   --bg: var(--bg-app);
-  --modal-bg: var(--bg-surface);
-  --modal-border: var(--color-border-default);
+  --modal-bg: var(--bg-app);
+  --modal-header-red-gradient:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.02) 5%, rgba(255, 255, 255, 0) 12%),
+    linear-gradient(180deg, rgba(212, 0, 0, 0.36) 0%, rgba(212, 0, 0, 0.22) 18%, rgba(212, 0, 0, 0.08) 34%, rgba(212, 0, 0, 0) 48%),
+    linear-gradient(180deg, #790000 0%, #700000 30%, #580000 52%, #420205 72%, #32050a 82%, #20080f 90%, #120b14 96%, var(--modal-bg) 100%);
+  --modal-title-color: #d1dbe4;
+  --modal-title-shadow: 0 1px 0 rgba(0, 0, 0, 0.55), 0 0 5px rgba(214, 224, 232, 0.12);
+  --modal-title-weight: 700;
+  --modal-premium-title-gradient: linear-gradient(to bottom, #f8fbfd 0%, #ffffff 38%, #dce6ed 57%, #f5f9fc 100%);
+  --modal-premium-title-shadow: 0 1px 1px rgba(0, 0, 0, 0.38), 0 0 2px rgba(255, 255, 255, 0.2);
+  --modal-border: rgba(255, 255, 255, 0.35);
   --bg-content: var(--bg-surface);
-  --txt: var(--txt-primary);
+  --txt: var(--text-primary);
   --txt-primary: var(--text-primary);
   --txt-muted: var(--text-muted);
   --line-soft: var(--border-default);
-  --line-hero-card: var(--border-strong);
+  --line-hero-card: rgba(184, 192, 201, 0.77);
   --border-subtle: var(--border-default);
+  --hero-gradient-start: #060d16;
+  --hero-gradient-end: #08090c;
+  --premium-title-gradient: linear-gradient(to bottom, #ccd7e1 0%, #f4f8fb 38%, #adbdca 56%, #e2ebf2 100%);
+  --premium-title-shadow: 0 1px 1px rgba(0, 0, 0, 0.26), 0 0 7px rgba(214, 224, 232, 0.22);
+  --premium-title-weight: 700;
+  --premium-title-letter-spacing: 0.085em;
+  --green: var(--success);
+  --red: var(--danger);
 }
 
 @media (min-width: 641px) {

@@ -341,6 +341,10 @@
   gap: 2px;
 }
 
+.kayit-workspace-grid--personel-form .personel-form-field-unit {
+  gap: 2px;
+}
+
 .kayit-workspace-grid--personel-form .form-section {
   gap: 2px;
 }
@@ -755,6 +759,7 @@
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 28px;
   position: relative;
+  align-items: stretch;
 }
 
 .personel-form-columns::after {
@@ -769,12 +774,20 @@
   pointer-events: none;
 }
 
+/*
+  İki kolon eşit yüksekliğe stretch olur; son alan (Kan Grubu / Net Maaş)
+  margin-top:auto ile alt hizada hizalanır. Sahte spacer yok.
+*/
 .personel-form-column {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: var(--space-2);
-  align-content: start;
   min-width: 0;
   padding-inline: 2px;
+}
+
+.personel-form-column > :last-child {
+  margin-top: auto;
 }
 
 .personel-form-column + .personel-form-column {
@@ -782,11 +795,21 @@
   border-left: none;
 }
 
+.personel-form-field-unit {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
 @media (max-width: 720px) {
   .kayit-workspace-grid,
   .surec-workspace-grid,
   .personel-form-columns {
     grid-template-columns: 1fr;
+  }
+
+  .personel-form-column > :last-child {
+    margin-top: 0;
   }
 
   .personel-form-column + .personel-form-column {

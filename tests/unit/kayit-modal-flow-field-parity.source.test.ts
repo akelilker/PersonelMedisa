@@ -43,4 +43,19 @@ describe("kayit modal flow actions + field surface parity", () => {
     expect(formCss).toMatch(/box-shadow:\s*0 0 0 1000px var\(--bg-field\) inset/);
     expect(formCss).not.toMatch(/\.form-input\s*\{[^}]*background:\s*var\(--bg-surface-elevated\)/s);
   });
+
+  it("bottom-aligns personel create columns via stretched flex stacks", () => {
+    const kayitCss = read(KAYIT_CSS);
+    const createFields = read(resolve(ROOT, "src/features/personeller/components/PersonelCreateFields.tsx"));
+
+    expect(kayitCss).toMatch(/\.personel-form-columns\s*\{[^}]*align-items:\s*stretch/s);
+    expect(kayitCss).toMatch(/\.personel-form-column\s*\{[^}]*display:\s*flex/s);
+    expect(kayitCss).toMatch(/\.personel-form-column\s*>\s*:last-child\s*\{[^}]*margin-top:\s*auto/s);
+    expect(kayitCss).not.toMatch(/\.personel-form-column\s*\{[^}]*display:\s*contents/s);
+
+    expect(createFields).toContain("personel-form-column--left");
+    expect(createFields).toContain("personel-form-column--right");
+    expect(createFields).toContain('name="create-kan"');
+    expect(createFields).toContain('name="create-maas"');
+  });
 });

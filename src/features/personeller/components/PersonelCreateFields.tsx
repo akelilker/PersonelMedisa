@@ -9,6 +9,7 @@ import {
 } from "react";
 import { FormField, type FormFieldOption } from "../../../components/form/FormField";
 import { mapUcretTipiSelectOptions } from "../../../lib/display/ucret-tipi-display";
+import { CALISAN_KAPSAMI_SELECT_OPTIONS } from "../../../lib/display/enum-display";
 import type { PersonelReferenceBundle } from "../../../data/app-data.types";
 import type { CreatePersonelFormState } from "../../../hooks/usePersoneller";
 import type { IdOption } from "../../../types/referans";
@@ -236,7 +237,7 @@ export function PersonelCreateFields({
   return (
     <div className={className}>
       <div className="personel-form-columns">
-        <div className="personel-form-column personel-form-column--left">
+        <div className="personel-form-column">
           <PersonelCreateSelect
             label="Çalışan Kapsamı"
             name="create-calisan-kapsami"
@@ -248,31 +249,34 @@ export function PersonelCreateFields({
               }))
             }
             required
-            options={[
-              { value: "IC_PERSONEL", label: "İç Personel" },
-              { value: "DIS_KAYNAK", label: "Dış Kaynak / SGK Başka İşverende" }
-            ]}
+            options={CALISAN_KAPSAMI_SELECT_OPTIONS}
             isOpen={openSelectName === "create-calisan-kapsami"}
             onOpenChange={(isOpen) => setSelectOpen("create-calisan-kapsami", isOpen)}
           />
-          <div className="personel-form-field-unit">
-            <FormField
-              label="T.C. Kimlik No"
-              name="create-tc"
-              value={form.tcKimlikNo}
-              onChange={(value) => {
-                setForm((prev) => ({ ...prev, tcKimlikNo: value }));
-                onFieldErrorClear?.("tcKimlikNo");
-              }}
-              placeholder="Örn. 12345678122"
-              required={form.calisanKapsami !== "DIS_KAYNAK"}
-            />
-            {tcKimlikNoFieldError ? (
-              <p className="personel-create-error" role="alert">
-                {tcKimlikNoFieldError}
-              </p>
-            ) : null}
-          </div>
+          <FormField
+            label="Sicil No"
+            name="create-sicil"
+            value={form.sicilNo}
+            onChange={(value) => setForm((prev) => ({ ...prev, sicilNo: value }))}
+            placeholder="Örn. MED-001"
+            required
+          />
+          <FormField
+            label="T.C. Kimlik No"
+            name="create-tc"
+            value={form.tcKimlikNo}
+            onChange={(value) => {
+              setForm((prev) => ({ ...prev, tcKimlikNo: value }));
+              onFieldErrorClear?.("tcKimlikNo");
+            }}
+            placeholder="Örn. 12345678122"
+            required={form.calisanKapsami !== "DIS_KAYNAK"}
+          />
+          {tcKimlikNoFieldError ? (
+            <p className="personel-create-error" role="alert">
+              {tcKimlikNoFieldError}
+            </p>
+          ) : null}
           <FormField
             label="Ad"
             name="create-ad"
@@ -342,15 +346,7 @@ export function PersonelCreateFields({
           />
         </div>
 
-        <div className="personel-form-column personel-form-column--right">
-          <FormField
-            label="Sicil No"
-            name="create-sicil"
-            value={form.sicilNo}
-            onChange={(value) => setForm((prev) => ({ ...prev, sicilNo: value }))}
-            placeholder="Örn. MED-001"
-            required
-          />
+        <div className="personel-form-column">
           <FormField
             label="İşe Giriş Tarihi"
             name="create-ise-giris"
@@ -359,91 +355,85 @@ export function PersonelCreateFields({
             onChange={(value) => setForm((prev) => ({ ...prev, iseGirisTarihi: value }))}
             required
           />
-          <div className="personel-form-field-unit">
-            {subeLoadError ? (
-              <p className="personel-create-error" role="alert">
-                {subeLoadError}
-              </p>
-            ) : subeOptions.length > 0 ? (
-              <>
-                <PersonelCreateSelect
-                  label="Şube"
-                  name="create-sube"
-                  value={form.subeId}
-                  onChange={(value) => {
-                    setForm((prev) => ({ ...prev, subeId: value }));
-                    onFieldErrorClear?.("subeId");
-                  }}
-                  required
-                  placeholderOption={{ value: "", label: "Seçiniz" }}
-                  options={toSelectOptions(subeOptions)}
-                  isOpen={openSelectName === "create-sube"}
-                  onOpenChange={(isOpen) => setSelectOpen("create-sube", isOpen)}
-                />
-                {subeIdFieldError ? (
-                  <p className="personel-create-error" role="alert">
-                    {subeIdFieldError}
-                  </p>
-                ) : null}
-              </>
-            ) : (
-              refMissingNote("Şube", true)
-            )}
-          </div>
-          <div className="personel-form-field-unit">
-            {refs.bagliAmirOptions.length > 0 ? (
-              <>
-                <PersonelCreateSelect
-                  label="Bağlı Amir"
-                  name="create-bagli-amir"
-                  value={form.bagliAmirId}
-                  onChange={
-                    onBagliAmirChange ??
-                    ((value) => setForm((prev) => ({ ...prev, bagliAmirId: value })))
-                  }
-                  placeholderOption={{ value: "", label: "Seçiniz" }}
-                  options={toSelectOptions(refs.bagliAmirOptions)}
-                  isOpen={openSelectName === "create-bagli-amir"}
-                  onOpenChange={(isOpen) => setSelectOpen("create-bagli-amir", isOpen)}
-                />
-                {bagliAmirInfoMessage ? (
-                  <p className="personel-form-note personel-form-note--info">{bagliAmirInfoMessage}</p>
-                ) : null}
-                {bagliAmirSubeWarning ? (
-                  <p className="personel-form-note personel-form-note--warning">{bagliAmirSubeWarning}</p>
-                ) : null}
-              </>
-            ) : (
-              refMissingNote("Bağlı amir", false)
-            )}
-          </div>
-          <div className="personel-form-field-unit">
-            {refs.departmanOptions.length > 0 ? (
-              <>
-                <PersonelCreateSelect
-                  label="Departman"
-                  name="create-departman"
-                  value={form.departmanId}
-                  onChange={
-                    onDepartmanChange ??
-                    ((value) => setForm((prev) => ({ ...prev, departmanId: value })))
-                  }
-                  required
-                  placeholderOption={{ value: "", label: "Seçiniz" }}
-                  options={toSelectOptions(refs.departmanOptions)}
-                  isOpen={openSelectName === "create-departman"}
-                  onOpenChange={(isOpen) => setSelectOpen("create-departman", isOpen)}
-                />
-                {bagliAmirDepartmanWarning ? (
-                  <p className="personel-form-note personel-form-note--warning">
-                    {bagliAmirDepartmanWarning}
-                  </p>
-                ) : null}
-              </>
-            ) : (
-              refMissingNote("Departman", true)
-            )}
-          </div>
+          {subeLoadError ? (
+            <p className="personel-create-error" role="alert">
+              {subeLoadError}
+            </p>
+          ) : subeOptions.length > 0 ? (
+            <>
+              <PersonelCreateSelect
+                label="Şube"
+                name="create-sube"
+                value={form.subeId}
+                onChange={(value) => {
+                  setForm((prev) => ({ ...prev, subeId: value }));
+                  onFieldErrorClear?.("subeId");
+                }}
+                required
+                placeholderOption={{ value: "", label: "Seçiniz" }}
+                options={toSelectOptions(subeOptions)}
+                isOpen={openSelectName === "create-sube"}
+                onOpenChange={(isOpen) => setSelectOpen("create-sube", isOpen)}
+              />
+              {subeIdFieldError ? (
+                <p className="personel-create-error" role="alert">
+                  {subeIdFieldError}
+                </p>
+              ) : null}
+            </>
+          ) : (
+            refMissingNote("Şube", true)
+          )}
+          {refs.bagliAmirOptions.length > 0 ? (
+            <>
+              <PersonelCreateSelect
+                label="Bağlı Amir"
+                name="create-bagli-amir"
+                value={form.bagliAmirId}
+                onChange={
+                  onBagliAmirChange ??
+                  ((value) => setForm((prev) => ({ ...prev, bagliAmirId: value })))
+                }
+                placeholderOption={{ value: "", label: "Seçiniz" }}
+                options={toSelectOptions(refs.bagliAmirOptions)}
+                isOpen={openSelectName === "create-bagli-amir"}
+                onOpenChange={(isOpen) => setSelectOpen("create-bagli-amir", isOpen)}
+              />
+              {bagliAmirInfoMessage ? (
+                <p className="personel-form-note personel-form-note--info">{bagliAmirInfoMessage}</p>
+              ) : null}
+              {bagliAmirSubeWarning ? (
+                <p className="personel-form-note personel-form-note--warning">{bagliAmirSubeWarning}</p>
+              ) : null}
+            </>
+          ) : (
+            refMissingNote("Bağlı amir", false)
+          )}
+          {refs.departmanOptions.length > 0 ? (
+            <>
+              <PersonelCreateSelect
+                label="Departman"
+                name="create-departman"
+                value={form.departmanId}
+                onChange={
+                  onDepartmanChange ??
+                  ((value) => setForm((prev) => ({ ...prev, departmanId: value })))
+                }
+                required
+                placeholderOption={{ value: "", label: "Seçiniz" }}
+                options={toSelectOptions(refs.departmanOptions)}
+                isOpen={openSelectName === "create-departman"}
+                onOpenChange={(isOpen) => setSelectOpen("create-departman", isOpen)}
+              />
+              {bagliAmirDepartmanWarning ? (
+                <p className="personel-form-note personel-form-note--warning">
+                  {bagliAmirDepartmanWarning}
+                </p>
+              ) : null}
+            </>
+          ) : (
+            refMissingNote("Departman", true)
+          )}
           {refs.bolumOptions.length > 0 ? (
             <PersonelCreateSelect
               label="Bölüm"

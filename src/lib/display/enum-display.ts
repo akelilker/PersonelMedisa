@@ -1,5 +1,6 @@
 import type { UiProfile, UserRole } from "../../types/auth";
 import type { FinansDurum } from "../../types/finans";
+import type { PersonelCalisanKapsami } from "../../types/personel";
 import type { ComplianceUyariSeviye, GunlukPuantajState } from "../../types/puantaj";
 import type { AylikOzetAggregateState, KullaniciTipi } from "../../types/yonetim";
 
@@ -89,6 +90,19 @@ const KULLANICI_TIPI_LABELS: Record<KullaniciTipi, string> = {
   IC_PERSONEL: "İç Personel",
   HARICI: "Harici"
 };
+
+export const CALISAN_KAPSAMI_LABELS: Record<PersonelCalisanKapsami, string> = {
+  IC_PERSONEL: "Dahili Personel",
+  DIS_KAYNAK: "Harici Personel"
+};
+
+export const CALISAN_KAPSAMI_SELECT_OPTIONS: Array<{
+  value: PersonelCalisanKapsami;
+  label: string;
+}> = [
+  { value: "IC_PERSONEL", label: CALISAN_KAPSAMI_LABELS.IC_PERSONEL },
+  { value: "DIS_KAYNAK", label: CALISAN_KAPSAMI_LABELS.DIS_KAYNAK }
+];
 
 const BILDIRIM_TURU_LABELS: Record<string, string> = {
   DEVAMSIZLIK: "Devamsızlık",
@@ -294,6 +308,16 @@ export function formatKullaniciTipiLabel(value: KullaniciTipi | null | undefined
   }
 
   return KULLANICI_TIPI_LABELS[value] ?? humanizeEnumFallback(value);
+}
+
+export function formatCalisanKapsamiLabel(
+  value: PersonelCalisanKapsami | null | undefined
+): string {
+  if (!value) {
+    return "-";
+  }
+
+  return CALISAN_KAPSAMI_LABELS[value] ?? humanizeEnumFallback(value);
 }
 
 export function formatAylikOzetStateLabel(value: AylikOzetAggregateState | null | undefined): string {

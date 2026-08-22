@@ -1,4 +1,4 @@
-import { formatAktifDurumLabel } from "../../../../lib/display/enum-display";
+import { formatAktifDurumLabel, formatCalisanKapsamiLabel } from "../../../../lib/display/enum-display";
 import type { Personel } from "../../../../types/personel";
 import { isPersonelMaasMissing } from "../../personel-create-utils";
 import {
@@ -78,7 +78,7 @@ export function PersonelDosyaHero({
         <DossierField label="Soyad" value={formatDetailValue(personel.soyad)} />
         <DossierField
           label="Çalışan Kapsamı"
-          value={personel.calisan_kapsami === "DIS_KAYNAK" ? "DIŞ KAYNAK" : "İÇ PERSONEL"}
+          value={formatCalisanKapsamiLabel(personel.calisan_kapsami ?? "IC_PERSONEL")}
         />
         <DossierField
           label="Sicil No"

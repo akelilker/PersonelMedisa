@@ -1,5 +1,6 @@
 import { type Dispatch, type FormEvent, type SetStateAction } from "react";
 import { FormField } from "../../../../components/form/FormField";
+import { CALISAN_KAPSAMI_SELECT_OPTIONS } from "../../../../lib/display/enum-display";
 import type { PersonelReferenceBundle } from "../../../../data/app-data.types";
 import type { IdOption } from "../../../../types/referans";
 import type { BagliAmirFormGuidance, EditPersonelFormState } from "../../personel-edit-utils";
@@ -49,10 +50,7 @@ export function PersonelInlineEditForm({
               calisanKapsami: value as EditPersonelFormState["calisanKapsami"]
             }))
           }
-          selectOptions={[
-            { value: "IC_PERSONEL", label: "İç Personel" },
-            { value: "DIS_KAYNAK", label: "Dış Kaynak / SGK Başka İşverende" }
-          ]}
+          selectOptions={CALISAN_KAPSAMI_SELECT_OPTIONS}
         />
         <FormField
           label="T.C. Kimlik No"

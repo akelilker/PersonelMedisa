@@ -7,7 +7,7 @@ import { LoadingState } from "../../../components/states/LoadingState";
 import { SubeDetailListNotice } from "../../../components/states/SubeDetailListNotice";
 import { useRoleAccess } from "../../../hooks/use-role-access";
 import { usePersoneller } from "../../../hooks/usePersoneller";
-import { formatAktifDurumLabel } from "../../../lib/display/enum-display";
+import { formatAktifDurumLabel, formatCalisanKapsamiLabel, CALISAN_KAPSAMI_SELECT_OPTIONS } from "../../../lib/display/enum-display";
 import type { Personel } from "../../../types/personel";
 import type { IdOption } from "../../../types/referans";
 import { PersonelImportDryRunModal } from "../components/PersonelImportDryRunModal";
@@ -354,10 +354,7 @@ export function PersonellerPage() {
                   onChange={(value) =>
                     setDraftCalisanKapsami(value as "" | "IC_PERSONEL" | "DIS_KAYNAK")
                   }
-                  selectOptions={[
-                    { value: "IC_PERSONEL", label: "İç Personel" },
-                    { value: "DIS_KAYNAK", label: "Dış Kaynak" }
-                  ]}
+                  selectOptions={CALISAN_KAPSAMI_SELECT_OPTIONS}
                   placeholderOption={{ value: "", label: "Tümü" }}
                 />
                 <div className="personeller-aktiflik-group" role="group" aria-label="Aktiflik">
@@ -498,7 +495,9 @@ export function PersonellerPage() {
                         personelName
                       )}
                       {personel.calisan_kapsami === "DIS_KAYNAK" ? (
-                        <span className="personeller-status-badge">DIŞ KAYNAK</span>
+                        <span className="personeller-status-badge">
+                          {formatCalisanKapsamiLabel("DIS_KAYNAK")}
+                        </span>
                       ) : null}
                       {missingFieldCount > 0 ? (
                         <span
@@ -564,7 +563,9 @@ export function PersonellerPage() {
                 <div className="personeller-item-content personeller-item-content--grid">
                   <span className="personeller-card-title">{personelName}</span>
                   {personel.calisan_kapsami === "DIS_KAYNAK" ? (
-                    <span className="personeller-status-badge">DIŞ KAYNAK</span>
+                    <span className="personeller-status-badge">
+                      {formatCalisanKapsamiLabel("DIS_KAYNAK")}
+                    </span>
                   ) : null}
                   {missingFieldCount > 0 ? (
                     <span

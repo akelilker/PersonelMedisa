@@ -9,6 +9,7 @@ import {
 } from "react";
 import { FormField, type FormFieldOption } from "../../../components/form/FormField";
 import { mapUcretTipiSelectOptions } from "../../../lib/display/ucret-tipi-display";
+import { CALISAN_KAPSAMI_SELECT_OPTIONS } from "../../../lib/display/enum-display";
 import type { PersonelReferenceBundle } from "../../../data/app-data.types";
 import type { CreatePersonelFormState } from "../../../hooks/usePersoneller";
 import type { IdOption } from "../../../types/referans";
@@ -248,12 +249,17 @@ export function PersonelCreateFields({
               }))
             }
             required
-            options={[
-              { value: "IC_PERSONEL", label: "İç Personel" },
-              { value: "DIS_KAYNAK", label: "Dış Kaynak / SGK Başka İşverende" }
-            ]}
+            options={CALISAN_KAPSAMI_SELECT_OPTIONS}
             isOpen={openSelectName === "create-calisan-kapsami"}
             onOpenChange={(isOpen) => setSelectOpen("create-calisan-kapsami", isOpen)}
+          />
+          <FormField
+            label="Sicil No"
+            name="create-sicil"
+            value={form.sicilNo}
+            onChange={(value) => setForm((prev) => ({ ...prev, sicilNo: value }))}
+            placeholder="Örn. MED-001"
+            required
           />
           <FormField
             label="T.C. Kimlik No"
@@ -341,14 +347,6 @@ export function PersonelCreateFields({
         </div>
 
         <div className="personel-form-column">
-          <FormField
-            label="Sicil No"
-            name="create-sicil"
-            value={form.sicilNo}
-            onChange={(value) => setForm((prev) => ({ ...prev, sicilNo: value }))}
-            placeholder="Örn. MED-001"
-            required
-          />
           <FormField
             label="İşe Giriş Tarihi"
             name="create-ise-giris"

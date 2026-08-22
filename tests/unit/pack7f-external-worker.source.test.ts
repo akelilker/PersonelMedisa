@@ -72,7 +72,7 @@ describe("Pack7F external worker source locks", () => {
     expect(dryRun).toContain("$hasScopeColumn");
     expect(controller).toContain("calisan_kapsami = :calisan_kapsami");
     expect(page).toContain("Çalışan Kapsamı");
-    expect(page).toContain("DIŞ KAYNAK");
+    expect(page).toContain("formatCalisanKapsamiLabel");
     expect(page).toContain("formatPersonelName");
     expect(detailPage).toContain("directoryOnly={isDirectoryOnly}");
     expect(surecWorkspace).toContain("isSelectedPersonelDirectoryOnly");

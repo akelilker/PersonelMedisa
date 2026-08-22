@@ -15,22 +15,22 @@ type Phase =
 
 function mapScanError(error: unknown): string {
   if (!isApiRequestError(error)) {
-    return "Baglanti kurulamadi, kayit olusturulmadi.";
+    return "Bağlantı kurulamadı, kayıt oluşturulmadı.";
   }
   switch (error.code) {
     case "QR_TOKEN_EXPIRED":
-      return "QR suresi doldu. Tekrar okutun.";
+      return "QR süresi doldu. Tekrar okutun.";
     case "QR_CROSS_BRANCH_DENIED":
-      return "Bu QR baska bir subeye aittir.";
+      return "Bu QR başka bir şubeye aittir.";
     case "SELF_SERVICE_BINDING_REQUIRED":
-      return "Personel baglantiniz yok.";
+      return "Personel bağlantınız yok.";
     case "SELF_SERVICE_PERSONEL_INACTIVE":
-      return "Personel hesabiniz pasif.";
+      return "Personel hesabınız pasif.";
     case "QR_CONFIG_NOT_READY":
     case "QR_SCHEMA_NOT_READY":
-      return "QR servisi su an hazir degil.";
+      return "QR servisi şu an hazır değil.";
     default:
-      return error.message || "Kayit olusturulamadi.";
+      return error.message || "Kayıt oluşturulamadı.";
   }
 }
 
@@ -56,7 +56,7 @@ export function PersonelQrScanPage() {
     setPhase({ kind: "scanning" });
     const video = videoRef.current;
     if (!video) {
-      setPhase({ kind: "error", message: "Kamera alani hazir degil." });
+      setPhase({ kind: "error", message: "Kamera alanı hazır değil." });
       return;
     }
     try {
@@ -73,7 +73,7 @@ export function PersonelQrScanPage() {
     } catch (error) {
       setPhase({
         kind: "error",
-        message: error instanceof Error ? error.message : "Kamera acilamadi."
+        message: error instanceof Error ? error.message : "Kamera açılamadı."
       });
     }
   };
@@ -107,7 +107,7 @@ export function PersonelQrScanPage() {
     <section className="self-service-home qr-scan-page" data-testid="personel-qr-scan-page">
       <header className="self-service-home__header">
         <h2>QR Okut</h2>
-        <p>Once QR kodu okutun, sonra Giris veya Cikis secin.</p>
+        <p>Önce QR kodu okutun, sonra Giriş veya Çıkış seçin.</p>
       </header>
 
       <div className="qr-scan-video-wrap">
@@ -116,23 +116,23 @@ export function PersonelQrScanPage() {
 
       {phase.kind === "idle" ? (
         <button type="button" className="self-service-action" data-testid="qr-scan-start" onClick={() => void beginScan()}>
-          Kamerayi ac
+          Kamerayı aç
         </button>
       ) : null}
 
       {phase.kind === "scanning" ? (
         <p className="self-service-muted" data-testid="qr-scan-scanning">
-          QR kodu cerceveye hizalayin...
+          QR kodu çerçeveye hizalayın...
         </p>
       ) : null}
 
       {phase.kind === "choose" ? (
         <div className="qr-scan-actions" data-testid="qr-scan-choose">
           <button type="button" className="self-service-action" onClick={() => void submit("GIRIS")}>
-            Giris
+            Giriş
           </button>
           <button type="button" className="self-service-action" onClick={() => void submit("CIKIS")}>
-            Cikis
+            Çıkış
           </button>
         </div>
       ) : null}
@@ -143,14 +143,14 @@ export function PersonelQrScanPage() {
 
       {phase.kind === "success" ? (
         <article className="state-card self-service-card" data-testid="qr-scan-success">
-          <h3>{phase.event.event_type === "GIRIS" ? "Giris kaydedildi" : "Cikis kaydedildi"}</h3>
+          <h3>{phase.event.event_type === "GIRIS" ? "Giriş kaydedildi" : "Çıkış kaydedildi"}</h3>
           <dl className="self-service-dl">
             <div>
               <dt>Zaman</dt>
               <dd>{new Date(phase.event.occurred_at).toLocaleString("tr-TR")}</dd>
             </div>
             <div>
-              <dt>Sube</dt>
+              <dt>Şube</dt>
               <dd>{phase.event.sube.ad || `#${phase.event.sube.id}`}</dd>
             </div>
           </dl>
@@ -170,7 +170,7 @@ export function PersonelQrScanPage() {
       ) : null}
 
       <p>
-        <Link to="/">Ozet</Link>
+        <Link to="/">Özet</Link>
         {" · "}
         <Link to="/self/qr-hareketleri">QR Hareketlerim</Link>
       </p>

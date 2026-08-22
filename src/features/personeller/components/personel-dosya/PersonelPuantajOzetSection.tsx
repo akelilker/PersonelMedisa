@@ -443,7 +443,7 @@ export function PersonelPuantajOzetSection({
                 </span>
               </div>
               <div className="personel-devam-primi-row">
-                <span className="personel-devam-primi-label">Readiness</span>
+                <span className="personel-devam-primi-label">Hazırlık</span>
                 <span
                   className="personel-devam-primi-value"
                   data-testid="personel-bordro-aday-ucret-korunan"

@@ -38,7 +38,9 @@ describe("S85-C1 SGK katalog hazirlik parity", () => {
     expect(router).toContain("SgkKatalogHazirlikController::import");
     expect(endpoints).toContain("sgkKatalogHazirlik");
     expect(page).toContain("sgk-katalog");
-    expect(panel).toContain("DOGRULANMIS_TAM seçilemez");
+    expect(panel).toContain("doğrulanmış tam seçilemez");
+    expect(panel).toContain("formatSgkTamlikDurumuLabel");
+    expect(panel).toContain("Doğrulama Kodu");
     expect(panel).toContain("sgk-katalog-approve");
     expect(docs).toContain("OPERASYONEL_DOGRULAMA_KANITI");
     expect(docs).not.toMatch(/C:\\Users\\Akel\\Downloads/);

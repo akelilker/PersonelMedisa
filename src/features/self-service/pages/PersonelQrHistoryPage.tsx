@@ -90,22 +90,22 @@ export function PersonelQrHistoryPage() {
     <section className="self-service-home" data-testid="personel-qr-history-page">
       <header className="self-service-home__header">
         <h2>QR Hareketlerim</h2>
-        <p>Ham giris/cikis kayitlari ve QR giris/cikis eslesmeleri.</p>
+        <p>Ham giriş/çıkış kayıtları ve QR giriş/çıkış eşleşmeleri.</p>
       </header>
 
       <section className="qr-interval-section" data-testid="personel-qr-intervals-section">
-        <h3>QR Eslesmeleri</h3>
+        <h3>QR Eşleşmeleri</h3>
         <p className="self-service-muted">
-          QR eslesme suresi gosterilir. Kanonik calisma suresi / puantaj hesabi sonraki fazdadir.
+          QR eşleşme süresi gösterilir. Kanonik çalışma süresi / puantaj hesabı sonraki fazdadır.
         </p>
         <p className="self-service-muted">
-          Tam eslesme: {intervals.summary.complete_interval_count} · Anomali:{" "}
-          {intervals.summary.anomaly_count} · Toplam eslesme:{" "}
+          Tam eşleşme: {intervals.summary.complete_interval_count} · Anomali:{" "}
+          {intervals.summary.anomaly_count} · Toplam eşleşme:{" "}
           {formatDuration(intervals.summary.complete_duration_seconds)}
         </p>
 
         {intervals.intervals.length === 0 && intervals.anomalies.length === 0 ? (
-          <p className="self-service-muted">Bu donemde QR eslesmesi yok.</p>
+          <p className="self-service-muted">Bu dönemde QR eşleşmesi yok.</p>
         ) : null}
 
         {intervals.intervals.length > 0 ? (
@@ -115,7 +115,7 @@ export function PersonelQrHistoryPage() {
                 key={`${item.entry_event_id}-${item.exit_event_id}`}
                 className="qr-history-item"
               >
-                <strong>Tam eslesme</strong>
+                <strong>Tam eşleşme</strong>
                 <span>
                   {new Date(item.entry_at).toLocaleString("tr-TR")} →{" "}
                   {new Date(item.exit_at).toLocaleString("tr-TR")}

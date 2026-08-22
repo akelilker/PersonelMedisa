@@ -16,6 +16,7 @@ import { useKayitModalController } from "../features/kayit/hooks/useKayitModalCo
 import { hasRolePermission } from "../lib/authorization/role-permissions";
 import { formatUiProfileLabel, formatUserRoleLabel } from "../lib/display/enum-display";
 import { resolveSecondaryModules } from "../lib/shell/secondary-module-nav";
+import { resolveYonetimModalTitle } from "../lib/yonetim/yonetim-modal-title";
 import { useAuth } from "../state/auth.store";
 
 export type AppShellOutletContext = {
@@ -45,17 +46,6 @@ function resolveBackBar(pathname: string): { to: string; label: string } | null 
     return { to: "/bildirimler", label: "Günlük kayıt listesine dön" };
   }
   return null;
-}
-
-function resolveYonetimModalTitle(tabParam: string | null): string {
-  const normalized = tabParam?.trim().toLowerCase() ?? "";
-  if (normalized === "subeler" || normalized === "sube") {
-    return "ŞUBE YÖNETİMİ";
-  }
-  if (normalized === "mevzuat") {
-    return "MEVZUAT PARAMETRELERİ";
-  }
-  return "KULLANICI YÖNETİMİ";
 }
 
 function resolveModuleModal(pathname: string, tabParam: string | null): ModuleModalConfig | null {

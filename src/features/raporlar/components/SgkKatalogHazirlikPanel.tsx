@@ -35,6 +35,16 @@ import { AppActionDialog } from "../../../components/modal/AppActionDialog";
 import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
 import { useRoleAccess } from "../../../hooks/use-role-access";
+import {
+  formatSgkBlockerDisplayText,
+  formatSgkEvetHayirLabel,
+  formatSgkImportUygunlukLabel,
+  formatSgkKanitKoduLabel,
+  formatSgkSurumDurumLabel,
+  formatSgkTamlikDurumuLabel
+} from "../../../lib/display/sgk-display";
+import { ApiSonucOzeti } from "../../../lib/display/api-sonuc-ozeti";
+import { formatSurecStateLabel } from "../../../lib/display/enum-display";
 import { useAuth } from "../../../state/auth.store";
 
 type SubTab =
@@ -63,6 +73,7 @@ type DialogKind =
 
 const ESLEME_DRAFT_CONFIRM = "SUREC_ESLEME_DRAFT_ONAY";
 const POLITIKA_DRAFT_CONFIRM = "SGK_POLITIKA_DRAFT_ONAY";
+const SGK_ONAY_BEKLIYOR_LABEL = formatSgkSurumDurumLabel("ONAY_BEKLIYOR");
 
 const DEFAULT_ESLEME_PACKAGE = JSON.stringify(
   { parent_surum_kodu: "", successor_surum_kodu: "", rows: [] },
@@ -87,25 +98,25 @@ const SUB_TABS: Array<{ key: SubTab; label: string }> = [
   { key: "tamlik", label: "Tamlık durumu" },
   { key: "kaynaklar", label: "Resmî kaynaklar" },
   { key: "operasyonel", label: "Operasyonel kanıtlar" },
-  { key: "import", label: "Import dry-run" },
+  { key: "import", label: "İçe aktarım denemesi" },
   { key: "esleme", label: "Süreç eşleme" },
   { key: "politika", label: "Şirket SGK politikası" },
-  { key: "coklu", label: "Çoklu neden validation" },
+  { key: "coklu", label: "Çoklu neden doğrulama" },
   { key: "belge", label: "Belge gereksinimleri" },
-  { key: "kismi", label: "Kısmi süreli blocker" },
-  { key: "bildirim", label: "Bildirim dönemi blocker" },
-  { key: "onay", label: "Onay readiness" }
+  { key: "kismi", label: "Kısmi süreli engel" },
+  { key: "bildirim", label: "Bildirim dönemi engeli" },
+  { key: "onay", label: "Onay hazırlığı" }
 ];
 
 function BlockerList({ items }: { items: SgkKatalogBlocker[] }) {
   if (items.length === 0) {
-    return <p data-testid="sgk-katalog-blocker-empty">Blocker yok.</p>;
+    return <p data-testid="sgk-katalog-blocker-empty">Engel yok.</p>;
   }
   return (
     <ul className="yonetim-list" data-testid="sgk-katalog-blocker-list">
       {items.map((item) => (
         <li key={item.code + item.message} data-testid={`sgk-katalog-blocker-${item.code}`}>
-          <strong>{item.code}</strong>: {item.message}
+          {formatSgkBlockerDisplayText(item)}
           {item.cozum_onerisi ? <div className="muted">Çözüm: {item.cozum_onerisi}</div> : null}
         </li>
       ))}
@@ -137,6 +148,36 @@ function summarizeHataliSatirlar(rows: unknown): string {
       return `#${item.row_index ?? "?"}: ${errors}`;
     })
     .join(" · ");
+}
+
+function SgkIslemOzeti(props: {
+  dogrulamaKodu?: string | null;
+  importUygun?: boolean | null;
+  applyUygun?: boolean | null;
+  testId?: string;
+}) {
+  return (
+    <dl className="sgk-islem-ozeti" data-testid={props.testId}>
+      {props.dogrulamaKodu ? (
+        <div>
+          <dt>Doğrulama Kodu</dt>
+          <dd className="bordro-mono--sm">{formatSgkKanitKoduLabel(props.dogrulamaKodu)}</dd>
+        </div>
+      ) : null}
+      {props.importUygun != null ? (
+        <div>
+          <dt>İçe Aktarmaya Uygun</dt>
+          <dd data-testid="sgk-import-uygunluk">{formatSgkImportUygunlukLabel(props.importUygun)}</dd>
+        </div>
+      ) : null}
+      {props.applyUygun != null ? (
+        <div>
+          <dt>Uygulamaya Uygun</dt>
+          <dd data-testid="sgk-apply-uygunluk">{formatSgkImportUygunlukLabel(props.applyUygun)}</dd>
+        </div>
+      ) : null}
+    </dl>
+  );
 }
 
 export function SgkKatalogHazirlikPanel() {
@@ -263,7 +304,7 @@ export function SgkKatalogHazirlikPanel() {
     try {
       setImportResult(await dryRunSgkKatalogImport({ format: "JSON", rows: [] }));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Import dry-run başarısız.");
+      setError(err instanceof Error ? err.message : "İçe aktarım denemesi başarısız.");
     }
   }
 
@@ -274,7 +315,7 @@ export function SgkKatalogHazirlikPanel() {
         await validateSgkSurecEsleme({ surec_turu: "RAPOR", alt_tur: "Raporlu_Hastalik", mappings: [] })
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Eşleme validation başarısız.");
+      setError(err instanceof Error ? err.message : "Eşleme doğrulaması başarısız.");
     }
   }
 
@@ -295,7 +336,7 @@ export function SgkKatalogHazirlikPanel() {
         setEslemeSuccessorKodu(successor);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Süreç eşleme dry-run başarısız.");
+      setError(err instanceof Error ? err.message : "Süreç eşleme ön kontrolü başarısız.");
     }
   }
 
@@ -317,7 +358,7 @@ export function SgkKatalogHazirlikPanel() {
         setPolitikaSurumKodu(surumKodu);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Politika dry-run başarısız.");
+      setError(err instanceof Error ? err.message : "Politika ön kontrolü başarısız.");
     }
   }
 
@@ -355,7 +396,7 @@ export function SgkKatalogHazirlikPanel() {
         }
         const body = parseJsonPackage(eslemePackageText);
         if (!body || !eslemeDryRun) {
-          setDialogError("Önce geçerli dry-run sonucu alın.");
+          setDialogError("Önce geçerli ön kontrol sonucu alın.");
           return;
         }
         const result = await importSgkSurecEsleme({
@@ -372,7 +413,7 @@ export function SgkKatalogHazirlikPanel() {
       } else if (dialog === "esleme-submit") {
         const kod = eslemeSuccessorKodu.trim();
         if (!kod) {
-          setDialogError("Successor sürüm kodu gerekli.");
+          setDialogError("Halef sürüm kodu gerekli.");
           return;
         }
         const result = await submitSgkKatalog({ surum_kodu: kod });
@@ -382,7 +423,7 @@ export function SgkKatalogHazirlikPanel() {
       } else if (dialog === "esleme-approve") {
         const kod = eslemeSuccessorKodu.trim();
         if (!kod) {
-          setDialogError("Successor sürüm kodu gerekli.");
+          setDialogError("Halef sürüm kodu gerekli.");
           return;
         }
         const result = await approveSgkKatalog({
@@ -396,7 +437,7 @@ export function SgkKatalogHazirlikPanel() {
         closeDialog();
       } else if (dialog === "katalog-import") {
         if (!importResult?.import_yapilabilir_mi) {
-          setDialogError("Import dry-run import_yapilabilir_mi=false.");
+          setDialogError("İçe aktarma ön kontrolü uygun değil.");
           return;
         }
         const result = await importSgkKatalog({
@@ -414,7 +455,7 @@ export function SgkKatalogHazirlikPanel() {
         }
         const body = parseJsonPackage(politikaPackageText);
         if (!body || !politikaDryRun) {
-          setDialogError("Önce geçerli dry-run sonucu alın.");
+          setDialogError("Önce geçerli ön kontrol sonucu alın.");
           return;
         }
         const result = await importSgkSirketPolitikasi({
@@ -493,7 +534,7 @@ export function SgkKatalogHazirlikPanel() {
     try {
       setCoklu(await validateSgkCokluNeden({ kodlar: ["15", "01"], kurallar: [] }));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Çoklu neden validation başarısız.");
+      setError(err instanceof Error ? err.message : "Çoklu neden doğrulaması başarısız.");
     }
   }
 
@@ -510,7 +551,7 @@ export function SgkKatalogHazirlikPanel() {
         })
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Operasyonel kanıt validation başarısız.");
+      setError(err instanceof Error ? err.message : "Operasyonel kanıt doğrulaması başarısız.");
     }
   }
 
@@ -547,7 +588,7 @@ export function SgkKatalogHazirlikPanel() {
         })
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Onay validation başarısız.");
+      setError(err instanceof Error ? err.message : "Onay doğrulaması başarısız.");
     }
   }
 
@@ -574,14 +615,14 @@ export function SgkKatalogHazirlikPanel() {
           </p>
         ) : (
           <p data-testid="sgk-katalog-kaynak-tamlik-uyari">
-            Kaynak tamlığı tamamlanmadı. Resmî katalog satırları gösterilmez; DOGRULANMIS_TAM seçilemez.
-            TEYITSIZ ve tarihsel kodlar güncel kayıt ekranında seçilemez.
+            Kaynak tamlığı tamamlanmadı. Resmî katalog satırları gösterilmez; doğrulanmış tam seçilemez.
+            Teyitsiz ve tarihsel kodlar güncel kayıt ekranında seçilemez.
           </p>
         )}
         {kisitliOnayli ? (
           <p data-testid="sgk-katalog-kisitli-tarih-uyari" className="muted">
-            Geçerlilik başlangıcı yoksa: Belirlenemedi. TEYITSIZ/KOSULLU alanlar otomatik izin sayılmaz; belirsiz
-            kuralda MANUEL_INCELEME uygulanır.
+            Geçerlilik başlangıcı yoksa: Belirlenemedi. Teyitsiz/koşullu alanlar otomatik izin sayılmaz; belirsiz
+            kuralda manuel inceleme uygulanır.
           </p>
         ) : null}
         <p data-testid="sgk-katalog-aktiflik-etiketleri" className="muted">
@@ -612,14 +653,19 @@ export function SgkKatalogHazirlikPanel() {
       {subTab === "tamlik" ? (
         <div data-testid="sgk-katalog-tamlik">
           <p>
-            Durum: <strong data-testid="sgk-katalog-tamlik-durumu">{SGK_TAMLIK_DURUMU_LABEL[tamlikDurumu] ?? tamlikDurumu}</strong> · Kod sayısı: {tamlik?.kod_sayisi ?? 0} · Kaynak:{" "}
-            {tamlik?.kaynak_sayisi ?? 0} · Sürüm satırı: {surumTotal}
+            Durum:{" "}
+            <strong data-testid="sgk-katalog-tamlik-durumu">{formatSgkTamlikDurumuLabel(tamlikDurumu)}</strong> · Kod
+            sayısı: {tamlik?.kod_sayisi ?? 0} · Kaynak: {tamlik?.kaynak_sayisi ?? 0} · Sürüm satırı: {surumTotal}
           </p>
-          <p>Onaylanabilir mi: {tamlik?.onaylanabilir_mi ? "evet" : "hayır"}</p>
+          <p>Onaylanabilir mi: {formatSgkEvetHayirLabel(tamlik?.onaylanabilir_mi ?? null)}</p>
           <p data-testid="sgk-katalog-dogrulanmis-tam-note" className="muted">
-            DOGRULANMIS_TAM: {tamlik?.dogrulanmis_tam_secilebilir_mi ? "seçilebilir" : "seçilemez (tam kanıt gerekir)"}
+            Doğrulanmış tam:{" "}
+            {tamlik?.dogrulanmis_tam_secilebilir_mi ? "seçilebilir" : "seçilemez (tam kanıt gerekir)"}
           </p>
-          <p data-testid="sgk-katalog-eksik-kanitlar">Eksik kanıtlar: {(tamlik?.eksik_kanitlar ?? []).join(", ") || "—"}</p>
+          <p data-testid="sgk-katalog-eksik-kanitlar">
+            Eksik kanıtlar:{" "}
+            {(tamlik?.eksik_kanitlar ?? []).map((kanit) => formatSurecStateLabel(kanit)).join(", ") || "—"}
+          </p>
           <BlockerList items={blockers} />
         </div>
       ) : null}
@@ -641,23 +687,23 @@ export function SgkKatalogHazirlikPanel() {
       {subTab === "operasyonel" ? (
         <div data-testid="sgk-katalog-operasyonel">
           <p data-testid="sgk-katalog-operasyonel-ayrim">
-            Operasyonel kanıt sınıfı: OPERASYONEL_DOGRULAMA_KANITI. Mevzuat kaynağı değildir; tek başına katalog
+            Operasyonel kanıt sınıfı: operasyonel doğrulama kanıtı. Mevzuat kaynağı değildir; tek başına katalog
             tamlığını geçirmez.
           </p>
           <button type="button" className="universal-btn-save" data-testid="sgk-katalog-operasyonel-validate" onClick={() => void runOperasyonel()} disabled={!canMevzuat}>
-            Metadata doğrula (validation-only)
+            Metadata doğrula (yalnız doğrulama)
           </button>
           {operasyonel ? (
-            <pre data-testid="sgk-katalog-operasyonel-result">{JSON.stringify(operasyonel, null, 2)}</pre>
+            <ApiSonucOzeti data={operasyonel} testId="sgk-katalog-operasyonel-result" title="İşlem Özeti" />
           ) : null}
         </div>
       ) : null}
 
       {subTab === "import" ? (
         <div data-testid="sgk-katalog-import">
-          <p>Import önce dry-run ile doğrulanır. Yazma {importWriteAktif ? "tamlık izin veriyorsa aktif" : "kapalı"}.</p>
+          <p>İçe aktarma önce ön kontrol ile doğrulanır. Yazma {importWriteAktif ? "tamlık izin veriyorsa aktif" : "kapalı"}.</p>
           <button type="button" className="universal-btn-save" data-testid="sgk-katalog-import-dry-run" onClick={() => void runImportDryRun()} disabled={!canMevzuat}>
-            Dry-run doğrula
+            Ön kontrol doğrula
           </button>
           <button
             type="button"
@@ -666,12 +712,16 @@ export function SgkKatalogHazirlikPanel() {
             disabled={!importWriteAktif || !canPrepare || !importResult?.import_yapilabilir_mi}
             onClick={() => openDialog("katalog-import")}
           >
-            Import yaz {importWriteAktif && canPrepare ? "(prepare)" : "(kapalı)"}
+            İçe aktarmayı yaz {importWriteAktif && canPrepare ? "(hazırlık açık)" : "(kapalı)"}
           </button>
           {importResult ? (
             <div data-testid="sgk-katalog-import-result">
-              <p>payload_hash: {importResult.payload_hash}</p>
-              <p>import_yapilabilir_mi: {String(importResult.import_yapilabilir_mi)}</p>
+              <h4>İşlem Özeti</h4>
+              <SgkIslemOzeti
+                dogrulamaKodu={importResult.payload_hash}
+                importUygun={importResult.import_yapilabilir_mi}
+                testId="sgk-katalog-import-ozet"
+              />
               <BlockerList items={importResult.blocker_detaylari ?? []} />
             </div>
           ) : null}
@@ -681,19 +731,19 @@ export function SgkKatalogHazirlikPanel() {
       {subTab === "esleme" ? (
         <div data-testid="sgk-katalog-esleme">
           <p data-testid="sgk-esleme-immutable-note" className="muted">
-            Onaylanmış katalog sürümü (parent) değiştirilemez; eşleme yalnızca successor TASLAK sürümüne yazılır.
+            Onaylanmış katalog sürümü (üst sürüm) değiştirilemez; eşleme yalnızca halef taslak sürümüne yazılır.
           </p>
           <p data-testid="sgk-esleme-decision-rules-note" className="muted">
-            Karar kuralları: Kod kullanılmaz (DAHIL) · Ücret modeline göre · Ücret kesilsin mi seçimine göre ·
-            Olay nedeninden türet · Yazılı kısmi sözleşme gerekli. DUSUR için kod zorunlu; DAHIL ile kod çelişki.
+            Karar kuralları: Kod kullanılmaz (dahil) · Ücret modeline göre · Ücret kesilsin mi seçimine göre ·
+            Olay nedeninden türet · Yazılı kısmi sözleşme gerekli. Düşür için kod zorunlu; dahil ile kod çelişki.
           </p>
           {eslemePreflightBlocker ? (
             <p data-testid="sgk-esleme-preflight-note" className="yonetim-error">
-              Preflight: {eslemePreflightBlocker.message}
+              Ön kontrol: {eslemePreflightBlocker.message}
             </p>
           ) : null}
           <p data-testid="sgk-esleme-dual-control-note" className="muted">
-            Onay adımında hazırlayan farklı olmalı; aynı kullanıcı kendi successor sürümünü onaylayamaz.
+            Onay adımında hazırlayan farklı olmalı; aynı kullanıcı kendi halef sürümünü onaylayamaz.
           </p>
           <div className="form-actions-row">
             <button
@@ -706,7 +756,7 @@ export function SgkKatalogHazirlikPanel() {
               Süreç Eşleme Şablonunu İndir
             </button>
             <button type="button" className="universal-btn-save" data-testid="sgk-katalog-esleme-validate" onClick={() => void runEslemeValidate()}>
-              Eşleme doğrula (legacy)
+              Eşleme doğrula (eski akış)
             </button>
           </div>
           <label className="form-label" htmlFor="sgk-esleme-package">
@@ -738,7 +788,7 @@ export function SgkKatalogHazirlikPanel() {
               disabled={!canMevzuat}
               onClick={() => void runEslemeDryRun()}
             >
-              Dry-run
+              Ön kontrol
             </button>
             <button
               type="button"
@@ -747,7 +797,7 @@ export function SgkKatalogHazirlikPanel() {
               disabled={!canPrepare || !eslemeApplyReady || eslemeApproved}
               onClick={() => openDialog("esleme-draft")}
             >
-              TASLAK import
+              TASLAK içe aktar
             </button>
             <button
               type="button"
@@ -756,7 +806,7 @@ export function SgkKatalogHazirlikPanel() {
               disabled={!canPrepare || !eslemeSuccessorKodu || eslemeApproved || eslemeSuccessorState === "ONAY_BEKLIYOR"}
               onClick={() => openDialog("esleme-submit")}
             >
-              Submit successor
+              Halef sürümü gönder
             </button>
             <button
               type="button"
@@ -773,7 +823,7 @@ export function SgkKatalogHazirlikPanel() {
               }
               onClick={() => openDialog("esleme-approve")}
             >
-              Approve successor
+              Halef sürümü onayla
             </button>
           </div>
           <div className="form-field-grid">
@@ -789,18 +839,24 @@ export function SgkKatalogHazirlikPanel() {
           </div>
           {eslemeDryRun ? (
             <div data-testid="sgk-esleme-dry-run-result">
-              <p>esleme_payload_hash: {String(eslemeDryRun.esleme_payload_hash ?? "—")}</p>
-              <p>apply_yapilabilir_mi: {String(eslemeDryRun.apply_yapilabilir_mi ?? false)}</p>
+              <h4>İşlem Özeti</h4>
+              <SgkIslemOzeti
+                dogrulamaKodu={String(eslemeDryRun.esleme_payload_hash ?? "")}
+                applyUygun={Boolean(eslemeDryRun.apply_yapilabilir_mi)}
+                testId="sgk-esleme-on-kontrol-ozet"
+              />
               <p data-testid="sgk-esleme-hatali-summary">{summarizeHataliSatirlar(eslemeDryRun.hatali_satirlar)}</p>
             </div>
           ) : null}
-          {eslemeValidate ? <pre data-testid="sgk-katalog-esleme-result">{JSON.stringify(eslemeValidate, null, 2)}</pre> : null}
+          {eslemeValidate ? (
+            <ApiSonucOzeti data={eslemeValidate} testId="sgk-katalog-esleme-result" title="İşlem Özeti" />
+          ) : null}
           {eslemeActionResult ? (
-            <pre data-testid="sgk-esleme-action-result">{JSON.stringify(eslemeActionResult, null, 2)}</pre>
+            <ApiSonucOzeti data={eslemeActionResult} testId="sgk-esleme-action-result" title="İşlem Özeti" />
           ) : null}
           {eslemeSuccessorState ? (
             <p data-testid="sgk-esleme-successor-state">
-              Successor state: {eslemeSuccessorState}
+              Halef durumu: {formatSgkSurumDurumLabel(eslemeSuccessorState)}
               {eslemeSuccessorKodu ? ` · ${eslemeSuccessorKodu}` : ""}
             </p>
           ) : null}
@@ -857,7 +913,7 @@ export function SgkKatalogHazirlikPanel() {
               disabled={!canMevzuat}
               onClick={() => void runPolitikaDryRun()}
             >
-              Dry-run
+              Ön kontrol
             </button>
             <button
               type="button"
@@ -866,7 +922,7 @@ export function SgkKatalogHazirlikPanel() {
               disabled={!canPrepare || !politikaImportReady || politikaApproved}
               onClick={() => openDialog("politika-draft")}
             >
-              TASLAK import
+              TASLAK içe aktar
             </button>
             <button
               type="button"
@@ -875,7 +931,7 @@ export function SgkKatalogHazirlikPanel() {
               disabled={!canPrepare || !politikaSurumKodu || politikaApproved || politikaSurumState === "ONAY_BEKLIYOR"}
               onClick={() => openDialog("politika-submit")}
             >
-              Submit
+              Gönder
             </button>
             <button
               type="button"
@@ -889,22 +945,26 @@ export function SgkKatalogHazirlikPanel() {
               }
               onClick={() => openDialog("politika-approve")}
             >
-              Approve
+              Onayla
             </button>
           </div>
           {politikaDryRun ? (
             <div data-testid="sgk-politika-dry-run-result">
-              <p>politika_hash: {String(politikaDryRun.politika_hash ?? "—")}</p>
-              <p>import_yapilabilir_mi: {String(politikaDryRun.import_yapilabilir_mi ?? false)}</p>
+              <h4>İşlem Özeti</h4>
+              <SgkIslemOzeti
+                dogrulamaKodu={String(politikaDryRun.politika_hash ?? "")}
+                importUygun={Boolean(politikaDryRun.import_yapilabilir_mi)}
+                testId="sgk-politika-on-kontrol-ozet"
+              />
               <p data-testid="sgk-politika-hatali-summary">{summarizeHataliSatirlar(politikaDryRun.hatali_satirlar)}</p>
             </div>
           ) : null}
           {politikaActionResult ? (
-            <pre data-testid="sgk-politika-action-result">{JSON.stringify(politikaActionResult, null, 2)}</pre>
+            <ApiSonucOzeti data={politikaActionResult} testId="sgk-politika-action-result" title="İşlem Özeti" />
           ) : null}
           {politikaSurumState ? (
             <p data-testid="sgk-politika-surum-state">
-              Politika state: {politikaSurumState}
+              Politika durumu: {formatSgkSurumDurumLabel(politikaSurumState)}
               {politikaSurumKodu ? ` · ${politikaSurumKodu}` : ""}
             </p>
           ) : null}
@@ -917,7 +977,7 @@ export function SgkKatalogHazirlikPanel() {
           <button type="button" className="universal-btn-save" data-testid="sgk-katalog-coklu-validate" onClick={() => void runCoklu()}>
             Çoklu neden doğrula
           </button>
-          {coklu ? <pre data-testid="sgk-katalog-coklu-result">{JSON.stringify(coklu, null, 2)}</pre> : null}
+          {coklu ? <ApiSonucOzeti data={coklu} testId="sgk-katalog-coklu-result" title="İşlem Özeti" /> : null}
         </div>
       ) : null}
 
@@ -928,16 +988,16 @@ export function SgkKatalogHazirlikPanel() {
           </p>
           <BlockerList items={(tamlik?.blocker_detaylari ?? []).filter((b) => b.code === "SGK_KATALOG_TAMLIK_KANITI_EKSIK")} />
           <div className="sgk-manuel-override-form" data-testid="sgk-manuel-kod-override-form">
-            <h4>SGK manuel kod override</h4>
+            <h4>SGK manuel kod üst yazımı</h4>
             <label>
-              Personel ID
+              Personel no
               <input value={overridePersonelId} onChange={(e) => setOverridePersonelId(e.target.value)} data-testid="sgk-override-personel-id" />
             </label>
             <label>
               Hedef türü
               <select value={overrideTargetType} onChange={(e) => setOverrideTargetType(e.target.value as "SUREC" | "GUNLUK_PUANTAJ")} data-testid="sgk-override-target-type">
-                <option value="SUREC">SUREC</option>
-                <option value="GUNLUK_PUANTAJ">GUNLUK_PUANTAJ (mühür satır id)</option>
+                <option value="SUREC">Süreç</option>
+                <option value="GUNLUK_PUANTAJ">Günlük puantaj (mühür satırı)</option>
               </select>
             </label>
             <label>
@@ -968,7 +1028,9 @@ export function SgkKatalogHazirlikPanel() {
             >
               Manuel override kaydet
             </button>
-            {overrideResult ? <pre data-testid="sgk-manuel-kod-override-result">{JSON.stringify(overrideResult, null, 2)}</pre> : null}
+            {overrideResult ? (
+              <ApiSonucOzeti data={overrideResult} testId="sgk-manuel-kod-override-result" title="İşlem Özeti" />
+            ) : null}
           </div>
         </div>
       ) : null}
@@ -976,28 +1038,28 @@ export function SgkKatalogHazirlikPanel() {
       {subTab === "kismi" ? (
         <div data-testid="sgk-katalog-kismi">
           <button type="button" className="universal-btn-save" data-testid="sgk-katalog-kismi-preview" onClick={() => void runKismi()}>
-            Preview (hesap yok)
+            Önizleme (hesap yok)
           </button>
-          {kismi ? <pre data-testid="sgk-katalog-kismi-result">{JSON.stringify(kismi, null, 2)}</pre> : null}
+          {kismi ? <ApiSonucOzeti data={kismi} testId="sgk-katalog-kismi-result" title="İşlem Özeti" /> : null}
         </div>
       ) : null}
 
       {subTab === "bildirim" ? (
         <div data-testid="sgk-katalog-bildirim">
           <button type="button" className="universal-btn-save" data-testid="sgk-katalog-bildirim-preview" onClick={() => void runBildirim()}>
-            Preview (15–14 varsayılmaz)
+            Önizleme (15–14 varsayılmaz)
           </button>
-          {bildirim ? <pre data-testid="sgk-katalog-bildirim-result">{JSON.stringify(bildirim, null, 2)}</pre> : null}
+          {bildirim ? <ApiSonucOzeti data={bildirim} testId="sgk-katalog-bildirim-result" title="İşlem Özeti" /> : null}
         </div>
       ) : null}
 
       {subTab === "onay" ? (
         <div data-testid="sgk-katalog-onay">
           <p data-testid="sgk-katalog-onay-disabled-note">
-            Onay/approve {approveAktif ? "tamlık izin veriyorsa mümkün" : "kapalı"}. DOGRULANMIS_TAM seçeneği sunulmaz.
+            Onay {approveAktif ? "tamlık izin veriyorsa mümkün" : "kapalı"}. Doğrulanmış tam seçeneği sunulmaz.
           </p>
           <button type="button" className="universal-btn-secondary" data-testid="sgk-katalog-approve" disabled={!approveAktif || !canApprove}>
-            Onayla {approveAktif && canApprove ? "(attestation gerekir)" : "(disabled)"}
+            Onayla {approveAktif && canApprove ? "(onay kaydı gerekir)" : "(pasif)"}
           </button>
           <button
             type="button"
@@ -1006,9 +1068,9 @@ export function SgkKatalogHazirlikPanel() {
             onClick={() => void runOnay()}
             disabled={!canOnayValidate}
           >
-            Transition doğrula
+            Geçiş doğrula
           </button>
-          {onay ? <pre data-testid="sgk-katalog-onay-result">{JSON.stringify(onay, null, 2)}</pre> : null}
+          {onay ? <ApiSonucOzeti data={onay} testId="sgk-katalog-onay-result" title="İşlem Özeti" /> : null}
         </div>
       ) : null}
 
@@ -1016,7 +1078,7 @@ export function SgkKatalogHazirlikPanel() {
         <AppActionDialog
           open
           testId="sgk-esleme-draft-dialog"
-          title="Süreç Eşleme TASLAK Import"
+          title="Süreç Eşleme TASLAK İçe Aktarma"
           description={`Onay metni olarak tam ${ESLEME_DRAFT_CONFIRM} yazın. Parent katalog değişmez.`}
           confirmLabel="TASLAK kaydet"
           submitLabel="Kaydediliyor..."
@@ -1039,9 +1101,9 @@ export function SgkKatalogHazirlikPanel() {
         <AppActionDialog
           open
           testId="sgk-esleme-submit-dialog"
-          title="Successor Katalog Submit"
-          description={`${eslemeSuccessorKodu || "—"} sürümü ONAY_BEKLIYOR durumuna gönderilecek.`}
-          confirmLabel="Submit"
+          title="Halef Katalog Gönderimi"
+          description={`${eslemeSuccessorKodu || "—"} sürümü ${SGK_ONAY_BEKLIYOR_LABEL} durumuna gönderilecek.`}
+          confirmLabel="Gönder"
           submitLabel="Gönderiliyor..."
           isSubmitting={dialogSubmitting}
           errorMessage={dialogError}
@@ -1054,8 +1116,8 @@ export function SgkKatalogHazirlikPanel() {
         <AppActionDialog
           open
           testId="sgk-esleme-approve-dialog"
-          title="Successor Katalog Onay"
-          description="Onaylayan hazırlayan farklı olmalı. Attestation bayrakları gönderilecek."
+          title="Halef Katalog Onayı"
+          description="Onaylayan hazırlayan farklı olmalı. Onay beyanları gönderilecek."
           confirmLabel="Onayla"
           submitLabel="Onaylanıyor..."
           isSubmitting={dialogSubmitting}
@@ -1069,9 +1131,9 @@ export function SgkKatalogHazirlikPanel() {
         <AppActionDialog
           open
           testId="sgk-katalog-import-dialog"
-          title="Katalog Import Yaz"
-          description="Dry-run payload hash ile katalog import yazılacak."
-          confirmLabel="Import yaz"
+          title="Katalog İçe Aktarma Yazımı"
+          description="Ön kontrol doğrulama kodu ile katalog içe aktarılacak."
+          confirmLabel="İçe aktarmayı yaz"
           submitLabel="Yazılıyor..."
           isSubmitting={dialogSubmitting}
           errorMessage={dialogError}
@@ -1084,7 +1146,7 @@ export function SgkKatalogHazirlikPanel() {
         <AppActionDialog
           open
           testId="sgk-politika-draft-dialog"
-          title="Şirket SGK Politikası TASLAK Import"
+          title="Şirket SGK Politikası TASLAK İçe Aktarma"
           description={`Onay metni olarak tam ${POLITIKA_DRAFT_CONFIRM} yazın.`}
           confirmLabel="TASLAK kaydet"
           submitLabel="Kaydediliyor..."
@@ -1107,9 +1169,9 @@ export function SgkKatalogHazirlikPanel() {
         <AppActionDialog
           open
           testId="sgk-politika-submit-dialog"
-          title="Politika Submit"
-          description={`${politikaSurumKodu || "—"} ONAY_BEKLIYOR durumuna gönderilecek.`}
-          confirmLabel="Submit"
+          title="Politika Gönderimi"
+          description={`${politikaSurumKodu || "—"} ${SGK_ONAY_BEKLIYOR_LABEL} durumuna gönderilecek.`}
+          confirmLabel="Gönder"
           submitLabel="Gönderiliyor..."
           isSubmitting={dialogSubmitting}
           errorMessage={dialogError}
@@ -1137,8 +1199,8 @@ export function SgkKatalogHazirlikPanel() {
         <AppActionDialog
           open
           testId="sgk-manuel-kod-override-dialog"
-          title="SGK Manuel Kod Override"
-          description="Yetkili manuel eksik gün kodu override kaydı oluşturulacak. Önceki aktif kayıt SUPERSEDED olur."
+          title="SGK Manuel Kod Üst Yazımı"
+          description="Yetkili manuel eksik gün kodu üst yazım kaydı oluşturulacak. Önceki aktif kayıt yeni kayıtla değiştirilir."
           confirmLabel="Kaydet"
           submitLabel="Kaydediliyor..."
           isSubmitting={dialogSubmitting}

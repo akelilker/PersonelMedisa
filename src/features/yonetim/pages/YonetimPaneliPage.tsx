@@ -93,7 +93,7 @@ const ROLE_LABELS: Record<UserRole, string> = {
   BOLUM_YONETICISI: "Bölüm Yöneticisi",
   GENEL_YONETICI: "Genel Yönetici",
   SISTEM_YONETICISI: "Sistem Yöneticisi",
-  AUTH_SMOKE_READONLY: "Teknik Smoke — Salt Okuma"
+  AUTH_SMOKE_READONLY: "Teknik doğrulama — Salt okuma"
 };
 
 const KULLANICI_TIPI_LABELS: Record<KullaniciTipi, string> = {
@@ -859,10 +859,10 @@ export function YonetimPaneliPage() {
       {isLoading ? <LoadingState label="Yönetim paneli yükleniyor..." /> : null}
       {!isLoading && errorMessage ? <ErrorState message={errorMessage} onRetry={() => void loadPanel()} /> : null}
       {!isLoading && successMessage ? <p className="yonetim-success">{successMessage}</p> : null}
-      {!isLoading && !errorMessage ? (
+      {!isLoading && !errorMessage && activeTab === "kullanicilar" ? (
         <p className="yonetim-kiosk-link">
           <Link to="/qr-kiosk" data-testid="yonetim-qr-kiosk-link">
-            QR Kiosk
+            QR Giriş Ekranı
           </Link>
         </p>
       ) : null}
@@ -1128,7 +1128,7 @@ export function YonetimPaneliPage() {
 
       {isKullaniciFormOpen ? (
         <AppModal
-          title={editingKullaniciId != null ? "Kullanıcı Workspace" : "Yeni Kullanıcı"}
+          title={editingKullaniciId != null ? "Kullanıcı Düzenleme" : "Yeni Kullanıcı"}
           backLabel="Kullanıcı Yönetimi"
           onBack={resetKullaniciEditor}
           onClose={resetKullaniciEditor}
@@ -1265,7 +1265,7 @@ export function YonetimPaneliPage() {
 
             {editingKullaniciId != null ? (
               <fieldset className="yonetim-workspace-section">
-                <legend>SGK actor lifecycle</legend>
+                <legend>SGK yetkili kimliği</legend>
                 <KullaniciActorIdentityPanel
                   userId={editingKullaniciId}
                   canManage={canManageYonetimPanel}

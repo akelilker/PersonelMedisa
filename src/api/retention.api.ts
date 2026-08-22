@@ -66,7 +66,7 @@ export async function createLegalHold(payload: {
     { method: "POST", body: JSON.stringify(payload) }
   );
   if (!response.data?.item) {
-    throw new Error("Legal hold olusturulamadi.");
+    throw new Error("Kayıt koruma altına alınamadı.");
   }
   return response.data.item;
 }
@@ -80,7 +80,7 @@ export async function releaseLegalHold(
     { method: "POST", body: JSON.stringify({ release_reason: releaseReason }) }
   );
   if (!response.data?.item) {
-    throw new Error("Legal hold serbest birakilamadi.");
+    throw new Error("Koruma kaldırılamadı.");
   }
   return response.data.item;
 }
@@ -111,7 +111,7 @@ export async function fetchRetentionEligibility(params: {
     ApiResponse<{ eligibility?: RetentionEligibility; policy_note?: string }>
   >(path);
   if (!response.data?.eligibility) {
-    throw new Error("Saklama uygunlugu alinamadi.");
+    throw new Error("Saklama süresi bilgisi alınamadı.");
   }
   return response.data.eligibility;
 }
@@ -144,7 +144,7 @@ export async function requestRetentionImha(payload: {
     body: JSON.stringify(payload)
   });
   if (!response.data?.item || !response.data.eligibility) {
-    throw new Error("Imha talebi olusturulamadi.");
+    throw new Error("İmha talebi oluşturulamadı.");
   }
   return { item: response.data.item, eligibility: response.data.eligibility };
 }
@@ -162,7 +162,7 @@ export async function approveRetentionImha(
     }
   );
   if (!response.data?.item) {
-    throw new Error("Imha onayi islenemedi.");
+    throw new Error("İmha onayı işlenemedi.");
   }
   return response.data.item;
 }

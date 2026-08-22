@@ -115,7 +115,7 @@ describe("EtkiAdayiRaporuPage frontend", () => {
     expect(screen.getByTestId("etki-adayi-rapor-page")).toBeTruthy();
     expect(screen.getByTestId("etki-adayi-rapor-summary")).toBeTruthy();
     expect(screen.getByTestId("etki-adayi-rapor-table")).toBeTruthy();
-    expect(screen.getByTestId("etki-adayi-rapor-row-3").textContent).toContain("HAZIR");
+    expect(screen.getByTestId("etki-adayi-rapor-row-3").textContent).toContain("Hazır");
   });
 
   it("shows export button only with export permission", () => {

@@ -14,7 +14,7 @@ const USER_ROLE_LABELS: Record<UserRole, string> = {
   BOLUM_YONETICISI: "Bölüm Yöneticisi",
   GENEL_YONETICI: "Genel Yönetici",
   SISTEM_YONETICISI: "Sistem Yöneticisi",
-  AUTH_SMOKE_READONLY: "Teknik Smoke — Salt Okuma"
+  AUTH_SMOKE_READONLY: "Teknik doğrulama — Salt okuma"
 };
 
 const UI_PROFILE_LABELS: Record<UiProfile, string> = {
@@ -79,6 +79,9 @@ const COMMON_STATE_LABELS: Record<string, string> = {
   REVIZE_ISTENDI: "Revize İstendi",
   TAMAMLANDI: "Tamamlandı",
   TASLAK: "Taslak",
+  ONAY_BEKLIYOR: "Onay Bekliyor",
+  ONAYLANDI: "Onaylandı",
+  REDDEDILDI: "Reddedildi",
   GONDERILDI: "Gönderildi",
   GEC_GONDERILDI: "Geç Gönderildi",
   DUZELTME_ISTENDI: "Düzeltme İstendi",
@@ -322,6 +325,132 @@ export function formatCalisanKapsamiLabel(
 
 export function formatAylikOzetStateLabel(value: AylikOzetAggregateState | null | undefined): string {
   return formatMappedLabel(value, COMMON_STATE_LABELS);
+}
+
+const RETENTION_CATEGORY_LABELS: Record<string, string> = {
+  PERSONEL_OZLUK: "Personel Özlük Dosyası",
+  PERSONEL_BELGE: "Personel Belgesi",
+  ISE_GIRIS_CIKIS: "İşe Giriş / Çıkış",
+  IZIN: "İzin",
+  RAPOR: "Rapor",
+  IS_KAZASI: "İş Kazası",
+  DISIPLIN: "Disiplin",
+  OLAY: "Olay",
+  SAVUNMA: "Savunma",
+  PUANTAJ: "Puantaj",
+  BORDRO: "Bordro",
+  SGK_EKSIK_GUN: "SGK Eksik Gün",
+  FAZLA_CALISMA: "Fazla Çalışma",
+  SERBEST_ZAMAN: "Serbest Zaman",
+  ONAY_AUDIT: "Onay Denetim Kaydı"
+};
+
+const RETENTION_IMHA_STATUS_LABELS: Record<string, string> = {
+  REQUESTED: "Onay Bekliyor",
+  APPROVED: "Onaylandı",
+  REJECTED: "Reddedildi",
+  BLOCKED: "Engellendi"
+};
+
+const RETENTION_ELIGIBILITY_CODE_LABELS: Record<string, string> = {
+  ELIGIBLE_FOR_DESTRUCTION_REQUEST: "Saklama süresi tamamlanmış. İmha talebi oluşturulabilir.",
+  RETENTION_NOT_MATURE: "Bu kayıt henüz imha edilemez.",
+  LEGAL_HOLD_ACTIVE: "Kayıt koruma altında; imha yapılamaz.",
+  TERMINATION_DATE_MISSING: "İşten ayrılma / çıkış tarihi eksik.",
+  TRIGGER_NOT_RESOLVED: "Saklama başlangıç tarihi belirlenemedi.",
+  PERIOD_NOT_CLOSED: "İlgili dönem kapanışı henüz tamamlanmamış.",
+  UNKNOWN_CATEGORY: "Bilinmeyen saklama kategorisi.",
+  SCHEMA_NOT_READY: "Saklama altyapısı henüz hazır değil."
+};
+
+export const RETENTION_CATEGORY_SELECT_OPTIONS: Array<{ value: string; label: string }> = [
+  { value: "PERSONEL_OZLUK", label: RETENTION_CATEGORY_LABELS.PERSONEL_OZLUK },
+  { value: "PERSONEL_BELGE", label: RETENTION_CATEGORY_LABELS.PERSONEL_BELGE },
+  { value: "ISE_GIRIS_CIKIS", label: RETENTION_CATEGORY_LABELS.ISE_GIRIS_CIKIS },
+  { value: "IZIN", label: RETENTION_CATEGORY_LABELS.IZIN },
+  { value: "RAPOR", label: RETENTION_CATEGORY_LABELS.RAPOR },
+  { value: "IS_KAZASI", label: RETENTION_CATEGORY_LABELS.IS_KAZASI },
+  { value: "DISIPLIN", label: RETENTION_CATEGORY_LABELS.DISIPLIN }
+];
+
+export function formatRetentionCategoryLabel(value: string | null | undefined): string {
+  return formatMappedLabel(value, RETENTION_CATEGORY_LABELS);
+}
+
+export function formatRetentionImhaStatusLabel(value: string | null | undefined): string {
+  return formatMappedLabel(value, RETENTION_IMHA_STATUS_LABELS);
+}
+
+const PERSONEL_IMPORT_SATIR_DURUM_LABELS: Record<string, string> = {
+  GECERLI: "Geçerli",
+  HATALI: "Hatalı",
+  MEVCUT: "Mevcut kayıt"
+};
+
+const RESMI_TATIL_DURUM_LABELS: Record<string, string> = {
+  TASLAK: "Taslak",
+  AKTIF: "Aktif",
+  IPTAL: "İptal"
+};
+
+const RESMI_TATIL_GUN_KAPSAMI_LABELS: Record<string, string> = {
+  TAM_GUN: "Tam gün",
+  YARIM_GUN: "Yarım gün"
+};
+
+const RESMI_TATIL_TURU_LABELS: Record<string, string> = {
+  UBGT: "UBGT",
+  DIGER: "Diğer"
+};
+
+export function formatPersonelImportSatirDurumLabel(value: string | null | undefined): string {
+  return formatMappedLabel(value, PERSONEL_IMPORT_SATIR_DURUM_LABELS);
+}
+
+export function formatResmiTatilDurumLabel(value: string | null | undefined): string {
+  return formatMappedLabel(value, RESMI_TATIL_DURUM_LABELS);
+}
+
+export function formatResmiTatilGunKapsamiLabel(value: string | null | undefined): string {
+  return formatMappedLabel(value, RESMI_TATIL_GUN_KAPSAMI_LABELS);
+}
+
+export function formatResmiTatilTuruLabel(value: string | null | undefined): string {
+  return formatMappedLabel(value, RESMI_TATIL_TURU_LABELS);
+}
+
+export function formatRetentionEligibilitySummary(eligibility: {
+  eligible?: boolean;
+  code?: string;
+  retention_until?: string | null;
+  message?: string | null;
+}): string {
+  if (eligibility.eligible === true) {
+    return "Saklama süresi tamamlanmış. İmha talebi oluşturulabilir.";
+  }
+
+  const untilRaw = eligibility.retention_until?.trim();
+  if (untilRaw) {
+    const parsed = new Date(untilRaw);
+    const untilLabel = Number.isNaN(parsed.getTime())
+      ? untilRaw
+      : parsed.toLocaleDateString("tr-TR");
+    return `Bu kayıt henüz imha edilemez. En erken değerlendirme tarihi: ${untilLabel}`;
+  }
+
+  const code = eligibility.code ? normalizeEnumKey(eligibility.code) : "";
+  if (code && RETENTION_ELIGIBILITY_CODE_LABELS[code]) {
+    return RETENTION_ELIGIBILITY_CODE_LABELS[code];
+  }
+
+  const message = eligibility.message?.trim();
+  if (message) {
+    return message
+      .replace(/\blegal hold\b/gi, "kayıt koruması")
+      .replace(/\bhold\b/gi, "koruma");
+  }
+
+  return "Saklama süresi değerlendirildi. İmha için ek kontrol gerekir.";
 }
 
 function coerceBooleanValue(value: unknown): boolean | null {

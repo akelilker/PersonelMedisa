@@ -784,20 +784,47 @@
 
 @media (max-width: 720px) {
   .kayit-workspace-grid,
-  .surec-workspace-grid,
-  .personel-form-columns {
+  .surec-workspace-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+/* Taşıt Kayıt İşlemleri mobile parity: keep 2 equal columns with center divider. */
+@media (max-width: 640px) {
+  .personel-form-columns {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: clamp(8px, 2.8vw, 14px);
+  }
+
+  .personel-form-column {
+    min-width: 0;
   }
 
   .personel-form-column + .personel-form-column {
-    padding-left: 0;
-    padding-top: 12px;
-    border-left: none;
-    border-top: 1px solid rgba(var(--theme-color-rgb), 0.26);
+    padding-left: 2px;
+    padding-top: 0;
+    border-top: none;
   }
 
   .personel-form-columns::after {
-    display: none;
+    display: block;
+  }
+
+  .kayit-workspace-grid--personel-form .personel-form-columns {
+    gap: clamp(6px, 2.5vw, 12px);
+  }
+
+  .modal-container--kayit-surec .modal-header {
+    padding-inline: clamp(10px, 2.5vw, 16px);
+  }
+
+  .kayit-workspace-tabs {
+    gap: clamp(10px, 3vw, 18px);
+    padding-inline: clamp(10px, 2.5vw, 16px);
+  }
+
+  .kayit-workspace-scroll-body {
+    padding-inline: clamp(8px, 2.2vw, 14px);
   }
 }
 

@@ -22,7 +22,8 @@
   :root {
     --app-footer-height: 30px;
     --app-footer-real-height: 38px;
-    --modal-gap-above-footer: 8px;
-    --modal-footer-optical-reserve: 10px;
+    /* Taşıt mobile parity: visible modal↔footer separation (shell comment: ~6px rhythm). */
+    --modal-gap-above-footer: 6px;
+    --modal-footer-optical-reserve: 0px;
   }
 }

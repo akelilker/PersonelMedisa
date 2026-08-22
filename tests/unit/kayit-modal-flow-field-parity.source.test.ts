@@ -135,6 +135,11 @@ describe("kayit modal flow actions + field surface parity", () => {
     expect(createFields).not.toContain("İç Kaynak");
     expect(createFields).not.toContain("Dış Kaynak");
     expect(createFields).not.toContain("SGK Başka İşverende");
+    expect(createFields).not.toContain("Dış Kaynak / SGK Başka İşverende");
+
+    expect(enumDisplay).not.toContain("İç Kaynak");
+    expect(enumDisplay).not.toContain("Dış Kaynak");
+    expect(enumDisplay).not.toContain("SGK Başka İşverende");
 
     expect(enumDisplay).toMatch(/value:\s*"IC_PERSONEL"/);
     expect(enumDisplay).toMatch(/value:\s*"DIS_KAYNAK"/);

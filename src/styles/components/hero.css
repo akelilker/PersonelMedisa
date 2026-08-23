@@ -194,8 +194,10 @@ body.login-page .hero .animated-line {
   body.login-page .hero {
     --hero-logo-width: 69px;
     --hero-spacer-width: 30px;
-    grid-template-rows: minmax(0, 1fr);
+    /* Title + accent share column 2; absolute overlay lost that track as CB. */
+    grid-template-rows: auto auto;
     column-gap: 14px;
+    row-gap: 3px;
     padding-inline: 16px;
   }
 
@@ -203,7 +205,7 @@ body.login-page .hero .animated-line {
   .hero-spacer,
   body.login-page .hero-logo,
   body.login-page .hero-spacer {
-    grid-row: 1;
+    grid-row: 1 / 3;
   }
 
   .hero-with-session .hero-logo {
@@ -232,7 +234,10 @@ body.login-page .hero .animated-line {
 
   .hero h1,
   body.login-page .hero h1 {
-    align-self: center;
+    grid-row: 1;
+    /* Sit on the shared column-2 track bottom so a tall session logo
+       does not inflate title→line distance when logo spans both rows. */
+    align-self: end;
     /* 20px + 1.8px tracking overflows the 331px center track (~492px hero shell). */
     font-size: 19px;
     letter-spacing: 1.8px;
@@ -240,9 +245,17 @@ body.login-page .hero .animated-line {
 
   .animated-line,
   body.login-page .hero .animated-line {
-    grid-row: 1;
-    position: absolute;
-    top: calc(50% + 8px);
+    grid-column: 2;
+    grid-row: 2;
+    position: static;
+    left: auto;
+    right: auto;
+    top: auto;
+    bottom: auto;
+    transform: none;
+    justify-self: center;
+    align-self: start;
+    width: 74%;
   }
 }
 

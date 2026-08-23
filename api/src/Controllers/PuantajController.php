@@ -23,6 +23,7 @@ use Medisa\Api\Services\Qr\QrPuantajCandidateDecisionLedgerService;
 use Medisa\Api\Services\Qr\QrPuantajCandidateDecisionService;
 use Medisa\Api\Services\Qr\QrPuantajCandidateReadService;
 use Medisa\Api\Services\Qr\QrAttendanceIntervalReadService;
+use Medisa\Api\Services\Personel\PersonelOrgStructureSchema;
 use Medisa\Api\Services\ResmiTatilTakvimProjectionService;
 use PDO;
 
@@ -655,11 +656,22 @@ class PuantajController
     /** @return array<string, mixed> */
     private static function loadPersonel(PDO $pdo, $personelId)
     {
-        $stmt = $pdo->prepare('SELECT id, sube_id, bolum_id, birim_id, dogum_tarihi FROM personeller WHERE id = :id LIMIT 1');
+        // Pack6 org columns only when schema-ready; never reference missing bolum_id/birim_id.
+        $cols = 'id, sube_id, dogum_tarihi';
+        if (PersonelOrgStructureSchema::isReady($pdo)) {
+            $cols = 'id, sube_id, bolum_id, birim_id, dogum_tarihi';
+        }
+        $stmt = $pdo->prepare("SELECT {$cols} FROM personeller WHERE id = :id LIMIT 1");
         $stmt->execute(['id' => $personelId]);
         $personel = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$personel) {
             JsonResponse::notFound('Personel bulunamadi.');
+        }
+        if (!array_key_exists('bolum_id', $personel)) {
+            $personel['bolum_id'] = null;
+        }
+        if (!array_key_exists('birim_id', $personel)) {
+            $personel['birim_id'] = null;
         }
 
         return $personel;

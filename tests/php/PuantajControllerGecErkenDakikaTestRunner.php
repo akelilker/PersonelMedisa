@@ -10,6 +10,7 @@ use Medisa\Api\Auth\AuthMiddleware;
 use Medisa\Api\Database\Connection;
 use Medisa\Api\Controllers\PuantajController;
 use Medisa\Api\Http\Request;
+use Medisa\Api\Services\Personel\PersonelOrgStructureSchema;
 
 if (PHP_SAPI === 'cli' && (($argv[1] ?? '') === '--negative-probe')) {
     $ref = new ReflectionClass(PuantajController::class);
@@ -350,6 +351,12 @@ function invokeUpsertChild(string $dbPath, array $user, int $personelId): array
     $status = (int) trim((string) @file_get_contents((string) $statusFile));
     @unlink((string) $statusFile);
     $decoded = json_decode($stdout, true);
+    if (!is_array($decoded)) {
+        // Windows may prefix stdout with extension-already-loaded warnings.
+        if (preg_match('/\{.*\}\s*\z/s', $stdout, $m)) {
+            $decoded = json_decode($m[0], true);
+        }
+    }
 
     return [
         'status' => $status,
@@ -556,6 +563,28 @@ if ($wrongBranch['status'] !== 403 || ($wrongBranch['payload']['errors'][0]['cod
     failScenario('15', 'wrong branch did not win before external guard');
 }
 passScenario('15', 'wrong branch wins before external guard');
+
+// 16. Pre-Pack6 schema: loadPersonel must not reference missing bolum_id/birim_id.
+PersonelOrgStructureSchema::clearReadyCache();
+if (PersonelOrgStructureSchema::isReady($upsertPdo)) {
+    failScenario('16', 'fixture unexpectedly reports org structure ready');
+}
+try {
+    $loaded = invokePrivate('loadPersonel', [$upsertPdo, 10]);
+} catch (Throwable $e) {
+    failScenario('16', 'loadPersonel threw against pre-org schema: ' . $e->getMessage());
+}
+if (!is_array($loaded)
+    || (int) ($loaded['id'] ?? 0) !== 10
+    || (int) ($loaded['sube_id'] ?? 0) !== 1
+    || array_key_exists('bolum_id', $loaded) === false
+    || array_key_exists('birim_id', $loaded) === false
+    || $loaded['bolum_id'] !== null
+    || $loaded['birim_id'] !== null
+) {
+    failScenario('16', 'loadPersonel pre-org payload mismatch: ' . json_encode($loaded));
+}
+passScenario('16', 'loadPersonel safe without bolum_id/birim_id columns');
 @unlink($dbFile);
 
 echo "OK\n";

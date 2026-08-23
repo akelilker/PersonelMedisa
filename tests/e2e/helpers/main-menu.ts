@@ -14,7 +14,7 @@ const ROLE_KAYIT_ENABLED: Record<MainMenuRole, boolean> = {
 };
 
 export async function expectThreeButtonMainMenu(page: Page, kayitEnabled: boolean) {
-  await expect(page.locator("#main-menu .menu-btn")).toHaveCount(3);
+  await expect(page.locator("#main-menu .menu-btn")).toHaveCount(4);
   await expect(page.getByTestId("menu-kayit-surec")).toBeVisible();
   if (kayitEnabled) {
     await expect(page.getByTestId("menu-kayit-surec")).toBeEnabled();
@@ -23,6 +23,7 @@ export async function expectThreeButtonMainMenu(page: Page, kayitEnabled: boolea
   }
   await expect(page.getByTestId("menu-personel-karti")).toBeVisible();
   await expect(page.getByTestId("menu-raporlar")).toBeVisible();
+  await expect(page.getByTestId("menu-moduller")).toBeVisible();
   await expect(page.getByTestId("menu-puantaj")).toHaveCount(0);
   await expect(page.getByTestId("menu-finans")).toHaveCount(0);
   await expect(page.getByTestId("menu-gunluk-kayit")).toHaveCount(0);

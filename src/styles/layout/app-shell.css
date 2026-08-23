@@ -293,6 +293,61 @@ body.modal-open .app-shell::before {
   cursor: not-allowed;
 }
 
+.main-menu-modules-picker {
+  display: grid;
+  gap: 5px;
+  width: 100%;
+  max-width: var(--app-shell-max-width);
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
+.main-menu-modules-picker nav {
+  display: grid;
+  gap: 5px;
+}
+
+.main-menu-module-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 44px;
+  margin: 0;
+  padding: 0 var(--space-4);
+  box-sizing: border-box;
+  text-align: center;
+  text-decoration: none;
+  background: linear-gradient(180deg, rgba(18, 24, 36, 0.96), rgba(10, 14, 22, 0.98));
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  color: var(--text-secondary);
+  font-weight: 600;
+  font-size: clamp(12px, 2.6vw, 14px);
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+}
+
+.main-menu-module-link:hover,
+.main-menu-module-link:focus-visible {
+  border-color: rgba(214, 225, 236, 0.5);
+  color: var(--text-inverse);
+  outline: 2px solid rgba(var(--theme-color-rgb), 0.85);
+  outline-offset: 2px;
+}
+
+@media (min-width: 641px) {
+  .main-menu-modules-picker {
+    gap: 8px;
+  }
+
+  .main-menu-modules-picker nav {
+    gap: 8px;
+  }
+}
+
 .kayit-tabs {
   display: grid;
   grid-template-columns: 1fr 1fr;

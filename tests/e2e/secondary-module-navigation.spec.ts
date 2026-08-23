@@ -24,182 +24,122 @@ async function expectNoHorizontalOverflow(page: import("@playwright/test").Page)
 }
 
 test.describe("Secondary module navigation", () => {
-  test("GY sees exact module list and each link opens the correct route", async ({ page }) => {
+  test("GY sees home MODÜLLER card, inline picker and each link opens the correct route", async ({ page }) => {
     await mockApi(page, "GENEL_YONETICI");
     await login(page, MOCK_ROLE_LOGIN.GENEL_YONETICI);
     await expect(page).toHaveURL(/\/$/);
 
-    const toggle = page.getByTestId("header-modules-toggle");
-    await expect(toggle).toBeVisible();
-    await expect(toggle).toHaveAttribute("aria-label", "Modüller");
-    await expect(toggle).toHaveAttribute("aria-expanded", "false");
-    await expect(toggle).toHaveAttribute("aria-controls", "shell-header-modules-menu");
+    await expect(page.getByTestId("header-modules-toggle")).toHaveCount(0);
+    await expect(page.getByTestId("overlay-modules-toggle")).toHaveCount(0);
 
-    await toggle.click();
-    await expect(toggle).toHaveAttribute("aria-expanded", "true");
+    const card = page.getByTestId("menu-moduller");
+    await expect(card).toBeVisible();
+    await expect(card).toHaveAttribute("aria-expanded", "false");
+    await expect(page.getByTestId("home-modules-nav")).toHaveCount(0);
 
-    const nav = page.getByTestId("shell-header-modules-nav");
+    await card.click();
+    await expect(card).toHaveAttribute("aria-expanded", "true");
+
+    const nav = page.getByTestId("home-modules-nav");
     await expect(nav).toBeVisible();
     await expect(nav.getByRole("link")).toHaveCount(GY_LINKS.length);
 
     for (const link of GY_LINKS) {
-      await expect(page.getByTestId(`shell-header-module-link-${link.id}`)).toHaveText(link.label);
+      await expect(page.getByTestId(`home-module-link-${link.id}`)).toHaveText(link.label);
     }
 
     for (const link of GY_LINKS) {
       await page.goto("/");
-      await page.getByTestId("header-modules-toggle").click();
-      await page.getByTestId(`shell-header-module-link-${link.id}`).click();
+      await page.getByTestId("menu-moduller").click();
+      await page.getByTestId(`home-module-link-${link.id}`).click();
       await expect(page).toHaveURL(link.path);
     }
   });
 
-  test("Personel Kartı overlay Modules navigates and Escape closes dropdown before modal", async ({
-    page
-  }) => {
+  test("Personel Kartı overlay has no Modules navigation", async ({ page }) => {
     await mockApi(page, "GENEL_YONETICI");
     await login(page, MOCK_ROLE_LOGIN.GENEL_YONETICI);
 
     await page.getByTestId("menu-personel-karti").click();
     await expect(page).toHaveURL(/\/personeller$/);
     await expect(page.getByRole("dialog", { name: "Personel Kartı" })).toBeVisible();
-    await expect(page.getByTestId("personeller-revizyon-merkezi-link")).toHaveCount(0);
-    await expect(page.getByTestId("personeller-belge-takip-link")).toHaveCount(0);
+    await expect(page.getByTestId("overlay-modules-toggle")).toHaveCount(0);
+    await expect(page.getByTestId("header-modules-toggle")).toHaveCount(0);
     await expect(page.getByRole("link", { name: "Puantaj" })).toHaveCount(0);
     await expect(page.getByRole("link", { name: "Günlük Kayıt" })).toHaveCount(0);
-    await expect(page.getByLabel("Modül menü")).toHaveCount(0);
-    await expect(page.locator("#personeller-module-menu")).toHaveCount(0);
-
-    const overlayToggle = page.getByTestId("overlay-modules-toggle");
-    await expect(overlayToggle).toBeVisible();
-    await expect(overlayToggle).toHaveAttribute("aria-controls", "shell-overlay-modules-menu");
-    await expect(page.getByTestId("header-modules-toggle")).toHaveCount(0);
-
-    await overlayToggle.click();
-    await expect(page.getByTestId("shell-overlay-modules-nav")).toBeVisible();
-    await page.getByTestId("shell-overlay-module-link-gunluk-kayit").click();
-    await expect(page).toHaveURL(/\/bildirimler$/);
-    await expect(page.getByRole("dialog", { name: "Günlük Kayıt Merkezi" })).toBeVisible();
-    await expect(page.getByTestId("overlay-modules-toggle")).toBeVisible();
-
-    await page.getByTestId("overlay-modules-toggle").click();
-    await expect(page.getByTestId("shell-overlay-modules-nav")).toBeVisible();
-    await page.keyboard.press("Escape");
-    await expect(page.getByTestId("overlay-modules-toggle")).toHaveAttribute("aria-expanded", "false");
-    await expect(page.getByTestId("overlay-modules-toggle")).toBeFocused();
-    await expect(page.getByRole("dialog", { name: "Günlük Kayıt Merkezi" })).toBeVisible();
-
-    await page.keyboard.press("Escape");
-    await expect(page).toHaveURL(/\/$/);
-    await expect(page.getByRole("dialog", { name: "Günlük Kayıt Merkezi" })).toHaveCount(0);
   });
 
-  test("Kayıt modal does not show overlay Modules; header Modules remains", async ({ page }) => {
+  test("Kayıt modal and overlay routes have no Modules toggle", async ({ page }) => {
     await mockApi(page, "GENEL_YONETICI");
     await login(page, MOCK_ROLE_LOGIN.GENEL_YONETICI);
 
     await page.getByTestId("menu-kayit-surec").click();
     await expect(page.getByRole("dialog", { name: "Kayıt ve Süreç İşlemleri" })).toBeVisible();
     await expect(page.getByTestId("overlay-modules-toggle")).toHaveCount(0);
-    await expect(page.getByTestId("kayit-surec-ops-links")).toHaveCount(0);
-    await expect(page.getByTestId("kayit-surec-puantaj-link")).toHaveCount(0);
-    await expect(page.getByTestId("kayit-surec-revizyon-merkezi-link")).toHaveCount(0);
-    await expect(page.getByTestId("header-modules-toggle")).toBeVisible();
-    await expect(page.locator("#shell-header-modules-menu")).toHaveCount(1);
-    await expect(page.locator("#shell-overlay-modules-menu")).toHaveCount(0);
+    await expect(page.getByTestId("header-modules-toggle")).toHaveCount(0);
+    await page.keyboard.press("Escape");
+
+    await page.goto("/personeller");
+    await expect(page.getByTestId("overlay-modules-toggle")).toHaveCount(0);
+    await expect(page.getByTestId("header-modules-toggle")).toHaveCount(0);
   });
 
-  test("correction route marks only Revizyon Merkezi active in overlay menu", async ({ page }) => {
+  test("Yönetim modal has no Modules toggle", async ({ page }) => {
     await mockApi(page, "GENEL_YONETICI");
     await login(page, MOCK_ROLE_LOGIN.GENEL_YONETICI);
 
-    await page.goto("/haftalik-kapanis/corrections/1");
-    await expect(page.getByTestId("overlay-modules-toggle")).toBeVisible();
-    await page.getByTestId("overlay-modules-toggle").click();
-
-    await expect(page.getByTestId("shell-overlay-module-link-revizyon-merkezi")).toHaveAttribute(
-      "aria-current",
-      "page"
-    );
-    await expect(page.getByTestId("shell-overlay-module-link-haftalik-kapanis")).not.toHaveAttribute(
-      "aria-current",
-      "page"
-    );
-    await expect(
-      page.locator('[data-testid^="shell-overlay-module-link-"][aria-current="page"]')
-    ).toHaveCount(1);
+    await page.getByTestId("header-settings-toggle").click();
+    await page.getByTestId("settings-yonetim-paneli").click();
+    await expect(page).toHaveURL(/\/yonetim-paneli\?tab=kullanicilar$/);
+    await expect(page.getByTestId("overlay-modules-toggle")).toHaveCount(0);
+    await expect(page.getByTestId("header-modules-toggle")).toHaveCount(0);
+    await expect(page.getByText("Modüller", { exact: true })).toHaveCount(0);
   });
 
-  test("BIRIM_AMIRI overlay menu hides Finans; PERSONEL has no toggle", async ({ page }) => {
+  test("BIRIM_AMIRI home picker hides Finans; PERSONEL has disabled MODÜLLER card", async ({ page }) => {
     await mockApi(page, "BIRIM_AMIRI");
     await login(page, MOCK_ROLE_LOGIN.BIRIM_AMIRI);
-    await page.goto("/personeller");
-    await page.getByTestId("overlay-modules-toggle").click();
-    await expect(page.getByTestId("shell-overlay-module-link-gunluk-kayit")).toBeVisible();
-    await expect(page.getByTestId("shell-overlay-module-link-finans")).toHaveCount(0);
+    await page.getByTestId("menu-moduller").click();
+    await expect(page.getByTestId("home-module-link-gunluk-kayit")).toBeVisible();
+    await expect(page.getByTestId("home-module-link-finans")).toHaveCount(0);
 
     await mockApi(page, "PERSONEL");
     await login(page, MOCK_ROLE_LOGIN.PERSONEL);
     await expect(page.getByTestId("header-modules-toggle")).toHaveCount(0);
+    await expect(page.getByTestId("menu-moduller")).toHaveCount(0);
     await page.goto("/raporlar");
     await expect(page.getByTestId("overlay-modules-toggle")).toHaveCount(0);
   });
 
-  test("opening Settings or Notifications closes header Modules", async ({ page }) => {
+  test("MODÜLLER card toggles closed on second click", async ({ page }) => {
     await mockApi(page, "GENEL_YONETICI");
     await login(page, MOCK_ROLE_LOGIN.GENEL_YONETICI);
 
-    const toggle = page.getByTestId("header-modules-toggle");
-    await toggle.click();
-    await expect(page.getByTestId("shell-header-modules-nav")).toBeVisible();
-
-    await page.getByTestId("header-settings-toggle").click();
-    await expect(toggle).toHaveAttribute("aria-expanded", "false");
-    await expect(page.getByTestId("shell-header-modules-nav")).toBeHidden();
-
-    await toggle.click();
-    await expect(page.getByTestId("shell-header-modules-nav")).toBeVisible();
-    await page.locator("#notifications-toggle-btn").click({ force: true });
-    await expect(toggle).toHaveAttribute("aria-expanded", "false");
+    const card = page.getByTestId("menu-moduller");
+    await card.click();
+    await expect(page.getByTestId("home-modules-nav")).toBeVisible();
+    await card.click();
+    await expect(page.getByTestId("home-modules-nav")).toHaveCount(0);
+    await expect(card).toHaveAttribute("aria-expanded", "false");
   });
 
-  test("outside click and Escape close header Modules with focus restore", async ({ page }) => {
-    await mockApi(page, "GENEL_YONETICI");
-    await login(page, MOCK_ROLE_LOGIN.GENEL_YONETICI);
-
-    const toggle = page.getByTestId("header-modules-toggle");
-    await toggle.click();
-    await expect(page.getByTestId("shell-header-modules-nav")).toBeVisible();
-
-    await page.mouse.click(8, 8);
-    await expect(toggle).toHaveAttribute("aria-expanded", "false");
-
-    await toggle.click();
-    await expect(page.getByTestId("shell-header-modules-nav")).toBeVisible();
-    await page.keyboard.press("Escape");
-    await expect(toggle).toHaveAttribute("aria-expanded", "false");
-    await expect(toggle).toBeFocused();
-  });
-
-  test("mobile viewports keep Modules without horizontal overflow", async ({ page }) => {
+  test("mobile viewports keep home MODÜLLER picker without horizontal overflow", async ({ page }) => {
     await mockApi(page, "GENEL_YONETICI");
     await login(page, MOCK_ROLE_LOGIN.GENEL_YONETICI);
 
     for (const size of [
+      { width: 430, height: 844 },
       { width: 390, height: 844 },
+      { width: 375, height: 812 },
+      { width: 360, height: 740 },
       { width: 320, height: 568 }
     ]) {
       await page.setViewportSize(size);
       await page.goto("/");
-      const toggle = page.getByTestId("header-modules-toggle");
-      await expect(toggle).toBeVisible();
-      await toggle.click();
-      await expect(page.getByTestId("shell-header-modules-nav")).toBeVisible();
-      await expectNoHorizontalOverflow(page);
-
-      await page.goto("/personeller");
-      await page.getByTestId("overlay-modules-toggle").click();
-      await expect(page.getByTestId("shell-overlay-modules-nav")).toBeVisible();
+      const card = page.getByTestId("menu-moduller");
+      await expect(card).toBeVisible();
+      await card.click();
+      await expect(page.getByTestId("home-modules-nav")).toBeVisible();
       await expectNoHorizontalOverflow(page);
     }
   });

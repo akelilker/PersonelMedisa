@@ -180,32 +180,19 @@
   padding-top: 16px;
 }
 
-/* Module overlay: single scroll owner on nested list surfaces. */
-.modal-body:has(> .personeller-page),
-.modal-body:has(> .yonetim-page) {
+/* Module overlay: nested scroll only for personeller list surfaces. */
+.modal-body:has(> .personeller-page) {
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
 
-.modal-body > .personeller-page,
-.modal-body > .yonetim-page {
+.modal-body > .personeller-page {
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
-}
-
-.modal-body > .personeller-page {
   gap: var(--space-3);
-}
-
-.modal-body > .yonetim-page {
-  gap: 14px;
-}
-
-.modal-body > .yonetim-page > * + * {
-  margin-top: 0;
 }
 
 .modal-header-spacer {

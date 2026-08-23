@@ -101,8 +101,7 @@ describe("user-visible Turkish final audit contracts", () => {
       "src/features/yonetim/components/SaklamaLegalHoldPanel.tsx",
       "src/features/yonetim/components/KullaniciActorIdentityPanel.tsx",
       "src/features/yonetim/components/MevzuatParametreleriPanel.tsx",
-      "src/components/shell/ShellHeaderActions.tsx",
-      "src/components/shell/ShellModuleMenu.tsx"
+      "src/components/shell/ShellHeaderActions.tsx"
     ];
     for (const rel of files) {
       const src = read(rel);

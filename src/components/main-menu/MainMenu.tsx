@@ -1,19 +1,24 @@
-import { useLocation, useNavigate } from "react-router-dom";
+import { useId, useMemo, useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useRoleAccess } from "../../hooks/use-role-access";
 import {
   PERSONELLER_LIST_ANY,
-  ROUTE_PERMISSION
+  ROUTE_PERMISSION,
+  hasRolePermission
 } from "../../lib/authorization/role-permissions";
+import { resolveSecondaryModules } from "../../lib/shell/secondary-module-nav";
 
 export type KayitTab = "yeni-kayit" | "surec";
 
 const KAYIT_DISABLED_MESSAGE = "Kayıt ve Süreç işlemleri için yetkiniz bulunmuyor.";
 const PERSONEL_DISABLED_MESSAGE = "Personel Kartı modülü için yetkiniz bulunmuyor.";
 const RAPORLAR_DISABLED_MESSAGE = "Raporlar modülü için yetkiniz bulunmuyor.";
+const MODULLER_DISABLED_MESSAGE = "Modül erişimi için yetkiniz bulunmuyor.";
 
 const KAYIT_DISABLED_DESCRIPTION_ID = "menu-kayit-surec-disabled-description";
 const PERSONEL_DISABLED_DESCRIPTION_ID = "menu-personel-karti-disabled-description";
 const RAPORLAR_DISABLED_DESCRIPTION_ID = "menu-raporlar-disabled-description";
+const MODULLER_DISABLED_DESCRIPTION_ID = "menu-moduller-disabled-description";
 
 type MainMenuProps = {
   onKayitOpen: (tab: KayitTab) => void;
@@ -22,11 +27,18 @@ type MainMenuProps = {
 export function MainMenu({ onKayitOpen }: MainMenuProps) {
   const location = useLocation();
   const navigate = useNavigate();
-  const { hasAnyPermission, hasPermission } = useRoleAccess();
+  const { hasAnyPermission, hasPermission, activeRole } = useRoleAccess();
+  const modulesPickerId = useId();
+  const [isModulesOpen, setIsModulesOpen] = useState(false);
 
   const canKayitSection = hasPermission("personeller.create") || hasPermission("surecler.create");
   const canViewPersoneller = hasAnyPermission(PERSONELLER_LIST_ANY);
   const canViewRaporlar = hasPermission(ROUTE_PERMISSION.raporlarPage);
+
+  const secondaryModules = useMemo(
+    () => resolveSecondaryModules((permission) => hasRolePermission(activeRole, permission)),
+    [activeRole]
+  );
 
   const { pathname } = location;
   const isKayitSurecActive = pathname.startsWith("/surecler");
@@ -36,6 +48,7 @@ export function MainMenu({ onKayitOpen }: MainMenuProps) {
   const kayitDisabled = !canKayitSection;
   const personelDisabled = !canViewPersoneller;
   const raporlarDisabled = !canViewRaporlar;
+  const modullerDisabled = secondaryModules.length === 0;
 
   return (
     <nav id="main-menu" className="menu-container" aria-label="Ana omurga modulleri">
@@ -98,6 +111,50 @@ export function MainMenu({ onKayitOpen }: MainMenuProps) {
         <span id={RAPORLAR_DISABLED_DESCRIPTION_ID} className="visually-hidden">
           {RAPORLAR_DISABLED_MESSAGE}
         </span>
+      ) : null}
+
+      <button
+        type="button"
+        className={`menu-btn${isModulesOpen ? " is-active" : ""}`}
+        data-testid="menu-moduller"
+        title={modullerDisabled ? MODULLER_DISABLED_MESSAGE : undefined}
+        aria-describedby={modullerDisabled ? MODULLER_DISABLED_DESCRIPTION_ID : undefined}
+        aria-expanded={isModulesOpen}
+        aria-controls={modullerDisabled ? undefined : modulesPickerId}
+        onClick={() => {
+          if (modullerDisabled) {
+            return;
+          }
+          setIsModulesOpen((prev) => !prev);
+        }}
+        disabled={modullerDisabled}
+      >
+        <div className="ttl">Modüller</div>
+      </button>
+      {modullerDisabled ? (
+        <span id={MODULLER_DISABLED_DESCRIPTION_ID} className="visually-hidden">
+          {MODULLER_DISABLED_MESSAGE}
+        </span>
+      ) : null}
+
+      {isModulesOpen && !modullerDisabled ? (
+        <div id={modulesPickerId} className="main-menu-modules-picker">
+          <nav aria-label="Modüller" data-testid="home-modules-nav">
+            {secondaryModules.map((module) => (
+              <Link
+                key={module.id}
+                to={module.to}
+                data-testid={`home-module-link-${module.id}`}
+                className="main-menu-module-link"
+                onClick={() => {
+                  setIsModulesOpen(false);
+                }}
+              >
+                {module.label}
+              </Link>
+            ))}
+          </nav>
+        </div>
       ) : null}
     </nav>
   );

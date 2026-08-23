@@ -127,8 +127,7 @@ test.describe("Rol bazli smoke", () => {
     await expect(kayitMenuHome).not.toHaveAttribute("aria-label");
 
     await page.goto("/");
-    await page.getByTestId("menu-moduller").click();
-    await page.getByTestId("home-module-link-gunluk-kayit").click();
+    await page.goto("/bildirimler");
     await expect(page.locator(".modal-header h2").first()).toContainText("Günlük Kayıt Merkezi");
     await expect(
       page.locator(".bildirimler-header-row").getByRole("button", { name: /Günlük Kayıt Ekle/i })

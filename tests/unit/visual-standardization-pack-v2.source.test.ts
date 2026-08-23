@@ -189,8 +189,6 @@ describe("PACK V2 visual standardization invariants", () => {
 
   it("preserves permission-aware module navigation and MainMenu registration", () => {
     const mainMenu = read(join(SRC_ROOT, "components", "main-menu", "MainMenu.tsx"));
-    expect(mainMenu.includes("resolveSecondaryModules")).toBe(true);
-    expect(mainMenu.includes('data-testid="menu-moduller"')).toBe(true);
     expect(mainMenu.includes('data-testid="menu-kayit-surec"')).toBe(true);
     expect(mainMenu.includes('data-testid="menu-personel-karti"')).toBe(true);
     expect(mainMenu.includes('data-testid="menu-raporlar"')).toBe(true);

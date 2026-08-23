@@ -14,10 +14,10 @@ test.describe("Kayit Surec pasif personel shell sekmeleri", () => {
     await kayitModal.getByPlaceholder("Personel ara").fill("Pasif");
     await kayitModal.getByRole("option", { name: /Pasif Ornek/i }).click();
 
-    await kayitModal.getByRole("tab", { name: "İzin / Devamsızlık" }).click();
-    const izinPlaceholder = kayitModal.locator(".surec-person-placeholder").filter({ hasText: /İzin \/ Devamsızlık/i });
-    await expect(izinPlaceholder).toContainText(/izin\/devamsızlık kaydı eklenmez/i);
-    await expect(kayitModal.getByRole("button", { name: /Geç Geldi/i })).toHaveCount(0);
+    await kayitModal.getByRole("tab", { name: "Puantaj" }).click();
+    const puantajPlaceholder = kayitModal.locator(".surec-person-placeholder").filter({ hasText: /Puantaj/i });
+    await expect(puantajPlaceholder).toContainText(/puantaj ve izin\/devamsızlık kaydı eklenmez/i);
+    await expect(kayitModal.getByTestId("kayit-surec-puantaj-sub-gec")).toHaveCount(0);
     await expect(kayitModal.locator("[name='surec-create-bas']")).toHaveCount(0);
 
     await kayitModal.getByRole("tab", { name: "Pozisyon" }).click();
@@ -26,10 +26,10 @@ test.describe("Kayit Surec pasif personel shell sekmeleri", () => {
     ).toContainText(/pozisyon değişikliği yapılamaz/i);
     await expect(kayitModal.locator('[name="pozisyon-effective-date"]')).toHaveCount(0);
 
-    await kayitModal.getByRole("tab", { name: "Mali İşlemler" }).click();
+    await kayitModal.getByRole("tab", { name: "Finans" }).click();
     await expect(
-      kayitModal.locator(".surec-person-placeholder").filter({ hasText: /Mali İşlemler/i })
-    ).toContainText(/mali kayıt eklenmez/i);
+      kayitModal.locator(".surec-person-placeholder").filter({ hasText: /Finans/i })
+    ).toContainText(/finans kaydı eklenmez/i);
     await expect(kayitModal.locator('[name="kayit-mali-donem"]')).toHaveCount(0);
 
     await kayitModal.getByRole("tab", { name: "Zimmet" }).click();

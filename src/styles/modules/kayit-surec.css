@@ -981,6 +981,11 @@
   overflow-wrap: anywhere;
 }
 
+.surec-person-process-nav {
+  margin: 0 0 var(--space-3);
+  padding: 0 0 10px;
+}
+
 .surec-person-tabs {
   display: flex;
   flex-wrap: wrap;

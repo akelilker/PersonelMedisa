@@ -48,7 +48,7 @@ class SureclerController
                 JsonResponse::notFound('Personel bulunamadi.');
             }
 
-            SubeScope::assertPersonelAccess($user, $request, (int) $personel['sube_id']);
+            SubeScope::assertPersonelAccess($user, $request, $personel);
             $where[] = 'sc.personel_id = :personel_id';
             $params['personel_id'] = $personelId;
         } elseif ($scope !== null) {
@@ -131,7 +131,7 @@ class SureclerController
             self::validationError('personel_id', 'Personel bulunamadı.');
         }
         // Authorize branch access before applying operational (external) guards.
-        SubeScope::assertPersonelAccess($user, $request, (int) $personel['sube_id']);
+        SubeScope::assertPersonelAccess($user, $request, $personel);
         \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::assertOperationalEligible(
             $pdo,
             $payload['personel_id']
@@ -262,7 +262,7 @@ class SureclerController
             JsonResponse::notFound('Surec bulunamadi.');
         }
 
-        SubeScope::assertPersonelAccess($user, $request, (int) $row['personel_sube_id']);
+        SubeScope::assertPersonelAccess($user, $request, self::personelOrgFromSurecRow($row));
         JsonResponse::success(self::mapSurecRow($row));
     }
 
@@ -297,7 +297,7 @@ class SureclerController
             JsonResponse::error(409, 'CONFLICT', 'Iptal veya tamamlanmis surec guncellenemez.');
         }
 
-        SubeScope::assertPersonelAccess($user, $request, (int) $existing['personel_sube_id']);
+        SubeScope::assertPersonelAccess($user, $request, self::personelOrgFromSurecRow($existing));
         \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::assertOperationalEligible(
             $pdo,
             (int) $existing['personel_id']
@@ -472,7 +472,7 @@ class SureclerController
             JsonResponse::notFound('Surec bulunamadi.');
         }
 
-        SubeScope::assertPersonelAccess($user, $request, (int) $existing['personel_sube_id']);
+        SubeScope::assertPersonelAccess($user, $request, self::personelOrgFromSurecRow($existing));
 
         $state = strtoupper((string) ($existing['state'] ?? ''));
         if ($state === 'IPTAL') {
@@ -724,11 +724,25 @@ class SureclerController
     /** @return array<string, mixed>|null */
     private static function fetchPersonelForScope(PDO $pdo, $personelId)
     {
-        $stmt = $pdo->prepare('SELECT id, sube_id, aktif_durum FROM personeller WHERE id = :id LIMIT 1');
+        $stmt = $pdo->prepare('SELECT id, sube_id, bolum_id, birim_id, aktif_durum FROM personeller WHERE id = :id LIMIT 1');
         $stmt->execute(['id' => (int) $personelId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
         return is_array($row) ? $row : null;
+    }
+
+    /**
+     * @param array<string, mixed> $row
+     * @return array<string, mixed>
+     */
+    private static function personelOrgFromSurecRow(array $row)
+    {
+        return [
+            'id' => (int) $row['personel_id'],
+            'sube_id' => (int) $row['personel_sube_id'],
+            'bolum_id' => array_key_exists('personel_bolum_id', $row) ? $row['personel_bolum_id'] : null,
+            'birim_id' => array_key_exists('personel_birim_id', $row) ? $row['personel_birim_id'] : null,
+        ];
     }
 
     /** @param array<string, mixed> $payload */
@@ -790,7 +804,9 @@ class SureclerController
         $stmt = $pdo->prepare('
             SELECT sc.id, sc.personel_id, sc.surec_turu, sc.alt_tur, sc.baslangic_tarihi, sc.bitis_tarihi,
                    sc.ucretli_mi, sc.tam_gun_mu, sc.ilk_iki_gun_firma_oder_mi, sc.aciklama, sc.state,
-                   p.sube_id AS personel_sube_id
+                   p.sube_id AS personel_sube_id,
+                   p.bolum_id AS personel_bolum_id,
+                   p.birim_id AS personel_birim_id
             FROM surecler sc
             INNER JOIN personeller p ON p.id = sc.personel_id
             WHERE sc.id = :id

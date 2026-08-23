@@ -15,6 +15,8 @@ export type YonetimKullanici = {
   /** Canonical DB flag; omitted when schema column absent. Never a credential secret. */
   must_change_password?: boolean;
   sube_ids: number[];
+  bolum_ids?: number[];
+  birim_ids?: number[];
   varsayilan_sube_id: number | null;
   durum: KayitDurumu;
   notlar?: string;
@@ -29,6 +31,8 @@ export type UpsertYonetimKullaniciPayload = {
   rol: UserRole;
   personel_id?: number | null;
   sube_ids: number[];
+  bolum_ids?: number[];
+  birim_ids?: number[];
   varsayilan_sube_id?: number | null;
   durum: KayitDurumu;
   notlar?: string;

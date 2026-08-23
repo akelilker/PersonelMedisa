@@ -108,7 +108,7 @@ class PersonelUcretController
         }
         try {
             $pdo = Connection::get();
-            $stmt = $pdo->prepare('SELECT id, sube_id FROM personeller WHERE id = :id');
+            $stmt = $pdo->prepare('SELECT id, sube_id, bolum_id, birim_id FROM personeller WHERE id = :id');
             $stmt->execute(['id' => $personelId]);
             $personel = $stmt->fetch(PDO::FETCH_ASSOC);
         } catch (\Throwable $e) {
@@ -117,7 +117,7 @@ class PersonelUcretController
         if (!$personel) {
             JsonResponse::error(404, 'SALARY_RECORD_NOT_FOUND', 'Personel bulunamadi.');
         }
-        SubeScope::assertPersonelAccess($user, $request, (int) $personel['sube_id']);
+        SubeScope::assertPersonelAccess($user, $request, $personel);
 
         return [$pdo, $user, $personelId];
     }

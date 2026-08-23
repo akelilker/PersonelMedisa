@@ -50,6 +50,8 @@ export function sanitizeYonetimKullaniciPayloadForApi(
     ad_soyad: payload.ad_soyad,
     rol: payload.rol,
     sube_ids: payload.sube_ids,
+    bolum_ids: payload.bolum_ids,
+    birim_ids: payload.birim_ids,
     varsayilan_sube_id: payload.varsayilan_sube_id,
     durum: payload.durum,
     personel_id: payload.personel_id ?? null

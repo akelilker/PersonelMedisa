@@ -79,7 +79,7 @@ class PuantajController
 
         $pdo = self::getConnection();
         $personel = self::loadPersonel($pdo, $personelId);
-        SubeScope::assertPersonelAccess($user, $request, (int) $personel['sube_id']);
+        SubeScope::assertPersonelAccess($user, $request, $personel);
         \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::assertOperationalEligible(
             $pdo,
             $personelId
@@ -163,7 +163,7 @@ class PuantajController
 
         $pdo = self::getConnection();
         $personel = self::loadPersonel($pdo, $personelId);
-        SubeScope::assertPersonelAccess($user, $request, (int) $personel['sube_id']);
+        SubeScope::assertPersonelAccess($user, $request, $personel);
         \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::assertOperationalEligible(
             $pdo,
             $personelId
@@ -214,7 +214,7 @@ class PuantajController
 
         $pdo = self::getConnection();
         $personel = self::loadPersonel($pdo, $personelId);
-        SubeScope::assertPersonelAccess($user, $request, (int) $personel['sube_id']);
+        SubeScope::assertPersonelAccess($user, $request, $personel);
 
         try {
             QrPuantajCandidateDecisionLedgerService::assertSchemaReady($pdo);
@@ -255,7 +255,7 @@ class PuantajController
 
         $pdo = self::getConnection();
         $personel = self::loadPersonel($pdo, $personelId);
-        SubeScope::assertPersonelAccess($user, $request, (int) $personel['sube_id']);
+        SubeScope::assertPersonelAccess($user, $request, $personel);
 
         $row = self::findPuantajRow($pdo, $personelId, $tarih);
         if (!$row) {
@@ -279,7 +279,7 @@ class PuantajController
 
         $pdo = self::getConnection();
         $personel = self::loadPersonel($pdo, $personelId);
-        SubeScope::assertPersonelAccess($user, $request, (int) $personel['sube_id']);
+        SubeScope::assertPersonelAccess($user, $request, $personel);
         \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::assertOperationalEligible(
             $pdo,
             $personelId
@@ -655,7 +655,7 @@ class PuantajController
     /** @return array<string, mixed> */
     private static function loadPersonel(PDO $pdo, $personelId)
     {
-        $stmt = $pdo->prepare('SELECT id, sube_id, dogum_tarihi FROM personeller WHERE id = :id LIMIT 1');
+        $stmt = $pdo->prepare('SELECT id, sube_id, bolum_id, birim_id, dogum_tarihi FROM personeller WHERE id = :id LIMIT 1');
         $stmt->execute(['id' => $personelId]);
         $personel = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$personel) {

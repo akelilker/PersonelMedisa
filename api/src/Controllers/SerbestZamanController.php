@@ -85,7 +85,7 @@ class SerbestZamanController
         if ($personel === null) {
             JsonResponse::error(404, 'NOT_FOUND', 'personel bulunamadi.');
         }
-        self::assertPersonelScope($user, $request, (int) $personel['sube_id']);
+        self::assertPersonelScope($user, $request, $personel);
 
         $stmt = $pdo->prepare(
             'SELECT * FROM serbest_zaman_events
@@ -124,7 +124,7 @@ class SerbestZamanController
         if ($personel === null) {
             JsonResponse::error(404, 'NOT_FOUND', 'personel bulunamadi.');
         }
-        self::assertPersonelScope($user, $request, (int) $personel['sube_id']);
+        self::assertPersonelScope($user, $request, $personel);
 
         $events = self::loadPersonelEvents($pdo, $personelId);
         $bakiye = self::hesaplaBakiye($personelId, $events, $referans);
@@ -227,7 +227,7 @@ class SerbestZamanController
         $where[] = \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::sqlIcPersonelPredicate($pdo, 'p');
         $whereSql = implode(' AND ', $where);
 
-        $sql = "SELECT p.id, " . \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::sqlAdSoyadExpr('p') . " AS ad_soyad, p.sicil_no, p.sube_id,
+        $sql = "SELECT p.id, " . \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::sqlAdSoyadExpr('p') . " AS ad_soyad, p.sicil_no, p.sube_id, p.bolum_id, p.birim_id,
                        s.ad AS sube_ad, d.ad AS bolum_ad
                 FROM personeller p
                 LEFT JOIN subeler s ON s.id = p.sube_id
@@ -243,7 +243,7 @@ class SerbestZamanController
         foreach ($personeller as $personel) {
             $pid = (int) $personel['id'];
             if ($personelIdFilter !== null) {
-                SubeScope::assertPersonelAccess($user, $request, (int) $personel['sube_id']);
+                SubeScope::assertPersonelAccess($user, $request, $personel);
             }
             $events = self::loadPersonelEvents($pdo, $pid);
             $rows = SerbestZamanDeadlineService::projectPersonelDeadlineRows(
@@ -331,7 +331,7 @@ class SerbestZamanController
             if ($personel === null) {
                 self::rollbackNotFound($pdo, 'personel bulunamadi.');
             }
-            self::assertPersonelScope($user, $request, (int) $personel['sube_id']);
+            self::assertPersonelScope($user, $request, $personel);
             \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::assertOperationalEligible(
                 $pdo,
                 (int) $personel['id']
@@ -528,7 +528,7 @@ class SerbestZamanController
             if ($personel === null) {
                 self::rollbackNotFound($pdo, 'personel bulunamadi.');
             }
-            self::assertPersonelScope($user, $request, (int) $personel['sube_id']);
+            self::assertPersonelScope($user, $request, $personel);
             \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::assertOperationalEligible(
                 $pdo,
                 $personelId
@@ -667,7 +667,7 @@ class SerbestZamanController
             if ($personel === null) {
                 self::rollbackNotFound($pdo, 'personel bulunamadi.');
             }
-            self::assertPersonelScope($user, $request, (int) $personel['sube_id']);
+            self::assertPersonelScope($user, $request, $personel);
             \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::assertOperationalEligible(
                 $pdo,
                 $personelId
@@ -836,7 +836,7 @@ class SerbestZamanController
             if ($personel === null) {
                 self::rollbackNotFound($pdo, 'personel bulunamadi.');
             }
-            self::assertPersonelScope($user, $request, (int) $personel['sube_id']);
+            self::assertPersonelScope($user, $request, $personel);
             \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::assertOperationalEligible(
                 $pdo,
                 $personelId
@@ -1146,7 +1146,7 @@ class SerbestZamanController
     /** @return array<string, mixed>|null */
     private static function loadPersonel(PDO $pdo, int $personelId, bool $forUpdate = false)
     {
-        $sql = 'SELECT id, sube_id FROM personeller WHERE id = :id LIMIT 1';
+        $sql = 'SELECT id, sube_id, bolum_id, birim_id FROM personeller WHERE id = :id LIMIT 1';
         if ($forUpdate) {
             $sql .= ' FOR UPDATE';
         }
@@ -1160,14 +1160,17 @@ class SerbestZamanController
         return $row;
     }
 
-    /** @param array<string, mixed> $user */
-    private static function assertPersonelScope(array $user, Request $request, int $subeId): void
+    /**
+     * @param array<string, mixed> $user
+     * @param array<string, mixed> $personel
+     */
+    private static function assertPersonelScope(array $user, Request $request, array $personel): void
     {
         $allowed = SubeScope::allowedSubeIds($user);
         if (count($allowed) === 0 && !RolePermissions::has($user, 'personeller.view')) {
             JsonResponse::forbidden('Sube baglami olmadan serbest zaman erisilemez.');
         }
-        SubeScope::assertPersonelAccess($user, $request, $subeId);
+        SubeScope::assertPersonelAccess($user, $request, $personel);
     }
 
     /** @return array{yil: int|null, ay: int|null, kilitli: bool} */

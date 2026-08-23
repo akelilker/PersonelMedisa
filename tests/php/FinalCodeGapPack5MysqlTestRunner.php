@@ -144,7 +144,8 @@ function p5MigrationFiles(): array
             && $name !== '067_personel_canonical_reference_gate.sql'
             && $name !== '068_sgk_actor_identity_lifecycle_audit.sql'
             && $name !== '069_personel_credential_onboarding.sql'
-            && $name !== '070_offline_mutation_idempotency.sql';
+            && $name !== '070_offline_mutation_idempotency.sql'
+            && $name !== '071_org_hierarchy_authorization.sql';
     }));
     sort($files, SORT_STRING);
 

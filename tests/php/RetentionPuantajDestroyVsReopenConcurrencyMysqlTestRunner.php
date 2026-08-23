@@ -136,6 +136,7 @@ function dvrMigrationFiles(): array
             && basename($file) !== '068_sgk_actor_identity_lifecycle_audit.sql'
             && basename($file) !== '069_personel_credential_onboarding.sql'
             && basename($file) !== '070_offline_mutation_idempotency.sql'
+            && basename($file) !== '071_org_hierarchy_authorization.sql'
     ));
     sort($files, SORT_STRING);
 

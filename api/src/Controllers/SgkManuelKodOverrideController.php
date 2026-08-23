@@ -35,13 +35,13 @@ final class SgkManuelKodOverrideController
             JsonResponse::serverError('Veritabani baglantisi kurulamadi.');
         }
 
-        $stmt = $pdo->prepare('SELECT id, sube_id FROM personeller WHERE id = :id LIMIT 1');
+        $stmt = $pdo->prepare('SELECT id, sube_id, bolum_id, birim_id FROM personeller WHERE id = :id LIMIT 1');
         $stmt->execute(['id' => $personelId]);
         $personel = $stmt->fetch(\PDO::FETCH_ASSOC);
         if (!is_array($personel)) {
             JsonResponse::notFound('Personel bulunamadi.');
         }
-        SubeScope::assertPersonelAccess($user, $request, (int) $personel['sube_id']);
+        SubeScope::assertPersonelAccess($user, $request, $personel);
 
         $result = SgkManuelKodOverrideService::createOverride($pdo, $user, $payload);
         $status = (int) ($result['http_status'] ?? 500);

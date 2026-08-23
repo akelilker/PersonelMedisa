@@ -8,7 +8,7 @@ import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
 import { isApiRequestError } from "../../../api/api-client";
 import { fetchPersonellerList } from "../../../api/personeller.api";
-import { createDepartmanOption, fetchDepartmanOptions } from "../../../api/referans.api";
+import { createDepartmanOption, fetchBirimOptions, fetchBolumOptions, fetchDepartmanOptions } from "../../../api/referans.api";
 import { createSurec, type CreateSurecPayload } from "../../../api/surecler.api";
 import {
   createYonetimKullanici,
@@ -24,7 +24,7 @@ import { KullaniciActorIdentityPanel } from "../components/KullaniciActorIdentit
 import { KullaniciRoleSummaryPanel } from "../components/KullaniciRoleSummaryPanel";
 import { MevzuatParametreleriPanel } from "../components/MevzuatParametreleriPanel";
 import { SaklamaLegalHoldPanel } from "../components/SaklamaLegalHoldPanel";
-import { YonetimSubeScopeField } from "../components/YonetimSubeScopeField";
+import { YonetimOrgScopeFields } from "../components/YonetimSubeScopeField";
 import { isRealYonetimKullaniciApi } from "../../../lib/yonetim/kullanici-api-contract";
 import {
   PERSONEL_FIRST_LOGIN_COMPLETE_LABEL,
@@ -73,6 +73,8 @@ type KullaniciFormState = {
   telefon: string;
   rol: UserRole;
   subeIds: number[];
+  bolumIds: number[];
+  birimIds: number[];
   varsayilanSubeId: string;
   durum: KayitDurumu;
   notlar: string;
@@ -91,6 +93,7 @@ const ROLE_LABELS: Record<UserRole, string> = {
   IK_SORUMLUSU: "İK Sorumlusu",
   BIRIM_AMIRI: "Birim Amiri",
   BOLUM_YONETICISI: "Bölüm Yöneticisi",
+  SUBE_YONETICISI: "Şube Yöneticisi",
   GENEL_YONETICI: "Genel Yönetici",
   SISTEM_YONETICISI: "Sistem Yöneticisi",
   AUTH_SMOKE_READONLY: "Teknik doğrulama — Salt okuma"
@@ -121,6 +124,8 @@ const INITIAL_KULLANICI_FORM: KullaniciFormState = {
   telefon: "",
   rol: "BIRIM_AMIRI",
   subeIds: [],
+  bolumIds: [],
+  birimIds: [],
   varsayilanSubeId: "",
   durum: "AKTIF",
   notlar: ""
@@ -292,6 +297,8 @@ function userFormFromItem(item: YonetimKullanici): KullaniciFormState {
     telefon: formatTelefon(item.telefon ?? ""),
     rol: item.rol,
     subeIds: item.sube_ids,
+    bolumIds: item.bolum_ids ?? [],
+    birimIds: item.birim_ids ?? [],
     varsayilanSubeId: item.varsayilan_sube_id != null ? String(item.varsayilan_sube_id) : "",
     durum: item.durum,
     notlar: item.notlar ?? ""
@@ -337,6 +344,8 @@ function toKullaniciPayload(form: KullaniciFormState, isEdit: boolean): UpsertYo
     kullanici_tipi: realKullaniciApi ? "HARICI" : form.kullaniciTipi,
     rol: form.rol,
     sube_ids: form.subeIds,
+    bolum_ids: form.bolumIds,
+    birim_ids: form.birimIds,
     varsayilan_sube_id: form.varsayilanSubeId ? Number.parseInt(form.varsayilanSubeId, 10) : null,
     durum: form.durum
   };
@@ -504,6 +513,8 @@ export function YonetimPaneliPage() {
   const [subeler, setSubeler] = useState<YonetimSube[]>([]);
   const [personeller, setPersoneller] = useState<Personel[]>([]);
   const [departmanOptions, setDepartmanOptions] = useState<IdOption[]>([]);
+  const [bolumOptions, setBolumOptions] = useState<IdOption[]>([]);
+  const [birimOptions, setBirimOptions] = useState<IdOption[]>([]);
 
   const [editingKullaniciId, setEditingKullaniciId] = useState<number | null>(null);
   const [editingSubeId, setEditingSubeId] = useState<number | null>(null);
@@ -593,17 +604,21 @@ export function YonetimPaneliPage() {
     setErrorMessage(null);
 
     try {
-      const [kullaniciList, subeList, personelList, departmanList] = await Promise.all([
+      const [kullaniciList, subeList, personelList, departmanList, bolumList, birimList] = await Promise.all([
         fetchYonetimKullanicilari(),
         fetchYonetimSubeleri(),
         fetchPersonellerList({ page: 1, limit: 250, aktiflik: "tum" }),
-        fetchDepartmanOptions()
+        fetchDepartmanOptions(),
+        fetchBolumOptions(),
+        fetchBirimOptions()
       ]);
 
       setKullanicilar(kullaniciList);
       setSubeler(subeList);
       setPersoneller(personelList.items);
       setDepartmanOptions(sortIdOptions(departmanList));
+      setBolumOptions(sortIdOptions(bolumList));
+      setBirimOptions(sortIdOptions(birimList));
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Yönetim paneli yüklenemedi.");
     } finally {
@@ -704,6 +719,24 @@ export function YonetimPaneliPage() {
         varsayilanSubeId: nextDefault
       };
     });
+  }
+
+  function toggleBolumSelection(bolumId: number) {
+    setKullaniciForm((prev) => ({
+      ...prev,
+      bolumIds: prev.bolumIds.includes(bolumId)
+        ? prev.bolumIds.filter((id) => id !== bolumId)
+        : [...prev.bolumIds, bolumId]
+    }));
+  }
+
+  function toggleBirimSelection(birimId: number) {
+    setKullaniciForm((prev) => ({
+      ...prev,
+      birimIds: prev.birimIds.includes(birimId)
+        ? prev.birimIds.filter((id) => id !== birimId)
+        : [...prev.birimIds, birimId]
+    }));
   }
 
   function toggleDepartmanSelection(departmanId: number) {
@@ -1244,7 +1277,7 @@ export function YonetimPaneliPage() {
             </fieldset>
 
             <fieldset className="yonetim-workspace-section">
-              <legend>Şube kapsamı</legend>
+              <legend>Organizasyon kapsamı</legend>
               <FormField
                 as="select"
                 label="Varsayılan Şube"
@@ -1256,10 +1289,17 @@ export function YonetimPaneliPage() {
                   .filter((sube) => kullaniciForm.subeIds.includes(sube.id))
                   .map((sube) => ({ value: String(sube.id), label: sube.ad }))}
               />
-              <YonetimSubeScopeField
+              <YonetimOrgScopeFields
+                role={kullaniciForm.rol}
                 subeler={subeler}
+                bolumler={bolumOptions.map((b) => ({ id: b.id, ad: b.label }))}
+                birimler={birimOptions.map((b) => ({ id: b.id, ad: b.label }))}
                 selectedSubeIds={kullaniciForm.subeIds}
+                selectedBolumIds={kullaniciForm.bolumIds}
+                selectedBirimIds={kullaniciForm.birimIds}
                 onToggleSube={toggleSubeSelection}
+                onToggleBolum={toggleBolumSelection}
+                onToggleBirim={toggleBirimSelection}
               />
             </fieldset>
 

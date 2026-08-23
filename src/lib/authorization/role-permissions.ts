@@ -263,6 +263,59 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     // Explicit SGK final approve only — does not inherit GENEL_YONETICI matrix.
     "sgk_karar_paketi.approve"
   ],
+  /** Branch-level operational management (independent of BOLUM_YONETICISI). */
+  SUBE_YONETICISI: [
+    "personeller.view",
+    "personeller.view.sube",
+    "personeller.create",
+    "personeller.import.apply",
+    "personeller.update",
+    "personeller.detail.view",
+    "surecler.view",
+    "surecler.view.sube",
+    "surecler.create",
+    "surecler.update",
+    "surecler.cancel",
+    "surecler.detail.view",
+    "bildirimler.view",
+    "bildirimler.create",
+    "bildirimler.update",
+    "bildirimler.cancel",
+    "bildirimler.detail.view",
+    "puantaj.view",
+    "puantaj.update",
+    "puantaj.muhurle",
+    "puantaj.donem_reopen.request",
+    "puantaj.donem_seal.history",
+    "puantaj.bildirim_etki.view",
+    "puantaj.donem_kapanis.view",
+    "puantaj.bildirim_etki.rapor.view",
+    "raporlar.view",
+    "finans.view",
+    "finans.create",
+    "finans.update",
+    "finans.cancel",
+    "isg.view",
+    "aylik-ozet.view",
+    "aylik-ozet.review",
+    "gunluk_bildirim.request_correction",
+    "haftalik_mutabakat.view",
+    "haftalik_mutabakat.reopen_request",
+    "aylik_bolum_onayi.view",
+    "aylik_bolum_onayi.approve",
+    "aylik_bildirim_onayi.view",
+    "revizyon.view",
+    "revizyon.create",
+    "revizyon.submit",
+    "revizyon.cancel",
+    "revizyon.view_finance_effect",
+    "revizyon.view_audit_history",
+    "disiplin.view",
+    "disiplin.final_decision",
+    "puantaj.olay_karar.decide",
+    "puantaj.olay_karar.view",
+    "sgk_karar_paketi.approve"
+  ],
   /** External accountant: finalized mali/bordro read + export. No operational write. */
   MUHASEBE: [
     "personeller.view",
@@ -461,16 +514,28 @@ export function hasRolePermission(
   return getRolePermissions(role).includes(permission);
 }
 
-/** Oturumdaki yetkili sube listesi; bos ise yonetim (tum subeler) varsayimi. */
+/** Oturumdaki yetkili sube listesi; bos + global rol ise tum subeler UX. */
 export function getAllowedSubeIdsFromSession(session: AuthSession | null): number[] {
   return session?.user.sube_ids ?? [];
 }
 
-/** Backend dogrulamasi zorunlu; frontend UX icin daraltma. */
+/** Backend dogrulamasi zorunlu; frontend UX icin daraltma. Fail-closed for non-global empty. */
 export function sessionAllowsSubeAccess(session: AuthSession | null, subeId: number): boolean {
+  const role = canonicalizeUserRole(session?.user.rol ?? null);
   const allowed = getAllowedSubeIdsFromSession(session);
   if (allowed.length === 0) {
-    return true;
+    if (role === "GENEL_YONETICI" || role === "SISTEM_YONETICISI") {
+      return true;
+    }
+    // Department/unit scope is not branch-assignment based; do not block FE by empty sube_ids.
+    if (role === "BOLUM_YONETICISI" || role === "BIRIM_AMIRI") {
+      const list = session?.sube_list ?? [];
+      if (list.length === 0) {
+        return true;
+      }
+      return list.some((s) => s.id === subeId);
+    }
+    return false;
   }
   return allowed.includes(subeId);
 }

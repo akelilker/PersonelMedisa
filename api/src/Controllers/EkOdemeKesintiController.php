@@ -121,7 +121,7 @@ class EkOdemeKesintiController
             JsonResponse::notFound('Finans kalemi bulunamadi.');
         }
 
-        SubeScope::assertPersonelAccess($user, $request, (int) $row['sube_id']);
+        SubeScope::assertPersonelAccess($user, $request, self::personelOrgFromFinansRow($row));
         JsonResponse::success(self::mapRow($row));
     }
 
@@ -145,7 +145,7 @@ class EkOdemeKesintiController
             self::validationError('personel_id', 'Personel bulunamadi.');
         }
 
-        SubeScope::assertPersonelAccess($user, $request, (int) $personel['sube_id']);
+        SubeScope::assertPersonelAccess($user, $request, $personel);
 
         $actorId = (int) ($user['id'] ?? 0);
         $idemKey = OfflineMutationIdempotencyService::readKey($request);
@@ -271,7 +271,7 @@ class EkOdemeKesintiController
             JsonResponse::error(409, 'CONFLICT', 'Iptal edilmis finans kalemi guncellenemez.');
         }
 
-        SubeScope::assertPersonelAccess($user, $request, (int) $existing['sube_id']);
+        SubeScope::assertPersonelAccess($user, $request, self::personelOrgFromFinansRow($existing));
 
         $targetPersonelId = $payload['personel_id'] ?? (int) $existing['personel_id'];
         if ($targetPersonelId !== (int) $existing['personel_id']) {
@@ -279,7 +279,7 @@ class EkOdemeKesintiController
             if (!$personel) {
                 self::validationError('personel_id', 'Personel bulunamadi.');
             }
-            SubeScope::assertPersonelAccess($user, $request, (int) $personel['sube_id']);
+            SubeScope::assertPersonelAccess($user, $request, $personel);
         }
 
         $fields = [];
@@ -417,7 +417,7 @@ class EkOdemeKesintiController
             JsonResponse::notFound('Finans kalemi bulunamadi.');
         }
 
-        SubeScope::assertPersonelAccess($user, $request, (int) $existing['sube_id']);
+        SubeScope::assertPersonelAccess($user, $request, self::personelOrgFromFinansRow($existing));
 
         if ((string) $existing['state'] === 'IPTAL') {
             JsonResponse::success(self::mapRow($existing));
@@ -740,10 +740,25 @@ class EkOdemeKesintiController
         return $aciklama === '' ? null : $aciklama;
     }
 
+
+    /**
+     * @param array<string, mixed> $row
+     * @return array<string, mixed>
+     */
+    private static function personelOrgFromFinansRow(array $row)
+    {
+        return [
+            'id' => (int) $row['personel_id'],
+            'sube_id' => (int) $row['sube_id'],
+            'bolum_id' => array_key_exists('bolum_id', $row) ? $row['bolum_id'] : null,
+            'birim_id' => array_key_exists('birim_id', $row) ? $row['birim_id'] : null,
+        ];
+    }
+
     /** @return array<string, mixed>|false */
     private static function fetchPersonel(PDO $pdo, $personelId)
     {
-        $stmt = $pdo->prepare('SELECT id, sube_id, aktif_durum FROM personeller WHERE id = :id LIMIT 1');
+        $stmt = $pdo->prepare('SELECT id, sube_id, bolum_id, birim_id, aktif_durum FROM personeller WHERE id = :id LIMIT 1');
         $stmt->execute(['id' => $personelId]);
 
         return $stmt->fetch(PDO::FETCH_ASSOC);
@@ -762,7 +777,7 @@ class EkOdemeKesintiController
     private static function fetchRowWithPersonel(PDO $pdo, $id)
     {
         $stmt = $pdo->prepare('
-            SELECT fk.*, p.sube_id
+            SELECT fk.*, p.sube_id, p.bolum_id, p.birim_id
             FROM ek_odeme_kesinti fk
             INNER JOIN personeller p ON p.id = fk.personel_id
             WHERE fk.id = :id

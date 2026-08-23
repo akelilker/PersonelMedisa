@@ -1,0 +1,122 @@
+import { describe, expect, it } from "vitest";
+import { readFileSync, readdirSync } from "node:fs";
+import { resolve } from "node:path";
+import {
+  ALL_ROLES,
+  ASSIGNABLE_USER_ROLES,
+  BIRIM_ASSIGNMENT_ROLES,
+  BOLUM_ASSIGNMENT_ROLES,
+  GLOBAL_SCOPE_ROLES,
+  SUBE_ASSIGNMENT_ROLES,
+  TECHNICAL_ROLES,
+  type UserRole
+} from "../../src/types/auth";
+import {
+  getRolePermissions,
+  hasRolePermission,
+  sessionAllowsSubeAccess
+} from "../../src/lib/authorization/role-permissions";
+import type { AuthSession } from "../../src/types/auth";
+
+const root = process.cwd();
+const PHP_ORG = resolve(root, "api/src/Scope/OrgScope.php");
+const PHP_ROLES = resolve(root, "api/src/Auth/RolePermissions.php");
+const MIG_071 = resolve(root, "api/migrations/071_org_hierarchy_authorization.sql");
+
+const HUMAN_8: UserRole[] = [
+  "PERSONEL",
+  "MUHASEBE",
+  "IK_SORUMLUSU",
+  "BIRIM_AMIRI",
+  "BOLUM_YONETICISI",
+  "SUBE_YONETICISI",
+  "GENEL_YONETICI",
+  "SISTEM_YONETICISI"
+];
+
+function sessionFor(role: UserRole, subeIds: number[] = []): AuthSession {
+  return {
+    token: "t",
+    user: { id: 1, ad_soyad: "T", rol: role, sube_ids: subeIds },
+    ui_profile: "yonetim",
+    active_sube_id: subeIds.length === 1 ? subeIds[0]! : null
+  };
+}
+
+describe("org hierarchy authorization contract", () => {
+  it("locks exact 8 human + 1 technical catalog including SUBE_YONETICISI", () => {
+    expect([...ASSIGNABLE_USER_ROLES].sort()).toEqual([...HUMAN_8].sort());
+    expect(ASSIGNABLE_USER_ROLES).toHaveLength(8);
+    expect(ASSIGNABLE_USER_ROLES).toContain("SUBE_YONETICISI");
+    expect(TECHNICAL_ROLES).toEqual(["AUTH_SMOKE_READONLY"]);
+    expect([...ALL_ROLES].sort()).toEqual([...HUMAN_8, "AUTH_SMOKE_READONLY"].sort());
+  });
+
+  it("keeps SUBE / BOLUM / BIRIM assignment roles independent", () => {
+    expect(SUBE_ASSIGNMENT_ROLES).toContain("SUBE_YONETICISI");
+    expect(BOLUM_ASSIGNMENT_ROLES).toEqual(["BOLUM_YONETICISI"]);
+    expect(BIRIM_ASSIGNMENT_ROLES).toEqual(["BIRIM_AMIRI"]);
+    expect(GLOBAL_SCOPE_ROLES).toEqual(["GENEL_YONETICI", "SISTEM_YONETICISI"]);
+    expect(SUBE_ASSIGNMENT_ROLES).not.toContain("BOLUM_YONETICISI");
+    expect(BOLUM_ASSIGNMENT_ROLES).not.toContain("SUBE_YONETICISI");
+  });
+
+  it("FE/BE permission parity includes SUBE_YONETICISI", () => {
+    const php = readFileSync(PHP_ROLES, "utf8");
+    expect(php).toContain("'SUBE_YONETICISI'");
+    expect(hasRolePermission("SUBE_YONETICISI", "personeller.view")).toBe(true);
+    expect(hasRolePermission("SUBE_YONETICISI", "yonetim-paneli.manage")).toBe(false);
+    expect(getRolePermissions("SUBE_YONETICISI").length).toBeGreaterThan(10);
+  });
+
+  it("sessionAllowsSubeAccess fail-closes non-global empty branch scope", () => {
+    expect(sessionAllowsSubeAccess(sessionFor("GENEL_YONETICI", []), 9)).toBe(true);
+    expect(sessionAllowsSubeAccess(sessionFor("SISTEM_YONETICISI", []), 9)).toBe(true);
+    expect(sessionAllowsSubeAccess(sessionFor("SUBE_YONETICISI", []), 1)).toBe(false);
+    expect(sessionAllowsSubeAccess(sessionFor("IK_SORUMLUSU", []), 1)).toBe(false);
+    expect(sessionAllowsSubeAccess(sessionFor("MUHASEBE", []), 1)).toBe(false);
+    expect(sessionAllowsSubeAccess(sessionFor("SUBE_YONETICISI", [1, 2]), 1)).toBe(true);
+    expect(sessionAllowsSubeAccess(sessionFor("SUBE_YONETICISI", [1, 2]), 3)).toBe(false);
+  });
+
+  it("migration 071 adds role + assignment tables without data remaps", () => {
+    const sql = readFileSync(MIG_071, "utf8");
+    expect(sql).toContain("SUBE_YONETICISI");
+    expect(sql).toContain("CREATE TABLE IF NOT EXISTS user_bolumler");
+    expect(sql).toContain("CREATE TABLE IF NOT EXISTS user_birimler");
+    expect(sql).not.toMatch(/UPDATE\s+users\s+SET\s+rol/i);
+    expect(sql).not.toMatch(/INSERT\s+INTO\s+user_bolumler/i);
+    expect(sql).not.toMatch(/INSERT\s+INTO\s+user_birimler/i);
+    const migrations = readdirSync(resolve(root, "api/migrations"));
+    expect(migrations).toContain("071_org_hierarchy_authorization.sql");
+  });
+
+  it("OrgScope owns fail-closed empty assignment + personel org filter", () => {
+    const php = readFileSync(PHP_ORG, "utf8");
+    expect(php).toContain("assertRequiredAssignment");
+    expect(php).toContain("appendPersonelOrgFilter");
+    expect(php).toContain("Bolum kapsami atanmamis");
+    expect(php).toContain("Birim kapsami atanmamis");
+    expect(php).toContain("Sube kapsami atanmamis");
+    expect(php).toContain("GLOBAL_ROLES");
+    expect(php).toContain("usesLegacySubeFallback");
+  });
+
+  it("STAGE A keeps BOLUM/BIRIM legacy sube fallback without empty-as-global", () => {
+    const php = readFileSync(PHP_ORG, "utf8");
+    expect(php).toContain("usesLegacySubeFallback");
+    expect(php).toMatch(
+      /allowedBolumIds\(\$user\)\) === 0 && count\(self::allowedSubeIds\(\$user\)\) === 0/,
+    );
+    expect(php).toMatch(
+      /allowedBirimIds\(\$user\)\) === 0 && count\(self::allowedSubeIds\(\$user\)\) === 0/,
+    );
+    const schema = readFileSync(
+      resolve(root, "api/src/Database/UserOrgAssignmentSchema.php"),
+      "utf8",
+    );
+    expect(schema).toContain("SHOW TABLES LIKE 'user_bolumler'");
+    expect(schema).toContain("SHOW TABLES LIKE 'user_birimler'");
+    expect(schema).toContain("isSubeYoneticisiRoleReady");
+  });
+});

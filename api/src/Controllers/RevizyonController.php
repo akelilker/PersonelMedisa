@@ -1101,14 +1101,13 @@ class RevizyonController
             JsonResponse::error(403, 'REVISION_SCOPE_DENIED', 'Revizyon talebi kapsam disi.');
         }
 
-        SubeScope::assertPersonelAccess($user, $request, (int) $row['sube_id']);
+        $pdo = Connection::get();
+        $personel = self::loadPersonel($pdo, (int) $row['personel_id']);
+        SubeScope::assertPersonelAccess($user, $request, $personel);
 
         if ($rol === 'GENEL_YONETICI') {
             return;
         }
-
-        $pdo = Connection::get();
-        $personel = self::loadPersonel($pdo, (int) $row['personel_id']);
 
         if ($rol === 'BOLUM_YONETICISI') {
             $departmanIds = self::loadUserDepartmanIds($pdo, (int) $user['id']);
@@ -1151,7 +1150,7 @@ class RevizyonController
             JsonResponse::error(403, 'REVISION_SCOPE_DENIED', 'Revizyon talebi kapsam disi.');
         }
 
-        SubeScope::assertPersonelAccess($user, $request, (int) $personel['sube_id']);
+        SubeScope::assertPersonelAccess($user, $request, $personel);
 
         if ($rol === 'GENEL_YONETICI') {
             return;
@@ -1343,7 +1342,7 @@ class RevizyonController
     private static function loadPersonel(PDO $pdo, int $personelId): array
     {
         $stmt = $pdo->prepare(
-            'SELECT id, sube_id, departman_id, aktif_durum FROM personeller WHERE id = :id LIMIT 1'
+            'SELECT id, sube_id, bolum_id, birim_id, departman_id, aktif_durum FROM personeller WHERE id = :id LIMIT 1'
         );
         $stmt->execute(['id' => $personelId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);

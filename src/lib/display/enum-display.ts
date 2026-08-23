@@ -12,6 +12,7 @@ const USER_ROLE_LABELS: Record<UserRole, string> = {
   IK_SORUMLUSU: "İK Sorumlusu",
   BIRIM_AMIRI: "Birim Amiri Rolü",
   BOLUM_YONETICISI: "Bölüm Yöneticisi",
+  SUBE_YONETICISI: "Şube Yöneticisi",
   GENEL_YONETICI: "Genel Yönetici",
   SISTEM_YONETICISI: "Sistem Yöneticisi",
   AUTH_SMOKE_READONLY: "Teknik doğrulama — Salt okuma"

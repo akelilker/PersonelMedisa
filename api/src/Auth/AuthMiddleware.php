@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Medisa\Api\Auth;
 
 use Medisa\Api\Database\Connection;
+use Medisa\Api\Database\UserOrgAssignmentSchema;
 use Medisa\Api\Database\UsersSchema;
 use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
@@ -74,6 +75,8 @@ class AuthMiddleware
         }
 
         $subeIds = self::loadUserSubeIds($pdo, $userId);
+        $bolumIds = UserOrgAssignmentSchema::loadUserBolumIds($pdo, $userId);
+        $birimIds = UserOrgAssignmentSchema::loadUserBirimIds($pdo, $userId);
         $rolCanonical = RolePermissions::normalizeRole((string) $row['rol']);
         self::$user = [
             'id' => (int) $row['id'],
@@ -82,6 +85,8 @@ class AuthMiddleware
             'rol' => $rolCanonical !== '' ? $rolCanonical : (string) $row['rol'],
             'durum' => (string) ($row['durum'] ?? ''),
             'sube_ids' => $subeIds,
+            'bolum_ids' => $bolumIds,
+            'birim_ids' => $birimIds,
         ];
         if (array_key_exists('actor_identity_id', $row) && $row['actor_identity_id'] !== null && $row['actor_identity_id'] !== '') {
             $aid = (int) $row['actor_identity_id'];

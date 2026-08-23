@@ -157,6 +157,8 @@ function normalizeYonetimKullanici(data: unknown): YonetimKullanici {
     personel_ad_soyad: readStringOrNull(record.personel_ad_soyad),
     ...(mustChangePassword === undefined ? {} : { must_change_password: mustChangePassword }),
     sube_ids: readNumberArray(record.sube_ids),
+    bolum_ids: readNumberArray(record.bolum_ids),
+    birim_ids: readNumberArray(record.birim_ids),
     varsayilan_sube_id: readNumber(record.varsayilan_sube_id) ?? null,
     durum: normalizeKayitDurumu(record.durum),
     notlar: readString(record.notlar)

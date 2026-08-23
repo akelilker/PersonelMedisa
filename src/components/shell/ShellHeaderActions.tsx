@@ -220,18 +220,20 @@ export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeade
 
   const subeIds = session?.user.sube_ids ?? [];
   const subeList = session?.sube_list ?? [];
+  const selectorIds =
+    subeIds.length > 0 ? subeIds : subeList.map((sube) => sube.id).filter((id) => id > 0);
 
   const subeControl = useMemo(() => {
-    if (subeIds.length === 0) {
+    if (selectorIds.length === 0) {
       return { kind: "all" as const };
     }
-    if (subeIds.length === 1) {
-      const id = subeIds[0];
+    if (selectorIds.length === 1) {
+      const id = selectorIds[0];
       const label = subeList.find((sube) => sube.id === id)?.ad ?? `Şube ${id}`;
       return { kind: "single" as const, id, label };
     }
     return { kind: "multi" as const };
-  }, [subeIds, subeList]);
+  }, [selectorIds, subeList]);
 
   useEffect(() => {
     setIsNotificationsOpen(false);
@@ -412,7 +414,7 @@ export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeade
               id="sube-selector-menu"
               className={`settings-dropdown sube-selector-dropdown${isSubeOpen ? " open" : ""}`}
             >
-              {subeIds.map((id) => {
+              {selectorIds.map((id) => {
                 const label = subeList.find((sube) => sube.id === id)?.ad ?? `Şube ${id}`;
                 return (
                   <button

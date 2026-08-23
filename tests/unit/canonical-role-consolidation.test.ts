@@ -22,12 +22,13 @@ const PHP_PATH = resolve(root, "api/src/Auth/RolePermissions.php");
 const YONETIM_CTRL = resolve(root, "api/src/Controllers/YonetimController.php");
 const MIG_054 = resolve(root, "api/migrations/054_canonical_role_consolidation.sql");
 
-const HUMAN_7: UserRole[] = [
+const HUMAN_8: UserRole[] = [
   "PERSONEL",
   "MUHASEBE",
   "IK_SORUMLUSU",
   "BIRIM_AMIRI",
   "BOLUM_YONETICISI",
+  "SUBE_YONETICISI",
   "GENEL_YONETICI",
   "SISTEM_YONETICISI"
 ];
@@ -62,11 +63,11 @@ function extractPhpRolePermissions(role: string): string[] {
 }
 
 describe("S1 canonical role consolidation", () => {
-  it("locks exact 7 human + 1 technical catalog", () => {
-    expect([...ASSIGNABLE_USER_ROLES].sort()).toEqual([...HUMAN_7].sort());
-    expect(ASSIGNABLE_USER_ROLES).toHaveLength(7);
+  it("locks exact 8 human + 1 technical catalog", () => {
+    expect([...ASSIGNABLE_USER_ROLES].sort()).toEqual([...HUMAN_8].sort());
+    expect(ASSIGNABLE_USER_ROLES).toHaveLength(8);
     expect(TECHNICAL_ROLES).toEqual(["AUTH_SMOKE_READONLY"]);
-    expect([...ALL_ROLES].sort()).toEqual([...HUMAN_7, "AUTH_SMOKE_READONLY"].sort());
+    expect([...ALL_ROLES].sort()).toEqual([...HUMAN_8, "AUTH_SMOKE_READONLY"].sort());
     for (const legacy of ["PATRON", "IK_BORDRO", "SGK_KARAR_ONAY_YETKILISI", "IDARI_ISLER"]) {
       expect(ALL_ROLES).not.toContain(legacy);
       expect(ASSIGNABLE_USER_ROLES).not.toContain(legacy);
@@ -108,7 +109,7 @@ describe("S1 canonical role consolidation", () => {
 
   it("API validRoles matches assignable humans + AUTH_SMOKE", () => {
     const php = readFileSync(YONETIM_CTRL, "utf8");
-    for (const role of HUMAN_7) {
+    for (const role of HUMAN_8) {
       expect(php).toContain(`'${role}'`);
     }
     expect(php).toContain("'AUTH_SMOKE_READONLY'");
@@ -280,11 +281,12 @@ describe("S1 canonical role consolidation", () => {
     }
   });
 
-  it("manual canonical role assignment: exact 7 picker; no legacy/smoke; GY+BOLUM selectable", () => {
-    expect(ASSIGNABLE_USER_ROLES).toHaveLength(7);
-    expect(ASSIGNABLE_USER_ROLES).toEqual(expect.arrayContaining(HUMAN_7));
+  it("manual canonical role assignment: exact 8 picker; no legacy/smoke; GY+BOLUM+SUBE selectable", () => {
+    expect(ASSIGNABLE_USER_ROLES).toHaveLength(8);
+    expect(ASSIGNABLE_USER_ROLES).toEqual(expect.arrayContaining(HUMAN_8));
     expect(ASSIGNABLE_USER_ROLES).toContain("GENEL_YONETICI");
     expect(ASSIGNABLE_USER_ROLES).toContain("BOLUM_YONETICISI");
+    expect(ASSIGNABLE_USER_ROLES).toContain("SUBE_YONETICISI");
     expect(ASSIGNABLE_USER_ROLES).not.toContain("AUTH_SMOKE_READONLY");
     expect(ASSIGNABLE_USER_ROLES).not.toContain("SGK_KARAR_ONAY_YETKILISI");
     expect(ASSIGNABLE_USER_ROLES).not.toContain("IDARI_ISLER");
@@ -323,7 +325,7 @@ describe("S1 canonical role consolidation", () => {
     expect(migrations).toContain("053_retention_legal_hold_arsiv.sql");
     expect(migrations).toContain("054_canonical_role_consolidation.sql");
     expect(migrations).toContain("055_yillik_izin_hak_duzeltmeleri.sql");
-    expect(migrations.at(-1)).toBe("070_offline_mutation_idempotency.sql");
+    expect(migrations.at(-1)).toBe("071_org_hierarchy_authorization.sql");
 
     const sql = readFileSync(MIG_054, "utf8");
     expect(sql).toContain("PERSONEL");

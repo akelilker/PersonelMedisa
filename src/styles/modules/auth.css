@@ -131,12 +131,12 @@
 
 @media (max-width: 640px) {
   .auth-login {
-    padding: 20px 0 48px;
+    padding: 12px 0 36px;
   }
 
   .auth-login-form {
     width: 100%;
-    gap: 18px;
+    gap: 16px;
   }
 
   .auth-field span {

@@ -317,6 +317,26 @@ body.modal-open .modal-container {
   border-bottom-color: rgba(168, 176, 186, 0.4);
 }
 
+@media (max-width: 640px) {
+  .modal-overlay {
+    left: 0;
+    right: 0;
+    width: 100%;
+    max-width: none;
+    transform: none;
+  }
+
+  .modal-container {
+    border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+    border-left-width: 0;
+    border-right-width: 0;
+  }
+
+  body.modal-open .modal-container {
+    border-bottom-color: rgba(168, 176, 186, 0.4);
+  }
+}
+
 @media (max-width: 480px) {
   .modal-overlay {
     bottom: calc(
@@ -325,7 +345,7 @@ body.modal-open .modal-container {
   }
 
   .modal-container {
-    border-radius: var(--radius-md) var(--radius-md) 0 0;
+    border-radius: 0;
   }
 
   .modal-header {

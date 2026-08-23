@@ -236,6 +236,30 @@ body.login-page .hero .animated-line {
     column-gap: var(--space-2);
   }
 
+  body.login-page .hero {
+    --hero-logo-width: clamp(34px, 10vw, 43px);
+    padding: 10px 8px 10px 2px;
+    column-gap: clamp(6px, 2vw, 8px);
+    min-height: 58px;
+  }
+
+  body.login-page .hero h1 {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: nowrap;
+    font-size: clamp(9.5px, 2.85vw, 18.5px);
+    letter-spacing: clamp(0.35px, 0.14vw, 1.8px);
+    padding: 0;
+  }
+
+  body.login-page .hero-logo {
+    margin-right: clamp(4px, 1.5vw, 8px);
+  }
+
+  body.login-page .hero-logo img {
+    height: clamp(28px, 8.5vw, 33px);
+  }
+
   /* Session hero: equal side tracks keep title centered; 76px meta overflows
      without inflating the grid track. 48/48 avoids user↔accent-line collision. */
   .hero.hero-with-session {
@@ -333,5 +357,10 @@ body.login-page .hero .animated-line {
   .hero h1 {
     font-size: clamp(17px, 4.9vw, 21px);
     letter-spacing: 1.5px;
+  }
+
+  body.login-page .hero h1 {
+    font-size: clamp(9px, 2.65vw, 17px);
+    letter-spacing: clamp(0.3px, 0.1vw, 1.5px);
   }
 }

@@ -308,12 +308,16 @@ body.modal-open .modal-container {
   .modal-overlay {
     left: 0;
     right: 0;
-    width: 100%;
+    width: auto;
     max-width: none;
     transform: none;
+    margin: 0;
+    box-sizing: border-box;
   }
 
   .modal-container {
+    width: 100%;
+    max-width: 100%;
     border-radius: var(--radius-sm) var(--radius-sm) 0 0;
     border-left-width: 0;
     border-right-width: 0;

@@ -56,3 +56,9 @@ jobs:
 
       - name: Run build
         run: npm run build
+
+      - name: Install Playwright WebKit
+        run: npx playwright install --with-deps webkit
+
+      - name: Run mobile WebKit layout regression
+        run: npx playwright test --project=webkit-mobile-regression

@@ -1,11 +1,12 @@
 .auth-login {
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   min-width: 0;
-  min-height: 100%;
+  min-height: 0;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  padding: clamp(28px, 5vh, 52px) 0 clamp(56px, 10vh, 96px);
+  justify-content: flex-start;
+  padding: var(--space-4) 0 clamp(36px, 8vh, 72px);
 }
 
 .auth-login-stage {
@@ -131,7 +132,10 @@
 
 @media (max-width: 640px) {
   .auth-login {
-    padding: 12px 0 36px;
+    flex: 0 1 auto;
+    min-height: 0;
+    justify-content: flex-start;
+    padding: var(--space-3) 0 36px;
   }
 
   .auth-login-form {

@@ -66,7 +66,7 @@ describe("desktop hero title fit", () => {
 
     expect(mobile).toMatch(/body\.login-page \.hero h1\s*\{[^}]*overflow:\s*visible/s);
     expect(mobile).toMatch(/body\.login-page \.hero h1\s*\{[^}]*text-overflow:\s*clip/s);
-    expect(mobile).toMatch(/\.hero\.hero-with-session\s*\{[^}]*--hero-logo-width:\s*48px/s);
-    expect(mobile).toMatch(/\.hero\.hero-with-session\s*\{[^}]*--hero-spacer-width:\s*48px/s);
+    expect(mobile).toMatch(/\.hero\.hero-with-session\s*\{[^}]*--hero-logo-width:\s*44px/s);
+    expect(mobile).toMatch(/\.hero\.hero-with-session\s*\{[^}]*--hero-spacer-width:\s*44px/s);
   });
 });

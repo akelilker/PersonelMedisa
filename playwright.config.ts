@@ -1,4 +1,6 @@
-import { defineConfig } from "@playwright/test";
+import { defineConfig, devices } from "@playwright/test";
+
+const MOBILE_REGRESSION = "**/mobile-tasit-parity*.spec.ts";
 
 export default defineConfig({
   testDir: "tests/e2e",
@@ -10,11 +12,26 @@ export default defineConfig({
     baseURL: "http://127.0.0.1:4173",
     headless: true
   },
+  projects: [
+    {
+      name: "chromium",
+      testIgnore: MOBILE_REGRESSION,
+      use: { browserName: "chromium" }
+    },
+    {
+      name: "chromium-mobile-regression",
+      testMatch: MOBILE_REGRESSION,
+      use: { browserName: "chromium" }
+    },
+    {
+      name: "webkit-mobile-regression",
+      testMatch: MOBILE_REGRESSION,
+      use: { ...devices["iPhone 14"] }
+    }
+  ],
   webServer: {
     command: "npm run dev -- --host 127.0.0.1 --port 4173",
     url: "http://127.0.0.1:4173/login",
-    // Always own the E2E server lifecycle. Sharing a leftover :4173 process caused
-    // mid-suite ERR_CONNECTION_REFUSED / first-interaction 60s timeouts under load.
     reuseExistingServer: false,
     timeout: 120_000
   }

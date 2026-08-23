@@ -295,10 +295,19 @@ body.login-page .hero .animated-line {
   }
 
   /* Session hero: equal side tracks keep title centered; 76px meta overflows
-     without inflating the grid track. 48/48 avoids user↔accent-line collision. */
+     without inflating the grid track. 44/44 balances center width vs accent line. */
   .hero.hero-with-session {
-    --hero-logo-width: 48px;
-    --hero-spacer-width: 48px;
+    --hero-logo-width: 44px;
+    --hero-spacer-width: 44px;
+    overflow: visible;
+  }
+
+  section.hero.hero-with-session > h1 {
+    overflow: hidden;
+    text-overflow: clip;
+    font-size: clamp(11px, 3.2vw, 12px);
+    letter-spacing: clamp(0.32px, 0.13vw, 0.65px);
+    padding: 0;
   }
 
   .hero h1 {
@@ -367,8 +376,8 @@ body.login-page .hero .animated-line {
   }
 
   /* Session hero: keep line as wide as possible without intersecting
-     the overflow-visible 76px username meta (48/48 grid).
-     Measured: 84–80% still collide on 320; 79% clears 390/360/320. */
+     the overflow-visible 76px username meta (44/44 grid).
+     Measured: 79% clears 390/360/320. */
   .hero.hero-with-session .animated-line {
     width: 79%;
   }
@@ -387,6 +396,13 @@ body.login-page .hero .animated-line {
   }
 }
 
+@media (max-width: 375px) {
+  section.hero.hero-with-session > h1 {
+    font-size: 10px;
+    letter-spacing: 0.45px;
+  }
+}
+
 @media (max-width: 360px) {
   .hero h1 {
     font-size: clamp(17px, 4.9vw, 21px);
@@ -398,4 +414,8 @@ body.login-page .hero .animated-line {
     letter-spacing: clamp(0.6px, 0.28vw, 1px);
   }
 
+  section.hero.hero-with-session > h1 {
+    font-size: 10px;
+    letter-spacing: 0.42px;
+  }
 }

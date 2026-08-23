@@ -47,10 +47,20 @@ describe("mobile Taşıt parity modal/login source guards", () => {
     expect(hero).not.toMatch(/body\.login-page \.hero h1\s*\{[^}]*text-overflow:\s*ellipsis/s);
   });
 
-  it("tightens mobile login form vertical rhythm without desktop overrides", () => {
+  it("keeps authenticated session hero title visible without ellipsis clipping", () => {
+    const hero = read("src/styles/components/hero.css");
+    expect(hero).toMatch(/section\.hero\.hero-with-session > h1\s*\{[^}]*overflow:\s*hidden/s);
+    expect(hero).toMatch(/section\.hero\.hero-with-session > h1\s*\{[^}]*text-overflow:\s*clip/s);
+    expect(hero).toMatch(/\.hero\.hero-with-session\s*\{[^}]*overflow:\s*visible/s);
+  });
+
+  it("keeps login form in natural flow (no viewport-height centering)", () => {
     const auth = read("src/styles/modules/auth.css");
-    expect(auth).toContain("padding: 12px 0 36px");
-    expect(auth).toContain("gap: 16px");
-    expect(auth).toMatch(/\.auth-login\s*\{[^}]*padding:\s*clamp\(28px,\s*5vh,\s*52px\)/s);
+    expect(auth).toMatch(/\.auth-login\s*\{[^}]*justify-content:\s*flex-start/s);
+    expect(auth).toMatch(/\.auth-login\s*\{[^}]*min-height:\s*0/s);
+    expect(auth).not.toMatch(/\.auth-login\s*\{[^}]*min-height:\s*100%/s);
+    expect(auth).toMatch(
+      /@media\s*\(max-width:\s*640px\)\s*\{[^}]*\.auth-login\s*\{[^}]*justify-content:\s*flex-start/s
+    );
   });
 });

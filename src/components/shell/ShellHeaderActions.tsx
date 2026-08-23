@@ -374,7 +374,9 @@ export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeade
             {subeControl.label}
           </span>
         ) : null}
-        {!minimal && subeControl.kind === "multi" ? (
+        {/* Multi-sube switch must remain on home (minimal): module routes use
+         * overlay chrome without ShellHeaderActions after modules canonicalize. */}
+        {subeControl.kind === "multi" ? (
           <div className="sube-selector-wrap">
             <button
               type="button"

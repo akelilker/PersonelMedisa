@@ -38,8 +38,7 @@
 
   .modal-body,
   .kayit-workspace-scroll-body,
-  .notifications-dropdown,
-  .modules-dropdown {
+  .notifications-dropdown {
     -webkit-overflow-scrolling: touch;
   }
 

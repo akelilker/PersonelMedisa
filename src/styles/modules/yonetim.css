@@ -1,5 +1,8 @@
 .yonetim-page {
   display: block;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .yonetim-page > * + * {
@@ -1006,9 +1009,17 @@
   }
 }
 
+@media (max-width: 640px) {
+  .yonetim-card-grid--users,
+  .yonetim-card-grid--branches {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 480px) {
-  .yonetim-card-grid--users {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+  .yonetim-card-grid--users,
+  .yonetim-card-grid--branches {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 

@@ -140,14 +140,14 @@ body {
     min-height: 44px;
   }
 
-  /* Shell-safe overlay widths (avoid full-viewport page scroll).
-   * settings-menu-dropdown owns viewport caps in dropdown.css. */
-  .settings-dropdown:not(.settings-menu-dropdown),
-  .modules-dropdown,
-  .notifications-dropdown {
-    width: min(300px, calc(var(--app-shell-max-width) - 28px));
-    max-width: calc(100% - 16px);
-  }
+  /*
+   * Do NOT re-assert .settings-dropdown / .notifications-dropdown widths here.
+   * icons-row-right is a narrow containing block; "%" max-width collapses the
+   * panel and word-wraps notification cards. Dedicated owners:
+   *   .settings-dropdown.settings-menu-dropdown → dropdown.css (viewport caps)
+   *   .settings-dropdown.notifications-dropdown → notifications.css (viewport caps)
+   *   .settings-dropdown.sube-selector-dropdown → icons-row.css (viewport caps)
+   */
 
   .icons-row {
     padding-left: max(6px, env(safe-area-inset-left, 0px));
@@ -160,12 +160,6 @@ body {
     width: 76px;
     max-width: 76px;
     overflow: visible;
-  }
-
-  /* Yönetim dense card grids: readable on phone */
-  .yonetim-card-grid--users,
-  .yonetim-card-grid--branches {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   /* Negative bleed chrome must not escape modal padding */
@@ -200,11 +194,6 @@ body {
 
 /* Very narrow phones */
 @media (max-width: 480px) {
-  .yonetim-card-grid--users,
-  .yonetim-card-grid--branches {
-    grid-template-columns: 1fr;
-  }
-
   .personeller-filter-secondary,
   .personeller-filter-primary {
     min-width: 0;

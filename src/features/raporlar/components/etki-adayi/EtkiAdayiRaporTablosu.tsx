@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import type { BildirimEtkiRaporRow, BildirimEtkiRaporSummary } from "../../../../api/bildirim-etki-rapor.api";
+import { formatBildirimPuantajEtkiAdayStateLabel } from "../../../../lib/bildirim-puantaj-etki-aday/display";
 
 type EtkiAdayiRaporTablosuProps = {
   rows: BildirimEtkiRaporRow[];
@@ -91,7 +92,7 @@ export function EtkiAdayiRaporTablosu({
                   <br />
                   <small>{formatEffective(row)}</small>
                 </td>
-                <td>{row.state}</td>
+                <td>{formatBildirimPuantajEtkiAdayStateLabel(row.state)}</td>
                 <td>{row.conflict_code ?? "-"}</td>
                 <td>{row.mevcut_puantaj_ozet ?? "-"}</td>
                 <td>{row.uygulanan_puantaj_ozet ?? "-"}</td>

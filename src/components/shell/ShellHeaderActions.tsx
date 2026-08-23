@@ -627,7 +627,7 @@ export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeade
                 navigateTo("/yonetim-paneli?tab=saklama");
               }}
             >
-              Saklama / Legal Hold
+              Saklama ve İmha
             </button>
           ) : null}
           {canViewResmiTatilTakvimi ? (

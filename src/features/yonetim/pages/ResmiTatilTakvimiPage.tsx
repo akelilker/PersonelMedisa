@@ -24,6 +24,12 @@ import { AppModal } from "../../../components/modal/AppModal";
 import { EmptyState } from "../../../components/states/EmptyState";
 import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
+import {
+  formatPersonelImportSatirDurumLabel,
+  formatResmiTatilDurumLabel,
+  formatResmiTatilGunKapsamiLabel,
+  formatResmiTatilTuruLabel
+} from "../../../lib/display/enum-display";
 import { useRoleAccess } from "../../../hooks/use-role-access";
 
 const FORM_ID = "resmi-tatil-takvimi-form";
@@ -322,24 +328,24 @@ export function ResmiTatilTakvimiPage() {
   const readinessCards = [
     { key: "aktif", label: "Aktif kayıt", value: envanter?.aktif ?? 0 },
     { key: "taslak", label: "Taslak kayıt", value: envanter?.taslak ?? 0 },
-    { key: "tam", label: "TAM_GUN", value: sinif?.tam_gun ?? preview?.tam_gun ?? 0 },
-    { key: "yarim", label: "YARIM_GUN", value: sinif?.yarim_gun ?? preview?.yarim_gun ?? 0 },
-    { key: "kaynak", label: "KAYNAK_EKSIK", value: sinif?.kaynak_eksik ?? preview?.kaynak_eksik ?? 0 },
-    { key: "bilinmiyor", label: "BILINMIYOR", value: sinif?.bilinmiyor ?? preview?.bilinmiyor ?? 0 },
-    { key: "cakisma", label: "CAKISMA", value: sinif?.cakisma ?? preview?.cakisma ?? 0 },
+    { key: "tam", label: "Tam gün", value: sinif?.tam_gun ?? preview?.tam_gun ?? 0 },
+    { key: "yarim", label: "Yarım gün", value: sinif?.yarim_gun ?? preview?.yarim_gun ?? 0 },
+    { key: "kaynak", label: "Kaynak eksik", value: sinif?.kaynak_eksik ?? preview?.kaynak_eksik ?? 0 },
+    { key: "bilinmiyor", label: "Bilinmiyor", value: sinif?.bilinmiyor ?? preview?.bilinmiyor ?? 0 },
+    { key: "cakisma", label: "Çakışma", value: sinif?.cakisma ?? preview?.cakisma ?? 0 },
     {
       key: "muhur",
-      label: "Mühür projection eksik",
+      label: "Mühür projeksiyonu eksik",
       value: preview?.muhur_projection_eksik ?? 0
     },
     {
       key: "interval",
-      label: "Interval ölçümü eksik",
+      label: "Aralık ölçümü eksik",
       value: preview?.interval_olcumu_eksik ?? 0
     },
     {
       key: "policy",
-      label: "Policy activation blocker",
+      label: "Politika aktivasyonu engeli",
       value: sinif?.policy_activation_blocker ?? preview?.policy_blocker ?? 0
     }
   ];
@@ -350,7 +356,7 @@ export function ResmiTatilTakvimiPage() {
         <div>
           <h1>Resmî Tatil Takvimi</h1>
           <p className="muted">
-            UBGT gün kapsamı owner’ı. Production ödeme politikası henüz aktif değildir.
+            UBGT gün kapsamı sahibi. Canlı ödeme politikası henüz aktif değildir.
           </p>
         </div>
         {canManage ? (
@@ -422,9 +428,9 @@ export function ResmiTatilTakvimiPage() {
       </div>
 
       <section className="kapanis-issue-section" data-testid="rtt-readiness-cards">
-        <h2>Readiness özeti</h2>
+        <h2>Hazırlık Özeti</h2>
         <p className="muted" data-testid="rtt-policy-not-active">
-          Policy activation: kapalı · Genel sistem tamamen hazır: hayır
+          Politika aktivasyonu: kapalı · Genel sistem tamamen hazır: hayır
         </p>
         <div className="form-field-grid">
           {readinessCards.map((card) => (
@@ -436,11 +442,11 @@ export function ResmiTatilTakvimiPage() {
         </div>
         <div className="form-field-grid" data-testid="rtt-readiness-status">
           <article className="yonetim-list-surface">
-            <strong>TAM_GUN aktivasyona hazır</strong>
+            <strong>Tam gün aktivasyona hazır</strong>
             <p>{preview?.tam_gun_aktivasyona_hazir ?? 0}</p>
           </article>
           <article className="yonetim-list-surface">
-            <strong>YARIM_GUN ödeme politikası bekliyor</strong>
+            <strong>Yarım gün ödeme politikası bekliyor</strong>
             <p>{preview?.yarim_gun_odeme_politikasi_bekliyor ?? 0}</p>
           </article>
           <article className="yonetim-list-surface">
@@ -450,7 +456,7 @@ export function ResmiTatilTakvimiPage() {
         </div>
         {(preview?.bilinmiyor ?? 0) > 0 || (preview?.cakisma ?? 0) > 0 ? (
           <p className="error-text" data-testid="rtt-blocker-message">
-            BILINMIYOR / CAKISMA tespit edildi; payable hesap ve policy activation engellenir.
+            Bilinmeyen / çakışma durumu tespit edildi; ödenebilir hesap ve politika aktivasyonu engellenir.
           </p>
         ) : null}
       </section>
@@ -510,15 +516,15 @@ export function ResmiTatilTakvimiPage() {
                   <td data-testid={`rtt-date-${item.id}`}>{formatDateOnly(item.tarih)}</td>
                   <td>{item.tatil_adi}</td>
                   <td>{item.tatil_kodu}</td>
-                  <td>{item.tatil_turu}</td>
+                  <td>{formatResmiTatilTuruLabel(item.tatil_turu)}</td>
                   <td>
-                    <span data-testid={`rtt-badge-kapsam-${item.id}`}>{item.gun_kapsami}</span>
+                    <span data-testid={`rtt-badge-kapsam-${item.id}`}>{formatResmiTatilGunKapsamiLabel(item.gun_kapsami)}</span>
                     {item.gun_kapsami === "YARIM_GUN"
                       ? ` (${formatTime(item.tatil_interval_baslangic)}–${formatTime(item.tatil_interval_bitis)})`
                       : null}
                   </td>
                   <td>
-                    <span data-testid={`rtt-badge-durum-${item.id}`}>{item.durum}</span>
+                    <span data-testid={`rtt-badge-durum-${item.id}`}>{formatResmiTatilDurumLabel(item.durum)}</span>
                   </td>
                   <td>{item.revizyon_no}</td>
                   <td>
@@ -657,7 +663,7 @@ export function ResmiTatilTakvimiPage() {
               {form.gun_kapsami === "YARIM_GUN" ? (
                 <>
                   <FormField
-                    label="Interval başlangıç"
+                    label="Aralık başlangıç"
                     name="rtt-form-interval-bas"
                     type="time"
                     required
@@ -665,7 +671,7 @@ export function ResmiTatilTakvimiPage() {
                     onChange={(value) => setForm((prev) => ({ ...prev, tatil_interval_baslangic: value }))}
                   />
                   <FormField
-                    label="Interval bitiş"
+                    label="Aralık bitiş"
                     name="rtt-form-interval-bit"
                     type="time"
                     required

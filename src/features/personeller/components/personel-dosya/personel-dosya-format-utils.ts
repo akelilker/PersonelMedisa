@@ -67,7 +67,7 @@ export function formatNullableScalar(value: string | number | boolean | null | u
     return formatDetailValue(value);
   }
   if (typeof value === "object") {
-    return JSON.stringify(value);
+    return "—";
   }
   return "-";
 }

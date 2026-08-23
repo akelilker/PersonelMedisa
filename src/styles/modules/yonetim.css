@@ -1,10 +1,8 @@
-.modal-container--yonetim .modal-back-btn,
-.modal-container--yonetim .modal-header h2 {
-  transform: translateY(8px);
-}
-
 .yonetim-page {
   display: block;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .yonetim-page > * + * {
@@ -170,33 +168,10 @@
 
 .yonetim-list-surface {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  grid-template-rows: auto auto minmax(0, 1fr);
-  gap: 0;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
   align-content: start;
-  align-items: start;
   padding: 0;
-}
-
-.yonetim-list-surface > .yonetim-list-header {
-  grid-column: 1 / -1;
-  grid-row: 1;
-  align-self: center;
-}
-
-.yonetim-list-surface > .yonetim-create-row {
-  grid-column: 1 / -1;
-  grid-row: 2;
-  margin-top: 0;
-  margin-bottom: 12px;
-}
-
-.yonetim-list-surface > .yonetim-card-grid,
-.yonetim-list-surface > .yonetim-list-table-wrap,
-.yonetim-list-surface > .state-empty {
-  grid-column: 1 / -1;
-  grid-row: 3;
-  min-height: 0;
 }
 
 .modal-body > .yonetim-page .yonetim-toolbar,
@@ -207,23 +182,6 @@
 .modal-body > .yonetim-page .state-error,
 .modal-body > .yonetim-page .state-loading {
   flex-shrink: 0;
-}
-
-.modal-body > .yonetim-page .yonetim-list-surface {
-  flex: 1;
-  min-height: 0;
-  display: grid;
-  align-content: start;
-}
-
-.modal-body > .yonetim-page .yonetim-list-header {
-  flex-shrink: 0;
-}
-
-.modal-body > .yonetim-page .yonetim-list-surface > .yonetim-card-grid,
-.modal-body > .yonetim-page .yonetim-list-surface > .yonetim-list-table-wrap {
-  min-height: 0;
-  overflow-y: auto;
 }
 
 .yonetim-list-header {
@@ -647,7 +605,8 @@
 }
 
 .yonetim-list-surface .yonetim-list-table-wrap {
-  overflow: auto;
+  overflow-x: auto;
+  overflow-y: visible;
   border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: var(--radius-lg);
   background: rgba(9, 13, 22, 0.86);
@@ -1050,9 +1009,17 @@
   }
 }
 
+@media (max-width: 640px) {
+  .yonetim-card-grid--users,
+  .yonetim-card-grid--branches {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 480px) {
-  .yonetim-card-grid--users {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+  .yonetim-card-grid--users,
+  .yonetim-card-grid--branches {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
@@ -1071,4 +1038,140 @@
 
 .yonetim-inline-action-gap-sm {
   margin-left: var(--space-1);
+}
+
+/* Saklama / imha plain-Turkish layout */
+.yonetim-saklama-panel {
+  display: grid;
+  gap: 16px;
+  width: 100%;
+  min-width: 0;
+}
+
+.yonetim-saklama-policy-banner {
+  display: grid;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 14px 16px;
+  border: 1px solid rgba(52, 211, 153, 0.28);
+  border-radius: 12px;
+  background: rgba(16, 77, 54, 0.22);
+  color: rgba(236, 253, 245, 0.95);
+}
+
+.yonetim-saklama-policy-banner strong,
+.yonetim-saklama-policy-banner p {
+  margin: 0;
+}
+
+.yonetim-saklama-policy-banner p {
+  color: rgba(236, 253, 245, 0.86);
+  line-height: 1.45;
+}
+
+.yonetim-saklama-sections {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+.yonetim-saklama-section {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  background: rgba(10, 14, 22, 0.55);
+}
+
+.yonetim-saklama-section-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.yonetim-saklama-section-copy h3,
+.yonetim-saklama-subsection h4,
+.yonetim-saklama-section-copy p {
+  margin: 0;
+}
+
+.yonetim-saklama-section-copy p {
+  color: rgba(239, 242, 247, 0.78);
+  line-height: 1.4;
+}
+
+.yonetim-saklama-form,
+.yonetim-saklama-subsection {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.yonetim-saklama-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.yonetim-saklama-list-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px 14px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.yonetim-saklama-list-main {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  flex: 1 1 220px;
+}
+
+.yonetim-saklama-list-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.yonetim-saklama-result {
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.yonetim-saklama-result p {
+  margin: 0;
+  line-height: 1.45;
+}
+
+.yonetim-saklama-result--ok {
+  border-color: rgba(52, 211, 153, 0.35);
+  background: rgba(16, 77, 54, 0.22);
+}
+
+.yonetim-saklama-result--wait {
+  border-color: rgba(251, 191, 36, 0.35);
+  background: rgba(120, 53, 15, 0.22);
+}
+
+@media (max-width: 720px) {
+  .yonetim-saklama-section,
+  .yonetim-saklama-policy-banner {
+    padding: 12px;
+  }
+
+  .yonetim-saklama-list-item {
+    flex-direction: column;
+  }
 }

@@ -1,5 +1,9 @@
 import type { KayitTab } from "../../components/main-menu/MainMenu";
-import { PERSONEL_SUREC_TABS, type PersonelSurecTab } from "./kayit-surec-constants";
+import {
+  isIncomingPersonelSurecTab,
+  normalizePersonelSurecTab,
+  type PersonelSurecTab
+} from "./kayit-surec-constants";
 
 export type KayitModalRouteConfig = {
   tab: KayitTab;
@@ -30,10 +34,10 @@ export function resolveKayitModalRouteConfig(state: unknown): KayitModalRouteCon
   const rawRecordId = (kayitModal as { recordId?: unknown }).recordId;
   const rawReturnTo = (kayitModal as { returnTo?: unknown }).returnTo;
   const rawOperation = (kayitModal as { operation?: unknown }).operation;
-  const targetTab = PERSONEL_SUREC_TABS.some((tab) => tab.id === rawTargetTab)
-    ? (rawTargetTab as PersonelSurecTab)
-    : PERSONEL_SUREC_TABS.some((tab) => tab.id === rawPersonelTab)
-      ? (rawPersonelTab as PersonelSurecTab)
+  const targetTab = isIncomingPersonelSurecTab(rawTargetTab)
+    ? normalizePersonelSurecTab(rawTargetTab)
+    : isIncomingPersonelSurecTab(rawPersonelTab)
+      ? normalizePersonelSurecTab(rawPersonelTab)
       : null;
 
   return {

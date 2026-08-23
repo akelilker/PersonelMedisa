@@ -81,13 +81,13 @@ export function QrKioskPage() {
   }, [loadToken]);
 
   if (status.kind === "loading") {
-    return <LoadingState label="Kiosk QR hazirlaniyor..." />;
+    return <LoadingState label="QR Giriş Ekranı hazırlanıyor..." />;
   }
 
   if (status.kind === "error") {
     return (
       <section className="qr-kiosk qr-kiosk--error" data-testid="qr-kiosk-page">
-        <h1>QR Kiosk</h1>
+        <h1>QR Giriş Ekranı</h1>
         <p role="alert">{status.message}</p>
         <button type="button" className="self-service-action" onClick={() => void loadToken()}>
           Yeniden dene
@@ -99,11 +99,11 @@ export function QrKioskPage() {
   return (
     <section className="qr-kiosk" data-testid="qr-kiosk-page">
       <header className="qr-kiosk__header">
-        <h1>{status.token.sube.ad || "Sube"}</h1>
-        <p>Personel QR okutarak giris/cikis kaydi olusturur.</p>
+        <h1>{status.token.sube.ad || "Şube"}</h1>
+        <p>Personel QR okutarak giriş/çıkış kaydı oluşturur.</p>
       </header>
       <div className="qr-kiosk__frame">
-        <img src={status.dataUrl} alt="Sube QR kodu" width={420} height={420} />
+        <img src={status.dataUrl} alt="Şube QR kodu" width={420} height={420} />
       </div>
       <p className="qr-kiosk__countdown" data-testid="qr-kiosk-countdown">
         Yenilenmeye {status.secondsLeft} sn

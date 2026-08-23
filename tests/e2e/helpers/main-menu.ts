@@ -23,6 +23,7 @@ export async function expectThreeButtonMainMenu(page: Page, kayitEnabled: boolea
   }
   await expect(page.getByTestId("menu-personel-karti")).toBeVisible();
   await expect(page.getByTestId("menu-raporlar")).toBeVisible();
+  await expect(page.getByTestId("menu-moduller")).toHaveCount(0);
   await expect(page.getByTestId("menu-puantaj")).toHaveCount(0);
   await expect(page.getByTestId("menu-finans")).toHaveCount(0);
   await expect(page.getByTestId("menu-gunluk-kayit")).toHaveCount(0);

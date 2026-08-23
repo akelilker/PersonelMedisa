@@ -47,8 +47,12 @@ import { PersonelCreateFields } from "../../../features/personeller/components/P
 import { PersonelZimmetCreateForm } from "../../../features/personeller/components/PersonelZimmetCreateForm";
 import { PersonelBelgelerPanel } from "../../../features/personeller/components/personel-dosya/PersonelBelgelerPanel";
 import { type KayitModalFooterModel } from "./KayitModalFooter";
+import { KayitSurecPersonelBelgeTakipPanel } from "./KayitSurecPersonelBelgeTakipPanel";
 import { KayitSurecPersonelFinansPanel } from "./KayitSurecPersonelFinansPanel";
 import { KayitSurecPersonelGenelPanel } from "./KayitSurecPersonelGenelPanel";
+import { KayitSurecPersonelHaftalikKapanisPanel } from "./KayitSurecPersonelHaftalikKapanisPanel";
+import { KayitSurecPersonelProcessNav } from "./KayitSurecPersonelProcessNav";
+import { KayitSurecPersonelPuantajPanel } from "./KayitSurecPersonelPuantajPanel";
 import { KayitSurecPersonelUcretPanel } from "./KayitSurecPersonelUcretPanel";
 import { KayitSurecPozisyonReferencePicker } from "./KayitSurecPozisyonReferencePicker";
 import { KayitSurecTabHeader } from "./KayitSurecTabHeader";
@@ -80,7 +84,6 @@ import { executePozisyonPersonnelUpdate } from "../kayit-surec-pozisyon";
 import {
   createPozisyonFormFromPersonel,
   DEVAMSIZLIK_ALT_TUR_CONFIG,
-  DEVAMSIZLIK_SUB_CARDS,
   KAYIT_SUREC_BELGELER_FORM_ID,
   KAYIT_SUREC_CEZA_FORM_ID,
   KAYIT_SUREC_MALI_FORM_ID,
@@ -88,11 +91,13 @@ import {
   KAYIT_SUREC_POZISYON_FORM_ID,
   KAYIT_SUREC_SUREC_FORM_ID,
   KAYIT_SUREC_ZIMMET_FORM_ID,
-  PERSONEL_SUREC_TABS,
+  normalizePersonelSurecTab,
+  resolveVisiblePersonelSurecTabs,
   resolvePersonelSurecTabForSurecTuru,
   type DevamsizlikSubId,
   type PersonelSurecTab,
-  type PozisyonFormState
+  type PozisyonFormState,
+  type PuantajSubdomainId
 } from "../kayit-surec-constants";
 import {
   formatGeneralField,
@@ -278,8 +283,9 @@ export function KayitSurecWorkspace({
   const surecPersonelPickerRef = useRef<HTMLDivElement>(null);
 
   const [activePersonelTab, setActivePersonelTab] = useState<PersonelSurecTab>(
-    initialPersonelTab ?? (initialSurecPersonelId ? "izin-devamsizlik" : "genel")
+    normalizePersonelSurecTab(initialPersonelTab ?? "genel")
   );
+  const [puantajSubdomain, setPuantajSubdomain] = useState<PuantajSubdomainId | null>(null);
   const [devamsizlikSubId, setDevamsizlikSubId] = useState<DevamsizlikSubId | null>(null);
   const [hakDuzeltmeOpen, setHakDuzeltmeOpen] = useState(
     initialOperation === "yillik-izin-hak-duzeltme"
@@ -474,9 +480,7 @@ export function KayitSurecWorkspace({
 
   const isSelectedPersonelPasif = selectedSurecPersonel?.aktif_durum === "PASIF";
   const isSelectedPersonelDirectoryOnly = selectedSurecPersonel?.calisan_kapsami === "DIS_KAYNAK";
-  const visiblePersonelSurecTabs = isSelectedPersonelDirectoryOnly
-    ? PERSONEL_SUREC_TABS.filter((tab) => tab.id === "genel" || tab.id === "pozisyon" || tab.id === "belgeler")
-    : PERSONEL_SUREC_TABS;
+  const visiblePersonelSurecTabs = resolveVisiblePersonelSurecTabs(isSelectedPersonelDirectoryOnly);
   const canSubmitShellFinansZimmet = Boolean(selectedSurecPersonel)
     && !isSelectedPersonelPasif
     && !isSelectedPersonelDirectoryOnly;
@@ -529,6 +533,12 @@ export function KayitSurecWorkspace({
     }
   }, [activePersonelTab, isSelectedPersonelDirectoryOnly]);
 
+  useEffect(() => {
+    if (!visiblePersonelSurecTabs.some((tab) => tab.id === activePersonelTab)) {
+      setActivePersonelTab("genel");
+    }
+  }, [activePersonelTab, visiblePersonelSurecTabs]);
+
   const hasInitialSurecPersonel = typeof initialSurecPersonelId === "string" && initialSurecPersonelId.length > 0;
   const prevShellPersonelIdRef = useRef<string | null>(null);
 
@@ -551,6 +561,8 @@ export function KayitSurecWorkspace({
       setActivePersonelTab("genel");
     }
     setDevamsizlikSubId(null);
+    setPuantajSubdomain(null);
+    setHakDuzeltmeOpen(false);
     setSurecForm((prev) => resetSurecFormKeepingPersonel(prev.personelId));
     setSurecError(null);
     setSurecPersonelPickerOpen(false);
@@ -621,15 +633,18 @@ export function KayitSurecWorkspace({
     setBelgeDurumInfo(null);
     setBelgeDurumError(null);
 
-    if (tabId === "izin-devamsizlik") {
-      const nextSubId = devamsizlikSubId ?? "izin";
-      const altTurConfig = DEVAMSIZLIK_ALT_TUR_CONFIG[nextSubId];
-      setDevamsizlikSubId(nextSubId);
-      setSurecForm((prev) => ({
-        ...resetSurecFormKeepingPersonel(prev.personelId),
-        surecTuru: resolveDevamsizlikSurecTuru(nextSubId, surecTuruOptions) ?? "",
-        altTur: altTurConfig.options[0]?.value ?? ""
-      }));
+    if (tabId === "puantaj") {
+      setDevamsizlikSubId(null);
+      setPuantajSubdomain(null);
+      setHakDuzeltmeOpen(false);
+      setSurecForm((prev) => resetSurecFormKeepingPersonel(prev.personelId));
+      return;
+    }
+
+    if (tabId === "haftalik-kapanis" || tabId === "belge-takip") {
+      setDevamsizlikSubId(null);
+      setPuantajSubdomain(null);
+      setHakDuzeltmeOpen(false);
       return;
     }
 
@@ -654,6 +669,8 @@ export function KayitSurecWorkspace({
 
   function selectDevamsizlikSubCard(id: DevamsizlikSubId) {
     setDevamsizlikSubId(id);
+    setPuantajSubdomain(id);
+    setHakDuzeltmeOpen(false);
     const resolvedKey = resolveDevamsizlikSurecTuru(id, surecTuruOptions);
     const altTurConfig = DEVAMSIZLIK_ALT_TUR_CONFIG[id];
 
@@ -662,6 +679,12 @@ export function KayitSurecWorkspace({
       surecTuru: resolvedKey ?? "",
       altTur: altTurConfig.options[0]?.value ?? ""
     }));
+  }
+
+  function openPuantajHakDuzeltme() {
+    setDevamsizlikSubId(null);
+    setPuantajSubdomain(null);
+    setHakDuzeltmeOpen(true);
   }
 
   async function loadBootstrap() {
@@ -807,12 +830,14 @@ export function KayitSurecWorkspace({
     setSurecError(null);
     setSurecInfo("Seçili personel ile süreç girişine devam edebilirsin.");
     setSurecForm(resetSurecFormKeepingPersonel(initialSurecPersonelId));
-    if (initialPersonelTab === "izin-devamsizlik") {
-      setActivePersonelTab("izin-devamsizlik");
+    if (initialPersonelTab) {
+      setActivePersonelTab(normalizePersonelSurecTab(initialPersonelTab));
     }
     if (initialOperation === "yillik-izin-hak-duzeltme") {
+      setActivePersonelTab("puantaj");
       setHakDuzeltmeOpen(true);
       setDevamsizlikSubId(null);
+      setPuantajSubdomain(null);
     }
   }, [initialSurecPersonelId, initialPersonelTab, initialOperation]);
 
@@ -878,8 +903,8 @@ export function KayitSurecWorkspace({
       setSurecError(
         activePersonelTab === "ayrilma"
           ? "Bu personel pasif; ayrılma kaydı eklenmez."
-          : activePersonelTab === "izin-devamsizlik"
-            ? "Bu personel pasif; izin/devamsızlık kaydı eklenmez."
+          : activePersonelTab === "puantaj"
+            ? "Bu personel pasif; puantaj/izin kaydı eklenmez."
             : "Bu personel pasif; süreç kaydı eklenmez."
       );
       return;
@@ -1072,6 +1097,8 @@ export function KayitSurecWorkspace({
     setSurecInfo(null);
     setActivePersonelTab("genel");
     setDevamsizlikSubId(null);
+    setPuantajSubdomain(null);
+    setHakDuzeltmeOpen(false);
     setSurecForm(resetSurecFormKeepingPersonel(surecForm.personelId));
   }
 
@@ -1115,11 +1142,11 @@ export function KayitSurecWorkspace({
       };
     }
 
-    if (activePersonelTab === "izin-devamsizlik") {
+    if (activePersonelTab === "puantaj") {
       return {
         primaryLabel: "Süreci Kaydet",
         primaryFormId,
-        primaryDisabled: surecSubmitting || !devamsizlikSubId,
+        primaryDisabled: surecSubmitting || !devamsizlikSubId || hakDuzeltmeOpen,
         secondaryLabel: "Kapat",
         onSecondaryClick: onClose
       };
@@ -1212,6 +1239,7 @@ export function KayitSurecWorkspace({
     canSubmitPozisyon,
     canWriteBelgeDurum,
     devamsizlikSubId,
+    hakDuzeltmeOpen,
     hasPozisyonDiff,
     isCezaSubmitting,
     isMaliSubmitting,
@@ -1251,6 +1279,14 @@ export function KayitSurecWorkspace({
           personel={selectedSurecPersonel}
           onChangePerson={beginChangeSurecPersonel}
           changeDisabled={personelContextLocked}
+        />
+      ) : null}
+      {activeTab === "surec" && selectedSurecPersonel ? (
+        <KayitSurecPersonelProcessNav
+          tabs={visiblePersonelSurecTabs}
+          activeTab={activePersonelTab}
+          locked={personelContextLocked}
+          onSelect={selectPersonelTab}
         />
       ) : null}
       {activeTab === "surec" && showSurecPersonelPickerSurface ? (
@@ -1435,28 +1471,6 @@ export function KayitSurecWorkspace({
 
                     {selectedSurecPersonel ? (
                       <div className="surec-person-shell">
-                        <div className="surec-person-tabs" role="tablist" aria-label="Personel işlem sekmeleri">
-                          {visiblePersonelSurecTabs.map((tab) => {
-                            const isActive = activePersonelTab === tab.id;
-
-                            return (
-                              <button
-                                key={tab.id}
-                                type="button"
-                                role="tab"
-                                data-testid={`kayit-surec-subtab-${tab.id}`}
-                                aria-selected={isActive}
-                                aria-disabled={personelContextLocked && !isActive}
-                                disabled={personelContextLocked && !isActive}
-                                className={`surec-person-tab${isActive ? " is-active" : ""}${tab.id === "izin-devamsizlik" ? " surec-shell-action-tile" : ""}`}
-                                onClick={() => selectPersonelTab(tab.id)}
-                              >
-                                {tab.label}
-                              </button>
-                            );
-                          })}
-                        </div>
-
                         {activePersonelTab === "genel" ? (
                           <KayitSurecPersonelGenelPanel
                             personel={selectedSurecPersonel}
@@ -1468,87 +1482,57 @@ export function KayitSurecWorkspace({
                           />
                         ) : null}
 
-                        {activePersonelTab === "izin-devamsizlik" ? (
-                          isSelectedPersonelPasif ? (
-                            <div className="surec-person-placeholder">
-                              <strong>İzin / Devamsızlık</strong>
-                              <p>Bu personel pasif; izin/devamsızlık kaydı eklenmez.</p>
-                            </div>
-                          ) : (
-                            <div className="surec-shell-panel">
-                              <div className="surec-devamsizlik-tiles" role="group" aria-label="İzin ve yokluk işlemleri">
-                                {DEVAMSIZLIK_SUB_CARDS.map((card) => {
-                                  const isActive = !hakDuzeltmeOpen && devamsizlikSubId === card.id;
+                        {activePersonelTab === "puantaj" ? (
+                          <KayitSurecPersonelPuantajPanel
+                            personel={selectedSurecPersonel}
+                            activeSubdomain={puantajSubdomain}
+                            hakDuzeltmeOpen={hakDuzeltmeOpen}
+                            canManageYillikIzinHak={canManageYillikIzinHak}
+                            isPassive={isSelectedPersonelPasif}
+                            onSelectDevamsizlikSub={selectDevamsizlikSubCard}
+                            onOpenHakDuzeltme={openPuantajHakDuzeltme}
+                          >
+                            {hakDuzeltmeOpen ? (
+                              <YillikIzinHakDuzeltmePanel
+                                personelId={selectedSurecPersonel.id}
+                                enabled={canManageYillikIzinHak}
+                              />
+                            ) : null}
 
-                                  return (
-                                    <button
-                                      key={card.id}
-                                      type="button"
-                                      className={`surec-devamsizlik-tile${isActive ? " is-active" : ""}`}
-                                      onClick={() => {
-                                        setHakDuzeltmeOpen(false);
-                                        selectDevamsizlikSubCard(card.id);
-                                      }}
-                                    >
-                                      <span className="surec-devamsizlik-tile-title">{card.title}</span>
-                                      <span className="surec-devamsizlik-tile-desc">{card.description}</span>
-                                      <span className="surec-devamsizlik-tile-status">{isActive ? "Seçildi" : "Seç"}</span>
-                                    </button>
-                                  );
-                                })}
-                                {canManageYillikIzinHak ? (
-                                  <button
-                                    type="button"
-                                    className={`surec-devamsizlik-tile${hakDuzeltmeOpen ? " is-active" : ""}`}
-                                    data-testid="yillik-izin-hak-duzeltme-tile"
-                                    onClick={() => {
-                                      setDevamsizlikSubId(null);
-                                      setHakDuzeltmeOpen(true);
-                                    }}
-                                  >
-                                    <span className="surec-devamsizlik-tile-title">İzin Hak Düzeltmesi</span>
-                                    <span className="surec-devamsizlik-tile-desc">
-                                      Devir / ek hak / idari düzeltme (süreç kaydı değil)
-                                    </span>
-                                    <span className="surec-devamsizlik-tile-status">
-                                      {hakDuzeltmeOpen ? "Seçildi" : "Seç"}
-                                    </span>
-                                  </button>
-                                ) : null}
-                              </div>
+                            {devamsizlikSubId && !hakDuzeltmeOpen ? (
+                              <>
+                                <form id={KAYIT_SUREC_SUREC_FORM_ID} className="workspace-form" onSubmit={handleSurecSubmit}>
+                                  <SurecFormFields
+                                    form={surecForm}
+                                    setForm={setSurecForm}
+                                    surecTuruOptions={surecTuruOptions}
+                                    personelOptions={personelOptions}
+                                    showPersonelField={false}
+                                    showSurecTuruField
+                                    altTurField={activeDevamsizlikAltTurField}
+                                    useOperationControls
+                                    errorMessage={surecError}
+                                    referenceError={null}
+                                    className="workspace-form-stack workspace-form-stack--compact"
+                                  />
+                                </form>
 
-                              {hakDuzeltmeOpen && selectedSurecPersonel ? (
-                                <YillikIzinHakDuzeltmePanel
-                                  personelId={selectedSurecPersonel.id}
-                                  enabled={canManageYillikIzinHak}
-                                />
-                              ) : null}
+                                <div className="workspace-inline-actions">
+                                  {surecInfo ? (
+                                    <p className="workspace-success workspace-success--inline">{surecInfo}</p>
+                                  ) : null}
+                                </div>
+                              </>
+                            ) : null}
+                          </KayitSurecPersonelPuantajPanel>
+                        ) : null}
 
-                              {devamsizlikSubId && !hakDuzeltmeOpen ? (
-                                <>
-                                  <form id={KAYIT_SUREC_SUREC_FORM_ID} className="workspace-form" onSubmit={handleSurecSubmit}>
-                                    <SurecFormFields
-                                      form={surecForm}
-                                      setForm={setSurecForm}
-                                      surecTuruOptions={surecTuruOptions}
-                                      personelOptions={personelOptions}
-                                      showPersonelField={false}
-                                      showSurecTuruField
-                                      altTurField={activeDevamsizlikAltTurField}
-                                      useOperationControls
-                                      errorMessage={surecError}
-                                      referenceError={null}
-                                      className="workspace-form-stack workspace-form-stack--compact"
-                                    />
-                                  </form>
+                        {activePersonelTab === "haftalik-kapanis" ? (
+                          <KayitSurecPersonelHaftalikKapanisPanel personel={selectedSurecPersonel} />
+                        ) : null}
 
-                                  <div className="workspace-inline-actions">
-                                    {surecInfo ? <p className="workspace-success workspace-success--inline">{surecInfo}</p> : null}
-                                  </div>
-                                </>
-                              ) : null}
-                            </div>
-                          )
+                        {activePersonelTab === "belge-takip" ? (
+                          <KayitSurecPersonelBelgeTakipPanel personel={selectedSurecPersonel} />
                         ) : null}
 
                         {activePersonelTab === "pozisyon" ? (
@@ -1644,8 +1628,8 @@ export function KayitSurecWorkspace({
                           selectedSurecPersonel ? (
                             isSelectedPersonelPasif ? (
                               <div className="surec-person-placeholder">
-                                <strong>Mali İşlemler</strong>
-                                <p>Bu personel pasif; mali kayıt eklenmez.</p>
+                                <strong>Finans</strong>
+                                <p>Bu personel pasif; finans kaydı eklenmez.</p>
                               </div>
                             ) : canViewUcret || canCreateFinans ? (
                               <div className="surec-shell-panel" data-testid="kayit-surec-mali-stack">
@@ -1662,7 +1646,7 @@ export function KayitSurecWorkspace({
                                 ) : null}
                                 {canCreateFinans ? (
                                   <KayitSurecPersonelFinansPanel
-                                    title="Mali İşlemler"
+                                    title="Finans"
                                     personelLabel={selectedSurecPersonelLabel}
                                     formId={KAYIT_SUREC_MALI_FORM_ID}
                                     fieldNamePrefix="kayit-mali"
@@ -1677,14 +1661,14 @@ export function KayitSurecWorkspace({
                               </div>
                             ) : (
                               <div className="surec-person-placeholder">
-                                <strong>Mali İşlemler</strong>
+                                <strong>Finans</strong>
                                 <p>Bu işlem için yetkin yok. Mali kayıtları Finans ekranından yönet.</p>
                               </div>
                             )
                           ) : (
                             <div className="surec-person-placeholder">
-                              <strong>Mali İşlemler</strong>
-                              <p>Mali işlemler için önce personel seç.</p>
+                              <strong>Finans</strong>
+                              <p>Finans işlemleri için önce personel seç.</p>
                             </div>
                           )
                         ) : activePersonelTab === "zimmet" ? (

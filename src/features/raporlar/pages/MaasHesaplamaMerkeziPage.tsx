@@ -23,6 +23,8 @@ import { AppActionDialog } from "../../../components/modal/AppActionDialog";
 import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
 import { useRoleAccess } from "../../../hooks/use-role-access";
+import { GirdiOzetOzeti, KaynakOzetOzeti } from "../../../lib/display/api-sonuc-ozeti";
+import { formatSurecStateLabel } from "../../../lib/display/enum-display";
 import { useMaasHesaplama, type MaasHesaplamaFilterState } from "../../../hooks/useMaasHesaplama";
 import { currentMonthParts, parseAyValue } from "../../../lib/donem-kapanis/display";
 import {
@@ -69,7 +71,7 @@ function adayName(aday: MaasHesaplamaAday): string {
 }
 
 function calistirmaLabel(calistirma: MaasHesaplamaCalistirma): string {
-  return `#${calistirma.id} · ${calistirma.state} · rev ${calistirma.revision_no}`;
+  return `#${calistirma.id} · ${formatSurecStateLabel(calistirma.state)} · rev ${calistirma.revision_no}`;
 }
 
 function parseDecimal(value: string): number | null {
@@ -689,7 +691,7 @@ export function MaasHesaplamaMerkeziPage() {
 
           <section data-testid="maas-hesaplama-source-summary">
             <h3>Kaynak özeti</h3>
-            <pre className="code-block">{JSON.stringify(preflight.source_summary ?? {}, null, 2)}</pre>
+            <KaynakOzetOzeti data={preflight.source_summary ?? {}} testId="maas-hesaplama-source-summary-ozet" />
           </section>
 
           <section data-testid="maas-hesaplama-snapshots">
@@ -704,7 +706,7 @@ export function MaasHesaplamaMerkeziPage() {
                     data-testid={`maas-hesaplama-snapshot-${snapshot.id}`}
                     onClick={() => void handleOpenDetail(snapshot.id)}
                   >
-                    #{snapshot.id} · {snapshot.state} · rev {snapshot.revision_no} ·{" "}
+                    #{snapshot.id} · {formatSurecStateLabel(snapshot.state)} · rev {snapshot.revision_no} ·{" "}
                     {snapshot.personel_sayisi} personel · {snapshot.girdi_sayisi} girdi ·{" "}
                     {shortHash(snapshot.snapshot_hash)}
                   </button>
@@ -739,14 +741,14 @@ export function MaasHesaplamaMerkeziPage() {
             <section data-testid="maas-hesaplama-snapshot-detail">
               <h3>Snapshot detay #{selectedDetail.id}</h3>
               <p>
-                State: {selectedDetail.state} · Rev: {selectedDetail.revision_no} · Personel:{" "}
+                Durum: {formatSurecStateLabel(selectedDetail.state)} · Rev: {selectedDetail.revision_no} · Personel:{" "}
                 {selectedDetail.personel_sayisi} · Girdi: {selectedDetail.girdi_sayisi}
               </p>
               <p data-testid="maas-hesaplama-detail-source-hash">
-                source_hash: {shortHash(selectedDetail.source_hash)}
+                Kaynak doğrulama kodu: {shortHash(selectedDetail.source_hash)}
               </p>
               <p data-testid="maas-hesaplama-detail-snapshot-hash">
-                snapshot_hash: {shortHash(selectedDetail.snapshot_hash)}
+                Anlık görüntü doğrulama kodu: {shortHash(selectedDetail.snapshot_hash)}
               </p>
               {selectedDetail.hash_dogrulama ? (
                 <p data-testid="maas-hesaplama-hash-dogrulama">
@@ -754,7 +756,7 @@ export function MaasHesaplamaMerkeziPage() {
                 </p>
               ) : null}
               {selectedDetail.girdi_ozet ? (
-                <pre className="code-block">{JSON.stringify(selectedDetail.girdi_ozet, null, 2)}</pre>
+                <GirdiOzetOzeti data={selectedDetail.girdi_ozet} testId="maas-hesaplama-girdi-ozet" />
               ) : null}
               <p className="muted-note">Snapshot payload düzenleme API’si yoktur; değerler salt okunur.</p>
             </section>
@@ -860,7 +862,7 @@ export function MaasHesaplamaMerkeziPage() {
                               {calistirmaLabel(calistirma)}
                             </button>
                           </td>
-                          <td>{calistirma.state}</td>
+                          <td>{formatSurecStateLabel(calistirma.state)}</td>
                           <td>{calistirma.aday_sayisi ?? calistirma.personel_sayisi ?? "—"}</td>
                           <td>{formatMoney(calistirma.toplam_net)}</td>
                           <td>{formatMoney(calistirma.toplam_brut)}</td>

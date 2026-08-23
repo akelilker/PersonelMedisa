@@ -10,19 +10,80 @@ test.describe("yonetim paneli ve aylik ozet", () => {
     await mockApi(page, "GENEL_YONETICI");
     await login(page, { username: "genel_yonetici", password: "demo123" });
 
+    await page.setViewportSize({ width: 390, height: 844 });
     await page.getByTestId("header-settings-toggle").click();
     await expect(page.getByTestId("settings-yonetim-paneli")).toBeVisible();
+    await expect(page.getByTestId("settings-yonetim-paneli")).toHaveText("Kullanıcı Yönetimi");
     await expect(page.getByTestId("settings-sube-yonetimi")).toBeVisible();
     await expect(page.getByTestId("settings-aylik-ozet")).toHaveCount(0);
+
+    const settingsGeometry = await page.locator("#settings-menu").evaluate((panel) => {
+      const bounds = panel.getBoundingClientRect();
+      return {
+        left: bounds.left,
+        right: bounds.right,
+        width: bounds.width,
+        viewportWidth: window.innerWidth,
+        maxWidth: getComputedStyle(panel).maxWidth
+      };
+    });
+    expect(settingsGeometry.left).toBeGreaterThanOrEqual(-1);
+    expect(settingsGeometry.right).toBeLessThanOrEqual(settingsGeometry.viewportWidth + 1);
+    expect(settingsGeometry.width).toBeGreaterThanOrEqual(220);
+    expect(settingsGeometry.maxWidth).not.toMatch(/^calc\(100%/);
 
     await page.getByTestId("settings-yonetim-paneli").click();
     await expect(page).toHaveURL(/\/yonetim-paneli\?tab=kullanicilar$/);
     await expect(page.locator(".modal-header h2").first()).toContainText("KULLANICI YÖNETİMİ");
-    await expect(page.locator(".modal-header").getByTestId("yonetim-back-ayarlar")).toBeVisible();
-    await expect(page.locator(".modal-header").getByTestId("yonetim-back-ayarlar")).toContainText("Ayarlar");
-    await expect(page.locator(".modal-header .modal-back-btn")).toHaveCount(1);
+    await expect(page.locator(".modal-header").getByTestId("yonetim-back-ayarlar")).toHaveCount(0);
+    await expect(page.locator(".modal-header .modal-back-btn")).toHaveCount(0);
+    await expect(page.getByTestId("yonetim-back-ayarlar")).toBeVisible();
+    await expect(page.getByTestId("yonetim-back-ayarlar")).toContainText("Ayarlar");
     await expect(page.locator(".modal-body .yonetim-content-back")).toHaveCount(0);
     await expect(page.getByTestId("yonetim-section-kullanicilar")).toBeVisible();
+
+    const yonetimGeometry = await page.locator(".modal-container--yonetim").evaluate((modal) => {
+      const body = modal.querySelector(".modal-body");
+      const pageRoot = modal.querySelector(".yonetim-page");
+      const card = modal.querySelector(".yonetim-card-grid--users .yonetim-entity-card");
+      const footer = document.querySelector("#app-footer");
+      if (!(body instanceof HTMLElement) || !(pageRoot instanceof HTMLElement) || !(footer instanceof HTMLElement)) {
+        throw new Error("Missing yönetim modal geometry owners");
+      }
+      const modalBounds = modal.getBoundingClientRect();
+      const bodyBounds = body.getBoundingClientRect();
+      const pageBounds = pageRoot.getBoundingClientRect();
+      const cardBounds = card?.getBoundingClientRect();
+      const footerBounds = footer.getBoundingClientRect();
+      const bodyStyle = getComputedStyle(body);
+      return {
+        modalLeft: modalBounds.left,
+        modalRight: modalBounds.right,
+        bodyLeft: bodyBounds.left,
+        bodyRight: bodyBounds.right,
+        pageLeft: pageBounds.left,
+        pageRight: pageBounds.right,
+        cardLeft: cardBounds?.left ?? null,
+        cardRight: cardBounds?.right ?? null,
+        footerGap: footerBounds.top - modalBounds.bottom,
+        overflowY: bodyStyle.overflowY,
+        overflowX: bodyStyle.overflowX,
+        viewportWidth: window.innerWidth
+      };
+    });
+    expect(yonetimGeometry.modalLeft).toBeGreaterThanOrEqual(-1);
+    expect(yonetimGeometry.modalRight).toBeLessThanOrEqual(yonetimGeometry.viewportWidth + 1);
+    expect(yonetimGeometry.pageLeft).toBeGreaterThanOrEqual(yonetimGeometry.bodyLeft - 1);
+    expect(yonetimGeometry.pageRight).toBeLessThanOrEqual(yonetimGeometry.bodyRight + 1);
+    if (yonetimGeometry.cardLeft != null && yonetimGeometry.cardRight != null) {
+      expect(yonetimGeometry.cardLeft).toBeGreaterThanOrEqual(yonetimGeometry.bodyLeft - 1);
+      expect(yonetimGeometry.cardRight).toBeLessThanOrEqual(yonetimGeometry.bodyRight + 1);
+    }
+    expect(yonetimGeometry.footerGap).toBeGreaterThan(0);
+    expect(["auto", "scroll", "overlay"]).toContain(yonetimGeometry.overflowY);
+    expect(yonetimGeometry.overflowX).toBe("hidden");
+
+    await page.setViewportSize({ width: 1280, height: 800 });
 
     await page.getByTestId("yonetim-kullanici-yeni").click();
     await expect(page.locator(".modal-header h2").last()).toContainText("Yeni Kullanıcı");

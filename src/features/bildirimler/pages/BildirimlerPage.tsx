@@ -46,6 +46,8 @@ import type { Bildirim, BirimAmiriSecenegi, GunlukOzet } from "../../../types/bi
 import type { HaftalikBildirimMutabakatCounts } from "../../../types/haftalik-bildirim-mutabakat";
 import type { Personel } from "../../../types/personel";
 import type { IdOption } from "../../../types/referans";
+import { KayitSurecReturnLink } from "../../kayit/components/KayitSurecReturnLink";
+import type { KayitSurecReturnContext } from "../../kayit/kayit-surec-navigation";
 import {
   formatGunlukKayitDayanak,
   formatGunlukKayitGunTipi,
@@ -764,6 +766,8 @@ export function BildirimlerPage() {
   const [rosterSearch, setRosterSearch] = useState("");
   const location = useLocation();
   const navigate = useNavigate();
+  const kayitSurecReturn = (location.state as { kayitSurecReturn?: KayitSurecReturnContext } | null)
+    ?.kayitSurecReturn;
 
   const todayIso = useMemo(() => {
     const now = new Date();
@@ -1023,11 +1027,14 @@ export function BildirimlerPage() {
     <section className="bildirimler-page">
       <div className="bildirimler-header-row">
         <h2>{pageTitle}</h2>
-        {canCreateBildirim ? (
-          <button type="button" className="universal-btn-aux" onClick={openCreateModal}>
-            {createButtonLabel}
-          </button>
-        ) : null}
+        <div className="bildirimler-header-actions">
+          {kayitSurecReturn ? <KayitSurecReturnLink context={kayitSurecReturn} /> : null}
+          {canCreateBildirim ? (
+            <button type="button" className="universal-btn-aux" onClick={openCreateModal}>
+              {createButtonLabel}
+            </button>
+          ) : null}
+        </div>
       </div>
 
       <div className="state-card" data-testid="bildirim-gunluk-hero">

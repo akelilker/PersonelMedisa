@@ -1,9 +1,14 @@
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const runnerPath = resolve(process.cwd(), "tests/php/PuantajControllerGecErkenDakikaTestRunner.php");
-const phpArgs = process.platform === "win32"
+const hasPdoSqlite =
+  process.platform === "win32" &&
+  spawnSync("php", ["-d", "display_errors=0", "-r", "echo extension_loaded('pdo_sqlite') ? '1' : '0';"], {
+    encoding: "utf8"
+  }).stdout.trim() === "1";
+const phpArgs = process.platform === "win32" && !hasPdoSqlite
   ? ["-d", "extension=php_sqlite3.dll", "-d", "extension=php_pdo_sqlite.dll", runnerPath]
   : [runnerPath];
 

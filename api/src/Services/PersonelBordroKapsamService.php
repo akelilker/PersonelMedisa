@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Medisa\Api\Services;
 
 use Medisa\Api\Http\JsonResponse;
+use Medisa\Api\Support\Utf8;
 use PDO;
 use PDOException;
 
@@ -406,7 +407,7 @@ class PersonelBordroKapsamService
             JsonResponse::error(409, 'ALREADY_CANCELLED', 'Kayit zaten iptal.');
         }
         $neden = trim((string) $neden);
-        if (mb_strlen($neden) < 3) {
+        if (Utf8::length($neden) < 3) {
             JsonResponse::error(422, 'VALIDATION_ERROR', 'Iptal nedeni zorunlu.');
         }
         $pdo->prepare(
@@ -441,7 +442,7 @@ class PersonelBordroKapsamService
             JsonResponse::error(422, 'VALIDATION_ERROR', 'neden_kodu gecersiz.');
         }
         $aciklama = trim((string) ($payload['aciklama'] ?? ''));
-        if (mb_strlen($aciklama) < 3) {
+        if (Utf8::length($aciklama) < 3) {
             JsonResponse::error(422, 'VALIDATION_ERROR', 'aciklama zorunlu (min 3 karakter).');
         }
         if ($durum === 'HARIC' && $aciklama === '') {

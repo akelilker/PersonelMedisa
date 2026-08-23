@@ -3,12 +3,13 @@ import { Link } from "react-router-dom";
 type BackBarProps = {
   to: string;
   label: string;
+  testId?: string;
 };
 
-export function BackBar({ to, label }: BackBarProps) {
+export function BackBar({ to, label, testId }: BackBarProps) {
   return (
     <div className="universal-back-bar">
-      <Link to={to} className="universal-back-btn" aria-label={label}>
+      <Link to={to} className="universal-back-btn" aria-label={label} data-testid={testId}>
         <svg
           className="back-icon-svg"
           xmlns="http://www.w3.org/2000/svg"

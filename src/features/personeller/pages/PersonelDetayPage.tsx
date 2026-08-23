@@ -120,7 +120,7 @@ export function PersonelDetayPage() {
             <div className="personel-archive-banner" data-testid="personel-arsiv-badge" role="status">
               <strong>Arşiv (salt okunur)</strong>
               <span> — Medisa saklama politikası</span>
-              {personel.legal_hold_active ? <span> — Legal hold aktif</span> : null}
+              {personel.legal_hold_active ? <span> — Kayıt koruma altında</span> : null}
               {earliestReview ? (
                 <span> — En erken imha değerlendirme tarihi: {earliestReview}</span>
               ) : null}

@@ -79,36 +79,131 @@ test.describe("mobile Taşıt parity — Kayıt modal", () => {
 
       const metrics = await kayitModal.evaluate((modal) => {
         const footer = document.querySelector("#app-footer");
+        const overlay = modal.closest(".modal-overlay");
         if (!(footer instanceof HTMLElement)) {
           throw new Error("Missing #app-footer");
         }
+        if (!(overlay instanceof HTMLElement)) {
+          throw new Error("Missing .modal-overlay");
+        }
 
         const modalBounds = modal.getBoundingClientRect();
+        const overlayBounds = overlay.getBoundingClientRect();
         const footerBounds = footer.getBoundingClientRect();
+        const body = modal.querySelector(".modal-body");
+        const bodyBounds = body?.getBoundingClientRect();
         const columns = modal.querySelector(".personel-form-columns");
         const columnStyles = columns ? getComputedStyle(columns) : null;
 
         return {
+          overlayLeft: overlayBounds.left,
+          overlayRight: overlayBounds.right,
           modalLeftEdgePx: modalBounds.left,
           modalRightEdgePx: window.innerWidth - modalBounds.right,
           modalFooterGapPx: footerBounds.top - modalBounds.bottom,
+          bodyLeft: bodyBounds?.left ?? null,
+          bodyRight: bodyBounds?.right ?? null,
           modalColumnsMobile: columnStyles?.gridTemplateColumns ?? "",
-          overflowX: getComputedStyle(document.documentElement).overflowX
+          overflowX: getComputedStyle(document.documentElement).overflowX,
+          viewportWidth: window.innerWidth
         };
       });
 
+      expect(metrics.overlayLeft).toBeGreaterThanOrEqual(-1);
+      expect(metrics.overlayRight).toBeLessThanOrEqual(metrics.viewportWidth + 1);
       expect(metrics.modalLeftEdgePx).toBeGreaterThanOrEqual(-1);
       expect(metrics.modalLeftEdgePx).toBeLessThanOrEqual(1);
       expect(metrics.modalRightEdgePx).toBeGreaterThanOrEqual(-1);
       expect(metrics.modalRightEdgePx).toBeLessThanOrEqual(1);
       expect(metrics.modalFooterGapPx).toBeGreaterThan(0);
       expect(metrics.modalFooterGapPx).toBeCloseTo(6, 1);
+      if (metrics.bodyLeft != null && metrics.bodyRight != null) {
+        expect(metrics.bodyLeft).toBeGreaterThanOrEqual(metrics.modalLeftEdgePx - 1);
+        expect(metrics.bodyRight).toBeLessThanOrEqual(metrics.viewportWidth - metrics.modalRightEdgePx + 1);
+      }
       const columnTracks = metrics.modalColumnsMobile.trim().split(/\s+/);
       expect(columnTracks).toHaveLength(2);
       expect(columnTracks[0]).toBe(columnTracks[1]);
       expect(metrics.overflowX).not.toBe("scroll");
 
       await expect(kayitModal.getByTestId("kayit-modal-footer-primary")).toBeVisible();
+    });
+  }
+});
+
+test.describe("mobile shell — notification + settings viewport panels", () => {
+  for (const viewport of [
+    { width: 390, height: 844 },
+    { width: 320, height: 720 }
+  ] as const) {
+    test(`notification + settings panels fit at ${viewport.width}px`, async ({ page }) => {
+      await page.setViewportSize(viewport);
+      await mockApi(page, "GENEL_YONETICI");
+      await login(page, { username: "yonetici", password: "secret" });
+
+      await page.locator("#notifications-toggle-btn").click({ force: true });
+      const notificationPanel = page.locator("#notifications-dropdown");
+      await expect(notificationPanel).toBeVisible();
+
+      const notifMetrics = await notificationPanel.evaluate((panel) => {
+        const panelBounds = panel.getBoundingClientRect();
+        const card = panel.querySelector(".notification-item");
+        const cardBounds = card?.getBoundingClientRect();
+        const line = panel.querySelector(".notif-line1");
+        const lineStyle = line ? getComputedStyle(line) : null;
+        return {
+          left: panelBounds.left,
+          right: panelBounds.right,
+          width: panelBounds.width,
+          cardLeft: cardBounds?.left ?? null,
+          cardRight: cardBounds?.right ?? null,
+          cardWidth: cardBounds?.width ?? null,
+          maxWidth: getComputedStyle(panel).maxWidth,
+          lineWhiteSpace: lineStyle?.whiteSpace ?? "",
+          viewportWidth: window.innerWidth
+        };
+      });
+
+      expect(notifMetrics.left).toBeGreaterThanOrEqual(-1);
+      expect(notifMetrics.right).toBeLessThanOrEqual(notifMetrics.viewportWidth + 1);
+      expect(notifMetrics.width).toBeGreaterThanOrEqual(Math.min(240, notifMetrics.viewportWidth - 32));
+      expect(notifMetrics.maxWidth).toMatch(/px|vw|%|calc/i);
+      expect(notifMetrics.maxWidth).not.toMatch(/^calc\(100%/);
+      if (notifMetrics.cardLeft != null && notifMetrics.cardRight != null && notifMetrics.cardWidth != null) {
+        expect(notifMetrics.cardLeft).toBeGreaterThanOrEqual(notifMetrics.left - 1);
+        expect(notifMetrics.cardRight).toBeLessThanOrEqual(notifMetrics.right + 1);
+        expect(notifMetrics.cardWidth).toBeGreaterThanOrEqual(Math.min(200, notifMetrics.width - 16));
+      }
+      expect(notifMetrics.lineWhiteSpace).not.toBe("nowrap");
+
+      await page.keyboard.press("Escape");
+      await page.getByTestId("header-settings-toggle").click();
+      const settingsPanel = page.locator("#settings-menu");
+      await expect(settingsPanel).toBeVisible();
+
+      const settingsMetrics = await settingsPanel.evaluate((panel) => {
+        const panelBounds = panel.getBoundingClientRect();
+        const item = panel.querySelector("button");
+        const itemBounds = item?.getBoundingClientRect();
+        return {
+          left: panelBounds.left,
+          right: panelBounds.right,
+          width: panelBounds.width,
+          itemLeft: itemBounds?.left ?? null,
+          itemRight: itemBounds?.right ?? null,
+          maxWidth: getComputedStyle(panel).maxWidth,
+          viewportWidth: window.innerWidth
+        };
+      });
+
+      expect(settingsMetrics.left).toBeGreaterThanOrEqual(-1);
+      expect(settingsMetrics.right).toBeLessThanOrEqual(settingsMetrics.viewportWidth + 1);
+      expect(settingsMetrics.width).toBeGreaterThanOrEqual(Math.min(220, settingsMetrics.viewportWidth - 32));
+      expect(settingsMetrics.maxWidth).not.toMatch(/^calc\(100%/);
+      if (settingsMetrics.itemLeft != null && settingsMetrics.itemRight != null) {
+        expect(settingsMetrics.itemLeft).toBeGreaterThanOrEqual(settingsMetrics.left - 1);
+        expect(settingsMetrics.itemRight).toBeLessThanOrEqual(settingsMetrics.right + 1);
+      }
     });
   }
 });

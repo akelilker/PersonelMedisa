@@ -164,11 +164,11 @@ function formatCellValue(column: RaporKolonu, value: unknown): string {
     return String(value);
   }
 
-  try {
-    return JSON.stringify(value);
-  } catch {
-    return String(value);
+  if (typeof value === "object") {
+    return "—";
   }
+
+  return String(value);
 }
 
 type AylikFilterState = {

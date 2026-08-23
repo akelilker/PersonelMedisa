@@ -39,7 +39,7 @@ export function KullaniciActorIdentityPanel(props: KullaniciActorIdentityPanelPr
       ) {
         setSnapshot(null);
       } else {
-        setErrorMessage(error instanceof Error ? error.message : "Actor kimliği okunamadı.");
+        setErrorMessage(error instanceof Error ? error.message : "SGK yetkili kimliği okunamadı.");
       }
     } finally {
       setIsLoading(false);
@@ -61,7 +61,7 @@ export function KullaniciActorIdentityPanel(props: KullaniciActorIdentityPanelPr
       const read = await action();
       setSnapshot(read);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Actor kimliği işlemi başarısız.");
+      setErrorMessage(error instanceof Error ? error.message : "SGK yetkili kimliği işlemi başarısız.");
     } finally {
       setIsWorking(false);
     }
@@ -71,25 +71,25 @@ export function KullaniciActorIdentityPanel(props: KullaniciActorIdentityPanelPr
   const actorStatus = snapshot?.actor_status ?? null;
   const readinessLabel =
     snapshot?.ready === true
-      ? "SGK dual-control hazır"
+      ? "SGK çift onay hazır"
       : snapshot?.readiness_code
         ? `Hazır değil (${snapshot.readiness_code})`
         : "Hazır değil";
 
   return (
     <div className="yonetim-workspace-panel" data-testid="yonetim-kullanici-actor-identity">
-      <p className="yonetim-workspace-panel-title">Formal SGK actor kimliği</p>
+      <p className="yonetim-workspace-panel-title">SGK yetkili kimliği</p>
       <p className="yonetim-hint">
-        Personel bağlantısından ayrıdır. Create / verify / bind işlemleri mevcut backend owner&apos;ı üzerinden çalışır.
+        Personel bağlantısından ayrıdır. Oluşturma, doğrulama ve bağlama işlemleri mevcut sistem üzerinden yürütülür.
       </p>
 
-      {isLoading ? <p className="yonetim-hint">Actor durumu yükleniyor…</p> : null}
+      {isLoading ? <p className="yonetim-hint">Yetkili kimlik durumu yükleniyor…</p> : null}
       {!isLoading && errorMessage ? <p className="yonetim-inline-error">{errorMessage}</p> : null}
 
       {!isLoading && !errorMessage ? (
         <dl className="yonetim-actor-readback">
           <div>
-            <dt>Actor ID</dt>
+            <dt>Yetkili kimlik no</dt>
             <dd>{actorId ?? "—"}</dd>
           </div>
           <div>
@@ -97,15 +97,15 @@ export function KullaniciActorIdentityPanel(props: KullaniciActorIdentityPanelPr
             <dd>{actorStatus ? (ACTOR_STATUS_LABELS[actorStatus] ?? actorStatus) : "—"}</dd>
           </div>
           <div>
-            <dt>Readiness</dt>
+            <dt>Hazırlık</dt>
             <dd>{actorId ? readinessLabel : "—"}</dd>
           </div>
           <div>
-            <dt>Actor şube kapsamı</dt>
+            <dt>Şube kapsamı</dt>
             <dd>{snapshot?.branch_scope?.length ? props.formatSubeScope(snapshot.branch_scope) : "—"}</dd>
           </div>
           <div>
-            <dt>Bağlı personel (actor)</dt>
+            <dt>Bağlı personel</dt>
             <dd>{snapshot?.personel_id ?? "—"}</dd>
           </div>
         </dl>
@@ -120,7 +120,7 @@ export function KullaniciActorIdentityPanel(props: KullaniciActorIdentityPanelPr
             disabled={isWorking || isLoading || actorId != null}
             onClick={() => void runAction(() => createYonetimActorIdentity(props.userId))}
           >
-            Actor kimliği oluştur
+            Yetkili kimlik oluştur
           </button>
           <button
             type="button"
@@ -142,7 +142,7 @@ export function KullaniciActorIdentityPanel(props: KullaniciActorIdentityPanelPr
           </button>
         </div>
       ) : (
-        <p className="yonetim-hint">Actor işlemleri yalnızca yönetim yetkisi olan kullanıcılar tarafından yapılabilir.</p>
+        <p className="yonetim-hint">Bu işlemler yalnızca yönetim yetkisi olan kullanıcılar tarafından yapılabilir.</p>
       )}
     </div>
   );

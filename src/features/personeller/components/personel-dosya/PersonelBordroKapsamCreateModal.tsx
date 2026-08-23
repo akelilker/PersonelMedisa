@@ -132,7 +132,7 @@ export function PersonelBordroKapsamCreateModal({
       hash = preview?.dry_run_hash;
     }
     if (!hash) {
-      setValidationMessage("Önce dry-run çalıştırılmalıdır.");
+      setValidationMessage("Önce ön kontrol çalıştırılmalıdır.");
       return;
     }
     const ok = await onCreate({ ...base, dry_run_hash: hash });

@@ -74,8 +74,7 @@ test.describe("S80 Revizyon Merkezi final UI kabul", () => {
     await page.keyboard.press("Escape");
     await expect(page.getByRole("dialog", { name: "Kayıt ve Süreç İşlemleri" })).toHaveCount(0);
 
-    await page.getByTestId("header-modules-toggle").click();
-    await page.getByTestId("shell-header-module-link-revizyon-merkezi").click();
+    await page.goto("/haftalik-kapanis/revizyonlar");
     await expect(page.getByTestId("revizyon-merkezi-page")).toBeVisible();
     await expect(page).toHaveURL(/\/haftalik-kapanis\/revizyonlar$/);
   });
@@ -191,8 +190,7 @@ test.describe("S80 Revizyon Merkezi final UI kabul", () => {
     await expect(page.getByTestId("kayit-surec-revizyon-merkezi-link")).toHaveCount(0);
     await expect(page.getByTestId("kayit-surec-ops-links")).toHaveCount(0);
     await page.keyboard.press("Escape");
-    await page.getByTestId("header-modules-toggle").click();
-    await page.getByTestId("shell-header-module-link-revizyon-merkezi").click();
+    await page.goto("/haftalik-kapanis/revizyonlar");
     await expect(page.getByTestId("revizyon-merkezi-page")).toBeVisible();
     await expect(page.getByTestId("revizyon-tab-onay")).toBeVisible();
 

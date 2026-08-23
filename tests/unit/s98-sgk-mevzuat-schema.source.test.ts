@@ -72,7 +72,7 @@ describe("S98 SGK mevzuat schema hardening", () => {
   it("frontend/mock expose canonical aktiflik labels and never select TEYITSIZ", () => {
     const api = readFileSync("src/api/sgk-katalog-hazirlik.api.ts", "utf8");
     expect(panel).toContain("SGK_AKTIFLIK_DURUMU_LABEL");
-    expect(panel).toContain("TEYITSIZ");
+    expect(panel).toContain("Teyitsiz");
     expect(api).toContain("PORTAL TEYİDİ BEKLİYOR");
     expect(api).toContain("BAĞLAMA ÖZGÜ");
     expect(mock).toContain("teyitsiz_secilebilir_mi: false");

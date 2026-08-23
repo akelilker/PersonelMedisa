@@ -30,11 +30,16 @@ describe("S90 Bildirimler auth PHP runner", () => {
     const runner = resolve(process.cwd(), "tests/php/BildirimlerAuthGateTestRunner.php");
     const phpArgs: string[] = [];
     if (process.platform === "win32") {
-      const extDir = spawnSync("php", ["-r", "echo ini_get('extension_dir');"], {
+      const extensionDirResult = spawnSync("php", ["-d", "display_errors=0", "-r", "echo ini_get('extension_dir');"], {
         encoding: "utf8"
-      }).stdout?.trim();
+      });
+      const extDir = (extensionDirResult.stdout ?? "")
+        .trim()
+        .split(/\r?\n/)
+        .filter((line) => line && !/warning/i.test(line))
+        .pop();
       if (extDir) {
-        phpArgs.push("-d", `extension_dir=${extDir}`, "-d", "extension=pdo_mysql");
+        phpArgs.push("-d", `extension_dir=${extDir}`);
       }
     }
     const result = spawnSync("php", [...phpArgs, runner], {

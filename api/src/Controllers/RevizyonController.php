@@ -10,6 +10,7 @@ use Medisa\Api\Database\Connection;
 use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
 use Medisa\Api\Scope\SubeScope;
+use Medisa\Api\Support\Utf8;
 use PDO;
 use PDOException;
 use Throwable;
@@ -186,7 +187,7 @@ class RevizyonController
         $kaynakId = self::parsePositiveInt($body['kaynak_id'] ?? null, 'kaynak_id', true);
         $revizyonTipi = self::requireRevizyonTipi($body);
         $gerekce = self::requireTrimmedString($body, 'gerekce');
-        if (mb_strlen($gerekce) > 1000) {
+        if (Utf8::length($gerekce) > 1000) {
             self::validationError('gerekce', 'gerekce en fazla 1000 karakter olabilir.');
         }
 
@@ -1909,7 +1910,7 @@ class RevizyonController
         if ($value === '') {
             return null;
         }
-        if (mb_strlen($value) > 1000) {
+        if (Utf8::length($value) > 1000) {
             self::correctionPayloadError('aciklama', 'aciklama en fazla 1000 karakter olabilir.');
         }
 
@@ -1986,7 +1987,7 @@ class RevizyonController
         if ($value === '') {
             return null;
         }
-        if (mb_strlen($value) > $maxLen) {
+        if (Utf8::length($value) > $maxLen) {
             self::validationError($field, $field . ' en fazla ' . $maxLen . ' karakter olabilir.');
         }
 

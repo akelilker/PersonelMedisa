@@ -11,6 +11,7 @@ use Medisa\Api\Http\CsvResponse;
 use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
 use Medisa\Api\Scope\SubeScope;
+use Medisa\Api\Support\Utf8;
 use Medisa\Api\Services\BildirimPuantajEtkiRaporQueryService;
 use Medisa\Api\Services\BildirimPuantajEtkiConflictClassificationService;
 use Medisa\Api\Services\BildirimPuantajEtkiConflictResolutionService;
@@ -1749,10 +1750,10 @@ class BildirimPuantajEtkiAdaylariController
         }
 
         $gerekce = trim((string) $value);
-        if ($gerekce === '' || mb_strlen($gerekce) < 5) {
+        if ($gerekce === '' || Utf8::length($gerekce) < 5) {
             self::validationError('gerekce', 'Karar gerekcesi en az 5 karakter olmalidir.');
         }
-        if (mb_strlen($gerekce) > 500) {
+        if (Utf8::length($gerekce) > 500) {
             self::validationError('gerekce', 'Karar gerekcesi en fazla 500 karakter olabilir.');
         }
 
@@ -1829,10 +1830,10 @@ class BildirimPuantajEtkiAdaylariController
         }
 
         $gerekce = trim((string) $value);
-        if ($gerekce === '' || mb_strlen($gerekce) < 5) {
+        if ($gerekce === '' || Utf8::length($gerekce) < 5) {
             self::validationError('gerekce', 'Manuel karar gerekcesi en az 5 karakter olmalidir.');
         }
-        if (mb_strlen($gerekce) > 500) {
+        if (Utf8::length($gerekce) > 500) {
             self::validationError('gerekce', 'Manuel karar gerekcesi en fazla 500 karakter olabilir.');
         }
 
@@ -1874,10 +1875,10 @@ class BildirimPuantajEtkiAdaylariController
         }
 
         $gerekce = trim((string) $value);
-        if ($gerekce === '' || mb_strlen($gerekce) < 5) {
+        if ($gerekce === '' || Utf8::length($gerekce) < 5) {
             self::validationError('gerekce', 'Yok sayma gerekcesi en az 5 karakter olmalidir.');
         }
-        if (mb_strlen($gerekce) > 500) {
+        if (Utf8::length($gerekce) > 500) {
             self::validationError('gerekce', 'Yok sayma gerekcesi en fazla 500 karakter olabilir.');
         }
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Medisa\Api\Services;
 
+use Medisa\Api\Support\Utf8;
 use PDO;
 
 class BildirimPuantajEtkiRaporQueryService
@@ -296,8 +297,8 @@ class BildirimPuantajEtkiRaporQueryService
 
     private static function maskName($ad, $soyad)
     {
-        $maskedAd = $ad !== '' ? mb_substr($ad, 0, 1) . '***' : '***';
-        $maskedSoyad = $soyad !== '' ? mb_substr($soyad, 0, 1) . '***' : '***';
+        $maskedAd = $ad !== '' ? Utf8::substring($ad, 0, 1) . '***' : '***';
+        $maskedSoyad = $soyad !== '' ? Utf8::substring($soyad, 0, 1) . '***' : '***';
 
         return trim($maskedAd . ' ' . $maskedSoyad);
     }

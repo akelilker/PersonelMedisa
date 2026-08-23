@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Medisa\Api\Services\Personel;
 
 use Medisa\Api\Scope\SubeScope;
+use Medisa\Api\Support\Utf8;
 use PDO;
 use RuntimeException;
 
@@ -980,7 +981,7 @@ final class PersonelImportDryRunService
 
     private static function normalizeSicilKey($sicil)
     {
-        return mb_strtolower(trim((string) $sicil), 'UTF-8');
+        return Utf8::lower(trim((string) $sicil));
     }
 
     private static function normalizeHeader($header)
@@ -991,7 +992,7 @@ final class PersonelImportDryRunService
         }
         $h = trim($h);
 
-        return mb_strtolower($h, 'UTF-8');
+        return Utf8::lower($h);
     }
 
     /** @return list<string> */

@@ -190,11 +190,20 @@ body.login-page .hero .animated-line {
 }
 
 @media (min-width: 641px) {
-  .hero {
+  .hero,
+  body.login-page .hero {
     --hero-logo-width: 69px;
     --hero-spacer-width: 30px;
+    grid-template-rows: minmax(0, 1fr);
     column-gap: 14px;
     padding-inline: 16px;
+  }
+
+  .hero-logo,
+  .hero-spacer,
+  body.login-page .hero-logo,
+  body.login-page .hero-spacer {
+    grid-row: 1;
   }
 
   .hero-with-session .hero-logo {
@@ -221,9 +230,18 @@ body.login-page .hero .animated-line {
     width: 69px;
   }
 
-  .hero h1 {
-    font-size: 19px;
+  .hero h1,
+  body.login-page .hero h1 {
+    align-self: center;
+    font-size: 20px;
     letter-spacing: 1.8px;
+  }
+
+  .animated-line,
+  body.login-page .hero .animated-line {
+    grid-row: 1;
+    position: absolute;
+    top: calc(50% + 8px);
   }
 }
 

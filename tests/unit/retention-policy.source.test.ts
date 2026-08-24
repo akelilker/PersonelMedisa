@@ -12,7 +12,7 @@ describe("retention policy source contract (053)", () => {
     const migrations = readdirSync(resolve(root, "api/migrations"))
       .filter((name) => /^\d{3}_.+\.sql$/.test(name))
       .sort();
-    expect(migrations.at(-1)).toBe("072_org_reference_short_codes.sql");
+    expect(migrations.at(-1)).toBe("073_test_fixture_personel_archive.sql");
     expect(migrations).toContain("052_puantaj_tolerans_ve_disiplin.sql");
     expect(migrations).toContain("053_retention_legal_hold_arsiv.sql");
     expect(migrations).toContain("058_qr_puantaj_candidate_decision_ledger.sql");

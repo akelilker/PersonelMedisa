@@ -56,7 +56,7 @@ describe("HaftalikKapanisController MariaDB", () => {
     const migrations = readdirSync(resolve(process.cwd(), "api/migrations"))
       .filter((name) => name.endsWith(".sql"))
       .sort();
-    expect(migrations.at(-1)).toBe("072_org_reference_short_codes.sql");
+    expect(migrations.at(-1)).toBe("073_test_fixture_personel_archive.sql");
   });
 
   it("runs HTTP haftalik kapanis acceptance on MariaDB", () => {

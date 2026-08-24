@@ -28,7 +28,7 @@ describe("Org Structure Pack6 MariaDB runtime", () => {
     const migrations = readdirSync(resolve(process.cwd(), "api/migrations"))
       .filter((name) => /^\d{3}_.+\.sql$/.test(name))
       .sort();
-    expect(migrations.at(-1)).toBe("072_org_reference_short_codes.sql");
+    expect(migrations.at(-1)).toBe("073_test_fixture_personel_archive.sql");
     expect(migrations).toContain("064_personel_org_location_model.sql");
 
     expect(migration065).toContain("bolumler");

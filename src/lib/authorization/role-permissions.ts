@@ -7,6 +7,7 @@ export type AppPermission =
   | "personeller.create"
   | "personeller.import.apply"
   | "personeller.update"
+  | "personeller.test_fixture.archive"
   | "personeller.detail.view"
   | "personeller.ucret.view"
   | "personeller.ucret.manage"
@@ -137,6 +138,7 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "personeller.create",
     "personeller.import.apply",
     "personeller.update",
+    "personeller.test_fixture.archive",
     "personeller.detail.view",
     "personeller.ucret.view",
     "personeller.ucret.manage",
@@ -396,6 +398,7 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "personeller.create",
     "personeller.import.apply",
     "personeller.update",
+    "personeller.test_fixture.archive",
     "personeller.detail.view",
     "personeller.ucret.view",
     "mevzuat_parametreleri.view",

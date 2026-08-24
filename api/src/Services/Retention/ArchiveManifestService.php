@@ -56,6 +56,7 @@ class ArchiveManifestService
         if (!in_array($triggerType, [
             RetentionCategories::TRIGGER_PERIOD_CLOSURE,
             RetentionCategories::TRIGGER_TERMINATION_DATE,
+            RetentionCategories::TRIGGER_TEST_FIXTURE_ARCHIVE,
         ], true)) {
             throw new RuntimeException('ARCHIVE_MANIFEST_TRIGGER_INVALID');
         }
@@ -455,6 +456,45 @@ class ArchiveManifestService
         } catch (\Throwable $e) {
             return $raw;
         }
+    }
+
+    /**
+     * TEST_FIXTURE_ARCHIVE manifest — uses archived_at date as trigger_date.
+     * Does NOT create employment termination / isten_cikis semantics.
+     * Does NOT call createPersonelLifecycleManifests (ISTEN_AYRILMA path).
+     *
+     * @return array<string, mixed>
+     */
+    public static function createTestFixtureArchiveManifest(PDO $pdo, $personelId, $archivedAtYmd, $actorId, $evidenceKodu)
+    {
+        $personelId = (int) $personelId;
+        $actorId = (int) $actorId;
+        $archivedAtYmd = (string) $archivedAtYmd;
+        $evidenceKodu = strtoupper(trim((string) $evidenceKodu));
+        if ($personelId <= 0 || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $archivedAtYmd)) {
+            throw new RuntimeException('ARCHIVE_MANIFEST_INVALID');
+        }
+
+        $dt = DateTime::createFromFormat('Y-m-d', $archivedAtYmd);
+        if (!$dt) {
+            throw new RuntimeException('ARCHIVE_MANIFEST_TRIGGER_DATE_INVALID');
+        }
+
+        $sourceIdentity = 'personel:' . $personelId . ':test_fixture_archive:' . $archivedAtYmd
+            . ':evidence:' . $evidenceKodu;
+        $fp = self::computePersonelOzlukFingerprint($pdo, $personelId);
+
+        return self::createManifest($pdo, [
+            'entity_type' => 'personel',
+            'record_id' => $personelId,
+            'personel_id' => $personelId,
+            'record_category' => RetentionCategories::PERSONEL_OZLUK,
+            'source_version_identity' => $sourceIdentity,
+            'trigger_type' => RetentionCategories::TRIGGER_TEST_FIXTURE_ARCHIVE,
+            'trigger_date' => $archivedAtYmd,
+            'retention_until' => RetentionPolicyService::calculateRetentionUntil($dt),
+            'source_sha256' => $fp,
+        ], $actorId > 0 ? $actorId : null);
     }
 
     /**

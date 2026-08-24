@@ -42,7 +42,7 @@ describe("I13-B varsayilan_sube_id MariaDB acceptance", () => {
     const migrations = readdirSync(resolve("api/migrations"))
       .filter((name) => /^\d{3}_.+\.sql$/.test(name))
       .sort();
-    expect(migrations.at(-1)).toBe("072_org_reference_short_codes.sql");
+    expect(migrations.at(-1)).toBe("073_test_fixture_personel_archive.sql");
   });
 
   it("applies 051 idempotently and asserts FK/ON DELETE SET NULL", () => {

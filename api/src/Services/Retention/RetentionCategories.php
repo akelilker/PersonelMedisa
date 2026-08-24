@@ -28,6 +28,8 @@ class RetentionCategories
 
     public const TRIGGER_PERIOD_CLOSURE = 'PERIOD_CLOSURE';
     public const TRIGGER_TERMINATION_DATE = 'TERMINATION_DATE';
+    /** Non-employment test fixture archive — never resolves as termination. */
+    public const TRIGGER_TEST_FIXTURE_ARCHIVE = 'TEST_FIXTURE_ARCHIVE';
 
     /** Medisa saklama politikası — company policy note (never statutory claim). */
     public const POLICY_NOTE = 'Medisa saklama politikası';

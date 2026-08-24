@@ -1526,7 +1526,7 @@ class BildirimPuantajEtkiAdaylariController
             'sube_id' => (int) $subeId,
         ]);
         if (!$stmt->fetchColumn()) {
-            JsonResponse::forbidden('Secili birim amiri bu sube icin yetkili degil.');
+            JsonResponse::forbidden('Secili birim yoneticisi bu sube icin yetkili degil.');
         }
     }
 

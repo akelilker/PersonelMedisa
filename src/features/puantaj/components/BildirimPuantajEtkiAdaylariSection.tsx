@@ -395,10 +395,10 @@ export function BildirimPuantajEtkiAdaylariSection() {
       return null;
     }
     if (birimAmiriSecenekleri.length === 0) {
-      return "Seçilen şubede aktif birim amiri bulunamadı.";
+      return "Seçilen şubede aktif birim yöneticisi bulunamadı.";
     }
     if (selectedBirimAmiriUserId === null) {
-      return "Verileri görüntülemek için birim amiri seçin.";
+      return "Verileri görüntülemek için birim yöneticisi seçin.";
     }
     return null;
   }, [
@@ -565,7 +565,7 @@ export function BildirimPuantajEtkiAdaylariSection() {
           onChange={setAy}
         />
         <FormField
-          label="Birim Amiri"
+          label="Birim Yöneticisi"
           name="puantaj-etki-aday-birim-amiri"
           as="select"
           value={selectedBirimAmiriUserId != null ? String(selectedBirimAmiriUserId) : ""}

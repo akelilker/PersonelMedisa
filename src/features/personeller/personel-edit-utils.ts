@@ -84,7 +84,7 @@ export function buildBagliAmirFormGuidance(
     departmanId === context.departmanId &&
     !subeWarning &&
     !departmanWarning
-      ? "Sube ve Bolum bilgileri, secilen Birim Amirine gore otomatik olarak guncellendi."
+      ? "Sube ve Bolum bilgileri, secilen Birim Yoneticisine gore otomatik olarak guncellendi."
       : null;
 
   return {

@@ -60,7 +60,7 @@ class HaftalikBildirimMutabakatlariController
         $user = AuthMiddleware::authenticate($request, true);
         RolePermissions::assert($user, 'haftalik_mutabakat.approve');
         if (strtoupper(trim((string) ($user['rol'] ?? ''))) !== 'BIRIM_AMIRI') {
-            JsonResponse::forbidden('Yalnizca birim amiri kendi haftasini onaylayabilir.');
+            JsonResponse::forbidden('Yalnizca birim yoneticisi kendi haftasini onaylayabilir.');
         }
 
         $body = $request->getJsonBody();
@@ -217,7 +217,7 @@ class HaftalikBildirimMutabakatlariController
             'sube_id' => (int) $subeId,
         ]);
         if (!$stmt->fetchColumn()) {
-            JsonResponse::forbidden('Secili birim amiri bu sube icin yetkili degil.');
+            JsonResponse::forbidden('Secili birim yoneticisi bu sube icin yetkili degil.');
         }
     }
 

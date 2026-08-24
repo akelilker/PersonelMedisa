@@ -17,8 +17,8 @@ describe("enum display labels", () => {
     expect(formatBildirimTuruLabel("GOREVDE")).toBe("Görevde");
   });
 
-  it("renders the exact Birim Amiri role label", () => {
-    expect(formatUserRoleLabel("BIRIM_AMIRI")).toBe("Birim Amiri Rolü");
+  it("renders the exact Birim Yöneticisi role label while keeping internal role id", () => {
+    expect(formatUserRoleLabel("BIRIM_AMIRI")).toBe("Birim Yöneticisi");
   });
 
   it("renders canonical Çalışan Kapsamı labels without changing enum values", () => {

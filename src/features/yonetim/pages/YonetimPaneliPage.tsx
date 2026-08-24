@@ -38,6 +38,7 @@ import type { UserRole } from "../../../types/auth";
 import { ASSIGNABLE_USER_ROLES } from "../../../types/auth";
 import type { Personel } from "../../../types/personel";
 import type { IdOption } from "../../../types/referans";
+import { formatSurecTuruLabel, formatUserRoleLabel } from "../../../lib/display/enum-display";
 import type {
   KayitDurumu,
   KullaniciTipi,
@@ -85,18 +86,6 @@ type SubeFormState = {
   ad: string;
   departmanIds: number[];
   durum: KayitDurumu;
-};
-
-const ROLE_LABELS: Record<UserRole, string> = {
-  PERSONEL: "Personel",
-  MUHASEBE: "Muhasebe",
-  IK_SORUMLUSU: "İK Sorumlusu",
-  BIRIM_AMIRI: "Birim Amiri",
-  BOLUM_YONETICISI: "Bölüm Yöneticisi",
-  SUBE_YONETICISI: "Şube Yöneticisi",
-  GENEL_YONETICI: "Genel Yönetici",
-  SISTEM_YONETICISI: "Sistem Yöneticisi",
-  AUTH_SMOKE_READONLY: "Teknik doğrulama — Salt okuma"
 };
 
 const KULLANICI_TIPI_LABELS: Record<KullaniciTipi, string> = {
@@ -219,7 +208,7 @@ function roleOptions(currentRole?: UserRole) {
 
   return roles.map((value) => ({
     value,
-    label: ROLE_LABELS[value]
+    label: formatUserRoleLabel(value)
   }));
 }
 
@@ -432,7 +421,7 @@ function buildYonetimSurecLogPayloads(
       personel_id: oldPersonelId,
       surec_turu: BIRIM_AMIRI_ATAMASI_KALDIRILDI_SUREC_TURU,
       baslangic_tarihi: today,
-      aciklama: "Birim Amiri Ataması Kaldırıldı."
+      aciklama: formatSurecTuruLabel(BIRIM_AMIRI_ATAMASI_KALDIRILDI_SUREC_TURU)
     });
   }
 
@@ -441,7 +430,7 @@ function buildYonetimSurecLogPayloads(
       personel_id: newPersonelId,
       surec_turu: BIRIM_AMIRI_ATANDI_SUREC_TURU,
       baslangic_tarihi: today,
-      aciklama: "Birim Amiri Olarak Atandı."
+      aciklama: formatSurecTuruLabel(BIRIM_AMIRI_ATANDI_SUREC_TURU)
     });
   }
 
@@ -588,7 +577,7 @@ export function YonetimPaneliPage() {
         return fallback;
       }
 
-      return ROLE_LABELS[item.rol];
+      return formatUserRoleLabel(item.rol);
     }
 
     const adSoyad = (item.ad_soyad ?? "").trim();
@@ -596,7 +585,7 @@ export function YonetimPaneliPage() {
       return adSoyad;
     }
 
-    return ROLE_LABELS[item.rol];
+    return formatUserRoleLabel(item.rol);
   }
 
   async function loadPanel() {
@@ -1029,7 +1018,7 @@ export function YonetimPaneliPage() {
                     >
                       <td className="yonetim-list-table-cell-strong">{formatKullaniciDisplayName(item)}</td>
                       <td>{KULLANICI_TIPI_LABELS[item.kullanici_tipi]}</td>
-                      <td>{ROLE_LABELS[item.rol]}</td>
+                      <td>{formatUserRoleLabel(item.rol)}</td>
                       <td title={formatSubeScopeLabel(item.sube_ids, subeNameMap)}>
                         {formatSubeScopeLabel(item.sube_ids, subeNameMap)}
                       </td>

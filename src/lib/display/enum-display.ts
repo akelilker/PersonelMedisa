@@ -10,7 +10,7 @@ const USER_ROLE_LABELS: Record<UserRole, string> = {
   PERSONEL: "Personel",
   MUHASEBE: "Muhasebe",
   IK_SORUMLUSU: "İK Sorumlusu",
-  BIRIM_AMIRI: "Birim Amiri Rolü",
+  BIRIM_AMIRI: "Birim Yöneticisi",
   BOLUM_YONETICISI: "Bölüm Yöneticisi",
   SUBE_YONETICISI: "Şube Yöneticisi",
   GENEL_YONETICI: "Genel Yönetici",
@@ -58,8 +58,8 @@ const SUREC_TURU_LABELS: Record<string, string> = {
   POZISYON_DEGISTI: "Pozisyon Değişti",
   ORG_DEGISIKLIK: "Organizasyon değişikliği",
   ISTEN_AYRILMA: "İsten ayrılma",
-  BIRIM_AMIRI_ATANDI: "Birim Amiri Olarak Atandı",
-  BIRIM_AMIRI_ATAMASI_KALDIRILDI: "Birim Amiri Ataması Kaldırıldı",
+  BIRIM_AMIRI_ATANDI: "Birim Yöneticisi Olarak Atandı",
+  BIRIM_AMIRI_ATAMASI_KALDIRILDI: "Birim Yöneticisi Ataması Kaldırıldı",
   SUBE_YETKISI_DEGISTI: "Bağlı Bölüm / Şube Yetkisi Değişti"
 };
 

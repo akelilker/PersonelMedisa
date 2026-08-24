@@ -97,7 +97,7 @@ export function YonetimOrgScopeFields(props: YonetimOrgScopeFieldsProps) {
       {showBirim && (
         <div className="yonetim-checkbox-section" data-testid="yonetim-birim-scope-field">
           <p className="yonetim-checkbox-title">Birim Yetkisi</p>
-          <p className="yonetim-hint">BIRIM_AMIRI için en az bir birim zorunludur.</p>
+          <p className="yonetim-hint">Birim Yöneticisi için en az bir birim zorunludur.</p>
           <div className="yonetim-selection-grid">
             {props.birimler.map((birim) => (
               <button

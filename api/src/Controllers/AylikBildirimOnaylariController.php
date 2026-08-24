@@ -38,7 +38,7 @@ class AylikBildirimOnaylariController
         $user = AuthMiddleware::authenticate($request, true);
         RolePermissions::assert($user, 'aylik_bildirim_onayi.approve');
         if (strtoupper(trim((string) ($user['rol'] ?? ''))) !== 'BIRIM_AMIRI') {
-            JsonResponse::forbidden('Yalnizca birim amiri kendi ayini onaylayabilir.');
+            JsonResponse::forbidden('Yalnizca birim yoneticisi kendi ayini onaylayabilir.');
         }
 
         $body = $request->getJsonBody();
@@ -185,7 +185,7 @@ class AylikBildirimOnaylariController
             'sube_id' => (int) $subeId,
         ]);
         if (!$stmt->fetchColumn()) {
-            JsonResponse::forbidden('Secili birim amiri bu sube icin yetkili degil.');
+            JsonResponse::forbidden('Secili birim yoneticisi bu sube icin yetkili degil.');
         }
     }
 

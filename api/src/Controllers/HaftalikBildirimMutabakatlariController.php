@@ -9,6 +9,7 @@ use Medisa\Api\Auth\RolePermissions;
 use Medisa\Api\Database\Connection;
 use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
+use Medisa\Api\Scope\ManagerApprovalScope;
 use Medisa\Api\Scope\SubeScope;
 use PDO;
 
@@ -30,7 +31,7 @@ class HaftalikBildirimMutabakatlariController
         if ($amirId === null) {
             self::validationError('birim_amiri_user_id', 'Birim amiri secimi zorunludur.');
         }
-        self::assertAmirScope($pdo, $subeId, $amirId);
+        ManagerApprovalScope::assertActorCanAccessBirimAmiriChain($user, $request, $pdo, $subeId, $amirId);
         $counts = self::fetchCounts($pdo, $subeId, $amirId, $haftaBaslangic, $haftaBitis);
         $existing = self::fetchExisting($pdo, $subeId, $amirId, $haftaBaslangic);
         $completionMeta = self::fetchCompletionMeta($pdo, $subeId, $amirId, $haftaBaslangic, $haftaBitis);
@@ -69,6 +70,7 @@ class HaftalikBildirimMutabakatlariController
         $amirId = self::userId($user);
         $pdo = self::connection();
         self::assertTablesReady($pdo);
+        ManagerApprovalScope::assertActorCanAccessBirimAmiriChain($user, $request, $pdo, $subeId, $amirId);
 
         try {
             $pdo->beginTransaction();
@@ -162,11 +164,13 @@ class HaftalikBildirimMutabakatlariController
             JsonResponse::notFound('Haftalik mutabakat bulunamadi.');
         }
 
-        SubeScope::assertPersonelAccess($user, $request, (int) $detail['mutabakat']['sube_id']);
-        if (strtoupper(trim((string) ($user['rol'] ?? ''))) === 'BIRIM_AMIRI'
-            && (int) $detail['mutabakat']['birim_amiri_user_id'] !== self::userId($user)) {
-            JsonResponse::forbidden();
-        }
+        ManagerApprovalScope::assertActorCanAccessBirimAmiriChain(
+            $user,
+            $request,
+            $pdo,
+            (int) $detail['mutabakat']['sube_id'],
+            (int) $detail['mutabakat']['birim_amiri_user_id']
+        );
         JsonResponse::success($detail);
     }
 
@@ -196,29 +200,6 @@ class HaftalikBildirimMutabakatlariController
             self::validationError('sube_id', 'Haftalik mutabakat icin aktif sube secilmelidir.');
         }
         return (int) $scope;
-    }
-
-    private static function assertAmirScope(PDO $pdo, $subeId, $amirId)
-    {
-        $stmt = $pdo->prepare('
-            SELECT 1
-            FROM users u
-            INNER JOIN user_subeler us ON us.user_id = u.id
-            WHERE u.id = :user_id
-              AND u.rol = :rol
-              AND u.durum = :durum
-              AND us.sube_id = :sube_id
-            LIMIT 1
-        ');
-        $stmt->execute([
-            'user_id' => (int) $amirId,
-            'rol' => 'BIRIM_AMIRI',
-            'durum' => 'AKTIF',
-            'sube_id' => (int) $subeId,
-        ]);
-        if (!$stmt->fetchColumn()) {
-            JsonResponse::forbidden('Secili birim yoneticisi bu sube icin yetkili degil.');
-        }
     }
 
     private static function resolveWeek($value)

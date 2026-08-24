@@ -9,6 +9,7 @@ use Medisa\Api\Auth\RolePermissions;
 use Medisa\Api\Database\Connection;
 use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
+use Medisa\Api\Scope\ManagerApprovalScope;
 use Medisa\Api\Scope\SubeScope;
 use PDO;
 
@@ -25,7 +26,7 @@ class GenelYoneticiBildirimOnaylariController
 
         $pdo = self::connection();
         self::assertTablesReady($pdo);
-        self::assertAmirScope($pdo, $subeId, $amirId);
+        ManagerApprovalScope::assertActorCanAccessBirimAmiriChain($user, $request, $pdo, $subeId, $amirId);
 
         $payload = self::buildSummaryPayload($pdo, $subeId, $amirId, $ay, $ayBaslangic, $ayBitis);
         JsonResponse::success($payload);
@@ -47,7 +48,7 @@ class GenelYoneticiBildirimOnaylariController
 
         $pdo = self::connection();
         self::assertTablesReady($pdo);
-        self::assertAmirScope($pdo, $subeId, $amirId);
+        ManagerApprovalScope::assertActorCanAccessBirimAmiriChain($user, $request, $pdo, $subeId, $amirId);
 
         try {
             $pdo->beginTransaction();
@@ -129,7 +130,13 @@ class GenelYoneticiBildirimOnaylariController
             JsonResponse::notFound('Genel yonetici bildirim onayi bulunamadi.');
         }
 
-        SubeScope::assertPersonelAccess($user, $request, (int) $detail['sube_id']);
+        ManagerApprovalScope::assertActorCanAccessBirimAmiriChain(
+            $user,
+            $request,
+            $pdo,
+            (int) $detail['sube_id'],
+            (int) $detail['birim_amiri_user_id']
+        );
         JsonResponse::success($detail);
     }
 
@@ -168,29 +175,6 @@ class GenelYoneticiBildirimOnaylariController
             self::validationError('birim_amiri_user_id', 'Birim amiri secimi zorunludur.');
         }
         return (int) $amirId;
-    }
-
-    private static function assertAmirScope(PDO $pdo, $subeId, $amirId)
-    {
-        $stmt = $pdo->prepare('
-            SELECT 1
-            FROM users u
-            INNER JOIN user_subeler us ON us.user_id = u.id
-            WHERE u.id = :user_id
-              AND u.rol = :rol
-              AND u.durum = :durum
-              AND us.sube_id = :sube_id
-            LIMIT 1
-        ');
-        $stmt->execute([
-            'user_id' => (int) $amirId,
-            'rol' => 'BIRIM_AMIRI',
-            'durum' => 'AKTIF',
-            'sube_id' => (int) $subeId,
-        ]);
-        if (!$stmt->fetchColumn()) {
-            JsonResponse::forbidden('Secili birim yoneticisi bu sube icin yetkili degil.');
-        }
     }
 
     private static function resolveMonth($value)

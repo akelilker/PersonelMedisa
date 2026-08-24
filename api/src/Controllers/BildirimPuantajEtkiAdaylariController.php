@@ -10,6 +10,7 @@ use Medisa\Api\Database\Connection;
 use Medisa\Api\Http\CsvResponse;
 use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
+use Medisa\Api\Scope\ManagerApprovalScope;
 use Medisa\Api\Scope\SubeScope;
 use Medisa\Api\Support\Utf8;
 use Medisa\Api\Services\BildirimPuantajEtkiRaporQueryService;
@@ -41,7 +42,13 @@ class BildirimPuantajEtkiAdaylariController
             JsonResponse::success(self::emptySummaryPayload($gyId));
         }
 
-        SubeScope::assertPersonelAccess($user, $request, (int) $gy['sube_id']);
+        ManagerApprovalScope::assertActorCanAccessBirimAmiriChain(
+            $user,
+            $request,
+            $pdo,
+            (int) $gy['sube_id'],
+            (int) $gy['birim_amiri_user_id']
+        );
         JsonResponse::success(self::buildSummaryPayload($pdo, $gy));
     }
 
@@ -59,14 +66,12 @@ class BildirimPuantajEtkiAdaylariController
 
         $pdo = self::connection();
         self::assertTablesReady($pdo);
-        self::assertAmirScope($pdo, $subeId, $amirId);
+        ManagerApprovalScope::assertActorCanAccessBirimAmiriChain($user, $request, $pdo, $subeId, $amirId);
 
         $gy = self::fetchGyByContext($pdo, $subeId, $amirId, $ay);
         if (!$gy) {
             JsonResponse::success(['items' => []], self::emptyPagination($page, $limit));
         }
-
-        SubeScope::assertPersonelAccess($user, $request, (int) $gy['sube_id']);
 
         $where = ['a.genel_yonetici_bildirim_onayi_id = :gy_id'];
         $params = ['gy_id' => (int) $gy['id']];
@@ -661,7 +666,7 @@ class BildirimPuantajEtkiAdaylariController
             JsonResponse::notFound('Puantaj etki adayi bulunamadi.');
         }
 
-        SubeScope::assertPersonelAccess($user, $request, (int) $row['sube_id']);
+        ManagerApprovalScope::assertActorCanAccessPersonelId($user, $request, $pdo, (int) $row['personel_id']);
         JsonResponse::success(self::enrichDetailWithConflictContext($pdo, $row));
     }
 
@@ -1507,29 +1512,6 @@ class BildirimPuantajEtkiAdaylariController
         return (int) $amirId;
     }
 
-    private static function assertAmirScope(PDO $pdo, $subeId, $amirId)
-    {
-        $stmt = $pdo->prepare('
-            SELECT 1
-            FROM users u
-            INNER JOIN user_subeler us ON us.user_id = u.id
-            WHERE u.id = :user_id
-              AND u.rol = :rol
-              AND u.durum = :durum
-              AND us.sube_id = :sube_id
-            LIMIT 1
-        ');
-        $stmt->execute([
-            'user_id' => (int) $amirId,
-            'rol' => 'BIRIM_AMIRI',
-            'durum' => 'AKTIF',
-            'sube_id' => (int) $subeId,
-        ]);
-        if (!$stmt->fetchColumn()) {
-            JsonResponse::forbidden('Secili birim yoneticisi bu sube icin yetkili degil.');
-        }
-    }
-
     /** @param array<string, mixed> $user */
     private static function userId(array $user)
     {
@@ -1928,6 +1910,7 @@ class BildirimPuantajEtkiAdaylariController
             $filters['karar_veren_user_id'] = $kararVerenUserId;
         }
 
+        $filters = ManagerApprovalScope::enrichReportFiltersForActor($user, $filters);
         $restrictAmirId = SubeScope::restrictBirimAmiriUserId($user);
 
         return [$filters, $restrictAmirId];

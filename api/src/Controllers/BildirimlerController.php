@@ -9,6 +9,7 @@ use Medisa\Api\Auth\RolePermissions;
 use Medisa\Api\Database\Connection;
 use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
+use Medisa\Api\Scope\ManagerApprovalScope;
 use Medisa\Api\Scope\SubeScope;
 use Medisa\Api\Services\OfflineMutationIdempotencyService;
 use PDO;
@@ -121,31 +122,9 @@ class BildirimlerController
 
         try {
             $pdo = Connection::get();
-            $stmt = $pdo->prepare('
-                SELECT u.id AS user_id, u.ad_soyad, us.sube_id
-                FROM users u
-                INNER JOIN user_subeler us ON us.user_id = u.id
-                WHERE u.rol = :rol
-                  AND u.durum = :durum
-                  AND us.sube_id = :sube_id
-                ORDER BY u.ad_soyad ASC, u.id ASC
-            ');
-            $stmt->execute([
-                'rol' => 'BIRIM_AMIRI',
-                'durum' => 'AKTIF',
-                'sube_id' => (int) $subeId,
-            ]);
+            $items = ManagerApprovalScope::listBirimAmiriOptionsForSube($pdo, (int) $subeId);
         } catch (\Throwable $e) {
             JsonResponse::serverError('Birim amiri secenekleri yuklenemedi.');
-        }
-
-        $items = [];
-        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
-            $items[] = [
-                'user_id' => (int) $row['user_id'],
-                'ad_soyad' => (string) $row['ad_soyad'],
-                'sube_id' => (int) $row['sube_id'],
-            ];
         }
 
         JsonResponse::success(['items' => $items]);

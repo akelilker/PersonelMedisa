@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
+import { spawnSync } from "node:child_process";
 import {
   ALL_ROLES,
   ASSIGNABLE_USER_ROLES,
@@ -128,5 +129,49 @@ describe("org hierarchy authorization contract", () => {
     expect(schema).toContain("SHOW TABLES LIKE 'user_bolumler'");
     expect(schema).toContain("SHOW TABLES LIKE 'user_birimler'");
     expect(schema).toContain("isSubeYoneticisiRoleReady");
+  });
+
+  it("ManagerApprovalScope owns BA picker/chain; approval controllers drop user_subeler BA auth", () => {
+    const owner = readFileSync(resolve(root, "api/src/Scope/ManagerApprovalScope.php"), "utf8");
+    expect(owner).toContain("user_birimler");
+    expect(owner).toContain("listBirimAmiriOptionsForSube");
+    expect(owner).toContain("enrichReportFiltersForActor");
+    expect(owner).not.toMatch(/INNER\s+JOIN\s+user_subeler/i);
+
+    const controllers = [
+      "BildirimPuantajEtkiAdaylariController.php",
+      "GenelYoneticiBildirimOnaylariController.php",
+      "HaftalikBildirimMutabakatlariController.php",
+      "AylikBildirimOnaylariController.php",
+      "BildirimlerController.php"
+    ];
+    for (const file of controllers) {
+      const src = readFileSync(resolve(root, `api/src/Controllers/${file}`), "utf8");
+      expect(src).not.toMatch(/INNER\s+JOIN\s+user_subeler/i);
+      expect(src).not.toContain("function assertAmirScope");
+      expect(src).toContain("ManagerApprovalScope");
+    }
+
+    const rapor = readFileSync(
+      resolve(root, "api/src/Services/BildirimPuantajEtkiRaporQueryService.php"),
+      "utf8"
+    );
+    expect(rapor).toContain("p.bolum_id IN");
+    expect(rapor).toContain("p.birim_id IN");
+    expect(rapor).toContain("bolum_ids");
+  });
+
+  it("ManagerApprovalScope PHP matrix PASS (O–T)", () => {
+    const result = spawnSync(
+      "php",
+      [resolve(root, "tests/php/ManagerApprovalScopePhpTestRunner.php")],
+      { encoding: "utf8" }
+    );
+    if (result.status !== 0) {
+      throw new Error(
+        `ManagerApprovalScope PHP runner failed (status=${result.status}):\n${result.stdout}\n${result.stderr}`
+      );
+    }
+    expect(result.stdout).toContain("MANAGER_APPROVAL_SCOPE_MATRIX=PASS");
   });
 });

@@ -98,12 +98,25 @@ export function timestampValue(value: string | null | undefined) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-export function formatReferenceValue(label?: string | null, id?: number | null) {
-  if (label) {
-    return label;
+export function formatReferenceValue(
+  label?: string | null,
+  id?: number | null,
+  kisaKod?: string | null
+) {
+  const name = typeof label === "string" ? label.trim() : "";
+  const code = typeof kisaKod === "string" ? kisaKod.trim() : "";
+
+  if (code && name) {
+    return `${code} — ${name}`;
   }
 
-  return typeof id === "number" ? `#${id}` : "-";
+  if (name) {
+    return name;
+  }
+
+  // Numeric DB ids stay internal — never surface as user-facing labels.
+  void id;
+  return "-";
 }
 
 export function formatSgkHesaplamaModuLabel(value?: string) {

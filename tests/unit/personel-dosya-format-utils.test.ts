@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { formatIsoDateDetail } from "../../src/features/personeller/components/personel-dosya/personel-dosya-format-utils";
+import {
+  formatIsoDateDetail,
+  formatReferenceValue
+} from "../../src/features/personeller/components/personel-dosya/personel-dosya-format-utils";
 
 describe("formatIsoDateDetail", () => {
   it("gecerli ISO date string'i tr-TR kisa tarih olarak gosterir", () => {
@@ -37,5 +40,32 @@ describe("formatIsoDateDetail", () => {
 
     expect(formatted).toBe(utcFormatted);
     expect(formatted).not.toMatch(/29\.02\.2024|28\.02\.2024|02\.03\.2024/);
+  });
+});
+
+describe("formatReferenceValue", () => {
+  it("kisa kod + ad icin canonical coded label uretir", () => {
+    expect(formatReferenceValue("Mali Ve İdari İşler", 13, "Mİİ")).toBe("Mİİ — Mali Ve İdari İşler");
+  });
+
+  it("kisa kod yoksa yalniz ad gosterir", () => {
+    expect(formatReferenceValue("Mali Ve İdari İşler", 13, null)).toBe("Mali Ve İdari İşler");
+    expect(formatReferenceValue("Mali Ve İdari İşler", 13, undefined)).toBe("Mali Ve İdari İşler");
+    expect(formatReferenceValue("Mali Ve İdari İşler", 13, "   ")).toBe("Mali Ve İdari İşler");
+  });
+
+  it("numeric id yi resolved label onune prefix etmez", () => {
+    const coded = formatReferenceValue("Mali Ve İdari İşler", 13, "Mİİ");
+    const uncoded = formatReferenceValue("Mali Ve İdari İşler", 13, null);
+    expect(coded).not.toMatch(/^13/);
+    expect(coded).not.toContain("13 —");
+    expect(uncoded).not.toMatch(/^13/);
+    expect(uncoded).not.toContain("#13");
+  });
+
+  it("cozulmemis referansta id yi kullaniciya gostermez", () => {
+    expect(formatReferenceValue(null, 13)).toBe("-");
+    expect(formatReferenceValue(undefined, 13)).toBe("-");
+    expect(formatReferenceValue("", 13)).toBe("-");
   });
 });

@@ -16,6 +16,7 @@ use PDOException;
 class ReferansController
 {
     private const CATALOG_AD_MAX_LENGTH = 120;
+    private const KISA_KOD_MAX_LENGTH = 16;
 
     public static function departmanlar(Request $request)
     {
@@ -250,6 +251,46 @@ class ReferansController
         }
 
         return strlen((string) $value);
+    }
+
+    /**
+     * Normalize optional hierarchical short code.
+     * "" / whitespace-only → null. Invalid type → InvalidArgumentException.
+     *
+     * @param mixed $raw
+     * @return string|null
+     */
+    private static function normalizeKisaKodOrThrow($raw)
+    {
+        if ($raw === null) {
+            return null;
+        }
+        if (!is_string($raw)) {
+            throw new \InvalidArgumentException('KISA_KOD_TYPE');
+        }
+        $trimmed = trim($raw);
+        if ($trimmed === '') {
+            return null;
+        }
+        if (self::utf8Length($trimmed) > self::KISA_KOD_MAX_LENGTH) {
+            throw new \InvalidArgumentException('KISA_KOD_TOO_LONG');
+        }
+
+        return $trimmed;
+    }
+
+    /**
+     * @param mixed $raw
+     * @return string|null
+     */
+    private static function responseKisaKod($raw)
+    {
+        if ($raw === null) {
+            return null;
+        }
+        $trimmed = trim((string) $raw);
+
+        return $trimmed === '' ? null : $trimmed;
     }
 
     private static function isDuplicateKeyException(PDOException $e)
@@ -500,10 +541,12 @@ class ReferansController
             );
         }
 
+        $hasKisaKod = PersonelOrgStructureSchema::hasKisaKodColumns($pdo);
+        $kisaSelect = $hasKisaKod ? ', kisa_kod' : '';
         $parentId = (int) ($request->getQuery($parentColumn, 0) ?: 0);
         if ($parentId > 0) {
             $stmt = $pdo->prepare(
-                "SELECT id, ad, {$parentColumn}
+                "SELECT id, ad, {$parentColumn}{$kisaSelect}
                  FROM {$table}
                  WHERE durum = 'AKTIF' AND {$parentColumn} = :parent_id
                  ORDER BY ad ASC"
@@ -511,7 +554,7 @@ class ReferansController
             $stmt->execute(['parent_id' => $parentId]);
         } else {
             $stmt = $pdo->query(
-                "SELECT id, ad, {$parentColumn}
+                "SELECT id, ad, {$parentColumn}{$kisaSelect}
                  FROM {$table}
                  WHERE durum = 'AKTIF'
                  ORDER BY ad ASC"
@@ -523,6 +566,7 @@ class ReferansController
             $items[] = [
                 'id' => (int) $row['id'],
                 'ad' => (string) $row['ad'],
+                'kisa_kod' => $hasKisaKod ? self::responseKisaKod($row['kisa_kod'] ?? null) : null,
                 $parentColumn => (int) $row[$parentColumn],
             ];
         }
@@ -603,6 +647,34 @@ class ReferansController
             );
         }
 
+        $hasKisaKod = PersonelOrgStructureSchema::hasKisaKodColumns($pdo);
+        $kisaKod = null;
+        if (array_key_exists('kisa_kod', $body)) {
+            if (!$hasKisaKod) {
+                JsonResponse::error(
+                    409,
+                    'ORG_REFERENCE_SHORT_CODE_SCHEMA_NOT_READY',
+                    'kisa_kod alani henuz hazir degil.'
+                );
+            }
+            try {
+                $kisaKod = self::normalizeKisaKodOrThrow($body['kisa_kod']);
+            } catch (\InvalidArgumentException $e) {
+                $code = $e->getMessage();
+                if ($code === 'KISA_KOD_TYPE') {
+                    JsonResponse::badRequest('kisa_kod metin olmalidir.', 'VALIDATION_ERROR', 'kisa_kod');
+                }
+                if ($code === 'KISA_KOD_TOO_LONG') {
+                    JsonResponse::badRequest(
+                        'kisa_kod en fazla ' . self::KISA_KOD_MAX_LENGTH . ' karakter olabilir.',
+                        'VALIDATION_ERROR',
+                        'kisa_kod'
+                    );
+                }
+                JsonResponse::badRequest('Gecersiz kisa_kod.', 'VALIDATION_ERROR', 'kisa_kod');
+            }
+        }
+
         $dupStmt = $pdo->prepare(
             "SELECT id FROM {$table} WHERE {$parentColumn} = :parent_id AND ad = :ad LIMIT 1"
         );
@@ -612,10 +684,22 @@ class ReferansController
         }
 
         try {
-            $stmt = $pdo->prepare(
-                "INSERT INTO {$table} ({$parentColumn}, ad, durum) VALUES (:parent_id, :ad, 'AKTIF')"
-            );
-            $stmt->execute(['parent_id' => $parentId, 'ad' => $ad]);
+            if ($hasKisaKod) {
+                $stmt = $pdo->prepare(
+                    "INSERT INTO {$table} ({$parentColumn}, ad, kisa_kod, durum)
+                     VALUES (:parent_id, :ad, :kisa_kod, 'AKTIF')"
+                );
+                $stmt->execute([
+                    'parent_id' => $parentId,
+                    'ad' => $ad,
+                    'kisa_kod' => $kisaKod,
+                ]);
+            } else {
+                $stmt = $pdo->prepare(
+                    "INSERT INTO {$table} ({$parentColumn}, ad, durum) VALUES (:parent_id, :ad, 'AKTIF')"
+                );
+                $stmt->execute(['parent_id' => $parentId, 'ad' => $ad]);
+            }
         } catch (PDOException $e) {
             if (self::isDuplicateKeyException($e)) {
                 JsonResponse::error(409, $duplicateCode, $duplicateMessage, 'ad');
@@ -631,6 +715,7 @@ class ReferansController
         JsonResponse::success([
             'id' => $id,
             'ad' => $ad,
+            'kisa_kod' => $kisaKod,
             $parentColumn => $parentId,
         ], [], 201);
     }

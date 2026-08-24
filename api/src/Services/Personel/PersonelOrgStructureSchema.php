@@ -47,6 +47,16 @@ final class PersonelOrgStructureSchema
         self::$readyCache = [];
     }
 
+    /**
+     * Optional display-code columns from migration 072.
+     * Not part of isReady() so pre-072 production remains usable.
+     */
+    public static function hasKisaKodColumns(PDO $pdo): bool
+    {
+        return self::columnExists($pdo, 'bolumler', 'kisa_kod')
+            && self::columnExists($pdo, 'birimler', 'kisa_kod');
+    }
+
     private static function evaluateReady(PDO $pdo): bool
     {
         if (!self::tableExists($pdo, 'bolumler')

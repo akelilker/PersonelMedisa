@@ -262,6 +262,7 @@ function normalizePersonel(data: unknown): Personel {
       "bolumAdi",
       "bolum"
     ),
+    bolum_kisa_kod: readNullableString(baseSources, "bolum_kisa_kod", "bolumKisaKod"),
     birim_id: readNullableNumber(baseSources, "birim_id", "birimId"),
     birim_adi: readNullableString(
       [...baseSources, ...referenceSources],
@@ -269,6 +270,7 @@ function normalizePersonel(data: unknown): Personel {
       "birimAdi",
       "birim"
     ),
+    birim_kisa_kod: readNullableString(baseSources, "birim_kisa_kod", "birimKisaKod"),
     gorev_id: readNumber(baseSources, "gorev_id"),
     pozisyon_id: readNullableNumber(baseSources, "pozisyon_id", "pozisyonId"),
     pozisyon_adi: readNullableString(

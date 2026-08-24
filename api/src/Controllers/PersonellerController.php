@@ -1172,7 +1172,11 @@ class PersonellerController
             ";
         }
         if (PersonelOrgStructureSchema::isReady($pdo)) {
-            $columns .= ', b.ad AS bolum_adi, bi.ad AS birim_adi, poz.ad AS pozisyon_adi';
+            $hasKisaKod = PersonelOrgStructureSchema::hasKisaKodColumns($pdo);
+            $kisaCols = $hasKisaKod
+                ? ', b.kisa_kod AS bolum_kisa_kod, bi.kisa_kod AS birim_kisa_kod'
+                : '';
+            $columns .= ', b.ad AS bolum_adi, bi.ad AS birim_adi, poz.ad AS pozisyon_adi' . $kisaCols;
             $joins .= "
             LEFT JOIN bolumler b ON b.id = p.bolum_id
             LEFT JOIN birimler bi ON bi.id = p.birim_id
@@ -1327,7 +1331,15 @@ class PersonellerController
                 : null,
             'departman_adi' => $row['departman_adi'],
             'bolum_adi' => array_key_exists('bolum_adi', $row) ? $row['bolum_adi'] : null,
+            'bolum_kisa_kod' => array_key_exists('bolum_kisa_kod', $row) && is_string($row['bolum_kisa_kod'])
+                && trim($row['bolum_kisa_kod']) !== ''
+                ? trim($row['bolum_kisa_kod'])
+                : null,
             'birim_adi' => array_key_exists('birim_adi', $row) ? $row['birim_adi'] : null,
+            'birim_kisa_kod' => array_key_exists('birim_kisa_kod', $row) && is_string($row['birim_kisa_kod'])
+                && trim($row['birim_kisa_kod']) !== ''
+                ? trim($row['birim_kisa_kod'])
+                : null,
             'gorev_adi' => $row['gorev_adi'],
             'pozisyon_adi' => array_key_exists('pozisyon_adi', $row) ? $row['pozisyon_adi'] : null,
             'personel_tipi_adi' => $row['personel_tipi_adi'],

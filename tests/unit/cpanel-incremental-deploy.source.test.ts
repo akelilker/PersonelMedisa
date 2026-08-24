@@ -73,7 +73,7 @@ function makeRepoSkeleton() {
   writeFileSync(join(directory, 'api/bin/migrate.php'), '<?php\n', 'utf8');
   writeFileSync(join(directory, 'api/public/index.php'), '<?php\n', 'utf8');
   writeFileSync(
-    join(directory, 'api/migrations/071_org_hierarchy_authorization.sql'),
+    join(directory, 'api/migrations/072_org_reference_short_codes.sql'),
     '-- tip\n',
     'utf8',
   );

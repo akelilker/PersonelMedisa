@@ -33,11 +33,11 @@ describe("I13-B default branch persistence source locks", () => {
     expect(scope).toContain("in_array($preferred, $subeIds, true)");
   });
 
-  it("migration tip includes 071 org hierarchy authorization", () => {
+  it("migration tip includes 072 org reference short codes", () => {
     const migrations = readdirSync(resolve("api/migrations"))
       .filter((name) => /^\d{3}_.+\.sql$/.test(name))
       .sort();
     expect(migrations[0]).toBe("001_initial_schema.sql");
-    expect(migrations.at(-1)).toBe("071_org_hierarchy_authorization.sql");
+    expect(migrations.at(-1)).toBe("072_org_reference_short_codes.sql");
   });
 });

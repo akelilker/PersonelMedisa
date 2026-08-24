@@ -1,5 +1,5 @@
 import {
-  hasRolePermission,
+  hasUserPermission,
   type AppPermission
 } from "../lib/authorization/role-permissions";
 import type { UserRole } from "../types/auth";
@@ -8,6 +8,7 @@ import { useAuth } from "../state/auth.store";
 export function useRoleAccess() {
   const { session } = useAuth();
   const activeRole = session?.user.rol;
+  const personelId = session?.user.personel_id ?? null;
   const uiProfile = session?.ui_profile ?? null;
 
   function hasRole(role: UserRole) {
@@ -23,15 +24,11 @@ export function useRoleAccess() {
   }
 
   function hasPermission(permission: AppPermission) {
-    return hasRolePermission(activeRole, permission);
+    return hasUserPermission(activeRole, permission, personelId);
   }
 
   function hasAnyPermission(permissions: AppPermission[]) {
-    if (!activeRole) {
-      return false;
-    }
-
-    return permissions.some((permission) => hasRolePermission(activeRole, permission));
+    return permissions.some((permission) => hasUserPermission(activeRole, permission, personelId));
   }
 
   return {

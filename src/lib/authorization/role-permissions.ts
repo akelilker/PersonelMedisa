@@ -117,6 +117,19 @@ export type AppPermission =
   | "self_service.qr.scan"
   | "self_service.qr.events.view";
 
+/**
+ * Canonical self-service baseline — same set as PERSONEL role matrix.
+ * Granted additionally when session user has a positive personel_id binding.
+ */
+export const SELF_SERVICE_BASELINE_PERMISSIONS: readonly AppPermission[] = [
+  "self_service.view",
+  "self_service.puantaj.view",
+  "self_service.yillik_izin.view",
+  "self_service.fazla_calisma.view",
+  "self_service.qr.scan",
+  "self_service.qr.events.view"
+];
+
 const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
   GENEL_YONETICI: [
     "personeller.view",
@@ -485,14 +498,7 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "retention.destruction.view"
   ],
   /** Self-service read surfaces (S3B). No broad personeller.* / puantaj.view. */
-  PERSONEL: [
-    "self_service.view",
-    "self_service.puantaj.view",
-    "self_service.yillik_izin.view",
-    "self_service.fazla_calisma.view",
-    "self_service.qr.scan",
-    "self_service.qr.events.view"
-  ],
+  PERSONEL: SELF_SERVICE_BASELINE_PERMISSIONS,
   AUTH_SMOKE_READONLY: ["ops.auth_smoke.read"]
 };
 
@@ -512,6 +518,46 @@ export function hasRolePermission(
   permission: AppPermission
 ): boolean {
   return getRolePermissions(role).includes(permission);
+}
+
+/** Fail-closed: positive personel_id on the auth user (no extra DB). */
+export function hasPersonnelLinkedSelfServiceEligibility(
+  personelId: number | null | undefined
+): boolean {
+  return typeof personelId === "number" && Number.isFinite(personelId) && personelId > 0;
+}
+
+/**
+ * Effective permission check: role matrix + personnel-linked self-service baseline.
+ * Mirrors api/src/Auth/RolePermissions::has.
+ */
+export function hasUserPermission(
+  role: UserRole | string | null | undefined,
+  permission: AppPermission,
+  personelId?: number | null
+): boolean {
+  if (
+    hasPersonnelLinkedSelfServiceEligibility(personelId) &&
+    SELF_SERVICE_BASELINE_PERMISSIONS.includes(permission)
+  ) {
+    return true;
+  }
+  return hasRolePermission(role, permission);
+}
+
+export function getEffectivePermissions(
+  role: UserRole | string | null | undefined,
+  personelId?: number | null
+): readonly AppPermission[] {
+  const rolePerms = getRolePermissions(role);
+  if (!hasPersonnelLinkedSelfServiceEligibility(personelId)) {
+    return rolePerms;
+  }
+  const merged = new Set<AppPermission>(rolePerms);
+  for (const permission of SELF_SERVICE_BASELINE_PERMISSIONS) {
+    merged.add(permission);
+  }
+  return [...merged];
 }
 
 /** Oturumdaki yetkili sube listesi; bos + global rol ise tum subeler UX. */

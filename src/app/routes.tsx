@@ -40,6 +40,8 @@ function AppLayout() {
 function HomeIndexMainMenu() {
   const ctx = useOutletContext<AppShellOutletContext>();
   const { session } = useAuth();
+  // Self-service-only role keeps dedicated home. Managers keep MainMenu;
+  // personnel-linked self-service is reached via /self* + effective permissions.
   if (session?.user.rol === "PERSONEL") {
     return <PersonelSelfServiceHomePage />;
   }
@@ -85,6 +87,14 @@ export function AppRoutes() {
         }
       >
         <Route index element={<HomeIndexMainMenu />} />
+        <Route
+          path="self"
+          element={
+            <ProtectedRoute requirePermission="self_service.view">
+              <PersonelSelfServiceHomePage />
+            </ProtectedRoute>
+          }
+        />
         <Route
           path="self/qr-okut"
           element={

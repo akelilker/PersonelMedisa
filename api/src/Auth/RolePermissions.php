@@ -381,6 +381,7 @@ class RolePermissions
             'retention.destruction.view',
         ],
         // Self-service read surfaces (S3B). No broad personeller.* / puantaj.view.
+        // Canonical self-service-only role; also the reusable personnel-linked baseline set.
         'PERSONEL' => [
             'self_service.view',
             'self_service.puantaj.view',
@@ -394,12 +395,54 @@ class RolePermissions
         ],
     ];
 
+    /**
+     * Canonical self-service baseline (PERSONEL matrix). No duplicate list.
+     *
+     * @return array<int, string>
+     */
+    public static function selfServiceBaselinePermissions()
+    {
+        return self::$matrix['PERSONEL'];
+    }
+
+    /**
+     * Linked-personnel eligibility for self-service baseline (no extra DB I/O).
+     * Active/valid enforcement remains SelfPersonelContext on /me endpoints.
+     *
+     * @param array<string, mixed> $user
+     */
+    public static function hasPersonnelLinkedSelfServiceEligibility(array $user)
+    {
+        if (!array_key_exists('personel_id', $user)) {
+            return false;
+        }
+        $raw = $user['personel_id'];
+        if ($raw === null || $raw === '') {
+            return false;
+        }
+
+        return (int) $raw > 0;
+    }
+
     /** @param array<string, mixed> $user */
     public static function has(array $user, $permission)
     {
-        $role = self::normalizeRole(isset($user['rol']) ? (string) $user['rol'] : '');
         $permission = trim((string) $permission);
-        if ($role === '' || $permission === '') {
+        if ($permission === '') {
+            return false;
+        }
+
+        // personel_id binding → own self-service baseline (role-independent).
+        // Does not grant management permissions or expand org scope.
+        if (
+            self::hasPersonnelLinkedSelfServiceEligibility($user)
+            && in_array($permission, self::selfServiceBaselinePermissions(), true)
+        ) {
+            return true;
+        }
+
+        $role = self::normalizeRole(isset($user['rol']) ? (string) $user['rol'] : '');
+        if ($role === '') {
             return false;
         }
 

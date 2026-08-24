@@ -7,9 +7,9 @@
 ```
 GENEL_YONETICI / SISTEM_YONETICISI  (global)
   → SUBE_YONETICISI                 (user_subeler)
-  → BOLUM_YONETICISI                (user_bolumler)
-  → BIRIM_AMIRI                     (user_birimler)
-  → PERSONEL                        (users.personel_id)
+    → BOLUM_YONETICISI              (user_bolumler)
+    → BIRIM_AMIRI                   (user_birimler)
+    → PERSONEL                      (users.personel_id)
 ```
 
 Functional branch-scoped: `IK_SORUMLUSU`, `MUHASEBE` via `user_subeler`.
@@ -29,25 +29,17 @@ Functional branch-scoped: `IK_SORUMLUSU`, `MUHASEBE` via `user_subeler`.
 | --- | --- |
 | GENEL_YONETICI, SISTEM_YONETICISI | Unrestricted (global) |
 | SUBE_YONETICISI, IK_SORUMLUSU, MUHASEBE | **Deny** (fail-closed) |
-| BOLUM_YONETICISI | Unit assign (`user_bolumler`) preferred; **legacy `user_subeler` fallback** when unit empty; both empty → **Deny** |
-| BIRIM_AMIRI | Unit assign (`user_birimler`) preferred; **legacy `user_subeler` fallback** when unit empty; both empty → **Deny** |
+| BOLUM_YONETICISI | Requires `user_bolumler`; empty → **Deny**. `user_subeler` is **not** a fallback |
+| BIRIM_AMIRI | Requires `user_birimler`; empty → **Deny**. `user_subeler` is **not** a fallback |
 | PERSONEL | Bound `personel_id` only |
 
-## Deploy transition (STAGE A)
+Legacy `user_subeler` fallback for BOLUM/BIRIM was removed after canonical unit assignment rollout (all active BY/BA had unit rows). Write path (`YonetimController::assertRoleOrgAssignments`) also requires at least one bolum (BY) or birim (BA) assignment.
 
-Deploy cPanel does **not** apply migrations. Code must remain safe when 071 is absent:
+## Schema readiness
 
 - `UserOrgAssignmentSchema::isReady` gates all `user_bolumler` / `user_birimler` SQL
-- Missing tables → empty unit ids (no crash); BOLUM/BIRIM keep legacy branch scope if `user_subeler` present
-- `SUBE_YONETICISI` writes → 409 `SCHEMA_NOT_READY` until ENUM widened
-
-### Ops rollout
-
-| Stage | Action |
-| --- | --- |
-| A | Ship code + migration file; existing BOLUM/BIRIM with branch scope continue |
-| B | Apply migration 071 via Apply cPanel migrations; populate `user_bolumler` / `user_birimler` |
-| C | Once all operational BOLUM/BIRIM have unit rows, remove legacy sube fallback in a follow-up |
+- Missing tables → empty unit ids (no crash); BOLUM/BIRIM with empty unit → **Deny**
+- `SUBE_YONETICISI` writes → 409 `SCHEMA_NOT_READY` until ENUM widened (migration 071)
 
 ## Schema (071)
 

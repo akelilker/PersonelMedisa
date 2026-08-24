@@ -79,9 +79,8 @@ class OrgScope
      * Fail-closed for management-scoped roles without required assignment.
      * PERSONEL self-service uses personel_id binding instead.
      *
-     * STAGE A compatibility: BOLUM/BIRIM may still operate on legacy user_subeler
-     * when unit assignment tables are empty/unpopulated. Empty unit AND empty
-     * branch → deny (never empty-as-global).
+     * BOLUM_YONETICISI requires user_bolumler; BIRIM_AMIRI requires user_birimler.
+     * user_subeler is not a fallback for either unit role (never empty-as-global).
      *
      * @param array<string, mixed> $user
      */
@@ -93,7 +92,7 @@ class OrgScope
         }
 
         if (in_array($role, self::BOLUM_ASSIGNMENT_ROLES, true)) {
-            if (count(self::allowedBolumIds($user)) === 0 && count(self::allowedSubeIds($user)) === 0) {
+            if (count(self::allowedBolumIds($user)) === 0) {
                 JsonResponse::forbidden('Bolum kapsami atanmamis.');
             }
 
@@ -101,7 +100,7 @@ class OrgScope
         }
 
         if (in_array($role, self::BIRIM_ASSIGNMENT_ROLES, true)) {
-            if (count(self::allowedBirimIds($user)) === 0 && count(self::allowedSubeIds($user)) === 0) {
+            if (count(self::allowedBirimIds($user)) === 0) {
                 JsonResponse::forbidden('Birim kapsami atanmamis.');
             }
 
@@ -113,24 +112,6 @@ class OrgScope
                 JsonResponse::forbidden('Sube kapsami atanmamis.');
             }
         }
-    }
-
-    /**
-     * True when BOLUM/BIRIM still authorize via user_subeler (pre-assignment / pre-071).
-     *
-     * @param array<string, mixed> $user
-     */
-    public static function usesLegacySubeFallback(array $user)
-    {
-        $role = self::normalizeRole($user);
-        if (in_array($role, self::BOLUM_ASSIGNMENT_ROLES, true)) {
-            return count(self::allowedBolumIds($user)) === 0 && count(self::allowedSubeIds($user)) > 0;
-        }
-        if (in_array($role, self::BIRIM_ASSIGNMENT_ROLES, true)) {
-            return count(self::allowedBirimIds($user)) === 0 && count(self::allowedSubeIds($user)) > 0;
-        }
-
-        return false;
     }
 
     /**
@@ -156,8 +137,9 @@ class OrgScope
         }
 
         // Unit-assigned BOLUM/BIRIM: optional branch narrow only; cannot invent branch auth.
-        if ((in_array($role, self::BOLUM_ASSIGNMENT_ROLES, true) && count(self::allowedBolumIds($user)) > 0)
-            || (in_array($role, self::BIRIM_ASSIGNMENT_ROLES, true) && count(self::allowedBirimIds($user)) > 0)
+        // assertRequiredAssignment already denied empty unit assignment (no user_subeler fallback).
+        if (in_array($role, self::BOLUM_ASSIGNMENT_ROLES, true)
+            || in_array($role, self::BIRIM_ASSIGNMENT_ROLES, true)
         ) {
             return $requested;
         }
@@ -225,7 +207,7 @@ class OrgScope
             $subeId = (int) $personelOrg;
         }
 
-        if (in_array($role, self::BIRIM_ASSIGNMENT_ROLES, true) && count(self::allowedBirimIds($user)) > 0) {
+        if (in_array($role, self::BIRIM_ASSIGNMENT_ROLES, true)) {
             $allowedBirim = self::allowedBirimIds($user);
             if ($birimId === null || $birimId <= 0 || !in_array($birimId, $allowedBirim, true)) {
                 JsonResponse::forbidden();
@@ -235,7 +217,7 @@ class OrgScope
             return;
         }
 
-        if (in_array($role, self::BOLUM_ASSIGNMENT_ROLES, true) && count(self::allowedBolumIds($user)) > 0) {
+        if (in_array($role, self::BOLUM_ASSIGNMENT_ROLES, true)) {
             $allowedBolum = self::allowedBolumIds($user);
             if ($bolumId === null || $bolumId <= 0 || !in_array($bolumId, $allowedBolum, true)) {
                 JsonResponse::forbidden();
@@ -245,7 +227,7 @@ class OrgScope
             return;
         }
 
-        // Legacy BOLUM/BIRIM (sube-only) and branch-scoped roles share sube enforcement below.
+        // Branch-scoped roles (SUBE / IK / MUHASEBE) and optional GY active-sube narrow.
 
         if (self::isUnrestricted($user) && count(self::allowedSubeIds($user)) === 0) {
             $scope = self::resolveActiveSubeId($user, $request);
@@ -294,8 +276,13 @@ class OrgScope
             return;
         }
 
-        if (in_array($role, self::BIRIM_ASSIGNMENT_ROLES, true) && count(self::allowedBirimIds($user)) > 0) {
+        if (in_array($role, self::BIRIM_ASSIGNMENT_ROLES, true)) {
             $ids = self::allowedBirimIds($user);
+            if (count($ids) === 0) {
+                $where[] = '1=0';
+
+                return;
+            }
             self::appendInFilter($where, $params, $col . 'birim_id', $ids, $paramPrefix . '_birim');
             if ($activeSubeScope !== null) {
                 $key = $paramPrefix . '_active_sube';
@@ -306,8 +293,13 @@ class OrgScope
             return;
         }
 
-        if (in_array($role, self::BOLUM_ASSIGNMENT_ROLES, true) && count(self::allowedBolumIds($user)) > 0) {
+        if (in_array($role, self::BOLUM_ASSIGNMENT_ROLES, true)) {
             $ids = self::allowedBolumIds($user);
+            if (count($ids) === 0) {
+                $where[] = '1=0';
+
+                return;
+            }
             self::appendInFilter($where, $params, $col . 'bolum_id', $ids, $paramPrefix . '_bolum');
             if ($activeSubeScope !== null) {
                 $key = $paramPrefix . '_active_sube';

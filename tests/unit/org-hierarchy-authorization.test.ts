@@ -99,18 +99,28 @@ describe("org hierarchy authorization contract", () => {
     expect(php).toContain("Birim kapsami atanmamis");
     expect(php).toContain("Sube kapsami atanmamis");
     expect(php).toContain("GLOBAL_ROLES");
-    expect(php).toContain("usesLegacySubeFallback");
+    expect(php).not.toContain("usesLegacySubeFallback");
   });
 
-  it("STAGE A keeps BOLUM/BIRIM legacy sube fallback without empty-as-global", () => {
+  it("BOLUM/BIRIM require canonical unit assignment; user_subeler is not a fallback", () => {
     const php = readFileSync(PHP_ORG, "utf8");
-    expect(php).toContain("usesLegacySubeFallback");
-    expect(php).toMatch(
+    expect(php).not.toContain("usesLegacySubeFallback");
+    expect(php).not.toMatch(/STAGE A compatibility/);
+    expect(php).toContain("user_subeler is not a fallback");
+    expect(php).toContain("if (count(self::allowedBolumIds($user)) === 0) {");
+    expect(php).toContain("if (count(self::allowedBirimIds($user)) === 0) {");
+    expect(php).not.toMatch(
       /allowedBolumIds\(\$user\)\) === 0 && count\(self::allowedSubeIds\(\$user\)\) === 0/,
     );
-    expect(php).toMatch(
+    expect(php).not.toMatch(
       /allowedBirimIds\(\$user\)\) === 0 && count\(self::allowedSubeIds\(\$user\)\) === 0/,
     );
+    const yonetim = readFileSync(resolve(root, "api/src/Controllers/YonetimController.php"), "utf8");
+    expect(yonetim).toContain("BOLUM_YONETICISI icin en az bir bolum atamasi zorunludur.");
+    expect(yonetim).toContain("BIRIM_AMIRI icin en az bir birim atamasi zorunludur.");
+    expect(yonetim).not.toContain("bolum veya sube atamasi");
+    expect(yonetim).not.toContain("birim veya sube atamasi");
+    expect(yonetim).not.toContain("STAGE A: unit roles may still use legacy branch scope");
     const schema = readFileSync(
       resolve(root, "api/src/Database/UserOrgAssignmentSchema.php"),
       "utf8",

@@ -130,7 +130,7 @@ ohOk('SUBE_MULTI=ASSIGNED_ONLY');
 
 $f = ohFilterSql(ohUser('BOLUM_YONETICISI', []));
 if (!in_array('1=0', $f['where'], true)) {
-    ohFail('BOLUM zero unit+branch must deny');
+    ohFail('BOLUM zero unit must deny');
 }
 ohOk('BOLUM_ZERO=DENY');
 
@@ -141,10 +141,10 @@ if (strpos(implode(' ', $f['where']), 'bolum_id') === false) {
 ohOk('BOLUM_OWN=ALLOW_FILTER');
 
 $f = ohFilterSql(ohUser('BOLUM_YONETICISI', [1], []));
-if (strpos(implode(' ', $f['where']), 'sube_id') === false) {
-    ohFail('BOLUM legacy sube fallback must sube filter');
+if (!in_array('1=0', $f['where'], true)) {
+    ohFail('BOLUM sube-only must deny (no legacy fallback)');
 }
-ohOk('BOLUM_LEGACY_SUBE=ALLOW_FILTER');
+ohOk('BOLUM_SUBE_ONLY=DENY');
 
 $f = ohFilterSql(ohUser('BIRIM_AMIRI', []));
 if (!in_array('1=0', $f['where'], true)) {
@@ -158,6 +158,12 @@ if (strpos(implode(' ', $f['where']), 'birim_id') === false) {
 }
 ohOk('BIRIM_OWN=ALLOW_FILTER');
 
+$f = ohFilterSql(ohUser('BIRIM_AMIRI', [1], [], []));
+if (!in_array('1=0', $f['where'], true)) {
+    ohFail('BIRIM sube-only must deny (no legacy fallback)');
+}
+ohOk('BIRIM_SUBE_ONLY=DENY');
+
 $f = ohFilterSql(ohUser('PERSONEL', [], [], [], 5));
 if (strpos(implode(' ', $f['where']), 'id =') === false) {
     ohFail('PERSONEL must self filter');
@@ -170,13 +176,24 @@ if (!in_array('1=0', $f['where'], true)) {
 }
 ohOk('PERSONEL_UNBOUND=DENY');
 
-if (!OrgScope::usesLegacySubeFallback(ohUser('BOLUM_YONETICISI', [1], []))) {
-    ohFail('usesLegacySubeFallback BOLUM expected true');
+// Production-shape: 8 canonical BY + 6 canonical BA assignment shapes remain filterable
+$byShapes = [[1], [2], [3], [9], [10], [11], [13], [17]];
+foreach ($byShapes as $bolumIds) {
+    $f = ohFilterSql(ohUser('BOLUM_YONETICISI', [], $bolumIds));
+    if (strpos(implode(' ', $f['where']), 'bolum_id') === false) {
+        ohFail('production-shape BY bolum=[' . implode(',', $bolumIds) . '] must bolum filter');
+    }
 }
-if (OrgScope::usesLegacySubeFallback(ohUser('BOLUM_YONETICISI', [1], [9]))) {
-    ohFail('usesLegacySubeFallback BOLUM with unit must be false');
+ohOk('PRODUCTION_SHAPE_BY_CANONICAL=8/8');
+
+$baShapes = [[3], [9], [11], [25], [26], [29]];
+foreach ($baShapes as $birimIds) {
+    $f = ohFilterSql(ohUser('BIRIM_AMIRI', [], [], $birimIds));
+    if (strpos(implode(' ', $f['where']), 'birim_id') === false) {
+        ohFail('production-shape BA birim=[' . implode(',', $birimIds) . '] must birim filter');
+    }
 }
-ohOk('LEGACY_FALLBACK_FLAG');
+ohOk('PRODUCTION_SHAPE_BA_CANONICAL=6/6');
 
 // --- assertPersonelAccess matrix via child process ---
 ohAssertDenies(ohUser('SUBE_YONETICISI', []), ['id' => 1, 'sube_id' => 1], 'SUBE_ZERO_ASSERT');
@@ -191,12 +208,13 @@ ohAssertDenies(ohUser('BOLUM_YONETICISI', [], [10]), ['id' => 2, 'sube_id' => 1,
 // bolumler are catalog (⊂ departman), not branch-parented — same bolum_id on another sube remains in unit scope.
 ohAssertAllows(ohUser('BOLUM_YONETICISI', [], [10]), ['id' => 3, 'sube_id' => 2, 'bolum_id' => 10], 'BOLUM_SAME_UNIT_OTHER_BRANCH_ASSERT');
 ohAssertDenies(ohUser('BOLUM_YONETICISI', [], [10]), ['id' => 4, 'sube_id' => 2, 'bolum_id' => 99], 'BOLUM_CROSS_BRANCH_OTHER_UNIT_ASSERT');
-ohAssertAllows(ohUser('BOLUM_YONETICISI', [1], []), ['id' => 1, 'sube_id' => 1, 'bolum_id' => 99], 'BOLUM_LEGACY_SUBE_ASSERT');
-ohAssertDenies(ohUser('BOLUM_YONETICISI', [1], []), ['id' => 2, 'sube_id' => 2, 'bolum_id' => 99], 'BOLUM_LEGACY_CROSS_ASSERT');
+ohAssertDenies(ohUser('BOLUM_YONETICISI', [1], []), ['id' => 1, 'sube_id' => 1, 'bolum_id' => 99], 'BOLUM_SUBE_ONLY_ASSERT');
+ohAssertDenies(ohUser('BOLUM_YONETICISI', [1], []), ['id' => 2, 'sube_id' => 2, 'bolum_id' => 99], 'BOLUM_SUBE_ONLY_CROSS_ASSERT');
 
 ohAssertDenies(ohUser('BIRIM_AMIRI', []), ['id' => 1, 'sube_id' => 1, 'birim_id' => 20], 'BIRIM_ZERO_ASSERT');
 ohAssertAllows(ohUser('BIRIM_AMIRI', [], [], [20]), ['id' => 1, 'sube_id' => 1, 'birim_id' => 20], 'BIRIM_OWN_ASSERT');
 ohAssertDenies(ohUser('BIRIM_AMIRI', [], [], [20]), ['id' => 2, 'sube_id' => 1, 'birim_id' => 21], 'BIRIM_SIBLING_ASSERT');
+ohAssertDenies(ohUser('BIRIM_AMIRI', [1], [], []), ['id' => 1, 'sube_id' => 1, 'birim_id' => 20], 'BIRIM_SUBE_ONLY_ASSERT');
 
 ohAssertAllows(ohUser('GENEL_YONETICI', []), ['id' => 1, 'sube_id' => 9], 'GENEL_GLOBAL_ASSERT');
 ohAssertAllows(ohUser('SISTEM_YONETICISI', []), ['id' => 1, 'sube_id' => 9], 'SISTEM_GLOBAL_ASSERT');

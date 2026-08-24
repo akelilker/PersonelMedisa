@@ -1659,18 +1659,17 @@ class YonetimController
             }
         }
 
-        // STAGE A: unit roles may still use legacy branch scope until user_bolumler/user_birimler populated.
-        if ($rol === 'BOLUM_YONETICISI' && count($bolumIds) === 0 && count($subeIds) === 0) {
+        if ($rol === 'BOLUM_YONETICISI' && count($bolumIds) === 0) {
             JsonResponse::badRequest(
-                'BOLUM_YONETICISI icin en az bir bolum veya sube atamasi zorunludur.',
+                'BOLUM_YONETICISI icin en az bir bolum atamasi zorunludur.',
                 'VALIDATION_ERROR',
                 'bolum_ids'
             );
         }
 
-        if ($rol === 'BIRIM_AMIRI' && count($birimIds) === 0 && count($subeIds) === 0) {
+        if ($rol === 'BIRIM_AMIRI' && count($birimIds) === 0) {
             JsonResponse::badRequest(
-                'BIRIM_AMIRI icin en az bir birim veya sube atamasi zorunludur.',
+                'BIRIM_AMIRI icin en az bir birim atamasi zorunludur.',
                 'VALIDATION_ERROR',
                 'birim_ids'
             );

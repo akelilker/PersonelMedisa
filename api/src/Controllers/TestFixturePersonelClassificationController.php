@@ -11,19 +11,19 @@ use Medisa\Api\Database\Connection;
 use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
 use Medisa\Api\Services\Personel\TestFixturePersonelArchiveException;
-use Medisa\Api\Services\Personel\TestFixturePersonelArchiveService;
+use Medisa\Api\Services\Personel\TestFixturePersonelClassificationService;
 use PDO;
 
 /**
- * Canonical HTTP owner for TEST_FIXTURE_ARCHIVE lifecycle.
- * Exactly one route: POST /personeller/{id}/test-fixture-archive
+ * Canonical HTTP owner for persisted TEST_FIXTURE classification.
+ * Exactly one route: POST /personeller/{id}/test-fixture-classification
  */
-class TestFixturePersonelArchiveController
+class TestFixturePersonelClassificationController
 {
-    public static function archive(Request $request, $personelId)
+    public static function classify(Request $request, $personelId)
     {
         $user = AuthMiddleware::authenticate($request, true);
-        RolePermissions::assert($user, 'personeller.test_fixture.archive');
+        RolePermissions::assert($user, 'personeller.test_fixture.classify');
 
         $id = self::parsePositiveInt($personelId);
         if ($id === null) {
@@ -46,26 +46,48 @@ class TestFixturePersonelArchiveController
         if (!is_array($body)) {
             $body = [];
         }
-        // Client cannot bypass eligibility via payload flags.
+
+        // Client cannot assert classification without machine-verifiable evidence_kodu.
         if (array_key_exists('force', $body)
-            || array_key_exists('skip_classification', $body)
-            || array_key_exists('skip_bound_user_check', $body)
-            || array_key_exists('isten_cikis_tarihi', $body)
-            || array_key_exists('termination_date', $body)
+            || array_key_exists('skip_evidence', $body)
+            || array_key_exists('is_test', $body)
+            || array_key_exists('sinif', $body) && !array_key_exists('evidence_kodu', $body)
         ) {
-            JsonResponse::error(422, 'VALIDATION_ERROR', 'Archive payload eligibility bypass alanlari yasak.');
+            JsonResponse::error(422, 'VALIDATION_ERROR', 'Classification eligibility bypass alanlari yasak.');
         }
 
+        $evidenceKodu = isset($body['evidence_kodu']) ? strtoupper(trim((string) $body['evidence_kodu'])) : '';
+        if ($evidenceKodu === '') {
+            JsonResponse::error(422, 'VALIDATION_ERROR', 'evidence_kodu zorunlu.', 'evidence_kodu');
+        }
+
+        // Explicit client "classification=TEST_FIXTURE" alone is not evidence.
+        if (array_key_exists('classification', $body)
+            && !in_array($evidenceKodu, TestFixturePersonelClassificationService::allowedHttpEvidenceKodlari(), true)
+        ) {
+            JsonResponse::error(422, 'VALIDATION_ERROR', 'Client classification assertion evidence degildir.', 'classification');
+        }
+
+        $evidenceRef = array_key_exists('evidence_ref', $body) ? $body['evidence_ref'] : null;
+        $aciklama = array_key_exists('aciklama', $body) ? $body['aciklama'] : null;
+
         try {
-            $result = TestFixturePersonelArchiveService::archive($pdo, $id, $user, null);
-            $status = ($result['status'] ?? '') === TestFixturePersonelArchiveService::CODE_ALREADY_CORRECT
+            $result = TestFixturePersonelClassificationService::classifyViaHttp(
+                $pdo,
+                $id,
+                $evidenceKodu,
+                $user,
+                $evidenceRef,
+                $aciklama
+            );
+            $status = ($result['status'] ?? '') === TestFixturePersonelClassificationService::CODE_ALREADY_CORRECT
                 ? 200
                 : 201;
             JsonResponse::success($result, [], $status);
         } catch (TestFixturePersonelArchiveException $e) {
             JsonResponse::error($e->getHttpStatus(), $e->getErrorCode(), $e->getMessage(), $e->getField());
         } catch (\Throwable $e) {
-            JsonResponse::serverError('Test fixture archive basarisiz.');
+            JsonResponse::serverError('Test fixture classification basarisiz.');
         }
     }
 

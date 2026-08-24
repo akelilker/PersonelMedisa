@@ -145,6 +145,7 @@ function p6MigrationFiles(): array
             && $name !== '069_personel_credential_onboarding.sql'
             && $name !== '070_offline_mutation_idempotency.sql'
             && $name !== '071_org_hierarchy_authorization.sql';
+            && $name !== '072_org_reference_short_codes.sql'
             && $name !== '073_test_fixture_personel_archive.sql';
     }));
     sort($files, SORT_STRING);

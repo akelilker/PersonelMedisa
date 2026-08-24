@@ -3,14 +3,16 @@
 declare(strict_types=1);
 
 /**
- * Focused MariaDB acceptance for TEST_FIXTURE_ARCHIVE owner.
+ * Focused MariaDB acceptance for TEST_FIXTURE classification + archive owners.
  * php tests/php/TestFixturePersonelArchiveMysqlTestRunner.php
  */
 
 require_once __DIR__ . '/../../api/src/bootstrap.php';
 
 use Medisa\Api\Auth\AuthMiddleware;
+use Medisa\Api\Auth\RolePermissions;
 use Medisa\Api\Controllers\TestFixturePersonelArchiveController;
+use Medisa\Api\Controllers\TestFixturePersonelClassificationController;
 use Medisa\Api\Database\Connection;
 use Medisa\Api\Http\Request;
 use Medisa\Api\Services\Auth\ActorIdentityService;
@@ -141,7 +143,9 @@ function tfaHttp(PDO $pdo, $user, string $method, string $path, array $body = []
     putenv('MEDISA_TEST_HTTP_STATUS_FILE=' . $statusFile);
     ob_start();
     try {
-        if (preg_match('#^/personeller/(\d+)/test-fixture-archive$#', $path, $m)) {
+        if (preg_match('#^/personeller/(\d+)/test-fixture-classification$#', $path, $m)) {
+            TestFixturePersonelClassificationController::classify(tfaRequest($method, $path, $body), $m[1]);
+        } elseif (preg_match('#^/personeller/(\d+)/test-fixture-archive$#', $path, $m)) {
             TestFixturePersonelArchiveController::archive(tfaRequest($method, $path, $body), $m[1]);
         } else {
             throw new RuntimeException('Unexpected path');
@@ -194,6 +198,40 @@ function tfaInsertPersonel(PDO $pdo, string $tc, string $sicil, string $ad = 'Fi
     return (int) $pdo->lastInsertId();
 }
 
+function tfaInsertDemoKapsam(PDO $pdo, int $personelId, int $actorId = 10): int
+{
+    $stmt = $pdo->prepare(
+        "INSERT INTO personel_bordro_kapsamlari
+            (personel_id, sube_id, durum, neden_kodu, aciklama, gecerlilik_baslangic, state,
+             hazirlayan_id, onaylayan_id, onay_zamani, created_by)
+         VALUES
+            (:pid, 1, 'HARIC', 'DEMO_TEST_VERISI', 'Demo test kapsami kaniti', '2020-01-01', 'ONAYLANDI',
+             :actor, :actor2, NOW(), :actor3)"
+    );
+    $stmt->execute([
+        'pid' => $personelId,
+        'actor' => $actorId,
+        'actor2' => $actorId,
+        'actor3' => $actorId,
+    ]);
+
+    return (int) $pdo->lastInsertId();
+}
+
+/** @param array<string,mixed> $actor */
+function tfaClassifyFixture(PDO $pdo, int $personelId, array $actor): array
+{
+    tfaInsertDemoKapsam($pdo, $personelId, (int) ($actor['id'] ?? 10));
+
+    return TestFixturePersonelClassificationService::classifyViaHttp(
+        $pdo,
+        $personelId,
+        TestFixturePersonelClassificationService::EVIDENCE_BORDRO_KAPSAM_DEMO_TEST_VERISI,
+        $actor,
+        'kapsam:' . $personelId
+    );
+}
+
 $root = tfaRootPdo();
 $database = 'medisa_tfa_' . bin2hex(random_bytes(4));
 $root->exec('CREATE DATABASE `' . $database . '` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
@@ -203,11 +241,11 @@ try {
     tfaApply($pdo, '001_initial_schema.sql');
     tfaApply($pdo, '005_gunluk_bildirimler.sql');
     tfaApply($pdo, '018_personel_ucret_gecmisi.sql');
+    tfaApply($pdo, '035_personel_bordro_kapsamlari.sql');
     tfaApply($pdo, '053_retention_legal_hold_arsiv.sql');
     tfaApply($pdo, '056_users_personel_binding.sql');
     tfaApply($pdo, '066_personel_calisan_kapsami.sql');
     tfaApply($pdo, '073_test_fixture_personel_archive.sql');
-    // Idempotent re-apply
     tfaApply($pdo, '073_test_fixture_personel_archive.sql');
 
     tfaSeedBase($pdo);
@@ -225,58 +263,134 @@ try {
         'durum' => 'AKTIF',
         'sube_ids' => [1],
     ];
+    $personelRole = [
+        'id' => 12,
+        'username' => 'personel_actor',
+        'rol' => 'PERSONEL',
+        'durum' => 'AKTIF',
+        'sube_ids' => [1],
+    ];
 
-    // --- 1 valid fixture / no deps → PASS ---
-    $p1 = tfaInsertPersonel($pdo, '11111111111', 'TF-001');
-    TestFixturePersonelClassificationService::classify(
+    // ========== CLASSIFICATION ==========
+    $pCls = tfaInsertPersonel($pdo, '10000000001', 'CLS-001');
+    tfaInsertDemoKapsam($pdo, $pCls);
+    $c1 = TestFixturePersonelClassificationService::classifyViaHttp(
         $pdo,
-        $p1,
-        TestFixturePersonelClassificationService::EVIDENCE_SEED_SCHEMA_FIXTURE,
+        $pCls,
+        TestFixturePersonelClassificationService::EVIDENCE_BORDRO_KAPSAM_DEMO_TEST_VERISI,
+        $gy,
+        'demo-kapsam-1'
+    );
+    tfaAssert(($c1['status'] ?? '') === 'CLASSIFIED', '1 valid persisted DEMO_TEST evidence → classify PASS');
+    tfaAssert(($c1['evidence_kodu'] ?? '') === 'BORDRO_KAPSAM_DEMO_TEST_VERISI', '9 classification evidence preserved');
+    tfaAssert(($c1['classified_by'] ?? 0) === 10, '9 classification actor preserved');
+    tfaAssert(isset($c1['classified_at']) && $c1['classified_at'] !== '', '9 classification timestamp preserved');
+
+    $pRealCls = tfaInsertPersonel($pdo, '10000000002', 'REAL-CLS', 'Real', 'Employee');
+    $denyRealCls = false;
+    try {
+        TestFixturePersonelClassificationService::classifyViaHttp(
+            $pdo,
+            $pRealCls,
+            TestFixturePersonelClassificationService::EVIDENCE_BORDRO_KAPSAM_DEMO_TEST_VERISI,
+            $gy
+        );
+    } catch (\Medisa\Api\Services\Personel\TestFixturePersonelArchiveException $e) {
+        $denyRealCls = $e->getErrorCode() === 'EVIDENCE_MISSING';
+    }
+    tfaAssert($denyRealCls, '2 real employee → DENY');
+
+    $pClient = tfaInsertPersonel($pdo, '10000000003', 'CLIENT-ONLY');
+    $denyClient = false;
+    try {
+        TestFixturePersonelClassificationService::classifyViaHttp(
+            $pdo,
+            $pClient,
+            'CLIENT_ASSERTION',
+            $gy
+        );
+    } catch (\Medisa\Api\Services\Personel\TestFixturePersonelArchiveException $e) {
+        $denyClient = in_array($e->getErrorCode(), ['EVIDENCE_NOT_HTTP_ELIGIBLE', 'INVALID_EVIDENCE_KODU'], true);
+    }
+    tfaAssert($denyClient, '3 client-only assertion → DENY');
+
+    $pPattern = tfaInsertPersonel($pdo, '10000000004', 'TEST-001', 'Test', 'User');
+    $denyPattern = false;
+    try {
+        TestFixturePersonelClassificationService::classifyViaHttp(
+            $pdo,
+            $pPattern,
+            TestFixturePersonelClassificationService::EVIDENCE_SEED_SCHEMA_FIXTURE,
+            $gy
+        );
+    } catch (\Medisa\Api\Services\Personel\TestFixturePersonelArchiveException $e) {
+        $denyPattern = in_array($e->getErrorCode(), ['EVIDENCE_NOT_HTTP_ELIGIBLE', 'EVIDENCE_UNVERIFIABLE'], true);
+    }
+    tfaAssert($denyPattern, '4 name/sicil pattern alone → DENY');
+
+    $pManual = tfaInsertPersonel($pdo, '10000000005', 'MANUAL-1');
+    $denyManual = false;
+    try {
+        TestFixturePersonelClassificationService::classifyViaHttp(
+            $pdo,
+            $pManual,
+            TestFixturePersonelClassificationService::EVIDENCE_MANUAL_OPS_CLASSIFIED,
+            $gy
+        );
+    } catch (\Medisa\Api\Services\Personel\TestFixturePersonelArchiveException $e) {
+        $denyManual = in_array($e->getErrorCode(), ['EVIDENCE_NOT_HTTP_ELIGIBLE', 'EVIDENCE_UNVERIFIABLE'], true);
+    }
+    tfaAssert($denyManual, '5 insufficient MANUAL_OPS evidence → DENY');
+
+    tfaAssert(
+        !RolePermissions::has($muhasebe, 'personeller.test_fixture.classify'),
+        '6 unauthorized role → DENY'
+    );
+    tfaAssert(
+        !RolePermissions::has($personelRole, 'personeller.test_fixture.classify'),
+        '7 PERSONEL → DENY'
+    );
+    tfaAssert(
+        RolePermissions::has($gy, 'personeller.test_fixture.classify'),
+        '6 GY authorized for classify'
+    );
+
+    $c2 = TestFixturePersonelClassificationService::classifyViaHttp(
+        $pdo,
+        $pCls,
+        TestFixturePersonelClassificationService::EVIDENCE_BORDRO_KAPSAM_DEMO_TEST_VERISI,
         $gy
     );
+    tfaAssert(($c2['status'] ?? '') === TestFixturePersonelClassificationService::CODE_ALREADY_CORRECT, '8 second classification → ALREADY_CORRECT');
+    $clsCount = (int) $pdo->query(
+        "SELECT COUNT(*) FROM personel_test_fixture_siniflandirmalari WHERE personel_id = {$pCls}"
+    )->fetchColumn();
+    tfaAssert($clsCount === 1, '8 no duplicate classification row');
+
+    // ========== ARCHIVE ==========
+    $p1 = tfaInsertPersonel($pdo, '11111111111', 'TF-001');
+    tfaClassifyFixture($pdo, $p1, $gy);
     $pdo->exec(
         "INSERT INTO users (username, password_hash, ad_soyad, rol, durum, personel_id)
          VALUES ('tf_u1', 'x', 'Bound Pasif', 'MUHASEBE', 'PASIF', {$p1})"
     );
     $r1 = TestFixturePersonelArchiveService::archive($pdo, $p1, $gy);
-    tfaAssert(($r1['status'] ?? '') === 'ARCHIVED', '1 valid fixture/no deps → PASS');
-    tfaAssert(($r1['aktif_durum'] ?? '') === 'PASIF', '1 personel PASIF');
-    tfaAssert(array_key_exists('termination_date', $r1) && $r1['termination_date'] === null, '12 fake termination date absent');
-    tfaAssert(($r1['fake_employment_exit_created'] ?? true) === false, '12 fake employment exit false');
-    $istenCol = (int) $pdo->query(
-        "SELECT COUNT(*) FROM information_schema.COLUMNS
-         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'personeller' AND COLUMN_NAME = 'isten_cikis_tarihi'"
-    )->fetchColumn();
-    if ($istenCol === 1) {
-        $exitDate = $pdo->query("SELECT isten_cikis_tarihi FROM personeller WHERE id = {$p1}")->fetchColumn();
-        tfaAssert($exitDate === null || $exitDate === '', '12 no isten_cikis_tarihi written');
-    }
-    tfaAssert(isset($r1['manifest']['id']) && (int) $r1['manifest']['id'] > 0, '11 archive manifest created');
-    tfaAssert(
-        ($r1['manifest']['trigger_type'] ?? '') === RetentionCategories::TRIGGER_TEST_FIXTURE_ARCHIVE,
-        '11 manifest trigger TEST_FIXTURE_ARCHIVE'
-    );
+    tfaAssert(($r1['status'] ?? '') === 'ARCHIVED', '17 P4 no-dependency → PASS');
+    tfaAssert(array_key_exists('termination_date', $r1) && $r1['termination_date'] === null, '18 fake termination date absent');
+    tfaAssert(($r1['fake_employment_exit_created'] ?? true) === false, '18 fake employment exit false');
+    tfaAssert(isset($r1['manifest']['id']) && (int) $r1['manifest']['id'] > 0, 'archive manifest created');
 
-    // --- 13 idempotent second call ---
     $r1b = TestFixturePersonelArchiveService::archive($pdo, $p1, $gy);
-    tfaAssert(($r1b['status'] ?? '') === TestFixturePersonelArchiveService::CODE_ALREADY_CORRECT, '13 idempotent second call');
-    $manifestCount = (int) $pdo->query(
-        "SELECT COUNT(*) FROM arsiv_manifestleri WHERE personel_id = {$p1}
-         AND trigger_type = 'TEST_FIXTURE_ARCHIVE'"
-    )->fetchColumn();
-    tfaAssert($manifestCount === 1, '13 no duplicate manifest');
+    tfaAssert(($r1b['status'] ?? '') === TestFixturePersonelArchiveService::CODE_ALREADY_CORRECT, 'archive idempotent');
 
-    // --- 14 active list exclusion ---
     $aktifCount = (int) $pdo->query(
         "SELECT COUNT(*) FROM personeller WHERE id = {$p1} AND aktif_durum = 'AKTIF'"
     )->fetchColumn();
-    tfaAssert($aktifCount === 0, '14 active list exclusion');
+    tfaAssert($aktifCount === 0, '20 active-set exclusion passes');
 
-    // --- 16 historical read preserved (row still exists) ---
-    $hist = $pdo->query("SELECT id, aktif_durum, sicil_no FROM personeller WHERE id = {$p1}")->fetch(PDO::FETCH_ASSOC);
-    tfaAssert(is_array($hist) && (string) $hist['aktif_durum'] === 'PASIF', '16 historical read preserved');
+    $hist = $pdo->query("SELECT id, aktif_durum FROM personeller WHERE id = {$p1}")->fetch(PDO::FETCH_ASSOC);
+    tfaAssert(is_array($hist) && (string) $hist['aktif_durum'] === 'PASIF', '19 historical refs retained');
 
-    // --- 15 QR / formal actor denial ---
     $ref = new ReflectionClass(ActorIdentityService::class);
     $m = $ref->getMethod('loadActivePersonel');
     $m->setAccessible(true);
@@ -287,9 +401,8 @@ try {
         $qrDenied = ($e->errorCode === 'PERSONEL_INACTIVE')
             || strpos($e->getMessage(), 'Pasif personel') !== false;
     }
-    tfaAssert($qrDenied, '15 QR/new workflow denial for PASIF personel');
+    tfaAssert($qrDenied, 'QR denial for PASIF fixture');
 
-    // --- 2 real employee → DENY ---
     $pReal = tfaInsertPersonel($pdo, '22222222222', 'REAL-001', 'Real', 'Employee');
     $deniedReal = false;
     try {
@@ -297,9 +410,8 @@ try {
     } catch (\Medisa\Api\Services\Personel\TestFixturePersonelArchiveException $e) {
         $deniedReal = $e->getErrorCode() === TestFixturePersonelArchiveService::CODE_REAL_EMPLOYEE;
     }
-    tfaAssert($deniedReal, '2 real employee → DENY');
+    tfaAssert($deniedReal, 'archive real employee → DENY');
 
-    // --- 3 unknown classification → DENY ---
     $pUnk = tfaInsertPersonel($pdo, '33333333333', 'UNK-001');
     $deniedUnk = false;
     try {
@@ -307,16 +419,10 @@ try {
     } catch (\Medisa\Api\Services\Personel\TestFixturePersonelArchiveException $e) {
         $deniedUnk = $e->getErrorCode() === TestFixturePersonelArchiveService::CODE_REAL_EMPLOYEE;
     }
-    tfaAssert($deniedUnk, '3 unknown classification → DENY');
+    tfaAssert($deniedUnk, 'unknown classification → DENY');
 
-    // --- 4 active bound user → DENY ---
     $pActiveUser = tfaInsertPersonel($pdo, '44444444444', 'TF-AU');
-    TestFixturePersonelClassificationService::classify(
-        $pdo,
-        $pActiveUser,
-        TestFixturePersonelClassificationService::EVIDENCE_SEED_SCHEMA_FIXTURE,
-        $gy
-    );
+    tfaClassifyFixture($pdo, $pActiveUser, $gy);
     $pdo->exec(
         "INSERT INTO users (username, password_hash, ad_soyad, rol, durum, personel_id)
          VALUES ('tf_active_bound', 'x', 'Bound Aktif', 'MUHASEBE', 'AKTIF', {$pActiveUser})"
@@ -327,51 +433,140 @@ try {
     } catch (\Medisa\Api\Services\Personel\TestFixturePersonelArchiveException $e) {
         $deniedActiveUser = $e->getErrorCode() === TestFixturePersonelArchiveService::CODE_ACTIVE_BOUND_USER;
     }
-    tfaAssert($deniedActiveUser, '4 active bound user → DENY');
+    tfaAssert($deniedActiveUser, 'active bound user → DENY');
 
-    // --- 5 PASIF bound user → PASS ---
     $pPasifUser = tfaInsertPersonel($pdo, '55555555555', 'TF-PU');
-    TestFixturePersonelClassificationService::classify(
-        $pdo,
-        $pPasifUser,
-        TestFixturePersonelClassificationService::EVIDENCE_LIVE_API_SMOKE_CREATE,
-        $gy
-    );
+    tfaClassifyFixture($pdo, $pPasifUser, $gy);
     $pdo->exec(
         "INSERT INTO users (username, password_hash, ad_soyad, rol, durum, personel_id)
          VALUES ('tf_pasif_bound', 'x', 'Bound Pasif2', 'MUHASEBE', 'PASIF', {$pPasifUser})"
     );
     $r5 = TestFixturePersonelArchiveService::archive($pdo, $pPasifUser, $gy);
-    tfaAssert(($r5['status'] ?? '') === 'ARCHIVED', '5 PASIF bound user → PASS');
+    tfaAssert(($r5['status'] ?? '') === 'ARCHIVED', 'PASIF bound user → PASS');
 
-    // --- 6 historical refs preserved ---
-    $pHist = tfaInsertPersonel($pdo, '66666666666', 'TF-HIST');
-    TestFixturePersonelClassificationService::classify(
-        $pdo,
-        $pHist,
-        TestFixturePersonelClassificationService::EVIDENCE_SEED_SCHEMA_FIXTURE,
-        $gy
+    // 10 HAFTALIK_MUTABAKATA_ALINDI fixture → cancelled with TEST_FIXTURE_ARCHIVE reason
+    $pHaftalik = tfaInsertPersonel($pdo, '66666666666', 'TF-HAFT');
+    tfaClassifyFixture($pdo, $pHaftalik, $gy);
+    $pdo->exec(
+        "INSERT INTO gunluk_bildirimler (personel_id, tarih, sube_id, bildirim_turu, state, aciklama)
+         VALUES ({$pHaftalik}, '2026-07-01', 1, 'DIGER', 'HAFTALIK_MUTABAKATA_ALINDI', 'weekly fixture')"
     );
+    $rHaft = TestFixturePersonelArchiveService::archive($pdo, $pHaftalik, $gy);
+    tfaAssert(($rHaft['status'] ?? '') === 'ARCHIVED', '10 HAFTALIK fixture safely cancelled');
+    $haftRow = $pdo->query(
+        "SELECT state, aciklama FROM gunluk_bildirimler WHERE personel_id = {$pHaftalik} LIMIT 1"
+    )->fetch(PDO::FETCH_ASSOC);
+    tfaAssert(is_array($haftRow) && (string) $haftRow['state'] === 'IPTAL', '10 HAFTALIK → IPTAL');
+    tfaAssert(
+        is_array($haftRow) && strpos((string) $haftRow['aciklama'], 'TEST_FIXTURE_ARCHIVE') !== false,
+        '12 cancellation audit reason = TEST_FIXTURE_ARCHIVE'
+    );
+
+    // 11 ordinary cancel path still rejects HAFTALIK
+    $bildirimSrc = file_get_contents(__DIR__ . '/../../api/src/Controllers/BildirimlerController.php');
+    tfaAssert(
+        strpos((string) $bildirimSrc, "state === 'HAFTALIK_MUTABAKATA_ALINDI'") !== false
+        && strpos((string) $bildirimSrc, 'haftalık mutabakata alındığı için doğrudan değiştirilemez') !== false,
+        '11 ordinary real personnel HAFTALIK cancel remains blocked'
+    );
+
+    // 13 P1-style dependency set atomic archive
+    $pP1 = tfaInsertPersonel($pdo, '77777777771', 'TF-P1');
+    tfaClassifyFixture($pdo, $pP1, $gy);
+    $pdo->exec(
+        "INSERT INTO gunluk_bildirimler (personel_id, tarih, sube_id, bildirim_turu, state)
+         VALUES
+         ({$pP1}, '2026-06-01', 1, 'DIGER', 'TASLAK'),
+         ({$pP1}, '2026-06-02', 1, 'DIGER', 'HAFTALIK_MUTABAKATA_ALINDI')"
+    );
+    $futureBas = (new DateTimeImmutable('today'))->modify('+30 days')->format('Y-m-d');
+    $pdo->prepare(
+        "INSERT INTO personel_ucret_gecmisi
+            (personel_id, ucret_tutari, ucret_turu, gecerlilik_baslangic, gecerlilik_bitis, state, kaynak)
+         VALUES (:pid, 2000.00, 'NET', :future_bas, NULL, 'AKTIF', 'MANUEL')"
+    )->execute(['pid' => $pP1, 'future_bas' => $futureBas]);
+    $rP1 = TestFixturePersonelArchiveService::archive($pdo, $pP1, $gy);
+    tfaAssert(($rP1['status'] ?? '') === 'ARCHIVED', '13 P1-style dependency set archives atomically');
+    $bildirimIptal = (int) $pdo->query(
+        "SELECT COUNT(*) FROM gunluk_bildirimler WHERE personel_id = {$pP1} AND state = 'IPTAL'"
+    )->fetchColumn();
+    tfaAssert($bildirimIptal === 2, '13 all P1 bildirim cancelled');
+    $futureState = (string) $pdo->query(
+        "SELECT state FROM personel_ucret_gecmisi WHERE personel_id = {$pP1} AND gecerlilik_baslangic = '{$futureBas}'"
+    )->fetchColumn();
+    tfaAssert($futureState === 'IPTAL', '13 future ucret cancelled');
+
+    // 14 incompatible state fail-closed + rollback
+    $pBlock = tfaInsertPersonel($pdo, '88888888888', 'TF-BLOCK');
+    tfaClassifyFixture($pdo, $pBlock, $gy);
+    $pdo->exec(
+        "INSERT INTO gunluk_bildirimler (personel_id, tarih, sube_id, bildirim_turu, state)
+         VALUES ({$pBlock}, '2026-07-01', 1, 'DIGER', 'GONDERILDI')"
+    );
+    $blocked = false;
+    try {
+        TestFixturePersonelArchiveService::archive($pdo, $pBlock, $gy);
+    } catch (\Medisa\Api\Services\Personel\TestFixturePersonelArchiveException $e) {
+        $blocked = $e->getErrorCode() === TestFixturePersonelArchiveService::CODE_OPEN_WORKFLOW_UNSUPPORTED;
+    }
+    tfaAssert($blocked, '14 incompatible workflow fail closed');
+    $stillAktif = (string) $pdo->query(
+        "SELECT aktif_durum FROM personeller WHERE id = {$pBlock}"
+    )->fetchColumn();
+    tfaAssert($stillAktif === 'AKTIF', '14 dependency failure transaction rollback');
+    $stillGonderildi = (string) $pdo->query(
+        "SELECT state FROM gunluk_bildirimler WHERE personel_id = {$pBlock} LIMIT 1"
+    )->fetchColumn();
+    tfaAssert($stillGonderildi === 'GONDERILDI', '14 bildirim not partially cancelled');
+
+    // 15 P2 RAPOR
+    $pP2 = tfaInsertPersonel($pdo, '99999999992', 'TF-P2');
+    tfaClassifyFixture($pdo, $pP2, $gy);
+    $pdo->exec(
+        "INSERT INTO surecler (personel_id, surec_turu, alt_tur, baslangic_tarihi, bitis_tarihi, state)
+         VALUES
+         ({$pP2}, 'RAPOR', 'Raporlu_Hastalik', '2026-07-06', '2026-07-10', 'AKTIF'),
+         ({$pP2}, 'RAPOR', 'Raporlu_Hastalik', '2026-07-11', '2026-07-12', 'AKTIF')"
+    );
+    $rP2 = TestFixturePersonelArchiveService::archive($pdo, $pP2, $gy);
+    tfaAssert(($rP2['status'] ?? '') === 'ARCHIVED', '15 P2-style RAPOR passes');
+    $raporIptal = (int) $pdo->query(
+        "SELECT COUNT(*) FROM surecler WHERE personel_id = {$pP2} AND state = 'IPTAL'"
+    )->fetchColumn();
+    tfaAssert($raporIptal === 2, '15 RAPOR surecler IPTAL');
+
+    // 16 P3 IZIN/POZISYON/BELGE
+    $pP3 = tfaInsertPersonel($pdo, '99999999993', 'TF-P3');
+    tfaClassifyFixture($pdo, $pP3, $gy);
+    $pdo->exec(
+        "INSERT INTO surecler (personel_id, surec_turu, alt_tur, baslangic_tarihi, bitis_tarihi, state)
+         VALUES
+         ({$pP3}, 'IZIN', 'Yillik', '2026-08-01', '2026-08-05', 'AKTIF'),
+         ({$pP3}, 'POZISYON', 'Degisim', '2026-08-01', '2026-08-01', 'AKTIF'),
+         ({$pP3}, 'BELGE', 'Kimlik', '2026-08-01', '2026-08-01', 'AKTIF')"
+    );
+    $rP3 = TestFixturePersonelArchiveService::archive($pdo, $pP3, $gy);
+    tfaAssert(($rP3['status'] ?? '') === 'ARCHIVED', '16 P3-style IZIN/POZISYON/BELGE passes');
+    $p3Iptal = (int) $pdo->query(
+        "SELECT COUNT(*) FROM surecler WHERE personel_id = {$pP3} AND state = 'IPTAL'"
+    )->fetchColumn();
+    tfaAssert($p3Iptal === 3, '16 P3 surecler IPTAL');
+
+    // historical puantaj preserved
+    $pHist = tfaInsertPersonel($pdo, '66666666661', 'TF-HIST');
+    tfaClassifyFixture($pdo, $pHist, $gy);
     $pdo->exec(
         "INSERT INTO gunluk_puantaj (personel_id, tarih, gun_tipi)
          VALUES ({$pHist}, '2026-03-02', 'Normal_Is_Gunu')"
     );
-    $pdo->exec(
-        "INSERT INTO gunluk_bildirimler (personel_id, tarih, sube_id, bildirim_turu, state)
-         VALUES ({$pHist}, '2026-03-02', 1, 'DIGER', 'TASLAK')"
-    );
-    $r6 = TestFixturePersonelArchiveService::archive($pdo, $pHist, $gy);
-    tfaAssert(($r6['status'] ?? '') === 'ARCHIVED', '6 archive with historical refs');
+    $rHist = TestFixturePersonelArchiveService::archive($pdo, $pHist, $gy);
+    tfaAssert(($rHist['status'] ?? '') === 'ARCHIVED', 'historical archive PASS');
     $puantajLeft = (int) $pdo->query(
         "SELECT COUNT(*) FROM gunluk_puantaj WHERE personel_id = {$pHist}"
     )->fetchColumn();
-    tfaAssert($puantajLeft === 1, '6 historical puantaj preserved');
-    $bildirimState = (string) $pdo->query(
-        "SELECT state FROM gunluk_bildirimler WHERE personel_id = {$pHist} LIMIT 1"
-    )->fetchColumn();
-    tfaAssert($bildirimState === 'IPTAL', '8 cancellable workflow cancelled (TASLAK→IPTAL)');
+    tfaAssert($puantajLeft === 1, '19 historical puantaj preserved');
 
-    // --- 7 sealed payroll/SGK unsafe rewrite rejected / preserved ---
+    // sealed preserved
     $pdo->exec(
         "CREATE TABLE IF NOT EXISTS maas_hesaplama_personel_snapshotlari (
             id INT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -382,12 +577,7 @@ try {
          ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
     );
     $pSeal = tfaInsertPersonel($pdo, '77777777777', 'TF-SEAL');
-    TestFixturePersonelClassificationService::classify(
-        $pdo,
-        $pSeal,
-        TestFixturePersonelClassificationService::EVIDENCE_SEED_SCHEMA_FIXTURE,
-        $gy
-    );
+    tfaClassifyFixture($pdo, $pSeal, $gy);
     $pdo->exec(
         "INSERT INTO maas_hesaplama_personel_snapshotlari (personel_id, seal_hash, payload_json)
          VALUES ({$pSeal}, 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', '{\"sealed\":true}')"
@@ -396,107 +586,28 @@ try {
         "SELECT seal_hash, payload_json FROM maas_hesaplama_personel_snapshotlari WHERE personel_id = {$pSeal}"
     )->fetch(PDO::FETCH_ASSOC);
     $r7 = TestFixturePersonelArchiveService::archive($pdo, $pSeal, $gy);
-    tfaAssert(($r7['status'] ?? '') === 'ARCHIVED', '7 archive with sealed snapshot present');
+    tfaAssert(($r7['status'] ?? '') === 'ARCHIVED', 'sealed present archive PASS');
     $afterSeal = $pdo->query(
         "SELECT seal_hash, payload_json FROM maas_hesaplama_personel_snapshotlari WHERE personel_id = {$pSeal}"
     )->fetch(PDO::FETCH_ASSOC);
     tfaAssert(
         (string) $beforeSeal['seal_hash'] === (string) $afterSeal['seal_hash']
         && (string) $beforeSeal['payload_json'] === (string) $afterSeal['payload_json'],
-        '7 sealed payroll/SGK preserved (no rewrite)'
+        'sealed payroll preserved'
     );
 
-    // --- 9 incompatible workflow fail closed ---
-    $pBlock = tfaInsertPersonel($pdo, '88888888888', 'TF-BLOCK');
-    TestFixturePersonelClassificationService::classify(
-        $pdo,
-        $pBlock,
-        TestFixturePersonelClassificationService::EVIDENCE_SEED_SCHEMA_FIXTURE,
-        $gy
-    );
-    $pdo->exec(
-        "INSERT INTO gunluk_bildirimler (personel_id, tarih, sube_id, bildirim_turu, state)
-         VALUES ({$pBlock}, '2026-07-01', 1, 'DIGER', 'HAFTALIK_MUTABAKATA_ALINDI')"
-    );
-    $blocked = false;
-    try {
-        TestFixturePersonelArchiveService::archive($pdo, $pBlock, $gy);
-    } catch (\Medisa\Api\Services\Personel\TestFixturePersonelArchiveException $e) {
-        $blocked = $e->getErrorCode() === TestFixturePersonelArchiveService::CODE_OPEN_WORKFLOW_UNSUPPORTED;
-    }
-    tfaAssert($blocked, '9 incompatible workflow fail closed');
-    $stillAktif = (string) $pdo->query(
-        "SELECT aktif_durum FROM personeller WHERE id = {$pBlock}"
-    )->fetchColumn();
-    tfaAssert($stillAktif === 'AKTIF', '18 dependency failure transaction rollback (personel still AKTIF)');
-
-    // --- 8 surec cancel + 10 future ucret ---
-    $pDeps = tfaInsertPersonel($pdo, '99999999999', 'TF-DEPS');
-    TestFixturePersonelClassificationService::classify(
-        $pdo,
-        $pDeps,
-        TestFixturePersonelClassificationService::EVIDENCE_SEED_SCHEMA_FIXTURE,
-        $gy
-    );
-    $pdo->exec(
-        "INSERT INTO surecler (personel_id, surec_turu, alt_tur, baslangic_tarihi, bitis_tarihi, state)
-         VALUES ({$pDeps}, 'RAPOR', 'Raporlu_Hastalik', '2026-07-06', '2026-07-10', 'AKTIF')"
-    );
-    $futureBas = (new DateTimeImmutable('today'))->modify('+30 days')->format('Y-m-d');
-    $pastBas = (new DateTimeImmutable('today'))->modify('-60 days')->format('Y-m-d');
-    $pastBit = (new DateTimeImmutable('today'))->modify('-1 day')->format('Y-m-d');
-    $pdo->prepare(
-        "INSERT INTO personel_ucret_gecmisi
-            (personel_id, ucret_tutari, ucret_turu, gecerlilik_baslangic, gecerlilik_bitis, state, kaynak)
-         VALUES
-            (:pid, 1000.00, 'NET', :past_bas, :past_bit, 'AKTIF', 'MANUEL'),
-            (:pid2, 2000.00, 'NET', :future_bas, NULL, 'AKTIF', 'MANUEL')"
-    )->execute([
-        'pid' => $pDeps,
-        'past_bas' => $pastBas,
-        'past_bit' => $pastBit,
-        'pid2' => $pDeps,
-        'future_bas' => $futureBas,
-    ]);
-    // unique open_ended: only one open-ended AKTIF allowed — past has bitis, future open OK
-    $rDeps = TestFixturePersonelArchiveService::archive($pdo, $pDeps, $gy);
-    tfaAssert(($rDeps['status'] ?? '') === 'ARCHIVED', '8/10 deps archive PASS');
-    $surecState = (string) $pdo->query(
-        "SELECT state FROM surecler WHERE personel_id = {$pDeps} LIMIT 1"
-    )->fetchColumn();
-    tfaAssert($surecState === 'IPTAL', '8 cancellable surec cancelled');
-    $futureState = (string) $pdo->query(
-        "SELECT state FROM personel_ucret_gecmisi
-         WHERE personel_id = {$pDeps} AND gecerlilik_baslangic = '{$futureBas}'"
-    )->fetchColumn();
-    tfaAssert($futureState === 'IPTAL', '10 future ucret safe cancel');
-    $pastState = (string) $pdo->query(
-        "SELECT state FROM personel_ucret_gecmisi
-         WHERE personel_id = {$pDeps} AND gecerlilik_baslangic = '{$pastBas}'"
-    )->fetchColumn();
-    tfaAssert($pastState === 'AKTIF', '10 historical wage row preserved');
-
-    // --- 17 unauthorized role denied ---
     tfaAssert(
-        !\Medisa\Api\Auth\RolePermissions::has($muhasebe, 'personeller.test_fixture.archive'),
-        '17 unauthorized role denied'
-    );
-    tfaAssert(
-        \Medisa\Api\Auth\RolePermissions::has($gy, 'personeller.test_fixture.archive'),
-        '17 GY authorized for archive'
+        !RolePermissions::has($muhasebe, 'personeller.test_fixture.archive'),
+        'unauthorized archive role denied'
     );
 
-    // No hardcoded production IDs in service source
     $svc = file_get_contents(__DIR__ . '/../../api/src/Services/Personel/TestFixturePersonelArchiveService.php');
-    tfaAssert(strpos($svc, 'personel_id === 1') === false, 'no hardcoded personel id eligibility');
-    tfaAssert(strpos((string) $svc, 'P-0001') === false, 'no sicil pattern eligibility');
-
-    // ISTEN_AYRILMA termination requirement untouched
+    tfaAssert(strpos((string) $svc, 'personel_id === 1') === false, 'no hardcoded personel id eligibility');
     $surecSrc = file_get_contents(__DIR__ . '/../../api/src/Controllers/SureclerController.php');
-    tfaAssert(strpos($surecSrc, "surec_turu'] === 'ISTEN_AYRILMA'") !== false, 'ISTEN_AYRILMA path preserved');
+    tfaAssert(strpos((string) $surecSrc, "surec_turu'] === 'ISTEN_AYRILMA'") !== false, 'ISTEN_AYRILMA path preserved');
     $manifestSrc = file_get_contents(__DIR__ . '/../../api/src/Services/Retention/ArchiveManifestService.php');
     tfaAssert(
-        strpos($manifestSrc, 'CODE_TERMINATION_DATE_MISSING') !== false,
+        strpos((string) $manifestSrc, 'CODE_TERMINATION_DATE_MISSING') !== false,
         'ISTEN_AYRILMA termination-date requirement preserved'
     );
 

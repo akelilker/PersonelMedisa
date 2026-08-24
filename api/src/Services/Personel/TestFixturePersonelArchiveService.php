@@ -333,10 +333,8 @@ class TestFixturePersonelArchiveService
             foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
                 $state = strtoupper(trim((string) ($row['state'] ?? '')));
                 $id = (int) $row['id'];
-                if (in_array($state, ['TASLAK', 'DUZELTME_ISTENDI'], true)) {
+                if (in_array($state, ['TASLAK', 'DUZELTME_ISTENDI', 'HAFTALIK_MUTABAKATA_ALINDI'], true)) {
                     $bildirimCancel[] = $id;
-                } elseif ($state === 'HAFTALIK_MUTABAKATA_ALINDI') {
-                    $bildirimBlockers[] = ['id' => $id, 'state' => $state, 'domain' => 'bildirim'];
                 } else {
                     // Submitted / closed-ish states without cancel semantic → fail closed.
                     $bildirimBlockers[] = ['id' => $id, 'state' => $state, 'domain' => 'bildirim'];
@@ -415,18 +413,65 @@ class TestFixturePersonelArchiveService
         $cancelled = [];
         $actorId = isset($actor['id']) ? (int) $actor['id'] : null;
         foreach ($ids as $id) {
-            $stmt = $pdo->prepare(
-                "UPDATE gunluk_bildirimler
-                 SET state = 'IPTAL', updated_by = :updated_by
-                 WHERE id = :id AND state IN ('TASLAK', 'DUZELTME_ISTENDI')"
+            $lock = $pdo->prepare(
+                "SELECT id, state, aciklama FROM gunluk_bildirimler WHERE id = :id LIMIT 1 FOR UPDATE"
             );
-            $stmt->execute([
-                'updated_by' => $actorId,
-                'id' => (int) $id,
-            ]);
-            if ($stmt->rowCount() === 1) {
+            $lock->execute(['id' => (int) $id]);
+            $row = $lock->fetch(PDO::FETCH_ASSOC);
+            if (!is_array($row)) {
+                throw new TestFixturePersonelArchiveException(
+                    self::CODE_OPEN_WORKFLOW_UNSUPPORTED,
+                    'Bildirim bulunamadi; archive fail-closed.',
+                    409,
+                    'bildirim'
+                );
+            }
+            $state = strtoupper(trim((string) ($row['state'] ?? '')));
+            if ($state === 'IPTAL') {
                 $cancelled[] = (int) $id;
+                continue;
+            }
+
+            if (in_array($state, ['TASLAK', 'DUZELTME_ISTENDI'], true)) {
+                $stmt = $pdo->prepare(
+                    "UPDATE gunluk_bildirimler
+                     SET state = 'IPTAL', updated_by = :updated_by
+                     WHERE id = :id AND state IN ('TASLAK', 'DUZELTME_ISTENDI')"
+                );
+                $stmt->execute([
+                    'updated_by' => $actorId,
+                    'id' => (int) $id,
+                ]);
+            } elseif ($state === 'HAFTALIK_MUTABAKATA_ALINDI') {
+                // TEST_FIXTURE-ONLY withdrawal. Does not change ordinary BildirimlerController::cancel
+                // which still rejects HAFTALIK_MUTABAKATA_ALINDI for real personnel.
+                $prevAciklama = trim((string) ($row['aciklama'] ?? ''));
+                $auditNote = '[TEST_FIXTURE_ARCHIVE] Non-real fixture workflow withdrawn from active business processing.';
+                $nextAciklama = $prevAciklama === ''
+                    ? $auditNote
+                    : ($prevAciklama . "\n" . $auditNote);
+                $stmt = $pdo->prepare(
+                    "UPDATE gunluk_bildirimler
+                     SET state = 'IPTAL',
+                         updated_by = :updated_by,
+                         aciklama = :aciklama
+                     WHERE id = :id AND state = 'HAFTALIK_MUTABAKATA_ALINDI'"
+                );
+                $stmt->execute([
+                    'updated_by' => $actorId,
+                    'aciklama' => $nextAciklama,
+                    'id' => (int) $id,
+                ]);
             } else {
+                throw new TestFixturePersonelArchiveException(
+                    self::CODE_OPEN_WORKFLOW_UNSUPPORTED,
+                    'Bildirim state iptal edilemez; archive fail-closed.',
+                    409,
+                    'bildirim'
+                );
+            }
+
+            if ($stmt->rowCount() !== 1) {
                 throw new TestFixturePersonelArchiveException(
                     self::CODE_OPEN_WORKFLOW_UNSUPPORTED,
                     'Bildirim iptal yarisi; archive fail-closed.',
@@ -434,6 +479,7 @@ class TestFixturePersonelArchiveService
                     'bildirim'
                 );
             }
+            $cancelled[] = (int) $id;
         }
 
         return $cancelled;

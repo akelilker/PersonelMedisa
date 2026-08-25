@@ -63,7 +63,11 @@ describe("test fixture personel archive owner", () => {
     expect(routerSrc).toContain("/personeller/(\\d+)/test-fixture-archive");
     expect(routerSrc).toContain("/personeller/(\\d+)/test-fixture-classification");
     expect(controllerSrc).toContain("personeller.test_fixture.archive");
+    expect(controllerSrc).toContain("Medisa\\Api\\Scope\\SubeScope");
+    expect(controllerSrc).not.toContain("Medisa\\Api\\Auth\\SubeScope");
     expect(classifyControllerSrc).toContain("personeller.test_fixture.classify");
+    expect(classifyControllerSrc).toContain("Medisa\\Api\\Scope\\SubeScope");
+    expect(classifyControllerSrc).not.toContain("Medisa\\Api\\Auth\\SubeScope");
     expect(permissionsSrc).toContain("'personeller.test_fixture.archive'");
     expect(permissionsSrc).toContain("'personeller.test_fixture.classify'");
     expect(permissionsSrc).toMatch(

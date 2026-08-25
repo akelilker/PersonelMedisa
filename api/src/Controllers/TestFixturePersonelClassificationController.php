@@ -6,7 +6,7 @@ namespace Medisa\Api\Controllers;
 
 use Medisa\Api\Auth\AuthMiddleware;
 use Medisa\Api\Auth\RolePermissions;
-use Medisa\Api\Auth\SubeScope;
+use Medisa\Api\Scope\SubeScope;
 use Medisa\Api\Database\Connection;
 use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;

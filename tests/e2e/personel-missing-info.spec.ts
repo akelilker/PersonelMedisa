@@ -15,12 +15,15 @@ test.describe("personel eksik bilgi UX", () => {
     await login(page, { username: "yonetici", password: "secret" });
 
     await page.goto("/personeller");
-    await expect(page.getByTestId("personel-eksik-bilgi-1")).toHaveText("Eksik Bilgi");
+    await expect(page.getByTestId("personel-eksik-bilgi-1")).toContainText("eksik bilgi");
 
     await page.getByRole("link", { name: /Ayşe Yılmaz.*kişisinin kartını aç/i }).first().click();
     await expect(page).toHaveURL(/\/personeller\/1$/);
 
     await expect(page.getByTestId("personel-eksik-bilgi-ozeti")).toContainText("2 eksik bilgi");
+    await expect(page.getByTestId("personel-eksik-bilgi-ozeti")).toContainText("Bölüm");
+    await expect(page.getByTestId("personel-eksik-bilgi-ozeti")).toContainText("Birim");
+    await expect(page.getByRole("tab", { name: /Genel/ })).toContainText("2");
 
     const missingFields = page.locator(".personel-dosya-field.is-missing");
     await expect(missingFields.filter({ hasText: "Bölüm" })).toContainText("Bilgi girilmemiş");

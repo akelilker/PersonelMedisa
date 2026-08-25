@@ -18,6 +18,7 @@ import {
   updatePersonel,
   type CreatePersonelPayload
 } from "../api/personeller.api";
+import { resolvePersonelCompleteness } from "../features/personeller/personel-missing-info";
 import {
   fetchBagliAmirOptions,
   fetchBildirimTuruOptions,
@@ -316,8 +317,10 @@ export const dataCacheKeys = {
     departmanId: string,
     personelTipiId: string,
     page: number,
-    calisanKapsami = ""
-  ) => `personeller:list:s${subeSeg(subeId)}:${search}|${aktiflik}|${departmanId}|${personelTipiId}|${page}${calisanKapsami ? `|${calisanKapsami}` : ""}`,
+    calisanKapsami = "",
+    eksikBilgi = ""
+  ) =>
+    `personeller:list:s${subeSeg(subeId)}:${search}|${aktiflik}|${departmanId}|${personelTipiId}|${page}${calisanKapsami ? `|${calisanKapsami}` : ""}${eksikBilgi === "eksik" ? `|eksik:eksik` : ""}`,
   personelDetail: (subeId: number | null, id: number) =>
     `personeller:detail:s${subeSeg(subeId)}:${id}`,
   referansPersonel: () => `referans:personel-bundle`,
@@ -899,11 +902,12 @@ type PersonellerListCacheFilters = {
   personelTipiId: string;
   page: number;
   calisanKapsami: string;
+  eksikBilgi: string;
 };
 
 function parsePersonellerListCacheKeySuffix(suffix: string): PersonellerListCacheFilters | null {
   const parts = suffix.split("|");
-  if (parts.length !== 5 && parts.length !== 6) {
+  if (parts.length < 5 || parts.length > 7) {
     return null;
   }
 
@@ -912,13 +916,25 @@ function parsePersonellerListCacheKeySuffix(suffix: string): PersonellerListCach
     return null;
   }
 
+  let calisanKapsami = "";
+  let eksikBilgi = "";
+  for (let i = 5; i < parts.length; i += 1) {
+    const part = parts[i] ?? "";
+    if (part.startsWith("eksik:")) {
+      eksikBilgi = part.slice("eksik:".length);
+    } else {
+      calisanKapsami = part;
+    }
+  }
+
   return {
     search: parts[0],
     aktiflik: parts[1],
     departmanId: parts[2],
     personelTipiId: parts[3],
     page,
-    calisanKapsami: parts[5] ?? ""
+    calisanKapsami,
+    eksikBilgi
   };
 }
 
@@ -990,6 +1006,10 @@ function personelMatchesListCacheFilters(created: Personel, filters: Personeller
     return false;
   }
 
+  if (filters.eksikBilgi === "eksik" && resolvePersonelCompleteness(created).is_complete) {
+    return false;
+  }
+
   return true;
 }
 
@@ -1034,6 +1054,10 @@ function personelMatchesListFiltersForUpdate(
   }
 
   if (filters.calisanKapsami && (personel.calisan_kapsami ?? "IC_PERSONEL") !== filters.calisanKapsami) {
+    return false;
+  }
+
+  if (filters.eksikBilgi === "eksik" && resolvePersonelCompleteness(personel).is_complete) {
     return false;
   }
 

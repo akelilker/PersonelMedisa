@@ -2,6 +2,21 @@ export type PersonelAktifDurum = "AKTIF" | "PASIF";
 
 export type PersonelCalisanKapsami = "IC_PERSONEL" | "DIS_KAYNAK";
 
+export type PersonelCompletenessField = {
+  key: string;
+  label: string;
+  category: "KIMLIK" | "ILETISIM" | "ISTIHDAM" | string;
+  severity: "CRITICAL" | "WARNING" | string;
+  edit_target: "genel" | "pozisyon" | string;
+};
+
+export type PersonelCompleteness = {
+  is_complete: boolean;
+  missing_count: number;
+  critical_missing_labels: string[];
+  missing_fields?: PersonelCompletenessField[];
+};
+
 export type Personel = {
   id: number;
   tc_kimlik_no: string | null;
@@ -9,6 +24,7 @@ export type Personel = {
   soyad: string | null;
   aktif_durum: PersonelAktifDurum;
   calisan_kapsami?: PersonelCalisanKapsami;
+  completeness?: PersonelCompleteness;
   sube_id?: number;
   telefon?: string | null;
   dogum_tarihi?: string | null;

@@ -48,6 +48,7 @@ export type PersonelListQueryState = {
     departmanId: string;
     personelTipiId: string;
     calisanKapsami: "" | "IC_PERSONEL" | "DIS_KAYNAK";
+    eksikBilgi: "tum" | "eksik";
   };
   applied: {
     search: string;
@@ -55,6 +56,7 @@ export type PersonelListQueryState = {
     departmanId: string;
     personelTipiId: string;
     calisanKapsami: "" | "IC_PERSONEL" | "DIS_KAYNAK";
+    eksikBilgi: "tum" | "eksik";
   };
   page: number;
 };
@@ -123,8 +125,22 @@ async function fetchBagliAmirContext(amirId: number): Promise<BagliAmirContext |
 export function usePersoneller() {
   const revision = useAppDataRevision();
   const [listQuery, setListQuery] = useState<PersonelListQueryState>({
-    draft: { search: "", aktiflik: "tum", departmanId: "", personelTipiId: "", calisanKapsami: "" },
-    applied: { search: "", aktiflik: "tum", departmanId: "", personelTipiId: "", calisanKapsami: "" },
+    draft: {
+      search: "",
+      aktiflik: "tum",
+      departmanId: "",
+      personelTipiId: "",
+      calisanKapsami: "",
+      eksikBilgi: "tum"
+    },
+    applied: {
+      search: "",
+      aktiflik: "tum",
+      departmanId: "",
+      personelTipiId: "",
+      calisanKapsami: "",
+      eksikBilgi: "tum"
+    },
     page: 1
   });
 
@@ -153,7 +169,8 @@ export function usePersoneller() {
         appliedFilters.departmanId,
         appliedFilters.personelTipiId,
         listPage,
-        appliedFilters.calisanKapsami
+        appliedFilters.calisanKapsami,
+        appliedFilters.eksikBilgi
       ),
     [
       activeSube,
@@ -161,19 +178,22 @@ export function usePersoneller() {
       appliedFilters.departmanId,
       appliedFilters.personelTipiId,
       appliedFilters.calisanKapsami,
+      appliedFilters.eksikBilgi,
       appliedFilters.search,
       listPage
     ]
   );
 
   const listSnapshot = useMemo(
-    () => getCacheEntry<PaginatedResult<Personel>>(listKey),
+    () =>
+      getCacheEntry<PaginatedResult<Personel> & { missingPersonelTotal?: number | null }>(listKey),
     [listKey, revision]
   );
 
   const personeller = listSnapshot?.items ?? [];
   const hasNextPage = listSnapshot?.pagination.hasNextPage ?? false;
   const totalPages = listSnapshot?.pagination.totalPages ?? null;
+  const missingPersonelTotal = listSnapshot?.missingPersonelTotal ?? null;
 
   const refs = useMemo((): PersonelReferenceBundle => {
     return (
@@ -205,6 +225,7 @@ export function usePersoneller() {
           aktiflik: appliedFilters.aktiflik,
           personel_tipi_id: parseOptionalPositiveInt(appliedFilters.personelTipiId),
           calisan_kapsami: appliedFilters.calisanKapsami || undefined,
+          eksik_bilgi: appliedFilters.eksikBilgi === "eksik",
           sube_id: getSubeIdForApiRequest(),
           page: listPage,
           limit: PAGE_SIZE
@@ -216,6 +237,7 @@ export function usePersoneller() {
     appliedFilters.departmanId,
     appliedFilters.personelTipiId,
     appliedFilters.calisanKapsami,
+    appliedFilters.eksikBilgi,
     appliedFilters.search,
     listKey,
     listPage
@@ -223,7 +245,9 @@ export function usePersoneller() {
 
   useEffect(() => {
     let cancelled = false;
-    const hasSeed = getCacheEntry<PaginatedResult<Personel>>(listKey) !== undefined;
+    const hasSeed =
+      getCacheEntry<PaginatedResult<Personel> & { missingPersonelTotal?: number | null }>(listKey) !==
+      undefined;
     setIsLoading(!hasSeed);
     setErrorMessage(null);
 
@@ -237,6 +261,7 @@ export function usePersoneller() {
               aktiflik: appliedFilters.aktiflik,
               personel_tipi_id: parseOptionalPositiveInt(appliedFilters.personelTipiId),
               calisan_kapsami: appliedFilters.calisanKapsami || undefined,
+              eksik_bilgi: appliedFilters.eksikBilgi === "eksik",
               sube_id: getSubeIdForApiRequest(),
               page: listPage,
               limit: PAGE_SIZE
@@ -244,7 +269,9 @@ export function usePersoneller() {
           )
         );
       } catch {
-        if (!getCacheEntry<PaginatedResult<Personel>>(listKey)) {
+        if (
+          !getCacheEntry<PaginatedResult<Personel> & { missingPersonelTotal?: number | null }>(listKey)
+        ) {
           setErrorMessage("Personel listesi su an guncellenemiyor.");
         }
       } finally {
@@ -262,6 +289,7 @@ export function usePersoneller() {
     appliedFilters.departmanId,
     appliedFilters.personelTipiId,
     appliedFilters.calisanKapsami,
+    appliedFilters.eksikBilgi,
     appliedFilters.search,
     listKey,
     listPage
@@ -332,8 +360,22 @@ export function usePersoneller() {
 
   const clearFilters = useCallback(() => {
     setListQuery({
-      draft: { search: "", aktiflik: "tum", departmanId: "", personelTipiId: "", calisanKapsami: "" },
-      applied: { search: "", aktiflik: "tum", departmanId: "", personelTipiId: "", calisanKapsami: "" },
+      draft: {
+        search: "",
+        aktiflik: "tum",
+        departmanId: "",
+        personelTipiId: "",
+        calisanKapsami: "",
+        eksikBilgi: "tum"
+      },
+      applied: {
+        search: "",
+        aktiflik: "tum",
+        departmanId: "",
+        personelTipiId: "",
+        calisanKapsami: "",
+        eksikBilgi: "tum"
+      },
       page: 1
     });
   }, []);
@@ -356,6 +398,10 @@ export function usePersoneller() {
 
   const setDraftCalisanKapsami = useCallback((calisanKapsami: "" | "IC_PERSONEL" | "DIS_KAYNAK") => {
     setListQuery((prev) => ({ ...prev, draft: { ...prev.draft, calisanKapsami } }));
+  }, []);
+
+  const setDraftEksikBilgi = useCallback((eksikBilgi: "tum" | "eksik") => {
+    setListQuery((prev) => ({ ...prev, draft: { ...prev.draft, eksikBilgi } }));
   }, []);
 
   const setPage = useCallback((next: number | ((p: number) => number)) => {
@@ -464,7 +510,8 @@ export function usePersoneller() {
           listQuery.applied.departmanId,
           listQuery.applied.personelTipiId,
           1,
-          listQuery.applied.calisanKapsami
+          listQuery.applied.calisanKapsami,
+          listQuery.applied.eksikBilgi
         );
 
         try {
@@ -481,6 +528,7 @@ export function usePersoneller() {
                 aktiflik: listQuery.applied.aktiflik,
                 personel_tipi_id: parseOptionalPositiveInt(listQuery.applied.personelTipiId),
                 calisan_kapsami: listQuery.applied.calisanKapsami || undefined,
+                eksik_bilgi: listQuery.applied.eksikBilgi === "eksik",
                 sube_id: getSubeIdForApiRequest(),
                 page: 1,
                 limit: PAGE_SIZE
@@ -520,6 +568,7 @@ export function usePersoneller() {
     personeller,
     hasNextPage,
     totalPages,
+    missingPersonelTotal,
     isLoading,
     errorMessage,
     refetch,
@@ -544,6 +593,7 @@ export function usePersoneller() {
     setDraftDepartmanId,
     setDraftPersonelTipiId,
     setDraftCalisanKapsami,
+    setDraftEksikBilgi,
     setPage
   };
 }

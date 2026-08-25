@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  countMissingByEditTarget,
+  evaluatePersonelCompleteness,
   getPersonelMissingFieldKeys,
-  getPersonelMissingFields
+  getPersonelMissingFields,
+  resolvePersonelCompleteness
 } from "../../src/features/personeller/personel-missing-info";
 import type { Personel } from "../../src/types/personel";
 
@@ -25,6 +28,9 @@ const completePersonel: Personel = {
 
 describe("personel-missing-info", () => {
   it("tam IC_PERSONEL kaydında eksik alan üretmez", () => {
+    const completeness = evaluatePersonelCompleteness(completePersonel);
+    expect(completeness.is_complete).toBe(true);
+    expect(completeness.missing_count).toBe(0);
     expect(getPersonelMissingFields(completePersonel)).toEqual([]);
   });
 
@@ -46,6 +52,27 @@ describe("personel-missing-info", () => {
       "birim_id"
     ]);
     expect(missing.every((field) => field.editTarget === "genel")).toBe(true);
+    expect(missing.every((field) => field.severity === "CRITICAL")).toBe(true);
+    expect(missing.find((field) => field.key === "telefon")?.category).toBe("ILETISIM");
+  });
+
+  it("empty string ve whitespace-only değerleri eksik sayar", () => {
+    expect(
+      getPersonelMissingFieldKeys({ ...completePersonel, sicil_no: "" }).has("sicil_no")
+    ).toBe(true);
+    expect(
+      getPersonelMissingFieldKeys({ ...completePersonel, telefon: "   " }).has("telefon")
+    ).toBe(true);
+  });
+
+  it("opsiyonel alan NULL iken eksik saymaz", () => {
+    const completeness = evaluatePersonelCompleteness({
+      ...completePersonel,
+      dogum_yeri: undefined,
+      acil_durum_kisi: undefined,
+      kan_grubu: undefined
+    });
+    expect(completeness.is_complete).toBe(true);
   });
 
   it("DIS_KAYNAK nullable kimlik alanlarını eksik saymaz", () => {
@@ -95,8 +122,17 @@ describe("personel-missing-info", () => {
     });
 
     expect(missing).toEqual([
-      { key: "personel_tipi_id", label: "Personel Tipi", editTarget: "pozisyon" }
+      {
+        key: "personel_tipi_id",
+        label: "Personel Tipi",
+        category: "ISTIHDAM",
+        severity: "CRITICAL",
+        editTarget: "pozisyon"
+      }
     ]);
+    expect(countMissingByEditTarget({ ...completePersonel, personel_tipi_id: undefined }, "pozisyon")).toBe(
+      1
+    );
   });
 
   it("calisan_kapsami eski kayıtta yoksa güvenli biçimde IC_PERSONEL kabul eder", () => {
@@ -107,5 +143,47 @@ describe("personel-missing-info", () => {
     });
 
     expect(missing.has("tc_kimlik_no")).toBe(true);
+  });
+
+  it("API completeness varsa yerel politikayı ezmez; API özetini kullanır", () => {
+    const personel: Personel = {
+      ...completePersonel,
+      telefon: null,
+      completeness: {
+        is_complete: false,
+        missing_count: 1,
+        critical_missing_labels: ["Telefon"],
+        missing_fields: [
+          {
+            key: "telefon",
+            label: "Telefon",
+            category: "ILETISIM",
+            severity: "CRITICAL",
+            edit_target: "genel"
+          }
+        ]
+      }
+    };
+
+    const resolved = resolvePersonelCompleteness(personel);
+    expect(resolved.missing_count).toBe(1);
+    expect(getPersonelMissingFields(personel).map((field) => field.key)).toEqual(["telefon"]);
+  });
+
+  it("list-light API summary labels ile badge üretilebilir", () => {
+    const personel: Personel = {
+      ...completePersonel,
+      completeness: {
+        is_complete: false,
+        missing_count: 2,
+        critical_missing_labels: ["Bölüm", "Birim"]
+      }
+    };
+
+    expect(resolvePersonelCompleteness(personel).missing_count).toBe(2);
+    expect(getPersonelMissingFields(personel).map((field) => field.key)).toEqual([
+      "bolum_id",
+      "birim_id"
+    ]);
   });
 });

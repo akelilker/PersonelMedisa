@@ -14,6 +14,7 @@ use Medisa\Api\Scope\SubeScope;
 use Medisa\Api\Services\Personel\PersonelCalisanKapsamSchema;
 use Medisa\Api\Services\Personel\PersonelCalisanKapsamService;
 use Medisa\Api\Services\Personel\PersonelCanonicalValidator;
+use Medisa\Api\Services\Personel\PersonelCompletenessService;
 use Medisa\Api\Services\Personel\PersonelCreateService;
 use Medisa\Api\Services\Personel\PersonelImportApplyService;
 use Medisa\Api\Services\Personel\PersonelImportDryRunService;
@@ -51,6 +52,8 @@ class PersonellerController
         $departmanId = (int) ($request->getQuery('departman_id', 0) ?: 0);
         $personelTipiId = (int) ($request->getQuery('personel_tipi_id', 0) ?: 0);
         $calisanKapsami = strtoupper(trim((string) $request->getQuery('calisan_kapsami', '')));
+        $eksikBilgiRaw = strtolower(trim((string) $request->getQuery('eksik_bilgi', '')));
+        $eksikBilgiOnly = in_array($eksikBilgiRaw, ['1', 'true', 'yes', 'eksik', 'missing'], true);
 
         try {
             $pdo = Connection::get();
@@ -100,10 +103,26 @@ class PersonellerController
             $params['search_tc'] = $searchLike;
         }
 
+        $missingPredicate = PersonelCompletenessService::sqlHasMissingPredicate('p');
+        if ($eksikBilgiOnly) {
+            $where[] = $missingPredicate;
+        }
+
         $whereSql = implode(' AND ', $where);
         $countStmt = $pdo->prepare("SELECT COUNT(*) AS total FROM personeller p WHERE $whereSql");
         $countStmt->execute($params);
         $total = (int) ($countStmt->fetch(PDO::FETCH_ASSOC)['total'] ?? 0);
+
+        // Aggregate of incompleteness within scoped base filters (before eksik_bilgi-only clamp).
+        $missingCountWhere = $where;
+        if ($eksikBilgiOnly) {
+            array_pop($missingCountWhere);
+        }
+        $missingCountWhere[] = $missingPredicate;
+        $missingCountSql = implode(' AND ', $missingCountWhere);
+        $missingCountStmt = $pdo->prepare("SELECT COUNT(*) AS total FROM personeller p WHERE $missingCountSql");
+        $missingCountStmt->execute($params);
+        $missingPersonelTotal = (int) ($missingCountStmt->fetch(PDO::FETCH_ASSOC)['total'] ?? 0);
 
         $offset = ($page - 1) * $limit;
         $select = self::personelSelectSql($pdo);
@@ -125,7 +144,7 @@ class PersonellerController
 
         $items = [];
         foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
-            $items[] = self::mapPersonelRow($row, $user);
+            $items[] = self::mapPersonelRow($row, $user, false);
         }
 
         PersonelArchiveGate::maybeWriteListAudit($pdo, $user, $items, '/personeller');
@@ -137,6 +156,7 @@ class PersonellerController
                 'limit' => $limit,
                 'total' => $total,
                 'total_pages' => max(1, (int) ceil($total / $limit)),
+                'missing_personel_total' => $missingPersonelTotal,
             ]
         );
     }
@@ -1276,8 +1296,13 @@ class PersonellerController
         return $parsed > 0 ? $parsed : null;
     }
 
-    /** @param array<string, mixed> $row @return array<string, mixed> */
-    private static function mapPersonelRow(array $row, array $user)
+    /**
+     * @param array<string, mixed> $row
+     * @param array<string, mixed> $user
+     * @param bool $includeCompletenessFields Detail responses include full missing_fields; list stays light.
+     * @return array<string, mixed>
+     */
+    private static function mapPersonelRow(array $row, array $user, $includeCompletenessFields = true)
     {
         $ucretTipiId = $row['ucret_tipi_id'] !== null ? (int) $row['ucret_tipi_id'] : null;
         $primKuraliId = $row['prim_kurali_id'] !== null ? (int) $row['prim_kurali_id'] : null;
@@ -1371,6 +1396,11 @@ class PersonellerController
         if (!RolePermissions::has($user, 'personeller.ucret.view')) {
             unset($mapped['maas_tutari'], $mapped['net_maas_tutari'], $mapped['brut_maas_tutari']);
         }
+
+        $mapped['completeness'] = PersonelCompletenessService::evaluate(
+            $mapped,
+            (bool) $includeCompletenessFields
+        );
 
         return $mapped;
     }

@@ -13,8 +13,12 @@ export function DossierField({
 }) {
   return (
     <div className={`personel-dosya-field${missing ? " is-missing" : ""}`} data-missing={missing ? "true" : undefined}>
-      <span className="personel-dosya-field-label">{label}</span>
+      <span className="personel-dosya-field-label">
+        {missing ? "⚠ " : ""}
+        {label}
+      </span>
       <strong className={valueClassName ?? "personel-dosya-field-value"}>{value}</strong>
+      {missing ? <span className="personel-dosya-field-missing-hint">Bu bilgi eksik</span> : null}
     </div>
   );
 }
@@ -30,8 +34,12 @@ export function DossierRecord({
 }) {
   return (
     <div className={`personel-dosya-record${missing ? " is-missing" : ""}`} data-missing={missing ? "true" : undefined}>
-      <span className="personel-dosya-record-label">{label}</span>
+      <span className="personel-dosya-record-label">
+        {missing ? "⚠ " : ""}
+        {label}
+      </span>
       <span className="personel-dosya-record-value">{value}</span>
+      {missing ? <span className="personel-dosya-field-missing-hint">Bu bilgi eksik</span> : null}
     </div>
   );
 }

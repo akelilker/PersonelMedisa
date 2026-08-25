@@ -11,6 +11,8 @@ import type { HaftalikBildirimMutabakat } from "../types/haftalik-bildirim-mutab
 import type { AylikBildirimOnay } from "../types/aylik-bildirim-onay";
 import type { GenelYoneticiBildirimOnayi } from "../types/genel-yonetici-bildirim-onayi";
 import { hasRolePermission, type AppPermission } from "../lib/authorization/role-permissions";
+import { evaluatePersonelCompleteness } from "../features/personeller/personel-missing-info";
+import type { Personel } from "../types/personel";
 import {
   buildSgkKatalogBlockerRaporuMock,
   buildSgkKatalogImportDryRunMock,
@@ -4247,6 +4249,7 @@ function getDemoPuantajRowsForPersonel(personelId: number) {
 
 function buildDemoPersonelDetail(personel: DemoPersonel) {
   const sgkOzeti = hesaplaAylikSgkPuantajOzetleri(getDemoPuantajRowsForPersonel(personel.id))[0] ?? null;
+  const completeness = evaluatePersonelCompleteness(personel as Personel);
 
   return {
     ana_kart: { ...personel },
@@ -4272,7 +4275,8 @@ function buildDemoPersonelDetail(personel: DemoPersonel) {
       gorev: demoState.gorevler.find((g) => g.id === personel.gorev_id)?.ad ?? null,
       personel_tipi: getLabel(DEMO_PERSONEL_TIPI_LABELS, personel.personel_tipi_id),
       bagli_amir: getLabel(DEMO_BAGLI_AMIR_LABELS, personel.bagli_amir_id)
-    }
+    },
+    completeness
   };
 }
 
@@ -5098,8 +5102,10 @@ export function resolveDemoApiResponse(
     const departmanId = toNumber(requestUrl.searchParams.get("departman_id"));
     const personelTipiId = toNumber(requestUrl.searchParams.get("personel_tipi_id"));
     const calisanKapsami = toStringValue(requestUrl.searchParams.get("calisan_kapsami"));
+    const eksikBilgiRaw = (toStringValue(requestUrl.searchParams.get("eksik_bilgi")) ?? "").toLowerCase();
+    const eksikBilgiOnly = ["1", "true", "yes", "eksik", "missing"].includes(eksikBilgiRaw);
 
-    const filtered = demoState.personeller.filter((item) => {
+    const scoped = demoState.personeller.filter((item) => {
       if (aktiflik === "aktif" && item.aktif_durum !== "AKTIF") {
         return false;
       }
@@ -5126,15 +5132,31 @@ export function resolveDemoApiResponse(
       return fullText.includes(search);
     });
 
+    const missingPersonelTotal = scoped.filter(
+      (item) => !evaluatePersonelCompleteness(item as Personel).is_complete
+    ).length;
+
+    const filtered = eksikBilgiOnly
+      ? scoped.filter((item) => !evaluatePersonelCompleteness(item as Personel).is_complete)
+      : scoped;
+
     const start = (page - 1) * limit;
-    const items = filtered.slice(start, start + limit).map((item) => ({
-      ...item,
-      sube_adi: getSubeLabel(item.sube_id),
-      departman_adi: getDepartmanLabel(item.departman_id),
-      gorev_adi: getGorevAd(item.gorev_id),
-      personel_tipi_adi: getLabel(DEMO_PERSONEL_TIPI_LABELS, item.personel_tipi_id),
-      bagli_amir_adi: getLabel(DEMO_BAGLI_AMIR_LABELS, item.bagli_amir_id)
-    }));
+    const items = filtered.slice(start, start + limit).map((item) => {
+      const completeness = evaluatePersonelCompleteness(item as Personel);
+      return {
+        ...item,
+        sube_adi: getSubeLabel(item.sube_id),
+        departman_adi: getDepartmanLabel(item.departman_id),
+        gorev_adi: getGorevAd(item.gorev_id),
+        personel_tipi_adi: getLabel(DEMO_PERSONEL_TIPI_LABELS, item.personel_tipi_id),
+        bagli_amir_adi: getLabel(DEMO_BAGLI_AMIR_LABELS, item.bagli_amir_id),
+        completeness: {
+          is_complete: completeness.is_complete,
+          missing_count: completeness.missing_count,
+          critical_missing_labels: completeness.critical_missing_labels
+        }
+      };
+    });
     const total = filtered.length;
     const totalPages = Math.max(1, Math.ceil(total / limit));
 
@@ -5146,7 +5168,8 @@ export function resolveDemoApiResponse(
         page,
         limit,
         total,
-        total_pages: totalPages
+        total_pages: totalPages,
+        missing_personel_total: missingPersonelTotal
       }
     );
   }

@@ -57,9 +57,16 @@ export function PersonelDosyaHero({
 
       {missingFields.length > 0 ? (
         <div className="personel-dosya-completeness-summary" data-testid="personel-eksik-bilgi-ozeti" role="status">
-          <span className="personel-dosya-missing-count">
-            {missingFields.length} eksik bilgi
-          </span>
+          <div className="personel-dosya-missing-copy">
+            <span className="personel-dosya-missing-count">
+              {missingFields.length} eksik bilgi bulunuyor.
+            </span>
+            <ul className="personel-dosya-missing-list">
+              {missingFields.map((field) => (
+                <li key={field.key}>{field.label}</li>
+              ))}
+            </ul>
+          </div>
           {onOpenMissingInfo ? (
             <button
               type="button"

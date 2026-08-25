@@ -1,5 +1,5 @@
 import type { ApiResponse, PaginatedResult } from "../types/api";
-import type { Personel, PersonelAktifDurum } from "../types/personel";
+import type { Personel, PersonelAktifDurum, PersonelCompleteness } from "../types/personel";
 import { appendQueryParams } from "../utils/append-query-params";
 import { logAction } from "../audit/audit-service";
 import { ApiRequestError, apiRequest } from "./api-client";
@@ -13,6 +13,8 @@ export type PersonellerListParams = {
   aktiflik?: "aktif" | "pasif" | "tum";
   personel_tipi_id?: number;
   calisan_kapsami?: "IC_PERSONEL" | "DIS_KAYNAK";
+  /** When true, only personel with master-data gaps (server-side). */
+  eksik_bilgi?: boolean;
   page?: number;
   limit?: number;
 };
@@ -354,13 +356,59 @@ function normalizePersonel(data: unknown): Personel {
     arsiv_modu: Boolean(pickValue([root], ["arsiv_modu"]) ?? false) || undefined,
     legal_hold_active: Boolean(pickValue([root], ["legal_hold_active"]) ?? false) || undefined,
     retention_summary: (toRecord(root.retention_summary) as Personel["retention_summary"]) ?? undefined,
-    policy_note: readNullableString([root], "policy_note") ?? undefined
+    policy_note: readNullableString([root], "policy_note") ?? undefined,
+    completeness: normalizeCompleteness(root.completeness)
+  };
+}
+
+function normalizeCompleteness(value: unknown): PersonelCompleteness | undefined {
+  const record = toRecord(value);
+  if (!record) {
+    return undefined;
+  }
+  const missingCount = readNumberValue(record.missing_count);
+  if (missingCount === undefined || missingCount < 0) {
+    return undefined;
+  }
+  const labelsRaw = record.critical_missing_labels;
+  const critical_missing_labels = Array.isArray(labelsRaw)
+    ? labelsRaw.map((label) => String(label)).filter((label) => label.trim().length > 0)
+    : [];
+  const fieldsRaw = record.missing_fields;
+  const missing_fields = Array.isArray(fieldsRaw)
+    ? fieldsRaw
+        .map((field) => {
+          const row = toRecord(field);
+          if (!row) {
+            return null;
+          }
+          const key = readStringValue(row.key);
+          const label = readStringValue(row.label);
+          if (!key || !label) {
+            return null;
+          }
+          return {
+            key,
+            label,
+            category: readStringValue(row.category) ?? "ISTIHDAM",
+            severity: readStringValue(row.severity) ?? "CRITICAL",
+            edit_target: readStringValue(row.edit_target) === "pozisyon" ? "pozisyon" : "genel"
+          };
+        })
+        .filter((field): field is NonNullable<typeof field> => field != null)
+    : undefined;
+
+  return {
+    is_complete: Boolean(record.is_complete) && missingCount === 0,
+    missing_count: missingCount,
+    critical_missing_labels,
+    ...(missing_fields ? { missing_fields } : {})
   };
 }
 
 export async function fetchPersonellerList(
   params?: PersonellerListParams
-): Promise<PaginatedResult<Personel>> {
+): Promise<PaginatedResult<Personel> & { missingPersonelTotal?: number | null }> {
   const path = appendQueryParams(endpoints.personeller.list, {
     search: params?.search,
     departman_id: params?.departman_id,
@@ -368,14 +416,30 @@ export async function fetchPersonellerList(
     aktiflik: params?.aktiflik,
     personel_tipi_id: params?.personel_tipi_id,
     calisan_kapsami: params?.calisan_kapsami,
+    eksik_bilgi: params?.eksik_bilgi ? "1" : undefined,
     page: params?.page,
     limit: params?.limit
   });
   const response = await apiRequest<ApiResponse<unknown>>(path);
-  return normalizePaginatedList<Personel>(response, {
+  const normalized = normalizePaginatedList<unknown>(response, {
     requestedPage: params?.page,
     requestedLimit: params?.limit
   });
+  const meta = response.meta ?? {};
+  const missingRaw = meta.missing_personel_total ?? meta.missingPersonelTotal;
+  const missingPersonelTotal =
+    typeof missingRaw === "number" && Number.isFinite(missingRaw)
+      ? Math.trunc(missingRaw)
+      : typeof missingRaw === "string" && missingRaw.trim()
+        ? Number.parseInt(missingRaw, 10)
+        : null;
+
+  return {
+    items: normalized.items.map((item) => normalizePersonel(item)),
+    pagination: normalized.pagination,
+    missingPersonelTotal:
+      missingPersonelTotal != null && Number.isFinite(missingPersonelTotal) ? missingPersonelTotal : null
+  };
 }
 
 export async function createPersonel(payload: CreatePersonelPayload, options?: { idempotencyKey?: string }): Promise<Personel> {

@@ -13,7 +13,7 @@ import type { IdOption } from "../../../types/referans";
 import { formatReferenceValue } from "../components/personel-dosya/personel-dosya-format-utils";
 import { PersonelImportDryRunModal } from "../components/PersonelImportDryRunModal";
 import { PersonelImportHistoryModal } from "../components/PersonelImportHistoryModal";
-import { getPersonelMissingFields } from "../personel-missing-info";
+import { getPersonelMissingFields, resolvePersonelCompleteness } from "../personel-missing-info";
 
 function IconSearch(props: { className?: string }) {
   return (
@@ -161,6 +161,7 @@ export function PersonellerPage() {
     personeller,
     hasNextPage,
     totalPages,
+    missingPersonelTotal,
     isLoading,
     errorMessage,
     refetch,
@@ -172,6 +173,7 @@ export function PersonellerPage() {
     setDraftDepartmanId,
     setDraftPersonelTipiId,
     setDraftCalisanKapsami,
+    setDraftEksikBilgi,
     setPage
   } = usePersoneller();
 
@@ -187,7 +189,7 @@ export function PersonellerPage() {
   const [importModalOpen, setImportModalOpen] = useState(false);
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
 
-  const { draft } = listQuery;
+  const { draft, applied } = listQuery;
   const isArchiveMode = canViewArsiv && draft.aktiflik === "pasif";
   const page = listQuery.page;
   const departmanFilterOptions = toSelectOptions(refs.departmanOptions);
@@ -350,6 +352,17 @@ export function PersonellerPage() {
                   selectOptions={CALISAN_KAPSAMI_SELECT_OPTIONS}
                   placeholderOption={{ value: "", label: "Tümü" }}
                 />
+                <FormField
+                  as="select"
+                  label="Bilgi Durumu"
+                  name="personel-filter-eksik-bilgi"
+                  value={draft.eksikBilgi}
+                  onChange={(value) => setDraftEksikBilgi(value as "tum" | "eksik")}
+                  selectOptions={[
+                    { value: "tum", label: "Tüm Personeller" },
+                    { value: "eksik", label: "Eksik Bilgisi Olanlar" }
+                  ]}
+                />
                 <div className="personeller-aktiflik-group" role="group" aria-label="Aktiflik">
                   <span className="personeller-aktiflik-label">Aktiflik</span>
                   <div className="personeller-aktiflik-checks">
@@ -404,6 +417,17 @@ export function PersonellerPage() {
 
       {isLoading ? <LoadingState label="Personel verileri yükleniyor..." /> : null}
 
+      {!isLoading && !errorMessage && missingPersonelTotal != null ? (
+        <p
+          className="personeller-missing-summary"
+          data-testid="personeller-eksik-bilgi-sayaci"
+          role="status"
+        >
+          Eksik Bilgili: {missingPersonelTotal}
+          {applied.eksikBilgi === "eksik" ? " (filtre aktif)" : ""}
+        </p>
+      ) : null}
+
       {!isLoading && errorMessage ? (
         <ErrorState message={errorMessage} onRetry={() => void refetch()} />
       ) : null}
@@ -436,7 +460,9 @@ export function PersonellerPage() {
                 const emergencyCallHref = buildTelHref(personel.acil_durum_telefon);
                 const detailTo = `/personeller/${personel.id}`;
                 const personelName = formatPersonelName(personel);
-                const missingFieldCount = getPersonelMissingFields(personel).length;
+                const missingFields = getPersonelMissingFields(personel);
+                const missingFieldCount = resolvePersonelCompleteness(personel).missing_count;
+                const missingLabels = missingFields.map((field) => field.label).join(", ");
                 const previewLabel = `${personelName} kişisinin kartını aç`;
 
                 function rowActivate() {
@@ -495,10 +521,10 @@ export function PersonellerPage() {
                       {missingFieldCount > 0 ? (
                         <span
                           className="personeller-missing-badge"
-                          title={`${missingFieldCount} kritik bilgi eksik`}
+                          title={missingLabels || `${missingFieldCount} kritik bilgi eksik`}
                           data-testid={`personel-eksik-bilgi-${personel.id}`}
                         >
-                          Eksik Bilgi
+                          ⚠ {missingFieldCount} eksik bilgi
                         </span>
                       ) : null}
                     </td>
@@ -549,7 +575,9 @@ export function PersonellerPage() {
               const hasQuickActions = Boolean(personelCallHref || emergencyCallHref);
               const detailTo = `/personeller/${personel.id}`;
               const personelName = formatPersonelName(personel);
-              const missingFieldCount = getPersonelMissingFields(personel).length;
+              const missingFields = getPersonelMissingFields(personel);
+              const missingFieldCount = resolvePersonelCompleteness(personel).missing_count;
+              const missingLabels = missingFields.map((field) => field.label).join(", ");
               const previewLabel = `${personelName} kişisinin kartını aç`;
 
               const previewInner = (
@@ -563,10 +591,10 @@ export function PersonellerPage() {
                   {missingFieldCount > 0 ? (
                     <span
                       className="personeller-missing-badge"
-                      title={`${missingFieldCount} kritik bilgi eksik`}
+                      title={missingLabels || `${missingFieldCount} kritik bilgi eksik`}
                       data-testid={`personel-eksik-bilgi-${personel.id}`}
                     >
-                      Eksik Bilgi
+                      ⚠ {missingFieldCount} eksik bilgi
                     </span>
                   ) : null}
                   <span className="personeller-card-sub">{personelGridSubtitle(personel)}</span>

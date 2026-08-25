@@ -18,6 +18,8 @@ import {
   type PersonelBelgeKayitTipi
 } from "../../../src/types/personel-belge-kaydi";
 import { hasRolePermission, type AppPermission } from "../../../src/lib/authorization/role-permissions";
+import { evaluatePersonelCompleteness } from "../../../src/features/personeller/personel-missing-info";
+import type { Personel } from "../../../src/types/personel";
 import {
   listWeeksIntersectingMonth,
   resolveAylikBildirimOnayApproval,
@@ -4104,6 +4106,7 @@ let personelBelgeKaydiIdCounter = 903;
   function buildPersonelDetail(personel: (typeof personeller)[number]) {
     const sgkOzeti = hesaplaAylikSgkPuantajOzetleri(getPuantajRowsForPersonel(personel.id))[0] ?? null;
     const isPasif = personel.aktif_durum === "PASIF";
+    const completeness = evaluatePersonelCompleteness(personel as Personel);
 
     return {
       ana_kart: {
@@ -4155,6 +4158,7 @@ let personelBelgeKaydiIdCounter = 903;
         personel_tipi: personel.personel_tipi_adi,
         bagli_amir: personel.bagli_amir_adi
       },
+      completeness,
       ...(isPasif
         ? {
             arsiv_modu: true,
@@ -4673,6 +4677,8 @@ let personelBelgeKaydiIdCounter = 903;
       // Mirror PersonelArchiveGate: without arsiv.view, never expose PASIF via list.
       const aktiflik = canViewArsiv ? aktiflikRaw : "aktif";
       const subeScope = getRequestSubeScope(request, url);
+      const eksikBilgiRaw = (url.searchParams.get("eksik_bilgi") ?? "").toLowerCase();
+      const eksikBilgiOnly = ["1", "true", "yes", "eksik", "missing"].includes(eksikBilgiRaw);
 
       if (subeScope !== null && mockUserSubeIds.length > 0 && !mockUserSubeIds.includes(subeScope)) {
         await fulfillJson(route, 403, errorBody("FORBIDDEN", PERSONEL_CREATE_SUBE_UNAUTHORIZED_MESSAGE));
@@ -4695,7 +4701,7 @@ let personelBelgeKaydiIdCounter = 903;
         return true;
       };
 
-      const filtered = personeller.filter((item) => {
+      const scoped = personeller.filter((item) => {
         if (!personelMatchesListScope(item)) {
           return false;
         }
@@ -4719,8 +4725,26 @@ let personelBelgeKaydiIdCounter = 903;
         return fullText.includes(search);
       });
 
+      const missingPersonelTotal = scoped.filter(
+        (item) => !evaluatePersonelCompleteness(item as Personel).is_complete
+      ).length;
+
+      const filtered = eksikBilgiOnly
+        ? scoped.filter((item) => !evaluatePersonelCompleteness(item as Personel).is_complete)
+        : scoped;
+
       const start = (pageNumber - 1) * pageLimit;
-      const items = filtered.slice(start, start + pageLimit);
+      const items = filtered.slice(start, start + pageLimit).map((item) => {
+        const completeness = evaluatePersonelCompleteness(item as Personel);
+        return {
+          ...item,
+          completeness: {
+            is_complete: completeness.is_complete,
+            missing_count: completeness.missing_count,
+            critical_missing_labels: completeness.critical_missing_labels
+          }
+        };
+      });
 
       await fulfillJson(
         route,
@@ -4731,7 +4755,8 @@ let personelBelgeKaydiIdCounter = 903;
             page: pageNumber,
             limit: pageLimit,
             total: filtered.length,
-            total_pages: Math.max(1, Math.ceil(filtered.length / pageLimit))
+            total_pages: Math.max(1, Math.ceil(filtered.length / pageLimit)),
+            missing_personel_total: missingPersonelTotal
           },
           errors: []
         })

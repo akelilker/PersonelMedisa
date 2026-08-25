@@ -1,6 +1,7 @@
 import type { Personel } from "../../../../types/personel";
 import type { Surec } from "../../../../types/surec";
 import type { Zimmet } from "../../../../types/zimmet";
+import { getPersonelMissingFields } from "../../personel-missing-info";
 import { PersonelBelgelerPanel } from "./PersonelBelgelerPanel";
 import { PersonelDisiplinPanel } from "./PersonelDisiplinPanel";
 import { PersonelDosyaTabList, type PersonelDosyaTabId } from "./PersonelDosyaTabs";
@@ -65,12 +66,15 @@ export function PersonelDosyaTabPanels({
     onTabChange("surec-gecmisi");
   }
 
+  const missingOnGenel = getPersonelMissingFields(personel).length;
+
   return (
     <>
       <PersonelDosyaTabList
         activeTab={activeTab}
         onTabChange={onTabChange}
         directoryOnly={directoryOnly}
+        missingCounts={{ "genel-bilgiler": missingOnGenel }}
       />
 
       {!directoryOnly ? <div

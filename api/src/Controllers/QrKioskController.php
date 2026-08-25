@@ -9,21 +9,24 @@ use Medisa\Api\Auth\RolePermissions;
 use Medisa\Api\Database\Connection;
 use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
+use Medisa\Api\Scope\OrgScope;
 use Medisa\Api\Scope\SubeScope;
 use Medisa\Api\Services\Qr\QrAttendanceException;
 use Medisa\Api\Services\Qr\QrTokenService;
 use PDO;
 
 /**
- * Authenticated kiosk QR display token (S3C).
- * Permission: yonetim-paneli.manage (GENEL_YONETICI / SISTEM_YONETICISI).
+ * Authenticated kiosk QR display token.
+ * Permission: qr.kiosk.display (GENEL_YONETICI / SISTEM_YONETICISI / SUBE_YONETICISI).
+ * Branch scope remains SubeScope / user_subeler — no cross-branch mint.
  */
 class QrKioskController
 {
     public static function token(Request $request)
     {
         $user = AuthMiddleware::authenticate($request, true);
-        RolePermissions::assert($user, 'yonetim-paneli.manage');
+        RolePermissions::assert($user, 'qr.kiosk.display');
+        OrgScope::assertRequiredAssignment($user);
 
         try {
             $pdo = Connection::get();
@@ -36,6 +39,11 @@ class QrKioskController
             JsonResponse::badRequest('Aktif sube secilmelidir.', 'VALIDATION_ERROR', 'sube_id');
         }
         $subeId = (int) $scope;
+
+        $allowed = SubeScope::allowedSubeIds($user);
+        if (!OrgScope::isUnrestricted($user) && !in_array($subeId, $allowed, true)) {
+            JsonResponse::forbidden('Secili sube icin yetkiniz yok.');
+        }
 
         $stmt = $pdo->prepare('SELECT id, ad FROM subeler WHERE id = :id LIMIT 1');
         $stmt->execute(['id' => $subeId]);

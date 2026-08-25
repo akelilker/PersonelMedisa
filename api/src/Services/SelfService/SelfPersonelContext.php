@@ -69,27 +69,7 @@ class SelfPersonelContext
             return null;
         }
 
-        $personelStmt = $pdo->prepare(
-            'SELECT
-                p.id AS personel_id,
-                p.ad,
-                p.soyad,
-                p.sube_id,
-                p.departman_id,
-                p.gorev_id,
-                p.aktif_durum,
-                s.ad AS sube_ad,
-                d.ad AS departman_ad,
-                g.ad AS gorev_ad
-             FROM personeller p
-             INNER JOIN subeler s ON s.id = p.sube_id
-             LEFT JOIN departmanlar d ON d.id = p.departman_id
-             LEFT JOIN gorevler g ON g.id = p.gorev_id
-             WHERE p.id = :id
-             LIMIT 1'
-        );
-        $personelStmt->execute(['id' => $personelId]);
-        $personel = $personelStmt->fetch(PDO::FETCH_ASSOC);
+        $personel = self::loadPersonelRow($pdo, $personelId);
         if (!$personel) {
             if ($required) {
                 JsonResponse::error(
@@ -132,6 +112,18 @@ class SelfPersonelContext
             'departman_ad' => isset($personel['departman_ad']) && $personel['departman_ad'] !== null
                 ? (string) $personel['departman_ad']
                 : null,
+            'bolum_id' => isset($personel['bolum_id']) && $personel['bolum_id'] !== null
+                ? (int) $personel['bolum_id']
+                : null,
+            'bolum_ad' => isset($personel['bolum_ad']) && $personel['bolum_ad'] !== null
+                ? (string) $personel['bolum_ad']
+                : null,
+            'birim_id' => isset($personel['birim_id']) && $personel['birim_id'] !== null
+                ? (int) $personel['birim_id']
+                : null,
+            'birim_ad' => isset($personel['birim_ad']) && $personel['birim_ad'] !== null
+                ? (string) $personel['birim_ad']
+                : null,
             'gorev_id' => isset($personel['gorev_id']) && $personel['gorev_id'] !== null
                 ? (int) $personel['gorev_id']
                 : null,
@@ -139,6 +131,88 @@ class SelfPersonelContext
                 ? (string) $personel['gorev_ad']
                 : null,
             'aktif_durum' => $aktif,
+            'sicil_no' => $personel['sicil_no'] ?? null,
+            'tc_kimlik_no' => $personel['tc_kimlik_no'] ?? null,
+            'dogum_tarihi' => $personel['dogum_tarihi'] ?? null,
+            'telefon' => $personel['telefon'] ?? null,
+            'ise_giris_tarihi' => $personel['ise_giris_tarihi'] ?? null,
+            'personel_tipi_id' => isset($personel['personel_tipi_id']) && $personel['personel_tipi_id'] !== null
+                ? (int) $personel['personel_tipi_id']
+                : null,
+            'calisan_kapsami' => $personel['calisan_kapsami'] ?? null,
         ];
+    }
+
+    /**
+     * Prefer org-enriched row; fall back to baseline when bolum/birim schema absent.
+     *
+     * @return array<string, mixed>|null
+     */
+    private static function loadPersonelRow(PDO $pdo, $personelId)
+    {
+        $personelId = (int) $personelId;
+        $queries = [
+            'SELECT
+                p.id AS personel_id,
+                p.ad,
+                p.soyad,
+                p.sube_id,
+                p.departman_id,
+                p.bolum_id,
+                p.birim_id,
+                p.gorev_id,
+                p.aktif_durum,
+                p.sicil_no,
+                p.tc_kimlik_no,
+                p.dogum_tarihi,
+                p.telefon,
+                p.ise_giris_tarihi,
+                p.personel_tipi_id,
+                p.calisan_kapsami,
+                s.ad AS sube_ad,
+                d.ad AS departman_ad,
+                b.ad AS bolum_ad,
+                bi.ad AS birim_ad,
+                g.ad AS gorev_ad
+             FROM personeller p
+             INNER JOIN subeler s ON s.id = p.sube_id
+             LEFT JOIN departmanlar d ON d.id = p.departman_id
+             LEFT JOIN bolumler b ON b.id = p.bolum_id
+             LEFT JOIN birimler bi ON bi.id = p.birim_id
+             LEFT JOIN gorevler g ON g.id = p.gorev_id
+             WHERE p.id = :id
+             LIMIT 1',
+            'SELECT
+                p.id AS personel_id,
+                p.ad,
+                p.soyad,
+                p.sube_id,
+                p.departman_id,
+                p.gorev_id,
+                p.aktif_durum,
+                s.ad AS sube_ad,
+                d.ad AS departman_ad,
+                g.ad AS gorev_ad
+             FROM personeller p
+             INNER JOIN subeler s ON s.id = p.sube_id
+             LEFT JOIN departmanlar d ON d.id = p.departman_id
+             LEFT JOIN gorevler g ON g.id = p.gorev_id
+             WHERE p.id = :id
+             LIMIT 1',
+        ];
+
+        foreach ($queries as $sql) {
+            try {
+                $stmt = $pdo->prepare($sql);
+                $stmt->execute(['id' => $personelId]);
+                $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+                return is_array($row) ? $row : null;
+            } catch (\Throwable $e) {
+                continue;
+            }
+        }
+
+        return null;
     }
 }

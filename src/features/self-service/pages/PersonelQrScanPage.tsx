@@ -15,22 +15,48 @@ type Phase =
 
 function mapScanError(error: unknown): string {
   if (!isApiRequestError(error)) {
+    if (typeof navigator !== "undefined" && navigator.onLine === false) {
+      return "Bağlantı yok, işlem kaydedilmedi.";
+    }
     return "Bağlantı kurulamadı, kayıt oluşturulmadı.";
   }
   switch (error.code) {
     case "QR_TOKEN_EXPIRED":
       return "QR süresi doldu. Tekrar okutun.";
+    case "QR_TOKEN_INVALID":
+    case "QR_SIGNATURE_INVALID":
+      return "QR kodu geçersiz.";
     case "QR_CROSS_BRANCH_DENIED":
-      return "Bu QR başka bir şubeye aittir.";
+      return "Bu QR sizin çalışma şubenize ait değil.";
+    case "QR_IDEMPOTENCY_CONFLICT":
+      return "İşlem zaten kaydedilmiş.";
+    case "QR_REPLAY":
+    case "QR_JTI_REUSED":
+      return "QR daha önce kullanıldı.";
     case "SELF_SERVICE_BINDING_REQUIRED":
       return "Personel bağlantınız yok.";
     case "SELF_SERVICE_PERSONEL_INACTIVE":
-      return "Personel hesabınız pasif.";
+    case "PERSONEL_INACTIVE":
+      return "Personel hesabınız aktif değil.";
     case "QR_CONFIG_NOT_READY":
     case "QR_SCHEMA_NOT_READY":
       return "QR servisi şu an hazır değil.";
+    case "NETWORK_ERROR":
+      return "Bağlantı yok, işlem kaydedilmedi.";
     default:
       return error.message || "Kayıt oluşturulamadı.";
+  }
+}
+
+function formatEventClock(iso: string): string {
+  try {
+    return new Intl.DateTimeFormat("tr-TR", {
+      timeZone: "Europe/Istanbul",
+      hour: "2-digit",
+      minute: "2-digit"
+    }).format(new Date(iso));
+  } catch {
+    return new Date(iso).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
   }
 }
 
@@ -143,16 +169,21 @@ export function PersonelQrScanPage() {
 
       {phase.kind === "success" ? (
         <article className="state-card self-service-card" data-testid="qr-scan-success">
-          <h3>{phase.event.event_type === "GIRIS" ? "Giriş kaydedildi" : "Çıkış kaydedildi"}</h3>
+          <h3>
+            {phase.event.event_type === "GIRIS" ? "Giriş kaydedildi" : "Çıkış kaydedildi"} —{" "}
+            {formatEventClock(phase.event.occurred_at)}
+          </h3>
           <dl className="self-service-dl">
-            <div>
-              <dt>Zaman</dt>
-              <dd>{new Date(phase.event.occurred_at).toLocaleString("tr-TR")}</dd>
-            </div>
             <div>
               <dt>Şube</dt>
               <dd>{phase.event.sube.ad || `#${phase.event.sube.id}`}</dd>
             </div>
+            {phase.idempotent ? (
+              <div>
+                <dt>Not</dt>
+                <dd>İşlem zaten kaydedilmişti (idempotent).</dd>
+              </div>
+            ) : null}
           </dl>
           <button type="button" className="self-service-action" onClick={() => void beginScan()}>
             Yeni okutma

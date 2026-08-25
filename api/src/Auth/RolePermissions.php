@@ -109,6 +109,7 @@ class RolePermissions
             'retention.destruction.approve',
             'retention.destruction.execute',
             'retention.destruction.view',
+            'qr.kiosk.display',
         ],
         // Branch-level operational management (independent of BOLUM_YONETICISI).
         'SUBE_YONETICISI' => [
@@ -162,6 +163,7 @@ class RolePermissions
             'puantaj.olay_karar.decide',
             'puantaj.olay_karar.view',
             'sgk_karar_paketi.approve',
+            'qr.kiosk.display',
         ],
         // Department operational management within assigned bolumler only.
         'BOLUM_YONETICISI' => [
@@ -383,6 +385,7 @@ class RolePermissions
             'arsiv.audit.view',
             'retention.view',
             'retention.destruction.view',
+            'qr.kiosk.display',
         ],
         // Self-service read surfaces (S3B). No broad personeller.* / puantaj.view.
         // Canonical self-service-only role; also the reusable personnel-linked baseline set.

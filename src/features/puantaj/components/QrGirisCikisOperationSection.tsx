@@ -11,6 +11,7 @@ import { formatQrTime, qrAttendanceStatus, qrReadErrorMessage } from "../qr-read
 export function QrGirisCikisOperationSection() {
   const { hasPermission } = useRoleAccess();
   const canView = hasPermission("puantaj.view");
+  const canOpenKiosk = hasPermission("qr.kiosk.display");
   const {
     from,
     to,
@@ -39,8 +40,13 @@ export function QrGirisCikisOperationSection() {
   if (!canView) return null;
 
   const summary = {
+    entered: items.filter(
+      (item) => !item.anomalies.includes("NO_SCAN") && (Boolean(item.first_entry) || item.source_event_count > 0)
+    ).length,
+    notEntered: items.filter((item) => item.anomalies.includes("NO_SCAN")).length,
     inside: items.filter((item) => item.inside).length,
-    anomalies: items.filter((item) => item.anomalies.length > 0).length,
+    exited: items.filter((item) => Boolean(item.last_exit) && !item.inside).length,
+    anomalies: items.filter((item) => item.anomalies.some((code) => code !== "NO_SCAN")).length,
     intervals: items.reduce((sum, item) => sum + item.interval_count, 0)
   };
 
@@ -52,16 +58,20 @@ export function QrGirisCikisOperationSection() {
           <h2>QR Giriş / Çıkış</h2>
           <p>QR hareketleri salt okunur kanıt görünümüdür; puantaj adayı kararını değiştirmez.</p>
         </div>
-        <Link className="universal-btn-aux" to="/qr-kiosk">
-          QR Ekranını Aç
-        </Link>
+        {canOpenKiosk ? (
+          <Link className="universal-btn-aux" to="/qr-kiosk" data-testid="puantaj-qr-kiosk-link">
+            QR Ekranını Aç
+          </Link>
+        ) : null}
       </header>
 
       {hasLoaded ? (
-        <div className="puantaj-qr-summary" aria-label="Bugün özeti">
+        <div className="puantaj-qr-summary" aria-label="Bugün özeti" data-testid="puantaj-qr-live-summary">
           <div><span>Personel</span><strong>{total}</strong></div>
+          <div><span>Giriş yapan</span><strong>{summary.entered}</strong></div>
+          <div><span>Henüz giriş yok</span><strong>{summary.notEntered}</strong></div>
           <div><span>İçeride</span><strong>{summary.inside}</strong></div>
-          <div><span>Interval</span><strong>{summary.intervals}</strong></div>
+          <div><span>Çıkış yapan</span><strong>{summary.exited}</strong></div>
           <div><span>Anomali</span><strong>{summary.anomalies}</strong></div>
         </div>
       ) : null}
@@ -81,6 +91,7 @@ export function QrGirisCikisOperationSection() {
             placeholderOption={{ value: "", label: "Tümü" }}
             selectOptions={[
               { value: "INSIDE", label: "İçeride" },
+              { value: "NO_SCAN", label: "Henüz giriş yok" },
               { value: "MISSING", label: "Eksik okutma" },
               { value: "BRANCH_MISMATCH", label: "Şube uyuşmazlığı" }
             ]}
@@ -127,7 +138,7 @@ export function QrGirisCikisOperationSection() {
             <thead><tr><th>Personel</th><th>Sicil</th><th>Şube</th><th>Tarih</th><th>İlk giriş</th><th>Son çıkış</th><th>Son hareket</th><th>Durum</th><th>Interval</th><th>Anomali</th><th>Aksiyon</th></tr></thead>
             <tbody>
               {filteredItems.map((item) => (
-                <tr key={item.personel_id}>
+                <tr key={`${item.personel_id}-${item.date_from}`}>
                   <td>{item.ad_soyad}</td><td>{item.sicil_no ?? "—"}</td><td>{item.sube || item.sube_id}</td>
                   <td>{item.date_from === item.date_to ? item.date_from : `${item.date_from} – ${item.date_to}`}</td>
                   <td>{formatQrTime(item.first_entry)}</td><td>{formatQrTime(item.last_exit)}</td>

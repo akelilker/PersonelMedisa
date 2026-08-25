@@ -212,16 +212,30 @@ export function PersonelSelfServiceHomePage() {
 
   const { identity, today, month, last12, izin, fazla, sectionErrors } = status;
   const personelLabel = identity.personel.ad_soyad || identity.ad_soyad;
+  const orgLine = [
+    identity.personel.sube_ad,
+    identity.personel.bolum_ad,
+    identity.personel.birim_ad,
+    identity.personel.departman_ad,
+    identity.personel.gorev_ad
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  const missingCount = identity.completeness?.missing_count ?? 0;
+  const lastQr = identity.last_qr_event ?? null;
+  const lastQrLabel = lastQr
+    ? `${lastQr.event_type === "GIRIS" ? "Giriş" : "Çıkış"} — ${new Intl.DateTimeFormat("tr-TR", {
+        timeZone: "Europe/Istanbul",
+        hour: "2-digit",
+        minute: "2-digit"
+      }).format(new Date(lastQr.occurred_at))}`
+    : null;
 
   return (
     <section className="self-service-home" data-testid="personel-self-service-page">
       <header className="self-service-home__header">
         <h2>{personelLabel}</h2>
-        <p>
-          {[identity.personel.departman_ad, identity.personel.gorev_ad, identity.personel.sube_ad]
-            .filter(Boolean)
-            .join(" · ") || "Personel self-service"}
-        </p>
+        <p>{orgLine || "Personel self-service"}</p>
         <div className="self-service-home__actions">
           <Link className="self-service-action" to="/self/qr-okut" data-testid="self-qr-scan-link">
             QR Okut
@@ -231,6 +245,18 @@ export function PersonelSelfServiceHomePage() {
           </Link>
         </div>
       </header>
+
+      {missingCount > 0 ? (
+        <div className="self-service-home__warnings" role="status" data-testid="self-missing-info-warning">
+          <p>
+            Eksik bilgi uyarısı: {missingCount} alan
+            {identity.completeness?.critical_missing_labels?.length
+              ? ` (${identity.completeness.critical_missing_labels.slice(0, 3).join(", ")})`
+              : ""}
+            . Güncelleme için yöneticinize başvurun.
+          </p>
+        </div>
+      ) : null}
 
       {sectionErrors.length > 0 ? (
         <div className="self-service-home__warnings" role="status">
@@ -258,6 +284,10 @@ export function PersonelSelfServiceHomePage() {
                 {today.giris_saati ?? "—"} / {today.cikis_saati ?? "—"}
               </dd>
             </div>
+            <div>
+              <dt>Son QR hareketi</dt>
+              <dd data-testid="self-last-qr-event">{lastQrLabel ?? "—"}</dd>
+            </div>
             {(today.gec_kalma_dakika != null && today.gec_kalma_dakika > 0) ||
             (today.erken_cikis_dakika != null && today.erken_cikis_dakika > 0) ? (
               <div>
@@ -269,7 +299,16 @@ export function PersonelSelfServiceHomePage() {
             ) : null}
           </dl>
         ) : (
-          <p className="self-service-muted">Bugün için puantaj kaydı yok.</p>
+          <dl className="self-service-dl">
+            <div>
+              <dt>Son QR hareketi</dt>
+              <dd data-testid="self-last-qr-event">{lastQrLabel ?? "Bugün QR hareketi yok."}</dd>
+            </div>
+            <div>
+              <dt>Puantaj</dt>
+              <dd>Bugün için puantaj kaydı yok.</dd>
+            </div>
+          </dl>
         )}
       </article>
 

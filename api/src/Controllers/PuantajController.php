@@ -118,6 +118,8 @@ class PuantajController
         $personelId = (int) $request->getQuery('personel_id', 0);
         $limit = (int) $request->getQuery('limit', 50);
         $offset = (int) $request->getQuery('offset', 0);
+        $includeAbsentRaw = strtolower(trim((string) $request->getQuery('include_absent', '')));
+        $includeAbsent = in_array($includeAbsentRaw, ['1', 'true', 'yes'], true);
 
         try {
             $payload = QrAttendanceIntervalReadService::listForManager(
@@ -128,7 +130,8 @@ class PuantajController
                 $from,
                 $to,
                 $limit,
-                $offset
+                $offset,
+                $includeAbsent
             );
         } catch (\InvalidArgumentException $e) {
             JsonResponse::badRequest($e->getMessage());

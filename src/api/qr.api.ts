@@ -384,6 +384,7 @@ export async function fetchManagerQrAttendance(params?: {
   sube_id?: number;
   limit?: number;
   offset?: number;
+  include_absent?: boolean;
 }): Promise<ManagerQrAttendanceResponse> {
   const path = appendQueryParams(endpoints.puantaj.qrHareketleri, {
     from: params?.from,
@@ -391,7 +392,8 @@ export async function fetchManagerQrAttendance(params?: {
     personel_id: params?.personel_id,
     sube_id: params?.sube_id,
     limit: params?.limit,
-    offset: params?.offset
+    offset: params?.offset,
+    include_absent: params?.include_absent ? 1 : undefined
   });
   const response = await apiRequest<ApiResponse<unknown>>(path);
   return normalizeManagerQrAttendanceResponse(response);

@@ -31,12 +31,14 @@ export function useManagerQrAttendance({
     setLoading(true);
     setError(null);
     try {
+      const sameDay = from === to;
       const result = await fetchManagerQrAttendance({
         from,
         to,
         personel_id: personelId ? Number(personelId) : undefined,
         sube_id: subeId ? Number(subeId) : undefined,
-        limit: 100
+        limit: 100,
+        include_absent: sameDay
       });
       setItems(result.items);
       setTotal(result.total);
@@ -60,6 +62,7 @@ export function useManagerQrAttendance({
     return items.filter((item) => {
       if (anomaly === "INSIDE") return item.inside;
       if (anomaly === "MISSING") return item.missing_entry || item.missing_exit;
+      if (anomaly === "NO_SCAN") return item.anomalies.includes("NO_SCAN");
       if (anomaly === "BRANCH_MISMATCH") return item.branch_mismatch;
       return item.anomalies.includes(anomaly);
     });

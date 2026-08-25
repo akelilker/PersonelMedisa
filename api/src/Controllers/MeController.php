@@ -11,6 +11,7 @@ use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
 use Medisa\Api\Services\Izin\YillikIzinBakiyeService;
 use Medisa\Api\Services\Izin\YillikIzinHakDuzeltmeException;
+use Medisa\Api\Services\Personel\PersonelCompletenessService;
 use Medisa\Api\Services\Qr\QrAttendanceEventService;
 use Medisa\Api\Services\Qr\QrAttendanceException;
 use Medisa\Api\Services\Qr\QrAttendanceIntervalReadService;
@@ -40,6 +41,38 @@ class MeController
 
         $ctx = SelfPersonelContext::resolveForSelfService($user, $pdo, true);
 
+        $completeness = PersonelCompletenessService::evaluate([
+            'sicil_no' => $ctx['sicil_no'] ?? null,
+            'tc_kimlik_no' => $ctx['tc_kimlik_no'] ?? null,
+            'dogum_tarihi' => $ctx['dogum_tarihi'] ?? null,
+            'telefon' => $ctx['telefon'] ?? null,
+            'ise_giris_tarihi' => $ctx['ise_giris_tarihi'] ?? null,
+            'departman_id' => $ctx['departman_id'] ?? null,
+            'bolum_id' => $ctx['bolum_id'] ?? null,
+            'birim_id' => $ctx['birim_id'] ?? null,
+            'gorev_id' => $ctx['gorev_id'] ?? null,
+            'personel_tipi_id' => $ctx['personel_tipi_id'] ?? null,
+            'calisan_kapsami' => $ctx['calisan_kapsami'] ?? null,
+        ], false);
+
+        $lastQr = null;
+        try {
+            $todayRange = self::istanbulTodayRange();
+            $history = QrAttendanceEventService::listForSelf(
+                $pdo,
+                (int) $ctx['personel_id'],
+                $todayRange['from'],
+                $todayRange['to']
+            );
+            if (!empty($history['items'][0]) && is_array($history['items'][0])) {
+                $lastQr = $history['items'][0];
+            }
+        } catch (QrAttendanceException $e) {
+            $lastQr = null;
+        } catch (\Throwable $e) {
+            $lastQr = null;
+        }
+
         JsonResponse::success([
             'user_id' => (int) $user['id'],
             'username' => (string) ($user['username'] ?? ''),
@@ -55,10 +88,20 @@ class MeController
                 'sube_ad' => (string) $ctx['sube_ad'],
                 'departman_id' => $ctx['departman_id'],
                 'departman_ad' => $ctx['departman_ad'],
+                'bolum_id' => $ctx['bolum_id'] ?? null,
+                'bolum_ad' => $ctx['bolum_ad'] ?? null,
+                'birim_id' => $ctx['birim_id'] ?? null,
+                'birim_ad' => $ctx['birim_ad'] ?? null,
                 'gorev_id' => $ctx['gorev_id'],
                 'gorev_ad' => $ctx['gorev_ad'],
                 'aktif_durum' => (string) $ctx['aktif_durum'],
             ],
+            'completeness' => [
+                'is_complete' => (bool) ($completeness['is_complete'] ?? false),
+                'missing_count' => (int) ($completeness['missing_count'] ?? 0),
+                'critical_missing_labels' => array_values($completeness['critical_missing_labels'] ?? []),
+            ],
+            'last_qr_event' => $lastQr,
         ]);
     }
 
@@ -373,5 +416,18 @@ class MeController
             'atlanan_duplicate_hafta_sayisi' => 0,
             'atlanan_eksik_hafta_sayisi' => 0,
         ];
+    }
+
+    /** @return array{from:string,to:string} */
+    private static function istanbulTodayRange()
+    {
+        try {
+            $tz = new \DateTimeZone('Europe/Istanbul');
+            $today = (new \DateTimeImmutable('now', $tz))->format('Y-m-d');
+        } catch (\Throwable $e) {
+            $today = (new \DateTimeImmutable('now'))->format('Y-m-d');
+        }
+
+        return ['from' => $today, 'to' => $today];
     }
 }

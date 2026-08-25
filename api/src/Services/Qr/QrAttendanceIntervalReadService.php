@@ -45,14 +45,16 @@ class QrAttendanceIntervalReadService
      * events as self-service and never writes events, intervals, or puantaj.
      *
      * @param array<int,int> $allowedSubeIds
+     * @param bool $includeAbsent When true and from===to, include AKTIF personel with no QR that day.
      * @return array<string,mixed>
      */
-    public static function listForManager(PDO $pdo, $scopeSubeId, array $allowedSubeIds, $personelId, $from, $to, $limit, $offset)
+    public static function listForManager(PDO $pdo, $scopeSubeId, array $allowedSubeIds, $personelId, $from, $to, $limit, $offset, $includeAbsent = false)
     {
         QrAttendanceEventService::assertSchemaReady($pdo);
         $range = self::resolveManagerRange($from, $to);
         $limit = max(1, min(100, (int) $limit));
         $offset = max(0, (int) $offset);
+        $includeAbsent = (bool) $includeAbsent && $range['from'] === $range['to'];
         $rangeFrom = (new \DateTimeImmutable($range['from']))->modify('-1 day')->format('Y-m-d');
         $rangeTo = (new \DateTimeImmutable($range['to']))->modify('+1 day')->format('Y-m-d');
         $utc = QrAttendanceEventService::businessDateRangeToUtc($rangeFrom, $rangeTo);
@@ -96,6 +98,71 @@ class QrAttendanceIntervalReadService
         }
         $personStmt->execute();
         $personIds = array_map('intval', $personStmt->fetchAll(PDO::FETCH_COLUMN));
+
+        $people = [];
+        $eventsByPersonel = [];
+
+        if ($includeAbsent) {
+            $rosterWhere = ["p.aktif_durum = 'AKTIF'"];
+            $rosterParams = [];
+            if ((int) $personelId > 0) {
+                $rosterWhere[] = 'p.id = :personel_id';
+                $rosterParams['personel_id'] = (int) $personelId;
+            }
+            if ($scopeSubeId !== null) {
+                $rosterWhere[] = 'p.sube_id = :scope_sube_id';
+                $rosterParams['scope_sube_id'] = (int) $scopeSubeId;
+            } elseif ($allowedSubeIds) {
+                $keys = [];
+                foreach (array_values($allowedSubeIds) as $index => $subeId) {
+                    $key = 'roster_sube_' . $index;
+                    $keys[] = ':' . $key;
+                    $rosterParams[$key] = (int) $subeId;
+                }
+                $rosterWhere[] = 'p.sube_id IN (' . implode(', ', $keys) . ')';
+            }
+            // Prefer excluding DIS_KAYNAK when column exists; soft-fail to all AKTIF.
+            $calisanFilter = '';
+            try {
+                $col = $pdo->query("SHOW COLUMNS FROM personeller LIKE 'calisan_kapsami'");
+                if ($col !== false && $col->fetch(PDO::FETCH_ASSOC)) {
+                    $calisanFilter = " AND IFNULL(p.calisan_kapsami, 'IC_PERSONEL') <> 'DIS_KAYNAK'";
+                }
+                if ($col !== false) {
+                    $col->closeCursor();
+                }
+            } catch (\Throwable $e) {
+                $calisanFilter = '';
+            }
+            $rosterSql = 'SELECT p.id, p.ad, p.soyad, p.sicil_no, p.sube_id, s.ad AS sube_ad
+                FROM personeller p
+                LEFT JOIN subeler s ON s.id = p.sube_id
+                WHERE ' . implode(' AND ', $rosterWhere) . $calisanFilter . '
+                ORDER BY p.id ASC';
+            $rosterStmt = $pdo->prepare($rosterSql);
+            foreach ($rosterParams as $key => $value) {
+                $rosterStmt->bindValue(':' . $key, $value, is_int($value) ? PDO::PARAM_INT : PDO::PARAM_STR);
+            }
+            $rosterStmt->execute();
+            while ($row = $rosterStmt->fetch(PDO::FETCH_ASSOC)) {
+                if (!is_array($row)) {
+                    continue;
+                }
+                $id = (int) $row['id'];
+                $personIds[] = $id;
+                $people[$id] = [
+                    'personel_id' => $id,
+                    'ad_soyad' => trim((string) $row['ad'] . ' ' . (string) $row['soyad']),
+                    'sicil_no' => $row['sicil_no'] ?? null,
+                    'sube_id' => (int) $row['sube_id'],
+                    'sube' => (string) ($row['sube_ad'] ?? ''),
+                ];
+                $eventsByPersonel[$id] = [];
+            }
+            $personIds = array_values(array_unique(array_map('intval', $personIds)));
+            sort($personIds);
+        }
+
         if (!$personIds) {
             return [
                 'from' => $range['from'], 'to' => $range['to'], 'items' => [], 'total' => 0,
@@ -123,8 +190,6 @@ class QrAttendanceIntervalReadService
         }
         $stmt->execute();
 
-        $eventsByPersonel = [];
-        $people = [];
         while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
             if (!is_array($row)) {
                 continue;
@@ -152,16 +217,20 @@ class QrAttendanceIntervalReadService
         $businessDates = self::managerBusinessDates($range['from'], $range['to']);
         foreach ($people as $id => $person) {
             foreach ($businessDates as $businessDate) {
-                $items[] = self::mapManagerBusinessDateRow(
+                $row = self::mapManagerBusinessDateRow(
                     $person,
                     $eventsByPersonel[$id] ?? [],
                     $businessDate,
-                    $today
+                    $today,
+                    $includeAbsent
                 );
+                if ($row !== null) {
+                    $items[] = $row;
+                }
             }
         }
 
-        $items = array_values(array_filter($items));
+        $items = array_values($items);
         usort($items, static function (array $a, array $b): int {
             $dateCompare = strcmp((string) $b['date_from'], (string) $a['date_from']);
             if ($dateCompare !== 0) {
@@ -200,7 +269,7 @@ class QrAttendanceIntervalReadService
     }
 
     /** @param list<array<string,mixed>> $events @return array<string,mixed>|null */
-    private static function mapManagerBusinessDateRow(array $person, array $events, string $businessDate, string $today): ?array
+    private static function mapManagerBusinessDateRow(array $person, array $events, string $businessDate, string $today, bool $includeAbsent = false): ?array
     {
         $windowStart = (new \DateTimeImmutable($businessDate, new \DateTimeZone('Europe/Istanbul')))
             ->modify('-1 day')
@@ -223,7 +292,26 @@ class QrAttendanceIntervalReadService
             $businessDate
         );
         if ($localEvents === [] && $derived['intervals'] === [] && $derived['anomalies'] === []) {
-            return null;
+            if (!$includeAbsent) {
+                return null;
+            }
+
+            return $person + [
+                'date_from' => $businessDate,
+                'date_to' => $businessDate,
+                'first_entry' => null,
+                'last_exit' => null,
+                'last_movement' => null,
+                'last_movement_type' => null,
+                'inside' => false,
+                'interval_count' => 0,
+                'missing_entry' => false,
+                'missing_exit' => false,
+                'branch_mismatch' => false,
+                'anomalies' => ['NO_SCAN'],
+                'matched_seconds' => 0,
+                'source_event_count' => 0,
+            ];
         }
 
         $anomalyTypes = array_values(array_unique(array_map(

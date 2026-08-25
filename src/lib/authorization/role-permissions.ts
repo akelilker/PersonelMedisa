@@ -117,7 +117,8 @@ export type AppPermission =
   | "self_service.yillik_izin.view"
   | "self_service.fazla_calisma.view"
   | "self_service.qr.scan"
-  | "self_service.qr.events.view";
+  | "self_service.qr.events.view"
+  | "qr.kiosk.display";
 
 /**
  * Canonical self-service baseline — same set as PERSONEL role matrix.
@@ -225,7 +226,8 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "retention.destruction.request",
     "retention.destruction.approve",
     "retention.destruction.execute",
-    "retention.destruction.view"
+    "retention.destruction.view",
+    "qr.kiosk.display"
   ],
   BOLUM_YONETICISI: [
     "personeller.view",
@@ -331,7 +333,8 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "disiplin.final_decision",
     "puantaj.olay_karar.decide",
     "puantaj.olay_karar.view",
-    "sgk_karar_paketi.approve"
+    "sgk_karar_paketi.approve",
+    "qr.kiosk.display"
   ],
   /** External accountant: finalized mali/bordro read + export. No operational write. */
   MUHASEBE: [
@@ -501,7 +504,8 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "arsiv.download",
     "arsiv.audit.view",
     "retention.view",
-    "retention.destruction.view"
+    "retention.destruction.view",
+    "qr.kiosk.display"
   ],
   /** Self-service read surfaces (S3B). No broad personeller.* / puantaj.view. */
   PERSONEL: SELF_SERVICE_BASELINE_PERMISSIONS,
@@ -621,7 +625,8 @@ export const ROUTE_PERMISSION = {
   finansPage: "finans.view",
   isgPage: "isg.view",
   yonetimPaneliPage: "yonetim-paneli.view",
-  qrKioskPage: "yonetim-paneli.manage",
+  /** Branch QR display — scoped by SubeScope; not yonetim-paneli.manage. */
+  qrKioskPage: "qr.kiosk.display",
   resmiTatilTakvimiPage: "resmi_tatil_takvimi.view",
   aylikOzetPage: "aylik-ozet.view",
   haftalikKapanisPage: "revizyon.view"

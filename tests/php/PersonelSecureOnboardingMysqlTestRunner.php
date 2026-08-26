@@ -21,6 +21,108 @@ function psoAssert(bool $ok, string $name): void
     echo '[PASS] ' . $name . PHP_EOL;
 }
 
+function psoChildPdo(): PDO
+{
+    $dsn = getenv('MEDISA_TEST_MYSQL_DSN') ?: '';
+    $user = getenv('MEDISA_TEST_MYSQL_USER') ?: '';
+    $password = getenv('MEDISA_TEST_MYSQL_PASSWORD') ?: '';
+    if ($dsn === '' || $user === '') {
+        throw new RuntimeException('Disposable MariaDB credentials are required (MEDISA_TEST_MYSQL_*).');
+    }
+
+    $pdo = new PDO($dsn, $user, $password, [
+        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+        PDO::ATTR_EMULATE_PREPARES => false,
+        PDO::MYSQL_ATTR_USE_BUFFERED_QUERY => true,
+    ]);
+    $pdo->exec('SET SESSION innodb_lock_wait_timeout = 5');
+
+    return $pdo;
+}
+
+/**
+ * Child worker for true multi-connection concurrency / JsonResponse exit capture.
+ * Exit codes: 0 = handled; stdout last meaningful line is the result token.
+ */
+if (($argv[1] ?? '') === '--child') {
+    $action = (string) ($argv[2] ?? '');
+    $GLOBALS['config']['app_public_url'] = 'https://app.example.test/personelmedisa';
+    $GLOBALS['config']['personel_activation_ttl_minutes'] = 1440;
+    $pdo = psoChildPdo();
+    $actor = ['id' => 1, 'rol' => 'GENEL_YONETICI'];
+
+    try {
+        if ($action === 'reissue') {
+            $userId = (int) ($argv[3] ?? 0);
+            $result = PersonelAccountOnboardingService::reissueActivation($pdo, $userId, $actor);
+            echo 'OK:' . (string) ($result['activation']['activation_url'] ?? '') . PHP_EOL;
+            exit(0);
+        }
+        if ($action === 'redeem') {
+            $token = (string) ($argv[3] ?? '');
+            $password = (string) ($argv[4] ?? '');
+            $result = PersonelAccountOnboardingService::completeActivation($pdo, $token, $password, $password);
+            echo (($result['activated'] ?? false) === true ? 'OK' : 'FAIL') . PHP_EOL;
+            exit(0);
+        }
+        if ($action === 'onboard') {
+            $personelId = (int) ($argv[3] ?? 0);
+            $result = PersonelAccountOnboardingService::onboardAndIssue($pdo, $personelId, $actor);
+            echo 'OK:' . (string) ($result['user']['username'] ?? '') . PHP_EOL;
+            exit(0);
+        }
+        if ($action === 'reject-generic') {
+            PersonelAccountOnboardingService::rejectGenericPersonelBoundCreate([
+                'rol' => 'PERSONEL',
+                'personel_id' => 10,
+                'username' => 'caller-override',
+                'password' => 'CallerPass99',
+            ]);
+            echo 'UNEXPECTED_OK' . PHP_EOL;
+            exit(0);
+        }
+        if ($action === 'lock-hold-user') {
+            $userId = (int) ($argv[3] ?? 0);
+            $holdMs = (int) ($argv[4] ?? 400);
+            $signal = (string) ($argv[5] ?? '');
+            $pdo->beginTransaction();
+            $stmt = $pdo->prepare('SELECT id FROM users WHERE id = :id LIMIT 1 FOR UPDATE');
+            $stmt->execute(['id' => $userId]);
+            $stmt->fetch(PDO::FETCH_ASSOC);
+            if ($signal !== '') {
+                file_put_contents($signal, 'ready');
+            }
+            usleep(max(50, $holdMs) * 1000);
+            $pdo->commit();
+            echo 'HELD' . PHP_EOL;
+            exit(0);
+        }
+        if ($action === 'sync-collision') {
+            $personelId = (int) ($argv[3] ?? 0);
+            $newSicil = (string) ($argv[4] ?? '');
+            $pdo->beginTransaction();
+            $upd = $pdo->prepare('UPDATE personeller SET sicil_no = :s WHERE id = :id');
+            $upd->execute(['s' => $newSicil, 'id' => $personelId]);
+            PersonelAccountOnboardingService::syncUsernameFromSicilIfApplicable(
+                $pdo,
+                $personelId,
+                $newSicil,
+                $actor
+            );
+            $pdo->commit();
+            echo 'UNEXPECTED_COMMIT' . PHP_EOL;
+            exit(0);
+        }
+        fwrite(STDERR, "Unknown child action: {$action}\n");
+        exit(2);
+    } catch (Throwable $e) {
+        // JsonResponse exits; anything else is unexpected.
+        fwrite(STDERR, $e->getMessage() . PHP_EOL);
+        exit(1);
+    }
+}
+
 function psoRootPdo(): PDO
 {
     $dsn = getenv('MEDISA_TEST_MYSQL_DSN') ?: '';
@@ -36,6 +138,81 @@ function psoRootPdo(): PDO
         PDO::ATTR_EMULATE_PREPARES => false,
         PDO::MYSQL_ATTR_USE_BUFFERED_QUERY => true,
     ]);
+}
+
+/** @return array{process: resource, pipes: array<int, resource>} */
+function psoSpawnChild(array $args, string $dsn): array
+{
+    $phpArgs = [];
+    if (PHP_OS_FAMILY === 'Windows' && !extension_loaded('pdo_mysql')) {
+        $extensionDir = ini_get('extension_dir');
+        if (is_string($extensionDir) && $extensionDir !== '') {
+            $phpArgs[] = '-d';
+            $phpArgs[] = 'extension_dir=' . $extensionDir;
+        }
+        $phpArgs[] = '-d';
+        $phpArgs[] = 'extension=php_pdo_mysql.dll';
+    }
+    $command = array_merge([PHP_BINARY], $phpArgs, [__FILE__, '--child'], $args);
+    $pipes = [];
+    $env = getenv();
+    if (!is_array($env)) {
+        $env = [];
+    }
+    $env['MEDISA_TEST_MYSQL_DSN'] = $dsn;
+    $env['MEDISA_TEST_MYSQL_USER'] = (string) (getenv('MEDISA_TEST_MYSQL_USER') ?: '');
+    $env['MEDISA_TEST_MYSQL_PASSWORD'] = (string) (getenv('MEDISA_TEST_MYSQL_PASSWORD') ?: '');
+    $process = proc_open(
+        $command,
+        [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
+        $pipes,
+        null,
+        $env
+    );
+    if (!is_resource($process)) {
+        throw new RuntimeException('Child process could not start.');
+    }
+    fclose($pipes[0]);
+
+    return ['process' => $process, 'pipes' => $pipes];
+}
+
+/** @param array{process: resource, pipes: array<int, resource>} $child */
+function psoFinishChild(array $child): string
+{
+    $stdout = trim((string) stream_get_contents($child['pipes'][1]));
+    $stderr = trim((string) stream_get_contents($child['pipes'][2]));
+    fclose($child['pipes'][1]);
+    fclose($child['pipes'][2]);
+    $status = proc_close($child['process']);
+
+    $lines = preg_split("/\r\n|\n|\r/", $stdout) ?: [];
+    $meaningful = array_values(array_filter($lines, static function (string $line): bool {
+        $line = trim($line);
+        return $line !== '' && stripos($line, 'Warning:') !== 0;
+    }));
+    $last = $meaningful === [] ? '' : (string) end($meaningful);
+
+    // JsonResponse::error exits(0) after printing JSON.
+    if ($last === '' && $stderr !== '') {
+        throw new RuntimeException('Child failed (status=' . $status . '): ' . $stderr);
+    }
+
+    return $last;
+}
+
+function psoExtractErrorCode(string $jsonOrToken): ?string
+{
+    if ($jsonOrToken === '' || $jsonOrToken[0] !== '{') {
+        return null;
+    }
+    $decoded = json_decode($jsonOrToken, true);
+    if (!is_array($decoded)) {
+        return null;
+    }
+    $code = $decoded['errors'][0]['code'] ?? null;
+
+    return is_string($code) ? $code : null;
 }
 
 /** @return list<string> */
@@ -260,12 +437,55 @@ try {
     )->fetchColumn();
     psoAssert(strpos($auditBlob, $rawToken) === false, 'token not present in audit');
 
-    // 5: already bound → ALREADY_PROVISIONED (capture via register_tick / process isolation)
-    // Simulate by checking find path: second onboard must not create second user
+    // Idempotent / already bound: exactly one user for personel 10
     $userCountBefore = (int) $pdo->query('SELECT COUNT(*) FROM users WHERE personel_id = 10')->fetchColumn();
     psoAssert($userCountBefore === 1, 'exactly one bound user before idempotent check');
+    $dbDsn = (string) preg_replace('/dbname=[^;]+/', 'dbname=' . $database, (string) getenv('MEDISA_TEST_MYSQL_DSN'));
+    $idempotentChild = psoFinishChild(psoSpawnChild(['onboard', '10'], $dbDsn));
+    psoAssert(
+        psoExtractErrorCode($idempotentChild) === PersonelAccountOnboardingService::ERR_ALREADY_PROVISIONED,
+        'same personnel rerun fail-closed ALREADY_PROVISIONED'
+    );
+    psoAssert(
+        (int) $pdo->query('SELECT COUNT(*) FROM users WHERE personel_id = 10')->fetchColumn() === 1,
+        'idempotent onboard creates no duplicate user'
+    );
 
-    // 10–11: DIS_KAYNAK technical account + capability still disabled
+    // Fail-closed: missing sicil / PASIF / username collision / management-bound
+    $missingSicil = psoFinishChild(psoSpawnChild(['onboard', '13'], $dbDsn));
+    psoAssert(
+        psoExtractErrorCode($missingSicil) === PersonelAccountOnboardingService::ERR_SICIL_REQUIRED,
+        'missing sicil fail closed'
+    );
+    $pasif = psoFinishChild(psoSpawnChild(['onboard', '12'], $dbDsn));
+    psoAssert(
+        psoExtractErrorCode($pasif) === PersonelAccountOnboardingService::ERR_PERSONEL_INACTIVE,
+        'PASIF personnel denied'
+    );
+    $collide = psoFinishChild(psoSpawnChild(['onboard', '14'], $dbDsn));
+    psoAssert(
+        psoExtractErrorCode($collide) === PersonelAccountOnboardingService::ERR_SICIL_COLLISION,
+        'different-user username collision fail closed'
+    );
+    $mgrBound = psoFinishChild(psoSpawnChild(['onboard', '15'], $dbDsn));
+    psoAssert(
+        psoExtractErrorCode($mgrBound) === PersonelAccountOnboardingService::ERR_ALREADY_PROVISIONED,
+        'management-bound user blocks second PERSONEL account'
+    );
+    psoAssert(
+        (int) $pdo->query('SELECT COUNT(*) FROM users WHERE personel_id = 15')->fetchColumn() === 1,
+        'management binding remains single account'
+    );
+
+    // Generic create bypass owner
+    $generic = psoFinishChild(psoSpawnChild(['reject-generic'], $dbDsn));
+    psoAssert(
+        psoExtractErrorCode($generic) === PersonelAccountOnboardingService::ERR_USE_SECURE,
+        'generic PERSONEL+personel_id create blocked PERSONEL_USE_SECURE_ONBOARDING'
+    );
+    // Legitimate non-personnel create path remains owned by YonetimController (source-locked).
+
+    // DIS_KAYNAK technical account + capability still disabled
     $disResult = PersonelAccountOnboardingService::onboardAndIssue($pdo, 11, $actor);
     psoAssert(($disResult['user']['username'] ?? '') === 'SIC-DIS', 'DIS_KAYNAK username sicil');
     $caps = PersonelMobileCapabilityService::resolve($pdo, 11);
@@ -278,9 +498,16 @@ try {
         'DIS_KAYNAK guarded message exact'
     );
 
-    // 6: management bound → no duplicate (personel 15)
-    $mgrCountBefore = (int) $pdo->query('SELECT COUNT(*) FROM users WHERE personel_id = 15')->fetchColumn();
-    psoAssert($mgrCountBefore === 1, 'management already bound once');
+    // Failed activation (weak password) leaves hash unchanged
+    $hashBeforeFail = (string) $pdo->query(
+        'SELECT password_hash FROM users WHERE id = ' . (int) $userRow['id']
+    )->fetchColumn();
+    $weak = psoFinishChild(psoSpawnChild(['redeem', $rawToken, 'short'], $dbDsn));
+    psoAssert(psoExtractErrorCode($weak) !== null, 'weak password rejected before redeem');
+    $hashAfterFail = (string) $pdo->query(
+        'SELECT password_hash FROM users WHERE id = ' . (int) $userRow['id']
+    )->fetchColumn();
+    psoAssert($hashAfterFail === $hashBeforeFail, 'failed activation leaves password unchanged');
 
     // Token redeem success
     $complete = PersonelAccountOnboardingService::completeActivation(
@@ -308,7 +535,6 @@ try {
     )->fetchColumn();
     psoAssert($completeAudit === 1, 'token consumption audit created');
 
-    // Second redeem denied — invitation already consumed; status invalid
     $status2 = PersonelAccountOnboardingService::activationStatus($pdo, $rawToken);
     psoAssert(($status2['valid'] ?? true) === false, 'consumed token status invalid');
 
@@ -344,20 +570,119 @@ try {
     $expiredStatus = PersonelAccountOnboardingService::activationStatus($pdo, $disToken2);
     psoAssert(($expiredStatus['reason'] ?? '') === 'expired' || ($expiredStatus['valid'] ?? true) === false, 'expired token denied');
 
-    // Reissue again for redeem concurrency test
+    // Fresh token for real concurrent redeem
     $reissue2 = PersonelAccountOnboardingService::reissueActivation($pdo, $disUserId, $actor);
     parse_str(parse_url($reissue2['activation']['activation_url'], PHP_URL_FRAGMENT) ?: '', $disFrag3);
     $disToken3 = (string) ($disFrag3['token'] ?? '');
 
-    // Concurrent redeem: first succeeds, second fails (sequential simulation with lock semantics)
-    $ok1 = PersonelAccountOnboardingService::completeActivation($pdo, $disToken3, 'DisPassWord9', 'DisPassWord9');
-    psoAssert(($ok1['activated'] ?? false) === true, 'first concurrent redeem succeeds');
-    $statusAfter = PersonelAccountOnboardingService::activationStatus($pdo, $disToken3);
-    psoAssert(($statusAfter['valid'] ?? true) === false, 'second redeem sees consumed');
+    // E: concurrent issue/reissue — at most one live invitation; FOR UPDATE serializes on user row
+    $signal = tempnam(sys_get_temp_dir(), 'pso-lock-');
+    if ($signal === false) {
+        throw new RuntimeException('signal file create failed');
+    }
+    @unlink($signal);
+    $hold = psoSpawnChild(['lock-hold-user', (string) $disUserId, '600', $signal], $dbDsn);
+    $waitStart = microtime(true);
+    while (!is_file($signal) && (microtime(true) - $waitStart) < 5.0) {
+        usleep(20_000);
+    }
+    psoAssert(is_file($signal), 'FOR UPDATE hold child acquired user lock');
+    $blockedReissue = psoSpawnChild(['reissue', (string) $disUserId], $dbDsn);
+    $raceStart = microtime(true);
+    $blockedOut = psoFinishChild($blockedReissue);
+    $blockedElapsedMs = (microtime(true) - $raceStart) * 1000;
+    psoFinishChild($hold);
+    @unlink($signal);
+    psoAssert(strpos($blockedOut, 'OK:') === 0, 'reissue succeeds after FOR UPDATE holder releases');
+    psoAssert($blockedElapsedMs >= 200, 'competing reissue waited on locked user row');
+    $liveAfterHold = (int) $pdo->query(
+        'SELECT COUNT(*) FROM personel_account_activation_invitations
+         WHERE user_id = ' . $disUserId . ' AND consumed_at_utc IS NULL AND revoked_at_utc IS NULL'
+    )->fetchColumn();
+    psoAssert($liveAfterHold === 1, 'lock-hold + reissue leaves one live invitation');
+
+    $raceA = psoSpawnChild(['reissue', (string) $disUserId], $dbDsn);
+    $raceB = psoSpawnChild(['reissue', (string) $disUserId], $dbDsn);
+    $raceOut = [psoFinishChild($raceA), psoFinishChild($raceB)];
+    $raceOk = 0;
+    foreach ($raceOut as $line) {
+        if (strpos($line, 'OK:') === 0) {
+            $raceOk++;
+        }
+    }
+    psoAssert($raceOk === 2, 'two concurrent reissues both complete under serialization');
+    $liveAfterRace = (int) $pdo->query(
+        'SELECT COUNT(*) FROM personel_account_activation_invitations
+         WHERE user_id = ' . $disUserId . ' AND consumed_at_utc IS NULL AND revoked_at_utc IS NULL'
+    )->fetchColumn();
+    psoAssert($liveAfterRace === 1, 'concurrent reissue leaves at most one valid invitation');
+
+    // Refresh live token after race for redeem concurrency
+    $liveInv = $pdo->query(
+        'SELECT token_hash FROM personel_account_activation_invitations
+         WHERE user_id = ' . $disUserId . ' AND consumed_at_utc IS NULL AND revoked_at_utc IS NULL
+         ORDER BY id DESC LIMIT 1'
+    )->fetch(PDO::FETCH_ASSOC);
+    // Reissue once more so we own a known raw token for dual redeem
+    $reissue3 = PersonelAccountOnboardingService::reissueActivation($pdo, $disUserId, $actor);
+    parse_str(parse_url($reissue3['activation']['activation_url'], PHP_URL_FRAGMENT) ?: '', $disFrag4);
+    $disToken4 = (string) ($disFrag4['token'] ?? '');
+    $hashBeforeRedeem = (string) $pdo->query(
+        'SELECT password_hash FROM users WHERE id = ' . $disUserId
+    )->fetchColumn();
+    $auditBefore = (int) $pdo->query(
+        "SELECT COUNT(*) FROM personel_account_onboarding_audit WHERE event_type = 'ACTIVATION_COMPLETED' AND user_id = " . $disUserId
+    )->fetchColumn();
+
+    // F: concurrent redeem of same valid token
+    $redeemA = psoSpawnChild(['redeem', $disToken4, 'DisPassWord9'], $dbDsn);
+    $redeemB = psoSpawnChild(['redeem', $disToken4, 'OtherPassWord8'], $dbDsn);
+    $redeemResults = [psoFinishChild($redeemA), psoFinishChild($redeemB)];
+    $redeemOk = 0;
+    $redeemFail = 0;
+    foreach ($redeemResults as $line) {
+        if ($line === 'OK') {
+            $redeemOk++;
+        } elseif (psoExtractErrorCode($line) === PersonelAccountOnboardingService::ERR_ACTIVATION_INVALID
+            || strpos($line, 'Aktivasyon') !== false
+            || $line !== ''
+        ) {
+            if ($line !== 'OK') {
+                $redeemFail++;
+            }
+        }
+    }
+    psoAssert($redeemOk === 1, 'concurrent redeem exactly one success');
+    psoAssert($redeemFail === 1, 'concurrent redeem exactly one failure');
+    $afterDual = $pdo->query('SELECT password_hash, activation_required FROM users WHERE id = ' . $disUserId)->fetch(PDO::FETCH_ASSOC);
+    psoAssert((int) $afterDual['activation_required'] === 0, 'concurrent redeem clears activation_required once');
+    $pwMatchesOne =
+        PasswordHasher::verify('DisPassWord9', (string) $afterDual['password_hash'])
+        || PasswordHasher::verify('OtherPassWord8', (string) $afterDual['password_hash']);
+    $pwMatchesBoth =
+        PasswordHasher::verify('DisPassWord9', (string) $afterDual['password_hash'])
+        && PasswordHasher::verify('OtherPassWord8', (string) $afterDual['password_hash']);
+    psoAssert($pwMatchesOne && !$pwMatchesBoth, 'exactly one password change applied');
+    psoAssert((string) $afterDual['password_hash'] !== $hashBeforeRedeem, 'password hash changed once');
+    $auditAfter = (int) $pdo->query(
+        "SELECT COUNT(*) FROM personel_account_onboarding_audit WHERE event_type = 'ACTIVATION_COMPLETED' AND user_id = " . $disUserId
+    )->fetchColumn();
+    psoAssert($auditAfter === $auditBefore + 1, 'no double activation audit corruption');
+    unset($liveInv, $disToken3);
+
+    // Post-activation DIS_KAYNAK capability still denied
+    $capsAfter = PersonelMobileCapabilityService::resolve($pdo, 11);
+    psoAssert($capsAfter['qr_scan'] === false, 'post-activation DIS_KAYNAK qr_scan still denied');
+    psoAssert(
+        $capsAfter['coming_soon_message'] === PersonelMobileCapabilityService::MESSAGE_COMING_SOON,
+        'post-activation DIS_KAYNAK guarded message exact'
+    );
 
     // Sicil sync for SICIL_CANONICAL
+    $pdo->beginTransaction();
     $pdo->exec("UPDATE personeller SET sicil_no = 'SIC-100B' WHERE id = 10");
     PersonelAccountOnboardingService::syncUsernameFromSicilIfApplicable($pdo, 10, 'SIC-100B', $actor);
+    $pdo->commit();
     $synced = $pdo->query('SELECT username, password_hash, rol, personel_id FROM users WHERE id = ' . (int) $userRow['id'])->fetch(PDO::FETCH_ASSOC);
     psoAssert($synced['username'] === 'SIC-100B', 'sicil change updates username atomically');
     psoAssert($synced['password_hash'] === $afterActivate['password_hash'], 'password unchanged during sync');
@@ -368,24 +693,36 @@ try {
     )->fetchColumn();
     psoAssert($syncAudit === 1, 'username sync audit created');
 
-    // MANUAL account not renamed when its unbound personel sicil changes
-    $manualBefore = $pdo->query("SELECT username FROM users WHERE username = 'TAKEN-UN'")->fetch(PDO::FETCH_ASSOC);
+    // Collision rolls back BOTH (personel sicil + username) via abandoned txn in child
+    $sicilBeforeCollision = (string) $pdo->query('SELECT sicil_no FROM personeller WHERE id = 10')->fetchColumn();
+    $userBeforeCollision = $pdo->query(
+        'SELECT username, password_hash, rol, personel_id FROM users WHERE id = ' . (int) $userRow['id']
+    )->fetch(PDO::FETCH_ASSOC);
+    // Collide against existing USERNAME 'admin' (not another personel.sicil_no — avoids uq_personeller_sicil).
+    $collisionChild = psoFinishChild(psoSpawnChild(['sync-collision', '10', 'admin'], $dbDsn));
+    psoAssert(
+        psoExtractErrorCode($collisionChild) === PersonelAccountOnboardingService::ERR_SICIL_COLLISION,
+        'sicil username collision fail closed'
+    );
+    $sicilAfterCollision = (string) $pdo->query('SELECT sicil_no FROM personeller WHERE id = 10')->fetchColumn();
+    $userAfterCollision = $pdo->query(
+        'SELECT username, password_hash, rol, personel_id FROM users WHERE id = ' . (int) $userRow['id']
+    )->fetch(PDO::FETCH_ASSOC);
+    psoAssert($sicilAfterCollision === $sicilBeforeCollision, 'collision rolls back personel.sicil_no');
+    psoAssert($userAfterCollision['username'] === $userBeforeCollision['username'], 'collision rolls back username');
+    psoAssert($userAfterCollision['password_hash'] === $userBeforeCollision['password_hash'], 'collision password unchanged');
+    psoAssert($userAfterCollision['rol'] === $userBeforeCollision['rol'], 'collision role unchanged');
+    psoAssert((int) $userAfterCollision['personel_id'] === (int) $userBeforeCollision['personel_id'], 'collision binding unchanged');
+
+    // MANUAL account not silently renamed
     PersonelAccountOnboardingService::syncUsernameFromSicilIfApplicable($pdo, 14, 'TAKEN-UN-NEW', $actor);
-    $manualAfter = $pdo->query("SELECT username FROM users WHERE id = (SELECT id FROM (SELECT id FROM users WHERE username = 'TAKEN-UN' OR username = 'TAKEN-UN-NEW') t LIMIT 1)")->fetch(PDO::FETCH_ASSOC);
-    // TAKEN-UN user has no personel_id / not SICIL_CANONICAL — sync no-op
     $stillTaken = $pdo->query("SELECT username, username_source FROM users WHERE username = 'TAKEN-UN'")->fetch(PDO::FETCH_ASSOC);
     psoAssert(is_array($stillTaken) && $stillTaken['username_source'] === 'MANUAL', 'MANUAL username account not silently renamed');
 
-    // Token entropy helper
     $t1 = PersonelAccountOnboardingService::generateActivationToken();
     $t2 = PersonelAccountOnboardingService::generateActivationToken();
     psoAssert(strlen($t1) === 64 && strlen($t2) === 64 && $t1 !== $t2, 'token generator 256-bit unique');
-
-    // TTL owner
     psoAssert(PersonelAccountOnboardingService::activationTtlMinutes() === 1440, 'ttl default 1440 via config owner');
-
-    // Password policy mismatch path via status of activated user password unchanged on failed complete —
-    // covered: after activation, password_hash stable when invalid token used.
 
     echo PHP_EOL . '[DONE] PersonelSecureOnboardingMysqlTestRunner' . PHP_EOL;
 } finally {

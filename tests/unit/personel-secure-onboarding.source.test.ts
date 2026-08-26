@@ -55,6 +55,29 @@ describe("personel secure onboarding frontend contracts", () => {
     expect(panel).toContain("Personel şifresini aktivasyon bağlantısı üzerinden kendisi belirleyecektir.");
   });
 
+  it("onboarding panel: sicil read-only, no password field, one-shot URL + copy", () => {
+    const panel = read("src/features/yonetim/components/PersonelHesapOnboardingPanel.tsx");
+    expect(panel).toContain("Personel Hesabı Oluştur");
+    expect(panel).toContain("readOnly");
+    expect(panel).toContain("Kullanıcı adı (sicil)");
+    expect(panel).not.toMatch(/type=["']password["']/);
+    expect(panel).toContain("yalnızca bir kez gösterilir");
+    expect(panel).toContain("Bağlantıyı Kopyala");
+    expect(panel).toContain("navigator.clipboard.writeText");
+    expect(panel).toContain("Yeni Aktivasyon Bağlantısı Oluştur");
+    expect(panel).not.toMatch(/localStorage|sessionStorage|indexedDB/i);
+  });
+
+  it("activation page: autocomplete, success copy, mobile auth shell", () => {
+    const page = read("src/features/auth/pages/PersonelAktivasyonPage.tsx");
+    const css = read("src/styles/modules/auth.css");
+    expect(page).toContain('autoComplete="new-password"');
+    expect(page).toContain("Hesabınız başarıyla etkinleştirildi.");
+    expect(page).toContain('className="auth-login"');
+    expect(css).toContain("@media (max-width: 640px)");
+    expect(css).toContain(".auth-login");
+  });
+
   it("keeps DIS_KAYNAK capability coming-soon message unchanged", () => {
     const fe = read("src/features/self-service/personel-mobile-capability.ts");
     const be = read("api/src/Services/SelfService/PersonelMobileCapabilityService.php");

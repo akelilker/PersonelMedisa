@@ -39,6 +39,7 @@ export function PersonelDetayPage() {
   const canViewUcret = hasPermission("personeller.ucret.view");
   const canUpdatePersonel = hasPermission("personeller.update");
   const canViewBordroKapsam = hasPermission("personel_bordro_kapsam.view");
+  const canManageAccountOnboarding = hasPermission("yonetim-paneli.manage");
 
   const initialTab = resolvePersonelTab(searchParams.get("tab")) ?? "genel-bilgiler";
   const [activeTab, setActiveTab] = useState<PersonelDosyaTabId>(initialTab);
@@ -169,6 +170,7 @@ export function PersonelDetayPage() {
             canViewBordroKapsam={canViewBordroKapsam && !isArchived && !isDirectoryOnly}
             canManageBordroKapsam={false}
             canApproveBordroKapsam={false}
+            canManageAccountOnboarding={canManageAccountOnboarding && !isArchived && !isDirectoryOnly}
             directoryOnly={isDirectoryOnly}
           />
         </div>

@@ -8,6 +8,9 @@ import type {
   AylikOzetSummary,
   KayitDurumu,
   KullaniciTipi,
+  PersonelActivationMetaResponse,
+  PersonelActivationStatus,
+  PersonelHesapOnboardingResult,
   UpsertYonetimKullaniciPayload,
   UpsertYonetimSubePayload,
   YonetimActorIdentityRead,
@@ -145,6 +148,18 @@ function normalizeYonetimKullanici(data: unknown): YonetimKullanici {
   const mustChangePassword = readOptionalBoolean(
     record.must_change_password ?? record.mustChangePassword
   );
+  const activationRequired = readOptionalBoolean(
+    record.activation_required ?? record.activationRequired
+  );
+  const activationStatusRaw = readString(record.activation_status ?? record.activationStatus);
+  const activationStatus: PersonelActivationStatus | undefined =
+    activationStatusRaw === "PENDING" || activationStatusRaw === "ACTIVE"
+      ? activationStatusRaw
+      : activationRequired === true
+        ? "PENDING"
+        : activationRequired === false
+          ? "ACTIVE"
+          : undefined;
 
   return {
     id,
@@ -156,6 +171,10 @@ function normalizeYonetimKullanici(data: unknown): YonetimKullanici {
     personel_id: readNumber(record.personel_id) ?? null,
     personel_ad_soyad: readStringOrNull(record.personel_ad_soyad),
     ...(mustChangePassword === undefined ? {} : { must_change_password: mustChangePassword }),
+    ...(activationRequired === undefined ? {} : { activation_required: activationRequired }),
+    ...(activationStatus === undefined ? {} : { activation_status: activationStatus }),
+    activated_at_utc: readStringOrNull(record.activated_at_utc ?? record.activatedAtUtc),
+    username_source: readString(record.username_source ?? record.usernameSource),
     sube_ids: readNumberArray(record.sube_ids),
     bolum_ids: readNumberArray(record.bolum_ids),
     birim_ids: readNumberArray(record.birim_ids),
@@ -413,4 +432,104 @@ export async function ustOnayVer(filters: AylikOzetFilters): Promise<AylikOzetRe
   });
   const data = toRecord(response.data);
   return buildAylikOzetResponse(filters, data);
+}
+
+function normalizePersonelHesapOnboardingResult(data: unknown): PersonelHesapOnboardingResult {
+  const record = toRecord(data);
+  if (!record) {
+    throw new Error("Personel hesap onboarding yaniti beklenen formatta degil.");
+  }
+
+  const userRecord = toRecord(record.user);
+  const activationRecord = toRecord(record.activation);
+  const userId = userRecord ? readNumber(userRecord.id) : undefined;
+  const username = userRecord ? readString(userRecord.username) : undefined;
+  const activationUrl = activationRecord ? readString(activationRecord.activation_url) : undefined;
+  const createdAt = activationRecord ? readString(activationRecord.created_at_utc) : undefined;
+  const expiresAt = activationRecord ? readString(activationRecord.expires_at_utc) : undefined;
+
+  if (!userId || !username || !activationUrl || !createdAt || !expiresAt) {
+    throw new Error("Personel hesap onboarding yaniti zorunlu alanlari icermiyor.");
+  }
+
+  const activationRequired = userRecord
+    ? readOptionalBoolean(userRecord.activation_required)
+    : undefined;
+  const mustChangePassword = userRecord
+    ? readOptionalBoolean(userRecord.must_change_password)
+    : undefined;
+
+  return {
+    user: {
+      id: userId,
+      username,
+      rol: userRecord ? readString(userRecord.rol) : undefined,
+      durum: userRecord ? readString(userRecord.durum) : undefined,
+      personel_id: userRecord ? (readNumber(userRecord.personel_id) ?? null) : null,
+      ...(activationRequired === undefined ? {} : { activation_required: activationRequired }),
+      ...(mustChangePassword === undefined ? {} : { must_change_password: mustChangePassword }),
+      username_source: userRecord
+        ? readString(userRecord.username_source)
+        : undefined,
+      activated_at_utc: userRecord
+        ? readStringOrNull(userRecord.activated_at_utc)
+        : null
+    },
+    activation: {
+      activation_url: activationUrl,
+      created_at_utc: createdAt,
+      expires_at_utc: expiresAt,
+      reissued: activationRecord ? readBoolean(activationRecord.reissued) : false
+    },
+    message: readString(record.message)
+  };
+}
+
+export async function createPersonelHesapOnboarding(
+  personelId: number | string
+): Promise<PersonelHesapOnboardingResult> {
+  const response = await apiRequest<ApiResponse<unknown>>(
+    endpoints.yonetim.personelHesapOnboarding(personelId),
+    { method: "POST", body: JSON.stringify({}) }
+  );
+  return normalizePersonelHesapOnboardingResult(response.data);
+}
+
+export async function reissuePersonelAktivasyon(
+  kullaniciId: number | string
+): Promise<PersonelHesapOnboardingResult> {
+  const response = await apiRequest<ApiResponse<unknown>>(
+    endpoints.yonetim.kullaniciAktivasyonYenile(kullaniciId),
+    { method: "POST", body: JSON.stringify({}) }
+  );
+  return normalizePersonelHesapOnboardingResult(response.data);
+}
+
+export async function fetchPersonelAktivasyonMeta(
+  kullaniciId: number | string
+): Promise<PersonelActivationMetaResponse> {
+  const response = await apiRequest<ApiResponse<unknown>>(
+    endpoints.yonetim.kullaniciAktivasyonMeta(kullaniciId)
+  );
+  const record = toRecord(response.data);
+  const invitation = record ? toRecord(record.activation_invitation) : null;
+  if (!invitation) {
+    return { activation_invitation: null };
+  }
+
+  const createdAt = readString(invitation.created_at_utc);
+  const expiresAt = readString(invitation.expires_at_utc);
+  if (!createdAt || !expiresAt) {
+    return { activation_invitation: null };
+  }
+
+  return {
+    activation_invitation: {
+      invitation_id: readNumber(invitation.invitation_id),
+      created_at_utc: createdAt,
+      expires_at_utc: expiresAt,
+      is_expired: readBoolean(invitation.is_expired),
+      is_valid: readBoolean(invitation.is_valid)
+    }
+  };
 }

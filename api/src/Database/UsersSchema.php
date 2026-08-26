@@ -56,4 +56,49 @@ class UsersSchema
             return false;
         }
     }
+
+    public static function hasActivationRequired(PDO $pdo): bool
+    {
+        try {
+            $col = $pdo->query("SHOW COLUMNS FROM users LIKE 'activation_required'");
+            $exists = $col !== false && $col->fetch(PDO::FETCH_ASSOC) !== false;
+            if ($col !== false) {
+                $col->closeCursor();
+            }
+
+            return $exists;
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    public static function hasUsernameSource(PDO $pdo): bool
+    {
+        try {
+            $col = $pdo->query("SHOW COLUMNS FROM users LIKE 'username_source'");
+            $exists = $col !== false && $col->fetch(PDO::FETCH_ASSOC) !== false;
+            if ($col !== false) {
+                $col->closeCursor();
+            }
+
+            return $exists;
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    public static function hasActivatedAtUtc(PDO $pdo): bool
+    {
+        try {
+            $col = $pdo->query("SHOW COLUMNS FROM users LIKE 'activated_at_utc'");
+            $exists = $col !== false && $col->fetch(PDO::FETCH_ASSOC) !== false;
+            if ($col !== false) {
+                $col->closeCursor();
+            }
+
+            return $exists;
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
 }

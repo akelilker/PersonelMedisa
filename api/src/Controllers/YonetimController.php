@@ -14,6 +14,7 @@ use Medisa\Api\Http\Request;
 use Medisa\Api\Scope\OrgScope;
 use Medisa\Api\Scope\SubeScope;
 use Medisa\Api\Services\Auth\UserPersonelBindingService;
+use Medisa\Api\Services\Auth\PersonelAccountOnboardingService;
 use Medisa\Api\Services\Auth\ActorIdentityException;
 use Medisa\Api\Services\Auth\ActorIdentityService;
 use PDO;
@@ -925,6 +926,8 @@ class YonetimController
         $hasVarsayilan = UsersSchema::hasVarsayilanSubeId($pdo);
         $hasPersonelId = UsersSchema::hasPersonelId($pdo);
         $hasMustChangePassword = UsersSchema::hasMustChangePassword($pdo);
+        $hasActivationRequired = UsersSchema::hasActivationRequired($pdo);
+        $hasUsernameSource = UsersSchema::hasUsernameSource($pdo);
         $selectCols = ['id', 'username', 'ad_soyad', 'rol', 'durum'];
         if ($hasVarsayilan) {
             $selectCols[] = 'varsayilan_sube_id';
@@ -934,6 +937,15 @@ class YonetimController
         }
         if ($hasMustChangePassword) {
             $selectCols[] = 'must_change_password';
+        }
+        if ($hasActivationRequired) {
+            $selectCols[] = 'activation_required';
+        }
+        if (UsersSchema::hasActivatedAtUtc($pdo)) {
+            $selectCols[] = 'activated_at_utc';
+        }
+        if ($hasUsernameSource) {
+            $selectCols[] = 'username_source';
         }
         $selectSql = 'SELECT ' . implode(', ', $selectCols) . ' FROM users ORDER BY id ASC';
         $stmt = $pdo->query($selectSql);
@@ -982,6 +994,9 @@ class YonetimController
         $finalVarsayilanSubeId = self::parseOptionalInt($body['varsayilan_sube_id'] ?? null);
         $personelIdProvided = array_key_exists('personel_id', $body);
         $requestedPersonelId = $personelIdProvided ? self::parseOptionalInt($body['personel_id']) : null;
+
+        // Secure onboarding owns PERSONEL + personel_id creation (no admin-chosen password).
+        PersonelAccountOnboardingService::rejectGenericPersonelBoundCreate($body);
 
         if ($username === '') {
             JsonResponse::badRequest('Kullanici adi zorunludur.', 'VALIDATION_ERROR', 'username');
@@ -1380,6 +1395,22 @@ class YonetimController
             $mapped['must_change_password'] = self::readStoredMustChangePasswordFromRow($row);
         }
 
+        if (array_key_exists('activation_required', $row)) {
+            $mapped['activation_required'] = ((int) ($row['activation_required'] ?? 0)) === 1;
+            if ($mapped['activation_required']) {
+                $mapped['activation_status'] = 'PENDING';
+            } elseif (array_key_exists('activated_at_utc', $row) && $row['activated_at_utc']) {
+                $mapped['activation_status'] = 'ACTIVE';
+                $mapped['activated_at_utc'] = (string) $row['activated_at_utc'];
+            } else {
+                $mapped['activation_status'] = 'ACTIVE';
+            }
+        }
+
+        if (array_key_exists('username_source', $row) && $row['username_source'] !== null && $row['username_source'] !== '') {
+            $mapped['username_source'] = (string) $row['username_source'];
+        }
+
         return $mapped;
     }
 
@@ -1487,6 +1518,15 @@ class YonetimController
         }
         if ($hasMustChangePassword) {
             $cols[] = 'must_change_password';
+        }
+        if (UsersSchema::hasActivationRequired($pdo)) {
+            $cols[] = 'activation_required';
+        }
+        if (UsersSchema::hasActivatedAtUtc($pdo)) {
+            $cols[] = 'activated_at_utc';
+        }
+        if (UsersSchema::hasUsernameSource($pdo)) {
+            $cols[] = 'username_source';
         }
         $sql = 'SELECT ' . implode(', ', $cols) . ' FROM users WHERE id = :id LIMIT 1';
         $stmt = $pdo->prepare($sql);

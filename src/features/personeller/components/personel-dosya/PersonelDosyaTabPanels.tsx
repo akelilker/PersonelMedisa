@@ -33,6 +33,7 @@ export type PersonelDosyaTabPanelsProps = {
   canViewBordroKapsam?: boolean;
   canManageBordroKapsam?: boolean;
   canApproveBordroKapsam?: boolean;
+  canManageAccountOnboarding?: boolean;
   directoryOnly?: boolean;
 };
 
@@ -60,6 +61,7 @@ export function PersonelDosyaTabPanels({
   canViewBordroKapsam = false,
   canManageBordroKapsam = false,
   canApproveBordroKapsam = false,
+  canManageAccountOnboarding = false,
   directoryOnly = false
 }: PersonelDosyaTabPanelsProps) {
   function handleOpenSurecHistory() {
@@ -97,6 +99,7 @@ export function PersonelDosyaTabPanels({
           canViewBordroKapsam={canViewBordroKapsam}
           canManageBordroKapsam={canManageBordroKapsam}
           canApproveBordroKapsam={canApproveBordroKapsam}
+          canManageAccountOnboarding={canManageAccountOnboarding}
           isActive={activeTab === "genel-bilgiler"}
           onOpenSurecHistory={handleOpenSurecHistory}
         />

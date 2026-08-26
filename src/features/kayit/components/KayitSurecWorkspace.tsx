@@ -9,6 +9,7 @@ import {
   type KeyboardEvent,
   type SetStateAction
 } from "react";
+import { useNavigate } from "react-router-dom";
 import { FormField } from "../../../components/form/FormField";
 import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
@@ -234,8 +235,10 @@ export function KayitSurecWorkspace({
   primaryFormId,
   onFooterModelChange
 }: KayitSurecWorkspaceProps) {
+  const navigate = useNavigate();
   const { hasPermission } = useRoleAccess();
   const canCreatePersonel = hasPermission("personeller.create");
+  const canManageAccountOnboarding = hasPermission("yonetim-paneli.manage");
   const canCreateSurec = hasPermission("surecler.create");
   const canEditSurec = hasPermission("surecler.update");
   const canManageYillikIzinHak = hasPermission("yillik_izin_hak_duzeltme.manage");
@@ -269,6 +272,9 @@ export function KayitSurecWorkspace({
     Partial<Record<"tcKimlikNo" | "subeId", string>>
   >({});
   const [personelInfo, setPersonelInfo] = useState<string | null>(null);
+  const [createdPersonelIdForOnboarding, setCreatedPersonelIdForOnboarding] = useState<number | null>(
+    null
+  );
 
   const [surecForm, setSurecForm] = useState<SurecFormState>(INITIAL_SUREC_FORM);
   const [surecSubmitting, setSurecSubmitting] = useState(false);
@@ -855,6 +861,7 @@ export function KayitSurecWorkspace({
     setPersonelError(null);
     setPersonelFieldErrors({});
     setPersonelInfo(null);
+    setCreatedPersonelIdForOnboarding(null);
 
     try {
       const created = await createPersonel(buildCreatePersonelPayload(personelForm));
@@ -863,9 +870,15 @@ export function KayitSurecWorkspace({
       setPersonelForm(INITIAL_CREATE_PERSONEL_FORM);
       setPersonelFieldErrors({});
       setSurecForm(resetSurecFormKeepingPersonel(String(created.id)));
-      setPersonelInfo("Personel kaydı oluşturuldu. Süreç sekmesine geçiliyor.");
-      setSurecInfo("Personel seçildi. Süreç kaydına devam edebilirsin.");
-      onTabChange("surec");
+      if (canManageAccountOnboarding) {
+        setCreatedPersonelIdForOnboarding(created.id);
+        setPersonelInfo("Personel kaydı oluşturuldu. Hesap oluşturabilir veya süreç sekmesine geçebilirsiniz.");
+        setSurecInfo("Personel seçildi. Süreç kaydına devam edebilirsin.");
+      } else {
+        setPersonelInfo("Personel kaydı oluşturuldu. Süreç sekmesine geçiliyor.");
+        setSurecInfo("Personel seçildi. Süreç kaydına devam edebilirsin.");
+        onTabChange("surec");
+      }
     } catch (error) {
       const detail = getApiErrorDetail(error, "Personel kaydı oluşturulamadı.", {
         context: "personel-create"
@@ -1372,6 +1385,22 @@ export function KayitSurecWorkspace({
                   />
                 </form>
                 {personelInfo ? <p className="workspace-success">{personelInfo}</p> : null}
+                {createdPersonelIdForOnboarding != null && canManageAccountOnboarding ? (
+                  <div className="workspace-success" data-testid="personel-create-hesap-onboarding-cta">
+                    <p>İsterseniz personel hesabını güvenli aktivasyon ile oluşturabilirsiniz.</p>
+                    <button
+                      type="button"
+                      className="universal-btn-save"
+                      onClick={() => {
+                        const id = createdPersonelIdForOnboarding;
+                        onClose();
+                        navigate(`/personeller/${id}?tab=genel-bilgiler`);
+                      }}
+                    >
+                      Personel Hesabı Oluştur
+                    </button>
+                  </div>
+                ) : null}
               </>
             ) : null}
           </section>

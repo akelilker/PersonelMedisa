@@ -2,6 +2,8 @@ import type { UserRole } from "./auth";
 
 export type KullaniciTipi = "IC_PERSONEL" | "HARICI";
 export type KayitDurumu = "AKTIF" | "PASIF";
+export type PersonelActivationStatus = "PENDING" | "ACTIVE";
+export type UsernameSource = "SICIL_CANONICAL" | "MANUAL" | "SYSTEM" | string;
 
 export type YonetimKullanici = {
   id: number;
@@ -14,12 +16,51 @@ export type YonetimKullanici = {
   personel_ad_soyad?: string | null;
   /** Canonical DB flag; omitted when schema column absent. Never a credential secret. */
   must_change_password?: boolean;
+  activation_required?: boolean;
+  activation_status?: PersonelActivationStatus;
+  activated_at_utc?: string | null;
+  username_source?: UsernameSource;
   sube_ids: number[];
   bolum_ids?: number[];
   birim_ids?: number[];
   varsayilan_sube_id: number | null;
   durum: KayitDurumu;
   notlar?: string;
+};
+
+export type PersonelActivationIssue = {
+  activation_url: string;
+  created_at_utc: string;
+  expires_at_utc: string;
+  reissued: boolean;
+};
+
+export type PersonelHesapOnboardingResult = {
+  user: {
+    id: number;
+    username: string;
+    rol?: string;
+    durum?: string;
+    personel_id?: number | null;
+    activation_required?: boolean;
+    must_change_password?: boolean;
+    username_source?: UsernameSource;
+    activated_at_utc?: string | null;
+  };
+  activation: PersonelActivationIssue;
+  message?: string;
+};
+
+export type PersonelActivationInvitationMeta = {
+  invitation_id?: number;
+  created_at_utc: string;
+  expires_at_utc: string;
+  is_expired: boolean;
+  is_valid: boolean;
+};
+
+export type PersonelActivationMetaResponse = {
+  activation_invitation: PersonelActivationInvitationMeta | null;
 };
 
 export type UpsertYonetimKullaniciPayload = {

@@ -16,6 +16,7 @@ import { YonetimPaneliPage } from "../features/yonetim/pages/YonetimPaneliPage";
 import { ResmiTatilTakvimiPage } from "../features/yonetim/pages/ResmiTatilTakvimiPage";
 import { LoginPage } from "../features/auth/pages/LoginPage";
 import { ChangePasswordPage } from "../features/auth/pages/ChangePasswordPage";
+import { PersonelAktivasyonPage } from "../features/auth/pages/PersonelAktivasyonPage";
 import { PersonelSelfServiceHomePage } from "../features/self-service/pages/PersonelSelfServiceHomePage";
 import { PersonelQrScanPage } from "../features/self-service/pages/PersonelQrScanPage";
 import { PersonelQrHistoryPage } from "../features/self-service/pages/PersonelQrHistoryPage";
@@ -74,6 +75,7 @@ export function AppRoutes() {
       <Route element={<AppLayout />}>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/change-password" element={<ChangePasswordPage />} />
+        <Route path="/personel-aktivasyon" element={<PersonelAktivasyonPage />} />
       </Route>
 
       <Route path="/yetkisiz" element={<UnauthorizedPage />} />

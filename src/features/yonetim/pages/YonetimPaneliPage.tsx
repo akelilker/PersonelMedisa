@@ -27,6 +27,7 @@ import { SaklamaLegalHoldPanel } from "../components/SaklamaLegalHoldPanel";
 import { YonetimOrgScopeFields } from "../components/YonetimSubeScopeField";
 import { isRealYonetimKullaniciApi } from "../../../lib/yonetim/kullanici-api-contract";
 import {
+  PERSONEL_ACTIVATION_PENDING_LABEL,
   PERSONEL_FIRST_LOGIN_COMPLETE_LABEL,
   PERSONEL_FIRST_LOGIN_PENDING_LABEL,
   countPersonelFirstLoginStatus,
@@ -100,7 +101,7 @@ const DURUM_LABELS: Record<KayitDurumu, string> = {
 
 const FIRST_LOGIN_FILTER_OPTIONS: Array<{ value: PersonelFirstLoginFilter; label: string }> = [
   { value: "all", label: "Tümü" },
-  { value: "pending", label: PERSONEL_FIRST_LOGIN_PENDING_LABEL },
+  { value: "pending", label: `${PERSONEL_ACTIVATION_PENDING_LABEL} / ${PERSONEL_FIRST_LOGIN_PENDING_LABEL}` },
   { value: "completed", label: PERSONEL_FIRST_LOGIN_COMPLETE_LABEL }
 ];
 
@@ -315,8 +316,14 @@ function toKullaniciPayload(form: KullaniciFormState, isEdit: boolean): UpsertYo
     throw new Error("Kullanıcı adı zorunludur.");
   }
 
-  if (!isEdit && !form.password.trim()) {
+  if (!isEdit && !form.password.trim() && form.rol !== "PERSONEL") {
     throw new Error("Geçici şifre zorunludur.");
+  }
+
+  if (!isEdit && form.rol === "PERSONEL") {
+    throw new Error(
+      "PERSONEL hesapları Yönetim Paneli üzerinden oluşturulamaz. Personel kartındaki güvenli hesap onboarding akışını kullanın."
+    );
   }
 
   if (!realKullaniciApi && form.kullaniciTipi === "IC_PERSONEL" && !form.personelId) {
@@ -534,6 +541,9 @@ export function YonetimPaneliPage() {
     realKullaniciApi ||
     kullaniciForm.kullaniciTipi === "IC_PERSONEL" ||
     kullaniciForm.rol === "PERSONEL";
+
+  const isSecurePersonelCreatePath =
+    editingKullaniciId == null && kullaniciForm.rol === "PERSONEL";
 
   const subeNameMap = useMemo(() => new Map(subeler.map((sube) => [sube.id, sube.ad])), [subeler]);
   const personelDisplayNameMap = useMemo(
@@ -972,7 +982,7 @@ export function YonetimPaneliPage() {
                     {firstLoginLabel ? (
                       <span
                         className={
-                          item.must_change_password === true
+                          item.activation_required === true || item.must_change_password === true
                             ? "yonetim-first-login-badge yonetim-first-login-badge--pending"
                             : "yonetim-first-login-badge yonetim-first-login-badge--complete"
                         }
@@ -1029,7 +1039,7 @@ export function YonetimPaneliPage() {
                         {firstLoginLabel ? (
                           <span
                             className={
-                              item.must_change_password === true
+                              item.activation_required === true || item.must_change_password === true
                                 ? "yonetim-first-login-badge yonetim-first-login-badge--pending"
                                 : "yonetim-first-login-badge yonetim-first-login-badge--complete"
                             }
@@ -1171,14 +1181,22 @@ export function YonetimPaneliPage() {
                 onChange={(value) => setKullaniciForm((prev) => ({ ...prev, username: value }))}
                 required
               />
-              <FormField
-                label={editingKullaniciId != null ? "Geçici Şifre (boş bırakılırsa değişmez)" : "Geçici Şifre"}
-                name="yonetim-kullanici-password"
-                type="password"
-                value={kullaniciForm.password}
-                onChange={(value) => setKullaniciForm((prev) => ({ ...prev, password: value }))}
-                required={editingKullaniciId == null}
-              />
+              {!isSecurePersonelCreatePath ? (
+                <FormField
+                  label={editingKullaniciId != null ? "Geçici Şifre (boş bırakılırsa değişmez)" : "Geçici Şifre"}
+                  name="yonetim-kullanici-password"
+                  type="password"
+                  value={kullaniciForm.password}
+                  onChange={(value) => setKullaniciForm((prev) => ({ ...prev, password: value }))}
+                  required={editingKullaniciId == null}
+                />
+              ) : (
+                <p className="yonetim-hint" data-testid="yonetim-personel-secure-onboarding-hint">
+                  PERSONEL rolü için şifre buradan atanmaz. Personel hesabını ilgili personel kartındaki
+                  &quot;Personel Hesabı Oluştur&quot; akışı ile oluşturun; personel şifresini aktivasyon
+                  bağlantısı üzerinden kendisi belirler.
+                </p>
+              )}
               {!realKullaniciApi ? (
                 <FormField
                   as="select"

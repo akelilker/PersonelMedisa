@@ -31,12 +31,7 @@ class ChangePasswordController
         if ($current === '') {
             JsonResponse::badRequest('Mevcut sifre zorunludur.', 'VALIDATION_ERROR', 'current_password');
         }
-        if ($next === '') {
-            JsonResponse::badRequest('Yeni sifre zorunludur.', 'VALIDATION_ERROR', 'new_password');
-        }
-        if (strlen($next) < 8) {
-            JsonResponse::badRequest('Yeni sifre en az 8 karakter olmalidir.', 'VALIDATION_ERROR', 'new_password');
-        }
+        PasswordPolicy::assertValidNewPassword($next);
         if ($current === $next) {
             JsonResponse::badRequest('Yeni sifre mevcut sifreden farkli olmalidir.', 'VALIDATION_ERROR', 'new_password');
         }

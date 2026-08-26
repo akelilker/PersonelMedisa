@@ -25,6 +25,7 @@ use Medisa\Api\Services\Personel\PersonelOrgLocationSchema;
 use Medisa\Api\Services\Personel\PersonelOrgStructureSchema;
 use Medisa\Api\Services\Personel\PersonelValidationException;
 use Medisa\Api\Services\OfflineMutationIdempotencyService;
+use Medisa\Api\Services\Auth\PersonelAccountOnboardingService;
 use Medisa\Api\Services\PersonelUcretException;
 use Medisa\Api\Services\PersonelUcretService;
 use Medisa\Api\Services\Retention\PersonelArchiveGate;
@@ -555,6 +556,14 @@ class PersonellerController
             }
 
             self::updatePersonelRow($pdo, $personelId, $payload);
+            if (array_key_exists('sicil_no', $payload)) {
+                PersonelAccountOnboardingService::syncUsernameFromSicilIfApplicable(
+                    $pdo,
+                    $personelId,
+                    $payload['sicil_no'],
+                    $user
+                );
+            }
             if ($salaryChanged) {
                 PersonelUcretService::createSalaryRecord($pdo, $personelId, [
                     'ucret_tutari' => $salaryAmount,

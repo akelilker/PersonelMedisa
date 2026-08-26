@@ -1,5 +1,6 @@
 import type { Personel } from "../../../../types/personel";
 import type { Surec } from "../../../../types/surec";
+import { PersonelHesapOnboardingPanel } from "../../../yonetim/components/PersonelHesapOnboardingPanel";
 import { getPersonelMissingFieldKeys, type PersonelMissingFieldKey } from "../../personel-missing-info";
 import { DossierRecord, DossierSection } from "./personel-dosya-dossier";
 import { formatDetailValue, formatIsoDateDetail, formatReferenceValue } from "./personel-dosya-format-utils";
@@ -22,6 +23,7 @@ export function PersonelKartPanelGenelBilgiler({
   canViewBordroKapsam = false,
   canManageBordroKapsam = false,
   canApproveBordroKapsam = false,
+  canManageAccountOnboarding = false,
   isActive,
   onOpenSurecHistory
 }: {
@@ -37,6 +39,7 @@ export function PersonelKartPanelGenelBilgiler({
   canViewBordroKapsam?: boolean;
   canManageBordroKapsam?: boolean;
   canApproveBordroKapsam?: boolean;
+  canManageAccountOnboarding?: boolean;
   isActive: boolean;
   onOpenSurecHistory?: () => void;
 }) {
@@ -136,6 +139,19 @@ export function PersonelKartPanelGenelBilgiler({
         ) : null}
         <DossierRecord label="Pasiflik Etiketi" value={formatDetailValue(personel.pasiflik_durumu_etiketi)} />
       </DossierSection>
+
+      {canManageAccountOnboarding ? (
+        <DossierSection
+          title="Personel hesabı ve aktivasyon"
+          description="Güvenli hesap oluşturma ve aktivasyon bağlantısı Yönetici / İK tarafından buradan yönetilir."
+        >
+          <PersonelHesapOnboardingPanel
+            personelId={personel.id}
+            sicilNo={personel.sicil_no}
+            personelAktif={personel.aktif_durum === "AKTIF"}
+          />
+        </DossierSection>
+      ) : null}
 
       <PersonelPuantajOzetSection
         personel={personel}

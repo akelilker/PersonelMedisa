@@ -8,6 +8,7 @@ use Medisa\Api\Auth\AuthMiddleware;
 use Medisa\Api\Auth\AuthSmokeController;
 use Medisa\Api\Auth\ChangePasswordController;
 use Medisa\Api\Auth\LoginController;
+use Medisa\Api\Auth\PersonelActivationController;
 use Medisa\Api\Controllers\AylikBildirimOnaylariController;
 use Medisa\Api\Controllers\GenelYoneticiBildirimOnaylariController;
 use Medisa\Api\Controllers\BildirimlerController;
@@ -36,6 +37,7 @@ use Medisa\Api\Controllers\QrKioskController;
 use Medisa\Api\Controllers\PersonelBelgelerController;
 use Medisa\Api\Controllers\PersonelBordroKapsamController;
 use Medisa\Api\Controllers\PersonellerController;
+use Medisa\Api\Controllers\PersonelAccountOnboardingController;
 use Medisa\Api\Controllers\PersonelUcretController;
 use Medisa\Api\Controllers\TestFixturePersonelArchiveController;
 use Medisa\Api\Controllers\TestFixturePersonelClassificationController;
@@ -82,6 +84,12 @@ class Router
         }
         if ($path === '/auth/change-password' && $method === 'POST') {
             ChangePasswordController::change($this->request);
+        }
+        if ($path === '/auth/personel-activation/status' && $method === 'POST') {
+            PersonelActivationController::status($this->request);
+        }
+        if ($path === '/auth/personel-activation/complete' && $method === 'POST') {
+            PersonelActivationController::complete($this->request);
         }
         if ($path === '/auth/smoke-read' && $method === 'GET') {
             AuthSmokeController::smokeRead($this->request);
@@ -885,6 +893,15 @@ class Router
         if ($method === 'PUT' && preg_match('#^/yonetim/kullanicilar/(\d+)$#', $path, $matches)) {
             YonetimController::kullaniciGuncelle($this->request, $matches[1]);
         }
+        if ($method === 'POST' && preg_match('#^/yonetim/personeller/(\d+)/hesap-onboarding$#', $path, $matches)) {
+            PersonelAccountOnboardingController::onboard($this->request, $matches[1]);
+        }
+        if ($method === 'POST' && preg_match('#^/yonetim/kullanicilar/(\d+)/aktivasyon-yenile$#', $path, $matches)) {
+            PersonelAccountOnboardingController::reissue($this->request, $matches[1]);
+        }
+        if ($method === 'GET' && preg_match('#^/yonetim/kullanicilar/(\d+)/aktivasyon-meta$#', $path, $matches)) {
+            PersonelAccountOnboardingController::pendingMeta($this->request, $matches[1]);
+        }
         if ($method === 'GET' && preg_match('#^/yonetim/kullanicilar/(\d+)/actor-identity$#', $path, $matches)) {
             YonetimController::actorIdentityRead($this->request, $matches[1]);
         }
@@ -919,7 +936,11 @@ class Router
             RaporlarController::show($this->request, $matches[1]);
         }
 
-        if ($path !== '/health' && $path !== '/auth/login') {
+        if ($path !== '/health'
+            && $path !== '/auth/login'
+            && $path !== '/auth/personel-activation/status'
+            && $path !== '/auth/personel-activation/complete'
+        ) {
             AuthMiddleware::authenticate($this->request, true);
         }
 

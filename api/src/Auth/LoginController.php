@@ -48,12 +48,21 @@ class LoginController
         if ($hasMustChange) {
             $loginCols[] = 'must_change_password';
         }
+        $hasActivationRequired = UsersSchema::hasActivationRequired($pdo);
+        if ($hasActivationRequired) {
+            $loginCols[] = 'activation_required';
+        }
         $selectSql = 'SELECT ' . implode(', ', $loginCols) . ' FROM users WHERE username = :username LIMIT 1';
         $stmt = $pdo->prepare($selectSql);
         $stmt->execute(['username' => $username]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if (!$user || ($user['durum'] ?? '') !== 'AKTIF') {
+            JsonResponse::error(401, 'INVALID_CREDENTIALS', 'Kullanici adi veya sifre hatali.');
+        }
+
+        // Activation-pending accounts cannot log in. Opaque credentials message (no enumeration).
+        if ($hasActivationRequired && ((int) ($user['activation_required'] ?? 0)) === 1) {
             JsonResponse::error(401, 'INVALID_CREDENTIALS', 'Kullanici adi veya sifre hatali.');
         }
 

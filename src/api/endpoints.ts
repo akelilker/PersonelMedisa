@@ -1,7 +1,9 @@
 export const endpoints = {
   auth: {
     login: "/auth/login",
-    changePassword: "/auth/change-password"
+    changePassword: "/auth/change-password",
+    personelActivationStatus: "/auth/personel-activation/status",
+    personelActivationComplete: "/auth/personel-activation/complete"
   },
   clientTelemetry: "/client-telemetry",
   me: {
@@ -291,6 +293,9 @@ export const endpoints = {
   yonetim: {
     kullanicilar: "/yonetim/kullanicilar",
     kullaniciDetail: (id: number | string) => `/yonetim/kullanicilar/${id}`,
+    kullaniciAktivasyonYenile: (id: number | string) => `/yonetim/kullanicilar/${id}/aktivasyon-yenile`,
+    kullaniciAktivasyonMeta: (id: number | string) => `/yonetim/kullanicilar/${id}/aktivasyon-meta`,
+    personelHesapOnboarding: (id: number | string) => `/yonetim/personeller/${id}/hesap-onboarding`,
     actorIdentities: "/yonetim/actor-identities",
     actorIdentityDetail: (id: number | string) => `/yonetim/actor-identities/${id}`,
     actorIdentityVerify: (id: number | string) => `/yonetim/actor-identities/${id}/verify`,

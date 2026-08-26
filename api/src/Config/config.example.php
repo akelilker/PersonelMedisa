@@ -18,4 +18,9 @@ return [
     'personel_belge_storage_root' => '',
     // Physical destruction OPS gate — default OFF. Tests may override via env.
     'retention_physical_destruction_enabled' => false,
+    // Canonical public application base URL for security-sensitive links (no trailing slash).
+    // Example: https://example.com/personelmedisa
+    'app_public_url' => '',
+    // Personnel activation invitation TTL (minutes). Security default: 24 hours.
+    'personel_activation_ttl_minutes' => 1440,
 ];

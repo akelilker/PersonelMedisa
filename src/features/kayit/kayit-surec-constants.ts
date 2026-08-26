@@ -17,13 +17,24 @@ export type DevamsizlikSubId = "izin" | "rapor" | "is_kazasi" | "izinsiz" | "gec
 
 export type PersonelSurecTab =
   | "genel"
-  | "izin-devamsizlik"
+  | "puantaj"
+  | "haftalik-kapanis"
+  | "belge-takip"
   | "pozisyon"
   | "belgeler"
   | "mali"
   | "zimmet"
   | "ceza"
-  | "ayrilma";
+  | "ayrilma"
+  /** Legacy deep-link id; normalized to `puantaj` in selected-person navigation. */
+  | "izin-devamsizlik";
+
+export type PuantajSubdomainId =
+  | "gunluk-hareketler"
+  | "puantaj-duzenleme"
+  | "gorev"
+  | "fazla-mesai"
+  | DevamsizlikSubId;
 
 export type PozisyonFormState = {
   departmanId: string;
@@ -85,22 +96,89 @@ export const DEVAMSIZLIK_SUB_CARDS: DevamsizlikSubCard[] = [
   }
 ];
 
+/** Selected-person process navigation (presentation only; no route/permission duplication). */
 export const PERSONEL_SUREC_TABS: Array<{ id: PersonelSurecTab; label: string }> = [
   { id: "genel", label: "Genel" },
-  { id: "izin-devamsizlik", label: "İzin / Devamsızlık" },
+  { id: "puantaj", label: "Puantaj" },
+  { id: "haftalik-kapanis", label: "Haftalık Kapanış" },
+  { id: "belge-takip", label: "Belge Takip" },
+  { id: "mali", label: "Finans" },
   { id: "pozisyon", label: "Pozisyon" },
   { id: "belgeler", label: "Belgeler" },
-  { id: "mali", label: "Mali İşlemler" },
   { id: "zimmet", label: "Zimmet" },
   { id: "ceza", label: "Ceza" },
   { id: "ayrilma", label: "Ayrılma" }
 ];
 
+const DIS_KAYNAK_VISIBLE_TAB_IDS: PersonelSurecTab[] = ["genel", "pozisyon", "belgeler"];
+
+const INCOMING_PERSONEL_SUREC_TAB_IDS: PersonelSurecTab[] = [
+  ...PERSONEL_SUREC_TABS.map((tab) => tab.id),
+  "izin-devamsizlik"
+];
+
+export const PUANTAJ_SUBDOMAIN_CARDS: Array<{
+  id: PuantajSubdomainId;
+  title: string;
+  description: string;
+  kind: "route" | "inline-devamsizlik" | "puantaj-route";
+}> = [
+  {
+    id: "gunluk-hareketler",
+    title: "Günlük Hareketler",
+    description: "Günlük bildirim ve tamamlama akışı",
+    kind: "route"
+  },
+  {
+    id: "puantaj-duzenleme",
+    title: "Puantaj Düzenleme",
+    description: "Günlük puantaj satırı ve hareket kararları",
+    kind: "puantaj-route"
+  },
+  ...DEVAMSIZLIK_SUB_CARDS.map((card) => ({
+    id: card.id as PuantajSubdomainId,
+    title: card.title,
+    description: card.description,
+    kind: "inline-devamsizlik" as const
+  })),
+  {
+    id: "gorev",
+    title: "Görev",
+    description: "Görev / telafi çalışması puantaj kararları",
+    kind: "puantaj-route"
+  },
+  {
+    id: "fazla-mesai",
+    title: "Fazla Mesai",
+    description: "Fazla mesai ve tatil çalışması puantaj kararları",
+    kind: "puantaj-route"
+  }
+];
+
+export function isIncomingPersonelSurecTab(value: unknown): value is PersonelSurecTab {
+  return typeof value === "string" && INCOMING_PERSONEL_SUREC_TAB_IDS.includes(value as PersonelSurecTab);
+}
+
+/** Maps legacy/deep-link tab ids to canonical selected-person navigation tab. */
+export function normalizePersonelSurecTab(tab: PersonelSurecTab): PersonelSurecTab {
+  if (tab === "izin-devamsizlik") {
+    return "puantaj";
+  }
+  return tab;
+}
+
+export function resolveVisiblePersonelSurecTabs(isDirectoryOnly: boolean) {
+  if (isDirectoryOnly) {
+    return PERSONEL_SUREC_TABS.filter((tab) => DIS_KAYNAK_VISIBLE_TAB_IDS.includes(tab.id));
+  }
+  return PERSONEL_SUREC_TABS;
+}
+
 export function resolvePersonelSurecTabForSurecTuru(surecTuru: string): PersonelSurecTab {
   const normalized = surecTuru.trim().toUpperCase();
 
   if (["IZIN", "RAPOR", "IS_KAZASI", "DEVAMSIZLIK"].includes(normalized)) {
-    return "izin-devamsizlik";
+    return "puantaj";
   }
   if (["POZISYON_DEGISTI", "GOREV_DEGISTI", "BOLUM_DEGISTI", "DEPARTMAN_DEGISTI"].includes(normalized)) {
     return "pozisyon";

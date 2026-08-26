@@ -7,9 +7,11 @@ namespace Medisa\Api\Controllers;
 use Medisa\Api\Auth\AuthMiddleware;
 use Medisa\Api\Auth\RolePermissions;
 use Medisa\Api\Database\Connection;
+use Medisa\Api\Database\UserOrgAssignmentSchema;
 use Medisa\Api\Database\UsersSchema;
 use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
+use Medisa\Api\Scope\OrgScope;
 use Medisa\Api\Scope\SubeScope;
 use Medisa\Api\Services\Auth\UserPersonelBindingService;
 use Medisa\Api\Services\Auth\ActorIdentityException;
@@ -855,6 +857,7 @@ class YonetimController
         'IK_SORUMLUSU',
         'BIRIM_AMIRI',
         'BOLUM_YONETICISI',
+        'SUBE_YONETICISI',
         'GENEL_YONETICI',
         'SISTEM_YONETICISI',
         'AUTH_SMOKE_READONLY',
@@ -940,6 +943,8 @@ class YonetimController
             $userIds[] = (int) $row['id'];
         }
         $subeIdsByUser = self::loadSubeIdsByUserIds($pdo, $userIds);
+        $bolumIdsByUser = UserOrgAssignmentSchema::loadBolumIdsByUserIds($pdo, $userIds);
+        $birimIdsByUser = UserOrgAssignmentSchema::loadBirimIdsByUserIds($pdo, $userIds);
         $personelAdById = $hasPersonelId ? self::loadPersonelAdSoyadByIds($pdo, $rows) : [];
 
         $items = [];
@@ -951,7 +956,9 @@ class YonetimController
                 $hasVarsayilan,
                 $hasPersonelId,
                 $personelAdById,
-                $hasMustChangePassword
+                $hasMustChangePassword,
+                $bolumIdsByUser[$id] ?? [],
+                $birimIdsByUser[$id] ?? []
             );
         }
 
@@ -970,6 +977,8 @@ class YonetimController
         $rol = strtoupper(trim((string) ($body['rol'] ?? '')));
         $durum = strtoupper(trim((string) ($body['durum'] ?? 'AKTIF')));
         $finalSubeIds = self::parseSubeIds(isset($body['sube_ids']) ? $body['sube_ids'] : []);
+        $finalBolumIds = self::parseSubeIds(isset($body['bolum_ids']) ? $body['bolum_ids'] : []);
+        $finalBirimIds = self::parseSubeIds(isset($body['birim_ids']) ? $body['birim_ids'] : []);
         $finalVarsayilanSubeId = self::parseOptionalInt($body['varsayilan_sube_id'] ?? null);
         $personelIdProvided = array_key_exists('personel_id', $body);
         $requestedPersonelId = $personelIdProvided ? self::parseOptionalInt($body['personel_id']) : null;
@@ -1000,8 +1009,12 @@ class YonetimController
             JsonResponse::error(409, 'DUPLICATE_USERNAME', 'Bu kullanici adi zaten kayitli.', 'username');
         }
 
+        self::assertSubeYoneticisiRoleSchemaReady($pdo, $rol);
         self::assertSubeIdsExist($pdo, $finalSubeIds);
+        self::assertBolumIdsExist($pdo, $finalBolumIds);
+        self::assertBirimIdsExist($pdo, $finalBirimIds);
         self::assertVarsayilanSubeInScope($finalVarsayilanSubeId, $finalSubeIds);
+        self::assertRoleOrgAssignments($rol, $finalSubeIds, $finalBolumIds, $finalBirimIds, $requestedPersonelId, $rol === 'PERSONEL' || $personelIdProvided);
         self::assertAuthSmokeReadonlyContract($username, $rol, $finalSubeIds, $finalVarsayilanSubeId);
 
         $hasVarsayilan = UsersSchema::hasVarsayilanSubeId($pdo);
@@ -1066,6 +1079,8 @@ class YonetimController
             }
             $userId = (int) $pdo->lastInsertId();
             self::replaceUserSubeler($pdo, $userId, $finalSubeIds);
+            self::replaceUserBolumler($pdo, $userId, $finalBolumIds);
+            self::replaceUserBirimler($pdo, $userId, $finalBirimIds);
             if ($hasPersonelId && $personelIdProvided) {
                 UserPersonelBindingService::applyBinding($pdo, $userId, $requestedPersonelId, $actorUserId);
             }
@@ -1136,15 +1151,21 @@ class YonetimController
             : (string) $existing['durum'];
 
         $subeIdsProvided = array_key_exists('sube_ids', $body);
+        $bolumIdsProvided = array_key_exists('bolum_ids', $body);
+        $birimIdsProvided = array_key_exists('birim_ids', $body);
         $varsayilanProvided = array_key_exists('varsayilan_sube_id', $body);
         $requestedVarsayilan = $varsayilanProvided ? self::parseOptionalInt($body['varsayilan_sube_id']) : null;
         $personelIdProvided = array_key_exists('personel_id', $body);
         $requestedPersonelId = $personelIdProvided ? self::parseOptionalInt($body['personel_id']) : null;
 
         $currentSubeIds = self::loadSubeIdsByUserIds($pdo, [$kullaniciId])[$kullaniciId] ?? [];
+        $currentBolumIds = UserOrgAssignmentSchema::loadBolumIdsByUserIds($pdo, [$kullaniciId])[$kullaniciId] ?? [];
+        $currentBirimIds = UserOrgAssignmentSchema::loadBirimIdsByUserIds($pdo, [$kullaniciId])[$kullaniciId] ?? [];
         $currentStoredDefault = self::readStoredVarsayilanFromRow($existing);
 
         $finalSubeIds = $subeIdsProvided ? self::parseSubeIds($body['sube_ids']) : $currentSubeIds;
+        $finalBolumIds = $bolumIdsProvided ? self::parseSubeIds($body['bolum_ids']) : $currentBolumIds;
+        $finalBirimIds = $birimIdsProvided ? self::parseSubeIds($body['birim_ids']) : $currentBirimIds;
         $finalVarsayilanSubeId = $currentStoredDefault;
         if ($varsayilanProvided) {
             $finalVarsayilanSubeId = $requestedVarsayilan;
@@ -1170,10 +1191,29 @@ class YonetimController
             JsonResponse::error(409, 'DUPLICATE_USERNAME', 'Bu kullanici adi zaten kayitli.', 'username');
         }
 
+        self::assertSubeYoneticisiRoleSchemaReady($pdo, $rol);
+
         if ($subeIdsProvided) {
             self::assertSubeIdsExist($pdo, $finalSubeIds);
         }
+        if ($bolumIdsProvided) {
+            self::assertBolumIdsExist($pdo, $finalBolumIds);
+        }
+        if ($birimIdsProvided) {
+            self::assertBirimIdsExist($pdo, $finalBirimIds);
+        }
         self::assertVarsayilanSubeInScope($finalVarsayilanSubeId, $finalSubeIds);
+        $effectivePersonelId = $personelIdProvided
+            ? $requestedPersonelId
+            : self::readStoredPersonelIdFromRow($existing);
+        self::assertRoleOrgAssignments(
+            $rol,
+            $finalSubeIds,
+            $finalBolumIds,
+            $finalBirimIds,
+            $effectivePersonelId,
+            true
+        );
         self::assertAuthSmokeReadonlyContract($username, $rol, $finalSubeIds, $finalVarsayilanSubeId);
 
         $hasVarsayilan = UsersSchema::hasVarsayilanSubeId($pdo);
@@ -1236,6 +1276,12 @@ class YonetimController
             if ($subeIdsProvided) {
                 self::replaceUserSubeler($pdo, $kullaniciId, $finalSubeIds);
             }
+            if ($bolumIdsProvided) {
+                self::replaceUserBolumler($pdo, $kullaniciId, $finalBolumIds);
+            }
+            if ($birimIdsProvided) {
+                self::replaceUserBirimler($pdo, $kullaniciId, $finalBirimIds);
+            }
 
             if ($hasPersonelId && $personelIdProvided) {
                 UserPersonelBindingService::applyBinding(
@@ -1294,7 +1340,9 @@ class YonetimController
         $hasVarsayilanColumn = false,
         $hasPersonelIdColumn = false,
         array $personelAdById = [],
-        $hasMustChangePasswordColumn = false
+        $hasMustChangePasswordColumn = false,
+        array $bolumIds = [],
+        array $birimIds = []
     ) {
         $rol = (string) $row['rol'];
         $storedDefault = null;
@@ -1318,6 +1366,8 @@ class YonetimController
             'rol' => $rol,
             'durum' => (string) $row['durum'],
             'sube_ids' => $subeIds,
+            'bolum_ids' => $bolumIds,
+            'birim_ids' => $birimIds,
             'varsayilan_sube_id' => $storedDefault,
             'telefon' => null,
             'personel_id' => $personelId,
@@ -1458,6 +1508,8 @@ class YonetimController
         $hasPersonelId = UsersSchema::hasPersonelId($pdo);
         $hasMustChangePassword = UsersSchema::hasMustChangePassword($pdo);
         $subeIds = self::loadSubeIdsByUserIds($pdo, [(int) $userId])[(int) $userId] ?? [];
+        $bolumIds = UserOrgAssignmentSchema::loadBolumIdsByUserIds($pdo, [(int) $userId])[(int) $userId] ?? [];
+        $birimIds = UserOrgAssignmentSchema::loadBirimIdsByUserIds($pdo, [(int) $userId])[(int) $userId] ?? [];
         $personelAdById = $hasPersonelId ? self::loadPersonelAdSoyadByIds($pdo, [$row]) : [];
 
         return self::mapKullaniciRow(
@@ -1466,7 +1518,9 @@ class YonetimController
             $hasVarsayilan,
             $hasPersonelId,
             $personelAdById,
-            $hasMustChangePassword
+            $hasMustChangePassword,
+            $bolumIds,
+            $birimIds
         );
     }
 
@@ -1548,6 +1602,21 @@ class YonetimController
         }
     }
 
+    private static function assertSubeYoneticisiRoleSchemaReady(PDO $pdo, $rol)
+    {
+        if (strtoupper(trim((string) $rol)) !== 'SUBE_YONETICISI') {
+            return;
+        }
+        if (!UserOrgAssignmentSchema::isSubeYoneticisiRoleReady($pdo)) {
+            JsonResponse::error(
+                409,
+                'SCHEMA_NOT_READY',
+                'SUBE_YONETICISI rol semasi hazir degil.',
+                'rol'
+            );
+        }
+    }
+
     /** @param array<int, int> $subeIds */
     private static function replaceUserSubeler(PDO $pdo, $userId, array $subeIds)
     {
@@ -1564,6 +1633,133 @@ class YonetimController
                 'user_id' => $userId,
                 'sube_id' => $subeId,
             ]);
+        }
+    }
+
+    /**
+     * Role ↔ organizational assignment consistency (backend authoritative).
+     *
+     * @param array<int, int> $subeIds
+     * @param array<int, int> $bolumIds
+     * @param array<int, int> $birimIds
+     */
+    private static function assertRoleOrgAssignments(
+        $rol,
+        array $subeIds,
+        array $bolumIds,
+        array $birimIds,
+        $personelId,
+        $personelConsidered
+    ) {
+        $rol = strtoupper(trim((string) $rol));
+
+        if ($rol === 'SUBE_YONETICISI' || $rol === 'IK_SORUMLUSU' || $rol === 'MUHASEBE') {
+            if (count($subeIds) === 0) {
+                JsonResponse::badRequest('Bu rol icin en az bir sube atamasi zorunludur.', 'VALIDATION_ERROR', 'sube_ids');
+            }
+        }
+
+        if ($rol === 'BOLUM_YONETICISI' && count($bolumIds) === 0) {
+            JsonResponse::badRequest(
+                'BOLUM_YONETICISI icin en az bir bolum atamasi zorunludur.',
+                'VALIDATION_ERROR',
+                'bolum_ids'
+            );
+        }
+
+        if ($rol === 'BIRIM_AMIRI' && count($birimIds) === 0) {
+            JsonResponse::badRequest(
+                'BIRIM_AMIRI icin en az bir birim atamasi zorunludur.',
+                'VALIDATION_ERROR',
+                'birim_ids'
+            );
+        }
+
+        if ($rol === 'PERSONEL' && $personelConsidered && ($personelId === null || (int) $personelId <= 0)) {
+            JsonResponse::badRequest('PERSONEL rolu icin personel baglantisi zorunludur.', 'VALIDATION_ERROR', 'personel_id');
+        }
+
+        // Global roles may omit org assignments; do not require them.
+        if (in_array($rol, OrgScope::GLOBAL_ROLES, true)) {
+            return;
+        }
+    }
+
+    /** @param array<int, int> $bolumIds */
+    private static function assertBolumIdsExist(PDO $pdo, array $bolumIds)
+    {
+        if (count($bolumIds) === 0) {
+            return;
+        }
+        if (!UserOrgAssignmentSchema::isReady($pdo)) {
+            JsonResponse::error(409, 'SCHEMA_NOT_READY', 'Bolum atama semasi hazir degil.', 'bolum_ids');
+        }
+        $placeholders = implode(', ', array_fill(0, count($bolumIds), '?'));
+        $stmt = $pdo->prepare("SELECT COUNT(*) AS total FROM bolumler WHERE id IN ($placeholders)");
+        $stmt->execute($bolumIds);
+        $total = (int) ($stmt->fetch(PDO::FETCH_ASSOC)['total'] ?? 0);
+        if ($total !== count($bolumIds)) {
+            JsonResponse::badRequest('Gecersiz bolum secimi.', 'VALIDATION_ERROR', 'bolum_ids');
+        }
+    }
+
+    /** @param array<int, int> $birimIds */
+    private static function assertBirimIdsExist(PDO $pdo, array $birimIds)
+    {
+        if (count($birimIds) === 0) {
+            return;
+        }
+        if (!UserOrgAssignmentSchema::isReady($pdo)) {
+            JsonResponse::error(409, 'SCHEMA_NOT_READY', 'Birim atama semasi hazir degil.', 'birim_ids');
+        }
+        $placeholders = implode(', ', array_fill(0, count($birimIds), '?'));
+        $stmt = $pdo->prepare("SELECT COUNT(*) AS total FROM birimler WHERE id IN ($placeholders)");
+        $stmt->execute($birimIds);
+        $total = (int) ($stmt->fetch(PDO::FETCH_ASSOC)['total'] ?? 0);
+        if ($total !== count($birimIds)) {
+            JsonResponse::badRequest('Gecersiz birim secimi.', 'VALIDATION_ERROR', 'birim_ids');
+        }
+    }
+
+    /** @param array<int, int> $bolumIds */
+    private static function replaceUserBolumler(PDO $pdo, $userId, array $bolumIds)
+    {
+        if (!UserOrgAssignmentSchema::isReady($pdo)) {
+            if (count($bolumIds) > 0) {
+                JsonResponse::error(409, 'SCHEMA_NOT_READY', 'Bolum atama semasi hazir degil.', 'bolum_ids');
+            }
+
+            return;
+        }
+        $delete = $pdo->prepare('DELETE FROM user_bolumler WHERE user_id = :user_id');
+        $delete->execute(['user_id' => $userId]);
+        if (count($bolumIds) === 0) {
+            return;
+        }
+        $insert = $pdo->prepare('INSERT INTO user_bolumler (user_id, bolum_id) VALUES (:user_id, :bolum_id)');
+        foreach ($bolumIds as $bolumId) {
+            $insert->execute(['user_id' => $userId, 'bolum_id' => $bolumId]);
+        }
+    }
+
+    /** @param array<int, int> $birimIds */
+    private static function replaceUserBirimler(PDO $pdo, $userId, array $birimIds)
+    {
+        if (!UserOrgAssignmentSchema::isReady($pdo)) {
+            if (count($birimIds) > 0) {
+                JsonResponse::error(409, 'SCHEMA_NOT_READY', 'Birim atama semasi hazir degil.', 'birim_ids');
+            }
+
+            return;
+        }
+        $delete = $pdo->prepare('DELETE FROM user_birimler WHERE user_id = :user_id');
+        $delete->execute(['user_id' => $userId]);
+        if (count($birimIds) === 0) {
+            return;
+        }
+        $insert = $pdo->prepare('INSERT INTO user_birimler (user_id, birim_id) VALUES (:user_id, :birim_id)');
+        foreach ($birimIds as $birimId) {
+            $insert->execute(['user_id' => $userId, 'birim_id' => $birimId]);
         }
     }
 }

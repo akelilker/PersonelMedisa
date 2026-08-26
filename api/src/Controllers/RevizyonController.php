@@ -10,6 +10,7 @@ use Medisa\Api\Database\Connection;
 use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
 use Medisa\Api\Scope\SubeScope;
+use Medisa\Api\Support\Utf8;
 use PDO;
 use PDOException;
 use Throwable;
@@ -186,7 +187,7 @@ class RevizyonController
         $kaynakId = self::parsePositiveInt($body['kaynak_id'] ?? null, 'kaynak_id', true);
         $revizyonTipi = self::requireRevizyonTipi($body);
         $gerekce = self::requireTrimmedString($body, 'gerekce');
-        if (mb_strlen($gerekce) > 1000) {
+        if (Utf8::length($gerekce) > 1000) {
             self::validationError('gerekce', 'gerekce en fazla 1000 karakter olabilir.');
         }
 
@@ -1100,14 +1101,13 @@ class RevizyonController
             JsonResponse::error(403, 'REVISION_SCOPE_DENIED', 'Revizyon talebi kapsam disi.');
         }
 
-        SubeScope::assertPersonelAccess($user, $request, (int) $row['sube_id']);
+        $pdo = Connection::get();
+        $personel = self::loadPersonel($pdo, (int) $row['personel_id']);
+        SubeScope::assertPersonelAccess($user, $request, $personel);
 
         if ($rol === 'GENEL_YONETICI') {
             return;
         }
-
-        $pdo = Connection::get();
-        $personel = self::loadPersonel($pdo, (int) $row['personel_id']);
 
         if ($rol === 'BOLUM_YONETICISI') {
             $departmanIds = self::loadUserDepartmanIds($pdo, (int) $user['id']);
@@ -1150,7 +1150,7 @@ class RevizyonController
             JsonResponse::error(403, 'REVISION_SCOPE_DENIED', 'Revizyon talebi kapsam disi.');
         }
 
-        SubeScope::assertPersonelAccess($user, $request, (int) $personel['sube_id']);
+        SubeScope::assertPersonelAccess($user, $request, $personel);
 
         if ($rol === 'GENEL_YONETICI') {
             return;
@@ -1342,7 +1342,7 @@ class RevizyonController
     private static function loadPersonel(PDO $pdo, int $personelId): array
     {
         $stmt = $pdo->prepare(
-            'SELECT id, sube_id, departman_id, aktif_durum FROM personeller WHERE id = :id LIMIT 1'
+            'SELECT id, sube_id, bolum_id, birim_id, departman_id, aktif_durum FROM personeller WHERE id = :id LIMIT 1'
         );
         $stmt->execute(['id' => $personelId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -1909,7 +1909,7 @@ class RevizyonController
         if ($value === '') {
             return null;
         }
-        if (mb_strlen($value) > 1000) {
+        if (Utf8::length($value) > 1000) {
             self::correctionPayloadError('aciklama', 'aciklama en fazla 1000 karakter olabilir.');
         }
 
@@ -1986,7 +1986,7 @@ class RevizyonController
         if ($value === '') {
             return null;
         }
-        if (mb_strlen($value) > $maxLen) {
+        if (Utf8::length($value) > $maxLen) {
             self::validationError($field, $field . ' en fazla ' . $maxLen . ' karakter olabilir.');
         }
 

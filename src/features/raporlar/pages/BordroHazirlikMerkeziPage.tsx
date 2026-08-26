@@ -42,6 +42,7 @@ import { LoadingState } from "../../../components/states/LoadingState";
 import { useRoleAccess } from "../../../hooks/use-role-access";
 import { useMaasHesaplama } from "../../../hooks/useMaasHesaplama";
 import { currentMonthParts, parseAyValue } from "../../../lib/donem-kapanis/display";
+import { formatSurecStateLabel } from "../../../lib/display/enum-display";
 import { useAuth } from "../../../state/auth.store";
 import type { IdOption } from "../../../types/referans";
 import { fetchPersonelDetail } from "../../../api/personeller.api";
@@ -509,9 +510,9 @@ export function BordroHazirlikMerkeziPage() {
     if (!subeId) return;
     try {
       await downloadBordroReadinessCsv({ yil, ay, subeId });
-      setActionMessage("Readiness CSV indirildi.");
+      setActionMessage("Hazırlık CSV indirildi.");
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Readiness CSV indirilemedi.");
+      setErrorMessage(error instanceof Error ? error.message : "Hazırlık CSV indirilemedi.");
     }
   }
 
@@ -615,7 +616,7 @@ export function BordroHazirlikMerkeziPage() {
 
           <div>
             <button type="button" data-testid="bordro-readiness-csv-indir" onClick={() => void handleDownloadReadinessCsv()}>
-              Readiness CSV İndir
+              Hazırlık CSV İndir
             </button>
           </div>
 
@@ -642,7 +643,7 @@ export function BordroHazirlikMerkeziPage() {
                 <p>{domain.aciklama}</p>
                 {domain.blocker_codes && domain.blocker_codes.length > 0 ? (
                   <p data-testid={`bordro-readiness-blockers-${domain.key}`}>
-                    Blocker kodları: {domain.blocker_codes.join(", ")}
+                    Engel kodları: {domain.blocker_codes.join(", ")}
                   </p>
                 ) : null}
                 {domain.eksik_kodlar && domain.eksik_kodlar.length > 0 ? (
@@ -712,15 +713,18 @@ export function BordroHazirlikMerkeziPage() {
               <p>{preflight.hesaplanabilir_mi ? "Evet" : "Hayır"}</p>
             </div>
             <div>
-              <strong>Blocker</strong>
+              <strong>Engel</strong>
               <p>{preflight.blocker_count}</p>
             </div>
           </div>
           <section className="kapanis-issue-section">
             {blockers.map((item) => (
               <article key={`${item.code}-${item.record_id ?? "x"}`} data-testid={`bordro-hazirlik-issue-${item.code}`}>
-                <strong>{item.code}</strong>
-                <p>{"kullanici_mesaji" in item && item.kullanici_mesaji ? String(item.kullanici_mesaji) : item.message}</p>
+                <strong>
+                  {"kullanici_mesaji" in item && item.kullanici_mesaji
+                    ? String(item.kullanici_mesaji)
+                    : item.message}
+                </strong>
                 {"action_link" in item && item.action_link ? (
                   <Link to={String(item.action_link)} data-testid={`bordro-hazirlik-issue-link-${item.code}`}>
                     Sorunu çöz
@@ -847,7 +851,7 @@ export function BordroHazirlikMerkeziPage() {
                 return (
                   <tr key={politika.id} data-testid={`bordro-politika-row-${politika.id}`}>
                     <td>{politika.id}</td>
-                    <td>{politika.state}</td>
+                    <td>{formatSurecStateLabel(politika.state)}</td>
                     <td data-testid={`bordro-politika-evidence-${politika.id}`}>
                       {evidenceStatusLabel(politika.evidence_status)}
                     </td>

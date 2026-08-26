@@ -9,6 +9,7 @@ use Medisa\Api\Auth\RolePermissions;
 use Medisa\Api\Database\Connection;
 use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
+use Medisa\Api\Scope\OrgScope;
 use Medisa\Api\Scope\SubeScope;
 use Medisa\Api\Services\Personel\PersonelCalisanKapsamSchema;
 use Medisa\Api\Services\Personel\PersonelCalisanKapsamService;
@@ -38,7 +39,6 @@ class PersonellerController
             'personeller.view.sube',
         ]);
         $scope = SubeScope::resolveScope($user, $request);
-        $allowedSubeIds = SubeScope::allowedSubeIds($user);
 
         $page = max(1, (int) ($request->getQuery('page', 1) ?: 1));
         $limit = max(1, min(250, (int) ($request->getQuery('limit', 10) ?: 10)));
@@ -61,18 +61,7 @@ class PersonellerController
         $where = ['1=1'];
         $params = [];
 
-        if ($scope !== null) {
-            $where[] = 'p.sube_id = :scope_sube_id';
-            $params['scope_sube_id'] = $scope;
-        } elseif (count($allowedSubeIds) > 0) {
-            $placeholders = [];
-            foreach ($allowedSubeIds as $index => $subeId) {
-                $key = 'allowed_sube_id_' . $index;
-                $placeholders[] = ':' . $key;
-                $params[$key] = $subeId;
-            }
-            $where[] = 'p.sube_id IN (' . implode(', ', $placeholders) . ')';
-        }
+        OrgScope::appendPersonelOrgFilter($where, $params, $user, $scope, 'p');
 
         if ($aktiflik === 'aktif') {
             $where[] = "p.aktif_durum = 'AKTIF'";
@@ -167,7 +156,7 @@ class PersonellerController
             JsonResponse::serverError('Veritabani baglantisi kurulamadi.');
         }
 
-        $stmt = $pdo->prepare('SELECT sube_id, aktif_durum FROM personeller WHERE id = :id LIMIT 1');
+        $stmt = $pdo->prepare('SELECT id, sube_id, bolum_id, birim_id, aktif_durum FROM personeller WHERE id = :id LIMIT 1');
         $stmt->execute(['id' => $personelId]);
         $exists = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$exists) {
@@ -175,7 +164,7 @@ class PersonellerController
         }
 
         PersonelArchiveGate::assertDetailAccess($user, $exists);
-        SubeScope::assertPersonelAccess($user, $request, (int) $exists['sube_id']);
+        SubeScope::assertPersonelAccess($user, $request, $exists);
 
         $select = self::personelSelectSql($pdo);
         $sql = "
@@ -415,7 +404,7 @@ class PersonellerController
         }
 
         PersonelArchiveGate::assertBusinessWriteAllowed($pdo, $personelId);
-        self::assertUpdateSubeScope($user, $request, (int) $current['sube_id'], $payload);
+        self::assertUpdateSubeScope($user, $request, $current, $payload);
         self::assertAktifDurumNotChanged($current, $payload);
         if (PersonelOrgLocationSchema::payloadRequestsOrgFields($payload)
             && !PersonelOrgLocationSchema::isReady($pdo)
@@ -925,12 +914,13 @@ class PersonellerController
 
     /**
      * @param array<string, mixed> $user
+     * @param array<string, mixed> $current
      * @param array<string, mixed> $payload
      */
-    private static function assertUpdateSubeScope(array $user, Request $request, $currentSubeId, array $payload)
+    private static function assertUpdateSubeScope(array $user, Request $request, array $current, array $payload)
     {
-        $currentSubeId = (int) $currentSubeId;
-        SubeScope::assertPersonelAccess($user, $request, $currentSubeId);
+        $currentSubeId = (int) $current['sube_id'];
+        SubeScope::assertPersonelAccess($user, $request, $current);
 
         if (!array_key_exists('sube_id', $payload)) {
             return;
@@ -1182,7 +1172,11 @@ class PersonellerController
             ";
         }
         if (PersonelOrgStructureSchema::isReady($pdo)) {
-            $columns .= ', b.ad AS bolum_adi, bi.ad AS birim_adi, poz.ad AS pozisyon_adi';
+            $hasKisaKod = PersonelOrgStructureSchema::hasKisaKodColumns($pdo);
+            $kisaCols = $hasKisaKod
+                ? ', b.kisa_kod AS bolum_kisa_kod, bi.kisa_kod AS birim_kisa_kod'
+                : '';
+            $columns .= ', b.ad AS bolum_adi, bi.ad AS birim_adi, poz.ad AS pozisyon_adi' . $kisaCols;
             $joins .= "
             LEFT JOIN bolumler b ON b.id = p.bolum_id
             LEFT JOIN birimler bi ON bi.id = p.birim_id
@@ -1337,7 +1331,15 @@ class PersonellerController
                 : null,
             'departman_adi' => $row['departman_adi'],
             'bolum_adi' => array_key_exists('bolum_adi', $row) ? $row['bolum_adi'] : null,
+            'bolum_kisa_kod' => array_key_exists('bolum_kisa_kod', $row) && is_string($row['bolum_kisa_kod'])
+                && trim($row['bolum_kisa_kod']) !== ''
+                ? trim($row['bolum_kisa_kod'])
+                : null,
             'birim_adi' => array_key_exists('birim_adi', $row) ? $row['birim_adi'] : null,
+            'birim_kisa_kod' => array_key_exists('birim_kisa_kod', $row) && is_string($row['birim_kisa_kod'])
+                && trim($row['birim_kisa_kod']) !== ''
+                ? trim($row['birim_kisa_kod'])
+                : null,
             'gorev_adi' => $row['gorev_adi'],
             'pozisyon_adi' => array_key_exists('pozisyon_adi', $row) ? $row['pozisyon_adi'] : null,
             'personel_tipi_adi' => $row['personel_tipi_adi'],

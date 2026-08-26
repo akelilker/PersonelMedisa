@@ -137,16 +137,21 @@ describe("retention archive gate source contract", () => {
       "utf8"
     );
     expect(detail).toContain("En erken imha değerlendirme tarihi");
-    expect(detail).toContain("Legal hold aktif");
+    expect(detail).toContain("Kayıt koruma altında");
+    expect(detail).not.toContain("Legal hold aktif");
     expect(detail).not.toContain("otomatik silinecek");
 
     const panel = readFileSync(
       resolve(root, "src/features/yonetim/components/SaklamaLegalHoldPanel.tsx"),
       "utf8"
     );
-    expect(panel).toContain("Medisa saklama politikası");
+    expect(panel).toMatch(/Medisa politikasına göre/);
     expect(panel).toContain("Otomatik silme yoktur");
-    expect(panel).toMatch(/minimum 10 takvim yılı/);
+    expect(panel).toMatch(/10 takvim yılı/);
+    expect(panel).toContain("Korumaya Al");
+    expect(panel).not.toMatch(/Legal hold/i);
+    expect(panel).not.toContain("Hedef domain");
+    expect(panel).not.toContain("Personel ID");
     expect(panel).not.toMatch(/\botomatik silinecek\b/i);
     expect(panel).not.toMatch(/\bkanunen\b/i);
   });

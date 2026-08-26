@@ -34,7 +34,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
   componentDidCatch(error: Error, info: ErrorInfo): void {
     logError({
-      message: error.message || "React render/lifecycle error",
+      message: error.message || "Sayfa görüntülenirken bir hata oluştu",
       error_stack: error.stack,
       component_stack: info.componentStack ? String(info.componentStack) : undefined,
       source: this.props.rootLevel ? "RootErrorBoundary" : "ErrorBoundary",

@@ -10,6 +10,7 @@ import {
   type PersonelImportDryRunResult
 } from "../../../api/personeller.api";
 import { downloadReportCsv } from "../../../reports/export-report";
+import { formatPersonelImportSatirDurumLabel } from "../../../lib/display/enum-display";
 import {
   importErrorMessage,
   visibleImportError
@@ -29,7 +30,7 @@ const REFERENCE_MATCH_MESSAGE =
   "CSV’de şube, departman, görev ve personel tipi değerlerini referans dosyasında göründüğü şekilde yazın. Bu alanlarda tam eşleşme kullanılır.";
 
 const REFERENCE_FRESHNESS_MESSAGE =
-  "Referans listesi güncel sistem kayıtlarından hazırlanır. Dosya hazırlandıktan sonra sistem kayıtları değişirse dry-run işlemini yeniden çalıştırın.";
+  "Referans listesi güncel sistem kayıtlarından hazırlanır. Dosya hazırlandıktan sonra sistem kayıtları değişirse ön kontrol işlemini yeniden çalıştırın.";
 
 const APPLY_CONFIRM_MESSAGE =
   "Bu işlem yalnız personel ana kayıtlarını oluşturur. Ücret, bordro kapsamı ve SGK statüsü oluşturmaz.";
@@ -411,7 +412,7 @@ export function PersonelImportDryRunModal({
                         <td>{row.satir_no}</td>
                         <td>{row.sicil_no || "-"}</td>
                         <td>{row.tc_kimlik_no_masked}</td>
-                        <td>{row.durum}</td>
+                        <td>{formatPersonelImportSatirDurumLabel(row.durum)}</td>
                         <td>{row.hata_kodlari.map(importErrorMessage).join(", ")}</td>
                       </tr>
                     ))}

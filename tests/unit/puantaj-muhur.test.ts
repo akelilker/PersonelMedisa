@@ -21,10 +21,13 @@ describe("puantaj.muhurle permission", () => {
     expect(hasRolePermission("BIRIM_AMIRI", "puantaj.muhurle")).toBe(false);
   });
 
-  it("only GENEL_YONETICI and BOLUM_YONETICISI have puantaj.muhurle", () => {
+  it("only GENEL_YONETICI, SUBE_YONETICISI, and BOLUM_YONETICISI have puantaj.muhurle", () => {
     const roles = getRolesWithPermission("puantaj.muhurle");
-    expect(roles).toEqual(expect.arrayContaining(["GENEL_YONETICI", "BOLUM_YONETICISI"]));
-    expect(roles).toHaveLength(2);
+    expect([...roles].sort()).toEqual(
+      ["BOLUM_YONETICISI", "GENEL_YONETICI", "SUBE_YONETICISI"].sort()
+    );
+    expect(roles).toHaveLength(3);
+    expect(hasRolePermission("SUBE_YONETICISI", "puantaj.muhurle")).toBe(true);
   });
 });
 

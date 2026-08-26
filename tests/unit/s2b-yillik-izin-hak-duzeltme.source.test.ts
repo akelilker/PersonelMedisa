@@ -51,7 +51,7 @@ describe("S2B yillik izin hak duzeltme (source invariants)", () => {
     expect(migrations).toContain("053_retention_legal_hold_arsiv.sql");
     expect(migrations).toContain("054_canonical_role_consolidation.sql");
     expect(migrations).toContain("055_yillik_izin_hak_duzeltmeleri.sql");
-    expect(migrations.at(-1)).toBe("070_offline_mutation_idempotency.sql");
+    expect(migrations.at(-1)).toBe("073_test_fixture_personel_archive.sql");
 
     const sql = read("api/migrations/055_yillik_izin_hak_duzeltmeleri.sql");
     expect(sql).toContain("CREATE TABLE IF NOT EXISTS yillik_izin_hak_duzeltmeleri");
@@ -123,9 +123,10 @@ describe("S2B yillik izin hak duzeltme (source invariants)", () => {
     expect(existsSync(resolve(root, "src/features/kayit/components/YillikIzinHakDuzeltmePanel.tsx"))).toBe(true);
 
     const workspace = read("src/features/kayit/components/KayitSurecWorkspace.tsx");
+    const puantajPanel = read("src/features/kayit/components/KayitSurecPersonelPuantajPanel.tsx");
     expect(workspace).toContain("YillikIzinHakDuzeltmePanel");
     expect(workspace).toContain('hasPermission("yillik_izin_hak_duzeltme.manage")');
-    expect(workspace).toContain('data-testid="yillik-izin-hak-duzeltme-tile"');
+    expect(puantajPanel).toContain('data-testid="yillik-izin-hak-duzeltme-tile"');
     expect(workspace).toContain("canManageYillikIzinHak");
   });
 
@@ -133,7 +134,7 @@ describe("S2B yillik izin hak duzeltme (source invariants)", () => {
     const workspace = read("src/features/kayit/components/KayitSurecWorkspace.tsx");
     // Panel appears only inside surec branch with selected personel + hakDuzeltmeOpen.
     expect(workspace).toMatch(/activeTab === ["']surec["']/);
-    expect(workspace).toContain("hakDuzeltmeOpen && selectedSurecPersonel");
+    expect(workspace).toContain("hakDuzeltmeOpen ? (");
     expect(workspace).toContain("<YillikIzinHakDuzeltmePanel");
 
     // Kayıt first-create tab block must not mount the entitlement write panel.

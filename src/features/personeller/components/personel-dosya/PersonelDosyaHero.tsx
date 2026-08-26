@@ -92,12 +92,18 @@ export function PersonelDosyaHero({
         />
         <DossierField
           label="Bölüm"
-          value={fieldValue("bolum_id", formatReferenceValue(personel.bolum_adi, personel.bolum_id))}
+          value={fieldValue(
+            "bolum_id",
+            formatReferenceValue(personel.bolum_adi, personel.bolum_id, personel.bolum_kisa_kod)
+          )}
           missing={missingKeys.has("bolum_id")}
         />
         <DossierField
           label="Birim"
-          value={fieldValue("birim_id", formatReferenceValue(personel.birim_adi, personel.birim_id))}
+          value={fieldValue(
+            "birim_id",
+            formatReferenceValue(personel.birim_adi, personel.birim_id, personel.birim_kisa_kod)
+          )}
           missing={missingKeys.has("birim_id")}
         />
         <DossierField

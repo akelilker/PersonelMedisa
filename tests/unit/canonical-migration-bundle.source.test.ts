@@ -20,6 +20,18 @@ const migration070 = resolve(
   root,
   "api/migrations/070_offline_mutation_idempotency.sql",
 );
+const migration071 = resolve(
+  root,
+  "api/migrations/071_org_hierarchy_authorization.sql",
+);
+const migration072 = resolve(
+  root,
+  "api/migrations/072_org_reference_short_codes.sql",
+);
+const migration073 = resolve(
+  root,
+  "api/migrations/073_test_fixture_personel_archive.sql",
+);
 const phpAvailable = spawnSync("php", ["-r", "echo PHP_VERSION;"]).status === 0;
 
 describe("canonical migration bundle", () => {
@@ -35,7 +47,7 @@ describe("canonical migration bundle", () => {
       expect(firstBytes.equals(readFileSync(second))).toBe(true);
 
       const bundle = firstBytes.toString("utf8");
-      expect((bundle.match(/'version' => '/g) ?? []).length).toBe(71);
+      expect((bundle.match(/'version' => '/g) ?? []).length).toBe(74);
       expect(bundle).toContain("'name' => 'migration_ledger.sql'");
       expect(bundle).toContain(
         "'name' => '067_personel_canonical_reference_gate.sql'",
@@ -48,6 +60,15 @@ describe("canonical migration bundle", () => {
       );
       expect(bundle).toContain(
         "'name' => '070_offline_mutation_idempotency.sql'",
+      );
+      expect(bundle).toContain(
+        "'name' => '071_org_hierarchy_authorization.sql'",
+      );
+      expect(bundle).toContain(
+        "'name' => '072_org_reference_short_codes.sql'",
+      );
+      expect(bundle).toContain(
+        "'name' => '073_test_fixture_personel_archive.sql'",
       );
 
       const checksum068 = createHash("sha256")
@@ -73,6 +94,30 @@ describe("canonical migration bundle", () => {
         /'name' => '070_offline_mutation_idempotency\.sql',[\s\S]*?'checksum' => '([a-f0-9]{64})'/,
       );
       expect(entry070?.[1]).toBe(checksum070);
+
+      const checksum071 = createHash("sha256")
+        .update(readFileSync(migration071))
+        .digest("hex");
+      const entry071 = bundle.match(
+        /'name' => '071_org_hierarchy_authorization\.sql',[\s\S]*?'checksum' => '([a-f0-9]{64})'/,
+      );
+      expect(entry071?.[1]).toBe(checksum071);
+
+      const checksum072 = createHash("sha256")
+        .update(readFileSync(migration072))
+        .digest("hex");
+      const entry072 = bundle.match(
+        /'name' => '072_org_reference_short_codes\.sql',[\s\S]*?'checksum' => '([a-f0-9]{64})'/,
+      );
+      expect(entry072?.[1]).toBe(checksum072);
+
+      const checksum073 = createHash("sha256")
+        .update(readFileSync(migration073))
+        .digest("hex");
+      const entry073 = bundle.match(
+        /'name' => '073_test_fixture_personel_archive\.sql',[\s\S]*?'checksum' => '([a-f0-9]{64})'/,
+      );
+      expect(entry073?.[1]).toBe(checksum073);
 
       expect(bundle).toContain(
         createHash("sha256").update(readFileSync(ledger)).digest("hex"),
@@ -116,7 +161,7 @@ describe("canonical migration bundle", () => {
           `require '${phpRoot}/api/src/bootstrap.php';`,
           `$provider = new Medisa\\Api\\Database\\BundledMigrationSourceProvider('${phpBundle}');`,
           `$rows = $provider->all();`,
-          `if (count($rows) !== 71 || $rows[0]['version'] !== '000' || $rows[69]['version'] !== '069' || $rows[70]['version'] !== '070') { exit(1); }`,
+          `if (count($rows) !== 74 || $rows[0]['version'] !== '000' || $rows[70]['version'] !== '070' || $rows[71]['version'] !== '071' || $rows[72]['version'] !== '072' || $rows[73]['version'] !== '073') { exit(1); }`,
           "echo 'RAW_SQL_MISSING_PRODUCTION_SIMULATION=PASS';",
         ].join(" ");
         const result = spawnSync("php", ["-r", script], {

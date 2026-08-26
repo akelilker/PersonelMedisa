@@ -397,11 +397,15 @@ export async function fetchManagerQrAttendance(params?: {
   return normalizeManagerQrAttendanceResponse(response);
 }
 
-export async function fetchQrKioskToken(): Promise<QrKioskTokenResponse> {
+export async function fetchQrKioskToken(requestedSubeId?: number): Promise<QrKioskTokenResponse> {
   if (shouldPreferDemoApi()) {
     demoUnavailable();
   }
-  const response = await apiRequest<ApiResponse<unknown>>(endpoints.qrKiosk.token);
+  const path =
+    requestedSubeId != null && requestedSubeId > 0
+      ? appendQueryParams(endpoints.qrKiosk.token, { sube_id: requestedSubeId })
+      : endpoints.qrKiosk.token;
+  const response = await apiRequest<ApiResponse<unknown>>(path);
   const data = toRecord(unwrapData(response, "/qr-kiosk/token yaniti gecersiz."));
   if (!data) {
     throw new ApiRequestError("/qr-kiosk/token yaniti gecersiz.", 500, {

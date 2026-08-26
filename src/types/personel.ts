@@ -21,8 +21,10 @@ export type Personel = {
   departman_id?: number;
   bolum_id?: number | null;
   bolum_adi?: string | null;
+  bolum_kisa_kod?: string | null;
   birim_id?: number | null;
   birim_adi?: string | null;
+  birim_kisa_kod?: string | null;
   gorev_id?: number;
   pozisyon_id?: number | null;
   pozisyon_adi?: string | null;

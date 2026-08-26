@@ -10,6 +10,7 @@ import { usePersoneller } from "../../../hooks/usePersoneller";
 import { formatAktifDurumLabel, formatCalisanKapsamiLabel, CALISAN_KAPSAMI_SELECT_OPTIONS } from "../../../lib/display/enum-display";
 import type { Personel } from "../../../types/personel";
 import type { IdOption } from "../../../types/referans";
+import { formatReferenceValue } from "../components/personel-dosya/personel-dosya-format-utils";
 import { PersonelImportDryRunModal } from "../components/PersonelImportDryRunModal";
 import { PersonelImportHistoryModal } from "../components/PersonelImportHistoryModal";
 import { getPersonelMissingFields } from "../personel-missing-info";
@@ -128,14 +129,6 @@ function buildTelHref(value: string | null | undefined) {
 
 function formatPersonelName(personel: Pick<Personel, "ad" | "soyad">) {
   return [personel.ad, personel.soyad].map((part) => String(part ?? "").trim()).filter(Boolean).join(" ");
-}
-
-function formatReferenceValue(label: string | undefined, id: number | undefined) {
-  if (label) {
-    return label;
-  }
-
-  return typeof id === "number" ? `#${id}` : "-";
 }
 
 function personelGridSubtitle(personel: Personel) {

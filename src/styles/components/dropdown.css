@@ -36,9 +36,8 @@
   display: block;
 }
 
-/* Shared shell menu item surface (settings + modules) */
-.settings-dropdown button,
-.modules-dropdown .modules-nav-link {
+/* Shared shell menu item surface (settings) */
+.settings-dropdown button {
   display: block;
   width: 100%;
   margin: 0 0 2px;
@@ -59,8 +58,7 @@
 }
 
 .settings-dropdown button:hover,
-.modules-dropdown .modules-nav-link:hover,
-.modules-dropdown .modules-nav-link:focus-visible {
+.settings-dropdown button:focus-visible {
   border-color: rgba(214, 225, 236, 0.5);
   color: var(--text-inverse);
   outline: none;
@@ -75,57 +73,6 @@
 
 .settings-dropdown .settings-logout-btn {
   color: var(--theme-color);
-}
-
-.modules-menu-wrap {
-  position: relative;
-}
-
-.modules-menu-wrap--overlay {
-  z-index: var(--z-notifications);
-}
-
-.modal-modules-bar {
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  margin: 0 0 10px;
-  min-height: 34px;
-}
-
-.modules-menu-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  max-width: 140px;
-}
-
-.modules-menu-toggle-label {
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  color: inherit;
-  white-space: nowrap;
-}
-
-.modules-menu-toggle-icon {
-  display: none;
-  flex-shrink: 0;
-}
-
-.modules-dropdown {
-  right: 0;
-  left: auto;
-  top: 36px;
-  max-height: min(70vh, 420px);
-  overflow-y: auto;
-  overflow-x: hidden;
-}
-
-.modules-dropdown .modules-nav-link.is-active,
-.modules-dropdown .modules-nav-link[aria-current="page"] {
-  border-color: rgba(var(--theme-color-rgb), 0.85);
-  color: var(--text-inverse);
 }
 
 @media (max-width: 640px) {
@@ -146,24 +93,5 @@
   .settings-dropdown button {
     text-align: right;
     font-size: 13px;
-  }
-
-  .modules-menu-toggle-label {
-    font-size: 11px;
-  }
-
-  .modules-dropdown .modules-nav-link {
-    text-align: right;
-    font-size: 13px;
-  }
-}
-
-@media (max-width: 480px) {
-  .modules-menu-toggle-label {
-    display: none;
-  }
-
-  .modules-menu-toggle-icon {
-    display: block;
   }
 }

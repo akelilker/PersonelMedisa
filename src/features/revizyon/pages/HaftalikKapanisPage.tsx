@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { ApiRequestError } from "../../../api/api-client";
 import { fetchPersonellerList } from "../../../api/personeller.api";
 import { fetchRevizyonKaynaklar } from "../../../api/revizyon-talebi.api";
@@ -8,6 +8,8 @@ import { LoadingState } from "../../../components/states/LoadingState";
 import { useRoleAccess } from "../../../hooks/use-role-access";
 import { ROUTE_PERMISSION } from "../../../lib/authorization/role-permissions";
 import type { Personel } from "../../../types/personel";
+import { KayitSurecReturnLink } from "../../kayit/components/KayitSurecReturnLink";
+import type { KayitSurecReturnContext } from "../../kayit/kayit-surec-navigation";
 import { HaftalikKapanisClosePanel } from "../components/HaftalikKapanisClosePanel";
 import {
   buildRevizyonTalebiCreatePath,
@@ -46,6 +48,9 @@ export function HaftalikKapanisPage() {
   const canCreate = hasPermission("revizyon.create");
   const canApprove = hasPermission("revizyon.approve");
   const [searchParams] = useSearchParams();
+  const location = useLocation();
+  const kayitSurecReturn = (location.state as { kayitSurecReturn?: KayitSurecReturnContext } | null)
+    ?.kayitSurecReturn;
 
   const [personeller, setPersoneller] = useState<Personel[]>([]);
   const [personelId, setPersonelId] = useState(searchParams.get("personel_id") ?? "");
@@ -111,7 +116,10 @@ export function HaftalikKapanisPage() {
 
   return (
     <section className="states-page" data-testid="haftalik-kapanis-page">
-      <h2>Haftalık Kapanış</h2>
+      <div className="puantaj-header-row">
+        <h2>Haftalık Kapanış</h2>
+        {kayitSurecReturn ? <KayitSurecReturnLink context={kayitSurecReturn} /> : null}
+      </div>
       <p>
         Kapalı hafta kapanış kayıtları korunur. Revizyon talepleri ve düzeltme kayıtları burada yönetilir;
         rapor/bordro motoru otomatik yeniden hesaplanmaz.

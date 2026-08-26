@@ -58,8 +58,14 @@
   gap: 14px;
 }
 
+/*
+ * No position:relative on the wrap — same as .notification-wrap. Anchoring the
+ * viewport-wide panel to this narrow toggle overflows the phone edge; fall back
+ * to .icons-row-right as the containing block.
+ */
 .sube-selector-wrap {
-  position: relative;
+  display: inline-flex;
+  align-items: center;
 }
 
 /*
@@ -112,9 +118,36 @@
 }
 
 .sube-selector-dropdown {
-  left: 0;
-  right: auto;
+  /* Anchor to the toggle's right edge so a viewport-wide panel opens leftward
+   * into the shell (left:0 overflows past the phone right edge). */
+  left: auto;
+  right: 0;
   top: 36px;
+}
+
+/*
+ * Şube selector shares .settings-dropdown base ("% max-width" vs narrow
+ * icons-row-right). Cap against viewport like settings/notifications owners.
+ */
+.settings-dropdown.sube-selector-dropdown {
+  box-sizing: border-box;
+  width: min(
+    300px,
+    calc(100vw - 32px),
+    calc(var(--app-shell-max-width) - 24px)
+  );
+  max-width: calc(100vw - 32px);
+}
+
+@media (max-width: 640px) {
+  .settings-dropdown.sube-selector-dropdown {
+    width: min(
+      300px,
+      calc(100vw - 24px),
+      calc(var(--app-shell-max-width) - 24px)
+    );
+    max-width: calc(100vw - 24px);
+  }
 }
 
 .settings-dropdown button.sube-option-active {

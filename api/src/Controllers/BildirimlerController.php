@@ -9,6 +9,7 @@ use Medisa\Api\Auth\RolePermissions;
 use Medisa\Api\Database\Connection;
 use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
+use Medisa\Api\Scope\ManagerApprovalScope;
 use Medisa\Api\Scope\SubeScope;
 use Medisa\Api\Services\OfflineMutationIdempotencyService;
 use PDO;
@@ -121,31 +122,9 @@ class BildirimlerController
 
         try {
             $pdo = Connection::get();
-            $stmt = $pdo->prepare('
-                SELECT u.id AS user_id, u.ad_soyad, us.sube_id
-                FROM users u
-                INNER JOIN user_subeler us ON us.user_id = u.id
-                WHERE u.rol = :rol
-                  AND u.durum = :durum
-                  AND us.sube_id = :sube_id
-                ORDER BY u.ad_soyad ASC, u.id ASC
-            ');
-            $stmt->execute([
-                'rol' => 'BIRIM_AMIRI',
-                'durum' => 'AKTIF',
-                'sube_id' => (int) $subeId,
-            ]);
+            $items = ManagerApprovalScope::listBirimAmiriOptionsForSube($pdo, (int) $subeId);
         } catch (\Throwable $e) {
             JsonResponse::serverError('Birim amiri secenekleri yuklenemedi.');
-        }
-
-        $items = [];
-        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
-            $items[] = [
-                'user_id' => (int) $row['user_id'],
-                'ad_soyad' => (string) $row['ad_soyad'],
-                'sube_id' => (int) $row['sube_id'],
-            ];
         }
 
         JsonResponse::success(['items' => $items]);
@@ -175,7 +154,7 @@ class BildirimlerController
             JsonResponse::notFound('Bildirim bulunamadi.');
         }
 
-        SubeScope::assertPersonelAccess($user, $request, (int) $row['sube_id']);
+        SubeScope::assertPersonelAccess($user, $request, self::personelOrgFromBildirimRow($row));
         JsonResponse::success(self::mapRow($row));
     }
 
@@ -199,7 +178,7 @@ class BildirimlerController
             self::validationError('personel_id', 'Personel bulunamadi.');
         }
         // Authorize branch access before applying operational (external) guards.
-        SubeScope::assertPersonelAccess($user, $request, (int) $personel['sube_id']);
+        SubeScope::assertPersonelAccess($user, $request, $personel);
         \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::assertOperationalEligible(
             $pdo,
             $payload['personel_id']
@@ -212,7 +191,7 @@ class BildirimlerController
             self::validationError('tarih', 'Bildirim tarihi ise giris tarihinden once olamaz.');
         }
 
-        SubeScope::assertPersonelAccess($user, $request, (int) $personel['sube_id']);
+        SubeScope::assertPersonelAccess($user, $request, $personel);
 
         $rol = strtoupper(trim((string) ($user['rol'] ?? '')));
         $currentUserId = self::userId($user);
@@ -366,7 +345,7 @@ class BildirimlerController
         }
 
         self::assertOwnership($user, $existing);
-        SubeScope::assertPersonelAccess($user, $request, (int) $existing['sube_id']);
+        SubeScope::assertPersonelAccess($user, $request, self::personelOrgFromBildirimRow($existing));
         self::assertEditableState($existing);
 
         $fields = [];
@@ -526,7 +505,7 @@ class BildirimlerController
         }
 
         self::assertOwnership($user, $existing);
-        SubeScope::assertPersonelAccess($user, $request, (int) $existing['sube_id']);
+        SubeScope::assertPersonelAccess($user, $request, self::personelOrgFromBildirimRow($existing));
 
         $state = (string) $existing['state'];
         if ($state === 'GONDERILDI') {
@@ -589,7 +568,7 @@ class BildirimlerController
             JsonResponse::notFound('Bildirim bulunamadi.');
         }
 
-        SubeScope::assertPersonelAccess($user, $request, (int) $existing['sube_id']);
+        SubeScope::assertPersonelAccess($user, $request, self::personelOrgFromBildirimRow($existing));
 
         if ((string) $existing['state'] !== 'GONDERILDI') {
             JsonResponse::error(409, 'CONFLICT', 'Yalnizca gonderilmis bildirimler icin duzeltme istenebilir.');
@@ -645,7 +624,7 @@ class BildirimlerController
         }
 
         self::assertOwnership($user, $existing);
-        SubeScope::assertPersonelAccess($user, $request, (int) $existing['sube_id']);
+        SubeScope::assertPersonelAccess($user, $request, self::personelOrgFromBildirimRow($existing));
 
         $state = (string) $existing['state'];
         if ($state === 'IPTAL') {
@@ -1152,11 +1131,26 @@ class BildirimlerController
         }
     }
 
+
+    /**
+     * @param array<string, mixed> $row
+     * @return array<string, mixed>
+     */
+    private static function personelOrgFromBildirimRow(array $row)
+    {
+        return [
+            'id' => (int) $row['personel_id'],
+            'sube_id' => (int) $row['sube_id'],
+            'bolum_id' => array_key_exists('personel_bolum_id', $row) ? $row['personel_bolum_id'] : null,
+            'birim_id' => array_key_exists('personel_birim_id', $row) ? $row['personel_birim_id'] : null,
+        ];
+    }
+
     /** @return array<string, mixed>|false */
     private static function fetchPersonel(PDO $pdo, $personelId)
     {
         $stmt = $pdo->prepare('
-            SELECT id, sube_id, departman_id, aktif_durum, ise_giris_tarihi, bagli_amir_id
+            SELECT id, sube_id, bolum_id, birim_id, departman_id, aktif_durum, ise_giris_tarihi, bagli_amir_id
             FROM personeller
             WHERE id = :id
             LIMIT 1
@@ -1175,7 +1169,9 @@ class BildirimlerController
             g.ad AS gorev_adi,
             d.ad AS departman_adi,
             s.ad AS sube_adi,
-            p.bagli_amir_id AS amir_user_id
+            p.bagli_amir_id AS amir_user_id,
+            p.bolum_id AS personel_bolum_id,
+            p.birim_id AS personel_birim_id
         ';
     }
 

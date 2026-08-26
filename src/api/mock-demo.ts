@@ -1992,6 +1992,7 @@ const DEMO_USER_ROLES: readonly UserRole[] = [
   "IK_SORUMLUSU",
   "BIRIM_AMIRI",
   "BOLUM_YONETICISI",
+  "SUBE_YONETICISI",
   "GENEL_YONETICI",
   "SISTEM_YONETICISI"
 ];
@@ -4603,7 +4604,7 @@ export function resolveDemoApiResponse(
     const actor = readDemoApiActor(init);
     const permissionError = enforceDemoPermission(actor, "haftalik_mutabakat.approve");
     if (permissionError) return permissionError;
-    if (actor.role !== "BIRIM_AMIRI") return demoRevizyonError("FORBIDDEN", "Yalnizca birim amiri kendi haftasini onaylayabilir.");
+    if (actor.role !== "BIRIM_AMIRI") return demoRevizyonError("FORBIDDEN", "Yalnizca birim yoneticisi kendi haftasini onaylayabilir.");
     const week = mutabakatWeek(body.hafta_baslangic);
     if (!week) return demoRevizyonError("VALIDATION_ERROR", "Hafta baslangici Pazartesi olmalidir.");
     const subeId = mutabakatScope(actor);
@@ -4791,7 +4792,7 @@ export function resolveDemoApiResponse(
     const permissionError = enforceDemoPermission(actor, "aylik_bildirim_onayi.approve");
     if (permissionError) return permissionError;
     if (actor.role !== "BIRIM_AMIRI") {
-      return demoRevizyonError("FORBIDDEN", "Yalnizca birim amiri kendi ayini onaylayabilir.");
+      return demoRevizyonError("FORBIDDEN", "Yalnizca birim yoneticisi kendi ayini onaylayabilir.");
     }
     const ay = toStringValue(body.ay) ?? "";
     if (!resolveAyBounds(ay)) {
@@ -6549,7 +6550,7 @@ export function resolveDemoApiResponse(
     const subeId = toNumber(requestUrl.searchParams.get("sube_id")) ?? actor.subeIds[0] ?? 1;
     return ok({
       items: [
-        { user_id: 12, ad_soyad: "Birim Amiri", sube_id: subeId },
+        { user_id: 12, ad_soyad: "Birim Yöneticisi", sube_id: subeId },
         { user_id: 1, ad_soyad: "Demo Amir", sube_id: subeId }
       ]
     });
@@ -6646,7 +6647,7 @@ export function resolveDemoApiResponse(
       sube_id: subeId,
       sube_adi: demoState.subeler.find((s) => s.id === subeId)?.ad ?? "",
       birim_amiri_user_id: amirId,
-      birim_amiri_adi: actor.role === "BIRIM_AMIRI" ? "Birim Amiri" : "Demo Amir",
+      birim_amiri_adi: actor.role === "BIRIM_AMIRI" ? "Birim Yöneticisi" : "Demo Amir",
       ozet: {
         toplam_personel: personeller.length,
         bildirim_girilen: bildirimGirilen,

@@ -22,6 +22,8 @@ class RolePermissions
             'personeller.create',
             'personeller.import.apply',
             'personeller.update',
+            'personeller.test_fixture.classify',
+            'personeller.test_fixture.archive',
             'personeller.detail.view',
             'personeller.ucret.view',
             'personeller.ucret.manage',
@@ -108,6 +110,60 @@ class RolePermissions
             'retention.destruction.execute',
             'retention.destruction.view',
         ],
+        // Branch-level operational management (independent of BOLUM_YONETICISI).
+        'SUBE_YONETICISI' => [
+            'personeller.view',
+            'personeller.view.sube',
+            'personeller.create',
+            'personeller.import.apply',
+            'personeller.update',
+            'personeller.detail.view',
+            'surecler.view',
+            'surecler.view.sube',
+            'surecler.create',
+            'surecler.update',
+            'surecler.cancel',
+            'surecler.detail.view',
+            'bildirimler.view',
+            'bildirimler.create',
+            'bildirimler.update',
+            'bildirimler.cancel',
+            'bildirimler.detail.view',
+            'puantaj.view',
+            'puantaj.update',
+            'puantaj.muhurle',
+            'puantaj.donem_reopen.request',
+            'puantaj.donem_seal.history',
+            'puantaj.bildirim_etki.view',
+            'puantaj.donem_kapanis.view',
+            'puantaj.bildirim_etki.rapor.view',
+            'raporlar.view',
+            'finans.view',
+            'finans.create',
+            'finans.update',
+            'finans.cancel',
+            'isg.view',
+            'aylik-ozet.view',
+            'aylik-ozet.review',
+            'gunluk_bildirim.request_correction',
+            'haftalik_mutabakat.view',
+            'haftalik_mutabakat.reopen_request',
+            'aylik_bolum_onayi.view',
+            'aylik_bolum_onayi.approve',
+            'aylik_bildirim_onayi.view',
+            'revizyon.view',
+            'revizyon.create',
+            'revizyon.submit',
+            'revizyon.cancel',
+            'revizyon.view_finance_effect',
+            'revizyon.view_audit_history',
+            'disiplin.view',
+            'disiplin.final_decision',
+            'puantaj.olay_karar.decide',
+            'puantaj.olay_karar.view',
+            'sgk_karar_paketi.approve',
+        ],
+        // Department operational management within assigned bolumler only.
         'BOLUM_YONETICISI' => [
             'personeller.view',
             'personeller.view.sube',
@@ -228,6 +284,8 @@ class RolePermissions
             'personeller.create',
             'personeller.import.apply',
             'personeller.update',
+            'personeller.test_fixture.classify',
+            'personeller.test_fixture.archive',
             'personeller.detail.view',
             'personeller.ucret.view',
             'mevzuat_parametreleri.view',
@@ -327,6 +385,7 @@ class RolePermissions
             'retention.destruction.view',
         ],
         // Self-service read surfaces (S3B). No broad personeller.* / puantaj.view.
+        // Canonical self-service-only role; also the reusable personnel-linked baseline set.
         'PERSONEL' => [
             'self_service.view',
             'self_service.puantaj.view',
@@ -340,12 +399,54 @@ class RolePermissions
         ],
     ];
 
+    /**
+     * Canonical self-service baseline (PERSONEL matrix). No duplicate list.
+     *
+     * @return array<int, string>
+     */
+    public static function selfServiceBaselinePermissions()
+    {
+        return self::$matrix['PERSONEL'];
+    }
+
+    /**
+     * Linked-personnel eligibility for self-service baseline (no extra DB I/O).
+     * Active/valid enforcement remains SelfPersonelContext on /me endpoints.
+     *
+     * @param array<string, mixed> $user
+     */
+    public static function hasPersonnelLinkedSelfServiceEligibility(array $user)
+    {
+        if (!array_key_exists('personel_id', $user)) {
+            return false;
+        }
+        $raw = $user['personel_id'];
+        if ($raw === null || $raw === '') {
+            return false;
+        }
+
+        return (int) $raw > 0;
+    }
+
     /** @param array<string, mixed> $user */
     public static function has(array $user, $permission)
     {
-        $role = self::normalizeRole(isset($user['rol']) ? (string) $user['rol'] : '');
         $permission = trim((string) $permission);
-        if ($role === '' || $permission === '') {
+        if ($permission === '') {
+            return false;
+        }
+
+        // personel_id binding → own self-service baseline (role-independent).
+        // Does not grant management permissions or expand org scope.
+        if (
+            self::hasPersonnelLinkedSelfServiceEligibility($user)
+            && in_array($permission, self::selfServiceBaselinePermissions(), true)
+        ) {
+            return true;
+        }
+
+        $role = self::normalizeRole(isset($user['rol']) ? (string) $user['rol'] : '');
+        if ($role === '') {
             return false;
         }
 

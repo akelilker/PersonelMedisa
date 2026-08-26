@@ -46,6 +46,8 @@ import type { Bildirim, BirimAmiriSecenegi, GunlukOzet } from "../../../types/bi
 import type { HaftalikBildirimMutabakatCounts } from "../../../types/haftalik-bildirim-mutabakat";
 import type { Personel } from "../../../types/personel";
 import type { IdOption } from "../../../types/referans";
+import { KayitSurecReturnLink } from "../../kayit/components/KayitSurecReturnLink";
+import type { KayitSurecReturnContext } from "../../kayit/kayit-surec-navigation";
 import {
   formatGunlukKayitDayanak,
   formatGunlukKayitGunTipi,
@@ -585,7 +587,7 @@ function GenelYoneticiBildirimOnayiPanel({
             {[
               ["Ay", ozet.ay],
               ["Şube", subeLabel],
-              ["Birim Amiri", birimAmiriLabel],
+              ["Birim Yöneticisi", birimAmiriLabel],
               ["Toplam Bildirim", String(ozet.counts.toplam_bildirim)],
               ["Mutabakata Alınan", String(ozet.counts.mutabakata_alinan)],
               ["Eksik Hafta", String(ozet.counts.eksik_hafta)],
@@ -660,7 +662,7 @@ function GenelYoneticiBildirimOnayiPanel({
           }
         >
           <p>
-            Seçilen şube, birim amiri ve ay için Genel Yönetici bildirim onayı verilecek. Bu işlem
+            Seçilen şube, birim yöneticisi ve ay için Genel Yönetici bildirim onayı verilecek. Bu işlem
             mevcut sürümde geri alınamaz.
           </p>
         </AppModal>
@@ -764,6 +766,8 @@ export function BildirimlerPage() {
   const [rosterSearch, setRosterSearch] = useState("");
   const location = useLocation();
   const navigate = useNavigate();
+  const kayitSurecReturn = (location.state as { kayitSurecReturn?: KayitSurecReturnContext } | null)
+    ?.kayitSurecReturn;
 
   const todayIso = useMemo(() => {
     const now = new Date();
@@ -824,18 +828,18 @@ export function BildirimlerPage() {
     : isBirimAmiriSecenekleriLoading
       ? "Birim amiri seçenekleri yükleniyor..."
       : birimAmiriSecenekleri.length === 0 && !isBirimAmiri
-        ? "Seçilen şubede aktif birim amiri bulunamadı."
+        ? "Seçilen şubede aktif birim yöneticisi bulunamadı."
         : selectedBirimAmiriUserId === null
-          ? "Verileri görüntülemek için birim amiri seçin."
+          ? "Verileri görüntülemek için birim yöneticisi seçin."
           : null;
   const genelYoneticiContextMessage = selectedSubeId === null
     ? "Genel Yönetici onayı için şube seçin."
     : isBirimAmiriSecenekleriLoading
       ? "Birim amiri seçenekleri yükleniyor..."
       : birimAmiriSecenekleri.length === 0
-        ? "Seçilen şubede aktif birim amiri bulunamadı."
+        ? "Seçilen şubede aktif birim yöneticisi bulunamadı."
         : selectedBirimAmiriUserId === null
-          ? "Genel Yönetici onayı için birim amiri seçin."
+          ? "Genel Yönetici onayı için birim yöneticisi seçin."
           : null;
   const selectedSubeLabel =
     availableSubeler.find((sube) => sube.id === selectedSubeId)?.ad ?? "—";
@@ -1023,11 +1027,14 @@ export function BildirimlerPage() {
     <section className="bildirimler-page">
       <div className="bildirimler-header-row">
         <h2>{pageTitle}</h2>
-        {canCreateBildirim ? (
-          <button type="button" className="universal-btn-aux" onClick={openCreateModal}>
-            {createButtonLabel}
-          </button>
-        ) : null}
+        <div className="bildirimler-header-actions">
+          {kayitSurecReturn ? <KayitSurecReturnLink context={kayitSurecReturn} /> : null}
+          {canCreateBildirim ? (
+            <button type="button" className="universal-btn-aux" onClick={openCreateModal}>
+              {createButtonLabel}
+            </button>
+          ) : null}
+        </div>
       </div>
 
       <div className="state-card" data-testid="bildirim-gunluk-hero">
@@ -1035,7 +1042,7 @@ export function BildirimlerPage() {
         <p>
           {isBirimAmiri
             ? "Personelinizin bugünkü durumunu girin, taslakları gönderin ve günü tamamlayın. Haftalık mutabakat için günlük tamamlama gerekir."
-            : "Şube ve birim amiri bağlamında günlük kayıtları, haftalık mutabakatı ve onay zincirini izleyin."}
+            : "Şube ve birim yöneticisi bağlamında günlük kayıtları, haftalık mutabakatı ve onay zincirini izleyin."}
         </p>
       </div>
 
@@ -1184,7 +1191,7 @@ export function BildirimlerPage() {
             />
             <FormField
               as="select"
-              label="Birim Amiri"
+              label="Birim Yöneticisi"
               name="bildirim-panel-birim-amiri"
               value={selectedBirimAmiriUserId === null ? "" : String(selectedBirimAmiriUserId)}
               onChange={(value) =>

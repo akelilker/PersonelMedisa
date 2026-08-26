@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace Medisa\Api\Auth;
 
 use Medisa\Api\Database\Connection;
+use Medisa\Api\Database\UserOrgAssignmentSchema;
 use Medisa\Api\Database\UsersSchema;
 use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
+use Medisa\Api\Scope\OrgScope;
 use Medisa\Api\Scope\SubeScope;
 use PDO;
 
@@ -60,6 +62,8 @@ class LoginController
         }
 
         $subeIds = self::loadUserSubeIds($pdo, (int) $user['id']);
+        $bolumIds = UserOrgAssignmentSchema::loadUserBolumIds($pdo, (int) $user['id']);
+        $birimIds = UserOrgAssignmentSchema::loadUserBirimIds($pdo, (int) $user['id']);
         $rolRaw = (string) $user['rol'];
         $rol = RolePermissions::normalizeRole($rolRaw);
         if ($rol === '') {
@@ -76,13 +80,18 @@ class LoginController
                 'AUTH_SMOKE_READONLY hesabi exact bir sube scope gerektirir.'
             );
         }
-        $subeList = self::loadSubeList($pdo, $subeIds);
+        // Effective branch list for selector: assigned subeler, else derived from bolum/birim personnel (narrow UX only).
+        $selectorSubeIds = $subeIds;
+        if (count($selectorSubeIds) === 0 && (count($bolumIds) > 0 || count($birimIds) > 0)) {
+            $selectorSubeIds = self::deriveSubeIdsFromOrgAssignments($pdo, $bolumIds, $birimIds);
+        }
+        $subeList = self::loadSubeList($pdo, $selectorSubeIds, OrgScope::isUnrestricted(['rol' => $rol]));
         $preferredSubeId = null;
         if ($hasVarsayilan && array_key_exists('varsayilan_sube_id', $user) && $user['varsayilan_sube_id'] !== null && $user['varsayilan_sube_id'] !== '') {
             $preferred = (int) $user['varsayilan_sube_id'];
             $preferredSubeId = $preferred > 0 ? $preferred : null;
         }
-        $activeSubeId = SubeScope::resolveInitialActiveSubeId($subeIds, $preferredSubeId);
+        $activeSubeId = SubeScope::resolveInitialActiveSubeId($selectorSubeIds, $preferredSubeId);
 
         $ttl = (int) medisa_config('jwt_ttl_seconds', 86400);
         $token = Jwt::encode([
@@ -103,6 +112,8 @@ class LoginController
             'ad_soyad' => (string) $user['ad_soyad'],
             'rol' => $rol,
             'sube_ids' => $subeIds,
+            'bolum_ids' => $bolumIds,
+            'birim_ids' => $birimIds,
         ];
         if ($hasPersonelId) {
             $userPayload['personel_id'] = $personelIdPayload;
@@ -122,6 +133,47 @@ class LoginController
         JsonResponse::success($response);
     }
 
+    /**
+     * @param array<int, int> $bolumIds
+     * @param array<int, int> $birimIds
+     * @return array<int, int>
+     */
+    private static function deriveSubeIdsFromOrgAssignments(PDO $pdo, array $bolumIds, array $birimIds)
+    {
+        $ids = [];
+        if (count($birimIds) > 0) {
+            $placeholders = implode(',', array_fill(0, count($birimIds), '?'));
+            $stmt = $pdo->prepare(
+                "SELECT DISTINCT p.sube_id FROM personeller p WHERE p.birim_id IN ($placeholders) AND p.sube_id IS NOT NULL"
+            );
+            $stmt->execute(array_values($birimIds));
+            foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+                $sid = (int) $row['sube_id'];
+                if ($sid > 0) {
+                    $ids[$sid] = $sid;
+                }
+            }
+        }
+        if (count($bolumIds) > 0) {
+            $placeholders = implode(',', array_fill(0, count($bolumIds), '?'));
+            $stmt = $pdo->prepare(
+                "SELECT DISTINCT p.sube_id FROM personeller p WHERE p.bolum_id IN ($placeholders) AND p.sube_id IS NOT NULL"
+            );
+            $stmt->execute(array_values($bolumIds));
+            foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+                $sid = (int) $row['sube_id'];
+                if ($sid > 0) {
+                    $ids[$sid] = $sid;
+                }
+            }
+        }
+
+        $list = array_values($ids);
+        sort($list);
+
+        return $list;
+    }
+
     /** @return array<int, int> */
     private static function loadUserSubeIds(PDO $pdo, $userId)
     {
@@ -136,10 +188,16 @@ class LoginController
         return $ids;
     }
 
-    /** @param array<int, int> $subeIds @return array<int, array<string, mixed>> */
-    private static function loadSubeList(PDO $pdo, array $subeIds)
+    /**
+     * @param array<int, int> $subeIds
+     * @return array<int, array<string, mixed>>
+     */
+    private static function loadSubeList(PDO $pdo, array $subeIds, $unrestrictedEmpty = false)
     {
         if (count($subeIds) === 0) {
+            if (!$unrestrictedEmpty) {
+                return [];
+            }
             $stmt = $pdo->query('SELECT id, ad FROM subeler WHERE durum = "AKTIF" ORDER BY id ASC');
             $rows = $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
         } else {

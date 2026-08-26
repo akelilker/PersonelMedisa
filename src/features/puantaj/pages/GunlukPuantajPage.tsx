@@ -21,6 +21,8 @@ import { BildirimPuantajEtkiAdaylariSection } from "../components/BildirimPuanta
 import { PuantajOlayKararPanel } from "../components/PuantajOlayKararPanel";
 import { QrPuantajAdayiSection } from "../components/QrPuantajAdayiSection";
 import { QrGirisCikisOperationSection } from "../components/QrGirisCikisOperationSection";
+import { KayitSurecReturnLink } from "../../kayit/components/KayitSurecReturnLink";
+import type { KayitSurecReturnContext } from "../../kayit/kayit-surec-navigation";
 import { formatComplianceLevelLabel } from "../../../lib/display/enum-display";
 import type {
   PuantajGunTipi,
@@ -180,6 +182,8 @@ export function GunlukPuantajPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const kayitSurecReturn = (location.state as { kayitSurecReturn?: KayitSurecReturnContext } | null)
+    ?.kayitSurecReturn;
 
   const {
     formState,
@@ -314,6 +318,7 @@ export function GunlukPuantajPage() {
       <QrGirisCikisOperationSection />
       <div className="puantaj-header-row">
         <h2>Günlük Kayıt ve Puantaj</h2>
+        {kayitSurecReturn ? <KayitSurecReturnLink context={kayitSurecReturn} /> : null}
       </div>
 
       <form className="form-filter-panel" onSubmit={handleQuerySubmit}>

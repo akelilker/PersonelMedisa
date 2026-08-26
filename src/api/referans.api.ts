@@ -1,19 +1,29 @@
 import type { ApiResponse } from "../types/api";
 import type { IdOption, KeyOption } from "../types/referans";
+import { formatReferenceValue } from "../features/personeller/components/personel-dosya/personel-dosya-format-utils";
 import { apiRequest } from "./api-client";
 import { endpoints } from "./endpoints";
 import { extractListItems } from "./response-normalizers";
 
 function getObjectLabel(item: Record<string, unknown>) {
-  const candidates = ["ad", "adi", "name", "label", "title", "kod", "code", "key", "value"];
+  const candidates = ["ad", "adi", "name", "label", "title"];
   for (const field of candidates) {
     const value = item[field];
     if (typeof value === "string" && value.trim().length > 0) {
-      return value;
+      return value.trim();
     }
   }
 
   return null;
+}
+
+function readOptionalKisaKod(item: Record<string, unknown>): string | null {
+  const raw = item.kisa_kod ?? item.kisaKod;
+  if (typeof raw !== "string") {
+    return null;
+  }
+  const trimmed = raw.trim();
+  return trimmed ? trimmed : null;
 }
 
 function normalizeIdOptions(data: unknown, parentKey?: string): IdOption[] {
@@ -37,8 +47,13 @@ function normalizeIdOptions(data: unknown, parentKey?: string): IdOption[] {
         return null;
       }
 
-      const label = getObjectLabel(item) ?? String(id);
+      const name = getObjectLabel(item);
+      const kisaKod = readOptionalKisaKod(item);
+      const label = formatReferenceValue(name, id, kisaKod);
       const option: IdOption = { id, label };
+      if (kisaKod) {
+        option.kisaKod = kisaKod;
+      }
       if (parentKey) {
         const rawParent = item[parentKey];
         const parentId =

@@ -20,4 +20,6 @@ body.modal-open .content-wrap {
 body.login-page .content-wrap {
   display: flex;
   flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
 }

@@ -57,7 +57,7 @@ class ZimmetlerController
             if (!$personel) {
                 JsonResponse::notFound('Personel bulunamadi.');
             }
-            SubeScope::assertPersonelAccess($user, $request, (int) $personel['sube_id']);
+            SubeScope::assertPersonelAccess($user, $request, $personel);
             $where[] = 'z.personel_id = :personel_id';
             $params['personel_id'] = $personelId;
         } elseif ($scope !== null) {
@@ -156,7 +156,7 @@ class ZimmetlerController
             self::validationError('personel_id', 'Personel bulunamadi.');
         }
 
-        SubeScope::assertPersonelAccess($user, $request, (int) $personel['sube_id']);
+        SubeScope::assertPersonelAccess($user, $request, $personel);
 
         \Medisa\Api\Services\Retention\PersonelArchiveGate::assertBusinessWriteAllowed(
             $pdo,
@@ -247,7 +247,7 @@ class ZimmetlerController
     /** @return array<string, mixed>|null */
     private static function fetchPersonelForScope(PDO $pdo, $personelId)
     {
-        $stmt = $pdo->prepare('SELECT id, sube_id, aktif_durum FROM personeller WHERE id = :id LIMIT 1');
+        $stmt = $pdo->prepare('SELECT id, sube_id, bolum_id, birim_id, aktif_durum FROM personeller WHERE id = :id LIMIT 1');
         $stmt->execute(['id' => (int) $personelId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
 

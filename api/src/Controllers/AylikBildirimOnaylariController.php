@@ -9,6 +9,7 @@ use Medisa\Api\Auth\RolePermissions;
 use Medisa\Api\Database\Connection;
 use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
+use Medisa\Api\Scope\ManagerApprovalScope;
 use Medisa\Api\Scope\SubeScope;
 use PDO;
 
@@ -26,7 +27,7 @@ class AylikBildirimOnaylariController
         $pdo = self::connection();
         self::assertTablesReady($pdo);
         if ($amirId !== null) {
-            self::assertAmirScope($pdo, $subeId, $amirId);
+            ManagerApprovalScope::assertActorCanAccessBirimAmiriChain($user, $request, $pdo, $subeId, $amirId);
         }
 
         $payload = self::buildSummaryPayload($pdo, $subeId, $amirId, $ay, $ayBaslangic, $ayBitis);
@@ -38,7 +39,7 @@ class AylikBildirimOnaylariController
         $user = AuthMiddleware::authenticate($request, true);
         RolePermissions::assert($user, 'aylik_bildirim_onayi.approve');
         if (strtoupper(trim((string) ($user['rol'] ?? ''))) !== 'BIRIM_AMIRI') {
-            JsonResponse::forbidden('Yalnizca birim amiri kendi ayini onaylayabilir.');
+            JsonResponse::forbidden('Yalnizca birim yoneticisi kendi ayini onaylayabilir.');
         }
 
         $body = $request->getJsonBody();
@@ -52,6 +53,7 @@ class AylikBildirimOnaylariController
 
         $pdo = self::connection();
         self::assertTablesReady($pdo);
+        ManagerApprovalScope::assertActorCanAccessBirimAmiriChain($user, $request, $pdo, $subeId, $amirId);
 
         try {
             $pdo->beginTransaction();
@@ -118,11 +120,13 @@ class AylikBildirimOnaylariController
             JsonResponse::notFound('Aylik bildirim onayi bulunamadi.');
         }
 
-        SubeScope::assertPersonelAccess($user, $request, (int) $detail['onay']['sube_id']);
-        if (strtoupper(trim((string) ($user['rol'] ?? ''))) === 'BIRIM_AMIRI'
-            && (int) $detail['onay']['birim_amiri_user_id'] !== self::userId($user)) {
-            JsonResponse::forbidden();
-        }
+        ManagerApprovalScope::assertActorCanAccessBirimAmiriChain(
+            $user,
+            $request,
+            $pdo,
+            (int) $detail['onay']['sube_id'],
+            (int) $detail['onay']['birim_amiri_user_id']
+        );
 
         JsonResponse::success($detail);
     }
@@ -164,29 +168,6 @@ class AylikBildirimOnaylariController
 
         $requested = self::parsePositiveInt($request->getQuery('birim_amiri_user_id'));
         return $requested;
-    }
-
-    private static function assertAmirScope(PDO $pdo, $subeId, $amirId)
-    {
-        $stmt = $pdo->prepare('
-            SELECT 1
-            FROM users u
-            INNER JOIN user_subeler us ON us.user_id = u.id
-            WHERE u.id = :user_id
-              AND u.rol = :rol
-              AND u.durum = :durum
-              AND us.sube_id = :sube_id
-            LIMIT 1
-        ');
-        $stmt->execute([
-            'user_id' => (int) $amirId,
-            'rol' => 'BIRIM_AMIRI',
-            'durum' => 'AKTIF',
-            'sube_id' => (int) $subeId,
-        ]);
-        if (!$stmt->fetchColumn()) {
-            JsonResponse::forbidden('Secili birim amiri bu sube icin yetkili degil.');
-        }
     }
 
     private static function resolveMonth($value)

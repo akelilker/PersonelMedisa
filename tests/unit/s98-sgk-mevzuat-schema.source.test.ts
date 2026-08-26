@@ -72,7 +72,7 @@ describe("S98 SGK mevzuat schema hardening", () => {
   it("frontend/mock expose canonical aktiflik labels and never select TEYITSIZ", () => {
     const api = readFileSync("src/api/sgk-katalog-hazirlik.api.ts", "utf8");
     expect(panel).toContain("SGK_AKTIFLIK_DURUMU_LABEL");
-    expect(panel).toContain("TEYITSIZ");
+    expect(panel).toContain("Teyitsiz");
     expect(api).toContain("PORTAL TEYİDİ BEKLİYOR");
     expect(api).toContain("BAĞLAMA ÖZGÜ");
     expect(mock).toContain("teyitsiz_secilebilir_mi: false");
@@ -98,6 +98,6 @@ describe("S98 SGK mevzuat schema hardening", () => {
   it("migration sequence ends with 040 and parity last file updated", () => {
     const names = readdirSync(resolve("api/migrations")).filter((n) => n.endsWith(".sql")).sort();
     expect(names.some((n) => n.startsWith("040_"))).toBe(true);
-    expect(names.at(-1)).toBe("070_offline_mutation_idempotency.sql");
+    expect(names.at(-1)).toBe("073_test_fixture_personel_archive.sql");
   });
 });

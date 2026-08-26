@@ -239,11 +239,37 @@ final class PersonelBelgeContracts
         if ($value === '') {
             return null;
         }
-        $len = mb_strlen($value, 'UTF-8');
+        $len = self::utf8Length($value);
         if ($len <= 4) {
             return str_repeat('*', $len);
         }
 
-        return str_repeat('*', max(0, $len - 4)) . mb_substr($value, -4, null, 'UTF-8');
+        return str_repeat('*', max(0, $len - 4)) . self::utf8Substring($value, -4);
+    }
+
+    private static function utf8Length(string $value): int
+    {
+        if (function_exists('mb_strlen')) {
+            return (int) mb_strlen($value, 'UTF-8');
+        }
+
+        return count(self::utf8Characters($value));
+    }
+
+    private static function utf8Substring(string $value, int $offset): string
+    {
+        if (function_exists('mb_substr')) {
+            return (string) mb_substr($value, $offset, null, 'UTF-8');
+        }
+
+        return implode('', array_slice(self::utf8Characters($value), $offset));
+    }
+
+    /** @return list<string> */
+    private static function utf8Characters(string $value): array
+    {
+        $characters = preg_split('//u', $value, -1, PREG_SPLIT_NO_EMPTY);
+
+        return is_array($characters) ? $characters : str_split($value);
     }
 }

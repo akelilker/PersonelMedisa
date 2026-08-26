@@ -38,7 +38,9 @@ describe("S85-C1 SGK katalog hazirlik parity", () => {
     expect(router).toContain("SgkKatalogHazirlikController::import");
     expect(endpoints).toContain("sgkKatalogHazirlik");
     expect(page).toContain("sgk-katalog");
-    expect(panel).toContain("DOGRULANMIS_TAM seçilemez");
+    expect(panel).toContain("doğrulanmış tam seçilemez");
+    expect(panel).toContain("formatSgkTamlikDurumuLabel");
+    expect(panel).toContain("Doğrulama Kodu");
     expect(panel).toContain("sgk-katalog-approve");
     expect(docs).toContain("OPERASYONEL_DOGRULAMA_KANITI");
     expect(docs).not.toMatch(/C:\\Users\\Akel\\Downloads/);
@@ -48,7 +50,7 @@ describe("S85-C1 SGK katalog hazirlik parity", () => {
     expect(migrationNames.some((name) => name.startsWith("039_"))).toBe(true);
     expect(migrationNames.some((name) => name.startsWith("040_"))).toBe(true);
     expect(migrationNames.some((name) => name.startsWith("041_"))).toBe(true);
-    expect(migrationNames.filter((n) => n.endsWith(".sql")).sort().at(-1)).toBe("070_offline_mutation_idempotency.sql");
+    expect(migrationNames.filter((n) => n.endsWith(".sql")).sort().at(-1)).toBe("073_test_fixture_personel_archive.sql");
 
     expect(reader).toContain("SGK_KAYNAK_MANIFEST_STORAGE_HATASI");
     expect(reader).toContain("formatSanitizedRuntimeLog");

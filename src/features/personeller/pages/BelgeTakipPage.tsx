@@ -1,5 +1,5 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { FormField } from "../../../components/form/FormField";
 import { EmptyState } from "../../../components/states/EmptyState";
 import { ErrorState } from "../../../components/states/ErrorState";
@@ -22,6 +22,8 @@ import {
 } from "../../../types/personel-belge-kaydi";
 import { formatIsoDateDetail } from "../components/personel-dosya/personel-dosya-format-utils";
 import type { IdOption } from "../../../types/referans";
+import { KayitSurecReturnLink } from "../../kayit/components/KayitSurecReturnLink";
+import type { KayitSurecReturnContext } from "../../kayit/kayit-surec-navigation";
 
 type FilterDraft = {
   subeId: string;
@@ -58,6 +60,10 @@ function toSelectOptions(options: IdOption[]) {
 }
 
 export function BelgeTakipPage() {
+  const [searchParams] = useSearchParams();
+  const location = useLocation();
+  const kayitSurecReturnFromState = (location.state as { kayitSurecReturn?: KayitSurecReturnContext } | null)
+    ?.kayitSurecReturn;
   const [draft, setDraft] = useState<FilterDraft>(EMPTY_FILTERS);
   const [applied, setApplied] = useState<FilterDraft>(EMPTY_FILTERS);
   const [ozet, setOzet] = useState<BelgeTakipOzet>(EMPTY_OZET);
@@ -102,6 +108,31 @@ export function BelgeTakipPage() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    const personelId = searchParams.get("personel_id");
+    if (!personelId) {
+      return;
+    }
+
+    const nextFilters = { ...EMPTY_FILTERS, personelId };
+    setDraft(nextFilters);
+    setApplied(nextFilters);
+  }, [searchParams]);
+
+  const kayitSurecReturn =
+    kayitSurecReturnFromState ??
+    (() => {
+      const raw = searchParams.get("personel_id");
+      if (!raw) {
+        return null;
+      }
+      const personelId = Number.parseInt(raw, 10);
+      if (!Number.isFinite(personelId)) {
+        return null;
+      }
+      return { personelId, personelTab: "belge-takip" as const } satisfies KayitSurecReturnContext;
+    })();
 
   const loadData = useCallback(async (filters: FilterDraft) => {
     setIsLoading(true);
@@ -162,9 +193,12 @@ export function BelgeTakipPage() {
           <h2>Belge Takip</h2>
           <p>Personel belge kayıtlarının süre, dosya ve eksiklik durumunu izleyin.</p>
         </div>
-        <Link className="universal-btn-aux" to="/personeller">
-          Personellere dön
-        </Link>
+        <div className="personel-belge-panel-head-actions">
+          {kayitSurecReturn ? <KayitSurecReturnLink context={kayitSurecReturn} /> : null}
+          <Link className="universal-btn-aux" to="/personeller">
+            Personellere dön
+          </Link>
+        </div>
       </div>
 
       <form className="belge-takip-filter-panel workspace-form" onSubmit={handleSubmit}>

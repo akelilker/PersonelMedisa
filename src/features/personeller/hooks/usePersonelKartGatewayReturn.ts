@@ -14,7 +14,7 @@ export function usePersonelKartGatewayReturn({
         kayitModal: {
           tab: "surec",
           personelId: parsedPersonelId,
-          targetTab: "izin-devamsizlik",
+          targetTab: "puantaj",
           intent: "personel-surec-gateway",
           returnTo: `/personeller/${parsedPersonelId}`
         }
@@ -42,7 +42,7 @@ export function usePersonelKartGatewayReturn({
         kayitModal: {
           tab: "surec",
           personelId: parsedPersonelId,
-          targetTab: "izin-devamsizlik",
+          targetTab: "puantaj",
           intent: "yillik-izin-hak-duzeltme-gateway",
           operation: "yillik-izin-hak-duzeltme"
         }

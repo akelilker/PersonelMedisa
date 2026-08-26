@@ -36,6 +36,8 @@ use Medisa\Api\Controllers\PersonelBelgelerController;
 use Medisa\Api\Controllers\PersonelBordroKapsamController;
 use Medisa\Api\Controllers\PersonellerController;
 use Medisa\Api\Controllers\PersonelUcretController;
+use Medisa\Api\Controllers\TestFixturePersonelArchiveController;
+use Medisa\Api\Controllers\TestFixturePersonelClassificationController;
 use Medisa\Api\Controllers\PuantajController;
 use Medisa\Api\Controllers\RaporlarController;
 use Medisa\Api\Controllers\ReferansController;
@@ -115,6 +117,12 @@ class Router
 
         if ($method === 'PUT' && preg_match('#^/personeller/(\d+)$#', $path, $matches)) {
             PersonellerController::update($this->request, $matches[1]);
+        }
+        if ($method === 'POST' && preg_match('#^/personeller/(\d+)/test-fixture-classification$#', $path, $matches)) {
+            TestFixturePersonelClassificationController::classify($this->request, $matches[1]);
+        }
+        if ($method === 'POST' && preg_match('#^/personeller/(\d+)/test-fixture-archive$#', $path, $matches)) {
+            TestFixturePersonelArchiveController::archive($this->request, $matches[1]);
         }
         if ($method === 'PUT' && preg_match('#^/gunluk-puantaj/(\d+)/([^/]+)$#', $path, $matches)) {
             PuantajController::upsert($this->request, $matches[1], $matches[2]);

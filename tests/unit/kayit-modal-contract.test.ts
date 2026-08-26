@@ -41,8 +41,8 @@ describe("resolveKayitModalRouteConfig", () => {
     ).toEqual({
       tab: "surec",
       personelId: "7",
-      targetTab: "izin-devamsizlik",
-      personelTab: "izin-devamsizlik",
+      targetTab: "puantaj",
+      personelTab: "puantaj",
       intent: null,
       recordId: null,
       returnTo: null,

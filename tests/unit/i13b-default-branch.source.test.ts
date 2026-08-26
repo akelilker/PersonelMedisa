@@ -25,18 +25,19 @@ describe("I13-B default branch persistence source locks", () => {
 
     const login = readFileSync("api/src/Auth/LoginController.php", "utf8");
     expect(login).toContain("UsersSchema::hasVarsayilanSubeId");
-    expect(login).toContain("SubeScope::resolveInitialActiveSubeId($subeIds, $preferredSubeId)");
+    expect(login).toContain("SubeScope::resolveInitialActiveSubeId");
+    expect(login).toContain("$preferredSubeId");
 
     const scope = readFileSync("api/src/Scope/SubeScope.php", "utf8");
     expect(scope).toContain("$preferredSubeId = null");
     expect(scope).toContain("in_array($preferred, $subeIds, true)");
   });
 
-  it("migration tip ends at 054", () => {
+  it("migration tip includes 072 org reference short codes", () => {
     const migrations = readdirSync(resolve("api/migrations"))
       .filter((name) => /^\d{3}_.+\.sql$/.test(name))
       .sort();
     expect(migrations[0]).toBe("001_initial_schema.sql");
-    expect(migrations.at(-1)).toBe("070_offline_mutation_idempotency.sql");
+    expect(migrations.at(-1)).toBe("073_test_fixture_personel_archive.sql");
   });
 });

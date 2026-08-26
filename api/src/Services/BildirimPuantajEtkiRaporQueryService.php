@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Medisa\Api\Services;
 
+use Medisa\Api\Support\Utf8;
 use PDO;
 
 class BildirimPuantajEtkiRaporQueryService
@@ -83,6 +84,52 @@ class BildirimPuantajEtkiRaporQueryService
         if ($restrictAmirId !== null) {
             $where[] = 'a.birim_amiri_user_id = :restrict_amir_id';
             $params['restrict_amir_id'] = (int) $restrictAmirId;
+        }
+
+        if (isset($filters['bolum_ids']) && is_array($filters['bolum_ids']) && count($filters['bolum_ids']) > 0) {
+            $bolumIds = [];
+            foreach ($filters['bolum_ids'] as $rawId) {
+                $id = (int) $rawId;
+                if ($id > 0) {
+                    $bolumIds[$id] = $id;
+                }
+            }
+            if (count($bolumIds) === 0) {
+                $where[] = '1=0';
+            } else {
+                $placeholders = [];
+                $i = 0;
+                foreach (array_values($bolumIds) as $id) {
+                    $key = 'bolum_id_' . $i;
+                    $placeholders[] = ':' . $key;
+                    $params[$key] = $id;
+                    $i++;
+                }
+                $where[] = 'p.bolum_id IN (' . implode(', ', $placeholders) . ')';
+            }
+        }
+
+        if (isset($filters['birim_ids']) && is_array($filters['birim_ids']) && count($filters['birim_ids']) > 0) {
+            $birimIds = [];
+            foreach ($filters['birim_ids'] as $rawId) {
+                $id = (int) $rawId;
+                if ($id > 0) {
+                    $birimIds[$id] = $id;
+                }
+            }
+            if (count($birimIds) === 0) {
+                $where[] = '1=0';
+            } else {
+                $placeholders = [];
+                $i = 0;
+                foreach (array_values($birimIds) as $id) {
+                    $key = 'birim_id_' . $i;
+                    $placeholders[] = ':' . $key;
+                    $params[$key] = $id;
+                    $i++;
+                }
+                $where[] = 'p.birim_id IN (' . implode(', ', $placeholders) . ')';
+            }
         }
 
         if (isset($filters['departman_id']) && (int) $filters['departman_id'] > 0) {
@@ -296,8 +343,8 @@ class BildirimPuantajEtkiRaporQueryService
 
     private static function maskName($ad, $soyad)
     {
-        $maskedAd = $ad !== '' ? mb_substr($ad, 0, 1) . '***' : '***';
-        $maskedSoyad = $soyad !== '' ? mb_substr($soyad, 0, 1) . '***' : '***';
+        $maskedAd = $ad !== '' ? Utf8::substring($ad, 0, 1) . '***' : '***';
+        $maskedSoyad = $soyad !== '' ? Utf8::substring($soyad, 0, 1) . '***' : '***';
 
         return trim($maskedAd . ' ' . $maskedSoyad);
     }

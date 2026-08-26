@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { Navigate, useLocation } from "react-router-dom";
-import { hasRolePermission, type AppPermission } from "../lib/authorization/role-permissions";
+import { hasUserPermission, type AppPermission } from "../lib/authorization/role-permissions";
 import { useAuth } from "../state/auth.store";
 
 type ProtectedRouteProps = {
@@ -24,8 +24,10 @@ export function ProtectedRoute({ children, requirePermission, requireAll, requir
     return <Navigate to="/change-password" replace />;
   }
 
+  const personelId = session.user.personel_id ?? null;
+
   if (requireAny && requireAny.length > 0) {
-    const allowed = requireAny.some((p) => hasRolePermission(session.user.rol, p));
+    const allowed = requireAny.some((p) => hasUserPermission(session.user.rol, p, personelId));
     if (!allowed) {
       return <Navigate to="/yetkisiz" replace />;
     }
@@ -37,7 +39,7 @@ export function ProtectedRoute({ children, requirePermission, requireAll, requir
   ];
 
   if (permissions.length > 0) {
-    const allowed = permissions.every((p) => hasRolePermission(session.user.rol, p));
+    const allowed = permissions.every((p) => hasUserPermission(session.user.rol, p, personelId));
     if (!allowed) {
       return <Navigate to="/yetkisiz" replace />;
     }

@@ -190,11 +190,22 @@ body.login-page .hero .animated-line {
 }
 
 @media (min-width: 641px) {
-  .hero {
+  .hero,
+  body.login-page .hero {
     --hero-logo-width: 69px;
     --hero-spacer-width: 30px;
+    /* Title + accent share column 2; absolute overlay lost that track as CB. */
+    grid-template-rows: auto auto;
     column-gap: 14px;
+    row-gap: 3px;
     padding-inline: 16px;
+  }
+
+  .hero-logo,
+  .hero-spacer,
+  body.login-page .hero-logo,
+  body.login-page .hero-spacer {
+    grid-row: 1 / 3;
   }
 
   .hero-with-session .hero-logo {
@@ -221,9 +232,30 @@ body.login-page .hero .animated-line {
     width: 69px;
   }
 
-  .hero h1 {
-    font-size: 18px;
+  .hero h1,
+  body.login-page .hero h1 {
+    grid-row: 1;
+    /* Sit on the shared column-2 track bottom so a tall session logo
+       does not inflate title→line distance when logo spans both rows. */
+    align-self: end;
+    /* 20px + 1.8px tracking overflows the 331px center track (~492px hero shell). */
+    font-size: 19px;
     letter-spacing: 1.8px;
+  }
+
+  .animated-line,
+  body.login-page .hero .animated-line {
+    grid-column: 2;
+    grid-row: 2;
+    position: static;
+    left: auto;
+    right: auto;
+    top: auto;
+    bottom: auto;
+    transform: none;
+    justify-self: center;
+    align-self: start;
+    width: 74%;
   }
 }
 
@@ -237,18 +269,20 @@ body.login-page .hero .animated-line {
   }
 
   body.login-page .hero {
-    --hero-logo-width: clamp(34px, 10vw, 43px);
-    padding: 10px 8px 10px 2px;
-    column-gap: clamp(6px, 2vw, 8px);
-    min-height: 58px;
+    /* Login uses the same header proportions as the Taşıt reference.
+       The title still scales down on narrow phones so it remains whole. */
+    --hero-logo-width: 43px;
+    padding: 12px 12px 12px 3px;
+    column-gap: var(--space-2);
+    min-height: 65px;
   }
 
   body.login-page .hero h1 {
     overflow: visible;
     text-overflow: clip;
     white-space: nowrap;
-    font-size: clamp(9.5px, 2.85vw, 18.5px);
-    letter-spacing: clamp(0.35px, 0.14vw, 1.8px);
+    font-size: clamp(14px, 4.5vw, 20px);
+    letter-spacing: clamp(0.7px, 0.3vw, 1.8px);
     padding: 0;
   }
 
@@ -257,14 +291,23 @@ body.login-page .hero .animated-line {
   }
 
   body.login-page .hero-logo img {
-    height: clamp(28px, 8.5vw, 33px);
+    height: 33px;
   }
 
   /* Session hero: equal side tracks keep title centered; 76px meta overflows
-     without inflating the grid track. 48/48 avoids user↔accent-line collision. */
+     without inflating the grid track. 44/44 balances center width vs accent line. */
   .hero.hero-with-session {
-    --hero-logo-width: 48px;
-    --hero-spacer-width: 48px;
+    --hero-logo-width: 44px;
+    --hero-spacer-width: 44px;
+    overflow: visible;
+  }
+
+  section.hero.hero-with-session > h1 {
+    overflow: hidden;
+    text-overflow: clip;
+    font-size: clamp(11px, 3.2vw, 12px);
+    letter-spacing: clamp(0.32px, 0.13vw, 0.65px);
+    padding: 0;
   }
 
   .hero h1 {
@@ -333,8 +376,8 @@ body.login-page .hero .animated-line {
   }
 
   /* Session hero: keep line as wide as possible without intersecting
-     the overflow-visible 76px username meta (48/48 grid).
-     Measured: 84–80% still collide on 320; 79% clears 390/360/320. */
+     the overflow-visible 76px username meta (44/44 grid).
+     Measured: 79% clears 390/360/320. */
   .hero.hero-with-session .animated-line {
     width: 79%;
   }
@@ -353,6 +396,13 @@ body.login-page .hero .animated-line {
   }
 }
 
+@media (max-width: 375px) {
+  section.hero.hero-with-session > h1 {
+    font-size: 10px;
+    letter-spacing: 0.45px;
+  }
+}
+
 @media (max-width: 360px) {
   .hero h1 {
     font-size: clamp(17px, 4.9vw, 21px);
@@ -360,7 +410,12 @@ body.login-page .hero .animated-line {
   }
 
   body.login-page .hero h1 {
-    font-size: clamp(9px, 2.65vw, 17px);
-    letter-spacing: clamp(0.3px, 0.1vw, 1.5px);
+    font-size: clamp(13px, 4.25vw, 15.3px);
+    letter-spacing: clamp(0.6px, 0.28vw, 1px);
+  }
+
+  section.hero.hero-with-session > h1 {
+    font-size: 10px;
+    letter-spacing: 0.42px;
   }
 }

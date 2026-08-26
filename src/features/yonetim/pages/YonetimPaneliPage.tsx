@@ -8,7 +8,7 @@ import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
 import { isApiRequestError } from "../../../api/api-client";
 import { fetchPersonellerList } from "../../../api/personeller.api";
-import { createDepartmanOption, fetchDepartmanOptions } from "../../../api/referans.api";
+import { createDepartmanOption, fetchBirimOptions, fetchBolumOptions, fetchDepartmanOptions } from "../../../api/referans.api";
 import { createSurec, type CreateSurecPayload } from "../../../api/surecler.api";
 import {
   createYonetimKullanici,
@@ -24,7 +24,7 @@ import { KullaniciActorIdentityPanel } from "../components/KullaniciActorIdentit
 import { KullaniciRoleSummaryPanel } from "../components/KullaniciRoleSummaryPanel";
 import { MevzuatParametreleriPanel } from "../components/MevzuatParametreleriPanel";
 import { SaklamaLegalHoldPanel } from "../components/SaklamaLegalHoldPanel";
-import { YonetimSubeScopeField } from "../components/YonetimSubeScopeField";
+import { YonetimOrgScopeFields } from "../components/YonetimSubeScopeField";
 import { isRealYonetimKullaniciApi } from "../../../lib/yonetim/kullanici-api-contract";
 import {
   PERSONEL_FIRST_LOGIN_COMPLETE_LABEL,
@@ -38,6 +38,7 @@ import type { UserRole } from "../../../types/auth";
 import { ASSIGNABLE_USER_ROLES } from "../../../types/auth";
 import type { Personel } from "../../../types/personel";
 import type { IdOption } from "../../../types/referans";
+import { formatSurecTuruLabel, formatUserRoleLabel } from "../../../lib/display/enum-display";
 import type {
   KayitDurumu,
   KullaniciTipi,
@@ -73,6 +74,8 @@ type KullaniciFormState = {
   telefon: string;
   rol: UserRole;
   subeIds: number[];
+  bolumIds: number[];
+  birimIds: number[];
   varsayilanSubeId: string;
   durum: KayitDurumu;
   notlar: string;
@@ -83,17 +86,6 @@ type SubeFormState = {
   ad: string;
   departmanIds: number[];
   durum: KayitDurumu;
-};
-
-const ROLE_LABELS: Record<UserRole, string> = {
-  PERSONEL: "Personel",
-  MUHASEBE: "Muhasebe",
-  IK_SORUMLUSU: "İK Sorumlusu",
-  BIRIM_AMIRI: "Birim Amiri",
-  BOLUM_YONETICISI: "Bölüm Yöneticisi",
-  GENEL_YONETICI: "Genel Yönetici",
-  SISTEM_YONETICISI: "Sistem Yöneticisi",
-  AUTH_SMOKE_READONLY: "Teknik Smoke — Salt Okuma"
 };
 
 const KULLANICI_TIPI_LABELS: Record<KullaniciTipi, string> = {
@@ -121,6 +113,8 @@ const INITIAL_KULLANICI_FORM: KullaniciFormState = {
   telefon: "",
   rol: "BIRIM_AMIRI",
   subeIds: [],
+  bolumIds: [],
+  birimIds: [],
   varsayilanSubeId: "",
   durum: "AKTIF",
   notlar: ""
@@ -214,7 +208,7 @@ function roleOptions(currentRole?: UserRole) {
 
   return roles.map((value) => ({
     value,
-    label: ROLE_LABELS[value]
+    label: formatUserRoleLabel(value)
   }));
 }
 
@@ -292,6 +286,8 @@ function userFormFromItem(item: YonetimKullanici): KullaniciFormState {
     telefon: formatTelefon(item.telefon ?? ""),
     rol: item.rol,
     subeIds: item.sube_ids,
+    bolumIds: item.bolum_ids ?? [],
+    birimIds: item.birim_ids ?? [],
     varsayilanSubeId: item.varsayilan_sube_id != null ? String(item.varsayilan_sube_id) : "",
     durum: item.durum,
     notlar: item.notlar ?? ""
@@ -337,6 +333,8 @@ function toKullaniciPayload(form: KullaniciFormState, isEdit: boolean): UpsertYo
     kullanici_tipi: realKullaniciApi ? "HARICI" : form.kullaniciTipi,
     rol: form.rol,
     sube_ids: form.subeIds,
+    bolum_ids: form.bolumIds,
+    birim_ids: form.birimIds,
     varsayilan_sube_id: form.varsayilanSubeId ? Number.parseInt(form.varsayilanSubeId, 10) : null,
     durum: form.durum
   };
@@ -423,7 +421,7 @@ function buildYonetimSurecLogPayloads(
       personel_id: oldPersonelId,
       surec_turu: BIRIM_AMIRI_ATAMASI_KALDIRILDI_SUREC_TURU,
       baslangic_tarihi: today,
-      aciklama: "Birim Amiri Ataması Kaldırıldı."
+      aciklama: formatSurecTuruLabel(BIRIM_AMIRI_ATAMASI_KALDIRILDI_SUREC_TURU)
     });
   }
 
@@ -432,7 +430,7 @@ function buildYonetimSurecLogPayloads(
       personel_id: newPersonelId,
       surec_turu: BIRIM_AMIRI_ATANDI_SUREC_TURU,
       baslangic_tarihi: today,
-      aciklama: "Birim Amiri Olarak Atandı."
+      aciklama: formatSurecTuruLabel(BIRIM_AMIRI_ATANDI_SUREC_TURU)
     });
   }
 
@@ -504,6 +502,8 @@ export function YonetimPaneliPage() {
   const [subeler, setSubeler] = useState<YonetimSube[]>([]);
   const [personeller, setPersoneller] = useState<Personel[]>([]);
   const [departmanOptions, setDepartmanOptions] = useState<IdOption[]>([]);
+  const [bolumOptions, setBolumOptions] = useState<IdOption[]>([]);
+  const [birimOptions, setBirimOptions] = useState<IdOption[]>([]);
 
   const [editingKullaniciId, setEditingKullaniciId] = useState<number | null>(null);
   const [editingSubeId, setEditingSubeId] = useState<number | null>(null);
@@ -577,7 +577,7 @@ export function YonetimPaneliPage() {
         return fallback;
       }
 
-      return ROLE_LABELS[item.rol];
+      return formatUserRoleLabel(item.rol);
     }
 
     const adSoyad = (item.ad_soyad ?? "").trim();
@@ -585,7 +585,7 @@ export function YonetimPaneliPage() {
       return adSoyad;
     }
 
-    return ROLE_LABELS[item.rol];
+    return formatUserRoleLabel(item.rol);
   }
 
   async function loadPanel() {
@@ -593,17 +593,21 @@ export function YonetimPaneliPage() {
     setErrorMessage(null);
 
     try {
-      const [kullaniciList, subeList, personelList, departmanList] = await Promise.all([
+      const [kullaniciList, subeList, personelList, departmanList, bolumList, birimList] = await Promise.all([
         fetchYonetimKullanicilari(),
         fetchYonetimSubeleri(),
         fetchPersonellerList({ page: 1, limit: 250, aktiflik: "tum" }),
-        fetchDepartmanOptions()
+        fetchDepartmanOptions(),
+        fetchBolumOptions(),
+        fetchBirimOptions()
       ]);
 
       setKullanicilar(kullaniciList);
       setSubeler(subeList);
       setPersoneller(personelList.items);
       setDepartmanOptions(sortIdOptions(departmanList));
+      setBolumOptions(sortIdOptions(bolumList));
+      setBirimOptions(sortIdOptions(birimList));
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Yönetim paneli yüklenemedi.");
     } finally {
@@ -704,6 +708,24 @@ export function YonetimPaneliPage() {
         varsayilanSubeId: nextDefault
       };
     });
+  }
+
+  function toggleBolumSelection(bolumId: number) {
+    setKullaniciForm((prev) => ({
+      ...prev,
+      bolumIds: prev.bolumIds.includes(bolumId)
+        ? prev.bolumIds.filter((id) => id !== bolumId)
+        : [...prev.bolumIds, bolumId]
+    }));
+  }
+
+  function toggleBirimSelection(birimId: number) {
+    setKullaniciForm((prev) => ({
+      ...prev,
+      birimIds: prev.birimIds.includes(birimId)
+        ? prev.birimIds.filter((id) => id !== birimId)
+        : [...prev.birimIds, birimId]
+    }));
   }
 
   function toggleDepartmanSelection(departmanId: number) {
@@ -859,10 +881,10 @@ export function YonetimPaneliPage() {
       {isLoading ? <LoadingState label="Yönetim paneli yükleniyor..." /> : null}
       {!isLoading && errorMessage ? <ErrorState message={errorMessage} onRetry={() => void loadPanel()} /> : null}
       {!isLoading && successMessage ? <p className="yonetim-success">{successMessage}</p> : null}
-      {!isLoading && !errorMessage ? (
+      {!isLoading && !errorMessage && activeTab === "kullanicilar" ? (
         <p className="yonetim-kiosk-link">
           <Link to="/qr-kiosk" data-testid="yonetim-qr-kiosk-link">
-            QR Kiosk
+            QR Giriş Ekranı
           </Link>
         </p>
       ) : null}
@@ -996,7 +1018,7 @@ export function YonetimPaneliPage() {
                     >
                       <td className="yonetim-list-table-cell-strong">{formatKullaniciDisplayName(item)}</td>
                       <td>{KULLANICI_TIPI_LABELS[item.kullanici_tipi]}</td>
-                      <td>{ROLE_LABELS[item.rol]}</td>
+                      <td>{formatUserRoleLabel(item.rol)}</td>
                       <td title={formatSubeScopeLabel(item.sube_ids, subeNameMap)}>
                         {formatSubeScopeLabel(item.sube_ids, subeNameMap)}
                       </td>
@@ -1128,7 +1150,7 @@ export function YonetimPaneliPage() {
 
       {isKullaniciFormOpen ? (
         <AppModal
-          title={editingKullaniciId != null ? "Kullanıcı Workspace" : "Yeni Kullanıcı"}
+          title={editingKullaniciId != null ? "Kullanıcı Düzenleme" : "Yeni Kullanıcı"}
           backLabel="Kullanıcı Yönetimi"
           onBack={resetKullaniciEditor}
           onClose={resetKullaniciEditor}
@@ -1244,7 +1266,7 @@ export function YonetimPaneliPage() {
             </fieldset>
 
             <fieldset className="yonetim-workspace-section">
-              <legend>Şube kapsamı</legend>
+              <legend>Organizasyon kapsamı</legend>
               <FormField
                 as="select"
                 label="Varsayılan Şube"
@@ -1256,16 +1278,23 @@ export function YonetimPaneliPage() {
                   .filter((sube) => kullaniciForm.subeIds.includes(sube.id))
                   .map((sube) => ({ value: String(sube.id), label: sube.ad }))}
               />
-              <YonetimSubeScopeField
+              <YonetimOrgScopeFields
+                role={kullaniciForm.rol}
                 subeler={subeler}
+                bolumler={bolumOptions.map((b) => ({ id: b.id, ad: b.label }))}
+                birimler={birimOptions.map((b) => ({ id: b.id, ad: b.label }))}
                 selectedSubeIds={kullaniciForm.subeIds}
+                selectedBolumIds={kullaniciForm.bolumIds}
+                selectedBirimIds={kullaniciForm.birimIds}
                 onToggleSube={toggleSubeSelection}
+                onToggleBolum={toggleBolumSelection}
+                onToggleBirim={toggleBirimSelection}
               />
             </fieldset>
 
             {editingKullaniciId != null ? (
               <fieldset className="yonetim-workspace-section">
-                <legend>SGK actor lifecycle</legend>
+                <legend>SGK yetkili kimliği</legend>
                 <KullaniciActorIdentityPanel
                   userId={editingKullaniciId}
                   canManage={canManageYonetimPanel}

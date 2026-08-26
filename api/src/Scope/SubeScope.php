@@ -5,47 +5,26 @@ declare(strict_types=1);
 namespace Medisa\Api\Scope;
 
 use Medisa\Api\Auth\RolePermissions;
-use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
 
+/**
+ * Backward-compatible branch scope facade.
+ * Authoritative org rules live in OrgScope.
+ */
 class SubeScope
 {
     /**
-     * Effective sube scope for list/filter operations.
-     * null = no single-sub scope (GENEL all-data mode or unrestricted list).
-     *
      * @param array<string, mixed> $user
      * @return int|null
      */
     public static function resolveScope(array $user, Request $request)
     {
-        $querySube = self::parsePositiveInt($request->getQuery('sube_id'));
-        $headerSube = self::parsePositiveInt($request->getHeader('x-active-sube-id'));
-
-        $requested = $querySube !== null ? $querySube : $headerSube;
-        $allowed = self::allowedSubeIds($user);
-
-        if (count($allowed) === 0) {
-            return $requested;
-        }
-
-        if ($requested === null) {
-            if (count($allowed) === 1) {
-                return $allowed[0];
-            }
-
-            return null;
-        }
-
-        if (!in_array($requested, $allowed, true)) {
-            JsonResponse::forbidden('Secili sube icin yetkiniz yok.');
-        }
-
-        return $requested;
+        return OrgScope::resolveActiveSubeId($user, $request);
     }
 
     /**
      * BA-scoped read surfaces: own birim amiri context when user is branch-amir only.
+     * Retained for legacy surfaces; primary unit scope is OrgScope + user_birimler.
      *
      * @param array<string, mixed> $user
      * @return int|null
@@ -59,6 +38,11 @@ class SubeScope
             return null;
         }
 
+        // Prefer org unit assignment over actor-user-id restriction when units exist.
+        if (count(OrgScope::allowedBirimIds($user)) > 0) {
+            return null;
+        }
+
         $userId = isset($user['id']) ? (int) $user['id'] : 0;
 
         return $userId > 0 ? $userId : null;
@@ -66,35 +50,14 @@ class SubeScope
 
     /**
      * @param array<string, mixed> $user
+     * @param array<string, mixed>|int $personelOrg
      */
-    public static function assertPersonelAccess(array $user, Request $request, $personelSubeId)
+    public static function assertPersonelAccess(array $user, Request $request, $personelOrg)
     {
-        $personelSubeId = (int) $personelSubeId;
-        $allowed = self::allowedSubeIds($user);
-
-        if (count($allowed) === 0) {
-            $scope = self::resolveScope($user, $request);
-            if ($scope !== null && $personelSubeId !== $scope) {
-                JsonResponse::forbidden();
-            }
-            return;
-        }
-
-        if (!in_array($personelSubeId, $allowed, true)) {
-            JsonResponse::forbidden();
-        }
-
-        $scope = self::resolveScope($user, $request);
-        if ($scope !== null && $personelSubeId !== $scope) {
-            JsonResponse::forbidden();
-        }
+        OrgScope::assertPersonelAccess($user, $request, $personelOrg);
     }
 
     /**
-     * Resolve initial login active_sube_id.
-     * Preferred persisted default is used only when it belongs to allowed scope.
-     * Callers with one argument keep prior ASC-first / sole-sube behavior.
-     *
      * @param array<int, int> $subeIds
      * @param int|null $preferredSubeId
      */
@@ -123,29 +86,11 @@ class SubeScope
      * @param array<string, mixed> $params
      * @param int|null $scope
      * @param array<int, int> $allowedSubeIds
+     * @param bool $denyWhenEmpty fail-closed when no allowed branches (non-global roles)
      */
-    public static function appendSubeFilter(array &$where, array &$params, $scope, array $allowedSubeIds, $column, $paramPrefix = 'scope')
+    public static function appendSubeFilter(array &$where, array &$params, $scope, array $allowedSubeIds, $column, $paramPrefix = 'scope', $denyWhenEmpty = false)
     {
-        if ($scope !== null) {
-            $key = $paramPrefix . '_sube_id';
-            $where[] = $column . ' = :' . $key;
-            $params[$key] = (int) $scope;
-
-            return;
-        }
-
-        if (count($allowedSubeIds) === 0) {
-            return;
-        }
-
-        $placeholders = [];
-        foreach ($allowedSubeIds as $index => $subeId) {
-            $key = $paramPrefix . '_allowed_sube_id_' . $index;
-            $placeholders[] = ':' . $key;
-            $params[$key] = (int) $subeId;
-        }
-
-        $where[] = $column . ' IN (' . implode(', ', $placeholders) . ')';
+        OrgScope::appendSubeFilter($where, $params, $scope, $allowedSubeIds, $column, $paramPrefix, $denyWhenEmpty);
     }
 
     /** @param array<int, int> $allowedSubeIds */
@@ -154,11 +99,11 @@ class SubeScope
         $sealSubeId = (int) $sealSubeId;
 
         if (count($allowedSubeIds) > 0 && !in_array($sealSubeId, $allowedSubeIds, true)) {
-            JsonResponse::forbidden('Bu kayit aktif sube baglaminda goruntulenemiyor.');
+            \Medisa\Api\Http\JsonResponse::forbidden('Bu kayit aktif sube baglaminda goruntulenemiyor.');
         }
 
         if ($scope !== null && $sealSubeId !== (int) $scope) {
-            JsonResponse::forbidden('Bu kayit aktif sube baglaminda goruntulenemiyor.');
+            \Medisa\Api\Http\JsonResponse::forbidden('Bu kayit aktif sube baglaminda goruntulenemiyor.');
         }
     }
 
@@ -168,26 +113,6 @@ class SubeScope
      */
     public static function allowedSubeIds(array $user)
     {
-        $ids = isset($user['sube_ids']) && is_array($user['sube_ids']) ? $user['sube_ids'] : [];
-        $normalized = [];
-        foreach ($ids as $id) {
-            $value = (int) $id;
-            if ($value > 0) {
-                $normalized[] = $value;
-            }
-        }
-
-        return $normalized;
-    }
-
-    /** @param mixed $value */
-    private static function parsePositiveInt($value)
-    {
-        if ($value === null || $value === '') {
-            return null;
-        }
-
-        $parsed = (int) $value;
-        return $parsed > 0 ? $parsed : null;
+        return OrgScope::allowedSubeIds($user);
     }
 }

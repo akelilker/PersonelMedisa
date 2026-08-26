@@ -896,7 +896,7 @@ class PersonelBelgelerController
             return null;
         }
 
-        $stmt = $pdo->prepare('SELECT id, sube_id, aktif_durum FROM personeller WHERE id = :id LIMIT 1');
+        $stmt = $pdo->prepare('SELECT id, sube_id, bolum_id, birim_id, aktif_durum FROM personeller WHERE id = :id LIMIT 1');
         $stmt->execute(['id' => $id]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -910,7 +910,7 @@ class PersonelBelgelerController
             JsonResponse::notFound('Personel bulunamadi.');
         }
 
-        SubeScope::assertPersonelAccess($user, $request, (int) $personel['sube_id']);
+        SubeScope::assertPersonelAccess($user, $request, $personel);
     }
 
     /** @param array<string, mixed> $user */

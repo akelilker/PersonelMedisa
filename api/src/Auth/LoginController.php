@@ -73,6 +73,13 @@ class LoginController
                 'Kullanici rolu canonical modele cozulemedi. Manuel rol eslemesi gerekir.'
             );
         }
+
+        // PERSONEL self-service accounts: bound personel must be AKTIF (login fail-closed).
+        // Management roles with optional personel_id binding keep login; SelfPersonelContext still denies /me.
+        if ($rol === 'PERSONEL') {
+            self::assertPersonelRoleLoginAllowed($pdo, $hasPersonelId, $user);
+        }
+
         if ($rol === 'AUTH_SMOKE_READONLY' && count($subeIds) !== 1) {
             JsonResponse::error(
                 403,
@@ -218,5 +225,50 @@ class LoginController
         }
 
         return $list;
+    }
+
+    /**
+     * PERSONEL role login requires an AKTIF bound personel record.
+     *
+     * @param array<string, mixed> $user
+     */
+    private static function assertPersonelRoleLoginAllowed(PDO $pdo, $hasPersonelIdColumn, array $user)
+    {
+        if (!$hasPersonelIdColumn) {
+            JsonResponse::error(
+                403,
+                'PERSONEL_BINDING_REQUIRED',
+                'Personel hesabi baglantisi hazir degil.'
+            );
+        }
+
+        $raw = $user['personel_id'] ?? null;
+        $personelId = ($raw === null || $raw === '') ? 0 : (int) $raw;
+        if ($personelId <= 0) {
+            JsonResponse::error(
+                403,
+                'PERSONEL_BINDING_REQUIRED',
+                'Personel hesabiniz personel kaydiyla eslestirilmemis.'
+            );
+        }
+
+        $stmt = $pdo->prepare('SELECT aktif_durum FROM personeller WHERE id = :id LIMIT 1');
+        $stmt->execute(['id' => $personelId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!is_array($row)) {
+            JsonResponse::error(
+                403,
+                'PERSONEL_INACTIVE',
+                'Bagli personel kaydi bulunamadi.'
+            );
+        }
+        $aktif = strtoupper(trim((string) ($row['aktif_durum'] ?? '')));
+        if ($aktif !== 'AKTIF') {
+            JsonResponse::error(
+                403,
+                'PERSONEL_INACTIVE',
+                'Personel hesabiniz aktif degil.'
+            );
+        }
     }
 }

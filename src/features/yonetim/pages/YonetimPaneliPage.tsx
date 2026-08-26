@@ -468,6 +468,7 @@ export function YonetimPaneliPage() {
   const [searchParams] = useSearchParams();
   const { hasPermission } = useRoleAccess();
   const canManageYonetimPanel = hasPermission("yonetim-paneli.manage");
+  const canOpenQrKiosk = hasPermission("qr.kiosk.display");
   const canViewMevzuat = hasPermission("mevzuat_parametreleri.view");
   const canManageMevzuat = hasPermission("mevzuat_parametreleri.manage");
   const canViewSaklama =
@@ -881,7 +882,7 @@ export function YonetimPaneliPage() {
       {isLoading ? <LoadingState label="Yönetim paneli yükleniyor..." /> : null}
       {!isLoading && errorMessage ? <ErrorState message={errorMessage} onRetry={() => void loadPanel()} /> : null}
       {!isLoading && successMessage ? <p className="yonetim-success">{successMessage}</p> : null}
-      {!isLoading && !errorMessage && activeTab === "kullanicilar" ? (
+      {!isLoading && !errorMessage && activeTab === "kullanicilar" && canOpenQrKiosk ? (
         <p className="yonetim-kiosk-link">
           <Link to="/qr-kiosk" data-testid="yonetim-qr-kiosk-link">
             QR Giriş Ekranı

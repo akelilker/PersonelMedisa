@@ -27,7 +27,7 @@ describe('canonical migration runner contract', () => {
   });
 
   it('keeps the runner generic and migration tip data-driven', () => {
-    expect(migrations.at(-1)).toBe('073_test_fixture_personel_archive.sql');
+    expect(migrations.at(-1)).toBe('074_qr_attendance_correction_and_inbox.sql');
     expect(runner).not.toContain('068');
     expect(runner).not.toContain('069');
     expect(cli).not.toContain('068');

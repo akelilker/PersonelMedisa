@@ -67,7 +67,18 @@ export async function startQrScanner(options: StartOptions): Promise<QrScannerHa
         facingMode: { ideal: "environment" }
       }
     });
-  } catch {
+  } catch (error) {
+    const name =
+      error && typeof error === "object" && "name" in error ? String((error as { name?: unknown }).name) : "";
+    if (name === "NotAllowedError" || name === "PermissionDeniedError") {
+      throw new Error("Kamera izni reddedildi. Tarayici ayarlarindan kamera erisimini acin.");
+    }
+    if (name === "NotFoundError" || name === "DevicesNotFoundError") {
+      throw new Error("Bu cihazda kullanilabilir kamera bulunamadi.");
+    }
+    if (name === "NotReadableError" || name === "TrackStartError") {
+      throw new Error("Kamera baska bir uygulama tarafindan kullaniliyor olabilir.");
+    }
     throw new Error("Kamera izni reddedildi veya kamera acilamadi.");
   }
 

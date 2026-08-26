@@ -48,6 +48,7 @@ $expectedBaseline = [
     'self_service.fazla_calisma.view',
     'self_service.qr.scan',
     'self_service.qr.events.view',
+    'self_service.attendance.correct',
 ];
 if ($baseline !== $expectedBaseline) {
     plFail('SELF_SERVICE_BASELINE mismatch: ' . json_encode($baseline));

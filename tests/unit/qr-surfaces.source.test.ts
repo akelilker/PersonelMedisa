@@ -11,6 +11,7 @@ describe("QR surface ownership", () => {
     expect(source).toContain("Günlük operasyon / kontrol");
     expect(source).toContain("QR Ekranını Aç");
     expect(source).toContain("Günlük Puantaja Git");
+    expect(source).toContain('hasPermission("qr.kiosk.display")');
   });
 
   it("keeps Raporlar as an independent historical/reporting surface", () => {

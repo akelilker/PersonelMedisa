@@ -126,7 +126,16 @@ export async function postMeQrScan(input: {
   }
   return {
     event: normalizeEvent(data.event),
-    idempotent: Boolean(data.idempotent)
+    idempotent: Boolean(data.idempotent),
+    late_early_info: (() => {
+      const raw = toRecord(data.late_early_info);
+      if (!raw) return null;
+      const kind = readString(raw.kind);
+      const message = readString(raw.message);
+      const delta = readNumber(raw.delta_dakika);
+      if (!kind || !message || delta === null) return null;
+      return { kind, message, delta_dakika: delta };
+    })()
   };
 }
 
@@ -384,6 +393,7 @@ export async function fetchManagerQrAttendance(params?: {
   sube_id?: number;
   limit?: number;
   offset?: number;
+  include_absent?: boolean;
 }): Promise<ManagerQrAttendanceResponse> {
   const path = appendQueryParams(endpoints.puantaj.qrHareketleri, {
     from: params?.from,
@@ -391,7 +401,8 @@ export async function fetchManagerQrAttendance(params?: {
     personel_id: params?.personel_id,
     sube_id: params?.sube_id,
     limit: params?.limit,
-    offset: params?.offset
+    offset: params?.offset,
+    include_absent: params?.include_absent ? 1 : undefined
   });
   const response = await apiRequest<ApiResponse<unknown>>(path);
   return normalizeManagerQrAttendanceResponse(response);

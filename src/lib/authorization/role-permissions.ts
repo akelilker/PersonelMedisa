@@ -117,7 +117,10 @@ export type AppPermission =
   | "self_service.yillik_izin.view"
   | "self_service.fazla_calisma.view"
   | "self_service.qr.scan"
-  | "self_service.qr.events.view";
+  | "self_service.qr.events.view"
+  | "self_service.attendance.correct"
+  | "attendance.correction.decide"
+  | "qr.kiosk.display";
 
 /**
  * Canonical self-service baseline — same set as PERSONEL role matrix.
@@ -129,7 +132,8 @@ export const SELF_SERVICE_BASELINE_PERMISSIONS: readonly AppPermission[] = [
   "self_service.yillik_izin.view",
   "self_service.fazla_calisma.view",
   "self_service.qr.scan",
-  "self_service.qr.events.view"
+  "self_service.qr.events.view",
+  "self_service.attendance.correct"
 ];
 
 const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
@@ -225,7 +229,9 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "retention.destruction.request",
     "retention.destruction.approve",
     "retention.destruction.execute",
-    "retention.destruction.view"
+    "retention.destruction.view",
+    "qr.kiosk.display",
+    "attendance.correction.decide"
   ],
   BOLUM_YONETICISI: [
     "personeller.view",
@@ -278,7 +284,8 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "puantaj.olay_karar.decide",
     "puantaj.olay_karar.view",
     // Explicit SGK final approve only — does not inherit GENEL_YONETICI matrix.
-    "sgk_karar_paketi.approve"
+    "sgk_karar_paketi.approve",
+    "attendance.correction.decide"
   ],
   /** Branch-level operational management (independent of BOLUM_YONETICISI). */
   SUBE_YONETICISI: [
@@ -331,7 +338,8 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "disiplin.final_decision",
     "puantaj.olay_karar.decide",
     "puantaj.olay_karar.view",
-    "sgk_karar_paketi.approve"
+    "sgk_karar_paketi.approve",
+    "qr.kiosk.display"
   ],
   /** External accountant: finalized mali/bordro read + export. No operational write. */
   MUHASEBE: [
@@ -391,7 +399,8 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "haftalik_mutabakat.view",
     "haftalik_mutabakat.approve",
     "aylik_bildirim_onayi.view",
-    "aylik_bildirim_onayi.approve"
+    "aylik_bildirim_onayi.approve",
+    "attendance.correction.decide"
   ],
   /** IK operational owner (successor of IK_BORDRO). Prepare-only for SGK; no final approve. */
   IK_SORUMLUSU: [
@@ -501,7 +510,8 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "arsiv.download",
     "arsiv.audit.view",
     "retention.view",
-    "retention.destruction.view"
+    "retention.destruction.view",
+    "qr.kiosk.display"
   ],
   /** Self-service read surfaces (S3B). No broad personeller.* / puantaj.view. */
   PERSONEL: SELF_SERVICE_BASELINE_PERMISSIONS,
@@ -621,7 +631,8 @@ export const ROUTE_PERMISSION = {
   finansPage: "finans.view",
   isgPage: "isg.view",
   yonetimPaneliPage: "yonetim-paneli.view",
-  qrKioskPage: "yonetim-paneli.manage",
+  /** Branch QR display — scoped by SubeScope; not yonetim-paneli.manage. */
+  qrKioskPage: "qr.kiosk.display",
   resmiTatilTakvimiPage: "resmi_tatil_takvimi.view",
   aylikOzetPage: "aylik-ozet.view",
   haftalikKapanisPage: "revizyon.view"

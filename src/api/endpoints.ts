@@ -11,7 +11,14 @@ export const endpoints = {
     fazlaCalisma: "/me/fazla-calisma",
     qrScan: "/me/qr-scan",
     qrHareketleri: "/me/qr-hareketleri",
-    qrAraliklari: "/me/qr-araliklari"
+    qrAraliklari: "/me/qr-araliklari",
+    attendanceToday: "/me/attendance/today",
+    attendanceCorrectionRequests: "/me/attendance/correction-requests",
+    inboxNotifications: "/me/inbox-notifications",
+    ackInboxPopup: (id: number | string) => `/me/inbox-notifications/${id}/ack-popup`
+  },
+  attendance: {
+    decideCorrection: (id: number | string) => `/attendance/correction-requests/${id}/decide`
   },
   qrKiosk: {
     token: "/qr-kiosk/token"

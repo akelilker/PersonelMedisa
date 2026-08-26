@@ -20,6 +20,7 @@ export function formatQrTime(value: string | null): string {
 }
 
 export function qrAttendanceStatus(item: ManagerQrAttendanceItem, today = istanbulToday()): string {
+  if (item.anomalies.includes("NO_SCAN")) return "Henüz giriş yok";
   if (item.branch_mismatch) return "Şube uyuşmazlığı";
   if (item.date_from !== today) {
     if (item.missing_entry) return "Eksik giriş";

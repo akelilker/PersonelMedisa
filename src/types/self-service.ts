@@ -10,9 +10,19 @@ export type MePersonelSummary = {
   sube_ad: string;
   departman_id: number | null;
   departman_ad: string | null;
+  bolum_id: number | null;
+  bolum_ad: string | null;
+  birim_id: number | null;
+  birim_ad: string | null;
   gorev_id: number | null;
   gorev_ad: string | null;
   aktif_durum: string;
+};
+
+export type MeCompletenessSummary = {
+  is_complete: boolean;
+  missing_count: number;
+  critical_missing_labels: string[];
 };
 
 export type MeIdentity = {
@@ -22,6 +32,8 @@ export type MeIdentity = {
   rol: UserRole | string;
   personel_id: number;
   personel: MePersonelSummary;
+  completeness?: MeCompletenessSummary | null;
+  last_qr_event?: MeQrAttendanceEvent | null;
 };
 
 export type MePuantajGun = {
@@ -96,6 +108,11 @@ export type MeQrAttendanceEvent = {
 export type MeQrScanResponse = {
   event: MeQrAttendanceEvent;
   idempotent: boolean;
+  late_early_info?: {
+    kind: string;
+    message: string;
+    delta_dakika: number;
+  } | null;
 };
 
 export type MeQrHareketleriResponse = {

@@ -22,6 +22,7 @@ const PERMISSION_LABELS: Partial<Record<AppPermission, string>> = {
   "self_service.view": "Self-service ana sayfa",
   "self_service.qr.scan": "QR okutma",
   "self_service.qr.events.view": "QR hareket geçmişi",
+  "qr.kiosk.display": "Şube QR ekranı",
   "raporlar.view": "Raporlar",
   "finans.view": "Finans görüntüleme",
   "aylik-ozet.view": "Aylık kapanış özeti",
@@ -54,7 +55,7 @@ const GROUPS: Array<{ title: string; permissions: AppPermission[] }> = [
   },
   {
     title: "Self-service / QR",
-    permissions: ["self_service.view", "self_service.qr.scan", "self_service.qr.events.view"]
+    permissions: ["self_service.view", "self_service.qr.scan", "self_service.qr.events.view", "qr.kiosk.display"]
   },
   {
     title: "Rapor / finans",

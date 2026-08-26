@@ -113,9 +113,55 @@ function normalizePersonelSummary(value: unknown): MePersonelSummary {
     sube_ad: readString(record.sube_ad) ?? "",
     departman_id: readNullableNumber(record.departman_id),
     departman_ad: readString(record.departman_ad),
+    bolum_id: readNullableNumber(record.bolum_id),
+    bolum_ad: readString(record.bolum_ad),
+    birim_id: readNullableNumber(record.birim_id),
+    birim_ad: readString(record.birim_ad),
     gorev_id: readNullableNumber(record.gorev_id),
     gorev_ad: readString(record.gorev_ad),
     aktif_durum: readString(record.aktif_durum) ?? "AKTIF"
+  };
+}
+
+function normalizeMeCompleteness(value: unknown): MeIdentity["completeness"] {
+  const record = toRecord(value);
+  if (!record) {
+    return null;
+  }
+  const labels = Array.isArray(record.critical_missing_labels)
+    ? record.critical_missing_labels.filter((item): item is string => typeof item === "string")
+    : [];
+  return {
+    is_complete: record.is_complete === true,
+    missing_count: readNumber(record.missing_count) ?? labels.length,
+    critical_missing_labels: labels
+  };
+}
+
+function normalizeLastQrEvent(value: unknown): MeIdentity["last_qr_event"] {
+  const record = toRecord(value);
+  if (!record) {
+    return null;
+  }
+  const id = readNumber(record.id);
+  const eventType = readString(record.event_type);
+  const occurredAt = readString(record.occurred_at);
+  const sube = toRecord(record.sube) ?? {};
+  const subeId = readNumber(sube.id);
+  if (id === null || !eventType || !occurredAt || subeId === null) {
+    return null;
+  }
+  if (eventType !== "GIRIS" && eventType !== "CIKIS") {
+    return null;
+  }
+  return {
+    id,
+    event_type: eventType,
+    occurred_at: occurredAt,
+    sube: {
+      id: subeId,
+      ad: readString(sube.ad) ?? ""
+    }
   };
 }
 
@@ -139,7 +185,9 @@ function normalizeMeIdentity(data: unknown): MeIdentity {
     ad_soyad: readString(record.ad_soyad) ?? "",
     rol: readString(record.rol) ?? "",
     personel_id: personelId,
-    personel: normalizePersonelSummary(record.personel)
+    personel: normalizePersonelSummary(record.personel),
+    completeness: normalizeMeCompleteness(record.completeness),
+    last_qr_event: normalizeLastQrEvent(record.last_qr_event)
   };
 }
 

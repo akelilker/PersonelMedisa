@@ -229,7 +229,8 @@ describe("role permissions", () => {
       "self_service.yillik_izin.view",
       "self_service.fazla_calisma.view",
       "self_service.qr.scan",
-      "self_service.qr.events.view"
+      "self_service.qr.events.view",
+      "self_service.attendance.correct"
     ]);
     expect(hasRolePermission("PERSONEL", "raporlar.view")).toBe(false);
     expect(hasRolePermission("PERSONEL", "patron_ack.view")).toBe(false);

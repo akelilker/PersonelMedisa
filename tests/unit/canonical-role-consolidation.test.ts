@@ -264,7 +264,8 @@ describe("S1 canonical role consolidation", () => {
       "self_service.yillik_izin.view",
       "self_service.fazla_calisma.view",
       "self_service.qr.scan",
-      "self_service.qr.events.view"
+      "self_service.qr.events.view",
+      "self_service.attendance.correct"
     ]);
     expect(hasRolePermission("PERSONEL", "personeller.view")).toBe(false);
     expect(hasRolePermission("PERSONEL", "puantaj.view")).toBe(false);
@@ -329,7 +330,7 @@ describe("S1 canonical role consolidation", () => {
     expect(migrations).toContain("053_retention_legal_hold_arsiv.sql");
     expect(migrations).toContain("054_canonical_role_consolidation.sql");
     expect(migrations).toContain("055_yillik_izin_hak_duzeltmeleri.sql");
-    expect(migrations.at(-1)).toBe("073_test_fixture_personel_archive.sql");
+    expect(migrations.at(-1)).toBe("074_qr_attendance_correction_and_inbox.sql");
 
     const sql = readFileSync(MIG_054, "utf8");
     expect(sql).toContain("PERSONEL");

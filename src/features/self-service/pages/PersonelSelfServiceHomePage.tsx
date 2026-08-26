@@ -1,189 +1,174 @@
-import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import {
-  fetchMe,
-  fetchMeFazlaCalisma,
-  fetchMePuantaj,
-  fetchMeYillikIzinBakiye
-} from "../../../api/me.api";
+  ackInboxPopup,
+  createAttendanceCorrection,
+  decideAttendanceCorrection,
+  fetchAttendanceToday,
+  fetchInboxNotifications,
+  type AttendanceTodayResponse,
+  type InboxNotification
+} from "../../../api/attendance-mobile.api";
+import { fetchMe } from "../../../api/me.api";
 import { isApiRequestError, shouldPreferDemoApi } from "../../../api/api-client";
 import { LoadingState } from "../../../components/states/LoadingState";
-import type {
-  MeFazlaCalismaResponse,
-  MeIdentity,
-  MePuantajGun,
-  MePuantajResponse,
-  MeYillikIzinBakiye
-} from "../../../types/self-service";
+import type { MeIdentity } from "../../../types/self-service";
+import { BackgroundlessNoticeModal } from "../components/BackgroundlessNoticeModal";
+import { PersonelMobileCapabilityService } from "../personel-mobile-capability";
 
-type PageStatus =
-  | { kind: "loading" }
-  | { kind: "unbound" }
-  | { kind: "inactive" }
-  | { kind: "demo" }
-  | { kind: "error"; message: string }
+type NoticeState =
+  | null
   | {
-      kind: "ready";
-      identity: MeIdentity;
-      today: MePuantajGun | null;
-      month: MePuantajResponse | null;
-      last12: MePuantajResponse | null;
-      izin: MeYillikIzinBakiye | null;
-      fazla: MeFazlaCalismaResponse | null;
-      sectionErrors: string[];
+      title: string;
+      body: string;
+      infoTooltip?: string;
+      primaryLabel?: string;
+      secondaryLabel?: string;
+      onPrimary?: () => void;
+      onSecondary?: () => void;
+      notificationId?: number;
+      kind?: string;
     };
 
-function todayYmdIstanbul(): string {
-  try {
-    return new Intl.DateTimeFormat("en-CA", {
-      timeZone: "Europe/Istanbul",
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit"
-    }).format(new Date());
-  } catch {
-    return new Date().toISOString().slice(0, 10);
-  }
-}
+type CorrectDraft = {
+  eventId: number;
+  eventType: "GIRIS" | "CIKIS";
+  currentTime: string;
+};
 
-function monthsAgoYmd(months: number, today: string): string {
-  const [y, m, d] = today.split("-").map(Number);
-  const date = new Date(Date.UTC(y, m - 1, d));
-  date.setUTCMonth(date.getUTCMonth() - months);
-  const yy = date.getUTCFullYear();
-  const mm = String(date.getUTCMonth() + 1).padStart(2, "0");
-  const dd = String(date.getUTCDate()).padStart(2, "0");
-  return `${yy}-${mm}-${dd}`;
-}
-
-function formatMinutes(value: number | null | undefined): string {
-  if (value == null || !Number.isFinite(value)) {
-    return "—";
-  }
-  if (value === 0) {
-    return "0 dk";
-  }
-  const hours = Math.floor(Math.abs(value) / 60);
-  const mins = Math.abs(value) % 60;
-  const sign = value < 0 ? "-" : "";
-  if (hours === 0) {
-    return `${sign}${mins} dk`;
-  }
-  if (mins === 0) {
-    return `${sign}${hours} sa`;
-  }
-  return `${sign}${hours} sa ${mins} dk`;
-}
-
-function formatGun(value: number | null | undefined): string {
-  if (value == null || !Number.isFinite(value)) {
-    return "—";
-  }
-  return `${value} gün`;
-}
+const COMING_SOON = PersonelMobileCapabilityService.MESSAGE_COMING_SOON;
 
 export function PersonelSelfServiceHomePage() {
-  const [status, setStatus] = useState<PageStatus>({ kind: "loading" });
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState(true);
+  const [today, setToday] = useState<AttendanceTodayResponse | null>(null);
+  const [identity, setIdentity] = useState<MeIdentity | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [inboxOpen, setInboxOpen] = useState(false);
+  const [inboxItems, setInboxItems] = useState<InboxNotification[]>([]);
+  const [notice, setNotice] = useState<NoticeState>(null);
+  const [correctDraft, setCorrectDraft] = useState<CorrectDraft | null>(null);
+  const [correctTime, setCorrectTime] = useState("");
+  const [correctBusy, setCorrectBusy] = useState(false);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    async function load() {
-      if (shouldPreferDemoApi()) {
-        if (!cancelled) {
-          setStatus({ kind: "demo" });
-        }
-        return;
-      }
-
-      try {
-        const identity = await fetchMe();
-        const today = todayYmdIstanbul();
-        const from12 = monthsAgoYmd(12, today);
-        const sectionErrors: string[] = [];
-
-        const [monthResult, last12Result, izinResult, fazlaResult] = await Promise.allSettled([
-          fetchMePuantaj(),
-          fetchMePuantaj({ from: from12, to: today }),
-          fetchMeYillikIzinBakiye({ referans_tarih: today }),
-          fetchMeFazlaCalisma()
-        ]);
-
-        if (cancelled) {
-          return;
-        }
-
-        const month = monthResult.status === "fulfilled" ? monthResult.value : null;
-        if (monthResult.status === "rejected") {
-          sectionErrors.push("Bu ay puantaj özeti yüklenemedi.");
-        }
-
-        const last12 = last12Result.status === "fulfilled" ? last12Result.value : null;
-        if (last12Result.status === "rejected") {
-          sectionErrors.push("Son 12 ay özeti yüklenemedi.");
-        }
-
-        const izin = izinResult.status === "fulfilled" ? izinResult.value : null;
-        if (izinResult.status === "rejected") {
-          sectionErrors.push("Yıllık izin bakiyesi yüklenemedi.");
-        }
-
-        const fazla = fazlaResult.status === "fulfilled" ? fazlaResult.value : null;
-        if (fazlaResult.status === "rejected") {
-          sectionErrors.push("Fazla çalışma özeti yüklenemedi.");
-        }
-
-        const todayFromMonth = month?.items.find((item) => item.tarih === today) ?? null;
-        const todayFromYear = last12?.items.find((item) => item.tarih === today) ?? null;
-
-        setStatus({
-          kind: "ready",
-          identity,
-          today: todayFromMonth ?? todayFromYear,
-          month,
-          last12,
-          izin,
-          fazla,
-          sectionErrors
-        });
-      } catch (error) {
-        if (cancelled) {
-          return;
-        }
-        if (isApiRequestError(error)) {
-          if (error.code === "SELF_SERVICE_PERSONEL_INACTIVE") {
-            setStatus({ kind: "inactive" });
-            return;
-          }
-          // Binding required / schema missing / not found → same unbound surface.
-          // E2E/demo without /me mock also lands here fail-closed.
-          setStatus({ kind: "unbound" });
-          return;
-        }
-        setStatus({ kind: "unbound" });
-      }
+  const load = useCallback(async () => {
+    if (shouldPreferDemoApi()) {
+      setLoading(false);
+      setError(null);
+      setToday(null);
+      setIdentity(null);
+      return;
     }
-
-    void load();
-    return () => {
-      cancelled = true;
-    };
+    setLoading(true);
+    try {
+      const [me, attendance, inbox] = await Promise.all([
+        fetchMe(),
+        fetchAttendanceToday(),
+        fetchInboxNotifications()
+      ]);
+      setIdentity(me);
+      setToday(attendance);
+      setInboxItems(inbox.items);
+      const popup = inbox.pending_popups[0] ?? null;
+      if (popup) {
+        const isCorrection =
+          popup.kind === "ATTENDANCE_CORRECTION_REQUEST" || popup.kind === "ATTENDANCE_CORRECTION_REMINDER";
+        const correctionId = popup.related_correction_id;
+        setNotice({
+          title: popup.title,
+          body: popup.body,
+          infoTooltip:
+            popup.kind === "LATE_ENTRY_INFO" || popup.kind === "EARLY_EXIT_INFO" ? "Bilgi Amaçlıdır." : undefined,
+          notificationId: popup.id,
+          kind: popup.kind,
+          primaryLabel: isCorrection ? "Onayla" : undefined,
+          secondaryLabel: isCorrection ? "Reddet" : undefined,
+          onPrimary:
+            isCorrection && correctionId
+              ? async () => {
+                  await decideAttendanceCorrection(correctionId, "ONAYLA");
+                  await ackInboxPopup(popup.id);
+                  setNotice(null);
+                  await load();
+                }
+              : undefined,
+          onSecondary:
+            isCorrection && correctionId
+              ? async () => {
+                  await decideAttendanceCorrection(correctionId, "REDDET");
+                  await ackInboxPopup(popup.id);
+                  setNotice(null);
+                  await load();
+                }
+              : undefined
+        });
+      }
+      setError(null);
+    } catch (cause) {
+      if (isApiRequestError(cause) && cause.code === "SELF_SERVICE_BINDING_REQUIRED") {
+        setError("unbound");
+      } else if (isApiRequestError(cause) && cause.code === "SELF_SERVICE_PERSONEL_INACTIVE") {
+        setError("inactive");
+      } else {
+        setError(cause instanceof Error ? cause.message : "Özet yüklenemedi.");
+      }
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  if (status.kind === "loading") {
-    return <LoadingState label="Personel bilgileri yükleniyor..." />;
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const caps = today?.capabilities;
+  const comingSoon = caps?.coming_soon_message ?? COMING_SOON;
+  const unreadCount = useMemo(
+    () => inboxItems.filter((item) => item.popup_required && !item.popup_consumed).length,
+    [inboxItems]
+  );
+
+  function guardOrRun(capability: "qr_scan" | "attendance_correct", action: () => void) {
+    if (!caps || !caps[capability]) {
+      setNotice({ title: "Bilgi", body: comingSoon });
+      return;
+    }
+    action();
   }
 
-  if (status.kind === "demo") {
+  async function closeNotice() {
+    if (notice?.notificationId) {
+      try {
+        await ackInboxPopup(notice.notificationId);
+      } catch {
+        // keep closing
+      }
+    }
+    setNotice(null);
+    void load();
+  }
+
+  if (loading) {
+    return <LoadingState label="Personel paneli yükleniyor..." />;
+  }
+
+  if (shouldPreferDemoApi()) {
     return (
-      <section className="states-page" data-testid="personel-unbound-page">
-        <h2>Personel self-service</h2>
-        <p>Demo modda personel eşlemesi yok. Gerçek API ile bağlanmış hesapta özet burada görünür.</p>
+      <section className="personel-mobile-shell" data-testid="personel-self-service-page">
+        <header className="pm-header">
+          <div className="pm-header-accent pm-header-accent--left" aria-hidden="true" />
+          <div className="pm-header-main">
+            <p className="pm-product-title">PERSONEL YÖN. SİST.</p>
+            <p className="pm-page-title">ANASAYFA</p>
+          </div>
+          <div className="pm-header-accent pm-header-accent--right" aria-hidden="true" />
+        </header>
+        <p className="self-service-muted">Demo modda personel eşlemesi yok.</p>
       </section>
     );
   }
 
-  if (status.kind === "unbound") {
+  if (error === "unbound") {
     return (
       <section className="states-page" data-testid="personel-unbound-page">
         <h2>Hesabınız personel kaydıyla eşleştirilmemiş.</h2>
@@ -192,7 +177,7 @@ export function PersonelSelfServiceHomePage() {
     );
   }
 
-  if (status.kind === "inactive") {
+  if (error === "inactive") {
     return (
       <section className="states-page" data-testid="personel-inactive-page">
         <h2>Personel hesabınız aktif değil.</h2>
@@ -201,28 +186,20 @@ export function PersonelSelfServiceHomePage() {
     );
   }
 
-  if (status.kind === "error") {
+  if (error || !today) {
     return (
       <section className="states-page state-error" data-testid="personel-self-service-error">
         <h2>Özet yüklenemedi</h2>
-        <p>{status.message}</p>
+        <p>{error ?? "Bilinmeyen hata"}</p>
       </section>
     );
   }
 
-  const { identity, today, month, last12, izin, fazla, sectionErrors } = status;
-  const personelLabel = identity.personel.ad_soyad || identity.ad_soyad;
-  const orgLine = [
-    identity.personel.sube_ad,
-    identity.personel.bolum_ad,
-    identity.personel.birim_ad,
-    identity.personel.departman_ad,
-    identity.personel.gorev_ad
-  ]
+  const orgLine = [today.personel.sube_ad, today.personel.bolum_ad, today.personel.birim_ad, today.personel.gorev_ad]
     .filter(Boolean)
     .join(" · ");
-  const missingCount = identity.completeness?.missing_count ?? 0;
-  const lastQr = identity.last_qr_event ?? null;
+  const missingCount = identity?.completeness?.missing_count ?? 0;
+  const lastQr = identity?.last_qr_event ?? null;
   const lastQrLabel = lastQr
     ? `${lastQr.event_type === "GIRIS" ? "Giriş" : "Çıkış"} — ${new Intl.DateTimeFormat("tr-TR", {
         timeZone: "Europe/Istanbul",
@@ -232,204 +209,243 @@ export function PersonelSelfServiceHomePage() {
     : null;
 
   return (
-    <section className="self-service-home" data-testid="personel-self-service-page">
-      <header className="self-service-home__header">
-        <h2>{personelLabel}</h2>
-        <p>{orgLine || "Personel self-service"}</p>
-        <div className="self-service-home__actions">
-          <Link className="self-service-action" to="/self/qr-okut" data-testid="self-qr-scan-link">
-            QR Okut
-          </Link>
-          <Link className="self-service-action" to="/self/qr-hareketleri" data-testid="self-qr-history-link">
-            QR Hareketlerim
-          </Link>
+    <section className="personel-mobile-shell" data-testid="personel-self-service-page">
+      <header className="pm-header" data-testid="personel-mobile-header">
+        <div className="pm-header-accent pm-header-accent--left" aria-hidden="true" />
+        <div className="pm-header-main">
+          <p className="pm-product-title">PERSONEL YÖN. SİST.</p>
+          <p className="pm-page-title">ANASAYFA</p>
+          <p className="pm-user-line">{today.personel.ad_soyad}</p>
+          {orgLine ? <p className="pm-org-line">{orgLine}</p> : null}
         </div>
+        <div className="pm-header-actions">
+          <button
+            type="button"
+            className="pm-bell"
+            aria-label="Bildirimler"
+            data-testid="personel-notification-bell"
+            onClick={() => setInboxOpen((v) => !v)}
+          >
+            🔔
+            {unreadCount > 0 ? <span className="pm-bell-badge">{unreadCount}</span> : null}
+          </button>
+        </div>
+        <div className="pm-header-accent pm-header-accent--right" aria-hidden="true" />
       </header>
 
+      {inboxOpen ? (
+        <div className="pm-inbox" data-testid="personel-notification-inbox" role="region" aria-label="Bildirimler">
+          {inboxItems.length === 0 ? (
+            <p className="self-service-muted">Bildirim yok.</p>
+          ) : (
+            inboxItems.map((item) => (
+              <article key={item.id} className="pm-inbox-item">
+                <strong>{item.title}</strong>
+                <p>{item.body}</p>
+                <span className="pm-inbox-meta">{new Date(item.created_at).toLocaleString("tr-TR")}</span>
+              </article>
+            ))
+          )}
+        </div>
+      ) : null}
+
+      <div className="pm-attendance-grid" data-testid="personel-attendance-boxes">
+        <div className="pm-attendance-box" data-testid="attendance-box-giris">
+          {today.giris ? (
+            <>
+              <p className="pm-box-label">Giriş Saati</p>
+              <p className="pm-box-time">{today.giris.display_local_time ?? today.giris.local_time}</p>
+              {today.pending_giris_correction ? (
+                <p className="pm-box-pending">Bekliyor</p>
+              ) : (
+                <button
+                  type="button"
+                  className="pm-box-action"
+                  data-testid="giris-duzelt"
+                  onClick={() =>
+                    guardOrRun("attendance_correct", () => {
+                      setCorrectDraft({
+                        eventId: today.giris!.id,
+                        eventType: "GIRIS",
+                        currentTime: today.giris!.display_local_time ?? today.giris!.local_time
+                      });
+                      setCorrectTime(today.giris!.display_local_time ?? today.giris!.local_time);
+                    })
+                  }
+                >
+                  Düzelt
+                </button>
+              )}
+            </>
+          ) : (
+            <button
+              type="button"
+              className="pm-box-main-action"
+              data-testid="giris-scan"
+              aria-label="Giriş için QR okut"
+              onClick={() =>
+                guardOrRun("qr_scan", () => {
+                  navigate("/self/qr-okut?event=GIRIS");
+                })
+              }
+            >
+              GİRİŞ
+            </button>
+          )}
+        </div>
+
+        <div className="pm-attendance-box" data-testid="attendance-box-cikis">
+          {today.cikis ? (
+            <>
+              <p className="pm-box-label">Çıkış Saati</p>
+              <p className="pm-box-time">{today.cikis.display_local_time ?? today.cikis.local_time}</p>
+              {today.pending_cikis_correction ? (
+                <p className="pm-box-pending">Bekliyor</p>
+              ) : (
+                <button
+                  type="button"
+                  className="pm-box-action"
+                  data-testid="cikis-duzelt"
+                  onClick={() =>
+                    guardOrRun("attendance_correct", () => {
+                      setCorrectDraft({
+                        eventId: today.cikis!.id,
+                        eventType: "CIKIS",
+                        currentTime: today.cikis!.display_local_time ?? today.cikis!.local_time
+                      });
+                      setCorrectTime(today.cikis!.display_local_time ?? today.cikis!.local_time);
+                    })
+                  }
+                >
+                  Düzelt
+                </button>
+              )}
+            </>
+          ) : (
+            <button
+              type="button"
+              className="pm-box-main-action"
+              data-testid="cikis-scan"
+              aria-label="Çıkış için QR okut"
+              disabled={!today.can_scan_cikis && Boolean(caps?.qr_scan)}
+              onClick={() =>
+                guardOrRun("qr_scan", () => {
+                  navigate("/self/qr-okut?event=CIKIS");
+                })
+              }
+            >
+              ÇIKIŞ
+            </button>
+          )}
+        </div>
+      </div>
+
       {missingCount > 0 ? (
-        <div className="self-service-home__warnings" role="status" data-testid="self-missing-info-warning">
+        <div className="pm-secondary-card" role="status" data-testid="self-missing-info-warning">
           <p>
-            Eksik bilgi uyarısı: {missingCount} alan
-            {identity.completeness?.critical_missing_labels?.length
-              ? ` (${identity.completeness.critical_missing_labels.slice(0, 3).join(", ")})`
-              : ""}
-            . Güncelleme için yöneticinize başvurun.
+            Eksik bilgileriniz var ({missingCount}). Profilinizi tamamlamak için yöneticinizle iletişime geçin.
           </p>
         </div>
       ) : null}
 
-      {sectionErrors.length > 0 ? (
-        <div className="self-service-home__warnings" role="status">
-          {sectionErrors.map((msg) => (
-            <p key={msg}>{msg}</p>
-          ))}
+      {lastQrLabel ? (
+        <div className="pm-secondary-card" data-testid="self-last-qr-event">
+          <p className="pm-box-label">Son QR hareketi</p>
+          <p>{lastQrLabel}</p>
         </div>
       ) : null}
 
-      <article className="state-card self-service-card">
-        <h3>Bugün</h3>
-        {today ? (
-          <dl className="self-service-dl">
-            <div>
-              <dt>Tarih</dt>
-              <dd>{today.tarih}</dd>
-            </div>
-            <div>
-              <dt>Gün tipi</dt>
-              <dd>{today.gun_tipi ?? "—"}</dd>
-            </div>
-            <div>
-              <dt>Giriş / Çıkış</dt>
-              <dd>
-                {today.giris_saati ?? "—"} / {today.cikis_saati ?? "—"}
-              </dd>
-            </div>
-            <div>
-              <dt>Son QR hareketi</dt>
-              <dd data-testid="self-last-qr-event">{lastQrLabel ?? "—"}</dd>
-            </div>
-            {(today.gec_kalma_dakika != null && today.gec_kalma_dakika > 0) ||
-            (today.erken_cikis_dakika != null && today.erken_cikis_dakika > 0) ? (
-              <div>
-                <dt>Gecikme / Erken</dt>
-                <dd>
-                  {formatMinutes(today.gec_kalma_dakika)} / {formatMinutes(today.erken_cikis_dakika)}
-                </dd>
-              </div>
-            ) : null}
-          </dl>
-        ) : (
-          <dl className="self-service-dl">
-            <div>
-              <dt>Son QR hareketi</dt>
-              <dd data-testid="self-last-qr-event">{lastQrLabel ?? "Bugün QR hareketi yok."}</dd>
-            </div>
-            <div>
-              <dt>Puantaj</dt>
-              <dd>Bugün için puantaj kaydı yok.</dd>
-            </div>
-          </dl>
-        )}
-      </article>
+      <nav className="pm-secondary-nav" aria-label="Self-service kısayollar">
+        <Link to="/self/qr-okut" data-testid="self-qr-scan-link">
+          QR Okut
+        </Link>
+        <Link to="/self/qr-hareketleri" data-testid="self-qr-history-link">
+          QR Hareketlerim
+        </Link>
+      </nav>
 
-      <article className="state-card self-service-card">
-        <h3>Bu Ay</h3>
-        {month ? (
-          <dl className="self-service-dl">
-            <div>
-              <dt>Çalışma günü</dt>
-              <dd>{month.ozet.calisma_gun_adet}</dd>
-            </div>
-            <div>
-              <dt>Gecikme</dt>
-              <dd>
-                {month.ozet.gec_kalma_adet} kez · {formatMinutes(month.ozet.gec_kalma_dakika_toplam)}
-              </dd>
-            </div>
-            <div>
-              <dt>Erken çıkış</dt>
-              <dd>
-                {month.ozet.erken_cikis_adet} kez · {formatMinutes(month.ozet.erken_cikis_dakika_toplam)}
-              </dd>
-            </div>
-            <div>
-              <dt>Fazla çalışma</dt>
-              <dd>{formatMinutes(month.ozet.fazla_calisma_dakika_toplam)}</dd>
-            </div>
-          </dl>
-        ) : (
-          <p className="self-service-muted">Aylık özet yok.</p>
-        )}
-      </article>
+      <footer className="pm-footer" data-testid="personel-mobile-footer">
+        <div className="pm-footer-accent pm-footer-accent--left" aria-hidden="true" />
+        <span>PersonelMedisa</span>
+        <div className="pm-footer-accent pm-footer-accent--right" aria-hidden="true" />
+      </footer>
 
-      <article className="state-card self-service-card">
-        <h3>Son 12 Ay</h3>
-        {last12 ? (
-          <dl className="self-service-dl">
-            <div>
-              <dt>Dönem</dt>
-              <dd>
-                {last12.from} — {last12.to}
-              </dd>
-            </div>
-            <div>
-              <dt>Çalışma günü</dt>
-              <dd>{last12.ozet.calisma_gun_adet}</dd>
-            </div>
-            <div>
-              <dt>Gecikme toplam</dt>
-              <dd>{formatMinutes(last12.ozet.gec_kalma_dakika_toplam)}</dd>
-            </div>
-            <div>
-              <dt>Fazla çalışma</dt>
-              <dd>{formatMinutes(last12.ozet.fazla_calisma_dakika_toplam)}</dd>
-            </div>
-          </dl>
-        ) : (
-          <p className="self-service-muted">12 aylık özet yok.</p>
-        )}
-      </article>
+      {correctDraft ? (
+        <BackgroundlessNoticeModal
+          open
+          title={`${correctDraft.eventType === "GIRIS" ? "Giriş" : "Çıkış"} Düzeltme`}
+          body={`Mevcut saat: ${correctDraft.currentTime}. Yeni saati girin.`}
+          primaryLabel={correctBusy ? "Gönderiliyor..." : "Gönder"}
+          secondaryLabel="Vazgeç"
+          onSecondary={() => setCorrectDraft(null)}
+          onPrimary={() => {
+            if (!correctTime) return;
+            void (async () => {
+              setCorrectBusy(true);
+              try {
+                const result = await createAttendanceCorrection({
+                  source_event_id: correctDraft.eventId,
+                  requested_local_time: correctTime
+                });
+                setCorrectDraft(null);
+                setNotice({
+                  title: "Düzeltme Talebi",
+                  body: result.message || "Düzeltme talebiniz Yöneticinize iletildi."
+                });
+                await load();
+              } catch (cause) {
+                const message =
+                  isApiRequestError(cause) && cause.code === "MOBILE_CAPABILITY_PENDING_SCOPE"
+                    ? COMING_SOON
+                    : cause instanceof Error
+                      ? cause.message
+                      : "Düzeltme talebi oluşturulamadı.";
+                setNotice({ title: "Düzeltme Talebi", body: message });
+              } finally {
+                setCorrectBusy(false);
+              }
+            })();
+          }}
+          onClose={() => setCorrectDraft(null)}
+          testId="attendance-correct-modal"
+        >
+          <label className="pm-correct-label">
+            Yeni saat
+            <input
+              type="time"
+              required
+              value={correctTime}
+              onChange={(e) => setCorrectTime(e.target.value)}
+              data-testid="attendance-correct-time"
+            />
+          </label>
+        </BackgroundlessNoticeModal>
+      ) : null}
 
-      <article className="state-card self-service-card">
-        <h3>Yıllık İzin</h3>
-        {izin ? (
-          <dl className="self-service-dl">
-            <div>
-              <dt>Efektif hak</dt>
-              <dd>{formatGun(izin.efektif_hak_gun)}</dd>
-            </div>
-            <div>
-              <dt>Kullanılan</dt>
-              <dd>{formatGun(izin.kullanilan_gun)}</dd>
-            </div>
-            <div>
-              <dt>Kalan</dt>
-              <dd>{formatGun(izin.kalan_gun)}</dd>
-            </div>
-            <div>
-              <dt>Mevcut yıl bandı</dt>
-              <dd>{formatGun(izin.mevcut_yillik_hak_gun)}</dd>
-            </div>
-          </dl>
-        ) : (
-          <p className="self-service-muted">İzin bakiyesi yok.</p>
-        )}
-      </article>
-
-      <article className="state-card self-service-card">
-        <h3>Fazla Çalışma</h3>
-        {fazla ? (
-          <dl className="self-service-dl">
-            <div>
-              <dt>Yıl</dt>
-              <dd>{fazla.yil}</dd>
-            </div>
-            <div>
-              <dt>Kullanılan</dt>
-              <dd>{formatMinutes(fazla.yillik.kullanilan_dakika)}</dd>
-            </div>
-            <div>
-              <dt>Kalan</dt>
-              <dd>{formatMinutes(fazla.yillik.kalan_dakika)}</dd>
-            </div>
-            <div>
-              <dt>Limit</dt>
-              <dd>{formatMinutes(fazla.yillik.yillik_limit_dakika)}</dd>
-            </div>
-            {fazla.donem_ozet ? (
-              <div>
-                <dt>Dönem (ay)</dt>
-                <dd>
-                  {formatMinutes(fazla.donem_ozet.fazla_calisma_dakika_toplam)} ·{" "}
-                  {fazla.donem_ozet.calisma_gun_adet} gün
-                </dd>
-              </div>
-            ) : null}
-          </dl>
-        ) : (
-          <p className="self-service-muted">Fazla çalışma özeti yok.</p>
-        )}
-      </article>
+      <BackgroundlessNoticeModal
+        open={notice !== null}
+        title={notice?.title ?? ""}
+        body={notice?.body ?? ""}
+        infoTooltip={notice?.infoTooltip}
+        primaryLabel={notice?.primaryLabel}
+        secondaryLabel={notice?.secondaryLabel}
+        onPrimary={
+          notice?.onPrimary
+            ? () => {
+                void Promise.resolve(notice.onPrimary?.()).catch(() => undefined);
+              }
+            : undefined
+        }
+        onSecondary={
+          notice?.onSecondary
+            ? () => {
+                void Promise.resolve(notice.onSecondary?.()).catch(() => undefined);
+              }
+            : undefined
+        }
+        onClose={() => void closeNotice()}
+        testId="personel-notice-modal"
+      />
     </section>
   );
 }

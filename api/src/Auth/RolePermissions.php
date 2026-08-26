@@ -110,6 +110,7 @@ class RolePermissions
             'retention.destruction.execute',
             'retention.destruction.view',
             'qr.kiosk.display',
+            'attendance.correction.decide',
         ],
         // Branch-level operational management (independent of BOLUM_YONETICISI).
         'SUBE_YONETICISI' => [
@@ -218,6 +219,7 @@ class RolePermissions
             'puantaj.olay_karar.view',
             // Explicit SGK final approve only — does not inherit GENEL_YONETICI matrix.
             'sgk_karar_paketi.approve',
+            'attendance.correction.decide',
         ],
         // External accountant: finalized mali/bordro read + export. No operational write.
         'MUHASEBE' => [
@@ -278,6 +280,7 @@ class RolePermissions
             'haftalik_mutabakat.approve',
             'aylik_bildirim_onayi.view',
             'aylik_bildirim_onayi.approve',
+            'attendance.correction.decide',
         ],
         // IK operational owner. SGK prepare-only; no final approve / business decision.
         'IK_SORUMLUSU' => [
@@ -396,6 +399,7 @@ class RolePermissions
             'self_service.fazla_calisma.view',
             'self_service.qr.scan',
             'self_service.qr.events.view',
+            'self_service.attendance.correct',
         ],
         'AUTH_SMOKE_READONLY' => [
             'ops.auth_smoke.read',

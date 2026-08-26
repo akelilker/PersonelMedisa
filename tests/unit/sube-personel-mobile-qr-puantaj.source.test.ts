@@ -44,7 +44,8 @@ describe("sube + personel mobile QR puantaj wiring", () => {
       "self_service.yillik_izin.view",
       "self_service.fazla_calisma.view",
       "self_service.qr.scan",
-      "self_service.qr.events.view"
+      "self_service.qr.events.view",
+      "self_service.attendance.correct"
     ]);
     expect(hasRolePermission("PERSONEL", "personeller.view")).toBe(false);
     expect(hasRolePermission("PERSONEL", "puantaj.view")).toBe(false);

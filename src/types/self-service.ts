@@ -108,6 +108,11 @@ export type MeQrAttendanceEvent = {
 export type MeQrScanResponse = {
   event: MeQrAttendanceEvent;
   idempotent: boolean;
+  late_early_info?: {
+    kind: string;
+    message: string;
+    delta_dakika: number;
+  } | null;
 };
 
 export type MeQrHareketleriResponse = {

@@ -30,6 +30,7 @@ use Medisa\Api\Controllers\FazlaCalismaOdemeTercihiController;
 use Medisa\Api\Controllers\SerbestZamanController;
 use Medisa\Api\Controllers\MaasHesaplamaController;
 use Medisa\Api\Controllers\MeController;
+use Medisa\Api\Controllers\AttendanceMobileController;
 use Medisa\Api\Controllers\MevzuatParametreController;
 use Medisa\Api\Controllers\QrKioskController;
 use Medisa\Api\Controllers\PersonelBelgelerController;
@@ -110,6 +111,21 @@ class Router
         }
         if ($path === '/me/qr-araliklari' && $method === 'GET') {
             MeController::qrAraliklari($this->request);
+        }
+        if ($path === '/me/attendance/today' && $method === 'GET') {
+            AttendanceMobileController::today($this->request);
+        }
+        if ($path === '/me/attendance/correction-requests' && $method === 'POST') {
+            AttendanceMobileController::createCorrection($this->request);
+        }
+        if ($path === '/me/inbox-notifications' && $method === 'GET') {
+            AttendanceMobileController::inbox($this->request);
+        }
+        if ($method === 'POST' && preg_match('#^/me/inbox-notifications/(\d+)/ack-popup$#', $path, $matches)) {
+            AttendanceMobileController::ackPopup($this->request, $matches[1]);
+        }
+        if ($method === 'POST' && preg_match('#^/attendance/correction-requests/(\d+)/decide$#', $path, $matches)) {
+            AttendanceMobileController::decideCorrection($this->request, $matches[1]);
         }
         if ($path === '/qr-kiosk/token' && $method === 'GET') {
             QrKioskController::token($this->request);

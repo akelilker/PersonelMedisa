@@ -16,7 +16,7 @@ describe("migration 068 actor identity audit contract", () => {
     expect(migrationNames.at(-4)).toBe("070_offline_mutation_idempotency.sql");
     expect(migrationNames.at(-3)).toBe("071_org_hierarchy_authorization.sql");
     expect(migrationNames.at(-2)).toBe("072_org_reference_short_codes.sql");
-    expect(migrationNames.at(-1)).toBe("073_test_fixture_personel_archive.sql");
+    expect(migrationNames.at(-1)).toBe("074_qr_attendance_correction_and_inbox.sql");
   });
 
   it("keeps 068 append-only and attributable", () => {

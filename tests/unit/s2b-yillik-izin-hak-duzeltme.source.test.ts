@@ -51,7 +51,7 @@ describe("S2B yillik izin hak duzeltme (source invariants)", () => {
     expect(migrations).toContain("053_retention_legal_hold_arsiv.sql");
     expect(migrations).toContain("054_canonical_role_consolidation.sql");
     expect(migrations).toContain("055_yillik_izin_hak_duzeltmeleri.sql");
-    expect(migrations.at(-1)).toBe("073_test_fixture_personel_archive.sql");
+    expect(migrations.at(-1)).toBe("074_qr_attendance_correction_and_inbox.sql");
 
     const sql = read("api/migrations/055_yillik_izin_hak_duzeltmeleri.sql");
     expect(sql).toContain("CREATE TABLE IF NOT EXISTS yillik_izin_hak_duzeltmeleri");

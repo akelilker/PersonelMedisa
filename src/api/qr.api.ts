@@ -126,7 +126,16 @@ export async function postMeQrScan(input: {
   }
   return {
     event: normalizeEvent(data.event),
-    idempotent: Boolean(data.idempotent)
+    idempotent: Boolean(data.idempotent),
+    late_early_info: (() => {
+      const raw = toRecord(data.late_early_info);
+      if (!raw) return null;
+      const kind = readString(raw.kind);
+      const message = readString(raw.message);
+      const delta = readNumber(raw.delta_dakika);
+      if (!kind || !message || delta === null) return null;
+      return { kind, message, delta_dakika: delta };
+    })()
   };
 }
 

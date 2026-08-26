@@ -41,6 +41,15 @@ class QrAttendanceEventService
 
         $ctx = SelfPersonelContext::resolveForSelfService($authUser, $pdo, true);
         $personelId = (int) $ctx['personel_id'];
+        $caps = \Medisa\Api\Services\SelfService\PersonelMobileCapabilityService::resolve($pdo, $personelId, $ctx);
+        try {
+            \Medisa\Api\Services\SelfService\PersonelMobileCapabilityService::assertBusinessCapability(
+                $caps,
+                \Medisa\Api\Services\SelfService\PersonelMobileCapabilityService::CAP_QR_SCAN
+            );
+        } catch (\Medisa\Api\Services\SelfService\PersonelMobileCapabilityException $e) {
+            throw new QrAttendanceException($e->getErrorCode(), $e->getMessage(), $e->getHttpStatus());
+        }
         \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::assertOperationalEligible($pdo, $personelId);
         $personelSubeId = (int) $ctx['sube_id'];
         $userId = (int) ($authUser['id'] ?? 0);
@@ -98,6 +107,7 @@ class QrAttendanceEventService
             return [
                 'event' => self::publicEvent($pdo, $existingNonce),
                 'idempotent' => true,
+                'late_early_info' => null,
             ];
         }
 
@@ -106,8 +116,11 @@ class QrAttendanceEventService
             return [
                 'event' => self::publicEvent($pdo, $existingJti),
                 'idempotent' => true,
+                'late_early_info' => null,
             ];
         }
+
+        self::assertOpenShiftTransition($pdo, $personelId, $eventType);
 
         $occurredAt = self::utcNowMicro();
         $issuedAt = self::unixToUtcMicro((int) $claims['iat']);
@@ -174,10 +187,87 @@ class QrAttendanceEventService
             throw new QrAttendanceException('QR_TOKEN_INVALID', 'Kayit olusturulamadi.', 500);
         }
 
+        $publicEvent = self::publicEvent($pdo, $row);
+        $lateEarly = null;
+        if (empty($body['__skip_late_early'])) {
+            $businessDate = (new \DateTimeImmutable((string) $row['occurred_at_utc'], new \DateTimeZone('UTC')))
+                ->setTimezone(new \DateTimeZone('Europe/Istanbul'))
+                ->format('Y-m-d');
+            $planned = \Medisa\Api\Services\Attendance\LateEarlyInfoService::loadPlannedDay(
+                $pdo,
+                $personelId,
+                $businessDate
+            );
+            $lateEarly = \Medisa\Api\Services\Attendance\LateEarlyInfoService::evaluateAfterScan(
+                $eventType,
+                (string) $row['occurred_at_utc'],
+                $planned
+            );
+            if (is_array($lateEarly)) {
+                try {
+                    \Medisa\Api\Services\SelfService\PersonelInboxNotificationService::create(
+                        $pdo,
+                        $userId,
+                        $lateEarly['kind'],
+                        $lateEarly['kind'] === 'LATE_ENTRY_INFO' ? 'Geç Giriş Bilgisi' : 'Erken Çıkış Bilgisi',
+                        (string) $lateEarly['message'],
+                        $personelId,
+                        null,
+                        [
+                            'delta_dakika' => (int) $lateEarly['delta_dakika'],
+                            'info_only' => true,
+                            'financial_effect' => false,
+                            'puantaj_effect' => false,
+                        ],
+                        true
+                    );
+                } catch (\Throwable $e) {
+                    // Inbox schema may be absent pre-074; info still returned in scan payload.
+                }
+            }
+        }
+
         return [
-            'event' => self::publicEvent($pdo, $row),
+            'event' => $publicEvent,
             'idempotent' => false,
+            'late_early_info' => $lateEarly,
         ];
+    }
+
+    /**
+     * Fail-closed open-shift guard (explicit GIRIS/CIKIS still chosen by client).
+     * Open GIRIS without CIKIS → second GIRIS denied (incl. across days).
+     * No open GIRIS → CIKIS denied.
+     */
+    private static function assertOpenShiftTransition(PDO $pdo, $personelId, $eventType)
+    {
+        $stmt = $pdo->prepare(
+            'SELECT event_type, occurred_at_utc
+             FROM qr_attendance_events
+             WHERE personel_id = :pid
+             ORDER BY occurred_at_utc DESC, id DESC
+             LIMIT 1'
+        );
+        $stmt->execute(['pid' => (int) $personelId]);
+        $last = $stmt->fetch(PDO::FETCH_ASSOC);
+        $lastType = is_array($last) ? strtoupper((string) ($last['event_type'] ?? '')) : '';
+
+        if ($eventType === 'GIRIS' && $lastType === 'GIRIS') {
+            throw new QrAttendanceException(
+                'QR_OPEN_SHIFT_EXISTS',
+                'Acik giris kaydi varken yeni giris yapilamaz. Once cikis veya duzeltme gerekir.',
+                409,
+                'event_type'
+            );
+        }
+        if ($eventType === 'CIKIS' && $lastType !== 'GIRIS') {
+            throw new QrAttendanceException(
+                'QR_NO_OPEN_SHIFT',
+                'Acik giris olmadan cikis kaydedilemez.',
+                409,
+                'event_type'
+            );
+        }
     }
 
     /**

@@ -231,6 +231,7 @@ class MeController
             JsonResponse::success([
                 'event' => $result['event'],
                 'idempotent' => (bool) $result['idempotent'],
+                'late_early_info' => $result['late_early_info'] ?? null,
             ], [], $status);
         } catch (QrAttendanceException $e) {
             JsonResponse::error($e->getHttpStatus(), $e->getErrorCode(), $e->getMessage(), $e->getField());

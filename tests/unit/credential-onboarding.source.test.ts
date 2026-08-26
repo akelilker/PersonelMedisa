@@ -134,15 +134,16 @@ describe("credential onboarding owners (MG-CRED-ONBOARD-001)", () => {
     expect(change).not.toMatch(/WHERE id = :id.*\$body/);
   });
 
-  it("migration 069 remains in chain; tip is 070 with bundle/runner parity", () => {
+  it("migration 069 remains in chain; tip is 074 with bundle/runner parity", () => {
     const migrations = readdirSync(resolve("api/migrations"))
       .filter((name) => /^\d{3}_.+\.sql$/.test(name))
       .sort();
-    expect(migrations.at(-5)).toBe("069_personel_credential_onboarding.sql");
-    expect(migrations.at(-4)).toBe("070_offline_mutation_idempotency.sql");
-    expect(migrations.at(-3)).toBe("071_org_hierarchy_authorization.sql");
-    expect(migrations.at(-2)).toBe("072_org_reference_short_codes.sql");
-    expect(migrations.at(-1)).toBe("073_test_fixture_personel_archive.sql");
+    expect(migrations.at(-6)).toBe("069_personel_credential_onboarding.sql");
+    expect(migrations.at(-5)).toBe("070_offline_mutation_idempotency.sql");
+    expect(migrations.at(-4)).toBe("071_org_hierarchy_authorization.sql");
+    expect(migrations.at(-3)).toBe("072_org_reference_short_codes.sql");
+    expect(migrations.at(-2)).toBe("073_test_fixture_personel_archive.sql");
+    expect(migrations.at(-1)).toBe("074_qr_attendance_correction_and_inbox.sql");
 
     const migration069 = read("api/migrations/069_personel_credential_onboarding.sql");
     const checksum069 = createHash("sha256").update(migration069).digest("hex");
@@ -164,12 +165,15 @@ describe("credential onboarding owners (MG-CRED-ONBOARD-001)", () => {
     expect(bundleTest).toContain("'name' => '071_org_hierarchy_authorization.sql'");
     expect(bundleTest).toContain("'name' => '072_org_reference_short_codes.sql'");
     expect(bundleTest).toContain("'name' => '073_test_fixture_personel_archive.sql'");
+    expect(bundleTest).toContain("'name' => '074_qr_attendance_correction_and_inbox.sql'");
     expect(bundleTest).toContain("checksum069");
     expect(bundleTest).toContain("checksum070");
     expect(bundleTest).toContain("checksum071");
     expect(bundleTest).toContain("checksum072");
     expect(bundleTest).toContain("checksum073");
-    expect(bundleTest).toContain("count($rows) !== 74");
+    expect(bundleTest).toContain("checksum074");
+    expect(bundleTest).toContain("count($rows) !== 75");
+    expect(bundleTest).toContain("rows[74]['version'] !== '074'");
     expect(bundleTest).toContain("rows[73]['version'] !== '073'");
     expect(bundleTest).toContain("rows[72]['version'] !== '072'");
     expect(bundleTest).toContain("rows[71]['version'] !== '071'");

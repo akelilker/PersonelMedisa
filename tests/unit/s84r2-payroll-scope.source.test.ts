@@ -19,11 +19,12 @@ describe("S84-R2 payroll scope sources", () => {
     expect(migration).toContain("personel_bordro_kapsam_auditleri");
   });
 
-  it("treats 035 as latest migration", () => {
+  it("keeps migration 035 present in the chain", () => {
     const files = readdirSync("api/migrations")
       .filter((name) => /^\d{3}_/.test(name))
       .sort();
-    expect(files[files.length - 1]).toBe("074_qr_attendance_correction_and_inbox.sql");
+    expect(files).toContain("035_personel_bordro_kapsamlari.sql");
+    expect(files.filter((name) => name.startsWith("035_"))).toHaveLength(1);
   });
 
   it("service contract version is S84R2_PAYROLL_SCOPE_V1", () => {

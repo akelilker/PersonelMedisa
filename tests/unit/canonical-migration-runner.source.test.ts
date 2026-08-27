@@ -26,8 +26,21 @@ describe('canonical migration runner contract', () => {
     expect(runner).toContain('GET_LOCK');
   });
 
-  it('keeps the runner generic and migration tip data-driven', () => {
-    expect(migrations.at(-1)).toBe('074_qr_attendance_correction_and_inbox.sql');
+  it('owns the contiguous 001→075 filesystem migration chain', () => {
+    const numbers = migrations.map((name) => Number.parseInt(name.slice(0, 3), 10));
+    expect(migrations[0]).toBe('001_initial_schema.sql');
+    expect(migrations.at(-1)).toBe('075_personel_account_activation.sql');
+    expect(migrations).toHaveLength(75);
+    expect(new Set(numbers).size).toBe(75);
+    expect(numbers).toEqual(Array.from({ length: 75 }, (_, index) => index + 1));
+    expect(migrations).toContain('074_qr_attendance_correction_and_inbox.sql');
+    expect(migrations.indexOf('074_qr_attendance_correction_and_inbox.sql')).toBe(
+      migrations.indexOf('075_personel_account_activation.sql') - 1,
+    );
+    expect(migrations.filter((name) => name.startsWith('075_'))).toHaveLength(1);
+  });
+
+  it('keeps the runner generic without hardcoded migration version pins', () => {
     expect(runner).not.toContain('068');
     expect(runner).not.toContain('069');
     expect(cli).not.toContain('068');

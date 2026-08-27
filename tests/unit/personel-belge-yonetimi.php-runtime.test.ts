@@ -22,7 +22,7 @@ describe("PersonelBelge contracts php runtime", () => {
 });
 
 describe("S86 personel belge parity source", () => {
-  it("keeps FE/PHP contract and route parity with current migration tip", () => {
+  it("keeps FE/PHP contract and route parity with personel belge migrations", () => {
     const types = readFileSync(resolve("src/types/personel-belge-kaydi.ts"), "utf8");
     const endpoints = readFileSync(resolve("src/api/endpoints.ts"), "utf8");
     const router = readFileSync(resolve("api/src/Router.php"), "utf8");
@@ -53,7 +53,7 @@ describe("S86 personel belge parity source", () => {
     expect(existsSync(resolve("api/migrations/040_sgk_mevzuat_canonical_schema.sql"))).toBe(true);
     expect(existsSync(resolve("api/migrations/042_sgk_resmi_kaynakli_kisitli_katalog.sql"))).toBe(true);
     expect(migrations.some((n) => n.startsWith("039_"))).toBe(true);
-    expect(migrations.at(-1)).toBe("074_qr_attendance_correction_and_inbox.sql");
+    expect(migrations.filter((n) => n.startsWith("038_"))).toHaveLength(1);
     expect(existsSync(resolve("src/features/personeller/pages/BelgeTakipPage.tsx"))).toBe(true);
   });
 });

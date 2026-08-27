@@ -95,9 +95,9 @@ describe("S98 SGK mevzuat schema hardening", () => {
     expect(SGK_AKTIFLIK_DURUMU_LABEL.BAGLAMA_OZGUN).toBe("BAĞLAMA ÖZGÜ");
   });
 
-  it("migration sequence ends with 040 and parity last file updated", () => {
+  it("keeps migration 040 present and unique", () => {
     const names = readdirSync(resolve("api/migrations")).filter((n) => n.endsWith(".sql")).sort();
     expect(names.some((n) => n.startsWith("040_"))).toBe(true);
-    expect(names.at(-1)).toBe("074_qr_attendance_correction_and_inbox.sql");
+    expect(names.filter((n) => n.startsWith("040_"))).toHaveLength(1);
   });
 });

@@ -80,11 +80,12 @@ describe("S106 RESMI_KAYNAKLI_KISITLI katalog", () => {
     expect(migration042).not.toMatch(/\b(?:DELETE\s+FROM|TRUNCATE|DROP\s+TABLE)\b/i);
   });
 
-  it("migration sequence ends with 048", () => {
+  it("keeps migration 042 present in the chain", () => {
     const names = readdirSync(resolve("api/migrations"))
       .filter((n) => n.endsWith(".sql"))
       .sort();
-    expect(names.at(-1)).toBe("074_qr_attendance_correction_and_inbox.sql");
+    expect(names).toContain("042_sgk_resmi_kaynakli_kisitli_katalog.sql");
+    expect(names.filter((n) => n.startsWith("042_"))).toHaveLength(1);
   });
 
   it("contracts/validators expose S106 enums and write path", () => {

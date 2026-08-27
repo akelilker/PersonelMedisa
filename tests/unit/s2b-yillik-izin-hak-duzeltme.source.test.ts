@@ -43,7 +43,7 @@ function extractPhpRolePermissions(role: string): string[] {
 }
 
 describe("S2B yillik izin hak duzeltme (source invariants)", () => {
-  it("migration 055 is additive tip; 052/053/054 remain present", () => {
+  it("migration 055 remains present after 052/053/054", () => {
     const migrations = readdirSync(resolve(root, "api/migrations"))
       .filter((name) => /^\d{3}_.+\.sql$/.test(name))
       .sort();
@@ -51,7 +51,10 @@ describe("S2B yillik izin hak duzeltme (source invariants)", () => {
     expect(migrations).toContain("053_retention_legal_hold_arsiv.sql");
     expect(migrations).toContain("054_canonical_role_consolidation.sql");
     expect(migrations).toContain("055_yillik_izin_hak_duzeltmeleri.sql");
-    expect(migrations.at(-1)).toBe("074_qr_attendance_correction_and_inbox.sql");
+    expect(migrations.filter((name) => name.startsWith("055_"))).toHaveLength(1);
+    expect(migrations.indexOf("054_canonical_role_consolidation.sql")).toBeLessThan(
+      migrations.indexOf("055_yillik_izin_hak_duzeltmeleri.sql")
+    );
 
     const sql = read("api/migrations/055_yillik_izin_hak_duzeltmeleri.sql");
     expect(sql).toContain("CREATE TABLE IF NOT EXISTS yillik_izin_hak_duzeltmeleri");

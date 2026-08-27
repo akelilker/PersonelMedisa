@@ -33,11 +33,15 @@ describe("I13-B default branch persistence source locks", () => {
     expect(scope).toContain("in_array($preferred, $subeIds, true)");
   });
 
-  it("migration tip includes 072 org reference short codes", () => {
+  it("keeps 051 and 072 present in the migration chain", () => {
     const migrations = readdirSync(resolve("api/migrations"))
       .filter((name) => /^\d{3}_.+\.sql$/.test(name))
       .sort();
     expect(migrations[0]).toBe("001_initial_schema.sql");
-    expect(migrations.at(-1)).toBe("074_qr_attendance_correction_and_inbox.sql");
+    expect(migrations).toContain("051_users_varsayilan_sube_id.sql");
+    expect(migrations).toContain("072_org_reference_short_codes.sql");
+    expect(migrations.indexOf("051_users_varsayilan_sube_id.sql")).toBeLessThan(
+      migrations.indexOf("072_org_reference_short_codes.sql")
+    );
   });
 });

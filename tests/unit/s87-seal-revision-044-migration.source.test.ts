@@ -5,12 +5,16 @@ import { describe, expect, it } from "vitest";
 const MIGRATION = "api/migrations/044_puantaj_aylik_muhur_revision_reopen.sql";
 
 describe("S87 migration 044 seal revision reopen source contracts", () => {
-  it("exists and is tip of chain", () => {
+  it("exists and remains before later migrations", () => {
     expect(existsSync(resolve(MIGRATION))).toBe(true);
     const files = readdirSync(resolve("api/migrations"))
       .filter((n) => /^\d{3}_.+\.sql$/.test(n))
       .sort();
-    expect(files.at(-1)).toBe("074_qr_attendance_correction_and_inbox.sql");
+    expect(files).toContain("044_puantaj_aylik_muhur_revision_reopen.sql");
+    expect(files.filter((n) => n.startsWith("044_"))).toHaveLength(1);
+    expect(files.indexOf("044_puantaj_aylik_muhur_revision_reopen.sql")).toBeLessThan(
+      files.indexOf("075_personel_account_activation.sql")
+    );
   });
 
   it("is additive revision + dual-control reopen without destructive rewrite", () => {

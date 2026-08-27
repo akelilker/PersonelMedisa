@@ -56,10 +56,12 @@ describe("015_bildirim_puantaj_etki_cakisma_cozumleri migration source", () => {
     expect(migrationSource).not.toMatch(/backfill/i);
   });
 
-  it("is part of the contiguous migration sequence", () => {
+  it("keeps migration 015 present exactly once in the chain", () => {
     const migrations = readdirSync(resolve(process.cwd(), "api/migrations"))
       .filter((name) => /^\d{3}_.*\.sql$/.test(name))
       .sort();
-    expect(migrations.at(-1)).toBe("074_qr_attendance_correction_and_inbox.sql");
+    expect(migrations.filter((name) => name.startsWith("015_"))).toEqual([
+      "015_bildirim_puantaj_etki_cakisma_cozumleri.sql",
+    ]);
   });
 });

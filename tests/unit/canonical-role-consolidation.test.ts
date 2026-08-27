@@ -322,7 +322,7 @@ describe("S1 canonical role consolidation", () => {
     }
   });
 
-  it("migration 054 is staged-safe and 052/053 remain present; 055 is additive tip", () => {
+  it("migration 054 is staged-safe and 052/053/055 remain present", () => {
     const migrations = readdirSync(resolve(root, "api/migrations"))
       .filter((name) => /^\d{3}_.+\.sql$/.test(name))
       .sort();
@@ -330,7 +330,10 @@ describe("S1 canonical role consolidation", () => {
     expect(migrations).toContain("053_retention_legal_hold_arsiv.sql");
     expect(migrations).toContain("054_canonical_role_consolidation.sql");
     expect(migrations).toContain("055_yillik_izin_hak_duzeltmeleri.sql");
-    expect(migrations.at(-1)).toBe("074_qr_attendance_correction_and_inbox.sql");
+    expect(migrations.filter((name) => name.startsWith("054_"))).toHaveLength(1);
+    expect(migrations.indexOf("054_canonical_role_consolidation.sql")).toBeLessThan(
+      migrations.indexOf("055_yillik_izin_hak_duzeltmeleri.sql")
+    );
 
     const sql = readFileSync(MIG_054, "utf8");
     expect(sql).toContain("PERSONEL");

@@ -5,7 +5,7 @@
 **Tarih:** 2026-08-11 (refresh 2026-08-12 — master closure audit / S3F sonrası)
 **Motor sürümü (kod):** `S91C2_PAYROLL_ENGINE_V2`
 **Compliance kontratı:** `S87_PAYROLL_COMPLIANCE_V1`
-**Not:** Bu belge hesaplama haritasıdır. Production migration tip: **075** (canlı). Code tip **076** (`dis_kaynak_gecici_gorevlendirme`) kaynakta; production apply bu turda yok. QR pipeline S3C–S3F **CLOSED_PRODUCTION** (algoritmalar: `QR_INTERVAL_V1`, `QR_PUANTAJ_CANDIDATE_V1`, `QR_PUANTAJ_DECISION_V1`, `QR_CANDIDATE_HASH_V2`).
+**Not:** Bu belge hesaplama haritasıdır. Production migration tip: **076** (canlı). Code tip **076** (`dis_kaynak_gecici_gorevlendirme`). QR pipeline S3C–S3F **CLOSED_PRODUCTION** (algoritmalar: `QR_INTERVAL_V1`, `QR_PUANTAJ_CANDIDATE_V1`, `QR_PUANTAJ_DECISION_V1`, `QR_CANDIDATE_HASH_V2`).
 
 **2026-08-17 closure reconciliation:** SGK catalog `CLOSED_CONFIRMED`; UBGT `CLOSED_CONFIRMED`; payroll company policy `CLOSED_CONFIRMED`; active policy revision `3`, required/resolved `14/14`, missing `0`; `HAFTA_TATILI_GUNLERI=0` / Pazar; payroll policy preflight ready.
 
@@ -13,7 +13,7 @@
 
 **2026-08-27 SGK/UBGT live read-only verify:** `MG-OPS-SGK-CAT-001` + `MG-OPS-UBGT-001` → `CLOSED_CONFIRMED`. Canlı: SGK `RESMI_KAYNAKLI_KISITLI`/`ONAYLANDI`/`kod_sayisi=19`; şubeler `1,4,5,6,7,8,9,10,11` = `AY_1_SON_GUN`; UBGT 2026 = 17 aktif (`TAM_GUN=14`,`YARIM_GUN=3`, duplicate/conflict 0); company policy revision `3` (`14/14`), `HAFTA_TATILI_GUNLERI=0`. Seed/approve/write bu turda yok.
 
-**2026-08-27 DIS operasyonel/non-financial model (kaynak):** `docs/guncel/130-dis-kaynak-operasyonel-finansal-ayrim.md`. Directory-only zaman yasağı SUPERSEDED. DIS org opsiyonel; QR/puantaj operasyonel olabilir; gerçek SGK/bordro/banka fail-closed. 11 production DIS kaydı bu turda değişmedi. `MG-OPS-DIS-ORG-COMPLETE-001` → CLOSED; `MG-OPS-DIS-OPS-MODEL-001` → OPS_ROLLOUT (076 apply/deploy).
+**2026-08-28 DIS operasyonel/non-financial production kapanış:** `docs/guncel/130-dis-kaynak-operasyonel-finansal-ayrim.md`. Migration `076` canonical production applied (schema ready; `personel_gecici_gorevlendirmeler` live; assignment count=0). Directory-only zaman yasağı SUPERSEDED. DIS permanent org opsiyonel; effective org assignment-aware; QR/puantaj operasyonel olabilir; gerçek SGK/bordro/banka fail-closed. 11 production DIS kaydı mutasyona uğramadı; otomatik assignment yok; rol/user mutation yok. `MG-OPS-DIS-ORG-COMPLETE-001` → CLOSED; `MG-OPS-DIS-OPS-MODEL-001` → CLOSED_CONFIRMED. Gerçek görevlendirme rollout’u ayrı insan/operasyon kararıdır.
 
 **Business decision reconciliation:** Retention duration is `10 YEARS` through the canonical
 `RetentionCategories::POLICY_RETENTION_YEARS` owner, provenance

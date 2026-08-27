@@ -1,9 +1,9 @@
 ﻿# 130 â€” DIS_KAYNAK operasyonel / finansal ayrÄ±m ve org gÃ¶revlendirme
 
-**Tarih:** 2026-08-27
+**Tarih:** 2026-08-28
 **Branch:** `feat/dis-kaynak-operational-nonfinancial`
 **Code migration tip:** `076` (`076_dis_kaynak_gecici_gorevlendirme.sql`)
-**Production migration tip:** `075` (076 apply HAYIR â€” bu turda)
+**Production migration tip:** `076` (canonical production applied; schema ready; assignment count=0)
 
 ## SUPERSEDES
 
@@ -89,9 +89,16 @@ REAL_PAYROLL / SGK / BANK_EXPORT / ÃœCRET_TAHAKKUKU = HAYIR.
 QR/puantaj operasyonel kayÄ±tlarÄ± gerÃ§ek zaman kaydÄ±dÄ±r.
 GerÃ§ek bordro/SGK/banka pipeline'Ä±na DIS eklenmez; Ã¼cret tahakkuku Ã¼retilmez.
 
-## Gap registry
+## Gap registry / production kapanis
 
 - `MG-OPS-DIS-ORG-COMPLETE-001` = **CLOSED**
-- `MG-OPS-DIS-OPS-MODEL-001` = **OPS_ROLLOUT** (production 076 apply + deploy tamamlanmadan CLOSED_CONFIRMED yazÄ±lmaz)
+- `MG-OPS-DIS-OPS-MODEL-001` = **CLOSED_CONFIRMED**
+- Migration `076` production applied (canonical worker SUCCEEDED)
+- Schema ready: `personeller.sube_id` nullable; `personel_gecici_gorevlendirmeler` VAR
+- Production assignment count = 0 (gercek gorevlendirme bu turda olusturulmadi)
+- Gercek personel / rol / user / SGK / payroll mutation = 0
+- DIS permanent org optional; effective org gecici gorevlendirme aware
+- REAL_PAYROLL / SGK / BANK_EXPORT = HAYIR (076 bu siniri degistirmedi)
+- Gercek gorevlendirme rolloutu ayri insan/operasyon kararidir; teknik production kapanisini bloke etmez
 
-CURRENT_STATE: `CODE_MIGRATION_TIP=076`, `PRODUCTION_MIGRATION_TIP=075`.
+CURRENT_STATE: `CODE_MIGRATION_TIP=076`, `PRODUCTION_MIGRATION_TIP=076`.

@@ -1,19 +1,19 @@
 CODE_MIGRATION_TIP: 076
-PRODUCTION_MIGRATION_TIP: 075
+PRODUCTION_MIGRATION_TIP: 076
 
 # 110 — Canonical Closure / Gap Registry
 
 **Tür:** Güncel durum kaydı ve sonraki iş seçimi için tek referans.
-**Güncelleme:** 2026-08-27
-**Kapsam:** Dokümantasyon senkronu (SGK/UBGT canlı salt-okunur doğrulama kapanışı). Kod, migration, production veri mutasyonu, seed/approve/import ve feature flag bu turda değiştirilmedi.
+**Güncelleme:** 2026-08-28
+**Kapsam:** DIS_KAYNAK `076` production rollout + canonical doküman kapanışı. Bu turda uygulama kodu / migration dosyası / seed / personel-assignment-rol-SGK-bordro mutasyonu yok.
 
 ## Migration durumu
 
 | Alan | Değer | Kanıt / sınır |
 | --- | --- | --- |
 | CODE_MIGRATION_TIP | **076** | Repodaki son migration: `076_dis_kaynak_gecici_gorevlendirme.sql` |
-| PRODUCTION_MIGRATION_TIP | **075** | Canonical production migration ucu `075`; `076` kaynakta (apply HAYIR) |
-| Canlı migration doğrulaması | **AYRI SALT-OKUNUR İŞ** | Yeni migration eklenince tip eşitliği `npm run check:sync` ile fail-closed doğrulanır |
+| PRODUCTION_MIGRATION_TIP | **076** | Canonical production apply `33120768641` / request `33120768641-1` / worker `SUCCEEDED`; tip `076` |
+| Canlı migration doğrulaması | **PASS** | Ledger `076` + schema ready (`personeller.sube_id` nullable; `personel_gecici_gorevlendirmeler` VAR); assignment canlı kayıt=0; pending 077+ yok |
 
 ## Durum sözlüğü
 
@@ -42,7 +42,7 @@ PRODUCTION_MIGRATION_TIP: 075
 | `MG-ORG-ATTR-001` | Bölüm / Birim / Pozisyonun canonical personel modeli | **CLOSED** | Native owner modeli Pack6 ile kilitlendi. Bkz. `120-org-structure-pack6.md`. |
 | `MG-IMPORT-MAP-001` | Şube-Departman import kontratı | **CLOSED** | Açık aktif Şube + aktif Departman modeli; eski sparse matrix import bloke etmez. Bkz. `124-personnel-import-open-branch-department.md`. |
 | `MG-OPS-QR-001` | QR attendance teknik pipeline | **CLOSED** | Ürün kodu tamam; sonraki uygulama adımları ayrı personel/operasyon rollout’udur. |
-| `MG-MIG-071-075` | Org hierarchy / short codes / fixture archive / QR correction / secure activation şeması | **CLOSED** | Production migration ucu `075`; `071`–`075` uygulanmıştır. |
+| `MG-MIG-071-075` | Org hierarchy / short codes / fixture archive / QR correction / secure activation şeması | **CLOSED** | Production migration ucu `076`; `071`–`076` uygulanmıştır (`076` = DIS geçici görevlendirme schema). |
 | `MG-OPS-PERSONEL-001` | Canonical personel import rollout (Phase1 IC + Phase2 DIS) | **CLOSED_CONFIRMED** | Phase1: 122 `IC_PERSONEL` inserted, 0 rejected. Phase2: 11 `DIS_KAYNAK` inserted, 0 rejected. Canonical DIS hedefi **11** (MUHAMMAT FAWAZ + MUSTAFA HAMİD = `EXCLUDED_USER_CONFIRMED_TERMINATED`). Import yeniden dry-run/apply açılmaz. |
 | `MG-EXT-ORG-DATA-001` | Dış kaynak import org/görev kararları (Phase2) | **CLOSED_CONFIRMED** | Phase2 final candidate VALID=11 / INVALID=0; production apply 11 inserted. 13’lük eski hedef bilinçli terminated exclusion ile kapatıldı. |
 | `MG-OPS-SGK-CAT-001` | SGK canlı katalog/politika salt-okunur doğrulaması | **CLOSED_CONFIRMED** | 2026-08-27 canlı GET: `RESMI_KAYNAKLI_KISITLI` + `ONAYLANDI`, `kod_sayisi=19`, `DOGRULANMIS_TAM=false`; şubeler `1,4,5,6,7,8,9,10,11` → `AY_1_SON_GUN` + `ONAYLANDI`; `15_TO_NEXT_MONTH_14` / `MIXED_BY_INSURED` yok. Seed/approve bu turda yok. |
@@ -53,8 +53,8 @@ PRODUCTION_MIGRATION_TIP: 075
 | Öncelik | ID | Konu | Durum | Sonraki güvenli adım |
 | --- | --- | --- | --- | --- |
 | P1 | `MG-OPS-PERSONEL-PHONE-001` | 20 IC telefon deferred tamamlaması | **USER_GATED_DATA_COMPLETION** | `DEFERRED_USER_DATA` / `NON_BLOCKING_DATA_COMPLETION`. Import blocker değil; placeholder/uydurma yok; günlük operasyonu bloklamaz. |
-| P1 | `MG-OPS-DIS-ORG-COMPLETE-001` | DIS bölüm/birim completeness (eski USER_GATED) | **CLOSED** | Yeni iş kararı (130): DIS permanent org opsiyonel. 9 distinct / 17 occurrence tek başına data blocker değildir. Kaynak kod completeness/validator hizalandı; production personel mutation yok. Rollout: `MG-OPS-DIS-OPS-MODEL-001`. |
-| P1 | `MG-OPS-DIS-OPS-MODEL-001` | DIS operasyonel/non-financial + geçici görevlendirme production rollout | **OPS_ROLLOUT** | Migration `076` kodda; apply/deploy bu turda yok. QR/mobil/finansal fail-closed kaynakta hazır. |
+| P1 | `MG-OPS-DIS-ORG-COMPLETE-001` | DIS bölüm/birim completeness (eski USER_GATED) | **CLOSED** | Yeni iş kararı (130): DIS permanent org opsiyonel. Production personel/org mutation yok; 11 DIS kayda otomatik assignment yazılmadı. |
+| P1 | `MG-OPS-DIS-OPS-MODEL-001` | DIS operasyonel/non-financial + geçici görevlendirme production rollout | **CLOSED_CONFIRMED** | Migration `076` production applied; schema ready; assignment table live; production assignment count=0; gerçek görevlendirme oluşturma ayrı insan/operasyon kararıdır. SGK/gerçek payroll/banka fail-closed. |
 | P1 | `MG-RET-PHYS-001` | Gerçek fiziksel imha aktivasyonu | **USER_GATED** | Ayrı bakım penceresi, güncel yedek/geri dönüş kanıtı, çift kontrol ve açık feature flag yetkisi olmadan etkinleştirme yok. |
 | P1 | `MG-SZ-6M-001` | Serbest zaman 6 aylık operasyon sahipliği | **USER_GATED** | İK’nın takip sahipliği ve aksiyon akışı belirlenir; mevcut sistem uyarı/rapor yüzeyiyle işletilir. Yeni payroll hard block varsayılmaz. |
 | P2 | `MG-OPS-ORG-001` | Gerçek personel organizasyon FK eşlemesi (tamamlama) | **USER_GATED_DATA_COMPLETION** | Import rollout kapalı. Kalan org FK tamamlama ayrı insan/veri işidir; toplu import yeniden açılmaz. |
@@ -78,7 +78,7 @@ PRODUCTION_MIGRATION_TIP: 075
 1. **Saklama manifesti, fiziksel imha ve serbest zaman 6 ay takibi yeni code-gap değildir.** Kod ve güvenlik gate’leri vardır; açık olan taraf canlı işletim / yetkilendirmedir.
 2. **Gerçek imhayı açmak hızlı iş değildir.** Bu bir veri silme operasyonudur; feature flag’in kapalı olması beklenen güvenlik durumudur.
 3. **270 saat yıl değişimi için yeni iş kararı aranmaz.** Mevcut karar rolling 12 ay gerçek tarih modelidir.
-4. **`DIS_KAYNAK` artık directory-only değildir (130).** Zaman/QR/puantaj operasyonel olabilir; gerçek SGK/bordro/banka fail-closed kalır. Org bağlantısı opsiyoneldir. Production `076` apply + deploy ayrı OPS_ROLLOUT (`MG-OPS-DIS-OPS-MODEL-001`).
+4. **`DIS_KAYNAK` artık directory-only değildir (130).** Zaman/QR/puantaj operasyonel olabilir; gerçek SGK/bordro/banka fail-closed kalır. Org bağlantısı opsiyoneldir; effective org geçici görevlendirme aware. Production `076` applied (`MG-OPS-DIS-OPS-MODEL-001` = `CLOSED_CONFIRMED`). Gerçek görevlendirme rollout’u ayrı insan/operasyon kararıdır.
 5. **Personel import rollout kapalıdır (`CLOSED_CONFIRMED`).** Phase1 122 IC + Phase2 11 DIS production’da tamamlandı. 20 IC telefon deferred tamamlamadır; import blocker değildir. Terminated exclusion (MUHAMMAT FAWAZ, MUSTAFA HAMİD) backlog’a eklenmez. Fuzzy eşleme yoktur.
 6. **Bordro PDF / banka dosyası / SGK bildirgesi / FSC / QR-revizyon UX bug değildir.** FUTURE / INTENTIONAL_DEFER / OUT_OF_SCOPE / DECISION_REQUIRED olarak izlenir.
 

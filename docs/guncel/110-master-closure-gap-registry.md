@@ -5,7 +5,7 @@ PRODUCTION_MIGRATION_TIP: 075
 
 **Tür:** Güncel durum kaydı ve sonraki iş seçimi için tek referans.
 **Güncelleme:** 2026-08-27
-**Kapsam:** Dokümantasyon senkronu (personel import rollout reconcile). Kod, migration, production veri ve feature flag bu turda değiştirilmedi.
+**Kapsam:** Dokümantasyon senkronu (SGK/UBGT canlı salt-okunur doğrulama kapanışı). Kod, migration, production veri mutasyonu, seed/approve/import ve feature flag bu turda değiştirilmedi.
 
 ## Migration durumu
 
@@ -45,6 +45,8 @@ PRODUCTION_MIGRATION_TIP: 075
 | `MG-MIG-071-075` | Org hierarchy / short codes / fixture archive / QR correction / secure activation şeması | **CLOSED** | Production migration ucu `075`; `071`–`075` uygulanmıştır. |
 | `MG-OPS-PERSONEL-001` | Canonical personel import rollout (Phase1 IC + Phase2 DIS) | **CLOSED_CONFIRMED** | Phase1: 122 `IC_PERSONEL` inserted, 0 rejected. Phase2: 11 `DIS_KAYNAK` inserted, 0 rejected. Canonical DIS hedefi **11** (MUHAMMAT FAWAZ + MUSTAFA HAMİD = `EXCLUDED_USER_CONFIRMED_TERMINATED`). Import yeniden dry-run/apply açılmaz. |
 | `MG-EXT-ORG-DATA-001` | Dış kaynak import org/görev kararları (Phase2) | **CLOSED_CONFIRMED** | Phase2 final candidate VALID=11 / INVALID=0; production apply 11 inserted. 13’lük eski hedef bilinçli terminated exclusion ile kapatıldı. |
+| `MG-OPS-SGK-CAT-001` | SGK canlı katalog/politika salt-okunur doğrulaması | **CLOSED_CONFIRMED** | 2026-08-27 canlı GET: `RESMI_KAYNAKLI_KISITLI` + `ONAYLANDI`, `kod_sayisi=19`, `DOGRULANMIS_TAM=false`; şubeler `1,4,5,6,7,8,9,10,11` → `AY_1_SON_GUN` + `ONAYLANDI`; `15_TO_NEXT_MONTH_14` / `MIXED_BY_INSURED` yok. Seed/approve bu turda yok. |
+| `MG-OPS-UBGT-001` | UBGT canlı takvim/projeksiyon salt-okunur doğrulaması | **CLOSED_CONFIRMED** | 2026-08-27 canlı GET: 2026’da 17 aktif kayıt; duplicate/çelişki 0; `TAM_GUN=14` / `YARIM_GUN=3`; sabit milli günler + bayram/arife kümeleri mevcut. Şirket politikası `HAFTA_TATILI_GUNLERI=0` / Pazar; UBGT seed/write bu turda yok. |
 
 ## Gerçekten açık işler
 
@@ -52,8 +54,6 @@ PRODUCTION_MIGRATION_TIP: 075
 | --- | --- | --- | --- | --- |
 | P1 | `MG-OPS-PERSONEL-PHONE-001` | 20 IC telefon deferred tamamlaması | **USER_GATED_DATA_COMPLETION** | `DEFERRED_USER_DATA` / `NON_BLOCKING_DATA_COMPLETION`. Import blocker değil; placeholder/uydurma yok; günlük operasyonu bloklamaz. |
 | P1 | `MG-OPS-DIS-ORG-COMPLETE-001` | DIS bölüm/birim completeness vs import optional kontrat | **USER_GATED_DATA_COMPLETION** | Import create validator `bolum_id`/`birim_id` optional; CompletenessService DIS dahil zorunlu sayıyor (91b12c3 sonrası yüzey). 9 distinct / 17 occurrence. Bu otomatik bug değildir; iş kararı olmadan toplu yazma/import reopen yok. |
-| P1 | `MG-OPS-SGK-CAT-001` | SGK canlı katalog/politika salt-okunur doğrulaması | **READ_ONLY_VERIFY** | Resmî kaynak etkinlik tarihleri ve canlı katalog durumunu salt-okunur doğrula; kanıtsız seed/aktivasyon yapma. Kod gap değildir. |
-| P1 | `MG-OPS-UBGT-001` | UBGT canlı takvim/projeksiyon salt-okunur doğrulaması | **READ_ONLY_VERIFY** | Canonical resmî takvim girdileri, yarım gün politikası ve canlı projeksiyonu salt-okunur karşılaştır. Kod gap değildir. |
 | P1 | `MG-RET-PHYS-001` | Gerçek fiziksel imha aktivasyonu | **USER_GATED** | Ayrı bakım penceresi, güncel yedek/geri dönüş kanıtı, çift kontrol ve açık feature flag yetkisi olmadan etkinleştirme yok. |
 | P1 | `MG-SZ-6M-001` | Serbest zaman 6 aylık operasyon sahipliği | **USER_GATED** | İK’nın takip sahipliği ve aksiyon akışı belirlenir; mevcut sistem uyarı/rapor yüzeyiyle işletilir. Yeni payroll hard block varsayılmaz. |
 | P2 | `MG-OPS-ORG-001` | Gerçek personel organizasyon FK eşlemesi (tamamlama) | **USER_GATED_DATA_COMPLETION** | Import rollout kapalı. Kalan org FK tamamlama ayrı insan/veri işidir; toplu import yeniden açılmaz. |
@@ -83,10 +83,10 @@ PRODUCTION_MIGRATION_TIP: 075
 
 ## Hızlı, güvenli çalışma sırası
 
-1. Canlı SGK katalog/politika salt-okunur doğrulaması.
-2. Canlı UBGT takvim/projeksiyon salt-okunur doğrulaması.
-3. 20 deferred IC telefon tamamlaması (non-blocking; ayrı kullanıcı girdisi).
-4. DIS bölüm/birim için iş kararı: completeness zorunlu mu, yoksa import optional null meşru mu? Karar olmadan import reopen yok.
+1. 20 deferred IC telefon tamamlaması (non-blocking; ayrı kullanıcı girdisi).
+2. DIS bölüm/birim için iş kararı: completeness zorunlu mu, yoksa import optional null meşru mu? Karar olmadan import reopen yok.
+3. Saklama fiziksel imha aktivasyonu yalnız ayrı yetki + yedek kanıtı ile.
+4. Serbest zaman 6 ay operasyon sahipliği (İK süreci; yeni payroll hard block yok).
 
 ## Referans dokümanlar
 

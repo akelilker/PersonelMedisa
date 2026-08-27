@@ -4,6 +4,8 @@ Tarih: 22.07.2026
 Branch: `feat/s88-ubgt-tatil-takvimi-owner`  
 Base: `origin/main` @ `19145c1b03d77c10b037b7225f5ce01c90628f62`
 
+**2026-08-27 canlı salt-okunur doğrulama:** `MG-OPS-UBGT-001` → `CLOSED_CONFIRMED` (`110`). Canlı 2026 takvimi 17 aktif kayıt; duplicate/çelişki yok. Bu tarihsel checkpoint dosyasındaki “seed yok / production apply yok” ifadesi S88 faz sınırını anlatır; sonraki canlı takvim durumu `110` / `CURRENT_STATE.md` üzerindedir.
+
 ## Owner kararı
 
 Mevcut canonical tatil takvimi tablosu yoktu (`gun_tipi` manuel UBGT).  

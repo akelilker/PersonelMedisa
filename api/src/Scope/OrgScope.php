@@ -230,11 +230,20 @@ class OrgScope
         // Branch-scoped roles (SUBE / IK / MUHASEBE) and optional GY active-sube narrow.
 
         if (self::isUnrestricted($user) && count(self::allowedSubeIds($user)) === 0) {
+            // Bağlantısız DIS (sube_id NULL) merkezi havuz — GY/Sistem görür.
+            if ($subeId <= 0) {
+                return;
+            }
             $scope = self::resolveActiveSubeId($user, $request);
             if ($scope !== null && $subeId !== (int) $scope) {
                 JsonResponse::forbidden();
             }
 
+            return;
+        }
+
+        // IK_SORUMLUSU: bağlantısız DIS havuzu merkezi görünüm.
+        if ($role === 'IK_SORUMLUSU' && $subeId <= 0) {
             return;
         }
 

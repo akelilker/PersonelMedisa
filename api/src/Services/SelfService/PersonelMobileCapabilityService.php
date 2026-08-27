@@ -58,14 +58,17 @@ class PersonelMobileCapabilityService
         $isDis = $kapsam === 'DIS_KAYNAK';
 
         if ($isDis) {
+            // Operasyonel mobil: shell + QR + düzeltme talebi.
+            // İzin yazma işveren/hukuki sonuç üretebildiği için fail-closed kapalı.
             return [
                 'calisan_kapsami' => 'DIS_KAYNAK',
                 'shell' => true,
-                'qr_scan' => false,
-                'attendance_correct' => false,
+                'qr_scan' => true,
+                'attendance_correct' => true,
                 'puantaj_write' => false,
                 'izin_write' => false,
-                'coming_soon_message' => self::MESSAGE_COMING_SOON,
+                'coming_soon_message' => null,
+                'info_only_notice' => 'DIŞ KAYNAK — BİLGİ AMAÇLIDIR / ÜCRET VE SGK TAHAKKUKU OLUŞTURMAZ',
             ];
         }
 
@@ -77,6 +80,7 @@ class PersonelMobileCapabilityService
             'puantaj_write' => false,
             'izin_write' => true,
             'coming_soon_message' => null,
+            'info_only_notice' => null,
         ];
     }
 

@@ -42,12 +42,14 @@ describe("mobile attendance approval UX source contracts", () => {
     expect(home).toContain("BackgroundlessNoticeModal");
   });
 
-  it("keeps DIS_KAYNAK shell visible with central coming-soon gate", () => {
+  it("keeps DIS_KAYNAK shell + operational QR/attendance capabilities", () => {
     const svc = read("api/src/Services/SelfService/PersonelMobileCapabilityService.php");
     expect(svc).toContain("DIS_KAYNAK");
-    expect(svc).toContain(PersonelMobileCapabilityService.MESSAGE_COMING_SOON);
-    expect(svc).toContain("'qr_scan' => false");
+    expect(svc).toContain("'qr_scan' => true");
+    expect(svc).toContain("'attendance_correct' => true");
     expect(svc).toContain("'shell' => true");
+    expect(svc).toContain("'izin_write' => false");
+    expect(svc).toContain("ÜCRET VE SGK TAHAKKUKU OLUŞTURMAZ");
 
     const home = read("src/features/self-service/pages/PersonelSelfServiceHomePage.tsx");
     expect(home).toContain("comingSoon");

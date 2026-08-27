@@ -244,10 +244,17 @@ try {
     p7fAssert((int) $pdo->query("SELECT COUNT(*) FROM personeller WHERE tc_kimlik_no IS NULL AND sicil_no IN ('$uniqueA', '$uniqueB')")->fetchColumn() === 2, 'multiple null TC with unique sicil coexist');
 
     try {
-        PersonelCalisanKapsamService::assertOperationalEligibleOrThrow($pdo, $externalId);
-        p7fAssert(false, 'external operation rejected');
+        PersonelCalisanKapsamService::assertTimeOperationalEligibleOrThrow($pdo, $externalId);
+        p7fAssert(false, 'unassigned DIS time-ops rejected');
     } catch (PersonelValidationException $e) {
-        p7fAssert($e->getCodeString() === 'PERSONEL_OPERASYON_KAPSAM_DISI', 'external operation rejected');
+        p7fAssert($e->getCodeString() === 'PERSONEL_OPERASYON_ORG_SCOPE_YOK', 'unassigned DIS time-ops rejected');
+    }
+
+    try {
+        PersonelCalisanKapsamService::assertFinancialEligibleOrThrow($pdo, $externalId);
+        p7fAssert(false, 'DIS financial rejected');
+    } catch (PersonelValidationException $e) {
+        p7fAssert($e->getCodeString() === 'PERSONEL_FINANSAL_KAPSAM_DISI', 'DIS financial rejected');
     }
 
     try {

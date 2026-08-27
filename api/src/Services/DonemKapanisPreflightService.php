@@ -337,7 +337,7 @@ class DonemKapanisPreflightService
     {
         $where = [
             'p.sube_id = :sube_id',
-            \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::sqlIcPersonelPredicate($pdo, 'p'),
+            \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::sqlTimeOperationalEligiblePredicate($pdo, 'p'),
             'gp.tarih BETWEEN :bas AND :bit',
             "gp.state <> 'MUHURLENDI'",
             "gp.kontrol_durumu = 'BEKLIYOR'",
@@ -645,7 +645,7 @@ class DonemKapanisPreflightService
         $where = [
             'p.sube_id = :sube_id',
             "p.aktif_durum = 'AKTIF'",
-            \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::sqlIcPersonelPredicate($pdo, 'p'),
+            \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::sqlTimeOperationalEligiblePredicate($pdo, 'p'),
         ];
         $params = ['sube_id' => $subeId, 'bas' => $ayBaslangic, 'bit' => $ayBitis];
         if (isset($filters['departman_id']) && (int) $filters['departman_id'] > 0) {

@@ -99,31 +99,61 @@ class SelfPersonelContext
         $soyad = (string) ($personel['soyad'] ?? '');
         $adSoyad = trim($ad . ' ' . $soyad);
 
+        $subeId = isset($personel['sube_id']) && $personel['sube_id'] !== null && (int) $personel['sube_id'] > 0
+            ? (int) $personel['sube_id']
+            : null;
+        $departmanId = isset($personel['departman_id']) && $personel['departman_id'] !== null
+            ? (int) $personel['departman_id']
+            : null;
+        $bolumId = isset($personel['bolum_id']) && $personel['bolum_id'] !== null
+            ? (int) $personel['bolum_id']
+            : null;
+        $birimId = isset($personel['birim_id']) && $personel['birim_id'] !== null
+            ? (int) $personel['birim_id']
+            : null;
+        $subeAd = (string) ($personel['sube_ad'] ?? '');
+        $departmanAd = isset($personel['departman_ad']) && $personel['departman_ad'] !== null
+            ? (string) $personel['departman_ad']
+            : null;
+        $bolumAd = isset($personel['bolum_ad']) && $personel['bolum_ad'] !== null
+            ? (string) $personel['bolum_ad']
+            : null;
+        $birimAd = isset($personel['birim_ad']) && $personel['birim_ad'] !== null
+            ? (string) $personel['birim_ad']
+            : null;
+
+        // Aktif geçici görevlendirme effective org'u override eder (permanent overwrite yok).
+        $opCtx = \Medisa\Api\Services\Personel\PersonelOperationalContextService::resolve($pdo, $personelId);
+        if ($opCtx['source'] === \Medisa\Api\Services\Personel\PersonelOperationalContextService::SOURCE_ASSIGNMENT) {
+            $eff = $opCtx['effective'];
+            $subeId = $eff['sube_id'];
+            $departmanId = $eff['departman_id'];
+            $bolumId = $eff['bolum_id'];
+            $birimId = $eff['birim_id'];
+            if ($subeId !== null) {
+                try {
+                    $s = $pdo->prepare('SELECT ad FROM subeler WHERE id = :id LIMIT 1');
+                    $s->execute(['id' => $subeId]);
+                    $subeAd = (string) ($s->fetchColumn() ?: '');
+                } catch (\Throwable $e) {
+                    $subeAd = '';
+                }
+            }
+        }
+
         return [
             'personel_id' => (int) $personel['personel_id'],
             'ad' => $ad,
             'soyad' => $soyad,
             'ad_soyad' => $adSoyad,
-            'sube_id' => (int) $personel['sube_id'],
-            'sube_ad' => (string) ($personel['sube_ad'] ?? ''),
-            'departman_id' => isset($personel['departman_id']) && $personel['departman_id'] !== null
-                ? (int) $personel['departman_id']
-                : null,
-            'departman_ad' => isset($personel['departman_ad']) && $personel['departman_ad'] !== null
-                ? (string) $personel['departman_ad']
-                : null,
-            'bolum_id' => isset($personel['bolum_id']) && $personel['bolum_id'] !== null
-                ? (int) $personel['bolum_id']
-                : null,
-            'bolum_ad' => isset($personel['bolum_ad']) && $personel['bolum_ad'] !== null
-                ? (string) $personel['bolum_ad']
-                : null,
-            'birim_id' => isset($personel['birim_id']) && $personel['birim_id'] !== null
-                ? (int) $personel['birim_id']
-                : null,
-            'birim_ad' => isset($personel['birim_ad']) && $personel['birim_ad'] !== null
-                ? (string) $personel['birim_ad']
-                : null,
+            'sube_id' => $subeId !== null ? $subeId : 0,
+            'sube_ad' => $subeAd,
+            'departman_id' => $departmanId,
+            'departman_ad' => $departmanAd,
+            'bolum_id' => $bolumId,
+            'bolum_ad' => $bolumAd,
+            'birim_id' => $birimId,
+            'birim_ad' => $birimAd,
             'gorev_id' => isset($personel['gorev_id']) && $personel['gorev_id'] !== null
                 ? (int) $personel['gorev_id']
                 : null,
@@ -140,6 +170,8 @@ class SelfPersonelContext
                 ? (int) $personel['personel_tipi_id']
                 : null,
             'calisan_kapsami' => $personel['calisan_kapsami'] ?? null,
+            'org_status' => $opCtx['org_status'],
+            'operational_scope' => $opCtx,
         ];
     }
 
@@ -175,7 +207,7 @@ class SelfPersonelContext
                 bi.ad AS birim_ad,
                 g.ad AS gorev_ad
              FROM personeller p
-             INNER JOIN subeler s ON s.id = p.sube_id
+             LEFT JOIN subeler s ON s.id = p.sube_id
              LEFT JOIN departmanlar d ON d.id = p.departman_id
              LEFT JOIN bolumler b ON b.id = p.bolum_id
              LEFT JOIN birimler bi ON bi.id = p.birim_id
@@ -194,7 +226,7 @@ class SelfPersonelContext
                 d.ad AS departman_ad,
                 g.ad AS gorev_ad
              FROM personeller p
-             INNER JOIN subeler s ON s.id = p.sube_id
+             LEFT JOIN subeler s ON s.id = p.sube_id
              LEFT JOIN departmanlar d ON d.id = p.departman_id
              LEFT JOIN gorevler g ON g.id = p.gorev_id
              WHERE p.id = :id

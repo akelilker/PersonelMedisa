@@ -522,7 +522,7 @@ class HaftalikKapanisController
             FROM personeller
             WHERE sube_id = :sube_id
               AND aktif_durum = \'AKTIF\'
-              AND ' . \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::sqlIcPersonelPredicate($pdo, 'personeller') . '
+              AND ' . \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::sqlTimeOperationalEligiblePredicate($pdo, 'personeller') . '
         ';
         $params = ['sube_id' => (int) $subeId];
         if ($departmanId !== null) {

@@ -55,10 +55,13 @@ $capsDis = \Medisa\Api\Services\SelfService\PersonelMobileCapabilityService::res
     ['calisan_kapsami' => 'DIS_KAYNAK']
 );
 acaAssert($capsDis['shell'] === true, 'dis shell');
-acaAssert($capsDis['qr_scan'] === false, 'dis qr blocked');
+acaAssert($capsDis['qr_scan'] === true, 'dis qr allowed');
+acaAssert($capsDis['attendance_correct'] === true, 'dis attendance correction allowed');
+acaAssert($capsDis['izin_write'] === false, 'dis izin fail-closed');
+acaAssert($capsDis['coming_soon_message'] === null, 'dis no coming-soon blanket gate');
 acaAssert(
-    $capsDis['coming_soon_message'] === \Medisa\Api\Services\SelfService\PersonelMobileCapabilityService::MESSAGE_COMING_SOON,
-    'dis message'
+    is_string($capsDis['info_only_notice'] ?? null) && strpos((string) $capsDis['info_only_notice'], 'BİLGİ AMAÇLIDIR') !== false,
+    'dis info-only notice'
 );
 
 echo "[OK] AttendanceCorrectionApproverPureTestRunner\n";

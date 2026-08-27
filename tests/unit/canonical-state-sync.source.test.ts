@@ -50,11 +50,13 @@ describe("canonical state sync ownership", () => {
     const registryProd = parseTip(registry, "PRODUCTION_MIGRATION_TIP");
 
     expect(currentCode).toBe(fsTip);
-    expect(currentProd).toBe(fsTip);
     expect(registryCode).toBe(fsTip);
-    expect(registryProd).toBe(fsTip);
     expect(currentCode).toBe(registryCode);
     expect(currentProd).toBe(registryProd);
+    // Production tip may lag code tip until migration apply (076 OPS_ROLLOUT).
+    expect(Number.parseInt(currentProd ?? "0", 10)).toBeLessThanOrEqual(
+      Number.parseInt(currentCode ?? "0", 10)
+    );
   });
 
   it("verify-canonical-state script parses the three ownership sources", () => {

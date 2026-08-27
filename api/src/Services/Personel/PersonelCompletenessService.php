@@ -28,27 +28,31 @@ class PersonelCompletenessService
             $a = 'p';
         }
 
-        $orgPredicate = $hasOrgStructure
-            ? " OR IFNULL({$a}.bolum_id, 0) <= 0"
-                . " OR IFNULL({$a}.birim_id, 0) <= 0"
-            : ' OR 1=1';
         $calisanKapsami = $hasCalisanKapsami
             ? "IFNULL({$a}.calisan_kapsami, 'IC_PERSONEL')"
             : "'IC_PERSONEL'";
 
+        // Org (departman/bolum/birim) + gorev/personel_tipi yalnız IC için CRITICAL.
+        $icOrgPredicate = $hasOrgStructure
+            ? " OR IFNULL({$a}.departman_id, 0) <= 0"
+                . " OR IFNULL({$a}.bolum_id, 0) <= 0"
+                . " OR IFNULL({$a}.birim_id, 0) <= 0"
+                . " OR IFNULL({$a}.gorev_id, 0) <= 0"
+                . " OR IFNULL({$a}.personel_tipi_id, 0) <= 0"
+            : " OR IFNULL({$a}.departman_id, 0) <= 0"
+                . " OR IFNULL({$a}.gorev_id, 0) <= 0"
+                . " OR IFNULL({$a}.personel_tipi_id, 0) <= 0";
+
         return "("
             . "TRIM(IFNULL({$a}.sicil_no, '')) = ''"
             . " OR TRIM(IFNULL({$a}.ise_giris_tarihi, '')) = ''"
-            . " OR IFNULL({$a}.departman_id, 0) <= 0"
-            . $orgPredicate
-            . " OR IFNULL({$a}.gorev_id, 0) <= 0"
-            . " OR IFNULL({$a}.personel_tipi_id, 0) <= 0"
             . " OR ("
             . "  {$calisanKapsami} <> 'DIS_KAYNAK'"
             . "  AND ("
             . "    TRIM(IFNULL({$a}.tc_kimlik_no, '')) = ''"
             . "    OR TRIM(IFNULL({$a}.dogum_tarihi, '')) = ''"
             . "    OR TRIM(IFNULL({$a}.telefon, '')) = ''"
+            . $icOrgPredicate
             . "  )"
             . " )"
             . ")";
@@ -167,7 +171,7 @@ class PersonelCompletenessService
                 'category' => self::CATEGORY_ISTIHDAM,
                 'severity' => self::SEVERITY_CRITICAL,
                 'edit_target' => 'genel',
-                'scopes' => $both,
+                'scopes' => $icOnly,
             ],
             [
                 'key' => 'bolum_id',
@@ -175,7 +179,7 @@ class PersonelCompletenessService
                 'category' => self::CATEGORY_ISTIHDAM,
                 'severity' => self::SEVERITY_CRITICAL,
                 'edit_target' => 'genel',
-                'scopes' => $both,
+                'scopes' => $icOnly,
             ],
             [
                 'key' => 'birim_id',
@@ -183,7 +187,7 @@ class PersonelCompletenessService
                 'category' => self::CATEGORY_ISTIHDAM,
                 'severity' => self::SEVERITY_CRITICAL,
                 'edit_target' => 'genel',
-                'scopes' => $both,
+                'scopes' => $icOnly,
             ],
             [
                 'key' => 'gorev_id',
@@ -191,7 +195,7 @@ class PersonelCompletenessService
                 'category' => self::CATEGORY_ISTIHDAM,
                 'severity' => self::SEVERITY_CRITICAL,
                 'edit_target' => 'genel',
-                'scopes' => $both,
+                'scopes' => $icOnly,
             ],
             [
                 'key' => 'personel_tipi_id',
@@ -199,7 +203,7 @@ class PersonelCompletenessService
                 'category' => self::CATEGORY_ISTIHDAM,
                 'severity' => self::SEVERITY_CRITICAL,
                 'edit_target' => 'pozisyon',
-                'scopes' => $both,
+                'scopes' => $icOnly,
             ],
         ];
     }

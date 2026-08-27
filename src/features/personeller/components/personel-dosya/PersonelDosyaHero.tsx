@@ -87,6 +87,21 @@ export function PersonelDosyaHero({
           label="Çalışan Kapsamı"
           value={formatCalisanKapsamiLabel(personel.calisan_kapsami ?? "IC_PERSONEL")}
         />
+        {personel.calisan_kapsami === "DIS_KAYNAK" ? (
+          <DossierField
+            label="Organizasyon durumu"
+            value={
+              personel.org_status === "AKTIF_GECICI_GOREVLENDIRME"
+                ? "Aktif geçici görevlendirme"
+                : personel.org_status === "KALICI_ORGANIZASYON"
+                  ? "Kalıcı organizasyon bağlantısı"
+                  : "Bağlantısız"
+            }
+          />
+        ) : null}
+        {personel.info_only_notice ? (
+          <DossierField label="Bilgi" value={personel.info_only_notice} />
+        ) : null}
         <DossierField
           label="Sicil No"
           value={fieldValue("sicil_no", formatDetailValue(personel.sicil_no))}

@@ -334,7 +334,7 @@ class SerbestZamanController
                 self::rollbackNotFound($pdo, 'personel bulunamadi.');
             }
             self::assertPersonelScope($user, $request, $personel);
-            \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::assertOperationalEligible(
+            \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::assertFinancialEligible(
                 $pdo,
                 (int) $personel['id']
             );
@@ -531,7 +531,7 @@ class SerbestZamanController
                 self::rollbackNotFound($pdo, 'personel bulunamadi.');
             }
             self::assertPersonelScope($user, $request, $personel);
-            \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::assertOperationalEligible(
+            \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::assertFinancialEligible(
                 $pdo,
                 $personelId
             );
@@ -670,7 +670,7 @@ class SerbestZamanController
                 self::rollbackNotFound($pdo, 'personel bulunamadi.');
             }
             self::assertPersonelScope($user, $request, $personel);
-            \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::assertOperationalEligible(
+            \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::assertFinancialEligible(
                 $pdo,
                 $personelId
             );
@@ -839,7 +839,7 @@ class SerbestZamanController
                 self::rollbackNotFound($pdo, 'personel bulunamadi.');
             }
             self::assertPersonelScope($user, $request, $personel);
-            \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::assertOperationalEligible(
+            \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::assertFinancialEligible(
                 $pdo,
                 $personelId
             );

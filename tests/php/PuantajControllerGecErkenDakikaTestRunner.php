@@ -550,7 +550,7 @@ if ($internal['status'] !== 200 || (int) $upsertPdo->query('SELECT COUNT(*) FROM
 passScenario('13', 'authorized IC_PERSONEL upsert writes');
 
 $external = invokeUpsertChild($dbFile, $gy, 20);
-if ($external['status'] !== 409 || ($external['payload']['errors'][0]['code'] ?? '') !== 'PERSONEL_OPERASYON_KAPSAM_DISI') {
+if ($external['status'] !== 409 || ($external['payload']['errors'][0]['code'] ?? '') !== 'PERSONEL_OPERASYON_ORG_SCOPE_YOK') {
     failScenario('14', 'authorized DIS_KAYNAK upsert missing scope error');
 }
 if ((int) $upsertPdo->query('SELECT COUNT(*) FROM gunluk_puantaj WHERE personel_id = 20')->fetchColumn() !== 0) {
@@ -559,7 +559,7 @@ if ((int) $upsertPdo->query('SELECT COUNT(*) FROM gunluk_puantaj WHERE personel_
 passScenario('14', 'authorized DIS_KAYNAK upsert blocked without write');
 
 $wrongBranch = invokeUpsertChild($dbFile, $bolumScoped, 30);
-if ($wrongBranch['status'] !== 403 || ($wrongBranch['payload']['errors'][0]['code'] ?? '') === 'PERSONEL_OPERASYON_KAPSAM_DISI') {
+if ($wrongBranch['status'] !== 403 || ($wrongBranch['payload']['errors'][0]['code'] ?? '') === 'PERSONEL_OPERASYON_ORG_SCOPE_YOK') {
     failScenario('15', 'wrong branch did not win before external guard');
 }
 passScenario('15', 'wrong branch wins before external guard');

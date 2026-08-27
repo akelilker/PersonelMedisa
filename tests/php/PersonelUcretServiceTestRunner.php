@@ -106,12 +106,12 @@ salaryException(function () use ($pdo, $externalFuture): void {
         'ucret_turu' => 'NET',
         'gecerlilik_baslangic' => '2099-02-01',
     ]);
-}, 'PERSONEL_OPERASYON_KAPSAM_DISI', 'external salary update rejected');
+}, 'PERSONEL_FINANSAL_KAPSAM_DISI', 'external salary update rejected');
 salaryException(function () use ($pdo, $externalFuture): void {
     PersonelUcretService::closeSalaryRecord($pdo, (int) $externalFuture['id'], '2099-12-31');
-}, 'PERSONEL_OPERASYON_KAPSAM_DISI', 'external salary close rejected');
+}, 'PERSONEL_FINANSAL_KAPSAM_DISI', 'external salary close rejected');
 salaryException(function () use ($pdo, $externalFuture): void {
     PersonelUcretService::cancelSalaryRecord($pdo, (int) $externalFuture['id']);
-}, 'PERSONEL_OPERASYON_KAPSAM_DISI', 'external salary cancel rejected');
+}, 'PERSONEL_FINANSAL_KAPSAM_DISI', 'external salary cancel rejected');
 
 echo 'verify-personel-ucret-service: OK' . PHP_EOL;

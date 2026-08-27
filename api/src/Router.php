@@ -299,6 +299,12 @@ class Router
         if ($path === '/personeller' && $method === 'GET') {
             PersonellerController::list($this->request);
         }
+        if ($path === '/personeller/dis-kaynak/assignable-pool' && $method === 'GET') {
+            PersonellerController::listDisKaynakAssignablePool($this->request);
+        }
+        if ($path === '/personeller/dis-kaynak/unassigned-pool' && $method === 'GET') {
+            PersonellerController::listDisKaynakUnassignedPool($this->request);
+        }
         if ($path === '/personeller' && $method === 'POST') {
             PersonellerController::create($this->request);
         }
@@ -325,6 +331,15 @@ class Router
         }
         if ($method === 'GET' && preg_match('#^/personeller/(\d+)$#', $path, $matches)) {
             PersonellerController::detail($this->request, $matches[1]);
+        }
+        if ($method === 'GET' && preg_match('#^/personeller/(\d+)/gecici-gorevlendirmeler$#', $path, $matches)) {
+            PersonellerController::listGeciciGorevlendirmeler($this->request, $matches[1]);
+        }
+        if ($method === 'POST' && preg_match('#^/personeller/(\d+)/gecici-gorevlendirmeler$#', $path, $matches)) {
+            PersonellerController::createGeciciGorevlendirme($this->request, $matches[1]);
+        }
+        if ($method === 'POST' && preg_match('#^/personeller/(\d+)/gecici-gorevlendirmeler/(\d+)/sonlandir$#', $path, $matches)) {
+            PersonellerController::endGeciciGorevlendirme($this->request, $matches[1], $matches[2]);
         }
         if ($method === 'GET' && preg_match('#^/personeller/(\d+)/yillik-izin-bakiye$#', $path, $matches)) {
             YillikIzinHakDuzeltmeController::bakiye($this->request, $matches[1]);

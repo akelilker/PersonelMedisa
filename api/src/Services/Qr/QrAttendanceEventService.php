@@ -50,7 +50,7 @@ class QrAttendanceEventService
         } catch (\Medisa\Api\Services\SelfService\PersonelMobileCapabilityException $e) {
             throw new QrAttendanceException($e->getErrorCode(), $e->getMessage(), $e->getHttpStatus());
         }
-        \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::assertOperationalEligible($pdo, $personelId);
+        \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::assertTimeOperationalEligible($pdo, $personelId);
         $personelSubeId = (int) $ctx['sube_id'];
         $userId = (int) ($authUser['id'] ?? 0);
         if ($userId <= 0) {

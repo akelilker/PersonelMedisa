@@ -141,6 +141,7 @@ function dvrMigrationFiles(): array
             && basename($file) !== '073_test_fixture_personel_archive.sql'
             && basename($file) !== '074_qr_attendance_correction_and_inbox.sql'
             && basename($file) !== '075_personel_account_activation.sql'
+            && basename($file) !== '076_dis_kaynak_gecici_gorevlendirme.sql'
     ));
     sort($files, SORT_STRING);
 

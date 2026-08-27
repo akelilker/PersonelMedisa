@@ -81,7 +81,7 @@ class PuantajController
         $pdo = self::getConnection();
         $personel = self::loadPersonel($pdo, $personelId);
         SubeScope::assertPersonelAccess($user, $request, $personel);
-        \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::assertOperationalEligible(
+        \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::assertTimeOperationalEligible(
             $pdo,
             $personelId
         );
@@ -168,7 +168,7 @@ class PuantajController
         $pdo = self::getConnection();
         $personel = self::loadPersonel($pdo, $personelId);
         SubeScope::assertPersonelAccess($user, $request, $personel);
-        \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::assertOperationalEligible(
+        \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::assertTimeOperationalEligible(
             $pdo,
             $personelId
         );
@@ -284,7 +284,7 @@ class PuantajController
         $pdo = self::getConnection();
         $personel = self::loadPersonel($pdo, $personelId);
         SubeScope::assertPersonelAccess($user, $request, $personel);
-        \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::assertOperationalEligible(
+        \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::assertTimeOperationalEligible(
             $pdo,
             $personelId
         );
@@ -1564,7 +1564,7 @@ class PuantajController
              FROM gunluk_puantaj gp
              INNER JOIN personeller p ON p.id = gp.personel_id
              WHERE p.sube_id = :sube_id
-               AND ' . \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::sqlIcPersonelPredicate($pdo, 'p') . '
+               AND ' . \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::sqlTimeOperationalEligiblePredicate($pdo, 'p') . '
                AND gp.tarih BETWEEN :first_day AND :last_day
                AND gp.state <> :sealed_state
              ORDER BY gp.tarih ASC, gp.personel_id ASC'

@@ -1,4 +1,4 @@
-CODE_MIGRATION_TIP: 075
+CODE_MIGRATION_TIP: 076
 PRODUCTION_MIGRATION_TIP: 075
 
 # 110 — Canonical Closure / Gap Registry
@@ -11,8 +11,8 @@ PRODUCTION_MIGRATION_TIP: 075
 
 | Alan | Değer | Kanıt / sınır |
 | --- | --- | --- |
-| CODE_MIGRATION_TIP | **075** | Repodaki son migration: `075_personel_account_activation.sql` |
-| PRODUCTION_MIGRATION_TIP | **075** | Canonical production migration ucu `075`; `071`–`075` production’da uygulanmıştır |
+| CODE_MIGRATION_TIP | **076** | Repodaki son migration: `076_dis_kaynak_gecici_gorevlendirme.sql` |
+| PRODUCTION_MIGRATION_TIP | **075** | Canonical production migration ucu `075`; `076` kaynakta (apply HAYIR) |
 | Canlı migration doğrulaması | **AYRI SALT-OKUNUR İŞ** | Yeni migration eklenince tip eşitliği `npm run check:sync` ile fail-closed doğrulanır |
 
 ## Durum sözlüğü
@@ -53,7 +53,8 @@ PRODUCTION_MIGRATION_TIP: 075
 | Öncelik | ID | Konu | Durum | Sonraki güvenli adım |
 | --- | --- | --- | --- | --- |
 | P1 | `MG-OPS-PERSONEL-PHONE-001` | 20 IC telefon deferred tamamlaması | **USER_GATED_DATA_COMPLETION** | `DEFERRED_USER_DATA` / `NON_BLOCKING_DATA_COMPLETION`. Import blocker değil; placeholder/uydurma yok; günlük operasyonu bloklamaz. |
-| P1 | `MG-OPS-DIS-ORG-COMPLETE-001` | DIS bölüm/birim completeness vs import optional kontrat | **USER_GATED_DATA_COMPLETION** | Import create validator `bolum_id`/`birim_id` optional; CompletenessService DIS dahil zorunlu sayıyor (91b12c3 sonrası yüzey). 9 distinct / 17 occurrence. Bu otomatik bug değildir; iş kararı olmadan toplu yazma/import reopen yok. |
+| P1 | `MG-OPS-DIS-ORG-COMPLETE-001` | DIS bölüm/birim completeness (eski USER_GATED) | **CLOSED** | Yeni iş kararı (130): DIS permanent org opsiyonel. 9 distinct / 17 occurrence tek başına data blocker değildir. Kaynak kod completeness/validator hizalandı; production personel mutation yok. Rollout: `MG-OPS-DIS-OPS-MODEL-001`. |
+| P1 | `MG-OPS-DIS-OPS-MODEL-001` | DIS operasyonel/non-financial + geçici görevlendirme production rollout | **OPS_ROLLOUT** | Migration `076` kodda; apply/deploy bu turda yok. QR/mobil/finansal fail-closed kaynakta hazır. |
 | P1 | `MG-RET-PHYS-001` | Gerçek fiziksel imha aktivasyonu | **USER_GATED** | Ayrı bakım penceresi, güncel yedek/geri dönüş kanıtı, çift kontrol ve açık feature flag yetkisi olmadan etkinleştirme yok. |
 | P1 | `MG-SZ-6M-001` | Serbest zaman 6 aylık operasyon sahipliği | **USER_GATED** | İK’nın takip sahipliği ve aksiyon akışı belirlenir; mevcut sistem uyarı/rapor yüzeyiyle işletilir. Yeni payroll hard block varsayılmaz. |
 | P2 | `MG-OPS-ORG-001` | Gerçek personel organizasyon FK eşlemesi (tamamlama) | **USER_GATED_DATA_COMPLETION** | Import rollout kapalı. Kalan org FK tamamlama ayrı insan/veri işidir; toplu import yeniden açılmaz. |
@@ -77,7 +78,7 @@ PRODUCTION_MIGRATION_TIP: 075
 1. **Saklama manifesti, fiziksel imha ve serbest zaman 6 ay takibi yeni code-gap değildir.** Kod ve güvenlik gate’leri vardır; açık olan taraf canlı işletim / yetkilendirmedir.
 2. **Gerçek imhayı açmak hızlı iş değildir.** Bu bir veri silme operasyonudur; feature flag’in kapalı olması beklenen güvenlik durumudur.
 3. **270 saat yıl değişimi için yeni iş kararı aranmaz.** Mevcut karar rolling 12 ay gerçek tarih modelidir.
-4. **`DIS_KAYNAK` operasyonlarını açmak mevcut directory-only sınırını genişletir.** SGK, bordro, puantaj, izin, fazla çalışma ve serbest zaman taraflarına kapı açılması ayrı ürün/iş kuralı onayı ister.
+4. **`DIS_KAYNAK` artık directory-only değildir (130).** Zaman/QR/puantaj operasyonel olabilir; gerçek SGK/bordro/banka fail-closed kalır. Org bağlantısı opsiyoneldir. Production `076` apply + deploy ayrı OPS_ROLLOUT (`MG-OPS-DIS-OPS-MODEL-001`).
 5. **Personel import rollout kapalıdır (`CLOSED_CONFIRMED`).** Phase1 122 IC + Phase2 11 DIS production’da tamamlandı. 20 IC telefon deferred tamamlamadır; import blocker değildir. Terminated exclusion (MUHAMMAT FAWAZ, MUSTAFA HAMİD) backlog’a eklenmez. Fuzzy eşleme yoktur.
 6. **Bordro PDF / banka dosyası / SGK bildirgesi / FSC / QR-revizyon UX bug değildir.** FUTURE / INTENTIONAL_DEFER / OUT_OF_SCOPE / DECISION_REQUIRED olarak izlenir.
 

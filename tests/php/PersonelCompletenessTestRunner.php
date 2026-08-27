@@ -76,6 +76,21 @@ $disComplete = PersonelCompletenessService::evaluate(
 );
 completenessAssert($disComplete['is_complete'] === true, 'DIS_KAYNAK conditional not applicable → NOT missing');
 
+$disOrgOptional = PersonelCompletenessService::evaluate(
+    [
+        'calisan_kapsami' => 'DIS_KAYNAK',
+        'sicil_no' => 'D-1',
+        'ise_giris_tarihi' => '2026-01-01',
+        'bolum_id' => null,
+        'birim_id' => null,
+        'departman_id' => null,
+        'gorev_id' => null,
+        'personel_tipi_id' => null,
+    ],
+    true
+);
+completenessAssert($disOrgOptional['is_complete'] === true, 'DIS_KAYNAK null org → NOT missing');
+
 $multi = PersonelCompletenessService::evaluate(
     array_merge(baseCompleteIc(), [
         'telefon' => '',

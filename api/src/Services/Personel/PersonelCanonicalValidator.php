@@ -95,10 +95,18 @@ final class PersonelCanonicalValidator
         $sicilNo = self::requireTrimmedString($body, 'sicil_no', 'Sicil no zorunludur.');
         $iseGirisTarihi = self::requireValidDate($body, 'ise_giris_tarihi', 'Ise giris tarihi zorunludur.');
 
-        $subeId = self::requirePositiveInt($body, 'sube_id', 'Sube secilmelidir.');
-        $departmanId = self::requirePositiveInt($body, 'departman_id', 'Departman secilmelidir.');
-        $gorevId = self::requirePositiveInt($body, 'gorev_id', 'Gorev secilmelidir.');
-        $personelTipiId = self::requirePositiveInt($body, 'personel_tipi_id', 'Personel tipi secilmelidir.');
+        if ($kapsam === PersonelCalisanKapsamService::IC_PERSONEL) {
+            $subeId = self::requirePositiveInt($body, 'sube_id', 'Sube secilmelidir.');
+            $departmanId = self::requirePositiveInt($body, 'departman_id', 'Departman secilmelidir.');
+            $gorevId = self::requirePositiveInt($body, 'gorev_id', 'Gorev secilmelidir.');
+            $personelTipiId = self::requirePositiveInt($body, 'personel_tipi_id', 'Personel tipi secilmelidir.');
+        } else {
+            // DIS_KAYNAK: kalıcı org bağlantısı opsiyonel (bağlantısız havuz meşru).
+            $subeId = self::optionalPositiveInt($body, 'sube_id');
+            $departmanId = self::optionalPositiveInt($body, 'departman_id');
+            $gorevId = self::optionalPositiveInt($body, 'gorev_id');
+            $personelTipiId = self::optionalPositiveInt($body, 'personel_tipi_id');
+        }
 
         if (!array_key_exists('aktif_durum', $body)) {
             throw new PersonelValidationException('aktif_durum', 'Aktif durum zorunludur.');
@@ -251,7 +259,7 @@ final class PersonelCanonicalValidator
         }
 
         if (array_key_exists('sube_id', $body)) {
-            $payload['sube_id'] = self::requirePositiveInt($body, 'sube_id', 'Sube secilmelidir.');
+            $payload['sube_id'] = self::optionalPositiveInt($body, 'sube_id');
         }
 
         foreach ([
@@ -432,7 +440,12 @@ final class PersonelCanonicalValidator
         }
 
         foreach (['sube_id', 'departman_id', 'gorev_id', 'personel_tipi_id'] as $field) {
+            $isDis = $kapsam === PersonelCalisanKapsamService::DIS_KAYNAK;
             if (!array_key_exists($field, $row) || $row[$field] === null || $row[$field] === '') {
+                if ($isDis) {
+                    $payload[$field] = null;
+                    continue;
+                }
                 $errors[] = self::importError('PERSONEL_IMPORT_EKSIK_ALAN', $field, 'Referans zorunludur.');
                 continue;
             }

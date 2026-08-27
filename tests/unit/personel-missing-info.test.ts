@@ -91,7 +91,7 @@ describe("personel-missing-info", () => {
     expect(keys.size).toBe(0);
   });
 
-  it("DIS_KAYNAK organizasyon ve çalışma çekirdeğindeki boşlukları görünür tutar", () => {
+  it("DIS_KAYNAK organizasyon boşluklarını CRITICAL saymaz; yalnız çekirdek istihdam zorunlu", () => {
     const keys = getPersonelMissingFieldKeys({
       ...completePersonel,
       calisan_kapsami: "DIS_KAYNAK",
@@ -104,15 +104,7 @@ describe("personel-missing-info", () => {
       personel_tipi_id: undefined
     });
 
-    expect([...keys]).toEqual([
-      "sicil_no",
-      "ise_giris_tarihi",
-      "departman_id",
-      "bolum_id",
-      "birim_id",
-      "gorev_id",
-      "personel_tipi_id"
-    ]);
+    expect([...keys]).toEqual(["sicil_no", "ise_giris_tarihi"]);
   });
 
   it("Personel Tipi eksikliği mevcut Pozisyon owner'ına yönlenir", () => {

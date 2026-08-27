@@ -98,17 +98,25 @@ final class PersonelCreateService
         PersonelOrgLocationSchema::assertReadyForOrgWrite($pdo, $payload);
         PersonelOrgStructureSchema::assertReadyForOrgStructureWrite($pdo, $payload);
 
-        if (!self::existsActiveRecord($pdo, 'subeler', (int) $payload['sube_id'])) {
-            throw new PersonelValidationException('sube_id', 'Gecersiz sube.');
+        if ($payload['sube_id'] !== null && $payload['sube_id'] !== '') {
+            if (!self::existsActiveRecord($pdo, 'subeler', (int) $payload['sube_id'])) {
+                throw new PersonelValidationException('sube_id', 'Gecersiz sube.');
+            }
         }
-        if (!self::existsActiveRecord($pdo, 'departmanlar', (int) $payload['departman_id'])) {
-            throw new PersonelValidationException('departman_id', 'Gecersiz departman.');
+        if ($payload['departman_id'] !== null && $payload['departman_id'] !== '') {
+            if (!self::existsActiveRecord($pdo, 'departmanlar', (int) $payload['departman_id'])) {
+                throw new PersonelValidationException('departman_id', 'Gecersiz departman.');
+            }
         }
-        if (!self::existsActiveRecord($pdo, 'gorevler', (int) $payload['gorev_id'])) {
-            throw new PersonelValidationException('gorev_id', 'Gecersiz gorev.');
+        if ($payload['gorev_id'] !== null && $payload['gorev_id'] !== '') {
+            if (!self::existsActiveRecord($pdo, 'gorevler', (int) $payload['gorev_id'])) {
+                throw new PersonelValidationException('gorev_id', 'Gecersiz gorev.');
+            }
         }
-        if (!self::existsActiveRecord($pdo, 'personel_tipleri', (int) $payload['personel_tipi_id'])) {
-            throw new PersonelValidationException('personel_tipi_id', 'Gecersiz personel tipi.');
+        if ($payload['personel_tipi_id'] !== null && $payload['personel_tipi_id'] !== '') {
+            if (!self::existsActiveRecord($pdo, 'personel_tipleri', (int) $payload['personel_tipi_id'])) {
+                throw new PersonelValidationException('personel_tipi_id', 'Gecersiz personel tipi.');
+            }
         }
 
         if (array_key_exists('sgk_isveren_id', $payload) && $payload['sgk_isveren_id'] !== null) {

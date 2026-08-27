@@ -301,7 +301,7 @@ $baExternalOther = invokeSurecHttp($pdo, $ba, 'PUT', '/surecler/103', [
     'aciklama' => 'forbidden first',
 ]);
 surecAssert($baExternalOther['status'] === 403, 'HTTP BA external other sube → 403 before external guard');
-surecAssert(($baExternalOther['payload']['errors'][0]['code'] ?? '') !== 'PERSONEL_OPERASYON_KAPSAM_DISI', 'HTTP BA external other does not leak external guard');
+surecAssert(($baExternalOther['payload']['errors'][0]['code'] ?? '') !== 'PERSONEL_OPERASYON_ORG_SCOPE_YOK', 'HTTP BA external other does not leak external guard');
 
 $baOwn = invokeSurecHttp($pdo, $ba, 'GET', '/surecler/100');
 surecAssert($baOwn['status'] === 200, 'HTTP BA own sube detail → 200');
@@ -312,7 +312,7 @@ $externalOwnUpdate = invokeSurecHttp($pdo, $gy, 'PUT', '/surecler/104', [
     'aciklama' => 'blocked external',
 ]);
 surecAssert($externalOwnUpdate['status'] === 409, 'HTTP authorized external surec update → 409');
-surecAssert(($externalOwnUpdate['payload']['errors'][0]['code'] ?? '') === 'PERSONEL_OPERASYON_KAPSAM_DISI', 'HTTP authorized external surec update scope code');
+surecAssert(($externalOwnUpdate['payload']['errors'][0]['code'] ?? '') === 'PERSONEL_OPERASYON_ORG_SCOPE_YOK', 'HTTP authorized external surec update scope code');
 
 $baUpdate = invokeSurecHttp($pdo, $ba, 'PUT', '/surecler/100', [
     'surec_turu' => 'IZIN',

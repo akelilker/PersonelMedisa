@@ -497,13 +497,13 @@ try {
     $disResult = PersonelAccountOnboardingService::onboardAndIssue($pdo, 11, $actor);
     psoAssert(($disResult['user']['username'] ?? '') === 'yeniD', 'DIS_KAYNAK username from names');
     $caps = PersonelMobileCapabilityService::resolve($pdo, 11);
-    psoAssert($caps['qr_scan'] === false, 'DIS_KAYNAK qr_scan disabled');
-    psoAssert($caps['attendance_correct'] === false, 'DIS_KAYNAK attendance_correct disabled');
+    psoAssert($caps['qr_scan'] === true, 'DIS_KAYNAK qr_scan enabled');
+    psoAssert($caps['attendance_correct'] === true, 'DIS_KAYNAK attendance_correct enabled');
     psoAssert($caps['puantaj_write'] === false, 'DIS_KAYNAK puantaj_write disabled');
     psoAssert($caps['izin_write'] === false, 'DIS_KAYNAK izin_write disabled');
     psoAssert(
-        $caps['coming_soon_message'] === PersonelMobileCapabilityService::MESSAGE_COMING_SOON,
-        'DIS_KAYNAK guarded message exact'
+        $caps['coming_soon_message'] === null,
+        'DIS_KAYNAK no blanket coming-soon'
     );
 
     // Failed activation (weak password) leaves hash unchanged
@@ -680,10 +680,10 @@ try {
 
     // Post-activation DIS_KAYNAK capability still denied
     $capsAfter = PersonelMobileCapabilityService::resolve($pdo, 11);
-    psoAssert($capsAfter['qr_scan'] === false, 'post-activation DIS_KAYNAK qr_scan still denied');
+    psoAssert($capsAfter['qr_scan'] === true, 'post-activation DIS_KAYNAK qr_scan enabled');
     psoAssert(
-        $capsAfter['coming_soon_message'] === PersonelMobileCapabilityService::MESSAGE_COMING_SOON,
-        'post-activation DIS_KAYNAK guarded message exact'
+        $capsAfter['coming_soon_message'] === null,
+        'post-activation DIS_KAYNAK no blanket coming-soon'
     );
 
     // Sicil change must NOT rename username

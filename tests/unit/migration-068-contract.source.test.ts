@@ -8,7 +8,7 @@ const migrationNames = readdirSync(migrationDirectory)
 const migrationNumbers = migrationNames.map((name) => Number.parseInt(name.slice(0, 3), 10));
 
 describe("migration 068 actor identity audit contract", () => {
-  it("keeps a unique, numeric, ordered migration chain including 068→075 by name", () => {
+  it("keeps a unique, numeric, ordered migration chain including 068→076 by name", () => {
     expect(new Set(migrationNumbers).size).toBe(migrationNumbers.length);
     expect(migrationNumbers).toEqual([...migrationNumbers].sort((a, b) => a - b));
 
@@ -21,6 +21,7 @@ describe("migration 068 actor identity audit contract", () => {
       "073_test_fixture_personel_archive.sql",
       "074_qr_attendance_correction_and_inbox.sql",
       "075_personel_account_activation.sql",
+      "076_dis_kaynak_gecici_gorevlendirme.sql",
     ];
     for (const name of tail) {
       expect(migrationNames).toContain(name);

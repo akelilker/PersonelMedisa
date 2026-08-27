@@ -16,6 +16,8 @@ use Medisa\Api\Services\Personel\PersonelCalisanKapsamService;
 use Medisa\Api\Services\Personel\PersonelCanonicalValidator;
 use Medisa\Api\Services\Personel\PersonelCompletenessService;
 use Medisa\Api\Services\Personel\PersonelCreateService;
+use Medisa\Api\Services\Personel\PersonelGeciciGorevlendirmeService;
+use Medisa\Api\Services\Personel\PersonelOperationalContextService;
 use Medisa\Api\Services\Personel\PersonelImportApplyService;
 use Medisa\Api\Services\Personel\PersonelImportDryRunService;
 use Medisa\Api\Services\Personel\PersonelImportException;
@@ -1332,7 +1334,9 @@ class PersonellerController
             'soyad' => $row['soyad'] !== null && $row['soyad'] !== '' ? (string) $row['soyad'] : null,
             'aktif_durum' => (string) $row['aktif_durum'],
             'calisan_kapsami' => PersonelCalisanKapsamService::resolveFromRow($row),
-            'sube_id' => (int) $row['sube_id'],
+            'sube_id' => $row['sube_id'] !== null && (int) $row['sube_id'] > 0
+                ? (int) $row['sube_id']
+                : null,
             'sgk_isveren_id' => array_key_exists('sgk_isveren_id', $row) && $row['sgk_isveren_id'] !== null
                 ? (int) $row['sgk_isveren_id']
                 : null,
@@ -1415,7 +1419,91 @@ class PersonellerController
             (bool) $includeCompletenessFields
         );
 
+        try {
+            $pdo = Connection::get();
+            $opCtx = PersonelOperationalContextService::resolve($pdo, (int) $mapped['id']);
+            $mapped['org_status'] = $opCtx['org_status'];
+            $mapped['operational_context'] = [
+                'has_operational_scope' => $opCtx['has_operational_scope'],
+                'source' => $opCtx['source'],
+                'effective' => $opCtx['effective'],
+                'active_assignment_id' => isset($opCtx['active_assignment']['id'])
+                    ? (int) $opCtx['active_assignment']['id']
+                    : null,
+            ];
+            if ($mapped['calisan_kapsami'] === PersonelCalisanKapsamService::DIS_KAYNAK) {
+                $mapped['info_only_notice'] =
+                    'DIŞ KAYNAK — BİLGİ AMAÇLIDIR / ÜCRET VE SGK TAHAKKUKU OLUŞTURMAZ';
+            }
+        } catch (\Throwable $e) {
+            $mapped['org_status'] = PersonelOperationalContextService::ORG_BAGLANTISIZ;
+        }
+
         return $mapped;
+    }
+
+    public static function listGeciciGorevlendirmeler(Request $request, $personelId)
+    {
+        $user = AuthMiddleware::authenticate($request, true);
+        RolePermissions::assert($user, 'personeller.detail.view');
+        $pdo = Connection::get();
+        $personelId = (int) $personelId;
+        $stmt = $pdo->prepare('SELECT id, sube_id, bolum_id, birim_id, aktif_durum FROM personeller WHERE id = :id LIMIT 1');
+        $stmt->execute(['id' => $personelId]);
+        $exists = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$exists) {
+            JsonResponse::notFound();
+        }
+        SubeScope::assertPersonelAccess($user, $request, $exists);
+        $rows = PersonelGeciciGorevlendirmeService::listHistory($pdo, $personelId);
+        JsonResponse::success(['items' => $rows]);
+    }
+
+    public static function createGeciciGorevlendirme(Request $request, $personelId)
+    {
+        $user = AuthMiddleware::authenticate($request, true);
+        $pdo = Connection::get();
+        $body = $request->getJsonBody();
+        if (!is_array($body)) {
+            $body = [];
+        }
+        $body['personel_id'] = (int) $personelId;
+        try {
+            $row = PersonelGeciciGorevlendirmeService::create($pdo, $user, $body);
+            JsonResponse::success(['item' => $row], [], 201);
+        } catch (PersonelValidationException $e) {
+            JsonResponse::error(409, $e->getCodeString() ?: 'VALIDATION_ERROR', $e->getMessage(), $e->getField());
+        }
+    }
+
+    public static function endGeciciGorevlendirme(Request $request, $personelId, $assignmentId)
+    {
+        $user = AuthMiddleware::authenticate($request, true);
+        $pdo = Connection::get();
+        $body = $request->getJsonBody();
+        $endedAt = is_array($body) ? ($body['bitis_at'] ?? $body['ended_at'] ?? null) : null;
+        try {
+            $row = PersonelGeciciGorevlendirmeService::end($pdo, $user, $assignmentId, $endedAt);
+            JsonResponse::success(['item' => $row]);
+        } catch (PersonelValidationException $e) {
+            JsonResponse::error(409, $e->getCodeString() ?: 'VALIDATION_ERROR', $e->getMessage(), $e->getField());
+        }
+    }
+
+    public static function listDisKaynakAssignablePool(Request $request)
+    {
+        $user = AuthMiddleware::authenticate($request, true);
+        $pdo = Connection::get();
+        $items = PersonelGeciciGorevlendirmeService::listAssignablePoolForBolumManager($pdo, $user);
+        JsonResponse::success(['items' => $items]);
+    }
+
+    public static function listDisKaynakUnassignedPool(Request $request)
+    {
+        $user = AuthMiddleware::authenticate($request, true);
+        $pdo = Connection::get();
+        $items = PersonelGeciciGorevlendirmeService::listUnassignedDisPool($pdo, $user);
+        JsonResponse::success(['items' => $items]);
     }
 
     /** @param array<string, mixed> $body */

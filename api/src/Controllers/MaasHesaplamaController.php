@@ -398,7 +398,7 @@ class MaasHesaplamaController
             self::validationError('personel_id', 'personel_id ve sube_id zorunludur.');
         }
         self::assertSnapshotScope($user, $request, $subeId);
-        \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::assertOperationalEligible(
+        \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::assertFinancialEligible(
             $pdo,
             $personelId
         );

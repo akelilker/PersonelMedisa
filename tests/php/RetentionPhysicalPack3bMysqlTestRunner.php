@@ -133,7 +133,8 @@ function p3bMigrationFiles(): array
             && $name !== '072_org_reference_short_codes.sql'
             && $name !== '073_test_fixture_personel_archive.sql'
             && $name !== '074_qr_attendance_correction_and_inbox.sql'
-            && $name !== '075_personel_account_activation.sql';
+            && $name !== '075_personel_account_activation.sql'
+            && $name !== '076_dis_kaynak_gecici_gorevlendirme.sql';
     }));
     sort($files, SORT_STRING);
 

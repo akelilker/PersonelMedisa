@@ -19,7 +19,7 @@ final class SgkPrimGunuService
     public static function calculateResolution(PDO $pdo, array $resolution)
     {
         foreach (array_keys($resolution['personeller'] ?? []) as $pid) {
-            \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::assertOperationalEligible($pdo, $pid);
+            \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::assertFinancialEligible($pdo, $pid);
         }
         $periodStart = (string) $resolution['donem_baslangic'];
         $periodEnd = (string) $resolution['donem_bitis'];

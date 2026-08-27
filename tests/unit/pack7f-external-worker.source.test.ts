@@ -7,14 +7,17 @@ function read(path: string) {
 }
 
 describe("Pack7F external worker source locks", () => {
-  it("owns schema compatibility and directory-only policy centrally", () => {
+  it("owns schema compatibility and operational/financial split centrally", () => {
     const schema = read("api/src/Services/Personel/PersonelCalisanKapsamSchema.php");
     const service = read("api/src/Services/Personel/PersonelCalisanKapsamService.php");
     expect(schema).toContain("SCHEMA_NOT_READY");
     expect(schema).toContain("assertReadyForDisKaynakWrite");
     expect(service).toContain("PERSONEL_OPERASYON_KAPSAM_DISI");
+    expect(service).toContain("PERSONEL_FINANSAL_KAPSAM_DISI");
     expect(service).toContain("sqlIcPersonelPredicate");
     expect(service).toContain("assertOperationalEligible");
+    expect(service).toContain("assertTimeOperationalEligible");
+    expect(service).toContain("assertFinancialEligible");
     expect(service).toContain("DIS_KAYNAK_SGK_ISVEREN_YASAK");
   });
 
@@ -26,19 +29,24 @@ describe("Pack7F external worker source locks", () => {
       "api/src/Services/SgkPrimGunuService.php",
       "api/src/Controllers/HaftalikKapanisController.php"
     ].map(read).join("\n");
-    expect(files.match(/sqlIcPersonelPredicate/g)?.length ?? 0).toBeGreaterThanOrEqual(6);
+    expect(files.match(/sqlIcPersonelPredicate|sqlFinancialEligiblePredicate|sqlTimeOperationalEligiblePredicate/g)?.length ?? 0).toBeGreaterThanOrEqual(6);
 
     for (const path of [
       "api/src/Services/Qr/QrAttendanceEventService.php",
       "api/src/Controllers/PuantajController.php",
       "api/src/Controllers/BildirimlerController.php",
-      "api/src/Controllers/SureclerController.php",
+      "api/src/Controllers/SureclerController.php"
+    ]) {
+      expect(read(path), path).toContain("assertTimeOperationalEligible");
+    }
+    for (const path of [
       "api/src/Controllers/FazlaCalismaOdemeTercihiController.php",
       "api/src/Controllers/SerbestZamanController.php",
       "api/src/Services/PersonelUcretService.php",
-      "api/src/Controllers/MaasHesaplamaController.php"
+      "api/src/Controllers/MaasHesaplamaController.php",
+      "api/src/Services/SgkPrimGunuService.php"
     ]) {
-      expect(read(path), path).toContain("assertOperationalEligible");
+      expect(read(path), path).toContain("assertFinancialEligible");
     }
 
     for (const path of [
@@ -46,7 +54,11 @@ describe("Pack7F external worker source locks", () => {
       "api/src/Services/PuantajDonemReopenService.php",
       "api/src/Services/DonemKapanisPreflightService.php"
     ]) {
-      expect(read(path), path).toContain("sqlIcPersonelPredicate");
+      const src = read(path);
+      expect(
+        src.includes("sqlIcPersonelPredicate") || src.includes("sqlTimeOperationalEligiblePredicate") || src.includes("sqlFinancialEligiblePredicate"),
+        path
+      ).toBe(true);
     }
     for (const path of [
       "api/src/Services/BordroOnIzlemeService.php",
@@ -74,7 +86,7 @@ describe("Pack7F external worker source locks", () => {
     expect(page).toContain("Çalışan Kapsamı");
     expect(page).toContain("formatCalisanKapsamiLabel");
     expect(page).toContain("formatPersonelName");
-    expect(detailPage).toContain("directoryOnly={isDirectoryOnly}");
+    expect(detailPage).toContain("directoryOnly={isDisKaynak}");
     expect(surecWorkspace).toContain("isSelectedPersonelDirectoryOnly");
     expect(controller).toContain("SubeScope::");
   });

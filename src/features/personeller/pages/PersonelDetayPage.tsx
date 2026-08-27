@@ -67,13 +67,13 @@ export function PersonelDetayPage() {
   } = detail;
 
   const isArchived = personel?.aktif_durum === "PASIF" || personel?.arsiv_modu === true;
-  const isDirectoryOnly = personel?.calisan_kapsami === "DIS_KAYNAK";
-  const effectiveActiveTab = isDirectoryOnly && activeTab !== "genel-bilgiler" && activeTab !== "egitim-belgeler"
-    ? "genel-bilgiler"
-    : activeTab;
-  const canCreateSurecEffective = Boolean(canCreateSurec && !isArchived && !isDirectoryOnly);
+  const isDisKaynak = personel?.calisan_kapsami === "DIS_KAYNAK";
+  // Finansal sekmeler DIS için kapalı; operasyonel görünüm (puantaj bilgi) açılabilir.
+  const isFinancialBlocked = isDisKaynak;
+  const effectiveActiveTab = activeTab;
+  const canCreateSurecEffective = Boolean(canCreateSurec && !isArchived && !isDisKaynak);
   const canAccessSureclerEffective = Boolean(
-    !isArchived && !isDirectoryOnly && (canCreateSurecEffective || canViewSurecler)
+    !isArchived && !isDisKaynak && (canCreateSurecEffective || canViewSurecler)
   );
 
   const { handleOpenSurecModal, handleOpenMissingInfo } = usePersonelKartGatewayReturn({
@@ -134,7 +134,7 @@ export function PersonelDetayPage() {
             onOpenMissingInfo={canUpdatePersonel && !isArchived ? handleOpenMissingInfo : undefined}
           />
 
-          {!isArchived && !isDirectoryOnly ? (
+          {!isArchived && !isDisKaynak ? (
             <PersonelDosyaActionRow
               canAccessSurecler={canAccessSureclerEffective}
               canCreateSurec={canCreateSurecEffective}
@@ -158,20 +158,20 @@ export function PersonelDetayPage() {
             surecHistoryErrorMessage={surecHistoryErrorMessage}
             isZimmetHistoryLoading={isZimmetHistoryLoading}
             zimmetHistoryErrorMessage={zimmetHistoryErrorMessage}
-            canViewPuantaj={canViewPuantaj && !isArchived && !isDirectoryOnly}
-            canViewRevizyon={canViewRevizyon && !isArchived && !isDirectoryOnly}
+            canViewPuantaj={canViewPuantaj && !isArchived}
+            canViewRevizyon={canViewRevizyon && !isArchived}
             canCreateRevizyon={false}
             canCreateZimmet={false}
             canAccessSurecler={canAccessSureclerEffective || (isArchived && canViewSurecler)}
-            canViewFinans={canViewFinans && !isArchived && !isDirectoryOnly}
-            canViewBordro={canViewBordro && !isArchived && !isDirectoryOnly}
-            canViewUcret={canViewUcret && !isDirectoryOnly}
+            canViewFinans={canViewFinans && !isArchived && !isFinancialBlocked}
+            canViewBordro={canViewBordro && !isArchived && !isFinancialBlocked}
+            canViewUcret={canViewUcret && !isFinancialBlocked}
             canManageUcret={false}
-            canViewBordroKapsam={canViewBordroKapsam && !isArchived && !isDirectoryOnly}
+            canViewBordroKapsam={canViewBordroKapsam && !isArchived && !isFinancialBlocked}
             canManageBordroKapsam={false}
             canApproveBordroKapsam={false}
-            canManageAccountOnboarding={canManageAccountOnboarding && !isArchived && !isDirectoryOnly}
-            directoryOnly={isDirectoryOnly}
+            canManageAccountOnboarding={canManageAccountOnboarding && !isArchived}
+            directoryOnly={isDisKaynak}
           />
         </div>
       ) : null}

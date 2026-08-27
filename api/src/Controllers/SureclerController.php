@@ -133,7 +133,7 @@ class SureclerController
         }
         // Authorize branch access before applying operational (external) guards.
         SubeScope::assertPersonelAccess($user, $request, $personel);
-        \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::assertOperationalEligible(
+        \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::assertTimeOperationalEligible(
             $pdo,
             $payload['personel_id']
         );
@@ -299,7 +299,7 @@ class SureclerController
         }
 
         SubeScope::assertPersonelAccess($user, $request, self::personelOrgFromSurecRow($existing));
-        \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::assertOperationalEligible(
+        \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::assertTimeOperationalEligible(
             $pdo,
             (int) $existing['personel_id']
         );

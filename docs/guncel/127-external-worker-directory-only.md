@@ -1,18 +1,22 @@
 # 127 — Dış Kaynak Çalışan / Directory-Only (Pack7F)
 
+> **SUPERSEDED (2026-08-27):** Bu dokümandaki "DIS_KAYNAK SGK, bordro ve **zaman** operasyonlarına girmez" kararı bayattır.
+> Yeni canonical model: `docs/guncel/130-dis-kaynak-operasyonel-finansal-ayrim.md`
+> Özet: DIS finansal/SGK dışında kalır; zaman/QR/puantaj operasyonları (org veya geçici görevlendirme ile) açılabilir. Rol ve org bağlantısı `calisan_kapsami`'ndan bağımsızdır.
+
 **Tarih:** 2026-08-14
 **Branch:** `feat/pack7f-external-worker-scope`
 **Production migration tip:** `065` (değişmedi)
 **Pack7F migration:** `066_personel_calisan_kapsami.sql` (yalnız kod; production'a uygulanmadı)
 
-## Karar
+## Karar (tarihsel — kısmen superseded)
 
 `personeller.calisan_kapsami`, çalışanın SGK/bordro sorumluluğunun PersonelMedisa'ya ait olup olmadığını belirleyen ayrı ve birinci sınıf boyuttur:
 
 - `IC_PERSONEL`: mevcut iç personel davranışı.
-- `DIS_KAYNAK`: personel dizininde görünür; SGK, bordro ve zaman operasyonlarına girmez.
+- `DIS_KAYNAK`: ~~personel dizininde görünür; SGK, bordro ve zaman operasyonlarına girmez.~~ → **SGK/gerçek bordro dışında; zaman operasyonu için bkz. 130.**
 
-Bu alan şube yetkilendirmesinin veya mevcut `personel_bordro_kapsamlari.DAHIL/HARIC` modelinin yerine geçmez. Yetki sahibi yine `personeller.sube_id` + `SubeScope`; `HARIC` modeli değişmeden korunur.
+Bu alan şube yetkilendirmesinin veya mevcut `personel_bordro_kapsamlari.DAHIL/HARIC` modelinin yerine geçmez. Yetki sahibi yine `RolePermissions` + `OrgScope` / `SubeScope`; `HARIC` modeli değişmeden korunur.
 
 ## Şema ve 065 uyumluluğu
 

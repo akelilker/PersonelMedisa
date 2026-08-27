@@ -24,8 +24,11 @@ export type Personel = {
   soyad: string | null;
   aktif_durum: PersonelAktifDurum;
   calisan_kapsami?: PersonelCalisanKapsami;
+  /** BAGLANTISIZ | KALICI_ORGANIZASYON | AKTIF_GECICI_GOREVLENDIRME */
+  org_status?: string;
+  info_only_notice?: string | null;
   completeness?: PersonelCompleteness;
-  sube_id?: number;
+  sube_id?: number | null;
   telefon?: string | null;
   dogum_tarihi?: string | null;
   sicil_no?: string;

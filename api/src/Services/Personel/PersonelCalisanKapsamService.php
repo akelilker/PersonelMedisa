@@ -8,16 +8,23 @@ use Medisa\Api\Http\JsonResponse;
 use PDO;
 
 /**
- * Pack7F first-class workforce ownership owner.
- * IC_PERSONEL = MEDISA SGK/payroll. DIS_KAYNAK = directory-only.
- * Independent of personel_bordro_kapsamlari HARIC.
+ * Çalışan kapsamı owner'ı.
+ *
+ * calisan_kapsami = işveren finansal/SGK yükümlülüğü sınırı (IC vs DIS).
+ * Rol ve organizasyon bağlantısından bağımsızdır.
+ *
+ * A) Zaman/operasyon: DIS dahil olabilir (org veya aktif görevlendirme gerekir).
+ * B) Finansal/işveren: yalnız IC_PERSONEL.
  */
 final class PersonelCalisanKapsamService
 {
     public const IC_PERSONEL = 'IC_PERSONEL';
     public const DIS_KAYNAK = 'DIS_KAYNAK';
 
+    /** @deprecated Finansal fail-closed için ERROR_FINANSAL tercih edilir; geriye uyum. */
     public const ERROR_OPERASYON = 'PERSONEL_OPERASYON_KAPSAM_DISI';
+    public const ERROR_FINANSAL = 'PERSONEL_FINANSAL_KAPSAM_DISI';
+    public const ERROR_ORG_SCOPE = 'PERSONEL_OPERASYON_ORG_SCOPE_YOK';
     public const ERROR_SGK_YASAK = 'DIS_KAYNAK_SGK_ISVEREN_YASAK';
     public const ERROR_SCHEMA = PersonelCalisanKapsamSchema::ERROR_CODE;
 
@@ -107,9 +114,18 @@ final class PersonelCalisanKapsamService
     }
 
     /**
-     * SQL fragment: keep only IC_PERSONEL. 065 (column missing) → no extra predicate.
+     * SQL fragment: keep only IC_PERSONEL (finansal/SGK/gerçek bordro adayları).
+     * 065 (column missing) → no extra predicate.
      */
     public static function sqlIcPersonelPredicate(PDO $pdo, $alias = 'p'): string
+    {
+        return self::sqlFinancialEligiblePredicate($pdo, $alias);
+    }
+
+    /**
+     * Finansal/işveren kapsamı SQL predicate — DIS kesin dışarıda.
+     */
+    public static function sqlFinancialEligiblePredicate(PDO $pdo, $alias = 'p'): string
     {
         if (!PersonelCalisanKapsamSchema::isReady($pdo)) {
             return '1=1';
@@ -122,29 +138,102 @@ final class PersonelCalisanKapsamService
         return $safe . ".calisan_kapsami = 'IC_PERSONEL'";
     }
 
-    public static function assertOperationalEligible(PDO $pdo, $personelId): void
+    /**
+     * Zaman/operasyon SQL: IC + DIS (kapsam filtresi yok). Schema yoksa 1=1.
+     * Org/görevlendirme kapsamı ayrı owner'da uygulanır.
+     */
+    public static function sqlTimeOperationalEligiblePredicate(PDO $pdo, $alias = 'p'): string
+    {
+        unset($pdo, $alias);
+
+        return '1=1';
+    }
+
+    /**
+     * Zaman/QR/puantaj operasyonları — DIS org veya aktif görevlendirme ile dahil.
+     * Finansal side-effect üretmez; org scope yoksa fail-closed.
+     */
+    public static function assertTimeOperationalEligible(PDO $pdo, $personelId): void
+    {
+        $personelId = (int) $personelId;
+        if ($personelId <= 0) {
+            JsonResponse::error(400, 'PERSONEL_ID_INVALID', 'Gecersiz personel.', 'personel_id');
+        }
+        if (!self::isDisKaynak($pdo, $personelId)) {
+            return;
+        }
+        $ctx = PersonelOperationalContextService::resolve($pdo, $personelId);
+        if ($ctx['has_operational_scope']) {
+            return;
+        }
+        JsonResponse::error(
+            409,
+            self::ERROR_ORG_SCOPE,
+            'DIS_KAYNAK personeli icin kalici org baglantisi veya aktif gecici gorevlendirme gerekir.',
+            'personel_id'
+        );
+    }
+
+    public static function assertTimeOperationalEligibleOrThrow(PDO $pdo, $personelId): void
+    {
+        $personelId = (int) $personelId;
+        if ($personelId <= 0) {
+            throw new PersonelValidationException('personel_id', 'Gecersiz personel.');
+        }
+        if (!self::isDisKaynak($pdo, $personelId)) {
+            return;
+        }
+        $ctx = PersonelOperationalContextService::resolve($pdo, $personelId);
+        if ($ctx['has_operational_scope']) {
+            return;
+        }
+        throw new PersonelValidationException(
+            'personel_id',
+            'DIS_KAYNAK personeli icin kalici org baglantisi veya aktif gecici gorevlendirme gerekir.',
+            self::ERROR_ORG_SCOPE
+        );
+    }
+
+    /**
+     * Gerçek ücret / SGK / bordro / banka — DIS kesin dışarıda.
+     */
+    public static function assertFinancialEligible(PDO $pdo, $personelId): void
     {
         if (!self::isDisKaynak($pdo, $personelId)) {
             return;
         }
         JsonResponse::error(
             409,
-            self::ERROR_OPERASYON,
-            'Bu personel dizin kaydidir (DIS_KAYNAK); operasyonel islem yapilamaz.',
+            self::ERROR_FINANSAL,
+            'Bu personel DIS_KAYNAK kapsamindadir; ucret/SGK/gercek bordro islemi yapilamaz.',
             'personel_id'
         );
     }
 
-    public static function assertOperationalEligibleOrThrow(PDO $pdo, $personelId): void
+    public static function assertFinancialEligibleOrThrow(PDO $pdo, $personelId): void
     {
         if (!self::isDisKaynak($pdo, $personelId)) {
             return;
         }
         throw new PersonelValidationException(
             'personel_id',
-            'Bu personel dizin kaydidir (DIS_KAYNAK); operasyonel islem yapilamaz.',
-            self::ERROR_OPERASYON
+            'Bu personel DIS_KAYNAK kapsamindadir; ucret/SGK/gercek bordro islemi yapilamaz.',
+            self::ERROR_FINANSAL
         );
+    }
+
+    /**
+     * Geriye uyum: eski tek guard artık zaman/operasyon semantiğine yönlenir.
+     * Finansal caller'lar assertFinancialEligible kullanmalıdır.
+     */
+    public static function assertOperationalEligible(PDO $pdo, $personelId): void
+    {
+        self::assertTimeOperationalEligible($pdo, $personelId);
+    }
+
+    public static function assertOperationalEligibleOrThrow(PDO $pdo, $personelId): void
+    {
+        self::assertTimeOperationalEligibleOrThrow($pdo, $personelId);
     }
 
     /**

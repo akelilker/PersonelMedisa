@@ -1109,7 +1109,7 @@ $externalPut = invokeFcotHttp($pdo, $gy, 'PUT', '/fazla-calisma-odeme-tercihi', 
     'odeme_tipi' => 'KARAR_BEKLIYOR',
 ], $subeHeader);
 fcotAssert($externalPut['status'] === 409, 'Pack7F FM external PUT → 409');
-fcotAssert(($externalPut['payload']['errors'][0]['code'] ?? '') === 'PERSONEL_OPERASYON_KAPSAM_DISI', 'Pack7F FM external PUT scope code');
+fcotAssert(($externalPut['payload']['errors'][0]['code'] ?? '') === 'PERSONEL_FINANSAL_KAPSAM_DISI', 'Pack7F FM external PUT scope code');
 $afterExternalPut = $pdo->query('SELECT odeme_tipi, gerekce FROM fazla_calisma_odeme_tercihleri WHERE id = ' . $histTercihId)->fetch(PDO::FETCH_ASSOC);
 fcotAssert($beforeExternalPut == $afterExternalPut, 'Pack7F FM external PUT does not mutate preference');
 
@@ -1118,13 +1118,13 @@ $wrongBranchGet = invokeFcotHttp($pdo, $ba, 'GET', '/fazla-calisma-odeme-tercihi
     'snapshot_id' => (string) $snapshotOut,
 ]);
 fcotAssert($wrongBranchGet['status'] === 403, 'Pack7F FM wrong-branch GET → 403');
-fcotAssert(($wrongBranchGet['payload']['errors'][0]['code'] ?? '') !== 'PERSONEL_OPERASYON_KAPSAM_DISI', 'Pack7F FM wrong-branch GET no scope leak');
+fcotAssert(($wrongBranchGet['payload']['errors'][0]['code'] ?? '') !== 'PERSONEL_FINANSAL_KAPSAM_DISI', 'Pack7F FM wrong-branch GET no scope leak');
 $wrongBranchPut = invokeFcotHttp($pdo, $bolum, 'PUT', '/fazla-calisma-odeme-tercihi', [
     'snapshot_id' => $snapshotOut,
     'odeme_tipi' => 'UCRET',
 ], $subeHeader);
 fcotAssert($wrongBranchPut['status'] === 403, 'Pack7F FM wrong-branch PUT → 403');
-fcotAssert(($wrongBranchPut['payload']['errors'][0]['code'] ?? '') !== 'PERSONEL_OPERASYON_KAPSAM_DISI', 'Pack7F FM wrong-branch PUT no scope leak');
+fcotAssert(($wrongBranchPut['payload']['errors'][0]['code'] ?? '') !== 'PERSONEL_FINANSAL_KAPSAM_DISI', 'Pack7F FM wrong-branch PUT no scope leak');
 
 $fk = $pdo->query("
     SELECT DELETE_RULE FROM information_schema.REFERENTIAL_CONSTRAINTS

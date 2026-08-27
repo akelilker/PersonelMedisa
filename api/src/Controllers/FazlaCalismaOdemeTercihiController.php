@@ -112,7 +112,7 @@ class FazlaCalismaOdemeTercihiController
         }
         // Authorize snapshot/branch before operational guard.
         self::assertSnapshotScope($user, $request, $satirProbe);
-        \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::assertOperationalEligible(
+        \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::assertFinancialEligible(
             $pdo,
             (int) $satirProbe['personel_id']
         );
@@ -134,7 +134,7 @@ class FazlaCalismaOdemeTercihiController
 
             $subeId = (int) $satir['sube_id'];
             $personelId = (int) $satir['personel_id'];
-            \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::assertOperationalEligible($pdo, $personelId);
+            \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::assertFinancialEligible($pdo, $personelId);
             $fazlaDk = (int) $satir['fazla_calisma_dakika'];
             $haftaBaslangic = (string) $satir['hafta_baslangic'];
             $haftaBitis = (string) $satir['hafta_bitis'];

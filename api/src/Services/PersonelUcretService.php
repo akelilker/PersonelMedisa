@@ -140,7 +140,7 @@ class PersonelUcretService
                 throw new PersonelUcretException('SALARY_RECORD_NOT_FOUND', 'Personel bulunamadi.', 404);
             }
             try {
-                \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::assertOperationalEligibleOrThrow(
+                \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::assertFinancialEligibleOrThrow(
                     $pdo,
                     $personelId
                 );
@@ -412,7 +412,7 @@ class PersonelUcretService
     private static function assertPersonelOperationalEligible(PDO $pdo, int $personelId): void
     {
         try {
-            \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::assertOperationalEligibleOrThrow(
+            \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::assertFinancialEligibleOrThrow(
                 $pdo,
                 $personelId
             );

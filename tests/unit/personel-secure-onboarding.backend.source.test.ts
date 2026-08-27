@@ -7,7 +7,7 @@ function read(path: string): string {
 }
 
 describe("personel secure onboarding backend source contracts", () => {
-  it("adds migration 075 as tip after 074 with safe defaults and no seeds", () => {
+  it("adds migration 075 as tip after 074 with safe defaults and no username rewrite", () => {
     const migrations = readdirSync(resolve("api/migrations"))
       .filter((f) => /^\d+_.*\.sql$/.test(f))
       .sort();
@@ -15,11 +15,12 @@ describe("personel secure onboarding backend source contracts", () => {
     const sql = read("api/migrations/075_personel_account_activation.sql");
     expect(sql).toContain("activation_required");
     expect(sql).toContain("activated_at_utc");
-    expect(sql).toContain("username_source");
-    expect(sql).toContain("SICIL_CANONICAL");
     expect(sql).toContain("personel_account_activation_invitations");
     expect(sql).toContain("token_hash");
     expect(sql).toContain("personel_account_onboarding_audit");
+    expect(sql).not.toContain("username_source");
+    expect(sql).not.toContain("SICIL_CANONICAL");
+    expect(sql).not.toMatch(/UPDATE\s+users\s+SET\s+username/i);
     expect(sql).not.toMatch(/INSERT\s+INTO\s+users/i);
     expect(sql).not.toMatch(/INSERT\s+INTO\s+personel_account_activation/i);
   });
@@ -46,10 +47,15 @@ describe("personel secure onboarding backend source contracts", () => {
     const service = read("api/src/Services/Auth/PersonelAccountOnboardingService.php");
     expect(yonetim).toContain("rejectGenericPersonelBoundCreate");
     expect(service).toContain("PERSONEL_USE_SECURE_ONBOARDING");
-    expect(service).toContain("PERSONEL_SICIL_REQUIRED_FOR_ACCOUNT");
-    expect(service).toContain("PERSONEL_SICIL_USERNAME_COLLISION");
+    expect(service).toContain("PERSONEL_NAME_REQUIRED_FOR_ACCOUNT");
+    expect(service).toContain("PERSONEL_USERNAME_COLLISION");
     expect(service).toContain("ALREADY_PROVISIONED");
-    expect(service).toContain("SICIL_CANONICAL");
+    expect(service).toContain("buildPersonelUsernameFromNames");
+    expect(service).not.toContain("SICIL_CANONICAL");
+    expect(service).not.toContain("PERSONEL_SICIL_REQUIRED_FOR_ACCOUNT");
+    expect(service).not.toContain("PERSONEL_SICIL_USERNAME_COLLISION");
+    expect(service).not.toContain("syncUsernameFromSicilIfApplicable");
+    expect(service).not.toContain("username_source");
     expect(service).toContain("generateActivationToken");
     expect(service).toContain("random_bytes(32)");
     expect(service).toContain("hash('sha256'");
@@ -67,7 +73,6 @@ describe("personel secure onboarding backend source contracts", () => {
     expect(policy).toContain("MIN_LENGTH = 8");
     expect(change).toContain("PasswordPolicy::assertValidNewPassword");
     expect(activation).toContain("completeActivation");
-    // Reject client identity selectors — never accept as trusted identity
     expect(activation).toContain("array_key_exists('user_id'");
     expect(activation).toContain("array_key_exists('personel_id'");
     expect(activation).toContain("array_key_exists('username'");
@@ -88,6 +93,11 @@ describe("personel secure onboarding backend source contracts", () => {
     const example = read("api/src/Config/config.example.php");
     expect(example).toContain("'app_public_url'");
     expect(example).toContain("'personel_activation_ttl_minutes' => 1440");
+  });
+
+  it("personel update does not sync username from sicil", () => {
+    const controller = read("api/src/Controllers/PersonellerController.php");
+    expect(controller).not.toContain("syncUsernameFromSicilIfApplicable");
   });
 
   it("security scan: no unsafe token patterns in intended owners", () => {

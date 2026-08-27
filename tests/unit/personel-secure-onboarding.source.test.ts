@@ -52,14 +52,19 @@ describe("personel secure onboarding frontend contracts", () => {
     expect(page).not.toMatch(/\bamir\b/i);
     expect(panel).not.toMatch(/\bamir\b/i);
     expect(panel).toContain("Aktivasyon Bekliyor");
-    expect(panel).toContain("Personel şifresini aktivasyon bağlantısı üzerinden kendisi belirleyecektir.");
+    expect(panel).toContain(
+      "Hesap oluşturulduktan sonra personel kendi şifresini aktivasyon bağlantısı üzerinden"
+    );
   });
 
-  it("onboarding panel: sicil read-only, no password field, one-shot URL + copy", () => {
+  it("onboarding panel: önerilen kullanıcı adı, şifre yok, çakışmada düzenlenebilir", () => {
     const panel = read("src/features/yonetim/components/PersonelHesapOnboardingPanel.tsx");
     expect(panel).toContain("Personel Hesabı Oluştur");
-    expect(panel).toContain("readOnly");
-    expect(panel).toContain("Kullanıcı adı (sicil)");
+    expect(panel).toContain("buildPersonelUsernameFromNames");
+    expect(panel).toContain("PERSONEL_USERNAME_COLLISION");
+    expect(panel).toContain("readOnly={!usernameCollision}");
+    expect(panel).not.toContain("Kullanıcı adı (sicil)");
+    expect(panel).not.toContain("sicilNo");
     expect(panel).not.toMatch(/type=["']password["']/);
     expect(panel).toContain("yalnızca bir kez gösterilir");
     expect(panel).toContain("Bağlantıyı Kopyala");

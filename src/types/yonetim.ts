@@ -3,7 +3,6 @@ import type { UserRole } from "./auth";
 export type KullaniciTipi = "IC_PERSONEL" | "HARICI";
 export type KayitDurumu = "AKTIF" | "PASIF";
 export type PersonelActivationStatus = "PENDING" | "ACTIVE";
-export type UsernameSource = "SICIL_CANONICAL" | "MANUAL" | "SYSTEM" | string;
 
 export type YonetimKullanici = {
   id: number;
@@ -19,7 +18,6 @@ export type YonetimKullanici = {
   activation_required?: boolean;
   activation_status?: PersonelActivationStatus;
   activated_at_utc?: string | null;
-  username_source?: UsernameSource;
   sube_ids: number[];
   bolum_ids?: number[];
   birim_ids?: number[];
@@ -44,7 +42,6 @@ export type PersonelHesapOnboardingResult = {
     personel_id?: number | null;
     activation_required?: boolean;
     must_change_password?: boolean;
-    username_source?: UsernameSource;
     activated_at_utc?: string | null;
   };
   activation: PersonelActivationIssue;

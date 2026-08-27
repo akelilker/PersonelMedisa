@@ -28,7 +28,16 @@ class PersonelAccountOnboardingController
         }
 
         try {
-            $result = PersonelAccountOnboardingService::onboardAndIssue($pdo, (int) $personelId, $user);
+            $body = $request->getJsonBody();
+            $override = is_array($body) && array_key_exists('username', $body)
+                ? $body['username']
+                : null;
+            $result = PersonelAccountOnboardingService::onboardAndIssue(
+                $pdo,
+                (int) $personelId,
+                $user,
+                $override
+            );
         } catch (\Throwable $e) {
             JsonResponse::serverError('Personel hesabi olusturulamadi.');
         }

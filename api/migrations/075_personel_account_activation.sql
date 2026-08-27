@@ -1,6 +1,6 @@
 -- 075: Secure personnel account onboarding + one-time activation invitations.
 -- Additive only. No production seeds, no credential generation, no username/binding/role changes.
--- Existing users: activation_required DEFAULT 0, username_source DEFAULT 'MANUAL' (no backfill).
+-- Existing users: activation_required DEFAULT 0 (no backfill, no username rewrite).
 
 SET NAMES utf8mb4;
 SET time_zone = '+00:00';
@@ -31,21 +31,6 @@ SET @col_exists := (
 SET @sql := IF(
   @col_exists = 0,
   'ALTER TABLE users ADD COLUMN activated_at_utc DATETIME NULL DEFAULT NULL AFTER activation_required',
-  'SELECT 1'
-);
-PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
-
--- users.username_source — explicit ownership; existing rows stay MANUAL (no reinterpretation).
-SET @col_exists := (
-  SELECT COUNT(*)
-  FROM information_schema.COLUMNS
-  WHERE TABLE_SCHEMA = DATABASE()
-    AND TABLE_NAME = 'users'
-    AND COLUMN_NAME = 'username_source'
-);
-SET @sql := IF(
-  @col_exists = 0,
-  'ALTER TABLE users ADD COLUMN username_source ENUM(''SICIL_CANONICAL'', ''MANUAL'', ''SYSTEM'') NOT NULL DEFAULT ''MANUAL'' AFTER activated_at_utc',
   'SELECT 1'
 );
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;

@@ -1,61 +1,74 @@
-# Personel Secure Account Onboarding & Activation
+﻿# Personel GÃ¼venli Hesap AÃ§ma ve Aktivasyon
 
-**Status:** source-implemented / production-not-yet-applied  
-**Migration:** `075_personel_account_activation.sql`  
-**Owner service:** `PersonelAccountOnboardingService`
+**Durum:** kaynakta uygulandÄ± / canlÄ±ya henÃ¼z uygulanmadÄ±
+**Migration:** `075_personel_account_activation.sql`
+**Sahip servis:** `PersonelAccountOnboardingService`
 
-## Username policy
+## KullanÄ±cÄ± adÄ± kuralÄ±
 
-| Rule | Value |
+| Kural | DeÄŸer |
 |------|--------|
-| Canonical source | `personel.sicil_no` (trim) |
-| Missing sicil | fail closed `PERSONEL_SICIL_REQUIRED_FOR_ACCOUNT` |
-| Collision (other user) | fail closed `PERSONEL_SICIL_USERNAME_COLLISION` |
-| Same personnel already bound | `ALREADY_PROVISIONED` (no duplicate) |
-| Username source metadata | `users.username_source`: `SICIL_CANONICAL` \| `MANUAL` \| `SYSTEM` |
-| New onboarding accounts | `SICIL_CANONICAL` |
-| Existing accounts | default `MANUAL` — **no production backfill / reinterpretation** |
+| BiÃ§im | Ä°lk ad (kÃ¼Ã§Ã¼k Latin) + soyadÄ±n ilk harfi (bÃ¼yÃ¼k Latin) |
+| Ã–rnek | Ä°lker AKEL â†’ `ilkerA` |
+| Ã‡oklu ad | YalnÄ±z `ad` alanÄ±nÄ±n ilk kelimesi kullanÄ±lÄ±r (Mehmet Ali YILMAZ â†’ `mehmetY`) |
+| TÃ¼rkÃ§e karakter | Ã§/ÄŸ/Ä±/Ä°/Ã¶/ÅŸ/Ã¼ â†’ Latin eÅŸleri; boÅŸluk/nokta/tire temizlenir |
+| Sicil numarasÄ± | KullanÄ±cÄ± adÄ± **deÄŸildir** ve Ã¼retime katÄ±lmaz |
+| Sicil deÄŸiÅŸince | KullanÄ±cÄ± adÄ± **deÄŸiÅŸmez** |
+| Mevcut hesaplar | KullanÄ±cÄ± adlarÄ± **deÄŸiÅŸtirilmez** (backfill yok) |
+| Ã‡akÄ±ÅŸma | Otomatik sayÄ± eklenmez; yetkiliye â€œBu kullanÄ±cÄ± adÄ± zaten kullanÄ±lÄ±yor. FarklÄ± bir kullanÄ±cÄ± adÄ± belirleyin.â€ uyarÄ±sÄ± |
 
-Sicil change for a bound `SICIL_CANONICAL` user updates `users.username` atomically in the same transaction as the personel update. Collision fails the entire sicil change. `MANUAL` / `SYSTEM` accounts are never silently renamed.
+## Åifre kuralÄ±
 
-## Flow (future onboarding only)
+YÃ¶netici / Ä°K / Genel YÃ¶netici personelin ÅŸifresini seÃ§mez, gÃ¶rmez, Ã¶ÄŸrenmez.
 
-1. Yönetici/İK: **Personel Hesabı Oluştur** (no password field; username read-only = sicil)
-2. Server creates `PERSONEL` user with unusable random internal credential (hash only; never returned)
+Personel, tek kullanÄ±mlÄ±k aktivasyon baÄŸlantÄ±sÄ± Ã¼zerinden kendi ÅŸifresini belirler.
+
+Sonraki giriÅŸ: kullanÄ±cÄ± adÄ± (Ã¶r. `ilkerA`) + personelin kendi ÅŸifresi.
+
+## AkÄ±ÅŸ (yalnÄ±z yeni onboarding)
+
+1. YÃ¶netici/Ä°K: **Personel HesabÄ± OluÅŸtur** (ÅŸifre alanÄ± yok; kullanÄ±cÄ± adÄ± Ã¶nerisi otomatik)
+2. Sunucu `PERSONEL` kullanÄ±cÄ± oluÅŸturur; iÃ§ kullanÄ±m iÃ§in rastgele kullanÄ±lamaz kimlik bilgisi hashâ€™lenir (dÃ¶nÃ¼lmez)
 3. `activation_required=1`, `must_change_password=1`
-4. One-time activation invitation: **SHA-256 hash only** stored; raw token returned once as URL
-5. Personnel opens `/personel-aktivasyon#token=…`, chooses password
-6. Token consumed; `activation_required=0`, `must_change_password=0`
+4. Tek kullanÄ±mlÄ±k aktivasyon daveti: yalnÄ±z SHA-256 hash saklanÄ±r; ham token bir kez URL olarak dÃ¶ner
+5. Personel `/personel-aktivasyon#token=â€¦` aÃ§ar, ÅŸifresini seÃ§er
+6. Token tÃ¼ketilir; `activation_required=0`, `must_change_password=0`
 
-Admin never chooses or sees the personnel password. They may see the one-time **activation link** once.
+## Aktivasyon gÃ¼venliÄŸi
 
-## Activation security
+- Token entropisi â‰¥ 256 bit (`random_bytes(32)` â†’ hex)
+- TTL sahibi: `medisa_config('personel_activation_ttl_minutes')` (varsayÄ±lan **1440**)
+- Genel URL sahibi: `medisa_config('app_public_url')` (Host baÅŸlÄ±ÄŸÄ±na gÃ¼venilmez)
+- Fragment taÅŸÄ±ma (`#token=`); sayfa fragmentâ€™i hemen temizler
+- Issue/reissue yanÄ±tlarÄ±: `Cache-Control: no-store` + `Referrer-Policy: no-referrer`
+- Bekleyen kullanÄ±cÄ± baÅŸÄ±na en fazla bir canlÄ± davet (transactional revoke + insert)
+- EÅŸzamanlÄ± redeem: satÄ±r kilitleri â†’ tam olarak bir baÅŸarÄ±
 
-- Token entropy ≥ 256 bits (`random_bytes(32)` → hex)
-- TTL owner: `medisa_config('personel_activation_ttl_minutes')` (default **1440**)
-- Public URL owner: `medisa_config('app_public_url')` (never trust Host header)
-- Fragment transport (`#token=`); page clears fragment immediately
-- Issue/reissue responses: `Cache-Control: no-store` + `Referrer-Policy: no-referrer`
-- Max one live invitation per pending user (transactional revoke + insert)
-- Concurrent redeem: row locks → exactly one success
+Ã–rnek aktivasyon URL ÅŸekli:
 
-## Existing 133 accounts
+`https://www.karmotors.com.tr/personelmedisa/personel-aktivasyon#token=<gizli>`
 
-Grandfathered. Migration adds columns with safe defaults only:
+## Mevcut hesaplar
 
-- does **not** rename usernames, reset passwords, set activation-pending, change roles/bindings, or issue invitations
+Grandfathered. Migration yalnÄ±z gÃ¼venli varsayÄ±lanlarla sÃ¼tun/tablo ekler:
+
+- kullanÄ±cÄ± adlarÄ±nÄ± yeniden adlandÄ±rmaz
+- ÅŸifreleri sÄ±fÄ±rlamaz
+- aktivasyon beklemeye almaz
+- rol/baÄŸlantÄ± deÄŸiÅŸtirmez
+- davet Ã¼retmez
 
 ## DIS_KAYNAK
 
-Same technical onboarding/activation allowed.  
-`PersonelMobileCapabilityService` continues to disable business capabilities with:
+AynÄ± teknik onboarding/aktivasyon serbesttir.
+`PersonelMobileCapabilityService` iÅŸ yeteneklerini ÅŸu mesajla kapalÄ± tutmaya devam eder:
 
-> Yapım Aşamasındadır. Onay Bekleyen Kapsamlar Tamamlandığında Kullanıma Açılacaktır.
+> YapÄ±m AÅŸamasÄ±ndadÄ±r. Onay Bekleyen Kapsamlar TamamlandÄ±ÄŸÄ±nda KullanÄ±ma AÃ§Ä±lacaktÄ±r.
 
-## Generic create bypass
+## Genel oluÅŸturma bypass
 
-`POST /yonetim/kullanicilar` with `rol=PERSONEL` + `personel_id` → `PERSONEL_USE_SECURE_ONBOARDING`.  
-Non-personnel management/system user creation remains unchanged.
+`POST /yonetim/kullanicilar` ile `rol=PERSONEL` + `personel_id` â†’ `PERSONEL_USE_SECURE_ONBOARDING`.
+Personel dÄ±ÅŸÄ± yÃ¶netim/sistem kullanÄ±cÄ± oluÅŸturma deÄŸiÅŸmez.
 
 ## API
 
@@ -67,14 +80,16 @@ Non-personnel management/system user creation remains unchanged.
 | POST | `/auth/personel-activation/status` | public (token) |
 | POST | `/auth/personel-activation/complete` | public (token) |
 
-## Production rollout gate
+Ä°steÄŸe baÄŸlÄ± gÃ¶vde alanÄ±: `username` â€” yalnÄ±z Ã§akÄ±ÅŸma sonrasÄ± yetkili alternatif kullanÄ±cÄ± adÄ±.
 
-- `PRODUCTION_MIGRATION_APPLY = NO` until explicit ops approval
-- Do not bulk reprovision existing active roster
-- Do not deploy this source as live until migration + config (`app_public_url`) are ready
+## CanlÄ±ya alma kapÄ±sÄ±
 
-## Audit events
+- `PRODUCTION_MIGRATION_APPLY = NO` aÃ§Ä±k ops onayÄ± olmadan
+- Mevcut aktif kadroyu toplu yeniden provision etme
+- Migration + `app_public_url` hazÄ±r olmadan canlÄ±ya deploy etme
 
-`PERSONEL_ACCOUNT_CREATED`, `PERSONEL_ACCOUNT_BOUND`, `ACTIVATION_LINK_ISSUED`, `ACTIVATION_LINK_REISSUED`, `ACTIVATION_COMPLETED`, `ACTIVATION_REVOKED`, `USERNAME_SYNCED_FROM_SICIL`  
+## Denetim olaylarÄ±
 
-Never audit plaintext password, password hash, raw token, or full activation URL.
+`PERSONEL_ACCOUNT_CREATED`, `PERSONEL_ACCOUNT_BOUND`, `ACTIVATION_LINK_ISSUED`, `ACTIVATION_LINK_REISSUED`, `ACTIVATION_COMPLETED`, `ACTIVATION_REVOKED`
+
+DÃ¼z metin ÅŸifre, ÅŸifre hashâ€™i, ham token veya tam aktivasyon URLâ€™si denetlenmez.

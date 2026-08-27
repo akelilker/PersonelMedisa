@@ -17,20 +17,16 @@ use PDOException;
  */
 class PersonelAccountOnboardingService
 {
-    public const USERNAME_SOURCE_SICIL = 'SICIL_CANONICAL';
-    public const USERNAME_SOURCE_MANUAL = 'MANUAL';
-    public const USERNAME_SOURCE_SYSTEM = 'SYSTEM';
-
     public const EVENT_ACCOUNT_CREATED = 'PERSONEL_ACCOUNT_CREATED';
     public const EVENT_ACCOUNT_BOUND = 'PERSONEL_ACCOUNT_BOUND';
     public const EVENT_LINK_ISSUED = 'ACTIVATION_LINK_ISSUED';
     public const EVENT_LINK_REISSUED = 'ACTIVATION_LINK_REISSUED';
     public const EVENT_ACTIVATION_COMPLETED = 'ACTIVATION_COMPLETED';
     public const EVENT_ACTIVATION_REVOKED = 'ACTIVATION_REVOKED';
-    public const EVENT_USERNAME_SYNCED = 'USERNAME_SYNCED_FROM_SICIL';
 
-    public const ERR_SICIL_REQUIRED = 'PERSONEL_SICIL_REQUIRED_FOR_ACCOUNT';
-    public const ERR_SICIL_COLLISION = 'PERSONEL_SICIL_USERNAME_COLLISION';
+    public const ERR_NAME_REQUIRED = 'PERSONEL_NAME_REQUIRED_FOR_ACCOUNT';
+    public const ERR_USERNAME_COLLISION = 'PERSONEL_USERNAME_COLLISION';
+    public const ERR_USERNAME_INVALID = 'PERSONEL_USERNAME_INVALID';
     public const ERR_ALREADY_PROVISIONED = 'ALREADY_PROVISIONED';
     public const ERR_PERSONEL_INACTIVE = 'PERSONEL_INACTIVE';
     public const ERR_PERSONEL_ARCHIVED = 'PERSONEL_ARCHIVED_FIXTURE';
@@ -43,9 +39,10 @@ class PersonelAccountOnboardingService
      * Create/bind PERSONEL account for eligible personel and issue one-time activation URL.
      *
      * @param array<string, mixed> $actorUser
+     * @param string|null $usernameOverride Çakışma durumunda yetkili tarafından verilen alternatif kullanıcı adı
      * @return array<string, mixed>
      */
-    public static function onboardAndIssue(PDO $pdo, $personelId, array $actorUser)
+    public static function onboardAndIssue(PDO $pdo, $personelId, array $actorUser, $usernameOverride = null)
     {
         self::assertSchemaReady($pdo);
         $personelId = (int) $personelId;
@@ -59,7 +56,14 @@ class PersonelAccountOnboardingService
             $personel = self::lockPersonelRow($pdo, $personelId);
             self::assertEligibleForOnboarding($pdo, $personel);
 
-            $sicil = self::resolveCanonicalUsernameFromSicil($personel['sicil_no'] ?? null);
+            $suggested = self::buildPersonelUsernameFromNames(
+                $personel['ad'] ?? null,
+                $personel['soyad'] ?? null
+            );
+            $username = $usernameOverride !== null && trim((string) $usernameOverride) !== ''
+                ? self::normalizeOverrideUsername($usernameOverride)
+                : $suggested;
+
             $existing = self::findBoundUserForPersonel($pdo, $personelId);
 
             if ($existing !== null) {
@@ -72,11 +76,11 @@ class PersonelAccountOnboardingService
                 );
             }
 
-            self::assertUsernameAvailableForNewAccount($pdo, $sicil, $personelId);
+            self::assertUsernameAvailableForNewAccount($pdo, $username, $personelId, $suggested);
 
             $adSoyad = trim((string) ($personel['ad'] ?? '') . ' ' . (string) ($personel['soyad'] ?? ''));
             if ($adSoyad === '') {
-                $adSoyad = $sicil;
+                $adSoyad = $username;
             }
 
             $internalSecret = self::generateUnusableInternalSecret();
@@ -87,7 +91,7 @@ class PersonelAccountOnboardingService
             $insertCols = 'username, password_hash, ad_soyad, rol, durum';
             $insertVals = ':username, :password_hash, :ad_soyad, :rol, :durum';
             $params = [
-                'username' => $sicil,
+                'username' => $username,
                 'password_hash' => $passwordHash,
                 'ad_soyad' => $adSoyad,
                 'rol' => 'PERSONEL',
@@ -100,11 +104,6 @@ class PersonelAccountOnboardingService
             }
             $insertCols .= ', activation_required';
             $insertVals .= ', 1';
-            if (UsersSchema::hasUsernameSource($pdo)) {
-                $insertCols .= ', username_source';
-                $insertVals .= ', :username_source';
-                $params['username_source'] = self::USERNAME_SOURCE_SICIL;
-            }
             if (UsersSchema::hasVarsayilanSubeId($pdo)) {
                 $subeId = isset($personel['sube_id']) && $personel['sube_id'] !== null && $personel['sube_id'] !== ''
                     ? (int) $personel['sube_id']
@@ -121,9 +120,10 @@ class PersonelAccountOnboardingService
                 if (self::isUniqueViolation($e)) {
                     JsonResponse::error(
                         409,
-                        self::ERR_SICIL_COLLISION,
-                        'Bu sicil numarasi baska bir kullanici adi olarak kayitli.',
-                        'sicil_no'
+                        self::ERR_USERNAME_COLLISION,
+                        'Bu kullanici adi zaten kullaniliyor. Farkli bir kullanici adi belirleyin.',
+                        'username',
+                        ['suggested_username' => $suggested]
                     );
                 }
                 throw $e;
@@ -131,7 +131,8 @@ class PersonelAccountOnboardingService
 
             $userId = (int) $pdo->lastInsertId();
             self::writeAudit($pdo, self::EVENT_ACCOUNT_CREATED, $userId, $personelId, $actorId, null, [
-                'username_source' => self::USERNAME_SOURCE_SICIL,
+                'username' => $username,
+                'suggested_username' => $suggested,
                 'rol' => 'PERSONEL',
             ]);
 
@@ -145,7 +146,7 @@ class PersonelAccountOnboardingService
 
             $pdo->commit();
 
-            return self::buildIssueResponse($pdo, $userId, $sicil, $invitation, false);
+            return self::buildIssueResponse($pdo, $userId, $username, $invitation, false);
         } catch (\Throwable $e) {
             if ($pdo->inTransaction()) {
                 $pdo->rollBack();
@@ -365,84 +366,6 @@ class PersonelAccountOnboardingService
     }
 
     /**
-     * When sicil_no changes for a SICIL_CANONICAL bound user, sync username atomically.
-     * Call inside an existing personel-update transaction after sicil uniqueness is asserted.
-     *
-     * @param array<string, mixed>|null $actorUser
-     */
-    public static function syncUsernameFromSicilIfApplicable(
-        PDO $pdo,
-        $personelId,
-        $newSicilRaw,
-        array $actorUser = null
-    ) {
-        if (!UsersSchema::hasUsernameSource($pdo) || !UsersSchema::hasPersonelId($pdo)) {
-            return;
-        }
-        $personelId = (int) $personelId;
-        if ($personelId <= 0) {
-            return;
-        }
-
-        $newUsername = self::normalizeSicil($newSicilRaw);
-        if ($newUsername === '') {
-            return;
-        }
-
-        $stmt = $pdo->prepare(
-            'SELECT id, username, username_source, password_hash, rol, personel_id
-             FROM users
-             WHERE personel_id = :pid AND username_source = :src
-             LIMIT 1
-             FOR UPDATE'
-        );
-        $stmt->execute([
-            'pid' => $personelId,
-            'src' => self::USERNAME_SOURCE_SICIL,
-        ]);
-        $user = $stmt->fetch(PDO::FETCH_ASSOC);
-        if (!is_array($user)) {
-            return;
-        }
-
-        $oldUsername = (string) $user['username'];
-        if ($oldUsername === $newUsername) {
-            return;
-        }
-
-        $collision = $pdo->prepare(
-            'SELECT id, personel_id FROM users WHERE username = :u AND id <> :id LIMIT 1'
-        );
-        $collision->execute(['u' => $newUsername, 'id' => (int) $user['id']]);
-        $other = $collision->fetch(PDO::FETCH_ASSOC);
-        if (is_array($other)) {
-            JsonResponse::error(
-                409,
-                self::ERR_SICIL_COLLISION,
-                'Bu sicil numarasi baska bir kullanici adi olarak kayitli; sicil guncellenemedi.',
-                'sicil_no'
-            );
-        }
-
-        $upd = $pdo->prepare('UPDATE users SET username = :u WHERE id = :id');
-        $upd->execute(['u' => $newUsername, 'id' => (int) $user['id']]);
-
-        $actorId = is_array($actorUser) && isset($actorUser['id']) ? (int) $actorUser['id'] : null;
-        self::writeAudit(
-            $pdo,
-            self::EVENT_USERNAME_SYNCED,
-            (int) $user['id'],
-            $personelId,
-            $actorId,
-            null,
-            [
-                'old_username' => $oldUsername,
-                'new_username' => $newUsername,
-            ]
-        );
-    }
-
-    /**
      * Reject generic create of PERSONEL + personel_id (secure onboarding owns that path).
      *
      * @param array<string, mixed> $body
@@ -506,23 +429,101 @@ class PersonelAccountOnboardingService
         ];
     }
 
-    public static function resolveCanonicalUsernameFromSicil($sicilRaw)
+    /**
+     * İlk ad (küçük Latin) + soyadın ilk harfi (büyük Latin).
+     * Sicil numarası katılmaz. Otomatik sayı eklenmez.
+     */
+    public static function buildPersonelUsernameFromNames($adRaw, $soyadRaw)
     {
-        $sicil = self::normalizeSicil($sicilRaw);
-        if ($sicil === '') {
+        $ad = trim((string) $adRaw);
+        $soyad = trim((string) $soyadRaw);
+        if ($ad === '' || $soyad === '') {
             JsonResponse::badRequest(
-                'Personel hesabi icin sicil numarasi zorunludur.',
-                self::ERR_SICIL_REQUIRED,
-                'sicil_no'
+                'Personel hesabi icin ad ve soyad zorunludur.',
+                self::ERR_NAME_REQUIRED,
+                'ad'
             );
         }
 
-        return $sicil;
+        $adParts = preg_split('/\s+/u', $ad);
+        $firstAd = is_array($adParts) && isset($adParts[0]) ? trim((string) $adParts[0]) : '';
+        $namePart = self::foldToLowerAsciiToken($firstAd);
+        $initial = self::foldSurnameInitial($soyad);
+        if ($namePart === '' || $initial === '') {
+            JsonResponse::badRequest(
+                'Personel hesabi icin gecerli ad ve soyad zorunludur.',
+                self::ERR_NAME_REQUIRED,
+                'ad'
+            );
+        }
+
+        return $namePart . $initial;
     }
 
-    public static function normalizeSicil($sicilRaw)
+    public static function normalizeOverrideUsername($raw)
     {
-        return trim((string) $sicilRaw);
+        $username = trim((string) $raw);
+        if ($username === '' || !preg_match('/^[A-Za-z0-9]{2,64}$/', $username)) {
+            JsonResponse::badRequest(
+                'Kullanici adi gecersiz. Yalniz harf ve rakam kullanin.',
+                self::ERR_USERNAME_INVALID,
+                'username'
+            );
+        }
+
+        return $username;
+    }
+
+    public static function foldToLowerAsciiToken($value)
+    {
+        $folded = self::foldTurkishChars((string) $value);
+        $lower = strtolower($folded);
+
+        return preg_replace('/[^a-z0-9]/', '', $lower) ?? '';
+    }
+
+    public static function foldSurnameInitial($soyad)
+    {
+        $soyad = trim((string) $soyad);
+        if ($soyad === '') {
+            return '';
+        }
+        if (function_exists('mb_substr')) {
+            $first = mb_substr($soyad, 0, 1, 'UTF-8');
+        } else {
+            $first = substr($soyad, 0, 1);
+        }
+        $map = [
+            'ç' => 'C', 'Ç' => 'C',
+            'ğ' => 'G', 'Ğ' => 'G',
+            'ı' => 'I', 'İ' => 'I', 'I' => 'I', 'i' => 'I',
+            'ö' => 'O', 'Ö' => 'O',
+            'ş' => 'S', 'Ş' => 'S',
+            'ü' => 'U', 'Ü' => 'U',
+        ];
+        if (isset($map[$first])) {
+            return $map[$first];
+        }
+        $ascii = strtoupper(self::foldTurkishChars($first));
+        if (!preg_match('/^[A-Z]$/', $ascii)) {
+            return '';
+        }
+
+        return $ascii;
+    }
+
+    public static function foldTurkishChars($value)
+    {
+        $map = [
+            'ç' => 'c', 'Ç' => 'C',
+            'ğ' => 'g', 'Ğ' => 'G',
+            'ı' => 'i', 'İ' => 'I',
+            'ö' => 'o', 'Ö' => 'O',
+            'ş' => 's', 'Ş' => 'S',
+            'ü' => 'u', 'Ü' => 'U',
+        ];
+
+        return strtr((string) $value, $map);
     }
 
     public static function hashToken($rawToken)
@@ -628,9 +629,6 @@ class PersonelAccountOnboardingService
     private static function lockUserRow(PDO $pdo, $userId)
     {
         $cols = 'id, username, password_hash, ad_soyad, rol, durum, personel_id, activation_required';
-        if (UsersSchema::hasUsernameSource($pdo)) {
-            $cols .= ', username_source';
-        }
         $stmt = $pdo->prepare("SELECT $cols FROM users WHERE id = :id LIMIT 1 FOR UPDATE");
         $stmt->execute(['id' => (int) $userId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -675,7 +673,7 @@ class PersonelAccountOnboardingService
             );
         }
 
-        self::resolveCanonicalUsernameFromSicil($personel['sicil_no'] ?? null);
+        self::buildPersonelUsernameFromNames($personel['ad'] ?? null, $personel['soyad'] ?? null);
     }
 
     /**
@@ -721,7 +719,7 @@ class PersonelAccountOnboardingService
         return is_array($row) ? $row : null;
     }
 
-    private static function assertUsernameAvailableForNewAccount(PDO $pdo, $username, $personelId)
+    private static function assertUsernameAvailableForNewAccount(PDO $pdo, $username, $personelId, $suggestedUsername)
     {
         $stmt = $pdo->prepare(
             'SELECT id, personel_id FROM users WHERE username = :u LIMIT 1 FOR UPDATE'
@@ -744,9 +742,10 @@ class PersonelAccountOnboardingService
         }
         JsonResponse::error(
             409,
-            self::ERR_SICIL_COLLISION,
-            'Bu sicil numarasi baska bir kullanici adi olarak kayitli.',
-            'sicil_no'
+            self::ERR_USERNAME_COLLISION,
+            'Bu kullanici adi zaten kullaniliyor. Farkli bir kullanici adi belirleyin.',
+            'username',
+            ['suggested_username' => $suggestedUsername]
         );
     }
 
@@ -882,9 +881,6 @@ class PersonelAccountOnboardingService
         if (UsersSchema::hasMustChangePassword($pdo)) {
             $userCols .= ', must_change_password';
         }
-        if (UsersSchema::hasUsernameSource($pdo)) {
-            $userCols .= ', username_source';
-        }
         if (UsersSchema::hasActivatedAtUtc($pdo)) {
             $userCols .= ', activated_at_utc';
         }
@@ -903,7 +899,6 @@ class PersonelAccountOnboardingService
                 'must_change_password' => isset($user['must_change_password'])
                     ? ((int) $user['must_change_password']) === 1
                     : true,
-                'username_source' => (string) ($user['username_source'] ?? self::USERNAME_SOURCE_SICIL),
                 'activated_at_utc' => $user['activated_at_utc'] ?? null,
             ],
             'activation' => [

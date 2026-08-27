@@ -174,7 +174,6 @@ function normalizeYonetimKullanici(data: unknown): YonetimKullanici {
     ...(activationRequired === undefined ? {} : { activation_required: activationRequired }),
     ...(activationStatus === undefined ? {} : { activation_status: activationStatus }),
     activated_at_utc: readStringOrNull(record.activated_at_utc ?? record.activatedAtUtc),
-    username_source: readString(record.username_source ?? record.usernameSource),
     sube_ids: readNumberArray(record.sube_ids),
     bolum_ids: readNumberArray(record.bolum_ids),
     birim_ids: readNumberArray(record.birim_ids),
@@ -468,9 +467,6 @@ function normalizePersonelHesapOnboardingResult(data: unknown): PersonelHesapOnb
       personel_id: userRecord ? (readNumber(userRecord.personel_id) ?? null) : null,
       ...(activationRequired === undefined ? {} : { activation_required: activationRequired }),
       ...(mustChangePassword === undefined ? {} : { must_change_password: mustChangePassword }),
-      username_source: userRecord
-        ? readString(userRecord.username_source)
-        : undefined,
       activated_at_utc: userRecord
         ? readStringOrNull(userRecord.activated_at_utc)
         : null
@@ -486,11 +482,16 @@ function normalizePersonelHesapOnboardingResult(data: unknown): PersonelHesapOnb
 }
 
 export async function createPersonelHesapOnboarding(
-  personelId: number | string
+  personelId: number | string,
+  usernameOverride?: string
 ): Promise<PersonelHesapOnboardingResult> {
+  const body =
+    usernameOverride !== undefined && usernameOverride.trim() !== ""
+      ? { username: usernameOverride.trim() }
+      : {};
   const response = await apiRequest<ApiResponse<unknown>>(
     endpoints.yonetim.personelHesapOnboarding(personelId),
-    { method: "POST", body: JSON.stringify({}) }
+    { method: "POST", body: JSON.stringify(body) }
   );
   return normalizePersonelHesapOnboardingResult(response.data);
 }

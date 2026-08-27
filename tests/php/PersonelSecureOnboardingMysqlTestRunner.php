@@ -98,22 +98,6 @@ if (($argv[1] ?? '') === '--child') {
             echo 'HELD' . PHP_EOL;
             exit(0);
         }
-        if ($action === 'sync-collision') {
-            $personelId = (int) ($argv[3] ?? 0);
-            $newSicil = (string) ($argv[4] ?? '');
-            $pdo->beginTransaction();
-            $upd = $pdo->prepare('UPDATE personeller SET sicil_no = :s WHERE id = :id');
-            $upd->execute(['s' => $newSicil, 'id' => $personelId]);
-            PersonelAccountOnboardingService::syncUsernameFromSicilIfApplicable(
-                $pdo,
-                $personelId,
-                $newSicil,
-                $actor
-            );
-            $pdo->commit();
-            echo 'UNEXPECTED_COMMIT' . PHP_EOL;
-            exit(0);
-        }
         fwrite(STDERR, "Unknown child action: {$action}\n");
         exit(2);
     } catch (Throwable $e) {
@@ -339,20 +323,23 @@ try {
             sube_id, departman_id, gorev_id, aktif_durum, calisan_kapsami
          ) VALUES
          (1, '11111111111', 'Legacy', 'One', '1990-01-01', '5550000001', 'A', '5550000011', 'LEG-001', '2020-01-01', 1, 1, 1, 'AKTIF', 'IC_PERSONEL'),
-         (10, '10101010101', 'Yeni', 'Ic', '1991-01-01', '5550000010', 'B', '5550000010', 'SIC-100', '2021-01-01', 1, 1, 1, 'AKTIF', 'IC_PERSONEL'),
+         (10, '10101010101', 'İlker', 'Akel', '1991-01-01', '5550000010', 'B', '5550000010', 'SIC-100', '2021-01-01', 1, 1, 1, 'AKTIF', 'IC_PERSONEL'),
          (11, '11111111112', 'Yeni', 'Dis', '1992-01-01', '5550000011', 'C', '5550000011', 'SIC-DIS', '2021-01-01', 1, 1, 1, 'AKTIF', 'DIS_KAYNAK'),
          (12, '12121212121', 'Pasif', 'P', '1993-01-01', '5550000012', 'D', '5550000012', 'SIC-PAS', '2021-01-01', 1, 1, 1, 'PASIF', 'IC_PERSONEL'),
          (13, '13131313131', 'NoSicil', 'X', '1994-01-01', '5550000013', 'E', '5550000013', '   ', '2021-01-01', 1, 1, 1, 'AKTIF', 'IC_PERSONEL'),
-         (14, '14141414141', 'Collide', 'Y', '1995-01-01', '5550000014', 'F', '5550000014', 'TAKEN-UN', '2021-01-01', 1, 1, 1, 'AKTIF', 'IC_PERSONEL'),
-         (15, '15151515151', 'Mgr', 'Bound', '1996-01-01', '5550000015', 'G', '5550000015', 'MGR-001', '2021-01-01', 1, 1, 1, 'AKTIF', 'IC_PERSONEL')"
+         (14, '14141414141', 'Collide', 'Y', '1995-01-01', '5550000014', 'F', '5550000014', 'SIC-COL', '2021-01-01', 1, 1, 1, 'AKTIF', 'IC_PERSONEL'),
+         (15, '15151515151', 'Mgr', 'Bound', '1996-01-01', '5550000015', 'G', '5550000015', 'MGR-001', '2021-01-01', 1, 1, 1, 'AKTIF', 'IC_PERSONEL'),
+         (16, '16161616161', 'Özkan', 'Erçin', '1997-01-01', '5550000016', 'H', '5550000016', 'SIC-OZ', '2021-01-01', 1, 1, 1, 'AKTIF', 'IC_PERSONEL'),
+         (17, '17171717171', 'Kürşat', 'Kederoğlu', '1998-01-01', '5550000017', 'I', '5550000017', 'SIC-KU', '2021-01-01', 1, 1, 1, 'AKTIF', 'IC_PERSONEL'),
+         (18, '18181818181', 'Mehmet Ali', 'Yılmaz', '1999-01-01', '5550000018', 'J', '5550000018', 'SIC-MA', '2021-01-01', 1, 1, 1, 'AKTIF', 'IC_PERSONEL')"
     );
 
     // Bind legacy u2 to personel 1 (grandfathered).
     $pdo->exec('UPDATE users SET personel_id = 1 WHERE id = 2');
-    // Username collision fixture (manual account owns TAKEN-UN) — pre-075 columns only.
+    // Username collision fixture owns collideY (manual account) — pre-075 columns only.
     $pdo->exec(
         "INSERT INTO users (username, password_hash, ad_soyad, rol, durum, must_change_password)
-         VALUES ('TAKEN-UN', " . $pdo->quote($legacyHash) . ", 'Taken', 'GENEL_YONETICI', 'AKTIF', 0)"
+         VALUES ('collideY', " . $pdo->quote($legacyHash) . ", 'Taken', 'GENEL_YONETICI', 'AKTIF', 0)"
     );
     // Management-bound account for personel 15.
     $pdo->exec(
@@ -368,7 +355,7 @@ try {
     psoAssert(true, '075 ikinci apply idempotent');
 
     $afterUser2 = $pdo->query(
-        'SELECT username, password_hash, rol, personel_id, must_change_password, durum, activation_required, username_source
+        'SELECT username, password_hash, rol, personel_id, must_change_password, durum, activation_required
          FROM users WHERE id = 2'
     )->fetch(PDO::FETCH_ASSOC);
     psoAssert($afterUser2['username'] === $beforeUser2['username'], 'legacy username unchanged');
@@ -377,7 +364,6 @@ try {
     psoAssert((string) $afterUser2['personel_id'] === (string) $beforeUser2['personel_id'], 'legacy personel_id unchanged');
     psoAssert((int) $afterUser2['must_change_password'] === (int) $beforeUser2['must_change_password'], 'legacy must_change_password unchanged');
     psoAssert((int) $afterUser2['activation_required'] === 0, 'legacy activation_required=0');
-    psoAssert($afterUser2['username_source'] === 'MANUAL', 'legacy username_source=MANUAL default');
 
     $invCount = (int) $pdo->query('SELECT COUNT(*) FROM personel_account_activation_invitations')->fetchColumn();
     psoAssert($invCount === 0, 'no invitations auto-created for existing users');
@@ -388,17 +374,34 @@ try {
 
     $actor = ['id' => 1, 'rol' => 'GENEL_YONETICI'];
 
-    // 1–3: create IC_PERSONEL account with canonical sicil username
+    psoAssert(
+        PersonelAccountOnboardingService::buildPersonelUsernameFromNames('İlker', 'AKEL') === 'ilkerA',
+        'builder İlker AKEL → ilkerA'
+    );
+    psoAssert(
+        PersonelAccountOnboardingService::buildPersonelUsernameFromNames('Özkan', 'ERÇİN') === 'ozkanE',
+        'builder Özkan ERÇİN → ozkanE'
+    );
+    psoAssert(
+        PersonelAccountOnboardingService::buildPersonelUsernameFromNames('Kürşat', 'KEDEROĞLU') === 'kursatK',
+        'builder Kürşat KEDEROĞLU → kursatK'
+    );
+    psoAssert(
+        PersonelAccountOnboardingService::buildPersonelUsernameFromNames('Mehmet Ali', 'YILMAZ') === 'mehmetY',
+        'builder Mehmet Ali YILMAZ → mehmetY'
+    );
+
+    // 1–3: create IC_PERSONEL account with name-based username (sicil not used)
     $result = PersonelAccountOnboardingService::onboardAndIssue($pdo, 10, $actor);
-    psoAssert(($result['user']['username'] ?? '') === 'SIC-100', 'username exactly canonical sicil_no');
+    psoAssert(($result['user']['username'] ?? '') === 'ilkerA', 'username exactly ilkerA from names');
     psoAssert(($result['user']['rol'] ?? '') === 'PERSONEL', 'default role PERSONEL');
     psoAssert(($result['user']['activation_required'] ?? false) === true, 'activation_required set');
-    psoAssert(($result['user']['username_source'] ?? '') === 'SICIL_CANONICAL', 'username_source SICIL_CANONICAL');
+    psoAssert(!isset($result['user']['username_source']), 'username_source not returned');
     psoAssert(isset($result['activation']['activation_url']), 'activation_url present once');
     psoAssert(strpos($result['activation']['activation_url'], '#token=') !== false, 'url uses fragment transport');
     psoAssert(!isset($result['password']) && !isset($result['user']['password']), 'random internal credential never returned');
 
-    $userRow = $pdo->query('SELECT * FROM users WHERE username = \'SIC-100\'')->fetch(PDO::FETCH_ASSOC);
+    $userRow = $pdo->query('SELECT * FROM users WHERE username = \'ilkerA\'')->fetch(PDO::FETCH_ASSOC);
     psoAssert(is_array($userRow), 'account created');
     psoAssert((int) $userRow['personel_id'] === 10, 'binding through personel_id');
     psoAssert((int) $userRow['activation_required'] === 1, 'DB activation_required=1');
@@ -451,12 +454,15 @@ try {
         'idempotent onboard creates no duplicate user'
     );
 
-    // Fail-closed: missing sicil / PASIF / username collision / management-bound
-    $missingSicil = psoFinishChild(psoSpawnChild(['onboard', '13'], $dbDsn));
+    // Fail-closed: empty name / PASIF / username collision / management-bound
+    // Empty sicil still allowed when names exist.
+    $emptySicilOk = PersonelAccountOnboardingService::onboardAndIssue($pdo, 13, $actor);
+    psoAssert(($emptySicilOk['user']['username'] ?? '') === 'nosicilX', 'empty sicil still onboards from names');
     psoAssert(
-        psoExtractErrorCode($missingSicil) === PersonelAccountOnboardingService::ERR_SICIL_REQUIRED,
-        'missing sicil fail closed'
+        (string) $pdo->query('SELECT sicil_no FROM personeller WHERE id = 13')->fetchColumn() === '   ',
+        'empty sicil value preserved without becoming username'
     );
+
     $pasif = psoFinishChild(psoSpawnChild(['onboard', '12'], $dbDsn));
     psoAssert(
         psoExtractErrorCode($pasif) === PersonelAccountOnboardingService::ERR_PERSONEL_INACTIVE,
@@ -464,9 +470,11 @@ try {
     );
     $collide = psoFinishChild(psoSpawnChild(['onboard', '14'], $dbDsn));
     psoAssert(
-        psoExtractErrorCode($collide) === PersonelAccountOnboardingService::ERR_SICIL_COLLISION,
-        'different-user username collision fail closed'
+        psoExtractErrorCode($collide) === PersonelAccountOnboardingService::ERR_USERNAME_COLLISION,
+        'different-user username collision fail closed without auto suffix'
     );
+    $overrideOk = PersonelAccountOnboardingService::onboardAndIssue($pdo, 14, $actor, 'collideAlt');
+    psoAssert(($overrideOk['user']['username'] ?? '') === 'collideAlt', 'collision override username accepted');
     $mgrBound = psoFinishChild(psoSpawnChild(['onboard', '15'], $dbDsn));
     psoAssert(
         psoExtractErrorCode($mgrBound) === PersonelAccountOnboardingService::ERR_ALREADY_PROVISIONED,
@@ -487,7 +495,7 @@ try {
 
     // DIS_KAYNAK technical account + capability still disabled
     $disResult = PersonelAccountOnboardingService::onboardAndIssue($pdo, 11, $actor);
-    psoAssert(($disResult['user']['username'] ?? '') === 'SIC-DIS', 'DIS_KAYNAK username sicil');
+    psoAssert(($disResult['user']['username'] ?? '') === 'yeniD', 'DIS_KAYNAK username from names');
     $caps = PersonelMobileCapabilityService::resolve($pdo, 11);
     psoAssert($caps['qr_scan'] === false, 'DIS_KAYNAK qr_scan disabled');
     psoAssert($caps['attendance_correct'] === false, 'DIS_KAYNAK attendance_correct disabled');
@@ -678,46 +686,35 @@ try {
         'post-activation DIS_KAYNAK guarded message exact'
     );
 
-    // Sicil sync for SICIL_CANONICAL
-    $pdo->beginTransaction();
-    $pdo->exec("UPDATE personeller SET sicil_no = 'SIC-100B' WHERE id = 10");
-    PersonelAccountOnboardingService::syncUsernameFromSicilIfApplicable($pdo, 10, 'SIC-100B', $actor);
-    $pdo->commit();
-    $synced = $pdo->query('SELECT username, password_hash, rol, personel_id FROM users WHERE id = ' . (int) $userRow['id'])->fetch(PDO::FETCH_ASSOC);
-    psoAssert($synced['username'] === 'SIC-100B', 'sicil change updates username atomically');
-    psoAssert($synced['password_hash'] === $afterActivate['password_hash'], 'password unchanged during sync');
-    psoAssert($synced['rol'] === 'PERSONEL', 'role unchanged during sync');
-    psoAssert((int) $synced['personel_id'] === 10, 'binding unchanged during sync');
-    $syncAudit = (int) $pdo->query(
-        "SELECT COUNT(*) FROM personel_account_onboarding_audit WHERE event_type = 'USERNAME_SYNCED_FROM_SICIL' AND user_id = " . (int) $userRow['id']
+    // Sicil change must NOT rename username
+    $usernameBeforeSicil = (string) $pdo->query(
+        'SELECT username FROM users WHERE id = ' . (int) $userRow['id']
     )->fetchColumn();
-    psoAssert($syncAudit === 1, 'username sync audit created');
+    $pdo->exec("UPDATE personeller SET sicil_no = 'SIC-100B' WHERE id = 10");
+    $synced = $pdo->query('SELECT username, password_hash, rol, personel_id FROM users WHERE id = ' . (int) $userRow['id'])->fetch(PDO::FETCH_ASSOC);
+    psoAssert($synced['username'] === $usernameBeforeSicil, 'sicil change does not rename username');
+    psoAssert($synced['username'] === 'ilkerA', 'username remains ilkerA after sicil change');
+    psoAssert($synced['password_hash'] === $afterActivate['password_hash'], 'password unchanged during sicil change');
+    psoAssert($synced['rol'] === 'PERSONEL', 'role unchanged during sicil change');
+    psoAssert((int) $synced['personel_id'] === 10, 'binding unchanged during sicil change');
+    $sicilNow = (string) $pdo->query('SELECT sicil_no FROM personeller WHERE id = 10')->fetchColumn();
+    psoAssert($sicilNow === 'SIC-100B', 'personel sicil updated independently');
+    $syncAudit = (int) $pdo->query(
+        "SELECT COUNT(*) FROM personel_account_onboarding_audit WHERE event_type = 'USERNAME_SYNCED_FROM_SICIL'"
+    )->fetchColumn();
+    psoAssert($syncAudit === 0, 'no username sync-from-sicil audit events');
 
-    // Collision rolls back BOTH (personel sicil + username) via abandoned txn in child
-    $sicilBeforeCollision = (string) $pdo->query('SELECT sicil_no FROM personeller WHERE id = 10')->fetchColumn();
-    $userBeforeCollision = $pdo->query(
-        'SELECT username, password_hash, rol, personel_id FROM users WHERE id = ' . (int) $userRow['id']
-    )->fetch(PDO::FETCH_ASSOC);
-    // Collide against existing USERNAME 'admin' (not another personel.sicil_no — avoids uq_personeller_sicil).
-    $collisionChild = psoFinishChild(psoSpawnChild(['sync-collision', '10', 'admin'], $dbDsn));
-    psoAssert(
-        psoExtractErrorCode($collisionChild) === PersonelAccountOnboardingService::ERR_SICIL_COLLISION,
-        'sicil username collision fail closed'
-    );
-    $sicilAfterCollision = (string) $pdo->query('SELECT sicil_no FROM personeller WHERE id = 10')->fetchColumn();
-    $userAfterCollision = $pdo->query(
-        'SELECT username, password_hash, rol, personel_id FROM users WHERE id = ' . (int) $userRow['id']
-    )->fetch(PDO::FETCH_ASSOC);
-    psoAssert($sicilAfterCollision === $sicilBeforeCollision, 'collision rolls back personel.sicil_no');
-    psoAssert($userAfterCollision['username'] === $userBeforeCollision['username'], 'collision rolls back username');
-    psoAssert($userAfterCollision['password_hash'] === $userBeforeCollision['password_hash'], 'collision password unchanged');
-    psoAssert($userAfterCollision['rol'] === $userBeforeCollision['rol'], 'collision role unchanged');
-    psoAssert((int) $userAfterCollision['personel_id'] === (int) $userBeforeCollision['personel_id'], 'collision binding unchanged');
+    // Additional name fixtures
+    $oz = PersonelAccountOnboardingService::onboardAndIssue($pdo, 16, $actor);
+    psoAssert(($oz['user']['username'] ?? '') === 'ozkanE', 'Özkan Erçin → ozkanE');
+    $ku = PersonelAccountOnboardingService::onboardAndIssue($pdo, 17, $actor);
+    psoAssert(($ku['user']['username'] ?? '') === 'kursatK', 'Kürşat Kederoğlu → kursatK');
+    $ma = PersonelAccountOnboardingService::onboardAndIssue($pdo, 18, $actor);
+    psoAssert(($ma['user']['username'] ?? '') === 'mehmetY', 'Mehmet Ali Yılmaz → mehmetY');
 
-    // MANUAL account not silently renamed
-    PersonelAccountOnboardingService::syncUsernameFromSicilIfApplicable($pdo, 14, 'TAKEN-UN-NEW', $actor);
-    $stillTaken = $pdo->query("SELECT username, username_source FROM users WHERE username = 'TAKEN-UN'")->fetch(PDO::FETCH_ASSOC);
-    psoAssert(is_array($stillTaken) && $stillTaken['username_source'] === 'MANUAL', 'MANUAL username account not silently renamed');
+    // Existing collideY account username remains untouched by other onboarding
+    $stillTaken = $pdo->query("SELECT username FROM users WHERE username = 'collideY'")->fetch(PDO::FETCH_ASSOC);
+    psoAssert(is_array($stillTaken), 'existing colliding username account preserved');
 
     $t1 = PersonelAccountOnboardingService::generateActivationToken();
     $t2 = PersonelAccountOnboardingService::generateActivationToken();

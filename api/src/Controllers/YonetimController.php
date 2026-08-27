@@ -927,7 +927,6 @@ class YonetimController
         $hasPersonelId = UsersSchema::hasPersonelId($pdo);
         $hasMustChangePassword = UsersSchema::hasMustChangePassword($pdo);
         $hasActivationRequired = UsersSchema::hasActivationRequired($pdo);
-        $hasUsernameSource = UsersSchema::hasUsernameSource($pdo);
         $selectCols = ['id', 'username', 'ad_soyad', 'rol', 'durum'];
         if ($hasVarsayilan) {
             $selectCols[] = 'varsayilan_sube_id';
@@ -943,9 +942,6 @@ class YonetimController
         }
         if (UsersSchema::hasActivatedAtUtc($pdo)) {
             $selectCols[] = 'activated_at_utc';
-        }
-        if ($hasUsernameSource) {
-            $selectCols[] = 'username_source';
         }
         $selectSql = 'SELECT ' . implode(', ', $selectCols) . ' FROM users ORDER BY id ASC';
         $stmt = $pdo->query($selectSql);
@@ -1407,10 +1403,6 @@ class YonetimController
             }
         }
 
-        if (array_key_exists('username_source', $row) && $row['username_source'] !== null && $row['username_source'] !== '') {
-            $mapped['username_source'] = (string) $row['username_source'];
-        }
-
         return $mapped;
     }
 
@@ -1524,9 +1516,6 @@ class YonetimController
         }
         if (UsersSchema::hasActivatedAtUtc($pdo)) {
             $cols[] = 'activated_at_utc';
-        }
-        if (UsersSchema::hasUsernameSource($pdo)) {
-            $cols[] = 'username_source';
         }
         $sql = 'SELECT ' . implode(', ', $cols) . ' FROM users WHERE id = :id LIMIT 1';
         $stmt = $pdo->prepare($sql);

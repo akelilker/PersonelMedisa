@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { isApiRequestError } from "../../../api/api-client";
 import {
   createPersonelHesapOnboarding,
@@ -10,17 +10,18 @@ import type {
   PersonelActivationInvitationMeta,
   PersonelHesapOnboardingResult
 } from "../../../types/yonetim";
+import { buildPersonelUsernameFromNames } from "../personelUsernameFromNames";
 
 export type PersonelHesapOnboardingBoundUser = {
   id: number;
   activation_required?: boolean;
   username?: string;
-  username_source?: string;
 };
 
 export type PersonelHesapOnboardingPanelProps = {
   personelId: number;
-  sicilNo?: string | null;
+  ad?: string | null;
+  soyad?: string | null;
   personelAktif: boolean;
   hasBoundUser?: boolean;
   boundUser?: PersonelHesapOnboardingBoundUser | null;
@@ -39,7 +40,8 @@ function formatUtcLabel(value: string | undefined): string {
 
 export function PersonelHesapOnboardingPanel({
   personelId,
-  sicilNo,
+  ad,
+  soyad,
   personelAktif,
   hasBoundUser: hasBoundUserProp,
   boundUser: boundUserProp
@@ -55,6 +57,13 @@ export function PersonelHesapOnboardingPanel({
   const [issued, setIssued] = useState<PersonelHesapOnboardingResult | null>(null);
   const [copyStatus, setCopyStatus] = useState<string | null>(null);
   const [meta, setMeta] = useState<PersonelActivationInvitationMeta | null>(null);
+  const [usernameCollision, setUsernameCollision] = useState(false);
+  const [usernameOverride, setUsernameOverride] = useState("");
+
+  const suggestedUsername = useMemo(
+    () => buildPersonelUsernameFromNames(ad, soyad),
+    [ad, soyad]
+  );
 
   const resolveBoundUser = useCallback(async () => {
     if (boundUserProp != null || hasBoundUserProp === true || hasBoundUserProp === false) {
@@ -73,8 +82,7 @@ export function PersonelHesapOnboardingPanel({
         setBoundUser({
           id: match.id,
           activation_required: match.activation_required,
-          username: match.username,
-          username_source: match.username_source
+          username: match.username
         });
         setHasBoundUser(true);
       } else {
@@ -118,8 +126,11 @@ export function PersonelHesapOnboardingPanel({
     };
   }, [boundUser]);
 
-  const sicil = String(sicilNo ?? "").trim();
-  const eligible = personelAktif && sicil.length > 0 && hasBoundUser === false && !issued;
+  const eligible =
+    personelAktif &&
+    suggestedUsername.length > 0 &&
+    hasBoundUser === false &&
+    !issued;
 
   async function handleCreate() {
     if (!eligible || isWorking) {
@@ -129,16 +140,20 @@ export function PersonelHesapOnboardingPanel({
     setErrorMessage(null);
     setCopyStatus(null);
     try {
-      const result = await createPersonelHesapOnboarding(personelId);
+      const override =
+        usernameCollision && usernameOverride.trim() !== ""
+          ? usernameOverride.trim()
+          : undefined;
+      const result = await createPersonelHesapOnboarding(personelId, override);
       setIssued(result);
       setBoundUser({
         id: result.user.id,
         activation_required: true,
-        username: result.user.username,
-        username_source: result.user.username_source
+        username: result.user.username
       });
       setHasBoundUser(true);
       setConfirmOpen(false);
+      setUsernameCollision(false);
       setMeta({
         created_at_utc: result.activation.created_at_utc,
         expires_at_utc: result.activation.expires_at_utc,
@@ -146,13 +161,21 @@ export function PersonelHesapOnboardingPanel({
         is_valid: true
       });
     } catch (error) {
-      setErrorMessage(
-        isApiRequestError(error)
-          ? error.message
-          : error instanceof Error
+      if (isApiRequestError(error) && error.code === "PERSONEL_USERNAME_COLLISION") {
+        setUsernameCollision(true);
+        setUsernameOverride((prev) => (prev.trim() !== "" ? prev : suggestedUsername));
+        setErrorMessage(
+          error.message || "Bu kullanıcı adı zaten kullanılıyor. Farklı bir kullanıcı adı belirleyin."
+        );
+      } else {
+        setErrorMessage(
+          isApiRequestError(error)
             ? error.message
-            : "Personel hesabı oluşturulamadı."
-      );
+            : error instanceof Error
+              ? error.message
+              : "Personel hesabı oluşturulamadı."
+        );
+      }
     } finally {
       setIsWorking(false);
     }
@@ -171,8 +194,7 @@ export function PersonelHesapOnboardingPanel({
       setBoundUser({
         id: result.user.id,
         activation_required: true,
-        username: result.user.username,
-        username_source: result.user.username_source
+        username: result.user.username
       });
       setMeta({
         created_at_utc: result.activation.created_at_utc,
@@ -227,8 +249,8 @@ export function PersonelHesapOnboardingPanel({
         <p className="yonetim-hint">Pasif personel için hesap oluşturulamaz.</p>
       ) : null}
 
-      {!isLoadingBound && personelAktif && !sicil ? (
-        <p className="yonetim-hint">Hesap oluşturmak için sicil numarası zorunludur.</p>
+      {!isLoadingBound && personelAktif && !suggestedUsername ? (
+        <p className="yonetim-hint">Hesap oluşturmak için ad ve soyad zorunludur.</p>
       ) : null}
 
       {eligible && !confirmOpen ? (
@@ -239,6 +261,8 @@ export function PersonelHesapOnboardingPanel({
           onClick={() => {
             setConfirmOpen(true);
             setErrorMessage(null);
+            setUsernameCollision(false);
+            setUsernameOverride("");
           }}
         >
           Personel Hesabı Oluştur
@@ -248,12 +272,25 @@ export function PersonelHesapOnboardingPanel({
       {eligible && confirmOpen ? (
         <div className="yonetim-form-stack" data-testid="personel-hesap-onboarding-confirm">
           <p className="yonetim-hint">
-            Personel şifresini aktivasyon bağlantısı üzerinden kendisi belirleyecektir.
+            Hesap oluşturulduktan sonra personel kendi şifresini aktivasyon bağlantısı üzerinden
+            belirleyecektir.
           </p>
           <label className="form-field">
-            <span>Kullanıcı adı (sicil)</span>
-            <input type="text" value={sicil} readOnly />
+            <span>Kullanıcı adı</span>
+            <input
+              type="text"
+              value={usernameCollision ? usernameOverride : suggestedUsername}
+              readOnly={!usernameCollision}
+              onChange={(event) => setUsernameOverride(event.target.value)}
+              data-testid="personel-hesap-username"
+            />
           </label>
+          {usernameCollision ? (
+            <p className="yonetim-hint">
+              Önerilen kullanıcı adı dolu. Farklı bir kullanıcı adı belirleyin; sistem otomatik sayı
+              eklemez.
+            </p>
+          ) : null}
           <div className="yonetim-create-row">
             <button type="button" className="universal-btn-save" disabled={isWorking} onClick={() => void handleCreate()}>
               {isWorking ? "Oluşturuluyor…" : "Onayla ve Bağlantı Oluştur"}

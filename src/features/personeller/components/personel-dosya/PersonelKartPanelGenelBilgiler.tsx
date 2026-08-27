@@ -147,7 +147,8 @@ export function PersonelKartPanelGenelBilgiler({
         >
           <PersonelHesapOnboardingPanel
             personelId={personel.id}
-            sicilNo={personel.sicil_no}
+            ad={personel.ad}
+            soyad={personel.soyad}
             personelAktif={personel.aktif_durum === "AKTIF"}
           />
         </DossierSection>

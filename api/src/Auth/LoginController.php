@@ -11,6 +11,7 @@ use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
 use Medisa\Api\Scope\OrgScope;
 use Medisa\Api\Scope\SubeScope;
+use Medisa\Api\Services\Personel\PersonelOrgStructureSchema;
 use PDO;
 
 class LoginController
@@ -156,6 +157,12 @@ class LoginController
      */
     private static function deriveSubeIdsFromOrgAssignments(PDO $pdo, array $bolumIds, array $birimIds)
     {
+        // Fail-closed: never reference personeller.bolum_id / birim_id until both exist.
+        // Do not widen authority via user_subeler or unrestricted global branch lists.
+        if (!PersonelOrgStructureSchema::hasPersonelScopeColumns($pdo)) {
+            return [];
+        }
+
         $ids = [];
         if (count($birimIds) > 0) {
             $placeholders = implode(',', array_fill(0, count($birimIds), '?'));

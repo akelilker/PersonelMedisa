@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Medisa\Api\Services;
 
+use Medisa\Api\Services\Personel\PersonelOrgStructureSchema;
 use Medisa\Api\Support\Utf8;
 use PDO;
 
@@ -30,7 +31,7 @@ class BildirimPuantajEtkiRaporQueryService
     {
         $page = max(1, (int) $page);
         $limit = max(1, min(self::MAX_LIMIT, (int) $limit));
-        [$whereSql, $params, $joinSql] = self::buildFilterClause($filters, $restrictAmirId);
+        [$whereSql, $params, $joinSql] = self::buildFilterClause($pdo, $filters, $restrictAmirId);
 
         $total = self::countRows($pdo, $joinSql, $whereSql, $params);
         $offset = ($page - 1) * $limit;
@@ -59,7 +60,7 @@ class BildirimPuantajEtkiRaporQueryService
      */
     public static function exportRows(PDO $pdo, array $filters, $restrictAmirId = null)
     {
-        [$whereSql, $params, $joinSql] = self::buildFilterClause($filters, $restrictAmirId);
+        [$whereSql, $params, $joinSql] = self::buildFilterClause($pdo, $filters, $restrictAmirId);
         $rows = self::fetchRows($pdo, $joinSql, $whereSql, $params, null, null);
         $items = [];
         foreach ($rows as $row) {
@@ -73,7 +74,7 @@ class BildirimPuantajEtkiRaporQueryService
      * @param array<string, mixed> $filters
      * @return array{0: string, 1: array<string, mixed>, 2: string}
      */
-    private static function buildFilterClause(array $filters, $restrictAmirId)
+    private static function buildFilterClause(PDO $pdo, array $filters, $restrictAmirId)
     {
         $where = ['a.sube_id = :sube_id', 'a.ay = :donem'];
         $params = [
@@ -86,6 +87,8 @@ class BildirimPuantajEtkiRaporQueryService
             $params['restrict_amir_id'] = (int) $restrictAmirId;
         }
 
+        $hasPersonelScopeColumns = PersonelOrgStructureSchema::hasPersonelScopeColumns($pdo);
+
         if (isset($filters['bolum_ids']) && is_array($filters['bolum_ids']) && count($filters['bolum_ids']) > 0) {
             $bolumIds = [];
             foreach ($filters['bolum_ids'] as $rawId) {
@@ -94,7 +97,8 @@ class BildirimPuantajEtkiRaporQueryService
                     $bolumIds[$id] = $id;
                 }
             }
-            if (count($bolumIds) === 0) {
+            if (count($bolumIds) === 0 || !$hasPersonelScopeColumns) {
+                // Fail-closed: missing scope columns must not widen the result set.
                 $where[] = '1=0';
             } else {
                 $placeholders = [];
@@ -117,7 +121,8 @@ class BildirimPuantajEtkiRaporQueryService
                     $birimIds[$id] = $id;
                 }
             }
-            if (count($birimIds) === 0) {
+            if (count($birimIds) === 0 || !$hasPersonelScopeColumns) {
+                // Fail-closed: missing scope columns must not widen the result set.
                 $where[] = '1=0';
             } else {
                 $placeholders = [];

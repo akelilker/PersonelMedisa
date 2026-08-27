@@ -12,6 +12,7 @@ require $root . '/api/src/bootstrap.php';
 
 use Medisa\Api\Scope\ManagerApprovalScope;
 use Medisa\Api\Services\BildirimPuantajEtkiRaporQueryService;
+use Medisa\Api\Services\Personel\PersonelOrgStructureSchema;
 
 function masFail($msg)
 {
@@ -22,6 +23,26 @@ function masFail($msg)
 function masOk($msg)
 {
     echo "OK: {$msg}\n";
+}
+
+function masScopeReadyPdo(): PDO
+{
+    $pdo = new PDO('sqlite::memory:');
+    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    $pdo->exec(
+        'CREATE TABLE personeller (
+            id INTEGER PRIMARY KEY,
+            sube_id INTEGER NOT NULL,
+            bolum_id INTEGER NULL,
+            birim_id INTEGER NULL
+        )'
+    );
+    PersonelOrgStructureSchema::clearReadyCache();
+    if (!PersonelOrgStructureSchema::hasPersonelScopeColumns($pdo)) {
+        masFail('fixture PDO must expose personel scope columns');
+    }
+
+    return $pdo;
 }
 
 function masUser($rol, array $sube = [], array $bolum = [], array $birim = [], $id = 10)
@@ -118,11 +139,12 @@ masAssertDenies(
     'S_BA_OTHER_CHAIN_DENY'
 );
 
-// Report filter: BY bolum_ids → p.bolum_id IN
+// Report filter: BY bolum_ids → p.bolum_id IN (scope columns ready)
+$scopePdo = masScopeReadyPdo();
 $ref = new ReflectionClass(BildirimPuantajEtkiRaporQueryService::class);
 $method = $ref->getMethod('buildFilterClause');
 $method->setAccessible(true);
-[$whereSql, $params] = $method->invoke(null, [
+[$whereSql, $params] = $method->invoke(null, $scopePdo, [
     'sube_id' => 1,
     'donem' => '2026-08',
     'bolum_ids' => [1],
@@ -135,7 +157,7 @@ if (!isset($params['bolum_id_0']) || (int) $params['bolum_id_0'] !== 1) {
 }
 masOk('R_PUANTAJ_ETKI_REPORT_BY_BOLUM_FILTER');
 
-[$whereSql2] = $method->invoke(null, [
+[$whereSql2] = $method->invoke(null, $scopePdo, [
     'sube_id' => 1,
     'donem' => '2026-08',
     'bolum_ids' => [1],

@@ -156,6 +156,7 @@ describe("org hierarchy authorization contract", () => {
       resolve(root, "api/src/Services/BildirimPuantajEtkiRaporQueryService.php"),
       "utf8"
     );
+    expect(rapor).toContain("PersonelOrgStructureSchema::hasPersonelScopeColumns");
     expect(rapor).toContain("p.bolum_id IN");
     expect(rapor).toContain("p.birim_id IN");
     expect(rapor).toContain("bolum_ids");

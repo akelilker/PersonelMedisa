@@ -5,7 +5,7 @@ PRODUCTION_MIGRATION_TIP: 075
 
 **Tür:** Güncel durum kaydı ve sonraki iş seçimi için tek referans.
 **Güncelleme:** 2026-08-27
-**Kapsam:** Yalnızca dokümantasyon senkronu. Kod, migration, production veri ve feature flag değiştirilmedi.
+**Kapsam:** Dokümantasyon senkronu (personel import rollout reconcile). Kod, migration, production veri ve feature flag bu turda değiştirilmedi.
 
 ## Migration durumu
 
@@ -20,8 +20,10 @@ PRODUCTION_MIGRATION_TIP: 075
 | Durum | Anlamı |
 | --- | --- |
 | **CLOSED** | Karar ve kod owner’ı tamam; bu registry kapsamında yeni kod işi yok |
+| **CLOSED_CONFIRMED** | Canlı operasyon da doğrulanmış kapanış; yeniden import/apply açılmaz |
 | **OPS_ROLLOUT** | Kod/şema hazır, fakat canlı operasyon veya yetkili aktivasyon ayrı |
 | **USER_GATED** | İnsan onayı, canlı veri veya iş kararı olmadan ilerlemez |
+| **USER_GATED_DATA_COMPLETION** | Import/rollout kapalı; yalnız master-data tamamlama (non-blocking veya ayrı karar) |
 | **READ_ONLY_VERIFY** | Güvenli inceleme işi; yazma yetkisi gerektirmez |
 | **DECISION_REQUIRED** | İş/mevzuat kararı olmadan açılmaz; kod hatası değildir |
 | **FUTURE** | Bilinçli sonraki ürün çıktısı; bug / production blocker değildir |
@@ -41,18 +43,20 @@ PRODUCTION_MIGRATION_TIP: 075
 | `MG-IMPORT-MAP-001` | Şube-Departman import kontratı | **CLOSED** | Açık aktif Şube + aktif Departman modeli; eski sparse matrix import bloke etmez. Bkz. `124-personnel-import-open-branch-department.md`. |
 | `MG-OPS-QR-001` | QR attendance teknik pipeline | **CLOSED** | Ürün kodu tamam; sonraki uygulama adımları ayrı personel/operasyon rollout’udur. |
 | `MG-MIG-071-075` | Org hierarchy / short codes / fixture archive / QR correction / secure activation şeması | **CLOSED** | Production migration ucu `075`; `071`–`075` uygulanmıştır. |
+| `MG-OPS-PERSONEL-001` | Canonical personel import rollout (Phase1 IC + Phase2 DIS) | **CLOSED_CONFIRMED** | Phase1: 122 `IC_PERSONEL` inserted, 0 rejected. Phase2: 11 `DIS_KAYNAK` inserted, 0 rejected. Canonical DIS hedefi **11** (MUHAMMAT FAWAZ + MUSTAFA HAMİD = `EXCLUDED_USER_CONFIRMED_TERMINATED`). Import yeniden dry-run/apply açılmaz. |
+| `MG-EXT-ORG-DATA-001` | Dış kaynak import org/görev kararları (Phase2) | **CLOSED_CONFIRMED** | Phase2 final candidate VALID=11 / INVALID=0; production apply 11 inserted. 13’lük eski hedef bilinçli terminated exclusion ile kapatıldı. |
 
 ## Gerçekten açık işler
 
 | Öncelik | ID | Konu | Durum | Sonraki güvenli adım |
 | --- | --- | --- | --- | --- |
-| P0 | `MG-OPS-PERSONEL-001` | Canonical iç personel import reconciliation | **USER_GATED** | **SON KULLANICI VERİLERİYLE YENİDEN RECONCILE EDİLECEK.** Eski dry-run sayıları kesin gerçek diye yeniden üretilmez; insan girdileri tamamlanmadan apply yok. Fuzzy eşleme yok. |
-| P0 | `MG-EXT-ORG-DATA-001` | Dış kaynak organizasyon / görev kararları | **USER_GATED** | Kalan exact Departman, Bölüm, Birim ve Görev eşleşmelerini insan onayıyla tamamla. Tahmin/fuzzy eşleme yoktur. |
+| P1 | `MG-OPS-PERSONEL-PHONE-001` | 20 IC telefon deferred tamamlaması | **USER_GATED_DATA_COMPLETION** | `DEFERRED_USER_DATA` / `NON_BLOCKING_DATA_COMPLETION`. Import blocker değil; placeholder/uydurma yok; günlük operasyonu bloklamaz. |
+| P1 | `MG-OPS-DIS-ORG-COMPLETE-001` | DIS bölüm/birim completeness vs import optional kontrat | **USER_GATED_DATA_COMPLETION** | Import create validator `bolum_id`/`birim_id` optional; CompletenessService DIS dahil zorunlu sayıyor (91b12c3 sonrası yüzey). 9 distinct / 17 occurrence. Bu otomatik bug değildir; iş kararı olmadan toplu yazma/import reopen yok. |
 | P1 | `MG-OPS-SGK-CAT-001` | SGK canlı katalog/politika salt-okunur doğrulaması | **READ_ONLY_VERIFY** | Resmî kaynak etkinlik tarihleri ve canlı katalog durumunu salt-okunur doğrula; kanıtsız seed/aktivasyon yapma. Kod gap değildir. |
 | P1 | `MG-OPS-UBGT-001` | UBGT canlı takvim/projeksiyon salt-okunur doğrulaması | **READ_ONLY_VERIFY** | Canonical resmî takvim girdileri, yarım gün politikası ve canlı projeksiyonu salt-okunur karşılaştır. Kod gap değildir. |
 | P1 | `MG-RET-PHYS-001` | Gerçek fiziksel imha aktivasyonu | **USER_GATED** | Ayrı bakım penceresi, güncel yedek/geri dönüş kanıtı, çift kontrol ve açık feature flag yetkisi olmadan etkinleştirme yok. |
 | P1 | `MG-SZ-6M-001` | Serbest zaman 6 aylık operasyon sahipliği | **USER_GATED** | İK’nın takip sahipliği ve aksiyon akışı belirlenir; mevcut sistem uyarı/rapor yüzeyiyle işletilir. Yeni payroll hard block varsayılmaz. |
-| P2 | `MG-OPS-ORG-001` | Gerçek personel organizasyon FK eşlemesi | **USER_GATED** | Import verisi tamamlanmadan toplu personel yazımı yapılmaz. |
+| P2 | `MG-OPS-ORG-001` | Gerçek personel organizasyon FK eşlemesi (tamamlama) | **USER_GATED_DATA_COMPLETION** | Import rollout kapalı. Kalan org FK tamamlama ayrı insan/veri işidir; toplu import yeniden açılmaz. |
 | P2 | `MG-SUBE-YONETICI-001` | `SUBE_YONETICISI` gerçek kullanıcı ataması | **USER_GATED** | Hata değildir; hangi kullanıcıların hangi şubeye atanacağı iş sahibi tarafından belirlenirse ele alınır. |
 | P3 | `MG-ROLE-ENUM-DEBT-001` | Eski rol ENUM teknik borcu | **TECH_DEBT** | Kullanım envanteri ve migration etkisi çıkarılmadan daraltma yapılmaz. |
 
@@ -74,15 +78,15 @@ PRODUCTION_MIGRATION_TIP: 075
 2. **Gerçek imhayı açmak hızlı iş değildir.** Bu bir veri silme operasyonudur; feature flag’in kapalı olması beklenen güvenlik durumudur.
 3. **270 saat yıl değişimi için yeni iş kararı aranmaz.** Mevcut karar rolling 12 ay gerçek tarih modelidir.
 4. **`DIS_KAYNAK` operasyonlarını açmak mevcut directory-only sınırını genişletir.** SGK, bordro, puantaj, izin, fazla çalışma ve serbest zaman taraflarına kapı açılması ayrı ürün/iş kuralı onayı ister.
-5. **Personel importu teknik bir toplu yazma değildir.** Son kullanıcı verileriyle yeniden reconcile edilmeden apply yapılmaz; fuzzy eşleme yoktur.
+5. **Personel import rollout kapalıdır (`CLOSED_CONFIRMED`).** Phase1 122 IC + Phase2 11 DIS production’da tamamlandı. 20 IC telefon deferred tamamlamadır; import blocker değildir. Terminated exclusion (MUHAMMAT FAWAZ, MUSTAFA HAMİD) backlog’a eklenmez. Fuzzy eşleme yoktur.
 6. **Bordro PDF / banka dosyası / SGK bildirgesi / FSC / QR-revizyon UX bug değildir.** FUTURE / INTENTIONAL_DEFER / OUT_OF_SCOPE / DECISION_REQUIRED olarak izlenir.
 
 ## Hızlı, güvenli çalışma sırası
 
 1. Canlı SGK katalog/politika salt-okunur doğrulaması.
 2. Canlı UBGT takvim/projeksiyon salt-okunur doğrulaması.
-3. Personel import’un son kullanıcı verileriyle yeniden reconcile edilmesi.
-4. Yeni dry-run; yalnız sonuç tamamen geçerliyse import apply için ayrı onay talebi.
+3. 20 deferred IC telefon tamamlaması (non-blocking; ayrı kullanıcı girdisi).
+4. DIS bölüm/birim için iş kararı: completeness zorunlu mu, yoksa import optional null meşru mu? Karar olmadan import reopen yok.
 
 ## Referans dokümanlar
 

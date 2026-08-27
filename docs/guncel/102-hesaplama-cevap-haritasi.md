@@ -9,6 +9,8 @@
 
 **2026-08-17 closure reconciliation:** SGK catalog `CLOSED_CONFIRMED`; UBGT `CLOSED_CONFIRMED`; payroll company policy `CLOSED_CONFIRMED`; active policy revision `3`, required/resolved `14/14`, missing `0`; `HAFTA_TATILI_GUNLERI=0` / Pazar; payroll policy preflight ready. Canlı SGK/UBGT salt-okunur doğrulama `110` içinde `READ_ONLY_VERIFY` olarak izlenir (kod gap değildir).
 
+**2026-08-27 personnel import rollout:** Phase1 `122 IC_PERSONEL` + Phase2 `11 DIS_KAYNAK` production apply `CLOSED_CONFIRMED` (`110` / `MG-OPS-PERSONEL-001`, `MG-EXT-ORG-DATA-001`). Canonical DIS hedefi 11; MUHAMMAT FAWAZ + MUSTAFA HAMİD = `EXCLUDED_USER_CONFIRMED_TERMINATED` (backlog’a eklenmez). 20 IC telefon = `NON_BLOCKING_DATA_COMPLETION` / `DEFERRED_USER_DATA` (import blocker değil). Personel import pending / 13 external expected ifadesi bayattır.
+
 **Business decision reconciliation:** Retention duration is `10 YEARS` through the canonical
 `RetentionCategories::POLICY_RETENTION_YEARS` owner, provenance
 `USER_CONFIRMED_BUSINESS_DECISION`; typed physical destruction handlers exist but feature flag remains closed (`USER_GATED` / `110`).

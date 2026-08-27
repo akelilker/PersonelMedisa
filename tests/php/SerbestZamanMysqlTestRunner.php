@@ -390,6 +390,7 @@ function seedSzFixtures(PDO $pdo): void
 {
     $pdo->exec("INSERT INTO subeler (id, kod, ad) VALUES (1, 'MRK', 'Merkez'), (2, 'SB2', 'Sube 2')");
     $pdo->exec("INSERT INTO departmanlar (id, ad) VALUES (3, 'Operasyon')");
+    $pdo->exec("ALTER TABLE personeller ADD COLUMN bolum_id INT UNSIGNED NULL, ADD COLUMN birim_id INT UNSIGNED NULL");
     $pdo->exec("
         INSERT INTO users (id, username, password_hash, ad_soyad, rol, durum) VALUES
           (1, 'gy', 'x', 'Genel Yonetici', 'GENEL_YONETICI', 'AKTIF'),
@@ -406,6 +407,8 @@ function seedSzFixtures(PDO $pdo): void
           (10, '11111111111', 'Ayse', 'Yilmaz', '1990-01-01', 'S10', '2020-01-01', 1, 3, 'AKTIF'),
           (20, '22222222222', 'Mehmet', 'Demir', '1988-01-01', 'S20', '2020-01-01', 2, NULL, 'AKTIF')
     ");
+    $pdo->exec('UPDATE personeller SET bolum_id = 31, birim_id = 41 WHERE sube_id = 1');
+    $pdo->exec('UPDATE personeller SET bolum_id = 32, birim_id = 42 WHERE sube_id = 2');
 }
 
 /**
@@ -793,7 +796,7 @@ $pdo = szPdo(preg_replace('/dbname=[^;]+/', 'dbname=' . $dbName, $dsn));
 assertSzSchemaPostconditions($pdo);
 
 $gy = ['id' => 1, 'rol' => 'GENEL_YONETICI', 'sube_ids' => []];
-$ba = ['id' => 2, 'rol' => 'BIRIM_AMIRI', 'sube_ids' => [1]];
+$ba = ['id' => 2, 'rol' => 'BIRIM_AMIRI', 'sube_ids' => [1], 'birim_ids' => [41]];
 $personel = ['id' => 3, 'rol' => 'PERSONEL', 'sube_ids' => []];
 $muhasebe = ['id' => 4, 'rol' => 'MUHASEBE', 'sube_ids' => [1]];
 $subeHeader = ['x-active-sube-id' => '1'];
@@ -1049,7 +1052,7 @@ szAssert(
 );
 
 // --- S79-D-R1 acceptance hardening matrix ---
-$bolum = ['id' => 5, 'rol' => 'BOLUM_YONETICISI', 'sube_ids' => [1]];
+$bolum = ['id' => 5, 'rol' => 'BOLUM_YONETICISI', 'sube_ids' => [1], 'bolum_ids' => [31]];
 
 $baWrite = invokeSzHttp($pdo, $ba, 'POST', '/serbest-zaman/kullanim', [
     'personel_id' => 10,

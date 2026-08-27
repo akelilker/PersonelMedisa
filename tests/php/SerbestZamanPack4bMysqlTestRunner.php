@@ -139,7 +139,9 @@ function p4bMigrationFiles(): array
             && $name !== '070_offline_mutation_idempotency.sql'
             && $name !== '071_org_hierarchy_authorization.sql'
             && $name !== '072_org_reference_short_codes.sql'
-            && $name !== '073_test_fixture_personel_archive.sql';
+            && $name !== '073_test_fixture_personel_archive.sql'
+            && $name !== '074_qr_attendance_correction_and_inbox.sql'
+            && $name !== '075_personel_account_activation.sql';
     }));
     sort($files, SORT_STRING);
 
@@ -1607,7 +1609,7 @@ SIGNAL SQLSTATE '45000'
         'T FORBIDDEN code'
     );
 
-    // S. SubeScope: sube_ids=[1] must not see personel on sube 2
+    // S. Branch-scoped actor: sube_ids=[1] must not see personel on sube 2.
     $pdo->exec("INSERT INTO subeler (id, kod, ad, durum) VALUES (2, 'B', 'Sube B', 'AKTIF')");
     $pdo->exec(
         "INSERT INTO personeller (
@@ -1670,7 +1672,7 @@ SIGNAL SQLSTATE '45000'
     );
     ArchiveManifestService::createHaftalikPeriodManifests($pdo, $kapanisS, 2, $haftaS, 1);
 
-    $birimUser = ['id' => 3, 'rol' => 'BIRIM_AMIRI', 'sube_ids' => [1]];
+    $birimUser = ['id' => 3, 'rol' => 'MUHASEBE', 'sube_ids' => [1]];
     $httpS = invokeSzHttp(
         $pdo,
         $birimUser,
@@ -1680,7 +1682,7 @@ SIGNAL SQLSTATE '45000'
         [],
         ['referans_tarih' => '2020-12-01']
     );
-    p4bAssert($httpS['status'] === 200, 'S BIRIM_AMIRI deadline-takip → 200');
+    p4bAssert($httpS['status'] === 200, 'S MUHASEBE deadline-takip → 200');
     $itemsS = $httpS['payload']['data']['items'] ?? null;
     p4bAssert(is_array($itemsS), 'S items array');
     $seenPid50 = false;

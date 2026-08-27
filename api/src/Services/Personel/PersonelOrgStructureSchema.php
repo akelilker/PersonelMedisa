@@ -57,6 +57,69 @@ final class PersonelOrgStructureSchema
             && self::columnExists($pdo, 'birimler', 'kisa_kod');
     }
 
+    /**
+     * Safe personnel scope projection for owners that need organizational access data.
+     *
+     * Pre-065 schemas do not have bolum_id/birim_id. Project typed NULLs there instead
+     * of referencing missing columns, so legacy branch/global flows remain available
+     * while unit-scoped access continues to deny safely through OrgScope.
+     */
+    public static function personelScopeProjection(PDO $pdo, string $alias = '', bool $includeId = true): string
+    {
+        $prefix = trim($alias);
+        if ($prefix !== '') {
+            $prefix .= '.';
+        }
+
+        $columns = [];
+        if ($includeId) {
+            $columns[] = $prefix . 'id';
+        }
+        $columns[] = $prefix . 'sube_id';
+
+        if (self::hasPersonelScopeColumns($pdo)) {
+            $columns[] = $prefix . 'bolum_id';
+            $columns[] = $prefix . 'birim_id';
+        } else {
+            $columns[] = 'NULL AS bolum_id';
+            $columns[] = 'NULL AS birim_id';
+        }
+
+        return implode(', ', $columns);
+    }
+
+    /**
+     * Safe single-field projection with a caller-selected result alias.
+     * Used by joined read models that must retain their response contract.
+     */
+    public static function personelScopeColumnProjection(
+        PDO $pdo,
+        string $alias,
+        string $column,
+        string $resultAlias
+    ): string {
+        $prefix = trim($alias);
+        if ($prefix !== '') {
+            $prefix .= '.';
+        }
+
+        if ($column === 'sube_id' || ($column !== 'bolum_id' && $column !== 'birim_id') || self::hasPersonelScopeColumns($pdo)) {
+            return $prefix . $column . ' AS ' . $resultAlias;
+        }
+
+        return 'NULL AS ' . $resultAlias;
+    }
+
+    /**
+     * Scope-column readiness is intentionally narrower than full Pack6 readiness:
+     * callers may safely project/filter these two personnel columns only when both exist.
+     */
+    public static function hasPersonelScopeColumns(PDO $pdo): bool
+    {
+        return self::columnExists($pdo, 'personeller', 'bolum_id')
+            && self::columnExists($pdo, 'personeller', 'birim_id');
+    }
+
     private static function evaluateReady(PDO $pdo): bool
     {
         if (!self::tableExists($pdo, 'bolumler')

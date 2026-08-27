@@ -21,23 +21,30 @@ class PersonelCompletenessService
      * SQL predicate: personel row has at least one required master-data gap.
      * Must stay in parity with evaluate().
      */
-    public static function sqlHasMissingPredicate($alias = 'p')
+    public static function sqlHasMissingPredicate($alias = 'p', $hasOrgStructure = true, $hasCalisanKapsami = true)
     {
         $a = preg_replace('/[^a-zA-Z0-9_]/', '', (string) $alias);
         if ($a === '') {
             $a = 'p';
         }
 
+        $orgPredicate = $hasOrgStructure
+            ? " OR IFNULL({$a}.bolum_id, 0) <= 0"
+                . " OR IFNULL({$a}.birim_id, 0) <= 0"
+            : ' OR 1=1';
+        $calisanKapsami = $hasCalisanKapsami
+            ? "IFNULL({$a}.calisan_kapsami, 'IC_PERSONEL')"
+            : "'IC_PERSONEL'";
+
         return "("
             . "TRIM(IFNULL({$a}.sicil_no, '')) = ''"
             . " OR TRIM(IFNULL({$a}.ise_giris_tarihi, '')) = ''"
             . " OR IFNULL({$a}.departman_id, 0) <= 0"
-            . " OR IFNULL({$a}.bolum_id, 0) <= 0"
-            . " OR IFNULL({$a}.birim_id, 0) <= 0"
+            . $orgPredicate
             . " OR IFNULL({$a}.gorev_id, 0) <= 0"
             . " OR IFNULL({$a}.personel_tipi_id, 0) <= 0"
             . " OR ("
-            . "  IFNULL({$a}.calisan_kapsami, 'IC_PERSONEL') <> 'DIS_KAYNAK'"
+            . "  {$calisanKapsami} <> 'DIS_KAYNAK'"
             . "  AND ("
             . "    TRIM(IFNULL({$a}.tc_kimlik_no, '')) = ''"
             . "    OR TRIM(IFNULL({$a}.dogum_tarihi, '')) = ''"

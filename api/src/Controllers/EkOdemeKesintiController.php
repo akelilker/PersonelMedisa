@@ -11,6 +11,7 @@ use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
 use Medisa\Api\Scope\SubeScope;
 use Medisa\Api\Services\OfflineMutationIdempotencyService;
+use Medisa\Api\Services\Personel\PersonelOrgStructureSchema;
 use PDO;
 
 class EkOdemeKesintiController
@@ -758,7 +759,8 @@ class EkOdemeKesintiController
     /** @return array<string, mixed>|false */
     private static function fetchPersonel(PDO $pdo, $personelId)
     {
-        $stmt = $pdo->prepare('SELECT id, sube_id, bolum_id, birim_id, aktif_durum FROM personeller WHERE id = :id LIMIT 1');
+        $columns = PersonelOrgStructureSchema::personelScopeProjection($pdo);
+        $stmt = $pdo->prepare("SELECT {$columns}, aktif_durum FROM personeller WHERE id = :id LIMIT 1");
         $stmt->execute(['id' => $personelId]);
 
         return $stmt->fetch(PDO::FETCH_ASSOC);
@@ -776,8 +778,9 @@ class EkOdemeKesintiController
     /** @return array<string, mixed>|false */
     private static function fetchRowWithPersonel(PDO $pdo, $id)
     {
+        $scopeColumns = PersonelOrgStructureSchema::personelScopeProjection($pdo, 'p', false);
         $stmt = $pdo->prepare('
-            SELECT fk.*, p.sube_id, p.bolum_id, p.birim_id
+            SELECT fk.*, ' . $scopeColumns . '
             FROM ek_odeme_kesinti fk
             INNER JOIN personeller p ON p.id = fk.personel_id
             WHERE fk.id = :id

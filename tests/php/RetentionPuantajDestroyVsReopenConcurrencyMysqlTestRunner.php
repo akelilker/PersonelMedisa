@@ -139,6 +139,8 @@ function dvrMigrationFiles(): array
             && basename($file) !== '071_org_hierarchy_authorization.sql'
             && basename($file) !== '072_org_reference_short_codes.sql'
             && basename($file) !== '073_test_fixture_personel_archive.sql'
+            && basename($file) !== '074_qr_attendance_correction_and_inbox.sql'
+            && basename($file) !== '075_personel_account_activation.sql'
     ));
     sort($files, SORT_STRING);
 

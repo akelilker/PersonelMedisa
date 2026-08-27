@@ -10,6 +10,7 @@ use Medisa\Api\Database\Connection;
 use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
 use Medisa\Api\Scope\SubeScope;
+use Medisa\Api\Services\Personel\PersonelOrgStructureSchema;
 use Medisa\Api\Support\Utf8;
 use PDO;
 use PDOException;
@@ -1341,8 +1342,9 @@ class RevizyonController
     /** @return array<string, mixed> */
     private static function loadPersonel(PDO $pdo, int $personelId): array
     {
+        $columns = PersonelOrgStructureSchema::personelScopeProjection($pdo);
         $stmt = $pdo->prepare(
-            'SELECT id, sube_id, bolum_id, birim_id, departman_id, aktif_durum FROM personeller WHERE id = :id LIMIT 1'
+            "SELECT {$columns}, departman_id, aktif_durum FROM personeller WHERE id = :id LIMIT 1"
         );
         $stmt->execute(['id' => $personelId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);

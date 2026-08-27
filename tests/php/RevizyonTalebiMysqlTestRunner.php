@@ -353,6 +353,13 @@ function seedRtFixtures(PDO $pdo): void
 {
     $pdo->exec("INSERT INTO subeler (id, kod, ad) VALUES (1, 'MRK', 'Merkez'), (2, 'SB2', 'Sube 2')");
     $pdo->exec("INSERT INTO departmanlar (id, ad) VALUES (3, 'Operasyon')");
+    $pdo->exec("ALTER TABLE personeller ADD COLUMN bolum_id INT UNSIGNED NULL, ADD COLUMN birim_id INT UNSIGNED NULL");
+    $pdo->exec("CREATE TABLE bolumler (id INT UNSIGNED NOT NULL PRIMARY KEY, departman_id INT UNSIGNED NOT NULL) ENGINE=InnoDB");
+    $pdo->exec("CREATE TABLE birimler (id INT UNSIGNED NOT NULL PRIMARY KEY, bolum_id INT UNSIGNED NOT NULL) ENGINE=InnoDB");
+    $pdo->exec("CREATE TABLE user_bolumler (user_id INT UNSIGNED NOT NULL, bolum_id INT UNSIGNED NOT NULL, PRIMARY KEY (user_id, bolum_id)) ENGINE=InnoDB");
+    $pdo->exec("CREATE TABLE user_birimler (user_id INT UNSIGNED NOT NULL, birim_id INT UNSIGNED NOT NULL, PRIMARY KEY (user_id, birim_id)) ENGINE=InnoDB");
+    $pdo->exec("INSERT INTO bolumler (id, departman_id) VALUES (31, 3)");
+    $pdo->exec("INSERT INTO birimler (id, bolum_id) VALUES (41, 31)");
     $pdo->exec("
         INSERT INTO users (id, username, password_hash, ad_soyad, rol, durum) VALUES
           (1, 'gy', 'x', 'Genel Yonetici', 'GENEL_YONETICI', 'AKTIF'),
@@ -363,6 +370,8 @@ function seedRtFixtures(PDO $pdo): void
           (6, 'ik', 'x', 'IK Sorumlusu', 'IK_SORUMLUSU', 'AKTIF')
     ");
     $pdo->exec('INSERT INTO user_subeler (user_id, sube_id) VALUES (2, 1), (4, 1), (5, 1), (6, 1)');
+    $pdo->exec('INSERT INTO user_bolumler (user_id, bolum_id) VALUES (5, 31)');
+    $pdo->exec('INSERT INTO user_birimler (user_id, birim_id) VALUES (2, 41)');
     $pdo->exec('INSERT INTO sube_departmanlar (sube_id, departman_id) VALUES (1, 3)');
     $pdo->exec("
         INSERT INTO personeller (
@@ -371,6 +380,8 @@ function seedRtFixtures(PDO $pdo): void
           (10, '11111111111', 'Ayse', 'Yilmaz', '1990-01-01', 'S10', '2020-01-01', 1, 3, 'AKTIF'),
           (20, '22222222222', 'Mehmet', 'Demir', '1988-01-01', 'S20', '2020-01-01', 2, NULL, 'AKTIF')
     ");
+    $pdo->exec('UPDATE personeller SET bolum_id = 31, birim_id = 41 WHERE sube_id = 1');
+    $pdo->exec('UPDATE personeller SET bolum_id = 32, birim_id = 42 WHERE sube_id = 2');
 
     $stmt = $pdo->prepare('
         INSERT INTO gunluk_puantaj (personel_id, tarih, net_calisma_suresi_dakika)
@@ -705,10 +716,10 @@ $pdo = rtPdo(preg_replace('/dbname=[^;]+/', 'dbname=' . $dbName, $dsn));
 assertRtSchemaPostconditions($pdo);
 
 $gy = ['id' => 1, 'rol' => 'GENEL_YONETICI', 'sube_ids' => []];
-$ba = ['id' => 2, 'rol' => 'BIRIM_AMIRI', 'sube_ids' => [1]];
+$ba = ['id' => 2, 'rol' => 'BIRIM_AMIRI', 'sube_ids' => [1], 'birim_ids' => [41]];
 $personel = ['id' => 3, 'rol' => 'PERSONEL', 'sube_ids' => []];
 $muhasebe = ['id' => 4, 'rol' => 'MUHASEBE', 'sube_ids' => [1]];
-$bolum = ['id' => 5, 'rol' => 'BOLUM_YONETICISI', 'sube_ids' => [1]];
+$bolum = ['id' => 5, 'rol' => 'BOLUM_YONETICISI', 'sube_ids' => [1], 'bolum_ids' => [31]];
 $ik = ['id' => 6, 'rol' => 'IK_SORUMLUSU', 'sube_ids' => [1]];
 $subeHeader = ['x-active-sube-id' => '1'];
 

@@ -64,7 +64,15 @@ class PersonellerController
         $where = ['1=1'];
         $params = [];
 
-        OrgScope::appendPersonelOrgFilter($where, $params, $user, $scope, 'p');
+        $role = OrgScope::normalizeRole($user);
+        $unitScoped = in_array($role, OrgScope::BOLUM_ASSIGNMENT_ROLES, true)
+            || in_array($role, OrgScope::BIRIM_ASSIGNMENT_ROLES, true);
+        if ($unitScoped && !PersonelOrgStructureSchema::hasPersonelScopeColumns($pdo)) {
+            // Old schemas cannot prove unit membership; fail closed without referencing missing columns.
+            $where[] = '1=0';
+        } else {
+            OrgScope::appendPersonelOrgFilter($where, $params, $user, $scope, 'p');
+        }
 
         if ($aktiflik === 'aktif') {
             $where[] = "p.aktif_durum = 'AKTIF'";
@@ -103,7 +111,11 @@ class PersonellerController
             $params['search_tc'] = $searchLike;
         }
 
-        $missingPredicate = PersonelCompletenessService::sqlHasMissingPredicate('p');
+        $missingPredicate = PersonelCompletenessService::sqlHasMissingPredicate(
+            'p',
+            PersonelOrgStructureSchema::hasPersonelScopeColumns($pdo),
+            PersonelCalisanKapsamSchema::isReady($pdo)
+        );
         if ($eksikBilgiOnly) {
             $where[] = $missingPredicate;
         }
@@ -176,7 +188,8 @@ class PersonellerController
             JsonResponse::serverError('Veritabani baglantisi kurulamadi.');
         }
 
-        $stmt = $pdo->prepare('SELECT id, sube_id, bolum_id, birim_id, aktif_durum FROM personeller WHERE id = :id LIMIT 1');
+        $columns = PersonelOrgStructureSchema::personelScopeProjection($pdo);
+        $stmt = $pdo->prepare("SELECT {$columns}, aktif_durum FROM personeller WHERE id = :id LIMIT 1");
         $stmt->execute(['id' => $personelId]);
         $exists = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$exists) {

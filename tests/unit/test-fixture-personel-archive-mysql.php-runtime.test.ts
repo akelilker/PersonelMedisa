@@ -104,9 +104,11 @@ describe("test fixture personel archive owner", () => {
     expect(archiveManifest).toContain("CODE_TERMINATION_DATE_MISSING");
     expect(sureclerSrc).toContain("ISTEN_AYRILMA");
 
-    // Tip-lock: both 072 and 073 must remain excluded so filtered tip ends at 066.
+    // Tip-lock: post-Pack7F migrations remain excluded so filtered tip ends at 066.
     expect(pack5Src).toContain("072_org_reference_short_codes.sql");
     expect(pack5Src).toContain("073_test_fixture_personel_archive.sql");
+    expect(pack5Src).toContain("074_qr_attendance_correction_and_inbox.sql");
+    expect(pack5Src).toContain("075_personel_account_activation.sql");
     expect(pack5Src).toContain("066_personel_calisan_kapsami.sql");
     const excluded = [
       "067_personel_canonical_reference_gate.sql",
@@ -116,6 +118,8 @@ describe("test fixture personel archive owner", () => {
       "071_org_hierarchy_authorization.sql",
       "072_org_reference_short_codes.sql",
       "073_test_fixture_personel_archive.sql",
+      "074_qr_attendance_correction_and_inbox.sql",
+      "075_personel_account_activation.sql",
     ];
     const migrations = readdirSync(resolve(root, "api/migrations"))
       .filter((name) => /^\d{3}_.+\.sql$/.test(name) && !excluded.includes(name))

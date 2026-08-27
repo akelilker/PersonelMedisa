@@ -12,6 +12,7 @@ use Medisa\Api\Http\Request;
 use Medisa\Api\Scope\SubeScope;
 use Medisa\Api\Services\Payroll\FazlaCalismaYillikLimitService;
 use Medisa\Api\Services\Payroll\PayrollComplianceGuard;
+use Medisa\Api\Services\Personel\PersonelOrgStructureSchema;
 use Medisa\Api\Services\PuantajDonemKilidiService;
 use PDO;
 use PDOException;
@@ -596,7 +597,7 @@ class FazlaCalismaOdemeTercihiController
         if (count($allowed) === 0 && !RolePermissions::has($user, 'personeller.view')) {
             JsonResponse::forbidden('Sube baglami olmadan odeme tercihi erisilemez.');
         }
-        SubeScope::assertPersonelAccess($user, $request, (int) $satir['sube_id']);
+        SubeScope::assertPersonelAccess($user, $request, self::snapshotPersonelOrg($satir));
     }
 
     private static function assertWeekPeriodsOpen(PDO $pdo, int $subeId, string $haftaBaslangic, string $haftaBitis): void
@@ -666,10 +667,30 @@ class FazlaCalismaOdemeTercihiController
     /** @return array<string, mixed>|null */
     private static function loadSnapshotSatir(PDO $pdo, int $snapshotId, bool $forUpdate = false)
     {
+        $personelSube = PersonelOrgStructureSchema::personelScopeColumnProjection(
+            $pdo,
+            'p',
+            'sube_id',
+            'sube_id'
+        );
+        $personelBolum = PersonelOrgStructureSchema::personelScopeColumnProjection(
+            $pdo,
+            'p',
+            'bolum_id',
+            'personel_bolum_id'
+        );
+        $personelBirim = PersonelOrgStructureSchema::personelScopeColumnProjection(
+            $pdo,
+            'p',
+            'birim_id',
+            'personel_birim_id'
+        );
         $sql = 'SELECT s.id, s.kapanis_id, s.personel_id, s.hafta_baslangic, s.hafta_bitis,
-                       s.fazla_calisma_dakika, k.sube_id
+                       s.fazla_calisma_dakika, k.sube_id AS kapanis_sube_id,
+                       ' . $personelSube . ', ' . $personelBolum . ', ' . $personelBirim . '
                 FROM haftalik_kapanis_satirlari s
                 INNER JOIN haftalik_kapanislar k ON k.id = s.kapanis_id
+                INNER JOIN personeller p ON p.id = s.personel_id
                 WHERE s.id = :id
                 LIMIT 1';
         if ($forUpdate) {
@@ -680,6 +701,17 @@ class FazlaCalismaOdemeTercihiController
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
         return $row === false ? null : $row;
+    }
+
+    /** @param array<string, mixed> $satir @return array<string, mixed> */
+    private static function snapshotPersonelOrg(array $satir): array
+    {
+        return [
+            'id' => (int) $satir['personel_id'],
+            'sube_id' => (int) $satir['sube_id'],
+            'bolum_id' => $satir['personel_bolum_id'] ?? null,
+            'birim_id' => $satir['personel_birim_id'] ?? null,
+        ];
     }
 
     /** @return array<string, mixed>|null */

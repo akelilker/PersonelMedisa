@@ -13,6 +13,7 @@ use Medisa\Api\Scope\SubeScope;
 use Medisa\Api\Services\Payroll\FazlaCalismaYillikLimitService;
 use Medisa\Api\Services\Payroll\PayrollComplianceGuard;
 use Medisa\Api\Services\PuantajDonemKilidiService;
+use Medisa\Api\Services\Personel\PersonelOrgStructureSchema;
 use Medisa\Api\Services\SerbestZaman\SerbestZamanAllocationService;
 use Medisa\Api\Services\SerbestZaman\SerbestZamanDeadlineService;
 use PDO;
@@ -227,7 +228,8 @@ class SerbestZamanController
         $where[] = \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::sqlIcPersonelPredicate($pdo, 'p');
         $whereSql = implode(' AND ', $where);
 
-        $sql = "SELECT p.id, " . \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::sqlAdSoyadExpr('p') . " AS ad_soyad, p.sicil_no, p.sube_id, p.bolum_id, p.birim_id,
+        $scopeColumns = PersonelOrgStructureSchema::personelScopeProjection($pdo, 'p');
+        $sql = "SELECT {$scopeColumns}, " . \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::sqlAdSoyadExpr('p') . " AS ad_soyad, p.sicil_no,
                        s.ad AS sube_ad, d.ad AS bolum_ad
                 FROM personeller p
                 LEFT JOIN subeler s ON s.id = p.sube_id
@@ -1146,7 +1148,8 @@ class SerbestZamanController
     /** @return array<string, mixed>|null */
     private static function loadPersonel(PDO $pdo, int $personelId, bool $forUpdate = false)
     {
-        $sql = 'SELECT id, sube_id, bolum_id, birim_id FROM personeller WHERE id = :id LIMIT 1';
+        $columns = PersonelOrgStructureSchema::personelScopeProjection($pdo);
+        $sql = "SELECT {$columns} FROM personeller WHERE id = :id LIMIT 1";
         if ($forUpdate) {
             $sql .= ' FOR UPDATE';
         }

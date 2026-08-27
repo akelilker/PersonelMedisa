@@ -10,6 +10,7 @@ use Medisa\Api\Database\Connection;
 use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
 use Medisa\Api\Scope\SubeScope;
+use Medisa\Api\Services\Personel\PersonelOrgStructureSchema;
 use Medisa\Api\Services\PersonelUcretException;
 use Medisa\Api\Services\PersonelUcretService;
 use Medisa\Api\Services\Retention\PersonelArchiveGate;
@@ -108,7 +109,8 @@ class PersonelUcretController
         }
         try {
             $pdo = Connection::get();
-            $stmt = $pdo->prepare('SELECT id, sube_id, bolum_id, birim_id FROM personeller WHERE id = :id');
+            $columns = PersonelOrgStructureSchema::personelScopeProjection($pdo);
+            $stmt = $pdo->prepare("SELECT {$columns} FROM personeller WHERE id = :id");
             $stmt->execute(['id' => $personelId]);
             $personel = $stmt->fetch(PDO::FETCH_ASSOC);
         } catch (\Throwable $e) {

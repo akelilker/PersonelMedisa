@@ -135,7 +135,9 @@ function rpdMigrationFiles(): array
             && $name !== '070_offline_mutation_idempotency.sql'
             && $name !== '071_org_hierarchy_authorization.sql'
             && $name !== '072_org_reference_short_codes.sql'
-            && $name !== '073_test_fixture_personel_archive.sql';
+            && $name !== '073_test_fixture_personel_archive.sql'
+            && $name !== '074_qr_attendance_correction_and_inbox.sql'
+            && $name !== '075_personel_account_activation.sql';
     }));
     sort($files, SORT_STRING);
 

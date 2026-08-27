@@ -354,6 +354,13 @@ function seedHkFixtures(PDO $pdo): void
 {
     $pdo->exec("INSERT INTO subeler (id, kod, ad) VALUES (1, 'MRK', 'Merkez'), (2, 'SB2', 'Sube 2')");
     $pdo->exec("INSERT INTO departmanlar (id, ad) VALUES (3, 'Operasyon'), (4, 'Depo')");
+    $pdo->exec("ALTER TABLE personeller ADD COLUMN bolum_id INT UNSIGNED NULL, ADD COLUMN birim_id INT UNSIGNED NULL");
+    $pdo->exec("CREATE TABLE bolumler (id INT UNSIGNED NOT NULL PRIMARY KEY, departman_id INT UNSIGNED NOT NULL) ENGINE=InnoDB");
+    $pdo->exec("CREATE TABLE birimler (id INT UNSIGNED NOT NULL PRIMARY KEY, bolum_id INT UNSIGNED NOT NULL) ENGINE=InnoDB");
+    $pdo->exec("CREATE TABLE user_bolumler (user_id INT UNSIGNED NOT NULL, bolum_id INT UNSIGNED NOT NULL, PRIMARY KEY (user_id, bolum_id)) ENGINE=InnoDB");
+    $pdo->exec("CREATE TABLE user_birimler (user_id INT UNSIGNED NOT NULL, birim_id INT UNSIGNED NOT NULL, PRIMARY KEY (user_id, birim_id)) ENGINE=InnoDB");
+    $pdo->exec("INSERT INTO bolumler (id, departman_id) VALUES (31, 3)");
+    $pdo->exec("INSERT INTO birimler (id, bolum_id) VALUES (41, 31)");
     $pdo->exec("
         INSERT INTO users (id, username, password_hash, ad_soyad, rol, durum) VALUES
           (1, 'gy', 'x', 'Genel Yonetici', 'GENEL_YONETICI', 'AKTIF'),
@@ -363,6 +370,8 @@ function seedHkFixtures(PDO $pdo): void
           (5, 'bolum', 'x', 'Bolum Yoneticisi', 'BOLUM_YONETICISI', 'AKTIF')
     ");
     $pdo->exec('INSERT INTO user_subeler (user_id, sube_id) VALUES (2, 1), (4, 1), (5, 1)');
+    $pdo->exec('INSERT INTO user_bolumler (user_id, bolum_id) VALUES (5, 31)');
+    $pdo->exec('INSERT INTO user_birimler (user_id, birim_id) VALUES (2, 41)');
     $pdo->exec("
         INSERT INTO personeller (
           id, tc_kimlik_no, ad, soyad, dogum_tarihi, sicil_no, ise_giris_tarihi, sube_id, departman_id, aktif_durum
@@ -371,6 +380,7 @@ function seedHkFixtures(PDO $pdo): void
           (20, '22222222222', 'Mehmet', 'Demir', '1988-01-01', 'S20', '2020-01-01', 2, NULL, 'AKTIF'),
           (30, '33333333333', 'Can', 'Kara', '1991-01-01', 'S30', '2020-01-01', 1, 4, 'AKTIF')
     ");
+    $pdo->exec('UPDATE personeller SET bolum_id = 31, birim_id = 41 WHERE sube_id = 1');
 
     // Week 2026-04-06..12 mutabakat TAMAMLANDI for sube 1
     $pdo->exec("
@@ -617,7 +627,7 @@ $pdo = hkPdo(preg_replace('/dbname=[^;]+/', 'dbname=' . $dbName, $dsn));
 assertHkSchemaPostconditions($pdo);
 
 $gy = ['id' => 1, 'rol' => 'GENEL_YONETICI', 'sube_ids' => []];
-$ba = ['id' => 2, 'rol' => 'BIRIM_AMIRI', 'sube_ids' => [1]];
+$ba = ['id' => 2, 'rol' => 'BIRIM_AMIRI', 'sube_ids' => [1], 'birim_ids' => [41]];
 $personel = ['id' => 3, 'rol' => 'PERSONEL', 'sube_ids' => []];
 $muhasebe = ['id' => 4, 'rol' => 'MUHASEBE', 'sube_ids' => [1]];
 
@@ -841,7 +851,7 @@ $afterTx = (int) $pdo->query("
 hkAssert($txResult['status'] >= 400, 'transaction: insert fail after mutabakat → error status');
 hkAssert($beforeTx === $afterTx && $afterTx === 0, 'transaction: no partial kapanis row');
 
-$bolum = ['id' => 5, 'rol' => 'BOLUM_YONETICISI', 'sube_ids' => [1]];
+$bolum = ['id' => 5, 'rol' => 'BOLUM_YONETICISI', 'sube_ids' => [1], 'bolum_ids' => [31]];
 $bolumPost = invokeHkHttp($pdo, $bolum, 'POST', '/haftalik-kapanis', [
     'hafta_baslangic' => '2026-05-11',
     'hafta_bitis' => '2026-05-17',

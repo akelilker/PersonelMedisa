@@ -280,6 +280,8 @@ function createFcotParentTables(PDO $pdo): void
           sicil_no VARCHAR(32) NOT NULL,
           ise_giris_tarihi DATE NOT NULL,
           sube_id INT UNSIGNED NOT NULL,
+          bolum_id INT UNSIGNED NULL,
+          birim_id INT UNSIGNED NULL,
           departman_id INT UNSIGNED NULL,
           aktif_durum ENUM('AKTIF','PASIF') NOT NULL DEFAULT 'AKTIF',
           calisan_kapsami ENUM('IC_PERSONEL','DIS_KAYNAK') NOT NULL DEFAULT 'IC_PERSONEL',
@@ -433,6 +435,8 @@ function seedFcotFixtures(PDO $pdo): void
           (10, '11111111111', 'Ayse', 'Yilmaz', '1990-01-01', 'S10', '2020-01-01', 1, 3, 'AKTIF', 'IC_PERSONEL'),
           (20, '22222222222', 'Mehmet', 'Demir', '1988-01-01', 'S20', '2020-01-01', 2, NULL, 'AKTIF', 'IC_PERSONEL')
     ");
+    $pdo->exec('UPDATE personeller SET bolum_id = 31, birim_id = 41 WHERE id = 10');
+    $pdo->exec('UPDATE personeller SET bolum_id = 32, birim_id = 42 WHERE id = 20');
 }
 
 /**
@@ -598,10 +602,10 @@ $pdo = fcotPdo(preg_replace('/dbname=[^;]+/', 'dbname=' . $dbName, $dsn));
 assertFcotSchemaPostconditions($pdo);
 
 $gy = ['id' => 1, 'rol' => 'GENEL_YONETICI', 'sube_ids' => []];
-$ba = ['id' => 2, 'rol' => 'BIRIM_AMIRI', 'sube_ids' => [1]];
+$ba = ['id' => 2, 'rol' => 'BIRIM_AMIRI', 'sube_ids' => [1], 'birim_ids' => [41]];
 $personel = ['id' => 3, 'rol' => 'PERSONEL', 'sube_ids' => []];
 $muhasebe = ['id' => 4, 'rol' => 'MUHASEBE', 'sube_ids' => [1]];
-$bolum = ['id' => 5, 'rol' => 'BOLUM_YONETICISI', 'sube_ids' => [1]];
+$bolum = ['id' => 5, 'rol' => 'BOLUM_YONETICISI', 'sube_ids' => [1], 'bolum_ids' => [31]];
 $subeHeader = ['x-active-sube-id' => '1'];
 
 $seed = seedSnapshot($pdo, 1, 10, '2026-04-06', '2026-04-12', 180);

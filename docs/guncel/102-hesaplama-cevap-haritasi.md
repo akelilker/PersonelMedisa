@@ -69,7 +69,7 @@ Amir bildirimi / süreç / puantaj
 | UBGT / resmi tatil | `api/src/Services/ResmiTatilTakvimiService.php`, `ResmiTatilTakvimProjectionService.php` | Doc `94-s88-ubgt-tatil-takvimi-owner.md` |
 | Şirket çalışma politikası | `api/src/Services/SirketCalismaPolitikasiService.php` + `api/src/Services/Payroll/SirketCalismaPolitikasiCatalog.php` | Onaysız parametre yok |
 | Mevzuat parametreleri | `api/src/Services/MevzuatParametreService.php` + `MaasHesaplamaLegalParameterCatalog.php` | Eksikse blocker |
-| Saklama (10 yıl) | `api/src/Services/Retention/*` | Medisa saklama politikası; fiziksel imha executor stub (`EXECUTION_HANDLER_NOT_IMPLEMENTED`) — `110` |
+| Saklama (10 yıl) | `api/src/Services/Retention/*` | Medisa saklama politikası; typed fiziksel imha handler'ları ve fail-closed plan/execute gate'leri var. Gerçek imha feature flag kapalıyken çalışmaz; desteklenmeyen kaynak adapter'ı fail-closed kalır. Bkz. `110`, `114`, `118`. |
 | PERSONEL self-service okuma | `api/src/Controllers/MeController.php` + `api/src/Services/SelfService/SelfPersonelContext.php` (mig `056` `users.personel_id`) | `/me` puantaj / izin bakiye / FM / QR read. Maaş-bordro self-view OUT_OF_SCOPE |
 | QR attendance / interval / candidate / decision | `api/src/Services/Qr/*` (mig `057`/`058`) | S3C–S3F CLOSED_PRODUCTION; gerçek employee rollout USER_GATED |
 
@@ -249,7 +249,7 @@ Yetki için kod owner: `api/src/Auth/RolePermissions.php` (canonical). `09-rol-y
 | Süre | **10 yıl** (`POLICY_RETENTION_YEARS`) |
 | Dil | “Medisa saklama politikası” (kanunen iddia etmez; hedef 10 yıl) |
 | Kategoriler | Özlük, puantaj, bordro, izin, rapor, SGK, FM, serbest zaman, disiplin… |
-| İmha | Retention + legal hold + imha talebi/onay workflow var; fiziksel executor `EXECUTION_HANDLER_NOT_IMPLEMENTED`; manifest auto-wiring yalnız özlük + işe giriş/çıkış (`110`) |
+| İmha | Retention + legal hold + imha talebi/onay workflow ve typed fiziksel imha handler'ları var. Feature flag varsayılan olarak kapalıdır; gerçek imha ayrı çift-kontrol operasyonudur. Bilinmeyen/uygulanmamış kaynak adapter'ları fail-closed kalır (`110`, `114`, `118`). |
 
 ---
 

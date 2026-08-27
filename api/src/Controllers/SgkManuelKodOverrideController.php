@@ -11,6 +11,7 @@ use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
 use Medisa\Api\Scope\SubeScope;
 use Medisa\Api\Services\Payroll\SgkManuelKodOverrideService;
+use Medisa\Api\Services\Personel\PersonelOrgStructureSchema;
 
 final class SgkManuelKodOverrideController
 {
@@ -35,7 +36,8 @@ final class SgkManuelKodOverrideController
             JsonResponse::serverError('Veritabani baglantisi kurulamadi.');
         }
 
-        $stmt = $pdo->prepare('SELECT id, sube_id, bolum_id, birim_id FROM personeller WHERE id = :id LIMIT 1');
+        $columns = PersonelOrgStructureSchema::personelScopeProjection($pdo);
+        $stmt = $pdo->prepare("SELECT {$columns} FROM personeller WHERE id = :id LIMIT 1");
         $stmt->execute(['id' => $personelId]);
         $personel = $stmt->fetch(\PDO::FETCH_ASSOC);
         if (!is_array($personel)) {

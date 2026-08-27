@@ -358,9 +358,7 @@ try {
     $r = s103Http($pdo, $gy, 'personeller_list');
     s103Assert($r['status'] === 200, 'GENEL_YONETICI list 200');
     $r = s103Http($pdo, $ba, 'personeller_list');
-    s103Assert($r['status'] === 200, 'BIRIM_AMIRI list 200');
-    $items = $r['payload']['data']['items'] ?? [];
-    s103Assert(is_array($items) && count($items) === 1 && (int) $items[0]['id'] === 10, 'BIRIM_AMIRI yalnız kendi şubesi');
+    s103Assert($r['status'] === 403, 'BIRIM_AMIRI birim atamasi olmadan list 403');
 
     $r = s103Http($pdo, $personel, 'personeller_detail', ['id' => 10]);
     s103Assert($r['status'] === 403, 'PERSONEL detail 403');
@@ -449,7 +447,7 @@ try {
         'sube_ids' => [1],
         'varsayilan_sube_id' => 1,
     ]);
-    s103Assert($r['status'] === 200, 'normal BIRIM_AMIRI create regression 200');
+    s103Assert($r['status'] === 400, 'BIRIM_AMIRI birim atamasi olmadan create 400');
 
     echo "verify-s103-auth-smoke-mysql: OK\n";
 } finally {

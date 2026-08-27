@@ -147,7 +147,9 @@ function p5MigrationFiles(): array
             && $name !== '070_offline_mutation_idempotency.sql'
             && $name !== '071_org_hierarchy_authorization.sql'
             && $name !== '072_org_reference_short_codes.sql'
-            && $name !== '073_test_fixture_personel_archive.sql';
+            && $name !== '073_test_fixture_personel_archive.sql'
+            && $name !== '074_qr_attendance_correction_and_inbox.sql'
+            && $name !== '075_personel_account_activation.sql';
     }));
     sort($files, SORT_STRING);
 
@@ -651,7 +653,7 @@ p5Assert(in_array('064_personel_org_location_model.sql', $files, true), '064 pre
 p5Assert(end($files) === '066_personel_calisan_kapsami.sql', 'tip ends with 066_personel_calisan_kapsami.sql');
 
 $gyUser = ['id' => 1, 'rol' => 'GENEL_YONETICI', 'sube_ids' => []];
-$scopedUser = ['id' => 2, 'rol' => 'BOLUM_YONETICISI', 'sube_ids' => [1]];
+$scopedUser = ['id' => 2, 'rol' => 'IK_SORUMLUSU', 'sube_ids' => [1]];
 
 // ========== Phase Pre064 (through 062) — B1–B3 ==========
 $dbPre = 'medisa_pack5_pre_' . substr(bin2hex(random_bytes(4)), 0, 8);

@@ -11,6 +11,7 @@ use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
 use Medisa\Api\Scope\SubeScope;
 use Medisa\Api\Services\OfflineMutationIdempotencyService;
+use Medisa\Api\Services\Personel\PersonelOrgStructureSchema;
 use PDO;
 
 class SureclerController
@@ -724,7 +725,8 @@ class SureclerController
     /** @return array<string, mixed>|null */
     private static function fetchPersonelForScope(PDO $pdo, $personelId)
     {
-        $stmt = $pdo->prepare('SELECT id, sube_id, bolum_id, birim_id, aktif_durum FROM personeller WHERE id = :id LIMIT 1');
+        $columns = PersonelOrgStructureSchema::personelScopeProjection($pdo);
+        $stmt = $pdo->prepare("SELECT {$columns}, aktif_durum FROM personeller WHERE id = :id LIMIT 1");
         $stmt->execute(['id' => (int) $personelId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -801,12 +803,15 @@ class SureclerController
     /** @return array<string, mixed>|null */
     private static function fetchSurecWithPersonel(PDO $pdo, $surecId)
     {
+        $sube = PersonelOrgStructureSchema::personelScopeColumnProjection($pdo, 'p', 'sube_id', 'personel_sube_id');
+        $bolum = PersonelOrgStructureSchema::personelScopeColumnProjection($pdo, 'p', 'bolum_id', 'personel_bolum_id');
+        $birim = PersonelOrgStructureSchema::personelScopeColumnProjection($pdo, 'p', 'birim_id', 'personel_birim_id');
         $stmt = $pdo->prepare('
             SELECT sc.id, sc.personel_id, sc.surec_turu, sc.alt_tur, sc.baslangic_tarihi, sc.bitis_tarihi,
                    sc.ucretli_mi, sc.tam_gun_mu, sc.ilk_iki_gun_firma_oder_mi, sc.aciklama, sc.state,
-                   p.sube_id AS personel_sube_id,
-                   p.bolum_id AS personel_bolum_id,
-                   p.birim_id AS personel_birim_id
+                   ' . $sube . ',
+                   ' . $bolum . ',
+                   ' . $birim . '
             FROM surecler sc
             INNER JOIN personeller p ON p.id = sc.personel_id
             WHERE sc.id = :id

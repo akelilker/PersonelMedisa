@@ -10,6 +10,7 @@ use Medisa\Api\Database\Connection;
 use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
 use Medisa\Api\Scope\SubeScope;
+use Medisa\Api\Services\Personel\PersonelOrgStructureSchema;
 use Medisa\Api\Services\PersonelBordroKapsamService;
 use PDO;
 
@@ -78,7 +79,8 @@ class PersonelBordroKapsamController
         $user = AuthMiddleware::authenticate($request, true);
         RolePermissions::assert($user, $permission);
         $pdo = Connection::get();
-        $stmt = $pdo->prepare('SELECT id, sube_id, bolum_id, birim_id, sicil_no, ad, soyad FROM personeller WHERE id = :id LIMIT 1');
+        $columns = PersonelOrgStructureSchema::personelScopeProjection($pdo);
+        $stmt = $pdo->prepare("SELECT {$columns}, sicil_no, ad, soyad FROM personeller WHERE id = :id LIMIT 1");
         $stmt->execute(['id' => (int) $personelId]);
         $personel = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$personel) {

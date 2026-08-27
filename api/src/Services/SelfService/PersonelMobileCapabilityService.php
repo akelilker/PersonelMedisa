@@ -33,13 +33,13 @@ class PersonelMobileCapabilityService
      *   coming_soon_message: string|null
      * }
      */
-    public static function resolve(PDO $pdo, $personelId, array $personelRowOrCtx = null)
+    public static function resolve(?PDO $pdo, $personelId, array $personelRowOrCtx = null)
     {
         $personelId = (int) $personelId;
         $kapsam = 'IC_PERSONEL';
         if (is_array($personelRowOrCtx) && isset($personelRowOrCtx['calisan_kapsami']) && $personelRowOrCtx['calisan_kapsami'] !== null) {
             $kapsam = strtoupper(trim((string) $personelRowOrCtx['calisan_kapsami']));
-        } elseif ($personelId > 0) {
+        } elseif ($pdo !== null && $personelId > 0) {
             try {
                 $stmt = $pdo->prepare('SELECT calisan_kapsami FROM personeller WHERE id = :id LIMIT 1');
                 $stmt->execute(['id' => $personelId]);

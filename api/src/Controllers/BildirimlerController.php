@@ -12,6 +12,7 @@ use Medisa\Api\Http\Request;
 use Medisa\Api\Scope\ManagerApprovalScope;
 use Medisa\Api\Scope\SubeScope;
 use Medisa\Api\Services\OfflineMutationIdempotencyService;
+use Medisa\Api\Services\Personel\PersonelOrgStructureSchema;
 use PDO;
 
 class BildirimlerController
@@ -79,7 +80,7 @@ class BildirimlerController
             $total = self::countRows($pdo, $fromSql, $params);
             $offset = ($page - 1) * $limit;
             $sql = '
-                SELECT ' . self::enrichmentSelectSql() . '
+                SELECT ' . self::enrichmentSelectSql($pdo) . '
                 ' . $fromSql . '
                 ORDER BY gb.tarih DESC, gb.id DESC
                 LIMIT :limit OFFSET :offset
@@ -1149,8 +1150,9 @@ class BildirimlerController
     /** @return array<string, mixed>|false */
     private static function fetchPersonel(PDO $pdo, $personelId)
     {
+        $scopeColumns = PersonelOrgStructureSchema::personelScopeProjection($pdo);
         $stmt = $pdo->prepare('
-            SELECT id, sube_id, bolum_id, birim_id, departman_id, aktif_durum, ise_giris_tarihi, bagli_amir_id
+            SELECT ' . $scopeColumns . ', departman_id, aktif_durum, ise_giris_tarihi, bagli_amir_id
             FROM personeller
             WHERE id = :id
             LIMIT 1
@@ -1160,8 +1162,21 @@ class BildirimlerController
         return $stmt->fetch(PDO::FETCH_ASSOC);
     }
 
-    private static function enrichmentSelectSql()
+    private static function enrichmentSelectSql(PDO $pdo)
     {
+        $bolum = PersonelOrgStructureSchema::personelScopeColumnProjection(
+            $pdo,
+            'p',
+            'bolum_id',
+            'personel_bolum_id'
+        );
+        $birim = PersonelOrgStructureSchema::personelScopeColumnProjection(
+            $pdo,
+            'p',
+            'birim_id',
+            'personel_birim_id'
+        );
+
         return '
             gb.*,
             TRIM(CONCAT(COALESCE(p.ad, \'\'), \' \', COALESCE(p.soyad, \'\'))) AS personel_ad_soyad,
@@ -1170,9 +1185,8 @@ class BildirimlerController
             d.ad AS departman_adi,
             s.ad AS sube_adi,
             p.bagli_amir_id AS amir_user_id,
-            p.bolum_id AS personel_bolum_id,
-            p.birim_id AS personel_birim_id
-        ';
+            ' . $bolum . ',
+            ' . $birim;
     }
 
     private static function enrichmentFromSql()
@@ -1190,7 +1204,7 @@ class BildirimlerController
     private static function fetchRowById(PDO $pdo, $id)
     {
         $stmt = $pdo->prepare('
-            SELECT ' . self::enrichmentSelectSql() . '
+            SELECT ' . self::enrichmentSelectSql($pdo) . '
             ' . self::enrichmentFromSql() . '
             WHERE gb.id = :id
             LIMIT 1

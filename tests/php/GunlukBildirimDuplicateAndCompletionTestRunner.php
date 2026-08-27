@@ -293,6 +293,8 @@ $admin->exec('CREATE DATABASE `' . $database . '` CHARACTER SET utf8mb4 COLLATE 
           sicil_no VARCHAR(32) NOT NULL,
           ise_giris_tarihi DATE NOT NULL,
           sube_id INT UNSIGNED NOT NULL,
+          bolum_id INT UNSIGNED NULL,
+          birim_id INT UNSIGNED NULL,
           departman_id INT UNSIGNED NULL,
           gorev_id INT UNSIGNED NULL,
           bagli_amir_id INT UNSIGNED NULL,
@@ -302,6 +304,10 @@ $admin->exec('CREATE DATABASE `' . $database . '` CHARACTER SET utf8mb4 COLLATE 
           CONSTRAINT fk_s81_p_sube FOREIGN KEY (sube_id) REFERENCES subeler (id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     ");
+    $pdo->exec("CREATE TABLE bolumler (id INT UNSIGNED NOT NULL PRIMARY KEY, ad VARCHAR(120) NOT NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    $pdo->exec("CREATE TABLE birimler (id INT UNSIGNED NOT NULL PRIMARY KEY, bolum_id INT UNSIGNED NOT NULL, ad VARCHAR(120) NOT NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    $pdo->exec("CREATE TABLE user_bolumler (user_id INT UNSIGNED NOT NULL, bolum_id INT UNSIGNED NOT NULL, PRIMARY KEY (user_id, bolum_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    $pdo->exec("CREATE TABLE user_birimler (user_id INT UNSIGNED NOT NULL, birim_id INT UNSIGNED NOT NULL, PRIMARY KEY (user_id, birim_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
     $pdo->exec((string) file_get_contents(__DIR__ . '/../../api/migrations/005_gunluk_bildirimler.sql'));
     $pdo->exec((string) file_get_contents(__DIR__ . '/../../api/migrations/006_haftalik_bildirim_mutabakatlari.sql'));
 
@@ -360,6 +366,12 @@ $admin->exec('CREATE DATABASE `' . $database . '` CHARACTER SET utf8mb4 COLLATE 
     $amirId = (int) $pdo->lastInsertId();
     $pdo->prepare('INSERT INTO user_subeler (user_id, sube_id) VALUES (:u, :s)')
         ->execute(['u' => $amirId, 's' => $subeId]);
+    $pdo->exec("INSERT INTO bolumler (id, ad) VALUES (31, 'S81 Bolum')");
+    $pdo->exec("INSERT INTO birimler (id, bolum_id, ad) VALUES (41, 31, 'S81 Birim')");
+    $pdo->prepare('INSERT INTO user_bolumler (user_id, bolum_id) VALUES (:u, 31)')
+        ->execute(['u' => $amirId]);
+    $pdo->prepare('INSERT INTO user_birimler (user_id, birim_id) VALUES (:u, 41)')
+        ->execute(['u' => $amirId]);
 
     $tc = str_pad((string) random_int(10000000000, 99999999999), 11, '1', STR_PAD_LEFT);
     $pdo->prepare("
@@ -377,6 +389,8 @@ $admin->exec('CREATE DATABASE `' . $database . '` CHARACTER SET utf8mb4 COLLATE 
         'amir' => $amirId,
     ]);
     $personelId = (int) $pdo->lastInsertId();
+    $pdo->prepare('UPDATE personeller SET bolum_id = :bolum, birim_id = :birim WHERE id = :id')
+        ->execute(['bolum' => 31, 'birim' => 41, 'id' => $personelId]);
 
     $tarih = date('Y-m-d');
     $auth = [
@@ -384,6 +398,7 @@ $admin->exec('CREATE DATABASE `' . $database . '` CHARACTER SET utf8mb4 COLLATE 
         'rol' => 'BIRIM_AMIRI',
         'ad_soyad' => 'S81 Amir',
         'sube_ids' => [$subeId],
+        'birim_ids' => [41],
     ];
 
     $create1 = s81HttpChild('create', $auth, $subeId, [], [

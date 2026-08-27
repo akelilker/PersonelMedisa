@@ -50,7 +50,7 @@ $early = \Medisa\Api\Services\Attendance\LateEarlyInfoService::evaluateAfterScan
 acaAssert(is_array($early) && (int) $early['delta_dakika'] === 25, 'early exit delta 25');
 
 $capsDis = \Medisa\Api\Services\SelfService\PersonelMobileCapabilityService::resolve(
-    new PDO('sqlite::memory:'),
+    null,
     1,
     ['calisan_kapsami' => 'DIS_KAYNAK']
 );

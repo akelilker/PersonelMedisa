@@ -10,6 +10,7 @@ use Medisa\Api\Database\Connection;
 use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
 use Medisa\Api\Scope\SubeScope;
+use Medisa\Api\Services\Personel\PersonelOrgStructureSchema;
 use PDO;
 
 class ZimmetlerController
@@ -247,7 +248,8 @@ class ZimmetlerController
     /** @return array<string, mixed>|null */
     private static function fetchPersonelForScope(PDO $pdo, $personelId)
     {
-        $stmt = $pdo->prepare('SELECT id, sube_id, bolum_id, birim_id, aktif_durum FROM personeller WHERE id = :id LIMIT 1');
+        $columns = PersonelOrgStructureSchema::personelScopeProjection($pdo);
+        $stmt = $pdo->prepare("SELECT {$columns}, aktif_durum FROM personeller WHERE id = :id LIMIT 1");
         $stmt->execute(['id' => (int) $personelId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
 

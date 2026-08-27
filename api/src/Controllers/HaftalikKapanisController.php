@@ -10,6 +10,7 @@ use Medisa\Api\Database\Connection;
 use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
 use Medisa\Api\Scope\SubeScope;
+use Medisa\Api\Services\Personel\PersonelOrgStructureSchema;
 use Medisa\Api\Services\Payroll\FazlaCalismaYillikLimitService;
 use Medisa\Api\Services\Payroll\PayrollComplianceGuard;
 use PDO;
@@ -213,9 +214,8 @@ class HaftalikKapanisController
             JsonResponse::notFound('Haftalik kapanis bulunamadi.');
         }
 
-        self::assertReadScope($user, $request, (int) $header['sube_id']);
-
         $satirlar = self::fetchSatirlar($pdo, $kapanisId);
+        self::assertReadKapanisScope($pdo, $user, $request, $header, $satirlar);
         JsonResponse::success(self::mapKapanisResponse($header, $satirlar));
     }
 
@@ -240,7 +240,7 @@ class HaftalikKapanisController
         if (!$personel) {
             JsonResponse::notFound('Personel bulunamadi.');
         }
-        self::assertReadScope($user, $request, (int) $personel['sube_id']);
+        self::assertReadScope($user, $request, $personel);
 
         $ozet = self::aggregateYillik($pdo, $personelId, $yil, (int) $personel['sube_id']);
         JsonResponse::success($ozet);
@@ -307,13 +307,56 @@ class HaftalikKapanisController
      *
      * @param array<string, mixed> $user
      */
-    private static function assertReadScope(array $user, Request $request, $recordSubeId)
+    private static function assertReadScope(array $user, Request $request, $recordOrg)
     {
         $allowed = SubeScope::allowedSubeIds($user);
         if (count($allowed) === 0 && !RolePermissions::has($user, 'personeller.view')) {
             JsonResponse::forbidden('Sube baglami olmadan haftalik kapanis goruntulenemez.');
         }
-        SubeScope::assertPersonelAccess($user, $request, (int) $recordSubeId);
+        SubeScope::assertPersonelAccess($user, $request, $recordOrg);
+    }
+
+    /**
+     * A unit manager may read a weekly close only when every included personnel row
+     * remains inside that manager's canonical organizational scope.
+     *
+     * @param array<string, mixed> $header
+     * @param array<int, array<string, mixed>> $satirlar
+     */
+    private static function assertReadKapanisScope(PDO $pdo, array $user, Request $request, array $header, array $satirlar)
+    {
+        $personelIds = [];
+        foreach ($satirlar as $satir) {
+            $personelId = isset($satir['personel_id']) ? (int) $satir['personel_id'] : 0;
+            if ($personelId > 0) {
+                $personelIds[$personelId] = $personelId;
+            }
+        }
+        if (count($personelIds) === 0) {
+            self::assertReadScope($user, $request, (int) $header['sube_id']);
+
+            return;
+        }
+
+        $placeholders = [];
+        $params = [];
+        foreach (array_values($personelIds) as $index => $personelId) {
+            $key = 'scope_personel_' . $index;
+            $placeholders[] = ':' . $key;
+            $params[$key] = $personelId;
+        }
+        $columns = PersonelOrgStructureSchema::personelScopeProjection($pdo);
+        $stmt = $pdo->prepare(
+            "SELECT {$columns} FROM personeller WHERE id IN (" . implode(', ', $placeholders) . ') ORDER BY id ASC'
+        );
+        $stmt->execute($params);
+        $personeller = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        if (count($personeller) !== count($personelIds)) {
+            JsonResponse::forbidden();
+        }
+        foreach ($personeller as $personel) {
+            self::assertReadScope($user, $request, $personel);
+        }
     }
 
     private static function isDuplicateScopeException(PDOException $e)
@@ -894,7 +937,8 @@ class HaftalikKapanisController
 
     private static function fetchPersonelSube(PDO $pdo, $personelId)
     {
-        $stmt = $pdo->prepare('SELECT id, sube_id FROM personeller WHERE id = :id LIMIT 1');
+        $columns = PersonelOrgStructureSchema::personelScopeProjection($pdo);
+        $stmt = $pdo->prepare("SELECT {$columns} FROM personeller WHERE id = :id LIMIT 1");
         $stmt->execute(['id' => (int) $personelId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
 

@@ -13,6 +13,7 @@ use Medisa\Api\Scope\SubeScope;
 use Medisa\Api\Services\Izin\YillikIzinBakiyeService;
 use Medisa\Api\Services\Izin\YillikIzinHakDuzeltmeException;
 use Medisa\Api\Services\Izin\YillikIzinHakDuzeltmeLedgerService;
+use Medisa\Api\Services\Personel\PersonelOrgStructureSchema;
 use Medisa\Api\Services\Retention\PersonelArchiveGate;
 use PDO;
 
@@ -127,7 +128,8 @@ class YillikIzinHakDuzeltmeController
             JsonResponse::serverError('Veritabani baglantisi kurulamadi.');
         }
 
-        $stmt = $pdo->prepare('SELECT id, sube_id, bolum_id, birim_id FROM personeller WHERE id = :id LIMIT 1');
+        $columns = PersonelOrgStructureSchema::personelScopeProjection($pdo);
+        $stmt = $pdo->prepare("SELECT {$columns} FROM personeller WHERE id = :id LIMIT 1");
         $stmt->execute(['id' => $personelId]);
         $personel = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$personel) {

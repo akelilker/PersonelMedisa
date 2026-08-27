@@ -222,6 +222,8 @@ function createPersonelParentTables(PDO $pdo): void
           sicil_no VARCHAR(32) NOT NULL,
           ise_giris_tarihi DATE NOT NULL,
           sube_id INT UNSIGNED NOT NULL,
+          bolum_id INT UNSIGNED NULL,
+          birim_id INT UNSIGNED NULL,
           aktif_durum ENUM('AKTIF','PASIF') NOT NULL DEFAULT 'AKTIF',
           KEY idx_personel_sube (sube_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
@@ -239,6 +241,8 @@ function seedZimmetFixtures(PDO $pdo): void
           (20, '22222222222', 'Mehmet', 'Demir', '1988-01-01', 'S20', '2020-01-01', 2, 'AKTIF'),
           (30, '33333333333', 'Pasif', 'Kullanici', '1992-01-01', 'S30', '2020-01-01', 1, 'PASIF')
     ");
+    $pdo->exec('UPDATE personeller SET bolum_id = 31, birim_id = 41 WHERE id IN (10, 30)');
+    $pdo->exec('UPDATE personeller SET bolum_id = 32, birim_id = 42 WHERE id = 20');
 }
 
 function bootstrapZimmetSchema(PDO $pdo): void
@@ -362,8 +366,8 @@ $pdo = zimmetPdo(preg_replace('/dbname=[^;]+/', 'dbname=' . $dbName, $dsn));
 assertZimmetSchemaPostconditions($pdo);
 
 $gy = ['id' => 1, 'rol' => 'GENEL_YONETICI', 'sube_ids' => []];
-$bolum = ['id' => 4, 'rol' => 'BOLUM_YONETICISI', 'sube_ids' => [1]];
-$ba = ['id' => 3, 'rol' => 'BIRIM_AMIRI', 'sube_ids' => [1]];
+$bolum = ['id' => 4, 'rol' => 'BOLUM_YONETICISI', 'sube_ids' => [1], 'bolum_ids' => [31]];
+$ba = ['id' => 3, 'rol' => 'BIRIM_AMIRI', 'sube_ids' => [1], 'birim_ids' => [41]];
 $baEmpty = ['id' => 31, 'rol' => 'BIRIM_AMIRI', 'sube_ids' => []];
 $muhasebe = ['id' => 2, 'rol' => 'MUHASEBE', 'sube_ids' => [1, 2]];
 $ik = ['id' => 8, 'rol' => 'IK_SORUMLUSU', 'sube_ids' => [1, 2]];

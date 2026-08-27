@@ -207,6 +207,8 @@ function bootstrapSurecSchema(PDO $pdo): void
           sicil_no VARCHAR(32) NOT NULL,
           ise_giris_tarihi DATE NOT NULL,
           sube_id INT UNSIGNED NOT NULL,
+          bolum_id INT UNSIGNED NULL,
+          birim_id INT UNSIGNED NULL,
           aktif_durum ENUM('AKTIF','PASIF') NOT NULL DEFAULT 'AKTIF',
           calisan_kapsami ENUM('IC_PERSONEL','DIS_KAYNAK') NOT NULL DEFAULT 'IC_PERSONEL',
           KEY idx_personel_sube (sube_id)
@@ -241,6 +243,8 @@ function bootstrapSurecSchema(PDO $pdo): void
           (30, NULL, 'ExternalOther', NULL, NULL, 'S30', '2026-01-01', 2, 'AKTIF', 'DIS_KAYNAK'),
           (40, NULL, 'ExternalOwn', NULL, NULL, 'S40', '2026-01-01', 1, 'AKTIF', 'DIS_KAYNAK')
     ");
+    $pdo->exec('UPDATE personeller SET bolum_id = 31, birim_id = 41 WHERE id IN (10, 40)');
+    $pdo->exec('UPDATE personeller SET bolum_id = 32, birim_id = 42 WHERE id IN (20, 30)');
     $pdo->exec("
         INSERT INTO surecler (id, personel_id, surec_turu, alt_tur, baslangic_tarihi, bitis_tarihi, ucretli_mi, aciklama, state)
         VALUES
@@ -276,9 +280,9 @@ $dbName = (string) $root->query('SELECT DATABASE()')->fetchColumn();
 $pdo = surecPdo(preg_replace('/dbname=[^;]+/', 'dbname=' . $dbName, $dsn));
 
 $gy = ['id' => 1, 'rol' => 'GENEL_YONETICI', 'sube_ids' => []];
-$ba = ['id' => 3, 'rol' => 'BIRIM_AMIRI', 'sube_ids' => [1]];
+$ba = ['id' => 3, 'rol' => 'BIRIM_AMIRI', 'sube_ids' => [1], 'birim_ids' => [41]];
 $muhasebe = ['id' => 2, 'rol' => 'MUHASEBE', 'sube_ids' => []];
-$ik = ['id' => 8, 'rol' => 'IK_SORUMLUSU', 'sube_ids' => []];
+$ik = ['id' => 8, 'rol' => 'IK_SORUMLUSU', 'sube_ids' => [2]];
 
 $detail = invokeSurecHttp($pdo, $gy, 'GET', '/surecler/100');
 surecAssert($detail['status'] === 200, 'HTTP detail → 200');

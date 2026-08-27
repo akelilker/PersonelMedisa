@@ -1,0 +1,239 @@
+name: Set cPanel app_public_url
+
+# Narrow OPS owner: privacy-safe get → patch → put → readback for ONLY app_public_url
+# in production public_html/personelmedisa/api/config.local.php (FTP path: api/config.local.php).
+# Reuses existing FTP_* secrets. No generic key/value/path inputs. No SSH. No public endpoint.
+# Full config is never logged or uploaded as an artifact. Rollback restores runner-local backup.
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: Type SET_APP_PUBLIC_URL to authorize this request
+        required: true
+        type: string
+      app_public_url:
+        description: Exact authorized HTTPS public URL (no trailing slash)
+        required: true
+        type: string
+
+concurrency:
+  group: cpanel-app-public-url-ops
+  cancel-in-progress: false
+
+jobs:
+  set-app-public-url:
+    name: Privacy-safe app_public_url set + readback
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      FTP_SERVER: ${{ secrets.FTP_SERVER }}
+      FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+      FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+      FTP_PORT: ${{ secrets.FTP_PORT }}
+      CONFIRMATION: ${{ inputs.confirmation }}
+      AUTHORIZED_APP_PUBLIC_URL: ${{ inputs.app_public_url }}
+      # Hard-locked remote path relative to personelmedisa FTP root (no path input).
+      REMOTE_CONFIG_PATH: api/config.local.php
+      OPS_HELPER: scripts/ops/app-public-url-config-ops.php
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      - name: Validate authorization boundary and secrets
+        run: |
+          set -euo pipefail
+          test "$CONFIRMATION" = "SET_APP_PUBLIC_URL" || {
+            echo "Explicit SET_APP_PUBLIC_URL confirmation is required."
+            exit 1
+          }
+          test -n "$FTP_SERVER" || (echo "FTP_SERVER secret is missing." && exit 1)
+          test -n "$FTP_USERNAME" || (echo "FTP_USERNAME secret is missing." && exit 1)
+          test -n "$FTP_PASSWORD" || (echo "FTP_PASSWORD secret is missing." && exit 1)
+          test "$FTP_PORT" = "21" || (echo "FTP_PORT must be 21 for this cPanel FTP ops path." && exit 1)
+          test -f "$OPS_HELPER" || (echo "OPS helper missing." && exit 1)
+          test "$REMOTE_CONFIG_PATH" = "api/config.local.php" || {
+            echo "REMOTE_CONFIG_PATH lock violated."
+            exit 1
+          }
+          php "$OPS_HELPER" validate-url --value="$AUTHORIZED_APP_PUBLIC_URL"
+
+      - name: Install lftp and PHP CLI
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y lftp php-cli
+
+      - name: Get → patch → put → readback (privacy-safe)
+        run: |
+          set -euo pipefail
+
+          WORK="$RUNNER_TEMP/app-public-url-ops"
+          rm -rf "$WORK"
+          mkdir -p "$WORK"
+          BEFORE="$WORK/before.config.local.php"
+          PATCHED="$WORK/patched.config.local.php"
+          AFTER="$WORK/after.config.local.php"
+          BACKUP="$WORK/backup.config.local.php"
+
+          cleanup_temp() {
+            rm -rf "$WORK"
+          }
+          trap cleanup_temp EXIT
+
+          run_ftp_mode() {
+            local mode_name="$1"
+            local use_ftps="$2"
+            local ftp_commands="$3"
+
+            echo "App public URL transport mode: ${mode_name}"
+            lftp -u "${FTP_USERNAME}","${FTP_PASSWORD}" -p "${FTP_PORT}" "ftp://${FTP_SERVER}" -e "
+              set cmd:fail-exit true;
+              set net:max-retries 2;
+              set net:timeout 20;
+              set net:reconnect-interval-base 5;
+              set net:reconnect-interval-max 10;
+              set xfer:clobber true;
+              set ssl:verify-certificate no;
+              set ssl:check-hostname no;
+              set ftp:passive-mode on;
+              set ftp:ssl-allow ${use_ftps};
+              set ftp:ssl-force ${use_ftps};
+              set ftp:ssl-protect-data ${use_ftps};
+              ${ftp_commands}
+              bye
+            "
+          }
+
+          run_cpanel_ftp() {
+            local ftp_commands="$1"
+            echo "Explicit FTPS port 21 deneniyor..."
+            if run_ftp_mode "explicit-ftps" "true" "$ftp_commands"; then
+              return 0
+            fi
+            echo "Explicit FTPS basarisiz oldu, plain FTP fallback deneniyor..."
+            run_ftp_mode "plain-ftp" "false" "$ftp_commands"
+          }
+
+          # Never cat/print config contents. Helper emits only APP_PUBLIC_URL=...
+          privacy_get() {
+            local file="$1"
+            php "$OPS_HELPER" get --file="$file"
+          }
+
+          echo "REMOTE_CONFIG_LOCATION=public_html/personelmedisa/api/config.local.php"
+          echo "REMOTE_CONFIG_PATH=${REMOTE_CONFIG_PATH}"
+
+          get_commands="get ${REMOTE_CONFIG_PATH} -o ${BEFORE};"
+          if ! run_cpanel_ftp "$get_commands" >/dev/null 2>&1; then
+            echo "REMOTE_CONFIG_READ=FAIL"
+            echo "BLOCKER=REMOTE_CONFIG_GET_FAILED"
+            exit 1
+          fi
+          test -s "$BEFORE" || {
+            echo "REMOTE_CONFIG_READ=FAIL"
+            echo "BLOCKER=REMOTE_CONFIG_EMPTY"
+            exit 1
+          }
+          cp -f "$BEFORE" "$BACKUP"
+          echo "REMOTE_CONFIG_READ=PASS"
+
+          BEFORE_OUT="$(privacy_get "$BEFORE")"
+          printf '%s\n' "$BEFORE_OUT"
+          CURRENT_BEFORE="$(printf '%s\n' "$BEFORE_OUT" | sed -n 's/^APP_PUBLIC_URL=//p' | head -n1)"
+          echo "CURRENT_APP_PUBLIC_URL_BEFORE=${CURRENT_BEFORE:-MISSING}"
+
+          WRITE_NEEDED=YES
+          if [[ "${CURRENT_BEFORE:-}" == "$AUTHORIZED_APP_PUBLIC_URL" ]]; then
+            WRITE_NEEDED=NO
+          fi
+          echo "WRITE_NEEDED=${WRITE_NEEDED}"
+          echo "EXPECTED_APP_PUBLIC_URL=${AUTHORIZED_APP_PUBLIC_URL}"
+
+          CONFIG_UPLOAD=SKIPPED
+          APP_PUBLIC_URL_CHANGED=NO
+          ROLLBACK=NOT_NEEDED
+
+          if [[ "$WRITE_NEEDED" == "YES" ]]; then
+            php "$OPS_HELPER" patch \
+              --file="$BEFORE" \
+              --out="$PATCHED" \
+              --value="$AUTHORIZED_APP_PUBLIC_URL"
+            php "$OPS_HELPER" assert-unrelated-equal --before="$BEFORE" --after="$PATCHED"
+
+            REMOTE_TMP="api/config.local.php.ops-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.tmp"
+            put_commands="
+              lcd ${WORK};
+              put patched.config.local.php -o ${REMOTE_TMP};
+              mv ${REMOTE_TMP} ${REMOTE_CONFIG_PATH};
+            "
+            if ! run_cpanel_ftp "$put_commands" >/dev/null 2>&1; then
+              echo "CONFIG_UPLOAD=FAIL"
+              echo "BLOCKER=CONFIG_UPLOAD_FAILED"
+              exit 1
+            fi
+            CONFIG_UPLOAD=PASS
+            APP_PUBLIC_URL_CHANGED=YES
+            echo "CONFIG_UPLOAD=PASS"
+          else
+            echo "CONFIG_UPLOAD=SKIPPED"
+          fi
+
+          attempt_rollback() {
+            echo "Attempting rollback from runner-local backup..."
+            local rollback_commands="
+              lcd ${WORK};
+              put backup.config.local.php -o ${REMOTE_CONFIG_PATH};
+            "
+            if run_cpanel_ftp "$rollback_commands" >/dev/null 2>&1; then
+              ROLLBACK=PASS
+            else
+              ROLLBACK=FAIL
+            fi
+            echo "ROLLBACK=${ROLLBACK}"
+          }
+
+          rm -f "$AFTER"
+          readback_commands="get ${REMOTE_CONFIG_PATH} -o ${AFTER};"
+          if ! run_cpanel_ftp "$readback_commands" >/dev/null 2>&1; then
+            echo "READBACK_MATCH=NO"
+            echo "BLOCKER=READBACK_GET_FAILED"
+            if [[ "$WRITE_NEEDED" == "YES" ]]; then
+              attempt_rollback
+            fi
+            exit 1
+          fi
+
+          AFTER_OUT="$(privacy_get "$AFTER")"
+          printf '%s\n' "$AFTER_OUT"
+          CURRENT_AFTER="$(printf '%s\n' "$AFTER_OUT" | sed -n 's/^APP_PUBLIC_URL=//p' | head -n1)"
+          echo "CURRENT_APP_PUBLIC_URL_AFTER=${CURRENT_AFTER:-MISSING}"
+
+          if [[ "$WRITE_NEEDED" == "YES" ]]; then
+            php "$OPS_HELPER" assert-unrelated-equal --before="$BEFORE" --after="$AFTER" || {
+              echo "UNRELATED_CONFIG_KEYS_CHANGED detected after upload"
+              echo "BLOCKER=UNRELATED_CONFIG_DELTA"
+              attempt_rollback
+              exit 1
+            }
+          fi
+
+          if [[ "${CURRENT_AFTER:-}" != "$AUTHORIZED_APP_PUBLIC_URL" ]]; then
+            echo "READBACK_MATCH=NO"
+            echo "BLOCKER=READBACK_MISMATCH"
+            if [[ "$WRITE_NEEDED" == "YES" ]]; then
+              attempt_rollback
+            fi
+            exit 1
+          fi
+
+          echo "READBACK_MATCH=YES"
+          echo "APP_PUBLIC_URL_CHANGED=${APP_PUBLIC_URL_CHANGED}"
+          echo "UNRELATED_CONFIG_KEYS_CHANGED=0"
+          echo "ROLLBACK=${ROLLBACK}"
+          echo "FULL_CONFIG_EXPOSED=NO"
+          echo "CONFIG_ARTIFACT_UPLOADED=NO"
+          echo "OPS_EXECUTION_OWNER=set-cpanel-app-public-url.yml"
+          echo "APP_PUBLIC_URL_OPS_STATUS=READY"

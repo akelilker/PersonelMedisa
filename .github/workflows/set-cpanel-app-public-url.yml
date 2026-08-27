@@ -2,18 +2,15 @@ name: Set cPanel app_public_url
 
 # Narrow OPS owner: privacy-safe get → patch → put → readback for ONLY app_public_url
 # in production public_html/personelmedisa/api/config.local.php (FTP path: api/config.local.php).
-# Reuses existing FTP_* secrets. No generic key/value/path inputs. No SSH. No public endpoint.
+# Reuses existing FTP_* secrets. No generic key/value/path/URL inputs. No SSH. No public endpoint.
 # Full config is never logged or uploaded as an artifact. Rollback restores runner-local backup.
+# Canonical URL is immutable: https://www.karmotors.com.tr/personelmedisa
 
 on:
   workflow_dispatch:
     inputs:
       confirmation:
         description: Type SET_APP_PUBLIC_URL to authorize this request
-        required: true
-        type: string
-      app_public_url:
-        description: Exact authorized HTTPS public URL (no trailing slash)
         required: true
         type: string
 
@@ -32,7 +29,8 @@ jobs:
       FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
       FTP_PORT: ${{ secrets.FTP_PORT }}
       CONFIRMATION: ${{ inputs.confirmation }}
-      AUTHORIZED_APP_PUBLIC_URL: ${{ inputs.app_public_url }}
+      # Immutable PersonelMedisa production public URL — must match helper APP_PUBLIC_URL_CANONICAL.
+      AUTHORIZED_APP_PUBLIC_URL: https://www.karmotors.com.tr/personelmedisa
       # Hard-locked remote path relative to personelmedisa FTP root (no path input).
       REMOTE_CONFIG_PATH: api/config.local.php
       OPS_HELPER: scripts/ops/app-public-url-config-ops.php
@@ -56,6 +54,15 @@ jobs:
           test -f "$OPS_HELPER" || (echo "OPS helper missing." && exit 1)
           test "$REMOTE_CONFIG_PATH" = "api/config.local.php" || {
             echo "REMOTE_CONFIG_PATH lock violated."
+            exit 1
+          }
+          test "$AUTHORIZED_APP_PUBLIC_URL" = "https://www.karmotors.com.tr/personelmedisa" || {
+            echo "AUTHORIZED_APP_PUBLIC_URL workflow lock violated."
+            exit 1
+          }
+          HELPER_CANONICAL="$(php "$OPS_HELPER" canonical | sed -n 's/^CANONICAL_APP_PUBLIC_URL=//p' | head -n1)"
+          test "$HELPER_CANONICAL" = "$AUTHORIZED_APP_PUBLIC_URL" || {
+            echo "Helper/workflow canonical URL drift."
             exit 1
           }
           php "$OPS_HELPER" validate-url --value="$AUTHORIZED_APP_PUBLIC_URL"
@@ -125,6 +132,7 @@ jobs:
 
           echo "REMOTE_CONFIG_LOCATION=public_html/personelmedisa/api/config.local.php"
           echo "REMOTE_CONFIG_PATH=${REMOTE_CONFIG_PATH}"
+          echo "EXPECTED_APP_PUBLIC_URL=${AUTHORIZED_APP_PUBLIC_URL}"
 
           get_commands="get ${REMOTE_CONFIG_PATH} -o ${BEFORE};"
           if ! run_cpanel_ftp "$get_commands" >/dev/null 2>&1; then
@@ -150,7 +158,6 @@ jobs:
             WRITE_NEEDED=NO
           fi
           echo "WRITE_NEEDED=${WRITE_NEEDED}"
-          echo "EXPECTED_APP_PUBLIC_URL=${AUTHORIZED_APP_PUBLIC_URL}"
 
           CONFIG_UPLOAD=SKIPPED
           APP_PUBLIC_URL_CHANGED=NO
@@ -159,8 +166,7 @@ jobs:
           if [[ "$WRITE_NEEDED" == "YES" ]]; then
             php "$OPS_HELPER" patch \
               --file="$BEFORE" \
-              --out="$PATCHED" \
-              --value="$AUTHORIZED_APP_PUBLIC_URL"
+              --out="$PATCHED"
             php "$OPS_HELPER" assert-unrelated-equal --before="$BEFORE" --after="$PATCHED"
 
             REMOTE_TMP="api/config.local.php.ops-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.tmp"

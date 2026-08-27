@@ -7,18 +7,23 @@ declare(strict_types=1);
  *
  * Hard-locked:
  * - TARGET_KEY is fixed (no generic key input)
+ * - CANONICAL URL is fixed (no generic value surface)
  * - Commands never print sibling secrets / full config
  * - Remote path is owned by the GitHub Actions workflow (not this CLI)
  *
  * Usage:
+ *   php app-public-url-config-ops.php canonical
  *   php app-public-url-config-ops.php validate-url --value=URL
  *   php app-public-url-config-ops.php get --file=PATH
- *   php app-public-url-config-ops.php patch --file=PATH --out=PATH --value=URL
+ *   php app-public-url-config-ops.php patch --file=PATH --out=PATH
  *   php app-public-url-config-ops.php assert-unrelated-equal --before=PATH --after=PATH
  *   php app-public-url-config-ops.php self-test
  */
 
 const APP_PUBLIC_URL_TARGET_KEY = 'app_public_url';
+
+/** Sole allowed production PersonelMedisa public URL (immutable). */
+const APP_PUBLIC_URL_CANONICAL = 'https://www.karmotors.com.tr/personelmedisa';
 
 final class AppPublicUrlConfigOps
 {
@@ -29,6 +34,9 @@ final class AppPublicUrlConfigOps
 
         try {
             switch ($command) {
+                case 'canonical':
+                    echo 'CANONICAL_APP_PUBLIC_URL=' . APP_PUBLIC_URL_CANONICAL . "\n";
+                    return 0;
                 case 'validate-url':
                     self::validateUrl(self::requireOpt($opts, 'value'));
                     echo "URL_VALID=YES\n";
@@ -38,8 +46,7 @@ final class AppPublicUrlConfigOps
                 case 'patch':
                     return self::cmdPatch(
                         self::requireOpt($opts, 'file'),
-                        self::requireOpt($opts, 'out'),
-                        self::requireOpt($opts, 'value')
+                        self::requireOpt($opts, 'out')
                     );
                 case 'assert-unrelated-equal':
                     return self::cmdAssertUnrelatedEqual(
@@ -85,27 +92,33 @@ final class AppPublicUrlConfigOps
         return (string) $opts[$name];
     }
 
+    /**
+     * Accept ONLY the immutable PersonelMedisa production public URL.
+     * No generic HTTPS shape validation.
+     */
     public static function validateUrl(string $value): void
     {
         $value = trim($value);
         if ($value === '') {
             throw new RuntimeException('URL_EMPTY');
         }
-        if (substr($value, -1) === '/') {
-            throw new RuntimeException('URL_TRAILING_SLASH');
+        if ($value !== APP_PUBLIC_URL_CANONICAL) {
+            throw new RuntimeException('URL_NOT_CANONICAL');
         }
-        if (!preg_match('#^https://[A-Za-z0-9.-]+(?::[0-9]{2,5})?(?:/[A-Za-z0-9._~/-]*)?$#', $value)) {
-            throw new RuntimeException('URL_SHAPE_INVALID');
-        }
-        $parts = parse_url($value);
-        if (!is_array($parts) || ($parts['scheme'] ?? '') !== 'https') {
-            throw new RuntimeException('URL_SCHEME_INVALID');
-        }
-        if (isset($parts['user']) || isset($parts['pass']) || isset($parts['query']) || isset($parts['fragment'])) {
-            throw new RuntimeException('URL_UNSAFE_COMPONENTS');
-        }
-        if (!isset($parts['host']) || $parts['host'] === '') {
-            throw new RuntimeException('URL_HOST_MISSING');
+
+        // Defense-in-depth parse of the canonical constant itself.
+        $parts = parse_url(APP_PUBLIC_URL_CANONICAL);
+        if (!is_array($parts)
+            || ($parts['scheme'] ?? '') !== 'https'
+            || ($parts['host'] ?? '') !== 'www.karmotors.com.tr'
+            || ($parts['path'] ?? '') !== '/personelmedisa'
+            || isset($parts['port'])
+            || isset($parts['user'])
+            || isset($parts['pass'])
+            || isset($parts['query'])
+            || isset($parts['fragment'])
+        ) {
+            throw new RuntimeException('CANONICAL_CONTRACT_BROKEN');
         }
     }
 
@@ -139,8 +152,9 @@ final class AppPublicUrlConfigOps
         return 0;
     }
 
-    private static function cmdPatch(string $file, string $out, string $value): int
+    private static function cmdPatch(string $file, string $out): int
     {
+        $value = APP_PUBLIC_URL_CANONICAL;
         self::validateUrl($value);
         $before = self::loadConfigArray($file);
         $source = self::readFile($file);
@@ -358,8 +372,19 @@ final class AppPublicUrlConfigOps
                 . "    'app_public_url' => '',\n"
                 . "];\n");
 
-            $url = 'https://www.example.com/personelmedisa';
+            $url = APP_PUBLIC_URL_CANONICAL;
             self::validateUrl($url);
+
+            $rejected = false;
+            try {
+                self::validateUrl('https://www.example.com/personelmedisa');
+            } catch (Throwable $e) {
+                $rejected = true;
+            }
+            if (!$rejected) {
+                throw new RuntimeException('SELFTEST_GENERIC_URL_ACCEPTED');
+            }
+
             $patchedSource = self::patchSource((string) file_get_contents($before), $url);
             file_put_contents($after, $patchedSource);
 
@@ -389,6 +414,7 @@ final class AppPublicUrlConfigOps
             }
 
             echo "SELF_TEST=PASS\n";
+            echo 'CANONICAL_APP_PUBLIC_URL=' . APP_PUBLIC_URL_CANONICAL . "\n";
             return 0;
         } finally {
             foreach (glob($dir . DIRECTORY_SEPARATOR . '*') ?: [] as $f) {

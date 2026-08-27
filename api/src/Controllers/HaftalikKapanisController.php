@@ -517,14 +517,22 @@ class HaftalikKapanisController
     /** @return array<int, array<string, mixed>> */
     private static function loadPersoneller(PDO $pdo, $subeId, $departmanId)
     {
+        $params = ['sube_id' => (int) $subeId];
+        $subePred = \Medisa\Api\Services\Personel\PersonelGeciciGorevlendirmeService::sqlPersonelMatchesEffectiveSube(
+            $pdo,
+            'personeller',
+            'sube_id',
+            $params,
+            null,
+            'hk_eff'
+        );
         $sql = '
             SELECT id, departman_id, dogum_tarihi
             FROM personeller
-            WHERE sube_id = :sube_id
+            WHERE ' . $subePred . '
               AND aktif_durum = \'AKTIF\'
               AND ' . \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::sqlTimeOperationalEligiblePredicate($pdo, 'personeller') . '
         ';
-        $params = ['sube_id' => (int) $subeId];
         if ($departmanId !== null) {
             $sql .= ' AND departman_id = :departman_id';
             $params['departman_id'] = (int) $departmanId;

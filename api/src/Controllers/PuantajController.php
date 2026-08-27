@@ -1559,22 +1559,31 @@ class PuantajController
     /** @return array<int, array<string, mixed>> */
     private static function selectRowsForSeal(PDO $pdo, $subeId, $firstDay, $lastDay)
     {
+        $params = [
+            'sube_id' => $subeId,
+            'first_day' => $firstDay,
+            'last_day' => $lastDay,
+            'sealed_state' => 'MUHURLENDI',
+        ];
+        $subePred = \Medisa\Api\Services\Personel\PersonelGeciciGorevlendirmeService::sqlPersonelMatchesEffectiveSube(
+            $pdo,
+            'p',
+            'sube_id',
+            $params,
+            null,
+            'seal_eff'
+        );
         $stmt = $pdo->prepare(
             'SELECT gp.*
              FROM gunluk_puantaj gp
              INNER JOIN personeller p ON p.id = gp.personel_id
-             WHERE p.sube_id = :sube_id
+             WHERE ' . $subePred . '
                AND ' . \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::sqlTimeOperationalEligiblePredicate($pdo, 'p') . '
                AND gp.tarih BETWEEN :first_day AND :last_day
                AND gp.state <> :sealed_state
              ORDER BY gp.tarih ASC, gp.personel_id ASC'
         );
-        $stmt->execute([
-            'sube_id' => $subeId,
-            'first_day' => $firstDay,
-            'last_day' => $lastDay,
-            'sealed_state' => 'MUHURLENDI',
-        ]);
+        $stmt->execute($params);
 
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }

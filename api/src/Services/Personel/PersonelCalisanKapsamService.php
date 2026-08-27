@@ -162,7 +162,7 @@ final class PersonelCalisanKapsamService
         if (!self::isDisKaynak($pdo, $personelId)) {
             return;
         }
-        $ctx = PersonelOperationalContextService::resolve($pdo, $personelId);
+        $ctx = PersonelOperationalContextService::resolveNow($pdo, $personelId);
         if ($ctx['has_operational_scope']) {
             return;
         }
@@ -183,7 +183,7 @@ final class PersonelCalisanKapsamService
         if (!self::isDisKaynak($pdo, $personelId)) {
             return;
         }
-        $ctx = PersonelOperationalContextService::resolve($pdo, $personelId);
+        $ctx = PersonelOperationalContextService::resolveNow($pdo, $personelId);
         if ($ctx['has_operational_scope']) {
             return;
         }
@@ -220,20 +220,6 @@ final class PersonelCalisanKapsamService
             'Bu personel DIS_KAYNAK kapsamindadir; ucret/SGK/gercek bordro islemi yapilamaz.',
             self::ERROR_FINANSAL
         );
-    }
-
-    /**
-     * Geriye uyum: eski tek guard artık zaman/operasyon semantiğine yönlenir.
-     * Finansal caller'lar assertFinancialEligible kullanmalıdır.
-     */
-    public static function assertOperationalEligible(PDO $pdo, $personelId): void
-    {
-        self::assertTimeOperationalEligible($pdo, $personelId);
-    }
-
-    public static function assertOperationalEligibleOrThrow(PDO $pdo, $personelId): void
-    {
-        self::assertTimeOperationalEligibleOrThrow($pdo, $personelId);
     }
 
     /**

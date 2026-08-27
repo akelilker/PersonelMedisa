@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import { join, resolve } from "node:path";
 import { evaluatePersonelCompleteness } from "../../src/features/personeller/personel-missing-info";
 import type { Personel } from "../../src/types/personel";
 
@@ -98,14 +98,48 @@ describe("DIS_KAYNAK operasyonel/non-financial model", () => {
     expect(result.critical_missing_labels).toContain("Birim");
   });
 
-  it("geçici görevlendirme migration ve service owner mevcut", () => {
+  it("geçici görevlendirme: explicit hedef_sube + atomik overlap + silent fallback yok", () => {
     expect(read("api/migrations/076_dis_kaynak_gecici_gorevlendirme.sql")).toContain(
       "personel_gecici_gorevlendirmeler"
     );
     const svc = read("api/src/Services/Personel/PersonelGeciciGorevlendirmeService.php");
     expect(svc).toContain("GECICI_GOREVLENDIRME_CAKISMA");
-    expect(svc).toContain("BOLUM_YONETICISI");
-    expect(svc).toContain("assertActorMayAssignToBolum");
+    expect(svc).toContain("hedef_sube_id");
+    expect(svc).toContain("FOR UPDATE");
+    expect(svc).toContain("validateHedefChain");
+    expect(svc).toContain("Europe/Istanbul");
+    expect(svc).not.toContain("ORDER BY sube_id ASC LIMIT 1");
+    const ctx = read("api/src/Services/Personel/PersonelOperationalContextService.php");
+    expect(ctx).toContain("resolveNow");
+    expect(ctx).toContain("resolveAt");
+    const org = read("api/src/Scope/OrgScope.php");
+    expect(org).toContain("PersonelGeciciGorevlendirmeSchema::isReady");
+    expect(org).toContain("appendPermanentOrAssignmentInFilter");
+  });
+
+  it("ambiguous assertOperationalEligible consumer kalmamalı", () => {
+    const service = read("api/src/Services/Personel/PersonelCalisanKapsamService.php");
+    expect(service).not.toMatch(/function\s+assertOperationalEligible\b/);
+    expect(service).not.toMatch(/function\s+assertOperationalEligibleOrThrow\b/);
+
+    const callers: string[] = [];
+    const walk = (dir: string) => {
+      for (const name of readdirSync(dir)) {
+        const full = join(dir, name);
+        if (statSync(full).isDirectory()) {
+          walk(full);
+          continue;
+        }
+        if (!full.endsWith(".php")) continue;
+        if (full.replace(/\\/g, "/").endsWith("PersonelCalisanKapsamService.php")) continue;
+        const text = readFileSync(full, "utf8");
+        if (/assertOperationalEligible(OrThrow)?\s*\(/.test(text)) {
+          callers.push(full.replace(/\\/g, "/"));
+        }
+      }
+    };
+    walk(resolve(process.cwd(), "api/src"));
+    expect(callers, callers.join("\n")).toEqual([]);
   });
 
   it("doc 127 superseded ve 130 canonical", () => {

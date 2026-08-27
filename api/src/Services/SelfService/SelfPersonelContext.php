@@ -123,7 +123,7 @@ class SelfPersonelContext
             : null;
 
         // Aktif geçici görevlendirme effective org'u override eder (permanent overwrite yok).
-        $opCtx = \Medisa\Api\Services\Personel\PersonelOperationalContextService::resolve($pdo, $personelId);
+        $opCtx = \Medisa\Api\Services\Personel\PersonelOperationalContextService::resolveNow($pdo, $personelId);
         if ($opCtx['source'] === \Medisa\Api\Services\Personel\PersonelOperationalContextService::SOURCE_ASSIGNMENT) {
             $eff = $opCtx['effective'];
             $subeId = $eff['sube_id'];

@@ -15,7 +15,7 @@ describe("Pack7F external worker source locks", () => {
     expect(service).toContain("PERSONEL_OPERASYON_KAPSAM_DISI");
     expect(service).toContain("PERSONEL_FINANSAL_KAPSAM_DISI");
     expect(service).toContain("sqlIcPersonelPredicate");
-    expect(service).toContain("assertOperationalEligible");
+    expect(service).not.toContain("function assertOperationalEligible");
     expect(service).toContain("assertTimeOperationalEligible");
     expect(service).toContain("assertFinancialEligible");
     expect(service).toContain("DIS_KAYNAK_SGK_ISVEREN_YASAK");

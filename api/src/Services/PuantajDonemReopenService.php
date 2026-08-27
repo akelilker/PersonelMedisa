@@ -521,13 +521,22 @@ class PuantajDonemReopenService
         $firstDay = sprintf('%04d-%02d-01', $yil, $ay);
         $lastDay = date('Y-m-t', strtotime($firstDay));
 
+        $params = ['sube_id' => (int) $subeId];
+        $subePred = \Medisa\Api\Services\Personel\PersonelGeciciGorevlendirmeService::sqlPersonelMatchesEffectiveSube(
+            $pdo,
+            'personeller',
+            'sube_id',
+            $params,
+            null,
+            'reo_cal'
+        );
         $personelStmt = $pdo->prepare(
             'SELECT id, ise_giris_tarihi, cikis_tarihi
              FROM personeller
-             WHERE sube_id = :sube_id
+             WHERE ' . $subePred . '
                AND ' . \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::sqlTimeOperationalEligiblePredicate($pdo, 'personeller')
         );
-        $personelStmt->execute(['sube_id' => (int) $subeId]);
+        $personelStmt->execute($params);
         $personeller = $personelStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
         $puStmt = $pdo->prepare(
@@ -657,35 +666,52 @@ class PuantajDonemReopenService
         $firstDay = sprintf('%04d-%02d-01', $yil, $ay);
         $lastDay = date('Y-m-t', strtotime($firstDay));
         $driver = (string) $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+        $params = [
+            'sube_id' => (int) $subeId,
+            'd1' => $firstDay,
+            'd2' => $lastDay,
+            'muhur_id' => (int) $muhurId,
+        ];
         if ($driver === 'sqlite') {
+            $subePred = \Medisa\Api\Services\Personel\PersonelGeciciGorevlendirmeService::sqlPersonelMatchesEffectiveSube(
+                $pdo,
+                'personeller',
+                'sube_id',
+                $params,
+                null,
+                'reo_sq'
+            );
             $stmt = $pdo->prepare(
                 "UPDATE gunluk_puantaj
                  SET state = 'ACIK', muhur_id = NULL
                  WHERE personel_id IN (
                    SELECT id FROM personeller
-                   WHERE sube_id = :sube_id
+                   WHERE " . $subePred . "
                      AND " . \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::sqlTimeOperationalEligiblePredicate($pdo, 'personeller') . "
                  )
                    AND tarih BETWEEN :d1 AND :d2
                    AND (muhur_id = :muhur_id OR state = 'MUHURLENDI')"
             );
         } else {
+            $subePred = \Medisa\Api\Services\Personel\PersonelGeciciGorevlendirmeService::sqlPersonelMatchesEffectiveSube(
+                $pdo,
+                'p',
+                'sube_id',
+                $params,
+                null,
+                'reo_my'
+            );
             $stmt = $pdo->prepare(
                 "UPDATE gunluk_puantaj gp
                  INNER JOIN personeller p ON p.id = gp.personel_id
                  SET gp.state = 'ACIK', gp.muhur_id = NULL
-                 WHERE p.sube_id = :sube_id
+                 WHERE " . $subePred . "
                    AND " . \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::sqlTimeOperationalEligiblePredicate($pdo, 'p') . "
                    AND gp.tarih BETWEEN :d1 AND :d2
                    AND (gp.muhur_id = :muhur_id OR gp.state = 'MUHURLENDI')"
             );
         }
-        $stmt->execute([
-            'sube_id' => (int) $subeId,
-            'd1' => $firstDay,
-            'd2' => $lastDay,
-            'muhur_id' => (int) $muhurId,
-        ]);
+        $stmt->execute($params);
     }
 
     /** @return array<string, mixed>|null */

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Medisa\Api\Services\Qr;
 
 use Medisa\Api\Services\Attendance\AttendanceCorrectionApproverResolver;
+use Medisa\Api\Services\Personel\PersonelOperationalContextService;
 use Medisa\Api\Services\SelfService\PersonelInboxNotificationService;
 use Medisa\Api\Services\SelfService\PersonelMobileCapabilityService;
 use Medisa\Api\Services\SelfService\SelfPersonelContext;
@@ -87,7 +88,18 @@ class QrAttendanceCorrectionService
             );
         }
 
-        $approver = AttendanceCorrectionApproverResolver::resolve($pdo, $authUser, $ctx);
+        // Approver zinciri event zamanındaki effective org üzerinden (current değil).
+        $historical = PersonelOperationalContextService::resolveAt(
+            $pdo,
+            (int) $ctx['personel_id'],
+            (string) $event['occurred_at_utc']
+        );
+        $approverCtx = $ctx;
+        $approverCtx['sube_id'] = $historical['effective']['sube_id'] ?? 0;
+        $approverCtx['bolum_id'] = $historical['effective']['bolum_id'];
+        $approverCtx['birim_id'] = $historical['effective']['birim_id'];
+        $approverCtx['departman_id'] = $historical['effective']['departman_id'];
+        $approver = AttendanceCorrectionApproverResolver::resolve($pdo, $authUser, $approverCtx);
         if ($approver === null) {
             throw new QrAttendanceException(
                 'CORRECTION_NO_APPROVER',

@@ -7,6 +7,10 @@ namespace Medisa\Api\Scope;
 use Medisa\Api\Auth\RolePermissions;
 use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
+use Medisa\Api\Services\Personel\PersonelGeciciGorevlendirmeSchema;
+use Medisa\Api\Services\Personel\PersonelGeciciGorevlendirmeService;
+use Medisa\Api\Services\Personel\PersonelOperationalContextService;
+use PDO;
 
 /**
  * Canonical organizational authorization scope.
@@ -169,11 +173,12 @@ class OrgScope
 
     /**
      * Authoritative personnel access check.
+     * Optional PDO: 076 hazırsa aktif geçici görevlendirme effective org kullanılır.
      *
      * @param array<string, mixed> $user
      * @param array<string, mixed>|int $personelOrg personel row fragment or legacy sube_id int
      */
-    public static function assertPersonelAccess(array $user, Request $request, $personelOrg)
+    public static function assertPersonelAccess(array $user, Request $request, $personelOrg, $pdo = null)
     {
         $role = self::normalizeRole($user);
 
@@ -191,6 +196,12 @@ class OrgScope
         }
 
         self::assertRequiredAssignment($user);
+
+        if ($pdo instanceof PDO && is_array($personelOrg) && isset($personelOrg['id'])
+            && PersonelGeciciGorevlendirmeSchema::isReady($pdo)
+        ) {
+            $personelOrg = PersonelOperationalContextService::effectiveOrgForAccess($pdo, $personelOrg);
+        }
 
         $subeId = 0;
         $bolumId = null;
@@ -260,16 +271,26 @@ class OrgScope
 
     /**
      * SQL list filter for personeller alias (default p).
+     * Optional PDO: 076 hazırsa aktif görevlendirme hedef_* alanlarıyla OR.
+     * 076 yoksa mevcut 075 permanent-only davranış.
      *
      * @param array<int, string> $where
      * @param array<string, mixed> $params
      * @param array<string, mixed> $user
      * @param int|null $activeSubeScope
      */
-    public static function appendPersonelOrgFilter(array &$where, array &$params, array $user, $activeSubeScope, $alias = 'p', $paramPrefix = 'org')
-    {
+    public static function appendPersonelOrgFilter(
+        array &$where,
+        array &$params,
+        array $user,
+        $activeSubeScope,
+        $alias = 'p',
+        $paramPrefix = 'org',
+        $pdo = null
+    ) {
         $role = self::normalizeRole($user);
         $col = $alias . '.';
+        $assignmentAware = $pdo instanceof PDO && PersonelGeciciGorevlendirmeSchema::isReady($pdo);
 
         if ($role === 'PERSONEL') {
             $bound = isset($user['personel_id']) ? (int) $user['personel_id'] : 0;
@@ -292,11 +313,25 @@ class OrgScope
 
                 return;
             }
-            self::appendInFilter($where, $params, $col . 'birim_id', $ids, $paramPrefix . '_birim');
-            if ($activeSubeScope !== null) {
-                $key = $paramPrefix . '_active_sube';
-                $where[] = $col . 'sube_id = :' . $key;
-                $params[$key] = (int) $activeSubeScope;
+            if ($assignmentAware) {
+                self::appendPermanentOrAssignmentInFilter(
+                    $where,
+                    $params,
+                    $col,
+                    'birim_id',
+                    'hedef_birim_id',
+                    $ids,
+                    $paramPrefix . '_birim',
+                    $activeSubeScope,
+                    $paramPrefix
+                );
+            } else {
+                self::appendInFilter($where, $params, $col . 'birim_id', $ids, $paramPrefix . '_birim');
+                if ($activeSubeScope !== null) {
+                    $key = $paramPrefix . '_active_sube';
+                    $where[] = $col . 'sube_id = :' . $key;
+                    $params[$key] = (int) $activeSubeScope;
+                }
             }
 
             return;
@@ -309,11 +344,25 @@ class OrgScope
 
                 return;
             }
-            self::appendInFilter($where, $params, $col . 'bolum_id', $ids, $paramPrefix . '_bolum');
-            if ($activeSubeScope !== null) {
-                $key = $paramPrefix . '_active_sube';
-                $where[] = $col . 'sube_id = :' . $key;
-                $params[$key] = (int) $activeSubeScope;
+            if ($assignmentAware) {
+                self::appendPermanentOrAssignmentInFilter(
+                    $where,
+                    $params,
+                    $col,
+                    'bolum_id',
+                    'hedef_bolum_id',
+                    $ids,
+                    $paramPrefix . '_bolum',
+                    $activeSubeScope,
+                    $paramPrefix
+                );
+            } else {
+                self::appendInFilter($where, $params, $col . 'bolum_id', $ids, $paramPrefix . '_bolum');
+                if ($activeSubeScope !== null) {
+                    $key = $paramPrefix . '_active_sube';
+                    $where[] = $col . 'sube_id = :' . $key;
+                    $params[$key] = (int) $activeSubeScope;
+                }
             }
 
             return;
@@ -321,9 +370,22 @@ class OrgScope
 
         if (self::isUnrestricted($user) && count(self::allowedSubeIds($user)) === 0) {
             if ($activeSubeScope !== null) {
-                $key = $paramPrefix . '_active_sube';
-                $where[] = $col . 'sube_id = :' . $key;
-                $params[$key] = (int) $activeSubeScope;
+                if ($assignmentAware) {
+                    $key = $paramPrefix . '_active_sube';
+                    $params[$key] = (int) $activeSubeScope;
+                    $where[] = PersonelGeciciGorevlendirmeService::sqlPersonelMatchesEffectiveSube(
+                        $pdo,
+                        rtrim($col, '.'),
+                        $key,
+                        $params,
+                        null,
+                        $paramPrefix . '_eff'
+                    );
+                } else {
+                    $key = $paramPrefix . '_active_sube';
+                    $where[] = $col . 'sube_id = :' . $key;
+                    $params[$key] = (int) $activeSubeScope;
+                }
             }
 
             return;
@@ -338,13 +400,98 @@ class OrgScope
 
         if ($activeSubeScope !== null) {
             $key = $paramPrefix . '_active_sube';
-            $where[] = $col . 'sube_id = :' . $key;
             $params[$key] = (int) $activeSubeScope;
+            if ($assignmentAware) {
+                $where[] = PersonelGeciciGorevlendirmeService::sqlPersonelMatchesEffectiveSube(
+                    $pdo,
+                    rtrim($col, '.'),
+                    $key,
+                    $params,
+                    null,
+                    $paramPrefix . '_eff'
+                );
+            } else {
+                $where[] = $col . 'sube_id = :' . $key;
+            }
+
+            return;
+        }
+
+        if ($assignmentAware) {
+            self::appendPermanentOrAssignmentInFilter(
+                $where,
+                $params,
+                $col,
+                'sube_id',
+                'hedef_sube_id',
+                $allowedSube,
+                $paramPrefix . '_sube',
+                null,
+                $paramPrefix
+            );
 
             return;
         }
 
         self::appendInFilter($where, $params, $col . 'sube_id', $allowedSube, $paramPrefix . '_sube');
+    }
+
+    /**
+     * (permanent.col IN ids [AND permanent.sube=active])
+     * OR (aktif assignment hedef_col IN ids [AND hedef_sube=active])
+     *
+     * @param array<int, string> $where
+     * @param array<string, mixed> $params
+     * @param array<int, int> $ids
+     */
+    private static function appendPermanentOrAssignmentInFilter(
+        array &$where,
+        array &$params,
+        $col,
+        $permanentCol,
+        $assignmentCol,
+        array $ids,
+        $paramPrefix,
+        $activeSubeScope,
+        $scopePrefix
+    ) {
+        $permPlaceholders = [];
+        $asgPlaceholders = [];
+        foreach (array_values($ids) as $index => $id) {
+            $permKey = $paramPrefix . '_p_' . $index;
+            $asgKey = $paramPrefix . '_a_' . $index;
+            $permPlaceholders[] = ':' . $permKey;
+            $asgPlaceholders[] = ':' . $asgKey;
+            $params[$permKey] = (int) $id;
+            $params[$asgKey] = (int) $id;
+        }
+        $permanentParts = [$col . $permanentCol . ' IN (' . implode(', ', $permPlaceholders) . ')'];
+        $assignmentParts = ['g.' . $assignmentCol . ' IN (' . implode(', ', $asgPlaceholders) . ')'];
+
+        if ($activeSubeScope !== null) {
+            $permSubeKey = $scopePrefix . '_active_sube_p';
+            $asgSubeKey = $scopePrefix . '_active_sube_a';
+            $params[$permSubeKey] = (int) $activeSubeScope;
+            $params[$asgSubeKey] = (int) $activeSubeScope;
+            $permanentParts[] = $col . 'sube_id = :' . $permSubeKey;
+            $assignmentParts[] = 'g.hedef_sube_id = :' . $asgSubeKey;
+        }
+
+        $nowKey = $scopePrefix . '_asg_now';
+        $nowKey2 = $scopePrefix . '_asg_now_b';
+        $now = PersonelGeciciGorevlendirmeService::businessNow();
+        $params[$nowKey] = $now;
+        $params[$nowKey2] = $now;
+
+        $alias = rtrim($col, '.');
+        $where[] = '((' . implode(' AND ', $permanentParts) . ') OR EXISTS (
+            SELECT 1 FROM personel_gecici_gorevlendirmeler g
+            WHERE g.personel_id = ' . $alias . '.id
+              AND g.durum = \'AKTIF\'
+              AND g.baslangic_at <= :' . $nowKey . '
+              AND (g.bitis_at IS NULL OR g.bitis_at > :' . $nowKey2 . ')
+              AND ' . implode(' AND ', $assignmentParts) . '
+        ))';
     }
 
     /**

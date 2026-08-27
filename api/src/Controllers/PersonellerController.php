@@ -73,7 +73,7 @@ class PersonellerController
             // Old schemas cannot prove unit membership; fail closed without referencing missing columns.
             $where[] = '1=0';
         } else {
-            OrgScope::appendPersonelOrgFilter($where, $params, $user, $scope, 'p');
+            OrgScope::appendPersonelOrgFilter($where, $params, $user, $scope, 'p', 'org', $pdo);
         }
 
         if ($aktiflik === 'aktif') {
@@ -199,7 +199,7 @@ class PersonellerController
         }
 
         PersonelArchiveGate::assertDetailAccess($user, $exists);
-        SubeScope::assertPersonelAccess($user, $request, $exists);
+        SubeScope::assertPersonelAccess($user, $request, $exists, $pdo);
 
         $select = self::personelSelectSql($pdo);
         $sql = "
@@ -1454,7 +1454,7 @@ class PersonellerController
         if (!$exists) {
             JsonResponse::notFound();
         }
-        SubeScope::assertPersonelAccess($user, $request, $exists);
+        SubeScope::assertPersonelAccess($user, $request, $exists, $pdo);
         $rows = PersonelGeciciGorevlendirmeService::listHistory($pdo, $personelId);
         JsonResponse::success(['items' => $rows]);
     }

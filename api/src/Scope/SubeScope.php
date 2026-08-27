@@ -52,9 +52,9 @@ class SubeScope
      * @param array<string, mixed> $user
      * @param array<string, mixed>|int $personelOrg
      */
-    public static function assertPersonelAccess(array $user, Request $request, $personelOrg)
+    public static function assertPersonelAccess(array $user, Request $request, $personelOrg, $pdo = null)
     {
-        OrgScope::assertPersonelAccess($user, $request, $personelOrg);
+        OrgScope::assertPersonelAccess($user, $request, $personelOrg, $pdo);
     }
 
     /**

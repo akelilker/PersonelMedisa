@@ -335,14 +335,22 @@ class DonemKapanisPreflightService
     /** @param array<string, mixed> $filters */
     private static function evaluatePuantajBlockers(PDO $pdo, $subeId, $ayBaslangic, $ayBitis, array $filters)
     {
+        $params = ['sube_id' => $subeId, 'bas' => $ayBaslangic, 'bit' => $ayBitis];
+        $subePred = \Medisa\Api\Services\Personel\PersonelGeciciGorevlendirmeService::sqlPersonelMatchesEffectiveSube(
+            $pdo,
+            'p',
+            'sube_id',
+            $params,
+            null,
+            'pre_eff'
+        );
         $where = [
-            'p.sube_id = :sube_id',
+            $subePred,
             \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::sqlTimeOperationalEligiblePredicate($pdo, 'p'),
             'gp.tarih BETWEEN :bas AND :bit',
             "gp.state <> 'MUHURLENDI'",
             "gp.kontrol_durumu = 'BEKLIYOR'",
         ];
-        $params = ['sube_id' => $subeId, 'bas' => $ayBaslangic, 'bit' => $ayBitis];
         if (isset($filters['departman_id']) && (int) $filters['departman_id'] > 0) {
             $where[] = 'p.departman_id = :departman_id';
             $params['departman_id'] = (int) $filters['departman_id'];
@@ -642,12 +650,20 @@ class DonemKapanisPreflightService
     /** @param array<string, mixed> $filters */
     private static function countActivePersonelWithoutPuantaj(PDO $pdo, $subeId, $ayBaslangic, $ayBitis, array $filters)
     {
+        $params = ['sube_id' => $subeId, 'bas' => $ayBaslangic, 'bit' => $ayBitis];
+        $subePred = \Medisa\Api\Services\Personel\PersonelGeciciGorevlendirmeService::sqlPersonelMatchesEffectiveSube(
+            $pdo,
+            'p',
+            'sube_id',
+            $params,
+            null,
+            'cap_eff'
+        );
         $where = [
-            'p.sube_id = :sube_id',
+            $subePred,
             "p.aktif_durum = 'AKTIF'",
             \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::sqlTimeOperationalEligiblePredicate($pdo, 'p'),
         ];
-        $params = ['sube_id' => $subeId, 'bas' => $ayBaslangic, 'bit' => $ayBitis];
         if (isset($filters['departman_id']) && (int) $filters['departman_id'] > 0) {
             $where[] = 'p.departman_id = :departman_id';
             $params['departman_id'] = (int) $filters['departman_id'];

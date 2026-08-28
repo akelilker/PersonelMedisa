@@ -123,7 +123,17 @@ describe("retention policy source contract (053)", () => {
       resolve(root, "api/src/Services/Retention/RetentionPolicyService.php"),
       "utf8"
     );
-    expect(policy).toContain("modify('+' . RetentionCategories::POLICY_RETENTION_YEARS . ' years')");
+    expect(cats).toContain("MIN_RETENTION_YEARS = 10");
+    expect(cats).toContain("retentionYearsForCategory");
+    // Company floor may only be raised, never lowered, by a category.
+    expect(cats).toContain("$years > self::MIN_RETENTION_YEARS ? $years : self::MIN_RETENTION_YEARS");
+
+    expect(policy).toContain("modify('+' . $years . ' years')");
+    expect(policy).toContain("RetentionCategories::retentionYearsForCategory($category)");
+    // Personnel-linked anchor floor: employment end date or later applicable anchor.
+    expect(policy).toContain("applyPersonnelAnchorFloor");
+    expect(policy).toContain("self::CODE_TERMINATION_DATE_MISSING");
+    expect(policy).not.toMatch(/created_at[^\n]{0,40}\+\s*10/i);
     expect(policy).toContain("EXECUTION_HANDLER_NOT_IMPLEMENTED");
     expect(policy).toContain("ELIGIBLE_FOR_DESTRUCTION_REQUEST");
     expect(policy).toContain("evaluatePreApprovalEligibility");

@@ -613,6 +613,51 @@ try {
         $passCount++;
     }
 
+    // Unified 10-year policy: personnel-linked record of an ACTIVE employee is fail-closed
+    // even though the ledger candidate_date (2011) matured long before the 2037 clock.
+    $activeEval = RetentionPolicyService::evaluatePreApprovalEligibility(
+        $pdo,
+        RetentionCategories::ONAY_AUDIT,
+        [
+            'entity_type' => 'qr_pc_decision',
+            'record_id' => $qrLedgerId,
+            'personel_id' => 10,
+            'audit_source_type' => 'QR_PUANTAJ_CANDIDATE_DECISION',
+            'candidate_date' => '2011-05-15',
+        ]
+    );
+    p3bAssert(
+        ($activeEval['eligible'] ?? true) === false
+            && ($activeEval['code'] ?? '') === RetentionPolicyService::CODE_TERMINATION_DATE_MISSING,
+        'ONAY_AUDIT active employee fail-closed'
+    );
+    $passCount++;
+
+    // Employment ends 2012-01-01 → personnel anchor floor matures 2022-01-01 (< 2037 clock).
+    $pdo->exec("UPDATE personeller SET aktif_durum = 'PASIF' WHERE id = 10");
+    $pdo->exec(
+        "INSERT INTO surecler (personel_id, surec_turu, baslangic_tarihi, state)
+         VALUES (10, 'ISTEN_AYRILMA', '2012-01-01', 'AKTIF')"
+    );
+    $terminatedEval = RetentionPolicyService::evaluatePreApprovalEligibility(
+        $pdo,
+        RetentionCategories::ONAY_AUDIT,
+        [
+            'entity_type' => 'qr_pc_decision',
+            'record_id' => $qrLedgerId,
+            'personel_id' => 10,
+            'audit_source_type' => 'QR_PUANTAJ_CANDIDATE_DECISION',
+            'candidate_date' => '2011-05-15',
+        ]
+    );
+    // Latest applicable anchor wins: 2012-01-01 termination, not the 2011-05-15 candidate date.
+    p3bAssert(
+        ($terminatedEval['trigger_date'] ?? '') === '2012-01-01'
+            && ($terminatedEval['retention_until'] ?? '') === '2022-01-01',
+        'ONAY_AUDIT latest applicable anchor = termination date'
+    );
+    $passCount++;
+
     // Destroy ONAY_AUDIT ledger then PUANTAJ succeeds
     $apLedger = DestructionWorkflowService::requestDestruction($pdo, p3bGm(), [
         'category' => RetentionCategories::ONAY_AUDIT,

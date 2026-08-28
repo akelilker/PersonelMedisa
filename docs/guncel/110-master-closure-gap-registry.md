@@ -48,6 +48,7 @@ PRODUCTION_MIGRATION_TIP: 076
 | `MG-EXT-ORG-DATA-001` | Dış kaynak import org/görev kararları (Phase2) | **CLOSED_CONFIRMED** | 11 DIS production apply; terminated exclusion kilitli. |
 | `MG-OPS-DIS-ORG-COMPLETE-001` | DIS bölüm/birim completeness | **CLOSED** | Karar (130): DIS permanent org opsiyonel; otomatik assignment yok. |
 | `MG-OPS-DIS-OPS-MODEL-001` | DIS operasyonel/non-financial + geçici görevlendirme | **CLOSED_CONFIRMED** | Migration `076` production applied; SGK/payroll/banka fail-closed. |
+| `MG-RET-PHYS-001` | Saklama politikası + fiziksel imha mekanizması | **CLOSED_CONFIRMED** | `RETENTION_POLICY = MINIMUM_10_YEARS`; `SHORTER_CATEGORY_RETENTION = DISABLED`; personel-bağlı anchor = işten ayrılış tarihi veya daha geç uygulanabilir anchor; aktif personel imhası **PROHIBITED**; eksik anchor **FAIL_CLOSED**; legal hold override **ENABLED**; daha uzun mevzuat süresi kısaltılmaz. 15/15 typed handler; schema `059`–`064` production ready; GM çift kontrol + plan hash + idempotency korunur; feature flag varsayılan **OFF**. Bkz. `114-retention-physical-destruction-pack3c-final.md`, `118-production-migration-rollout-059-064.md`. Süresi dolan adayların mevcut request/approval/execution akışından geçirilmesi normal işletim işidir; açık backlog değildir. |
 | `MG-OPS-SGK-CAT-001` | SGK canlı katalog/politika salt-okunur doğrulaması | **CLOSED_CONFIRMED** | 2026-08-27 canlı GET doğrulandı. |
 | `MG-OPS-UBGT-001` | UBGT canlı takvim/projeksiyon salt-okunur doğrulaması | **CLOSED_CONFIRMED** | 2026-08-27 canlı GET doğrulandı. |
 | `MG-OPS-ORG-001` | IC kritik organizasyon FK tamamlama | **CLOSED** | Phase1 import sonrası AKTIF `IC_PERSONEL` için kritik org alanları (Şube/Departman/Bölüm/Birim/Görev/Personel Tipi) tamam; kalan telefon kalemi ayrıdır (`MG-OPS-PERSONEL-PHONE-001`). DIS org null’ları IC sayımına **dahil edilmez**. |
@@ -58,12 +59,6 @@ PRODUCTION_MIGRATION_TIP: 076
 | --- | --- | --- | --- |
 | `MG-OPS-PERSONEL-PHONE-001` | 20 IC telefon deferred tamamlaması | **USER_DATA_REQUIRED** | `DEFERRED_USER_DATA` / `NON_BLOCKING`. Import blocker değil; placeholder/uydurma yok. |
 | `MG-SUBE-YONETICI-001` | `SUBE_YONETICISI` gerçek kullanıcı ataması | **USER_ASSIGNMENT_REQUIRED** | `users.rol = SUBE_YONETICISI` + `user_subeler` explicit kanıtı; tahmin/atama otomasyonu yok. |
-
-## Kullanıcı yürütme onayı gerektiren (kod hazır, destructive değil bu tur)
-
-| ID | Konu | Durum | Not |
-| --- | --- | --- | --- |
-| `MG-RET-PHYS-001` | Fiziksel imha yürütme | **READY_FOR_USER_EXECUTION_APPROVAL** | Schema `059`–`064` production ready; typed handler coverage; legal hold guard; GM onay zinciri; feature flag varsayılan **OFF**. Bu turda imha/flag aktivasyonu **yok**. Nondestructive evaluate/preflight local PASS. Bkz. `114-retention-physical-destruction-pack3c-final.md`, `118-production-migration-rollout-059-064.md`. Sonraki adım: ayrı bakım penceresi + güncel yedek kanıtı + çift kontrol + explicit execution onayı. |
 
 ## Teknik borç (non-blocking)
 
@@ -87,11 +82,11 @@ PRODUCTION_MIGRATION_TIP: 076
 
 | Sınıf | Sayım |
 | --- | ---: |
-| **CLOSED_CONFIRMED** | 6 |
+| **CLOSED_CONFIRMED** | 7 |
 | **CLOSED** | 9 |
 | **USER_DATA_REQUIRED** | 1 |
 | **USER_ASSIGNMENT_REQUIRED** | 1 |
-| **READY_FOR_USER_EXECUTION_APPROVAL** | 1 |
+| **READY_FOR_USER_EXECUTION_APPROVAL** | 0 |
 | **TECH_DEBT_NON_BLOCKING** | 1 |
 | **FUTURE / OUT_OF_SCOPE / INTENTIONAL_DEFER** | 7 |
 | **BUG** | **0** |
@@ -102,7 +97,7 @@ PRODUCTION_MIGRATION_TIP: 076
 ## Özellikle yanlış önceliklendirilmemesi gerekenler
 
 1. **Serbest zaman 6 ay takibi artık açık code-gap / USER_GATED değildir.** Operasyon modeli kapatıldı (`MG-SZ-6M-001` = `CLOSED`); mevcut rapor/uyarı yüzeyi yeterlidir.
-2. **Fiziksel imha “kod eksik” veya generic OPS_ROLLOUT değildir.** Teknik owner hazır; statü `READY_FOR_USER_EXECUTION_APPROVAL`; gerçek imha ayrı kullanıcı onayı gerektirir.
+2. **Fiziksel imha artık açık backlog değildir.** `MG-RET-PHYS-001` = `CLOSED_CONFIRMED`: politika (minimum 10 yıl), doğru anchor guard, aktif personel/eksik anchor/legal hold fail-closed davranışı ve typed handler'lar canonicaldır. Bu, bugün veri silindiği anlamına gelmez; süresi dolan adayların mevcut güvenli akıştan geçirilmesi normal işletim işidir.
 3. **20 IC telefon ile IC org kritik gap ayrı sayılır.** Telefon `USER_DATA_REQUIRED` / non-blocking; DIS org null’ları IC org sayımına karışmaz.
 4. **`DIS_KAYNAK` modeli `CLOSED_CONFIRMED` (076).** Import reopen / migration re-apply yok.
 5. **Olağanüstü çalışma acil karar bekleyen açık iş değildir** (`INTENTIONAL_DEFER`).

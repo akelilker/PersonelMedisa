@@ -84,16 +84,55 @@ class RetentionPolicyService
     }
 
     /**
-     * Calendar +10 years from trigger date (not 3650 days).
+     * Calendar +N years from trigger date (not 3650 days), where N is the effective
+     * category duration with the company minimum floor applied.
      *
+     * @param string|null $category null → company floor
      * @return string Y-m-d
      */
-    public static function calculateRetentionUntil(DateTime $triggerDate)
+    public static function calculateRetentionUntil(DateTime $triggerDate, $category = null)
     {
+        $years = $category === null
+            ? RetentionCategories::MIN_RETENTION_YEARS
+            : RetentionCategories::retentionYearsForCategory($category);
+
         $until = clone $triggerDate;
-        $until->modify('+' . RetentionCategories::POLICY_RETENTION_YEARS . ' years');
+        $until->modify('+' . $years . ' years');
 
         return $until->format('Y-m-d');
+    }
+
+    /**
+     * Destruction anchor floor for personnel-linked sources.
+     *
+     * effective_anchor = latest applicable canonical anchor, and for personnel-linked
+     * records never earlier than the employment end date. A still-active employee or a
+     * missing employment end date resolves to no anchor at all → fail-closed.
+     *
+     * Applies to the destruction eligibility path only; archive/manifest trigger
+     * resolution keeps its own canonical lifecycle anchor.
+     *
+     * @param array<string, mixed> $context
+     * @param array{trigger_type: string, trigger_date: string} $trigger
+     * @return array{trigger_type: string, trigger_date: string}
+     */
+    private static function applyPersonnelAnchorFloor(PDO $pdo, array $context, array $trigger)
+    {
+        $personelId = isset($context['personel_id']) ? (int) $context['personel_id'] : 0;
+        if ($personelId <= 0) {
+            return $trigger;
+        }
+
+        $termination = self::resolveTerminationDate($pdo, $personelId);
+        if ($termination === null) {
+            throw new RuntimeException(self::CODE_TERMINATION_DATE_MISSING);
+        }
+
+        if ($termination > (string) $trigger['trigger_date']) {
+            $trigger['trigger_date'] = $termination;
+        }
+
+        return $trigger;
     }
 
     /**
@@ -178,7 +217,11 @@ class RetentionPolicyService
         }
 
         try {
-            $trigger = self::resolveTrigger($pdo, $category, $context);
+            $trigger = self::applyPersonnelAnchorFloor(
+                $pdo,
+                $context,
+                self::resolveTrigger($pdo, $category, $context)
+            );
         } catch (RuntimeException $e) {
             $code = $e->getMessage();
             if (!in_array($code, [
@@ -207,7 +250,7 @@ class RetentionPolicyService
             return $result;
         }
 
-        $retentionUntil = self::calculateRetentionUntil($triggerDt);
+        $retentionUntil = self::calculateRetentionUntil($triggerDt, $category);
         $result['retention_until'] = $retentionUntil;
 
         $clock = $asOf instanceof DateTimeImmutable ? $asOf : RetentionClock::now();
@@ -683,6 +726,8 @@ class RetentionPolicyService
             'trigger_date' => null,
             'retention_until' => null,
             'policy_note' => RetentionCategories::POLICY_NOTE,
+            'policy_min_years' => RetentionCategories::MIN_RETENTION_YEARS,
+            'policy_effective_years' => RetentionCategories::retentionYearsForCategory($category),
             'message' => '',
         ];
     }

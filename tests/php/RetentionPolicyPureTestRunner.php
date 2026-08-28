@@ -68,6 +68,89 @@ rpPureAssert(
 rpPureAssert(strpos(strtolower(RetentionCategories::POLICY_NOTE), 'kanunen') === false, 'no statutory kanunen');
 rpPureAssert(RetentionCategories::POLICY_RETENTION_YEARS === 10, 'policy years 10');
 
+// Unified minimum 10-year floor: no category may retain for less.
+rpPureAssert(RetentionCategories::MIN_RETENTION_YEARS === 10, 'min retention years 10');
+$declared = RetentionCategories::declaredRetentionYears();
+rpPureAssert(count($declared) === 15, 'declared retention map covers 15 categories');
+foreach (RetentionCategories::all() as $cat) {
+    rpPureAssert(isset($declared[$cat]), 'declared years present ' . $cat);
+    rpPureAssert(
+        RetentionCategories::retentionYearsForCategory($cat) >= RetentionCategories::MIN_RETENTION_YEARS,
+        'effective years >= floor ' . $cat
+    );
+}
+// G) a shorter declared period can never lower the effective floor
+rpPureAssert(
+    RetentionCategories::retentionYearsForCategory('UNDECLARED_CATEGORY') === 10,
+    'undeclared category falls back to 10-year floor'
+);
+// H) a longer declared period is preserved, never shortened
+$floorProbe = DateTime::createFromFormat('Y-m-d', '2026-01-01');
+rpPureAssert($floorProbe !== false, 'parse floor probe');
+rpPureAssert(
+    RetentionPolicyService::calculateRetentionUntil($floorProbe, RetentionCategories::BORDRO) === '2036-01-01',
+    'BORDRO effective retention = anchor + 10 years'
+);
+rpPureAssert(
+    RetentionPolicyService::calculateRetentionUntil($floorProbe) === '2036-01-01',
+    'category-less retention = anchor + 10 years'
+);
+
+// Real closure example: hire 2010, termination 2026 → earliest maturity 2036.
+$hire = DateTime::createFromFormat('Y-m-d', '2010-03-01');
+$termination = DateTime::createFromFormat('Y-m-d', '2026-06-30');
+rpPureAssert($hire !== false && $termination !== false, 'parse lifecycle dates');
+// A/B) the 2010 document date must never drive maturity for personnel-linked data
+rpPureAssert(
+    RetentionPolicyService::calculateRetentionUntil($hire, RetentionCategories::PERSONEL_OZLUK) === '2020-03-01',
+    'raw 2010 document age alone matures in 2020 (must not be the anchor)'
+);
+$terminationUntil = RetentionPolicyService::calculateRetentionUntil(
+    $termination,
+    RetentionCategories::PERSONEL_OZLUK
+);
+rpPureAssert($terminationUntil === '2036-06-30', 'termination anchor matures 2036');
+rpPureAssert($terminationUntil > '2027-12-31', 'not mature in 2026/2027');
+rpPureAssert($terminationUntil > '2035-12-31', 'not mature in 2035');
+
+// Personnel anchor floor is wired into the eligibility path (fail-closed source contract).
+$policySrc = file_get_contents(__DIR__ . '/../../api/src/Services/Retention/RetentionPolicyService.php');
+rpPureAssert(is_string($policySrc) && $policySrc !== '', 'read policy source');
+rpPureAssert(
+    strpos($policySrc, 'applyPersonnelAnchorFloor') !== false,
+    'eligibility applies personnel anchor floor'
+);
+rpPureAssert(
+    strpos($policySrc, 'self::applyPersonnelAnchorFloor(') !== false,
+    'anchor floor invoked in eligibility path'
+);
+// D/E) active employee and missing exit date both resolve to no anchor → fail-closed
+rpPureAssert(
+    strpos($policySrc, "if (\$termination === null) {\n            throw new RuntimeException(self::CODE_TERMINATION_DATE_MISSING);") !== false,
+    'missing/active termination anchor throws fail-closed'
+);
+// I) latest applicable anchor wins
+rpPureAssert(
+    strpos($policySrc, "if (\$termination > (string) \$trigger['trigger_date']) {") !== false,
+    'latest applicable anchor wins'
+);
+rpPureAssert(
+    strpos($policySrc, "return \$aktifDurum === 'AKTIF'") !== false
+        || strpos($policySrc, "if (\$aktifDurum === 'AKTIF') {\n            return null;") !== false,
+    'active employee has no termination anchor'
+);
+// F) legal hold remains an independent fail-closed gate
+rpPureAssert(
+    strpos($policySrc, 'hasActiveLegalHold') !== false
+        && strpos($policySrc, 'CODE_LEGAL_HOLD_ACTIVE') !== false,
+    'legal hold gate present'
+);
+// No blind created_at + 10 year shortcut anywhere in the policy owner.
+rpPureAssert(
+    preg_match('/created_at[^\n]{0,40}\+\s*10/i', $policySrc) !== 1,
+    'no created_at + 10 year shortcut'
+);
+
 // Codes present (Phase C final integrity matrix)
 foreach ([
     RetentionPolicyService::CODE_UNKNOWN_CATEGORY,

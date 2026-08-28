@@ -33,7 +33,15 @@ class RetentionCategories
 
     /** Medisa saklama politikası — company policy note (never statutory claim). */
     public const POLICY_NOTE = 'Medisa saklama politikası';
-    public const POLICY_RETENTION_YEARS = 10;
+
+    /**
+     * Canonical company-wide minimum retention floor (years).
+     * No category may retain for less. A longer legal/policy period always wins.
+     */
+    public const MIN_RETENTION_YEARS = 10;
+
+    /** Canonical company retention duration. Kept as the historical owner name. */
+    public const POLICY_RETENTION_YEARS = self::MIN_RETENTION_YEARS;
 
     /**
      * Periodic (PERIOD_CLOSURE) categories.
@@ -86,6 +94,39 @@ class RetentionCategories
     public static function isKnown($category)
     {
         return in_array((string) $category, self::all(), true);
+    }
+
+    /**
+     * Declared canonical retention duration per category, in years.
+     * Every category is declared at the company floor; a category may only ever be
+     * raised above it (longer legal/policy period), never lowered.
+     *
+     * @return array<string, int>
+     */
+    public static function declaredRetentionYears()
+    {
+        $map = [];
+        foreach (self::all() as $category) {
+            $map[$category] = self::MIN_RETENTION_YEARS;
+        }
+
+        return $map;
+    }
+
+    /**
+     * Effective retention duration = max(company floor, declared category duration).
+     * Makes a shorter-than-floor category period structurally unreachable while
+     * preserving any longer declared period.
+     *
+     * @return int years
+     */
+    public static function retentionYearsForCategory($category)
+    {
+        $declared = self::declaredRetentionYears();
+        $category = (string) $category;
+        $years = isset($declared[$category]) ? (int) $declared[$category] : self::MIN_RETENTION_YEARS;
+
+        return $years > self::MIN_RETENTION_YEARS ? $years : self::MIN_RETENTION_YEARS;
     }
 
     /**

@@ -394,6 +394,24 @@ jobs:
           test "$found" = "YES" || { echo "INVENTORY_TIMEOUT"; exit 1; }
 
           echo "DB_PROBE=OK_VIA_CRON"
+
+          jq -r '
+            "PRODUCTION_MIGRATION_TIP=\(.production_migration_tip)",
+            "USERS_ROL_ENUM=\(.users_rol_enum)",
+            (.users_rol_dagilim[] | "ROL_DAGILIM|" + .rol + "|toplam=" + (.toplam|tostring) + "|aktif=" + (.aktif|tostring)),
+            (.legacy_roles.rows[] | "LEGACY|" + .rol + "|toplam=" + (.toplam_sayi|tostring) + "|aktif=" + (.aktif_sayi|tostring) + "|pasif=" + (.pasif_sayi|tostring) + "|personel_bagli=" + (.personel_bagli_sayi|tostring) + "|" + .not),
+            (.legacy_roles.rows[] | .rol as $r | .kullanicilar[] | "LEGACY_USER|" + $r + "|id=" + (.id|tostring) + "|username=" + (.username|tostring) + "|personel_id=" + ((.personel_id // "")|tostring) + "|durum=" + (.durum|tostring)),
+            "AKTIF_LEGACY_ROLE_USER_COUNT=\(.legacy_roles.aktif_toplam)",
+            "TOPLAM_LEGACY_ROLE_USER_COUNT=\(.legacy_roles.toplam)",
+            "ROLE_INVENTORY_DONE=YES"
+          ' "$RESULT"
+
+          run_cpanel_ftp "
+            rm api/runtime/migration-control/readonly-inventory.pending;
+            rm api/runtime/migration-control/readonly-inventory-result.json;
+            rm api/runtime/migration-control/readonly-inventory-heartbeat.txt;
+          " || true
+
           jq -r '
             "PRODUCTION_MIGRATION_TIP=\(.production_migration_tip)",
             "IC_EKSIK_TELEFON_SAYISI=\(.phones.count)",
@@ -403,18 +421,6 @@ jobs:
             "IC_ORG_CRITICAL_GAP_DISTINCT_PERSONEL=\(.ic_org.distinct)",
             "IC_ORG_CRITICAL_GAP_OCCURRENCE=\(.ic_org.occurrence)",
             (.ic_org.field_counts | to_entries[] | "ORG_FIELD|\(.key)|\(.value)"),
-            (.ic_org.people[] | "ORG|\(.sicil_no)|\(.ad_soyad)|\(.eksik|join(\",\"))"),
-            (.legacy_roles.rows[] | "LEGACY|\(.rol)|toplam=\(.toplam_sayi)|aktif=\(.aktif_sayi)|pasif=\(.pasif_sayi)|personel_bagli=\(.personel_bagli_sayi)|\(.not)"),
-            (.legacy_roles.rows[] | .rol as $r | .kullanicilar[] | "LEGACY_USER|\($r)|id=\(.id)|username=\(.username)|personel_id=\(.personel_id // "")|durum=\(.durum)"),
-            "AKTIF_LEGACY_ROLE_USER_COUNT=\(.legacy_roles.aktif_toplam)",
-            "TOPLAM_LEGACY_ROLE_USER_COUNT=\(.legacy_roles.toplam)",
-            "USERS_ROL_ENUM=\(.users_rol_enum)",
-            (.users_rol_dagilim[] | "ROL_DAGILIM|\(.rol)|toplam=\(.toplam)|aktif=\(.aktif)"),
+            (.ic_org.people[] | "ORG|" + .sicil_no + "|" + .ad_soyad + "|" + (.eksik|join(","))),
             "INVENTORY_DONE=YES"
           ' "$RESULT"
-
-          run_cpanel_ftp "
-            rm api/runtime/migration-control/readonly-inventory.pending;
-            rm api/runtime/migration-control/readonly-inventory-result.json;
-            rm api/runtime/migration-control/readonly-inventory-heartbeat.txt;
-          " || true

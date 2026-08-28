@@ -287,7 +287,11 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "sgk_karar_paketi.approve",
     "attendance.correction.decide"
   ],
-  /** Branch-level operational management (independent of BOLUM_YONETICISI). */
+  /**
+   * Branch-level operational management, scoped by explicit user_subeler (fail-closed).
+   * Enters and submits branch operational data; never central payroll finalization,
+   * company-wide SGK/finance decisions, or user/system administration.
+   */
   SUBE_YONETICISI: [
     "personeller.view",
     "personeller.view.sube",
@@ -316,9 +320,6 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "puantaj.bildirim_etki.rapor.view",
     "raporlar.view",
     "finans.view",
-    "finans.create",
-    "finans.update",
-    "finans.cancel",
     "isg.view",
     "aylik-ozet.view",
     "aylik-ozet.review",
@@ -338,7 +339,6 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "disiplin.final_decision",
     "puantaj.olay_karar.decide",
     "puantaj.olay_karar.view",
-    "sgk_karar_paketi.approve",
     "qr.kiosk.display"
   ],
   /** External accountant: finalized mali/bordro read + export. No operational write. */

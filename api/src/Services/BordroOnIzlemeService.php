@@ -224,7 +224,7 @@ class BordroOnIzlemeService
         return self::transitionCalistirma($pdo, (int) $calistirmaId, 'ONAY_BEKLIYOR', 'KESINLESTI', $actor, [
             'kesinlestiren_by' => self::actorId($actor),
             'kesinlestirme_at' => gmdate('Y-m-d H:i:s'),
-        ]);
+        ], 'muhasebe_kontrol_by');
     }
 
     /** @return array<string, mixed>|null */
@@ -241,8 +241,13 @@ class BordroOnIzlemeService
         return $row ? self::mapCalistirma($row) : null;
     }
 
-    /** @param array<string, mixed> $extra @return array<string, mixed> */
-    private static function transitionCalistirma(PDO $pdo, $calistirmaId, $from, $to, array $actor, array $extra = [])
+    /**
+     * @param array<string, mixed> $extra
+     * @param string|null $separationColumn column holding the actor of the preceding control step;
+     *                                      when set, that actor may not also perform this transition
+     * @return array<string, mixed>
+     */
+    private static function transitionCalistirma(PDO $pdo, $calistirmaId, $from, $to, array $actor, array $extra = [], $separationColumn = null)
     {
         $allowedFrom = is_array($from) ? $from : [(string) $from];
         $pdo->beginTransaction();
@@ -264,6 +269,16 @@ class BordroOnIzlemeService
             }
             if ($to === 'KESINLESTI' && (string) ($row['bordro_onay_durumu'] ?? '') === 'KESINLESTI') {
                 throw new MaasHesaplamaException('BORDRO_ALREADY_FINALIZED', 'Bordro zaten kesinleştirilmiş.', 409);
+            }
+            if ($separationColumn !== null) {
+                $violation = \Medisa\Api\Auth\DualControl::violation($actor, $row[$separationColumn] ?? null, $pdo);
+                if ($violation !== null) {
+                    throw new MaasHesaplamaException(
+                        'BORDRO_' . $violation['code'],
+                        $violation['message'],
+                        403
+                    );
+                }
             }
             $sets = ["bordro_onay_durumu = :to"];
             $params = ['to' => (string) $to, 'id' => (int) $calistirmaId];

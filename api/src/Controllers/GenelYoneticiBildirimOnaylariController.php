@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Medisa\Api\Controllers;
 
 use Medisa\Api\Auth\AuthMiddleware;
+use Medisa\Api\Auth\DualControl;
 use Medisa\Api\Auth\RolePermissions;
 use Medisa\Api\Database\Connection;
 use Medisa\Api\Http\JsonResponse;
@@ -28,7 +29,7 @@ class GenelYoneticiBildirimOnaylariController
         self::assertTablesReady($pdo);
         ManagerApprovalScope::assertActorCanAccessBirimAmiriChain($user, $request, $pdo, $subeId, $amirId);
 
-        $payload = self::buildSummaryPayload($pdo, $subeId, $amirId, $ay, $ayBaslangic, $ayBitis);
+        $payload = self::buildSummaryPayload($pdo, $user, $subeId, $amirId, $ay, $ayBaslangic, $ayBitis);
         JsonResponse::success($payload);
     }
 
@@ -77,6 +78,11 @@ class GenelYoneticiBildirimOnaylariController
             $invariantError = self::validateAylikInvariant($context);
             if ($invariantError !== null) {
                 self::rollbackValidation($pdo, $invariantError['code'], $invariantError['message']);
+            }
+
+            $separation = self::separationViolation($pdo, $user, $amirId, $aylikOnay);
+            if ($separation !== null) {
+                self::rollbackForbidden($pdo, $separation['code'], $separation['message']);
             }
 
             $insert = $pdo->prepare('
@@ -197,12 +203,41 @@ class GenelYoneticiBildirimOnaylariController
         return [$ay, $ayBaslangic, $ayBitis];
     }
 
-    private static function buildSummaryPayload(PDO $pdo, $subeId, $amirId, $ay, $ayBaslangic, $ayBitis)
+    /**
+     * Final management approval must be independent of both the branch actor who entered the
+     * daily data and the actor who granted the preceding monthly approval.
+     *
+     * @param array<string, mixed> $actor
+     * @param array<string, mixed>|null $aylikOnay
+     * @return array{code: string, message: string}|null
+     */
+    private static function separationViolation(PDO $pdo, array $actor, $amirId, $aylikOnay)
+    {
+        $violation = DualControl::violation($actor, $amirId, $pdo);
+        if ($violation !== null) {
+            return $violation;
+        }
+
+        if ($aylikOnay === null) {
+            return null;
+        }
+
+        return DualControl::violation($actor, $aylikOnay['onaylayan_user_id'] ?? null, $pdo);
+    }
+
+    private static function buildSummaryPayload(PDO $pdo, array $actor, $subeId, $amirId, $ay, $ayBaslangic, $ayBitis)
     {
         $existingGy = self::fetchExistingGy($pdo, $subeId, $amirId, $ay);
         $aylikOnay = self::fetchAylikBildirimOnay($pdo, $subeId, $amirId, $ay);
         $context = self::buildMonthContext($pdo, $subeId, $amirId, $ayBaslangic, $ayBitis);
         [$canApprove, $blockReason] = self::approvalState($existingGy, $aylikOnay, $context);
+        if ($canApprove) {
+            $separation = self::separationViolation($pdo, $actor, $amirId, $aylikOnay);
+            if ($separation !== null) {
+                $canApprove = false;
+                $blockReason = $separation['code'];
+            }
+        }
 
         return [
             'ay' => $ay,
@@ -525,5 +560,13 @@ class GenelYoneticiBildirimOnaylariController
             $pdo->rollBack();
         }
         JsonResponse::error(422, $code, $message);
+    }
+
+    private static function rollbackForbidden(PDO $pdo, $code, $message)
+    {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        JsonResponse::error(403, $code, $message);
     }
 }

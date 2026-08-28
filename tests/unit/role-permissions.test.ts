@@ -397,6 +397,93 @@ describe("role permissions", () => {
     }
   });
 
+  it("locks MG-SUBE-YONETICI-001 branch-scoped capability model", () => {
+    const granted = [
+      "personeller.view.sube",
+      "personeller.detail.view",
+      "personeller.create",
+      "personeller.update",
+      "puantaj.view",
+      "puantaj.update",
+      "puantaj.muhurle",
+      "puantaj.donem_reopen.request",
+      "bildirimler.create",
+      "revizyon.create",
+      "revizyon.submit",
+      "haftalik_mutabakat.view",
+      "aylik_bildirim_onayi.view"
+    ] as const;
+    for (const permission of granted) {
+      expect(hasRolePermission("SUBE_YONETICISI", permission)).toBe(true);
+      expect(extractPhpRolePermissions("SUBE_YONETICISI")).toContain(permission);
+    }
+
+    const denied = [
+      // Central payroll finalization / final management approval.
+      "bordro_kesinlestirme.approve",
+      "bordro_on_izleme.view",
+      "maas_hesaplama.manage",
+      "maas_hesaplama_adaylari.manage",
+      "personel_bordro_kapsam.manage",
+      "personel_bordro_kapsam.approve",
+      "genel_yonetici_onayi.approve",
+      "genel_yonetici_bildirim_onayi.approve",
+      "puantaj.donem_reopen.approve",
+      "revizyon.approve",
+      "revizyon.reject",
+      // Company-wide SGK / official decisions.
+      "sgk_karar_paketi.prepare",
+      "sgk_karar_paketi.approve",
+      "sgk.manuel_kod_override",
+      // Company-wide finance writes / payment.
+      "finans.create",
+      "finans.update",
+      "finans.cancel",
+      // User and critical system administration.
+      "yonetim-paneli.view",
+      "yonetim-paneli.manage",
+      "sirket_parametreleri.manage",
+      "resmi_tatil_takvimi.manage",
+      "personeller.ucret.manage",
+      // Retention / legal hold.
+      "legal_hold.manage",
+      "retention.destruction.approve",
+      "retention.destruction.execute",
+      // Not a BIRIM_AMIRI + BOLUM_YONETICISI union.
+      "gunluk_bildirim.create",
+      "gunluk_bildirim.submit",
+      "gunluk_bildirim.complete_day",
+      "haftalik_mutabakat.approve",
+      "aylik_bildirim_onayi.approve",
+      "puantaj.amir_kontrol",
+      "attendance.correction.decide",
+      "puantaj.bildirim_etki.generate"
+    ] as const;
+    for (const permission of denied) {
+      expect(hasRolePermission("SUBE_YONETICISI", permission)).toBe(false);
+      expect(extractPhpRolePermissions("SUBE_YONETICISI")).not.toContain(permission);
+    }
+  });
+
+  it("fails closed for SUBE_YONETICISI without explicit sube assignment", () => {
+    const unscoped = {
+      token: "t",
+      ui_profile: "yonetim",
+      active_sube_id: null,
+      user: { id: 1, ad_soyad: "Sube", rol: "SUBE_YONETICISI", sube_ids: [] }
+    } satisfies AuthSession;
+    expect(sessionAllowsSubeAccess(unscoped, 1)).toBe(false);
+
+    const scoped = {
+      token: "t",
+      ui_profile: "yonetim",
+      active_sube_id: 4,
+      user: { id: 1, ad_soyad: "Sube", rol: "SUBE_YONETICISI", sube_ids: [4] }
+    } satisfies AuthSession;
+    expect(sessionAllowsSubeAccess(scoped, 4)).toBe(true);
+    expect(sessionAllowsSubeAccess(scoped, 5)).toBe(false);
+  });
+
   it("keeps TS and PHP role permission matrices in parity (S70B-1)", () => {
     for (const role of ALL_ROLES) {
       const tsPermissions = [...getRolePermissions(role)].sort();

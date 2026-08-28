@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Medisa\Api\Services;
 
+use Medisa\Api\Auth\DualControl;
 use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Support\Utf8;
 use PDO;
@@ -371,6 +372,14 @@ class PersonelBordroKapsamService
         }
         if ((string) $row['neden_kodu'] === 'DEMO_TEST_VERISI' && strtoupper((string) ($user['rol'] ?? '')) !== 'GENEL_YONETICI') {
             JsonResponse::error(403, 'FORBIDDEN', 'DEMO_TEST_VERISI onayi yalniz GENEL_YONETICI.');
+        }
+        // Onaya gonderilmis kayitta hazirlayan ile onaylayan ayrismak zorundadir (rol adindan bagimsiz).
+        // TASLAK kayitta ayri bir gonderim adimi olmadigi icin ayristirilacak kontrol adimi da yoktur.
+        if ((string) $row['state'] === 'ONAY_BEKLIYOR') {
+            $violation = DualControl::violation($user, $row['hazirlayan_id'] ?? null, $pdo);
+            if ($violation !== null) {
+                JsonResponse::error(403, 'BORDRO_KAPSAM_' . $violation['code'], $violation['message']);
+            }
         }
         $normalized = [
             'gecerlilik_baslangic' => (string) $row['gecerlilik_baslangic'],

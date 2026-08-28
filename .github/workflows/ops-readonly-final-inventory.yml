@@ -26,8 +26,9 @@ jobs:
       FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
       FTP_PORT: ${{ secrets.FTP_PORT }}
       CONFIRMATION: ${{ inputs.confirmation }}
-      POLL_ATTEMPTS: "45"
-      POLL_INTERVAL_SECONDS: "20"
+      POLL_ATTEMPTS: "151"
+      POLL_INTERVAL_SECONDS: "10"
+      CRON_INTERVAL_MINUTES: "15"
     steps:
       - name: Validate
         run: |
@@ -73,8 +74,10 @@ jobs:
             echo "FTP mode: ${mode_name}"
             lftp -u "${FTP_USERNAME}","${FTP_PASSWORD}" -p "${FTP_PORT}" "ftp://${FTP_SERVER}" -e "
               set cmd:fail-exit true;
-              set net:max-retries 2;
-              set net:timeout 25;
+              set net:max-retries 3;
+              set net:timeout 30;
+              set net:reconnect-interval-base 5;
+              set net:reconnect-interval-max 10;
               set xfer:clobber true;
               set ssl:verify-certificate no;
               set ssl:check-hostname no;
@@ -288,8 +291,17 @@ jobs:
           require __DIR__ . '/cpanel-migration-cron.impl.php';
           PHP
 
-          run_cpanel_ftp "get api/bin/cpanel-migration-cron.php -o ${ORIG};"
-          test -f "$ORIG"
+          got_orig=NO
+          for get_attempt in $(seq 1 8); do
+            rm -f "$ORIG"
+            if run_cpanel_ftp "get api/bin/cpanel-migration-cron.php -o ${ORIG};" && test -f "$ORIG"; then
+              got_orig=YES
+              break
+            fi
+            echo "GET cron attempt ${get_attempt}/8 failed; retrying in 15s..."
+            sleep 15
+          done
+          test "$got_orig" = "YES" || { echo "GET_CRON_FAILED"; exit 1; }
           : > "$WORK/readonly-inventory.pending"
 
           run_cpanel_ftp "

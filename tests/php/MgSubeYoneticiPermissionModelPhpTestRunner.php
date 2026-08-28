@@ -53,7 +53,6 @@ mgAssertHas('SUBE_YONETICISI', [
     'personeller.update',
     'puantaj.view',
     'puantaj.update',
-    'puantaj.muhurle',
     'puantaj.donem_reopen.request',
     'bildirimler.create',
     'bildirimler.update',
@@ -64,6 +63,12 @@ mgAssertHas('SUBE_YONETICISI', [
 ], true, 'SUBE_BRANCH_OPERATIONAL_DATA_ENTRY_AND_SUBMIT');
 
 mgAssertHas('SUBE_YONETICISI', [
+    // Corrective removals: period closing, bulk import, department approval, bordro effect.
+    'puantaj.muhurle',
+    'personeller.import.apply',
+    'aylik_bolum_onayi.approve',
+    'aylik-ozet.review',
+    'revizyon.view_finance_effect',
     // Central payroll finalization / final management approval.
     'bordro_kesinlestirme.approve',
     'bordro_on_izleme.view',
@@ -214,6 +219,160 @@ foreach (['GENEL_YONETICI', 'IK_SORUMLUSU', 'SUBE_YONETICISI', 'BOLUM_YONETICISI
     }
 }
 mgOk('NO_ROLE_NAME_BYPASS');
+
+// Reviewed and deliberately kept: branch-scoped operational decisions that assert
+// SubeScope::assertPersonelAccess on a DB-loaded row and record their acting user.
+mgAssertHas('SUBE_YONETICISI', [
+    'disiplin.final_decision',
+    'puantaj.olay_karar.decide',
+    'surecler.cancel',
+    'bildirimler.cancel',
+    'revizyon.cancel',
+    'finans.view',
+], true, 'SUBE_KEEPS_BRANCH_SCOPED_OPERATIONAL_DECISIONS');
+
+// --- Real endpoint gates, read from the owning source ---------------------------------
+
+/**
+ * Reads the permission list an endpoint gate actually consults, so the assertion below
+ * is bound to the real gate instead of a hand-copied list that can drift.
+ *
+ * @return array<int, string>
+ */
+function mgGatePermissions($file, $anchor, $window = 400)
+{
+    $source = file_get_contents($file);
+    if ($source === false) {
+        mgFail("gate source unreadable: {$file}");
+    }
+    $at = strpos($source, $anchor);
+    if ($at === false) {
+        mgFail("gate anchor not found in {$file}: {$anchor}");
+    }
+    $slice = substr($source, $at, $window);
+    if (!preg_match_all("/'([a-z0-9_.\\-]+\\.[a-z0-9_.\\-]+)'/i", $slice, $m)) {
+        mgFail("no permission literals near anchor in {$file}: {$anchor}");
+    }
+
+    return array_values(array_unique($m[1]));
+}
+
+$apiRoot = dirname(__DIR__, 2) . '/api/src';
+$subeYonetici = mgUser('SUBE_YONETICISI', [3]);
+
+$gates = [
+    'AYLIK_BOLUM_ONAY_WRITE' => mgGatePermissions(
+        $apiRoot . '/Controllers/YonetimController.php',
+        'private static function assertBolumOnayPermission'
+    ),
+    'PERSONEL_IMPORT_APPLY' => mgGatePermissions(
+        $apiRoot . '/Controllers/PersonellerController.php',
+        'public static function importApply'
+    ),
+    'PUANTAJ_AYLIK_MUHURLE' => mgGatePermissions(
+        $apiRoot . '/Controllers/PuantajController.php',
+        'public static function muhurleAylik'
+    ),
+    'HAFTALIK_KAPANIS_CREATE' => mgGatePermissions(
+        $apiRoot . '/Controllers/HaftalikKapanisController.php',
+        'public static function create'
+    ),
+];
+
+foreach ($gates as $label => $permissions) {
+    $granted = [];
+    foreach ($permissions as $permission) {
+        if (RolePermissions::has($subeYonetici, $permission)) {
+            $granted[] = $permission;
+        }
+    }
+    if ($granted !== []) {
+        mgFail("{$label}: SUBE_YONETICISI must be denied, but holds " . implode(', ', $granted));
+    }
+    mgOk("GATE_DENIES_SUBE_YONETICISI: {$label}");
+}
+
+// The same gates must still admit the roles that own them (no unrelated regression).
+if (!RolePermissions::has(mgUser('BOLUM_YONETICISI'), 'aylik_bolum_onayi.approve')) {
+    mgFail('BOLUM_YONETICISI must keep aylik_bolum_onayi.approve');
+}
+if (!RolePermissions::has(mgUser('GENEL_YONETICI'), 'puantaj.muhurle')) {
+    mgFail('GENEL_YONETICI must keep puantaj.muhurle');
+}
+mgOk('GATE_OWNERS_UNCHANGED');
+
+// --- DualControl is the canonical owner; SGK delegates to it --------------------------
+
+if (DualControl::isSameActorUser($approver, 7) !== true) {
+    mgFail('isSameActorUser must match identical user ids');
+}
+foreach ([null, '', 0, '0', -3, 8] as $notSame) {
+    if (DualControl::isSameActorUser($approver, $notSame)) {
+        mgFail('isSameActorUser must not match ' . var_export($notSame, true));
+    }
+}
+mgOk('SAME_ACTOR_USER_PREDICATE');
+
+// SgkKararPaketiAuthz keeps its public contract while delegating the decision.
+$self = \Medisa\Api\Services\Payroll\SgkKararPaketiAuthz::denySelfApproval($approver, 7);
+if (!empty($self['ok']) || $self['code'] !== 'SGK_SELF_APPROVAL_FORBIDDEN') {
+    mgFail('SGK denySelfApproval must still reject the preparer with its own code');
+}
+$other = \Medisa\Api\Services\Payroll\SgkKararPaketiAuthz::denySelfApproval($approver, 8);
+if (empty($other['ok'])) {
+    mgFail('SGK denySelfApproval must accept a distinct preparer');
+}
+$unknown = \Medisa\Api\Services\Payroll\SgkKararPaketiAuthz::denySelfApproval($approver, 0);
+if (empty($unknown['ok'])) {
+    mgFail('SGK denySelfApproval must leave unknown preparer to denySamePerson (contract)');
+}
+mgOk('SGK_AUTHZ_DELEGATES_WITHOUT_CONTRACT_BREAK');
+
+// Dependency direction: generic auth owner must not depend on the payroll service.
+$dualControlSource = file_get_contents($apiRoot . '/Auth/DualControl.php');
+if ($dualControlSource === false) {
+    mgFail('DualControl source unreadable');
+}
+if (strpos($dualControlSource, 'SgkKararPaketiAuthz') !== false) {
+    mgFail('DualControl must not depend on payroll SgkKararPaketiAuthz');
+}
+if (strpos($dualControlSource, 'function resolveActorIdentityId') === false
+    || strpos($dualControlSource, 'function actorIdentitySchemaSupported') === false
+) {
+    mgFail('DualControl must own actor identity resolution');
+}
+mgOk('DEPENDENCY_DIRECTION_DOMAIN_TO_DUALCONTROL');
+
+// Every former self-approval owner routes through the canonical decision.
+foreach ([
+    '/Services/PuantajDonemReopenService.php',
+    '/Services/Payroll/SgkKararPaketiAuthz.php',
+    '/Services/Payroll/SgkKatalogOnayService.php',
+    '/Services/SirketCalismaPolitikasiService.php',
+    '/Services/Qr/QrAttendanceCorrectionService.php',
+    '/Services/PersonelBordroKapsamService.php',
+    '/Services/BordroOnIzlemeService.php',
+    '/Controllers/GenelYoneticiBildirimOnaylariController.php',
+] as $relative) {
+    $source = file_get_contents($apiRoot . $relative);
+    if ($source === false || strpos($source, 'DualControl::') === false) {
+        mgFail("self-approval owner must delegate to DualControl: {$relative}");
+    }
+}
+mgOk('ALL_SELF_APPROVAL_OWNERS_USE_CANONICAL_DECISION');
+
+// direkt_onayla can no longer create an already-approved record.
+$kapsamSource = file_get_contents($apiRoot . '/Services/PersonelBordroKapsamService.php');
+if ($kapsamSource === false) {
+    mgFail('PersonelBordroKapsamService source unreadable');
+}
+if (preg_match("/direkt_onayla.*\n.*initialState = 'ONAYLANDI'/", $kapsamSource)) {
+    mgFail('direkt_onayla must not short-circuit into ONAYLANDI');
+}
+if (strpos($kapsamSource, "\$initialState = 'TASLAK';") === false) {
+    mgFail('bordro kapsam create must always start as TASLAK');
+}
+mgOk('BORDRO_KAPSAM_DIRECT_APPROVE_REMOVED');
 
 echo "MG_SUBE_YONETICI_PERMISSION_MODEL=PASS\n";
 exit(0);

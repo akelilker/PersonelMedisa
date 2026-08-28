@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Medisa\Api\Services\Payroll;
 
+use Medisa\Api\Auth\DualControl;
 use Medisa\Api\Auth\RolePermissions;
 use PDO;
 use RuntimeException;
@@ -122,9 +123,9 @@ final class SgkKararPaketiAuthz
      */
     public static function denySelfApproval(array $actor, $hazirlayanId)
     {
-        $actorId = (int) ($actor['id'] ?? 0);
-        $hazirlayanId = (int) $hazirlayanId;
-        if ($hazirlayanId > 0 && $actorId > 0 && $hazirlayanId === $actorId) {
+        // Decision algorithm is owned by Auth\DualControl; this maps it to the SGK code.
+        // Unknown hazirlayan is not decided here — denySamePerson owns that fail-closed path.
+        if (DualControl::isSameActorUser($actor, $hazirlayanId)) {
             return [
                 'ok' => false,
                 'code' => 'SGK_SELF_APPROVAL_FORBIDDEN',
@@ -153,7 +154,7 @@ final class SgkKararPaketiAuthz
                 'link_supported' => self::actorIdentitySchemaSupported($pdo),
             ];
         }
-        if ($hazirlayanId === $actorId) {
+        if (DualControl::isSameActorUser($actor, $hazirlayanId)) {
             // Self-approval is owned by denySelfApproval; do not double-fire same-person here.
             return ['ok' => true, 'link_supported' => self::actorIdentitySchemaSupported($pdo)];
         }
@@ -200,32 +201,12 @@ final class SgkKararPaketiAuthz
     }
 
     /**
-     * Schema probe without process-level static cache (safe across PDO / schema states).
+     * Thin adapter over the canonical Auth\DualControl schema probe.
+     * Kept as public contract for existing SGK / ActorIdentityService call sites.
      */
     public static function actorIdentitySchemaSupported(PDO $pdo): bool
     {
-        try {
-            $table = $pdo->query("SHOW TABLES LIKE 'actor_identities'");
-            if ($table === false || $table->fetch(PDO::FETCH_NUM) === false) {
-                if ($table !== false) {
-                    $table->closeCursor();
-                }
-
-                return false;
-            }
-            $table->closeCursor();
-
-            $col = $pdo->query("SHOW COLUMNS FROM users LIKE 'actor_identity_id'");
-            if ($col === false) {
-                return false;
-            }
-            $row = $col->fetch(PDO::FETCH_ASSOC);
-            $col->closeCursor();
-
-            return $row !== false;
-        } catch (\Throwable $e) {
-            return false;
-        }
+        return DualControl::actorIdentitySchemaSupported($pdo);
     }
 
     /**
@@ -242,25 +223,7 @@ final class SgkKararPaketiAuthz
      */
     public static function resolveActorIdentityId(PDO $pdo, $userId, $actorHint)
     {
-        $userId = (int) $userId;
-        // Session hint is trusted only as cache of authenticated user row — never from request body.
-        if (is_array($actorHint) && array_key_exists('actor_identity_id', $actorHint) && $actorHint['actor_identity_id'] !== null && $actorHint['actor_identity_id'] !== '') {
-            $aid = (int) $actorHint['actor_identity_id'];
-
-            return $aid > 0 ? $aid : null;
-        }
-        if ($userId <= 0 || !self::actorIdentitySchemaSupported($pdo)) {
-            return null;
-        }
-        $stmt = $pdo->prepare('SELECT actor_identity_id FROM users WHERE id = :id LIMIT 1');
-        $stmt->execute(['id' => $userId]);
-        $val = $stmt->fetchColumn();
-        if ($val === false || $val === null || $val === '') {
-            return null;
-        }
-        $aid = (int) $val;
-
-        return $aid > 0 ? $aid : null;
+        return DualControl::resolveActorIdentityId($pdo, $userId, $actorHint);
     }
 
     /**

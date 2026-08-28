@@ -113,7 +113,8 @@ class RolePermissions
             'personeller.view',
             'personeller.view.sube',
             'personeller.create',
-            'personeller.import.apply',
+            // personeller.import.apply intentionally absent: bulk import apply is a central
+            // data-load capability, not branch-level single-personnel data entry.
             'personeller.update',
             'personeller.detail.view',
             'surecler.view',
@@ -129,7 +130,8 @@ class RolePermissions
             'bildirimler.detail.view',
             'puantaj.view',
             'puantaj.update',
-            'puantaj.muhurle',
+            // puantaj.muhurle intentionally absent: it gates monthly sealing and weekly
+            // closing, which are central period-closing decisions, not branch data entry.
             'puantaj.donem_reopen.request',
             'puantaj.donem_seal.history',
             'puantaj.bildirim_etki.view',
@@ -139,18 +141,21 @@ class RolePermissions
             'finans.view',
             'isg.view',
             'aylik-ozet.view',
-            'aylik-ozet.review',
+            // aylik-ozet.review intentionally absent: it is an accepted alternative gate for
+            // the aylikOzetBolumOnay write, so keeping it would re-open the removed approval.
             'gunluk_bildirim.request_correction',
             'haftalik_mutabakat.view',
             'haftalik_mutabakat.reopen_request',
             'aylik_bolum_onayi.view',
-            'aylik_bolum_onayi.approve',
+            // aylik_bolum_onayi.approve intentionally absent: the underlying write records no
+            // actor, so separation of duties cannot be proven on that path.
             'aylik_bildirim_onayi.view',
             'revizyon.view',
             'revizyon.create',
             'revizyon.submit',
             'revizyon.cancel',
-            'revizyon.view_finance_effect',
+            // revizyon.view_finance_effect intentionally absent: it unmasks bordro effect
+            // labels while this role holds no bordro read grant at all.
             'revizyon.view_audit_history',
             'disiplin.view',
             'disiplin.final_decision',

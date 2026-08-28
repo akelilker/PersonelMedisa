@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Medisa\Api\Services;
 
+use Medisa\Api\Auth\DualControl;
 use Medisa\Api\Services\Payroll\MaasHesaplamaEngine;
 use Medisa\Api\Services\Payroll\SirketCalismaPolitikasiCatalog;
 use PDO;
@@ -394,9 +395,8 @@ class SirketCalismaPolitikasiService
             }
             self::assertCompleteDegerler($pdo, (int) $id);
             self::assertEvidenceComplete($pdo, (int) $id);
-            $hazirlayanId = $row['hazirlayan_id'] !== null ? (int) $row['hazirlayan_id'] : null;
-            $actorId = self::actorId($actor);
-            if ($hazirlayanId !== null && $actorId !== null && $hazirlayanId === $actorId) {
+            // Canonical separation-of-duties decision; unknown hazirlayan is fail-closed.
+            if (!DualControl::isSeparated($actor, $row['hazirlayan_id'] ?? null, $pdo)) {
                 throw new SirketCalismaPolitikasiException(
                     'POLICY_SELF_APPROVAL_FORBIDDEN',
                     'Hazirlayan kullanici politikayi onaylayamaz.',

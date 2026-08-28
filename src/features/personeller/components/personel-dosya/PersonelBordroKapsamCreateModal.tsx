@@ -67,7 +67,6 @@ export function PersonelBordroKapsamCreateModal({
 }: PersonelBordroKapsamCreateModalProps) {
   const [form, setForm] = useState<FormState>(INITIAL);
   const [validationMessage, setValidationMessage] = useState<string | null>(null);
-  const [direktOnayla, setDirektOnayla] = useState(false);
 
   if (!isOpen) {
     return null;
@@ -76,7 +75,6 @@ export function PersonelBordroKapsamCreateModal({
   function handleClose() {
     setForm(INITIAL);
     setValidationMessage(null);
-    setDirektOnayla(false);
     onClose();
   }
 
@@ -102,8 +100,7 @@ export function PersonelBordroKapsamCreateModal({
       gecerlilik_baslangic: form.gecerlilikBaslangic,
       gecerlilik_bitis: form.gecerlilikBitis || null,
       yil: Number.isFinite(yil) ? yil : undefined,
-      ay: Number.isFinite(ay) ? ay : undefined,
-      direkt_onayla: canApprove ? direktOnayla : undefined
+      ay: Number.isFinite(ay) ? ay : undefined
     };
   }
 
@@ -236,15 +233,13 @@ export function PersonelBordroKapsamCreateModal({
         </div>
 
         {canApprove ? (
-          <label className="personel-puantaj-summary-note">
-            <input
-              type="checkbox"
-              checked={direktOnayla}
-              onChange={(e) => setDirektOnayla(e.target.checked)}
-              data-testid="personel-bordro-kapsam-direkt-onay"
-            />{" "}
-            Doğrudan onayla (GY)
-          </label>
+          <p
+            className="personel-puantaj-summary-note"
+            data-testid="personel-bordro-kapsam-dual-control-note"
+          >
+            Kayıt taslak olarak oluşturulur. Görevler ayrılığı gereği kaydı hazırlayan
+            kullanıcı aynı kaydı onaylayamaz; onayı farklı bir yetkili vermelidir.
+          </p>
         ) : null}
 
         <button

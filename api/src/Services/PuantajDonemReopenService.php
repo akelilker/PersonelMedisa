@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Medisa\Api\Services;
 
+use Medisa\Api\Auth\DualControl;
 use Medisa\Api\Services\Retention\PhysicalDestruction\PuantajPhysicalDestructionGate;
 use PDO;
 
@@ -187,7 +188,7 @@ class PuantajDonemReopenService
             ]);
         }
 
-        if ((int) $talep['requested_by'] === $actorId) {
+        if (!DualControl::isSeparated($user, $talep['requested_by'] ?? null, $pdo)) {
             throw new PuantajDonemReopenException(
                 'REOPEN_SELF_APPROVAL_FORBIDDEN',
                 'Talep sahibi kendi talebini onaylayamaz.',
@@ -271,7 +272,7 @@ class PuantajDonemReopenService
         if ((string) $talep['talep_durumu'] !== PuantajDonemPeriodService::TALEP_ONAY_BEKLIYOR) {
             throw new PuantajDonemReopenException('REOPEN_REQUEST_NOT_PENDING', 'Yalniz bekleyen talep reddedilebilir.', 409);
         }
-        if ((int) $talep['requested_by'] === $actorId) {
+        if (!DualControl::isSeparated($user, $talep['requested_by'] ?? null, $pdo)) {
             throw new PuantajDonemReopenException(
                 'REOPEN_SELF_APPROVAL_FORBIDDEN',
                 'Talep sahibi kendi talebini reddedemez.',

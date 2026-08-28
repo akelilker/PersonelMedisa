@@ -5874,6 +5874,12 @@ export function resolveDemoApiResponse(
     if (actor.role === "MUHASEBE") {
       delete createBody.direkt_onayla;
     }
+    if (createBody.direkt_onayla === true) {
+      return demoRevizyonError(
+        "BORDRO_KAPSAM_SELF_APPROVAL_FORBIDDEN",
+        "Kaydi olusturan kullanici ayni istekte onaylayamaz; kayit onaya gonderilip farkli bir onaylayici tarafindan onaylanmalidir."
+      );
+    }
     const neden = (toStringValue(createBody.neden_kodu) ?? "").toUpperCase();
     if (neden === "DEMO_TEST_VERISI" && actor.role !== "GENEL_YONETICI") {
       return demoRevizyonError(
@@ -5902,10 +5908,7 @@ export function resolveDemoApiResponse(
       gecerlilik_bitis: string | null;
     };
     const now = new Date().toISOString();
-    let initialState: DemoPersonelBordroKapsamKaydi["state"] = "TASLAK";
-    if (actor.role === "GENEL_YONETICI" && createBody.direkt_onayla === true) {
-      initialState = "ONAYLANDI";
-    }
+    const initialState: DemoPersonelBordroKapsamKaydi["state"] = "TASLAK";
     const next: DemoPersonelBordroKapsamKaydi = {
       id: ++demoState.nextIds.personelBordroKapsam,
       personel_id: personelId,
@@ -5917,8 +5920,8 @@ export function resolveDemoApiResponse(
       gecerlilik_bitis: proposed.gecerlilik_bitis,
       state: initialState,
       hazirlayan_id: actor.userId,
-      onaylayan_id: initialState === "ONAYLANDI" ? actor.userId : null,
-      onay_zamani: initialState === "ONAYLANDI" ? now : null,
+      onaylayan_id: null,
+      onay_zamani: null,
       iptal_eden_id: null,
       iptal_zamani: null,
       iptal_nedeni: null,

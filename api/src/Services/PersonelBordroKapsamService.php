@@ -271,10 +271,17 @@ class PersonelBordroKapsamService
         }
 
         $rol = strtoupper((string) ($user['rol'] ?? ''));
-        $initialState = 'TASLAK';
-        if ($rol === 'GENEL_YONETICI' && !empty($payload['direkt_onayla'])) {
-            $initialState = 'ONAYLANDI';
+        // direkt_onayla, olusturan ile onaylayani ayni actor yapardi; separation of duties
+        // rol adindan bagimsiz oldugu icin bu bypass fail-closed reddedilir. Kontrat korunur:
+        // alan hala kabul edilir, ancak iki asamali submit/approve akisina yonlendirir.
+        if (!empty($payload['direkt_onayla'])) {
+            JsonResponse::error(
+                403,
+                'BORDRO_KAPSAM_' . DualControl::CODE_SELF_APPROVAL,
+                'Kaydi olusturan kullanici ayni istekte onaylayamaz; kayit onaya gonderilip farkli bir onaylayici tarafindan onaylanmalidir.'
+            );
         }
+        $initialState = 'TASLAK';
 
         if ($normalized['neden_kodu'] === 'DEMO_TEST_VERISI' && $rol !== 'GENEL_YONETICI') {
             JsonResponse::error(403, 'FORBIDDEN', 'DEMO_TEST_VERISI yalniz GENEL_YONETICI tarafindan secilebilir.');
@@ -373,13 +380,11 @@ class PersonelBordroKapsamService
         if ((string) $row['neden_kodu'] === 'DEMO_TEST_VERISI' && strtoupper((string) ($user['rol'] ?? '')) !== 'GENEL_YONETICI') {
             JsonResponse::error(403, 'FORBIDDEN', 'DEMO_TEST_VERISI onayi yalniz GENEL_YONETICI.');
         }
-        // Onaya gonderilmis kayitta hazirlayan ile onaylayan ayrismak zorundadir (rol adindan bagimsiz).
-        // TASLAK kayitta ayri bir gonderim adimi olmadigi icin ayristirilacak kontrol adimi da yoktur.
-        if ((string) $row['state'] === 'ONAY_BEKLIYOR') {
-            $violation = DualControl::violation($user, $row['hazirlayan_id'] ?? null, $pdo);
-            if ($violation !== null) {
-                JsonResponse::error(403, 'BORDRO_KAPSAM_' . $violation['code'], $violation['message']);
-            }
+        // Hazirlayan ile onaylayan her state'te ayrismak zorundadir; rol adi (GENEL_YONETICI dahil)
+        // bypass degildir ve hazirlayan bilinmiyorsa ayrisma kanitlanamadigi icin onay reddedilir.
+        $violation = DualControl::violation($user, $row['hazirlayan_id'] ?? null, $pdo);
+        if ($violation !== null) {
+            JsonResponse::error(403, 'BORDRO_KAPSAM_' . $violation['code'], $violation['message']);
         }
         $normalized = [
             'gecerlilik_baslangic' => (string) $row['gecerlilik_baslangic'],

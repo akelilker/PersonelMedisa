@@ -5788,6 +5788,17 @@ let personelBelgeKaydiIdCounter = 903;
       if (role === "MUHASEBE") {
         delete payload.direkt_onayla;
       }
+      if (payload.direkt_onayla === true) {
+        await fulfillJson(
+          route,
+          403,
+          errorBody(
+            "BORDRO_KAPSAM_SELF_APPROVAL_FORBIDDEN",
+            "Kaydi olusturan kullanici ayni istekte onaylayamaz; kayit onaya gonderilip farkli bir onaylayici tarafindan onaylanmalidir."
+          )
+        );
+        return;
+      }
       const dryRunHash = String(payload.dry_run_hash ?? "");
       if (!dryRunHash) {
         await fulfillJson(
@@ -5824,10 +5835,7 @@ let personelBelgeKaydiIdCounter = 903;
         return;
       }
       const now = new Date().toISOString();
-      let initialState: MockPersonelBordroKapsam["state"] = "TASLAK";
-      if (role === "GENEL_YONETICI" && payload.direkt_onayla === true) {
-        initialState = "ONAYLANDI";
-      }
+      const initialState: MockPersonelBordroKapsam["state"] = "TASLAK";
       const proposed = preview.result.proposed;
       const created: MockPersonelBordroKapsam = {
         id: ++personelBordroKapsamIdCounter,

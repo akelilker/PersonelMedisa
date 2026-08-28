@@ -405,13 +405,18 @@ describe("role permissions", () => {
       "personeller.update",
       "puantaj.view",
       "puantaj.update",
-      "puantaj.muhurle",
       "puantaj.donem_reopen.request",
       "bildirimler.create",
       "revizyon.create",
       "revizyon.submit",
       "haftalik_mutabakat.view",
-      "aylik_bildirim_onayi.view"
+      "aylik_bildirim_onayi.view",
+      // Reviewed and kept: branch-scoped operational decisions on DB-loaded rows.
+      "disiplin.final_decision",
+      "puantaj.olay_karar.decide",
+      "surecler.cancel",
+      "revizyon.cancel",
+      "finans.view"
     ] as const;
     for (const permission of granted) {
       expect(hasRolePermission("SUBE_YONETICISI", permission)).toBe(true);
@@ -419,6 +424,12 @@ describe("role permissions", () => {
     }
 
     const denied = [
+      // Corrective removals: period closing, bulk import, department approval, bordro effect.
+      "puantaj.muhurle",
+      "personeller.import.apply",
+      "aylik_bolum_onayi.approve",
+      "aylik-ozet.review",
+      "revizyon.view_finance_effect",
       // Central payroll finalization / final management approval.
       "bordro_kesinlestirme.approve",
       "bordro_on_izleme.view",

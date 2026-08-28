@@ -175,7 +175,6 @@ export function buildCreatePersonelPayload(form: CreatePersonelFormState): Creat
     telefon,
     acil_durum_kisi: form.acilDurumKisi.trim() === "" ? null : form.acilDurumKisi.trim(),
     acil_durum_telefon: acilDurumTelefon,
-    sicil_no: form.sicilNo.trim(),
     ise_giris_tarihi: form.iseGirisTarihi,
     sube_id: subeId,
     departman_id: parseRequiredPositiveInt(form.departmanId, "Departman"),

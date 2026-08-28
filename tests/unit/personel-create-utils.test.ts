@@ -15,7 +15,6 @@ const validForm = {
   telefon: "05321234567",
   acilDurumKisi: "Yakın Kişi",
   acilDurumTelefon: "05329876543",
-  sicilNo: "E2E-001",
   iseGirisTarihi: "2026-06-01",
   subeId: "1",
   departmanId: "3",

@@ -25,6 +25,8 @@ use Medisa\Api\Services\Personel\PersonelImportHistoryService;
 use Medisa\Api\Services\Personel\PersonelImportReferenceCatalogService;
 use Medisa\Api\Services\Personel\PersonelOrgLocationSchema;
 use Medisa\Api\Services\Personel\PersonelOrgStructureSchema;
+use Medisa\Api\Services\Personel\PersonelSicilAllocationException;
+use Medisa\Api\Services\Personel\PersonelSicilAllocator;
 use Medisa\Api\Services\Personel\PersonelValidationException;
 use Medisa\Api\Services\OfflineMutationIdempotencyService;
 use Medisa\Api\Services\PersonelUcretException;
@@ -302,7 +304,9 @@ class PersonellerController
             JsonResponse::error($status, $code, $e->getMessage(), $e->getField());
         }
         self::assertTcAvailable($pdo, $payload['tc_kimlik_no'] ?? null);
-        self::assertSicilAvailable($pdo, (string) $payload['sicil_no']);
+        if (!PersonelSicilAllocator::isAutoRequest($payload['sicil_no'] ?? null)) {
+            self::assertSicilAvailable($pdo, (string) $payload['sicil_no']);
+        }
 
         $actorId = (int) ($user['id'] ?? 0);
         $idemKey = OfflineMutationIdempotencyService::readKey($request);
@@ -382,6 +386,11 @@ class PersonellerController
 
             $pdo->commit();
             JsonResponse::success(self::mapPersonelRow($row, $user), [], 201);
+        } catch (PersonelSicilAllocationException $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            JsonResponse::error(409, $e->getCodeString(), $e->getMessage(), $e->getField());
         } catch (PersonelUcretException $e) {
             if ($pdo->inTransaction()) {
                 $pdo->rollBack();

@@ -253,14 +253,9 @@ export function PersonelCreateFields({
             isOpen={openSelectName === "create-calisan-kapsami"}
             onOpenChange={(isOpen) => setSelectOpen("create-calisan-kapsami", isOpen)}
           />
-          <FormField
-            label="Sicil No"
-            name="create-sicil"
-            value={form.sicilNo}
-            onChange={(value) => setForm((prev) => ({ ...prev, sicilNo: value }))}
-            placeholder="Örn. MED-001"
-            required
-          />
+          <p className="personel-form-note personel-form-note--info" data-testid="create-sicil-auto-note">
+            Sicil numarası kayıt sırasında otomatik atanacaktır.
+          </p>
           <FormField
             label="T.C. Kimlik No"
             name="create-tc"

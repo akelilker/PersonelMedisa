@@ -137,7 +137,8 @@ function p3cMigrationFiles(): array
             && $name !== '074_qr_attendance_correction_and_inbox.sql'
             && $name !== '075_personel_account_activation.sql'
             && $name !== '076_dis_kaynak_gecici_gorevlendirme.sql'
-            && $name !== '077_legacy_role_enum_shrink.sql';
+            && $name !== '077_legacy_role_enum_shrink.sql'
+            && $name !== '078_personel_sicil_sequence.sql';
     }));
     sort($files, SORT_STRING);
 

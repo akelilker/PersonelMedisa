@@ -59,7 +59,7 @@ describe("canonical migration bundle", () => {
       expect(firstBytes.equals(readFileSync(second))).toBe(true);
 
       const bundle = firstBytes.toString("utf8");
-      expect((bundle.match(/'version' => '/g) ?? []).length).toBe(78);
+      expect((bundle.match(/'version' => '/g) ?? []).length).toBe(79);
       expect(bundle).toContain("'name' => 'migration_ledger.sql'");
       expect(bundle).toContain(
         "'name' => '067_personel_canonical_reference_gate.sql'",
@@ -92,6 +92,7 @@ describe("canonical migration bundle", () => {
         "'name' => '076_dis_kaynak_gecici_gorevlendirme.sql'",
       );
       expect(bundle).toContain("'name' => '077_legacy_role_enum_shrink.sql'");
+      expect(bundle).toContain("'name' => '078_personel_sicil_sequence.sql'");
 
       const checksum068 = createHash("sha256")
         .update(readFileSync(migration068))
@@ -207,7 +208,7 @@ describe("canonical migration bundle", () => {
           `require '${phpRoot}/api/src/bootstrap.php';`,
           `$provider = new Medisa\\Api\\Database\\BundledMigrationSourceProvider('${phpBundle}');`,
           `$rows = $provider->all();`,
-          `if (count($rows) !== 78 || $rows[0]['version'] !== '000' || $rows[70]['version'] !== '070' || $rows[71]['version'] !== '071' || $rows[72]['version'] !== '072' || $rows[73]['version'] !== '073' || $rows[74]['version'] !== '074' || $rows[75]['version'] !== '075' || $rows[76]['version'] !== '076' || $rows[77]['version'] !== '077') { exit(1); }`,
+          `if (count($rows) !== 79 || $rows[0]['version'] !== '000' || $rows[70]['version'] !== '070' || $rows[71]['version'] !== '071' || $rows[72]['version'] !== '072' || $rows[73]['version'] !== '073' || $rows[74]['version'] !== '074' || $rows[75]['version'] !== '075' || $rows[76]['version'] !== '076' || $rows[77]['version'] !== '077' || $rows[78]['version'] !== '078') { exit(1); }`,
           "echo 'RAW_SQL_MISSING_PRODUCTION_SIMULATION=PASS';",
         ].join(" ");
         const result = spawnSync("php", ["-r", script], {

@@ -3398,6 +3398,26 @@ function demoMonthEndIso(yil: number, ay: number): string {
   return `${String(yil).padStart(4, "0")}-${String(ay).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
+/** Mirrors the backend sicil allocator: blank request → next free numeric sicil, min 3 digits. */
+function demoResolveCreateSicilNo(requested: string | null | undefined): string {
+  const explicit = (requested ?? "").trim();
+  if (explicit !== "") {
+    return explicit;
+  }
+
+  const taken = new Set(demoState.personeller.map((item) => (item.sicil_no ?? "").trim()));
+  let candidate = demoState.personeller.reduce((max, item) => {
+    const value = (item.sicil_no ?? "").trim();
+    return /^\d+$/.test(value) ? Math.max(max, Number.parseInt(value, 10)) : max;
+  }, 0);
+
+  do {
+    candidate += 1;
+  } while (taken.has(String(candidate).padStart(3, "0")));
+
+  return String(candidate).padStart(3, "0");
+}
+
 function demoHasMockActivePayrollSnapshot(personel: DemoPersonel): boolean {
   const sicil = (personel.sicil_no ?? "").toUpperCase();
   return personel.id === 1 || sicil === "P-001" || sicil === "P-0001";
@@ -5548,7 +5568,7 @@ export function resolveDemoApiResponse(
       sube_id: subeId,
       telefon: toStringValue(body.telefon) ?? undefined,
       dogum_tarihi: toStringValue(body.dogum_tarihi) ?? undefined,
-      sicil_no: toStringValue(body.sicil_no) ?? undefined,
+      sicil_no: demoResolveCreateSicilNo(toStringValue(body.sicil_no)),
       dogum_yeri: toStringValue(body.dogum_yeri) ?? undefined,
       kan_grubu: toStringValue(body.kan_grubu) ?? undefined,
       ise_giris_tarihi: toStringValue(body.ise_giris_tarihi) ?? undefined,

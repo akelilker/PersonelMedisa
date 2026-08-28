@@ -92,7 +92,9 @@ final class PersonelCanonicalValidator
         // Emergency contact is optional for initial master create/import; empty → NULL.
         $acilDurumKisi = self::optionalTrimmedString($body, 'acil_durum_kisi');
         $acilDurumTelefon = self::optionalTrimmedString($body, 'acil_durum_telefon');
-        $sicilNo = self::requireTrimmedString($body, 'sicil_no', 'Sicil no zorunludur.');
+        // Interactive create: missing/blank sicil means AUTO (backend allocates).
+        // Import keeps its own mandatory sicil check before reaching here.
+        $sicilNo = self::optionalTrimmedString($body, 'sicil_no');
         $iseGirisTarihi = self::requireValidDate($body, 'ise_giris_tarihi', 'Ise giris tarihi zorunludur.');
 
         if ($kapsam === PersonelCalisanKapsamService::IC_PERSONEL) {

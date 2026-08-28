@@ -46,13 +46,24 @@ Bu değerler yalnız şema ENUM kalıntısı ve normalize sınırındaki geriye 
 
 Yetki kapsamı hiçbir rol için genişletilmemiş veya daraltılmamıştır; frontend rol seçim listesi zaten yalnız `ASSIGNABLE_USER_ROLES` (8 canonical) sunuyordu, `LEGACY_ROLE_SELECTABLE_COUNT = 0`.
 
+## Production apply durumu
+
+Kod değişikliği `d6372deb3a6d83388bb31baf10d753f0acf912fe` ile canlıdır (CI PASS, Deploy cPanel PASS, authenticated read-only smoke PASS — smoke aktörü yetki yükselmesi olmadan çalışmaya devam ediyor).
+
+Migration `077` **production'a uygulanamamıştır**. `Apply cPanel migrations` workflow'u üç ayrı denemede (`33144474181`, `33148682586`, `33152241001`) `MIGRATION_TIMEOUT_REASON=STATUS_TERMINAL_NOT_OBSERVED` ile zaman aşımına uğradı: worker kontrol düzleminde ne `status.json` ne de `request.*` izi gözlemlenebildi. Aynı pencerede salt-okunur envanter workflow'u da `api/bin/cpanel-migration-cron.php` dosyasını FTP üzerinden çekemedi (`max-retries exceeded`, hem explicit-FTPS hem plain-FTP). Bu bir cPanel/FTP ortam sorunudur; migration içeriğinden veya guard'ından kaynaklanmaz.
+
+Bu nedenle `PRODUCTION_MIGRATION_TIP = 076` olarak kalmıştır ve production `users.rol` ENUM'u hâlâ 4 legacy değeri **şema seviyesinde** taşımaktadır. Yetki açısından risk yoktur: bu değerlerin atanmış kullanıcısı yok, hiçbir arayüzden seçilemez ve backend/frontend normalize sınırları bunları fail-closed reddeder.
+
+Kalan tek adım, FTP/cron kontrol düzlemi sağlıklıya döndüğünde `Apply cPanel migrations` workflow'unu `deployed_sha = d6372deb3a6d83388bb31baf10d753f0acf912fe` ve onay `APPLY_CANONICAL_MIGRATIONS` ile yeniden çalıştırmaktır.
+
 ## Kapanış anahtarları
 
 ```
-LEGACY_ROLE_ENUM_ACTIVE = HAYIR
+LEGACY_ROLE_AUTHORIZATION_ACTIVE = HAYIR
 LEGACY_ROLE_ASSIGNED_REAL_USER_COUNT = 0
 LEGACY_ROLE_SELECTABLE_COUNT = 0
 CANONICAL_AUTH_ROLE_COUNT = 8
 SYSTEM_TEST_ROLE_COUNT = 1
-MG_ROLE_ENUM_DEBT_001 = CLOSED_CONFIRMED
+LEGACY_ROLE_ENUM_SCHEMA_SHRINK = MIGRATION_077_PENDING_PRODUCTION_APPLY
+MG_ROLE_ENUM_DEBT_001 = CODE_CLOSED_PRODUCTION_APPLY_PENDING
 ```

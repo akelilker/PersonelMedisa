@@ -51,7 +51,6 @@ PRODUCTION_MIGRATION_TIP: 076
 | `MG-RET-PHYS-001` | Saklama politikası + fiziksel imha mekanizması | **CLOSED_CONFIRMED** | `RETENTION_POLICY = MINIMUM_10_YEARS`; `SHORTER_CATEGORY_RETENTION = DISABLED`; personel-bağlı anchor = işten ayrılış tarihi veya daha geç uygulanabilir anchor; aktif personel imhası **PROHIBITED**; eksik anchor **FAIL_CLOSED**; legal hold override **ENABLED**; daha uzun mevzuat süresi kısaltılmaz. 15/15 typed handler; schema `059`–`064` production ready; GM çift kontrol + plan hash + idempotency korunur; feature flag varsayılan **OFF**. Bkz. `114-retention-physical-destruction-pack3c-final.md`, `118-production-migration-rollout-059-064.md`. Süresi dolan adayların mevcut request/approval/execution akışından geçirilmesi normal işletim işidir; açık backlog değildir. |
 | `MG-OPS-SGK-CAT-001` | SGK canlı katalog/politika salt-okunur doğrulaması | **CLOSED_CONFIRMED** | 2026-08-27 canlı GET doğrulandı. |
 | `MG-OPS-UBGT-001` | UBGT canlı takvim/projeksiyon salt-okunur doğrulaması | **CLOSED_CONFIRMED** | 2026-08-27 canlı GET doğrulandı. |
-| `MG-ROLE-ENUM-DEBT-001` | Legacy `users.rol` ENUM temizliği | **CLOSED_CONFIRMED** | Salt-okunur production envanteri: `PATRON`, `IK_BORDRO`, `SGK_KARAR_ONAY_YETKILISI`, `IDARI_ISLER` için atanmış kullanıcı sayısı (aktif+pasif) **0**. Migration `077_legacy_role_enum_shrink.sql` ENUM'u canonical 8 insan rolü + `AUTH_SMOKE_READONLY` teknik aktörüne daraltır; data guard unmapped legacy kullanıcı varsa FAIL eder. BE `RolePermissions::normalizeRole` ve FE `canonicalizeUserRole` legacy alias taşımaz, tümü fail-closed. Rol mapping veya yetki genişletmesi yapılmamıştır. Bkz. `docs/guncel/131-legacy-role-enum-canonical-cleanup.md`. |
 | `MG-OPS-ORG-001` | IC kritik organizasyon FK tamamlama | **CLOSED** | Phase1 import sonrası AKTIF `IC_PERSONEL` için kritik org alanları (Şube/Departman/Bölüm/Birim/Görev/Personel Tipi) tamam; kalan telefon kalemi ayrıdır (`MG-OPS-PERSONEL-PHONE-001`). DIS org null’ları IC sayımına **dahil edilmez**. |
 
 ## Kullanıcı verisi / ataması gerektiren (teknik blocker değil)
@@ -63,7 +62,9 @@ PRODUCTION_MIGRATION_TIP: 076
 
 ## Teknik borç (non-blocking)
 
-Açık kalem yok.
+| ID | Konu | Durum | Not |
+| --- | --- | --- | --- |
+| `MG-ROLE-ENUM-DEBT-001` | Legacy `users.rol` ENUM şema daraltması | **TECH_DEBT_NON_BLOCKING** | Kod tarafı kapalı ve canlı: legacy alias yok, authorization fail-closed, legacy rol seçilemez (`LEGACY_ROLE_SELECTABLE_COUNT = 0`). Salt-okunur production envanteri legacy rol atanmış kullanıcı sayısını **0** olarak doğruladı, dolayısıyla yetki riski yok. Kalan tek iş `077_legacy_role_enum_shrink.sql` migration'ının production'a uygulanmasıdır; `PRODUCTION_MIGRATION_TIP` hâlâ `076`. Apply, cPanel migration worker kontrol düzlemine ulaşılamadığı için 3 denemede de `STATUS_TERMINAL_NOT_OBSERVED` ile zaman aşımına uğradı (ortam kaynaklı, kod kaynaklı değil). Bkz. `docs/guncel/131-legacy-role-enum-canonical-cleanup.md`. |
 
 ## Bilinçli ertelenen / kapsam dışı / future (bug değil)
 
@@ -81,12 +82,12 @@ Açık kalem yok.
 
 | Sınıf | Sayım |
 | --- | ---: |
-| **CLOSED_CONFIRMED** | 8 |
+| **CLOSED_CONFIRMED** | 7 |
 | **CLOSED** | 9 |
 | **USER_DATA_REQUIRED** | 1 |
 | **USER_ASSIGNMENT_REQUIRED** | 1 |
 | **READY_FOR_USER_EXECUTION_APPROVAL** | 0 |
-| **TECH_DEBT_NON_BLOCKING** | 0 |
+| **TECH_DEBT_NON_BLOCKING** | 1 |
 | **FUTURE / OUT_OF_SCOPE / INTENTIONAL_DEFER** | 7 |
 | **BUG** | **0** |
 | **OPS_ROLLOUT** | **0** |

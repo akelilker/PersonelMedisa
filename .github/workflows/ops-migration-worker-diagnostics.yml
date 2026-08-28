@@ -1,0 +1,192 @@
+name: Ops migration worker diagnostics
+
+# Salt-okunur cPanel migration control-plane teshisi.
+# Hicbir dosya yazmaz, tasimaz, silmez; canli worker'a dokunmaz.
+# Amac: FTP login root, deploy SHA, worker SHA256 pariteti ve
+# migration-control dizin envanterini kanitlamak.
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: Type READONLY_WORKER_DIAGNOSTICS
+        required: true
+        type: string
+
+concurrency:
+  group: cpanel-canonical-migration-control
+  cancel-in-progress: false
+
+jobs:
+  diagnose:
+    name: Readonly migration worker diagnostics
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      FTP_SERVER: ${{ secrets.FTP_SERVER }}
+      FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+      FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+      FTP_PORT: ${{ secrets.FTP_PORT }}
+      CONFIRMATION: ${{ inputs.confirmation }}
+    steps:
+      - name: Validate explicit request
+        run: |
+          set -euo pipefail
+          test "$CONFIRMATION" = "READONLY_WORKER_DIAGNOSTICS" || {
+            echo "Explicit diagnostics confirmation is required."
+            exit 1
+          }
+          test -n "$FTP_SERVER" || (echo "FTP_SERVER secret is missing." && exit 1)
+          test -n "$FTP_USERNAME" || (echo "FTP_USERNAME secret is missing." && exit 1)
+          test -n "$FTP_PASSWORD" || (echo "FTP_PASSWORD secret is missing." && exit 1)
+          test "$FTP_PORT" = "21" || (echo "FTP_PORT must be 21 for this cPanel FTP deploy." && exit 1)
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install FTP client
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y lftp
+
+      - name: Collect readonly control-plane evidence
+        run: |
+          set -euo pipefail
+
+          run_ftp_mode() {
+            local mode_name="$1"
+            local use_ftps="$2"
+            local ftp_commands="$3"
+
+            echo "Diagnostics transport mode: ${mode_name}"
+            lftp -u "${FTP_USERNAME}","${FTP_PASSWORD}" -p "${FTP_PORT}" "ftp://${FTP_SERVER}" -e "
+              set cmd:fail-exit true;
+              set net:max-retries 3;
+              set net:timeout 30;
+              set net:reconnect-interval-base 5;
+              set net:reconnect-interval-max 10;
+              set xfer:clobber true;
+              set ssl:verify-certificate no;
+              set ssl:check-hostname no;
+              set ftp:passive-mode on;
+              set ftp:ssl-allow ${use_ftps};
+              set ftp:ssl-force ${use_ftps};
+              set ftp:ssl-protect-data ${use_ftps};
+              ${ftp_commands}
+              bye
+            "
+          }
+
+          run_cpanel_ftp() {
+            local ftp_commands="$1"
+            if run_ftp_mode "explicit-ftps" "true" "$ftp_commands"; then
+              return 0
+            fi
+            echo "Explicit FTPS basarisiz oldu, plain FTP fallback deneniyor..."
+            run_ftp_mode "plain-ftp" "false" "$ftp_commands"
+          }
+
+          WORK="$RUNNER_TEMP/worker-diagnostics"
+          rm -rf "$WORK"
+          mkdir -p "$WORK"
+
+          # 1) FTP login root ve dizin envanteri. Cikti dosya adlarindan ibarettir;
+          #    request payload'lari indirilmez, icerik basilmaz.
+          echo "--- FTP transport probe ---"
+          ftp_probe_ok="YES"
+          if ! run_cpanel_ftp "
+            pwd;
+            cls -1 api/bin > ${WORK}/api-bin.txt;
+            cls -1 api/runtime/migration-control > ${WORK}/control-dir.txt;
+            get api/.deploy-sha -o ${WORK}/deploy-sha.txt;
+            get api/bin/cpanel-migration-cron.php -o ${WORK}/remote-worker.php;
+          "; then
+            ftp_probe_ok="NO"
+          fi
+          echo "FTP_PROBE_OK=${ftp_probe_ok}"
+          if [[ "$ftp_probe_ok" != "YES" ]]; then
+            echo "DIAGNOSTICS_RESULT=FTP_UNREACHABLE"
+            exit 1
+          fi
+
+          # 2) Deploy SHA readback.
+          deploy_sha="$(tr -d '\r\n' < "${WORK}/deploy-sha.txt" 2>/dev/null || true)"
+          [[ "$deploy_sha" =~ ^[0-9a-fA-F]{40}$ ]] || deploy_sha="INVALID"
+          echo "REMOTE_DEPLOY_SHA=${deploy_sha}"
+
+          # 3) Worker parity: local repo worker vs canli worker.
+          local_sha256="$(sha256sum api/bin/cpanel-migration-cron.php | cut -d' ' -f1)"
+          remote_sha256="$(sha256sum "${WORK}/remote-worker.php" | cut -d' ' -f1)"
+          echo "LOCAL_WORKER_SHA256=${local_sha256}"
+          echo "REMOTE_WORKER_SHA256=${remote_sha256}"
+          if [[ "$local_sha256" == "$remote_sha256" ]]; then
+            echo "REMOTE_WORKER_MATCH=YES"
+          else
+            echo "REMOTE_WORKER_MATCH=NO"
+          fi
+
+          # 4) Canli worker'da beklenmeyen wrapper/artifact var mi?
+          #    Sadece yapisal isaretler; kaynak icerigi basilmaz.
+          if grep -q "cpanel-migration-cron.impl.php" "${WORK}/remote-worker.php"; then
+            echo "REMOTE_WORKER_IS_WRAPPER=YES"
+          else
+            echo "REMOTE_WORKER_IS_WRAPPER=NO"
+          fi
+          if grep -q "MigrationExecutionService" "${WORK}/remote-worker.php"; then
+            echo "REMOTE_WORKER_HAS_CANONICAL_BODY=YES"
+          else
+            echo "REMOTE_WORKER_HAS_CANONICAL_BODY=NO"
+          fi
+          echo "REMOTE_WORKER_BYTES=$(wc -c < "${WORK}/remote-worker.php" | tr -d ' ')"
+
+          # 5) api/bin envanteri: gecici inventory artifact'leri kaldi mi?
+          echo "--- api/bin listing ---"
+          sed 's/[[:space:]]*$//' "${WORK}/api-bin.txt" | sed '/^$/d' | sed 's/^/API_BIN|/'
+          for artifact in cpanel-migration-cron.impl.php readonly-inventory-once.php; do
+            if grep -qx "$artifact" "${WORK}/api-bin.txt"; then
+              echo "STALE_ARTIFACT|${artifact}=PRESENT"
+            else
+              echo "STALE_ARTIFACT|${artifact}=ABSENT"
+            fi
+          done
+
+          # 6) migration-control envanteri: yalniz dosya adlari ve sayimlar.
+          echo "--- migration-control listing ---"
+          sed 's/[[:space:]]*$//' "${WORK}/control-dir.txt" | sed '/^$/d' | sed 's/^/CONTROL_ENTRY|/'
+          count_matching() {
+            grep -c "^$1" "${WORK}/control-dir.txt" 2>/dev/null || true
+          }
+          echo "PENDING_COUNT=$(count_matching 'request\.pending\.')"
+          echo "PROCESSING_COUNT=$(count_matching 'request\.processing\.')"
+          echo "COMPLETED_COUNT=$(count_matching 'request\.completed\.')"
+          echo "FAILED_COUNT=$(count_matching 'request\.failed\.')"
+          if grep -qx "status.json" "${WORK}/control-dir.txt"; then
+            echo "STATUS_JSON_EXISTS=YES"
+          else
+            echo "STATUS_JSON_EXISTS=NO"
+          fi
+          if grep -qx "worker.lock" "${WORK}/control-dir.txt"; then
+            echo "WORKER_LOCK_EXISTS=YES"
+          else
+            echo "WORKER_LOCK_EXISTS=NO"
+          fi
+
+          # 7) Cron heartbeat (worker heartbeat yayinlandiysa mevcuttur).
+          if grep -qx "worker-heartbeat.json" "${WORK}/control-dir.txt"; then
+            echo "WORKER_HEARTBEAT_EXISTS=YES"
+            if run_cpanel_ftp "get api/runtime/migration-control/worker-heartbeat.json -o ${WORK}/heartbeat.json;"; then
+              hb_updated="$(jq -r '.updated_at // "NONE"' "${WORK}/heartbeat.json" 2>/dev/null || echo NONE)"
+              hb_sha="$(jq -r '.deployed_sha // "NONE"' "${WORK}/heartbeat.json" 2>/dev/null || echo NONE)"
+              [[ "$hb_updated" =~ ^[0-9TZ:._+-]{1,64}$ ]] || hb_updated="NONE"
+              [[ "$hb_sha" =~ ^[0-9a-fA-F]{40}$ ]] || hb_sha="NONE"
+              echo "WORKER_HEARTBEAT_UPDATED_AT=${hb_updated}"
+              echo "WORKER_HEARTBEAT_DEPLOY_SHA=${hb_sha}"
+            else
+              echo "WORKER_HEARTBEAT_UPDATED_AT=UNREADABLE"
+            fi
+          else
+            echo "WORKER_HEARTBEAT_EXISTS=NO"
+          fi
+
+          echo "DIAGNOSTICS_RESULT=COLLECTED"

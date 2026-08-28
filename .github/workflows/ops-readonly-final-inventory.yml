@@ -1,0 +1,232 @@
+name: Ops readonly final master inventory
+
+# Salt-okunur production inventory for final master closure.
+# Mutasyon yok. config.local.php artifact olarak yüklenmez / loglanmaz.
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: Type READONLY_FINAL_INVENTORY
+        required: true
+        type: string
+
+concurrency:
+  group: ops-readonly-final-master-inventory
+  cancel-in-progress: false
+
+jobs:
+  inventory:
+    name: Readonly phones / org / sube / roles
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      FTP_SERVER: ${{ secrets.FTP_SERVER }}
+      FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+      FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+      FTP_PORT: ${{ secrets.FTP_PORT }}
+      CONFIRMATION: ${{ inputs.confirmation }}
+    steps:
+      - name: Validate
+        run: |
+          set -euo pipefail
+          test "$CONFIRMATION" = "READONLY_FINAL_INVENTORY" || exit 1
+          test -n "$FTP_SERVER" && test -n "$FTP_USERNAME" && test -n "$FTP_PASSWORD"
+          test "$FTP_PORT" = "21"
+
+      - name: Install tools
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y lftp php-cli php-mysql
+
+      - name: FTP config + run SELECTs
+        run: |
+          set -euo pipefail
+          WORK="$RUNNER_TEMP/final-inv"
+          rm -rf "$WORK"
+          mkdir -p "$WORK"
+          cleanup() { rm -rf "$WORK"; }
+          trap cleanup EXIT
+
+          run_ftp_mode() {
+            local mode_name="$1"
+            local use_ftps="$2"
+            local ftp_commands="$3"
+            echo "FTP mode: ${mode_name}"
+            lftp -u "${FTP_USERNAME}","${FTP_PASSWORD}" -p "${FTP_PORT}" "ftp://${FTP_SERVER}" -e "
+              set cmd:fail-exit true;
+              set net:max-retries 2;
+              set net:timeout 20;
+              set xfer:clobber true;
+              set ssl:verify-certificate no;
+              set ssl:check-hostname no;
+              set ftp:passive-mode on;
+              set ftp:ssl-allow ${use_ftps};
+              set ftp:ssl-force ${use_ftps};
+              set ftp:ssl-protect-data ${use_ftps};
+              ${ftp_commands}
+              bye
+            "
+          }
+
+          run_cpanel_ftp() {
+            local ftp_commands="$1"
+            if run_ftp_mode "explicit-ftps" "true" "$ftp_commands"; then
+              return 0
+            fi
+            run_ftp_mode "plain-ftp" "false" "$ftp_commands"
+          }
+
+          run_cpanel_ftp "get api/config.local.php -o ${WORK}/config.local.php;"
+          test -f "${WORK}/config.local.php"
+
+          export WORK FTP_SERVER
+          php <<'PHP'
+          <?php
+          declare(strict_types=1);
+          $work = getenv('WORK') ?: '';
+          $cfg = require $work . '/config.local.php';
+          if (!is_array($cfg)) { fwrite(STDERR, "CONFIG_INVALID\n"); exit(1); }
+
+          $hosts = [];
+          $primary = (string)($cfg['db_host'] ?? '');
+          if ($primary !== '') $hosts[] = $primary;
+          $ftp = (string)(getenv('FTP_SERVER') ?: '');
+          if ($ftp !== '' && !in_array($ftp, $hosts, true)) $hosts[] = $ftp;
+
+          $pdo = null;
+          foreach ($hosts as $host) {
+            try {
+              $pdo = new PDO(
+                sprintf('mysql:host=%s;dbname=%s;charset=utf8mb4', $host, (string)$cfg['db_name']),
+                (string)$cfg['db_user'],
+                (string)$cfg['db_password'],
+                [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC, PDO::ATTR_TIMEOUT => 10]
+              );
+              break;
+            } catch (Throwable $e) { $pdo = null; }
+          }
+          if (!$pdo) { echo "DB_PROBE=UNREACHABLE\n"; exit(1); }
+          echo "DB_PROBE=OK\n";
+
+          $blankPhone = "(TRIM(IFNULL(p.telefon,'')) = '')";
+          $ic = "IFNULL(p.calisan_kapsami,'IC_PERSONEL') = 'IC_PERSONEL'";
+          $aktif = "p.aktif_durum = 'AKTIF'";
+
+          echo "===PHONE_LIST===\n";
+          $sql = "SELECT p.sicil_no, TRIM(CONCAT(IFNULL(p.ad,''),' ',IFNULL(p.soyad,''))) AS ad_soyad,
+                         IFNULL(s.ad, '') AS sube
+                  FROM personeller p
+                  LEFT JOIN subeler s ON s.id = p.sube_id
+                  WHERE {$aktif} AND {$ic} AND {$blankPhone}
+                  ORDER BY p.sicil_no";
+          $rows = $pdo->query($sql)->fetchAll();
+          echo "IC_EKSIK_TELEFON_SAYISI=" . count($rows) . "\n";
+          foreach ($rows as $r) {
+            echo "PHONE|" . ($r['sicil_no'] ?? '') . "|" . ($r['ad_soyad'] ?? '') . "|" . ($r['sube'] ?? '') . "\n";
+          }
+
+          echo "===SUBE_YONETICISI===\n";
+          $subeler = $pdo->query("SELECT id, ad FROM subeler WHERE durum='AKTIF' ORDER BY id")->fetchAll();
+          echo "AKTIF_SUBE_SAYISI=" . count($subeler) . "\n";
+          $hasPersonelId = false;
+          try {
+            $hasPersonelId = (bool)$pdo->query("SHOW COLUMNS FROM users LIKE 'personel_id'")->fetch();
+          } catch (Throwable $e) { $hasPersonelId = false; }
+          if ($hasPersonelId) {
+            $assignStmt = $pdo->prepare(
+              "SELECT u.id AS user_id, u.personel_id,
+                      COALESCE(NULLIF(TRIM(u.ad_soyad),''), u.username) AS user_ad,
+                      NULLIF(TRIM(CONCAT(IFNULL(p.ad,''),' ',IFNULL(p.soyad,''))),'') AS personel_ad
+               FROM users u
+               INNER JOIN user_subeler us ON us.user_id = u.id AND us.sube_id = :sid
+               LEFT JOIN personeller p ON p.id = u.personel_id
+               WHERE u.rol = 'SUBE_YONETICISI' AND u.durum='AKTIF'
+               ORDER BY u.id"
+            );
+          } else {
+            $assignStmt = $pdo->prepare(
+              "SELECT u.id AS user_id, NULL AS personel_id,
+                      COALESCE(NULLIF(TRIM(u.ad_soyad),''), u.username) AS user_ad,
+                      NULL AS personel_ad
+               FROM users u
+               INNER JOIN user_subeler us ON us.user_id = u.id AND us.sube_id = :sid
+               WHERE u.rol = 'SUBE_YONETICISI' AND u.durum='AKTIF'
+               ORDER BY u.id"
+            );
+          }
+          foreach ($subeler as $s) {
+            $assignStmt->execute(['sid' => (int)$s['id']]);
+            $asg = $assignStmt->fetchAll();
+            if (!$asg) {
+              echo "SUBE|" . $s['id'] . "|" . $s['ad'] . "|ATAMA_YOK||| |\n";
+            } else {
+              foreach ($asg as $a) {
+                $name = $a['personel_ad'] ?: $a['user_ad'];
+                echo "SUBE|" . $s['id'] . "|" . $s['ad'] . "|VAR|" . ($a['user_id'] ?? '') . "|" . ($a['personel_id'] ?? '') . "|" . $name . "\n";
+              }
+            }
+          }
+
+          echo "===IC_ORG_GAPS===\n";
+          // Canonical critical org fields for IC (exclude telefon — separate class)
+          $orgSql = "SELECT p.sicil_no,
+                            TRIM(CONCAT(IFNULL(p.ad,''),' ',IFNULL(p.soyad,''))) AS ad_soyad,
+                            CASE WHEN IFNULL(p.sube_id,0)<=0 THEN 1 ELSE 0 END AS miss_sube,
+                            CASE WHEN IFNULL(p.departman_id,0)<=0 THEN 1 ELSE 0 END AS miss_dep,
+                            CASE WHEN IFNULL(p.bolum_id,0)<=0 THEN 1 ELSE 0 END AS miss_bolum,
+                            CASE WHEN IFNULL(p.birim_id,0)<=0 THEN 1 ELSE 0 END AS miss_birim,
+                            CASE WHEN IFNULL(p.gorev_id,0)<=0 THEN 1 ELSE 0 END AS miss_gorev,
+                            CASE WHEN IFNULL(p.personel_tipi_id,0)<=0 THEN 1 ELSE 0 END AS miss_tip
+                     FROM personeller p
+                     WHERE {$aktif} AND {$ic}
+                       AND (
+                         IFNULL(p.sube_id,0)<=0 OR IFNULL(p.departman_id,0)<=0 OR IFNULL(p.bolum_id,0)<=0
+                         OR IFNULL(p.birim_id,0)<=0 OR IFNULL(p.gorev_id,0)<=0 OR IFNULL(p.personel_tipi_id,0)<=0
+                       )
+                     ORDER BY p.sicil_no";
+          $orgRows = $pdo->query($orgSql)->fetchAll();
+          $counts = ['Şube'=>0,'Departman'=>0,'Bölüm'=>0,'Birim'=>0,'Görev'=>0,'Personel Tipi'=>0];
+          $distinct = 0;
+          $occ = 0;
+          foreach ($orgRows as $r) {
+            $fields = [];
+            if ((int)$r['miss_sube']===1) { $fields[]='Şube'; $counts['Şube']++; $occ++; }
+            if ((int)$r['miss_dep']===1) { $fields[]='Departman'; $counts['Departman']++; $occ++; }
+            if ((int)$r['miss_bolum']===1) { $fields[]='Bölüm'; $counts['Bölüm']++; $occ++; }
+            if ((int)$r['miss_birim']===1) { $fields[]='Birim'; $counts['Birim']++; $occ++; }
+            if ((int)$r['miss_gorev']===1) { $fields[]='Görev'; $counts['Görev']++; $occ++; }
+            if ((int)$r['miss_tip']===1) { $fields[]='Personel Tipi'; $counts['Personel Tipi']++; $occ++; }
+            if ($fields) {
+              $distinct++;
+              echo "ORG|" . ($r['sicil_no'] ?? '') . "|" . ($r['ad_soyad'] ?? '') . "|" . implode(',', $fields) . "\n";
+            }
+          }
+          echo "IC_ORG_CRITICAL_GAP_DISTINCT_PERSONEL={$distinct}\n";
+          echo "IC_ORG_CRITICAL_GAP_OCCURRENCE={$occ}\n";
+          foreach ($counts as $k=>$v) echo "ORG_FIELD|{$k}|{$v}\n";
+
+          echo "===LEGACY_ROLES===\n";
+          $legacy = ['PATRON','IK_BORDRO','SGK_KARAR_ONAY_YETKILISI','IDARI_ISLER','AUTH_SMOKE_READONLY'];
+          // Discover actual ENUM values if possible
+          $col = $pdo->query("SHOW COLUMNS FROM users LIKE 'rol'")->fetch();
+          if ($col && isset($col['Type'])) echo "USERS_ROL_TYPE=" . $col['Type'] . "\n";
+          $totalLegacyActive = 0;
+          foreach ($legacy as $role) {
+            try {
+              $st = $pdo->prepare("SELECT COUNT(*) FROM users WHERE rol = :r");
+              $st->execute(['r'=>$role]);
+              $c = (int)$st->fetchColumn();
+            } catch (Throwable $e) { $c = -1; }
+            $note = $role === 'AUTH_SMOKE_READONLY' ? 'protected_smoke_fixture' : 'legacy_enum';
+            echo "LEGACY|{$role}|{$c}|{$note}\n";
+            if ($c > 0) $totalLegacyActive += $c;
+          }
+          echo "AKTIF_LEGACY_ROLE_USER_COUNT={$totalLegacyActive}\n";
+
+          echo "===TIP===\n";
+          $tip = $pdo->query("SELECT version FROM medisa_schema_migrations ORDER BY version DESC LIMIT 1")->fetchColumn();
+          echo "PRODUCTION_MIGRATION_TIP={$tip}\n";
+          echo "INVENTORY_DONE=YES\n";
+          PHP

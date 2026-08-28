@@ -144,7 +144,7 @@ jobs:
           echo "--- api/bin listing ---"
           sed 's/[[:space:]]*$//' "${WORK}/api-bin.txt" | sed '/^$/d' | sed 's/^/API_BIN|/'
           for artifact in cpanel-migration-cron.impl.php readonly-inventory-once.php; do
-            if grep -qx "$artifact" "${WORK}/api-bin.txt"; then
+            if grep -q "/${artifact}$" "${WORK}/api-bin.txt"; then
               echo "STALE_ARTIFACT|${artifact}=PRESENT"
             else
               echo "STALE_ARTIFACT|${artifact}=ABSENT"
@@ -154,26 +154,28 @@ jobs:
           # 6) migration-control envanteri: yalniz dosya adlari ve sayimlar.
           echo "--- migration-control listing ---"
           sed 's/[[:space:]]*$//' "${WORK}/control-dir.txt" | sed '/^$/d' | sed 's/^/CONTROL_ENTRY|/'
+          # lftp `cls -1` her satirda tam uzak yolu dondurur, bu yuzden eslesmeler
+          # dosya adi sonuna gore yapilir.
           count_matching() {
-            grep -c "^$1" "${WORK}/control-dir.txt" 2>/dev/null || true
+            grep -c "$1" "${WORK}/control-dir.txt" 2>/dev/null || true
           }
           echo "PENDING_COUNT=$(count_matching 'request\.pending\.')"
           echo "PROCESSING_COUNT=$(count_matching 'request\.processing\.')"
           echo "COMPLETED_COUNT=$(count_matching 'request\.completed\.')"
           echo "FAILED_COUNT=$(count_matching 'request\.failed\.')"
-          if grep -qx "status.json" "${WORK}/control-dir.txt"; then
+          if grep -q "/status.json$" "${WORK}/control-dir.txt"; then
             echo "STATUS_JSON_EXISTS=YES"
           else
             echo "STATUS_JSON_EXISTS=NO"
           fi
-          if grep -qx "worker.lock" "${WORK}/control-dir.txt"; then
+          if grep -q "/worker.lock$" "${WORK}/control-dir.txt"; then
             echo "WORKER_LOCK_EXISTS=YES"
           else
             echo "WORKER_LOCK_EXISTS=NO"
           fi
 
           # 7) Cron heartbeat (worker heartbeat yayinlandiysa mevcuttur).
-          if grep -qx "worker-heartbeat.json" "${WORK}/control-dir.txt"; then
+          if grep -q "/worker-heartbeat.json$" "${WORK}/control-dir.txt"; then
             echo "WORKER_HEARTBEAT_EXISTS=YES"
             if run_cpanel_ftp "get api/runtime/migration-control/worker-heartbeat.json -o ${WORK}/heartbeat.json;"; then
               hb_updated="$(jq -r '.updated_at // "NONE"' "${WORK}/heartbeat.json" 2>/dev/null || echo NONE)"

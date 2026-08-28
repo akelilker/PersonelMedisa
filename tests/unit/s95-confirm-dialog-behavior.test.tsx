@@ -85,7 +85,7 @@ describe("S95 dönem mühür confirm dialog behavior", () => {
     useRoleAccessMock.mockReturnValue({
       hasPermission: (permission: string) =>
         permission === "puantaj.donem_kapanis.view" ||
-        permission === "puantaj.muhurle" ||
+        permission === "puantaj.donem_muhurle" ||
         permission === "puantaj.donem_kapanis.export"
     });
     useDonemKapanisPreflightMock.mockReturnValue({

@@ -31,11 +31,11 @@ describe("FazlaCalismaOdemeTercihiController MariaDB", () => {
     expect(routerSource).toContain("FazlaCalismaOdemeTercihiController::put");
 
     expect(controllerSource).toContain("puantaj.view");
-    expect(controllerSource).toContain("puantaj.muhurle");
+    expect(controllerSource).toContain("fazla_calisma_odeme_tercihi.manage");
     expect(controllerSource).toContain("PERIOD_LOCKED");
     expect(controllerSource).toContain("PERIOD_STATE_UNKNOWN");
     expect(controllerSource).toContain("STATE_CONFLICT");
-    expect(permissionsSource).toContain("'puantaj.muhurle'");
+    expect(permissionsSource).toContain("'fazla_calisma_odeme_tercihi.manage'");
     expect(permissionsSource).toContain("'puantaj.view'");
 
     expect(migrationSource).toMatch(/CREATE TABLE\s+fazla_calisma_odeme_tercihleri\s*\(/);
@@ -64,6 +64,10 @@ describe("FazlaCalismaOdemeTercihiController MariaDB", () => {
     expect(result.stdout).toContain("[PASS] snapshot 404");
     expect(result.stdout).toContain("[PASS] scope dışı 403");
     expect(result.stdout).toContain("[PASS] BA empty allowedSubeIds global GET → 403");
+    expect(result.stdout).toContain("[PASS] SUBE_YONETICISI PUT own branch → 200");
+    expect(result.stdout).toContain("[PASS] SUBE_YONETICISI PUT actor recorded");
+    expect(result.stdout).toContain("[PASS] SUBE_YONETICISI cross-branch PUT → 403");
+    expect(result.stdout).toContain("[PASS] SUBE_YONETICISI empty user_subeler PUT → 403");
     expect(result.stdout).toContain("[PASS] PUT insert");
     expect(result.stdout).toContain("[PASS] PUT gerçek update");
     expect(result.stdout).toContain("[PASS] aynı kanıt payloadı idempotent");

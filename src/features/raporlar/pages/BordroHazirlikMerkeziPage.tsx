@@ -110,7 +110,7 @@ export function BordroHazirlikMerkeziPage() {
   const canManagePolicy = hasPermission("sirket_parametreleri.manage");
   const canApprove = hasPermission("bordro_kesinlestirme.approve");
   const canViewFinance = hasPermission("finans.view");
-  const canEditOdemeTercihi = hasPermission("puantaj.muhurle");
+  const canEditOdemeTercihi = hasPermission("fazla_calisma_odeme_tercihi.manage");
   const canViewBordroKapsam = hasPermission("personel_bordro_kapsam.view");
   const canManageBordroKapsam = hasPermission("personel_bordro_kapsam.manage");
   const canApproveBordroKapsam = hasPermission("personel_bordro_kapsam.approve");

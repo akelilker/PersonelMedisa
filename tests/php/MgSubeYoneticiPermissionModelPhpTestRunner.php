@@ -60,11 +60,15 @@ mgAssertHas('SUBE_YONETICISI', [
     'revizyon.submit',
     'haftalik_mutabakat.view',
     'aylik_bildirim_onayi.view',
+    // Branch-scoped payroll input split out of the overloaded puantaj.muhurle key.
+    'fazla_calisma_odeme_tercihi.manage',
+    'serbest_zaman.manage',
 ], true, 'SUBE_BRANCH_OPERATIONAL_DATA_ENTRY_AND_SUBMIT');
 
 mgAssertHas('SUBE_YONETICISI', [
     // Corrective removals: period closing, bulk import, department approval, bordro effect.
-    'puantaj.muhurle',
+    'puantaj.donem_muhurle',
+    'puantaj.haftalik_kapanis.manage',
     'personeller.import.apply',
     'aylik_bolum_onayi.approve',
     'aylik-ozet.review',
@@ -134,6 +138,12 @@ mgAssertHas('IK_SORUMLUSU', [
     'personel_bordro_kapsam.manage',
     'sgk_karar_paketi.prepare',
 ], true, 'IK_SORUMLUSU_IS_CENTRAL_CONTROL_OWNER');
+
+// The split must not hand IK a closing authority it never had under puantaj.muhurle.
+mgAssertHas('IK_SORUMLUSU', [
+    'puantaj.donem_muhurle',
+    'puantaj.haftalik_kapanis.manage',
+], false, 'IK_SORUMLUSU_GAINS_NO_CLOSURE_FROM_SPLIT');
 
 mgAssertHas('IK_SORUMLUSU', [
     'bordro_kesinlestirme.approve',
@@ -279,6 +289,30 @@ $gates = [
     ),
 ];
 
+// Branch payroll input gates must ADMIT the branch manager after the split.
+$operationalGates = [
+    'FAZLA_CALISMA_ODEME_TERCIHI_PUT' => mgGatePermissions(
+        $apiRoot . '/Controllers/FazlaCalismaOdemeTercihiController.php',
+        'public static function put'
+    ),
+    'SERBEST_ZAMAN_OLUSUM' => mgGatePermissions(
+        $apiRoot . '/Controllers/SerbestZamanController.php',
+        'public static function olusum'
+    ),
+    'SERBEST_ZAMAN_KULLANIM' => mgGatePermissions(
+        $apiRoot . '/Controllers/SerbestZamanController.php',
+        'public static function kullanim'
+    ),
+    'SERBEST_ZAMAN_IPTAL' => mgGatePermissions(
+        $apiRoot . '/Controllers/SerbestZamanController.php',
+        'public static function iptal'
+    ),
+    'SERBEST_ZAMAN_DUZELTME' => mgGatePermissions(
+        $apiRoot . '/Controllers/SerbestZamanController.php',
+        'public static function duzeltme'
+    ),
+];
+
 foreach ($gates as $label => $permissions) {
     $granted = [];
     foreach ($permissions as $permission) {
@@ -292,13 +326,151 @@ foreach ($gates as $label => $permissions) {
     mgOk("GATE_DENIES_SUBE_YONETICISI: {$label}");
 }
 
+$closurePermissions = ['puantaj.donem_muhurle', 'puantaj.haftalik_kapanis.manage'];
+foreach ($operationalGates as $label => $permissions) {
+    if ($permissions === []) {
+        mgFail("{$label}: no permission literal found at gate");
+    }
+    foreach ($permissions as $permission) {
+        if (in_array($permission, $closurePermissions, true)) {
+            mgFail("{$label}: operational write must not be gated by a closure permission");
+        }
+        if (!RolePermissions::has($subeYonetici, $permission)) {
+            mgFail("{$label}: SUBE_YONETICISI must hold {$permission}");
+        }
+        if (!RolePermissions::has(mgUser('GENEL_YONETICI'), $permission)
+            || !RolePermissions::has(mgUser('BOLUM_YONETICISI'), $permission)
+        ) {
+            mgFail("{$label}: {$permission} must stay granted to GENEL/BOLUM_YONETICISI");
+        }
+    }
+    mgOk("GATE_ADMITS_SUBE_YONETICISI: {$label}");
+}
+
+// Splitting must not leave an alternative gate: no write path may accept both a closure
+// permission and an operational one, and no closure endpoint may accept an operational key.
+foreach ($gates as $label => $permissions) {
+    foreach ($permissions as $permission) {
+        if (in_array($permission, ['fazla_calisma_odeme_tercihi.manage', 'serbest_zaman.manage'], true)) {
+            mgFail("{$label}: closure gate must not accept a branch operational permission");
+        }
+    }
+}
+mgOk('NO_ALTERNATIVE_GATE_BETWEEN_CLOSURE_AND_OPERATIONAL');
+
+// Every operational write path authorizes the DB-loaded target, never a client sube_id.
+$scopeOwners = [
+    '/Controllers/FazlaCalismaOdemeTercihiController.php' => [
+        'anchors' => ['public static function put'],
+        'scope' => 'self::assertSnapshotScope($user, $request,',
+        'load' => 'self::loadSnapshotSatir(',
+    ],
+    '/Controllers/SerbestZamanController.php' => [
+        'anchors' => [
+            'public static function olusum',
+            'public static function kullanim',
+            'public static function iptal',
+            'public static function duzeltme',
+        ],
+        'scope' => 'self::assertPersonelScope($user, $request, $personel)',
+        'load' => 'self::loadPersonel($pdo,',
+    ],
+];
+foreach ($scopeOwners as $relative => $spec) {
+    $source = file_get_contents($apiRoot . $relative);
+    if ($source === false) {
+        mgFail("scope owner source unreadable: {$relative}");
+    }
+    if (strpos($source, 'SubeScope::assertPersonelAccess') === false) {
+        mgFail("{$relative} must delegate to SubeScope::assertPersonelAccess");
+    }
+    // Empty user_subeler must be denied before any personel row is trusted.
+    if (strpos($source, "count(\$allowed) === 0 && !RolePermissions::has(\$user, 'personeller.view')") === false) {
+        mgFail("{$relative} must fail closed on empty user_subeler");
+    }
+    foreach ($spec['anchors'] as $anchor) {
+        $at = strpos($source, $anchor);
+        if ($at === false) {
+            mgFail("write path missing in {$relative}: {$anchor}");
+        }
+        $end = strpos($source, "\n    public static function", $at + strlen($anchor));
+        $body = $end === false ? substr($source, $at) : substr($source, $at, $end - $at);
+        if (strpos($body, $spec['scope']) === false) {
+            mgFail("{$relative}::{$anchor} must assert branch scope on the loaded row");
+        }
+        if (strpos($body, $spec['load']) === false) {
+            mgFail("{$relative}::{$anchor} must load the target from the database");
+        }
+        if (preg_match("/\\\$body\\['sube_id'\\]/", $body)) {
+            mgFail("{$relative}::{$anchor} must not trust a client-supplied sube_id");
+        }
+        if (strpos($body, "'created_by' => \$userId > 0 ? \$userId : null") === false
+            && strpos($body, '$userId > 0 ? $userId : null') === false
+        ) {
+            mgFail("{$relative}::{$anchor} must record the acting user");
+        }
+    }
+    mgOk('SCOPE_ENFORCED_ON_DB_LOADED_TARGET: ' . $relative);
+}
+
 // The same gates must still admit the roles that own them (no unrelated regression).
 if (!RolePermissions::has(mgUser('BOLUM_YONETICISI'), 'aylik_bolum_onayi.approve')) {
     mgFail('BOLUM_YONETICISI must keep aylik_bolum_onayi.approve');
 }
-if (!RolePermissions::has(mgUser('GENEL_YONETICI'), 'puantaj.muhurle')) {
-    mgFail('GENEL_YONETICI must keep puantaj.muhurle');
+foreach ([
+    'puantaj.donem_muhurle',
+    'puantaj.haftalik_kapanis.manage',
+    'fazla_calisma_odeme_tercihi.manage',
+    'serbest_zaman.manage',
+] as $granular) {
+    if (!RolePermissions::has(mgUser('GENEL_YONETICI'), $granular)) {
+        mgFail("GENEL_YONETICI must keep {$granular}");
+    }
+    if (!RolePermissions::has(mgUser('BOLUM_YONETICISI'), $granular)) {
+        mgFail("BOLUM_YONETICISI must keep {$granular}");
+    }
 }
+// The overloaded key must be gone from the matrix entirely (no compatibility alias).
+$permissionsSource = file_get_contents($apiRoot . '/Auth/RolePermissions.php');
+if ($permissionsSource === false) {
+    mgFail('RolePermissions source unreadable');
+}
+if (strpos($permissionsSource, 'puantaj.muhurle') !== false) {
+    mgFail('puantaj.muhurle must not remain in the backend permission matrix');
+}
+foreach (['GENEL_YONETICI', 'BOLUM_YONETICISI', 'SUBE_YONETICISI', 'IK_SORUMLUSU', 'MUHASEBE', 'BIRIM_AMIRI', 'SISTEM_YONETICISI', 'PERSONEL'] as $rol) {
+    if (RolePermissions::has(mgUser($rol), 'puantaj.muhurle')) {
+        mgFail("{$rol} must not resolve the removed puantaj.muhurle key");
+    }
+}
+mgOk('OLD_OVERLOADED_PERMISSION_FULLY_REMOVED');
+
+// --- Central payroll control chain ----------------------------------------------------
+// Branch input → central İK control → a different GENEL_YONETICI finalizes.
+if (!RolePermissions::has(mgUser('IK_SORUMLUSU'), 'bordro_on_izleme.view')
+    || !RolePermissions::has(mgUser('IK_SORUMLUSU'), 'maas_hesaplama.manage')
+) {
+    mgFail('IK_SORUMLUSU must be able to see and control bordro hazirlik data');
+}
+if (RolePermissions::has(mgUser('IK_SORUMLUSU'), 'bordro_kesinlestirme.approve')) {
+    mgFail('IK_SORUMLUSU must not finalize bordro');
+}
+if (!RolePermissions::has(mgUser('GENEL_YONETICI'), 'bordro_kesinlestirme.approve')) {
+    mgFail('GENEL_YONETICI must own bordro finalization');
+}
+if (RolePermissions::has($subeYonetici, 'bordro_on_izleme.view')
+    || RolePermissions::has($subeYonetici, 'bordro_kesinlestirme.approve')
+) {
+    mgFail('SUBE_YONETICISI must stay out of the central bordro control chain');
+}
+$bordroSource = file_get_contents($apiRoot . '/Services/BordroOnIzlemeService.php');
+if ($bordroSource === false) {
+    mgFail('BordroOnIzlemeService source unreadable');
+}
+if (strpos($bordroSource, "'muhasebe_kontrol_by'") === false) {
+    mgFail('kesinlestir must separate duties against the muhasebe control actor');
+}
+mgOk('CENTRAL_CONTROL_CHAIN_SEPARATED');
 mgOk('GATE_OWNERS_UNCHANGED');
 
 // --- DualControl is the canonical owner; SGK delegates to it --------------------------

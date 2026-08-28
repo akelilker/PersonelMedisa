@@ -399,7 +399,7 @@ class PuantajController
     public static function muhurleAylik(Request $request)
     {
         $user = AuthMiddleware::authenticate($request, true);
-        RolePermissions::assert($user, 'puantaj.muhurle');
+        RolePermissions::assert($user, 'puantaj.donem_muhurle');
 
         $payload = $request->getJsonBody();
         $yil = self::readRequiredInt($payload, 'yil', 2000, 2100);

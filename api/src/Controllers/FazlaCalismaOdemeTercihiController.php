@@ -21,9 +21,9 @@ use Throwable;
 /**
  * Fazla calisma odeme tercihi owner (S79-C).
  *
- * Permissions (existing RolePermissions — no new keys):
+ * Permissions (RolePermissions):
  * - GET → puantaj.view
- * - PUT → puantaj.muhurle
+ * - PUT → fazla_calisma_odeme_tercihi.manage (branch-scoped payroll input, not period sealing)
  *
  * Identity: UNIQUE(snapshot_id) where snapshot_id = haftalik_kapanis_satirlari.id
  * Period: week months must be unsealed (puantaj_aylik_muhurleri); unknown → PERIOD_STATE_UNKNOWN
@@ -76,7 +76,7 @@ class FazlaCalismaOdemeTercihiController
     public static function put(Request $request)
     {
         $user = AuthMiddleware::authenticate($request, true);
-        RolePermissions::assert($user, 'puantaj.muhurle');
+        RolePermissions::assert($user, 'fazla_calisma_odeme_tercihi.manage');
 
         $body = $request->getJsonBody();
 

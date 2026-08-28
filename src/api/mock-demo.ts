@@ -7060,7 +7060,7 @@ export function resolveDemoApiResponse(
 
   if (pathname === "/puantaj/muhurle" && method === "POST") {
     const actor = readDemoApiActor(init);
-    const permissionError = enforceDemoPermission(actor, "puantaj.muhurle");
+    const permissionError = enforceDemoPermission(actor, "puantaj.donem_muhurle");
     if (permissionError) {
       return permissionError;
     }
@@ -7318,7 +7318,7 @@ export function resolveDemoApiResponse(
 
   if (pathname === "/haftalik-kapanis" && method === "POST") {
     const actor = readDemoApiActor(init);
-    const permissionError = enforceDemoPermission(actor, "puantaj.muhurle");
+    const permissionError = enforceDemoPermission(actor, "puantaj.haftalik_kapanis.manage");
     if (permissionError) {
       return permissionError;
     }
@@ -7451,7 +7451,7 @@ export function resolveDemoApiResponse(
 
   if (pathname === "/fazla-calisma-odeme-tercihi" && method === "PUT") {
     const actor = readDemoApiActor(init);
-    const permissionError = enforceDemoPermission(actor, "puantaj.muhurle");
+    const permissionError = enforceDemoPermission(actor, "fazla_calisma_odeme_tercihi.manage");
     if (permissionError) {
       return permissionError;
     }
@@ -7730,7 +7730,7 @@ export function resolveDemoApiResponse(
 
   if (pathname === "/serbest-zaman/olusum" && method === "POST") {
     const actor = readDemoApiActor(init);
-    const permissionError = enforceDemoPermission(actor, "puantaj.muhurle");
+    const permissionError = enforceDemoPermission(actor, "serbest_zaman.manage");
     if (permissionError) return permissionError;
 
     for (const field of [
@@ -7819,7 +7819,7 @@ export function resolveDemoApiResponse(
 
   if (pathname === "/serbest-zaman/kullanim" && method === "POST") {
     const actor = readDemoApiActor(init);
-    const permissionError = enforceDemoPermission(actor, "puantaj.muhurle");
+    const permissionError = enforceDemoPermission(actor, "serbest_zaman.manage");
     if (permissionError) return permissionError;
 
     if (Object.prototype.hasOwnProperty.call(body, "sube_id")) {
@@ -7906,7 +7906,7 @@ export function resolveDemoApiResponse(
 
   if (pathname === "/serbest-zaman/iptal" && method === "POST") {
     const actor = readDemoApiActor(init);
-    const permissionError = enforceDemoPermission(actor, "puantaj.muhurle");
+    const permissionError = enforceDemoPermission(actor, "serbest_zaman.manage");
     if (permissionError) return permissionError;
 
     if (Object.prototype.hasOwnProperty.call(body, "sube_id")) {
@@ -8019,7 +8019,7 @@ export function resolveDemoApiResponse(
 
   if (pathname === "/serbest-zaman/duzeltme" && method === "POST") {
     const actor = readDemoApiActor(init);
-    const permissionError = enforceDemoPermission(actor, "puantaj.muhurle");
+    const permissionError = enforceDemoPermission(actor, "serbest_zaman.manage");
     if (permissionError) return permissionError;
 
     if (Object.prototype.hasOwnProperty.call(body, "sube_id")) {

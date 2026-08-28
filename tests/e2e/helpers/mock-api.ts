@@ -11145,7 +11145,7 @@ let personelBelgeKaydiIdCounter = 903;
     }
 
     if (path === "/api/puantaj/muhurle" && method === "POST") {
-      if (await denyUnlessRolePermission(route, "puantaj.muhurle")) {
+      if (await denyUnlessRolePermission(route, "puantaj.donem_muhurle")) {
         return;
       }
 
@@ -11352,7 +11352,7 @@ let personelBelgeKaydiIdCounter = 903;
     }
 
     if (path === "/api/haftalik-kapanis" && method === "POST") {
-      if (await denyUnlessRolePermission(route, "puantaj.muhurle")) return;
+      if (await denyUnlessRolePermission(route, "puantaj.haftalik_kapanis.manage")) return;
 
       const payload = (request.postDataJSON() ?? {}) as {
         hafta_baslangic?: string;
@@ -12010,7 +12010,7 @@ let personelBelgeKaydiIdCounter = 903;
     }
 
     if (path === "/api/fazla-calisma-odeme-tercihi" && method === "PUT") {
-      if (await denyUnlessRolePermission(route, "puantaj.muhurle")) return;
+      if (await denyUnlessRolePermission(route, "fazla_calisma_odeme_tercihi.manage")) return;
 
       const payload = (request.postDataJSON() ?? {}) as Record<string, unknown>;
       const serverOwned = [
@@ -12146,7 +12146,7 @@ let personelBelgeKaydiIdCounter = 903;
     }
 
     if (path === "/api/serbest-zaman/olusum" && method === "POST") {
-      if (await denyUnlessRolePermission(route, "puantaj.muhurle")) return;
+      if (await denyUnlessRolePermission(route, "serbest_zaman.manage")) return;
       const payload = (request.postDataJSON() ?? {}) as Record<string, unknown>;
       if ("sube_id" in payload) {
         await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "sube_id istemci tarafindan belirlenemez.", "sube_id"));
@@ -12198,7 +12198,7 @@ let personelBelgeKaydiIdCounter = 903;
     }
 
     if (path === "/api/serbest-zaman/kullanim" && method === "POST") {
-      if (await denyUnlessRolePermission(route, "puantaj.muhurle")) return;
+      if (await denyUnlessRolePermission(route, "serbest_zaman.manage")) return;
       const payload = (request.postDataJSON() ?? {}) as Record<string, unknown>;
       const personelId = Number(payload.personel_id);
       const dakika = Number(payload.dakika);
@@ -12235,7 +12235,7 @@ let personelBelgeKaydiIdCounter = 903;
     }
 
     if (path === "/api/serbest-zaman/iptal" && method === "POST") {
-      if (await denyUnlessRolePermission(route, "puantaj.muhurle")) return;
+      if (await denyUnlessRolePermission(route, "serbest_zaman.manage")) return;
       const payload = (request.postDataJSON() ?? {}) as Record<string, unknown>;
       const personelId = Number(payload.personel_id);
       const hedefId = Number(payload.hedef_event_id);
@@ -12269,7 +12269,7 @@ let personelBelgeKaydiIdCounter = 903;
     }
 
     if (path === "/api/serbest-zaman/duzeltme" && method === "POST") {
-      if (await denyUnlessRolePermission(route, "puantaj.muhurle")) return;
+      if (await denyUnlessRolePermission(route, "serbest_zaman.manage")) return;
       const payload = (request.postDataJSON() ?? {}) as Record<string, unknown>;
       const personelId = Number(payload.personel_id);
       const hedefId = Number(payload.hedef_event_id);

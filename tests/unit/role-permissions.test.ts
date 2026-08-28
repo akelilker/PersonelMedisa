@@ -405,6 +405,9 @@ describe("role permissions", () => {
       "personeller.update",
       "puantaj.view",
       "puantaj.update",
+      // Branch-scoped payroll input, split out of the overloaded puantaj.muhurle key.
+      "fazla_calisma_odeme_tercihi.manage",
+      "serbest_zaman.manage",
       "puantaj.donem_reopen.request",
       "bildirimler.create",
       "revizyon.create",
@@ -425,7 +428,8 @@ describe("role permissions", () => {
 
     const denied = [
       // Corrective removals: period closing, bulk import, department approval, bordro effect.
-      "puantaj.muhurle",
+      "puantaj.donem_muhurle",
+      "puantaj.haftalik_kapanis.manage",
       "personeller.import.apply",
       "aylik_bolum_onayi.approve",
       "aylik-ozet.review",
@@ -493,6 +497,50 @@ describe("role permissions", () => {
     } satisfies AuthSession;
     expect(sessionAllowsSubeAccess(scoped, 4)).toBe(true);
     expect(sessionAllowsSubeAccess(scoped, 5)).toBe(false);
+  });
+
+  it("leaves no puantaj.muhurle grant or enforcement behind", () => {
+    const owners = [
+      "api/src/Auth/RolePermissions.php",
+      "api/src/Controllers/PuantajController.php",
+      "api/src/Controllers/HaftalikKapanisController.php",
+      "api/src/Controllers/FazlaCalismaOdemeTercihiController.php",
+      "api/src/Controllers/SerbestZamanController.php",
+      "src/lib/authorization/role-permissions.ts",
+      "src/lib/yonetim/kullanici-role-summary.ts",
+      "src/api/mock-demo.ts",
+      "src/features/puantaj/pages/GunlukPuantajPage.tsx",
+      "src/features/raporlar/pages/DonemKapanisMerkeziPage.tsx",
+      "src/features/raporlar/pages/BordroHazirlikMerkeziPage.tsx",
+      "src/features/revizyon/components/HaftalikKapanisClosePanel.tsx"
+    ];
+    for (const owner of owners) {
+      const source = readFileSync(resolve(process.cwd(), owner), "utf8");
+      expect(source, owner).not.toContain("puantaj.muhurle");
+    }
+  });
+
+  it("binds each split gate to its own permission in the owning source", () => {
+    const gates: Array<[string, string]> = [
+      ["api/src/Controllers/PuantajController.php", "puantaj.donem_muhurle"],
+      ["api/src/Controllers/HaftalikKapanisController.php", "puantaj.haftalik_kapanis.manage"],
+      [
+        "api/src/Controllers/FazlaCalismaOdemeTercihiController.php",
+        "fazla_calisma_odeme_tercihi.manage"
+      ],
+      ["api/src/Controllers/SerbestZamanController.php", "serbest_zaman.manage"]
+    ];
+    for (const [owner, permission] of gates) {
+      const source = readFileSync(resolve(process.cwd(), owner), "utf8");
+      expect(source, owner).toContain(`RolePermissions::assert($user, '${permission}')`);
+      for (const [, other] of gates) {
+        if (other !== permission) {
+          expect(source, `${owner} must not also gate on ${other}`).not.toContain(
+            `RolePermissions::assert($user, '${other}')`
+          );
+        }
+      }
+    }
   });
 
   it("keeps TS and PHP role permission matrices in parity (S70B-1)", () => {

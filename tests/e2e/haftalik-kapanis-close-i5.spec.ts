@@ -154,7 +154,7 @@ test.describe("I5 haftalik kapanis close UI", () => {
     await expect(page.getByTestId("hk-close-success")).toHaveCount(0);
   });
 
-  test("roles without puantaj.muhurle hide close action", async ({ page }) => {
+  test("roles without puantaj.haftalik_kapanis.manage hide close action", async ({ page }) => {
     for (const role of ["MUHASEBE", "BIRIM_AMIRI", "PERSONEL"] as const) {
       await loginAsMockRole(page, role, MOCK_ROLE_LOGIN[role]);
       await page.goto("/haftalik-kapanis", { waitUntil: "domcontentloaded" });

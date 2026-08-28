@@ -567,9 +567,9 @@ $permissionsSource = (string) file_get_contents(__DIR__ . '/../../api/src/Auth/R
 fcotAssert(strpos($routerSource, 'FazlaCalismaOdemeTercihiController::get') !== false, 'router GET fcot');
 fcotAssert(strpos($routerSource, 'FazlaCalismaOdemeTercihiController::put') !== false, 'router PUT fcot');
 fcotAssert(strpos($controllerSource, "puantaj.view") !== false, 'GET permission puantaj.view');
-fcotAssert(strpos($controllerSource, "puantaj.muhurle") !== false, 'PUT permission puantaj.muhurle');
+fcotAssert(strpos($controllerSource, "fazla_calisma_odeme_tercihi.manage") !== false, 'PUT permission fazla_calisma_odeme_tercihi.manage');
 fcotAssert(strpos($permissionsSource, "'puantaj.view'") !== false, 'RolePermissions has puantaj.view');
-fcotAssert(strpos($permissionsSource, "'puantaj.muhurle'") !== false, 'RolePermissions has puantaj.muhurle');
+fcotAssert(strpos($permissionsSource, "'fazla_calisma_odeme_tercihi.manage'") !== false, 'RolePermissions has fazla_calisma_odeme_tercihi.manage');
 fcotAssert(preg_match('/CREATE TABLE\s+fazla_calisma_odeme_tercihleri\s*\(/i', $migrationSource) === 1, 'migration main table');
 fcotAssert(preg_match('/CREATE TABLE\s+fazla_calisma_odeme_tercihi_audit\s*\(/i', $migrationSource) === 1, 'migration audit table');
 fcotAssert(stripos($migrationSource, 'CREATE TABLE IF NOT EXISTS') === false, 'migration no IF NOT EXISTS');
@@ -703,6 +703,34 @@ $bolumPut = invokeFcotHttp($pdo, $bolum, 'PUT', '/fazla-calisma-odeme-tercihi', 
     'gerekce' => 'Bolum karari',
 ], $subeHeader);
 fcotAssert($bolumPut['status'] === 200, 'BOLUM_YONETICISI PUT scope içi → 200');
+
+// MG-SUBE-YONETICI-001 split: branch manager owns this payroll input inside user_subeler.
+$sube = ['id' => 6, 'rol' => 'SUBE_YONETICISI', 'sube_ids' => [1]];
+$subeSeed = seedSnapshot($pdo, 1, 10, '2026-04-20', '2026-04-26', 120);
+$subePut = invokeFcotHttp($pdo, $sube, 'PUT', '/fazla-calisma-odeme-tercihi', [
+    'snapshot_id' => $subeSeed['snapshot_id'],
+    'odeme_tipi' => 'UCRET',
+    'gerekce' => 'Sube karari',
+], $subeHeader);
+fcotAssert($subePut['status'] === 200, 'SUBE_YONETICISI PUT own branch → 200');
+$subeActor = (int) $pdo->query(
+    'SELECT secen_kullanici_id FROM fazla_calisma_odeme_tercihleri WHERE snapshot_id = ' . (int) $subeSeed['snapshot_id']
+)->fetchColumn();
+fcotAssert($subeActor === 6, 'SUBE_YONETICISI PUT actor recorded');
+
+$subeCross = invokeFcotHttp($pdo, $sube, 'PUT', '/fazla-calisma-odeme-tercihi', [
+    'snapshot_id' => $snapshotOut,
+    'odeme_tipi' => 'UCRET',
+    'gerekce' => 'Cross branch',
+], ['x-active-sube-id' => '2']);
+fcotAssert($subeCross['status'] === 403, 'SUBE_YONETICISI cross-branch PUT → 403');
+
+$subeEmpty = ['id' => 6, 'rol' => 'SUBE_YONETICISI', 'sube_ids' => []];
+$subeEmptyPut = invokeFcotHttp($pdo, $subeEmpty, 'PUT', '/fazla-calisma-odeme-tercihi', [
+    'snapshot_id' => $subeSeed['snapshot_id'],
+    'odeme_tipi' => 'KARAR_BEKLIYOR',
+], $subeHeader);
+fcotAssert($subeEmptyPut['status'] === 403, 'SUBE_YONETICISI empty user_subeler PUT → 403');
 
 // KAPANDI weekly close alone is not a PUT blocker (seed snapshots are KAPANDI).
 fcotAssert(

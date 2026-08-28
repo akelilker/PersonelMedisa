@@ -4,31 +4,73 @@ import {
   getRolesWithPermission
 } from "../../src/lib/authorization/role-permissions";
 
-describe("puantaj.muhurle permission", () => {
-  it("GENEL_YONETICI has puantaj.muhurle", () => {
-    expect(hasRolePermission("GENEL_YONETICI", "puantaj.muhurle")).toBe(true);
+const CLOSURE_PERMISSIONS = [
+  "puantaj.donem_muhurle",
+  "puantaj.haftalik_kapanis.manage"
+] as const;
+
+const BRANCH_PAYROLL_INPUT_PERMISSIONS = [
+  "fazla_calisma_odeme_tercihi.manage",
+  "serbest_zaman.manage"
+] as const;
+
+describe("puantaj period closure permissions", () => {
+  it("GENEL_YONETICI and BOLUM_YONETICISI keep both closure permissions", () => {
+    for (const permission of CLOSURE_PERMISSIONS) {
+      expect(hasRolePermission("GENEL_YONETICI", permission)).toBe(true);
+      expect(hasRolePermission("BOLUM_YONETICISI", permission)).toBe(true);
+    }
   });
 
-  it("BOLUM_YONETICISI has puantaj.muhurle", () => {
-    expect(hasRolePermission("BOLUM_YONETICISI", "puantaj.muhurle")).toBe(true);
+  it("MUHASEBE and BIRIM_AMIRI have no closure permission", () => {
+    for (const permission of CLOSURE_PERMISSIONS) {
+      expect(hasRolePermission("MUHASEBE", permission)).toBe(false);
+      expect(hasRolePermission("BIRIM_AMIRI", permission)).toBe(false);
+    }
   });
 
-  it("MUHASEBE does NOT have puantaj.muhurle", () => {
-    expect(hasRolePermission("MUHASEBE", "puantaj.muhurle")).toBe(false);
+  it("only GENEL_YONETICI and BOLUM_YONETICISI can close a period", () => {
+    for (const permission of CLOSURE_PERMISSIONS) {
+      expect([...getRolesWithPermission(permission)].sort()).toEqual([
+        "BOLUM_YONETICISI",
+        "GENEL_YONETICI"
+      ]);
+    }
   });
 
-  it("BIRIM_AMIRI does NOT have puantaj.muhurle", () => {
-    expect(hasRolePermission("BIRIM_AMIRI", "puantaj.muhurle")).toBe(false);
+  it("SUBE_YONETICISI cannot seal a month or close a week", () => {
+    for (const permission of CLOSURE_PERMISSIONS) {
+      expect(hasRolePermission("SUBE_YONETICISI", permission)).toBe(false);
+    }
   });
 
-  it("only GENEL_YONETICI and BOLUM_YONETICISI have puantaj.muhurle", () => {
-    const roles = getRolesWithPermission("puantaj.muhurle");
-    expect([...roles].sort()).toEqual(
-      ["BOLUM_YONETICISI", "GENEL_YONETICI"].sort()
-    );
-    expect(roles).toHaveLength(2);
-    // Sealing and weekly closing are central period decisions, not branch data entry.
-    expect(hasRolePermission("SUBE_YONETICISI", "puantaj.muhurle")).toBe(false);
+  it("IK_SORUMLUSU gains no closure authority from the permission split", () => {
+    for (const permission of CLOSURE_PERMISSIONS) {
+      expect(hasRolePermission("IK_SORUMLUSU", permission)).toBe(false);
+    }
+  });
+});
+
+describe("branch-scoped payroll input permissions", () => {
+  it("SUBE_YONETICISI can enter fazla calisma payment preference and serbest zaman", () => {
+    for (const permission of BRANCH_PAYROLL_INPUT_PERMISSIONS) {
+      expect(hasRolePermission("SUBE_YONETICISI", permission)).toBe(true);
+    }
+  });
+
+  it("GENEL_YONETICI and BOLUM_YONETICISI keep the same input capability", () => {
+    for (const permission of BRANCH_PAYROLL_INPUT_PERMISSIONS) {
+      expect(hasRolePermission("GENEL_YONETICI", permission)).toBe(true);
+      expect(hasRolePermission("BOLUM_YONETICISI", permission)).toBe(true);
+    }
+  });
+
+  it("read-only roles get no payroll input write", () => {
+    for (const permission of BRANCH_PAYROLL_INPUT_PERMISSIONS) {
+      for (const role of ["MUHASEBE", "BIRIM_AMIRI", "SISTEM_YONETICISI", "PERSONEL"] as const) {
+        expect(hasRolePermission(role, permission)).toBe(false);
+      }
+    }
   });
 });
 

@@ -177,7 +177,7 @@ export function GunlukPuantajPage() {
   const { hasPermission } = useRoleAccess();
   const canUpdatePuantaj = hasPermission("puantaj.update");
   const canAmirKontrol = hasPermission("puantaj.amir_kontrol");
-  const canMuhurle = hasPermission("puantaj.muhurle");
+  const canMuhurle = hasPermission("puantaj.donem_muhurle");
   const canViewRaporlar = hasPermission("raporlar.view");
   const location = useLocation();
   const navigate = useNavigate();

@@ -252,7 +252,11 @@ S75 canlı kabulünde bu permission doğrulanmış MUHASEBE oturumuyla kullanıl
 | `puantaj.bildirim_etki.rapor.view` | ✓ | ✓ | ✓ | ✓ (kendi kapsam) |
 | `puantaj.bildirim_etki.rapor.export` | ✓ | ✓ | — | — |
 
-`puantaj.muhurle` MUHASEBE'ye otomatik genişletilmez.
+`puantaj.donem_muhurle` ve `puantaj.haftalik_kapanis.manage` MUHASEBE'ye otomatik genişletilmez.
+
+`puantaj.muhurle` kaldırıldı; dönem mühürleme/haftalık kapanış ile bordroya esas operasyonel girdi
+(`fazla_calisma_odeme_tercihi.manage`, `serbest_zaman.manage`) ayrı permission'lardır. Operasyonel
+girdiler `SUBE_YONETICISI`'ne explicit `user_subeler` kapsamında verilir; mühürleme/kapanış merkezde kalır.
 
 ### Finans
 

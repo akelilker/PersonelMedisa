@@ -28,7 +28,10 @@ export type AppPermission =
   | "puantaj.view"
   | "puantaj.update"
   | "puantaj.amir_kontrol"
-  | "puantaj.muhurle"
+  | "puantaj.donem_muhurle"
+  | "puantaj.haftalik_kapanis.manage"
+  | "fazla_calisma_odeme_tercihi.manage"
+  | "serbest_zaman.manage"
   | "puantaj.donem_reopen.request"
   | "puantaj.donem_reopen.approve"
   | "puantaj.donem_reseal"
@@ -163,7 +166,10 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "bildirimler.detail.view",
     "puantaj.view",
     "puantaj.update",
-    "puantaj.muhurle",
+    "puantaj.donem_muhurle",
+    "puantaj.haftalik_kapanis.manage",
+    "fazla_calisma_odeme_tercihi.manage",
+    "serbest_zaman.manage",
     "puantaj.donem_reopen.approve",
     "puantaj.donem_seal.history",
     "puantaj.bildirim_etki.view",
@@ -253,7 +259,10 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "bildirimler.detail.view",
     "puantaj.view",
     "puantaj.update",
-    "puantaj.muhurle",
+    "puantaj.donem_muhurle",
+    "puantaj.haftalik_kapanis.manage",
+    "fazla_calisma_odeme_tercihi.manage",
+    "serbest_zaman.manage",
     "puantaj.donem_reopen.request",
     "puantaj.donem_seal.history",
     "puantaj.bildirim_etki.view",
@@ -311,6 +320,8 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "bildirimler.detail.view",
     "puantaj.view",
     "puantaj.update",
+    "fazla_calisma_odeme_tercihi.manage",
+    "serbest_zaman.manage",
     "puantaj.donem_reopen.request",
     "puantaj.donem_seal.history",
     "puantaj.bildirim_etki.view",

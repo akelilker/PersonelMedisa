@@ -116,7 +116,7 @@ describe("DonemKapanisMerkeziPage frontend", () => {
   beforeEach(() => {
     useRoleAccessMock.mockReturnValue({
       hasPermission: (permission: string) =>
-        permission === "puantaj.donem_kapanis.view" || permission === "puantaj.muhurle"
+        permission === "puantaj.donem_kapanis.view" || permission === "puantaj.donem_muhurle"
     });
     useDonemKapanisPreflightMock.mockReturnValue(makeHookState());
   });
@@ -126,12 +126,12 @@ describe("DonemKapanisMerkeziPage frontend", () => {
     vi.clearAllMocks();
   });
 
-  it("shows seal action only when user has puantaj.muhurle", () => {
+  it("shows seal action only when user has puantaj.donem_muhurle", () => {
     renderPage();
     expect(screen.getByTestId("donem-kapanis-muhurle")).toBeTruthy();
   });
 
-  it("hides seal action without puantaj.muhurle permission", () => {
+  it("hides seal action without puantaj.donem_muhurle permission", () => {
     useRoleAccessMock.mockReturnValue({
       hasPermission: (permission: string) => permission === "puantaj.donem_kapanis.view"
     });

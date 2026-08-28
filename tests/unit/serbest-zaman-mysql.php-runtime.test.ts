@@ -31,7 +31,7 @@ describe("SerbestZamanController MariaDB", () => {
     expect(routerSource).toContain("SerbestZamanController::duzeltme");
 
     expect(controllerSource).toContain("puantaj.view");
-    expect(controllerSource).toContain("puantaj.muhurle");
+    expect(controllerSource).toContain("serbest_zaman.manage");
     expect(controllerSource).not.toContain("PERIOD_LOCKED");
     expect(controllerSource).not.toContain("PERIOD_STATE_UNKNOWN");
 
@@ -97,6 +97,13 @@ describe("SerbestZamanController MariaDB", () => {
     expect(result.stdout).toContain("[PASS] unauthenticated POST → 401");
     expect(result.stdout).toContain("[PASS] BOLUM_YONETICISI scope içi POST olusum → 200");
     expect(result.stdout).toContain("[PASS] BOLUM_YONETICISI scope dışı GET → 403");
+    expect(result.stdout).toContain("[PASS] SUBE_YONETICISI own branch POST olusum → 200");
+    expect(result.stdout).toContain("[PASS] SUBE_YONETICISI olusum actor recorded");
+    expect(result.stdout).toContain("[PASS] SUBE_YONETICISI own branch POST kullanim → 200");
+    expect(result.stdout).toContain("[PASS] SUBE_YONETICISI own branch POST duzeltme → 200");
+    expect(result.stdout).toContain("[PASS] SUBE_YONETICISI own branch POST iptal → 200");
+    expect(result.stdout).toContain("[PASS] SUBE_YONETICISI cross-branch POST → 403");
+    expect(result.stdout).toContain("[PASS] SUBE_YONETICISI empty user_subeler POST → 403");
     expect(result.stdout).toContain("[PASS] GET events olmayan personel → 404");
     expect(result.stdout).toContain("[PASS] GET no-write (event count unchanged)");
     expect(result.stdout).toContain("[PASS] GET events no internal field leak");

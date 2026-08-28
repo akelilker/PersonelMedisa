@@ -587,9 +587,9 @@ hkAssert(strpos($routerSource, 'HaftalikKapanisController::yillikFazlaCalisma') 
 $yillikPos = strpos($routerSource, "/haftalik-kapanis/yillik-fazla-calisma");
 $idPos = strpos($routerSource, '#^/haftalik-kapanis/(\\d+)$#');
 hkAssert($yillikPos !== false && $idPos !== false && $yillikPos < $idPos, 'router yillik before :id regex');
-hkAssert(strpos($controllerSource, "puantaj.muhurle") !== false, 'create permission puantaj.muhurle');
+hkAssert(strpos($controllerSource, "puantaj.haftalik_kapanis.manage") !== false, 'create permission puantaj.haftalik_kapanis.manage');
 hkAssert(strpos($controllerSource, "puantaj.view") !== false, 'detail/yillik permission puantaj.view');
-hkAssert(strpos($permissionsSource, "'puantaj.muhurle'") !== false, 'RolePermissions has puantaj.muhurle');
+hkAssert(strpos($permissionsSource, "'puantaj.haftalik_kapanis.manage'") !== false, 'RolePermissions has puantaj.haftalik_kapanis.manage');
 hkAssert(strpos($permissionsSource, "'puantaj.view'") !== false, 'RolePermissions has puantaj.view');
 hkAssert(preg_match('/CREATE TABLE\s+haftalik_kapanislar\s*\(/i', $migrationSource) === 1, 'migration CREATE TABLE haftalik_kapanislar');
 hkAssert(preg_match('/CREATE TABLE\s+haftalik_kapanis_satirlari\s*\(/i', $migrationSource) === 1, 'migration CREATE TABLE satirlar');
@@ -641,10 +641,15 @@ $unauth = invokeHkHttp($pdo, null, 'POST', '/haftalik-kapanis', $weekPayload, $s
 hkAssert($unauth['status'] === 401, 'unauthenticated POST → 401');
 
 $personelPost = invokeHkHttp($pdo, $personel, 'POST', '/haftalik-kapanis', $weekPayload, $subeHeader);
-hkAssert($personelPost['status'] === 403, 'PERSONEL (no puantaj.muhurle) POST → 403');
+hkAssert($personelPost['status'] === 403, 'PERSONEL (no puantaj.haftalik_kapanis.manage) POST → 403');
 
 $muhPost = invokeHkHttp($pdo, $muhasebe, 'POST', '/haftalik-kapanis', $weekPayload, $subeHeader);
 hkAssert($muhPost['status'] === 403, 'MUHASEBE (has view, no muhurle) POST → 403');
+
+// MG-SUBE-YONETICI-001: weekly closing stays central even inside the branch manager's scope.
+$subeYonetici = ['id' => 6, 'rol' => 'SUBE_YONETICISI', 'sube_ids' => [1]];
+$subePost = invokeHkHttp($pdo, $subeYonetici, 'POST', '/haftalik-kapanis', $weekPayload, $subeHeader);
+hkAssert($subePost['status'] === 403, 'SUBE_YONETICISI own branch POST → 403');
 
 $gyNoScope = invokeHkHttp($pdo, $gy, 'POST', '/haftalik-kapanis', $weekPayload);
 hkAssert($gyNoScope['status'] === 422, 'GY without active sube header → 422');

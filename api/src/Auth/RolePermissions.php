@@ -40,7 +40,10 @@ class RolePermissions
             'bildirimler.detail.view',
             'puantaj.view',
             'puantaj.update',
-            'puantaj.muhurle',
+            'puantaj.donem_muhurle',
+            'puantaj.haftalik_kapanis.manage',
+            'fazla_calisma_odeme_tercihi.manage',
+            'serbest_zaman.manage',
             'puantaj.donem_reopen.approve',
             'puantaj.donem_seal.history',
             'puantaj.bildirim_etki.view',
@@ -130,8 +133,12 @@ class RolePermissions
             'bildirimler.detail.view',
             'puantaj.view',
             'puantaj.update',
-            // puantaj.muhurle intentionally absent: it gates monthly sealing and weekly
-            // closing, which are central period-closing decisions, not branch data entry.
+            // Branch-scoped payroll input: both writes load the target personel/snapshot from
+            // the DB and assert SubeScope::assertPersonelAccess, so they stay inside user_subeler.
+            'fazla_calisma_odeme_tercihi.manage',
+            'serbest_zaman.manage',
+            // puantaj.donem_muhurle / puantaj.haftalik_kapanis.manage intentionally absent:
+            // period sealing and weekly closing are central closing decisions, not branch input.
             'puantaj.donem_reopen.request',
             'puantaj.donem_seal.history',
             'puantaj.bildirim_etki.view',
@@ -184,7 +191,10 @@ class RolePermissions
             'bildirimler.detail.view',
             'puantaj.view',
             'puantaj.update',
-            'puantaj.muhurle',
+            'puantaj.donem_muhurle',
+            'puantaj.haftalik_kapanis.manage',
+            'fazla_calisma_odeme_tercihi.manage',
+            'serbest_zaman.manage',
             'puantaj.donem_reopen.request',
             'puantaj.donem_seal.history',
             'puantaj.bildirim_etki.view',

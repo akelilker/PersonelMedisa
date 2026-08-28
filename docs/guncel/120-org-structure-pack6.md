@@ -77,7 +77,7 @@ Ops evidence: `docs/guncel/121-pack6-production-rollout.md`.
 
 ### Locked branch inventory (future)
 
-**MEDISA:** Medisa (`MRK`), Giresun (`GRS`), Medisa Kayseri (`MDS-KYS`), Medisa Ankara (`MDS-ANK`), Medisa İstanbul (`MDS-IST`)
+**MEDISA:** Medisa (`MRK`), Medisa Giresun (`GRS`), Medisa Kayseri (`MDS-KYS`), Medisa Ankara (`MDS-ANK`), Medisa İstanbul (`MDS-IST`)
 
 **KARYAPI:** Karyapı (`KRP`), Karyapı Ankara (`KRP-ANK`), Karyapı Kayseri (`KRP-KYS`), Karyapı İstanbul (`KRP-IST`)
 

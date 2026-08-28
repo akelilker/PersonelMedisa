@@ -9,7 +9,7 @@
 
 **2026-08-17 closure reconciliation:** SGK catalog `CLOSED_CONFIRMED`; UBGT `CLOSED_CONFIRMED`; payroll company policy `CLOSED_CONFIRMED`; active policy revision `3`, required/resolved `14/14`, missing `0`; `HAFTA_TATILI_GUNLERI=0` / Pazar; payroll policy preflight ready.
 
-**2026-08-27 personnel import rollout:** Phase1 `122 IC_PERSONEL` + Phase2 `11 DIS_KAYNAK` production apply `CLOSED_CONFIRMED` (`110` / `MG-OPS-PERSONEL-001`, `MG-EXT-ORG-DATA-001`). Canonical DIS hedefi 11; MUHAMMAT FAWAZ + MUSTAFA HAMİD = `EXCLUDED_USER_CONFIRMED_TERMINATED` (backlog’a eklenmez). 20 IC telefon = `NON_BLOCKING_DATA_COMPLETION` / `DEFERRED_USER_DATA` (import blocker değil). Personel import pending / 13 external expected ifadesi bayattır.
+**2026-08-27 personnel import rollout:** Phase1 `122 IC_PERSONEL` + Phase2 `11 DIS_KAYNAK` production apply `CLOSED_CONFIRMED` (`110` / `MG-OPS-PERSONEL-001`, `MG-EXT-ORG-DATA-001`). Canonical DIS hedefi 11; MUHAMMAT FAWAZ + MUSTAFA HAMİD = `EXCLUDED_USER_CONFIRMED_TERMINATED` (backlog’a eklenmez). 20 IC telefon deferred kalemi kapanmıştır: `MG-OPS-PERSONEL-PHONE-001` = `CLOSED_CONFIRMED`, `PERSONEL_IC_PHONE_DEFERRED = 0` (gerçek kullanıcı verisi, canonical write owner; import reopen yok). Personel import pending / 13 external expected ifadesi bayattır.
 
 **2026-08-27 SGK/UBGT live read-only verify:** `MG-OPS-SGK-CAT-001` + `MG-OPS-UBGT-001` → `CLOSED_CONFIRMED`. Canlı: SGK `RESMI_KAYNAKLI_KISITLI`/`ONAYLANDI`/`kod_sayisi=19`; şubeler `1,4,5,6,7,8,9,10,11` = `AY_1_SON_GUN`; UBGT 2026 = 17 aktif (`TAM_GUN=14`,`YARIM_GUN=3`, duplicate/conflict 0); company policy revision `3` (`14/14`), `HAFTA_TATILI_GUNLERI=0`. Seed/approve/write bu turda yok.
 

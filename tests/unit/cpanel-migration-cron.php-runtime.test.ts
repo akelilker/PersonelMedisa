@@ -93,19 +93,10 @@ describe('cPanel migration cron worker runtime', () => {
 
       const heartbeatPath = join(fixture.controlDirectory, 'worker-heartbeat.json');
       const heartbeat = JSON.parse(readFileSync(heartbeatPath, 'utf8'));
-      expect(heartbeat.schema_version).toBe('2');
+      expect(heartbeat.schema_version).toBe('1');
       expect(heartbeat.deployed_sha).toBe(deployedSha);
       expect(heartbeat.updated_at).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
-      expect(Object.keys(heartbeat).sort()).toEqual([
-        'deployed_sha',
-        'legacy_role_enum_count',
-        'production_migration_tip',
-        'schema_version',
-        'updated_at',
-      ]);
-      // Without a reachable database the schema probes degrade instead of failing.
-      expect(heartbeat.production_migration_tip).toBe('UNKNOWN');
-      expect(heartbeat.legacy_role_enum_count).toBe(-1);
+      expect(Object.keys(heartbeat).sort()).toEqual(['deployed_sha', 'schema_version', 'updated_at']);
 
       // A heartbeat tick must not create status or request lifecycle artifacts.
       const entries = readdirSync(fixture.controlDirectory);

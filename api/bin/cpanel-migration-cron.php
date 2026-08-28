@@ -239,54 +239,6 @@ function writeStatus(string $statusPath, array $status): void
     }
 }
 
-/**
- * Applied schema tip, so production migration state is observable without an
- * ad-hoc inventory job. Read-only and best-effort: a DB outage degrades the
- * field to UNKNOWN instead of breaking the heartbeat or the migration worker.
- */
-function readProductionMigrationTip(): string
-{
-    try {
-        $tip = Connection::get()
-            ->query('SELECT version FROM medisa_schema_migrations ORDER BY version DESC LIMIT 1')
-            ->fetchColumn();
-        if (is_string($tip) && preg_match('/^[A-Za-z0-9._-]{1,64}$/', $tip) === 1) {
-            return $tip;
-        }
-    } catch (\Throwable) {
-        // Intentionally swallowed: observability must never fail the worker.
-    }
-    return 'UNKNOWN';
-}
-
-/**
- * How many retired role values still exist in the users.rol ENUM definition.
- * Schema metadata only: never reads or reports user rows.
- */
-function readLegacyRoleEnumCount(): int
-{
-    try {
-        $columnType = Connection::get()
-            ->query(
-                "SELECT COLUMN_TYPE FROM information_schema.COLUMNS
-                  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'rol'"
-            )
-            ->fetchColumn();
-        if (!is_string($columnType) || $columnType === '') {
-            return -1;
-        }
-        $present = 0;
-        foreach (['PATRON', 'IK_BORDRO', 'SGK_KARAR_ONAY_YETKILISI', 'IDARI_ISLER'] as $retired) {
-            if (str_contains($columnType, "'" . $retired . "'")) {
-                $present++;
-            }
-        }
-        return $present;
-    } catch (\Throwable) {
-        return -1;
-    }
-}
-
 function writeHeartbeat(string $heartbeatPath, string $deployShaPath): void
 {
     $publishedSha = trim((string) @file_get_contents($deployShaPath));
@@ -294,11 +246,9 @@ function writeHeartbeat(string $heartbeatPath, string $deployShaPath): void
         $publishedSha = 'UNKNOWN';
     }
     $json = json_encode([
-        'schema_version' => '2',
+        'schema_version' => '1',
         'updated_at' => gmdate('Y-m-d\TH:i:s\Z'),
         'deployed_sha' => strtolower($publishedSha),
-        'production_migration_tip' => readProductionMigrationTip(),
-        'legacy_role_enum_count' => readLegacyRoleEnumCount(),
     ], JSON_UNESCAPED_SLASHES);
     if ($json === false) {
         return;

@@ -64,7 +64,7 @@ Salt-okunur teşhis (`ops-migration-worker-diagnostics`) her ikisini de kanıtla
 ### Kalıcı önlemler
 
 - Canlı worker'ı değiştiren envanter workflow'u kaldırıldı.
-- Worker her tick'te atomic `worker-heartbeat.json` yayınlıyor: `schema_version`, `updated_at`, `deployed_sha`, `production_migration_tip`, `legacy_role_enum_count`. Şema sorguları salt-okunur ve fail-soft'tur (DB erişilemezse `UNKNOWN` / `-1`); kullanıcı satırı okunmaz.
+- Worker her tick'te atomic `worker-heartbeat.json` yayınlıyor: `schema_version`, `updated_at`, `deployed_sha`. Saf dosya sistemi sinyalidir; veritabanına dokunmaz, kullanıcı/personel verisi veya secret yazmaz. Cron'un hangi deploy root'unu çalıştırdığı artık istek göndermeden kanıtlanabiliyor.
 - Apply workflow'unun preflight ve teşhis adımları dizin listelemesine geçti; busy guard artık fail-closed.
 - Birikmiş dört talep kör silinmedi; canonical worker yaşam döngüsüyle `DEPLOY_SHA_MISMATCH` gerekçesiyle `request.failed.*` arşivine taşındı.
 

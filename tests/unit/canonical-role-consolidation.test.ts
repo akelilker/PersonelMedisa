@@ -7,11 +7,7 @@ import {
   TECHNICAL_ROLES,
   type UserRole
 } from "../../src/types/auth";
-import {
-  canonicalizeUserRole,
-  SAFE_LEGACY_ROLE_ALIASES,
-  UNRESOLVED_LEGACY_ROLES
-} from "../../src/lib/authorization/canonicalize-user-role";
+import { canonicalizeUserRole } from "../../src/lib/authorization/canonicalize-user-role";
 import {
   getRolePermissions,
   hasRolePermission
@@ -80,25 +76,32 @@ describe("S1 canonical role consolidation", () => {
     expect(getRolePermissions("AUTH_SMOKE_READONLY")).toEqual(["ops.auth_smoke.read"]);
   });
 
-  it("safe-aliases PATRON and IK_BORDRO only", () => {
-    expect(SAFE_LEGACY_ROLE_ALIASES.PATRON).toBe("GENEL_YONETICI");
-    expect(SAFE_LEGACY_ROLE_ALIASES.IK_BORDRO).toBe("IK_SORUMLUSU");
-    expect(canonicalizeUserRole("PATRON")).toBe("GENEL_YONETICI");
-    expect(canonicalizeUserRole("IK_BORDRO")).toBe("IK_SORUMLUSU");
-    expect(hasRolePermission("PATRON", "legal_hold.manage")).toBe(true);
-    expect(hasRolePermission("IK_BORDRO", "sgk_karar_paketi.prepare")).toBe(true);
-    expect(hasRolePermission("IK_BORDRO", "sgk_karar_paketi.approve")).toBe(false);
+  it("fail-closes every legacy role string with no alias fallback", () => {
+    const legacy = ["PATRON", "IK_BORDRO", "SGK_KARAR_ONAY_YETKILISI", "IDARI_ISLER"] as const;
+    for (const role of legacy) {
+      expect(canonicalizeUserRole(role)).toBeNull();
+      expect(getRolePermissions(role)).toEqual([]);
+    }
+    expect(hasRolePermission("PATRON", "legal_hold.manage")).toBe(false);
+    expect(hasRolePermission("IK_BORDRO", "sgk_karar_paketi.prepare")).toBe(false);
+    expect(hasRolePermission("SGK_KARAR_ONAY_YETKILISI", "sgk_karar_paketi.approve")).toBe(false);
+
+    const php = readFileSync(PHP_PATH, "utf8");
+    expect(php).not.toContain("safeAliases");
+    const feCanon = readFileSync(
+      resolve(root, "src/lib/authorization/canonicalize-user-role.ts"),
+      "utf8"
+    );
+    for (const role of legacy) {
+      expect(feCanon).not.toContain(role);
+    }
   });
 
-  it("fail-closes unresolved legacy roles", () => {
-    expect(UNRESOLVED_LEGACY_ROLES).toEqual(
-      expect.arrayContaining(["SGK_KARAR_ONAY_YETKILISI", "IDARI_ISLER"])
-    );
-    expect(canonicalizeUserRole("SGK_KARAR_ONAY_YETKILISI")).toBeNull();
-    expect(canonicalizeUserRole("IDARI_ISLER")).toBeNull();
-    expect(getRolePermissions("SGK_KARAR_ONAY_YETKILISI")).toEqual([]);
-    expect(getRolePermissions("IDARI_ISLER")).toEqual([]);
-    expect(hasRolePermission("SGK_KARAR_ONAY_YETKILISI", "sgk_karar_paketi.approve")).toBe(false);
+  it("canonical 8 + technical actor resolve through both normalization boundaries", () => {
+    for (const role of ALL_ROLES) {
+      expect(canonicalizeUserRole(role)).toBe(role);
+      expect(getRolePermissions(role).length).toBeGreaterThan(0);
+    }
   });
 
   it("keeps FE/BE permission parity for all canonical roles", () => {
@@ -344,6 +347,25 @@ describe("S1 canonical role consolidation", () => {
     expect(sql).not.toMatch(/UPDATE users SET rol = .+ WHERE rol = 'IDARI_ISLER'/);
     expect(sql).toContain("SGK_KARAR_ONAY_YETKILISI");
     expect(sql).toContain("IDARI_ISLER");
+  });
+
+  it("migration 077 shrinks users.rol to the canonical catalog behind a data guard", () => {
+    const sql = readFileSync(resolve(root, "api/migrations/077_legacy_role_enum_shrink.sql"), "utf8");
+
+    const enumMatch = sql.match(/MODIFY COLUMN rol ENUM\(([^)]*)\)/);
+    expect(enumMatch).not.toBeNull();
+    const enumValues = (enumMatch?.[1] ?? "")
+      .split(",")
+      .map((part) => part.trim().replace(/^''|''$/g, ""));
+    expect(enumValues.sort()).toEqual([...HUMAN_8, "AUTH_SMOKE_READONLY"].sort());
+
+    expect(sql).toContain("PACK077_BLOCKER: legacy role still assigned to users");
+    expect(sql).toContain(
+      "WHERE rol IN ('PATRON', 'IK_BORDRO', 'SGK_KARAR_ONAY_YETKILISI', 'IDARI_ISLER')"
+    );
+    expect(sql).not.toMatch(/UPDATE users SET rol/);
+    expect(sql).not.toMatch(/\b(INSERT|DELETE|DROP TABLE)\b/);
+    expect(sql).not.toMatch(/\bpersoneller\b/);
   });
 
   it("S2B yillik_izin_hak_duzeltme.manage is GY+IK only; surecler.create uses RolePermissions", () => {

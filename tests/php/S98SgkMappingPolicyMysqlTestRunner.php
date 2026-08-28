@@ -183,7 +183,7 @@ try {
     // --- S98 identity fail-closed authz matrix (service-level) ---
     $prepOk = [
         'id' => 1,
-        'rol' => 'IK_BORDRO',
+        'rol' => 'IK_SORUMLUSU',
         'username' => 'hazirlayan.s98',
         'durum' => 'AKTIF',
         'actor_identity_id' => 1,
@@ -199,7 +199,6 @@ try {
         'actor_identity_status' => 'VERIFIED',
         'sube_ids' => [1],
     ];
-    // IK_BORDRO safely aliases → IK_SORUMLUSU (prepare OK; approve still denied below)
     SgkKararPaketiAuthz::assertPrepare($pdo, $prepOk);
     SgkKararPaketiAuthz::assertApprove($pdo, $apprOk);
     SgkKararPaketiAuthz::assertSubeScope($apprOk, 1);

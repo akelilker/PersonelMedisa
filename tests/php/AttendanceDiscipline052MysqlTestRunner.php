@@ -99,13 +99,13 @@ function ad052Seed(PDO $pdo): void
     $pdo->exec("INSERT INTO subeler (id, kod, ad, durum) VALUES (1, 'A', 'Sube A', 'AKTIF')");
     $pdo->exec(
         "ALTER TABLE users MODIFY COLUMN rol ENUM(
-            'GENEL_YONETICI','MUHASEBE','BIRIM_AMIRI','BOLUM_YONETICISI','IK_BORDRO'
+            'GENEL_YONETICI','MUHASEBE','BIRIM_AMIRI','BOLUM_YONETICISI','IK_SORUMLUSU'
         ) NOT NULL"
     );
     $pdo->exec(
         "INSERT INTO users (id, username, password_hash, ad_soyad, rol, durum) VALUES
         (1, 'bolum', '{$hash}', 'Bolum Yon', 'BOLUM_YONETICISI', 'AKTIF'),
-        (2, 'ik', '{$hash}', 'IK User', 'IK_BORDRO', 'AKTIF'),
+        (2, 'ik', '{$hash}', 'IK User', 'IK_SORUMLUSU', 'AKTIF'),
         (3, 'genel', '{$hash}', 'Genel Yon', 'GENEL_YONETICI', 'AKTIF')"
     );
     $pdo->exec(
@@ -204,12 +204,11 @@ try {
     $proj = DisiplinAdayProjectionService::projectForMonth($pdo, $userGenel, '2026-08', 1, 10);
     ad052Assert(count($proj['items']) >= 1, 'lifecycle seed vaka');
     $vakaId = (int) $proj['items'][0]['id'];
-    // IK_BORDRO safely aliases → IK_SORUMLUSU (review/defense OK)
-    $userIk = ad052User(2, 'IK_BORDRO');
+    $userIk = ad052User(2, 'IK_SORUMLUSU');
     $userBolum = ad052User(1, 'BOLUM_YONETICISI');
 
     $vaka = DisiplinVakaService::ikReview($pdo, $userIk, $vakaId);
-    ad052Assert($vaka['lifecycle_state'] === AttendanceDisciplineCatalog::LIFECYCLE_IK_INCELEME, 'ikReview state (IK_BORDRO alias)');
+    ad052Assert($vaka['lifecycle_state'] === AttendanceDisciplineCatalog::LIFECYCLE_IK_INCELEME, 'ikReview state');
 
     $pastDeadlineFailed = false;
     try {

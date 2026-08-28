@@ -300,7 +300,7 @@ try {
         "SELECT COLUMN_TYPE FROM information_schema.COLUMNS
          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'rol'"
     )->fetchColumn();
-    s103Assert(strpos($colType, 'PATRON') !== false, 'enum contains PATRON');
+    s103Assert(strpos($colType, 'PATRON') !== false, 'migration 041 enum contains PATRON');
     s103Assert(strpos($colType, 'AUTH_SMOKE_READONLY') !== false, 'enum contains AUTH_SMOKE_READONLY');
     s103Assert(strpos($colType, 'GENEL_YONETICI') !== false, 'enum keeps GENEL_YONETICI');
     s103Assert((int) $pdo->query('SELECT COUNT(*) FROM users')->fetchColumn() === $usersBefore, 'user row delta 0');
@@ -312,8 +312,8 @@ try {
     s103Assert(!RolePermissions::has(['rol' => 'AUTH_SMOKE_READONLY'], 'personeller.view.sube'), 'smoke no personeller.view.sube');
     s103Assert(!RolePermissions::has(['rol' => 'AUTH_SMOKE_READONLY'], 'personeller.detail.view'), 'smoke no detail.view');
     s103Assert(!RolePermissions::has(['rol' => 'AUTH_SMOKE_READONLY'], 'personeller.create'), 'smoke no create');
-    s103Assert(RolePermissions::has(['rol' => 'PATRON'], 'personeller.view'), 'legacy PATRON aliases to GENEL_YONETICI personeller.view');
-    s103Assert(RolePermissions::normalizeRole('PATRON') === 'GENEL_YONETICI', 'PATRON normalizes to GENEL_YONETICI');
+    s103Assert(!RolePermissions::has(['rol' => 'PATRON'], 'personeller.view'), 'legacy PATRON has no permission');
+    s103Assert(RolePermissions::normalizeRole('PATRON') === '', 'PATRON fails closed');
     s103Assert(RolePermissions::normalizeRole('PERSONEL') === 'PERSONEL', 'PERSONEL canonical');
     s103Assert(!RolePermissions::has(['rol' => 'PERSONEL'], 'personeller.view'), 'PERSONEL no personeller.view');
 
@@ -325,14 +325,14 @@ try {
     $hash = password_hash('SmokeTestPass-24chars!!', PASSWORD_BCRYPT);
     $pdo->exec("INSERT INTO users (id, username, password_hash, ad_soyad, rol, durum) VALUES
       (1, 'gy', '$hash', 'GY', 'GENEL_YONETICI', 'AKTIF'),
-      (2, 'patron', '$hash', 'Patron', 'PATRON', 'AKTIF'),
+      (2, 'gy2', '$hash', 'GY Global', 'GENEL_YONETICI', 'AKTIF'),
       (3, 'pm_smoke_ro_test', '$hash', 'Otomatik Smoke Test', 'AUTH_SMOKE_READONLY', 'AKTIF'),
       (4, 'ba', '$hash', 'BA', 'BIRIM_AMIRI', 'AKTIF'),
       (5, 'pm_smoke_ro_bad0', '$hash', 'Bad0', 'AUTH_SMOKE_READONLY', 'AKTIF'),
       (6, 'pm_smoke_ro_bad2', '$hash', 'Bad2', 'AUTH_SMOKE_READONLY', 'AKTIF')
     ");
     $pdo->exec('INSERT INTO user_subeler (user_id, sube_id) VALUES (3, 1), (4, 1), (6, 1), (6, 2)');
-    // patron: empty sube_ids (unrestricted risk before authz fix)
+    // gy2: empty sube_ids (unrestricted risk before authz fix)
     $pdo->exec("INSERT INTO personeller (
         id, tc_kimlik_no, ad, soyad, dogum_tarihi, telefon, acil_durum_kisi, acil_durum_telefon,
         sicil_no, ise_giris_tarihi, sube_id, aktif_durum
@@ -342,15 +342,15 @@ try {
     ");
 
     $gy = ['id' => 1, 'username' => 'gy', 'ad_soyad' => 'GY', 'rol' => 'GENEL_YONETICI', 'sube_ids' => []];
-    $patron = ['id' => 2, 'username' => 'patron', 'ad_soyad' => 'Patron', 'rol' => 'PATRON', 'sube_ids' => []];
+    $gyGlobal = ['id' => 2, 'username' => 'gy2', 'ad_soyad' => 'GY Global', 'rol' => 'GENEL_YONETICI', 'sube_ids' => []];
     $smoke = ['id' => 3, 'username' => 'pm_smoke_ro_test', 'ad_soyad' => 'Smoke', 'rol' => 'AUTH_SMOKE_READONLY', 'sube_ids' => [1]];
     $ba = ['id' => 4, 'username' => 'ba', 'ad_soyad' => 'BA', 'rol' => 'BIRIM_AMIRI', 'sube_ids' => [1]];
     $smoke0 = ['id' => 5, 'username' => 'pm_smoke_ro_bad0', 'ad_soyad' => 'Bad0', 'rol' => 'AUTH_SMOKE_READONLY', 'sube_ids' => []];
     $smoke2 = ['id' => 6, 'username' => 'pm_smoke_ro_bad2', 'ad_soyad' => 'Bad2', 'rol' => 'AUTH_SMOKE_READONLY', 'sube_ids' => [1, 2]];
     $personel = ['id' => 7, 'username' => 'personel', 'ad_soyad' => 'Personel', 'rol' => 'PERSONEL', 'sube_ids' => []];
 
-    $r = s103Http($pdo, $patron, 'personeller_list');
-    s103Assert($r['status'] === 200, 'legacy PATRON aliases to GENEL_YONETICI list 200');
+    $r = s103Http($pdo, $gyGlobal, 'personeller_list');
+    s103Assert($r['status'] === 200, 'global GENEL_YONETICI list 200');
     $r = s103Http($pdo, $personel, 'personeller_list');
     s103Assert($r['status'] === 403, 'PERSONEL list 403');
     $r = s103Http($pdo, $smoke, 'personeller_list');
@@ -386,8 +386,8 @@ try {
     s103Assert($r['status'] === 403, 'GY smoke-read 403');
     $r = s103Http($pdo, $ba, 'smoke_read');
     s103Assert($r['status'] === 403, 'BA smoke-read 403');
-    $r = s103Http($pdo, $patron, 'smoke_read');
-    s103Assert($r['status'] === 403, 'PATRON smoke-read 403');
+    $r = s103Http($pdo, $gyGlobal, 'smoke_read');
+    s103Assert($r['status'] === 403, 'global GY smoke-read 403');
     $r = s103Http($pdo, $smoke0, 'smoke_read');
     s103Assert($r['status'] === 403, 'smoke 0 sube 403');
     $code = $r['payload']['errors'][0]['code'] ?? '';

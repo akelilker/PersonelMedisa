@@ -124,8 +124,8 @@ describe("S98 SGK dual-control identity fail-closed", () => {
     expect(perms).toMatch(/'IK_SORUMLUSU'\s*=>\s*\[[\s\S]*?'sgk_karar_paketi\.prepare'/);
     expect(perms).toMatch(/'GENEL_YONETICI'\s*=>\s*\[[\s\S]*?'sgk_karar_paketi\.approve'/);
     expect(perms).toMatch(/'BOLUM_YONETICISI'\s*=>\s*\[[\s\S]*?'sgk_karar_paketi\.approve'/);
-    expect(perms).toContain("'IK_BORDRO' => 'IK_SORUMLUSU'");
-    expect(perms).not.toMatch(/'SGK_KARAR_ONAY_YETKILISI'\s*=>\s*\[/);
+    expect(perms).not.toContain("IK_BORDRO");
+    expect(perms).not.toContain("SGK_KARAR_ONAY_YETKILISI");
     const ikStart = perms.indexOf("'IK_SORUMLUSU' => [");
     const ikEnd = perms.indexOf("'SISTEM_YONETICISI' => [");
     expect(ikStart).toBeGreaterThan(-1);

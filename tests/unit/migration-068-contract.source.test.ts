@@ -22,6 +22,7 @@ describe("migration 068 actor identity audit contract", () => {
       "074_qr_attendance_correction_and_inbox.sql",
       "075_personel_account_activation.sql",
       "076_dis_kaynak_gecici_gorevlendirme.sql",
+      "077_legacy_role_enum_shrink.sql",
     ];
     for (const name of tail) {
       expect(migrationNames).toContain(name);

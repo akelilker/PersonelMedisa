@@ -121,7 +121,8 @@ function rp053MigrationFiles(): array
             && $name !== '073_test_fixture_personel_archive.sql'
             && $name !== '074_qr_attendance_correction_and_inbox.sql'
             && $name !== '075_personel_account_activation.sql'
-            && $name !== '076_dis_kaynak_gecici_gorevlendirme.sql';
+            && $name !== '076_dis_kaynak_gecici_gorevlendirme.sql'
+            && $name !== '077_legacy_role_enum_shrink.sql';
     }));
     sort($files, SORT_STRING);
 

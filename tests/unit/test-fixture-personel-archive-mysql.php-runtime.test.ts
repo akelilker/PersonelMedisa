@@ -121,6 +121,7 @@ describe("test fixture personel archive owner", () => {
       "074_qr_attendance_correction_and_inbox.sql",
       "075_personel_account_activation.sql",
       "076_dis_kaynak_gecici_gorevlendirme.sql",
+      "077_legacy_role_enum_shrink.sql",
     ];
     const migrations = readdirSync(resolve(root, "api/migrations"))
       .filter((name) => /^\d{3}_.+\.sql$/.test(name) && !excluded.includes(name))

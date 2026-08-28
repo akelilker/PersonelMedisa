@@ -8,12 +8,6 @@ use Medisa\Api\Http\JsonResponse;
 
 class RolePermissions
 {
-    /** @var array<string, string> */
-    private static $safeAliases = [
-        'PATRON' => 'GENEL_YONETICI',
-        'IK_BORDRO' => 'IK_SORUMLUSU',
-    ];
-
     /** @var array<string, array<int, string>> */
     private static $matrix = [
         'GENEL_YONETICI' => [
@@ -489,8 +483,8 @@ class RolePermissions
 
     /**
      * Single BE normalization boundary.
-     * Safe aliases: PATRON→GENEL_YONETICI, IK_BORDRO→IK_SORUMLUSU.
-     * Unresolved legacy (SGK_KARAR_ONAY_YETKILISI, IDARI_ISLER) → '' (fail-closed).
+     * Canonical catalog only; anything else (including legacy role strings) → ''
+     * so authorization fails closed instead of guessing an authority level.
      *
      * @return string
      */
@@ -498,14 +492,6 @@ class RolePermissions
     {
         $normalized = strtoupper(trim((string) $role));
         if ($normalized === '') {
-            return '';
-        }
-
-        if (isset(self::$safeAliases[$normalized])) {
-            $normalized = self::$safeAliases[$normalized];
-        }
-
-        if ($normalized === 'SGK_KARAR_ONAY_YETKILISI' || $normalized === 'IDARI_ISLER') {
             return '';
         }
 

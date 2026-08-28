@@ -238,12 +238,12 @@ describe("role permissions", () => {
     expect(hasRolePermission("PERSONEL", "puantaj.view")).toBe(false);
   });
 
-  it("safe-aliases PATRON to GENEL_YONETICI permissions", () => {
-    expect(hasRolePermission("PATRON", "patron_ack.view")).toBe(true);
-    expect(hasRolePermission("PATRON", "patron_ack.mark_seen")).toBe(true);
-    expect(hasRolePermission("PATRON", "raporlar.view")).toBe(true);
-    expect(hasRolePermission("PATRON", "bordro_kesinlestirme.approve")).toBe(true);
-    expect(hasRolePermission("PATRON", "sirket_parametreleri.manage")).toBe(true);
+  it("grants no permission to the legacy PATRON string", () => {
+    expect(hasRolePermission("PATRON", "patron_ack.view")).toBe(false);
+    expect(hasRolePermission("PATRON", "patron_ack.mark_seen")).toBe(false);
+    expect(hasRolePermission("PATRON", "raporlar.view")).toBe(false);
+    expect(hasRolePermission("PATRON", "bordro_kesinlestirme.approve")).toBe(false);
+    expect(hasRolePermission("PATRON", "sirket_parametreleri.manage")).toBe(false);
     expect(ALL_ROLES).not.toContain("PATRON");
   });
 
@@ -371,7 +371,7 @@ describe("role permissions", () => {
     expect(hasRolePermission("IK_SORUMLUSU", "sirket_parametreleri.view")).toBe(true);
     expect(hasRolePermission("IK_SORUMLUSU", "sirket_parametreleri.manage")).toBe(true);
     expect(hasRolePermission("IK_SORUMLUSU", "bordro_kesinlestirme.approve")).toBe(false);
-    expect(hasRolePermission("IK_BORDRO", "sgk_karar_paketi.prepare")).toBe(true);
+    expect(hasRolePermission("IK_BORDRO", "sgk_karar_paketi.prepare")).toBe(false);
     expect(hasRolePermission("IK_BORDRO", "sgk_karar_paketi.approve")).toBe(false);
     expect(hasRolePermission("SGK_KARAR_ONAY_YETKILISI", "sgk_karar_paketi.approve")).toBe(false);
     expect(hasRolePermission("SGK_KARAR_ONAY_YETKILISI", "sgk_karar_paketi.prepare")).toBe(false);

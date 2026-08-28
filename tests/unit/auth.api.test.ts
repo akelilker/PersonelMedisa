@@ -209,7 +209,7 @@ describe("auth.api login", () => {
     });
   });
 
-  it("canonicalizes IK_BORDRO login payload to IK_SORUMLUSU", async () => {
+  it("accepts canonical IK_SORUMLUSU login payload", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async () =>
@@ -220,7 +220,7 @@ describe("auth.api login", () => {
             user: {
               id: 8,
               ad_soyad: "Fixture Preparer",
-              rol: "IK_BORDRO",
+              rol: "IK_SORUMLUSU",
               sube_ids: [1, 2]
             },
             active_sube_id: 1
@@ -232,6 +232,24 @@ describe("auth.api login", () => {
     const session = await login({ username: "hazirlayan", password: "secret" });
     expect(session.token).toBe("ik-token");
     expect(session.user.rol).toBe("IK_SORUMLUSU");
+  });
+
+  it("fail-closes legacy IK_BORDRO login role", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        createJsonResponse({
+          data: {
+            token: "legacy-token",
+            user: { rol: "IK_BORDRO" }
+          }
+        })
+      )
+    );
+
+    await expect(login({ username: "hazirlayan", password: "secret" })).rejects.toMatchObject({
+      message: "Login yanıtı beklenen oturum formatında değil."
+    });
   });
 
   it("fail-closes unresolved SGK_KARAR_ONAY_YETKILISI login role", async () => {

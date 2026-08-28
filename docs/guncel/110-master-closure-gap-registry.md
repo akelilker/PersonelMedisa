@@ -1,4 +1,4 @@
-CODE_MIGRATION_TIP: 076
+CODE_MIGRATION_TIP: 077
 PRODUCTION_MIGRATION_TIP: 076
 
 # 110 — Canonical Closure / Gap Registry
@@ -11,7 +11,7 @@ PRODUCTION_MIGRATION_TIP: 076
 
 | Alan | Değer | Kanıt / sınır |
 | --- | --- | --- |
-| CODE_MIGRATION_TIP | **076** | Repodaki son migration: `076_dis_kaynak_gecici_gorevlendirme.sql` |
+| CODE_MIGRATION_TIP | **077** | Repodaki son migration: `077_legacy_role_enum_shrink.sql` |
 | PRODUCTION_MIGRATION_TIP | **076** | Canonical production apply `33120768641` / request `33120768641-1` / worker `SUCCEEDED`; tip `076` |
 | Canlı migration doğrulaması | **PASS** | Ledger `076` + schema ready; assignment canlı kayıt=0; pending 077+ yok; migration workflow bu turda **tekrar çalıştırılmaz** |
 
@@ -51,6 +51,7 @@ PRODUCTION_MIGRATION_TIP: 076
 | `MG-RET-PHYS-001` | Saklama politikası + fiziksel imha mekanizması | **CLOSED_CONFIRMED** | `RETENTION_POLICY = MINIMUM_10_YEARS`; `SHORTER_CATEGORY_RETENTION = DISABLED`; personel-bağlı anchor = işten ayrılış tarihi veya daha geç uygulanabilir anchor; aktif personel imhası **PROHIBITED**; eksik anchor **FAIL_CLOSED**; legal hold override **ENABLED**; daha uzun mevzuat süresi kısaltılmaz. 15/15 typed handler; schema `059`–`064` production ready; GM çift kontrol + plan hash + idempotency korunur; feature flag varsayılan **OFF**. Bkz. `114-retention-physical-destruction-pack3c-final.md`, `118-production-migration-rollout-059-064.md`. Süresi dolan adayların mevcut request/approval/execution akışından geçirilmesi normal işletim işidir; açık backlog değildir. |
 | `MG-OPS-SGK-CAT-001` | SGK canlı katalog/politika salt-okunur doğrulaması | **CLOSED_CONFIRMED** | 2026-08-27 canlı GET doğrulandı. |
 | `MG-OPS-UBGT-001` | UBGT canlı takvim/projeksiyon salt-okunur doğrulaması | **CLOSED_CONFIRMED** | 2026-08-27 canlı GET doğrulandı. |
+| `MG-ROLE-ENUM-DEBT-001` | Legacy `users.rol` ENUM temizliği | **CLOSED_CONFIRMED** | Salt-okunur production envanteri: `PATRON`, `IK_BORDRO`, `SGK_KARAR_ONAY_YETKILISI`, `IDARI_ISLER` için atanmış kullanıcı sayısı (aktif+pasif) **0**. Migration `077_legacy_role_enum_shrink.sql` ENUM'u canonical 8 insan rolü + `AUTH_SMOKE_READONLY` teknik aktörüne daraltır; data guard unmapped legacy kullanıcı varsa FAIL eder. BE `RolePermissions::normalizeRole` ve FE `canonicalizeUserRole` legacy alias taşımaz, tümü fail-closed. Rol mapping veya yetki genişletmesi yapılmamıştır. Bkz. `docs/guncel/131-legacy-role-enum-canonical-cleanup.md`. |
 | `MG-OPS-ORG-001` | IC kritik organizasyon FK tamamlama | **CLOSED** | Phase1 import sonrası AKTIF `IC_PERSONEL` için kritik org alanları (Şube/Departman/Bölüm/Birim/Görev/Personel Tipi) tamam; kalan telefon kalemi ayrıdır (`MG-OPS-PERSONEL-PHONE-001`). DIS org null’ları IC sayımına **dahil edilmez**. |
 
 ## Kullanıcı verisi / ataması gerektiren (teknik blocker değil)
@@ -62,9 +63,7 @@ PRODUCTION_MIGRATION_TIP: 076
 
 ## Teknik borç (non-blocking)
 
-| ID | Konu | Durum | Not |
-| --- | --- | --- | --- |
-| `MG-ROLE-ENUM-DEBT-001` | Legacy `users.rol` ENUM envanteri | **TECH_DEBT_NON_BLOCKING** | ENUM migration / rol mutation bu turda yok. |
+Açık kalem yok.
 
 ## Bilinçli ertelenen / kapsam dışı / future (bug değil)
 
@@ -82,12 +81,12 @@ PRODUCTION_MIGRATION_TIP: 076
 
 | Sınıf | Sayım |
 | --- | ---: |
-| **CLOSED_CONFIRMED** | 7 |
+| **CLOSED_CONFIRMED** | 8 |
 | **CLOSED** | 9 |
 | **USER_DATA_REQUIRED** | 1 |
 | **USER_ASSIGNMENT_REQUIRED** | 1 |
 | **READY_FOR_USER_EXECUTION_APPROVAL** | 0 |
-| **TECH_DEBT_NON_BLOCKING** | 1 |
+| **TECH_DEBT_NON_BLOCKING** | 0 |
 | **FUTURE / OUT_OF_SCOPE / INTENTIONAL_DEFER** | 7 |
 | **BUG** | **0** |
 | **OPS_ROLLOUT** | **0** |

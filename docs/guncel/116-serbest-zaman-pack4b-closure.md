@@ -6,8 +6,9 @@
 **Retention feature enable:** **NO**
 **Real physical destruction:** **NO**
 
-> **Current production tip:** **064** — see [`118-production-migration-rollout-059-064.md`](118-production-migration-rollout-059-064.md).
-> Schema `061`/`062` production rollout is complete; feature enable / real destruction remain gated. Body below preserves Pack 4B historical code-closure claims.
+> **Final master closure (2026-08-28):** `MG-SZ-6M-001` = **CLOSED**. Operasyon sahipliği: takip `IK_SORUMLUSU`; operasyonel sorumlu `BIRIM_AMIRI` / `BOLUM_YONETICISI`; eskalasyon `GENEL_YONETICI`. Bkz. `110-master-closure-gap-registry.md`, `CURRENT_STATE.md`.
+>
+> **Current production tip:** **076** — see [`118-production-migration-rollout-059-064.md`](118-production-migration-rollout-059-064.md) (schema `059`–`064` applied earlier).
 
 ## PACK4B_RESULT
 

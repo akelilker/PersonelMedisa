@@ -1104,14 +1104,14 @@ szAssert($bolumOutWrite['status'] === 403, 'BOLUM_YONETICISI scope dışı POST 
 
 // MG-SUBE-YONETICI-001: branch manager owns serbest zaman input inside user_subeler.
 $subeYonetici = ['id' => 6, 'rol' => 'SUBE_YONETICISI', 'sube_ids' => [1]];
-$seedSube = seedSnapshot($pdo, 1, 10, '2026-05-18', '2026-05-24', 60);
+$seedSube = seedSnapshot($pdo, 1, 10, '2026-06-15', '2026-06-21', 60);
 $tidSube = seedSzTercih(
     $pdo,
     $seedSube['snapshot_id'],
     $seedSube['kapanis_id'],
     10,
-    '2026-05-18',
-    '2026-05-24',
+    '2026-06-15',
+    '2026-06-21',
     60
 );
 $subeOlusum = invokeSzHttp($pdo, $subeYonetici, 'POST', '/serbest-zaman/olusum', [
@@ -1128,7 +1128,7 @@ szAssert($subeOlusumActor === 6, 'SUBE_YONETICISI olusum actor recorded');
 $subeKullanim = invokeSzHttp($pdo, $subeYonetici, 'POST', '/serbest-zaman/kullanim', [
     'personel_id' => 10,
     'dakika' => 10,
-    'event_tarihi' => '2026-05-25',
+    'event_tarihi' => '2026-06-22',
     'islem_anahtari' => 'sz-sube-kullanim',
 ], $subeHeader);
 szAssert($subeKullanim['status'] === 200, 'SUBE_YONETICISI own branch POST kullanim → 200');
@@ -1139,7 +1139,7 @@ $subeDuzeltme = invokeSzHttp($pdo, $subeYonetici, 'POST', '/serbest-zaman/duzelt
     'hedef_event_id' => $subeKullanimId,
     'hedef_event_tipi' => 'SERBEST_ZAMAN_KULLANIM',
     'yeni_dakika' => 5,
-    'event_tarihi' => '2026-05-26',
+    'event_tarihi' => '2026-06-23',
     'islem_anahtari' => 'sz-sube-duzeltme',
     'aciklama' => 'Sube duzeltmesi',
 ], $subeHeader);
@@ -1149,7 +1149,7 @@ $subeIptal = invokeSzHttp($pdo, $subeYonetici, 'POST', '/serbest-zaman/iptal', [
     'personel_id' => 10,
     'hedef_event_id' => $subeKullanimId,
     'hedef_event_tipi' => 'SERBEST_ZAMAN_KULLANIM',
-    'event_tarihi' => '2026-05-27',
+    'event_tarihi' => '2026-06-24',
     'islem_anahtari' => 'sz-sube-iptal',
 ], $subeHeader);
 szAssert($subeIptal['status'] === 200, 'SUBE_YONETICISI own branch POST iptal → 200');

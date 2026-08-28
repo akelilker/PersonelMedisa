@@ -18,6 +18,7 @@ $controlDirectory = is_string($controlDirectory) && $controlDirectory !== ''
     ? $controlDirectory
     : $apiDirectory . '/runtime/migration-control';
 $statusPath = $controlDirectory . '/status.json';
+$heartbeatPath = $controlDirectory . '/worker-heartbeat.json';
 $lockPath = $controlDirectory . '/worker.lock';
 $deployShaPath = getenv('MEDISA_DEPLOY_SHA_PATH');
 $deployShaPath = is_string($deployShaPath) && $deployShaPath !== ''
@@ -27,6 +28,10 @@ $deployShaPath = is_string($deployShaPath) && $deployShaPath !== ''
 if (!is_dir($controlDirectory)) {
     exit(0);
 }
+
+// Proves which deploy root the Cron schedule actually executes, even when there
+// is no request to process. Best-effort: never blocks or fails migration work.
+writeHeartbeat($heartbeatPath, $deployShaPath);
 
 $lockHandle = fopen($lockPath, 'c');
 if ($lockHandle === false || !flock($lockHandle, LOCK_EX | LOCK_NB)) {
@@ -231,6 +236,36 @@ function writeStatus(string $statusPath, array $status): void
     if (!rename($temporaryPath, $statusPath)) {
         @unlink($temporaryPath);
         throw new RuntimeException('STATUS_PUBLISH_FAILED');
+    }
+}
+
+function writeHeartbeat(string $heartbeatPath, string $deployShaPath): void
+{
+    $publishedSha = trim((string) @file_get_contents($deployShaPath));
+    if (preg_match('/^[a-f0-9]{40}$/i', $publishedSha) !== 1) {
+        $publishedSha = 'UNKNOWN';
+    }
+    $json = json_encode([
+        'schema_version' => '1',
+        'updated_at' => gmdate('Y-m-d\TH:i:s\Z'),
+        'deployed_sha' => strtolower($publishedSha),
+    ], JSON_UNESCAPED_SLASHES);
+    if ($json === false) {
+        return;
+    }
+    $temporaryPath = $heartbeatPath . '.' . bin2hex(random_bytes(8)) . '.tmp';
+    if (@file_put_contents($temporaryPath, $json . PHP_EOL, LOCK_EX) === false) {
+        return;
+    }
+    @chmod($temporaryPath, 0600);
+    if (PHP_OS_FAMILY === 'Windows') {
+        @file_put_contents($heartbeatPath, $json . PHP_EOL, LOCK_EX);
+        @chmod($heartbeatPath, 0600);
+        @unlink($temporaryPath);
+        return;
+    }
+    if (!@rename($temporaryPath, $heartbeatPath)) {
+        @unlink($temporaryPath);
     }
 }
 

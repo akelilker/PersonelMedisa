@@ -96,25 +96,37 @@ jobs:
             run_ftp_mode "plain-ftp" "false" "$ftp_commands"
           }
 
+          # A directory listing is the only pattern proven to observe this cPanel
+          # control plane; a silently empty glob mirror made the busy guard fail
+          # open and let unclaimed requests pile up.
           preflight_dir="$RUNNER_TEMP/cpanel-migration-preflight"
           rm -rf "$preflight_dir"
           mkdir -p "$preflight_dir"
-          preflight_commands="mirror --verbose=0 --include-glob status.json --include-glob request.pending.*.json --include-glob request.processing.*.json --exclude-glob * api/runtime/migration-control ${preflight_dir};"
+          preflight_listing="$preflight_dir/control-listing.txt"
+          preflight_commands="cls -1 api/runtime/migration-control > ${preflight_listing};"
           if ! run_cpanel_ftp "$preflight_commands" >/dev/null 2>&1; then
             echo "MIGRATION_CONTROL_PLANE_PREFLIGHT_FAILED"
             exit 1
           fi
-          shopt -s nullglob
-          pending_requests=("$preflight_dir"/request.pending.*.json)
-          processing_requests=("$preflight_dir"/request.processing.*.json)
-          shopt -u nullglob
+          pending_count="$(grep -c 'request\.pending\.' "$preflight_listing" || true)"
+          processing_count="$(grep -c 'request\.processing\.' "$preflight_listing" || true)"
+          [[ "$pending_count" =~ ^[0-9]+$ ]] || pending_count=0
+          [[ "$processing_count" =~ ^[0-9]+$ ]] || processing_count=0
           preflight_running="NO"
-          if [[ -f "$preflight_dir/status.json" ]]; then
-            preflight_state="$(jq -r '.state // empty' "$preflight_dir/status.json" 2>/dev/null || true)"
-            if [[ "$preflight_state" == "RUNNING" ]]; then
-              preflight_running="YES"
+          if grep -q 'status\.json' "$preflight_listing"; then
+            preflight_status_file="$preflight_dir/status.json"
+            rm -f "$preflight_status_file"
+            if run_cpanel_ftp "get api/runtime/migration-control/status.json -o ${preflight_status_file};" >/dev/null 2>&1; then
+              preflight_state="$(jq -r '.state // empty' "$preflight_status_file" 2>/dev/null || true)"
+              if [[ "$preflight_state" == "RUNNING" ]]; then
+                preflight_running="YES"
+              fi
             fi
           fi
+          pending_requests=()
+          processing_requests=()
+          for _ in $(seq 1 "$pending_count"); do pending_requests+=("pending"); done
+          for _ in $(seq 1 "$processing_count"); do processing_requests+=("processing"); done
           if (( ${#pending_requests[@]} > 0 || ${#processing_requests[@]} > 0 )) || [[ "$preflight_running" == "YES" ]]; then
             echo "MIGRATION_CONTROL_PLANE_BUSY"
             if [[ ${#pending_requests[@]} -gt 0 ]]; then
@@ -269,8 +281,9 @@ jobs:
           diagnostic_dir="$RUNNER_TEMP/cpanel-migration-final-diagnostic"
           rm -rf "$diagnostic_dir"
           mkdir -p "$diagnostic_dir"
+          diagnostic_listing="$diagnostic_dir/control-listing.txt"
           diagnostic_commands="
-            mirror --verbose=0 --include-glob status.json --include-glob request.pending.${REQUEST_ID}.json --include-glob request.processing.*.json --include-glob request.completed.${REQUEST_ID}.json --include-glob request.failed.${REQUEST_ID}.json --exclude-glob * api/runtime/migration-control ${diagnostic_dir};
+            cls -1 api/runtime/migration-control > ${diagnostic_listing};
           "
           diagnostic_ftp_ok="YES"
           if ! run_cpanel_ftp "$diagnostic_commands" >/dev/null 2>&1; then
@@ -286,20 +299,29 @@ jobs:
           diagnostic_status_state=""
           diagnostic_status_updated_at=""
 
-          json_matches_request "$diagnostic_dir/request.pending.${REQUEST_ID}.json" && pending_match="YES"
-          json_matches_request "$diagnostic_dir/request.completed.${REQUEST_ID}.json" && completed_match="YES"
-          json_matches_request "$diagnostic_dir/request.failed.${REQUEST_ID}.json" && failed_match="YES"
-          shopt -s nullglob
-          for processing_file in "$diagnostic_dir"/request.processing.*.json; do
-            if json_matches_request "$processing_file"; then
-              processing_match="YES"
-              break
-            fi
-          done
-          shopt -u nullglob
+          fetch_diagnostic_entry() {
+            local remote_name="$1"
+            local local_path="$2"
+            rm -f "$local_path"
+            grep -q "${remote_name}" "$diagnostic_listing" 2>/dev/null || return 1
+            run_cpanel_ftp "get api/runtime/migration-control/${remote_name} -o ${local_path};" >/dev/null 2>&1
+          }
+
+          if fetch_diagnostic_entry "request.pending.${REQUEST_ID}.json" "$diagnostic_dir/request.pending.${REQUEST_ID}.json"; then
+            json_matches_request "$diagnostic_dir/request.pending.${REQUEST_ID}.json" && pending_match="YES"
+          fi
+          if fetch_diagnostic_entry "request.completed.${REQUEST_ID}.json" "$diagnostic_dir/request.completed.${REQUEST_ID}.json"; then
+            json_matches_request "$diagnostic_dir/request.completed.${REQUEST_ID}.json" && completed_match="YES"
+          fi
+          if fetch_diagnostic_entry "request.failed.${REQUEST_ID}.json" "$diagnostic_dir/request.failed.${REQUEST_ID}.json"; then
+            json_matches_request "$diagnostic_dir/request.failed.${REQUEST_ID}.json" && failed_match="YES"
+          fi
+          if grep -q 'request\.processing\.' "$diagnostic_listing" 2>/dev/null; then
+            processing_match="YES"
+          fi
 
           diagnostic_status_file="$diagnostic_dir/status.json"
-          if [[ -f "$diagnostic_status_file" ]]; then
+          if fetch_diagnostic_entry "status.json" "$diagnostic_status_file"; then
             status_exists="YES"
             diagnostic_status_request="$(jq -r '.request_id // empty' "$diagnostic_status_file" 2>/dev/null || true)"
             diagnostic_status_state="$(jq -r '.state // empty' "$diagnostic_status_file" 2>/dev/null || true)"

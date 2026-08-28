@@ -68,6 +68,29 @@ describe('cPanel migration worker observability contract', () => {
     expect(worker).not.toMatch(/\b(?:mysql|psql|sqlite3)\b/i);
   });
 
+  it('publishes a cron heartbeat that proves the executing deploy root', () => {
+    expect(worker).toContain("'/worker-heartbeat.json'");
+    expect(worker).toContain('writeHeartbeat($heartbeatPath, $deployShaPath)');
+    expect(worker).toContain('function writeHeartbeat(');
+    // The heartbeat must be observable even when there is nothing to migrate,
+    // so it is published before the worker lock and any request handling.
+    expect(worker.indexOf('writeHeartbeat($heartbeatPath, $deployShaPath)')).toBeLessThan(
+      worker.indexOf("fopen($lockPath, 'c')"),
+    );
+    const heartbeatBody = worker.slice(
+      worker.indexOf('function writeHeartbeat('),
+      worker.indexOf('function archiveRequest('),
+    );
+    expect(heartbeatBody).toContain("'schema_version'");
+    expect(heartbeatBody).toContain("'updated_at'");
+    expect(heartbeatBody).toContain("'deployed_sha'");
+    for (const forbidden of ['users', 'personel', 'rol', 'username', 'password', 'INSERT', 'UPDATE', 'ALTER']) {
+      expect(heartbeatBody).not.toContain(forbidden);
+    }
+    expect(heartbeatBody).not.toContain('Connection::get');
+    expect(heartbeatBody).not.toContain('MigrationExecutionService');
+  });
+
   it('keeps the request and archive control plane in the worker', () => {
     expect(worker).toContain('rename($pendingPath, $processingPath)');
     expect(worker).toContain('hash_equals($publishedSha, $deployedSha)');

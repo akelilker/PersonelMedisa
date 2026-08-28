@@ -191,8 +191,8 @@ describe('canonical cPanel migration FTP transport contract', () => {
 
   it('performs one final read-only diagnostic and recognizes canonical archives', () => {
     expect(migration).toContain('One final read-only inspection');
-    expect(migration).toContain('mirror --verbose=0');
-    expect(migration).toContain('request.processing.*.json');
+    expect(migration).toContain('cls -1 api/runtime/migration-control');
+    expect(migration).toContain('request\\.processing\\.');
     expect(migration).toContain('request.completed.${REQUEST_ID}.json');
     expect(migration).toContain('request.failed.${REQUEST_ID}.json');
     expect(migration).toContain('MIGRATION_DIAG_PENDING_MATCH=${pending_match}');
@@ -208,19 +208,31 @@ describe('canonical cPanel migration FTP transport contract', () => {
     expect(migration).toContain('REQUEST_NOT_CLAIMED');
     expect(migration).toContain('STATUS_TERMINAL_NOT_OBSERVED');
     expect(migration).toContain('UNKNOWN_CONTROL_PLANE_TIMEOUT');
-    expect(migration).not.toMatch(/diagnostic_commands="[\s\S]*?\b(?:put|mput|mv|rm)\b/);
+    const diagnosticCommands = migration.match(/diagnostic_commands="[^"]*"/);
+    expect(diagnosticCommands).not.toBeNull();
+    expect(diagnosticCommands?.[0]).not.toMatch(/\b(?:put|mput|mv|rm)\b/);
+  });
+
+  it('observes the control plane by directory listing so the busy guard cannot fail open', () => {
+    // A silently empty `mirror --include-glob` let four unclaimed requests pile
+    // up while the workflow reported an empty control plane.
+    expect(migration).not.toContain('--include-glob');
+    expect(migration).toContain('preflight_commands="cls -1 api/runtime/migration-control');
+    expect(migration).toContain("pending_count=\"$(grep -c 'request\\.pending\\.' \"$preflight_listing\" || true)\"");
+    expect(migration).toContain(
+      "processing_count=\"$(grep -c 'request\\.processing\\.' \"$preflight_listing\" || true)\"",
+    );
+    expect(migration).toMatch(/\[\[ "\$pending_count" =~ \^\[0-9\]\+\$ \]\] \|\| pending_count=0/);
+    expect(migration).toMatch(/\[\[ "\$processing_count" =~ \^\[0-9\]\+\$ \]\] \|\| processing_count=0/);
   });
 
   it('keeps one queued control-plane owner and never creates an automatic retry request', () => {
     expect(migration).toContain('group: cpanel-canonical-migration-control');
     expect(migration).toContain('cancel-in-progress: false');
-    const preflightIndex = migration.indexOf('preflight_commands="mirror --verbose=0');
+    const preflightIndex = migration.indexOf('preflight_commands="cls -1 api/runtime/migration-control');
     const uploadIndex = migration.indexOf('put -O api/runtime/migration-control request.${REQUEST_ID}.tmp');
     expect(preflightIndex).toBeGreaterThanOrEqual(0);
     expect(uploadIndex).toBeGreaterThan(preflightIndex);
-    expect(migration).toContain('--include-glob status.json');
-    expect(migration).toContain('--include-glob request.pending.*.json');
-    expect(migration).toContain('--include-glob request.processing.*.json');
     expect(migration).toContain('MIGRATION_CONTROL_PLANE_BUSY');
     expect(migration).toContain('MIGRATION_DIAG_RUNNING_STATUS_EXISTS=${preflight_running}');
     expect(migration.match(/put -O api\/runtime\/migration-control request\.\$\{REQUEST_ID\}\.tmp/g)).toHaveLength(1);

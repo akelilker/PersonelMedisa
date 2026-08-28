@@ -83,6 +83,45 @@ describe('cPanel migration cron worker runtime', () => {
     }
   });
 
+  it('publishes a heartbeat on every tick without a request and never mutates data', () => {
+    const fixture = makeFixture();
+    const deployedSha = 'd'.repeat(40);
+    try {
+      mkdirSync(fixture.controlDirectory, { recursive: true });
+      writeFileSync(fixture.deployShaPath, deployedSha);
+      expect(runWorker(fixture.controlDirectory, fixture.deployShaPath, fixture.bundlePath)).toBe(0);
+
+      const heartbeatPath = join(fixture.controlDirectory, 'worker-heartbeat.json');
+      const heartbeat = JSON.parse(readFileSync(heartbeatPath, 'utf8'));
+      expect(heartbeat.schema_version).toBe('1');
+      expect(heartbeat.deployed_sha).toBe(deployedSha);
+      expect(heartbeat.updated_at).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
+      expect(Object.keys(heartbeat).sort()).toEqual(['deployed_sha', 'schema_version', 'updated_at']);
+
+      // A heartbeat tick must not create status or request lifecycle artifacts.
+      const entries = readdirSync(fixture.controlDirectory);
+      expect(entries).not.toContain('status.json');
+      expect(entries.some((name) => name.startsWith('request.'))).toBe(false);
+      expect(entries.some((name) => name.endsWith('.tmp'))).toBe(false);
+    } finally {
+      rmSync(fixture.directory, { recursive: true, force: true });
+    }
+  });
+
+  it('reports an unknown deploy sha in the heartbeat instead of failing the tick', () => {
+    const fixture = makeFixture();
+    try {
+      mkdirSync(fixture.controlDirectory, { recursive: true });
+      expect(runWorker(fixture.controlDirectory, fixture.deployShaPath, fixture.bundlePath)).toBe(0);
+      const heartbeat = JSON.parse(
+        readFileSync(join(fixture.controlDirectory, 'worker-heartbeat.json'), 'utf8'),
+      );
+      expect(heartbeat.deployed_sha).toBe('unknown');
+    } finally {
+      rmSync(fixture.directory, { recursive: true, force: true });
+    }
+  });
+
   it('claims malformed requests and fails closed without retrying', () => {
     const fixture = makeFixture();
     try {

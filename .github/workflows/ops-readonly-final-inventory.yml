@@ -310,7 +310,6 @@ jobs:
             put -O api/bin ${INV} -o readonly-inventory-once.php;
             put -O api/bin ${WRAPPER} -o cpanel-migration-cron.php;
             put -O api/runtime/migration-control ${WORK}/readonly-inventory.pending -o readonly-inventory.pending;
-            rm api/runtime/migration-control/readonly-inventory-result.json;
           "
 
           echo "Waiting for cron inventory result (up to ~15m)..."

@@ -124,7 +124,6 @@ test.describe("I2 Kayit modal viewport layout", () => {
     await kayitModal.locator('[name="create-telefon"]').fill("05324445566");
     await kayitModal.locator('[name="create-acil-kisi"]').fill("Acil Kisi");
     await kayitModal.locator('[name="create-acil-tel"]').fill("05327778899");
-    await kayitModal.locator('[name="create-sicil"]').fill("E2E-I2-01");
     await kayitModal.locator('[name="create-ise-giris"]').fill("2026-06-15");
     await kayitModal.getByRole("combobox", { name: "Departman" }).click();
     await kayitModal.getByRole("option", { name: "Döşeme" }).click();

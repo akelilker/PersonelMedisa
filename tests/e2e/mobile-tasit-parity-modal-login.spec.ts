@@ -367,7 +367,7 @@ test.describe("desktop regression — hero + Kayıt modal", () => {
     });
   }
 
-  test("keeps 2-column grid, sicil left, and bottom row alignment", async ({ page }) => {
+  test("keeps 2-column grid, auto-sicil note left, and bottom row alignment", async ({ page }) => {
     await page.setViewportSize({ width: 1366, height: 768 });
     await mockApi(page, "GENEL_YONETICI");
     await login(page, { username: "yonetici", password: "secret" });
@@ -378,7 +378,7 @@ test.describe("desktop regression — hero + Kayıt modal", () => {
       const columns = modal.querySelectorAll(".personel-form-column");
       const kan = modal.querySelector('[name="create-kan"]');
       const maas = modal.querySelector('[name="create-maas"]');
-      const sicil = modal.querySelector('[name="create-sicil"]');
+      const sicil = modal.querySelector('[data-testid="create-sicil-auto-note"]');
       const leftColumn = modal.querySelector(".personel-form-column:first-child");
       const columnsTemplate = getComputedStyle(modal.querySelector(".personel-form-columns") as Element)
         .gridTemplateColumns;

@@ -31,7 +31,6 @@ async function createMaassizPersonel(page: Page) {
   await kayitModal.locator('[name="create-telefon"]').fill("05324445566");
   await kayitModal.locator('[name="create-acil-kisi"]').fill("Acil Kisi");
   await kayitModal.locator('[name="create-acil-tel"]').fill("05327778899");
-  await kayitModal.locator('[name="create-sicil"]').fill("E2E-UCRET-01");
   await kayitModal.locator('[name="create-ise-giris"]').fill("2026-01-10");
   await selectCreateOption(kayitModal, "Şube", "Merkez");
   await selectCreateOption(kayitModal, "Departman", "Döşeme");

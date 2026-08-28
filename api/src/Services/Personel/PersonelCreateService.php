@@ -22,6 +22,11 @@ final class PersonelCreateService
         PersonelOrgStructureSchema::assertReadyForOrgStructureWrite($pdo, $payload);
         $orgReady = PersonelOrgLocationSchema::isReady($pdo);
         $orgStructReady = PersonelOrgStructureSchema::isReady($pdo);
+        // Missing/blank sicil means AUTO: the canonical allocator owns the number,
+        // inside this same transaction, so no caller computes MAX+1 on its own.
+        $sicilNo = PersonelSicilAllocator::isAutoRequest($payload['sicil_no'] ?? null)
+            ? PersonelSicilAllocator::allocateInTransaction($pdo)
+            : trim((string) $payload['sicil_no']);
         $cols = [
             'tc_kimlik_no', 'ad', 'soyad', 'dogum_tarihi', 'telefon', 'acil_durum_kisi', 'acil_durum_telefon',
             'sicil_no', 'ise_giris_tarihi', 'sube_id',
@@ -34,7 +39,7 @@ final class PersonelCreateService
             'telefon' => $payload['telefon'],
             'acil_durum_kisi' => $payload['acil_durum_kisi'],
             'acil_durum_telefon' => $payload['acil_durum_telefon'],
-            'sicil_no' => $payload['sicil_no'],
+            'sicil_no' => $sicilNo,
             'ise_giris_tarihi' => $payload['ise_giris_tarihi'],
             'sube_id' => $payload['sube_id'],
         ];

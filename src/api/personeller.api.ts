@@ -27,7 +27,8 @@ export type CreatePersonelPayload = {
   telefon?: string | null;
   acil_durum_kisi?: string | null;
   acil_durum_telefon?: string | null;
-  sicil_no: string;
+  /** Omitted/blank means AUTO: the backend allocates the next free sicil. */
+  sicil_no?: string;
   ise_giris_tarihi: string;
   sube_id: number;
   departman_id: number;

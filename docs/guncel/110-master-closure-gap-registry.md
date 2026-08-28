@@ -1,4 +1,4 @@
-CODE_MIGRATION_TIP: 077
+CODE_MIGRATION_TIP: 078
 PRODUCTION_MIGRATION_TIP: 077
 
 # 110 — Canonical Closure / Gap Registry
@@ -11,7 +11,7 @@ PRODUCTION_MIGRATION_TIP: 077
 
 | Alan | Değer | Kanıt / sınır |
 | --- | --- | --- |
-| CODE_MIGRATION_TIP | **077** | Repodaki son migration: `077_legacy_role_enum_shrink.sql` |
+| CODE_MIGRATION_TIP | **078** | Repodaki son migration: `078_personel_sicil_sequence.sql` (production apply bekliyor) |
 | PRODUCTION_MIGRATION_TIP | **077** | Canonical production apply `33169230032` / request `33169230032-1` / worker `SUCCEEDED`; tip `077` |
 | Canlı migration doğrulaması | **PASS** | Ledger `076` + schema ready; assignment canlı kayıt=0; pending 077+ yok; migration workflow bu turda **tekrar çalıştırılmaz** |
 

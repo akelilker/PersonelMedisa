@@ -27,7 +27,6 @@ async function fillRequiredPersonelFields(modal: Locator, options?: { tcKimlikNo
   await modal.locator('[name="create-telefon"]').fill("05324445566");
   await modal.locator('[name="create-acil-kisi"]').fill("Acil Kisi");
   await modal.locator('[name="create-acil-tel"]').fill("05327778899");
-  await modal.locator('[name="create-sicil"]').fill("E2E-HATA-01");
   await modal.locator('[name="create-ise-giris"]').fill("2026-06-15");
 
   await selectCreateOption(modal, "Şube", options?.sube ?? "Merkez");

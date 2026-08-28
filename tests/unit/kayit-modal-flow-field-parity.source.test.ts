@@ -65,23 +65,22 @@ describe("kayit modal flow actions + field surface parity", () => {
     expect(formCss).not.toMatch(/\.form-input\s*\{[^}]*background:\s*var\(--bg-surface-elevated\)/s);
   });
 
-  it("populated references: Sicil left, 11/11 columns, natural bottom row, no spacer hacks", () => {
+  it("populated references: 10/11 columns, natural bottom row, no spacer hacks", () => {
     const kayitCss = read(KAYIT_CSS);
     const createFields = read(CREATE_FIELDS);
     assertNoSpacerHacks(kayitCss, createFields);
 
     const { left, right } = splitCreateColumns(createFields);
 
-    expect((createFields.match(/name="create-sicil"/g) ?? []).length).toBe(1);
-    expect(left).toContain('name="create-sicil"');
-    expect(right).not.toContain('name="create-sicil"');
+    // Sicil is backend-allocated: the create form carries an info note, not an input.
+    expect(createFields).not.toContain('name="create-sicil"');
+    expect(left).toContain("Sicil numarası kayıt sırasında otomatik atanacaktır.");
 
     const leftNames = [...left.matchAll(/name="(create-[^"]+)"/g)].map((m) => m[1]);
     const rightNames = [...right.matchAll(/name="(create-[^"]+)"/g)].map((m) => m[1]);
 
     expect(leftNames).toEqual([
       "create-calisan-kapsami",
-      "create-sicil",
       "create-tc",
       "create-ad",
       "create-soyad",

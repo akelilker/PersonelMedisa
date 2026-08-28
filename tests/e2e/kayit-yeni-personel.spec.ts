@@ -24,7 +24,6 @@ async function fillRequiredPersonelFields(modal: Locator, options?: { includeSub
   await modal.locator('[name="create-telefon"]').fill("05324445566");
   await modal.locator('[name="create-acil-kisi"]').fill("Acil Kisi");
   await modal.locator('[name="create-acil-tel"]').fill("05327778899");
-  await modal.locator('[name="create-sicil"]').fill("E2E-KAYIT-01");
   await modal.locator('[name="create-ise-giris"]').fill("2026-06-15");
 
   if (options?.includeSube !== false) {
@@ -122,7 +121,6 @@ test.describe("Kayit yeni personel", () => {
     await kayitModal.locator('[name="create-telefon"]').fill("05321112233");
     await kayitModal.locator('[name="create-acil-kisi"]').fill("Acil Kisi");
     await kayitModal.locator('[name="create-acil-tel"]').fill("05324443322");
-    await kayitModal.locator('[name="create-sicil"]').fill("E2E-CACHE-SYNC-01");
     await kayitModal.locator('[name="create-ise-giris"]').fill("2026-06-20");
     await selectCreateOption(kayitModal, "Şube", "Merkez");
     await selectCreateOption(kayitModal, "Departman", "Döşeme");

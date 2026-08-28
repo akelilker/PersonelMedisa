@@ -216,17 +216,45 @@ jobs:
               $legacyRoles = ['PATRON','IK_BORDRO','SGK_KARAR_ONAY_YETKILISI','IDARI_ISLER','AUTH_SMOKE_READONLY'];
               $legacy = [];
               $legacyActive = 0;
+              $legacyTotal = 0;
               foreach ($legacyRoles as $role) {
-                  $st = $pdo->prepare("SELECT COUNT(*) FROM users WHERE rol = :r AND durum='AKTIF'");
+                  $st = $pdo->prepare(
+                      "SELECT
+                         COUNT(*) AS toplam,
+                         SUM(CASE WHEN durum='AKTIF' THEN 1 ELSE 0 END) AS aktif,
+                         SUM(CASE WHEN durum<>'AKTIF' THEN 1 ELSE 0 END) AS pasif,
+                         SUM(CASE WHEN IFNULL(personel_id,0)>0 THEN 1 ELSE 0 END) AS personel_bagli
+                       FROM users WHERE rol = :r"
+                  );
                   $st->execute(['r' => $role]);
-                  $c = (int)$st->fetchColumn();
+                  $row = $st->fetch(PDO::FETCH_ASSOC) ?: [];
+                  $c = (int)($row['aktif'] ?? 0);
+                  $t = (int)($row['toplam'] ?? 0);
+                  $ids = $pdo->prepare("SELECT id, kullanici_adi, personel_id, durum FROM users WHERE rol = :r ORDER BY id");
+                  $ids->execute(['r' => $role]);
                   $legacy[] = [
                       'rol' => $role,
+                      'toplam_sayi' => $t,
                       'aktif_sayi' => $c,
+                      'pasif_sayi' => (int)($row['pasif'] ?? 0),
+                      'personel_bagli_sayi' => (int)($row['personel_bagli'] ?? 0),
+                      'kullanicilar' => $ids->fetchAll(PDO::FETCH_ASSOC),
                       'not' => $role === 'AUTH_SMOKE_READONLY' ? 'protected_smoke_fixture' : 'legacy_enum',
                   ];
                   $legacyActive += $c;
+                  $legacyTotal += $t;
               }
+
+              $enumDef = (string)$pdo->query(
+                  "SELECT COLUMN_TYPE FROM information_schema.COLUMNS
+                    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'rol'"
+              )->fetchColumn();
+
+              $roleDist = $pdo->query(
+                  "SELECT rol, COUNT(*) AS toplam,
+                          SUM(CASE WHEN durum='AKTIF' THEN 1 ELSE 0 END) AS aktif
+                     FROM users GROUP BY rol ORDER BY rol"
+              )->fetchAll(PDO::FETCH_ASSOC);
 
               $tip = (string)$pdo->query(
                   "SELECT version FROM medisa_schema_migrations ORDER BY version DESC LIMIT 1"
@@ -249,8 +277,11 @@ jobs:
                   ],
                   'legacy_roles' => [
                       'aktif_toplam' => $legacyActive,
+                      'toplam' => $legacyTotal,
                       'rows' => $legacy,
                   ],
+                  'users_rol_enum' => $enumDef,
+                  'users_rol_dagilim' => $roleDist,
               ];
               if (!is_dir($controlDir)) {
                   @mkdir($controlDir, 0700, true);
@@ -346,8 +377,12 @@ jobs:
             "IC_ORG_CRITICAL_GAP_OCCURRENCE=\(.ic_org.occurrence)",
             (.ic_org.field_counts | to_entries[] | "ORG_FIELD|\(.key)|\(.value)"),
             (.ic_org.people[] | "ORG|\(.sicil_no)|\(.ad_soyad)|\(.eksik|join(\",\"))"),
-            (.legacy_roles.rows[] | "LEGACY|\(.rol)|\(.aktif_sayi)|\(.not)"),
+            (.legacy_roles.rows[] | "LEGACY|\(.rol)|toplam=\(.toplam_sayi)|aktif=\(.aktif_sayi)|pasif=\(.pasif_sayi)|personel_bagli=\(.personel_bagli_sayi)|\(.not)"),
+            (.legacy_roles.rows[] | .rol as $r | .kullanicilar[] | "LEGACY_USER|\($r)|id=\(.id)|kullanici_adi=\(.kullanici_adi)|personel_id=\(.personel_id // "")|durum=\(.durum)"),
             "AKTIF_LEGACY_ROLE_USER_COUNT=\(.legacy_roles.aktif_toplam)",
+            "TOPLAM_LEGACY_ROLE_USER_COUNT=\(.legacy_roles.toplam)",
+            "USERS_ROL_ENUM=\(.users_rol_enum)",
+            (.users_rol_dagilim[] | "ROL_DAGILIM|\(.rol)|toplam=\(.toplam)|aktif=\(.aktif)"),
             "INVENTORY_DONE=YES"
           ' "$RESULT"
 

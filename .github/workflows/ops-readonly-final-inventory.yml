@@ -116,7 +116,7 @@ jobs:
           $resultPath = $controlDir . '/readonly-inventory-result.json';
 
           if (!is_file($pending)) {
-              exit(0);
+              return;
           }
           @unlink($pending);
 
@@ -230,7 +230,7 @@ jobs:
                   $row = $st->fetch(PDO::FETCH_ASSOC) ?: [];
                   $c = (int)($row['aktif'] ?? 0);
                   $t = (int)($row['toplam'] ?? 0);
-                  $ids = $pdo->prepare("SELECT id, kullanici_adi, personel_id, durum FROM users WHERE rol = :r ORDER BY id");
+                  $ids = $pdo->prepare("SELECT id, username, personel_id, durum FROM users WHERE rol = :r ORDER BY id");
                   $ids->execute(['r' => $role]);
                   $legacy[] = [
                       'rol' => $role,
@@ -292,15 +292,16 @@ jobs:
               }
               file_put_contents($resultPath, $json . "\n", LOCK_EX);
               @chmod($resultPath, 0600);
-              exit(0);
+              return;
           } catch (Throwable $e) {
               $err = json_encode([
                   'ok' => false,
                   'error' => 'INVENTORY_FAILED',
+                  'message' => $e->getMessage(),
                   'captured_at' => gmdate('Y-m-d\TH:i:s\Z'),
-              ], JSON_UNESCAPED_SLASHES);
+              ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
               @file_put_contents($resultPath, $err . "\n", LOCK_EX);
-              exit(1);
+              return;
           }
           PHP
 
@@ -309,12 +310,26 @@ jobs:
           declare(strict_types=1);
 
           if (PHP_SAPI === 'cli') {
-              $pending = dirname(__DIR__) . '/runtime/migration-control/readonly-inventory.pending';
+              $controlDir = dirname(__DIR__) . '/runtime/migration-control';
+              @file_put_contents($controlDir . '/readonly-inventory-heartbeat.txt', gmdate('c') . "\n", LOCK_EX);
+              $pending = $controlDir . '/readonly-inventory.pending';
               if (is_file($pending)) {
                   $script = __DIR__ . '/readonly-inventory-once.php';
                   if (is_file($script)) {
-                      $php = (defined('PHP_BINARY') && PHP_BINARY !== '') ? PHP_BINARY : 'php';
-                      passthru(escapeshellarg($php) . ' ' . escapeshellarg($script));
+                      try {
+                          require $script;
+                      } catch (Throwable $e) {
+                          @file_put_contents(
+                              $controlDir . '/readonly-inventory-result.json',
+                              json_encode([
+                                  'ok' => false,
+                                  'error' => 'INVENTORY_FATAL',
+                                  'message' => $e->getMessage(),
+                                  'captured_at' => gmdate('Y-m-d\TH:i:s\Z'),
+                              ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n",
+                              LOCK_EX
+                          );
+                      }
                   }
               }
           }
@@ -362,6 +377,18 @@ jobs:
             sleep "$POLL_INTERVAL_SECONDS"
           done
 
+          if [[ "$found" != "YES" ]]; then
+            echo "Fetching cron heartbeat for diagnosis..."
+            if run_cpanel_ftp "get api/runtime/migration-control/readonly-inventory-heartbeat.txt -o ${WORK}/heartbeat.txt;" >/dev/null 2>&1; then
+              echo "CRON_HEARTBEAT=$(cat "${WORK}/heartbeat.txt")"
+            else
+              echo "CRON_HEARTBEAT=NONE"
+            fi
+            if [[ -f "$RESULT" ]]; then
+              echo "LAST_RESULT_PAYLOAD=$(cat "$RESULT")"
+            fi
+          fi
+
           restore_cron
 
           test "$found" = "YES" || { echo "INVENTORY_TIMEOUT"; exit 1; }
@@ -378,7 +405,7 @@ jobs:
             (.ic_org.field_counts | to_entries[] | "ORG_FIELD|\(.key)|\(.value)"),
             (.ic_org.people[] | "ORG|\(.sicil_no)|\(.ad_soyad)|\(.eksik|join(\",\"))"),
             (.legacy_roles.rows[] | "LEGACY|\(.rol)|toplam=\(.toplam_sayi)|aktif=\(.aktif_sayi)|pasif=\(.pasif_sayi)|personel_bagli=\(.personel_bagli_sayi)|\(.not)"),
-            (.legacy_roles.rows[] | .rol as $r | .kullanicilar[] | "LEGACY_USER|\($r)|id=\(.id)|kullanici_adi=\(.kullanici_adi)|personel_id=\(.personel_id // "")|durum=\(.durum)"),
+            (.legacy_roles.rows[] | .rol as $r | .kullanicilar[] | "LEGACY_USER|\($r)|id=\(.id)|username=\(.username)|personel_id=\(.personel_id // "")|durum=\(.durum)"),
             "AKTIF_LEGACY_ROLE_USER_COUNT=\(.legacy_roles.aktif_toplam)",
             "TOPLAM_LEGACY_ROLE_USER_COUNT=\(.legacy_roles.toplam)",
             "USERS_ROL_ENUM=\(.users_rol_enum)",
@@ -389,4 +416,5 @@ jobs:
           run_cpanel_ftp "
             rm api/runtime/migration-control/readonly-inventory.pending;
             rm api/runtime/migration-control/readonly-inventory-result.json;
+            rm api/runtime/migration-control/readonly-inventory-heartbeat.txt;
           " || true

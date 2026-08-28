@@ -16,7 +16,10 @@ const PERMISSION_LABELS: Partial<Record<AppPermission, string>> = {
   "personeller.detail.view": "Personel kartı detay",
   "puantaj.view": "Puantaj görüntüleme",
   "puantaj.update": "Puantaj güncelleme",
-  "puantaj.muhurle": "Aylık puantaj mühürleme",
+  "puantaj.donem_muhurle": "Aylık puantaj mühürleme",
+  "puantaj.haftalik_kapanis.manage": "Haftalık kapanış yönetimi",
+  "fazla_calisma_odeme_tercihi.manage": "Fazla çalışma ödeme tercihi girişi",
+  "serbest_zaman.manage": "Serbest zaman girişi",
   "sgk_karar_paketi.prepare": "SGK karar paketi hazırlama",
   "sgk_karar_paketi.approve": "SGK karar paketi onayı",
   "self_service.view": "Self-service ana sayfa",
@@ -47,7 +50,14 @@ const GROUPS: Array<{ title: string; permissions: AppPermission[] }> = [
   },
   {
     title: "Puantaj",
-    permissions: ["puantaj.view", "puantaj.update", "puantaj.muhurle"]
+    permissions: [
+      "puantaj.view",
+      "puantaj.update",
+      "fazla_calisma_odeme_tercihi.manage",
+      "serbest_zaman.manage",
+      "puantaj.haftalik_kapanis.manage",
+      "puantaj.donem_muhurle"
+    ]
   },
   {
     title: "SGK dual-control",

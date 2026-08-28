@@ -397,6 +397,152 @@ describe("role permissions", () => {
     }
   });
 
+  it("locks MG-SUBE-YONETICI-001 branch-scoped capability model", () => {
+    const granted = [
+      "personeller.view.sube",
+      "personeller.detail.view",
+      "personeller.create",
+      "personeller.update",
+      "puantaj.view",
+      "puantaj.update",
+      // Branch-scoped payroll input, split out of the overloaded puantaj.muhurle key.
+      "fazla_calisma_odeme_tercihi.manage",
+      "serbest_zaman.manage",
+      "puantaj.donem_reopen.request",
+      "bildirimler.create",
+      "revizyon.create",
+      "revizyon.submit",
+      "haftalik_mutabakat.view",
+      "aylik_bildirim_onayi.view",
+      // Reviewed and kept: branch-scoped operational decisions on DB-loaded rows.
+      "disiplin.final_decision",
+      "puantaj.olay_karar.decide",
+      "surecler.cancel",
+      "revizyon.cancel",
+      "finans.view"
+    ] as const;
+    for (const permission of granted) {
+      expect(hasRolePermission("SUBE_YONETICISI", permission)).toBe(true);
+      expect(extractPhpRolePermissions("SUBE_YONETICISI")).toContain(permission);
+    }
+
+    const denied = [
+      // Corrective removals: period closing, bulk import, department approval, bordro effect.
+      "puantaj.donem_muhurle",
+      "puantaj.haftalik_kapanis.manage",
+      "personeller.import.apply",
+      "aylik_bolum_onayi.approve",
+      "aylik-ozet.review",
+      "revizyon.view_finance_effect",
+      // Central payroll finalization / final management approval.
+      "bordro_kesinlestirme.approve",
+      "bordro_on_izleme.view",
+      "maas_hesaplama.manage",
+      "maas_hesaplama_adaylari.manage",
+      "personel_bordro_kapsam.manage",
+      "personel_bordro_kapsam.approve",
+      "genel_yonetici_onayi.approve",
+      "genel_yonetici_bildirim_onayi.approve",
+      "puantaj.donem_reopen.approve",
+      "revizyon.approve",
+      "revizyon.reject",
+      // Company-wide SGK / official decisions.
+      "sgk_karar_paketi.prepare",
+      "sgk_karar_paketi.approve",
+      "sgk.manuel_kod_override",
+      // Company-wide finance writes / payment.
+      "finans.create",
+      "finans.update",
+      "finans.cancel",
+      // User and critical system administration.
+      "yonetim-paneli.view",
+      "yonetim-paneli.manage",
+      "sirket_parametreleri.manage",
+      "resmi_tatil_takvimi.manage",
+      "personeller.ucret.manage",
+      // Retention / legal hold.
+      "legal_hold.manage",
+      "retention.destruction.approve",
+      "retention.destruction.execute",
+      // Not a BIRIM_AMIRI + BOLUM_YONETICISI union.
+      "gunluk_bildirim.create",
+      "gunluk_bildirim.submit",
+      "gunluk_bildirim.complete_day",
+      "haftalik_mutabakat.approve",
+      "aylik_bildirim_onayi.approve",
+      "puantaj.amir_kontrol",
+      "attendance.correction.decide",
+      "puantaj.bildirim_etki.generate"
+    ] as const;
+    for (const permission of denied) {
+      expect(hasRolePermission("SUBE_YONETICISI", permission)).toBe(false);
+      expect(extractPhpRolePermissions("SUBE_YONETICISI")).not.toContain(permission);
+    }
+  });
+
+  it("fails closed for SUBE_YONETICISI without explicit sube assignment", () => {
+    const unscoped = {
+      token: "t",
+      ui_profile: "yonetim",
+      active_sube_id: null,
+      user: { id: 1, ad_soyad: "Sube", rol: "SUBE_YONETICISI", sube_ids: [] }
+    } satisfies AuthSession;
+    expect(sessionAllowsSubeAccess(unscoped, 1)).toBe(false);
+
+    const scoped = {
+      token: "t",
+      ui_profile: "yonetim",
+      active_sube_id: 4,
+      user: { id: 1, ad_soyad: "Sube", rol: "SUBE_YONETICISI", sube_ids: [4] }
+    } satisfies AuthSession;
+    expect(sessionAllowsSubeAccess(scoped, 4)).toBe(true);
+    expect(sessionAllowsSubeAccess(scoped, 5)).toBe(false);
+  });
+
+  it("leaves no puantaj.muhurle grant or enforcement behind", () => {
+    const owners = [
+      "api/src/Auth/RolePermissions.php",
+      "api/src/Controllers/PuantajController.php",
+      "api/src/Controllers/HaftalikKapanisController.php",
+      "api/src/Controllers/FazlaCalismaOdemeTercihiController.php",
+      "api/src/Controllers/SerbestZamanController.php",
+      "src/lib/authorization/role-permissions.ts",
+      "src/lib/yonetim/kullanici-role-summary.ts",
+      "src/api/mock-demo.ts",
+      "src/features/puantaj/pages/GunlukPuantajPage.tsx",
+      "src/features/raporlar/pages/DonemKapanisMerkeziPage.tsx",
+      "src/features/raporlar/pages/BordroHazirlikMerkeziPage.tsx",
+      "src/features/revizyon/components/HaftalikKapanisClosePanel.tsx"
+    ];
+    for (const owner of owners) {
+      const source = readFileSync(resolve(process.cwd(), owner), "utf8");
+      expect(source, owner).not.toContain("puantaj.muhurle");
+    }
+  });
+
+  it("binds each split gate to its own permission in the owning source", () => {
+    const gates: Array<[string, string]> = [
+      ["api/src/Controllers/PuantajController.php", "puantaj.donem_muhurle"],
+      ["api/src/Controllers/HaftalikKapanisController.php", "puantaj.haftalik_kapanis.manage"],
+      [
+        "api/src/Controllers/FazlaCalismaOdemeTercihiController.php",
+        "fazla_calisma_odeme_tercihi.manage"
+      ],
+      ["api/src/Controllers/SerbestZamanController.php", "serbest_zaman.manage"]
+    ];
+    for (const [owner, permission] of gates) {
+      const source = readFileSync(resolve(process.cwd(), owner), "utf8");
+      expect(source, owner).toContain(`RolePermissions::assert($user, '${permission}')`);
+      for (const [, other] of gates) {
+        if (other !== permission) {
+          expect(source, `${owner} must not also gate on ${other}`).not.toContain(
+            `RolePermissions::assert($user, '${other}')`
+          );
+        }
+      }
+    }
+  });
+
   it("keeps TS and PHP role permission matrices in parity (S70B-1)", () => {
     for (const role of ALL_ROLES) {
       const tsPermissions = [...getRolePermissions(role)].sort();

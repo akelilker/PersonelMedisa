@@ -5874,6 +5874,12 @@ export function resolveDemoApiResponse(
     if (actor.role === "MUHASEBE") {
       delete createBody.direkt_onayla;
     }
+    if (createBody.direkt_onayla === true) {
+      return demoRevizyonError(
+        "BORDRO_KAPSAM_SELF_APPROVAL_FORBIDDEN",
+        "Kaydi olusturan kullanici ayni istekte onaylayamaz; kayit onaya gonderilip farkli bir onaylayici tarafindan onaylanmalidir."
+      );
+    }
     const neden = (toStringValue(createBody.neden_kodu) ?? "").toUpperCase();
     if (neden === "DEMO_TEST_VERISI" && actor.role !== "GENEL_YONETICI") {
       return demoRevizyonError(
@@ -5902,10 +5908,7 @@ export function resolveDemoApiResponse(
       gecerlilik_bitis: string | null;
     };
     const now = new Date().toISOString();
-    let initialState: DemoPersonelBordroKapsamKaydi["state"] = "TASLAK";
-    if (actor.role === "GENEL_YONETICI" && createBody.direkt_onayla === true) {
-      initialState = "ONAYLANDI";
-    }
+    const initialState: DemoPersonelBordroKapsamKaydi["state"] = "TASLAK";
     const next: DemoPersonelBordroKapsamKaydi = {
       id: ++demoState.nextIds.personelBordroKapsam,
       personel_id: personelId,
@@ -5917,8 +5920,8 @@ export function resolveDemoApiResponse(
       gecerlilik_bitis: proposed.gecerlilik_bitis,
       state: initialState,
       hazirlayan_id: actor.userId,
-      onaylayan_id: initialState === "ONAYLANDI" ? actor.userId : null,
-      onay_zamani: initialState === "ONAYLANDI" ? now : null,
+      onaylayan_id: null,
+      onay_zamani: null,
       iptal_eden_id: null,
       iptal_zamani: null,
       iptal_nedeni: null,
@@ -7057,7 +7060,7 @@ export function resolveDemoApiResponse(
 
   if (pathname === "/puantaj/muhurle" && method === "POST") {
     const actor = readDemoApiActor(init);
-    const permissionError = enforceDemoPermission(actor, "puantaj.muhurle");
+    const permissionError = enforceDemoPermission(actor, "puantaj.donem_muhurle");
     if (permissionError) {
       return permissionError;
     }
@@ -7315,7 +7318,7 @@ export function resolveDemoApiResponse(
 
   if (pathname === "/haftalik-kapanis" && method === "POST") {
     const actor = readDemoApiActor(init);
-    const permissionError = enforceDemoPermission(actor, "puantaj.muhurle");
+    const permissionError = enforceDemoPermission(actor, "puantaj.haftalik_kapanis.manage");
     if (permissionError) {
       return permissionError;
     }
@@ -7448,7 +7451,7 @@ export function resolveDemoApiResponse(
 
   if (pathname === "/fazla-calisma-odeme-tercihi" && method === "PUT") {
     const actor = readDemoApiActor(init);
-    const permissionError = enforceDemoPermission(actor, "puantaj.muhurle");
+    const permissionError = enforceDemoPermission(actor, "fazla_calisma_odeme_tercihi.manage");
     if (permissionError) {
       return permissionError;
     }
@@ -7727,7 +7730,7 @@ export function resolveDemoApiResponse(
 
   if (pathname === "/serbest-zaman/olusum" && method === "POST") {
     const actor = readDemoApiActor(init);
-    const permissionError = enforceDemoPermission(actor, "puantaj.muhurle");
+    const permissionError = enforceDemoPermission(actor, "serbest_zaman.manage");
     if (permissionError) return permissionError;
 
     for (const field of [
@@ -7816,7 +7819,7 @@ export function resolveDemoApiResponse(
 
   if (pathname === "/serbest-zaman/kullanim" && method === "POST") {
     const actor = readDemoApiActor(init);
-    const permissionError = enforceDemoPermission(actor, "puantaj.muhurle");
+    const permissionError = enforceDemoPermission(actor, "serbest_zaman.manage");
     if (permissionError) return permissionError;
 
     if (Object.prototype.hasOwnProperty.call(body, "sube_id")) {
@@ -7903,7 +7906,7 @@ export function resolveDemoApiResponse(
 
   if (pathname === "/serbest-zaman/iptal" && method === "POST") {
     const actor = readDemoApiActor(init);
-    const permissionError = enforceDemoPermission(actor, "puantaj.muhurle");
+    const permissionError = enforceDemoPermission(actor, "serbest_zaman.manage");
     if (permissionError) return permissionError;
 
     if (Object.prototype.hasOwnProperty.call(body, "sube_id")) {
@@ -8016,7 +8019,7 @@ export function resolveDemoApiResponse(
 
   if (pathname === "/serbest-zaman/duzeltme" && method === "POST") {
     const actor = readDemoApiActor(init);
-    const permissionError = enforceDemoPermission(actor, "puantaj.muhurle");
+    const permissionError = enforceDemoPermission(actor, "serbest_zaman.manage");
     if (permissionError) return permissionError;
 
     if (Object.prototype.hasOwnProperty.call(body, "sube_id")) {

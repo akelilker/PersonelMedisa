@@ -28,7 +28,10 @@ export type AppPermission =
   | "puantaj.view"
   | "puantaj.update"
   | "puantaj.amir_kontrol"
-  | "puantaj.muhurle"
+  | "puantaj.donem_muhurle"
+  | "puantaj.haftalik_kapanis.manage"
+  | "fazla_calisma_odeme_tercihi.manage"
+  | "serbest_zaman.manage"
   | "puantaj.donem_reopen.request"
   | "puantaj.donem_reopen.approve"
   | "puantaj.donem_reseal"
@@ -163,7 +166,10 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "bildirimler.detail.view",
     "puantaj.view",
     "puantaj.update",
-    "puantaj.muhurle",
+    "puantaj.donem_muhurle",
+    "puantaj.haftalik_kapanis.manage",
+    "fazla_calisma_odeme_tercihi.manage",
+    "serbest_zaman.manage",
     "puantaj.donem_reopen.approve",
     "puantaj.donem_seal.history",
     "puantaj.bildirim_etki.view",
@@ -253,7 +259,10 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "bildirimler.detail.view",
     "puantaj.view",
     "puantaj.update",
-    "puantaj.muhurle",
+    "puantaj.donem_muhurle",
+    "puantaj.haftalik_kapanis.manage",
+    "fazla_calisma_odeme_tercihi.manage",
+    "serbest_zaman.manage",
     "puantaj.donem_reopen.request",
     "puantaj.donem_seal.history",
     "puantaj.bildirim_etki.view",
@@ -287,12 +296,15 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "sgk_karar_paketi.approve",
     "attendance.correction.decide"
   ],
-  /** Branch-level operational management (independent of BOLUM_YONETICISI). */
+  /**
+   * Branch-level operational management, scoped by explicit user_subeler (fail-closed).
+   * Enters and submits branch operational data; never central payroll finalization,
+   * company-wide SGK/finance decisions, or user/system administration.
+   */
   SUBE_YONETICISI: [
     "personeller.view",
     "personeller.view.sube",
     "personeller.create",
-    "personeller.import.apply",
     "personeller.update",
     "personeller.detail.view",
     "surecler.view",
@@ -308,7 +320,8 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "bildirimler.detail.view",
     "puantaj.view",
     "puantaj.update",
-    "puantaj.muhurle",
+    "fazla_calisma_odeme_tercihi.manage",
+    "serbest_zaman.manage",
     "puantaj.donem_reopen.request",
     "puantaj.donem_seal.history",
     "puantaj.bildirim_etki.view",
@@ -316,29 +329,22 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "puantaj.bildirim_etki.rapor.view",
     "raporlar.view",
     "finans.view",
-    "finans.create",
-    "finans.update",
-    "finans.cancel",
     "isg.view",
     "aylik-ozet.view",
-    "aylik-ozet.review",
     "gunluk_bildirim.request_correction",
     "haftalik_mutabakat.view",
     "haftalik_mutabakat.reopen_request",
     "aylik_bolum_onayi.view",
-    "aylik_bolum_onayi.approve",
     "aylik_bildirim_onayi.view",
     "revizyon.view",
     "revizyon.create",
     "revizyon.submit",
     "revizyon.cancel",
-    "revizyon.view_finance_effect",
     "revizyon.view_audit_history",
     "disiplin.view",
     "disiplin.final_decision",
     "puantaj.olay_karar.decide",
     "puantaj.olay_karar.view",
-    "sgk_karar_paketi.approve",
     "qr.kiosk.display"
   ],
   /** External accountant: finalized mali/bordro read + export. No operational write. */

@@ -37,9 +37,9 @@ describe("HaftalikKapanisController MariaDB", () => {
     expect(idRegexPos).toBeGreaterThan(-1);
     expect(yillikPos).toBeLessThan(idRegexPos);
 
-    expect(controllerSource).toContain("puantaj.muhurle");
+    expect(controllerSource).toContain("puantaj.haftalik_kapanis.manage");
     expect(controllerSource).toContain("puantaj.view");
-    expect(permissionsSource).toContain("'puantaj.muhurle'");
+    expect(permissionsSource).toContain("'puantaj.haftalik_kapanis.manage'");
     expect(permissionsSource).toContain("'puantaj.view'");
 
     expect(migrationSource).toMatch(/CREATE TABLE\s+haftalik_kapanislar\s*\(/);
@@ -65,7 +65,8 @@ describe("HaftalikKapanisController MariaDB", () => {
     expect(result.stdout).toContain("verify-haftalik-kapanis-mysql: OK");
     expect(result.stdout).toContain("[PASS] partial existing haftalik_kapanislar → migration fails");
     expect(result.stdout).toContain("[PASS] unauthenticated POST → 401");
-    expect(result.stdout).toContain("[PASS] PERSONEL (no puantaj.muhurle) POST → 403");
+    expect(result.stdout).toContain("[PASS] PERSONEL (no puantaj.haftalik_kapanis.manage) POST → 403");
+    expect(result.stdout).toContain("[PASS] SUBE_YONETICISI own branch POST → 403");
     expect(result.stdout).toContain("[PASS] MUHASEBE (has view, no muhurle) POST → 403");
     expect(result.stdout).toContain("[PASS] GY without active sube header → 422");
     expect(result.stdout).toContain("[PASS] GY POST without mutabakat → 409 STATE_CONFLICT");

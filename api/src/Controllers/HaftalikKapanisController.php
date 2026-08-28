@@ -20,7 +20,7 @@ use PDOException;
  * Haftalik kapanis snapshot owner (S79-B).
  *
  * Permissions (existing RolePermissions matrix — no new keys):
- * - POST create  → puantaj.muhurle
+ * - POST create  → puantaj.haftalik_kapanis.manage
  * - GET detail   → puantaj.view
  * - GET yillik   → puantaj.view
  *
@@ -40,7 +40,7 @@ class HaftalikKapanisController
     public static function create(Request $request)
     {
         $user = AuthMiddleware::authenticate($request, true);
-        RolePermissions::assert($user, 'puantaj.muhurle');
+        RolePermissions::assert($user, 'puantaj.haftalik_kapanis.manage');
 
         $subeId = self::requireScope($user, $request);
         $body = $request->getJsonBody();

@@ -177,6 +177,13 @@ try {
           AND column_name = 'sicil_no' AND non_unique = 0")->fetchColumn();
     p7fAssert($sicilUniqueCount >= 1, 'sicil unique index created by migration 066');
 
+    // Migration 076: baglantisiz DIS icin sube_id NULL olabilir, placeholder sube yok.
+    $pdo->exec('ALTER TABLE personeller MODIFY COLUMN sube_id INT UNSIGNED NULL');
+    $subeNullable = (string) $pdo->query("SELECT is_nullable FROM information_schema.columns
+        WHERE table_schema = DATABASE() AND table_name = 'personeller'
+          AND column_name = 'sube_id'")->fetchColumn();
+    p7fAssert($subeNullable === 'YES', 'migration 076 sube_id nullable for unassigned DIS');
+
     $external = PersonelCanonicalValidator::normalizeAndValidateCreatePayload([
         'calisan_kapsami' => 'DIS_KAYNAK', 'ad' => 'Tekad', 'sicil_no' => 'P7F-DIS-1',
         'ise_giris_tarihi' => '2026-08-01', 'sube_id' => 1, 'departman_id' => 1,
@@ -242,6 +249,9 @@ try {
     $insert->execute(['tc' => null, 'ad' => 'NullTcB', 'soyad' => null, 'dogum' => null, 'telefon' => null,
         'sicil' => $uniqueB, 'giris' => '2026-08-01', 'kapsam' => 'DIS_KAYNAK']);
     p7fAssert((int) $pdo->query("SELECT COUNT(*) FROM personeller WHERE tc_kimlik_no IS NULL AND sicil_no IN ('$uniqueA', '$uniqueB')")->fetchColumn() === 2, 'multiple null TC with unique sicil coexist');
+
+    $externalSube = $pdo->query('SELECT sube_id FROM personeller WHERE id = ' . $externalId)->fetchColumn();
+    p7fAssert($externalSube === null, 'unassigned DIS row carries no placeholder sube');
 
     try {
         PersonelCalisanKapsamService::assertTimeOperationalEligibleOrThrow($pdo, $externalId);

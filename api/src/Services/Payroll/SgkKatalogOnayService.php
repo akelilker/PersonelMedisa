@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Medisa\Api\Services\Payroll;
 
+use Medisa\Api\Auth\DualControl;
+
 /**
  * S85-C1 / S106: Catalog approval state-machine validation (no DB write).
  */
@@ -78,7 +80,9 @@ final class SgkKatalogOnayService
             }
             $hazirlayanId = (int) ($input['hazirlayan_id'] ?? 0);
             $actorId = (int) ($input['actor_id'] ?? 0);
-            if ($hazirlayanId > 0 && $actorId > 0 && $hazirlayanId === $actorId) {
+            // Pure state-machine validation has no PDO, so only the same-user leg of the
+            // canonical rule applies here; the identity leg is enforced by the write service.
+            if (DualControl::isSameActorUser(['id' => $actorId], $hazirlayanId)) {
                 $blockers[] = SgkKatalogContracts::blocker(
                     'SELF_APPROVAL',
                     'Hazirlayan kendi katalog surumunu onaylayamaz (dual-control).',

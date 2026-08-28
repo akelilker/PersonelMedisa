@@ -55,7 +55,7 @@ function buildCloseSelectionKey(params: {
 export function HaftalikKapanisClosePanel() {
   const { hasPermission } = useRoleAccess();
   const { session } = useAuth();
-  const canClose = hasPermission("puantaj.muhurle");
+  const canClose = hasPermission("puantaj.haftalik_kapanis.manage");
 
   const activeSubeId = session?.active_sube_id ?? null;
   const activeSubeLabel =

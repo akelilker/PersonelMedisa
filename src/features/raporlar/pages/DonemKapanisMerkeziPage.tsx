@@ -38,7 +38,7 @@ export function DonemKapanisMerkeziPage() {
   const { hasPermission } = useRoleAccess();
   const { session } = useAuth();
   const canExport = hasPermission("puantaj.donem_kapanis.export");
-  const canMuhurle = hasPermission("puantaj.muhurle");
+  const canMuhurle = hasPermission("puantaj.donem_muhurle");
 
   const [filters, setFilters] = useState<DonemKapanisFilterState>(INITIAL_FILTERS);
   const [subeOptions, setSubeOptions] = useState<IdOption[]>([]);

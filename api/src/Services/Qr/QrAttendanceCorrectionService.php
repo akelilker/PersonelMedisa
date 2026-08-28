@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Medisa\Api\Services\Qr;
 
+use Medisa\Api\Auth\DualControl;
 use Medisa\Api\Services\Attendance\AttendanceCorrectionApproverResolver;
 use Medisa\Api\Services\Personel\PersonelOperationalContextService;
 use Medisa\Api\Services\SelfService\PersonelInboxNotificationService;
@@ -221,7 +222,7 @@ class QrAttendanceCorrectionService
                 $pdo->rollBack();
                 throw new QrAttendanceException('FORBIDDEN', 'Bu talebi karara baglama yetkiniz yok.', 403);
             }
-            if ($actorId === (int) $row['requester_user_id']) {
+            if (!DualControl::isSeparated($authUser, $row['requester_user_id'] ?? null, $pdo)) {
                 $pdo->rollBack();
                 throw new QrAttendanceException('SELF_APPROVAL_FORBIDDEN', 'Kendi talebinizi onaylayamazsiniz.', 403);
             }

@@ -42,7 +42,7 @@ test.describe("S84-R2 payroll scope", () => {
     await expect(page.getByTestId("personel-bordro-kapsam-liste")).toContainText(/TASLAK/);
   });
 
-  test("GENEL_YONETICI: onay yolu (Bordro Hazırlık)", async ({ page }) => {
+  test("GENEL_YONETICI: dogrudan onay bypass'i yok, kayit taslak kalir", async ({ page }) => {
     await loginAsMockRole(page, "GENEL_YONETICI");
     await openBordroHazirlikPersonelKapsam(page, 1);
 
@@ -50,19 +50,19 @@ test.describe("S84-R2 payroll scope", () => {
     const modal = page.locator(".modal-container").filter({
       has: page.getByRole("heading", { name: /Bordro Kapsam Kararı/i })
     }).last();
-    await expect(modal.getByTestId("personel-bordro-kapsam-direkt-onay")).toBeVisible();
+    await expect(modal.getByTestId("personel-bordro-kapsam-direkt-onay")).toHaveCount(0);
+    await expect(modal.getByTestId("personel-bordro-kapsam-dual-control-note")).toBeVisible();
 
     await modal.locator('[name="pbk-aciklama"]').fill("GY onayli kapsam karari");
     await modal.locator('[name="pbk-baslangic"]').fill("2026-04-01");
     await modal.locator('[name="pbk-yil"]').fill("2026");
     await modal.locator('[name="pbk-ay"]').fill("4");
-    await modal.getByTestId("personel-bordro-kapsam-direkt-onay").check();
     await modal.getByTestId("personel-bordro-kapsam-dry-run").click();
     await expect(modal.getByTestId("personel-bordro-kapsam-dry-run-result")).toBeVisible();
     await modal.getByTestId("personel-bordro-kapsam-kaydet").click();
 
     await expect(page.getByTestId("personel-bordro-kapsam-liste")).toBeVisible();
-    await expect(page.getByTestId("personel-bordro-kapsam-liste")).toContainText(/ONAYLANDI/);
+    await expect(page.getByTestId("personel-bordro-kapsam-liste")).toContainText(/TASLAK/);
   });
 
   test("Personel Kartı bordro kapsam RO + Bordro Hazırlıkta Gör linki", async ({ page }) => {

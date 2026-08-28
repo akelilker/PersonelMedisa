@@ -176,6 +176,7 @@ class BordroHazirlikController
     public static function submitKontrol(Request $request, $calistirmaId)
     {
         [$pdo, $user] = self::authOnly($request, 'maas_hesaplama_adaylari.manage');
+        self::assertCalistirmaScope($pdo, $user, $request, (int) $calistirmaId);
         $body = $request->getJsonBody();
         $not = trim((string) ($body['muhasebe_kontrol_notu'] ?? ''));
         try {
@@ -192,6 +193,7 @@ class BordroHazirlikController
     public static function geriGonder(Request $request, $calistirmaId)
     {
         [$pdo, $user] = self::authOnly($request, 'bordro_kesinlestirme.approve');
+        self::assertCalistirmaScope($pdo, $user, $request, (int) $calistirmaId);
         $body = $request->getJsonBody();
         $not = trim((string) ($body['not'] ?? ''));
         try {
@@ -208,6 +210,7 @@ class BordroHazirlikController
     public static function kesinlestir(Request $request, $calistirmaId)
     {
         [$pdo, $user] = self::authOnly($request, 'bordro_kesinlestirme.approve');
+        self::assertCalistirmaScope($pdo, $user, $request, (int) $calistirmaId);
         try {
             JsonResponse::success([
                 'calistirma' => BordroOnIzlemeService::kesinlestir($pdo, (int) $calistirmaId, $user),
@@ -343,6 +346,24 @@ class BordroHazirlikController
     private static function assertSubeScope(array $user, Request $request, $subeId)
     {
         SubeScope::assertPersonelAccess($user, $request, (int) $subeId);
+    }
+
+    /**
+     * Kontrol/onay mutation'lari da liste ve detay ile ayni sube kapsam modelini kullanir;
+     * calistirma sube_id istemciden degil kayittan okunur.
+     *
+     * @param array<string, mixed> $user
+     */
+    private static function assertCalistirmaScope(PDO $pdo, array $user, Request $request, $calistirmaId)
+    {
+        $stmt = $pdo->prepare('SELECT sube_id FROM maas_hesaplama_calistirmalari WHERE id = :id LIMIT 1');
+        $stmt->execute(['id' => (int) $calistirmaId]);
+        $subeId = $stmt->fetchColumn();
+        if ($subeId === false) {
+            JsonResponse::error(404, 'PAYROLL_CALCULATION_NOT_FOUND', 'Çalıştırma bulunamadı.');
+        }
+
+        self::assertSubeScope($user, $request, (int) $subeId);
     }
 
     private static function readQueryInt(Request $request, $key, $min, $max)

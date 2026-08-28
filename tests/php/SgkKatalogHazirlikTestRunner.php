@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/../../api/src/Auth/DualControl.php';
 require_once __DIR__ . '/../../api/src/Services/Payroll/SgkKatalogContracts.php';
 require_once __DIR__ . '/../../api/src/Services/Payroll/SgkKatalogTamlikService.php';
 require_once __DIR__ . '/../../api/src/Services/Payroll/SgkKatalogImportValidator.php';

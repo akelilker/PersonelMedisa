@@ -114,7 +114,7 @@ E2E seed kayıtları (`puantajKayitlari`): personel 1 → `2026-04-09`, `2026-04
 | Konu | Detay |
 | ---- | ----- |
 | API | `POST /api/puantaj/muhurle` — payload `{ yil, ay }` — `muhurleAylikPuantaj` |
-| Yetkili roller | GENEL_YONETICI, BOLUM_YONETICISI (`puantaj.muhurle`) |
+| Yetkili roller | GENEL_YONETICI, BOLUM_YONETICISI (`puantaj.donem_muhurle`) |
 | Yetkisiz roller | MUHASEBE, BIRIM_AMIRI — buton render edilmez |
 | Başarı sonrası modal | Otomatik kapanmaz; kullanıcı **Vazgeç** veya modal close ile kapatır |
 | Mühür sonrası kayıt | `state: "MUHURLENDI"` — `refetchActive()` ile UI güncellenir |
@@ -213,7 +213,7 @@ Owner: `tests/e2e/helpers/mock-api.ts`
 | ----- | ------ |
 | `puantaj-hesap-motoru.test.ts` | Hesap motoru — derin davranış (239 test) |
 | `puantaj.api.test.ts` | GET normalize, PUT payload/URL |
-| `puantaj-muhur.test.ts` | `puantaj.muhurle` permission matrisi; `MUHURLENDI` → `canEdit` mantığı |
+| `puantaj-muhur.test.ts` | `puantaj.donem_muhurle` / `puantaj.haftalik_kapanis.manage` ve operasyonel girdi permission matrisi; `MUHURLENDI` → `canEdit` mantığı |
 
 E2E kullanıcı akışını kilitler; hesap motoru doğruluğunun ana sahibi unit testtir.
 

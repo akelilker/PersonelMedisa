@@ -397,9 +397,10 @@ function seedSzFixtures(PDO $pdo): void
           (2, 'ba', 'x', 'Birim Amiri', 'BIRIM_AMIRI', 'AKTIF'),
           (3, 'personel', 'x', 'Personel', 'PERSONEL', 'AKTIF'),
           (4, 'muh', 'x', 'Muhasebe', 'MUHASEBE', 'AKTIF'),
-          (5, 'bolum', 'x', 'Bolum Yoneticisi', 'BOLUM_YONETICISI', 'AKTIF')
+          (5, 'bolum', 'x', 'Bolum Yoneticisi', 'BOLUM_YONETICISI', 'AKTIF'),
+          (6, 'sube', 'x', 'Sube Yoneticisi', 'SUBE_YONETICISI', 'AKTIF')
     ");
-    $pdo->exec('INSERT INTO user_subeler (user_id, sube_id) VALUES (2, 1), (4, 1), (5, 1)');
+    $pdo->exec('INSERT INTO user_subeler (user_id, sube_id) VALUES (2, 1), (4, 1), (5, 1), (6, 1)');
     $pdo->exec("
         INSERT INTO personeller (
           id, tc_kimlik_no, ad, soyad, dogum_tarihi, sicil_no, ise_giris_tarihi, sube_id, departman_id, aktif_durum
@@ -740,7 +741,7 @@ szAssert(strpos($routerSource, 'SerbestZamanController::kullanim') !== false, 'r
 szAssert(strpos($routerSource, 'SerbestZamanController::iptal') !== false, 'router POST iptal');
 szAssert(strpos($routerSource, 'SerbestZamanController::duzeltme') !== false, 'router POST duzeltme');
 szAssert(strpos($controllerSource, 'puantaj.view') !== false, 'controller has puantaj.view');
-szAssert(strpos($controllerSource, 'puantaj.muhurle') !== false, 'controller has puantaj.muhurle');
+szAssert(strpos($controllerSource, 'serbest_zaman.manage') !== false, 'controller has serbest_zaman.manage');
 szAssert(strpos($controllerSource, 'PERIOD_LOCKED') === false, 'controller NO PERIOD_LOCKED');
 szAssert(strpos($controllerSource, 'PERIOD_STATE_UNKNOWN') === false, 'controller NO PERIOD_STATE_UNKNOWN');
 szAssert(preg_match('/CREATE TABLE\s+serbest_zaman_events\s*\(/i', $migrationSource) === 1, 'migration CREATE serbest_zaman_events');
@@ -1100,6 +1101,75 @@ $bolumOutWrite = invokeSzHttp($pdo, $bolum, 'POST', '/serbest-zaman/kullanim', [
     'islem_anahtari' => 'sz-bolum-out-write',
 ], $subeHeader);
 szAssert($bolumOutWrite['status'] === 403, 'BOLUM_YONETICISI scope dışı POST → 403');
+
+// MG-SUBE-YONETICI-001: branch manager owns serbest zaman input inside user_subeler.
+$subeYonetici = ['id' => 6, 'rol' => 'SUBE_YONETICISI', 'sube_ids' => [1]];
+$seedSube = seedSnapshot($pdo, 1, 10, '2026-06-15', '2026-06-21', 60);
+$tidSube = seedSzTercih(
+    $pdo,
+    $seedSube['snapshot_id'],
+    $seedSube['kapanis_id'],
+    10,
+    '2026-06-15',
+    '2026-06-21',
+    60
+);
+$subeOlusum = invokeSzHttp($pdo, $subeYonetici, 'POST', '/serbest-zaman/olusum', [
+    'odeme_tercihi_id' => $tidSube,
+], $subeHeader);
+szAssert($subeOlusum['status'] === 200, 'SUBE_YONETICISI own branch POST olusum → 200');
+$subeOlusumId = (int) ($subeOlusum['payload']['data']['id'] ?? 0);
+szAssert($subeOlusumId > 0, 'SUBE_YONETICISI olusum event persisted');
+$subeOlusumActor = (int) $pdo->query(
+    'SELECT created_by FROM serbest_zaman_events WHERE id = ' . $subeOlusumId
+)->fetchColumn();
+szAssert($subeOlusumActor === 6, 'SUBE_YONETICISI olusum actor recorded');
+
+$subeKullanim = invokeSzHttp($pdo, $subeYonetici, 'POST', '/serbest-zaman/kullanim', [
+    'personel_id' => 10,
+    'dakika' => 10,
+    'event_tarihi' => '2026-06-22',
+    'islem_anahtari' => 'sz-sube-kullanim',
+], $subeHeader);
+szAssert($subeKullanim['status'] === 200, 'SUBE_YONETICISI own branch POST kullanim → 200');
+$subeKullanimId = (int) ($subeKullanim['payload']['data']['id'] ?? 0);
+
+$subeDuzeltme = invokeSzHttp($pdo, $subeYonetici, 'POST', '/serbest-zaman/duzeltme', [
+    'personel_id' => 10,
+    'hedef_event_id' => $subeKullanimId,
+    'hedef_event_tipi' => 'SERBEST_ZAMAN_KULLANIM',
+    'yeni_dakika' => 5,
+    'event_tarihi' => '2026-06-23',
+    'islem_anahtari' => 'sz-sube-duzeltme',
+    'aciklama' => 'Sube duzeltmesi',
+], $subeHeader);
+szAssert($subeDuzeltme['status'] === 200, 'SUBE_YONETICISI own branch POST duzeltme → 200');
+
+$subeIptal = invokeSzHttp($pdo, $subeYonetici, 'POST', '/serbest-zaman/iptal', [
+    'personel_id' => 10,
+    'hedef_event_id' => $subeKullanimId,
+    'hedef_event_tipi' => 'SERBEST_ZAMAN_KULLANIM',
+    'event_tarihi' => '2026-06-24',
+    'islem_anahtari' => 'sz-sube-iptal',
+], $subeHeader);
+szAssert($subeIptal['status'] === 200, 'SUBE_YONETICISI own branch POST iptal → 200');
+
+$subeCross = invokeSzHttp($pdo, $subeYonetici, 'POST', '/serbest-zaman/kullanim', [
+    'personel_id' => 20,
+    'dakika' => 1,
+    'event_tarihi' => '2026-05-25',
+    'islem_anahtari' => 'sz-sube-cross-branch',
+], ['x-active-sube-id' => '2']);
+szAssert($subeCross['status'] === 403, 'SUBE_YONETICISI cross-branch POST → 403');
+
+$subeEmpty = ['id' => 6, 'rol' => 'SUBE_YONETICISI', 'sube_ids' => []];
+$subeEmptyWrite = invokeSzHttp($pdo, $subeEmpty, 'POST', '/serbest-zaman/kullanim', [
+    'personel_id' => 10,
+    'dakika' => 1,
+    'event_tarihi' => '2026-05-25',
+    'islem_anahtari' => 'sz-sube-empty-scope',
+], $subeHeader);
+szAssert($subeEmptyWrite['status'] === 403, 'SUBE_YONETICISI empty user_subeler POST → 403');
 
 $missingPersonel = invokeSzHttp($pdo, $gy, 'GET', '/serbest-zaman/events', [], $subeHeader, [
     'personel_id' => '99999',

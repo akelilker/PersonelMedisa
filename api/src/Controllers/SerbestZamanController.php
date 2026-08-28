@@ -24,10 +24,10 @@ use Throwable;
 /**
  * Serbest zaman event store owner (S79-D).
  *
- * Permissions (existing RolePermissions — no new keys):
+ * Permissions (RolePermissions):
  * - GET events/bakiye → puantaj.view
  * - GET deadline-takip → raporlar.view (ops/İK surface)
- * - POST writes → puantaj.muhurle
+ * - POST writes → serbest_zaman.manage (branch-scoped payroll input, not period sealing)
  *
  * Period lock is NOT a write blocker; donem_* columns are audit metadata only.
  * Active OLUSUM uniqueness: serbest_zaman_aktif_olusumlar guard table.
@@ -297,7 +297,7 @@ class SerbestZamanController
     public static function olusum(Request $request): void
     {
         $user = AuthMiddleware::authenticate($request, true);
-        RolePermissions::assert($user, 'puantaj.muhurle');
+        RolePermissions::assert($user, 'serbest_zaman.manage');
 
         $body = $request->getJsonBody();
         foreach (array_merge(self::SERVER_OWNED_FIELDS, ['islem_anahtari', 'hedef_event_id', 'hedef_event_tipi', 'yeni_dakika', 'aciklama']) as $field) {
@@ -500,7 +500,7 @@ class SerbestZamanController
     public static function kullanim(Request $request): void
     {
         $user = AuthMiddleware::authenticate($request, true);
-        RolePermissions::assert($user, 'puantaj.muhurle');
+        RolePermissions::assert($user, 'serbest_zaman.manage');
 
         $body = $request->getJsonBody();
         foreach (self::SERVER_OWNED_WRITE_COMMON as $field) {
@@ -641,7 +641,7 @@ class SerbestZamanController
     public static function iptal(Request $request): void
     {
         $user = AuthMiddleware::authenticate($request, true);
-        RolePermissions::assert($user, 'puantaj.muhurle');
+        RolePermissions::assert($user, 'serbest_zaman.manage');
 
         $body = $request->getJsonBody();
         foreach (['sube_id', 'created_by', 'created_at', 'donem_yil', 'donem_ay', 'donem_kilitli_miydi', 'event_tipi', 'dakika', 'yeni_dakika'] as $field) {
@@ -809,7 +809,7 @@ class SerbestZamanController
     public static function duzeltme(Request $request): void
     {
         $user = AuthMiddleware::authenticate($request, true);
-        RolePermissions::assert($user, 'puantaj.muhurle');
+        RolePermissions::assert($user, 'serbest_zaman.manage');
 
         $body = $request->getJsonBody();
         foreach (['sube_id', 'created_by', 'created_at', 'donem_yil', 'donem_ay', 'donem_kilitli_miydi', 'event_tipi', 'dakika'] as $field) {

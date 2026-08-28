@@ -1,7 +1,7 @@
 name: Ops readonly final master inventory
 
-# Salt-okunur production inventory for final master closure.
-# Mutasyon yok. config.local.php artifact olarak yüklenmez / loglanmaz.
+# Salt-okunur production inventory (SELECT only).
+# Geçici cron wrapper + CLI inventory; cron orijinali her zaman geri yüklenir.
 
 on:
   workflow_dispatch:
@@ -19,13 +19,15 @@ jobs:
   inventory:
     name: Readonly phones / org / sube / roles
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 35
     env:
       FTP_SERVER: ${{ secrets.FTP_SERVER }}
       FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
       FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
       FTP_PORT: ${{ secrets.FTP_PORT }}
       CONFIRMATION: ${{ inputs.confirmation }}
+      POLL_ATTEMPTS: "45"
+      POLL_INTERVAL_SECONDS: "20"
     steps:
       - name: Validate
         run: |
@@ -38,16 +40,31 @@ jobs:
         run: |
           set -euo pipefail
           sudo apt-get update
-          sudo apt-get install -y lftp php-cli php-mysql
+          sudo apt-get install -y lftp jq
 
-      - name: FTP config + run SELECTs
+      - name: Cron wrapper inventory + restore
         run: |
           set -euo pipefail
           WORK="$RUNNER_TEMP/final-inv"
           rm -rf "$WORK"
           mkdir -p "$WORK"
-          cleanup() { rm -rf "$WORK"; }
-          trap cleanup EXIT
+          ORIG="$WORK/cpanel-migration-cron.orig.php"
+          WRAPPER="$WORK/cpanel-migration-cron.wrapper.php"
+          INV="$WORK/readonly-inventory-once.php"
+          RESULT="$WORK/readonly-inventory-result.json"
+          RESTORED=0
+
+          restore_cron() {
+            if [[ "$RESTORED" = "1" ]]; then
+              return 0
+            fi
+            if [[ -f "$ORIG" ]]; then
+              echo "Restoring original migration cron..."
+              run_cpanel_ftp "put -O api/bin ${ORIG} -o cpanel-migration-cron.php; rm api/bin/cpanel-migration-cron.impl.php; rm api/bin/readonly-inventory-once.php;" || true
+              RESTORED=1
+            fi
+          }
+          trap 'restore_cron; rm -rf "$WORK"' EXIT
 
           run_ftp_mode() {
             local mode_name="$1"
@@ -57,7 +74,7 @@ jobs:
             lftp -u "${FTP_USERNAME}","${FTP_PASSWORD}" -p "${FTP_PORT}" "ftp://${FTP_SERVER}" -e "
               set cmd:fail-exit true;
               set net:max-retries 2;
-              set net:timeout 20;
+              set net:timeout 25;
               set xfer:clobber true;
               set ssl:verify-certificate no;
               set ssl:check-hostname no;
@@ -78,155 +95,252 @@ jobs:
             run_ftp_mode "plain-ftp" "false" "$ftp_commands"
           }
 
-          run_cpanel_ftp "get api/config.local.php -o ${WORK}/config.local.php;"
-          test -f "${WORK}/config.local.php"
-
-          export WORK FTP_SERVER
-          php <<'PHP'
+          cat > "$INV" <<'PHP'
           <?php
           declare(strict_types=1);
-          $work = getenv('WORK') ?: '';
-          $cfg = require $work . '/config.local.php';
-          if (!is_array($cfg)) { fwrite(STDERR, "CONFIG_INVALID\n"); exit(1); }
 
-          $hosts = [];
-          $primary = (string)($cfg['db_host'] ?? '');
-          if ($primary !== '') $hosts[] = $primary;
-          $ftp = (string)(getenv('FTP_SERVER') ?: '');
-          if ($ftp !== '' && !in_array($ftp, $hosts, true)) $hosts[] = $ftp;
-
-          $pdo = null;
-          foreach ($hosts as $host) {
-            try {
-              $pdo = new PDO(
-                sprintf('mysql:host=%s;dbname=%s;charset=utf8mb4', $host, (string)$cfg['db_name']),
-                (string)$cfg['db_user'],
-                (string)$cfg['db_password'],
-                [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC, PDO::ATTR_TIMEOUT => 10]
-              );
-              break;
-            } catch (Throwable $e) { $pdo = null; }
-          }
-          if (!$pdo) { echo "DB_PROBE=UNREACHABLE\n"; exit(1); }
-          echo "DB_PROBE=OK\n";
-
-          $blankPhone = "(TRIM(IFNULL(p.telefon,'')) = '')";
-          $ic = "IFNULL(p.calisan_kapsami,'IC_PERSONEL') = 'IC_PERSONEL'";
-          $aktif = "p.aktif_durum = 'AKTIF'";
-
-          echo "===PHONE_LIST===\n";
-          $sql = "SELECT p.sicil_no, TRIM(CONCAT(IFNULL(p.ad,''),' ',IFNULL(p.soyad,''))) AS ad_soyad,
-                         IFNULL(s.ad, '') AS sube
-                  FROM personeller p
-                  LEFT JOIN subeler s ON s.id = p.sube_id
-                  WHERE {$aktif} AND {$ic} AND {$blankPhone}
-                  ORDER BY p.sicil_no";
-          $rows = $pdo->query($sql)->fetchAll();
-          echo "IC_EKSIK_TELEFON_SAYISI=" . count($rows) . "\n";
-          foreach ($rows as $r) {
-            echo "PHONE|" . ($r['sicil_no'] ?? '') . "|" . ($r['ad_soyad'] ?? '') . "|" . ($r['sube'] ?? '') . "\n";
+          if (PHP_SAPI !== 'cli') {
+              http_response_code(404);
+              exit(1);
           }
 
-          echo "===SUBE_YONETICISI===\n";
-          $subeler = $pdo->query("SELECT id, ad FROM subeler WHERE durum='AKTIF' ORDER BY id")->fetchAll();
-          echo "AKTIF_SUBE_SAYISI=" . count($subeler) . "\n";
-          $hasPersonelId = false;
+          require dirname(__DIR__) . '/src/bootstrap.php';
+
+          use Medisa\Api\Database\Connection;
+
+          $controlDir = dirname(__DIR__) . '/runtime/migration-control';
+          $pending = $controlDir . '/readonly-inventory.pending';
+          $resultPath = $controlDir . '/readonly-inventory-result.json';
+
+          if (!is_file($pending)) {
+              exit(0);
+          }
+          @unlink($pending);
+
           try {
-            $hasPersonelId = (bool)$pdo->query("SHOW COLUMNS FROM users LIKE 'personel_id'")->fetch();
-          } catch (Throwable $e) { $hasPersonelId = false; }
-          if ($hasPersonelId) {
-            $assignStmt = $pdo->prepare(
-              "SELECT u.id AS user_id, u.personel_id,
-                      COALESCE(NULLIF(TRIM(u.ad_soyad),''), u.username) AS user_ad,
-                      NULLIF(TRIM(CONCAT(IFNULL(p.ad,''),' ',IFNULL(p.soyad,''))),'') AS personel_ad
-               FROM users u
-               INNER JOIN user_subeler us ON us.user_id = u.id AND us.sube_id = :sid
-               LEFT JOIN personeller p ON p.id = u.personel_id
-               WHERE u.rol = 'SUBE_YONETICISI' AND u.durum='AKTIF'
-               ORDER BY u.id"
-            );
-          } else {
-            $assignStmt = $pdo->prepare(
-              "SELECT u.id AS user_id, NULL AS personel_id,
-                      COALESCE(NULLIF(TRIM(u.ad_soyad),''), u.username) AS user_ad,
-                      NULL AS personel_ad
-               FROM users u
-               INNER JOIN user_subeler us ON us.user_id = u.id AND us.sube_id = :sid
-               WHERE u.rol = 'SUBE_YONETICISI' AND u.durum='AKTIF'
-               ORDER BY u.id"
-            );
-          }
-          foreach ($subeler as $s) {
-            $assignStmt->execute(['sid' => (int)$s['id']]);
-            $asg = $assignStmt->fetchAll();
-            if (!$asg) {
-              echo "SUBE|" . $s['id'] . "|" . $s['ad'] . "|ATAMA_YOK||| |\n";
-            } else {
-              foreach ($asg as $a) {
-                $name = $a['personel_ad'] ?: $a['user_ad'];
-                echo "SUBE|" . $s['id'] . "|" . $s['ad'] . "|VAR|" . ($a['user_id'] ?? '') . "|" . ($a['personel_id'] ?? '') . "|" . $name . "\n";
+              $pdo = Connection::get();
+              $blankPhone = "(TRIM(IFNULL(p.telefon,'')) = '')";
+              $ic = "IFNULL(p.calisan_kapsami,'IC_PERSONEL') = 'IC_PERSONEL'";
+              $aktif = "p.aktif_durum = 'AKTIF'";
+
+              $phones = $pdo->query(
+                  "SELECT p.sicil_no, TRIM(CONCAT(IFNULL(p.ad,''),' ',IFNULL(p.soyad,''))) AS ad_soyad,
+                          IFNULL(s.ad, '') AS sube
+                   FROM personeller p
+                   LEFT JOIN subeler s ON s.id = p.sube_id
+                   WHERE {$aktif} AND {$ic} AND {$blankPhone}
+                   ORDER BY p.sicil_no"
+              )->fetchAll(PDO::FETCH_ASSOC);
+
+              $subeler = $pdo->query("SELECT id, ad FROM subeler WHERE durum='AKTIF' ORDER BY id")->fetchAll(PDO::FETCH_ASSOC);
+              $assignStmt = $pdo->prepare(
+                  "SELECT u.id AS user_id, u.personel_id,
+                          COALESCE(NULLIF(TRIM(u.ad_soyad),''), u.username) AS user_ad,
+                          NULLIF(TRIM(CONCAT(IFNULL(p.ad,''),' ',IFNULL(p.soyad,''))),'') AS personel_ad
+                   FROM users u
+                   INNER JOIN user_subeler us ON us.user_id = u.id AND us.sube_id = :sid
+                   LEFT JOIN personeller p ON p.id = u.personel_id
+                   WHERE u.rol = 'SUBE_YONETICISI' AND u.durum='AKTIF'
+                   ORDER BY u.id"
+              );
+              $subeRows = [];
+              foreach ($subeler as $s) {
+                  $assignStmt->execute(['sid' => (int)$s['id']]);
+                  $asg = $assignStmt->fetchAll(PDO::FETCH_ASSOC);
+                  if (!$asg) {
+                      $subeRows[] = [
+                          'sube_id' => (int)$s['id'],
+                          'sube' => (string)$s['ad'],
+                          'durum' => 'ATAMA_YOK',
+                          'user_id' => null,
+                          'personel_id' => null,
+                          'ad_soyad' => null,
+                      ];
+                      continue;
+                  }
+                  foreach ($asg as $a) {
+                      $subeRows[] = [
+                          'sube_id' => (int)$s['id'],
+                          'sube' => (string)$s['ad'],
+                          'durum' => 'VAR',
+                          'user_id' => (int)$a['user_id'],
+                          'personel_id' => $a['personel_id'] !== null ? (int)$a['personel_id'] : null,
+                          'ad_soyad' => $a['personel_ad'] ?: $a['user_ad'],
+                      ];
+                  }
               }
-            }
-          }
 
-          echo "===IC_ORG_GAPS===\n";
-          // Canonical critical org fields for IC (exclude telefon — separate class)
-          $orgSql = "SELECT p.sicil_no,
-                            TRIM(CONCAT(IFNULL(p.ad,''),' ',IFNULL(p.soyad,''))) AS ad_soyad,
-                            CASE WHEN IFNULL(p.sube_id,0)<=0 THEN 1 ELSE 0 END AS miss_sube,
-                            CASE WHEN IFNULL(p.departman_id,0)<=0 THEN 1 ELSE 0 END AS miss_dep,
-                            CASE WHEN IFNULL(p.bolum_id,0)<=0 THEN 1 ELSE 0 END AS miss_bolum,
-                            CASE WHEN IFNULL(p.birim_id,0)<=0 THEN 1 ELSE 0 END AS miss_birim,
-                            CASE WHEN IFNULL(p.gorev_id,0)<=0 THEN 1 ELSE 0 END AS miss_gorev,
-                            CASE WHEN IFNULL(p.personel_tipi_id,0)<=0 THEN 1 ELSE 0 END AS miss_tip
-                     FROM personeller p
-                     WHERE {$aktif} AND {$ic}
-                       AND (
-                         IFNULL(p.sube_id,0)<=0 OR IFNULL(p.departman_id,0)<=0 OR IFNULL(p.bolum_id,0)<=0
-                         OR IFNULL(p.birim_id,0)<=0 OR IFNULL(p.gorev_id,0)<=0 OR IFNULL(p.personel_tipi_id,0)<=0
-                       )
-                     ORDER BY p.sicil_no";
-          $orgRows = $pdo->query($orgSql)->fetchAll();
-          $counts = ['Şube'=>0,'Departman'=>0,'Bölüm'=>0,'Birim'=>0,'Görev'=>0,'Personel Tipi'=>0];
-          $distinct = 0;
-          $occ = 0;
-          foreach ($orgRows as $r) {
-            $fields = [];
-            if ((int)$r['miss_sube']===1) { $fields[]='Şube'; $counts['Şube']++; $occ++; }
-            if ((int)$r['miss_dep']===1) { $fields[]='Departman'; $counts['Departman']++; $occ++; }
-            if ((int)$r['miss_bolum']===1) { $fields[]='Bölüm'; $counts['Bölüm']++; $occ++; }
-            if ((int)$r['miss_birim']===1) { $fields[]='Birim'; $counts['Birim']++; $occ++; }
-            if ((int)$r['miss_gorev']===1) { $fields[]='Görev'; $counts['Görev']++; $occ++; }
-            if ((int)$r['miss_tip']===1) { $fields[]='Personel Tipi'; $counts['Personel Tipi']++; $occ++; }
-            if ($fields) {
-              $distinct++;
-              echo "ORG|" . ($r['sicil_no'] ?? '') . "|" . ($r['ad_soyad'] ?? '') . "|" . implode(',', $fields) . "\n";
-            }
-          }
-          echo "IC_ORG_CRITICAL_GAP_DISTINCT_PERSONEL={$distinct}\n";
-          echo "IC_ORG_CRITICAL_GAP_OCCURRENCE={$occ}\n";
-          foreach ($counts as $k=>$v) echo "ORG_FIELD|{$k}|{$v}\n";
+              $orgRows = $pdo->query(
+                  "SELECT p.sicil_no,
+                          TRIM(CONCAT(IFNULL(p.ad,''),' ',IFNULL(p.soyad,''))) AS ad_soyad,
+                          CASE WHEN IFNULL(p.sube_id,0)<=0 THEN 1 ELSE 0 END AS miss_sube,
+                          CASE WHEN IFNULL(p.departman_id,0)<=0 THEN 1 ELSE 0 END AS miss_dep,
+                          CASE WHEN IFNULL(p.bolum_id,0)<=0 THEN 1 ELSE 0 END AS miss_bolum,
+                          CASE WHEN IFNULL(p.birim_id,0)<=0 THEN 1 ELSE 0 END AS miss_birim,
+                          CASE WHEN IFNULL(p.gorev_id,0)<=0 THEN 1 ELSE 0 END AS miss_gorev,
+                          CASE WHEN IFNULL(p.personel_tipi_id,0)<=0 THEN 1 ELSE 0 END AS miss_tip
+                   FROM personeller p
+                   WHERE {$aktif} AND {$ic}
+                     AND (
+                       IFNULL(p.sube_id,0)<=0 OR IFNULL(p.departman_id,0)<=0 OR IFNULL(p.bolum_id,0)<=0
+                       OR IFNULL(p.birim_id,0)<=0 OR IFNULL(p.gorev_id,0)<=0 OR IFNULL(p.personel_tipi_id,0)<=0
+                     )
+                   ORDER BY p.sicil_no"
+              )->fetchAll(PDO::FETCH_ASSOC);
 
-          echo "===LEGACY_ROLES===\n";
-          $legacy = ['PATRON','IK_BORDRO','SGK_KARAR_ONAY_YETKILISI','IDARI_ISLER','AUTH_SMOKE_READONLY'];
-          // Discover actual ENUM values if possible
-          $col = $pdo->query("SHOW COLUMNS FROM users LIKE 'rol'")->fetch();
-          if ($col && isset($col['Type'])) echo "USERS_ROL_TYPE=" . $col['Type'] . "\n";
-          $totalLegacyActive = 0;
-          foreach ($legacy as $role) {
-            try {
-              $st = $pdo->prepare("SELECT COUNT(*) FROM users WHERE rol = :r");
-              $st->execute(['r'=>$role]);
-              $c = (int)$st->fetchColumn();
-            } catch (Throwable $e) { $c = -1; }
-            $note = $role === 'AUTH_SMOKE_READONLY' ? 'protected_smoke_fixture' : 'legacy_enum';
-            echo "LEGACY|{$role}|{$c}|{$note}\n";
-            if ($c > 0) $totalLegacyActive += $c;
-          }
-          echo "AKTIF_LEGACY_ROLE_USER_COUNT={$totalLegacyActive}\n";
+              $fieldCounts = [
+                  'Sube' => 0, 'Departman' => 0, 'Bolum' => 0, 'Birim' => 0, 'Gorev' => 0, 'Personel_Tipi' => 0,
+              ];
+              $people = [];
+              $occ = 0;
+              foreach ($orgRows as $r) {
+                  $fields = [];
+                  if ((int)$r['miss_sube'] === 1) { $fields[] = 'Sube'; $fieldCounts['Sube']++; $occ++; }
+                  if ((int)$r['miss_dep'] === 1) { $fields[] = 'Departman'; $fieldCounts['Departman']++; $occ++; }
+                  if ((int)$r['miss_bolum'] === 1) { $fields[] = 'Bolum'; $fieldCounts['Bolum']++; $occ++; }
+                  if ((int)$r['miss_birim'] === 1) { $fields[] = 'Birim'; $fieldCounts['Birim']++; $occ++; }
+                  if ((int)$r['miss_gorev'] === 1) { $fields[] = 'Gorev'; $fieldCounts['Gorev']++; $occ++; }
+                  if ((int)$r['miss_tip'] === 1) { $fields[] = 'Personel_Tipi'; $fieldCounts['Personel_Tipi']++; $occ++; }
+                  if ($fields) {
+                      $people[] = [
+                          'sicil_no' => (string)$r['sicil_no'],
+                          'ad_soyad' => (string)$r['ad_soyad'],
+                          'eksik' => $fields,
+                      ];
+                  }
+              }
 
-          echo "===TIP===\n";
-          $tip = $pdo->query("SELECT version FROM medisa_schema_migrations ORDER BY version DESC LIMIT 1")->fetchColumn();
-          echo "PRODUCTION_MIGRATION_TIP={$tip}\n";
-          echo "INVENTORY_DONE=YES\n";
+              $legacyRoles = ['PATRON','IK_BORDRO','SGK_KARAR_ONAY_YETKILISI','IDARI_ISLER','AUTH_SMOKE_READONLY'];
+              $legacy = [];
+              $legacyActive = 0;
+              foreach ($legacyRoles as $role) {
+                  $st = $pdo->prepare("SELECT COUNT(*) FROM users WHERE rol = :r AND durum='AKTIF'");
+                  $st->execute(['r' => $role]);
+                  $c = (int)$st->fetchColumn();
+                  $legacy[] = [
+                      'rol' => $role,
+                      'aktif_sayi' => $c,
+                      'not' => $role === 'AUTH_SMOKE_READONLY' ? 'protected_smoke_fixture' : 'legacy_enum',
+                  ];
+                  $legacyActive += $c;
+              }
+
+              $tip = (string)$pdo->query(
+                  "SELECT version FROM medisa_schema_migrations ORDER BY version DESC LIMIT 1"
+              )->fetchColumn();
+
+              $payload = [
+                  'ok' => true,
+                  'captured_at' => gmdate('Y-m-d\TH:i:s\Z'),
+                  'production_migration_tip' => $tip,
+                  'phones' => ['count' => count($phones), 'rows' => $phones],
+                  'sube_yoneticisi' => [
+                      'aktif_sube_sayisi' => count($subeler),
+                      'rows' => $subeRows,
+                  ],
+                  'ic_org' => [
+                      'distinct' => count($people),
+                      'occurrence' => $occ,
+                      'field_counts' => $fieldCounts,
+                      'people' => $people,
+                  ],
+                  'legacy_roles' => [
+                      'aktif_toplam' => $legacyActive,
+                      'rows' => $legacy,
+                  ],
+              ];
+              if (!is_dir($controlDir)) {
+                  @mkdir($controlDir, 0700, true);
+              }
+              $json = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+              if ($json === false) {
+                  throw new RuntimeException('JSON_ENCODE_FAILED');
+              }
+              file_put_contents($resultPath, $json . "\n", LOCK_EX);
+              @chmod($resultPath, 0600);
+              exit(0);
+          } catch (Throwable $e) {
+              $err = json_encode([
+                  'ok' => false,
+                  'error' => 'INVENTORY_FAILED',
+                  'captured_at' => gmdate('Y-m-d\TH:i:s\Z'),
+              ], JSON_UNESCAPED_SLASHES);
+              @file_put_contents($resultPath, $err . "\n", LOCK_EX);
+              exit(1);
+          }
           PHP
+
+          cat > "$WRAPPER" <<'PHP'
+          <?php
+          declare(strict_types=1);
+
+          if (PHP_SAPI === 'cli') {
+              $pending = dirname(__DIR__) . '/runtime/migration-control/readonly-inventory.pending';
+              if (is_file($pending)) {
+                  $script = __DIR__ . '/readonly-inventory-once.php';
+                  if (is_file($script)) {
+                      $php = (defined('PHP_BINARY') && PHP_BINARY !== '') ? PHP_BINARY : 'php';
+                      passthru(escapeshellarg($php) . ' ' . escapeshellarg($script));
+                  }
+              }
+          }
+
+          require __DIR__ . '/cpanel-migration-cron.impl.php';
+          PHP
+
+          run_cpanel_ftp "get api/bin/cpanel-migration-cron.php -o ${ORIG};"
+          test -f "$ORIG"
+          : > "$WORK/readonly-inventory.pending"
+
+          run_cpanel_ftp "
+            mkdir api/runtime/migration-control;
+            put -O api/bin ${ORIG} -o cpanel-migration-cron.impl.php;
+            put -O api/bin ${INV} -o readonly-inventory-once.php;
+            put -O api/bin ${WRAPPER} -o cpanel-migration-cron.php;
+            put -O api/runtime/migration-control ${WORK}/readonly-inventory.pending -o readonly-inventory.pending;
+            rm api/runtime/migration-control/readonly-inventory-result.json;
+          "
+
+          echo "Waiting for cron inventory result (up to ~15m)..."
+          found=NO
+          for attempt in $(seq 1 "$POLL_ATTEMPTS"); do
+            rm -f "$RESULT"
+            if run_cpanel_ftp "get api/runtime/migration-control/readonly-inventory-result.json -o ${RESULT};" >/dev/null 2>&1; then
+              if [[ -f "$RESULT" ]] && jq -e '.ok == true' "$RESULT" >/dev/null 2>&1; then
+                found=YES
+                break
+              fi
+              if [[ -f "$RESULT" ]] && jq -e '.ok == false' "$RESULT" >/dev/null 2>&1; then
+                echo "INVENTORY_FAILED"
+                cat "$RESULT"
+                exit 1
+              fi
+            fi
+            echo "poll=${attempt}/${POLL_ATTEMPTS}"
+            sleep "$POLL_INTERVAL_SECONDS"
+          done
+
+          restore_cron
+
+          test "$found" = "YES" || { echo "INVENTORY_TIMEOUT"; exit 1; }
+
+          echo "DB_PROBE=OK_VIA_CRON"
+          jq -r '
+            "PRODUCTION_MIGRATION_TIP=\(.production_migration_tip)",
+            "IC_EKSIK_TELEFON_SAYISI=\(.phones.count)",
+            (.phones.rows[] | "PHONE|\(.sicil_no)|\(.ad_soyad)|\(.sube)"),
+            "AKTIF_SUBE_SAYISI=\(.sube_yoneticisi.aktif_sube_sayisi)",
+            (.sube_yoneticisi.rows[] | "SUBE|\(.sube_id)|\(.sube)|\(.durum)|\(.user_id // "")|\(.personel_id // "")|\(.ad_soyad // "")"),
+            "IC_ORG_CRITICAL_GAP_DISTINCT_PERSONEL=\(.ic_org.distinct)",
+            "IC_ORG_CRITICAL_GAP_OCCURRENCE=\(.ic_org.occurrence)",
+            (.ic_org.field_counts | to_entries[] | "ORG_FIELD|\(.key)|\(.value)"),
+            (.ic_org.people[] | "ORG|\(.sicil_no)|\(.ad_soyad)|\(.eksik|join(\",\"))"),
+            (.legacy_roles.rows[] | "LEGACY|\(.rol)|\(.aktif_sayi)|\(.not)"),
+            "AKTIF_LEGACY_ROLE_USER_COUNT=\(.legacy_roles.aktif_toplam)",
+            "INVENTORY_DONE=YES"
+          ' "$RESULT"
+
+          run_cpanel_ftp "
+            rm api/runtime/migration-control/readonly-inventory.pending;
+            rm api/runtime/migration-control/readonly-inventory-result.json;
+          " || true

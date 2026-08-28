@@ -174,16 +174,40 @@ jobs:
             echo "WORKER_LOCK_EXISTS=NO"
           fi
 
-          # 7) Cron heartbeat (worker heartbeat yayinlandiysa mevcuttur).
+          # 7) Son worker status'u (yalniz bounded, guvenli alanlar).
+          if grep -q "/status.json$" "${WORK}/control-dir.txt"; then
+            if run_cpanel_ftp "get api/runtime/migration-control/status.json -o ${WORK}/status.json"; then
+              st_state="$(jq -r '.state // "NONE"' "${WORK}/status.json" 2>/dev/null || echo NONE)"
+              st_request="$(jq -r '.request_id // "NONE"' "${WORK}/status.json" 2>/dev/null || echo NONE)"
+              st_updated="$(jq -r '.updated_at // "NONE"' "${WORK}/status.json" 2>/dev/null || echo NONE)"
+              st_reason="$(jq -r '.reason // "NONE"' "${WORK}/status.json" 2>/dev/null || echo NONE)"
+              [[ "$st_state" =~ ^(RUNNING|SUCCEEDED|FAILED)$ ]] || st_state="NONE"
+              [[ "$st_request" =~ ^[A-Za-z0-9._-]{1,128}$ ]] || st_request="NONE"
+              [[ "$st_updated" =~ ^[0-9TZ:._+-]{1,64}$ ]] || st_updated="NONE"
+              [[ "$st_reason" =~ ^[A-Z0-9_]{1,64}$ ]] || st_reason="NONE"
+              echo "WORKER_STATUS_STATE=${st_state}"
+              echo "WORKER_STATUS_REQUEST_ID=${st_request}"
+              echo "WORKER_STATUS_UPDATED_AT=${st_updated}"
+              echo "WORKER_STATUS_REASON=${st_reason}"
+            fi
+          fi
+
+          # 8) Cron heartbeat (worker heartbeat yayinlandiysa mevcuttur).
           if grep -q "/worker-heartbeat.json$" "${WORK}/control-dir.txt"; then
             echo "WORKER_HEARTBEAT_EXISTS=YES"
             if run_cpanel_ftp "get api/runtime/migration-control/worker-heartbeat.json -o ${WORK}/heartbeat.json;"; then
               hb_updated="$(jq -r '.updated_at // "NONE"' "${WORK}/heartbeat.json" 2>/dev/null || echo NONE)"
               hb_sha="$(jq -r '.deployed_sha // "NONE"' "${WORK}/heartbeat.json" 2>/dev/null || echo NONE)"
+              hb_tip="$(jq -r '.production_migration_tip // "NONE"' "${WORK}/heartbeat.json" 2>/dev/null || echo NONE)"
+              hb_legacy="$(jq -r '.legacy_role_enum_count // "NONE"' "${WORK}/heartbeat.json" 2>/dev/null || echo NONE)"
               [[ "$hb_updated" =~ ^[0-9TZ:._+-]{1,64}$ ]] || hb_updated="NONE"
               [[ "$hb_sha" =~ ^[0-9a-fA-F]{40}$ ]] || hb_sha="NONE"
+              [[ "$hb_tip" =~ ^[A-Za-z0-9._-]{1,64}$ ]] || hb_tip="NONE"
+              [[ "$hb_legacy" =~ ^-?[0-9]{1,3}$ ]] || hb_legacy="NONE"
               echo "WORKER_HEARTBEAT_UPDATED_AT=${hb_updated}"
               echo "WORKER_HEARTBEAT_DEPLOY_SHA=${hb_sha}"
+              echo "PRODUCTION_MIGRATION_TIP=${hb_tip}"
+              echo "LEGACY_ROLE_ENUM_SCHEMA_COUNT=${hb_legacy}"
             else
               echo "WORKER_HEARTBEAT_UPDATED_AT=UNREADABLE"
             fi

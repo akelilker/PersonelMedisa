@@ -84,11 +84,35 @@ describe('cPanel migration worker observability contract', () => {
     expect(heartbeatBody).toContain("'schema_version'");
     expect(heartbeatBody).toContain("'updated_at'");
     expect(heartbeatBody).toContain("'deployed_sha'");
-    for (const forbidden of ['users', 'personel', 'rol', 'username', 'password', 'INSERT', 'UPDATE', 'ALTER']) {
+    for (const forbidden of ['username', 'password', 'personel', 'INSERT', 'UPDATE', 'DELETE', 'ALTER']) {
       expect(heartbeatBody).not.toContain(forbidden);
     }
-    expect(heartbeatBody).not.toContain('Connection::get');
     expect(heartbeatBody).not.toContain('MigrationExecutionService');
+  });
+
+  it('exposes production schema state through read-only, fail-soft probes', () => {
+    expect(worker).toContain("'production_migration_tip' => readProductionMigrationTip()");
+    expect(worker).toContain("'legacy_role_enum_count' => readLegacyRoleEnumCount()");
+
+    const probes = worker.slice(
+      worker.indexOf('function readProductionMigrationTip('),
+      worker.indexOf('function writeHeartbeat('),
+    );
+    // Read-only: no write statement may appear in the observability probes.
+    for (const mutation of ['INSERT', 'UPDATE ', 'DELETE', 'ALTER', 'DROP', 'TRUNCATE']) {
+      expect(probes).not.toContain(mutation);
+    }
+    // Schema metadata only: never selects user rows or identity columns.
+    for (const forbidden of ['username', 'ad_soyad', 'personel', 'password', 'FROM users']) {
+      expect(probes).not.toContain(forbidden);
+    }
+    // A database outage must degrade the field, never fail the cron tick.
+    expect(probes).toContain("return 'UNKNOWN'");
+    expect(probes).toContain('return -1;');
+    expect(probes.match(/catch \(\\Throwable\)/g)?.length).toBe(2);
+    for (const retired of ['PATRON', 'IK_BORDRO', 'SGK_KARAR_ONAY_YETKILISI', 'IDARI_ISLER']) {
+      expect(probes).toContain(retired);
+    }
   });
 
   it('keeps the request and archive control plane in the worker', () => {

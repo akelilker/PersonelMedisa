@@ -1,5 +1,5 @@
 CODE_MIGRATION_TIP: 077
-PRODUCTION_MIGRATION_TIP: 076
+PRODUCTION_MIGRATION_TIP: 077
 
 # 131 — Legacy `users.rol` ENUM canonical cleanup
 
@@ -25,7 +25,7 @@ Ayrıca `AUTH_SMOKE_READONLY` **teknik/sistem aktörü** olarak korunur: tek izn
 
 ## Legacy değerler ve production envanteri
 
-Salt-okunur production envanteri (`ops-readonly-final-inventory` workflow, cron üzerinden `SELECT`; mutation yok):
+Salt-okunur production envanteri (cron üzerinden `SELECT`; mutation yok):
 
 | Legacy rol | Toplam kullanıcı | Aktif | Pasif | Personel bağlı |
 | --- | ---: | ---: | ---: | ---: |
@@ -48,13 +48,25 @@ Yetki kapsamı hiçbir rol için genişletilmemiş veya daraltılmamıştır; fr
 
 ## Production apply durumu
 
-Kod değişikliği `d6372deb3a6d83388bb31baf10d753f0acf912fe` ile canlıdır (CI PASS, Deploy cPanel PASS, authenticated read-only smoke PASS — smoke aktörü yetki yükselmesi olmadan çalışmaya devam ediyor).
+Kod değişikliği canlıdır (CI PASS, Deploy cPanel PASS, authenticated read-only smoke PASS — smoke aktörü yetki yükselmesi olmadan çalışmaya devam ediyor).
 
-Migration `077` **production'a uygulanamamıştır**. `Apply cPanel migrations` workflow'u üç ayrı denemede (`33144474181`, `33148682586`, `33152241001`) `MIGRATION_TIMEOUT_REASON=STATUS_TERMINAL_NOT_OBSERVED` ile zaman aşımına uğradı: worker kontrol düzleminde ne `status.json` ne de `request.*` izi gözlemlenebildi. Aynı pencerede salt-okunur envanter workflow'u da `api/bin/cpanel-migration-cron.php` dosyasını FTP üzerinden çekemedi (`max-retries exceeded`, hem explicit-FTPS hem plain-FTP). Bu bir cPanel/FTP ortam sorunudur; migration içeriğinden veya guard'ından kaynaklanmaz.
+Migration `077` production'a **uygulanmıştır**: apply run `33169230032`, request `33169230032-1`, worker `SUCCEEDED`, `deployed_sha = 23cebad69f24aa22fcbbbf621d4cd82372f7cfce`. Worker `APPLY` ve `VERIFY` aşamalarını geçmiştir; migration'ın kendi guard'ları (legacy rol atanmış kullanıcı sayısı ve canonical ENUM readback assert'i) apply sırasında sağlanmıştır. `PRODUCTION_MIGRATION_TIP = 077`.
 
-Bu nedenle `PRODUCTION_MIGRATION_TIP = 076` olarak kalmıştır ve production `users.rol` ENUM'u hâlâ 4 legacy değeri **şema seviyesinde** taşımaktadır. Yetki açısından risk yoktur: bu değerlerin atanmış kullanıcısı yok, hiçbir arayüzden seçilemez ve backend/frontend normalize sınırları bunları fail-closed reddeder.
+### Neden dört önceki deneme başarısız oldu
 
-Kalan tek adım, FTP/cron kontrol düzlemi sağlıklıya döndüğünde `Apply cPanel migrations` workflow'unu `deployed_sha = d6372deb3a6d83388bb31baf10d753f0acf912fe` ve onay `APPLY_CANONICAL_MIGRATIONS` ile yeniden çalıştırmaktır.
+Dört deneme (`33144474181`, `33148682586`, `33152241001`, `33154572612`) `MIGRATION_TIMEOUT_REASON=STATUS_TERMINAL_NOT_OBSERVED` verdi. Bu bir FTP kesintisi değildi; iki ayrı repo kaynaklı kusurun birleşimiydi:
+
+1. **Canlı worker bozulmuştu.** Kaldırılan `ops-readonly-final-inventory` workflow'u, envanter almak için canlı `api/bin/cpanel-migration-cron.php` dosyasını geçici bir wrapper ile değiştiriyor ve orijinali `cpanel-migration-cron.impl.php` olarak yanına kopyalıyordu. Restore adımı `|| true` ile hataları yuttuğu için wrapper canlıda kaldı, `impl` dosyası ise silindi. Wrapper her tick'te var olmayan dosyayı `require` edip PHP fatal veriyordu; bu yüzden hiçbir `status.json`, `worker.lock` veya arşiv üretilemedi. Incremental deploy git'te değişmeyen bu dosyayı yeniden yüklemediği için sonraki deploy'lar da onarmadı.
+2. **Teşhis yanlış negatif veriyordu.** Preflight ve final teşhis `mirror --include-glob` kullanıyordu; bu kalıp bu cPanel FTP sunucusunda sessizce boş dönüyor. Sonuç olarak busy guard fail-open kaldı (dört talep talep edilmeden birikti) ve teşhis, dosyalar aslında dururken "hiçbir iz yok" raporladı.
+
+Salt-okunur teşhis (`ops-migration-worker-diagnostics`) her ikisini de kanıtladı: `REMOTE_WORKER_IS_WRAPPER=YES`, `REMOTE_WORKER_BYTES=504`, `STALE_ARTIFACT|cpanel-migration-cron.impl.php=ABSENT` ve dört `request.pending.*` dosyasının hâlâ yerinde durduğu dizin listesi.
+
+### Kalıcı önlemler
+
+- Canlı worker'ı değiştiren envanter workflow'u kaldırıldı.
+- Worker her tick'te atomic `worker-heartbeat.json` yayınlıyor: `schema_version`, `updated_at`, `deployed_sha`, `production_migration_tip`, `legacy_role_enum_count`. Şema sorguları salt-okunur ve fail-soft'tur (DB erişilemezse `UNKNOWN` / `-1`); kullanıcı satırı okunmaz.
+- Apply workflow'unun preflight ve teşhis adımları dizin listelemesine geçti; busy guard artık fail-closed.
+- Birikmiş dört talep kör silinmedi; canonical worker yaşam döngüsüyle `DEPLOY_SHA_MISMATCH` gerekçesiyle `request.failed.*` arşivine taşındı.
 
 ## Kapanış anahtarları
 
@@ -62,8 +74,9 @@ Kalan tek adım, FTP/cron kontrol düzlemi sağlıklıya döndüğünde `Apply c
 LEGACY_ROLE_AUTHORIZATION_ACTIVE = HAYIR
 LEGACY_ROLE_ASSIGNED_REAL_USER_COUNT = 0
 LEGACY_ROLE_SELECTABLE_COUNT = 0
+LEGACY_ROLE_ENUM_SCHEMA_COUNT = 0
 CANONICAL_AUTH_ROLE_COUNT = 8
 SYSTEM_TEST_ROLE_COUNT = 1
-LEGACY_ROLE_ENUM_SCHEMA_SHRINK = MIGRATION_077_PENDING_PRODUCTION_APPLY
-MG_ROLE_ENUM_DEBT_001 = CODE_CLOSED_PRODUCTION_APPLY_PENDING
+LEGACY_ROLE_ENUM_SCHEMA_SHRINK = MIGRATION_077_PRODUCTION_APPLIED
+MG_ROLE_ENUM_DEBT_001 = CLOSED_CONFIRMED
 ```

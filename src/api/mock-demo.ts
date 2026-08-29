@@ -12,6 +12,7 @@ import type { AylikBildirimOnay } from "../types/aylik-bildirim-onay";
 import type { GenelYoneticiBildirimOnayi } from "../types/genel-yonetici-bildirim-onayi";
 import { hasRolePermission, type AppPermission } from "../lib/authorization/role-permissions";
 import { evaluatePersonelCompleteness } from "../features/personeller/personel-missing-info";
+import { personelSearchMatches } from "../features/personeller/personel-search-query";
 import type { Personel } from "../types/personel";
 import {
   buildSgkKatalogBlockerRaporuMock,
@@ -5117,7 +5118,7 @@ export function resolveDemoApiResponse(
     const page = toNumber(requestUrl.searchParams.get("page")) ?? 1;
     const limit = toNumber(requestUrl.searchParams.get("limit")) ?? 10;
     const aktiflik = toStringValue(requestUrl.searchParams.get("aktiflik")) ?? "tum";
-    const search = (toStringValue(requestUrl.searchParams.get("search")) ?? "").toLowerCase();
+    const search = toStringValue(requestUrl.searchParams.get("search")) ?? "";
     const subeId = toNumber(requestUrl.searchParams.get("sube_id"));
     const departmanId = toNumber(requestUrl.searchParams.get("departman_id"));
     const personelTipiId = toNumber(requestUrl.searchParams.get("personel_tipi_id"));
@@ -5144,12 +5145,7 @@ export function resolveDemoApiResponse(
       if (calisanKapsami && (item.calisan_kapsami ?? "IC_PERSONEL") !== calisanKapsami) {
         return false;
       }
-      if (!search) {
-        return true;
-      }
-
-      const fullText = `${item.ad} ${item.soyad} ${item.tc_kimlik_no}`.toLowerCase();
-      return fullText.includes(search);
+      return personelSearchMatches(item, search);
     });
 
     const missingPersonelTotal = scoped.filter(

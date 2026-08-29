@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fetchPersonelDetail, updatePersonel } from "../../src/api/personeller.api";
+import {
+  fetchPersonelDetail,
+  fetchPersonellerList,
+  updatePersonel
+} from "../../src/api/personeller.api";
 
 function createJsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -14,6 +18,32 @@ describe("personeller.api", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
+  });
+
+  it("sends the raw search text as a single query param and forwards the abort signal", async () => {
+    const fetchMock = vi.fn(async () =>
+      createJsonResponse(
+        { data: { items: [] }, meta: { page: 1, limit: 10, total: 0, total_pages: 1 }, errors: [] },
+        200
+      )
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const controller = new AbortController();
+    await fetchPersonellerList({
+      search: "İlker Akel",
+      calisan_kapsami: "DIS_KAYNAK",
+      page: 1,
+      limit: 10,
+      signal: controller.signal
+    });
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    // One unified search param — the backend owns tokenization.
+    expect(url).toContain("search=%C4%B0lker+Akel");
+    expect(url).toContain("calisan_kapsami=DIS_KAYNAK");
+    expect(url).not.toContain("search_ad");
+    expect(init?.signal).toBeInstanceOf(AbortSignal);
   });
 
   it("normalizes nested personel detail payload into flat Personel shape", async () => {

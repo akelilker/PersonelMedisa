@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
-import { getApiErrorMessage, shouldQueueOfflineMutation } from "../api/api-client";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { getApiErrorMessage, isAbortedRequestError, shouldQueueOfflineMutation } from "../api/api-client";
 import {
   createPersonel,
   fetchPersonelDetail,
@@ -32,7 +32,11 @@ import {
 } from "../data/data-manager";
 import { buildCreatePersonelPayload, parseOptionalPositiveInt } from "../features/personeller/personel-create-utils";
 import type { PaginatedResult } from "../types/api";
-import { runDeduped } from "../lib/in-flight-dedupe";
+import { acquireDedupedRequest, runDeduped } from "../lib/in-flight-dedupe";
+import {
+  PERSONEL_SEARCH_DEBOUNCE_MS,
+  normalizePersonelSearchQuery
+} from "../features/personeller/personel-search-query";
 import type { Personel } from "../types/personel";
 import {
   buildBagliAmirContext,
@@ -41,24 +45,34 @@ import {
 } from "../features/personeller/personel-edit-utils";
 const PAGE_SIZE = 10;
 
+export type PersonelListFilters = {
+  search: string;
+  aktiflik: "aktif" | "pasif" | "tum";
+  departmanId: string;
+  personelTipiId: string;
+  calisanKapsami: "" | "IC_PERSONEL" | "DIS_KAYNAK";
+  eksikBilgi: "tum" | "eksik";
+};
+
+/**
+ * `draft` is what the inputs show (raw text included), `applied` is what the API
+ * is actually queried with. Every filter except the text box is applied the moment
+ * it changes; the text box lands in `applied` after the debounce (or immediately
+ * on Enter / clear).
+ */
 export type PersonelListQueryState = {
-  draft: {
-    search: string;
-    aktiflik: "aktif" | "pasif" | "tum";
-    departmanId: string;
-    personelTipiId: string;
-    calisanKapsami: "" | "IC_PERSONEL" | "DIS_KAYNAK";
-    eksikBilgi: "tum" | "eksik";
-  };
-  applied: {
-    search: string;
-    aktiflik: "aktif" | "pasif" | "tum";
-    departmanId: string;
-    personelTipiId: string;
-    calisanKapsami: "" | "IC_PERSONEL" | "DIS_KAYNAK";
-    eksikBilgi: "tum" | "eksik";
-  };
+  draft: PersonelListFilters;
+  applied: PersonelListFilters;
   page: number;
+};
+
+const INITIAL_LIST_FILTERS: PersonelListFilters = {
+  search: "",
+  aktiflik: "tum",
+  departmanId: "",
+  personelTipiId: "",
+  calisanKapsami: "",
+  eksikBilgi: "tum"
 };
 
 export type CreatePersonelFormState = {
@@ -123,26 +137,12 @@ async function fetchBagliAmirContext(amirId: number): Promise<BagliAmirContext |
 export function usePersoneller() {
   const revision = useAppDataRevision();
   const [listQuery, setListQuery] = useState<PersonelListQueryState>({
-    draft: {
-      search: "",
-      aktiflik: "tum",
-      departmanId: "",
-      personelTipiId: "",
-      calisanKapsami: "",
-      eksikBilgi: "tum"
-    },
-    applied: {
-      search: "",
-      aktiflik: "tum",
-      departmanId: "",
-      personelTipiId: "",
-      calisanKapsami: "",
-      eksikBilgi: "tum"
-    },
+    draft: { ...INITIAL_LIST_FILTERS },
+    applied: { ...INITIAL_LIST_FILTERS },
     page: 1
   });
 
-  const [isLoading, setIsLoading] = useState(true);
+  const [isFetching, setIsFetching] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const [referenceError, setReferenceError] = useState<string | null>(null);
@@ -188,10 +188,26 @@ export function usePersoneller() {
     [listKey, revision]
   );
 
-  const personeller = listSnapshot?.items ?? [];
-  const hasNextPage = listSnapshot?.pagination.hasNextPage ?? false;
-  const totalPages = listSnapshot?.pagination.totalPages ?? null;
-  const missingPersonelTotal = listSnapshot?.missingPersonelTotal ?? null;
+  // The previous result stays on screen while the next query is in flight, so the
+  // list does not blank out and flicker on every keystroke.
+  const [lastLoadedSnapshot, setLastLoadedSnapshot] = useState<
+    (PaginatedResult<Personel> & { missingPersonelTotal?: number | null }) | null
+  >(null);
+
+  useEffect(() => {
+    if (listSnapshot !== undefined) {
+      setLastLoadedSnapshot(listSnapshot);
+    }
+  }, [listSnapshot]);
+
+  const shownSnapshot = listSnapshot ?? lastLoadedSnapshot ?? undefined;
+  /** True once the API answered the query currently in `applied`. */
+  const isCurrentQueryResolved = listSnapshot !== undefined;
+
+  const personeller = shownSnapshot?.items ?? [];
+  const hasNextPage = shownSnapshot?.pagination.hasNextPage ?? false;
+  const totalPages = shownSnapshot?.pagination.totalPages ?? null;
+  const missingPersonelTotal = shownSnapshot?.missingPersonelTotal ?? null;
 
   const refs = useMemo((): PersonelReferenceBundle => {
     return (
@@ -214,84 +230,91 @@ export function usePersoneller() {
     [activeSube, createBagliAmirContext, createForm.departmanId]
   );
 
+  const listRequestParams = useCallback(
+    (page: number, signal?: AbortSignal) => ({
+      search: appliedFilters.search || undefined,
+      departman_id: parseOptionalPositiveInt(appliedFilters.departmanId),
+      aktiflik: appliedFilters.aktiflik,
+      personel_tipi_id: parseOptionalPositiveInt(appliedFilters.personelTipiId),
+      calisan_kapsami: appliedFilters.calisanKapsami || undefined,
+      eksik_bilgi: appliedFilters.eksikBilgi === "eksik",
+      sube_id: getSubeIdForApiRequest(),
+      page,
+      limit: PAGE_SIZE,
+      signal
+    }),
+    [
+      appliedFilters.aktiflik,
+      appliedFilters.departmanId,
+      appliedFilters.personelTipiId,
+      appliedFilters.calisanKapsami,
+      appliedFilters.eksikBilgi,
+      appliedFilters.search
+    ]
+  );
+
   const refetch = useCallback(async () => {
-    await fetchWithCacheMerge(listKey, () =>
-      runDeduped(listKey, () =>
-        fetchPersonellerList({
-          search: appliedFilters.search || undefined,
-          departman_id: parseOptionalPositiveInt(appliedFilters.departmanId),
-          aktiflik: appliedFilters.aktiflik,
-          personel_tipi_id: parseOptionalPositiveInt(appliedFilters.personelTipiId),
-          calisan_kapsami: appliedFilters.calisanKapsami || undefined,
-          eksik_bilgi: appliedFilters.eksikBilgi === "eksik",
-          sube_id: getSubeIdForApiRequest(),
-          page: listPage,
-          limit: PAGE_SIZE
-        })
-      )
+    const lease = acquireDedupedRequest(listKey, (signal) =>
+      fetchPersonellerList(listRequestParams(listPage, signal))
     );
-  }, [
-    appliedFilters.aktiflik,
-    appliedFilters.departmanId,
-    appliedFilters.personelTipiId,
-    appliedFilters.calisanKapsami,
-    appliedFilters.eksikBilgi,
-    appliedFilters.search,
-    listKey,
-    listPage
-  ]);
+    try {
+      await fetchWithCacheMerge(listKey, () => lease.promise);
+    } finally {
+      lease.release();
+    }
+  }, [listKey, listPage, listRequestParams]);
+
+  // Monotonic id: only the newest query may touch loading/error state, so a slow
+  // response that lands after a newer one can never overwrite the current result.
+  const listRequestSeqRef = useRef(0);
+  const isMountedRef = useRef(true);
 
   useEffect(() => {
-    let cancelled = false;
-    const hasSeed =
-      getCacheEntry<PaginatedResult<Personel> & { missingPersonelTotal?: number | null }>(listKey) !==
-      undefined;
-    setIsLoading(!hasSeed);
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    const requestId = listRequestSeqRef.current + 1;
+    listRequestSeqRef.current = requestId;
+
+    setIsFetching(true);
     setErrorMessage(null);
+
+    const lease = acquireDedupedRequest(listKey, (signal) =>
+      fetchPersonellerList(listRequestParams(listPage, signal))
+    );
 
     void (async () => {
       try {
-        await fetchWithCacheMerge(listKey, () =>
-          runDeduped(listKey, () =>
-            fetchPersonellerList({
-              search: appliedFilters.search || undefined,
-              departman_id: parseOptionalPositiveInt(appliedFilters.departmanId),
-              aktiflik: appliedFilters.aktiflik,
-              personel_tipi_id: parseOptionalPositiveInt(appliedFilters.personelTipiId),
-              calisan_kapsami: appliedFilters.calisanKapsami || undefined,
-              eksik_bilgi: appliedFilters.eksikBilgi === "eksik",
-              sube_id: getSubeIdForApiRequest(),
-              page: listPage,
-              limit: PAGE_SIZE
-            })
-          )
-        );
-      } catch {
+        await fetchWithCacheMerge(listKey, () => lease.promise);
+      } catch (error) {
+        if (
+          isAbortedRequestError(error) ||
+          requestId !== listRequestSeqRef.current ||
+          !isMountedRef.current
+        ) {
+          // Superseded or unmounted: not a user-facing failure.
+          return;
+        }
         if (
           !getCacheEntry<PaginatedResult<Personel> & { missingPersonelTotal?: number | null }>(listKey)
         ) {
           setErrorMessage("Personel listesi su an guncellenemiyor.");
         }
       } finally {
-        if (!cancelled) {
-          setIsLoading(false);
+        if (requestId === listRequestSeqRef.current && isMountedRef.current) {
+          setIsFetching(false);
         }
       }
     })();
 
     return () => {
-      cancelled = true;
+      lease.release();
     };
-  }, [
-    appliedFilters.aktiflik,
-    appliedFilters.departmanId,
-    appliedFilters.personelTipiId,
-    appliedFilters.calisanKapsami,
-    appliedFilters.eksikBilgi,
-    appliedFilters.search,
-    listKey,
-    listPage
-  ]);
+  }, [listKey, listPage, listRequestParams]);
 
   useEffect(() => {
     let cancelled = false;
@@ -347,60 +370,140 @@ export function usePersoneller() {
     };
   }, []);
 
-  const submitFilters = useCallback((event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setListQuery((prev) => ({
-      ...prev,
-      applied: { ...prev.draft },
-      page: 1
-    }));
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isComposingRef = useRef(false);
+  const [searchCommitTick, setSearchCommitTick] = useState(0);
+
+  const cancelPendingSearch = useCallback(() => {
+    if (searchDebounceRef.current !== null) {
+      clearTimeout(searchDebounceRef.current);
+      searchDebounceRef.current = null;
+    }
   }, []);
 
-  const clearFilters = useCallback(() => {
-    setListQuery({
-      draft: {
-        search: "",
-        aktiflik: "tum",
-        departmanId: "",
-        personelTipiId: "",
-        calisanKapsami: "",
-        eksikBilgi: "tum"
-      },
-      applied: {
-        search: "",
-        aktiflik: "tum",
-        departmanId: "",
-        personelTipiId: "",
-        calisanKapsami: "",
-        eksikBilgi: "tum"
-      },
-      page: 1
-    });
+  useEffect(() => cancelPendingSearch, [cancelPendingSearch]);
+
+  /** Commits the normalized search text and restarts pagination. */
+  const applySearch = useCallback((search: string) => {
+    setListQuery((prev) =>
+      prev.applied.search === search && prev.page === 1
+        ? prev
+        : { ...prev, applied: { ...prev.applied, search }, page: 1 }
+    );
   }, []);
+
+  /**
+   * Dropdowns, scope, activity and every other non-text filter take effect the
+   * moment they change. A search still waiting for its debounce is committed
+   * together with them, so no keystroke is lost.
+   */
+  const applyFilterPatch = useCallback(
+    (patch: Partial<Omit<PersonelListFilters, "search">>) => {
+      cancelPendingSearch();
+      setListQuery((prev) => {
+        const draft = { ...prev.draft, ...patch };
+        return {
+          draft,
+          applied: { ...draft, search: normalizePersonelSearchQuery(draft.search) },
+          page: 1
+        };
+      });
+    },
+    [cancelPendingSearch]
+  );
 
   const setDraftSearch = useCallback((search: string) => {
     setListQuery((prev) => ({ ...prev, draft: { ...prev.draft, search } }));
   }, []);
 
-  const setDraftAktiflik = useCallback((aktiflik: "aktif" | "pasif" | "tum") => {
-    setListQuery((prev) => ({ ...prev, draft: { ...prev.draft, aktiflik } }));
-  }, []);
+  const draftSearch = listQuery.draft.search;
 
-  const setDraftDepartmanId = useCallback((departmanId: string) => {
-    setListQuery((prev) => ({ ...prev, draft: { ...prev.draft, departmanId } }));
-  }, []);
+  useEffect(() => {
+    const nextSearch = normalizePersonelSearchQuery(draftSearch);
+    if (nextSearch === appliedFilters.search) {
+      cancelPendingSearch();
+      return undefined;
+    }
+    // Half-composed IME text must not be queried; onCompositionEnd re-runs this.
+    if (isComposingRef.current) {
+      return undefined;
+    }
 
-  const setDraftPersonelTipiId = useCallback((personelTipiId: string) => {
-    setListQuery((prev) => ({ ...prev, draft: { ...prev.draft, personelTipiId } }));
-  }, []);
+    cancelPendingSearch();
+    if (nextSearch === "") {
+      // Cleared input returns to the default list right away.
+      applySearch(nextSearch);
+      return undefined;
+    }
 
-  const setDraftCalisanKapsami = useCallback((calisanKapsami: "" | "IC_PERSONEL" | "DIS_KAYNAK") => {
-    setListQuery((prev) => ({ ...prev, draft: { ...prev.draft, calisanKapsami } }));
-  }, []);
+    searchDebounceRef.current = setTimeout(() => {
+      searchDebounceRef.current = null;
+      applySearch(nextSearch);
+    }, PERSONEL_SEARCH_DEBOUNCE_MS);
 
-  const setDraftEksikBilgi = useCallback((eksikBilgi: "tum" | "eksik") => {
-    setListQuery((prev) => ({ ...prev, draft: { ...prev.draft, eksikBilgi } }));
-  }, []);
+    return cancelPendingSearch;
+  }, [applySearch, appliedFilters.search, cancelPendingSearch, draftSearch, searchCommitTick]);
+
+  /** Enter (or any form submit) skips the remaining debounce. */
+  const submitFilters = useCallback(
+    (event?: FormEvent<HTMLFormElement>) => {
+      event?.preventDefault();
+      cancelPendingSearch();
+      setListQuery((prev) => ({
+        ...prev,
+        applied: { ...prev.draft, search: normalizePersonelSearchQuery(prev.draft.search) },
+        page: 1
+      }));
+    },
+    [cancelPendingSearch]
+  );
+
+  const setSearchComposing = useCallback(
+    (composing: boolean) => {
+      isComposingRef.current = composing;
+      if (composing) {
+        cancelPendingSearch();
+        return;
+      }
+      // Re-runs the debounce effect against the now-complete text.
+      setSearchCommitTick((tick) => tick + 1);
+    },
+    [cancelPendingSearch]
+  );
+
+  const clearFilters = useCallback(() => {
+    cancelPendingSearch();
+    setListQuery({
+      draft: { ...INITIAL_LIST_FILTERS },
+      applied: { ...INITIAL_LIST_FILTERS },
+      page: 1
+    });
+  }, [cancelPendingSearch]);
+
+  const setDraftAktiflik = useCallback(
+    (aktiflik: "aktif" | "pasif" | "tum") => applyFilterPatch({ aktiflik }),
+    [applyFilterPatch]
+  );
+
+  const setDraftDepartmanId = useCallback(
+    (departmanId: string) => applyFilterPatch({ departmanId }),
+    [applyFilterPatch]
+  );
+
+  const setDraftPersonelTipiId = useCallback(
+    (personelTipiId: string) => applyFilterPatch({ personelTipiId }),
+    [applyFilterPatch]
+  );
+
+  const setDraftCalisanKapsami = useCallback(
+    (calisanKapsami: "" | "IC_PERSONEL" | "DIS_KAYNAK") => applyFilterPatch({ calisanKapsami }),
+    [applyFilterPatch]
+  );
+
+  const setDraftEksikBilgi = useCallback(
+    (eksikBilgi: "tum" | "eksik") => applyFilterPatch({ eksikBilgi }),
+    [applyFilterPatch]
+  );
 
   const setPage = useCallback((next: number | ((p: number) => number)) => {
     setListQuery((prev) => ({
@@ -567,7 +670,11 @@ export function usePersoneller() {
     hasNextPage,
     totalPages,
     missingPersonelTotal,
-    isLoading,
+    /** First load only: there is nothing to keep on screen yet. */
+    isLoading: isFetching && personeller.length === 0,
+    /** A newer query is in flight while previous rows stay visible. */
+    isRefreshing: isFetching && personeller.length > 0,
+    isCurrentQueryResolved,
     errorMessage,
     refetch,
     refs,
@@ -587,6 +694,7 @@ export function usePersoneller() {
     submitFilters,
     clearFilters,
     setDraftSearch,
+    setSearchComposing,
     setDraftAktiflik,
     setDraftDepartmanId,
     setDraftPersonelTipiId,

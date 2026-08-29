@@ -14,6 +14,7 @@ import { formatReferenceValue } from "../components/personel-dosya/personel-dosy
 import { PersonelImportDryRunModal } from "../components/PersonelImportDryRunModal";
 import { PersonelImportHistoryModal } from "../components/PersonelImportHistoryModal";
 import { getPersonelMissingFields, resolvePersonelCompleteness } from "../personel-missing-info";
+import { PERSONEL_SEARCH_MAX_LENGTH } from "../personel-search-query";
 
 function IconSearch(props: { className?: string }) {
   return (
@@ -163,12 +164,15 @@ export function PersonellerPage() {
     totalPages,
     missingPersonelTotal,
     isLoading,
+    isRefreshing,
+    isCurrentQueryResolved,
     errorMessage,
     refetch,
     refs,
     submitFilters,
     clearFilters,
     setDraftSearch,
+    setSearchComposing,
     setDraftAktiflik,
     setDraftDepartmanId,
     setDraftPersonelTipiId,
@@ -286,9 +290,22 @@ export function PersonellerPage() {
               <FormField
                 label="Ara"
                 name="personel-filter-search"
-                placeholder="Ad, soyad veya T.C. Kimlik No"
+                type="search"
+                placeholder="Ad soyad, sicil, T.C. Kimlik No veya telefon"
+                autoComplete="off"
+                maxLength={PERSONEL_SEARCH_MAX_LENGTH}
+                dataTestId="personeller-search-input"
                 value={draft.search}
                 onChange={setDraftSearch}
+                onCompositionStart={() => setSearchComposing(true)}
+                onCompositionEnd={() => setSearchComposing(false)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    // Search as you type is the default; Enter just skips the debounce.
+                    event.preventDefault();
+                    submitFilters();
+                  }
+                }}
               />
             </div>
           ) : null}
@@ -405,9 +422,6 @@ export function PersonellerPage() {
           ) : null}
 
           <div className="form-actions-row personeller-filter-actions">
-            <button type="submit" className="universal-btn-aux">
-              Filtrele
-            </button>
             <button type="button" className="universal-btn-aux" onClick={clearFilters}>
               Temizle
             </button>
@@ -416,6 +430,16 @@ export function PersonellerPage() {
       ) : null}
 
       {isLoading ? <LoadingState label="Personel verileri yükleniyor..." /> : null}
+
+      {isRefreshing ? (
+        <p
+          className="personeller-missing-summary"
+          data-testid="personeller-list-refreshing"
+          role="status"
+        >
+          Sonuçlar güncelleniyor...
+        </p>
+      ) : null}
 
       {!isLoading && !errorMessage && missingPersonelTotal != null ? (
         <p
@@ -432,7 +456,8 @@ export function PersonellerPage() {
         <ErrorState message={errorMessage} onRetry={() => void refetch()} />
       ) : null}
 
-      {!isLoading && !errorMessage && personeller.length === 0 ? (
+      {/* Only after the query in `applied` actually answered — never mid-request. */}
+      {!isLoading && !isRefreshing && isCurrentQueryResolved && !errorMessage && personeller.length === 0 ? (
         <EmptyState
           title="Personel kaydı bulunamadı"
           message="Filtre veya kaynak veri durumunu kontrol et."
@@ -642,7 +667,7 @@ export function PersonellerPage() {
           type="button"
           className="universal-btn-aux"
           onClick={() => setPage((prev) => Math.max(1, prev - 1))}
-          disabled={isLoading || page <= 1}
+          disabled={isLoading || isRefreshing || page <= 1}
         >
           Onceki
         </button>
@@ -654,7 +679,7 @@ export function PersonellerPage() {
           type="button"
           className="universal-btn-aux"
           onClick={() => setPage((prev) => prev + 1)}
-          disabled={isLoading || !hasNextPage}
+          disabled={isLoading || isRefreshing || !hasNextPage}
         >
           Sonraki
         </button>

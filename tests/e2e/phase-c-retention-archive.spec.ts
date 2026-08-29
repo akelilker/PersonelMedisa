@@ -10,8 +10,9 @@ test.describe("Phase C retention archive UI", () => {
     await page.goto("/personeller");
     await page.getByRole("button", { name: "Detaylı filtre aç" }).click();
     await expect(page.locator('input[name="personel-filter-pasif"]')).toBeVisible();
+    // Filters apply the moment they change; there is no submit button anymore.
     await page.locator('input[name="personel-filter-pasif"]').check();
-    await page.getByRole("button", { name: "Filtrele" }).click();
+    await expect(page.getByRole("button", { name: "Filtrele" })).toHaveCount(0);
 
     await expect(page.getByTestId("personeller-arsiv-banner")).toBeVisible({ timeout: 15_000 });
     await expect(page.getByText(/Pasif\s+Ornek/i).first()).toBeVisible({ timeout: 15_000 });

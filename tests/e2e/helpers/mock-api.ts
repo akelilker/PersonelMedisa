@@ -19,6 +19,7 @@ import {
 } from "../../../src/types/personel-belge-kaydi";
 import { hasRolePermission, type AppPermission } from "../../../src/lib/authorization/role-permissions";
 import { evaluatePersonelCompleteness } from "../../../src/features/personeller/personel-missing-info";
+import { personelSearchMatches } from "../../../src/features/personeller/personel-search-query";
 import type { Personel } from "../../../src/types/personel";
 import {
   listWeeksIntersectingMonth,
@@ -4669,7 +4670,8 @@ let personelBelgeKaydiIdCounter = 903;
     if (path === "/api/personeller" && method === "GET") {
       const pageNumber = Number.parseInt(url.searchParams.get("page") ?? "1", 10) || 1;
       const pageLimit = Number.parseInt(url.searchParams.get("limit") ?? "10", 10) || 10;
-      const search = (url.searchParams.get("search") ?? "").toLowerCase();
+      const search = url.searchParams.get("search") ?? "";
+      const calisanKapsami = url.searchParams.get("calisan_kapsami") ?? "";
       const departmanId = Number.parseInt(url.searchParams.get("departman_id") ?? "", 10);
       const personelTipiId = Number.parseInt(url.searchParams.get("personel_tipi_id") ?? "", 10);
       const aktiflikRaw = url.searchParams.get("aktiflik") ?? "tum";
@@ -4717,12 +4719,10 @@ let personelBelgeKaydiIdCounter = 903;
         if (Number.isFinite(personelTipiId) && item.personel_tipi_id !== personelTipiId) {
           return false;
         }
-        if (!search) {
-          return true;
+        if (calisanKapsami && (item.calisan_kapsami ?? "IC_PERSONEL") !== calisanKapsami) {
+          return false;
         }
-
-        const fullText = `${item.ad} ${item.soyad} ${item.tc_kimlik_no}`.toLowerCase();
-        return fullText.includes(search);
+        return personelSearchMatches(item, search);
       });
 
       const missingPersonelTotal = scoped.filter(

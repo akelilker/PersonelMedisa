@@ -1,4 +1,9 @@
-import type { FormEventHandler, ReactNode } from "react";
+import type {
+  CompositionEventHandler,
+  FormEventHandler,
+  KeyboardEventHandler,
+  ReactNode
+} from "react";
 
 export type FormFieldOption = { value: string; label: string };
 
@@ -14,8 +19,14 @@ type FormFieldBase = {
 
 type FormFieldAsInput = FormFieldBase & {
   as?: "input";
-  type?: "text" | "date" | "tel" | "number" | "month" | "time" | "password";
+  type?: "text" | "date" | "tel" | "number" | "month" | "time" | "password" | "search";
   onInvalid?: FormEventHandler<HTMLInputElement>;
+  onKeyDown?: KeyboardEventHandler<HTMLInputElement>;
+  onCompositionStart?: CompositionEventHandler<HTMLInputElement>;
+  onCompositionEnd?: CompositionEventHandler<HTMLInputElement>;
+  autoComplete?: string;
+  maxLength?: number;
+  dataTestId?: string;
   min?: number | string;
   step?: string;
   rows?: never;
@@ -97,9 +108,15 @@ export function FormField(props: FormFieldProps) {
         disabled={disabled}
         min={props.min}
         step={props.step}
+        maxLength={props.maxLength}
+        autoComplete={props.autoComplete}
+        data-testid={props.dataTestId}
         value={value}
         onChange={(event) => onChange(event.target.value)}
         onInvalid={props.onInvalid}
+        onKeyDown={props.onKeyDown}
+        onCompositionStart={props.onCompositionStart}
+        onCompositionEnd={props.onCompositionEnd}
       />
     );
   }

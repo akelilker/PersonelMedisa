@@ -25,6 +25,7 @@ use Medisa\Api\Services\Personel\PersonelImportHistoryService;
 use Medisa\Api\Services\Personel\PersonelImportReferenceCatalogService;
 use Medisa\Api\Services\Personel\PersonelOrgLocationSchema;
 use Medisa\Api\Services\Personel\PersonelOrgStructureSchema;
+use Medisa\Api\Services\Personel\PersonelSearchPredicate;
 use Medisa\Api\Services\Personel\PersonelSicilAllocationException;
 use Medisa\Api\Services\Personel\PersonelSicilAllocator;
 use Medisa\Api\Services\Personel\PersonelValidationException;
@@ -47,7 +48,8 @@ class PersonellerController
 
         $page = max(1, (int) ($request->getQuery('page', 1) ?: 1));
         $limit = max(1, min(250, (int) ($request->getQuery('limit', 10) ?: 10)));
-        $search = strtolower(trim((string) $request->getQuery('search', '')));
+        // Normalization, tokenization and case folding belong to PersonelSearchPredicate.
+        $search = PersonelSearchPredicate::normalize($request->getQuery('search', ''));
         // Without arsiv.view: always AKTIF (blocks pasif|tum bypass).
         $aktiflik = PersonelArchiveGate::effectiveListAktiflik(
             $user,
@@ -107,13 +109,7 @@ class PersonellerController
             }
         }
 
-        if ($search !== '') {
-            $where[] = '(LOWER(p.ad) LIKE :search_ad OR LOWER(p.soyad) LIKE :search_soyad OR p.tc_kimlik_no LIKE :search_tc)';
-            $searchLike = '%' . $search . '%';
-            $params['search_ad'] = $searchLike;
-            $params['search_soyad'] = $searchLike;
-            $params['search_tc'] = $searchLike;
-        }
+        PersonelSearchPredicate::append($where, $params, $search, 'p', 'search', $pdo);
 
         $missingPredicate = PersonelCompletenessService::sqlHasMissingPredicate(
             'p',

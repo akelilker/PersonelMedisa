@@ -325,15 +325,15 @@ export async function updateYonetimKullanici(
 
 /**
  * Canonical admin credential reset: boolean intent only.
- * Never sends a password or a hash; the server writes the standard initial
- * password hash and forces a change on first login.
+ * Never sends a password or a hash; the server derives the initial password from
+ * the account's own stored name and forces a change on first login.
  */
-export async function resetYonetimKullaniciStandartSifre(
+export async function resetYonetimKullaniciBaslangicSifresi(
   kullaniciId: number | string
 ): Promise<YonetimKullanici> {
   const response = await apiRequest<ApiResponse<unknown>>(endpoints.yonetim.kullaniciDetail(kullaniciId), {
     method: "PUT",
-    body: JSON.stringify({ standart_baslangic_sifresine_sifirla: true })
+    body: JSON.stringify({ baslangic_sifresine_sifirla: true })
   });
   return normalizeYonetimKullanici(response.data);
 }

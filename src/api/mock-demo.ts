@@ -1,4 +1,4 @@
-﻿import type { ApiResponse } from "../types/api";
+import type { ApiResponse } from "../types/api";
 import type { HaftalikKapanisSnapshotSatir, HaftalikKapanisSonuc } from "../types/haftalik-kapanis";
 import type {
   FazlaCalismaOdemeTercihi,
@@ -8218,7 +8218,7 @@ export function resolveDemoApiResponse(
       return null;
     }
 
-    const resetToStandardInitial = body.standart_baslangic_sifresine_sifirla === true;
+    const resetToInitial = body.baslangic_sifresine_sifirla === true;
     const personelId = "personel_id" in body ? toNumber(body.personel_id) : target.personel_id;
     const linkedPersonel =
       personelId !== null ? demoState.personeller.find((personel) => personel.id === personelId) ?? null : null;
@@ -8244,7 +8244,7 @@ export function resolveDemoApiResponse(
           ? body.rol
           : target.rol,
       personel_id: personelId,
-      must_change_password: resetToStandardInitial || toStringValue(body.password)
+      must_change_password: resetToInitial || toStringValue(body.password)
         ? true
         : (target.must_change_password ?? false),
       sube_ids: Array.isArray(body.sube_ids)

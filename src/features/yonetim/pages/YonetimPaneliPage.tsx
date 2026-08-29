@@ -16,7 +16,7 @@ import {
   deleteYonetimSube,
   fetchYonetimKullanicilari,
   fetchYonetimSubeleri,
-  resetYonetimKullaniciStandartSifre,
+  resetYonetimKullaniciBaslangicSifresi,
   updateYonetimKullanici,
   updateYonetimSube
 } from "../../../api/yonetim.api";
@@ -792,7 +792,7 @@ export function YonetimPaneliPage() {
     }
   }
 
-  async function handleStandartBaslangicSifresineSifirla() {
+  async function handleBaslangicSifresineSifirla() {
     if (isSubmitting || editingKullaniciId == null) {
       return;
     }
@@ -802,14 +802,14 @@ export function YonetimPaneliPage() {
     setSuccessMessage(null);
 
     try {
-      await resetYonetimKullaniciStandartSifre(editingKullaniciId);
+      await resetYonetimKullaniciBaslangicSifresi(editingKullaniciId);
       setSifreResetConfirmOpen(false);
-      setSuccessMessage("Hesap standart başlangıç şifresine sıfırlandı. Kullanıcı ilk girişte şifresini değiştirecek.");
+      setSuccessMessage("Hesap başlangıç şifresine sıfırlandı. Kullanıcı ilk girişte şifresini değiştirecek.");
       resetKullaniciEditor();
       await loadPanel();
     } catch (error) {
       setFormErrorMessage(
-        error instanceof Error ? error.message : "Standart başlangıç şifresine sıfırlama yapılamadı."
+        error instanceof Error ? error.message : "Başlangıç şifresine sıfırlama yapılamadı."
       );
     } finally {
       setIsSubmitting(false);
@@ -1210,15 +1210,15 @@ export function YonetimPaneliPage() {
               />
               {!isSecurePersonelCreatePath ? (
                 editingKullaniciId == null ? (
-                  <p className="yonetim-hint" data-testid="yonetim-standart-baslangic-sifresi-hint">
-                    Yeni hesap standart başlangıç şifresiyle oluşturulur. Kullanıcı ilk girişte standart
-                    başlangıç şifresini kendi kalıcı şifresiyle değiştirir.
+                  <p className="yonetim-hint" data-testid="yonetim-baslangic-sifresi-hint">
+                    Yeni hesabın başlangıç şifresi, girdiğiniz ad soyad bilgisinden şirket kuralıyla
+                    otomatik üretilir. Kullanıcı ilk girişte bu şifreyi kendi kalıcı şifresiyle değiştirir.
                   </p>
                 ) : (
-                  <div className="yonetim-form-stack" data-testid="yonetim-standart-baslangic-sifresi-reset">
+                  <div className="yonetim-form-stack" data-testid="yonetim-baslangic-sifresi-reset">
                     <p className="yonetim-hint">
                       Şifre bu formdan belirlenmez. Gerekiyorsa hesabı ilk giriş durumuna alın; kullanıcı
-                      standart başlangıç şifresiyle girip kendi kalıcı şifresini belirler.
+                      ad soyadından üretilen başlangıç şifresiyle girip kendi kalıcı şifresini belirler.
                     </p>
                     {!sifreResetConfirmOpen ? (
                       <button
@@ -1231,20 +1231,21 @@ export function YonetimPaneliPage() {
                           setSifreResetConfirmOpen(true);
                         }}
                       >
-                        Standart Başlangıç Şifresine Sıfırla
+                        Başlangıç Şifresine Sıfırla
                       </button>
                     ) : (
                       <div className="yonetim-create-row" data-testid="yonetim-kullanici-sifre-sifirla-confirm">
                         <p className="yonetim-hint">
-                          Hesap standart başlangıç şifresine döner ve kullanıcı ilk girişte kendi kalıcı
-                          şifresini belirlemek zorunda kalır. Rol, yetki ve personel bağlantısı değişmez.
+                          Hesap, kullanıcının ad soyadından üretilen başlangıç şifresine döner ve kullanıcı
+                          ilk girişte kendi kalıcı şifresini belirlemek zorunda kalır. Rol, yetki ve personel
+                          bağlantısı değişmez.
                         </p>
                         <button
                           type="button"
                           className="universal-btn-save"
                           data-testid="yonetim-kullanici-sifre-sifirla-onayla"
                           disabled={isSubmitting}
-                          onClick={() => void handleStandartBaslangicSifresineSifirla()}
+                          onClick={() => void handleBaslangicSifresineSifirla()}
                         >
                           {isSubmitting ? "Sıfırlanıyor…" : "Onayla"}
                         </button>

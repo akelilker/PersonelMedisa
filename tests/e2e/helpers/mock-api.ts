@@ -12442,10 +12442,10 @@ let personelBelgeKaydiIdCounter = 903;
         varsayilan_sube_id?: number | null;
         durum?: "AKTIF" | "PASIF";
         notlar?: string;
-        standart_baslangic_sifresine_sifirla?: boolean;
+        baslangic_sifresine_sifirla?: boolean;
       };
 
-      const resetToStandardInitial = payload.standart_baslangic_sifresine_sifirla === true;
+      const resetToInitial = payload.baslangic_sifresine_sifirla === true;
       const nextUsername = payload.username != null ? String(payload.username).trim() : target.username;
       if (
         nextUsername !== target.username &&
@@ -12491,7 +12491,7 @@ let personelBelgeKaydiIdCounter = 903;
         rol: payload.rol ?? target.rol,
         personel_id: payload.personel_id !== undefined ? payload.personel_id ?? null : target.personel_id,
         must_change_password:
-          resetToStandardInitial ||
+          resetToInitial ||
           (typeof payload.password === "string" && payload.password.trim() !== "")
             ? true
             : target.must_change_password,

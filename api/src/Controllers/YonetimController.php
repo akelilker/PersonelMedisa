@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace Medisa\Api\Controllers;
 
 use Medisa\Api\Auth\AuthMiddleware;
+use Medisa\Api\Auth\InitialPassword;
 use Medisa\Api\Auth\PasswordHasher;
 use Medisa\Api\Auth\PasswordPolicy;
 use Medisa\Api\Auth\RolePermissions;
-use Medisa\Api\Auth\StandardInitialPassword;
 use Medisa\Api\Database\Connection;
 use Medisa\Api\Database\UserOrgAssignmentSchema;
 use Medisa\Api\Database\UsersSchema;
@@ -1010,14 +1010,14 @@ class YonetimController
             JsonResponse::badRequest('Gecersiz durum.', 'VALIDATION_ERROR', 'durum');
         }
 
-        // No plaintext password from the admin UI: new accounts get the standard
-        // initial password hash and must change it on first login. An explicit
-        // password stays supported for legacy API callers.
+        // No plaintext password from the admin UI: new accounts get the initial
+        // password derived from their own stored name and must change it on first
+        // login. An explicit password stays supported for legacy API callers.
         if ($password !== '') {
             PasswordPolicy::assertValidNewPassword($password);
             $passwordHash = PasswordHasher::hash($password);
         } else {
-            $passwordHash = StandardInitialPassword::requireHash();
+            $passwordHash = InitialPassword::requireHashForName($adSoyad);
         }
 
         try {
@@ -1161,7 +1161,7 @@ class YonetimController
             ? trim((string) $body['username'])
             : (string) $existing['username'];
         $password = array_key_exists('password', $body) ? (string) $body['password'] : '';
-        $resetToStandardInitial = self::parseStandardInitialPasswordResetIntent($body);
+        $resetToInitial = self::parseInitialPasswordResetIntent($body);
         $adSoyad = array_key_exists('ad_soyad', $body)
             ? trim((string) $body['ad_soyad'])
             : (string) $existing['ad_soyad'];
@@ -1214,20 +1214,24 @@ class YonetimController
         }
 
         // Password writes stay one canonical owner: either the legacy explicit password
-        // or the standard initial password reset intent, never both.
+        // or the initial password reset intent, never both.
         $passwordHash = null;
-        if ($password !== '' && $resetToStandardInitial) {
+        if ($password !== '' && $resetToInitial) {
             JsonResponse::badRequest(
-                'Sifre alani ile standart baslangic sifresi sifirlama ayni istekte kullanilamaz.',
+                'Sifre alani ile baslangic sifresi sifirlama ayni istekte kullanilamaz.',
                 'VALIDATION_ERROR',
-                'standart_baslangic_sifresine_sifirla'
+                'baslangic_sifresine_sifirla'
             );
         }
         if ($password !== '') {
             PasswordPolicy::assertValidNewPassword($password);
             $passwordHash = PasswordHasher::hash($password);
-        } elseif ($resetToStandardInitial) {
-            $passwordHash = StandardInitialPassword::requireHash();
+        } elseif ($resetToInitial) {
+            // The name is resolved from stored state only, never from the request:
+            // a bound personnel record owns it, otherwise the stored user field does.
+            $passwordHash = InitialPassword::requireHashForName(
+                self::resolveStoredAdSoyadForInitialPassword($pdo, $existing)
+            );
         }
 
         self::assertSubeYoneticisiRoleSchemaReady($pdo, $rol);
@@ -1631,22 +1635,42 @@ class YonetimController
      *
      * @param array<string, mixed> $body
      */
-    private static function parseStandardInitialPasswordResetIntent(array $body)
+    private static function parseInitialPasswordResetIntent(array $body)
     {
-        if (!array_key_exists('standart_baslangic_sifresine_sifirla', $body)) {
+        if (!array_key_exists('baslangic_sifresine_sifirla', $body)) {
             return false;
         }
 
-        $value = $body['standart_baslangic_sifresine_sifirla'];
+        $value = $body['baslangic_sifresine_sifirla'];
         if (!is_bool($value)) {
             JsonResponse::badRequest(
-                'Standart baslangic sifresi sifirlama alani boolean olmalidir.',
+                'Baslangic sifresi sifirlama alani boolean olmalidir.',
                 'VALIDATION_ERROR',
-                'standart_baslangic_sifresine_sifirla'
+                'baslangic_sifresine_sifirla'
             );
         }
 
         return $value;
+    }
+
+    /**
+     * Canonical stored name behind an account's initial password: the bound
+     * personnel record when there is one, otherwise the stored user name.
+     *
+     * @param array<string, mixed> $existing
+     */
+    private static function resolveStoredAdSoyadForInitialPassword(PDO $pdo, array $existing)
+    {
+        $personelId = self::readStoredPersonelIdFromRow($existing);
+        if ($personelId !== null) {
+            $names = self::loadPersonelAdSoyadByIds($pdo, [$existing]);
+            $personelAdSoyad = trim((string) ($names[$personelId] ?? ''));
+            if ($personelAdSoyad !== '') {
+                return $personelAdSoyad;
+            }
+        }
+
+        return trim((string) ($existing['ad_soyad'] ?? ''));
     }
 
     private static function isValidRole($rol)

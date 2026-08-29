@@ -14,7 +14,7 @@ vi.mock("../../src/api/api-client", async (importOriginal) => {
   };
 });
 
-const { resetYonetimKullaniciStandartSifre } = await import("../../src/api/yonetim.api");
+const { resetYonetimKullaniciBaslangicSifresi } = await import("../../src/api/yonetim.api");
 
 function read(path: string): string {
   return readFileSync(resolve(path), "utf8");
@@ -22,7 +22,7 @@ function read(path: string): string {
 
 const PAGE = "src/features/yonetim/pages/YonetimPaneliPage.tsx";
 
-describe("yonetim user modal: standard initial password model", () => {
+describe("yonetim user modal: derived initial password model", () => {
   afterEach(() => {
     apiRequestMock.mockReset();
   });
@@ -36,18 +36,18 @@ describe("yonetim user modal: standard initial password model", () => {
     expect(page).not.toContain("payload.password");
   });
 
-  it("tells the user on create that the standard initial password is used", () => {
+  it("tells the user on create that the password comes from the name", () => {
     const page = read(PAGE);
-    expect(page).toContain("yonetim-standart-baslangic-sifresi-hint");
-    expect(page).toContain("Yeni hesap standart başlangıç şifresiyle oluşturulur.");
+    expect(page).toContain("yonetim-baslangic-sifresi-hint");
+    expect(page).toContain("ad soyad bilgisinden şirket kuralıyla");
   });
 
   it("offers a confirmed reset action on the existing-user editor", () => {
     const page = read(PAGE);
     expect(page).toContain("yonetim-kullanici-sifre-sifirla");
     expect(page).toContain("yonetim-kullanici-sifre-sifirla-confirm");
-    expect(page).toContain("Standart Başlangıç Şifresine Sıfırla");
-    expect(page).toContain("resetYonetimKullaniciStandartSifre");
+    expect(page).toContain("Başlangıç Şifresine Sıfırla");
+    expect(page).toContain("resetYonetimKullaniciBaslangicSifresi");
   });
 
   it("keeps the modal-scoped submit error owner intact", () => {
@@ -74,14 +74,14 @@ describe("yonetim user modal: standard initial password model", () => {
       errors: []
     });
 
-    await resetYonetimKullaniciStandartSifre(148);
+    await resetYonetimKullaniciBaslangicSifresi(148);
 
     expect(apiRequestMock).toHaveBeenCalledTimes(1);
     const [path, init] = apiRequestMock.mock.calls[0] as [string, RequestInit];
     expect(path).toBe("/yonetim/kullanicilar/148");
     expect(init.method).toBe("PUT");
     const body = JSON.parse(String(init.body)) as Record<string, unknown>;
-    expect(body).toEqual({ standart_baslangic_sifresine_sifirla: true });
+    expect(body).toEqual({ baslangic_sifresine_sifirla: true });
   });
 
   it("keeps the production bundle sources free of demo credentials", () => {

@@ -34,7 +34,8 @@ describe("I6 surec pozisyon personnel update parity", () => {
     expect(form.gorevId).toBe("1");
     expect(form.bagliAmirId).toBe("9");
     expect(form.personelTipiId).toBe("1");
-    expect(form.effectiveDate).toBe("");
+    // Already assigned personel: subsequent change defaults to today.
+    expect(form.effectiveDate).toBe(new Date().toISOString().slice(0, 10));
     expect(form.aciklama).toBe("");
   });
 
@@ -56,6 +57,7 @@ describe("I6 surec pozisyon personnel update parity", () => {
     const personel = makePersonel();
     const form = createPozisyonFormFromPersonel(personel);
     form.gorevId = "2";
+    form.effectiveDate = "";
     const updatePersonel = vi.fn();
     const createSurec = vi.fn();
     const result = await executePozisyonPersonnelUpdate({
@@ -173,7 +175,7 @@ describe("I6 surec pozisyon personnel update parity", () => {
     expect(prefilledB.gorevId).toBe("2");
     expect(prefilledB.bagliAmirId).toBe("10");
     expect(prefilledB.personelTipiId).toBe("2");
-    expect(prefilledB.effectiveDate).toBe("");
+    expect(prefilledB.effectiveDate).toBe(new Date().toISOString().slice(0, 10));
     expect(prefilledB.departmanId).not.toBe(dirtyA.departmanId);
   });
 

@@ -77,12 +77,11 @@ test.describe("yonetim kullanicilar API (S44)", () => {
     await page.goto("/yonetim-paneli?tab=kullanicilar");
     await page.getByTestId("yonetim-kullanici-yeni").click();
     await expect(page.getByLabel("Kullanıcı Adı")).toBeVisible();
-    await expect(page.getByLabel("Geçici Şifre")).toBeVisible();
+    await expect(page.getByTestId("yonetim-standart-baslangic-sifresi-hint")).toBeVisible();
 
     await page.getByLabel("Kullanıcı Tipi").selectOption("HARICI");
     await page.getByLabel("Rol").selectOption("MUHASEBE");
     await page.getByLabel("Kullanıcı Adı").fill("e2e_muhasebe");
-    await page.getByLabel("Geçici Şifre").fill("GeciciSifre2026");
     await page.getByLabel("Ad Soyad").fill("E2E Muhasebe");
     await page.locator(".yonetim-selection-pill").filter({ hasText: "Merkez" }).click();
     await page.locator(".yonetim-selection-pill").filter({ hasText: "Depolama" }).click();

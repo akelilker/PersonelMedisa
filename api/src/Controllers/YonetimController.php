@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace Medisa\Api\Controllers;
 
 use Medisa\Api\Auth\AuthMiddleware;
+use Medisa\Api\Auth\PasswordHasher;
+use Medisa\Api\Auth\PasswordPolicy;
 use Medisa\Api\Auth\RolePermissions;
+use Medisa\Api\Auth\StandardInitialPassword;
 use Medisa\Api\Database\Connection;
 use Medisa\Api\Database\UserOrgAssignmentSchema;
 use Medisa\Api\Database\UsersSchema;
@@ -997,9 +1000,6 @@ class YonetimController
         if ($username === '') {
             JsonResponse::badRequest('Kullanici adi zorunludur.', 'VALIDATION_ERROR', 'username');
         }
-        if ($password === '') {
-            JsonResponse::badRequest('Sifre zorunludur.', 'VALIDATION_ERROR', 'password');
-        }
         if ($adSoyad === '') {
             JsonResponse::badRequest('Ad soyad zorunludur.', 'VALIDATION_ERROR', 'ad_soyad');
         }
@@ -1008,6 +1008,16 @@ class YonetimController
         }
         if ($durum !== 'AKTIF' && $durum !== 'PASIF') {
             JsonResponse::badRequest('Gecersiz durum.', 'VALIDATION_ERROR', 'durum');
+        }
+
+        // No plaintext password from the admin UI: new accounts get the standard
+        // initial password hash and must change it on first login. An explicit
+        // password stays supported for legacy API callers.
+        if ($password !== '') {
+            PasswordPolicy::assertValidNewPassword($password);
+            $passwordHash = PasswordHasher::hash($password);
+        } else {
+            $passwordHash = StandardInitialPassword::requireHash();
         }
 
         try {
@@ -1064,7 +1074,7 @@ class YonetimController
                 );
                 $stmt->execute([
                     'username' => $username,
-                    'password_hash' => password_hash($password, PASSWORD_BCRYPT),
+                    'password_hash' => $passwordHash,
                     'ad_soyad' => $adSoyad,
                     'rol' => $rol,
                     'durum' => $durum,
@@ -1082,7 +1092,7 @@ class YonetimController
                 );
                 $stmt->execute([
                     'username' => $username,
-                    'password_hash' => password_hash($password, PASSWORD_BCRYPT),
+                    'password_hash' => $passwordHash,
                     'ad_soyad' => $adSoyad,
                     'rol' => $rol,
                     'durum' => $durum,
@@ -1151,6 +1161,7 @@ class YonetimController
             ? trim((string) $body['username'])
             : (string) $existing['username'];
         $password = array_key_exists('password', $body) ? (string) $body['password'] : '';
+        $resetToStandardInitial = self::parseStandardInitialPasswordResetIntent($body);
         $adSoyad = array_key_exists('ad_soyad', $body)
             ? trim((string) $body['ad_soyad'])
             : (string) $existing['ad_soyad'];
@@ -1200,6 +1211,23 @@ class YonetimController
         }
         if ($username !== (string) $existing['username'] && self::usernameExists($pdo, $username, $kullaniciId)) {
             JsonResponse::error(409, 'DUPLICATE_USERNAME', 'Bu kullanici adi zaten kayitli.', 'username');
+        }
+
+        // Password writes stay one canonical owner: either the legacy explicit password
+        // or the standard initial password reset intent, never both.
+        $passwordHash = null;
+        if ($password !== '' && $resetToStandardInitial) {
+            JsonResponse::badRequest(
+                'Sifre alani ile standart baslangic sifresi sifirlama ayni istekte kullanilamaz.',
+                'VALIDATION_ERROR',
+                'standart_baslangic_sifresine_sifirla'
+            );
+        }
+        if ($password !== '') {
+            PasswordPolicy::assertValidNewPassword($password);
+            $passwordHash = PasswordHasher::hash($password);
+        } elseif ($resetToStandardInitial) {
+            $passwordHash = StandardInitialPassword::requireHash();
         }
 
         self::assertSubeYoneticisiRoleSchemaReady($pdo, $rol);
@@ -1269,9 +1297,9 @@ class YonetimController
                 'durum' => $durum,
             ];
             $sql = 'UPDATE users SET username = :username, ad_soyad = :ad_soyad, rol = :rol, durum = :durum';
-            if ($password !== '') {
+            if ($passwordHash !== null) {
                 $sql .= ', password_hash = :password_hash';
-                $params['password_hash'] = password_hash($password, PASSWORD_BCRYPT);
+                $params['password_hash'] = $passwordHash;
                 if ($hasMustChange) {
                     $sql .= ', must_change_password = 1';
                 }
@@ -1596,6 +1624,29 @@ class YonetimController
         $parsed = (int) $value;
 
         return $parsed > 0 ? $parsed : null;
+    }
+
+    /**
+     * Boolean-only intent flag; anything other than a real boolean fails closed.
+     *
+     * @param array<string, mixed> $body
+     */
+    private static function parseStandardInitialPasswordResetIntent(array $body)
+    {
+        if (!array_key_exists('standart_baslangic_sifresine_sifirla', $body)) {
+            return false;
+        }
+
+        $value = $body['standart_baslangic_sifresine_sifirla'];
+        if (!is_bool($value)) {
+            JsonResponse::badRequest(
+                'Standart baslangic sifresi sifirlama alani boolean olmalidir.',
+                'VALIDATION_ERROR',
+                'standart_baslangic_sifresine_sifirla'
+            );
+        }
+
+        return $value;
     }
 
     private static function isValidRole($rol)

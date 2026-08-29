@@ -16,6 +16,7 @@ import {
   deleteYonetimSube,
   fetchYonetimKullanicilari,
   fetchYonetimSubeleri,
+  resetYonetimKullaniciStandartSifre,
   updateYonetimKullanici,
   updateYonetimSube
 } from "../../../api/yonetim.api";
@@ -68,7 +69,6 @@ function resolveYonetimActiveTab(tabParam: string | null): ActiveTab {
 
 type KullaniciFormState = {
   username: string;
-  password: string;
   kullaniciTipi: KullaniciTipi;
   personelId: string;
   adSoyad: string;
@@ -107,7 +107,6 @@ const FIRST_LOGIN_FILTER_OPTIONS: Array<{ value: PersonelFirstLoginFilter; label
 
 const INITIAL_KULLANICI_FORM: KullaniciFormState = {
   username: "",
-  password: "",
   kullaniciTipi: "IC_PERSONEL",
   personelId: "",
   adSoyad: "",
@@ -280,7 +279,6 @@ function mergeIdOptions(current: IdOption[], incoming: IdOption[]) {
 function userFormFromItem(item: YonetimKullanici): KullaniciFormState {
   return {
     username: item.username ?? "",
-    password: "",
     kullaniciTipi: item.kullanici_tipi,
     personelId: item.personel_id != null ? String(item.personel_id) : "",
     adSoyad: formatAdSoyad(item.ad_soyad),
@@ -316,10 +314,6 @@ function toKullaniciPayload(form: KullaniciFormState, isEdit: boolean): UpsertYo
     throw new Error("Kullanıcı adı zorunludur.");
   }
 
-  if (!isEdit && !form.password.trim() && form.rol !== "PERSONEL") {
-    throw new Error("Geçici şifre zorunludur.");
-  }
-
   if (!isEdit && form.rol === "PERSONEL") {
     throw new Error(
       "PERSONEL hesapları Yönetim Paneli üzerinden oluşturulamaz. Personel kartındaki güvenli hesap onboarding akışını kullanın."
@@ -351,10 +345,6 @@ function toKullaniciPayload(form: KullaniciFormState, isEdit: boolean): UpsertYo
   if (!realKullaniciApi) {
     payload.telefon = normalizeTelefonDigits(form.telefon) || undefined;
     payload.notlar = form.notlar.trim() || undefined;
-  }
-
-  if (form.password.trim()) {
-    payload.password = form.password;
   }
 
   return payload;
@@ -503,6 +493,7 @@ export function YonetimPaneliPage() {
   // Submit failures must stay inside the open editor modal; the page-level
   // ErrorState renders behind it and hides the list behind the overlay.
   const [formErrorMessage, setFormErrorMessage] = useState<string | null>(null);
+  const [sifreResetConfirmOpen, setSifreResetConfirmOpen] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [subeDeleteError, setSubeDeleteError] = useState<string | null>(null);
   const [isSubeDeleteDialogOpen, setIsSubeDeleteDialogOpen] = useState(false);
@@ -655,6 +646,7 @@ export function YonetimPaneliPage() {
     setKullaniciForm(INITIAL_KULLANICI_FORM);
     setIsKullaniciFormOpen(false);
     setFormErrorMessage(null);
+    setSifreResetConfirmOpen(false);
   }
 
   function resetSubeEditor() {
@@ -676,6 +668,7 @@ export function YonetimPaneliPage() {
     setEditingKullaniciId(null);
     setKullaniciForm(INITIAL_KULLANICI_FORM);
     setIsKullaniciFormOpen(true);
+    setSifreResetConfirmOpen(false);
   }
 
   function openKullaniciEditor(item: YonetimKullanici) {
@@ -685,6 +678,7 @@ export function YonetimPaneliPage() {
     setEditingKullaniciId(item.id);
     setKullaniciForm(userFormFromItem(item));
     setIsKullaniciFormOpen(true);
+    setSifreResetConfirmOpen(false);
   }
 
   function openYeniSubeForm() {
@@ -793,6 +787,30 @@ export function YonetimPaneliPage() {
       } else {
         setFormErrorMessage(error instanceof Error ? error.message : "Kullanıcı kaydı kaydedilemedi.");
       }
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function handleStandartBaslangicSifresineSifirla() {
+    if (isSubmitting || editingKullaniciId == null) {
+      return;
+    }
+
+    setIsSubmitting(true);
+    setFormErrorMessage(null);
+    setSuccessMessage(null);
+
+    try {
+      await resetYonetimKullaniciStandartSifre(editingKullaniciId);
+      setSifreResetConfirmOpen(false);
+      setSuccessMessage("Hesap standart başlangıç şifresine sıfırlandı. Kullanıcı ilk girişte şifresini değiştirecek.");
+      resetKullaniciEditor();
+      await loadPanel();
+    } catch (error) {
+      setFormErrorMessage(
+        error instanceof Error ? error.message : "Standart başlangıç şifresine sıfırlama yapılamadı."
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -1191,14 +1209,57 @@ export function YonetimPaneliPage() {
                 required
               />
               {!isSecurePersonelCreatePath ? (
-                <FormField
-                  label={editingKullaniciId != null ? "Geçici Şifre (boş bırakılırsa değişmez)" : "Geçici Şifre"}
-                  name="yonetim-kullanici-password"
-                  type="password"
-                  value={kullaniciForm.password}
-                  onChange={(value) => setKullaniciForm((prev) => ({ ...prev, password: value }))}
-                  required={editingKullaniciId == null}
-                />
+                editingKullaniciId == null ? (
+                  <p className="yonetim-hint" data-testid="yonetim-standart-baslangic-sifresi-hint">
+                    Yeni hesap standart başlangıç şifresiyle oluşturulur. Kullanıcı ilk girişte standart
+                    başlangıç şifresini kendi kalıcı şifresiyle değiştirir.
+                  </p>
+                ) : (
+                  <div className="yonetim-form-stack" data-testid="yonetim-standart-baslangic-sifresi-reset">
+                    <p className="yonetim-hint">
+                      Şifre bu formdan belirlenmez. Gerekiyorsa hesabı ilk giriş durumuna alın; kullanıcı
+                      standart başlangıç şifresiyle girip kendi kalıcı şifresini belirler.
+                    </p>
+                    {!sifreResetConfirmOpen ? (
+                      <button
+                        type="button"
+                        className="yonetim-panel-action"
+                        data-testid="yonetim-kullanici-sifre-sifirla"
+                        disabled={isSubmitting}
+                        onClick={() => {
+                          setFormErrorMessage(null);
+                          setSifreResetConfirmOpen(true);
+                        }}
+                      >
+                        Standart Başlangıç Şifresine Sıfırla
+                      </button>
+                    ) : (
+                      <div className="yonetim-create-row" data-testid="yonetim-kullanici-sifre-sifirla-confirm">
+                        <p className="yonetim-hint">
+                          Hesap standart başlangıç şifresine döner ve kullanıcı ilk girişte kendi kalıcı
+                          şifresini belirlemek zorunda kalır. Rol, yetki ve personel bağlantısı değişmez.
+                        </p>
+                        <button
+                          type="button"
+                          className="universal-btn-save"
+                          data-testid="yonetim-kullanici-sifre-sifirla-onayla"
+                          disabled={isSubmitting}
+                          onClick={() => void handleStandartBaslangicSifresineSifirla()}
+                        >
+                          {isSubmitting ? "Sıfırlanıyor…" : "Onayla"}
+                        </button>
+                        <button
+                          type="button"
+                          className="yonetim-panel-action"
+                          disabled={isSubmitting}
+                          onClick={() => setSifreResetConfirmOpen(false)}
+                        >
+                          Vazgeç
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )
               ) : (
                 <p className="yonetim-hint" data-testid="yonetim-personel-secure-onboarding-hint">
                   PERSONEL rolü için şifre buradan atanmaz. Personel hesabını ilgili personel kartındaki

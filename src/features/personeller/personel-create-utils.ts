@@ -141,7 +141,8 @@ export function buildCreatePersonelPayload(form: CreatePersonelFormState): Creat
     throw new Error("Acil durum telefonu 05xx xxx xx xx formatında olmalıdır.");
   }
 
-  if (!form.subeId.trim()) {
+  // DIS_KAYNAK may stay organizationally unassigned (migration 076: no placeholder branch).
+  if (!isDisKaynak && !form.subeId.trim()) {
     throw new Error("Şube seçilmelidir.");
   }
   if (!form.ad.trim()) {
@@ -154,7 +155,18 @@ export function buildCreatePersonelPayload(form: CreatePersonelFormState): Creat
     throw new Error("Doğum tarihi zorunludur.");
   }
 
-  const subeId = parseRequiredPositiveInt(form.subeId, "Şube");
+  const subeId = isDisKaynak
+    ? parseOptionalPositiveInt(form.subeId)
+    : parseRequiredPositiveInt(form.subeId, "Şube");
+  const departmanId = isDisKaynak
+    ? parseOptionalPositiveInt(form.departmanId)
+    : parseRequiredPositiveInt(form.departmanId, "Departman");
+  const gorevId = isDisKaynak
+    ? parseOptionalPositiveInt(form.gorevId)
+    : parseRequiredPositiveInt(form.gorevId, "Unvan");
+  const personelTipiId = isDisKaynak
+    ? parseOptionalPositiveInt(form.personelTipiId)
+    : parseRequiredPositiveInt(form.personelTipiId, "Personel Tipi");
   const bagliAmirId = parseOptionalPositiveInt(form.bagliAmirId);
   const ucretTipiId = parseOptionalPositiveInt(form.ucretTipiId);
   const primKuraliId = parseOptionalPositiveInt(form.primKuraliId);
@@ -176,10 +188,10 @@ export function buildCreatePersonelPayload(form: CreatePersonelFormState): Creat
     acil_durum_kisi: form.acilDurumKisi.trim() === "" ? null : form.acilDurumKisi.trim(),
     acil_durum_telefon: acilDurumTelefon,
     ise_giris_tarihi: form.iseGirisTarihi,
-    sube_id: subeId,
-    departman_id: parseRequiredPositiveInt(form.departmanId, "Departman"),
-    gorev_id: parseRequiredPositiveInt(form.gorevId, "Unvan"),
-    personel_tipi_id: parseRequiredPositiveInt(form.personelTipiId, "Personel Tipi"),
+    ...(subeId !== undefined ? { sube_id: subeId } : {}),
+    ...(departmanId !== undefined ? { departman_id: departmanId } : {}),
+    ...(gorevId !== undefined ? { gorev_id: gorevId } : {}),
+    ...(personelTipiId !== undefined ? { personel_tipi_id: personelTipiId } : {}),
     aktif_durum: "AKTIF",
     calisan_kapsami: isDisKaynak ? "DIS_KAYNAK" : "IC_PERSONEL",
     ...(form.dogumYeri.trim() ? { dogum_yeri: form.dogumYeri.trim() } : {}),

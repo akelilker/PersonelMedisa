@@ -23,4 +23,10 @@ return [
     'app_public_url' => '',
     // Personnel activation invitation TTL (minutes). Security default: 24 hours.
     'personel_activation_ttl_minutes' => 1440,
+    // Bcrypt hash of the single standard initial password used by every new account.
+    // Plaintext is never stored here or anywhere in the repo; set the real hash only in
+    // production api/config.local.php. Missing/placeholder => user create and
+    // "reset to standard initial password" fail closed with
+    // STANDARD_INITIAL_PASSWORD_NOT_CONFIGURED.
+    'standard_initial_password_hash' => 'CHANGE_ME_STANDARD_INITIAL_PASSWORD_BCRYPT_HASH',
 ];

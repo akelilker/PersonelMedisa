@@ -210,6 +210,36 @@ describe("apiRequest", () => {
     expect(personelCalls.length).toBeLessThanOrEqual(3);
   });
 
+  it("GET domain 404 with API error envelope does not retry the root /api base", async () => {
+    const fetchMock = vi.fn(async () =>
+      createJsonResponse(
+        { data: null, meta: {}, errors: [{ code: "SALARY_MISSING", message: "Ucret kaydi yok." }] },
+        404
+      )
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(apiRequest("/personeller/211/ucretler/aktif")).rejects.toMatchObject({
+      status: 404,
+      code: "SALARY_MISSING"
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(String(fetchMock.mock.calls[0][0])).toContain("/personelmedisa/api/");
+  });
+
+  it("GET 404 without API error envelope still discovers the next base", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response("<!doctype html><title>404</title>", { status: 404 }))
+      .mockResolvedValueOnce(createJsonResponse({ data: { ok: true }, meta: {}, errors: [] }, 200));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(apiRequest("/personeller")).resolves.toMatchObject({ data: { ok: true } });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(String(fetchMock.mock.calls[0][0])).toContain("/personelmedisa/api/");
+    expect(String(fetchMock.mock.calls[1][0])).toMatch(/\/api\/personeller$/);
+  });
+
   it("GET 401 does not retry", async () => {
     const fetchMock = vi.fn(async () =>
       createJsonResponse(

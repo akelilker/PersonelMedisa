@@ -139,6 +139,26 @@ deployed SHA ile request oluşturur.
 suffix/path varyantları) web’den engeller. Config yedeği yalnız web root dışında tutulur
 (private dizin `0700`, yedek dosya `0600`); web root içinde `config.local.php.*` / `~` oluşturulmaz.
 
+## Standart başlangıç şifresi hash config'i (OPS)
+
+Yeni kullanıcı oluşturma ve `Standart Başlangıç Şifresine Sıfırla` eylemi, canlı
+`api/config.local.php` içindeki `standard_initial_password_hash` anahtarını okur.
+Anahtar yok veya `CHANGE_ME` ise backend fail-closed
+`STANDARD_INITIAL_PASSWORD_NOT_CONFIGURED` döner.
+
+Provizyon owner'ı: `Actions` → `Set cPanel standard initial password hash`
+(`workflow_dispatch`, confirmation `SET_STANDARD_INITIAL_PASSWORD_HASH`).
+
+- Değer, maskelenmiş repo secret'ı `STANDARD_INITIAL_PASSWORD_HASH` üzerinden gelir ve
+  **bcrypt hash**'tir; plaintext şifre hiçbir zaman secret'a, repoya, log'a veya
+  workflow input'una yazılmaz.
+- Workflow yalnız bu tek anahtarı yamalar; diğer config anahtarları değişirse
+  (`UNRELATED_CONFIG_KEYS_CHANGED != 0`) rollback yapar.
+- Log çıktısı yalnız durum bayraklarıdır: `STANDARD_INITIAL_PASSWORD_HASH_CONFIGURED`,
+  `READBACK_MATCH`, `HASH_EXPOSED=NO`, `PLAINTEXT_EXPOSED=NO`.
+- Hash üretimi lokalde yapılır (`password_hash($plain, PASSWORD_BCRYPT)`); plaintext
+  yalnız hesap sahibinde kalır.
+
 ## Deploy Sonrası Canlı Smoke Checklist
 
 Deploy cPanel workflow **success** sonrası aşağıdaki adımları sırayla uygula. `<BASE_URL>` yerine canlı host adresini kullan.

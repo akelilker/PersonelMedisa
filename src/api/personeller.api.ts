@@ -30,10 +30,11 @@ export type CreatePersonelPayload = {
   /** Omitted/blank means AUTO: the backend allocates the next free sicil. */
   sicil_no?: string;
   ise_giris_tarihi: string;
-  sube_id: number;
-  departman_id: number;
-  gorev_id: number;
-  personel_tipi_id: number;
+  /** DIS_KAYNAK may stay unassigned (migration 076: no placeholder branch). */
+  sube_id?: number | null;
+  departman_id?: number | null;
+  gorev_id?: number | null;
+  personel_tipi_id?: number | null;
   aktif_durum: "AKTIF" | "PASIF";
   calisan_kapsami?: "IC_PERSONEL" | "DIS_KAYNAK";
   dogum_yeri?: string;

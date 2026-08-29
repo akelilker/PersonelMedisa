@@ -12361,8 +12361,12 @@ let personelBelgeKaydiIdCounter = 903;
         await fulfillJson(route, 400, errorBody("VALIDATION_ERROR", "Kullanici adi zorunludur.", "username"));
         return;
       }
-      if (!password) {
-        await fulfillJson(route, 400, errorBody("VALIDATION_ERROR", "Sifre zorunludur.", "password"));
+      if (password !== "" && password.length < 8) {
+        await fulfillJson(
+          route,
+          400,
+          errorBody("VALIDATION_ERROR", "Yeni sifre en az 8 karakter olmalidir.", "new_password")
+        );
         return;
       }
       const scopeError = assertMockVarsayilanSubeInScope(payload.varsayilan_sube_id, payload.sube_ids ?? []);
@@ -12438,8 +12442,10 @@ let personelBelgeKaydiIdCounter = 903;
         varsayilan_sube_id?: number | null;
         durum?: "AKTIF" | "PASIF";
         notlar?: string;
+        standart_baslangic_sifresine_sifirla?: boolean;
       };
 
+      const resetToStandardInitial = payload.standart_baslangic_sifresine_sifirla === true;
       const nextUsername = payload.username != null ? String(payload.username).trim() : target.username;
       if (
         nextUsername !== target.username &&
@@ -12483,9 +12489,10 @@ let personelBelgeKaydiIdCounter = 903;
         telefon: payload.telefon ?? target.telefon,
         kullanici_tipi: payload.kullanici_tipi ?? target.kullanici_tipi,
         rol: payload.rol ?? target.rol,
-        personel_id: payload.personel_id ?? null,
+        personel_id: payload.personel_id !== undefined ? payload.personel_id ?? null : target.personel_id,
         must_change_password:
-          typeof payload.password === "string" && payload.password.trim() !== ""
+          resetToStandardInitial ||
+          (typeof payload.password === "string" && payload.password.trim() !== "")
             ? true
             : target.must_change_password,
         sube_ids: nextSubeIds,

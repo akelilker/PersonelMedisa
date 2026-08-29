@@ -591,8 +591,22 @@ export async function apiRequest<T>(path: string, init?: ApiRequestInit): Promis
 
       // SAFE path from here.
       if (response.status === 404) {
-        // Subfolder API discovery: try next base.
-        break;
+        // A 404 carrying an API error envelope is a domain answer ("no record"),
+        // not base-path evidence: the request already reached the API. Only an
+        // envelope-less 404 (web server / SPA shell) proves the base is wrong,
+        // so only that one advances to the next base candidate.
+        if (apiError === null && baseIndex + 1 < bases.length) {
+          break;
+        }
+
+        if (isDemoApiFallbackEnabled()) {
+          const mock = resolveDemoApiResponse(path, init);
+          if (mock !== null) {
+            return mock as T;
+          }
+        }
+
+        throw lastError;
       }
 
       if (isTransientReadStatus(response.status)) {

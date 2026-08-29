@@ -10,6 +10,7 @@ use Medisa\Api\Database\Connection;
 use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
 use Medisa\Api\Scope\SubeScope;
+use Medisa\Api\Services\Personel\PersonelSearchPredicate;
 use Medisa\Api\Services\Retention\ArchiveAccessService;
 use Medisa\Api\Services\Retention\PersonelArchiveGate;
 use Medisa\Api\Services\Retention\RetentionCategories;
@@ -31,7 +32,7 @@ class ArsivController
 
         $page = max(1, (int) ($request->getQuery('page', 1) ?: 1));
         $limit = max(1, min(250, (int) ($request->getQuery('limit', 25) ?: 25)));
-        $search = strtolower(trim((string) $request->getQuery('search', '')));
+        $search = PersonelSearchPredicate::normalize($request->getQuery('search', ''));
         $scope = SubeScope::resolveScope($user, $request);
         $allowedSubeIds = SubeScope::allowedSubeIds($user);
 
@@ -49,13 +50,7 @@ class ArsivController
             }
             $where[] = 'p.sube_id IN (' . implode(', ', $placeholders) . ')';
         }
-        if ($search !== '') {
-            $where[] = '(LOWER(p.ad) LIKE :search_ad OR LOWER(p.soyad) LIKE :search_soyad OR p.tc_kimlik_no LIKE :search_tc)';
-            $like = '%' . $search . '%';
-            $params['search_ad'] = $like;
-            $params['search_soyad'] = $like;
-            $params['search_tc'] = $like;
-        }
+        PersonelSearchPredicate::append($where, $params, $search, 'p', 'search', $pdo);
 
         $whereSql = implode(' AND ', $where);
         $countStmt = $pdo->prepare("SELECT COUNT(*) AS total FROM personeller p WHERE $whereSql");

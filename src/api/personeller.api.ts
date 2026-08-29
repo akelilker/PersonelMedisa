@@ -17,6 +17,8 @@ export type PersonellerListParams = {
   eksik_bilgi?: boolean;
   page?: number;
   limit?: number;
+  /** Lets the caller cancel a superseded list query. */
+  signal?: AbortSignal;
 };
 
 export type CreatePersonelPayload = {
@@ -422,7 +424,10 @@ export async function fetchPersonellerList(
     page: params?.page,
     limit: params?.limit
   });
-  const response = await apiRequest<ApiResponse<unknown>>(path);
+  const response = await apiRequest<ApiResponse<unknown>>(
+    path,
+    params?.signal ? { signal: params.signal } : undefined
+  );
   const normalized = normalizePaginatedList<unknown>(response, {
     requestedPage: params?.page,
     requestedLimit: params?.limit

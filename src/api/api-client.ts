@@ -114,6 +114,20 @@ export class ApiRequestError extends Error {
   }
 }
 
+/**
+ * True when the caller itself cancelled the request (superseded query, unmount).
+ * Callers use this to stay silent instead of surfacing a user-facing error.
+ */
+export function isAbortedRequestError(error: unknown): boolean {
+  if (error instanceof ApiRequestError) {
+    return error.code === "REQUEST_ABORTED";
+  }
+  if (!error || typeof error !== "object") {
+    return false;
+  }
+  return (error as { name?: string }).name === "AbortError";
+}
+
 export function shouldQueueOfflineMutation(error: unknown): boolean {
   if (typeof navigator !== "undefined" && navigator.onLine === false) {
     return true;

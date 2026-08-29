@@ -59,6 +59,11 @@ final class MigrationExecutionService
         for ($e = $exception; $e !== null; $e = $e->getPrevious()) {
             $message = strtolower($e->getMessage());
 
+            // The backup and preflight owners already throw canonical reason codes;
+            // re-deriving them from prose would lose which guard actually failed.
+            if (preg_match('/^(BACKUP|PREFLIGHT)_[A-Z0-9_]{1,48}$/', $e->getMessage()) === 1) {
+                return $e->getMessage();
+            }
             if (
                 str_contains($message, 'database configuration is incomplete')
                 || str_contains($message, 'sqlstate')

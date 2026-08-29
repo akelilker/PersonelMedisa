@@ -53,7 +53,12 @@ function writeBundle(bundlePath: string) {
   );
 }
 
-function writeRequest(controlDirectory: string, requestId: string, deployedSha: string) {
+function writeRequest(
+  controlDirectory: string,
+  requestId: string,
+  deployedSha: string,
+  mode?: 'APPLY' | 'READ_ONLY_PREFLIGHT',
+) {
   writeFileSync(
     join(controlDirectory, `request.pending.${requestId}.json`),
     JSON.stringify({
@@ -61,6 +66,7 @@ function writeRequest(controlDirectory: string, requestId: string, deployedSha: 
       request_id: requestId,
       deployed_sha: deployedSha,
       requested_at: '2026-08-18T05:00:00Z',
+      ...(mode ? { mode } : {}),
     }),
   );
 }
@@ -153,7 +159,9 @@ describe('cPanel migration cron worker runtime', () => {
     }
   });
 
-  it('executes apply in-process, classifies the failure safely, and archives once', () => {
+  // The database is now first reached by the mandatory backup stage, so a broken
+  // connection surfaces there instead of at apply.
+  it('executes the request in-process, classifies the failure safely, and archives once', () => {
     const fixture = makeFixture();
     const deployedSha = 'c'.repeat(40);
     try {
@@ -165,12 +173,75 @@ describe('cPanel migration cron worker runtime', () => {
       const status = JSON.parse(readFileSync(join(fixture.controlDirectory, 'status.json'), 'utf8'));
       expect(status.state).toBe('FAILED');
       expect(status.reason).toBe('DB_CONNECTION_FAILED');
-      expect(status.stage).toBe('APPLY');
+      expect(status.stage).toBe('BACKUP');
       expect(status.exit_code).toBe(1);
       expect(JSON.stringify(status)).not.toMatch(/password|dsn|stack trace/i);
       expect(readdirSync(fixture.controlDirectory).filter((name) => name.startsWith('request.failed.'))).toHaveLength(1);
       expect(runWorker(fixture.controlDirectory, fixture.deployShaPath, fixture.bundlePath)).toBe(0);
       expect(readdirSync(fixture.controlDirectory).filter((name) => name.startsWith('request.failed.'))).toHaveLength(1);
+    } finally {
+      rmSync(fixture.directory, { recursive: true, force: true });
+    }
+  });
+
+  it('stops an apply request at the backup stage, so apply is unreachable without a dump', () => {
+    const fixture = makeFixture();
+    const deployedSha = 'e'.repeat(40);
+    try {
+      mkdirSync(fixture.controlDirectory, { recursive: true });
+      writeBundle(fixture.bundlePath);
+      writeFileSync(fixture.deployShaPath, deployedSha);
+      writeRequest(fixture.controlDirectory, 'backup-gate', deployedSha, 'APPLY');
+      expect(runWorker(fixture.controlDirectory, fixture.deployShaPath, fixture.bundlePath)).toBe(1);
+      const status = JSON.parse(readFileSync(join(fixture.controlDirectory, 'status.json'), 'utf8'));
+      expect(status.state).toBe('FAILED');
+      expect(status.stage).toBe('BACKUP');
+      expect(status.mode).toBe('APPLY');
+      expect(status.backup_readback).toBeUndefined();
+      expect(JSON.stringify(status)).not.toMatch(/password|dsn|stack trace/i);
+    } finally {
+      rmSync(fixture.directory, { recursive: true, force: true });
+    }
+  });
+
+  it('never applies or backs anything up in preflight mode and publishes no partial report', () => {
+    const fixture = makeFixture();
+    const deployedSha = 'f'.repeat(40);
+    try {
+      mkdirSync(fixture.controlDirectory, { recursive: true });
+      writeBundle(fixture.bundlePath);
+      writeFileSync(fixture.deployShaPath, deployedSha);
+      writeRequest(fixture.controlDirectory, 'preflight-1', deployedSha, 'READ_ONLY_PREFLIGHT');
+      expect(runWorker(fixture.controlDirectory, fixture.deployShaPath, fixture.bundlePath)).toBe(1);
+      const status = JSON.parse(readFileSync(join(fixture.controlDirectory, 'status.json'), 'utf8'));
+      expect(status.stage).toBe('PREFLIGHT');
+      expect(status.mode).toBe('READ_ONLY_PREFLIGHT');
+      expect(readdirSync(fixture.controlDirectory)).not.toContain('preflight.json');
+    } finally {
+      rmSync(fixture.directory, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects an unknown request mode instead of guessing apply', () => {
+    const fixture = makeFixture();
+    const deployedSha = '9'.repeat(40);
+    try {
+      mkdirSync(fixture.controlDirectory, { recursive: true });
+      writeFileSync(fixture.deployShaPath, deployedSha);
+      writeFileSync(
+        join(fixture.controlDirectory, 'request.pending.bad-mode.json'),
+        JSON.stringify({
+          schema_version: 1,
+          request_id: 'bad-mode',
+          deployed_sha: deployedSha,
+          requested_at: '2026-08-18T05:00:00Z',
+          mode: 'APPLY_EVERYTHING',
+        }),
+      );
+      expect(runWorker(fixture.controlDirectory, fixture.deployShaPath, fixture.bundlePath)).toBe(1);
+      const status = JSON.parse(readFileSync(join(fixture.controlDirectory, 'status.json'), 'utf8'));
+      expect(status.reason).toBe('REQUEST_INVALID');
+      expect(status.stage).toBe('REQUEST_PARSE');
     } finally {
       rmSync(fixture.directory, { recursive: true, force: true });
     }

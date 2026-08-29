@@ -1,16 +1,37 @@
 name: Ops migration worker diagnostics
 
 # Salt-okunur cPanel migration control-plane teshisi.
-# Hicbir dosya yazmaz, tasimaz, silmez; canli worker'a dokunmaz.
-# Amac: FTP login root, deploy SHA, worker SHA256 pariteti ve
-# migration-control dizin envanterini kanitlamak.
+#
+# Iki mod:
+#   READONLY_WORKER_DIAGNOSTICS      - yalniz FTP envanteri. Hicbir dosya yazmaz.
+#   READ_ONLY_MIGRATION_PREFLIGHT    - ayni kontrol duzlemine tek bir preflight
+#                                      request'i birakir; worker production DB'de
+#                                      SADECE SELECT calistirip preflight.json
+#                                      uretir. INSERT/UPDATE/DELETE/DDL, migration
+#                                      apply ve ledger yazimi bu yolda yoktur.
+#
+# Cikti sozlesmesi: yalniz sayilar, kolon/index adlari, migration versiyonlari,
+# checksum ve reason code. Personel/bordro satiri, isim, TCKN, ucret, token veya
+# DB credential loglanmaz.
 
 on:
   workflow_dispatch:
     inputs:
-      confirmation:
-        description: Type READONLY_WORKER_DIAGNOSTICS
+      mode:
+        description: Diagnostics mode
         required: true
+        default: READONLY_WORKER_DIAGNOSTICS
+        type: choice
+        options:
+          - READONLY_WORKER_DIAGNOSTICS
+          - READ_ONLY_MIGRATION_PREFLIGHT
+      confirmation:
+        description: Type the selected mode again to authorize it
+        required: true
+        type: string
+      deployed_sha:
+        description: Exact deployed commit SHA (required for READ_ONLY_MIGRATION_PREFLIGHT)
+        required: false
         type: string
 
 concurrency:
@@ -28,14 +49,30 @@ jobs:
       FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
       FTP_PORT: ${{ secrets.FTP_PORT }}
       CONFIRMATION: ${{ inputs.confirmation }}
+      MODE: ${{ inputs.mode }}
+      DEPLOYED_SHA: ${{ inputs.deployed_sha }}
+      POLL_ATTEMPTS: "91"
+      POLL_INTERVAL_SECONDS: "10"
+      TOTAL_POLL_WINDOW_SECONDS: "900"
     steps:
       - name: Validate explicit request
         run: |
           set -euo pipefail
-          test "$CONFIRMATION" = "READONLY_WORKER_DIAGNOSTICS" || {
-            echo "Explicit diagnostics confirmation is required."
+          case "$MODE" in
+            READONLY_WORKER_DIAGNOSTICS|READ_ONLY_MIGRATION_PREFLIGHT) ;;
+            *) echo "Unsupported diagnostics mode." && exit 1 ;;
+          esac
+          test "$CONFIRMATION" = "$MODE" || {
+            echo "Explicit diagnostics confirmation must repeat the selected mode."
             exit 1
           }
+          if [[ "$MODE" == "READ_ONLY_MIGRATION_PREFLIGHT" ]]; then
+            [[ "$DEPLOYED_SHA" =~ ^[0-9a-fA-F]{40}$ ]] || {
+              echo "PREFLIGHT_RESULT=BLOCKED"
+              echo "PREFLIGHT_REASON=DEPLOYED_SHA_INPUT_INVALID"
+              exit 1
+            }
+          fi
           test -n "$FTP_SERVER" || (echo "FTP_SERVER secret is missing." && exit 1)
           test -n "$FTP_USERNAME" || (echo "FTP_USERNAME secret is missing." && exit 1)
           test -n "$FTP_PASSWORD" || (echo "FTP_PASSWORD secret is missing." && exit 1)
@@ -159,8 +196,12 @@ jobs:
           count_matching() {
             grep -c "$1" "${WORK}/control-dir.txt" 2>/dev/null || true
           }
-          echo "PENDING_COUNT=$(count_matching 'request\.pending\.')"
-          echo "PROCESSING_COUNT=$(count_matching 'request\.processing\.')"
+          pending_count="$(count_matching 'request\.pending\.')"
+          processing_count="$(count_matching 'request\.processing\.')"
+          [[ "$pending_count" =~ ^[0-9]+$ ]] || pending_count=0
+          [[ "$processing_count" =~ ^[0-9]+$ ]] || processing_count=0
+          echo "PENDING_COUNT=${pending_count}"
+          echo "PROCESSING_COUNT=${processing_count}"
           echo "COMPLETED_COUNT=$(count_matching 'request\.completed\.')"
           echo "FAILED_COUNT=$(count_matching 'request\.failed\.')"
           if grep -q "/status.json$" "${WORK}/control-dir.txt"; then
@@ -168,13 +209,19 @@ jobs:
           else
             echo "STATUS_JSON_EXISTS=NO"
           fi
+          # worker.lock is an flock handle the worker never unlinks, so its mere
+          # presence proves nothing and is not an error. Busy-ness is derived from
+          # heartbeat freshness, status state and processing requests instead.
           if grep -q "/worker.lock$" "${WORK}/control-dir.txt"; then
             echo "WORKER_LOCK_EXISTS=YES"
           else
             echo "WORKER_LOCK_EXISTS=NO"
           fi
+          echo "WORKER_LOCK_IS_ERROR=NO"
 
           # 7) Son worker status'u (yalniz bounded, guvenli alanlar).
+          worker_status_state="NONE"
+          heartbeat_sha="NONE"
           if grep -q "/status.json$" "${WORK}/control-dir.txt"; then
             if run_cpanel_ftp "get api/runtime/migration-control/status.json -o ${WORK}/status.json"; then
               st_state="$(jq -r '.state // "NONE"' "${WORK}/status.json" 2>/dev/null || echo NONE)"
@@ -185,6 +232,7 @@ jobs:
               [[ "$st_request" =~ ^[A-Za-z0-9._-]{1,128}$ ]] || st_request="NONE"
               [[ "$st_updated" =~ ^[0-9TZ:._+-]{1,64}$ ]] || st_updated="NONE"
               [[ "$st_reason" =~ ^[A-Z0-9_]{1,64}$ ]] || st_reason="NONE"
+              worker_status_state="$st_state"
               echo "WORKER_STATUS_STATE=${st_state}"
               echo "WORKER_STATUS_REQUEST_ID=${st_request}"
               echo "WORKER_STATUS_UPDATED_AT=${st_updated}"
@@ -200,6 +248,7 @@ jobs:
               hb_sha="$(jq -r '.deployed_sha // "NONE"' "${WORK}/heartbeat.json" 2>/dev/null || echo NONE)"
               [[ "$hb_updated" =~ ^[0-9TZ:._+-]{1,64}$ ]] || hb_updated="NONE"
               [[ "$hb_sha" =~ ^[0-9a-fA-F]{40}$ ]] || hb_sha="NONE"
+              heartbeat_sha="$hb_sha"
               echo "WORKER_HEARTBEAT_UPDATED_AT=${hb_updated}"
               echo "WORKER_HEARTBEAT_DEPLOY_SHA=${hb_sha}"
             else
@@ -207,6 +256,18 @@ jobs:
             fi
           else
             echo "WORKER_HEARTBEAT_EXISTS=NO"
+          fi
+
+          # 8b) Deploy SHA <-> heartbeat SHA pariteti ve gercek busy kanitlari.
+          if [[ "$heartbeat_sha" != "NONE" && "$heartbeat_sha" == "$deploy_sha" ]]; then
+            echo "HEARTBEAT_DEPLOY_SHA_MATCH=YES"
+          else
+            echo "HEARTBEAT_DEPLOY_SHA_MATCH=NO"
+          fi
+          if (( processing_count > 0 )) || [[ "$worker_status_state" == "RUNNING" ]]; then
+            echo "WORKER_BUSY=YES"
+          else
+            echo "WORKER_BUSY=NO"
           fi
 
           # 9) API error boundary tail. The boundary answers a failed request with a
@@ -226,3 +287,185 @@ jobs:
           fi
 
           echo "DIAGNOSTICS_RESULT=COLLECTED"
+
+      - name: Run read-only migration preflight on production
+        if: inputs.mode == 'READ_ONLY_MIGRATION_PREFLIGHT'
+        env:
+          REQUEST_ID: preflight-${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          set -euo pipefail
+
+          run_ftp_mode() {
+            local mode_name="$1"
+            local use_ftps="$2"
+            local ftp_commands="$3"
+
+            echo "Preflight transport mode: ${mode_name}"
+            lftp -u "${FTP_USERNAME}","${FTP_PASSWORD}" -p "${FTP_PORT}" "ftp://${FTP_SERVER}" -e "
+              set cmd:fail-exit true;
+              set net:max-retries 2;
+              set net:timeout 20;
+              set net:reconnect-interval-base 5;
+              set net:reconnect-interval-max 10;
+              set xfer:clobber true;
+              set ssl:verify-certificate no;
+              set ssl:check-hostname no;
+              set ftp:passive-mode on;
+              set ftp:ssl-allow ${use_ftps};
+              set ftp:ssl-force ${use_ftps};
+              set ftp:ssl-protect-data ${use_ftps};
+              ${ftp_commands}
+              bye
+            "
+          }
+
+          run_cpanel_ftp() {
+            local ftp_commands="$1"
+            if run_ftp_mode "explicit-ftps" "true" "$ftp_commands"; then
+              return 0
+            fi
+            echo "Explicit FTPS basarisiz oldu, plain FTP fallback deneniyor..."
+            run_ftp_mode "plain-ftp" "false" "$ftp_commands"
+          }
+
+          WORK="$RUNNER_TEMP/migration-preflight"
+          rm -rf "$WORK"
+          mkdir -p "$WORK"
+
+          # Busy guard: the preflight shares the control plane with apply, so it
+          # must never queue behind or race another request.
+          listing="$WORK/control-listing.txt"
+          if ! run_cpanel_ftp "cls -1 api/runtime/migration-control > ${listing};" >/dev/null 2>&1; then
+            echo "PREFLIGHT_RESULT=BLOCKED"
+            echo "PREFLIGHT_REASON=CONTROL_PLANE_UNREACHABLE"
+            exit 1
+          fi
+          # `set -e` makes `grep -q ... && flag=YES` abort the step on a non-match,
+          # so every probe here stays an explicit if.
+          busy="NO"
+          if grep -q 'request\.pending\.' "$listing"; then
+            busy="YES"
+          fi
+          if grep -q 'request\.processing\.' "$listing"; then
+            busy="YES"
+          fi
+          if grep -q '/status.json$' "$listing"; then
+            if run_cpanel_ftp "get api/runtime/migration-control/status.json -o ${WORK}/status.json;" >/dev/null 2>&1; then
+              if [[ "$(jq -r '.state // empty' "${WORK}/status.json" 2>/dev/null || true)" == "RUNNING" ]]; then
+                busy="YES"
+              fi
+            fi
+          fi
+          if [[ "$busy" == "YES" ]]; then
+            echo "PREFLIGHT_RESULT=BLOCKED"
+            echo "PREFLIGHT_REASON=MIGRATION_CONTROL_PLANE_BUSY"
+            exit 1
+          fi
+
+          request_dir="$WORK/request"
+          mkdir -p "$request_dir"
+          jq -n \
+            --arg request_id "$REQUEST_ID" \
+            --arg deployed_sha "$DEPLOYED_SHA" \
+            --arg requested_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            '{schema_version: 1, request_id: $request_id, deployed_sha: $deployed_sha, requested_at: $requested_at, mode: "READ_ONLY_PREFLIGHT"}' \
+            > "$request_dir/request.${REQUEST_ID}.tmp"
+
+          run_cpanel_ftp "
+            mkdir -p api/runtime/migration-control;
+            lcd ${request_dir};
+            put -O api/runtime/migration-control request.${REQUEST_ID}.tmp;
+            mv api/runtime/migration-control/request.${REQUEST_ID}.tmp api/runtime/migration-control/request.pending.${REQUEST_ID}.json;
+          "
+
+          status_file="$WORK/poll-status.json"
+          deadline="$(( $(date +%s) + TOTAL_POLL_WINDOW_SECONDS ))"
+          worker_state="NONE"
+          for _ in $(seq 1 "$POLL_ATTEMPTS"); do
+            rm -f "$status_file"
+            if run_cpanel_ftp "get api/runtime/migration-control/status.json -o ${status_file};" >/dev/null 2>&1; then
+              if [[ "$(jq -r '.request_id // empty' "$status_file" 2>/dev/null || true)" == "$REQUEST_ID" ]]; then
+                worker_state="$(jq -r '.state // "NONE"' "$status_file" 2>/dev/null || echo NONE)"
+                if [[ "$worker_state" == "SUCCEEDED" || "$worker_state" == "FAILED" ]]; then
+                  break
+                fi
+              fi
+            fi
+            if (( $(date +%s) >= deadline )); then
+              break
+            fi
+            sleep "$POLL_INTERVAL_SECONDS"
+          done
+
+          echo "PREFLIGHT_WORKER_STATE=${worker_state}"
+          if [[ "$worker_state" == "FAILED" ]]; then
+            reason="$(jq -r 'if (.reason | type) == "string" and (.reason | test("^[A-Z0-9_]+$")) then .reason else "UNKNOWN_PREFLIGHT_FAILURE" end' "$status_file" 2>/dev/null || echo UNKNOWN_PREFLIGHT_FAILURE)"
+            echo "PREFLIGHT_RESULT=BLOCKED"
+            echo "PREFLIGHT_REASON=${reason}"
+            exit 1
+          fi
+          if [[ "$worker_state" != "SUCCEEDED" ]]; then
+            echo "PREFLIGHT_RESULT=BLOCKED"
+            echo "PREFLIGHT_REASON=WAITING_FOR_CRON_TICK"
+            exit 1
+          fi
+
+          report="$WORK/preflight.json"
+          if ! run_cpanel_ftp "get api/runtime/migration-control/preflight.json -o ${report};" >/dev/null 2>&1; then
+            echo "PREFLIGHT_RESULT=BLOCKED"
+            echo "PREFLIGHT_REASON=PREFLIGHT_REPORT_UNREADABLE"
+            exit 1
+          fi
+
+          # Bounded, allowlisted output. The report carries only counts, version
+          # numbers, checksums and column/index names by construction; the filters
+          # below keep an unexpected field from ever reaching the log.
+          emit_scalar() {
+            local label="$1"
+            local filter="$2"
+            local pattern="$3"
+            local value
+            value="$(jq -r "${filter} // \"NONE\"" "$report" 2>/dev/null || echo NONE)"
+            [[ "$value" =~ $pattern ]] || value="NONE"
+            echo "${label}=${value}"
+          }
+          emit_list() {
+            local label="$1"
+            local filter="$2"
+            local value
+            value="$(jq -r "[${filter}[]? | tostring] | join(\",\")" "$report" 2>/dev/null || echo "")"
+            [[ "$value" =~ ^[A-Za-z0-9_,.-]{0,512}$ ]] || value="UNPRINTABLE"
+            echo "${label}=${value:-NONE}"
+          }
+
+          emit_scalar PREFLIGHT_SCHEMA_VERSION '.schema_version' '^[0-9]{1,3}$'
+          emit_scalar PREFLIGHT_GENERATED_AT '.generated_at' '^[0-9TZ:.+-]{1,64}$'
+          emit_scalar PREFLIGHT_DEPLOY_SHA '.deployed_sha' '^[0-9a-f]{40}$'
+          emit_scalar CODE_TIP '.bundle.code_tip' '^[0-9]{3}$'
+          emit_scalar PROD_TIP '.ledger.applied_tip' '^[0-9]{3}$'
+          emit_scalar LEDGER_APPLIED_COUNT '.ledger.applied_count' '^[0-9]{1,6}$'
+          emit_scalar PENDING_CHECKSUM '.bundle.expected_pending_checksum' '^[0-9a-f]{64}$'
+          emit_list PENDING_MIGRATIONS '.ledger.pending_names'
+          emit_list LEDGER_CHECKSUM_MISMATCH '.ledger.checksum_mismatch_versions'
+          emit_list LEDGER_GAPS '.ledger.gap_versions'
+          emit_list STATE_INDEXES '(.schema.aylik_kapanis_state.indexes | keys)'
+          emit_list STATE_COLUMNS '(.schema.aylik_kapanis_state.columns | keys)'
+          emit_list OZET_INDEXES '(.schema.aylik_ozet_satirlari.indexes | keys)'
+          for guard in ozet_rows ozet_sube_null_rows ozet_sube_orphan_rows ozet_distinct_ay \
+            ozet_distinct_ay_sube_pairs ozet_duplicate_ay_sube_personel ozet_actor_columns_present \
+            state_rows state_distinct_ay state_duplicate_ay state_rows_expected_after_079; do
+            emit_scalar "GUARD_$(echo "$guard" | tr '[:lower:]' '[:upper:]')" ".guards.${guard}" '^-?[0-9]{1,12}$'
+          done
+          for flag in branch_table_resolved state_sube_column_present state_legacy_unique_present \
+            state_composite_unique_present; do
+            emit_scalar "FLAG_$(echo "$flag" | tr '[:lower:]' '[:upper:]')" ".guards.${flag}" '^(true|false)$'
+          done
+          emit_list PREFLIGHT_BLOCKERS '.blockers'
+          emit_list PREFLIGHT_WARNINGS '.warnings'
+          emit_scalar PREFLIGHT_RESULT '.result' '^(PASS|BLOCKED)$'
+
+          if [[ "$(jq -r '.result // "BLOCKED"' "$report" 2>/dev/null || echo BLOCKED)" != "PASS" ]]; then
+            echo "PREFLIGHT_APPLY_READY=NO"
+            exit 1
+          fi
+          echo "PREFLIGHT_APPLY_READY=YES"

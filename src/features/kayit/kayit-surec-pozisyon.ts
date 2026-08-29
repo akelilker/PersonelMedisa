@@ -35,7 +35,7 @@ export function validatePozisyonSubmit(
     return { ok: false, message: "Pozisyon bilgisi değişmedi." };
   }
   if (!form.effectiveDate) {
-    return { ok: false, message: "Değişikliğin geçerli olacağı tarihi seç." };
+    return { ok: false, message: "Göreve başlama tarihini seç." };
   }
   if (!form.departmanId || !form.gorevId || !form.personelTipiId) {
     return { ok: false, message: "Departman, unvan ve çalışma tipi boş bırakılamaz." };

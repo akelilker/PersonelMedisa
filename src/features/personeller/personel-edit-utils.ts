@@ -1,6 +1,7 @@
 import type { UpdatePersonelPayload } from "../../api/personeller.api";
 import type { CreateSurecPayload } from "../../api/surecler.api";
 import type { LifecycleFormFields } from "../../lib/personel-lifecycle-diff";
+import { resolveGoreveBaslamaTarihiDefault } from "../../lib/personel/gorev-baslama-tarihi";
 import type { Personel } from "../../types/personel";
 import type { IdOption } from "../../types/referans";
 import {
@@ -216,7 +217,7 @@ export function personelToEditForm(personel: Personel): EditPersonelFormState {
     ucretTipiId: personel.ucret_tipi_id != null ? String(personel.ucret_tipi_id) : "",
     maasTutari: resolvedMaas != null ? String(resolvedMaas) : "",
     primKuraliId: personel.prim_kurali_id != null ? String(personel.prim_kurali_id) : "",
-    effectiveDate: ""
+    effectiveDate: resolveGoreveBaslamaTarihiDefault(personel)
   };
 }
 

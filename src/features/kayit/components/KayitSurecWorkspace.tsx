@@ -1620,7 +1620,7 @@ export function KayitSurecWorkspace({
                                 </div>
 
                                 <FormField
-                                  label="Geçerlilik Tarihi"
+                                  label="Göreve Başlama Tarihi"
                                   name="pozisyon-effective-date"
                                   type="date"
                                   value={pozisyonForm.effectiveDate}

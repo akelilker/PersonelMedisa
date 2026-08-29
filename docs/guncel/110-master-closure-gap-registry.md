@@ -1,5 +1,5 @@
 CODE_MIGRATION_TIP: 078
-PRODUCTION_MIGRATION_TIP: 077
+PRODUCTION_MIGRATION_TIP: 078
 
 # 110 — Canonical Closure / Gap Registry
 
@@ -11,9 +11,10 @@ PRODUCTION_MIGRATION_TIP: 077
 
 | Alan | Değer | Kanıt / sınır |
 | --- | --- | --- |
-| CODE_MIGRATION_TIP | **078** | Repodaki son migration: `078_personel_sicil_sequence.sql` (production apply bekliyor) |
-| PRODUCTION_MIGRATION_TIP | **077** | Canonical production apply `33169230032` / request `33169230032-1` / worker `SUCCEEDED`; tip `077` |
-| Canlı migration doğrulaması | **PASS** | Ledger `076` + schema ready; assignment canlı kayıt=0; pending 077+ yok; migration workflow bu turda **tekrar çalıştırılmaz** |
+| CODE_MIGRATION_TIP | **078** | Repodaki son migration: `078_personel_sicil_sequence.sql` |
+| PRODUCTION_MIGRATION_TIP | **078** | `078_personel_sicil_sequence.sql` production'a uygulandı; otomatik sicil sequence owner'ı canlı |
+| Otomatik sicil owner | **`PersonelSicilAllocator`** | `api/src/Services/Personel/PersonelSicilAllocator.php` + singleton tablo `personel_sicil_sequence` (migration 078); interaktif create'te `sicil_no` gönderilmez, backend tahsis eder |
+| Canlı migration doğrulaması | **PASS** | Tip `078`; pending 079+ yok; migration workflow bu turda **tekrar çalıştırılmaz** |
 
 ## Durum sözlüğü
 

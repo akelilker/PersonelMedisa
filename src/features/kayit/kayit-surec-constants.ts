@@ -1,3 +1,4 @@
+import { resolveGoreveBaslamaTarihiDefault } from "../../lib/personel/gorev-baslama-tarihi";
 import type { Personel } from "../../types/personel";
 
 export const KAYIT_SUREC_PERSONEL_FORM_ID = "kayit-surec-personel-form";
@@ -246,7 +247,7 @@ export function createPozisyonFormFromPersonel(personel: Personel | null): Pozis
     gorevId: toOptionalIdValue(personel?.gorev_id),
     bagliAmirId: toOptionalIdValue(personel?.bagli_amir_id),
     personelTipiId: toOptionalIdValue(personel?.personel_tipi_id),
-    effectiveDate: "",
+    effectiveDate: personel ? resolveGoreveBaslamaTarihiDefault(personel) : "",
     aciklama: ""
   };
 }

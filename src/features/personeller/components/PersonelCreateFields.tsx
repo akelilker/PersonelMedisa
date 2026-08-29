@@ -364,7 +364,7 @@ export function PersonelCreateFields({
                   setForm((prev) => ({ ...prev, subeId: value }));
                   onFieldErrorClear?.("subeId");
                 }}
-                required
+                required={form.calisanKapsami !== "DIS_KAYNAK"}
                 placeholderOption={{ value: "", label: "Seçiniz" }}
                 options={toSelectOptions(subeOptions)}
                 isOpen={openSelectName === "create-sube"}
@@ -414,7 +414,7 @@ export function PersonelCreateFields({
                   onDepartmanChange ??
                   ((value) => setForm((prev) => ({ ...prev, departmanId: value })))
                 }
-                required
+                required={form.calisanKapsami !== "DIS_KAYNAK"}
                 placeholderOption={{ value: "", label: "Seçiniz" }}
                 options={toSelectOptions(refs.departmanOptions)}
                 isOpen={openSelectName === "create-departman"}
@@ -479,7 +479,7 @@ export function PersonelCreateFields({
               name="create-gorev"
               value={form.gorevId}
               onChange={(value) => setForm((prev) => ({ ...prev, gorevId: value }))}
-              required
+              required={form.calisanKapsami !== "DIS_KAYNAK"}
               placeholderOption={{ value: "", label: "Seçiniz" }}
               options={toSelectOptions(refs.gorevOptions)}
               isOpen={openSelectName === "create-gorev"}
@@ -506,7 +506,7 @@ export function PersonelCreateFields({
               name="create-personel-tipi"
               value={form.personelTipiId}
               onChange={(value) => setForm((prev) => ({ ...prev, personelTipiId: value }))}
-              required
+              required={form.calisanKapsami !== "DIS_KAYNAK"}
               placeholderOption={{ value: "", label: "Seçiniz" }}
               options={toSelectOptions(refs.personelTipiOptions)}
               isOpen={openSelectName === "create-personel-tipi"}

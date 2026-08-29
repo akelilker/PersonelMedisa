@@ -8192,7 +8192,8 @@ export function resolveDemoApiResponse(
           ? body.rol
           : "BIRIM_AMIRI",
       personel_id: personelId,
-      must_change_password: Boolean(toStringValue(body.password)),
+      // New accounts always start on the standard initial password.
+      must_change_password: true,
       sube_ids: Array.isArray(body.sube_ids)
         ? body.sube_ids
             .map((item) => toNumber(item))
@@ -8217,7 +8218,8 @@ export function resolveDemoApiResponse(
       return null;
     }
 
-    const personelId = toNumber(body.personel_id);
+    const resetToStandardInitial = body.standart_baslangic_sifresine_sifirla === true;
+    const personelId = "personel_id" in body ? toNumber(body.personel_id) : target.personel_id;
     const linkedPersonel =
       personelId !== null ? demoState.personeller.find((personel) => personel.id === personelId) ?? null : null;
     Object.assign(target, {
@@ -8225,7 +8227,12 @@ export function resolveDemoApiResponse(
         toStringValue(body.ad_soyad) ??
         (linkedPersonel ? `${linkedPersonel.ad} ${linkedPersonel.soyad}` : target.ad_soyad),
       telefon: toStringValue(body.telefon) ?? linkedPersonel?.telefon ?? target.telefon,
-      kullanici_tipi: body.kullanici_tipi === "HARICI" ? "HARICI" : "IC_PERSONEL",
+      kullanici_tipi:
+        "kullanici_tipi" in body
+          ? body.kullanici_tipi === "HARICI"
+            ? "HARICI"
+            : "IC_PERSONEL"
+          : target.kullanici_tipi,
       rol:
         body.rol === "PERSONEL" ||
         body.rol === "MUHASEBE" ||
@@ -8237,7 +8244,7 @@ export function resolveDemoApiResponse(
           ? body.rol
           : target.rol,
       personel_id: personelId,
-      must_change_password: toStringValue(body.password)
+      must_change_password: resetToStandardInitial || toStringValue(body.password)
         ? true
         : (target.must_change_password ?? false),
       sube_ids: Array.isArray(body.sube_ids)
@@ -8245,9 +8252,10 @@ export function resolveDemoApiResponse(
             .map((item) => toNumber(item))
             .filter((item): item is number => item !== null)
         : target.sube_ids,
-      varsayilan_sube_id: toNumber(body.varsayilan_sube_id),
-      durum: body.durum === "PASIF" ? "PASIF" : "AKTIF",
-      notlar: toStringValue(body.notlar) ?? undefined
+      varsayilan_sube_id:
+        "varsayilan_sube_id" in body ? toNumber(body.varsayilan_sube_id) : target.varsayilan_sube_id,
+      durum: "durum" in body ? (body.durum === "PASIF" ? "PASIF" : "AKTIF") : target.durum,
+      notlar: toStringValue(body.notlar) ?? target.notlar
     });
     return ok({
       ...target,

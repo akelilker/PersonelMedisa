@@ -940,6 +940,17 @@ class PersonellerController
     /** @param array<string, mixed> $user */
     private static function assertCreateSubeScope(array $user, Request $request, $subeId)
     {
+        // Unassigned DIS_KAYNAK (sube_id NULL) is a legitimate central pool record
+        // (migration 076: no placeholder branch). Only unrestricted roles may create it,
+        // and the active-branch header must not be compared against a missing branch.
+        if ($subeId === null || (int) $subeId <= 0) {
+            if (!OrgScope::isUnrestricted($user)) {
+                JsonResponse::forbidden('Sube atanmamis personel olusturma yetkiniz yok.');
+            }
+
+            return;
+        }
+
         $subeId = (int) $subeId;
         $headerSube = self::parseHeaderPositiveInt($request->getHeader('x-active-sube-id'));
         if ($headerSube !== null && $headerSube !== $subeId) {

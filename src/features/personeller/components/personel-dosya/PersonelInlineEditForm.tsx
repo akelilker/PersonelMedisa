@@ -237,7 +237,7 @@ export function PersonelInlineEditForm({
         )}
         {hasLifecycleDiff ? (
           <FormField
-            label="Geçerlilik Tarihi"
+            label="Göreve Başlama Tarihi"
             name="edit-effective-date"
             type="date"
             value={editForm.effectiveDate}

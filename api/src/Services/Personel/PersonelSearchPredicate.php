@@ -39,8 +39,13 @@ final class PersonelSearchPredicate
     /**
      * Normalizes raw request input: collapses every Unicode whitespace run into a
      * single space, trims and clamps the length.
+     *
+     * Untyped on purpose: production runs PHP 7.4, where `mixed` is not a type but
+     * a class name resolved inside this namespace.
+     *
+     * @param mixed $raw
      */
-    public static function normalize(mixed $raw): string
+    public static function normalize($raw): string
     {
         $value = (string) $raw;
         $collapsed = preg_replace('/\s+/u', ' ', $value);
@@ -63,9 +68,10 @@ final class PersonelSearchPredicate
     }
 
     /**
+     * @param  mixed $raw
      * @return list<string>
      */
-    public static function tokenize(mixed $raw): array
+    public static function tokenize($raw): array
     {
         $normalized = self::normalize($raw);
         if ($normalized === '') {
@@ -91,11 +97,12 @@ final class PersonelSearchPredicate
      *
      * @param list<string>         $where
      * @param array<string, mixed> $params
+     * @param mixed                $raw
      */
     public static function append(
         array &$where,
         array &$params,
-        mixed $raw,
+        $raw,
         string $alias = 'p',
         string $paramPrefix = 'search',
         ?PDO $pdo = null

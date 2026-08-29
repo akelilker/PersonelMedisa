@@ -209,4 +209,20 @@ jobs:
             echo "WORKER_HEARTBEAT_EXISTS=NO"
           fi
 
+          # 9) API error boundary tail. The boundary answers a failed request with a
+          #    generic code plus a correlation id and keeps the exception class,
+          #    file and line here, under the web-denied runtime directory. Reading
+          #    it is the only way to attribute a production 500 to an owner.
+          if run_cpanel_ftp "get api/runtime/api-error-boundary.log -o ${WORK}/api-errors.log;"; then
+            echo "API_ERROR_LOG_EXISTS=YES"
+            echo "API_ERROR_LOG_LINES=$(wc -l < "${WORK}/api-errors.log" | tr -d ' ')"
+            echo "API_ERROR_LOG_TAIL_BEGIN"
+            # Bounded tail; the boundary never writes request bodies, query strings
+            # or credentials into these lines.
+            tail -n 25 "${WORK}/api-errors.log"
+            echo "API_ERROR_LOG_TAIL_END"
+          else
+            echo "API_ERROR_LOG_EXISTS=NO"
+          fi
+
           echo "DIAGNOSTICS_RESULT=COLLECTED"

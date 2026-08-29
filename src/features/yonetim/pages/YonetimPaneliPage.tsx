@@ -500,6 +500,9 @@ export function YonetimPaneliPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isAddingDepartman, setIsAddingDepartman] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  // Submit failures must stay inside the open editor modal; the page-level
+  // ErrorState renders behind it and hides the list behind the overlay.
+  const [formErrorMessage, setFormErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [subeDeleteError, setSubeDeleteError] = useState<string | null>(null);
   const [isSubeDeleteDialogOpen, setIsSubeDeleteDialogOpen] = useState(false);
@@ -651,6 +654,7 @@ export function YonetimPaneliPage() {
     setEditingKullaniciId(null);
     setKullaniciForm(INITIAL_KULLANICI_FORM);
     setIsKullaniciFormOpen(false);
+    setFormErrorMessage(null);
   }
 
   function resetSubeEditor() {
@@ -659,6 +663,7 @@ export function YonetimPaneliPage() {
     setYeniDepartmanAdi("");
     setIsDepartmanCreateOpen(false);
     setIsSubeFormOpen(false);
+    setFormErrorMessage(null);
     setSubeDeleteError(null);
     setIsSubeDeleteDialogOpen(false);
     setSubeDeleteDialogError(null);
@@ -667,6 +672,7 @@ export function YonetimPaneliPage() {
   function openYeniKullaniciForm() {
     setSuccessMessage(null);
     setErrorMessage(null);
+    setFormErrorMessage(null);
     setEditingKullaniciId(null);
     setKullaniciForm(INITIAL_KULLANICI_FORM);
     setIsKullaniciFormOpen(true);
@@ -675,6 +681,7 @@ export function YonetimPaneliPage() {
   function openKullaniciEditor(item: YonetimKullanici) {
     setSuccessMessage(null);
     setErrorMessage(null);
+    setFormErrorMessage(null);
     setEditingKullaniciId(item.id);
     setKullaniciForm(userFormFromItem(item));
     setIsKullaniciFormOpen(true);
@@ -683,6 +690,7 @@ export function YonetimPaneliPage() {
   function openYeniSubeForm() {
     setSuccessMessage(null);
     setErrorMessage(null);
+    setFormErrorMessage(null);
     setSubeDeleteError(null);
     setEditingSubeId(null);
     setSubeForm(INITIAL_SUBE_FORM);
@@ -694,6 +702,7 @@ export function YonetimPaneliPage() {
   function openSubeEditor(item: YonetimSube) {
     setSuccessMessage(null);
     setErrorMessage(null);
+    setFormErrorMessage(null);
     setSubeDeleteError(null);
     setEditingSubeId(item.id);
     setSubeForm(subeFormFromItem(item));
@@ -755,7 +764,7 @@ export function YonetimPaneliPage() {
     }
 
     setIsSubmitting(true);
-    setErrorMessage(null);
+    setFormErrorMessage(null);
     setSuccessMessage(null);
 
     try {
@@ -780,9 +789,9 @@ export function YonetimPaneliPage() {
       await loadPanel();
     } catch (error) {
       if (isApiRequestError(error) && error.code === "PERSONEL_ALREADY_BOUND") {
-        setErrorMessage("Bu personel kaydı başka bir kullanıcıya bağlı.");
+        setFormErrorMessage("Bu personel kaydı başka bir kullanıcıya bağlı.");
       } else {
-        setErrorMessage(error instanceof Error ? error.message : "Kullanıcı kaydı kaydedilemedi.");
+        setFormErrorMessage(error instanceof Error ? error.message : "Kullanıcı kaydı kaydedilemedi.");
       }
     } finally {
       setIsSubmitting(false);
@@ -796,7 +805,7 @@ export function YonetimPaneliPage() {
     }
 
     setIsSubmitting(true);
-    setErrorMessage(null);
+    setFormErrorMessage(null);
     setSuccessMessage(null);
 
     try {
@@ -812,7 +821,7 @@ export function YonetimPaneliPage() {
       resetSubeEditor();
       await loadPanel();
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Şube tanımı kaydedilemedi.");
+      setFormErrorMessage(error instanceof Error ? error.message : "Şube tanımı kaydedilemedi.");
     } finally {
       setIsSubmitting(false);
     }
@@ -867,7 +876,7 @@ export function YonetimPaneliPage() {
     }
 
     setIsAddingDepartman(true);
-    setErrorMessage(null);
+    setFormErrorMessage(null);
     setSuccessMessage(null);
 
     try {
@@ -881,7 +890,7 @@ export function YonetimPaneliPage() {
       setIsDepartmanCreateOpen(false);
       setSuccessMessage(`"${created.label}" departmanı seçeneklere eklendi.`);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Departman eklenemedi.");
+      setFormErrorMessage(error instanceof Error ? error.message : "Departman eklenemedi.");
     } finally {
       setIsAddingDepartman(false);
     }
@@ -1322,6 +1331,12 @@ export function YonetimPaneliPage() {
               </fieldset>
             ) : null}
 
+            {formErrorMessage ? (
+              <p className="yonetim-inline-error" role="alert" data-testid="yonetim-kullanici-form-error">
+                {formErrorMessage}
+              </p>
+            ) : null}
+
             <div className="form-actions-row">
               <button type="submit" className="universal-btn-save" data-testid="yonetim-kullanici-kaydet">
                 {editingKullaniciId != null ? "Kullanıcıyı Güncelle" : "Kullanıcıyı Kaydet"}
@@ -1440,6 +1455,12 @@ export function YonetimPaneliPage() {
                 </div>
               </div>
             </div>
+
+            {formErrorMessage ? (
+              <p className="yonetim-inline-error" role="alert" data-testid="yonetim-sube-form-error">
+                {formErrorMessage}
+              </p>
+            ) : null}
 
             {subeDeleteError ? (
               <p className="yonetim-inline-error" role="alert">

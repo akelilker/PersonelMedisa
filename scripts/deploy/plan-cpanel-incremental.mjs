@@ -1452,9 +1452,11 @@ function main() {
   writeFileSync(join(outDir, 'plan.json'), `${JSON.stringify(plan, null, 2)}\n`, 'utf8');
   writeFileSync(join(outDir, 'summary.env'), formatDeploySummary(plan), 'utf8');
   // Remote parity gate input: every api/ path this run claims to have uploaded.
+  // Every line is newline terminated, otherwise the gate's `while read` loop drops
+  // the last path and silently under-verifies the upload.
   writeFileSync(
     join(outDir, 'api-uploads.list'),
-    plan.apiUploads.map((path) => renderLftpGitPath(path)).join('\n'),
+    plan.apiUploads.map((path) => `${renderLftpGitPath(path)}\n`).join(''),
     'utf8',
   );
   writeFileSync(deployShaLocalPathOs, `${currentSha}\n`, 'utf8');

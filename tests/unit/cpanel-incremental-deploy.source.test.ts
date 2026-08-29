@@ -1080,6 +1080,9 @@ describe('cPanel incremental deploy workflow wiring', () => {
 
   it('gates the deploy-sha marker on byte parity of every uploaded api/ file', () => {
     expect(planner).toContain("join(outDir, 'api-uploads.list')");
+    // Newline terminated per path: an unterminated last line is dropped by the
+    // gate's `while read` loop, which under-verifies without failing.
+    expect(planner).toContain('`${renderLftpGitPath(path)}\\n`');
     expect(source).toContain('verify_uploaded_api_file_parity');
     expect(source).toContain('$PLAN_DIR/api-uploads.list');
     expect(source).toContain('SHA256_MISMATCH');

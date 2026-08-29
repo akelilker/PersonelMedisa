@@ -236,7 +236,8 @@ mgAssertHas('SUBE_YONETICISI', [
     'disiplin.final_decision',
     'puantaj.olay_karar.decide',
     'surecler.cancel',
-    'bildirimler.cancel',
+    // bildirimler.cancel is deliberately not here: it was a dead grant, and the real
+    // notification cancel owner gates on gunluk_bildirim.update_own_open.
     'revizyon.cancel',
     'finans.view',
 ], true, 'SUBE_KEEPS_BRANCH_SCOPED_OPERATIONAL_DECISIONS');

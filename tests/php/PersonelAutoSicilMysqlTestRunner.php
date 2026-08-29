@@ -234,7 +234,10 @@ try {
         return (bool) preg_match('/^\d{3}_.+\.sql$/', (string) $name);
     }));
     sort($chain, SORT_STRING);
-    autoSicilAssert(end($chain) === '078_personel_sicil_sequence.sql', '078 canonical migration tip');
+    autoSicilAssert(
+        end($chain) === '079_aylik_kapanis_sube_scope_and_actor.sql',
+        '079 canonical migration tip'
+    );
     autoSicilAssert(
         (int) $pdo->query(
             "SELECT COUNT(*) FROM information_schema.STATISTICS

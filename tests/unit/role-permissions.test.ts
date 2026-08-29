@@ -74,7 +74,10 @@ describe("role permissions", () => {
     expect(hasRolePermission("BIRIM_AMIRI", "bildirimler.view")).toBe(true);
     expect(hasRolePermission("BIRIM_AMIRI", "bildirimler.create")).toBe(true);
     expect(hasRolePermission("BIRIM_AMIRI", "bildirimler.update")).toBe(true);
-    expect(hasRolePermission("BIRIM_AMIRI", "bildirimler.cancel")).toBe(true);
+    // Dead grant removed: cancel is gated by gunluk_bildirim.update_own_open, so no
+    // role may carry a permission that no route, controller or UI gate ever reads.
+    expect(hasRolePermission("BIRIM_AMIRI", "bildirimler.update_own_open" as never)).toBe(false);
+    expect(hasRolePermission("BIRIM_AMIRI", "gunluk_bildirim.update_own_open")).toBe(true);
     expect(hasRolePermission("BIRIM_AMIRI", "puantaj.view")).toBe(true);
     expect(hasRolePermission("BIRIM_AMIRI", "raporlar.view")).toBe(true);
     expect(hasRolePermission("BIRIM_AMIRI", "personeller.create")).toBe(false);

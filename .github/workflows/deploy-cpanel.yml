@@ -9,6 +9,14 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      force_full_mirror:
+        description: >-
+          Re-mirror every api/ file instead of planning from the git diff. Needed
+          when a file is missing remotely while api/.deploy-sha already claims the
+          current commit, because a diff-derived plan has nothing to upload.
+        type: boolean
+        default: false
 
 concurrency:
   group: deploy-cpanel-production
@@ -155,6 +163,7 @@ jobs:
           LOCAL_REPO_DIR: ${{ env.LOCAL_REPO_DIR }}
           REMOTE_TARGET_DIR: ${{ env.REMOTE_TARGET_DIR }}
           DEPLOY_SHA: ${{ env.DEPLOY_SHA }}
+          FORCE_FULL_MIRROR: ${{ inputs.force_full_mirror == true && 'true' || 'false' }}
         run: |
           set -euo pipefail
 
@@ -275,6 +284,7 @@ jobs:
           node scripts/deploy/plan-cpanel-incremental.mjs \
             --previous-sha="$PREVIOUS_DEPLOY_SHA" \
             --previous-sha-read-status="$PREVIOUS_SHA_READ" \
+            --force-full-mirror="$FORCE_FULL_MIRROR" \
             --current-sha="$DEPLOY_SHA" \
             --repo-root="$LOCAL_REPO_DIR" \
             --dist-dir="${LOCAL_DIST_DIR%/}" \
@@ -313,6 +323,29 @@ jobs:
           # Payload transfer NEVER writes api/.deploy-sha.
           # Finalization is a separate FTP operation after payload verify PASS.
 
+          # Reads one uploaded api/ file back and proves byte parity with the commit.
+          # Without this an INCREMENTAL put that never landed stays invisible: the
+          # marker advances, the frontend expects the new code, and the missing PHP
+          # class only surfaces as an empty HTTP 500 in production.
+          verify_uploaded_api_file_parity() {
+            local relative_path="$1"
+            local remote_copy
+            remote_copy="$(mktemp)"
+            if ! lftp_get_remote_to_local "$relative_path" "$remote_copy"; then
+              rm -f "$remote_copy"
+              echo "API_FILE_PARITY=FAIL path=${relative_path} reason=${LAST_READ_CLASS}"
+              return 1
+            fi
+            if [[ "$(sha256sum "$remote_copy" | cut -d' ' -f1)" != \
+                  "$(sha256sum "${LOCAL_REPO_DIR}/${relative_path}" | cut -d' ' -f1)" ]]; then
+              rm -f "$remote_copy"
+              echo "API_FILE_PARITY=FAIL path=${relative_path} reason=SHA256_MISMATCH"
+              return 1
+            fi
+            rm -f "$remote_copy"
+            echo "API_FILE_PARITY=OK path=${relative_path}"
+          }
+
           verify_payload_before_sha() {
             local remote_bundle_path
             remote_bundle_path="$(mktemp)"
@@ -322,6 +355,15 @@ jobs:
               "$(sha256sum "${LOCAL_REPO_DIR}/api/runtime-build/canonical-migrations.php" | cut -d' ' -f1)"
             rm -f "${remote_bundle_path}"
             echo "REMOTE_BUNDLE_GET=SUCCESS"
+
+            local verified=0
+            echo "API_UPLOAD_PARITY starting"
+            while IFS= read -r api_path; do
+              [[ -z "$api_path" ]] && continue
+              verify_uploaded_api_file_parity "$api_path" || return 1
+              verified=$((verified + 1))
+            done < "$PLAN_DIR/api-uploads.list"
+            echo "API_UPLOAD_PARITY=SUCCESS verified=${verified}"
           }
 
           finalize_deploy_sha() {

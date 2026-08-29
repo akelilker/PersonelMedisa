@@ -462,6 +462,7 @@ export function countOwnedApiFiles(args) {
  *   ancestryOk?: boolean | null,
  *   fetchOk?: boolean | null,
  *   previousShaReadStatus?: 'SUCCESS' | 'NOT_FOUND' | 'TRANSPORT_FAILED' | 'INVALID_CONTENT' | null,
+ *   forceFullMirror?: boolean | null,
  * }} input
  * @returns {DeployPlan}
  */
@@ -497,6 +498,11 @@ export function createDeployPlan(input) {
 
   if (!isValidSha(currentSha)) {
     return { ...base, fallbackReason: 'CURRENT_SHA_INVALID' };
+  }
+  if (input.forceFullMirror === true) {
+    // Recovery path: a diff-derived plan cannot re-upload an api/ file that is
+    // missing remotely while the marker already claims the current SHA.
+    return { ...base, fallbackReason: 'FORCED_FULL_MIRROR' };
   }
   if (!previousSha) {
     if (readStatus === 'TRANSPORT_FAILED') {
@@ -1379,6 +1385,7 @@ function main() {
   ) {
     previousShaReadStatus = previousShaReadStatusRaw;
   }
+  const forceFullMirror = (args['force-full-mirror'] ?? '').trim().toLowerCase() === 'true';
   const deployShaLocalPathOs = resolve(
     args['deploy-sha-local-path'] ?? join(outDir, '.deploy-sha'),
   );
@@ -1439,10 +1446,17 @@ function main() {
     ancestryOk,
     fetchOk,
     previousShaReadStatus,
+    forceFullMirror,
   });
 
   writeFileSync(join(outDir, 'plan.json'), `${JSON.stringify(plan, null, 2)}\n`, 'utf8');
   writeFileSync(join(outDir, 'summary.env'), formatDeploySummary(plan), 'utf8');
+  // Remote parity gate input: every api/ path this run claims to have uploaded.
+  writeFileSync(
+    join(outDir, 'api-uploads.list'),
+    plan.apiUploads.map((path) => renderLftpGitPath(path)).join('\n'),
+    'utf8',
+  );
   writeFileSync(deployShaLocalPathOs, `${currentSha}\n`, 'utf8');
 
   const ctx = {

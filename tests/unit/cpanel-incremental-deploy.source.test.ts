@@ -1077,4 +1077,51 @@ describe('cPanel incremental deploy workflow wiring', () => {
       /export function renderFullMirrorPayloadCommands[\s\S]*lftpQuote\(ctx\.localDistDir/,
     );
   });
+
+  it('gates the deploy-sha marker on byte parity of every uploaded api/ file', () => {
+    expect(planner).toContain("join(outDir, 'api-uploads.list')");
+    expect(source).toContain('verify_uploaded_api_file_parity');
+    expect(source).toContain('$PLAN_DIR/api-uploads.list');
+    expect(source).toContain('SHA256_MISMATCH');
+    expect(source).toContain('API_UPLOAD_PARITY=SUCCESS');
+    // Parity must run inside the pre-finalization verify so a failure still
+    // leaves the previous SHA on the marker and triggers the full mirror.
+    const verifyIdx = source.indexOf('verify_payload_before_sha() {');
+    const parityIdx = source.indexOf('API_UPLOAD_PARITY starting');
+    expect(verifyIdx).toBeGreaterThanOrEqual(0);
+    expect(parityIdx).toBeGreaterThan(verifyIdx);
+    expect(source).toMatch(
+      /verify_payload_before_sha\n\s+finalize_deploy_sha/,
+    );
+  });
+
+  it('exposes a forced full mirror recovery path for remotely missing api/ files', () => {
+    expect(source).toContain('force_full_mirror');
+    expect(source).toContain('--force-full-mirror=');
+    expect(planner).toContain("args['force-full-mirror']");
+
+    const repoRoot = makeRepoSkeleton();
+    const distDir = makeDist();
+    const sha = 'cccccccccccccccccccccccccccccccccccccccc';
+    const planned = createDeployPlan({
+      previousSha: sha,
+      currentSha: sha,
+      repoRoot,
+      distDir,
+      previousShaReadStatus: 'SUCCESS',
+    });
+    expect(planned.mode).toBe('INCREMENTAL');
+    expect(planned.apiUploads).toEqual([]);
+
+    const forced = createDeployPlan({
+      previousSha: sha,
+      currentSha: sha,
+      repoRoot,
+      distDir,
+      previousShaReadStatus: 'SUCCESS',
+      forceFullMirror: true,
+    });
+    expect(forced.mode).toBe('FULL_MIRROR_FALLBACK');
+    expect(forced.fallbackReason).toBe('FORCED_FULL_MIRROR');
+  });
 });

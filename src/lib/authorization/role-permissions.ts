@@ -23,7 +23,9 @@ export type AppPermission =
   | "bildirimler.view"
   | "bildirimler.create"
   | "bildirimler.update"
-  | "bildirimler.cancel"
+  // bildirimler.cancel intentionally absent: cancel is gated by
+  // gunluk_bildirim.update_own_open in canCancelGunlukBildirim and in
+  // BildirimlerController::cancel. The sync-queue op of the same name is unrelated.
   | "bildirimler.detail.view"
   | "puantaj.view"
   | "puantaj.update"
@@ -162,7 +164,6 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "bildirimler.view",
     "bildirimler.create",
     "bildirimler.update",
-    "bildirimler.cancel",
     "bildirimler.detail.view",
     "puantaj.view",
     "puantaj.update",
@@ -255,7 +256,6 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "bildirimler.view",
     "bildirimler.create",
     "bildirimler.update",
-    "bildirimler.cancel",
     "bildirimler.detail.view",
     "puantaj.view",
     "puantaj.update",
@@ -316,7 +316,6 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "bildirimler.view",
     "bildirimler.create",
     "bildirimler.update",
-    "bildirimler.cancel",
     "bildirimler.detail.view",
     "puantaj.view",
     "puantaj.update",
@@ -384,7 +383,6 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "bildirimler.view",
     "bildirimler.create",
     "bildirimler.update",
-    "bildirimler.cancel",
     "bildirimler.detail.view",
     "puantaj.view",
     "puantaj.amir_kontrol",

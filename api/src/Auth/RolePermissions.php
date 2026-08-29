@@ -8,7 +8,14 @@ use Medisa\Api\Http\JsonResponse;
 
 class RolePermissions
 {
-    /** @var array<string, array<int, string>> */
+    /**
+     * bildirimler.cancel is intentionally absent from every role: the cancel owner
+     * (BildirimlerController::cancel, POST /bildirimler/{id}/iptal) gates on
+     * gunluk_bildirim.update_own_open, so the grant was never read by any route,
+     * controller or frontend gate. Re-adding it would grant nothing.
+     *
+     * @var array<string, array<int, string>>
+     */
     private static $matrix = [
         'GENEL_YONETICI' => [
             'personeller.view',
@@ -36,7 +43,6 @@ class RolePermissions
             'bildirimler.view',
             'bildirimler.create',
             'bildirimler.update',
-            'bildirimler.cancel',
             'bildirimler.detail.view',
             'puantaj.view',
             'puantaj.update',
@@ -129,7 +135,6 @@ class RolePermissions
             'bildirimler.view',
             'bildirimler.create',
             'bildirimler.update',
-            'bildirimler.cancel',
             'bildirimler.detail.view',
             'puantaj.view',
             'puantaj.update',
@@ -187,7 +192,6 @@ class RolePermissions
             'bildirimler.view',
             'bildirimler.create',
             'bildirimler.update',
-            'bildirimler.cancel',
             'bildirimler.detail.view',
             'puantaj.view',
             'puantaj.update',
@@ -265,7 +269,6 @@ class RolePermissions
             'bildirimler.view',
             'bildirimler.create',
             'bildirimler.update',
-            'bildirimler.cancel',
             'bildirimler.detail.view',
             'puantaj.view',
             'puantaj.amir_kontrol',

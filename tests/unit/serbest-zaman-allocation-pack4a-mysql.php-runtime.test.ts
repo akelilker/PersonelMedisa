@@ -28,7 +28,7 @@ describe("SerbestZamanAllocation Pack4A MariaDB", () => {
     const migrations = readdirSync(resolve(process.cwd(), "api/migrations"))
       .filter((name) => name.endsWith(".sql"))
       .sort();
-    expect(migrations.at(-1)).toBe("078_personel_sicil_sequence.sql");
+    expect(migrations.at(-1)).toBe("079_aylik_kapanis_sube_scope_and_actor.sql");
     expect(migrations).toContain("061_serbest_zaman_kullanim_tahsisleri.sql");
 
     expect(serviceSource).toContain("class SerbestZamanAllocationService");

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Medisa\Api\Controllers;
 
 use Medisa\Api\Auth\AuthMiddleware;
+use Medisa\Api\Auth\DualControl;
 use Medisa\Api\Auth\InitialPassword;
 use Medisa\Api\Auth\PasswordHasher;
 use Medisa\Api\Auth\PasswordPolicy;
@@ -500,8 +501,10 @@ class YonetimController
     {
         $user = AuthMiddleware::authenticate($request, true);
         RolePermissions::assert($user, 'aylik-ozet.view');
+        OrgScope::assertRequiredAssignment($user);
 
         $filters = self::parseAylikOzetFilters($request, false);
+        self::assertAylikSubeAccess($user, $filters['sube_id']);
 
         try {
             $pdo = Connection::get();
@@ -531,17 +534,32 @@ class YonetimController
         $params = $where['params'];
         $params['son_islem'] = 'Bolum yoneticisi toplu onay verdi';
 
+        // Resolved before the write: the canonical branch set comes from the rows the
+        // scoped predicate actually owns, never from the request body sube_id.
+        $canonicalSubeIds = self::resolveCanonicalAylikSubeIds($pdo, $filters, $user);
+        $actorColumns = self::aylikOzetActorColumnsSupported($pdo);
+
+        $actorSql = '';
+        if ($actorColumns) {
+            $actorSql = ',
+                    bolum_onay_actor_user_id = :actor_user_id,
+                    bolum_onay_actor_identity_id = :actor_identity_id,
+                    bolum_onay_at = CURRENT_TIMESTAMP(3)';
+            $params['actor_user_id'] = (int) $user['id'];
+            $params['actor_identity_id'] = DualControl::resolveActorIdentityId($pdo, (int) $user['id'], $user);
+        }
+
         $pdo->beginTransaction();
         try {
             $updateSql = 'UPDATE aylik_ozet_satirlari
                 SET bolum_onay_durumu = \'BOLUM_ONAYLANDI\',
                     revize_var_mi = 0,
-                    son_islem = :son_islem
+                    son_islem = :son_islem' . $actorSql . '
                 WHERE ' . $where['sql'] . ' AND kapanis_durumu <> \'KAPANDI\'';
             $stmt = $pdo->prepare($updateSql);
             $stmt->execute($params);
 
-            self::syncAylikKapanisState($pdo, $filters['ay']);
+            self::syncAylikKapanisState($pdo, $filters['ay'], $canonicalSubeIds);
             $pdo->commit();
         } catch (\Throwable $e) {
             if ($pdo->inTransaction()) {
@@ -569,21 +587,35 @@ class YonetimController
         }
 
         self::assertNoPendingBolumOnay($pdo, $filters, $user);
+        self::assertAylikKapanisSeparationOfDuties($pdo, $filters, $user);
 
         $where = self::buildAylikOzetWhereClause($filters, $user);
         $params = $where['params'];
         $params['son_islem'] = 'Genel yonetici ust onay verdi';
 
+        $canonicalSubeIds = self::resolveCanonicalAylikSubeIds($pdo, $filters, $user);
+        $actorColumns = self::aylikOzetActorColumnsSupported($pdo);
+
+        $actorSql = '';
+        if ($actorColumns) {
+            $actorSql = ',
+                    kapanis_actor_user_id = :actor_user_id,
+                    kapanis_actor_identity_id = :actor_identity_id,
+                    kapanis_at = CURRENT_TIMESTAMP(3)';
+            $params['actor_user_id'] = (int) $user['id'];
+            $params['actor_identity_id'] = DualControl::resolveActorIdentityId($pdo, (int) $user['id'], $user);
+        }
+
         $pdo->beginTransaction();
         try {
             $updateSql = 'UPDATE aylik_ozet_satirlari
                 SET kapanis_durumu = \'KAPANDI\',
-                    son_islem = :son_islem
+                    son_islem = :son_islem' . $actorSql . '
                 WHERE ' . $where['sql'];
             $stmt = $pdo->prepare($updateSql);
             $stmt->execute($params);
 
-            self::syncAylikKapanisState($pdo, $filters['ay']);
+            self::syncAylikKapanisState($pdo, $filters['ay'], $canonicalSubeIds);
             $pdo->commit();
         } catch (\Throwable $e) {
             if ($pdo->inTransaction()) {
@@ -642,6 +674,10 @@ class YonetimController
     /** @param array<string, mixed> $user */
     private static function assertAylikWriteSubeScope(array $user, $subeId)
     {
+        // Canonical empty-scope deny: a branch/unit role without an assignment must not
+        // fall through to an unrestricted month-wide write.
+        OrgScope::assertRequiredAssignment($user);
+
         $subeId = (int) $subeId;
         $allowed = SubeScope::allowedSubeIds($user);
         if (count($allowed) > 0 && $subeId <= 0) {
@@ -700,20 +736,25 @@ class YonetimController
     {
         $where = ['ay = :ay'];
         $params = ['ay' => $filters['ay']];
+
+        // The requested branch may only ever narrow inside the assignment, so the
+        // allowed-list predicate is ANDed on top instead of being replaced by it. A
+        // cross-branch sube_id therefore matches no row even if a caller reaches this
+        // builder without the assertAylikSubeAccess gate in front of it.
         if ($filters['sube_id'] > 0) {
             $where[] = 'sube_id = :sube_id';
             $params['sube_id'] = $filters['sube_id'];
-        } else {
-            $allowedSubeIds = SubeScope::allowedSubeIds($user);
-            if (count($allowedSubeIds) > 0) {
-                $placeholders = [];
-                foreach ($allowedSubeIds as $index => $subeId) {
-                    $key = 'allowed_sube_id_' . $index;
-                    $placeholders[] = ':' . $key;
-                    $params[$key] = $subeId;
-                }
-                $where[] = 'sube_id IN (' . implode(', ', $placeholders) . ')';
+        }
+
+        $allowedSubeIds = SubeScope::allowedSubeIds($user);
+        if (count($allowedSubeIds) > 0) {
+            $placeholders = [];
+            foreach ($allowedSubeIds as $index => $subeId) {
+                $key = 'allowed_sube_id_' . $index;
+                $placeholders[] = ':' . $key;
+                $params[$key] = $subeId;
             }
+            $where[] = 'sube_id IN (' . implode(', ', $placeholders) . ')';
         }
         if ($filters['departman_id'] > 0) {
             $where[] = 'departman_id = :departman_id';
@@ -791,10 +832,7 @@ class YonetimController
             }
         }
 
-        $stateStmt = $pdo->prepare('SELECT state FROM aylik_kapanis_state WHERE ay = :ay LIMIT 1');
-        $stateStmt->execute(['ay' => $filters['ay']]);
-        $stateRow = $stateStmt->fetch(PDO::FETCH_ASSOC);
-        $state = $stateRow ? (string) $stateRow['state'] : 'BOLUM_ONAYINDA';
+        $state = self::readAylikKapanisState($pdo, $filters, $user);
 
         return [
             'ay' => $filters['ay'],
@@ -805,15 +843,145 @@ class YonetimController
         ];
     }
 
-    private static function syncAylikKapanisState(PDO $pdo, $ay)
+    /**
+     * State reported to the caller covers only the branches the caller can see, so a
+     * branch-restricted user never receives another branch's aggregate next to its own
+     * branch-filtered items.
+     *
+     * @param array{ay: string, sube_id: int, departman_id: int, sadece_revizeli: bool} $filters
+     * @param array<string, mixed> $user
+     */
+    private static function readAylikKapanisState(PDO $pdo, array $filters, array $user)
     {
+        if (!self::aylikKapanisStateSubeScopeSupported($pdo)) {
+            $stmt = $pdo->prepare('SELECT state FROM aylik_kapanis_state WHERE ay = :ay LIMIT 1');
+            $stmt->execute(['ay' => $filters['ay']]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            return $row ? (string) $row['state'] : 'BOLUM_ONAYINDA';
+        }
+
+        $subeIds = self::resolveCanonicalAylikSubeIds($pdo, $filters, $user);
+        if (count($subeIds) === 0) {
+            return 'BOLUM_ONAYINDA';
+        }
+
+        $states = [];
+        foreach ($subeIds as $subeId) {
+            $scopeId = $subeId > 0 ? $subeId : 0;
+            $stmt = $pdo->prepare(
+                'SELECT state FROM aylik_kapanis_state WHERE ay = :ay AND sube_id = :sube_id LIMIT 1'
+            );
+            $stmt->execute(['ay' => $filters['ay'], 'sube_id' => $scopeId]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            $states[] = $row ? (string) $row['state'] : 'BOLUM_ONAYINDA';
+        }
+
+        return self::foldAylikKapanisStates($states);
+    }
+
+    /**
+     * Same precedence as the per-branch aggregate: KAPANDI only when every visible
+     * branch is closed, otherwise the most blocking state wins.
+     *
+     * @param array<int, string> $states
+     */
+    private static function foldAylikKapanisStates(array $states)
+    {
+        if (count($states) === 0) {
+            return 'BOLUM_ONAYINDA';
+        }
+
+        $allClosed = true;
+        foreach ($states as $state) {
+            if ($state !== 'KAPANDI') {
+                $allClosed = false;
+                break;
+            }
+        }
+        if ($allClosed) {
+            return 'KAPANDI';
+        }
+        if (in_array('REVIZE_ISTENDI', $states, true)) {
+            return 'REVIZE_ISTENDI';
+        }
+        if (in_array('BOLUM_ONAYINDA', $states, true)) {
+            return 'BOLUM_ONAYINDA';
+        }
+
+        return 'BOLUM_ONAYLANDI';
+    }
+
+    /**
+     * Canonical branch set of a monthly write, resolved server-side from the closing
+     * rows the scoped predicate owns. The request body sube_id can only narrow inside
+     * the actor's already-authorized scope; it never becomes the branch identity that
+     * the aggregated state is keyed on.
+     *
+     * @param array{ay: string, sube_id: int, departman_id: int, sadece_revizeli: bool} $filters
+     * @param array<string, mixed> $user
+     * @return array<int, int>
+     */
+    private static function resolveCanonicalAylikSubeIds(PDO $pdo, array $filters, array $user)
+    {
+        $where = self::buildAylikOzetWhereClause($filters, $user);
         $stmt = $pdo->prepare(
-            'SELECT bolum_onay_durumu, kapanis_durumu FROM aylik_ozet_satirlari WHERE ay = :ay'
+            'SELECT DISTINCT sube_id FROM aylik_ozet_satirlari WHERE ' . $where['sql']
         );
-        $stmt->execute(['ay' => $ay]);
+        $stmt->execute($where['params']);
+
+        $subeIds = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $subeIds[] = (int) $row['sube_id'];
+        }
+        sort($subeIds);
+
+        return $subeIds;
+    }
+
+    /**
+     * Recomputes the persisted closing state for exactly the canonical branches the
+     * caller's write touched. Each branch aggregates only its own rows, so closing one
+     * branch can never move another branch's state inside the same month.
+     *
+     * @param array<int, int> $subeIds canonical branches resolved by resolveCanonicalAylikSubeIds
+     */
+    private static function syncAylikKapanisState(PDO $pdo, $ay, array $subeIds)
+    {
+        if (!self::aylikKapanisStateSubeScopeSupported($pdo)) {
+            // Pre-079 schema has a single month-keyed row and no branch column, so the
+            // legacy global aggregate is kept verbatim rather than silently narrowed.
+            self::writeAylikKapanisState($pdo, $ay, null, self::computeAylikKapanisState($pdo, $ay, null));
+
+            return;
+        }
+
+        foreach ($subeIds as $subeId) {
+            $state = self::computeAylikKapanisState($pdo, $ay, $subeId);
+            if ($state !== null) {
+                self::writeAylikKapanisState($pdo, $ay, $subeId, $state);
+            }
+        }
+    }
+
+    /**
+     * @param int|null $subeId null aggregates the whole month (legacy pre-079 shape)
+     * @return string|null null when the scope has no row to aggregate
+     */
+    private static function computeAylikKapanisState(PDO $pdo, $ay, $subeId)
+    {
+        $sql = 'SELECT bolum_onay_durumu, kapanis_durumu FROM aylik_ozet_satirlari WHERE ay = :ay';
+        $params = ['ay' => $ay];
+        if ($subeId !== null) {
+            $sql .= ' AND sube_id <=> :sube_id';
+            $params['sube_id'] = (int) $subeId > 0 ? (int) $subeId : null;
+        }
+
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
         if (count($rows) === 0) {
-            return;
+            return null;
         }
 
         $allClosed = true;
@@ -832,26 +1000,125 @@ class YonetimController
             }
         }
 
-        $state = 'BOLUM_ONAYINDA';
         if ($allClosed) {
-            $state = 'KAPANDI';
-        } elseif ($hasRevize) {
-            $state = 'REVIZE_ISTENDI';
-        } elseif (!$hasPending) {
-            $state = 'BOLUM_ONAYLANDI';
+            return 'KAPANDI';
+        }
+        if ($hasRevize) {
+            return 'REVIZE_ISTENDI';
         }
 
-        $existing = $pdo->prepare('SELECT id FROM aylik_kapanis_state WHERE ay = :ay LIMIT 1');
-        $existing->execute(['ay' => $ay]);
-        $existingRow = $existing->fetch(PDO::FETCH_ASSOC);
-        if ($existingRow) {
-            $update = $pdo->prepare('UPDATE aylik_kapanis_state SET state = :state WHERE ay = :ay');
-            $update->execute(['state' => $state, 'ay' => $ay]);
+        return $hasPending ? 'BOLUM_ONAYINDA' : 'BOLUM_ONAYLANDI';
+    }
+
+    /** @param int|null $subeId null targets the legacy month-only row */
+    private static function writeAylikKapanisState(PDO $pdo, $ay, $subeId, $state)
+    {
+        if ($state === null) {
             return;
         }
 
-        $insert = $pdo->prepare('INSERT INTO aylik_kapanis_state (ay, state) VALUES (:ay, :state)');
-        $insert->execute(['ay' => $ay, 'state' => $state]);
+        if ($subeId === null) {
+            $existing = $pdo->prepare('SELECT id FROM aylik_kapanis_state WHERE ay = :ay LIMIT 1');
+            $existing->execute(['ay' => $ay]);
+            if ($existing->fetch(PDO::FETCH_ASSOC)) {
+                $update = $pdo->prepare('UPDATE aylik_kapanis_state SET state = :state WHERE ay = :ay');
+                $update->execute(['state' => $state, 'ay' => $ay]);
+
+                return;
+            }
+
+            $insert = $pdo->prepare('INSERT INTO aylik_kapanis_state (ay, state) VALUES (:ay, :state)');
+            $insert->execute(['ay' => $ay, 'state' => $state]);
+
+            return;
+        }
+
+        // sube_id = 0 is the "branch not resolved" sentinel introduced by 079.
+        $scopeId = (int) $subeId > 0 ? (int) $subeId : 0;
+        $existing = $pdo->prepare(
+            'SELECT id FROM aylik_kapanis_state WHERE ay = :ay AND sube_id = :sube_id LIMIT 1'
+        );
+        $existing->execute(['ay' => $ay, 'sube_id' => $scopeId]);
+        if ($existing->fetch(PDO::FETCH_ASSOC)) {
+            $update = $pdo->prepare(
+                'UPDATE aylik_kapanis_state SET state = :state WHERE ay = :ay AND sube_id = :sube_id'
+            );
+            $update->execute(['state' => $state, 'ay' => $ay, 'sube_id' => $scopeId]);
+
+            return;
+        }
+
+        $insert = $pdo->prepare(
+            'INSERT INTO aylik_kapanis_state (ay, sube_id, state) VALUES (:ay, :sube_id, :state)'
+        );
+        $insert->execute(['ay' => $ay, 'sube_id' => $scopeId, 'state' => $state]);
+    }
+
+    /**
+     * Fail-closed separation of duties for the final month close: whoever gave a
+     * section approval on the rows being closed may not also close them, and neither
+     * may a second account belonging to the same actor identity.
+     *
+     * Rows approved before 079 carry no actor (NULL) and are treated as legacy so an
+     * existing month stays closable; every approval written after 079 records an actor,
+     * so no bypass window exists for new data.
+     *
+     * @param array{ay: string, sube_id: int, departman_id: int, sadece_revizeli: bool} $filters
+     * @param array<string, mixed> $user
+     */
+    private static function assertAylikKapanisSeparationOfDuties(PDO $pdo, array $filters, array $user)
+    {
+        if (!self::aylikOzetActorColumnsSupported($pdo)) {
+            return;
+        }
+
+        $where = self::buildAylikOzetWhereClause($filters, $user);
+        $stmt = $pdo->prepare(
+            'SELECT DISTINCT bolum_onay_actor_user_id AS approver
+             FROM aylik_ozet_satirlari
+             WHERE ' . $where['sql'] . '
+               AND kapanis_durumu <> \'KAPANDI\'
+               AND bolum_onay_actor_user_id IS NOT NULL'
+        );
+        $stmt->execute($where['params']);
+
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $violation = DualControl::violation($user, $row['approver'], $pdo);
+            if ($violation !== null) {
+                JsonResponse::error(403, $violation['code'], $violation['message']);
+            }
+        }
+    }
+
+    private static function aylikKapanisStateSubeScopeSupported(PDO $pdo)
+    {
+        return self::columnExists($pdo, 'aylik_kapanis_state', 'sube_id');
+    }
+
+    private static function aylikOzetActorColumnsSupported(PDO $pdo)
+    {
+        return self::columnExists($pdo, 'aylik_ozet_satirlari', 'bolum_onay_actor_user_id')
+            && self::columnExists($pdo, 'aylik_ozet_satirlari', 'kapanis_actor_user_id');
+    }
+
+    private static function columnExists(PDO $pdo, $table, $column)
+    {
+        try {
+            // information_schema rather than SHOW COLUMNS: the latter cannot take a
+            // server-side bound parameter, which production runs with.
+            $stmt = $pdo->prepare(
+                'SELECT 1 FROM information_schema.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :table AND COLUMN_NAME = :column
+                 LIMIT 1'
+            );
+            $stmt->execute(['table' => $table, 'column' => $column]);
+            $found = $stmt->fetchColumn();
+            $stmt->closeCursor();
+
+            return $found !== false;
+        } catch (\Throwable $e) {
+            return false;
+        }
     }
 
     /** @var array<int, string> */

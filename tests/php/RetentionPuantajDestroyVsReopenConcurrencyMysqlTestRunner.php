@@ -144,6 +144,7 @@ function dvrMigrationFiles(): array
             && basename($file) !== '076_dis_kaynak_gecici_gorevlendirme.sql'
             && basename($file) !== '077_legacy_role_enum_shrink.sql'
             && basename($file) !== '078_personel_sicil_sequence.sql'
+            && basename($file) !== '079_aylik_kapanis_sube_scope_and_actor.sql'
     ));
     sort($files, SORT_STRING);
 

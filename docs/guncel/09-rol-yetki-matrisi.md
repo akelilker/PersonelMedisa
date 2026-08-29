@@ -129,7 +129,8 @@ Bu permission'lar yeni S72 `aylik_bildirim_onayi.*` domain'i değildir. Legacy `
 
 Ek (mevcut kod — gecis):
 
-- `bildirimler.view/create/update/cancel` — evet (gunluk kayit merkezi)
+- `bildirimler.view/create/update` — evet (gunluk kayit merkezi)
+- Bildirim iptali `gunluk_bildirim.update_own_open` ile kapililir; ayri bir `bildirimler.cancel` yetkisi yoktur.
 - `personeller.view.sube`, `surecler.view.sube` — evet
 - `puantaj.view`, `puantaj.amir_kontrol` — evet
 - `puantaj.update`, `finans.*` — hayir
@@ -213,7 +214,7 @@ Asagidaki anahtarlar kodda halen kullanilmaktadir. S70B kod fazinda yeni anahtar
 ### Bildirimler (gecis — gunluk_bildirim.* ile birlestirilecek)
 
 - `bildirimler.view`: tum roller
-- `bildirimler.create/update/cancel`: yonetim rolleri + `BIRIM_AMIRI`
+- `bildirimler.create/update`: yonetim rolleri + `BIRIM_AMIRI`
 
 ### Gunluk Puantaj
 

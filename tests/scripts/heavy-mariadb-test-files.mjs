@@ -4,6 +4,7 @@
 export const heavyMariaDbTestFiles = [
   "tests/unit/actor-identity-lifecycle-mysql.php-runtime.test.ts",
   "tests/unit/attendance-discipline-052-mysql.php-runtime.test.ts",
+  "tests/unit/aylik-kapanis-sube-scope-mysql.php-runtime.test.ts",
   "tests/unit/bildirim-puantaj-etki-conflict-resolution-mysql.php-runtime.test.ts",
   "tests/unit/dis-kaynak-gecici-gorevlendirme-mysql.php-runtime.test.ts",
   "tests/unit/disposable-mariadb-lock.php-runtime.test.ts",

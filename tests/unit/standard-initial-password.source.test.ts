@@ -68,6 +68,26 @@ describe("standard initial password owner", () => {
     expect(yonetim).not.toMatch(/JsonResponse::success\([^)]*password_hash/);
   });
 
+  it("owns production config provisioning without exposing the hash", () => {
+    const ops = read("scripts/ops/standard-initial-password-config-ops.php");
+    const workflow = read(".github/workflows/set-cpanel-standard-initial-password-hash.yml");
+
+    // The value only ever travels through a private file, never argv or output.
+    expect(ops).toContain("--hash-file=");
+    expect(ops).toContain("readHashFile");
+    expect(ops).toContain("STANDARD_INITIAL_PASSWORD_HASH_CONFIGURED=");
+    expect(ops).not.toMatch(/echo\s+\$hash/);
+    expect(ops).toContain("UNRELATED_CONFIG_KEYS_CHANGED");
+
+    expect(workflow).toContain("secrets.STANDARD_INITIAL_PASSWORD_HASH");
+    expect(workflow).toContain("REMOTE_CONFIG_PATH: api/config.local.php");
+    expect(workflow).toContain("SET_STANDARD_INITIAL_PASSWORD_HASH");
+    expect(workflow).toContain("HASH_EXPOSED=NO");
+    expect(workflow).toContain("PLAINTEXT_EXPOSED=NO");
+    // The secret must never be interpolated into a workflow_dispatch input.
+    expect(workflow).not.toContain("inputs.hash");
+  });
+
   it("adds no new migration for this change", () => {
     const migrations = readdirSync(resolve("api/migrations")).filter((name) => name.endsWith(".sql"));
     const highest = migrations

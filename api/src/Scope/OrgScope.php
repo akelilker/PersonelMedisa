@@ -7,6 +7,8 @@ namespace Medisa\Api\Scope;
 use Medisa\Api\Auth\RolePermissions;
 use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
+use Medisa\Api\Services\Personel\PersonelCalisanKapsamSchema;
+use Medisa\Api\Services\Personel\PersonelCalisanKapsamService;
 use Medisa\Api\Services\Personel\PersonelGeciciGorevlendirmeSchema;
 use Medisa\Api\Services\Personel\PersonelGeciciGorevlendirmeService;
 use Medisa\Api\Services\Personel\PersonelOperationalContextService;
@@ -373,17 +375,25 @@ class OrgScope
                 if ($assignmentAware) {
                     $key = $paramPrefix . '_active_sube';
                     $params[$key] = (int) $activeSubeScope;
-                    $where[] = PersonelGeciciGorevlendirmeService::sqlPersonelMatchesEffectiveSube(
-                        $pdo,
-                        rtrim($col, '.'),
-                        $key,
-                        $params,
-                        null,
-                        $paramPrefix . '_eff'
+                    $where[] = self::withBranchlessDisKaynak(
+                        PersonelGeciciGorevlendirmeService::sqlPersonelMatchesEffectiveSube(
+                            $pdo,
+                            rtrim($col, '.'),
+                            $key,
+                            $params,
+                            null,
+                            $paramPrefix . '_eff'
+                        ),
+                        $col,
+                        $pdo
                     );
                 } else {
                     $key = $paramPrefix . '_active_sube';
-                    $where[] = $col . 'sube_id = :' . $key;
+                    $where[] = self::withBranchlessDisKaynak(
+                        $col . 'sube_id = :' . $key,
+                        $col,
+                        $pdo
+                    );
                     $params[$key] = (int) $activeSubeScope;
                 }
             }
@@ -401,8 +411,11 @@ class OrgScope
         if ($activeSubeScope !== null) {
             $key = $paramPrefix . '_active_sube';
             $params[$key] = (int) $activeSubeScope;
+            // Branch-scoped roles stay confined to the active branch; only an
+            // unrestricted user also sees the branchless DIS_KAYNAK records.
+            $includeBranchless = self::isUnrestricted($user);
             if ($assignmentAware) {
-                $where[] = PersonelGeciciGorevlendirmeService::sqlPersonelMatchesEffectiveSube(
+                $matches = PersonelGeciciGorevlendirmeService::sqlPersonelMatchesEffectiveSube(
                     $pdo,
                     rtrim($col, '.'),
                     $key,
@@ -411,8 +424,11 @@ class OrgScope
                     $paramPrefix . '_eff'
                 );
             } else {
-                $where[] = $col . 'sube_id = :' . $key;
+                $matches = $col . 'sube_id = :' . $key;
             }
+            $where[] = $includeBranchless
+                ? self::withBranchlessDisKaynak($matches, $col, $pdo)
+                : $matches;
 
             return;
         }
@@ -434,6 +450,38 @@ class OrgScope
         }
 
         self::appendInFilter($where, $params, $col . 'sube_id', $allowedSube, $paramPrefix . '_sube');
+    }
+
+    /**
+     * Widen an active-branch predicate to also match the branchless DIS_KAYNAK
+     * records.
+     *
+     * Migration 076 forbids a placeholder branch for an unassigned DIS_KAYNAK
+     * record, so `sube_id IS NULL` is its correct steady state. Without this term
+     * such a record belongs to no branch context at all and stays invisible in
+     * every one of them. Only DIS_KAYNAK is widened: a branchless IC_PERSONEL is
+     * incomplete data, not a valid state, and must not leak into a branch list.
+     *
+     * Callers decide who gets this — it is only ever applied for an unrestricted
+     * user.
+     *
+     * @param string $activeSubePredicate
+     * @param string $col alias with trailing dot, e.g. `p.`
+     * @param PDO|null $pdo
+     * @return string
+     */
+    private static function withBranchlessDisKaynak($activeSubePredicate, $col, $pdo)
+    {
+        // Referencing calisan_kapsami before 066 is ready would break the query;
+        // fall back to the plain branch predicate.
+        if (!($pdo instanceof PDO) || !PersonelCalisanKapsamSchema::isReady($pdo)) {
+            return $activeSubePredicate;
+        }
+
+        $branchless = '(' . $col . 'sube_id IS NULL AND ' . $col . "calisan_kapsami = '"
+            . PersonelCalisanKapsamService::DIS_KAYNAK . "')";
+
+        return '((' . $activeSubePredicate . ') OR ' . $branchless . ')';
     }
 
     /**

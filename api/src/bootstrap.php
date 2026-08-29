@@ -15,4 +15,8 @@ spl_autoload_register(function ($class) {
     }
 });
 
+// Installed before config/routing so a failure in either is still reported as a
+// contract-shaped 500 with a correlation id instead of an empty response body.
+Medisa\Api\Http\ErrorBoundary::install();
+
 require __DIR__ . '/Config/config.php';

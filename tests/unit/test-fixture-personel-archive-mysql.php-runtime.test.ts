@@ -123,7 +123,7 @@ describe("test fixture personel archive owner", () => {
       "076_dis_kaynak_gecici_gorevlendirme.sql",
       "077_legacy_role_enum_shrink.sql",
       "078_personel_sicil_sequence.sql",
-      "079_aylik_kapanis_sube_scope_and_actor.sql",
+      "079_sirket_sube_hiyerarsisi.sql",
     ];
     const migrations = readdirSync(resolve(root, "api/migrations"))
       .filter((name) => /^\d{3}_.+\.sql$/.test(name) && !excluded.includes(name))

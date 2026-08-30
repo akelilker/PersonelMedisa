@@ -33,16 +33,27 @@ final class MigrationPreflightReport
     /** The single migration this preflight authorizes. */
     public const EXPECTED_PENDING_VERSION = '079';
 
-    private const TARGET_TABLES = ['aylik_kapanis_state', 'aylik_ozet_satirlari'];
+    /**
+     * The migration file this gate was written against. The version number alone
+     * is not enough: slot 079 previously held a monthly-closing migration that
+     * was withdrawn as business-model wrong, and it must never reach production
+     * through this gate.
+     */
+    public const EXPECTED_PENDING_NAME = '079_sirket_sube_hiyerarsisi.sql';
 
-    private const ACTOR_COLUMNS = [
-        'bolum_onay_actor_user_id',
-        'bolum_onay_actor_identity_id',
-        'bolum_onay_at',
-        'kapanis_actor_user_id',
-        'kapanis_actor_identity_id',
-        'kapanis_at',
+    /** Withdrawn 079. Must not appear anywhere in the canonical source. */
+    public const WITHDRAWN_MIGRATION_NAME = '079_aylik_kapanis_sube_scope_and_actor.sql';
+
+    private const TARGET_TABLES = ['users', 'subeler', 'sgk_isverenler', 'calisma_lokasyonlari'];
+
+    /** table => column added by the new 079, all nullable INT UNSIGNED. */
+    private const RELATION_COLUMNS = [
+        'subeler' => 'sirket_id',
+        'sgk_isverenler' => 'sirket_id',
+        'calisma_lokasyonlari' => 'sube_id',
     ];
+
+    private const NEW_TABLES = ['sirketler', 'user_sirketler', 'user_sgk_isverenler'];
 
     /**
      * @return array<string, mixed>
@@ -72,6 +83,9 @@ final class MigrationPreflightReport
                 'migration_count' => count($bundle['migrations']),
                 'code_tip' => $bundle['code_tip'],
                 'expected_pending_checksum' => $bundle['expected_pending_checksum'],
+                // Published so the apply gate can prove the withdrawn 079 is gone
+                // rather than inferring it from the absence of a blocker.
+                'withdrawn_present' => $bundle['withdrawn_present'],
             ],
             'ledger' => [
                 'ready' => $ledger['ready'],
@@ -100,12 +114,23 @@ final class MigrationPreflightReport
         if ($migrations === []) {
             $blockers[] = 'MIGRATION_SOURCE_MISSING';
 
-            return ['migrations' => [], 'code_tip' => 'NONE', 'expected_pending_checksum' => 'NONE'];
+            return [
+                'migrations' => [],
+                'code_tip' => 'NONE',
+                'expected_pending_checksum' => 'NONE',
+                'withdrawn_present' => false,
+            ];
         }
 
         $expectedChecksum = 'NONE';
+        $withdrawnPresent = false;
         foreach ($migrations as $migration) {
-            if ($migration['version'] === self::EXPECTED_PENDING_VERSION) {
+            if ((string) $migration['name'] === self::WITHDRAWN_MIGRATION_NAME) {
+                $withdrawnPresent = true;
+            }
+            if ($migration['version'] === self::EXPECTED_PENDING_VERSION
+                && (string) $migration['name'] === self::EXPECTED_PENDING_NAME
+            ) {
                 $expectedChecksum = $migration['checksum'];
             }
         }
@@ -114,6 +139,7 @@ final class MigrationPreflightReport
             'migrations' => $migrations,
             'code_tip' => (string) $migrations[count($migrations) - 1]['version'],
             'expected_pending_checksum' => $expectedChecksum,
+            'withdrawn_present' => $withdrawnPresent,
         ];
     }
 
@@ -204,6 +230,18 @@ final class MigrationPreflightReport
             ];
         }
 
+        // Observed, not required: the new tables this migration creates and the
+        // monthly-closing table the withdrawn 079 would have altered. Their
+        // absence is the expected preimage, so it must not raise a blocker here.
+        foreach (array_merge(self::NEW_TABLES, ['aylik_kapanis_state']) as $table) {
+            $exists = self::tableExists($pdo, $table);
+            $schema[$table] = [
+                'exists' => $exists,
+                'columns' => $exists ? self::columnFacts($pdo, $table) : [],
+                'indexes' => $exists ? self::indexFacts($pdo, $table) : [],
+            ];
+        }
+
         return $schema;
     }
 
@@ -274,108 +312,56 @@ final class MigrationPreflightReport
         array &$warnings
     ): array {
         $guards = [
-            'branch_table_resolved' => false,
-            'ozet_rows' => 0,
-            'ozet_sube_null_rows' => 0,
-            'ozet_sube_orphan_rows' => 0,
-            'ozet_distinct_ay' => 0,
-            'ozet_distinct_ay_sube_pairs' => 0,
-            'ozet_duplicate_ay_sube_personel' => 0,
-            'ozet_actor_columns_present' => 0,
-            'state_rows' => 0,
-            'state_distinct_ay' => 0,
-            'state_duplicate_ay' => 0,
-            'state_sube_column_present' => false,
-            'state_legacy_unique_present' => false,
-            'state_composite_unique_present' => false,
-            'state_rows_expected_after_079' => 0,
+            'branch_table_resolved' => ($schema['subeler']['exists'] ?? false) === true,
+            'sube_rows' => 0,
+            'sgk_isveren_rows' => 0,
+            'calisma_lokasyonu_rows' => 0,
+            'personel_rows' => 0,
+            'user_sube_assignment_rows' => 0,
+            'sirketler_table_present' => self::tableExists($pdo, 'sirketler'),
+            'user_sirketler_table_present' => self::tableExists($pdo, 'user_sirketler'),
+            'user_sgk_isverenler_table_present' => self::tableExists($pdo, 'user_sgk_isverenler'),
+            'relation_columns_present' => 0,
+            'sirket_rows' => 0,
+            'sube_rows_expected_after_079' => 0,
+            'user_sube_assignment_rows_expected_after_079' => 0,
         ];
 
-        $ozetPresent = ($schema['aylik_ozet_satirlari']['exists'] ?? false) === true;
-        $statePresent = ($schema['aylik_kapanis_state']['exists'] ?? false) === true;
+        if (!$guards['branch_table_resolved']) {
+            // No silent pass: an unresolvable branch owner means every guard
+            // below was never actually evaluated.
+            $blockers[] = 'BRANCH_TABLE_UNRESOLVED';
 
-        if ($ozetPresent) {
-            $guards['ozet_rows'] = self::count($pdo, 'SELECT COUNT(*) FROM aylik_ozet_satirlari');
-            $guards['ozet_sube_null_rows'] = self::count(
-                $pdo,
-                'SELECT COUNT(*) FROM aylik_ozet_satirlari WHERE sube_id IS NULL'
-            );
-            $guards['ozet_distinct_ay'] = self::count(
-                $pdo,
-                'SELECT COUNT(DISTINCT ay) FROM aylik_ozet_satirlari'
-            );
-            $guards['ozet_distinct_ay_sube_pairs'] = self::count(
-                $pdo,
-                'SELECT COUNT(*) FROM (SELECT ay, sube_id FROM aylik_ozet_satirlari
-                 GROUP BY ay, sube_id) AS scoped'
-            );
-            $guards['ozet_duplicate_ay_sube_personel'] = self::count(
-                $pdo,
-                'SELECT COUNT(*) FROM (SELECT ay, sube_id, personel_id
-                 FROM aylik_ozet_satirlari GROUP BY ay, sube_id, personel_id
-                 HAVING COUNT(*) > 1) AS duplicates'
-            );
+            return $guards;
+        }
 
-            $columns = $schema['aylik_ozet_satirlari']['columns'];
-            $present = 0;
-            foreach (self::ACTOR_COLUMNS as $column) {
-                if (isset($columns[$column])) {
-                    $present++;
-                }
+        $guards['sube_rows'] = self::count($pdo, 'SELECT COUNT(*) FROM subeler');
+        $guards['sgk_isveren_rows'] = self::count($pdo, 'SELECT COUNT(*) FROM sgk_isverenler');
+        $guards['calisma_lokasyonu_rows'] = self::count($pdo, 'SELECT COUNT(*) FROM calisma_lokasyonlari');
+        $guards['personel_rows'] = self::count($pdo, 'SELECT COUNT(*) FROM personeller');
+        $guards['user_sube_assignment_rows'] = self::count($pdo, 'SELECT COUNT(*) FROM user_subeler');
+
+        $present = 0;
+        foreach (self::RELATION_COLUMNS as $table => $column) {
+            if (isset($schema[$table]['columns'][$column])) {
+                $present++;
             }
-            $guards['ozet_actor_columns_present'] = $present;
+        }
+        $guards['relation_columns_present'] = $present;
 
-            if (self::tableExists($pdo, 'subeler')) {
-                $guards['branch_table_resolved'] = true;
-                $guards['ozet_sube_orphan_rows'] = self::count(
-                    $pdo,
-                    'SELECT COUNT(*) FROM aylik_ozet_satirlari o
-                     WHERE o.sube_id IS NOT NULL
-                       AND NOT EXISTS (SELECT 1 FROM subeler s WHERE s.id = o.sube_id)'
-                );
-            } else {
-                // No silent pass: an unresolvable branch owner means the orphan
-                // guard was never actually evaluated.
-                $blockers[] = 'BRANCH_TABLE_UNRESOLVED';
-            }
-
-            if ($guards['ozet_sube_null_rows'] > 0) {
-                $warnings[] = 'OZET_SUBE_NULL_ROWS_PRESENT';
-            }
-            if ($guards['ozet_sube_orphan_rows'] > 0) {
-                $warnings[] = 'OZET_SUBE_ORPHAN_ROWS_PRESENT';
+        if ($guards['sirketler_table_present']) {
+            $guards['sirket_rows'] = self::count($pdo, 'SELECT COUNT(*) FROM sirketler');
+            if ($guards['sirket_rows'] > 0) {
+                // The migration seeds nothing, so rows here mean the mapping
+                // operation already started outside this gate.
+                $warnings[] = 'SIRKET_ROWS_ALREADY_PRESENT';
             }
         }
 
-        if ($statePresent) {
-            $stateColumns = $schema['aylik_kapanis_state']['columns'];
-            $stateIndexes = $schema['aylik_kapanis_state']['indexes'];
-            $guards['state_sube_column_present'] = isset($stateColumns['sube_id']);
-            $guards['state_legacy_unique_present'] = isset($stateIndexes['uq_aylik_kapanis_state_ay']);
-            $guards['state_composite_unique_present']
-                = isset($stateIndexes['uq_aylik_kapanis_state_ay_sube']);
-
-            $guards['state_rows'] = self::count($pdo, 'SELECT COUNT(*) FROM aylik_kapanis_state');
-            $guards['state_distinct_ay'] = self::count(
-                $pdo,
-                'SELECT COUNT(DISTINCT ay) FROM aylik_kapanis_state'
-            );
-            $guards['state_duplicate_ay'] = self::count(
-                $pdo,
-                'SELECT COUNT(*) FROM (SELECT ay FROM aylik_kapanis_state
-                 GROUP BY ay HAVING COUNT(*) > 1) AS duplicates'
-            );
-
-            // 079 is schema-only: it adds no state row and removes none, so the
-            // legacy rows survive verbatim under the sentinel sube_id = 0.
-            $guards['state_rows_expected_after_079'] = $guards['state_rows'];
-
-            if ($guards['state_duplicate_ay'] > 0 && !$guards['state_sube_column_present']) {
-                // Duplicate months would collide on (ay, 0) when the composite
-                // UNIQUE key is created.
-                $blockers[] = 'STATE_DUPLICATE_AY_BLOCKS_COMPOSITE_KEY';
-            }
-        }
+        // 079 is additive and writes no data: every branch and every existing
+        // user branch assignment must survive the apply untouched.
+        $guards['sube_rows_expected_after_079'] = $guards['sube_rows'];
+        $guards['user_sube_assignment_rows_expected_after_079'] = $guards['user_sube_assignment_rows'];
 
         return $guards;
     }
@@ -396,8 +382,14 @@ final class MigrationPreflightReport
         if ($ledger['pending_versions'] !== [self::EXPECTED_PENDING_VERSION]) {
             $blockers[] = 'PENDING_NOT_ONLY_079';
         }
+        if ($ledger['pending_names'] !== [] && $ledger['pending_names'] !== [self::EXPECTED_PENDING_NAME]) {
+            $blockers[] = 'PENDING_NAME_UNEXPECTED';
+        }
         if ($bundle['expected_pending_checksum'] === 'NONE') {
             $blockers[] = 'PENDING_CHECKSUM_UNRESOLVED';
+        }
+        if ($bundle['withdrawn_present']) {
+            $blockers[] = 'WITHDRAWN_079_PRESENT_IN_SOURCE';
         }
     }
 
@@ -408,25 +400,36 @@ final class MigrationPreflightReport
      */
     private static function assertPreimage(array $schema, array &$blockers, array &$warnings): void
     {
-        $stateIndexes = $schema['aylik_kapanis_state']['indexes'] ?? [];
-        $ozetColumns = $schema['aylik_ozet_satirlari']['columns'] ?? [];
-
-        $actorPresent = 0;
-        foreach (self::ACTOR_COLUMNS as $column) {
-            if (isset($ozetColumns[$column])) {
-                $actorPresent++;
+        // The legacy owners this migration extends must be in their expected
+        // preimage shape. Every one of them is a pre-079 table, so their absence
+        // means the gate is pointed at the wrong database.
+        foreach (self::RELATION_COLUMNS as $table => $column) {
+            if (($schema[$table]['exists'] ?? false) !== true) {
+                $blockers[] = 'PREIMAGE_OWNER_TABLE_MISSING';
+                continue;
             }
+
+            if (!isset($schema[$table]['columns'][$column])) {
+                continue;
+            }
+
+            // Present is acceptable only as a resumable partial run: the column
+            // must already be exactly what 079 would have created. A NOT NULL or
+            // non-integer column is conflicting drift, not a partial state.
+            $facts = $schema[$table]['columns'][$column];
+            if ($facts['nullable'] !== true || $facts['type'] !== 'int') {
+                $blockers[] = 'PREIMAGE_RELATION_COLUMN_INCOMPATIBLE';
+                continue;
+            }
+
+            $warnings[] = 'PREIMAGE_PARTIAL_HIERARCHY_PRESENT';
         }
-        if ($actorPresent !== 0) {
-            // Either 079 already ran or someone changed the schema by hand; both
-            // invalidate the preimage this gate was written against.
-            $blockers[] = 'PREIMAGE_ACTOR_COLUMNS_ALREADY_PRESENT';
-        }
-        if (!isset($stateIndexes['uq_aylik_kapanis_state_ay'])) {
-            $blockers[] = 'PREIMAGE_LEGACY_UNIQUE_MISSING';
-        }
-        if (isset($stateIndexes['uq_aylik_kapanis_state_ay_sube'])) {
-            $warnings[] = 'PREIMAGE_COMPOSITE_UNIQUE_ALREADY_PRESENT';
+
+        // Withdrawn 079 touched the monthly-closing tables. Its structures must
+        // not be present, because that would mean the withdrawn migration ran.
+        $stateColumns = $schema['aylik_kapanis_state']['columns'] ?? [];
+        if (isset($stateColumns['sube_id'])) {
+            $blockers[] = 'WITHDRAWN_079_STRUCTURE_PRESENT';
         }
     }
 

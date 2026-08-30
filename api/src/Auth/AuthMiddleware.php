@@ -74,9 +74,11 @@ class AuthMiddleware
             return null;
         }
 
-        $subeIds = self::loadUserSubeIds($pdo, $userId);
+        $explicitSubeIds = self::loadUserSubeIds($pdo, $userId);
         $bolumIds = UserOrgAssignmentSchema::loadUserBolumIds($pdo, $userId);
         $birimIds = UserOrgAssignmentSchema::loadUserBirimIds($pdo, $userId);
+        $sirketIds = UserOrgAssignmentSchema::loadUserSirketIds($pdo, $userId);
+        $sgkIsverenIds = UserOrgAssignmentSchema::loadUserSgkIsverenIds($pdo, $userId);
         $rolCanonical = RolePermissions::normalizeRole((string) $row['rol']);
         self::$user = [
             'id' => (int) $row['id'],
@@ -84,7 +86,10 @@ class AuthMiddleware
             'ad_soyad' => (string) $row['ad_soyad'],
             'rol' => $rolCanonical !== '' ? $rolCanonical : (string) $row['rol'],
             'durum' => (string) ($row['durum'] ?? ''),
-            'sube_ids' => $subeIds,
+            'sube_ids' => self::resolveEffectiveSubeIds($pdo, $explicitSubeIds, $sirketIds),
+            'explicit_sube_ids' => $explicitSubeIds,
+            'sirket_ids' => $sirketIds,
+            'sgk_isveren_ids' => $sgkIsverenIds,
             'bolum_ids' => $bolumIds,
             'birim_ids' => $birimIds,
         ];
@@ -186,6 +191,38 @@ class AuthMiddleware
         } catch (\Throwable $e) {
             return null;
         }
+    }
+
+    /**
+     * Effective branch visibility = explicit user_subeler grants ∪ the branches
+     * that currently belong to the granted companies.
+     *
+     * Recomputed per request rather than copied into user_subeler, so a branch
+     * added to a company after the grant becomes visible immediately and no
+     * assignment row ever has to be rewritten. The union is a widening only:
+     * every explicit grant survives.
+     *
+     * @param array<int, int> $explicitSubeIds
+     * @param array<int, int> $sirketIds
+     * @return array<int, int>
+     */
+    private static function resolveEffectiveSubeIds(PDO $pdo, array $explicitSubeIds, array $sirketIds)
+    {
+        if (count($sirketIds) === 0) {
+            return $explicitSubeIds;
+        }
+
+        $merged = array_merge($explicitSubeIds, UserOrgAssignmentSchema::resolveSubeIdsForSirketIds($pdo, $sirketIds));
+        $unique = [];
+        foreach ($merged as $id) {
+            $value = (int) $id;
+            if ($value > 0 && !in_array($value, $unique, true)) {
+                $unique[] = $value;
+            }
+        }
+        sort($unique);
+
+        return $unique;
     }
 
     /** @return array<int, int> */

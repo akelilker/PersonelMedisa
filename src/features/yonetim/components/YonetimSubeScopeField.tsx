@@ -65,7 +65,7 @@ export function YonetimOrgScopeFields(props: YonetimOrgScopeFieldsProps) {
                 aria-pressed={props.selectedSubeIds.includes(sube.id)}
                 onClick={() => props.onToggleSube(sube.id)}
               >
-                <strong>{sube.ad}</strong>
+                <strong>{sube.tam_ad}</strong>
                 <span>{sube.departman_adlari.join(", ") || "Departman tanımlı değil"}</span>
               </button>
             ))}

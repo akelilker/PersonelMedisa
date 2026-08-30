@@ -66,6 +66,21 @@ function readSubeIds(record: Record<string, unknown>): number[] {
   return ids;
 }
 
+function readIdList(record: Record<string, unknown>, key: string): number[] {
+  const raw = record[key];
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  const ids: number[] = [];
+  for (const item of raw) {
+    const n = readNumber(item);
+    if (n !== null && n > 0) {
+      ids.push(n);
+    }
+  }
+  return ids;
+}
+
 function readSubeList(record: Record<string, unknown>): AuthSession["sube_list"] {
   const raw = record.sube_list ?? record.subeler ?? record.branches;
   if (!Array.isArray(raw)) {
@@ -78,10 +93,21 @@ function readSubeList(record: Record<string, unknown>): AuthSession["sube_list"]
     }
     const row = item as Record<string, unknown>;
     const id = readNumber(row.id);
+    // `tam_ad` wins when the backend derived one; older payloads and mocks only
+    // carry `ad`, which is then already the display name.
     const ad =
-        readString(row.ad) ?? readString(row.name) ?? readString(row.label) ?? (id !== null ? `Şube ${id}` : null);
+      readString(row.tam_ad) ??
+      readString(row.ad) ??
+      readString(row.name) ??
+      readString(row.label) ??
+      (id !== null ? `Şube ${id}` : null);
     if (id !== null && ad) {
-      out.push({ id, ad });
+      out.push({
+        id,
+        ad,
+        kisa_ad: readString(row.kisa_ad) ?? readString(row.ad) ?? undefined,
+        tam_ad: readString(row.tam_ad) ?? undefined
+      });
     }
   }
   return out.length ? out : undefined;
@@ -188,6 +214,11 @@ function normalizeAuthSession(payload: unknown): AuthSession | null {
       ad_soyad: fullName,
       rol: role,
       sube_ids,
+      // Absent in legacy sessions and mock payloads: an empty array is the safe
+      // fallback, never an implicit grant.
+      explicit_sube_ids: readIdList(userSource, "explicit_sube_ids"),
+      sirket_ids: readIdList(userSource, "sirket_ids"),
+      sgk_isveren_ids: readIdList(userSource, "sgk_isveren_ids"),
       personel_id
     }
   };

@@ -21,12 +21,13 @@ use Medisa\Api\Services\Auth\UserPersonelBindingService;
 use Medisa\Api\Services\Auth\PersonelAccountOnboardingService;
 use Medisa\Api\Services\Auth\ActorIdentityException;
 use Medisa\Api\Services\Auth\ActorIdentityService;
+use Medisa\Api\Services\Organizasyon\OrganizasyonException;
+use Medisa\Api\Services\Organizasyon\OrganizasyonService;
 use PDO;
 use PDOException;
 
 class YonetimController
 {
-    private const SUBE_DELETE_BLOCKED_MESSAGE = 'Şubede Kayıtlı Personel Gözükmektedir. Kayıtlı Personel Varken Silme İşlemi Yapılamaz.';
 
     public static function actorIdentityCreate(Request $request)
     {
@@ -114,202 +115,67 @@ class YonetimController
         $user = AuthMiddleware::authenticate($request, true);
         self::assertSubeListeleme($user);
 
-        try {
-            $pdo = Connection::get();
-        } catch (\Throwable $e) {
-            JsonResponse::serverError('Veritabani baglantisi kurulamadi.');
-        }
+        $pdo = self::subePdo();
 
-        $items = self::loadSubeItems($pdo);
-
-        JsonResponse::success(['items' => $items]);
+        // Legacy flat endpoint, extended read model. It keeps working on a
+        // pre-079 schema: the shared owner emits null relations and falls back
+        // to the raw branch name for tam_ad.
+        JsonResponse::success(['items' => OrganizasyonService::listSubeler($pdo)]);
     }
 
     public static function subeOlustur(Request $request)
     {
         $user = AuthMiddleware::authenticate($request, true);
         self::assertSubeYonetimi($user);
-
         $body = $request->getJsonBody();
-        $kod = trim((string) ($body['kod'] ?? ''));
-        $ad = trim((string) ($body['ad'] ?? ''));
-        $durum = strtoupper(trim((string) ($body['durum'] ?? 'AKTIF')));
-        $departmanIds = self::parseDepartmanIds(isset($body['departman_ids']) ? $body['departman_ids'] : []);
-
-        if ($kod === '') {
-            JsonResponse::badRequest('Sube kodu zorunludur.', 'VALIDATION_ERROR', 'kod');
-        }
-        if ($ad === '') {
-            JsonResponse::badRequest('Sube adi zorunludur.', 'VALIDATION_ERROR', 'ad');
-        }
-        if ($durum !== 'AKTIF' && $durum !== 'PASIF') {
-            JsonResponse::badRequest('Gecersiz durum.', 'VALIDATION_ERROR', 'durum');
-        }
+        $pdo = self::subePdo();
 
         try {
-            $pdo = Connection::get();
-        } catch (\Throwable $e) {
-            JsonResponse::serverError('Veritabani baglantisi kurulamadi.');
+            JsonResponse::success(OrganizasyonService::createSube($pdo, $body));
+        } catch (OrganizasyonException $e) {
+            self::subeError($e);
         }
-
-        self::assertDepartmanIdsExist($pdo, $departmanIds);
-        self::assertSubeKodUnique($pdo, $kod);
-        self::assertSubeAdUnique($pdo, $ad);
-
-        $pdo->beginTransaction();
-        try {
-            $stmt = $pdo->prepare(
-                'INSERT INTO subeler (kod, ad, durum) VALUES (:kod, :ad, :durum)'
-            );
-            $stmt->execute([
-                'kod' => $kod,
-                'ad' => $ad,
-                'durum' => $durum,
-            ]);
-            $subeId = (int) $pdo->lastInsertId();
-            self::replaceSubeDepartmanlar($pdo, $subeId, $departmanIds);
-            $pdo->commit();
-        } catch (\Throwable $e) {
-            $pdo->rollBack();
-            JsonResponse::serverError('Sube kaydi olusturulamadi.');
-        }
-
-        $created = self::findSubeItemById($pdo, $subeId);
-        if ($created === null) {
-            JsonResponse::serverError('Sube kaydi olusturulamadi.');
-        }
-
-        JsonResponse::success($created);
     }
 
     public static function subeGuncelle(Request $request, $subeId)
     {
         $user = AuthMiddleware::authenticate($request, true);
         self::assertSubeYonetimi($user);
-
-        $subeId = (int) $subeId;
-        if ($subeId <= 0) {
-            JsonResponse::badRequest('Gecersiz sube id.', 'VALIDATION_ERROR', 'id');
-        }
-
-        try {
-            $pdo = Connection::get();
-        } catch (\Throwable $e) {
-            JsonResponse::serverError('Veritabani baglantisi kurulamadi.');
-        }
-
-        $existing = self::findSubeRowById($pdo, $subeId);
-        if ($existing === null) {
-            JsonResponse::notFound('Sube bulunamadi.');
-        }
-
         $body = $request->getJsonBody();
-        $kod = array_key_exists('kod', $body)
-            ? trim((string) $body['kod'])
-            : (string) $existing['kod'];
-        $ad = array_key_exists('ad', $body)
-            ? trim((string) $body['ad'])
-            : (string) $existing['ad'];
-        $durum = array_key_exists('durum', $body)
-            ? strtoupper(trim((string) $body['durum']))
-            : (string) $existing['durum'];
-        $departmanIds = array_key_exists('departman_ids', $body)
-            ? self::parseDepartmanIds($body['departman_ids'])
-            : null;
+        $pdo = self::subePdo();
 
-        if ($kod === '') {
-            JsonResponse::badRequest('Sube kodu zorunludur.', 'VALIDATION_ERROR', 'kod');
-        }
-        if ($ad === '') {
-            JsonResponse::badRequest('Sube adi zorunludur.', 'VALIDATION_ERROR', 'ad');
-        }
-        if ($durum !== 'AKTIF' && $durum !== 'PASIF') {
-            JsonResponse::badRequest('Gecersiz durum.', 'VALIDATION_ERROR', 'durum');
-        }
-
-        if ($departmanIds !== null) {
-            self::assertDepartmanIdsExist($pdo, $departmanIds);
-        }
-        if ($kod !== (string) $existing['kod']) {
-            self::assertSubeKodUnique($pdo, $kod, $subeId);
-        }
-        if ($ad !== (string) $existing['ad']) {
-            self::assertSubeAdUnique($pdo, $ad, $subeId);
-        }
-
-        $pdo->beginTransaction();
         try {
-            $stmt = $pdo->prepare(
-                'UPDATE subeler SET kod = :kod, ad = :ad, durum = :durum WHERE id = :id'
-            );
-            $stmt->execute([
-                'id' => $subeId,
-                'kod' => $kod,
-                'ad' => $ad,
-                'durum' => $durum,
-            ]);
-
-            if ($departmanIds !== null) {
-                self::replaceSubeDepartmanlar($pdo, $subeId, $departmanIds);
-            }
-
-            $pdo->commit();
-        } catch (\Throwable $e) {
-            $pdo->rollBack();
-            JsonResponse::serverError('Sube kaydi guncellenemedi.');
+            JsonResponse::success(OrganizasyonService::updateSube($pdo, $subeId, $body));
+        } catch (OrganizasyonException $e) {
+            self::subeError($e);
         }
-
-        $updated = self::findSubeItemById($pdo, $subeId);
-        if ($updated === null) {
-            JsonResponse::serverError('Sube kaydi guncellenemedi.');
-        }
-
-        JsonResponse::success($updated);
     }
 
     public static function subeSil(Request $request, $subeId)
     {
         $user = AuthMiddleware::authenticate($request, true);
         self::assertSubeYonetimi($user);
-
-        $subeId = (int) $subeId;
-        if ($subeId <= 0) {
-            JsonResponse::badRequest('Gecersiz sube id.', 'VALIDATION_ERROR', 'id');
-        }
+        $pdo = self::subePdo();
 
         try {
-            $pdo = Connection::get();
+            JsonResponse::success(OrganizasyonService::deleteSube($pdo, $subeId));
+        } catch (OrganizasyonException $e) {
+            self::subeError($e);
+        }
+    }
+
+    private static function subePdo()
+    {
+        try {
+            return Connection::get();
         } catch (\Throwable $e) {
             JsonResponse::serverError('Veritabani baglantisi kurulamadi.');
         }
+    }
 
-        $existing = self::findSubeRowById($pdo, $subeId);
-        if ($existing === null) {
-            JsonResponse::notFound('Sube bulunamadi.');
-        }
-
-        $personelStmt = $pdo->prepare('SELECT COUNT(*) AS total FROM personeller WHERE sube_id = :sube_id');
-        $personelStmt->execute(['sube_id' => $subeId]);
-        $personelCount = (int) ($personelStmt->fetch(PDO::FETCH_ASSOC)['total'] ?? 0);
-        if ($personelCount > 0) {
-            JsonResponse::error(409, 'SUBE_HAS_PERSONEL', self::SUBE_DELETE_BLOCKED_MESSAGE);
-        }
-
-        $pdo->beginTransaction();
-        try {
-            $deleteDepartmanlar = $pdo->prepare('DELETE FROM sube_departmanlar WHERE sube_id = :sube_id');
-            $deleteDepartmanlar->execute(['sube_id' => $subeId]);
-
-            $deleteSube = $pdo->prepare('DELETE FROM subeler WHERE id = :id');
-            $deleteSube->execute(['id' => $subeId]);
-
-            $pdo->commit();
-        } catch (\Throwable $e) {
-            $pdo->rollBack();
-            JsonResponse::serverError('Sube kaydi silinemedi.');
-        }
-
-        JsonResponse::success(['id' => $subeId, 'deleted' => true]);
+    private static function subeError(OrganizasyonException $e)
+    {
+        JsonResponse::error($e->httpStatus, $e->errorCode, $e->getMessage(), $e->field);
     }
 
     /** @param array<string, mixed> $user */
@@ -327,174 +193,6 @@ class YonetimController
     private static function assertSubeYonetimi(array $user)
     {
         RolePermissions::assert($user, 'yonetim-paneli.manage');
-    }
-
-    /** @return array<int, array<string, mixed>> */
-    private static function loadSubeItems(PDO $pdo)
-    {
-        $stmt = $pdo->query(
-            'SELECT s.id, s.kod, s.ad, s.durum,
-                    GROUP_CONCAT(sd.departman_id ORDER BY sd.departman_id ASC) AS departman_ids,
-                    GROUP_CONCAT(d.ad ORDER BY sd.departman_id ASC) AS departman_adlari
-             FROM subeler s
-             LEFT JOIN sube_departmanlar sd ON sd.sube_id = s.id
-             LEFT JOIN departmanlar d ON d.id = sd.departman_id
-             GROUP BY s.id, s.kod, s.ad, s.durum
-             ORDER BY s.id ASC'
-        );
-        $rows = $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
-        $items = [];
-        foreach ($rows as $row) {
-            $items[] = self::mapSubeRow($row);
-        }
-
-        return $items;
-    }
-
-    /** @param array<string, mixed> $row @return array<string, mixed> */
-    private static function mapSubeRow(array $row)
-    {
-        $departmanIds = [];
-        $departmanAdlari = [];
-        if (!empty($row['departman_ids'])) {
-            foreach (explode(',', (string) $row['departman_ids']) as $id) {
-                $departmanIds[] = (int) $id;
-            }
-        }
-        if (!empty($row['departman_adlari'])) {
-            foreach (explode(',', (string) $row['departman_adlari']) as $ad) {
-                $departmanAdlari[] = (string) $ad;
-            }
-        }
-
-        return [
-            'id' => (int) $row['id'],
-            'kod' => (string) $row['kod'],
-            'ad' => (string) $row['ad'],
-            'durum' => (string) $row['durum'],
-            'departman_ids' => $departmanIds,
-            'departman_adlari' => $departmanAdlari,
-        ];
-    }
-
-    /** @return array<string, mixed>|null */
-    private static function findSubeRowById(PDO $pdo, $subeId)
-    {
-        $stmt = $pdo->prepare('SELECT id, kod, ad, durum FROM subeler WHERE id = :id LIMIT 1');
-        $stmt->execute(['id' => $subeId]);
-        $row = $stmt->fetch(PDO::FETCH_ASSOC);
-
-        return $row ?: null;
-    }
-
-    /** @return array<string, mixed>|null */
-    private static function findSubeItemById(PDO $pdo, $subeId)
-    {
-        $stmt = $pdo->prepare(
-            'SELECT s.id, s.kod, s.ad, s.durum,
-                    GROUP_CONCAT(sd.departman_id ORDER BY sd.departman_id ASC) AS departman_ids,
-                    GROUP_CONCAT(d.ad ORDER BY sd.departman_id ASC) AS departman_adlari
-             FROM subeler s
-             LEFT JOIN sube_departmanlar sd ON sd.sube_id = s.id
-             LEFT JOIN departmanlar d ON d.id = sd.departman_id
-             WHERE s.id = :id
-             GROUP BY s.id, s.kod, s.ad, s.durum
-             LIMIT 1'
-        );
-        $stmt->execute(['id' => $subeId]);
-        $row = $stmt->fetch(PDO::FETCH_ASSOC);
-        if (!$row) {
-            return null;
-        }
-
-        return self::mapSubeRow($row);
-    }
-
-    /** @param mixed $value @return array<int, int> */
-    private static function parseDepartmanIds($value)
-    {
-        if (!is_array($value)) {
-            return [];
-        }
-
-        $ids = [];
-        foreach ($value as $item) {
-            $parsed = (int) $item;
-            if ($parsed > 0) {
-                $ids[] = $parsed;
-            }
-        }
-
-        return array_values(array_unique($ids));
-    }
-
-    /** @param array<int, int> $departmanIds */
-    private static function assertDepartmanIdsExist(PDO $pdo, array $departmanIds)
-    {
-        if (count($departmanIds) === 0) {
-            return;
-        }
-
-        $placeholders = implode(', ', array_fill(0, count($departmanIds), '?'));
-        $stmt = $pdo->prepare("SELECT COUNT(*) AS total FROM departmanlar WHERE id IN ($placeholders)");
-        $stmt->execute($departmanIds);
-        $total = (int) ($stmt->fetch(PDO::FETCH_ASSOC)['total'] ?? 0);
-        if ($total !== count($departmanIds)) {
-            JsonResponse::badRequest('Gecersiz departman secimi.', 'VALIDATION_ERROR', 'departman_ids');
-        }
-    }
-
-    private static function assertSubeKodUnique(PDO $pdo, $kod, $excludeSubeId = null)
-    {
-        $sql = 'SELECT id FROM subeler WHERE kod = :kod';
-        $params = ['kod' => $kod];
-        if ($excludeSubeId !== null) {
-            $sql .= ' AND id <> :exclude_id';
-            $params['exclude_id'] = (int) $excludeSubeId;
-        }
-        $sql .= ' LIMIT 1';
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute($params);
-        if ($stmt->fetch(PDO::FETCH_ASSOC)) {
-            JsonResponse::error(409, 'DUPLICATE_SUBE_KOD', 'Bu sube kodu zaten kayitli.', 'kod');
-        }
-    }
-
-    private static function assertSubeAdUnique(PDO $pdo, $ad, $excludeSubeId = null)
-    {
-        $sql = 'SELECT id FROM subeler WHERE ad = :ad';
-        $params = ['ad' => $ad];
-        if ($excludeSubeId !== null) {
-            $sql .= ' AND id <> :exclude_id';
-            $params['exclude_id'] = (int) $excludeSubeId;
-        }
-        $sql .= ' LIMIT 1';
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute($params);
-        if ($stmt->fetch(PDO::FETCH_ASSOC)) {
-            JsonResponse::error(409, 'DUPLICATE_SUBE_AD', 'Bu sube adi zaten kayitli.', 'ad');
-        }
-    }
-
-    /** @param array<int, int> $departmanIds */
-    private static function replaceSubeDepartmanlar(PDO $pdo, $subeId, array $departmanIds)
-    {
-        $delete = $pdo->prepare('DELETE FROM sube_departmanlar WHERE sube_id = :sube_id');
-        $delete->execute(['sube_id' => $subeId]);
-
-        if (count($departmanIds) === 0) {
-            return;
-        }
-
-        $insert = $pdo->prepare(
-            'INSERT INTO sube_departmanlar (sube_id, departman_id) VALUES (:sube_id, :departman_id)'
-        );
-        foreach ($departmanIds as $departmanId) {
-            $insert->execute([
-                'sube_id' => $subeId,
-                'departman_id' => $departmanId,
-            ]);
-        }
     }
 
     public static function aylikOzet(Request $request)
@@ -1236,7 +934,9 @@ class YonetimController
                 $personelAdById,
                 $hasMustChangePassword,
                 $bolumIdsByUser[$id] ?? [],
-                $birimIdsByUser[$id] ?? []
+                $birimIdsByUser[$id] ?? [],
+                UserOrgAssignmentSchema::loadUserSirketIds($pdo, $id),
+                UserOrgAssignmentSchema::loadUserSgkIsverenIds($pdo, $id)
             );
         }
 
@@ -1257,6 +957,8 @@ class YonetimController
         $finalSubeIds = self::parseSubeIds(isset($body['sube_ids']) ? $body['sube_ids'] : []);
         $finalBolumIds = self::parseSubeIds(isset($body['bolum_ids']) ? $body['bolum_ids'] : []);
         $finalBirimIds = self::parseSubeIds(isset($body['birim_ids']) ? $body['birim_ids'] : []);
+        $finalSirketIds = self::parseSubeIds(isset($body['sirket_ids']) ? $body['sirket_ids'] : []);
+        $finalSgkIsverenIds = self::parseSubeIds(isset($body['sgk_isveren_ids']) ? $body['sgk_isveren_ids'] : []);
         $finalVarsayilanSubeId = self::parseOptionalInt($body['varsayilan_sube_id'] ?? null);
         $personelIdProvided = array_key_exists('personel_id', $body);
         $requestedPersonelId = $personelIdProvided ? self::parseOptionalInt($body['personel_id']) : null;
@@ -1301,6 +1003,7 @@ class YonetimController
         self::assertSubeIdsExist($pdo, $finalSubeIds);
         self::assertBolumIdsExist($pdo, $finalBolumIds);
         self::assertBirimIdsExist($pdo, $finalBirimIds);
+        self::assertHierarchyScopeAllowed($pdo, $rol, $finalSirketIds, $finalSgkIsverenIds);
         self::assertVarsayilanSubeInScope($finalVarsayilanSubeId, $finalSubeIds);
         self::assertRoleOrgAssignments($rol, $finalSubeIds, $finalBolumIds, $finalBirimIds, $requestedPersonelId, $rol === 'PERSONEL' || $personelIdProvided);
         self::assertAuthSmokeReadonlyContract($username, $rol, $finalSubeIds, $finalVarsayilanSubeId);
@@ -1369,6 +1072,8 @@ class YonetimController
             self::replaceUserSubeler($pdo, $userId, $finalSubeIds);
             self::replaceUserBolumler($pdo, $userId, $finalBolumIds);
             self::replaceUserBirimler($pdo, $userId, $finalBirimIds);
+            UserOrgAssignmentSchema::replaceUserSirketler($pdo, $userId, $finalSirketIds);
+            UserOrgAssignmentSchema::replaceUserSgkIsverenler($pdo, $userId, $finalSgkIsverenIds);
             if ($hasPersonelId && $personelIdProvided) {
                 UserPersonelBindingService::applyBinding($pdo, $userId, $requestedPersonelId, $actorUserId);
             }
@@ -1442,6 +1147,8 @@ class YonetimController
         $subeIdsProvided = array_key_exists('sube_ids', $body);
         $bolumIdsProvided = array_key_exists('bolum_ids', $body);
         $birimIdsProvided = array_key_exists('birim_ids', $body);
+        $sirketIdsProvided = array_key_exists('sirket_ids', $body);
+        $sgkIsverenIdsProvided = array_key_exists('sgk_isveren_ids', $body);
         $varsayilanProvided = array_key_exists('varsayilan_sube_id', $body);
         $requestedVarsayilan = $varsayilanProvided ? self::parseOptionalInt($body['varsayilan_sube_id']) : null;
         $personelIdProvided = array_key_exists('personel_id', $body);
@@ -1450,8 +1157,12 @@ class YonetimController
         $currentSubeIds = self::loadSubeIdsByUserIds($pdo, [$kullaniciId])[$kullaniciId] ?? [];
         $currentBolumIds = UserOrgAssignmentSchema::loadBolumIdsByUserIds($pdo, [$kullaniciId])[$kullaniciId] ?? [];
         $currentBirimIds = UserOrgAssignmentSchema::loadBirimIdsByUserIds($pdo, [$kullaniciId])[$kullaniciId] ?? [];
+        $currentSirketIds = UserOrgAssignmentSchema::loadUserSirketIds($pdo, $kullaniciId);
+        $currentSgkIsverenIds = UserOrgAssignmentSchema::loadUserSgkIsverenIds($pdo, $kullaniciId);
         $currentStoredDefault = self::readStoredVarsayilanFromRow($existing);
 
+        $finalSirketIds = $sirketIdsProvided ? self::parseSubeIds($body['sirket_ids']) : $currentSirketIds;
+        $finalSgkIsverenIds = $sgkIsverenIdsProvided ? self::parseSubeIds($body['sgk_isveren_ids']) : $currentSgkIsverenIds;
         $finalSubeIds = $subeIdsProvided ? self::parseSubeIds($body['sube_ids']) : $currentSubeIds;
         $finalBolumIds = $bolumIdsProvided ? self::parseSubeIds($body['bolum_ids']) : $currentBolumIds;
         $finalBirimIds = $birimIdsProvided ? self::parseSubeIds($body['birim_ids']) : $currentBirimIds;
@@ -1512,6 +1223,7 @@ class YonetimController
         if ($birimIdsProvided) {
             self::assertBirimIdsExist($pdo, $finalBirimIds);
         }
+        self::assertHierarchyScopeAllowed($pdo, $rol, $finalSirketIds, $finalSgkIsverenIds);
         self::assertVarsayilanSubeInScope($finalVarsayilanSubeId, $finalSubeIds);
         $effectivePersonelId = $personelIdProvided
             ? $requestedPersonelId
@@ -1592,6 +1304,12 @@ class YonetimController
             if ($birimIdsProvided) {
                 self::replaceUserBirimler($pdo, $kullaniciId, $finalBirimIds);
             }
+            if ($sirketIdsProvided) {
+                UserOrgAssignmentSchema::replaceUserSirketler($pdo, $kullaniciId, $finalSirketIds);
+            }
+            if ($sgkIsverenIdsProvided) {
+                UserOrgAssignmentSchema::replaceUserSgkIsverenler($pdo, $kullaniciId, $finalSgkIsverenIds);
+            }
 
             if ($hasPersonelId && $personelIdProvided) {
                 UserPersonelBindingService::applyBinding(
@@ -1652,7 +1370,9 @@ class YonetimController
         array $personelAdById = [],
         $hasMustChangePasswordColumn = false,
         array $bolumIds = [],
-        array $birimIds = []
+        array $birimIds = [],
+        array $sirketIds = [],
+        array $sgkIsverenIds = []
     ) {
         $rol = (string) $row['rol'];
         $storedDefault = null;
@@ -1678,6 +1398,8 @@ class YonetimController
             'sube_ids' => $subeIds,
             'bolum_ids' => $bolumIds,
             'birim_ids' => $birimIds,
+            'sirket_ids' => $sirketIds,
+            'sgk_isveren_ids' => $sgkIsverenIds,
             'varsayilan_sube_id' => $storedDefault,
             'telefon' => null,
             'personel_id' => $personelId,
@@ -1848,7 +1570,9 @@ class YonetimController
             $personelAdById,
             $hasMustChangePassword,
             $bolumIds,
-            $birimIds
+            $birimIds,
+            UserOrgAssignmentSchema::loadUserSirketIds($pdo, (int) $userId),
+            UserOrgAssignmentSchema::loadUserSgkIsverenIds($pdo, (int) $userId)
         );
     }
 
@@ -1958,6 +1682,65 @@ class YonetimController
         $total = (int) ($stmt->fetch(PDO::FETCH_ASSOC)['total'] ?? 0);
         if ($total !== count($subeIds)) {
             JsonResponse::badRequest('Gecersiz sube secimi.', 'VALIDATION_ERROR', 'sube_ids');
+        }
+    }
+
+    /**
+     * Company and payroll scope grants are validated server-side, per role.
+     *
+     * A branch manager must never be handed a company scope: that is how a
+     * branch-scoped account would silently become company-wide, so the payload
+     * is rejected rather than trimmed.
+     *
+     * @param array<int, int> $sirketIds
+     * @param array<int, int> $sgkIsverenIds
+     */
+    private static function assertHierarchyScopeAllowed(PDO $pdo, $rol, array $sirketIds, array $sgkIsverenIds)
+    {
+        if (count($sirketIds) === 0 && count($sgkIsverenIds) === 0) {
+            return;
+        }
+
+        if (!UserOrgAssignmentSchema::isHierarchyScopeReady($pdo)) {
+            JsonResponse::error(
+                409,
+                'SCHEMA_NOT_READY',
+                'Sirket/SGK kapsam semasi hazir degil.',
+                count($sirketIds) > 0 ? 'sirket_ids' : 'sgk_isveren_ids'
+            );
+        }
+
+        if (!OrgScope::isSirketScopeEligible($rol, $sirketIds)) {
+            JsonResponse::badRequest(
+                'Bu rol sirket kapsami alamaz.',
+                'SCOPE_NOT_ALLOWED_FOR_ROLE',
+                'sirket_ids'
+            );
+        }
+        if (!OrgScope::isSgkScopeEligible($rol, $sgkIsverenIds)) {
+            JsonResponse::badRequest(
+                'Bu rol SGK kapsami alamaz.',
+                'SCOPE_NOT_ALLOWED_FOR_ROLE',
+                'sgk_isveren_ids'
+            );
+        }
+
+        self::assertScopeIdsExist($pdo, 'sirketler', $sirketIds, 'sirket_ids', 'Gecersiz sirket secimi.');
+        self::assertScopeIdsExist($pdo, 'sgk_isverenler', $sgkIsverenIds, 'sgk_isveren_ids', 'Gecersiz SGK isvereni secimi.');
+    }
+
+    /** @param array<int, int> $ids */
+    private static function assertScopeIdsExist(PDO $pdo, $table, array $ids, $field, $message)
+    {
+        if (count($ids) === 0) {
+            return;
+        }
+
+        $placeholders = implode(', ', array_fill(0, count($ids), '?'));
+        $stmt = $pdo->prepare("SELECT COUNT(*) FROM {$table} WHERE id IN ($placeholders)");
+        $stmt->execute($ids);
+        if ((int) $stmt->fetchColumn() !== count($ids)) {
+            JsonResponse::badRequest($message, 'VALIDATION_ERROR', $field);
         }
     }
 

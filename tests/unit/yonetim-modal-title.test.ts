@@ -7,7 +7,7 @@ import {
 describe("yonetim modal title mapping", () => {
   it("maps each yönetim tab to its canonical Turkish title", () => {
     expect(resolveYonetimModalTitle("kullanicilar")).toBe("KULLANICI YÖNETİMİ");
-    expect(resolveYonetimModalTitle("subeler")).toBe("ŞUBE YÖNETİMİ");
+    expect(resolveYonetimModalTitle("subeler")).toBe("ŞİRKET VE ŞUBE YÖNETİMİ");
     expect(resolveYonetimModalTitle("mevzuat")).toBe("MEVZUAT PARAMETRELERİ");
     expect(resolveYonetimModalTitle("saklama")).toBe("SAKLAMA VE İMHA YÖNETİMİ");
   });

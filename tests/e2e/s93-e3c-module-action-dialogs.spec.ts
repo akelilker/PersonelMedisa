@@ -14,12 +14,12 @@ test.describe("S93-E3C Yönetim ve Kayıt action dialogs", () => {
   test("GENEL_YONETICI: şube sil dialogu native confirm oluşturmaz", async ({ page }) => {
     const nativeDialogs = trackNativeDialogs(page);
     await loginAsMockRole(page, "GENEL_YONETICI");
-    await page.goto("/yonetim-paneli?tab=subeler");
+    await page.goto("/yonetim-paneli?tab=subeler&sirket=1");
     await expect(page.getByTestId("yonetim-section-subeler")).toBeVisible();
 
     await page.getByTestId("yonetim-sube-yeni").click();
     await page.getByLabel("Şube Kodu").fill("E3C");
-    await page.getByLabel("Şube Adı").fill("E3C Sube");
+    await page.getByLabel(/Şube kısa adı/i).fill("E3C Sube");
     await page.getByTestId("yonetim-sube-departman-panel").getByRole("button", { name: /^Depo$/i }).click();
     await page.getByTestId("yonetim-sube-kaydet").click();
     await expect(page.getByText("Şube tanımı eklendi.")).toBeVisible();

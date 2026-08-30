@@ -237,7 +237,7 @@ function AylikKapanisOzetiSection() {
 
   async function loadBaseData() {
     const [subeler, departmanlar] = await Promise.all([fetchYonetimSubeleri(), fetchDepartmanOptions()]);
-    setSubeOptions(subeler.map((sube) => ({ id: sube.id, label: sube.ad })));
+    setSubeOptions(subeler.map((sube) => ({ id: sube.id, label: sube.tam_ad })));
     setDepartmanOptions(departmanlar);
   }
 

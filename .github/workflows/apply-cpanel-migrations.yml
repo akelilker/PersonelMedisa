@@ -68,7 +68,8 @@ jobs:
           MAX_HEARTBEAT_AGE_SECONDS: "1800"
           MAX_PREFLIGHT_AGE_SECONDS: "86400"
           EXPECTED_PROD_TIP: "078"
-          EXPECTED_PENDING: "079_aylik_kapanis_sube_scope_and_actor.sql"
+          EXPECTED_PENDING: "079_sirket_sube_hiyerarsisi.sql"
+          WITHDRAWN_079: "079_aylik_kapanis_sube_scope_and_actor.sql"
         run: |
           set -euo pipefail
 
@@ -196,12 +197,27 @@ jobs:
 
           blockers="$(jq -r '[.blockers[]?] | length' "${WORK}/preflight.json" 2>/dev/null || echo 1)"
           (( blockers == 0 )) || block PREFLIGHT_BLOCKERS_PRESENT
-          orphans="$(jq -r '.guards.ozet_sube_orphan_rows // -1' "${WORK}/preflight.json" 2>/dev/null || echo -1)"
-          duplicates="$(jq -r '.guards.ozet_duplicate_ay_sube_personel // -1' "${WORK}/preflight.json" 2>/dev/null || echo -1)"
-          state_dup="$(jq -r '.guards.state_duplicate_ay // -1' "${WORK}/preflight.json" 2>/dev/null || echo -1)"
-          (( orphans == 0 )) || block DATA_GUARD_ORPHAN_SUBE_ROWS
-          (( duplicates == 0 )) || block DATA_GUARD_DUPLICATE_ROWS
-          (( state_dup == 0 )) || block DATA_GUARD_DUPLICATE_STATE_MONTHS
+
+          # The withdrawn monthly-closing 079 must be gone from the canonical
+          # source and must never be what this gate authorizes.
+          if [[ -f "api/migrations/${WITHDRAWN_079}" ]]; then
+            block WITHDRAWN_079_STILL_IN_SOURCE
+          fi
+          if [[ "$pending" == "$WITHDRAWN_079" ]]; then
+            block WITHDRAWN_079_PENDING
+          fi
+          echo "GATE_WITHDRAWN_079_ABSENT=YES"
+
+          # 079 is additive and writes no data: the branch owner must resolve and
+          # the row counts it reports must be the counts expected afterwards.
+          branch_resolved="$(jq -r '.guards.branch_table_resolved // false' "${WORK}/preflight.json" 2>/dev/null || echo false)"
+          [[ "$branch_resolved" == "true" ]] || block BRANCH_TABLE_UNRESOLVED
+          sube_rows="$(jq -r '.guards.sube_rows // -1' "${WORK}/preflight.json" 2>/dev/null || echo -1)"
+          sube_rows_after="$(jq -r '.guards.sube_rows_expected_after_079 // -2' "${WORK}/preflight.json" 2>/dev/null || echo -2)"
+          assignment_rows="$(jq -r '.guards.user_sube_assignment_rows // -1' "${WORK}/preflight.json" 2>/dev/null || echo -1)"
+          assignment_rows_after="$(jq -r '.guards.user_sube_assignment_rows_expected_after_079 // -2' "${WORK}/preflight.json" 2>/dev/null || echo -2)"
+          (( sube_rows >= 0 && sube_rows == sube_rows_after )) || block DATA_GUARD_SUBE_ROW_DELTA
+          (( assignment_rows >= 0 && assignment_rows == assignment_rows_after )) || block DATA_GUARD_ASSIGNMENT_ROW_DELTA
           echo "GATE_DATA_GUARDS=PASS"
 
           echo "MIGRATION_GATE_RESULT=PASS"

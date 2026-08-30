@@ -3,11 +3,13 @@
 declare(strict_types=1);
 
 /**
- * Migration 079 control plane — DB-backed acceptance against a real MariaDB.
+ * Migration 079 (sirket -> sgk/sube -> lokasyon hierarchy) — DB-backed acceptance
+ * against a real MariaDB.
  *
  * Covers the three owners that make 079 apply-ready: the read-only production
- * preflight, the mandatory pre-migration backup, and the key-transition order of
- * the 079 DDL itself.
+ * preflight, the mandatory pre-migration backup, and the DDL itself across an
+ * empty schema, a production-like 078 preimage, a compatible partial state,
+ * incompatible drift and a second run.
  *
  * Nothing here touches production. Every assertion runs against a disposable
  * database created and dropped by this runner.
@@ -20,6 +22,9 @@ require_once __DIR__ . '/../../api/src/bootstrap.php';
 use Medisa\Api\Database\FilesystemMigrationSourceProvider;
 use Medisa\Api\Database\MigrationBackupService;
 use Medisa\Api\Database\MigrationPreflightReport;
+
+const MCP_MIGRATION_079 = '079_sirket_sube_hiyerarsisi.sql';
+const MCP_WITHDRAWN_079 = '079_aylik_kapanis_sube_scope_and_actor.sql';
 
 function mcpAssert(bool $ok, string $name): void
 {
@@ -43,70 +48,95 @@ function mcpPdo(string $dsn): PDO
     );
 }
 
-/** Pre-079 production shape: legacy month-only UNIQUE key, no actor columns. */
+/**
+ * Pre-079 production shape: the organisation owners exist, none of them knows
+ * about a company yet.
+ */
 function mcpCreatePreimage(PDO $pdo): void
 {
     $pdo->exec(
-        'CREATE TABLE subeler (
+        "CREATE TABLE users (
             id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+            username VARCHAR(80) NOT NULL,
+            rol VARCHAR(40) NOT NULL DEFAULT 'PERSONEL',
+            PRIMARY KEY (id),
+            UNIQUE KEY uq_users_username (username)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+    );
+    $pdo->exec(
+        "CREATE TABLE sgk_isverenler (
+            id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+            kod VARCHAR(32) NOT NULL,
+            ad VARCHAR(160) NOT NULL,
+            PRIMARY KEY (id),
+            UNIQUE KEY uq_sgk_isverenler_kod (kod)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+    );
+    $pdo->exec(
+        "CREATE TABLE subeler (
+            id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+            kod VARCHAR(32) NOT NULL,
             ad VARCHAR(120) NOT NULL,
+            sgk_isveren_id INT UNSIGNED NULL,
+            durum ENUM('AKTIF','PASIF') NOT NULL DEFAULT 'AKTIF',
+            PRIMARY KEY (id),
+            UNIQUE KEY uq_subeler_kod (kod),
+            CONSTRAINT fk_subeler_sgk FOREIGN KEY (sgk_isveren_id) REFERENCES sgk_isverenler (id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+    );
+    $pdo->exec(
+        "CREATE TABLE calisma_lokasyonlari (
+            id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+            kod VARCHAR(32) NOT NULL,
+            ad VARCHAR(160) NOT NULL,
+            PRIMARY KEY (id),
+            UNIQUE KEY uq_calisma_lokasyonlari_kod (kod)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+    );
+    $pdo->exec(
+        'CREATE TABLE personeller (
+            id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+            ad_soyad VARCHAR(160) NOT NULL,
+            sube_id INT UNSIGNED NULL,
+            sgk_isveren_id INT UNSIGNED NULL,
+            calisma_lokasyonu_id INT UNSIGNED NULL,
             PRIMARY KEY (id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
     );
     $pdo->exec(
-        "CREATE TABLE aylik_kapanis_state (
-            id INT UNSIGNED NOT NULL AUTO_INCREMENT,
-            ay CHAR(7) NOT NULL,
-            state ENUM('BOLUM_ONAYINDA','BOLUM_ONAYLANDI','REVIZE_ISTENDI','KAPANDI')
-                NOT NULL DEFAULT 'BOLUM_ONAYINDA',
-            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            PRIMARY KEY (id),
-            UNIQUE KEY uq_aylik_kapanis_state_ay (ay)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
-    );
-    $pdo->exec(
-        "CREATE TABLE aylik_ozet_satirlari (
-            id INT UNSIGNED NOT NULL AUTO_INCREMENT,
-            ay CHAR(7) NOT NULL,
-            personel_id INT UNSIGNED NOT NULL,
-            ad_soyad VARCHAR(160) NOT NULL,
-            sicil_no VARCHAR(32) NULL,
-            sube_id INT UNSIGNED NULL,
-            sube VARCHAR(120) NOT NULL,
-            departman_id INT UNSIGNED NULL,
-            bolum VARCHAR(120) NOT NULL,
-            bolum_onay_durumu ENUM('BOLUM_ONAYINDA','BOLUM_ONAYLANDI','REVIZE_ISTENDI')
-                NOT NULL DEFAULT 'BOLUM_ONAYINDA',
-            revize_var_mi TINYINT(1) NOT NULL DEFAULT 0,
-            son_islem VARCHAR(255) NULL,
-            kapanis_durumu ENUM('ACIK','KAPANDI') NOT NULL DEFAULT 'ACIK',
-            PRIMARY KEY (id),
-            KEY idx_aylik_ozet_ay (ay),
-            KEY idx_aylik_ozet_sube (sube_id)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+        'CREATE TABLE user_subeler (
+            user_id INT UNSIGNED NOT NULL,
+            sube_id INT UNSIGNED NOT NULL,
+            PRIMARY KEY (user_id, sube_id),
+            CONSTRAINT fk_user_subeler_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+            CONSTRAINT fk_user_subeler_sube FOREIGN KEY (sube_id) REFERENCES subeler (id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
     );
 }
 
+/**
+ * Fixture shaped like the documented production reality: gapped branch ids, a
+ * branch whose name already carries the company prefix, and a branch manager
+ * scoped to exactly one branch.
+ */
 function mcpSeed(PDO $pdo): void
 {
-    $pdo->exec("INSERT INTO subeler (id, ad) VALUES (1, 'Sube Bir'), (2, 'Sube Iki')");
+    $pdo->exec("INSERT INTO users (id, username, rol) VALUES (50, 'branch_manager', 'SUBE_YONETICISI')");
+    $pdo->exec("INSERT INTO sgk_isverenler (id, kod, ad) VALUES (1, 'SGK-1', 'Bordro Birimi Bir')");
+    // Ids 1, 2, 4 with no 3: the gap is production reality and must survive.
     $pdo->exec(
-        "INSERT INTO aylik_kapanis_state (ay, state) VALUES
-            ('2026-06', 'KAPANDI'),
-            ('2026-07', 'BOLUM_ONAYLANDI')"
+        "INSERT INTO subeler (id, kod, ad, sgk_isveren_id) VALUES
+            (1, 'SB-1', 'Fabrika', 1),
+            (2, 'SB-2', 'Giresun', 1),
+            (4, 'SB-4', 'Medisa Kayseri', NULL)"
     );
-    // One already-approved legacy row per branch plus the two shapes the guards
-    // must count: a NULL branch and a branch id with no owner row.
+    $pdo->exec("INSERT INTO calisma_lokasyonlari (id, kod, ad) VALUES (1, 'LOK-1', 'Fabrika Sahasi')");
     $pdo->exec(
-        "INSERT INTO aylik_ozet_satirlari
-            (ay, personel_id, ad_soyad, sicil_no, sube_id, sube, bolum, bolum_onay_durumu, son_islem, kapanis_durumu)
-         VALUES
-            ('2026-06', 11, 'Fixture Personel A', 'FX-1', 1, 'Sube Bir', 'Bolum', 'BOLUM_ONAYLANDI', 'onay', 'KAPANDI'),
-            ('2026-06', 12, 'Fixture Personel B', 'FX-2', 2, 'Sube Iki', 'Bolum', 'BOLUM_ONAYLANDI', 'onay', 'KAPANDI'),
-            ('2026-07', 13, 'Fixture Personel C', 'FX-3', 1, 'Sube Bir', 'Bolum', 'BOLUM_ONAYINDA', NULL, 'ACIK'),
-            ('2026-07', 14, 'Fixture Personel D', 'FX-4', NULL, 'Bilinmiyor', 'Bolum', 'BOLUM_ONAYINDA', NULL, 'ACIK'),
-            ('2026-07', 15, 'Fixture Personel E', 'FX-5', 99, 'Kapali Sube', 'Bolum', 'BOLUM_ONAYINDA', NULL, 'ACIK')"
+        "INSERT INTO personeller (id, ad_soyad, sube_id, sgk_isveren_id, calisma_lokasyonu_id) VALUES
+            (11, 'Fixture Personel A', 1, 1, 1),
+            (12, 'Fixture Personel B', 2, 1, NULL)"
     );
+    $pdo->exec('INSERT INTO user_subeler (user_id, sube_id) VALUES (50, 2)');
 }
 
 /**
@@ -133,8 +163,10 @@ function mcpSeedLedger(PDO $pdo, array $migrations, string $tip): void
 function mcpFingerprint(PDO $pdo): string
 {
     $parts = [];
-    foreach (['aylik_kapanis_state', 'aylik_ozet_satirlari', 'medisa_schema_migrations', 'subeler'] as $table) {
-        // ORDER BY 1: the ledger is keyed on version, the others on id.
+    foreach (
+        ['users', 'subeler', 'sgk_isverenler', 'calisma_lokasyonlari', 'personeller', 'user_subeler', 'medisa_schema_migrations'] as $table
+    ) {
+        // ORDER BY 1: the ledger is keyed on version, the others on their first key column.
         $rows = $pdo->query('SELECT * FROM `' . $table . '` ORDER BY 1')->fetchAll(PDO::FETCH_ASSOC);
         $parts[] = $table . ':' . json_encode($rows);
     }
@@ -173,11 +205,49 @@ function mcpIndexes(PDO $pdo, string $table): array
     return $indexes;
 }
 
+/** @return array<string, array{nullable: bool, type: string}> */
+function mcpColumns(PDO $pdo, string $table): array
+{
+    $statement = $pdo->prepare(
+        'SELECT COLUMN_NAME, IS_NULLABLE, COLUMN_TYPE FROM information_schema.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :t'
+    );
+    $statement->execute([':t' => $table]);
+    $columns = [];
+    foreach ($statement->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        $columns[(string) $row['COLUMN_NAME']] = [
+            'nullable' => (string) $row['IS_NULLABLE'] === 'YES',
+            'type' => (string) $row['COLUMN_TYPE'],
+        ];
+    }
+
+    return $columns;
+}
+
+/** @return array<string, array{table: string, referenced: string, delete_rule: string}> */
+function mcpForeignKeys(PDO $pdo): array
+{
+    $rows = $pdo->query(
+        "SELECT rc.CONSTRAINT_NAME, rc.TABLE_NAME, rc.REFERENCED_TABLE_NAME, rc.DELETE_RULE
+         FROM information_schema.REFERENTIAL_CONSTRAINTS rc
+         WHERE rc.CONSTRAINT_SCHEMA = DATABASE()"
+    )->fetchAll(PDO::FETCH_ASSOC);
+
+    $keys = [];
+    foreach ($rows as $row) {
+        $keys[(string) $row['CONSTRAINT_NAME']] = [
+            'table' => (string) $row['TABLE_NAME'],
+            'referenced' => (string) $row['REFERENCED_TABLE_NAME'],
+            'delete_rule' => (string) $row['DELETE_RULE'],
+        ];
+    }
+
+    return $keys;
+}
+
 function mcpApply079(PDO $pdo): ?string
 {
-    $sql = (string) file_get_contents(
-        __DIR__ . '/../../api/migrations/079_aylik_kapanis_sube_scope_and_actor.sql'
-    );
+    $sql = (string) file_get_contents(__DIR__ . '/../../api/migrations/' . MCP_MIGRATION_079);
     try {
         $pdo->exec($sql);
 
@@ -221,10 +291,12 @@ if (preg_match('/host=([^;]+)/i', $dsn, $hostMatch)
 $suffix = bin2hex(random_bytes(5));
 $db = 'medisa_mcp_' . $suffix;
 $restoreDb = 'medisa_mcp_restore_' . $suffix;
+$driftDb = 'medisa_mcp_drift_' . $suffix;
 $rootDsn = preg_replace('/;?dbname=[^;]*/i', '', $dsn) ?: $dsn;
 $root = mcpPdo($rootDsn);
-$root->exec('CREATE DATABASE `' . $db . '` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
-$root->exec('CREATE DATABASE `' . $restoreDb . '` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
+foreach ([$db, $restoreDb, $driftDb] as $name) {
+    $root->exec('CREATE DATABASE `' . $name . '` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
+}
 $pdo = mcpPdo((preg_replace('/dbname=[^;]+/i', 'dbname=' . $db, $dsn) ?: $dsn));
 
 $apiDirectory = realpath(__DIR__ . '/../../api');
@@ -237,6 +309,20 @@ $fakeApiDirectory = $sandbox . '/public_html/personelmedisa/api';
 mkdir($fakeApiDirectory, 0777, true);
 
 try {
+    // ---------------------------------------------------------------------
+    // 0) The withdrawn monthly-close 079 is gone from the canonical source
+    // ---------------------------------------------------------------------
+    mcpAssert(
+        !is_file($apiDirectory . '/migrations/' . MCP_WITHDRAWN_079),
+        'the withdrawn monthly-close 079 is absent from the migration source'
+    );
+    $slot079 = array_values(array_filter(
+        $migrations,
+        static fn (array $migration): bool => (string) $migration['version'] === '079'
+    ));
+    mcpAssert(count($slot079) === 1, 'the canonical source carries exactly one migration 079');
+    mcpAssert((string) $slot079[0]['name'] === MCP_MIGRATION_079, 'the single 079 is the hierarchy migration');
+
     mcpCreatePreimage($pdo);
     mcpSeed($pdo);
     mcpSeedLedger($pdo, $migrations, '078');
@@ -252,8 +338,8 @@ try {
     mcpAssert($report['ledger']['applied_tip'] === '078', 'preflight reports production tip 078');
     mcpAssert($report['bundle']['code_tip'] === '079', 'preflight reports code tip 079');
     mcpAssert(
-        $report['ledger']['pending_names'] === ['079_aylik_kapanis_sube_scope_and_actor.sql'],
-        'pending list contains only migration 079'
+        $report['ledger']['pending_names'] === [MCP_MIGRATION_079],
+        'pending list contains only the hierarchy migration 079'
     );
     mcpAssert(
         $report['ledger']['checksum_mismatch_versions'] === []
@@ -262,47 +348,40 @@ try {
     );
     mcpAssert(
         $report['bundle']['expected_pending_checksum']
-            === hash_file('sha256', $apiDirectory . '/migrations/079_aylik_kapanis_sube_scope_and_actor.sql'),
+            === hash_file('sha256', $apiDirectory . '/migrations/' . MCP_MIGRATION_079),
         'pending checksum equals the sha256 of the 079 file on this ref'
     );
+    mcpAssert($report['bundle']['withdrawn_present'] === false, 'the withdrawn 079 is not pending');
     mcpAssert($report['result'] === 'PASS', 'canonical preimage passes the preflight');
 
     // ---------------------------------------------------------------------
     // 2) Aggregate-only guards and the row transform they predict
     // ---------------------------------------------------------------------
     $guards = $report['guards'];
-    mcpAssert($guards['ozet_rows'] === 5, 'ozet row count is reported as an aggregate');
-    mcpAssert($guards['ozet_sube_null_rows'] === 1, 'null branch rows are counted');
-    mcpAssert($guards['ozet_sube_orphan_rows'] === 1, 'orphan branch rows are counted');
-    mcpAssert($guards['branch_table_resolved'] === true, 'orphan guard resolved its canonical branch owner');
-    mcpAssert($guards['ozet_duplicate_ay_sube_personel'] === 0, 'duplicate (ay, sube, personel) rows are counted');
-    mcpAssert($guards['state_rows'] === 2 && $guards['state_distinct_ay'] === 2, 'legacy state rows and months are counted');
-    mcpAssert($guards['state_duplicate_ay'] === 0, 'legacy state has no duplicate month');
+    mcpAssert($guards['branch_table_resolved'] === true, 'guards resolved their canonical branch owner');
+    mcpAssert($guards['sube_rows'] === 3, 'branch rows are reported as an aggregate');
+    mcpAssert($guards['user_sube_assignment_rows'] === 1, 'explicit branch assignments are counted');
     mcpAssert(
-        $guards['state_rows_expected_after_079'] === $guards['state_rows'],
-        '079 is schema-only, so the expected post-migration state row count equals the preimage count'
+        $guards['sirketler_table_present'] === false
+            && $guards['user_sirketler_table_present'] === false
+            && $guards['user_sgk_isverenler_table_present'] === false,
+        'the new hierarchy tables are absent in the preimage'
     );
+    mcpAssert($guards['relation_columns_present'] === 0, 'no relation column exists before apply');
     mcpAssert(
-        $guards['state_legacy_unique_present'] === true
-            && $guards['state_composite_unique_present'] === false
-            && $guards['state_sube_column_present'] === false,
-        'preimage is still the legacy UNIQUE(ay) shape'
-    );
-    mcpAssert($guards['ozet_actor_columns_present'] === 0, 'actor columns are absent before apply');
-    mcpAssert(
-        in_array('OZET_SUBE_NULL_ROWS_PRESENT', $report['warnings'], true)
-            && in_array('OZET_SUBE_ORPHAN_ROWS_PRESENT', $report['warnings'], true),
-        'null and orphan branch rows surface as warnings, not as silent zeroes'
+        $guards['sube_rows_expected_after_079'] === $guards['sube_rows']
+            && $guards['user_sube_assignment_rows_expected_after_079'] === $guards['user_sube_assignment_rows'],
+        '079 is schema-only, so every expected post-migration count equals the preimage count'
     );
 
     // ---------------------------------------------------------------------
     // 3) The report is publishable: aggregates only, never row content
     // ---------------------------------------------------------------------
     $encoded = (string) json_encode($report);
-    foreach (['Fixture Personel', 'FX-1', 'FX-5', 'Sube Bir', 'Kapali Sube', 'BOLUM_ONAYLANDI'] as $leak) {
+    foreach (['Fixture Personel', 'branch_manager', 'Fabrika', 'Giresun', 'Medisa Kayseri'] as $leak) {
         mcpAssert(strpos($encoded, $leak) === false, 'preflight report never carries row content: ' . $leak);
     }
-    mcpAssert(strpos($encoded, 'ad_soyad') !== false, 'column names are reported (schema readback is the point)');
+    mcpAssert(strpos($encoded, 'sgk_isveren_id') !== false, 'column names are reported (schema readback is the point)');
     mcpAssert(
         preg_match('/password|passwd|secret|token|dsn|bearer/i', $encoded) !== 1,
         'preflight report carries no credential-shaped field'
@@ -346,18 +425,18 @@ try {
     );
     mcpAssert($backup['readback'] === 'VERIFIED', 'backup readback is verified before the caller continues');
     mcpAssert(
-        $backup['tables'] === ['aylik_kapanis_state', 'aylik_ozet_satirlari', 'medisa_schema_migrations'],
-        'backup scope is the two closing tables plus the ledger preimage'
+        $backup['tables'] === ['subeler', 'sgk_isverenler', 'calisma_lokasyonlari', 'user_subeler', 'medisa_schema_migrations'],
+        'backup scope is exactly what the hierarchy migration touches, plus the ledger preimage'
     );
     mcpAssert(
-        $backup['row_counts']['aylik_ozet_satirlari'] === 5
-            && $backup['row_counts']['aylik_kapanis_state'] === 2,
+        $backup['row_counts']['subeler'] === 3 && $backup['row_counts']['user_subeler'] === 1,
         'backup metadata reports the row counts it captured'
     );
     mcpAssert(!array_key_exists('absolute_path', $backup), 'published metadata omits the server path');
     mcpAssert(is_file($backupPath . '.meta.json'), 'rollback metadata is stored next to the dump');
 
     $restore = mcpPdo((preg_replace('/dbname=[^;]+/i', 'dbname=' . $restoreDb, $dsn) ?: $dsn));
+    $restore->exec('SET FOREIGN_KEY_CHECKS = 0');
     // SHOW CREATE TABLE spans several lines, so statements are accumulated until
     // the terminating semicolon rather than executed line by line.
     $statement = '';
@@ -372,14 +451,14 @@ try {
         }
     }
     mcpAssert(
-        (int) $restore->query('SELECT COUNT(*) FROM aylik_ozet_satirlari')->fetchColumn() === 5
-            && (int) $restore->query('SELECT COUNT(*) FROM aylik_kapanis_state')->fetchColumn() === 2
+        (int) $restore->query('SELECT COUNT(*) FROM subeler')->fetchColumn() === 3
+            && (int) $restore->query('SELECT COUNT(*) FROM user_subeler')->fetchColumn() === 1
             && (int) $restore->query("SELECT COUNT(*) FROM medisa_schema_migrations WHERE version = '078'")->fetchColumn() === 1,
-        'the dump alone is a sufficient restore artifact for all three tables'
+        'the dump alone is a sufficient restore artifact for the whole backup scope'
     );
     mcpAssert(
-        isset(mcpIndexes($restore, 'aylik_kapanis_state')['uq_aylik_kapanis_state_ay']),
-        'restore brings back the pre-079 key shape, so the index transition is reversible'
+        !isset(mcpColumns($restore, 'subeler')['sirket_id']),
+        'restore brings back the pre-079 branch shape, so the migration is reversible'
     );
 
     putenv('MEDISA_MIGRATION_BACKUP_DIR=' . $sandbox . '/public_html/dumps');
@@ -408,84 +487,141 @@ try {
     );
 
     // ---------------------------------------------------------------------
-    // 6) 079 key transition: composite first, legacy never dropped blindly
+    // 6) Fail-closed drift: an incompatible column wearing the same name
     // ---------------------------------------------------------------------
-    $decoyFailure = null;
-    $pdo->exec('ALTER TABLE aylik_kapanis_state ADD KEY uq_aylik_kapanis_state_ay_sube (ay)');
-    $decoyFailure = mcpApply079($pdo);
-    $decoyIndexes = mcpIndexes($pdo, 'aylik_kapanis_state');
-    mcpAssert($decoyFailure !== null, 'a non-unique key wearing the composite name aborts the migration');
+    $drift = mcpPdo((preg_replace('/dbname=[^;]+/i', 'dbname=' . $driftDb, $dsn) ?: $dsn));
+    mcpCreatePreimage($drift);
+    mcpSeed($drift);
+    $drift->exec('ALTER TABLE subeler ADD COLUMN sirket_id VARCHAR(32) NOT NULL DEFAULT ""');
+    $driftFailure = mcpApply079($drift);
+    mcpAssert($driftFailure !== null, 'an incompatible sirket_id column aborts the migration');
     mcpAssert(
-        strpos((string) $decoyFailure, 'composite closing state key missing before legacy drop') !== false,
-        'the abort names the pre-drop composite guard'
+        strpos((string) $driftFailure, 'incompatible hierarchy column already present') !== false,
+        'the abort names the drift guard instead of reporting success'
     );
     mcpAssert(
-        isset($decoyIndexes['uq_aylik_kapanis_state_ay'])
-            && $decoyIndexes['uq_aylik_kapanis_state_ay']['unique'] === true,
-        'the legacy UNIQUE key survives the abort, so the table is never uniqueness-free'
+        !isset(mcpColumns($drift, 'sirketler')['id']) && mcpColumns($drift, 'sirketler') === [],
+        'the aborted run creates no hierarchy table'
     );
-    $pdo->exec('ALTER TABLE aylik_kapanis_state DROP KEY uq_aylik_kapanis_state_ay_sube');
-
-    // Mid-state resume: both keys present is the intended worst case.
-    $pdo->exec('ALTER TABLE aylik_kapanis_state ADD UNIQUE KEY uq_aylik_kapanis_state_ay_sube (ay, sube_id)');
-    $midIndexes = mcpIndexes($pdo, 'aylik_kapanis_state');
+    $driftPreflight = MigrationPreflightReport::collect($drift, $source, $deployedSha);
     mcpAssert(
-        isset($midIndexes['uq_aylik_kapanis_state_ay'], $midIndexes['uq_aylik_kapanis_state_ay_sube']),
-        'the interrupted state carries both unique keys instead of none'
-    );
-    mcpAssert(mcpApply079($pdo) === null, 'a rerun resumes from the interrupted state');
-    $resumed = mcpIndexes($pdo, 'aylik_kapanis_state');
-    mcpAssert(
-        !isset($resumed['uq_aylik_kapanis_state_ay']) && isset($resumed['uq_aylik_kapanis_state_ay_sube']),
-        'the resume finishes the transition: composite kept, legacy dropped'
+        in_array('PREIMAGE_RELATION_COLUMN_INCOMPATIBLE', $driftPreflight['blockers'], true)
+            && $driftPreflight['result'] === 'BLOCKED',
+        'the preflight refuses the same drift before an apply is ever requested'
     );
 
     // ---------------------------------------------------------------------
-    // 7) Post-apply shape, data preservation and idempotency
+    // 7) Empty schema: the structural guard refuses to build half a hierarchy
     // ---------------------------------------------------------------------
-    $composite = $resumed['uq_aylik_kapanis_state_ay_sube'];
+    $drift->exec('DROP TABLE user_subeler');
+    $drift->exec('DROP TABLE personeller');
+    $drift->exec('DROP TABLE subeler');
+    $drift->exec('DROP TABLE calisma_lokasyonlari');
+    $drift->exec('DROP TABLE sgk_isverenler');
+    $drift->exec('DROP TABLE users');
+    $emptyFailure = mcpApply079($drift);
+    mcpAssert($emptyFailure !== null, 'an empty schema aborts instead of creating orphan tables');
     mcpAssert(
-        $composite['unique'] === true && $composite['columns'] === ['ay', 'sube_id'],
-        'the surviving key is UNIQUE (ay, sube_id)'
-    );
-    $stateColumns = $pdo->query(
-        "SELECT COLUMN_NAME, IS_NULLABLE, COLUMN_DEFAULT FROM information_schema.COLUMNS
-         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'aylik_kapanis_state'
-           AND COLUMN_NAME = 'sube_id'"
-    )->fetch(PDO::FETCH_ASSOC);
-    mcpAssert(
-        $stateColumns !== false
-            && $stateColumns['IS_NULLABLE'] === 'NO'
-            && (int) $stateColumns['COLUMN_DEFAULT'] === 0,
-        'state sube_id is NOT NULL DEFAULT 0, so the unique key cannot be bypassed by NULL'
-    );
-    mcpAssert(
-        (int) $pdo->query('SELECT COUNT(*) FROM aylik_kapanis_state')->fetchColumn() === 2
-            && (int) $pdo->query('SELECT COUNT(*) FROM aylik_kapanis_state WHERE sube_id <> 0')->fetchColumn() === 0,
-        'legacy state rows survive verbatim under the sentinel sube_id = 0'
-    );
-    mcpAssert(
-        (int) $pdo->query('SELECT COUNT(*) FROM aylik_ozet_satirlari')->fetchColumn() === 5
-            && (int) $pdo->query("SELECT COUNT(*) FROM aylik_ozet_satirlari WHERE bolum_onay_durumu = 'BOLUM_ONAYLANDI'")->fetchColumn() === 2,
-        'no closing or approval row is changed by the migration'
-    );
-    $actorColumns = $pdo->query(
-        "SELECT COLUMN_NAME, IS_NULLABLE FROM information_schema.COLUMNS
-         WHERE TABLE_SCHEMA = DATABASE()
-           AND TABLE_NAME = 'aylik_ozet_satirlari'
-           AND COLUMN_NAME IN (
-             'bolum_onay_actor_user_id', 'bolum_onay_actor_identity_id', 'bolum_onay_at',
-             'kapanis_actor_user_id', 'kapanis_actor_identity_id', 'kapanis_at'
-           )"
-    )->fetchAll(PDO::FETCH_ASSOC);
-    mcpAssert(count($actorColumns) === 6, 'all six actor columns exist after apply');
-    $nullable = array_filter($actorColumns, static fn (array $row): bool => $row['IS_NULLABLE'] !== 'YES');
-    mcpAssert($nullable === [], 'actor columns are additive and nullable, so legacy rows stay valid');
-    mcpAssert(
-        (int) $pdo->query('SELECT COUNT(*) FROM aylik_ozet_satirlari WHERE bolum_onay_actor_user_id IS NULL')->fetchColumn() === 5,
-        'existing approved rows keep a NULL actor instead of being back-filled'
+        strpos((string) $emptyFailure, 'organisation owner tables missing') !== false,
+        'the abort names the missing owner tables'
     );
 
+    // ---------------------------------------------------------------------
+    // 8) Apply on the production-like preimage
+    // ---------------------------------------------------------------------
+    mcpAssert(mcpApply079($pdo) === null, '079 applies cleanly on the 078 preimage');
+
+    $subeColumns = mcpColumns($pdo, 'subeler');
+    mcpAssert(
+        isset($subeColumns['sirket_id'])
+            && $subeColumns['sirket_id']['nullable'] === true
+            && strpos($subeColumns['sirket_id']['type'], 'unsigned') !== false,
+        'subeler.sirket_id is added as a nullable unsigned int'
+    );
+    mcpAssert(
+        (mcpColumns($pdo, 'sgk_isverenler')['sirket_id']['nullable'] ?? null) === true
+            && (mcpColumns($pdo, 'calisma_lokasyonlari')['sube_id']['nullable'] ?? null) === true,
+        'the remaining relation columns are nullable so legacy rows stay valid'
+    );
+    mcpAssert(
+        !isset(mcpColumns($pdo, 'personeller')['sirket_id']),
+        'personeller gains no sirket_id: the company is derived from the branch'
+    );
+    mcpAssert(
+        !isset($subeColumns['tam_ad']),
+        'tam_ad is never stored; it is derived by the backend read model'
+    );
+
+    $sirketColumns = mcpColumns($pdo, 'sirketler');
+    mcpAssert(
+        isset($sirketColumns['id'], $sirketColumns['kod'], $sirketColumns['ad'], $sirketColumns['durum']),
+        'sirketler carries id, kod, ad and durum'
+    );
+    $sirketIndexes = mcpIndexes($pdo, 'sirketler');
+    mcpAssert(
+        ($sirketIndexes['uq_sirketler_kod']['unique'] ?? false) === true
+            && ($sirketIndexes['uq_sirketler_ad']['unique'] ?? false) === true,
+        'company code and name are globally unique'
+    );
+
+    $foreignKeys = mcpForeignKeys($pdo);
+    foreach ([
+        'fk_subeler_sirket' => ['subeler', 'sirketler', 'RESTRICT'],
+        'fk_sgk_isverenler_sirket' => ['sgk_isverenler', 'sirketler', 'RESTRICT'],
+        'fk_calisma_lokasyonlari_sube' => ['calisma_lokasyonlari', 'subeler', 'RESTRICT'],
+        'fk_user_sirketler_user' => ['user_sirketler', 'users', 'CASCADE'],
+        'fk_user_sirketler_sirket' => ['user_sirketler', 'sirketler', 'RESTRICT'],
+        'fk_user_sgk_isverenler_user' => ['user_sgk_isverenler', 'users', 'CASCADE'],
+        'fk_user_sgk_isverenler_sgk' => ['user_sgk_isverenler', 'sgk_isverenler', 'RESTRICT'],
+    ] as $name => $expected) {
+        mcpAssert(
+            isset($foreignKeys[$name])
+                && $foreignKeys[$name]['table'] === $expected[0]
+                && $foreignKeys[$name]['referenced'] === $expected[1]
+                && $foreignKeys[$name]['delete_rule'] === $expected[2],
+            'foreign key ' . $name . ' points at ' . $expected[1] . ' with ON DELETE ' . $expected[2]
+        );
+    }
+    foreach (['idx_subeler_sirket', 'idx_sgk_isverenler_sirket'] as $index) {
+        $table = $index === 'idx_subeler_sirket' ? 'subeler' : 'sgk_isverenler';
+        mcpAssert(isset(mcpIndexes($pdo, $table)[$index]), 'relation index ' . $index . ' exists');
+    }
+
+    // ---------------------------------------------------------------------
+    // 9) Data preservation: no seed, no mapping, no rename, no id shift
+    // ---------------------------------------------------------------------
+    mcpAssert(
+        (int) $pdo->query('SELECT COUNT(*) FROM sirketler')->fetchColumn() === 0
+            && (int) $pdo->query('SELECT COUNT(*) FROM user_sirketler')->fetchColumn() === 0
+            && (int) $pdo->query('SELECT COUNT(*) FROM user_sgk_isverenler')->fetchColumn() === 0,
+        'the migration seeds no company and copies no user scope'
+    );
+    mcpAssert(
+        $pdo->query('SELECT GROUP_CONCAT(id ORDER BY id) FROM subeler')->fetchColumn() === '1,2,4',
+        'branch ids survive verbatim, including the 3 that does not exist in production'
+    );
+    mcpAssert(
+        $pdo->query("SELECT ad FROM subeler WHERE id = 4")->fetchColumn() === 'Medisa Kayseri',
+        'no branch is renamed: a name that already carries the company prefix is left alone'
+    );
+    mcpAssert(
+        (int) $pdo->query('SELECT COUNT(*) FROM subeler WHERE sirket_id IS NOT NULL')->fetchColumn() === 0
+            && (int) $pdo->query('SELECT COUNT(*) FROM sgk_isverenler WHERE sirket_id IS NOT NULL')->fetchColumn() === 0,
+        'no branch or payroll employer is mapped to a company by the migration'
+    );
+    mcpAssert(
+        (int) $pdo->query('SELECT COUNT(*) FROM user_subeler')->fetchColumn() === 1
+            && (int) $pdo->query('SELECT sube_id FROM user_subeler WHERE user_id = 50')->fetchColumn() === 2,
+        'the branch manager keeps exactly the branch assignment it had'
+    );
+    mcpAssert(
+        (int) $pdo->query('SELECT COUNT(*) FROM personeller WHERE sube_id = 1 AND sgk_isveren_id = 1')->fetchColumn() === 1,
+        'personnel branch and payroll axes stay independent and unmoved'
+    );
+
+    // ---------------------------------------------------------------------
+    // 10) Idempotency and compatible partial-state resume
+    // ---------------------------------------------------------------------
     $postApplyFingerprint = mcpFingerprint($pdo);
     mcpAssert(mcpApply079($pdo) === null, 'a second full rerun is a no-op');
     mcpAssert(
@@ -493,18 +629,31 @@ try {
         'the idempotent rerun changes neither schema nor data'
     );
 
+    $pdo->exec('ALTER TABLE user_sirketler DROP FOREIGN KEY fk_user_sirketler_sirket');
+    $pdo->exec('DROP TABLE user_sirketler');
+    $pdo->exec('ALTER TABLE calisma_lokasyonlari DROP FOREIGN KEY fk_calisma_lokasyonlari_sube');
+    mcpAssert(mcpApply079($pdo) === null, 'a compatible partial state resumes instead of failing');
+    mcpAssert(
+        isset(mcpForeignKeys($pdo)['fk_calisma_lokasyonlari_sube'], mcpForeignKeys($pdo)['fk_user_sirketler_sirket']),
+        'the resume restores exactly the missing pieces'
+    );
+    mcpAssert(
+        $postApplyFingerprint === mcpFingerprint($pdo),
+        'the resumed schema is identical to the one a single clean run produces'
+    );
+
     // The post-079 schema must no longer read as an apply-ready preimage.
     $postReport = MigrationPreflightReport::collect($pdo, $source, $deployedSha);
     mcpAssert(
-        in_array('PREIMAGE_ACTOR_COLUMNS_ALREADY_PRESENT', $postReport['blockers'], true)
-            && $postReport['result'] === 'BLOCKED',
-        'an already-migrated schema is refused as an apply preimage'
+        in_array('PREIMAGE_PARTIAL_HIERARCHY_PRESENT', $postReport['warnings'], true),
+        'an already-migrated schema is reported as a partial-hierarchy state, not as a clean preimage'
     );
 
     echo 'verify-migration-control-plane-preflight-mysql: OK' . PHP_EOL;
 } finally {
     putenv('MEDISA_MIGRATION_BACKUP_DIR');
     mcpRemoveTree($sandbox);
-    $root->exec('DROP DATABASE IF EXISTS `' . $db . '`');
-    $root->exec('DROP DATABASE IF EXISTS `' . $restoreDb . '`');
+    foreach ([$db, $restoreDb, $driftDb] as $name) {
+        $root->exec('DROP DATABASE IF EXISTS `' . $name . '`');
+    }
 }

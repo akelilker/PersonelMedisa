@@ -6,6 +6,7 @@ namespace Medisa\Api\Services\Personel;
 
 use Medisa\Api\Http\CsvResponse;
 use Medisa\Api\Scope\SubeScope;
+use Medisa\Api\Services\Organizasyon\SubeReadModel;
 use PDO;
 use RuntimeException;
 use Throwable;
@@ -295,6 +296,10 @@ final class PersonelImportReferenceCatalogService
             throw new RuntimeException('Invalid reference table.');
         }
 
+        if ($table === 'subeler') {
+            return self::loadSubeNameIndex($pdo);
+        }
+
         $stmt = $pdo->query("SELECT id, ad FROM $table WHERE durum = 'AKTIF'");
         $index = [];
         if (!$stmt) {
@@ -309,6 +314,51 @@ final class PersonelImportReferenceCatalogService
                 $index[$name] = [];
             }
             $index[$name][] = (int) $row['id'];
+        }
+
+        return $index;
+    }
+
+    /**
+     * Branch names are the one reference where the short name is not a key:
+     * "Ankara" can legitimately exist under two companies. The index therefore
+     * carries the canonical company-qualified name ("Medisa Ankara") as the
+     * resolvable entry, and keeps the short name pointing at every match so a
+     * bare "Ankara" resolves to nothing and raises PERSONEL_IMPORT_REFERANS_BELIRSIZ
+     * instead of silently picking one.
+     *
+     * On a pre-079 / unmapped database the derived name equals the raw name, so
+     * the legacy single-key behaviour is preserved exactly.
+     *
+     * @return array<string, list<int>>
+     */
+    private static function loadSubeNameIndex(PDO $pdo): array
+    {
+        $sql = 'SELECT ' . SubeReadModel::selectColumns($pdo)
+            . ' FROM subeler s' . SubeReadModel::joinSql($pdo)
+            . " WHERE s.durum = 'AKTIF'";
+
+        $stmt = $pdo->query($sql);
+        $index = [];
+        if (!$stmt) {
+            return $index;
+        }
+
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $mapped = SubeReadModel::mapRow($row);
+            $id = (int) $mapped['id'];
+            foreach ([$mapped['ad'], $mapped['tam_ad']] as $name) {
+                $name = (string) $name;
+                if ($name === '') {
+                    continue;
+                }
+                if (!isset($index[$name])) {
+                    $index[$name] = [];
+                }
+                if (!in_array($id, $index[$name], true)) {
+                    $index[$name][] = $id;
+                }
+            }
         }
 
         return $index;

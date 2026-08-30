@@ -94,7 +94,7 @@ describe("canonical migration bundle", () => {
       expect(bundle).toContain("'name' => '077_legacy_role_enum_shrink.sql'");
       expect(bundle).toContain("'name' => '078_personel_sicil_sequence.sql'");
       expect(bundle).toContain(
-        "'name' => '079_aylik_kapanis_sube_scope_and_actor.sql'",
+        "'name' => '079_sirket_sube_hiyerarsisi.sql'",
       );
 
       const checksum068 = createHash("sha256")

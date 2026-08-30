@@ -11,13 +11,21 @@ import { fetchPersonellerList } from "../../../api/personeller.api";
 import { createDepartmanOption, fetchBirimOptions, fetchBolumOptions, fetchDepartmanOptions } from "../../../api/referans.api";
 import { createSurec, type CreateSurecPayload } from "../../../api/surecler.api";
 import {
+  createSirketSube,
   createYonetimKullanici,
+  createYonetimSirket,
   createYonetimSube,
+  deleteSirketSube,
+  deleteYonetimSirket,
   deleteYonetimSube,
+  fetchOrganizasyonReadiness,
   fetchYonetimKullanicilari,
+  fetchYonetimSirketleri,
   fetchYonetimSubeleri,
   resetYonetimKullaniciBaslangicSifresi,
+  updateSirketSube,
   updateYonetimKullanici,
+  updateYonetimSirket,
   updateYonetimSube
 } from "../../../api/yonetim.api";
 import { useRoleAccess } from "../../../hooks/use-role-access";
@@ -44,9 +52,12 @@ import { formatSurecTuruLabel, formatUserRoleLabel } from "../../../lib/display/
 import type {
   KayitDurumu,
   KullaniciTipi,
+  OrganizasyonReadiness,
   UpsertYonetimKullaniciPayload,
+  UpsertYonetimSirketPayload,
   UpsertYonetimSubePayload,
   YonetimKullanici,
+  YonetimSirket,
   YonetimSube
 } from "../../../types/yonetim";
 
@@ -89,6 +100,12 @@ type SubeFormState = {
   durum: KayitDurumu;
 };
 
+type SirketFormState = {
+  kod: string;
+  ad: string;
+  durum: KayitDurumu;
+};
+
 const KULLANICI_TIPI_LABELS: Record<KullaniciTipi, string> = {
   IC_PERSONEL: "İç Personel",
   HARICI: "Harici"
@@ -127,8 +144,15 @@ const INITIAL_SUBE_FORM: SubeFormState = {
   durum: "AKTIF"
 };
 
+const INITIAL_SIRKET_FORM: SirketFormState = {
+  kod: "",
+  ad: "",
+  durum: "AKTIF"
+};
+
 const YONETIM_KULLANICI_FORM_ID = "yonetim-kullanici-form";
 const YONETIM_SUBE_FORM_ID = "yonetim-sube-form";
+const YONETIM_SIRKET_FORM_ID = "yonetim-sirket-form";
 const REAL_KULLANICI_API_UNSUPPORTED_HINT =
   "Telefon, notlar ve kullanıcı tipi V1 canlı API'de desteklenmiyor. Bağlı personel eşlemesi kaydedilir.";
 const BIRIM_AMIRI_ATANDI_SUREC_TURU = "BIRIM_AMIRI_ATANDI";
@@ -350,6 +374,25 @@ function toKullaniciPayload(form: KullaniciFormState, isEdit: boolean): UpsertYo
   return payload;
 }
 
+function sirketFormFromItem(item: YonetimSirket): SirketFormState {
+  return { kod: item.kod, ad: item.ad, durum: item.durum };
+}
+
+function toSirketPayload(form: SirketFormState, isEdit: boolean): UpsertYonetimSirketPayload {
+  const kod = form.kod.trim().toUpperCase();
+  const ad = form.ad.trim();
+
+  if (!ad) {
+    throw new Error("Şirket adı zorunludur.");
+  }
+  if (!isEdit && !kod) {
+    throw new Error("Şirket kodu zorunludur.");
+  }
+
+  // `kod` is immutable after creation, so an edit payload omits it entirely.
+  return isEdit ? { ad, durum: form.durum } : { kod, ad, durum: form.durum };
+}
+
 function toSubePayload(form: SubeFormState): UpsertYonetimSubePayload {
   const kod = form.kod.trim().toUpperCase();
   const ad = form.ad.trim();
@@ -462,7 +505,7 @@ function isCorruptedDisplayText(value: string) {
 }
 
 export function YonetimPaneliPage() {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { hasPermission } = useRoleAccess();
   const canManageYonetimPanel = hasPermission("yonetim-paneli.manage");
   const canOpenQrKiosk = hasPermission("qr.kiosk.display");
@@ -502,6 +545,13 @@ export function YonetimPaneliPage() {
   const [kullanicilar, setKullanicilar] = useState<YonetimKullanici[]>([]);
   const [firstLoginFilter, setFirstLoginFilter] = useState<PersonelFirstLoginFilter>("all");
   const [subeler, setSubeler] = useState<YonetimSube[]>([]);
+  const [sirketler, setSirketler] = useState<YonetimSirket[]>([]);
+  const [readiness, setReadiness] = useState<OrganizasyonReadiness | null>(null);
+  const [isSirketFormOpen, setIsSirketFormOpen] = useState(false);
+  const [editingSirketId, setEditingSirketId] = useState<number | null>(null);
+  const [sirketForm, setSirketForm] = useState<SirketFormState>(INITIAL_SIRKET_FORM);
+  const [isSirketDeleteDialogOpen, setIsSirketDeleteDialogOpen] = useState(false);
+  const [sirketDeleteDialogError, setSirketDeleteDialogError] = useState<string | null>(null);
   const [personeller, setPersoneller] = useState<Personel[]>([]);
   const [departmanOptions, setDepartmanOptions] = useState<IdOption[]>([]);
   const [bolumOptions, setBolumOptions] = useState<IdOption[]>([]);
@@ -539,7 +589,43 @@ export function YonetimPaneliPage() {
   const isSecurePersonelCreatePath =
     editingKullaniciId == null && kullaniciForm.rol === "PERSONEL";
 
-  const subeNameMap = useMemo(() => new Map(subeler.map((sube) => [sube.id, sube.ad])), [subeler]);
+  // Scope summaries are a shared surface, so they use the company-qualified name.
+  const subeNameMap = useMemo(() => new Map(subeler.map((sube) => [sube.id, sube.tam_ad])), [subeler]);
+
+  // The hierarchy UI only opens once production branches are actually mapped to
+  // companies; schema alone would render empty company cards over legacy data.
+  const hierarchyMode = readiness?.data_ready === true;
+  const selectedSirketIdParam = Number.parseInt(searchParams.get("sirket") ?? "", 10);
+  const selectedSirketId =
+    hierarchyMode && Number.isInteger(selectedSirketIdParam) && selectedSirketIdParam > 0
+      ? selectedSirketIdParam
+      : null;
+  const selectedSirket = useMemo(
+    () => sirketler.find((item) => item.id === selectedSirketId) ?? null,
+    [sirketler, selectedSirketId]
+  );
+  const sirketSubeleri = useMemo(
+    () => (selectedSirketId == null ? [] : subeler.filter((sube) => sube.sirket?.id === selectedSirketId)),
+    [subeler, selectedSirketId]
+  );
+
+  const visibleSubeler = hierarchyMode && selectedSirketId != null ? sirketSubeleri : subeler;
+  // Company detail is the one screen scoped to a single company, so it shows the
+  // short name; every shared listing keeps the company-qualified name.
+  const subeListLabel = (item: YonetimSube) => (selectedSirketId != null ? item.ad : item.tam_ad);
+
+  function openSirketDetay(sirketId: number) {
+    const next = new URLSearchParams(searchParams);
+    next.set("tab", "subeler");
+    next.set("sirket", String(sirketId));
+    setSearchParams(next);
+  }
+
+  function closeSirketDetay() {
+    const next = new URLSearchParams(searchParams);
+    next.delete("sirket");
+    setSearchParams(next);
+  }
   const personelDisplayNameMap = useMemo(
     () => new Map(personeller.map((personel) => [personel.id, formatAdSoyad([personel.ad, personel.soyad].filter(Boolean).join(" "))])),
     [personeller]
@@ -609,6 +695,24 @@ export function YonetimPaneliPage() {
 
       setKullanicilar(kullaniciList);
       setSubeler(subeList);
+      // Readiness and the company list are best-effort: on a pre-migration
+      // backend the panel must still render the legacy flat branch UI.
+      let readinessState: OrganizasyonReadiness | null = null;
+      try {
+        readinessState = await fetchOrganizasyonReadiness();
+      } catch {
+        readinessState = null;
+      }
+      setReadiness(readinessState);
+      if (readinessState?.schema_ready) {
+        try {
+          setSirketler(await fetchYonetimSirketleri());
+        } catch {
+          setSirketler([]);
+        }
+      } else {
+        setSirketler([]);
+      }
       setPersoneller(personelList.items);
       setDepartmanOptions(sortIdOptions(departmanList));
       setBolumOptions(sortIdOptions(bolumList));
@@ -691,6 +795,86 @@ export function YonetimPaneliPage() {
     setYeniDepartmanAdi("");
     setIsDepartmanCreateOpen(false);
     setIsSubeFormOpen(true);
+  }
+
+  function resetSirketEditor() {
+    setEditingSirketId(null);
+    setSirketForm(INITIAL_SIRKET_FORM);
+    setIsSirketFormOpen(false);
+    setFormErrorMessage(null);
+    setIsSirketDeleteDialogOpen(false);
+    setSirketDeleteDialogError(null);
+  }
+
+  function openYeniSirketForm() {
+    setSuccessMessage(null);
+    setErrorMessage(null);
+    setFormErrorMessage(null);
+    setEditingSirketId(null);
+    setSirketForm(INITIAL_SIRKET_FORM);
+    setIsSirketFormOpen(true);
+  }
+
+  function openSirketEditor(item: YonetimSirket) {
+    setSuccessMessage(null);
+    setErrorMessage(null);
+    setFormErrorMessage(null);
+    setEditingSirketId(item.id);
+    setSirketForm(sirketFormFromItem(item));
+    setIsSirketFormOpen(true);
+  }
+
+  async function handleSirketSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (isSubmitting) {
+      return;
+    }
+
+    setIsSubmitting(true);
+    setFormErrorMessage(null);
+    setSuccessMessage(null);
+
+    try {
+      const payload = toSirketPayload(sirketForm, editingSirketId != null);
+      if (editingSirketId != null) {
+        await updateYonetimSirket(editingSirketId, payload);
+        setSuccessMessage("Şirket tanımı güncellendi.");
+      } else {
+        await createYonetimSirket(payload);
+        setSuccessMessage("Şirket tanımı eklendi.");
+      }
+
+      resetSirketEditor();
+      await loadPanel();
+    } catch (error) {
+      setFormErrorMessage(error instanceof Error ? error.message : "Şirket tanımı kaydedilemedi.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function confirmSirketDelete() {
+    if (editingSirketId == null || isSubmitting || !canManageYonetimPanel) {
+      return;
+    }
+
+    setIsSubmitting(true);
+    setSirketDeleteDialogError(null);
+    setSuccessMessage(null);
+
+    try {
+      await deleteYonetimSirket(editingSirketId);
+      if (selectedSirketId === editingSirketId) {
+        closeSirketDetay();
+      }
+      resetSirketEditor();
+      setSuccessMessage("Şirket tanımı silindi.");
+      await loadPanel();
+    } catch (error) {
+      setSirketDeleteDialogError(error instanceof Error ? error.message : "Şirket silinemedi.");
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   function openSubeEditor(item: YonetimSube) {
@@ -828,11 +1012,21 @@ export function YonetimPaneliPage() {
 
     try {
       const payload = toSubePayload(subeForm);
+      // In hierarchy mode the parent company comes from the route/state, never
+      // from a form field, so the nested endpoints own the write.
       if (editingSubeId != null) {
-        await updateYonetimSube(editingSubeId, payload);
+        if (selectedSirketId != null) {
+          await updateSirketSube(selectedSirketId, editingSubeId, payload);
+        } else {
+          await updateYonetimSube(editingSubeId, payload);
+        }
         setSuccessMessage("Şube tanımı güncellendi.");
       } else {
-        await createYonetimSube(payload);
+        if (selectedSirketId != null) {
+          await createSirketSube(selectedSirketId, payload);
+        } else {
+          await createYonetimSube(payload);
+        }
         setSuccessMessage("Şube tanımı eklendi.");
       }
 
@@ -873,7 +1067,11 @@ export function YonetimPaneliPage() {
     setSuccessMessage(null);
 
     try {
-      await deleteYonetimSube(editingSubeId);
+      if (selectedSirketId != null) {
+        await deleteSirketSube(selectedSirketId, editingSubeId);
+      } else {
+        await deleteYonetimSube(editingSubeId);
+      }
       setIsSubeDeleteDialogOpen(false);
       resetSubeEditor();
       setSuccessMessage("Şube tanımı silindi.");
@@ -1089,31 +1287,106 @@ export function YonetimPaneliPage() {
       ) : null}
 
       {!isLoading && !errorMessage && activeTab === "subeler" ? (
-        <section className="yonetim-list-surface" aria-label="Şube yönetimi" data-testid="yonetim-section-subeler">
+        <section
+          className="yonetim-list-surface"
+          aria-label="Şirket ve şube yönetimi"
+          data-testid="yonetim-section-subeler"
+          data-mode={hierarchyMode ? (selectedSirketId != null ? "sirket-detay" : "sirketler") : "legacy"}
+        >
           <div className="yonetim-list-header">
             <div className="yonetim-list-actions">
               <YonetimViewToggle label="Şubeler görünümü" value={subeViewMode} onChange={setSubeViewMode} />
             </div>
           </div>
 
+          {!hierarchyMode && readiness?.schema_ready ? (
+            <p className="yonetim-hint" data-testid="yonetim-organizasyon-readiness-note">
+              Şirket hiyerarşisi şeması hazır, mevcut şubeler henüz şirketlere eşlenmedi. Eşleme
+              tamamlanana kadar şube yönetimi mevcut düz listeyle sürüyor.
+            </p>
+          ) : null}
+
+          {hierarchyMode && selectedSirketId != null ? (
+            <nav className="yonetim-breadcrumb" aria-label="Şirket kırılımı" data-testid="yonetim-sirket-breadcrumb">
+              <button type="button" className="yonetim-create-link" onClick={closeSirketDetay}>
+                Şirketler
+              </button>
+              <span aria-hidden> › </span>
+              <span>{selectedSirket?.ad ?? `Şirket ${selectedSirketId}`}</span>
+            </nav>
+          ) : null}
+
           <div className="yonetim-create-row">
-            <button
-              type="button"
-              className="yonetim-create-link"
-              data-testid="yonetim-sube-yeni"
-              onClick={openYeniSubeForm}
-            >
-              + Yeni Şube
-            </button>
+            {hierarchyMode && selectedSirketId == null ? (
+              <button
+                type="button"
+                className="yonetim-create-link"
+                data-testid="yonetim-sirket-yeni"
+                onClick={openYeniSirketForm}
+              >
+                + Yeni Şirket
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="yonetim-create-link"
+                data-testid="yonetim-sube-yeni"
+                onClick={openYeniSubeForm}
+              >
+                + Yeni Şube
+              </button>
+            )}
           </div>
 
-          {subeler.length === 0 ? (
+          {hierarchyMode && selectedSirketId == null ? (
+            sirketler.length === 0 ? (
+              <EmptyState title="Şirket tanımı yok" message="İlk şirket kaydını buradan oluşturabilirsin." />
+            ) : (
+              <div className="yonetim-card-grid yonetim-card-grid--branches">
+                {sirketler.map((item) => (
+                  <article
+                    key={item.id}
+                    className="yonetim-entity-card yonetim-entity-card--branch-preview yonetim-entity-card--interactive"
+                    role="button"
+                    tabIndex={0}
+                    data-testid={`yonetim-sirket-card-${item.id}`}
+                    onClick={() => openSirketDetay(item.id)}
+                    onKeyDown={(event) => {
+                      if (isActivationKey(event)) {
+                        event.preventDefault();
+                        openSirketDetay(item.id);
+                      }
+                    }}
+                  >
+                    <div className="yonetim-card-meta">
+                      <strong>{item.ad}</strong>
+                      <span>{item.kod}</span>
+                    </div>
+                    <p>{item.sube_sayisi} şube</p>
+                    <p>Durum: {DURUM_LABELS[item.durum]}</p>
+                    <button
+                      type="button"
+                      className="yonetim-create-link"
+                      data-testid={`yonetim-sirket-duzenle-${item.id}`}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        openSirketEditor(item);
+                      }}
+                    >
+                      Düzenle
+                    </button>
+                  </article>
+                ))}
+              </div>
+            )
+          ) : visibleSubeler.length === 0 ? (
             <EmptyState title="Şube tanımı yok" message="İlk şube kaydını buradan oluşturmaya başlayabilirsin." />
           ) : subeViewMode === "card" ? (
             <div className="yonetim-card-grid yonetim-card-grid--branches">
-              {subeler.map((item) => (
+              {visibleSubeler.map((item) => (
                 <article
                   key={item.id}
+                  data-testid={`yonetim-sube-card-${item.id}`}
                   className="yonetim-entity-card yonetim-entity-card--branch-preview yonetim-entity-card--interactive"
                   role="button"
                   tabIndex={0}
@@ -1126,7 +1399,7 @@ export function YonetimPaneliPage() {
                   }}
                 >
                   <div className="yonetim-card-meta">
-                    <strong>{item.ad}</strong>
+                    <strong>{subeListLabel(item)}</strong>
                     <span>{item.kod}</span>
                   </div>
                   <p>{item.departman_adlari.length}</p>
@@ -1148,7 +1421,7 @@ export function YonetimPaneliPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {subeler.map((item) => (
+                  {visibleSubeler.map((item) => (
                     <tr
                       key={item.id}
                       className="yonetim-list-table-row"
@@ -1162,7 +1435,7 @@ export function YonetimPaneliPage() {
                         }
                       }}
                     >
-                      <td className="yonetim-list-table-cell-strong">{item.ad}</td>
+                      <td className="yonetim-list-table-cell-strong">{subeListLabel(item)}</td>
                       <td>{item.kod}</td>
                       <td>{item.departman_adlari.length}</td>
                       <td title={item.departman_adlari.join(", ") || "Departman tanımlı değil"}>
@@ -1419,6 +1692,11 @@ export function YonetimPaneliPage() {
           onClose={resetSubeEditor}
         >
           <form className="yonetim-form-stack yonetim-form-stack--sube" id={YONETIM_SUBE_FORM_ID} onSubmit={handleSubeSubmit}>
+            <p className="yonetim-hint" data-testid="yonetim-sube-form-sirket-hint">
+              {selectedSirket
+                ? `${selectedSirket.ad} şirketi altında kısa şube adı girin; şirket adını tekrar yazmayın.`
+                : "Yalnızca kısa şube adı girin."}
+            </p>
             <div className="form-field-grid">
               <FormField
                 label="Şube Kodu"
@@ -1426,13 +1704,15 @@ export function YonetimPaneliPage() {
                 value={subeForm.kod}
                 onChange={(value) => setSubeForm((prev) => ({ ...prev, kod: value }))}
                 required
+                disabled={editingSubeId != null}
               />
               <FormField
-                label="Şube Adı"
+                label="Şube kısa adı"
                 name="yonetim-sube-ad"
                 value={subeForm.ad}
                 onChange={(value) => setSubeForm((prev) => ({ ...prev, ad: value }))}
                 required
+                placeholder="Ankara"
               />
               <div className="yonetim-durum-row">
                 <span className="yonetim-durum-label">Durum</span>
@@ -1554,6 +1834,110 @@ export function YonetimPaneliPage() {
             ) : null}
           </form>
         </AppModal>
+      ) : null}
+
+      {isSirketFormOpen ? (
+        <AppModal
+          title={editingSirketId != null ? "Şirket Düzenle" : "Yeni Şirket"}
+          backLabel="Şirket ve Şube Yönetimi"
+          onBack={resetSirketEditor}
+          onClose={resetSirketEditor}
+        >
+          <form className="yonetim-form-stack" id={YONETIM_SIRKET_FORM_ID} onSubmit={handleSirketSubmit}>
+            <div className="form-field-grid">
+              <FormField
+                label="Şirket Kodu"
+                name="yonetim-sirket-kod"
+                value={sirketForm.kod}
+                onChange={(value) => setSirketForm((prev) => ({ ...prev, kod: value }))}
+                required
+                disabled={editingSirketId != null}
+              />
+              <FormField
+                label="Şirket Adı"
+                name="yonetim-sirket-ad"
+                value={sirketForm.ad}
+                onChange={(value) => setSirketForm((prev) => ({ ...prev, ad: value }))}
+                required
+                placeholder="Medisa"
+              />
+              <div className="yonetim-durum-row">
+                <span className="yonetim-durum-label">Durum</span>
+                <div className="yonetim-durum-toggle" role="group" aria-label="Durum">
+                  <button
+                    type="button"
+                    className={`yonetim-durum-btn${sirketForm.durum === "AKTIF" ? " is-active" : ""}`}
+                    aria-pressed={sirketForm.durum === "AKTIF"}
+                    onClick={() => setSirketForm((prev) => ({ ...prev, durum: "AKTIF" }))}
+                  >
+                    {DURUM_LABELS.AKTIF}
+                  </button>
+                  <button
+                    type="button"
+                    className={`yonetim-durum-btn${sirketForm.durum === "PASIF" ? " is-active" : ""}`}
+                    aria-pressed={sirketForm.durum === "PASIF"}
+                    onClick={() => setSirketForm((prev) => ({ ...prev, durum: "PASIF" }))}
+                  >
+                    {DURUM_LABELS.PASIF}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {formErrorMessage ? (
+              <p className="yonetim-inline-error" role="alert" data-testid="yonetim-sirket-form-error">
+                {formErrorMessage}
+              </p>
+            ) : null}
+
+            <div className="form-actions-row">
+              <button type="submit" className="universal-btn-save" data-testid="yonetim-sirket-kaydet">
+                {editingSirketId != null ? "Şirketi Güncelle" : "Şirketi Kaydet"}
+              </button>
+              <button type="button" className="universal-btn-cancel" onClick={resetSirketEditor}>
+                Vazgeç
+              </button>
+            </div>
+
+            {editingSirketId != null && canManageYonetimPanel ? (
+              <div className="form-actions-row">
+                <button
+                  type="button"
+                  className="universal-btn-cancel"
+                  data-testid="yonetim-sirket-sil"
+                  onClick={() => {
+                    setSirketDeleteDialogError(null);
+                    setIsSirketDeleteDialogOpen(true);
+                  }}
+                  disabled={isSubmitting}
+                >
+                  Şirketi Sil
+                </button>
+              </div>
+            ) : null}
+          </form>
+        </AppModal>
+      ) : null}
+
+      {isSirketDeleteDialogOpen ? (
+        <AppActionDialog
+          open
+          testId="yonetim-sirket-delete-dialog"
+          title="Şirketi Sil"
+          description="Bu şirketi silmek istediğinize emin misiniz?"
+          confirmLabel="Şirketi Sil"
+          submitLabel="Siliniyor..."
+          destructive
+          isSubmitting={isSubmitting}
+          errorMessage={sirketDeleteDialogError}
+          onConfirm={confirmSirketDelete}
+          onCancel={() => {
+            if (!isSubmitting) {
+              setIsSirketDeleteDialogOpen(false);
+              setSirketDeleteDialogError(null);
+            }
+          }}
+        />
       ) : null}
 
       {isSubeDeleteDialogOpen ? (

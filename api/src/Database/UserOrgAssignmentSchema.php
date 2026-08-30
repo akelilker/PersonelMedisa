@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Medisa\Api\Database;
 
+use Medisa\Api\Services\Organizasyon\OrganizasyonSchema;
 use PDO;
 
 /**
- * Readiness for user↔bolum / user↔birim assignment tables (071).
+ * Readiness and loaders for the user↔org assignment tables:
+ * user_bolumler / user_birimler (071) and user_sirketler / user_sgk_isverenler (079).
  */
 class UserOrgAssignmentSchema
 {
@@ -16,6 +18,9 @@ class UserOrgAssignmentSchema
 
     /** @var bool|null */
     private static $subeYoneticisiEnumReady = null;
+
+    /** @var bool|null */
+    private static $hierarchyScopeReady = null;
 
     public static function isReady(PDO $pdo)
     {
@@ -145,10 +150,136 @@ class UserOrgAssignmentSchema
         return $map;
     }
 
+    /** user_sirketler / user_sgk_isverenler scope tables (079). */
+    public static function isHierarchyScopeReady(PDO $pdo)
+    {
+        if (self::$hierarchyScopeReady !== null) {
+            return self::$hierarchyScopeReady;
+        }
+
+        self::$hierarchyScopeReady = OrganizasyonSchema::isSchemaReady($pdo);
+
+        return self::$hierarchyScopeReady;
+    }
+
+    /** @return array<int, int> */
+    public static function loadUserSirketIds(PDO $pdo, $userId)
+    {
+        return self::loadHierarchyScopeIds($pdo, $userId, 'user_sirketler', 'sirket_id');
+    }
+
+    /** @return array<int, int> */
+    public static function loadUserSgkIsverenIds(PDO $pdo, $userId)
+    {
+        return self::loadHierarchyScopeIds($pdo, $userId, 'user_sgk_isverenler', 'sgk_isveren_id');
+    }
+
+    /**
+     * Branches currently owned by the given companies.
+     *
+     * Resolved live on every request on purpose: this is what makes a company
+     * scope dynamic. Materialising it into user_subeler would freeze the grant
+     * at assignment time, so a branch created later would stay invisible until
+     * somebody remembered to re-copy the ids.
+     *
+     * @param array<int, int> $sirketIds
+     * @return array<int, int>
+     */
+    public static function resolveSubeIdsForSirketIds(PDO $pdo, array $sirketIds)
+    {
+        $sirketIds = self::normalizeIds($sirketIds);
+        if (count($sirketIds) === 0 || !self::isHierarchyScopeReady($pdo)) {
+            return [];
+        }
+
+        $placeholders = implode(', ', array_fill(0, count($sirketIds), '?'));
+        $stmt = $pdo->prepare(
+            "SELECT id FROM subeler WHERE sirket_id IN ($placeholders) ORDER BY id ASC"
+        );
+        $stmt->execute($sirketIds);
+        $ids = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $ids[] = (int) $row['id'];
+        }
+
+        return $ids;
+    }
+
+    /** @param array<int, int> $sirketIds */
+    public static function replaceUserSirketler(PDO $pdo, $userId, array $sirketIds)
+    {
+        self::replaceHierarchyScope($pdo, $userId, 'user_sirketler', 'sirket_id', $sirketIds);
+    }
+
+    /** @param array<int, int> $sgkIsverenIds */
+    public static function replaceUserSgkIsverenler(PDO $pdo, $userId, array $sgkIsverenIds)
+    {
+        self::replaceHierarchyScope($pdo, $userId, 'user_sgk_isverenler', 'sgk_isveren_id', $sgkIsverenIds);
+    }
+
+    /** @return array<int, int> */
+    private static function loadHierarchyScopeIds(PDO $pdo, $userId, $table, $column)
+    {
+        $userId = (int) $userId;
+        if ($userId <= 0 || !self::isHierarchyScopeReady($pdo)) {
+            return [];
+        }
+
+        $stmt = $pdo->prepare("SELECT {$column} AS link_id FROM {$table} WHERE user_id = :user_id ORDER BY {$column} ASC");
+        $stmt->execute(['user_id' => $userId]);
+        $ids = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $ids[] = (int) $row['link_id'];
+        }
+
+        return $ids;
+    }
+
+    /** @param array<int, int> $ids */
+    private static function replaceHierarchyScope(PDO $pdo, $userId, $table, $column, array $ids)
+    {
+        $userId = (int) $userId;
+        if ($userId <= 0 || !self::isHierarchyScopeReady($pdo)) {
+            return;
+        }
+
+        $delete = $pdo->prepare("DELETE FROM {$table} WHERE user_id = :user_id");
+        $delete->execute(['user_id' => $userId]);
+
+        $ids = self::normalizeIds($ids);
+        if (count($ids) === 0) {
+            return;
+        }
+
+        $insert = $pdo->prepare("INSERT INTO {$table} (user_id, {$column}) VALUES (:user_id, :link_id)");
+        foreach ($ids as $id) {
+            $insert->execute(['user_id' => $userId, 'link_id' => $id]);
+        }
+    }
+
+    /**
+     * @param array<int, mixed> $ids
+     * @return array<int, int>
+     */
+    private static function normalizeIds(array $ids)
+    {
+        $normalized = [];
+        foreach ($ids as $id) {
+            $value = (int) $id;
+            if ($value > 0) {
+                $normalized[] = $value;
+            }
+        }
+
+        return array_values(array_unique($normalized));
+    }
+
     /** Test helper — clear process cache. */
     public static function resetCache()
     {
         self::$ready = null;
         self::$subeYoneticisiEnumReady = null;
+        self::$hierarchyScopeReady = null;
+        OrganizasyonSchema::resetCache();
     }
 }

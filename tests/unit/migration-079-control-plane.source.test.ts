@@ -1,51 +1,97 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const read = (relativePath: string) => readFileSync(resolve(process.cwd(), relativePath), 'utf8');
 
-const migration = read('api/migrations/079_aylik_kapanis_sube_scope_and_actor.sql');
+const MIGRATION_NAME = '079_sirket_sube_hiyerarsisi.sql';
+const WITHDRAWN_NAME = '079_aylik_kapanis_sube_scope_and_actor.sql';
+
+const migration = read(`api/migrations/${MIGRATION_NAME}`);
 const worker = read('api/bin/cpanel-migration-cron.php');
 const preflightOwner = read('api/src/Database/MigrationPreflightReport.php');
 const backupOwner = read('api/src/Database/MigrationBackupService.php');
 const diagnostics = read('.github/workflows/ops-migration-worker-diagnostics.yml');
 const apply = read('.github/workflows/apply-cpanel-migrations.yml');
 
-describe('migration 079 key transition order', () => {
-  it('creates and asserts the composite unique key before dropping the legacy one', () => {
-    const addComposite = migration.indexOf('ADD UNIQUE KEY uq_aylik_kapanis_state_ay_sube (ay, sube_id)');
-    const assertComposite = migration.indexOf('composite closing state key missing before legacy drop');
-    const dropLegacy = migration.indexOf('DROP INDEX uq_aylik_kapanis_state_ay');
+describe('migration 079 slot', () => {
+  it('holds exactly one 079 and no trace of the withdrawn monthly-close migration', () => {
+    const migrations = readdirSync(resolve(process.cwd(), 'api/migrations')).filter((name) =>
+      name.endsWith('.sql'),
+    );
+    const slot079 = migrations.filter((name) => name.startsWith('079'));
 
-    expect(addComposite).toBeGreaterThan(0);
-    expect(assertComposite).toBeGreaterThan(addComposite);
-    expect(dropLegacy).toBeGreaterThan(assertComposite);
+    expect(slot079).toEqual([MIGRATION_NAME]);
+    expect(migrations).not.toContain(WITHDRAWN_NAME);
   });
 
-  it('requires the composite key to be really unique on really both columns', () => {
-    expect(migration).toContain("INDEX_NAME = 'uq_aylik_kapanis_state_ay_sube'\n    AND NON_UNIQUE = 0");
-    expect(migration).toContain("AND COLUMN_NAME IN ('ay', 'sube_id')");
-    expect(migration).toContain('@p079_composite_cols <> 2');
-    expect(migration).toContain('@p079_cols <> 7 OR @p079_uq <> 2 OR @p079_legacy_uq <> 0');
+  it('creates the company root and the four hierarchy relations additively', () => {
+    expect(migration).toContain('CREATE TABLE IF NOT EXISTS sirketler');
+    expect(migration).toContain('UNIQUE KEY uq_sirketler_kod (kod)');
+    expect(migration).toContain('UNIQUE KEY uq_sirketler_ad (ad)');
+    expect(migration).toContain('ALTER TABLE subeler ADD COLUMN sirket_id INT UNSIGNED NULL');
+    expect(migration).toContain('ALTER TABLE sgk_isverenler ADD COLUMN sirket_id INT UNSIGNED NULL');
+    expect(migration).toContain('ALTER TABLE calisma_lokasyonlari ADD COLUMN sube_id INT UNSIGNED NULL');
+    expect(migration).toContain('CREATE TABLE IF NOT EXISTS user_sirketler');
+    expect(migration).toContain('CREATE TABLE IF NOT EXISTS user_sgk_isverenler');
   });
 
-  it('stays additive and never writes a closing, approval or personel row', () => {
-    expect(migration).toContain('sube_id INT UNSIGNED NOT NULL DEFAULT 0');
-    for (const column of [
-      'bolum_onay_actor_user_id INT UNSIGNED NULL',
-      'bolum_onay_actor_identity_id INT UNSIGNED NULL',
-      'bolum_onay_at DATETIME(3) NULL',
-      'kapanis_actor_user_id INT UNSIGNED NULL',
-      'kapanis_actor_identity_id INT UNSIGNED NULL',
-      'kapanis_at DATETIME(3) NULL',
+  it('keeps every organisation reference RESTRICT and only cascades the user link', () => {
+    for (const fk of [
+      'fk_subeler_sirket FOREIGN KEY (sirket_id) REFERENCES sirketler (id) ON DELETE RESTRICT',
+      'fk_sgk_isverenler_sirket FOREIGN KEY (sirket_id) REFERENCES sirketler (id) ON DELETE RESTRICT',
+      'fk_calisma_lokasyonlari_sube FOREIGN KEY (sube_id) REFERENCES subeler (id) ON DELETE RESTRICT',
+      'fk_user_sirketler_sirket FOREIGN KEY (sirket_id) REFERENCES sirketler (id) ON DELETE RESTRICT',
+      'fk_user_sgk_isverenler_sgk FOREIGN KEY (sgk_isveren_id) REFERENCES sgk_isverenler (id) ON DELETE RESTRICT',
     ]) {
-      expect(migration).toContain(column);
+      expect(migration).toContain(fk);
     }
+    expect(migration).toContain(
+      'fk_user_sirketler_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE',
+    );
+    expect(migration).toContain(
+      'fk_user_sgk_isverenler_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE',
+    );
+  });
+
+  it('scopes user grants by composite primary key so an assignment cannot duplicate', () => {
+    expect(migration).toContain('PRIMARY KEY (user_id, sirket_id)');
+    expect(migration).toContain('PRIMARY KEY (user_id, sgk_isveren_id)');
+  });
+
+  it('writes no data at all: no seed, no mapping, no backfill, no rename', () => {
     expect(migration).not.toMatch(/\bINSERT\s+INTO\b/i);
-    expect(migration).not.toMatch(/\bUPDATE\s+aylik_/i);
+    expect(migration).not.toMatch(/\bUPDATE\s+\w+\s+SET\b/i);
     expect(migration).not.toMatch(/\bDELETE\s+FROM\b/i);
     expect(migration).not.toMatch(/\bTRUNCATE\b/i);
     expect(migration).not.toMatch(/\bDROP\s+TABLE\b/i);
+    expect(migration).not.toMatch(/\bDROP\s+INDEX\b/i);
+    expect(migration).not.toMatch(/\bRENAME\s+(?:TABLE|COLUMN)\b/i);
+  });
+
+  it('leaves the monthly-closing owners and personeller.sirket_id untouched', () => {
+    expect(migration).not.toContain('aylik_kapanis_state');
+    expect(migration).not.toContain('aylik_ozet_satirlari');
+    expect(migration).not.toMatch(/ALTER TABLE personeller/i);
+    // `tam_ad` stays a derived read-model value; it must never become a column.
+    expect(migration).not.toMatch(/(?:ADD\s+COLUMN\s+|^\s*)tam_ad\b/im);
+  });
+
+  it('defers the branch-name hardening that needs mapped production rows', () => {
+    expect(migration).not.toContain('uq_subeler_sirket_ad');
+    expect(migration).not.toMatch(/ADD UNIQUE KEY[^\n]*subeler/i);
+  });
+
+  it('fails closed on incompatible drift instead of reporting success', () => {
+    for (const blocker of [
+      'PACK079_BLOCKER: organisation owner tables missing',
+      'PACK079_BLOCKER: incompatible hierarchy column already present',
+      'PACK079_BLOCKER: hierarchy foreign key points at the wrong parent',
+      'PACK079_BLOCKER: incompatible sirketler table already present',
+      'PACK079_BLOCKER: sirket-sube hierarchy readback failed',
+    ]) {
+      expect(migration).toContain(blocker);
+    }
   });
 
   it('keeps every step guarded by information_schema so a rerun resumes', () => {
@@ -98,9 +144,30 @@ describe('migration worker control-plane stages', () => {
 
 describe('read-only preflight owner', () => {
   it('only reads: no write statement reaches the production database', () => {
-    expect(preflightOwner).not.toMatch(/\b(INSERT INTO|UPDATE |DELETE FROM|ALTER TABLE|DROP |TRUNCATE|CREATE TABLE)\b/);
+    expect(preflightOwner).not.toMatch(
+      /\b(INSERT INTO|UPDATE |DELETE FROM|ALTER TABLE|DROP |TRUNCATE|CREATE TABLE)\b/,
+    );
     expect(preflightOwner).toContain('information_schema.COLUMNS');
     expect(preflightOwner).toContain('information_schema.STATISTICS');
+  });
+
+  it('expects the hierarchy migration and rejects the withdrawn one', () => {
+    expect(preflightOwner).toContain(`EXPECTED_PENDING_NAME = '${MIGRATION_NAME}'`);
+    expect(preflightOwner).toContain(`WITHDRAWN_MIGRATION_NAME = '${WITHDRAWN_NAME}'`);
+    expect(preflightOwner).toContain('WITHDRAWN_079_PRESENT_IN_SOURCE');
+    expect(preflightOwner).toContain('WITHDRAWN_079_STRUCTURE_PRESENT');
+  });
+
+  it('drops the monthly-close specific guards it no longer owns', () => {
+    for (const retired of [
+      'ozet_sube_null_rows',
+      'ozet_duplicate_ay_sube_personel',
+      'STATE_DUPLICATE_AY_BLOCKS_COMPOSITE_KEY',
+      'PREIMAGE_ACTOR_COLUMNS_ALREADY_PRESENT',
+      'PREIMAGE_LEGACY_UNIQUE_MISSING',
+    ]) {
+      expect(preflightOwner).not.toContain(retired);
+    }
   });
 
   it('reports aggregates and never selects a personal column', () => {
@@ -108,11 +175,8 @@ describe('read-only preflight owner', () => {
     expect(preflightOwner).not.toContain('sicil_no');
     expect(preflightOwner).not.toMatch(/SELECT \*/);
     for (const guard of [
-      'ozet_sube_null_rows',
-      'ozet_sube_orphan_rows',
-      'ozet_duplicate_ay_sube_personel',
-      'state_duplicate_ay',
-      'state_rows_expected_after_079',
+      'sube_rows_expected_after_079',
+      'user_sube_assignment_rows_expected_after_079',
     ]) {
       expect(preflightOwner).toContain(guard);
     }
@@ -129,9 +193,8 @@ describe('read-only preflight owner', () => {
       'PENDING_NOT_ONLY_079',
       'MIGRATION_CHECKSUM_MISMATCH',
       'MIGRATION_LEDGER_GAP',
-      'PREIMAGE_ACTOR_COLUMNS_ALREADY_PRESENT',
-      'PREIMAGE_LEGACY_UNIQUE_MISSING',
-      'STATE_DUPLICATE_AY_BLOCKS_COMPOSITE_KEY',
+      'PREIMAGE_OWNER_TABLE_MISSING',
+      'PREIMAGE_RELATION_COLUMN_INCOMPATIBLE',
     ]) {
       expect(preflightOwner).toContain(reason);
     }
@@ -139,10 +202,17 @@ describe('read-only preflight owner', () => {
 });
 
 describe('backup owner', () => {
-  it('backs up exactly the rollback scope', () => {
-    expect(backupOwner).toContain("'aylik_kapanis_state'");
-    expect(backupOwner).toContain("'aylik_ozet_satirlari'");
-    expect(backupOwner).toContain("'medisa_schema_migrations'");
+  it('backs up exactly the rollback scope of the hierarchy migration', () => {
+    for (const table of [
+      "'subeler'",
+      "'sgk_isverenler'",
+      "'calisma_lokasyonlari'",
+      "'user_subeler'",
+      "'medisa_schema_migrations'",
+    ]) {
+      expect(backupOwner).toContain(table);
+    }
+    expect(backupOwner).not.toContain("'aylik_ozet_satirlari'");
   });
 
   it('refuses any webroot-reachable or unresolvable location', () => {
@@ -211,9 +281,10 @@ describe('control-plane workflow gates', () => {
       'APPLIED_MIGRATION_MODIFIED',
       'MIGRATION_LEDGER_GAP',
       'PREFLIGHT_BLOCKERS_PRESENT',
-      'DATA_GUARD_ORPHAN_SUBE_ROWS',
-      'DATA_GUARD_DUPLICATE_ROWS',
-      'DATA_GUARD_DUPLICATE_STATE_MONTHS',
+      'WITHDRAWN_079_STILL_IN_SOURCE',
+      'WITHDRAWN_079_PENDING',
+      'DATA_GUARD_SUBE_ROW_DELTA',
+      'DATA_GUARD_ASSIGNMENT_ROW_DELTA',
     ]) {
       expect(apply).toContain(reason);
     }
@@ -224,7 +295,7 @@ describe('control-plane workflow gates', () => {
     const uploadIndex = apply.indexOf('Upload one atomic migration request');
     expect(gateIndex).toBeGreaterThan(0);
     expect(uploadIndex).toBeGreaterThan(gateIndex);
-    expect(apply).toContain('EXPECTED_PENDING: "079_aylik_kapanis_sube_scope_and_actor.sql"');
+    expect(apply).toContain(`EXPECTED_PENDING: "${MIGRATION_NAME}"`);
     expect(apply).toContain('EXPECTED_PROD_TIP: "078"');
   });
 

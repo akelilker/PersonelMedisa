@@ -31,6 +31,7 @@ import {
   SUBE_DELETE_BLOCKED_ERROR_CODE,
   SUBE_DELETE_BLOCKED_MESSAGE
 } from "../lib/yonetim/sube-delete";
+import { deriveSubeTamAd, normalizeOrgName } from "../lib/organizasyon/sube-display-name";
 import { assertRevizyonTransition } from "../lib/revizyon-talebi/revizyon-state";
 import {
   canApproveOrRejectRevizyon,
@@ -363,8 +364,17 @@ type DemoYonetimKullanici = {
 type DemoSube = {
   id: number;
   kod: string;
+  /** Short branch name; the demo backend derives `tam_ad` from it. */
   ad: string;
+  sirket_id: number | null;
   departman_ids: number[];
+  durum: "AKTIF" | "PASIF";
+};
+
+type DemoSirket = {
+  id: number;
+  kod: string;
+  ad: string;
   durum: "AKTIF" | "PASIF";
 };
 
@@ -453,6 +463,7 @@ const demoState: {
   departmanlar: DemoDepartman[];
   gorevler: Array<{ id: number; ad: string }>;
   subeler: DemoSube[];
+  sirketler: DemoSirket[];
   aylikDurumMap: Record<string, DemoAylikDurum>;
   belgeDurumByPersonelId: Record<
     number,
@@ -890,11 +901,18 @@ const demoState: {
   ],
   departmanlar: [...DEMO_DEPARTMANLAR],
   gorevler: [...DEMO_GOREVLER],
+  // Demo-only hierarchy fixture. This is test data for the mock backend and has
+  // no relation to the production mapping, which is a separate approved gate.
+  sirketler: [
+    { id: 1, kod: "DEMO-A", ad: "Demo Holding", durum: "AKTIF" },
+    { id: 2, kod: "DEMO-B", ad: "Demo Lojistik", durum: "AKTIF" }
+  ],
   subeler: [
     {
       id: 1,
       kod: "MRK",
       ad: "Merkez",
+      sirket_id: 1,
       departman_ids: [1, 3],
       durum: "AKTIF"
     },
@@ -902,6 +920,7 @@ const demoState: {
       id: 2,
       kod: "DPL",
       ad: "Depolama",
+      sirket_id: 2,
       departman_ids: [6],
       durum: "AKTIF"
     }
@@ -2236,7 +2255,7 @@ function enrichDemoBildirim(item: DemoBildirim): DemoBildirim {
       personel.departman_id != null
         ? demoState.departmanlar.find((d) => d.id === personel.departman_id)?.ad ?? null
         : null,
-    sube_adi: demoState.subeler.find((s) => s.id === personel.sube_id)?.ad ?? null,
+    sube_adi: demoSubeGosterimAdi(personel.sube_id) ?? null,
     amir_user_id: personel.bagli_amir_id ?? null
   };
 }
@@ -4077,6 +4096,72 @@ function getSubeLabel(id: number | undefined) {
   return demoState.subeler.find((item) => item.id === id)?.ad;
 }
 
+function mapDemoSubeRow(item: DemoSube) {
+  const sirket = demoState.sirketler.find((row) => row.id === item.sirket_id) ?? null;
+
+  return {
+    id: item.id,
+    kod: item.kod,
+    ad: item.ad,
+    tam_ad: deriveSubeTamAd(sirket?.ad ?? null, item.ad),
+    sirket: sirket ? { id: sirket.id, kod: sirket.kod, ad: sirket.ad } : null,
+    sgk_isveren: null,
+    departman_ids: item.departman_ids,
+    departman_adlari: item.departman_ids
+      .map((departmanId) => getDepartmanLabel(departmanId))
+      .filter((label): label is string => typeof label === "string"),
+    durum: item.durum
+  };
+}
+
+function demoSubeGosterimAdi(subeId: number | null | undefined): string | undefined {
+  const sube = demoState.subeler.find((item) => item.id === subeId);
+  return sube ? mapDemoSubeRow(sube).tam_ad : undefined;
+}
+
+function readDemoDepartmanIds(body: Record<string, unknown>): number[] | null {
+  if (!Array.isArray(body.departman_ids)) {
+    return null;
+  }
+
+  return body.departman_ids.map((item) => toNumber(item)).filter((item): item is number => item !== null);
+}
+
+function validateDemoSubeWrite(
+  body: Record<string, unknown>,
+  sirketId: number,
+  currentSubeId: number | null
+) {
+  if (body.tam_ad !== undefined) {
+    return demoRevizyonError("TAM_AD_READ_ONLY", "Tam ad yalnizca okunur bir alandir.");
+  }
+
+  const payloadSirketId = toNumber(body.sirket_id);
+  if (payloadSirketId !== null && payloadSirketId !== sirketId) {
+    return demoRevizyonError("SIRKET_ID_MISMATCH", "Sirket route ile payload uyusmuyor.");
+  }
+
+  const ad = (toStringValue(body.ad) ?? "").trim();
+  if (!ad) {
+    return demoRevizyonError("VALIDATION_ERROR", "Sube kisa adi zorunludur.");
+  }
+
+  // Short names are unique per company only; the same name under another
+  // company is valid and must not be rejected here.
+  const duplicate = demoState.subeler.some(
+    (item) =>
+      item.id !== currentSubeId &&
+      item.sirket_id === sirketId &&
+      normalizeOrgName(item.ad) === normalizeOrgName(ad)
+  );
+  if (duplicate) {
+    const sirketAd = demoState.sirketler.find((item) => item.id === sirketId)?.ad ?? "Sirket";
+    return demoRevizyonError("SUBE_AD_DUPLICATE", `${sirketAd} sirketinde ayni kisa adli sube zaten var.`);
+  }
+
+  return null;
+}
+
 function getDepartmanLabel(id: number | undefined) {
   if (typeof id !== "number") {
     return undefined;
@@ -4472,7 +4557,14 @@ export function resolveDemoApiResponse(
       role === "BIRIM_AMIRI" ? [1] : role === "MUHASEBE" ? [1, 2] : role === "BOLUM_YONETICISI" ? [2] : [];
     const sube_list =
       sube_ids.length > 0
-      ? sube_ids.map((id) => ({ id, ad: id === 1 ? "Merkez" : `Åube ${id}` }))
+      ? sube_ids.map((id) => {
+            const sube = demoState.subeler.find((item) => item.id === id) ?? null;
+            const row = sube ? mapDemoSubeRow(sube) : null;
+            if (row) {
+              return { id, ad: row.tam_ad, kisa_ad: row.ad, tam_ad: row.tam_ad };
+            }
+            return { id, ad: `Åube ${id}`, kisa_ad: `Sube ${id}`, tam_ad: `Sube ${id}` };
+          })
         : undefined;
 
     return ok({
@@ -4483,7 +4575,10 @@ export function resolveDemoApiResponse(
         id: username.length + 1,
         ad_soyad: username,
         rol: role,
-        sube_ids
+        sube_ids,
+        explicit_sube_ids: sube_ids,
+        sirket_ids: [],
+        sgk_isveren_ids: []
       }
     });
   }
@@ -6687,7 +6782,7 @@ export function resolveDemoApiResponse(
     return ok({
       tarih,
       sube_id: subeId,
-      sube_adi: demoState.subeler.find((s) => s.id === subeId)?.ad ?? "",
+      sube_adi: demoSubeGosterimAdi(subeId) ?? "",
       birim_amiri_user_id: amirId,
       birim_amiri_adi: actor.role === "BIRIM_AMIRI" ? "Birim Yöneticisi" : "Demo Amir",
       ozet: {
@@ -8259,15 +8354,178 @@ export function resolveDemoApiResponse(
     });
   }
 
-  if (pathname === "/yonetim/subeler" && method === "GET") {
+  if (pathname === "/yonetim/organizasyon-readiness" && method === "GET") {
+    const unmapped = demoState.subeler.filter((item) => item.sirket_id === null).length;
     return ok({
-      items: demoState.subeler.map((item) => ({
+      schema_ready: true,
+      data_ready: unmapped === 0,
+      counts: {
+        sirket_count: demoState.sirketler.length,
+        sube_count: demoState.subeler.length,
+        unmapped_sube_count: unmapped,
+        unmapped_sgk_isveren_count: 0,
+        orphan_sube_sirket_count: 0,
+        orphan_lokasyon_sube_count: 0,
+        sube_sgk_sirket_mismatch_count: 0
+      },
+      blockers: unmapped > 0 ? ["SUBE_SIRKET_UNMAPPED"] : []
+    });
+  }
+
+  if (pathname === "/yonetim/sirketler" && method === "GET") {
+    return ok({
+      items: demoState.sirketler.map((item) => ({
         ...item,
-        departman_adlari: item.departman_ids
-          .map((departmanId) => getDepartmanLabel(departmanId))
-          .filter((label): label is string => typeof label === "string")
+        sube_sayisi: demoState.subeler.filter((sube) => sube.sirket_id === item.id).length
       }))
     });
+  }
+
+  if (pathname === "/yonetim/sirketler" && method === "POST") {
+    const kod = (toStringValue(body.kod) ?? "").trim().toUpperCase();
+    const ad = (toStringValue(body.ad) ?? "").trim();
+    if (!kod || !ad) {
+      return demoRevizyonError("VALIDATION_ERROR", "Sirket kodu ve adi zorunludur.");
+    }
+    if (demoState.sirketler.some((item) => normalizeOrgName(item.ad) === normalizeOrgName(ad))) {
+      return demoRevizyonError("SIRKET_AD_DUPLICATE", "Bu sirket adi zaten kayitli.");
+    }
+    if (demoState.sirketler.some((item) => item.kod.toUpperCase() === kod)) {
+      return demoRevizyonError("SIRKET_KOD_DUPLICATE", "Bu sirket kodu zaten kayitli.");
+    }
+
+    const next: DemoSirket = {
+      id: Math.max(0, ...demoState.sirketler.map((item) => item.id)) + 1,
+      kod,
+      ad,
+      durum: body.durum === "PASIF" ? "PASIF" : "AKTIF"
+    };
+    demoState.sirketler.push(next);
+    return ok({ ...next, sube_sayisi: 0 });
+  }
+
+  const demoSirketMatch = pathname.match(/^\/yonetim\/sirketler\/(\d+)$/);
+  if (demoSirketMatch && (method === "GET" || method === "PUT" || method === "DELETE")) {
+    const id = Number.parseInt(demoSirketMatch[1], 10);
+    const target = demoState.sirketler.find((item) => item.id === id);
+    if (!target) {
+      return demoRevizyonError("NOT_FOUND", "Sirket bulunamadi.");
+    }
+
+    if (method === "GET") {
+      return ok({
+        ...target,
+        sube_sayisi: demoState.subeler.filter((sube) => sube.sirket_id === id).length
+      });
+    }
+
+    if (method === "PUT") {
+      if (toStringValue(body.kod) != null) {
+        return demoRevizyonError("SIRKET_KOD_IMMUTABLE", "Sirket kodu degistirilemez.");
+      }
+      const ad = (toStringValue(body.ad) ?? "").trim();
+      if (!ad) {
+        return demoRevizyonError("VALIDATION_ERROR", "Sirket adi zorunludur.");
+      }
+      if (
+        demoState.sirketler.some(
+          (item) => item.id !== id && normalizeOrgName(item.ad) === normalizeOrgName(ad)
+        )
+      ) {
+        return demoRevizyonError("SIRKET_AD_DUPLICATE", "Bu sirket adi zaten kayitli.");
+      }
+      target.ad = ad;
+      target.durum = body.durum === "PASIF" ? "PASIF" : "AKTIF";
+      return ok({
+        ...target,
+        sube_sayisi: demoState.subeler.filter((sube) => sube.sirket_id === id).length
+      });
+    }
+
+    if (demoState.subeler.some((sube) => sube.sirket_id === id)) {
+      return demoRevizyonError("SIRKET_HAS_DEPENDENTS", "Sirkete bagli sube oldugu icin silinemez.");
+    }
+    demoState.sirketler.splice(
+      demoState.sirketler.findIndex((item) => item.id === id),
+      1
+    );
+    return ok({ id });
+  }
+
+  const demoSirketSubeListMatch = pathname.match(/^\/yonetim\/sirketler\/(\d+)\/subeler$/);
+  if (demoSirketSubeListMatch && (method === "GET" || method === "POST")) {
+    const sirketId = Number.parseInt(demoSirketSubeListMatch[1], 10);
+    const sirket = demoState.sirketler.find((item) => item.id === sirketId);
+    if (!sirket) {
+      return demoRevizyonError("NOT_FOUND", "Sirket bulunamadi.");
+    }
+
+    if (method === "GET") {
+      return ok({
+        items: demoState.subeler
+          .filter((item) => item.sirket_id === sirketId)
+          .map((item) => mapDemoSubeRow(item))
+      });
+    }
+
+    const validation = validateDemoSubeWrite(body, sirketId, null);
+    if (validation) {
+      return validation;
+    }
+
+    const next: DemoSube = {
+      id: ++demoState.nextIds.sube,
+      kod: (toStringValue(body.kod) ?? `SBE-${demoState.nextIds.sube}`).trim().toUpperCase(),
+      ad: (toStringValue(body.ad) ?? "Yeni Sube").trim(),
+      sirket_id: sirketId,
+      departman_ids: readDemoDepartmanIds(body) ?? [],
+      durum: body.durum === "PASIF" ? "PASIF" : "AKTIF"
+    };
+    demoState.subeler.unshift(next);
+    return ok(mapDemoSubeRow(next));
+  }
+
+  const demoSirketSubeMatch = pathname.match(/^\/yonetim\/sirketler\/(\d+)\/subeler\/(\d+)$/);
+  if (demoSirketSubeMatch) {
+    const sirketId = Number.parseInt(demoSirketSubeMatch[1], 10);
+    const subeId = Number.parseInt(demoSirketSubeMatch[2], 10);
+    const target = demoState.subeler.find((item) => item.id === subeId);
+    if (!target || target.sirket_id !== sirketId) {
+      return demoRevizyonError("NOT_FOUND", "Sube bulunamadi.");
+    }
+
+    if (method === "GET") {
+      return ok(mapDemoSubeRow(target));
+    }
+
+    if (method === "PUT") {
+      if (toStringValue(body.kod) != null) {
+        return demoRevizyonError("SUBE_KOD_IMMUTABLE", "Sube kodu degistirilemez.");
+      }
+      const validation = validateDemoSubeWrite(body, sirketId, subeId);
+      if (validation) {
+        return validation;
+      }
+      target.ad = (toStringValue(body.ad) ?? target.ad).trim();
+      target.departman_ids = readDemoDepartmanIds(body) ?? target.departman_ids;
+      target.durum = body.durum === "PASIF" ? "PASIF" : "AKTIF";
+      return ok(mapDemoSubeRow(target));
+    }
+
+    if (method === "DELETE") {
+      if (demoState.personeller.some((personel) => personel.sube_id === subeId)) {
+        return demoRevizyonError(SUBE_DELETE_BLOCKED_ERROR_CODE, SUBE_DELETE_BLOCKED_MESSAGE);
+      }
+      demoState.subeler.splice(
+        demoState.subeler.findIndex((item) => item.id === subeId),
+        1
+      );
+      return ok({ id: subeId });
+    }
+  }
+
+  if (pathname === "/yonetim/subeler" && method === "GET") {
+    return ok({ items: demoState.subeler.map((item) => mapDemoSubeRow(item)) });
   }
 
   if (pathname === "/yonetim/subeler" && method === "POST") {
@@ -8275,6 +8533,7 @@ export function resolveDemoApiResponse(
       id: ++demoState.nextIds.sube,
       kod: toStringValue(body.kod) ?? `SBE-${demoState.nextIds.sube}`,
       ad: toStringValue(body.ad) ?? "Yeni Sube",
+      sirket_id: null,
       departman_ids: Array.isArray(body.departman_ids)
         ? body.departman_ids
             .map((item) => toNumber(item))
@@ -8283,12 +8542,7 @@ export function resolveDemoApiResponse(
       durum: body.durum === "PASIF" ? "PASIF" : "AKTIF"
     };
     demoState.subeler.unshift(next);
-    return ok({
-      ...next,
-      departman_adlari: next.departman_ids
-        .map((departmanId) => getDepartmanLabel(departmanId))
-        .filter((label): label is string => typeof label === "string")
-    });
+    return ok(mapDemoSubeRow(next));
   }
 
   const yonetimSubeMatch = pathname.match(/^\/yonetim\/subeler\/(\d+)$/);
@@ -8309,12 +8563,7 @@ export function resolveDemoApiResponse(
         : target.departman_ids,
       durum: body.durum === "PASIF" ? "PASIF" : "AKTIF"
     });
-    return ok({
-      ...target,
-      departman_adlari: target.departman_ids
-        .map((departmanId) => getDepartmanLabel(departmanId))
-        .filter((label): label is string => typeof label === "string")
-    });
+    return ok(mapDemoSubeRow(target));
   }
 
   if (yonetimSubeMatch && method === "DELETE") {

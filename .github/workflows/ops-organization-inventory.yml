@@ -1,0 +1,284 @@
+name: Ops organization inventory (read-only)
+
+# Salt-okunur production organizasyon envanteri.
+#
+# Tek mod: READ_ONLY_ORGANIZATION_INVENTORY. Kontrol duzlemine tek bir request
+# birakir; worker production DB'de SADECE SELECT calistirip
+# organization-inventory.json uretir. INSERT/UPDATE/DELETE/DDL, migration apply,
+# backup, ledger yazimi ve mapping bu yolda YOKTUR.
+#
+# Bu workflow'un mapping/apply yetkisi yoktur ve mapping request'i yazamaz.
+#
+# Log sozlesmesi: yalniz sayilar, checksum ve reason code. Satir bazli envanter
+# (sube/SGK/lokasyon kod ve adlari) log'a dokulmez; private repository erisim
+# sinirinda kalan artifact olarak yayinlanir.
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: Type READ_ONLY_ORGANIZATION_INVENTORY to authorize this read
+        required: true
+        type: string
+      deployed_sha:
+        description: Exact deployed commit SHA
+        required: true
+        type: string
+
+concurrency:
+  group: cpanel-canonical-migration-control
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  inventory:
+    name: Read-only organization inventory
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      FTP_SERVER: ${{ secrets.FTP_SERVER }}
+      FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+      FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+      FTP_PORT: ${{ secrets.FTP_PORT }}
+      CONFIRMATION: ${{ inputs.confirmation }}
+      DEPLOYED_SHA: ${{ inputs.deployed_sha }}
+      MODE: READ_ONLY_ORGANIZATION_INVENTORY
+      POLL_ATTEMPTS: "91"
+      POLL_INTERVAL_SECONDS: "10"
+      TOTAL_POLL_WINDOW_SECONDS: "900"
+    steps:
+      - name: Validate explicit request
+        run: |
+          set -euo pipefail
+          test "$CONFIRMATION" = "$MODE" || {
+            echo "INVENTORY_RESULT=BLOCKED"
+            echo "INVENTORY_REASON=CONFIRMATION_MISMATCH"
+            exit 1
+          }
+          [[ "$DEPLOYED_SHA" =~ ^[0-9a-fA-F]{40}$ ]] || {
+            echo "INVENTORY_RESULT=BLOCKED"
+            echo "INVENTORY_REASON=DEPLOYED_SHA_INPUT_INVALID"
+            exit 1
+          }
+          test -n "$FTP_SERVER" || (echo "FTP_SERVER secret is missing." && exit 1)
+          test -n "$FTP_USERNAME" || (echo "FTP_USERNAME secret is missing." && exit 1)
+          test -n "$FTP_PASSWORD" || (echo "FTP_PASSWORD secret is missing." && exit 1)
+          test "$FTP_PORT" = "21" || (echo "FTP_PORT must be 21 for this cPanel FTP deploy." && exit 1)
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install FTP client
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y lftp
+
+      - name: Collect row-level organization inventory
+        run: |
+          set -euo pipefail
+
+          run_ftp_mode() {
+            local mode_name="$1"
+            local use_ftps="$2"
+            local ftp_commands="$3"
+
+            echo "Inventory transport mode: ${mode_name}"
+            lftp -u "${FTP_USERNAME}","${FTP_PASSWORD}" -p "${FTP_PORT}" "ftp://${FTP_SERVER}" -e "
+              set cmd:fail-exit true;
+              set net:max-retries 2;
+              set net:timeout 20;
+              set net:reconnect-interval-base 5;
+              set net:reconnect-interval-max 10;
+              set xfer:clobber true;
+              set ssl:verify-certificate no;
+              set ssl:check-hostname no;
+              set ftp:passive-mode on;
+              set ftp:ssl-allow ${use_ftps};
+              set ftp:ssl-force ${use_ftps};
+              set ftp:ssl-protect-data ${use_ftps};
+              ${ftp_commands}
+              bye
+            "
+          }
+
+          run_cpanel_ftp() {
+            local ftp_commands="$1"
+            if run_ftp_mode "explicit-ftps" "true" "$ftp_commands"; then
+              return 0
+            fi
+            echo "Explicit FTPS basarisiz oldu, plain FTP fallback deneniyor..."
+            run_ftp_mode "plain-ftp" "false" "$ftp_commands"
+          }
+
+          WORK="$RUNNER_TEMP/organization-inventory"
+          rm -rf "$WORK"
+          mkdir -p "$WORK"
+
+          # Deploy SHA parity: the inventory must be produced by the exact code the
+          # caller authorized, otherwise the artifact describes an unknown owner.
+          if ! run_cpanel_ftp "get api/.deploy-sha -o ${WORK}/deploy-sha.txt;" >/dev/null 2>&1; then
+            echo "INVENTORY_RESULT=BLOCKED"
+            echo "INVENTORY_REASON=CONTROL_PLANE_UNREACHABLE"
+            exit 1
+          fi
+          remote_sha="$(tr -d '\r\n' < "${WORK}/deploy-sha.txt" 2>/dev/null || true)"
+          if [[ "${remote_sha,,}" != "${DEPLOYED_SHA,,}" ]]; then
+            echo "INVENTORY_RESULT=BLOCKED"
+            echo "INVENTORY_REASON=DEPLOY_SHA_MISMATCH"
+            exit 1
+          fi
+
+          # Busy guard: the inventory shares the control plane with apply and with
+          # the mapping operation, so it must never queue behind or race another
+          # request.
+          listing="$WORK/control-listing.txt"
+          if ! run_cpanel_ftp "cls -1 api/runtime/migration-control > ${listing};" >/dev/null 2>&1; then
+            echo "INVENTORY_RESULT=BLOCKED"
+            echo "INVENTORY_REASON=CONTROL_PLANE_UNREACHABLE"
+            exit 1
+          fi
+          busy="NO"
+          if grep -q 'request\.pending\.' "$listing"; then
+            busy="YES"
+          fi
+          if grep -q 'request\.processing\.' "$listing"; then
+            busy="YES"
+          fi
+          if grep -q '/status.json$' "$listing"; then
+            if run_cpanel_ftp "get api/runtime/migration-control/status.json -o ${WORK}/status.json;" >/dev/null 2>&1; then
+              if [[ "$(jq -r '.state // empty' "${WORK}/status.json" 2>/dev/null || true)" == "RUNNING" ]]; then
+                busy="YES"
+              fi
+            fi
+          fi
+          if [[ "$busy" == "YES" ]]; then
+            echo "INVENTORY_RESULT=BLOCKED"
+            echo "INVENTORY_REASON=MIGRATION_CONTROL_PLANE_BUSY"
+            exit 1
+          fi
+
+          REQUEST_ID="orginv-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          echo "INVENTORY_REQUEST_ID=${REQUEST_ID}"
+          request_dir="$WORK/request"
+          mkdir -p "$request_dir"
+          # The request carries a mode and a SHA and nothing else: no table name, no
+          # SQL, no filter. There is no field an operator could inject a query into.
+          jq -n \
+            --arg request_id "$REQUEST_ID" \
+            --arg deployed_sha "$DEPLOYED_SHA" \
+            --arg requested_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            '{schema_version: 1, request_id: $request_id, deployed_sha: $deployed_sha, requested_at: $requested_at, mode: "READ_ONLY_ORGANIZATION_INVENTORY"}' \
+            > "$request_dir/request.${REQUEST_ID}.tmp"
+
+          run_cpanel_ftp "
+            mkdir -p api/runtime/migration-control;
+            lcd ${request_dir};
+            put -O api/runtime/migration-control request.${REQUEST_ID}.tmp;
+            mv api/runtime/migration-control/request.${REQUEST_ID}.tmp api/runtime/migration-control/request.pending.${REQUEST_ID}.json;
+          "
+
+          status_file="$WORK/poll-status.json"
+          deadline="$(( $(date +%s) + TOTAL_POLL_WINDOW_SECONDS ))"
+          worker_state="NONE"
+          for _ in $(seq 1 "$POLL_ATTEMPTS"); do
+            rm -f "$status_file"
+            if run_cpanel_ftp "get api/runtime/migration-control/status.json -o ${status_file};" >/dev/null 2>&1; then
+              if [[ "$(jq -r '.request_id // empty' "$status_file" 2>/dev/null || true)" == "$REQUEST_ID" ]]; then
+                worker_state="$(jq -r '.state // "NONE"' "$status_file" 2>/dev/null || echo NONE)"
+                if [[ "$worker_state" == "SUCCEEDED" || "$worker_state" == "FAILED" ]]; then
+                  break
+                fi
+              fi
+            fi
+            if (( $(date +%s) >= deadline )); then
+              break
+            fi
+            sleep "$POLL_INTERVAL_SECONDS"
+          done
+
+          echo "INVENTORY_WORKER_STATE=${worker_state}"
+          if [[ "$worker_state" == "FAILED" ]]; then
+            reason="$(jq -r 'if (.reason | type) == "string" and (.reason | test("^[A-Z0-9_]+$")) then .reason else "UNKNOWN_INVENTORY_FAILURE" end' "$status_file" 2>/dev/null || echo UNKNOWN_INVENTORY_FAILURE)"
+            echo "INVENTORY_RESULT=BLOCKED"
+            echo "INVENTORY_REASON=${reason}"
+            exit 1
+          fi
+          if [[ "$worker_state" != "SUCCEEDED" ]]; then
+            echo "INVENTORY_RESULT=BLOCKED"
+            echo "INVENTORY_REASON=WAITING_FOR_CRON_TICK"
+            exit 1
+          fi
+
+          report="$WORK/organization-inventory.json"
+          if ! run_cpanel_ftp "get api/runtime/migration-control/organization-inventory.json -o ${report};" >/dev/null 2>&1; then
+            echo "INVENTORY_RESULT=BLOCKED"
+            echo "INVENTORY_REASON=INVENTORY_REPORT_UNREADABLE"
+            exit 1
+          fi
+
+          mkdir -p "$GITHUB_WORKSPACE/inventory-artifact"
+          cp "$report" "$GITHUB_WORKSPACE/inventory-artifact/organization-inventory.json"
+
+          # Bounded, allowlisted summary. The row-level section stays in the
+          # artifact; only counts, checksums and reason codes reach this log.
+          emit_scalar() {
+            local label="$1"
+            local filter="$2"
+            local pattern="$3"
+            local value
+            value="$(jq -r "${filter} // \"NONE\"" "$report" 2>/dev/null || echo NONE)"
+            [[ "$value" =~ $pattern ]] || value="NONE"
+            echo "${label}=${value}"
+          }
+          emit_list() {
+            local label="$1"
+            local filter="$2"
+            local value
+            value="$(jq -r "[${filter}[]? | tostring] | join(\",\")" "$report" 2>/dev/null || echo "")"
+            [[ "$value" =~ ^[A-Za-z0-9_,.-]{0,512}$ ]] || value="UNPRINTABLE"
+            echo "${label}=${value:-NONE}"
+          }
+
+          emit_scalar INVENTORY_SCHEMA_VERSION '.schema_version' '^[0-9]{1,3}$'
+          emit_scalar INVENTORY_GENERATED_AT '.generated_at' '^[0-9TZ:.+-]{1,64}$'
+          emit_scalar INVENTORY_DEPLOY_SHA '.deployed_sha' '^[0-9a-f]{40}$'
+          emit_scalar INVENTORY_CHECKSUM '.inventory_checksum' '^[0-9a-f]{64}$'
+          emit_scalar PRODUCTION_MIGRATION_TIP '.production_migration_tip' '^[0-9]{3}|NONE$'
+          emit_scalar PENDING_MIGRATION_COUNT '.pending_migration_count' '^[0-9]{1,6}$'
+          emit_scalar SCHEMA_READY '.schema_ready' '^(true|false)$'
+          emit_scalar DATA_READY '.data_ready' '^(true|false)$'
+          emit_scalar ID_3_PRESENT '.data.id_3_present' '^(true|false)$'
+          emit_list BRANCH_IDS '.data.branch_ids'
+          emit_list EXPECTED_BRANCH_IDS '.data.expected_branch_ids'
+          emit_list UNEXPECTED_BRANCH_IDS '.data.unexpected_branch_ids'
+          emit_list MISSING_BRANCH_IDS '.data.missing_branch_ids'
+          for table in sirketler subeler sgk_isverenler calisma_lokasyonlari personeller user_subeler user_sirketler user_sgk_isverenler; do
+            emit_scalar "ROWS_$(echo "$table" | tr '[:lower:]' '[:upper:]')" ".data.row_counts.${table}" '^-?[0-9]{1,12}$'
+          done
+          for guard in unmapped_sube_count unmapped_sgk_isveren_count orphan_sube_sirket_count orphan_lokasyon_sube_count sube_sgk_sirket_mismatch_count; do
+            emit_scalar "GUARD_$(echo "$guard" | tr '[:lower:]' '[:upper:]')" ".data.orphan_counts.${guard}" '^-?[0-9]{1,12}$'
+          done
+          emit_scalar USER_SUBE_TOTAL '.data.scope_summary.user_sube_total' '^-?[0-9]{1,12}$'
+          emit_scalar USER_SIRKET_TOTAL '.data.scope_summary.user_sirket_total' '^-?[0-9]{1,12}$'
+          emit_scalar USER_SGK_ISVEREN_TOTAL '.data.scope_summary.user_sgk_isveren_total' '^-?[0-9]{1,12}$'
+          emit_list INVENTORY_BLOCKERS '.blockers'
+          emit_list READINESS_BLOCKERS '.readiness_blockers'
+          emit_scalar INVENTORY_RESULT '.result' '^(PASS|BLOCKED)$'
+
+          if [[ "$(jq -r '.result // "BLOCKED"' "$report" 2>/dev/null || echo BLOCKED)" != "PASS" ]]; then
+            echo "INVENTORY_MAPPING_READY=NO"
+            exit 1
+          fi
+          echo "INVENTORY_MAPPING_READY=YES"
+
+      - name: Publish inventory artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: organization-inventory
+          path: inventory-artifact/
+          retention-days: 7
+          if-no-files-found: warn

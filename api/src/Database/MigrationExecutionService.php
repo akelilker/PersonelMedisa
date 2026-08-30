@@ -30,6 +30,42 @@ final class MigrationExecutionService
         return MigrationRunner::verify($pdo, $source);
     }
 
+    /**
+     * Plain ledger facts: which version is applied last, and how many are pending.
+     *
+     * MigrationPreflightReport cannot answer this for a caller that is not about
+     * to apply 079 — it is pinned to "applied 078, pending only 079" and reports
+     * anything else as blocked. Operations that merely need to know where the
+     * chain stands (the organisation mapping owners) read it here instead, which
+     * also keeps SQL out of the control-plane worker.
+     *
+     * @return array{tip: string, pending_count: int}
+     */
+    public static function ledgerFacts(PDO $pdo, MigrationSourceProvider $source): array
+    {
+        $applied = [];
+        $statement = $pdo->query('SELECT version FROM medisa_schema_migrations ORDER BY version');
+        if ($statement !== false) {
+            foreach ($statement->fetchAll(PDO::FETCH_COLUMN) as $version) {
+                $applied[(string) $version] = true;
+            }
+            $statement->closeCursor();
+        }
+
+        $tip = 'NONE';
+        $pendingCount = 0;
+        foreach ($source->all() as $migration) {
+            $version = (string) $migration['version'];
+            if (isset($applied[$version])) {
+                $tip = $version;
+                continue;
+            }
+            $pendingCount++;
+        }
+
+        return ['tip' => $tip, 'pending_count' => $pendingCount];
+    }
+
     public static function sourceForRuntime(
         string $apiDirectory,
         bool $requireBundle = false

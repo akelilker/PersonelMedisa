@@ -103,19 +103,24 @@ describe('migration 079 slot', () => {
 });
 
 describe('migration worker control-plane stages', () => {
-  it('supports exactly the apply and read-only preflight request modes', () => {
-    expect(worker).toContain("'/^(APPLY|READ_ONLY_PREFLIGHT)$/'");
+  it('supports exactly the canonical request modes and still defaults to apply', () => {
+    expect(worker).toContain("'/^(APPLY|READ_ONLY_PREFLIGHT|READ_ONLY_ORGANIZATION_INVENTORY'");
+    expect(worker).toContain("|ORGANIZATION_MAPPING_PREFLIGHT|ORGANIZATION_MAPPING_APPLY)$/'");
     expect(worker).toContain(": 'APPLY';");
   });
 
   it('runs the mandatory backup stage before apply and never the other way round', () => {
+    // Scoped to the migration apply path: the worker also owns the organisation
+    // mapping stages, which have their own backup call earlier in the file.
     const backupStage = worker.indexOf("$stage = 'BACKUP';");
-    const backupCall = worker.indexOf('MigrationBackupService::create');
-    const applyStage = worker.indexOf("$stage = 'APPLY';");
-    const applyCall = worker.indexOf('MigrationExecutionService::apply');
-
     expect(backupStage).toBeGreaterThan(0);
-    expect(backupCall).toBeGreaterThan(backupStage);
+
+    const migrationApply = worker.slice(backupStage);
+    const backupCall = migrationApply.indexOf('MigrationBackupService::create($pdo');
+    const applyStage = migrationApply.indexOf("$stage = 'APPLY';");
+    const applyCall = migrationApply.indexOf('MigrationExecutionService::apply');
+
+    expect(backupCall).toBeGreaterThan(0);
     expect(applyStage).toBeGreaterThan(backupCall);
     expect(applyCall).toBeGreaterThan(applyStage);
   });
@@ -123,7 +128,7 @@ describe('migration worker control-plane stages', () => {
   it('never applies or backs up on the preflight path', () => {
     const preflightBlock = worker.slice(
       worker.indexOf("if ($mode === 'READ_ONLY_PREFLIGHT') {"),
-      worker.indexOf("$stage = 'BACKUP';"),
+      worker.indexOf("if ($mode === 'READ_ONLY_ORGANIZATION_INVENTORY') {"),
     );
     expect(preflightBlock).toContain('MigrationPreflightReport::collect');
     expect(preflightBlock).not.toContain('MigrationExecutionService::apply');

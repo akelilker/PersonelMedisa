@@ -1,5 +1,15 @@
 CODE_MIGRATION_TIP: 079
-PRODUCTION_MIGRATION_TIP: 078
+PRODUCTION_MIGRATION_TIP: 079
+
+ORG_HIERARCHY_SCHEMA_READY: true
+ORG_HIERARCHY_DATA_READY: false
+MG_SIRKET_SUBE_PROD_MAPPING_001: CODE_READY_NOT_EXECUTED (inventory owner + operations-only initial mapping owner kod olarak hazır; production envanteri ve mapping preflight/apply ÇALIŞTIRILMADI; production mutation=0)
+ORG_MAPPING_INVENTORY_OWNER: OrganizationMappingInventoryReport (SELECT-only, checksum'lı, PII'siz) + `ops-organization-inventory.yml`
+ORG_MAPPING_EXECUTION_OWNER: OrganizationInitialMappingService (operations-only; public API/UI'da re-parent YOK) + `apply-organization-mapping.yml`
+ORG_MAPPING_SPEC_OWNER: OrganizationMappingSpec (allowlist + preimage + inventory checksum pin; production değeri repoda YOK)
+ORG_USER_SCOPE_ROLLOUT: DEFERRED (user_sirketler / user_sgk_isverenler bu operasyonun dışında)
+ORG_BRANCH_NAME_DB_HARDENING: NEXT_GATE (eşleme doğrulandıktan sonra ayrı migration)
+AYLIK_KAPANIS_SGK_REDESIGN: NEXT_GATE
 
 PERSONEL_IMPORT_ROLLOUT: CLOSED_CONFIRMED
 PERSONEL_IMPORT_PHASE1_IC: 122 / CLOSED_PASS

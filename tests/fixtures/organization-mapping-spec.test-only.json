@@ -1,0 +1,92 @@
+{
+  "schema_version": "1",
+  "metadata": {
+    "authorized_deploy_sha": "0000000000000000000000000000000000000000",
+    "expected_production_tip": "079",
+    "inventory_checksum": "0000000000000000000000000000000000000000000000000000000000000000",
+    "inventory_generated_at": "2026-01-01T00:00:00Z",
+    "expected_row_counts": {
+      "sirketler": 0,
+      "subeler": 3,
+      "sgk_isverenler": 2,
+      "calisma_lokasyonlari": 2,
+      "personeller": 4,
+      "user_subeler": 1,
+      "user_sirketler": 0,
+      "user_sgk_isverenler": 0
+    },
+    "expected_branch_ids": [1, 2, 4],
+    "operation_id": "TEST-ONLY-MAPPING-001"
+  },
+  "companies": [
+    { "kod": "TESTCO-A", "ad": "Test Company A", "durum": "AKTIF" },
+    { "kod": "TESTCO-B", "ad": "Test Company B", "durum": "AKTIF" }
+  ],
+  "sgk_mappings": [
+    {
+      "sgk_isveren_id": 1,
+      "expected_kod": "TEST-SGK-1",
+      "expected_ad": "Test Payroll One",
+      "expected_sirket_id": null,
+      "target_company_kod": "TESTCO-A"
+    },
+    {
+      "sgk_isveren_id": 2,
+      "expected_kod": "TEST-SGK-2",
+      "expected_ad": "Test Payroll Two",
+      "expected_sirket_id": null,
+      "target_company_kod": "TESTCO-B"
+    }
+  ],
+  "branch_mappings": [
+    {
+      "sube_id": 1,
+      "expected_kod": "TEST-SB-1",
+      "expected_ad": "Test Company A Merkez",
+      "expected_sirket_id": null,
+      "expected_sgk_isveren_id": 1,
+      "target_company_kod": "TESTCO-A",
+      "approved_ad": "Merkez"
+    },
+    {
+      "sube_id": 2,
+      "expected_kod": "TEST-SB-2",
+      "expected_ad": "Test Branch Two",
+      "expected_sirket_id": null,
+      "expected_sgk_isveren_id": 1,
+      "target_company_kod": "TESTCO-A",
+      "approved_ad": null
+    },
+    {
+      "sube_id": 4,
+      "expected_kod": "TEST-SB-4",
+      "expected_ad": "Test Branch Four",
+      "expected_sirket_id": null,
+      "expected_sgk_isveren_id": 2,
+      "target_company_kod": "TESTCO-B",
+      "approved_ad": null
+    }
+  ],
+  "location_mappings": [
+    {
+      "calisma_lokasyonu_id": 1,
+      "expected_kod": "TEST-LOC-1",
+      "expected_ad": "Test Location One",
+      "expected_sube_id": null,
+      "target_sube_id": 1
+    },
+    {
+      "calisma_lokasyonu_id": 2,
+      "expected_kod": "TEST-LOC-2",
+      "expected_ad": "Test Location Two",
+      "expected_sube_id": null,
+      "target_sube_id": null
+    }
+  ],
+  "preservation": {
+    "expected_personel_count": 4,
+    "expected_user_sube_count": 1,
+    "expected_user_sirket_count": 0,
+    "expected_user_sgk_isveren_count": 0
+  }
+}

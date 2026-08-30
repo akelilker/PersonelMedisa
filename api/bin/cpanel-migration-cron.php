@@ -6,6 +6,10 @@ use Medisa\Api\Database\Connection;
 use Medisa\Api\Database\MigrationBackupService;
 use Medisa\Api\Database\MigrationExecutionService;
 use Medisa\Api\Database\MigrationPreflightReport;
+use Medisa\Api\Services\Organizasyon\OrganizationInitialMappingService;
+use Medisa\Api\Services\Organizasyon\OrganizationMappingFailure;
+use Medisa\Api\Services\Organizasyon\OrganizationMappingInventoryReport;
+use Medisa\Api\Services\Organizasyon\OrganizationMappingSpec;
 
 if (PHP_SAPI !== 'cli') {
     http_response_code(404);
@@ -21,6 +25,9 @@ $controlDirectory = is_string($controlDirectory) && $controlDirectory !== ''
     : $apiDirectory . '/runtime/migration-control';
 $statusPath = $controlDirectory . '/status.json';
 $preflightPath = $controlDirectory . '/preflight.json';
+$inventoryPath = $controlDirectory . '/organization-inventory.json';
+$mappingPreflightPath = $controlDirectory . '/organization-mapping-preflight.json';
+$mappingPostcheckPath = $controlDirectory . '/organization-mapping-postcheck.json';
 $heartbeatPath = $controlDirectory . '/worker-heartbeat.json';
 $lockPath = $controlDirectory . '/worker.lock';
 $deployShaPath = getenv('MEDISA_DEPLOY_SHA_PATH');
@@ -92,7 +99,12 @@ try {
         // Requests written before the preflight mode existed carry no mode and must
         // keep meaning "apply", so the control plane stays backward compatible.
         $mode = array_key_exists('mode', $request)
-            ? requireString($request, 'mode', '/^(APPLY|READ_ONLY_PREFLIGHT)$/')
+            ? requireString(
+                $request,
+                'mode',
+                '/^(APPLY|READ_ONLY_PREFLIGHT|READ_ONLY_ORGANIZATION_INVENTORY'
+                . '|ORGANIZATION_MAPPING_PREFLIGHT|ORGANIZATION_MAPPING_APPLY)$/'
+            )
             : 'APPLY';
 
         $stage = 'DEPLOY_SHA_CHECK';
@@ -132,6 +144,181 @@ try {
                 'mode' => $mode,
                 'preflight_result' => (string) $report['result'],
                 'preflight_generated_at' => (string) $report['generated_at'],
+            ]);
+            $stage = 'REQUEST_ARCHIVE';
+            archiveRequest(
+                $processingPath,
+                $controlDirectory . '/request.completed.' . safeId($requestId) . '.json'
+            );
+            exit(0);
+        }
+
+        // Row-level organisation inventory. Strictly SELECT-only: it publishes the
+        // inventory artifact and leaves before the backup/apply stages exist, so
+        // this mode has no path to a mutation even if a later stage is added.
+        if ($mode === 'READ_ONLY_ORGANIZATION_INVENTORY') {
+            $stage = 'ORGANIZATION_INVENTORY';
+            try {
+                $migrationSource = MigrationExecutionService::sourceForRuntime($apiDirectory, true);
+                $pdo = Connection::get();
+                $ledger = MigrationExecutionService::ledgerFacts($pdo, $migrationSource);
+                $inventory = OrganizationMappingInventoryReport::collect($pdo, $deployedSha, $ledger['tip']);
+                $inventory['request_id'] = $requestId;
+                $inventory['pending_migration_count'] = $ledger['pending_count'];
+                writeJsonAtomically($inventoryPath, $inventory);
+            } catch (\Throwable $exception) {
+                throw MigrationWorkerFailure::fromThrowable($stage, $exception);
+            }
+
+            $stage = 'STATUS_WRITE';
+            writeStatus($statusPath, [
+                'state' => 'SUCCEEDED',
+                'request_id' => $requestId,
+                'deployed_sha' => strtolower($deployedSha),
+                'mode' => $mode,
+                'inventory_result' => (string) $inventory['result'],
+                'inventory_checksum' => (string) $inventory['inventory_checksum'],
+                'inventory_generated_at' => (string) $inventory['generated_at'],
+            ]);
+            $stage = 'REQUEST_ARCHIVE';
+            archiveRequest(
+                $processingPath,
+                $controlDirectory . '/request.completed.' . safeId($requestId) . '.json'
+            );
+            exit(0);
+        }
+
+        // Read-only gate for the initial organisation mapping. Same request shape
+        // as the apply below, deliberately reachable on its own so the decision can
+        // be reviewed against production before anything is written.
+        if ($mode === 'ORGANIZATION_MAPPING_PREFLIGHT') {
+            $stage = 'ORGANIZATION_MAPPING_PREFLIGHT';
+            try {
+                $spec = OrganizationMappingSpec::parse($request['mapping_spec'] ?? null);
+                $migrationSource = MigrationExecutionService::sourceForRuntime($apiDirectory, true);
+                $pdo = Connection::get();
+                $ledger = MigrationExecutionService::ledgerFacts($pdo, $migrationSource);
+                $inventory = readPublishedInventory($inventoryPath);
+                $report = OrganizationInitialMappingService::preflight(
+                    $pdo,
+                    $spec,
+                    $deployedSha,
+                    $ledger['tip'],
+                    $ledger['pending_count'],
+                    $inventory
+                );
+                $report['request_id'] = $requestId;
+                writeJsonAtomically($mappingPreflightPath, $report);
+            } catch (\Throwable $exception) {
+                throw MigrationWorkerFailure::fromThrowable($stage, $exception);
+            }
+
+            $stage = 'STATUS_WRITE';
+            writeStatus($statusPath, [
+                'state' => 'SUCCEEDED',
+                'request_id' => $requestId,
+                'deployed_sha' => strtolower($deployedSha),
+                'mode' => $mode,
+                'mapping_preflight_result' => (string) $report['result'],
+                'mapping_spec_checksum' => (string) $report['spec_checksum'],
+                'mapping_operation_id' => (string) $report['operation_id'],
+            ]);
+            $stage = 'REQUEST_ARCHIVE';
+            archiveRequest(
+                $processingPath,
+                $controlDirectory . '/request.completed.' . safeId($requestId) . '.json'
+            );
+            exit(0);
+        }
+
+        // Mapping apply. Backup is a stage, not a checklist item: the mapping owner
+        // refuses to start without verified backup evidence.
+        if ($mode === 'ORGANIZATION_MAPPING_APPLY') {
+            $stage = 'ORGANIZATION_MAPPING_PREFLIGHT';
+            try {
+                $spec = OrganizationMappingSpec::parse($request['mapping_spec'] ?? null);
+                $migrationSource = MigrationExecutionService::sourceForRuntime($apiDirectory, true);
+                $pdo = Connection::get();
+                $ledger = MigrationExecutionService::ledgerFacts($pdo, $migrationSource);
+                $inventory = readPublishedInventory($inventoryPath);
+                $preflight = OrganizationInitialMappingService::preflight(
+                    $pdo,
+                    $spec,
+                    $deployedSha,
+                    $ledger['tip'],
+                    $ledger['pending_count'],
+                    $inventory
+                );
+                writeJsonAtomically($mappingPreflightPath, $preflight + ['request_id' => $requestId]);
+                if ($preflight['result'] !== 'PASS') {
+                    throw new OrganizationMappingFailure(
+                        'MAPPING_PREFLIGHT_BLOCKED',
+                        implode(',', $preflight['blockers'])
+                    );
+                }
+            } catch (\Throwable $exception) {
+                throw MigrationWorkerFailure::fromThrowable($stage, $exception);
+            }
+
+            $stage = 'ORGANIZATION_MAPPING_BACKUP';
+            try {
+                $backup = MigrationBackupService::createForOrganizationMapping(
+                    $pdo,
+                    $apiDirectory,
+                    $spec->operationId(),
+                    $ledger['tip'],
+                    $spec->authorizedDeploySha(),
+                    $spec->inventoryChecksum(),
+                    $spec->checksum()
+                );
+            } catch (\Throwable $exception) {
+                throw MigrationWorkerFailure::fromThrowable($stage, $exception);
+            }
+
+            $stage = 'ORGANIZATION_MAPPING_APPLY';
+            try {
+                $applied = OrganizationInitialMappingService::apply(
+                    $pdo,
+                    $spec,
+                    $deployedSha,
+                    $ledger['tip'],
+                    $ledger['pending_count'],
+                    $inventory,
+                    $backup
+                );
+            } catch (\Throwable $exception) {
+                throw MigrationWorkerFailure::fromThrowable($stage, $exception);
+            }
+
+            $stage = 'ORGANIZATION_MAPPING_POSTCHECK';
+            try {
+                $postcheck = OrganizationInitialMappingService::postcheck($pdo, $spec, $backup);
+                $postcheck['request_id'] = $requestId;
+                $postcheck['applied'] = $applied['applied'];
+                writeJsonAtomically($mappingPostcheckPath, $postcheck);
+                if ($postcheck['result'] !== 'PASS') {
+                    throw new OrganizationMappingFailure(
+                        'MAPPING_POSTCHECK_BLOCKED',
+                        implode(',', $postcheck['unexpected_deltas'])
+                    );
+                }
+            } catch (\Throwable $exception) {
+                throw MigrationWorkerFailure::fromThrowable($stage, $exception);
+            }
+
+            $stage = 'STATUS_WRITE';
+            writeStatus($statusPath, [
+                'state' => 'SUCCEEDED',
+                'request_id' => $requestId,
+                'deployed_sha' => strtolower($deployedSha),
+                'mode' => $mode,
+                'mapping_operation_id' => $spec->operationId(),
+                'mapping_spec_checksum' => $spec->checksum(),
+                'mapping_postcheck_result' => (string) $postcheck['result'],
+                'backup_file' => (string) $backup['file'],
+                'backup_sha256' => (string) $backup['sha256'],
+                'backup_bytes' => (int) $backup['bytes'],
+                'backup_readback' => (string) $backup['readback'],
             ]);
             $stage = 'REQUEST_ARCHIVE';
             archiveRequest(
@@ -223,6 +410,29 @@ function requireString(array $request, string $key, string $pattern): string
     return $value;
 }
 
+/**
+ * Read back the inventory artifact the read-only inventory mode published.
+ *
+ * The mapping modes never collect their own inventory: the spec pins a checksum,
+ * and that checksum has to be verifiable against the exact artifact a human
+ * reviewed, not against a fresh read taken moments before the write.
+ *
+ * @return array<string, mixed>
+ */
+function readPublishedInventory(string $inventoryPath): array
+{
+    $raw = @file_get_contents($inventoryPath);
+    if ($raw === false) {
+        throw new OrganizationMappingFailure('MAPPING_INVENTORY_ARTIFACT_MISSING');
+    }
+    $decoded = json_decode($raw, true);
+    if (!is_array($decoded)) {
+        throw new OrganizationMappingFailure('MAPPING_INVENTORY_UNREADABLE');
+    }
+
+    return $decoded;
+}
+
 final class MigrationWorkerFailure extends RuntimeException
 {
     public function __construct(
@@ -236,6 +446,13 @@ final class MigrationWorkerFailure extends RuntimeException
 
     public static function fromThrowable(string $stage, \Throwable $exception): self
     {
+        // A mapping owner already failed with a precise, publishable reason code;
+        // re-classifying it through the generic migration classifier would flatten
+        // it into a much less useful UNKNOWN.
+        if ($exception instanceof OrganizationMappingFailure) {
+            return new self($exception->reason, $stage, 1, $exception->detail);
+        }
+
         return new self(
             MigrationExecutionService::classify($exception),
             $stage,
@@ -274,6 +491,21 @@ function classifyWorkerFailure(Throwable $exception, string $stage): string
     }
     if ($stage === 'PREFLIGHT') {
         return 'PREFLIGHT_FAILED';
+    }
+    if ($stage === 'ORGANIZATION_INVENTORY') {
+        return 'ORGANIZATION_INVENTORY_FAILED';
+    }
+    if ($stage === 'ORGANIZATION_MAPPING_PREFLIGHT') {
+        return 'ORGANIZATION_MAPPING_PREFLIGHT_FAILED';
+    }
+    if ($stage === 'ORGANIZATION_MAPPING_BACKUP') {
+        return 'ORGANIZATION_MAPPING_BACKUP_FAILED';
+    }
+    if ($stage === 'ORGANIZATION_MAPPING_APPLY') {
+        return 'ORGANIZATION_MAPPING_APPLY_FAILED';
+    }
+    if ($stage === 'ORGANIZATION_MAPPING_POSTCHECK') {
+        return 'ORGANIZATION_MAPPING_POSTCHECK_FAILED';
     }
     return $stage === 'VERIFY' ? 'SCHEMA_VERIFY_FAILED' : 'UNKNOWN_MIGRATION_FAILURE';
 }

@@ -1,5 +1,5 @@
 CODE_MIGRATION_TIP: 079
-PRODUCTION_MIGRATION_TIP: 078
+PRODUCTION_MIGRATION_TIP: 079
 
 # 110 — Canonical Closure / Gap Registry
 
@@ -11,10 +11,11 @@ PRODUCTION_MIGRATION_TIP: 078
 
 | Alan | Değer | Kanıt / sınır |
 | --- | --- | --- |
-| CODE_MIGRATION_TIP | **079** | Repodaki son migration: `079_sirket_sube_hiyerarsisi.sql` (production'a uygulanmadı). Eski `079_aylik_kapanis_sube_scope_and_actor.sql` iş modeli yanlış olduğu için geri çekildi; canonical kaynaktan çıkarıldı ve hiçbir koşulda uygulanmaz (MG-SIRKET-SUBE-HIYERARSI-001) |
-| PRODUCTION_MIGRATION_TIP | **078** | `078_personel_sicil_sequence.sql` production'a uygulandı; otomatik sicil sequence owner'ı canlı |
+| CODE_MIGRATION_TIP | **079** | Repodaki son migration: `079_sirket_sube_hiyerarsisi.sql`. Eski `079_aylik_kapanis_sube_scope_and_actor.sql` iş modeli yanlış olduğu için geri çekildi; canonical kaynaktan çıkarıldı ve hiçbir koşulda uygulanmaz (MG-SIRKET-SUBE-HIYERARSI-001) |
+| PRODUCTION_MIGRATION_TIP | **079** | `079_sirket_sube_hiyerarsisi.sql` production'a uygulandı (apply `33322972259`, postcheck `33323369963`, backup `medisa-pre-079-33322972259-1-20260830-164502.sql`). Additive; hiçbir satır yazmadı. `schema_ready = true`, `data_ready = false` — eşleme ayrı onaylı operasyondur |
+| Organizasyon eşleme durumu | **CODE_READY / NOT_EXECUTED** | Envanter ve mapping owner'ları kod olarak hazır (MG-SIRKET-SUBE-PROD-MAPPING-001). Production envanteri **çalıştırılmadı**, mapping preflight/apply **çalıştırılmadı**, production mutation sayısı **0** |
 | Otomatik sicil owner | **`PersonelSicilAllocator`** | `api/src/Services/Personel/PersonelSicilAllocator.php` + singleton tablo `personel_sicil_sequence` (migration 078); interaktif create'te `sicil_no` gönderilmez, backend tahsis eder |
-| Canlı migration doğrulaması | **PASS** | Tip `078`; pending 079+ yok; migration workflow bu turda **tekrar çalıştırılmaz** |
+| Canlı migration doğrulaması | **PASS** | Tip `079`; pending migration yok; migration workflow bu turda **tekrar çalıştırılmaz** |
 
 ## Durum sözlüğü
 

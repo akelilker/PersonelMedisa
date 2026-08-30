@@ -208,6 +208,38 @@ MariaDB testi bunu doğrudan doğrular (üç lokasyon eşlenmemişken `data_read
 | `.github/workflows/ops-organization-inventory.yml` | Yalnız envanter. Tek mod, mutation yetkisi yok, mapping request'i yazamaz. Satır verisi log'a değil artifact'a gider. |
 | `.github/workflows/apply-organization-mapping.yml` | Preflight veya apply. Explicit confirmation, exact authorized SHA, spec path allowlist'i, inventory checksum pin'i. Apply yolunda zorunlu backup + postcheck. |
 
+### Publication boundary (repository visibility)
+
+Satır verisinin artifact'a gitmesi **tek başına** gizlilik sağlamaz: GitHub
+Actions artifact'ı public repository'de signed-in herhangi bir kullanıcı
+tarafından indirilebilir. Aynı şekilde mapping spec'i repo içinde review edilmiş
+bir dosya olduğu için public repository'de spec'in taşıdığı satır preimage'ları
+da açıktır. Bu yüzden "artifact private'dır" mutlak bir iddia **değildir**;
+gizlilik tamamen repository visibility'sine bağlıdır.
+
+Her iki workflow da bunu fail-closed uygular. Guard, GitHub'ın canonical
+repository context'ini (`github.event.repository.private`) okur — input'la
+override edilemez — ve repository private değilse operasyon checkout'tan,
+herhangi bir FTP temasından ve control-plane request'inden **önce** durur:
+
+| Workflow | Public repository davranışı | Reason code |
+| --- | --- | --- |
+| `ops-organization-inventory.yml` | Envanter operasyonu hiç başlamaz; production'dan satır verisi istenmez, artifact upload adımına erişilemez. | `PUBLIC_REPOSITORY_ARTIFACT_EXPOSURE` |
+| `apply-organization-mapping.yml` | Mapping operasyonu hiç başlamaz; spec preimage'ları production'a gitmez, evidence artifact yayınlanmaz. | `PUBLIC_REPOSITORY_SPEC_TRANSPORT_UNSAFE` |
+
+Guard yalnız upload adımını atlamaz, tüm operasyonu durdurur. `retention-days`
+düşürmek, artifact adını gizlemek veya yalnızca uyarmak güvenlik kontrolü olarak
+kabul **edilmez**; artifact upload adımlarının `always()` koşulu da aynı
+visibility şartıyla birlikte değerlendirilir, böylece guard fail ettikten sonra
+upload çalışmaz. Private repository'de mevcut kontrollü artifact yolu
+değişmeden korunur.
+
+Bu repository şu anda public olduğu için her iki workflow da bu guard ile
+durur; yeniden ham envanter üretilemez. Bu tur öncesinde `33332497486` deploy
+SHA'sı ile üretilmiş envanter artifact'ı public erişime açık olduğu için
+**silindi** (GitHub artifact silme geri alınamaz). Envanter satır değerleri ve
+checksum'ı repository dokümanına taşınmaz; operatör kaydında kalır.
+
    200|İkisi de tek `cpanel-canonical-migration-control` concurrency grubunu paylaşır ve
 busy guard uygular. Mapping workflow'u şu koşullarda çalışamaz: kod deploy
 edilmemişse (`DEPLOY_SHA_MISMATCH`, `REMOTE_WORKER_PARITY_MISMATCH`), envanter

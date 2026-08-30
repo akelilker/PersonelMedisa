@@ -8,6 +8,18 @@ Bu dizin şu anda **gerçek bir production spec içermez**. Spec ancak salt-okun
 envanter (`ops-organization-inventory.yml`) çalıştırılıp exact satır verisi
 görüldükten sonra yazılır; bu paket kodu kurar, kararı doldurmaz.
 
+## Publication boundary önkoşulu
+
+Bu akışın gizliliği tamamen repository visibility'sine bağlıdır ve aşağıdaki
+adımlar **yalnız private repository'de** çalıştırılabilir. Envanter
+artifact'ı ve bu dizindeki spec dosyası production satır preimage'ları taşır;
+public repository'de hem artifact hem repo dosyası signed-in herhangi bir
+kullanıcıya açıktır. Bu yüzden her iki workflow da repository private değilse
+control-plane request'i bırakmadan önce fail-closed durur
+(`PUBLIC_REPOSITORY_ARTIFACT_EXPOSURE`,
+`PUBLIC_REPOSITORY_SPEC_TRANSPORT_UNSAFE`). Guard'ı input ile aşmak mümkün
+değildir ve `retention-days` düşürmek bu koşulun yerine geçmez.
+
 ## Spec nasıl üretilir
 
 1. `ops-organization-inventory.yml` çalıştır (mutation yok). Artifact

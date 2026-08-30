@@ -524,6 +524,107 @@ describe('workflow separation', () => {
   });
 });
 
+describe('publication boundary (repository visibility)', () => {
+  const ownersDoc = read('docs/guncel/129-organization-mapping-owners.md');
+  const opsReadme = read('ops/organization-mapping/README.md');
+  const guardStep = '- name: Validate repository publication boundary';
+  const guardCheck = 'if [ "${REPOSITORY_PRIVATE:-}" != "true" ]; then';
+
+  it('reads the canonical repository visibility instead of an input or a hardcoded value', () => {
+    for (const workflow of [inventoryWorkflow, mappingWorkflow]) {
+      expect(workflow).toContain('REPOSITORY_PRIVATE: ${{ github.event.repository.private }}');
+      expect(workflow).toContain(guardCheck);
+      expect(workflow).not.toContain('inputs.repository_private');
+      expect(workflow).not.toContain('inputs.allow_public');
+      expect(workflow).not.toContain('accept_public_exposure');
+      expect(workflow).not.toMatch(/REPOSITORY_PRIVATE:\s*(?:"?true"?|"?false"?)\s*$/m);
+    }
+  });
+
+  it('stops the whole inventory operation before any control-plane request', () => {
+    const guardAt = inventoryWorkflow.indexOf(guardStep);
+    expect(guardAt).toBeGreaterThan(-1);
+    expect(inventoryWorkflow).toContain('INVENTORY_REASON=PUBLIC_REPOSITORY_ARTIFACT_EXPOSURE');
+    for (const later of [
+      '- name: Checkout repository',
+      '- name: Collect row-level organization inventory',
+      'request.pending.${REQUEST_ID}.json',
+      'actions/upload-artifact@v4',
+    ]) {
+      expect(inventoryWorkflow.indexOf(later)).toBeGreaterThan(guardAt);
+    }
+  });
+
+  it('stops the whole mapping operation before the spec reaches production', () => {
+    const guardAt = mappingWorkflow.indexOf(guardStep);
+    expect(guardAt).toBeGreaterThan(-1);
+    expect(mappingWorkflow).toContain('MAPPING_REASON=PUBLIC_REPOSITORY_SPEC_TRANSPORT_UNSAFE');
+    for (const later of [
+      '- name: Checkout repository',
+      '- name: Verify the approved mapping spec',
+      'request.pending.${REQUEST_ID}.json',
+      'actions/upload-artifact@v4',
+    ]) {
+      expect(mappingWorkflow.indexOf(later)).toBeGreaterThan(guardAt);
+    }
+  });
+
+  it('keeps the artifact upload unreachable once the boundary blocks', () => {
+    for (const workflow of [inventoryWorkflow, mappingWorkflow]) {
+      expect(workflow).toContain('if: always() && github.event.repository.private == true');
+      expect(workflow).not.toMatch(/^\s{8}if: always\(\)\s*$/m);
+    }
+  });
+
+  it('preserves the controlled artifact path for a private repository', () => {
+    expect(inventoryWorkflow).toContain('name: organization-inventory');
+    expect(inventoryWorkflow).toContain('retention-days: 7');
+    expect(mappingWorkflow).toContain('name: organization-mapping-evidence');
+    expect(mappingWorkflow).toContain('retention-days: 14');
+  });
+
+  it('does not treat retention as the security control', () => {
+    for (const workflow of [inventoryWorkflow, mappingWorkflow]) {
+      expect(workflow).not.toMatch(/retention-days: [01]\s*$/m);
+    }
+  });
+
+  it('adds no raw row-data log fallback while blocking', () => {
+    for (const workflow of [inventoryWorkflow, mappingWorkflow]) {
+      expect(workflow).not.toContain('cat "$report"');
+      expect(workflow).not.toContain('cat "$SPEC_PATH"');
+      expect(workflow).not.toContain('.data.branches');
+      expect(workflow).not.toContain('.data.sgk_employers');
+      expect(workflow).not.toContain('.data.work_locations');
+    }
+  });
+
+  it('never publishes the backup dump or an absolute backup path', () => {
+    expect(mappingWorkflow).not.toMatch(/get[^\n]*\.sql/);
+    expect(mappingWorkflow).not.toContain('backup_path');
+    expect(mappingWorkflow).toContain("emit_scalar MAPPING_BACKUP_FILE \"$status_file\" '.backup_file' '^[A-Za-z0-9._-]{1,160}$'");
+    expect(backupOwner).not.toContain("'path' => $absolutePath");
+  });
+
+  it('documents that confidentiality depends on repository visibility', () => {
+    expect(inventoryWorkflow).not.toContain('private repository erisim');
+    for (const doc of [ownersDoc, opsReadme]) {
+      expect(doc).toContain('PUBLIC_REPOSITORY_ARTIFACT_EXPOSURE');
+      expect(doc).toContain('PUBLIC_REPOSITORY_SPEC_TRANSPORT_UNSAFE');
+      expect(doc).toContain('repository visibility');
+    }
+  });
+
+  it('keeps real production inventory rows and checksums out of the repository docs', () => {
+    for (const doc of [ownersDoc, opsReadme]) {
+      expect(doc).not.toMatch(/\b[0-9a-f]{64}\b/);
+      expect(doc).not.toMatch(/personel_count["`]?\s*[:=]\s*\d/);
+      expect(doc).not.toMatch(/linked_branch_ids["`]?\s*[:=]/);
+      expect(doc).not.toMatch(/"kod"\s*:\s*"[^"]+"/);
+    }
+  });
+});
+
 describe('test-only mapping spec fixture', () => {
   const fixture = JSON.parse(read('tests/fixtures/organization-mapping-spec.test-only.json'));
 

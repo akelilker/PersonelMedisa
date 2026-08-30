@@ -16,6 +16,15 @@ name: Apply organization mapping (operations only)
 # Bu workflow calisamaz eger: kod deploy edilmemisse (deploy SHA pariteti),
 # envanter artifact'i yayinlanmamissa veya spec'in pinledigi inventory checksum
 # production'da dogrulanamiyorsa.
+#
+# Gizlilik sinirinin repository visibility'ye bagli oldugu yer: spec production
+# satir preimage'larini tasir ve preflight/postcheck evidence artifact'i da ayni
+# veriyi icerir. Public repository'de hem repo icindeki spec dosyasi hem de
+# GitHub Actions artifact'i signed-in herhangi bir kullaniciya aciktir, yani bu
+# tur icin guvenli bir spec transport'u YOKTUR. Bu yuzden repository private
+# degilse mapping operasyonu control-plane request'i birakilmadan ONCE durur
+# (PUBLIC_REPOSITORY_SPEC_TRANSPORT_UNSAFE). Gecici plaintext input/artifact
+# yontemi bu sinirin cozumu degildir.
 
 on:
   workflow_dispatch:
@@ -67,10 +76,26 @@ jobs:
       DEPLOYED_SHA: ${{ inputs.deployed_sha }}
       SPEC_PATH: ${{ inputs.spec_path }}
       EXPECTED_INVENTORY_CHECKSUM: ${{ inputs.expected_inventory_checksum }}
+      REPOSITORY_PRIVATE: ${{ github.event.repository.private }}
       POLL_ATTEMPTS: "121"
       POLL_INTERVAL_SECONDS: "10"
       TOTAL_POLL_WINDOW_SECONDS: "1200"
     steps:
+      # Publication boundary gate. Runs before checkout, before any FTP contact
+      # and before any control-plane request, so a public repository never sends
+      # spec preimages to production and never publishes mapping evidence. The
+      # value comes from GitHub's canonical repository context, not from an
+      # input, and anything other than an explicit "true" blocks.
+      - name: Validate repository publication boundary
+        run: |
+          set -euo pipefail
+          if [ "${REPOSITORY_PRIVATE:-}" != "true" ]; then
+            echo "MAPPING_RESULT=BLOCKED"
+            echo "MAPPING_REASON=PUBLIC_REPOSITORY_SPEC_TRANSPORT_UNSAFE"
+            echo "PRODUCTION_MUTATION_COUNT=0"
+            exit 1
+          fi
+
       - name: Validate explicit request
         run: |
           set -euo pipefail
@@ -361,8 +386,10 @@ jobs:
 
           echo "MAPPING_RESULT=APPLIED"
 
+      # `always()` must not outlive the publication boundary: without the second
+      # clause this step would still upload after the guard failed.
       - name: Publish mapping evidence artifact
-        if: always()
+        if: always() && github.event.repository.private == true
         uses: actions/upload-artifact@v4
         with:
           name: organization-mapping-evidence

@@ -46,6 +46,27 @@ final class MigrationBackupService
         'medisa_schema_migrations',
     ];
 
+    /**
+     * Rollback scope of the initial organisation mapping operation.
+     *
+     * Wider than the migration scope on purpose: the mapping writes company rows
+     * and the relation columns on three owners, so restoring it needs the company
+     * table and both scope tables in the preimage too — unlike migration 079,
+     * which created them and whose rollback for them is a DROP.
+     *
+     * @var list<string>
+     */
+    private const MAPPING_BACKED_UP_TABLES = [
+        'sirketler',
+        'subeler',
+        'sgk_isverenler',
+        'calisma_lokasyonlari',
+        'user_subeler',
+        'user_sirketler',
+        'user_sgk_isverenler',
+        'medisa_schema_migrations',
+    ];
+
     private const DIRECTORY_NAME = 'medisa-migration-backups';
 
     /**
@@ -57,16 +78,71 @@ final class MigrationBackupService
         string $requestId,
         string $migrationTip
     ): array {
+        return self::write($pdo, $apiDirectory, 'medisa-pre', $requestId, $migrationTip, self::BACKED_UP_TABLES, []);
+    }
+
+    /**
+     * Pre-mapping backup for the initial organisation mapping operation.
+     *
+     * Same owner, same webroot-outside rule, same readback — a parallel dump
+     * system would be a second thing to audit and a second thing to get wrong.
+     * The published metadata additionally pins what the dump was taken for, so a
+     * restore candidate can be matched to the exact operation that needed it.
+     *
+     * @return array<string, mixed>
+     */
+    public static function createForOrganizationMapping(
+        PDO $pdo,
+        string $apiDirectory,
+        string $operationId,
+        string $migrationTip,
+        string $authorizedSha,
+        string $inventoryChecksum,
+        string $specChecksum
+    ): array {
+        return self::write(
+            $pdo,
+            $apiDirectory,
+            'medisa-pre-orgmapping',
+            $operationId,
+            $migrationTip,
+            self::MAPPING_BACKED_UP_TABLES,
+            [
+                'operation' => 'ORGANIZATION_INITIAL_MAPPING',
+                'operation_id' => $operationId,
+                'authorized_deploy_sha' => strtolower($authorizedSha),
+                'inventory_checksum' => $inventoryChecksum,
+                'spec_checksum' => $specChecksum,
+                'schema_objects' => self::schemaObjects($pdo, self::MAPPING_BACKED_UP_TABLES),
+            ]
+        );
+    }
+
+    /**
+     * @param list<string> $tables
+     * @param array<string, mixed> $extraMetadata
+     * @return array<string, mixed>
+     */
+    private static function write(
+        PDO $pdo,
+        string $apiDirectory,
+        string $namePrefix,
+        string $requestId,
+        string $migrationTip,
+        array $tables,
+        array $extraMetadata
+    ): array {
         $directory = self::resolveDirectory($apiDirectory);
         $fileName = sprintf(
-            'medisa-pre-%s-%s-%s.sql',
+            '%s-%s-%s-%s.sql',
+            $namePrefix,
             self::safe($migrationTip),
             self::safe($requestId),
             gmdate('Ymd-His')
         );
         $path = $directory . DIRECTORY_SEPARATOR . $fileName;
 
-        $dump = self::renderDump($pdo, $requestId, $migrationTip);
+        $dump = self::renderDump($pdo, $requestId, $migrationTip, $tables);
         if (@file_put_contents($path, $dump['sql'], LOCK_EX) === false) {
             throw new RuntimeException('BACKUP_WRITE_FAILED');
         }
@@ -86,7 +162,7 @@ final class MigrationBackupService
             'tables' => $dump['tables'],
             'row_counts' => $dump['row_counts'],
             'readback' => 'VERIFIED',
-        ];
+        ] + $extraMetadata;
 
         // The absolute location stays next to the dump instead of in the published
         // status, so CI logs never have to carry the server directory layout.
@@ -177,9 +253,10 @@ final class MigrationBackupService
     }
 
     /**
+     * @param list<string> $tables
      * @return array{sql: string, tables: list<string>, row_counts: array<string, int>}
      */
-    private static function renderDump(PDO $pdo, string $requestId, string $migrationTip): array
+    private static function renderDump(PDO $pdo, string $requestId, string $migrationTip, array $tables): array
     {
         $lines = [
             '-- Medisa pre-migration backup',
@@ -194,7 +271,7 @@ final class MigrationBackupService
         ];
         $rowCounts = [];
 
-        foreach (self::BACKED_UP_TABLES as $table) {
+        foreach ($tables as $table) {
             $createStatement = self::showCreate($pdo, $table);
             if ($createStatement === null) {
                 throw new RuntimeException('BACKUP_SOURCE_INCOMPLETE');
@@ -217,9 +294,53 @@ final class MigrationBackupService
 
         return [
             'sql' => implode("\n", $lines),
-            'tables' => self::BACKED_UP_TABLES,
+            'tables' => array_values($tables),
             'row_counts' => $rowCounts,
         ];
+    }
+
+    /**
+     * Index and foreign-key inventory of the backed-up tables. The dump already
+     * carries the definitions inside SHOW CREATE TABLE; this is the manifest-side
+     * summary a restore readback can compare against without parsing SQL.
+     *
+     * @param list<string> $tables
+     * @return array<string, array{indexes: int, foreign_keys: int}>
+     */
+    private static function schemaObjects(PDO $pdo, array $tables): array
+    {
+        $objects = [];
+        foreach ($tables as $table) {
+            $objects[$table] = [
+                'indexes' => self::metadataCount(
+                    $pdo,
+                    'SELECT COUNT(DISTINCT INDEX_NAME) FROM information_schema.STATISTICS
+                     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :table',
+                    $table
+                ),
+                'foreign_keys' => self::metadataCount(
+                    $pdo,
+                    "SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
+                     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :table
+                       AND CONSTRAINT_TYPE = 'FOREIGN KEY'",
+                    $table
+                ),
+            ];
+        }
+
+        return $objects;
+    }
+
+    private static function metadataCount(PDO $pdo, string $sql, string $table): int
+    {
+        try {
+            $statement = $pdo->prepare($sql);
+            $statement->execute(['table' => $table]);
+
+            return (int) $statement->fetchColumn();
+        } catch (Throwable $exception) {
+            return -1;
+        }
     }
 
     private static function showCreate(PDO $pdo, string $table): ?string

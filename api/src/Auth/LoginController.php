@@ -11,6 +11,7 @@ use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
 use Medisa\Api\Scope\OrgScope;
 use Medisa\Api\Scope\SubeScope;
+use Medisa\Api\Services\Organizasyon\SubeReadModel;
 use Medisa\Api\Services\Personel\PersonelOrgStructureSchema;
 use PDO;
 
@@ -71,9 +72,17 @@ class LoginController
             JsonResponse::error(401, 'INVALID_CREDENTIALS', 'Kullanici adi veya sifre hatali.');
         }
 
-        $subeIds = self::loadUserSubeIds($pdo, (int) $user['id']);
+        $explicitSubeIds = self::loadUserSubeIds($pdo, (int) $user['id']);
         $bolumIds = UserOrgAssignmentSchema::loadUserBolumIds($pdo, (int) $user['id']);
         $birimIds = UserOrgAssignmentSchema::loadUserBirimIds($pdo, (int) $user['id']);
+        $sirketIds = UserOrgAssignmentSchema::loadUserSirketIds($pdo, (int) $user['id']);
+        $sgkIsverenIds = UserOrgAssignmentSchema::loadUserSgkIsverenIds($pdo, (int) $user['id']);
+        // Same union the request-time authorization owner computes, so the session
+        // the client caches and the scope the backend enforces cannot disagree.
+        $subeIds = self::unionSubeIds(
+            $explicitSubeIds,
+            UserOrgAssignmentSchema::resolveSubeIdsForSirketIds($pdo, $sirketIds)
+        );
         $rolRaw = (string) $user['rol'];
         $rol = RolePermissions::normalizeRole($rolRaw);
         if ($rol === '') {
@@ -129,6 +138,9 @@ class LoginController
             'ad_soyad' => (string) $user['ad_soyad'],
             'rol' => $rol,
             'sube_ids' => $subeIds,
+            'explicit_sube_ids' => $explicitSubeIds,
+            'sirket_ids' => $sirketIds,
+            'sgk_isveren_ids' => $sgkIsverenIds,
             'bolum_ids' => $bolumIds,
             'birim_ids' => $birimIds,
         ];
@@ -197,6 +209,25 @@ class LoginController
         return $list;
     }
 
+    /**
+     * @param array<int, int> $explicit
+     * @param array<int, int> $fromSirketScope
+     * @return array<int, int>
+     */
+    private static function unionSubeIds(array $explicit, array $fromSirketScope)
+    {
+        $unique = [];
+        foreach (array_merge($explicit, $fromSirketScope) as $id) {
+            $value = (int) $id;
+            if ($value > 0 && !in_array($value, $unique, true)) {
+                $unique[] = $value;
+            }
+        }
+        sort($unique);
+
+        return $unique;
+    }
+
     /** @return array<int, int> */
     private static function loadUserSubeIds(PDO $pdo, $userId)
     {
@@ -217,26 +248,35 @@ class LoginController
      */
     private static function loadSubeList(PDO $pdo, array $subeIds, $unrestrictedEmpty = false)
     {
+        // The selector is a shared surface, so it shows the company-qualified
+        // name derived by the read model owner — the same string the header,
+        // reports and personnel screens show.
+        $sql = 'SELECT ' . SubeReadModel::selectColumns($pdo)
+            . ' FROM subeler s' . SubeReadModel::joinSql($pdo)
+            . " WHERE s.durum = 'AKTIF'";
+
         if (count($subeIds) === 0) {
             if (!$unrestrictedEmpty) {
                 return [];
             }
-            $stmt = $pdo->query('SELECT id, ad FROM subeler WHERE durum = "AKTIF" ORDER BY id ASC');
+            $stmt = $pdo->query($sql . ' ORDER BY s.id ASC');
             $rows = $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
         } else {
             $placeholders = implode(',', array_fill(0, count($subeIds), '?'));
-            $stmt = $pdo->prepare(
-                "SELECT id, ad FROM subeler WHERE id IN ($placeholders) AND durum = 'AKTIF' ORDER BY id ASC"
-            );
+            $stmt = $pdo->prepare($sql . " AND s.id IN ($placeholders) ORDER BY s.id ASC");
             $stmt->execute($subeIds);
             $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
         }
 
         $list = [];
         foreach ($rows as $row) {
+            $mapped = SubeReadModel::mapRow($row);
             $list[] = [
-                'id' => (int) $row['id'],
-                'ad' => (string) $row['ad'],
+                'id' => $mapped['id'],
+                'ad' => $mapped['tam_ad'],
+                'kisa_ad' => $mapped['ad'],
+                'tam_ad' => $mapped['tam_ad'],
+                'sirket' => $mapped['sirket'],
             ];
         }
 

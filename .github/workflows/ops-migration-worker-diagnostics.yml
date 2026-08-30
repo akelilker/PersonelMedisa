@@ -448,16 +448,17 @@ jobs:
           emit_list PENDING_MIGRATIONS '.ledger.pending_names'
           emit_list LEDGER_CHECKSUM_MISMATCH '.ledger.checksum_mismatch_versions'
           emit_list LEDGER_GAPS '.ledger.gap_versions'
-          emit_list STATE_INDEXES '(.schema.aylik_kapanis_state.indexes | keys)'
-          emit_list STATE_COLUMNS '(.schema.aylik_kapanis_state.columns | keys)'
-          emit_list OZET_INDEXES '(.schema.aylik_ozet_satirlari.indexes | keys)'
-          for guard in ozet_rows ozet_sube_null_rows ozet_sube_orphan_rows ozet_distinct_ay \
-            ozet_distinct_ay_sube_pairs ozet_duplicate_ay_sube_personel ozet_actor_columns_present \
-            state_rows state_distinct_ay state_duplicate_ay state_rows_expected_after_079; do
+          emit_list SUBE_COLUMNS '(.schema.subeler.columns | keys)'
+          emit_list SGK_ISVEREN_COLUMNS '(.schema.sgk_isverenler.columns | keys)'
+          emit_list LOKASYON_COLUMNS '(.schema.calisma_lokasyonlari.columns | keys)'
+          for guard in \
+            sube_rows sgk_isveren_rows calisma_lokasyonu_rows personel_rows \
+            user_sube_assignment_rows sirket_rows relation_columns_present \
+            sube_rows_expected_after_079 user_sube_assignment_rows_expected_after_079; do
             emit_scalar "GUARD_$(echo "$guard" | tr '[:lower:]' '[:upper:]')" ".guards.${guard}" '^-?[0-9]{1,12}$'
           done
-          for flag in branch_table_resolved state_sube_column_present state_legacy_unique_present \
-            state_composite_unique_present; do
+          for flag in branch_table_resolved sirketler_table_present \
+            user_sirketler_table_present user_sgk_isverenler_table_present; do
             emit_scalar "FLAG_$(echo "$flag" | tr '[:lower:]' '[:upper:]')" ".guards.${flag}" '^(true|false)$'
           done
           emit_list PREFLIGHT_BLOCKERS '.blockers'

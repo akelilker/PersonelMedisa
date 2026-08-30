@@ -16,12 +16,17 @@ use Throwable;
  * INSERT statements for exactly the tables a migration can damage, plus the
  * migration ledger preimage needed to put the ledger back.
  *
- * Scope is deliberately narrow — aylik_kapanis_state, aylik_ozet_satirlari and
- * medisa_schema_migrations. A whole-database dump is not attempted: it would not
+ * Scope is deliberately narrow — the owners migration 079 touches (subeler,
+ * sgk_isverenler, calisma_lokasyonlari and the branch assignment table) plus the
+ * migration ledger preimage. A whole-database dump is not attempted: it would not
  * finish inside a cron tick and it would copy far more personal data than the
  * rollback of one migration needs.
  *
- * The dump contains real closing rows, so it may only ever be written outside the
+ * The tables 079 creates (sirketler, user_sirketler, user_sgk_isverenler) are not
+ * backed up: they do not exist in the preimage, so the rollback for them is a
+ * DROP, not a restore.
+ *
+ * The dump contains real organisation rows, so it may only ever be written outside the
  * webroot. When no such location can be resolved the backup fails closed and the
  * migration does not start; it never falls back to a web-reachable directory.
  *
@@ -34,8 +39,10 @@ final class MigrationBackupService
 
     /** @var list<string> */
     private const BACKED_UP_TABLES = [
-        'aylik_kapanis_state',
-        'aylik_ozet_satirlari',
+        'subeler',
+        'sgk_isverenler',
+        'calisma_lokasyonlari',
+        'user_subeler',
         'medisa_schema_migrations',
     ];
 

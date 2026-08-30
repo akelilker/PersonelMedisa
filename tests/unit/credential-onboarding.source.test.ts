@@ -148,7 +148,7 @@ describe("credential onboarding owners (MG-CRED-ONBOARD-001)", () => {
     expect(migrations.at(-4)).toBe("076_dis_kaynak_gecici_gorevlendirme.sql");
     expect(migrations.at(-3)).toBe("077_legacy_role_enum_shrink.sql");
     expect(migrations.at(-2)).toBe("078_personel_sicil_sequence.sql");
-    expect(migrations.at(-1)).toBe("079_aylik_kapanis_sube_scope_and_actor.sql");
+    expect(migrations.at(-1)).toBe("079_sirket_sube_hiyerarsisi.sql");
 
     const migration069 = read("api/migrations/069_personel_credential_onboarding.sql");
     const checksum069 = createHash("sha256").update(migration069).digest("hex");
@@ -175,7 +175,7 @@ describe("credential onboarding owners (MG-CRED-ONBOARD-001)", () => {
     expect(bundleTest).toContain("'name' => '076_dis_kaynak_gecici_gorevlendirme.sql'");
     expect(bundleTest).toContain("'name' => '077_legacy_role_enum_shrink.sql'");
     expect(bundleTest).toContain("'name' => '078_personel_sicil_sequence.sql'");
-    expect(bundleTest).toContain("'name' => '079_aylik_kapanis_sube_scope_and_actor.sql'");
+    expect(bundleTest).toContain("'name' => '079_sirket_sube_hiyerarsisi.sql'");
     expect(bundleTest).toContain("checksum069");
     expect(bundleTest).toContain("checksum070");
     expect(bundleTest).toContain("checksum071");

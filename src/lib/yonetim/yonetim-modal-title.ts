@@ -2,7 +2,7 @@ export type YonetimPanelTab = "kullanicilar" | "subeler" | "mevzuat" | "saklama"
 
 const YONETIM_MODAL_TITLES: Record<YonetimPanelTab, string> = {
   kullanicilar: "KULLANICI YÖNETİMİ",
-  subeler: "ŞUBE YÖNETİMİ",
+  subeler: "ŞİRKET VE ŞUBE YÖNETİMİ",
   mevzuat: "MEVZUAT PARAMETRELERİ",
   saklama: "SAKLAMA VE İMHA YÖNETİMİ"
 };

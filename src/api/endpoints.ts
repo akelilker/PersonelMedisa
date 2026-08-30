@@ -302,6 +302,12 @@ export const endpoints = {
     kullaniciActorIdentity: (id: number | string) => `/yonetim/kullanicilar/${id}/actor-identity`,
     subeler: "/yonetim/subeler",
     subeDetail: (id: number | string) => `/yonetim/subeler/${id}`,
+    organizasyonReadiness: "/yonetim/organizasyon-readiness",
+    sirketler: "/yonetim/sirketler",
+    sirketDetail: (id: number | string) => `/yonetim/sirketler/${id}`,
+    sirketSubeler: (id: number | string) => `/yonetim/sirketler/${id}/subeler`,
+    sirketSubeDetail: (sirketId: number | string, subeId: number | string) =>
+      `/yonetim/sirketler/${sirketId}/subeler/${subeId}`,
     aylikOzet: "/yonetim/aylik-ozet",
     aylikOzetBolumOnay: "/yonetim/aylik-ozet/bolum-onay",
     aylikOzetKapat: "/yonetim/aylik-ozet/ay-kapat"

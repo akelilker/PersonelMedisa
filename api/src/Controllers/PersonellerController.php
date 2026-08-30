@@ -23,6 +23,8 @@ use Medisa\Api\Services\Personel\PersonelImportDryRunService;
 use Medisa\Api\Services\Personel\PersonelImportException;
 use Medisa\Api\Services\Personel\PersonelImportHistoryService;
 use Medisa\Api\Services\Personel\PersonelImportReferenceCatalogService;
+use Medisa\Api\Services\Organizasyon\OrganizasyonSchema;
+use Medisa\Api\Services\Organizasyon\SubeReadModel;
 use Medisa\Api\Services\Personel\PersonelOrgLocationSchema;
 use Medisa\Api\Services\Personel\PersonelOrgStructureSchema;
 use Medisa\Api\Services\Personel\PersonelSearchPredicate;
@@ -1205,6 +1207,26 @@ class PersonellerController
         $stmt->execute($params);
     }
 
+    /**
+     * Shared display name for the personnel record's branch, delegated to the
+     * single read-model owner. Null branch stays null.
+     *
+     * @param array<string, mixed> $row
+     * @return string|null
+     */
+    private static function subeGosterimAdi(array $row)
+    {
+        $subeAd = $row['sube_adi'] ?? null;
+        if ($subeAd === null || $subeAd === '') {
+            return $subeAd;
+        }
+
+        return SubeReadModel::tamAd(
+            array_key_exists('sube_sirket_adi', $row) ? $row['sube_sirket_adi'] : null,
+            (string) $subeAd
+        );
+    }
+
     /** @return array{columns:string,joins:string} */
     private static function personelSelectSql(PDO $pdo)
     {
@@ -1215,6 +1237,14 @@ class PersonellerController
             LEFT JOIN gorevler g ON g.id = p.gorev_id
             LEFT JOIN personel_tipleri pt ON pt.id = p.personel_tipi_id
         ";
+        if (OrganizasyonSchema::isSchemaReady($pdo)) {
+            // Personnel screens are a shared surface: they show the derived
+            // company-qualified branch name, not the raw short name.
+            $columns .= ', sirket_of_sube.ad AS sube_sirket_adi';
+            $joins .= "
+            LEFT JOIN sirketler sirket_of_sube ON sirket_of_sube.id = s.sirket_id
+            ";
+        }
         if (PersonelOrgLocationSchema::isReady($pdo)) {
             $columns .= ', si.ad AS sgk_isveren_adi, cl.ad AS calisma_lokasyonu_adi';
             $joins .= "
@@ -1382,7 +1412,8 @@ class PersonellerController
                 : null,
             'personel_tipi_id' => $row['personel_tipi_id'] !== null ? (int) $row['personel_tipi_id'] : null,
             'bagli_amir_id' => $row['bagli_amir_id'] !== null ? (int) $row['bagli_amir_id'] : null,
-            'sube_adi' => $row['sube_adi'],
+            'sube_adi' => self::subeGosterimAdi($row),
+            'sube_kisa_adi' => $row['sube_adi'],
             'sgk_isveren_adi' => array_key_exists('sgk_isveren_adi', $row) ? $row['sgk_isveren_adi'] : null,
             'calisma_lokasyonu_adi' => array_key_exists('calisma_lokasyonu_adi', $row)
                 ? $row['calisma_lokasyonu_adi']
@@ -1402,7 +1433,7 @@ class PersonellerController
             'pozisyon_adi' => array_key_exists('pozisyon_adi', $row) ? $row['pozisyon_adi'] : null,
             'personel_tipi_adi' => $row['personel_tipi_adi'],
             'referans_adlari' => [
-                'sube' => $row['sube_adi'],
+                'sube' => self::subeGosterimAdi($row),
                 'sgk_isveren' => array_key_exists('sgk_isveren_adi', $row) ? $row['sgk_isveren_adi'] : null,
                 'calisma_lokasyonu' => array_key_exists('calisma_lokasyonu_adi', $row)
                     ? $row['calisma_lokasyonu_adi']

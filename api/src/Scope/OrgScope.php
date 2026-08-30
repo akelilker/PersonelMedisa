@@ -37,6 +37,18 @@ class OrgScope
     const BIRIM_ASSIGNMENT_ROLES = ['BIRIM_AMIRI'];
 
     /**
+     * Roles that may hold a company-wide scope (user_sirketler).
+     *
+     * SUBE_YONETICISI is deliberately absent: a branch manager stays confined to
+     * the branches explicitly granted in user_subeler and must never be widened
+     * to every branch of a company. Global roles need no grant at all.
+     */
+    const SIRKET_SCOPE_ELIGIBLE_ROLES = ['IK_SORUMLUSU', 'MUHASEBE'];
+
+    /** Roles that may hold an SGK/payroll-employer scope (user_sgk_isverenler). */
+    const SGK_SCOPE_ELIGIBLE_ROLES = ['IK_SORUMLUSU', 'MUHASEBE'];
+
+    /**
      * @param array<string, mixed> $user
      */
     public static function normalizeRole(array $user)
@@ -61,6 +73,56 @@ class OrgScope
     public static function allowedSubeIds(array $user)
     {
         return self::normalizePositiveIds(isset($user['sube_ids']) && is_array($user['sube_ids']) ? $user['sube_ids'] : []);
+    }
+
+    /**
+     * Explicit branch grants only (user_subeler), without the branches a company
+     * scope resolves to. Needed wherever the *assignment* matters rather than the
+     * effective visibility — e.g. proving that a company scope was not
+     * materialised into user_subeler.
+     *
+     * @param array<string, mixed> $user
+     * @return array<int, int>
+     */
+    public static function explicitSubeIds(array $user)
+    {
+        if (isset($user['explicit_sube_ids']) && is_array($user['explicit_sube_ids'])) {
+            return self::normalizePositiveIds($user['explicit_sube_ids']);
+        }
+
+        return self::allowedSubeIds($user);
+    }
+
+    /**
+     * @param array<string, mixed> $user
+     * @return array<int, int>
+     */
+    public static function allowedSirketIds(array $user)
+    {
+        return self::normalizePositiveIds(isset($user['sirket_ids']) && is_array($user['sirket_ids']) ? $user['sirket_ids'] : []);
+    }
+
+    /**
+     * @param array<string, mixed> $user
+     * @return array<int, int>
+     */
+    public static function allowedSgkIsverenIds(array $user)
+    {
+        return self::normalizePositiveIds(isset($user['sgk_isveren_ids']) && is_array($user['sgk_isveren_ids']) ? $user['sgk_isveren_ids'] : []);
+    }
+
+    /** @param array<int, mixed> $ids */
+    public static function isSirketScopeEligible($role, array $ids = [])
+    {
+        return count(self::normalizePositiveIds($ids)) === 0
+            || in_array(RolePermissions::normalizeRole((string) $role), self::SIRKET_SCOPE_ELIGIBLE_ROLES, true);
+    }
+
+    /** @param array<int, mixed> $ids */
+    public static function isSgkScopeEligible($role, array $ids = [])
+    {
+        return count(self::normalizePositiveIds($ids)) === 0
+            || in_array(RolePermissions::normalizeRole((string) $role), self::SGK_SCOPE_ELIGIBLE_ROLES, true);
     }
 
     /**
@@ -114,7 +176,10 @@ class OrgScope
         }
 
         if (in_array($role, self::SUBE_ASSIGNMENT_ROLES, true)) {
-            if (count(self::allowedSubeIds($user)) === 0) {
+            // allowedSubeIds already contains the branches a company scope
+            // resolves to. An SGK-only grant has no branch axis at all, so it is
+            // checked separately rather than being faked as a branch list.
+            if (count(self::allowedSubeIds($user)) === 0 && count(self::allowedSgkIsverenIds($user)) === 0) {
                 JsonResponse::forbidden('Sube kapsami atanmamis.');
             }
         }
@@ -155,6 +220,13 @@ class OrgScope
         }
 
         if (count($allowed) === 0) {
+            // SGK/payroll-only scope has no branch axis; the active branch can
+            // only narrow such a user, never authorize them, so it is passed
+            // through and the personnel filter keeps confining on sgk_isveren_id.
+            if (count(self::allowedSgkIsverenIds($user)) > 0) {
+                return $requested;
+            }
+
             JsonResponse::forbidden('Sube kapsami atanmamis.');
         }
 
@@ -262,7 +334,17 @@ class OrgScope
 
         $allowedSube = self::allowedSubeIds($user);
         if (count($allowedSube) === 0 || !in_array($subeId, $allowedSube, true)) {
-            JsonResponse::forbidden();
+            // Payroll-employer scope is a second, independent axis: the record may
+            // be outside every granted branch and still be inside the granted SGK
+            // employer. Read from the personnel row, never guessed from the branch.
+            $allowedSgk = self::allowedSgkIsverenIds($user);
+            $personelSgkId = 0;
+            if (is_array($personelOrg) && isset($personelOrg['sgk_isveren_id'])) {
+                $personelSgkId = (int) $personelOrg['sgk_isveren_id'];
+            }
+            if (count($allowedSgk) === 0 || $personelSgkId <= 0 || !in_array($personelSgkId, $allowedSgk, true)) {
+                JsonResponse::forbidden();
+            }
         }
 
         $scope = self::resolveActiveSubeId($user, $request);
@@ -402,6 +484,70 @@ class OrgScope
         }
 
         $allowedSube = self::allowedSubeIds($user);
+        $allowedSgk = self::allowedSgkIsverenIds($user);
+
+        // The branch axis and the payroll axis are combined with OR, never
+        // substituted for one another: an SGK scope resolves straight off
+        // personeller.sgk_isveren_id
+        // and is never inferred from a physical branch.
+        $branchWhere = [];
+        self::appendBranchScopedPersonelFilter(
+            $branchWhere,
+            $params,
+            $user,
+            $allowedSube,
+            $activeSubeScope,
+            $col,
+            $paramPrefix,
+            $pdo,
+            $assignmentAware
+        );
+
+        if (count($allowedSgk) > 0) {
+            $sgkWhere = [];
+            self::appendInFilter($sgkWhere, $params, $col . 'sgk_isveren_id', $allowedSgk, $paramPrefix . '_sgk');
+            if ($activeSubeScope !== null) {
+                $key = $paramPrefix . '_sgk_active_sube';
+                $params[$key] = (int) $activeSubeScope;
+                $sgkWhere[] = $col . 'sube_id = :' . $key;
+            }
+            $branchWhere = array_values(array_filter($branchWhere, function ($clause) {
+                return $clause !== '1=0';
+            }));
+            $sgkClause = '(' . implode(' AND ', $sgkWhere) . ')';
+            $where[] = count($branchWhere) === 0
+                ? $sgkClause
+                : '((' . implode(' AND ', $branchWhere) . ') OR ' . $sgkClause . ')';
+
+            return;
+        }
+
+        foreach ($branchWhere as $clause) {
+            $where[] = $clause;
+        }
+    }
+
+    /**
+     * Branch-axis predicate for branch-scoped roles, extracted so the SGK axis
+     * can be OR-combined with it instead of duplicating the assignment-aware logic.
+     *
+     * @param array<int, string> $where
+     * @param array<string, mixed> $params
+     * @param array<string, mixed> $user
+     * @param array<int, int> $allowedSube
+     * @param int|null $activeSubeScope
+     */
+    private static function appendBranchScopedPersonelFilter(
+        array &$where,
+        array &$params,
+        array $user,
+        array $allowedSube,
+        $activeSubeScope,
+        $col,
+        $paramPrefix,
+        $pdo,
+        $assignmentAware
+    ) {
         if (count($allowedSube) === 0) {
             $where[] = '1=0';
 

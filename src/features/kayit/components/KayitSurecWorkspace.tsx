@@ -729,7 +729,7 @@ export function KayitSurecWorkspace({
       setSubeOptions(
         subeler
           .filter((sube) => sube.durum === "AKTIF")
-          .map((sube) => ({ id: sube.id, label: sube.ad }))
+          .map((sube) => ({ id: sube.id, label: sube.tam_ad }))
       );
       setSubeLoadError(null);
 

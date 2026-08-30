@@ -88,10 +88,25 @@ export type YonetimActorIdentityRead = {
   readiness_code?: string | null;
 };
 
+export type YonetimOrgRelation = {
+  id: number;
+  kod: string | null;
+  ad: string;
+};
+
 export type YonetimSube = {
   id: number;
   kod: string;
+  /** Short branch name, e.g. "Ankara". Company detail screens show this. */
   ad: string;
+  /**
+   * Shared display name, e.g. "Medisa Ankara". Read-only and derived by the
+   * backend read model — never concatenated in the frontend and never sent on
+   * a write payload.
+   */
+  tam_ad: string;
+  sirket: YonetimOrgRelation | null;
+  sgk_isveren: YonetimOrgRelation | null;
   departman_ids: number[];
   departman_adlari: string[];
   durum: KayitDurumu;
@@ -102,6 +117,36 @@ export type UpsertYonetimSubePayload = {
   ad: string;
   departman_ids: number[];
   durum: KayitDurumu;
+  sgk_isveren_id?: number | null;
+};
+
+export type YonetimSirket = {
+  id: number;
+  kod: string;
+  ad: string;
+  durum: KayitDurumu;
+  sube_sayisi: number;
+};
+
+export type UpsertYonetimSirketPayload = {
+  kod?: string;
+  ad: string;
+  durum: KayitDurumu;
+};
+
+export type OrganizasyonReadiness = {
+  schema_ready: boolean;
+  data_ready: boolean;
+  counts: {
+    sirket_count: number;
+    sube_count: number;
+    unmapped_sube_count: number;
+    unmapped_sgk_isveren_count: number;
+    orphan_sube_sirket_count: number;
+    orphan_lokasyon_sube_count: number;
+    sube_sgk_sirket_mismatch_count: number;
+  };
+  blockers: string[];
 };
 
 /** Bölüm satırı: üst onay `kapanis_durumu` ile taşınır; bu alanda KAPANDI kullanılmaz. */

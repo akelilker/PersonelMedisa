@@ -51,7 +51,7 @@ describe("RevizyonController correction MariaDB", () => {
     const migrations = readdirSync(resolve(process.cwd(), "api/migrations"))
       .filter((name) => name.endsWith(".sql"))
       .sort();
-    expect(migrations.at(-1)).toBe("079_aylik_kapanis_sube_scope_and_actor.sql");
+    expect(migrations.at(-1)).toBe("079_sirket_sube_hiyerarsisi.sql");
   });
 
   it("runs HTTP revizyon correction acceptance on MariaDB", () => {

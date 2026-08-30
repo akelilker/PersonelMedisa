@@ -11,10 +11,14 @@ import type {
   PersonelActivationMetaResponse,
   PersonelActivationStatus,
   PersonelHesapOnboardingResult,
+  OrganizasyonReadiness,
   UpsertYonetimKullaniciPayload,
+  UpsertYonetimSirketPayload,
   UpsertYonetimSubePayload,
   YonetimActorIdentityRead,
   YonetimKullanici,
+  YonetimOrgRelation,
+  YonetimSirket,
   YonetimSube
 } from "../types/yonetim";
 import type { UserRole } from "../types/auth";
@@ -183,6 +187,42 @@ function normalizeYonetimKullanici(data: unknown): YonetimKullanici {
   };
 }
 
+function normalizeOrgRelation(data: unknown): YonetimOrgRelation | null {
+  const record = toRecord(data);
+  if (!record) {
+    return null;
+  }
+  const id = readNumber(record.id);
+  const ad = readString(record.ad);
+  if (!id || !ad) {
+    return null;
+  }
+
+  return { id, kod: readString(record.kod) ?? null, ad };
+}
+
+function normalizeYonetimSirket(data: unknown): YonetimSirket {
+  const record = toRecord(data);
+  if (!record) {
+    throw new Error("Sirket yaniti beklenen formatta degil.");
+  }
+
+  const id = readNumber(record.id);
+  const kod = readString(record.kod);
+  const ad = readString(record.ad);
+  if (!id || !kod || !ad) {
+    throw new Error("Sirket yaniti zorunlu alanlari icermiyor.");
+  }
+
+  return {
+    id,
+    kod,
+    ad,
+    durum: normalizeKayitDurumu(record.durum),
+    sube_sayisi: readNumber(record.sube_sayisi) ?? 0
+  };
+}
+
 function normalizeYonetimSube(data: unknown): YonetimSube {
   const record = toRecord(data);
   if (!record) {
@@ -200,6 +240,11 @@ function normalizeYonetimSube(data: unknown): YonetimSube {
     id,
     kod,
     ad,
+    // Never rebuilt here: the backend read model owns the derived display name.
+    // On a legacy/unmapped record it already equals the raw short name.
+    tam_ad: readString(record.tam_ad) ?? ad,
+    sirket: normalizeOrgRelation(record.sirket),
+    sgk_isveren: normalizeOrgRelation(record.sgk_isveren),
     departman_ids: readNumberArray(record.departman_ids),
     departman_adlari: Array.isArray(record.departman_adlari)
       ? record.departman_adlari
@@ -402,7 +447,8 @@ function throwYonetimApiError(response: ApiResponse<unknown>, fallbackMessage: s
   const first = Array.isArray(response.errors) ? response.errors[0] : null;
   const message = typeof first?.message === "string" && first.message.trim() ? first.message : fallbackMessage;
   const code = typeof first?.code === "string" ? first.code : undefined;
-  const status = code === SUBE_DELETE_BLOCKED_ERROR_CODE ? 409 : 400;
+  const conflictCodes = [SUBE_DELETE_BLOCKED_ERROR_CODE, "SIRKET_HAS_DEPENDENTS", "SUBE_HAS_LOKASYON"];
+  const status = code && conflictCodes.includes(code) ? 409 : 400;
 
   throw new ApiRequestError(message, status, code ? { code } : undefined);
 }
@@ -412,6 +458,108 @@ export async function deleteYonetimSube(subeId: number | string): Promise<void> 
     method: "DELETE"
   });
 
+  if (Array.isArray(response.errors) && response.errors.length > 0) {
+    throwYonetimApiError(response, "Şube silinemedi.");
+  }
+}
+
+export async function fetchOrganizasyonReadiness(): Promise<OrganizasyonReadiness> {
+  const response = await apiRequest<ApiResponse<unknown>>(endpoints.yonetim.organizasyonReadiness);
+  const record = toRecord(response.data) ?? {};
+  const counts = toRecord(record.counts) ?? {};
+
+  return {
+    schema_ready: record.schema_ready === true,
+    data_ready: record.data_ready === true,
+    counts: {
+      sirket_count: readNumber(counts.sirket_count) ?? 0,
+      sube_count: readNumber(counts.sube_count) ?? 0,
+      unmapped_sube_count: readNumber(counts.unmapped_sube_count) ?? 0,
+      unmapped_sgk_isveren_count: readNumber(counts.unmapped_sgk_isveren_count) ?? 0,
+      orphan_sube_sirket_count: readNumber(counts.orphan_sube_sirket_count) ?? 0,
+      orphan_lokasyon_sube_count: readNumber(counts.orphan_lokasyon_sube_count) ?? 0,
+      sube_sgk_sirket_mismatch_count: readNumber(counts.sube_sgk_sirket_mismatch_count) ?? 0
+    },
+    blockers: Array.isArray(record.blockers)
+      ? record.blockers.map((item) => readString(item)).filter((item): item is string => typeof item === "string")
+      : []
+  };
+}
+
+export async function fetchYonetimSirketleri(): Promise<YonetimSirket[]> {
+  const response = await apiRequest<ApiResponse<unknown>>(endpoints.yonetim.sirketler);
+  return extractListItems(response.data).map(normalizeYonetimSirket);
+}
+
+export async function createYonetimSirket(payload: UpsertYonetimSirketPayload): Promise<YonetimSirket> {
+  const response = await apiRequest<ApiResponse<unknown>>(endpoints.yonetim.sirketler, {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+  return normalizeYonetimSirket(response.data);
+}
+
+export async function updateYonetimSirket(
+  sirketId: number | string,
+  payload: UpsertYonetimSirketPayload
+): Promise<YonetimSirket> {
+  // `kod` is immutable server-side; it is never part of an update payload.
+  const { kod: _immutableKod, ...rest } = payload;
+  const response = await apiRequest<ApiResponse<unknown>>(endpoints.yonetim.sirketDetail(sirketId), {
+    method: "PUT",
+    body: JSON.stringify(rest)
+  });
+  return normalizeYonetimSirket(response.data);
+}
+
+export async function deleteYonetimSirket(sirketId: number | string): Promise<void> {
+  const response = await apiRequest<ApiResponse<unknown>>(endpoints.yonetim.sirketDetail(sirketId), {
+    method: "DELETE"
+  });
+  if (Array.isArray(response.errors) && response.errors.length > 0) {
+    throwYonetimApiError(response, "Şirket silinemedi.");
+  }
+}
+
+export async function fetchSirketSubeleri(sirketId: number | string): Promise<YonetimSube[]> {
+  const response = await apiRequest<ApiResponse<unknown>>(endpoints.yonetim.sirketSubeler(sirketId));
+  const record = toRecord(response.data);
+  return extractListItems(record?.items ?? response.data).map(normalizeYonetimSube);
+}
+
+export async function createSirketSube(
+  sirketId: number | string,
+  payload: UpsertYonetimSubePayload
+): Promise<YonetimSube> {
+  const response = await apiRequest<ApiResponse<unknown>>(endpoints.yonetim.sirketSubeler(sirketId), {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+  return normalizeYonetimSube(response.data);
+}
+
+export async function updateSirketSube(
+  sirketId: number | string,
+  subeId: number | string,
+  payload: UpsertYonetimSubePayload
+): Promise<YonetimSube> {
+  // Branch `kod` is immutable on edit, mirroring the server-side rule.
+  const { kod: _immutableKod, ...rest } = payload;
+  const response = await apiRequest<ApiResponse<unknown>>(
+    endpoints.yonetim.sirketSubeDetail(sirketId, subeId),
+    { method: "PUT", body: JSON.stringify(rest) }
+  );
+  return normalizeYonetimSube(response.data);
+}
+
+export async function deleteSirketSube(
+  sirketId: number | string,
+  subeId: number | string
+): Promise<void> {
+  const response = await apiRequest<ApiResponse<unknown>>(
+    endpoints.yonetim.sirketSubeDetail(sirketId, subeId),
+    { method: "DELETE" }
+  );
   if (Array.isArray(response.errors) && response.errors.length > 0) {
     throwYonetimApiError(response, "Şube silinemedi.");
   }

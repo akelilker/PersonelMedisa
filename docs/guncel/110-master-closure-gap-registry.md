@@ -11,7 +11,7 @@ PRODUCTION_MIGRATION_TIP: 078
 
 | Alan | Değer | Kanıt / sınır |
 | --- | --- | --- |
-| CODE_MIGRATION_TIP | **079** | Repodaki son migration: `079_aylik_kapanis_sube_scope_and_actor.sql` (production'a uygulanmadı) |
+| CODE_MIGRATION_TIP | **079** | Repodaki son migration: `079_sirket_sube_hiyerarsisi.sql` (production'a uygulanmadı). Eski `079_aylik_kapanis_sube_scope_and_actor.sql` iş modeli yanlış olduğu için geri çekildi; canonical kaynaktan çıkarıldı ve hiçbir koşulda uygulanmaz (MG-SIRKET-SUBE-HIYERARSI-001) |
 | PRODUCTION_MIGRATION_TIP | **078** | `078_personel_sicil_sequence.sql` production'a uygulandı; otomatik sicil sequence owner'ı canlı |
 | Otomatik sicil owner | **`PersonelSicilAllocator`** | `api/src/Services/Personel/PersonelSicilAllocator.php` + singleton tablo `personel_sicil_sequence` (migration 078); interaktif create'te `sicil_no` gönderilmez, backend tahsis eder |
 | Canlı migration doğrulaması | **PASS** | Tip `078`; pending 079+ yok; migration workflow bu turda **tekrar çalıştırılmaz** |

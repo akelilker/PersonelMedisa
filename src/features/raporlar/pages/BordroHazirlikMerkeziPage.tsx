@@ -249,7 +249,7 @@ export function BordroHazirlikMerkeziPage() {
       setFilters((prev) => (prev.subeId === String(activeSubeId) ? prev : { ...prev, subeId: String(activeSubeId) }));
     }
     void fetchYonetimSubeleri().then((items) => {
-      if (items.length > 0) setSubeOptions(items.map((item) => ({ id: item.id, label: item.ad })));
+      if (items.length > 0) setSubeOptions(items.map((item) => ({ id: item.id, label: item.tam_ad })));
     });
   }, [session?.active_sube_id, session?.sube_list]);
 

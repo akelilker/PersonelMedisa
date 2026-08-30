@@ -35,13 +35,15 @@ describe("Pack7B open branch-department import contract", () => {
   });
 
   it("keeps Yönetim matrix config and Revizyon department-scope join unchanged", () => {
-    const yonetim = read("api/src/Controllers/YonetimController.php");
+    // Branch writes now live in the organisation domain service; the matrix
+    // config itself is unchanged, only its owner moved out of the controller.
+    const organizasyon = read("api/src/Services/Organizasyon/OrganizasyonService.php");
     const revizyon = read("api/src/Controllers/RevizyonController.php");
     const historical = read("docs/guncel/123-personnel-import-data-readiness.md");
 
-    expect(yonetim).toContain("function replaceSubeDepartmanlar");
-    expect(yonetim).toContain("DELETE FROM sube_departmanlar WHERE sube_id = :sube_id");
-    expect(yonetim).toContain("INSERT INTO sube_departmanlar (sube_id, departman_id)");
+    expect(organizasyon).toContain("function replaceSubeDepartmanlar");
+    expect(organizasyon).toContain("DELETE FROM sube_departmanlar WHERE sube_id = :sube_id");
+    expect(organizasyon).toContain("INSERT INTO sube_departmanlar (sube_id, departman_id)");
     expect(revizyon).toContain("INNER JOIN sube_departmanlar sd ON sd.sube_id = us.sube_id");
     expect(historical).toContain("PERSONEL_IMPORT_SUBE_DEPARTMAN_ILISKISI");
     expect(historical).toContain("| DRY_RUN_VALID | **40** |");

@@ -13,7 +13,15 @@ export type UiProfile = "yonetim" | "birim_amiri";
 
 export type SubeInfo = {
   id: number;
+  /**
+   * Shared display name derived by the backend read model: company-qualified
+   * ("Medisa Ankara") once the branch is mapped, the raw branch name otherwise.
+   * Consumers render this as-is and never concatenate a company name themselves.
+   */
   ad: string;
+  /** Raw short branch name ("Ankara"), for company-scoped screens. */
+  kisa_ad?: string;
+  tam_ad?: string;
 };
 
 export type AuthUser = {
@@ -25,6 +33,16 @@ export type AuthUser = {
    * Empty is unrestricted ONLY for GENEL_YONETICI / SISTEM_YONETICISI.
    */
   sube_ids: number[];
+  /**
+   * Explicit user_subeler grants only, without the branches a company scope
+   * resolves to. Present so the union in `sube_ids` stays inspectable and a
+   * company scope is provably not materialised into branch assignments.
+   */
+  explicit_sube_ids?: number[];
+  /** Company-wide scope (user_sirketler). Resolved to branches per request. */
+  sirket_ids?: number[];
+  /** Payroll-employer scope (user_sgk_isverenler), an axis of its own. */
+  sgk_isveren_ids?: number[];
   /** Authoritative department assignment (user_bolumler). */
   bolum_ids?: number[];
   /** Authoritative unit assignment (user_birimler). */

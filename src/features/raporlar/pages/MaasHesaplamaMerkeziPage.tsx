@@ -168,7 +168,7 @@ export function MaasHesaplamaMerkeziPage() {
               ? yonetimSubeler.filter((sube) => allowedSubeIds.includes(sube.id))
               : yonetimSubeler;
           if (scoped.length > 0) {
-            setSubeOptions(scoped.map((sube) => ({ id: sube.id, label: sube.ad })));
+            setSubeOptions(scoped.map((sube) => ({ id: sube.id, label: sube.tam_ad })));
           }
         }
       } catch {

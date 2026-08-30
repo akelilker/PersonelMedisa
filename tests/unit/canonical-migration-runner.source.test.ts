@@ -29,7 +29,7 @@ describe('canonical migration runner contract', () => {
   it('owns the contiguous 001→079 filesystem migration chain', () => {
     const numbers = migrations.map((name) => Number.parseInt(name.slice(0, 3), 10));
     expect(migrations[0]).toBe('001_initial_schema.sql');
-    expect(migrations.at(-1)).toBe('079_aylik_kapanis_sube_scope_and_actor.sql');
+    expect(migrations.at(-1)).toBe('079_sirket_sube_hiyerarsisi.sql');
     expect(migrations).toHaveLength(79);
     expect(new Set(numbers).size).toBe(79);
     expect(numbers).toEqual(Array.from({ length: 79 }, (_, index) => index + 1));
@@ -47,7 +47,7 @@ describe('canonical migration runner contract', () => {
       migrations.indexOf('078_personel_sicil_sequence.sql') - 1,
     );
     expect(migrations.indexOf('078_personel_sicil_sequence.sql')).toBe(
-      migrations.indexOf('079_aylik_kapanis_sube_scope_and_actor.sql') - 1,
+      migrations.indexOf('079_sirket_sube_hiyerarsisi.sql') - 1,
     );
     expect(migrations.filter((name) => name.startsWith('075_'))).toHaveLength(1);
     expect(migrations.filter((name) => name.startsWith('076_'))).toHaveLength(1);

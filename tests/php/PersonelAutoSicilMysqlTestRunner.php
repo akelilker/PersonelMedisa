@@ -235,7 +235,7 @@ try {
     }));
     sort($chain, SORT_STRING);
     autoSicilAssert(
-        end($chain) === '079_aylik_kapanis_sube_scope_and_actor.sql',
+        end($chain) === '079_sirket_sube_hiyerarsisi.sql',
         '079 canonical migration tip'
     );
     autoSicilAssert(

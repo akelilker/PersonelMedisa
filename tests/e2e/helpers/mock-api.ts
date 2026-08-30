@@ -6,6 +6,7 @@ import {
   SUBE_DELETE_BLOCKED_ERROR_CODE,
   SUBE_DELETE_BLOCKED_MESSAGE
 } from "../../../src/lib/yonetim/sube-delete";
+import { deriveSubeTamAd, normalizeOrgName } from "../../../src/lib/organizasyon/sube-display-name";
 import {
   computeGecerlilikDurumu,
   deriveTakipDurumu,
@@ -3464,10 +3465,83 @@ export async function mockApi(page: Page, role: MockUserRole, options: MockApiOp
     { id: 8, ad: "8 No'lu Prim Kuralı" }
   ];
 
+  const sirketler: Array<{
+    id: number;
+    kod: string;
+    ad: string;
+    durum: "AKTIF" | "PASIF";
+  }> = [
+    { id: 1, kod: "MED", ad: "Medisa", durum: "AKTIF" },
+    { id: 2, kod: "KAR", ad: "Karyapı", durum: "AKTIF" }
+  ];
+  let sirketIdCounter = 2;
+
+  function mapSirket(item: (typeof sirketler)[number]) {
+    return { ...item, sube_sayisi: subeler.filter((sube) => sube.sirket_id === item.id).length };
+  }
+
+  function mapSube(item: (typeof subeler)[number]) {
+    const sirket = sirketler.find((row) => row.id === item.sirket_id) ?? null;
+    return {
+      ...item,
+      tam_ad: deriveSubeTamAd(sirket?.ad ?? null, item.ad),
+      sirket: sirket ? { id: sirket.id, kod: sirket.kod, ad: sirket.ad } : null,
+      sgk_isveren: null
+    };
+  }
+
+  /**
+   * Mirrors the backend write contract for a nested branch: tam_ad is derived,
+   * the parent company comes from the route, and the short name is unique inside
+   * the company only.
+   */
+  function validateNestedSubeWrite(
+    payload: { kod?: string; ad?: string; tam_ad?: string; sirket_id?: number },
+    sirketId: number,
+    target: (typeof subeler)[number] | null
+  ): { status: number; body: ReturnType<typeof errorBody> } | null {
+    if (payload.tam_ad !== undefined) {
+      return {
+        status: 400,
+        body: errorBody("VALIDATION_ERROR", "tam_ad turetilmis bir okuma alanidir.", "tam_ad")
+      };
+    }
+    if (payload.sirket_id !== undefined) {
+      return {
+        status: 400,
+        body: errorBody("VALIDATION_ERROR", "Sirket baglami route uzerinden gelir.", "sirket_id")
+      };
+    }
+    const kod = (payload.kod ?? target?.kod ?? "").trim();
+    if (target && payload.kod != null && kod !== target.kod) {
+      return { status: 409, body: errorBody("KOD_IMMUTABLE", "Sube kodu degistirilemez.", "kod") };
+    }
+    if (subeler.some((item) => item.id !== target?.id && item.kod === kod)) {
+      return { status: 409, body: errorBody("DUPLICATE_SUBE_KOD", "Bu sube kodu zaten kayitli.", "kod") };
+    }
+    const ad = normalizeOrgName(payload.ad ?? target?.ad ?? "");
+    const duplicate = subeler.some(
+      (item) => item.id !== target?.id && item.sirket_id === sirketId && normalizeOrgName(item.ad) === ad
+    );
+    if (duplicate) {
+      return {
+        status: 409,
+        body: errorBody(
+          "DUPLICATE_SUBE_AD",
+          "Bu sirkette ayni kisa ada sahip bir sube zaten var.",
+          "ad"
+        )
+      };
+    }
+
+    return null;
+  }
+
   const subeler: Array<{
     id: number;
     kod: string;
     ad: string;
+    sirket_id: number | null;
     departman_ids: number[];
     departman_adlari: string[];
     durum: "AKTIF" | "PASIF";
@@ -3476,6 +3550,7 @@ export async function mockApi(page: Page, role: MockUserRole, options: MockApiOp
       id: 1,
       kod: "MRK",
       ad: "Merkez",
+      sirket_id: 1,
       departman_ids: [1, 3],
       departman_adlari: ["Muhasebe", "Döşeme"],
       durum: "AKTIF"
@@ -3484,6 +3559,7 @@ export async function mockApi(page: Page, role: MockUserRole, options: MockApiOp
       id: 2,
       kod: "DPL",
       ad: "Depolama",
+      sirket_id: 1,
       departman_ids: [1],
       departman_adlari: ["Depo"],
       durum: "AKTIF"
@@ -3492,6 +3568,7 @@ export async function mockApi(page: Page, role: MockUserRole, options: MockApiOp
       id: 99,
       kod: "PSF",
       ad: "Pasif Şube",
+      sirket_id: 2,
       departman_ids: [1],
       departman_adlari: ["Muhasebe"],
       durum: "PASIF"
@@ -12512,6 +12589,204 @@ let personelBelgeKaydiIdCounter = 903;
       return;
     }
 
+    if (path === "/api/yonetim/organizasyon-readiness" && method === "GET") {
+      if (await denyUnlessRolePermission(route, "yonetim-paneli.view")) {
+        return;
+      }
+      const unmapped = subeler.filter((item) => item.sirket_id == null).length;
+      await fulfillJson(
+        route,
+        200,
+        okBody({
+          schema_ready: true,
+          data_ready: unmapped === 0,
+          blockers: unmapped === 0 ? [] : ["SUBE_SIRKET_UNMAPPED"],
+          counts: { sirket: sirketler.length, sube: subeler.length, unmapped_sube: unmapped }
+        })
+      );
+      return;
+    }
+
+    if (path === "/api/yonetim/sirketler" && method === "GET") {
+      if (await denyUnlessRolePermission(route, "yonetim-paneli.view")) {
+        return;
+      }
+      await fulfillJson(route, 200, okBody({ items: sirketler.map(mapSirket) }));
+      return;
+    }
+
+    if (path === "/api/yonetim/sirketler" && method === "POST") {
+      if (await denyUnlessRolePermission(route, "yonetim-paneli.manage")) {
+        return;
+      }
+      const payload = request.postDataJSON() as { kod?: string; ad?: string; durum?: "AKTIF" | "PASIF" };
+      const kod = (payload.kod ?? "").trim();
+      const ad = (payload.ad ?? "").trim();
+      if (sirketler.some((item) => item.kod === kod)) {
+        await fulfillJson(route, 409, errorBody("DUPLICATE_SIRKET_KOD", "Bu sirket kodu zaten kayitli.", "kod"));
+        return;
+      }
+      if (sirketler.some((item) => normalizeOrgName(item.ad) === normalizeOrgName(ad))) {
+        await fulfillJson(route, 409, errorBody("DUPLICATE_SIRKET_AD", "Bu sirket adi zaten kayitli.", "ad"));
+        return;
+      }
+      const created = { id: ++sirketIdCounter, kod, ad, durum: payload.durum ?? "AKTIF" };
+      sirketler.push(created);
+      await fulfillJson(route, 201, okBody(mapSirket(created)));
+      return;
+    }
+
+    if (path.match(/^\/api\/yonetim\/sirketler\/\d+$/) && method === "PUT") {
+      if (await denyUnlessRolePermission(route, "yonetim-paneli.manage")) {
+        return;
+      }
+      const sirketId = Number.parseInt(path.split("/")[4] ?? "0", 10);
+      const target = sirketler.find((item) => item.id === sirketId);
+      if (!target) {
+        await fulfillJson(route, 404, errorBody("NOT_FOUND", "Sirket bulunamadi."));
+        return;
+      }
+      const payload = request.postDataJSON() as { kod?: string; ad?: string; durum?: "AKTIF" | "PASIF" };
+      if (payload.kod != null && payload.kod.trim() !== target.kod) {
+        await fulfillJson(route, 409, errorBody("KOD_IMMUTABLE", "Sirket kodu degistirilemez.", "kod"));
+        return;
+      }
+      Object.assign(target, {
+        ...(payload.ad ? { ad: payload.ad.trim() } : {}),
+        ...(payload.durum ? { durum: payload.durum } : {})
+      });
+      await fulfillJson(route, 200, okBody(mapSirket(target)));
+      return;
+    }
+
+    if (path.match(/^\/api\/yonetim\/sirketler\/\d+$/) && method === "DELETE") {
+      if (await denyUnlessRolePermission(route, "yonetim-paneli.manage")) {
+        return;
+      }
+      const sirketId = Number.parseInt(path.split("/")[4] ?? "0", 10);
+      const targetIndex = sirketler.findIndex((item) => item.id === sirketId);
+      if (targetIndex === -1) {
+        await fulfillJson(route, 404, errorBody("NOT_FOUND", "Sirket bulunamadi."));
+        return;
+      }
+      if (subeler.some((item) => item.sirket_id === sirketId)) {
+        await fulfillJson(
+          route,
+          409,
+          errorBody("SIRKET_HAS_DEPENDENTS", "Sirkete bagli sube bulundugu icin silinemez.")
+        );
+        return;
+      }
+      sirketler.splice(targetIndex, 1);
+      await fulfillJson(route, 200, okBody({ id: sirketId, deleted: true }));
+      return;
+    }
+
+    if (path.match(/^\/api\/yonetim\/sirketler\/\d+\/subeler$/) && method === "GET") {
+      if (await denyUnlessRolePermission(route, "yonetim-paneli.view")) {
+        return;
+      }
+      const sirketId = Number.parseInt(path.split("/")[4] ?? "0", 10);
+      await fulfillJson(
+        route,
+        200,
+        okBody({ items: subeler.filter((item) => item.sirket_id === sirketId).map(mapSube) })
+      );
+      return;
+    }
+
+    if (path.match(/^\/api\/yonetim\/sirketler\/\d+\/subeler$/) && method === "POST") {
+      if (await denyUnlessRolePermission(route, "yonetim-paneli.manage")) {
+        return;
+      }
+      const sirketId = Number.parseInt(path.split("/")[4] ?? "0", 10);
+      if (!sirketler.some((item) => item.id === sirketId)) {
+        await fulfillJson(route, 404, errorBody("NOT_FOUND", "Sirket bulunamadi."));
+        return;
+      }
+      const payload = request.postDataJSON() as {
+        kod?: string;
+        ad?: string;
+        tam_ad?: string;
+        sirket_id?: number;
+        departman_ids?: number[];
+        durum?: "AKTIF" | "PASIF";
+      };
+      const nestedError = validateNestedSubeWrite(payload, sirketId, null);
+      if (nestedError) {
+        await fulfillJson(route, nestedError.status, nestedError.body);
+        return;
+      }
+      const created = {
+        id: ++subeIdCounter,
+        sirket_id: sirketId,
+        ...normalizeSubePayload(payload as { kod: string; ad: string; departman_ids?: number[]; durum: "AKTIF" | "PASIF" })
+      };
+      subeler.unshift(created);
+      await fulfillJson(route, 201, okBody(mapSube(created)));
+      return;
+    }
+
+    if (path.match(/^\/api\/yonetim\/sirketler\/\d+\/subeler\/\d+$/) && method === "PUT") {
+      if (await denyUnlessRolePermission(route, "yonetim-paneli.manage")) {
+        return;
+      }
+      const segments = path.split("/");
+      const sirketId = Number.parseInt(segments[4] ?? "0", 10);
+      const subeId = Number.parseInt(segments[6] ?? "0", 10);
+      const target = subeler.find((item) => item.id === subeId && item.sirket_id === sirketId);
+      if (!target) {
+        await fulfillJson(route, 404, errorBody("NOT_FOUND", "Sube bu sirkete bagli degil."));
+        return;
+      }
+      const payload = request.postDataJSON() as {
+        kod?: string;
+        ad?: string;
+        tam_ad?: string;
+        sirket_id?: number;
+        departman_ids?: number[];
+        durum?: "AKTIF" | "PASIF";
+      };
+      const nestedError = validateNestedSubeWrite(payload, sirketId, target);
+      if (nestedError) {
+        await fulfillJson(route, nestedError.status, nestedError.body);
+        return;
+      }
+      Object.assign(target, {
+        ...(payload.ad ? { ad: payload.ad.trim() } : {}),
+        ...(payload.departman_ids
+          ? {
+              departman_ids: payload.departman_ids,
+              departman_adlari: payload.departman_ids.map((id) => getDepartmanLabel(id))
+            }
+          : {}),
+        ...(payload.durum ? { durum: payload.durum } : {})
+      });
+      await fulfillJson(route, 200, okBody(mapSube(target)));
+      return;
+    }
+
+    if (path.match(/^\/api\/yonetim\/sirketler\/\d+\/subeler\/\d+$/) && method === "DELETE") {
+      if (await denyUnlessRolePermission(route, "yonetim-paneli.manage")) {
+        return;
+      }
+      const segments = path.split("/");
+      const sirketId = Number.parseInt(segments[4] ?? "0", 10);
+      const subeId = Number.parseInt(segments[6] ?? "0", 10);
+      const targetIndex = subeler.findIndex((item) => item.id === subeId && item.sirket_id === sirketId);
+      if (targetIndex === -1) {
+        await fulfillJson(route, 404, errorBody("NOT_FOUND", "Sube bu sirkete bagli degil."));
+        return;
+      }
+      if (personeller.some((personel) => personel.sube_id === subeId)) {
+        await fulfillJson(route, 409, errorBody(SUBE_DELETE_BLOCKED_ERROR_CODE, SUBE_DELETE_BLOCKED_MESSAGE));
+        return;
+      }
+      subeler.splice(targetIndex, 1);
+      await fulfillJson(route, 200, okBody({ id: subeId, deleted: true }));
+      return;
+    }
+
     if (path === "/api/yonetim/subeler" && method === "GET") {
       if (
         await denyUnlessAnyRolePermission(route, [
@@ -12523,7 +12798,7 @@ let personelBelgeKaydiIdCounter = 903;
       ) {
         return;
       }
-      await fulfillJson(route, 200, okBody({ items: subeler }));
+      await fulfillJson(route, 200, okBody({ items: subeler.map(mapSube) }));
       return;
     }
 

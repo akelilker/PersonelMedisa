@@ -34,6 +34,7 @@ use Medisa\Api\Controllers\MeController;
 use Medisa\Api\Controllers\AttendanceMobileController;
 use Medisa\Api\Controllers\MevzuatParametreController;
 use Medisa\Api\Controllers\QrKioskController;
+use Medisa\Api\Controllers\OrganizasyonController;
 use Medisa\Api\Controllers\PersonelBelgelerController;
 use Medisa\Api\Controllers\PersonelBordroKapsamController;
 use Medisa\Api\Controllers\PersonellerController;
@@ -876,6 +877,42 @@ class Router
         }
         if ($method === 'POST' && preg_match('#^/haftalik-kapanis/revizyon-corrections/(\d+)/iptal$#', $path, $matches)) {
             RevizyonController::correctionIptal($this->request, $matches[1]);
+        }
+
+        if ($path === '/yonetim/organizasyon-readiness' && $method === 'GET') {
+            OrganizasyonController::readiness($this->request);
+        }
+        if ($path === '/yonetim/sirketler' && $method === 'GET') {
+            OrganizasyonController::sirketler($this->request);
+        }
+        if ($path === '/yonetim/sirketler' && $method === 'POST') {
+            OrganizasyonController::sirketOlustur($this->request);
+        }
+        // Nested branch routes are matched before the single-segment company
+        // routes: the parent company is route context, never a payload field.
+        if ($method === 'GET' && preg_match('#^/yonetim/sirketler/(\d+)/subeler$#', $path, $matches)) {
+            OrganizasyonController::sirketSubeleri($this->request, $matches[1]);
+        }
+        if ($method === 'POST' && preg_match('#^/yonetim/sirketler/(\d+)/subeler$#', $path, $matches)) {
+            OrganizasyonController::sirketSubeOlustur($this->request, $matches[1]);
+        }
+        if ($method === 'GET' && preg_match('#^/yonetim/sirketler/(\d+)/subeler/(\d+)$#', $path, $matches)) {
+            OrganizasyonController::sirketSubeDetay($this->request, $matches[1], $matches[2]);
+        }
+        if ($method === 'PUT' && preg_match('#^/yonetim/sirketler/(\d+)/subeler/(\d+)$#', $path, $matches)) {
+            OrganizasyonController::sirketSubeGuncelle($this->request, $matches[1], $matches[2]);
+        }
+        if ($method === 'DELETE' && preg_match('#^/yonetim/sirketler/(\d+)/subeler/(\d+)$#', $path, $matches)) {
+            OrganizasyonController::sirketSubeSil($this->request, $matches[1], $matches[2]);
+        }
+        if ($method === 'GET' && preg_match('#^/yonetim/sirketler/(\d+)$#', $path, $matches)) {
+            OrganizasyonController::sirketDetay($this->request, $matches[1]);
+        }
+        if ($method === 'PUT' && preg_match('#^/yonetim/sirketler/(\d+)$#', $path, $matches)) {
+            OrganizasyonController::sirketGuncelle($this->request, $matches[1]);
+        }
+        if ($method === 'DELETE' && preg_match('#^/yonetim/sirketler/(\d+)$#', $path, $matches)) {
+            OrganizasyonController::sirketSil($this->request, $matches[1]);
         }
 
         if ($path === '/yonetim/subeler' && $method === 'GET') {

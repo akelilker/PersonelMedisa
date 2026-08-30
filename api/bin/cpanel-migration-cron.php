@@ -3,7 +3,9 @@
 declare(strict_types=1);
 
 use Medisa\Api\Database\Connection;
+use Medisa\Api\Database\MigrationBackupService;
 use Medisa\Api\Database\MigrationExecutionService;
+use Medisa\Api\Database\MigrationPreflightReport;
 
 if (PHP_SAPI !== 'cli') {
     http_response_code(404);
@@ -18,6 +20,7 @@ $controlDirectory = is_string($controlDirectory) && $controlDirectory !== ''
     ? $controlDirectory
     : $apiDirectory . '/runtime/migration-control';
 $statusPath = $controlDirectory . '/status.json';
+$preflightPath = $controlDirectory . '/preflight.json';
 $heartbeatPath = $controlDirectory . '/worker-heartbeat.json';
 $lockPath = $controlDirectory . '/worker.lock';
 $deployShaPath = getenv('MEDISA_DEPLOY_SHA_PATH');
@@ -69,6 +72,9 @@ try {
     }
 
     $requestId = $claimToken;
+    // Declared before the request is parsed so a failure status can always name
+    // which mode the worker believed it was running.
+    $mode = 'APPLY';
     try {
         $stage = 'REQUEST_PARSE';
         $rawRequest = file_get_contents($processingPath);
@@ -83,6 +89,11 @@ try {
         $requestId = requireString($request, 'request_id', '/^[A-Za-z0-9._-]{1,128}$/');
         $deployedSha = requireString($request, 'deployed_sha', '/^[a-f0-9]{40}$/i');
         requireString($request, 'requested_at', '/^\d{4}-\d{2}-\d{2}T.*Z$/');
+        // Requests written before the preflight mode existed carry no mode and must
+        // keep meaning "apply", so the control plane stays backward compatible.
+        $mode = array_key_exists('mode', $request)
+            ? requireString($request, 'mode', '/^(APPLY|READ_ONLY_PREFLIGHT)$/')
+            : 'APPLY';
 
         $stage = 'DEPLOY_SHA_CHECK';
         $publishedSha = trim((string) @file_get_contents($deployShaPath));
@@ -95,15 +106,59 @@ try {
             'state' => 'RUNNING',
             'request_id' => $requestId,
             'deployed_sha' => strtolower($deployedSha),
+            'mode' => $mode,
         ]);
 
         $baseline = getenv('MEDISA_MIGRATION_BASELINE');
         $baseline = is_string($baseline) && $baseline !== '' ? trim($baseline) : null;
 
-        $stage = 'APPLY';
+        if ($mode === 'READ_ONLY_PREFLIGHT') {
+            $stage = 'PREFLIGHT';
+            try {
+                $migrationSource = MigrationExecutionService::sourceForRuntime($apiDirectory, true);
+                $pdo = Connection::get();
+                $report = MigrationPreflightReport::collect($pdo, $migrationSource, $deployedSha);
+                $report['request_id'] = $requestId;
+                writeJsonAtomically($preflightPath, $report);
+            } catch (\Throwable $exception) {
+                throw MigrationWorkerFailure::fromThrowable($stage, $exception);
+            }
+
+            $stage = 'STATUS_WRITE';
+            writeStatus($statusPath, [
+                'state' => 'SUCCEEDED',
+                'request_id' => $requestId,
+                'deployed_sha' => strtolower($deployedSha),
+                'mode' => $mode,
+                'preflight_result' => (string) $report['result'],
+                'preflight_generated_at' => (string) $report['generated_at'],
+            ]);
+            $stage = 'REQUEST_ARCHIVE';
+            archiveRequest(
+                $processingPath,
+                $controlDirectory . '/request.completed.' . safeId($requestId) . '.json'
+            );
+            exit(0);
+        }
+
+        // Backup is a stage, not a checklist item: apply is unreachable unless a
+        // dump for the two closing tables plus the ledger preimage has been
+        // written outside the webroot and read back successfully.
+        $stage = 'BACKUP';
         try {
             $migrationSource = MigrationExecutionService::sourceForRuntime($apiDirectory, true);
             $pdo = Connection::get();
+            $migrations = $migrationSource->all();
+            $migrationTip = $migrations === []
+                ? 'unknown'
+                : (string) $migrations[count($migrations) - 1]['version'];
+            $backup = MigrationBackupService::create($pdo, $apiDirectory, $requestId, $migrationTip);
+        } catch (\Throwable $exception) {
+            throw MigrationWorkerFailure::fromThrowable($stage, $exception);
+        }
+
+        $stage = 'APPLY';
+        try {
             MigrationExecutionService::apply($pdo, $migrationSource, $baseline);
         } catch (\Throwable $exception) {
             throw MigrationWorkerFailure::fromThrowable($stage, $exception);
@@ -120,6 +175,11 @@ try {
             'state' => 'SUCCEEDED',
             'request_id' => $requestId,
             'deployed_sha' => strtolower($deployedSha),
+            'mode' => $mode,
+            'backup_file' => (string) $backup['file'],
+            'backup_sha256' => (string) $backup['sha256'],
+            'backup_bytes' => (int) $backup['bytes'],
+            'backup_readback' => (string) $backup['readback'],
         ]);
         $stage = 'REQUEST_ARCHIVE';
         archiveRequest($processingPath, $controlDirectory . '/request.completed.' . safeId($requestId) . '.json');
@@ -131,6 +191,7 @@ try {
         $failureStatus = [
             'state' => 'FAILED',
             'request_id' => $requestId,
+            'mode' => $mode,
             'reason' => $reason,
             'stage' => $exception instanceof MigrationWorkerFailure ? $exception->stage : $stage,
             'exit_code' => $exception instanceof MigrationWorkerFailure ? $exception->exitCode : 1,
@@ -208,32 +269,46 @@ function classifyWorkerFailure(Throwable $exception, string $stage): string
     if ($stage === 'REQUEST_ARCHIVE') {
         return 'REQUEST_ARCHIVE_FAILED';
     }
+    if ($stage === 'BACKUP') {
+        return 'BACKUP_FAILED';
+    }
+    if ($stage === 'PREFLIGHT') {
+        return 'PREFLIGHT_FAILED';
+    }
     return $stage === 'VERIFY' ? 'SCHEMA_VERIFY_FAILED' : 'UNKNOWN_MIGRATION_FAILURE';
 }
 
 /**
- * @param array<string, string> $status
+ * @param array<string, mixed> $status
  */
 function writeStatus(string $statusPath, array $status): void
 {
     $status['schema_version'] = '1';
     $status['updated_at'] = gmdate('Y-m-d\TH:i:s\Z');
-    $temporaryPath = $statusPath . '.' . bin2hex(random_bytes(8)) . '.tmp';
-    $json = json_encode($status, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+    writeJsonAtomically($statusPath, $status);
+}
+
+/**
+ * @param array<string, mixed> $payload
+ */
+function writeJsonAtomically(string $path, array $payload): void
+{
+    $temporaryPath = $path . '.' . bin2hex(random_bytes(8)) . '.tmp';
+    $json = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
     if (file_put_contents($temporaryPath, $json . PHP_EOL, LOCK_EX) === false) {
         throw new RuntimeException('STATUS_WRITE_FAILED');
     }
     @chmod($temporaryPath, 0600);
     if (PHP_OS_FAMILY === 'Windows') {
-        if (file_put_contents($statusPath, $json . PHP_EOL, LOCK_EX) === false) {
+        if (file_put_contents($path, $json . PHP_EOL, LOCK_EX) === false) {
             @unlink($temporaryPath);
             throw new RuntimeException('STATUS_WRITE_FAILED');
         }
-        @chmod($statusPath, 0600);
+        @chmod($path, 0600);
         @unlink($temporaryPath);
         return;
     }
-    if (!rename($temporaryPath, $statusPath)) {
+    if (!rename($temporaryPath, $path)) {
         @unlink($temporaryPath);
         throw new RuntimeException('STATUS_PUBLISH_FAILED');
     }

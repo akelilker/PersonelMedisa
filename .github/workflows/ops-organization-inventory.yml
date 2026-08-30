@@ -10,8 +10,17 @@ name: Ops organization inventory (read-only)
 # Bu workflow'un mapping/apply yetkisi yoktur ve mapping request'i yazamaz.
 #
 # Log sozlesmesi: yalniz sayilar, checksum ve reason code. Satir bazli envanter
-# (sube/SGK/lokasyon kod ve adlari) log'a dokulmez; private repository erisim
-# sinirinda kalan artifact olarak yayinlanir.
+# (sube/SGK/lokasyon kod ve adlari) log'a dokulmez; artifact olarak yayinlanir.
+#
+# Bu artifact'in gizliligi TAMAMEN repository visibility'sine baglidir: GitHub
+# Actions artifact'i public repository'de signed-in herhangi bir kullanici
+# indirebilir. Bu yuzden artifact yolu "her zaman private" degildir ve public
+# repository'de guvenli kabul EDILEMEZ.
+#
+# Fail-closed sinir: repository private degilse envanter operasyonu control-plane
+# request'i birakilmadan ONCE durur (PUBLIC_REPOSITORY_ARTIFACT_EXPOSURE).
+# retention-days dusurmek, artifact adini gizlemek veya yalnizca uyarmak cozum
+# degildir; ham satir verisi public repository'de kisa sureli de yayinlanmaz.
 
 on:
   workflow_dispatch:
@@ -45,10 +54,26 @@ jobs:
       CONFIRMATION: ${{ inputs.confirmation }}
       DEPLOYED_SHA: ${{ inputs.deployed_sha }}
       MODE: READ_ONLY_ORGANIZATION_INVENTORY
+      REPOSITORY_PRIVATE: ${{ github.event.repository.private }}
       POLL_ATTEMPTS: "91"
       POLL_INTERVAL_SECONDS: "10"
       TOTAL_POLL_WINDOW_SECONDS: "900"
     steps:
+      # Publication boundary gate. Runs before checkout, before any FTP contact
+      # and before any control-plane request, so a public repository never even
+      # asks production for row-level inventory. The value comes from GitHub's
+      # canonical repository context, not from an input, and anything other than
+      # an explicit "true" (including a missing context on an unexpected event)
+      # blocks: default-deny, not default-publish.
+      - name: Validate repository publication boundary
+        run: |
+          set -euo pipefail
+          if [ "${REPOSITORY_PRIVATE:-}" != "true" ]; then
+            echo "INVENTORY_RESULT=BLOCKED"
+            echo "INVENTORY_REASON=PUBLIC_REPOSITORY_ARTIFACT_EXPOSURE"
+            exit 1
+          fi
+
       - name: Validate explicit request
         run: |
           set -euo pipefail
@@ -274,8 +299,10 @@ jobs:
           fi
           echo "INVENTORY_MAPPING_READY=YES"
 
+      # `always()` must not outlive the publication boundary: without the second
+      # clause this step would still upload after the guard failed.
       - name: Publish inventory artifact
-        if: always()
+        if: always() && github.event.repository.private == true
         uses: actions/upload-artifact@v4
         with:
           name: organization-inventory

@@ -9,6 +9,7 @@ use Medisa\Api\Auth\RolePermissions;
 use Medisa\Api\Database\Connection;
 use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
+use Medisa\Api\Services\Organizasyon\OrganizasyonAuditContext;
 use Medisa\Api\Services\Organizasyon\OrganizasyonException;
 use Medisa\Api\Services\Organizasyon\OrganizasyonSchema;
 use Medisa\Api\Services\Organizasyon\OrganizasyonService;
@@ -116,11 +117,12 @@ class OrganizasyonController
         $user = AuthMiddleware::authenticate($request, true);
         self::assertManage($user);
         $body = $request->getJsonBody();
+        $auditContext = OrganizasyonAuditContext::fromRequest($request, $user);
 
-        self::run(function (PDO $pdo) use ($sirketId, $body) {
+        self::run(function (PDO $pdo) use ($sirketId, $body, $auditContext) {
             $sirket = OrganizasyonService::readSirket($pdo, $sirketId);
             JsonResponse::success(
-                OrganizasyonService::createSube($pdo, $body, (int) $sirket['id']),
+                OrganizasyonService::createSube($pdo, $body, (int) $sirket['id'], $auditContext),
                 [],
                 201
             );

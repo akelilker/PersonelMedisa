@@ -266,7 +266,14 @@ try {
         'SISTEM_YONETICISI behaves the same'
     );
 
-    foreach (['SUBE_YONETICISI', 'IK_SORUMLUSU', 'MUHASEBE'] as $rol) {
+    foreach (['IK_SORUMLUSU', 'IK_PERSONELI'] as $ikRol) {
+        pusAssert(
+            $search('İlker Akel', pusUser($ikRol, [1]), 1)['ids'] === [212],
+            $ikRol . ' reads every branch, including the branchless DIS_KAYNAK row'
+        );
+    }
+
+    foreach (['SUBE_YONETICISI', 'MUHASEBE'] as $rol) {
         $restricted = $search('İlker Akel', pusUser($rol, [1]), 1);
         pusAssert($restricted['ids'] === [], $rol . ' cannot reach branchless DIS_KAYNAK through search');
         $byName = $search('Akel', pusUser($rol, [1]), 1);

@@ -133,6 +133,6 @@ describe("initial password owner", () => {
       .map((name) => Number.parseInt(name.slice(0, 3), 10))
       .filter((value) => Number.isFinite(value))
       .sort((left, right) => right - left)[0];
-    expect(highest).toBe(80);
+    expect(highest).toBe(81);
   });
 });

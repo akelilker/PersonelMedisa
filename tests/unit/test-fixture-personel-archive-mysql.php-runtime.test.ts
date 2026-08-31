@@ -125,6 +125,7 @@ describe("test fixture personel archive owner", () => {
       "078_personel_sicil_sequence.sql",
       "079_sirket_sube_hiyerarsisi.sql",
       "080_organizasyon_audit_owners.sql",
+      "081_ik_personeli_rolu.sql",
     ];
     const migrations = readdirSync(resolve(root, "api/migrations"))
       .filter((name) => /^\d{3}_.+\.sql$/.test(name) && !excluded.includes(name))

@@ -442,7 +442,7 @@ try {
     // assertRequiredAssignment answers 403 and terminates the request, so the
     // fail-closed guarantee is asserted where it is observable: the predicate a
     // scopeless user gets must match nothing rather than everything.
-    $noScope = ['rol' => 'IK_SORUMLUSU', 'sube_ids' => [], 'sirket_ids' => [], 'sgk_isveren_ids' => []];
+    $noScope = ['rol' => 'SUBE_YONETICISI', 'sube_ids' => [], 'sirket_ids' => [], 'sgk_isveren_ids' => []];
     $emptyWhere = [];
     $emptyParams = [];
     OrgScope::appendPersonelOrgFilter($emptyWhere, $emptyParams, $noScope, null, 'p');
@@ -450,6 +450,21 @@ try {
         $emptyWhere !== [] && strpos(implode(' AND ', $emptyWhere), '1=0') !== false,
         'a scoped role with no scope at all fails closed instead of matching every row'
     );
+
+    // IK roles read every company/branch from the role itself, so an empty
+    // assignment set must not narrow their read filter.
+    foreach (['IK_SORUMLUSU', 'IK_PERSONELI'] as $ikRol) {
+        $ikWhere = [];
+        $ikParams = [];
+        OrgScope::appendPersonelOrgFilter(
+            $ikWhere,
+            $ikParams,
+            ['rol' => $ikRol, 'sube_ids' => [], 'sirket_ids' => [], 'sgk_isveren_ids' => []],
+            null,
+            'p'
+        );
+        hierAssert($ikWhere === [], $ikRol . ' reads every branch without an assignment row');
+    }
 
     $sgkOnly = [
         'rol' => 'MUHASEBE',

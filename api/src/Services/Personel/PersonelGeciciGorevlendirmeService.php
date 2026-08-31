@@ -6,6 +6,7 @@ namespace Medisa\Api\Services\Personel;
 
 use Medisa\Api\Auth\RolePermissions;
 use Medisa\Api\Http\JsonResponse;
+use Medisa\Api\Scope\HrWriteScope;
 use Medisa\Api\Scope\OrgScope;
 use PDO;
 use PDOException;
@@ -179,7 +180,7 @@ final class PersonelGeciciGorevlendirmeService
             return [];
         }
         $role = OrgScope::normalizeRole($user);
-        $allowedCentral = in_array($role, ['GENEL_YONETICI', 'SISTEM_YONETICISI', 'IK_SORUMLUSU'], true);
+        $allowedCentral = OrgScope::isUnrestricted($user) || OrgScope::isOrganizationGlobalRead($user);
         if (!$allowedCentral) {
             JsonResponse::forbidden('Dis kaynak havuzu icin yetki yok.');
         }
@@ -231,7 +232,7 @@ final class PersonelGeciciGorevlendirmeService
         OrgScope::assertRequiredAssignment($user);
         $role = OrgScope::normalizeRole($user);
         if ($role !== 'BOLUM_YONETICISI' && !OrgScope::isUnrestricted($user)
-            && $role !== 'IK_SORUMLUSU' && $role !== 'SUBE_YONETICISI') {
+            && !OrgScope::isOrganizationGlobalRead($user) && $role !== 'SUBE_YONETICISI') {
             JsonResponse::forbidden('Gorevlendirme havuzu icin yetki yok.');
         }
         if (!PersonelCalisanKapsamSchema::isReady($pdo)) {
@@ -562,7 +563,15 @@ final class PersonelGeciciGorevlendirmeService
         OrgScope::assertRequiredAssignment($user);
         $role = OrgScope::normalizeRole($user);
 
-        if (OrgScope::isUnrestricted($user) || $role === 'IK_SORUMLUSU') {
+        if (OrgScope::isUnrestricted($user)) {
+            return;
+        }
+
+        // İK assigns across the whole organisation, but a company-write-scoped İK
+        // user may only place someone into a branch it is allowed to write in.
+        if (OrgScope::isOrganizationGlobalRead($user)) {
+            HrWriteScope::assertSubeWritable($user, $subeId);
+
             return;
         }
 

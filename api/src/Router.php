@@ -948,6 +948,9 @@ class Router
         if ($method === 'PUT' && preg_match('#^/yonetim/kullanicilar/(\d+)$#', $path, $matches)) {
             YonetimController::kullaniciGuncelle($this->request, $matches[1]);
         }
+        if ($method === 'DELETE' && preg_match('#^/yonetim/kullanicilar/(\d+)$#', $path, $matches)) {
+            YonetimController::kullaniciErisimKaldir($this->request, $matches[1]);
+        }
         if ($method === 'POST' && preg_match('#^/yonetim/personeller/(\d+)/hesap-onboarding$#', $path, $matches)) {
             PersonelAccountOnboardingController::onboard($this->request, $matches[1]);
         }

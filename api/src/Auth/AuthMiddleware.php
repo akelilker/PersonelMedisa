@@ -88,6 +88,11 @@ class AuthMiddleware
             'durum' => (string) ($row['durum'] ?? ''),
             'sube_ids' => self::resolveEffectiveSubeIds($pdo, $explicitSubeIds, $sirketIds),
             'explicit_sube_ids' => $explicitSubeIds,
+            // Write reach of a company-write-scoped role: strictly the branches of
+            // the granted companies, never the explicit branch grants, and
+            // recomputed per request so a newly created branch of a granted
+            // company is writable without touching any grant row.
+            'write_sube_ids' => UserOrgAssignmentSchema::resolveSubeIdsForSirketIds($pdo, $sirketIds),
             'sirket_ids' => $sirketIds,
             'sgk_isveren_ids' => $sgkIsverenIds,
             'bolum_ids' => $bolumIds,

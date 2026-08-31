@@ -10,6 +10,7 @@ const USER_ROLE_LABELS: Record<UserRole, string> = {
   PERSONEL: "Personel",
   MUHASEBE: "Muhasebe",
   IK_SORUMLUSU: "İK Sorumlusu",
+  IK_PERSONELI: "İK Personeli",
   BIRIM_AMIRI: "Birim Yöneticisi",
   BOLUM_YONETICISI: "Bölüm Yöneticisi",
   SUBE_YONETICISI: "Şube Yöneticisi",

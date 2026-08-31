@@ -24,10 +24,11 @@ const PHP_ORG = resolve(root, "api/src/Scope/OrgScope.php");
 const PHP_ROLES = resolve(root, "api/src/Auth/RolePermissions.php");
 const MIG_071 = resolve(root, "api/migrations/071_org_hierarchy_authorization.sql");
 
-const HUMAN_8: UserRole[] = [
+const HUMAN_9: UserRole[] = [
   "PERSONEL",
   "MUHASEBE",
   "IK_SORUMLUSU",
+  "IK_PERSONELI",
   "BIRIM_AMIRI",
   "BOLUM_YONETICISI",
   "SUBE_YONETICISI",
@@ -45,12 +46,12 @@ function sessionFor(role: UserRole, subeIds: number[] = []): AuthSession {
 }
 
 describe("org hierarchy authorization contract", () => {
-  it("locks exact 8 human + 1 technical catalog including SUBE_YONETICISI", () => {
-    expect([...ASSIGNABLE_USER_ROLES].sort()).toEqual([...HUMAN_8].sort());
-    expect(ASSIGNABLE_USER_ROLES).toHaveLength(8);
+  it("locks exact 9 human + 1 technical catalog including SUBE_YONETICISI", () => {
+    expect([...ASSIGNABLE_USER_ROLES].sort()).toEqual([...HUMAN_9].sort());
+    expect(ASSIGNABLE_USER_ROLES).toHaveLength(9);
     expect(ASSIGNABLE_USER_ROLES).toContain("SUBE_YONETICISI");
     expect(TECHNICAL_ROLES).toEqual(["AUTH_SMOKE_READONLY"]);
-    expect([...ALL_ROLES].sort()).toEqual([...HUMAN_8, "AUTH_SMOKE_READONLY"].sort());
+    expect([...ALL_ROLES].sort()).toEqual([...HUMAN_9, "AUTH_SMOKE_READONLY"].sort());
   });
 
   it("keeps SUBE / BOLUM / BIRIM assignment roles independent", () => {
@@ -74,7 +75,10 @@ describe("org hierarchy authorization contract", () => {
     expect(sessionAllowsSubeAccess(sessionFor("GENEL_YONETICI", []), 9)).toBe(true);
     expect(sessionAllowsSubeAccess(sessionFor("SISTEM_YONETICISI", []), 9)).toBe(true);
     expect(sessionAllowsSubeAccess(sessionFor("SUBE_YONETICISI", []), 1)).toBe(false);
-    expect(sessionAllowsSubeAccess(sessionFor("IK_SORUMLUSU", []), 1)).toBe(false);
+    // İK reach is role-derived, so an empty branch grant is a valid fully
+    // readable state rather than a fail-closed one.
+    expect(sessionAllowsSubeAccess(sessionFor("IK_SORUMLUSU", []), 1)).toBe(true);
+    expect(sessionAllowsSubeAccess(sessionFor("IK_PERSONELI", []), 1)).toBe(true);
     expect(sessionAllowsSubeAccess(sessionFor("MUHASEBE", []), 1)).toBe(false);
     expect(sessionAllowsSubeAccess(sessionFor("SUBE_YONETICISI", [1, 2]), 1)).toBe(true);
     expect(sessionAllowsSubeAccess(sessionFor("SUBE_YONETICISI", [1, 2]), 3)).toBe(false);

@@ -106,7 +106,8 @@ function readSubeList(record: Record<string, unknown>): AuthSession["sube_list"]
         id,
         ad,
         kisa_ad: readString(row.kisa_ad) ?? readString(row.ad) ?? undefined,
-        tam_ad: readString(row.tam_ad) ?? undefined
+        tam_ad: readString(row.tam_ad) ?? undefined,
+        sirket_id: readNumber(toRecord(row.sirket)?.id ?? row.sirket_id)
       });
     }
   }

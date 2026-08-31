@@ -28,7 +28,22 @@ class OrgScope
     const GLOBAL_ROLES = ['GENEL_YONETICI', 'SISTEM_YONETICISI'];
 
     /** Require user_subeler; empty = deny. */
-    const SUBE_ASSIGNMENT_ROLES = ['SUBE_YONETICISI', 'IK_SORUMLUSU', 'MUHASEBE', 'AUTH_SMOKE_READONLY'];
+    const SUBE_ASSIGNMENT_ROLES = ['SUBE_YONETICISI', 'MUHASEBE', 'AUTH_SMOKE_READONLY'];
+
+    /**
+     * İK roles whose *read* reach is the whole organisation, derived from the
+     * role itself rather than from assignment rows.
+     *
+     * İK works on people wherever they sit, so a branch-by-branch grant never
+     * described the job: it only produced grants that had to be rewritten every
+     * time a branch or company was added. Reading is therefore role-derived and
+     * automatically covers future branches; explicit user_subeler/user_sirketler
+     * rows may not narrow it.
+     *
+     * This is visibility only — it grants no management permission, and for a
+     * write-scoped İK role the write reach stays narrower (see HrWriteScope).
+     */
+    const ORGANIZATION_GLOBAL_READ_ROLES = ['IK_SORUMLUSU', 'IK_PERSONELI'];
 
     /** Require user_bolumler; empty = deny. */
     const BOLUM_ASSIGNMENT_ROLES = ['BOLUM_YONETICISI'];
@@ -42,8 +57,11 @@ class OrgScope
      * SUBE_YONETICISI is deliberately absent: a branch manager stays confined to
      * the branches explicitly granted in user_subeler and must never be widened
      * to every branch of a company. Global roles need no grant at all.
+     *
+     * IK_PERSONELI is eligible because for that role the company grant is what
+     * defines where it may write.
      */
-    const SIRKET_SCOPE_ELIGIBLE_ROLES = ['IK_SORUMLUSU', 'MUHASEBE'];
+    const SIRKET_SCOPE_ELIGIBLE_ROLES = ['IK_SORUMLUSU', 'IK_PERSONELI', 'MUHASEBE'];
 
     /** Roles that may hold an SGK/payroll-employer scope (user_sgk_isverenler). */
     const SGK_SCOPE_ELIGIBLE_ROLES = ['IK_SORUMLUSU', 'MUHASEBE'];
@@ -64,6 +82,16 @@ class OrgScope
         $role = self::normalizeRole($user);
 
         return in_array($role, self::GLOBAL_ROLES, true);
+    }
+
+    /**
+     * Organisation-wide read reach without management authority.
+     *
+     * @param array<string, mixed> $user
+     */
+    public static function isOrganizationGlobalRead(array $user)
+    {
+        return in_array(self::normalizeRole($user), self::ORGANIZATION_GLOBAL_READ_ROLES, true);
     }
 
     /**
@@ -159,6 +187,12 @@ class OrgScope
             return;
         }
 
+        // İK reach comes from the role, so there is no assignment to require and
+        // an empty grant is a valid, fully readable state.
+        if (self::isOrganizationGlobalRead($user)) {
+            return;
+        }
+
         if (in_array($role, self::BOLUM_ASSIGNMENT_ROLES, true)) {
             if (count(self::allowedBolumIds($user)) === 0) {
                 JsonResponse::forbidden('Bolum kapsami atanmamis.');
@@ -204,6 +238,12 @@ class OrgScope
         $role = self::normalizeRole($user);
 
         if ($role === 'PERSONEL') {
+            return $requested;
+        }
+
+        // İK sees every branch, so any requested branch is a narrow rather than
+        // an escalation, and explicit legacy grants must not shrink the list.
+        if (self::isOrganizationGlobalRead($user)) {
             return $requested;
         }
 
@@ -312,7 +352,21 @@ class OrgScope
             return;
         }
 
-        // Branch-scoped roles (SUBE / IK / MUHASEBE) and optional GY active-sube narrow.
+        // İK: organisation-wide read, optionally narrowed to the active branch.
+        // The branchless DIS pool stays visible here for the same reason it is
+        // visible to a global role — it belongs to no branch context at all.
+        // Writing is the separate, narrower question answered by HrWriteScope.
+        if (self::isOrganizationGlobalRead($user)) {
+            $scope = self::resolveActiveSubeId($user, $request);
+            if ($scope !== null && $subeId > 0 && $subeId !== (int) $scope) {
+                JsonResponse::forbidden();
+            }
+            HrWriteScope::assertPersonelWritable($user, $request, $personelOrg);
+
+            return;
+        }
+
+        // Branch-scoped roles (SUBE / MUHASEBE) and optional GY active-sube narrow.
 
         if (self::isUnrestricted($user) && count(self::allowedSubeIds($user)) === 0) {
             // Bağlantısız DIS (sube_id NULL) merkezi havuz — GY/Sistem görür.
@@ -324,11 +378,6 @@ class OrgScope
                 JsonResponse::forbidden();
             }
 
-            return;
-        }
-
-        // IK_SORUMLUSU: bağlantısız DIS havuzu merkezi görünüm.
-        if ($role === 'IK_SORUMLUSU' && $subeId <= 0) {
             return;
         }
 
@@ -452,7 +501,12 @@ class OrgScope
             return;
         }
 
-        if (self::isUnrestricted($user) && count(self::allowedSubeIds($user)) === 0) {
+        // Organisation-wide readers list like an unrestricted user: no branch
+        // predicate at all unless an active branch narrows the view. Legacy
+        // explicit grants are ignored on purpose so they cannot shrink the list.
+        if (self::isOrganizationGlobalRead($user)
+            || (self::isUnrestricted($user) && count(self::allowedSubeIds($user)) === 0)
+        ) {
             if ($activeSubeScope !== null) {
                 if ($assignmentAware) {
                     $key = $paramPrefix . '_active_sube';

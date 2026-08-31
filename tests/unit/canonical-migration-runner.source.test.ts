@@ -29,10 +29,10 @@ describe('canonical migration runner contract', () => {
   it('owns the contiguous 001→080 filesystem migration chain', () => {
     const numbers = migrations.map((name) => Number.parseInt(name.slice(0, 3), 10));
     expect(migrations[0]).toBe('001_initial_schema.sql');
-    expect(migrations.at(-1)).toBe('080_organizasyon_audit_owners.sql');
-    expect(migrations).toHaveLength(80);
-    expect(new Set(numbers).size).toBe(80);
-    expect(numbers).toEqual(Array.from({ length: 80 }, (_, index) => index + 1));
+    expect(migrations.at(-1)).toBe('081_ik_personeli_rolu.sql');
+    expect(migrations).toHaveLength(81);
+    expect(new Set(numbers).size).toBe(81);
+    expect(numbers).toEqual(Array.from({ length: 81 }, (_, index) => index + 1));
     expect(migrations).toContain('074_qr_attendance_correction_and_inbox.sql');
     expect(migrations.indexOf('074_qr_attendance_correction_and_inbox.sql')).toBe(
       migrations.indexOf('075_personel_account_activation.sql') - 1,

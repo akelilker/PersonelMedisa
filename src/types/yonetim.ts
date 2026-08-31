@@ -21,6 +21,7 @@ export type YonetimKullanici = {
   sube_ids: number[];
   bolum_ids?: number[];
   birim_ids?: number[];
+  sirket_ids?: number[];
   varsayilan_sube_id: number | null;
   durum: KayitDurumu;
   notlar?: string;
@@ -71,6 +72,11 @@ export type UpsertYonetimKullaniciPayload = {
   sube_ids: number[];
   bolum_ids?: number[];
   birim_ids?: number[];
+  /**
+   * Sirket kapsami. IK_PERSONELI icin dogrudan islem yapabilecegi sirketler,
+   * diger scoped roller icin mevcut sirket kapsami anlamini korur.
+   */
+  sirket_ids?: number[];
   varsayilan_sube_id?: number | null;
   durum: KayitDurumu;
   notlar?: string;

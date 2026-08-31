@@ -27,6 +27,8 @@ use Throwable;
  * not personal data. Personnel rows are only ever counted, never selected, and no
  * user id, username or personnel column reaches the output. The scope summary
  * reports assignment totals per role, which is a count of grants, not of people.
+ * The same rule holds for the location×branch matrix: it publishes relation ids
+ * and a COUNT, so it says how many people share a combination and never who.
  *
  * Determinism: rows are ordered by primary key, keys are emitted in a fixed
  * order, and the checksum covers the data section only — not `generated_at` —
@@ -35,7 +37,7 @@ use Throwable;
  */
 final class OrganizationMappingInventoryReport
 {
-    public const SCHEMA_VERSION = '1';
+    public const SCHEMA_VERSION = '2';
 
     /**
      * The branch id set the production postcheck evidence of migration 079
@@ -63,6 +65,8 @@ final class OrganizationMappingInventoryReport
             'sgk_employers' => self::sgkEmployers($pdo),
             'work_locations' => self::workLocations($pdo),
             'scope_summary' => self::scopeSummary($pdo),
+            'personnel_location_branch_matrix' => self::personnelLocationBranchMatrix($pdo),
+            'personnel_without_location_by_branch' => self::personnelWithoutLocationByBranch($pdo),
             'row_counts' => self::rowCounts($pdo),
             'orphan_counts' => [
                 'orphan_sube_sirket_count' => (int) $readiness['counts']['orphan_sube_sirket_count'],
@@ -82,6 +86,17 @@ final class OrganizationMappingInventoryReport
         $data['missing_branch_ids'] = array_values(
             array_diff(self::DOCUMENTED_BRANCH_IDS, $branchIds)
         );
+
+        $matrixTotal = self::sumPersonelCount($data['personnel_location_branch_matrix']);
+        $withoutLocationTotal = self::sumPersonelCount($data['personnel_without_location_by_branch']);
+        $data['personnel_location_matrix_total'] = $matrixTotal;
+        $data['personnel_without_location_total'] = $withoutLocationTotal;
+        // The two aggregates partition `personeller` by "has a work location" and
+        // nothing else, so their sum must be the table count. If it is not, the
+        // matrix is not a provable projection of the personnel table and no
+        // location decision may be taken from it.
+        $data['personnel_matrix_reconciled'] = $data['row_counts']['personeller'] >= 0
+            && ($matrixTotal + $withoutLocationTotal) === $data['row_counts']['personeller'];
 
         $blockers = self::blockers($data, $readiness);
 
@@ -256,6 +271,84 @@ final class OrganizationMappingInventoryReport
     }
 
     /**
+     * The `calisma_lokasyonu_id × sube_id` intersection of the personnel table,
+     * for the rows that actually carry a work location.
+     *
+     * Why this is published: the per-branch and per-location personnel counts are
+     * marginals, and equal marginals are not a mapping proof — they cannot show
+     * whether a location's people sit under one branch or several. Only the
+     * intersection can. It stays anonymous: relation ids and a COUNT, never a
+     * personnel row, id or column.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private static function personnelLocationBranchMatrix(PDO $pdo): array
+    {
+        $rows = self::query(
+            $pdo,
+            'SELECT p.calisma_lokasyonu_id AS calisma_lokasyonu_id, p.sube_id AS sube_id,
+                    COUNT(*) AS personel_count
+             FROM personeller p
+             WHERE p.calisma_lokasyonu_id IS NOT NULL
+             GROUP BY p.calisma_lokasyonu_id, p.sube_id
+             ORDER BY p.calisma_lokasyonu_id ASC, p.sube_id ASC'
+        );
+
+        $items = [];
+        foreach ($rows as $row) {
+            $items[] = [
+                'calisma_lokasyonu_id' => (int) $row['calisma_lokasyonu_id'],
+                'sube_id' => self::nullableInt($row['sube_id'] ?? null),
+                'personel_count' => (int) $row['personel_count'],
+            ];
+        }
+
+        return $items;
+    }
+
+    /**
+     * The complement of the matrix: personnel with no work location at all,
+     * grouped by branch. Published so the matrix can be reconciled against the
+     * personnel row count instead of being trusted.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private static function personnelWithoutLocationByBranch(PDO $pdo): array
+    {
+        $rows = self::query(
+            $pdo,
+            'SELECT p.sube_id AS sube_id, COUNT(*) AS personel_count
+             FROM personeller p
+             WHERE p.calisma_lokasyonu_id IS NULL
+             GROUP BY p.sube_id
+             ORDER BY p.sube_id ASC'
+        );
+
+        $items = [];
+        foreach ($rows as $row) {
+            $items[] = [
+                'sube_id' => self::nullableInt($row['sube_id'] ?? null),
+                'personel_count' => (int) $row['personel_count'],
+            ];
+        }
+
+        return $items;
+    }
+
+    /**
+     * @param list<array<string, mixed>> $rows
+     */
+    private static function sumPersonelCount(array $rows): int
+    {
+        $total = 0;
+        foreach ($rows as $row) {
+            $total += (int) $row['personel_count'];
+        }
+
+        return $total;
+    }
+
+    /**
      * Authorization scope totals. Roles are grouped, users are not listed: the
      * mapping decision needs to know how much scope exists, never whose it is.
      *
@@ -333,6 +426,9 @@ final class OrganizationMappingInventoryReport
         }
         if ($data['orphan_counts']['sube_sgk_sirket_mismatch_count'] > 0) {
             $blockers[] = 'BRANCH_SGK_COMPANY_MISMATCH';
+        }
+        if ($data['personnel_matrix_reconciled'] !== true) {
+            $blockers[] = 'INVENTORY_PERSONNEL_MATRIX_COUNT_MISMATCH';
         }
         foreach (['subeler', 'sgk_isverenler', 'calisma_lokasyonlari', 'personeller'] as $table) {
             if ($data['row_counts'][$table] < 0) {

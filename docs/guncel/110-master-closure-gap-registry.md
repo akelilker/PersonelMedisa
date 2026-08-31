@@ -4,7 +4,7 @@ PRODUCTION_MIGRATION_TIP: 079
 # 110 — Canonical Closure / Gap Registry
 
 **Tür:** Güncel durum kaydı ve sonraki iş seçimi için tek referans.
-**Güncelleme:** 2026-08-28 (final master closure reconcile)
+**Güncelleme:** 2026-08-31 (organizasyon eşleme production kapanışı + envanter matrix kontratı reconcile)
 **Kapsam:** PersonelMedisa teknik ana sistem kapanışı + kullanıcı-gated kalan işlerin net sınıflandırması. Bu turda uygulama kodu / migration dosyası / seed / personel-assignment-rol-SGK-bordro-retention-imha mutasyonu yok.
 
 ## Migration durumu
@@ -13,7 +13,8 @@ PRODUCTION_MIGRATION_TIP: 079
 | --- | --- | --- |
 | CODE_MIGRATION_TIP | **079** | Repodaki son migration: `079_sirket_sube_hiyerarsisi.sql`. Eski `079_aylik_kapanis_sube_scope_and_actor.sql` iş modeli yanlış olduğu için geri çekildi; canonical kaynaktan çıkarıldı ve hiçbir koşulda uygulanmaz (MG-SIRKET-SUBE-HIYERARSI-001) |
 | PRODUCTION_MIGRATION_TIP | **079** | `079_sirket_sube_hiyerarsisi.sql` production'a uygulandı (apply `33322972259`, postcheck `33323369963`, backup `medisa-pre-079-33322972259-1-20260830-164502.sql`). Additive; hiçbir satır yazmadı. `schema_ready = true`, `data_ready = false` — eşleme ayrı onaylı operasyondur |
-| Organizasyon eşleme durumu | **CODE_READY / NOT_EXECUTED** | Envanter ve mapping owner'ları kod olarak hazır (MG-SIRKET-SUBE-PROD-MAPPING-001). Production envanteri **çalıştırılmadı**, mapping preflight/apply **çalıştırılmadı**, production mutation sayısı **0** |
+| Organizasyon eşleme durumu | **CLOSED_CONFIRMED** | İlk production mapping uygulandı (MG-SIRKET-SUBE-PROD-MAPPING-001, apply run `33342644722`): 3 şirket, 10 şube, 3 SGK işvereni eşlendi; postcheck PASS ve `data_ready = true`. 7 çalışma lokasyonu bilinçli **deferred** (`sube_id` NULL). Eski spec yeniden uygulanmaz |
+| Production deploy / main SHA | **`067692bba744808c06b6b7d802797c453859df53`** | Mapping operasyonunun pinlendiği canonical deploy SHA'sı; bu registry turu aynı SHA üzerinden ilerledi |
 | Otomatik sicil owner | **`PersonelSicilAllocator`** | `api/src/Services/Personel/PersonelSicilAllocator.php` + singleton tablo `personel_sicil_sequence` (migration 078); interaktif create'te `sicil_no` gönderilmez, backend tahsis eder |
 | Canlı migration doğrulaması | **PASS** | Tip `079`; pending migration yok; migration workflow bu turda **tekrar çalıştırılmaz** |
 
@@ -55,6 +56,9 @@ PRODUCTION_MIGRATION_TIP: 079
 | `MG-OPS-UBGT-001` | UBGT canlı takvim/projeksiyon salt-okunur doğrulaması | **CLOSED_CONFIRMED** | 2026-08-27 canlı GET doğrulandı. |
 | `MG-ROLE-ENUM-DEBT-001` | Legacy `users.rol` ENUM şema daraltması | **CLOSED_CONFIRMED** | Kod tarafı kapalı: legacy alias yok, authorization fail-closed, legacy rol seçilemez. Şema daraltması `077_legacy_role_enum_shrink.sql` production'a uygulandı (apply `33169230032` / request `33169230032-1` / worker `SUCCEEDED`); migration'ın kendi guard'ları legacy rol atanmış kullanıcı **0** ve canonical ENUM readback assert'i ile korunmuştur. `LEGACY_ROLE_ENUM_SCHEMA_COUNT = 0`. Bkz. `docs/guncel/131-legacy-role-enum-canonical-cleanup.md`. |
 | `MG-OPS-CRON-WORKER-001` | cPanel migration worker kontrol düzlemi | **CLOSED_CONFIRMED** | Canlı `api/bin/cpanel-migration-cron.php`, salt-okunur envanter workflow'unun geçici wrapper'ı olarak kalmış ve require ettiği `impl` dosyası sunucuda bulunmadığı için her cron tick'i PHP fatal ile bitiyordu. Wrapper'ı yazan workflow kaldırıldı, worker canonical hale getirildi, kalıcı `worker-heartbeat.json` eklendi ve apply workflow'unun fail-open busy guard'ı dizin listelemesine çevrildi. |
+| `MG-SIRKET-SUBE-PROD-MAPPING-001` | Şirket / şube / SGK ilk production eşlemesi | **CLOSED_CONFIRMED** | Apply run `33342644722`, deploy SHA `067692bba744808c06b6b7d802797c453859df53`; 3 şirket + 10 şube + 3 SGK eşlendi, postcheck PASS, `data_ready = true`, backup verified. 7 çalışma lokasyonu deferred; ID 3 oluşturulmadı; personel ve user scope satırları byte-identical korundu. Bkz. `129-organization-mapping-owners.md`. |
+| `MG-ORG-INVENTORY-LOCATION-BRANCH-MATRIX-001` | Envanterde anonim lokasyon × şube personel matrisi | **CLOSED** | `OrganizationMappingInventoryReport` schema version `2`: `personnel_location_branch_matrix` + `personnel_without_location_by_branch`, deterministic GROUP BY/ORDER BY, `personnel_matrix_reconciled` guard'ı ve `INVENTORY_PERSONNEL_MATRIX_COUNT_MISMATCH` blocker'ı. Yalnız ilişki ID'si + COUNT yayınlanır; matris log'a değil private artifact'a gider. Mapping/spec owner davranışı değişmedi. |
+| `MG-CI-ACTIONS-NODE24-001` | GitHub Actions Node 24 runtime temizliği | **CLOSED** | Control-plane workflow'ları `actions/checkout@v6` ve `actions/upload-artifact@v6` ile pinli; v4/v5 kullanımı kaynak testiyle yasaklı. Açık deprecation kalemi yok. |
 | `MG-OPS-ORG-001` | IC kritik organizasyon FK tamamlama | **CLOSED** | Phase1 import sonrası AKTIF `IC_PERSONEL` için kritik org alanları (Şube/Departman/Bölüm/Birim/Görev/Personel Tipi) tamam; kalan telefon kalemi ayrıdır (`MG-OPS-PERSONEL-PHONE-001`). DIS org null’ları IC sayımına **dahil edilmez**. |
 | `MG-OPS-PERSONEL-PHONE-001` | 20 IC telefon deferred tamamlaması | **CLOSED_CONFIRMED** | Gerçek kullanıcı verisi ile canonical write owner (authenticated `PUT /personeller/{id}`) üzerinden tamamlandı; direct SQL / import reopen / migration yok. Preflight `MATCHED_RECORD_COUNT = 20`, `DUPLICATE_SICIL_COUNT = 0`, hepsi AKTIF `IC_PERSONEL`. Post-write salt-okunur readback `PHONE_EXPECTED_MATCH_COUNT = 20`, `PHONE_MISSING_COUNT = 0`, `PHONE_MISMATCH_COUNT = 0`, `PERSONEL_IC_PHONE_DEFERRED = 0`. Kapsam dışı mutasyon yok (`UNEXPECTED_PERSONNEL_MUTATION_COUNT = 0`). Numaralar PII olduğu için dokümana yazılmaz. Ayrıca sicil 216 için kullanıcı onaylı tekil isim düzeltmesi uygulandı (`soyad` correction, fail-closed önceki-değer teyidi ile); başka personelin adına dokunulmadı. |
 
@@ -78,19 +82,20 @@ Açık teknik borç kalemi yoktur.
 | `MG-SGK-BILDIRGE-001` | SGK bildirgesi çıktısı | **FUTURE** | |
 | `MG-SELF-PAY-001` | PERSONEL maaş/bordro self-view | **OUT_OF_SCOPE** | |
 | `MG-QR-REV-UX-001` | QR anomaly → kontrollü revizyon UX | **INTENTIONAL_DEFER** | |
+| `MG-ORG-LOCATION-BRANCH-MAP-001` | 7 çalışma lokasyonunun şube eşlemesi | **INTENTIONAL_DEFER** | İlk mapping'de bilinçli deferred; `sube_id` NULL kaldı ve readiness'i bloke etmiyor. Karar kaydı: İzmir ve Sakarya lokasyonları MEDISA'ya aittir ve MEDISA altında **ayrı şube adaylarıdır** (`Medisa / İzmir`, `Medisa / Sakarya`). Şube oluşturma yapılmadı; gerçek eşleme yeni envanter matrisinin (`personnel_location_branch_matrix`) sonucunu **ve** ayrı production onayını bekler. |
 | `MG-FSC-025-001` | FSC %25 aktif bandı | **INTENTIONAL_DEFER** | |
 
 ## Final sınıflandırma özeti
 
 | Sınıf | Sayım |
 | --- | ---: |
-| **CLOSED_CONFIRMED** | 10 |
-| **CLOSED** | 9 |
+| **CLOSED_CONFIRMED** | 11 |
+| **CLOSED** | 11 |
 | **USER_DATA_REQUIRED** | 0 |
 | **USER_ASSIGNMENT_REQUIRED** | 1 |
 | **READY_FOR_USER_EXECUTION_APPROVAL** | 0 |
 | **TECH_DEBT_NON_BLOCKING** | 0 |
-| **FUTURE / OUT_OF_SCOPE / INTENTIONAL_DEFER** | 7 |
+| **FUTURE / OUT_OF_SCOPE / INTENTIONAL_DEFER** | 8 |
 | **BUG** | **0** |
 | **OPS_ROLLOUT** | **0** |
 
@@ -104,11 +109,13 @@ Açık teknik borç kalemi yoktur.
 4. **`DIS_KAYNAK` modeli `CLOSED_CONFIRMED` (076).** Import reopen / migration re-apply yok.
 5. **Olağanüstü çalışma acil karar bekleyen açık iş değildir** (`INTENTIONAL_DEFER`).
 6. **Bordro PDF / banka / SGK filing / FSC / QR-revizyon UX bug veya OPS_ROLLOUT değildir.**
+7. **Organizasyon eşlemesi artık `CODE_READY / NOT_EXECUTED` değildir.** İlk production mapping çalıştırıldı (`33342644722`), `data_ready = true`; eski spec yeniden uygulanmaz. Kalan tek kalem 7 lokasyonun bilinçli deferred eşlemesidir ve bu bir bug değildir.
 
 ## Kalan güvenli iş sırası (kullanıcı/ops)
 
 1. `SUBE_YONETICISI` explicit kullanıcı–şube atamaları (iş sahibi kararı).
 2. Fiziksel imha yalnız ayrı execution onayı + yedek kanıtı + bakım penceresi ile.
+3. Salt-okunur envanterin schema version `2` ile yeniden çalıştırılması (ayrı dispatch onayı), ardından 7 lokasyonun matris kanıtına dayalı kararı; İzmir/Sakarya için MEDISA altında şube oluşturma ayrı production onayı gerektirir.
 
 > **Bayat madde kaldırıldı:** DIS bölüm/birim zorunluluk kararı (`130` + `076` rollout) kapanmıştır; import reopen maddesi geçersizdir.
 

@@ -420,12 +420,14 @@ jobs:
           # Bounded, allowlisted output. The report carries only counts, version
           # numbers, checksums and column/index names by construction; the filters
           # below keep an unexpected field from ever reaching the log.
+          # Null-only fallback: `a // b` also fires on `false`, which reported a
+          # proven-false boolean as a missing field.
           emit_scalar() {
             local label="$1"
             local filter="$2"
             local pattern="$3"
             local value
-            value="$(jq -r "${filter} // \"NONE\"" "$report" 2>/dev/null || echo NONE)"
+            value="$(jq -r "${filter} | if . == null then \"NONE\" else tostring end" "$report" 2>/dev/null || echo NONE)"
             [[ "$value" =~ $pattern ]] || value="NONE"
             echo "${label}=${value}"
           }

@@ -230,6 +230,16 @@ describe('read-only organization inventory owner', () => {
     expect(inventoryWorkflow).not.toMatch(/BASELINE_BRANCH_IDS=\s*"?1,2,4/);
   });
 
+  it('prints a false boolean as false instead of hiding it behind NONE', () => {
+    // jq's `a // b` alternative fires on `false` as well as on `null`, so the
+    // old filter reported every proven-false boolean (id_3_present, data_ready,
+    // branch_set_valid) as a missing field. The fallback must be null-only.
+    for (const workflow of [inventoryWorkflow, mappingWorkflow, diagnosticsWorkflow]) {
+      expect(workflow).toContain('if . == null then \\"NONE\\" else tostring end');
+      expect(workflow).not.toMatch(/value="\$\(jq -r "\$\{filter\} \/\/ \\"NONE\\""/);
+    }
+  });
+
   it('leaves the mapping and spec owner schema versions untouched', () => {
     expect(specOwner).toContain("public const SCHEMA_VERSION = '1'");
     expect(mappingOwner).toContain("public const SCHEMA_VERSION = '1'");

@@ -79,7 +79,7 @@ jobs:
           test "$FTP_PORT" = "21" || (echo "FTP_PORT must be 21 for this cPanel FTP deploy." && exit 1)
 
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install FTP client
         run: |

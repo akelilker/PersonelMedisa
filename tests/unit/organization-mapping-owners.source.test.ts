@@ -11,6 +11,8 @@ const backupOwner = read('api/src/Database/MigrationBackupService.php');
 const worker = read('api/bin/cpanel-migration-cron.php');
 const inventoryWorkflow = read('.github/workflows/ops-organization-inventory.yml');
 const mappingWorkflow = read('.github/workflows/apply-organization-mapping.yml');
+const migrationsWorkflow = read('.github/workflows/apply-cpanel-migrations.yml');
+const diagnosticsWorkflow = read('.github/workflows/ops-migration-worker-diagnostics.yml');
 const publicService = read('api/src/Services/Organizasyon/OrganizasyonService.php');
 const router = read('api/src/Router.php');
 
@@ -467,7 +469,7 @@ describe('workflow separation', () => {
   });
 
   it('keeps the row-level inventory out of the log and in an artifact', () => {
-    expect(inventoryWorkflow).toContain('actions/upload-artifact@v4');
+    expect(inventoryWorkflow).toContain('actions/upload-artifact@v6');
     expect(inventoryWorkflow).toContain('name: organization-inventory');
     expect(inventoryWorkflow).not.toContain('cat "$report"');
     expect(inventoryWorkflow).not.toContain('.data.branches');
@@ -524,6 +526,30 @@ describe('workflow separation', () => {
   });
 });
 
+describe('first-party action runtime pins', () => {
+  const checkoutOwners = [
+    migrationsWorkflow,
+    diagnosticsWorkflow,
+    inventoryWorkflow,
+    mappingWorkflow,
+  ];
+
+  it('checks out with the Node 24 major on every control-plane workflow', () => {
+    for (const workflow of checkoutOwners) {
+      expect(workflow).toContain('uses: actions/checkout@v6');
+      expect(workflow).not.toContain('actions/checkout@v4');
+      expect(workflow).not.toContain('actions/checkout@v5');
+    }
+  });
+
+  it('uploads artifacts with the Node 24 major on both publication owners', () => {
+    for (const workflow of [inventoryWorkflow, mappingWorkflow]) {
+      expect(workflow).toContain('uses: actions/upload-artifact@v6');
+      expect(workflow).not.toContain('actions/upload-artifact@v4');
+    }
+  });
+});
+
 describe('publication boundary (repository visibility)', () => {
   const ownersDoc = read('docs/guncel/129-organization-mapping-owners.md');
   const opsReadme = read('ops/organization-mapping/README.md');
@@ -549,7 +575,7 @@ describe('publication boundary (repository visibility)', () => {
       '- name: Checkout repository',
       '- name: Collect row-level organization inventory',
       'request.pending.${REQUEST_ID}.json',
-      'actions/upload-artifact@v4',
+      'actions/upload-artifact@v6',
     ]) {
       expect(inventoryWorkflow.indexOf(later)).toBeGreaterThan(guardAt);
     }
@@ -563,7 +589,7 @@ describe('publication boundary (repository visibility)', () => {
       '- name: Checkout repository',
       '- name: Verify the approved mapping spec',
       'request.pending.${REQUEST_ID}.json',
-      'actions/upload-artifact@v4',
+      'actions/upload-artifact@v6',
     ]) {
       expect(mappingWorkflow.indexOf(later)).toBeGreaterThan(guardAt);
     }

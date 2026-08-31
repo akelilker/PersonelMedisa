@@ -55,7 +55,7 @@ jobs:
           sudo apt-get install -y lftp
 
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       # No migration request is created until the read-only preflight published by
       # `Ops migration worker diagnostics` (mode READ_ONLY_MIGRATION_PREFLIGHT)

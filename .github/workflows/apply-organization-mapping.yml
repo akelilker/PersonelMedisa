@@ -131,7 +131,7 @@ jobs:
           test "$FTP_PORT" = "21" || (echo "FTP_PORT must be 21 for this cPanel FTP deploy." && exit 1)
 
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install FTP client
         run: |
@@ -390,7 +390,7 @@ jobs:
       # clause this step would still upload after the guard failed.
       - name: Publish mapping evidence artifact
         if: always() && github.event.repository.private == true
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: organization-mapping-evidence
           path: mapping-artifact/

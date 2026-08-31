@@ -249,12 +249,16 @@ jobs:
 
           # Bounded, allowlisted summary. The row-level section stays in the
           # artifact; only counts, checksums and reason codes reach this log.
+          # The fallback triggers on a missing field only. `a // b` would also fire
+          # on `false`, which printed every false boolean (id_3_present,
+          # data_ready) as NONE and made an absent field indistinguishable from a
+          # proven negative.
           emit_scalar() {
             local label="$1"
             local filter="$2"
             local pattern="$3"
             local value
-            value="$(jq -r "${filter} // \"NONE\"" "$report" 2>/dev/null || echo NONE)"
+            value="$(jq -r "${filter} | if . == null then \"NONE\" else tostring end" "$report" 2>/dev/null || echo NONE)"
             [[ "$value" =~ $pattern ]] || value="NONE"
             echo "${label}=${value}"
           }

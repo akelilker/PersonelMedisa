@@ -315,9 +315,11 @@ jobs:
             fi
           done
 
+          # Null-only fallback: `a // b` also fires on `false`, which reported a
+          # proven-false boolean as a missing field.
           emit_scalar() {
             local label="$1" file="$2" filter="$3" pattern="$4" value
-            value="$(jq -r "${filter} // \"NONE\"" "$file" 2>/dev/null || echo NONE)"
+            value="$(jq -r "${filter} | if . == null then \"NONE\" else tostring end" "$file" 2>/dev/null || echo NONE)"
             [[ "$value" =~ $pattern ]] || value="NONE"
             echo "${label}=${value}"
           }

@@ -128,7 +128,48 @@ function omapCreateSchema(PDO $pdo): void
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
     );
     $pdo->exec((string) file_get_contents(__DIR__ . '/../../api/migrations/079_sirket_sube_hiyerarsisi.sql'));
+    // 080 owns `sube_olusturma_auditleri`, which is the only proof an extension
+    // branch is legitimate. The inventory must be exercised against the real
+    // audit schema, triggers included, not a hand-written stand-in.
+    $pdo->exec((string) file_get_contents(__DIR__ . '/../../api/migrations/080_organizasyon_audit_owners.sql'));
     omapSeedLedger($pdo);
+}
+
+/**
+ * A canonical branch-create audit row, exactly as OrganizasyonAuditWriter writes
+ * one. `$kod` is passed separately so a test can record an identity that
+ * disagrees with the live branch row.
+ */
+function omapRecordBranchCreateAudit(PDO $pdo, int $subeId, string $kod, int $actorUserId = 52): void
+{
+    $pdo->prepare(
+        'INSERT INTO sube_olusturma_auditleri
+            (sube_id, sirket_id, kod, ad, durum, sgk_isveren_id, departman_ids, departman_ids_hash,
+             actor_user_id, request_hash)
+         VALUES (:sube_id, NULL, :kod, :ad, :durum, NULL, :departman_ids, :departman_ids_hash,
+                 :actor_user_id, :request_hash)'
+    )->execute([
+        'sube_id' => $subeId,
+        'kod' => $kod,
+        'ad' => 'Fixture Extension ' . $subeId,
+        'durum' => 'AKTIF',
+        'departman_ids' => '',
+        'departman_ids_hash' => hash('sha256', ''),
+        'actor_user_id' => $actorUserId,
+        'request_hash' => hash('sha256', 'fixture-' . $subeId . '-' . $kod),
+    ]);
+}
+
+/** Fingerprint including the audit owner: the inventory may not write there either. */
+function omapBranchFingerprint(PDO $pdo): string
+{
+    $parts = [];
+    foreach (['subeler', 'sube_olusturma_auditleri', 'personeller', 'user_subeler'] as $table) {
+        $rows = $pdo->query('SELECT * FROM `' . $table . '` ORDER BY 1')->fetchAll(PDO::FETCH_ASSOC);
+        $parts[] = $table . ':' . json_encode($rows);
+    }
+
+    return hash('sha256', implode('|', $parts));
 }
 
 /**
@@ -375,10 +416,12 @@ $suffix = bin2hex(random_bytes(5));
 $db = 'medisa_orgmap_' . $suffix;
 $conflictDb = 'medisa_orgmap_conflict_' . $suffix;
 $partialDb = 'medisa_orgmap_partial_' . $suffix;
+$extDb = 'medisa_orgmap_ext_' . $suffix;
+$extBlockedDb = 'medisa_orgmap_extblocked_' . $suffix;
 
 $rootDsn = preg_replace('/;?dbname=[^;]*/i', '', $dsn) ?: $dsn;
 $root = omapPdo($rootDsn);
-foreach ([$db, $conflictDb, $partialDb] as $name) {
+foreach ([$db, $conflictDb, $partialDb, $extDb, $extBlockedDb] as $name) {
     $root->exec('CREATE DATABASE `' . $name . '` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
 }
 
@@ -417,6 +460,13 @@ try {
     omapAssert(
         $inventory['data']['unexpected_branch_ids'] === [] && $inventory['data']['missing_branch_ids'] === [],
         'the observed branch set matches the documented one with no difference'
+    );
+    omapAssert(
+        $inventory['data']['baseline_branch_ids'] === [1, 2, 4, 5, 6, 7, 8, 9, 10, 11]
+            && $inventory['data']['audited_extension_branch_ids'] === []
+            && $inventory['data']['expected_branch_count'] === 10
+            && $inventory['data']['branch_set_valid'] === true,
+        'a baseline-only database is provable with no extension at all'
     );
 
     $branchOne = $inventory['data']['branches'][0];
@@ -508,8 +558,8 @@ try {
         'the matrix publishes relation ids and a count, and nothing else'
     );
     omapAssert(
-        $inventory['schema_version'] === '2',
-        'the extended inventory contract is published as schema version 2'
+        $inventory['schema_version'] === '3',
+        'the extended inventory contract is published as schema version 3'
     );
 
     omapAssert(
@@ -1115,11 +1165,204 @@ try {
         'the mid-transaction error rolls every write back'
     );
 
+    // -----------------------------------------------------------------------
+    // 11) Baseline + audited branch extensions
+    //
+    // The inventory must accept a branch created after the 079 baseline when the
+    // canonical create owner recorded it, and must keep blocking everything it
+    // cannot prove. Two disposable databases: one walks the passing progression,
+    // the other collects the fail-closed cases.
+    // -----------------------------------------------------------------------
+    $ext = omapPdo((preg_replace('/dbname=[^;]+/i', 'dbname=' . $extDb, $dsn) ?: $dsn));
+    omapCreateSchema($ext);
+    omapSeed($ext);
+    OrganizasyonSchema::resetCache();
+
+    $extBefore = omapBranchFingerprint($ext);
+    $baselineOnly = OrganizationMappingInventoryReport::collect($ext, OMAP_SHA, OMAP_TIP);
+    omapAssert(
+        $baselineOnly['result'] === 'PASS'
+            && $baselineOnly['data']['branch_create_audit_ready'] === true
+            && $baselineOnly['data']['audited_extension_branch_ids'] === []
+            && $baselineOnly['data']['unaudited_extension_branch_ids'] === []
+            && $baselineOnly['data']['expected_branch_count'] === 10
+            && $baselineOnly['data']['row_counts']['subeler'] === 10,
+        'baseline only: PASS with an empty extension set'
+    );
+
+    // An extension branch with no create audit at all.
+    $ext->exec(
+        "INSERT INTO subeler (id, kod, ad, sgk_isveren_id) VALUES
+            (12, 'TEST-SB-12', 'Fixture Extension 12', 1),
+            (13, 'TEST-SB-13', 'Fixture Extension 13', 1)"
+    );
+    OrganizasyonSchema::resetCache();
+    $unaudited = OrganizationMappingInventoryReport::collect($ext, OMAP_SHA, OMAP_TIP);
+    omapAssert(
+        $unaudited['result'] === 'BLOCKED'
+            && $unaudited['data']['unaudited_extension_branch_ids'] === [12, 13]
+            && $unaudited['data']['audited_extension_branch_ids'] === []
+            && $unaudited['data']['unexpected_branch_ids'] === [12, 13]
+            && $unaudited['data']['branch_set_valid'] === false
+            && in_array('UNEXPECTED_BRANCH_IDS_PRESENT', $unaudited['blockers'], true)
+            && in_array('BRANCH_SET_NOT_PROVABLE', $unaudited['blockers'], true),
+        'an extension branch without a create audit is a blocker'
+    );
+    omapAssert(
+        $unaudited['data']['expected_branch_count'] === 10,
+        'an unprovable extension never grows the expected branch count'
+    );
+
+    // The same two branches, now with the canonical create audit behind them:
+    // exactly the GATE 3 production shape.
+    omapRecordBranchCreateAudit($ext, 12, 'TEST-SB-12');
+    omapRecordBranchCreateAudit($ext, 13, 'TEST-SB-13');
+    OrganizasyonSchema::resetCache();
+    $audited = OrganizationMappingInventoryReport::collect($ext, OMAP_SHA, OMAP_TIP);
+    omapAssert(
+        $audited['result'] === 'PASS'
+            && $audited['blockers'] === []
+            && $audited['data']['audited_extension_branch_ids'] === [12, 13]
+            && $audited['data']['unaudited_extension_branch_ids'] === []
+            && $audited['data']['duplicate_extension_audit_branch_ids'] === []
+            && $audited['data']['missing_baseline_branch_ids'] === []
+            && $audited['data']['branch_set_valid'] === true,
+        'audited extensions 12 and 13 are accepted with no blocker'
+    );
+    omapAssert(
+        $audited['data']['expected_branch_ids'] === [1, 2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]
+            && $audited['data']['expected_branch_count'] === 12
+            && $audited['data']['row_counts']['subeler'] === 12,
+        'the expected branch set and count are derived: baseline plus audited extensions'
+    );
+
+    // A future legitimate branch must pass without touching this owner again.
+    $ext->exec("INSERT INTO subeler (id, kod, ad, sgk_isveren_id) VALUES (14, 'TEST-SB-14', 'Fixture Extension 14', 1)");
+    omapRecordBranchCreateAudit($ext, 14, 'TEST-SB-14');
+    OrganizasyonSchema::resetCache();
+    $future = OrganizationMappingInventoryReport::collect($ext, OMAP_SHA, OMAP_TIP);
+    omapAssert(
+        $future['result'] === 'PASS'
+            && $future['data']['audited_extension_branch_ids'] === [12, 13, 14]
+            && $future['data']['expected_branch_count'] === 13,
+        'a future audited extension passes with no code change'
+    );
+    omapAssert(
+        $future['data']['branch_create_audit_ready'] === true,
+        'the audit owner is readable, so extension proof is evaluable'
+    );
+
+    $extAfter = omapBranchFingerprint($ext);
+    OrganizationMappingInventoryReport::collect($ext, OMAP_SHA, OMAP_TIP);
+    omapAssert(
+        omapBranchFingerprint($ext) === $extAfter && $extBefore !== $extAfter,
+        'the classification is SELECT-only: only the fixture changed rows'
+    );
+
+    // ---- fail-closed cases ----
+    $extBlocked = omapPdo((preg_replace('/dbname=[^;]+/i', 'dbname=' . $extBlockedDb, $dsn) ?: $dsn));
+    omapCreateSchema($extBlocked);
+    omapSeed($extBlocked);
+    OrganizasyonSchema::resetCache();
+
+    // Duplicate create audit for one branch. The unique key normally makes this
+    // impossible, which is exactly why the guard must not depend on it: a legacy
+    // or tampered schema without the index still has to be caught.
+    $extBlocked->exec('ALTER TABLE sube_olusturma_auditleri DROP FOREIGN KEY fk_soa_sube');
+    $extBlocked->exec('ALTER TABLE sube_olusturma_auditleri DROP INDEX uq_soa_sube');
+    $extBlocked->exec("INSERT INTO subeler (id, kod, ad, sgk_isveren_id) VALUES (12, 'TEST-SB-12', 'Fixture Extension 12', 1)");
+    omapRecordBranchCreateAudit($extBlocked, 12, 'TEST-SB-12');
+    omapRecordBranchCreateAudit($extBlocked, 12, 'TEST-SB-12');
+    OrganizasyonSchema::resetCache();
+    $duplicate = OrganizationMappingInventoryReport::collect($extBlocked, OMAP_SHA, OMAP_TIP);
+    omapAssert(
+        $duplicate['result'] === 'BLOCKED'
+            && $duplicate['data']['duplicate_extension_audit_branch_ids'] === [12]
+            && $duplicate['data']['audited_extension_branch_ids'] === []
+            && in_array('DUPLICATE_BRANCH_CREATE_AUDIT', $duplicate['blockers'], true),
+        'two create audits for one branch block instead of counting as proof'
+    );
+
+    // An audit whose recorded branch identity disagrees with the live row.
+    $extBlocked->exec("INSERT INTO subeler (id, kod, ad, sgk_isveren_id) VALUES (13, 'TEST-SB-13', 'Fixture Extension 13', 1)");
+    omapRecordBranchCreateAudit($extBlocked, 13, 'TEST-SB-OTHER');
+    OrganizasyonSchema::resetCache();
+    $mismatch = OrganizationMappingInventoryReport::collect($extBlocked, OMAP_SHA, OMAP_TIP);
+    omapAssert(
+        $mismatch['result'] === 'BLOCKED'
+            && $mismatch['data']['mismatched_extension_audit_branch_ids'] === [13]
+            && !in_array(13, $mismatch['data']['audited_extension_branch_ids'], true)
+            && in_array('BRANCH_CREATE_AUDIT_MISMATCH', $mismatch['blockers'], true),
+        'a create audit that does not match the live branch identity blocks'
+    );
+
+    // A lawful post-creation update must NOT look like tampering: only the branch
+    // id and the immutable kod are compared, and the audit row is immutable.
+    $extBlocked->exec("INSERT INTO subeler (id, kod, ad, sgk_isveren_id) VALUES (14, 'TEST-SB-14', 'Fixture Extension 14', 1)");
+    omapRecordBranchCreateAudit($extBlocked, 14, 'TEST-SB-14');
+    $extBlocked->exec("UPDATE subeler SET ad = 'Renamed Later', durum = 'PASIF' WHERE id = 14");
+    OrganizasyonSchema::resetCache();
+    $renamed = OrganizationMappingInventoryReport::collect($extBlocked, OMAP_SHA, OMAP_TIP);
+    omapAssert(
+        $renamed['data']['audited_extension_branch_ids'] === [14]
+            && !in_array(14, $renamed['data']['unaudited_extension_branch_ids'], true),
+        'a later rename or status change does not invalidate the create audit'
+    );
+
+    // The company/SGK and orphan guards keep working alongside the new rules.
+    $extBlocked->exec("INSERT INTO sirketler (id, kod, ad) VALUES (70, 'TESTCO-X', 'Test Company X'), (71, 'TESTCO-Y', 'Test Company Y')");
+    $extBlocked->exec('UPDATE subeler SET sirket_id = 70 WHERE id = 1');
+    $extBlocked->exec('UPDATE sgk_isverenler SET sirket_id = 71 WHERE id = 1');
+    OrganizasyonSchema::resetCache();
+    $guarded = OrganizationMappingInventoryReport::collect($extBlocked, OMAP_SHA, OMAP_TIP);
+    omapAssert(
+        $guarded['data']['orphan_counts']['sube_sgk_sirket_mismatch_count'] > 0
+            && in_array('BRANCH_SGK_COMPANY_MISMATCH', $guarded['blockers'], true),
+        'the branch/payroll company mismatch guard is untouched by the new model'
+    );
+    omapAssert(
+        array_keys($guarded['data']['orphan_counts']) === [
+            'orphan_sube_sirket_count',
+            'orphan_lokasyon_sube_count',
+            'sube_sgk_sirket_mismatch_count',
+            'unmapped_sube_count',
+            'unmapped_sgk_isveren_count',
+        ],
+        'every orphan and mismatch counter is still published'
+    );
+
+    // A vanished baseline branch stays a blocker.
+    $extBlocked->exec('DELETE FROM personeller WHERE sube_id = 6');
+    $extBlocked->exec('DELETE FROM subeler WHERE id = 6');
+    OrganizasyonSchema::resetCache();
+    $missingBaseline = OrganizationMappingInventoryReport::collect($extBlocked, OMAP_SHA, OMAP_TIP);
+    omapAssert(
+        $missingBaseline['result'] === 'BLOCKED'
+            && $missingBaseline['data']['missing_baseline_branch_ids'] === [6]
+            && $missingBaseline['data']['missing_branch_ids'] === [6]
+            && in_array('DOCUMENTED_BRANCH_IDS_MISSING', $missingBaseline['blockers'], true)
+            && $missingBaseline['data']['branch_set_valid'] === false,
+        'a missing baseline branch is still a blocker'
+    );
+
+    // Branch id 3 is still refused, even if someone audits its creation.
+    $extBlocked->exec("INSERT INTO subeler (id, kod, ad, sgk_isveren_id) VALUES (3, 'TEST-SB-3', 'Never Existed', 1)");
+    omapRecordBranchCreateAudit($extBlocked, 3, 'TEST-SB-3');
+    OrganizasyonSchema::resetCache();
+    $idThree = OrganizationMappingInventoryReport::collect($extBlocked, OMAP_SHA, OMAP_TIP);
+    omapAssert(
+        $idThree['data']['id_3_present'] === true
+            && !in_array(3, $idThree['data']['audited_extension_branch_ids'], true)
+            && in_array('UNEXPECTED_BRANCH_ID_3_PRESENT', $idThree['blockers'], true)
+            && $idThree['result'] === 'BLOCKED',
+        'an audit cannot legitimise branch id 3'
+    );
+
     echo 'verify-organization-mapping-mysql: OK' . PHP_EOL;
 } finally {
     putenv('MEDISA_MIGRATION_BACKUP_DIR');
     omapRemoveTree($sandbox);
-    foreach ([$db, $conflictDb, $partialDb] as $name) {
+    foreach ([$db, $conflictDb, $partialDb, $extDb, $extBlockedDb] as $name) {
         $root->exec('DROP DATABASE IF EXISTS `' . $name . '`');
     }
 }

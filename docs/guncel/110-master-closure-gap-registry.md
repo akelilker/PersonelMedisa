@@ -58,6 +58,7 @@ PRODUCTION_MIGRATION_TIP: 079
 | `MG-OPS-CRON-WORKER-001` | cPanel migration worker kontrol düzlemi | **CLOSED_CONFIRMED** | Canlı `api/bin/cpanel-migration-cron.php`, salt-okunur envanter workflow'unun geçici wrapper'ı olarak kalmış ve require ettiği `impl` dosyası sunucuda bulunmadığı için her cron tick'i PHP fatal ile bitiyordu. Wrapper'ı yazan workflow kaldırıldı, worker canonical hale getirildi, kalıcı `worker-heartbeat.json` eklendi ve apply workflow'unun fail-open busy guard'ı dizin listelemesine çevrildi. |
 | `MG-SIRKET-SUBE-PROD-MAPPING-001` | Şirket / şube / SGK ilk production eşlemesi | **CLOSED_CONFIRMED** | Apply run `33342644722`, deploy SHA `067692bba744808c06b6b7d802797c453859df53`; 3 şirket + 10 şube + 3 SGK eşlendi, postcheck PASS, `data_ready = true`, backup verified. 7 çalışma lokasyonu deferred; ID 3 oluşturulmadı; personel ve user scope satırları byte-identical korundu. Bkz. `129-organization-mapping-owners.md`. |
 | `MG-ORG-INVENTORY-LOCATION-BRANCH-MATRIX-001` | Envanterde anonim lokasyon × şube personel matrisi | **CLOSED** | `OrganizationMappingInventoryReport` schema version `2`: `personnel_location_branch_matrix` + `personnel_without_location_by_branch`, deterministic GROUP BY/ORDER BY, `personnel_matrix_reconciled` guard'ı ve `INVENTORY_PERSONNEL_MATRIX_COUNT_MISMATCH` blocker'ı. Yalnız ilişki ID'si + COUNT yayınlanır; matris log'a değil private artifact'a gider. Mapping/spec owner davranışı değişmedi. |
+| `MG-ORG-INVENTORY-AUDITED-BRANCH-EXTENSIONS-001` | Envanterin baseline dışı meşru şubeleri tanıması | **CLOSED** | `OrganizationMappingInventoryReport` schema version `3`: 079 şube ID kümesi artık izinli liste değil **tarihsel baseline**; baseline dışı şube ancak `sube_olusturma_auditleri` içinde tekil, kimliği eşleşen canonical create audit'i varsa geçerli audited extension olur. Yeni alanlar: `baseline_branch_ids`, `audited_extension_branch_ids`, `unaudited_extension_branch_ids`, `duplicate_extension_audit_branch_ids`, `mismatched_extension_audit_branch_ids`, `missing_baseline_branch_ids`, `expected_branch_count`, `branch_set_valid`. Baseline kaybı, audit'siz extension, duplicate/uyuşmayan audit ve ID 3 blocker olarak kalır; şirket/SGK/orphan/mismatch guard'ları ve tamamlanmış mapping spec beklentisi değişmedi. |
 | `MG-CI-ACTIONS-NODE24-001` | GitHub Actions Node 24 runtime temizliği | **CLOSED** | Control-plane workflow'ları `actions/checkout@v6` ve `actions/upload-artifact@v6` ile pinli; v4/v5 kullanımı kaynak testiyle yasaklı. Açık deprecation kalemi yok. |
 | `MG-OPS-ORG-001` | IC kritik organizasyon FK tamamlama | **CLOSED** | Phase1 import sonrası AKTIF `IC_PERSONEL` için kritik org alanları (Şube/Departman/Bölüm/Birim/Görev/Personel Tipi) tamam; kalan telefon kalemi ayrıdır (`MG-OPS-PERSONEL-PHONE-001`). DIS org null’ları IC sayımına **dahil edilmez**. |
 | `MG-OPS-PERSONEL-PHONE-001` | 20 IC telefon deferred tamamlaması | **CLOSED_CONFIRMED** | Gerçek kullanıcı verisi ile canonical write owner (authenticated `PUT /personeller/{id}`) üzerinden tamamlandı; direct SQL / import reopen / migration yok. Preflight `MATCHED_RECORD_COUNT = 20`, `DUPLICATE_SICIL_COUNT = 0`, hepsi AKTIF `IC_PERSONEL`. Post-write salt-okunur readback `PHONE_EXPECTED_MATCH_COUNT = 20`, `PHONE_MISSING_COUNT = 0`, `PHONE_MISMATCH_COUNT = 0`, `PERSONEL_IC_PHONE_DEFERRED = 0`. Kapsam dışı mutasyon yok (`UNEXPECTED_PERSONNEL_MUTATION_COUNT = 0`). Numaralar PII olduğu için dokümana yazılmaz. Ayrıca sicil 216 için kullanıcı onaylı tekil isim düzeltmesi uygulandı (`soyad` correction, fail-closed önceki-değer teyidi ile); başka personelin adına dokunulmadı. |
@@ -90,7 +91,7 @@ Açık teknik borç kalemi yoktur.
 | Sınıf | Sayım |
 | --- | ---: |
 | **CLOSED_CONFIRMED** | 11 |
-| **CLOSED** | 11 |
+| **CLOSED** | 12 |
 | **USER_DATA_REQUIRED** | 0 |
 | **USER_ASSIGNMENT_REQUIRED** | 1 |
 | **READY_FOR_USER_EXECUTION_APPROVAL** | 0 |
@@ -115,7 +116,7 @@ Açık teknik borç kalemi yoktur.
 
 1. `SUBE_YONETICISI` explicit kullanıcı–şube atamaları (iş sahibi kararı).
 2. Fiziksel imha yalnız ayrı execution onayı + yedek kanıtı + bakım penceresi ile.
-3. Salt-okunur envanterin schema version `2` ile yeniden çalıştırılması (ayrı dispatch onayı), ardından 7 lokasyonun matris kanıtına dayalı kararı; İzmir/Sakarya için MEDISA altında şube oluşturma ayrı production onayı gerektirir.
+3. Salt-okunur envanterin schema version `3` ile yeniden çalıştırılması (ayrı dispatch onayı), ardından 7 lokasyonun matris kanıtına dayalı kararı. İzmir/Sakarya şubeleri (`MDS-IZM` id 12, `MDS-SAK` id 13) canonical audited create owner ile oluşturuldu; envanter bunları audited extension olarak kabul eder.
 
 > **Bayat madde kaldırıldı:** DIS bölüm/birim zorunluluk kararı (`130` + `076` rollout) kapanmıştır; import reopen maddesi geçersizdir.
 

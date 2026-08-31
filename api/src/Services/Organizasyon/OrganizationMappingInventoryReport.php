@@ -37,16 +37,22 @@ use Throwable;
  */
 final class OrganizationMappingInventoryReport
 {
-    public const SCHEMA_VERSION = '2';
+    public const SCHEMA_VERSION = '3';
 
     /**
-     * The branch id set the production postcheck evidence of migration 079
-     * recorded (10 rows, no id 3). It is used for one thing only: reporting the
-     * difference against what the database actually holds, so an unexpected or
-     * missing branch becomes a blocker instead of a surprise during mapping. It
-     * is never used to create, rename or map a branch.
+     * The historical production baseline: the branch id set the postcheck
+     * evidence of migration 079 recorded (10 rows, no id 3). Losing one of these
+     * is still a blocker. It is never used to create, rename or map a branch.
+     *
+     * It is deliberately NOT the set of ids allowed to exist. A branch created
+     * after the baseline is legitimate when the canonical create owner recorded
+     * it; see branchSetReport(). Growing this list per new branch would make
+     * every future legitimate branch a false blocker.
      */
-    private const DOCUMENTED_BRANCH_IDS = [1, 2, 4, 5, 6, 7, 8, 9, 10, 11];
+    private const BASELINE_BRANCH_IDS = [1, 2, 4, 5, 6, 7, 8, 9, 10, 11];
+
+    /** An id that never existed in production must never become an extension. */
+    private const FORBIDDEN_BRANCH_IDS = [3];
 
     /**
      * Collect the full inventory.
@@ -60,7 +66,7 @@ final class OrganizationMappingInventoryReport
         $readiness = OrganizasyonSchema::report($pdo);
 
         $data = [
-            'expected_branch_ids' => self::DOCUMENTED_BRANCH_IDS,
+            'baseline_branch_ids' => self::BASELINE_BRANCH_IDS,
             'branches' => self::branches($pdo),
             'sgk_employers' => self::sgkEmployers($pdo),
             'work_locations' => self::workLocations($pdo),
@@ -80,12 +86,7 @@ final class OrganizationMappingInventoryReport
         $branchIds = array_map(static fn (array $row): int => $row['id'], $data['branches']);
         $data['branch_ids'] = $branchIds;
         $data['id_3_present'] = in_array(3, $branchIds, true);
-        $data['unexpected_branch_ids'] = array_values(
-            array_diff($branchIds, self::DOCUMENTED_BRANCH_IDS)
-        );
-        $data['missing_branch_ids'] = array_values(
-            array_diff(self::DOCUMENTED_BRANCH_IDS, $branchIds)
-        );
+        $data += self::branchSetReport($pdo, $data['branches']);
 
         $matrixTotal = self::sumPersonelCount($data['personnel_location_branch_matrix']);
         $withoutLocationTotal = self::sumPersonelCount($data['personnel_without_location_by_branch']);
@@ -162,6 +163,134 @@ final class OrganizationMappingInventoryReport
         }
 
         return $value;
+    }
+
+    /**
+     * Decide, per live branch, whether it is provably allowed to exist.
+     *
+     * Two classes of branch are legitimate and they are proven differently:
+     *
+     *  - a baseline branch (migration 079 production evidence) needs no audit,
+     *    because it predates the audited create owner; its disappearance is a
+     *    blocker;
+     *  - an extension branch needs a canonical create audit row in
+     *    `sube_olusturma_auditleri`, exactly one, whose branch id and immutable
+     *    `kod` match the live row. Only those two columns are used: `ad`,
+     *    `durum`, `sirket_id` and `sgk_isveren_id` may legitimately change after
+     *    creation, so requiring them to match would turn a lawful later update
+     *    into a fake tamper signal.
+     *
+     * Anything else is a blocker: an unaudited extension, a duplicated create
+     * audit, an audit whose branch identity disagrees with the live row, and a
+     * missing baseline branch. Fail-closed: when the audit owner cannot be read,
+     * no extension can be proven, so every extension is reported unaudited.
+     *
+     * @param list<array<string, mixed>> $branches
+     * @return array<string, mixed>
+     */
+    private static function branchSetReport(PDO $pdo, array $branches): array
+    {
+        $branchIds = array_map(static fn (array $row): int => (int) $row['id'], $branches);
+        $liveKod = [];
+        foreach ($branches as $branch) {
+            $liveKod[(int) $branch['id']] = (string) $branch['kod'];
+        }
+
+        $audits = self::branchCreateAudits($pdo);
+        $auditReady = $audits !== null;
+
+        $audited = [];
+        $unaudited = [];
+        $duplicate = [];
+        $mismatched = [];
+        foreach ($branchIds as $id) {
+            if (in_array($id, self::BASELINE_BRANCH_IDS, true)) {
+                continue;
+            }
+            $audit = $auditReady ? ($audits[$id] ?? null) : null;
+            if ($audit === null || in_array($id, self::FORBIDDEN_BRANCH_IDS, true)) {
+                $unaudited[] = $id;
+                continue;
+            }
+            if ($audit['audit_rows'] > 1) {
+                $duplicate[] = $id;
+                $unaudited[] = $id;
+                continue;
+            }
+            if ($audit['kod'] !== $liveKod[$id] || $audit['actor_user_id'] <= 0) {
+                $mismatched[] = $id;
+                $unaudited[] = $id;
+                continue;
+            }
+            $audited[] = $id;
+        }
+
+        $missingBaseline = array_values(array_diff(self::BASELINE_BRANCH_IDS, $branchIds));
+
+        // The expected set — and therefore the expected branch count — is derived,
+        // never pinned to a number: baseline plus the extensions that carry proof.
+        $expected = array_merge(self::BASELINE_BRANCH_IDS, $audited);
+        sort($expected);
+        $unexpected = array_values(array_diff($branchIds, $expected));
+
+        return [
+            'branch_create_audit_ready' => $auditReady,
+            'audited_extension_branch_ids' => $audited,
+            'unaudited_extension_branch_ids' => array_values(array_unique($unaudited)),
+            'duplicate_extension_audit_branch_ids' => $duplicate,
+            'mismatched_extension_audit_branch_ids' => $mismatched,
+            'missing_baseline_branch_ids' => $missingBaseline,
+            'expected_branch_ids' => $expected,
+            'expected_branch_count' => count($expected),
+            'unexpected_branch_ids' => $unexpected,
+            'missing_branch_ids' => $missingBaseline,
+            'branch_set_valid' => $unexpected === []
+                && $missingBaseline === []
+                && $duplicate === []
+                && $mismatched === []
+                && !in_array(3, $branchIds, true),
+        ];
+    }
+
+    /**
+     * Create-audit evidence per branch id, or null when the audit owner cannot be
+     * read at all (migration 080 not applied on this database, for instance).
+     *
+     * Grouped rather than listed: the inventory needs the count, the recorded
+     * `kod` and the fact that an actor is attached — never the justification text
+     * or the request hash.
+     *
+     * @return array<int, array{audit_rows:int, kod:string, actor_user_id:int}>|null
+     */
+    private static function branchCreateAudits(PDO $pdo): ?array
+    {
+        try {
+            $statement = $pdo->query(
+                'SELECT a.sube_id AS sube_id, COUNT(*) AS audit_rows,
+                        MIN(a.kod) AS kod, MIN(a.actor_user_id) AS actor_user_id
+                 FROM sube_olusturma_auditleri a
+                 GROUP BY a.sube_id
+                 ORDER BY a.sube_id ASC'
+            );
+            if ($statement === false) {
+                return null;
+            }
+            $rows = $statement->fetchAll(PDO::FETCH_ASSOC);
+            $statement->closeCursor();
+        } catch (Throwable $exception) {
+            return null;
+        }
+
+        $audits = [];
+        foreach (is_array($rows) ? $rows : [] as $row) {
+            $audits[(int) $row['sube_id']] = [
+                'audit_rows' => (int) $row['audit_rows'],
+                'kod' => (string) $row['kod'],
+                'actor_user_id' => (int) $row['actor_user_id'],
+            ];
+        }
+
+        return $audits;
     }
 
     /**
@@ -412,11 +541,25 @@ final class OrganizationMappingInventoryReport
         if ($data['id_3_present']) {
             $blockers[] = 'UNEXPECTED_BRANCH_ID_3_PRESENT';
         }
+        // A branch that is neither baseline nor a provably audited extension.
         if ($data['unexpected_branch_ids'] !== []) {
             $blockers[] = 'UNEXPECTED_BRANCH_IDS_PRESENT';
         }
-        if ($data['missing_branch_ids'] !== []) {
+        if ($data['duplicate_extension_audit_branch_ids'] !== []) {
+            $blockers[] = 'DUPLICATE_BRANCH_CREATE_AUDIT';
+        }
+        if ($data['mismatched_extension_audit_branch_ids'] !== []) {
+            $blockers[] = 'BRANCH_CREATE_AUDIT_MISMATCH';
+        }
+        // An extension exists but its proof cannot be read: unprovable, not fine.
+        if ($data['branch_create_audit_ready'] !== true && $data['unaudited_extension_branch_ids'] !== []) {
+            $blockers[] = 'BRANCH_CREATE_AUDIT_UNREADABLE';
+        }
+        if ($data['missing_baseline_branch_ids'] !== []) {
             $blockers[] = 'DOCUMENTED_BRANCH_IDS_MISSING';
+        }
+        if ($data['branch_set_valid'] !== true) {
+            $blockers[] = 'BRANCH_SET_NOT_PROVABLE';
         }
         if ($data['orphan_counts']['orphan_sube_sirket_count'] > 0) {
             $blockers[] = 'BRANCH_COMPANY_ORPHAN';

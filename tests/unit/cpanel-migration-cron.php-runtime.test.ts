@@ -159,8 +159,9 @@ describe('cPanel migration cron worker runtime', () => {
     }
   });
 
-  // The database is now first reached by the mandatory backup stage, so a broken
-  // connection surfaces there instead of at apply.
+  // The database is first reached while resolving which single migration the
+  // request owns, so a broken connection surfaces there — still before the
+  // mandatory backup, and far before apply.
   it('executes the request in-process, classifies the failure safely, and archives once', () => {
     const fixture = makeFixture();
     const deployedSha = 'c'.repeat(40);
@@ -173,7 +174,7 @@ describe('cPanel migration cron worker runtime', () => {
       const status = JSON.parse(readFileSync(join(fixture.controlDirectory, 'status.json'), 'utf8'));
       expect(status.state).toBe('FAILED');
       expect(status.reason).toBe('DB_CONNECTION_FAILED');
-      expect(status.stage).toBe('BACKUP');
+      expect(status.stage).toBe('TARGET_RESOLVE');
       expect(status.exit_code).toBe(1);
       expect(JSON.stringify(status)).not.toMatch(/password|dsn|stack trace/i);
       expect(readdirSync(fixture.controlDirectory).filter((name) => name.startsWith('request.failed.'))).toHaveLength(1);
@@ -184,7 +185,7 @@ describe('cPanel migration cron worker runtime', () => {
     }
   });
 
-  it('stops an apply request at the backup stage, so apply is unreachable without a dump', () => {
+  it('stops an apply request before the dump exists, so apply is unreachable without one', () => {
     const fixture = makeFixture();
     const deployedSha = 'e'.repeat(40);
     try {
@@ -195,9 +196,10 @@ describe('cPanel migration cron worker runtime', () => {
       expect(runWorker(fixture.controlDirectory, fixture.deployShaPath, fixture.bundlePath)).toBe(1);
       const status = JSON.parse(readFileSync(join(fixture.controlDirectory, 'status.json'), 'utf8'));
       expect(status.state).toBe('FAILED');
-      expect(status.stage).toBe('BACKUP');
+      expect(status.stage).toBe('TARGET_RESOLVE');
       expect(status.mode).toBe('APPLY');
       expect(status.backup_readback).toBeUndefined();
+      expect(status.applied_versions).toBeUndefined();
       expect(JSON.stringify(status)).not.toMatch(/password|dsn|stack trace/i);
     } finally {
       rmSync(fixture.directory, { recursive: true, force: true });

@@ -373,16 +373,19 @@ try {
             && $report['ledger']['gap_versions'] === [],
         'ledger has no checksum mismatch and no gap'
     );
-    mcpAssert(
-        $report['bundle']['expected_pending_checksum']
-            === hash_file('sha256', $apiDirectory . '/migrations/' . MCP_MIGRATION_079),
-        'pending checksum equals the sha256 of the 079 file on this ref'
-    );
     mcpAssert($report['bundle']['withdrawn_present'] === false, 'the withdrawn 079 is not pending');
-    mcpAssert($report['result'] === 'PASS', 'canonical preimage passes the preflight');
+
+    // The preflight owner authorises the current round, not this historical one:
+    // a database that never received 079 must read as blocked, never as ready.
+    mcpAssert($report['result'] === 'BLOCKED', 'a pre-079 database is not apply-ready for the current round');
+    mcpAssert(
+        in_array('PENDING_NOT_ROUND_SUFFIX', $report['blockers'], true)
+            && in_array('CODE_TIP_UNEXPECTED', $report['blockers'], true),
+        'the blocker names the chain shape it refused instead of failing silently'
+    );
 
     // ---------------------------------------------------------------------
-    // 2) Aggregate-only guards and the row transform they predict
+    // 2) Aggregate-only guards stay observable even on a refused chain
     // ---------------------------------------------------------------------
     $guards = $report['guards'];
     mcpAssert($guards['branch_table_resolved'] === true, 'guards resolved their canonical branch owner');
@@ -396,9 +399,9 @@ try {
     );
     mcpAssert($guards['relation_columns_present'] === 0, 'no relation column exists before apply');
     mcpAssert(
-        $guards['sube_rows_expected_after_079'] === $guards['sube_rows']
-            && $guards['user_sube_assignment_rows_expected_after_079'] === $guards['user_sube_assignment_rows'],
-        '079 is schema-only, so every expected post-migration count equals the preimage count'
+        $guards['sube_rows_expected_after_round'] === $guards['sube_rows']
+            && $guards['user_sube_assignment_rows_expected_after_round'] === $guards['user_sube_assignment_rows'],
+        'the round is schema-only, so every expected post-migration count equals the preimage count'
     );
 
     // ---------------------------------------------------------------------
@@ -669,11 +672,13 @@ try {
         'the resumed schema is identical to the one a single clean run produces'
     );
 
-    // The post-079 schema must no longer read as an apply-ready preimage.
+    // The applied hierarchy is the preimage the current round builds on, so the
+    // relation columns must now read as present rather than as drift.
     $postReport = MigrationPreflightReport::collect($pdo, $source, $deployedSha);
     mcpAssert(
-        in_array('PREIMAGE_PARTIAL_HIERARCHY_PRESENT', $postReport['warnings'], true),
-        'an already-migrated schema is reported as a partial-hierarchy state, not as a clean preimage'
+        !in_array('PREIMAGE_HIERARCHY_COLUMN_MISSING', $postReport['blockers'], true)
+            && !in_array('PREIMAGE_RELATION_COLUMN_INCOMPATIBLE', $postReport['blockers'], true),
+        'an applied hierarchy reads as the expected preimage for the next round'
     );
 
     echo 'verify-migration-control-plane-preflight-mysql: OK' . PHP_EOL;

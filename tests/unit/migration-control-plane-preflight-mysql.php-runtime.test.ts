@@ -26,8 +26,9 @@ describe("migration 079 control plane: preflight, backup and the company/branch 
       "preflight reports code tip 079",
       "pending list contains only the hierarchy migration 079",
       "ledger has no checksum mismatch and no gap",
-      "pending checksum equals the sha256 of the 079 file on this ref",
       "the withdrawn 079 is not pending",
+      "a pre-079 database is not apply-ready for the current round",
+      "the blocker names the chain shape it refused instead of failing silently",
       "sirketler carries id, kod, ad and durum",
       "company code and name are globally unique",
       "foreign key fk_subeler_sirket points at sirketler with ON DELETE RESTRICT",
@@ -50,7 +51,7 @@ describe("migration 079 control plane: preflight, backup and the company/branch 
       "a compatible partial state resumes instead of failing",
       "the resume restores exactly the missing pieces",
       "the resumed schema is identical to the one a single clean run produces",
-      "an already-migrated schema is reported as a partial-hierarchy state, not as a clean preimage"
+      "an applied hierarchy reads as the expected preimage for the next round"
     ]) {
       expect(result.stdout).toContain(marker);
     }

@@ -13,6 +13,7 @@ const preflightOwner = read('api/src/Database/MigrationPreflightReport.php');
 const backupOwner = read('api/src/Database/MigrationBackupService.php');
 const diagnostics = read('.github/workflows/ops-migration-worker-diagnostics.yml');
 const apply = read('.github/workflows/apply-cpanel-migrations.yml');
+const runner = read('api/src/Database/MigrationRunner.php');
 
 describe('migration 079 slot', () => {
   it('holds exactly one 079 and no trace of the withdrawn monthly-close migration', () => {
@@ -141,9 +142,54 @@ describe('migration worker control-plane stages', () => {
     expect(worker).toContain("'backup_readback' => (string) $backup['readback']");
   });
 
+  it('applies exactly the authorized migration and refuses to skip ahead', () => {
+    expect(worker).toContain("requireString($request, 'target_version', '/^\\d{3}$/')");
+    expect(worker).toContain("$stage = 'TARGET_RESOLVE';");
+    expect(worker).toContain("throw new RuntimeException('TARGET_NOT_NEXT_PENDING');");
+    expect(worker).toContain("throw new RuntimeException('TARGET_ALREADY_APPLIED');");
+    expect(worker).toContain(
+      'MigrationExecutionService::apply($pdo, $migrationSource, $baseline, $targetVersion)',
+    );
+    expect(worker).toContain(
+      'MigrationExecutionService::verify($pdo, $migrationSource, $targetVersion)',
+    );
+    // Each targeted request names its own dump, so a round keeps one backup per
+    // migration instead of a single dump covering both applies.
+    expect(worker).toContain('$backupLabel = $targetVersion ?? $migrationTip;');
+    expect(worker).toContain(
+      'MigrationBackupService::create($pdo, $apiDirectory, $requestId, $backupLabel)',
+    );
+  });
+
   it('keeps the flock handle and never deletes worker.lock', () => {
     expect(worker).toContain('flock($lockHandle, LOCK_UN)');
     expect(worker).not.toMatch(/unlink\(\$lockPath\)/);
+  });
+});
+
+describe('canonical runner target contract', () => {
+  it('stops after the authorized version and leaves the rest pending', () => {
+    expect(runner).toContain('?string $applyThroughVersion = null');
+    expect(runner).toContain(
+      "if (\$applyThroughVersion !== null && (int) \$version > (int) \$applyThroughVersion) {",
+    );
+    expect(runner).toContain('Migration target is not in the canonical chain');
+  });
+
+  it('still applies each migration in its own transaction', () => {
+    const applyOne = runner.slice(runner.indexOf('private static function applyOne'));
+    expect(applyOne).toContain('$pdo->beginTransaction();');
+    expect(applyOne).toContain('$pdo->commit();');
+    expect(applyOne).toContain('$pdo->rollBack();');
+  });
+
+  it('verify refuses both a missing and an over-applied migration', () => {
+    expect(runner).toContain('Authorized migration was not applied: ');
+    expect(runner).toContain('Migration applied beyond the authorized target: ');
+    // A full-chain verify keeps demanding a drained chain.
+    expect(runner).toContain(
+      "if (\$expectedThroughVersion === null && \$pending !== []) {",
+    );
   });
 });
 
@@ -156,8 +202,10 @@ describe('read-only preflight owner', () => {
     expect(preflightOwner).toContain('information_schema.STATISTICS');
   });
 
-  it('expects the hierarchy migration and rejects the withdrawn one', () => {
-    expect(preflightOwner).toContain(`EXPECTED_PENDING_NAME = '${MIGRATION_NAME}'`);
+  it('expects the canonical round and rejects the withdrawn migration', () => {
+    expect(preflightOwner).toContain("EXPECTED_APPLIED_TIP = '079'");
+    expect(preflightOwner).toContain("'080' => '080_organizasyon_audit_owners.sql'");
+    expect(preflightOwner).toContain("'081' => '081_ik_personeli_rolu.sql'");
     expect(preflightOwner).toContain(`WITHDRAWN_MIGRATION_NAME = '${WITHDRAWN_NAME}'`);
     expect(preflightOwner).toContain('WITHDRAWN_079_PRESENT_IN_SOURCE');
     expect(preflightOwner).toContain('WITHDRAWN_079_STRUCTURE_PRESENT');
@@ -180,8 +228,9 @@ describe('read-only preflight owner', () => {
     expect(preflightOwner).not.toContain('sicil_no');
     expect(preflightOwner).not.toMatch(/SELECT \*/);
     for (const guard of [
-      'sube_rows_expected_after_079',
-      'user_sube_assignment_rows_expected_after_079',
+      'sube_rows_expected_after_round',
+      'user_sube_assignment_rows_expected_after_round',
+      'user_rows_expected_after_round',
     ]) {
       expect(preflightOwner).toContain(guard);
     }
@@ -194,15 +243,23 @@ describe('read-only preflight owner', () => {
 
   it('locks the expected chain shape', () => {
     for (const reason of [
-      'APPLIED_TIP_NOT_078',
-      'PENDING_NOT_ONLY_079',
+      'APPLIED_TIP_UNEXPECTED',
+      'PENDING_NOT_ROUND_SUFFIX',
+      'ROUND_ALREADY_COMPLETE',
       'MIGRATION_CHECKSUM_MISMATCH',
       'MIGRATION_LEDGER_GAP',
       'PREIMAGE_OWNER_TABLE_MISSING',
       'PREIMAGE_RELATION_COLUMN_INCOMPATIBLE',
+      'PREIMAGE_HIERARCHY_TABLE_MISSING',
     ]) {
       expect(preflightOwner).toContain(reason);
     }
+  });
+
+  it('treats an already-created audit table or role as resumable, not as success', () => {
+    expect(preflightOwner).toContain('PREIMAGE_PARTIAL_ROUND_AUDIT_TABLE_PRESENT');
+    expect(preflightOwner).toContain('PREIMAGE_NEW_ROLE_ALREADY_PRESENT');
+    expect(preflightOwner).toContain("ROUND_NEW_ROLE = 'IK_PERSONELI'");
   });
 });
 
@@ -281,7 +338,8 @@ describe('control-plane workflow gates', () => {
       'PREFLIGHT_SHA_MISMATCH',
       'PREFLIGHT_STALE',
       'PROD_TIP_UNEXPECTED',
-      'PENDING_NOT_ONLY_079',
+      'PENDING_NOT_ROUND_SUFFIX',
+      'TARGET_NOT_NEXT_PENDING',
       'PENDING_CHECKSUM_MISMATCH',
       'APPLIED_MIGRATION_MODIFIED',
       'MIGRATION_LEDGER_GAP',
@@ -290,6 +348,7 @@ describe('control-plane workflow gates', () => {
       'WITHDRAWN_079_PENDING',
       'DATA_GUARD_SUBE_ROW_DELTA',
       'DATA_GUARD_ASSIGNMENT_ROW_DELTA',
+      'DATA_GUARD_USER_ROW_DELTA',
     ]) {
       expect(apply).toContain(reason);
     }
@@ -300,8 +359,18 @@ describe('control-plane workflow gates', () => {
     const uploadIndex = apply.indexOf('Upload one atomic migration request');
     expect(gateIndex).toBeGreaterThan(0);
     expect(uploadIndex).toBeGreaterThan(gateIndex);
-    expect(apply).toContain(`EXPECTED_PENDING: "${MIGRATION_NAME}"`);
-    expect(apply).toContain('EXPECTED_PROD_TIP: "078"');
+    expect(apply).toContain(
+      'ROUND_MIGRATIONS: "080_organizasyon_audit_owners.sql 081_ik_personeli_rolu.sql"',
+    );
+    expect(apply).toContain('PRE_ROUND_TIP: "079"');
+  });
+
+  it('authorizes exactly one migration per request and carries it into the payload', () => {
+    expect(apply).toContain('target_migration:');
+    expect(apply).toContain('TARGET_MIGRATION: ${{ inputs.target_migration }}');
+    expect(apply).toContain('--arg target_version "${TARGET_MIGRATION:0:3}"');
+    expect(apply).toContain('target_version: $target_version');
+    expect(apply).toContain('[[ "$next_pending" == "$TARGET_MIGRATION" ]] || block TARGET_NOT_NEXT_PENDING');
   });
 
   it('never turns into bulk migration, direct SQL or manual FTP editing', () => {

@@ -16,30 +16,35 @@ final class MigrationExecutionService
     public static function apply(
         PDO $pdo,
         MigrationSourceProvider|string $source,
-        ?string $baseline
+        ?string $baseline,
+        ?string $applyThroughVersion = null
     ): array
     {
-        return MigrationRunner::run($pdo, $source, $baseline);
+        return MigrationRunner::run($pdo, $source, $baseline, $applyThroughVersion);
     }
 
     /**
      * @return array{applied_count: int, pending: list<string>, latest: string|null}
      */
-    public static function verify(PDO $pdo, MigrationSourceProvider|string $source): array
-    {
-        return MigrationRunner::verify($pdo, $source);
+    public static function verify(
+        PDO $pdo,
+        MigrationSourceProvider|string $source,
+        ?string $expectedThroughVersion = null
+    ): array {
+        return MigrationRunner::verify($pdo, $source, $expectedThroughVersion);
     }
 
     /**
      * Plain ledger facts: which version is applied last, and how many are pending.
      *
-     * MigrationPreflightReport cannot answer this for a caller that is not about
-     * to apply 079 — it is pinned to "applied 078, pending only 079" and reports
-     * anything else as blocked. Operations that merely need to know where the
-     * chain stands (the organisation mapping owners) read it here instead, which
-     * also keeps SQL out of the control-plane worker.
+     * MigrationPreflightReport cannot answer this for a caller outside the
+     * authorized round — it pins the round's expected tip and pending set and
+     * reports anything else as blocked. Operations that merely need to know where
+     * the chain stands (the organisation mapping owners, and the worker deciding
+     * which single migration a request owns) read it here instead, which also
+     * keeps SQL out of the control-plane worker.
      *
-     * @return array{tip: string, pending_count: int}
+     * @return array{tip: string, pending_count: int, pending_versions: list<string>}
      */
     public static function ledgerFacts(PDO $pdo, MigrationSourceProvider $source): array
     {
@@ -53,17 +58,21 @@ final class MigrationExecutionService
         }
 
         $tip = 'NONE';
-        $pendingCount = 0;
+        $pendingVersions = [];
         foreach ($source->all() as $migration) {
             $version = (string) $migration['version'];
             if (isset($applied[$version])) {
                 $tip = $version;
                 continue;
             }
-            $pendingCount++;
+            $pendingVersions[] = $version;
         }
 
-        return ['tip' => $tip, 'pending_count' => $pendingCount];
+        return [
+            'tip' => $tip,
+            'pending_count' => count($pendingVersions),
+            'pending_versions' => $pendingVersions,
+        ];
     }
 
     public static function sourceForRuntime(

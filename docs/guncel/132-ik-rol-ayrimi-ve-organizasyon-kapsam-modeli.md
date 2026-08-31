@@ -1,7 +1,7 @@
 # 132 — İK rol ayrımı ve organizasyon kapsam modeli
 
 **Faz:** MG-ORGANIZATION-HR-FINAL-CLOSEOUT-001
-**Kapsam:** `IK_SORUMLUSU` / `IK_PERSONELI` rol ayrımı, global read + atanmış şirkette yazma modeli, login erişimi kaldırma owner'ı, İzmir/Sakarya şube-personel planı ve lokasyon kararı.
+**Kapsam:** `IK_SORUMLUSU` / `IK_PERSONELI` rol ayrımı, global read + atanmış şirkette yazma modeli, login erişimi kaldırma owner'ı, İzmir/Sakarya şube-personel planı ve lokasyon kararı. Rol atama kararı için bkz. bölüm 7: bu closeout'ta hiçbir kullanıcı `IK_PERSONELI` yapılmaz.
 **Durum:** Kod + migration repoda hazır. Production migration apply ve production business-data mutation **yapılmadı**; ayrı onay kapılarına bağlıdır.
 
 ## 1. Rol modeli
@@ -10,6 +10,8 @@
 | --- | --- | --- |
 | `IK_SORUMLUSU` | Bütün mevcut ve gelecekteki şirket/şube — role'den gelir, `user_subeler`/`user_sirketler` satırı gerektirmez ve bu satırlar kapsamı **daraltmaz** | Rolün izin setindeki bütün İK işlemleri, bütün şirketlerde |
 | `IK_PERSONELI` | `IK_SORUMLUSU` ile aynı global salt-okunur kapsam | Yalnız `user_sirketler` ile atanmış şirketlerin şubelerinde; başka şirkette 403 |
+
+Bağlayıcı iş kararı: `sedanurB` ve `zeynepG` aynı görev seviyesindedir ve ikisi de `IK_SORUMLUSU`'dur. `IK_PERSONELI` rolü altyapıda hazır durur fakat bu closeout'ta hiçbir kullanıcıya atanmaz; Seda-approver / Zeynep-maker gibi bir ayrım veya cross-company write kısıtı kurulmaz.
 
 `IK_PERSONELI` izin seti, `IK_SORUMLUSU` izinlerinden yönetim/onay yetkilerinin (`puantaj.donem_reseal`, `sgk_karar_paketi.prepare`, `sirket_parametreleri.manage`, `personel_bordro_kapsam.manage`, `maas_hesaplama.manage`, `maas_hesaplama_adaylari.manage`) çıkarılmasıyla **türetilir**; iki yerde ayrı liste tutulmaz. Aynı türetme frontend `role-permissions.ts` içinde birebir tekrarlanır ve parity testiyle kilitlidir.
 
@@ -52,6 +54,17 @@ UI'da kapsam dışı kayıtlarda mutation aksiyonları gizlenir ve `Bu işlem İ
 
 CODE_MIGRATION_TIP = `081`, PRODUCTION_MIGRATION_TIP = `079`. Pending: `080`, `081`.
 
+### 5.1 Migration control-plane round modeli
+
+Canonical apply owner'ı tek bir migration'a pinliydi (`beklenen tip 078`, `pending yalnız 079`), bu yüzden 080/081 turunu tanımıyordu. Owner artık **tur** modeliyle çalışır:
+
+- `MigrationPreflightReport::ROUND_MIGRATIONS` turu sıralı ve isimleriyle pinler (`080`, `081`). Canlı pending set bu turun boş olmayan bir **suffix**'i olmak zorundadır; böylece hem tur başlamadan hem de iki apply arasında preflight PASS verebilir. Tur bittiğinde `ROUND_ALREADY_COMPLETE` ile bloklanır, yani üçüncü bir apply mümkün değildir.
+- `apply-cpanel-migrations.yml` artık zorunlu `target_migration` input'u alır. Gate, hedefin **sıradaki** pending migration olduğunu ve checksum'ının o ref'teki dosya ile birebir eşleştiğini doğrular; istek payload'ına `target_version` yazar.
+- Worker hedefi tekrar canlı ledger'a karşı doğrular (`TARGET_NOT_NEXT_PENDING`, `TARGET_ALREADY_APPLIED`), dump'ı hedef migration adıyla alır ve `MigrationRunner`'ı yalnız o versiyona kadar çalıştırır. Böylece **her migration kendi doğrulanmış backup'ı ve kendi transaction'ı ile** uygulanır; iki migration tek apply'a çökmez.
+- `MigrationRunner::verify()` hedefli çağrıda kalan pending'i kabul eder ama hedefin ötesine geçmiş bir uygulamayı reddeder; hedefsiz çağrıda hâlâ tam drenaj ister.
+
+Bu değişiklik yalnız control-plane sözleşmesidir: `080` ve `081` dosyalarının içeriği, adı ve checksum'ı korunur.
+
 ## 6. `042` hesabı kararı
 
 - Yalnız exact `042` login hesabı kapsamdadır.
@@ -64,11 +77,12 @@ CODE_MIGRATION_TIP = `081`, PRODUCTION_MIGRATION_TIP = `079`. Pending: `080`, `0
 
 - MEDISA altında `MDS-IZM` (İzmir) ve `MDS-SAK` (Sakarya) şubeleri, durum `AKTIF`, SGK = MEDISA. ID tahmin edilmez; create sonrası exact readback yapılır.
 - Personel 112 (sicil 040) → `MDS-IZM`, personel 169 (sicil 463) → `MDS-SAK`. Yalnız `sube_id` değişir; lokasyon, SGK ve diğer alanlar korunur.
-- `sedanurB`: rol `IK_SORUMLUSU` kalır; erişimi daraltmayan ama yanıltıcı olan legacy scope satırları canonical update ile temizlenir.
-- `zeynepG`: rol `IK_PERSONELI`, yazma şirketi yalnız MEDISA; legacy per-branch scope temizlenir.
+- `sedanurB`: rol `IK_SORUMLUSU` **değişmez**; global İK davranışı readback ile doğrulanır.
+- `zeynepG`: rol `IK_SORUMLUSU` **değişmez**; `IK_PERSONELI`'ye çevrilmez ve write-company kapsamı tanımlanmaz. Global İK davranışı readback ile doğrulanır.
+- Her iki kullanıcı için yalnız erişimi **daraltan** redundant legacy scope satırları canonical auditli update ile temizlenir; başka rol/scope mutation'ı yoktur.
 - `042`: yukarıdaki karar uygulanır.
 
-Tüm bu mutation'lar audit zorunludur.
+Tüm bu mutation'lar audit zorunludur. Rol değişikliği içermeyen bu changeset'te gerçek mutation actor'ı mevcut audit owner'larıyla kaydedilir.
 
 ## 8. Lokasyon kararı (kapalı)
 

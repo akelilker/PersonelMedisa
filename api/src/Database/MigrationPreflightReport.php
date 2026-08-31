@@ -27,33 +27,48 @@ final class MigrationPreflightReport
 {
     public const SCHEMA_VERSION = '1';
 
-    /** Expected production ledger tip before migration 079 is applied. */
-    public const EXPECTED_APPLIED_TIP = '078';
-
-    /** The single migration this preflight authorizes. */
-    public const EXPECTED_PENDING_VERSION = '079';
+    /** Expected production ledger tip before this round's first migration. */
+    public const EXPECTED_APPLIED_TIP = '079';
 
     /**
-     * The migration file this gate was written against. The version number alone
-     * is not enough: slot 079 previously held a monthly-closing migration that
-     * was withdrawn as business-model wrong, and it must never reach production
-     * through this gate.
+     * The migrations this round authorizes, in apply order. Each one is a
+     * separate canonical request with its own backup, so the gate must accept the
+     * chain both before the round starts and between its two applies. The version
+     * number alone is never enough: slot 079 previously held a monthly-closing
+     * migration that was withdrawn as business-model wrong, so names are pinned
+     * next to versions here.
+     *
+     * @var array<string, string>
      */
-    public const EXPECTED_PENDING_NAME = '079_sirket_sube_hiyerarsisi.sql';
+    public const ROUND_MIGRATIONS = [
+        '080' => '080_organizasyon_audit_owners.sql',
+        '081' => '081_ik_personeli_rolu.sql',
+    ];
 
     /** Withdrawn 079. Must not appear anywhere in the canonical source. */
     public const WITHDRAWN_MIGRATION_NAME = '079_aylik_kapanis_sube_scope_and_actor.sql';
 
     private const TARGET_TABLES = ['users', 'subeler', 'sgk_isverenler', 'calisma_lokasyonlari'];
 
-    /** table => column added by the new 079, all nullable INT UNSIGNED. */
+    /** Owners 079 added. This round extends them and must find them applied. */
     private const RELATION_COLUMNS = [
         'subeler' => 'sirket_id',
         'sgk_isverenler' => 'sirket_id',
         'calisma_lokasyonlari' => 'sube_id',
     ];
 
-    private const NEW_TABLES = ['sirketler', 'user_sirketler', 'user_sgk_isverenler'];
+    private const HIERARCHY_TABLES = ['sirketler', 'user_sirketler', 'user_sgk_isverenler'];
+
+    /** Append-only audit tables this round creates. Absent is the preimage. */
+    private const ROUND_AUDIT_TABLES = [
+        'personel_sube_degisiklik_auditleri',
+        'sube_olusturma_auditleri',
+        'user_org_scope_auditleri',
+        'user_erisim_kaldirma_auditleri',
+    ];
+
+    /** Role 081 adds to the users.rol enum. Absent is the preimage. */
+    private const ROUND_NEW_ROLE = 'IK_PERSONELI';
 
     /**
      * @return array<string, mixed>
@@ -68,6 +83,9 @@ final class MigrationPreflightReport
 
         $bundle = self::bundleFacts($source, $blockers);
         $ledger = self::ledgerFacts($pdo, $bundle['migrations'], $blockers);
+        // The checksum the gate authorizes is the checksum of the next migration
+        // in the round, which is only knowable once the ledger has been read.
+        $bundle['expected_pending_checksum'] = self::nextPendingChecksum($bundle, $ledger);
         $schema = self::schemaFacts($pdo, $blockers);
         $guards = self::guardFacts($pdo, $schema, $blockers, $warnings);
 
@@ -82,6 +100,9 @@ final class MigrationPreflightReport
             'bundle' => [
                 'migration_count' => count($bundle['migrations']),
                 'code_tip' => $bundle['code_tip'],
+                'round_versions' => array_keys(self::ROUND_MIGRATIONS),
+                'next_pending_version' => $ledger['pending_versions'][0] ?? 'NONE',
+                'next_pending_name' => $ledger['pending_names'][0] ?? 'NONE',
                 'expected_pending_checksum' => $bundle['expected_pending_checksum'],
                 // Published so the apply gate can prove the withdrawn 079 is gone
                 // rather than inferring it from the absence of a blocker.
@@ -122,25 +143,45 @@ final class MigrationPreflightReport
             ];
         }
 
-        $expectedChecksum = 'NONE';
         $withdrawnPresent = false;
         foreach ($migrations as $migration) {
             if ((string) $migration['name'] === self::WITHDRAWN_MIGRATION_NAME) {
                 $withdrawnPresent = true;
-            }
-            if ($migration['version'] === self::EXPECTED_PENDING_VERSION
-                && (string) $migration['name'] === self::EXPECTED_PENDING_NAME
-            ) {
-                $expectedChecksum = $migration['checksum'];
             }
         }
 
         return [
             'migrations' => $migrations,
             'code_tip' => (string) $migrations[count($migrations) - 1]['version'],
-            'expected_pending_checksum' => $expectedChecksum,
+            'expected_pending_checksum' => 'NONE',
             'withdrawn_present' => $withdrawnPresent,
         ];
+    }
+
+    /**
+     * Checksum of the next migration the round would apply, resolved only when
+     * that migration is the round member its version pins it to.
+     *
+     * @param array<string, mixed> $bundle
+     * @param array<string, mixed> $ledger
+     */
+    private static function nextPendingChecksum(array $bundle, array $ledger): string
+    {
+        $version = $ledger['pending_versions'][0] ?? null;
+        $name = $ledger['pending_names'][0] ?? null;
+        if ($version === null || (self::ROUND_MIGRATIONS[$version] ?? null) !== $name) {
+            return 'NONE';
+        }
+
+        foreach ($bundle['migrations'] as $migration) {
+            if ((string) $migration['version'] === $version
+                && (string) $migration['name'] === $name
+            ) {
+                return (string) $migration['checksum'];
+            }
+        }
+
+        return 'NONE';
     }
 
     /**
@@ -230,10 +271,10 @@ final class MigrationPreflightReport
             ];
         }
 
-        // Observed, not required: the new tables this migration creates and the
+        // Observed, not required: the audit tables this round creates and the
         // monthly-closing table the withdrawn 079 would have altered. Their
         // absence is the expected preimage, so it must not raise a blocker here.
-        foreach (array_merge(self::NEW_TABLES, ['aylik_kapanis_state']) as $table) {
+        foreach (array_merge(self::ROUND_AUDIT_TABLES, self::HIERARCHY_TABLES, ['aylik_kapanis_state']) as $table) {
             $exists = self::tableExists($pdo, $table);
             $schema[$table] = [
                 'exists' => $exists,
@@ -318,13 +359,18 @@ final class MigrationPreflightReport
             'calisma_lokasyonu_rows' => 0,
             'personel_rows' => 0,
             'user_sube_assignment_rows' => 0,
+            'user_sirket_assignment_rows' => 0,
+            'user_rows' => 0,
             'sirketler_table_present' => self::tableExists($pdo, 'sirketler'),
             'user_sirketler_table_present' => self::tableExists($pdo, 'user_sirketler'),
             'user_sgk_isverenler_table_present' => self::tableExists($pdo, 'user_sgk_isverenler'),
             'relation_columns_present' => 0,
             'sirket_rows' => 0,
-            'sube_rows_expected_after_079' => 0,
-            'user_sube_assignment_rows_expected_after_079' => 0,
+            'round_audit_tables_present' => 0,
+            'new_role_already_present' => false,
+            'sube_rows_expected_after_round' => 0,
+            'user_sube_assignment_rows_expected_after_round' => 0,
+            'user_rows_expected_after_round' => 0,
         ];
 
         if (!$guards['branch_table_resolved']) {
@@ -340,6 +386,27 @@ final class MigrationPreflightReport
         $guards['calisma_lokasyonu_rows'] = self::count($pdo, 'SELECT COUNT(*) FROM calisma_lokasyonlari');
         $guards['personel_rows'] = self::count($pdo, 'SELECT COUNT(*) FROM personeller');
         $guards['user_sube_assignment_rows'] = self::count($pdo, 'SELECT COUNT(*) FROM user_subeler');
+        $guards['user_rows'] = self::count($pdo, 'SELECT COUNT(*) FROM users');
+        if ($guards['user_sirketler_table_present']) {
+            $guards['user_sirket_assignment_rows'] = self::count($pdo, 'SELECT COUNT(*) FROM user_sirketler');
+        }
+
+        $auditPresent = 0;
+        foreach (self::ROUND_AUDIT_TABLES as $table) {
+            if (($schema[$table]['exists'] ?? false) === true) {
+                $auditPresent++;
+            }
+        }
+        $guards['round_audit_tables_present'] = $auditPresent;
+
+        // 081 only widens the users.rol enum. Finding the new role already in the
+        // enum is a resumable partial state, never a reason to write rows.
+        $roleType = self::columnType($pdo, 'users', 'rol');
+        $guards['new_role_already_present'] = $roleType !== null
+            && str_contains($roleType, "'" . self::ROUND_NEW_ROLE . "'");
+        if ($guards['new_role_already_present']) {
+            $warnings[] = 'PREIMAGE_NEW_ROLE_ALREADY_PRESENT';
+        }
 
         $present = 0;
         foreach (self::RELATION_COLUMNS as $table => $column) {
@@ -351,17 +418,13 @@ final class MigrationPreflightReport
 
         if ($guards['sirketler_table_present']) {
             $guards['sirket_rows'] = self::count($pdo, 'SELECT COUNT(*) FROM sirketler');
-            if ($guards['sirket_rows'] > 0) {
-                // The migration seeds nothing, so rows here mean the mapping
-                // operation already started outside this gate.
-                $warnings[] = 'SIRKET_ROWS_ALREADY_PRESENT';
-            }
         }
 
-        // 079 is additive and writes no data: every branch and every existing
-        // user branch assignment must survive the apply untouched.
-        $guards['sube_rows_expected_after_079'] = $guards['sube_rows'];
-        $guards['user_sube_assignment_rows_expected_after_079'] = $guards['user_sube_assignment_rows'];
+        // Both migrations in this round are additive and write no data: every
+        // branch, user and user assignment must survive the applies untouched.
+        $guards['sube_rows_expected_after_round'] = $guards['sube_rows'];
+        $guards['user_sube_assignment_rows_expected_after_round'] = $guards['user_sube_assignment_rows'];
+        $guards['user_rows_expected_after_round'] = $guards['user_rows'];
 
         return $guards;
     }
@@ -373,18 +436,46 @@ final class MigrationPreflightReport
      */
     private static function assertChainShape(array $bundle, array $ledger, array &$blockers): void
     {
-        if ($bundle['code_tip'] !== self::EXPECTED_PENDING_VERSION) {
+        $roundVersions = array_keys(self::ROUND_MIGRATIONS);
+        $roundTip = (string) $roundVersions[count($roundVersions) - 1];
+
+        if ($bundle['code_tip'] !== $roundTip) {
             $blockers[] = 'CODE_TIP_UNEXPECTED';
         }
-        if ($ledger['ready'] && $ledger['applied_tip'] !== self::EXPECTED_APPLIED_TIP) {
-            $blockers[] = 'APPLIED_TIP_NOT_078';
+
+        // The pending set must be exactly what is left of the round: the whole
+        // round before it starts, or its tail between two applies. Anything else
+        // is either an unknown migration or a chain this gate cannot reason about.
+        $pendingVersions = $ledger['pending_versions'];
+        $expectedSuffixes = [];
+        for ($index = 0; $index < count($roundVersions); $index++) {
+            $expectedSuffixes[] = array_values(array_slice($roundVersions, $index));
         }
-        if ($ledger['pending_versions'] !== [self::EXPECTED_PENDING_VERSION]) {
-            $blockers[] = 'PENDING_NOT_ONLY_079';
+        if ($pendingVersions === []) {
+            // Nothing left to authorize; a further request would be a third apply.
+            $blockers[] = 'ROUND_ALREADY_COMPLETE';
+        } elseif (!in_array($pendingVersions, $expectedSuffixes, true)) {
+            $blockers[] = 'PENDING_NOT_ROUND_SUFFIX';
+        } else {
+            $expectedNames = [];
+            foreach ($pendingVersions as $version) {
+                $expectedNames[] = self::ROUND_MIGRATIONS[$version];
+            }
+            if ($ledger['pending_names'] !== $expectedNames) {
+                $blockers[] = 'PENDING_NAME_UNEXPECTED';
+            }
+
+            // The applied tip must be exactly the version before the next pending
+            // one, so a partially applied round is provable rather than assumed.
+            $firstPending = (string) $pendingVersions[0];
+            $expectedTip = $firstPending === (string) $roundVersions[0]
+                ? self::EXPECTED_APPLIED_TIP
+                : (string) $roundVersions[array_search($firstPending, $roundVersions, true) - 1];
+            if ($ledger['ready'] && $ledger['applied_tip'] !== $expectedTip) {
+                $blockers[] = 'APPLIED_TIP_UNEXPECTED';
+            }
         }
-        if ($ledger['pending_names'] !== [] && $ledger['pending_names'] !== [self::EXPECTED_PENDING_NAME]) {
-            $blockers[] = 'PENDING_NAME_UNEXPECTED';
-        }
+
         if ($bundle['expected_pending_checksum'] === 'NONE') {
             $blockers[] = 'PENDING_CHECKSUM_UNRESOLVED';
         }
@@ -400,29 +491,37 @@ final class MigrationPreflightReport
      */
     private static function assertPreimage(array $schema, array &$blockers, array &$warnings): void
     {
-        // The legacy owners this migration extends must be in their expected
-        // preimage shape. Every one of them is a pre-079 table, so their absence
-        // means the gate is pointed at the wrong database.
+        // This round builds on the hierarchy 079 already delivered, so those owners
+        // must be present and in their applied shape. Their absence means the gate
+        // is pointed at a database that never received 079.
         foreach (self::RELATION_COLUMNS as $table => $column) {
             if (($schema[$table]['exists'] ?? false) !== true) {
                 $blockers[] = 'PREIMAGE_OWNER_TABLE_MISSING';
                 continue;
             }
-
             if (!isset($schema[$table]['columns'][$column])) {
+                $blockers[] = 'PREIMAGE_HIERARCHY_COLUMN_MISSING';
                 continue;
             }
 
-            // Present is acceptable only as a resumable partial run: the column
-            // must already be exactly what 079 would have created. A NOT NULL or
-            // non-integer column is conflicting drift, not a partial state.
             $facts = $schema[$table]['columns'][$column];
             if ($facts['nullable'] !== true || $facts['type'] !== 'int') {
                 $blockers[] = 'PREIMAGE_RELATION_COLUMN_INCOMPATIBLE';
-                continue;
             }
+        }
 
-            $warnings[] = 'PREIMAGE_PARTIAL_HIERARCHY_PRESENT';
+        foreach (self::HIERARCHY_TABLES as $table) {
+            if (($schema[$table]['exists'] ?? false) !== true) {
+                $blockers[] = 'PREIMAGE_HIERARCHY_TABLE_MISSING';
+            }
+        }
+
+        // Audit tables are what this round creates: absent is the clean preimage,
+        // present is a resumable partial round, never a silent pass.
+        foreach (self::ROUND_AUDIT_TABLES as $table) {
+            if (($schema[$table]['exists'] ?? false) === true) {
+                $warnings[] = 'PREIMAGE_PARTIAL_ROUND_AUDIT_TABLE_PRESENT';
+            }
         }
 
         // Withdrawn 079 touched the monthly-closing tables. Its structures must
@@ -431,6 +530,21 @@ final class MigrationPreflightReport
         if (isset($stateColumns['sube_id'])) {
             $blockers[] = 'WITHDRAWN_079_STRUCTURE_PRESENT';
         }
+    }
+
+    /**
+     * COLUMN_TYPE for one column — the enum definition, never a stored value.
+     */
+    private static function columnType(PDO $pdo, string $table, string $column): ?string
+    {
+        $statement = $pdo->prepare(
+            'SELECT COLUMN_TYPE FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :table AND COLUMN_NAME = :column'
+        );
+        $statement->execute([':table' => $table, ':column' => $column]);
+        $type = $statement->fetchColumn();
+
+        return is_string($type) ? $type : null;
     }
 
     private static function count(PDO $pdo, string $sql): int

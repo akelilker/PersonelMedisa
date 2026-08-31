@@ -106,6 +106,12 @@ try {
                 . '|ORGANIZATION_MAPPING_PREFLIGHT|ORGANIZATION_MAPPING_APPLY)$/'
             )
             : 'APPLY';
+        // Optional, and only meaningful for APPLY: the single migration version
+        // this request is authorized to apply. Requests written before the round
+        // model carry none and keep draining the whole pending chain.
+        $targetVersion = array_key_exists('target_version', $request)
+            ? requireString($request, 'target_version', '/^\d{3}$/')
+            : null;
 
         $stage = 'DEPLOY_SHA_CHECK';
         $publishedSha = trim((string) @file_get_contents($deployShaPath));
@@ -331,28 +337,50 @@ try {
         // Backup is a stage, not a checklist item: apply is unreachable unless a
         // dump for the two closing tables plus the ledger preimage has been
         // written outside the webroot and read back successfully.
-        $stage = 'BACKUP';
+        // A targeted request owns exactly one migration. It must be the next
+        // pending one: applying anything else would either skip a migration or
+        // re-enter one that is already committed.
+        $stage = 'TARGET_RESOLVE';
         try {
             $migrationSource = MigrationExecutionService::sourceForRuntime($apiDirectory, true);
             $pdo = Connection::get();
+            if ($targetVersion !== null) {
+                $ledger = MigrationExecutionService::ledgerFacts($pdo, $migrationSource);
+                $nextPending = $ledger['pending_versions'][0] ?? null;
+                if ($nextPending === null) {
+                    throw new RuntimeException('TARGET_ALREADY_APPLIED');
+                }
+                if ($nextPending !== $targetVersion) {
+                    throw new RuntimeException('TARGET_NOT_NEXT_PENDING');
+                }
+            }
+        } catch (\Throwable $exception) {
+            throw MigrationWorkerFailure::fromThrowable($stage, $exception);
+        }
+
+        $stage = 'BACKUP';
+        try {
             $migrations = $migrationSource->all();
             $migrationTip = $migrations === []
                 ? 'unknown'
                 : (string) $migrations[count($migrations) - 1]['version'];
-            $backup = MigrationBackupService::create($pdo, $apiDirectory, $requestId, $migrationTip);
+            // A targeted request names its dump after the migration it is about to
+            // apply, so each migration in a round keeps its own rollback artifact.
+            $backupLabel = $targetVersion ?? $migrationTip;
+            $backup = MigrationBackupService::create($pdo, $apiDirectory, $requestId, $backupLabel);
         } catch (\Throwable $exception) {
             throw MigrationWorkerFailure::fromThrowable($stage, $exception);
         }
 
         $stage = 'APPLY';
         try {
-            MigrationExecutionService::apply($pdo, $migrationSource, $baseline);
+            $applyResult = MigrationExecutionService::apply($pdo, $migrationSource, $baseline, $targetVersion);
         } catch (\Throwable $exception) {
             throw MigrationWorkerFailure::fromThrowable($stage, $exception);
         }
         $stage = 'VERIFY';
         try {
-            MigrationExecutionService::verify($pdo, $migrationSource);
+            $verifyResult = MigrationExecutionService::verify($pdo, $migrationSource, $targetVersion);
         } catch (\Throwable $exception) {
             throw MigrationWorkerFailure::fromThrowable($stage, $exception);
         }
@@ -363,6 +391,9 @@ try {
             'request_id' => $requestId,
             'deployed_sha' => strtolower($deployedSha),
             'mode' => $mode,
+            'target_version' => $targetVersion ?? 'ALL_PENDING',
+            'applied_versions' => implode(',', $applyResult['pending']),
+            'pending_versions_after' => implode(',', $verifyResult['pending']),
             'backup_file' => (string) $backup['file'],
             'backup_sha256' => (string) $backup['sha256'],
             'backup_bytes' => (int) $backup['bytes'],

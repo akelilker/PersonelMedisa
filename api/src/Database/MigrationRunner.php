@@ -15,16 +15,27 @@ final class MigrationRunner
     /**
      * @param MigrationSourceProvider|string $source
      * @param string|null $baselineVersion
+     * @param string|null $applyThroughVersion Highest version this run may apply.
+     *        Null keeps the historical behaviour of draining the whole chain. A
+     *        version stops the run after it, so a control-plane request can own
+     *        exactly one migration and exactly one backup.
      * @return array{applied: list<string>, pending: list<string>, latest: string|null}
      */
     public static function run(
         PDO $pdo,
         MigrationSourceProvider|string $source,
-        ?string $baselineVersion = null
+        ?string $baselineVersion = null,
+        ?string $applyThroughVersion = null
     ): array {
+        if ($applyThroughVersion !== null && preg_match('/^\d{3}$/', $applyThroughVersion) !== 1) {
+            throw new RuntimeException('Migration target must be a three-digit version.');
+        }
         $migrations = self::resolve($source);
         if ($migrations === []) {
             throw new RuntimeException('No canonical migration files were discovered.');
+        }
+        if ($applyThroughVersion !== null && !self::chainHasVersion($migrations, $applyThroughVersion)) {
+            throw new RuntimeException("Migration target is not in the canonical chain: {$applyThroughVersion}");
         }
 
         self::acquireLock($pdo);
@@ -64,6 +75,12 @@ final class MigrationRunner
                     }
                     $applied[] = $version;
                     continue;
+                }
+
+                if ($applyThroughVersion !== null && (int) $version > (int) $applyThroughVersion) {
+                    // Everything past the authorized target stays pending: a later
+                    // request applies it behind its own backup.
+                    break;
                 }
 
                 $pending[] = $version;
@@ -201,13 +218,24 @@ final class MigrationRunner
 
     /**
      * @param MigrationSourceProvider|string $source
+     * @param string|null $expectedThroughVersion Highest version expected to be
+     *        applied. Null demands a fully drained chain; a version accepts the
+     *        remainder as pending but still refuses anything applied beyond it.
      * @return array{applied_count: int, pending: list<string>, latest: string|null}
      */
-    public static function verify(PDO $pdo, MigrationSourceProvider|string $source): array
-    {
+    public static function verify(
+        PDO $pdo,
+        MigrationSourceProvider|string $source,
+        ?string $expectedThroughVersion = null
+    ): array {
         $migrations = self::resolve($source);
         if ($migrations === [] || !self::tableExists($pdo, 'medisa_schema_migrations')) {
             throw new RuntimeException('Canonical migration schema is not ready.');
+        }
+        if ($expectedThroughVersion !== null && !self::chainHasVersion($migrations, $expectedThroughVersion)) {
+            throw new RuntimeException(
+                "Migration target is not in the canonical chain: {$expectedThroughVersion}"
+            );
         }
 
         $ledger = self::readLedger($pdo);
@@ -215,8 +243,22 @@ final class MigrationRunner
         $pending = [];
         foreach ($migrations as $migration) {
             if (!isset($ledger[$migration['version']])) {
+                if ($expectedThroughVersion !== null
+                    && (int) $migration['version'] <= (int) $expectedThroughVersion
+                ) {
+                    throw new RuntimeException(
+                        'Authorized migration was not applied: ' . $migration['version']
+                    );
+                }
                 $pending[] = $migration['version'];
                 continue;
+            }
+            if ($expectedThroughVersion !== null
+                && (int) $migration['version'] > (int) $expectedThroughVersion
+            ) {
+                throw new RuntimeException(
+                    'Migration applied beyond the authorized target: ' . $migration['version']
+                );
             }
             if (!hash_equals($ledger[$migration['version']]['checksum'], $migration['checksum'])) {
                 throw new RuntimeException(
@@ -225,7 +267,7 @@ final class MigrationRunner
             }
         }
 
-        if ($pending !== []) {
+        if ($expectedThroughVersion === null && $pending !== []) {
             throw new RuntimeException(
                 'Schema is not ready; pending canonical migrations remain: '
                 . implode(',', $pending)
@@ -234,9 +276,23 @@ final class MigrationRunner
 
         return [
             'applied_count' => count($ledger),
-            'pending' => [],
+            'pending' => $pending,
             'latest' => $migrations[count($migrations) - 1]['version'],
         ];
+    }
+
+    /**
+     * @param list<array{version: string, name: string, checksum: string, sql: string}> $migrations
+     */
+    private static function chainHasVersion(array $migrations, string $version): bool
+    {
+        foreach ($migrations as $migration) {
+            if ((string) $migration['version'] === $version) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

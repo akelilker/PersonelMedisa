@@ -463,6 +463,56 @@ try {
     omapAssert(count($inventory['data']['work_locations']) === 7, 'every work location is inventoried');
 
     omapAssert(
+        $inventory['data']['personnel_location_branch_matrix'] === [
+            ['calisma_lokasyonu_id' => 1, 'sube_id' => 1, 'personel_count' => 2],
+            ['calisma_lokasyonu_id' => 2, 'sube_id' => 4, 'personel_count' => 1],
+            ['calisma_lokasyonu_id' => 3, 'sube_id' => 7, 'personel_count' => 1],
+            ['calisma_lokasyonu_id' => 4, 'sube_id' => 11, 'personel_count' => 1],
+        ],
+        'the location x branch matrix is exact, anonymous and deterministically ordered'
+    );
+    omapAssert(
+        $inventory['data']['personnel_without_location_by_branch'] === [
+            ['sube_id' => 2, 'personel_count' => 1],
+            ['sube_id' => 5, 'personel_count' => 1],
+            ['sube_id' => 6, 'personel_count' => 1],
+            ['sube_id' => 8, 'personel_count' => 1],
+            ['sube_id' => 9, 'personel_count' => 1],
+            ['sube_id' => 10, 'personel_count' => 1],
+            ['sube_id' => 11, 'personel_count' => 1],
+        ],
+        'personnel without a work location are aggregated per branch, exactly'
+    );
+    omapAssert(
+        $inventory['data']['personnel_location_matrix_total'] === 5
+            && $inventory['data']['personnel_without_location_total'] === 7
+            && $inventory['data']['personnel_location_matrix_total']
+                + $inventory['data']['personnel_without_location_total']
+                === $inventory['data']['row_counts']['personeller'],
+        'matrix total plus without-location total equals every personnel row'
+    );
+    omapAssert(
+        $inventory['data']['personnel_matrix_reconciled'] === true
+            && !in_array('INVENTORY_PERSONNEL_MATRIX_COUNT_MISMATCH', $inventory['blockers'], true),
+        'the matrix reconciles against the personnel count and raises no mismatch blocker'
+    );
+    $matrixKeys = [];
+    foreach ($inventory['data']['personnel_location_branch_matrix'] as $entry) {
+        $matrixKeys = array_merge($matrixKeys, array_keys($entry));
+    }
+    foreach ($inventory['data']['personnel_without_location_by_branch'] as $entry) {
+        $matrixKeys = array_merge($matrixKeys, array_keys($entry));
+    }
+    omapAssert(
+        array_values(array_unique($matrixKeys)) === ['calisma_lokasyonu_id', 'sube_id', 'personel_count'],
+        'the matrix publishes relation ids and a count, and nothing else'
+    );
+    omapAssert(
+        $inventory['schema_version'] === '2',
+        'the extended inventory contract is published as schema version 2'
+    );
+
+    omapAssert(
         $inventory['data']['scope_summary']['user_sube_total'] === 3
             && $inventory['data']['scope_summary']['user_sirket_total'] === 0
             && $inventory['data']['scope_summary']['user_sgk_isveren_total'] === 0,

@@ -122,6 +122,71 @@ describe('read-only organization inventory owner', () => {
     }
   });
 
+  it('publishes the anonymous location x branch personnel matrix', () => {
+    expect(inventoryOwner).toContain("'personnel_location_branch_matrix' => self::personnelLocationBranchMatrix($pdo)");
+    expect(inventoryOwner).toContain(
+      "'personnel_without_location_by_branch' => self::personnelWithoutLocationByBranch($pdo)",
+    );
+    expect(inventoryOwner).toContain('WHERE p.calisma_lokasyonu_id IS NOT NULL');
+    expect(inventoryOwner).toContain('GROUP BY p.calisma_lokasyonu_id, p.sube_id');
+    expect(inventoryOwner).toContain('ORDER BY p.calisma_lokasyonu_id ASC, p.sube_id ASC');
+    expect(inventoryOwner).toContain('WHERE p.calisma_lokasyonu_id IS NULL');
+    expect(inventoryOwner).toContain('GROUP BY p.sube_id');
+    expect(inventoryOwner).toContain('ORDER BY p.sube_id ASC');
+  });
+
+  it('emits only relation ids and a count in both new aggregates', () => {
+    const matrixBlock = inventoryOwner.slice(
+      inventoryOwner.indexOf('private static function personnelLocationBranchMatrix('),
+      inventoryOwner.indexOf('private static function sumPersonelCount('),
+    );
+    expect(matrixBlock.length).toBeGreaterThan(0);
+    const published = matrixBlock.match(/'[a-z_]+' =>/g) ?? [];
+    expect([...new Set(published)].sort()).toEqual([
+      "'calisma_lokasyonu_id' =>",
+      "'personel_count' =>",
+      "'sube_id' =>",
+    ]);
+    // The aggregate selects the two relation columns and COUNT(*), nothing else.
+    expect(matrixBlock).not.toMatch(/SELECT\s+\*/i);
+    for (const forbidden of ['p.id', 'ad_soyad', 'sicil', 'tckn', 'telefon', 'iban', 'user_id', 'username']) {
+      expect(matrixBlock).not.toContain(forbidden);
+    }
+  });
+
+  it('reconciles the matrix against the personnel row count and fails closed', () => {
+    expect(inventoryOwner).toContain("'personnel_location_matrix_total'");
+    expect(inventoryOwner).toContain("'personnel_without_location_total'");
+    expect(inventoryOwner).toContain("'personnel_matrix_reconciled'");
+    expect(inventoryOwner).toContain("=== $data['row_counts']['personeller']");
+    expect(inventoryOwner).toContain('INVENTORY_PERSONNEL_MATRIX_COUNT_MISMATCH');
+  });
+
+  it('publishes the extended contract as inventory schema version 2', () => {
+    expect(inventoryOwner).toContain("public const SCHEMA_VERSION = '2'");
+  });
+
+  it('leaves the mapping and spec owner schema versions untouched', () => {
+    expect(specOwner).toContain("public const SCHEMA_VERSION = '1'");
+    expect(mappingOwner).toContain("public const SCHEMA_VERSION = '1'");
+    const fixture = JSON.parse(read('tests/fixtures/organization-mapping-spec.test-only.json'));
+    expect(fixture.schema_version).toBe('1');
+  });
+
+  it('keeps the matrix out of the workflow log and inside the private artifact', () => {
+    for (const field of [
+      'personnel_location_branch_matrix',
+      'personnel_without_location_by_branch',
+      'personnel_location_matrix_total',
+      'personnel_without_location_total',
+    ]) {
+      expect(inventoryWorkflow).not.toContain(field);
+    }
+    expect(inventoryWorkflow).not.toContain('cat "$report"');
+    expect(inventoryWorkflow).toContain('actions/upload-artifact@v6');
+    expect(inventoryWorkflow).toContain('if: always() && github.event.repository.private == true');
+  });
+
   it('does not extend the migration preflight report contract', () => {
     const preflight = read('api/src/Database/MigrationPreflightReport.php');
     expect(preflight).not.toContain('OrganizationMappingInventoryReport');

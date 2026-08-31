@@ -4,8 +4,9 @@ PRODUCTION_MIGRATION_TIP: 079
 # 129 — Organizasyon eşleme sahipleri: salt-okunur envanter + kontrollü ilk mapping
 
 **Paket:** `MG-SIRKET-SUBE-PROD-MAPPING-001`
-**Durum:** kod hazır, production'da **çalıştırılmadı**.
-Bu doküman apply onayı **değildir**.
+**Durum:** ilk production mapping **tamamlandı** (apply run `33342644722`);
+şirket/şube/SGK ekseni kapalı, çalışma lokasyonları bilinçli **deferred**.
+Bu doküman yeni bir apply onayı **değildir**; eski spec yeniden uygulanmaz.
 
     10|## 0. Root cause
 
@@ -80,6 +81,42 @@ PII politikası: organizasyon satırı referans verisidir. Personel yalnız
 bazında yalnız atama sayısı raporlanır. Değerlendirilemeyen sayım `0` değil `-1`
 döner ve `INVENTORY_COUNT_UNEVALUABLE` blocker'ına dönüşür.
 
+### 2.1 Anonim lokasyon × şube personel matrisi (schema version `2`)
+
+`MG-ORG-INVENTORY-LOCATION-BRANCH-MATRIX-001` ile envanter kontratı genişletildi;
+yalnız `OrganizationMappingInventoryReport::SCHEMA_VERSION` `1` → `2` oldu.
+Mapping spec ve mapping servisinin schema version'ları **değişmedi**.
+
+Root cause: envanter personel sayılarını şube ekseninde ve lokasyon ekseninde
+ayrı ayrı veriyordu. Bunlar marjinal sayılardır; marjinal eşitliği mapping kanıtı
+**değildir** — bir lokasyondaki kişilerin tek şubede mi, birkaç şubede mi olduğu
+yalnız kesişimden görülür. Bu yüzden `personeller.calisma_lokasyonu_id ×
+personeller.sube_id` kesişimi yayınlanır.
+
+| Alan | Kapsam | Kontrat |
+| --- | --- | --- |
+| `personnel_location_branch_matrix` | yalnız `calisma_lokasyonu_id IS NOT NULL` | `calisma_lokasyonu_id`, nullable `sube_id`, `personel_count`; `GROUP BY calisma_lokasyonu_id, sube_id`; `ORDER BY calisma_lokasyonu_id ASC, sube_id ASC` |
+| `personnel_without_location_by_branch` | yalnız `calisma_lokasyonu_id IS NULL` | nullable `sube_id`, `personel_count`; `GROUP BY sube_id`; `ORDER BY sube_id ASC` |
+
+Reconciliation: iki aggregate `personeller` tablosunu "lokasyonu var / yok"
+ekseninde tam olarak böler. `personnel_location_matrix_total` +
+`personnel_without_location_total` toplamı `row_counts.personeller` ile eşit
+olmak zorundadır; eşitse `personnel_matrix_reconciled` true olur, değilse
+envanter PASS **vermez** ve `INVENTORY_PERSONNEL_MATRIX_COUNT_MISMATCH`
+blocker'ı yayınlanır. Böylece matrisin gerçekten personel tablosunun bir
+projeksiyonu olduğu kanıtlanır, varsayılmaz.
+
+PII sınırı: matris yalnız **ilişki ID'leri ve aggregate sayı** taşır. Personel
+id'si, ad/soyad, sicil, TC, telefon, IBAN, kullanıcı id/username veya başka
+hiçbir personel alanı ne seçilir ne yayınlanır — matris bir kombinasyonda kaç
+kişi olduğunu söyler, kimin olduğunu söylemez. Envanter SELECT-only kalır:
+mutation statement, `->exec(`, transaction ve caller-supplied SQL/filter yoktur.
+
+Yayın sınırı: matris **log'a basılmaz**. `ops-organization-inventory.yml`
+canonical JSON'un tamamını private repository artifact'ı olarak taşır; matris
+için `echo`, `jq emit_*` veya step summary çıktısı eklenmedi ve workflow bu
+turda değiştirilmedi.
+
     80|Determinizm: satırlar primary key sırasına göre, JSON recursive key-sorted,
 checksum yalnız `data` bölümü üzerinde. `generated_at` bilinçli olarak
 checksum'ın **dışındadır**; aksi halde değişmeyen bir veritabanı her okumada yeni
@@ -138,9 +175,11 @@ Kurallar ve reason code'ları:
 **yoktur**; `approved_ad` yoksa mevcut ad korunur (ID 7 ve 11 durumu),
 `target_sube_id` null ise lokasyon deferred kalır.
 
-Bu pakette spec **gerçek production değerleriyle doldurulmadı**. Yalnız
-schema/validator ve `tests/fixtures/organization-mapping-spec.test-only.json`
-fixture'ı oluşturuldu; fixture kodları açıkça test-only'dir.
+Repoda tutulan tek spec dosyası
+`tests/fixtures/organization-mapping-spec.test-only.json` fixture'ıdır ve
+kodları açıkça test-only'dir. İlk production mapping'i çalıştıran onaylı spec
+operatör kaydındadır; gerçek satır preimage'ları, checksum'ı ve row-level
+production değerleri bu dokümana taşınmaz.
 
 ## 5. Operations-only mapping owner
 
@@ -247,7 +286,24 @@ yayınlanmamışsa (`INVENTORY_ARTIFACT_MISSING`) veya spec'in pinlediği checks
 production'daki envanterle eşleşmiyorsa (`INVENTORY_CHECKSUM_MISMATCH`,
 `SPEC_INVENTORY_CHECKSUM_MISMATCH`).
 
-Hiçbir workflow bu turda dispatch **edilmedi**.
+Bu turda (matrix kontratı turu) hiçbir workflow dispatch **edilmedi** ve
+production'da hiçbir mutation yapılmadı.
+
+## 6.1 İlk production mapping durumu
+
+| Alan | Değer |
+| --- | --- |
+| Apply run | `33342644722` |
+| Sonuç | postcheck PASS, `data_ready` **true** |
+| Kapsam | 3 şirket, 10 şube, 3 SGK işvereni eşlendi |
+| Çalışma lokasyonu | 7 lokasyon **deferred**; `sube_id` NULL kaldı |
+| Yeniden apply | **yok** — eski spec yeniden uygulanmaz |
+
+Lokasyon kararı (kayıt): İzmir ve Sakarya çalışma lokasyonları **MEDISA**'ya
+aittir ve MEDISA altında **ayrı şube adaylarıdır** (`Medisa / İzmir`,
+`Medisa / Sakarya`). Şube oluşturma ve production lokasyon mapping'i
+yapılmamıştır; gerçek lokasyon eşlemesi yeni envanter matrisinin sonucunu ve
+ayrı bir production onayını bekler.
 
 ## 7. Recovery
 
@@ -270,10 +326,11 @@ commit edilmemiştir.
 
 ## 8. Sonraki gate'ler
 
-- Production envanteri çalıştırma (salt-okunur) → exact satır verisi.
+- Yeni schema version `2` envanterini salt-okunur çalıştırma → anonim
+  lokasyon × şube matrisi (ayrı dispatch onayı ile).
 - SGK işvereni → şirket eşlemesinin iş anlamıyla doğrulanması.
-   230|- Belirsiz çalışma lokasyonlarının kararı (deferred kalabilir).
-- Mapping preflight → apply onayı.
+   230|- 7 deferred çalışma lokasyonunun matris sonucuna dayalı kararı; İzmir ve
+  Sakarya için MEDISA altında şube oluşturma ayrı onay gerektirir.
 - Şube kısa adı DB uniqueness hardening (ayrı migration, eşleme sonrası).
 - User scope rollout (`user_sirketler`, `user_sgk_isverenler`).
 - SGK/bordro sahibi üzerinden yeniden tasarlanmış aylık kapanış işi.

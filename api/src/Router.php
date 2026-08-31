@@ -342,6 +342,9 @@ class Router
         if ($method === 'POST' && preg_match('#^/personeller/(\d+)/gecici-gorevlendirmeler/(\d+)/sonlandir$#', $path, $matches)) {
             PersonellerController::endGeciciGorevlendirme($this->request, $matches[1], $matches[2]);
         }
+        if ($method === 'POST' && preg_match('#^/personeller/(\d+)/kalici-sube-degisikligi$#', $path, $matches)) {
+            PersonellerController::kaliciSubeDegisikligi($this->request, $matches[1]);
+        }
         if ($method === 'GET' && preg_match('#^/personeller/(\d+)/yillik-izin-bakiye$#', $path, $matches)) {
             YillikIzinHakDuzeltmeController::bakiye($this->request, $matches[1]);
         }

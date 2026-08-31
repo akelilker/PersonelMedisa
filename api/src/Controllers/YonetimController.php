@@ -21,6 +21,8 @@ use Medisa\Api\Services\Auth\UserPersonelBindingService;
 use Medisa\Api\Services\Auth\PersonelAccountOnboardingService;
 use Medisa\Api\Services\Auth\ActorIdentityException;
 use Medisa\Api\Services\Auth\ActorIdentityService;
+use Medisa\Api\Services\Organizasyon\OrganizasyonAuditContext;
+use Medisa\Api\Services\Organizasyon\OrganizasyonAuditWriter;
 use Medisa\Api\Services\Organizasyon\OrganizasyonException;
 use Medisa\Api\Services\Organizasyon\OrganizasyonService;
 use PDO;
@@ -131,7 +133,14 @@ class YonetimController
         $pdo = self::subePdo();
 
         try {
-            JsonResponse::success(OrganizasyonService::createSube($pdo, $body));
+            JsonResponse::success(
+                OrganizasyonService::createSube(
+                    $pdo,
+                    $body,
+                    null,
+                    OrganizasyonAuditContext::fromRequest($request, $user)
+                )
+            );
         } catch (OrganizasyonException $e) {
             self::subeError($e);
         }
@@ -1270,6 +1279,42 @@ class YonetimController
 
         $actorUserId = isset($user['id']) ? (int) $user['id'] : 0;
 
+        // Organisation scope is the grant that decides what a user can see, so a
+        // change to it is audited before/after. Fail-closed: an environment
+        // without migration 080 cannot silently regrant scope.
+        $scopeAxesTouched = [
+            OrganizasyonAuditWriter::SCOPE_SUBE => [$subeIdsProvided, $currentSubeIds, $finalSubeIds],
+            OrganizasyonAuditWriter::SCOPE_SIRKET => [$sirketIdsProvided, $currentSirketIds, $finalSirketIds],
+            OrganizasyonAuditWriter::SCOPE_SGK_ISVEREN => [
+                $sgkIsverenIdsProvided,
+                $currentSgkIsverenIds,
+                $finalSgkIsverenIds,
+            ],
+        ];
+        $scopeChanges = [];
+        foreach ($scopeAxesTouched as $scopeTuru => $axis) {
+            list($provided, $before, $after) = $axis;
+            if (!$provided) {
+                continue;
+            }
+            if (OrganizasyonAuditWriter::canonicalIdList($before) === OrganizasyonAuditWriter::canonicalIdList($after)) {
+                continue;
+            }
+            $scopeChanges[$scopeTuru] = [$before, $after];
+        }
+        $scopeAuditContext = null;
+        if (count($scopeChanges) > 0) {
+            try {
+                OrganizasyonAuditWriter::assertReady($pdo, OrganizasyonAuditWriter::USER_SCOPE_TABLE);
+                $scopeAuditContext = OrganizasyonAuditContext::fromRequest($request, $user);
+            } catch (OrganizasyonException $e) {
+                JsonResponse::error($e->httpStatus, $e->errorCode, $e->getMessage(), $e->field);
+            }
+        }
+        $scopeGerekce = isset($body['gerekce']) && is_string($body['gerekce']) && trim($body['gerekce']) !== ''
+            ? trim($body['gerekce'])
+            : null;
+
         $pdo->beginTransaction();
         try {
             $params = [
@@ -1318,6 +1363,20 @@ class YonetimController
                     $requestedPersonelId,
                     $actorUserId
                 );
+            }
+
+            if ($scopeAuditContext !== null) {
+                foreach ($scopeChanges as $scopeTuru => $sets) {
+                    OrganizasyonAuditWriter::recordUserOrgScopeChange(
+                        $pdo,
+                        $kullaniciId,
+                        (string) $scopeTuru,
+                        $sets[0],
+                        $sets[1],
+                        $scopeAuditContext,
+                        $scopeGerekce
+                    );
+                }
             }
 
             $pdo->commit();

@@ -305,6 +305,9 @@ try {
     i13bApplyFile($pdo, '001_initial_schema.sql');
     i13bApplyFile($pdo, '041_auth_smoke_readonly_role.sql');
     i13bApplyFile($pdo, '051_users_varsayilan_sube_id.sql');
+    // Organisation scope writes are audited (080); without the audit tables the
+    // controller fails closed and the branch-scope cases below never run.
+    i13bApplyFile($pdo, '080_organizasyon_audit_owners.sql');
 
     $pdo->exec("INSERT INTO subeler (id, kod, ad, durum) VALUES (1, 'A', 'Sube A', 'AKTIF'), (2, 'B', 'Sube B', 'AKTIF')");
     $hash = password_hash($pass, PASSWORD_BCRYPT);

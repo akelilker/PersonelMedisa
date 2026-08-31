@@ -152,7 +152,8 @@ function p6MigrationFiles(): array
             && $name !== '076_dis_kaynak_gecici_gorevlendirme.sql'
             && $name !== '077_legacy_role_enum_shrink.sql'
             && $name !== '078_personel_sicil_sequence.sql'
-            && $name !== '079_sirket_sube_hiyerarsisi.sql';
+            && $name !== '079_sirket_sube_hiyerarsisi.sql'
+            && $name !== '080_organizasyon_audit_owners.sql';
     }));
     sort($files, SORT_STRING);
 

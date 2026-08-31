@@ -24,6 +24,33 @@ use Medisa\Api\Database\MigrationBackupService;
 use Medisa\Api\Database\MigrationPreflightReport;
 
 const MCP_MIGRATION_079 = '079_sirket_sube_hiyerarsisi.sql';
+
+/**
+ * The 079 apply gate authorises exactly one migration, so this runner feeds it
+ * the chain as it stood at that decision: 001→079. Later migrations are a
+ * separate approval and must not silently ride through a gate that never
+ * reviewed them — freezing the source here keeps this test measuring the gate
+ * instead of measuring how far the repository has moved since.
+ */
+final class McpChainThrough079 implements Medisa\Api\Database\MigrationSourceProvider
+{
+    /** @var Medisa\Api\Database\MigrationSourceProvider */
+    private $inner;
+
+    public function __construct(Medisa\Api\Database\MigrationSourceProvider $inner)
+    {
+        $this->inner = $inner;
+    }
+
+    /** @return list<array{version: string, name: string, checksum: string, sql: string}> */
+    public function all(): array
+    {
+        return array_values(array_filter(
+            $this->inner->all(),
+            static fn (array $migration): bool => (int) $migration['version'] <= 79
+        ));
+    }
+}
 const MCP_WITHDRAWN_079 = '079_aylik_kapanis_sube_scope_and_actor.sql';
 
 function mcpAssert(bool $ok, string $name): void
@@ -300,7 +327,7 @@ foreach ([$db, $restoreDb, $driftDb] as $name) {
 $pdo = mcpPdo((preg_replace('/dbname=[^;]+/i', 'dbname=' . $db, $dsn) ?: $dsn));
 
 $apiDirectory = realpath(__DIR__ . '/../../api');
-$source = new FilesystemMigrationSourceProvider($apiDirectory . '/migrations');
+$source = new McpChainThrough079(new FilesystemMigrationSourceProvider($apiDirectory . '/migrations'));
 $migrations = $source->all();
 $deployedSha = str_repeat('a', 40);
 

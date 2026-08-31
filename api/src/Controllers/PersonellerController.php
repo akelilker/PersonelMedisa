@@ -23,8 +23,11 @@ use Medisa\Api\Services\Personel\PersonelImportDryRunService;
 use Medisa\Api\Services\Personel\PersonelImportException;
 use Medisa\Api\Services\Personel\PersonelImportHistoryService;
 use Medisa\Api\Services\Personel\PersonelImportReferenceCatalogService;
+use Medisa\Api\Services\Organizasyon\OrganizasyonAuditContext;
+use Medisa\Api\Services\Organizasyon\OrganizasyonException;
 use Medisa\Api\Services\Organizasyon\OrganizasyonSchema;
 use Medisa\Api\Services\Organizasyon\SubeReadModel;
+use Medisa\Api\Services\Personel\PersonelKaliciSubeDegisikligiService;
 use Medisa\Api\Services\Personel\PersonelOrgLocationSchema;
 use Medisa\Api\Services\Personel\PersonelOrgStructureSchema;
 use Medisa\Api\Services\Personel\PersonelSearchPredicate;
@@ -1535,6 +1538,131 @@ class PersonellerController
         } catch (PersonelValidationException $e) {
             JsonResponse::error(409, $e->getCodeString() ?: 'VALIDATION_ERROR', $e->getMessage(), $e->getField());
         }
+    }
+
+    /**
+     * Permanent branch change. Deliberately separate from update(): that path
+     * still forbids moving anybody between branches and stays that way.
+     */
+    public static function kaliciSubeDegisikligi(Request $request, $personelId)
+    {
+        $user = AuthMiddleware::authenticate($request, true);
+
+        try {
+            PersonelKaliciSubeDegisikligiService::assertRole($user);
+        } catch (OrganizasyonException $e) {
+            JsonResponse::error($e->httpStatus, $e->errorCode, $e->getMessage(), $e->field);
+        }
+
+        $personelId = (int) $personelId;
+        if ($personelId <= 0) {
+            JsonResponse::notFound();
+        }
+
+        $body = $request->getJsonBody();
+        if (!is_array($body)) {
+            $body = [];
+        }
+
+        try {
+            $pdo = Connection::get();
+        } catch (\Throwable $e) {
+            JsonResponse::serverError('Veritabani baglantisi kurulamadi.');
+        }
+
+        PersonelArchiveGate::assertBusinessWriteAllowed($pdo, $personelId);
+
+        $actorId = (int) ($user['id'] ?? 0);
+        $idemKey = OfflineMutationIdempotencyService::readKey($request);
+        $idemScope = 'personeller.kalici-sube-degisikligi:' . $personelId;
+        $idemHash = OfflineMutationIdempotencyService::hashPayload([
+            'op' => $idemScope,
+            'personel_id' => $personelId,
+            'payload' => $body,
+        ]);
+
+        try {
+            $auditContext = OrganizasyonAuditContext::fromRequest($request, $user, $idemKey);
+        } catch (OrganizasyonException $e) {
+            JsonResponse::error($e->httpStatus, $e->errorCode, $e->getMessage(), $e->field);
+        }
+
+        if ($idemKey !== null) {
+            $replay = OfflineMutationIdempotencyService::findCompletedReplay(
+                $pdo,
+                $actorId,
+                $idemScope,
+                $idemKey,
+                $idemHash
+            );
+            if (is_array($replay)) {
+                self::respondKaliciSubeDegisikligi($pdo, $user, $personelId, (int) ($replay['http_status'] ?? 200));
+            }
+        }
+
+        $claim = null;
+        $complete = null;
+        if ($idemKey !== null) {
+            $claim = function (PDO $tx) use ($actorId, $idemScope, $idemKey, $idemHash) {
+                return OfflineMutationIdempotencyService::claimInTransaction(
+                    $tx,
+                    $actorId,
+                    $idemScope,
+                    $idemKey,
+                    $idemHash
+                );
+            };
+            $complete = function (PDO $tx) use ($actorId, $idemScope, $idemKey, $personelId) {
+                OfflineMutationIdempotencyService::completeInTransaction(
+                    $tx,
+                    $actorId,
+                    $idemScope,
+                    $idemKey,
+                    200,
+                    'personel',
+                    $personelId,
+                    null
+                );
+            };
+        }
+
+        try {
+            $result = PersonelKaliciSubeDegisikligiService::apply(
+                $pdo,
+                $user,
+                $personelId,
+                $body,
+                $auditContext,
+                $claim,
+                $complete
+            );
+        } catch (OrganizasyonException $e) {
+            JsonResponse::error($e->httpStatus, $e->errorCode, $e->getMessage(), $e->field);
+        } catch (\Throwable $e) {
+            JsonResponse::serverError('Kalici sube degisikligi uygulanamadi.');
+        }
+
+        self::respondKaliciSubeDegisikligi(
+            $pdo,
+            $user,
+            $personelId,
+            200,
+            $result['replay'] ? [] : ['audit_id' => $result['audit_id']]
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $user
+     * @param array<string, mixed> $meta
+     */
+    private static function respondKaliciSubeDegisikligi(PDO $pdo, array $user, $personelId, $status, array $meta = [])
+    {
+        $row = self::fetchPersonelRowById($pdo, $personelId);
+        if (!$row) {
+            JsonResponse::serverError('Kalici sube degisikligi dogrulanamadi.');
+        }
+
+        JsonResponse::success(self::mapPersonelRow($row, $user), $meta, (int) $status);
     }
 
     public static function listDisKaynakAssignablePool(Request $request)

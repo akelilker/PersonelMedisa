@@ -216,10 +216,19 @@ final class OrganizasyonService
     /**
      * @param array<string, mixed> $body
      * @param int|null $parentSirketId company from the nested route, never from the payload
+     * @param OrganizasyonAuditContext|null $auditContext
+     *        Supplied by every authenticated route. Null is reserved for
+     *        fixtures and schema harnesses that have no actor to attribute the
+     *        write to; when it is present the audit row is mandatory and its
+     *        failure rolls the branch back.
      * @return array<string, mixed>
      */
-    public static function createSube(PDO $pdo, array $body, ?int $parentSirketId = null): array
-    {
+    public static function createSube(
+        PDO $pdo,
+        array $body,
+        ?int $parentSirketId = null,
+        ?OrganizasyonAuditContext $auditContext = null
+    ): array {
         self::rejectDerivedFields($body);
         self::rejectPayloadSirketId($body, $parentSirketId);
 
@@ -252,6 +261,11 @@ final class OrganizasyonService
             $params['sgk_isveren_id'] = $sgkIsverenId;
         }
 
+        // An unauditable environment must not gain a branch it cannot explain.
+        if ($auditContext !== null) {
+            OrganizasyonAuditWriter::assertReady($pdo, OrganizasyonAuditWriter::SUBE_CREATE_TABLE);
+        }
+
         $pdo->beginTransaction();
         try {
             $stmt = $pdo->prepare(
@@ -261,7 +275,21 @@ final class OrganizasyonService
             $stmt->execute($params);
             $subeId = (int) $pdo->lastInsertId();
             self::replaceSubeDepartmanlar($pdo, $subeId, $departmanIds);
+            if ($auditContext !== null) {
+                OrganizasyonAuditWriter::recordSubeOlusturma($pdo, [
+                    'sube_id' => $subeId,
+                    'sirket_id' => $params['sirket_id'] ?? null,
+                    'kod' => $kod,
+                    'ad' => $ad,
+                    'durum' => $durum,
+                    'sgk_isveren_id' => $sgkIsverenId,
+                    'departman_ids' => $departmanIds,
+                ], $auditContext);
+            }
             $pdo->commit();
+        } catch (OrganizasyonException $e) {
+            $pdo->rollBack();
+            throw $e;
         } catch (\Throwable $e) {
             $pdo->rollBack();
             throw new OrganizasyonException(500, 'INTERNAL_ERROR', 'Şube kaydı oluşturulamadı.');

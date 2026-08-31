@@ -36,7 +36,8 @@ describe("organization mapping owners: inventory, preflight, backup, transaction
       "matrix total plus without-location total equals every personnel row",
       "the matrix reconciles against the personnel count and raises no mismatch blocker",
       "the matrix publishes relation ids and a count, and nothing else",
-      "the extended inventory contract is published as schema version 2",
+      "the extended inventory contract is published as schema version 3",
+      "a baseline-only database is provable with no extension at all",
       "scope totals are reported and both new scope tables are proven empty",
       "branch assignments are grouped per role without naming a user",
       "no personnel name and no username reaches the inventory payload",
@@ -113,7 +114,23 @@ describe("organization mapping owners: inventory, preflight, backup, transaction
       "the mismatch rollback restores the exact preimage, including company rows",
       "a mid-transaction database error aborts the operation",
       "no transaction is left open after the failure",
-      "the mid-transaction error rolls every write back"
+      "the mid-transaction error rolls every write back",
+      // baseline + audited branch extensions
+      "baseline only: PASS with an empty extension set",
+      "an extension branch without a create audit is a blocker",
+      "an unprovable extension never grows the expected branch count",
+      "audited extensions 12 and 13 are accepted with no blocker",
+      "the expected branch set and count are derived: baseline plus audited extensions",
+      "a future audited extension passes with no code change",
+      "the audit owner is readable, so extension proof is evaluable",
+      "the classification is SELECT-only: only the fixture changed rows",
+      "two create audits for one branch block instead of counting as proof",
+      "a create audit that does not match the live branch identity blocks",
+      "a later rename or status change does not invalidate the create audit",
+      "the branch/payroll company mismatch guard is untouched by the new model",
+      "every orphan and mismatch counter is still published",
+      "a missing baseline branch is still a blocker",
+      "an audit cannot legitimise branch id 3"
     ]) {
       expect(result.stdout).toContain(marker);
     }

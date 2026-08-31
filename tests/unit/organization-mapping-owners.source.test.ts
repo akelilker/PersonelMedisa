@@ -60,9 +60,51 @@ describe('read-only organization inventory owner', () => {
     ]) {
       expect(inventoryOwner).toContain(field);
     }
-    for (const field of ['branch_ids', 'id_3_present', 'unexpected_branch_ids', 'missing_branch_ids']) {
+    for (const field of [
+      'branch_ids',
+      'id_3_present',
+      'baseline_branch_ids',
+      'audited_extension_branch_ids',
+      'unaudited_extension_branch_ids',
+      'duplicate_extension_audit_branch_ids',
+      'mismatched_extension_audit_branch_ids',
+      'missing_baseline_branch_ids',
+      'expected_branch_count',
+      'branch_set_valid',
+      'unexpected_branch_ids',
+      'missing_branch_ids',
+    ]) {
       expect(inventoryOwner).toContain(field);
     }
+  });
+
+  it('treats the 079 branch ids as a baseline, not as the set allowed to exist', () => {
+    expect(inventoryOwner).toContain('private const BASELINE_BRANCH_IDS = [1, 2, 4, 5, 6, 7, 8, 9, 10, 11]');
+    expect(inventoryOwner).not.toContain('DOCUMENTED_BRANCH_IDS = [');
+    // 12 and 13 exist in production as audited extensions; hardcoding them would
+    // reintroduce the same false blocker for the next legitimate branch.
+    for (const forbidden of [/BRANCH_IDS = \[[^\]]*\b12\b/, /BRANCH_IDS = \[[^\]]*\b13\b/]) {
+      expect(inventoryOwner).not.toMatch(forbidden);
+    }
+    // The expected set and the expected count are derived, never pinned.
+    expect(inventoryOwner).toContain('$expected = array_merge(self::BASELINE_BRANCH_IDS, $audited)');
+    expect(inventoryOwner).toContain("'expected_branch_count' => count($expected)");
+  });
+
+  it('proves an extension branch from the canonical create audit only', () => {
+    expect(inventoryOwner).toContain('FROM sube_olusturma_auditleri a');
+    expect(inventoryOwner).toContain('GROUP BY a.sube_id');
+    // Exactly one audit row, and only the immutable identity columns are compared.
+    expect(inventoryOwner).toContain("if ($audit['audit_rows'] > 1)");
+    expect(inventoryOwner).toContain("$audit['kod'] !== $liveKod[$id]");
+    expect(inventoryOwner).toContain("$audit['actor_user_id'] <= 0");
+    // A missing audit owner cannot make an extension provable.
+    expect(inventoryOwner).toContain('return null;');
+    expect(inventoryOwner).toContain('$auditReady = $audits !== null;');
+    expect(inventoryOwner).toContain('FORBIDDEN_BRANCH_IDS = [3]');
+    // The justification text and the request hash stay out of the payload.
+    expect(inventoryOwner).not.toContain('gerekce');
+    expect(inventoryOwner).not.toContain('request_hash');
   });
 
   it('counts personnel and never selects a personal column', () => {
@@ -115,6 +157,10 @@ describe('read-only organization inventory owner', () => {
       'INVENTORY_SCHEMA_NOT_READY',
       'UNEXPECTED_BRANCH_ID_3_PRESENT',
       'UNEXPECTED_BRANCH_IDS_PRESENT',
+      'DUPLICATE_BRANCH_CREATE_AUDIT',
+      'BRANCH_CREATE_AUDIT_MISMATCH',
+      'BRANCH_CREATE_AUDIT_UNREADABLE',
+      'BRANCH_SET_NOT_PROVABLE',
       'DOCUMENTED_BRANCH_IDS_MISSING',
       'BRANCH_SGK_COMPANY_MISMATCH',
     ]) {
@@ -162,8 +208,26 @@ describe('read-only organization inventory owner', () => {
     expect(inventoryOwner).toContain('INVENTORY_PERSONNEL_MATRIX_COUNT_MISMATCH');
   });
 
-  it('publishes the extended contract as inventory schema version 2', () => {
-    expect(inventoryOwner).toContain("public const SCHEMA_VERSION = '2'");
+  it('publishes the extended contract as inventory schema version 3', () => {
+    expect(inventoryOwner).toContain("public const SCHEMA_VERSION = '3'");
+  });
+
+  it('publishes the branch set classification in the workflow log summary', () => {
+    for (const label of [
+      "emit_scalar BRANCH_CREATE_AUDIT_READY '.data.branch_create_audit_ready'",
+      "emit_scalar BRANCH_SET_VALID '.data.branch_set_valid'",
+      "emit_scalar EXPECTED_BRANCH_COUNT '.data.expected_branch_count'",
+      "emit_list BASELINE_BRANCH_IDS '.data.baseline_branch_ids'",
+      "emit_list AUDITED_EXTENSION_BRANCH_IDS '.data.audited_extension_branch_ids'",
+      "emit_list UNAUDITED_EXTENSION_BRANCH_IDS '.data.unaudited_extension_branch_ids'",
+      "emit_list DUPLICATE_EXTENSION_AUDIT_BRANCH_IDS '.data.duplicate_extension_audit_branch_ids'",
+      "emit_list MISSING_BASELINE_BRANCH_IDS '.data.missing_baseline_branch_ids'",
+    ]) {
+      expect(inventoryWorkflow).toContain(label);
+    }
+    // The workflow stays a transport and log owner: the rule lives in the report.
+    expect(inventoryWorkflow).not.toContain('sube_olusturma_auditleri');
+    expect(inventoryWorkflow).not.toMatch(/BASELINE_BRANCH_IDS=\s*"?1,2,4/);
   });
 
   it('leaves the mapping and spec owner schema versions untouched', () => {

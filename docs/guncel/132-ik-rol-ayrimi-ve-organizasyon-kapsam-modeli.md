@@ -73,9 +73,10 @@ Bu değişiklik yalnız control-plane sözleşmesidir: `080` ve `081` dosyaları
 - İşlem `user_erisim_kaldirma_auditleri` satırı olmadan tamamlanamaz; audit hatası business mutation'ı rollback eder.
 - Idempotent tekrar güvenlidir; credential okunmaz veya raporlanmaz.
 
-## 7. Onaya bağlı production business changeset (henüz uygulanmadı)
+## 7. Production business changeset (uygulandı)
 
-- MEDISA altında `MDS-IZM` (İzmir) ve `MDS-SAK` (Sakarya) şubeleri, durum `AKTIF`, SGK = MEDISA. ID tahmin edilmez; create sonrası exact readback yapılır.
+- MEDISA altında `MDS-IZM` (İzmir, id **12**) ve `MDS-SAK` (Sakarya, id **13**) şubeleri, durum `AKTIF`, SGK = MEDISA. ID tahmin edilmedi; canonical audited create owner ile oluşturuldu ve exact readback yapıldı.
+- Sonuç: production şube sayısı 10 → **12**. Envanter bu iki şubeyi ID listesine eklendiği için değil, `sube_olusturma_auditleri` içindeki canonical create kanıtı sayesinde **audited extension** olarak kabul eder; ayrıntı: `docs/guncel/129-organization-mapping-owners.md` §2.2.
 - Personel 112 (sicil 040) → `MDS-IZM`, personel 169 (sicil 463) → `MDS-SAK`. Yalnız `sube_id` değişir; lokasyon, SGK ve diğer alanlar korunur.
 - `sedanurB`: rol `IK_SORUMLUSU` **değişmez**; global İK davranışı readback ile doğrulanır.
 - `zeynepG`: rol `IK_SORUMLUSU` **değişmez**; `IK_PERSONELI`'ye çevrilmez ve write-company kapsamı tanımlanmaz. Global İK davranışı readback ile doğrulanır.

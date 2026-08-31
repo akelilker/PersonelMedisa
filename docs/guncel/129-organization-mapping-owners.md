@@ -67,8 +67,12 @@ taraftan SQL, tablo adı veya filtre kabul edilmez. Kaynak testi
 - **SGK işvereni:** `id`, `kod`, `ad`, `durum`, `sirket_id`, `personel_count`,
   `linked_branch_ids`, `linked_branch_count`.
 - **Çalışma lokasyonu:** `id`, `kod`, `ad`, `durum`, `sube_id`, `personel_count`.
-- **Küme kontrolü:** `branch_ids`, `expected_branch_ids`, `id_3_present`,
-  `unexpected_branch_ids`, `missing_branch_ids`, orphan/mismatch sayıları.
+- **Küme kontrolü:** `branch_ids`, `baseline_branch_ids`, `expected_branch_ids`,
+  `expected_branch_count`, `id_3_present`, `audited_extension_branch_ids`,
+  `unaudited_extension_branch_ids`, `duplicate_extension_audit_branch_ids`,
+  `mismatched_extension_audit_branch_ids`, `missing_baseline_branch_ids`,
+  `branch_create_audit_ready`, `branch_set_valid`, `unexpected_branch_ids`,
+  `missing_branch_ids`, orphan/mismatch sayıları (bkz. §2.2).
 - **Scope:** `user_sube_total`, rol bazında `assignment_count`,
     70|  `user_sirket_total`, `user_sgk_isveren_total`.
 
@@ -121,6 +125,45 @@ turda değiştirilmedi.
 checksum yalnız `data` bölümü üzerinde. `generated_at` bilinçli olarak
 checksum'ın **dışındadır**; aksi halde değişmeyen bir veritabanı her okumada yeni
 checksum üretir ve hiçbir spec onu pinleyemezdi.
+
+### 2.2 Baseline + audited şube extension modeli (schema version `3`)
+
+`MG-ORG-INVENTORY-AUDITED-BRANCH-EXTENSIONS-001` ile envanter kontratı yeniden
+genişletildi; yalnız `OrganizationMappingInventoryReport::SCHEMA_VERSION` `2` →
+`3` oldu. Mapping spec ve mapping servisinin schema version'ları ve tamamlanmış
+mapping operasyonunun tarihsel 10-şube beklentisi **değişmedi**.
+
+Root cause: envanter, ilk organizasyon mapping turundaki 10 şube ID'sini tüm
+gelecek için değişmez izinli liste kabul ediyordu. Canonical audited
+branch-create owner ile oluşturulan şubeler (production'da `MDS-IZM` id 12 ve
+`MDS-SAK` id 13) bu yüzden `UNEXPECTED_BRANCH_IDS_PRESENT` üretiyordu. Listeye
+12 ve 13 eklemek aynı hatayı bir sonraki meşru şubede tekrarlardı, bu yüzden
+kural ID listesinden **kanıta** taşındı.
+
+| Sınıf | Kanıt | Sonuç |
+| --- | --- | --- |
+| Baseline şube (`1,2,4,5,6,7,8,9,10,11`) | migration 079 production postcheck kanıtı | audit gerekmez; **kaybolması blocker** (`DOCUMENTED_BRANCH_IDS_MISSING`) |
+| Audited extension | `sube_olusturma_auditleri` içinde **tek** create satırı; `sube_id` ve değişmez `kod` canlı satırla eşleşir; `actor_user_id` mevcut | geçerli; `expected_branch_ids` ve `expected_branch_count` bu şubeyi kapsar |
+| Audit'siz extension | kanıt yok | blocker (`UNEXPECTED_BRANCH_IDS_PRESENT`, `BRANCH_SET_NOT_PROVABLE`) |
+| Duplicate create audit | aynı şube için >1 satır | blocker (`DUPLICATE_BRANCH_CREATE_AUDIT`) |
+| Kimliği uyuşmayan audit | audit `kod` ≠ canlı `kod` | blocker (`BRANCH_CREATE_AUDIT_MISMATCH`) |
+| Audit owner okunamıyor + extension var | kanıt değerlendirilemez | blocker (`BRANCH_CREATE_AUDIT_UNREADABLE`) |
+| ID 3 | tarihsel olarak yok | audit olsa bile blocker (`UNEXPECTED_BRANCH_ID_3_PRESENT`) |
+
+Yalnız `sube_id` ve `kod` karşılaştırılır: `ad`, `durum`, `sirket_id` ve
+`sgk_isveren_id` oluşturmadan sonra meşru şekilde değişebilir, bunları eşitlik
+şartı yapmak yasal bir güncellemeyi sahte bir tamper sinyaline çevirirdi. Audit
+satırının `gerekce` ve `request_hash` alanları envantere **girmez**.
+
+Şube count beklentisi sabit değildir: `expected_branch_count` =
+baseline + doğrulanmış audited extension sayısı. `branch_set_valid` bu dört
+koşulun tamamıdır: eksik baseline yok, beklenmeyen ID yok, duplicate audit yok,
+kimlik uyuşmazlığı yok ve ID 3 yok. Live şube tarafındaki
+şirket/SGK/orphan/mismatch kontrolleri aynen korunur.
+
+GATE 3 sonrası beklenen production değerleri: baseline 10, audited extension
+`12,13`, unaudited/duplicate/missing yok, toplam şube 12, `branch_set_valid`
+true, envanter PASS, blocker listesi boş.
 
 ## 3. Yeni control-plane modu
 
@@ -326,8 +369,9 @@ commit edilmemiştir.
 
 ## 8. Sonraki gate'ler
 
-- Yeni schema version `2` envanterini salt-okunur çalıştırma → anonim
-  lokasyon × şube matrisi (ayrı dispatch onayı ile).
+- Yeni schema version `3` envanterini salt-okunur çalıştırma → anonim
+  lokasyon × şube matrisi + baseline/audited extension sınıflandırması (ayrı
+  dispatch onayı ile).
 - SGK işvereni → şirket eşlemesinin iş anlamıyla doğrulanması.
    230|- 7 deferred çalışma lokasyonunun matris sonucuna dayalı kararı; İzmir ve
   Sakarya için MEDISA altında şube oluşturma ayrı onay gerektirir.

@@ -21,6 +21,7 @@ export const heavyMariaDbTestFiles = [
   "tests/unit/migration-control-plane-preflight-mysql.php-runtime.test.ts",
   "tests/unit/offline-mutation-idempotency-mysql.php-runtime.test.ts",
   "tests/unit/org-structure-pack6-mysql.php-runtime.test.ts",
+  "tests/unit/ik-personeli-role-scope.php-runtime.test.ts",
   "tests/unit/organizasyon-audit-owners.php-runtime.test.ts",
   "tests/unit/organization-mapping-mysql.php-runtime.test.ts",
   "tests/unit/pack7f-external-worker-mysql.php-runtime.test.ts",

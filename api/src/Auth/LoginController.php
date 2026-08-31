@@ -111,7 +111,14 @@ class LoginController
         if (count($selectorSubeIds) === 0 && (count($bolumIds) > 0 || count($birimIds) > 0)) {
             $selectorSubeIds = self::deriveSubeIdsFromOrgAssignments($pdo, $bolumIds, $birimIds);
         }
-        $subeList = self::loadSubeList($pdo, $selectorSubeIds, OrgScope::isUnrestricted(['rol' => $rol]));
+        // İK sees every branch by role, so its selector is the full list even
+        // when legacy assignment rows exist — those may not narrow it.
+        $ikGlobalRead = OrgScope::isOrganizationGlobalRead(['rol' => $rol]);
+        $subeList = self::loadSubeList(
+            $pdo,
+            $ikGlobalRead ? [] : $selectorSubeIds,
+            $ikGlobalRead || OrgScope::isUnrestricted(['rol' => $rol])
+        );
         $preferredSubeId = null;
         if ($hasVarsayilan && array_key_exists('varsayilan_sube_id', $user) && $user['varsayilan_sube_id'] !== null && $user['varsayilan_sube_id'] !== '') {
             $preferred = (int) $user['varsayilan_sube_id'];

@@ -18,8 +18,12 @@ describe("branchless DIS_KAYNAK list scope (DB-backed)", () => {
       "unrestricted + branch2 sees branch2 staff (incl. bound DIS) + branchless DIS_KAYNAK",
       "unrestricted without active branch is unfiltered",
       "SUBE_YONETICISI scoped to branch1 does not see branchless DIS_KAYNAK",
-      "IK_SORUMLUSU scoped to branch1 does not see branchless DIS_KAYNAK",
       "MUHASEBE scoped to branch1 does not see branchless DIS_KAYNAK",
+      // İK reads the whole organisation, so the branchless central pool is in
+      // view for it exactly as it is for an unrestricted user.
+      "IK_SORUMLUSU active branch view includes branchless DIS_KAYNAK",
+      "IK_PERSONELI active branch view includes branchless DIS_KAYNAK",
+      "IK_SORUMLUSU without active branch reads every branch",
       "branchless IC_PERSONEL never appears in a branch context",
       "branch-bound DIS_KAYNAK stays in its own branch",
       "search finds the branchless DIS_KAYNAK record inside a branch context",
@@ -41,7 +45,7 @@ describe("branchless DIS_KAYNAK list scope (DB-backed)", () => {
     expect(controllerSource).not.toMatch(/sube_id IS NULL/);
   });
 
-  it("gates the widening on OrgScope::isUnrestricted", () => {
+  it("gates the branch-scoped widening on OrgScope::isUnrestricted", () => {
     expect(orgScopeSource).toContain("$includeBranchless = self::isUnrestricted($user);");
     expect(orgScopeSource).toMatch(/\$includeBranchless\s*\n?\s*\?\s*self::withBranchlessDisKaynak/);
   });

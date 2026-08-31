@@ -18,10 +18,11 @@ const PHP_PATH = resolve(root, "api/src/Auth/RolePermissions.php");
 const YONETIM_CTRL = resolve(root, "api/src/Controllers/YonetimController.php");
 const MIG_054 = resolve(root, "api/migrations/054_canonical_role_consolidation.sql");
 
-const HUMAN_8: UserRole[] = [
+const HUMAN_9: UserRole[] = [
   "PERSONEL",
   "MUHASEBE",
   "IK_SORUMLUSU",
+  "IK_PERSONELI",
   "BIRIM_AMIRI",
   "BOLUM_YONETICISI",
   "SUBE_YONETICISI",
@@ -29,9 +30,8 @@ const HUMAN_8: UserRole[] = [
   "SISTEM_YONETICISI"
 ];
 
-function extractPhpRolePermissions(role: string): string[] {
+function extractPhpStringList(marker: string): string[] {
   const php = readFileSync(PHP_PATH, "utf8");
-  const marker = `'${role}' => [`;
   const start = php.indexOf(marker);
   if (start < 0) {
     return [];
@@ -58,12 +58,28 @@ function extractPhpRolePermissions(role: string): string[] {
   return permissions.sort();
 }
 
+/**
+ * IK_PERSONELI has no matrix literal on either side: it is derived from
+ * IK_SORUMLUSU minus a withheld list, so parity is checked against the same
+ * derivation rather than a list that does not exist.
+ */
+function extractPhpRolePermissions(role: string): string[] {
+  if (role === "IK_PERSONELI") {
+    const withheld = new Set(extractPhpStringList("IK_PERSONELI_WITHHELD_PERMISSIONS = ["));
+    return extractPhpStringList("'IK_SORUMLUSU' => [")
+      .filter((permission) => !withheld.has(permission))
+      .sort();
+  }
+
+  return extractPhpStringList(`'${role}' => [`);
+}
+
 describe("S1 canonical role consolidation", () => {
-  it("locks exact 8 human + 1 technical catalog", () => {
-    expect([...ASSIGNABLE_USER_ROLES].sort()).toEqual([...HUMAN_8].sort());
-    expect(ASSIGNABLE_USER_ROLES).toHaveLength(8);
+  it("locks exact 9 human + 1 technical catalog", () => {
+    expect([...ASSIGNABLE_USER_ROLES].sort()).toEqual([...HUMAN_9].sort());
+    expect(ASSIGNABLE_USER_ROLES).toHaveLength(9);
     expect(TECHNICAL_ROLES).toEqual(["AUTH_SMOKE_READONLY"]);
-    expect([...ALL_ROLES].sort()).toEqual([...HUMAN_8, "AUTH_SMOKE_READONLY"].sort());
+    expect([...ALL_ROLES].sort()).toEqual([...HUMAN_9, "AUTH_SMOKE_READONLY"].sort());
     for (const legacy of ["PATRON", "IK_BORDRO", "SGK_KARAR_ONAY_YETKILISI", "IDARI_ISLER"]) {
       expect(ALL_ROLES).not.toContain(legacy);
       expect(ASSIGNABLE_USER_ROLES).not.toContain(legacy);
@@ -112,7 +128,7 @@ describe("S1 canonical role consolidation", () => {
 
   it("API validRoles matches assignable humans + AUTH_SMOKE", () => {
     const php = readFileSync(YONETIM_CTRL, "utf8");
-    for (const role of HUMAN_8) {
+    for (const role of HUMAN_9) {
       expect(php).toContain(`'${role}'`);
     }
     expect(php).toContain("'AUTH_SMOKE_READONLY'");
@@ -290,8 +306,8 @@ describe("S1 canonical role consolidation", () => {
   });
 
   it("manual canonical role assignment: exact 8 picker; no legacy/smoke; GY+BOLUM+SUBE selectable", () => {
-    expect(ASSIGNABLE_USER_ROLES).toHaveLength(8);
-    expect(ASSIGNABLE_USER_ROLES).toEqual(expect.arrayContaining(HUMAN_8));
+    expect(ASSIGNABLE_USER_ROLES).toHaveLength(9);
+    expect(ASSIGNABLE_USER_ROLES).toEqual(expect.arrayContaining(HUMAN_9));
     expect(ASSIGNABLE_USER_ROLES).toContain("GENEL_YONETICI");
     expect(ASSIGNABLE_USER_ROLES).toContain("BOLUM_YONETICISI");
     expect(ASSIGNABLE_USER_ROLES).toContain("SUBE_YONETICISI");
@@ -357,7 +373,11 @@ describe("S1 canonical role consolidation", () => {
     const enumValues = (enumMatch?.[1] ?? "")
       .split(",")
       .map((part) => part.trim().replace(/^''|''$/g, ""));
-    expect(enumValues.sort()).toEqual([...HUMAN_8, "AUTH_SMOKE_READONLY"].sort());
+    // 077 is a published migration and keeps its own historical catalog;
+    // IK_PERSONELI arrives additively in 081.
+    expect(enumValues.sort()).toEqual(
+      [...HUMAN_9.filter((role) => role !== "IK_PERSONELI"), "AUTH_SMOKE_READONLY"].sort()
+    );
 
     expect(sql).toContain("PACK077_BLOCKER: legacy role still assigned to users");
     expect(sql).toContain(

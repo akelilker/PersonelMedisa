@@ -3,9 +3,11 @@ import {
   BIRIM_ASSIGNMENT_ROLES,
   BOLUM_ASSIGNMENT_ROLES,
   GLOBAL_SCOPE_ROLES,
-  SUBE_ASSIGNMENT_ROLES
+  ORGANIZATION_GLOBAL_READ_ROLES,
+  SUBE_ASSIGNMENT_ROLES,
+  WRITE_COMPANY_SCOPED_ROLES
 } from "../../../types/auth";
-import type { YonetimSube } from "../../../types/yonetim";
+import type { YonetimSirket, YonetimSube } from "../../../types/yonetim";
 
 type OrgOption = { id: number; ad: string; parentLabel?: string };
 
@@ -20,6 +22,9 @@ type YonetimOrgScopeFieldsProps = {
   onToggleSube: (subeId: number) => void;
   onToggleBolum: (bolumId: number) => void;
   onToggleBirim: (birimId: number) => void;
+  sirketler?: YonetimSirket[];
+  selectedSirketIds?: number[];
+  onToggleSirket?: (sirketId: number) => void;
 };
 
 function isGlobal(role: UserRole): boolean {
@@ -38,6 +43,14 @@ function needsBirim(role: UserRole): boolean {
   return (BIRIM_ASSIGNMENT_ROLES as readonly string[]).includes(role);
 }
 
+function isOrganizationGlobalRead(role: UserRole): boolean {
+  return (ORGANIZATION_GLOBAL_READ_ROLES as readonly string[]).includes(role);
+}
+
+function needsWriteCompany(role: UserRole): boolean {
+  return (WRITE_COMPANY_SCOPED_ROLES as readonly string[]).includes(role);
+}
+
 /** Role-specific organizational assignment controls for Kullanıcı Yönetimi. */
 export function YonetimOrgScopeFields(props: YonetimOrgScopeFieldsProps) {
   const showSube = needsSube(props.role) && !needsBolum(props.role) && !needsBirim(props.role);
@@ -46,8 +59,48 @@ export function YonetimOrgScopeFields(props: YonetimOrgScopeFieldsProps) {
   const showBolum = needsBolum(props.role);
   const showBirim = needsBirim(props.role);
 
+  const showOrganizationGlobalRead = isOrganizationGlobalRead(props.role);
+  const showWriteCompany = needsWriteCompany(props.role);
+  const sirketler = props.sirketler ?? [];
+  const selectedSirketIds = props.selectedSirketIds ?? [];
+
   return (
     <>
+      {showOrganizationGlobalRead && (
+        <div className="yonetim-checkbox-section" data-testid="yonetim-ik-global-scope-note">
+          <p className="yonetim-checkbox-title">Organizasyon erişimi</p>
+          <p className="yonetim-hint">
+            {showWriteCompany
+              ? "Bu rol tüm şirket ve şubeleri görüntüler. Şube seçimi gerekmez; sonradan açılan şubeler de otomatik görünür."
+              : "Tüm şirket ve şubelerde İK erişimi. Şube seçimi gerekmez; sonradan açılan şubeler de otomatik kapsama girer."}
+          </p>
+        </div>
+      )}
+
+      {showWriteCompany && (
+        <div className="yonetim-checkbox-section" data-testid="yonetim-sirket-write-scope-field">
+          <p className="yonetim-checkbox-title">İşlem yapabileceği şirketler</p>
+          <p className="yonetim-hint">
+            En az bir şirket seçilmelidir. Seçilmeyen şirketlerin kayıtları görüntülenir ancak
+            değiştirilemez; bu işlemi İK sorumlusu kendi hesabıyla gerçekleştirir.
+          </p>
+          <div className="yonetim-selection-grid">
+            {sirketler.map((sirket) => (
+              <button
+                key={sirket.id}
+                type="button"
+                className={`yonetim-selection-pill${selectedSirketIds.includes(sirket.id) ? " is-selected" : ""}`}
+                aria-pressed={selectedSirketIds.includes(sirket.id)}
+                onClick={() => props.onToggleSirket?.(sirket.id)}
+              >
+                <strong>{sirket.ad}</strong>
+                <span>{sirket.kod}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {(showSube || showSubeOptional) && (
         <div className="yonetim-checkbox-section" data-testid="yonetim-sube-scope-field">
           <p className="yonetim-checkbox-title">Şube Yetkisi</p>

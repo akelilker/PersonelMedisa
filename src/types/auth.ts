@@ -2,6 +2,7 @@ export type UserRole =
   | "PERSONEL"
   | "MUHASEBE"
   | "IK_SORUMLUSU"
+  | "IK_PERSONELI"
   | "BIRIM_AMIRI"
   | "BOLUM_YONETICISI"
   | "SUBE_YONETICISI"
@@ -22,6 +23,11 @@ export type SubeInfo = {
   /** Raw short branch name ("Ankara"), for company-scoped screens. */
   kisa_ad?: string;
   tam_ad?: string;
+  /**
+   * Sube -> sirket eslesmesi. Write-company scoped roller icin bir kaydin hangi
+   * sirkete ait oldugunu bu liste soyler; ayri bir eslesme state'i kurulmaz.
+   */
+  sirket_id?: number | null;
 };
 
 export type AuthUser = {
@@ -80,11 +86,12 @@ export const MANAGEMENT_ROLES: UserRole[] = [
   "MUHASEBE"
 ];
 
-/** Insan kullanici olusturma / rol picker — exact 8 canonical human roles. */
+/** Insan kullanici olusturma / rol picker — exact 9 canonical human roles. */
 export const ASSIGNABLE_USER_ROLES: UserRole[] = [
   "PERSONEL",
   "MUHASEBE",
   "IK_SORUMLUSU",
+  "IK_PERSONELI",
   "BIRIM_AMIRI",
   "BOLUM_YONETICISI",
   "SUBE_YONETICISI",
@@ -105,9 +112,26 @@ export const GLOBAL_SCOPE_ROLES: UserRole[] = ["GENEL_YONETICI", "SISTEM_YONETIC
 
 export const SUBE_ASSIGNMENT_ROLES: UserRole[] = [
   "SUBE_YONETICISI",
-  "IK_SORUMLUSU",
   "MUHASEBE"
 ];
+
+/**
+ * Butun sirket ve subeleri rolden gelen kapsamla goren IK rolleri. Sube veya
+ * sirket atama satiri bu kapsami daraltmaz, bu yuzden ekranlar tek tek sube
+ * secimi yerine global erisimi anlatir ve yeni acilan sube icin atama
+ * gerekmez.
+ */
+export const ORGANIZATION_GLOBAL_READ_ROLES: UserRole[] = [
+  "IK_SORUMLUSU",
+  "IK_PERSONELI"
+];
+
+/**
+ * Global okuma kapsamina ragmen yalniz atanmis sirketlerde dogrudan islem
+ * yapabilen roller. Kapsam disi sirket islemini IK sorumlusu kendi hesabiyla
+ * gerceklestirir; asil guvenlik owner'i her durumda backend 403'udur.
+ */
+export const WRITE_COMPANY_SCOPED_ROLES: UserRole[] = ["IK_PERSONELI"];
 
 export const BOLUM_ASSIGNMENT_ROLES: UserRole[] = ["BOLUM_YONETICISI"];
 export const BIRIM_ASSIGNMENT_ROLES: UserRole[] = ["BIRIM_AMIRI"];

@@ -15,6 +15,7 @@ use Medisa\Api\Database\UserOrgAssignmentSchema;
 use Medisa\Api\Database\UsersSchema;
 use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
+use Medisa\Api\Scope\HrWriteScope;
 use Medisa\Api\Scope\OrgScope;
 use Medisa\Api\Scope\SubeScope;
 use Medisa\Api\Services\Auth\UserPersonelBindingService;
@@ -833,6 +834,7 @@ class YonetimController
         'PERSONEL',
         'MUHASEBE',
         'IK_SORUMLUSU',
+        'IK_PERSONELI',
         'BIRIM_AMIRI',
         'BOLUM_YONETICISI',
         'SUBE_YONETICISI',
@@ -1014,7 +1016,7 @@ class YonetimController
         self::assertBirimIdsExist($pdo, $finalBirimIds);
         self::assertHierarchyScopeAllowed($pdo, $rol, $finalSirketIds, $finalSgkIsverenIds);
         self::assertVarsayilanSubeInScope($finalVarsayilanSubeId, $finalSubeIds);
-        self::assertRoleOrgAssignments($rol, $finalSubeIds, $finalBolumIds, $finalBirimIds, $requestedPersonelId, $rol === 'PERSONEL' || $personelIdProvided);
+        self::assertRoleOrgAssignments($rol, $finalSubeIds, $finalBolumIds, $finalBirimIds, $requestedPersonelId, $rol === 'PERSONEL' || $personelIdProvided, $finalSirketIds);
         self::assertAuthSmokeReadonlyContract($username, $rol, $finalSubeIds, $finalVarsayilanSubeId);
 
         $hasVarsayilan = UsersSchema::hasVarsayilanSubeId($pdo);
@@ -1243,7 +1245,8 @@ class YonetimController
             $finalBolumIds,
             $finalBirimIds,
             $effectivePersonelId,
-            true
+            true,
+            $finalSirketIds
         );
         self::assertAuthSmokeReadonlyContract($username, $rol, $finalSubeIds, $finalVarsayilanSubeId);
 
@@ -1407,6 +1410,215 @@ class YonetimController
         }
 
         JsonResponse::success($updated);
+    }
+
+    /**
+     * Remove a login account.
+     *
+     * The users row is deliberately kept. Every audit, binding and history row
+     * points at it with ON DELETE RESTRICT, so a hard delete would either fail or
+     * cost the attribution those records exist to provide — a deleted account
+     * whose past actions can no longer be explained is worse than a revoked one.
+     * What is removed is everything that makes the account usable: it is
+     * deactivated (AuthMiddleware rejects a non-AKTIF user, so every issued token
+     * stops working on its next request), its credential is replaced by an
+     * unusable random secret, any pending activation invitation is revoked, and
+     * all organisation scope grants are cleared.
+     *
+     * A bound personnel record is never touched: the binding is cleared through
+     * its own audited owner and the personeller row survives untouched.
+     *
+     * Idempotent: repeating the call on an already revoked account clears
+     * whatever is left and reports success without writing a second audit row it
+     * has nothing to describe.
+     */
+    public static function kullaniciErisimKaldir(Request $request, $kullaniciId)
+    {
+        $user = AuthMiddleware::authenticate($request, true);
+        self::assertKullaniciYonetimi($user);
+
+        $kullaniciId = (int) $kullaniciId;
+        if ($kullaniciId <= 0) {
+            JsonResponse::badRequest('Gecersiz kullanici id.', 'VALIDATION_ERROR', 'id');
+        }
+
+        $actorUserId = isset($user['id']) ? (int) $user['id'] : 0;
+        if ($actorUserId === $kullaniciId) {
+            JsonResponse::error(409, 'SELF_ACCESS_REMOVAL_FORBIDDEN', 'Kendi hesabinizin erisimini kaldiramazsiniz.', 'id');
+        }
+
+        try {
+            $pdo = Connection::get();
+        } catch (\Throwable $e) {
+            JsonResponse::serverError('Veritabani baglantisi kurulamadi.');
+        }
+
+        $existing = self::findKullaniciRowById($pdo, $kullaniciId);
+        if ($existing === null) {
+            JsonResponse::notFound('Kullanici bulunamadi.');
+        }
+
+        // An unauditable environment must not gain an account nobody can explain
+        // the disappearance of. Asserted before any write, like the 080 owners.
+        try {
+            OrganizasyonAuditWriter::assertReady($pdo, OrganizasyonAuditWriter::USER_ACCESS_REVOKE_TABLE);
+            OrganizasyonAuditWriter::assertReady($pdo, OrganizasyonAuditWriter::USER_SCOPE_TABLE);
+            $auditContext = OrganizasyonAuditContext::fromRequest($request, $user);
+        } catch (OrganizasyonException $e) {
+            JsonResponse::error($e->httpStatus, $e->errorCode, $e->getMessage(), $e->field);
+        }
+
+        $body = $request->getJsonBody();
+        $gerekce = isset($body['gerekce']) && is_string($body['gerekce']) && trim($body['gerekce']) !== ''
+            ? trim($body['gerekce'])
+            : null;
+
+        $oncekiDurum = strtoupper(trim((string) $existing['durum']));
+        $hasPersonelId = UsersSchema::hasPersonelId($pdo);
+        $korunanPersonelId = null;
+        if ($hasPersonelId && isset($existing['personel_id']) && (int) $existing['personel_id'] > 0) {
+            $korunanPersonelId = (int) $existing['personel_id'];
+        }
+
+        $currentSubeIds = self::loadSubeIdsByUserIds($pdo, [$kullaniciId])[$kullaniciId] ?? [];
+        $currentBolumIds = UserOrgAssignmentSchema::loadBolumIdsByUserIds($pdo, [$kullaniciId])[$kullaniciId] ?? [];
+        $currentBirimIds = UserOrgAssignmentSchema::loadBirimIdsByUserIds($pdo, [$kullaniciId])[$kullaniciId] ?? [];
+        $currentSirketIds = UserOrgAssignmentSchema::loadUserSirketIds($pdo, $kullaniciId);
+        $currentSgkIsverenIds = UserOrgAssignmentSchema::loadUserSgkIsverenIds($pdo, $kullaniciId);
+        $temizlenenScope = count($currentSubeIds) + count($currentBolumIds) + count($currentBirimIds)
+            + count($currentSirketIds) + count($currentSgkIsverenIds);
+
+        $alreadyRevoked = $oncekiDurum !== 'AKTIF'
+            && $temizlenenScope === 0
+            && $korunanPersonelId === null;
+        if ($alreadyRevoked) {
+            JsonResponse::success(self::findKullaniciById($pdo, $kullaniciId));
+        }
+
+        $hasMustChange = UsersSchema::hasMustChangePassword($pdo);
+        $hasVarsayilan = UsersSchema::hasVarsayilanSubeId($pdo);
+
+        $pdo->beginTransaction();
+        try {
+            if ($korunanPersonelId !== null) {
+                // Clears the link only. The personeller row is not read for
+                // change and not written here.
+                UserPersonelBindingService::applyBinding($pdo, $kullaniciId, null, $actorUserId);
+            }
+
+            if (count($currentSubeIds) > 0) {
+                self::replaceUserSubeler($pdo, $kullaniciId, []);
+            }
+            if (count($currentBolumIds) > 0) {
+                self::replaceUserBolumler($pdo, $kullaniciId, []);
+            }
+            if (count($currentBirimIds) > 0) {
+                self::replaceUserBirimler($pdo, $kullaniciId, []);
+            }
+            if (count($currentSirketIds) > 0) {
+                UserOrgAssignmentSchema::replaceUserSirketler($pdo, $kullaniciId, []);
+            }
+            if (count($currentSgkIsverenIds) > 0) {
+                UserOrgAssignmentSchema::replaceUserSgkIsverenler($pdo, $kullaniciId, []);
+            }
+
+            $sql = 'UPDATE users SET durum = :durum, password_hash = :password_hash';
+            $params = [
+                'id' => $kullaniciId,
+                'durum' => 'PASIF',
+                // Random, never returned and never recoverable: the account keeps
+                // a syntactically valid credential that nobody holds.
+                'password_hash' => PasswordHasher::hash(bin2hex(random_bytes(32))),
+            ];
+            if ($hasMustChange) {
+                $sql .= ', must_change_password = 1';
+            }
+            if ($hasVarsayilan) {
+                $sql .= ', varsayilan_sube_id = NULL';
+            }
+            $sql .= ' WHERE id = :id';
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute($params);
+
+            self::revokePendingActivationInvitations($pdo, $kullaniciId);
+
+            $scopeAxes = [
+                OrganizasyonAuditWriter::SCOPE_SUBE => $currentSubeIds,
+                OrganizasyonAuditWriter::SCOPE_SIRKET => $currentSirketIds,
+                OrganizasyonAuditWriter::SCOPE_SGK_ISVEREN => $currentSgkIsverenIds,
+            ];
+            foreach ($scopeAxes as $scopeTuru => $before) {
+                OrganizasyonAuditWriter::recordUserOrgScopeChange(
+                    $pdo,
+                    $kullaniciId,
+                    (string) $scopeTuru,
+                    $before,
+                    [],
+                    $auditContext,
+                    $gerekce
+                );
+            }
+
+            OrganizasyonAuditWriter::recordUserAccessRevoke(
+                $pdo,
+                [
+                    'target_user_id' => $kullaniciId,
+                    'target_username' => (string) $existing['username'],
+                    'onceki_durum' => $oncekiDurum,
+                    'korunan_personel_id' => $korunanPersonelId,
+                    'temizlenen_scope_satiri' => $temizlenenScope,
+                ],
+                $auditContext,
+                $gerekce
+            );
+
+            $pdo->commit();
+        } catch (\Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            if ($e instanceof OrganizasyonException) {
+                JsonResponse::error($e->httpStatus, $e->errorCode, $e->getMessage(), $e->field);
+            }
+            JsonResponse::serverError('Kullanici erisimi kaldirilamadi.');
+        }
+
+        $updated = self::findKullaniciById($pdo, $kullaniciId);
+        if ($updated === null || strtoupper((string) ($updated['durum'] ?? '')) !== 'PASIF') {
+            JsonResponse::serverError('Kullanici erisimi kaldirilamadi.');
+        }
+
+        JsonResponse::success($updated);
+    }
+
+    /**
+     * Pending activation invitations are a second, token-shaped way into the
+     * account, so they are revoked with it. Absent schema is not an error: there
+     * is then nothing to revoke.
+     */
+    private static function revokePendingActivationInvitations(PDO $pdo, $kullaniciId)
+    {
+        try {
+            $table = $pdo->query("SHOW TABLES LIKE 'personel_account_activation_invitations'");
+            $exists = $table !== false && $table->fetch(PDO::FETCH_NUM) !== false;
+            if ($table !== false) {
+                $table->closeCursor();
+            }
+            if (!$exists) {
+                return;
+            }
+        } catch (\Throwable $e) {
+            return;
+        }
+
+        $stmt = $pdo->prepare(
+            'UPDATE personel_account_activation_invitations
+                SET revoked_at_utc = UTC_TIMESTAMP()
+              WHERE user_id = :user_id
+                AND revoked_at_utc IS NULL
+                AND consumed_at_utc IS NULL'
+        );
+        $stmt->execute(['user_id' => (int) $kullaniciId]);
     }
 
     /** @param array<string, mixed> $user */
@@ -1862,14 +2074,30 @@ class YonetimController
         array $bolumIds,
         array $birimIds,
         $personelId,
-        $personelConsidered
+        $personelConsidered,
+        array $sirketIds = []
     ) {
         $rol = strtoupper(trim((string) $rol));
 
-        if ($rol === 'SUBE_YONETICISI' || $rol === 'IK_SORUMLUSU' || $rol === 'MUHASEBE') {
+        // IK_SORUMLUSU is deliberately absent: its reach is the whole
+        // organisation and comes from the role, so demanding a branch grant would
+        // both contradict the model and produce grants that narrow nothing.
+        if ($rol === 'SUBE_YONETICISI' || $rol === 'MUHASEBE') {
             if (count($subeIds) === 0) {
                 JsonResponse::badRequest('Bu rol icin en az bir sube atamasi zorunludur.', 'VALIDATION_ERROR', 'sube_ids');
             }
+        }
+
+        // IK_PERSONELI reads everywhere but writes only in granted companies, so
+        // an empty grant would be a role with no work it can do. Requiring the
+        // selection here keeps the read-only case an explicit decision rather
+        // than an accident of an unfinished form.
+        if (HrWriteScope::requiresWriteCompanySelection($rol) && count($sirketIds) === 0) {
+            JsonResponse::badRequest(
+                'Bu rol icin en az bir islem sirketi secilmelidir.',
+                'VALIDATION_ERROR',
+                'sirket_ids'
+            );
         }
 
         if ($rol === 'BOLUM_YONETICISI' && count($bolumIds) === 0) {

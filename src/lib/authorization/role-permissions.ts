@@ -1,4 +1,8 @@
 import type { AuthSession, UserRole } from "../../types/auth";
+import {
+  ORGANIZATION_GLOBAL_READ_ROLES,
+  WRITE_COMPANY_SCOPED_ROLES
+} from "../../types/auth";
 import { canonicalizeUserRole } from "./canonicalize-user-role";
 
 export type AppPermission =
@@ -141,7 +145,10 @@ export const SELF_SERVICE_BASELINE_PERMISSIONS: readonly AppPermission[] = [
   "self_service.attendance.correct"
 ];
 
-const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
+const BASE_ROLE_PERMISSIONS: Record<
+  Exclude<UserRole, "IK_PERSONELI">,
+  readonly AppPermission[]
+> = {
   GENEL_YONETICI: [
     "personeller.view",
     "personeller.view.sube",
@@ -522,6 +529,34 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
   AUTH_SMOKE_READONLY: ["ops.auth_smoke.read"]
 };
 
+/**
+ * Mirrors RolePermissions::IK_PERSONELI_WITHHELD_PERMISSIONS. These are the İK
+ * sorumlusu's own control surfaces — period reseal, SGK decision preparation,
+ * company parameter and payroll-scope management, salary-calculation
+ * management — so an İK personeli never inherits them.
+ */
+const IK_PERSONELI_WITHHELD_PERMISSIONS: readonly AppPermission[] = [
+  "puantaj.donem_reseal",
+  "sgk_karar_paketi.prepare",
+  "sirket_parametreleri.manage",
+  "personel_bordro_kapsam.manage",
+  "maas_hesaplama.manage",
+  "maas_hesaplama_adaylari.manage"
+];
+
+/**
+ * IK_PERSONELI is derived rather than listed so it stays a strict subset of
+ * IK_SORUMLUSU by construction, exactly as it is on the backend. Company reach
+ * is not expressed here: permissions answer "what", the write-company scope
+ * answers "where", and the backend 403 is the authority for both.
+ */
+const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
+  ...BASE_ROLE_PERMISSIONS,
+  IK_PERSONELI: BASE_ROLE_PERMISSIONS.IK_SORUMLUSU.filter(
+    (permission) => !IK_PERSONELI_WITHHELD_PERMISSIONS.includes(permission)
+  )
+};
+
 const EMPTY_PERMISSIONS: readonly AppPermission[] = [];
 
 export function getRolePermissions(role?: UserRole | string | null): readonly AppPermission[] {
@@ -580,6 +615,59 @@ export function getEffectivePermissions(
   return [...merged];
 }
 
+/**
+ * Butun sirket/subeleri rolden gelen kapsamla okuyan IK rolleri.
+ */
+export function isOrganizationGlobalReadRole(
+  role: UserRole | string | null | undefined
+): boolean {
+  const canonical = canonicalizeUserRole(role ?? null);
+  return canonical !== null && ORGANIZATION_GLOBAL_READ_ROLES.includes(canonical);
+}
+
+/**
+ * Bir sirkette dogrudan islem yapilabilir mi.
+ *
+ * Yalniz write-company scoped roller icin daraltir; digerleri icin rol izinleri
+ * tek belirleyicidir. Bu kontrol UX icindir — kapsam disi yazmayi reddeden owner
+ * her zaman backend'dir.
+ */
+export function sessionAllowsSirketWrite(
+  session: AuthSession | null,
+  sirketId: number | null | undefined
+): boolean {
+  const role = canonicalizeUserRole(session?.user.rol ?? null);
+  if (role === null || !WRITE_COMPANY_SCOPED_ROLES.includes(role)) {
+    return true;
+  }
+  if (sirketId === null || sirketId === undefined || sirketId <= 0) {
+    return false;
+  }
+  return (session?.user.sirket_ids ?? []).includes(sirketId);
+}
+
+/**
+ * Bir subedeki kayit dogrudan degistirilebilir mi.
+ *
+ * Sube -> sirket eslesmesi oturumun sube listesinden okunur; ayri bir eslesme
+ * kaynagi kurulmaz. Eslesme bilinmiyorsa fail-closed davranilir: kapsami
+ * kanitlanamayan yazma UI'da da acilmaz. Nihai karar backend 403'udur.
+ */
+export function sessionAllowsSubeWrite(
+  session: AuthSession | null,
+  subeId: number | null | undefined
+): boolean {
+  const role = canonicalizeUserRole(session?.user.rol ?? null);
+  if (role === null || !WRITE_COMPANY_SCOPED_ROLES.includes(role)) {
+    return true;
+  }
+  if (subeId === null || subeId === undefined || subeId <= 0) {
+    return false;
+  }
+  const sube = (session?.sube_list ?? []).find((item) => item.id === subeId);
+  return sessionAllowsSirketWrite(session, sube?.sirket_id ?? null);
+}
+
 /** Oturumdaki yetkili sube listesi; bos + global rol ise tum subeler UX. */
 export function getAllowedSubeIdsFromSession(session: AuthSession | null): number[] {
   return session?.user.sube_ids ?? [];
@@ -589,6 +677,11 @@ export function getAllowedSubeIdsFromSession(session: AuthSession | null): numbe
 export function sessionAllowsSubeAccess(session: AuthSession | null, subeId: number): boolean {
   const role = canonicalizeUserRole(session?.user.rol ?? null);
   const allowed = getAllowedSubeIdsFromSession(session);
+  // İK gorunurlugu rolden gelir: atama satiri olsun olmasin butun subeler
+  // okunabilir, bu yuzden liste kontrolu yapilmaz.
+  if (isOrganizationGlobalReadRole(role)) {
+    return true;
+  }
   if (allowed.length === 0) {
     if (role === "GENEL_YONETICI" || role === "SISTEM_YONETICISI") {
       return true;

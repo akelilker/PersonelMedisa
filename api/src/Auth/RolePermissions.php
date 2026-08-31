@@ -417,6 +417,55 @@ class RolePermissions
     ];
 
     /**
+     * IK_PERSONELI is derived from IK_SORUMLUSU minus the permissions that carry
+     * İK owner authority, so the subset relation is guaranteed by construction
+     * instead of by a second hand-maintained list that could silently drift above
+     * its owner.
+     *
+     * Removed here: period reseal, SGK decision-package preparation, company
+     * parameter and payroll-scope management, salary-calculation management.
+     * These are the İK sorumlusu's own control/approval surfaces; an İK personeli
+     * that needed one of them would have to be promoted, not widened.
+     *
+     * Organisational reach is *not* expressed here — permission answers "what",
+     * OrgScope/HrWriteScope answer "on which company".
+     *
+     * @var array<int, string>
+     */
+    const IK_PERSONELI_WITHHELD_PERMISSIONS = [
+        'puantaj.donem_reseal',
+        'sgk_karar_paketi.prepare',
+        'sirket_parametreleri.manage',
+        'personel_bordro_kapsam.manage',
+        'maas_hesaplama.manage',
+        'maas_hesaplama_adaylari.manage',
+    ];
+
+    /** @var array<string, array<int, string>>|null */
+    private static $resolvedMatrix = null;
+
+    /**
+     * Canonical role → permission map, including the derived IK_PERSONELI row.
+     *
+     * @return array<string, array<int, string>>
+     */
+    private static function matrix()
+    {
+        if (self::$resolvedMatrix !== null) {
+            return self::$resolvedMatrix;
+        }
+
+        $matrix = self::$matrix;
+        $matrix['IK_PERSONELI'] = array_values(array_diff(
+            $matrix['IK_SORUMLUSU'],
+            self::IK_PERSONELI_WITHHELD_PERMISSIONS
+        ));
+        self::$resolvedMatrix = $matrix;
+
+        return self::$resolvedMatrix;
+    }
+
+    /**
      * Canonical self-service baseline (PERSONEL matrix). No duplicate list.
      *
      * @return array<int, string>
@@ -467,11 +516,12 @@ class RolePermissions
             return false;
         }
 
-        if (!isset(self::$matrix[$role])) {
+        $matrix = self::matrix();
+        if (!isset($matrix[$role])) {
             return false;
         }
 
-        return in_array($permission, self::$matrix[$role], true);
+        return in_array($permission, $matrix[$role], true);
     }
 
     /** @param array<string, mixed> $user */
@@ -511,7 +561,7 @@ class RolePermissions
             return '';
         }
 
-        if (isset(self::$matrix[$normalized])) {
+        if (isset(self::matrix()[$normalized])) {
             return $normalized;
         }
 

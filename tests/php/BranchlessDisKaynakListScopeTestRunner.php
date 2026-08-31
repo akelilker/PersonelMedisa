@@ -134,7 +134,7 @@ bdAssertIds(bdVisible($pdo, $gy, 7), [212], 'unrestricted + empty branch still s
 bdAssertIds(bdVisible($pdo, $gy, null), [1, 2, 3, 4, 99, 212], 'unrestricted without active branch is unfiltered');
 
 // --- Restricted roles gain nothing ---
-foreach (['SUBE_YONETICISI', 'IK_SORUMLUSU', 'MUHASEBE'] as $rol) {
+foreach (['SUBE_YONETICISI', 'MUHASEBE'] as $rol) {
     $u = bdUser($rol, [1]);
     bdAssertIds(bdVisible($pdo, $u, 1), [1, 2], $rol . ' scoped to branch1 does not see branchless DIS_KAYNAK');
     $res = bdVisible($pdo, $u, null);
@@ -142,6 +142,20 @@ foreach (['SUBE_YONETICISI', 'IK_SORUMLUSU', 'MUHASEBE'] as $rol) {
         bdFail($rol . ' without active branch must not see the branchless DIS_KAYNAK record');
     }
     bdOk($rol . ' without active branch still excludes branchless DIS_KAYNAK');
+}
+
+// --- İK reads the whole organisation, including the branchless central pool ---
+// The pool belongs to no branch context at all, and assertPersonelAccess has
+// always let İK reach it; the list predicate now agrees. A legacy branch grant
+// may not narrow this.
+foreach (['IK_SORUMLUSU', 'IK_PERSONELI'] as $rol) {
+    $u = bdUser($rol, [1]);
+    bdAssertIds(bdVisible($pdo, $u, 1), [1, 2, 212], $rol . ' active branch view includes branchless DIS_KAYNAK');
+    bdAssertIds(
+        bdVisible($pdo, $u, null),
+        [1, 2, 3, 4, 99, 212],
+        $rol . ' without active branch reads every branch'
+    );
 }
 
 // Cross-branch deny is intact. The active-branch header is already clamped to the

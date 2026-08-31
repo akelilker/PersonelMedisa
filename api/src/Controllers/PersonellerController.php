@@ -9,6 +9,7 @@ use Medisa\Api\Auth\RolePermissions;
 use Medisa\Api\Database\Connection;
 use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
+use Medisa\Api\Scope\HrWriteScope;
 use Medisa\Api\Scope\OrgScope;
 use Medisa\Api\Scope\SubeScope;
 use Medisa\Api\Services\Personel\PersonelCalisanKapsamSchema;
@@ -236,7 +237,7 @@ class PersonellerController
     public static function create(Request $request)
     {
         $user = AuthMiddleware::authenticate($request, true);
-        self::assertWriteRole($user);
+        self::assertWriteRole($user, 'personeller.create');
 
         $body = $request->getJsonBody();
         $hasSalary = self::hasSalaryField($body);
@@ -416,7 +417,7 @@ class PersonellerController
     public static function update(Request $request, $personelId)
     {
         $user = AuthMiddleware::authenticate($request, true);
-        self::assertWriteRole($user);
+        self::assertWriteRole($user, 'personeller.update');
 
         $personelId = (int) $personelId;
         if ($personelId <= 0) {
@@ -929,13 +930,30 @@ class PersonellerController
         JsonResponse::error(400, 'PERSONEL_IMPORT_DOSYA_GECERSIZ', 'CSV dosyasi veya csv alani zorunludur.');
     }
 
-    /** @param array<string, mixed> $user */
-    private static function assertWriteRole(array $user)
+    /**
+     * Personnel write gate.
+     *
+     * The permission matrix is the primary answer, so a role that holds
+     * personeller.create/update — such as the İK roles — is no longer excluded by
+     * a role list that predates the matrix. The historical role list is kept as
+     * an additional allowance so no role that could write before this pack loses
+     * access here.
+     *
+     * @param array<string, mixed> $user
+     * @param string $permission
+     */
+    private static function assertWriteRole(array $user, $permission)
     {
-        $allowedRoles = ['GENEL_YONETICI', 'BOLUM_YONETICISI', 'MUHASEBE'];
-        if (!in_array((string) ($user['rol'] ?? ''), $allowedRoles, true)) {
-            JsonResponse::forbidden();
+        if (RolePermissions::has($user, $permission)) {
+            return;
         }
+
+        $legacyRoles = ['GENEL_YONETICI', 'BOLUM_YONETICISI', 'MUHASEBE'];
+        if (in_array(OrgScope::normalizeRole($user), $legacyRoles, true)) {
+            return;
+        }
+
+        JsonResponse::forbidden();
     }
 
     /** @param array<string, mixed> $user */
@@ -956,6 +974,15 @@ class PersonellerController
         $headerSube = self::parseHeaderPositiveInt($request->getHeader('x-active-sube-id'));
         if ($headerSube !== null && $headerSube !== $subeId) {
             JsonResponse::forbidden();
+        }
+
+        // İK reaches every branch by role, so a legacy explicit grant must not
+        // narrow the target branch. Whether it may actually be written is the
+        // separate company-write question.
+        if (OrgScope::isOrganizationGlobalRead($user)) {
+            HrWriteScope::assertSubeWritable($user, $subeId);
+
+            return;
         }
 
         $allowed = SubeScope::allowedSubeIds($user);

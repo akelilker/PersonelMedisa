@@ -144,7 +144,8 @@ function p4aMigrationFiles(): array
             && $name !== '077_legacy_role_enum_shrink.sql'
             && $name !== '078_personel_sicil_sequence.sql'
             && $name !== '079_sirket_sube_hiyerarsisi.sql'
-            && $name !== '080_organizasyon_audit_owners.sql';
+            && $name !== '080_organizasyon_audit_owners.sql'
+            && $name !== '081_ik_personeli_rolu.sql';
     }));
     sort($files, SORT_STRING);
 

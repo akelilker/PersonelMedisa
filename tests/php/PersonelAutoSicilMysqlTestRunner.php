@@ -235,7 +235,7 @@ try {
     }));
     sort($chain, SORT_STRING);
     autoSicilAssert(
-        end($chain) === '080_organizasyon_audit_owners.sql',
+        end($chain) === '081_ik_personeli_rolu.sql',
         '080 canonical migration tip'
     );
     autoSicilAssert(

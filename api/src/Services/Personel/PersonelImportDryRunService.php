@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Medisa\Api\Services\Personel;
 
+use Medisa\Api\Scope\HrWriteScope;
+use Medisa\Api\Scope\OrgScope;
 use Medisa\Api\Scope\SubeScope;
 use Medisa\Api\Support\Utf8;
 use PDO;
@@ -269,7 +271,13 @@ final class PersonelImportDryRunService
             }
         }
 
-        $allowedSubeIds = SubeScope::allowedSubeIds($user);
+        // An organisation-wide İK reader is not confined by branch grants, so the
+        // branch-membership rule below would only misfire on legacy rows. The
+        // rule that does apply to it is the company write scope, evaluated per
+        // row so a file may not smuggle in a branch the importer cannot write.
+        $organizationGlobalRead = OrgScope::isOrganizationGlobalRead($user);
+        $allowedSubeIds = $organizationGlobalRead ? [] : SubeScope::allowedSubeIds($user);
+        $writeSubeIds = HrWriteScope::isCompanyWriteScoped($user) ? HrWriteScope::writeSubeIds($user) : null;
         $activeSubeId = self::parsePositiveInt($activeSubeHeader);
 
         $refCatalog = PersonelImportReferenceCatalogService::loadCatalogForDryRun($pdo);
@@ -422,6 +430,12 @@ final class PersonelImportDryRunService
                 if (count($allowedSubeIds) > 0 && !in_array($subeId, $allowedSubeIds, true)) {
                     $hataKodlari[] = 'PERSONEL_IMPORT_SUBE_SCOPE_IHLALI';
                 }
+                if ($writeSubeIds !== null && !in_array($subeId, $writeSubeIds, true)) {
+                    $hataKodlari[] = 'PERSONEL_IMPORT_SUBE_SCOPE_IHLALI';
+                }
+            } elseif ($writeSubeIds !== null) {
+                // A branchless row cannot be attributed to a granted company.
+                $hataKodlari[] = 'PERSONEL_IMPORT_SUBE_SCOPE_IHLALI';
             }
 
             $hataKodlari = array_values(array_unique($hataKodlari));

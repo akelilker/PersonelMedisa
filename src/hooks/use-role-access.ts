@@ -1,5 +1,6 @@
 import {
   hasUserPermission,
+  sessionAllowsSubeWrite,
   type AppPermission
 } from "../lib/authorization/role-permissions";
 import type { UserRole } from "../types/auth";
@@ -31,12 +32,25 @@ export function useRoleAccess() {
     return permissions.some((permission) => hasUserPermission(activeRole, permission, personelId));
   }
 
+  /**
+   * Bir subedeki kayit uzerinde dogrudan islem yapilabilir mi.
+   *
+   * Yalniz yazma kapsami okuma kapsamindan dar olan roller icin daraltir; diger
+   * roller icin izin kontrolu tek belirleyici olmaya devam eder. Bu kontrol
+   * kullaniciyi reddedilecek bir islemden onceden korur, guvenlik owner'i
+   * degildir: kapsam disi yazmayi backend 403 ile reddeder.
+   */
+  function canWriteInSube(subeId: number | null | undefined) {
+    return sessionAllowsSubeWrite(session ?? null, subeId);
+  }
+
   return {
     activeRole,
     uiProfile,
     hasRole,
     hasAnyRole,
     hasPermission,
-    hasAnyPermission
+    hasAnyPermission,
+    canWriteInSube
   };
 }

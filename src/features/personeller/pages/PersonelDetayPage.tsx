@@ -28,7 +28,7 @@ export function PersonelDetayPage() {
   const { personelId } = useParams();
   const parsedPersonelId = Number.parseInt(personelId ?? "", 10);
   const hasValidId = !Number.isNaN(parsedPersonelId) && parsedPersonelId > 0;
-  const { hasPermission } = useRoleAccess();
+  const { hasPermission, canWriteInSube } = useRoleAccess();
   const canCreateSurec = hasPermission("surecler.create");
   const canViewSurecler = hasPermission("surecler.view") || hasPermission("surecler.view.sube");
   const canAccessSurecler = canCreateSurec || canViewSurecler;
@@ -68,10 +68,15 @@ export function PersonelDetayPage() {
 
   const isArchived = personel?.aktif_durum === "PASIF" || personel?.arsiv_modu === true;
   const isDisKaynak = personel?.calisan_kapsami === "DIS_KAYNAK";
+  // Kayit, kullanicinin dogrudan islem yapabilecegi bir sirkette mi. Kapsam
+  // disinda kart okunur kalir, yazma aksiyonlari acilmaz.
+  const canWriteOnPersonel = canWriteInSube(personel?.sube_id ?? null);
   // Finansal sekmeler DIS için kapalı; operasyonel görünüm (puantaj bilgi) açılabilir.
   const isFinancialBlocked = isDisKaynak;
   const effectiveActiveTab = activeTab;
-  const canCreateSurecEffective = Boolean(canCreateSurec && !isArchived && !isDisKaynak);
+  const canCreateSurecEffective = Boolean(
+    canCreateSurec && !isArchived && !isDisKaynak && canWriteOnPersonel
+  );
   const canAccessSureclerEffective = Boolean(
     !isArchived && !isDisKaynak && (canCreateSurecEffective || canViewSurecler)
   );
@@ -131,8 +136,16 @@ export function PersonelDetayPage() {
           <PersonelDosyaHero
             personel={personel}
             canViewUcret={canViewUcret}
-            onOpenMissingInfo={canUpdatePersonel && !isArchived ? handleOpenMissingInfo : undefined}
+            onOpenMissingInfo={
+              canUpdatePersonel && !isArchived && canWriteOnPersonel ? handleOpenMissingInfo : undefined
+            }
           />
+
+          {!canWriteOnPersonel ? (
+            <p className="personel-write-scope-notice" role="status" data-testid="personel-write-scope-notice">
+              Bu işlem İK sorumlusu tarafından gerçekleştirilmelidir.
+            </p>
+          ) : null}
 
           {!isArchived && !isDisKaynak ? (
             <PersonelDosyaActionRow

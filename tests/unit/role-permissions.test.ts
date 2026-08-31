@@ -19,9 +19,8 @@ const PHP_ROLE_PERMISSIONS_PATH = resolve(
   "api/src/Auth/RolePermissions.php"
 );
 
-function extractPhpRolePermissions(role: string): string[] {
+function extractPhpStringList(marker: string): string[] {
   const php = readFileSync(PHP_ROLE_PERMISSIONS_PATH, "utf8");
-  const marker = `'${role}' => [`;
   const start = php.indexOf(marker);
   if (start < 0) {
     return [];
@@ -49,6 +48,22 @@ function extractPhpRolePermissions(role: string): string[] {
   }
 
   return permissions.sort();
+}
+
+/**
+ * IK_PERSONELI has no matrix literal on either side: it is derived from
+ * IK_SORUMLUSU minus a withheld list, so the parity check derives it the same
+ * way instead of asserting against a list that does not exist.
+ */
+function extractPhpRolePermissions(role: string): string[] {
+  if (role === "IK_PERSONELI") {
+    const withheld = new Set(extractPhpStringList("IK_PERSONELI_WITHHELD_PERMISSIONS = ["));
+    return extractPhpStringList("'IK_SORUMLUSU' => [")
+      .filter((permission) => !withheld.has(permission))
+      .sort();
+  }
+
+  return extractPhpStringList(`'${role}' => [`);
 }
 
 describe("role permissions", () => {

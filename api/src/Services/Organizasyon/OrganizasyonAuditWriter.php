@@ -29,6 +29,7 @@ final class OrganizasyonAuditWriter
     public const PERSONEL_SUBE_TABLE = 'personel_sube_degisiklik_auditleri';
     public const SUBE_CREATE_TABLE = 'sube_olusturma_auditleri';
     public const USER_SCOPE_TABLE = 'user_org_scope_auditleri';
+    public const USER_ACCESS_REVOKE_TABLE = 'user_erisim_kaldirma_auditleri';
 
     public const SCOPE_SUBE = 'SUBE';
     public const SCOPE_SIRKET = 'SIRKET';
@@ -47,7 +48,13 @@ final class OrganizasyonAuditWriter
      */
     public static function isReady(PDO $pdo, string $table): bool
     {
-        if (!in_array($table, [self::PERSONEL_SUBE_TABLE, self::SUBE_CREATE_TABLE, self::USER_SCOPE_TABLE], true)) {
+        $known = [
+            self::PERSONEL_SUBE_TABLE,
+            self::SUBE_CREATE_TABLE,
+            self::USER_SCOPE_TABLE,
+            self::USER_ACCESS_REVOKE_TABLE,
+        ];
+        if (!in_array($table, $known, true)) {
             return false;
         }
         if (array_key_exists($table, self::$readyCache)) {
@@ -210,6 +217,52 @@ final class OrganizasyonAuditWriter
             'yeni_ids' => $afterList,
             'actor_user_id' => $context->actorUserId(),
             'gerekce' => $gerekce === null ? null : self::clampGerekce($gerekce),
+            'request_hash' => $context->requestHash(),
+        ]);
+
+        return (int) $pdo->lastInsertId();
+    }
+
+    /**
+     * Login access revocation. The users row is kept so every historical audit
+     * actor stays resolvable, which is exactly why the revocation itself has to
+     * be recorded here rather than inferred from the surviving row.
+     *
+     * @param array{
+     *   target_user_id:int,
+     *   target_username:string,
+     *   onceki_durum:string,
+     *   korunan_personel_id:int|null,
+     *   temizlenen_scope_satiri:int
+     * } $entry
+     */
+    public static function recordUserAccessRevoke(
+        PDO $pdo,
+        array $entry,
+        OrganizasyonAuditContext $context,
+        ?string $gerekce = null
+    ): int {
+        self::assertReady($pdo, self::USER_ACCESS_REVOKE_TABLE);
+
+        $stmt = $pdo->prepare(
+            'INSERT INTO ' . self::USER_ACCESS_REVOKE_TABLE . ' ('
+            . 'target_user_id, target_username, onceki_durum, yeni_durum, korunan_personel_id,'
+            . ' temizlenen_scope_satiri, gerekce, actor_user_id, request_hash'
+            . ') VALUES ('
+            . ':target_user_id, :target_username, :onceki_durum, :yeni_durum, :korunan_personel_id,'
+            . ' :temizlenen_scope_satiri, :gerekce, :actor_user_id, :request_hash)'
+        );
+        $stmt->execute([
+            'target_user_id' => (int) $entry['target_user_id'],
+            'target_username' => (string) $entry['target_username'],
+            'onceki_durum' => (string) $entry['onceki_durum'],
+            'yeni_durum' => 'PASIF',
+            'korunan_personel_id' => $entry['korunan_personel_id'] === null
+                ? null
+                : (int) $entry['korunan_personel_id'],
+            'temizlenen_scope_satiri' => (int) $entry['temizlenen_scope_satiri'],
+            'gerekce' => $gerekce === null ? null : self::clampGerekce($gerekce),
+            'actor_user_id' => $context->actorUserId(),
             'request_hash' => $context->requestHash(),
         ]);
 

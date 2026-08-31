@@ -45,7 +45,7 @@ import {
   type PersonelFirstLoginFilter
 } from "../../../lib/yonetim/personel-first-login-status";
 import type { UserRole } from "../../../types/auth";
-import { ASSIGNABLE_USER_ROLES } from "../../../types/auth";
+import { ASSIGNABLE_USER_ROLES, WRITE_COMPANY_SCOPED_ROLES } from "../../../types/auth";
 import type { Personel } from "../../../types/personel";
 import type { IdOption } from "../../../types/referans";
 import { formatSurecTuruLabel, formatUserRoleLabel } from "../../../lib/display/enum-display";
@@ -88,6 +88,7 @@ type KullaniciFormState = {
   subeIds: number[];
   bolumIds: number[];
   birimIds: number[];
+  sirketIds: number[];
   varsayilanSubeId: string;
   durum: KayitDurumu;
   notlar: string;
@@ -132,6 +133,7 @@ const INITIAL_KULLANICI_FORM: KullaniciFormState = {
   subeIds: [],
   bolumIds: [],
   birimIds: [],
+  sirketIds: [],
   varsayilanSubeId: "",
   durum: "AKTIF",
   notlar: ""
@@ -311,6 +313,7 @@ function userFormFromItem(item: YonetimKullanici): KullaniciFormState {
     subeIds: item.sube_ids,
     bolumIds: item.bolum_ids ?? [],
     birimIds: item.birim_ids ?? [],
+    sirketIds: item.sirket_ids ?? [],
     varsayilanSubeId: item.varsayilan_sube_id != null ? String(item.varsayilan_sube_id) : "",
     durum: item.durum,
     notlar: item.notlar ?? ""
@@ -352,6 +355,15 @@ function toKullaniciPayload(form: KullaniciFormState, isEdit: boolean): UpsertYo
     throw new Error("Varsayılan şube, yetki verilen şubeler içinde olmalıdır.");
   }
 
+  // Bos secim = hicbir yerde islem yapamayan aktif kullanici. Backend de ayni
+  // kurali uygular; buradaki kontrol yalniz formu erken durdurur.
+  if (
+    (WRITE_COMPANY_SCOPED_ROLES as readonly string[]).includes(form.rol) &&
+    form.sirketIds.length === 0
+  ) {
+    throw new Error("Bu rol için en az bir işlem şirketi seçilmelidir.");
+  }
+
   const payload: UpsertYonetimKullaniciPayload = {
     username,
     ad_soyad: adSoyad,
@@ -360,6 +372,7 @@ function toKullaniciPayload(form: KullaniciFormState, isEdit: boolean): UpsertYo
     sube_ids: form.subeIds,
     bolum_ids: form.bolumIds,
     birim_ids: form.birimIds,
+    sirket_ids: form.sirketIds,
     varsayilan_sube_id: form.varsayilanSubeId ? Number.parseInt(form.varsayilanSubeId, 10) : null,
     durum: form.durum
   };
@@ -923,6 +936,15 @@ export function YonetimPaneliPage() {
       birimIds: prev.birimIds.includes(birimId)
         ? prev.birimIds.filter((id) => id !== birimId)
         : [...prev.birimIds, birimId]
+    }));
+  }
+
+  function toggleSirketSelection(sirketId: number) {
+    setKullaniciForm((prev) => ({
+      ...prev,
+      sirketIds: prev.sirketIds.includes(sirketId)
+        ? prev.sirketIds.filter((id) => id !== sirketId)
+        : [...prev.sirketIds, sirketId]
     }));
   }
 
@@ -1652,6 +1674,9 @@ export function YonetimPaneliPage() {
                 onToggleSube={toggleSubeSelection}
                 onToggleBolum={toggleBolumSelection}
                 onToggleBirim={toggleBirimSelection}
+                sirketler={sirketler}
+                selectedSirketIds={kullaniciForm.sirketIds}
+                onToggleSirket={toggleSirketSelection}
               />
             </fieldset>
 

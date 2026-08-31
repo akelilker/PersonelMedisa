@@ -1,5 +1,5 @@
-CODE_MIGRATION_TIP: 081
-PRODUCTION_MIGRATION_TIP: 079
+CODE_MIGRATION_TIP: 082
+PRODUCTION_MIGRATION_TIP: 081
 
 # 110 — Canonical Closure / Gap Registry
 
@@ -11,8 +11,8 @@ PRODUCTION_MIGRATION_TIP: 079
 
 | Alan | Değer | Kanıt / sınır |
 | --- | --- | --- |
-| CODE_MIGRATION_TIP | **081** | Repodaki son migration: `081_ik_personeli_rolu.sql` — `users.rol` ENUM'una additive `IK_PERSONELI` eklemesi ve login erişimi kaldırma işleminin append-only denetim tablosu `user_erisim_kaldirma_auditleri`; hiçbir iş satırı yazmaz, hiçbir rolü remap etmez (MG-ORGANIZATION-HR-FINAL-CLOSEOUT-001). Bir önceki tip: `080_organizasyon_audit_owners.sql` — organizasyon yazma yollarının append-only denetim tabloları, additive, hiçbir satır yazmaz (MG-ORG-AUDITED-BRANCH-CHANGE-001). Eski `079_aylik_kapanis_sube_scope_and_actor.sql` iş modeli yanlış olduğu için geri çekildi; canonical kaynaktan çıkarıldı ve hiçbir koşulda uygulanmaz (MG-SIRKET-SUBE-HIYERARSI-001) |
-| PRODUCTION_MIGRATION_TIP | **079** | `079_sirket_sube_hiyerarsisi.sql` production'a uygulandı (apply `33322972259`, postcheck `33323369963`, backup `medisa-pre-079-33322972259-1-20260830-164502.sql`). Additive; hiçbir satır yazmadı. `schema_ready = true`, `data_ready = false` — eşleme ayrı onaylı operasyondur |
+| CODE_MIGRATION_TIP | **082** | Repodaki son migration: `082_user_erisim_degisiklik_auditleri.sql` — `PUT /yonetim/kullanicilar/{id}` üzerinden yapılan `durum`/`rol`/`username`/`personel_id` değişikliklerinin append-only denetim tablosu `user_erisim_degisiklik_auditleri`; additive, hiçbir iş satırı yazmaz, 081'in erişim kaldırma denetim geçmişine dokunmaz (MG-USER-ACCESS-CHANGE-AUDIT-001). Bir önceki tip: `081_ik_personeli_rolu.sql` — `users.rol` ENUM'una additive `IK_PERSONELI` eklemesi ve login erişimi kaldırma işleminin append-only denetim tablosu `user_erisim_kaldirma_auditleri`; hiçbir iş satırı yazmaz, hiçbir rolü remap etmez (MG-ORGANIZATION-HR-FINAL-CLOSEOUT-001). Bir önceki tip: `080_organizasyon_audit_owners.sql` — organizasyon yazma yollarının append-only denetim tabloları, additive, hiçbir satır yazmaz (MG-ORG-AUDITED-BRANCH-CHANGE-001). Eski `079_aylik_kapanis_sube_scope_and_actor.sql` iş modeli yanlış olduğu için geri çekildi; canonical kaynaktan çıkarıldı ve hiçbir koşulda uygulanmaz (MG-SIRKET-SUBE-HIYERARSI-001) |
+| PRODUCTION_MIGRATION_TIP | **081** | 080/081 round'u production'a uygulandı; pending = 0. Bir önceki tip `079_sirket_sube_hiyerarsisi.sql` idi (apply `33322972259`, postcheck `33323369963`, backup `medisa-pre-079-33322972259-1-20260830-164502.sql`). Hepsi additive; hiçbir satır yazmadı. `schema_ready = true`, `data_ready = false` — eşleme ayrı onaylı operasyondur. Sıradaki round yalnız 082'dir |
 | Organizasyon eşleme durumu | **CLOSED_CONFIRMED** | İlk production mapping uygulandı (MG-SIRKET-SUBE-PROD-MAPPING-001, apply run `33342644722`): 3 şirket, 10 şube, 3 SGK işvereni eşlendi; postcheck PASS ve `data_ready = true`. 7 çalışma lokasyonu bilinçli **deferred** (`sube_id` NULL). Eski spec yeniden uygulanmaz |
 | `MATRIX_DEVELOPMENT_BASELINE_SHA` | **`067692bba744808c06b6b7d802797c453859df53`** | Değişmez tarihsel kanıt: organizasyon eşleme apply operasyonunun pinlendiği deploy SHA'sı ve bu envanter matrix turunun geliştirme baseline'ı. "Güncel/son production SHA" iddiası **değildir**; main ilerledikçe güncellenmez. Apply yetkisi kanıtı için `MG-SIRKET-SUBE-PROD-MAPPING-001` satırındaki apply run kaydı esastır |
 | Otomatik sicil owner | **`PersonelSicilAllocator`** | `api/src/Services/Personel/PersonelSicilAllocator.php` + singleton tablo `personel_sicil_sequence` (migration 078); interaktif create'te `sicil_no` gönderilmez, backend tahsis eder |

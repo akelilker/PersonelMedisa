@@ -126,7 +126,8 @@ function rp053MigrationFiles(): array
             && $name !== '078_personel_sicil_sequence.sql'
             && $name !== '079_sirket_sube_hiyerarsisi.sql'
             && $name !== '080_organizasyon_audit_owners.sql'
-            && $name !== '081_ik_personeli_rolu.sql';
+            && $name !== '081_ik_personeli_rolu.sql'
+            && $name !== '082_user_erisim_degisiklik_auditleri.sql';
     }));
     sort($files, SORT_STRING);
 

@@ -458,13 +458,14 @@ jobs:
             sube_rows sgk_isveren_rows calisma_lokasyonu_rows personel_rows \
             user_sube_assignment_rows user_sirket_assignment_rows user_rows \
             sirket_rows relation_columns_present round_audit_tables_present \
+            predecessor_audit_tables_present \
             sube_rows_expected_after_round user_sube_assignment_rows_expected_after_round \
             user_rows_expected_after_round; do
             emit_scalar "GUARD_$(echo "$guard" | tr '[:lower:]' '[:upper:]')" ".guards.${guard}" '^-?[0-9]{1,12}$'
           done
           for flag in branch_table_resolved sirketler_table_present \
             user_sirketler_table_present user_sgk_isverenler_table_present \
-            new_role_already_present; do
+            predecessor_role_present; do
             emit_scalar "FLAG_$(echo "$flag" | tr '[:lower:]' '[:upper:]')" ".guards.${flag}" '^(true|false)$'
           done
           emit_list PREFLIGHT_BLOCKERS '.blockers'

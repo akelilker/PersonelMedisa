@@ -1282,6 +1282,42 @@ class YonetimController
 
         $actorUserId = isset($user['id']) ? (int) $user['id'] : 0;
 
+        // Status, role, username and personnel binding are the access-defining
+        // fields of an account: together they decide whether someone can log in,
+        // as whom, and with which authority. They are audited as one event by
+        // migration 082's owner, which is a different table from the revocation
+        // owner in 081 — DELETE keeps writing revocations, this path keeps
+        // writing changes, and neither writes into the other.
+        //
+        // The binding flag is read after the schema fallbacks above, so a
+        // personel_id that was demoted to a no-op is not audited as a change.
+        $storedPersonelId = self::readStoredPersonelIdFromRow($existing);
+        $accessBefore = [
+            'durum' => (string) $existing['durum'],
+            'rol' => (string) $existing['rol'],
+            'username' => (string) $existing['username'],
+            'personel_id' => $storedPersonelId,
+        ];
+        $accessAfter = [
+            'durum' => $durum,
+            'rol' => $rol,
+            'username' => $username,
+            'personel_id' => ($hasPersonelId && $personelIdProvided) ? $requestedPersonelId : $storedPersonelId,
+        ];
+        $accessAuditContext = null;
+        if (OrganizasyonAuditWriter::resolveAccessEventType($accessBefore, $accessAfter) !== null) {
+            // Fail-closed before the mutation starts: an environment without
+            // migration 082 must refuse the change rather than perform it
+            // unaudited. Read-only calls and edits that touch none of these four
+            // fields never reach this gate.
+            try {
+                OrganizasyonAuditWriter::assertAccessChangeReady($pdo);
+                $accessAuditContext = OrganizasyonAuditContext::fromRequest($request, $user);
+            } catch (OrganizasyonException $e) {
+                JsonResponse::error($e->httpStatus, $e->errorCode, $e->getMessage(), $e->field);
+            }
+        }
+
         // Organisation scope is the grant that decides what a user can see, so a
         // change to it is audited before/after. Fail-closed: an environment
         // without migration 080 cannot silently regrant scope.
@@ -1365,6 +1401,21 @@ class YonetimController
                     $kullaniciId,
                     $requestedPersonelId,
                     $actorUserId
+                );
+            }
+
+            // After the binding, so the audited after-image is the state the
+            // transaction will actually commit. A failure here propagates and
+            // rolls back the user row, the scope writes, the binding and the
+            // credential reset together.
+            if ($accessAuditContext !== null) {
+                OrganizasyonAuditWriter::recordUserAccessChange(
+                    $pdo,
+                    $kullaniciId,
+                    $accessBefore,
+                    $accessAfter,
+                    $accessAuditContext,
+                    $scopeGerekce
                 );
             }
 

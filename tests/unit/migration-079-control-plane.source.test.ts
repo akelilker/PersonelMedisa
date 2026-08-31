@@ -203,9 +203,8 @@ describe('read-only preflight owner', () => {
   });
 
   it('expects the canonical round and rejects the withdrawn migration', () => {
-    expect(preflightOwner).toContain("EXPECTED_APPLIED_TIP = '079'");
-    expect(preflightOwner).toContain("'080' => '080_organizasyon_audit_owners.sql'");
-    expect(preflightOwner).toContain("'081' => '081_ik_personeli_rolu.sql'");
+    expect(preflightOwner).toContain("EXPECTED_APPLIED_TIP = '081'");
+    expect(preflightOwner).toContain("'082' => '082_user_erisim_degisiklik_auditleri.sql'");
     expect(preflightOwner).toContain(`WITHDRAWN_MIGRATION_NAME = '${WITHDRAWN_NAME}'`);
     expect(preflightOwner).toContain('WITHDRAWN_079_PRESENT_IN_SOURCE');
     expect(preflightOwner).toContain('WITHDRAWN_079_STRUCTURE_PRESENT');
@@ -258,8 +257,8 @@ describe('read-only preflight owner', () => {
 
   it('treats an already-created audit table or role as resumable, not as success', () => {
     expect(preflightOwner).toContain('PREIMAGE_PARTIAL_ROUND_AUDIT_TABLE_PRESENT');
-    expect(preflightOwner).toContain('PREIMAGE_NEW_ROLE_ALREADY_PRESENT');
-    expect(preflightOwner).toContain("ROUND_NEW_ROLE = 'IK_PERSONELI'");
+    expect(preflightOwner).toContain('PREIMAGE_PREDECESSOR_AUDIT_TABLE_MISSING');
+    expect(preflightOwner).toContain("PREDECESSOR_ROLE = 'IK_PERSONELI'");
   });
 });
 
@@ -360,9 +359,9 @@ describe('control-plane workflow gates', () => {
     expect(gateIndex).toBeGreaterThan(0);
     expect(uploadIndex).toBeGreaterThan(gateIndex);
     expect(apply).toContain(
-      'ROUND_MIGRATIONS: "080_organizasyon_audit_owners.sql 081_ik_personeli_rolu.sql"',
+      'ROUND_MIGRATIONS: "082_user_erisim_degisiklik_auditleri.sql"',
     );
-    expect(apply).toContain('PRE_ROUND_TIP: "079"');
+    expect(apply).toContain('PRE_ROUND_TIP: "081"');
   });
 
   it('authorizes exactly one migration per request and carries it into the payload', () => {

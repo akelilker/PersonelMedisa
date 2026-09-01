@@ -191,11 +191,8 @@ jobs:
           }
 
           deploy_with_ftp_mode() {
-            local mode_name="$1"
-            local use_ftps="$2"
-            local ftp_commands="$3"
+            local ftp_commands="$1"
 
-            echo "Deploy transport mode: ${mode_name}"
             lftp -u "${FTP_USERNAME}","${FTP_PASSWORD}" -p "${FTP_PORT}" "ftp://${FTP_SERVER}" -e "
               set cmd:fail-exit true;
               set net:max-retries 2;
@@ -206,9 +203,9 @@ jobs:
               set ssl:verify-certificate no;
               set ssl:check-hostname no;
               set ftp:passive-mode on;
-              set ftp:ssl-allow ${use_ftps};
-              set ftp:ssl-force ${use_ftps};
-              set ftp:ssl-protect-data ${use_ftps};
+              set ftp:ssl-allow false;
+              set ftp:ssl-force false;
+              set ftp:ssl-protect-data false;
               ${ftp_commands}
               bye
             "

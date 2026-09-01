@@ -44,10 +44,8 @@ sanitize_lftp_error_detail() {
   node --input-type=module -e "import { sanitizeLftpErrorDetail } from './scripts/deploy/plan-cpanel-incremental.mjs'; const fs = await import('node:fs'); const text = fs.readFileSync(process.argv[1], 'utf8'); process.stdout.write(sanitizeLftpErrorDetail(text));" "$log_file"
 }
 
-# ---- AA1 / AA2: both transports fail, caller errexit preserved, rc captured ----
+# ---- AA1 / AA2: plain FTP failure, caller errexit preserved, rc captured ----
 deploy_with_ftp_mode() {
-  local mode_name="$1"
-  echo "Deploy transport mode: ${mode_name}"
   echo "get: Access failed: 421 Service not available"
   return 1
 }
@@ -72,9 +70,7 @@ if cpanel_ftp_errexit_enabled; then AFTER=1; fi
 
 assert_eq "AA1_ERREXIT_PRESERVED" "$BEFORE" "$AFTER"
 assert_eq "AA2_RC_CAPTURED" "1" "$rc"
-assert_contains "AA2_HAS_FTPS_RESULT" "FTPS_RESULT=" "$out"
 assert_contains "AA2_HAS_PLAIN_RESULT" "PLAIN_FTP_RESULT=" "$out"
-assert_contains "AA2_HAS_FTPS_DETAIL" "FTPS_ERROR_DETAIL=" "$out"
 assert_contains "AA2_HAS_PLAIN_DETAIL" "PLAIN_FTP_ERROR_DETAIL=" "$out"
 assert_eq "AA2_LAST_READ_CLASS_TRANSPORTISH" "1" "$([[ "$LAST_READ_CLASS" != "SUCCESS" && "$LAST_READ_CLASS" != "REMOTE_NOT_FOUND" ]] && echo 1 || echo 0)"
 
@@ -91,8 +87,6 @@ assert_contains "AA5_REFUSE" "REFUSING_BULK_UPLOAD=YES" "REFUSING_BULK_UPLOAD=YE
 
 # ---- AA3: real 550 → REMOTE_NOT_FOUND / capability PASS ----
 deploy_with_ftp_mode() {
-  local mode_name="$1"
-  echo "Deploy transport mode: ${mode_name}"
   echo "get: Access failed: 550 Failed to open file. (api/.deploy-sha)"
   return 1
 }
@@ -113,8 +107,6 @@ fi
 
 # ---- AA4: syntax error class ----
 deploy_with_ftp_mode() {
-  local mode_name="$1"
-  echo "Deploy transport mode: ${mode_name}"
   echo "Unknown command \`getx'"
   echo "Usage: get [OPTS] files"
   return 1
@@ -127,7 +119,7 @@ assert_eq "AA4_SYNTAX" "LFTP_SYNTAX_ERROR" "$LAST_READ_CLASS"
 # ---- AA8: sanitize does not leak secrets ----
 secret_log="$(mktemp)"
 printf '%s\n' \
-  'Deploy transport mode: explicit-ftps' \
+  'Deploy transport mode: plain-ftp' \
   'lftp -u secretuser,super-secret-password ftp://ftp.example.com' \
   'get: Access failed: 550 Failed to open file. (api/.deploy-sha)' \
   >"$secret_log"

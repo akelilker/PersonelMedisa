@@ -90,12 +90,10 @@ jobs:
           }
           trap cleanup_temp EXIT
 
-          run_ftp_mode() {
-            local mode_name="$1"
-            local use_ftps="$2"
-            local ftp_commands="$3"
+          run_cpanel_plain_ftp() {
+            local ftp_commands="$1"
 
-            echo "App public URL transport mode: ${mode_name}"
+            echo "Deploy transport mode: plain-ftp"
             lftp -u "${FTP_USERNAME}","${FTP_PASSWORD}" -p "${FTP_PORT}" "ftp://${FTP_SERVER}" -e "
               set cmd:fail-exit true;
               set net:max-retries 2;
@@ -106,22 +104,16 @@ jobs:
               set ssl:verify-certificate no;
               set ssl:check-hostname no;
               set ftp:passive-mode on;
-              set ftp:ssl-allow ${use_ftps};
-              set ftp:ssl-force ${use_ftps};
-              set ftp:ssl-protect-data ${use_ftps};
+              set ftp:ssl-allow false;
+              set ftp:ssl-force false;
+              set ftp:ssl-protect-data false;
               ${ftp_commands}
               bye
             "
           }
 
           run_cpanel_ftp() {
-            local ftp_commands="$1"
-            echo "Explicit FTPS port 21 deneniyor..."
-            if run_ftp_mode "explicit-ftps" "true" "$ftp_commands"; then
-              return 0
-            fi
-            echo "Explicit FTPS basarisiz oldu, plain FTP fallback deneniyor..."
-            run_ftp_mode "plain-ftp" "false" "$ftp_commands"
+            run_cpanel_plain_ftp "$1"
           }
 
           # Never cat/print config contents. Helper emits only APP_PUBLIC_URL=...

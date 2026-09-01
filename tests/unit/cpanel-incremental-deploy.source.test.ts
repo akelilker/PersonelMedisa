@@ -873,7 +873,6 @@ describe('cPanel incremental deploy planner', () => {
     expect(libCode).not.toMatch(/(^|\n)\s*set \+e/);
     expect(libCode).not.toMatch(/(^|\n)\s*set -[^\n]*e/);
     expect(source).toContain('cpanel-ftp-readback-lib.sh');
-    expect(lib).toContain('FTPS_ERROR_DETAIL');
     expect(lib).toContain('PLAIN_FTP_ERROR_DETAIL');
     // AA6: refuse gate remains before bulk transfer path
     expect(source.indexOf('REFUSING_BULK_UPLOAD=YES')).toBeLessThan(
@@ -1011,7 +1010,7 @@ describe('cPanel incremental deploy planner', () => {
   it('AA8) sanitizeLftpErrorDetail never leaks credentials', () => {
     const detail = sanitizeLftpErrorDetail(
       [
-        'Deploy transport mode: explicit-ftps',
+        'Deploy transport mode: plain-ftp',
         'lftp -u secretuser,super-secret-password ftp://ftp.example.com',
         'get: Access failed: 550 Failed to open file. (api/.deploy-sha)',
       ].join('\n'),

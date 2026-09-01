@@ -2,7 +2,8 @@ CODE_MIGRATION_TIP: 083
 PRODUCTION_MIGRATION_TIP: 083
 PRODUCTION_MIGRATION_PENDING: 0
 
-MG_PERSONNEL_BULK_RECONCILIATION_PRODUCTION: CLOSED_CONFIRMED (BASE/deploy SHA 06bbe03; 14 create + 3 exit; total personel 153 / aktif 146; 2 deferred exit: Ahmed Khalil Alsamar + Sefine Özcan — DEFERRED_MISSING_EXIT_INFORMATION; production mutation tamamlandı)
+MG_PERSONNEL_BULK_RECONCILIATION_PRODUCTION: CLOSED_CONFIRMED (BASE/deploy SHA 06bbe03; 14 create + 3 exit; total personel 153 / aktif 146; 2 deferred exit: Ahmed Khalil Alsamar (202) + Sefine Özcan (208) — henüz uygulanmadı; blocker veri değil sabit postcheck contract; hedef dinamik contract sonrası 153 toplam / 144 aktif)
+MG_PERSONNEL_BULK_POSTCHECK_DYNAMIC_CONTRACT_001: CODE_READY (PersonelLifecycleBulkPostcheck envanter fingerprint + dry-run plan türevli dinamik contract; sabit 14/3/153/146 binding kaldırıldı; production mutation=0)
 MG_PERSONNEL_BULK_DRY_RUN_APPLY_PARITY_001: CODE_READY (PersonelLifecycleBulkMutationPlanner ortak owner; bolum→departman inference + hierarchy validation dry-run/apply parity; production mutation=0)
 
 ORG_HIERARCHY_SCHEMA_READY: true

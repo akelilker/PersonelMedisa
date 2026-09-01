@@ -23,6 +23,7 @@ describe("MG personnel bulk dry-run apply parity (MariaDB runtime)", () => {
       "dry-run plan carries inferred departman_id=1",
       "canonical create payload from dry-run plan inserts successfully",
       "dry-run and apply share canonical_ready create payload",
+      "single ready create row passes dynamic postcheck",
       "turkish departman name resolves to canonical row",
       "ambiguous reference name resolves to null",
       "dry-run blocked row leaves personel count unchanged",

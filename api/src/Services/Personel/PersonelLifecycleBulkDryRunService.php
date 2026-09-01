@@ -58,16 +58,14 @@ final class PersonelLifecycleBulkDryRunService
             }
         }
 
-        $normalizedRows = array_map(static function (array $raw): array {
-            return PersonelLifecycleBulkRowContract::normalizeRow($raw);
-        }, $rows);
-        $postcheck = PersonelLifecycleBulkPostcheck::summarize($normalizedRows);
-        $hasLifecycleMutations = ($postcheck['create_count'] ?? 0) > 0 || ($postcheck['exit_count'] ?? 0) > 0;
-        $postcheckErrors = $hasLifecycleMutations
-            ? PersonelLifecycleBulkPostcheck::validateBindingContract($normalizedRows)
-            : [];
+        $inventory = PersonelLifecycleBulkPostcheck::captureInventory($pdo);
+        $postcheck = PersonelLifecycleBulkPostcheck::summarize($inventory, $satirlar);
+        $postcheckErrors = PersonelLifecycleBulkPostcheck::validateContract($inventory, $satirlar);
 
-        $preimageChecksum = hash('sha256', json_encode($satirlar, JSON_UNESCAPED_UNICODE));
+        $preimageChecksum = PersonelLifecycleBulkPostcheck::checksumPreimage(
+            (string) $inventory['inventory_fingerprint'],
+            $satirlar
+        );
         $sourceChecksum = hash('sha256', json_encode($rows, JSON_UNESCAPED_UNICODE));
 
         return [
@@ -210,6 +208,12 @@ final class PersonelLifecycleBulkDryRunService
             return self::resultRow($op, 'BLOCKED', $errors, null, null);
         }
 
+        if ($op === PersonelLifecycleBulkRowContract::OP_EXIT
+            && strtoupper(trim((string) ($personel['aktif_durum'] ?? ''))) !== 'AKTIF'
+        ) {
+            $errors[] = 'EXIT_PREIMAGE_NOT_AKTIF';
+        }
+
         $gerekce = trim((string) ($row['gerekce'] ?? ($row['payload']['gerekce'] ?? '')));
         if ($gerekce === '' && !in_array($op, [PersonelLifecycleBulkRowContract::OP_EXIT], true)) {
             $errors[] = 'GEREKCE_EKSIK';
@@ -260,6 +264,9 @@ final class PersonelLifecycleBulkDryRunService
         if ($validationDetail !== null) {
             $row['validation_field'] = $validationDetail['field'] ?? null;
             $row['validation_code'] = $validationDetail['code'] ?? null;
+        }
+        if ($personel !== null) {
+            $row['preimage_aktif_durum'] = strtoupper(trim((string) ($personel['aktif_durum'] ?? '')));
         }
 
         return $row;

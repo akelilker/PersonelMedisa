@@ -346,15 +346,41 @@ try {
     mgAssert(strpos($labels, 'Şube') !== false, 'completeness includes sube gap');
     mgAssert(strpos($labels, 'Pozisyon') !== false, 'completeness includes pozisyon gap');
 
-    // 7–8) Postcheck binding contract.
+    // 7–8) Dynamic postcheck contract from live inventory + dry-run analysis.
+    $inventory = PersonelLifecycleBulkPostcheck::captureInventory($pdo);
     $bindingRows = mgBindingRows(14, 3);
-    $summary = PersonelLifecycleBulkPostcheck::summarize($bindingRows);
-    mgAssert($summary['expected_total_after'] === 153, 'postcheck total 153 for 14 creates');
-    mgAssert($summary['expected_active_after'] === 146, 'postcheck active 146 for 14 creates and 3 exits');
-    mgAssert(count(PersonelLifecycleBulkPostcheck::validateBindingContract($bindingRows)) === 0, 'binding contract passes for 14+3');
-    $nineRows = mgBindingRows(9, 3);
-    $nineErrors = PersonelLifecycleBulkPostcheck::validateBindingContract($nineRows);
-    mgAssert(in_array('POSTCHECK_CREATE_COUNT_MISMATCH', $nineErrors, true), 'nine-create plan cannot claim 153/146');
+    $bindingDry = PersonelLifecycleBulkDryRunService::dryRun($pdo, $gm, $request, $bindingRows, null, str_repeat('c', 40));
+    $postcheck = $bindingDry['postcheck'] ?? [];
+    mgAssert(
+        ($postcheck['baseline_total'] ?? -1) === $inventory['baseline_total'],
+        'postcheck baseline total matches live inventory'
+    );
+    mgAssert(
+        ($postcheck['expected_total_after'] ?? -1) === $inventory['baseline_total'] + 14,
+        'postcheck total delta from 14 creates'
+    );
+    mgAssert(
+        ($postcheck['expected_active_after'] ?? -1) === $inventory['baseline_active'] + 14 - 3,
+        'postcheck active delta from 14 creates and 3 exits'
+    );
+    mgAssert(count($bindingDry['postcheck_errors'] ?? []) === 0, '14+3 ready plan passes dynamic contract');
+    mgAssert(($bindingDry['can_apply'] ?? false) === true, '14+3 ready plan is can_apply');
+
+    $pasifExitRow = [
+        'mutation_id' => 'mg-exit-pasif',
+        'operation_type' => PersonelLifecycleBulkRowContract::OP_EXIT,
+        'personel_id' => 901,
+        'payload' => ['exit_date' => '2026-08-31', 'aciklama' => 'blocked pasif exit'],
+        'gerekce' => 'blocked pasif exit',
+    ];
+    $pdo->exec("UPDATE personeller SET aktif_durum = 'PASIF' WHERE id = 901");
+    $pasifDry = PersonelLifecycleBulkDryRunService::dryRun($pdo, $gm, $request, [$pasifExitRow], null, str_repeat('d', 40));
+    mgAssert(
+        in_array('EXIT_PREIMAGE_NOT_AKTIF', $pasifDry['satirlar'][0]['hata_kodlari'] ?? [], true),
+        'exit on pasif preimage is blocked in dry-run'
+    );
+    mgAssert(($pasifDry['can_apply'] ?? true) === false, 'pasif exit preimage blocks can_apply');
+    $pdo->exec("UPDATE personeller SET aktif_durum = 'AKTIF' WHERE id = 901");
 
     // 9) Bulk dry-run org row is READY (not 501).
     $orgDryRow = [

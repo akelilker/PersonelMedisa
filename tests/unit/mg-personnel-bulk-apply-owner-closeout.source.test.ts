@@ -35,16 +35,19 @@ describe("MG personnel bulk apply owner closeout sources", () => {
     expect(apply).toContain("deployed_sha");
   });
 
-  it("enforces binding postcheck contract 14 create + 3 exit -> 153/146", () => {
+  it("derives dynamic postcheck contract from inventory fingerprint and dry-run analysis", () => {
     const postcheck = read("api/src/Services/Personel/PersonelLifecycleBulkPostcheck.php");
     const dryRun = read("api/src/Services/Personel/PersonelLifecycleBulkDryRunService.php");
 
-    expect(postcheck).toContain("BINDING_CREATE_COUNT = 14");
-    expect(postcheck).toContain("BINDING_EXIT_COUNT = 3");
-    expect(postcheck).toContain("EXPECTED_TOTAL_AFTER = 153");
-    expect(postcheck).toContain("EXPECTED_ACTIVE_AFTER = 146");
-    expect(postcheck).toContain("POSTCHECK_CREATE_COUNT_MISMATCH");
-    expect(dryRun).toContain("PersonelLifecycleBulkPostcheck::validateBindingContract");
+    expect(postcheck).toContain("captureInventory");
+    expect(postcheck).toContain("inventory_fingerprint");
+    expect(postcheck).toContain("validateContract");
+    expect(postcheck).toContain("checksumPreimage");
+    expect(postcheck).not.toContain("BINDING_CREATE_COUNT");
+    expect(postcheck).not.toContain("validateBindingContract");
+    expect(dryRun).toContain("PersonelLifecycleBulkPostcheck::captureInventory");
+    expect(dryRun).toContain("PersonelLifecycleBulkPostcheck::validateContract");
+    expect(dryRun).toContain("preimage_aktif_durum");
   });
 
   it("extends completeness owner for sube, lokasyon, yonetici and pozisyon", () => {

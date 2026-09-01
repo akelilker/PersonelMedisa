@@ -228,12 +228,11 @@ describe("the update owner cannot change access unaudited", () => {
   });
 });
 
-describe("the control plane authorizes the 081 to 082 round and nothing else", () => {
-  it("pins production tip 081 as the only apply-ready preimage", () => {
-    expect(preflight).toContain("public const EXPECTED_APPLIED_TIP = '081';");
-    expect(preflight).toContain("'082' => '082_user_erisim_degisiklik_auditleri.sql',");
-    expect(preflight).not.toContain("'080' => '080_organizasyon_audit_owners.sql',");
-    expect(preflight).not.toContain("'081' => '081_ik_personeli_rolu.sql',");
+describe("the control plane authorizes the 082 to 083 round and nothing else", () => {
+  it("pins production tip 082 as the only apply-ready preimage", () => {
+    expect(preflight).toContain("public const EXPECTED_APPLIED_TIP = '082';");
+    expect(preflight).toContain("'083' => '083_personel_organizasyon_degisiklik_auditleri.sql',");
+    expect(preflight).not.toContain("'082' => '083_personel_organizasyon_degisiklik_auditleri.sql',");
   });
 
   it("proves the completed round is present rather than trusting the ledger tip", () => {

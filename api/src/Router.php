@@ -309,6 +309,15 @@ class Router
         if ($path === '/personeller' && $method === 'POST') {
             PersonellerController::create($this->request);
         }
+        if ($path === '/personeller/export.xlsx' && $method === 'GET') {
+            PersonellerController::exportXlsx($this->request);
+        }
+        if ($path === '/personeller/lifecycle-bulk/dry-run' && $method === 'POST') {
+            PersonellerController::lifecycleBulkDryRun($this->request);
+        }
+        if ($path === '/personeller/lifecycle-bulk/apply' && $method === 'POST') {
+            PersonellerController::lifecycleBulkApply($this->request);
+        }
         if ($path === '/personeller/import/template.csv' && $method === 'GET') {
             PersonellerController::importTemplate($this->request);
         }
@@ -341,6 +350,9 @@ class Router
         }
         if ($method === 'POST' && preg_match('#^/personeller/(\d+)/gecici-gorevlendirmeler/(\d+)/sonlandir$#', $path, $matches)) {
             PersonellerController::endGeciciGorevlendirme($this->request, $matches[1], $matches[2]);
+        }
+        if ($method === 'POST' && preg_match('#^/personeller/(\d+)/organizasyon-degisikligi$#', $path, $matches)) {
+            PersonellerController::organizasyonDegisikligi($this->request, $matches[1]);
         }
         if ($method === 'POST' && preg_match('#^/personeller/(\d+)/kalici-sube-degisikligi$#', $path, $matches)) {
             PersonellerController::kaliciSubeDegisikligi($this->request, $matches[1]);

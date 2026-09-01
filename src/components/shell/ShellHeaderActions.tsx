@@ -4,7 +4,9 @@ import { dataCacheKeys, getAppData, getCacheEntry, useAppDataRevision } from "..
 import { useBildirimlerHeaderPreview } from "../../hooks/useBildirimler";
 import { useRoleAccess } from "../../hooks/use-role-access";
 import { formatBildirimTuruLabel, normalizeEnumKey } from "../../lib/display/enum-display";
+import { canonicalizeUserRole } from "../../lib/authorization/canonicalize-user-role";
 import { useAuth } from "../../state/auth.store";
+import { GLOBAL_SCOPE_ROLES } from "../../types/auth";
 import type { Personel } from "../../types/personel";
 
 type NotificationLevel = "neutral" | "warning" | "critical";
@@ -222,6 +224,12 @@ export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeade
   const subeList = session?.sube_list ?? [];
   const selectorIds =
     subeIds.length > 0 ? subeIds : subeList.map((sube) => sube.id).filter((id) => id > 0);
+  const role = canonicalizeUserRole(session?.user.rol);
+  const isGlobalBranchSelector =
+    role != null &&
+    (GLOBAL_SCOPE_ROLES as readonly string[]).includes(role) &&
+    subeIds.length === 0 &&
+    selectorIds.length > 1;
 
   const subeControl = useMemo(() => {
     if (selectorIds.length === 0) {
@@ -395,7 +403,9 @@ export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeade
               <span className="sube-selector-label">
                 {activeSubeId != null
                   ? subeList.find((sube) => sube.id === activeSubeId)?.ad ?? `Şube ${activeSubeId}`
-                  : "Şube"}
+                  : isGlobalBranchSelector
+                    ? "Tüm şubeler"
+                    : "Şube"}
               </span>
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -414,6 +424,19 @@ export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeade
               id="sube-selector-menu"
               className={`settings-dropdown sube-selector-dropdown${isSubeOpen ? " open" : ""}`}
             >
+              {isGlobalBranchSelector ? (
+                <button
+                  type="button"
+                  className={activeSubeId === null ? "sube-option-active" : undefined}
+                  onClick={() => {
+                    setActiveSubeId(null);
+                    setIsSubeOpen(false);
+                  }}
+                >
+                  Tüm şubeler
+                  {activeSubeId === null ? " (seçili)" : ""}
+                </button>
+              ) : null}
               {selectorIds.map((id) => {
                 const label = subeList.find((sube) => sube.id === id)?.ad ?? `Şube ${id}`;
                 return (

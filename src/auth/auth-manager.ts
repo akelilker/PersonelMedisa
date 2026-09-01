@@ -1,7 +1,9 @@
 import type { AuthSession, AuthUser, LoginCredentials } from "../types/auth";
+import { GLOBAL_SCOPE_ROLES } from "../types/auth";
 import { apiRequest } from "../api/api-client";
 import { login as requestLoginSession } from "../api/auth.api";
 import { endpoints } from "../api/endpoints";
+import { canonicalizeUserRole } from "../lib/authorization/canonicalize-user-role";
 import { MEDISA_AUTH_SESSION_KEY } from "./auth-constants";
 import { finalizeAuthSessionSube } from "./auth-session-sube";
 import { registerAuthTokenSource } from "./auth-token-provider";
@@ -153,7 +155,8 @@ export function getActiveSubeIdForApiHeader(): string | null {
 
 /**
  * Aktif subeyi oturuma yazar (ayni storage konumu).
- * Coklu sube disinda veya yetkisiz id icin no-op.
+ * Global roller: null = tum subeler; tek sube gecici filtre (session.sube_list).
+ * Scoped roller: yalnizca user.sube_ids icindeki subeler.
  */
 export function setActiveSubeId(nextId: number | null): void {
   const located = readRawFromStorages();
@@ -162,13 +165,25 @@ export function setActiveSubeId(nextId: number | null): void {
     return;
   }
 
-  const ids = Array.isArray(current.user.sube_ids) ? current.user.sube_ids : [];
+  const assigned = Array.isArray(current.user.sube_ids) ? current.user.sube_ids : [];
+  const listIds = (current.sube_list ?? []).map((s) => s.id).filter((id) => id > 0);
+  const role = canonicalizeUserRole(current.user.rol);
+  const isGlobal =
+    role != null && (GLOBAL_SCOPE_ROLES as readonly string[]).includes(role) && assigned.length === 0;
 
-  if (ids.length === 0) {
-    if (nextId !== null) {
+  if (assigned.length > 0) {
+    if (nextId !== null && !assigned.includes(nextId)) {
       return;
     }
-  } else if (nextId !== null && !ids.includes(nextId)) {
+  } else if (isGlobal) {
+    if (nextId !== null && !listIds.includes(nextId)) {
+      return;
+    }
+  } else if (listIds.length > 0) {
+    if (nextId !== null && !listIds.includes(nextId)) {
+      return;
+    }
+  } else if (nextId !== null) {
     return;
   }
 

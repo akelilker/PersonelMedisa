@@ -1,4 +1,4 @@
-﻿# App public URL secure OPS owner (SOURCE)
+# App public URL secure OPS owner (SOURCE)
 
 **Status:** source-ready / production-not-dispatched
 **Workflow:** `.github/workflows/set-cpanel-app-public-url.yml`
@@ -32,15 +32,15 @@ This closes the previous blocker: `SAFE_READBACK_OWNER_NOT_AVAILABLE` / `OPS_EXE
 ## Privacy rules
 
 - Full `config.local.php` is never printed, never artifact-uploaded, never committed
-- Helper stdout emits only `APP_PUBLIC_URL=â€¦` and status flags
-- Sibling secrets (`db_password`, `jwt_secret`, â€¦) stay in runner temp and are deleted on exit
+- Helper stdout emits only `APP_PUBLIC_URL=…` and status flags
+- Sibling secrets (`db_password`, `jwt_secret`, …) stay in runner temp and are deleted on exit
 - Unrelated key delta must remain `0` or the job fails closed (and rolls back after a write)
 
-## Manual dispatch (production â€” separate approval)
+## Manual dispatch (production — separate approval)
 
 Do **not** run from this SOURCE/HARDEN phase. When explicitly authorized later:
 
-1. Actions â†’ **Set cPanel app_public_url** (requires workflow present on default branch â€” install separately)
+1. Actions → **Set cPanel app_public_url** (requires workflow present on default branch — install separately)
 2. `confirmation` = `SET_APP_PUBLIC_URL`
 3. Confirm readback `READBACK_MATCH=YES` and `UNRELATED_CONFIG_KEYS_CHANGED=0`
 4. Value is never caller-selected; always `https://www.karmotors.com.tr/personelmedisa`
@@ -55,5 +55,5 @@ Do **not** run from this SOURCE/HARDEN phase. When explicitly authorized later:
 
 ## Tests
 
-- `tests/unit/app-public-url-secure-ops.source.test.ts` â€” YAML/security invariants
-- `tests/unit/app-public-url-config-ops.php-runtime.test.ts` â€” helper get/patch/privacy runtime
+- `tests/unit/app-public-url-secure-ops.source.test.ts` — YAML/security invariants
+- `tests/unit/app-public-url-config-ops.php-runtime.test.ts` — helper get/patch/privacy runtime

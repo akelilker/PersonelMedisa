@@ -35,7 +35,11 @@ export const endpoints = {
     importApply: "/personeller/import/apply",
     importRuns: "/personeller/import/runs",
     importRunDetail: (id: number | string) => `/personeller/import/runs/${id}`,
-    importRunEvidenceCsv: (id: number | string) => `/personeller/import/runs/${id}/evidence.csv`
+    importRunEvidenceCsv: (id: number | string) => `/personeller/import/runs/${id}/evidence.csv`,
+    exportXlsx: "/personeller/export.xlsx",
+    lifecycleBulkDryRun: "/personeller/lifecycle-bulk/dry-run",
+    lifecycleBulkApply: "/personeller/lifecycle-bulk/apply",
+    organizasyonDegisikligi: (id: number | string) => `/personeller/${id}/organizasyon-degisikligi`
   },
   personelUcretleri: {
     list: (personelId: number | string) => `/personeller/${personelId}/ucretler`,

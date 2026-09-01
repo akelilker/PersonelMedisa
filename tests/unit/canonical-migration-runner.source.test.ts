@@ -26,13 +26,13 @@ describe('canonical migration runner contract', () => {
     expect(runner).toContain('GET_LOCK');
   });
 
-  it('owns the contiguous 001→082 filesystem migration chain', () => {
+  it('owns the contiguous 001→083 filesystem migration chain', () => {
     const numbers = migrations.map((name) => Number.parseInt(name.slice(0, 3), 10));
     expect(migrations[0]).toBe('001_initial_schema.sql');
-    expect(migrations.at(-1)).toBe('082_user_erisim_degisiklik_auditleri.sql');
-    expect(migrations).toHaveLength(82);
-    expect(new Set(numbers).size).toBe(82);
-    expect(numbers).toEqual(Array.from({ length: 82 }, (_, index) => index + 1));
+    expect(migrations.at(-1)).toBe('083_personel_organizasyon_degisiklik_auditleri.sql');
+    expect(migrations).toHaveLength(83);
+    expect(new Set(numbers).size).toBe(83);
+    expect(numbers).toEqual(Array.from({ length: 83 }, (_, index) => index + 1));
     expect(migrations).toContain('074_qr_attendance_correction_and_inbox.sql');
     expect(migrations.indexOf('074_qr_attendance_correction_and_inbox.sql')).toBe(
       migrations.indexOf('075_personel_account_activation.sql') - 1,

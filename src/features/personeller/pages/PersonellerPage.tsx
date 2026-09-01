@@ -13,6 +13,7 @@ import type { IdOption } from "../../../types/referans";
 import { formatReferenceValue } from "../components/personel-dosya/personel-dosya-format-utils";
 import { PersonelImportDryRunModal } from "../components/PersonelImportDryRunModal";
 import { PersonelImportHistoryModal } from "../components/PersonelImportHistoryModal";
+import { downloadPersonelExportXlsx } from "../../../api/personeller.api";
 import { getPersonelMissingFields, resolvePersonelCompleteness } from "../personel-missing-info";
 import { PERSONEL_SEARCH_MAX_LENGTH } from "../personel-search-query";
 
@@ -184,6 +185,7 @@ export function PersonellerPage() {
   const { hasPermission } = useRoleAccess();
   const canOpenDetail = hasPermission("personeller.detail.view");
   const canCreatePersonel = hasPermission("personeller.create");
+  const canExportPersonel = hasPermission("personeller.view") || hasPermission("personeller.view.sube");
   const canApplyPersonelImport = hasPermission("personeller.import.apply");
   const canViewArsiv = hasPermission("arsiv.view");
   const navigate = useNavigate();
@@ -192,6 +194,8 @@ export function PersonellerPage() {
   const [viewMode, setViewMode] = useState<"list" | "grid">("grid");
   const [importModalOpen, setImportModalOpen] = useState(false);
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
+  const [exportBusy, setExportBusy] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
 
   const { draft, applied } = listQuery;
   const isArchiveMode = canViewArsiv && draft.aktiflik === "pasif";
@@ -204,6 +208,12 @@ export function PersonellerPage() {
       <h2 id="personeller-page-heading" className="personeller-sr-only">
         Personeller
       </h2>
+
+      {exportError ? (
+        <p className="personeller-export-error" role="alert" data-testid="personeller-export-error">
+          {exportError}
+        </p>
+      ) : null}
 
       {isArchiveMode ? (
         <p className="personeller-archive-banner" data-testid="personeller-arsiv-banner" role="status">
@@ -243,6 +253,27 @@ export function PersonellerPage() {
             </button>
           </div>
           <div className="personeller-toolbar-right">
+            {canExportPersonel ? (
+              <button
+                type="button"
+                className="universal-btn-aux personeller-import-action"
+                data-testid="personeller-export-xlsx"
+                disabled={exportBusy}
+                onClick={() => {
+                  setExportError(null);
+                  setExportBusy(true);
+                  void downloadPersonelExportXlsx()
+                    .catch((error: unknown) => {
+                      setExportError(
+                        error instanceof Error ? error.message : "Excel export başarısız."
+                      );
+                    })
+                    .finally(() => setExportBusy(false));
+                }}
+              >
+                {exportBusy ? "Excel hazırlanıyor…" : "Excel'e Aktar"}
+              </button>
+            ) : null}
             {canCreatePersonel ? (
               <button
                 type="button"

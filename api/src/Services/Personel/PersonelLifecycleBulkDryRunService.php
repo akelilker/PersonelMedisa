@@ -14,36 +14,29 @@ use PDO;
  */
 final class PersonelLifecycleBulkDryRunService
 {
-    public const SCHEMA_VERSION = 'personel-lifecycle-bulk-v1';
+    public const SCHEMA_VERSION = 'personel-lifecycle-bulk-v2';
     public const MAX_ROWS = 500;
-
-    /** @var list<string> */
-    public const OPERATION_TYPES = [
-        'YENI_GIRIS',
-        'ISTEN_AYRILMA',
-        'YENIDEN_ISE_ALMA',
-        'GOREV_UNVAN_DEGISIKLIGI',
-        'DEPARTMAN_BOLUM_BIRIM_POZISYON_DEGISIKLIGI',
-        'KALICI_SUBE_DEGISIKLIGI',
-        'CALISMA_LOKASYONU_DEGISIKLIGI',
-        'SGK_ISVERENI_DEGISIKLIGI',
-        'SADECE_NOT',
-        'DEGISIKLIK_YOK',
-    ];
 
     /**
      * @param array<string, mixed> $user
      * @param list<array<string, mixed>> $rows
      * @return array<string, mixed>
      */
-    public static function dryRun(PDO $pdo, array $user, Request $request, array $rows, $activeSubeHeader = null): array
-    {
+    public static function dryRun(
+        PDO $pdo,
+        array $user,
+        Request $request,
+        array $rows,
+        $activeSubeHeader = null,
+        ?string $deployedSha = null
+    ): array {
         if (count($rows) > self::MAX_ROWS) {
             throw new PersonelImportException('ROW_LIMIT', 'En fazla ' . self::MAX_ROWS . ' satir analiz edilebilir.');
         }
 
-        $scope = SubeScope::resolveScope($user, $activeSubeHeader);
+        $scope = $activeSubeHeader ?? SubeScope::resolveScope($user, $request);
         $seenKeys = [];
+        $seenMutationIds = [];
         $satirlar = [];
         $ready = 0;
         $blocked = 0;
@@ -51,9 +44,10 @@ final class PersonelLifecycleBulkDryRunService
 
         foreach ($rows as $index => $rawRow) {
             $rowNum = $index + 1;
-            $row = self::normalizeRow($rawRow);
-            $analysis = self::analyzeRow($pdo, $user, $request, $scope, $row, $seenKeys);
+            $row = PersonelLifecycleBulkRowContract::normalizeRow($rawRow);
+            $analysis = self::analyzeRow($pdo, $user, $request, $scope, $row, $seenKeys, $seenMutationIds);
             $analysis['satir_no'] = $rowNum;
+            $analysis['mutation_id'] = $row['mutation_id'];
             $satirlar[] = $analysis;
             if (($analysis['durum'] ?? '') === 'READY') {
                 $ready++;
@@ -64,6 +58,15 @@ final class PersonelLifecycleBulkDryRunService
             }
         }
 
+        $normalizedRows = array_map(static function (array $raw): array {
+            return PersonelLifecycleBulkRowContract::normalizeRow($raw);
+        }, $rows);
+        $postcheck = PersonelLifecycleBulkPostcheck::summarize($normalizedRows);
+        $hasLifecycleMutations = ($postcheck['create_count'] ?? 0) > 0 || ($postcheck['exit_count'] ?? 0) > 0;
+        $postcheckErrors = $hasLifecycleMutations
+            ? PersonelLifecycleBulkPostcheck::validateBindingContract($normalizedRows)
+            : [];
+
         $preimageChecksum = hash('sha256', json_encode($satirlar, JSON_UNESCAPED_UNICODE));
         $sourceChecksum = hash('sha256', json_encode($rows, JSON_UNESCAPED_UNICODE));
 
@@ -72,52 +75,60 @@ final class PersonelLifecycleBulkDryRunService
             'dry_run_checksum' => $preimageChecksum,
             'source_checksum' => $sourceChecksum,
             'preimage_checksum' => $preimageChecksum,
-            'can_apply' => $blocked === 0 && $ready > 0,
+            'deployed_sha' => $deployedSha,
+            'can_apply' => $blocked === 0 && $ready > 0 && count($postcheckErrors) === 0,
             'ozet' => [
                 'toplam_satir' => count($rows),
                 'ready' => $ready,
                 'blocked' => $blocked,
                 'no_change' => $noChange,
             ],
+            'postcheck' => $postcheck,
+            'postcheck_errors' => $postcheckErrors,
             'satirlar' => $satirlar,
             'active_sube_id' => $scope,
         ];
     }
 
     /**
-     * @param array<string, mixed> $raw
-     * @return array<string, string>
-     */
-    private static function normalizeRow(array $raw): array
-    {
-        $out = [];
-        foreach (PersonelExportService::CHANGE_TEMPLATE_HEADERS as $col) {
-            $out[$col] = trim((string) ($raw[$col] ?? ''));
-        }
-
-        return $out;
-    }
-
-    /**
      * @param array<string, mixed> $user
-     * @param array<string, string> $row
+     * @param array<string, mixed> $row
      * @param array<string, true> $seenKeys
+     * @param array<string, true> $seenMutationIds
      * @return array<string, mixed>
      */
-    private static function analyzeRow(PDO $pdo, array $user, Request $request, $scope, array $row, array &$seenKeys): array
-    {
+    private static function analyzeRow(
+        PDO $pdo,
+        array $user,
+        Request $request,
+        $scope,
+        array $row,
+        array &$seenKeys,
+        array &$seenMutationIds
+    ): array {
         $errors = [];
-        $tip = strtoupper($row['islem_tipi'] ?? '');
-        if ($tip === '') {
-            $errors[] = 'ISLEM_TIPI_EKSIK';
-        } elseif (!in_array($tip, self::OPERATION_TYPES, true)) {
-            $errors[] = 'ISLEM_TIPI_GECERSIZ';
+        $opRaw = PersonelLifecycleBulkRowContract::resolveOperationType($row);
+        $op = PersonelLifecycleBulkRowContract::mapLegacyToCanonical($opRaw);
+
+        if ($opRaw === '') {
+            $errors[] = 'OPERATION_TYPE_EKSIK';
+        } elseif (!in_array($opRaw, PersonelLifecycleBulkRowContract::OPERATION_TYPES, true)) {
+            $errors[] = 'OPERATION_TYPE_GECERSIZ';
         }
 
-        $personelId = (int) ($row['personel_id'] ?? 0);
-        $sicil = $row['sicil_no'] ?? '';
+        $mutationId = (string) ($row['mutation_id'] ?? '');
+        if ($mutationId === '') {
+            $errors[] = 'MUTATION_ID_EKSIK';
+        } elseif (isset($seenMutationIds[$mutationId])) {
+            $errors[] = 'DUPLICATE_MUTATION_ID';
+        } else {
+            $seenMutationIds[$mutationId] = true;
+        }
+
+        $personelId = (int) ($row['personel_id'] ?? ($row['payload']['personel_id'] ?? 0));
+        $sicil = trim((string) ($row['sicil_no'] ?? ''));
         $matchKey = $personelId > 0 ? 'id:' . $personelId : ($sicil !== '' ? 'sicil:' . $sicil : '');
-        if ($matchKey !== '') {
+        if ($matchKey !== '' && $op !== PersonelLifecycleBulkRowContract::OP_CREATE) {
             if (isset($seenKeys[$matchKey])) {
                 $errors[] = 'DUPLICATE_SATIR';
             }
@@ -125,7 +136,9 @@ final class PersonelLifecycleBulkDryRunService
         }
 
         $personel = null;
-        if ($tip !== 'YENI_GIRIS' && $tip !== 'SADECE_NOT') {
+        if (!in_array($op, [PersonelLifecycleBulkRowContract::OP_CREATE, PersonelLifecycleBulkRowContract::OP_REFERENCE], true)
+            && $opRaw !== 'SADECE_NOT'
+        ) {
             if ($personelId <= 0 && $sicil === '') {
                 $errors[] = 'PERSONEL_ESLESME_EKSIK';
             } else {
@@ -146,38 +159,70 @@ final class PersonelLifecycleBulkDryRunService
             }
         }
 
-        if ($tip === 'SADECE_NOT' || $tip === 'DEGISIKLIK_YOK') {
-            return self::resultRow($tip, count($errors) === 0 ? 'NO_CHANGE' : 'BLOCKED', $errors, $personel, null);
+        if ($opRaw === 'SADECE_NOT' || $opRaw === 'DEGISIKLIK_YOK') {
+            return self::resultRow($opRaw, count($errors) === 0 ? 'NO_CHANGE' : 'BLOCKED', $errors, $personel, null);
         }
 
-        if ($tip === 'YENI_GIRIS') {
-            if (trim($row['ise_giris_tarihi'] ?? '') === '') {
+        if ($op === PersonelLifecycleBulkRowContract::OP_CREATE) {
+            $payload = is_array($row['payload'] ?? null) ? $row['payload'] : [];
+            $iseGiris = trim((string) ($payload['ise_giris_tarihi'] ?? $row['ise_giris_tarihi'] ?? ''));
+            if ($iseGiris === '') {
                 $errors[] = 'ISE_GIRIS_TARIHI_EKSIK';
             }
+            if (PersonelIncompleteCreateService::hasIntent($payload)) {
+                try {
+                    PersonelIncompleteCreateService::assertAuthorized($user);
+                    PersonelIncompleteCreateService::normalizePayload($payload);
+                } catch (\Throwable $e) {
+                    $errors[] = $e instanceof PersonelValidationException ? 'INCOMPLETE_CREATE_INVALID' : 'INCOMPLETE_CREATE_FORBIDDEN';
+                }
+            } else {
+                try {
+                    PersonelCanonicalValidator::normalizeAndValidateCreatePayload($payload);
+                } catch (\Throwable $e) {
+                    $errors[] = 'STRICT_CREATE_INVALID';
+                }
+            }
 
-            return self::resultRow($tip, count($errors) === 0 ? 'READY' : 'BLOCKED', $errors, null, [
-                'mutation' => 'PersonelCreateService',
-                'plan' => 'create',
+            return self::resultRow($op, count($errors) === 0 ? 'READY' : 'BLOCKED', $errors, null, [
+                'owner' => 'PersonelCreateService',
+                'operation_type' => $op,
+                'incomplete' => PersonelIncompleteCreateService::hasIntent($payload),
+                'payload' => $payload,
+                'personel_ref' => (string) ($row['personel_ref'] ?? ''),
+            ]);
+        }
+
+        if ($op === PersonelLifecycleBulkRowContract::OP_REFERENCE) {
+            $payload = is_array($row['payload'] ?? null) ? $row['payload'] : [];
+            if (trim((string) ($payload['ad'] ?? '')) === '') {
+                $errors[] = 'REFERANS_AD_EKSIK';
+            }
+
+            return self::resultRow($op, count($errors) === 0 ? 'READY' : 'BLOCKED', $errors, null, [
+                'owner' => 'PersonelLifecycleBulkReferenceResolver',
+                'operation_type' => $op,
+                'payload' => $payload,
             ]);
         }
 
         if ($personel === null) {
-            return self::resultRow($tip, 'BLOCKED', $errors, null, null);
+            return self::resultRow($op, 'BLOCKED', $errors, null, null);
         }
 
-        $gerekce = trim($row['gerekce'] ?? '');
-        if ($gerekce === '' && $tip !== 'DEGISIKLIK_YOK') {
+        $gerekce = trim((string) ($row['gerekce'] ?? ($row['payload']['gerekce'] ?? '')));
+        if ($gerekce === '' && !in_array($op, [PersonelLifecycleBulkRowContract::OP_EXIT], true)) {
             $errors[] = 'GEREKCE_EKSIK';
         }
 
-        $plan = self::buildMutationPlan($tip, $personel, $row);
-        if ($plan === null && $tip !== 'DEGISIKLIK_YOK') {
+        $plan = self::buildMutationPlan($pdo, $op, $personel, $row);
+        if ($plan === null) {
             $errors[] = 'PLAN_URETILEMEDI';
-        } elseif ($plan !== null && ($plan['no_change'] ?? false)) {
-            return self::resultRow($tip, 'NO_CHANGE', $errors, $personel, $plan);
+        } elseif ($plan['no_change'] ?? false) {
+            return self::resultRow($op, 'NO_CHANGE', $errors, $personel, $plan);
         }
 
-        return self::resultRow($tip, count($errors) === 0 ? 'READY' : 'BLOCKED', $errors, $personel, $plan);
+        return self::resultRow($op, count($errors) === 0 ? 'READY' : 'BLOCKED', $errors, $personel, $plan);
     }
 
     /**
@@ -207,7 +252,8 @@ final class PersonelLifecycleBulkDryRunService
     {
         if ($personelId > 0) {
             $stmt = $pdo->prepare(
-                'SELECT id, sicil_no, sube_id, bolum_id, birim_id, aktif_durum, gorev_id, departman_id
+                'SELECT id, sicil_no, sube_id, bolum_id, birim_id, aktif_durum, gorev_id, departman_id,
+                        sgk_isveren_id, calisma_lokasyonu_id, pozisyon_id
                  FROM personeller WHERE id = :id LIMIT 1'
             );
             $stmt->execute(['id' => $personelId]);
@@ -217,7 +263,8 @@ final class PersonelLifecycleBulkDryRunService
         }
         if ($sicil !== '') {
             $stmt = $pdo->prepare(
-                'SELECT id, sicil_no, sube_id, bolum_id, birim_id, aktif_durum, gorev_id, departman_id
+                'SELECT id, sicil_no, sube_id, bolum_id, birim_id, aktif_durum, gorev_id, departman_id,
+                        sgk_isveren_id, calisma_lokasyonu_id, pozisyon_id
                  FROM personeller WHERE sicil_no = :sicil LIMIT 1'
             );
             $stmt->execute(['sicil' => $sicil]);
@@ -231,55 +278,97 @@ final class PersonelLifecycleBulkDryRunService
 
     /**
      * @param array<string, mixed> $personel
-     * @param array<string, string> $row
+     * @param array<string, mixed> $row
      * @return array<string, mixed>|null
      */
-    private static function buildMutationPlan(string $tip, array $personel, array $row): ?array
+    private static function buildMutationPlan(PDO $pdo, string $op, array $personel, array $row): ?array
     {
-        switch ($tip) {
-            case 'ISTEN_AYRILMA':
+        $payload = is_array($row['payload'] ?? null) ? $row['payload'] : [];
+        $personelId = (int) $personel['id'];
+        $preimage = [];
+        foreach (PersonelOrganizasyonDegisikligiService::TRACKED_FIELDS as $field) {
+            $preimage[$field] = $personel[$field] ?? null;
+        }
+
+        switch ($op) {
+            case PersonelLifecycleBulkRowContract::OP_EXIT:
                 return [
-                    'owner' => 'SureclerController::create ISTEN_AYRILMA',
-                    'personel_id' => (int) $personel['id'],
-                    'isten_cikis_tarihi' => $row['isten_cikis_tarihi'] ?? '',
+                    'owner' => 'PersonelIstenAyrilmaService',
+                    'operation_type' => $op,
+                    'personel_id' => $personelId,
+                    'exit_date' => trim((string) ($payload['exit_date'] ?? $row['isten_cikis_tarihi'] ?? '')),
+                    'aciklama' => trim((string) ($payload['aciklama'] ?? $row['gerekce'] ?? '')),
                 ];
-            case 'YENIDEN_ISE_ALMA':
+            case PersonelLifecycleBulkRowContract::OP_BASIC_UPDATE:
                 return [
-                    'owner' => 'SureclerController / rehire path',
-                    'personel_id' => (int) $personel['id'],
+                    'owner' => 'PersonelBasicUpdateService',
+                    'operation_type' => $op,
+                    'personel_id' => $personelId,
+                    'payload' => $payload,
                 ];
-            case 'GOREV_UNVAN_DEGISIKLIGI':
-                return [
-                    'owner' => 'PersonelOrganizasyonDegisikligiService',
-                    'personel_id' => (int) $personel['id'],
-                    'yeni_gorev' => $row['yeni_gorev_unvan'] ?? '',
-                    'no_change' => trim($row['yeni_gorev_unvan'] ?? '') === '',
-                ];
-            case 'KALICI_SUBE_DEGISIKLIGI':
+            case PersonelLifecycleBulkRowContract::OP_BRANCH:
                 return [
                     'owner' => 'PersonelKaliciSubeDegisikligiService',
-                    'personel_id' => (int) $personel['id'],
-                    'yeni_sube' => $row['yeni_sube'] ?? '',
+                    'operation_type' => $op,
+                    'personel_id' => $personelId,
+                    'yeni_sube_id' => (int) ($payload['yeni_sube_id'] ?? 0),
+                    'yeni_sube' => trim((string) ($payload['yeni_sube'] ?? $row['yeni_sube'] ?? '')),
+                    'gerekce' => trim((string) ($payload['gerekce'] ?? $row['gerekce'] ?? '')),
+                    'preimage_sube_id' => (int) ($personel['sube_id'] ?? 0),
                 ];
-            case 'CALISMA_LOKASYONU_DEGISIKLIGI':
-                return [
-                    'owner' => 'PersonelOrganizasyonDegisikligiService',
-                    'personel_id' => (int) $personel['id'],
-                    'yeni_calisma_lokasyonu' => $row['yeni_calisma_lokasyonu'] ?? '',
+            case PersonelLifecycleBulkRowContract::OP_ORG_UPDATE:
+                $targets = [
+                    'gorev_id' => $payload['gorev_id'] ?? null,
+                    'departman_id' => $payload['departman_id'] ?? null,
+                    'bolum_id' => $payload['bolum_id'] ?? null,
+                    'birim_id' => $payload['birim_id'] ?? null,
+                    'pozisyon_id' => $payload['pozisyon_id'] ?? null,
+                    'sgk_isveren_id' => $payload['sgk_isveren_id'] ?? null,
+                    'calisma_lokasyonu_id' => $payload['calisma_lokasyonu_id'] ?? null,
                 ];
-            case 'SGK_ISVERENI_DEGISIKLIGI':
-                return [
-                    'owner' => 'PersonelOrganizasyonDegisikligiService',
-                    'personel_id' => (int) $personel['id'],
-                    'yeni_sgk_isveren' => $row['yeni_sgk_isvereni'] ?? '',
-                ];
-            case 'DEPARTMAN_BOLUM_BIRIM_POZISYON_DEGISIKLIGI':
-                $any = trim($row['yeni_departman'] . $row['yeni_bolum'] . $row['yeni_birim'] . $row['yeni_pozisyon']);
+                if (trim((string) ($row['yeni_gorev_unvan'] ?? '')) !== '') {
+                    $targets['gorev_id'] = PersonelLifecycleBulkReferenceResolver::resolveActiveIdByName(
+                        $pdo,
+                        'gorevler',
+                        (string) $row['yeni_gorev_unvan']
+                    );
+                }
+                if (trim((string) ($row['yeni_departman'] ?? '')) !== '') {
+                    $targets['departman_id'] = PersonelLifecycleBulkReferenceResolver::resolveActiveIdByName(
+                        $pdo,
+                        'departmanlar',
+                        (string) $row['yeni_departman']
+                    );
+                }
+                if (trim((string) ($row['yeni_bolum'] ?? '')) !== '') {
+                    $targets['bolum_id'] = PersonelLifecycleBulkReferenceResolver::resolveActiveIdByName(
+                        $pdo,
+                        'bolumler',
+                        (string) $row['yeni_bolum']
+                    );
+                }
+                if (trim((string) ($row['yeni_birim'] ?? '')) !== '') {
+                    $targets['birim_id'] = PersonelLifecycleBulkReferenceResolver::resolveActiveIdByName(
+                        $pdo,
+                        'birimler',
+                        (string) $row['yeni_birim']
+                    );
+                }
+                if (trim((string) ($row['yeni_pozisyon'] ?? '')) !== '') {
+                    $targets['pozisyon_id'] = PersonelLifecycleBulkReferenceResolver::resolveActiveIdByName(
+                        $pdo,
+                        'pozisyonlar',
+                        (string) $row['yeni_pozisyon']
+                    );
+                }
 
                 return [
                     'owner' => 'PersonelOrganizasyonDegisikligiService',
-                    'personel_id' => (int) $personel['id'],
-                    'no_change' => $any === '',
+                    'operation_type' => $op,
+                    'personel_id' => $personelId,
+                    'preimage' => $preimage,
+                    'targets' => $targets,
+                    'gerekce' => trim((string) ($payload['gerekce'] ?? $row['gerekce'] ?? '')),
                 ];
             default:
                 return null;

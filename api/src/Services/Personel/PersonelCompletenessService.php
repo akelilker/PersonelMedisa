@@ -32,15 +32,21 @@ class PersonelCompletenessService
             ? "IFNULL({$a}.calisan_kapsami, 'IC_PERSONEL')"
             : "'IC_PERSONEL'";
 
-        // Org (departman/bolum/birim) + gorev/personel_tipi yalnız IC için CRITICAL.
+        // Org (departman/bolum/birim) + gorev/personel_tipi + sube/lokasyon/yonetici yalnız IC için CRITICAL.
         $icOrgPredicate = $hasOrgStructure
-            ? " OR IFNULL({$a}.departman_id, 0) <= 0"
+            ? " OR IFNULL({$a}.sube_id, 0) <= 0"
+                . " OR IFNULL({$a}.calisma_lokasyonu_id, 0) <= 0"
+                . " OR IFNULL({$a}.bagli_amir_id, 0) <= 0"
+                . " OR IFNULL({$a}.departman_id, 0) <= 0"
                 . " OR IFNULL({$a}.bolum_id, 0) <= 0"
                 . " OR IFNULL({$a}.birim_id, 0) <= 0"
                 . " OR IFNULL({$a}.gorev_id, 0) <= 0"
+                . " OR IFNULL({$a}.pozisyon_id, 0) <= 0"
                 . " OR IFNULL({$a}.personel_tipi_id, 0) <= 0"
-            : " OR IFNULL({$a}.departman_id, 0) <= 0"
+            : " OR IFNULL({$a}.sube_id, 0) <= 0"
+                . " OR IFNULL({$a}.departman_id, 0) <= 0"
                 . " OR IFNULL({$a}.gorev_id, 0) <= 0"
+                . " OR IFNULL({$a}.pozisyon_id, 0) <= 0"
                 . " OR IFNULL({$a}.personel_tipi_id, 0) <= 0";
 
         return "("
@@ -166,6 +172,30 @@ class PersonelCompletenessService
                 'scopes' => $both,
             ],
             [
+                'key' => 'sube_id',
+                'label' => 'Şube',
+                'category' => self::CATEGORY_ISTIHDAM,
+                'severity' => self::SEVERITY_CRITICAL,
+                'edit_target' => 'genel',
+                'scopes' => $icOnly,
+            ],
+            [
+                'key' => 'calisma_lokasyonu_id',
+                'label' => 'Çalışma Lokasyonu',
+                'category' => self::CATEGORY_ISTIHDAM,
+                'severity' => self::SEVERITY_CRITICAL,
+                'edit_target' => 'genel',
+                'scopes' => $icOnly,
+            ],
+            [
+                'key' => 'bagli_amir_id',
+                'label' => 'Yönetici',
+                'category' => self::CATEGORY_ISTIHDAM,
+                'severity' => self::SEVERITY_CRITICAL,
+                'edit_target' => 'genel',
+                'scopes' => $icOnly,
+            ],
+            [
                 'key' => 'departman_id',
                 'label' => 'Departman',
                 'category' => self::CATEGORY_ISTIHDAM,
@@ -192,6 +222,14 @@ class PersonelCompletenessService
             [
                 'key' => 'gorev_id',
                 'label' => 'Unvan / Görev',
+                'category' => self::CATEGORY_ISTIHDAM,
+                'severity' => self::SEVERITY_CRITICAL,
+                'edit_target' => 'genel',
+                'scopes' => $icOnly,
+            ],
+            [
+                'key' => 'pozisyon_id',
+                'label' => 'Pozisyon',
                 'category' => self::CATEGORY_ISTIHDAM,
                 'severity' => self::SEVERITY_CRITICAL,
                 'edit_target' => 'genel',
@@ -237,7 +275,11 @@ class PersonelCompletenessService
             case 'bolum_id':
             case 'birim_id':
             case 'gorev_id':
+            case 'pozisyon_id':
             case 'personel_tipi_id':
+            case 'sube_id':
+            case 'calisma_lokasyonu_id':
+            case 'bagli_amir_id':
                 return !self::hasPositiveId(isset($personel[$key]) ? $personel[$key] : null);
             default:
                 return false;

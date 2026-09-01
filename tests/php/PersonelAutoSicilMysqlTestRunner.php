@@ -235,8 +235,8 @@ try {
     }));
     sort($chain, SORT_STRING);
     autoSicilAssert(
-        end($chain) === '081_ik_personeli_rolu.sql',
-        '080 canonical migration tip'
+        end($chain) === '082_user_erisim_degisiklik_auditleri.sql',
+        '082 canonical migration tip'
     );
     autoSicilAssert(
         (int) $pdo->query(

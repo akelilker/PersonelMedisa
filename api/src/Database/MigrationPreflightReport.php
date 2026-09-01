@@ -28,21 +28,25 @@ final class MigrationPreflightReport
     public const SCHEMA_VERSION = '1';
 
     /** Expected production ledger tip before this round's first migration. */
-    public const EXPECTED_APPLIED_TIP = '079';
+    public const EXPECTED_APPLIED_TIP = '081';
 
     /**
      * The migrations this round authorizes, in apply order. Each one is a
      * separate canonical request with its own backup, so the gate must accept the
-     * chain both before the round starts and between its two applies. The version
+     * chain both before the round starts and between two applies. The version
      * number alone is never enough: slot 079 previously held a monthly-closing
      * migration that was withdrawn as business-model wrong, so names are pinned
      * next to versions here.
      *
+     * This round is the single access-change audit owner. The completed 080/081
+     * round is not re-declared here: its migrations stay applied, their ledger
+     * rows and checksums are untouched, and this gate only reasons about what
+     * comes after them.
+     *
      * @var array<string, string>
      */
     public const ROUND_MIGRATIONS = [
-        '080' => '080_organizasyon_audit_owners.sql',
-        '081' => '081_ik_personeli_rolu.sql',
+        '082' => '082_user_erisim_degisiklik_auditleri.sql',
     ];
 
     /** Withdrawn 079. Must not appear anywhere in the canonical source. */
@@ -61,14 +65,24 @@ final class MigrationPreflightReport
 
     /** Append-only audit tables this round creates. Absent is the preimage. */
     private const ROUND_AUDIT_TABLES = [
+        'user_erisim_degisiklik_auditleri',
+    ];
+
+    /**
+     * Audit owners the completed 080/081 round already delivered. This round
+     * extends that family, so finding them present is how the gate proves it is
+     * pointed at a database that actually received the previous round rather
+     * than at one that merely reports tip 081.
+     */
+    private const PREDECESSOR_AUDIT_TABLES = [
         'personel_sube_degisiklik_auditleri',
         'sube_olusturma_auditleri',
         'user_org_scope_auditleri',
         'user_erisim_kaldirma_auditleri',
     ];
 
-    /** Role 081 adds to the users.rol enum. Absent is the preimage. */
-    private const ROUND_NEW_ROLE = 'IK_PERSONELI';
+    /** Role 081 added to the users.rol enum. Present is the expected preimage. */
+    private const PREDECESSOR_ROLE = 'IK_PERSONELI';
 
     /**
      * @return array<string, mixed>
@@ -274,7 +288,12 @@ final class MigrationPreflightReport
         // Observed, not required: the audit tables this round creates and the
         // monthly-closing table the withdrawn 079 would have altered. Their
         // absence is the expected preimage, so it must not raise a blocker here.
-        foreach (array_merge(self::ROUND_AUDIT_TABLES, self::HIERARCHY_TABLES, ['aylik_kapanis_state']) as $table) {
+        foreach (array_merge(
+            self::ROUND_AUDIT_TABLES,
+            self::PREDECESSOR_AUDIT_TABLES,
+            self::HIERARCHY_TABLES,
+            ['aylik_kapanis_state']
+        ) as $table) {
             $exists = self::tableExists($pdo, $table);
             $schema[$table] = [
                 'exists' => $exists,
@@ -367,7 +386,8 @@ final class MigrationPreflightReport
             'relation_columns_present' => 0,
             'sirket_rows' => 0,
             'round_audit_tables_present' => 0,
-            'new_role_already_present' => false,
+            'predecessor_audit_tables_present' => 0,
+            'predecessor_role_present' => false,
             'sube_rows_expected_after_round' => 0,
             'user_sube_assignment_rows_expected_after_round' => 0,
             'user_rows_expected_after_round' => 0,
@@ -399,13 +419,22 @@ final class MigrationPreflightReport
         }
         $guards['round_audit_tables_present'] = $auditPresent;
 
-        // 081 only widens the users.rol enum. Finding the new role already in the
-        // enum is a resumable partial state, never a reason to write rows.
+        $predecessorPresent = 0;
+        foreach (self::PREDECESSOR_AUDIT_TABLES as $table) {
+            if (($schema[$table]['exists'] ?? false) === true) {
+                $predecessorPresent++;
+            }
+        }
+        $guards['predecessor_audit_tables_present'] = $predecessorPresent;
+
+        // 081 widened the users.rol enum. This round does not touch roles, so the
+        // role it added must already be there: its absence means the ledger tip
+        // and the actual schema disagree about whether 081 ran.
         $roleType = self::columnType($pdo, 'users', 'rol');
-        $guards['new_role_already_present'] = $roleType !== null
-            && str_contains($roleType, "'" . self::ROUND_NEW_ROLE . "'");
-        if ($guards['new_role_already_present']) {
-            $warnings[] = 'PREIMAGE_NEW_ROLE_ALREADY_PRESENT';
+        $guards['predecessor_role_present'] = $roleType !== null
+            && str_contains($roleType, "'" . self::PREDECESSOR_ROLE . "'");
+        if (!$guards['predecessor_role_present']) {
+            $blockers[] = 'PREIMAGE_PREDECESSOR_ROLE_MISSING';
         }
 
         $present = 0;
@@ -420,8 +449,8 @@ final class MigrationPreflightReport
             $guards['sirket_rows'] = self::count($pdo, 'SELECT COUNT(*) FROM sirketler');
         }
 
-        // Both migrations in this round are additive and write no data: every
-        // branch, user and user assignment must survive the applies untouched.
+        // This round is additive and writes no data: every branch, user and user
+        // assignment must survive the apply untouched.
         $guards['sube_rows_expected_after_round'] = $guards['sube_rows'];
         $guards['user_sube_assignment_rows_expected_after_round'] = $guards['user_sube_assignment_rows'];
         $guards['user_rows_expected_after_round'] = $guards['user_rows'];
@@ -452,8 +481,12 @@ final class MigrationPreflightReport
             $expectedSuffixes[] = array_values(array_slice($roundVersions, $index));
         }
         if ($pendingVersions === []) {
-            // Nothing left to authorize; a further request would be a third apply.
-            $blockers[] = 'ROUND_ALREADY_COMPLETE';
+            // Nothing left to authorize; a further request would re-apply. The
+            // healthy end state is tip 082 exactly; an empty pending set on any
+            // other tip means the chain is not the one this gate authorizes.
+            $blockers[] = $ledger['ready'] && $ledger['applied_tip'] === $roundTip
+                ? 'ROUND_ALREADY_COMPLETE'
+                : 'APPLIED_TIP_UNEXPECTED';
         } elseif (!in_array($pendingVersions, $expectedSuffixes, true)) {
             $blockers[] = 'PENDING_NOT_ROUND_SUFFIX';
         } else {
@@ -513,6 +546,15 @@ final class MigrationPreflightReport
         foreach (self::HIERARCHY_TABLES as $table) {
             if (($schema[$table]['exists'] ?? false) !== true) {
                 $blockers[] = 'PREIMAGE_HIERARCHY_TABLE_MISSING';
+            }
+        }
+
+        // The 080/081 audit owners must already be here. This round is their
+        // sibling, so their absence means the database never received the round
+        // the ledger claims is applied.
+        foreach (self::PREDECESSOR_AUDIT_TABLES as $table) {
+            if (($schema[$table]['exists'] ?? false) !== true) {
+                $blockers[] = 'PREIMAGE_PREDECESSOR_AUDIT_TABLE_MISSING';
             }
         }
 

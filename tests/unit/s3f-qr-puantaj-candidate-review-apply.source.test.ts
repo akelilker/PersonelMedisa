@@ -41,7 +41,7 @@ describe("S3F QR puantaj candidate review / apply", () => {
     const migrations = readdirSync(resolve(process.cwd(), "api/migrations"))
       .filter((name) => /^\d{3}_.+\.sql$/.test(name))
       .sort();
-    expect(migrations.at(-1)).toBe("081_ik_personeli_rolu.sql");
+    expect(migrations.at(-1)).toBe("082_user_erisim_degisiklik_auditleri.sql");
     expect(migrations).toContain("058_qr_puantaj_candidate_decision_ledger.sql");
 
     for (const n of ["052", "053", "054", "055", "056", "057"] as const) {

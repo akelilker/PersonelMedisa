@@ -30,12 +30,21 @@ final class OrganizasyonAuditWriter
     public const SUBE_CREATE_TABLE = 'sube_olusturma_auditleri';
     public const USER_SCOPE_TABLE = 'user_org_scope_auditleri';
     public const USER_ACCESS_REVOKE_TABLE = 'user_erisim_kaldirma_auditleri';
+    public const USER_ACCESS_CHANGE_TABLE = 'user_erisim_degisiklik_auditleri';
 
     public const SCOPE_SUBE = 'SUBE';
     public const SCOPE_SIRKET = 'SIRKET';
     public const SCOPE_SGK_ISVEREN = 'SGK_ISVEREN';
 
+    public const ACCESS_EVENT_RESTORE = 'ACCESS_RESTORE';
+    public const ACCESS_EVENT_STATUS = 'STATUS_CHANGE';
+    public const ACCESS_EVENT_ROLE = 'ROLE_CHANGE';
+    public const ACCESS_EVENT_USERNAME = 'USERNAME_CHANGE';
+    public const ACCESS_EVENT_BINDING = 'PERSONEL_BINDING_CHANGE';
+    public const ACCESS_EVENT_COMBINED = 'COMBINED_ACCESS_CHANGE';
+
     public const SCHEMA_NOT_READY = 'ORGANIZASYON_AUDIT_SCHEMA_NOT_READY';
+    public const ACCESS_CHANGE_SCHEMA_NOT_READY = 'USER_ACCESS_AUDIT_SCHEMA_NOT_READY';
 
     private const GEREKCE_MAX = 500;
 
@@ -53,6 +62,7 @@ final class OrganizasyonAuditWriter
             self::SUBE_CREATE_TABLE,
             self::USER_SCOPE_TABLE,
             self::USER_ACCESS_REVOKE_TABLE,
+            self::USER_ACCESS_CHANGE_TABLE,
         ];
         if (!in_array($table, $known, true)) {
             return false;
@@ -263,6 +273,138 @@ final class OrganizasyonAuditWriter
             'temizlenen_scope_satiri' => (int) $entry['temizlenen_scope_satiri'],
             'gerekce' => $gerekce === null ? null : self::clampGerekce($gerekce),
             'actor_user_id' => $context->actorUserId(),
+            'request_hash' => $context->requestHash(),
+        ]);
+
+        return (int) $pdo->lastInsertId();
+    }
+
+    /**
+     * Migration 082 gates security-impacting user access changes. A dedicated
+     * error code keeps this distinguishable from the 080 owners: an operator
+     * seeing it needs to apply 082, not one of the organisation migrations.
+     */
+    public static function assertAccessChangeReady(PDO $pdo): void
+    {
+        if (self::isReady($pdo, self::USER_ACCESS_CHANGE_TABLE)) {
+            return;
+        }
+
+        throw new OrganizasyonException(
+            409,
+            self::ACCESS_CHANGE_SCHEMA_NOT_READY,
+            'Kullanıcı erişim denetim şeması bu ortamda henüz hazır değil; denetlenemeyen erişim değişikliği reddedildi.'
+        );
+    }
+
+    /**
+     * Which access event a before/after pair represents, or null when nothing
+     * security-impacting moved.
+     *
+     * Deterministic and total, so the controller never has to decide: several
+     * axes in one request are always one COMBINED_ACCESS_CHANGE carrying every
+     * pair, never several rows that a reader would have to stitch back
+     * together. A lone reactivation is typed ACCESS_RESTORE because that is the
+     * event a reviewer searches for; any other single axis is typed by itself.
+     *
+     * @param array{durum:string, rol:string, username:string, personel_id:int|null} $before
+     * @param array{durum:string, rol:string, username:string, personel_id:int|null} $after
+     */
+    public static function resolveAccessEventType(array $before, array $after): ?string
+    {
+        $changed = [];
+        if ((string) $before['durum'] !== (string) $after['durum']) {
+            $changed[] = 'durum';
+        }
+        if ((string) $before['rol'] !== (string) $after['rol']) {
+            $changed[] = 'rol';
+        }
+        if ((string) $before['username'] !== (string) $after['username']) {
+            $changed[] = 'username';
+        }
+        if (self::nullableId($before['personel_id'] ?? null) !== self::nullableId($after['personel_id'] ?? null)) {
+            $changed[] = 'personel_id';
+        }
+
+        if (count($changed) === 0) {
+            return null;
+        }
+        if (count($changed) > 1) {
+            return self::ACCESS_EVENT_COMBINED;
+        }
+
+        switch ($changed[0]) {
+            case 'rol':
+                return self::ACCESS_EVENT_ROLE;
+            case 'username':
+                return self::ACCESS_EVENT_USERNAME;
+            case 'personel_id':
+                return self::ACCESS_EVENT_BINDING;
+            default:
+                return ((string) $before['durum'] === 'PASIF' && (string) $after['durum'] === 'AKTIF')
+                    ? self::ACCESS_EVENT_RESTORE
+                    : self::ACCESS_EVENT_STATUS;
+        }
+    }
+
+    /**
+     * Records one security-impacting access change.
+     *
+     * Only the axis that actually moved is written; an untouched axis stays
+     * NULL/NULL rather than repeating its own value, which is what makes the
+     * row readable without consulting the users table. Returns null when
+     * nothing changed, so an ordinary profile edit produces no row and does not
+     * need migration 082 to be present.
+     *
+     * Must run inside the caller's transaction: the INSERT is plain and the
+     * exception propagates, so a failed audit rolls the access change back.
+     *
+     * @param array{durum:string, rol:string, username:string, personel_id:int|null} $before
+     * @param array{durum:string, rol:string, username:string, personel_id:int|null} $after
+     */
+    public static function recordUserAccessChange(
+        PDO $pdo,
+        int $targetUserId,
+        array $before,
+        array $after,
+        OrganizasyonAuditContext $context,
+        ?string $gerekce = null
+    ): ?int {
+        $eventType = self::resolveAccessEventType($before, $after);
+        if ($eventType === null) {
+            return null;
+        }
+
+        self::assertAccessChangeReady($pdo);
+
+        $durumChanged = (string) $before['durum'] !== (string) $after['durum'];
+        $rolChanged = (string) $before['rol'] !== (string) $after['rol'];
+        $usernameChanged = (string) $before['username'] !== (string) $after['username'];
+        $beforePersonelId = self::nullableId($before['personel_id'] ?? null);
+        $afterPersonelId = self::nullableId($after['personel_id'] ?? null);
+        $personelChanged = $beforePersonelId !== $afterPersonelId;
+
+        $stmt = $pdo->prepare(
+            'INSERT INTO ' . self::USER_ACCESS_CHANGE_TABLE . ' ('
+            . 'actor_user_id, target_user_id, event_type, eski_durum, yeni_durum, eski_rol, yeni_rol,'
+            . ' eski_username, yeni_username, eski_personel_id, yeni_personel_id, gerekce, request_hash'
+            . ') VALUES ('
+            . ':actor_user_id, :target_user_id, :event_type, :eski_durum, :yeni_durum, :eski_rol, :yeni_rol,'
+            . ' :eski_username, :yeni_username, :eski_personel_id, :yeni_personel_id, :gerekce, :request_hash)'
+        );
+        $stmt->execute([
+            'actor_user_id' => $context->actorUserId(),
+            'target_user_id' => $targetUserId,
+            'event_type' => $eventType,
+            'eski_durum' => $durumChanged ? (string) $before['durum'] : null,
+            'yeni_durum' => $durumChanged ? (string) $after['durum'] : null,
+            'eski_rol' => $rolChanged ? (string) $before['rol'] : null,
+            'yeni_rol' => $rolChanged ? (string) $after['rol'] : null,
+            'eski_username' => $usernameChanged ? (string) $before['username'] : null,
+            'yeni_username' => $usernameChanged ? (string) $after['username'] : null,
+            'eski_personel_id' => $personelChanged ? $beforePersonelId : null,
+            'yeni_personel_id' => $personelChanged ? $afterPersonelId : null,
+            'gerekce' => $gerekce === null ? null : self::clampGerekce($gerekce),
             'request_hash' => $context->requestHash(),
         ]);
 

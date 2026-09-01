@@ -147,6 +147,7 @@ function dvrMigrationFiles(): array
             && basename($file) !== '079_sirket_sube_hiyerarsisi.sql'
             && basename($file) !== '080_organizasyon_audit_owners.sql'
             && basename($file) !== '081_ik_personeli_rolu.sql'
+            && basename($file) !== '082_user_erisim_degisiklik_auditleri.sql'
     ));
     sort($files, SORT_STRING);
 

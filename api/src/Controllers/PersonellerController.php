@@ -28,7 +28,10 @@ use Medisa\Api\Services\Organizasyon\OrganizasyonAuditContext;
 use Medisa\Api\Services\Organizasyon\OrganizasyonException;
 use Medisa\Api\Services\Organizasyon\OrganizasyonSchema;
 use Medisa\Api\Services\Organizasyon\SubeReadModel;
-use Medisa\Api\Services\Personel\PersonelKaliciSubeDegisikligiService;
+use Medisa\Api\Services\Personel\PersonelExportService;
+use Medisa\Api\Services\Personel\PersonelLifecycleBulkApplyService;
+use Medisa\Api\Services\Personel\PersonelLifecycleBulkDryRunService;
+use Medisa\Api\Services\Personel\PersonelOrganizasyonDegisikligiService;
 use Medisa\Api\Services\Personel\PersonelOrgLocationSchema;
 use Medisa\Api\Services\Personel\PersonelOrgStructureSchema;
 use Medisa\Api\Services\Personel\PersonelSearchPredicate;
@@ -452,6 +455,11 @@ class PersonellerController
         PersonelArchiveGate::assertBusinessWriteAllowed($pdo, $personelId);
         self::assertUpdateSubeScope($user, $request, $current, $payload);
         self::assertAktifDurumNotChanged($current, $payload);
+        try {
+            PersonelOrganizasyonDegisikligiService::assertNotChangedViaGenericPut($current, $payload);
+        } catch (OrganizasyonException $e) {
+            JsonResponse::error($e->httpStatus, $e->errorCode, $e->getMessage(), $e->field);
+        }
         if (PersonelOrgLocationSchema::payloadRequestsOrgFields($payload)
             && !PersonelOrgLocationSchema::isReady($pdo)
         ) {
@@ -631,6 +639,170 @@ class PersonellerController
 
             JsonResponse::serverError('Kayit guncellenemedi.');
         }
+    }
+
+    public static function exportXlsx(Request $request)
+    {
+        $user = AuthMiddleware::authenticate($request, true);
+        RolePermissions::assertAny($user, ['personeller.view', 'personeller.view.sube']);
+
+        try {
+            $pdo = Connection::get();
+        } catch (\Throwable $e) {
+            JsonResponse::serverError('Veritabani baglantisi kurulamadi.');
+        }
+
+        $activeSube = SubeScope::resolveScope($user, $request);
+        $deploySha = self::resolveDeploySha();
+
+        try {
+            $result = PersonelExportService::buildWorkbook($pdo, $user, $activeSube, $deploySha);
+        } catch (\RuntimeException $e) {
+            if (strpos($e->getMessage(), 'PERSONEL_EXPORT_RECONCILE_FAILED') !== false) {
+                JsonResponse::error(409, 'PERSONEL_EXPORT_RECONCILE_FAILED', 'Export satir sayisi dogrulanamadi.');
+            }
+            JsonResponse::serverError('Personel export uretilemedi.');
+        }
+
+        $filename = 'personel-export-' . gmdate('Y-m-d') . '.xlsx';
+        if (!headers_sent()) {
+            header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+            header('Content-Disposition: attachment; filename="' . $filename . '"');
+            header('X-Personel-Export-Row-Count: ' . (int) ($result['meta']['row_count'] ?? 0));
+            header('X-Personel-Export-Scope: ' . (string) ($result['meta']['filter_scope'] ?? ''));
+            http_response_code(200);
+        }
+        echo $result['binary'];
+        exit;
+    }
+
+    public static function lifecycleBulkDryRun(Request $request)
+    {
+        $user = AuthMiddleware::authenticate($request, true);
+        RolePermissions::assertAny($user, ['personeller.create', 'personeller.update']);
+
+        $body = $request->getJsonBody();
+        $rows = $body['rows'] ?? null;
+        if (!is_array($rows)) {
+            JsonResponse::error(422, 'ROWS_REQUIRED', 'Lifecycle dry-run icin rows dizisi zorunludur.');
+        }
+
+        try {
+            $pdo = Connection::get();
+        } catch (\Throwable $e) {
+            JsonResponse::serverError('Veritabani baglantisi kurulamadi.');
+        }
+
+        $activeSube = SubeScope::resolveScope($user, $request);
+        try {
+            $result = PersonelLifecycleBulkDryRunService::dryRun($pdo, $user, $request, $rows, $activeSube);
+        } catch (PersonelImportException $e) {
+            JsonResponse::error($e->getHttpStatus(), $e->getCodeString(), $e->getMessage());
+        }
+
+        JsonResponse::success($result);
+    }
+
+    public static function lifecycleBulkApply(Request $request)
+    {
+        $user = AuthMiddleware::authenticate($request, true);
+        RolePermissions::assert($user, 'personeller.import.apply');
+
+        $body = $request->getJsonBody();
+        $rows = $body['rows'] ?? null;
+        if (!is_array($rows)) {
+            JsonResponse::error(422, 'ROWS_REQUIRED', 'Lifecycle apply icin rows dizisi zorunludur.');
+        }
+        $dryRunChecksum = trim((string) ($body['dry_run_checksum'] ?? ''));
+        $preimageChecksum = trim((string) ($body['preimage_checksum'] ?? ''));
+        if ($dryRunChecksum === '' || $preimageChecksum === '') {
+            JsonResponse::error(422, 'CHECKSUM_REQUIRED', 'Dry-run checksum ve preimage checksum zorunludur.');
+        }
+
+        try {
+            $pdo = Connection::get();
+        } catch (\Throwable $e) {
+            JsonResponse::serverError('Veritabani baglantisi kurulamadi.');
+        }
+
+        $activeSube = SubeScope::resolveScope($user, $request);
+        try {
+            $result = PersonelLifecycleBulkApplyService::apply(
+                $pdo,
+                $user,
+                $request,
+                $rows,
+                $dryRunChecksum,
+                $preimageChecksum,
+                $activeSube
+            );
+        } catch (PersonelImportException $e) {
+            JsonResponse::error($e->getHttpStatus(), $e->getCodeString(), $e->getMessage());
+        }
+
+        JsonResponse::success($result);
+    }
+
+    public static function organizasyonDegisikligi(Request $request, $personelId)
+    {
+        $user = AuthMiddleware::authenticate($request, true);
+        self::assertWriteRole($user, 'personeller.update');
+
+        $personelId = (int) $personelId;
+        if ($personelId <= 0) {
+            JsonResponse::notFound();
+        }
+
+        try {
+            $pdo = Connection::get();
+        } catch (\Throwable $e) {
+            JsonResponse::serverError('Veritabani baglantisi kurulamadi.');
+        }
+
+        PersonelArchiveGate::assertBusinessWriteAllowed($pdo, $personelId);
+        $body = $request->getJsonBody();
+        $idemKey = OfflineMutationIdempotencyService::readKey($request);
+        $auditContext = OrganizasyonAuditContext::fromRequest($request, $user, $idemKey);
+
+        try {
+            $result = PersonelOrganizasyonDegisikligiService::apply(
+                $pdo,
+                $user,
+                $request,
+                $personelId,
+                $body,
+                $auditContext
+            );
+        } catch (OrganizasyonException $e) {
+            JsonResponse::error($e->httpStatus, $e->errorCode, $e->getMessage(), $e->field);
+        }
+
+        $row = self::fetchPersonelRowById($pdo, $personelId);
+        if (!$row) {
+            JsonResponse::notFound();
+        }
+
+        JsonResponse::success([
+            'organizasyon' => $result,
+            'personel' => self::mapPersonelRow($row, $user),
+        ]);
+    }
+
+    private static function resolveDeploySha()
+    {
+        $fromEnv = getenv('MEDISA_DEPLOY_SHA');
+        if (is_string($fromEnv) && preg_match('/^[a-f0-9]{40}$/i', trim($fromEnv))) {
+            return strtolower(trim($fromEnv));
+        }
+        $path = getenv('MEDISA_DEPLOY_SHA_PATH');
+        if (is_string($path) && is_readable($path)) {
+            $raw = trim((string) file_get_contents($path));
+            if (preg_match('/^[a-f0-9]{40}$/i', $raw)) {
+                return strtolower($raw);
+            }
+        }
+
+        return 'unknown';
     }
 
     public static function importTemplate(Request $request)

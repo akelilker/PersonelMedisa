@@ -31,6 +31,7 @@ final class OrganizasyonAuditWriter
     public const USER_SCOPE_TABLE = 'user_org_scope_auditleri';
     public const USER_ACCESS_REVOKE_TABLE = 'user_erisim_kaldirma_auditleri';
     public const USER_ACCESS_CHANGE_TABLE = 'user_erisim_degisiklik_auditleri';
+    public const PERSONEL_ORG_CHANGE_TABLE = 'personel_organizasyon_degisiklik_auditleri';
 
     public const SCOPE_SUBE = 'SUBE';
     public const SCOPE_SIRKET = 'SIRKET';
@@ -45,6 +46,7 @@ final class OrganizasyonAuditWriter
 
     public const SCHEMA_NOT_READY = 'ORGANIZASYON_AUDIT_SCHEMA_NOT_READY';
     public const ACCESS_CHANGE_SCHEMA_NOT_READY = 'USER_ACCESS_AUDIT_SCHEMA_NOT_READY';
+    public const PERSONEL_ORG_CHANGE_SCHEMA_NOT_READY = 'PERSONEL_ORGANIZASYON_AUDIT_SCHEMA_NOT_READY';
 
     private const GEREKCE_MAX = 500;
 
@@ -63,6 +65,7 @@ final class OrganizasyonAuditWriter
             self::USER_SCOPE_TABLE,
             self::USER_ACCESS_REVOKE_TABLE,
             self::USER_ACCESS_CHANGE_TABLE,
+            self::PERSONEL_ORG_CHANGE_TABLE,
         ];
         if (!in_array($table, $known, true)) {
             return false;
@@ -445,6 +448,59 @@ final class OrganizasyonAuditWriter
         sort($normalized);
 
         return $normalized;
+    }
+
+    public static function assertPersonelOrganizasyonReady(PDO $pdo): void
+    {
+        if (self::isReady($pdo, self::PERSONEL_ORG_CHANGE_TABLE)) {
+            return;
+        }
+
+        throw new OrganizasyonException(
+            409,
+            self::PERSONEL_ORG_CHANGE_SCHEMA_NOT_READY,
+            'Personel organizasyon denetim şeması bu ortamda henüz hazır değil; denetlenemeyen organizasyon değişikliği reddedildi.'
+        );
+    }
+
+    /**
+     * @param array{
+     *   personel_id:int,
+     *   olay_tipi:string,
+     *   degisen_alanlar:array<int, string>,
+     *   eski_degerler:array<string, mixed>,
+     *   yeni_degerler:array<string, mixed>,
+     *   gerekce:string
+     * } $entry
+     */
+    public static function recordPersonelOrganizasyonDegisikligi(
+        PDO $pdo,
+        array $entry,
+        OrganizasyonAuditContext $context
+    ): int {
+        self::assertPersonelOrganizasyonReady($pdo);
+
+        $stmt = $pdo->prepare(
+            'INSERT INTO ' . self::PERSONEL_ORG_CHANGE_TABLE . ' ('
+            . 'personel_id, olay_tipi, degisen_alanlar, eski_degerler, yeni_degerler,'
+            . ' gerekce, actor_user_id, request_hash, idempotency_key'
+            . ') VALUES ('
+            . ':personel_id, :olay_tipi, :degisen_alanlar, :eski_degerler, :yeni_degerler,'
+            . ' :gerekce, :actor_user_id, :request_hash, :idempotency_key)'
+        );
+        $stmt->execute([
+            'personel_id' => (int) $entry['personel_id'],
+            'olay_tipi' => (string) $entry['olay_tipi'],
+            'degisen_alanlar' => json_encode(array_values($entry['degisen_alanlar']), JSON_UNESCAPED_UNICODE),
+            'eski_degerler' => json_encode($entry['eski_degerler'], JSON_UNESCAPED_UNICODE),
+            'yeni_degerler' => json_encode($entry['yeni_degerler'], JSON_UNESCAPED_UNICODE),
+            'gerekce' => self::clampGerekce((string) $entry['gerekce']),
+            'actor_user_id' => $context->actorUserId(),
+            'request_hash' => $context->requestHash(),
+            'idempotency_key' => $context->idempotencyKey(),
+        ]);
+
+        return (int) $pdo->lastInsertId();
     }
 
     /** Test helper — clear process cache. */

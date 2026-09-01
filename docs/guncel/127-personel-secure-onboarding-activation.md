@@ -1,74 +1,74 @@
-﻿# Personel GÃ¼venli Hesap AÃ§ma ve Aktivasyon
+# Personel Güvenli Hesap Açma ve Aktivasyon
 
-**Durum:** kaynakta uygulandÄ± / canlÄ±ya henÃ¼z uygulanmadÄ±
+**Durum:** kaynakta uygulandı / canlıya henüz uygulanmadı
 **Migration:** `075_personel_account_activation.sql`
 **Sahip servis:** `PersonelAccountOnboardingService`
 
-## KullanÄ±cÄ± adÄ± kuralÄ±
+## Kullanıcı adı kuralı
 
-| Kural | DeÄŸer |
+| Kural | Değer |
 |------|--------|
-| BiÃ§im | Ä°lk ad (kÃ¼Ã§Ã¼k Latin) + soyadÄ±n ilk harfi (bÃ¼yÃ¼k Latin) |
-| Ã–rnek | Ä°lker AKEL â†’ `ilkerA` |
-| Ã‡oklu ad | YalnÄ±z `ad` alanÄ±nÄ±n ilk kelimesi kullanÄ±lÄ±r (Mehmet Ali YILMAZ â†’ `mehmetY`) |
-| TÃ¼rkÃ§e karakter | Ã§/ÄŸ/Ä±/Ä°/Ã¶/ÅŸ/Ã¼ â†’ Latin eÅŸleri; boÅŸluk/nokta/tire temizlenir |
-| Sicil numarasÄ± | KullanÄ±cÄ± adÄ± **deÄŸildir** ve Ã¼retime katÄ±lmaz |
-| Sicil deÄŸiÅŸince | KullanÄ±cÄ± adÄ± **deÄŸiÅŸmez** |
-| Mevcut hesaplar | KullanÄ±cÄ± adlarÄ± **deÄŸiÅŸtirilmez** (backfill yok) |
-| Ã‡akÄ±ÅŸma | Otomatik sayÄ± eklenmez; yetkiliye â€œBu kullanÄ±cÄ± adÄ± zaten kullanÄ±lÄ±yor. FarklÄ± bir kullanÄ±cÄ± adÄ± belirleyin.â€ uyarÄ±sÄ± |
+| Biçim | İlk ad (küçük Latin) + soyadın ilk harfi (büyük Latin) |
+| Örnek | İlker AKEL → `ilkerA` |
+| Çoklu ad | Yalnız `ad` alanının ilk kelimesi kullanılır (Mehmet Ali YILMAZ → `mehmetY`) |
+| Türkçe karakter | ç/ğ/ı/İ/ö/ş/ü → Latin eşleri; boşluk/nokta/tire temizlenir |
+| Sicil numarası | Kullanıcı adı **değildir** ve üretime katılmaz |
+| Sicil değişince | Kullanıcı adı **değişmez** |
+| Mevcut hesaplar | Kullanıcı adları **değiştirilmez** (backfill yok) |
+| Çakışma | Otomatik sayı eklenmez; yetkiliye “Bu kullanıcı adı zaten kullanılıyor. Farklı bir kullanıcı adı belirleyin.” uyarısı |
 
-## Åifre kuralÄ±
+## Şifre kuralı
 
-YÃ¶netici / Ä°K / Genel YÃ¶netici personelin ÅŸifresini seÃ§mez, gÃ¶rmez, Ã¶ÄŸrenmez.
+Yönetici / İK / Genel Yönetici personelin şifresini seçmez, görmez, öğrenmez.
 
-Personel, tek kullanÄ±mlÄ±k aktivasyon baÄŸlantÄ±sÄ± Ã¼zerinden kendi ÅŸifresini belirler.
+Personel, tek kullanımlık aktivasyon bağlantısı üzerinden kendi şifresini belirler.
 
-Sonraki giriÅŸ: kullanÄ±cÄ± adÄ± (Ã¶r. `ilkerA`) + personelin kendi ÅŸifresi.
+Sonraki giriş: kullanıcı adı (ör. `ilkerA`) + personelin kendi şifresi.
 
-## AkÄ±ÅŸ (yalnÄ±z yeni onboarding)
+## Akış (yalnız yeni onboarding)
 
-1. YÃ¶netici/Ä°K: **Personel HesabÄ± OluÅŸtur** (ÅŸifre alanÄ± yok; kullanÄ±cÄ± adÄ± Ã¶nerisi otomatik)
-2. Sunucu `PERSONEL` kullanÄ±cÄ± oluÅŸturur; iÃ§ kullanÄ±m iÃ§in rastgele kullanÄ±lamaz kimlik bilgisi hashâ€™lenir (dÃ¶nÃ¼lmez)
+1. Yönetici/İK: **Personel Hesabı Oluştur** (şifre alanı yok; kullanıcı adı önerisi otomatik)
+2. Sunucu `PERSONEL` kullanıcı oluşturur; iç kullanım için rastgele kullanılamaz kimlik bilgisi hash’lenir (dönülmez)
 3. `activation_required=1`, `must_change_password=1`
-4. Tek kullanÄ±mlÄ±k aktivasyon daveti: yalnÄ±z SHA-256 hash saklanÄ±r; ham token bir kez URL olarak dÃ¶ner
-5. Personel `/personel-aktivasyon#token=â€¦` aÃ§ar, ÅŸifresini seÃ§er
-6. Token tÃ¼ketilir; `activation_required=0`, `must_change_password=0`
+4. Tek kullanımlık aktivasyon daveti: yalnız SHA-256 hash saklanır; ham token bir kez URL olarak döner
+5. Personel `/personel-aktivasyon#token=…` açar, şifresini seçer
+6. Token tüketilir; `activation_required=0`, `must_change_password=0`
 
-## Aktivasyon gÃ¼venliÄŸi
+## Aktivasyon güvenliği
 
-- Token entropisi â‰¥ 256 bit (`random_bytes(32)` â†’ hex)
-- TTL sahibi: `medisa_config('personel_activation_ttl_minutes')` (varsayÄ±lan **1440**)
-- Genel URL sahibi: `medisa_config('app_public_url')` (Host baÅŸlÄ±ÄŸÄ±na gÃ¼venilmez)
-- Fragment taÅŸÄ±ma (`#token=`); sayfa fragmentâ€™i hemen temizler
-- Issue/reissue yanÄ±tlarÄ±: `Cache-Control: no-store` + `Referrer-Policy: no-referrer`
-- Bekleyen kullanÄ±cÄ± baÅŸÄ±na en fazla bir canlÄ± davet (transactional revoke + insert)
-- EÅŸzamanlÄ± redeem: satÄ±r kilitleri â†’ tam olarak bir baÅŸarÄ±
+- Token entropisi ≥ 256 bit (`random_bytes(32)` → hex)
+- TTL sahibi: `medisa_config('personel_activation_ttl_minutes')` (varsayılan **1440**)
+- Genel URL sahibi: `medisa_config('app_public_url')` (Host başlığına güvenilmez)
+- Fragment taşıma (`#token=`); sayfa fragment’i hemen temizler
+- Issue/reissue yanıtları: `Cache-Control: no-store` + `Referrer-Policy: no-referrer`
+- Bekleyen kullanıcı başına en fazla bir canlı davet (transactional revoke + insert)
+- Eşzamanlı redeem: satır kilitleri → tam olarak bir başarı
 
-Ã–rnek aktivasyon URL ÅŸekli:
+Örnek aktivasyon URL şekli:
 
 `https://www.karmotors.com.tr/personelmedisa/personel-aktivasyon#token=<gizli>`
 
 ## Mevcut hesaplar
 
-Grandfathered. Migration yalnÄ±z gÃ¼venli varsayÄ±lanlarla sÃ¼tun/tablo ekler:
+Grandfathered. Migration yalnız güvenli varsayılanlarla sütun/tablo ekler:
 
-- kullanÄ±cÄ± adlarÄ±nÄ± yeniden adlandÄ±rmaz
-- ÅŸifreleri sÄ±fÄ±rlamaz
+- kullanıcı adlarını yeniden adlandırmaz
+- şifreleri sıfırlamaz
 - aktivasyon beklemeye almaz
-- rol/baÄŸlantÄ± deÄŸiÅŸtirmez
-- davet Ã¼retmez
+- rol/bağlantı değiştirmez
+- davet üretmez
 
 ## DIS_KAYNAK
 
-AynÄ± teknik onboarding/aktivasyon serbesttir.
-`PersonelMobileCapabilityService` iÅŸ yeteneklerini ÅŸu mesajla kapalÄ± tutmaya devam eder:
+Aynı teknik onboarding/aktivasyon serbesttir.
+`PersonelMobileCapabilityService` iş yeteneklerini şu mesajla kapalı tutmaya devam eder:
 
-> YapÄ±m AÅŸamasÄ±ndadÄ±r. Onay Bekleyen Kapsamlar TamamlandÄ±ÄŸÄ±nda KullanÄ±ma AÃ§Ä±lacaktÄ±r.
+> Yapım Aşamasındadır. Onay Bekleyen Kapsamlar Tamamlandığında Kullanıma Açılacaktır.
 
-## Genel oluÅŸturma bypass
+## Genel oluşturma bypass
 
-`POST /yonetim/kullanicilar` ile `rol=PERSONEL` + `personel_id` â†’ `PERSONEL_USE_SECURE_ONBOARDING`.
-Personel dÄ±ÅŸÄ± yÃ¶netim/sistem kullanÄ±cÄ± oluÅŸturma deÄŸiÅŸmez.
+`POST /yonetim/kullanicilar` ile `rol=PERSONEL` + `personel_id` → `PERSONEL_USE_SECURE_ONBOARDING`.
+Personel dışı yönetim/sistem kullanıcı oluşturma değişmez.
 
 ## API
 
@@ -80,16 +80,16 @@ Personel dÄ±ÅŸÄ± yÃ¶netim/sistem kullanÄ±cÄ± oluÅŸturma deÄŸiÅ�
 | POST | `/auth/personel-activation/status` | public (token) |
 | POST | `/auth/personel-activation/complete` | public (token) |
 
-Ä°steÄŸe baÄŸlÄ± gÃ¶vde alanÄ±: `username` â€” yalnÄ±z Ã§akÄ±ÅŸma sonrasÄ± yetkili alternatif kullanÄ±cÄ± adÄ±.
+İsteğe bağlı gövde alanı: `username` — yalnız çakışma sonrası yetkili alternatif kullanıcı adı.
 
-## CanlÄ±ya alma kapÄ±sÄ±
+## Canlıya alma kapısı
 
-- `PRODUCTION_MIGRATION_APPLY = NO` aÃ§Ä±k ops onayÄ± olmadan
+- `PRODUCTION_MIGRATION_APPLY = NO` açık ops onayı olmadan
 - Mevcut aktif kadroyu toplu yeniden provision etme
-- Migration + `app_public_url` hazÄ±r olmadan canlÄ±ya deploy etme
+- Migration + `app_public_url` hazır olmadan canlıya deploy etme
 
-## Denetim olaylarÄ±
+## Denetim olayları
 
 `PERSONEL_ACCOUNT_CREATED`, `PERSONEL_ACCOUNT_BOUND`, `ACTIVATION_LINK_ISSUED`, `ACTIVATION_LINK_REISSUED`, `ACTIVATION_COMPLETED`, `ACTIVATION_REVOKED`
 
-DÃ¼z metin ÅŸifre, ÅŸifre hashâ€™i, ham token veya tam aktivasyon URLâ€™si denetlenmez.
+Düz metin şifre, şifre hash’i, ham token veya tam aktivasyon URL’si denetlenmez.

@@ -1,4 +1,4 @@
-﻿# 130 â€” DIS_KAYNAK operasyonel / finansal ayrÄ±m ve org gÃ¶revlendirme
+# 130 — DIS_KAYNAK operasyonel / finansal ayrım ve org görevlendirme
 
 **Tarih:** 2026-08-28
 **Branch:** `feat/dis-kaynak-operational-nonfinancial`
@@ -7,87 +7,87 @@
 
 ## SUPERSEDES
 
-`docs/guncel/127-external-worker-directory-only.md` iÃ§indeki ÅŸu karar **bayattÄ±r / SUPERSEDED**:
+`docs/guncel/127-external-worker-directory-only.md` içindeki şu karar **bayattır / SUPERSEDED**:
 
-> "DIS_KAYNAK SGK, bordro ve zaman operasyonlarÄ±na girmez."
+> "DIS_KAYNAK SGK, bordro ve zaman operasyonlarına girmez."
 
-Yeni otoriter model: **zaman/operasyon â‰  finansal/iÅŸveren**.
+Yeni otoriter model: **zaman/operasyon ≠ finansal/işveren**.
 
-## ÃœÃ§ baÄŸÄ±msÄ±z boyut
+## Üç bağımsız boyut
 
-| Boyut | Anlam | DIS davranÄ±ÅŸÄ± |
+| Boyut | Anlam | DIS davranışı |
 | --- | --- | --- |
-| A) `calisan_kapsami` | SGK / Ã¼cret / gerÃ§ek bordro / banka yÃ¼kÃ¼mlÃ¼lÃ¼ÄŸÃ¼ | `DIS_KAYNAK` = PersonelMedisa iÅŸveren mali kapsamÄ± dÄ±ÅŸÄ±nda |
-| B) Organizasyon baÄŸlantÄ±sÄ± | Åube/Dep/BÃ¶lÃ¼m/Birim | TamamÄ± veya bir kÄ±smÄ± NULL olabilir (baÄŸlantÄ±sÄ±z havuz meÅŸru) |
-| C) Rol / yetki | `RolePermissions` + `OrgScope` | DIS olduÄŸu iÃ§in rol engellenmez |
+| A) `calisan_kapsami` | SGK / ücret / gerçek bordro / banka yükümlülüğü | `DIS_KAYNAK` = PersonelMedisa işveren mali kapsamı dışında |
+| B) Organizasyon bağlantısı | Şube/Dep/Bölüm/Birim | Tamamı veya bir kısmı NULL olabilir (bağlantısız havuz meşru) |
+| C) Rol / yetki | `RolePermissions` + `OrgScope` | DIS olduğu için rol engellenmez |
 
 ## Operasyonel vs finansal owner
 
 Merkezi owner: `PersonelCalisanKapsamService`
 
-- `assertTimeOperationalEligible` â€” DIS org veya aktif geÃ§ici gÃ¶revlendirme ile **dahil** (effective `sube_id` ÅŸart)
-- `assertFinancialEligible` / `sqlIcPersonelPredicate` â€” DIS **kesin dÄ±ÅŸarÄ±da**
-- `assertSgkIsverenAllowed` â€” `DIS_KAYNAK_SGK_ISVEREN_YASAK` korunur
-- Ambiguous `assertOperationalEligible*` **kaldÄ±rÄ±ldÄ±**; caller'lar explicit time/finans seÃ§er
+- `assertTimeOperationalEligible` — DIS org veya aktif geçici görevlendirme ile **dahil** (effective `sube_id` şart)
+- `assertFinancialEligible` / `sqlIcPersonelPredicate` — DIS **kesin dışarıda**
+- `assertSgkIsverenAllowed` — `DIS_KAYNAK_SGK_ISVEREN_YASAK` korunur
+- Ambiguous `assertOperationalEligible*` **kaldırıldı**; caller'lar explicit time/finans seçer
 
 ## Effective org (canonical)
 
 Owner: `PersonelOperationalContextService`
 
-- `resolveNow(personelId)` â€” current business-time (Europe/Istanbul)
-- `resolveAt(personelId, timestamp)` â€” tarihsel (QR `occurred_at_utc` â†’ Istanbul); soft-end sonrasÄ± correction iÃ§in kapsayan pencere
+- `resolveNow(personelId)` — current business-time (Europe/Istanbul)
+- `resolveAt(personelId, timestamp)` — tarihsel (QR `occurred_at_utc` → Istanbul); soft-end sonrası correction için kapsayan pencere
 
-Ã–ncelik: **aktif/kapsayan geÃ§ici gÃ¶revlendirme â†’ yoksa permanent org**.
+Öncelik: **aktif/kapsayan geçici görevlendirme → yoksa permanent org**.
 Effective: `sube_id`, `departman_id`, `bolum_id`, `birim_id`.
 `personeller.*` overwrite edilmez.
 
-Partial org (Ã¶r. yalnÄ±z `bolum_id`, effective ÅŸube yok): completeness kÄ±rmÄ±zÄ± olmayabilir; **QR/puantaj operational ready sayÄ±lmaz** (fail-closed).
+Partial org (ör. yalnız `bolum_id`, effective şube yok): completeness kırmızı olmayabilir; **QR/puantaj operational ready sayılmaz** (fail-closed).
 
-## GeÃ§ici gÃ¶revlendirme
+## Geçici görevlendirme
 
 Tablo: `personel_gecici_gorevlendirmeler` (migration 076).
 
-- **`hedef_sube_id` explicit zorunlu** â€” silent `ORDER BY sube_id LIMIT 1` yok
-- Zincir fail-closed: `hedef_sube_id` â†’ `sube_departmanlar` â†’ bÃ¶lÃ¼mÃ¼n departmanÄ± â†’ (opsiyonel) birim aynÄ± bÃ¶lÃ¼m
-- Atomik create: transaction + `personeller` `SELECT â€¦ FOR UPDATE` + overlap yeniden kontrol + INSERT
-- Overlap â†’ `GECICI_GOREVLENDIRME_CAKISMA`; bitiÅŸmeyen aralÄ±klar (01â€“05 / 06â€“10) serbest
+- **`hedef_sube_id` explicit zorunlu** — silent `ORDER BY sube_id LIMIT 1` yok
+- Zincir fail-closed: `hedef_sube_id` → `sube_departmanlar` → bölümün departmanı → (opsiyonel) birim aynı bölüm
+- Atomik create: transaction + `personeller` `SELECT … FOR UPDATE` + overlap yeniden kontrol + INSERT
+- Overlap → `GECICI_GOREVLENDIRME_CAKISMA`; bitişmeyen aralıklar (01–05 / 06–10) serbest
 - Soft-end; hard delete yok; ikinci end reject; `bitis >= baslangic`
 
 ## OrgScope / SubeScope
 
-076 hazÄ±rsa `appendPersonelOrgFilter` / `assertPersonelAccess` aktif gÃ¶revlendirme `hedef_*` alanlarÄ±nÄ± OR eder.
-076 yoksa 075 permanent-only davranÄ±ÅŸ (fatal SQL yok).
+076 hazırsa `appendPersonelOrgFilter` / `assertPersonelAccess` aktif görevlendirme `hedef_*` alanlarını OR eder.
+076 yoksa 075 permanent-only davranış (fatal SQL yok).
 
 ## Puantaj / zaman bulk
 
-`p.sube_id = :sube_id` adaylarÄ± `sqlPersonelMatchesEffectiveSube` ile assignment-aware.
-Finansal/SGK/bordro/banka SQL'leri yalnÄ±z `sqlFinancialEligiblePredicate` (IC) â€” DIS assignment olsa bile **0 aday**.
+`p.sube_id = :sube_id` adayları `sqlPersonelMatchesEffectiveSube` ile assignment-aware.
+Finansal/SGK/bordro/banka SQL'leri yalnız `sqlFinancialEligiblePredicate` (IC) — DIS assignment olsa bile **0 aday**.
 
 ## Correction approver
 
-`AttendanceCorrectionApproverResolver` event zamanÄ±ndaki effective org ile Ã§Ã¶zÃ¼lÃ¼r (`resolveAt`).
-Zincir: BIRIM_AMIRI â†’ BOLUM_YONETICISI â†’ GENEL_YONETICI.
+`AttendanceCorrectionApproverResolver` event zamanındaki effective org ile çözülür (`resolveAt`).
+Zincir: BIRIM_AMIRI → BOLUM_YONETICISI → GENEL_YONETICI.
 `SUBE_YONETICISI` zincire eklenmez. Self-approval yok.
 
 ## Completeness
 
-DIS iÃ§in `departman_id` / `bolum_id` / `birim_id` / `gorev_id` / `personel_tipi_id` CRITICAL deÄŸildir.
-IC davranÄ±ÅŸÄ± deÄŸiÅŸmez.
+DIS için `departman_id` / `bolum_id` / `birim_id` / `gorev_id` / `personel_tipi_id` CRITICAL değildir.
+IC davranışı değişmez.
 
 ## Mobil
 
 DIS: `shell` + `qr_scan` + `attendance_correct` = true.
 `izin_write` fail-closed.
-UI: "DIÅ KAYNAK â€” BÄ°LGÄ° AMAÃ‡LIDIR / ÃœCRET VE SGK TAHAKKUKU OLUÅTURMAZ"
+UI: "DIŞ KAYNAK — BİLGİ AMAÇLIDIR / ÜCRET VE SGK TAHAKKUKU OLUŞTURMAZ"
 
-## Finansal kesin kapalÄ± (assignment olsa bile)
+## Finansal kesin kapalı (assignment olsa bile)
 
-REAL_PAYROLL / SGK / BANK_EXPORT / ÃœCRET_TAHAKKUKU = HAYIR.
+REAL_PAYROLL / SGK / BANK_EXPORT / ÜCRET_TAHAKKUKU = HAYIR.
 
-## Bilgi amaÃ§lÄ± Ã§alÄ±ÅŸma Ã¶zeti
+## Bilgi amaçlı çalışma özeti
 
-QR/puantaj operasyonel kayÄ±tlarÄ± gerÃ§ek zaman kaydÄ±dÄ±r.
-GerÃ§ek bordro/SGK/banka pipeline'Ä±na DIS eklenmez; Ã¼cret tahakkuku Ã¼retilmez.
+QR/puantaj operasyonel kayıtları gerçek zaman kaydıdır.
+Gerçek bordro/SGK/banka pipeline'ına DIS eklenmez; ücret tahakkuku üretilmez.
 
 ## Gap registry / production kapanis
 

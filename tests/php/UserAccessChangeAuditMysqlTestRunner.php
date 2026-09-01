@@ -30,7 +30,9 @@ use Medisa\Api\Http\Request;
 
 const UACA_AUDIT_TABLE = 'user_erisim_degisiklik_auditleri';
 const UACA_REVOKE_TABLE = 'user_erisim_kaldirma_auditleri';
+const UACA_ORG_AUDIT_TABLE = 'personel_organizasyon_degisiklik_auditleri';
 const UACA_MIGRATION_082 = '082_user_erisim_degisiklik_auditleri.sql';
+const UACA_MIGRATION_083 = '083_personel_organizasyon_degisiklik_auditleri.sql';
 
 function uacaAssert(bool $ok, string $name): void
 {
@@ -316,20 +318,28 @@ $root->exec('CREATE DATABASE `' . $db . '` CHARACTER SET utf8mb4 COLLATE utf8mb4
 try {
     $pdo = uacaPdo($baseDsn . ';dbname=' . $db);
 
-    // The canonical chain in order, so 082 is proven to apply on the production
-    // schema shape rather than on a hand-built subset. 067 is the reference-data
-    // gate and needs a populated catalog no schema test has; it owns nothing this
-    // contract touches, so it is the one file skipped.
+    // The canonical chain in order through tip 083, so 082 is proven to apply on the
+    // production schema shape and 083 is proven not to disturb the access-change
+    // audit owner. 067 is the reference-data gate and needs a populated catalog no
+    // schema test has; it owns nothing this contract touches, so it is the one file skipped.
     $chain = array_values(array_filter(
         scandir(__DIR__ . '/../../api/migrations') ?: [],
         static fn ($name): bool => (bool) preg_match('/^\d{3}_.+\.sql$/', (string) $name)
             && $name !== '067_personel_canonical_reference_gate.sql'
     ));
     sort($chain, SORT_STRING);
-    uacaAssert(end($chain) === UACA_MIGRATION_082, 'the canonical chain tip is migration 082');
+    uacaAssert(end($chain) === UACA_MIGRATION_083, 'the canonical chain tip is migration 083');
     foreach ($chain as $migration) {
         uacaApplyFile($pdo, (string) $migration);
     }
+    uacaAssert(
+        uacaCount(
+            $pdo,
+            "SELECT COUNT(*) FROM information_schema.TABLES
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '" . UACA_ORG_AUDIT_TABLE . "'"
+        ) === 1,
+        'migration 083 created the personnel organisation audit table'
+    );
     uacaAssert(
         uacaCount(
             $pdo,

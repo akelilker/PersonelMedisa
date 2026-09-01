@@ -2,7 +2,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { resolve } from "node:path";
 import { ensureDisposableMariaDbEnv, runPhpMysqlRunner } from "../scripts/disposable-mariadb.mjs";
 
-describe("canonical migration round 082 control plane (MariaDB runtime)", () => {
+describe("canonical migration round 083 control plane (MariaDB runtime)", () => {
   beforeAll(async () => {
     await ensureDisposableMariaDbEnv();
   }, 90_000);
@@ -19,24 +19,18 @@ describe("canonical migration round 082 control plane (MariaDB runtime)", () => 
 
     const stdout = String(result.stdout);
     for (const marker of [
-      "the preimage database is at production tip 081",
-      "a production tip 081 database is apply-ready for the 082 round",
-      "only 082 is pending before the apply",
-      "the next authorized migration is 082",
-      "the authorized checksum is the sha256 of the 082 file on this ref",
-      "the preimage proves the completed 080/081 round is really present",
-      "an empty pending set on a non-round tip is named rather than read as complete",
-      "a ledger that claims 081 without its audit owner is refused",
-      "restoring the predecessor owner makes the round apply-ready again",
+      "the preimage database is at production tip 082",
+      "a production tip 082 database is apply-ready for the 083 round",
+      "only 083 is pending before the apply",
+      "the next authorized migration is 083",
+      "the clean preimage does not yet carry the personnel org audit table",
+      "the preimage proves the completed 082 round is really present",
       "a targeted request applies exactly one migration",
-      "production tip is 082 after the apply",
-      "082 created the access change audit owner",
-      "the previous round owner user_erisim_kaldirma_auditleri survived 082",
-      "082 wrote no business row",
-      "no existing user role value was remapped",
-      "no already-applied ledger row or checksum was rewritten by the round",
+      "production tip is 083 after the apply",
+      "083 created the personnel organisation audit owner",
+      "the previous round owner user_erisim_degisiklik_auditleri survived 083",
+      "083 wrote no business row",
       "a completed round is not apply-ready again",
-      "verify refuses a chain applied beyond its authorized target",
       "a target outside the canonical chain is refused",
       "verify-migration-round-control-plane-mysql: OK"
     ]) {

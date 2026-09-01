@@ -95,6 +95,20 @@ class ReferansController
         );
     }
 
+    /** @param array<string, mixed> $body @return array{id:int, ad:string} */
+    public static function createPozisyonRecord(PDO $pdo, array $body)
+    {
+        return self::createCatalogNamedEntityRecord(
+            $pdo,
+            'pozisyonlar',
+            $body,
+            'POZISYON_NAME_REQUIRED',
+            'POZISYON_NAME_TYPE',
+            'POZISYON_NAME_TOO_LONG',
+            'POZISYON_ZATEN_VAR'
+        );
+    }
+
     /**
      * @param array<string, mixed> $body
      * @return array{id: int, ad: string}

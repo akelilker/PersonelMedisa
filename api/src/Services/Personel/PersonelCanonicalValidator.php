@@ -681,4 +681,28 @@ final class PersonelCanonicalValidator
 
         return null;
     }
+
+    /** @param array<string, mixed> $body */
+    public static function requireTrimmedStringPublic(array $body, string $field, string $message): string
+    {
+        return self::requireTrimmedString($body, $field, $message);
+    }
+
+    /** @param array<string, mixed> $body */
+    public static function requireValidDatePublic(array $body, string $field, string $message): string
+    {
+        return self::requireValidDate($body, $field, $message);
+    }
+
+    /** @param array<string, mixed> $body */
+    public static function optionalTrimmedStringPublic(array $body, string $field): ?string
+    {
+        return self::optionalTrimmedString($body, $field);
+    }
+
+    /** @param array<string, mixed> $body */
+    public static function optionalPositiveIntPublic(array $body, string $field): ?int
+    {
+        return self::optionalPositiveInt($body, $field);
+    }
 }

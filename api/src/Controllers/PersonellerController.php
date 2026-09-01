@@ -19,6 +19,7 @@ use Medisa\Api\Services\Personel\PersonelCompletenessService;
 use Medisa\Api\Services\Personel\PersonelCreateService;
 use Medisa\Api\Services\Personel\PersonelGeciciGorevlendirmeService;
 use Medisa\Api\Services\Personel\PersonelOperationalContextService;
+use Medisa\Api\Services\Personel\PersonelIncompleteCreateService;
 use Medisa\Api\Services\Personel\PersonelImportApplyService;
 use Medisa\Api\Services\Personel\PersonelImportDryRunService;
 use Medisa\Api\Services\Personel\PersonelImportException;
@@ -247,8 +248,18 @@ class PersonellerController
         if ($hasSalary && !RolePermissions::has($user, 'personeller.ucret.manage')) {
             JsonResponse::error(403, 'SALARY_ACCESS_FORBIDDEN', 'Ucret bilgisi yonetme yetkiniz yok.');
         }
+        $incompleteIntent = PersonelIncompleteCreateService::hasIntent($body);
+        if ($incompleteIntent) {
+            try {
+                PersonelIncompleteCreateService::assertAuthorized($user);
+            } catch (PersonelValidationException $e) {
+                JsonResponse::error(403, $e->getCodeString(), $e->getMessage(), $e->getField());
+            }
+        }
         try {
-            $payload = PersonelCanonicalValidator::normalizeAndValidateCreatePayload($body);
+            $payload = $incompleteIntent
+                ? PersonelIncompleteCreateService::normalizePayload($body)
+                : PersonelCanonicalValidator::normalizeAndValidateCreatePayload($body);
         } catch (PersonelValidationException $e) {
             JsonResponse::error(422, $e->getCodeString(), $e->getMessage(), $e->getField());
         }
@@ -686,6 +697,7 @@ class PersonellerController
         if (!is_array($rows)) {
             JsonResponse::error(422, 'ROWS_REQUIRED', 'Lifecycle dry-run icin rows dizisi zorunludur.');
         }
+        $deployedSha = trim((string) ($body['deployed_sha'] ?? ''));
 
         try {
             $pdo = Connection::get();
@@ -695,7 +707,14 @@ class PersonellerController
 
         $activeSube = SubeScope::resolveScope($user, $request);
         try {
-            $result = PersonelLifecycleBulkDryRunService::dryRun($pdo, $user, $request, $rows, $activeSube);
+            $result = PersonelLifecycleBulkDryRunService::dryRun(
+                $pdo,
+                $user,
+                $request,
+                $rows,
+                $activeSube,
+                $deployedSha !== '' ? $deployedSha : null
+            );
         } catch (PersonelImportException $e) {
             JsonResponse::error($e->getHttpStatus(), $e->getCodeString(), $e->getMessage());
         }
@@ -715,8 +734,12 @@ class PersonellerController
         }
         $dryRunChecksum = trim((string) ($body['dry_run_checksum'] ?? ''));
         $preimageChecksum = trim((string) ($body['preimage_checksum'] ?? ''));
+        $deployedSha = trim((string) ($body['deployed_sha'] ?? ''));
         if ($dryRunChecksum === '' || $preimageChecksum === '') {
             JsonResponse::error(422, 'CHECKSUM_REQUIRED', 'Dry-run checksum ve preimage checksum zorunludur.');
+        }
+        if ($deployedSha === '' || !preg_match('/^[a-f0-9]{40}$/i', $deployedSha)) {
+            JsonResponse::error(422, 'DEPLOYED_SHA_REQUIRED', 'deployed_sha zorunludur.');
         }
 
         try {
@@ -734,6 +757,7 @@ class PersonellerController
                 $rows,
                 $dryRunChecksum,
                 $preimageChecksum,
+                $deployedSha,
                 $activeSube
             );
         } catch (PersonelImportException $e) {

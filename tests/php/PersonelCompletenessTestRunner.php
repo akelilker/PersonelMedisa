@@ -27,11 +27,15 @@ function baseCompleteIc(): array
         'dogum_tarihi' => '1990-01-01',
         'telefon' => '05551234567',
         'ise_giris_tarihi' => '2020-01-01',
-        'departman_id' => 1,
-        'bolum_id' => 2,
-        'birim_id' => 3,
-        'gorev_id' => 4,
-        'personel_tipi_id' => 5,
+        'sube_id' => 1,
+        'calisma_lokasyonu_id' => 2,
+        'bagli_amir_id' => 3,
+        'departman_id' => 4,
+        'bolum_id' => 5,
+        'birim_id' => 6,
+        'gorev_id' => 7,
+        'pozisyon_id' => 8,
+        'personel_tipi_id' => 9,
     ];
 }
 

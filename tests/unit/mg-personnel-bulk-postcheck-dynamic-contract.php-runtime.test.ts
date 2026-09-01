@@ -27,6 +27,8 @@ describe("MG personnel bulk postcheck dynamic contract (MariaDB runtime)", () =>
       "checksum drift blocks apply",
       "pasif exit preimage blocked in dry-run",
       "tampered exit preimage fails validateContract",
+      "duplicate replay writes one idempotency ledger row",
+      "duplicate replay blocked on second apply",
       "duplicate replay writes no extra audit",
       "inventory drift blocks apply with stale checksum",
     ]) {

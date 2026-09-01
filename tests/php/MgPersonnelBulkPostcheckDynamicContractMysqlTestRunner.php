@@ -379,6 +379,7 @@ try {
         'pasif exit preimage blocked in dry-run'
     );
     pcAssert(($dryPasif['can_apply'] ?? true) === false, 'pasif exit blocks can_apply');
+    $pdo->exec("UPDATE personeller SET aktif_durum = 'AKTIF' WHERE id = 132");
 
     // Scenario F: tampered analysis row fails validateContract (fail-closed)
     $inventoryF = PersonelLifecycleBulkPostcheck::captureInventory($pdo);
@@ -391,16 +392,21 @@ try {
     );
 
     // Scenario G: duplicate replay does not duplicate writes
+    $dryOrgForApply = PersonelLifecycleBulkDryRunService::dryRun($pdo, $gm, $request, [$orgRow], null, $deployedSha);
     PersonelLifecycleBulkApplyService::apply(
         $pdo,
         $gm,
         $request,
         [$orgRow],
-        (string) $dryOrg['dry_run_checksum'],
-        (string) $dryOrg['preimage_checksum'],
+        (string) $dryOrgForApply['dry_run_checksum'],
+        (string) $dryOrgForApply['preimage_checksum'],
         $deployedSha
     );
     $auditAfterFirst = (int) $pdo->query('SELECT COUNT(*) FROM personel_organizasyon_degisiklik_auditleri')->fetchColumn();
+    $ledgerCount = (int) $pdo->query(
+        "SELECT COUNT(*) FROM offline_mutation_idempotency WHERE idempotency_key = 'pc-org-neutral'"
+    )->fetchColumn();
+    pcAssert($ledgerCount === 1, 'duplicate replay writes one idempotency ledger row');
     $retryBlocked = false;
     try {
         PersonelLifecycleBulkApplyService::apply(
@@ -408,12 +414,12 @@ try {
             $gm,
             $request,
             [$orgRow],
-            (string) $dryOrg['dry_run_checksum'],
-            (string) $dryOrg['preimage_checksum'],
+            (string) $dryOrgForApply['dry_run_checksum'],
+            (string) $dryOrgForApply['preimage_checksum'],
             $deployedSha
         );
     } catch (PersonelImportException $e) {
-        $retryBlocked = $e->getCodeString() === 'CANNOT_APPLY' || $e->getCodeString() === 'DRY_RUN_STALE';
+        $retryBlocked = in_array($e->getCodeString(), ['CANNOT_APPLY', 'DRY_RUN_STALE', 'PREIMAGE_STALE'], true);
     }
     pcAssert($retryBlocked, 'duplicate replay blocked on second apply');
     pcAssert(

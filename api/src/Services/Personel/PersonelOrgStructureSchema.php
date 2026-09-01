@@ -239,6 +239,47 @@ final class PersonelOrgStructureSchema
         return (bool) $stmt->fetch(PDO::FETCH_ASSOC);
     }
 
+    public static function inferDepartmanIdFromBolum(PDO $pdo, int $bolumId): ?int
+    {
+        if ($bolumId < 1 || !self::isReady($pdo)) {
+            return null;
+        }
+
+        $stmt = $pdo->prepare(
+            "SELECT departman_id FROM bolumler WHERE id = :id AND durum = 'AKTIF' LIMIT 1"
+        );
+        $stmt->execute(['id' => $bolumId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!is_array($row)) {
+            return null;
+        }
+        $departmanId = (int) ($row['departman_id'] ?? 0);
+
+        return $departmanId > 0 ? $departmanId : null;
+    }
+
+    /**
+     * When bolum is present without departman, derive parent departman from canonical bolum row.
+     *
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
+    public static function inferMissingDepartmanForCreate(PDO $pdo, array $payload): array
+    {
+        $bolumId = self::nullablePositiveInt($payload, 'bolum_id');
+        $departmanId = self::nullablePositiveInt($payload, 'departman_id');
+        if ($bolumId === null || $departmanId !== null) {
+            return $payload;
+        }
+
+        $inferred = self::inferDepartmanIdFromBolum($pdo, $bolumId);
+        if ($inferred !== null) {
+            $payload['departman_id'] = $inferred;
+        }
+
+        return $payload;
+    }
+
     /**
      * Fail-closed hierarchy invariants for effective (merged) org state.
      * Does not silently rewrite parents.

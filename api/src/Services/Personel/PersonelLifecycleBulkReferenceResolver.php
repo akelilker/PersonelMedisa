@@ -53,18 +53,29 @@ final class PersonelLifecycleBulkReferenceResolver
         if ($stmt === false) {
             return null;
         }
-        $asciiNeedle = self::asciiFold($needle);
+        $asciiNeedle = self::searchKey($name);
+        $matchedIds = [];
         while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
             if (!is_array($row)) {
                 continue;
             }
             $candidate = self::normalizeName((string) ($row['ad'] ?? ''));
-            if ($candidate === $needle || self::asciiFold($candidate) === $asciiNeedle) {
-                return (int) $row['id'];
+            if ($candidate === $needle || self::searchKey((string) ($row['ad'] ?? '')) === $asciiNeedle) {
+                $matchedIds[(int) $row['id']] = true;
             }
         }
 
+        $ids = array_keys($matchedIds);
+        if (count($ids) === 1) {
+            return (int) $ids[0];
+        }
+
         return null;
+    }
+
+    public static function searchKey(string $value): string
+    {
+        return self::asciiFold(self::normalizeName($value));
     }
 
     /**

@@ -1,5 +1,5 @@
 CODE_MIGRATION_TIP: 083
-PRODUCTION_MIGRATION_TIP: 082
+PRODUCTION_MIGRATION_TIP: 083
 
 # 110 — Canonical Closure / Gap Registry
 
@@ -11,12 +11,12 @@ PRODUCTION_MIGRATION_TIP: 082
 
 | Alan | Değer | Kanıt / sınır |
 | --- | --- | --- |
-| CODE_MIGRATION_TIP | **082** | Repodaki son migration: `083_personel_organizasyon_degisiklik_auditleri.sql` — `PUT /yonetim/kullanicilar/{id}` üzerinden yapılan `durum`/`rol`/`username`/`personel_id` değişikliklerinin append-only denetim tablosu `user_erisim_degisiklik_auditleri`; additive, hiçbir iş satırı yazmaz, 081'in erişim kaldırma denetim geçmişine dokunmaz (MG-USER-ACCESS-CHANGE-AUDIT-001). Bir önceki tip: `081_ik_personeli_rolu.sql` — `users.rol` ENUM'una additive `IK_PERSONELI` eklemesi ve login erişimi kaldırma işleminin append-only denetim tablosu `user_erisim_kaldirma_auditleri`; hiçbir iş satırı yazmaz, hiçbir rolü remap etmez (MG-ORGANIZATION-HR-FINAL-CLOSEOUT-001). Bir önceki tip: `080_organizasyon_audit_owners.sql` — organizasyon yazma yollarının append-only denetim tabloları, additive, hiçbir satır yazmaz (MG-ORG-AUDITED-BRANCH-CHANGE-001). Eski `079_aylik_kapanis_sube_scope_and_actor.sql` iş modeli yanlış olduğu için geri çekildi; canonical kaynaktan çıkarıldı ve hiçbir koşulda uygulanmaz (MG-SIRKET-SUBE-HIYERARSI-001) |
-| PRODUCTION_MIGRATION_TIP | **081** | 080/081 round'u production'a uygulandı; pending = 0. Bir önceki tip `079_sirket_sube_hiyerarsisi.sql` idi (apply `33322972259`, postcheck `33323369963`, backup `medisa-pre-079-33322972259-1-20260830-164502.sql`). Hepsi additive; hiçbir satır yazmadı. `schema_ready = true`, `data_ready = false` — eşleme ayrı onaylı operasyondur. Sıradaki round yalnız 082'dir |
+| CODE_MIGRATION_TIP | **083** | Repodaki son migration: `083_personel_organizasyon_degisiklik_auditleri.sql` — personel org alanı değişikliklerinin append-only denetim tablosu `personel_organizasyon_degisiklik_auditleri`; additive, hiçbir iş satırı yazmaz (MG-PERSONEL-ORG-CHANGE-AUDIT-001). Bir önceki tip: `082_user_erisim_degisiklik_auditleri.sql` — `PUT /yonetim/kullanicilar/{id}` üzerinden yapılan `durum`/`rol`/`username`/`personel_id` değişikliklerinin append-only denetim tablosu `user_erisim_degisiklik_auditleri`; additive, hiçbir iş satırı yazmaz (MG-USER-ACCESS-CHANGE-AUDIT-001). Bir önceki tip: `081_ik_personeli_rolu.sql` — `users.rol` ENUM'una additive `IK_PERSONELI` eklemesi ve login erişimi kaldırma işleminin append-only denetim tablosu `user_erisim_kaldirma_auditleri`; hiçbir iş satırı yazmaz, hiçbir rolü remap etmez (MG-ORGANIZATION-HR-FINAL-CLOSEOUT-001). Eski `079_aylik_kapanis_sube_scope_and_actor.sql` iş modeli yanlış olduğu için geri çekildi; canonical kaynaktan çıkarıldı ve hiçbir koşulda uygulanmaz (MG-SIRKET-SUBE-HIYERARSI-001) |
+| PRODUCTION_MIGRATION_TIP | **083** | 082/083 round'u production'a uygulandı; pending = 0. Hepsi additive; hiçbir iş satırı yazmadı. Organizasyon eşlemesi `CLOSED_CONFIRMED`; `data_ready = true`. Yeni migration açılmadı |
 | Organizasyon eşleme durumu | **CLOSED_CONFIRMED** | İlk production mapping uygulandı (MG-SIRKET-SUBE-PROD-MAPPING-001, apply run `33342644722`): 3 şirket, 10 şube, 3 SGK işvereni eşlendi; postcheck PASS ve `data_ready = true`. 7 çalışma lokasyonu bilinçli **deferred** (`sube_id` NULL). Eski spec yeniden uygulanmaz |
 | `MATRIX_DEVELOPMENT_BASELINE_SHA` | **`067692bba744808c06b6b7d802797c453859df53`** | Değişmez tarihsel kanıt: organizasyon eşleme apply operasyonunun pinlendiği deploy SHA'sı ve bu envanter matrix turunun geliştirme baseline'ı. "Güncel/son production SHA" iddiası **değildir**; main ilerledikçe güncellenmez. Apply yetkisi kanıtı için `MG-SIRKET-SUBE-PROD-MAPPING-001` satırındaki apply run kaydı esastır |
 | Otomatik sicil owner | **`PersonelSicilAllocator`** | `api/src/Services/Personel/PersonelSicilAllocator.php` + singleton tablo `personel_sicil_sequence` (migration 078); interaktif create'te `sicil_no` gönderilmez, backend tahsis eder |
-| Canlı migration doğrulaması | **PASS** | Tip `079`; pending migration yok; migration workflow bu turda **tekrar çalıştırılmaz** |
+| Canlı migration doğrulaması | **PASS** | Tip `083`; pending migration yok |
 
 ## Durum sözlüğü
 
@@ -62,6 +62,8 @@ PRODUCTION_MIGRATION_TIP: 082
 | `MG-CI-ACTIONS-NODE24-001` | GitHub Actions Node 24 runtime temizliği | **CLOSED** | Control-plane workflow'ları `actions/checkout@v6` ve `actions/upload-artifact@v6` ile pinli; v4/v5 kullanımı kaynak testiyle yasaklı. Açık deprecation kalemi yok. |
 | `MG-OPS-ORG-001` | IC kritik organizasyon FK tamamlama | **CLOSED** | Phase1 import sonrası AKTIF `IC_PERSONEL` için kritik org alanları (Şube/Departman/Bölüm/Birim/Görev/Personel Tipi) tamam; kalan telefon kalemi ayrıdır (`MG-OPS-PERSONEL-PHONE-001`). DIS org null’ları IC sayımına **dahil edilmez**. |
 | `MG-OPS-PERSONEL-PHONE-001` | 20 IC telefon deferred tamamlaması | **CLOSED_CONFIRMED** | Gerçek kullanıcı verisi ile canonical write owner (authenticated `PUT /personeller/{id}`) üzerinden tamamlandı; direct SQL / import reopen / migration yok. Preflight `MATCHED_RECORD_COUNT = 20`, `DUPLICATE_SICIL_COUNT = 0`, hepsi AKTIF `IC_PERSONEL`. Post-write salt-okunur readback `PHONE_EXPECTED_MATCH_COUNT = 20`, `PHONE_MISSING_COUNT = 0`, `PHONE_MISMATCH_COUNT = 0`, `PERSONEL_IC_PHONE_DEFERRED = 0`. Kapsam dışı mutasyon yok (`UNEXPECTED_PERSONNEL_MUTATION_COUNT = 0`). Numaralar PII olduğu için dokümana yazılmaz. Ayrıca sicil 216 için kullanıcı onaylı tekil isim düzeltmesi uygulandı (`soyad` correction, fail-closed önceki-değer teyidi ile); başka personelin adına dokunulmadı. |
+| `MG-PERSONNEL-BULK-RECONCILIATION-PRODUCTION` | Onaylı bulk lifecycle reconciliation (production) | **CLOSED_CONFIRMED** | Deploy SHA `06bbe03`; 14 create + 3 exit; toplam personel 153 / aktif 146; 2 deferred exit (Ahmed Khalil Alsamar, Sefine Özcan — `DEFERRED_MISSING_EXIT_INFORMATION`). Production mutation tamamlandı; artefakt geçmişi değiştirilmez. |
+| `MG-PERSONNEL-BULK-DRY-RUN-APPLY-PARITY-001` | Bulk dry-run / apply org hierarchy parity | **CODE_READY** | `PersonelLifecycleBulkMutationPlanner` ortak owner; `bolum_id` → `departman_id` inference + `validateCreateReferences` dry-run/apply parity; production mutation=0. PR bekliyor. |
 
 ## Kullanıcı verisi / ataması gerektiren (teknik blocker değil)
 

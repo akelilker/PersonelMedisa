@@ -42,14 +42,14 @@ function observeTerminalState(events: ObservedStatus[], requestId: string): Obse
 }
 
 describe('canonical cPanel migration FTP transport contract', () => {
-  it('matches deploy FTPS compatibility semantics', () => {
+  it('matches deploy plain FTP compatibility semantics', () => {
     for (const setting of [
       'set ssl:verify-certificate no;',
       'set ssl:check-hostname no;',
       'set ftp:passive-mode on;',
-      'set ftp:ssl-allow ${use_ftps};',
-      'set ftp:ssl-force ${use_ftps};',
-      'set ftp:ssl-protect-data ${use_ftps};',
+      'set ftp:ssl-allow false;',
+      'set ftp:ssl-force false;',
+      'set ftp:ssl-protect-data false;',
     ]) {
       expect(migration).toContain(setting);
       expect(deploy).toContain(setting);
@@ -58,28 +58,26 @@ describe('canonical cPanel migration FTP transport contract', () => {
     expect(migration).toContain('set net:reconnect-interval-max 10;');
   });
 
-  it('uses one canonical transport owner for request and status operations', () => {
-    expect(migration).toMatch(/run_ftp_mode\(\)/);
+  it('uses one canonical plain FTP owner for request and status operations', () => {
+    expect(migration).toMatch(/run_cpanel_plain_ftp\(\)/);
     expect(migration).toMatch(/run_cpanel_ftp\(\)/);
     expect(migration.match(/run_cpanel_ftp "\$request_commands"/g)).toHaveLength(1);
     expect(migration.match(/run_cpanel_ftp "\$status_commands"/g)).toHaveLength(1);
     expect(migration).not.toContain('set ssl:verify-certificate yes;');
+    expect(migration).not.toContain('explicit-ftps');
+    expect(migration).not.toContain('use_ftps');
   });
 
-  it('tries explicit FTPS before the deploy-compatible plain FTP fallback', () => {
-    const ftpsIndex = migration.indexOf('run_ftp_mode "explicit-ftps" "true"');
-    const fallbackIndex = migration.indexOf('run_ftp_mode "plain-ftp" "false"');
+  it('uses the deploy readback lib plain FTP diagnosis contract', () => {
     const deployLib = readFileSync(
       resolve(process.cwd(), 'scripts/deploy/cpanel-ftp-readback-lib.sh'),
       'utf8',
     );
 
-    expect(ftpsIndex).toBeGreaterThanOrEqual(0);
-    expect(fallbackIndex).toBeGreaterThan(ftpsIndex);
     expect(deploy).toContain('deploy_with_ftp_mode');
-    expect(deployLib).toContain('deploy_with_ftp_mode "explicit-ftps" "true"');
-    expect(deployLib).toContain('deploy_with_ftp_mode "plain-ftp" "false"');
-    expect(deployLib.indexOf('explicit-ftps')).toBeLessThan(deployLib.indexOf('plain-ftp'));
+    expect(deployLib).toContain('Deploy transport mode: plain-ftp');
+    expect(deployLib).toContain('PLAIN_FTP_RESULT=');
+    expect(deployLib).not.toMatch(/explicit-ftps|FTPS_RESULT|use_ftps/);
   });
 
   it('keeps the existing FTP secret names and never logs the password', () => {
@@ -135,8 +133,8 @@ describe('canonical cPanel migration FTP transport contract', () => {
     expect(migration).toContain('[Tt][Oo][Kk][Ee][Nn]');
     expect(migration).toContain('[Dd][Ss][Nn]');
     expect(migration).toContain('FTP_PASSWORD');
-    expect(migration).toContain('run_ftp_mode "explicit-ftps" "true"');
-    expect(migration).toContain('run_ftp_mode "plain-ftp" "false"');
+    expect(migration).toContain('Deploy transport mode: plain-ftp');
+    expect(migration).not.toContain('explicit-ftps');
   });
 
   it('covers the 15-minute Cron worst case with a bounded 25-minute observation window', () => {

@@ -58,10 +58,8 @@ jobs:
         run: |
           set -euo pipefail
 
-          run_mode() {
-            local mode_name="$1"
-            local use_ftps="$2"
-            echo "Cleanup modu: ${mode_name}"
+          run_plain_cleanup() {
+            echo "Deploy transport mode: plain-ftp"
 
             rm -f /tmp/remote-assets.txt
             lftp -u "${FTP_USERNAME}","${FTP_PASSWORD}" -p "${FTP_PORT}" "ftp://${FTP_SERVER}" -e "
@@ -70,9 +68,9 @@ jobs:
               set net:max-retries 2;
               set net:timeout 20;
               set ftp:passive-mode on;
-              set ftp:ssl-allow ${use_ftps};
-              set ftp:ssl-force ${use_ftps};
-              set ftp:ssl-protect-data ${use_ftps};
+              set ftp:ssl-allow false;
+              set ftp:ssl-force false;
+              set ftp:ssl-protect-data false;
               set ssl:verify-certificate no;
               set ssl:check-hostname no;
               cd .;
@@ -122,9 +120,9 @@ jobs:
               set net:max-retries 2;
               set net:timeout 20;
               set ftp:passive-mode on;
-              set ftp:ssl-allow ${use_ftps};
-              set ftp:ssl-force ${use_ftps};
-              set ftp:ssl-protect-data ${use_ftps};
+              set ftp:ssl-allow false;
+              set ftp:ssl-force false;
+              set ftp:ssl-protect-data false;
               set ssl:verify-certificate no;
               set ssl:check-hostname no;
               cd .;
@@ -133,12 +131,7 @@ jobs:
             "
           }
 
-          echo "Explicit FTPS port 21 deneniyor..."
-          if run_mode "explicit-ftps" "true"; then
-            exit 0
-          fi
-          echo "Explicit FTPS basarisiz, plain FTP fallback..."
-          run_mode "plain-ftp" "false"
+          run_plain_cleanup
 
       - name: Post-cleanup smoke
         run: |

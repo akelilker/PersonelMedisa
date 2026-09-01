@@ -15,76 +15,42 @@ cpanel_ftp_errexit_enabled() {
   esac
 }
 
-# Runs FTPS then plain FTP without mutating caller errexit.
+# Runs passive plain FTP only without mutating caller errexit.
 # Sets globals:
-#   LAST_FTP_LOG LAST_FTPS_LOG LAST_PLAIN_LOG
-#   LAST_FTPS_RESULT LAST_PLAIN_RESULT LAST_READ_CLASS
-#   LAST_FTPS_DETAIL LAST_PLAIN_DETAIL
+#   LAST_FTP_LOG
+#   LAST_FTP_RESULT LAST_READ_CLASS LAST_FTP_DETAIL
 run_cpanel_ftp_diagnosed() {
   local ftp_commands="$1"
   local local_out_hint="${2:-}"
-  local ftps_log plain_log
-  local ftps_rc=1
-  local plain_rc=1
+  local ftp_log
+  local ftp_rc=1
 
-  ftps_log="$(mktemp)"
-  plain_log="$(mktemp)"
-  LAST_FTPS_LOG="$ftps_log"
-  LAST_PLAIN_LOG="$plain_log"
-  LAST_FTP_LOG="$plain_log"
-  LAST_FTPS_RESULT="NOT_RUN"
-  LAST_PLAIN_RESULT="NOT_RUN"
-  LAST_FTPS_DETAIL=""
-  LAST_PLAIN_DETAIL=""
+  ftp_log="$(mktemp)"
+  LAST_FTP_LOG="$ftp_log"
+  LAST_FTP_RESULT="NOT_RUN"
+  LAST_FTP_DETAIL=""
   LAST_READ_CLASS="LFTP_COMMAND_ERROR"
 
-  echo "Explicit FTPS port 21 deneniyor..."
-  if deploy_with_ftp_mode "explicit-ftps" "true" "$ftp_commands" >"$ftps_log" 2>&1; then
-    ftps_rc=0
+  echo "Deploy transport mode: plain-ftp"
+  if deploy_with_ftp_mode "$ftp_commands" >"$ftp_log" 2>&1; then
+    ftp_rc=0
   else
-    ftps_rc=$?
+    ftp_rc=$?
   fi
 
-  if [[ "$ftps_rc" -eq 0 ]]; then
-    LAST_FTPS_RESULT="SUCCESS"
-    LAST_PLAIN_RESULT="SKIPPED"
+  if [[ "$ftp_rc" -eq 0 ]]; then
+    LAST_FTP_RESULT="SUCCESS"
     LAST_READ_CLASS="SUCCESS"
-    LAST_FTPS_DETAIL=""
-    LAST_PLAIN_DETAIL=""
-    LAST_FTP_LOG="$ftps_log"
-    echo "FTPS_RESULT=SUCCESS"
-    echo "PLAIN_FTP_RESULT=SKIPPED"
-    return 0
-  fi
-
-  LAST_FTPS_RESULT="$(classify_lftp_read_log "$ftps_log" "$local_out_hint" "$ftps_rc")"
-  LAST_FTPS_DETAIL="$(sanitize_lftp_error_detail "$ftps_log")"
-  echo "FTPS_RESULT=${LAST_FTPS_RESULT}"
-  echo "FTPS_ERROR_CLASS=${LAST_FTPS_RESULT}"
-  echo "FTPS_ERROR_DETAIL=${LAST_FTPS_DETAIL}"
-  echo "Explicit FTPS basarisiz oldu, plain FTP fallback deneniyor..."
-
-  if deploy_with_ftp_mode "plain-ftp" "false" "$ftp_commands" >"$plain_log" 2>&1; then
-    plain_rc=0
-  else
-    plain_rc=$?
-  fi
-
-  if [[ "$plain_rc" -eq 0 ]]; then
-    LAST_PLAIN_RESULT="SUCCESS"
-    LAST_READ_CLASS="SUCCESS"
-    LAST_PLAIN_DETAIL=""
-    LAST_FTP_LOG="$plain_log"
+    LAST_FTP_DETAIL=""
     echo "PLAIN_FTP_RESULT=SUCCESS"
     return 0
   fi
 
-  LAST_PLAIN_RESULT="$(classify_lftp_read_log "$plain_log" "$local_out_hint" "$plain_rc")"
-  LAST_PLAIN_DETAIL="$(sanitize_lftp_error_detail "$plain_log")"
-  LAST_READ_CLASS="$LAST_PLAIN_RESULT"
-  LAST_FTP_LOG="$plain_log"
-  echo "PLAIN_FTP_RESULT=${LAST_PLAIN_RESULT}"
-  echo "PLAIN_FTP_ERROR_CLASS=${LAST_PLAIN_RESULT}"
-  echo "PLAIN_FTP_ERROR_DETAIL=${LAST_PLAIN_DETAIL}"
+  LAST_FTP_RESULT="$(classify_lftp_read_log "$ftp_log" "$local_out_hint" "$ftp_rc")"
+  LAST_FTP_DETAIL="$(sanitize_lftp_error_detail "$ftp_log")"
+  LAST_READ_CLASS="$LAST_FTP_RESULT"
+  echo "PLAIN_FTP_RESULT=${LAST_FTP_RESULT}"
+  echo "PLAIN_FTP_ERROR_CLASS=${LAST_FTP_RESULT}"
+  echo "PLAIN_FTP_ERROR_DETAIL=${LAST_FTP_DETAIL}"
   return 1
 }

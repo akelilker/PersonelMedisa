@@ -83,21 +83,22 @@ describe('set-cpanel-app-public-url workflow security contract', () => {
     expect(workflow).toContain('rm -rf "$WORK"');
   });
 
-  it('matches deploy FTPS compatibility semantics and concurrency lock', () => {
+  it('matches deploy plain FTP compatibility semantics and concurrency lock', () => {
     expect(workflow).toContain('cancel-in-progress: false');
     expect(workflow).toContain('group: cpanel-app-public-url-ops');
-    expect(workflow).toContain('run_ftp_mode "explicit-ftps" "true"');
-    expect(workflow).toContain('run_ftp_mode "plain-ftp" "false"');
+    expect(workflow).toContain('run_cpanel_plain_ftp');
+    expect(workflow).toContain('Deploy transport mode: plain-ftp');
     for (const setting of [
       'set ssl:verify-certificate no;',
       'set ssl:check-hostname no;',
       'set ftp:passive-mode on;',
-      'set ftp:ssl-allow ${use_ftps};',
-      'set ftp:ssl-force ${use_ftps};',
-      'set ftp:ssl-protect-data ${use_ftps};',
+      'set ftp:ssl-allow false;',
+      'set ftp:ssl-force false;',
+      'set ftp:ssl-protect-data false;',
     ]) {
       expect(workflow).toContain(setting);
     }
+    expect(workflow).not.toContain('explicit-ftps');
   });
 });
 

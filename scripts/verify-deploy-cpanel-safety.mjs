@@ -142,7 +142,6 @@ const readbackLibCode = readbackLib
 
 check(
   /cpanel-ftp-readback-lib\.sh/.test(workflow) &&
-    /FTPS_ERROR_DETAIL/.test(readbackLib) &&
     /PLAIN_FTP_ERROR_DETAIL/.test(readbackLib),
   'read-back lib + sanitized error detail contract is missing',
 );

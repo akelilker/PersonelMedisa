@@ -28,7 +28,8 @@ describe("MG personnel bulk apply owner closeout sources", () => {
     expect(apply).toContain("PersonelOrganizasyonDegisikligiService::apply");
     expect(apply).toContain("PersonelKaliciSubeDegisikligiService::apply");
     expect(apply).toContain("PersonelIstenAyrilmaService::applyInTransaction");
-    expect(apply).toContain("PersonelIncompleteCreateService::hasIntent");
+    expect(apply).toContain("PersonelLifecycleBulkMutationPlanner::planCreatePayload");
+    expect(apply).toContain("canonical_ready");
     expect(apply).not.toContain("501, 'NOT_IMPLEMENTED'");
     expect(apply).toContain("DEPENDENCY_BLOCKED");
     expect(apply).toContain("deployed_sha");

@@ -235,13 +235,12 @@ final class PersonelLifecycleBulkApplyService
 
         if ($owner === 'PersonelCreateService') {
             $payload = is_array($plan['payload'] ?? null) ? $plan['payload'] : [];
-            if (PersonelIncompleteCreateService::hasIntent($payload)) {
-                PersonelIncompleteCreateService::assertAuthorized($user);
-                $canonical = PersonelIncompleteCreateService::normalizePayload($payload);
+            if (($plan['canonical_ready'] ?? false) === true) {
+                $canonical = $payload;
             } else {
-                $canonical = PersonelCanonicalValidator::normalizeAndValidateCreatePayload($payload);
+                $planned = PersonelLifecycleBulkMutationPlanner::planCreatePayload($pdo, $user, $payload);
+                $canonical = $planned['payload'];
             }
-            PersonelCreateService::validateCreateReferences($pdo, $canonical);
             if (!empty($canonical['tc_kimlik_no']) && PersonelCreateService::tcExists($pdo, (string) $canonical['tc_kimlik_no'])) {
                 throw new PersonelValidationException('tc_kimlik_no', 'Bu T.C. Kimlik No baska personelde kayitli.');
             }

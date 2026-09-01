@@ -169,28 +169,28 @@ final class PersonelLifecycleBulkDryRunService
             if ($iseGiris === '') {
                 $errors[] = 'ISE_GIRIS_TARIHI_EKSIK';
             }
-            if (PersonelIncompleteCreateService::hasIntent($payload)) {
+
+            if (count($errors) === 0) {
                 try {
-                    PersonelIncompleteCreateService::assertAuthorized($user);
-                    PersonelIncompleteCreateService::normalizePayload($payload);
+                    $planned = PersonelLifecycleBulkMutationPlanner::planCreatePayload($pdo, $user, $payload);
+
+                    return self::resultRow($op, 'READY', $errors, null, [
+                        'owner' => 'PersonelCreateService',
+                        'operation_type' => $op,
+                        'incomplete' => $planned['incomplete'],
+                        'payload' => $planned['payload'],
+                        'personel_ref' => (string) ($row['personel_ref'] ?? ''),
+                        'canonical_ready' => true,
+                    ]);
                 } catch (\Throwable $e) {
-                    $errors[] = $e instanceof PersonelValidationException ? 'INCOMPLETE_CREATE_INVALID' : 'INCOMPLETE_CREATE_FORBIDDEN';
-                }
-            } else {
-                try {
-                    PersonelCanonicalValidator::normalizeAndValidateCreatePayload($payload);
-                } catch (\Throwable $e) {
-                    $errors[] = 'STRICT_CREATE_INVALID';
+                    $errors[] = PersonelLifecycleBulkMutationPlanner::dryRunErrorCode($e);
+                    $detail = PersonelLifecycleBulkMutationPlanner::dryRunValidationDetail($e);
+
+                    return self::resultRow($op, 'BLOCKED', $errors, null, null, $detail);
                 }
             }
 
-            return self::resultRow($op, count($errors) === 0 ? 'READY' : 'BLOCKED', $errors, null, [
-                'owner' => 'PersonelCreateService',
-                'operation_type' => $op,
-                'incomplete' => PersonelIncompleteCreateService::hasIntent($payload),
-                'payload' => $payload,
-                'personel_ref' => (string) ($row['personel_ref'] ?? ''),
-            ]);
+            return self::resultRow($op, 'BLOCKED', $errors, null, null);
         }
 
         if ($op === PersonelLifecycleBulkRowContract::OP_REFERENCE) {
@@ -220,6 +220,17 @@ final class PersonelLifecycleBulkDryRunService
             $errors[] = 'PLAN_URETILEMEDI';
         } elseif ($plan['no_change'] ?? false) {
             return self::resultRow($op, 'NO_CHANGE', $errors, $personel, $plan);
+        } elseif ($op === PersonelLifecycleBulkRowContract::OP_ORG_UPDATE && $personel !== null) {
+            try {
+                $targets = is_array($plan['targets'] ?? null) ? $plan['targets'] : [];
+                $plan['targets'] = PersonelLifecycleBulkMutationPlanner::planOrgTargets($pdo, $personel, $targets);
+                $plan['canonical_ready'] = true;
+            } catch (\Throwable $e) {
+                $errors[] = PersonelLifecycleBulkMutationPlanner::dryRunErrorCode($e);
+                $detail = PersonelLifecycleBulkMutationPlanner::dryRunValidationDetail($e);
+
+                return self::resultRow($op, 'BLOCKED', $errors, $personel, null, $detail);
+            }
         }
 
         return self::resultRow($op, count($errors) === 0 ? 'READY' : 'BLOCKED', $errors, $personel, $plan);
@@ -235,9 +246,10 @@ final class PersonelLifecycleBulkDryRunService
         string $durum,
         array $errors,
         ?array $personel,
-        ?array $plan
+        ?array $plan,
+        ?array $validationDetail = null
     ): array {
-        return [
+        $row = [
             'islem_tipi' => $tip,
             'durum' => $durum,
             'hata_kodlari' => $errors,
@@ -245,6 +257,12 @@ final class PersonelLifecycleBulkDryRunService
             'sicil_no' => $personel !== null ? (string) ($personel['sicil_no'] ?? '') : null,
             'mutation_plan' => $plan,
         ];
+        if ($validationDetail !== null) {
+            $row['validation_field'] = $validationDetail['field'] ?? null;
+            $row['validation_code'] = $validationDetail['code'] ?? null;
+        }
+
+        return $row;
     }
 
     /** @return array<string, mixed>|null */

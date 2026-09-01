@@ -1,0 +1,198 @@
+{
+  "schema_version": "1",
+  "metadata": {
+    "authorized_deploy_sha": "f230e08b31219891a85623d98be3872206c4c27a",
+    "expected_production_tip": "079",
+    "inventory_checksum": "e2779cab6f89b3d4cb1df74eda0ba919d770ded549cb3d20a130e95990f8b314",
+    "inventory_generated_at": "2026-08-30T21:15:02Z",
+    "expected_row_counts": {
+      "sirketler": 0,
+      "subeler": 10,
+      "sgk_isverenler": 3,
+      "calisma_lokasyonlari": 7,
+      "personeller": 139,
+      "user_subeler": 31,
+      "user_sirketler": 0,
+      "user_sgk_isverenler": 0
+    },
+    "expected_branch_ids": [1, 2, 4, 5, 6, 7, 8, 9, 10, 11],
+    "operation_id": "MG-SIRKET-SUBE-INITIAL-MAPPING-001"
+  },
+  "companies": [
+    { "kod": "MEDISA", "ad": "Medisa", "durum": "AKTIF" },
+    { "kod": "KARYAPI", "ad": "Karyapı", "durum": "AKTIF" },
+    { "kod": "SENAY_MOBILYA", "ad": "Şenay Mobilya", "durum": "AKTIF" }
+  ],
+  "sgk_mappings": [
+    {
+      "sgk_isveren_id": 1,
+      "expected_kod": "MEDISA",
+      "expected_ad": "Medisa",
+      "expected_sirket_id": null,
+      "target_company_kod": "MEDISA"
+    },
+    {
+      "sgk_isveren_id": 2,
+      "expected_kod": "KARYAPI",
+      "expected_ad": "Karyapı",
+      "expected_sirket_id": null,
+      "target_company_kod": "KARYAPI"
+    },
+    {
+      "sgk_isveren_id": 3,
+      "expected_kod": "SENAY_MOBILYA",
+      "expected_ad": "Şenay Mobilya",
+      "expected_sirket_id": null,
+      "target_company_kod": "SENAY_MOBILYA"
+    }
+  ],
+  "branch_mappings": [
+    {
+      "sube_id": 1,
+      "expected_kod": "MRK",
+      "expected_ad": "Medisa",
+      "expected_sirket_id": null,
+      "expected_sgk_isveren_id": 1,
+      "target_company_kod": "MEDISA",
+      "approved_ad": "Fabrika"
+    },
+    {
+      "sube_id": 2,
+      "expected_kod": "GRS",
+      "expected_ad": "Medisa Giresun",
+      "expected_sirket_id": null,
+      "expected_sgk_isveren_id": 1,
+      "target_company_kod": "MEDISA",
+      "approved_ad": "Giresun"
+    },
+    {
+      "sube_id": 4,
+      "expected_kod": "MDS-KYS",
+      "expected_ad": "Medisa Kayseri",
+      "expected_sirket_id": null,
+      "expected_sgk_isveren_id": 1,
+      "target_company_kod": "MEDISA",
+      "approved_ad": "Kayseri"
+    },
+    {
+      "sube_id": 5,
+      "expected_kod": "MDS-ANK",
+      "expected_ad": "Medisa Ankara",
+      "expected_sirket_id": null,
+      "expected_sgk_isveren_id": 1,
+      "target_company_kod": "MEDISA",
+      "approved_ad": "Ankara"
+    },
+    {
+      "sube_id": 6,
+      "expected_kod": "MDS-IST",
+      "expected_ad": "Medisa İstanbul",
+      "expected_sirket_id": null,
+      "expected_sgk_isveren_id": 1,
+      "target_company_kod": "MEDISA",
+      "approved_ad": "İstanbul"
+    },
+    {
+      "sube_id": 7,
+      "expected_kod": "KRP",
+      "expected_ad": "Karyapı",
+      "expected_sirket_id": null,
+      "expected_sgk_isveren_id": 2,
+      "target_company_kod": "KARYAPI",
+      "approved_ad": null
+    },
+    {
+      "sube_id": 8,
+      "expected_kod": "KRP-ANK",
+      "expected_ad": "Karyapı Ankara",
+      "expected_sirket_id": null,
+      "expected_sgk_isveren_id": 2,
+      "target_company_kod": "KARYAPI",
+      "approved_ad": "Ankara"
+    },
+    {
+      "sube_id": 9,
+      "expected_kod": "KRP-KYS",
+      "expected_ad": "Karyapı Kayseri",
+      "expected_sirket_id": null,
+      "expected_sgk_isveren_id": 2,
+      "target_company_kod": "KARYAPI",
+      "approved_ad": "Kayseri"
+    },
+    {
+      "sube_id": 10,
+      "expected_kod": "KRP-IST",
+      "expected_ad": "Karyapı İstanbul",
+      "expected_sirket_id": null,
+      "expected_sgk_isveren_id": 2,
+      "target_company_kod": "KARYAPI",
+      "approved_ad": "İstanbul"
+    },
+    {
+      "sube_id": 11,
+      "expected_kod": "SNY",
+      "expected_ad": "Şenay Mobilya",
+      "expected_sirket_id": null,
+      "expected_sgk_isveren_id": 3,
+      "target_company_kod": "SENAY_MOBILYA",
+      "approved_ad": null
+    }
+  ],
+  "location_mappings": [
+    {
+      "calisma_lokasyonu_id": 1,
+      "expected_kod": "ANKARA",
+      "expected_ad": "Ankara",
+      "expected_sube_id": null,
+      "target_sube_id": null
+    },
+    {
+      "calisma_lokasyonu_id": 2,
+      "expected_kod": "GIRESUN",
+      "expected_ad": "Giresun",
+      "expected_sube_id": null,
+      "target_sube_id": null
+    },
+    {
+      "calisma_lokasyonu_id": 3,
+      "expected_kod": "ISTANBUL",
+      "expected_ad": "İstanbul",
+      "expected_sube_id": null,
+      "target_sube_id": null
+    },
+    {
+      "calisma_lokasyonu_id": 4,
+      "expected_kod": "IZMIR",
+      "expected_ad": "İzmir",
+      "expected_sube_id": null,
+      "target_sube_id": null
+    },
+    {
+      "calisma_lokasyonu_id": 5,
+      "expected_kod": "KARABUK",
+      "expected_ad": "Karabük",
+      "expected_sube_id": null,
+      "target_sube_id": null
+    },
+    {
+      "calisma_lokasyonu_id": 6,
+      "expected_kod": "KAYSERI",
+      "expected_ad": "Kayseri",
+      "expected_sube_id": null,
+      "target_sube_id": null
+    },
+    {
+      "calisma_lokasyonu_id": 7,
+      "expected_kod": "SAKARYA",
+      "expected_ad": "Sakarya",
+      "expected_sube_id": null,
+      "target_sube_id": null
+    }
+  ],
+  "preservation": {
+    "expected_personel_count": 139,
+    "expected_user_sube_count": 31,
+    "expected_user_sirket_count": 0,
+    "expected_user_sgk_isveren_count": 0
+  }
+}

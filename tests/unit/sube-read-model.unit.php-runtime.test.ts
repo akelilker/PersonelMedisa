@@ -14,6 +14,9 @@ describe("SubeReadModel unit (no DB)", () => {
     expect(result.stdout).toContain("[PASS] Medisa Fabrika");
     expect(result.stdout).toContain("[PASS] Karyapı no duplication");
     expect(result.stdout).toContain("[PASS] Şenay no duplication");
+    expect(result.stdout).toContain(
+      "[PASS] findById works on minimal subeler without durum/sirket columns"
+    );
     expect(result.stdout).toContain("verify-sube-read-model-unit: OK");
   });
 });

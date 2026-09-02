@@ -14,6 +14,7 @@ const MOBILE_VIEWPORTS = [
 ] as const;
 
 const MAX_LOGIN_HERO_FORM_GAP_PX = 48;
+const MIN_LOGIN_TITLE_SAFE_GUTTER_PX = 8;
 
 async function assertNoHorizontalOverflow(page: Page) {
   const metrics = await page.evaluate(() => ({
@@ -29,17 +30,26 @@ async function assertLoginTitleParity(page: Page) {
   const title = page.locator("body.login-page .hero h1");
   await expect(title).toBeVisible();
   await expect(title).toHaveText(LOGIN_TITLE);
+  await page.evaluate(async () => {
+    await document.fonts.ready;
+  });
 
   const titleMetrics = await title.evaluate((el, expectedVisual) => {
     const style = getComputedStyle(el);
     const rect = el.getBoundingClientRect();
+    const hero = el.closest(".hero");
+    const heroRect = hero?.getBoundingClientRect();
+    const overflowWidth = Math.max(0, el.scrollWidth - el.clientWidth);
     const visualText = (el.textContent ?? "").toLocaleUpperCase("tr-TR");
     return {
       textOverflow: style.textOverflow,
       overflow: style.overflow,
       whiteSpace: style.whiteSpace,
-      scrollWidth: el.scrollWidth,
-      clientWidth: el.clientWidth,
+      fontStatus: document.fonts.status,
+      titleVisualLeft: rect.left - overflowWidth / 2,
+      titleVisualRight: rect.right + overflowWidth / 2,
+      heroLeft: heroRect?.left ?? null,
+      heroRight: heroRect?.right ?? null,
       visible: rect.width > 0 && rect.height > 0,
       visualText
     };
@@ -49,7 +59,11 @@ async function assertLoginTitleParity(page: Page) {
   expect(titleMetrics.textOverflow).not.toBe("ellipsis");
   expect(titleMetrics.overflow).not.toBe("hidden");
   expect(titleMetrics.whiteSpace).toBe("nowrap");
-  expect(titleMetrics.scrollWidth).toBeLessThanOrEqual(titleMetrics.clientWidth + 2);
+  expect(titleMetrics.fontStatus).toBe("loaded");
+  expect(titleMetrics.heroLeft).not.toBeNull();
+  expect(titleMetrics.heroRight).not.toBeNull();
+  expect(titleMetrics.titleVisualLeft).toBeGreaterThanOrEqual(titleMetrics.heroLeft! + MIN_LOGIN_TITLE_SAFE_GUTTER_PX);
+  expect(titleMetrics.titleVisualRight).toBeLessThanOrEqual(titleMetrics.heroRight! - MIN_LOGIN_TITLE_SAFE_GUTTER_PX);
   expect(titleMetrics.visible).toBe(true);
 }
 

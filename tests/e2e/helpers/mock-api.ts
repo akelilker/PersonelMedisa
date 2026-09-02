@@ -5691,7 +5691,7 @@ let personelBelgeKaydiIdCounter = 903;
         await fulfillJson(route, 200, okBody(matches[0]));
         return;
       }
-      await fulfillJson(route, 404, errorBody("SALARY_MISSING", "Belirtilen tarihte gecerli ucret kaydi yok."));
+      await fulfillJson(route, 200, okBody(null));
       return;
     }
 

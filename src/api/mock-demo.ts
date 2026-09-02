@@ -5746,7 +5746,7 @@ export function resolveDemoApiResponse(
       }
     }
 
-    return demoRevizyonError("SALARY_MISSING", "Belirtilen tarihte gecerli ucret kaydi yok.");
+    return ok(null);
   }
 
   const personelUcretListMatch = pathname.match(/^\/personeller\/(\d+)\/ucretler$/);

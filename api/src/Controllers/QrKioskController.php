@@ -11,6 +11,7 @@ use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
 use Medisa\Api\Scope\OrgScope;
 use Medisa\Api\Scope\SubeScope;
+use Medisa\Api\Services\Organizasyon\SubeReadModel;
 use Medisa\Api\Services\Qr\QrAttendanceException;
 use Medisa\Api\Services\Qr\QrTokenService;
 use PDO;
@@ -45,10 +46,8 @@ class QrKioskController
             JsonResponse::forbidden('Secili sube icin yetkiniz yok.');
         }
 
-        $stmt = $pdo->prepare('SELECT id, ad FROM subeler WHERE id = :id LIMIT 1');
-        $stmt->execute(['id' => $subeId]);
-        $sube = $stmt->fetch(PDO::FETCH_ASSOC);
-        if (!is_array($sube)) {
+        $sube = SubeReadModel::findById($pdo, $subeId);
+        if ($sube === null) {
             JsonResponse::notFound('Sube bulunamadi.');
         }
 
@@ -70,7 +69,8 @@ class QrKioskController
             'ttl_seconds' => $minted['ttl_seconds'],
             'sube' => [
                 'id' => (int) $sube['id'],
-                'ad' => (string) ($sube['ad'] ?? ''),
+                // Global kiosk label — company-qualified when mapped.
+                'ad' => (string) $sube['tam_ad'],
             ],
         ]);
     }

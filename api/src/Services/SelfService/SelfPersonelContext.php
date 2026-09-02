@@ -6,6 +6,7 @@ namespace Medisa\Api\Services\SelfService;
 
 use Medisa\Api\Database\UsersSchema;
 use Medisa\Api\Http\JsonResponse;
+use Medisa\Api\Services\Organizasyon\SubeReadModel;
 use PDO;
 
 /**
@@ -111,7 +112,7 @@ class SelfPersonelContext
         $birimId = isset($personel['birim_id']) && $personel['birim_id'] !== null
             ? (int) $personel['birim_id']
             : null;
-        $subeAd = (string) ($personel['sube_ad'] ?? '');
+        $subeAd = self::resolveSubeDisplayAd($pdo, $subeId);
         $departmanAd = isset($personel['departman_ad']) && $personel['departman_ad'] !== null
             ? (string) $personel['departman_ad']
             : null;
@@ -130,15 +131,7 @@ class SelfPersonelContext
             $departmanId = $eff['departman_id'];
             $bolumId = $eff['bolum_id'];
             $birimId = $eff['birim_id'];
-            if ($subeId !== null) {
-                try {
-                    $s = $pdo->prepare('SELECT ad FROM subeler WHERE id = :id LIMIT 1');
-                    $s->execute(['id' => $subeId]);
-                    $subeAd = (string) ($s->fetchColumn() ?: '');
-                } catch (\Throwable $e) {
-                    $subeAd = '';
-                }
-            }
+            $subeAd = self::resolveSubeDisplayAd($pdo, $subeId);
         }
 
         return [
@@ -173,6 +166,26 @@ class SelfPersonelContext
             'org_status' => $opCtx['org_status'],
             'operational_scope' => $opCtx,
         ];
+    }
+
+    /**
+     * Global display label for self-service org context (SubeReadModel.tam_ad).
+     *
+     * @param int|null $subeId
+     */
+    private static function resolveSubeDisplayAd(PDO $pdo, $subeId): string
+    {
+        $id = $subeId !== null ? (int) $subeId : 0;
+        if ($id <= 0) {
+            return '';
+        }
+        try {
+            $mapped = SubeReadModel::findById($pdo, $id);
+
+            return $mapped !== null ? (string) $mapped['tam_ad'] : '';
+        } catch (\Throwable $e) {
+            return '';
+        }
     }
 
     /**

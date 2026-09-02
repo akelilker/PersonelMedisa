@@ -229,7 +229,10 @@ final class PersonelExportService
             self::dateOnly($row['ise_giris_tarihi'] ?? null),
             self::dateOnly($row['isten_cikis_tarihi'] ?? null),
             (string) ($row['sirket_adi'] ?? ''),
-            (string) ($row['sube_adi'] ?? ''),
+            SubeReadModel::tamAd(
+                isset($row['sirket_adi']) ? (string) $row['sirket_adi'] : null,
+                (string) ($row['sube_adi'] ?? '')
+            ),
             (string) ($row['sgk_isveren_adi'] ?? ''),
             (string) ($row['calisma_lokasyonu_adi'] ?? ''),
             (string) ($row['departman_adi'] ?? ''),

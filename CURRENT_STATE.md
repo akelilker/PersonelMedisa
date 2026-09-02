@@ -7,13 +7,15 @@ MG_PERSONNEL_BULK_POSTCHECK_DYNAMIC_CONTRACT_001: CODE_READY (PersonelLifecycleB
 MG_PERSONNEL_BULK_DRY_RUN_APPLY_PARITY_001: CODE_READY (PersonelLifecycleBulkMutationPlanner ortak owner; bolum→departman inference + hierarchy validation dry-run/apply parity; production mutation=0)
 
 ORG_HIERARCHY_SCHEMA_READY: true
-ORG_HIERARCHY_DATA_READY: false
-MG_SIRKET_SUBE_PROD_MAPPING_001: CODE_READY_NOT_EXECUTED (inventory owner + operations-only initial mapping owner kod olarak hazır; production envanteri ve mapping preflight/apply ÇALIŞTIRILMADI; production mutation=0)
+ORG_HIERARCHY_DATA_READY: true
+MG_SIRKET_SUBE_PROD_MAPPING_001: CLOSED_CONFIRMED (apply run 33342644722; 3 şirket + ilk 10 şube + 3 SGK eşlendi; postcheck PASS; canlıda ek Medisa şubeleri 12/İzmir + 13/Sakarya; toplam 12 şube; `subeler.ad` = kısa ad; görünen ad = SubeReadModel.tam_ad (DB kolonu değil); 7 çalışma lokasyonu deferred sube_id=NULL; eski mapping spec yeniden uygulanmaz)
 ORG_MAPPING_INVENTORY_OWNER: OrganizationMappingInventoryReport (SELECT-only, checksum'lı, PII'siz) + `ops-organization-inventory.yml`
 ORG_MAPPING_EXECUTION_OWNER: OrganizationInitialMappingService (operations-only; public API/UI'da re-parent YOK) + `apply-organization-mapping.yml`
-ORG_MAPPING_SPEC_OWNER: OrganizationMappingSpec (allowlist + preimage + inventory checksum pin; production değeri repoda YOK)
-ORG_USER_SCOPE_ROLLOUT: DEFERRED (user_sirketler / user_sgk_isverenler bu operasyonun dışında)
-ORG_BRANCH_NAME_DB_HARDENING: NEXT_GATE (eşleme doğrulandıktan sonra ayrı migration)
+ORG_MAPPING_SPEC_OWNER: OrganizationMappingSpec (allowlist + preimage + inventory checksum pin; `ops/organization-mapping/*.json` = historical preimage artifact, canlı truth değil)
+ORG_BRANCH_DISPLAY_OWNER: SubeReadModel (kısa `ad` + türetilmiş `tam_ad`; frontend concat owner YOK)
+ORG_USER_SCOPE_ROLLOUT: DEFERRED (user_sirketler / user_sgk_isverenler boş; personel binding rollout bu fazın dışında)
+ORG_LOCATION_SUBE_MAPPING: DEFERRED (calisma_lokasyonlari.sube_id bilinçli NULL)
+ORG_BRANCH_NAME_DB_HARDENING: CLOSED_NOT_NEEDED (tam_ad bilerek kolon değil; SubeReadModel owner)
 AYLIK_KAPANIS_SGK_REDESIGN: NEXT_GATE
 
 PERSONEL_IMPORT_ROLLOUT: CLOSED_CONFIRMED

@@ -10,6 +10,7 @@ use Medisa\Api\Database\Connection;
 use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
 use Medisa\Api\Scope\SubeScope;
+use Medisa\Api\Services\Organizasyon\SubeReadModel;
 use Medisa\Api\Services\Personel\PersonelOrgStructureSchema;
 use Medisa\Api\Support\Utf8;
 use PDO;
@@ -40,6 +41,30 @@ class RevizyonController
         'KAPANIS_HESAP_REVIZYONU' => 'KAPANIS_HESAP_REVIZYONU',
         'BORDRO_ETKI_NOTU' => 'BORDRO_ETKI_NOTU',
     ];
+
+    /** @var array<int, string> */
+    private static $subeDisplayCache = [];
+
+    /**
+     * @param mixed $subeId
+     * @param mixed $fallback
+     */
+    private static function displaySubeAd(PDO $pdo, $subeId, $fallback = null): ?string
+    {
+        $id = (int) $subeId;
+        if ($id <= 0) {
+            return $fallback !== null && $fallback !== '' ? (string) $fallback : null;
+        }
+        if (!array_key_exists($id, self::$subeDisplayCache)) {
+            $mapped = SubeReadModel::findById($pdo, $id);
+            self::$subeDisplayCache[$id] = $mapped !== null
+                ? (string) $mapped['tam_ad']
+                : (string) ($fallback ?? '');
+        }
+        $label = self::$subeDisplayCache[$id];
+
+        return $label !== '' ? $label : null;
+    }
 
     private const SERVER_OWNED_FIELDS = [
         'id',
@@ -105,7 +130,7 @@ class RevizyonController
 
         $items = [];
         foreach ($rows as $row) {
-            $items[] = self::presentTalep($user, $row);
+            $items[] = self::presentTalep($pdo, $user, $row);
         }
 
         JsonResponse::success(['items' => $items]);
@@ -126,7 +151,7 @@ class RevizyonController
         }
 
         self::assertCanViewTalep($user, $request, $row);
-        $payload = self::presentTalep($user, $row);
+        $payload = self::presentTalep($pdo, $user, $row);
         if (RolePermissions::has($user, 'revizyon.view_audit_history')) {
             $payload['audit_gecmisi'] = self::loadAuditGecmisi($pdo, $talepId);
         }
@@ -291,7 +316,7 @@ class RevizyonController
         }
 
         $row = self::loadTalepById($pdo, $talepId, false);
-        JsonResponse::success(self::presentTalep($user, $row), [], 201);
+        JsonResponse::success(self::presentTalep($pdo, $user, $row), [], 201);
     }
 
     public static function gonder(Request $request, $id)
@@ -354,7 +379,7 @@ class RevizyonController
         }
 
         $fresh = self::loadTalepById($pdo, $talepId, false);
-        JsonResponse::success(self::presentTalep($user, $fresh));
+        JsonResponse::success(self::presentTalep($pdo, $user, $fresh));
     }
 
     public static function corrections(Request $request)
@@ -370,7 +395,7 @@ class RevizyonController
 
         $items = [];
         foreach ($rows as $row) {
-            $items[] = self::presentCorrection($user, $row);
+            $items[] = self::presentCorrection($pdo, $user, $row);
         }
 
         JsonResponse::success(['items' => $items]);
@@ -391,7 +416,7 @@ class RevizyonController
         }
 
         self::assertCanViewCorrection($user, $request, $row);
-        JsonResponse::success(self::presentCorrection($user, $row));
+        JsonResponse::success(self::presentCorrection($pdo, $user, $row));
     }
 
     public static function correctionUret(Request $request, $id)
@@ -537,7 +562,7 @@ class RevizyonController
         }
 
         $row = self::loadCorrectionById($pdo, $correctionId, false);
-        JsonResponse::success(self::presentCorrection($user, $row));
+        JsonResponse::success(self::presentCorrection($pdo, $user, $row));
     }
 
     public static function correctionIptal(Request $request, $id)
@@ -594,7 +619,7 @@ class RevizyonController
         }
 
         $fresh = self::loadCorrectionById($pdo, $correctionId, false);
-        JsonResponse::success(self::presentCorrection($user, $fresh));
+        JsonResponse::success(self::presentCorrection($pdo, $user, $fresh));
     }
 
     /**
@@ -660,7 +685,7 @@ class RevizyonController
         }
 
         $fresh = self::loadTalepById($pdo, $talepId, false);
-        JsonResponse::success(self::presentTalep($user, $fresh));
+        JsonResponse::success(self::presentTalep($pdo, $user, $fresh));
     }
 
     /** @param array<string, mixed> $body */
@@ -698,7 +723,7 @@ class RevizyonController
      * @param array<string, mixed> $row
      * @return array<string, mixed>
      */
-    private static function presentTalep(array $user, array $row): array
+    private static function presentTalep(PDO $pdo, array $user, array $row): array
     {
         $correctionEventId = $row['correction_event_id'] !== null
             ? (int) $row['correction_event_id']
@@ -726,7 +751,7 @@ class RevizyonController
             'personel_ad_soyad' => isset($row['personel_ad_soyad']) ? (string) $row['personel_ad_soyad'] : null,
             'sicil_no' => isset($row['sicil_no']) ? (string) $row['sicil_no'] : null,
             'sube_id' => isset($row['sube_id']) ? (int) $row['sube_id'] : null,
-            'sube_adi' => isset($row['sube_adi']) ? (string) $row['sube_adi'] : null,
+            'sube_adi' => self::displaySubeAd($pdo, $row['sube_id'] ?? null, $row['sube_adi'] ?? null),
             'departman_id' => array_key_exists('departman_id', $row) && $row['departman_id'] !== null
                 ? (int) $row['departman_id']
                 : null,
@@ -1649,7 +1674,7 @@ class RevizyonController
      * @param array<string, mixed> $row
      * @return array<string, mixed>
      */
-    private static function presentCorrection(array $user, array $row): array
+    private static function presentCorrection(PDO $pdo, array $user, array $row): array
     {
         $payload = [
             'id' => (int) $row['id'],
@@ -1658,7 +1683,7 @@ class RevizyonController
             'personel_ad_soyad' => isset($row['personel_ad_soyad']) ? (string) $row['personel_ad_soyad'] : null,
             'sicil_no' => isset($row['sicil_no']) ? (string) $row['sicil_no'] : null,
             'sube_id' => isset($row['sube_id']) ? (int) $row['sube_id'] : null,
-            'sube_adi' => isset($row['sube_adi']) ? (string) $row['sube_adi'] : null,
+            'sube_adi' => self::displaySubeAd($pdo, $row['sube_id'] ?? null, $row['sube_adi'] ?? null),
             'departman_id' => array_key_exists('departman_id', $row) && $row['departman_id'] !== null
                 ? (int) $row['departman_id']
                 : null,

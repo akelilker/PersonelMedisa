@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Medisa\Api\Services;
 
+use Medisa\Api\Services\Organizasyon\OrganizasyonSchema;
+use Medisa\Api\Services\Organizasyon\SubeReadModel;
 use PDO;
 
 /**
@@ -128,12 +130,20 @@ class BordroOnIzlemeService
     /** @return array<int, array<string, mixed>> */
     public static function listPersonelSatirlari(PDO $pdo, $calistirmaId, $departmanId = null)
     {
-        $sql = "SELECT a.*, p.ad, p.soyad, p.sicil_no, p.departman_id, d.ad AS departman_ad, ss.ad AS sube_ad
+        $sirketJoin = '';
+        $sirketSelect = 'NULL AS sube_sirket_adi';
+        if (OrganizasyonSchema::isSchemaReady($pdo)) {
+            $sirketJoin = ' LEFT JOIN sirketler sirket_of_sube ON sirket_of_sube.id = ss.sirket_id';
+            $sirketSelect = 'sirket_of_sube.ad AS sube_sirket_adi';
+        }
+        $sql = "SELECT a.*, p.ad, p.soyad, p.sicil_no, p.departman_id, d.ad AS departman_ad,
+                       ss.ad AS sube_ad, {$sirketSelect}
                 FROM maas_hesaplama_adaylari a
                 INNER JOIN personeller p ON p.id = a.personel_id
                 LEFT JOIN departmanlar d ON d.id = p.departman_id
                 INNER JOIN maas_hesaplama_calistirmalari c ON c.id = a.calistirma_id
                 INNER JOIN subeler ss ON ss.id = c.sube_id
+                {$sirketJoin}
                 WHERE a.calistirma_id = :cid AND a.state = 'HESAPLANDI'";
         $params = ['cid' => (int) $calistirmaId];
         if ($departmanId !== null) {
@@ -151,13 +161,21 @@ class BordroOnIzlemeService
     /** @return array<string, mixed>|null */
     public static function getAdayDetay(PDO $pdo, $adayId)
     {
+        $sirketJoin = '';
+        $sirketSelect = 'NULL AS sube_sirket_adi';
+        if (OrganizasyonSchema::isSchemaReady($pdo)) {
+            $sirketJoin = ' LEFT JOIN sirketler sirket_of_sube ON sirket_of_sube.id = ss.sirket_id';
+            $sirketSelect = 'sirket_of_sube.ad AS sube_sirket_adi';
+        }
         $stmt = $pdo->prepare(
-            "SELECT a.*, p.ad, p.soyad, p.sicil_no, p.departman_id, d.ad AS departman_ad, c.sube_id, ss.ad AS sube_ad
+            "SELECT a.*, p.ad, p.soyad, p.sicil_no, p.departman_id, d.ad AS departman_ad,
+                    c.sube_id, ss.ad AS sube_ad, {$sirketSelect}
              FROM maas_hesaplama_adaylari a
              INNER JOIN personeller p ON p.id = a.personel_id
              LEFT JOIN departmanlar d ON d.id = p.departman_id
              INNER JOIN maas_hesaplama_calistirmalari c ON c.id = a.calistirma_id
              INNER JOIN subeler ss ON ss.id = c.sube_id
+             {$sirketJoin}
              WHERE a.id = :id
              LIMIT 1"
         );
@@ -380,7 +398,10 @@ class BordroOnIzlemeService
             'personel_id' => (int) $row['personel_id'],
             'ad_soyad' => trim(((string) ($row['ad'] ?? '')) . ' ' . ((string) ($row['soyad'] ?? ''))),
             'sicil' => (string) ($row['sicil_no'] ?? ''),
-            'sube_ad' => (string) ($row['sube_ad'] ?? ''),
+            'sube_ad' => SubeReadModel::tamAd(
+                $row['sube_sirket_adi'] ?? null,
+                (string) ($row['sube_ad'] ?? '')
+            ),
             'departman_ad' => (string) ($row['departman_ad'] ?? ''),
             'net_maas' => $row['hedef_net_tutar'] !== null ? (string) $row['hedef_net_tutar'] : null,
             'brut_maas' => (string) $row['hesaplanan_brut_tutar'],

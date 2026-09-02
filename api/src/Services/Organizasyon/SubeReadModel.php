@@ -69,7 +69,9 @@ final class SubeReadModel
      */
     public static function selectColumns(PDO $pdo, string $alias = 's'): string
     {
-        $columns = $alias . '.id, ' . $alias . '.kod, ' . $alias . '.ad, ' . $alias . '.durum';
+        // Minimal SQLite fixtures may only have id/kod/ad; production always has durum.
+        $columns = $alias . '.id, ' . $alias . '.kod, ' . $alias . '.ad'
+            . (self::hasSubeDurumColumn($pdo) ? ', ' . $alias . '.durum' : ', NULL AS durum');
 
         $columns .= OrganizasyonSchema::isSgkRelationReady($pdo)
             ? ', ' . $alias . '.sgk_isveren_id, e.kod AS sgk_isveren_kod, e.ad AS sgk_isveren_ad'
@@ -97,7 +99,8 @@ final class SubeReadModel
     /** GROUP BY list matching selectColumns(). */
     public static function groupBySql(PDO $pdo, string $alias = 's'): string
     {
-        $group = $alias . '.id, ' . $alias . '.kod, ' . $alias . '.ad, ' . $alias . '.durum';
+        $group = $alias . '.id, ' . $alias . '.kod, ' . $alias . '.ad'
+            . (self::hasSubeDurumColumn($pdo) ? ', ' . $alias . '.durum' : '');
 
         if (OrganizasyonSchema::isSgkRelationReady($pdo)) {
             $group .= ', ' . $alias . '.sgk_isveren_id, e.kod, e.ad';
@@ -107,6 +110,33 @@ final class SubeReadModel
         }
 
         return $group;
+    }
+
+    /**
+     * Load one branch through the shared projection/mapping path.
+     * Callers that need a display label must use `tam_ad`; `ad` stays the short name.
+     *
+     * @return array<string, mixed>|null
+     */
+    public static function findById(PDO $pdo, $subeId): ?array
+    {
+        $id = (int) $subeId;
+        if ($id <= 0) {
+            return null;
+        }
+
+        $stmt = $pdo->prepare(
+            'SELECT ' . self::selectColumns($pdo)
+            . ' FROM subeler s' . self::joinSql($pdo)
+            . ' WHERE s.id = :id LIMIT 1'
+        );
+        $stmt->execute(['id' => $id]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!is_array($row)) {
+            return null;
+        }
+
+        return self::mapRow($row);
     }
 
     /**
@@ -205,5 +235,51 @@ final class SubeReadModel
         }
 
         return $names;
+    }
+
+    /** @var bool|null */
+    private static $hasDurumColumn = null;
+
+    /**
+     * Production `subeler` always has durum; disposable SQLite payroll fixtures
+     * often ship id/kod/ad only. Project NULL instead of crashing findById.
+     */
+    private static function hasSubeDurumColumn(PDO $pdo): bool
+    {
+        if (self::$hasDurumColumn !== null) {
+            return self::$hasDurumColumn;
+        }
+
+        try {
+            $driver = (string) $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+            if ($driver === 'sqlite') {
+                $stmt = $pdo->query('PRAGMA table_info(subeler)');
+                $rows = $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
+                foreach ($rows as $row) {
+                    if (strcasecmp((string) ($row['name'] ?? ''), 'durum') === 0) {
+                        self::$hasDurumColumn = true;
+
+                        return true;
+                    }
+                }
+                self::$hasDurumColumn = false;
+
+                return false;
+            }
+
+            $stmt = $pdo->prepare(
+                'SELECT 1 FROM information_schema.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :table AND COLUMN_NAME = :column
+                 LIMIT 1'
+            );
+            $stmt->execute(['table' => 'subeler', 'column' => 'durum']);
+            self::$hasDurumColumn = $stmt->fetchColumn() !== false;
+
+            return self::$hasDurumColumn;
+        } catch (\Throwable $e) {
+            self::$hasDurumColumn = false;
+
+            return false;
+        }
     }
 }

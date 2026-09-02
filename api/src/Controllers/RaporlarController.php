@@ -10,6 +10,7 @@ use Medisa\Api\Database\Connection;
 use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
 use Medisa\Api\Scope\SubeScope;
+use Medisa\Api\Services\Organizasyon\SubeReadModel;
 use Medisa\Api\Services\SgkPrimGunuService;
 use PDO;
 
@@ -340,7 +341,7 @@ class RaporlarController
 
     $items = [];
     foreach (self::attachCanonicalSgk($pdo, $stmt->fetchAll(PDO::FETCH_ASSOC), (string) $resolved['donem']) as $row) {
-      $items[] = self::mapPersonelOzetRow($row);
+      $items[] = self::mapPersonelOzetRow($pdo, $row);
     }
 
     return ['items' => $items, 'total' => $total];
@@ -398,7 +399,7 @@ class RaporlarController
 
     $items = [];
     foreach (self::attachCanonicalSgk($pdo, $stmt->fetchAll(PDO::FETCH_ASSOC), $donem) as $row) {
-      $items[] = self::mapPersonelOzetRow($row);
+      $items[] = self::mapPersonelOzetRow($pdo, $row);
     }
 
     return ['items' => $items, 'total' => $total];
@@ -1060,7 +1061,8 @@ class RaporlarController
 
     $whereSql = implode(' AND ', $where);
     $sql = "
-            SELECT p.id AS personel_id, TRIM(CONCAT_WS(' ', p.ad, p.soyad)) AS ad_soyad, p.sicil_no,
+            SELECT p.id AS personel_id, p.sube_id AS personel_sube_id,
+                   TRIM(CONCAT_WS(' ', p.ad, p.soyad)) AS ad_soyad, p.sicil_no,
                    s.ad AS sube, d.ad AS bolum
             FROM personeller p
             LEFT JOIN subeler s ON s.id = p.sube_id
@@ -1074,7 +1076,7 @@ class RaporlarController
 
     $items = [];
     foreach ($rows as $row) {
-      $items[] = self::mapLegacyReportRow($tip, $row);
+      $items[] = self::mapLegacyReportRow($pdo, $tip, $row);
     }
 
     JsonResponse::success(
@@ -1363,15 +1365,40 @@ class RaporlarController
     return $rows;
   }
 
+  /** @var array<int, string> */
+  private static $subeDisplayCache = [];
+
+  /**
+   * Global report/display branch label via SubeReadModel.tam_ad.
+   *
+   * @param mixed $subeId
+   * @param mixed $fallback
+   */
+  private static function displaySubeAd(PDO $pdo, $subeId, $fallback = '')
+  {
+    $id = (int) $subeId;
+    if ($id <= 0) {
+      return (string) $fallback;
+    }
+    if (!array_key_exists($id, self::$subeDisplayCache)) {
+      $mapped = SubeReadModel::findById($pdo, $id);
+      self::$subeDisplayCache[$id] = $mapped !== null
+        ? (string) $mapped['tam_ad']
+        : (string) $fallback;
+    }
+
+    return self::$subeDisplayCache[$id];
+  }
+
   /** @param array<string, mixed> $row @return array<string, mixed> */
-  private static function mapPersonelOzetRow(array $row)
+  private static function mapPersonelOzetRow(PDO $pdo, array $row)
   {
     return [
       'personel_id' => (int) $row['personel_id'],
       'ad_soyad' => (string) $row['ad_soyad'],
       'sicil_no' => $row['sicil_no'],
       'aktif_durum' => (string) $row['aktif_durum'],
-      'sube' => $row['sube'],
+      'sube' => self::displaySubeAd($pdo, $row['personel_sube_id'] ?? 0, $row['sube'] ?? ''),
       'bolum' => $row['bolum'],
       'net_calisma_dakika' => (int) $row['net_calisma_dakika'],
       'sgk_prim_gun' => $row['sgk_prim_gun'] !== null ? (int) $row['sgk_prim_gun'] : null,
@@ -1496,13 +1523,13 @@ class RaporlarController
   }
 
   /** @param array<string, mixed> $row @return array<string, mixed> */
-  private static function mapLegacyReportRow($tip, array $row)
+  private static function mapLegacyReportRow(PDO $pdo, $tip, array $row)
   {
     $base = [
       'personel_id' => (int) $row['personel_id'],
       'ad_soyad' => (string) $row['ad_soyad'],
       'sicil_no' => $row['sicil_no'],
-      'sube' => $row['sube'],
+      'sube' => self::displaySubeAd($pdo, $row['personel_sube_id'] ?? 0, $row['sube'] ?? ''),
       'bolum' => $row['bolum'],
     ];
 

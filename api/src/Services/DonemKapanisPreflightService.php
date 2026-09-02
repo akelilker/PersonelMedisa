@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Medisa\Api\Services;
 
+use Medisa\Api\Services\Organizasyon\SubeReadModel;
 use PDO;
 
 class DonemKapanisPreflightService
@@ -524,14 +525,16 @@ class DonemKapanisPreflightService
 
     private static function fetchSube(PDO $pdo, $subeId)
     {
-        $stmt = $pdo->prepare('SELECT id, kod, ad FROM subeler WHERE id = :id LIMIT 1');
-        $stmt->execute(['id' => $subeId]);
-        $row = $stmt->fetch(PDO::FETCH_ASSOC);
-        if (!$row) {
-            return ['id' => $subeId, 'kod' => null, 'ad' => null];
+        $mapped = SubeReadModel::findById($pdo, (int) $subeId);
+        if ($mapped === null) {
+            return ['id' => (int) $subeId, 'kod' => null, 'ad' => null];
         }
 
-        return ['id' => (int) $row['id'], 'kod' => (string) $row['kod'], 'ad' => (string) $row['ad']];
+        return [
+            'id' => (int) $mapped['id'],
+            'kod' => (string) $mapped['kod'],
+            'ad' => (string) $mapped['tam_ad'],
+        ];
     }
 
     private static function fetchCandidateStateCounts(PDO $pdo, $subeId, $donem)

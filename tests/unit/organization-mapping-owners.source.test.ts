@@ -837,7 +837,11 @@ describe('the approved production decision is documented, not coded', () => {
     expect(readme).toContain('User scope');
   });
 
-  it('holds no real production spec yet', () => {
-    expect(readme).toContain('**gerçek bir production spec içermez**');
+  it('documents that repo mapping JSON is a historical preimage, not live truth', () => {
+    expect(readme).toContain('historical');
+    expect(readme).toContain('preimage');
+    expect(readme).toContain('CLOSED_CONFIRMED');
+    expect(readme).toContain('SubeReadModel');
+    expect(readme).not.toContain('**gerçek bir production spec içermez**');
   });
 });

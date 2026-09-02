@@ -1661,7 +1661,7 @@ export function YonetimPaneliPage() {
                 placeholderOption={{ value: "", label: "Tüm Şubeler / Seçimsiz" }}
                 selectOptions={subeler
                   .filter((sube) => kullaniciForm.subeIds.includes(sube.id))
-                  .map((sube) => ({ value: String(sube.id), label: sube.ad }))}
+                  .map((sube) => ({ value: String(sube.id), label: sube.tam_ad }))}
               />
               <YonetimOrgScopeFields
                 role={kullaniciForm.rol}

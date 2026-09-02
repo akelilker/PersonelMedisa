@@ -9,6 +9,7 @@ api/runtime-build/
 coverage/
 playwright-report/
 test-results/
+artifacts/
 .test-mariadb/
 
 # Environment files

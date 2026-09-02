@@ -53,6 +53,17 @@ describe("fetchPersonelAktifUcret empty state (no wage record)", () => {
     expect(apiRequestMock).toHaveBeenCalledTimes(1);
   });
 
+  it("treats HTTP 200 with null data as empty state without throwing", async () => {
+    apiRequestMock.mockResolvedValue({
+      data: null,
+      meta: {},
+      errors: []
+    });
+
+    await expect(fetchPersonelAktifUcret(4)).resolves.toBeNull();
+    expect(apiRequestMock).toHaveBeenCalledTimes(1);
+  });
+
   it.each([
     [401, "UNAUTHORIZED"],
     [403, "FORBIDDEN"],

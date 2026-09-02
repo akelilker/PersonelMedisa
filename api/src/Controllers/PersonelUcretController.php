@@ -31,6 +31,10 @@ class PersonelUcretController
         try {
             JsonResponse::success(PersonelUcretService::resolveSalaryForDate($pdo, $personelId, $date));
         } catch (PersonelUcretException $e) {
+            // Soft-null read: missing active wage is an empty state, not a failed request.
+            if ($e->getCodeString() === 'SALARY_MISSING') {
+                JsonResponse::success(null);
+            }
             self::error($e);
         }
     }

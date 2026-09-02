@@ -258,7 +258,7 @@ try {
     parityAssert((int) ($planPayload['departman_id'] ?? 0) === 1, 'dry-run plan carries inferred departman_id=1');
     parityAssert(($goodDry['satirlar'][0]['mutation_plan']['canonical_ready'] ?? false) === true, 'dry-run and apply share canonical_ready create payload');
 
-    parityAssert(($goodDry['can_apply'] ?? true) === false, 'single create row does not satisfy binding postcheck');
+    parityAssert(($goodDry['can_apply'] ?? false) === true, 'single ready create row passes dynamic postcheck');
 
     $pdo->beginTransaction();
     $createdId = PersonelCreateService::insertPersonel($pdo, $planPayload);

@@ -96,6 +96,28 @@ final class PersonelLifecycleBulkMutationPlanner
     }
 
     /**
+     * Canonicalize the basic axis during dry-run so apply never reinterprets
+     * a multi-axis row. Reference checks intentionally stay in the existing
+     * basic-update owner.
+     *
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
+    public static function planBasicPayload(PDO $pdo, int $personelId, array $payload): array
+    {
+        $validated = PersonelCanonicalValidator::normalizeAndValidateUpdatePayload($payload);
+        $basic = [];
+        foreach (PersonelBasicUpdateService::allowedColumns() as $field) {
+            if (array_key_exists($field, $validated)) {
+                $basic[$field] = $validated[$field];
+            }
+        }
+        PersonelBasicUpdateService::assertPlanReferences($pdo, $basic, $personelId);
+
+        return $basic;
+    }
+
+    /**
      * @return array{field:?string, code:string}|null
      */
     public static function dryRunValidationDetail(\Throwable $e): ?array

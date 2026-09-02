@@ -6,10 +6,14 @@ export type PersonelMissingFieldKey =
   | "dogum_tarihi"
   | "telefon"
   | "ise_giris_tarihi"
+  | "sube_id"
+  | "calisma_lokasyonu_id"
+  | "bagli_amir_id"
   | "departman_id"
   | "bolum_id"
   | "birim_id"
   | "gorev_id"
+  | "pozisyon_id"
   | "personel_tipi_id";
 
 export type PersonelMissingFieldCategory = "KIMLIK" | "ILETISIM" | "ISTIHDAM";
@@ -37,10 +41,14 @@ const VALID_KEYS = new Set<PersonelMissingFieldKey>([
   "dogum_tarihi",
   "telefon",
   "ise_giris_tarihi",
+  "sube_id",
+  "calisma_lokasyonu_id",
+  "bagli_amir_id",
   "departman_id",
   "bolum_id",
   "birim_id",
   "gorev_id",
+  "pozisyon_id",
   "personel_tipi_id"
 ]);
 
@@ -99,12 +107,39 @@ const PERSONEL_MISSING_FIELD_RULES: readonly PersonelMissingFieldRule[] = [
     isMissing: (personel) => !hasText(personel.ise_giris_tarihi)
   },
   {
+    key: "sube_id",
+    label: "Şube",
+    category: "ISTIHDAM",
+    severity: "CRITICAL",
+    editTarget: "genel",
+    scopes: BOTH_SCOPES,
+    isMissing: (personel) => !hasPositiveId(personel.sube_id)
+  },
+  {
+    key: "calisma_lokasyonu_id",
+    label: "Çalışma Lokasyonu",
+    category: "ISTIHDAM",
+    severity: "CRITICAL",
+    editTarget: "genel",
+    scopes: BOTH_SCOPES,
+    isMissing: (personel) => !hasPositiveId(personel.calisma_lokasyonu_id)
+  },
+  {
+    key: "bagli_amir_id",
+    label: "Yönetici",
+    category: "ISTIHDAM",
+    severity: "CRITICAL",
+    editTarget: "genel",
+    scopes: BOTH_SCOPES,
+    isMissing: (personel) => !hasPositiveId(personel.bagli_amir_id)
+  },
+  {
     key: "departman_id",
     label: "Departman",
     category: "ISTIHDAM",
     severity: "CRITICAL",
     editTarget: "genel",
-    scopes: IC_ONLY,
+    scopes: BOTH_SCOPES,
     isMissing: (personel) => !hasPositiveId(personel.departman_id)
   },
   {
@@ -113,7 +148,7 @@ const PERSONEL_MISSING_FIELD_RULES: readonly PersonelMissingFieldRule[] = [
     category: "ISTIHDAM",
     severity: "CRITICAL",
     editTarget: "genel",
-    scopes: IC_ONLY,
+    scopes: BOTH_SCOPES,
     isMissing: (personel) => !hasPositiveId(personel.bolum_id)
   },
   {
@@ -122,7 +157,7 @@ const PERSONEL_MISSING_FIELD_RULES: readonly PersonelMissingFieldRule[] = [
     category: "ISTIHDAM",
     severity: "CRITICAL",
     editTarget: "genel",
-    scopes: IC_ONLY,
+    scopes: BOTH_SCOPES,
     isMissing: (personel) => !hasPositiveId(personel.birim_id)
   },
   {
@@ -131,8 +166,17 @@ const PERSONEL_MISSING_FIELD_RULES: readonly PersonelMissingFieldRule[] = [
     category: "ISTIHDAM",
     severity: "CRITICAL",
     editTarget: "genel",
-    scopes: IC_ONLY,
+    scopes: BOTH_SCOPES,
     isMissing: (personel) => !hasPositiveId(personel.gorev_id)
+  },
+  {
+    key: "pozisyon_id",
+    label: "Pozisyon",
+    category: "ISTIHDAM",
+    severity: "CRITICAL",
+    editTarget: "genel",
+    scopes: BOTH_SCOPES,
+    isMissing: (personel) => !hasPositiveId(personel.pozisyon_id)
   },
   {
     key: "personel_tipi_id",

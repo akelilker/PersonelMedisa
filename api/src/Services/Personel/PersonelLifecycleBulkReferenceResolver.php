@@ -21,6 +21,7 @@ final class PersonelLifecycleBulkReferenceResolver
         if ($needle === '') {
             return null;
         }
+        $asciiNeedle = self::searchKey($displayName);
 
         $stmt = $pdo->query(
             "SELECT id, ad_soyad FROM users
@@ -30,16 +31,20 @@ final class PersonelLifecycleBulkReferenceResolver
         if ($stmt === false) {
             return null;
         }
+        $matchedIds = [];
         while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
             if (!is_array($row)) {
                 continue;
             }
-            if (self::normalizeName((string) ($row['ad_soyad'] ?? '')) === $needle) {
-                return (int) $row['id'];
+            $candidate = (string) ($row['ad_soyad'] ?? '');
+            if (self::normalizeName($candidate) === $needle || self::searchKey($candidate) === $asciiNeedle) {
+                $matchedIds[(int) $row['id']] = true;
             }
         }
 
-        return null;
+        $ids = array_keys($matchedIds);
+
+        return count($ids) === 1 ? (int) $ids[0] : null;
     }
 
     public static function resolveActiveIdByName(PDO $pdo, string $table, string $name): ?int

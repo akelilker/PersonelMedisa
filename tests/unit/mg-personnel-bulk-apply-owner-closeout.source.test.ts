@@ -35,6 +35,25 @@ describe("MG personnel bulk apply owner closeout sources", () => {
     expect(apply).toContain("deployed_sha");
   });
 
+  it("plans multi-axis rows once and applies them in one outer transaction", () => {
+    const dryRun = read("api/src/Services/Personel/PersonelLifecycleBulkDryRunService.php");
+    const apply = read("api/src/Services/Personel/PersonelLifecycleBulkApplyService.php");
+    const org = read("api/src/Services/Personel/PersonelOrganizasyonDegisikligiService.php");
+    const branch = read("api/src/Services/Personel/PersonelKaliciSubeDegisikligiService.php");
+
+    expect(dryRun).toContain("'mode' => 'MULTI_AXIS'");
+    expect(dryRun).toContain("resolveReferenceOrFail");
+    expect(dryRun).toContain("resolveManagerOrFail");
+    expect(dryRun).toContain("MISSING_MANAGER_PERSONNEL_REFERENCE");
+    expect(dryRun).not.toContain("'gorev_id' => $payload['gorev_id'] ?? null");
+    expect(apply).toContain("assertMultiAxisPreimage");
+    expect(apply).toContain("PersonelOrganizasyonDegisikligiService::applyInTransaction");
+    expect(apply).toContain("PersonelKaliciSubeDegisikligiService::applyInTransaction");
+    expect(apply).toContain("PERSONEL_LIFECYCLE_STALE_PREIMAGE");
+    expect(org).toContain("$ownsTransaction = !$pdo->inTransaction()");
+    expect(branch).toContain("$ownsTransaction = !$pdo->inTransaction()");
+  });
+
   it("derives dynamic postcheck contract from inventory fingerprint and dry-run analysis", () => {
     const postcheck = read("api/src/Services/Personel/PersonelLifecycleBulkPostcheck.php");
     const dryRun = read("api/src/Services/Personel/PersonelLifecycleBulkDryRunService.php");
@@ -57,11 +76,13 @@ describe("MG personnel bulk apply owner closeout sources", () => {
     expect(completeness).toContain("'key' => 'bagli_amir_id'");
     expect(completeness).toContain("'key' => 'pozisyon_id'");
     expect(completeness).toContain("pozisyon_id, 0) <= 0");
+    expect(completeness).toContain("DIS_KAYNAK records must retain a NULL payroll employer");
   });
 
   it("does not fabricate manager users and avoids TC in resolver paths", () => {
     const resolver = read("api/src/Services/Personel/PersonelLifecycleBulkReferenceResolver.php");
     expect(resolver).toContain("resolveBagliAmirUserId");
+    expect(resolver).toContain("$matchedIds");
     expect(resolver).not.toContain("INSERT INTO users");
     expect(resolver).not.toContain("tc_kimlik");
   });

@@ -88,12 +88,17 @@ final class PersonelOrganizasyonDegisikligiService
         $preimage = self::parsePreimage($body);
         $targets = self::parseTargets($body);
 
-        $pdo->beginTransaction();
+        $ownsTransaction = !$pdo->inTransaction();
+        if ($ownsTransaction) {
+            $pdo->beginTransaction();
+        }
         try {
             if ($claimIdempotency !== null) {
                 $replay = $claimIdempotency($pdo);
                 if (is_array($replay)) {
-                    $pdo->commit();
+                    if ($ownsTransaction) {
+                        $pdo->commit();
+                    }
 
                     return [
                         'replay' => true,
@@ -181,7 +186,9 @@ final class PersonelOrganizasyonDegisikligiService
                 $completeIdempotency($pdo);
             }
 
-            $pdo->commit();
+            if ($ownsTransaction) {
+                $pdo->commit();
+            }
 
             return [
                 'replay' => false,
@@ -191,11 +198,34 @@ final class PersonelOrganizasyonDegisikligiService
                 'degisen_alanlar' => $changes,
             ];
         } catch (\Throwable $e) {
-            if ($pdo->inTransaction()) {
+            if ($ownsTransaction && $pdo->inTransaction()) {
                 $pdo->rollBack();
             }
             throw $e;
         }
+    }
+
+    /**
+     * Execute the canonical organisation owner inside a caller-owned atomic
+     * transaction. Idempotency belongs to that caller's outer mutation.
+     *
+     * @param array<string, mixed> $user
+     * @param array<string, mixed> $body
+     * @return array{replay:bool, personel_id:int, olay_tipi:string, audit_id:int|null, degisen_alanlar:list<string>}
+     */
+    public static function applyInTransaction(
+        PDO $pdo,
+        array $user,
+        Request $request,
+        int $personelId,
+        array $body,
+        OrganizasyonAuditContext $auditContext
+    ): array {
+        if (!$pdo->inTransaction()) {
+            throw new \LogicException('applyInTransaction aktif bir transaction gerektirir.');
+        }
+
+        return self::apply($pdo, $user, $request, $personelId, $body, $auditContext);
     }
 
     /** @param list<string> $changes */

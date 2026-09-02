@@ -32,8 +32,10 @@ class PersonelCompletenessService
             ? "IFNULL({$a}.calisan_kapsami, 'IC_PERSONEL')"
             : "'IC_PERSONEL'";
 
-        // Org (departman/bolum/birim) + gorev/personel_tipi + sube/lokasyon/yonetici yalnız IC için CRITICAL.
-        $icOrgPredicate = $hasOrgStructure
+        // Branch/location/manager and organization fields are critical for both
+        // employee scopes. SGK is deliberately not a completeness requirement:
+        // DIS_KAYNAK records must retain a NULL payroll employer.
+        $sharedOrgPredicate = $hasOrgStructure
             ? " OR IFNULL({$a}.sube_id, 0) <= 0"
                 . " OR IFNULL({$a}.calisma_lokasyonu_id, 0) <= 0"
                 . " OR IFNULL({$a}.bagli_amir_id, 0) <= 0"
@@ -42,23 +44,22 @@ class PersonelCompletenessService
                 . " OR IFNULL({$a}.birim_id, 0) <= 0"
                 . " OR IFNULL({$a}.gorev_id, 0) <= 0"
                 . " OR IFNULL({$a}.pozisyon_id, 0) <= 0"
-                . " OR IFNULL({$a}.personel_tipi_id, 0) <= 0"
             : " OR IFNULL({$a}.sube_id, 0) <= 0"
                 . " OR IFNULL({$a}.departman_id, 0) <= 0"
                 . " OR IFNULL({$a}.gorev_id, 0) <= 0"
-                . " OR IFNULL({$a}.pozisyon_id, 0) <= 0"
-                . " OR IFNULL({$a}.personel_tipi_id, 0) <= 0";
+                . " OR IFNULL({$a}.pozisyon_id, 0) <= 0";
 
         return "("
             . "TRIM(IFNULL({$a}.sicil_no, '')) = ''"
             . " OR TRIM(IFNULL({$a}.ise_giris_tarihi, '')) = ''"
+            . $sharedOrgPredicate
             . " OR ("
             . "  {$calisanKapsami} <> 'DIS_KAYNAK'"
             . "  AND ("
             . "    TRIM(IFNULL({$a}.tc_kimlik_no, '')) = ''"
             . "    OR TRIM(IFNULL({$a}.dogum_tarihi, '')) = ''"
             . "    OR TRIM(IFNULL({$a}.telefon, '')) = ''"
-            . $icOrgPredicate
+            . "    OR IFNULL({$a}.personel_tipi_id, 0) <= 0"
             . "  )"
             . " )"
             . ")";
@@ -177,7 +178,7 @@ class PersonelCompletenessService
                 'category' => self::CATEGORY_ISTIHDAM,
                 'severity' => self::SEVERITY_CRITICAL,
                 'edit_target' => 'genel',
-                'scopes' => $icOnly,
+                'scopes' => $both,
             ],
             [
                 'key' => 'calisma_lokasyonu_id',
@@ -185,7 +186,7 @@ class PersonelCompletenessService
                 'category' => self::CATEGORY_ISTIHDAM,
                 'severity' => self::SEVERITY_CRITICAL,
                 'edit_target' => 'genel',
-                'scopes' => $icOnly,
+                'scopes' => $both,
             ],
             [
                 'key' => 'bagli_amir_id',
@@ -193,7 +194,7 @@ class PersonelCompletenessService
                 'category' => self::CATEGORY_ISTIHDAM,
                 'severity' => self::SEVERITY_CRITICAL,
                 'edit_target' => 'genel',
-                'scopes' => $icOnly,
+                'scopes' => $both,
             ],
             [
                 'key' => 'departman_id',
@@ -201,7 +202,7 @@ class PersonelCompletenessService
                 'category' => self::CATEGORY_ISTIHDAM,
                 'severity' => self::SEVERITY_CRITICAL,
                 'edit_target' => 'genel',
-                'scopes' => $icOnly,
+                'scopes' => $both,
             ],
             [
                 'key' => 'bolum_id',
@@ -209,7 +210,7 @@ class PersonelCompletenessService
                 'category' => self::CATEGORY_ISTIHDAM,
                 'severity' => self::SEVERITY_CRITICAL,
                 'edit_target' => 'genel',
-                'scopes' => $icOnly,
+                'scopes' => $both,
             ],
             [
                 'key' => 'birim_id',
@@ -217,7 +218,7 @@ class PersonelCompletenessService
                 'category' => self::CATEGORY_ISTIHDAM,
                 'severity' => self::SEVERITY_CRITICAL,
                 'edit_target' => 'genel',
-                'scopes' => $icOnly,
+                'scopes' => $both,
             ],
             [
                 'key' => 'gorev_id',
@@ -225,7 +226,7 @@ class PersonelCompletenessService
                 'category' => self::CATEGORY_ISTIHDAM,
                 'severity' => self::SEVERITY_CRITICAL,
                 'edit_target' => 'genel',
-                'scopes' => $icOnly,
+                'scopes' => $both,
             ],
             [
                 'key' => 'pozisyon_id',
@@ -233,7 +234,7 @@ class PersonelCompletenessService
                 'category' => self::CATEGORY_ISTIHDAM,
                 'severity' => self::SEVERITY_CRITICAL,
                 'edit_target' => 'genel',
-                'scopes' => $icOnly,
+                'scopes' => $both,
             ],
             [
                 'key' => 'personel_tipi_id',

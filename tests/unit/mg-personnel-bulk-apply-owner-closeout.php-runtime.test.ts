@@ -31,7 +31,15 @@ describe("MG personnel bulk apply owner closeout (MariaDB runtime)", () => {
       "bulk apply org update wrote audit row",
       "stale preimage blocks apply",
       "retry does not duplicate audit rows",
+      "multi-axis apply succeeds",
+      "second owner error rolls back audit and idempotency ledger",
+      "later owner error rolls back idempotency ledger claim",
       "manager resolution does not create users",
+      "unresolved manager name blocks dry-run without user creation",
+      "ambiguous manager name blocks dry-run without arbitrary selection",
+      "blocked manager rows do not prevent other row analysis but block changeset apply",
+      "blocked manager dry-run writes neither audit nor idempotency ledger",
+      "unexpected manager resolver database error escapes dry-run globally",
     ]) {
       expect(stdout).toContain(marker);
     }

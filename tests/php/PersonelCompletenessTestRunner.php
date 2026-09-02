@@ -89,11 +89,33 @@ $disOrgOptional = PersonelCompletenessService::evaluate(
         'birim_id' => null,
         'departman_id' => null,
         'gorev_id' => null,
+        'sube_id' => null,
+        'calisma_lokasyonu_id' => null,
+        'bagli_amir_id' => null,
+        'pozisyon_id' => null,
         'personel_tipi_id' => null,
     ],
     true
 );
-completenessAssert($disOrgOptional['is_complete'] === true, 'DIS_KAYNAK null org → NOT missing');
+completenessAssert($disOrgOptional['is_complete'] === false, 'DIS_KAYNAK null org → CRITICAL missing');
+completenessAssert(
+    $disOrgOptional['critical_missing_labels'] === [
+        'Şube', 'Çalışma Lokasyonu', 'Yönetici', 'Departman', 'Bölüm', 'Birim', 'Unvan / Görev', 'Pozisyon',
+    ],
+    'DIS_KAYNAK requires all non-SGK organizational fields'
+);
+
+$disCompleteWithNullSgk = PersonelCompletenessService::evaluate(
+    array_merge(baseCompleteIc(), [
+        'calisan_kapsami' => 'DIS_KAYNAK',
+        'tc_kimlik_no' => null,
+        'dogum_tarihi' => null,
+        'telefon' => null,
+        'sgk_isveren_id' => null,
+    ]),
+    true
+);
+completenessAssert($disCompleteWithNullSgk['is_complete'] === true, 'DIS_KAYNAK NULL SGK remains complete');
 
 $multi = PersonelCompletenessService::evaluate(
     array_merge(baseCompleteIc(), [

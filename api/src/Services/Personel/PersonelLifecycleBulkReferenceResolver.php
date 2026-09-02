@@ -17,29 +17,39 @@ final class PersonelLifecycleBulkReferenceResolver
      */
     public static function resolveBagliAmirUserId(PDO $pdo, string $displayName): ?int
     {
+        $ids = self::resolveBagliAmirUserIds($pdo, $displayName);
+
+        return count($ids) === 1 ? (int) $ids[0] : null;
+    }
+
+    /** @return list<int> Active manager IDs matching the normalized display name. */
+    public static function resolveBagliAmirUserIds(PDO $pdo, string $displayName): array
+    {
         $needle = self::normalizeName($displayName);
         if ($needle === '') {
-            return null;
+            return [];
         }
-
+        $asciiNeedle = self::searchKey($displayName);
         $stmt = $pdo->query(
             "SELECT id, ad_soyad FROM users
              WHERE durum = 'AKTIF'
                AND rol IN ('GENEL_YONETICI', 'BOLUM_YONETICISI', 'BIRIM_AMIRI', 'MUHASEBE', 'SUBE_YONETICISI', 'IK_SORUMLUSU')"
         );
         if ($stmt === false) {
-            return null;
+            return [];
         }
+        $matchedIds = [];
         while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
             if (!is_array($row)) {
                 continue;
             }
-            if (self::normalizeName((string) ($row['ad_soyad'] ?? '')) === $needle) {
-                return (int) $row['id'];
+            $candidate = (string) ($row['ad_soyad'] ?? '');
+            if (self::normalizeName($candidate) === $needle || self::searchKey($candidate) === $asciiNeedle) {
+                $matchedIds[(int) $row['id']] = true;
             }
         }
 
-        return null;
+        return array_map('intval', array_keys($matchedIds));
     }
 
     public static function resolveActiveIdByName(PDO $pdo, string $table, string $name): ?int

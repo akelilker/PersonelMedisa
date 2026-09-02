@@ -118,6 +118,12 @@ final class PersonelBasicUpdateService
         ];
     }
 
+    /** @param array<string, mixed> $payload */
+    public static function assertPlanReferences(PDO $pdo, array $payload, int $personelId): void
+    {
+        self::validateReferences($pdo, $payload, $personelId);
+    }
+
     private static function isAllowedColumn(string $column): bool
     {
         return in_array($column, self::allowedColumns(), true);

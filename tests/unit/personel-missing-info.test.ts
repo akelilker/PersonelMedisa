@@ -19,10 +19,14 @@ const completePersonel: Personel = {
   dogum_tarihi: "1992-03-14",
   sicil_no: "P-001",
   ise_giris_tarihi: "2023-02-01",
+  sube_id: 2,
+  calisma_lokasyonu_id: 3,
+  bagli_amir_id: 4,
   departman_id: 3,
   bolum_id: 4,
   birim_id: 5,
   gorev_id: 6,
+  pozisyon_id: 7,
   personel_tipi_id: 1
 };
 
@@ -91,7 +95,7 @@ describe("personel-missing-info", () => {
     expect(keys.size).toBe(0);
   });
 
-  it("DIS_KAYNAK organizasyon boşluklarını CRITICAL saymaz; yalnız çekirdek istihdam zorunlu", () => {
+  it("DIS_KAYNAK eksik organizasyon alanlarını CRITICAL sayar; SGK gerekmez", () => {
     const keys = getPersonelMissingFieldKeys({
       ...completePersonel,
       calisan_kapsami: "DIS_KAYNAK",
@@ -101,10 +105,25 @@ describe("personel-missing-info", () => {
       bolum_id: null,
       birim_id: null,
       gorev_id: undefined,
+      sube_id: undefined,
+      calisma_lokasyonu_id: null,
+      bagli_amir_id: undefined,
+      pozisyon_id: undefined,
       personel_tipi_id: undefined
     });
 
-    expect([...keys]).toEqual(["sicil_no", "ise_giris_tarihi"]);
+    expect([...keys]).toEqual([
+      "sicil_no",
+      "ise_giris_tarihi",
+      "sube_id",
+      "calisma_lokasyonu_id",
+      "bagli_amir_id",
+      "departman_id",
+      "bolum_id",
+      "birim_id",
+      "gorev_id",
+      "pozisyon_id"
+    ]);
   });
 
   it("Personel Tipi eksikliği mevcut Pozisyon owner'ına yönlenir", () => {

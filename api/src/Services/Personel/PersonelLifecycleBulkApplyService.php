@@ -200,7 +200,9 @@ final class PersonelLifecycleBulkApplyService
                     'durum' => 'FAILED',
                     'hata' => $e instanceof OrganizasyonException
                         ? $e->errorCode
-                        : ($e instanceof PersonelValidationException ? $e->getCodeString() : 'APPLY_ERROR'),
+                        : ($e instanceof PersonelValidationException || $e instanceof PersonelImportException
+                            ? $e->getCodeString()
+                            : 'APPLY_ERROR'),
                 ];
             }
         }
@@ -232,6 +234,71 @@ final class PersonelLifecycleBulkApplyService
         array &$applyResultHolder
     ): array {
         $owner = (string) ($plan['owner'] ?? '');
+
+        if ($owner === 'PersonelLifecycleBulkApplyService' && ($plan['mode'] ?? '') === 'MULTI_AXIS') {
+            $personelId = (int) ($plan['personel_id'] ?? 0);
+            $axes = is_array($plan['axes'] ?? null) ? $plan['axes'] : [];
+            if ($personelId <= 0 || count($axes) < 2) {
+                throw new PersonelImportException('MULTI_AXIS_PLAN_INVALID', 'Multi-axis plan geçersiz.');
+            }
+
+            $pdo->beginTransaction();
+            try {
+                self::assertMultiAxisPreimage(
+                    $pdo,
+                    $personelId,
+                    is_array($plan['preimage'] ?? null) ? $plan['preimage'] : []
+                );
+                $replay = $claimFn($pdo);
+                if (is_array($replay)) {
+                    $pdo->commit();
+
+                    return ['entity_id' => (int) ($replay['result_entity_id'] ?? $personelId), 'replay' => true];
+                }
+
+                if (isset($axes['basic'])) {
+                    $payload = is_array($axes['basic']['payload'] ?? null) ? $axes['basic']['payload'] : [];
+                    PersonelBasicUpdateService::apply($pdo, $user, $request, $personelId, $payload);
+                }
+                if (isset($axes['organization'])) {
+                    PersonelOrganizasyonDegisikligiService::applyInTransaction(
+                        $pdo,
+                        $user,
+                        $request,
+                        $personelId,
+                        [
+                            'gerekce' => (string) ($plan['gerekce'] ?? ''),
+                            'preimage' => is_array($axes['organization']['preimage'] ?? null) ? $axes['organization']['preimage'] : [],
+                            'targets' => is_array($axes['organization']['targets'] ?? null) ? $axes['organization']['targets'] : [],
+                        ],
+                        $auditContext
+                    );
+                }
+                if (isset($axes['branch'])) {
+                    PersonelKaliciSubeDegisikligiService::applyInTransaction(
+                        $pdo,
+                        $user,
+                        $personelId,
+                        [
+                            'yeni_sube_id' => $axes['branch']['yeni_sube_id'] ?? null,
+                            'beklenen_mevcut_sube_id' => $axes['branch']['preimage_sube_id'] ?? null,
+                            'gerekce' => (string) ($plan['gerekce'] ?? ''),
+                        ],
+                        $auditContext
+                    );
+                }
+                $applyResultHolder['entity_id'] = $personelId;
+                $completeFn($pdo);
+                $pdo->commit();
+
+                return ['entity_id' => $personelId];
+            } catch (\Throwable $e) {
+                if ($pdo->inTransaction()) {
+                    $pdo->rollBack();
+                }
+                throw $e;
+            }
+        }
 
         if ($owner === 'PersonelCreateService') {
             $payload = is_array($plan['payload'] ?? null) ? $plan['payload'] : [];
@@ -431,6 +498,53 @@ final class PersonelLifecycleBulkApplyService
         }
 
         throw new OrganizasyonException(501, 'NOT_IMPLEMENTED_ROW', 'Plan owner uygulanamadi.', $owner);
+    }
+
+    /** @param array<string, mixed> $expected */
+    private static function assertMultiAxisPreimage(PDO $pdo, int $personelId, array $expected): void
+    {
+        $columns = array_values(array_unique(array_merge(
+            ['id', 'sube_id', 'bagli_amir_id', 'calisan_kapsami'],
+            PersonelOrganizasyonDegisikligiService::TRACKED_FIELDS
+        )));
+        $stmt = $pdo->prepare(
+            'SELECT ' . implode(', ', $columns) . ' FROM personeller WHERE id = :id FOR UPDATE'
+        );
+        $stmt->execute(['id' => $personelId]);
+        $current = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!is_array($current)) {
+            throw new PersonelValidationException('personel_id', 'Personel bulunamadı.', 'PERSONEL_BULUNAMADI');
+        }
+
+        foreach ($expected as $field => $before) {
+            if (!in_array($field, $columns, true)) {
+                continue;
+            }
+            $actual = $current[$field] ?? null;
+            if ($field === 'calisan_kapsami') {
+                $same = strtoupper(trim((string) $actual)) === strtoupper(trim((string) $before));
+            } else {
+                $same = self::nullableId($actual) === self::nullableId($before);
+            }
+            if (!$same) {
+                throw new PersonelImportException(
+                    'PERSONEL_LIFECYCLE_STALE_PREIMAGE',
+                    'Personel önizlemesi güncel değil; yeniden dry-run çalıştırın.'
+                );
+            }
+        }
+    }
+
+    /** @param mixed $value */
+    private static function nullableId($value): ?int
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        $id = (int) $value;
+
+        return $id > 0 ? $id : null;
     }
 
     /**

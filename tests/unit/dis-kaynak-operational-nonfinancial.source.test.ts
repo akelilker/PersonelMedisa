@@ -52,7 +52,7 @@ describe("DIS_KAYNAK operasyonel/non-financial model", () => {
     expect(mobile).toContain("ÜCRET VE SGK TAHAKKUKU OLUŞTURMAZ");
   });
 
-  it("DIS completeness: bolum/birim CRITICAL değil", () => {
+  it("DIS completeness: bolum/birim CRITICAL ve SGK zorunlu değil", () => {
     const dis: Personel = {
       id: 1,
       tc_kimlik_no: null,
@@ -69,9 +69,10 @@ describe("DIS_KAYNAK operasyonel/non-financial model", () => {
       personel_tipi_id: undefined
     };
     const result = evaluatePersonelCompleteness(dis);
-    expect(result.is_complete).toBe(true);
-    expect(result.critical_missing_labels).not.toContain("Bölüm");
-    expect(result.critical_missing_labels).not.toContain("Birim");
+    expect(result.is_complete).toBe(false);
+    expect(result.critical_missing_labels).toContain("Bölüm");
+    expect(result.critical_missing_labels).toContain("Birim");
+    expect(result.critical_missing_labels).not.toContain("SGK İşveren");
   });
 
   it("IC completeness: bolum/birim CRITICAL kalır", () => {

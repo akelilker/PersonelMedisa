@@ -7,6 +7,7 @@ namespace Medisa\Api\Services;
 use Medisa\Api\Services\Attendance\AttendanceDisciplineCatalog;
 use Medisa\Api\Services\Attendance\AttendancePayrollEffectResolver;
 use Medisa\Api\Services\Attendance\PuantajOlayKararService;
+use Medisa\Api\Services\Organizasyon\SubeReadModel;
 use Medisa\Api\Services\Payroll\FazlaCalismaYillikLimitService;
 use Medisa\Api\Services\Payroll\PayrollComplianceGuard;
 use Medisa\Api\Services\Personel\PersonelCalisanKapsamService;
@@ -2705,14 +2706,18 @@ class MaasHesaplamaSnapshotService
 
     private static function fetchSube(PDO $pdo, $subeId)
     {
-        $stmt = $pdo->prepare('SELECT id, kod, ad FROM subeler WHERE id = :id LIMIT 1');
-        $stmt->execute(['id' => (int) $subeId]);
-        $row = $stmt->fetch(PDO::FETCH_ASSOC);
-        if (!$row) {
+        // Snapshot `ad` is the global display label at create time (SubeReadModel.tam_ad).
+        // Historical rows are not backfilled; short name stays on subeler.ad only.
+        $mapped = SubeReadModel::findById($pdo, (int) $subeId);
+        if ($mapped === null) {
             return ['id' => (int) $subeId, 'kod' => null, 'ad' => null];
         }
 
-        return ['id' => (int) $row['id'], 'kod' => (string) $row['kod'], 'ad' => (string) $row['ad']];
+        return [
+            'id' => (int) $mapped['id'],
+            'kod' => (string) $mapped['kod'],
+            'ad' => (string) $mapped['tam_ad'],
+        ];
     }
 
     public static function maskTc($tc)

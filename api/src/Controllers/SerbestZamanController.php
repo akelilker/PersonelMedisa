@@ -10,6 +10,8 @@ use Medisa\Api\Database\Connection;
 use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
 use Medisa\Api\Scope\SubeScope;
+use Medisa\Api\Services\Organizasyon\OrganizasyonSchema;
+use Medisa\Api\Services\Organizasyon\SubeReadModel;
 use Medisa\Api\Services\Payroll\FazlaCalismaYillikLimitService;
 use Medisa\Api\Services\Payroll\PayrollComplianceGuard;
 use Medisa\Api\Services\PuantajDonemKilidiService;
@@ -229,10 +231,17 @@ class SerbestZamanController
         $whereSql = implode(' AND ', $where);
 
         $scopeColumns = PersonelOrgStructureSchema::personelScopeProjection($pdo, 'p');
+        $sirketJoin = '';
+        $sirketSelect = 'NULL AS sube_sirket_adi';
+        if (OrganizasyonSchema::isSchemaReady($pdo)) {
+            $sirketJoin = ' LEFT JOIN sirketler sirket_of_sube ON sirket_of_sube.id = s.sirket_id';
+            $sirketSelect = 'sirket_of_sube.ad AS sube_sirket_adi';
+        }
         $sql = "SELECT {$scopeColumns}, " . \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::sqlAdSoyadExpr('p') . " AS ad_soyad, p.sicil_no,
-                       s.ad AS sube_ad, d.ad AS bolum_ad
+                       s.ad AS sube_ad, {$sirketSelect}, d.ad AS bolum_ad
                 FROM personeller p
                 LEFT JOIN subeler s ON s.id = p.sube_id
+                {$sirketJoin}
                 LEFT JOIN departmanlar d ON d.id = p.departman_id
                 WHERE {$whereSql}
                 ORDER BY p.id ASC";
@@ -257,7 +266,10 @@ class SerbestZamanController
                     'ad_soyad' => (string) ($personel['ad_soyad'] ?? ''),
                     'sicil_no' => (string) ($personel['sicil_no'] ?? ''),
                     'sube_id' => (int) ($personel['sube_id'] ?? 0),
-                    'sube_ad' => (string) ($personel['sube_ad'] ?? ''),
+                    'sube_ad' => SubeReadModel::tamAd(
+                        $personel['sube_sirket_adi'] ?? null,
+                        (string) ($personel['sube_ad'] ?? '')
+                    ),
                     'bolum_ad' => (string) ($personel['bolum_ad'] ?? ''),
                 ]
             );

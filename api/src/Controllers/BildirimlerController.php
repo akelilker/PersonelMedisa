@@ -12,6 +12,8 @@ use Medisa\Api\Http\Request;
 use Medisa\Api\Scope\ManagerApprovalScope;
 use Medisa\Api\Scope\SubeScope;
 use Medisa\Api\Services\OfflineMutationIdempotencyService;
+use Medisa\Api\Services\Organizasyon\OrganizasyonSchema;
+use Medisa\Api\Services\Organizasyon\SubeReadModel;
 use Medisa\Api\Services\Personel\PersonelOrgStructureSchema;
 use PDO;
 
@@ -73,7 +75,7 @@ class BildirimlerController
         self::appendListFilters($request, $where, $params);
 
         $whereSql = implode(' AND ', $where);
-        $fromSql = self::enrichmentFromSql() . '
+        $fromSql = self::enrichmentFromSql($pdo) . '
             WHERE ' . $whereSql;
 
         try {
@@ -1184,20 +1186,29 @@ class BildirimlerController
             g.ad AS gorev_adi,
             d.ad AS departman_adi,
             s.ad AS sube_adi,
+            ' . (OrganizasyonSchema::isSchemaReady($pdo)
+                ? 'sirket_of_sube.ad AS sube_sirket_adi,'
+                : 'NULL AS sube_sirket_adi,') . '
             p.bagli_amir_id AS amir_user_id,
             ' . $bolum . ',
             ' . $birim;
     }
 
-    private static function enrichmentFromSql()
+    private static function enrichmentFromSql(?PDO $pdo = null)
     {
+        $sirketJoin = '';
+        if ($pdo !== null && OrganizasyonSchema::isSchemaReady($pdo)) {
+            $sirketJoin = '
+            LEFT JOIN sirketler sirket_of_sube ON sirket_of_sube.id = s.sirket_id';
+        }
+
         return '
             FROM gunluk_bildirimler gb
             LEFT JOIN personeller p ON p.id = gb.personel_id
             LEFT JOIN departmanlar d ON d.id = gb.departman_id
             LEFT JOIN gorevler g ON g.id = p.gorev_id
             LEFT JOIN subeler s ON s.id = gb.sube_id
-        ';
+            ' . $sirketJoin;
     }
 
     /** @return array<string, mixed>|false */
@@ -1205,7 +1216,7 @@ class BildirimlerController
     {
         $stmt = $pdo->prepare('
             SELECT ' . self::enrichmentSelectSql($pdo) . '
-            ' . self::enrichmentFromSql() . '
+            ' . self::enrichmentFromSql($pdo) . '
             WHERE gb.id = :id
             LIMIT 1
         ');
@@ -1278,7 +1289,10 @@ class BildirimlerController
             $mapped['departman_adi'] = (string) $row['departman_adi'];
         }
         if (array_key_exists('sube_adi', $row) && $row['sube_adi'] !== null) {
-            $mapped['sube_adi'] = (string) $row['sube_adi'];
+            $mapped['sube_adi'] = SubeReadModel::tamAd(
+                array_key_exists('sube_sirket_adi', $row) ? $row['sube_sirket_adi'] : null,
+                (string) $row['sube_adi']
+            );
         }
         if (array_key_exists('amir_user_id', $row) && $row['amir_user_id'] !== null) {
             $mapped['amir_user_id'] = (int) $row['amir_user_id'];
@@ -1379,11 +1393,9 @@ class BildirimlerController
 
     private static function fetchSubeAdi(PDO $pdo, $subeId)
     {
-        $stmt = $pdo->prepare('SELECT ad FROM subeler WHERE id = :id LIMIT 1');
-        $stmt->execute(['id' => (int) $subeId]);
-        $ad = $stmt->fetchColumn();
+        $mapped = SubeReadModel::findById($pdo, (int) $subeId);
 
-        return $ad !== false ? (string) $ad : '';
+        return $mapped !== null ? (string) $mapped['tam_ad'] : '';
     }
 
     private static function fetchUserAdSoyad(PDO $pdo, $userId)

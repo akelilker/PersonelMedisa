@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Medisa\Api\Services\Qr;
 
 use Medisa\Api\Database\QrAttendanceSchema;
+use Medisa\Api\Services\Organizasyon\SubeReadModel;
 use Medisa\Api\Services\SelfService\SelfPersonelContext;
 use PDO;
 use PDOException;
@@ -419,14 +420,8 @@ class QrAttendanceEventService
      */
     private static function publicEvent(PDO $pdo, array $row)
     {
-        $subeAd = '';
         $subeId = (int) ($row['sube_id'] ?? 0);
-        if ($subeId > 0) {
-            $stmt = $pdo->prepare('SELECT ad FROM subeler WHERE id = :id LIMIT 1');
-            $stmt->execute(['id' => $subeId]);
-            $ad = $stmt->fetchColumn();
-            $subeAd = is_string($ad) ? $ad : '';
-        }
+        $mapped = $subeId > 0 ? SubeReadModel::findById($pdo, $subeId) : null;
 
         return [
             'id' => (int) $row['id'],
@@ -434,7 +429,7 @@ class QrAttendanceEventService
             'occurred_at' => self::formatUtcForClient((string) $row['occurred_at_utc']),
             'sube' => [
                 'id' => $subeId,
-                'ad' => $subeAd,
+                'ad' => $mapped !== null ? (string) $mapped['tam_ad'] : '',
             ],
         ];
     }

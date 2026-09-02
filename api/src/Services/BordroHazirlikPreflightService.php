@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Medisa\Api\Services;
 
+use Medisa\Api\Services\Organizasyon\SubeReadModel;
 use Medisa\Api\Services\Payroll\PayrollComplianceGuard;
 use Medisa\Api\Services\Payroll\SirketCalismaPolitikasiCatalog;
 use PDO;
@@ -258,6 +259,11 @@ class BordroHazirlikPreflightService
             }
         }
 
+        $subeMapped = SubeReadModel::findById($pdo, (int) $subeId);
+        $subeDisplayAd = $subeMapped !== null
+            ? (string) $subeMapped['tam_ad']
+            : '';
+
         $items = [];
         $excluded = PersonelBordroKapsamService::listExcludedPersonelIds(
             $pdo,
@@ -281,7 +287,9 @@ class BordroHazirlikPreflightService
             $items[] = [
                 'ad_soyad' => trim((string) $row['ad'] . ' ' . (string) $row['soyad']),
                 'sicil_no' => (string) $row['sicil_no'],
-                'sube_adi' => (string) ($row['sube_adi'] ?? ''),
+                'sube_adi' => $subeDisplayAd !== ''
+                    ? $subeDisplayAd
+                    : (string) ($row['sube_adi'] ?? ''),
                 'departman_adi' => (string) ($row['departman_adi'] ?? ''),
                 'gorev_adi' => (string) ($row['gorev_adi'] ?? ''),
                 'ise_giris_tarihi' => $row['ise_giris_tarihi'] !== null ? (string) $row['ise_giris_tarihi'] : null,

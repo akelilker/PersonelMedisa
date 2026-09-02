@@ -20,8 +20,10 @@ describe("company/branch hierarchy: read model, API contract, scope and import (
     for (const marker of [
       // read model
       "company + short name compose",
+      "Medisa Fabrika composes without inventing a longer name",
       "no company falls back to the raw branch name",
       "an equal short name is not repeated",
+      "Şenay equal short name is not duplicated",
       "equality is decided after whitespace and Turkish case normalization",
       "Turkish dotted-I folds to the same normalized name",
       // legacy fallback
@@ -36,6 +38,7 @@ describe("company/branch hierarchy: read model, API contract, scope and import (
       "company code is immutable on edit",
       "the stored branch name stays the short name",
       "the read model composes the shared display name",
+      "findById returns short ad and derived tam_ad through the same owner",
       "the parent company comes from the route, not from the payload",
       "the same short name under a different company is accepted and stays distinguishable",
       "a normalized duplicate short name inside one company is refused",

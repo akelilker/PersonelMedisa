@@ -10,6 +10,8 @@ use Medisa\Api\Database\Connection;
 use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
 use Medisa\Api\Scope\SubeScope;
+use Medisa\Api\Services\Organizasyon\OrganizasyonSchema;
+use Medisa\Api\Services\Organizasyon\SubeReadModel;
 use Medisa\Api\Services\Personel\PersonelSearchPredicate;
 use Medisa\Api\Services\Retention\ArchiveAccessService;
 use Medisa\Api\Services\Retention\PersonelArchiveGate;
@@ -58,11 +60,18 @@ class ArsivController
         $total = (int) ($countStmt->fetch(PDO::FETCH_ASSOC)['total'] ?? 0);
 
         $offset = ($page - 1) * $limit;
+        $sirketJoin = '';
+        $sirketSelect = 'NULL AS sube_sirket_adi';
+        if (OrganizasyonSchema::isSchemaReady($pdo)) {
+            $sirketJoin = ' LEFT JOIN sirketler sirket_of_sube ON sirket_of_sube.id = s.sirket_id';
+            $sirketSelect = 'sirket_of_sube.ad AS sube_sirket_adi';
+        }
         $sql = "
             SELECT p.id, p.ad, p.soyad, p.tc_kimlik_no, p.sicil_no, p.aktif_durum, p.sube_id,
-                   p.ise_giris_tarihi, s.ad AS sube_adi
+                   p.ise_giris_tarihi, s.ad AS sube_adi, {$sirketSelect}
             FROM personeller p
             LEFT JOIN subeler s ON s.id = p.sube_id
+            {$sirketJoin}
             WHERE $whereSql
             ORDER BY p.id ASC
             LIMIT :limit OFFSET :offset
@@ -78,6 +87,7 @@ class ArsivController
 
         $items = [];
         foreach ($rows as $row) {
+            $short = $row['sube_adi'] !== null ? (string) $row['sube_adi'] : null;
             $items[] = [
                 'id' => (int) $row['id'],
                 'ad' => (string) $row['ad'],
@@ -86,7 +96,9 @@ class ArsivController
                 'sicil_no' => $row['sicil_no'],
                 'aktif_durum' => (string) $row['aktif_durum'],
                 'sube_id' => (int) $row['sube_id'],
-                'sube_adi' => $row['sube_adi'],
+                'sube_adi' => $short !== null && $short !== ''
+                    ? SubeReadModel::tamAd($row['sube_sirket_adi'] ?? null, $short)
+                    : null,
                 'ise_giris_tarihi' => $row['ise_giris_tarihi'],
                 'arsiv_modu' => true,
                 'policy_note' => RetentionCategories::POLICY_NOTE,
@@ -122,12 +134,19 @@ class ArsivController
             JsonResponse::serverError('Veritabani baglantisi kurulamadi.');
         }
 
+        $sirketJoin = '';
+        $sirketSelect = 'NULL AS sube_sirket_adi';
+        if (OrganizasyonSchema::isSchemaReady($pdo)) {
+            $sirketJoin = ' LEFT JOIN sirketler sirket_of_sube ON sirket_of_sube.id = s.sirket_id';
+            $sirketSelect = 'sirket_of_sube.ad AS sube_sirket_adi';
+        }
         $sql = "
             SELECT p.id, p.ad, p.soyad, p.tc_kimlik_no, p.sicil_no, p.aktif_durum, p.sube_id,
                    p.ise_giris_tarihi, p.telefon, p.dogum_tarihi,
-                   s.ad AS sube_adi, d.ad AS departman_adi, g.ad AS gorev_adi
+                   s.ad AS sube_adi, {$sirketSelect}, d.ad AS departman_adi, g.ad AS gorev_adi
             FROM personeller p
             LEFT JOIN subeler s ON s.id = p.sube_id
+            {$sirketJoin}
             LEFT JOIN departmanlar d ON d.id = p.departman_id
             LEFT JOIN gorevler g ON g.id = p.gorev_id
             WHERE p.id = :id
@@ -158,6 +177,7 @@ class ArsivController
         );
 
         $markers = PersonelArchiveGate::buildArchiveMarkers($pdo, $row);
+        $short = $row['sube_adi'] !== null ? (string) $row['sube_adi'] : null;
         JsonResponse::success([
             'id' => (int) $row['id'],
             'ad' => (string) $row['ad'],
@@ -166,7 +186,9 @@ class ArsivController
             'sicil_no' => $row['sicil_no'],
             'aktif_durum' => (string) $row['aktif_durum'],
             'sube_id' => (int) $row['sube_id'],
-            'sube_adi' => $row['sube_adi'],
+            'sube_adi' => $short !== null && $short !== ''
+                ? SubeReadModel::tamAd($row['sube_sirket_adi'] ?? null, $short)
+                : null,
             'departman_adi' => $row['departman_adi'],
             'gorev_adi' => $row['gorev_adi'],
             'ise_giris_tarihi' => $row['ise_giris_tarihi'],

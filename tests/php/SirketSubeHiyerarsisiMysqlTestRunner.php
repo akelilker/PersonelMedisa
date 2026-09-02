@@ -166,8 +166,13 @@ try {
     // A) Read model: the derived display name
     // =====================================================================
     hierAssert(SubeReadModel::tamAd('Medisa', 'Ankara') === 'Medisa Ankara', 'company + short name compose');
+    hierAssert(SubeReadModel::tamAd('Medisa', 'Fabrika') === 'Medisa Fabrika', 'Medisa Fabrika composes without inventing a longer name');
     hierAssert(SubeReadModel::tamAd(null, 'Ankara') === 'Ankara', 'no company falls back to the raw branch name');
     hierAssert(SubeReadModel::tamAd('Karyapı', 'Karyapı') === 'Karyapı', 'an equal short name is not repeated');
+    hierAssert(
+        SubeReadModel::tamAd('Şenay Mobilya', 'Şenay Mobilya') === 'Şenay Mobilya',
+        'Şenay equal short name is not duplicated'
+    );
     hierAssert(
         SubeReadModel::tamAd('Şenay Mobilya', ' şenay   mobilya ') === 'Şenay Mobilya',
         'equality is decided after whitespace and Turkish case normalization'
@@ -274,6 +279,13 @@ try {
 
     hierAssert($medisaAnkara['ad'] === 'Ankara', 'the stored branch name stays the short name');
     hierAssert($medisaAnkara['tam_ad'] === 'Medisa Ankara', 'the read model composes the shared display name');
+    $byId = SubeReadModel::findById($pdo, (int) $medisaAnkara['id']);
+    hierAssert(
+        $byId !== null
+            && $byId['ad'] === 'Ankara'
+            && $byId['tam_ad'] === 'Medisa Ankara',
+        'findById returns short ad and derived tam_ad through the same owner'
+    );
     hierAssert(
         ($medisaAnkara['sirket']['id'] ?? null) === (int) $medisa['id'],
         'the parent company comes from the route, not from the payload'

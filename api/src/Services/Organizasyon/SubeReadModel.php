@@ -110,6 +110,33 @@ final class SubeReadModel
     }
 
     /**
+     * Load one branch through the shared projection/mapping path.
+     * Callers that need a display label must use `tam_ad`; `ad` stays the short name.
+     *
+     * @return array<string, mixed>|null
+     */
+    public static function findById(PDO $pdo, $subeId): ?array
+    {
+        $id = (int) $subeId;
+        if ($id <= 0) {
+            return null;
+        }
+
+        $stmt = $pdo->prepare(
+            'SELECT ' . self::selectColumns($pdo)
+            . ' FROM subeler s' . self::joinSql($pdo)
+            . ' WHERE s.id = :id LIMIT 1'
+        );
+        $stmt->execute(['id' => $id]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!is_array($row)) {
+            return null;
+        }
+
+        return self::mapRow($row);
+    }
+
+    /**
      * @param array<string, mixed> $row
      * @return array<string, mixed>
      */

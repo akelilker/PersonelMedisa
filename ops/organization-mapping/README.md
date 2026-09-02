@@ -4,9 +4,18 @@ Bu dizin, üretimdeki ilk şirket/şube/SGK/lokasyon eşlemesi için **onaylanm�
 mapping spec dosyalarını tutar. `apply-organization-mapping.yml` yalnız bu
 dizindeki `*.json` dosyalarını kabul eder (`ops/organization-mapping/<ad>.json`).
 
-Bu dizin şu anda **gerçek bir production spec içermez**. Spec ancak salt-okunur
-envanter (`ops-organization-inventory.yml`) çalıştırılıp exact satır verisi
-görüldükten sonra yazılır; bu paket kodu kurar, kararı doldurmaz.
+## Historical status (canlı truth değil)
+
+İlk production mapping **uygulanmıştır** (`MG_SIRKET_SUBE_PROD_MAPPING_001` =
+`CLOSED_CONFIRMED`, apply run `33342644722`). Bu dizindeki
+`mg-sirket-sube-initial-mapping-001.json` (ve benzeri) dosyalar **historical
+preimage / apply artifact**tır: o anki envanter checksum + satır preimage'ını
+pinler. Bunları bugünkü production truth sanıp yeniden apply etmek yasaktır;
+canlı şube adları / şirket bağları DB + `SubeReadModel` üzerinden okunur.
+
+Canlı özet (display modeli): `subeler.ad` = kısa ad; global görünen ad =
+`SubeReadModel.tam_ad` (DB kolonu değildir). Lokasyon→şube ve user şirket/SGK
+scope rollout ayrı deferred kalemlerdir.
 
 ## Publication boundary önkoşulu
 

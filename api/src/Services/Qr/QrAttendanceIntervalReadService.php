@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Medisa\Api\Services\Qr;
 
+use Medisa\Api\Services\Organizasyon\SubeReadModel;
 use PDO;
 
 /**
@@ -13,6 +14,38 @@ use PDO;
 class QrAttendanceIntervalReadService
 {
     public const MANAGER_MAX_RANGE_DAYS = 31;
+
+    /** @var array<int, string> */
+    private static $subeDisplayCache = [];
+
+    /** Resolve global branch display via SubeReadModel (request-local cache). */
+    private static function displaySubeAd(PDO $pdo, $subeId, $fallback = ''): string
+    {
+        $id = (int) $subeId;
+        if ($id <= 0) {
+            return (string) $fallback;
+        }
+        if (!array_key_exists($id, self::$subeDisplayCache)) {
+            $mapped = SubeReadModel::findById($pdo, $id);
+            self::$subeDisplayCache[$id] = $mapped !== null
+                ? (string) $mapped['tam_ad']
+                : (string) $fallback;
+        }
+
+        return self::$subeDisplayCache[$id];
+    }
+
+    /** @param array<string, mixed> $row */
+    private static function withDisplaySubeAd(PDO $pdo, array $row): array
+    {
+        $row['sube_ad'] = self::displaySubeAd(
+            $pdo,
+            $row['sube_id'] ?? 0,
+            (string) ($row['sube_ad'] ?? '')
+        );
+
+        return $row;
+    }
 
     /**
      * @return array<string,mixed>
@@ -155,7 +188,7 @@ class QrAttendanceIntervalReadService
                     'ad_soyad' => trim((string) $row['ad'] . ' ' . (string) $row['soyad']),
                     'sicil_no' => $row['sicil_no'] ?? null,
                     'sube_id' => (int) $row['sube_id'],
-                    'sube' => (string) ($row['sube_ad'] ?? ''),
+                    'sube' => self::displaySubeAd($pdo, $row['sube_id'] ?? 0, (string) ($row['sube_ad'] ?? '')),
                 ];
                 $eventsByPersonel[$id] = [];
             }
@@ -200,14 +233,22 @@ class QrAttendanceIntervalReadService
                 'ad_soyad' => trim((string) $row['ad'] . ' ' . (string) $row['soyad']),
                 'sicil_no' => $row['sicil_no'] ?? null,
                 'sube_id' => (int) $row['personel_sube_id'],
-                'sube' => (string) ($row['personel_sube_ad'] ?? ''),
+                'sube' => self::displaySubeAd(
+                    $pdo,
+                    $row['personel_sube_id'] ?? 0,
+                    (string) ($row['personel_sube_ad'] ?? '')
+                ),
             ];
             $eventsByPersonel[$id][] = [
                 'id' => (int) $row['id'],
                 'event_type' => (string) $row['event_type'],
                 'occurred_at_utc' => (string) $row['occurred_at_utc'],
                 'sube_id' => (int) $row['sube_id'],
-                'sube_ad' => (string) ($row['event_sube_ad'] ?? ''),
+                'sube_ad' => self::displaySubeAd(
+                    $pdo,
+                    $row['sube_id'] ?? 0,
+                    (string) ($row['event_sube_ad'] ?? '')
+                ),
                 'user_id' => (int) $row['user_id'],
             ];
         }
@@ -419,7 +460,7 @@ class QrAttendanceIntervalReadService
         ]);
         $prev = $prevStmt->fetch(PDO::FETCH_ASSOC);
         if (is_array($prev)) {
-            $rows[] = $prev;
+            $rows[] = self::withDisplaySubeAd($pdo, $prev);
         }
 
         $inStmt = $pdo->prepare(
@@ -438,7 +479,7 @@ class QrAttendanceIntervalReadService
         ]);
         while ($row = $inStmt->fetch(PDO::FETCH_ASSOC)) {
             if (is_array($row)) {
-                $rows[] = $row;
+                $rows[] = self::withDisplaySubeAd($pdo, $row);
             }
         }
 
@@ -457,7 +498,7 @@ class QrAttendanceIntervalReadService
         ]);
         $next = $nextStmt->fetch(PDO::FETCH_ASSOC);
         if (is_array($next)) {
-            $rows[] = $next;
+            $rows[] = self::withDisplaySubeAd($pdo, $next);
         }
 
         return $rows;

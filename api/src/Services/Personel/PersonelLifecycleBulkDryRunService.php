@@ -219,7 +219,20 @@ final class PersonelLifecycleBulkDryRunService
             $errors[] = 'GEREKCE_EKSIK';
         }
 
-        $plan = self::buildMutationPlan($pdo, $op, $personel, $row);
+        try {
+            $plan = self::buildMutationPlan($pdo, $op, $personel, $row);
+        } catch (PersonelValidationException $e) {
+            $errors[] = PersonelLifecycleBulkMutationPlanner::dryRunErrorCode($e);
+
+            return self::resultRow(
+                $op,
+                'BLOCKED',
+                $errors,
+                $personel,
+                null,
+                PersonelLifecycleBulkMutationPlanner::dryRunValidationDetail($e)
+            );
+        }
         if ($plan === null) {
             $errors[] = 'PLAN_URETILEMEDI';
         } elseif ($plan['no_change'] ?? false) {
@@ -240,7 +253,7 @@ final class PersonelLifecycleBulkDryRunService
                     $plan['targets'] = PersonelLifecycleBulkMutationPlanner::planOrgTargets($pdo, $personel, $targets);
                 }
                 $plan['canonical_ready'] = true;
-            } catch (\Throwable $e) {
+            } catch (PersonelValidationException $e) {
                 $errors[] = PersonelLifecycleBulkMutationPlanner::dryRunErrorCode($e);
                 $detail = PersonelLifecycleBulkMutationPlanner::dryRunValidationDetail($e);
 
@@ -493,15 +506,22 @@ final class PersonelLifecycleBulkDryRunService
 
     private static function resolveManagerOrFail(PDO $pdo, string $name): int
     {
-        $id = PersonelLifecycleBulkReferenceResolver::resolveBagliAmirUserId($pdo, $name);
-        if ($id === null) {
+        $ids = PersonelLifecycleBulkReferenceResolver::resolveBagliAmirUserIds($pdo, $name);
+        if (count($ids) === 0) {
             throw new PersonelValidationException(
-                'bagli_amir_id',
+                'bagli_amir',
                 'Aktif ve tekil bağlı amir bulunamadı.',
                 'MISSING_MANAGER_PERSONNEL_REFERENCE'
             );
         }
+        if (count($ids) !== 1) {
+            throw new PersonelValidationException(
+                'bagli_amir',
+                'Bağlı amir adı birden fazla aktif kullanıcıyla eşleşiyor.',
+                'AMBIGUOUS_MANAGER_PERSONNEL_REFERENCE'
+            );
+        }
 
-        return $id;
+        return (int) $ids[0];
     }
 }

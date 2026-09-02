@@ -45,6 +45,8 @@ describe("MG personnel bulk apply owner closeout sources", () => {
     expect(dryRun).toContain("resolveReferenceOrFail");
     expect(dryRun).toContain("resolveManagerOrFail");
     expect(dryRun).toContain("MISSING_MANAGER_PERSONNEL_REFERENCE");
+    expect(dryRun).toContain("AMBIGUOUS_MANAGER_PERSONNEL_REFERENCE");
+    expect(dryRun).toContain("catch (PersonelValidationException $e)");
     expect(dryRun).not.toContain("'gorev_id' => $payload['gorev_id'] ?? null");
     expect(apply).toContain("assertMultiAxisPreimage");
     expect(apply).toContain("PersonelOrganizasyonDegisikligiService::applyInTransaction");
@@ -82,6 +84,7 @@ describe("MG personnel bulk apply owner closeout sources", () => {
   it("does not fabricate manager users and avoids TC in resolver paths", () => {
     const resolver = read("api/src/Services/Personel/PersonelLifecycleBulkReferenceResolver.php");
     expect(resolver).toContain("resolveBagliAmirUserId");
+    expect(resolver).toContain("resolveBagliAmirUserIds");
     expect(resolver).toContain("$matchedIds");
     expect(resolver).not.toContain("INSERT INTO users");
     expect(resolver).not.toContain("tc_kimlik");

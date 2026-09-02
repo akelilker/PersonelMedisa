@@ -539,6 +539,30 @@ try {
         'multi-axis stale retry does not duplicate business mutation'
     );
 
+    // An organization-owner error after basic update must roll everything back too.
+    $secondOwnerRollbackRow = [[
+        'mutation_id' => 'mg-multi-second-owner-100',
+        'operation_type' => PersonelLifecycleBulkRowContract::OP_ORG_UPDATE,
+        'personel_id' => 100,
+        'gerekce' => 'MG second owner rollback test',
+        'payload' => ['bagli_amir_id' => 2, 'gorev_id' => 999],
+    ]];
+    $secondOwnerDry = PersonelLifecycleBulkDryRunService::dryRun($pdo, $gm, $request, $secondOwnerRollbackRow, null, $deployedSha);
+    $beforeSecondOwner = $pdo->query('SELECT bagli_amir_id, gorev_id FROM personeller WHERE id = 100')->fetch(PDO::FETCH_ASSOC);
+    $beforeSecondOwnerAudit = (int) $pdo->query('SELECT COUNT(*) FROM personel_organizasyon_degisiklik_auditleri')->fetchColumn();
+    $secondOwnerApply = PersonelLifecycleBulkApplyService::apply(
+        $pdo, $gm, $request, $secondOwnerRollbackRow,
+        (string) $secondOwnerDry['dry_run_checksum'], (string) $secondOwnerDry['preimage_checksum'], $deployedSha
+    );
+    $afterSecondOwner = $pdo->query('SELECT bagli_amir_id, gorev_id FROM personeller WHERE id = 100')->fetch(PDO::FETCH_ASSOC);
+    mgAssert(($secondOwnerApply['failed_count'] ?? 0) === 1, 'second owner error fails multi-axis row');
+    mgAssert($afterSecondOwner === $beforeSecondOwner, 'second owner error rolls back earlier basic update');
+    mgAssert(
+        (int) $pdo->query('SELECT COUNT(*) FROM personel_organizasyon_degisiklik_auditleri')->fetchColumn() === $beforeSecondOwnerAudit
+            && (int) $pdo->query("SELECT COUNT(*) FROM offline_mutation_idempotency WHERE idempotency_key = 'mg-multi-second-owner-100'")->fetchColumn() === 0,
+        'second owner error rolls back audit and idempotency ledger'
+    );
+
     // A later branch-owner error rolls back the earlier basic/org writes, audits and ledger claim.
     $rollbackRow = [[
         'mutation_id' => 'mg-multi-rollback-100',
@@ -600,17 +624,80 @@ try {
     $afterUsers = (int) $pdo->query('SELECT COUNT(*) FROM users')->fetchColumn();
     mgAssert($managerId === null, 'unknown manager name resolves to NULL');
     mgAssert($beforeUsers === $afterUsers, 'manager resolution does not create users');
-    $halilDry = PersonelLifecycleBulkDryRunService::dryRun($pdo, $gm, $request, [[
-        'mutation_id' => 'mg-missing-manager',
-        'operation_type' => PersonelLifecycleBulkRowContract::OP_ORG_UPDATE,
-        'personel_id' => 100,
-        'gerekce' => 'MG missing manager reference',
-        'payload' => ['bagli_amir' => 'Halil Senay'],
-    ]], null, $deployedSha);
+    $pdo->exec("INSERT INTO users (id, username, rol, durum, ad_soyad, password_hash) VALUES
+        (3, 'duplicate-amir-1', 'BIRIM_AMIRI', 'AKTIF', 'Çakışan Amir', 'x'),
+        (4, 'duplicate-amir-2', 'BIRIM_AMIRI', 'AKTIF', 'Cakisan Amir', 'x')");
+    $beforeManagerAnalysis = [
+        'personel' => (int) $pdo->query('SELECT COUNT(*) FROM personeller')->fetchColumn(),
+        'org_audit' => (int) $pdo->query('SELECT COUNT(*) FROM personel_organizasyon_degisiklik_auditleri')->fetchColumn(),
+        'ledger' => (int) $pdo->query('SELECT COUNT(*) FROM offline_mutation_idempotency')->fetchColumn(),
+    ];
+    $managerDry = PersonelLifecycleBulkDryRunService::dryRun($pdo, $gm, $request, [
+        [
+            'mutation_id' => 'mg-missing-manager',
+            'operation_type' => PersonelLifecycleBulkRowContract::OP_ORG_UPDATE,
+            'personel_id' => 100,
+            'gerekce' => 'MG missing manager reference',
+            'payload' => ['bagli_amir' => 'Halil Senay'],
+        ],
+        [
+            'mutation_id' => 'mg-ambiguous-manager',
+            'operation_type' => PersonelLifecycleBulkRowContract::OP_ORG_UPDATE,
+            'personel_id' => 101,
+            'gerekce' => 'MG ambiguous manager reference',
+            'payload' => ['bagli_amir' => 'Cakisan Amir'],
+        ],
+        [
+            'mutation_id' => 'mg-valid-manager-analysis',
+            'operation_type' => PersonelLifecycleBulkRowContract::OP_ORG_UPDATE,
+            'personel_id' => 903,
+            'gerekce' => 'MG valid manager analysis row',
+            'payload' => ['bagli_amir' => 'Ik Sorumlusu'],
+        ],
+    ], null, $deployedSha);
+    $halilDry = $managerDry['satirlar'][0] ?? [];
     mgAssert(
-        in_array('MISSING_MANAGER_PERSONNEL_REFERENCE', $halilDry['satirlar'][0]['hata_kodlari'] ?? [], true),
+        ($halilDry['durum'] ?? '') === 'BLOCKED'
+            && in_array('MISSING_MANAGER_PERSONNEL_REFERENCE', $halilDry['hata_kodlari'] ?? [], true)
+            && ($halilDry['validation_code'] ?? '') === 'MISSING_MANAGER_PERSONNEL_REFERENCE'
+            && ($halilDry['validation_field'] ?? '') === 'bagli_amir'
+            && array_key_exists('mutation_plan', $halilDry) && $halilDry['mutation_plan'] === null,
         'unresolved manager name blocks dry-run without user creation'
     );
+    $ambiguousManagerDry = $managerDry['satirlar'][1] ?? [];
+    mgAssert(
+        ($ambiguousManagerDry['durum'] ?? '') === 'BLOCKED'
+            && ($ambiguousManagerDry['validation_code'] ?? '') === 'AMBIGUOUS_MANAGER_PERSONNEL_REFERENCE'
+            && array_key_exists('mutation_plan', $ambiguousManagerDry) && $ambiguousManagerDry['mutation_plan'] === null,
+        'ambiguous manager name blocks dry-run without arbitrary selection'
+    );
+    mgAssert(
+        ($managerDry['satirlar'][2]['durum'] ?? '') === 'READY' && ($managerDry['can_apply'] ?? true) === false,
+        'blocked manager rows do not prevent other row analysis but block changeset apply'
+    );
+    mgAssert(
+        (int) $pdo->query('SELECT COUNT(*) FROM personeller')->fetchColumn() === $beforeManagerAnalysis['personel'],
+        'blocked manager dry-run does not write business data'
+    );
+    mgAssert(
+        (int) $pdo->query('SELECT COUNT(*) FROM personel_organizasyon_degisiklik_auditleri')->fetchColumn() === $beforeManagerAnalysis['org_audit']
+            && (int) $pdo->query('SELECT COUNT(*) FROM offline_mutation_idempotency')->fetchColumn() === $beforeManagerAnalysis['ledger'],
+        'blocked manager dry-run writes neither audit nor idempotency ledger'
+    );
+    $pdo->exec('ALTER TABLE users RENAME COLUMN ad_soyad TO ad_soyad_bozuk');
+    $unexpectedEscaped = false;
+    try {
+        PersonelLifecycleBulkDryRunService::dryRun($pdo, $gm, $request, [[
+            'mutation_id' => 'mg-unexpected-manager-system-error',
+            'operation_type' => PersonelLifecycleBulkRowContract::OP_ORG_UPDATE,
+            'personel_id' => 100,
+            'gerekce' => 'MG unexpected manager system error',
+            'payload' => ['bagli_amir' => 'Ik Sorumlusu'],
+        ]], null, $deployedSha);
+    } catch (\PDOException $e) {
+        $unexpectedEscaped = true;
+    }
+    mgAssert($unexpectedEscaped, 'unexpected manager resolver database error escapes dry-run globally');
 
     // 15) Sensitive TC marker stays out of runner output (this file uses masked placeholder only).
     mgAssert(strpos($labels, '10000000146') === false, 'completeness labels omit raw TC content');

@@ -14,6 +14,7 @@ const MOBILE_VIEWPORTS = [
 ] as const;
 
 const MAX_LOGIN_HERO_FORM_GAP_PX = 48;
+const MIN_LOGIN_TITLE_SAFE_GUTTER_PX = 8;
 
 async function assertNoHorizontalOverflow(page: Page) {
   const metrics = await page.evaluate(() => ({
@@ -29,27 +30,65 @@ async function assertLoginTitleParity(page: Page) {
   const title = page.locator("body.login-page .hero h1");
   await expect(title).toBeVisible();
   await expect(title).toHaveText(LOGIN_TITLE);
+  await page.evaluate(async () => {
+    await document.fonts.ready;
+  });
 
-  const titleMetrics = await title.evaluate((el, expectedVisual) => {
+  const titleMetrics = await title.evaluate((el) => {
     const style = getComputedStyle(el);
     const rect = el.getBoundingClientRect();
+    const hero = el.closest(".hero");
+    const heroRect = hero?.getBoundingClientRect();
+    // Ink bounds of the rendered text (not the h1 content-box). Login CSS
+    // intentionally uses overflow:visible + nowrap, so scrollWidth may exceed
+    // clientWidth while the title still sits safely inside the hero.
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    const inkRect = range.getBoundingClientRect();
     const visualText = (el.textContent ?? "").toLocaleUpperCase("tr-TR");
     return {
       textOverflow: style.textOverflow,
       overflow: style.overflow,
       whiteSpace: style.whiteSpace,
+      fontFamily: style.fontFamily,
+      fontSize: style.fontSize,
+      paddingLeft: style.paddingLeft,
+      paddingRight: style.paddingRight,
+      fontStatus: document.fonts.status,
+      devicePixelRatio: window.devicePixelRatio,
+      viewportWidth: window.innerWidth,
       scrollWidth: el.scrollWidth,
       clientWidth: el.clientWidth,
-      visible: rect.width > 0 && rect.height > 0,
+      titleBoxLeft: rect.left,
+      titleBoxRight: rect.right,
+      titleInkLeft: inkRect.left,
+      titleInkRight: inkRect.right,
+      heroLeft: heroRect?.left ?? null,
+      heroRight: heroRect?.right ?? null,
+      leftGutterPx: heroRect ? inkRect.left - heroRect.left : null,
+      rightGutterPx: heroRect ? heroRect.right - inkRect.right : null,
+      visible: rect.width > 0 && rect.height > 0 && inkRect.width > 0,
       visualText
     };
-  }, LOGIN_TITLE_VISUAL);
+  });
 
   expect(titleMetrics.visualText).toBe(LOGIN_TITLE_VISUAL);
   expect(titleMetrics.textOverflow).not.toBe("ellipsis");
   expect(titleMetrics.overflow).not.toBe("hidden");
   expect(titleMetrics.whiteSpace).toBe("nowrap");
-  expect(titleMetrics.scrollWidth).toBeLessThanOrEqual(titleMetrics.clientWidth + 2);
+  expect(titleMetrics.fontStatus).toBe("loaded");
+  expect(titleMetrics.heroLeft).not.toBeNull();
+  expect(titleMetrics.heroRight).not.toBeNull();
+  expect(titleMetrics.leftGutterPx).not.toBeNull();
+  expect(titleMetrics.rightGutterPx).not.toBeNull();
+  expect(titleMetrics.leftGutterPx!).toBeGreaterThanOrEqual(MIN_LOGIN_TITLE_SAFE_GUTTER_PX);
+  expect(titleMetrics.rightGutterPx!).toBeGreaterThanOrEqual(MIN_LOGIN_TITLE_SAFE_GUTTER_PX);
+  expect(titleMetrics.titleInkLeft).toBeGreaterThanOrEqual(
+    titleMetrics.heroLeft! + MIN_LOGIN_TITLE_SAFE_GUTTER_PX
+  );
+  expect(titleMetrics.titleInkRight).toBeLessThanOrEqual(
+    titleMetrics.heroRight! - MIN_LOGIN_TITLE_SAFE_GUTTER_PX
+  );
   expect(titleMetrics.visible).toBe(true);
 }
 

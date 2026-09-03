@@ -57,6 +57,7 @@ import type {
   UpsertYonetimSirketPayload,
   UpsertYonetimSubePayload,
   YonetimKullanici,
+  YonetimOrgRelation,
   YonetimSirket,
   YonetimSube
 } from "../../../types/yonetim";
@@ -89,6 +90,7 @@ type KullaniciFormState = {
   bolumIds: number[];
   birimIds: number[];
   sirketIds: number[];
+  sgkIsverenIds: number[];
   varsayilanSubeId: string;
   durum: KayitDurumu;
   notlar: string;
@@ -134,6 +136,7 @@ const INITIAL_KULLANICI_FORM: KullaniciFormState = {
   bolumIds: [],
   birimIds: [],
   sirketIds: [],
+  sgkIsverenIds: [],
   varsayilanSubeId: "",
   durum: "AKTIF",
   notlar: ""
@@ -314,6 +317,7 @@ function userFormFromItem(item: YonetimKullanici): KullaniciFormState {
     bolumIds: item.bolum_ids ?? [],
     birimIds: item.birim_ids ?? [],
     sirketIds: item.sirket_ids ?? [],
+    sgkIsverenIds: item.sgk_isveren_ids ?? [],
     varsayilanSubeId: item.varsayilan_sube_id != null ? String(item.varsayilan_sube_id) : "",
     durum: item.durum,
     notlar: item.notlar ?? ""
@@ -329,7 +333,11 @@ function subeFormFromItem(item: YonetimSube): SubeFormState {
   };
 }
 
-function toKullaniciPayload(form: KullaniciFormState, isEdit: boolean): UpsertYonetimKullaniciPayload {
+function toKullaniciPayload(
+  form: KullaniciFormState,
+  isEdit: boolean,
+  effectiveVarsayilanSubeIds: number[] = form.subeIds
+): UpsertYonetimKullaniciPayload {
   const realKullaniciApi = isRealYonetimKullaniciApi();
   const adSoyad = formatAdSoyad(form.adSoyad);
   if (!adSoyad) {
@@ -351,7 +359,10 @@ function toKullaniciPayload(form: KullaniciFormState, isEdit: boolean): UpsertYo
     throw new Error("İç personel kullanıcıları için personel seçimi zorunludur.");
   }
 
-  if (form.varsayilanSubeId && !form.subeIds.includes(Number.parseInt(form.varsayilanSubeId, 10))) {
+  if (
+    form.varsayilanSubeId &&
+    !effectiveVarsayilanSubeIds.includes(Number.parseInt(form.varsayilanSubeId, 10))
+  ) {
     throw new Error("Varsayılan şube, yetki verilen şubeler içinde olmalıdır.");
   }
 
@@ -364,6 +375,15 @@ function toKullaniciPayload(form: KullaniciFormState, isEdit: boolean): UpsertYo
     throw new Error("Bu rol için en az bir işlem şirketi seçilmelidir.");
   }
 
+  if (
+    form.rol === "MUHASEBE" &&
+    form.subeIds.length === 0 &&
+    form.sirketIds.length === 0 &&
+    form.sgkIsverenIds.length === 0
+  ) {
+    throw new Error("Bu rol için en az bir şube, şirket veya SGK kapsamı zorunludur.");
+  }
+
   const payload: UpsertYonetimKullaniciPayload = {
     username,
     ad_soyad: adSoyad,
@@ -373,6 +393,7 @@ function toKullaniciPayload(form: KullaniciFormState, isEdit: boolean): UpsertYo
     bolum_ids: form.bolumIds,
     birim_ids: form.birimIds,
     sirket_ids: form.sirketIds,
+    sgk_isveren_ids: form.sgkIsverenIds,
     varsayilan_sube_id: form.varsayilanSubeId ? Number.parseInt(form.varsayilanSubeId, 10) : null,
     durum: form.durum
   };
@@ -604,6 +625,24 @@ export function YonetimPaneliPage() {
 
   // Scope summaries are a shared surface, so they use the company-qualified name.
   const subeNameMap = useMemo(() => new Map(subeler.map((sube) => [sube.id, sube.tam_ad])), [subeler]);
+  const sgkIsverenOptions = useMemo(() => {
+    const map = new Map<number, YonetimOrgRelation>();
+    for (const sube of subeler) {
+      if (sube.sgk_isveren) {
+        map.set(sube.sgk_isveren.id, sube.sgk_isveren);
+      }
+    }
+    return Array.from(map.values()).sort((left, right) => left.ad.localeCompare(right.ad, "tr"));
+  }, [subeler]);
+  const effectiveVarsayilanSubeIds = useMemo(() => {
+    const ids = new Set(kullaniciForm.subeIds);
+    for (const sube of subeler) {
+      if (sube.sirket && kullaniciForm.sirketIds.includes(sube.sirket.id)) {
+        ids.add(sube.id);
+      }
+    }
+    return Array.from(ids);
+  }, [kullaniciForm.subeIds, kullaniciForm.sirketIds, subeler]);
 
   // The hierarchy UI only opens once production branches are actually mapped to
   // companies; schema alone would render empty company cards over legacy data.
@@ -948,6 +987,15 @@ export function YonetimPaneliPage() {
     }));
   }
 
+  function toggleSgkIsverenSelection(sgkIsverenId: number) {
+    setKullaniciForm((prev) => ({
+      ...prev,
+      sgkIsverenIds: prev.sgkIsverenIds.includes(sgkIsverenId)
+        ? prev.sgkIsverenIds.filter((id) => id !== sgkIsverenId)
+        : [...prev.sgkIsverenIds, sgkIsverenId]
+    }));
+  }
+
   function toggleDepartmanSelection(departmanId: number) {
     setSubeForm((prev) => ({
       ...prev,
@@ -968,7 +1016,7 @@ export function YonetimPaneliPage() {
     setSuccessMessage(null);
 
     try {
-      const payload = toKullaniciPayload(kullaniciForm, editingKullaniciId != null);
+      const payload = toKullaniciPayload(kullaniciForm, editingKullaniciId != null, effectiveVarsayilanSubeIds);
       const existingKullanici =
         editingKullaniciId != null ? kullanicilar.find((item) => item.id === editingKullaniciId) ?? null : null;
       const surecLogPayloads = buildYonetimSurecLogPayloads(existingKullanici, payload, subeNameMap);
@@ -1660,7 +1708,7 @@ export function YonetimPaneliPage() {
                 onChange={(value) => setKullaniciForm((prev) => ({ ...prev, varsayilanSubeId: value }))}
                 placeholderOption={{ value: "", label: "Tüm Şubeler / Seçimsiz" }}
                 selectOptions={subeler
-                  .filter((sube) => kullaniciForm.subeIds.includes(sube.id))
+                  .filter((sube) => effectiveVarsayilanSubeIds.includes(sube.id))
                   .map((sube) => ({ value: String(sube.id), label: sube.tam_ad }))}
               />
               <YonetimOrgScopeFields
@@ -1677,6 +1725,9 @@ export function YonetimPaneliPage() {
                 sirketler={sirketler}
                 selectedSirketIds={kullaniciForm.sirketIds}
                 onToggleSirket={toggleSirketSelection}
+                sgkIsverenler={sgkIsverenOptions}
+                selectedSgkIsverenIds={kullaniciForm.sgkIsverenIds}
+                onToggleSgkIsveren={toggleSgkIsverenSelection}
               />
             </fieldset>
 

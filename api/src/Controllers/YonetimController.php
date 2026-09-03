@@ -1015,8 +1015,17 @@ class YonetimController
         self::assertBolumIdsExist($pdo, $finalBolumIds);
         self::assertBirimIdsExist($pdo, $finalBirimIds);
         self::assertHierarchyScopeAllowed($pdo, $rol, $finalSirketIds, $finalSgkIsverenIds);
-        self::assertVarsayilanSubeInScope($finalVarsayilanSubeId, $finalSubeIds);
-        self::assertRoleOrgAssignments($rol, $finalSubeIds, $finalBolumIds, $finalBirimIds, $requestedPersonelId, $rol === 'PERSONEL' || $personelIdProvided, $finalSirketIds);
+        self::assertVarsayilanSubeInEffectiveScope($pdo, $finalVarsayilanSubeId, $finalSubeIds, $finalSirketIds);
+        self::assertRoleOrgAssignments(
+            $rol,
+            $finalSubeIds,
+            $finalBolumIds,
+            $finalBirimIds,
+            $requestedPersonelId,
+            $rol === 'PERSONEL' || $personelIdProvided,
+            $finalSirketIds,
+            $finalSgkIsverenIds
+        );
         self::assertAuthSmokeReadonlyContract($username, $rol, $finalSubeIds, $finalVarsayilanSubeId);
 
         $hasVarsayilan = UsersSchema::hasVarsayilanSubeId($pdo);
@@ -1235,7 +1244,7 @@ class YonetimController
             self::assertBirimIdsExist($pdo, $finalBirimIds);
         }
         self::assertHierarchyScopeAllowed($pdo, $rol, $finalSirketIds, $finalSgkIsverenIds);
-        self::assertVarsayilanSubeInScope($finalVarsayilanSubeId, $finalSubeIds);
+        self::assertVarsayilanSubeInEffectiveScope($pdo, $finalVarsayilanSubeId, $finalSubeIds, $finalSirketIds);
         $effectivePersonelId = $personelIdProvided
             ? $requestedPersonelId
             : self::readStoredPersonelIdFromRow($existing);
@@ -1246,7 +1255,8 @@ class YonetimController
             $finalBirimIds,
             $effectivePersonelId,
             true,
-            $finalSirketIds
+            $finalSirketIds,
+            $finalSgkIsverenIds
         );
         self::assertAuthSmokeReadonlyContract($username, $rol, $finalSubeIds, $finalVarsayilanSubeId);
 
@@ -2066,18 +2076,6 @@ class YonetimController
         }
     }
 
-    /** @param array<int, int> $subeIds */
-    private static function assertVarsayilanSubeInScope($varsayilanSubeId, array $subeIds)
-    {
-        if ($varsayilanSubeId === null) {
-            return;
-        }
-
-        if (!in_array($varsayilanSubeId, $subeIds, true)) {
-            JsonResponse::badRequest('Varsayilan sube yetki verilen subeler icinde olmalidir.', 'VALIDATION_ERROR', 'varsayilan_sube_id');
-        }
-    }
-
     private static function assertSubeYoneticisiRoleSchemaReady(PDO $pdo, $rol)
     {
         if (strtoupper(trim((string) $rol)) !== 'SUBE_YONETICISI') {
@@ -2118,6 +2116,8 @@ class YonetimController
      * @param array<int, int> $subeIds
      * @param array<int, int> $bolumIds
      * @param array<int, int> $birimIds
+     * @param array<int, int> $sirketIds
+     * @param array<int, int> $sgkIsverenIds
      */
     private static function assertRoleOrgAssignments(
         $rol,
@@ -2126,16 +2126,30 @@ class YonetimController
         array $birimIds,
         $personelId,
         $personelConsidered,
-        array $sirketIds = []
+        array $sirketIds = [],
+        array $sgkIsverenIds = []
     ) {
         $rol = strtoupper(trim((string) $rol));
 
         // IK_SORUMLUSU is deliberately absent: its reach is the whole
         // organisation and comes from the role, so demanding a branch grant would
         // both contradict the model and produce grants that narrow nothing.
-        if ($rol === 'SUBE_YONETICISI' || $rol === 'MUHASEBE') {
+        if ($rol === 'SUBE_YONETICISI') {
             if (count($subeIds) === 0) {
                 JsonResponse::badRequest('Bu rol icin en az bir sube atamasi zorunludur.', 'VALIDATION_ERROR', 'sube_ids');
+            }
+        }
+
+        // MUHASEBE may be branch-, company-, and/or SGK-scoped. Company grants
+        // resolve to live branches per request; SGK grants are a separate payroll
+        // axis. At least one of the three axes must be present (matches OrgScope).
+        if ($rol === 'MUHASEBE') {
+            if (count($subeIds) === 0 && count($sirketIds) === 0 && count($sgkIsverenIds) === 0) {
+                JsonResponse::badRequest(
+                    'Bu rol icin en az bir sube, sirket veya SGK kapsami zorunludur.',
+                    'VALIDATION_ERROR',
+                    'sube_ids'
+                );
             }
         }
 
@@ -2174,6 +2188,45 @@ class YonetimController
         // Global roles may omit org assignments; do not require them.
         if (in_array($rol, OrgScope::GLOBAL_ROLES, true)) {
             return;
+        }
+    }
+
+    /**
+     * Varsayılan şube must sit inside effective branch visibility:
+     * explicit user_subeler ∪ live branches of granted companies.
+     *
+     * @param array<int, int> $subeIds
+     * @param array<int, int> $sirketIds
+     */
+    private static function assertVarsayilanSubeInEffectiveScope(
+        PDO $pdo,
+        $varsayilanSubeId,
+        array $subeIds,
+        array $sirketIds
+    ) {
+        if ($varsayilanSubeId === null) {
+            return;
+        }
+
+        $effective = $subeIds;
+        if (count($sirketIds) > 0 && UserOrgAssignmentSchema::isHierarchyScopeReady($pdo)) {
+            $fromCompany = UserOrgAssignmentSchema::resolveSubeIdsForSirketIds($pdo, $sirketIds);
+            $merged = array_merge($effective, $fromCompany);
+            $effective = [];
+            foreach ($merged as $id) {
+                $value = (int) $id;
+                if ($value > 0 && !in_array($value, $effective, true)) {
+                    $effective[] = $value;
+                }
+            }
+        }
+
+        if (!in_array((int) $varsayilanSubeId, $effective, true)) {
+            JsonResponse::badRequest(
+                'Varsayilan sube yetki verilen subeler icinde olmalidir.',
+                'VALIDATION_ERROR',
+                'varsayilan_sube_id'
+            );
         }
     }
 

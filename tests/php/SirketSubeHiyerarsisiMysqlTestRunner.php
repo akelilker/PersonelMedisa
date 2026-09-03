@@ -497,6 +497,52 @@ try {
         'the SGK axis is never inferred from a physical branch'
     );
 
+    // Company-only MUHASEBE: AuthMiddleware-shaped payload already carries the
+    // live company→branch resolution in sube_ids (UNION), without user_subeler rows.
+    $companyOnly = [
+        'rol' => 'MUHASEBE',
+        'sube_ids' => $resolvedAfter,
+        'explicit_sube_ids' => [],
+        'sirket_ids' => [(int) $medisa['id']],
+        'sgk_isveren_ids' => [],
+    ];
+    $companyWhere = [];
+    $companyParams = [];
+    OrgScope::appendPersonelOrgFilter($companyWhere, $companyParams, $companyOnly, null, 'p');
+    $companyPred = implode(' AND ', $companyWhere);
+    hierAssert(
+        strpos($companyPred, 'sube_id') !== false && strpos($companyPred, '1=0') === false,
+        'a company-only MUHASEBE payload filters the resolved company branches'
+    );
+    hierAssert(
+        OrgScope::isSirketScopeEligible('MUHASEBE', [(int) $medisa['id']]) === true
+            && OrgScope::isSgkScopeEligible('MUHASEBE', [$sgkMedisa]) === true,
+        'MUHASEBE may hold company and SGK grants without inventing a new role'
+    );
+
+    // Mixed company∪branch: duplicate branch id in both axes must not shrink the set.
+    $mixed = [
+        'rol' => 'MUHASEBE',
+        'sube_ids' => array_values(array_unique(array_merge(
+            [(int) $medisaAnkara['id']],
+            $resolvedAfter
+        ))),
+        'explicit_sube_ids' => [(int) $medisaAnkara['id']],
+        'sirket_ids' => [(int) $medisa['id']],
+        'sgk_isveren_ids' => [],
+    ];
+    $mixedWhere = [];
+    $mixedParams = [];
+    OrgScope::appendPersonelOrgFilter($mixedWhere, $mixedParams, $mixed, null, 'p');
+    hierAssert(
+        strpos(implode(' AND ', $mixedWhere), '1=0') === false,
+        'company + explicit branch grants compose as a widening union'
+    );
+    hierAssert(
+        !in_array((int) $karyapiAnkara['id'], $resolvedAfter, true),
+        'company scope never opens another company branch'
+    );
+
     // =====================================================================
     // E) Import reference catalog: the ambiguous short name
     // =====================================================================

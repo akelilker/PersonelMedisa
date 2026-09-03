@@ -13,7 +13,7 @@ ORG_MAPPING_INVENTORY_OWNER: OrganizationMappingInventoryReport (SELECT-only, ch
 ORG_MAPPING_EXECUTION_OWNER: OrganizationInitialMappingService (operations-only; public API/UI'da re-parent YOK) + `apply-organization-mapping.yml`
 ORG_MAPPING_SPEC_OWNER: OrganizationMappingSpec (allowlist + preimage + inventory checksum pin; `ops/organization-mapping/*.json` = historical preimage artifact, canlı truth değil)
 ORG_BRANCH_DISPLAY_OWNER: SubeReadModel (kısa `ad` + türetilmiş `tam_ad`; frontend concat owner YOK)
-ORG_USER_SCOPE_ROLLOUT: DEFERRED (user_sirketler / user_sgk_isverenler boş; personel binding rollout bu fazın dışında)
+ORG_USER_SCOPE_ROLLOUT: CODE_READY (company∪branch UNION + SGK OR axis owners complete; yönetim assignment/FE round-trip; production grants still 0; mutation gate separate — docs/guncel/140)
 ORG_LOCATION_SUBE_MAPPING: DEFERRED (calisma_lokasyonlari.sube_id bilinçli NULL)
 ORG_BRANCH_NAME_DB_HARDENING: CLOSED_NOT_NEEDED (tam_ad bilerek kolon değil; SubeReadModel owner)
 AYLIK_KAPANIS_SGK_REDESIGN: NEXT_GATE

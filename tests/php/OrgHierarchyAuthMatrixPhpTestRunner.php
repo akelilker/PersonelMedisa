@@ -24,7 +24,7 @@ function ohOk($msg)
     echo "OK: {$msg}\n";
 }
 
-function ohUser($rol, array $sube = [], array $bolum = [], array $birim = [], $personelId = null)
+function ohUser($rol, array $sube = [], array $bolum = [], array $birim = [], $personelId = null, array $sirket = [], array $sgk = [])
 {
     $u = [
         'id' => 10,
@@ -32,6 +32,8 @@ function ohUser($rol, array $sube = [], array $bolum = [], array $birim = [], $p
         'sube_ids' => $sube,
         'bolum_ids' => $bolum,
         'birim_ids' => $birim,
+        'sirket_ids' => $sirket,
+        'sgk_isveren_ids' => $sgk,
     ];
     if ($personelId !== null) {
         $u['personel_id'] = $personelId;
@@ -99,16 +101,45 @@ if ($f['where'] !== []) {
 ohOk('SISTEM_EMPTY_SCOPE=global');
 
 $f = ohFilterSql(ohUser('IK_SORUMLUSU', []));
-if (!in_array('1=0', $f['where'], true)) {
-    ohFail('IK empty must deny filter');
+if ($f['where'] !== []) {
+    ohFail('IK empty filter should be organisation-global (no branch predicate)');
 }
-ohOk('IK_EMPTY_SCOPE=DENY');
+ohOk('IK_EMPTY_SCOPE=global_read');
+
+$f = ohFilterSql(ohUser('IK_PERSONELI', [1], [], [], null, [9]));
+if ($f['where'] !== []) {
+    ohFail('IK_PERSONELI must ignore materialised company/branch grants on read');
+}
+ohOk('IK_PERSONELI_COMPANY_GRANT_IGNORED_ON_READ');
 
 $f = ohFilterSql(ohUser('MUHASEBE', []));
 if (!in_array('1=0', $f['where'], true)) {
     ohFail('MUHASEBE empty must deny filter');
 }
 ohOk('MUHASEBE_EMPTY_SCOPE=DENY');
+
+$f = ohFilterSql(ohUser('MUHASEBE', [1, 2]));
+if (strpos(implode(' ', $f['where']), 'sube_id') === false) {
+    ohFail('MUHASEBE branch-only must filter sube');
+}
+ohOk('MUHASEBE_BRANCH_ONLY=ALLOW_FILTER');
+
+$f = ohFilterSql(ohUser('MUHASEBE', [], [], [], null, [], [77]));
+$pred = implode(' ', $f['where']);
+if (strpos($pred, 'sgk_isveren_id') === false) {
+    ohFail('MUHASEBE SGK-only must filter personeller.sgk_isveren_id');
+}
+if (strpos($pred, 'sube_id IN') !== false && strpos($pred, 'sgk_isveren_id') === false) {
+    ohFail('SGK grant must not be rewritten as a physical branch IN list');
+}
+ohOk('MUHASEBE_SGK_ONLY=PAYROLL_AXIS');
+
+$f = ohFilterSql(ohUser('MUHASEBE', [1], [], [], null, [], [77]));
+$pred = implode(' ', $f['where']);
+if (strpos($pred, 'sube_id') === false || strpos($pred, 'sgk_isveren_id') === false || strpos($pred, ' OR ') === false) {
+    ohFail('MUHASEBE mixed branch+SGK must OR the axes');
+}
+ohOk('MUHASEBE_BRANCH_OR_SGK=UNION');
 
 $f = ohFilterSql(ohUser('SUBE_YONETICISI', []));
 if (!in_array('1=0', $f['where'], true)) {
@@ -218,11 +249,32 @@ ohAssertDenies(ohUser('BIRIM_AMIRI', [1], [], []), ['id' => 1, 'sube_id' => 1, '
 
 ohAssertAllows(ohUser('GENEL_YONETICI', []), ['id' => 1, 'sube_id' => 9], 'GENEL_GLOBAL_ASSERT');
 ohAssertAllows(ohUser('SISTEM_YONETICISI', []), ['id' => 1, 'sube_id' => 9], 'SISTEM_GLOBAL_ASSERT');
-ohAssertDenies(ohUser('IK_SORUMLUSU', []), ['id' => 1, 'sube_id' => 1], 'IK_EMPTY_ASSERT');
+ohAssertAllows(ohUser('IK_SORUMLUSU', []), ['id' => 1, 'sube_id' => 1], 'IK_GLOBAL_READ_ASSERT');
+ohAssertAllows(ohUser('IK_PERSONELI', []), ['id' => 2, 'sube_id' => 2], 'IK_PERSONELI_GLOBAL_READ_ASSERT');
 ohAssertDenies(ohUser('MUHASEBE', []), ['id' => 1, 'sube_id' => 1], 'MUHASEBE_EMPTY_ASSERT');
+ohAssertAllows(ohUser('MUHASEBE', [1]), ['id' => 1, 'sube_id' => 1], 'MUHASEBE_BRANCH_OWN_ASSERT');
+ohAssertDenies(ohUser('MUHASEBE', [1]), ['id' => 2, 'sube_id' => 2], 'MUHASEBE_BRANCH_CROSS_ASSERT');
+ohAssertAllows(
+    ohUser('MUHASEBE', [], [], [], null, [], [77]),
+    ['id' => 9, 'sube_id' => 99, 'sgk_isveren_id' => 77],
+    'MUHASEBE_SGK_OWN_ASSERT'
+);
+ohAssertDenies(
+    ohUser('MUHASEBE', [], [], [], null, [], [77]),
+    ['id' => 10, 'sube_id' => 99, 'sgk_isveren_id' => 88],
+    'MUHASEBE_SGK_CROSS_ASSERT'
+);
+ohAssertDenies(
+    ohUser('MUHASEBE', [], [], [], null, [], [77]),
+    ['id' => 11, 'sube_id' => 1],
+    'MUHASEBE_SGK_DOES_NOT_GRANT_BRANCH_ASSERT'
+);
 
 ohAssertAllows(ohUser('PERSONEL', [], [], [], 5), ['id' => 5, 'sube_id' => 1], 'PERSONEL_SELF_ASSERT');
 ohAssertDenies(ohUser('PERSONEL', [], [], [], 5), ['id' => 6, 'sube_id' => 1], 'PERSONEL_OTHER_ASSERT');
+// Manager binding is identity-only: a SUBE_YONETICISI with personel_id still uses branch scope.
+ohAssertAllows(ohUser('SUBE_YONETICISI', [1], [], [], 5), ['id' => 99, 'sube_id' => 1], 'MANAGER_PERSONEL_BINDING_NOT_AUTHZ');
+ohAssertDenies(ohUser('SUBE_YONETICISI', [1], [], [], 5), ['id' => 5, 'sube_id' => 2], 'MANAGER_BINDING_NO_CROSS_BRANCH');
 
 echo "ORG_HIERARCHY_AUTH_MATRIX=PASS\n";
 exit(0);

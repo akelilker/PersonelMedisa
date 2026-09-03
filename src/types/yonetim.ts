@@ -22,6 +22,8 @@ export type YonetimKullanici = {
   bolum_ids?: number[];
   birim_ids?: number[];
   sirket_ids?: number[];
+  /** Payroll-employer grants (user_sgk_isverenler); not a physical branch list. */
+  sgk_isveren_ids?: number[];
   varsayilan_sube_id: number | null;
   durum: KayitDurumu;
   notlar?: string;
@@ -74,9 +76,14 @@ export type UpsertYonetimKullaniciPayload = {
   birim_ids?: number[];
   /**
    * Sirket kapsami. IK_PERSONELI icin dogrudan islem yapabilecegi sirketler,
-   * diger scoped roller icin mevcut sirket kapsami anlamini korur.
+   * MUHASEBE icin canli sube cozumlemesi ureten sirket grant'i.
    */
   sirket_ids?: number[];
+  /**
+   * SGK/bordro isveren kapsami. Fiziksel sube yetkisi degildir; yalniz
+   * personeller.sgk_isveren_id eksenindeki islemler icin.
+   */
+  sgk_isveren_ids?: number[];
   varsayilan_sube_id?: number | null;
   durum: KayitDurumu;
   notlar?: string;

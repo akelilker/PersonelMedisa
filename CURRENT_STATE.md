@@ -16,7 +16,7 @@ ORG_BRANCH_DISPLAY_OWNER: SubeReadModel (kısa `ad` + türetilmiş `tam_ad`; fro
 ORG_USER_SCOPE_ROLLOUT: CODE_READY (company∪branch UNION + SGK OR axis owners complete; yönetim assignment/FE round-trip; production grants still 0; mutation gate separate — docs/guncel/140)
 ORG_LOCATION_SUBE_MAPPING: DEFERRED (calisma_lokasyonlari.sube_id bilinçli NULL)
 ORG_BRANCH_NAME_DB_HARDENING: CLOSED_NOT_NEEDED (tam_ad bilerek kolon değil; SubeReadModel owner)
-AYLIK_KAPANIS_SGK_REDESIGN: NEXT_GATE
+AYLIK_KAPANIS_SGK_REDESIGN: CLOSED_CONFIRMED (period-close/snapshot execution key remains (sube_id,yil,ay) — muhür/attendance is branch-operational; MaasHesaplamaSnapshotService freezes personeller.sgk_isveren_id + company labels into personel JSON and branch company/default-SGK into header; personel.sube_id may diverge from employer; missing SGK fail-closed at snapshot preflight; no employer-keyed close product)
 
 PERSONEL_IMPORT_ROLLOUT: CLOSED_CONFIRMED
 PERSONEL_IMPORT_PHASE1_IC: 122 / CLOSED_PASS

@@ -1,6 +1,6 @@
 # 141 — Canonical payroll SGK integrity
 
-**Status:** CODE_READY (PR `fix/payroll-sgk-integrity`)  
+**Status:** CLOSED_CONFIRMED (merged PR #242; production deploy includes tip `a17da8a`; aktif IC missing SGK = 0)
 **Baseline:** `1da67928c849919fcb9a05c3ee4ce34e1f27ac43`
 
 ## Rules

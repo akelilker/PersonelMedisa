@@ -113,10 +113,7 @@ final class PersonelCanonicalValidator
         if (!array_key_exists('aktif_durum', $body)) {
             throw new PersonelValidationException('aktif_durum', 'Aktif durum zorunludur.');
         }
-        $aktifDurum = strtoupper(trim((string) $body['aktif_durum']));
-        if (!in_array($aktifDurum, ['AKTIF', 'PASIF'], true)) {
-            throw new PersonelValidationException('aktif_durum', 'Aktif durum AKTIF veya PASIF olmalidir.');
-        }
+        $aktifDurum = self::requireCreateAktifDurum($body['aktif_durum']);
 
         $dogumYeri = self::optionalTrimmedString($body, 'dogum_yeri');
         $kanGrubu = self::optionalTrimmedString($body, 'kan_grubu');
@@ -696,6 +693,28 @@ final class PersonelCanonicalValidator
         }
 
         return null;
+    }
+
+    /**
+     * Normal create/incomplete-create cannot write archive/PASIF.
+     * Real archive requires completed ISTEN_AYRILMA; fixtures use TestFixturePersonelArchiveService.
+     *
+     * @param mixed $value
+     */
+    public static function requireCreateAktifDurum($value): string
+    {
+        $aktifDurum = strtoupper(trim((string) $value));
+        if ($aktifDurum === 'AKTIF') {
+            return $aktifDurum;
+        }
+        if ($aktifDurum === 'PASIF') {
+            throw new PersonelValidationException(
+                'aktif_durum',
+                'Yeni personel yalniz AKTIF olusturulabilir; arsiv ISTEN_AYRILMA veya test-fixture archive ile olur.',
+                'CREATE_PASIF_FORBIDDEN'
+            );
+        }
+        throw new PersonelValidationException('aktif_durum', 'Aktif durum AKTIF veya PASIF olmalidir.');
     }
 
     /** @param array<string, mixed> $body */

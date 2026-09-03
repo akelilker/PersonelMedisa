@@ -62,15 +62,20 @@ PRODUCTION_MIGRATION_TIP: 083
 | `MG-CI-ACTIONS-NODE24-001` | GitHub Actions Node 24 runtime temizliği | **CLOSED** | Control-plane workflow'ları `actions/checkout@v6` ve `actions/upload-artifact@v6` ile pinli; v4/v5 kullanımı kaynak testiyle yasaklı. Açık deprecation kalemi yok. |
 | `MG-OPS-ORG-001` | IC kritik organizasyon FK tamamlama | **CLOSED** | Phase1 import sonrası AKTIF `IC_PERSONEL` için kritik org alanları (Şube/Departman/Bölüm/Birim/Görev/Personel Tipi) tamam; kalan telefon kalemi ayrıdır (`MG-OPS-PERSONEL-PHONE-001`). DIS org null’ları IC sayımına **dahil edilmez**. |
 | `MG-OPS-PERSONEL-PHONE-001` | 20 IC telefon deferred tamamlaması | **CLOSED_CONFIRMED** | Gerçek kullanıcı verisi ile canonical write owner (authenticated `PUT /personeller/{id}`) üzerinden tamamlandı; direct SQL / import reopen / migration yok. Preflight `MATCHED_RECORD_COUNT = 20`, `DUPLICATE_SICIL_COUNT = 0`, hepsi AKTIF `IC_PERSONEL`. Post-write salt-okunur readback `PHONE_EXPECTED_MATCH_COUNT = 20`, `PHONE_MISSING_COUNT = 0`, `PHONE_MISMATCH_COUNT = 0`, `PERSONEL_IC_PHONE_DEFERRED = 0`. Kapsam dışı mutasyon yok (`UNEXPECTED_PERSONNEL_MUTATION_COUNT = 0`). Numaralar PII olduğu için dokümana yazılmaz. Ayrıca sicil 216 için kullanıcı onaylı tekil isim düzeltmesi uygulandı (`soyad` correction, fail-closed önceki-değer teyidi ile); başka personelin adına dokunulmadı. |
-| `MG-PERSONNEL-BULK-RECONCILIATION-PRODUCTION` | Onaylı bulk lifecycle reconciliation (production) | **CLOSED_CONFIRMED** | Deploy SHA `06bbe03`; 14 create + 3 exit; toplam personel 153 / aktif 146. Ahmed Khalil Alsamar (202) ve Sefine Özcan (208) çıkışları henüz uygulanmadı; blocker veri değil sabit `PersonelLifecycleBulkPostcheck` binding contract. Hedef: dinamik contract deploy sonrası 0 create + 2 exit → 153 toplam / 144 aktif. |
-| `MG-PERSONNEL-BULK-POSTCHECK-DYNAMIC-CONTRACT-001` | Bulk lifecycle postcheck dinamik contract | **CODE_READY** | Envanter fingerprint + dry-run plan türevli `PersonelLifecycleBulkPostcheck`; sabit 14/3/153/146 binding kaldırıldı; fail-closed checksum/fingerprint bağlama; production mutation=0. PR bekliyor. |
-| `MG-PERSONNEL-BULK-DRY-RUN-APPLY-PARITY-001` | Bulk dry-run / apply org hierarchy parity | **CODE_READY** | `PersonelLifecycleBulkMutationPlanner` ortak owner; `bolum_id` → `departman_id` inference + `validateCreateReferences` dry-run/apply parity; production mutation=0. PR bekliyor. |
+| `MG-PERSONNEL-BULK-RECONCILIATION-PRODUCTION` | Onaylı bulk lifecycle reconciliation (production) | **CLOSED_CONFIRMED** | Deploy SHA `06bbe03` apply; canlı 2026-09-03: **153 toplam / 144 aktif / 9 pasif**. 202 + 208 artık PASIF/archive; `cikis_tarihi` hâlâ NULL → ayrı `DATA_REQUIRED` exit-date remediation (bulk reopen yok). |
+| `MG-PERSONNEL-BULK-POSTCHECK-DYNAMIC-CONTRACT-001` | Bulk lifecycle postcheck dinamik contract | **CLOSED** | Merged PR #234; `PersonelLifecycleBulkPostcheck` dinamik contract canlı. |
+| `MG-PERSONNEL-BULK-DRY-RUN-APPLY-PARITY-001` | Bulk dry-run / apply org hierarchy parity | **CLOSED** | Merged PR #232; `PersonelLifecycleBulkMutationPlanner` canlı. |
+| `MG-PAYROLL-SGK-INTEGRITY-001` | Canonical payroll SGK / same-company integrity | **CLOSED_CONFIRMED** | Merged PR #242; `PersonelSgkCompanyConsistency`; aktif IC missing SGK = 0. personel_id=1 PASIF+null exit residual ayrı data gate. |
+| `MG-FINAL-NONVISUAL-CLOSEOUT-001` | QR hariç son geniş teknik kapanış envanteri | **CLOSED** | Live deploy `a17da8a`; product-code MUST_FIX = 0; kalan = data/ops + optional/future + QR deferred. |
 
 ## Kullanıcı verisi / ataması gerektiren (teknik blocker değil)
 
 | ID | Konu | Durum | Not |
 | --- | --- | --- | --- |
-| `MG-SUBE-YONETICI-001` | `SUBE_YONETICISI` gerçek kullanıcı ataması | **USER_ASSIGNMENT_REQUIRED** | `users.rol = SUBE_YONETICISI` + `user_subeler` explicit kanıtı; tahmin/atama otomasyonu yok. |
+| `MG-SUBE-YONETICI-001` | `SUBE_YONETICISI` gerçek kullanıcı ataması | **USER_ASSIGNMENT_REQUIRED** (PARTIAL) | Canlıda 2 AKTIF: `381`/Bora Bayazıt → sube 4; `040`/Halil Şenay → sube 2. Kalan şubeler için explicit atama hâlâ iş sahibi kararı; tahmin/atama otomasyonu yok. |
+| `MG-PERSONNEL-POST-BULK-ACCOUNT-014` | Bulk sonrası 14 AKTIF personel için PERSONEL hesabı | **USER_DATA_REQUIRED** | ids 213–226; historical 136 rollout yeniden açılmaz; canonical onboarding owner + ayrı onay. QR handoff ile kesişebilir. |
+| `MG-PERSONNEL-EXIT-DATE-202-208` | 202/208 PASIF ama `cikis_tarihi` NULL | **USER_DATA_REQUIRED** | Archive’da; employment-exit owner ile gerçek çıkış tarihi. |
+| `MG-MANAGER-ALPER-SUNGUR` | Alper Sungur uygulama kullanıcısı | **USER_DATA_REQUIRED** | Production’da eşleşen user yok; kaynak olmadan hesap yaratılmaz. |
 
 ## Teknik borç (non-blocking)
 
@@ -93,17 +98,19 @@ Açık teknik borç kalemi yoktur.
 
 | Sınıf | Sayım |
 | --- | ---: |
-| **CLOSED_CONFIRMED** | 11 |
-| **CLOSED** | 12 |
-| **USER_DATA_REQUIRED** | 0 |
-| **USER_ASSIGNMENT_REQUIRED** | 1 |
+| **CLOSED_CONFIRMED** | 13 |
+| **CLOSED** | 15 |
+| **USER_DATA_REQUIRED** | 3 |
+| **USER_ASSIGNMENT_REQUIRED** | 1 (PARTIAL) |
 | **READY_FOR_USER_EXECUTION_APPROVAL** | 0 |
 | **TECH_DEBT_NON_BLOCKING** | 0 |
 | **FUTURE / OUT_OF_SCOPE / INTENTIONAL_DEFER** | 8 |
 | **BUG** | **0** |
 | **OPS_ROLLOUT** | **0** |
+| **MUST_FIX_BEFORE_UI_POLISH** | **0** |
 
 **TEKNIK_ANA_SISTEM:** **KAPALI**
+**UI_POLISH_READY (QR hariç):** **YES** (data/ops + optional/future kalabilir)
 
 ## Özellikle yanlış önceliklendirilmemesi gerekenler
 

@@ -21,7 +21,7 @@ describe("I13-B default branch persistence source locks", () => {
     const yonetim = readFileSync("api/src/Controllers/YonetimController.php", "utf8");
     expect(yonetim).toContain("UsersSchema::hasVarsayilanSubeId");
     expect(yonetim).toContain("SCHEMA_NOT_READY");
-    expect(yonetim).toContain("assertVarsayilanSubeInScope");
+    expect(yonetim).toContain("assertVarsayilanSubeInEffectiveScope");
 
     const login = readFileSync("api/src/Auth/LoginController.php", "utf8");
     expect(login).toContain("UsersSchema::hasVarsayilanSubeId");

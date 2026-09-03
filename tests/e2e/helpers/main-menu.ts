@@ -28,6 +28,7 @@ export async function expectThreeButtonMainMenu(page: Page, kayitEnabled: boolea
   await expect(page.getByTestId("menu-finans")).toHaveCount(0);
   await expect(page.getByTestId("menu-gunluk-kayit")).toHaveCount(0);
   await expect(page.getByTestId("menu-yonetim-paneli")).toHaveCount(0);
+  await expect(page.getByTestId("menu-self-service")).toHaveCount(0);
 }
 
 export async function expectMainMenuForRole(page: Page, role: MainMenuRole) {

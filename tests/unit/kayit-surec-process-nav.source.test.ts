@@ -65,4 +65,11 @@ describe("kayit-surec selected-person process navigation", () => {
     expect(mainMenu).not.toContain("menu-moduller");
     expect(mainMenu).not.toMatch(/Modüller/i);
   });
+
+  it("does not show self-service tile on manager MainMenu", () => {
+    const mainMenu = read("src/components/main-menu/MainMenu.tsx");
+    expect(mainMenu).not.toContain("menu-self-service");
+    expect(mainMenu).not.toContain("self_service.view");
+    expect(mainMenu).not.toMatch(/Öz Servis\s*\/\s*QR/i);
+  });
 });

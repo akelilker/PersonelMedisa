@@ -473,7 +473,7 @@ describe("Personeller live search", () => {
 
     expect(view.result.current.listQuery.applied).toEqual({
       search: "",
-      aktiflik: "tum",
+      aktiflik: "aktif",
       departmanId: "",
       personelTipiId: "",
       calisanKapsami: "",

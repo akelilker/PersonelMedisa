@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { FormField } from "../../../components/form/FormField";
 import { EmptyState } from "../../../components/states/EmptyState";
 import { ErrorState } from "../../../components/states/ErrorState";
@@ -188,6 +188,7 @@ export function PersonellerPage() {
   const canExportPersonel = hasPermission("personeller.view") || hasPermission("personeller.view.sube");
   const canApplyPersonelImport = hasPermission("personeller.import.apply");
   const canViewArsiv = hasPermission("arsiv.view");
+  const location = useLocation();
   const navigate = useNavigate();
   const [searchExpanded, setSearchExpanded] = useState(false);
   const [filterExpanded, setFilterExpanded] = useState(false);
@@ -202,6 +203,22 @@ export function PersonellerPage() {
   const page = listQuery.page;
   const departmanFilterOptions = toSelectOptions(refs.departmanOptions);
   const personelTipiFilterOptions = toSelectOptions(refs.personelTipiOptions);
+
+  const isArchiveRoute = location.pathname.startsWith("/arsiv/personeller");
+
+  // Route-level semantic split:
+  // - /personeller => active operational list
+  // - /arsiv/personeller => archived list
+  // Keep it centralized in the list owner hook.
+  useEffect(() => {
+    if (!canViewArsiv) {
+      return;
+    }
+    const target = isArchiveRoute ? "pasif" : "aktif";
+    if (draft.aktiflik !== target) {
+      setDraftAktiflik(target);
+    }
+  }, [canViewArsiv, draft.aktiflik, isArchiveRoute, setDraftAktiflik]);
 
   return (
     <section className="personeller-page" aria-labelledby="personeller-page-heading">
@@ -253,6 +270,15 @@ export function PersonellerPage() {
             </button>
           </div>
           <div className="personeller-toolbar-right">
+            {canViewArsiv ? (
+              <Link
+                to={isArchiveRoute ? "/personeller" : "/arsiv/personeller"}
+                className="universal-btn-aux personeller-import-action"
+                data-testid="personeller-archive-nav"
+              >
+                {isArchiveRoute ? "Aktif Personeller" : "Arşiv"}
+              </Link>
+            ) : null}
             {canExportPersonel ? (
               <button
                 type="button"

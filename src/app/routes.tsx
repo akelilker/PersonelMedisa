@@ -130,6 +130,14 @@ export function AppRoutes() {
           }
         />
         <Route
+          path="arsiv/personeller"
+          element={
+            <ProtectedRoute requirePermission="arsiv.view">
+              <PersonellerPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="personeller/belge-takip"
           element={
             <ProtectedRoute requireAny={PERSONELLER_LIST_ANY}>

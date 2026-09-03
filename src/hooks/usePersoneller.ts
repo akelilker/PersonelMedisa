@@ -69,7 +69,7 @@ export type PersonelListQueryState = {
 
 const INITIAL_LIST_FILTERS: PersonelListFilters = {
   search: "",
-  aktiflik: "tum",
+  aktiflik: "aktif",
   departmanId: "",
   personelTipiId: "",
   calisanKapsami: "",

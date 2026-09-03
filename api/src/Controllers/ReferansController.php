@@ -9,6 +9,7 @@ use Medisa\Api\Auth\RolePermissions;
 use Medisa\Api\Database\Connection;
 use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
+use Medisa\Api\Services\Personel\PersonelOrgLocationSchema;
 use Medisa\Api\Services\Personel\PersonelOrgStructureSchema;
 use PDO;
 use PDOException;
@@ -398,6 +399,39 @@ class ReferansController
     public static function personelTipleri(Request $request)
     {
         self::listByTable($request, 'personel_tipleri');
+    }
+
+    public static function sgkIsverenler(Request $request)
+    {
+        AuthMiddleware::authenticate($request, true);
+
+        try {
+            $pdo = Connection::get();
+        } catch (\Throwable $e) {
+            JsonResponse::serverError('Veritabani baglantisi kurulamadi.');
+        }
+
+        if (!PersonelOrgLocationSchema::isReady($pdo)) {
+            JsonResponse::error(
+                409,
+                PersonelOrgLocationSchema::ERROR_CODE,
+                'Org location schema hazir degil.'
+            );
+        }
+
+        $stmt = $pdo->query(
+            "SELECT id, ad FROM sgk_isverenler WHERE durum = 'AKTIF' ORDER BY ad ASC, id ASC"
+        );
+        $rows = $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
+        $items = [];
+        foreach ($rows as $row) {
+            $items[] = [
+                'id' => (int) $row['id'],
+                'ad' => (string) $row['ad'],
+            ];
+        }
+
+        JsonResponse::success(['items' => $items]);
     }
 
     public static function bagliAmirler(Request $request)

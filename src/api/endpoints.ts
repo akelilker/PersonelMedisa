@@ -288,6 +288,7 @@ export const endpoints = {
     birimler: "/referans/birimler",
     pozisyonlar: "/referans/pozisyonlar",
     personelTipleri: "/referans/personel-tipleri",
+    sgkIsverenler: "/referans/sgk-isverenler",
     bagliAmirler: "/referans/bagli-amirler",
     bildirimTurleri: "/referans/bildirim-turleri",
     surecTurleri: "/referans/surec-turleri",

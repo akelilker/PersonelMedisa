@@ -15,6 +15,7 @@ import {
   fetchPersonelTipiOptions,
   fetchPozisyonOptions,
   fetchPrimKuraliOptions,
+  fetchSgkIsverenOptions,
   fetchUcretTipiOptions
 } from "../api/referans.api";
 import { emptyPaginated, makeTempId, type PersonelReferenceBundle } from "../data/app-data.types";
@@ -86,6 +87,7 @@ export type CreatePersonelFormState = {
   acilDurumTelefon: string;
   iseGirisTarihi: string;
   subeId: string;
+  sgkIsverenId: string;
   departmanId: string;
   bolumId: string;
   birimId: string;
@@ -111,6 +113,7 @@ export const INITIAL_CREATE_PERSONEL_FORM: CreatePersonelFormState = {
   acilDurumTelefon: "",
   iseGirisTarihi: "",
   subeId: "",
+  sgkIsverenId: "",
   departmanId: "",
   bolumId: "",
   birimId: "",
@@ -218,6 +221,7 @@ export function usePersoneller() {
         gorevOptions: [],
         pozisyonOptions: [],
         personelTipiOptions: [],
+        sgkIsverenOptions: [],
         bagliAmirOptions: [],
         ucretTipiOptions: [],
         primKuraliOptions: []
@@ -331,6 +335,7 @@ export function usePersoneller() {
               gorevOptions,
               pozisyonOptions,
               personelTipiOptions,
+              sgkIsverenOptions,
               bagliAmirOptions,
               ucretTipiOptions,
               primKuraliOptions
@@ -341,6 +346,7 @@ export function usePersoneller() {
               fetchGorevOptions(),
               fetchPozisyonOptions(),
               fetchPersonelTipiOptions(),
+              fetchSgkIsverenOptions(),
               fetchBagliAmirOptions(),
               fetchUcretTipiOptions(),
               fetchPrimKuraliOptions()
@@ -352,6 +358,7 @@ export function usePersoneller() {
               gorevOptions,
               pozisyonOptions,
               personelTipiOptions,
+              sgkIsverenOptions,
               bagliAmirOptions,
               ucretTipiOptions,
               primKuraliOptions

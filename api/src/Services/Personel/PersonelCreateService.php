@@ -129,6 +129,24 @@ final class PersonelCreateService
                 throw new PersonelValidationException('sgk_isveren_id', 'Gecersiz SGK isveren.');
             }
         }
+
+        $kapsam = isset($payload['calisan_kapsami'])
+            ? PersonelCalisanKapsamService::normalize((string) $payload['calisan_kapsami'])
+            : PersonelCalisanKapsamService::IC_PERSONEL;
+        $aktifDurum = strtoupper(trim((string) ($payload['aktif_durum'] ?? 'AKTIF')));
+        if (PersonelOrgLocationSchema::isReady($pdo)) {
+            PersonelSgkCompanyConsistency::assertRequiredForActiveIc(
+                $kapsam,
+                $aktifDurum,
+                $payload['sgk_isveren_id'] ?? null
+            );
+            PersonelSgkCompanyConsistency::assertCompatible(
+                $pdo,
+                $payload['sgk_isveren_id'] ?? null,
+                $payload['sube_id'] ?? null
+            );
+        }
+
         if (array_key_exists('calisma_lokasyonu_id', $payload) && $payload['calisma_lokasyonu_id'] !== null) {
             if (!PersonelOrgLocationSchema::existsActiveCalismaLokasyonu($pdo, (int) $payload['calisma_lokasyonu_id'])) {
                 throw new PersonelValidationException('calisma_lokasyonu_id', 'Gecersiz calisma lokasyonu.');

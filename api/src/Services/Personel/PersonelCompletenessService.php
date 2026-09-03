@@ -21,8 +21,12 @@ class PersonelCompletenessService
      * SQL predicate: personel row has at least one required master-data gap.
      * Must stay in parity with evaluate().
      */
-    public static function sqlHasMissingPredicate($alias = 'p', $hasOrgStructure = true, $hasCalisanKapsami = true)
-    {
+    public static function sqlHasMissingPredicate(
+        $alias = 'p',
+        $hasOrgStructure = true,
+        $hasCalisanKapsami = true,
+        $hasOrgLocation = true
+    ) {
         $a = preg_replace('/[^a-zA-Z0-9_]/', '', (string) $alias);
         if ($a === '') {
             $a = 'p';
@@ -33,8 +37,7 @@ class PersonelCompletenessService
             : "'IC_PERSONEL'";
 
         // Branch/location/manager and organization fields are critical for both
-        // employee scopes. SGK is deliberately not a completeness requirement:
-        // DIS_KAYNAK records must retain a NULL payroll employer.
+        // employee scopes. SGK is IC-only (DIS_KAYNAK must keep NULL payroll employer).
         $sharedOrgPredicate = $hasOrgStructure
             ? " OR IFNULL({$a}.sube_id, 0) <= 0"
                 . " OR IFNULL({$a}.calisma_lokasyonu_id, 0) <= 0"
@@ -49,10 +52,18 @@ class PersonelCompletenessService
                 . " OR IFNULL({$a}.gorev_id, 0) <= 0"
                 . " OR IFNULL({$a}.pozisyon_id, 0) <= 0";
 
+        $icSgkPredicate = $hasOrgLocation
+            ? " OR ("
+                . "  {$calisanKapsami} <> 'DIS_KAYNAK'"
+                . "  AND IFNULL({$a}.sgk_isveren_id, 0) <= 0"
+                . " )"
+            : '';
+
         return "("
             . "TRIM(IFNULL({$a}.sicil_no, '')) = ''"
             . " OR TRIM(IFNULL({$a}.ise_giris_tarihi, '')) = ''"
             . $sharedOrgPredicate
+            . $icSgkPredicate
             . " OR ("
             . "  {$calisanKapsami} <> 'DIS_KAYNAK'"
             . "  AND ("
@@ -181,6 +192,14 @@ class PersonelCompletenessService
                 'scopes' => $both,
             ],
             [
+                'key' => 'sgk_isveren_id',
+                'label' => 'SGK İşveren',
+                'category' => self::CATEGORY_ISTIHDAM,
+                'severity' => self::SEVERITY_CRITICAL,
+                'edit_target' => 'genel',
+                'scopes' => $icOnly,
+            ],
+            [
                 'key' => 'calisma_lokasyonu_id',
                 'label' => 'Çalışma Lokasyonu',
                 'category' => self::CATEGORY_ISTIHDAM,
@@ -279,6 +298,7 @@ class PersonelCompletenessService
             case 'pozisyon_id':
             case 'personel_tipi_id':
             case 'sube_id':
+            case 'sgk_isveren_id':
             case 'calisma_lokasyonu_id':
             case 'bagli_amir_id':
                 return !self::hasPositiveId(isset($personel[$key]) ? $personel[$key] : null);

@@ -11,6 +11,7 @@ import {
   fetchPersonelTipiOptions,
   fetchPozisyonOptions,
   fetchPrimKuraliOptions,
+  fetchSgkIsverenOptions,
   fetchUcretTipiOptions
 } from "../api/referans.api";
 import { createSurec, fetchSureclerList } from "../api/surecler.api";
@@ -432,6 +433,7 @@ function usePersonelDetailEdit(
         gorevOptions: [],
         pozisyonOptions: [],
         personelTipiOptions: [],
+        sgkIsverenOptions: [],
         bagliAmirOptions: [],
         ucretTipiOptions: [],
         primKuraliOptions: []
@@ -466,6 +468,7 @@ function usePersonelDetailEdit(
               gorevOptions,
               pozisyonOptions,
               personelTipiOptions,
+              sgkIsverenOptions,
               bagliAmirOptions,
               ucretTipiOptions,
               primKuraliOptions
@@ -476,6 +479,7 @@ function usePersonelDetailEdit(
               fetchGorevOptions(),
               fetchPozisyonOptions(),
               fetchPersonelTipiOptions(),
+              fetchSgkIsverenOptions(),
               fetchBagliAmirOptions(),
               fetchUcretTipiOptions(),
               fetchPrimKuraliOptions()
@@ -487,6 +491,7 @@ function usePersonelDetailEdit(
               gorevOptions,
               pozisyonOptions,
               personelTipiOptions,
+              sgkIsverenOptions,
               bagliAmirOptions,
               ucretTipiOptions,
               primKuraliOptions

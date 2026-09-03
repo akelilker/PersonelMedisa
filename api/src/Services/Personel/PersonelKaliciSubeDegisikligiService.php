@@ -294,10 +294,8 @@ final class PersonelKaliciSubeDegisikligiService
 
     /**
      * A person's payroll employer and their branch must stay inside one company.
-     *
-     * Fail-closed: when the hierarchy is unmapped — the employer or the branch
-     * has no company — the match cannot be proven, so the move is refused
-     * rather than assumed correct.
+     * Canonical evaluator: PersonelSgkCompanyConsistency (no duplicated SQL).
+     * This owner keeps its historical error code for branch-move API clients.
      */
     private static function assertSgkSirketConsistency(
         PDO $pdo,
@@ -317,19 +315,19 @@ final class PersonelKaliciSubeDegisikligiService
             );
         }
 
-        $stmt = $pdo->prepare('SELECT sirket_id FROM sgk_isverenler WHERE id = :id LIMIT 1');
-        $stmt->execute(['id' => $sgkIsverenId]);
-        $row = $stmt->fetch(PDO::FETCH_ASSOC);
-        $sgkSirketId = is_array($row) ? self::nullableId($row['sirket_id'] ?? null) : null;
-
-        if ($sgkSirketId === null || $targetSirketId === null || $sgkSirketId !== $targetSirketId) {
-            throw new OrganizasyonException(
-                409,
-                self::ERROR_SGK_MISMATCH,
-                'Personelin SGK işvereni ile hedef şubenin şirketi uyuşmuyor.',
-                'yeni_sube_id'
-            );
+        $result = PersonelSgkCompanyConsistency::evaluateAgainstSirket($pdo, $sgkIsverenId, $targetSirketId);
+        if ($result['ok']) {
+            return;
         }
+
+        throw new OrganizasyonException(
+            409,
+            self::ERROR_SGK_MISMATCH,
+            $result['code'] === PersonelSgkCompanyConsistency::ERROR_HIERARCHY
+                ? 'Şirket hiyerarşisi hazır olmadığı için SGK işvereni ile hedef şube eşleşmesi doğrulanamıyor.'
+                : 'Personelin SGK işvereni ile hedef şubenin şirketi uyuşmuyor.',
+            'yeni_sube_id'
+        );
     }
 
     /**

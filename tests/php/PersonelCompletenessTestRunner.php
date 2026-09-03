@@ -28,6 +28,7 @@ function baseCompleteIc(): array
         'telefon' => '05551234567',
         'ise_giris_tarihi' => '2020-01-01',
         'sube_id' => 1,
+        'sgk_isveren_id' => 1,
         'calisma_lokasyonu_id' => 2,
         'bagli_amir_id' => 3,
         'departman_id' => 4,
@@ -117,6 +118,21 @@ $disCompleteWithNullSgk = PersonelCompletenessService::evaluate(
 );
 completenessAssert($disCompleteWithNullSgk['is_complete'] === true, 'DIS_KAYNAK NULL SGK remains complete');
 
+$icMissingSgk = PersonelCompletenessService::evaluate(
+    array_merge(baseCompleteIc(), ['sgk_isveren_id' => null]),
+    true
+);
+completenessAssert($icMissingSgk['is_complete'] === false, 'IC NULL SGK → incomplete');
+completenessAssert($icMissingSgk['missing_fields'][0]['key'] === 'sgk_isveren_id', 'IC NULL SGK → key');
+
+$icWithSgk = PersonelCompletenessService::evaluate(baseCompleteIc(), true);
+completenessAssert($icWithSgk['is_complete'] === true, 'IC with SGK → complete');
+
+$predicate = PersonelCompletenessService::sqlHasMissingPredicate('p');
+completenessAssert(strpos($predicate, 'sgk_isveren_id') !== false, 'sql predicate includes sgk_isveren_id');
+completenessAssert(strpos($predicate, 'sicil_no') !== false, 'sql predicate includes sicil_no');
+completenessAssert(strpos($predicate, 'DIS_KAYNAK') !== false, 'sql predicate scopes IC-only fields');
+
 $multi = PersonelCompletenessService::evaluate(
     array_merge(baseCompleteIc(), [
         'telefon' => '',
@@ -137,10 +153,6 @@ $listLight = PersonelCompletenessService::evaluate(array_merge(baseCompleteIc(),
 completenessAssert(!array_key_exists('missing_fields', $listLight), 'list summary omits missing_fields');
 completenessAssert($listLight['missing_count'] === 1, 'list summary missing_count');
 completenessAssert($listLight['critical_missing_labels'] === ['Telefon'], 'list summary labels');
-
-$predicate = PersonelCompletenessService::sqlHasMissingPredicate('p');
-completenessAssert(strpos($predicate, 'sicil_no') !== false, 'sql predicate includes sicil_no');
-completenessAssert(strpos($predicate, 'DIS_KAYNAK') !== false, 'sql predicate scopes IC-only fields');
 
 $controllerSource = (string) file_get_contents(__DIR__ . '/../../api/src/Controllers/PersonellerController.php');
 completenessAssert(

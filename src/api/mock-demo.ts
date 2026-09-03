@@ -8893,6 +8893,14 @@ export function resolveDemoApiResponse(
       ]);
     }
 
+    if (pathname === "/referans/sgk-isverenler") {
+      return ok([
+        { id: 1, ad: "Medisa" },
+        { id: 2, ad: "Karyapı" },
+        { id: 3, ad: "Şenay Mobilya" }
+      ]);
+    }
+
     if (pathname === "/referans/surec-turleri") {
       return ok([
         { key: "IZIN", label: "İzin" },

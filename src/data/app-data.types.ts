@@ -32,6 +32,7 @@ export type PersonelReferenceBundle = {
   gorevOptions: IdOption[];
   pozisyonOptions: IdOption[];
   personelTipiOptions: IdOption[];
+  sgkIsverenOptions: IdOption[];
   bagliAmirOptions: IdOption[];
   ucretTipiOptions: IdOption[];
   primKuraliOptions: IdOption[];

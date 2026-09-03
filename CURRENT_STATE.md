@@ -17,6 +17,7 @@ ORG_USER_SCOPE_ROLLOUT: CODE_READY (company∪branch UNION + SGK OR axis owners 
 ORG_LOCATION_SUBE_MAPPING: DEFERRED (calisma_lokasyonlari.sube_id bilinçli NULL)
 ORG_BRANCH_NAME_DB_HARDENING: CLOSED_NOT_NEEDED (tam_ad bilerek kolon değil; SubeReadModel owner)
 AYLIK_KAPANIS_SGK_REDESIGN: CLOSED_CONFIRMED (period-close/snapshot execution key remains (sube_id,yil,ay) — muhür/attendance is branch-operational; MaasHesaplamaSnapshotService freezes personeller.sgk_isveren_id + company labels into personel JSON and branch company/default-SGK into header; personel.sube_id may diverge from employer; missing SGK fail-closed at snapshot preflight; no employer-keyed close product)
+PAYROLL_SGK_INTEGRITY: CODE_READY (PersonelSgkCompanyConsistency canonical same-company owner; aktif IC create/import require sgk_isveren_id; completeness IC-only SGK key; org-change cross-company DENY; branch-default autofill YOK; personel_id=1 PASIF+cikis_tarihi=NULL = DATA_INCONSISTENCY deferred — resolver employment-overlap unchanged, PASIF shortcut YOK)
 
 PERSONEL_IMPORT_ROLLOUT: CLOSED_CONFIRMED
 PERSONEL_IMPORT_PHASE1_IC: 122 / CLOSED_PASS

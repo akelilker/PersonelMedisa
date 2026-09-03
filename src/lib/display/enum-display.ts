@@ -112,6 +112,7 @@ export const CALISAN_KAPSAMI_SELECT_OPTIONS: Array<{
 const BILDIRIM_TURU_LABELS: Record<string, string> = {
   DEVAMSIZLIK: "Devamsızlık",
   DIGER: "Diğer",
+  ERKEN_CIKTI: "Erken Çıktı",
   GEC_GELDI: "Geç Geldi",
   GEC_CIKTI: "Geç Çıktı",
   GELMEDI: "Gelmedi",

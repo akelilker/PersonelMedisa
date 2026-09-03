@@ -1,13 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { dataCacheKeys, getAppData, getCacheEntry, useAppDataRevision } from "../../data/data-manager";
+import { getAppData, useAppDataRevision } from "../../data/data-manager";
 import { useBildirimlerHeaderPreview } from "../../hooks/useBildirimler";
 import { useRoleAccess } from "../../hooks/use-role-access";
-import { formatBildirimTuruLabel, normalizeEnumKey } from "../../lib/display/enum-display";
+import {
+  formatHeaderBildirimCopy,
+  formatHeaderReminderCopy
+} from "../../lib/bildirim/header-notification-copy";
+import { normalizeEnumKey } from "../../lib/display/enum-display";
 import { canonicalizeUserRole } from "../../lib/authorization/canonicalize-user-role";
 import { useAuth } from "../../state/auth.store";
 import { GLOBAL_SCOPE_ROLES } from "../../types/auth";
-import type { Personel } from "../../types/personel";
 
 type NotificationLevel = "neutral" | "warning" | "critical";
 
@@ -56,29 +59,11 @@ function formatSyncLabel(updatedAt: string | null) {
   }).format(parsed)}`;
 }
 
-function getReminderSubtitle(daysLeft: number, dueDate: Date) {
-  if (daysLeft <= 0) {
-    return `Bugün son gün (${formatDate(dueDate)})`;
-  }
-
-  return `${daysLeft} gün kaldı (${formatDate(dueDate)})`;
-}
-
 function buildReminderNotifications(baseDate: Date, route: string): HeaderNotification[] {
   const start = startOfDay(baseDate);
   const reminders = [
-    {
-      key: "salary",
-      dayOfMonth: 5,
-      title: "Maaş ödeme zamanı yaklaşıyor",
-      route
-    },
-    {
-      key: "sgk",
-      dayOfMonth: 26,
-      title: "SGK prim odeme takibini kontrol et",
-      route
-    }
+    { key: "salary" as const, dayOfMonth: 5, route },
+    { key: "sgk" as const, dayOfMonth: 26, route }
   ];
 
   return reminders
@@ -93,10 +78,16 @@ function buildReminderNotifications(baseDate: Date, route: string): HeaderNotifi
         return null;
       }
 
+      const copy = formatHeaderReminderCopy({
+        key: reminder.key,
+        daysLeft,
+        dueDateLabel: formatDate(dueDate)
+      });
+
       return {
         id: `reminder-${reminder.key}`,
-        title: reminder.title,
-        subtitle: getReminderSubtitle(daysLeft, dueDate),
+        title: copy.title,
+        subtitle: copy.subtitle,
         level: daysLeft <= 2 ? "critical" : "warning",
         route: reminder.route,
         unread: true
@@ -118,7 +109,12 @@ function mapBildirimLevel(bildirimTuru: string): NotificationLevel {
     return "critical";
   }
 
-  if (normalized === "IZINLI_GELMEDI" || normalized.includes("GEC") || normalized.includes("RAPOR")) {
+  if (
+    normalized === "IZINLI_GELMEDI" ||
+    normalized === "ERKEN_CIKTI" ||
+    normalized.includes("GEC") ||
+    normalized.includes("RAPOR")
+  ) {
     return "warning";
   }
 
@@ -171,31 +167,18 @@ export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeade
         ? "/bildirimler"
         : "/";
 
-  const headerPersonelMap = useMemo(() => {
-    const meta = getCacheEntry<{ personeller?: Personel[] }>(dataCacheKeys.bildirimRef());
-    return new Map((meta?.personeller ?? []).map((personel) => [personel.id, personel]));
-  }, [revision]);
-
   const syncLabel = useMemo(() => formatSyncLabel(getAppData().updatedAt), [revision]);
 
   const notifications = useMemo(() => {
     const reminderItems =
       uiProfile === "birim_amiri" ? [] : buildReminderNotifications(new Date(), reminderRoute);
     const apiItems: HeaderNotification[] = headerBildirimler.map((item) => {
-      const personel =
-        typeof item.personel_id === "number" ? headerPersonelMap.get(item.personel_id) ?? null : null;
-      const tarihText = item.tarih ? `Tarih: ${item.tarih}` : "";
-      const personelText = personel
-        ? `Personel: ${[personel.ad, personel.soyad].filter(Boolean).join(" ")}`
-        : item.personel_id
-          ? `Personel: ${item.personel_id}`
-          : "";
-      const subtitle = [tarihText, personelText].filter(Boolean).join(" | ") || "İşlem gerektiriyor";
+      const copy = formatHeaderBildirimCopy(item);
 
       return {
         id: `api-${item.id}`,
-        title: formatBildirimTuruLabel(item.bildirim_turu),
-        subtitle,
+        title: copy.title,
+        subtitle: copy.subtitle,
         level: mapBildirimLevel(item.bildirim_turu),
         route: canViewBildirimDetay ? `/bildirimler/${item.id}` : "/bildirimler",
         unread: item.state !== "IPTAL" && item.okundu_mi !== true
@@ -203,7 +186,7 @@ export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeade
     });
 
     return [...reminderItems, ...apiItems];
-  }, [canViewBildirimDetay, headerBildirimler, headerPersonelMap, reminderRoute, uiProfile]);
+  }, [canViewBildirimDetay, headerBildirimler, reminderRoute, uiProfile]);
 
   const visibleNotifications = useMemo(
     () =>

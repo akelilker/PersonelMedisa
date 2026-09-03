@@ -13,6 +13,7 @@ export type AppPermission =
   | "personeller.update"
   | "personeller.test_fixture.classify"
   | "personeller.test_fixture.archive"
+  | "personeller.test_fixture.purge"
   | "personeller.detail.view"
   | "personeller.ucret.view"
   | "personeller.ucret.manage"
@@ -157,6 +158,7 @@ const BASE_ROLE_PERMISSIONS: Record<
     "personeller.update",
     "personeller.test_fixture.classify",
     "personeller.test_fixture.archive",
+    "personeller.test_fixture.purge",
     "personeller.detail.view",
     "personeller.ucret.view",
     "personeller.ucret.manage",
@@ -422,6 +424,7 @@ const BASE_ROLE_PERMISSIONS: Record<
     "personeller.update",
     "personeller.test_fixture.classify",
     "personeller.test_fixture.archive",
+    "personeller.test_fixture.purge",
     "personeller.detail.view",
     "personeller.ucret.view",
     "mevzuat_parametreleri.view",

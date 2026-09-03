@@ -67,10 +67,7 @@ final class PersonelIncompleteCreateService
         if (!array_key_exists('aktif_durum', $body)) {
             throw new PersonelValidationException('aktif_durum', 'Aktif durum zorunludur.');
         }
-        $aktifDurum = strtoupper(trim((string) $body['aktif_durum']));
-        if (!in_array($aktifDurum, ['AKTIF', 'PASIF'], true)) {
-            throw new PersonelValidationException('aktif_durum', 'Aktif durum AKTIF veya PASIF olmalidir.');
-        }
+        $aktifDurum = PersonelCanonicalValidator::requireCreateAktifDurum($body['aktif_durum']);
 
         $payload = [
             'ad' => $ad,

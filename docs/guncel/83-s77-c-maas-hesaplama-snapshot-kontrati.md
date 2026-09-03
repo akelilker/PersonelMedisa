@@ -17,6 +17,20 @@ Bu fazda brüt/net, SGK, vergi veya bordro PDF üretilmez.
 | Etki adayları | `onayli_bildirim_puantaj_etki_adaylari` + S75 çözümleri |
 | Snapshot | `MaasHesaplamaSnapshotService` |
 
+## Canonical org identity (create-time freeze)
+
+Execution / uniqueness key remains **`(sube_id, yil, ay)`** — same as mühür. This is branch-operational attendance close, not an SGK-employer close product.
+
+At snapshot create, `resolvePersonnelSet` freezes into `personel_snapshot_json`:
+
+- `sube_id` (operational branch)
+- `sgk_isveren_id` (+ kod/ad) from **`personeller.sgk_isveren_id`** — never inferred from `subeler.sgk_isveren_id`
+- `sirket_id` (+ kod/ad) from the employer’s company when present, else the branch company
+
+Header `fetchSube` freezes branch display `tam_ad` plus branch company and branch-default SGK as **operational context only**. Detail reads frozen payloads; it does not re-resolve live org.
+
+When org-location schema is ready, IC personel without `sgk_isveren_id` raise `SGK_ISVEREN_MISSING` (BLOCKER). `DIS_KAYNAK` stays outside the IC payroll set.
+
 ## Veri modeli
 
 - `maas_hesaplama_donem_snapshotlari`

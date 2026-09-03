@@ -7,10 +7,12 @@ namespace Medisa\Api\Services;
 use Medisa\Api\Services\Attendance\AttendanceDisciplineCatalog;
 use Medisa\Api\Services\Attendance\AttendancePayrollEffectResolver;
 use Medisa\Api\Services\Attendance\PuantajOlayKararService;
+use Medisa\Api\Services\Organizasyon\OrganizasyonSchema;
 use Medisa\Api\Services\Organizasyon\SubeReadModel;
 use Medisa\Api\Services\Payroll\FazlaCalismaYillikLimitService;
 use Medisa\Api\Services\Payroll\PayrollComplianceGuard;
 use Medisa\Api\Services\Personel\PersonelCalisanKapsamService;
+use Medisa\Api\Services\Personel\PersonelOrgLocationSchema;
 use PDO;
 use PDOException;
 
@@ -19,6 +21,11 @@ use PDOException;
  * degismez snapshot olarak donduran domain owner.
  *
  * Snapshot bir hesap sonucu degildir; SGK/vergi/brut-net donusumu icermez.
+ *
+ * Period-close / snapshot execution key remains (sube_id, yil, ay) — the muhür
+ * and attendance seal are branch-operational. Payroll employer identity is
+ * frozen from personeller.sgk_isveren_id (independent of subeler.sgk_isveren_id)
+ * into the personel JSON at create time so later org moves cannot rewrite history.
  */
 class MaasHesaplamaSnapshotService
 {
@@ -28,6 +35,9 @@ class MaasHesaplamaSnapshotService
     public const SEVERITY_BLOCKER = 'BLOCKER';
     public const SEVERITY_WARNING = 'WARNING';
     public const SEVERITY_INFO = 'INFO';
+
+    /** IC personel in the payroll set must carry a payroll-employer identity. */
+    public const BLOCKER_SGK_ISVEREN_MISSING = 'SGK_ISVEREN_MISSING';
 
     public const AUDIT_PREFLIGHT_BLOCKED = 'PREFLIGHT_BLOCKED';
     public const AUDIT_SNAPSHOT_CREATE = 'SNAPSHOT_CREATE';
@@ -329,17 +339,44 @@ class MaasHesaplamaSnapshotService
      */
     public static function resolvePersonnelSet(PDO $pdo, $subeId, $donemBaslangic, $donemBitis, $muhurId, array &$items)
     {
+        $orgLocationReady = PersonelOrgLocationSchema::isReady($pdo);
+        $hierarchyReady = OrganizasyonSchema::isSchemaReady($pdo);
+
+        $sgkSelect = $orgLocationReady
+            ? ', p.sgk_isveren_id, si.kod AS sgk_isveren_kod, si.ad AS sgk_isveren_adi'
+            : ', NULL AS sgk_isveren_id, NULL AS sgk_isveren_kod, NULL AS sgk_isveren_adi';
+        $sirketSelect = ($orgLocationReady && $hierarchyReady)
+            ? ', si.sirket_id AS sgk_sirket_id, sk.kod AS sgk_sirket_kod, sk.ad AS sgk_sirket_adi'
+            : ', NULL AS sgk_sirket_id, NULL AS sgk_sirket_kod, NULL AS sgk_sirket_adi';
+        $branchSirketSelect = $hierarchyReady
+            ? ', sb.sirket_id AS sube_sirket_id, sbk.kod AS sube_sirket_kod, sbk.ad AS sube_sirket_adi'
+            : ', NULL AS sube_sirket_id, NULL AS sube_sirket_kod, NULL AS sube_sirket_adi';
+
+        $joins = '';
+        if ($orgLocationReady) {
+            $joins .= ' LEFT JOIN sgk_isverenler si ON si.id = p.sgk_isveren_id';
+            if ($hierarchyReady) {
+                $joins .= ' LEFT JOIN sirketler sk ON sk.id = si.sirket_id';
+            }
+        }
+        if ($hierarchyReady) {
+            $joins .= ' LEFT JOIN subeler sb ON sb.id = p.sube_id'
+                . ' LEFT JOIN sirketler sbk ON sbk.id = sb.sirket_id';
+        }
+
         $stmt = $pdo->prepare(
             "SELECT p.id, p.ad, p.soyad, p.tc_kimlik_no, p.sicil_no, p.ise_giris_tarihi,
                     p.aktif_durum, p.sube_id, p.departman_id, p.gorev_id, p.personel_tipi_id,
                     p.ucret_tipi_id, p.prim_kurali_id, p.bagli_amir_id,
-                    d.ad AS departman_adi, g.ad AS gorev_adi, pt.ad AS personel_tipi_adi,
+                    d.ad AS departman_adi, g.ad AS gorev_adi, pt.ad AS personel_tipi_adi
+                    {$sgkSelect}{$sirketSelect}{$branchSirketSelect},
                     (SELECT MIN(s.baslangic_tarihi) FROM surecler s
                       WHERE s.personel_id = p.id AND s.surec_turu = 'ISTEN_AYRILMA' AND s.state = 'AKTIF') AS cikis_tarihi
              FROM personeller p
              LEFT JOIN departmanlar d ON d.id = p.departman_id
              LEFT JOIN gorevler g ON g.id = p.gorev_id
              LEFT JOIN personel_tipleri pt ON pt.id = p.personel_tipi_id
+             {$joins}
              WHERE p.sube_id = :sube_id
              AND " . PersonelCalisanKapsamService::sqlIcPersonelPredicate($pdo, 'p') . "
              ORDER BY p.id ASC"
@@ -422,6 +459,36 @@ class MaasHesaplamaSnapshotService
                 ], $adSoyad);
             }
 
+            $sgkIsverenId = self::nullablePositiveInt($row['sgk_isveren_id'] ?? null);
+            // Payroll employer is personeller.sgk_isveren_id — never inferred from the branch default.
+            $sirketId = self::nullablePositiveInt($row['sgk_sirket_id'] ?? null);
+            if ($sirketId === null) {
+                $sirketId = self::nullablePositiveInt($row['sube_sirket_id'] ?? null);
+            }
+            $sirketKod = $row['sgk_sirket_kod'] ?? null;
+            $sirketAdi = $row['sgk_sirket_adi'] ?? null;
+            if ($sirketKod === null && $sirketAdi === null) {
+                $sirketKod = $row['sube_sirket_kod'] ?? null;
+                $sirketAdi = $row['sube_sirket_adi'] ?? null;
+            }
+
+            if ($orgLocationReady && $sgkIsverenId === null) {
+                $items[] = self::issue(
+                    self::SEVERITY_BLOCKER,
+                    self::BLOCKER_SGK_ISVEREN_MISSING,
+                    'IC personelin SGK isvereni eksik; bordro snapshot olusturulamaz.',
+                    'personel',
+                    $personelId,
+                    $personelId,
+                    [
+                        'sube_id' => (int) $row['sube_id'],
+                        'sicil_no' => $row['sicil_no'] !== null ? (string) $row['sicil_no'] : null,
+                    ],
+                    $adSoyad
+                );
+                continue;
+            }
+
             $personeller[$personelId] = [
                 'personel_id' => $personelId,
                 'ad' => (string) $row['ad'],
@@ -430,6 +497,12 @@ class MaasHesaplamaSnapshotService
                 'tc_kimlik_no_masked' => self::maskTc((string) $row['tc_kimlik_no']),
                 'sicil_no' => $row['sicil_no'] !== null ? (string) $row['sicil_no'] : null,
                 'sube_id' => (int) $row['sube_id'],
+                'sirket_id' => $sirketId,
+                'sirket_kod' => $sirketKod !== null ? (string) $sirketKod : null,
+                'sirket_adi' => $sirketAdi !== null ? (string) $sirketAdi : null,
+                'sgk_isveren_id' => $sgkIsverenId,
+                'sgk_isveren_kod' => $row['sgk_isveren_kod'] !== null ? (string) $row['sgk_isveren_kod'] : null,
+                'sgk_isveren_adi' => $row['sgk_isveren_adi'] !== null ? (string) $row['sgk_isveren_adi'] : null,
                 'departman_id' => $row['departman_id'] !== null ? (int) $row['departman_id'] : null,
                 'departman_adi' => $row['departman_adi'] !== null ? (string) $row['departman_adi'] : null,
                 'gorev_id' => $row['gorev_id'] !== null ? (int) $row['gorev_id'] : null,
@@ -2708,16 +2781,48 @@ class MaasHesaplamaSnapshotService
     {
         // Snapshot `ad` is the global display label at create time (SubeReadModel.tam_ad).
         // Historical rows are not backfilled; short name stays on subeler.ad only.
+        // Company + branch-default SGK are frozen as operational branch context only —
+        // they do not replace personeller.sgk_isveren_id on the personel payload.
         $mapped = SubeReadModel::findById($pdo, (int) $subeId);
         if ($mapped === null) {
-            return ['id' => (int) $subeId, 'kod' => null, 'ad' => null];
+            return [
+                'id' => (int) $subeId,
+                'kod' => null,
+                'ad' => null,
+                'sirket_id' => null,
+                'sirket_kod' => null,
+                'sirket_adi' => null,
+                'sgk_isveren_id' => null,
+                'sgk_isveren_kod' => null,
+                'sgk_isveren_adi' => null,
+            ];
         }
+
+        $sirket = is_array($mapped['sirket'] ?? null) ? $mapped['sirket'] : null;
+        $sgk = is_array($mapped['sgk_isveren'] ?? null) ? $mapped['sgk_isveren'] : null;
 
         return [
             'id' => (int) $mapped['id'],
             'kod' => (string) $mapped['kod'],
             'ad' => (string) $mapped['tam_ad'],
+            'sirket_id' => isset($sirket['id']) ? (int) $sirket['id'] : null,
+            'sirket_kod' => isset($sirket['kod']) && $sirket['kod'] !== null ? (string) $sirket['kod'] : null,
+            'sirket_adi' => isset($sirket['ad']) && $sirket['ad'] !== null ? (string) $sirket['ad'] : null,
+            'sgk_isveren_id' => isset($sgk['id']) ? (int) $sgk['id'] : null,
+            'sgk_isveren_kod' => isset($sgk['kod']) && $sgk['kod'] !== null ? (string) $sgk['kod'] : null,
+            'sgk_isveren_adi' => isset($sgk['ad']) && $sgk['ad'] !== null ? (string) $sgk['ad'] : null,
         ];
+    }
+
+    /** @param mixed $value */
+    private static function nullablePositiveInt($value)
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+        $parsed = (int) $value;
+
+        return $parsed > 0 ? $parsed : null;
     }
 
     public static function maskTc($tc)

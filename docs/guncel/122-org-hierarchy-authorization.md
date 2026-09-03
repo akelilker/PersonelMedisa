@@ -28,7 +28,9 @@ Functional branch-scoped: `IK_SORUMLUSU`, `MUHASEBE` via `user_subeler`.
 | Role | Empty required assignment |
 | --- | --- |
 | GENEL_YONETICI, SISTEM_YONETICISI | Unrestricted (global) |
-| SUBE_YONETICISI, IK_SORUMLUSU, MUHASEBE | **Deny** (fail-closed) |
+| IK_SORUMLUSU, IK_PERSONELI | Organisation-wide **read** from role (assignment may not narrow). `IK_PERSONELI` **write** narrowed by `user_sirketler` via `HrWriteScope` |
+| SUBE_YONETICISI | Requires `user_subeler`; empty → **Deny** |
+| MUHASEBE | Requires at least one of `user_subeler` / `user_sirketler` / `user_sgk_isverenler`; empty → **Deny** |
 | BOLUM_YONETICISI | Requires `user_bolumler`; empty → **Deny**. `user_subeler` is **not** a fallback |
 | BIRIM_AMIRI | Requires `user_birimler`; empty → **Deny**. `user_subeler` is **not** a fallback |
 | PERSONEL | Bound `personel_id` only |

@@ -133,5 +133,21 @@ export const ORGANIZATION_GLOBAL_READ_ROLES: UserRole[] = [
  */
 export const WRITE_COMPANY_SCOPED_ROLES: UserRole[] = ["IK_PERSONELI"];
 
+/**
+ * Sirket kapsami (user_sirketler) alabilen roller. SUBE_YONETICISI bilerek
+ * yok: sube muduru yalniz explicit user_subeler ile sinirli kalir.
+ */
+export const SIRKET_SCOPE_ELIGIBLE_ROLES: UserRole[] = [
+  "IK_SORUMLUSU",
+  "IK_PERSONELI",
+  "MUHASEBE"
+];
+
+/**
+ * SGK/bordro isveren kapsami (user_sgk_isverenler) alabilen roller.
+ * Fiziksel sube yetkisi uretmez; personeller.sgk_isveren_id eksenidir.
+ */
+export const SGK_SCOPE_ELIGIBLE_ROLES: UserRole[] = ["IK_SORUMLUSU", "MUHASEBE"];
+
 export const BOLUM_ASSIGNMENT_ROLES: UserRole[] = ["BOLUM_YONETICISI"];
 export const BIRIM_ASSIGNMENT_ROLES: UserRole[] = ["BIRIM_AMIRI"];

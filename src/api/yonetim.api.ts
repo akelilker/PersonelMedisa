@@ -182,6 +182,7 @@ function normalizeYonetimKullanici(data: unknown): YonetimKullanici {
     bolum_ids: readNumberArray(record.bolum_ids),
     birim_ids: readNumberArray(record.birim_ids),
     sirket_ids: readNumberArray(record.sirket_ids),
+    sgk_isveren_ids: readNumberArray(record.sgk_isveren_ids),
     varsayilan_sube_id: readNumber(record.varsayilan_sube_id) ?? null,
     durum: normalizeKayitDurumu(record.durum),
     notlar: readString(record.notlar)

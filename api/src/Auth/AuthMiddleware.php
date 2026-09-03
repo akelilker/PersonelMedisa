@@ -9,6 +9,7 @@ use Medisa\Api\Database\UserOrgAssignmentSchema;
 use Medisa\Api\Database\UsersSchema;
 use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
+use Medisa\Api\Scope\OrgScope;
 use PDO;
 
 class AuthMiddleware
@@ -80,13 +81,20 @@ class AuthMiddleware
         $sirketIds = UserOrgAssignmentSchema::loadUserSirketIds($pdo, $userId);
         $sgkIsverenIds = UserOrgAssignmentSchema::loadUserSgkIsverenIds($pdo, $userId);
         $rolCanonical = RolePermissions::normalizeRole((string) $row['rol']);
+        $rol = $rolCanonical !== '' ? $rolCanonical : (string) $row['rol'];
+        // Organisation-wide İK read is role-derived. Company grants feed write_sube_ids
+        // only (HrWriteScope); materialising them into sube_ids would poison legacy
+        // SubeScope::appendSubeFilter callers into a false company-narrowed read.
+        $visibilitySubeIds = OrgScope::isOrganizationGlobalRead(['rol' => $rol])
+            ? []
+            : self::resolveEffectiveSubeIds($pdo, $explicitSubeIds, $sirketIds);
         self::$user = [
             'id' => (int) $row['id'],
             'username' => (string) $row['username'],
             'ad_soyad' => (string) $row['ad_soyad'],
-            'rol' => $rolCanonical !== '' ? $rolCanonical : (string) $row['rol'],
+            'rol' => $rol,
             'durum' => (string) ($row['durum'] ?? ''),
-            'sube_ids' => self::resolveEffectiveSubeIds($pdo, $explicitSubeIds, $sirketIds),
+            'sube_ids' => $visibilitySubeIds,
             'explicit_sube_ids' => $explicitSubeIds,
             // Write reach of a company-write-scoped role: strictly the branches of
             // the granted companies, never the explicit branch grants, and

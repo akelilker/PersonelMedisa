@@ -77,12 +77,6 @@ class LoginController
         $birimIds = UserOrgAssignmentSchema::loadUserBirimIds($pdo, (int) $user['id']);
         $sirketIds = UserOrgAssignmentSchema::loadUserSirketIds($pdo, (int) $user['id']);
         $sgkIsverenIds = UserOrgAssignmentSchema::loadUserSgkIsverenIds($pdo, (int) $user['id']);
-        // Same union the request-time authorization owner computes, so the session
-        // the client caches and the scope the backend enforces cannot disagree.
-        $subeIds = self::unionSubeIds(
-            $explicitSubeIds,
-            UserOrgAssignmentSchema::resolveSubeIdsForSirketIds($pdo, $sirketIds)
-        );
         $rolRaw = (string) $user['rol'];
         $rol = RolePermissions::normalizeRole($rolRaw);
         if ($rol === '') {
@@ -92,6 +86,17 @@ class LoginController
                 'Kullanici rolu canonical modele cozulemedi. Manuel rol eslemesi gerekir.'
             );
         }
+
+        // Same visibility union AuthMiddleware computes for non-İK roles. İK keeps
+        // sube_ids empty in the session payload: read reach is role-derived and
+        // company grants must not appear as a narrowed branch list.
+        $ikGlobalRead = OrgScope::isOrganizationGlobalRead(['rol' => $rol]);
+        $subeIds = $ikGlobalRead
+            ? []
+            : self::unionSubeIds(
+                $explicitSubeIds,
+                UserOrgAssignmentSchema::resolveSubeIdsForSirketIds($pdo, $sirketIds)
+            );
 
         // PERSONEL self-service accounts: bound personel must be AKTIF (login fail-closed).
         // Management roles with optional personel_id binding keep login; SelfPersonelContext still denies /me.
@@ -113,7 +118,6 @@ class LoginController
         }
         // İK sees every branch by role, so its selector is the full list even
         // when legacy assignment rows exist — those may not narrow it.
-        $ikGlobalRead = OrgScope::isOrganizationGlobalRead(['rol' => $rol]);
         $subeList = self::loadSubeList(
             $pdo,
             $ikGlobalRead ? [] : $selectorSubeIds,

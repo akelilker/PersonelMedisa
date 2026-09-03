@@ -180,7 +180,19 @@ describe("İK organisation scope model", () => {
     expect(YONETIM).toContain("HrWriteScope::requiresWriteCompanySelection($rol) && count($sirketIds) === 0");
     expect(YONETIM).toContain("Bu rol icin en az bir islem sirketi secilmelidir.");
     // IK_SORUMLUSU no longer needs a branch grant it cannot be narrowed by.
-    expect(YONETIM).toContain("if ($rol === 'SUBE_YONETICISI' || $rol === 'MUHASEBE') {");
+    expect(YONETIM).toContain("if ($rol === 'SUBE_YONETICISI') {");
+    expect(YONETIM).toContain("if ($rol === 'MUHASEBE') {");
+    expect(YONETIM).toContain(
+      "Bu rol icin en az bir sube, sirket veya SGK kapsami zorunludur."
+    );
+  });
+
+  it("keeps organisation-wide İK visibility free of company-materialised sube_ids", () => {
+    expect(AUTH_MIDDLEWARE).toContain("OrgScope::isOrganizationGlobalRead(['rol' => $rol])");
+    expect(AUTH_MIDDLEWARE).toContain("? []");
+    expect(AUTH_MIDDLEWARE).toContain(
+      "'write_sube_ids' => UserOrgAssignmentSchema::resolveSubeIdsForSirketIds($pdo, $sirketIds),"
+    );
   });
 });
 

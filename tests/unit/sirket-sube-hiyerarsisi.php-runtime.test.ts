@@ -58,6 +58,10 @@ describe("company/branch hierarchy: read model, API contract, scope and import (
       "the company scope is never materialised into user_subeler rows",
       "a scoped role with no scope at all fails closed instead of matching every row",
       "an SGK scope filters on personeller.sgk_isveren_id, the payroll axis itself",
+      "a company-only MUHASEBE payload filters the resolved company branches",
+      "MUHASEBE may hold company and SGK grants without inventing a new role",
+      "company + explicit branch grants compose as a widening union",
+      "company scope never opens another company branch",
       // import / export
       "the canonical full name resolves to exactly one branch",
       "the bare short name stays ambiguous instead of silently picking one branch",

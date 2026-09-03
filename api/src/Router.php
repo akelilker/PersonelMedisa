@@ -469,6 +469,9 @@ class Router
         if ($path === '/referans/personel-tipleri' && $method === 'GET') {
             ReferansController::personelTipleri($this->request);
         }
+        if ($path === '/referans/sgk-isverenler' && $method === 'GET') {
+            ReferansController::sgkIsverenler($this->request);
+        }
         if ($path === '/referans/bagli-amirler' && $method === 'GET') {
             ReferansController::bagliAmirler($this->request);
         }

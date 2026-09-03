@@ -7,6 +7,7 @@ export type PersonelMissingFieldKey =
   | "telefon"
   | "ise_giris_tarihi"
   | "sube_id"
+  | "sgk_isveren_id"
   | "calisma_lokasyonu_id"
   | "bagli_amir_id"
   | "departman_id"
@@ -42,6 +43,7 @@ const VALID_KEYS = new Set<PersonelMissingFieldKey>([
   "telefon",
   "ise_giris_tarihi",
   "sube_id",
+  "sgk_isveren_id",
   "calisma_lokasyonu_id",
   "bagli_amir_id",
   "departman_id",
@@ -114,6 +116,15 @@ const PERSONEL_MISSING_FIELD_RULES: readonly PersonelMissingFieldRule[] = [
     editTarget: "genel",
     scopes: BOTH_SCOPES,
     isMissing: (personel) => !hasPositiveId(personel.sube_id)
+  },
+  {
+    key: "sgk_isveren_id",
+    label: "SGK İşveren",
+    category: "ISTIHDAM",
+    severity: "CRITICAL",
+    editTarget: "genel",
+    scopes: IC_ONLY,
+    isMissing: (personel) => !hasPositiveId(personel.sgk_isveren_id)
   },
   {
     key: "calisma_lokasyonu_id",

@@ -65,7 +65,7 @@ describe("kayit modal flow actions + field surface parity", () => {
     expect(formCss).not.toMatch(/\.form-input\s*\{[^}]*background:\s*var\(--bg-surface-elevated\)/s);
   });
 
-  it("populated references: 10/11 columns, natural bottom row, no spacer hacks", () => {
+  it("populated references: 10/12 columns, natural bottom row, no spacer hacks", () => {
     const kayitCss = read(KAYIT_CSS);
     const createFields = read(CREATE_FIELDS);
     assertNoSpacerHacks(kayitCss, createFields);
@@ -94,6 +94,7 @@ describe("kayit modal flow actions + field surface parity", () => {
     expect(rightNames).toEqual([
       "create-ise-giris",
       "create-sube",
+      "create-sgk-isveren",
       "create-bagli-amir",
       "create-departman",
       "create-bolum",

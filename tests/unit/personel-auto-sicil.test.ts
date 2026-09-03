@@ -28,6 +28,7 @@ const validForm = {
   acilDurumTelefon: "05329876543",
   iseGirisTarihi: "2026-08-12",
   subeId: "1",
+  sgkIsverenId: "1",
   departmanId: "3",
   gorevId: "1",
   personelTipiId: "1"

@@ -438,9 +438,22 @@ final class PersonelImportDryRunService
                 $hataKodlari[] = 'PERSONEL_IMPORT_SUBE_SCOPE_IHLALI';
             }
 
+            $payloadCandidate = is_array($fieldResult['payload'] ?? null) ? $fieldResult['payload'] : null;
+            if ($payloadCandidate !== null) {
+                try {
+                    PersonelSgkCompanyConsistency::assertCompatible(
+                        $pdo,
+                        $payloadCandidate['sgk_isveren_id'] ?? null,
+                        $payloadCandidate['sube_id'] ?? null
+                    );
+                } catch (PersonelValidationException $e) {
+                    $hataKodlari[] = $e->getCodeString();
+                }
+            }
+
             $hataKodlari = array_values(array_unique($hataKodlari));
             $isValid = count($hataKodlari) === 0;
-            $payload = is_array($fieldResult['payload'] ?? null) ? $fieldResult['payload'] : null;
+            $payload = $payloadCandidate;
             if ($isValid && $payload !== null) {
                 $gecerli++;
                 $aday++;

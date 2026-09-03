@@ -379,6 +379,23 @@ export function PersonelCreateFields({
           ) : (
             refMissingNote("Şube", true)
           )}
+          {form.calisanKapsami !== "DIS_KAYNAK" ? (
+            refs.sgkIsverenOptions.length > 0 ? (
+              <PersonelCreateSelect
+                label="SGK İşveren"
+                name="create-sgk-isveren"
+                value={form.sgkIsverenId}
+                onChange={(value) => setForm((prev) => ({ ...prev, sgkIsverenId: value }))}
+                required
+                placeholderOption={{ value: "", label: "Seçiniz" }}
+                options={toSelectOptions(refs.sgkIsverenOptions)}
+                isOpen={openSelectName === "create-sgk-isveren"}
+                onOpenChange={(isOpen) => setSelectOpen("create-sgk-isveren", isOpen)}
+              />
+            ) : (
+              refMissingNote("SGK işveren", true)
+            )
+          ) : null}
           {refs.bagliAmirOptions.length > 0 ? (
             <>
               <PersonelCreateSelect

@@ -144,6 +144,9 @@ final class PersonelOrganizasyonDegisikligiService
                     continue;
                 }
                 self::validateReference($pdo, $field, $after);
+                if ($field === 'sgk_isveren_id') {
+                    self::assertSgkCompanyCompatible($pdo, $after, self::normalizeFieldValue('sube_id', $current['sube_id'] ?? null));
+                }
                 $changes[] = $field;
                 $oldValues[$field] = $before;
                 $newValues[$field] = $after;
@@ -347,6 +350,22 @@ final class PersonelOrganizasyonDegisikligiService
         if (!$stmt->fetch(PDO::FETCH_ASSOC)) {
             throw OrganizasyonException::validation('Geçersiz referans: ' . $field, $field);
         }
+    }
+
+    /** @param mixed $sgkIsverenId @param mixed $subeId */
+    private static function assertSgkCompanyCompatible(PDO $pdo, $sgkIsverenId, $subeId): void
+    {
+        $result = PersonelSgkCompanyConsistency::evaluate($pdo, $sgkIsverenId, $subeId);
+        if ($result['ok']) {
+            return;
+        }
+
+        throw new OrganizasyonException(
+            409,
+            (string) $result['code'],
+            (string) $result['message'],
+            'sgk_isveren_id'
+        );
     }
 }
 

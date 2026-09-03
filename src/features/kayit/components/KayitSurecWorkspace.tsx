@@ -38,6 +38,7 @@ import {
   fetchPersonelTipiOptions,
   fetchPozisyonOptions,
   fetchPrimKuraliOptions,
+  fetchSgkIsverenOptions,
   fetchSurecTuruOptions,
   fetchUcretTipiOptions
 } from "../../../api/referans.api";
@@ -219,6 +220,7 @@ const EMPTY_REFS: PersonelReferenceBundle = {
   gorevOptions: [],
   pozisyonOptions: [],
   personelTipiOptions: [],
+  sgkIsverenOptions: [],
   bagliAmirOptions: [],
   ucretTipiOptions: [],
   primKuraliOptions: []
@@ -705,6 +707,7 @@ export function KayitSurecWorkspace({
         gorevOptions,
         pozisyonOptions,
         personelTipiOptions,
+        sgkIsverenOptions,
         bagliAmirOptions,
         ucretTipiOptions,
         primKuraliOptions,
@@ -718,6 +721,7 @@ export function KayitSurecWorkspace({
         fetchGorevOptions(),
         fetchPozisyonOptions(),
         fetchPersonelTipiOptions(),
+        fetchSgkIsverenOptions(),
         fetchBagliAmirOptions(),
         fetchUcretTipiOptions(),
         fetchPrimKuraliOptions(),
@@ -740,6 +744,7 @@ export function KayitSurecWorkspace({
         gorevOptions,
         pozisyonOptions,
         personelTipiOptions,
+        sgkIsverenOptions,
         bagliAmirOptions,
         ucretTipiOptions,
         primKuraliOptions

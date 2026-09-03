@@ -185,6 +185,15 @@ export async function fetchPersonelTipiOptions(): Promise<IdOption[]> {
   return normalizeIdOptions(response.data);
 }
 
+export async function fetchSgkIsverenOptions(): Promise<IdOption[]> {
+  try {
+    const response = await apiRequest<ApiResponse<unknown>>(endpoints.referans.sgkIsverenler);
+    return normalizeIdOptions(response.data);
+  } catch {
+    return [];
+  }
+}
+
 export async function fetchBagliAmirOptions(): Promise<IdOption[]> {
   const response = await apiRequest<ApiResponse<unknown>>(endpoints.referans.bagliAmirler);
   return normalizeIdOptions(response.data);

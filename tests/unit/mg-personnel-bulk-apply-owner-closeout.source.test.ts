@@ -71,14 +71,15 @@ describe("MG personnel bulk apply owner closeout sources", () => {
     expect(dryRun).toContain("preimage_aktif_durum");
   });
 
-  it("extends completeness owner for sube, lokasyon, yonetici and pozisyon", () => {
+  it("extends completeness owner for sube, lokasyon, yonetici, pozisyon and IC SGK", () => {
     const completeness = read("api/src/Services/Personel/PersonelCompletenessService.php");
     expect(completeness).toContain("'key' => 'sube_id'");
     expect(completeness).toContain("'key' => 'calisma_lokasyonu_id'");
     expect(completeness).toContain("'key' => 'bagli_amir_id'");
     expect(completeness).toContain("'key' => 'pozisyon_id'");
+    expect(completeness).toContain("'key' => 'sgk_isveren_id'");
     expect(completeness).toContain("pozisyon_id, 0) <= 0");
-    expect(completeness).toContain("DIS_KAYNAK records must retain a NULL payroll employer");
+    expect(completeness).toContain("SGK is IC-only (DIS_KAYNAK must keep NULL payroll employer)");
   });
 
   it("does not fabricate manager users and avoids TC in resolver paths", () => {

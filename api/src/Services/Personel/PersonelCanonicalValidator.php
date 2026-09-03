@@ -161,8 +161,19 @@ final class PersonelCanonicalValidator
             'prim_kurali_id' => $primKuraliId,
         ];
 
-        // Optional Pack5 org refs — key present means write intent (blank → NULL).
-        if (array_key_exists('sgk_isveren_id', $body)) {
+        // Pack5 org refs — IC AKTIF requires explicit SGK employer (no branch-default autofill).
+        if ($kapsam === PersonelCalisanKapsamService::IC_PERSONEL && $aktifDurum === 'AKTIF') {
+            PersonelSgkCompanyConsistency::assertRequiredForActiveIc(
+                $kapsam,
+                $aktifDurum,
+                array_key_exists('sgk_isveren_id', $body) ? $body['sgk_isveren_id'] : null
+            );
+            $payload['sgk_isveren_id'] = self::requirePositiveInt(
+                $body,
+                'sgk_isveren_id',
+                'Aktif IC personel icin SGK isvereni zorunludur.'
+            );
+        } elseif (array_key_exists('sgk_isveren_id', $body)) {
             $payload['sgk_isveren_id'] = self::optionalPositiveInt($body, 'sgk_isveren_id');
         }
         if (array_key_exists('calisma_lokasyonu_id', $body)) {
@@ -508,6 +519,11 @@ final class PersonelCanonicalValidator
             $code = 'PERSONEL_IMPORT_EKSIK_ALAN';
             if ($e->getCodeString() === PersonelCalisanKapsamService::ERROR_SGK_YASAK) {
                 $code = PersonelCalisanKapsamService::ERROR_SGK_YASAK;
+            } elseif ($e->getCodeString() === PersonelSgkCompanyConsistency::ERROR_REQUIRED) {
+                $code = PersonelSgkCompanyConsistency::ERROR_REQUIRED;
+            } elseif ($e->getCodeString() === PersonelSgkCompanyConsistency::ERROR_MISMATCH
+                || $e->getCodeString() === PersonelSgkCompanyConsistency::ERROR_HIERARCHY) {
+                $code = $e->getCodeString();
             } elseif ($e->getField() === 'tc_kimlik_no') {
                 $code = 'PERSONEL_IMPORT_GECERSIZ_TC';
             } elseif (in_array($e->getField(), ['dogum_tarihi', 'ise_giris_tarihi'], true)) {

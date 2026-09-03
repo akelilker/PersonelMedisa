@@ -206,7 +206,9 @@ export function buildCreatePersonelPayload(form: CreatePersonelFormState): Creat
     ...(parseOptionalPositiveInt(form.pozisyonId) !== undefined
       ? { pozisyon_id: parseOptionalPositiveInt(form.pozisyonId)! }
       : {}),
-    ...(isDisKaynak ? { sgk_isveren_id: null } : {}),
+    ...(isDisKaynak
+      ? { sgk_isveren_id: null }
+      : { sgk_isveren_id: parseRequiredPositiveInt(form.sgkIsverenId, "SGK İşveren") }),
     ...(!isDisKaynak && ucretTipiId !== undefined ? { ucret_tipi_id: ucretTipiId } : {}),
     ...(!isDisKaynak && primKuraliId !== undefined ? { prim_kurali_id: primKuraliId } : {}),
     ...(!isDisKaynak && maasTutari !== undefined ? { net_maas_tutari: maasTutari, maas_tutari: maasTutari } : {})

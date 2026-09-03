@@ -20,6 +20,7 @@ const completePersonel: Personel = {
   sicil_no: "P-001",
   ise_giris_tarihi: "2023-02-01",
   sube_id: 2,
+  sgk_isveren_id: 1,
   calisma_lokasyonu_id: 3,
   bagli_amir_id: 4,
   departman_id: 3,
@@ -55,6 +56,9 @@ describe("personel-missing-info", () => {
       "bolum_id",
       "birim_id"
     ]);
+    expect(getPersonelMissingFieldKeys({ ...completePersonel, sgk_isveren_id: null }).has("sgk_isveren_id")).toBe(
+      true
+    );
     expect(missing.every((field) => field.editTarget === "genel")).toBe(true);
     expect(missing.every((field) => field.severity === "CRITICAL")).toBe(true);
     expect(missing.find((field) => field.key === "telefon")?.category).toBe("ILETISIM");
@@ -92,6 +96,7 @@ describe("personel-missing-info", () => {
     expect(keys.has("tc_kimlik_no")).toBe(false);
     expect(keys.has("dogum_tarihi")).toBe(false);
     expect(keys.has("telefon")).toBe(false);
+    expect(keys.has("sgk_isveren_id")).toBe(false);
     expect(keys.size).toBe(0);
   });
 

@@ -124,7 +124,8 @@ class PersonellerController
         $missingPredicate = PersonelCompletenessService::sqlHasMissingPredicate(
             'p',
             PersonelOrgStructureSchema::hasPersonelScopeColumns($pdo),
-            PersonelCalisanKapsamSchema::isReady($pdo)
+            PersonelCalisanKapsamSchema::isReady($pdo),
+            PersonelOrgLocationSchema::isReady($pdo)
         );
         if ($eksikBilgiOnly) {
             $where[] = $missingPredicate;

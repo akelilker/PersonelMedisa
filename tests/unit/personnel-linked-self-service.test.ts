@@ -104,8 +104,10 @@ describe("personnel-linked self-service authorization", () => {
     expect(hook).toContain("personel_id");
     expect(route).toContain("hasUserPermission");
     expect(route).toContain("personel_id");
-    expect(menu).toContain('hasPermission("self_service.view")');
-    expect(menu).toContain("menu-self-service");
+    // Manager MainMenu must not surface self-service; /self stays route-gated.
+    expect(menu).not.toContain("menu-self-service");
+    expect(menu).not.toContain("self_service.view");
+    expect(menu).not.toMatch(/Öz Servis\s*\/\s*QR/i);
     expect(routes).toContain('requirePermission="self_service.view"');
     expect(routes).toContain('path="self"');
   });

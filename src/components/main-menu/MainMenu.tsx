@@ -27,13 +27,11 @@ export function MainMenu({ onKayitOpen }: MainMenuProps) {
   const canKayitSection = hasPermission("personeller.create") || hasPermission("surecler.create");
   const canViewPersoneller = hasAnyPermission(PERSONELLER_LIST_ANY);
   const canViewRaporlar = hasPermission(ROUTE_PERMISSION.raporlarPage);
-  const canSelfService = hasPermission("self_service.view");
 
   const { pathname } = location;
   const isKayitSurecActive = pathname.startsWith("/surecler");
   const isPersonelActive = pathname.startsWith("/personeller");
   const isRaporlarActive = pathname.startsWith("/raporlar");
-  const isSelfActive = pathname === "/self" || pathname.startsWith("/self/");
 
   const kayitDisabled = !canKayitSection;
   const personelDisabled = !canViewPersoneller;
@@ -100,20 +98,6 @@ export function MainMenu({ onKayitOpen }: MainMenuProps) {
         <span id={RAPORLAR_DISABLED_DESCRIPTION_ID} className="visually-hidden">
           {RAPORLAR_DISABLED_MESSAGE}
         </span>
-      ) : null}
-
-      {canSelfService ? (
-        <button
-          type="button"
-          className={`menu-btn${isSelfActive ? " is-active" : ""}`}
-          aria-current={isSelfActive ? "page" : undefined}
-          data-testid="menu-self-service"
-          onClick={() => {
-            navigate("/self");
-          }}
-        >
-          <div className="ttl">Öz Servis / QR</div>
-        </button>
       ) : null}
     </nav>
   );

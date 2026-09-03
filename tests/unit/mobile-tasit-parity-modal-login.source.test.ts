@@ -54,7 +54,7 @@ describe("mobile Taşıt parity modal/login source guards", () => {
     expect(hero).toMatch(/\.hero\.hero-with-session\s*\{[^}]*overflow:\s*visible/s);
   });
 
-  it("keeps login form in natural flow (no viewport-height centering)", () => {
+  it("keeps mobile login form in natural flow (no viewport-height centering)", () => {
     const auth = read("src/styles/modules/auth.css");
     expect(auth).toMatch(/\.auth-login\s*\{[^}]*justify-content:\s*flex-start/s);
     expect(auth).toMatch(/\.auth-login\s*\{[^}]*min-height:\s*0/s);
@@ -62,5 +62,17 @@ describe("mobile Taşıt parity modal/login source guards", () => {
     expect(auth).toMatch(
       /@media\s*\(max-width:\s*640px\)\s*\{[^}]*\.auth-login\s*\{[^}]*justify-content:\s*flex-start/s
     );
+  });
+
+  it("centers desktop login form within remaining panel body", () => {
+    const auth = read("src/styles/modules/auth.css");
+    expect(auth).toMatch(
+      /@media\s*\(min-width:\s*641px\)\s*\{[^}]*\.auth-login\s*\{[^}]*flex:\s*1\s+1\s+auto/s
+    );
+    expect(auth).toMatch(
+      /@media\s*\(min-width:\s*641px\)\s*\{[^}]*\.auth-login\s*\{[^}]*justify-content:\s*center/s
+    );
+    expect(auth).toMatch(/\.auth-login-stage\s*\{[^}]*justify-content:\s*center/s);
+    expect(auth).toMatch(/\.auth-login-form\s*\{[^}]*width:\s*min\(100%,\s*392px\)/s);
   });
 });

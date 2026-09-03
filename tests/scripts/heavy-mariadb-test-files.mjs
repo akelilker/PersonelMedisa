@@ -71,6 +71,7 @@ export const heavyMariaDbTestFiles = [
   "tests/unit/sirket-sube-hiyerarsisi.php-runtime.test.ts",
   "tests/unit/surecler-detail-update-cancel-mysql.php-runtime.test.ts",
   "tests/unit/test-fixture-personel-archive-mysql.php-runtime.test.ts",
+  "tests/unit/test-fixture-personel-purge-mysql.php-runtime.test.ts",
   "tests/unit/user-access-change-audit.php-runtime.test.ts",
   "tests/unit/zimmetler-create-list-mysql.php-runtime.test.ts"
 ];

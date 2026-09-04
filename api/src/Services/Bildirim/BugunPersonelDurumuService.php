@@ -13,8 +13,9 @@ use PDO;
 
 /**
  * IK / GENEL morning operations read model: branch → unit → person drill-down.
- * Attendance truth = exception-only gunluk_bildirimler (same as BirimAmiriGunlukDurumService).
- * No QR synthesis. Completions from gunluk_bildirim_tamamlamalari.
+ * Person state requires evidence: exception row, attendance/puantaj proof, or unit completion.
+ * No-open-row is NOT GELDI before completion. No QR synthesis.
+ * Completions from gunluk_bildirim_tamamlamalari.
  */
 class BugunPersonelDurumuService
 {
@@ -26,6 +27,9 @@ class BugunPersonelDurumuService
     public const COMPLETION_BEKLENIYOR = 'BEKLENIYOR';
     public const COMPLETION_SURESI_GECTI = 'SURESI_GECTI';
     public const COMPLETION_GEC_BILDIRILDI = 'GEC_BILDIRILDI';
+
+    /** Read-model-only: no persistence enum. */
+    public const DURUM_HENUZ_DEGERLENDIRILMEDI = 'HENUZ_DEGERLENDIRILMEDI';
 
     /** @var array<int, string> */
     private static $exceptionTurleri = [
@@ -64,12 +68,8 @@ class BugunPersonelDurumuService
                     'sube_id' => $subeId,
                     'sube_adi' => self::resolveSubeAdi($pdo, $subeId, isset($row['sube_ad']) ? (string) $row['sube_ad'] : ''),
                     'units' => [],
-                    'personeller' => [],
                 ];
             }
-
-            $person = self::mapPersonelRow($row);
-            $branches[$subeId]['personeller'][] = $person;
 
             $birimId = (int) ($row['birim_id'] ?? 0);
             $unitKey = $birimId > 0 ? (string) $birimId : 'none';
@@ -81,13 +81,13 @@ class BugunPersonelDurumuService
                         : 'Birimsiz',
                     'bolum_id' => isset($row['bolum_id']) && $row['bolum_id'] !== null ? (int) $row['bolum_id'] : null,
                     'bolum_adi' => isset($row['bolum_adi']) ? trim((string) $row['bolum_adi']) : null,
-                    'personeller' => [],
+                    'rows' => [],
                     'amir_user_ids' => $birimId > 0 && isset($amirByBirim[$birimId])
                         ? $amirByBirim[$birimId]
                         : self::fallbackAmirIdsFromRows($rows, $subeId, $birimId),
                 ];
             }
-            $branches[$subeId]['units'][$unitKey]['personeller'][] = $person;
+            $branches[$subeId]['units'][$unitKey]['rows'][] = $row;
         }
 
         $branchSummaries = [];
@@ -102,15 +102,6 @@ class BugunPersonelDurumuService
 
             foreach ($branch['units'] as $unit) {
                 $unitsTotal++;
-                $counts = self::buildStatusCounts($unit['personeller']);
-                foreach ($counts as $key => $value) {
-                    if ($key === 'toplam') {
-                        $branchCounts['toplam'] += $value;
-                    } else {
-                        $branchCounts[$key] += $value;
-                    }
-                }
-
                 $completion = self::resolveUnitCompletion(
                     (int) $branch['sube_id'],
                     isset($unit['amir_user_ids']) && is_array($unit['amir_user_ids']) ? $unit['amir_user_ids'] : [],
@@ -124,6 +115,19 @@ class BugunPersonelDurumuService
                     $incompleteUnitsAttention++;
                 }
 
+                $personeller = [];
+                foreach ($unit['rows'] as $rawRow) {
+                    $personeller[] = self::mapPersonelRow($rawRow, (bool) $completion['tamamlandi_mi']);
+                }
+                $counts = self::buildStatusCounts($personeller);
+                foreach ($counts as $key => $value) {
+                    if ($key === 'toplam') {
+                        $branchCounts['toplam'] += $value;
+                    } else {
+                        $branchCounts[$key] += $value;
+                    }
+                }
+
                 $unitSummaries[] = [
                     'birim_id' => $unit['birim_id'],
                     'birim_adi' => $unit['birim_adi'] !== '' ? $unit['birim_adi'] : 'Birim',
@@ -131,7 +135,7 @@ class BugunPersonelDurumuService
                     'bolum_adi' => $unit['bolum_adi'],
                     'counts' => $counts,
                     'bildirim' => $completion,
-                    'personeller' => $unit['personeller'],
+                    'personeller' => $personeller,
                 ];
             }
 
@@ -171,7 +175,44 @@ class BugunPersonelDurumuService
     }
 
     /**
+     * Exception row → that status.
+     * Else attendance giris proof → GELDI / GEC_GELDI by 08:30.
+     * Else unit completion (exception-only implicit present) → GELDI.
+     * Else → HENUZ_DEGERLENDIRILMEDI (never auto-GELMEDI).
+     *
      * @param string|null $bildirimTuru
+     * @param string|null $attendanceGirisSaati
+     * @param bool $unitCompleted
+     * @param int|null $storedDakika
+     */
+    public static function resolvePersonDurum(
+        $bildirimTuru,
+        $attendanceGirisSaati = null,
+        $unitCompleted = false,
+        $storedDakika = null
+    ) {
+        $tur = strtoupper(trim((string) $bildirimTuru));
+        if (in_array($tur, self::$exceptionTurleri, true)) {
+            return $tur;
+        }
+
+        $giris = self::nullableString($attendanceGirisSaati);
+        if ($giris !== null) {
+            $late = self::resolveLateMinutes($giris, $storedDakika);
+
+            return ($late !== null && $late > 0) ? 'GEC_GELDI' : 'GELDI';
+        }
+
+        if ($unitCompleted) {
+            return 'GELDI';
+        }
+
+        return self::DURUM_HENUZ_DEGERLENDIRILMEDI;
+    }
+
+    /**
+     * @param string|null $bildirimTuru
+     * @deprecated Prefer resolvePersonDurum — kept for exception extraction only.
      */
     public static function deriveDurum($bildirimTuru)
     {
@@ -180,7 +221,26 @@ class BugunPersonelDurumuService
             return $tur;
         }
 
-        return 'GELDI';
+        return self::DURUM_HENUZ_DEGERLENDIRILMEDI;
+    }
+
+    /**
+     * Count invariant helper for tests / callers.
+     *
+     * @param array<string, int> $counts
+     */
+    public static function countsSatisfyInvariant(array $counts)
+    {
+        $sum = (int) ($counts['geldi'] ?? 0)
+            + (int) ($counts['gec_geldi'] ?? 0)
+            + (int) ($counts['gelmedi'] ?? 0)
+            + (int) ($counts['izinli'] ?? 0)
+            + (int) ($counts['raporlu'] ?? 0)
+            + (int) ($counts['gorevde'] ?? 0)
+            + (int) ($counts['erken_cikti'] ?? 0)
+            + (int) ($counts['henuz_degerlendirilmedi'] ?? 0);
+
+        return $sum === (int) ($counts['toplam'] ?? 0);
     }
 
     /**
@@ -565,19 +625,31 @@ class BugunPersonelDurumuService
 
     /**
      * @param array<string, mixed> $row
+     * @param bool $unitCompleted
      * @return array<string, mixed>
      */
-    private static function mapPersonelRow(array $row)
+    private static function mapPersonelRow(array $row, $unitCompleted = false)
     {
-        $durum = self::deriveDurum(isset($row['bildirim_turu']) ? $row['bildirim_turu'] : null);
         $dakika = self::nullableInt(isset($row['dakika']) ? $row['dakika'] : null);
         $puantajGec = self::nullableInt(isset($row['puantaj_gec']) ? $row['puantaj_gec'] : null);
         $puantajErken = self::nullableInt(isset($row['puantaj_erken']) ? $row['puantaj_erken'] : null);
 
-        $giris = self::nullableString(isset($row['baslangic_saati']) ? $row['baslangic_saati'] : null);
-        if ($giris === null) {
-            $giris = self::nullableString(isset($row['puantaj_giris']) ? $row['puantaj_giris'] : null);
-        }
+        $exceptionTur = isset($row['bildirim_turu']) ? $row['bildirim_turu'] : null;
+        $exceptionGiris = self::nullableString(isset($row['baslangic_saati']) ? $row['baslangic_saati'] : null);
+        $puantajGiris = self::nullableString(isset($row['puantaj_giris']) ? $row['puantaj_giris'] : null);
+
+        // Attendance proof for present/late when no exception row exists.
+        $attendanceGiris = $puantajGiris;
+        $storedForLate = $dakika !== null && $dakika > 0 ? $dakika : $puantajGec;
+
+        $durum = self::resolvePersonDurum(
+            $exceptionTur,
+            $attendanceGiris,
+            (bool) $unitCompleted,
+            $storedForLate
+        );
+
+        $giris = $exceptionGiris !== null ? $exceptionGiris : $puantajGiris;
         $cikis = self::nullableString(isset($row['bitis_saati']) ? $row['bitis_saati'] : null);
         if ($cikis === null) {
             $cikis = self::nullableString(isset($row['puantaj_cikis']) ? $row['puantaj_cikis'] : null);
@@ -586,7 +658,7 @@ class BugunPersonelDurumuService
         $gec = null;
         $erken = null;
         if ($durum === 'GEC_GELDI') {
-            $gec = self::resolveLateMinutes($giris, $dakika !== null && $dakika > 0 ? $dakika : $puantajGec);
+            $gec = self::resolveLateMinutes($giris, $storedForLate);
         } elseif ($durum === 'ERKEN_CIKTI') {
             $erken = $dakika !== null && $dakika > 0 ? $dakika : $puantajErken;
             if ($erken !== null && $erken <= 0) {
@@ -658,6 +730,9 @@ class BugunPersonelDurumuService
         if ($durum === 'GELDI') {
             return $giris !== null ? (string) $giris : 'Geldi';
         }
+        if ($durum === self::DURUM_HENUZ_DEGERLENDIRILMEDI) {
+            return 'Henüz değerlendirilmedi';
+        }
 
         return self::durumLabel($durum);
     }
@@ -665,6 +740,9 @@ class BugunPersonelDurumuService
     private static function statusGroup($durum)
     {
         $durum = strtoupper(trim((string) $durum));
+        if ($durum === self::DURUM_HENUZ_DEGERLENDIRILMEDI) {
+            return 'PENDING';
+        }
         if (in_array($durum, ['IZINLI', 'RAPORLU', 'GOREVDE'], true)) {
             return 'PLANNED';
         }
@@ -679,6 +757,9 @@ class BugunPersonelDurumuService
     }
 
     /**
+     * Exclusive primary-state buckets (ERKEN_CIKTI is its own primary exception; not double-counted with GELDI).
+     * DIGER folds into geldi display bucket (no dedicated morning key).
+     *
      * @param array<int, array<string, mixed>> $personeller
      * @return array<string, int>
      */
@@ -700,8 +781,12 @@ class BugunPersonelDurumuService
                 $counts['gorevde']++;
             } elseif ($durum === 'ERKEN_CIKTI') {
                 $counts['erken_cikti']++;
-            } else {
+            } elseif ($durum === self::DURUM_HENUZ_DEGERLENDIRILMEDI) {
+                $counts['henuz_degerlendirilmedi']++;
+            } elseif ($durum === 'GELDI' || $durum === 'DIGER') {
                 $counts['geldi']++;
+            } else {
+                $counts['henuz_degerlendirilmedi']++;
             }
         }
 
@@ -720,6 +805,7 @@ class BugunPersonelDurumuService
             'raporlu' => 0,
             'gorevde' => 0,
             'erken_cikti' => 0,
+            'henuz_degerlendirilmedi' => 0,
         ];
     }
 
@@ -734,6 +820,7 @@ class BugunPersonelDurumuService
             'RAPORLU' => 'Raporlu',
             'GOREVDE' => 'Görevde',
             'DIGER' => 'Diğer',
+            self::DURUM_HENUZ_DEGERLENDIRILMEDI => 'Henüz Değerlendirilmedi',
         ];
         $key = strtoupper(trim((string) $durum));
 

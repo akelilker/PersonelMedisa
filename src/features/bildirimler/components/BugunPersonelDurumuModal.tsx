@@ -29,7 +29,9 @@ type BugunPersonelDurumuModalProps = {
 function countToneClass(key: BugunStatusKey, value: number): string {
   if (value <= 0) return "";
   if (key === "gelmedi" || key === "gec_geldi") return " is-attention";
-  if (key === "izinli" || key === "raporlu" || key === "gorevde") return " is-planned";
+  if (key === "izinli" || key === "raporlu" || key === "gorevde" || key === "henuz_degerlendirilmedi") {
+    return " is-planned";
+  }
   return "";
 }
 

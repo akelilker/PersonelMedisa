@@ -4,6 +4,8 @@ import { describe, expect, it } from "vitest";
 import { hasRolePermission } from "../../src/lib/authorization/role-permissions";
 import {
   BUGUN_STATUS_TO_DURUM,
+  countsSatisfyInvariant,
+  emptyStatusCounts,
   filterPersonsByStatus,
   formatCompletionGlyph
 } from "../../src/lib/bildirim/bugun-personel-durumu";
@@ -40,19 +42,22 @@ describe("bugun personel durumu owners", () => {
     expect(service).toContain("class BugunPersonelDurumuService");
     expect(service).toContain("WORKDAY_START = '08:30'");
     expect(service).toContain("ON_TIME_DEADLINE = '09:30'");
+    expect(service).toContain("HENUZ_DEGERLENDIRILMEDI");
+    expect(service).toContain("resolvePersonDurum");
     expect(shell).toContain("bugun-personel-durumu-entry");
     expect(shell).toContain("BugunPersonelDurumuModal");
   });
 
-  it("does not invent QR attendance and reuses exception-only derive", () => {
+  it("does not invent QR attendance; evidence gates present before GELDI", () => {
     const service = read("api/src/Services/Bildirim/BugunPersonelDurumuService.php");
-    expect(service).toContain("exception-only");
     expect(service).not.toContain("qr_attendance");
     expect(service).toContain("gunluk_bildirimler");
     expect(service).toContain("gunluk_bildirim_tamamlamalari");
+    expect(service).toContain("gunluk_puantaj");
+    expect(service).toContain("No-open-row is NOT GELDI");
   });
 
-  it("filters person list by status key", () => {
+  it("filters person list by status key including henuz_degerlendirilmedi", () => {
     const people: BugunPersonelDurumuPerson[] = [
       {
         personel_id: 1,
@@ -71,22 +76,48 @@ describe("bugun personel durumu owners", () => {
       {
         personel_id: 2,
         ad_soyad: "B",
-        durum: "GELMEDI",
-        durum_label: "Gelmedi",
+        durum: "HENUZ_DEGERLENDIRILMEDI",
+        durum_label: "Henüz Değerlendirilmedi",
         gec_kalma_dakika: null,
         erken_cikis_dakika: null,
         giris_saati: null,
         cikis_saati: null,
         aciklama: null,
         alt_tur: null,
-        detail_line: "Giriş yok · Açıklama yok",
-        group: "ATTENTION"
+        detail_line: "Henüz değerlendirilmedi",
+        group: "PENDING"
       }
     ];
     expect(filterPersonsByStatus(people, "gec_geldi")).toHaveLength(1);
-    expect(filterPersonsByStatus(people, "gelmedi")[0]?.personel_id).toBe(2);
+    expect(filterPersonsByStatus(people, "henuz_degerlendirilmedi")[0]?.personel_id).toBe(2);
     expect(BUGUN_STATUS_TO_DURUM.izinli).toBe("IZINLI");
+    expect(BUGUN_STATUS_TO_DURUM.henuz_degerlendirilmedi).toBe("HENUZ_DEGERLENDIRILMEDI");
     expect(formatCompletionGlyph("SURESI_GECTI")).toBe("⚠");
+  });
+
+  it("enforces branch/unit count invariant including henuz_degerlendirilmedi", () => {
+    const counts = emptyStatusCounts();
+    counts.toplam = 5;
+    counts.geldi = 1;
+    counts.gec_geldi = 1;
+    counts.gelmedi = 1;
+    counts.izinli = 1;
+    counts.henuz_degerlendirilmedi = 1;
+    expect(countsSatisfyInvariant(counts)).toBe(true);
+    counts.geldi = 2;
+    expect(countsSatisfyInvariant(counts)).toBe(false);
+  });
+
+  it("documents correction history schema gap (no old→new owner without migration)", () => {
+    const controller = read("api/src/Controllers/BildirimlerController.php");
+    const migration = read("api/migrations/005_gunluk_bildirimler.sql");
+    expect(controller).toContain("bildirim_turu = :bildirim_turu");
+    expect(controller).toContain("correction_reason");
+    expect(migration).toContain("correction_reason");
+    expect(migration).toContain("correction_requested_by");
+    expect(migration).not.toContain("onceki_durum");
+    expect(migration).not.toContain("eski_bildirim_turu");
+    expect(migration).not.toMatch(/gunluk_bildirim.*history|bildirim_gecmis/i);
   });
 
   it("keeps PR #251 header summary and PR #254 birim amiri home owners intact", () => {
@@ -94,6 +125,7 @@ describe("bugun personel durumu owners", () => {
     const shell = read("src/components/shell/ShellHeaderActions.tsx");
     const home = read("src/features/self-service/pages/BirimAmiriOperationalHomePage.tsx");
     const routes = read("src/app/routes.tsx");
+    const birimService = read("api/src/Services/Bildirim/BirimAmiriGunlukDurumService.php");
 
     expect(header).toContain("formatHeaderGunlukTamamlamaCopy");
     expect(shell).toContain("useBildirimlerHeaderPreview");
@@ -101,6 +133,8 @@ describe("bugun personel durumu owners", () => {
     expect(home).toContain("BirimAmiriOperationalHomePage");
     expect(routes).toContain('session?.user.rol === "BIRIM_AMIRI"');
     expect(routes).toContain("BirimAmiriOperationalHomePage");
+    // PR #254 exception-only GELDI for birim amiri home is intentionally unchanged
+    expect(birimService).toContain("no open daily notification → GELDI");
   });
 
   it("adds payroll close gate without migration", () => {

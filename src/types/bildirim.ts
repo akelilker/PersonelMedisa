@@ -171,6 +171,7 @@ export type BugunPersonelDurumuStatusCounts = {
   raporlu: number;
   gorevde: number;
   erken_cikti: number;
+  henuz_degerlendirilmedi: number;
 };
 
 export type BugunPersonelDurumuPerson = {

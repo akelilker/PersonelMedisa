@@ -126,8 +126,8 @@
 
 .bugun-personel-stat.is-attention,
 .bugun-personel-stat-btn.is-attention {
-  color: #ffb4b4;
-  border-left: 2px solid #c40016;
+  color: var(--danger);
+  border-left: 2px solid var(--brand-red);
 }
 
 .bugun-personel-stat.is-planned,
@@ -190,7 +190,7 @@
 
 @media (max-width: 640px) {
   .modal-body--bugun-personel {
-    padding: 10px 8px calc(14px + env(safe-area-inset-bottom, 0px));
+    padding: 10px 8px 14px;
   }
 
   .bugun-personel-header-badge {

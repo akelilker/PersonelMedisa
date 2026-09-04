@@ -11,7 +11,8 @@ export const BUGUN_STATUS_KEYS = [
   "izinli",
   "raporlu",
   "gorevde",
-  "erken_cikti"
+  "erken_cikti",
+  "henuz_degerlendirilmedi"
 ] as const;
 
 export type BugunStatusKey = (typeof BUGUN_STATUS_KEYS)[number];
@@ -23,7 +24,8 @@ export const BUGUN_STATUS_TO_DURUM: Record<BugunStatusKey, string> = {
   izinli: "IZINLI",
   raporlu: "RAPORLU",
   gorevde: "GOREVDE",
-  erken_cikti: "ERKEN_CIKTI"
+  erken_cikti: "ERKEN_CIKTI",
+  henuz_degerlendirilmedi: "HENUZ_DEGERLENDIRILMEDI"
 };
 
 export const BUGUN_STATUS_LABEL: Record<BugunStatusKey, string> = {
@@ -33,7 +35,8 @@ export const BUGUN_STATUS_LABEL: Record<BugunStatusKey, string> = {
   izinli: "İzinli",
   raporlu: "Raporlu",
   gorevde: "Görevde",
-  erken_cikti: "Erken çıktı"
+  erken_cikti: "Erken çıktı",
+  henuz_degerlendirilmedi: "Henüz değerlendirilmedi"
 };
 
 export function filterPersonsByStatus(
@@ -61,8 +64,22 @@ export function emptyStatusCounts(): BugunPersonelDurumuStatusCounts {
     izinli: 0,
     raporlu: 0,
     gorevde: 0,
-    erken_cikti: 0
+    erken_cikti: 0,
+    henuz_degerlendirilmedi: 0
   };
+}
+
+export function countsSatisfyInvariant(counts: BugunPersonelDurumuStatusCounts): boolean {
+  const sum =
+    counts.geldi +
+    counts.gec_geldi +
+    counts.gelmedi +
+    counts.izinli +
+    counts.raporlu +
+    counts.gorevde +
+    counts.erken_cikti +
+    counts.henuz_degerlendirilmedi;
+  return sum === counts.toplam;
 }
 
 export function summarizeAttentionFromPayload(payload: BugunPersonelDurumu): number {

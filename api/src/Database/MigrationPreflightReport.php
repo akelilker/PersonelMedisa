@@ -28,7 +28,7 @@ final class MigrationPreflightReport
     public const SCHEMA_VERSION = '1';
 
     /** Expected production ledger tip before this round's first migration. */
-    public const EXPECTED_APPLIED_TIP = '083';
+    public const EXPECTED_APPLIED_TIP = '084';
 
     /**
      * The migrations this round authorizes, in apply order. Each one is a
@@ -38,14 +38,14 @@ final class MigrationPreflightReport
      * migration that was withdrawn as business-model wrong, so names are pinned
      * next to versions here.
      *
-     * This round is the daily attendance completion header-summary owner.
-     * Production is expected at tip 083; only 084 is pending in this round.
-     * 084 adds columns (no new audit table).
+     * This round is the daily notification correction audit owner.
+     * Production is expected at tip 084; only 085 is pending in this round.
+     * 085 creates append-only gunluk_bildirim_duzeltme_auditleri.
      *
      * @var array<string, string>
      */
     public const ROUND_MIGRATIONS = [
-        '084' => '084_gunluk_bildirim_tamamlama_header_summary.sql',
+        '085' => '085_gunluk_bildirim_duzeltme_auditleri.sql',
     ];
 
     /** Withdrawn 079. Must not appear anywhere in the canonical source. */
@@ -64,13 +64,14 @@ final class MigrationPreflightReport
 
     /**
      * Append-only audit tables this round creates. Absent is the preimage.
-     * 084 is additive columns only — no new audit table.
      */
     private const ROUND_AUDIT_TABLES = [
+        'gunluk_bildirim_duzeltme_auditleri',
     ];
 
     /**
-     * Audit owners the completed 083 round already delivered.
+     * Audit owners the completed 083/084 rounds already delivered.
+     * 084 added columns only — no new audit table.
      */
     private const PREDECESSOR_AUDIT_TABLES = [
         'personel_sube_degisiklik_auditleri',
@@ -482,7 +483,7 @@ final class MigrationPreflightReport
         }
         if ($pendingVersions === []) {
             // Nothing left to authorize; a further request would re-apply. The
-            // healthy end state is tip 084 exactly; an empty pending set on any
+            // healthy end state is tip 085 exactly; an empty pending set on any
             // other tip means the chain is not the one this gate authorizes.
             $blockers[] = $ledger['ready'] && $ledger['applied_tip'] === $roundTip
                 ? 'ROUND_ALREADY_COMPLETE'

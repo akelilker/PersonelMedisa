@@ -12,6 +12,7 @@ import {
   fetchPozisyonOptions,
   fetchPrimKuraliOptions,
   fetchSgkIsverenOptions,
+  fetchCalismaLokasyonuOptions,
   fetchUcretTipiOptions
 } from "../api/referans.api";
 import { createSurec, fetchSureclerList } from "../api/surecler.api";
@@ -434,6 +435,7 @@ function usePersonelDetailEdit(
         pozisyonOptions: [],
         personelTipiOptions: [],
         sgkIsverenOptions: [],
+        calismaLokasyonuOptions: [],
         bagliAmirOptions: [],
         ucretTipiOptions: [],
         primKuraliOptions: []
@@ -469,6 +471,7 @@ function usePersonelDetailEdit(
               pozisyonOptions,
               personelTipiOptions,
               sgkIsverenOptions,
+              calismaLokasyonuOptions,
               bagliAmirOptions,
               ucretTipiOptions,
               primKuraliOptions
@@ -480,6 +483,7 @@ function usePersonelDetailEdit(
               fetchPozisyonOptions(),
               fetchPersonelTipiOptions(),
               fetchSgkIsverenOptions(),
+              fetchCalismaLokasyonuOptions(),
               fetchBagliAmirOptions(),
               fetchUcretTipiOptions(),
               fetchPrimKuraliOptions()
@@ -492,6 +496,7 @@ function usePersonelDetailEdit(
               pozisyonOptions,
               personelTipiOptions,
               sgkIsverenOptions,
+              calismaLokasyonuOptions,
               bagliAmirOptions,
               ucretTipiOptions,
               primKuraliOptions
@@ -632,14 +637,11 @@ function usePersonelDetailEdit(
       }
 
       const body = buildPersonelUpdatePayload(editForm, hasLifecycleDiff, {
-        includeOrgStructureFields:
-          personelRefs.bolumOptions.length > 0 ||
-          personelRefs.birimOptions.length > 0 ||
-          personelRefs.pozisyonOptions.length > 0,
+        includeBagliAmir: false,
+        includeWageFields: false,
         currentPersonel: personel
       });
 
-      const lifecycleSnap = snapshotFromLifecycleForm(pickLifecycleFormFields(editForm));
       const optimistic: Personel = {
         ...personel,
         ad: body.ad ?? personel.ad,
@@ -647,7 +649,7 @@ function usePersonelDetailEdit(
         telefon: body.telefon ?? personel.telefon,
         sicil_no: body.sicil_no ?? personel.sicil_no,
         ise_giris_tarihi: body.ise_giris_tarihi ?? personel.ise_giris_tarihi,
-        ...lifecycleSnapshotToPersonelPatch(lifecycleSnap)
+        prim_kurali_id: body.prim_kurali_id !== undefined ? body.prim_kurali_id : personel.prim_kurali_id
       };
 
       commitPersonelUpdateToCaches(optimistic);

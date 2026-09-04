@@ -39,7 +39,8 @@ export const endpoints = {
     exportXlsx: "/personeller/export.xlsx",
     lifecycleBulkDryRun: "/personeller/lifecycle-bulk/dry-run",
     lifecycleBulkApply: "/personeller/lifecycle-bulk/apply",
-    organizasyonDegisikligi: (id: number | string) => `/personeller/${id}/organizasyon-degisikligi`
+    organizasyonDegisikligi: (id: number | string) => `/personeller/${id}/organizasyon-degisikligi`,
+    kaliciSubeDegisikligi: (id: number | string) => `/personeller/${id}/kalici-sube-degisikligi`
   },
   personelUcretleri: {
     list: (personelId: number | string) => `/personeller/${personelId}/ucretler`,
@@ -292,6 +293,7 @@ export const endpoints = {
     pozisyonlar: "/referans/pozisyonlar",
     personelTipleri: "/referans/personel-tipleri",
     sgkIsverenler: "/referans/sgk-isverenler",
+    calismaLokasyonlari: "/referans/calisma-lokasyonlari",
     bagliAmirler: "/referans/bagli-amirler",
     bildirimTurleri: "/referans/bildirim-turleri",
     surecTurleri: "/referans/surec-turleri",

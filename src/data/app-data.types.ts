@@ -33,6 +33,7 @@ export type PersonelReferenceBundle = {
   pozisyonOptions: IdOption[];
   personelTipiOptions: IdOption[];
   sgkIsverenOptions: IdOption[];
+  calismaLokasyonuOptions: IdOption[];
   bagliAmirOptions: IdOption[];
   ucretTipiOptions: IdOption[];
   primKuraliOptions: IdOption[];

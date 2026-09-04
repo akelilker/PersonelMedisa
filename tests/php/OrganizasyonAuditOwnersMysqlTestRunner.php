@@ -284,8 +284,8 @@ try {
     foreach ([
         ['id' => 3, 'rol' => 'BOLUM_YONETICISI'],
         ['id' => 4, 'rol' => 'MUHASEBE'],
-        ['id' => 5, 'rol' => 'IK_SORUMLUSU'],
         ['id' => 5, 'rol' => 'PERSONEL'],
+        ['id' => 5, 'rol' => 'BIRIM_AMIRI'],
     ] as $denied) {
         $failure = auditFailure(function () use ($pdo, $denied, $movePayload) {
             PersonelKaliciSubeDegisikligiService::apply(
@@ -466,6 +466,25 @@ try {
     auditAssert(
         (int) auditScalar($pdo, 'SELECT COUNT(*) FROM personel_sube_degisiklik_auditleri') === 1,
         'the audit row survived both attempts'
+    );
+
+    // Reset and prove IK_SORUMLUSU can permanently move (product decision).
+    $pdo->exec('UPDATE personeller SET sube_id = 1 WHERE id = 100');
+    $ik = ['id' => 5, 'rol' => 'IK_SORUMLUSU'];
+    $ikResult = PersonelKaliciSubeDegisikligiService::apply(
+        $pdo,
+        $ik,
+        100,
+        $movePayload,
+        auditContextFor(5, 'ik-move-1')
+    );
+    auditAssert(
+        $ikResult['yeni_sube_id'] === 2 && $ikResult['onceki_sube_id'] === 1,
+        'IK_SORUMLUSU authorised permanent branch move succeeds'
+    );
+    auditAssert(
+        (int) auditScalar($pdo, 'SELECT sube_id FROM personeller WHERE id = 100') === 2,
+        'IK_SORUMLUSU move persisted sube_id'
     );
 
     // =====================================================================

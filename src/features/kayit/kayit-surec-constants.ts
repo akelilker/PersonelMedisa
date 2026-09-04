@@ -37,14 +37,24 @@ export type PuantajSubdomainId =
   | "fazla-mesai"
   | DevamsizlikSubId;
 
-export type PozisyonFormState = {
+export type OrganizasyonFormState = {
   departmanId: string;
+  bolumId: string;
+  birimId: string;
   gorevId: string;
+  pozisyonId: string;
   bagliAmirId: string;
   personelTipiId: string;
-  effectiveDate: string;
+  calismaLokasyonuId: string;
+  sgkIsverenId: string;
+  degisiklikTarihi: string;
+  degisiklikNedeni: "" | "TERFI" | "GOREV_DEGISTI" | "YAPILANDIRMA";
   aciklama: string;
+  /** @deprecated Use degisiklikTarihi */
+  effectiveDate: string;
 };
+
+export type PozisyonFormState = OrganizasyonFormState;
 
 type DevamsizlikSubCard = {
   id: DevamsizlikSubId;
@@ -104,7 +114,7 @@ export const PERSONEL_SUREC_TABS: Array<{ id: PersonelSurecTab; label: string }>
   { id: "haftalik-kapanis", label: "Haftalık Kapanış" },
   { id: "belge-takip", label: "Belge Takip" },
   { id: "mali", label: "Finans" },
-  { id: "pozisyon", label: "Pozisyon" },
+  { id: "pozisyon", label: "Görev / Organizasyon" },
   { id: "belgeler", label: "Belgeler" },
   { id: "zimmet", label: "Zimmet" },
   { id: "ceza", label: "Ceza" },
@@ -241,16 +251,26 @@ export const DEVAMSIZLIK_ALT_TUR_CONFIG: Record<DevamsizlikSubId, DevamsizlikAlt
   }
 };
 
-export function createPozisyonFormFromPersonel(personel: Personel | null): PozisyonFormState {
+export function createPozisyonFormFromPersonel(personel: Personel | null): OrganizasyonFormState {
+  const degisiklikTarihi = personel ? resolveGoreveBaslamaTarihiDefault(personel) : "";
   return {
     departmanId: toOptionalIdValue(personel?.departman_id),
+    bolumId: toOptionalIdValue(personel?.bolum_id),
+    birimId: toOptionalIdValue(personel?.birim_id),
     gorevId: toOptionalIdValue(personel?.gorev_id),
+    pozisyonId: toOptionalIdValue(personel?.pozisyon_id),
     bagliAmirId: toOptionalIdValue(personel?.bagli_amir_id),
     personelTipiId: toOptionalIdValue(personel?.personel_tipi_id),
-    effectiveDate: personel ? resolveGoreveBaslamaTarihiDefault(personel) : "",
-    aciklama: ""
+    calismaLokasyonuId: toOptionalIdValue(personel?.calisma_lokasyonu_id),
+    sgkIsverenId: toOptionalIdValue(personel?.sgk_isveren_id),
+    degisiklikTarihi,
+    degisiklikNedeni: "",
+    aciklama: "",
+    effectiveDate: degisiklikTarihi
   };
 }
+
+export const createOrganizasyonFormFromPersonel = createPozisyonFormFromPersonel;
 
 function toOptionalIdValue(value: number | null | undefined) {
   return typeof value === "number" ? String(value) : "";

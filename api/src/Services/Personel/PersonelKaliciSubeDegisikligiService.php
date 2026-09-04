@@ -31,8 +31,12 @@ use PDO;
  */
 final class PersonelKaliciSubeDegisikligiService
 {
-    /** Only these roles may permanently move a person between branches. */
-    public const ALLOWED_ROLES = ['GENEL_YONETICI', 'SISTEM_YONETICISI'];
+    /**
+     * Only these roles may permanently move a person between branches.
+     * IK_SORUMLUSU is operational owner of daily personnel moves; SUBE/BOLUM
+     * managers stay on their existing business rules (not admitted here).
+     */
+    public const ALLOWED_ROLES = ['GENEL_YONETICI', 'SISTEM_YONETICISI', 'IK_SORUMLUSU'];
 
     public const ERROR_ROLE = 'KALICI_SUBE_DEGISIKLIGI_FORBIDDEN';
     public const ERROR_STALE = 'KALICI_SUBE_DEGISIKLIGI_STALE_PREIMAGE';
@@ -52,7 +56,7 @@ final class PersonelKaliciSubeDegisikligiService
             throw new OrganizasyonException(
                 403,
                 self::ERROR_ROLE,
-                'Kalıcı şube değişikliği yalnızca genel yönetici veya sistem yöneticisi tarafından yapılabilir.'
+                'Kalıcı şube değişikliği için yetkiniz yok.'
             );
         }
     }

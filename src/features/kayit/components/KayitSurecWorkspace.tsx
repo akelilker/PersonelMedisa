@@ -10,7 +10,6 @@ import {
   type SetStateAction
 } from "react";
 import { useNavigate } from "react-router-dom";
-import { FormField } from "../../../components/form/FormField";
 import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
 import type { KayitTab } from "../../../components/main-menu/MainMenu";
@@ -24,6 +23,8 @@ import {
   getSubeIdForApiRequest
 } from "../../../data/data-manager";
 import {
+  applyPersonelKaliciSubeDegisikligi,
+  applyPersonelOrganizasyonDegisikligi,
   createPersonel,
   fetchPersonellerList,
   updatePersonel
@@ -39,6 +40,7 @@ import {
   fetchPozisyonOptions,
   fetchPrimKuraliOptions,
   fetchSgkIsverenOptions,
+  fetchCalismaLokasyonuOptions,
   fetchSurecTuruOptions,
   fetchUcretTipiOptions
 } from "../../../api/referans.api";
@@ -53,10 +55,10 @@ import { KayitSurecPersonelBelgeTakipPanel } from "./KayitSurecPersonelBelgeTaki
 import { KayitSurecPersonelFinansPanel } from "./KayitSurecPersonelFinansPanel";
 import { KayitSurecPersonelGenelPanel } from "./KayitSurecPersonelGenelPanel";
 import { KayitSurecPersonelHaftalikKapanisPanel } from "./KayitSurecPersonelHaftalikKapanisPanel";
+import { KayitSurecPersonelOrganizasyonPanel } from "./KayitSurecPersonelOrganizasyonPanel";
 import { KayitSurecPersonelProcessNav } from "./KayitSurecPersonelProcessNav";
 import { KayitSurecPersonelPuantajPanel } from "./KayitSurecPersonelPuantajPanel";
 import { KayitSurecPersonelUcretPanel } from "./KayitSurecPersonelUcretPanel";
-import { KayitSurecPozisyonReferencePicker } from "./KayitSurecPozisyonReferencePicker";
 import { KayitSurecTabHeader } from "./KayitSurecTabHeader";
 import { YillikIzinHakDuzeltmePanel } from "./YillikIzinHakDuzeltmePanel";
 import { buildCreatePersonelPayload } from "../../../features/personeller/personel-create-utils";
@@ -82,9 +84,13 @@ import {
   type BelgeTuru
 } from "../../../types/belgeler";
 import { refetchPersonelDetailAfterIstenAyrilma, refetchSurecCachesForPersonel } from "../kayit-surec-cache";
-import { executePozisyonPersonnelUpdate } from "../kayit-surec-pozisyon";
 import {
-  createPozisyonFormFromPersonel,
+  executeKaliciSubeDegisikligi,
+  executeOrganizasyonPersonnelUpdate,
+  hasOrganizasyonFormDiff
+} from "../kayit-surec-pozisyon";
+import {
+  createOrganizasyonFormFromPersonel,
   DEVAMSIZLIK_ALT_TUR_CONFIG,
   KAYIT_SUREC_BELGELER_FORM_ID,
   KAYIT_SUREC_CEZA_FORM_ID,
@@ -97,20 +103,18 @@ import {
   resolveVisiblePersonelSurecTabs,
   resolvePersonelSurecTabForSurecTuru,
   type DevamsizlikSubId,
+  type OrganizasyonFormState,
   type PersonelSurecTab,
-  type PozisyonFormState,
   type PuantajSubdomainId
 } from "../kayit-surec-constants";
 import {
-  formatGeneralField,
   formatPersonelLabel,
-  hasPozisyonOrganizationalDiff,
   normalizePersonelSearchText,
-  optionLabel,
   resetSurecFormKeepingPersonel,
-  resolveDevamsizlikSurecTuru,
-  toOptionalIdValue
+  resolveDevamsizlikSurecTuru
 } from "../kayit-surec-utils";
+import { useAuth } from "../../../state/auth.store";
+import { canonicalizeUserRole } from "../../../lib/authorization/canonicalize-user-role";
 
 export {
   KAYIT_SUREC_BELGELER_FORM_ID,
@@ -221,6 +225,7 @@ const EMPTY_REFS: PersonelReferenceBundle = {
   pozisyonOptions: [],
   personelTipiOptions: [],
   sgkIsverenOptions: [],
+  calismaLokasyonuOptions: [],
   bagliAmirOptions: [],
   ucretTipiOptions: [],
   primKuraliOptions: []
@@ -238,7 +243,9 @@ export function KayitSurecWorkspace({
   onFooterModelChange
 }: KayitSurecWorkspaceProps) {
   const navigate = useNavigate();
+  const { session } = useAuth();
   const { hasPermission } = useRoleAccess();
+  const actorRole = canonicalizeUserRole(session?.user.rol ?? null);
   const canCreatePersonel = hasPermission("personeller.create");
   const canManageAccountOnboarding = hasPermission("yonetim-paneli.manage");
   const canCreateSurec = hasPermission("surecler.create");
@@ -256,8 +263,12 @@ export function KayitSurecWorkspace({
   const canManageUcret = hasPermission("personeller.ucret.manage");
   const canCreateZimmet = canUpdatePersonel;
   const canCreateFinans = hasPermission("finans.create");
-  /** Pozisyon: `updatePersonel` + `createSurec(POZISYON_DEGISTI)` — ikisi de zorunlu. */
-  const canSubmitPozisyon = canUpdatePersonel && canCreateSurec;
+  /** Org change: personeller.update; surec history is best-effort after success. */
+  const canSubmitPozisyon = canUpdatePersonel;
+  const canTransferSube =
+    actorRole === "GENEL_YONETICI" ||
+    actorRole === "SISTEM_YONETICISI" ||
+    actorRole === "IK_SORUMLUSU";
 
   const [refs, setRefs] = useState<PersonelReferenceBundle>(EMPTY_REFS);
   const [subeOptions, setSubeOptions] = useState<IdOption[]>([]);
@@ -298,8 +309,13 @@ export function KayitSurecWorkspace({
   const [hakDuzeltmeOpen, setHakDuzeltmeOpen] = useState(
     initialOperation === "yillik-izin-hak-duzeltme"
   );
-  const [pozisyonForm, setPozisyonForm] = useState<PozisyonFormState>(createPozisyonFormFromPersonel(null));
+  const [pozisyonForm, setPozisyonForm] = useState<OrganizasyonFormState>(createOrganizasyonFormFromPersonel(null));
   const [pozisyonSubmitting, setPozisyonSubmitting] = useState(false);
+  const [kaliciSubeSubmitting, setKaliciSubeSubmitting] = useState(false);
+  const [yeniSubeId, setYeniSubeId] = useState("");
+  const [subeGerekce, setSubeGerekce] = useState("");
+  const [subeTransferError, setSubeTransferError] = useState<string | null>(null);
+  const [subeTransferInfo, setSubeTransferInfo] = useState<string | null>(null);
   const [genelMutating, setGenelMutating] = useState(false);
   const [ucretMutating, setUcretMutating] = useState(false);
   const [belgeFileMutating, setBelgeFileMutating] = useState(false);
@@ -317,6 +333,7 @@ export function KayitSurecWorkspace({
   const personelContextLocked =
     genelMutating ||
     pozisyonSubmitting ||
+    kaliciSubeSubmitting ||
     ucretMutating ||
     belgeDurumSaving ||
     belgeFileMutating;
@@ -530,7 +547,7 @@ export function KayitSurecWorkspace({
   const selectedSurecPersonelLabel = selectedSurecPersonel ? formatPersonelLabel(selectedSurecPersonel) : "Seçiniz";
 
   const hasPozisyonDiff = Boolean(
-    selectedSurecPersonel && hasPozisyonOrganizationalDiff(pozisyonForm, selectedSurecPersonel)
+    selectedSurecPersonel && hasOrganizasyonFormDiff(pozisyonForm, selectedSurecPersonel)
   );
   const selectedSurecPersonelIdRef = useRef<number | null>(null);
   selectedSurecPersonelIdRef.current = selectedSurecPersonel?.id ?? null;
@@ -577,10 +594,14 @@ export function KayitSurecWorkspace({
   }, [editingSurec, hasInitialSurecPersonel, surecForm.personelId]);
 
   useEffect(() => {
-    setPozisyonForm(createPozisyonFormFromPersonel(selectedSurecPersonel));
+    setPozisyonForm(createOrganizasyonFormFromPersonel(selectedSurecPersonel));
     setPozisyonError(null);
     setPozisyonInfo(null);
     setOpenPozisyonPicker(null);
+    setYeniSubeId("");
+    setSubeGerekce("");
+    setSubeTransferError(null);
+    setSubeTransferInfo(null);
   }, [selectedSurecPersonel]);
 
   function selectSurecPersonel(personelId: string) {
@@ -708,6 +729,7 @@ export function KayitSurecWorkspace({
         pozisyonOptions,
         personelTipiOptions,
         sgkIsverenOptions,
+        calismaLokasyonuOptions,
         bagliAmirOptions,
         ucretTipiOptions,
         primKuraliOptions,
@@ -722,6 +744,7 @@ export function KayitSurecWorkspace({
         fetchPozisyonOptions(),
         fetchPersonelTipiOptions(),
         fetchSgkIsverenOptions(),
+        fetchCalismaLokasyonuOptions(),
         fetchBagliAmirOptions(),
         fetchUcretTipiOptions(),
         fetchPrimKuraliOptions(),
@@ -745,6 +768,7 @@ export function KayitSurecWorkspace({
         pozisyonOptions,
         personelTipiOptions,
         sgkIsverenOptions,
+        calismaLokasyonuOptions,
         bagliAmirOptions,
         ucretTipiOptions,
         primKuraliOptions
@@ -980,7 +1004,7 @@ export function KayitSurecWorkspace({
   async function handlePozisyonSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (!selectedSurecPersonel || pozisyonSubmitting) {
+    if (!selectedSurecPersonel || pozisyonSubmitting || kaliciSubeSubmitting) {
       return;
     }
 
@@ -994,53 +1018,21 @@ export function KayitSurecWorkspace({
     const submitForm = { ...pozisyonForm };
     const submitBaseline = selectedSurecPersonel;
 
-    const changes = [
-      {
-        label: "Departman",
-        before: formatGeneralField(submitBaseline.departman_adi),
-        after: optionLabel(refs.departmanOptions, submitForm.departmanId, formatGeneralField(submitBaseline.departman_adi)),
-        changed: submitForm.departmanId !== toOptionalIdValue(submitBaseline.departman_id)
-      },
-      {
-        label: "Unvan",
-        before: formatGeneralField(submitBaseline.gorev_adi),
-        after: optionLabel(refs.gorevOptions, submitForm.gorevId, formatGeneralField(submitBaseline.gorev_adi)),
-        changed: submitForm.gorevId !== toOptionalIdValue(submitBaseline.gorev_id)
-      },
-      {
-        label: "Bağlı Amir",
-        before: formatGeneralField(submitBaseline.bagli_amir_adi),
-        after: optionLabel(refs.bagliAmirOptions, submitForm.bagliAmirId, formatGeneralField(submitBaseline.bagli_amir_adi)),
-        changed: submitForm.bagliAmirId !== toOptionalIdValue(submitBaseline.bagli_amir_id)
-      },
-      {
-        label: "Çalışma Tipi",
-        before: formatGeneralField(submitBaseline.personel_tipi_adi),
-        after: optionLabel(
-          refs.personelTipiOptions,
-          submitForm.personelTipiId,
-          formatGeneralField(submitBaseline.personel_tipi_adi)
-        ),
-        changed: submitForm.personelTipiId !== toOptionalIdValue(submitBaseline.personel_tipi_id)
-      }
-    ].filter((item) => item.changed);
-
-    const changeSummary = changes.map((item) => `${item.label}: ${item.before} -> ${item.after}`).join("; ");
-    const aciklama = [changeSummary, submitForm.aciklama.trim()].filter(Boolean).join(" | ");
-
     setPozisyonSubmitting(true);
     setSurecPersonelPickerOpen(false);
     setPozisyonError(null);
     setPozisyonInfo(null);
 
     try {
-      const result = await executePozisyonPersonnelUpdate({
+      const result = await executeOrganizasyonPersonnelUpdate({
         personel: submitBaseline,
         form: submitForm,
-        aciklama,
         deps: {
-          updatePersonel,
-          createSurec
+          applyOrganizasyon: (personelId, payload) =>
+            applyPersonelOrganizasyonDegisikligi(personelId, payload).then((res) => ({
+              personel: res.personel
+            })),
+          createSurec: canCreateSurec ? createSurec : undefined
         }
       });
 
@@ -1049,7 +1041,7 @@ export function KayitSurecWorkspace({
       if (result.status === "no_op") {
         if (isCurrentSelection) {
           setPozisyonError(null);
-          setPozisyonInfo("Pozisyon bilgisi değişmedi.");
+          setPozisyonInfo("Organizasyon bilgisi değişmedi.");
         }
         return;
       }
@@ -1062,31 +1054,10 @@ export function KayitSurecWorkspace({
         return;
       }
 
-      if (result.status === "update_failed") {
+      if (result.status === "org_failed") {
         if (isCurrentSelection) {
           setPozisyonInfo(null);
-          setPozisyonError(getApiErrorMessage(result.error, "Pozisyon güncellenemedi."));
-        }
-        return;
-      }
-
-      if (result.status === "partial_surec_failed") {
-        commitPersonelUpdateToCaches(result.updated);
-        setPersoneller((prev) => prev.map((item) => (item.id === result.updated.id ? result.updated : item)));
-        try {
-          await refetchSurecCachesForPersonel(submitPersonelId);
-        } catch {
-          /* Önbellek yenilemesi başarısız. */
-        }
-        if (isCurrentSelection) {
-          setPozisyonForm(createPozisyonFormFromPersonel(result.updated));
-          setPozisyonInfo(null);
-          setPozisyonError(
-            getApiErrorMessage(
-              result.error,
-              "Personel güncellendi ancak pozisyon süreç kaydı oluşturulamadı. Tekrar kaydetmeden önce durumu kontrol edin."
-            )
-          );
+          setPozisyonError(getApiErrorMessage(result.error, "Organizasyon güncellenemedi."));
         }
         return;
       }
@@ -1094,18 +1065,81 @@ export function KayitSurecWorkspace({
       try {
         await refetchSurecCachesForPersonel(submitPersonelId);
       } catch {
-        /* Önbellek yenilemesi başarısız. */
+        /* cache refresh soft-fail */
       }
 
       commitPersonelUpdateToCaches(result.updated);
       setPersoneller((prev) => prev.map((item) => (item.id === result.updated.id ? result.updated : item)));
 
       if (isCurrentSelection) {
-        setPozisyonForm(createPozisyonFormFromPersonel(result.updated));
-        setPozisyonInfo("Pozisyon güncellendi.");
+        setPozisyonForm(createOrganizasyonFormFromPersonel(result.updated));
+        setPozisyonError(null);
+        setPozisyonInfo(result.surecWarning ?? "Görev / organizasyon güncellendi.");
       }
     } finally {
       setPozisyonSubmitting(false);
+    }
+  }
+
+  async function handleKaliciSubeSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!selectedSurecPersonel || kaliciSubeSubmitting || pozisyonSubmitting) {
+      return;
+    }
+    if (!canTransferSube) {
+      setSubeTransferInfo(null);
+      setSubeTransferError("Kalıcı şube değişikliği için yetkin bulunmuyor.");
+      return;
+    }
+
+    const submitPersonelId = selectedSurecPersonel.id;
+    setKaliciSubeSubmitting(true);
+    setSubeTransferError(null);
+    setSubeTransferInfo(null);
+
+    try {
+      const result = await executeKaliciSubeDegisikligi({
+        personel: selectedSurecPersonel,
+        yeniSubeId,
+        gerekce: subeGerekce,
+        deps: {
+          applyKaliciSube: (personelId, payload) =>
+            applyPersonelKaliciSubeDegisikligi(personelId, payload)
+        }
+      });
+
+      const isCurrentSelection = selectedSurecPersonelIdRef.current === submitPersonelId;
+
+      if (result.status === "validation_error") {
+        if (isCurrentSelection) {
+          setSubeTransferError(result.message);
+        }
+        return;
+      }
+
+      if (result.status === "failed") {
+        if (isCurrentSelection) {
+          setSubeTransferError(getApiErrorMessage(result.error, "Şube değiştirilemedi."));
+        }
+        return;
+      }
+
+      commitPersonelUpdateToCaches(result.updated);
+      setPersoneller((prev) => prev.map((item) => (item.id === result.updated.id ? result.updated : item)));
+      try {
+        await refetchSurecCachesForPersonel(submitPersonelId);
+      } catch {
+        /* cache refresh soft-fail */
+      }
+
+      if (isCurrentSelection) {
+        setPozisyonForm(createOrganizasyonFormFromPersonel(result.updated));
+        setYeniSubeId("");
+        setSubeGerekce("");
+        setSubeTransferInfo("Kalıcı şube değişikliği uygulandı.");
+      }
+    } finally {
+      setKaliciSubeSubmitting(false);
     }
   }
 
@@ -1128,7 +1162,10 @@ export function KayitSurecWorkspace({
     .join(" ");
 
   const resetPozisyonForm = useCallback(() => {
-    setPozisyonForm(createPozisyonFormFromPersonel(selectedSurecPersonel));
+    setPozisyonForm(createOrganizasyonFormFromPersonel(selectedSurecPersonel));
+    setPozisyonError(null);
+    setPozisyonInfo(null);
+    setOpenPozisyonPicker(null);
   }, [selectedSurecPersonel]);
 
   const footerModel = useMemo((): KayitModalFooterModel | null => {
@@ -1176,9 +1213,9 @@ export function KayitSurecWorkspace({
       }
 
       return {
-        primaryLabel: "Kaydet",
+        primaryLabel: pozisyonSubmitting ? "Kaydediliyor..." : "Kaydet",
         primaryFormId: KAYIT_SUREC_POZISYON_FORM_ID,
-        primaryDisabled: pozisyonSubmitting || !hasPozisyonDiff,
+        primaryDisabled: pozisyonSubmitting || kaliciSubeSubmitting || !hasPozisyonDiff,
         secondaryLabel: "Vazgeç",
         onSecondaryClick: resetPozisyonForm
       };
@@ -1572,89 +1609,33 @@ export function KayitSurecWorkspace({
                         {activePersonelTab === "pozisyon" ? (
                           isSelectedPersonelPasif ? (
                             <div className="surec-person-placeholder">
-                              <strong>Pozisyon</strong>
-                              <p>Bu personel pasif; pozisyon değişikliği yapılamaz.</p>
-                            </div>
-                          ) : canSubmitPozisyon ? (
-                            <div className="surec-position-panel">
-                              <form
-                                id={KAYIT_SUREC_POZISYON_FORM_ID}
-                                className="workspace-form surec-position-form"
-                                onSubmit={handlePozisyonSubmit}
-                              >
-                                <div className="surec-position-grid">
-                                  <KayitSurecPozisyonReferencePicker
-                                    label="Departman"
-                                    name="pozisyon-departman"
-                                    value={pozisyonForm.departmanId}
-                                    options={refs.departmanOptions}
-                                    isOpen={openPozisyonPicker === "departman"}
-                                    onOpenChange={(isOpen) => setOpenPozisyonPicker(isOpen ? "departman" : null)}
-                                    onChange={(value) => setPozisyonForm((prev) => ({ ...prev, departmanId: value }))}
-                                    required
-                                  />
-                                  <KayitSurecPozisyonReferencePicker
-                                    label="Unvan"
-                                    name="pozisyon-gorev"
-                                    value={pozisyonForm.gorevId}
-                                    options={refs.gorevOptions}
-                                    isOpen={openPozisyonPicker === "gorev"}
-                                    onOpenChange={(isOpen) => setOpenPozisyonPicker(isOpen ? "gorev" : null)}
-                                    onChange={(value) => setPozisyonForm((prev) => ({ ...prev, gorevId: value }))}
-                                    required
-                                  />
-                                  <KayitSurecPozisyonReferencePicker
-                                    label="Bağlı Amir"
-                                    name="pozisyon-bagli-amir"
-                                    value={pozisyonForm.bagliAmirId}
-                                    options={refs.bagliAmirOptions}
-                                    isOpen={openPozisyonPicker === "bagli-amir"}
-                                    onOpenChange={(isOpen) => setOpenPozisyonPicker(isOpen ? "bagli-amir" : null)}
-                                    onChange={(value) => setPozisyonForm((prev) => ({ ...prev, bagliAmirId: value }))}
-                                  />
-                                  <KayitSurecPozisyonReferencePicker
-                                    label="Çalışma Tipi"
-                                    name="pozisyon-personel-tipi"
-                                    value={pozisyonForm.personelTipiId}
-                                    options={refs.personelTipiOptions}
-                                    isOpen={openPozisyonPicker === "personel-tipi"}
-                                    onOpenChange={(isOpen) => setOpenPozisyonPicker(isOpen ? "personel-tipi" : null)}
-                                    onChange={(value) => setPozisyonForm((prev) => ({ ...prev, personelTipiId: value }))}
-                                    required
-                                  />
-                                </div>
-
-                                <FormField
-                                  label="Göreve Başlama Tarihi"
-                                  name="pozisyon-effective-date"
-                                  type="date"
-                                  value={pozisyonForm.effectiveDate}
-                                  onChange={(value) => setPozisyonForm((prev) => ({ ...prev, effectiveDate: value }))}
-                                  required={hasPozisyonDiff}
-                                />
-
-                                <FormField
-                                  label="Açıklama"
-                                  name="pozisyon-aciklama"
-                                  as="textarea"
-                                  value={pozisyonForm.aciklama}
-                                  onChange={(value) => setPozisyonForm((prev) => ({ ...prev, aciklama: value }))}
-                                  placeholder="Değişiklik notu"
-                                  rows={2}
-                                />
-
-                                {pozisyonError ? <p className="workspace-error">{pozisyonError}</p> : null}
-                                {pozisyonInfo ? <p className="workspace-success">{pozisyonInfo}</p> : null}
-                              </form>
+                              <strong>Görev / Organizasyon</strong>
+                              <p>Bu personel pasif; organizasyon değişikliği yapılamaz.</p>
                             </div>
                           ) : (
-                            <div className="surec-person-placeholder">
-                              <strong>Pozisyon</strong>
-                              <p>
-                                Bu işlem için yetkin yok. Pozisyon değişikliği personel kartını günceller ve süreç kaydı
-                                oluşturur.
-                              </p>
-                            </div>
+                            <KayitSurecPersonelOrganizasyonPanel
+                              personel={selectedSurecPersonel}
+                              form={pozisyonForm}
+                              setForm={setPozisyonForm}
+                              refs={refs}
+                              subeOptions={subeOptions}
+                              canSubmitOrg={canSubmitPozisyon}
+                              canTransferSube={canTransferSube}
+                              orgSubmitting={pozisyonSubmitting}
+                              subeSubmitting={kaliciSubeSubmitting}
+                              orgError={pozisyonError}
+                              orgInfo={pozisyonInfo}
+                              subeError={subeTransferError}
+                              subeInfo={subeTransferInfo}
+                              openPicker={openPozisyonPicker}
+                              setOpenPicker={setOpenPozisyonPicker}
+                              yeniSubeId={yeniSubeId}
+                              setYeniSubeId={setYeniSubeId}
+                              subeGerekce={subeGerekce}
+                              setSubeGerekce={setSubeGerekce}
+                              onOrgSubmit={handlePozisyonSubmit}
+                              onSubeSubmit={handleKaliciSubeSubmit}
+                            />
                           )
                         ) : null}
 

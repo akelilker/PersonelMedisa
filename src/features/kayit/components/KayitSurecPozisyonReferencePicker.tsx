@@ -8,6 +8,7 @@ type KayitSurecPozisyonReferencePickerProps = {
   options: IdOption[];
   isOpen: boolean;
   required?: boolean;
+  disabled?: boolean;
   onChange: (value: string) => void;
   onOpenChange: (isOpen: boolean) => void;
 };
@@ -19,6 +20,7 @@ export function KayitSurecPozisyonReferencePicker({
   options,
   isOpen,
   required = false,
+  disabled = false,
   onChange,
   onOpenChange
 }: KayitSurecPozisyonReferencePickerProps) {
@@ -36,7 +38,13 @@ export function KayitSurecPozisyonReferencePicker({
         aria-labelledby={`${name}-label`}
         aria-expanded={isOpen}
         aria-controls={`${name}-panel`}
-        onClick={() => onOpenChange(!isOpen)}
+        disabled={disabled}
+        onClick={() => {
+          if (disabled) {
+            return;
+          }
+          onOpenChange(!isOpen);
+        }}
       >
         <span>{selectedLabel === "-" ? "Seçiniz" : selectedLabel}</span>
         <span aria-hidden="true">⌄</span>

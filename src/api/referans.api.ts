@@ -194,6 +194,15 @@ export async function fetchSgkIsverenOptions(): Promise<IdOption[]> {
   }
 }
 
+export async function fetchCalismaLokasyonuOptions(): Promise<IdOption[]> {
+  try {
+    const response = await apiRequest<ApiResponse<unknown>>(endpoints.referans.calismaLokasyonlari);
+    return normalizeIdOptions(response.data);
+  } catch {
+    return [];
+  }
+}
+
 export async function fetchBagliAmirOptions(): Promise<IdOption[]> {
   const response = await apiRequest<ApiResponse<unknown>>(endpoints.referans.bagliAmirler);
   return normalizeIdOptions(response.data);

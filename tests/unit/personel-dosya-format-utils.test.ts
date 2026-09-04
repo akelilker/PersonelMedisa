@@ -34,11 +34,14 @@ describe("formatIsoDateDetail", () => {
   it("timezone kaymasi olusturmaz", () => {
     const formatted = formatIsoDateDetail("2024-03-01");
     const utcFormatted = new Intl.DateTimeFormat("tr-TR", {
-      dateStyle: "short",
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
       timeZone: "UTC"
     }).format(new Date(Date.UTC(2024, 2, 1)));
 
     expect(formatted).toBe(utcFormatted);
+    expect(formatted).toBe("01.03.2024");
     expect(formatted).not.toMatch(/29\.02\.2024|28\.02\.2024|02\.03\.2024/);
   });
 });

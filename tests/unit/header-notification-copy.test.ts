@@ -55,11 +55,14 @@ describe("formatHeaderBildirimCopy", () => {
         bildirim_turu: "GEC_GELDI",
         dakika: 25,
         baslangic_saati: "08:00",
-        bitis_saati: "08:25"
+        bitis_saati: "08:25",
+        sube_adi: "Merkez"
       })
     );
     expect(copy.title).toBe("Ahmet Yılmaz 25 dakika geç geldi.");
     expect(copy.subtitle).toBe("15.07.2026");
+    expect(copy.subtitle).not.toContain("08:00");
+    expect(copy.subtitle).not.toContain("Merkez");
     assertNoTechnicalLeak(copy);
   });
 

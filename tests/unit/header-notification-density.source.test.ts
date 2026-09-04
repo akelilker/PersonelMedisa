@@ -23,6 +23,12 @@ describe("header notification density owners (tasit parity)", () => {
       /\.settings-dropdown\.notifications-dropdown\s*\{[^}]*width:\s*min\(360px,\s*calc\(100vw\s*-\s*32px\)\)/s
     );
     expect(css).toMatch(
+      /@media\s*\(min-width:\s*769px\)\s*\{[^}]*\.settings-dropdown\.notifications-dropdown\s*\{[^}]*width:\s*min\(320px,\s*calc\(100vw\s*-\s*32px\)\)/s
+    );
+    expect(css).toMatch(
+      /@media\s*\(max-width:\s*640px\)\s*\{[^}]*\.settings-dropdown\.notifications-dropdown\s*\{[^}]*width:\s*min\(82vw,\s*420px\)/s
+    );
+    expect(css).toMatch(
       /\.settings-dropdown\.notifications-dropdown\s*\{[^}]*max-height:\s*min\(60vh,\s*428px\)/s
     );
   });
@@ -32,5 +38,7 @@ describe("header notification density owners (tasit parity)", () => {
     expect(copy).toContain("summarizeDigerAciklama");
     expect(copy).toContain("formatDigerTitle");
     expect(copy).not.toMatch(/\$\{personelName\}:\s*\$\{aciklama\}/);
+    expect(copy).toContain("gg.aa.yyyy only");
+    expect(copy).not.toContain("includeSube");
   });
 });

@@ -37,24 +37,9 @@ function formatNotificationDate(tarih: string | null | undefined): string | null
   return formatted === "-" ? null : formatted;
 }
 
-function buildSubtitle(
-  tarih: string | null | undefined,
-  options?: { subeAdi?: string | null }
-): string {
-  // Header date row stays secondary and scannable: gg.aa.yyyy only (no clock range).
-  const dateLabel = formatNotificationDate(tarih);
-  const sube = trimText(options?.subeAdi);
-
-  if (dateLabel && sube) {
-    return `${dateLabel} · ${sube}`;
-  }
-  if (dateLabel) {
-    return dateLabel;
-  }
-  if (sube) {
-    return sube;
-  }
-  return "İşlem gerektiriyor";
+function buildSubtitle(tarih: string | null | undefined): string {
+  // Header date row: gg.aa.yyyy only (no clock, şube, or technical metadata).
+  return formatNotificationDate(tarih) ?? "İşlem gerektiriyor";
 }
 
 function positiveDakika(value: number | null | undefined): number | null {
@@ -236,55 +221,51 @@ export function formatHeaderBildirimCopy(
     | "bitis_saati"
     | "sube_adi"
   >,
-  options?: { lookupPersonelName?: string | null; includeSube?: boolean }
+  options?: { lookupPersonelName?: string | null }
 ): HeaderNotificationCopy {
   const personelName = resolvePersonelName(item, options?.lookupPersonelName);
   const tur = normalizeEnumKey(item.bildirim_turu);
   const dakika = positiveDakika(item.dakika);
-  const includeSube = options?.includeSube === true;
-  const subtitleOptions = {
-    subeAdi: includeSube ? item.sube_adi : null
-  };
 
   switch (tur) {
     case "GELMEDI":
       return {
         title: `${personelName} gelmedi.`,
-        subtitle: buildSubtitle(item.tarih, { subeAdi: subtitleOptions.subeAdi })
+        subtitle: buildSubtitle(item.tarih)
       };
     case "GEC_GELDI":
       return {
         title: dakika
           ? `${personelName} ${dakika} dakika geç geldi.`
           : `${personelName} geç geldi.`,
-        subtitle: buildSubtitle(item.tarih, { subeAdi: subtitleOptions.subeAdi })
+        subtitle: buildSubtitle(item.tarih)
       };
     case "ERKEN_CIKTI":
       return {
         title: dakika
           ? `${personelName} ${dakika} dakika erken çıktı.`
           : `${personelName} erken çıktı.`,
-        subtitle: buildSubtitle(item.tarih, { subeAdi: subtitleOptions.subeAdi })
+        subtitle: buildSubtitle(item.tarih)
       };
     case "IZINLI":
       return {
         title: `${personelName} izinli.`,
-        subtitle: buildSubtitle(item.tarih, { subeAdi: subtitleOptions.subeAdi })
+        subtitle: buildSubtitle(item.tarih)
       };
     case "RAPORLU":
       return {
         title: `${personelName} raporlu.`,
-        subtitle: buildSubtitle(item.tarih, { subeAdi: subtitleOptions.subeAdi })
+        subtitle: buildSubtitle(item.tarih)
       };
     case "GOREVDE":
       return {
         title: `${personelName} görevde çalıştı.`,
-        subtitle: buildSubtitle(item.tarih, { subeAdi: subtitleOptions.subeAdi })
+        subtitle: buildSubtitle(item.tarih)
       };
     case "DIGER": {
       return {
         title: formatDigerTitle(personelName, trimText(item.aciklama)),
-        subtitle: buildSubtitle(item.tarih, { subeAdi: subtitleOptions.subeAdi })
+        subtitle: buildSubtitle(item.tarih)
       };
     }
     default: {
@@ -294,7 +275,7 @@ export function formatHeaderBildirimCopy(
         title: hasPersonel
           ? `${personelName} · ${eventLabel}`
           : `Günlük bildirim · ${eventLabel}`,
-        subtitle: buildSubtitle(item.tarih, { subeAdi: subtitleOptions.subeAdi })
+        subtitle: buildSubtitle(item.tarih)
       };
     }
   }

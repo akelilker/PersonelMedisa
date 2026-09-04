@@ -7,18 +7,24 @@
  * would resolve against the tiny anchor instead of the viewport). The compound
  * ".settings-dropdown.notifications-dropdown" selector guarantees this owner's
  * rules win regardless of import order.
+ *
+ * Density reference: tasitmedisa/notifications.css — compact event rows
+ * (desktop ≥769 → 320px, tablet 641–768 → 360px, mobile min(82vw,420px);
+ * min-height ~52px, padding 4px 10px 1px, title ≤2 lines, date secondary).
+ * PersonelMedisa keeps its own theme surfaces; layout/typography density only.
  */
 .settings-dropdown.notifications-dropdown {
   top: 100%;
   right: 0;
   left: auto;
+  /* Tablet / default (≥641 until desktop override): Taşıt 360px band. */
   width: min(360px, calc(100vw - 32px));
   max-width: calc(100vw - 32px);
   box-sizing: border-box;
   overflow-y: auto;
   overflow-x: hidden;
-  max-height: min(60vh, 440px);
-  padding: 4px 8px 8px;
+  max-height: min(60vh, 428px);
+  padding: 1px 8px 5px;
   border: none;
   border-radius: 0;
   background: transparent;
@@ -28,11 +34,19 @@
   isolation: isolate;
 }
 
+/* Desktop: Taşıt authoritative ≥769 panel width is 320px. */
+@media (min-width: 769px) {
+  .settings-dropdown.notifications-dropdown {
+    width: min(320px, calc(100vw - 32px));
+    max-width: calc(100vw - 32px);
+  }
+}
+
 .settings-dropdown.notifications-dropdown.open {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
+  gap: 2px;
 }
 
 .notifications-dropdown::-webkit-scrollbar {
@@ -43,13 +57,13 @@
   flex-shrink: 0;
   align-self: center;
   width: 100%;
-  max-width: 420px;
+  max-width: 100%;
   box-sizing: border-box;
   position: sticky;
   top: 0;
   z-index: 2;
   margin: 0;
-  padding: 2px 2px 0;
+  padding: 2px 2px 3px;
   border: none;
   border-radius: 0;
   background: transparent;
@@ -65,8 +79,9 @@
   background: transparent;
   box-shadow: none;
   color: rgba(240, 240, 240, 0.9);
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 600;
+  line-height: 1.2;
   text-align: left;
   justify-content: flex-start;
   white-space: nowrap;
@@ -85,17 +100,21 @@
   flex-direction: column;
   flex-shrink: 0;
   align-items: flex-start;
-  justify-content: center;
+  justify-content: flex-start;
+  gap: 1px;
   width: 100%;
-  max-width: 420px;
+  max-width: 100%;
   box-sizing: border-box;
-  min-height: 48px;
+  min-height: 52px;
+  max-height: none;
+  height: auto;
   margin-inline: auto;
-  padding: 10px 12px 8px;
+  padding: 4px 10px 1px;
   text-align: left;
   white-space: normal;
-  border: 1.15px solid rgba(255, 255, 255, 0.28);
-  border-radius: var(--radius-lg);
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 7px;
   background: rgba(7, 12, 20, 0.94);
   box-shadow:
     0 6px 12px rgba(0, 0, 0, 0.16),
@@ -145,21 +164,41 @@
 
 .notifications-dropdown .notif-line1 {
   width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
   color: var(--text-inverse);
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 1.35;
-  margin-bottom: 2px;
-  word-break: break-word;
+  font-size: 11.5px;
+  font-weight: 500;
+  line-height: 1.18;
+  margin: 0;
+  padding: 0;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: normal;
   transition: color 0.18s ease;
 }
 
 .notifications-dropdown .notif-line2 {
   width: 100%;
-  color: rgba(240, 240, 240, 0.76);
-  font-size: 11px;
-  line-height: 1.2;
-  word-break: break-word;
+  max-width: 100%;
+  box-sizing: border-box;
+  align-self: flex-start;
+  color: rgba(160, 174, 192, 0.95);
+  font-size: 10.5px;
+  font-weight: 400;
+  line-height: 1.1;
+  margin: 0;
+  padding: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: clip;
+  text-align: left;
   transition: color 0.18s ease;
 }
 
@@ -191,7 +230,7 @@
 
 .notifications-dropdown .notification-error {
   width: 100%;
-  max-width: 420px;
+  max-width: 100%;
   box-sizing: border-box;
   flex-shrink: 0;
   margin-inline: auto;
@@ -240,7 +279,24 @@ body:not(.modal-open):has(.icons-row .settings-dropdown.open) .icons-row {
 
 @media (max-width: 640px) {
   .settings-dropdown.notifications-dropdown {
-    width: min(300px, calc(100vw - 24px));
+    width: min(82vw, 420px);
     max-width: calc(100vw - 24px);
+    max-height: min(64vh, calc(100dvh - 230px));
+    padding: 0 8px;
+  }
+
+  .notifications-dropdown .notification-item {
+    min-height: 54px;
+    padding: 4px 10px 1px;
+  }
+
+  .notifications-dropdown .notif-line1 {
+    font-size: 12.5px;
+    line-height: 1.18;
+  }
+
+  .notifications-dropdown .notif-line2 {
+    font-size: 11.5px;
+    line-height: 1.14;
   }
 }

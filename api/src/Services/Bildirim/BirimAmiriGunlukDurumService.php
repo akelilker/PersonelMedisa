@@ -1,0 +1,373 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Medisa\Api\Services\Bildirim;
+
+use Medisa\Api\Http\Request;
+use Medisa\Api\Scope\OrgScope;
+use PDO;
+
+/**
+ * BIRIM_AMIRI operational home: today's unit roster from OrgScope + gunluk_bildirimler.
+ * Does not reuse the legacy bagli-amir / sube-wide roster fallback. Fail-closed on empty units.
+ */
+class BirimAmiriGunlukDurumService
+{
+    /** @var array<int, string> */
+    private static $exceptionTurleri = [
+        'GELMEDI',
+        'GEC_GELDI',
+        'ERKEN_CIKTI',
+        'IZINLI',
+        'RAPORLU',
+        'GOREVDE',
+        'DIGER',
+    ];
+
+    /**
+     * Exception-only model: no open daily notification → GELDI.
+     *
+     * @param string|null $bildirimTuru
+     */
+    public static function deriveDurum($bildirimTuru)
+    {
+        $tur = strtoupper(trim((string) $bildirimTuru));
+        if (in_array($tur, self::$exceptionTurleri, true)) {
+            return $tur;
+        }
+
+        return 'GELDI';
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $rows
+     * @return array<string, int>
+     */
+    public static function buildOzetCounts(array $rows)
+    {
+        $geldi = 0;
+        $gelmedi = 0;
+        $gecGeldi = 0;
+        $izinli = 0;
+        $raporlu = 0;
+        $erkenCikti = 0;
+        $gorevde = 0;
+
+        foreach ($rows as $row) {
+            $durum = strtoupper(trim((string) ($row['durum'] ?? '')));
+            if ($durum === 'GELMEDI') {
+                $gelmedi++;
+            } elseif ($durum === 'GEC_GELDI') {
+                $gecGeldi++;
+            } elseif ($durum === 'IZINLI') {
+                $izinli++;
+            } elseif ($durum === 'RAPORLU') {
+                $raporlu++;
+            } elseif ($durum === 'ERKEN_CIKTI') {
+                $erkenCikti++;
+            } elseif ($durum === 'GOREVDE') {
+                $gorevde++;
+            } elseif ($durum === 'GELDI') {
+                $geldi++;
+            } else {
+                $geldi++;
+            }
+        }
+
+        return [
+            'toplam_personel' => count($rows),
+            'geldi' => $geldi,
+            'gelmedi' => $gelmedi,
+            'gec_geldi' => $gecGeldi,
+            'izinli_raporlu' => $izinli + $raporlu,
+            'erken_cikti' => $erkenCikti,
+            'gorevde' => $gorevde,
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $user
+     * @return array<string, mixed>
+     */
+    public static function build(PDO $pdo, array $user, Request $request, $tarih)
+    {
+        $tarih = (string) $tarih;
+        $amirId = isset($user['id']) ? (int) $user['id'] : 0;
+        $activeSube = OrgScope::resolveActiveSubeId($user, $request);
+
+        $where = [
+            "p.aktif_durum = 'AKTIF'",
+            'p.ise_giris_tarihi <= :bagd_tarih_giris',
+        ];
+        $params = ['bagd_tarih_giris' => $tarih];
+        OrgScope::appendPersonelOrgFilter($where, $params, $user, $activeSube, 'p', 'bagd', $pdo);
+
+        $nameExpr = self::isSqlite($pdo)
+            ? "TRIM(COALESCE(p.ad, '') || ' ' || COALESCE(p.soyad, ''))"
+            : "TRIM(CONCAT(COALESCE(p.ad, ''), ' ', COALESCE(p.soyad, '')))";
+
+        $bildirimJoin = '';
+        $bildirimSelect = '
+                NULL AS bildirim_turu,
+                NULL AS dakika,
+                NULL AS baslangic_saati,
+                NULL AS bitis_saati';
+        if (self::hasTable($pdo, 'gunluk_bildirimler')) {
+            $params['bagd_tarih_gb'] = $tarih;
+            $params['bagd_iptal'] = 'IPTAL';
+            $bildirimSelect = '
+                gb.bildirim_turu AS bildirim_turu,
+                gb.dakika AS dakika,
+                gb.baslangic_saati AS baslangic_saati,
+                gb.bitis_saati AS bitis_saati';
+            $bildirimJoin = '
+            LEFT JOIN gunluk_bildirimler gb ON gb.id = (
+                SELECT gb2.id
+                FROM gunluk_bildirimler gb2
+                WHERE gb2.personel_id = p.id
+                  AND gb2.tarih = :bagd_tarih_gb
+                  AND gb2.state <> :bagd_iptal
+                ORDER BY gb2.id DESC
+                LIMIT 1
+            )';
+        }
+
+        $puantajJoin = '';
+        $puantajSelect = '
+                NULL AS puantaj_giris,
+                NULL AS puantaj_cikis,
+                NULL AS puantaj_gec,
+                NULL AS puantaj_erken';
+        if (self::hasTable($pdo, 'gunluk_puantaj')) {
+            $params['bagd_tarih_gp'] = $tarih;
+            $gecCol = self::hasColumn($pdo, 'gunluk_puantaj', 'gec_kalma_dakika')
+                ? 'gp.gec_kalma_dakika'
+                : 'NULL';
+            $erkenCol = self::hasColumn($pdo, 'gunluk_puantaj', 'erken_cikis_dakika')
+                ? 'gp.erken_cikis_dakika'
+                : 'NULL';
+            $puantajSelect = '
+                gp.giris_saati AS puantaj_giris,
+                gp.cikis_saati AS puantaj_cikis,
+                ' . $gecCol . ' AS puantaj_gec,
+                ' . $erkenCol . ' AS puantaj_erken';
+            $puantajJoin = '
+            LEFT JOIN gunluk_puantaj gp ON gp.personel_id = p.id AND gp.tarih = :bagd_tarih_gp';
+        }
+
+        $sql = '
+            SELECT
+                p.id AS personel_id,
+                ' . $nameExpr . ' AS ad_soyad,
+                ' . $bildirimSelect . ',
+                ' . $puantajSelect . '
+            FROM personeller p
+            ' . $bildirimJoin . '
+            ' . $puantajJoin . '
+            WHERE ' . implode(' AND ', $where) . '
+            ORDER BY p.ad ASC, p.soyad ASC, p.id ASC
+        ';
+
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+
+        $personeller = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $personeller[] = self::mapPersonelRow($row);
+        }
+
+        $ozet = self::buildOzetCounts($personeller);
+        $tamamlama = self::fetchTamamlama($pdo, $amirId, $tarih, $activeSube);
+
+        return [
+            'tarih' => $tarih,
+            'ozet' => $ozet,
+            'tamamlandi_mi' => is_array($tamamlama),
+            'tamamlama' => $tamamlama,
+            'personeller' => $personeller,
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $row
+     * @return array<string, mixed>
+     */
+    public static function mapPersonelRow(array $row)
+    {
+        $durum = self::deriveDurum(isset($row['bildirim_turu']) ? $row['bildirim_turu'] : null);
+        $dakika = self::nullableInt(isset($row['dakika']) ? $row['dakika'] : null);
+        $puantajGec = self::nullableInt(isset($row['puantaj_gec']) ? $row['puantaj_gec'] : null);
+        $puantajErken = self::nullableInt(isset($row['puantaj_erken']) ? $row['puantaj_erken'] : null);
+
+        $gec = null;
+        $erken = null;
+        if ($durum === 'GEC_GELDI') {
+            $gec = $dakika !== null && $dakika > 0 ? $dakika : $puantajGec;
+        } elseif ($durum === 'ERKEN_CIKTI') {
+            $erken = $dakika !== null && $dakika > 0 ? $dakika : $puantajErken;
+        }
+
+        $giris = self::nullableString(isset($row['baslangic_saati']) ? $row['baslangic_saati'] : null);
+        if ($giris === null) {
+            $giris = self::nullableString(isset($row['puantaj_giris']) ? $row['puantaj_giris'] : null);
+        }
+        $cikis = self::nullableString(isset($row['bitis_saati']) ? $row['bitis_saati'] : null);
+        if ($cikis === null) {
+            $cikis = self::nullableString(isset($row['puantaj_cikis']) ? $row['puantaj_cikis'] : null);
+        }
+
+        return [
+            'personel_id' => (int) $row['personel_id'],
+            'ad_soyad' => trim((string) $row['ad_soyad']),
+            'durum' => $durum,
+            'durum_label' => self::durumLabel($durum),
+            'gec_kalma_dakika' => $gec !== null && $gec > 0 ? $gec : null,
+            'erken_cikis_dakika' => $erken !== null && $erken > 0 ? $erken : null,
+            'giris_saati' => $giris,
+            'cikis_saati' => $cikis,
+        ];
+    }
+
+    /**
+     * @param mixed $value
+     * @return int|null
+     */
+    private static function nullableInt($value)
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        return (int) $value;
+    }
+
+    /**
+     * @param mixed $value
+     * @return string|null
+     */
+    private static function nullableString($value)
+    {
+        if ($value === null) {
+            return null;
+        }
+        $trimmed = trim((string) $value);
+
+        return $trimmed === '' ? null : $trimmed;
+    }
+
+    private static function durumLabel($durum)
+    {
+        $map = [
+            'GELDI' => 'Geldi',
+            'GELMEDI' => 'Gelmedi',
+            'GEC_GELDI' => 'Geç Geldi',
+            'ERKEN_CIKTI' => 'Erken Çıktı',
+            'IZINLI' => 'İzinli',
+            'RAPORLU' => 'Raporlu',
+            'GOREVDE' => 'Görevde',
+            'DIGER' => 'Diğer',
+        ];
+        $key = strtoupper(trim((string) $durum));
+
+        return isset($map[$key]) ? $map[$key] : $key;
+    }
+
+    /**
+     * @param int|null $activeSube
+     * @return array<string, mixed>|null
+     */
+    private static function fetchTamamlama(PDO $pdo, $amirId, $tarih, $activeSube)
+    {
+        if ($amirId <= 0 || !self::hasTable($pdo, 'gunluk_bildirim_tamamlamalari')) {
+            return null;
+        }
+
+        $sql = '
+            SELECT id, tamamlandi_at, tamamlayan_user_id, state
+            FROM gunluk_bildirim_tamamlamalari
+            WHERE birim_amiri_user_id = :amir_id
+              AND tarih = :tarih
+        ';
+        $params = [
+            'amir_id' => (int) $amirId,
+            'tarih' => $tarih,
+        ];
+        if ($activeSube !== null) {
+            $sql .= ' AND sube_id = :sube_id';
+            $params['sube_id'] = (int) $activeSube;
+        }
+        $sql .= ' ORDER BY id DESC LIMIT 1';
+
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$row) {
+            return null;
+        }
+
+        return [
+            'id' => (int) $row['id'],
+            'tamamlandi_at' => $row['tamamlandi_at'] !== null ? (string) $row['tamamlandi_at'] : null,
+            'tamamlayan_user_id' => (int) $row['tamamlayan_user_id'],
+            'state' => (string) $row['state'],
+        ];
+    }
+
+    private static function hasTable(PDO $pdo, $table)
+    {
+        $table = (string) $table;
+        try {
+            $stmt = $pdo->query('SHOW TABLES LIKE ' . $pdo->quote($table));
+            if ($stmt && $stmt->fetch()) {
+                return true;
+            }
+        } catch (\Throwable $e) {
+            // sqlite / non-mysql
+        }
+        try {
+            $stmt = $pdo->prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = :n LIMIT 1");
+            $stmt->execute(['n' => $table]);
+
+            return (bool) $stmt->fetchColumn();
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    private static function hasColumn(PDO $pdo, $table, $column)
+    {
+        try {
+            $stmt = $pdo->query('SHOW COLUMNS FROM ' . $table . ' LIKE ' . $pdo->quote((string) $column));
+            if ($stmt && $stmt->fetch()) {
+                return true;
+            }
+        } catch (\Throwable $e) {
+            // sqlite
+        }
+        try {
+            $stmt = $pdo->query('PRAGMA table_info(' . $table . ')');
+            if (!$stmt) {
+                return false;
+            }
+            foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $col) {
+                if (isset($col['name']) && (string) $col['name'] === (string) $column) {
+                    return true;
+                }
+            }
+        } catch (\Throwable $e) {
+            return false;
+        }
+
+        return false;
+    }
+
+    private static function isSqlite(PDO $pdo)
+    {
+        try {
+            return strtolower((string) $pdo->getAttribute(PDO::ATTR_DRIVER_NAME)) === 'sqlite';
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+}

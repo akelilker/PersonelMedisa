@@ -130,3 +130,33 @@ export type GunlukOzet = {
   tamamlama: GunlukBildirimTamamlama | null;
   personeller: GunlukOzetPersonel[];
 };
+
+/** BIRIM_AMIRI operational home — OrgScope unit roster for today. */
+export type BirimAmiriGunlukDurumOzet = {
+  toplam_personel: number;
+  geldi: number;
+  gelmedi: number;
+  gec_geldi: number;
+  izinli_raporlu: number;
+  erken_cikti: number;
+  gorevde: number;
+};
+
+export type BirimAmiriGunlukDurumPersonel = {
+  personel_id: number;
+  ad_soyad: string;
+  durum: string;
+  durum_label: string;
+  gec_kalma_dakika: number | null;
+  erken_cikis_dakika: number | null;
+  giris_saati: string | null;
+  cikis_saati: string | null;
+};
+
+export type BirimAmiriGunlukDurum = {
+  tarih: string;
+  ozet: BirimAmiriGunlukDurumOzet;
+  tamamlandi_mi: boolean;
+  tamamlama: GunlukBildirimTamamlama | null;
+  personeller: BirimAmiriGunlukDurumPersonel[];
+};

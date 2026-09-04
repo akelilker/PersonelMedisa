@@ -58,6 +58,8 @@ test.describe("Global module navigation absence", () => {
   test("BIRIM_AMIRI has no global modules surfaces; PERSONEL home has no main menu", async ({ page }) => {
     await mockApi(page, "BIRIM_AMIRI");
     await login(page, MOCK_ROLE_LOGIN.BIRIM_AMIRI);
+    await expect(page.getByTestId("birim-amiri-operational-home")).toBeVisible();
+    await expect(page.locator("#main-menu")).toHaveCount(0);
     await expect(page.getByTestId("menu-moduller")).toHaveCount(0);
     await expect(page.getByTestId("header-modules-toggle")).toHaveCount(0);
 

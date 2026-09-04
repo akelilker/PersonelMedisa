@@ -113,6 +113,7 @@ const BILDIRIM_TURU_LABELS: Record<string, string> = {
   DEVAMSIZLIK: "Devamsızlık",
   DIGER: "Diğer",
   ERKEN_CIKTI: "Erken Çıktı",
+  GELDI: "Geldi",
   GEC_GELDI: "Geç Geldi",
   GEC_CIKTI: "Geç Çıktı",
   GELMEDI: "Gelmedi",

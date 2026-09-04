@@ -10,7 +10,9 @@ use Medisa\Api\Database\Connection;
 use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
 use Medisa\Api\Scope\ManagerApprovalScope;
+use Medisa\Api\Scope\OrgScope;
 use Medisa\Api\Scope\SubeScope;
+use Medisa\Api\Services\Bildirim\BirimAmiriGunlukDurumService;
 use Medisa\Api\Services\OfflineMutationIdempotencyService;
 use Medisa\Api\Services\Organizasyon\OrganizasyonSchema;
 use Medisa\Api\Services\Organizasyon\SubeReadModel;
@@ -829,6 +831,34 @@ class BildirimlerController
             'tamamlama' => $tamamlama,
             'personeller' => $personeller,
         ]);
+    }
+
+    /**
+     * BIRIM_AMIRI operational home roster. Own unit via user_birimler (OrgScope).
+     * Does not reuse fetchGunlukRoster sube-wide fallback.
+     */
+    public static function birimGunlukDurum(Request $request)
+    {
+        $user = AuthMiddleware::authenticate($request, true);
+        $rol = RolePermissions::normalizeRole(isset($user['rol']) ? (string) $user['rol'] : '');
+        if ($rol !== 'BIRIM_AMIRI') {
+            JsonResponse::forbidden();
+        }
+        RolePermissions::assert($user, 'bildirimler.view');
+        OrgScope::assertRequiredAssignment($user);
+
+        $tarih = trim((string) $request->getQuery('tarih', ''));
+        if ($tarih === '' || !self::isValidDate($tarih)) {
+            self::validationError('tarih', 'Tarih YYYY-MM-DD formatinda zorunludur.');
+        }
+
+        try {
+            $pdo = Connection::get();
+        } catch (\Throwable $e) {
+            JsonResponse::serverError('Veritabani baglantisi kurulamadi.');
+        }
+
+        JsonResponse::success(BirimAmiriGunlukDurumService::build($pdo, $user, $request, $tarih));
     }
 
     public static function gunlukTamamlamaGet(Request $request)

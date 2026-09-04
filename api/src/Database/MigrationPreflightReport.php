@@ -28,7 +28,7 @@ final class MigrationPreflightReport
     public const SCHEMA_VERSION = '1';
 
     /** Expected production ledger tip before this round's first migration. */
-    public const EXPECTED_APPLIED_TIP = '082';
+    public const EXPECTED_APPLIED_TIP = '083';
 
     /**
      * The migrations this round authorizes, in apply order. Each one is a
@@ -38,13 +38,14 @@ final class MigrationPreflightReport
      * migration that was withdrawn as business-model wrong, so names are pinned
      * next to versions here.
      *
-     * This round is the personnel organisation change audit owner. Production
-     * is expected at tip 082; only 083 is pending in this round.
+     * This round is the daily attendance completion header-summary owner.
+     * Production is expected at tip 083; only 084 is pending in this round.
+     * 084 adds columns (no new audit table).
      *
      * @var array<string, string>
      */
     public const ROUND_MIGRATIONS = [
-        '083' => '083_personel_organizasyon_degisiklik_auditleri.sql',
+        '084' => '084_gunluk_bildirim_tamamlama_header_summary.sql',
     ];
 
     /** Withdrawn 079. Must not appear anywhere in the canonical source. */
@@ -61,13 +62,15 @@ final class MigrationPreflightReport
 
     private const HIERARCHY_TABLES = ['sirketler', 'user_sirketler', 'user_sgk_isverenler'];
 
-    /** Append-only audit tables this round creates. Absent is the preimage. */
+    /**
+     * Append-only audit tables this round creates. Absent is the preimage.
+     * 084 is additive columns only — no new audit table.
+     */
     private const ROUND_AUDIT_TABLES = [
-        'personel_organizasyon_degisiklik_auditleri',
     ];
 
     /**
-     * Audit owners the completed 082 round already delivered.
+     * Audit owners the completed 083 round already delivered.
      */
     private const PREDECESSOR_AUDIT_TABLES = [
         'personel_sube_degisiklik_auditleri',
@@ -75,6 +78,7 @@ final class MigrationPreflightReport
         'user_org_scope_auditleri',
         'user_erisim_kaldirma_auditleri',
         'user_erisim_degisiklik_auditleri',
+        'personel_organizasyon_degisiklik_auditleri',
     ];
 
     /** Role 081 added to the users.rol enum. Present is the expected preimage. */
@@ -478,7 +482,7 @@ final class MigrationPreflightReport
         }
         if ($pendingVersions === []) {
             // Nothing left to authorize; a further request would re-apply. The
-            // healthy end state is tip 083 exactly; an empty pending set on any
+            // healthy end state is tip 084 exactly; an empty pending set on any
             // other tip means the chain is not the one this gate authorizes.
             $blockers[] = $ledger['ready'] && $ledger['applied_tip'] === $roundTip
                 ? 'ROUND_ALREADY_COMPLETE'

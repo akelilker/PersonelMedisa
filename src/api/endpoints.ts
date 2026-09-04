@@ -98,6 +98,7 @@ export const endpoints = {
     birimAmiriSecenekleri: "/bildirimler/birim-amiri-secenekleri",
     gunlukOzet: "/bildirimler/gunluk-ozet",
     birimGunlukDurum: "/bildirimler/birim-gunluk-durum",
+    bugunPersonelDurumu: "/bildirimler/bugun-personel-durumu",
     gunlukTamamlama: "/bildirimler/gunluk-tamamlama",
     gunlukTamamlamalari: "/bildirimler/gunluk-tamamlamalari",
     gunlukTamamlamaDetail: (id: number | string) => `/bildirimler/gunluk-tamamlama/${id}`,

@@ -16,6 +16,7 @@ import { personelSearchMatches } from "../features/personeller/personel-search-q
 import {
   buildBirimAmiriOzetCounts,
   isAktifBirimPersonelForDate,
+  istanbulBusinessDate,
   mapBirimAmiriPersonelRow
 } from "../features/self-service/birim-amiri-operational";
 import type { Personel } from "../types/personel";
@@ -7083,6 +7084,222 @@ export function resolveDemoApiResponse(
           }
         : null,
       personeller
+    });
+  }
+
+  if (pathname === "/bildirimler/bugun-personel-durumu" && method === "GET") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "bugun_personel_durumu.view");
+    if (permissionError) return permissionError;
+
+    const tarih =
+      toStringValue(requestUrl.searchParams.get("tarih")) || istanbulBusinessDate();
+    const requestedSubeId = toNumber(requestUrl.searchParams.get("sube_id"));
+    if (requestedSubeId !== null) {
+      const allowed =
+        actor.subeIds.length === 0 ||
+        actor.subeIds.includes(requestedSubeId) ||
+        actor.role === "GENEL_YONETICI" ||
+        actor.role === "IK_SORUMLUSU" ||
+        actor.role === "SISTEM_YONETICISI";
+      if (!allowed) {
+        return demoRevizyonError("FORBIDDEN", "Bu sube kapsaminda erisim yok.");
+      }
+    }
+
+    const now = new Date();
+    const deadline = new Date(`${tarih}T09:30:00`);
+    const emptyCounts = () => ({
+      toplam: 0,
+      geldi: 0,
+      gec_geldi: 0,
+      gelmedi: 0,
+      izinli: 0,
+      raporlu: 0,
+      gorevde: 0,
+      erken_cikti: 0
+    });
+
+    type UnitBucket = {
+      birim_id: number | null;
+      birim_adi: string;
+      bolum_id: number | null;
+      bolum_adi: string | null;
+      personeller: ReturnType<typeof mapBirimAmiriPersonelRow>[];
+      amirIds: number[];
+    };
+    type BranchBucket = {
+      sube_id: number;
+      sube_adi: string;
+      units: Map<string, UnitBucket>;
+    };
+
+    const branches = new Map<number, BranchBucket>();
+    for (const personel of demoState.personeller) {
+      if ((personel.aktif_durum ?? "AKTIF").toUpperCase() !== "AKTIF") continue;
+      if ((personel.ise_giris_tarihi ?? "1900-01-01") > tarih) continue;
+      const subeId = personel.sube_id ?? 0;
+      if (subeId < 1) continue;
+      if (requestedSubeId !== null && subeId !== requestedSubeId) continue;
+      if (actor.subeIds.length > 0 && !actor.subeIds.includes(subeId) && actor.role === "SUBE_YONETICISI") {
+        continue;
+      }
+
+      if (!branches.has(subeId)) {
+        branches.set(subeId, {
+          sube_id: subeId,
+          sube_adi: demoSubeGosterimAdi(subeId) ?? `Şube ${subeId}`,
+          units: new Map()
+        });
+      }
+      const branch = branches.get(subeId)!;
+      const birimId = personel.birim_id ?? 0;
+      const unitKey = birimId > 0 ? String(birimId) : "none";
+      if (!branch.units.has(unitKey)) {
+        branch.units.set(unitKey, {
+          birim_id: birimId > 0 ? birimId : null,
+          birim_adi: birimId > 0 ? `Birim ${birimId}` : "Birimsiz",
+          bolum_id: null,
+          bolum_adi: null,
+          personeller: [],
+          amirIds: personel.bagli_amir_id ? [personel.bagli_amir_id] : []
+        });
+      }
+      const open = demoState.bildirimler
+        .filter(
+          (item) =>
+            item.personel_id === personel.id &&
+            item.tarih === tarih &&
+            (item.state ?? "").toUpperCase() !== "IPTAL"
+        )
+        .sort((a, b) => b.id - a.id)[0];
+      const mapped = mapBirimAmiriPersonelRow({
+        personel_id: personel.id,
+        ad_soyad: `${personel.ad} ${personel.soyad ?? ""}`.trim(),
+        bildirim_turu: open?.bildirim_turu ?? null,
+        dakika: open?.dakika ?? null,
+        baslangic_saati: open?.baslangic_saati ?? null,
+        bitis_saati: open?.bitis_saati ?? null
+      });
+      const detailLine =
+        mapped.durum === "GEC_GELDI"
+          ? [mapped.giris_saati, mapped.gec_kalma_dakika ? `${mapped.gec_kalma_dakika} dk geç` : null]
+              .filter(Boolean)
+              .join(" · ") || "Geç Geldi"
+          : mapped.durum === "GELMEDI"
+            ? "Giriş yok · Açıklama yok"
+            : mapped.durum_label;
+      branch.units.get(unitKey)!.personeller.push({
+        ...mapped,
+        aciklama: open?.aciklama ?? null,
+        alt_tur: open?.alt_tur ?? null,
+        detail_line: detailLine,
+        group:
+          mapped.durum === "IZINLI" || mapped.durum === "RAPORLU" || mapped.durum === "GOREVDE"
+            ? "PLANNED"
+            : mapped.durum === "GELMEDI"
+              ? "ATTENTION"
+              : "ACTUAL"
+      } as never);
+    }
+
+    const branchSummaries = Array.from(branches.values()).map((branch) => {
+      const branchCounts = emptyCounts();
+      let unitsCompleted = 0;
+      const units = Array.from(branch.units.values()).map((unit) => {
+        const counts = emptyCounts();
+        counts.toplam = unit.personeller.length;
+        for (const person of unit.personeller) {
+          const durum = person.durum.toUpperCase();
+          if (durum === "GELMEDI") counts.gelmedi += 1;
+          else if (durum === "GEC_GELDI") counts.gec_geldi += 1;
+          else if (durum === "IZINLI") counts.izinli += 1;
+          else if (durum === "RAPORLU") counts.raporlu += 1;
+          else if (durum === "GOREVDE") counts.gorevde += 1;
+          else if (durum === "ERKEN_CIKTI") counts.erken_cikti += 1;
+          else counts.geldi += 1;
+        }
+        for (const key of Object.keys(counts) as Array<keyof typeof counts>) {
+          if (key !== "toplam") branchCounts[key] += counts[key];
+        }
+        branchCounts.toplam += counts.toplam;
+
+        const completion = demoState.gunlukBildirimTamamlamalari.find(
+          (item) =>
+            item.sube_id === branch.sube_id &&
+            item.tarih === tarih &&
+            (unit.amirIds.length === 0 || unit.amirIds.includes(item.birim_amiri_user_id))
+        );
+        const tamamlandiAt = completion?.tamamlandi_at ?? null;
+        let status = "BEKLENIYOR";
+        if (tamamlandiAt) {
+          const completed = new Date(tamamlandiAt);
+          status = completed <= deadline ? "TAMAMLANDI" : "GEC_BILDIRILDI";
+        } else if (now > deadline) {
+          status = "SURESI_GECTI";
+        }
+        if (completion) unitsCompleted += 1;
+        const timeLabel = tamamlandiAt
+          ? new Intl.DateTimeFormat("tr-TR", {
+              hour: "2-digit",
+              minute: "2-digit",
+              timeZone: "Europe/Istanbul"
+            }).format(new Date(tamamlandiAt))
+          : null;
+        const statusLabel =
+          status === "TAMAMLANDI"
+            ? timeLabel
+              ? `Tamamlandı · ${timeLabel}`
+              : "Tamamlandı"
+            : status === "GEC_BILDIRILDI"
+              ? timeLabel
+                ? `Geç Bildirildi · ${timeLabel}`
+                : "Geç Bildirildi"
+              : status === "SURESI_GECTI"
+                ? "Süresi Geçti"
+                : "Bekleniyor";
+
+        return {
+          birim_id: unit.birim_id,
+          birim_adi: unit.birim_adi,
+          bolum_id: unit.bolum_id,
+          bolum_adi: unit.bolum_adi,
+          counts,
+          bildirim: {
+            status,
+            status_label: statusLabel,
+            tamamlandi_mi: completion != null,
+            tamamlandi_at: tamamlandiAt,
+            tamamlayan_user_id: completion?.tamamlayan_user_id ?? null,
+            completion_id: completion?.id ?? null
+          },
+          personeller: unit.personeller
+        };
+      });
+
+      return {
+        sube_id: branch.sube_id,
+        sube_adi: branch.sube_adi,
+        counts: branchCounts,
+        birim_bildirim: { tamamlanan: unitsCompleted, toplam: units.length },
+        units
+      };
+    });
+
+    let attention = 0;
+    for (const branch of branchSummaries) {
+      attention += branch.counts.gelmedi + branch.counts.gec_geldi;
+      attention += Math.max(0, branch.birim_bildirim.toplam - branch.birim_bildirim.tamamlanan);
+    }
+
+    return ok({
+      tarih,
+      timezone: "Europe/Istanbul",
+      workday_start: "08:30",
+      on_time_deadline: "09:30",
+      server_now: now.toISOString().slice(0, 19).replace("T", " "),
+      attention_count: attention,
+      branches: branchSummaries.sort((a, b) => a.sube_adi.localeCompare(b.sube_adi, "tr"))
     });
   }
 

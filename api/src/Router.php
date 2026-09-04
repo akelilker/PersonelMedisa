@@ -765,6 +765,9 @@ class Router
         if ($path === '/bildirimler/birim-gunluk-durum' && $method === 'GET') {
             BildirimlerController::birimGunlukDurum($this->request);
         }
+        if ($path === '/bildirimler/bugun-personel-durumu' && $method === 'GET') {
+            BildirimlerController::bugunPersonelDurumu($this->request);
+        }
         if ($path === '/bildirimler/gunluk-tamamlamalari' && $method === 'GET') {
             BildirimlerController::gunlukTamamlamaList($this->request);
         }

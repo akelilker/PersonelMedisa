@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { getAppData, useAppDataRevision } from "../../data/data-manager";
+import { BugunPersonelDurumuModal } from "../../features/bildirimler/components/BugunPersonelDurumuModal";
 import { useBildirimlerHeaderPreview } from "../../hooks/useBildirimler";
 import { useRoleAccess } from "../../hooks/use-role-access";
 import {
@@ -10,6 +11,8 @@ import {
 import { canonicalizeUserRole } from "../../lib/authorization/canonicalize-user-role";
 import { useAuth } from "../../state/auth.store";
 import { GLOBAL_SCOPE_ROLES } from "../../types/auth";
+import { fetchBugunPersonelDurumu } from "../../api/bildirimler.api";
+import { istanbulBusinessDate } from "../../features/self-service/birim-amiri-operational";
 
 type NotificationLevel = "neutral" | "warning" | "critical";
 
@@ -108,6 +111,7 @@ export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeade
 
   const canViewBildirimler = hasPermission("bildirimler.view");
   const canViewBildirimDetay = hasPermission("bildirimler.detail.view");
+  const canViewBugunPersonelDurumu = hasPermission("bugun_personel_durumu.view");
   const canViewRaporlar = hasPermission("raporlar.view");
   const canViewFinans = hasPermission("finans.view");
   const canViewYonetimPanel = hasPermission("yonetim-paneli.view");
@@ -122,6 +126,8 @@ export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeade
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isSubeOpen, setIsSubeOpen] = useState(false);
+  const [isBugunModalOpen, setIsBugunModalOpen] = useState(false);
+  const [bugunAttentionCount, setBugunAttentionCount] = useState(0);
   const [notificationActionError, setNotificationActionError] = useState<string | null>(null);
   const [readNotificationIds, setReadNotificationIds] = useState<Record<string, true>>({});
 
@@ -207,6 +213,27 @@ export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeade
     setIsSettingsOpen(false);
     setIsSubeOpen(false);
   }, [location.pathname]);
+
+  useEffect(() => {
+    if (!canViewBugunPersonelDurumu || !minimal) {
+      return;
+    }
+    let cancelled = false;
+    void fetchBugunPersonelDurumu({ tarih: istanbulBusinessDate() })
+      .then((data) => {
+        if (!cancelled) {
+          setBugunAttentionCount(Math.max(0, Number(data.attention_count) || 0));
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setBugunAttentionCount(0);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [canViewBugunPersonelDurumu, minimal, location.pathname]);
 
   useEffect(() => {
     function handleDocumentClick(event: MouseEvent) {
@@ -317,6 +344,7 @@ export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeade
     .join(" ");
 
   return (
+    <>
     <div className={`icons-row${minimal ? " icons-row--minimal" : ""}`} ref={rootRef}>
       {!minimal ? (
         <div className="icons-row-left">
@@ -333,6 +361,47 @@ export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeade
         </div>
       ) : null}
       <div className="icons-row-right">
+        {canViewBugunPersonelDurumu && minimal ? (
+          <button
+            type="button"
+            className="icon-btn bugun-personel-header-btn"
+            data-testid="bugun-personel-durumu-entry"
+            aria-label={
+              bugunAttentionCount > 0
+                ? `Bugünkü Personel Durumu, ${bugunAttentionCount} dikkat`
+                : "Bugünkü Personel Durumu"
+            }
+            title="Bugünkü Personel Durumu"
+            onClick={() => {
+              setIsBugunModalOpen(true);
+              setIsNotificationsOpen(false);
+              setIsSettingsOpen(false);
+              setIsSubeOpen(false);
+            }}
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="22"
+              height="22"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <rect x="3" y="4" width="18" height="18" rx="2" />
+              <path d="M16 2v4M8 2v4M3 10h18" />
+              <path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01" />
+            </svg>
+            {bugunAttentionCount > 0 ? (
+              <span className="bugun-personel-header-badge" aria-hidden="true">
+                {bugunAttentionCount > 99 ? "99+" : bugunAttentionCount}
+              </span>
+            ) : null}
+          </button>
+        ) : null}
         {!minimal && subeControl.kind === "all" ? (
           <span className="sube-header-badge" title="Aktif şube filtresi yok">
             Tüm şubeler
@@ -600,5 +669,17 @@ export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeade
         </div>
       </div>
     </div>
+    {canViewBugunPersonelDurumu ? (
+      <BugunPersonelDurumuModal
+        open={isBugunModalOpen}
+        onClose={() => {
+          setIsBugunModalOpen(false);
+          void fetchBugunPersonelDurumu({ tarih: istanbulBusinessDate() })
+            .then((data) => setBugunAttentionCount(Math.max(0, Number(data.attention_count) || 0)))
+            .catch(() => undefined);
+        }}
+      />
+    ) : null}
+    </>
   );
 }

@@ -13,10 +13,12 @@ use Medisa\Api\Scope\ManagerApprovalScope;
 use Medisa\Api\Scope\OrgScope;
 use Medisa\Api\Scope\SubeScope;
 use Medisa\Api\Services\Bildirim\BirimAmiriGunlukDurumService;
+use Medisa\Api\Services\Bildirim\BugunPersonelDurumuService;
 use Medisa\Api\Services\OfflineMutationIdempotencyService;
 use Medisa\Api\Services\Organizasyon\OrganizasyonSchema;
 use Medisa\Api\Services\Organizasyon\SubeReadModel;
 use Medisa\Api\Services\Personel\PersonelOrgStructureSchema;
+use Medisa\Api\Services\PuantajDonemPeriodService;
 use PDO;
 
 class BildirimlerController
@@ -197,6 +199,7 @@ class BildirimlerController
         }
 
         SubeScope::assertPersonelAccess($user, $request, $personel);
+        self::assertPeriodOpenForDate($pdo, (int) $personel['sube_id'], (string) $payload['tarih']);
 
         $rol = strtoupper(trim((string) ($user['rol'] ?? '')));
         $currentUserId = self::userId($user);
@@ -352,6 +355,11 @@ class BildirimlerController
         self::assertOwnership($user, $existing);
         SubeScope::assertPersonelAccess($user, $request, self::personelOrgFromBildirimRow($existing));
         self::assertEditableState($existing);
+        self::assertPeriodOpenForDate(
+            $pdo,
+            (int) ($existing['sube_id'] ?? 0),
+            (string) ($existing['tarih'] ?? '')
+        );
 
         $fields = [];
         $params = ['id' => $bildirimId, 'updated_by' => self::userId($user)];
@@ -579,6 +587,12 @@ class BildirimlerController
             JsonResponse::error(409, 'CONFLICT', 'Yalnizca gonderilmis bildirimler icin duzeltme istenebilir.');
         }
 
+        self::assertPeriodOpenForDate(
+            $pdo,
+            (int) ($existing['sube_id'] ?? 0),
+            (string) ($existing['tarih'] ?? '')
+        );
+
         try {
             $stmt = $pdo->prepare('
                 UPDATE gunluk_bildirimler
@@ -630,6 +644,11 @@ class BildirimlerController
 
         self::assertOwnership($user, $existing);
         SubeScope::assertPersonelAccess($user, $request, self::personelOrgFromBildirimRow($existing));
+        self::assertPeriodOpenForDate(
+            $pdo,
+            (int) ($existing['sube_id'] ?? 0),
+            (string) ($existing['tarih'] ?? '')
+        );
 
         $state = (string) $existing['state'];
         if ($state === 'IPTAL') {
@@ -831,6 +850,63 @@ class BildirimlerController
             'tamamlama' => $tamamlama,
             'personeller' => $personeller,
         ]);
+    }
+
+    /**
+     * IK / GENEL morning operations overview. Branch → unit → person read model.
+     * Fail-closed for BIRIM_AMIRI / MUHASEBE / PERSONEL (permission gate).
+     */
+    public static function bugunPersonelDurumu(Request $request)
+    {
+        $user = AuthMiddleware::authenticate($request, true);
+        RolePermissions::assert($user, 'bugun_personel_durumu.view');
+
+        $tarih = trim((string) $request->getQuery('tarih', ''));
+        if ($tarih === '') {
+            $tarih = (new \DateTimeImmutable('now', new \DateTimeZone(BugunPersonelDurumuService::TIMEZONE)))
+                ->format('Y-m-d');
+        } elseif (!self::isValidDate($tarih)) {
+            self::validationError('tarih', 'Tarih YYYY-MM-DD formatinda zorunludur.');
+        }
+
+        $requestedSubeId = self::parsePositiveInt($request->getQuery('sube_id'));
+        if ($requestedSubeId !== null) {
+            OrgScope::assertPersonelAccess(
+                $user,
+                $request,
+                ['sube_id' => $requestedSubeId, 'bolum_id' => null, 'birim_id' => null]
+            );
+        }
+
+        try {
+            $pdo = Connection::get();
+        } catch (\Throwable $e) {
+            JsonResponse::serverError('Veritabani baglantisi kurulamadi.');
+        }
+
+        $payload = BugunPersonelDurumuService::build($pdo, $user, $request, $tarih);
+        if ($requestedSubeId !== null) {
+            $payload['branches'] = array_values(array_filter(
+                isset($payload['branches']) && is_array($payload['branches']) ? $payload['branches'] : [],
+                function ($branch) use ($requestedSubeId) {
+                    return (int) ($branch['sube_id'] ?? 0) === (int) $requestedSubeId;
+                }
+            ));
+            $attention = 0;
+            foreach ($payload['branches'] as $branch) {
+                $counts = isset($branch['counts']) && is_array($branch['counts']) ? $branch['counts'] : [];
+                $attention += (int) ($counts['gelmedi'] ?? 0) + (int) ($counts['gec_geldi'] ?? 0);
+                $birimBildirim = isset($branch['birim_bildirim']) && is_array($branch['birim_bildirim'])
+                    ? $branch['birim_bildirim']
+                    : [];
+                $tamamlanan = (int) ($birimBildirim['tamamlanan'] ?? 0);
+                $toplam = (int) ($birimBildirim['toplam'] ?? 0);
+                $attention += max(0, $toplam - $tamamlanan);
+            }
+            $payload['attention_count'] = $attention;
+        }
+
+        JsonResponse::success($payload);
     }
 
     /**
@@ -1382,6 +1458,31 @@ class BildirimlerController
         }
     }
 
+    /**
+     * Canonical payroll/puantaj period gate for daily notification mutations.
+     * SEALED / REOPEN_PENDING → fail-closed. No schema migration.
+     */
+    private static function assertPeriodOpenForDate(PDO $pdo, $subeId, $tarih)
+    {
+        $subeId = (int) $subeId;
+        $tarih = trim((string) $tarih);
+        if ($subeId < 1 || !preg_match('/^(\d{4})-(\d{2})-\d{2}$/', $tarih, $m)) {
+            return;
+        }
+        $yil = (int) $m[1];
+        $ay = (int) $m[2];
+        try {
+            if (PuantajDonemPeriodService::isWriteLocked($pdo, $subeId, $yil, $ay)) {
+                JsonResponse::error(
+                    409,
+                    'PERIOD_LOCKED',
+                    'Bu ayin puantaj donemi kapali oldugu icin gunluk bildirim duzeltilemez.'
+                );
+            }
+        } catch (\Throwable $e) {
+            // Missing period tables must not block today's open-period ops in partial schemas.
+        }
+    }
 
     /**
      * @param array<string, mixed> $row

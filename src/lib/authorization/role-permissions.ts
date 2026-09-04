@@ -32,6 +32,7 @@ export type AppPermission =
   // gunluk_bildirim.update_own_open in canCancelGunlukBildirim and in
   // BildirimlerController::cancel. The sync-queue op of the same name is unrelated.
   | "bildirimler.detail.view"
+  | "bugun_personel_durumu.view"
   | "puantaj.view"
   | "puantaj.update"
   | "puantaj.amir_kontrol"
@@ -174,6 +175,7 @@ const BASE_ROLE_PERMISSIONS: Record<
     "bildirimler.create",
     "bildirimler.update",
     "bildirimler.detail.view",
+    "bugun_personel_durumu.view",
     "puantaj.view",
     "puantaj.update",
     "puantaj.donem_muhurle",
@@ -436,6 +438,7 @@ const BASE_ROLE_PERMISSIONS: Record<
     "surecler.detail.view",
     "bildirimler.view",
     "bildirimler.detail.view",
+    "bugun_personel_durumu.view",
     "haftalik_mutabakat.view",
     "puantaj.view",
     "puantaj.donem_reopen.request",
@@ -490,6 +493,7 @@ const BASE_ROLE_PERMISSIONS: Record<
     "surecler.detail.view",
     "bildirimler.view",
     "bildirimler.detail.view",
+    "bugun_personel_durumu.view",
     "puantaj.view",
     "puantaj.donem_seal.history",
     "puantaj.bildirim_etki.view",

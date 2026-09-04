@@ -160,3 +160,67 @@ export type BirimAmiriGunlukDurum = {
   tamamlama: GunlukBildirimTamamlama | null;
   personeller: BirimAmiriGunlukDurumPersonel[];
 };
+
+/** IK / GENEL morning operations overview — branch → unit → person. */
+export type BugunPersonelDurumuStatusCounts = {
+  toplam: number;
+  geldi: number;
+  gec_geldi: number;
+  gelmedi: number;
+  izinli: number;
+  raporlu: number;
+  gorevde: number;
+  erken_cikti: number;
+};
+
+export type BugunPersonelDurumuPerson = {
+  personel_id: number;
+  ad_soyad: string;
+  durum: string;
+  durum_label: string;
+  gec_kalma_dakika: number | null;
+  erken_cikis_dakika: number | null;
+  giris_saati: string | null;
+  cikis_saati: string | null;
+  aciklama: string | null;
+  alt_tur: string | null;
+  detail_line: string;
+  group: "PLANNED" | "ACTUAL" | "ATTENTION" | string;
+};
+
+export type BugunPersonelDurumuBildirim = {
+  status: string;
+  status_label: string;
+  tamamlandi_mi: boolean;
+  tamamlandi_at: string | null;
+  tamamlayan_user_id: number | null;
+  completion_id: number | null;
+};
+
+export type BugunPersonelDurumuUnit = {
+  birim_id: number | null;
+  birim_adi: string;
+  bolum_id: number | null;
+  bolum_adi: string | null;
+  counts: BugunPersonelDurumuStatusCounts;
+  bildirim: BugunPersonelDurumuBildirim;
+  personeller: BugunPersonelDurumuPerson[];
+};
+
+export type BugunPersonelDurumuBranch = {
+  sube_id: number;
+  sube_adi: string;
+  counts: BugunPersonelDurumuStatusCounts;
+  birim_bildirim: { tamamlanan: number; toplam: number };
+  units: BugunPersonelDurumuUnit[];
+};
+
+export type BugunPersonelDurumu = {
+  tarih: string;
+  timezone: string;
+  workday_start: string;
+  on_time_deadline: string;
+  server_now: string;
+  attention_count: number;
+  branches: BugunPersonelDurumuBranch[];
+};

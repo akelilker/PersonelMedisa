@@ -1,4 +1,5 @@
 import { formatBildirimTuruLabel } from "../../lib/display/enum-display";
+import { resolveLateMinutes } from "../../lib/bildirim/gunluk-personel-durum-semantics";
 
 export const BIRIM_AMIRI_DURUM_KEYS = [
   "GELDI",
@@ -8,7 +9,8 @@ export const BIRIM_AMIRI_DURUM_KEYS = [
   "RAPORLU",
   "ERKEN_CIKTI",
   "GOREVDE",
-  "DIGER"
+  "DIGER",
+  "HENUZ_DEGERLENDIRILMEDI"
 ] as const;
 
 export type BirimAmiriPersonelDurum = (typeof BIRIM_AMIRI_DURUM_KEYS)[number];
@@ -23,15 +25,33 @@ const EXCEPTION_TURLERI = new Set<string>([
   "DIGER"
 ]);
 
-/** Exception-only model: no open daily notification → GELDI. */
-export function deriveBirimAmiriPersonelDurum(
-  bildirimTuru: string | null | undefined
+/** Canonical evidence gates — shared with IK Bugün dashboard (PR #255). */
+export function resolveBirimAmiriPersonelDurum(
+  bildirimTuru: string | null | undefined,
+  attendanceGiris: string | null | undefined = null,
+  unitCompleted = false,
+  storedDakika: number | null = null
 ): BirimAmiriPersonelDurum {
   const tur = (bildirimTuru ?? "").trim().toUpperCase();
   if (EXCEPTION_TURLERI.has(tur)) {
     return tur as BirimAmiriPersonelDurum;
   }
-  return "GELDI";
+  const giris = (attendanceGiris ?? "").trim();
+  if (giris !== "") {
+    const late = resolveLateMinutes(giris, storedDakika);
+    return late != null && late > 0 ? "GEC_GELDI" : "GELDI";
+  }
+  if (unitCompleted) {
+    return "GELDI";
+  }
+  return "HENUZ_DEGERLENDIRILMEDI";
+}
+
+/** @deprecated Prefer resolveBirimAmiriPersonelDurum with evidence args. */
+export function deriveBirimAmiriPersonelDurum(
+  bildirimTuru: string | null | undefined
+): BirimAmiriPersonelDurum {
+  return resolveBirimAmiriPersonelDurum(bildirimTuru, null, false);
 }
 
 export type BirimAmiriOzetCounts = {
@@ -39,9 +59,12 @@ export type BirimAmiriOzetCounts = {
   geldi: number;
   gelmedi: number;
   gec_geldi: number;
+  izinli: number;
+  raporlu: number;
   izinli_raporlu: number;
   erken_cikti: number;
   gorevde: number;
+  henuz_degerlendirilmedi: number;
 };
 
 export function buildBirimAmiriOzetCounts(
@@ -52,28 +75,51 @@ export function buildBirimAmiriOzetCounts(
     geldi: 0,
     gelmedi: 0,
     gec_geldi: 0,
+    izinli: 0,
+    raporlu: 0,
     izinli_raporlu: 0,
     erken_cikti: 0,
-    gorevde: 0
+    gorevde: 0,
+    henuz_degerlendirilmedi: 0
   };
 
   for (const row of rows) {
     const durum = row.durum.trim().toUpperCase();
     if (durum === "GELMEDI") ozet.gelmedi += 1;
     else if (durum === "GEC_GELDI") ozet.gec_geldi += 1;
-    else if (durum === "IZINLI" || durum === "RAPORLU") ozet.izinli_raporlu += 1;
+    else if (durum === "IZINLI") ozet.izinli += 1;
+    else if (durum === "RAPORLU") ozet.raporlu += 1;
     else if (durum === "ERKEN_CIKTI") ozet.erken_cikti += 1;
     else if (durum === "GOREVDE") ozet.gorevde += 1;
-    else ozet.geldi += 1;
+    else if (durum === "HENUZ_DEGERLENDIRILMEDI") ozet.henuz_degerlendirilmedi += 1;
+    else if (durum === "GELDI" || durum === "DIGER") ozet.geldi += 1;
+    else ozet.henuz_degerlendirilmedi += 1;
   }
+  ozet.izinli_raporlu = ozet.izinli + ozet.raporlu;
 
   return ozet;
+}
+
+export function birimAmiriCountsSatisfyInvariant(counts: BirimAmiriOzetCounts): boolean {
+  const sum =
+    counts.geldi +
+    counts.gec_geldi +
+    counts.gelmedi +
+    counts.izinli +
+    counts.raporlu +
+    counts.gorevde +
+    counts.erken_cikti +
+    counts.henuz_degerlendirilmedi;
+  return sum === counts.toplam_personel;
 }
 
 export function formatBirimAmiriDurumLabel(durum: string | null | undefined): string {
   const key = (durum ?? "").trim().toUpperCase();
   if (key === "GELDI") {
     return "Geldi";
+  }
+  if (key === "HENUZ_DEGERLENDIRILMEDI") {
+    return "Henüz Değerlendirilmedi";
   }
   const labeled = formatBildirimTuruLabel(key);
   return labeled === "-" ? key : labeled;
@@ -112,7 +158,7 @@ export function formatBirimAmiriPersonelStatusLine(input: {
   const times = [input.giris_saati, input.cikis_saati].filter(
     (value): value is string => typeof value === "string" && value.trim().length > 0
   );
-  if (times.length > 0) {
+  if (times.length > 0 && durum !== "HENUZ_DEGERLENDIRILMEDI") {
     parts.push(times.join("–"));
   }
 
@@ -137,17 +183,23 @@ export type BirimAmiriGunlukDurumBuildRow = {
   cikis_saati?: string | null;
   gec_kalma_dakika?: number | null;
   erken_cikis_dakika?: number | null;
+  unit_completed?: boolean;
 };
 
 export function mapBirimAmiriPersonelRow(input: BirimAmiriGunlukDurumBuildRow) {
-  const durum = deriveBirimAmiriPersonelDurum(input.bildirim_turu);
   const dakika =
     typeof input.dakika === "number" && Number.isFinite(input.dakika) ? Math.trunc(input.dakika) : null;
+  const stored = dakika && dakika > 0 ? dakika : positiveDakika(input.gec_kalma_dakika);
+  const attendanceGiris = input.giris_saati ?? null;
+  const durum = resolveBirimAmiriPersonelDurum(
+    input.bildirim_turu,
+    attendanceGiris,
+    input.unit_completed === true,
+    stored
+  );
   const gec =
     durum === "GEC_GELDI"
-      ? dakika && dakika > 0
-        ? dakika
-        : positiveDakika(input.gec_kalma_dakika)
+      ? resolveLateMinutes(input.baslangic_saati || attendanceGiris, stored)
       : null;
   const erken =
     durum === "ERKEN_CIKTI"

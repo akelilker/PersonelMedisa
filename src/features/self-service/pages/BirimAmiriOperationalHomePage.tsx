@@ -153,6 +153,10 @@ export function BirimAmiriOperationalHomePage() {
               <span>Görevde</span>
               <strong data-testid="birim-count-gorevde">{ozet.gorevde}</strong>
             </li>
+            <li>
+              <span>Henüz Değerlendirilmedi</span>
+              <strong data-testid="birim-count-henuz">{ozet.henuz_degerlendirilmedi}</strong>
+            </li>
           </ul>
         ) : null}
 

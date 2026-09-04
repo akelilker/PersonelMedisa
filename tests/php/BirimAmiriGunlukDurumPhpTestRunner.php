@@ -33,13 +33,13 @@ function bagdAssert(bool $condition, string $msg): void
     bagdOk($msg);
 }
 
-if (BirimAmiriGunlukDurumService::deriveDurum(null) !== 'GELDI') {
-    bagdFail('null notification is GELDI');
+if (BirimAmiriGunlukDurumService::deriveDurum(null) !== 'HENUZ_DEGERLENDIRILMEDI') {
+    bagdFail('null notification is HENUZ_DEGERLENDIRILMEDI');
 }
 if (BirimAmiriGunlukDurumService::deriveDurum('GEC_GELDI') !== 'GEC_GELDI') {
     bagdFail('GEC_GELDI stays exception');
 }
-bagdOk('deriveDurum exception-only');
+bagdOk('deriveDurum evidence-gated');
 
 $counts = BirimAmiriGunlukDurumService::buildOzetCounts([
     ['durum' => 'GELDI'],
@@ -49,14 +49,19 @@ $counts = BirimAmiriGunlukDurumService::buildOzetCounts([
     ['durum' => 'RAPORLU'],
     ['durum' => 'ERKEN_CIKTI'],
     ['durum' => 'GOREVDE'],
+    ['durum' => 'HENUZ_DEGERLENDIRILMEDI'],
 ]);
-bagdAssert($counts['toplam_personel'] === 7, 'count toplam');
+bagdAssert($counts['toplam_personel'] === 8, 'count toplam');
 bagdAssert($counts['geldi'] === 1, 'count geldi');
 bagdAssert($counts['gec_geldi'] === 1, 'count gec');
 bagdAssert($counts['gelmedi'] === 1, 'count gelmedi');
+bagdAssert($counts['izinli'] === 1, 'count izinli');
+bagdAssert($counts['raporlu'] === 1, 'count raporlu');
 bagdAssert($counts['izinli_raporlu'] === 2, 'count izinli_raporlu');
 bagdAssert($counts['erken_cikti'] === 1, 'count erken');
 bagdAssert($counts['gorevde'] === 1, 'count gorevde');
+bagdAssert($counts['henuz_degerlendirilmedi'] === 1, 'count henuz');
+bagdAssert(BirimAmiriGunlukDurumService::countsSatisfyInvariant($counts), 'count invariant');
 
 $mapped = BirimAmiriGunlukDurumService::mapPersonelRow([
     'personel_id' => 1,

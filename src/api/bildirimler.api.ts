@@ -3,6 +3,7 @@ import type {
   Bildirim,
   BirimAmiriGunlukDurum,
   BirimAmiriSecenegi,
+  BugunPersonelDurumu,
   GunlukBildirimTamamlama,
   GunlukOzet,
   GunlukTamamlamaDetail,
@@ -93,6 +94,17 @@ function normalizeBirimGunlukDurum(data: unknown): BirimAmiriGunlukDurum {
     throw new Error("Birim gunluk durum yaniti eksik alan iceriyor.");
   }
   return row as BirimAmiriGunlukDurum;
+}
+
+function normalizeBugunPersonelDurumu(data: unknown): BugunPersonelDurumu {
+  if (typeof data !== "object" || data === null) {
+    throw new Error("Bugun personel durumu yaniti beklenen formatta degil.");
+  }
+  const row = data as Partial<BugunPersonelDurumu>;
+  if (typeof row.tarih !== "string" || !Array.isArray(row.branches)) {
+    throw new Error("Bugun personel durumu yaniti eksik alan iceriyor.");
+  }
+  return row as BugunPersonelDurumu;
 }
 
 function normalizeTamamlama(data: unknown): GunlukBildirimTamamlama {
@@ -217,6 +229,18 @@ export async function fetchBirimGunlukDurum(params: {
   });
   const response = await apiRequest<ApiResponse<unknown>>(path);
   return normalizeBirimGunlukDurum(response.data);
+}
+
+export async function fetchBugunPersonelDurumu(params?: {
+  tarih?: string;
+  sube_id?: number;
+}): Promise<BugunPersonelDurumu> {
+  const path = appendQueryParams(endpoints.bildirimler.bugunPersonelDurumu, {
+    tarih: params?.tarih,
+    sube_id: params?.sube_id
+  });
+  const response = await apiRequest<ApiResponse<unknown>>(path);
+  return normalizeBugunPersonelDurumu(response.data);
 }
 
 export async function fetchGunlukTamamlama(params: {

@@ -16,6 +16,7 @@ import { personelSearchMatches } from "../features/personeller/personel-search-q
 import {
   buildBirimAmiriOzetCounts,
   isAktifBirimPersonelForDate,
+  istanbulBusinessDate,
   mapBirimAmiriPersonelRow
 } from "../features/self-service/birim-amiri-operational";
 import type { Personel } from "../types/personel";
@@ -7050,6 +7051,11 @@ export function resolveDemoApiResponse(
     const roster = demoState.personeller.filter((personel) =>
       isAktifBirimPersonelForDate(personel, allowedBirimIds, tarih)
     );
+    const tamamlama =
+      demoState.gunlukBildirimTamamlamalari.find(
+        (item) => item.birim_amiri_user_id === actor.userId && item.tarih === tarih
+      ) ?? null;
+    const unitCompleted = tamamlama != null;
     const personeller = roster.map((personel) => {
       const open = demoState.bildirimler
         .filter(
@@ -7059,21 +7065,24 @@ export function resolveDemoApiResponse(
             (item.state ?? "").toUpperCase() !== "IPTAL"
         )
         .sort((a, b) => b.id - a.id)[0];
+      const puantaj = demoState.puantajMap[`${personel.id}|${tarih}`];
       return mapBirimAmiriPersonelRow({
         personel_id: personel.id,
         ad_soyad: `${personel.ad} ${personel.soyad ?? ""}`.trim(),
         bildirim_turu: open?.bildirim_turu ?? null,
-        dakika: open?.dakika ?? null
+        dakika: open?.dakika ?? null,
+        baslangic_saati: open?.baslangic_saati ?? null,
+        bitis_saati: open?.bitis_saati ?? null,
+        giris_saati: puantaj?.giris_saati ?? null,
+        cikis_saati: puantaj?.cikis_saati ?? null,
+        gec_kalma_dakika: puantaj?.gec_kalma_dakika ?? null,
+        unit_completed: unitCompleted
       });
     });
-    const tamamlama =
-      demoState.gunlukBildirimTamamlamalari.find(
-        (item) => item.birim_amiri_user_id === actor.userId && item.tarih === tarih
-      ) ?? null;
     return ok({
       tarih,
       ozet: buildBirimAmiriOzetCounts(personeller),
-      tamamlandi_mi: tamamlama != null,
+      tamamlandi_mi: unitCompleted,
       tamamlama: tamamlama
         ? {
             id: tamamlama.id,
@@ -7083,6 +7092,321 @@ export function resolveDemoApiResponse(
           }
         : null,
       personeller
+    });
+  }
+
+  if (pathname === "/bildirimler/bugun-personel-durumu" && method === "GET") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "bugun_personel_durumu.view");
+    if (permissionError) return permissionError;
+
+    const tarih =
+      toStringValue(requestUrl.searchParams.get("tarih")) || istanbulBusinessDate();
+    const requestedSubeId = toNumber(requestUrl.searchParams.get("sube_id"));
+    if (requestedSubeId !== null) {
+      const allowed =
+        actor.subeIds.length === 0 ||
+        actor.subeIds.includes(requestedSubeId) ||
+        actor.role === "GENEL_YONETICI" ||
+        actor.role === "IK_SORUMLUSU" ||
+        actor.role === "SISTEM_YONETICISI";
+      if (!allowed) {
+        return demoRevizyonError("FORBIDDEN", "Bu sube kapsaminda erisim yok.");
+      }
+    }
+
+    const now = new Date();
+    const deadline = new Date(`${tarih}T09:30:00`);
+    const emptyCounts = () => ({
+      toplam: 0,
+      geldi: 0,
+      gec_geldi: 0,
+      gelmedi: 0,
+      izinli: 0,
+      raporlu: 0,
+      gorevde: 0,
+      erken_cikti: 0,
+      henuz_degerlendirilmedi: 0
+    });
+
+    const exceptionTurleri = new Set([
+      "GELMEDI",
+      "GEC_GELDI",
+      "ERKEN_CIKTI",
+      "IZINLI",
+      "RAPORLU",
+      "GOREVDE",
+      "DIGER"
+    ]);
+    const parseHhMm = (value: string | null | undefined): number | null => {
+      if (!value) return null;
+      const m = /^(\d{1,2}):(\d{2})/.exec(value.trim());
+      if (!m) return null;
+      const hour = Number(m[1]);
+      const minute = Number(m[2]);
+      if (hour > 23 || minute > 59) return null;
+      return hour * 60 + minute;
+    };
+    const lateMinutes = (giris: string | null, stored: number | null): number | null => {
+      if (stored != null && stored > 0) return stored;
+      const entry = parseHhMm(giris);
+      const startMin = parseHhMm("08:30");
+      if (entry == null || startMin == null) return null;
+      const diff = entry - startMin;
+      return diff > 0 ? diff : null;
+    };
+    const resolveDemoPersonDurum = (
+      bildirimTuru: string | null | undefined,
+      attendanceGiris: string | null | undefined,
+      unitCompleted: boolean,
+      storedDakika: number | null
+    ): string => {
+      const tur = (bildirimTuru ?? "").trim().toUpperCase();
+      if (exceptionTurleri.has(tur)) return tur;
+      if (attendanceGiris) {
+        const late = lateMinutes(attendanceGiris, storedDakika);
+        return late != null && late > 0 ? "GEC_GELDI" : "GELDI";
+      }
+      if (unitCompleted) return "GELDI";
+      return "HENUZ_DEGERLENDIRILMEDI";
+    };
+    const durumLabelDemo = (durum: string): string => {
+      const map: Record<string, string> = {
+        GELDI: "Geldi",
+        GELMEDI: "Gelmedi",
+        GEC_GELDI: "Geç Geldi",
+        ERKEN_CIKTI: "Erken Çıktı",
+        IZINLI: "İzinli",
+        RAPORLU: "Raporlu",
+        GOREVDE: "Görevde",
+        DIGER: "Diğer",
+        HENUZ_DEGERLENDIRILMEDI: "Henüz Değerlendirilmedi"
+      };
+      return map[durum] ?? durum;
+    };
+
+    type RawPerson = {
+      personel_id: number;
+      ad_soyad: string;
+      bildirim_turu: string | null;
+      dakika: number | null;
+      baslangic_saati: string | null;
+      bitis_saati: string | null;
+      aciklama: string | null;
+      alt_tur: string | null;
+      puantaj_giris: string | null;
+      puantaj_cikis: string | null;
+      puantaj_gec: number | null;
+    };
+    type UnitBucket = {
+      birim_id: number | null;
+      birim_adi: string;
+      bolum_id: number | null;
+      bolum_adi: string | null;
+      rows: RawPerson[];
+      amirIds: number[];
+    };
+    type BranchBucket = {
+      sube_id: number;
+      sube_adi: string;
+      units: Map<string, UnitBucket>;
+    };
+
+    const branches = new Map<number, BranchBucket>();
+    for (const personel of demoState.personeller) {
+      if ((personel.aktif_durum ?? "AKTIF").toUpperCase() !== "AKTIF") continue;
+      if ((personel.ise_giris_tarihi ?? "1900-01-01") > tarih) continue;
+      const subeId = personel.sube_id ?? 0;
+      if (subeId < 1) continue;
+      if (requestedSubeId !== null && subeId !== requestedSubeId) continue;
+      if (actor.subeIds.length > 0 && !actor.subeIds.includes(subeId) && actor.role === "SUBE_YONETICISI") {
+        continue;
+      }
+
+      if (!branches.has(subeId)) {
+        branches.set(subeId, {
+          sube_id: subeId,
+          sube_adi: demoSubeGosterimAdi(subeId) ?? `Şube ${subeId}`,
+          units: new Map()
+        });
+      }
+      const branch = branches.get(subeId)!;
+      const birimId = personel.birim_id ?? 0;
+      const unitKey = birimId > 0 ? String(birimId) : "none";
+      if (!branch.units.has(unitKey)) {
+        branch.units.set(unitKey, {
+          birim_id: birimId > 0 ? birimId : null,
+          birim_adi: birimId > 0 ? `Birim ${birimId}` : "Birimsiz",
+          bolum_id: null,
+          bolum_adi: null,
+          rows: [],
+          amirIds: personel.bagli_amir_id ? [personel.bagli_amir_id] : []
+        });
+      }
+      const open = demoState.bildirimler
+        .filter(
+          (item) =>
+            item.personel_id === personel.id &&
+            item.tarih === tarih &&
+            (item.state ?? "").toUpperCase() !== "IPTAL"
+        )
+        .sort((a, b) => b.id - a.id)[0];
+      const puantaj = demoState.puantajMap[`${personel.id}|${tarih}`];
+      branch.units.get(unitKey)!.rows.push({
+        personel_id: personel.id,
+        ad_soyad: `${personel.ad} ${personel.soyad ?? ""}`.trim(),
+        bildirim_turu: open?.bildirim_turu ?? null,
+        dakika: open?.dakika ?? null,
+        baslangic_saati: open?.baslangic_saati ?? null,
+        bitis_saati: open?.bitis_saati ?? null,
+        aciklama: open?.aciklama ?? null,
+        alt_tur: open?.alt_tur ?? null,
+        puantaj_giris: puantaj?.giris_saati ?? null,
+        puantaj_cikis: puantaj?.cikis_saati ?? null,
+        puantaj_gec: puantaj?.gec_kalma_dakika ?? null
+      });
+    }
+
+    const branchSummaries = Array.from(branches.values()).map((branch) => {
+      const branchCounts = emptyCounts();
+      let unitsCompleted = 0;
+      const units = Array.from(branch.units.values()).map((unit) => {
+        const completion = demoState.gunlukBildirimTamamlamalari.find(
+          (item) =>
+            item.sube_id === branch.sube_id &&
+            item.tarih === tarih &&
+            (unit.amirIds.length === 0 || unit.amirIds.includes(item.birim_amiri_user_id))
+        );
+        const tamamlandiAt = completion?.tamamlandi_at ?? null;
+        let status = "BEKLENIYOR";
+        if (tamamlandiAt) {
+          const completed = new Date(tamamlandiAt);
+          status = completed <= deadline ? "TAMAMLANDI" : "GEC_BILDIRILDI";
+        } else if (now > deadline) {
+          status = "SURESI_GECTI";
+        }
+        if (completion) unitsCompleted += 1;
+        const unitCompleted = completion != null;
+
+        const personeller = unit.rows.map((row) => {
+          const stored = row.dakika != null && row.dakika > 0 ? row.dakika : row.puantaj_gec;
+          const durum = resolveDemoPersonDurum(row.bildirim_turu, row.puantaj_giris, unitCompleted, stored);
+          const giris = row.baslangic_saati ?? row.puantaj_giris;
+          const gec = durum === "GEC_GELDI" ? lateMinutes(giris, stored) : null;
+          const detailLine =
+            durum === "GEC_GELDI"
+              ? [giris, gec ? `${gec} dk geç` : null].filter(Boolean).join(" · ") || "Geç Geldi"
+              : durum === "GELMEDI"
+                ? "Giriş yok · Açıklama yok"
+                : durum === "HENUZ_DEGERLENDIRILMEDI"
+                  ? "Henüz değerlendirilmedi"
+                  : durum === "GELDI" && giris
+                    ? giris
+                    : durumLabelDemo(durum);
+          return {
+            personel_id: row.personel_id,
+            ad_soyad: row.ad_soyad,
+            durum,
+            durum_label: durumLabelDemo(durum),
+            gec_kalma_dakika: gec,
+            erken_cikis_dakika: null as number | null,
+            giris_saati: giris,
+            cikis_saati: row.bitis_saati ?? row.puantaj_cikis,
+            aciklama: row.aciklama,
+            alt_tur: row.alt_tur,
+            detail_line: detailLine,
+            group:
+              durum === "HENUZ_DEGERLENDIRILMEDI"
+                ? "PENDING"
+                : durum === "IZINLI" || durum === "RAPORLU" || durum === "GOREVDE"
+                  ? "PLANNED"
+                  : durum === "GELMEDI"
+                    ? "ATTENTION"
+                    : "ACTUAL"
+          };
+        });
+
+        const counts = emptyCounts();
+        counts.toplam = personeller.length;
+        for (const person of personeller) {
+          const durum = person.durum.toUpperCase();
+          if (durum === "GELMEDI") counts.gelmedi += 1;
+          else if (durum === "GEC_GELDI") counts.gec_geldi += 1;
+          else if (durum === "IZINLI") counts.izinli += 1;
+          else if (durum === "RAPORLU") counts.raporlu += 1;
+          else if (durum === "GOREVDE") counts.gorevde += 1;
+          else if (durum === "ERKEN_CIKTI") counts.erken_cikti += 1;
+          else if (durum === "HENUZ_DEGERLENDIRILMEDI") counts.henuz_degerlendirilmedi += 1;
+          else if (durum === "GELDI" || durum === "DIGER") counts.geldi += 1;
+          else counts.henuz_degerlendirilmedi += 1;
+        }
+        for (const key of Object.keys(counts) as Array<keyof typeof counts>) {
+          if (key !== "toplam") branchCounts[key] += counts[key];
+        }
+        branchCounts.toplam += counts.toplam;
+
+        const timeLabel = tamamlandiAt
+          ? new Intl.DateTimeFormat("tr-TR", {
+              hour: "2-digit",
+              minute: "2-digit",
+              timeZone: "Europe/Istanbul"
+            }).format(new Date(tamamlandiAt))
+          : null;
+        const statusLabel =
+          status === "TAMAMLANDI"
+            ? timeLabel
+              ? `Tamamlandı · ${timeLabel}`
+              : "Tamamlandı"
+            : status === "GEC_BILDIRILDI"
+              ? timeLabel
+                ? `Geç Bildirildi · ${timeLabel}`
+                : "Geç Bildirildi"
+              : status === "SURESI_GECTI"
+                ? "Süresi Geçti"
+                : "Bekleniyor";
+
+        return {
+          birim_id: unit.birim_id,
+          birim_adi: unit.birim_adi,
+          bolum_id: unit.bolum_id,
+          bolum_adi: unit.bolum_adi,
+          counts,
+          bildirim: {
+            status,
+            status_label: statusLabel,
+            tamamlandi_mi: unitCompleted,
+            tamamlandi_at: tamamlandiAt,
+            tamamlayan_user_id: completion?.tamamlayan_user_id ?? null,
+            completion_id: completion?.id ?? null
+          },
+          personeller
+        };
+      });
+
+      units.sort((a, b) => a.birim_adi.localeCompare(b.birim_adi, "tr"));
+      return {
+        sube_id: branch.sube_id,
+        sube_adi: branch.sube_adi,
+        counts: branchCounts,
+        birim_bildirim: { tamamlanan: unitsCompleted, toplam: units.length },
+        units
+      };
+    });
+
+    let attention = 0;
+    for (const branch of branchSummaries) {
+      attention += branch.counts.gelmedi + branch.counts.gec_geldi;
+      attention += Math.max(0, branch.birim_bildirim.toplam - branch.birim_bildirim.tamamlanan);
+    }
+
+    return ok({
+      tarih,
+      timezone: "Europe/Istanbul",
+      workday_start: "08:30",
+      on_time_deadline: "09:30",
+      server_now: now.toISOString().slice(0, 19).replace("T", " "),
+      attention_count: attention,
+      branches: branchSummaries.sort((a, b) => a.sube_adi.localeCompare(b.sube_adi, "tr"))
     });
   }
 

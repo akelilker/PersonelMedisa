@@ -134,26 +134,27 @@ describe("credential onboarding owners (MG-CRED-ONBOARD-001)", () => {
     expect(change).not.toMatch(/WHERE id = :id.*\$body/);
   });
 
-  it("migration 069 remains in chain; tip is 084 with bundle/runner parity", () => {
+  it("migration 069 remains in chain; tip is 085 with bundle/runner parity", () => {
     const migrations = readdirSync(resolve("api/migrations"))
       .filter((name) => /^\d{3}_.+\.sql$/.test(name))
       .sort();
-    expect(migrations.at(-16)).toBe("069_personel_credential_onboarding.sql");
-    expect(migrations.at(-15)).toBe("070_offline_mutation_idempotency.sql");
-    expect(migrations.at(-14)).toBe("071_org_hierarchy_authorization.sql");
-    expect(migrations.at(-13)).toBe("072_org_reference_short_codes.sql");
-    expect(migrations.at(-12)).toBe("073_test_fixture_personel_archive.sql");
-    expect(migrations.at(-11)).toBe("074_qr_attendance_correction_and_inbox.sql");
-    expect(migrations.at(-10)).toBe("075_personel_account_activation.sql");
-    expect(migrations.at(-9)).toBe("076_dis_kaynak_gecici_gorevlendirme.sql");
-    expect(migrations.at(-8)).toBe("077_legacy_role_enum_shrink.sql");
-    expect(migrations.at(-7)).toBe("078_personel_sicil_sequence.sql");
-    expect(migrations.at(-6)).toBe("079_sirket_sube_hiyerarsisi.sql");
-    expect(migrations.at(-5)).toBe("080_organizasyon_audit_owners.sql");
-    expect(migrations.at(-4)).toBe("081_ik_personeli_rolu.sql");
-    expect(migrations.at(-3)).toBe("082_user_erisim_degisiklik_auditleri.sql");
-    expect(migrations.at(-2)).toBe("083_personel_organizasyon_degisiklik_auditleri.sql");
-    expect(migrations.at(-1)).toBe("084_gunluk_bildirim_tamamlama_header_summary.sql");
+    expect(migrations.at(-17)).toBe("069_personel_credential_onboarding.sql");
+    expect(migrations.at(-16)).toBe("070_offline_mutation_idempotency.sql");
+    expect(migrations.at(-15)).toBe("071_org_hierarchy_authorization.sql");
+    expect(migrations.at(-14)).toBe("072_org_reference_short_codes.sql");
+    expect(migrations.at(-13)).toBe("073_test_fixture_personel_archive.sql");
+    expect(migrations.at(-12)).toBe("074_qr_attendance_correction_and_inbox.sql");
+    expect(migrations.at(-11)).toBe("075_personel_account_activation.sql");
+    expect(migrations.at(-10)).toBe("076_dis_kaynak_gecici_gorevlendirme.sql");
+    expect(migrations.at(-9)).toBe("077_legacy_role_enum_shrink.sql");
+    expect(migrations.at(-8)).toBe("078_personel_sicil_sequence.sql");
+    expect(migrations.at(-7)).toBe("079_sirket_sube_hiyerarsisi.sql");
+    expect(migrations.at(-6)).toBe("080_organizasyon_audit_owners.sql");
+    expect(migrations.at(-5)).toBe("081_ik_personeli_rolu.sql");
+    expect(migrations.at(-4)).toBe("082_user_erisim_degisiklik_auditleri.sql");
+    expect(migrations.at(-3)).toBe("083_personel_organizasyon_degisiklik_auditleri.sql");
+    expect(migrations.at(-2)).toBe("084_gunluk_bildirim_tamamlama_header_summary.sql");
+    expect(migrations.at(-1)).toBe("085_gunluk_bildirim_duzeltme_auditleri.sql");
 
     const migration069 = read("api/migrations/069_personel_credential_onboarding.sql");
     const checksum069 = createHash("sha256").update(migration069).digest("hex");
@@ -190,7 +191,8 @@ describe("credential onboarding owners (MG-CRED-ONBOARD-001)", () => {
     expect(bundleTest).toContain("checksum074");
     expect(bundleTest).toContain("checksum075");
     expect(bundleTest).toContain("checksum076");
-    expect(bundleTest).toContain("count($rows) !== 85");
+    expect(bundleTest).toContain("count($rows) !== 86");
+    expect(bundleTest).toContain("rows[85]['version'] !== '085'");
     expect(bundleTest).toContain("rows[84]['version'] !== '084'");
     expect(bundleTest).toContain("rows[83]['version'] !== '083'");
     expect(bundleTest).toContain("rows[76]['version'] !== '076'");

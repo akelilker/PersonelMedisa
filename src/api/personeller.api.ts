@@ -490,7 +490,12 @@ export type OrganizasyonTrackedField =
   | "sgk_isveren_id"
   | "calisma_lokasyonu_id";
 
-export type OrganizasyonFieldMap = Partial<Record<OrganizasyonTrackedField, number | null>>;
+/** Work-info axes accepted by the canonical org owner in the same transaction. */
+export type OrganizasyonWorkInfoField = "bagli_amir_id" | "personel_tipi_id";
+
+export type OrganizasyonMutableField = OrganizasyonTrackedField | OrganizasyonWorkInfoField;
+
+export type OrganizasyonFieldMap = Partial<Record<OrganizasyonMutableField, number | null>>;
 
 export type ApplyOrganizasyonDegisikligiPayload = {
   preimage: OrganizasyonFieldMap;

@@ -16,17 +16,26 @@ describe("personel organization change workflow closeout", () => {
     expect(api).toContain("applyPersonelKaliciSubeDegisikligi");
   });
 
-  it("Pozisyon tab orchestrates canonical org then basic axes", () => {
+  it("Pozisyon tab orchestrates single atomic canonical org save", () => {
     const owner = read("src/features/kayit/kayit-surec-pozisyon.ts");
     const workspace = read("src/features/kayit/components/KayitSurecWorkspace.tsx");
+    const orgService = read("api/src/Services/Personel/PersonelOrganizasyonDegisikligiService.php");
     expect(owner).toContain("executeOrganizasyonPersonnelUpdate");
     expect(owner).toContain("applyOrganizasyon");
-    expect(owner).toContain("basic_failed");
+    expect(owner).toContain("bagli_amir_id");
+    expect(owner).toContain("personel_tipi_id");
+    expect(owner).not.toContain("basic_failed");
+    expect(owner).toContain("surecWarning");
     expect(owner).toContain("executeKaliciSubeDegisikligi");
     expect(workspace).toContain("applyPersonelOrganizasyonDegisikligi");
     expect(workspace).toContain("applyPersonelKaliciSubeDegisikligi");
     expect(workspace).toContain("KayitSurecPersonelOrganizasyonPanel");
+    expect(workspace).toContain('actorRole === "IK_SORUMLUSU"');
     expect(workspace).not.toMatch(/executePozisyonPersonnelUpdate\s*\(/);
+    expect(workspace).not.toContain("basic_failed");
+    expect(orgService).toContain("WORK_INFO_FIELDS");
+    expect(orgService).toContain("'bagli_amir_id'");
+    expect(orgService).toContain("'personel_tipi_id'");
   });
 
   it("Genel / identity PUT no longer sends tracked org fields", () => {

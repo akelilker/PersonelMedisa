@@ -265,7 +265,10 @@ export function KayitSurecWorkspace({
   const canCreateFinans = hasPermission("finans.create");
   /** Org change: personeller.update; surec history is best-effort after success. */
   const canSubmitPozisyon = canUpdatePersonel;
-  const canTransferSube = actorRole === "GENEL_YONETICI" || actorRole === "SISTEM_YONETICISI";
+  const canTransferSube =
+    actorRole === "GENEL_YONETICI" ||
+    actorRole === "SISTEM_YONETICISI" ||
+    actorRole === "IK_SORUMLUSU";
 
   const [refs, setRefs] = useState<PersonelReferenceBundle>(EMPTY_REFS);
   const [subeOptions, setSubeOptions] = useState<IdOption[]>([]);
@@ -1029,7 +1032,6 @@ export function KayitSurecWorkspace({
             applyPersonelOrganizasyonDegisikligi(personelId, payload).then((res) => ({
               personel: res.personel
             })),
-          updatePersonel,
           createSurec: canCreateSurec ? createSurec : undefined
         }
       });
@@ -1060,48 +1062,6 @@ export function KayitSurecWorkspace({
         return;
       }
 
-      if (result.status === "basic_failed") {
-        commitPersonelUpdateToCaches(result.updated);
-        setPersoneller((prev) => prev.map((item) => (item.id === result.updated.id ? result.updated : item)));
-        try {
-          await refetchSurecCachesForPersonel(submitPersonelId);
-        } catch {
-          /* cache refresh soft-fail */
-        }
-        if (isCurrentSelection) {
-          setPozisyonForm(createOrganizasyonFormFromPersonel(result.updated));
-          setPozisyonInfo(null);
-          setPozisyonError(
-            getApiErrorMessage(
-              result.error,
-              "Organizasyon alanları kaydedildi ancak bağlı amir / çalışma tipi güncellenemedi."
-            )
-          );
-        }
-        return;
-      }
-
-      if (result.status === "partial_surec_failed") {
-        commitPersonelUpdateToCaches(result.updated);
-        setPersoneller((prev) => prev.map((item) => (item.id === result.updated.id ? result.updated : item)));
-        try {
-          await refetchSurecCachesForPersonel(submitPersonelId);
-        } catch {
-          /* cache refresh soft-fail */
-        }
-        if (isCurrentSelection) {
-          setPozisyonForm(createOrganizasyonFormFromPersonel(result.updated));
-          setPozisyonInfo(null);
-          setPozisyonError(
-            getApiErrorMessage(
-              result.error,
-              "Organizasyon kaydedildi ancak süreç geçmişi notu oluşturulamadı."
-            )
-          );
-        }
-        return;
-      }
-
       try {
         await refetchSurecCachesForPersonel(submitPersonelId);
       } catch {
@@ -1113,7 +1073,8 @@ export function KayitSurecWorkspace({
 
       if (isCurrentSelection) {
         setPozisyonForm(createOrganizasyonFormFromPersonel(result.updated));
-        setPozisyonInfo("Görev / organizasyon güncellendi.");
+        setPozisyonError(null);
+        setPozisyonInfo(result.surecWarning ?? "Görev / organizasyon güncellendi.");
       }
     } finally {
       setPozisyonSubmitting(false);

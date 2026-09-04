@@ -2,8 +2,8 @@ import type {
   ApplyKaliciSubeDegisikligiPayload,
   ApplyOrganizasyonDegisikligiPayload,
   OrganizasyonFieldMap,
-  OrganizasyonTrackedField,
-  UpdatePersonelPayload
+  OrganizasyonMutableField,
+  OrganizasyonTrackedField
 } from "../../api/personeller.api";
 import type { Personel } from "../../types/personel";
 import type { Surec } from "../../types/surec";
@@ -20,6 +20,13 @@ const ORG_TRACKED_FIELDS: OrganizasyonTrackedField[] = [
   "calisma_lokasyonu_id"
 ];
 
+const WORK_INFO_FIELDS: Array<"bagli_amir_id" | "personel_tipi_id"> = [
+  "bagli_amir_id",
+  "personel_tipi_id"
+];
+
+const ALL_MUTABLE_FIELDS: OrganizasyonMutableField[] = [...ORG_TRACKED_FIELDS, ...WORK_INFO_FIELDS];
+
 const GEREKCE_MIN = 10;
 
 export type OrganizasyonWriteDeps = {
@@ -27,7 +34,8 @@ export type OrganizasyonWriteDeps = {
     personelId: number,
     payload: ApplyOrganizasyonDegisikligiPayload
   ) => Promise<{ personel: Personel }>;
-  updatePersonel: (personelId: number, payload: UpdatePersonelPayload) => Promise<Personel>;
+  /** @deprecated Basic PUT is no longer used for Görev/Organizasyon save. */
+  updatePersonel?: (personelId: number, payload: Record<string, unknown>) => Promise<Personel>;
   createSurec?: (payload: {
     personel_id: number;
     surec_turu: "POZISYON_DEGISTI";
@@ -44,9 +52,7 @@ export type OrganizasyonWriteResult =
   | { status: "no_op" }
   | { status: "validation_error"; message: string }
   | { status: "org_failed"; error: unknown }
-  | { status: "basic_failed"; updated: Personel; error: unknown }
-  | { status: "partial_surec_failed"; updated: Personel; error: unknown }
-  | { status: "full_success"; updated: Personel };
+  | { status: "full_success"; updated: Personel; surecWarning?: string };
 
 export type KaliciSubeWriteResult =
   | { status: "validation_error"; message: string }
@@ -57,7 +63,7 @@ function formIdToNullable(value: string): number | null {
   return parsePozisyonId(value);
 }
 
-function personelOrgSnapshot(personel: Personel): Record<OrganizasyonTrackedField, number | null> {
+function personelOrgSnapshot(personel: Personel): Record<OrganizasyonMutableField, number | null> {
   return {
     departman_id: personel.departman_id ?? null,
     bolum_id: personel.bolum_id ?? null,
@@ -65,11 +71,13 @@ function personelOrgSnapshot(personel: Personel): Record<OrganizasyonTrackedFiel
     gorev_id: personel.gorev_id ?? null,
     pozisyon_id: personel.pozisyon_id ?? null,
     sgk_isveren_id: personel.sgk_isveren_id ?? null,
-    calisma_lokasyonu_id: personel.calisma_lokasyonu_id ?? null
+    calisma_lokasyonu_id: personel.calisma_lokasyonu_id ?? null,
+    bagli_amir_id: personel.bagli_amir_id ?? null,
+    personel_tipi_id: personel.personel_tipi_id ?? null
   };
 }
 
-function formOrgSnapshot(form: OrganizasyonFormState): Record<OrganizasyonTrackedField, number | null> {
+function formOrgSnapshot(form: OrganizasyonFormState): Record<OrganizasyonMutableField, number | null> {
   return {
     departman_id: formIdToNullable(form.departmanId),
     bolum_id: formIdToNullable(form.bolumId),
@@ -77,7 +85,9 @@ function formOrgSnapshot(form: OrganizasyonFormState): Record<OrganizasyonTracke
     gorev_id: formIdToNullable(form.gorevId),
     pozisyon_id: formIdToNullable(form.pozisyonId),
     sgk_isveren_id: formIdToNullable(form.sgkIsverenId),
-    calisma_lokasyonu_id: formIdToNullable(form.calismaLokasyonuId)
+    calisma_lokasyonu_id: formIdToNullable(form.calismaLokasyonuId),
+    bagli_amir_id: formIdToNullable(form.bagliAmirId),
+    personel_tipi_id: formIdToNullable(form.personelTipiId)
   };
 }
 
@@ -112,6 +122,10 @@ export function hasPozisyonOrganizationalDiff(
   );
 }
 
+/**
+ * Sparse targets for every mutable axis (tracked org + work info) in one payload.
+ * Single canonical POST keeps the save atomic — no follow-up basic PUT.
+ */
 export function buildOrganizasyonTargets(
   form: OrganizasyonFormState,
   personel: Personel
@@ -121,7 +135,7 @@ export function buildOrganizasyonTargets(
   const preimage: OrganizasyonFieldMap = {};
   const targets: OrganizasyonFieldMap = {};
 
-  for (const field of ORG_TRACKED_FIELDS) {
+  for (const field of ALL_MUTABLE_FIELDS) {
     preimage[field] = current[field];
     if (current[field] !== next[field]) {
       targets[field] = next[field];
@@ -131,11 +145,12 @@ export function buildOrganizasyonTargets(
   return { preimage, targets };
 }
 
+/** @deprecated Work-info axes travel with the canonical org owner; kept for tests. */
 export function buildBasicWorkInfoUpdatePayload(
   form: OrganizasyonFormState,
   personel: Personel
-): UpdatePersonelPayload {
-  const payload: UpdatePersonelPayload = {};
+): { bagli_amir_id?: number | null; personel_tipi_id?: number } {
+  const payload: { bagli_amir_id?: number | null; personel_tipi_id?: number } = {};
 
   if (form.bagliAmirId !== toOptionalIdValue(personel.bagli_amir_id)) {
     payload.bagli_amir_id = formIdToNullable(form.bagliAmirId);
@@ -200,6 +215,11 @@ export function validateOrganizasyonSubmit(
   return { ok: true };
 }
 
+/**
+ * Single canonical mutation for Görev/Organizasyon.
+ * Org tracked + bagli_amir + personel_tipi travel together — no partial persist.
+ * POZISYON_DEGISTI surec note is best-effort after SUCCESS (never masks a failed save).
+ */
 export async function executeOrganizasyonPersonnelUpdate(params: {
   personel: Personel;
   form: OrganizasyonFormState;
@@ -213,35 +233,24 @@ export async function executeOrganizasyonPersonnelUpdate(params: {
     return { status: "validation_error", message: validation.message };
   }
 
-  const orgDiff = hasOrgTrackedDiff(params.form, params.personel);
-  const basicDiff = hasBasicWorkInfoDiff(params.form, params.personel);
-  let updated = params.personel;
-
-  if (orgDiff) {
-    const { preimage, targets } = buildOrganizasyonTargets(params.form, params.personel);
-    try {
-      const result = await params.deps.applyOrganizasyon(params.personel.id, {
-        preimage,
-        targets,
-        gerekce: resolveGerekce(params.form)
-      });
-      updated = result.personel;
-    } catch (error) {
-      return { status: "org_failed", error };
-    }
+  const { preimage, targets } = buildOrganizasyonTargets(params.form, params.personel);
+  if (Object.keys(targets).length === 0) {
+    return { status: "no_op" };
   }
 
-  if (basicDiff) {
-    const basicPayload = buildBasicWorkInfoUpdatePayload(params.form, updated);
-    if (Object.keys(basicPayload).length > 0) {
-      try {
-        updated = await params.deps.updatePersonel(updated.id, basicPayload);
-      } catch (error) {
-        return { status: "basic_failed", updated, error };
-      }
-    }
+  let updated: Personel;
+  try {
+    const result = await params.deps.applyOrganizasyon(params.personel.id, {
+      preimage,
+      targets,
+      gerekce: resolveGerekce(params.form)
+    });
+    updated = result.personel;
+  } catch (error) {
+    return { status: "org_failed", error };
   }
 
+  let surecWarning: string | undefined;
   if (params.deps.createSurec) {
     const today = new Date().toISOString().slice(0, 10);
     const baslangic = params.form.degisiklikTarihi.trim() || today;
@@ -252,12 +261,12 @@ export async function executeOrganizasyonPersonnelUpdate(params: {
         baslangic_tarihi: baslangic > today ? today : baslangic,
         aciklama: resolveGerekce(params.form)
       });
-    } catch (error) {
-      return { status: "partial_surec_failed", updated, error };
+    } catch {
+      surecWarning = "Organizasyon kaydedildi; süreç geçmişi notu oluşturulamadı.";
     }
   }
 
-  return { status: "full_success", updated };
+  return { status: "full_success", updated, surecWarning };
 }
 
 /** @deprecated Prefer executeOrganizasyonPersonnelUpdate */
@@ -266,7 +275,7 @@ export async function executePozisyonPersonnelUpdate(params: {
   form: OrganizasyonFormState;
   aciklama: string;
   deps: {
-    updatePersonel: OrganizasyonWriteDeps["updatePersonel"];
+    updatePersonel?: OrganizasyonWriteDeps["updatePersonel"];
     createSurec: NonNullable<OrganizasyonWriteDeps["createSurec"]>;
     applyOrganizasyon?: OrganizasyonWriteDeps["applyOrganizasyon"];
   };
@@ -283,7 +292,6 @@ export async function executePozisyonPersonnelUpdate(params: {
     form: { ...params.form, aciklama: params.aciklama || params.form.aciklama },
     deps: {
       applyOrganizasyon: params.deps.applyOrganizasyon,
-      updatePersonel: params.deps.updatePersonel,
       createSurec: params.deps.createSurec
     }
   });

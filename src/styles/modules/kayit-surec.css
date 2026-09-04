@@ -1071,6 +1071,22 @@
   gap: var(--space-3);
 }
 
+.surec-org-section-lead {
+  margin-bottom: var(--space-3);
+}
+
+.surec-org-section-mid {
+  margin: var(--space-3) 0 var(--space-2);
+}
+
+.surec-org-section-sub {
+  margin-bottom: var(--space-2);
+}
+
+.surec-org-sube-transfer {
+  margin-top: var(--space-4);
+}
+
 .surec-position-panel .workspace-surface-header {
   display: none;
 }

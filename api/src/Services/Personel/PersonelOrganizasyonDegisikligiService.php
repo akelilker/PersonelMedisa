@@ -14,8 +14,13 @@ use PDO;
 
 /**
  * Canonical owner for audited personnel organisation field changes
- * (gorev/unvan, departman, bolum, birim, pozisyon, SGK isveren, calisma lokasyonu).
+ * (gorev/unvan, departman, bolum, birim, pozisyon, SGK isveren, calisma lokasyonu)
+ * plus same-transaction çalışma bilgisi axes (bagli_amir_id, personel_tipi_id).
  * Permanent branch moves use PersonelKaliciSubeDegisikligiService instead.
+ *
+ * TRACKED_FIELDS stay blocked on generic PUT. WORK_INFO_FIELDS may still be
+ * written by bulk/basic PUT owners; the Görev/Organizasyon screen uses this
+ * owner so org + amir + tip never partial-persist across two client mutations.
  */
 final class PersonelOrganizasyonDegisikligiService
 {
@@ -24,7 +29,7 @@ final class PersonelOrganizasyonDegisikligiService
     public const ERROR_FORBIDDEN = 'PERSONEL_ORGANIZASYON_FORBIDDEN';
     public const ERROR_GENERIC_PUT = 'PERSONEL_ORGANIZASYON_CANONICAL_OWNER_REQUIRED';
 
-    /** @var list<string> */
+    /** @var list<string> Protected org axes — generic PUT must not change these. */
     public const TRACKED_FIELDS = [
         'gorev_id',
         'departman_id',
@@ -35,8 +40,30 @@ final class PersonelOrganizasyonDegisikligiService
         'calisma_lokasyonu_id',
     ];
 
+    /**
+     * Work-info axes accepted by this owner in the same transaction.
+     * Not blocked on generic PUT (bulk basic axis still owns that path).
+     *
+     * @var list<string>
+     */
+    public const WORK_INFO_FIELDS = [
+        'bagli_amir_id',
+        'personel_tipi_id',
+    ];
+
     private const GEREKCE_MIN = 10;
     private const GEREKCE_MAX = 500;
+    private const WORK_INFO_ONLY_GEREKCE = 'Calisma bilgisi guncellemesi';
+
+    /**
+     * Fields this owner may mutate in one atomic apply().
+     *
+     * @return list<string>
+     */
+    public static function mutableFields(): array
+    {
+        return array_merge(self::TRACKED_FIELDS, self::WORK_INFO_FIELDS);
+    }
 
     /**
      * Generic PUT must not change organisation fields — use this owner.
@@ -84,7 +111,6 @@ final class PersonelOrganizasyonDegisikligiService
 
         OrganizasyonAuditWriter::assertPersonelOrganizasyonReady($pdo);
 
-        $gerekce = self::parseGerekce($body);
         $preimage = self::parsePreimage($body);
         $targets = self::parseTargets($body);
 
@@ -160,6 +186,14 @@ final class PersonelOrganizasyonDegisikligiService
                 );
             }
 
+            $hasTrackedChange = false;
+            foreach ($changes as $field) {
+                if (in_array($field, self::TRACKED_FIELDS, true)) {
+                    $hasTrackedChange = true;
+                    break;
+                }
+            }
+            $gerekce = self::parseGerekce($body, $hasTrackedChange);
             $olayTipi = self::resolveOlayTipi($changes);
             $setParts = [];
             $params = ['id' => $personelId];
@@ -234,15 +268,29 @@ final class PersonelOrganizasyonDegisikligiService
     /** @param list<string> $changes */
     private static function resolveOlayTipi(array $changes): string
     {
-        $onlyGorev = count($changes) === 1 && $changes[0] === 'gorev_id';
+        $tracked = [];
+        $work = [];
+        foreach ($changes as $field) {
+            if (in_array($field, self::TRACKED_FIELDS, true)) {
+                $tracked[] = $field;
+            } elseif (in_array($field, self::WORK_INFO_FIELDS, true)) {
+                $work[] = $field;
+            }
+        }
+
+        if (count($tracked) === 0 && count($work) > 0) {
+            return 'CALISMA_BILGISI_DEGISIKLIGI';
+        }
+
+        $onlyGorev = count($tracked) === 1 && $tracked[0] === 'gorev_id';
         if ($onlyGorev) {
             return 'GOREV_UNVAN_DEGISIKLIGI';
         }
-        $onlyLoc = count($changes) === 1 && $changes[0] === 'calisma_lokasyonu_id';
+        $onlyLoc = count($tracked) === 1 && $tracked[0] === 'calisma_lokasyonu_id';
         if ($onlyLoc) {
             return 'CALISMA_LOKASYONU_DEGISIKLIGI';
         }
-        $onlySgk = count($changes) === 1 && $changes[0] === 'sgk_isveren_id';
+        $onlySgk = count($tracked) === 1 && $tracked[0] === 'sgk_isveren_id';
         if ($onlySgk) {
             return 'SGK_ISVERENI_DEGISIKLIGI';
         }
@@ -253,7 +301,7 @@ final class PersonelOrganizasyonDegisikligiService
     /** @return array<string, mixed>|null */
     private static function loadPersonelOrgRow(PDO $pdo, int $personelId): ?array
     {
-        $cols = ['id', 'sube_id', 'departman_id', 'gorev_id'];
+        $cols = ['id', 'sube_id', 'departman_id', 'gorev_id', 'bagli_amir_id', 'personel_tipi_id'];
         if (PersonelOrgStructureSchema::isReady($pdo)) {
             $cols = array_merge($cols, ['bolum_id', 'birim_id', 'pozisyon_id']);
         }
@@ -276,7 +324,7 @@ final class PersonelOrganizasyonDegisikligiService
             throw OrganizasyonException::validation('Organizasyon önizleme (preimage) zorunludur.', 'preimage');
         }
         $out = [];
-        foreach (self::TRACKED_FIELDS as $field) {
+        foreach (self::mutableFields() as $field) {
             if (array_key_exists($field, $pre)) {
                 $out[$field] = $pre[$field];
             }
@@ -293,7 +341,7 @@ final class PersonelOrganizasyonDegisikligiService
             throw OrganizasyonException::validation('Yeni organizasyon değerleri zorunludur.', 'yeni');
         }
         $out = [];
-        foreach (self::TRACKED_FIELDS as $field) {
+        foreach (self::mutableFields() as $field) {
             if (array_key_exists($field, $targets)) {
                 $out[$field] = $targets[$field];
             }
@@ -303,12 +351,34 @@ final class PersonelOrganizasyonDegisikligiService
     }
 
     /** @param array<string, mixed> $body */
-    private static function parseGerekce(array $body): string
+    private static function parseGerekce(array $body, bool $requiresJustification): string
     {
         $gerekce = trim((string) ($body['gerekce'] ?? ''));
-        if (strlen($gerekce) < self::GEREKCE_MIN) {
+        if (!$requiresJustification) {
+            if ($gerekce === '') {
+                return self::WORK_INFO_ONLY_GEREKCE;
+            }
+            $length = function_exists('mb_strlen') ? mb_strlen($gerekce) : strlen($gerekce);
+            if ($length > self::GEREKCE_MAX) {
+                throw OrganizasyonException::validation(
+                    'Gerekçe en fazla ' . self::GEREKCE_MAX . ' karakter olabilir.',
+                    'gerekce'
+                );
+            }
+
+            return $gerekce;
+        }
+
+        $length = function_exists('mb_strlen') ? mb_strlen($gerekce) : strlen($gerekce);
+        if ($length < self::GEREKCE_MIN) {
             throw OrganizasyonException::validation(
                 'Gerekçe en az ' . self::GEREKCE_MIN . ' karakter olmalıdır.',
+                'gerekce'
+            );
+        }
+        if ($length > self::GEREKCE_MAX) {
+            throw OrganizasyonException::validation(
+                'Gerekçe en fazla ' . self::GEREKCE_MAX . ' karakter olabilir.',
                 'gerekce'
             );
         }
@@ -330,8 +400,23 @@ final class PersonelOrganizasyonDegisikligiService
     private static function validateReference(PDO $pdo, string $field, $value): void
     {
         if ($value === null) {
+            if ($field === 'personel_tipi_id') {
+                throw OrganizasyonException::validation('Personel tipi boş bırakılamaz.', 'personel_tipi_id');
+            }
+
             return;
         }
+
+        if ($field === 'bagli_amir_id') {
+            $stmt = $pdo->prepare("SELECT id FROM users WHERE id = :id AND durum = 'AKTIF' LIMIT 1");
+            $stmt->execute(['id' => (int) $value]);
+            if (!$stmt->fetch(PDO::FETCH_ASSOC)) {
+                throw OrganizasyonException::validation('Geçersiz bağlı amir.', 'bagli_amir_id');
+            }
+
+            return;
+        }
+
         $tableMap = [
             'gorev_id' => 'gorevler',
             'departman_id' => 'departmanlar',
@@ -340,6 +425,7 @@ final class PersonelOrganizasyonDegisikligiService
             'pozisyon_id' => 'pozisyonlar',
             'sgk_isveren_id' => 'sgk_isverenler',
             'calisma_lokasyonu_id' => 'calisma_lokasyonlari',
+            'personel_tipi_id' => 'personel_tipleri',
         ];
         if (!isset($tableMap[$field])) {
             return;

@@ -5809,13 +5809,21 @@ export function resolveDemoApiResponse(
     if (!personel) {
       return null;
     }
-    const gerekce = String(body.gerekce ?? "").trim();
-    if (gerekce.length < 10) {
-      return demoRevizyonError("VALIDATION_ERROR", "Gerekçe en az 10 karakter olmalıdır.");
-    }
     const targets = (body.targets ?? body.yeni ?? {}) as Record<string, unknown>;
+    const gerekce = String(body.gerekce ?? "").trim();
     const changed: string[] = [];
-    for (const field of [
+    const mutableFields = [
+      "gorev_id",
+      "departman_id",
+      "bolum_id",
+      "birim_id",
+      "pozisyon_id",
+      "sgk_isveren_id",
+      "calisma_lokasyonu_id",
+      "bagli_amir_id",
+      "personel_tipi_id"
+    ];
+    const trackedFields = new Set([
       "gorev_id",
       "departman_id",
       "bolum_id",
@@ -5823,7 +5831,8 @@ export function resolveDemoApiResponse(
       "pozisyon_id",
       "sgk_isveren_id",
       "calisma_lokasyonu_id"
-    ]) {
+    ]);
+    for (const field of mutableFields) {
       if (!(field in targets)) continue;
       const next =
         targets[field] === null || targets[field] === "" || targets[field] === undefined
@@ -5835,11 +5844,15 @@ export function resolveDemoApiResponse(
     if (changed.length === 0) {
       return demoRevizyonError("PERSONEL_ORGANIZASYON_NO_CHANGE", "Organizasyon değişikliği yok.");
     }
+    const hasTracked = changed.some((field) => trackedFields.has(field));
+    if (hasTracked && gerekce.length < 10) {
+      return demoRevizyonError("VALIDATION_ERROR", "Gerekçe en az 10 karakter olmalıdır.");
+    }
     return ok({
       organizasyon: {
         replay: false,
         personel_id: id,
-        olay_tipi: "DEPARTMAN_BOLUM_BIRIM_POZISYON_DEGISIKLIGI",
+        olay_tipi: hasTracked ? "DEPARTMAN_BOLUM_BIRIM_POZISYON_DEGISIKLIGI" : "CALISMA_BILGISI_DEGISIKLIGI",
         audit_id: id,
         degisen_alanlar: changed
       },

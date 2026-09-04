@@ -67,7 +67,7 @@ export function KayitSurecPersonelOrganizasyonPanel({
 
   return (
     <div className="surec-position-panel" data-testid="kayit-surec-organizasyon-panel">
-      <div className="surec-person-placeholder" style={{ marginBottom: "1rem" }}>
+      <div className="surec-person-placeholder surec-org-section-lead">
         <strong>Görev ve Organizasyon Değişikliği</strong>
         <p>
           Değişiklik anında personel kaydına uygulanır. Structured audit canonical owner üzerinden tutulur;
@@ -164,9 +164,9 @@ export function KayitSurecPersonelOrganizasyonPanel({
             ) : null}
           </div>
 
-          <div className="surec-person-placeholder" style={{ margin: "1rem 0 0.5rem" }}>
+          <div className="surec-person-placeholder surec-org-section-mid">
             <strong>Çalışma Bilgileri</strong>
-            <p>Bağlı amir ve çalışma tipi generic personel güncelleme owner’ı üzerinden kaydedilir.</p>
+            <p>Bağlı amir ve çalışma tipi, organizasyon alanlarıyla aynı kaydet işleminde atomik olarak uygulanır.</p>
           </div>
 
           <div className="surec-position-grid">
@@ -246,11 +246,10 @@ export function KayitSurecPersonelOrganizasyonPanel({
 
       {canTransferSube ? (
         <section
-          className="workspace-form"
-          style={{ marginTop: "1.5rem" }}
+          className="workspace-form surec-org-sube-transfer"
           data-testid="kayit-surec-kalici-sube-panel"
         >
-          <div className="surec-person-placeholder" style={{ marginBottom: "0.75rem" }}>
+          <div className="surec-person-placeholder surec-org-section-sub">
             <strong>Kalıcı Şube Değişikliği</strong>
             <p>
               Mevcut şube: {formatGeneralField(personel.sube_adi)}. Çalışma lokasyonu ve SGK işvereni korunur;

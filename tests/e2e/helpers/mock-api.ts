@@ -5451,10 +5451,6 @@ let personelBelgeKaydiIdCounter = 903;
 
       const body = (request.postDataJSON() ?? {}) as Record<string, unknown>;
       const gerekce = String(body.gerekce ?? "").trim();
-      if (gerekce.length < 10) {
-        await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "Gerekçe en az 10 karakter olmalıdır.", "gerekce"));
-        return;
-      }
 
       const preimage = (body.preimage ?? body.beklenen ?? {}) as Record<string, unknown>;
       const targets = (body.targets ?? body.yeni ?? {}) as Record<string, unknown>;
@@ -5467,9 +5463,11 @@ let personelBelgeKaydiIdCounter = 903;
         "sgk_isveren_id",
         "calisma_lokasyonu_id"
       ] as const;
+      const workInfo = ["bagli_amir_id", "personel_tipi_id"] as const;
+      const mutable = [...tracked, ...workInfo] as const;
 
       const changed: string[] = [];
-      for (const field of tracked) {
+      for (const field of mutable) {
         if (!(field in targets)) continue;
         const current =
           personel[field as keyof typeof personel] === undefined || personel[field as keyof typeof personel] === null
@@ -5502,6 +5500,12 @@ let personelBelgeKaydiIdCounter = 903;
         return;
       }
 
+      const hasTracked = changed.some((field) => (tracked as readonly string[]).includes(field));
+      if (hasTracked && gerekce.length < 10) {
+        await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "Gerekçe en az 10 karakter olmalıdır.", "gerekce"));
+        return;
+      }
+
       syncPersonelReferansAdlari(personel);
       await fulfillJson(
         route,
@@ -5511,9 +5515,11 @@ let personelBelgeKaydiIdCounter = 903;
             replay: false,
             personel_id: personelId,
             olay_tipi:
-              changed.length === 1 && changed[0] === "gorev_id"
-                ? "GOREV_UNVAN_DEGISIKLIGI"
-                : "DEPARTMAN_BOLUM_BIRIM_POZISYON_DEGISIKLIGI",
+              !hasTracked
+                ? "CALISMA_BILGISI_DEGISIKLIGI"
+                : changed.length === 1 && changed[0] === "gorev_id"
+                  ? "GOREV_UNVAN_DEGISIKLIGI"
+                  : "DEPARTMAN_BOLUM_BIRIM_POZISYON_DEGISIKLIGI",
             audit_id: personelId * 1000 + changed.length,
             degisen_alanlar: changed
           },
@@ -5530,7 +5536,7 @@ let personelBelgeKaydiIdCounter = 903;
         await fulfillJson(route, 404, errorBody("NOT_FOUND", "Personel bulunamadi."));
         return;
       }
-      if (role !== "GENEL_YONETICI" && role !== "SISTEM_YONETICISI") {
+      if (role !== "GENEL_YONETICI" && role !== "SISTEM_YONETICISI" && role !== "IK_SORUMLUSU") {
         await fulfillJson(route, 403, errorBody("FORBIDDEN", "Kalici sube degisikligi yetkiniz yok."));
         return;
       }

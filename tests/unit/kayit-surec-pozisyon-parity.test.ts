@@ -54,16 +54,14 @@ describe("canonical organizasyon personnel update", () => {
     const form = createOrganizasyonFormFromPersonel(personel);
     form.aciklama = "enough chars for reason";
     const applyOrganizasyon = vi.fn();
-    const updatePersonel = vi.fn();
     const createSurec = vi.fn();
     const result = await executeOrganizasyonPersonnelUpdate({
       personel,
       form,
-      deps: { applyOrganizasyon, updatePersonel, createSurec }
+      deps: { applyOrganizasyon, createSurec }
     });
     expect(result.status).toBe("no_op");
     expect(applyOrganizasyon).not.toHaveBeenCalled();
-    expect(updatePersonel).not.toHaveBeenCalled();
     expect(createSurec).not.toHaveBeenCalled();
   });
 
@@ -76,7 +74,7 @@ describe("canonical organizasyon personnel update", () => {
     const result = await executeOrganizasyonPersonnelUpdate({
       personel,
       form,
-      deps: { applyOrganizasyon, updatePersonel: vi.fn() }
+      deps: { applyOrganizasyon }
     });
     expect(result.status).toBe("validation_error");
     expect(applyOrganizasyon).not.toHaveBeenCalled();
@@ -105,61 +103,107 @@ describe("canonical organizasyon personnel update", () => {
     );
   });
 
-  it("amir-only change uses basic PUT and skips org endpoint", async () => {
+  it("amir-only change uses canonical org endpoint (no basic PUT)", async () => {
     const personel = makePersonel();
     const form = createOrganizasyonFormFromPersonel(personel);
     form.bagliAmirId = "10";
     const updated = makePersonel({ bagli_amir_id: 10 });
-    const applyOrganizasyon = vi.fn();
-    const updatePersonel = vi.fn().mockResolvedValue(updated);
+    const applyOrganizasyon = vi.fn().mockResolvedValue({ personel: updated });
+    const updatePersonel = vi.fn();
     const result = await executeOrganizasyonPersonnelUpdate({
       personel,
       form,
       deps: { applyOrganizasyon, updatePersonel }
     });
     expect(result.status).toBe("full_success");
-    expect(applyOrganizasyon).not.toHaveBeenCalled();
-    expect(updatePersonel).toHaveBeenCalledWith(1, { bagli_amir_id: 10 });
+    expect(applyOrganizasyon).toHaveBeenCalledTimes(1);
+    expect(applyOrganizasyon.mock.calls[0][1].targets).toEqual({ bagli_amir_id: 10 });
+    expect(updatePersonel).not.toHaveBeenCalled();
   });
 
-  it("org success then basic failure returns basic_failed with updated personel", async () => {
+  it("org + amir + tip is a single atomic applyOrganizasyon call", async () => {
     const personel = makePersonel();
     const form = createOrganizasyonFormFromPersonel(personel);
     form.gorevId = "2";
     form.bagliAmirId = "10";
-    form.aciklama = "Org + amir degisikligi";
-    const orgUpdated = makePersonel({ gorev_id: 2 });
-    const applyOrganizasyon = vi.fn().mockResolvedValue({ personel: orgUpdated });
+    form.personelTipiId = "2";
+    form.aciklama = "Org + amir + tip degisikligi";
+    const updated = makePersonel({ gorev_id: 2, bagli_amir_id: 10, personel_tipi_id: 2 });
+    const applyOrganizasyon = vi.fn().mockResolvedValue({ personel: updated });
     const updatePersonel = vi.fn().mockRejectedValue(new Error("basic boom"));
     const result = await executeOrganizasyonPersonnelUpdate({
       personel,
       form,
       deps: { applyOrganizasyon, updatePersonel }
     });
-    expect(result.status).toBe("basic_failed");
-    if (result.status === "basic_failed") {
+    expect(result.status).toBe("full_success");
+    expect(applyOrganizasyon).toHaveBeenCalledTimes(1);
+    expect(applyOrganizasyon.mock.calls[0][1].targets).toEqual({
+      gorev_id: 2,
+      bagli_amir_id: 10,
+      personel_tipi_id: 2
+    });
+    expect(updatePersonel).not.toHaveBeenCalled();
+  });
+
+  it("canonical failure leaves no client-side partial success path", async () => {
+    const personel = makePersonel();
+    const form = createOrganizasyonFormFromPersonel(personel);
+    form.gorevId = "2";
+    form.bagliAmirId = "10";
+    form.aciklama = "Org + amir degisikligi";
+    const applyOrganizasyon = vi.fn().mockRejectedValue(new Error("org boom"));
+    const updatePersonel = vi.fn();
+    const result = await executeOrganizasyonPersonnelUpdate({
+      personel,
+      form,
+      deps: { applyOrganizasyon, updatePersonel }
+    });
+    expect(result.status).toBe("org_failed");
+    expect(updatePersonel).not.toHaveBeenCalled();
+  });
+
+  it("surec failure after SUCCESS is soft warning not save failure", async () => {
+    const personel = makePersonel();
+    const form = createOrganizasyonFormFromPersonel(personel);
+    form.gorevId = "2";
+    form.aciklama = "Gorev unvan degisikligi";
+    const updated = makePersonel({ gorev_id: 2 });
+    const applyOrganizasyon = vi.fn().mockResolvedValue({ personel: updated });
+    const createSurec = vi.fn().mockRejectedValue(new Error("surec boom"));
+    const result = await executeOrganizasyonPersonnelUpdate({
+      personel,
+      form,
+      deps: { applyOrganizasyon, createSurec }
+    });
+    expect(result.status).toBe("full_success");
+    if (result.status === "full_success") {
       expect(result.updated.gorev_id).toBe(2);
+      expect(result.surecWarning).toMatch(/süreç geçmişi/i);
     }
   });
 
-  it("builds org targets sparse for changed fields only", () => {
+  it("builds org targets sparse for changed fields only including work info", () => {
     const personel = makePersonel();
     const form = createOrganizasyonFormFromPersonel(personel);
     form.departmanId = "2";
     form.bolumId = "";
     form.birimId = "";
+    form.bagliAmirId = "11";
     const { targets, preimage } = buildOrganizasyonTargets(form, personel);
     expect(preimage.departman_id).toBe(3);
+    expect(preimage.bagli_amir_id).toBe(9);
     expect(targets).toEqual({
       departman_id: 2,
       bolum_id: null,
-      birim_id: null
+      birim_id: null,
+      bagli_amir_id: 11
     });
     expect(hasOrgTrackedDiff(form, personel)).toBe(true);
     expect(hasOrganizasyonFormDiff(form, personel)).toBe(true);
   });
 
-  it("basic payload never includes tracked org fields", () => {
+  it("basic payload helper never includes tracked org fields", () => {
     const personel = makePersonel();
     const form = createOrganizasyonFormFromPersonel(personel);
     form.bagliAmirId = "11";

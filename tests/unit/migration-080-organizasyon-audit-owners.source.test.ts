@@ -126,12 +126,12 @@ describe('permanent personnel branch change owner', () => {
     );
   });
 
-  it('admits only the two unrestricted management roles', () => {
+  it('admits genel, sistem and IK sorumlusu for permanent branch moves', () => {
     expect(branchChangeService).toContain(
-      "public const ALLOWED_ROLES = ['GENEL_YONETICI', 'SISTEM_YONETICISI'];",
+      "public const ALLOWED_ROLES = ['GENEL_YONETICI', 'SISTEM_YONETICISI', 'IK_SORUMLUSU'];",
     );
-    for (const role of ['BOLUM_YONETICISI', 'MUHASEBE', 'IK_SORUMLUSU']) {
-      expect(branchChangeService).not.toContain(role);
+    for (const role of ['BOLUM_YONETICISI', 'MUHASEBE', 'BIRIM_AMIRI', 'PERSONEL']) {
+      expect(branchChangeService).not.toContain(`'${role}'`);
     }
   });
 

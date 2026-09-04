@@ -31,6 +31,7 @@ import {
   fetchPrimKuraliOptions,
   fetchPersonelTipiOptions,
   fetchSgkIsverenOptions,
+  fetchCalismaLokasyonuOptions,
   fetchUcretTipiOptions,
   fetchSurecTuruOptions
 } from "../api/referans.api";
@@ -470,6 +471,7 @@ function resolveFallbackForKey(key: string): unknown {
       pozisyonOptions: [],
       personelTipiOptions: [],
       sgkIsverenOptions: [],
+      calismaLokasyonuOptions: [],
       bagliAmirOptions: [],
       ucretTipiOptions: [],
       primKuraliOptions: []
@@ -1675,6 +1677,7 @@ export async function loadDataFromServer(options?: LoadDataFromServerOptions): P
             pozisyonOptions: await fetchPozisyonOptions(),
             personelTipiOptions: await fetchPersonelTipiOptions(),
             sgkIsverenOptions: await fetchSgkIsverenOptions(),
+            calismaLokasyonuOptions: await fetchCalismaLokasyonuOptions(),
             bagliAmirOptions: await fetchBagliAmirOptions(),
             ucretTipiOptions: await fetchUcretTipiOptions(),
             primKuraliOptions: await fetchPrimKuraliOptions()

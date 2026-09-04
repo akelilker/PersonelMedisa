@@ -5433,6 +5433,150 @@ let personelBelgeKaydiIdCounter = 903;
       return;
     }
 
+    if (path.match(/^\/api\/personeller\/\d+\/organizasyon-degisikligi$/) && method === "POST") {
+      const personelId = Number.parseInt(path.split("/")[3] ?? "0", 10);
+      const personel = personeller.find((item) => item.id === personelId);
+      if (!personel) {
+        await fulfillJson(route, 404, errorBody("NOT_FOUND", "Personel bulunamadi."));
+        return;
+      }
+      if (personel.aktif_durum === "PASIF") {
+        await fulfillJson(route, 409, errorBody("ARCHIVED_PERSONEL_READ_ONLY", "Arsiv personel salt okunur."));
+        return;
+      }
+      if (!hasRolePermission(role, "personeller.update")) {
+        await fulfillJson(route, 403, errorBody("PERSONEL_ORGANIZASYON_FORBIDDEN", "Organizasyon değişikliği yetkiniz yok."));
+        return;
+      }
+
+      const body = (request.postDataJSON() ?? {}) as Record<string, unknown>;
+      const gerekce = String(body.gerekce ?? "").trim();
+      if (gerekce.length < 10) {
+        await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "Gerekçe en az 10 karakter olmalıdır.", "gerekce"));
+        return;
+      }
+
+      const preimage = (body.preimage ?? body.beklenen ?? {}) as Record<string, unknown>;
+      const targets = (body.targets ?? body.yeni ?? {}) as Record<string, unknown>;
+      const tracked = [
+        "gorev_id",
+        "departman_id",
+        "bolum_id",
+        "birim_id",
+        "pozisyon_id",
+        "sgk_isveren_id",
+        "calisma_lokasyonu_id"
+      ] as const;
+
+      const changed: string[] = [];
+      for (const field of tracked) {
+        if (!(field in targets)) continue;
+        const current =
+          personel[field as keyof typeof personel] === undefined || personel[field as keyof typeof personel] === null
+            ? null
+            : Number(personel[field as keyof typeof personel]);
+        const expected =
+          preimage[field] === undefined || preimage[field] === null || preimage[field] === ""
+            ? null
+            : Number(preimage[field]);
+        if (current !== expected) {
+          await fulfillJson(
+            route,
+            409,
+            errorBody("PERSONEL_ORGANIZASYON_STALE_PREIMAGE", "Organizasyon önizleme güncel değil.", field)
+          );
+          return;
+        }
+        const next =
+          targets[field] === undefined || targets[field] === null || targets[field] === ""
+            ? null
+            : Number(targets[field]);
+        if (current !== next) {
+          (personel as Record<string, unknown>)[field] = next;
+          changed.push(field);
+        }
+      }
+
+      if (changed.length === 0) {
+        await fulfillJson(route, 422, errorBody("PERSONEL_ORGANIZASYON_NO_CHANGE", "Organizasyon değişikliği yok."));
+        return;
+      }
+
+      syncPersonelReferansAdlari(personel);
+      await fulfillJson(
+        route,
+        200,
+        okBody({
+          organizasyon: {
+            replay: false,
+            personel_id: personelId,
+            olay_tipi:
+              changed.length === 1 && changed[0] === "gorev_id"
+                ? "GOREV_UNVAN_DEGISIKLIGI"
+                : "DEPARTMAN_BOLUM_BIRIM_POZISYON_DEGISIKLIGI",
+            audit_id: personelId * 1000 + changed.length,
+            degisen_alanlar: changed
+          },
+          personel: buildPersonelDetail(personel)
+        })
+      );
+      return;
+    }
+
+    if (path.match(/^\/api\/personeller\/\d+\/kalici-sube-degisikligi$/) && method === "POST") {
+      const personelId = Number.parseInt(path.split("/")[3] ?? "0", 10);
+      const personel = personeller.find((item) => item.id === personelId);
+      if (!personel) {
+        await fulfillJson(route, 404, errorBody("NOT_FOUND", "Personel bulunamadi."));
+        return;
+      }
+      if (role !== "GENEL_YONETICI" && role !== "SISTEM_YONETICISI") {
+        await fulfillJson(route, 403, errorBody("FORBIDDEN", "Kalici sube degisikligi yetkiniz yok."));
+        return;
+      }
+      const body = (request.postDataJSON() ?? {}) as Record<string, unknown>;
+      const gerekce = String(body.gerekce ?? "").trim();
+      if (gerekce.length < 10) {
+        await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "Gerekçe en az 10 karakter olmalıdır.", "gerekce"));
+        return;
+      }
+      const expected = body.beklenen_mevcut_sube_id == null || body.beklenen_mevcut_sube_id === ""
+        ? null
+        : Number(body.beklenen_mevcut_sube_id);
+      const current = personel.sube_id ?? null;
+      if (current !== expected) {
+        await fulfillJson(route, 409, errorBody("KALICI_SUBE_DEGISIKLIGI_STALE_PREIMAGE", "Sube onizleme guncel degil."));
+        return;
+      }
+      const yeni = Number(body.yeni_sube_id);
+      if (!Number.isInteger(yeni) || yeni <= 0) {
+        await fulfillJson(route, 404, errorBody("KALICI_SUBE_DEGISIKLIGI_TARGET_INVALID", "Hedef sube gecersiz."));
+        return;
+      }
+      if (yeni === current) {
+        await fulfillJson(route, 409, errorBody("KALICI_SUBE_DEGISIKLIGI_NO_CHANGE", "Hedef sube ayni."));
+        return;
+      }
+      personel.sube_id = yeni;
+      syncPersonelReferansAdlari(personel);
+      await fulfillJson(route, 200, { ...okBody(buildPersonelDetail(personel)), meta: { audit_id: personelId } });
+      return;
+    }
+
+    if (path === "/api/referans/calisma-lokasyonlari" && method === "GET") {
+      await fulfillJson(
+        route,
+        200,
+        okBody({
+          items: [
+            { id: 1, ad: "Fabrika" },
+            { id: 2, ad: "Ankara Ofis" }
+          ]
+        })
+      );
+      return;
+    }
+
     if (path.match(/^\/api\/personeller\/\d+$/) && method === "PUT") {
       const personelId = Number.parseInt(path.split("/")[3] ?? "0", 10);
       const personel = personeller.find((item) => item.id === personelId);
@@ -5496,10 +5640,43 @@ let personelBelgeKaydiIdCounter = 903;
         return Number.isInteger(parsed) && parsed > 0 ? parsed : NaN;
       };
 
-      for (const field of ["departman_id", "gorev_id", "bagli_amir_id", "personel_tipi_id", "ucret_tipi_id", "prim_kurali_id"]) {
+      for (const field of ["departman_id", "gorev_id", "bagli_amir_id", "personel_tipi_id", "ucret_tipi_id", "prim_kurali_id", "bolum_id", "birim_id", "pozisyon_id", "sgk_isveren_id", "calisma_lokasyonu_id"]) {
         const parsed = readNullablePositiveInt(field);
         if (typeof parsed === "number" && Number.isNaN(parsed)) {
           await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "Gecersiz deger.", field));
+          return;
+        }
+      }
+
+      const trackedOrgFields = [
+        "departman_id",
+        "gorev_id",
+        "bolum_id",
+        "birim_id",
+        "pozisyon_id",
+        "sgk_isveren_id",
+        "calisma_lokasyonu_id"
+      ] as const;
+      for (const field of trackedOrgFields) {
+        if (!(field in payload)) continue;
+        const current =
+          personel[field as keyof typeof personel] === undefined || personel[field as keyof typeof personel] === null
+            ? null
+            : Number(personel[field as keyof typeof personel]);
+        const next =
+          payload[field] === null || payload[field] === ""
+            ? null
+            : Number(payload[field]);
+        if (current !== next) {
+          await fulfillJson(
+            route,
+            409,
+            errorBody(
+              "PERSONEL_ORGANIZASYON_CANONICAL_OWNER_REQUIRED",
+              "Organizasyon alanı değişiklikleri yalnızca denetimli organizasyon-degisikligi yolundan yapılabilir.",
+              field
+            )
+          );
           return;
         }
       }

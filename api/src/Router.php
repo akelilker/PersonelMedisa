@@ -476,6 +476,9 @@ class Router
         if ($path === '/referans/sgk-isverenler' && $method === 'GET') {
             ReferansController::sgkIsverenler($this->request);
         }
+        if ($path === '/referans/calisma-lokasyonlari' && $method === 'GET') {
+            ReferansController::calismaLokasyonlari($this->request);
+        }
         if ($path === '/referans/bagli-amirler' && $method === 'GET') {
             ReferansController::bagliAmirler($this->request);
         }

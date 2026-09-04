@@ -1,15 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { getApiErrorMessage } from "../../../api/api-client";
 import { fetchPersonelDetail, updatePersonel } from "../../../api/personeller.api";
-import { createSurec } from "../../../api/surecler.api";
 import type { PersonelReferenceBundle } from "../../../data/app-data.types";
 import { dataCacheKeys, deleteCacheEntry, getActiveSube } from "../../../data/data-manager";
 import { displayUcretTipiLabel } from "../../../lib/display/ucret-tipi-display";
-import {
-  computeHasLifecycleDiff,
-  lifecycleSnapshotToPersonelPatch,
-  snapshotFromLifecycleForm
-} from "../../../lib/personel-lifecycle-diff";
+import { computeHasLifecycleDiff } from "../../../lib/personel-lifecycle-diff";
 import { useAuth } from "../../../state/auth.store";
 import type { Personel } from "../../../types/personel";
 import { PersonelInlineEditForm } from "../../personeller/components/personel-dosya/PersonelInlineEditForm";
@@ -17,7 +12,6 @@ import { parseOptionalPositiveInt } from "../../personeller/personel-create-util
 import {
   buildBagliAmirContext,
   buildBagliAmirFormGuidance,
-  buildBagliAmirSurecPayloads,
   buildPersonelUpdatePayload,
   personelToEditForm,
   pickGenelLifecycleFormFields,
@@ -139,7 +133,10 @@ export function KayitSurecPersonelGenelPanel({
           { label: "Acil Durum Kişisi", value: formatGeneralField(personel.acil_durum_kisi) },
           { label: "Acil Durum Telefon", value: formatGeneralField(personel.acil_durum_telefon) },
           { label: "Departman", value: formatGeneralField(personel.departman_adi) },
-          { label: "Unvan", value: formatGeneralField(personel.gorev_adi) },
+          { label: "Bölüm", value: formatGeneralField(personel.bolum_adi) },
+          { label: "Birim", value: formatGeneralField(personel.birim_adi) },
+          { label: "Görev / Unvan", value: formatGeneralField(personel.gorev_adi) },
+          { label: "Pozisyon", value: formatGeneralField(personel.pozisyon_adi) },
           { label: "Bağlı Amir", value: formatGeneralField(personel.bagli_amir_adi) }
         ]
       },
@@ -225,13 +222,9 @@ export function KayitSurecPersonelGenelPanel({
     const previousPersonel = personel;
     const body = buildPersonelUpdatePayload(editForm, hasLifecycleDiff, {
       includeWageFields: false,
-      includeOrgStructureFields:
-        personelRefs.bolumOptions.length > 0 ||
-        personelRefs.birimOptions.length > 0 ||
-        personelRefs.pozisyonOptions.length > 0,
+      includeBagliAmir: false,
       currentPersonel: personel
     });
-    const lifecycleSnap = snapshotFromLifecycleForm(genelLifecycleFields);
     const optimistic: Personel = {
       ...personel,
       ad: body.ad ?? personel.ad,
@@ -239,7 +232,7 @@ export function KayitSurecPersonelGenelPanel({
       telefon: body.telefon ?? personel.telefon,
       sicil_no: body.sicil_no ?? personel.sicil_no,
       ise_giris_tarihi: body.ise_giris_tarihi ?? personel.ise_giris_tarihi,
-      ...lifecycleSnapshotToPersonelPatch(lifecycleSnap)
+      prim_kurali_id: body.prim_kurali_id !== undefined ? body.prim_kurali_id : personel.prim_kurali_id
     };
     onPersonelUpdated(optimistic);
 
@@ -254,18 +247,6 @@ export function KayitSurecPersonelGenelPanel({
       setEditForm(personelToEditForm(updated));
       setIsEditing(false);
       setEditInfoMessage("Personel bilgileri güncellendi.");
-
-      if (hasLifecycleDiff && editForm.effectiveDate.trim()) {
-        const payloads = buildBagliAmirSurecPayloads(
-          previousPersonel,
-          updated,
-          editForm.effectiveDate.trim(),
-          personelRefs.bagliAmirOptions
-        );
-        if (payloads.length > 0) {
-          await Promise.allSettled(payloads.map((payload) => createSurec(payload)));
-        }
-      }
     } catch (error) {
       if (personelIdRef.current === requestPersonelId) {
         onPersonelUpdated(previousPersonel);

@@ -16,6 +16,7 @@ import {
   fetchPozisyonOptions,
   fetchPrimKuraliOptions,
   fetchSgkIsverenOptions,
+  fetchCalismaLokasyonuOptions,
   fetchUcretTipiOptions
 } from "../api/referans.api";
 import { emptyPaginated, makeTempId, type PersonelReferenceBundle } from "../data/app-data.types";
@@ -222,6 +223,7 @@ export function usePersoneller() {
         pozisyonOptions: [],
         personelTipiOptions: [],
         sgkIsverenOptions: [],
+        calismaLokasyonuOptions: [],
         bagliAmirOptions: [],
         ucretTipiOptions: [],
         primKuraliOptions: []
@@ -336,6 +338,7 @@ export function usePersoneller() {
               pozisyonOptions,
               personelTipiOptions,
               sgkIsverenOptions,
+              calismaLokasyonuOptions,
               bagliAmirOptions,
               ucretTipiOptions,
               primKuraliOptions
@@ -347,6 +350,7 @@ export function usePersoneller() {
               fetchPozisyonOptions(),
               fetchPersonelTipiOptions(),
               fetchSgkIsverenOptions(),
+              fetchCalismaLokasyonuOptions(),
               fetchBagliAmirOptions(),
               fetchUcretTipiOptions(),
               fetchPrimKuraliOptions()
@@ -359,6 +363,7 @@ export function usePersoneller() {
               pozisyonOptions,
               personelTipiOptions,
               sgkIsverenOptions,
+              calismaLokasyonuOptions,
               bagliAmirOptions,
               ucretTipiOptions,
               primKuraliOptions

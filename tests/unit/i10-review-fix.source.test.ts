@@ -13,8 +13,11 @@ function readOwner(relativePath: string) {
 }
 
 const baseForm: EditPersonelFormState = {
+  calisanKapsami: "IC_PERSONEL",
+  tcKimlikNo: "12345678901",
   ad: "Ali",
   soyad: "Veli",
+  dogumTarihi: "1990-01-01",
   telefon: "05551234567",
   departmanId: "2",
   bolumId: "",
@@ -42,29 +45,37 @@ const personel = {
 } as Personel;
 
 describe("I10 review fix — Genel ücret owner + payload", () => {
-  it("Genel lifecycle pins wage fields from personel (Mali owner)", () => {
+  it("Genel lifecycle pins org and wage fields from personel", () => {
     const fields = pickGenelLifecycleFormFields(baseForm, personel);
     expect(fields.ucretTipiId).toBe("1");
     expect(fields.maasTutari).toBe("30000");
-    expect(fields.departmanId).toBe("2");
+    expect(fields.departmanId).toBe("1");
+    expect(fields.gorevId).toBe("1");
+    expect(fields.bagliAmirId).toBe("1");
   });
 
-  it("Genel PUT omits ucret_tipi_id and maas fields", () => {
-    const payload = buildPersonelUpdatePayload(baseForm, true, { includeWageFields: false });
+  it("Genel PUT omits ucret and tracked org fields", () => {
+    const payload = buildPersonelUpdatePayload(baseForm, true, {
+      includeWageFields: false,
+      includeBagliAmir: false
+    });
     expect(payload).not.toHaveProperty("ucret_tipi_id");
     expect(payload).not.toHaveProperty("maas_tutari");
     expect(payload).not.toHaveProperty("net_maas_tutari");
-    expect(payload.departman_id).toBe(2);
+    expect(payload).not.toHaveProperty("departman_id");
+    expect(payload).not.toHaveProperty("gorev_id");
+    expect(payload).not.toHaveProperty("bagli_amir_id");
     expect(payload.prim_kurali_id).toBe(5);
   });
 
-  it("PersonelInlineEditForm has no ücret tipi write control", () => {
+  it("PersonelInlineEditForm has no ücret tipi write control and redirects org edits", () => {
     const source = readOwner(
       "src/features/personeller/components/personel-dosya/PersonelInlineEditForm.tsx"
     );
     expect(source).not.toContain('name="edit-ucret-tipi-id"');
     expect(source).not.toContain("canManageUcret");
     expect(source).toContain("personel-edit-ucret-yonlendirme");
+    expect(source).toContain("personel-edit-org-yonlendirme");
   });
 
   it("Genel panel locks person context and guards stale PUT responses", () => {

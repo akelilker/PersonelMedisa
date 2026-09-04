@@ -31,7 +31,7 @@ describe("göreve başlama tarihi default", () => {
     const personel = makePersonel({ gorev_id: undefined, pozisyon_id: undefined });
     expect(isFirstGorevAtamasi(personel)).toBe(true);
     expect(resolveGoreveBaslamaTarihiDefault(personel)).toBe("2026-01-01");
-    expect(createPozisyonFormFromPersonel(personel).effectiveDate).toBe("2026-01-01");
+    expect(createPozisyonFormFromPersonel(personel).degisiklikTarihi).toBe("2026-01-01");
     expect(personelToEditForm(personel).effectiveDate).toBe("2026-01-01");
   });
 
@@ -39,7 +39,7 @@ describe("göreve başlama tarihi default", () => {
     const personel = makePersonel({ gorev_id: 4 });
     expect(isFirstGorevAtamasi(personel)).toBe(false);
     expect(resolveGoreveBaslamaTarihiDefault(personel)).toBe(today());
-    expect(createPozisyonFormFromPersonel(personel).effectiveDate).toBe(today());
+    expect(createPozisyonFormFromPersonel(personel).degisiklikTarihi).toBe(today());
   });
 
   it("uses today for a subsequent pozisyon change", () => {
@@ -56,29 +56,24 @@ describe("göreve başlama tarihi default", () => {
   it("keeps a manually entered date", () => {
     const personel = makePersonel({ gorev_id: 4 });
     const form = createPozisyonFormFromPersonel(personel);
+    form.degisiklikTarihi = "2025-06-15";
     form.effectiveDate = "2025-06-15";
-    expect(form.effectiveDate).toBe("2025-06-15");
+    expect(form.degisiklikTarihi).toBe("2025-06-15");
   });
 
-  it("shows the assignment start date wording, not pozisyon validity", () => {
-    const workspace = readFileSync(
-      resolve("src/features/kayit/components/KayitSurecWorkspace.tsx"),
+  it("labels immediate apply as Değişiklik Tarihi on organizasyon panel", () => {
+    const panel = readFileSync(
+      resolve("src/features/kayit/components/KayitSurecPersonelOrganizasyonPanel.tsx"),
       "utf8"
     );
-    const inlineEdit = readFileSync(
-      resolve("src/features/personeller/components/personel-dosya/PersonelInlineEditForm.tsx"),
-      "utf8"
-    );
-    expect(workspace).toContain('label="Göreve Başlama Tarihi"');
-    expect(workspace).not.toContain("Geçerlilik Tarihi");
-    expect(inlineEdit).toContain('label="Göreve Başlama Tarihi"');
-    expect(inlineEdit).not.toContain("Geçerlilik Tarihi");
+    expect(panel).toContain('label="Değişiklik Tarihi"');
+    expect(panel).toContain("Değişiklik hemen uygulanır");
+    expect(panel).not.toContain("Geçerlilik Tarihi");
   });
 
-  it("keeps the backend effective_date contract unchanged", () => {
-    const utils = readFileSync(resolve("src/features/kayit/kayit-surec-utils.ts"), "utf8");
+  it("surec history uses degisiklikTarihi as baslangic note only", () => {
     const pozisyon = readFileSync(resolve("src/features/kayit/kayit-surec-pozisyon.ts"), "utf8");
-    expect(utils).toContain("effective_date: form.effectiveDate");
-    expect(pozisyon).toContain("baslangic_tarihi: params.form.effectiveDate");
+    expect(pozisyon).toContain("baslangic_tarihi: baslangic");
+    expect(pozisyon).toContain("params.form.degisiklikTarihi");
   });
 });

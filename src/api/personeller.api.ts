@@ -481,6 +481,101 @@ export async function updatePersonel(
   return updated;
 }
 
+export type OrganizasyonTrackedField =
+  | "gorev_id"
+  | "departman_id"
+  | "bolum_id"
+  | "birim_id"
+  | "pozisyon_id"
+  | "sgk_isveren_id"
+  | "calisma_lokasyonu_id";
+
+export type OrganizasyonFieldMap = Partial<Record<OrganizasyonTrackedField, number | null>>;
+
+export type ApplyOrganizasyonDegisikligiPayload = {
+  preimage: OrganizasyonFieldMap;
+  targets: OrganizasyonFieldMap;
+  gerekce: string;
+};
+
+export type OrganizasyonDegisikligiResult = {
+  organizasyon: {
+    replay: boolean;
+    personel_id: number;
+    olay_tipi: string;
+    audit_id: number | null;
+    degisen_alanlar: string[];
+  };
+  personel: Personel;
+};
+
+export async function applyPersonelOrganizasyonDegisikligi(
+  personelId: number | string,
+  payload: ApplyOrganizasyonDegisikligiPayload,
+  options?: { idempotencyKey?: string }
+): Promise<OrganizasyonDegisikligiResult> {
+  const response = await apiRequest<ApiResponse<unknown>>(endpoints.personeller.organizasyonDegisikligi(personelId), {
+    method: "POST",
+    body: JSON.stringify({
+      preimage: payload.preimage,
+      targets: payload.targets,
+      gerekce: payload.gerekce
+    }),
+    idempotencyKey: options?.idempotencyKey
+  });
+
+  const data = toRecord(response.data);
+  if (!data) {
+    throw new Error("Organizasyon degisikligi yaniti beklenen formatta degil.");
+  }
+
+  const organizasyonRaw = toRecord(data.organizasyon);
+  const personel = normalizePersonel(data.personel);
+  const degisen = Array.isArray(organizasyonRaw?.degisen_alanlar)
+    ? organizasyonRaw.degisen_alanlar.filter((item): item is string => typeof item === "string")
+    : [];
+
+  logAction({
+    action: "PERSONEL_UPDATE",
+    payload: { personel_id: personel.id, organizasyon_olay: organizasyonRaw?.olay_tipi ?? null }
+  });
+
+  return {
+    organizasyon: {
+      replay: Boolean(organizasyonRaw?.replay),
+      personel_id: typeof organizasyonRaw?.personel_id === "number" ? organizasyonRaw.personel_id : personel.id,
+      olay_tipi: typeof organizasyonRaw?.olay_tipi === "string" ? organizasyonRaw.olay_tipi : "",
+      audit_id: typeof organizasyonRaw?.audit_id === "number" ? organizasyonRaw.audit_id : null,
+      degisen_alanlar: degisen
+    },
+    personel
+  };
+}
+
+export type ApplyKaliciSubeDegisikligiPayload = {
+  beklenen_mevcut_sube_id: number | null;
+  yeni_sube_id: number;
+  gerekce: string;
+};
+
+export async function applyPersonelKaliciSubeDegisikligi(
+  personelId: number | string,
+  payload: ApplyKaliciSubeDegisikligiPayload,
+  options?: { idempotencyKey?: string }
+): Promise<Personel> {
+  const response = await apiRequest<ApiResponse<unknown>>(endpoints.personeller.kaliciSubeDegisikligi(personelId), {
+    method: "POST",
+    body: JSON.stringify(payload),
+    idempotencyKey: options?.idempotencyKey
+  });
+  const updated = normalizePersonel(response.data);
+  logAction({
+    action: "PERSONEL_UPDATE",
+    payload: { personel_id: updated.id, kalici_sube: payload.yeni_sube_id }
+  });
+  return updated;
+}
+
 export type PersonelImportDryRunRow = {
   satir_no: number;
   sicil_no: string;

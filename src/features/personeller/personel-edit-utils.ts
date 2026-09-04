@@ -178,19 +178,19 @@ export function pickLifecycleFormFields(form: EditPersonelFormState): LifecycleF
   };
 }
 
-/** Süreç → Genel: ücret alanlarını personelden kilitle (Mali owner). */
+/** Süreç → Genel: org/amir pinned from personel (Görev / Organizasyon owner). */
 export function pickGenelLifecycleFormFields(
   form: EditPersonelFormState,
   personel: Personel
 ): LifecycleFormFields {
   const resolvedMaas = resolvePersonelMaasTutari(personel);
   return {
-    departmanId: form.departmanId,
-    bolumId: form.bolumId,
-    birimId: form.birimId,
-    gorevId: form.gorevId,
-    pozisyonId: form.pozisyonId,
-    bagliAmirId: form.bagliAmirId,
+    departmanId: personel.departman_id != null ? String(personel.departman_id) : "",
+    bolumId: personel.bolum_id != null ? String(personel.bolum_id) : "",
+    birimId: personel.birim_id != null ? String(personel.birim_id) : "",
+    gorevId: personel.gorev_id != null ? String(personel.gorev_id) : "",
+    pozisyonId: personel.pozisyon_id != null ? String(personel.pozisyon_id) : "",
+    bagliAmirId: personel.bagli_amir_id != null ? String(personel.bagli_amir_id) : "",
     ucretTipiId: personel.ucret_tipi_id != null ? String(personel.ucret_tipi_id) : "",
     maasTutari: resolvedMaas != null ? String(resolvedMaas) : "",
     primKuraliId: form.primKuraliId
@@ -225,12 +225,17 @@ export type BuildPersonelUpdatePayloadOptions = {
   /** Default true. Genel panel must pass false — ücret write owner is Süreç → Mali. */
   includeWageFields?: boolean;
   /**
-   * When true, include bolum_id/birim_id/pozisyon_id (empty → null clear).
-   * Default false so pre-065 forms omit keys (no ORG_STRUCTURE_SCHEMA_NOT_READY).
+   * @deprecated TRACKED org fields must never go through generic PUT.
+   * Kept for call-site compatibility; ignored.
    */
   includeOrgStructureFields?: boolean;
   /** Existing row used to avoid sending unchanged legacy blanks as required-field writes. */
   currentPersonel?: Personel;
+  /**
+   * When true, allow bagli_amir_id on generic PUT (basic-update axis).
+   * Default false — amir edits belong on Görev / Organizasyon.
+   */
+  includeBagliAmir?: boolean;
 };
 
 export function buildPersonelUpdatePayload(
@@ -239,7 +244,7 @@ export function buildPersonelUpdatePayload(
   options: BuildPersonelUpdatePayloadOptions = {}
 ): UpdatePersonelPayload {
   const includeWageFields = options.includeWageFields !== false;
-  const includeOrgStructureFields = options.includeOrgStructureFields === true;
+  const includeBagliAmir = options.includeBagliAmir === true;
   const tcKimlikNo = String(editForm.tcKimlikNo ?? "").trim();
   const soyad = String(editForm.soyad ?? "").trim();
   const dogumTarihi = String(editForm.dogumTarihi ?? "").trim();
@@ -273,15 +278,7 @@ export function buildPersonelUpdatePayload(
   const idPayload = payload as Record<string, number | null | undefined>;
 
   const setOptionalId = (
-    key:
-      | "departman_id"
-      | "gorev_id"
-      | "bagli_amir_id"
-      | "prim_kurali_id"
-      | "ucret_tipi_id"
-      | "bolum_id"
-      | "birim_id"
-      | "pozisyon_id",
+    key: "bagli_amir_id" | "prim_kurali_id" | "ucret_tipi_id",
     raw: string | null | undefined
   ) => {
     const trimmed = String(raw ?? "").trim();
@@ -296,16 +293,12 @@ export function buildPersonelUpdatePayload(
     }
   };
 
-  setOptionalId("departman_id", editForm.departmanId);
-  setOptionalId("gorev_id", editForm.gorevId);
-  setOptionalId("bagli_amir_id", editForm.bagliAmirId);
-  setOptionalId("prim_kurali_id", editForm.primKuraliId);
-
-  if (includeOrgStructureFields) {
-    setOptionalId("bolum_id", editForm.bolumId);
-    setOptionalId("birim_id", editForm.birimId);
-    setOptionalId("pozisyon_id", editForm.pozisyonId);
+  // Never send TRACKED org fields (departman/gorev/bolum/birim/pozisyon/sgk/lokasyon)
+  // via generic PUT — canonical owner is organizasyon-degisikligi.
+  if (includeBagliAmir) {
+    setOptionalId("bagli_amir_id", editForm.bagliAmirId);
   }
+  setOptionalId("prim_kurali_id", editForm.primKuraliId);
 
   if (includeWageFields) {
     setOptionalId("ucret_tipi_id", editForm.ucretTipiId);

@@ -5802,6 +5802,75 @@ export function resolveDemoApiResponse(
     });
   }
 
+  const personelOrgMatch = pathname.match(/^\/personeller\/(\d+)\/organizasyon-degisikligi$/);
+  if (personelOrgMatch && method === "POST") {
+    const id = Number.parseInt(personelOrgMatch[1], 10);
+    const personel = demoState.personeller.find((item) => item.id === id);
+    if (!personel) {
+      return null;
+    }
+    const gerekce = String(body.gerekce ?? "").trim();
+    if (gerekce.length < 10) {
+      return demoRevizyonError("VALIDATION_ERROR", "Gerekçe en az 10 karakter olmalıdır.");
+    }
+    const targets = (body.targets ?? body.yeni ?? {}) as Record<string, unknown>;
+    const changed: string[] = [];
+    for (const field of [
+      "gorev_id",
+      "departman_id",
+      "bolum_id",
+      "birim_id",
+      "pozisyon_id",
+      "sgk_isveren_id",
+      "calisma_lokasyonu_id"
+    ]) {
+      if (!(field in targets)) continue;
+      const next =
+        targets[field] === null || targets[field] === "" || targets[field] === undefined
+          ? undefined
+          : toNumber(targets[field]) ?? undefined;
+      (personel as Record<string, unknown>)[field] = next;
+      changed.push(field);
+    }
+    if (changed.length === 0) {
+      return demoRevizyonError("PERSONEL_ORGANIZASYON_NO_CHANGE", "Organizasyon değişikliği yok.");
+    }
+    return ok({
+      organizasyon: {
+        replay: false,
+        personel_id: id,
+        olay_tipi: "DEPARTMAN_BOLUM_BIRIM_POZISYON_DEGISIKLIGI",
+        audit_id: id,
+        degisen_alanlar: changed
+      },
+      personel: buildDemoPersonelDetail(personel)
+    });
+  }
+
+  const personelSubeMatch = pathname.match(/^\/personeller\/(\d+)\/kalici-sube-degisikligi$/);
+  if (personelSubeMatch && method === "POST") {
+    const id = Number.parseInt(personelSubeMatch[1], 10);
+    const personel = demoState.personeller.find((item) => item.id === id);
+    if (!personel) {
+      return null;
+    }
+    const yeni = toNumber(body.yeni_sube_id);
+    if (yeni == null) {
+      return demoRevizyonError("KALICI_SUBE_DEGISIKLIGI_TARGET_INVALID", "Hedef sube gecersiz.");
+    }
+    personel.sube_id = yeni;
+    return ok(buildDemoPersonelDetail(personel));
+  }
+
+  if (pathname === "/referans/calisma-lokasyonlari" && method === "GET") {
+    return ok({
+      items: [
+        { id: 1, ad: "Fabrika" },
+        { id: 2, ad: "Ankara Ofis" }
+      ]
+    });
+  }
+
   const personelDetailMatch = pathname.match(/^\/personeller\/(\d+)$/);
   if (personelDetailMatch) {
     const id = Number.parseInt(personelDetailMatch[1], 10);
@@ -5815,6 +5884,25 @@ export function resolveDemoApiResponse(
     }
 
     if (method === "PUT") {
+      for (const field of [
+        "gorev_id",
+        "departman_id",
+        "bolum_id",
+        "birim_id",
+        "pozisyon_id",
+        "sgk_isveren_id",
+        "calisma_lokasyonu_id"
+      ]) {
+        if (!(field in body)) continue;
+        const current = (personel as Record<string, unknown>)[field] ?? null;
+        const next = body[field] ?? null;
+        if (Number(current) !== Number(next) && !(current == null && next == null)) {
+          return demoRevizyonError(
+            "PERSONEL_ORGANIZASYON_CANONICAL_OWNER_REQUIRED",
+            "Organizasyon alanı değişiklikleri yalnızca denetimli organizasyon-degisikligi yolundan yapılabilir."
+          );
+        }
+      }
       Object.assign(personel, body);
       return ok(buildDemoPersonelDetail(personel));
     }

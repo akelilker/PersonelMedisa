@@ -434,6 +434,39 @@ class ReferansController
         JsonResponse::success(['items' => $items]);
     }
 
+    public static function calismaLokasyonlari(Request $request)
+    {
+        AuthMiddleware::authenticate($request, true);
+
+        try {
+            $pdo = Connection::get();
+        } catch (\Throwable $e) {
+            JsonResponse::serverError('Veritabani baglantisi kurulamadi.');
+        }
+
+        if (!PersonelOrgLocationSchema::isReady($pdo)) {
+            JsonResponse::error(
+                409,
+                PersonelOrgLocationSchema::ERROR_CODE,
+                'Org location schema hazir degil.'
+            );
+        }
+
+        $stmt = $pdo->query(
+            "SELECT id, ad FROM calisma_lokasyonlari WHERE durum = 'AKTIF' ORDER BY ad ASC, id ASC"
+        );
+        $rows = $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
+        $items = [];
+        foreach ($rows as $row) {
+            $items[] = [
+                'id' => (int) $row['id'],
+                'ad' => (string) $row['ad'],
+            ];
+        }
+
+        JsonResponse::success(['items' => $items]);
+    }
+
     public static function bagliAmirler(Request $request)
     {
         AuthMiddleware::authenticate($request, true);

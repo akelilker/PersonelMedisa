@@ -133,8 +133,10 @@ describe("bugun personel durumu owners", () => {
     expect(home).toContain("BirimAmiriOperationalHomePage");
     expect(routes).toContain('session?.user.rol === "BIRIM_AMIRI"');
     expect(routes).toContain("BirimAmiriOperationalHomePage");
-    // PR #254 exception-only GELDI for birim amiri home is intentionally unchanged
-    expect(birimService).toContain("no open daily notification → GELDI");
+    // PR #254 home + PR #255 evidence-gated parity (shared resolvePersonDurum)
+    expect(birimService).toContain("BugunPersonelDurumuService::resolvePersonDurum");
+    expect(birimService).toContain("HENUZ_DEGERLENDIRILMEDI");
+    expect(birimService).not.toContain("no open daily notification → GELDI");
   });
 
   it("adds payroll close gate without migration", () => {

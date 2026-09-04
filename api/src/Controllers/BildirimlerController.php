@@ -14,6 +14,7 @@ use Medisa\Api\Scope\OrgScope;
 use Medisa\Api\Scope\SubeScope;
 use Medisa\Api\Services\Bildirim\BirimAmiriGunlukDurumService;
 use Medisa\Api\Services\Bildirim\BugunPersonelDurumuService;
+use Medisa\Api\Services\Bildirim\GunlukBildirimDuzeltmeAuditService;
 use Medisa\Api\Services\OfflineMutationIdempotencyService;
 use Medisa\Api\Services\Organizasyon\OrganizasyonSchema;
 use Medisa\Api\Services\Organizasyon\SubeReadModel;
@@ -162,7 +163,9 @@ class BildirimlerController
         }
 
         SubeScope::assertPersonelAccess($user, $request, self::personelOrgFromBildirimRow($row));
-        JsonResponse::success(self::mapRow($row));
+        $mapped = self::mapRow($row);
+        $mapped['duzeltme_gecmisi'] = GunlukBildirimDuzeltmeAuditService::listByBildirimId($pdo, $bildirimId);
+        JsonResponse::success($mapped);
     }
 
     public static function create(Request $request)
@@ -414,9 +417,49 @@ class BildirimlerController
             : ($existing['aciklama'] !== null ? (string) $existing['aciklama'] : null);
         self::assertDigereAciklama($nextTur, $nextAciklama);
 
+        $nextAltTur = array_key_exists('alt_tur', $payload)
+            ? $payload['alt_tur']
+            : ($existing['alt_tur'] !== null ? (string) $existing['alt_tur'] : null);
+        $nextDakika = null;
+        if ($computedDakika !== null) {
+            $nextDakika = $computedDakika;
+        } elseif (array_key_exists('dakika', $payload)) {
+            $nextDakika = $payload['dakika'];
+        } else {
+            $nextDakika = $existing['dakika'] !== null ? (int) $existing['dakika'] : null;
+        }
+
+        $nextBusiness = [
+            'bildirim_turu' => $nextTur,
+            'alt_tur' => $nextAltTur,
+            'baslangic_saati' => $nextBaslangic,
+            'bitis_saati' => $nextBitis,
+            'dakika' => $nextDakika,
+            'aciklama' => $nextAciklama,
+            'state' => (string) $existing['state'],
+        ];
+        if (!GunlukBildirimDuzeltmeAuditService::businessFieldsChanged(
+            GunlukBildirimDuzeltmeAuditService::businessSnapshot($existing),
+            $nextBusiness
+        )) {
+            // No-op: identical business fields — do not bump updated_at / audit.
+            JsonResponse::success(self::mapRow($existing));
+        }
+
         $fields[] = 'updated_by = :updated_by';
 
         $actorId = (int) ($user['id'] ?? 0);
+        $correctionReason = isset($body['correction_reason'])
+            ? trim((string) $body['correction_reason'])
+            : null;
+        if ($correctionReason === '') {
+            $correctionReason = null;
+        }
+        if ($correctionReason === null && isset($existing['correction_reason'])) {
+            $existingReason = trim((string) $existing['correction_reason']);
+            $correctionReason = $existingReason !== '' ? $existingReason : null;
+        }
+
         $idemKey = OfflineMutationIdempotencyService::readKey($request);
         $idemScope = 'bildirimler.update:' . $bildirimId;
         $idemHash = OfflineMutationIdempotencyService::hashPayload([
@@ -463,6 +506,17 @@ class BildirimlerController
                 }
             }
 
+            if (GunlukBildirimDuzeltmeAuditService::hasTable($pdo)) {
+                GunlukBildirimDuzeltmeAuditService::appendInTransaction(
+                    $pdo,
+                    $existing,
+                    $nextBusiness,
+                    GunlukBildirimDuzeltmeAuditService::OLAY_DUZELTME,
+                    $actorId,
+                    $correctionReason
+                );
+            }
+
             $sql = 'UPDATE gunluk_bildirimler SET ' . implode(', ', $fields) . ' WHERE id = :id';
             $stmt = $pdo->prepare($sql);
             $stmt->execute($params);
@@ -487,7 +541,7 @@ class BildirimlerController
 
             $pdo->commit();
             JsonResponse::success(self::mapRow($row));
-        } catch (\PDOException $e) {
+        } catch (\Throwable $e) {
             if ($pdo->inTransaction()) {
                 $pdo->rollBack();
             }
@@ -711,6 +765,25 @@ class BildirimlerController
                 }
             }
 
+            if (GunlukBildirimDuzeltmeAuditService::hasTable($pdo)) {
+                GunlukBildirimDuzeltmeAuditService::appendInTransaction(
+                    $pdo,
+                    $existing,
+                    [
+                        'bildirim_turu' => (string) $existing['bildirim_turu'],
+                        'alt_tur' => $existing['alt_tur'] !== null ? (string) $existing['alt_tur'] : null,
+                        'baslangic_saati' => $existing['baslangic_saati'] !== null ? (string) $existing['baslangic_saati'] : null,
+                        'bitis_saati' => $existing['bitis_saati'] !== null ? (string) $existing['bitis_saati'] : null,
+                        'dakika' => $existing['dakika'] !== null ? (int) $existing['dakika'] : null,
+                        'aciklama' => $existing['aciklama'] !== null ? (string) $existing['aciklama'] : null,
+                        'state' => 'IPTAL',
+                    ],
+                    GunlukBildirimDuzeltmeAuditService::OLAY_IPTAL,
+                    $actorId,
+                    'IPTAL'
+                );
+            }
+
             $stmt = $pdo->prepare('
                 UPDATE gunluk_bildirimler
                 SET state = :state, updated_by = :updated_by
@@ -742,7 +815,7 @@ class BildirimlerController
 
             $pdo->commit();
             JsonResponse::success(self::mapRow($row));
-        } catch (\PDOException $e) {
+        } catch (\Throwable $e) {
             if ($pdo->inTransaction()) {
                 $pdo->rollBack();
             }

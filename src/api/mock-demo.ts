@@ -7051,6 +7051,11 @@ export function resolveDemoApiResponse(
     const roster = demoState.personeller.filter((personel) =>
       isAktifBirimPersonelForDate(personel, allowedBirimIds, tarih)
     );
+    const tamamlama =
+      demoState.gunlukBildirimTamamlamalari.find(
+        (item) => item.birim_amiri_user_id === actor.userId && item.tarih === tarih
+      ) ?? null;
+    const unitCompleted = tamamlama != null;
     const personeller = roster.map((personel) => {
       const open = demoState.bildirimler
         .filter(
@@ -7060,21 +7065,24 @@ export function resolveDemoApiResponse(
             (item.state ?? "").toUpperCase() !== "IPTAL"
         )
         .sort((a, b) => b.id - a.id)[0];
+      const puantaj = demoState.puantajMap[`${personel.id}|${tarih}`];
       return mapBirimAmiriPersonelRow({
         personel_id: personel.id,
         ad_soyad: `${personel.ad} ${personel.soyad ?? ""}`.trim(),
         bildirim_turu: open?.bildirim_turu ?? null,
-        dakika: open?.dakika ?? null
+        dakika: open?.dakika ?? null,
+        baslangic_saati: open?.baslangic_saati ?? null,
+        bitis_saati: open?.bitis_saati ?? null,
+        giris_saati: puantaj?.giris_saati ?? null,
+        cikis_saati: puantaj?.cikis_saati ?? null,
+        gec_kalma_dakika: puantaj?.gec_kalma_dakika ?? null,
+        unit_completed: unitCompleted
       });
     });
-    const tamamlama =
-      demoState.gunlukBildirimTamamlamalari.find(
-        (item) => item.birim_amiri_user_id === actor.userId && item.tarih === tarih
-      ) ?? null;
     return ok({
       tarih,
       ozet: buildBirimAmiriOzetCounts(personeller),
-      tamamlandi_mi: tamamlama != null,
+      tamamlandi_mi: unitCompleted,
       tamamlama: tamamlama
         ? {
             id: tamamlama.id,

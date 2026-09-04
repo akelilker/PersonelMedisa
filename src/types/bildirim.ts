@@ -137,9 +137,12 @@ export type BirimAmiriGunlukDurumOzet = {
   geldi: number;
   gelmedi: number;
   gec_geldi: number;
+  izinli: number;
+  raporlu: number;
   izinli_raporlu: number;
   erken_cikti: number;
   gorevde: number;
+  henuz_degerlendirilmedi: number;
 };
 
 export type BirimAmiriGunlukDurumPersonel = {

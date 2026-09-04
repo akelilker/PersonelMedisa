@@ -10,34 +10,18 @@ use PDO;
 
 /**
  * BIRIM_AMIRI operational home: today's unit roster from OrgScope + gunluk_bildirimler.
+ * Person status uses the same evidence gates as BugunPersonelDurumuService (PR #255).
  * Does not reuse the legacy bagli-amir / sube-wide roster fallback. Fail-closed on empty units.
  */
 class BirimAmiriGunlukDurumService
 {
-    /** @var array<int, string> */
-    private static $exceptionTurleri = [
-        'GELMEDI',
-        'GEC_GELDI',
-        'ERKEN_CIKTI',
-        'IZINLI',
-        'RAPORLU',
-        'GOREVDE',
-        'DIGER',
-    ];
-
     /**
-     * Exception-only model: no open daily notification → GELDI.
-     *
+     * @deprecated Prefer BugunPersonelDurumuService::resolvePersonDurum
      * @param string|null $bildirimTuru
      */
     public static function deriveDurum($bildirimTuru)
     {
-        $tur = strtoupper(trim((string) $bildirimTuru));
-        if (in_array($tur, self::$exceptionTurleri, true)) {
-            return $tur;
-        }
-
-        return 'GELDI';
+        return BugunPersonelDurumuService::resolvePersonDurum($bildirimTuru, null, false);
     }
 
     /**
@@ -53,6 +37,7 @@ class BirimAmiriGunlukDurumService
         $raporlu = 0;
         $erkenCikti = 0;
         $gorevde = 0;
+        $henuz = 0;
 
         foreach ($rows as $row) {
             $durum = strtoupper(trim((string) ($row['durum'] ?? '')));
@@ -68,10 +53,12 @@ class BirimAmiriGunlukDurumService
                 $erkenCikti++;
             } elseif ($durum === 'GOREVDE') {
                 $gorevde++;
-            } elseif ($durum === 'GELDI') {
+            } elseif ($durum === BugunPersonelDurumuService::DURUM_HENUZ_DEGERLENDIRILMEDI) {
+                $henuz++;
+            } elseif ($durum === 'GELDI' || $durum === 'DIGER') {
                 $geldi++;
             } else {
-                $geldi++;
+                $henuz++;
             }
         }
 
@@ -80,10 +67,32 @@ class BirimAmiriGunlukDurumService
             'geldi' => $geldi,
             'gelmedi' => $gelmedi,
             'gec_geldi' => $gecGeldi,
+            'izinli' => $izinli,
+            'raporlu' => $raporlu,
             'izinli_raporlu' => $izinli + $raporlu,
             'erken_cikti' => $erkenCikti,
             'gorevde' => $gorevde,
+            'henuz_degerlendirilmedi' => $henuz,
         ];
+    }
+
+    /**
+     * Count invariant: exclusive primary buckets sum to toplam.
+     *
+     * @param array<string, int> $counts
+     */
+    public static function countsSatisfyInvariant(array $counts)
+    {
+        $sum = (int) ($counts['geldi'] ?? 0)
+            + (int) ($counts['gec_geldi'] ?? 0)
+            + (int) ($counts['gelmedi'] ?? 0)
+            + (int) ($counts['izinli'] ?? 0)
+            + (int) ($counts['raporlu'] ?? 0)
+            + (int) ($counts['gorevde'] ?? 0)
+            + (int) ($counts['erken_cikti'] ?? 0)
+            + (int) ($counts['henuz_degerlendirilmedi'] ?? 0);
+
+        return $sum === (int) ($counts['toplam_personel'] ?? 0);
     }
 
     /**
@@ -172,18 +181,20 @@ class BirimAmiriGunlukDurumService
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
 
+        $tamamlama = self::fetchTamamlama($pdo, $amirId, $tarih, $activeSube);
+        $unitCompleted = is_array($tamamlama);
+
         $personeller = [];
         foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
-            $personeller[] = self::mapPersonelRow($row);
+            $personeller[] = self::mapPersonelRow($row, $unitCompleted);
         }
 
         $ozet = self::buildOzetCounts($personeller);
-        $tamamlama = self::fetchTamamlama($pdo, $amirId, $tarih, $activeSube);
 
         return [
             'tarih' => $tarih,
             'ozet' => $ozet,
-            'tamamlandi_mi' => is_array($tamamlama),
+            'tamamlandi_mi' => $unitCompleted,
             'tamamlama' => $tamamlama,
             'personeller' => $personeller,
         ];
@@ -191,27 +202,34 @@ class BirimAmiriGunlukDurumService
 
     /**
      * @param array<string, mixed> $row
+     * @param bool $unitCompleted
      * @return array<string, mixed>
      */
-    public static function mapPersonelRow(array $row)
+    public static function mapPersonelRow(array $row, $unitCompleted = false)
     {
-        $durum = self::deriveDurum(isset($row['bildirim_turu']) ? $row['bildirim_turu'] : null);
         $dakika = self::nullableInt(isset($row['dakika']) ? $row['dakika'] : null);
         $puantajGec = self::nullableInt(isset($row['puantaj_gec']) ? $row['puantaj_gec'] : null);
         $puantajErken = self::nullableInt(isset($row['puantaj_erken']) ? $row['puantaj_erken'] : null);
+        $puantajGiris = self::nullableString(isset($row['puantaj_giris']) ? $row['puantaj_giris'] : null);
+        $storedForLate = $dakika !== null && $dakika > 0 ? $dakika : $puantajGec;
+
+        $durum = BugunPersonelDurumuService::resolvePersonDurum(
+            isset($row['bildirim_turu']) ? $row['bildirim_turu'] : null,
+            $puantajGiris,
+            (bool) $unitCompleted,
+            $storedForLate
+        );
 
         $gec = null;
         $erken = null;
+        $exceptionGiris = self::nullableString(isset($row['baslangic_saati']) ? $row['baslangic_saati'] : null);
+        $giris = $exceptionGiris !== null ? $exceptionGiris : $puantajGiris;
         if ($durum === 'GEC_GELDI') {
-            $gec = $dakika !== null && $dakika > 0 ? $dakika : $puantajGec;
+            $gec = BugunPersonelDurumuService::resolveLateMinutes($giris, $storedForLate);
         } elseif ($durum === 'ERKEN_CIKTI') {
             $erken = $dakika !== null && $dakika > 0 ? $dakika : $puantajErken;
         }
 
-        $giris = self::nullableString(isset($row['baslangic_saati']) ? $row['baslangic_saati'] : null);
-        if ($giris === null) {
-            $giris = self::nullableString(isset($row['puantaj_giris']) ? $row['puantaj_giris'] : null);
-        }
         $cikis = self::nullableString(isset($row['bitis_saati']) ? $row['bitis_saati'] : null);
         if ($cikis === null) {
             $cikis = self::nullableString(isset($row['puantaj_cikis']) ? $row['puantaj_cikis'] : null);
@@ -267,6 +285,7 @@ class BirimAmiriGunlukDurumService
             'RAPORLU' => 'Raporlu',
             'GOREVDE' => 'Görevde',
             'DIGER' => 'Diğer',
+            BugunPersonelDurumuService::DURUM_HENUZ_DEGERLENDIRILMEDI => 'Henüz Değerlendirilmedi',
         ];
         $key = strtoupper(trim((string) $durum));
 
@@ -356,7 +375,6 @@ class BirimAmiriGunlukDurumService
                 }
             }
         } catch (\Throwable $e) {
-            return false;
         }
 
         return false;

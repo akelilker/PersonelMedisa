@@ -5,6 +5,7 @@ import {
   cancelBildirim,
   createBildirim,
   fetchBildirimlerList,
+  fetchGunlukTamamlamalariHeader,
   updateBildirim
 } from "../api/bildirimler.api";
 import {
@@ -1498,17 +1499,9 @@ function mergeSurecIntoListCachesForSube(row: Surec, subeKey: number | null, inc
   }
 }
 
-function mergeBildirimHeader(sube: number | null, b: Bildirim, incomingRaw: unknown): void {
-  const key = dataCacheKeys.bildirimlerHeader(sube);
-  mergeCacheEntry<PaginatedResult<Bildirim>>(key, (prev) => {
-    const base = prev ?? emptyPaginated<Bildirim>();
-    const existing = base.items.find((i) => i.id === b.id);
-    if (existing && !shouldApplyRealtimeUpdate(existing, b, incomingRaw)) {
-      return base;
-    }
-    const withoutDup = base.items.filter((i) => i.id !== b.id);
-    return { ...base, items: [b, ...withoutDup].slice(0, 32) };
-  });
+function mergeBildirimHeader(_sube: number | null, _b: Bildirim, _incomingRaw: unknown): void {
+  // Header bell now projects gunluk_bildirim_tamamlamalari completions only.
+  // Individual GELMEDI/GEC_GELDI/… rows must not land in the header cache.
 }
 
 function prependBildirimToFirstPageLists(sube: number | null, b: Bildirim, incomingRaw: unknown): void {
@@ -1661,7 +1654,11 @@ export async function loadDataFromServer(options?: LoadDataFromServerOptions): P
       (async () => {
         const key = dataCacheKeys.bildirimlerHeader(sube);
         try {
-          const data = await fetchBildirimlerList({ page: 1, limit: 8, sube_id: subeQ });
+          const data = await fetchGunlukTamamlamalariHeader({
+            page: 1,
+            limit: 8,
+            sube_id: subeQ
+          });
           setCacheEntry(key, data);
         } catch {
           /* sessiz */

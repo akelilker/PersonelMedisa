@@ -11,7 +11,7 @@ describe("personel secure onboarding backend source contracts", () => {
     const migrations = readdirSync(resolve("api/migrations"))
       .filter((f) => /^\d+_.*\.sql$/.test(f))
       .sort();
-    expect(migrations[migrations.length - 1]).toBe("083_personel_organizasyon_degisiklik_auditleri.sql");
+    expect(migrations[migrations.length - 1]).toBe("084_gunluk_bildirim_tamamlama_header_summary.sql");
     const sql = read("api/migrations/075_personel_account_activation.sql");
     expect(sql).toContain("activation_required");
     expect(sql).toContain("activated_at_utc");

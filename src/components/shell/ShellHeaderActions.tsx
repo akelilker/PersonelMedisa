@@ -4,10 +4,9 @@ import { getAppData, useAppDataRevision } from "../../data/data-manager";
 import { useBildirimlerHeaderPreview } from "../../hooks/useBildirimler";
 import { useRoleAccess } from "../../hooks/use-role-access";
 import {
-  formatHeaderBildirimCopy,
+  formatHeaderGunlukTamamlamaCopy,
   formatHeaderReminderCopy
 } from "../../lib/bildirim/header-notification-copy";
-import { normalizeEnumKey } from "../../lib/display/enum-display";
 import { canonicalizeUserRole } from "../../lib/authorization/canonicalize-user-role";
 import { useAuth } from "../../state/auth.store";
 import { GLOBAL_SCOPE_ROLES } from "../../types/auth";
@@ -96,31 +95,6 @@ function buildReminderNotifications(baseDate: Date, route: string): HeaderNotifi
     .filter((item): item is HeaderNotification => item !== null);
 }
 
-function mapBildirimLevel(bildirimTuru: string): NotificationLevel {
-  const normalized = normalizeEnumKey(bildirimTuru);
-
-  if (
-    normalized.includes("DEVAMSIZLIK") ||
-    normalized === "GELMEDI" ||
-    normalized === "IZINSIZ_GELMEDI" ||
-    normalized.includes("IZINSIZ") ||
-    normalized.includes("UYARI")
-  ) {
-    return "critical";
-  }
-
-  if (
-    normalized === "IZINLI_GELMEDI" ||
-    normalized === "ERKEN_CIKTI" ||
-    normalized.includes("GEC") ||
-    normalized.includes("RAPOR")
-  ) {
-    return "warning";
-  }
-
-  return "neutral";
-}
-
 export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeaderActionsProps) {
   const rootRef = useRef<HTMLDivElement | null>(null);
 
@@ -152,7 +126,7 @@ export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeade
   const [readNotificationIds, setReadNotificationIds] = useState<Record<string, true>>({});
 
   const {
-    items: headerBildirimler,
+    items: headerTamamlamalar,
     isLoading: headerBildirimlerLoading,
     errorMessage: headerBildirimlerError,
     reload: reloadHeaderBildirimler,
@@ -172,21 +146,23 @@ export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeade
   const notifications = useMemo(() => {
     const reminderItems =
       uiProfile === "birim_amiri" ? [] : buildReminderNotifications(new Date(), reminderRoute);
-    const apiItems: HeaderNotification[] = headerBildirimler.map((item) => {
-      const copy = formatHeaderBildirimCopy(item);
+    const apiItems: HeaderNotification[] = headerTamamlamalar.map((item) => {
+      const copy = formatHeaderGunlukTamamlamaCopy(item);
 
       return {
-        id: `api-${item.id}`,
+        id: `tamamlama-${item.id}`,
         title: copy.title,
         subtitle: copy.subtitle,
-        level: mapBildirimLevel(item.bildirim_turu),
-        route: canViewBildirimDetay ? `/bildirimler/${item.id}` : "/bildirimler",
-        unread: item.state !== "IPTAL" && item.okundu_mi !== true
+        level: "neutral" as const,
+        route: canViewBildirimDetay
+          ? `/bildirimler/gunluk/${item.id}`
+          : "/bildirimler",
+        unread: item.okundu_mi !== true
       };
     });
 
     return [...reminderItems, ...apiItems];
-  }, [canViewBildirimDetay, headerBildirimler, reminderRoute, uiProfile]);
+  }, [canViewBildirimDetay, headerTamamlamalar, reminderRoute, uiProfile]);
 
   const visibleNotifications = useMemo(
     () =>
@@ -272,8 +248,8 @@ export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeade
   }
 
   function handleNotificationClick(notification: HeaderNotification) {
-    if (notification.id.startsWith("api-")) {
-      const numericId = Number.parseInt(notification.id.slice(4), 10);
+    if (notification.id.startsWith("tamamlama-")) {
+      const numericId = Number.parseInt(notification.id.slice("tamamlama-".length), 10);
       if (Number.isFinite(numericId)) {
         void markOkundu(numericId)
           .then(() => {
@@ -299,8 +275,8 @@ export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeade
   function markAllNotificationsAsRead() {
     const unreadItems = visibleNotifications.filter((item) => item.unread);
     const unreadApiIds = unreadItems
-      .filter((item) => item.id.startsWith("api-"))
-      .map((item) => Number.parseInt(item.id.slice(4), 10))
+      .filter((item) => item.id.startsWith("tamamlama-"))
+      .map((item) => Number.parseInt(item.id.slice("tamamlama-".length), 10))
       .filter((id) => Number.isFinite(id));
 
     if (unreadApiIds.length > 0) {

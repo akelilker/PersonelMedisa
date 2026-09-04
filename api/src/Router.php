@@ -759,11 +759,20 @@ class Router
         if ($path === '/bildirimler/gunluk-ozet' && $method === 'GET') {
             BildirimlerController::gunlukOzet($this->request);
         }
+        if ($path === '/bildirimler/gunluk-tamamlamalari' && $method === 'GET') {
+            BildirimlerController::gunlukTamamlamaList($this->request);
+        }
         if ($path === '/bildirimler/gunluk-tamamlama' && $method === 'GET') {
             BildirimlerController::gunlukTamamlamaGet($this->request);
         }
         if ($path === '/bildirimler/gunluk-tamamlama' && $method === 'POST') {
             BildirimlerController::gunlukTamamlamaCreate($this->request);
+        }
+        if ($method === 'GET' && preg_match('#^/bildirimler/gunluk-tamamlama/(\d+)$#', $path, $matches)) {
+            BildirimlerController::gunlukTamamlamaDetail($this->request, $matches[1]);
+        }
+        if ($method === 'PUT' && preg_match('#^/bildirimler/gunluk-tamamlama/(\d+)/okundu$#', $path, $matches)) {
+            BildirimlerController::gunlukTamamlamaMarkOkundu($this->request, $matches[1]);
         }
         if ($method === 'POST' && preg_match('#^/bildirimler/(\d+)/submit$#', $path, $matches)) {
             BildirimlerController::submit($this->request, $matches[1]);

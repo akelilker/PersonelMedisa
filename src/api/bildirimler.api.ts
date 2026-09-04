@@ -3,7 +3,9 @@ import type {
   Bildirim,
   BirimAmiriSecenegi,
   GunlukBildirimTamamlama,
-  GunlukOzet
+  GunlukOzet,
+  GunlukTamamlamaDetail,
+  GunlukTamamlamaHeaderItem
 } from "../types/bildirim";
 import { appendQueryParams } from "../utils/append-query-params";
 import { logAction } from "../audit/audit-service";
@@ -92,6 +94,32 @@ function normalizeTamamlama(data: unknown): GunlukBildirimTamamlama {
   return row as GunlukBildirimTamamlama;
 }
 
+function normalizeTamamlamaHeaderItem(data: unknown): GunlukTamamlamaHeaderItem {
+  if (typeof data !== "object" || data === null) {
+    throw new Error("Gunluk tamamlama header yaniti beklenen formatta degil.");
+  }
+  const row = data as Partial<GunlukTamamlamaHeaderItem>;
+  if (
+    typeof row.id !== "number" ||
+    typeof row.tarih !== "string" ||
+    typeof row.tamamlayan_ad_soyad !== "string"
+  ) {
+    throw new Error("Gunluk tamamlama header yaniti eksik alan iceriyor.");
+  }
+  return row as GunlukTamamlamaHeaderItem;
+}
+
+function normalizeTamamlamaDetail(data: unknown): GunlukTamamlamaDetail {
+  if (typeof data !== "object" || data === null) {
+    throw new Error("Gunluk tamamlama detay yaniti beklenen formatta degil.");
+  }
+  const detail = data as Partial<GunlukTamamlamaDetail>;
+  if (!detail.submission || !detail.ozet || !Array.isArray(detail.kategoriler)) {
+    throw new Error("Gunluk tamamlama detay yaniti eksik alan iceriyor.");
+  }
+  return detail as GunlukTamamlamaDetail;
+}
+
 export async function fetchBildirimlerList(
   params?: BildirimlerListParams
 ): Promise<PaginatedResult<Bildirim>> {
@@ -112,6 +140,47 @@ export async function fetchBildirimlerList(
     requestedPage: params?.page,
     requestedLimit: params?.limit
   });
+}
+
+export async function fetchGunlukTamamlamalariHeader(params?: {
+  sube_id?: number;
+  page?: number;
+  limit?: number;
+}): Promise<PaginatedResult<GunlukTamamlamaHeaderItem>> {
+  const path = appendQueryParams(endpoints.bildirimler.gunlukTamamlamalari, {
+    sube_id: params?.sube_id,
+    page: params?.page ?? 1,
+    limit: params?.limit ?? 8
+  });
+  const response = await apiRequest<ApiResponse<unknown>>(path);
+  return normalizePaginatedList<GunlukTamamlamaHeaderItem>(response, {
+    requestedPage: params?.page ?? 1,
+    requestedLimit: params?.limit ?? 8
+  });
+}
+
+export async function fetchGunlukTamamlamaDetail(
+  submissionId: number | string
+): Promise<GunlukTamamlamaDetail> {
+  const response = await apiRequest<ApiResponse<unknown>>(
+    endpoints.bildirimler.gunlukTamamlamaDetail(submissionId)
+  );
+  return normalizeTamamlamaDetail(response.data);
+}
+
+export async function markGunlukTamamlamaOkundu(
+  submissionId: number | string
+): Promise<GunlukTamamlamaHeaderItem> {
+  const response = await apiRequest<ApiResponse<unknown>>(
+    endpoints.bildirimler.gunlukTamamlamaOkundu(submissionId),
+    { method: "PUT" }
+  );
+  const updated = normalizeTamamlamaHeaderItem(response.data);
+  logAction({
+    action: "BILDIRIM_MARK_READ",
+    payload: { tamamlama_id: updated.id }
+  });
+  return updated;
 }
 
 export async function fetchGunlukOzet(params: {
@@ -165,11 +234,14 @@ export async function completeGunlukTamamlama(
   return created;
 }
 
-export async function createBildirim(payload: CreateBildirimPayload, options?: { idempotencyKey?: string }): Promise<Bildirim> {
+export async function createBildirim(
+  payload: CreateBildirimPayload,
+  options?: { idempotencyKey?: string }
+): Promise<Bildirim> {
   const response = await apiRequest<ApiResponse<unknown>>(endpoints.bildirimler.list, {
     method: "POST",
     body: JSON.stringify(payload),
-    idempotencyKey: options?.idempotencyKey,
+    idempotencyKey: options?.idempotencyKey
   });
   const created = normalizeBildirim(response.data);
   logAction({ action: "BILDIRIM_CREATE", payload: { bildirim_id: created.id } });
@@ -189,7 +261,7 @@ export async function updateBildirim(
   const response = await apiRequest<ApiResponse<unknown>>(endpoints.bildirimler.detail(bildirimId), {
     method: "PUT",
     body: JSON.stringify(payload),
-    idempotencyKey: options?.idempotencyKey,
+    idempotencyKey: options?.idempotencyKey
   });
   const updated = normalizeBildirim(response.data);
   if (payload.okundu_mi === true) {
@@ -200,10 +272,13 @@ export async function updateBildirim(
   return updated;
 }
 
-export async function cancelBildirim(bildirimId: number | string, options?: { idempotencyKey?: string }): Promise<void> {
+export async function cancelBildirim(
+  bildirimId: number | string,
+  options?: { idempotencyKey?: string }
+): Promise<void> {
   await apiRequest<ApiResponse<unknown>>(endpoints.bildirimler.detail(bildirimId) + "/iptal", {
     method: "POST",
-    idempotencyKey: options?.idempotencyKey,
+    idempotencyKey: options?.idempotencyKey
   });
   logAction({ action: "BILDIRIM_CANCEL", payload: { bildirim_id: bildirimId } });
 }

@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
   fetchPersonellerList,
-  fetchBildirimlerList,
+  fetchGunlukTamamlamalariHeader,
   fetchDepartmanOptions,
   fetchGorevOptions,
   fetchPersonelTipiOptions,
@@ -17,7 +17,10 @@ const {
   getActiveSubeIdMock
 } = vi.hoisted(() => ({
   fetchPersonellerList: vi.fn(async () => ({ items: [], meta: { page: 1, limit: 10, total: 0 } })),
-  fetchBildirimlerList: vi.fn(async () => ({ items: [], meta: { page: 1, limit: 8, total: 0 } })),
+  fetchGunlukTamamlamalariHeader: vi.fn(async () => ({
+    items: [],
+    meta: { page: 1, limit: 8, total: 0 }
+  })),
   fetchDepartmanOptions: vi.fn(async () => []),
   fetchGorevOptions: vi.fn(async () => []),
   fetchPersonelTipiOptions: vi.fn(async () => []),
@@ -37,7 +40,8 @@ vi.mock("../../src/api/personeller.api", () => ({
 }));
 
 vi.mock("../../src/api/bildirimler.api", () => ({
-  fetchBildirimlerList,
+  fetchGunlukTamamlamalariHeader,
+  fetchBildirimlerList: vi.fn(),
   createBildirim: vi.fn(),
   updateBildirim: vi.fn(),
   cancelBildirim: vi.fn()
@@ -93,7 +97,7 @@ describe("S90 loadDataFromServer auth gate", () => {
     getTokenMock.mockReturnValue(null);
     getActiveSubeIdMock.mockReturnValue(null);
     fetchPersonellerList.mockClear();
-    fetchBildirimlerList.mockClear();
+    fetchGunlukTamamlamalariHeader.mockClear();
     fetchDepartmanOptions.mockClear();
     fetchGorevOptions.mockClear();
     fetchPersonelTipiOptions.mockClear();
@@ -113,7 +117,7 @@ describe("S90 loadDataFromServer auth gate", () => {
     getTokenMock.mockReturnValue(null);
     await loadDataFromServer();
     expect(fetchPersonellerList).not.toHaveBeenCalled();
-    expect(fetchBildirimlerList).not.toHaveBeenCalled();
+    expect(fetchGunlukTamamlamalariHeader).not.toHaveBeenCalled();
     expect(fetchDepartmanOptions).not.toHaveBeenCalled();
     expect(fetchSurecTuruOptions).not.toHaveBeenCalled();
     expect(fetchBildirimTuruOptions).not.toHaveBeenCalled();
@@ -123,7 +127,7 @@ describe("S90 loadDataFromServer auth gate", () => {
     getTokenMock.mockReturnValue("tok-1");
     await loadDataFromServer({ force: true });
     expect(fetchPersonellerList).toHaveBeenCalled();
-    expect(fetchBildirimlerList).toHaveBeenCalledTimes(1);
+    expect(fetchGunlukTamamlamalariHeader).toHaveBeenCalledTimes(1);
     expect(fetchSurecTuruOptions).toHaveBeenCalledTimes(1);
   });
 
@@ -131,17 +135,17 @@ describe("S90 loadDataFromServer auth gate", () => {
     getTokenMock.mockReturnValue("tok-dup");
     await loadDataFromServer({ force: true });
     const personelCalls = fetchPersonellerList.mock.calls.length;
-    const bildirimCalls = fetchBildirimlerList.mock.calls.length;
+    const bildirimCalls = fetchGunlukTamamlamalariHeader.mock.calls.length;
     await loadDataFromServer();
     expect(fetchPersonellerList.mock.calls.length).toBe(personelCalls);
-    expect(fetchBildirimlerList.mock.calls.length).toBe(bildirimCalls);
+    expect(fetchGunlukTamamlamalariHeader.mock.calls.length).toBe(bildirimCalls);
   });
 
   it("StrictMode benzeri eşzamanlı çağrıları tek inflight'ta birleştirir", async () => {
     getTokenMock.mockReturnValue("tok-race");
     resetProtectedDataLoadGate();
     await Promise.all([loadDataFromServer({ force: true }), loadDataFromServer({ force: true })]);
-    expect(fetchBildirimlerList).toHaveBeenCalledTimes(1);
+    expect(fetchGunlukTamamlamalariHeader).toHaveBeenCalledTimes(1);
   });
 
   it("online event token yokken protected istek açmaz", async () => {
@@ -150,18 +154,18 @@ describe("S90 loadDataFromServer auth gate", () => {
     window.dispatchEvent(new Event("online"));
     await Promise.resolve();
     expect(fetchPersonellerList).not.toHaveBeenCalled();
-    expect(fetchBildirimlerList).not.toHaveBeenCalled();
+    expect(fetchGunlukTamamlamalariHeader).not.toHaveBeenCalled();
     detach();
   });
 
   it("online event token varken force refresh yapar", async () => {
     getTokenMock.mockReturnValue("tok-online");
     await loadDataFromServer({ force: true });
-    fetchBildirimlerList.mockClear();
+    fetchGunlukTamamlamalariHeader.mockClear();
     const detach = attachConnectivityListeners();
     window.dispatchEvent(new Event("online"));
     await vi.waitFor(() => {
-      expect(fetchBildirimlerList).toHaveBeenCalled();
+      expect(fetchGunlukTamamlamalariHeader).toHaveBeenCalled();
     });
     detach();
   });

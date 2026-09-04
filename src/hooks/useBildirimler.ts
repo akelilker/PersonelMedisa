@@ -6,7 +6,8 @@ import {
   createBildirim,
   fetchBildirimDetail,
   fetchBildirimlerList,
-  markBildirimOkundu,
+  fetchGunlukTamamlamalariHeader,
+  markGunlukTamamlamaOkundu,
   requestBildirimCorrection,
   submitBildirim,
   updateBildirim,
@@ -36,7 +37,7 @@ import {
 import { normalizeEnumKey } from "../lib/display/enum-display";
 import { runDeduped } from "../lib/in-flight-dedupe";
 import type { PaginatedResult } from "../types/api";
-import type { Bildirim } from "../types/bildirim";
+import type { Bildirim, GunlukTamamlamaHeaderItem } from "../types/bildirim";
 import type { Personel } from "../types/personel";
 import { useAuth } from "../state/auth.store";
 import type { IdOption, KeyOption } from "../types/referans";
@@ -863,14 +864,14 @@ export function useBildirimlerHeaderPreview(enabled: boolean) {
     if (!enabled) {
       return [];
     }
-    return getCacheEntry<PaginatedResult<Bildirim>>(key)?.items ?? [];
+    return getCacheEntry<PaginatedResult<GunlukTamamlamaHeaderItem>>(key)?.items ?? [];
   }, [enabled, key, revision]);
 
   const isLoading = useMemo(() => {
     if (!enabled) {
       return false;
     }
-    return getCacheEntry<PaginatedResult<Bildirim>>(key) === undefined;
+    return getCacheEntry<PaginatedResult<GunlukTamamlamaHeaderItem>>(key) === undefined;
   }, [enabled, key, revision]);
 
   const reload = useCallback(async () => {
@@ -879,7 +880,7 @@ export function useBildirimlerHeaderPreview(enabled: boolean) {
     }
     await fetchWithCacheMerge(key, () =>
       runDeduped(key, () =>
-        fetchBildirimlerList({ page: 1, limit: 8, sube_id: getSubeIdForApiRequest() })
+        fetchGunlukTamamlamalariHeader({ page: 1, limit: 8, sube_id: getSubeIdForApiRequest() })
       )
     );
   }, [enabled, key]);
@@ -893,7 +894,7 @@ export function useBildirimlerHeaderPreview(enabled: boolean) {
       try {
         await fetchWithCacheMerge(key, () =>
           runDeduped(key, () =>
-            fetchBildirimlerList({ page: 1, limit: 8, sube_id: getSubeIdForApiRequest() })
+            fetchGunlukTamamlamalariHeader({ page: 1, limit: 8, sube_id: getSubeIdForApiRequest() })
           )
         );
       } finally {
@@ -907,7 +908,7 @@ export function useBildirimlerHeaderPreview(enabled: boolean) {
     };
   }, [enabled, key]);
 
-  const markOkundu = useCallback((id: number) => markBildirimOkundu(id), []);
+  const markOkundu = useCallback((id: number) => markGunlukTamamlamaOkundu(id), []);
 
   return { items, isLoading, errorMessage: null as string | null, reload, markOkundu };
 }

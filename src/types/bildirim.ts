@@ -39,6 +39,63 @@ export type GunlukBildirimTamamlama = {
   state: string;
 };
 
+/** Header + detail owner for a completed daily attendance submission. */
+export type GunlukTamamlamaHeaderItem = {
+  id: number;
+  kind?: "gunluk_tamamlama";
+  sube_id: number;
+  sube_adi?: string | null;
+  birim_amiri_user_id: number;
+  tarih: string;
+  state: string;
+  tamamlayan_user_id: number;
+  tamamlayan_ad_soyad: string;
+  tamamlandi_at: string | null;
+  created_at?: string | null;
+  okundu_mi?: boolean;
+  toplam_personel?: number | null;
+};
+
+export type GunlukTamamlamaKayit = {
+  bildirim_id: number;
+  personel_id: number;
+  ad_soyad: string;
+  bildirim_turu: string;
+  dakika: number | null;
+  baslangic_saati: string | null;
+  bitis_saati: string | null;
+  aciklama: string | null;
+  departman_adi: string | null;
+};
+
+export type GunlukTamamlamaKategori = {
+  tur: string;
+  label: string;
+  count: number;
+  kayitlar: GunlukTamamlamaKayit[];
+};
+
+export type GunlukTamamlamaOzetCounts = {
+  toplam_personel: number;
+  gec_gelen: number;
+  gelmeyen: number;
+  izinli: number;
+  raporlu: number;
+  izinli_raporlu: number;
+  erken_cikan: number;
+  gorevde: number;
+  diger: number;
+  bildirim_satiri: number;
+};
+
+export type GunlukTamamlamaDetail = {
+  submission: GunlukTamamlamaHeaderItem;
+  scope_label: string;
+  ozet: GunlukTamamlamaOzetCounts;
+  kategoriler: GunlukTamamlamaKategori[];
+  kayitlar: GunlukTamamlamaKayit[];
+};
+
 export type GunlukOzetCounts = {
   toplam_personel: number;
   bildirim_girilen: number;

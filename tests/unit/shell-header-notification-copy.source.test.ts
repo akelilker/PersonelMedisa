@@ -9,17 +9,18 @@ function read(rel: string) {
 }
 
 describe("ShellHeaderActions human-readable notification wiring", () => {
-  it("uses canonical formatter and does not compose Personel:/Tarih: leaks", () => {
+  it("uses completion summary formatter and does not compose Personel:/Tarih: leaks", () => {
     const shell = read("src/components/shell/ShellHeaderActions.tsx");
     expect(shell).toContain('from "../../lib/bildirim/header-notification-copy"');
-    expect(shell).toContain("formatHeaderBildirimCopy");
+    expect(shell).toContain("formatHeaderGunlukTamamlamaCopy");
     expect(shell).toContain("formatHeaderReminderCopy");
+    expect(shell).not.toContain("formatHeaderBildirimCopy");
     expect(shell).not.toContain("Personel:");
     expect(shell).not.toContain("Tarih:");
     expect(shell).not.toContain("formatBildirimTuruLabel");
     expect(shell).not.toContain("headerPersonelMap");
     expect(shell).toContain("markAllNotificationsAsRead");
-    expect(shell).toContain("mapBildirimLevel");
-    expect(shell).toContain('normalized === "ERKEN_CIKTI"');
+    expect(shell).not.toContain("mapBildirimLevel");
+    expect(shell).toContain("/bildirimler/gunluk/");
   });
 });

@@ -97,6 +97,9 @@ export const endpoints = {
     birimAmiriSecenekleri: "/bildirimler/birim-amiri-secenekleri",
     gunlukOzet: "/bildirimler/gunluk-ozet",
     gunlukTamamlama: "/bildirimler/gunluk-tamamlama",
+    gunlukTamamlamalari: "/bildirimler/gunluk-tamamlamalari",
+    gunlukTamamlamaDetail: (id: number | string) => `/bildirimler/gunluk-tamamlama/${id}`,
+    gunlukTamamlamaOkundu: (id: number | string) => `/bildirimler/gunluk-tamamlama/${id}/okundu`,
     detail: (id: number | string) => `/bildirimler/${id}`,
     submit: (id: number | string) => `/bildirimler/${id}/submit`,
     requestCorrection: (id: number | string) => `/bildirimler/${id}/request-correction`

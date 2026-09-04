@@ -194,6 +194,10 @@ type DemoBildirim = {
   departman_adi?: string | null;
   sube_adi?: string | null;
   amir_user_id?: number | null;
+  alt_tur?: string | null;
+  baslangic_saati?: string | null;
+  bitis_saati?: string | null;
+  dakika?: number | null;
 };
 
 type DemoGunlukTamamlama = {
@@ -205,6 +209,8 @@ type DemoGunlukTamamlama = {
   tamamlayan_user_id: number;
   tamamlandi_at: string | null;
   not_metni?: string | null;
+  okundu_mi?: boolean;
+  toplam_personel?: number | null;
 };
 
 type DemoPersonelUcretKaydi = {
@@ -2199,6 +2205,118 @@ function normalizeDemoBildirimTuru(value: string | null | undefined): string | n
   return DEMO_BILDIRIM_ALLOWED_TURLER.includes(mapped as (typeof DEMO_BILDIRIM_ALLOWED_TURLER)[number])
     ? mapped
     : null;
+}
+
+function demoUserAdSoyad(userId: number): string {
+  const user = demoState.yonetimKullanicilari.find((item) => item.id === userId);
+  return user?.ad_soyad?.trim() || "Birim amiri";
+}
+
+function demoSubeAdi(subeId: number): string {
+  const sube = demoState.subeler.find((item) => item.id === subeId);
+  return sube?.ad ?? `Şube ${subeId}`;
+}
+
+function mapDemoTamamlamaHeader(item: DemoGunlukTamamlama) {
+  return {
+    id: item.id,
+    kind: "gunluk_tamamlama" as const,
+    sube_id: item.sube_id,
+    sube_adi: demoSubeAdi(item.sube_id),
+    birim_amiri_user_id: item.birim_amiri_user_id,
+    tarih: item.tarih,
+    state: item.state,
+    tamamlayan_user_id: item.tamamlayan_user_id,
+    tamamlayan_ad_soyad: demoUserAdSoyad(item.tamamlayan_user_id),
+    tamamlandi_at: item.tamamlandi_at,
+    created_at: item.tamamlandi_at,
+    okundu_mi: item.okundu_mi === true,
+    toplam_personel: item.toplam_personel ?? null
+  };
+}
+
+function buildDemoTamamlamaDetail(item: DemoGunlukTamamlama) {
+  const rows = demoState.bildirimler
+    .filter(
+      (row) =>
+        row.sube_id === item.sube_id &&
+        row.created_by === item.birim_amiri_user_id &&
+        row.tarih === item.tarih &&
+        (row.state ?? "").toUpperCase() !== "IPTAL"
+    )
+    .map((row) => {
+      const personel = demoState.personeller.find((p) => p.id === row.personel_id);
+      const departman = personel
+        ? demoState.departmanlar.find((d) => d.id === personel.departman_id)
+        : null;
+      return {
+        bildirim_id: row.id,
+        personel_id: row.personel_id ?? 0,
+        ad_soyad: personel ? `${personel.ad} ${personel.soyad}`.trim() : "Personel",
+        bildirim_turu: row.bildirim_turu,
+        dakika: typeof row.dakika === "number" ? row.dakika : null,
+        baslangic_saati: row.baslangic_saati ?? null,
+        bitis_saati: row.bitis_saati ?? null,
+        aciklama: row.aciklama ?? null,
+        departman_adi: departman?.ad ?? null
+      };
+    });
+
+  const counts = {
+    toplam_personel: item.toplam_personel ?? rows.length,
+    gec_gelen: 0,
+    gelmeyen: 0,
+    izinli: 0,
+    raporlu: 0,
+    izinli_raporlu: 0,
+    erken_cikan: 0,
+    gorevde: 0,
+    diger: 0,
+    bildirim_satiri: rows.length
+  };
+
+  for (const row of rows) {
+    const tur = row.bildirim_turu.toUpperCase();
+    if (tur === "GEC_GELDI") counts.gec_gelen++;
+    else if (tur === "GELMEDI") counts.gelmeyen++;
+    else if (tur === "IZINLI") counts.izinli++;
+    else if (tur === "RAPORLU") counts.raporlu++;
+    else if (tur === "ERKEN_CIKTI") counts.erken_cikan++;
+    else if (tur === "GOREVDE") counts.gorevde++;
+    else if (tur === "DIGER") counts.diger++;
+  }
+  counts.izinli_raporlu = counts.izinli + counts.raporlu;
+
+  const order = [
+    ["GEC_GELDI", "Geç Gelenler"],
+    ["GELMEDI", "Gelmeyenler"],
+    ["IZINLI", "İzinli"],
+    ["RAPORLU", "Raporlu"],
+    ["ERKEN_CIKTI", "Erken Çıkanlar"],
+    ["GOREVDE", "Görevde"],
+    ["DIGER", "Diğer"]
+  ] as const;
+
+  const kategoriler = order.map(([tur, label]) => {
+    const kayitlar = rows.filter((row) => row.bildirim_turu.toUpperCase() === tur);
+    return { tur, label, count: kayitlar.length, kayitlar };
+  });
+
+  const deptCounts: Record<string, number> = {};
+  for (const row of rows) {
+    if (!row.departman_adi) continue;
+    deptCounts[row.departman_adi] = (deptCounts[row.departman_adi] ?? 0) + 1;
+  }
+  const scopeLabel =
+    Object.entries(deptCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? demoSubeAdi(item.sube_id);
+
+  return {
+    submission: mapDemoTamamlamaHeader(item),
+    scope_label: scopeLabel,
+    ozet: counts,
+    kategoriler,
+    kayitlar: rows
+  };
 }
 
 function demoBildirimConflict(message: string): ApiResponse<unknown> {
@@ -6807,6 +6925,46 @@ export function resolveDemoApiResponse(
     });
   }
 
+  if (pathname === "/bildirimler/gunluk-tamamlamalari" && method === "GET") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "bildirimler.view");
+    if (permissionError) return permissionError;
+
+    const page = toNumber(requestUrl.searchParams.get("page")) ?? 1;
+    const limit = toNumber(requestUrl.searchParams.get("limit")) ?? 8;
+    const subeFilter =
+      toNumber(requestUrl.searchParams.get("sube_id")) ??
+      (actor.subeIds.length === 1 ? actor.subeIds[0] : null);
+
+    const filtered = demoState.gunlukBildirimTamamlamalari
+      .filter((item) => (subeFilter === null ? true : item.sube_id === subeFilter))
+      .slice()
+      .sort((a, b) => {
+        const aAt = a.tamamlandi_at ?? "";
+        const bAt = b.tamamlandi_at ?? "";
+        if (aAt === bAt) return b.id - a.id;
+        return aAt < bAt ? 1 : -1;
+      });
+
+    const start = (page - 1) * limit;
+    const slice = filtered.slice(start, start + limit);
+    const items = slice.map((item) => mapDemoTamamlamaHeader(item));
+    const total = filtered.length;
+    const totalPages = Math.max(1, Math.ceil(total / Math.max(1, limit)));
+
+    return ok(
+      { items },
+      {
+        page,
+        limit,
+        total,
+        total_pages: totalPages,
+        has_next_page: page * limit < total,
+        has_prev_page: page > 1
+      }
+    );
+  }
+
   if (pathname === "/bildirimler/gunluk-tamamlama" && method === "GET") {
     const actor = readDemoApiActor(init);
     const permissionError = enforceDemoPermission(actor, "bildirimler.view");
@@ -6865,12 +7023,7 @@ export function resolveDemoApiResponse(
         item.sube_id === subeId && item.birim_amiri_user_id === amirId && item.tarih === tarih
     );
     if (existing) {
-      return ok({
-        id: existing.id,
-        tamamlandi_at: existing.tamamlandi_at,
-        tamamlayan_user_id: existing.tamamlayan_user_id,
-        state: existing.state
-      });
+      return ok(mapDemoTamamlamaHeader(existing));
     }
     const blockers = demoState.bildirimler.filter(
       (item) =>
@@ -6890,15 +7043,49 @@ export function resolveDemoApiResponse(
       state: "TAMAMLANDI",
       tamamlayan_user_id: amirId,
       tamamlandi_at: new Date().toISOString(),
-      not_metni: toStringValue(body.not_metni) ?? null
+      not_metni: toStringValue(body.not_metni) ?? null,
+      okundu_mi: false,
+      toplam_personel: demoState.personeller.filter(
+        (p) => p.sube_id === subeId && (p.aktif_durum ?? "AKTIF") === "AKTIF"
+      ).length
     };
     demoState.gunlukBildirimTamamlamalari.push(next);
-    return ok({
-      id: next.id,
-      tamamlandi_at: next.tamamlandi_at,
-      tamamlayan_user_id: next.tamamlayan_user_id,
-      state: next.state
-    });
+    return ok(mapDemoTamamlamaHeader(next));
+  }
+
+  const gunlukTamamlamaDetailMatch = pathname.match(/^\/bildirimler\/gunluk-tamamlama\/(\d+)$/);
+  if (gunlukTamamlamaDetailMatch && method === "GET") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "bildirimler.detail.view");
+    if (permissionError) return permissionError;
+    const id = Number.parseInt(gunlukTamamlamaDetailMatch[1] ?? "", 10);
+    const item = demoState.gunlukBildirimTamamlamalari.find((row) => row.id === id);
+    if (!item) {
+      return demoRevizyonError("NOT_FOUND", "Devamsizlik bildirimi bulunamadi.");
+    }
+    if (actor.subeIds.length > 0 && !actor.subeIds.includes(item.sube_id)) {
+      return demoRevizyonError("FORBIDDEN", "Bu kayit aktif sube baglaminda goruntulenemiyor.");
+    }
+    return ok(buildDemoTamamlamaDetail(item));
+  }
+
+  const gunlukTamamlamaOkunduMatch = pathname.match(
+    /^\/bildirimler\/gunluk-tamamlama\/(\d+)\/okundu$/
+  );
+  if (gunlukTamamlamaOkunduMatch && method === "PUT") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "bildirimler.view");
+    if (permissionError) return permissionError;
+    const id = Number.parseInt(gunlukTamamlamaOkunduMatch[1] ?? "", 10);
+    const item = demoState.gunlukBildirimTamamlamalari.find((row) => row.id === id);
+    if (!item) {
+      return demoRevizyonError("NOT_FOUND", "Devamsizlik bildirimi bulunamadi.");
+    }
+    if (actor.subeIds.length > 0 && !actor.subeIds.includes(item.sube_id)) {
+      return demoRevizyonError("FORBIDDEN", "Bu kayit aktif sube baglaminda goruntulenemiyor.");
+    }
+    item.okundu_mi = true;
+    return ok(mapDemoTamamlamaHeader(item));
   }
 
   if (pathname === "/bildirimler" && method === "POST") {

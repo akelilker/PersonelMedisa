@@ -39,6 +39,9 @@ function resolveBackBar(pathname: string): { to: string; label: string } | null 
   if (/^\/surecler\/\d+$/.test(pathname)) {
     return { to: "/surecler", label: "Süreç listesine dön" };
   }
+  if (/^\/bildirimler\/gunluk\/\d+$/.test(pathname)) {
+    return { to: "/bildirimler", label: "Günlük kayıt listesine dön" };
+  }
   if (/^\/bildirimler\/\d+$/.test(pathname)) {
     return { to: "/bildirimler", label: "Günlük kayıt listesine dön" };
   }
@@ -67,6 +70,9 @@ function resolveModuleModal(pathname: string, tabParam: string | null): ModuleMo
     return { title: "Süreç Takibi", closeTo: "/", titleVariant: "premium" };
   }
 
+  if (/^\/bildirimler\/gunluk\/\d+$/.test(pathname)) {
+    return { title: "Devamsızlık Bildirimi", closeTo: "/bildirimler", titleVariant: "premium" };
+  }
   if (/^\/bildirimler\/\d+$/.test(pathname)) {
     return { title: "Günlük Kayıt Detayı", closeTo: "/bildirimler", titleVariant: "premium" };
   }

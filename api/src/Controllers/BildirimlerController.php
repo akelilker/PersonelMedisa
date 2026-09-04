@@ -902,8 +902,9 @@ class BildirimlerController
         self::assertTableReady($pdo);
         self::assertCompletionTableReady($pdo);
 
-        $existing = self::fetchTamamlama($pdo, $subeId, $amirId, $tarih);
+        $existing = self::fetchTamamlamaHeaderRow($pdo, $subeId, $amirId, $tarih);
         if ($existing) {
+            // Idempotent: same submission identity → no duplicate header notification.
             JsonResponse::success($existing);
         }
 
@@ -916,33 +917,60 @@ class BildirimlerController
             );
         }
 
+        $roster = self::fetchGunlukRoster($pdo, $subeId, $amirId, $tarih);
+        $toplamPersonel = count($roster);
+        $hasHeaderCols = self::hasTamamlamaHeaderColumns($pdo);
+
         try {
-            $stmt = $pdo->prepare('
-                INSERT INTO gunluk_bildirim_tamamlamalari (
-                    sube_id, birim_amiri_user_id, tarih, state,
-                    tamamlayan_user_id, tamamlandi_at, not_metni
-                ) VALUES (
-                    :sube_id, :birim_amiri_user_id, :tarih, :state,
-                    :tamamlayan_user_id, NOW(), :not_metni
-                )
-            ');
-            $stmt->execute([
-                'sube_id' => $subeId,
-                'birim_amiri_user_id' => $amirId,
-                'tarih' => $tarih,
-                'state' => 'TAMAMLANDI',
-                'tamamlayan_user_id' => $amirId,
-                'not_metni' => $notMetni,
-            ]);
+            if ($hasHeaderCols) {
+                $stmt = $pdo->prepare('
+                    INSERT INTO gunluk_bildirim_tamamlamalari (
+                        sube_id, birim_amiri_user_id, tarih, state,
+                        tamamlayan_user_id, tamamlandi_at, not_metni,
+                        okundu_mi, toplam_personel
+                    ) VALUES (
+                        :sube_id, :birim_amiri_user_id, :tarih, :state,
+                        :tamamlayan_user_id, NOW(), :not_metni,
+                        0, :toplam_personel
+                    )
+                ');
+                $stmt->execute([
+                    'sube_id' => $subeId,
+                    'birim_amiri_user_id' => $amirId,
+                    'tarih' => $tarih,
+                    'state' => 'TAMAMLANDI',
+                    'tamamlayan_user_id' => $amirId,
+                    'not_metni' => $notMetni,
+                    'toplam_personel' => $toplamPersonel,
+                ]);
+            } else {
+                $stmt = $pdo->prepare('
+                    INSERT INTO gunluk_bildirim_tamamlamalari (
+                        sube_id, birim_amiri_user_id, tarih, state,
+                        tamamlayan_user_id, tamamlandi_at, not_metni
+                    ) VALUES (
+                        :sube_id, :birim_amiri_user_id, :tarih, :state,
+                        :tamamlayan_user_id, NOW(), :not_metni
+                    )
+                ');
+                $stmt->execute([
+                    'sube_id' => $subeId,
+                    'birim_amiri_user_id' => $amirId,
+                    'tarih' => $tarih,
+                    'state' => 'TAMAMLANDI',
+                    'tamamlayan_user_id' => $amirId,
+                    'not_metni' => $notMetni,
+                ]);
+            }
             $id = (int) $pdo->lastInsertId();
-            $row = self::fetchTamamlamaById($pdo, $id);
+            $row = self::fetchTamamlamaHeaderById($pdo, $id);
             if (!$row) {
                 JsonResponse::serverError('Gunluk tamamlama kaydedilemedi.');
             }
             JsonResponse::success($row, [], 201);
         } catch (\PDOException $e) {
             if ((string) $e->getCode() === '23000') {
-                $again = self::fetchTamamlama($pdo, $subeId, $amirId, $tarih);
+                $again = self::fetchTamamlamaHeaderRow($pdo, $subeId, $amirId, $tarih);
                 if ($again) {
                     JsonResponse::success($again);
                 }
@@ -950,6 +978,196 @@ class BildirimlerController
             }
             JsonResponse::serverError('Gunluk tamamlama kaydedilemedi.');
         }
+    }
+
+    /**
+     * Header projection: one summary item per day-completion submission.
+     * Individual GELMEDI/GEC_GELDI/… rows are NOT header sources.
+     */
+    public static function gunlukTamamlamaList(Request $request)
+    {
+        $user = AuthMiddleware::authenticate($request, true);
+        RolePermissions::assert($user, 'bildirimler.view');
+        $scope = SubeScope::resolveScope($user, $request);
+        $allowedSubeIds = SubeScope::allowedSubeIds($user);
+
+        $page = max(1, (int) ($request->getQuery('page', 1) ?: 1));
+        $limit = max(1, min(self::MAX_LIMIT, (int) ($request->getQuery('limit', 8) ?: 8)));
+
+        try {
+            $pdo = Connection::get();
+        } catch (\Throwable $e) {
+            JsonResponse::serverError('Veritabani baglantisi kurulamadi.');
+        }
+
+        if (!self::isCompletionTableReady($pdo)) {
+            JsonResponse::success(
+                ['items' => []],
+                [
+                    'page' => $page,
+                    'limit' => $limit,
+                    'total' => 0,
+                    'total_pages' => 1,
+                    'has_next_page' => false,
+                    'has_prev_page' => false,
+                ]
+            );
+        }
+
+        $where = ['1=1'];
+        $params = [];
+        SubeScope::appendSubeFilter($where, $params, $scope, $allowedSubeIds, 't.sube_id');
+        $whereSql = implode(' AND ', $where);
+
+        $hasHeaderCols = self::hasTamamlamaHeaderColumns($pdo);
+        $extraSelect = $hasHeaderCols
+            ? ', t.okundu_mi, t.toplam_personel'
+            : ', 0 AS okundu_mi, NULL AS toplam_personel';
+
+        try {
+            $countStmt = $pdo->prepare(
+                'SELECT COUNT(*) FROM gunluk_bildirim_tamamlamalari t WHERE ' . $whereSql
+            );
+            self::bindParams($countStmt, $params);
+            $countStmt->execute();
+            $total = (int) $countStmt->fetchColumn();
+
+            $offset = ($page - 1) * $limit;
+            $sql = '
+                SELECT
+                    t.id,
+                    t.sube_id,
+                    t.birim_amiri_user_id,
+                    t.tarih,
+                    t.state,
+                    t.tamamlayan_user_id,
+                    t.tamamlandi_at,
+                    t.created_at
+                    ' . $extraSelect . ',
+                    u.ad_soyad AS actor_ad_soyad
+                FROM gunluk_bildirim_tamamlamalari t
+                LEFT JOIN users u ON u.id = t.tamamlayan_user_id
+                WHERE ' . $whereSql . '
+                ORDER BY t.tamamlandi_at DESC, t.id DESC
+                LIMIT :limit OFFSET :offset
+            ';
+            $stmt = $pdo->prepare($sql);
+            self::bindParams($stmt, $params);
+            $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+            $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+            $stmt->execute();
+        } catch (\PDOException $e) {
+            JsonResponse::serverError('Gunluk tamamlama bildirimleri listelenemedi.');
+        }
+
+        $items = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $items[] = self::mapTamamlamaHeaderRow($pdo, $row);
+        }
+
+        JsonResponse::success(
+            ['items' => $items],
+            [
+                'page' => $page,
+                'limit' => $limit,
+                'total' => $total,
+                'total_pages' => max(1, (int) ceil($total / max(1, $limit))),
+                'has_next_page' => $page * $limit < $total,
+                'has_prev_page' => $page > 1,
+            ]
+        );
+    }
+
+    public static function gunlukTamamlamaDetail(Request $request, $id)
+    {
+        $user = AuthMiddleware::authenticate($request, true);
+        RolePermissions::assert($user, 'bildirimler.detail.view');
+        $tamamlamaId = self::parsePositiveInt($id);
+        if ($tamamlamaId === null) {
+            JsonResponse::notFound('Kayit bulunamadi.');
+        }
+
+        try {
+            $pdo = Connection::get();
+        } catch (\Throwable $e) {
+            JsonResponse::serverError('Veritabani baglantisi kurulamadi.');
+        }
+
+        self::assertCompletionTableReady($pdo);
+        self::assertTableReady($pdo);
+
+        $header = self::fetchTamamlamaHeaderById($pdo, $tamamlamaId);
+        if (!$header) {
+            JsonResponse::notFound('Devamsizlik bildirimi bulunamadi.');
+        }
+
+        $scope = SubeScope::resolveScope($user, $request);
+        $allowedSubeIds = SubeScope::allowedSubeIds($user);
+        SubeScope::assertSealAccess((int) $header['sube_id'], $scope, $allowedSubeIds);
+
+        $rows = self::fetchSubmissionPersonelRows(
+            $pdo,
+            (int) $header['sube_id'],
+            (int) $header['birim_amiri_user_id'],
+            (string) $header['tarih']
+        );
+
+        $counts = self::buildSubmissionSummaryCounts($rows, $header['toplam_personel'] ?? null);
+        $scopeLabel = self::resolveSubmissionScopeLabel($rows, (string) ($header['sube_adi'] ?? ''));
+
+        JsonResponse::success([
+            'submission' => $header,
+            'scope_label' => $scopeLabel,
+            'ozet' => $counts,
+            'kategoriler' => self::groupSubmissionRowsByCategory($rows),
+            'kayitlar' => $rows,
+        ]);
+    }
+
+    public static function gunlukTamamlamaMarkOkundu(Request $request, $id)
+    {
+        $user = AuthMiddleware::authenticate($request, true);
+        RolePermissions::assert($user, 'bildirimler.view');
+        $tamamlamaId = self::parsePositiveInt($id);
+        if ($tamamlamaId === null) {
+            JsonResponse::notFound('Kayit bulunamadi.');
+        }
+
+        try {
+            $pdo = Connection::get();
+        } catch (\Throwable $e) {
+            JsonResponse::serverError('Veritabani baglantisi kurulamadi.');
+        }
+
+        self::assertCompletionTableReady($pdo);
+        $header = self::fetchTamamlamaHeaderById($pdo, $tamamlamaId);
+        if (!$header) {
+            JsonResponse::notFound('Devamsizlik bildirimi bulunamadi.');
+        }
+
+        $scope = SubeScope::resolveScope($user, $request);
+        $allowedSubeIds = SubeScope::allowedSubeIds($user);
+        SubeScope::assertSealAccess((int) $header['sube_id'], $scope, $allowedSubeIds);
+
+        if (self::hasTamamlamaHeaderColumns($pdo)) {
+            try {
+                $stmt = $pdo->prepare('
+                    UPDATE gunluk_bildirim_tamamlamalari
+                    SET okundu_mi = 1
+                    WHERE id = :id
+                ');
+                $stmt->execute(['id' => $tamamlamaId]);
+            } catch (\PDOException $e) {
+                JsonResponse::serverError('Bildirim okundu isaretlenemedi.');
+            }
+        }
+
+        $fresh = self::fetchTamamlamaHeaderById($pdo, $tamamlamaId);
+        if (!$fresh) {
+            JsonResponse::notFound('Devamsizlik bildirimi bulunamadi.');
+        }
+        $fresh['okundu_mi'] = true;
+        JsonResponse::success($fresh);
     }
 
     public static function isTableReady(PDO $pdo)
@@ -1589,6 +1807,295 @@ class BildirimlerController
             'tamamlayan_user_id' => (int) $row['tamamlayan_user_id'],
             'state' => (string) $row['state'],
         ];
+    }
+
+    public static function hasTamamlamaHeaderColumns(PDO $pdo)
+    {
+        try {
+            $stmt = $pdo->query("SHOW COLUMNS FROM gunluk_bildirim_tamamlamalari LIKE 'okundu_mi'");
+
+            return $stmt && (bool) $stmt->fetch();
+        } catch (\PDOException $e) {
+            return false;
+        }
+    }
+
+    /** @param array<string, mixed> $row @return array<string, mixed> */
+    private static function mapTamamlamaHeaderRow(PDO $pdo, array $row)
+    {
+        $subeId = (int) ($row['sube_id'] ?? 0);
+        $actorName = trim((string) ($row['actor_ad_soyad'] ?? ''));
+        if ($actorName === '' && isset($row['tamamlayan_user_id'])) {
+            $actorName = self::fetchUserAdSoyad($pdo, (int) $row['tamamlayan_user_id']);
+        }
+
+        return [
+            'id' => (int) $row['id'],
+            'sube_id' => $subeId,
+            'sube_adi' => self::fetchSubeAdi($pdo, $subeId),
+            'birim_amiri_user_id' => (int) ($row['birim_amiri_user_id'] ?? $row['tamamlayan_user_id'] ?? 0),
+            'tarih' => (string) ($row['tarih'] ?? ''),
+            'state' => (string) ($row['state'] ?? 'TAMAMLANDI'),
+            'tamamlayan_user_id' => (int) ($row['tamamlayan_user_id'] ?? 0),
+            'tamamlayan_ad_soyad' => $actorName !== '' ? $actorName : 'Birim amiri',
+            'tamamlandi_at' => $row['tamamlandi_at'] !== null ? (string) $row['tamamlandi_at'] : null,
+            'created_at' => isset($row['created_at']) && $row['created_at'] !== null
+                ? (string) $row['created_at']
+                : null,
+            'okundu_mi' => (bool) ((int) ($row['okundu_mi'] ?? 0)),
+            'toplam_personel' => isset($row['toplam_personel']) && $row['toplam_personel'] !== null
+                ? (int) $row['toplam_personel']
+                : null,
+            'kind' => 'gunluk_tamamlama',
+        ];
+    }
+
+    /** @return array<string, mixed>|null */
+    private static function fetchTamamlamaHeaderRow(PDO $pdo, $subeId, $amirId, $tarih)
+    {
+        if (!self::isCompletionTableReady($pdo)) {
+            return null;
+        }
+        $hasHeaderCols = self::hasTamamlamaHeaderColumns($pdo);
+        $extra = $hasHeaderCols
+            ? ', t.okundu_mi, t.toplam_personel'
+            : ', 0 AS okundu_mi, NULL AS toplam_personel';
+        $stmt = $pdo->prepare('
+            SELECT
+                t.id,
+                t.sube_id,
+                t.birim_amiri_user_id,
+                t.tarih,
+                t.state,
+                t.tamamlayan_user_id,
+                t.tamamlandi_at,
+                t.created_at
+                ' . $extra . ',
+                u.ad_soyad AS actor_ad_soyad
+            FROM gunluk_bildirim_tamamlamalari t
+            LEFT JOIN users u ON u.id = t.tamamlayan_user_id
+            WHERE t.sube_id = :sube_id
+              AND t.birim_amiri_user_id = :amir_id
+              AND t.tarih = :tarih
+            LIMIT 1
+        ');
+        $stmt->execute([
+            'sube_id' => (int) $subeId,
+            'amir_id' => (int) $amirId,
+            'tarih' => $tarih,
+        ]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        return $row ? self::mapTamamlamaHeaderRow($pdo, $row) : null;
+    }
+
+    /** @return array<string, mixed>|null */
+    private static function fetchTamamlamaHeaderById(PDO $pdo, $id)
+    {
+        if (!self::isCompletionTableReady($pdo)) {
+            return null;
+        }
+        $hasHeaderCols = self::hasTamamlamaHeaderColumns($pdo);
+        $extra = $hasHeaderCols
+            ? ', t.okundu_mi, t.toplam_personel'
+            : ', 0 AS okundu_mi, NULL AS toplam_personel';
+        $stmt = $pdo->prepare('
+            SELECT
+                t.id,
+                t.sube_id,
+                t.birim_amiri_user_id,
+                t.tarih,
+                t.state,
+                t.tamamlayan_user_id,
+                t.tamamlandi_at,
+                t.created_at
+                ' . $extra . ',
+                u.ad_soyad AS actor_ad_soyad
+            FROM gunluk_bildirim_tamamlamalari t
+            LEFT JOIN users u ON u.id = t.tamamlayan_user_id
+            WHERE t.id = :id
+            LIMIT 1
+        ');
+        $stmt->execute(['id' => (int) $id]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        return $row ? self::mapTamamlamaHeaderRow($pdo, $row) : null;
+    }
+
+    /**
+     * Personel-level rows for a completed day (source = gunluk_bildirimler).
+     * Linked by sube + amir (created_by) + tarih — the submission identity keys.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private static function fetchSubmissionPersonelRows(PDO $pdo, $subeId, $amirId, $tarih)
+    {
+        $sql = '
+            SELECT
+                gb.id AS bildirim_id,
+                gb.personel_id,
+                TRIM(CONCAT(COALESCE(p.ad, \'\'), \' \', COALESCE(p.soyad, \'\'))) AS ad_soyad,
+                gb.bildirim_turu,
+                gb.dakika,
+                gb.baslangic_saati,
+                gb.bitis_saati,
+                gb.aciklama,
+                d.ad AS departman_adi
+            FROM gunluk_bildirimler gb
+            INNER JOIN personeller p ON p.id = gb.personel_id
+            LEFT JOIN departmanlar d ON d.id = COALESCE(gb.departman_id, p.departman_id)
+            WHERE gb.sube_id = :sube_id
+              AND gb.created_by = :amir_id
+              AND gb.tarih = :tarih
+              AND gb.state <> :iptal
+            ORDER BY
+                FIELD(gb.bildirim_turu, \'GEC_GELDI\', \'GELMEDI\', \'IZINLI\', \'RAPORLU\', \'ERKEN_CIKTI\', \'GOREVDE\', \'DIGER\'),
+                p.ad ASC,
+                p.soyad ASC,
+                gb.id ASC
+        ';
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute([
+            'sube_id' => (int) $subeId,
+            'amir_id' => (int) $amirId,
+            'tarih' => $tarih,
+            'iptal' => 'IPTAL',
+        ]);
+
+        $items = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $items[] = [
+                'bildirim_id' => (int) $row['bildirim_id'],
+                'personel_id' => (int) $row['personel_id'],
+                'ad_soyad' => trim((string) $row['ad_soyad']),
+                'bildirim_turu' => (string) $row['bildirim_turu'],
+                'dakika' => $row['dakika'] !== null ? (int) $row['dakika'] : null,
+                'baslangic_saati' => $row['baslangic_saati'] !== null ? (string) $row['baslangic_saati'] : null,
+                'bitis_saati' => $row['bitis_saati'] !== null ? (string) $row['bitis_saati'] : null,
+                'aciklama' => $row['aciklama'] !== null ? (string) $row['aciklama'] : null,
+                'departman_adi' => $row['departman_adi'] !== null ? (string) $row['departman_adi'] : null,
+            ];
+        }
+
+        return $items;
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $rows
+     * @param int|null $toplamSnapshot
+     * @return array<string, int>
+     */
+    private static function buildSubmissionSummaryCounts(array $rows, $toplamSnapshot)
+    {
+        $gec = 0;
+        $gelmedi = 0;
+        $izinli = 0;
+        $raporlu = 0;
+        $erken = 0;
+        $gorevde = 0;
+        $diger = 0;
+
+        foreach ($rows as $row) {
+            $tur = strtoupper(trim((string) ($row['bildirim_turu'] ?? '')));
+            if ($tur === 'GEC_GELDI') {
+                $gec++;
+            } elseif ($tur === 'GELMEDI') {
+                $gelmedi++;
+            } elseif ($tur === 'IZINLI') {
+                $izinli++;
+            } elseif ($tur === 'RAPORLU') {
+                $raporlu++;
+            } elseif ($tur === 'ERKEN_CIKTI') {
+                $erken++;
+            } elseif ($tur === 'GOREVDE') {
+                $gorevde++;
+            } elseif ($tur === 'DIGER') {
+                $diger++;
+            }
+        }
+
+        $rowCount = count($rows);
+        $toplam = $toplamSnapshot !== null && (int) $toplamSnapshot > 0
+            ? (int) $toplamSnapshot
+            : $rowCount;
+
+        return [
+            'toplam_personel' => $toplam,
+            'gec_gelen' => $gec,
+            'gelmeyen' => $gelmedi,
+            'izinli' => $izinli,
+            'raporlu' => $raporlu,
+            'izinli_raporlu' => $izinli + $raporlu,
+            'erken_cikan' => $erken,
+            'gorevde' => $gorevde,
+            'diger' => $diger,
+            'bildirim_satiri' => $rowCount,
+        ];
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $rows
+     * @return array<string, array{tur:string, label:string, count:int, kayitlar:array<int, array<string, mixed>>}>
+     */
+    private static function groupSubmissionRowsByCategory(array $rows)
+    {
+        $order = [
+            'GEC_GELDI' => 'Geç Gelenler',
+            'GELMEDI' => 'Gelmeyenler',
+            'IZINLI' => 'İzinli',
+            'RAPORLU' => 'Raporlu',
+            'ERKEN_CIKTI' => 'Erken Çıkanlar',
+            'GOREVDE' => 'Görevde',
+            'DIGER' => 'Diğer',
+        ];
+
+        $groups = [];
+        foreach ($order as $tur => $label) {
+            $groups[$tur] = [
+                'tur' => $tur,
+                'label' => $label,
+                'count' => 0,
+                'kayitlar' => [],
+            ];
+        }
+
+        foreach ($rows as $row) {
+            $tur = strtoupper(trim((string) ($row['bildirim_turu'] ?? '')));
+            if (!isset($groups[$tur])) {
+                continue;
+            }
+            $groups[$tur]['kayitlar'][] = $row;
+            $groups[$tur]['count']++;
+        }
+
+        return array_values($groups);
+    }
+
+    /**
+     * Prefer the dominant departman among submitted rows; else şube adı.
+     *
+     * @param array<int, array<string, mixed>> $rows
+     */
+    private static function resolveSubmissionScopeLabel(array $rows, $subeAdi)
+    {
+        $counts = [];
+        foreach ($rows as $row) {
+            $label = trim((string) ($row['departman_adi'] ?? ''));
+            if ($label === '') {
+                continue;
+            }
+            if (!isset($counts[$label])) {
+                $counts[$label] = 0;
+            }
+            $counts[$label]++;
+        }
+        if (count($counts) === 0) {
+            return $subeAdi !== '' ? $subeAdi : 'Devamsızlık Bildirimi';
+        }
+        arsort($counts);
+        $top = array_key_first($counts);
+
+        return is_string($top) && $top !== '' ? $top : ($subeAdi !== '' ? $subeAdi : 'Devamsızlık Bildirimi');
     }
 
     /** @return array{taslak:int, duzeltme:int} */

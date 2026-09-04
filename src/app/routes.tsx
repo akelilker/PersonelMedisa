@@ -9,6 +9,7 @@ import { SurecTakipPage } from "../features/surecler/pages/SurecTakipPage";
 import { SurecDetayPage } from "../features/surecler/pages/SurecDetayPage";
 import { BildirimlerPage } from "../features/bildirimler/pages/BildirimlerPage";
 import { BildirimDetayPage } from "../features/bildirimler/pages/BildirimDetayPage";
+import { GunlukTamamlamaDetayPage } from "../features/bildirimler/pages/GunlukTamamlamaDetayPage";
 import { GunlukPuantajPage } from "../features/puantaj/pages/GunlukPuantajPage";
 import { RaporlarPage } from "../features/raporlar/pages/RaporlarPage";
 import { FinansPage } from "../features/finans/pages/FinansPage";
@@ -174,6 +175,14 @@ export function AppRoutes() {
           element={
             <ProtectedRoute requirePermission={ROUTE_PERMISSION.bildirimlerPage}>
               <BildirimlerPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="bildirimler/gunluk/:submissionId"
+          element={
+            <ProtectedRoute requirePermission={ROUTE_PERMISSION.bildirimDetail}>
+              <GunlukTamamlamaDetayPage />
             </ProtectedRoute>
           }
         />

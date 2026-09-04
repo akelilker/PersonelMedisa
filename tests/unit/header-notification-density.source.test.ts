@@ -33,12 +33,11 @@ describe("header notification density owners (tasit parity)", () => {
     );
   });
 
-  it("keeps DIGER summary owner in header-notification-copy", () => {
+  it("keeps summary completion copy owner for header", () => {
     const copy = read("src/lib/bildirim/header-notification-copy.ts");
-    expect(copy).toContain("summarizeDigerAciklama");
-    expect(copy).toContain("formatDigerTitle");
-    expect(copy).not.toMatch(/\$\{personelName\}:\s*\$\{aciklama\}/);
-    expect(copy).toContain("gg.aa.yyyy only");
-    expect(copy).not.toContain("includeSube");
+    expect(copy).toContain("formatHeaderGunlukTamamlamaCopy");
+    expect(copy).toContain("Devamsızlık Bildirimini Tamamladı.");
+    expect(copy).toContain("Detayları Gör");
+    expect(copy).not.toContain("formatHeaderBildirimCopy");
   });
 });

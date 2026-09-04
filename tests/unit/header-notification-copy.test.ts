@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   formatHeaderBildirimCopy,
-  formatHeaderReminderCopy
+  formatHeaderReminderCopy,
+  summarizeDigerAciklama
 } from "../../src/lib/bildirim/header-notification-copy";
 import { formatBildirimTuruLabel } from "../../src/lib/display/enum-display";
 import type { Bildirim } from "../../src/types/bildirim";
@@ -93,14 +94,31 @@ describe("formatHeaderBildirimCopy", () => {
     );
   });
 
-  it("formats DIGER with mandatory aciklama in title", () => {
+  it("formats DIGER with short aciklama summary in title", () => {
     const copy = formatHeaderBildirimCopy(
       baseItem({
         bildirim_turu: "DIGER",
         aciklama: "Servis nedeniyle geç giriş yaptı."
       })
     );
-    expect(copy.title).toBe("Ahmet Yılmaz: Servis nedeniyle geç giriş yaptı.");
+    expect(copy.title).toBe("Ahmet Yılmaz — Servis nedeniyle geç giriş yaptı.");
+    expect(copy.subtitle).toBe("15.07.2026");
+    assertNoTechnicalLeak(copy);
+  });
+
+  it("formats DIGER long paragraph via result sentence, not full dump", () => {
+    const long =
+      "Personel ile sabah görüşmesi yapılmış, eksik evraklar kontrol edilmiş ve ilgili birim bilgilendirilmiştir. " +
+      "Ayrıca vardiya notları gözden geçirilmiştir. Testi Yapılmıştır.";
+    const copy = formatHeaderBildirimCopy(
+      baseItem({
+        bildirim_turu: "DIGER",
+        aciklama: long
+      })
+    );
+    expect(copy.title).toBe("Ahmet Yılmaz — Testi Yapılmıştır.");
+    expect(copy.title).not.toContain("Personel ile sabah");
+    expect(copy.title.length).toBeLessThan(long.length);
     expect(copy.subtitle).toBe("15.07.2026");
     assertNoTechnicalLeak(copy);
   });
@@ -154,6 +172,37 @@ describe("formatHeaderBildirimCopy", () => {
     );
     expect(copy.title).toBe("Günlük bildirim · Uyarı");
     assertNoTechnicalLeak(copy);
+  });
+});
+
+describe("summarizeDigerAciklama", () => {
+  it("prefers conclusive result sentence", () => {
+    expect(
+      summarizeDigerAciklama(
+        "Uzun giriş notu burada yer alır. İkinci cümle de uzundur. Testi Yapılmıştır."
+      )
+    ).toBe("Testi Yapılmıştır.");
+  });
+
+  it("picks shortest meaningful sentence among several", () => {
+    expect(
+      summarizeDigerAciklama(
+        "Bu sabah şube içinde uzun bir süreç işletildi ve birden fazla kontrol yapıldı. Raporlu."
+      )
+    ).toBe("Raporlu.");
+  });
+
+  it("reduces single long sentence without mid-word chop when possible", () => {
+    const long =
+      "Personelin gün içindeki tüm görev dağılımı yeniden planlanarak sabah brifinginde aktarıldı ve ilgili amir bilgilendirildi";
+    const summary = summarizeDigerAciklama(long);
+    expect(summary.length).toBeLessThanOrEqual(100);
+    expect(summary.endsWith(".") || summary.endsWith("…")).toBe(true);
+    if (summary.endsWith("…")) {
+      const before = summary.slice(0, -1);
+      expect(before).toMatch(/\S$/);
+      expect(long.startsWith(before) || long.includes(before.replace(/\.$/, ""))).toBe(true);
+    }
   });
 });
 

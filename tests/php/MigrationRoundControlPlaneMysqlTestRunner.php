@@ -3,10 +3,10 @@
 declare(strict_types=1);
 
 /**
- * Canonical migration round 083 — DB-backed acceptance against a real MariaDB.
+ * Canonical migration round 084 — DB-backed acceptance against a real MariaDB.
  *
- * Production preimage: tip 082 with 083 pending. Setup applies 080–082 from
- * real files; subject under test is 083 only.
+ * Production preimage: tip 083 with 084 pending. Setup applies 080–083 from
+ * real files; subject under test is 084 only.
  *
  * Nothing here touches production.
  *
@@ -24,14 +24,16 @@ use Medisa\Api\Database\MigrationSourceProvider;
 const MRC_MIGRATION_080 = '080_organizasyon_audit_owners.sql';
 const MRC_MIGRATION_081 = '081_ik_personeli_rolu.sql';
 const MRC_MIGRATION_083 = '083_personel_organizasyon_degisiklik_auditleri.sql';
+const MRC_MIGRATION_084 = '084_gunluk_bildirim_tamamlama_header_summary.sql';
 
-/** Audit owners the completed 080/081 round left behind. */
+/** Audit owners the completed 080–083 rounds left behind. */
 const MRC_PREDECESSOR_AUDIT_TABLES = [
     'personel_sube_degisiklik_auditleri',
     'sube_olusturma_auditleri',
     'user_org_scope_auditleri',
     'user_erisim_kaldirma_auditleri',
     'user_erisim_degisiklik_auditleri',
+    'personel_organizasyon_degisiklik_auditleri',
 ];
 
 /**
@@ -181,6 +183,26 @@ function mrcCreatePostO79Preimage(PDO $pdo): void
             CONSTRAINT fk_user_sgk_isverenler_sgk FOREIGN KEY (sgk_isveren_id) REFERENCES sgk_isverenler (id) ON DELETE RESTRICT
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
     );
+    // 032-shaped owner that 084 extends with additive columns only.
+    $pdo->exec(
+        "CREATE TABLE gunluk_bildirim_tamamlamalari (
+            id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+            sube_id INT UNSIGNED NOT NULL,
+            birim_amiri_user_id INT UNSIGNED NOT NULL,
+            tarih DATE NOT NULL,
+            state VARCHAR(32) NOT NULL DEFAULT 'TAMAMLANDI',
+            tamamlayan_user_id INT UNSIGNED NOT NULL,
+            tamamlandi_at TIMESTAMP NULL DEFAULT NULL,
+            not_metni TEXT NULL,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY uniq_gbt_sube_amir_tarih (sube_id, birim_amiri_user_id, tarih),
+            CONSTRAINT fk_gbt_sube FOREIGN KEY (sube_id) REFERENCES subeler (id),
+            CONSTRAINT fk_gbt_birim_amiri FOREIGN KEY (birim_amiri_user_id) REFERENCES users (id),
+            CONSTRAINT fk_gbt_tamamlayan FOREIGN KEY (tamamlayan_user_id) REFERENCES users (id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+    );
 }
 
 function mrcSeed(PDO $pdo): void
@@ -251,6 +273,17 @@ function mrcTableExists(PDO $pdo, string $table): bool
     return (int) $statement->fetchColumn() === 1;
 }
 
+function mrcColumnExists(PDO $pdo, string $table, string $column): bool
+{
+    $statement = $pdo->prepare(
+        'SELECT COUNT(*) FROM information_schema.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :t AND COLUMN_NAME = :c'
+    );
+    $statement->execute([':t' => $table, ':c' => $column]);
+
+    return (int) $statement->fetchColumn() === 1;
+}
+
 function mrcRoleEnum(PDO $pdo): string
 {
     $type = $pdo->query(
@@ -271,72 +304,95 @@ $root->exec('CREATE DATABASE `' . $db . '` CHARACTER SET utf8mb4 COLLATE utf8mb4
 
 $apiDirectory = dirname(__DIR__, 2) . '/api';
 $filesystemSource = new FilesystemMigrationSourceProvider($apiDirectory . '/migrations');
-$sourceThrough082 = new MrcChainThrough($filesystemSource, 82);
-$source = new MrcChainThrough($filesystemSource, 83);
+$sourceThrough083 = new MrcChainThrough($filesystemSource, 83);
+$source = new MrcChainThrough($filesystemSource, 84);
 $deployedSha = str_repeat('b', 40);
 
 try {
     $pdo = mrcPdo($rootDsn . ';dbname=' . $db);
     mrcCreatePostO79Preimage($pdo);
     mrcSeed($pdo);
-    mrcSeedLedger($pdo, $sourceThrough082->all(), '079');
+    mrcSeedLedger($pdo, $sourceThrough083->all(), '079');
 
-    MigrationExecutionService::apply($pdo, $sourceThrough082, null, '080');
-    MigrationExecutionService::apply($pdo, $sourceThrough082, null, '081');
-    MigrationExecutionService::apply($pdo, $sourceThrough082, null, '082');
+    MigrationExecutionService::apply($pdo, $sourceThrough083, null, '080');
+    MigrationExecutionService::apply($pdo, $sourceThrough083, null, '081');
+    MigrationExecutionService::apply($pdo, $sourceThrough083, null, '082');
+    MigrationExecutionService::apply($pdo, $sourceThrough083, null, '083');
     mrcAssert(
-        MigrationExecutionService::ledgerFacts($pdo, $sourceThrough082)['tip'] === '082',
-        'the preimage database is at production tip 082'
+        MigrationExecutionService::ledgerFacts($pdo, $sourceThrough083)['tip'] === '083',
+        'the preimage database is at production tip 083'
     );
 
     $baselineCounts = mrcBusinessCounts($pdo);
     $baselineRoles = mrcRoleValues($pdo);
+    $baselineCompletionRows = (int) $pdo->query('SELECT COUNT(*) FROM gunluk_bildirim_tamamlamalari')->fetchColumn();
 
     // -----------------------------------------------------------------
-    // 1) tip 082, only 083 pending → apply ready
+    // 1) tip 083, only 084 pending → apply ready
     // -----------------------------------------------------------------
     $report = MigrationPreflightReport::collect($pdo, $source, $deployedSha);
-    mrcAssert($report['result'] === 'PASS', 'a production tip 082 database is apply-ready for the 083 round');
-    mrcAssert($report['ledger']['applied_tip'] === '082', 'preflight reports production tip 082');
-    mrcAssert($report['bundle']['code_tip'] === '083', 'preflight reports code tip 083');
+    mrcAssert($report['result'] === 'PASS', 'a production tip 083 database is apply-ready for the 084 round');
+    mrcAssert($report['ledger']['applied_tip'] === '083', 'preflight reports production tip 083');
+    mrcAssert($report['bundle']['code_tip'] === '084', 'preflight reports code tip 084');
     mrcAssert(
-        $report['ledger']['pending_names'] === [MRC_MIGRATION_083],
-        'only 083 is pending before the apply'
+        $report['ledger']['pending_names'] === [MRC_MIGRATION_084],
+        'only 084 is pending before the apply'
     );
     mrcAssert(
-        $report['bundle']['next_pending_name'] === MRC_MIGRATION_083,
-        'the next authorized migration is 083'
+        $report['bundle']['next_pending_name'] === MRC_MIGRATION_084,
+        'the next authorized migration is 084'
+    );
+    mrcAssert(
+        is_string($report['bundle']['expected_pending_checksum'])
+            && preg_match('/^[a-f0-9]{64}$/', $report['bundle']['expected_pending_checksum']) === 1,
+        'preflight resolves the pending 084 checksum'
     );
     mrcAssert(
         $report['guards']['round_audit_tables_present'] === 0,
-        'the clean preimage does not yet carry the personnel org audit table'
+        '084 creates no new audit table so the round-audit preimage stays empty'
     );
     mrcAssert(
-        $report['guards']['predecessor_audit_tables_present'] === 5,
-        'the preimage proves the completed 082 round is really present'
+        $report['guards']['predecessor_audit_tables_present'] === 6,
+        'the preimage proves the completed 083 round is really present'
+    );
+    mrcAssert(
+        !mrcColumnExists($pdo, 'gunluk_bildirim_tamamlamalari', 'okundu_mi'),
+        'the clean preimage does not yet carry okundu_mi'
+    );
+    mrcAssert(
+        !mrcColumnExists($pdo, 'gunluk_bildirim_tamamlamalari', 'toplam_personel'),
+        'the clean preimage does not yet carry toplam_personel'
     );
 
     // -----------------------------------------------------------------
-    // 2) Apply exactly 083
+    // 2) Apply exactly 084
     // -----------------------------------------------------------------
-    $applied = MigrationExecutionService::apply($pdo, $source, null, '083');
-    mrcAssert($applied['pending'] === ['083'], 'a targeted request applies exactly one migration');
+    $applied = MigrationExecutionService::apply($pdo, $source, null, '084');
+    mrcAssert($applied['pending'] === ['084'], 'a targeted request applies exactly one migration');
 
     $ledger = MigrationExecutionService::ledgerFacts($pdo, $source);
-    mrcAssert($ledger['tip'] === '083', 'production tip is 083 after the apply');
+    mrcAssert($ledger['tip'] === '084', 'production tip is 084 after the apply');
     mrcAssert($ledger['pending_versions'] === [], 'no migration is left pending');
     mrcAssert(
-        mrcTableExists($pdo, 'personel_organizasyon_degisiklik_auditleri'),
-        '083 created the personnel organisation audit owner'
+        mrcColumnExists($pdo, 'gunluk_bildirim_tamamlamalari', 'okundu_mi'),
+        '084 added okundu_mi'
+    );
+    mrcAssert(
+        mrcColumnExists($pdo, 'gunluk_bildirim_tamamlamalari', 'toplam_personel'),
+        '084 added toplam_personel'
     );
     foreach (MRC_PREDECESSOR_AUDIT_TABLES as $predecessor) {
-        mrcAssert(mrcTableExists($pdo, $predecessor), 'the previous round owner ' . $predecessor . ' survived 083');
+        mrcAssert(mrcTableExists($pdo, $predecessor), 'the previous round owner ' . $predecessor . ' survived 084');
     }
-    mrcAssert($baselineCounts === mrcBusinessCounts($pdo), '083 wrote no business row');
+    mrcAssert($baselineCounts === mrcBusinessCounts($pdo), '084 wrote no business row');
     mrcAssert($baselineRoles === mrcRoleValues($pdo), 'no existing user role value was remapped');
+    mrcAssert(
+        $baselineCompletionRows === (int) $pdo->query('SELECT COUNT(*) FROM gunluk_bildirim_tamamlamalari')->fetchColumn(),
+        '084 wrote no completion row'
+    );
 
     // -----------------------------------------------------------------
-    // 3) tip 083, pending 0 → round complete
+    // 3) tip 084, pending 0 → round complete
     // -----------------------------------------------------------------
     $doneReport = MigrationPreflightReport::collect($pdo, $source, $deployedSha);
     mrcAssert($doneReport['result'] === 'BLOCKED', 'a completed round is not apply-ready again');

@@ -8,7 +8,6 @@ export type HeaderNotificationCopy = {
 };
 
 const PERSONEL_NAME_FALLBACK = "Personel bildirimi";
-const HH_MM_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
 /** Soft ceiling for header DIGER summary before CSS line-clamp. */
 const DIGER_SUMMARY_SOFT_MAX = 96;
@@ -38,40 +37,24 @@ function formatNotificationDate(tarih: string | null | undefined): string | null
   return formatted === "-" ? null : formatted;
 }
 
-function formatClock(value: string | null | undefined): string | null {
-  const trimmed = trimText(value);
-  if (!trimmed || !HH_MM_PATTERN.test(trimmed)) {
-    return null;
-  }
-  return trimmed;
-}
-
 function buildSubtitle(
   tarih: string | null | undefined,
-  options?: { baslangic?: string | null; bitis?: string | null; subeAdi?: string | null }
+  options?: { subeAdi?: string | null }
 ): string {
+  // Header date row stays secondary and scannable: gg.aa.yyyy only (no clock range).
   const dateLabel = formatNotificationDate(tarih);
-  const start = formatClock(options?.baslangic);
-  const end = formatClock(options?.bitis);
-  const parts: string[] = [];
-
-  if (dateLabel) {
-    if (start && end) {
-      parts.push(`${dateLabel} · ${start} → ${end}`);
-    } else {
-      parts.push(dateLabel);
-    }
-  }
-
   const sube = trimText(options?.subeAdi);
-  if (sube && parts.length > 0) {
-    // Keep subtitle scannable: only append branch when date exists and branch is distinct.
-    parts[0] = `${parts[0]} · ${sube}`;
-  } else if (sube) {
-    parts.push(sube);
-  }
 
-  return parts[0] ?? "İşlem gerektiriyor";
+  if (dateLabel && sube) {
+    return `${dateLabel} · ${sube}`;
+  }
+  if (dateLabel) {
+    return dateLabel;
+  }
+  if (sube) {
+    return sube;
+  }
+  return "İşlem gerektiriyor";
 }
 
 function positiveDakika(value: number | null | undefined): number | null {
@@ -260,8 +243,6 @@ export function formatHeaderBildirimCopy(
   const dakika = positiveDakika(item.dakika);
   const includeSube = options?.includeSube === true;
   const subtitleOptions = {
-    baslangic: item.baslangic_saati,
-    bitis: item.bitis_saati,
     subeAdi: includeSube ? item.sube_adi : null
   };
 
@@ -276,14 +257,14 @@ export function formatHeaderBildirimCopy(
         title: dakika
           ? `${personelName} ${dakika} dakika geç geldi.`
           : `${personelName} geç geldi.`,
-        subtitle: buildSubtitle(item.tarih, subtitleOptions)
+        subtitle: buildSubtitle(item.tarih, { subeAdi: subtitleOptions.subeAdi })
       };
     case "ERKEN_CIKTI":
       return {
         title: dakika
           ? `${personelName} ${dakika} dakika erken çıktı.`
           : `${personelName} erken çıktı.`,
-        subtitle: buildSubtitle(item.tarih, subtitleOptions)
+        subtitle: buildSubtitle(item.tarih, { subeAdi: subtitleOptions.subeAdi })
       };
     case "IZINLI":
       return {

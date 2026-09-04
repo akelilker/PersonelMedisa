@@ -9,14 +9,14 @@
  * rules win regardless of import order.
  *
  * Density reference: tasitmedisa/notifications.css — compact event rows
- * (min-height ~52px, padding 4px 10px 1px, title ≤2 lines, date secondary).
+ * (desktop width 360px, min-height ~52px, padding 4px 10px 1px, title ≤2 lines, date secondary).
  * PersonelMedisa keeps its own theme surfaces; layout/typography density only.
  */
 .settings-dropdown.notifications-dropdown {
   top: 100%;
   right: 0;
   left: auto;
-  width: min(320px, calc(100vw - 32px));
+  width: min(360px, calc(100vw - 32px));
   max-width: calc(100vw - 32px);
   box-sizing: border-box;
   overflow-y: auto;

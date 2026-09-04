@@ -20,7 +20,7 @@ describe("header notification density owners (tasit parity)", () => {
     expect(css).toMatch(/\.notif-line1\s*\{[^}]*line-height:\s*1\.18/s);
     expect(css).toMatch(/\.notif-line2\s*\{[^}]*font-size:\s*10\.5px/s);
     expect(css).toMatch(
-      /\.settings-dropdown\.notifications-dropdown\s*\{[^}]*width:\s*min\(320px,\s*calc\(100vw\s*-\s*32px\)\)/s
+      /\.settings-dropdown\.notifications-dropdown\s*\{[^}]*width:\s*min\(360px,\s*calc\(100vw\s*-\s*32px\)\)/s
     );
     expect(css).toMatch(
       /\.settings-dropdown\.notifications-dropdown\s*\{[^}]*max-height:\s*min\(60vh,\s*428px\)/s

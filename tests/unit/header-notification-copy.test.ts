@@ -59,7 +59,7 @@ describe("formatHeaderBildirimCopy", () => {
       })
     );
     expect(copy.title).toBe("Ahmet Yılmaz 25 dakika geç geldi.");
-    expect(copy.subtitle).toBe("15.07.2026 · 08:00 → 08:25");
+    expect(copy.subtitle).toBe("15.07.2026");
     assertNoTechnicalLeak(copy);
   });
 
@@ -79,7 +79,7 @@ describe("formatHeaderBildirimCopy", () => {
       })
     );
     expect(copy.title).toBe("Ahmet Yılmaz 15 dakika erken çıktı.");
-    expect(copy.subtitle).toBe("15.07.2026 · 17:00 → 16:45");
+    expect(copy.subtitle).toBe("15.07.2026");
   });
 
   it("formats IZINLI / RAPORLU / GOREVDE", () => {

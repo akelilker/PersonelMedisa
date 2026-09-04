@@ -13,6 +13,11 @@ import type { GenelYoneticiBildirimOnayi } from "../types/genel-yonetici-bildiri
 import { hasRolePermission, type AppPermission } from "../lib/authorization/role-permissions";
 import { evaluatePersonelCompleteness } from "../features/personeller/personel-missing-info";
 import { personelSearchMatches } from "../features/personeller/personel-search-query";
+import {
+  buildBirimAmiriOzetCounts,
+  isAktifBirimPersonelForDate,
+  mapBirimAmiriPersonelRow
+} from "../features/self-service/birim-amiri-operational";
 import type { Personel } from "../types/personel";
 import {
   buildSgkKatalogBlockerRaporuMock,
@@ -97,6 +102,7 @@ type DemoPersonel = {
   acil_durum_kisi?: string;
   acil_durum_telefon?: string;
   departman_id?: number;
+  birim_id?: number;
   gorev_id?: number;
   personel_tipi_id?: number;
   bagli_amir_id?: number;
@@ -179,6 +185,7 @@ type DemoBildirim = {
   personel_id?: number;
   sube_id?: number;
   bildirim_turu: string;
+  dakika?: number | null;
   aciklama?: string;
   state?: string;
   okundu_mi?: boolean;
@@ -197,7 +204,6 @@ type DemoBildirim = {
   alt_tur?: string | null;
   baslangic_saati?: string | null;
   bitis_saati?: string | null;
-  dakika?: number | null;
 };
 
 type DemoGunlukTamamlama = {
@@ -540,6 +546,7 @@ const demoState: {
       departman_id: 3,
       gorev_id: 1,
       personel_tipi_id: 1,
+      birim_id: 10,
       bagli_amir_id: undefined,
       maas_tutari: 35000
     },
@@ -561,6 +568,7 @@ const demoState: {
       departman_id: 6,
       gorev_id: 2,
       personel_tipi_id: 2,
+      birim_id: 20,
       bagli_amir_id: undefined
     }
   ],
@@ -681,6 +689,7 @@ const demoState: {
       personel_id: 1,
       sube_id: 1,
       bildirim_turu: "GEC_GELDI",
+      dakika: 18,
       aciklama: "Demo bildirim",
       state: "GONDERILDI",
       okundu_mi: false,
@@ -7014,6 +7023,57 @@ export function resolveDemoApiResponse(
         duzeltme_istendi: duzeltme,
         tamamlandi_mi: tamamlama != null
       },
+      tamamlama: tamamlama
+        ? {
+            id: tamamlama.id,
+            tamamlandi_at: tamamlama.tamamlandi_at,
+            tamamlayan_user_id: tamamlama.tamamlayan_user_id,
+            state: tamamlama.state
+          }
+        : null,
+      personeller
+    });
+  }
+
+  if (pathname === "/bildirimler/birim-gunluk-durum" && method === "GET") {
+    const actor = readDemoApiActor(init);
+    if (actor.role !== "BIRIM_AMIRI") {
+      return demoRevizyonError("FORBIDDEN", "Bu kayit aktif sube baglaminda goruntulenemiyor.");
+    }
+    const permissionError = enforceDemoPermission(actor, "bildirimler.view");
+    if (permissionError) return permissionError;
+    const tarih = toStringValue(requestUrl.searchParams.get("tarih"));
+    if (!tarih) {
+      return demoRevizyonError("VALIDATION_ERROR", "Tarih YYYY-MM-DD formatinda zorunludur.");
+    }
+    const allowedBirimIds = [10];
+    const roster = demoState.personeller.filter((personel) =>
+      isAktifBirimPersonelForDate(personel, allowedBirimIds, tarih)
+    );
+    const personeller = roster.map((personel) => {
+      const open = demoState.bildirimler
+        .filter(
+          (item) =>
+            item.personel_id === personel.id &&
+            item.tarih === tarih &&
+            (item.state ?? "").toUpperCase() !== "IPTAL"
+        )
+        .sort((a, b) => b.id - a.id)[0];
+      return mapBirimAmiriPersonelRow({
+        personel_id: personel.id,
+        ad_soyad: `${personel.ad} ${personel.soyad ?? ""}`.trim(),
+        bildirim_turu: open?.bildirim_turu ?? null,
+        dakika: open?.dakika ?? null
+      });
+    });
+    const tamamlama =
+      demoState.gunlukBildirimTamamlamalari.find(
+        (item) => item.birim_amiri_user_id === actor.userId && item.tarih === tarih
+      ) ?? null;
+    return ok({
+      tarih,
+      ozet: buildBirimAmiriOzetCounts(personeller),
+      tamamlandi_mi: tamamlama != null,
       tamamlama: tamamlama
         ? {
             id: tamamlama.id,

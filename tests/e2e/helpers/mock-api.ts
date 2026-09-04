@@ -21,6 +21,11 @@ import {
 import { hasRolePermission, type AppPermission } from "../../../src/lib/authorization/role-permissions";
 import { evaluatePersonelCompleteness } from "../../../src/features/personeller/personel-missing-info";
 import { personelSearchMatches } from "../../../src/features/personeller/personel-search-query";
+import {
+  buildBirimAmiriOzetCounts,
+  isAktifBirimPersonelForDate,
+  mapBirimAmiriPersonelRow
+} from "../../../src/features/self-service/birim-amiri-operational";
 import type { Personel } from "../../../src/types/personel";
 import {
   listWeeksIntersectingMonth,
@@ -1304,6 +1309,7 @@ type MockBildirimRecord = {
   personel_id: number;
   sube_id?: number;
   bildirim_turu: string;
+  dakika?: number | null;
   aciklama?: string;
   state: string;
   okundu_mi?: boolean;
@@ -1993,6 +1999,7 @@ export async function mockApi(page: Page, role: MockUserRole, options: MockApiOp
     departman_id?: number;
     gorev_id?: number;
     personel_tipi_id?: number;
+    birim_id?: number;
     bagli_amir_id?: number;
     sube_adi?: string;
     departman_adi?: string;
@@ -2024,6 +2031,7 @@ export async function mockApi(page: Page, role: MockUserRole, options: MockApiOp
       departman_id: 3,
       gorev_id: 1,
       personel_tipi_id: 1,
+      birim_id: 10,
       bagli_amir_id: 9,
       sube_adi: "Merkez",
       departman_adi: "Döşeme",
@@ -2055,6 +2063,7 @@ export async function mockApi(page: Page, role: MockUserRole, options: MockApiOp
       departman_id: 6,
       gorev_id: 2,
       personel_tipi_id: 2,
+      birim_id: 20,
       bagli_amir_id: 9,
       sube_adi: "Depolama",
       departman_adi: "Depo",
@@ -2085,6 +2094,7 @@ export async function mockApi(page: Page, role: MockUserRole, options: MockApiOp
       departman_id: 3,
       gorev_id: 1,
       personel_tipi_id: 1,
+      birim_id: 10,
       bagli_amir_id: 9,
       sube_adi: "Merkez",
       departman_adi: "Döşeme",
@@ -2115,6 +2125,7 @@ export async function mockApi(page: Page, role: MockUserRole, options: MockApiOp
       departman_id: 3,
       gorev_id: 1,
       personel_tipi_id: 1,
+      birim_id: 10,
       bagli_amir_id: 9,
       sube_adi: "Merkez",
       departman_adi: "Döşeme",
@@ -2142,6 +2153,7 @@ export async function mockApi(page: Page, role: MockUserRole, options: MockApiOp
       departman_id: 6,
       gorev_id: 2,
       personel_tipi_id: 1,
+      birim_id: 99,
       bagli_amir_id: 10,
       sube_adi: "Pasif Şube",
       departman_adi: "Depo",
@@ -4737,7 +4749,9 @@ let personelBelgeKaydiIdCounter = 903;
             id: MOCK_ROLE_USER_ID[role],
             ad_soyad: "Mock Kullanıcı",
             rol: role,
-            sube_ids: mockUserSubeIds
+            sube_ids: mockUserSubeIds,
+            birim_ids: role === "BIRIM_AMIRI" ? [10] : [],
+            personel_id: role === "BIRIM_AMIRI" ? 1 : null
           }
         })
       );
@@ -7595,6 +7609,70 @@ let personelBelgeKaydiIdCounter = 903;
           : null,
         personeller: personelRows
       }));
+      return;
+    }
+
+    if (path === "/api/bildirimler/birim-gunluk-durum" && method === "GET") {
+      if (role !== "BIRIM_AMIRI") {
+        await fulfillJson(route, 403, errorBody("FORBIDDEN", "Bu kayit aktif sube baglaminda goruntulenemiyor."));
+        return;
+      }
+      if (await denyUnlessRolePermission(route, "bildirimler.view")) return;
+      const tarih = url.searchParams.get("tarih") ?? "";
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(tarih)) {
+        await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "Tarih YYYY-MM-DD formatinda zorunludur.", "tarih"));
+        return;
+      }
+      const allowedBirimIds = [10];
+      const roster = personeller.filter((personel) =>
+        isAktifBirimPersonelForDate(
+          {
+            aktif_durum: personel.aktif_durum,
+            ise_giris_tarihi: personel.ise_giris_tarihi,
+            birim_id: personel.birim_id
+          },
+          allowedBirimIds,
+          tarih
+        )
+      );
+      const personelRows = roster.map((personel) => {
+        const open = bildirimler
+          .filter(
+            (item) =>
+              item.personel_id === personel.id &&
+              item.tarih === tarih &&
+              item.state.toUpperCase() !== "IPTAL"
+          )
+          .sort((a, b) => b.id - a.id)[0];
+        return mapBirimAmiriPersonelRow({
+          personel_id: personel.id,
+          ad_soyad: `${personel.ad} ${personel.soyad}`,
+          bildirim_turu: open?.bildirim_turu ?? null,
+          dakika: open?.dakika ?? null
+        });
+      });
+      const tamamlama =
+        bildirimPageState.tamamlamalar.find(
+          (item) => item.birim_amiri_user_id === MOCK_ROLE_USER_ID[role] && item.tarih === tarih
+        ) ?? null;
+      await fulfillJson(
+        route,
+        200,
+        okBody({
+          tarih,
+          ozet: buildBirimAmiriOzetCounts(personelRows),
+          tamamlandi_mi: tamamlama != null,
+          tamamlama: tamamlama
+            ? {
+                id: tamamlama.id,
+                tamamlandi_at: tamamlama.tamamlandi_at,
+                tamamlayan_user_id: tamamlama.tamamlayan_user_id,
+                state: tamamlama.state
+              }
+            : null,
+          personeller: personelRows
+        })
+      );
       return;
     }
 

@@ -114,7 +114,7 @@ s90Assert(
     'Router dispatches GET /bildirimler to list'
 );
 
-foreach (['list', 'detail', 'create', 'update', 'cancel', 'submit', 'gunlukOzet'] as $method) {
+foreach (['list', 'detail', 'create', 'update', 'cancel', 'submit', 'gunlukOzet', 'birimGunlukDurum'] as $method) {
     $fnPos = strpos($controllerSource, 'public static function ' . $method);
     s90Assert($fnPos !== false, 'method exists: ' . $method);
     $nextFn = strpos($controllerSource, 'public static function ', $fnPos + 10);

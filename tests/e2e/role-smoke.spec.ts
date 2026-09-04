@@ -85,13 +85,11 @@ test.describe("Rol bazli smoke", () => {
     await login(page, users.birimAmiri);
     await expect(page).toHaveURL("/");
 
-    await expectMainMenuForRole(page, "BIRIM_AMIRI");
+    await expect(page.getByTestId("birim-amiri-operational-home")).toBeVisible();
+    await expect(page.locator("#main-menu")).toHaveCount(0);
+    await expect(page.getByTestId("menu-kayit-surec")).toHaveCount(0);
     await expect(page.getByTestId("hero-session-user")).toHaveText("Mock Kullanıcı");
     await expect(page.getByTestId("hero-session-sube")).toHaveText("Merkez");
-    const kayitMenu = page.getByTestId("menu-kayit-surec");
-    await expect(kayitMenu).toBeDisabled();
-    await kayitMenu.click({ force: true });
-    await expect(page.getByRole("heading", { name: /Kayıt ve Süreç İşlemleri/i })).toHaveCount(0);
 
     await page.goto("/personeller/1");
     await expect(page).toHaveURL(/\/personeller\/1$/);
@@ -104,30 +102,21 @@ test.describe("Rol bazli smoke", () => {
     expect(pageErrors).toEqual([]);
   });
 
-  test("Birim amiri 3 ana omurga butonunu gorur, yazma owner'ina giremez; ikincil akislarla gunluk kayda iner", async ({
+  test("Birim amiri self-service tabanli home gorur; yazma owner'ina giremez; ikincil akislarla gunluk kayda iner", async ({
     page
   }) => {
     await mockApi(page, "BIRIM_AMIRI");
     await login(page, users.birimAmiri);
     await expect(page).toHaveURL("/");
 
-    await expectMainMenuForRole(page, "BIRIM_AMIRI");
-    const kayitMenuHome = page.getByTestId("menu-kayit-surec");
-    await expect(kayitMenuHome).toHaveAttribute(
-      "title",
-      "Kayıt ve Süreç işlemleri için yetkiniz bulunmuyor."
-    );
-    await expect(kayitMenuHome).toHaveAttribute(
-      "aria-describedby",
-      "menu-kayit-surec-disabled-description"
-    );
-    await expect(page.locator("#menu-kayit-surec-disabled-description")).toHaveText(
-      "Kayıt ve Süreç işlemleri için yetkiniz bulunmuyor."
-    );
-    await expect(kayitMenuHome).not.toHaveAttribute("aria-label");
+    await expect(page.getByTestId("birim-amiri-operational-home")).toBeVisible();
+    await expect(page.locator("#main-menu")).toHaveCount(0);
+    await expect(page.getByTestId("menu-kayit-surec")).toHaveCount(0);
+    await expect(page.getByTestId("menu-personel-karti")).toHaveCount(0);
+    await expect(page.getByTestId("menu-raporlar")).toHaveCount(0);
+    await expect(page.getByTestId("self-qr-scan-link")).toHaveCount(0);
 
-    await page.goto("/");
-    await page.goto("/bildirimler");
+    await page.getByTestId("birim-amiri-edit-daily").click();
     await expect(page.locator(".modal-header h2").first()).toContainText("Günlük Kayıt Merkezi");
     await expect(
       page.locator(".bildirimler-header-row").getByRole("button", { name: /Günlük Kayıt Ekle/i })

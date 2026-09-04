@@ -1,6 +1,7 @@
 import type { ApiResponse, PaginatedResult } from "../types/api";
 import type {
   Bildirim,
+  BirimAmiriGunlukDurum,
   BirimAmiriSecenegi,
   GunlukBildirimTamamlama,
   GunlukOzet,
@@ -81,6 +82,17 @@ function normalizeGunlukOzet(data: unknown): GunlukOzet {
     throw new Error("Gunluk ozet yaniti beklenen formatta degil.");
   }
   return data as GunlukOzet;
+}
+
+function normalizeBirimGunlukDurum(data: unknown): BirimAmiriGunlukDurum {
+  if (typeof data !== "object" || data === null) {
+    throw new Error("Birim gunluk durum yaniti beklenen formatta degil.");
+  }
+  const row = data as Partial<BirimAmiriGunlukDurum>;
+  if (typeof row.tarih !== "string" || !row.ozet || !Array.isArray(row.personeller)) {
+    throw new Error("Birim gunluk durum yaniti eksik alan iceriyor.");
+  }
+  return row as BirimAmiriGunlukDurum;
 }
 
 function normalizeTamamlama(data: unknown): GunlukBildirimTamamlama {
@@ -195,6 +207,16 @@ export async function fetchGunlukOzet(params: {
   });
   const response = await apiRequest<ApiResponse<unknown>>(path);
   return normalizeGunlukOzet(response.data);
+}
+
+export async function fetchBirimGunlukDurum(params: {
+  tarih: string;
+}): Promise<BirimAmiriGunlukDurum> {
+  const path = appendQueryParams(endpoints.bildirimler.birimGunlukDurum, {
+    tarih: params.tarih
+  });
+  const response = await apiRequest<ApiResponse<unknown>>(path);
+  return normalizeBirimGunlukDurum(response.data);
 }
 
 export async function fetchGunlukTamamlama(params: {

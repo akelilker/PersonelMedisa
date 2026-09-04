@@ -19,6 +19,7 @@ import { LoginPage } from "../features/auth/pages/LoginPage";
 import { ChangePasswordPage } from "../features/auth/pages/ChangePasswordPage";
 import { PersonelAktivasyonPage } from "../features/auth/pages/PersonelAktivasyonPage";
 import { PersonelSelfServiceHomePage } from "../features/self-service/pages/PersonelSelfServiceHomePage";
+import { BirimAmiriOperationalHomePage } from "../features/self-service/pages/BirimAmiriOperationalHomePage";
 import { PersonelQrScanPage } from "../features/self-service/pages/PersonelQrScanPage";
 import { PersonelQrHistoryPage } from "../features/self-service/pages/PersonelQrHistoryPage";
 import { QrKioskPage } from "../features/self-service/pages/QrKioskPage";
@@ -47,7 +48,18 @@ function HomeIndexMainMenu() {
   if (session?.user.rol === "PERSONEL") {
     return <PersonelSelfServiceHomePage />;
   }
+  if (session?.user.rol === "BIRIM_AMIRI") {
+    return <BirimAmiriOperationalHomePage />;
+  }
   return ctx.showMainMenu ? <MainMenu onKayitOpen={ctx.onKayitOpen} /> : null;
+}
+
+function SelfServiceHomeRoute() {
+  const { session } = useAuth();
+  if (session?.user.rol === "BIRIM_AMIRI") {
+    return <BirimAmiriOperationalHomePage />;
+  }
+  return <PersonelSelfServiceHomePage />;
 }
 
 function NotFoundPage() {
@@ -94,7 +106,7 @@ export function AppRoutes() {
           path="self"
           element={
             <ProtectedRoute requirePermission="self_service.view">
-              <PersonelSelfServiceHomePage />
+              <SelfServiceHomeRoute />
             </ProtectedRoute>
           }
         />

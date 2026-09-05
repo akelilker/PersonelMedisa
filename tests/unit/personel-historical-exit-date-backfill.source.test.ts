@@ -79,6 +79,14 @@ describe("Personel historical exit-date backfill source contract", () => {
     expect(wrapper).toContain("isApplyRequested");
     expect(wrapper).toContain('production_mutation: DO_APPLY ? "REQUESTED" : "DRY_RUN_ONLY"');
     expect(wrapper).toContain("evaluateResidualPreimage");
+    expect(wrapper).toContain("resolveCurlBinary");
+    expect(wrapper).toContain("resolveFtpNetrc");
+    expect(wrapper).toContain("resolveLiveConfigPath");
+    expect(wrapper).toContain("--curl-bin");
+    expect(wrapper).toContain("--ftp-netrc");
+    expect(wrapper).not.toMatch(/spawnSync\(\s*["']curl\.exe["']/);
+    expect(wrapper).not.toContain('Documents",\n  "medisa-ops-tmp"');
+    expect(wrapper).not.toContain("Documents/medisa-ops-tmp");
     expect(wrapper).not.toContain('.includes("AHMED")');
     expect(wrapper).not.toContain('.includes("SEFINE")');
 
@@ -87,6 +95,11 @@ describe("Personel historical exit-date backfill source contract", () => {
     expect(gates).toContain("matchesExactFullName");
     expect(gates).toContain("EXPECTED_SHA_MISSING");
     expect(gates).toContain("EXPECTED_SHA_INVALID");
+    expect(gates).toContain("CURL_BINARY_NOT_AVAILABLE");
+    expect(gates).toContain("FTP_NETRC_NOT_CONFIGURED");
+    expect(gates).toContain("FTP_NETRC_NOT_READABLE");
+    expect(gates).toContain("MEDISA_OPS_CURL_BIN");
+    expect(gates).toContain("MEDISA_OPS_FTP_NETRC");
   });
 
   it("keeps lifecycle bulk apply behind import.apply authorization gate", () => {

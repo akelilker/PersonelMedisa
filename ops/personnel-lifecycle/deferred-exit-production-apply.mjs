@@ -10,10 +10,20 @@
  * Default: dry-run only (non-mutating).
  * Production apply requires explicit --apply after live PASIF residual preimage gate.
  *
- * Usage: node ops/personnel-lifecycle/deferred-exit-production-apply.mjs --expected-sha=<40-hex> [--apply]
+ * Usage:
+ *   node ops/personnel-lifecycle/deferred-exit-production-apply.mjs \
+ *     --expected-sha=<40-hex> \
+ *     [--curl-bin=<path-or-command>] \
+ *     [--ftp-netrc=<path>] \
+ *     [--live-config=<path>] \
+ *     [--apply]
+ *
+ * Env (optional; CLI wins):
+ *   MEDISA_OPS_CURL_BIN, MEDISA_OPS_FTP_NETRC, MEDISA_OPS_LIVE_CONFIG
  *
  * --expected-sha is mandatory at runtime (exact match to origin/main, live .deploy-sha,
  * worker heartbeat deployed_sha, and API deployed_sha). No silent code-prep baseline fallback.
+ * Portability flags never imply --apply.
  */
 "use strict";
 
@@ -28,28 +38,31 @@ import {
   verifyPersonnelExitSurec,
 } from "../../scripts/ops/personel-lifecycle-exit-postcheck.mjs";
 import {
+  FTP_COMMAND_FAILED,
+  FTP_REMOTE_READ_FAILED,
+  assertCurlBinaryAvailable,
+  buildFtpFailure,
   evaluateResidualPreimage,
   evaluateShaPreflight,
   isApplyRequested,
   parseExpectedSha,
+  resolveCurlBinary,
+  resolveFtpNetrc,
+  resolveLiveConfigPath,
+  sanitizePathForReport,
 } from "./lib/historical-exit-backfill-gates.mjs";
 
 const DIR = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.join(DIR, "../..");
-const LIVE_CONFIG = path.join(process.env.TEMP || "/tmp", "live-config.local.php");
-const FTP_NETRC = path.join(
-  process.env.USERPROFILE || process.env.HOME || "",
-  "Documents",
-  "medisa-ops-tmp",
-  "org-rollout",
-  "private",
-  "ftp.curl"
-);
 const API = "https://www.karmotors.com.tr/personelmedisa/api";
 const ACTOR_UID = 10;
 const DO_APPLY = isApplyRequested(process.argv);
 /** Set in main() via required --expected-sha (fail closed; no silent baseline). */
 let EXPECTED_SHA = null;
+/** Resolved in main() before any FTP (fail closed). */
+let CURL_BIN = null;
+let FTP_NETRC = null;
+let LIVE_CONFIG = null;
 
 const BACKFILL_ROWS = [
   {
@@ -87,9 +100,10 @@ const report = {
   live_preimage_required: true,
 };
 
-function fail(code, msg) {
+function fail(code, msg, details) {
   const e = new Error(msg);
   e.code = code;
+  if (details !== undefined) e.details = details;
   throw e;
 }
 
@@ -144,17 +158,68 @@ function unwrapItems(json) {
   return [];
 }
 
-
+/**
+ * Fail-closed FTP GET via resolved curl + netrc. Never prints credential contents.
+ */
 function ftpGet(remote, local) {
   const r = spawnSync(
-    "curl.exe",
+    CURL_BIN,
     ["-sS", "--netrc-file", FTP_NETRC, `ftp://ftp.karmotors.com.tr/${remote}`, "-o", local],
     { encoding: "utf8" }
   );
-  if (r.status !== 0) fail("FTP", `FTP get failed ${remote}: ${r.stderr || r.stdout}`);
+  if (r.error || r.status !== 0) {
+    throw buildFtpFailure({
+      code: FTP_COMMAND_FAILED,
+      message: `FTP command failed for ${remote}`,
+      curlBin: CURL_BIN,
+      exitStatus: r.status,
+      stderr: r.stderr || r.error?.message || r.stdout || "",
+      remote,
+      local,
+      netrcPath: FTP_NETRC,
+    });
+  }
+  if (!fs.existsSync(local) || fs.statSync(local).size === 0) {
+    throw buildFtpFailure({
+      code: FTP_REMOTE_READ_FAILED,
+      message: `FTP remote read failed (empty/missing local file) for ${remote}`,
+      curlBin: CURL_BIN,
+      exitStatus: r.status,
+      stderr: r.stderr || "",
+      remote,
+      local,
+      netrcPath: FTP_NETRC,
+    });
+  }
 }
 
-function runPreflight() {
+function resolveOpsRuntime(argv) {
+  const curlResolved = resolveCurlBinary({ argv, env: process.env });
+  assertCurlBinaryAvailable(curlResolved.binary);
+  CURL_BIN = curlResolved.binary;
+
+  const netrcResolved = resolveFtpNetrc({ argv, env: process.env });
+  FTP_NETRC = netrcResolved.path;
+
+  const liveResolved = resolveLiveConfigPath({
+    argv,
+    env: process.env,
+    tempDir: process.env.TEMP || "/tmp",
+  });
+  LIVE_CONFIG = liveResolved.path;
+
+  report.preflight.curl_bin = sanitizePathForReport(CURL_BIN);
+  report.preflight.curl_bin_source = curlResolved.source;
+  report.preflight.ftp_netrc = sanitizePathForReport(FTP_NETRC);
+  report.preflight.ftp_netrc_source = netrcResolved.source;
+  report.preflight.live_config = sanitizePathForReport(LIVE_CONFIG);
+  report.preflight.live_config_source = liveResolved.source;
+  report.preflight.live_config_needs_ftp_fetch = liveResolved.needs_ftp_fetch;
+
+  return liveResolved;
+}
+
+function runPreflight(liveResolved) {
   report.preflight.expected_sha = EXPECTED_SHA;
   const origin = spawnSync("git", ["rev-parse", "origin/main"], { cwd: REPO_ROOT, encoding: "utf8" });
   const originMain = (origin.stdout || "").trim().toLowerCase();
@@ -167,7 +232,7 @@ function runPreflight() {
   report.preflight.live_deploy_sha = liveSha;
   report.preflight.live_deploy_sha_pass = liveSha === EXPECTED_SHA;
 
-  if (!fs.existsSync(LIVE_CONFIG)) {
+  if (liveResolved.needs_ftp_fetch) {
     ftpGet("api/config.local.php", LIVE_CONFIG);
   }
 
@@ -183,7 +248,7 @@ function runPreflight() {
     String(hb.deployed_sha || "").toLowerCase() === EXPECTED_SHA;
   report.preflight.worker_idle_pass = String(migStatus.state || "") === "SUCCEEDED";
 
-  const health = spawnSync("curl.exe", ["-sS", "--max-time", "15", `${API}/health`], {
+  const health = spawnSync(CURL_BIN, ["-sS", "--max-time", "15", `${API}/health`], {
     encoding: "utf8",
   });
   report.preflight.api_health_pass = (health.stdout || "").includes('"status":"ok"');
@@ -379,8 +444,10 @@ async function postcheck(token) {
 
 async function main() {
   try {
-    EXPECTED_SHA = parseExpectedSha(process.argv.slice(2));
-    runPreflight();
+    const argv = process.argv.slice(2);
+    EXPECTED_SHA = parseExpectedSha(argv);
+    const liveResolved = resolveOpsRuntime(argv);
+    runPreflight(liveResolved);
     const token = mintJwt(readJwtSecret(LIVE_CONFIG), ACTOR_UID);
     await verifyHistoricalResidualPreimage(token);
     await runDryApply(token);
@@ -392,7 +459,11 @@ async function main() {
     console.log(JSON.stringify(report, null, 2));
   } catch (e) {
     report.final_status = "FAIL";
-    report.error = { code: e.code || "ERROR", message: e.message };
+    report.error = {
+      code: e.code || "ERROR",
+      message: e.message,
+      ...(e.details ? { details: e.details } : {}),
+    };
     fs.writeFileSync(path.join(DIR, "deferred-exit-report.json"), JSON.stringify(report, null, 2));
     console.error(JSON.stringify(report, null, 2));
     process.exit(1);

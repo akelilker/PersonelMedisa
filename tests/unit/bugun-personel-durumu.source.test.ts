@@ -46,6 +46,9 @@ describe("bugun personel durumu owners", () => {
     expect(service).toContain("HENUZ_DEGERLENDIRILMEDI");
     expect(service).toContain("resolvePersonDurum");
     expect(service).toContain("isMissingEntryEvidence");
+    expect(service).toMatch(
+      /attentionCount \+= \(int\) \$branchCounts\['gelmedi'\][\s\S]*henuz_degerlendirilmedi/
+    );
     expect(shell).toContain("bugun-personel-durumu-entry");
     expect(shell).toContain("BugunPersonelDurumuModal");
   });

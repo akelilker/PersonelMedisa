@@ -167,7 +167,9 @@ class BugunPersonelDurumuService
                 return strcmp((string) $a['birim_adi'], (string) $b['birim_adi']);
             });
 
-            $attentionCount += (int) $branchCounts['gelmedi'] + (int) $branchCounts['gec_geldi'];
+            $attentionCount += (int) $branchCounts['gelmedi']
+                + (int) $branchCounts['gec_geldi']
+                + (int) $branchCounts['henuz_degerlendirilmedi'];
 
             $periodWritable = true;
             if (preg_match('/^(\d{4})-(\d{2})-\d{2}$/', $tarih, $tm)) {

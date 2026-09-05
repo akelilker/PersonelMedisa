@@ -12,6 +12,7 @@ import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
 import { useRoleAccess } from "../../../hooks/use-role-access";
 import { usePuantaj } from "../../../hooks/usePuantaj";
+import { dispatchOpenBugunPersonelDurumu } from "../../../lib/bildirim/bugun-personel-durumu-events";
 import {
   HALF_DAY_UBGT_POLICY_ERROR_CODE,
   HOLIDAY_OVERTIME_POLICY_REQUIRED,
@@ -770,7 +771,26 @@ export function GunlukPuantajPage() {
               Bu kayıt mühürlenmiştir ve düzenlenemez.
             </p>
           ) : !canUpdatePuantaj ? (
-            <p className="puantaj-form-readonly">Bu modülü sadece görüntüleme yetkin var.</p>
+            <div className="puantaj-form-readonly" data-testid="puantaj-readonly-ik-hint">
+              <p>Bu modülü sadece görüntüleme yetkin var.</p>
+              {hasPermission("bugun_personel_durumu.view") ? (
+                <p>
+                  Günlük durum düzeltmesi için{" "}
+                  <button
+                    type="button"
+                    className="universal-btn-aux"
+                    data-testid="puantaj-open-bugun-correction"
+                    onClick={() => dispatchOpenBugunPersonelDurumu()}
+                  >
+                    Bugünkü Personel Durumu
+                  </button>
+                  {hasPermission("gunluk_bildirim.correct_scoped")
+                    ? " (scoped correction owner)"
+                    : ""}{" "}
+                  kullanılır. Amir Kontrol / satır kaydı için puantaj.update gerekir.
+                </p>
+              ) : null}
+            </div>
           ) : null}
 
           <div className="form-actions-row">

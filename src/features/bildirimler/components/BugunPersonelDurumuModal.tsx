@@ -29,6 +29,7 @@ import {
   turRequiresAciklama,
   type ScopedCorrectableTur
 } from "../../../lib/bildirim/gunluk-bildirim-correct-scoped";
+import { dispatchRefreshBugunPersonelDurumu } from "../../../lib/bildirim/bugun-personel-durumu-events";
 import { istanbulBusinessDate } from "../../self-service/birim-amiri-operational";
 import type {
   BugunPersonelDurumu,
@@ -381,6 +382,7 @@ export function BugunPersonelDurumuModal({ open, onClose }: BugunPersonelDurumuM
       setEditing(false);
       setEditForm(null);
       await load(anchor);
+      dispatchRefreshBugunPersonelDurumu();
     } catch (err) {
       const code =
         err && typeof err === "object" && "code" in err ? String((err as { code?: string }).code) : "";

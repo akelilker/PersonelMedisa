@@ -89,6 +89,7 @@ export type CreatePersonelFormState = {
   iseGirisTarihi: string;
   subeId: string;
   sgkIsverenId: string;
+  calismaLokasyonuId: string;
   departmanId: string;
   bolumId: string;
   birimId: string;
@@ -115,6 +116,7 @@ export const INITIAL_CREATE_PERSONEL_FORM: CreatePersonelFormState = {
   iseGirisTarihi: "",
   subeId: "",
   sgkIsverenId: "",
+  calismaLokasyonuId: "",
   departmanId: "",
   bolumId: "",
   birimId: "",

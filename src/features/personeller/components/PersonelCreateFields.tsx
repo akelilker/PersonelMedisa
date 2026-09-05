@@ -13,6 +13,10 @@ import { CALISAN_KAPSAMI_SELECT_OPTIONS } from "../../../lib/display/enum-displa
 import type { PersonelReferenceBundle } from "../../../data/app-data.types";
 import type { CreatePersonelFormState } from "../../../hooks/usePersoneller";
 import type { IdOption } from "../../../types/referans";
+import {
+  filterSgkIsverenOptionsForSube,
+  resolveSgkIsverenAfterSubeChange
+} from "../personel-create-org-deps";
 
 type PersonelCreateFieldsProps = {
   form: CreatePersonelFormState;
@@ -197,8 +201,52 @@ export function PersonelCreateFields({
   const tcKimlikNoFieldError = fieldErrors?.tcKimlikNo;
   const subeIdFieldError = fieldErrors?.subeId;
 
+  const filteredSgkIsverenOptions = useMemo(
+    () => filterSgkIsverenOptionsForSube(refs.sgkIsverenOptions, subeOptions, form.subeId),
+    [form.subeId, refs.sgkIsverenOptions, subeOptions]
+  );
+
   function setSelectOpen(name: string, isOpen: boolean) {
     setOpenSelectName(isOpen ? name : null);
+  }
+
+  function handleSubeChange(value: string) {
+    const nextSgkOptions = filterSgkIsverenOptionsForSube(refs.sgkIsverenOptions, subeOptions, value);
+    setForm((prev) => ({
+      ...prev,
+      subeId: value,
+      sgkIsverenId: resolveSgkIsverenAfterSubeChange(prev.sgkIsverenId, nextSgkOptions)
+    }));
+    onFieldErrorClear?.("subeId");
+  }
+
+  function handleDepartmanChange(value: string) {
+    if (onDepartmanChange) {
+      onDepartmanChange(value);
+      return;
+    }
+    const nextBolumId =
+      value &&
+      form.bolumId &&
+      refs.bolumOptions.some(
+        (opt) => String(opt.id) === form.bolumId && String(opt.parentId ?? "") === value
+      )
+        ? form.bolumId
+        : "";
+    const nextBirimId =
+      nextBolumId &&
+      form.birimId &&
+      refs.birimOptions.some(
+        (opt) => String(opt.id) === form.birimId && String(opt.parentId ?? "") === nextBolumId
+      )
+        ? form.birimId
+        : "";
+    setForm((prev) => ({
+      ...prev,
+      departmanId: value,
+      bolumId: nextBolumId,
+      birimId: nextBirimId
+    }));
   }
 
   useLayoutEffect(() => {
@@ -245,7 +293,8 @@ export function PersonelCreateFields({
             onChange={(value) =>
               setForm((prev) => ({
                 ...prev,
-                calisanKapsami: value === "DIS_KAYNAK" ? "DIS_KAYNAK" : "IC_PERSONEL"
+                calisanKapsami: value === "DIS_KAYNAK" ? "DIS_KAYNAK" : "IC_PERSONEL",
+                ...(value === "DIS_KAYNAK" ? { sgkIsverenId: "" } : {})
               }))
             }
             required
@@ -360,10 +409,7 @@ export function PersonelCreateFields({
                 label="Şube"
                 name="create-sube"
                 value={form.subeId}
-                onChange={(value) => {
-                  setForm((prev) => ({ ...prev, subeId: value }));
-                  onFieldErrorClear?.("subeId");
-                }}
+                onChange={handleSubeChange}
                 required={form.calisanKapsami !== "DIS_KAYNAK"}
                 placeholderOption={{ value: "", label: "Seçiniz" }}
                 options={toSelectOptions(subeOptions)}
@@ -381,20 +427,40 @@ export function PersonelCreateFields({
           )}
           {form.calisanKapsami !== "DIS_KAYNAK" ? (
             refs.sgkIsverenOptions.length > 0 ? (
-              <PersonelCreateSelect
-                label="SGK İşveren"
-                name="create-sgk-isveren"
-                value={form.sgkIsverenId}
-                onChange={(value) => setForm((prev) => ({ ...prev, sgkIsverenId: value }))}
-                required
-                placeholderOption={{ value: "", label: "Seçiniz" }}
-                options={toSelectOptions(refs.sgkIsverenOptions)}
-                isOpen={openSelectName === "create-sgk-isveren"}
-                onOpenChange={(isOpen) => setSelectOpen("create-sgk-isveren", isOpen)}
-              />
+              <>
+                <PersonelCreateSelect
+                  label="SGK İşveren"
+                  name="create-sgk-isveren"
+                  value={form.sgkIsverenId}
+                  onChange={(value) => setForm((prev) => ({ ...prev, sgkIsverenId: value }))}
+                  required
+                  placeholderOption={{ value: "", label: "Seçiniz" }}
+                  options={toSelectOptions(filteredSgkIsverenOptions)}
+                  isOpen={openSelectName === "create-sgk-isveren"}
+                  onOpenChange={(isOpen) => setSelectOpen("create-sgk-isveren", isOpen)}
+                  disabled={!form.subeId}
+                />
+                {form.subeId && filteredSgkIsverenOptions.length === 0 ? (
+                  <p className="personel-form-note personel-form-note--warning" role="status">
+                    Seçilen şubenin şirketiyle uyumlu SGK işvereni bulunamadı.
+                  </p>
+                ) : null}
+              </>
             ) : (
               refMissingNote("SGK işveren", true)
             )
+          ) : null}
+          {form.calisanKapsami !== "DIS_KAYNAK" && refs.calismaLokasyonuOptions.length > 0 ? (
+            <PersonelCreateSelect
+              label="Çalışma Lokasyonu"
+              name="create-calisma-lokasyonu"
+              value={form.calismaLokasyonuId}
+              onChange={(value) => setForm((prev) => ({ ...prev, calismaLokasyonuId: value }))}
+              placeholderOption={{ value: "", label: "Seçiniz" }}
+              options={toSelectOptions(refs.calismaLokasyonuOptions)}
+              isOpen={openSelectName === "create-calisma-lokasyonu"}
+              onOpenChange={(isOpen) => setSelectOpen("create-calisma-lokasyonu", isOpen)}
+            />
           ) : null}
           {refs.bagliAmirOptions.length > 0 ? (
             <>
@@ -427,10 +493,7 @@ export function PersonelCreateFields({
                 label="Departman"
                 name="create-departman"
                 value={form.departmanId}
-                onChange={
-                  onDepartmanChange ??
-                  ((value) => setForm((prev) => ({ ...prev, departmanId: value })))
-                }
+                onChange={handleDepartmanChange}
                 required={form.calisanKapsami !== "DIS_KAYNAK"}
                 placeholderOption={{ value: "", label: "Seçiniz" }}
                 options={toSelectOptions(refs.departmanOptions)}
@@ -492,7 +555,7 @@ export function PersonelCreateFields({
           ) : null}
           {refs.gorevOptions.length > 0 ? (
             <PersonelCreateSelect
-              label="Unvan"
+              label="Görev / Unvan"
               name="create-gorev"
               value={form.gorevId}
               onChange={(value) => setForm((prev) => ({ ...prev, gorevId: value }))}
@@ -503,7 +566,7 @@ export function PersonelCreateFields({
               onOpenChange={(isOpen) => setSelectOpen("create-gorev", isOpen)}
             />
           ) : (
-            refMissingNote("Unvan", true)
+            refMissingNote("Görev / Unvan", true)
           )}
           {refs.pozisyonOptions.length > 0 ? (
             <PersonelCreateSelect
@@ -519,7 +582,7 @@ export function PersonelCreateFields({
           ) : null}
           {refs.personelTipiOptions.length > 0 ? (
             <PersonelCreateSelect
-              label="Personel Tipi"
+              label="Çalışma Tipi"
               name="create-personel-tipi"
               value={form.personelTipiId}
               onChange={(value) => setForm((prev) => ({ ...prev, personelTipiId: value }))}
@@ -530,7 +593,7 @@ export function PersonelCreateFields({
               onOpenChange={(isOpen) => setSelectOpen("create-personel-tipi", isOpen)}
             />
           ) : (
-            refMissingNote("Personel Tipi", true)
+            refMissingNote("Çalışma Tipi", true)
           )}
           {form.calisanKapsami !== "DIS_KAYNAK" && refs.ucretTipiOptions.length > 0 ? (
             <PersonelCreateSelect

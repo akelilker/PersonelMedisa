@@ -420,14 +420,18 @@ class ReferansController
         }
 
         $stmt = $pdo->query(
-            "SELECT id, ad FROM sgk_isverenler WHERE durum = 'AKTIF' ORDER BY ad ASC, id ASC"
+            "SELECT id, ad, sirket_id FROM sgk_isverenler WHERE durum = 'AKTIF' ORDER BY ad ASC, id ASC"
         );
         $rows = $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
         $items = [];
         foreach ($rows as $row) {
+            $sirketId = isset($row['sirket_id']) && $row['sirket_id'] !== null && $row['sirket_id'] !== ''
+                ? (int) $row['sirket_id']
+                : null;
             $items[] = [
                 'id' => (int) $row['id'],
                 'ad' => (string) $row['ad'],
+                'sirket_id' => $sirketId !== null && $sirketId > 0 ? $sirketId : null,
             ];
         }
 

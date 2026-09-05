@@ -95,6 +95,7 @@ describe("kayit modal flow actions + field surface parity", () => {
       "create-ise-giris",
       "create-sube",
       "create-sgk-isveren",
+      "create-calisma-lokasyonu",
       "create-bagli-amir",
       "create-departman",
       "create-bolum",
@@ -107,6 +108,10 @@ describe("kayit modal flow actions + field surface parity", () => {
     ]);
     expect(leftNames.at(-1)).toBe("create-kan");
     expect(rightNames.at(-1)).toBe("create-maas");
+    expect(createFields).toContain("Görev / Unvan");
+    expect(createFields).toContain("Çalışma Tipi");
+    expect(createFields).toContain("Çalışma Lokasyonu");
+    expect(createFields).toContain("filterSgkIsverenOptionsForSube");
   });
 
   it("empty references: keeps canonical conditional render for Bölüm/Birim/Pozisyon", () => {

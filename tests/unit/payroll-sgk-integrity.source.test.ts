@@ -111,6 +111,7 @@ describe("canonical payroll SGK integrity", () => {
   it("exposes SGK referans list for create contract", () => {
     expect(read("api/src/Router.php")).toContain("/referans/sgk-isverenler");
     expect(read("api/src/Controllers/ReferansController.php")).toContain("function sgkIsverenler");
+    expect(read("api/src/Controllers/ReferansController.php")).toContain("sirket_id");
     expect(read("src/api/endpoints.ts")).toContain("sgkIsverenler");
     expect(read("src/features/personeller/personel-create-utils.ts")).toContain("sgk_isveren_id");
     expect(read("src/features/personeller/components/PersonelCreateFields.tsx")).toContain("SGK İşveren");

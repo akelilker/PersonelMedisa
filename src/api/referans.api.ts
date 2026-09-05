@@ -54,6 +54,16 @@ function normalizeIdOptions(data: unknown, parentKey?: string): IdOption[] {
       if (kisaKod) {
         option.kisaKod = kisaKod;
       }
+      const rawSirket = item.sirket_id ?? item.sirketId;
+      if (rawSirket !== undefined && rawSirket !== null && rawSirket !== "") {
+        const sirketId =
+          typeof rawSirket === "number"
+            ? rawSirket
+            : Number.parseInt(String(rawSirket), 10);
+        if (Number.isFinite(sirketId) && sirketId > 0) {
+          option.sirketId = sirketId;
+        }
+      }
       if (parentKey) {
         const rawParent = item[parentKey];
         const parentId =

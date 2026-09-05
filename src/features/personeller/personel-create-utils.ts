@@ -56,8 +56,8 @@ export function parseRequiredPositiveInt(value: string, label: string) {
   return number;
 }
 
-export function parseOptionalPositiveInt(value: string) {
-  const trimmed = value.trim();
+export function parseOptionalPositiveInt(value: string | null | undefined) {
+  const trimmed = (value ?? "").trim();
   if (!trimmed) {
     return undefined;
   }
@@ -163,13 +163,14 @@ export function buildCreatePersonelPayload(form: CreatePersonelFormState): Creat
     : parseRequiredPositiveInt(form.departmanId, "Departman");
   const gorevId = isDisKaynak
     ? parseOptionalPositiveInt(form.gorevId)
-    : parseRequiredPositiveInt(form.gorevId, "Unvan");
+    : parseRequiredPositiveInt(form.gorevId, "Görev / Unvan");
   const personelTipiId = isDisKaynak
     ? parseOptionalPositiveInt(form.personelTipiId)
-    : parseRequiredPositiveInt(form.personelTipiId, "Personel Tipi");
+    : parseRequiredPositiveInt(form.personelTipiId, "Çalışma Tipi");
   const bagliAmirId = parseOptionalPositiveInt(form.bagliAmirId);
   const ucretTipiId = parseOptionalPositiveInt(form.ucretTipiId);
   const primKuraliId = parseOptionalPositiveInt(form.primKuraliId);
+  const calismaLokasyonuId = parseOptionalPositiveInt(form.calismaLokasyonuId);
   const maasRaw = form.maasTutari.trim();
   const maasTutari =
     maasRaw === ""
@@ -206,6 +207,7 @@ export function buildCreatePersonelPayload(form: CreatePersonelFormState): Creat
     ...(parseOptionalPositiveInt(form.pozisyonId) !== undefined
       ? { pozisyon_id: parseOptionalPositiveInt(form.pozisyonId)! }
       : {}),
+    ...(calismaLokasyonuId !== undefined ? { calisma_lokasyonu_id: calismaLokasyonuId } : {}),
     ...(isDisKaynak
       ? { sgk_isveren_id: null }
       : { sgk_isveren_id: parseRequiredPositiveInt(form.sgkIsverenId, "SGK İşveren") }),

@@ -6702,6 +6702,48 @@ let personelBelgeKaydiIdCounter = 903;
         return;
       }
 
+      if (surecTuru === "ISTEN_AYRILMA") {
+        const today = new Date().toISOString().slice(0, 10);
+        if (baslangicTarihi > today) {
+          await fulfillJson(
+            route,
+            422,
+            errorBody(
+              "EXIT_DATE_IN_FUTURE",
+              "İşten ayrılış tarihi ileri bir tarih olamaz.",
+              "baslangic_tarihi"
+            )
+          );
+          return;
+        }
+        const hireDate =
+          typeof linkedPersonel.ise_giris_tarihi === "string" ? linkedPersonel.ise_giris_tarihi.slice(0, 10) : "";
+        if (hireDate && isValidDateString(hireDate) && baslangicTarihi < hireDate) {
+          await fulfillJson(
+            route,
+            422,
+            errorBody(
+              "EXIT_BEFORE_HIRE_DATE",
+              "Ayrilis tarihi ise giris tarihinden once olamaz.",
+              "baslangic_tarihi"
+            )
+          );
+          return;
+        }
+        const existingExit = surecler.find(
+          (item) =>
+            item.personel_id === personelId && item.surec_turu === "ISTEN_AYRILMA" && item.state === "AKTIF"
+        );
+        if (existingExit) {
+          await fulfillJson(
+            route,
+            409,
+            errorBody("EXIT_ALREADY_ACTIVE", "Aktif isten ayrilma kaydi zaten var.", "surec_turu")
+          );
+          return;
+        }
+      }
+
       if (surecTuru === "POZISYON_DEGISTI") {
         const mockOrgIndex = surecler.findIndex(
           (item) =>

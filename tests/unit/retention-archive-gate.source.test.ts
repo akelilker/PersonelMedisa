@@ -53,8 +53,20 @@ describe("retention archive gate source contract", () => {
       resolve(root, "api/src/Controllers/SureclerController.php"),
       "utf8"
     );
-    expect(surec).toContain("createPersonelLifecycleManifests");
+    expect(surec).toContain("PersonelIstenAyrilmaService::applyInTransaction");
     expect(surec).toContain("PersonelArchiveGate::assertBusinessWriteAllowed");
+    expect(surec).not.toContain("deactivatePersonel");
+
+    const exitOwner = readFileSync(
+      resolve(root, "api/src/Services/Personel/PersonelIstenAyrilmaService.php"),
+      "utf8"
+    );
+    expect(exitOwner).toContain("createPersonelLifecycleManifests");
+    expect(exitOwner).toContain("EXIT_PREIMAGE_NOT_AKTIF");
+    expect(exitOwner).toContain("EXIT_BEFORE_HIRE_DATE");
+    expect(exitOwner).toContain("EXIT_ALREADY_ACTIVE");
+    expect(exitOwner).toContain("EXIT_DATE_IN_FUTURE");
+    expect(exitOwner).toContain("İşten ayrılış tarihi ileri bir tarih olamaz.");
 
     const puantaj = readFileSync(
       resolve(root, "api/src/Controllers/PuantajController.php"),

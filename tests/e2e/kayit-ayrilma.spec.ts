@@ -19,6 +19,7 @@ test.describe("Kayit Surec Ayrilma sekmesi", () => {
 
     await kayitModal.getByRole("tab", { name: "Ayrılma" }).click();
 
+    await expect(kayitModal.getByTestId("kayit-ayrilma-pasif-uyari")).toContainText(/PASIF/i);
     await expect(kayitModal.locator("[name='surec-create-bas']")).toBeVisible();
     await expect(kayitModal.locator("[name='surec-create-turu']")).toHaveCount(0);
     await expect(kayitModal.locator("[name='surec-create-turu-text']")).toHaveCount(0);
@@ -30,7 +31,7 @@ test.describe("Kayit Surec Ayrilma sekmesi", () => {
 
     await kayitModal.getByTestId("kayit-modal-footer-primary").click();
 
-    await expect(kayitModal.locator(".workspace-success--inline")).toContainText(/Süreç kaydı eklendi/i, {
+    await expect(kayitModal.locator(".workspace-success--inline")).toContainText(/Ayrılma kaydedildi|PASIF|Süreç kaydı eklendi/i, {
       timeout: 15_000
     });
 
@@ -130,7 +131,7 @@ test.describe("Kayit Surec Ayrilma sekmesi", () => {
     });
 
     await kayitModal.getByTestId("kayit-modal-footer-primary").click();
-    await expect(kayitModal.locator(".workspace-success--inline")).toContainText(/Süreç kaydı eklendi/i, {
+    await expect(kayitModal.locator(".workspace-success--inline")).toContainText(/Ayrılma kaydedildi|PASIF|Süreç kaydı eklendi/i, {
       timeout: 15_000
     });
 

@@ -290,6 +290,48 @@ try {
     // Retention clock readable (sanity for future-date gate)
     hebAssert(RetentionClock::now() instanceof DateTimeInterface, 'retention clock available');
 
+    // --- Lock-first apply safety ---
+    // apply on AKTIF locked row rejects (same fail-closed as plan)
+    $aktifApplyDenied = false;
+    try {
+        $pdo->beginTransaction();
+        PersonelHistoricalExitDateBackfillService::applyInTransaction($pdo, 1, '2025-12-31', 'aktif-apply', 1);
+        $pdo->commit();
+    } catch (PersonelValidationException $e) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        $aktifApplyDenied = $e->getCodeString() === PersonelHistoricalExitDateBackfillService::ERROR_NOT_PASIF;
+    }
+    hebAssert($aktifApplyDenied, 'apply rejects locked AKTIF personel');
+    hebAssert(
+        (int) $pdo->query('SELECT COUNT(*) FROM surecler WHERE personel_id = 1')->fetchColumn() === 0,
+        'AKTIF apply rejection creates no ISTEN_AYRILMA'
+    );
+
+    // same-target retry under lock does not duplicate ISTEN_AYRILMA (personel 2 already backfilled)
+    $beforeDup = (int) $pdo->query('SELECT COUNT(*) FROM surecler WHERE personel_id = 2 AND surec_turu = \'ISTEN_AYRILMA\' AND state <> \'IPTAL\'')->fetchColumn();
+    $pdo->beginTransaction();
+    $retryLocked = PersonelHistoricalExitDateBackfillService::applyInTransaction($pdo, 2, '2025-12-31', 'lock-retry', 99);
+    $pdo->commit();
+    $afterDup = (int) $pdo->query('SELECT COUNT(*) FROM surecler WHERE personel_id = 2 AND surec_turu = \'ISTEN_AYRILMA\' AND state <> \'IPTAL\'')->fetchColumn();
+    hebAssert($retryLocked['already_applied'] === true, 'locked same-target retry is already_applied');
+    hebAssert($beforeDup === $afterDup && $afterDup === 1, 'locked same-target retry does not duplicate ISTEN_AYRILMA');
+
+    // normal PERSONEL_EXIT PASIF reject still holds after historical owner changes
+    $normalExitPasifAgain = false;
+    try {
+        $pdo->beginTransaction();
+        PersonelIstenAyrilmaService::applyInTransaction($pdo, 4, '2025-11-01', 'normal-again', 1);
+        $pdo->commit();
+    } catch (PersonelValidationException $e) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        $normalExitPasifAgain = $e->getCodeString() === PersonelIstenAyrilmaService::ERROR_EXIT_NOT_AKTIF;
+    }
+    hebAssert($normalExitPasifAgain, 'normal PERSONEL_EXIT still rejects PASIF after backfill lock fix');
+
     echo "ALL_HISTORICAL_EXIT_BACKFILL_TESTS_PASSED\n";
 } catch (Throwable $e) {
     echo '[FAIL] ' . $e->getMessage() . PHP_EOL;

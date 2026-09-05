@@ -33,7 +33,7 @@ final class PersonelHistoricalExitDateBackfillService
     public const BACKFILL_ACIKLAMA_PREFIX = '[HISTORICAL_EXIT_DATE_BACKFILL]';
 
     /**
-     * SELECT-only plan / validation. Never mutates.
+     * SELECT-only plan / validation. Never mutates. Never takes FOR UPDATE.
      *
      * @return array{
      *   personel_id:int,
@@ -48,7 +48,114 @@ final class PersonelHistoricalExitDateBackfillService
     public static function plan(PDO $pdo, int $personelId, string $exitDate, ?string $aciklama): array
     {
         $normalizedExit = self::normalizeAndValidateExitDate($exitDate);
+        // Dry-run/plan remains SELECT-only (no FOR UPDATE).
         $personel = self::loadPersonel($pdo, $personelId, false);
+
+        return self::composePlanFromPersonel($pdo, $personelId, $personel, $normalizedExit, $aciklama);
+    }
+
+    /**
+     * Apply historical backfill inside an existing transaction (caller owns begin/commit/rollback).
+     *
+     * Fail-closed order:
+     * 1) Lock target personel row FOR UPDATE (serialization owner)
+     * 2) Validate locked personel exists + PASIF + hire/exit date rules
+     * 3) Evaluate surec/current-exit plan under that lock
+     * 4) Mutate only after locked validation
+     *
+     * Concurrent historical backfills for the same personel serialize on the personel row lock
+     * and cannot create duplicate ISTEN_AYRILMA surecler.
+     *
+     * @return array{
+     *   personel_id:int,
+     *   surec_id:int|null,
+     *   action:string,
+     *   exit_date:string,
+     *   already_applied:bool
+     * }
+     */
+    public static function applyInTransaction(
+        PDO $pdo,
+        int $personelId,
+        string $exitDate,
+        ?string $aciklama,
+        int $actorUserId
+    ): array {
+        $normalizedExit = self::normalizeAndValidateExitDate($exitDate);
+
+        // Lock personel row FIRST — do NOT call unlocked plan() on the apply path.
+        $personel = self::loadPersonel($pdo, $personelId, true);
+        $plan = self::composePlanFromPersonel($pdo, $personelId, $personel, $normalizedExit, $aciklama);
+
+        if ($plan['action'] === self::ACTION_ALREADY_APPLIED) {
+            return [
+                'personel_id' => $personelId,
+                'surec_id' => $plan['preimage']['isten_ayrilma_surec_id'] !== null
+                    ? (int) $plan['preimage']['isten_ayrilma_surec_id']
+                    : null,
+                'action' => self::ACTION_ALREADY_APPLIED,
+                'exit_date' => $plan['exit_date'],
+                'already_applied' => true,
+            ];
+        }
+
+        // Under the personel row lock, re-read surecler before mutation (fail-closed TOCTOU).
+        $surecler = self::loadActiveIstenAyrilmaSurecler($pdo, $personelId);
+        if (count($surecler) > 0) {
+            $currentExit = self::resolveCurrentExitDate($pdo, $personelId, $surecler);
+            if ($currentExit === $plan['exit_date']) {
+                return [
+                    'personel_id' => $personelId,
+                    'surec_id' => (int) $surecler[0]['id'],
+                    'action' => self::ACTION_ALREADY_APPLIED,
+                    'exit_date' => $plan['exit_date'],
+                    'already_applied' => true,
+                ];
+            }
+
+            throw new PersonelValidationException(
+                'baslangic_tarihi',
+                'Mevcut tarihi cikis kaydi ile celisen backfill tarihi.',
+                self::ERROR_CONFLICT
+            );
+        }
+
+        $surecId = self::insertHistoricalSurec($pdo, $personelId, $plan['exit_date'], $plan['aciklama']);
+
+        // Personel stays PASIF — do not touch aktif_durum.
+        ArchiveManifestService::createPersonelLifecycleManifests($pdo, $personelId, $actorUserId);
+
+        return [
+            'personel_id' => $personelId,
+            'surec_id' => $surecId,
+            'action' => self::ACTION_CREATE_HISTORICAL_SUREC,
+            'exit_date' => $plan['exit_date'],
+            'already_applied' => false,
+        ];
+    }
+
+    /**
+     * Shared plan composition against an already-loaded personel row.
+     * Caller chooses SELECT vs FOR UPDATE when loading the row.
+     *
+     * @param array<string, mixed> $personel
+     * @return array{
+     *   personel_id:int,
+     *   exit_date:string,
+     *   action:string,
+     *   no_change:bool,
+     *   preimage:array<string,mixed>,
+     *   postimage:array<string,mixed>,
+     *   aciklama:string
+     * }
+     */
+    private static function composePlanFromPersonel(
+        PDO $pdo,
+        int $personelId,
+        array $personel,
+        string $normalizedExit,
+        ?string $aciklama
+    ): array {
         self::assertPasifPreimage($personel);
 
         $hireDate = self::normalizeDateOnly($personel['ise_giris_tarihi'] ?? null);
@@ -116,75 +223,6 @@ final class PersonelHistoricalExitDateBackfillService
                 'isten_ayrilma_surec_id' => null,
             ],
             'aciklama' => $aciklamaFinal,
-        ];
-    }
-
-    /**
-     * Apply historical backfill inside an existing transaction (caller owns begin/commit/rollback).
-     *
-     * @return array{
-     *   personel_id:int,
-     *   surec_id:int|null,
-     *   action:string,
-     *   exit_date:string,
-     *   already_applied:bool
-     * }
-     */
-    public static function applyInTransaction(
-        PDO $pdo,
-        int $personelId,
-        string $exitDate,
-        ?string $aciklama,
-        int $actorUserId
-    ): array {
-        $plan = self::plan($pdo, $personelId, $exitDate, $aciklama);
-
-        // Re-lock personel row for apply-time TOCTOU protection.
-        self::loadPersonel($pdo, $personelId, true);
-
-        if ($plan['action'] === self::ACTION_ALREADY_APPLIED) {
-            return [
-                'personel_id' => $personelId,
-                'surec_id' => $plan['preimage']['isten_ayrilma_surec_id'] !== null
-                    ? (int) $plan['preimage']['isten_ayrilma_surec_id']
-                    : null,
-                'action' => self::ACTION_ALREADY_APPLIED,
-                'exit_date' => $plan['exit_date'],
-                'already_applied' => true,
-            ];
-        }
-
-        $surecler = self::loadActiveIstenAyrilmaSurecler($pdo, $personelId);
-        if (count($surecler) > 0) {
-            $currentExit = self::resolveCurrentExitDate($pdo, $personelId, $surecler);
-            if ($currentExit === $plan['exit_date']) {
-                return [
-                    'personel_id' => $personelId,
-                    'surec_id' => (int) $surecler[0]['id'],
-                    'action' => self::ACTION_ALREADY_APPLIED,
-                    'exit_date' => $plan['exit_date'],
-                    'already_applied' => true,
-                ];
-            }
-
-            throw new PersonelValidationException(
-                'baslangic_tarihi',
-                'Mevcut tarihi cikis kaydi ile celisen backfill tarihi.',
-                self::ERROR_CONFLICT
-            );
-        }
-
-        $surecId = self::insertHistoricalSurec($pdo, $personelId, $plan['exit_date'], $plan['aciklama']);
-
-        // Personel stays PASIF — do not touch aktif_durum.
-        ArchiveManifestService::createPersonelLifecycleManifests($pdo, $personelId, $actorUserId);
-
-        return [
-            'personel_id' => $personelId,
-            'surec_id' => $surecId,
-            'action' => self::ACTION_CREATE_HISTORICAL_SUREC,
-            'exit_date' => $plan['exit_date'],
-            'already_applied' => false,
         ];
     }
 

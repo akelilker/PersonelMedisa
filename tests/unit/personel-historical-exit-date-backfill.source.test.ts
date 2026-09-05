@@ -28,6 +28,24 @@ describe("Personel historical exit-date backfill source contract", () => {
     expect(normalExit).not.toContain("HISTORICAL_EXIT_DATE_BACKFILL");
   });
 
+  it("apply locks personel FOR UPDATE before plan/mutation; plan stays SELECT-only", () => {
+    const backfill = read(
+      "api/src/Services/Personel/PersonelHistoricalExitDateBackfillService.php"
+    );
+    const applyIdx = backfill.indexOf("function applyInTransaction");
+    const composeIdx = backfill.indexOf("composePlanFromPersonel", applyIdx);
+    const lockIdx = backfill.indexOf("loadPersonel($pdo, $personelId, true)", applyIdx);
+    const unlockedPlanCall = backfill
+      .slice(applyIdx, applyIdx + 800)
+      .includes("self::plan(");
+
+    expect(lockIdx).toBeGreaterThan(applyIdx);
+    expect(composeIdx).toBeGreaterThan(lockIdx);
+    expect(unlockedPlanCall).toBe(false);
+    expect(backfill).toContain("FOR UPDATE");
+    expect(backfill).toContain("loadPersonel($pdo, $personelId, false)");
+  });
+
   it("wires HISTORICAL_EXIT_DATE_BACKFILL through lifecycle bulk dry-run/apply/postcheck", () => {
     const contract = read("api/src/Services/Personel/PersonelLifecycleBulkRowContract.php");
     const dryRun = read("api/src/Services/Personel/PersonelLifecycleBulkDryRunService.php");
@@ -43,21 +61,32 @@ describe("Personel historical exit-date backfill source contract", () => {
     expect(postcheck).toContain("OP_HISTORICAL_EXIT_DATE_BACKFILL");
   });
 
-  it("retargets deferred-exit ops wrapper to historical backfill with exact 202/208 dates", () => {
+  it("retargets deferred-exit ops wrapper to historical backfill with exact 202/208 dates and runtime SHA pin", () => {
     const wrapper = read("ops/personnel-lifecycle/deferred-exit-production-apply.mjs");
+    const gates = read("ops/personnel-lifecycle/lib/historical-exit-backfill-gates.mjs");
 
     expect(wrapper).toContain("HISTORICAL_EXIT_DATE_BACKFILL");
     expect(wrapper).toContain("PersonelHistoricalExitDateBackfillService");
-    expect(wrapper).toContain("0b6c90b2c4a75532d42482b898a421a3658ea3a5");
+    expect(wrapper).toContain("parseExpectedSha");
+    expect(wrapper).toContain("--expected-sha");
+    expect(wrapper).not.toContain("0b6c90b2c4a75532d42482b898a421a3658ea3a5");
     expect(wrapper).toContain("personel_id: 202");
     expect(wrapper).toContain('exit_date: "2025-12-31"');
     expect(wrapper).toContain("personel_id: 208");
     expect(wrapper).toContain('exit_date: "2026-05-25"');
     expect(wrapper).not.toContain("2026-07-30");
     expect(wrapper).not.toContain('operation_type: "PERSONEL_EXIT"');
-    expect(wrapper).toContain('process.argv.includes("--apply")');
+    expect(wrapper).toContain("isApplyRequested");
     expect(wrapper).toContain('production_mutation: DO_APPLY ? "REQUESTED" : "DRY_RUN_ONLY"');
-    expect(wrapper).toContain('aktifDurum === "PASIF"');
+    expect(wrapper).toContain("evaluateResidualPreimage");
+    expect(wrapper).not.toContain('.includes("AHMED")');
+    expect(wrapper).not.toContain('.includes("SEFINE")');
+
+    expect(gates).toContain('"AHMED KHALIL ALSAMAR"');
+    expect(gates).toContain('"SEFINE OZCAN"');
+    expect(gates).toContain("matchesExactFullName");
+    expect(gates).toContain("EXPECTED_SHA_MISSING");
+    expect(gates).toContain("EXPECTED_SHA_INVALID");
   });
 
   it("keeps lifecycle bulk apply behind import.apply authorization gate", () => {

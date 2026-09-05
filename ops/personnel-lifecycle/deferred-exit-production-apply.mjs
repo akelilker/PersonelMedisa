@@ -10,7 +10,10 @@
  * Default: dry-run only (non-mutating).
  * Production apply requires explicit --apply after live PASIF residual preimage gate.
  *
- * Usage: node ops/personnel-lifecycle/deferred-exit-production-apply.mjs [--apply]
+ * Usage: node ops/personnel-lifecycle/deferred-exit-production-apply.mjs --expected-sha=<40-hex> [--apply]
+ *
+ * --expected-sha is mandatory at runtime (exact match to origin/main, live .deploy-sha,
+ * worker heartbeat deployed_sha, and API deployed_sha). No silent code-prep baseline fallback.
  */
 "use strict";
 
@@ -24,6 +27,12 @@ import {
   resolveSurecIdFromApplyResult,
   verifyPersonnelExitSurec,
 } from "../../scripts/ops/personel-lifecycle-exit-postcheck.mjs";
+import {
+  evaluateResidualPreimage,
+  evaluateShaPreflight,
+  isApplyRequested,
+  parseExpectedSha,
+} from "./lib/historical-exit-backfill-gates.mjs";
 
 const DIR = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.join(DIR, "../..");
@@ -37,10 +46,10 @@ const FTP_NETRC = path.join(
   "ftp.curl"
 );
 const API = "https://www.karmotors.com.tr/personelmedisa/api";
-/** Pin to authoritative code-prep baseline; refresh to deployed SHA after merge before production apply. */
-const EXPECTED_ORIGIN_MAIN = "0b6c90b2c4a75532d42482b898a421a3658ea3a5";
 const ACTOR_UID = 10;
-const DO_APPLY = process.argv.includes("--apply");
+const DO_APPLY = isApplyRequested(process.argv);
+/** Set in main() via required --expected-sha (fail closed; no silent baseline). */
+let EXPECTED_SHA = null;
 
 const BACKFILL_ROWS = [
   {
@@ -65,10 +74,6 @@ const BACKFILL_ROWS = [
   },
 ];
 
-const EXPECTED_NAMES = {
-  202: { ad: "AHMED", soyad: "KHALIL" },
-  208: { ad: "SEFINE", soyad: "OZCAN" },
-};
 
 const report = {
   phase: "MG-PERSONNEL-HISTORICAL-EXIT-DATE-BACKFILL-001",
@@ -139,18 +144,6 @@ function unwrapItems(json) {
   return [];
 }
 
-function normName(v) {
-  return String(v ?? "")
-    .trim()
-    .replace(/\s+/g, " ")
-    .toLocaleUpperCase("tr-TR")
-    .replace(/İ/g, "I")
-    .replace(/Ş/g, "S")
-    .replace(/Ğ/g, "G")
-    .replace(/Ü/g, "U")
-    .replace(/Ö/g, "O")
-    .replace(/Ç/g, "C");
-}
 
 function ftpGet(remote, local) {
   const r = spawnSync(
@@ -162,16 +155,17 @@ function ftpGet(remote, local) {
 }
 
 function runPreflight() {
+  report.preflight.expected_sha = EXPECTED_SHA;
   const origin = spawnSync("git", ["rev-parse", "origin/main"], { cwd: REPO_ROOT, encoding: "utf8" });
   const originMain = (origin.stdout || "").trim().toLowerCase();
   report.preflight.origin_main = originMain;
-  report.preflight.origin_main_pass = originMain === EXPECTED_ORIGIN_MAIN;
+  report.preflight.origin_main_pass = originMain === EXPECTED_SHA;
 
   const tmp = process.env.TEMP || "/tmp";
   ftpGet("api/.deploy-sha", path.join(tmp, "live-deploy-sha.txt"));
   const liveSha = fs.readFileSync(path.join(tmp, "live-deploy-sha.txt"), "utf8").trim().toLowerCase();
   report.preflight.live_deploy_sha = liveSha;
-  report.preflight.live_deploy_sha_pass = liveSha === EXPECTED_ORIGIN_MAIN;
+  report.preflight.live_deploy_sha_pass = liveSha === EXPECTED_SHA;
 
   if (!fs.existsSync(LIVE_CONFIG)) {
     ftpGet("api/config.local.php", LIVE_CONFIG);
@@ -186,13 +180,29 @@ function runPreflight() {
   const hb = JSON.parse(fs.readFileSync(path.join(tmp, "live-worker-hb.json"), "utf8"));
   report.preflight.worker_heartbeat_sha = hb.deployed_sha || "";
   report.preflight.worker_heartbeat_pass =
-    String(hb.deployed_sha || "").toLowerCase() === EXPECTED_ORIGIN_MAIN;
+    String(hb.deployed_sha || "").toLowerCase() === EXPECTED_SHA;
   report.preflight.worker_idle_pass = String(migStatus.state || "") === "SUCCEEDED";
 
   const health = spawnSync("curl.exe", ["-sS", "--max-time", "15", `${API}/health`], {
     encoding: "utf8",
   });
   report.preflight.api_health_pass = (health.stdout || "").includes('"status":"ok"');
+
+  const shaGate = evaluateShaPreflight({
+    expectedSha: EXPECTED_SHA,
+    originMain: report.preflight.origin_main,
+    liveDeploySha: report.preflight.live_deploy_sha,
+    workerHeartbeatSha: report.preflight.worker_heartbeat_sha,
+  });
+  report.preflight.origin_main_pass = shaGate.origin_main_pass;
+  report.preflight.live_deploy_sha_pass = shaGate.live_deploy_sha_pass;
+  report.preflight.worker_heartbeat_pass = shaGate.worker_heartbeat_pass;
+  if (!shaGate.all_sha_pass) {
+    fail(
+      "PREFLIGHT_SHA",
+      `Expected SHA mismatch: expected=${shaGate.expected_sha} origin/main=${shaGate.origin_main} live=${shaGate.live_deploy_sha} heartbeat=${shaGate.worker_heartbeat_sha}`
+    );
+  }
 
   const required = [
     "origin_main_pass",
@@ -217,15 +227,7 @@ async function verifyHistoricalResidualPreimage(token) {
     const res = await api(`/personeller/${id}`, { token });
     if (res.status !== 200) fail("PREIMAGE", `GET /personeller/${id} HTTP ${res.status}`);
     const p = res.json?.data ?? {};
-    const aktifDurum = String(p.aktif_durum || "").toUpperCase();
     const istenCikis = p.isten_cikis_tarihi ?? p.cikis_tarihi ?? null;
-    const fullName = normName(`${p.ad || ""} ${p.soyad || ""}`);
-    const nameExpected = EXPECTED_NAMES[id];
-    const nameMatch =
-      fullName.includes(nameExpected.ad) ||
-      fullName.includes(nameExpected.soyad) ||
-      fullName.includes("AHMED") ||
-      fullName.includes("SEFINE");
 
     let exitSurecCount = 0;
     const surecRes = await api(`/surecler?personel_id=${id}&surec_turu=ISTEN_AYRILMA`, { token });
@@ -236,19 +238,27 @@ async function verifyHistoricalResidualPreimage(token) {
       exitSurecCount = items.length;
     }
 
-    const exitEmpty = !istenCikis && exitSurecCount === 0;
-    const residualPass = aktifDurum === "PASIF" && exitEmpty;
+    const gate = evaluateResidualPreimage({
+      personelId: id,
+      ad: p.ad,
+      soyad: p.soyad,
+      aktifDurum: p.aktif_durum,
+      istenCikisTarihi: istenCikis,
+      exitSurecCount,
+    });
 
     report.personnel_preimage[id] = {
       personel_id: id,
-      aktif_durum: aktifDurum,
+      aktif_durum: String(p.aktif_durum || "").toUpperCase(),
       isten_cikis_tarihi: istenCikis,
       exit_surec_count: exitSurecCount,
       expected_exit_date: expectedExit,
-      name_match: nameMatch,
-      pasif_pass: aktifDurum === "PASIF",
-      exit_date_empty_pass: exitEmpty,
-      residual_preimage_pass: residualPass && nameMatch,
+      full_name_normalized: gate.full_name_normalized,
+      expected_full_name: gate.expected_full_name,
+      name_exact_pass: gate.name_exact_pass,
+      pasif_pass: gate.pasif_pass,
+      exit_date_empty_pass: gate.exit_date_empty_pass,
+      residual_preimage_pass: gate.residual_preimage_pass,
     };
   }
 
@@ -258,7 +268,7 @@ async function verifyHistoricalResidualPreimage(token) {
   if (!report.personnel_preimage.all_pass) {
     fail(
       "PREIMAGE",
-      "Historical residual preimage failed (require PASIF + missing exit date for 202/208)"
+      "Historical residual preimage failed (require exact personel_id + exact full name + PASIF + empty exit + 0 ISTEN_AYRILMA)"
     );
   }
 }
@@ -267,7 +277,7 @@ async function runDryApply(token) {
   const dry = await api("/personeller/lifecycle-bulk/dry-run", {
     method: "POST",
     token,
-    body: { rows: BACKFILL_ROWS, deployed_sha: EXPECTED_ORIGIN_MAIN },
+    body: { rows: BACKFILL_ROWS, deployed_sha: EXPECTED_SHA },
   });
   report.dry_run = {
     status: dry.status,
@@ -303,7 +313,7 @@ async function runDryApply(token) {
       rows: BACKFILL_ROWS,
       dry_run_checksum: report.dry_run.dry_run_checksum,
       preimage_checksum: report.dry_run.preimage_checksum,
-      deployed_sha: EXPECTED_ORIGIN_MAIN,
+      deployed_sha: EXPECTED_SHA,
     },
   });
   report.apply = {
@@ -369,6 +379,7 @@ async function postcheck(token) {
 
 async function main() {
   try {
+    EXPECTED_SHA = parseExpectedSha(process.argv.slice(2));
     runPreflight();
     const token = mintJwt(readJwtSecret(LIVE_CONFIG), ACTOR_UID);
     await verifyHistoricalResidualPreimage(token);

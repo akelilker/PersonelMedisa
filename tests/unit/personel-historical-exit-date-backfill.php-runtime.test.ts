@@ -44,5 +44,10 @@ describe("Personel HISTORICAL_EXIT_DATE_BACKFILL MariaDB runtime", () => {
     expect(result.stdout).toContain("[PASS] apply conflict rolls back caller transaction path");
     expect(result.stdout).toContain("[PASS] rolled-back conflict leaves no partial surec");
     expect(result.stdout).toContain("[PASS] retention clock available");
+    expect(result.stdout).toContain("[PASS] apply rejects locked AKTIF personel");
+    expect(result.stdout).toContain("[PASS] AKTIF apply rejection creates no ISTEN_AYRILMA");
+    expect(result.stdout).toContain("[PASS] locked same-target retry is already_applied");
+    expect(result.stdout).toContain("[PASS] locked same-target retry does not duplicate ISTEN_AYRILMA");
+    expect(result.stdout).toContain("[PASS] normal PERSONEL_EXIT still rejects PASIF after backfill lock fix");
   });
 });

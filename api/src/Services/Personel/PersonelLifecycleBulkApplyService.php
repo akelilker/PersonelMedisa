@@ -509,6 +509,55 @@ final class PersonelLifecycleBulkApplyService
             }
         }
 
+        if ($owner === 'PersonelHistoricalExitDateCorrectionService') {
+            $personelId = (int) ($plan['personel_id'] ?? 0);
+            $surecId = (int) ($plan['surec_id'] ?? 0);
+            $expectedOld = (string) ($plan['old_exit_date'] ?? '');
+            $exitDate = (string) ($plan['exit_date'] ?? $plan['new_exit_date'] ?? '');
+            $aciklama = (string) ($plan['aciklama'] ?? '');
+
+            $pdo->beginTransaction();
+            try {
+                $replay = $claimFn($pdo);
+                if (is_array($replay)) {
+                    $pdo->commit();
+
+                    return [
+                        'entity_id' => (int) ($replay['result_entity_id'] ?? 0),
+                        'replay' => true,
+                    ];
+                }
+                $result = PersonelHistoricalExitDateCorrectionService::applyInTransaction(
+                    $pdo,
+                    $personelId,
+                    $surecId,
+                    $expectedOld,
+                    $exitDate,
+                    $aciklama !== '' ? $aciklama : null,
+                    $actorId,
+                    $mutationId !== '' ? $mutationId : null
+                );
+                $entityId = (int) ($result['surec_id'] ?? $surecId);
+                $applyResultHolder['entity_id'] = $entityId;
+                $completeFn($pdo);
+                $pdo->commit();
+
+                return [
+                    'entity_id' => $entityId,
+                    'already_applied' => !empty($result['already_applied']),
+                    'action' => (string) ($result['action'] ?? ''),
+                    'old_exit_date' => (string) ($result['old_exit_date'] ?? ''),
+                    'new_exit_date' => (string) ($result['new_exit_date'] ?? ''),
+                    'audit' => is_array($result['audit'] ?? null) ? $result['audit'] : null,
+                ];
+            } catch (\Throwable $e) {
+                if ($pdo->inTransaction()) {
+                    $pdo->rollBack();
+                }
+                throw $e;
+            }
+        }
+
         if ($owner === 'PersonelLifecycleBulkReferenceResolver') {
             $payload = is_array($plan['payload'] ?? null) ? $plan['payload'] : [];
             $table = (string) ($payload['table'] ?? 'gorevler');
@@ -603,6 +652,7 @@ final class PersonelLifecycleBulkApplyService
             PersonelLifecycleBulkRowContract::OP_BRANCH => 50,
             PersonelLifecycleBulkRowContract::OP_EXIT => 60,
             PersonelLifecycleBulkRowContract::OP_HISTORICAL_EXIT_DATE_BACKFILL => 65,
+            PersonelLifecycleBulkRowContract::OP_HISTORICAL_EXIT_DATE_CORRECTION => 66,
         ];
 
         $combined = [];

@@ -232,6 +232,9 @@ describe("the control plane authorizes the 084 to 085 round and nothing else", (
   it("pins production tip 084 as the only apply-ready preimage", () => {
     expect(preflight).toContain("public const EXPECTED_APPLIED_TIP = '084';");
     expect(preflight).toContain("'085' => '085_gunluk_bildirim_duzeltme_auditleri.sql',");
+    expect(preflight).toContain(
+      "'086' => '086_personel_historical_exit_date_correction_auditleri.sql',",
+    );
     expect(preflight).not.toContain("'084' => '085_gunluk_bildirim_duzeltme_auditleri.sql',");
   });
 

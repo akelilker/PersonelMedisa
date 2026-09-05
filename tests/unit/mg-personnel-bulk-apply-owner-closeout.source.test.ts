@@ -94,6 +94,9 @@ describe("MG personnel bulk apply owner closeout sources", () => {
   it("keeps migration control plane at repo tip 085", () => {
     const preflight = read("api/src/Database/MigrationPreflightReport.php");
     expect(preflight).toContain("'085' => '085_gunluk_bildirim_duzeltme_auditleri.sql'");
+    expect(preflight).toContain(
+      "'086' => '086_personel_historical_exit_date_correction_auditleri.sql'",
+    );
     expect(preflight).toContain("EXPECTED_APPLIED_TIP = '084'");
     expect(preflight).not.toContain("'084' => '084_gunluk_bildirim_tamamlama_header_summary.sql'");
   });

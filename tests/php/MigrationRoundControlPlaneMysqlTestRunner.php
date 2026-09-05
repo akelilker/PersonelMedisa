@@ -3,10 +3,10 @@
 declare(strict_types=1);
 
 /**
- * Canonical migration round 085 — DB-backed acceptance against a real MariaDB.
+ * Canonical migration round 085–086 — DB-backed acceptance against a real MariaDB.
  *
- * Production preimage: tip 084 with 085 pending. Setup applies 080–084 from
- * real files; subject under test is 085 only.
+ * Production preimage: tip 084 with 085+086 pending. Setup applies 080–084 from
+ * real files; subjects under test are 085 then 086.
  *
  * Nothing here touches production.
  *
@@ -22,7 +22,9 @@ use Medisa\Api\Database\MigrationRunner;
 use Medisa\Api\Database\MigrationSourceProvider;
 
 const MRC_MIGRATION_085 = '085_gunluk_bildirim_duzeltme_auditleri.sql';
+const MRC_MIGRATION_086 = '086_personel_historical_exit_date_correction_auditleri.sql';
 const MRC_AUTHORIZED_CHECKSUM = '8918827085503147024e5b2fa51c0374a054f24660e618ac562da8d00bcf4be7';
+const MRC_AUTHORIZED_CHECKSUM_086 = 'e8effb50b17319acb9deaa5e4b8fca8257c7d4850648953f998b5bf0232012c5';
 
 /** Audit owners the completed 080–084 rounds left behind (084 added no audit table). */
 const MRC_PREDECESSOR_AUDIT_TABLES = [
@@ -196,6 +198,19 @@ function mrcCreatePostO79Preimage(PDO $pdo): void
             CONSTRAINT fk_gb_personel FOREIGN KEY (personel_id) REFERENCES personeller (id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
     );
+    // Minimal surecler owner required by 086 FK / fail-closed gate.
+    $pdo->exec(
+        "CREATE TABLE surecler (
+            id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+            personel_id INT UNSIGNED NOT NULL,
+            surec_turu VARCHAR(64) NOT NULL,
+            baslangic_tarihi DATE NOT NULL,
+            bitis_tarihi DATE NULL,
+            state VARCHAR(16) NOT NULL DEFAULT 'AKTIF',
+            PRIMARY KEY (id),
+            CONSTRAINT fk_surecler_personel FOREIGN KEY (personel_id) REFERENCES personeller (id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+    );
     // 032-shaped owner that 084 extends with additive columns only.
     $pdo->exec(
         "CREATE TABLE gunluk_bildirim_tamamlamalari (
@@ -309,7 +324,7 @@ $root->exec('CREATE DATABASE `' . $db . '` CHARACTER SET utf8mb4 COLLATE utf8mb4
 $apiDirectory = dirname(__DIR__, 2) . '/api';
 $filesystemSource = new FilesystemMigrationSourceProvider($apiDirectory . '/migrations');
 $sourceThrough084 = new MrcChainThrough($filesystemSource, 84);
-$source = new MrcChainThrough($filesystemSource, 85);
+$source = new MrcChainThrough($filesystemSource, 86);
 $deployedSha = str_repeat('b', 40);
 
 try {
@@ -332,15 +347,15 @@ try {
     $baselineRoles = mrcRoleValues($pdo);
 
     // -----------------------------------------------------------------
-    // 1) tip 084, only 085 pending → apply ready
+    // 1) tip 084, 085+086 pending → apply ready
     // -----------------------------------------------------------------
     $report = MigrationPreflightReport::collect($pdo, $source, $deployedSha);
-    mrcAssert($report['result'] === 'PASS', 'a production tip 084 database is apply-ready for the 085 round');
+    mrcAssert($report['result'] === 'PASS', 'a production tip 084 database is apply-ready for the 085-086 round');
     mrcAssert($report['ledger']['applied_tip'] === '084', 'preflight reports production tip 084');
-    mrcAssert($report['bundle']['code_tip'] === '085', 'preflight reports code tip 085');
+    mrcAssert($report['bundle']['code_tip'] === '086', 'preflight reports code tip 086');
     mrcAssert(
-        $report['ledger']['pending_names'] === [MRC_MIGRATION_085],
-        'only 085 is pending before the apply'
+        $report['ledger']['pending_names'] === [MRC_MIGRATION_085, MRC_MIGRATION_086],
+        '085 and 086 are pending before the apply'
     );
     mrcAssert(
         $report['bundle']['next_pending_name'] === MRC_MIGRATION_085,
@@ -353,7 +368,7 @@ try {
     );
     mrcAssert(
         $report['guards']['round_audit_tables_present'] === 0,
-        'the clean preimage does not yet carry gunluk_bildirim_duzeltme_auditleri'
+        'the clean preimage does not yet carry round audit tables'
     );
     mrcAssert(
         $report['guards']['predecessor_audit_tables_present'] === 6,
@@ -368,7 +383,7 @@ try {
 
     $ledger = MigrationExecutionService::ledgerFacts($pdo, $source);
     mrcAssert($ledger['tip'] === '085', 'production tip is 085 after the apply');
-    mrcAssert($ledger['pending_versions'] === [], 'no migration is left pending');
+    mrcAssert($ledger['pending_versions'] === ['086'], '086 remains pending after 085');
     mrcAssert(
         mrcTableExists($pdo, 'gunluk_bildirim_duzeltme_auditleri'),
         '085 created the correction audit owner'
@@ -388,7 +403,36 @@ try {
     mrcAssert($baselineRoles === mrcRoleValues($pdo), 'no existing user role value was remapped');
 
     // -----------------------------------------------------------------
-    // 3) tip 085, pending 0 → round complete
+    // 3) Apply exactly 086
+    // -----------------------------------------------------------------
+    $midReport = MigrationPreflightReport::collect($pdo, $source, $deployedSha);
+    mrcAssert($midReport['result'] === 'PASS', 'tip 085 with 086 pending remains apply-ready');
+    mrcAssert(
+        $midReport['bundle']['expected_pending_checksum'] === MRC_AUTHORIZED_CHECKSUM_086,
+        'preflight resolves the pending 086 checksum'
+    );
+
+    $applied086 = MigrationExecutionService::apply($pdo, $source, null, '086');
+    mrcAssert($applied086['pending'] === ['086'], 'a targeted request applies exactly 086');
+    $ledger086 = MigrationExecutionService::ledgerFacts($pdo, $source);
+    mrcAssert($ledger086['tip'] === '086', 'production tip is 086 after the apply');
+    mrcAssert($ledger086['pending_versions'] === [], 'no migration is left pending');
+    mrcAssert(
+        mrcTableExists($pdo, 'personel_historical_exit_date_correction_auditleri'),
+        '086 created the historical exit correction audit owner'
+    );
+    mrcAssert(
+        mrcTriggerExists($pdo, 'trg_phedca_no_update'),
+        '086 installed append-only UPDATE protection'
+    );
+    mrcAssert(
+        mrcTriggerExists($pdo, 'trg_phedca_no_delete'),
+        '086 installed append-only DELETE protection'
+    );
+    mrcAssert($baselineCounts === mrcBusinessCounts($pdo), '086 wrote no business row');
+
+    // -----------------------------------------------------------------
+    // 4) tip 086, pending 0 → round complete
     // -----------------------------------------------------------------
     $doneReport = MigrationPreflightReport::collect($pdo, $source, $deployedSha);
     mrcAssert($doneReport['result'] === 'BLOCKED', 'a completed round is not apply-ready again');

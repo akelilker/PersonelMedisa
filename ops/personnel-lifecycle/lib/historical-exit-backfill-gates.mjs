@@ -21,6 +21,30 @@ export const EXPECTED_FULL_NAMES = Object.freeze({
   208: "SEFINE OZCAN",
 });
 
+/** Authoritative HR exit dates for known residual targets. */
+export const EXPECTED_EXIT_DATES = Object.freeze({
+  202: "2025-12-31",
+  208: "2026-05-25",
+});
+
+/** Known wrong live dates that require HISTORICAL_EXIT_DATE_CORRECTION (not backfill). */
+export const WRONG_EXIT_DATES_REQUIRING_CORRECTION = Object.freeze({
+  202: "2026-07-30",
+  208: "2026-07-30",
+});
+
+export const CORRECTION_SUREC_IDS = Object.freeze({
+  202: 38,
+  208: 39,
+});
+
+/** Domain classifications for residual / conflict evaluation. */
+export const BACKFILL_CLASSIFICATION = Object.freeze({
+  CREATE_ELIGIBLE: "CREATE_ELIGIBLE",
+  ALREADY_APPLIED: "ALREADY_APPLIED",
+  CONFLICT: "CONFLICT",
+});
+
 /** Legacy Windows-only netrc fallback (used only when the path exists). */
 export const LEGACY_WINDOWS_FTP_NETRC_SEGMENTS = Object.freeze([
   "Documents",
@@ -315,8 +339,44 @@ export function matchesExactFullName(personelId, liveFullName, expectedMap = EXP
 }
 
 /**
- * Evaluate live residual preimage gate for one target.
- * Requires: exact personel_id + exact full name + PASIF + empty canonical exit + active ISTEN_AYRILMA count 0.
+ * Normalize YYYY-MM-DD (or datetime prefix) to date-only, else null.
+ * @param {unknown} value
+ * @returns {string|null}
+ */
+export function normalizeDateOnly(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const raw = String(value).trim();
+  const m = raw.match(/^(\d{4}-\d{2}-\d{2})/);
+  return m ? m[1] : null;
+}
+
+/**
+ * Evaluate live residual preimage gate for one target against domain owner semantics.
+ *
+ * Domain (PersonelHistoricalExitDateBackfillService):
+ * - no existing exit => CREATE_ELIGIBLE (backfill may create)
+ * - existing exit same as expected => ALREADY_APPLIED (no-op)
+ * - existing exit different => CONFLICT (STOP; route to HISTORICAL_EXIT_DATE_CORRECTION)
+ *
+ * Does NOT require exitSurecCount === 0 when an existing matching surec date is present.
+ * Does NOT auto-correct conflicts through backfill.
+ *
+ * @returns {{
+ *   personel_id:number,
+ *   full_name_normalized:string,
+ *   expected_full_name:string|null,
+ *   name_exact_pass:boolean,
+ *   pasif_pass:boolean,
+ *   exit_date_empty_pass:boolean,
+ *   exit_surec_count:number,
+ *   current_exit_date:string|null,
+ *   expected_exit_date:string|null,
+ *   classification:string,
+ *   already_applied_pass:boolean,
+ *   conflict:boolean,
+ *   residual_preimage_pass:boolean,
+ *   backfill_gate_pass:boolean
+ * }}
  */
 export function evaluateResidualPreimage({
   personelId,
@@ -325,13 +385,39 @@ export function evaluateResidualPreimage({
   aktifDurum,
   istenCikisTarihi,
   exitSurecCount,
+  expectedExitDate = null,
+  currentSurecExitDate = null,
   expectedMap = EXPECTED_FULL_NAMES,
 }) {
   const id = Number(personelId);
   const fullName = `${ad || ""} ${soyad || ""}`.trim();
   const nameExact = matchesExactFullName(id, fullName, expectedMap);
   const pasif = String(aktifDurum || "").toUpperCase() === "PASIF";
-  const exitEmpty = !istenCikisTarihi && Number(exitSurecCount || 0) === 0;
+  const count = Number(exitSurecCount || 0);
+  const expected =
+    normalizeDateOnly(expectedExitDate) ??
+    normalizeDateOnly(EXPECTED_EXIT_DATES[id] ?? null);
+  const currentExit =
+    normalizeDateOnly(currentSurecExitDate) ?? normalizeDateOnly(istenCikisTarihi);
+  const exitEmpty = !currentExit && count === 0;
+
+  let classification = BACKFILL_CLASSIFICATION.CREATE_ELIGIBLE;
+  if (!exitEmpty) {
+    if (expected && currentExit === expected) {
+      classification = BACKFILL_CLASSIFICATION.ALREADY_APPLIED;
+    } else {
+      classification = BACKFILL_CLASSIFICATION.CONFLICT;
+    }
+  }
+
+  const residual_preimage_pass =
+    nameExact && pasif && classification === BACKFILL_CLASSIFICATION.CREATE_ELIGIBLE;
+  const already_applied_pass =
+    nameExact && pasif && classification === BACKFILL_CLASSIFICATION.ALREADY_APPLIED;
+  const conflict =
+    nameExact && pasif && classification === BACKFILL_CLASSIFICATION.CONFLICT;
+  const backfill_gate_pass = residual_preimage_pass || already_applied_pass;
+
   return {
     personel_id: id,
     full_name_normalized: normName(fullName),
@@ -339,8 +425,74 @@ export function evaluateResidualPreimage({
     name_exact_pass: nameExact,
     pasif_pass: pasif,
     exit_date_empty_pass: exitEmpty,
-    exit_surec_count: Number(exitSurecCount || 0),
-    residual_preimage_pass: nameExact && pasif && exitEmpty,
+    exit_surec_count: count,
+    current_exit_date: currentExit,
+    expected_exit_date: expected,
+    classification,
+    already_applied_pass,
+    conflict,
+    residual_preimage_pass,
+    backfill_gate_pass,
+  };
+}
+
+/**
+ * Fail-closed preimage for HISTORICAL_EXIT_DATE_CORRECTION targets.
+ * Requires exact baslangic_tarihi AND bitis_tarihi == expected_old.
+ */
+export function evaluateCorrectionPreimage({
+  personelId,
+  ad,
+  soyad,
+  aktifDurum,
+  surecId,
+  currentSurecExitDate,
+  currentSurecBitisDate,
+  expectedOldExitDate,
+  expectedNewExitDate,
+  nonIptalIstenAyrilmaCount,
+  expectedMap = EXPECTED_FULL_NAMES,
+}) {
+  const id = Number(personelId);
+  const fullName = `${ad || ""} ${soyad || ""}`.trim();
+  const nameExact = matchesExactFullName(id, fullName, expectedMap);
+  const pasif = String(aktifDurum || "").toUpperCase() === "PASIF";
+  const expectedSurecId = Number(CORRECTION_SUREC_IDS[id] ?? 0);
+  const surecIdOk = Number(surecId) === expectedSurecId && expectedSurecId > 0;
+  const oldExpected =
+    normalizeDateOnly(expectedOldExitDate) ??
+    normalizeDateOnly(WRONG_EXIT_DATES_REQUIRING_CORRECTION[id] ?? null);
+  const newExpected =
+    normalizeDateOnly(expectedNewExitDate) ??
+    normalizeDateOnly(EXPECTED_EXIT_DATES[id] ?? null);
+  const currentBaslangic = normalizeDateOnly(currentSurecExitDate);
+  const currentBitis =
+    normalizeDateOnly(currentSurecBitisDate) ??
+    normalizeDateOnly(currentSurecExitDate);
+  const oldBaslangicMatch =
+    currentBaslangic !== null && oldExpected !== null && currentBaslangic === oldExpected;
+  const oldBitisMatch =
+    currentBitis !== null && oldExpected !== null && currentBitis === oldExpected;
+  const oldMatch = oldBaslangicMatch && oldBitisMatch;
+  const countOk = Number(nonIptalIstenAyrilmaCount || 0) === 1;
+  const correction_preimage_pass =
+    nameExact && pasif && surecIdOk && oldMatch && countOk && newExpected !== null;
+
+  return {
+    personel_id: id,
+    surec_id: Number(surecId) || null,
+    expected_surec_id: expectedSurecId || null,
+    name_exact_pass: nameExact,
+    pasif_pass: pasif,
+    surec_id_pass: surecIdOk,
+    old_exit_date_pass: oldBaslangicMatch,
+    old_bitis_tarihi_pass: oldBitisMatch,
+    single_exit_pass: countOk,
+    current_exit_date: currentBaslangic,
+    current_bitis_tarihi: currentBitis,
+    expected_old_exit_date: oldExpected,
+    expected_new_exit_date: newExpected,
+    correction_preimage_pass,
   };
 }
 

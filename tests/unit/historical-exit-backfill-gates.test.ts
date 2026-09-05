@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   EXPECTED_FULL_NAMES,
+  evaluateCorrectionPreimage,
   evaluateResidualPreimage,
   evaluateShaPreflight,
   isApplyRequested,
@@ -28,7 +29,7 @@ describe("historical exit backfill gates — identity", () => {
     expect(matchesExactFullName(208, "AHMED KHALIL ALSAMAR")).toBe(false);
   });
 
-  it("requires exact id + exact name + PASIF + empty exit preimage", () => {
+  it("classifies CREATE_ELIGIBLE / ALREADY_APPLIED / CONFLICT per domain owner", () => {
     const pass = evaluateResidualPreimage({
       personelId: 202,
       ad: "Ahmed Khalil",
@@ -36,8 +37,40 @@ describe("historical exit backfill gates — identity", () => {
       aktifDurum: "PASIF",
       istenCikisTarihi: null,
       exitSurecCount: 0,
+      expectedExitDate: "2025-12-31",
     });
     expect(pass.residual_preimage_pass).toBe(true);
+    expect(pass.classification).toBe("CREATE_ELIGIBLE");
+    expect(pass.backfill_gate_pass).toBe(true);
+
+    const already = evaluateResidualPreimage({
+      personelId: 202,
+      ad: "Ahmed Khalil",
+      soyad: "Alsamar",
+      aktifDurum: "PASIF",
+      istenCikisTarihi: null,
+      exitSurecCount: 1,
+      expectedExitDate: "2025-12-31",
+      currentSurecExitDate: "2025-12-31",
+    });
+    expect(already.classification).toBe("ALREADY_APPLIED");
+    expect(already.already_applied_pass).toBe(true);
+    expect(already.residual_preimage_pass).toBe(false);
+    expect(already.backfill_gate_pass).toBe(true);
+
+    const conflict = evaluateResidualPreimage({
+      personelId: 208,
+      ad: "Sefine",
+      soyad: "Ozcan",
+      aktifDurum: "PASIF",
+      istenCikisTarihi: null,
+      exitSurecCount: 1,
+      expectedExitDate: "2026-05-25",
+      currentSurecExitDate: "2026-07-30",
+    });
+    expect(conflict.classification).toBe("CONFLICT");
+    expect(conflict.conflict).toBe(true);
+    expect(conflict.backfill_gate_pass).toBe(false);
 
     const wrongName = evaluateResidualPreimage({
       personelId: 202,
@@ -60,27 +93,6 @@ describe("historical exit backfill gates — identity", () => {
     });
     expect(aktif.residual_preimage_pass).toBe(false);
     expect(aktif.pasif_pass).toBe(false);
-
-    const hasExit = evaluateResidualPreimage({
-      personelId: 208,
-      ad: "Sefine",
-      soyad: "Ozcan",
-      aktifDurum: "PASIF",
-      istenCikisTarihi: "2026-05-25",
-      exitSurecCount: 0,
-    });
-    expect(hasExit.residual_preimage_pass).toBe(false);
-    expect(hasExit.exit_date_empty_pass).toBe(false);
-
-    const hasSurec = evaluateResidualPreimage({
-      personelId: 208,
-      ad: "Sefine",
-      soyad: "Ozcan",
-      aktifDurum: "PASIF",
-      istenCikisTarihi: null,
-      exitSurecCount: 1,
-    });
-    expect(hasSurec.residual_preimage_pass).toBe(false);
   });
 });
 
@@ -151,5 +163,43 @@ describe("historical exit backfill gates — runtime SHA", () => {
     expect(isApplyRequested(["node", "script.mjs", `--expected-sha=${SHA}`, "--apply"])).toBe(
       true
     );
+  });
+});
+
+describe("historical exit correction preimage — baslangic + bitis", () => {
+  it("passes only when baslangic and bitis both equal expected_old", () => {
+    const pass = evaluateCorrectionPreimage({
+      personelId: 202,
+      ad: "Ahmed Khalil",
+      soyad: "Alsamar",
+      aktifDurum: "PASIF",
+      surecId: 38,
+      currentSurecExitDate: "2026-07-30",
+      currentSurecBitisDate: "2026-07-30",
+      expectedOldExitDate: "2026-07-30",
+      expectedNewExitDate: "2025-12-31",
+      nonIptalIstenAyrilmaCount: 1,
+    });
+    expect(pass.correction_preimage_pass).toBe(true);
+    expect(pass.old_exit_date_pass).toBe(true);
+    expect(pass.old_bitis_tarihi_pass).toBe(true);
+  });
+
+  it("fails when bitis mismatches even if baslangic matches", () => {
+    const fail = evaluateCorrectionPreimage({
+      personelId: 202,
+      ad: "Ahmed Khalil",
+      soyad: "Alsamar",
+      aktifDurum: "PASIF",
+      surecId: 38,
+      currentSurecExitDate: "2026-07-30",
+      currentSurecBitisDate: "2026-08-01",
+      expectedOldExitDate: "2026-07-30",
+      expectedNewExitDate: "2025-12-31",
+      nonIptalIstenAyrilmaCount: 1,
+    });
+    expect(fail.old_exit_date_pass).toBe(true);
+    expect(fail.old_bitis_tarihi_pass).toBe(false);
+    expect(fail.correction_preimage_pass).toBe(false);
   });
 });

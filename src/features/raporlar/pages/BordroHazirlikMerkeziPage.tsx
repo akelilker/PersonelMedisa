@@ -14,7 +14,8 @@ import {
   type BordroDevirImportResult,
   type BordroDevirListItem,
   type BordroNetMaasEksikItem,
-  type BordroOnIzlemeOzet
+  type BordroOnIzlemeOzet,
+  type BordroOperasyonelHazirlikOzet
 } from "../../../api/bordro-hazirlik.api";
 import {
   approveSirketPolitika,
@@ -43,6 +44,7 @@ import { useRoleAccess } from "../../../hooks/use-role-access";
 import { useMaasHesaplama } from "../../../hooks/useMaasHesaplama";
 import { currentMonthParts, parseAyValue } from "../../../lib/donem-kapanis/display";
 import { formatSurecStateLabel } from "../../../lib/display/enum-display";
+import { dispatchOpenBugunPersonelDurumu } from "../../../lib/bildirim/bugun-personel-durumu-events";
 import { useAuth } from "../../../state/auth.store";
 import type { IdOption } from "../../../types/referans";
 import { fetchPersonelDetail } from "../../../api/personeller.api";
@@ -55,6 +57,20 @@ import { SgkKatalogHazirlikPanel } from "../components/SgkKatalogHazirlikPanel";
 
 const BORDRO_KESINLESTIR_ONAY_MESAJI =
   "Bordro kesinleştirilecek. Bu işlem geri alınamaz. Devam edilsin mi?";
+
+const PROBLEM_LABELS: Record<string, string> = {
+  HENUZ_DEGERLENDIRILMEDI: "Henüz değerlendirilmedi",
+  EKSIK_GIRIS: "Eksik giriş",
+  PUANTAJ_KONTROL_BEKLIYOR: "Puantaj kontrol bekliyor",
+  CANDIDATE_HAZIR_PENDING: "Etki adayı HAZIR",
+  CANDIDATE_INCELEME_PENDING: "Etki adayı inceleme"
+};
+
+function formatPeriodStateLabel(state: string | undefined): string {
+  if (!state) return "—";
+  if (state === "ACIK") return "OPEN (ACIK)";
+  return state;
+}
 
 type TabKey =
   | "veri-hazirlik"
@@ -315,6 +331,7 @@ export function BordroHazirlikMerkeziPage() {
 
   const blockers = useMemo(() => blockerItems(preflight?.items ?? []), [preflight]);
   const readinessDomains = preflight?.readiness_domains ?? [];
+  const operasyonel: BordroOperasyonelHazirlikOzet | null = preflight?.operasyonel_hazirlik ?? null;
 
   if (!canView) {
     return <ErrorState message="Bordro hazırlık merkezine erişim yetkiniz yok." />;
@@ -599,6 +616,120 @@ export function BordroHazirlikMerkeziPage() {
 
       {activeTab === "veri-hazirlik" && preflight ? (
         <section data-testid="bordro-veri-hazirlik">
+          {operasyonel ? (
+            <section className="kapanis-issue-section" data-testid="bordro-operasyonel-hazirlik">
+              <h3>Operasyonel hazırlık (puantaj / günlük kayıt)</h3>
+              <p className="personel-puantaj-summary-note" data-testid="bordro-operasyonel-period-state">
+                Dönem durumu: {formatPeriodStateLabel(operasyonel.period_state)}
+                {operasyonel.read_only ? " · Salt okunur (SEALED / REOPEN_PENDING)" : " · Düzeltme yolları açık"}
+                {" · "}As of {operasyonel.as_of}
+              </p>
+              <div className="kapanis-ozet-grid" data-testid="bordro-operasyonel-ozet">
+                <div>
+                  <strong>Toplam personel</strong>
+                  <p data-testid="bordro-op-toplam-personel">{operasyonel.ozet.toplam_personel}</p>
+                </div>
+                <div>
+                  <strong>Bordroya hazır</strong>
+                  <p data-testid="bordro-op-hazir-personel">{operasyonel.ozet.bordroya_hazir_personel}</p>
+                </div>
+                <div>
+                  <strong>Kontrol gereken</strong>
+                  <p data-testid="bordro-op-kontrol-personel">{operasyonel.ozet.kontrol_gereken_personel}</p>
+                </div>
+                <div>
+                  <strong>Henüz değerlendirilmedi</strong>
+                  <p data-testid="bordro-op-henuz">{operasyonel.ozet.henuz_degerlendirilmedi_gun}</p>
+                </div>
+                <div>
+                  <strong>Eksik giriş / açıklanmamış</strong>
+                  <p data-testid="bordro-op-eksik">
+                    {operasyonel.ozet.eksik_giris_gun} / {operasyonel.ozet.aciklanmamis_gun}
+                  </p>
+                </div>
+                <div>
+                  <strong>İzin / Rapor / Devamsızlık</strong>
+                  <p data-testid="bordro-op-izin-rapor-devam">
+                    {operasyonel.ozet.izinli_gun} / {operasyonel.ozet.raporlu_gun} / {operasyonel.ozet.devamsizlik_gun}
+                  </p>
+                </div>
+                <div>
+                  <strong>Geç / Erken</strong>
+                  <p data-testid="bordro-op-gec-erken">
+                    {operasyonel.ozet.gec_gelme_gun} / {operasyonel.ozet.erken_cikma_gun}
+                  </p>
+                </div>
+                <div>
+                  <strong>Fazla mesai (dk)</strong>
+                  <p data-testid="bordro-op-fm">{operasyonel.ozet.fazla_mesai_dakika}</p>
+                </div>
+              </div>
+
+              <section data-testid="bordro-kontrol-gerekenler">
+                <h4>Kontrol gerekenler</h4>
+                {operasyonel.kontrol_gerekenler.length === 0 ? (
+                  <p data-testid="bordro-kontrol-gerekenler-empty">Kontrol gereken personel yok.</p>
+                ) : (
+                  <table className="yonetim-table">
+                    <thead>
+                      <tr>
+                        <th>Personel</th>
+                        <th>Sicil</th>
+                        <th>Sorunlar</th>
+                        <th>Gün özeti</th>
+                        <th>İşlem</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {operasyonel.kontrol_gerekenler.map((row) => (
+                        <tr key={row.personel_id} data-testid={`bordro-kontrol-row-${row.personel_id}`}>
+                          <td>
+                            <strong>{row.ad_soyad}</strong>
+                            {row.cikis_tarihi ? (
+                              <span data-testid={`bordro-kontrol-exit-${row.personel_id}`}>
+                                {" "}
+                                (ayrılış {row.cikis_tarihi})
+                              </span>
+                            ) : null}
+                          </td>
+                          <td>{row.sicil_no ?? "—"}</td>
+                          <td data-testid={`bordro-kontrol-problems-${row.personel_id}`}>
+                            {row.problem_kodlari.map((kod) => PROBLEM_LABELS[kod] ?? kod).join(", ")}
+                          </td>
+                          <td>
+                            H:{row.gun_ozeti.henuz_degerlendirilmedi} · E:{row.gun_ozeti.eksik_giris} · İ:
+                            {row.gun_ozeti.izinli} · R:{row.gun_ozeti.raporlu} · D:{row.gun_ozeti.gelmedi}
+                          </td>
+                          <td className="form-actions-row">
+                            <Link
+                              to={row.action_links.puantaj}
+                              data-testid={`bordro-kontrol-puantaj-${row.personel_id}`}
+                            >
+                              Puantaj
+                            </Link>
+                            <button
+                              type="button"
+                              data-testid={`bordro-kontrol-bugun-${row.personel_id}`}
+                              onClick={() => dispatchOpenBugunPersonelDurumu()}
+                            >
+                              Bugün düzeltme
+                            </button>
+                            <Link
+                              to={row.action_links.surec}
+                              data-testid={`bordro-kontrol-surec-${row.personel_id}`}
+                            >
+                              Süreç
+                            </Link>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </section>
+            </section>
+          ) : null}
+
           <div className="kapanis-ozet-grid">
             <div>
               <strong>Hesaplanabilir</strong>

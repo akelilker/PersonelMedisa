@@ -156,6 +156,8 @@ class BordroHazirlikPreflightService
         );
         $candidateGate = self::buildCandidateGate($hesaplanabilir, $items, $readinessDomains);
 
+        $operasyonel = BordroOperasyonelHazirlikService::build($pdo, (int) $subeId, (int) $yil, (int) $ay);
+
         return [
             'sube_id' => (int) $subeId,
             'yil' => (int) $yil,
@@ -170,6 +172,7 @@ class BordroHazirlikPreflightService
             'items' => $items,
             'readiness_domains' => $readinessDomains,
             'candidate_gate' => $candidateGate,
+            'operasyonel_hazirlik' => $operasyonel,
             'snapshot_preflight' => [
                 'snapshot_olusturulabilir_mi' => (bool) ($snapshotPreflight['snapshot_olusturulabilir_mi'] ?? false),
                 'existing_snapshot' => $existingSnapshot,

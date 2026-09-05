@@ -565,6 +565,9 @@ class Router
         if ($path === '/bordro-hazirlik/readiness' && $method === 'GET') {
             BordroHazirlikController::readiness($this->request);
         }
+        if ($path === '/bordro-hazirlik/operasyonel-ozet' && $method === 'GET') {
+            BordroHazirlikController::operasyonelOzet($this->request);
+        }
         if ($path === '/bordro-hazirlik/readiness/export.csv' && $method === 'GET') {
             BordroHazirlikController::readinessExportCsv($this->request);
         }

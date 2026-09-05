@@ -221,6 +221,7 @@ export const endpoints = {
   bordroHazirlik: {
     preflight: "/bordro-hazirlik/preflight",
     readiness: "/bordro-hazirlik/readiness",
+    operasyonelOzet: "/bordro-hazirlik/operasyonel-ozet",
     readinessExportCsv: "/bordro-hazirlik/readiness/export.csv",
     netMaasEksikleri: "/bordro-hazirlik/net-maas-eksikleri",
     onIzleme: "/bordro-hazirlik/on-izleme",

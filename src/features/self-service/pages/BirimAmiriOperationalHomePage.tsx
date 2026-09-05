@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { fetchAttendanceToday, type AttendanceTodayResponse } from "../../../api/attendance-mobile.api";
 import { fetchBirimGunlukDurum } from "../../../api/bildirimler.api";
 import { fetchMe } from "../../../api/me.api";
 import { isApiRequestError, shouldPreferDemoApi } from "../../../api/api-client";
 import { LoadingState } from "../../../components/states/LoadingState";
+import { formatEksikGirisAttention } from "../../../lib/bildirim/gunluk-bildirim-timing-copy";
 import { useAuth } from "../../../state/auth.store";
 import type { BirimAmiriGunlukDurum } from "../../../types/bildirim";
 import type { MeIdentity } from "../../../types/self-service";
@@ -15,6 +16,7 @@ import {
 
 export function BirimAmiriOperationalHomePage() {
   const { session } = useAuth();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [today, setToday] = useState<AttendanceTodayResponse | null>(null);
   const [identity, setIdentity] = useState<MeIdentity | null>(null);
@@ -70,6 +72,12 @@ export function BirimAmiriOperationalHomePage() {
     : null;
   const ozet = unit?.ozet;
   const tamamlandi = unit?.tamamlandi_mi === true;
+  const eksikGiris = unit?.bildirim?.eksik_giris ?? ozet?.eksik_giris ?? 0;
+  const pazarPrompt = unit?.pazar_mesai_prompt;
+  const completionLabel = unit?.bildirim?.status_label ?? null;
+  const completionStatus = unit?.bildirim?.status ?? null;
+  const isOverdue =
+    completionStatus === "SURESI_GECTI" || completionStatus === "GEC_BILDIRILDI";
 
   return (
     <section className="personel-mobile-shell" data-testid="birim-amiri-operational-home">
@@ -120,9 +128,60 @@ export function BirimAmiriOperationalHomePage() {
         </div>
       </section>
 
+      {pazarPrompt?.show ? (
+        <section className="pm-section" data-testid="birim-amiri-pazar-mesai-prompt">
+          <p className="birim-amiri-pazar-prompt-text" role="status">
+            {pazarPrompt.message}
+          </p>
+          <div className="pm-unit-cta birim-amiri-pazar-prompt-actions">
+            <button
+              type="button"
+              className="self-service-action"
+              data-testid="birim-amiri-pazar-prompt-evet"
+              onClick={() =>
+                navigate("/bildirimler", {
+                  state: { focusTarih: pazarPrompt.sunday_tarih }
+                })
+              }
+            >
+              Evet
+            </button>
+            <button
+              type="button"
+              className="self-service-action self-service-action--aux"
+              data-testid="birim-amiri-pazar-prompt-hayir"
+              onClick={() => {
+                /* Hayır: do not dismiss permanently — prompt remains until Sunday completion. */
+              }}
+            >
+              Hayır
+            </button>
+          </div>
+        </section>
+      ) : null}
+
       <section className="pm-section" data-testid="birim-amiri-unit-section">
         <h2 className="pm-section-title">Birimim</h2>
         {unitError ? <p className="self-service-muted">{unitError}</p> : null}
+        {completionLabel ? (
+          <p
+            className={
+              isOverdue ? "gunluk-eksik-giris-warning" : "self-service-muted"
+            }
+            data-testid="birim-amiri-completion-status"
+          >
+            {completionLabel}
+          </p>
+        ) : null}
+        {tamamlandi && eksikGiris > 0 ? (
+          <p
+            className="gunluk-eksik-giris-warning"
+            data-testid="birim-amiri-eksik-giris-warning"
+            role="status"
+          >
+            {formatEksikGirisAttention(eksikGiris)}
+          </p>
+        ) : null}
         {ozet ? (
           <ul className="pm-unit-summary" data-testid="birim-amiri-unit-summary">
             <li>

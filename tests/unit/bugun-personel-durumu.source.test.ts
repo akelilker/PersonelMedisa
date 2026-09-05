@@ -42,8 +42,10 @@ describe("bugun personel durumu owners", () => {
     expect(service).toContain("class BugunPersonelDurumuService");
     expect(service).toContain("WORKDAY_START = '08:30'");
     expect(service).toContain("ON_TIME_DEADLINE = '09:30'");
+    expect(service).toContain("SUNDAY_REVIEW_DEADLINE = '12:00'");
     expect(service).toContain("HENUZ_DEGERLENDIRILMEDI");
     expect(service).toContain("resolvePersonDurum");
+    expect(service).toContain("isMissingEntryEvidence");
     expect(shell).toContain("bugun-personel-durumu-entry");
     expect(shell).toContain("BugunPersonelDurumuModal");
   });

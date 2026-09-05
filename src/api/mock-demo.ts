@@ -7057,6 +7057,21 @@ export function resolveDemoApiResponse(
         row.bildirim_state === "DUZELTME_ISTENDI" ||
         (row.bildirim_turu != null && sorunluTurler.has(row.bildirim_turu))
     ).length;
+    const exceptionTurleri = new Set([
+      "GELMEDI",
+      "GEC_GELDI",
+      "ERKEN_CIKTI",
+      "IZINLI",
+      "RAPORLU",
+      "GOREVDE",
+      "DIGER"
+    ]);
+    const eksikGiris = personeller.filter((row) => {
+      const tur = (row.bildirim_turu ?? "").toUpperCase();
+      if (exceptionTurleri.has(tur)) return false;
+      const puantaj = demoState.puantajMap[`${row.personel_id}|${tarih}`];
+      return !(puantaj?.giris_saati && String(puantaj.giris_saati).trim());
+    }).length;
     const tamamlama =
       demoState.gunlukBildirimTamamlamalari.find(
         (item) =>
@@ -7074,6 +7089,7 @@ export function resolveDemoApiResponse(
         toplam_personel: personeller.length,
         bildirim_girilen: bildirimGirilen,
         eksik_bildirim: taslak + duzeltme,
+        eksik_giris: eksikGiris,
         sorunlu_personel: sorunlu,
         taslak,
         gonderildi,
@@ -7112,6 +7128,17 @@ export function resolveDemoApiResponse(
         (item) => item.birim_amiri_user_id === actor.userId && item.tarih === tarih
       ) ?? null;
     const unitCompleted = tamamlama != null;
+    const exceptionTurleri = new Set([
+      "GELMEDI",
+      "GEC_GELDI",
+      "ERKEN_CIKTI",
+      "IZINLI",
+      "RAPORLU",
+      "GOREVDE",
+      "DIGER"
+    ]);
+    let eksikGiris = 0;
+    let attendanceProofCount = 0;
     const personeller = roster.map((personel) => {
       const open = demoState.bildirimler
         .filter(
@@ -7122,6 +7149,11 @@ export function resolveDemoApiResponse(
         )
         .sort((a, b) => b.id - a.id)[0];
       const puantaj = demoState.puantajMap[`${personel.id}|${tarih}`];
+      const tur = (open?.bildirim_turu ?? "").toUpperCase();
+      const hasException = exceptionTurleri.has(tur);
+      const hasAttendance = Boolean(puantaj?.giris_saati && String(puantaj.giris_saati).trim());
+      if (!hasException && !hasAttendance) eksikGiris += 1;
+      if (hasAttendance) attendanceProofCount += 1;
       return mapBirimAmiriPersonelRow({
         personel_id: personel.id,
         ad_soyad: `${personel.ad} ${personel.soyad ?? ""}`.trim(),
@@ -7135,9 +7167,92 @@ export function resolveDemoApiResponse(
         unit_completed: unitCompleted
       });
     });
+    const ozet = {
+      ...buildBirimAmiriOzetCounts(personeller),
+      eksik_giris: eksikGiris,
+      attendance_proof_count: attendanceProofCount
+    };
+    const now = new Date();
+    const [by, bm, bd] = tarih.split("-").map((part) => Number(part));
+    const isSunday = new Date(by!, bm! - 1, bd!).getDay() === 0;
+    const deadline = isSunday
+      ? new Date(by!, bm! - 1, bd! + 1, 12, 0, 0)
+      : new Date(by!, bm! - 1, bd!, 9, 30, 0);
+    const tamamlandiAt = tamamlama?.tamamlandi_at ?? null;
+    let status = "BEKLENIYOR";
+    if (tamamlandiAt) {
+      status = new Date(tamamlandiAt) <= deadline ? "TAMAMLANDI" : "GEC_BILDIRILDI";
+    } else if (now > deadline) {
+      status = "SURESI_GECTI";
+    }
+    const timeLabel = tamamlandiAt
+      ? new Intl.DateTimeFormat("tr-TR", {
+          hour: "2-digit",
+          minute: "2-digit",
+          timeZone: "Europe/Istanbul"
+        }).format(new Date(tamamlandiAt))
+      : null;
+    const statusLabel = isSunday
+      ? status === "TAMAMLANDI"
+        ? timeLabel
+          ? `Zamanında Pazar Kontrolü · ${timeLabel}`
+          : "Zamanında Pazar Kontrolü"
+        : status === "GEC_BILDIRILDI"
+          ? timeLabel
+            ? `Geç Bildirildi (Pazar mesaisi) · ${timeLabel}`
+            : "Geç Bildirildi (Pazar mesaisi)"
+          : status === "SURESI_GECTI"
+            ? "Pazar Mesaisi Bildirimi Süresi Geçti"
+            : "Kontrol bekliyor"
+      : status === "TAMAMLANDI"
+        ? timeLabel
+          ? `Tamamlandı · ${timeLabel}`
+          : "Tamamlandı"
+        : status === "GEC_BILDIRILDI"
+          ? timeLabel
+            ? `Geç Bildirildi · ${timeLabel}`
+            : "Geç Bildirildi"
+          : status === "SURESI_GECTI"
+            ? "Süresi Geçti"
+            : "Bekleniyor";
+
+    let pazarMesaiPrompt: {
+      show: boolean;
+      sunday_tarih: string;
+      attendance_count: number;
+      message: string;
+    } | null = null;
+    if (new Date(by!, bm! - 1, bd!).getDay() === 1) {
+      const sundayDate = new Date(by!, bm! - 1, bd! - 1);
+      const sunday = [
+        sundayDate.getFullYear(),
+        String(sundayDate.getMonth() + 1).padStart(2, "0"),
+        String(sundayDate.getDate()).padStart(2, "0")
+      ].join("-");
+      const sundayRoster = demoState.personeller.filter((personel) =>
+        isAktifBirimPersonelForDate(personel, allowedBirimIds, sunday)
+      );
+      let sundayAttendance = 0;
+      for (const personel of sundayRoster) {
+        const puantaj = demoState.puantajMap[`${personel.id}|${sunday}`];
+        if (puantaj?.giris_saati && String(puantaj.giris_saati).trim()) sundayAttendance += 1;
+      }
+      const sundayDone = demoState.gunlukBildirimTamamlamalari.some(
+        (item) => item.birim_amiri_user_id === actor.userId && item.tarih === sunday
+      );
+      if (sundayAttendance > 0 && !sundayDone) {
+        pazarMesaiPrompt = {
+          show: true,
+          sunday_tarih: sunday,
+          attendance_count: sundayAttendance,
+          message: `Dün Mesaiye Gelen ${sundayAttendance} Personel Var. Bildirimi Tamamlamak İster misiniz?`
+        };
+      }
+    }
+
     return ok({
       tarih,
-      ozet: buildBirimAmiriOzetCounts(personeller),
+      ozet,
       tamamlandi_mi: unitCompleted,
       tamamlama: tamamlama
         ? {
@@ -7147,7 +7262,15 @@ export function resolveDemoApiResponse(
             state: tamamlama.state
           }
         : null,
-      personeller
+      bildirim: {
+        status,
+        status_label: statusLabel,
+        eksik_giris: eksikGiris,
+        tamamlandi_mi: unitCompleted,
+        tamamlandi_at: tamamlandiAt
+      },
+      personeller,
+      pazar_mesai_prompt: pazarMesaiPrompt
     });
   }
 
@@ -7172,7 +7295,11 @@ export function resolveDemoApiResponse(
     }
 
     const now = new Date();
-    const deadline = new Date(`${tarih}T09:30:00`);
+    const [y, mo, da] = tarih.split("-").map((part) => Number(part));
+    const isSunday = new Date(y!, mo! - 1, da!).getDay() === 0;
+    const deadline = isSunday
+      ? new Date(y!, mo! - 1, da! + 1, 12, 0, 0)
+      : new Date(y!, mo! - 1, da!, 9, 30, 0);
     const emptyCounts = () => ({
       toplam: 0,
       geldi: 0,
@@ -7428,8 +7555,19 @@ export function resolveDemoApiResponse(
               timeZone: "Europe/Istanbul"
             }).format(new Date(tamamlandiAt))
           : null;
-        const statusLabel =
-          status === "TAMAMLANDI"
+        const statusLabel = isSunday
+          ? status === "TAMAMLANDI"
+            ? timeLabel
+              ? `Zamanında Pazar Kontrolü · ${timeLabel}`
+              : "Zamanında Pazar Kontrolü"
+            : status === "GEC_BILDIRILDI"
+              ? timeLabel
+                ? `Geç Bildirildi (Pazar mesaisi) · ${timeLabel}`
+                : "Geç Bildirildi (Pazar mesaisi)"
+              : status === "SURESI_GECTI"
+                ? "Pazar Mesaisi Bildirimi Süresi Geçti"
+                : "Kontrol bekliyor"
+          : status === "TAMAMLANDI"
             ? timeLabel
               ? `Tamamlandı · ${timeLabel}`
               : "Tamamlandı"
@@ -7440,6 +7578,12 @@ export function resolveDemoApiResponse(
               : status === "SURESI_GECTI"
                 ? "Süresi Geçti"
                 : "Bekleniyor";
+
+        const eksikGiris = unit.rows.filter((row) => {
+          const hasException =
+            row.bildirim_turu != null && exceptionTurleri.has(row.bildirim_turu.toUpperCase());
+          return !hasException && !row.puantaj_giris;
+        }).length;
 
         return {
           birim_id: unit.birim_id,
@@ -7453,7 +7597,8 @@ export function resolveDemoApiResponse(
             tamamlandi_mi: unitCompleted,
             tamamlandi_at: tamamlandiAt,
             tamamlayan_user_id: completion?.tamamlayan_user_id ?? null,
-            completion_id: completion?.id ?? null
+            completion_id: completion?.id ?? null,
+            eksik_giris: eksikGiris
           },
           personeller
         };

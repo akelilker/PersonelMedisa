@@ -153,6 +153,25 @@
   color: #9ae6b4;
 }
 
+.gunluk-eksik-giris-warning {
+  margin: 8px 0 0;
+  color: #c62828;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.birim-amiri-pazar-prompt-text {
+  margin: 0 0 10px;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.birim-amiri-pazar-prompt-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .bugun-personel-person-row {
   display: flex;
   flex-direction: column;

@@ -940,6 +940,7 @@ class BildirimlerController
         // Exception-only model: eksik = taslak + duzeltme bekleyen (herkese GELDI yazilmaz).
         $eksik = $taslak + $duzeltme;
         $tamamlandiMi = is_array($tamamlama);
+        $eksikGiris = self::countEksikGiris($pdo, $personeller, $tarih);
 
         JsonResponse::success([
             'tarih' => $tarih,
@@ -951,6 +952,7 @@ class BildirimlerController
                 'toplam_personel' => $toplam,
                 'bildirim_girilen' => $bildirimGirilen,
                 'eksik_bildirim' => $eksik,
+                'eksik_giris' => $eksikGiris,
                 'sorunlu_personel' => $sorunlu,
                 'taslak' => $taslak,
                 'gonderildi' => $gonderildi,
@@ -1330,6 +1332,13 @@ class BildirimlerController
 
         $counts = self::buildSubmissionSummaryCounts($rows, $header['toplam_personel'] ?? null);
         $scopeLabel = self::resolveSubmissionScopeLabel($rows, (string) ($header['sube_adi'] ?? ''));
+        $roster = self::fetchGunlukRoster(
+            $pdo,
+            (int) $header['sube_id'],
+            (int) $header['birim_amiri_user_id'],
+            (string) $header['tarih']
+        );
+        $counts['eksik_giris'] = self::countEksikGiris($pdo, $roster, (string) $header['tarih']);
 
         JsonResponse::success([
             'submission' => $header,
@@ -2009,6 +2018,84 @@ class BildirimlerController
         }
 
         return $items;
+    }
+
+    /**
+     * Live missing-entry count from exception + puantaj giriş evidence (ignores completion).
+     *
+     * @param array<int, array<string, mixed>> $personeller
+     */
+    private static function countEksikGiris(PDO $pdo, array $personeller, $tarih)
+    {
+        if (count($personeller) === 0) {
+            return 0;
+        }
+
+        $girisMap = [];
+        if (self::isPuantajTableReady($pdo)) {
+            $ids = [];
+            foreach ($personeller as $row) {
+                $pid = (int) ($row['personel_id'] ?? 0);
+                if ($pid > 0) {
+                    $ids[$pid] = $pid;
+                }
+            }
+            if (count($ids) > 0) {
+                $placeholders = [];
+                $params = ['tarih' => (string) $tarih];
+                $i = 0;
+                foreach ($ids as $pid) {
+                    $key = 'p' . $i;
+                    $placeholders[] = ':' . $key;
+                    $params[$key] = $pid;
+                    $i++;
+                }
+                $stmt = $pdo->prepare('
+                    SELECT personel_id, giris_saati
+                    FROM gunluk_puantaj
+                    WHERE tarih = :tarih
+                      AND personel_id IN (' . implode(', ', $placeholders) . ')
+                ');
+                $stmt->execute($params);
+                foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+                    $girisMap[(int) $row['personel_id']] = $row['giris_saati'] !== null
+                        ? (string) $row['giris_saati']
+                        : null;
+                }
+            }
+        }
+
+        $count = 0;
+        foreach ($personeller as $row) {
+            $pid = (int) ($row['personel_id'] ?? 0);
+            if (BugunPersonelDurumuService::isMissingEntryEvidence(
+                isset($row['bildirim_turu']) ? $row['bildirim_turu'] : null,
+                isset($girisMap[$pid]) ? $girisMap[$pid] : null
+            )) {
+                $count++;
+            }
+        }
+
+        return $count;
+    }
+
+    private static function isPuantajTableReady(PDO $pdo)
+    {
+        try {
+            $stmt = $pdo->query("SHOW TABLES LIKE 'gunluk_puantaj'");
+            if ($stmt && $stmt->fetch()) {
+                return true;
+            }
+        } catch (\Throwable $e) {
+        }
+        try {
+            $stmt = $pdo->prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'gunluk_puantaj' LIMIT 1");
+            $stmt->execute();
+
+            return (bool) $stmt->fetchColumn();
+        } catch (\Throwable $e) {
+            return false;
+        }
     }
 
     private static function durumLabel($state)

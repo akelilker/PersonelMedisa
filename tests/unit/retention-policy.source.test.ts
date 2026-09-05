@@ -285,9 +285,15 @@ describe("retention policy source contract (053)", () => {
       resolve(root, "api/src/Controllers/SureclerController.php"),
       "utf8"
     );
-    expect(surecler).toContain("createPersonelLifecycleManifests");
+    expect(surecler).toContain("PersonelIstenAyrilmaService::applyInTransaction");
     expect(surecler).not.toMatch(/runIfSchemaReady\s*\(/);
     expect(surecler).not.toContain("Pre-053 environments");
+    const exitOwner = readFileSync(
+      resolve(root, "api/src/Services/Personel/PersonelIstenAyrilmaService.php"),
+      "utf8"
+    );
+    expect(exitOwner).toContain("createPersonelLifecycleManifests");
+    expect(exitOwner).not.toMatch(/runIfSchemaReady\s*\(/);
   });
 
   it("wires retention roles and permissions parity", () => {

@@ -994,6 +994,11 @@ export function KayitSurecWorkspace({
             const refreshed = await refetchPersonelDetailAfterIstenAyrilma(payload.personel_id);
             commitPersonelUpdateToCaches(refreshed);
             setPersoneller((prev) => prev.map((item) => (item.id === refreshed.id ? refreshed : item)));
+            setSurecInfo(
+              refreshed.aktif_durum === "PASIF"
+                ? "Ayrılma kaydedildi; personel PASIF."
+                : "Süreç kaydı eklendi."
+            );
           } catch {
             /* Personel detay önbelleği / liste satırı güncellenemedi. */
           }
@@ -1255,8 +1260,12 @@ export function KayitSurecWorkspace({
     }
 
     if (activePersonelTab === "ayrilma") {
+      if (isSelectedPersonelPasif || !canCreateSurec) {
+        return null;
+      }
+
       return {
-        primaryLabel: "Süreci Kaydet",
+        primaryLabel: surecSubmitting ? "Kaydediliyor..." : "Ayrılmayı Kaydet",
         primaryFormId,
         primaryDisabled: surecSubmitting,
         secondaryLabel: "Vazgeç",
@@ -1736,6 +1745,9 @@ export function KayitSurecWorkspace({
                                 <div className="surec-shell-panel">
                                   <p className="workspace-empty-hint">
                                     <strong>Ayrılma</strong> — {selectedSurecPersonelLabel}
+                                  </p>
+                                  <p className="workspace-empty-hint" data-testid="kayit-ayrilma-pasif-uyari">
+                                    Kaydettiğinizde personel PASIF (işten ayrıldı) olur. Geçmiş kayıtlar silinmez.
                                   </p>
                                   <form
                                     id={KAYIT_SUREC_SUREC_FORM_ID}

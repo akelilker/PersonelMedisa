@@ -13,7 +13,13 @@ use PDO;
  */
 final class PersonelIstenAyrilmaService
 {
+    public const ERROR_EXIT_NOT_AKTIF = 'EXIT_PREIMAGE_NOT_AKTIF';
+    public const ERROR_EXIT_ALREADY_ACTIVE = 'EXIT_ALREADY_ACTIVE';
+    public const ERROR_EXIT_BEFORE_HIRE = 'EXIT_BEFORE_HIRE_DATE';
+
     /**
+     * Apply termination inside an existing transaction (caller owns begin/commit/rollback).
+     *
      * @return array{surec_id:int, personel_id:int}
      */
     public static function applyInTransaction(
@@ -27,11 +33,45 @@ final class PersonelIstenAyrilmaService
             throw new PersonelValidationException('baslangic_tarihi', 'Gecerli bir tarih olmalidir.');
         }
 
-        $stmt = $pdo->prepare('SELECT id, aktif_durum FROM personeller WHERE id = :id LIMIT 1');
+        $stmt = $pdo->prepare(
+            'SELECT id, aktif_durum, ise_giris_tarihi FROM personeller WHERE id = :id LIMIT 1 FOR UPDATE'
+        );
         $stmt->execute(['id' => $personelId]);
         $personel = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!is_array($personel)) {
             throw new PersonelValidationException('personel_id', 'Personel bulunamadi.');
+        }
+
+        $aktifDurum = strtoupper(trim((string) ($personel['aktif_durum'] ?? '')));
+        if ($aktifDurum !== 'AKTIF') {
+            throw new PersonelValidationException(
+                'personel_id',
+                'Bu personel pasif; ayrilma kaydi eklenmez.',
+                self::ERROR_EXIT_NOT_AKTIF
+            );
+        }
+
+        $hireDate = self::normalizeDateOnly($personel['ise_giris_tarihi'] ?? null);
+        if ($hireDate !== null && $exitDate < $hireDate) {
+            throw new PersonelValidationException(
+                'baslangic_tarihi',
+                'Ayrilis tarihi ise giris tarihinden once olamaz.',
+                self::ERROR_EXIT_BEFORE_HIRE
+            );
+        }
+
+        $dup = $pdo->prepare(
+            "SELECT id FROM surecler
+             WHERE personel_id = :pid AND surec_turu = 'ISTEN_AYRILMA' AND state = 'AKTIF'
+             LIMIT 1"
+        );
+        $dup->execute(['pid' => $personelId]);
+        if ($dup->fetch(PDO::FETCH_ASSOC)) {
+            throw new PersonelValidationException(
+                'surec_turu',
+                'Aktif isten ayrilma kaydi zaten var.',
+                self::ERROR_EXIT_ALREADY_ACTIVE
+            );
         }
 
         $surecId = self::insertSurec($pdo, [
@@ -46,13 +86,36 @@ final class PersonelIstenAyrilmaService
             'aciklama' => $aciklama,
         ]);
 
-        if (strtoupper((string) ($personel['aktif_durum'] ?? '')) === 'AKTIF') {
-            $deactivate = $pdo->prepare("UPDATE personeller SET aktif_durum = 'PASIF' WHERE id = :id");
-            $deactivate->execute(['id' => $personelId]);
-            ArchiveManifestService::createPersonelLifecycleManifests($pdo, $personelId, $actorUserId);
+        $deactivate = $pdo->prepare("UPDATE personeller SET aktif_durum = 'PASIF' WHERE id = :id AND aktif_durum = 'AKTIF'");
+        $deactivate->execute(['id' => $personelId]);
+        if ($deactivate->rowCount() !== 1) {
+            throw new PersonelValidationException(
+                'personel_id',
+                'Bu personel pasif; ayrilma kaydi eklenmez.',
+                self::ERROR_EXIT_NOT_AKTIF
+            );
         }
 
+        ArchiveManifestService::createPersonelLifecycleManifests($pdo, $personelId, $actorUserId);
+
         return ['surec_id' => $surecId, 'personel_id' => $personelId];
+    }
+
+    /** @param mixed $value */
+    private static function normalizeDateOnly($value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+        $raw = trim((string) $value);
+        if (preg_match('/^(\d{4}-\d{2}-\d{2})/', $raw, $m) === 1) {
+            $raw = $m[1];
+        }
+        if (!PersonelCanonicalValidator::isValidDateString($raw)) {
+            return null;
+        }
+
+        return $raw;
     }
 
     /** @param array<string, mixed> $payload */

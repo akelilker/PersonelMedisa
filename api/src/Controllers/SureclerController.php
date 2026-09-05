@@ -11,7 +11,9 @@ use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
 use Medisa\Api\Scope\SubeScope;
 use Medisa\Api\Services\OfflineMutationIdempotencyService;
+use Medisa\Api\Services\Personel\PersonelIstenAyrilmaService;
 use Medisa\Api\Services\Personel\PersonelOrgStructureSchema;
+use Medisa\Api\Services\Personel\PersonelValidationException;
 use Medisa\Api\Services\PuantajDonemPeriodService;
 use PDO;
 
@@ -198,15 +200,18 @@ class SureclerController
                 }
             }
 
-            $insertId = self::insertSurec($pdo, $payload);
             if ($payload['surec_turu'] === 'ISTEN_AYRILMA') {
-                self::deactivatePersonel($pdo, $payload['personel_id']);
-                // Baseline tip 058: retention schema (053) is required — SCHEMA_NOT_READY fails closed.
-                \Medisa\Api\Services\Retention\ArchiveManifestService::createPersonelLifecycleManifests(
+                // Canonical owner: surec insert + PASIF + retention manifests (single transaction).
+                $applied = PersonelIstenAyrilmaService::applyInTransaction(
                     $pdo,
                     (int) $payload['personel_id'],
+                    (string) $payload['baslangic_tarihi'],
+                    $payload['aciklama'] !== null ? (string) $payload['aciklama'] : null,
                     $actorId
                 );
+                $insertId = (int) $applied['surec_id'];
+            } else {
+                $insertId = self::insertSurec($pdo, $payload);
             }
 
             $row = self::fetchSurecRowById($pdo, $insertId);
@@ -230,6 +235,16 @@ class SureclerController
 
             $pdo->commit();
             JsonResponse::success(self::mapSurecRow($row), [], 201);
+        } catch (PersonelValidationException $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            $code = $e->getCodeString();
+            $status = in_array($code, [
+                PersonelIstenAyrilmaService::ERROR_EXIT_NOT_AKTIF,
+                PersonelIstenAyrilmaService::ERROR_EXIT_ALREADY_ACTIVE,
+            ], true) ? 409 : 422;
+            JsonResponse::error($status, $code, $e->getMessage(), $e->getField());
         } catch (\Throwable $e) {
             if ($pdo->inTransaction()) {
                 $pdo->rollBack();
@@ -785,12 +800,6 @@ class SureclerController
         ]);
 
         return (int) $pdo->lastInsertId();
-    }
-
-    private static function deactivatePersonel(PDO $pdo, $personelId)
-    {
-        $stmt = $pdo->prepare("UPDATE personeller SET aktif_durum = 'PASIF' WHERE id = :id");
-        $stmt->execute(['id' => (int) $personelId]);
     }
 
     /** @return array<string, mixed>|null */

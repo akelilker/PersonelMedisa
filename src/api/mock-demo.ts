@@ -6652,12 +6652,31 @@ export function resolveDemoApiResponse(
   if (pathname === "/surecler" && method === "POST") {
     const surecTuru = toStringValue(body.surec_turu) ?? "IZIN";
     const altTur = toStringValue(body.alt_tur) ?? undefined;
+    const personelId = toNumber(body.personel_id) ?? 1;
+    const baslangicTarihi = toStringValue(body.baslangic_tarihi) ?? undefined;
+    const targetPersonel = demoState.personeller.find((personel) => personel.id === personelId);
+    if (targetPersonel?.aktif_durum === "PASIF") {
+      return demoRevizyonError("EXIT_PREIMAGE_NOT_AKTIF", "Bu personel pasif; ayrilma kaydi eklenmez.");
+    }
+    if (surecTuru === "ISTEN_AYRILMA") {
+      const hireDate = targetPersonel?.ise_giris_tarihi?.slice(0, 10) ?? "";
+      if (hireDate && baslangicTarihi && baslangicTarihi < hireDate) {
+        return demoRevizyonError("EXIT_BEFORE_HIRE_DATE", "Ayrilis tarihi ise giris tarihinden once olamaz.");
+      }
+      const existingExit = demoState.surecler.find(
+        (item) =>
+          item.personel_id === personelId && item.surec_turu === "ISTEN_AYRILMA" && item.state === "AKTIF"
+      );
+      if (existingExit) {
+        return demoRevizyonError("EXIT_ALREADY_ACTIVE", "Aktif isten ayrilma kaydi zaten var.");
+      }
+    }
     const next: DemoSurec = {
       id: ++demoState.nextIds.surec,
-      personel_id: toNumber(body.personel_id) ?? 1,
+      personel_id: personelId,
       surec_turu: surecTuru,
       alt_tur: altTur,
-      baslangic_tarihi: toStringValue(body.baslangic_tarihi) ?? undefined,
+      baslangic_tarihi: baslangicTarihi,
       bitis_tarihi: toStringValue(body.bitis_tarihi) ?? undefined,
       ucretli_mi: body.ucretli_mi === undefined ? true : Boolean(body.ucretli_mi),
       ilk_iki_gun_firma_oder_mi:
@@ -6672,7 +6691,6 @@ export function resolveDemoApiResponse(
     demoState.surecler.unshift(next);
 
     if (next.surec_turu === "ISTEN_AYRILMA") {
-      const targetPersonel = demoState.personeller.find((personel) => personel.id === next.personel_id);
       if (targetPersonel) {
         targetPersonel.aktif_durum = "PASIF";
       }

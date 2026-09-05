@@ -49,8 +49,13 @@ function hebBootstrap(PDO $root): PDO
     $root->exec('USE `' . $database . '`');
 
     $dsn = (string) getenv('MEDISA_TEST_MYSQL_DSN');
+    if (stripos($dsn, 'dbname=') !== false) {
+        $dsn = preg_replace('/dbname=[^;]*/i', 'dbname=' . $database, $dsn);
+    } else {
+        $dsn = rtrim($dsn, ';') . ';dbname=' . $database;
+    }
     $pdo = new PDO(
-        preg_replace('/dbname=[^;]+/', 'dbname=' . $database, $dsn),
+        $dsn,
         getenv('MEDISA_TEST_MYSQL_USER') ?: '',
         getenv('MEDISA_TEST_MYSQL_PASSWORD') ?: '',
         [

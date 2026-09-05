@@ -19,12 +19,12 @@ describe("Personel historical exit-date backfill source contract", () => {
     expect(backfill).toContain("HISTORICAL_EXIT_BACKFILL_CONFLICT");
     expect(backfill).toContain("CREATE_HISTORICAL_ISTEN_AYRILMA");
     expect(backfill).toContain("[HISTORICAL_EXIT_DATE_BACKFILL]");
-    expect(backfill).toContain("aktif_durum !== 'PASIF'");
+    expect(backfill).toContain("$aktifDurum !== 'PASIF'");
     expect(backfill).not.toContain("aktif_durum = 'AKTIF'");
     expect(backfill).not.toContain("SET aktif_durum");
 
     expect(normalExit).toContain("EXIT_PREIMAGE_NOT_AKTIF");
-    expect(normalExit).toContain("aktif_durum !== 'AKTIF'");
+    expect(normalExit).toContain("$aktifDurum !== 'AKTIF'");
     expect(normalExit).not.toContain("HISTORICAL_EXIT_DATE_BACKFILL");
   });
 

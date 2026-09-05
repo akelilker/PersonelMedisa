@@ -6703,6 +6703,19 @@ let personelBelgeKaydiIdCounter = 903;
       }
 
       if (surecTuru === "ISTEN_AYRILMA") {
+        const today = new Date().toISOString().slice(0, 10);
+        if (baslangicTarihi > today) {
+          await fulfillJson(
+            route,
+            422,
+            errorBody(
+              "EXIT_DATE_IN_FUTURE",
+              "İşten ayrılış tarihi ileri bir tarih olamaz.",
+              "baslangic_tarihi"
+            )
+          );
+          return;
+        }
         const hireDate =
           typeof linkedPersonel.ise_giris_tarihi === "string" ? linkedPersonel.ise_giris_tarihi.slice(0, 10) : "";
         if (hireDate && isValidDateString(hireDate) && baslangicTarihi < hireDate) {

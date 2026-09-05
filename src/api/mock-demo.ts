@@ -6659,6 +6659,13 @@ export function resolveDemoApiResponse(
       return demoRevizyonError("EXIT_PREIMAGE_NOT_AKTIF", "Bu personel pasif; ayrilma kaydi eklenmez.");
     }
     if (surecTuru === "ISTEN_AYRILMA") {
+      const today = new Date().toISOString().slice(0, 10);
+      if (baslangicTarihi && baslangicTarihi > today) {
+        return demoRevizyonError(
+          "EXIT_DATE_IN_FUTURE",
+          "İşten ayrılış tarihi ileri bir tarih olamaz."
+        );
+      }
       const hireDate = targetPersonel?.ise_giris_tarihi?.slice(0, 10) ?? "";
       if (hireDate && baslangicTarihi && baslangicTarihi < hireDate) {
         return demoRevizyonError("EXIT_BEFORE_HIRE_DATE", "Ayrilis tarihi ise giris tarihinden once olamaz.");

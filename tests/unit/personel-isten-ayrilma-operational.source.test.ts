@@ -23,6 +23,9 @@ describe("Personel ISTEN_AYRILMA operational source contract", () => {
     expect(serviceSource).toContain("EXIT_PREIMAGE_NOT_AKTIF");
     expect(serviceSource).toContain("EXIT_BEFORE_HIRE_DATE");
     expect(serviceSource).toContain("EXIT_ALREADY_ACTIVE");
+    expect(serviceSource).toContain("EXIT_DATE_IN_FUTURE");
+    expect(serviceSource).toContain("İşten ayrılış tarihi ileri bir tarih olamaz.");
+    expect(serviceSource).toContain("RetentionClock::now()");
     expect(serviceSource).toContain("aktif_durum = 'PASIF'");
     expect(controllerSource).toContain("PersonelIstenAyrilmaService::applyInTransaction");
     expect(controllerSource).not.toContain("function deactivatePersonel");

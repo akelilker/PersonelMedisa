@@ -65,6 +65,8 @@ describe("retention archive gate source contract", () => {
     expect(exitOwner).toContain("EXIT_PREIMAGE_NOT_AKTIF");
     expect(exitOwner).toContain("EXIT_BEFORE_HIRE_DATE");
     expect(exitOwner).toContain("EXIT_ALREADY_ACTIVE");
+    expect(exitOwner).toContain("EXIT_DATE_IN_FUTURE");
+    expect(exitOwner).toContain("İşten ayrılış tarihi ileri bir tarih olamaz.");
 
     const puantaj = readFileSync(
       resolve(root, "api/src/Controllers/PuantajController.php"),

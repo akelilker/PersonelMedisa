@@ -5,17 +5,21 @@ declare(strict_types=1);
 namespace Medisa\Api\Services\Personel;
 
 use Medisa\Api\Services\Retention\ArchiveManifestService;
+use Medisa\Api\Services\Retention\RetentionClock;
 use PDO;
 
 /**
  * Canonical owner for ISTEN_AYRILMA (deactivate + retention manifests).
  * Shared by SureclerController and lifecycle bulk apply.
+ *
+ * No future-effective scheduler: exit_date > today is denied (no surec / PASIF / retention).
  */
 final class PersonelIstenAyrilmaService
 {
     public const ERROR_EXIT_NOT_AKTIF = 'EXIT_PREIMAGE_NOT_AKTIF';
     public const ERROR_EXIT_ALREADY_ACTIVE = 'EXIT_ALREADY_ACTIVE';
     public const ERROR_EXIT_BEFORE_HIRE = 'EXIT_BEFORE_HIRE_DATE';
+    public const ERROR_EXIT_IN_FUTURE = 'EXIT_DATE_IN_FUTURE';
 
     /**
      * Apply termination inside an existing transaction (caller owns begin/commit/rollback).
@@ -31,6 +35,15 @@ final class PersonelIstenAyrilmaService
     ): array {
         if (!PersonelCanonicalValidator::isValidDateString($exitDate)) {
             throw new PersonelValidationException('baslangic_tarihi', 'Gecerli bir tarih olmalidir.');
+        }
+
+        $today = RetentionClock::now()->format('Y-m-d');
+        if ($exitDate > $today) {
+            throw new PersonelValidationException(
+                'baslangic_tarihi',
+                'İşten ayrılış tarihi ileri bir tarih olamaz.',
+                self::ERROR_EXIT_IN_FUTURE
+            );
         }
 
         $stmt = $pdo->prepare(

@@ -169,11 +169,46 @@ try {
         'before-hire deny writes no surec'
     );
 
+    $today = (new DateTimeImmutable('today'))->format('Y-m-d');
+    $tomorrow = (new DateTimeImmutable('today'))->modify('+1 day')->format('Y-m-d');
+
+    // Future exit deny: no surec / PASIF / retention
+    $futureDeny = false;
+    $futureMessage = '';
+    try {
+        $pdo->beginTransaction();
+        PersonelIstenAyrilmaService::applyInTransaction($pdo, 1, $tomorrow, 'yarin', 1);
+        $pdo->commit();
+    } catch (PersonelValidationException $e) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        $futureDeny = $e->getCodeString() === PersonelIstenAyrilmaService::ERROR_EXIT_IN_FUTURE;
+        $futureMessage = $e->getMessage();
+    }
+    piaAssert($futureDeny, 'tomorrow exit denied');
+    piaAssert(
+        $futureMessage === 'İşten ayrılış tarihi ileri bir tarih olamaz.',
+        'tomorrow exit user-facing message'
+    );
+    piaAssert(
+        (string) $pdo->query("SELECT aktif_durum FROM personeller WHERE id = 1")->fetchColumn() === 'AKTIF',
+        'tomorrow deny keeps AKTIF'
+    );
+    piaAssert(
+        (int) $pdo->query("SELECT COUNT(*) FROM surecler WHERE personel_id = 1")->fetchColumn() === 0,
+        'tomorrow deny writes no surec'
+    );
+    piaAssert(
+        (int) $pdo->query('SELECT COUNT(*) FROM arsiv_manifestleri WHERE personel_id = 1')->fetchColumn() === 0,
+        'tomorrow deny writes no retention'
+    );
+
     // PASIF duplicate deny
     $pasifDeny = false;
     try {
         $pdo->beginTransaction();
-        PersonelIstenAyrilmaService::applyInTransaction($pdo, 2, '2026-01-01', 'ikinci', 1);
+        PersonelIstenAyrilmaService::applyInTransaction($pdo, 2, $today, 'ikinci', 1);
         $pdo->commit();
     } catch (PersonelValidationException $e) {
         if ($pdo->inTransaction()) {
@@ -187,30 +222,40 @@ try {
         'history ISTEN_AYRILMA preserved on duplicate deny'
     );
 
-    // Happy path: surec + PASIF + no user delete (users table absent / untouched)
+    // Today exit success
     $pdo->beginTransaction();
-    $applied = PersonelIstenAyrilmaService::applyInTransaction($pdo, 1, '2026-05-01', 'normal ayrilma', 9);
+    $applied = PersonelIstenAyrilmaService::applyInTransaction($pdo, 1, $today, 'bugun ayrilma', 9);
     $pdo->commit();
-    piaAssert((int) ($applied['surec_id'] ?? 0) > 0, 'normal exit returns surec_id');
+    piaAssert((int) ($applied['surec_id'] ?? 0) > 0, 'today exit returns surec_id');
     piaAssert(
         (string) $pdo->query('SELECT aktif_durum FROM personeller WHERE id = 1')->fetchColumn() === 'PASIF',
-        'normal exit sets PASIF'
+        'today exit sets PASIF'
     );
     $surec = $pdo->query('SELECT surec_turu, baslangic_tarihi, aciklama, state FROM surecler WHERE id = ' . (int) $applied['surec_id'])->fetch();
-    piaAssert(is_array($surec) && ($surec['surec_turu'] ?? '') === 'ISTEN_AYRILMA', 'normal exit surec turu');
-    piaAssert(($surec['baslangic_tarihi'] ?? '') === '2026-05-01', 'normal exit date stored');
-    piaAssert(($surec['aciklama'] ?? '') === 'normal ayrilma', 'normal exit aciklama stored');
-    piaAssert(($surec['state'] ?? '') === 'AKTIF', 'normal exit surec AKTIF');
+    piaAssert(is_array($surec) && ($surec['surec_turu'] ?? '') === 'ISTEN_AYRILMA', 'today exit surec turu');
+    piaAssert(($surec['baslangic_tarihi'] ?? '') === $today, 'today exit date stored');
+    piaAssert(($surec['aciklama'] ?? '') === 'bugun ayrilma', 'today exit aciklama stored');
+    piaAssert(($surec['state'] ?? '') === 'AKTIF', 'today exit surec AKTIF');
     piaAssert(
         (int) $pdo->query('SELECT COUNT(*) FROM arsiv_manifestleri WHERE personel_id = 1')->fetchColumn() >= 1,
-        'normal exit mints retention manifests'
+        'today exit mints retention manifests'
+    );
+
+    // Past exit still allowed (existing business rule)
+    $pdo->beginTransaction();
+    $pastApplied = PersonelIstenAyrilmaService::applyInTransaction($pdo, 3, '2026-07-01', 'gecmis ayrilma', 9);
+    $pdo->commit();
+    piaAssert((int) ($pastApplied['surec_id'] ?? 0) > 0, 'past exit returns surec_id');
+    piaAssert(
+        (string) $pdo->query('SELECT aktif_durum FROM personeller WHERE id = 3')->fetchColumn() === 'PASIF',
+        'past exit sets PASIF'
     );
 
     // Duplicate active exit on now-PASIF
     $dupAfter = false;
     try {
         $pdo->beginTransaction();
-        PersonelIstenAyrilmaService::applyInTransaction($pdo, 1, '2026-06-01', 'tekrar', 9);
+        PersonelIstenAyrilmaService::applyInTransaction($pdo, 1, $today, 'tekrar', 9);
         $pdo->commit();
     } catch (PersonelValidationException $e) {
         if ($pdo->inTransaction()) {
@@ -224,13 +269,16 @@ try {
         'no second ISTEN_AYRILMA row'
     );
 
-    // Atomicity: missing retention host fails closed — drop manifests table mid-flight via invalid actor path
-    // Simulate by terminating personel 3 then forcing SCHEMA_NOT_READY via dropping arsiv table in nested attempt.
+    // Atomicity: schema fail after validation — use a fresh AKTIF row
+    $pdo->exec("
+        INSERT INTO personeller (id, ad, soyad, sicil_no, ise_giris_tarihi, aktif_durum)
+        VALUES (4, 'Schema', 'Fail', 'R4', '2024-06-01', 'AKTIF')
+    ");
     $pdo->exec('DROP TABLE arsiv_manifestleri');
     $rolled = false;
     try {
         $pdo->beginTransaction();
-        PersonelIstenAyrilmaService::applyInTransaction($pdo, 3, '2026-07-01', 'schema fail', 1);
+        PersonelIstenAyrilmaService::applyInTransaction($pdo, 4, $today, 'schema fail', 1);
         $pdo->commit();
     } catch (Throwable $e) {
         if ($pdo->inTransaction()) {
@@ -240,11 +288,11 @@ try {
     }
     piaAssert($rolled, 'schema failure rolls back transaction');
     piaAssert(
-        (string) $pdo->query('SELECT aktif_durum FROM personeller WHERE id = 3')->fetchColumn() === 'AKTIF',
+        (string) $pdo->query('SELECT aktif_durum FROM personeller WHERE id = 4')->fetchColumn() === 'AKTIF',
         'atomic rollback keeps personel AKTIF'
     );
     piaAssert(
-        (int) $pdo->query('SELECT COUNT(*) FROM surecler WHERE personel_id = 3')->fetchColumn() === 0,
+        (int) $pdo->query('SELECT COUNT(*) FROM surecler WHERE personel_id = 4')->fetchColumn() === 0,
         'atomic rollback writes no orphan surec'
     );
 

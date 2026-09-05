@@ -225,6 +225,7 @@ export const endpoints = {
     readinessExportCsv: "/bordro-hazirlik/readiness/export.csv",
     netMaasEksikleri: "/bordro-hazirlik/net-maas-eksikleri",
     onIzleme: "/bordro-hazirlik/on-izleme",
+    onIzlemeExportCsv: "/bordro-hazirlik/on-izleme/export.csv",
     devirler: "/bordro-hazirlik/devirler",
     devirSablonCsv: "/bordro-hazirlik/devirler/sablon.csv",
     devirImport: "/bordro-hazirlik/devirler/import",

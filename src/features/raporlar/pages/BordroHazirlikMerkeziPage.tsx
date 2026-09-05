@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import {
   downloadBordroDevirSablonCsv,
+  downloadBordroOnIzlemeCsv,
   downloadBordroReadinessCsv,
   fetchBordroDevirListesi,
   fetchBordroHazirlikPreflight,
@@ -68,8 +69,18 @@ const PROBLEM_LABELS: Record<string, string> = {
 
 function formatPeriodStateLabel(state: string | undefined): string {
   if (!state) return "—";
-  if (state === "ACIK") return "OPEN (ACIK)";
-  return state;
+  switch (state) {
+    case "ACIK":
+      return "Açık";
+    case "SEALED":
+      return "Mühürlü";
+    case "REOPEN_PENDING":
+      return "Yeniden açma bekliyor";
+    case "REOPENED":
+      return "Yeniden açıldı";
+    default:
+      return state;
+  }
 }
 
 type TabKey =
@@ -441,7 +452,7 @@ export function BordroHazirlikMerkeziPage() {
   }
 
   function openKesinlestirDialog() {
-    if (!onIzleme?.calistirma?.id || isKesinlestirSubmitting || (preflight?.blocker_count ?? 1) > 0) {
+    if (!onIzleme?.calistirma?.id || isKesinlestirSubmitting || kesinlestirBlockedByPreflight) {
       return;
     }
     setKesinlestirDialogError(null);
@@ -533,6 +544,19 @@ export function BordroHazirlikMerkeziPage() {
     }
   }
 
+  async function handleDownloadOnIzlemeCsv() {
+    if (!subeId) return;
+    try {
+      await downloadBordroOnIzlemeCsv({ yil, ay, subeId });
+      setActionMessage("Ön izleme CSV indirildi (ekrandaki personel ve toplamlarla aynı kapsam).");
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Ön izleme CSV indirilemedi.");
+    }
+  }
+
+  const operasyonelKontrolGereken = operasyonel?.ozet.kontrol_gereken_personel ?? 0;
+  const kesinlestirBlockedByPreflight = (preflight?.blocker_count ?? 1) > 0;
+
   return (
     <section className="yonetim-page donem-kapanis-page" data-testid="bordro-hazirlik-merkezi">
       <header className="yonetim-page-header">
@@ -621,8 +645,10 @@ export function BordroHazirlikMerkeziPage() {
               <h3>Operasyonel hazırlık (puantaj / günlük kayıt)</h3>
               <p className="personel-puantaj-summary-note" data-testid="bordro-operasyonel-period-state">
                 Dönem durumu: {formatPeriodStateLabel(operasyonel.period_state)}
-                {operasyonel.read_only ? " · Salt okunur (SEALED / REOPEN_PENDING)" : " · Düzeltme yolları açık"}
-                {" · "}As of {operasyonel.as_of}
+                {operasyonel.read_only
+                  ? " · Salt okunur (mühürlü / yeniden açma bekliyor)"
+                  : " · Düzeltme yolları açık"}
+                {" · "}Kesim tarihi: {operasyonel.as_of}
               </p>
               <div className="kapanis-ozet-grid" data-testid="bordro-operasyonel-ozet">
                 <div>
@@ -744,6 +770,12 @@ export function BordroHazirlikMerkeziPage() {
               <p data-testid="bordro-candidate-gate-aktif">{candidateGate?.aktif ? "Açık" : "Kapalı"}</p>
             </div>
           </div>
+          {operasyonelKontrolGereken > 0 ? (
+            <p className="yonetim-error" data-testid="bordro-operasyonel-blocker-mesaj">
+              {operasyonelKontrolGereken} personelde operasyonel açık kayıt var. Sessizce hazır kabul
+              edilmez; Veri Hazırlık sekmesinden giderilmeden hesaplama/kesinleştirme yapılamaz.
+            </p>
+          ) : null}
 
           <div>
             <button type="button" data-testid="bordro-readiness-csv-indir" onClick={() => void handleDownloadReadinessCsv()}>
@@ -1161,6 +1193,16 @@ export function BordroHazirlikMerkeziPage() {
             )}
           </div>
 
+          <div className="form-actions-row">
+            <button
+              type="button"
+              data-testid="bordro-on-izleme-csv-indir"
+              onClick={() => void handleDownloadOnIzlemeCsv()}
+            >
+              Ön İzleme CSV İndir
+            </button>
+          </div>
+
           {canManageAday ? (
             <div data-testid="bordro-muhasebe-actions">
               <label htmlFor="bordro-kontrol-notu">Muhasebe kontrol notu</label>
@@ -1181,11 +1223,25 @@ export function BordroHazirlikMerkeziPage() {
               <button
                 type="button"
                 data-testid="bordro-kesinlestir"
-                disabled={(preflight?.blocker_count ?? 1) > 0 || isKesinlestirSubmitting}
+                disabled={kesinlestirBlockedByPreflight || isKesinlestirSubmitting}
+                title={
+                  kesinlestirBlockedByPreflight
+                    ? "Kesinleştirme engelli: preflight blocker’ları (operasyonel açık kayıtlar dahil) giderilmelidir."
+                    : undefined
+                }
                 onClick={openKesinlestirDialog}
               >
                 Kesinleştir
               </button>
+              {kesinlestirBlockedByPreflight ? (
+                <p className="personel-puantaj-summary-note" data-testid="bordro-kesinlestir-blocked-note">
+                  Kesinleştirme kapalı: {preflight?.blocker_count ?? 0} blocker mevcut
+                  {operasyonelKontrolGereken > 0
+                    ? ` (${operasyonelKontrolGereken} personel operasyonel olarak hazır değil)`
+                    : ""}
+                  .
+                </p>
+              ) : null}
             </div>
           ) : null}
 
@@ -1281,7 +1337,9 @@ export function BordroHazirlikMerkeziPage() {
               ) : null}
             </>
           ) : null}
-          <MaasHesaplamaMerkeziPage />
+          <MaasHesaplamaMerkeziPage
+            lockedFilters={{ ay: filters.ay, subeId: filters.subeId }}
+          />
         </section>
       ) : null}
 

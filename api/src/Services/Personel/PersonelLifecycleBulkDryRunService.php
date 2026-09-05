@@ -220,10 +220,17 @@ final class PersonelLifecycleBulkDryRunService
             $errors[] = PersonelHistoricalExitDateBackfillService::ERROR_NOT_PASIF;
         }
 
+        if ($op === PersonelLifecycleBulkRowContract::OP_HISTORICAL_EXIT_DATE_CORRECTION
+            && strtoupper(trim((string) ($personel['aktif_durum'] ?? ''))) !== 'PASIF'
+        ) {
+            $errors[] = PersonelHistoricalExitDateCorrectionService::ERROR_NOT_PASIF;
+        }
+
         $gerekce = trim((string) ($row['gerekce'] ?? ($row['payload']['gerekce'] ?? '')));
         if ($gerekce === '' && !in_array($op, [
             PersonelLifecycleBulkRowContract::OP_EXIT,
             PersonelLifecycleBulkRowContract::OP_HISTORICAL_EXIT_DATE_BACKFILL,
+            PersonelLifecycleBulkRowContract::OP_HISTORICAL_EXIT_DATE_CORRECTION,
         ], true)) {
             $errors[] = 'GEREKCE_EKSIK';
         }
@@ -377,6 +384,36 @@ final class PersonelLifecycleBulkDryRunService
                     'no_change' => $planned['no_change'],
                     'preimage' => $planned['preimage'],
                     'postimage' => $planned['postimage'],
+                ];
+            case PersonelLifecycleBulkRowContract::OP_HISTORICAL_EXIT_DATE_CORRECTION:
+                $surecId = (int) ($payload['surec_id'] ?? $row['surec_id'] ?? 0);
+                $expectedOld = trim((string) ($payload['expected_old_exit_date'] ?? $payload['old_exit_date'] ?? ''));
+                $exitDate = trim((string) ($payload['exit_date'] ?? $payload['new_exit_date'] ?? ''));
+                $aciklama = trim((string) ($payload['aciklama'] ?? $row['gerekce'] ?? ''));
+                $planned = PersonelHistoricalExitDateCorrectionService::plan(
+                    $pdo,
+                    $personelId,
+                    $surecId,
+                    $expectedOld,
+                    $exitDate,
+                    $aciklama !== '' ? $aciklama : null
+                );
+
+                return [
+                    'owner' => 'PersonelHistoricalExitDateCorrectionService',
+                    'operation_type' => $op,
+                    'personel_id' => $personelId,
+                    'surec_id' => $planned['surec_id'],
+                    'old_exit_date' => $planned['old_exit_date'],
+                    'exit_date' => $planned['new_exit_date'],
+                    'new_exit_date' => $planned['new_exit_date'],
+                    'aciklama' => $planned['aciklama'],
+                    'action' => $planned['action'],
+                    'no_change' => $planned['no_change'],
+                    'preimage' => $planned['preimage'],
+                    'postimage' => $planned['postimage'],
+                    'retention_reconciliation' => $planned['retention_reconciliation'],
+                    'audit' => $planned['audit'],
                 ];
             case PersonelLifecycleBulkRowContract::OP_BASIC_UPDATE:
                 return [

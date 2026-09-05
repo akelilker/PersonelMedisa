@@ -1,29 +1,23 @@
 /**
- * MG-PERSONNEL-HISTORICAL-EXIT-DATE-BACKFILL-001
+ * MG-PERSONNEL-HISTORICAL-EXIT-DATE-CORRECTION-001
  * Canonical owner: POST /personeller/lifecycle-bulk/{dry-run,apply}
- * Operation: HISTORICAL_EXIT_DATE_BACKFILL (PersonelHistoricalExitDateBackfillService)
+ * Operation: HISTORICAL_EXIT_DATE_CORRECTION (PersonelHistoricalExitDateCorrectionService)
  *
- * Targets (authoritative HR dates):
- *   202 -> 2025-12-31
- *   208 -> 2026-05-25
+ * Targets (authoritative HR correction of wrong live surec dates):
+ *   surec 38 / personel 202: 2026-07-30 -> 2025-12-31
+ *   surec 39 / personel 208: 2026-07-30 -> 2026-05-25
  *
  * Default: dry-run only (non-mutating).
- * Production apply requires explicit --apply after live PASIF residual preimage gate.
+ * Production apply requires explicit --apply after live correction preimage gate.
+ * Do NOT run production dry-run/apply from an undeployed feature branch.
  *
  * Usage:
- *   node ops/personnel-lifecycle/deferred-exit-production-apply.mjs \
+ *   node ops/personnel-lifecycle/historical-exit-date-correction-production-apply.mjs \
  *     --expected-sha=<40-hex> \
  *     [--curl-bin=<path-or-command>] \
  *     [--ftp-netrc=<path>] \
  *     [--live-config=<path>] \
  *     [--apply]
- *
- * Env (optional; CLI wins):
- *   MEDISA_OPS_CURL_BIN, MEDISA_OPS_FTP_NETRC, MEDISA_OPS_LIVE_CONFIG
- *
- * --expected-sha is mandatory at runtime (exact match to origin/main, live .deploy-sha,
- * worker heartbeat deployed_sha, and API deployed_sha). No silent code-prep baseline fallback.
- * Portability flags never imply --apply.
  */
 "use strict";
 
@@ -38,11 +32,14 @@ import {
   verifyPersonnelExitSurec,
 } from "../../scripts/ops/personel-lifecycle-exit-postcheck.mjs";
 import {
+  CORRECTION_SUREC_IDS,
+  EXPECTED_EXIT_DATES,
   FTP_COMMAND_FAILED,
   FTP_REMOTE_READ_FAILED,
+  WRONG_EXIT_DATES_REQUIRING_CORRECTION,
   assertCurlBinaryAvailable,
   buildFtpFailure,
-  evaluateResidualPreimage,
+  evaluateCorrectionPreimage,
   evaluateShaPreflight,
   isApplyRequested,
   parseExpectedSha,
@@ -57,39 +54,40 @@ const REPO_ROOT = path.join(DIR, "../..");
 const API = "https://www.karmotors.com.tr/personelmedisa/api";
 const ACTOR_UID = 10;
 const DO_APPLY = isApplyRequested(process.argv);
-/** Set in main() via required --expected-sha (fail closed; no silent baseline). */
 let EXPECTED_SHA = null;
-/** Resolved in main() before any FTP (fail closed). */
 let CURL_BIN = null;
 let FTP_NETRC = null;
 let LIVE_CONFIG = null;
 
-const BACKFILL_ROWS = [
+const CORRECTION_ROWS = [
   {
-    mutation_id: "mg-historical-exit-backfill-202",
-    operation_type: "HISTORICAL_EXIT_DATE_BACKFILL",
+    mutation_id: "mg-historical-exit-date-correction-202",
+    operation_type: "HISTORICAL_EXIT_DATE_CORRECTION",
     personel_id: 202,
-    gerekce: "Tarihi PASIF residual cikis tarihi backfill (HR authoritative)",
+    gerekce: "HR authoritative historical exit date correction",
     payload: {
-      exit_date: "2025-12-31",
-      aciklama: "HR authoritative historical exit date backfill",
+      surec_id: CORRECTION_SUREC_IDS[202],
+      expected_old_exit_date: WRONG_EXIT_DATES_REQUIRING_CORRECTION[202],
+      exit_date: EXPECTED_EXIT_DATES[202],
+      aciklama: "HR authoritative historical exit date correction",
     },
   },
   {
-    mutation_id: "mg-historical-exit-backfill-208",
-    operation_type: "HISTORICAL_EXIT_DATE_BACKFILL",
+    mutation_id: "mg-historical-exit-date-correction-208",
+    operation_type: "HISTORICAL_EXIT_DATE_CORRECTION",
     personel_id: 208,
-    gerekce: "Tarihi PASIF residual cikis tarihi backfill (HR authoritative)",
+    gerekce: "HR authoritative historical exit date correction",
     payload: {
-      exit_date: "2026-05-25",
-      aciklama: "HR authoritative historical exit date backfill",
+      surec_id: CORRECTION_SUREC_IDS[208],
+      expected_old_exit_date: WRONG_EXIT_DATES_REQUIRING_CORRECTION[208],
+      exit_date: EXPECTED_EXIT_DATES[208],
+      aciklama: "HR authoritative historical exit date correction",
     },
   },
 ];
 
-
 const report = {
-  phase: "MG-PERSONNEL-HISTORICAL-EXIT-DATE-BACKFILL-001",
+  phase: "MG-PERSONNEL-HISTORICAL-EXIT-DATE-CORRECTION-001",
   timestamp: new Date().toISOString(),
   preflight: {},
   personnel_preimage: {},
@@ -158,9 +156,6 @@ function unwrapItems(json) {
   return [];
 }
 
-/**
- * Fail-closed FTP GET via resolved curl + netrc. Never prints credential contents.
- */
 function ftpGet(remote, local) {
   const r = spawnSync(
     CURL_BIN,
@@ -281,83 +276,55 @@ function runPreflight(liveResolved) {
   if (!report.preflight.all_pass) fail("PREFLIGHT", "Binding preflight failed");
 }
 
-/**
- * Historical residual preimage aligned to domain owner:
- * CREATE_ELIGIBLE or ALREADY_APPLIED may proceed (backfill dry-run).
- * CONFLICT stops and must route to HISTORICAL_EXIT_DATE_CORRECTION (never auto-overwrite).
- */
-async function verifyHistoricalResidualPreimage(token) {
-  for (const row of BACKFILL_ROWS) {
+async function verifyCorrectionPreimage(token) {
+  for (const row of CORRECTION_ROWS) {
     const id = row.personel_id;
-    const expectedExit = row.payload.exit_date;
+    const surecId = row.payload.surec_id;
     const res = await api(`/personeller/${id}`, { token });
     if (res.status !== 200) fail("PREIMAGE", `GET /personeller/${id} HTTP ${res.status}`);
     const p = res.json?.data ?? {};
-    const istenCikis = p.isten_cikis_tarihi ?? p.cikis_tarihi ?? null;
 
-    let exitSurecCount = 0;
-    let currentSurecExitDate = null;
-    const surecRes = await api(`/surecler?personel_id=${id}&surec_turu=ISTEN_AYRILMA`, { token });
-    if (surecRes.status === 200) {
-      const items = unwrapItems(surecRes.json).filter(
-        (s) => String(s.state || "").toUpperCase() !== "IPTAL"
-      );
-      exitSurecCount = items.length;
-      if (items.length === 1) {
-        currentSurecExitDate = items[0].baslangic_tarihi ?? null;
-      } else if (items.length > 1) {
-        currentSurecExitDate = items[0].baslangic_tarihi ?? null;
-      }
+    const surecRes = await api(`/surecler/${surecId}`, { token });
+    if (surecRes.status !== 200) fail("PREIMAGE", `GET /surecler/${surecId} HTTP ${surecRes.status}`);
+    const s = surecRes.json?.data ?? {};
+
+    let nonIptalCount = 0;
+    const listRes = await api(`/surecler?personel_id=${id}&surec_turu=ISTEN_AYRILMA`, { token });
+    if (listRes.status === 200) {
+      nonIptalCount = unwrapItems(listRes.json).filter(
+        (x) => String(x.state || "").toUpperCase() !== "IPTAL"
+      ).length;
     }
 
-    const gate = evaluateResidualPreimage({
+    const gate = evaluateCorrectionPreimage({
       personelId: id,
       ad: p.ad,
       soyad: p.soyad,
       aktifDurum: p.aktif_durum,
-      istenCikisTarihi: istenCikis,
-      exitSurecCount,
-      expectedExitDate: expectedExit,
-      currentSurecExitDate,
+      surecId,
+      currentSurecExitDate: s.baslangic_tarihi,
+      expectedOldExitDate: row.payload.expected_old_exit_date,
+      expectedNewExitDate: row.payload.exit_date,
+      nonIptalIstenAyrilmaCount: nonIptalCount,
     });
 
     report.personnel_preimage[id] = {
-      personel_id: id,
+      ...gate,
       aktif_durum: String(p.aktif_durum || "").toUpperCase(),
-      isten_cikis_tarihi: istenCikis,
-      exit_surec_count: exitSurecCount,
-      current_exit_date: gate.current_exit_date,
-      expected_exit_date: expectedExit,
-      classification: gate.classification,
-      full_name_normalized: gate.full_name_normalized,
-      expected_full_name: gate.expected_full_name,
-      name_exact_pass: gate.name_exact_pass,
-      pasif_pass: gate.pasif_pass,
-      exit_date_empty_pass: gate.exit_date_empty_pass,
-      already_applied_pass: gate.already_applied_pass,
-      conflict: gate.conflict,
-      residual_preimage_pass: gate.residual_preimage_pass,
-      backfill_gate_pass: gate.backfill_gate_pass,
+      ise_giris_tarihi: p.ise_giris_tarihi ?? null,
+      retention_trigger_date: p.retention_summary?.trigger_date ?? null,
+      surec_state: s.state ?? null,
+      surec_aciklama: s.aciklama ?? null,
     };
   }
 
-  const conflictIds = BACKFILL_ROWS.filter(
-    (row) => report.personnel_preimage[row.personel_id]?.conflict === true
-  ).map((row) => row.personel_id);
-  if (conflictIds.length > 0) {
-    fail(
-      "PREIMAGE_CONFLICT",
-      `Existing ISTEN_AYRILMA dates conflict with backfill targets for personel_id=[${conflictIds.join(",")}]; use HISTORICAL_EXIT_DATE_CORRECTION (PersonelHistoricalExitDateCorrectionService), do not overwrite via backfill`
-    );
-  }
-
-  report.personnel_preimage.all_pass = BACKFILL_ROWS.every(
-    (row) => report.personnel_preimage[row.personel_id]?.backfill_gate_pass === true
+  report.personnel_preimage.all_pass = CORRECTION_ROWS.every(
+    (row) => report.personnel_preimage[row.personel_id]?.correction_preimage_pass === true
   );
   if (!report.personnel_preimage.all_pass) {
     fail(
       "PREIMAGE",
-      "Historical residual preimage failed (require exact personel_id + exact full name + PASIF + CREATE_ELIGIBLE or ALREADY_APPLIED; CONFLICT routes to correction owner)"
+      "Historical exit-date correction preimage failed (exact PASIF + surec_id + old date + single ISTEN_AYRILMA)"
     );
   }
 }
@@ -366,7 +333,7 @@ async function runDryApply(token) {
   const dry = await api("/personeller/lifecycle-bulk/dry-run", {
     method: "POST",
     token,
-    body: { rows: BACKFILL_ROWS, deployed_sha: EXPECTED_SHA },
+    body: { rows: CORRECTION_ROWS, deployed_sha: EXPECTED_SHA },
   });
   report.dry_run = {
     status: dry.status,
@@ -381,6 +348,12 @@ async function runDryApply(token) {
       personel_id: s.personel_id,
       owner: s.mutation_plan?.owner ?? null,
       action: s.mutation_plan?.action ?? null,
+      surec_id: s.mutation_plan?.surec_id ?? null,
+      old_exit_date: s.mutation_plan?.old_exit_date ?? null,
+      new_exit_date: s.mutation_plan?.new_exit_date ?? s.mutation_plan?.exit_date ?? null,
+      retention_reconciliation: s.mutation_plan?.retention_reconciliation ?? null,
+      audit: s.mutation_plan?.audit ?? null,
+      postimage: s.mutation_plan?.postimage ?? null,
       hata_kodlari: s.hata_kodlari ?? [],
     })),
     errors: dry.json?.errors ?? null,
@@ -389,9 +362,9 @@ async function runDryApply(token) {
   if (!report.dry_run.can_apply) fail("DRY_RUN", "can_apply=false");
 
   const ownersOk = (report.dry_run.satirlar || []).every(
-    (s) => s.owner === "PersonelHistoricalExitDateBackfillService"
+    (s) => s.owner === "PersonelHistoricalExitDateCorrectionService"
   );
-  if (!ownersOk) fail("DRY_RUN", "expected PersonelHistoricalExitDateBackfillService owner");
+  if (!ownersOk) fail("DRY_RUN", "expected PersonelHistoricalExitDateCorrectionService owner");
 
   if (!DO_APPLY) return;
 
@@ -399,7 +372,7 @@ async function runDryApply(token) {
     method: "POST",
     token,
     body: {
-      rows: BACKFILL_ROWS,
+      rows: CORRECTION_ROWS,
       dry_run_checksum: report.dry_run.dry_run_checksum,
       preimage_checksum: report.dry_run.preimage_checksum,
       deployed_sha: EXPECTED_SHA,
@@ -418,13 +391,14 @@ async function runDryApply(token) {
 async function postcheck(token) {
   const applyRows = report.apply?.satir_sonuclari ?? null;
   const checks = {};
-  for (const row of BACKFILL_ROWS) {
+  for (const row of CORRECTION_ROWS) {
     const personelId = row.personel_id;
     const expectedExitDate = row.payload.exit_date;
-    const surecId = resolveSurecIdFromApplyResult(applyRows, {
-      mutationId: row.mutation_id,
-      owner: "PersonelHistoricalExitDateBackfillService",
-    });
+    const surecId =
+      resolveSurecIdFromApplyResult(applyRows, {
+        mutationId: row.mutation_id,
+        owner: "PersonelHistoricalExitDateCorrectionService",
+      }) ?? row.payload.surec_id;
     try {
       const surecEvidence = await verifyPersonnelExitSurec(api, {
         token,
@@ -435,14 +409,14 @@ async function postcheck(token) {
       const personelRes = await api(`/personeller/${personelId}`, { token });
       const p = personelRes.json?.data ?? {};
       const aktifDurum = String(p.aktif_durum || "").toUpperCase();
-      const istenCikis = p.isten_cikis_tarihi ?? null;
       checks[personelId] = {
         ...surecEvidence,
         aktif_durum: aktifDurum,
-        isten_cikis_tarihi: istenCikis,
+        retention_trigger_date: p.retention_summary?.trigger_date ?? null,
         pass:
           aktifDurum === "PASIF" &&
-          (surecEvidence.baslangic_tarihi === expectedExitDate || istenCikis === expectedExitDate),
+          surecEvidence.baslangic_tarihi === expectedExitDate &&
+          Number(surecEvidence.surec_id) === Number(row.payload.surec_id),
       };
     } catch (error) {
       if (error instanceof ExitPostcheckError) {
@@ -460,10 +434,10 @@ async function postcheck(token) {
 
   report.postcheck = {
     personnel: checks,
-    personnel_pass: BACKFILL_ROWS.every((row) => checks[row.personel_id]?.pass === true),
-    all_pass: BACKFILL_ROWS.every((row) => checks[row.personel_id]?.pass === true),
+    personnel_pass: CORRECTION_ROWS.every((row) => checks[row.personel_id]?.pass === true),
+    all_pass: CORRECTION_ROWS.every((row) => checks[row.personel_id]?.pass === true),
   };
-  if (DO_APPLY && !report.postcheck.all_pass) fail("POSTCHECK", "Historical backfill postcheck failed");
+  if (DO_APPLY && !report.postcheck.all_pass) fail("POSTCHECK", "Historical correction postcheck failed");
 }
 
 async function main() {
@@ -473,13 +447,16 @@ async function main() {
     const liveResolved = resolveOpsRuntime(argv);
     runPreflight(liveResolved);
     const token = mintJwt(readJwtSecret(LIVE_CONFIG), ACTOR_UID);
-    await verifyHistoricalResidualPreimage(token);
+    await verifyCorrectionPreimage(token);
     await runDryApply(token);
     if (DO_APPLY) {
       await postcheck(token);
     }
     report.final_status = DO_APPLY ? "APPLIED" : "DRY_RUN_PASS";
-    fs.writeFileSync(path.join(DIR, "deferred-exit-report.json"), JSON.stringify(report, null, 2));
+    fs.writeFileSync(
+      path.join(DIR, "historical-exit-date-correction-report.json"),
+      JSON.stringify(report, null, 2)
+    );
     console.log(JSON.stringify(report, null, 2));
   } catch (e) {
     report.final_status = "FAIL";
@@ -488,9 +465,12 @@ async function main() {
       message: e.message,
       ...(e.details ? { details: e.details } : {}),
     };
-    fs.writeFileSync(path.join(DIR, "deferred-exit-report.json"), JSON.stringify(report, null, 2));
-    console.error(JSON.stringify(report, null, 2));
-    process.exit(1);
+    fs.writeFileSync(
+      path.join(DIR, "historical-exit-date-correction-report.json"),
+      JSON.stringify(report, null, 2)
+    );
+    console.log(JSON.stringify(report, null, 2));
+    process.exitCode = 1;
   }
 }
 

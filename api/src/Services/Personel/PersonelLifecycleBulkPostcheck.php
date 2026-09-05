@@ -138,6 +138,7 @@ final class PersonelLifecycleBulkPostcheck
                 case PersonelLifecycleBulkRowContract::OP_BRANCH:
                 case PersonelLifecycleBulkRowContract::OP_REFERENCE:
                 case PersonelLifecycleBulkRowContract::OP_HISTORICAL_EXIT_DATE_BACKFILL:
+                case PersonelLifecycleBulkRowContract::OP_HISTORICAL_EXIT_DATE_CORRECTION:
                     $neutral++;
                     break;
                 default:

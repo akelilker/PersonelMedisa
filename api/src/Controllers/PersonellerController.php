@@ -472,6 +472,8 @@ class PersonellerController
         } catch (OrganizasyonException $e) {
             JsonResponse::error($e->httpStatus, $e->errorCode, $e->getMessage(), $e->field);
         }
+        // Fail-closed: even same-value tracked org / sube keys never write via generic PUT.
+        $payload = PersonelOrganizasyonDegisikligiService::stripProtectedOrgFieldsFromGenericPut($payload);
         if (PersonelOrgLocationSchema::payloadRequestsOrgFields($payload)
             && !PersonelOrgLocationSchema::isReady($pdo)
         ) {
@@ -1334,7 +1336,7 @@ class PersonellerController
     private static function assertSicilAvailable(PDO $pdo, $sicilNo, $exceptPersonelId = null)
     {
         if (PersonelCreateService::sicilExists($pdo, (string) $sicilNo, $exceptPersonelId)) {
-            JsonResponse::error(409, 'DUPLICATE_SICIL_NO', 'Bu sicil no ile kayit acilamaz.', 'sicil_no');
+            self::duplicateSicilResponse();
         }
     }
 
@@ -1533,7 +1535,7 @@ class PersonellerController
 
     private static function duplicateSicilResponse()
     {
-        JsonResponse::error(409, 'DUPLICATE_SICIL_NO', 'Bu sicil no ile kayit acilamaz.', 'sicil_no');
+        JsonResponse::error(409, 'DUPLICATE_SICIL_NO', 'Bu sicil no ile kayıt açılamaz.', 'sicil_no');
     }
 
     private static function isDuplicateTcException(\PDOException $e)

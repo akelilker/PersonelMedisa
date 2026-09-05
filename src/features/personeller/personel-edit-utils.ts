@@ -252,7 +252,7 @@ export function buildPersonelUpdatePayload(
   const sicilNo = String(editForm.sicilNo ?? "").trim();
   const iseGirisTarihi = String(editForm.iseGirisTarihi ?? "").trim();
   const payload: UpdatePersonelPayload = {
-    calisan_kapsami: editForm.calisanKapsami ?? "IC",
+    calisan_kapsami: editForm.calisanKapsami ?? "IC_PERSONEL",
     tc_kimlik_no: tcKimlikNo || null,
     ad: normalizePersonelAd(editForm.ad),
     soyad: soyad ? normalizePersonelSoyad(soyad) : null,

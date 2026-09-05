@@ -91,6 +91,24 @@ final class PersonelOrganizasyonDegisikligiService
     }
 
     /**
+     * Drop protected org axes (and sube_id) from a generic PUT payload so same-value
+     * keys cannot reach UPDATE personeller. Call after assertNotChangedViaGenericPut /
+     * sube scope checks. DIS_KAYNAK may re-clear sgk_isveren_id afterwards.
+     *
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
+    public static function stripProtectedOrgFieldsFromGenericPut(array $payload): array
+    {
+        foreach (self::TRACKED_FIELDS as $field) {
+            unset($payload[$field]);
+        }
+        unset($payload['sube_id']);
+
+        return $payload;
+    }
+
+    /**
      * @param array<string, mixed> $user
      * @param array<string, mixed> $body Expected preimage + new values + gerekce
      * @return array{replay:bool, personel_id:int, olay_tipi:string, audit_id:int|null, degisen_alanlar:list<string>}

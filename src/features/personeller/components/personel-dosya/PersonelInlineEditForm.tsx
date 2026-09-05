@@ -3,7 +3,7 @@ import { FormField } from "../../../../components/form/FormField";
 import { CALISAN_KAPSAMI_SELECT_OPTIONS } from "../../../../lib/display/enum-display";
 import type { PersonelReferenceBundle } from "../../../../data/app-data.types";
 import type { IdOption } from "../../../../types/referans";
-import type { BagliAmirFormGuidance, EditPersonelFormState } from "../../personel-edit-utils";
+import type { EditPersonelFormState } from "../../personel-edit-utils";
 
 function idOptionsToSelectOptions(options: IdOption[]) {
   return options.map((option) => ({ value: String(option.id), label: option.label }));
@@ -12,16 +12,12 @@ function idOptionsToSelectOptions(options: IdOption[]) {
 export type PersonelInlineEditFormProps = {
   editForm: EditPersonelFormState;
   setEditForm: Dispatch<SetStateAction<EditPersonelFormState>>;
-  handleEditDepartmanChange: (departmanId: string) => void;
-  handleEditBagliAmirChange: (bagliAmirId: string) => void;
-  editBagliAmirGuidance: BagliAmirFormGuidance;
   personelRefs: PersonelReferenceBundle;
-  hasLifecycleDiff: boolean;
   editErrorMessage: string | null;
   isSubmitting: boolean;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onDiscard: () => void;
-  /** identity = Genel özlük; full kept for legacy tests but org fields are read-only notes */
+  /** identity = Genel özlük; full kept for legacy call-sites but org fields are redirect notes only */
   variant?: "identity" | "full";
 };
 

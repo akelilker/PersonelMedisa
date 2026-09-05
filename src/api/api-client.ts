@@ -152,6 +152,7 @@ export function isApiRequestError(error: unknown): error is ApiRequestError {
 }
 
 const DUPLICATE_TC_MESSAGE = "Bu T.C. Kimlik No ile kayıt açılamaz.";
+const DUPLICATE_SICIL_MESSAGE = "Bu sicil no ile kayıt açılamaz.";
 const PERSONEL_CREATE_FORBIDDEN_SUBE_YETKI_MESSAGE = "Seçili şube için yetkiniz yok.";
 const PERSONEL_CREATE_FORBIDDEN_SUBE_SCOPE_MESSAGE =
   "Seçilen şube aktif şube filtresiyle uyuşmuyor.";
@@ -196,6 +197,14 @@ function resolveApiErrorDetail(
         ...baseDetail,
         message: rawMessage || DUPLICATE_TC_MESSAGE,
         field: error.field ?? "tc_kimlik_no"
+      };
+    }
+
+    if (error.code === "DUPLICATE_SICIL_NO") {
+      return {
+        ...baseDetail,
+        message: rawMessage || DUPLICATE_SICIL_MESSAGE,
+        field: error.field ?? "sicil_no"
       };
     }
 

@@ -59,6 +59,7 @@ class BugunPersonelDurumuService
         $rows = self::fetchRosterRows($pdo, $user, $activeSube, $tarih);
         $amirByBirim = self::fetchAmirIdsByBirim($pdo, $rows);
         $completions = self::fetchCompletionsBySubeAmir($pdo, $tarih);
+        $surecExceptionByPersonel = self::fetchCoveringSurecExceptionTurByPersonel($pdo, $rows, $tarih);
 
         $branches = [];
         foreach ($rows as $row) {
@@ -121,9 +122,21 @@ class BugunPersonelDurumuService
                 $personeller = [];
                 $eksikGiris = 0;
                 foreach ($unit['rows'] as $rawRow) {
-                    $personeller[] = self::mapPersonelRow($rawRow, (bool) $completion['tamamlandi_mi']);
-                    if (self::isMissingEntryEvidence(
+                    $personelId = (int) ($rawRow['personel_id'] ?? 0);
+                    $surecException = $personelId > 0 && isset($surecExceptionByPersonel[$personelId])
+                        ? $surecExceptionByPersonel[$personelId]
+                        : null;
+                    $personeller[] = self::mapPersonelRow(
+                        $rawRow,
+                        (bool) $completion['tamamlandi_mi'],
+                        $surecException
+                    );
+                    $effectiveException = self::effectiveExceptionTur(
                         isset($rawRow['bildirim_turu']) ? $rawRow['bildirim_turu'] : null,
+                        $surecException
+                    );
+                    if (self::isMissingEntryEvidence(
+                        $effectiveException,
                         isset($rawRow['puantaj_giris']) ? $rawRow['puantaj_giris'] : null
                     )) {
                         $eksikGiris++;
@@ -198,6 +211,54 @@ class BugunPersonelDurumuService
             'attention_count' => $attentionCount,
             'branches' => $branchSummaries,
         ];
+    }
+
+    /**
+     * Map covering resmi surec → Bugün exception turu (read-only overlay).
+     * Saatli GEC/ERKEN surec türleri buradan türetilmez; günlük bildirim owner’ı kullanır.
+     *
+     * @param mixed $surecTuru
+     * @param mixed $altTur
+     * @return string|null
+     */
+    public static function mapSurecToBugunExceptionTur($surecTuru, $altTur = null)
+    {
+        $tur = strtoupper(trim((string) $surecTuru));
+        if ($tur === 'IZIN') {
+            return 'IZINLI';
+        }
+        if ($tur === 'RAPOR' || $tur === 'IS_KAZASI') {
+            return 'RAPORLU';
+        }
+        if ($tur === 'DEVAMSIZLIK') {
+            $alt = strtoupper(trim((string) $altTur));
+            if ($alt === '' || $alt === 'IZINSIZ_GELMEDI') {
+                return 'GELMEDI';
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Bildirim exception wins; otherwise covering resmi surec overlay.
+     *
+     * @param mixed $bildirimTuru
+     * @param string|null $surecExceptionTur
+     * @return string|null
+     */
+    public static function effectiveExceptionTur($bildirimTuru, $surecExceptionTur = null)
+    {
+        $tur = strtoupper(trim((string) $bildirimTuru));
+        if (in_array($tur, self::$exceptionTurleri, true)) {
+            return $tur;
+        }
+        $overlay = strtoupper(trim((string) $surecExceptionTur));
+        if (in_array($overlay, self::$exceptionTurleri, true)) {
+            return $overlay;
+        }
+
+        return null;
     }
 
     /**
@@ -736,17 +797,86 @@ class BugunPersonelDurumuService
     }
 
     /**
+     * @param array<int, array<string, mixed>> $rows
+     * @param string $tarih
+     * @return array<int, string> personel_id → Bugün exception turu
+     */
+    private static function fetchCoveringSurecExceptionTurByPersonel(PDO $pdo, array $rows, $tarih)
+    {
+        if (!self::hasTable($pdo, 'surecler')) {
+            return [];
+        }
+
+        $ids = [];
+        foreach ($rows as $row) {
+            $id = (int) ($row['personel_id'] ?? 0);
+            if ($id > 0) {
+                $ids[$id] = $id;
+            }
+        }
+        if (count($ids) === 0) {
+            return [];
+        }
+
+        $placeholders = [];
+        $params = ['bpd_surec_tarih' => (string) $tarih, 'bpd_surec_state' => 'AKTIF'];
+        $i = 0;
+        foreach ($ids as $id) {
+            $key = 'bpd_sp' . $i;
+            $placeholders[] = ':' . $key;
+            $params[$key] = $id;
+            $i++;
+        }
+
+        $sql = '
+            SELECT personel_id, surec_turu, alt_tur
+            FROM surecler
+            WHERE state = :bpd_surec_state
+              AND personel_id IN (' . implode(', ', $placeholders) . ')
+              AND baslangic_tarihi <= :bpd_surec_tarih
+              AND (bitis_tarihi IS NULL OR bitis_tarihi >= :bpd_surec_tarih)
+              AND surec_turu IN (\'IZIN\', \'RAPOR\', \'IS_KAZASI\', \'DEVAMSIZLIK\')
+            ORDER BY id DESC
+        ';
+        try {
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute($params);
+        } catch (\Throwable $e) {
+            return [];
+        }
+
+        $map = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $personelId = (int) ($row['personel_id'] ?? 0);
+            if ($personelId < 1 || isset($map[$personelId])) {
+                continue;
+            }
+            $mapped = self::mapSurecToBugunExceptionTur(
+                isset($row['surec_turu']) ? $row['surec_turu'] : null,
+                isset($row['alt_tur']) ? $row['alt_tur'] : null
+            );
+            if ($mapped !== null) {
+                $map[$personelId] = $mapped;
+            }
+        }
+
+        return $map;
+    }
+
+    /**
      * @param array<string, mixed> $row
      * @param bool $unitCompleted
+     * @param string|null $surecExceptionTur
      * @return array<string, mixed>
      */
-    private static function mapPersonelRow(array $row, $unitCompleted = false)
+    private static function mapPersonelRow(array $row, $unitCompleted = false, $surecExceptionTur = null)
     {
         $dakika = self::nullableInt(isset($row['dakika']) ? $row['dakika'] : null);
         $puantajGec = self::nullableInt(isset($row['puantaj_gec']) ? $row['puantaj_gec'] : null);
         $puantajErken = self::nullableInt(isset($row['puantaj_erken']) ? $row['puantaj_erken'] : null);
 
-        $exceptionTur = isset($row['bildirim_turu']) ? $row['bildirim_turu'] : null;
+        $bildirimTur = isset($row['bildirim_turu']) ? $row['bildirim_turu'] : null;
+        $exceptionTur = self::effectiveExceptionTur($bildirimTur, $surecExceptionTur);
         $exceptionGiris = self::nullableString(isset($row['baslangic_saati']) ? $row['baslangic_saati'] : null);
         $puantajGiris = self::nullableString(isset($row['puantaj_giris']) ? $row['puantaj_giris'] : null);
 
@@ -780,12 +910,16 @@ class BugunPersonelDurumuService
 
         $detail = self::personDetailLine($durum, $giris, $gec, isset($row['aciklama']) ? $row['aciklama'] : null, isset($row['alt_tur']) ? $row['alt_tur'] : null);
 
-        $hasException = $exceptionTur !== null
-            && in_array(strtoupper(trim((string) $exceptionTur)), self::$exceptionTurleri, true);
+        $hasBildirimException = $bildirimTur !== null
+            && in_array(strtoupper(trim((string) $bildirimTur)), self::$exceptionTurleri, true);
+        $hasSurecException = $surecExceptionTur !== null
+            && in_array(strtoupper(trim((string) $surecExceptionTur)), self::$exceptionTurleri, true);
         $hasAttendance = $puantajGiris !== null && trim((string) $puantajGiris) !== '';
         $evidence = 'UNASSESSED';
-        if ($hasException) {
+        if ($hasBildirimException) {
             $evidence = 'EXCEPTION';
+        } elseif ($hasSurecException) {
+            $evidence = 'RESMI_SUREC';
         } elseif ($hasAttendance) {
             $evidence = 'ATTENDANCE';
         } elseif ($unitCompleted) {

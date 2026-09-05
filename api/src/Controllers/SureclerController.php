@@ -12,6 +12,7 @@ use Medisa\Api\Http\Request;
 use Medisa\Api\Scope\SubeScope;
 use Medisa\Api\Services\OfflineMutationIdempotencyService;
 use Medisa\Api\Services\Personel\PersonelOrgStructureSchema;
+use Medisa\Api\Services\PuantajDonemPeriodService;
 use PDO;
 
 class SureclerController
@@ -146,6 +147,9 @@ class SureclerController
                 (int) $payload['personel_id']
             );
         }
+
+        self::assertPeriodOpenForOperationalSurec($pdo, $personel, $payload);
+        self::assertNoCoveringAbsenceOverlap($pdo, $payload, null);
 
         $actorId = (int) ($user['id'] ?? 0);
         $idemKey = OfflineMutationIdempotencyService::readKey($request);
@@ -309,6 +313,8 @@ class SureclerController
         );
 
         $payload = self::normalizeAndValidateUpdatePayload($body, $existing);
+        self::assertPeriodOpenForOperationalSurec($pdo, self::personelOrgFromSurecRow($existing), $payload);
+        self::assertNoCoveringAbsenceOverlap($pdo, $payload, $surecId);
 
         $actorId = (int) ($user['id'] ?? 0);
         $idemKey = OfflineMutationIdempotencyService::readKey($request);
@@ -695,6 +701,9 @@ class SureclerController
             if (!self::isValidDateString($bitisTarihi)) {
                 self::validationError('bitis_tarihi', 'Bitiş tarihi geçerli olmalıdır.');
             }
+            if ($bitisTarihi < $baslangicTarihi) {
+                self::validationError('bitis_tarihi', 'Bitiş tarihi başlangıç tarihinden önce olamaz.');
+            }
         }
 
         $ucretliMi = false;
@@ -966,6 +975,116 @@ class SureclerController
         }
 
         return (bool) ((int) $value);
+    }
+
+    /**
+     * Time-operational absence süreçleri: sealed / reopen-pending aylarda yazılamaz.
+     *
+     * @param array<string, mixed> $personel
+     * @param array<string, mixed> $payload
+     */
+    private static function assertPeriodOpenForOperationalSurec(PDO $pdo, array $personel, array $payload)
+    {
+        $surecTuru = strtoupper((string) ($payload['surec_turu'] ?? ''));
+        if (!in_array($surecTuru, ['IZIN', 'RAPOR', 'IS_KAZASI', 'DEVAMSIZLIK'], true)) {
+            return;
+        }
+
+        $subeId = (int) ($personel['sube_id'] ?? 0);
+        $dates = [(string) ($payload['baslangic_tarihi'] ?? '')];
+        if (!empty($payload['bitis_tarihi'])) {
+            $dates[] = (string) $payload['bitis_tarihi'];
+        }
+        foreach ($dates as $tarih) {
+            $tarih = trim($tarih);
+            if ($subeId < 1 || !preg_match('/^(\d{4})-(\d{2})-\d{2}$/', $tarih, $m)) {
+                continue;
+            }
+            try {
+                if (PuantajDonemPeriodService::isWriteLocked($pdo, $subeId, (int) $m[1], (int) $m[2])) {
+                    JsonResponse::error(
+                        409,
+                        'PERIOD_LOCKED',
+                        'Bu ayin puantaj donemi kapali oldugu icin surec kaydi yazilamaz.'
+                    );
+                }
+            } catch (\Throwable $e) {
+                // Missing period tables must not block open-period ops in partial schemas.
+            }
+        }
+    }
+
+    /**
+     * Same-person covering absence overlap (IZIN/RAPOR/IS_KAZASI/IZINSIZ) fail-closed.
+     *
+     * @param array<string, mixed> $payload
+     * @param int|null $exceptSurecId
+     */
+    private static function assertNoCoveringAbsenceOverlap(PDO $pdo, array $payload, $exceptSurecId)
+    {
+        $surecTuru = strtoupper((string) ($payload['surec_turu'] ?? ''));
+        if (!self::isCoveringAbsenceSurec($surecTuru, $payload['alt_tur'] ?? null)) {
+            return;
+        }
+
+        $personelId = (int) ($payload['personel_id'] ?? 0);
+        $bas = (string) ($payload['baslangic_tarihi'] ?? '');
+        $bit = !empty($payload['bitis_tarihi']) ? (string) $payload['bitis_tarihi'] : $bas;
+        if ($personelId < 1 || $bas === '') {
+            return;
+        }
+
+        $sql = '
+            SELECT id, surec_turu, alt_tur, baslangic_tarihi, bitis_tarihi
+            FROM surecler
+            WHERE personel_id = :personel_id
+              AND state = \'AKTIF\'
+              AND surec_turu IN (\'IZIN\', \'RAPOR\', \'IS_KAZASI\', \'DEVAMSIZLIK\')
+              AND baslangic_tarihi <= :bitis
+              AND COALESCE(bitis_tarihi, baslangic_tarihi) >= :baslangic
+        ';
+        $params = [
+            'personel_id' => $personelId,
+            'baslangic' => $bas,
+            'bitis' => $bit,
+        ];
+        if ($exceptSurecId !== null && (int) $exceptSurecId > 0) {
+            $sql .= ' AND id <> :except_id';
+            $params['except_id'] = (int) $exceptSurecId;
+        }
+        $sql .= ' ORDER BY id ASC LIMIT 20';
+
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            if (!self::isCoveringAbsenceSurec(
+                (string) ($row['surec_turu'] ?? ''),
+                $row['alt_tur'] ?? null
+            )) {
+                continue;
+            }
+            JsonResponse::error(
+                409,
+                'SUREC_DATE_OVERLAP',
+                'Ayni personelde bu tarih araliginda cakisan izin/rapor/devamsizlik kaydi var.',
+                'baslangic_tarihi'
+            );
+        }
+    }
+
+    /** @param mixed $altTur */
+    private static function isCoveringAbsenceSurec($surecTuru, $altTur)
+    {
+        $tur = strtoupper(trim((string) $surecTuru));
+        if (in_array($tur, ['IZIN', 'RAPOR', 'IS_KAZASI'], true)) {
+            return true;
+        }
+        if ($tur !== 'DEVAMSIZLIK') {
+            return false;
+        }
+        $alt = strtoupper(trim((string) $altTur));
+
+        return $alt === '' || $alt === 'IZINSIZ_GELMEDI';
     }
 
     private static function validationError($field, $message)

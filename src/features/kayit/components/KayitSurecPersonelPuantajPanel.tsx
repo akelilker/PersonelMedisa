@@ -1,5 +1,6 @@
 import { type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
+import { dispatchOpenBugunPersonelDurumu } from "../../../lib/bildirim/bugun-personel-durumu-events";
 import type { Personel } from "../../../types/personel";
 import {
   DEVAMSIZLIK_SUB_CARDS,
@@ -51,6 +52,11 @@ export function KayitSurecPersonelPuantajPanel({
       return;
     }
 
+    if (card.kind === "bugun-modal") {
+      dispatchOpenBugunPersonelDurumu();
+      return;
+    }
+
     if (card.kind === "route") {
       navigate("/bildirimler", {
         state: buildKayitSurecRouteState(personel.id, "puantaj", { openCreateModal: true })
@@ -74,9 +80,9 @@ export function KayitSurecPersonelPuantajPanel({
 
   return (
     <div className="surec-shell-panel" data-testid="kayit-surec-puantaj-panel">
-      <p className="workspace-empty-hint">
-        <strong>Puantaj</strong> — izin, devamsızlık, günlük hareketler ve puantaj kararları bu süreç altında
-        toplanır.
+      <p className="workspace-empty-hint" data-testid="kayit-surec-puantaj-owner-hint">
+        <strong>Puantaj</strong> — İzin / Rapor / İş Kazası / İzinsiz = özlük süreç kaydı. Geç / Erken /
+        Görevde = Bugünkü Personel Durumu (saatli günlük durum).
       </p>
 
       <div className="surec-devamsizlik-tiles" role="group" aria-label="Puantaj alt işlemleri">
@@ -97,7 +103,11 @@ export function KayitSurecPersonelPuantajPanel({
               <span className="surec-devamsizlik-tile-title">{card.title}</span>
               <span className="surec-devamsizlik-tile-desc">{card.description}</span>
               <span className="surec-devamsizlik-tile-status">
-                {card.kind === "route" || card.kind === "puantaj-route" ? "Aç" : isActive ? "Seçildi" : "Seç"}
+                {card.kind === "route" || card.kind === "puantaj-route" || card.kind === "bugun-modal"
+                  ? "Aç"
+                  : isActive
+                    ? "Seçildi"
+                    : "Seç"}
               </span>
             </button>
           );

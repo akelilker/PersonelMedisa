@@ -71,6 +71,7 @@ import { usePersonelFinansCreate } from "../../../hooks/useFinans";
 import { INITIAL_CREATE_PERSONEL_FORM, usePersonelZimmetCreate, type CreatePersonelFormState } from "../../../hooks/usePersoneller";
 import { INITIAL_SUREC_FORM, type SurecFormState } from "../../../hooks/useSurecler";
 import { useRoleAccess } from "../../../hooks/use-role-access";
+import { dispatchRefreshBugunPersonelDurumu } from "../../../lib/bildirim/bugun-personel-durumu-events";
 import { formatAktifDurumLabel } from "../../../lib/display/enum-display";
 import type { Personel } from "../../../types/personel";
 import type { IdOption, KeyOption } from "../../../types/referans";
@@ -974,6 +975,7 @@ export function KayitSurecWorkspace({
         } catch {
           /* Süreç listesi önbelleği yenilenemedi. */
         }
+        dispatchRefreshBugunPersonelDurumu();
       } else {
         const payload = buildCreateSurecPayload(surecForm);
         nextSurecPersonelId = String(payload.personel_id);
@@ -983,6 +985,9 @@ export function KayitSurecWorkspace({
           await refetchSurecCachesForPersonel(payload.personel_id);
         } catch {
           /* Süreç listesi önbelleği yenilenemedi. */
+        }
+        if (["IZIN", "RAPOR", "IS_KAZASI", "DEVAMSIZLIK"].includes(payload.surec_turu)) {
+          dispatchRefreshBugunPersonelDurumu();
         }
         if (payload.surec_turu === "ISTEN_AYRILMA") {
           try {

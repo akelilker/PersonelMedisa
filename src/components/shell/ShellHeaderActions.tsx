@@ -12,6 +12,10 @@ import { canonicalizeUserRole } from "../../lib/authorization/canonicalize-user-
 import { useAuth } from "../../state/auth.store";
 import { GLOBAL_SCOPE_ROLES } from "../../types/auth";
 import { fetchBugunPersonelDurumu } from "../../api/bildirimler.api";
+import {
+  OPEN_BUGUN_PERSONEL_DURUMU_EVENT,
+  REFRESH_BUGUN_PERSONEL_DURUMU_EVENT
+} from "../../lib/bildirim/bugun-personel-durumu-events";
 import { istanbulBusinessDate } from "../../features/self-service/birim-amiri-operational";
 
 type NotificationLevel = "neutral" | "warning" | "critical";
@@ -213,6 +217,29 @@ export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeade
     setIsSettingsOpen(false);
     setIsSubeOpen(false);
   }, [location.pathname]);
+
+  useEffect(() => {
+    if (!canViewBugunPersonelDurumu || !minimal) {
+      return;
+    }
+    function openBugun() {
+      setIsBugunModalOpen(true);
+      setIsNotificationsOpen(false);
+      setIsSettingsOpen(false);
+      setIsSubeOpen(false);
+    }
+    function refreshBugunAttention() {
+      void fetchBugunPersonelDurumu({ tarih: istanbulBusinessDate() })
+        .then((data) => setBugunAttentionCount(Math.max(0, Number(data.attention_count) || 0)))
+        .catch(() => setBugunAttentionCount(0));
+    }
+    window.addEventListener(OPEN_BUGUN_PERSONEL_DURUMU_EVENT, openBugun);
+    window.addEventListener(REFRESH_BUGUN_PERSONEL_DURUMU_EVENT, refreshBugunAttention);
+    return () => {
+      window.removeEventListener(OPEN_BUGUN_PERSONEL_DURUMU_EVENT, openBugun);
+      window.removeEventListener(REFRESH_BUGUN_PERSONEL_DURUMU_EVENT, refreshBugunAttention);
+    };
+  }, [canViewBugunPersonelDurumu, minimal]);
 
   useEffect(() => {
     if (!canViewBugunPersonelDurumu || !minimal) {

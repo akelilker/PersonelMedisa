@@ -1,9 +1,19 @@
 /**
- * MG-PERSONNEL-DEFERRED-EXIT-001
+ * MG-PERSONNEL-HISTORICAL-EXIT-DATE-BACKFILL-001
  * Canonical owner: POST /personeller/lifecycle-bulk/{dry-run,apply}
- * Postcheck owner: scripts/ops/personel-lifecycle-exit-postcheck.mjs
+ * Operation: HISTORICAL_EXIT_DATE_BACKFILL (PersonelHistoricalExitDateBackfillService)
  *
- * Usage: node ops/personnel-lifecycle/deferred-exit-production-apply.mjs [--apply]
+ * Targets (authoritative HR dates):
+ *   202 -> 2025-12-31
+ *   208 -> 2026-05-25
+ *
+ * Default: dry-run only (non-mutating).
+ * Production apply requires explicit --apply after live PASIF residual preimage gate.
+ *
+ * Usage: node ops/personnel-lifecycle/deferred-exit-production-apply.mjs --expected-sha=<40-hex> [--apply]
+ *
+ * --expected-sha is mandatory at runtime (exact match to origin/main, live .deploy-sha,
+ * worker heartbeat deployed_sha, and API deployed_sha). No silent code-prep baseline fallback.
  */
 "use strict";
 
@@ -15,38 +25,58 @@ import { spawnSync } from "node:child_process";
 import {
   ExitPostcheckError,
   resolveSurecIdFromApplyResult,
-  verifyPersonnelExitPreimage,
   verifyPersonnelExitSurec,
 } from "../../scripts/ops/personel-lifecycle-exit-postcheck.mjs";
+import {
+  evaluateResidualPreimage,
+  evaluateShaPreflight,
+  isApplyRequested,
+  parseExpectedSha,
+} from "./lib/historical-exit-backfill-gates.mjs";
 
 const DIR = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.join(DIR, "../..");
-const LIVE_CONFIG = path.join(process.env.TEMP, "live-config.local.php");
-const FTP_NETRC = path.join(process.env.USERPROFILE, "Documents", "medisa-ops-tmp", "org-rollout", "private", "ftp.curl");
+const LIVE_CONFIG = path.join(process.env.TEMP || "/tmp", "live-config.local.php");
+const FTP_NETRC = path.join(
+  process.env.USERPROFILE || process.env.HOME || "",
+  "Documents",
+  "medisa-ops-tmp",
+  "org-rollout",
+  "private",
+  "ftp.curl"
+);
 const API = "https://www.karmotors.com.tr/personelmedisa/api";
-const EXPECTED_ORIGIN_MAIN = "51c6bad5b85d8735ffc101fc6c69ac34dadecaa6";
 const ACTOR_UID = 10;
-const DO_APPLY = process.argv.includes("--apply");
+const DO_APPLY = isApplyRequested(process.argv);
+/** Set in main() via required --expected-sha (fail closed; no silent baseline). */
+let EXPECTED_SHA = null;
 
-const EXIT_ROWS = [
+const BACKFILL_ROWS = [
   {
-    mutation_id: "mg-exit-202",
-    operation_type: "PERSONEL_EXIT",
+    mutation_id: "mg-historical-exit-backfill-202",
+    operation_type: "HISTORICAL_EXIT_DATE_BACKFILL",
     personel_id: 202,
-    gerekce: "İşveren feshi",
-    payload: { exit_date: "2026-07-30", aciklama: "İşveren feshi" },
+    gerekce: "Tarihi PASIF residual cikis tarihi backfill (HR authoritative)",
+    payload: {
+      exit_date: "2025-12-31",
+      aciklama: "HR authoritative historical exit date backfill",
+    },
   },
   {
-    mutation_id: "mg-exit-208",
-    operation_type: "PERSONEL_EXIT",
+    mutation_id: "mg-historical-exit-backfill-208",
+    operation_type: "HISTORICAL_EXIT_DATE_BACKFILL",
     personel_id: 208,
-    gerekce: "İşveren feshi",
-    payload: { exit_date: "2026-07-30", aciklama: "İşveren feshi" },
+    gerekce: "Tarihi PASIF residual cikis tarihi backfill (HR authoritative)",
+    payload: {
+      exit_date: "2026-05-25",
+      aciklama: "HR authoritative historical exit date backfill",
+    },
   },
 ];
 
+
 const report = {
-  phase: "MG-PERSONNEL-DEFERRED-EXIT-001",
+  phase: "MG-PERSONNEL-HISTORICAL-EXIT-DATE-BACKFILL-001",
   timestamp: new Date().toISOString(),
   preflight: {},
   personnel_preimage: {},
@@ -54,6 +84,7 @@ const report = {
   apply: null,
   postcheck: null,
   production_mutation: DO_APPLY ? "REQUESTED" : "DRY_RUN_ONLY",
+  live_preimage_required: true,
 };
 
 function fail(code, msg) {
@@ -65,25 +96,37 @@ function fail(code, msg) {
 function b64url(d) {
   return Buffer.from(d).toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
+
 function readJwtSecret(phpPath) {
   const src = fs.readFileSync(phpPath, "utf8");
   const m = src.match(/'jwt_secret'\s*=>\s*'([^']+)'/);
   if (!m) fail("CONFIG", "jwt_secret missing");
   return m[1];
 }
+
 function mintJwt(secret, sub, ttl = 7200) {
   const header = b64url(JSON.stringify({ typ: "JWT", alg: "HS256" }));
   const payload = b64url(
-    JSON.stringify({ sub: Number(sub), rol: "GENEL_YONETICI", iat: Math.floor(Date.now() / 1000), exp: Math.floor(Date.now() / 1000) + ttl })
+    JSON.stringify({
+      sub: Number(sub),
+      rol: "GENEL_YONETICI",
+      iat: Math.floor(Date.now() / 1000),
+      exp: Math.floor(Date.now() / 1000) + ttl,
+    })
   );
   const sig = b64url(crypto.createHmac("sha256", secret).update(`${header}.${payload}`).digest());
   return `${header}.${payload}.${sig}`;
 }
-async function api(pathname, { method = "GET", token, body, accept } = {}) {
-  const h = { Accept: accept || "application/json" };
-  if (token) h.Authorization = `Bearer ${token}`;
-  if (body !== undefined) h["Content-Type"] = "application/json";
-  const res = await fetch(API + pathname, { method, headers: h, body: body !== undefined ? JSON.stringify(body) : undefined });
+
+async function api(pathname, { method = "GET", token, body } = {}) {
+  const headers = { Accept: "application/json" };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  if (body !== undefined) headers["Content-Type"] = "application/json";
+  const res = await fetch(API + pathname, {
+    method,
+    headers,
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  });
   const text = await res.text();
   let json = null;
   try {
@@ -93,21 +136,15 @@ async function api(pathname, { method = "GET", token, body, accept } = {}) {
   }
   return { status: res.status, text, json };
 }
+
 function unwrapItems(json) {
   const d = json?.data;
   if (Array.isArray(d)) return d;
   if (Array.isArray(d?.items)) return d.items;
   return [];
 }
-function unwrapMeta(json) {
-  return json?.meta ?? json?.data?.meta ?? {};
-}
-function normName(v) {
-  return String(v ?? "")
-    .trim()
-    .replace(/\s+/g, " ")
-    .toLocaleUpperCase("tr-TR");
-}
+
+
 function ftpGet(remote, local) {
   const r = spawnSync(
     "curl.exe",
@@ -118,40 +155,58 @@ function ftpGet(remote, local) {
 }
 
 function runPreflight() {
+  report.preflight.expected_sha = EXPECTED_SHA;
   const origin = spawnSync("git", ["rev-parse", "origin/main"], { cwd: REPO_ROOT, encoding: "utf8" });
   const originMain = (origin.stdout || "").trim().toLowerCase();
   report.preflight.origin_main = originMain;
-  report.preflight.origin_main_pass = originMain === EXPECTED_ORIGIN_MAIN;
+  report.preflight.origin_main_pass = originMain === EXPECTED_SHA;
 
-  ftpGet("api/.deploy-sha", path.join(process.env.TEMP, "live-deploy-sha.txt"));
-  const liveSha = fs.readFileSync(path.join(process.env.TEMP, "live-deploy-sha.txt"), "utf8").trim().toLowerCase();
+  const tmp = process.env.TEMP || "/tmp";
+  ftpGet("api/.deploy-sha", path.join(tmp, "live-deploy-sha.txt"));
+  const liveSha = fs.readFileSync(path.join(tmp, "live-deploy-sha.txt"), "utf8").trim().toLowerCase();
   report.preflight.live_deploy_sha = liveSha;
-  report.preflight.live_deploy_sha_pass = liveSha === EXPECTED_ORIGIN_MAIN;
+  report.preflight.live_deploy_sha_pass = liveSha === EXPECTED_SHA;
 
   if (!fs.existsSync(LIVE_CONFIG)) {
     ftpGet("api/config.local.php", LIVE_CONFIG);
   }
 
-  ftpGet("api/runtime/migration-control/status.json", path.join(process.env.TEMP, "live-mig-status.json"));
-  const migStatus = JSON.parse(fs.readFileSync(path.join(process.env.TEMP, "live-mig-status.json"), "utf8"));
-  report.preflight.migration_applied = migStatus.applied_versions || "";
+  ftpGet("api/runtime/migration-control/status.json", path.join(tmp, "live-mig-status.json"));
+  const migStatus = JSON.parse(fs.readFileSync(path.join(tmp, "live-mig-status.json"), "utf8"));
   report.preflight.migration_pending_after = migStatus.pending_versions_after || "";
-  report.preflight.migration_tip_pass = String(migStatus.applied_versions || "").split(",").includes("083");
   report.preflight.migration_pending_pass = String(migStatus.pending_versions_after || "").trim() === "";
 
-  ftpGet("api/runtime/migration-control/worker-heartbeat.json", path.join(process.env.TEMP, "live-worker-hb.json"));
-  const hb = JSON.parse(fs.readFileSync(path.join(process.env.TEMP, "live-worker-hb.json"), "utf8"));
+  ftpGet("api/runtime/migration-control/worker-heartbeat.json", path.join(tmp, "live-worker-hb.json"));
+  const hb = JSON.parse(fs.readFileSync(path.join(tmp, "live-worker-hb.json"), "utf8"));
   report.preflight.worker_heartbeat_sha = hb.deployed_sha || "";
-  report.preflight.worker_heartbeat_pass = String(hb.deployed_sha || "").toLowerCase() === EXPECTED_ORIGIN_MAIN;
+  report.preflight.worker_heartbeat_pass =
+    String(hb.deployed_sha || "").toLowerCase() === EXPECTED_SHA;
   report.preflight.worker_idle_pass = String(migStatus.state || "") === "SUCCEEDED";
 
-  const health = spawnSync("curl.exe", ["-sS", "--max-time", "15", `${API}/health`], { encoding: "utf8" });
-  report.preflight.api_health_pass = health.stdout.includes('"status":"ok"');
+  const health = spawnSync("curl.exe", ["-sS", "--max-time", "15", `${API}/health`], {
+    encoding: "utf8",
+  });
+  report.preflight.api_health_pass = (health.stdout || "").includes('"status":"ok"');
+
+  const shaGate = evaluateShaPreflight({
+    expectedSha: EXPECTED_SHA,
+    originMain: report.preflight.origin_main,
+    liveDeploySha: report.preflight.live_deploy_sha,
+    workerHeartbeatSha: report.preflight.worker_heartbeat_sha,
+  });
+  report.preflight.origin_main_pass = shaGate.origin_main_pass;
+  report.preflight.live_deploy_sha_pass = shaGate.live_deploy_sha_pass;
+  report.preflight.worker_heartbeat_pass = shaGate.worker_heartbeat_pass;
+  if (!shaGate.all_sha_pass) {
+    fail(
+      "PREFLIGHT_SHA",
+      `Expected SHA mismatch: expected=${shaGate.expected_sha} origin/main=${shaGate.origin_main} live=${shaGate.live_deploy_sha} heartbeat=${shaGate.worker_heartbeat_sha}`
+    );
+  }
 
   const required = [
     "origin_main_pass",
     "live_deploy_sha_pass",
-    "migration_tip_pass",
     "migration_pending_pass",
     "worker_idle_pass",
     "worker_heartbeat_pass",
@@ -161,51 +216,82 @@ function runPreflight() {
   if (!report.preflight.all_pass) fail("PREFLIGHT", "Binding preflight failed");
 }
 
-async function verifyPersonnelPreimage(token) {
-  const expected = {
-    202: { ad: "AHMED", soyad: "KHALIL ALSAMAR" },
-    208: { ad: "SEFİNE", soyad: "ÖZCAN" },
-  };
-  for (const id of [202, 208]) {
-    const preimage = await verifyPersonnelExitPreimage(api, { token, personelId: id });
+/**
+ * Historical residual preimage: PASIF + missing canonical exit date.
+ * Does NOT accept AKTIF (that belongs to normal PERSONEL_EXIT).
+ */
+async function verifyHistoricalResidualPreimage(token) {
+  for (const row of BACKFILL_ROWS) {
+    const id = row.personel_id;
+    const expectedExit = row.payload.exit_date;
     const res = await api(`/personeller/${id}`, { token });
+    if (res.status !== 200) fail("PREIMAGE", `GET /personeller/${id} HTTP ${res.status}`);
     const p = res.json?.data ?? {};
+    const istenCikis = p.isten_cikis_tarihi ?? p.cikis_tarihi ?? null;
+
+    let exitSurecCount = 0;
+    const surecRes = await api(`/surecler?personel_id=${id}&surec_turu=ISTEN_AYRILMA`, { token });
+    if (surecRes.status === 200) {
+      const items = unwrapItems(surecRes.json).filter(
+        (s) => String(s.state || "").toUpperCase() !== "IPTAL"
+      );
+      exitSurecCount = items.length;
+    }
+
+    const gate = evaluateResidualPreimage({
+      personelId: id,
+      ad: p.ad,
+      soyad: p.soyad,
+      aktifDurum: p.aktif_durum,
+      istenCikisTarihi: istenCikis,
+      exitSurecCount,
+    });
+
     report.personnel_preimage[id] = {
-      ...preimage,
-      ad: normName(p.ad),
-      soyad: normName(p.soyad),
-      name_match:
-        normName(`${p.ad} ${p.soyad}`).includes(expected[id].ad.replace("İ", "I")) ||
-        normName(`${p.ad} ${p.soyad}`).includes("SEFINE") ||
-        normName(`${p.ad} ${p.soyad}`).includes("AHMED"),
-      active_pass: preimage.aktif_durum === "AKTIF",
-      exit_date_empty_pass: !preimage.isten_cikis_tarihi && preimage.exit_surec_count === 0,
-      preimage_pass: preimage.preimage_pass,
+      personel_id: id,
+      aktif_durum: String(p.aktif_durum || "").toUpperCase(),
+      isten_cikis_tarihi: istenCikis,
+      exit_surec_count: exitSurecCount,
+      expected_exit_date: expectedExit,
+      full_name_normalized: gate.full_name_normalized,
+      expected_full_name: gate.expected_full_name,
+      name_exact_pass: gate.name_exact_pass,
+      pasif_pass: gate.pasif_pass,
+      exit_date_empty_pass: gate.exit_date_empty_pass,
+      residual_preimage_pass: gate.residual_preimage_pass,
     };
   }
-  report.personnel_preimage.all_pass = [202, 208].every((id) => report.personnel_preimage[id]?.preimage_pass === true);
-  if (!report.personnel_preimage.all_pass) fail("PREIMAGE", "Personnel preimage failed");
+
+  report.personnel_preimage.all_pass = BACKFILL_ROWS.every(
+    (row) => report.personnel_preimage[row.personel_id]?.residual_preimage_pass === true
+  );
+  if (!report.personnel_preimage.all_pass) {
+    fail(
+      "PREIMAGE",
+      "Historical residual preimage failed (require exact personel_id + exact full name + PASIF + empty exit + 0 ISTEN_AYRILMA)"
+    );
+  }
 }
 
 async function runDryApply(token) {
   const dry = await api("/personeller/lifecycle-bulk/dry-run", {
     method: "POST",
     token,
-    body: { rows: EXIT_ROWS, deployed_sha: EXPECTED_ORIGIN_MAIN },
+    body: { rows: BACKFILL_ROWS, deployed_sha: EXPECTED_SHA },
   });
   report.dry_run = {
     status: dry.status,
     can_apply: dry.json?.data?.can_apply === true,
-    dry_run_checksum: dry.json?.data?.dry_run_checksum ?? null,
+    dry_run_checksum: dry.json?.data?.dry_run_checksum ?? dry.json?.data?.preimage_checksum ?? null,
     preimage_checksum: dry.json?.data?.preimage_checksum ?? null,
     ozet: dry.json?.data?.ozet ?? null,
-    postcheck: dry.json?.data?.postcheck ?? null,
     postcheck_errors: dry.json?.data?.postcheck_errors ?? null,
     satirlar: (dry.json?.data?.satirlar || []).map((s) => ({
       mutation_id: s.mutation_id,
       durum: s.durum,
       personel_id: s.personel_id,
       owner: s.mutation_plan?.owner ?? null,
+      action: s.mutation_plan?.action ?? null,
       hata_kodlari: s.hata_kodlari ?? [],
     })),
     errors: dry.json?.errors ?? null,
@@ -213,16 +299,21 @@ async function runDryApply(token) {
   if (dry.status !== 200) fail("DRY_RUN", `dry-run HTTP ${dry.status} ${dry.text.slice(0, 400)}`);
   if (!report.dry_run.can_apply) fail("DRY_RUN", "can_apply=false");
 
+  const ownersOk = (report.dry_run.satirlar || []).every(
+    (s) => s.owner === "PersonelHistoricalExitDateBackfillService"
+  );
+  if (!ownersOk) fail("DRY_RUN", "expected PersonelHistoricalExitDateBackfillService owner");
+
   if (!DO_APPLY) return;
 
   const apply = await api("/personeller/lifecycle-bulk/apply", {
     method: "POST",
     token,
     body: {
-      rows: EXIT_ROWS,
+      rows: BACKFILL_ROWS,
       dry_run_checksum: report.dry_run.dry_run_checksum,
       preimage_checksum: report.dry_run.preimage_checksum,
-      deployed_sha: EXPECTED_ORIGIN_MAIN,
+      deployed_sha: EXPECTED_SHA,
     },
   });
   report.apply = {
@@ -236,42 +327,33 @@ async function runDryApply(token) {
 }
 
 async function postcheck(token) {
-  let total = 0;
-  let active = 0;
-  let page = 1;
-  for (;;) {
-    const res = await api(`/personeller?limit=200&page=${page}`, { token });
-    if (res.status !== 200) fail("POSTCHECK", `personeller list ${res.status}`);
-    const items = unwrapItems(res.json);
-    total += items.length;
-    active += items.filter((p) => String(p.aktif_durum).toUpperCase() === "AKTIF").length;
-    const metaTotal = Number(unwrapMeta(res.json).total ?? total);
-    if (total >= metaTotal || items.length === 0) break;
-    page += 1;
-  }
-
   const applyRows = report.apply?.satir_sonuclari ?? null;
   const checks = {};
-  for (const row of EXIT_ROWS) {
+  for (const row of BACKFILL_ROWS) {
     const personelId = row.personel_id;
-    const surecId = resolveSurecIdFromApplyResult(applyRows, { mutationId: row.mutation_id });
+    const expectedExitDate = row.payload.exit_date;
+    const surecId = resolveSurecIdFromApplyResult(applyRows, {
+      mutationId: row.mutation_id,
+      owner: "PersonelHistoricalExitDateBackfillService",
+    });
     try {
       const surecEvidence = await verifyPersonnelExitSurec(api, {
         token,
         personelId,
         surecId,
-        expectedExitDate: row.payload.exit_date,
-        expectedAciklama: row.payload.aciklama,
+        expectedExitDate,
       });
       const personelRes = await api(`/personeller/${personelId}`, { token });
       const p = personelRes.json?.data ?? {};
+      const aktifDurum = String(p.aktif_durum || "").toUpperCase();
+      const istenCikis = p.isten_cikis_tarihi ?? null;
       checks[personelId] = {
         ...surecEvidence,
-        aktif_durum: String(p.aktif_durum || "").toUpperCase(),
+        aktif_durum: aktifDurum,
+        isten_cikis_tarihi: istenCikis,
         pass:
-          String(p.aktif_durum || "").toUpperCase() === "PASIF" &&
-          surecEvidence.baslangic_tarihi === row.payload.exit_date &&
-          surecEvidence.aciklama === row.payload.aciklama,
+          aktifDurum === "PASIF" &&
+          (surecEvidence.baslangic_tarihi === expectedExitDate || istenCikis === expectedExitDate),
       };
     } catch (error) {
       if (error instanceof ExitPostcheckError) {
@@ -288,26 +370,23 @@ async function postcheck(token) {
   }
 
   report.postcheck = {
-    total_personel: total,
-    active_personel: active,
-    expected_total: 153,
-    expected_active: 144,
-    total_pass: total === 153,
-    active_pass: active === 144,
     personnel: checks,
-    personnel_pass: EXIT_ROWS.every((row) => checks[row.personel_id]?.pass === true),
-    all_pass: total === 153 && active === 144 && EXIT_ROWS.every((row) => checks[row.personel_id]?.pass === true),
+    personnel_pass: BACKFILL_ROWS.every((row) => checks[row.personel_id]?.pass === true),
+    all_pass: BACKFILL_ROWS.every((row) => checks[row.personel_id]?.pass === true),
   };
-  if (DO_APPLY && !report.postcheck.all_pass) fail("POSTCHECK", "Postcheck failed");
+  if (DO_APPLY && !report.postcheck.all_pass) fail("POSTCHECK", "Historical backfill postcheck failed");
 }
 
 async function main() {
   try {
+    EXPECTED_SHA = parseExpectedSha(process.argv.slice(2));
     runPreflight();
     const token = mintJwt(readJwtSecret(LIVE_CONFIG), ACTOR_UID);
-    await verifyPersonnelPreimage(token);
+    await verifyHistoricalResidualPreimage(token);
     await runDryApply(token);
-    await postcheck(token);
+    if (DO_APPLY) {
+      await postcheck(token);
+    }
     report.final_status = DO_APPLY ? "APPLIED" : "DRY_RUN_PASS";
     fs.writeFileSync(path.join(DIR, "deferred-exit-report.json"), JSON.stringify(report, null, 2));
     console.log(JSON.stringify(report, null, 2));

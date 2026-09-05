@@ -214,8 +214,17 @@ final class PersonelLifecycleBulkDryRunService
             $errors[] = 'EXIT_PREIMAGE_NOT_AKTIF';
         }
 
+        if ($op === PersonelLifecycleBulkRowContract::OP_HISTORICAL_EXIT_DATE_BACKFILL
+            && strtoupper(trim((string) ($personel['aktif_durum'] ?? ''))) !== 'PASIF'
+        ) {
+            $errors[] = PersonelHistoricalExitDateBackfillService::ERROR_NOT_PASIF;
+        }
+
         $gerekce = trim((string) ($row['gerekce'] ?? ($row['payload']['gerekce'] ?? '')));
-        if ($gerekce === '' && !in_array($op, [PersonelLifecycleBulkRowContract::OP_EXIT], true)) {
+        if ($gerekce === '' && !in_array($op, [
+            PersonelLifecycleBulkRowContract::OP_EXIT,
+            PersonelLifecycleBulkRowContract::OP_HISTORICAL_EXIT_DATE_BACKFILL,
+        ], true)) {
             $errors[] = 'GEREKCE_EKSIK';
         }
 
@@ -347,6 +356,27 @@ final class PersonelLifecycleBulkDryRunService
                     'personel_id' => $personelId,
                     'exit_date' => trim((string) ($payload['exit_date'] ?? $row['isten_cikis_tarihi'] ?? '')),
                     'aciklama' => trim((string) ($payload['aciklama'] ?? $row['gerekce'] ?? '')),
+                ];
+            case PersonelLifecycleBulkRowContract::OP_HISTORICAL_EXIT_DATE_BACKFILL:
+                $exitDate = trim((string) ($payload['exit_date'] ?? $row['isten_cikis_tarihi'] ?? ''));
+                $aciklama = trim((string) ($payload['aciklama'] ?? $row['gerekce'] ?? ''));
+                $planned = PersonelHistoricalExitDateBackfillService::plan(
+                    $pdo,
+                    $personelId,
+                    $exitDate,
+                    $aciklama !== '' ? $aciklama : null
+                );
+
+                return [
+                    'owner' => 'PersonelHistoricalExitDateBackfillService',
+                    'operation_type' => $op,
+                    'personel_id' => $personelId,
+                    'exit_date' => $planned['exit_date'],
+                    'aciklama' => $planned['aciklama'],
+                    'action' => $planned['action'],
+                    'no_change' => $planned['no_change'],
+                    'preimage' => $planned['preimage'],
+                    'postimage' => $planned['postimage'],
                 ];
             case PersonelLifecycleBulkRowContract::OP_BASIC_UPDATE:
                 return [

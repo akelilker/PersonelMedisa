@@ -269,7 +269,11 @@ function ensureDataDir(mysqldPath) {
     throw new Error("MariaDB data directory is missing and install helper was not found.");
   }
 
-  const install = spawnSync(installDb, [`--datadir=${dataDir}`, "--password="], {
+  // Linux mariadb-install-db rejects Windows-style --password=; use auth-root normal instead.
+  const installArgs = process.platform === "win32"
+    ? [`--datadir=${dataDir}`, "--password="]
+    : [`--datadir=${dataDir}`, "--auth-root-authentication-method=normal"];
+  const install = spawnSync(installDb, installArgs, {
     encoding: "utf8"
   });
   if (install.status !== 0) {

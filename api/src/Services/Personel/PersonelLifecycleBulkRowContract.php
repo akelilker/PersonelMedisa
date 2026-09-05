@@ -14,6 +14,7 @@ final class PersonelLifecycleBulkRowContract
     public const OP_ORG_UPDATE = 'PERSONEL_ORGANIZATION_UPDATE';
     public const OP_BRANCH = 'PERMANENT_BRANCH_CHANGE';
     public const OP_EXIT = 'PERSONEL_EXIT';
+    public const OP_HISTORICAL_EXIT_DATE_BACKFILL = 'HISTORICAL_EXIT_DATE_BACKFILL';
     public const OP_REFERENCE = 'REFERENCE_CREATE_OR_RESOLVE';
 
     /** @var list<string> */
@@ -23,6 +24,7 @@ final class PersonelLifecycleBulkRowContract
         self::OP_ORG_UPDATE,
         self::OP_BRANCH,
         self::OP_EXIT,
+        self::OP_HISTORICAL_EXIT_DATE_BACKFILL,
         self::OP_REFERENCE,
         'YENI_GIRIS',
         'ISTEN_AYRILMA',

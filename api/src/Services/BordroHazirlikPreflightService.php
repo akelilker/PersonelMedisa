@@ -139,6 +139,43 @@ class BordroHazirlikPreflightService
         $netMaasCount = self::countNetMaasEksikleri($pdo, (int) $subeId, $donemBitis, null);
         $devirCount = self::countDevirEksikleri($pdo, (int) $subeId, (int) $yil, (int) $ay);
 
+        // Operasyonel hazırlık (açık gün / puantaj / etki) must feed blockers before gate counts.
+        $operasyonel = BordroOperasyonelHazirlikService::build($pdo, (int) $subeId, (int) $yil, (int) $ay);
+        $kontrolGereken = (int) ($operasyonel['ozet']['kontrol_gereken_personel'] ?? 0);
+        if ($kontrolGereken > 0) {
+            $items[] = self::actionableIssue(
+                'BLOCKER',
+                'OPERASYONEL_HAZIRLIK_EKSIK',
+                'Operasyonel olarak hazır olmayan personel var; açık kayıtlar giderilmeden dönem kapatılamaz.',
+                'operasyonel_puantaj',
+                null,
+                null,
+                [
+                    'adet' => $kontrolGereken,
+                    'kontrol_gereken_personel' => $kontrolGereken,
+                    'bordroya_hazir_personel' => (int) ($operasyonel['ozet']['bordroya_hazir_personel'] ?? 0),
+                    'toplam_personel' => (int) ($operasyonel['ozet']['toplam_personel'] ?? 0),
+                ],
+                '/raporlar?panel=bordro-hazirlik&tab=veri-hazirlik'
+            );
+        } else {
+            $items[] = self::actionableIssue(
+                'INFO',
+                'OPERASYONEL_HAZIRLIK_TAMAM',
+                'Operasyonel hazırlık tamam; açık kontrol gerektiren personel yok.',
+                'operasyonel_puantaj',
+                null,
+                null,
+                [
+                    'adet' => 0,
+                    'kontrol_gereken_personel' => 0,
+                    'bordroya_hazir_personel' => (int) ($operasyonel['ozet']['bordroya_hazir_personel'] ?? 0),
+                    'toplam_personel' => (int) ($operasyonel['ozet']['toplam_personel'] ?? 0),
+                ],
+                '/raporlar?panel=bordro-hazirlik&tab=veri-hazirlik'
+            );
+        }
+
         $blockerCount = self::countSeverity($items, 'BLOCKER');
         $warningCount = self::countSeverity($items, 'WARNING');
         $infoCount = self::countSeverity($items, 'INFO');
@@ -152,11 +189,10 @@ class BordroHazirlikPreflightService
             $snapshotPreflight,
             $calcPreflight,
             $netMaasCount,
-            $devirCount
+            $devirCount,
+            $operasyonel
         );
         $candidateGate = self::buildCandidateGate($hesaplanabilir, $items, $readinessDomains);
-
-        $operasyonel = BordroOperasyonelHazirlikService::build($pdo, (int) $subeId, (int) $yil, (int) $ay);
 
         return [
             'sube_id' => (int) $subeId,
@@ -217,9 +253,9 @@ class BordroHazirlikPreflightService
                 LEFT JOIN departmanlar d ON d.id = p.departman_id
                 LEFT JOIN gorevler g ON g.id = p.gorev_id
                 WHERE p.sube_id = :sube_id
-                  AND p.aktif_durum = 'AKTIF'
                   AND " . \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::sqlIcPersonelPredicate($pdo, 'p') . "
                   AND p.ise_giris_tarihi <= :donem_bitis2";
+        // Period roster (not AKTIF-only): mid-period PASIF / isten ayrılma retained.
         $params = [
             'sube_id' => (int) $subeId,
             'donem_bitis' => $donemBitis,
@@ -245,7 +281,7 @@ class BordroHazirlikPreflightService
                  FROM personeller p
                  LEFT JOIN subeler s ON s.id = p.sube_id
                  LEFT JOIN departmanlar d ON d.id = p.departman_id
-                 WHERE p.sube_id = :sube_id AND p.aktif_durum = 'AKTIF'
+                 WHERE p.sube_id = :sube_id
                    AND " . \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::sqlIcPersonelPredicate($pdo, 'p') . "
                    AND p.ise_giris_tarihi <= :donem_bitis
                  ORDER BY p.ad ASC, p.soyad ASC"
@@ -374,9 +410,15 @@ class BordroHazirlikPreflightService
                 $donemBaslangic,
                 $donemBitis
             );
+            $periodSet = BordroOperasyonelHazirlikService::resolveOperationalPersonnelSet(
+                $pdo,
+                (int) $subeId,
+                $donemBaslangic,
+                $donemBitis
+            );
             $stmt = $pdo->prepare(
                 "SELECT p.id FROM personeller p
-                 WHERE p.sube_id = :sube AND p.aktif_durum = 'AKTIF'
+                 WHERE p.sube_id = :sube
                    AND " . \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::sqlIcPersonelPredicate($pdo, 'p') . "
                    AND NOT EXISTS (
                      SELECT 1 FROM personel_bordro_devirleri d
@@ -386,7 +428,8 @@ class BordroHazirlikPreflightService
             $stmt->execute(['sube' => (int) $subeId, 'yil' => (int) $yil, 'ay' => (int) $ay]);
             $count = 0;
             foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
-                if (isset($excluded[(int) $row['id']])) {
+                $pid = (int) $row['id'];
+                if (!isset($periodSet[$pid]) || isset($excluded[$pid])) {
                     continue;
                 }
                 $count++;
@@ -405,6 +448,7 @@ class BordroHazirlikPreflightService
      * @param array<string, mixed> $projection
      * @param array<string, mixed> $snapshotPreflight
      * @param array<string, mixed>|null $calcPreflight
+     * @param array<string, mixed> $operasyonel
      * @return array<int, array<string, mixed>>
      */
     private static function buildReadinessDomains(
@@ -415,9 +459,29 @@ class BordroHazirlikPreflightService
         array $snapshotPreflight,
         $calcPreflight,
         $netMaasCount,
-        $devirCount
+        $devirCount,
+        array $operasyonel = []
     ) {
         $domains = [];
+
+        $kontrolGereken = (int) ($operasyonel['ozet']['kontrol_gereken_personel'] ?? 0);
+        $opItems = self::filterCodes($items, ['OPERASYONEL_HAZIRLIK_EKSIK']);
+        $opStatus = $kontrolGereken > 0 || count(self::filterSeverity($opItems, 'BLOCKER')) > 0 ? 'BLOKE' : 'HAZIR';
+        $domains[] = self::domain(
+            'operasyonel_puantaj',
+            'Operasyonel Puantaj Hazırlık',
+            $opStatus,
+            $kontrolGereken,
+            $kontrolGereken,
+            $opStatus === 'HAZIR'
+                ? 'Operasyonel hazırlık tamam; açık kontrol gerektiren personel yok.'
+                : sprintf(
+                    '%d personelde açık gün, eksik giriş, puantaj kontrol veya etki adayı var. Veri Hazırlık sekmesinden giderin.',
+                    $kontrolGereken
+                ),
+            '/raporlar?panel=bordro-hazirlik&tab=veri-hazirlik',
+            ['OPERASYONEL_HAZIRLIK_EKSIK']
+        );
 
         $s81Blockers = self::filterCodes($items, ['S81_GENEL_YONETICI_FINAL_ONAY_EKSIK']);
         $s81Status = $gyFinal['tamam'] ? 'HAZIR' : 'BLOKE';
@@ -795,6 +859,18 @@ class BordroHazirlikPreflightService
                 }
 
                 return 'Genel yönetici final onayı yok (ONAY_KAYDI_YOK). Bildirimler ekranından final onayı tamamlayın.';
+            case 'OPERASYONEL_HAZIRLIK_EKSIK':
+                $adet = (int) (($item['metadata']['kontrol_gereken_personel'] ?? 0) ?: 0);
+                if ($adet > 0) {
+                    return sprintf(
+                        '%d personelde operasyonel açık kayıt var (henüz değerlendirilmedi, eksik giriş, puantaj kontrol veya etki adayı). Veri Hazırlık sekmesinden tamamlayın; sessizce hazır kabul edilmez.',
+                        $adet
+                    );
+                }
+
+                return 'Operasyonel hazırlık eksik. Veri Hazırlık sekmesinden açık kayıtları giderin; sessizce hazır kabul edilmez.';
+            case 'OPERASYONEL_HAZIRLIK_TAMAM':
+                return 'Operasyonel hazırlık tamam; açık kontrol gerektiren personel yok.';
             case 'CORRECTION_SOURCE_CONFLICT':
                 return 'Açık revizyon / correction çatışması var. Revizyon merkezinden çözün.';
             case 'PAYROLL_SCOPE_EXCLUDED':
@@ -844,6 +920,9 @@ class BordroHazirlikPreflightService
                 return '/raporlar?panel=etki-adayi';
             case 'S81_GENEL_YONETICI_FINAL_ONAY_EKSIK':
                 return '/bildirimler';
+            case 'OPERASYONEL_HAZIRLIK_EKSIK':
+            case 'OPERASYONEL_HAZIRLIK_TAMAM':
+                return '/raporlar?panel=bordro-hazirlik&tab=veri-hazirlik';
             case 'CORRECTION_SOURCE_CONFLICT':
                 return '/revizyon-merkezi';
             case 'PAYROLL_SCOPE_EXCLUDED':

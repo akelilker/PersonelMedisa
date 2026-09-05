@@ -79,14 +79,32 @@ function parseDecimal(value: string): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-export function MaasHesaplamaMerkeziPage() {
+export function MaasHesaplamaMerkeziPage(props?: {
+  /** When embedded under Bordro Hazırlık, reuse parent yıl/ay/şube. */
+  lockedFilters?: { ay: string; subeId: string } | null;
+}) {
   const { hasPermission } = useRoleAccess();
   const { session } = useAuth();
   const canManage = hasPermission("maas_hesaplama.manage");
   const canViewAdaylari = hasPermission("maas_hesaplama_adaylari.view");
   const canManageAdaylari = hasPermission("maas_hesaplama_adaylari.manage");
 
-  const [filters, setFilters] = useState<MaasHesaplamaFilterState>(INITIAL_FILTERS);
+  const [filters, setFilters] = useState<MaasHesaplamaFilterState>(() => ({
+    ay: props?.lockedFilters?.ay || INITIAL_FILTERS.ay,
+    subeId: props?.lockedFilters?.subeId || INITIAL_FILTERS.subeId
+  }));
+
+  useEffect(() => {
+    if (!props?.lockedFilters) return;
+    setFilters((prev) => {
+      if (prev.ay === props.lockedFilters!.ay && prev.subeId === props.lockedFilters!.subeId) {
+        return prev;
+      }
+      return { ay: props.lockedFilters!.ay, subeId: props.lockedFilters!.subeId };
+    });
+  }, [props?.lockedFilters?.ay, props?.lockedFilters?.subeId]);
+
+  const filtersLocked = Boolean(props?.lockedFilters);
   const [subeOptions, setSubeOptions] = useState<IdOption[]>([]);
   const [isCreating, setIsCreating] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
@@ -146,7 +164,7 @@ export function MaasHesaplamaMerkeziPage() {
       setSubeOptions(sessionSubeler);
     }
     const activeSubeId = session?.active_sube_id;
-    if (activeSubeId) {
+    if (activeSubeId && !filtersLocked) {
       setFilters((prev) =>
         prev.subeId === String(activeSubeId) ? prev : { ...prev, subeId: String(activeSubeId) }
       );
@@ -175,7 +193,7 @@ export function MaasHesaplamaMerkeziPage() {
         /* session sube_list fallback */
       }
     })();
-  }, [session?.active_sube_id, sessionSubeKey, allowedSubeKey]);
+  }, [session?.active_sube_id, sessionSubeKey, allowedSubeKey, filtersLocked]);
 
   const createDisabled = useMemo(() => {
     if (!preflight || !canManage || isCreating) {
@@ -520,6 +538,7 @@ export function MaasHesaplamaMerkeziPage() {
             type="month"
             value={filters.ay}
             onChange={(value) => setFilters((prev) => ({ ...prev, ay: value }))}
+            disabled={filtersLocked}
           />
           <FormField
             as="select"
@@ -527,12 +546,18 @@ export function MaasHesaplamaMerkeziPage() {
             name="maas-hesaplama-sube"
             value={filters.subeId}
             onChange={(value) => setFilters((prev) => ({ ...prev, subeId: value }))}
+            disabled={filtersLocked}
             selectOptions={[
               { value: "", label: "Şube seçin" },
               ...subeOptions.map((sube) => ({ value: String(sube.id), label: sube.label }))
             ]}
           />
         </div>
+        {filtersLocked ? (
+          <p className="personel-puantaj-summary-note" data-testid="maas-hesaplama-period-locked-note">
+            Dönem ve şube Bordro Hazırlık Merkezi seçimiyle kilitli (aynı yıl/ay/şube).
+          </p>
+        ) : null}
         <div className="form-actions-row">
           <button type="submit" className="universal-btn-save" data-testid="maas-hesaplama-submit">
             Preflight getir

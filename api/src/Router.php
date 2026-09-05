@@ -577,6 +577,9 @@ class Router
         if ($path === '/bordro-hazirlik/on-izleme' && $method === 'GET') {
             BordroHazirlikController::onIzleme($this->request);
         }
+        if ($path === '/bordro-hazirlik/on-izleme/export.csv' && $method === 'GET') {
+            BordroHazirlikController::onIzlemeExportCsv($this->request);
+        }
         if ($path === '/bordro-hazirlik/devirler/sablon.csv' && $method === 'GET') {
             BordroHazirlikController::devirSablonCsv($this->request);
         }

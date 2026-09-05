@@ -172,6 +172,78 @@ class BordroHazirlikController
         }
     }
 
+    /** Preview/export parity: same personel rows + totals as on-izleme screen. */
+    public static function onIzlemeExportCsv(Request $request)
+    {
+        [$pdo, $user, $subeId] = self::context($request, 'bordro_on_izleme.view');
+        $yil = self::readQueryInt($request, 'yil', 2000, 2100);
+        $ay = self::readQueryInt($request, 'ay', 1, 12);
+        $departmanId = self::optionalQueryInt($request, 'departman_id', 1, 999999);
+        try {
+            $ozet = BordroOnIzlemeService::buildDonemOzeti($pdo, $subeId, $yil, $ay, $departmanId);
+            $canFinance = RolePermissions::has($user, 'finans.view');
+            if (!$canFinance) {
+                $ozet = BordroOnIzlemeService::maskFinanceFields($ozet);
+            }
+            $columns = [
+                'donem',
+                'sube_id',
+                'aday_id',
+                'personel_id',
+                'ad_soyad',
+                'sicil',
+                'departman_ad',
+                'bordro_onay_durumu',
+                'net_odenecek',
+                'brut_maas',
+                'toplam_ek_odeme',
+                'toplam_kesinti',
+                'aktif_correction_var_mi',
+            ];
+            $rows = [];
+            foreach ($ozet['personel_satirlari'] ?? [] as $row) {
+                $rows[] = [
+                    'donem' => (string) ($ozet['donem'] ?? ''),
+                    'sube_id' => (int) ($ozet['sube_id'] ?? $subeId),
+                    'aday_id' => (int) ($row['aday_id'] ?? 0),
+                    'personel_id' => (int) ($row['personel_id'] ?? 0),
+                    'ad_soyad' => (string) ($row['ad_soyad'] ?? ''),
+                    'sicil' => (string) ($row['sicil'] ?? ''),
+                    'departman_ad' => (string) ($row['departman_ad'] ?? ''),
+                    'bordro_onay_durumu' => (string) ($row['bordro_onay_durumu'] ?? ''),
+                    'net_odenecek' => $canFinance ? (string) ($row['net_odenecek'] ?? '') : '',
+                    'brut_maas' => $canFinance ? (string) ($row['brut_maas'] ?? '') : '',
+                    'toplam_ek_odeme' => $canFinance ? (string) ($row['toplam_ek_odeme'] ?? '') : '',
+                    'toplam_kesinti' => $canFinance ? (string) ($row['toplam_kesinti'] ?? '') : '',
+                    'aktif_correction_var_mi' => !empty($row['aktif_correction_var_mi']) ? '1' : '0',
+                ];
+            }
+            // Trailing summary row mirrors on-screen totals (same scope).
+            $rows[] = [
+                'donem' => (string) ($ozet['donem'] ?? ''),
+                'sube_id' => (int) ($ozet['sube_id'] ?? $subeId),
+                'aday_id' => '',
+                'personel_id' => '',
+                'ad_soyad' => 'TOPLAM',
+                'sicil' => '',
+                'departman_ad' => '',
+                'bordro_onay_durumu' => '',
+                'net_odenecek' => $canFinance ? (string) ($ozet['toplam_net'] ?? '') : '',
+                'brut_maas' => $canFinance ? (string) ($ozet['toplam_brut'] ?? '') : '',
+                'toplam_ek_odeme' => $canFinance ? (string) ($ozet['toplam_ek_odeme'] ?? '') : '',
+                'toplam_kesinti' => $canFinance ? (string) ($ozet['toplam_kesinti'] ?? '') : '',
+                'aktif_correction_var_mi' => '',
+            ];
+            CsvResponse::send(
+                sprintf('bordro-on-izleme-%04d-%02d.csv', $yil, $ay),
+                $columns,
+                $rows
+            );
+        } catch (\Throwable $e) {
+            JsonResponse::serverError('Bordro on izleme export olusturulamadi.');
+        }
+    }
+
     public static function adayDetay(Request $request, $adayId)
     {
         [$pdo, $user] = self::authOnly($request, 'bordro_on_izleme.view');
@@ -287,10 +359,18 @@ class BordroHazirlikController
      */
     private static function enrichDevirler(PDO $pdo, array $devirler, $subeId, $yil, $ay, $eksikOnly, $departmanId = null)
     {
+        $donemBaslangic = sprintf('%04d-%02d-01', (int) $yil, (int) $ay);
+        $donemBitis = sprintf('%04d-%02d-%02d', (int) $yil, (int) $ay, (int) cal_days_in_month(CAL_GREGORIAN, (int) $ay, (int) $yil));
+        $periodSet = \Medisa\Api\Services\BordroOperasyonelHazirlikService::resolveOperationalPersonnelSet(
+            $pdo,
+            (int) $subeId,
+            $donemBaslangic,
+            $donemBitis
+        );
         $sql = "SELECT p.id, p.ad, p.soyad, p.sicil_no, p.departman_id, d.ad AS departman_ad
              FROM personeller p
              LEFT JOIN departmanlar d ON d.id = p.departman_id
-             WHERE p.sube_id = :sube AND p.aktif_durum = 'AKTIF'
+             WHERE p.sube_id = :sube
                AND " . \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::sqlIcPersonelPredicate($pdo, 'p');
         $params = ['sube' => (int) $subeId];
         if ($departmanId !== null) {
@@ -308,6 +388,9 @@ class BordroHazirlikController
         $items = [];
         foreach ($personeller as $personel) {
             $pid = (int) $personel['id'];
+            if (!isset($periodSet[$pid])) {
+                continue;
+            }
             $devir = $devirByPersonel[$pid] ?? null;
             $eksikAlanlar = [];
             if ($ay > 1 && $devir === null) {

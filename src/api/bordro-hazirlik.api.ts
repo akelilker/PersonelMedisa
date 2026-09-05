@@ -398,6 +398,21 @@ export async function downloadBordroReadinessCsv(params: {
   await downloadAuthenticatedCsv(path, `bordro-readiness-${params.yil}-${String(params.ay).padStart(2, "0")}.csv`);
 }
 
+export async function downloadBordroOnIzlemeCsv(params: {
+  yil: number;
+  ay: number;
+  subeId: number;
+  departmanId?: number | null;
+}) {
+  const path = appendQueryParams(endpoints.bordroHazirlik.onIzlemeExportCsv, {
+    sube_id: params.subeId,
+    yil: params.yil,
+    ay: params.ay,
+    ...(params.departmanId ? { departman_id: params.departmanId } : {})
+  });
+  await downloadAuthenticatedCsv(path, `bordro-on-izleme-${params.yil}-${String(params.ay).padStart(2, "0")}.csv`);
+}
+
 export async function importBordroDevirler(payload: {
   yil: number;
   ay: number;

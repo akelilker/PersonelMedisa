@@ -28,7 +28,9 @@ describe("S83 bordro business data readiness sources", () => {
     expect(preflight).toContain("/raporlar?panel=etki-adayi");
     expect(preflight).toContain("ONAY_TABLOSU_YOK");
     expect(preflight).toContain("ONAY_KAYDI_YOK");
-    expect(preflight).toContain("p.aktif_durum = 'AKTIF'");
+    // Period roster retains mid-period PASIF / isten ayrılma (not AKTIF-only).
+    expect(preflight).toContain("Period roster (not AKTIF-only)");
+    expect(preflight).toContain("resolveOperationalPersonnelSet");
     expect(preflight).not.toContain("p.durum = 'AKTIF'");
     expect(preflight).toContain("gy.onaylandi_at");
     expect(preflight).toContain("gy.state = 'TAMAMLANDI'");
@@ -36,10 +38,12 @@ describe("S83 bordro business data readiness sources", () => {
     expect(preflight).not.toContain("gy.state = 'ONAYLANDI'");
   });
 
-  it("bordro hazirlik personel filters use aktif_durum", () => {
+  it("bordro hazirlik period roster retains mid-period exits; policy still uses aktif_durum", () => {
     const controller = readFileSync("api/src/Controllers/BordroHazirlikController.php", "utf8");
     const policy = readFileSync("api/src/Services/SirketCalismaPolitikasiService.php", "utf8");
-    expect(controller).toContain("p.aktif_durum = 'AKTIF'");
+    const enrich = controller.slice(controller.indexOf("function enrichDevirler"));
+    expect(enrich).toContain("resolveOperationalPersonnelSet");
+    expect(enrich).not.toContain("aktif_durum = 'AKTIF'");
     expect(controller).not.toContain("p.durum = 'AKTIF'");
     expect(policy).toContain("aktif_durum = 'AKTIF'");
     expect(policy).not.toMatch(/personeller WHERE sube_id = :s AND durum = 'AKTIF'/);

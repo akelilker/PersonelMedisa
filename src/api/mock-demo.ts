@@ -1662,9 +1662,37 @@ function buildDemoBordroReadiness(yil: number, ay: number, subeId: number) {
       metadata: {}
     });
   }
+  const operasyonel = buildDemoBordroOperasyonelHazirlik(yil, ay, subeId);
+  const kontrolGereken = Number(operasyonel.ozet.kontrol_gereken_personel ?? 0);
+  if (kontrolGereken > 0) {
+    items.push({
+      severity: "BLOCKER",
+      code: "OPERASYONEL_HAZIRLIK_EKSIK",
+      message: "Operasyonel olarak hazır olmayan personel var.",
+      kullanici_mesaji: `${kontrolGereken} personelde operasyonel açık kayıt var (henüz değerlendirilmedi, eksik giriş, puantaj kontrol veya etki adayı). Veri Hazırlık sekmesinden tamamlayın; sessizce hazır kabul edilmez.`,
+      action_link: "/raporlar?panel=bordro-hazirlik&tab=veri-hazirlik",
+      metadata: {
+        adet: kontrolGereken,
+        kontrol_gereken_personel: kontrolGereken
+      }
+    });
+  }
   const blockerCount = items.filter((item) => item.severity === "BLOCKER").length;
   const hesaplanabilir = blockerCount === 0;
   const readiness_domains = [
+    {
+      key: "operasyonel_puantaj",
+      label: "Operasyonel Puantaj Hazırlık",
+      status: kontrolGereken > 0 ? "BLOKE" : "HAZIR",
+      eksik_kayit_sayisi: kontrolGereken,
+      etkilenen_personel_sayisi: kontrolGereken,
+      aciklama:
+        kontrolGereken > 0
+          ? `${kontrolGereken} personelde açık gün, eksik giriş, puantaj kontrol veya etki adayı var. Veri Hazırlık sekmesinden giderin.`
+          : "Operasyonel hazırlık tamam; açık kontrol gerektiren personel yok.",
+      action_link: "/raporlar?panel=bordro-hazirlik&tab=veri-hazirlik",
+      blocker_codes: kontrolGereken > 0 ? ["OPERASYONEL_HAZIRLIK_EKSIK"] : []
+    },
     {
       key: "s81_final_onay",
       label: "S81 Final Onay",
@@ -1789,7 +1817,7 @@ function buildDemoBordroReadiness(yil: number, ay: number, subeId: number) {
         mesaj: d.aciklama
       }))
     },
-    operasyonel_hazirlik: buildDemoBordroOperasyonelHazirlik(yil, ay, subeId),
+    operasyonel_hazirlik: operasyonel,
     policy_summary: {
       onayli_politika_id: approvedPolicy?.id ?? null,
       policy_version_hash: approvedPolicy?.policy_version_hash ?? null,
@@ -1804,6 +1832,8 @@ function buildDemoBordroOperasyonelHazirlik(yil: number, ay: number, subeId: num
   const donem = `${yil}-${String(ay).padStart(2, "0")}`;
   const donemBaslangic = `${donem}-01`;
   const donemBitis = `${donem}-28`;
+  // Demo default: operasyonel hazır (open-item gate should not silently block happy path).
+  // Flip kontrol_gereken via scenario hooks when testing readiness blockers.
   return {
     sube_id: subeId,
     yil,
@@ -1817,10 +1847,10 @@ function buildDemoBordroOperasyonelHazirlik(yil: number, ay: number, subeId: num
     read_only: false,
     ozet: {
       toplam_personel: 2,
-      bordroya_hazir_personel: 1,
-      kontrol_gereken_personel: 1,
-      henuz_degerlendirilmedi_gun: 2,
-      eksik_giris_gun: 1,
+      bordroya_hazir_personel: 2,
+      kontrol_gereken_personel: 0,
+      henuz_degerlendirilmedi_gun: 0,
+      eksik_giris_gun: 0,
       aciklanmamis_gun: 0,
       izinli_gun: 1,
       raporlu_gun: 0,
@@ -1836,38 +1866,7 @@ function buildDemoBordroOperasyonelHazirlik(yil: number, ay: number, subeId: num
       "puantaj_kontrol_bekleyen_yok",
       "etki_aday_hazir_inceleme_yok"
     ],
-    kontrol_gerekenler: [
-      {
-        personel_id: 2,
-        ad_soyad: "Demo Kontrol",
-        sicil_no: "P-002",
-        aktif_durum: "AKTIF",
-        cikis_tarihi: null,
-        istihdam_baslangic: donemBaslangic,
-        istihdam_bitis: donemBitis,
-        operasyonel_hazir: false,
-        problem_kodlari: ["HENUZ_DEGERLENDIRILMEDI"],
-        gun_ozeti: {
-          henuz_degerlendirilmedi: 2,
-          eksik_giris: 1,
-          aciklanmamis: 0,
-          izinli: 0,
-          raporlu: 0,
-          gelmedi: 0,
-          gec_geldi: 0,
-          erken_cikti: 0,
-          fazla_mesai_dakika: 0,
-          puantaj_kontrol_bekleyen: 0
-        },
-        etki_aday: { HAZIR: 0, INCELEME_GEREKLI: 0 },
-        action_links: {
-          puantaj: "/puantaj?personel_id=2",
-          bugun: "bugun_personel_durumu",
-          surec: "/surecler?personel_id=2"
-        },
-        ornek_problem_gunleri: [{ tarih: `${donem}-03`, kod: "HENUZ_DEGERLENDIRILMEDI" }]
-      }
-    ],
+    kontrol_gerekenler: [] as Array<Record<string, unknown>>,
     personel_satirlari: [],
     contract_version: "S96_BORDRO_OPERASYONEL_HAZIRLIK_V1",
     generated_at: new Date().toISOString()
@@ -11774,6 +11773,62 @@ export function resolveDemoApiResponse(
     return ok(ozet);
   }
 
+  if (pathname === "/bordro-hazirlik/on-izleme/export.csv" && method === "GET") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "bordro_on_izleme.view");
+    if (permissionError) return permissionError;
+    const yil = toNumber(requestUrl.searchParams.get("yil")) ?? 2026;
+    const ay = toNumber(requestUrl.searchParams.get("ay")) ?? 3;
+    const subeId = toNumber(requestUrl.searchParams.get("sube_id")) ?? 1;
+    const calistirma =
+      maasDemo.calistirmalar.find((item) => item.yil === yil && item.ay === ay && item.state !== "IPTAL") ?? null;
+    const adaylar = calistirma ? maasDemo.adaylar.filter((item) => item.calistirma_id === calistirma.id) : [];
+    const canViewFinance = hasRolePermission(actor.role, "finans.view");
+    const header =
+      "donem,sube_id,aday_id,personel_id,ad_soyad,sicil,departman_ad,bordro_onay_durumu,net_odenecek,brut_maas,toplam_ek_odeme,toplam_kesinti,aktif_correction_var_mi";
+    const rows = adaylar.map((aday) =>
+      [
+        `${yil}-${String(ay).padStart(2, "0")}`,
+        String(subeId),
+        String(aday.id),
+        String(aday.personel_id),
+        aday.personel_ad_soyad ?? "Demo Personel",
+        "P-001",
+        "Demo",
+        calistirma?.bordro_onay_durumu ?? "HESAPLANDI",
+        canViewFinance ? String(aday.net_odenecek ?? "") : "",
+        canViewFinance ? String(aday.hesaplanan_brut_tutar ?? "") : "",
+        canViewFinance ? String(aday.toplam_ek_odeme ?? "") : "",
+        canViewFinance ? String(aday.toplam_kesinti ?? "") : "",
+        aday.correction_projection_json ? "1" : "0"
+      ].join(",")
+    );
+    const toplamNet = canViewFinance
+      ? adaylar.reduce((sum, item) => sum + Number(item.net_odenecek ?? 0), 0).toFixed(2)
+      : "";
+    const toplamBrut = canViewFinance
+      ? adaylar.reduce((sum, item) => sum + Number(item.hesaplanan_brut_tutar ?? 0), 0).toFixed(2)
+      : "";
+    rows.push(
+      [
+        `${yil}-${String(ay).padStart(2, "0")}`,
+        String(subeId),
+        "",
+        "",
+        "TOPLAM",
+        "",
+        "",
+        "",
+        toplamNet,
+        toplamBrut,
+        canViewFinance ? "0.00" : "",
+        canViewFinance ? "0.00" : "",
+        ""
+      ].join(",")
+    );
+    return ok(`${header}\n${rows.join("\n")}\n`);
+  }
+
   if (pathname === "/bordro-hazirlik/devirler" && method === "GET") {
     const actor = readDemoApiActor(init);
     const permissionError = enforceDemoPermission(actor, "maas_hesaplama_adaylari.view");
@@ -11893,7 +11948,10 @@ export function resolveDemoApiResponse(
     const id = Number.parseInt(bordroKesinlestirMatch[1] ?? "", 10);
     const calistirma = maasDemo.calistirmalar.find((item) => item.id === id);
     if (!calistirma) return demoRevizyonError("NOT_FOUND", "Calistirma bulunamadi.");
-    calistirma.bordro_onay_durumu = "KESINLESTI";
+    // Idempotent: already finalized → return current row without mutation side effects.
+    if (calistirma.bordro_onay_durumu !== "KESINLESTI") {
+      calistirma.bordro_onay_durumu = "KESINLESTI";
+    }
     return ok({ calistirma });
   }
 

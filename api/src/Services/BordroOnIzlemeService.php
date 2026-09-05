@@ -232,17 +232,80 @@ class BordroOnIzlemeService
     /** @param array<string, mixed> $actor */
     public static function kesinlestir(PDO $pdo, $calistirmaId, array $actor)
     {
-        $preflight = self::preflightForCalistirma($pdo, (int) $calistirmaId);
-        if ((int) $preflight['blocker_count'] > 0) {
-            throw new MaasHesaplamaException('BORDRO_PREFLIGHT_BLOCKED', 'Kesinleştirme için blocker giderilmelidir.', 409, [
-                'blocker_count' => (int) $preflight['blocker_count'],
-            ]);
+        $calistirmaId = (int) $calistirmaId;
+        $existing = self::fetchCalistirmaRow($pdo, $calistirmaId);
+        if (!$existing) {
+            throw new MaasHesaplamaException('PAYROLL_CALCULATION_NOT_FOUND', 'Çalıştırma bulunamadı.', 404);
+        }
+        if ((string) ($existing['bordro_onay_durumu'] ?? '') === 'KESINLESTI') {
+            // Idempotent guard: tekrar kesinleştirme yan etki üretmez.
+            return self::mapCalistirma($existing);
         }
 
-        return self::transitionCalistirma($pdo, (int) $calistirmaId, 'ONAY_BEKLIYOR', 'KESINLESTI', $actor, [
+        if (PuantajDonemPeriodService::isPeriodReopened(
+            $pdo,
+            (int) $existing['sube_id'],
+            (int) $existing['yil'],
+            (int) $existing['ay']
+        )) {
+            throw new MaasHesaplamaException(
+                'PERIOD_REOPENED',
+                'Dönem yeniden açma oturumunda; bordro kesinleştirilemez.',
+                409,
+                [
+                    'period_state' => PuantajDonemPeriodService::resolvePeriodState(
+                        $pdo,
+                        (int) $existing['sube_id'],
+                        (int) $existing['yil'],
+                        (int) $existing['ay']
+                    ),
+                ]
+            );
+        }
+
+        $preflight = BordroHazirlikPreflightService::build(
+            $pdo,
+            (int) $existing['sube_id'],
+            (int) $existing['yil'],
+            (int) $existing['ay']
+        );
+        if ((int) $preflight['blocker_count'] > 0) {
+            $opBlocker = null;
+            foreach ($preflight['items'] as $item) {
+                if (($item['severity'] ?? '') === 'BLOCKER' && ($item['code'] ?? '') === 'OPERASYONEL_HAZIRLIK_EKSIK') {
+                    $opBlocker = $item;
+                    break;
+                }
+            }
+            throw new MaasHesaplamaException(
+                'BORDRO_PREFLIGHT_BLOCKED',
+                $opBlocker
+                    ? (string) ($opBlocker['kullanici_mesaji'] ?? $opBlocker['message'] ?? 'Kesinleştirme için operasyonel açık kayıtlar giderilmelidir.')
+                    : 'Kesinleştirme için blocker giderilmelidir.',
+                409,
+                [
+                    'blocker_count' => (int) $preflight['blocker_count'],
+                    'operasyonel_hazirlik_eksik' => $opBlocker !== null,
+                ]
+            );
+        }
+
+        return self::transitionCalistirma($pdo, $calistirmaId, 'ONAY_BEKLIYOR', 'KESINLESTI', $actor, [
             'kesinlestiren_by' => self::actorId($actor),
             'kesinlestirme_at' => gmdate('Y-m-d H:i:s'),
         ], 'muhasebe_kontrol_by');
+    }
+
+    /** @return array<string, mixed>|null */
+    private static function fetchCalistirmaRow(PDO $pdo, $calistirmaId)
+    {
+        $stmt = $pdo->prepare(
+            "SELECT * FROM maas_hesaplama_calistirmalari WHERE id = :id AND state = 'HESAPLANDI' LIMIT 1"
+        );
+        $stmt->execute(['id' => (int) $calistirmaId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        return $row ?: null;
     }
 
     /** @return array<string, mixed>|null */
@@ -284,9 +347,6 @@ class BordroOnIzlemeService
                     'mevcut' => (string) ($row['bordro_onay_durumu'] ?? 'HESAPLANDI'),
                     'beklenen' => $allowedFrom,
                 ]);
-            }
-            if ($to === 'KESINLESTI' && (string) ($row['bordro_onay_durumu'] ?? '') === 'KESINLESTI') {
-                throw new MaasHesaplamaException('BORDRO_ALREADY_FINALIZED', 'Bordro zaten kesinleştirilmiş.', 409);
             }
             if ($separationColumn !== null) {
                 $violation = \Medisa\Api\Auth\DualControl::violation($actor, $row[$separationColumn] ?? null, $pdo);

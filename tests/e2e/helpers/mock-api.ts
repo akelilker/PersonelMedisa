@@ -1584,9 +1584,23 @@ function buildMockBordroReadiness(params: {
       etkilenen_kayit_sayisi: 0
     });
   }
+  const kontrolGereken = 0;
   const blockerCount = items.filter((item) => item.severity === "BLOCKER").length;
   const hesaplanabilir = blockerCount === 0;
   const readiness_domains = [
+    {
+      key: "operasyonel_puantaj",
+      label: "Operasyonel Puantaj Hazırlık",
+      status: kontrolGereken > 0 ? "BLOKE" : "HAZIR",
+      eksik_kayit_sayisi: kontrolGereken,
+      etkilenen_personel_sayisi: kontrolGereken,
+      aciklama:
+        kontrolGereken > 0
+          ? `${kontrolGereken} personelde açık gün var.`
+          : "Operasyonel hazırlık tamam; açık kontrol gerektiren personel yok.",
+      action_link: "/raporlar?panel=bordro-hazirlik&tab=veri-hazirlik",
+      blocker_codes: kontrolGereken > 0 ? ["OPERASYONEL_HAZIRLIK_EKSIK"] : []
+    },
     {
       key: "s81_final_onay",
       label: "S81 Final Onay",
@@ -1716,6 +1730,43 @@ function buildMockBordroReadiness(params: {
         ok: d.status === "HAZIR",
         mesaj: d.aciklama
       }))
+    },
+    operasyonel_hazirlik: {
+      sube_id: subeId,
+      yil,
+      ay,
+      donem: `${yil}-${String(ay).padStart(2, "0")}`,
+      donem_baslangic: `${yil}-${String(ay).padStart(2, "0")}-01`,
+      donem_bitis: `${yil}-${String(ay).padStart(2, "0")}-28`,
+      as_of: `${yil}-${String(ay).padStart(2, "0")}-28`,
+      period_state: "ACIK",
+      period_writable: true,
+      read_only: false,
+      ozet: {
+        toplam_personel: 2,
+        bordroya_hazir_personel: 2,
+        kontrol_gereken_personel: 0,
+        henuz_degerlendirilmedi_gun: 0,
+        eksik_giris_gun: 0,
+        aciklanmamis_gun: 0,
+        izinli_gun: 0,
+        raporlu_gun: 0,
+        devamsizlik_gun: 0,
+        gec_gelme_gun: 0,
+        erken_cikma_gun: 0,
+        fazla_mesai_dakika: 0,
+        puantaj_kontrol_bekleyen: 0
+      },
+      ready_criteria: [
+        "henuz_degerlendirilmedi_yok",
+        "cozulmemis_eksik_giris_yok",
+        "puantaj_kontrol_bekleyen_yok",
+        "etki_aday_hazir_inceleme_yok"
+      ],
+      kontrol_gerekenler: [],
+      personel_satirlari: [],
+      contract_version: "S96_BORDRO_OPERASYONEL_HAZIRLIK_V1",
+      generated_at: new Date().toISOString()
     },
     policy_summary: {
       onayli_politika_id: approvedPolicy?.id ?? null,
@@ -10664,6 +10715,70 @@ let personelBelgeKaydiIdCounter = 903;
       return;
     }
 
+    if (path === "/api/bordro-hazirlik/on-izleme/export.csv" && method === "GET") {
+      if (await denyUnlessRolePermission(route, "bordro_on_izleme.view")) {
+        return;
+      }
+      const yil = Number.parseInt(url.searchParams.get("yil") ?? "", 10) || 2026;
+      const ay = Number.parseInt(url.searchParams.get("ay") ?? "", 10) || 3;
+      const subeId = Number.parseInt(url.searchParams.get("sube_id") ?? "1", 10);
+      const calistirma = maasCalistirmalar.find((item) => item.yil === yil && item.ay === ay && item.state !== "IPTAL") ?? null;
+      const adaylar = calistirma
+        ? maasAdaylar.filter((item) => item.calistirma_id === calistirma.id)
+        : [];
+      const canViewFinance = hasRolePermission(role, "finans.view");
+      const header =
+        "donem,sube_id,aday_id,personel_id,ad_soyad,sicil,departman_ad,bordro_onay_durumu,net_odenecek,brut_maas,toplam_ek_odeme,toplam_kesinti,aktif_correction_var_mi";
+      const rows = adaylar.map((aday) => {
+        const personel = personeller.find((entry) => entry.id === aday.personel_id);
+        const adSoyad = personel ? `${personel.ad} ${personel.soyad}` : `Personel #${aday.personel_id}`;
+        return [
+          `${yil}-${String(ay).padStart(2, "0")}`,
+          String(subeId),
+          String(aday.id),
+          String(aday.personel_id),
+          adSoyad,
+          personel?.sicil_no ?? "",
+          "Demo",
+          calistirma?.bordro_onay_durumu ?? "HESAPLANDI",
+          canViewFinance ? String(aday.net_odenecek ?? "") : "",
+          canViewFinance ? String(aday.hesaplanan_brut_tutar ?? "") : "",
+          canViewFinance ? String(aday.toplam_ek_odeme ?? "") : "",
+          canViewFinance ? String(aday.toplam_kesinti ?? "") : "",
+          aday.correction_projection_json ? "1" : "0"
+        ].join(",");
+      });
+      const toplamNet = canViewFinance
+        ? adaylar.reduce((sum, item) => sum + Number(item.net_odenecek ?? 0), 0).toFixed(2)
+        : "";
+      const toplamBrut = canViewFinance
+        ? adaylar.reduce((sum, item) => sum + Number(item.hesaplanan_brut_tutar ?? 0), 0).toFixed(2)
+        : "";
+      rows.push(
+        [
+          `${yil}-${String(ay).padStart(2, "0")}`,
+          String(subeId),
+          "",
+          "",
+          "TOPLAM",
+          "",
+          "",
+          "",
+          toplamNet,
+          toplamBrut,
+          canViewFinance ? "0.00" : "",
+          canViewFinance ? "0.00" : "",
+          ""
+        ].join(",")
+      );
+      await route.fulfill({
+        status: 200,
+        contentType: "text/csv; charset=utf-8",
+        body: `${header}\n${rows.join("\n")}\n`
+      });
+      return;
+    }
+
     if (path === "/api/bordro-hazirlik/devirler" && method === "GET") {
       if (await denyUnlessRolePermission(route, "maas_hesaplama_adaylari.view")) {
         return;
@@ -10808,7 +10923,10 @@ let personelBelgeKaydiIdCounter = 903;
         await fulfillJson(route, 404, errorBody("NOT_FOUND", "Calistirma bulunamadi."));
         return;
       }
-      calistirma.bordro_onay_durumu = "KESINLESTI";
+      // Idempotent duplicate finalization guard.
+      if (calistirma.bordro_onay_durumu !== "KESINLESTI") {
+        calistirma.bordro_onay_durumu = "KESINLESTI";
+      }
       await fulfillJson(route, 200, okBody({ calistirma }));
       return;
     }

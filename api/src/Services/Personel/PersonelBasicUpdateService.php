@@ -59,6 +59,7 @@ final class PersonelBasicUpdateService
         ) {
             throw new PersonelValidationException('sube_id', 'Kalici sube degisikligi canonical owner gerektirir.');
         }
+        $payload = PersonelOrganizasyonDegisikligiService::stripProtectedOrgFieldsFromGenericPut($payload);
 
         $resultingKapsam = array_key_exists('calisan_kapsami', $payload)
             ? (string) $payload['calisan_kapsami']

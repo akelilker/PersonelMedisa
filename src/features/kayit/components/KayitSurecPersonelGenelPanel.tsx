@@ -1,21 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { getApiErrorMessage } from "../../../api/api-client";
-import { fetchPersonelDetail, updatePersonel } from "../../../api/personeller.api";
+import { updatePersonel } from "../../../api/personeller.api";
 import type { PersonelReferenceBundle } from "../../../data/app-data.types";
 import { dataCacheKeys, deleteCacheEntry, getActiveSube } from "../../../data/data-manager";
 import { displayUcretTipiLabel } from "../../../lib/display/ucret-tipi-display";
 import { computeHasLifecycleDiff } from "../../../lib/personel-lifecycle-diff";
-import { useAuth } from "../../../state/auth.store";
 import type { Personel } from "../../../types/personel";
 import { PersonelInlineEditForm } from "../../personeller/components/personel-dosya/PersonelInlineEditForm";
-import { parseOptionalPositiveInt } from "../../personeller/personel-create-utils";
 import {
-  buildBagliAmirContext,
-  buildBagliAmirFormGuidance,
   buildPersonelUpdatePayload,
   personelToEditForm,
   pickGenelLifecycleFormFields,
-  type BagliAmirContext,
   type EditPersonelFormState
 } from "../../personeller/personel-edit-utils";
 import { formatGeneralField, formatMoneyField } from "../kayit-surec-utils";
@@ -29,15 +24,6 @@ type KayitSurecPersonelGenelPanelProps = {
   onPersonelUpdated: (updated: Personel) => void;
 };
 
-async function fetchBagliAmirContext(amirId: number): Promise<BagliAmirContext | null> {
-  try {
-    const amir = await fetchPersonelDetail(amirId);
-    return buildBagliAmirContext(amir);
-  } catch {
-    return null;
-  }
-}
-
 export function KayitSurecPersonelGenelPanel({
   personel,
   canUpdatePersonel,
@@ -46,8 +32,6 @@ export function KayitSurecPersonelGenelPanel({
   onBusyChange,
   onPersonelUpdated
 }: KayitSurecPersonelGenelPanelProps) {
-  const { session } = useAuth();
-  const activeSubeId = session?.active_sube_id ?? null;
   const isPasif = personel.aktif_durum === "PASIF";
   const canEdit = canUpdatePersonel && !isPasif;
 
@@ -56,7 +40,6 @@ export function KayitSurecPersonelGenelPanel({
   const [editErrorMessage, setEditErrorMessage] = useState<string | null>(null);
   const [editInfoMessage, setEditInfoMessage] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<EditPersonelFormState>(() => personelToEditForm(personel));
-  const [editBagliAmirContext, setEditBagliAmirContext] = useState<BagliAmirContext | null>(null);
 
   const personelIdRef = useRef(personel.id);
   personelIdRef.current = personel.id;
@@ -77,28 +60,6 @@ export function KayitSurecPersonelGenelPanel({
   }, [personel]);
 
   useEffect(() => {
-    let cancelled = false;
-    const amirId = personel.bagli_amir_id;
-    if (typeof amirId !== "number") {
-      setEditBagliAmirContext(null);
-      return () => {
-        cancelled = true;
-      };
-    }
-
-    void (async () => {
-      const context = await fetchBagliAmirContext(amirId);
-      if (!cancelled) {
-        setEditBagliAmirContext(context);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [personel.bagli_amir_id]);
-
-  useEffect(() => {
     publishBusy(isSubmitting);
   }, [isSubmitting]);
 
@@ -112,12 +73,7 @@ export function KayitSurecPersonelGenelPanel({
     [personel, genelLifecycleFields]
   );
 
-  const editBagliAmirGuidance = useMemo(
-    () => buildBagliAmirFormGuidance(editForm.departmanId, editBagliAmirContext, activeSubeId),
-    [activeSubeId, editBagliAmirContext, editForm.departmanId]
-  );
-
-  const generalColumns = useMemo(
+  const identityColumns = useMemo(
     () => [
       {
         items: [
@@ -125,26 +81,15 @@ export function KayitSurecPersonelGenelPanel({
           { label: "Doğum Tarihi", value: formatGeneralField(personel.dogum_tarihi) },
           { label: "Doğum Yeri", value: formatGeneralField(personel.dogum_yeri) },
           { label: "Telefon", value: formatGeneralField(personel.telefon) },
-          { label: "Kan Grubu", value: formatGeneralField(personel.kan_grubu) }
-        ]
-      },
-      {
-        items: [
+          { label: "Kan Grubu", value: formatGeneralField(personel.kan_grubu) },
           { label: "Acil Durum Kişisi", value: formatGeneralField(personel.acil_durum_kisi) },
-          { label: "Acil Durum Telefon", value: formatGeneralField(personel.acil_durum_telefon) },
-          { label: "Departman", value: formatGeneralField(personel.departman_adi) },
-          { label: "Bölüm", value: formatGeneralField(personel.bolum_adi) },
-          { label: "Birim", value: formatGeneralField(personel.birim_adi) },
-          { label: "Görev / Unvan", value: formatGeneralField(personel.gorev_adi) },
-          { label: "Pozisyon", value: formatGeneralField(personel.pozisyon_adi) },
-          { label: "Bağlı Amir", value: formatGeneralField(personel.bagli_amir_adi) }
+          { label: "Acil Durum Telefon", value: formatGeneralField(personel.acil_durum_telefon) }
         ]
       },
       {
         items: [
           { label: "Sicil No", value: formatGeneralField(personel.sicil_no) },
           { label: "İşe Giriş Tarihi", value: formatGeneralField(personel.ise_giris_tarihi) },
-          { label: "Personel Tipi", value: formatGeneralField(personel.personel_tipi_adi) },
           {
             label: "Ücret Tipi",
             value: formatGeneralField(
@@ -162,43 +107,23 @@ export function KayitSurecPersonelGenelPanel({
     [canViewUcret, personel]
   );
 
-  const handleEditDepartmanChange = useCallback((departmanId: string) => {
-    setEditForm((prev) => ({ ...prev, departmanId }));
-  }, []);
-
-  const handleEditBagliAmirChange = useCallback((bagliAmirId: string) => {
-    setEditForm((prev) => ({ ...prev, bagliAmirId }));
-
-    const amirId = parseOptionalPositiveInt(bagliAmirId);
-    if (amirId === undefined) {
-      setEditBagliAmirContext(null);
-      return;
-    }
-
-    void (async () => {
-      const context = await fetchBagliAmirContext(amirId);
-      setEditBagliAmirContext(context);
-      if (!context?.departmanId) {
-        return;
-      }
-      setEditForm((prev) =>
-        prev.bagliAmirId === bagliAmirId ? { ...prev, departmanId: context.departmanId } : prev
-      );
-    })();
-  }, []);
+  const orgSummaryItems = useMemo(
+    () => [
+      { label: "Departman", value: formatGeneralField(personel.departman_adi) },
+      { label: "Bölüm", value: formatGeneralField(personel.bolum_adi) },
+      { label: "Birim", value: formatGeneralField(personel.birim_adi) },
+      { label: "Görev / Unvan", value: formatGeneralField(personel.gorev_adi) },
+      { label: "Pozisyon", value: formatGeneralField(personel.pozisyon_adi) },
+      { label: "Bağlı Amir", value: formatGeneralField(personel.bagli_amir_adi) },
+      { label: "Personel Tipi", value: formatGeneralField(personel.personel_tipi_adi) }
+    ],
+    [personel]
+  );
 
   const discardEdit = useCallback(() => {
     setIsEditing(false);
     setEditErrorMessage(null);
     setEditForm(personelToEditForm(personel));
-    const amirId = personel.bagli_amir_id;
-    if (typeof amirId !== "number") {
-      setEditBagliAmirContext(null);
-      return;
-    }
-    void (async () => {
-      setEditBagliAmirContext(await fetchBagliAmirContext(amirId));
-    })();
   }, [personel]);
 
   async function handleEditSubmit(event: FormEvent<HTMLFormElement>) {
@@ -227,9 +152,12 @@ export function KayitSurecPersonelGenelPanel({
     });
     const optimistic: Personel = {
       ...personel,
+      calisan_kapsami: body.calisan_kapsami ?? personel.calisan_kapsami,
+      tc_kimlik_no: body.tc_kimlik_no !== undefined ? body.tc_kimlik_no : personel.tc_kimlik_no,
       ad: body.ad ?? personel.ad,
-      soyad: body.soyad ?? personel.soyad,
-      telefon: body.telefon ?? personel.telefon,
+      soyad: body.soyad !== undefined ? body.soyad : personel.soyad,
+      dogum_tarihi: body.dogum_tarihi !== undefined ? body.dogum_tarihi : personel.dogum_tarihi,
+      telefon: body.telefon !== undefined ? body.telefon : personel.telefon,
       sicil_no: body.sicil_no ?? personel.sicil_no,
       ise_giris_tarihi: body.ise_giris_tarihi ?? personel.ise_giris_tarihi,
       prim_kurali_id: body.prim_kurali_id !== undefined ? body.prim_kurali_id : personel.prim_kurali_id
@@ -284,7 +212,9 @@ export function KayitSurecPersonelGenelPanel({
       ) : null}
 
       {isPasif ? (
-        <p className="workspace-empty-hint">Bu personel pasif; genel bilgiler salt okunur izlenir.</p>
+        <p className="workspace-empty-hint" data-testid="kayit-surec-personel-genel-pasif-hint">
+          Bu personel pasif; genel bilgiler salt okunur izlenir.
+        </p>
       ) : null}
 
       {editInfoMessage ? <p className="workspace-success">{editInfoMessage}</p> : null}
@@ -293,11 +223,7 @@ export function KayitSurecPersonelGenelPanel({
         <PersonelInlineEditForm
           editForm={editForm}
           setEditForm={setEditForm}
-          handleEditDepartmanChange={handleEditDepartmanChange}
-          handleEditBagliAmirChange={handleEditBagliAmirChange}
-          editBagliAmirGuidance={editBagliAmirGuidance}
           personelRefs={personelRefs}
-          hasLifecycleDiff={hasLifecycleDiff}
           editErrorMessage={editErrorMessage}
           isSubmitting={isSubmitting}
           onSubmit={(event) => void handleEditSubmit(event)}
@@ -305,7 +231,7 @@ export function KayitSurecPersonelGenelPanel({
         />
       ) : (
         <div className="surec-person-general-columns">
-          {generalColumns.map((column, columnIndex) => (
+          {identityColumns.map((column, columnIndex) => (
             <section key={`personel-general-column-${columnIndex}`} className="surec-person-general-column">
               <div className="surec-shell-summary-grid">
                 {column.items.map((item) => (
@@ -317,6 +243,22 @@ export function KayitSurecPersonelGenelPanel({
               </div>
             </section>
           ))}
+          <section
+            className="surec-person-general-column"
+            data-testid="kayit-surec-personel-genel-org-readonly"
+          >
+            <p className="personel-form-note personel-form-note--info">
+              Organizasyon özeti salt okunur. Değişiklik için Süreç → Görev / Organizasyon sekmesini kullanın.
+            </p>
+            <div className="surec-shell-summary-grid">
+              {orgSummaryItems.map((item) => (
+                <div key={`org-${item.label}`} className="surec-shell-summary-item">
+                  <span className="surec-shell-summary-label">{item.label}</span>
+                  <strong className="surec-shell-summary-value">{item.value}</strong>
+                </div>
+              ))}
+            </div>
+          </section>
         </div>
       )}
     </div>

@@ -171,9 +171,26 @@ class BildirimlerController
     public static function create(Request $request)
     {
         $user = AuthMiddleware::authenticate($request, true);
-        RolePermissions::assert($user, 'gunluk_bildirim.create');
+        RolePermissions::assertAny($user, ['gunluk_bildirim.create', 'gunluk_bildirim.correct_scoped']);
         $body = $request->getJsonBody();
         $payload = self::normalizeCreatePayload($body);
+        $isScopedCorrector = RolePermissions::has($user, 'gunluk_bildirim.correct_scoped')
+            && !RolePermissions::has($user, 'gunluk_bildirim.create');
+        $scopedReason = null;
+        if ($isScopedCorrector || (
+            RolePermissions::has($user, 'gunluk_bildirim.correct_scoped')
+            && isset($body['correction_reason'])
+        )) {
+            $scopedReason = isset($body['correction_reason'])
+                ? trim((string) $body['correction_reason'])
+                : '';
+            if ($isScopedCorrector && $scopedReason === '') {
+                self::validationError('correction_reason', 'Duzeltme nedeni zorunludur.');
+            }
+            if ($scopedReason === '') {
+                $scopedReason = null;
+            }
+        }
 
         try {
             $pdo = Connection::get();
@@ -275,11 +292,11 @@ class BildirimlerController
                 INSERT INTO gunluk_bildirimler (
                     personel_id, tarih, sube_id, departman_id, bildirim_turu, alt_tur,
                     baslangic_saati, bitis_saati, dakika, aciklama, state,
-                    created_by, updated_by
+                    correction_reason, created_by, updated_by
                 ) VALUES (
                     :personel_id, :tarih, :sube_id, :departman_id, :bildirim_turu, :alt_tur,
                     :baslangic_saati, :bitis_saati, :dakika, :aciklama, :state,
-                    :created_by, :updated_by
+                    :correction_reason, :created_by, :updated_by
                 )
             ');
             $stmt->execute([
@@ -294,6 +311,7 @@ class BildirimlerController
                 'dakika' => $dakika,
                 'aciklama' => $payload['aciklama'],
                 'state' => 'TASLAK',
+                'correction_reason' => $scopedReason,
                 'created_by' => $currentUserId,
                 'updated_by' => $currentUserId,
             ]);
@@ -333,7 +351,10 @@ class BildirimlerController
     public static function update(Request $request, $id)
     {
         $user = AuthMiddleware::authenticate($request, true);
-        RolePermissions::assert($user, 'gunluk_bildirim.update_own_open');
+        RolePermissions::assertAny($user, [
+            'gunluk_bildirim.update_own_open',
+            'gunluk_bildirim.correct_scoped',
+        ]);
         $bildirimId = self::parsePositiveInt($id);
         if ($bildirimId === null) {
             JsonResponse::notFound('Kayit bulunamadi.');
@@ -355,9 +376,19 @@ class BildirimlerController
             JsonResponse::notFound('Bildirim bulunamadi.');
         }
 
-        self::assertOwnership($user, $existing);
+        $isOwnerPath = RolePermissions::has($user, 'gunluk_bildirim.update_own_open')
+            && self::isOwner($user, $existing);
+        $isScopedPath = RolePermissions::has($user, 'gunluk_bildirim.correct_scoped');
+        if (!$isOwnerPath && !$isScopedPath) {
+            JsonResponse::forbidden();
+        }
+
         SubeScope::assertPersonelAccess($user, $request, self::personelOrgFromBildirimRow($existing));
-        self::assertEditableState($existing);
+        if ($isOwnerPath) {
+            self::assertEditableState($existing);
+        } else {
+            self::assertScopedCorrectableState($existing);
+        }
         self::assertPeriodOpenForDate(
             $pdo,
             (int) ($existing['sube_id'] ?? 0),
@@ -455,7 +486,13 @@ class BildirimlerController
         if ($correctionReason === '') {
             $correctionReason = null;
         }
-        if ($correctionReason === null && isset($existing['correction_reason'])) {
+        if (!$isOwnerPath && $isScopedPath) {
+            if ($correctionReason === null) {
+                self::validationError('correction_reason', 'Duzeltme nedeni zorunludur.');
+            }
+            $fields[] = 'correction_reason = :correction_reason';
+            $params['correction_reason'] = $correctionReason;
+        } elseif ($correctionReason === null && isset($existing['correction_reason'])) {
             $existingReason = trim((string) $existing['correction_reason']);
             $correctionReason = $existingReason !== '' ? $existingReason : null;
         }
@@ -1505,11 +1542,18 @@ class BildirimlerController
     /** @param array<string, mixed> $user @param array<string, mixed> $row */
     private static function assertOwnership(array $user, array $row)
     {
-        $currentUserId = self::userId($user);
-        $createdBy = isset($row['created_by']) ? (int) $row['created_by'] : 0;
-        if ($currentUserId === null || $createdBy !== $currentUserId) {
+        if (!self::isOwner($user, $row)) {
             JsonResponse::forbidden();
         }
+    }
+
+    /** @param array<string, mixed> $user @param array<string, mixed> $row */
+    private static function isOwner(array $user, array $row)
+    {
+        $currentUserId = self::userId($user);
+        $createdBy = isset($row['created_by']) ? (int) $row['created_by'] : 0;
+
+        return $currentUserId !== null && $createdBy === $currentUserId;
     }
 
     /** @param array<string, mixed> $row */
@@ -1527,6 +1571,31 @@ class BildirimlerController
             JsonResponse::error(409, 'CONFLICT', 'Bu durumdaki bildirim guncellenemez.');
         }
         if (!in_array($state, self::$editableStates, true)) {
+            JsonResponse::error(409, 'CONFLICT', 'Bu durumdaki bildirim guncellenemez.');
+        }
+    }
+
+    /**
+     * IK / GENEL scoped correction may edit open + submitted rows in scope.
+     * Still fail-closed for IPTAL / haftalık mutabakat.
+     *
+     * @param array<string, mixed> $row
+     */
+    private static function assertScopedCorrectableState(array $row)
+    {
+        $state = (string) $row['state'];
+        if ($state === 'HAFTALIK_MUTABAKATA_ALINDI') {
+            JsonResponse::error(
+                409,
+                'CONFLICT',
+                'Bu kayıt haftalık mutabakata alındığı için doğrudan değiştirilemez.'
+            );
+        }
+        if ($state === 'IPTAL') {
+            JsonResponse::error(409, 'CONFLICT', 'Bu durumdaki bildirim guncellenemez.');
+        }
+        $allowed = array_merge(self::$editableStates, ['GONDERILDI']);
+        if (!in_array($state, $allowed, true)) {
             JsonResponse::error(409, 'CONFLICT', 'Bu durumdaki bildirim guncellenemez.');
         }
     }

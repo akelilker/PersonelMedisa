@@ -205,6 +205,20 @@ type DemoBildirim = {
   alt_tur?: string | null;
   baslangic_saati?: string | null;
   bitis_saati?: string | null;
+  duzeltme_gecmisi?: Array<{
+    id: number;
+    gunluk_bildirim_id: number;
+    personel_id: number;
+    sube_id: number;
+    tarih: string;
+    olay_tipi: string;
+    actor_user_id: number;
+    actor_ad_soyad?: string | null;
+    correction_reason?: string | null;
+    eski_bildirim_turu: string;
+    yeni_bildirim_turu?: string | null;
+    created_at: string;
+  }>;
 };
 
 type DemoGunlukTamamlama = {
@@ -2343,6 +2357,48 @@ function assertDemoBildirimOwnership(
   }
 
   return null;
+}
+
+function assertDemoBildirimScopedCorrectableState(
+  bildirim: DemoBildirim
+): ApiResponse<unknown> | null {
+  const state = (bildirim.state ?? "").toUpperCase();
+  if (state === "HAFTALIK_MUTABAKATA_ALINDI" || state === "IPTAL") {
+    return demoBildirimConflict("Bu durumdaki bildirim guncellenemez.");
+  }
+  if (
+    !(DEMO_BILDIRIM_EDITABLE_STATES as readonly string[]).includes(state) &&
+    state !== "GONDERILDI"
+  ) {
+    return demoBildirimConflict("Bu durumdaki bildirim guncellenemez.");
+  }
+  return null;
+}
+
+function appendDemoBildirimAudit(
+  bildirim: DemoBildirim,
+  actor: RevizyonActorContext,
+  eskiTur: string,
+  yeniTur: string,
+  reason: string | null
+): void {
+  const history = Array.isArray(bildirim.duzeltme_gecmisi) ? bildirim.duzeltme_gecmisi : [];
+  const nextId = history.reduce((max, row) => Math.max(max, row.id), 0) + 1;
+  history.push({
+    id: nextId,
+    gunluk_bildirim_id: bildirim.id,
+    personel_id: bildirim.personel_id ?? 0,
+    sube_id: bildirim.sube_id ?? 0,
+    tarih: bildirim.tarih ?? istanbulBusinessDate(),
+    olay_tipi: "DUZELTME",
+    actor_user_id: actor.userId,
+    actor_ad_soyad: `Kullanıcı #${actor.userId}`,
+    correction_reason: reason,
+    eski_bildirim_turu: eskiTur,
+    yeni_bildirim_turu: yeniTur,
+    created_at: new Date().toISOString()
+  });
+  bildirim.duzeltme_gecmisi = history;
 }
 
 function assertDemoBildirimEditableState(bildirim: DemoBildirim): ApiResponse<unknown> | null {
@@ -7188,6 +7244,9 @@ export function resolveDemoApiResponse(
     type RawPerson = {
       personel_id: number;
       ad_soyad: string;
+      bildirim_id: number | null;
+      bildirim_state: string | null;
+      created_by: number | null;
       bildirim_turu: string | null;
       dakika: number | null;
       baslangic_saati: string | null;
@@ -7255,6 +7314,9 @@ export function resolveDemoApiResponse(
       branch.units.get(unitKey)!.rows.push({
         personel_id: personel.id,
         ad_soyad: `${personel.ad} ${personel.soyad ?? ""}`.trim(),
+        bildirim_id: open?.id ?? null,
+        bildirim_state: open?.state ?? null,
+        created_by: open?.created_by ?? null,
         bildirim_turu: open?.bildirim_turu ?? null,
         dakika: open?.dakika ?? null,
         baslangic_saati: open?.baslangic_saati ?? null,
@@ -7303,9 +7365,22 @@ export function resolveDemoApiResponse(
                   : durum === "GELDI" && giris
                     ? giris
                     : durumLabelDemo(durum);
+          const hasException =
+            row.bildirim_turu != null && exceptionTurleri.has(row.bildirim_turu.toUpperCase());
+          const hasAttendance = Boolean(row.puantaj_giris);
+          const evidence = hasException
+            ? "EXCEPTION"
+            : hasAttendance
+              ? "ATTENDANCE"
+              : unitCompleted
+                ? "COMPLETION"
+                : "UNASSESSED";
           return {
             personel_id: row.personel_id,
             ad_soyad: row.ad_soyad,
+            bildirim_id: row.bildirim_id,
+            bildirim_state: row.bildirim_state,
+            created_by: row.created_by,
             durum,
             durum_label: durumLabelDemo(durum),
             gec_kalma_dakika: gec,
@@ -7315,6 +7390,7 @@ export function resolveDemoApiResponse(
             aciklama: row.aciklama,
             alt_tur: row.alt_tur,
             detail_line: detailLine,
+            evidence,
             group:
               durum === "HENUZ_DEGERLENDIRILMEDI"
                 ? "PENDING"
@@ -7388,7 +7464,11 @@ export function resolveDemoApiResponse(
         sube_id: branch.sube_id,
         sube_adi: branch.sube_adi,
         counts: branchCounts,
-        birim_bildirim: { tamamlanan: unitsCompleted, toplam: units.length },
+        period_writable: true,
+        birim_bildirim: {
+          tamamlanan: unitsCompleted,
+          toplam: units.length
+        },
         units
       };
     });
@@ -7575,9 +7655,20 @@ export function resolveDemoApiResponse(
 
   if (pathname === "/bildirimler" && method === "POST") {
     const actor = readDemoApiActor(init);
-    const permissionError = enforceDemoPermission(actor, "gunluk_bildirim.create");
+    const permissionError = enforceDemoAnyPermission(actor, [
+      "gunluk_bildirim.create",
+      "gunluk_bildirim.correct_scoped"
+    ]);
     if (permissionError) {
       return permissionError;
+    }
+
+    const isScopedOnly =
+      hasRolePermission(actor.role, "gunluk_bildirim.correct_scoped") &&
+      !hasRolePermission(actor.role, "gunluk_bildirim.create");
+    const correctionReason = toStringValue(body.correction_reason)?.trim() ?? "";
+    if (isScopedOnly && !correctionReason) {
+      return demoRevizyonError("VALIDATION_ERROR", "Duzeltme nedeni zorunludur.");
     }
 
     const bildirimTuru = normalizeDemoBildirimTuru(toStringValue(body.bildirim_turu));
@@ -7617,10 +7708,16 @@ export function resolveDemoApiResponse(
       sube_id: resolveDemoBildirimSubeId(personelId),
       bildirim_turu: bildirimTuru,
       aciklama,
+      alt_tur: toStringValue(body.alt_tur) ?? null,
+      baslangic_saati: toStringValue(body.baslangic_saati) ?? null,
+      bitis_saati: toStringValue(body.bitis_saati) ?? null,
+      dakika: toNumber(body.dakika),
+      correction_reason: correctionReason || null,
       state: "TASLAK",
       okundu_mi: false,
       created_by: actor.userId,
-      updated_by: actor.userId
+      updated_by: actor.userId,
+      duzeltme_gecmisi: []
     };
     demoState.bildirimler.unshift(next);
     return ok(enrichDemoBildirim(next));
@@ -7636,40 +7733,99 @@ export function resolveDemoApiResponse(
     }
 
     if (method === "GET") {
-      const permissionError = enforceDemoPermission(actor, "bildirimler.view");
+      const permissionError = enforceDemoPermission(actor, "bildirimler.detail.view");
       if (permissionError) {
         return permissionError;
       }
 
-      return ok(bildirim);
+      return ok({
+        ...enrichDemoBildirim(bildirim),
+        duzeltme_gecmisi: Array.isArray(bildirim.duzeltme_gecmisi) ? bildirim.duzeltme_gecmisi : []
+      });
     }
 
     if (method === "PUT") {
-      const permissionError = enforceDemoPermission(actor, "gunluk_bildirim.update_own_open");
+      const permissionError = enforceDemoAnyPermission(actor, [
+        "gunluk_bildirim.update_own_open",
+        "gunluk_bildirim.correct_scoped"
+      ]);
       if (permissionError) {
         return permissionError;
       }
 
-      const ownershipError = assertDemoBildirimOwnership(actor, bildirim);
-      if (ownershipError) {
-        return ownershipError;
+      const isOwnerPath =
+        hasRolePermission(actor.role, "gunluk_bildirim.update_own_open") &&
+        assertDemoBildirimOwnership(actor, bildirim) === null;
+      const isScopedPath = hasRolePermission(actor.role, "gunluk_bildirim.correct_scoped");
+      if (!isOwnerPath && !isScopedPath) {
+        return demoRevizyonError("FORBIDDEN", "Bu islem icin yetkiniz yok.");
       }
 
-      const stateError = assertDemoBildirimEditableState(bildirim);
-      if (stateError) {
-        return stateError;
+      if (isOwnerPath) {
+        const stateError = assertDemoBildirimEditableState(bildirim);
+        if (stateError) {
+          return stateError;
+        }
+      } else {
+        const stateError = assertDemoBildirimScopedCorrectableState(bildirim);
+        if (stateError) {
+          return stateError;
+        }
       }
+
+      const correctionReason = toStringValue(body.correction_reason)?.trim() ?? "";
+      if (!isOwnerPath && isScopedPath && !correctionReason) {
+        return demoRevizyonError("VALIDATION_ERROR", "Duzeltme nedeni zorunludur.");
+      }
+
+      const eskiTur = bildirim.bildirim_turu;
+      let changed = false;
 
       if (body.bildirim_turu !== undefined) {
         const nextTur = normalizeDemoBildirimTuru(toStringValue(body.bildirim_turu));
         if (!nextTur) {
           return demoRevizyonError("VALIDATION_ERROR", "Bildirim turu gecerli degil.");
         }
+        if (nextTur !== bildirim.bildirim_turu) {
+          changed = true;
+        }
         bildirim.bildirim_turu = nextTur;
       }
 
       if (body.aciklama !== undefined) {
-        bildirim.aciklama = toStringValue(body.aciklama) ?? undefined;
+        const nextAciklama = toStringValue(body.aciklama) ?? undefined;
+        if ((nextAciklama ?? "") !== (bildirim.aciklama ?? "")) {
+          changed = true;
+        }
+        bildirim.aciklama = nextAciklama;
+      }
+      if (body.alt_tur !== undefined) {
+        const nextAlt = toStringValue(body.alt_tur) ?? null;
+        if ((nextAlt ?? "") !== (bildirim.alt_tur ?? "")) {
+          changed = true;
+        }
+        bildirim.alt_tur = nextAlt;
+      }
+      if (body.baslangic_saati !== undefined) {
+        const nextBas = toStringValue(body.baslangic_saati) ?? null;
+        if ((nextBas ?? "") !== (bildirim.baslangic_saati ?? "")) {
+          changed = true;
+        }
+        bildirim.baslangic_saati = nextBas;
+      }
+      if (body.bitis_saati !== undefined) {
+        const nextBit = toStringValue(body.bitis_saati) ?? null;
+        if ((nextBit ?? "") !== (bildirim.bitis_saati ?? "")) {
+          changed = true;
+        }
+        bildirim.bitis_saati = nextBit;
+      }
+      if (body.dakika !== undefined) {
+        const nextDakika = toNumber(body.dakika);
+        if (nextDakika !== (bildirim.dakika ?? null)) {
+          changed = true;
+        }
+        bildirim.dakika = nextDakika;
       }
 
       const nextTur = bildirim.bildirim_turu;
@@ -7677,8 +7833,25 @@ export function resolveDemoApiResponse(
         return demoRevizyonError("VALIDATION_ERROR", "DIGER turu icin aciklama zorunludur.");
       }
 
+      if (!changed) {
+        return ok(enrichDemoBildirim(bildirim));
+      }
+
+      if (!isOwnerPath && isScopedPath) {
+        bildirim.correction_reason = correctionReason;
+        appendDemoBildirimAudit(bildirim, actor, eskiTur, nextTur, correctionReason);
+      } else if (eskiTur !== nextTur || correctionReason) {
+        appendDemoBildirimAudit(
+          bildirim,
+          actor,
+          eskiTur,
+          nextTur,
+          correctionReason || bildirim.correction_reason || null
+        );
+      }
+
       bildirim.updated_by = actor.userId;
-      return ok(bildirim);
+      return ok(enrichDemoBildirim(bildirim));
     }
   }
 

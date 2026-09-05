@@ -315,5 +315,30 @@ gbdaAssert(
     'request-correction state-only → no business transition'
 );
 
+gbdaAssert(
+    \Medisa\Api\Auth\RolePermissions::has(['rol' => 'IK_SORUMLUSU'], 'gunluk_bildirim.correct_scoped'),
+    'IK has correct_scoped'
+);
+gbdaAssert(
+    \Medisa\Api\Auth\RolePermissions::has(['rol' => 'GENEL_YONETICI'], 'gunluk_bildirim.correct_scoped'),
+    'GENEL has correct_scoped'
+);
+gbdaAssert(
+    !\Medisa\Api\Auth\RolePermissions::has(['rol' => 'BIRIM_AMIRI'], 'gunluk_bildirim.correct_scoped'),
+    'BIRIM_AMIRI no correct_scoped'
+);
+gbdaAssert(
+    !\Medisa\Api\Auth\RolePermissions::has(['rol' => 'MUHASEBE'], 'gunluk_bildirim.correct_scoped'),
+    'MUHASEBE no correct_scoped'
+);
+gbdaAssert(
+    !\Medisa\Api\Auth\RolePermissions::has(['rol' => 'PERSONEL'], 'gunluk_bildirim.correct_scoped'),
+    'PERSONEL no correct_scoped'
+);
+gbdaAssert(
+    !\Medisa\Api\Auth\RolePermissions::has(['rol' => 'SISTEM_YONETICISI'], 'gunluk_bildirim.correct_scoped'),
+    'SISTEM no correct_scoped'
+);
+
 gbdaOk('ALL_PASS gunluk-bildirim-duzeltme-audit');
 echo "ALL_PASS gunluk-bildirim-duzeltme-audit\n";

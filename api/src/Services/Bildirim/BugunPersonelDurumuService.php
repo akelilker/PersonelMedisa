@@ -7,6 +7,7 @@ namespace Medisa\Api\Services\Bildirim;
 use Medisa\Api\Http\Request;
 use Medisa\Api\Scope\OrgScope;
 use Medisa\Api\Services\Organizasyon\SubeReadModel;
+use Medisa\Api\Services\PuantajDonemPeriodService;
 use DateTimeImmutable;
 use DateTimeZone;
 use PDO;
@@ -145,10 +146,25 @@ class BugunPersonelDurumuService
 
             $attentionCount += (int) $branchCounts['gelmedi'] + (int) $branchCounts['gec_geldi'];
 
+            $periodWritable = true;
+            if (preg_match('/^(\d{4})-(\d{2})-\d{2}$/', $tarih, $tm)) {
+                try {
+                    $periodWritable = !PuantajDonemPeriodService::isWriteLocked(
+                        $pdo,
+                        (int) $branch['sube_id'],
+                        (int) $tm[1],
+                        (int) $tm[2]
+                    );
+                } catch (\Throwable $e) {
+                    $periodWritable = true;
+                }
+            }
+
             $branchSummaries[] = [
                 'sube_id' => $branch['sube_id'],
                 'sube_adi' => $branch['sube_adi'],
                 'counts' => $branchCounts,
+                'period_writable' => $periodWritable,
                 'birim_bildirim' => [
                     'tamamlanan' => $unitsCompleted,
                     'toplam' => $unitsTotal,
@@ -359,7 +375,10 @@ class BugunPersonelDurumuService
             ? "TRIM(COALESCE(p.ad, '') || ' ' || COALESCE(p.soyad, ''))"
             : "TRIM(CONCAT(COALESCE(p.ad, ''), ' ', COALESCE(p.soyad, '')))";
 
-        $bildirimSelect = '
+            $bildirimSelect = '
+                NULL AS bildirim_id,
+                NULL AS bildirim_state,
+                NULL AS bildirim_created_by,
                 NULL AS bildirim_turu,
                 NULL AS dakika,
                 NULL AS baslangic_saati,
@@ -371,6 +390,9 @@ class BugunPersonelDurumuService
             $params['bpd_tarih_gb'] = $tarih;
             $params['bpd_iptal'] = 'IPTAL';
             $bildirimSelect = '
+                gb.id AS bildirim_id,
+                gb.state AS bildirim_state,
+                gb.created_by AS bildirim_created_by,
                 gb.bildirim_turu AS bildirim_turu,
                 gb.dakika AS dakika,
                 gb.baslangic_saati AS baslangic_saati,
@@ -668,9 +690,28 @@ class BugunPersonelDurumuService
 
         $detail = self::personDetailLine($durum, $giris, $gec, isset($row['aciklama']) ? $row['aciklama'] : null, isset($row['alt_tur']) ? $row['alt_tur'] : null);
 
+        $hasException = $exceptionTur !== null
+            && in_array(strtoupper(trim((string) $exceptionTur)), self::$exceptionTurleri, true);
+        $hasAttendance = $puantajGiris !== null && trim((string) $puantajGiris) !== '';
+        $evidence = 'UNASSESSED';
+        if ($hasException) {
+            $evidence = 'EXCEPTION';
+        } elseif ($hasAttendance) {
+            $evidence = 'ATTENDANCE';
+        } elseif ($unitCompleted) {
+            $evidence = 'COMPLETION';
+        }
+
         return [
             'personel_id' => (int) $row['personel_id'],
             'ad_soyad' => trim((string) $row['ad_soyad']),
+            'bildirim_id' => isset($row['bildirim_id']) && $row['bildirim_id'] !== null
+                ? (int) $row['bildirim_id']
+                : null,
+            'bildirim_state' => self::nullableString(isset($row['bildirim_state']) ? $row['bildirim_state'] : null),
+            'created_by' => isset($row['bildirim_created_by']) && $row['bildirim_created_by'] !== null
+                ? (int) $row['bildirim_created_by']
+                : null,
             'durum' => $durum,
             'durum_label' => self::durumLabel($durum),
             'gec_kalma_dakika' => $gec,
@@ -680,6 +721,7 @@ class BugunPersonelDurumuService
             'aciklama' => self::nullableString(isset($row['aciklama']) ? $row['aciklama'] : null),
             'alt_tur' => self::nullableString(isset($row['alt_tur']) ? $row['alt_tur'] : null),
             'detail_line' => $detail,
+            'evidence' => $evidence,
             'group' => self::statusGroup($durum),
         ];
     }

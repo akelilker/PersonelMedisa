@@ -172,6 +172,146 @@
   color: #a0aec0;
 }
 
+.bugun-personel-person-row--btn {
+  width: 100%;
+  margin: 0;
+  border-top: 0;
+  border-right: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-left: 2px solid rgba(196, 0, 22, 0.55);
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.bugun-personel-person-row--btn:hover,
+.bugun-personel-person-row--btn:focus-visible {
+  background: rgba(255, 255, 255, 0.04);
+  outline: none;
+}
+
+.bugun-personel-unit-open {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.bugun-personel-evidence {
+  font-size: 11px;
+  color: #8aa0b8;
+}
+
+.bugun-personel-person-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.bugun-personel-person-detail-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.bugun-personel-person-detail-head strong {
+  font-size: 15px;
+  color: #fff;
+}
+
+.bugun-personel-person-detail-line,
+.bugun-personel-lock-note,
+.bugun-personel-history-empty,
+.bugun-personel-form-error {
+  margin: 0;
+  font-size: 12.5px;
+  color: #a0aec0;
+}
+
+.bugun-personel-lock-note,
+.bugun-personel-form-error {
+  color: #f5b5b5;
+}
+
+.bugun-personel-edit-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.bugun-personel-edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.bugun-personel-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: #c9d4e5;
+}
+
+.bugun-personel-field input,
+.bugun-personel-field select,
+.bugun-personel-field textarea {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.25);
+  color: #fff;
+  font: inherit;
+}
+
+.bugun-personel-edit-footer {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.bugun-personel-history h3 {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: #fff;
+}
+
+.bugun-personel-history-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.bugun-personel-history-list li {
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 12.5px;
+  color: #d7dde8;
+}
+
+.bugun-personel-history-actor,
+.bugun-personel-history-reason {
+  color: #a0aec0;
+  font-size: 12px;
+}
+
 .bugun-personel-header-btn {
   position: relative;
 }

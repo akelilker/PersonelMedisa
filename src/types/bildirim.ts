@@ -24,6 +24,24 @@ export type Bildirim = {
   bitis_saati?: string | null;
   dakika?: number | null;
   sube_id?: number;
+  duzeltme_gecmisi?: GunlukBildirimDuzeltmeAudit[];
+};
+
+export type GunlukBildirimDuzeltmeAudit = {
+  id: number;
+  gunluk_bildirim_id: number;
+  personel_id: number;
+  sube_id: number;
+  tarih: string;
+  olay_tipi: string;
+  actor_user_id: number;
+  actor_ad_soyad?: string | null;
+  correction_reason?: string | null;
+  eski_bildirim_turu: string;
+  yeni_bildirim_turu?: string | null;
+  eski_alanlar?: Record<string, unknown>;
+  yeni_alanlar?: Record<string, unknown>;
+  created_at: string;
 };
 
 export type BirimAmiriSecenegi = {
@@ -180,6 +198,9 @@ export type BugunPersonelDurumuStatusCounts = {
 export type BugunPersonelDurumuPerson = {
   personel_id: number;
   ad_soyad: string;
+  bildirim_id?: number | null;
+  bildirim_state?: string | null;
+  created_by?: number | null;
   durum: string;
   durum_label: string;
   gec_kalma_dakika: number | null;
@@ -189,6 +210,7 @@ export type BugunPersonelDurumuPerson = {
   aciklama: string | null;
   alt_tur: string | null;
   detail_line: string;
+  evidence?: "EXCEPTION" | "ATTENDANCE" | "COMPLETION" | "UNASSESSED" | string;
   group: "PLANNED" | "ACTUAL" | "ATTENTION" | string;
 };
 
@@ -215,6 +237,7 @@ export type BugunPersonelDurumuBranch = {
   sube_id: number;
   sube_adi: string;
   counts: BugunPersonelDurumuStatusCounts;
+  period_writable?: boolean;
   birim_bildirim: { tamamlanan: number; toplam: number };
   units: BugunPersonelDurumuUnit[];
 };

@@ -91,10 +91,10 @@ describe("MG personnel bulk apply owner closeout sources", () => {
     expect(resolver).not.toContain("tc_kimlik");
   });
 
-  it("keeps migration control plane at repo tip 084", () => {
+  it("keeps migration control plane at repo tip 085", () => {
     const preflight = read("api/src/Database/MigrationPreflightReport.php");
-    expect(preflight).toContain("'084' => '084_gunluk_bildirim_tamamlama_header_summary.sql'");
-    expect(preflight).toContain("EXPECTED_APPLIED_TIP = '083'");
-    expect(preflight).not.toContain("'083' => '083_personel_organizasyon_degisiklik_auditleri.sql'");
+    expect(preflight).toContain("'085' => '085_gunluk_bildirim_duzeltme_auditleri.sql'");
+    expect(preflight).toContain("EXPECTED_APPLIED_TIP = '084'");
+    expect(preflight).not.toContain("'084' => '084_gunluk_bildirim_tamamlama_header_summary.sql'");
   });
 });

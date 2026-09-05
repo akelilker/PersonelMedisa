@@ -468,6 +468,47 @@ final class PersonelLifecycleBulkApplyService
             }
         }
 
+        if ($owner === 'PersonelHistoricalExitDateBackfillService') {
+            $personelId = (int) ($plan['personel_id'] ?? 0);
+            $exitDate = (string) ($plan['exit_date'] ?? '');
+            $aciklama = (string) ($plan['aciklama'] ?? '');
+
+            $pdo->beginTransaction();
+            try {
+                $replay = $claimFn($pdo);
+                if (is_array($replay)) {
+                    $pdo->commit();
+
+                    return [
+                        'entity_id' => (int) ($replay['result_entity_id'] ?? 0),
+                        'replay' => true,
+                    ];
+                }
+                $result = PersonelHistoricalExitDateBackfillService::applyInTransaction(
+                    $pdo,
+                    $personelId,
+                    $exitDate,
+                    $aciklama !== '' ? $aciklama : null,
+                    $actorId
+                );
+                $entityId = (int) ($result['surec_id'] ?? $personelId);
+                $applyResultHolder['entity_id'] = $entityId;
+                $completeFn($pdo);
+                $pdo->commit();
+
+                return [
+                    'entity_id' => $entityId,
+                    'already_applied' => !empty($result['already_applied']),
+                    'action' => (string) ($result['action'] ?? ''),
+                ];
+            } catch (\Throwable $e) {
+                if ($pdo->inTransaction()) {
+                    $pdo->rollBack();
+                }
+                throw $e;
+            }
+        }
+
         if ($owner === 'PersonelLifecycleBulkReferenceResolver') {
             $payload = is_array($plan['payload'] ?? null) ? $plan['payload'] : [];
             $table = (string) ($payload['table'] ?? 'gorevler');
@@ -561,6 +602,7 @@ final class PersonelLifecycleBulkApplyService
             PersonelLifecycleBulkRowContract::OP_ORG_UPDATE => 40,
             PersonelLifecycleBulkRowContract::OP_BRANCH => 50,
             PersonelLifecycleBulkRowContract::OP_EXIT => 60,
+            PersonelLifecycleBulkRowContract::OP_HISTORICAL_EXIT_DATE_BACKFILL => 65,
         ];
 
         $combined = [];

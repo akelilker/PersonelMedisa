@@ -22,9 +22,13 @@ describe("MG personnel exit postcheck route parity (source contract)", () => {
     expect(postcheckHelper).toContain("PersonelIstenAyrilmaService");
     expect(postcheckHelper).toContain("fetchCanonicalExitSurec");
     expect(deferredExitOps).toContain("verifyPersonnelExitSurec");
-    expect(deferredExitOps).toContain("resolveSurecIdFromApplyResult(applyRows, { mutationId: row.mutation_id })");
+    expect(deferredExitOps).toContain("resolveSurecIdFromApplyResult(applyRows, {");
+    expect(deferredExitOps).toContain("mutationId: row.mutation_id");
+    expect(deferredExitOps).toContain('owner: "PersonelHistoricalExitDateBackfillService"');
     expect(deferredExitOps).not.toMatch(/\/personeller\/\$\{[^}]+\}\/surecler/);
     expect(deferredExitOps).toContain("personel-lifecycle-exit-postcheck.mjs");
+    expect(deferredExitOps).toContain("HISTORICAL_EXIT_DATE_BACKFILL");
+    expect(deferredExitOps).not.toContain('operation_type: "PERSONEL_EXIT"');
   });
 
   it("validates ISTEN_AYRILMA personel/date/aciklama with fail-closed business codes", () => {

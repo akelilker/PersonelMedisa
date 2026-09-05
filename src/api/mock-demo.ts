@@ -7645,7 +7645,8 @@ export function resolveDemoApiResponse(
 
     let attention = 0;
     for (const branch of branchSummaries) {
-      attention += branch.counts.gelmedi + branch.counts.gec_geldi;
+      attention +=
+        branch.counts.gelmedi + branch.counts.gec_geldi + branch.counts.henuz_degerlendirilmedi;
       attention += Math.max(0, branch.birim_bildirim.toplam - branch.birim_bildirim.tamamlanan);
     }
 

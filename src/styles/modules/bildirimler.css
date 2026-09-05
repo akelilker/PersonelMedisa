@@ -231,6 +231,13 @@
   font-weight: 500;
 }
 
+.gunluk-eksik-giris-warning {
+  margin: 8px 0 0;
+  color: var(--red);
+  font-weight: 600;
+  font-size: 13px;
+}
+
 @media (max-width: 720px) {
   .bildirimler-item {
     grid-template-columns: 1fr;

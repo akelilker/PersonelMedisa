@@ -22,6 +22,10 @@ import {
   canSubmitGunlukBildirim
 } from "../../../lib/bildirim/gunluk-bildirim-actions";
 import {
+  formatEksikGirisAttention,
+  formatEksikGirisCompleteConfirm
+} from "../../../lib/bildirim/gunluk-bildirim-timing-copy";
+import {
   getCurrentMonthValue,
   isAylikBildirimOnayApproveEnabled,
   resolveAylikBildirimOnayStatusMessage
@@ -763,6 +767,7 @@ export function BildirimlerPage() {
   const [isCompletingDay, setIsCompletingDay] = useState(false);
   const [completeDayError, setCompleteDayError] = useState<string | null>(null);
   const [completeDaySuccess, setCompleteDaySuccess] = useState<string | null>(null);
+  const [pendingCompleteConfirm, setPendingCompleteConfirm] = useState(false);
   const [rosterSearch, setRosterSearch] = useState("");
   const location = useLocation();
   const navigate = useNavigate();
@@ -901,8 +906,22 @@ export function BildirimlerPage() {
     gunlukOzet.ozet.taslak === 0 &&
     gunlukOzet.ozet.duzeltme_istendi === 0;
 
-  async function handleCompleteDay() {
+  const eksikGirisCount = gunlukOzet?.ozet.eksik_giris ?? 0;
+
+  function requestCompleteDay() {
     if (!canCompleteToday || isCompletingDay) return;
+    setCompleteDayError(null);
+    setCompleteDaySuccess(null);
+    if (eksikGirisCount > 0) {
+      setPendingCompleteConfirm(true);
+      return;
+    }
+    void performCompleteDay();
+  }
+
+  async function performCompleteDay() {
+    if (!canCompleteToday || isCompletingDay) return;
+    setPendingCompleteConfirm(false);
     setIsCompletingDay(true);
     setCompleteDayError(null);
     setCompleteDaySuccess(null);
@@ -916,6 +935,10 @@ export function BildirimlerPage() {
     } finally {
       setIsCompletingDay(false);
     }
+  }
+
+  function cancelCompleteDayConfirm() {
+    setPendingCompleteConfirm(false);
   }
 
   const personelMap = useMemo(
@@ -950,9 +973,17 @@ export function BildirimlerPage() {
         : typeof currentState?.prefillPersonelId === "string"
           ? currentState.prefillPersonelId
           : "";
+    const focusTarih =
+      typeof currentState?.focusTarih === "string" && /^\d{4}-\d{2}-\d{2}$/.test(currentState.focusTarih)
+        ? currentState.focusTarih
+        : "";
 
-    if (!currentState?.openCreateModal && !prefillPersonelId) {
+    if (!currentState?.openCreateModal && !prefillPersonelId && !focusTarih) {
       return;
+    }
+
+    if (focusTarih) {
+      updateDraft({ tarih: focusTarih });
     }
 
     if (prefillPersonelId) {
@@ -975,6 +1006,7 @@ export function BildirimlerPage() {
     const nextState = { ...currentState };
     delete nextState.openCreateModal;
     delete nextState.prefillPersonelId;
+    delete nextState.focusTarih;
 
     navigate(location.pathname, {
       replace: true,
@@ -1055,7 +1087,7 @@ export function BildirimlerPage() {
                 type="button"
                 className="universal-btn-aux"
                 data-testid="gunluk-bildirim-tamamla"
-                onClick={() => void handleCompleteDay()}
+                onClick={() => requestCompleteDay()}
                 disabled={isCompletingDay}
               >
                 {isCompletingDay ? "Tamamlanıyor..." : "Bugünkü bildirimi tamamla"}
@@ -1066,6 +1098,15 @@ export function BildirimlerPage() {
           {gunlukOzetError ? <p className="bildirim-form-error">{gunlukOzetError}</p> : null}
           {completeDayError ? <p className="bildirim-form-error">{completeDayError}</p> : null}
           {completeDaySuccess ? <p className="yonetim-success">{completeDaySuccess}</p> : null}
+          {gunlukOzet?.ozet.tamamlandi_mi && eksikGirisCount > 0 ? (
+            <p
+              className="gunluk-eksik-giris-warning"
+              data-testid="gunluk-eksik-giris-warning"
+              role="status"
+            >
+              {formatEksikGirisAttention(eksikGirisCount)}
+            </p>
+          ) : null}
           {gunlukOzet ? (
             <>
               <div className="bildirim-model-grid" data-testid="gunluk-bildirim-ozet-cards">
@@ -1747,6 +1788,21 @@ export function BildirimlerPage() {
           errorMessage={cancelDialogError}
           onConfirm={confirmCancelBildirim}
           onCancel={closeCancelBildirimDialog}
+        />
+      ) : null}
+
+      {pendingCompleteConfirm ? (
+        <AppActionDialog
+          open
+          testId="gunluk-tamamla-eksik-giris-dialog"
+          title="Eksik Giriş Uyarısı"
+          description={formatEksikGirisCompleteConfirm(eksikGirisCount)}
+          confirmLabel="Evet"
+          cancelLabel="Hayır"
+          submitLabel="Tamamlanıyor..."
+          isSubmitting={isCompletingDay}
+          onConfirm={() => void performCompleteDay()}
+          onCancel={cancelCompleteDayConfirm}
         />
       ) : null}
     </section>

@@ -92,6 +92,15 @@ export function GunlukTamamlamaDetayPage() {
               <li>Görevde: {ozet.gorevde} Kişi</li>
               <li>Diğer: {ozet.diger} Kişi</li>
             </ul>
+            {(ozet.eksik_giris ?? 0) > 0 ? (
+              <p
+                className="gunluk-eksik-giris-warning"
+                data-testid="tamamlama-eksik-giris-warning"
+                role="status"
+              >
+                {ozet.eksik_giris} Personel Henüz Giriş Yapmadı
+              </p>
+            ) : null}
           </div>
 
           <div className="gunluk-tamamlama-kategoriler">

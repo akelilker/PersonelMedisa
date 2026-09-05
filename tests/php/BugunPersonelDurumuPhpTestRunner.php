@@ -128,6 +128,93 @@ $waiting = BugunPersonelDurumuService::classifyCompletionStatus(
 );
 bpdAssert($waiting === BugunPersonelDurumuService::COMPLETION_BEKLENIYOR, '09:00 waiting');
 
+$justLate = BugunPersonelDurumuService::classifyCompletionStatus(
+    '2026-09-04 09:30:01',
+    $tarih,
+    new \DateTimeImmutable('2026-09-04 10:00:00', $tz)
+);
+bpdAssert($justLate === BugunPersonelDurumuService::COMPLETION_GEC_BILDIRILDI, '09:30:01 late');
+
+// Missing entry ≠ GELMEDI; completion does not clear live missing-entry evidence
+bpdAssert(
+    BugunPersonelDurumuService::isMissingEntryEvidence(null, null) === true,
+    'no exception + no attendance → missing entry'
+);
+bpdAssert(
+    BugunPersonelDurumuService::isMissingEntryEvidence(null, '08:45') === false,
+    'attendance clears missing entry'
+);
+bpdAssert(
+    BugunPersonelDurumuService::isMissingEntryEvidence('IZINLI', null) === false,
+    'exception clears missing entry'
+);
+bpdAssert(
+    BugunPersonelDurumuService::resolvePersonDurum(null, null, false) !== 'GELMEDI',
+    'missing entry person !== GELMEDI'
+);
+
+// Sunday: normal 09:30 overdue does not apply; Monday 12:00 review deadline
+$sunday = '2026-09-06';
+bpdAssert(BugunPersonelDurumuService::isSundayDate($sunday), '2026-09-06 is Sunday');
+$sundayDeadline = BugunPersonelDurumuService::deadlineDateTime($sunday);
+bpdAssert(
+    $sundayDeadline->format('Y-m-d H:i:s') === '2026-09-07 12:00:00',
+    'Sunday review deadline = Monday 12:00'
+);
+$sundayMorning = BugunPersonelDurumuService::classifyCompletionStatus(
+    null,
+    $sunday,
+    new \DateTimeImmutable('2026-09-06 09:31:00', $tz)
+);
+bpdAssert(
+    $sundayMorning === BugunPersonelDurumuService::COMPLETION_BEKLENIYOR,
+    'Sunday 09:31 no normal overdue'
+);
+$monday1159 = BugunPersonelDurumuService::classifyCompletionStatus(
+    null,
+    $sunday,
+    new \DateTimeImmutable('2026-09-07 11:59:00', $tz)
+);
+bpdAssert(
+    $monday1159 === BugunPersonelDurumuService::COMPLETION_BEKLENIYOR,
+    'Monday 11:59 Sunday review still waiting'
+);
+$monday1200Complete = BugunPersonelDurumuService::classifyCompletionStatus(
+    '2026-09-07 12:00:00',
+    $sunday,
+    new \DateTimeImmutable('2026-09-07 13:00:00', $tz)
+);
+bpdAssert(
+    $monday1200Complete === BugunPersonelDurumuService::COMPLETION_TAMAMLANDI,
+    'Monday 12:00:00 Sunday completion on time'
+);
+$monday120001 = BugunPersonelDurumuService::classifyCompletionStatus(
+    null,
+    $sunday,
+    new \DateTimeImmutable('2026-09-07 12:00:01', $tz)
+);
+bpdAssert(
+    $monday120001 === BugunPersonelDurumuService::COMPLETION_SURESI_GECTI,
+    'Monday 12:00:01 Sunday review overdue'
+);
+bpdAssert(
+    BugunPersonelDurumuService::completionStatusLabel(
+        BugunPersonelDurumuService::COMPLETION_SURESI_GECTI,
+        null,
+        $sunday
+    ) === 'Pazar Mesaisi Bildirimi Süresi Geçti',
+    'Sunday overdue label exact'
+);
+$sundayLateComplete = BugunPersonelDurumuService::classifyCompletionStatus(
+    '2026-09-07 12:30:00',
+    $sunday,
+    new \DateTimeImmutable('2026-09-07 13:00:00', $tz)
+);
+bpdAssert(
+    $sundayLateComplete === BugunPersonelDurumuService::COMPLETION_GEC_BILDIRILDI,
+    'Monday late Sunday completion still allowed as GEC_BILDIRILDI'
+);
+
 // 8) branch/unit total count invariant
 $invariantCounts = [
     'toplam' => 8,

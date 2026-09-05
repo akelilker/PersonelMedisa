@@ -104,6 +104,8 @@ export type GunlukTamamlamaOzetCounts = {
   gorevde: number;
   diger: number;
   bildirim_satiri: number;
+  /** Live missing-entry count after completion (not GELMEDI). */
+  eksik_giris?: number;
 };
 
 export type GunlukTamamlamaDetail = {
@@ -118,6 +120,8 @@ export type GunlukOzetCounts = {
   toplam_personel: number;
   bildirim_girilen: number;
   eksik_bildirim: number;
+  /** Live: no exception + no attendance proof (≠ GELMEDI). */
+  eksik_giris?: number;
   sorunlu_personel: number;
   taslak: number;
   gonderildi: number;
@@ -161,6 +165,8 @@ export type BirimAmiriGunlukDurumOzet = {
   erken_cikti: number;
   gorevde: number;
   henuz_degerlendirilmedi: number;
+  eksik_giris?: number;
+  attendance_proof_count?: number;
 };
 
 export type BirimAmiriGunlukDurumPersonel = {
@@ -174,12 +180,27 @@ export type BirimAmiriGunlukDurumPersonel = {
   cikis_saati: string | null;
 };
 
+export type BirimAmiriPazarMesaiPrompt = {
+  show: boolean;
+  sunday_tarih: string;
+  attendance_count: number;
+  message: string;
+};
+
 export type BirimAmiriGunlukDurum = {
   tarih: string;
   ozet: BirimAmiriGunlukDurumOzet;
   tamamlandi_mi: boolean;
   tamamlama: GunlukBildirimTamamlama | null;
   personeller: BirimAmiriGunlukDurumPersonel[];
+  bildirim?: {
+    status: string;
+    status_label: string;
+    eksik_giris: number;
+    tamamlandi_mi: boolean;
+    tamamlandi_at: string | null;
+  };
+  pazar_mesai_prompt?: BirimAmiriPazarMesaiPrompt | null;
 };
 
 /** IK / GENEL morning operations overview — branch → unit → person. */
@@ -221,6 +242,8 @@ export type BugunPersonelDurumuBildirim = {
   tamamlandi_at: string | null;
   tamamlayan_user_id: number | null;
   completion_id: number | null;
+  /** Live missing-entry count (updates after later arrivals; not GELMEDI). */
+  eksik_giris?: number;
 };
 
 export type BugunPersonelDurumuUnit = {

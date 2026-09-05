@@ -533,6 +533,15 @@ export function BugunPersonelDurumuModal({ open, onClose }: BugunPersonelDurumuM
                   <span aria-hidden="true">{formatCompletionGlyph(unit.bildirim.status)}</span>
                   <span>{unit.bildirim.status_label}</span>
                 </div>
+                {unit.bildirim.tamamlandi_mi && (unit.bildirim.eksik_giris ?? 0) > 0 ? (
+                  <p
+                    className="gunluk-eksik-giris-warning"
+                    data-testid={`bugun-eksik-giris-${unit.birim_id ?? "none"}`}
+                    role="status"
+                  >
+                    {unit.bildirim.eksik_giris} Personel Henüz Giriş Yapmadı
+                  </p>
+                ) : null}
               </div>
             ))}
           </div>

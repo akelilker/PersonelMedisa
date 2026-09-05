@@ -28,6 +28,8 @@ describe("BIRIM_AMIRI operational home owners", () => {
     expect(home).not.toContain("giris-scan");
     expect(home).toContain("Kendi Bilgilerim");
     expect(home).toContain("Birimim");
+    expect(home).toContain("birim-amiri-pazar-mesai-prompt");
+    expect(home).toContain("birim-amiri-eksik-giris-warning");
   });
 
   it("backend unit roster uses OrgScope and does not reuse fetchGunlukRoster fallback", () => {

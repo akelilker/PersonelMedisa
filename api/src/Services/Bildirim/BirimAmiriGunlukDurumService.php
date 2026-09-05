@@ -185,18 +185,150 @@ class BirimAmiriGunlukDurumService
         $unitCompleted = is_array($tamamlama);
 
         $personeller = [];
+        $eksikGiris = 0;
+        $attendanceProofCount = 0;
         foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
             $personeller[] = self::mapPersonelRow($row, $unitCompleted);
+            $puantajGiris = isset($row['puantaj_giris']) ? $row['puantaj_giris'] : null;
+            if (BugunPersonelDurumuService::isMissingEntryEvidence(
+                isset($row['bildirim_turu']) ? $row['bildirim_turu'] : null,
+                $puantajGiris
+            )) {
+                $eksikGiris++;
+            }
+            if (BugunPersonelDurumuService::hasAttendanceProof($puantajGiris)) {
+                $attendanceProofCount++;
+            }
         }
 
         $ozet = self::buildOzetCounts($personeller);
+        $ozet['eksik_giris'] = $eksikGiris;
+        $ozet['attendance_proof_count'] = $attendanceProofCount;
+
+        $tz = new \DateTimeZone(BugunPersonelDurumuService::TIMEZONE);
+        $now = new \DateTimeImmutable('now', $tz);
+        $tamamlandiAt = $unitCompleted && isset($tamamlama['tamamlandi_at'])
+            ? $tamamlama['tamamlandi_at']
+            : null;
+        $status = BugunPersonelDurumuService::classifyCompletionStatus($tamamlandiAt, $tarih, $now);
+        $timeLabel = null;
+        if ($tamamlandiAt !== null) {
+            $parsed = \DateTimeImmutable::createFromFormat(
+                'Y-m-d H:i:s',
+                (string) $tamamlandiAt,
+                $tz
+            );
+            if ($parsed instanceof \DateTimeImmutable) {
+                $timeLabel = $parsed->format('H:i');
+            }
+        }
 
         return [
             'tarih' => $tarih,
             'ozet' => $ozet,
             'tamamlandi_mi' => $unitCompleted,
             'tamamlama' => $tamamlama,
+            'bildirim' => [
+                'status' => $status,
+                'status_label' => BugunPersonelDurumuService::completionStatusLabel($status, $timeLabel, $tarih),
+                'eksik_giris' => $eksikGiris,
+                'tamamlandi_mi' => $unitCompleted,
+                'tamamlandi_at' => $tamamlandiAt,
+            ],
             'personeller' => $personeller,
+            'pazar_mesai_prompt' => self::buildPazarMesaiPrompt(
+                $pdo,
+                $user,
+                $request,
+                $tarih,
+                $amirId,
+                $activeSube
+            ),
+        ];
+    }
+
+    /**
+     * Monday operational home: prompt when prior Sunday had real attendance and no completion.
+     *
+     * @param array<string, mixed> $user
+     * @param int|null $activeSube
+     * @return array<string, mixed>|null
+     */
+    private static function buildPazarMesaiPrompt(
+        PDO $pdo,
+        array $user,
+        Request $request,
+        $tarih,
+        $amirId,
+        $activeSube
+    ) {
+        $tz = new \DateTimeZone(BugunPersonelDurumuService::TIMEZONE);
+        $day = \DateTimeImmutable::createFromFormat('!Y-m-d', (string) $tarih, $tz);
+        if (!$day instanceof \DateTimeImmutable || (int) $day->format('N') !== 1) {
+            return null;
+        }
+
+        $sunday = $day->modify('-1 day')->format('Y-m-d');
+        $sundayPayload = self::buildSundaySnapshot($pdo, $user, $request, $sunday, $amirId, $activeSube);
+        $attendanceCount = (int) ($sundayPayload['attendance_proof_count'] ?? 0);
+        $sundayCompleted = (bool) ($sundayPayload['tamamlandi_mi'] ?? false);
+        if ($attendanceCount < 1 || $sundayCompleted) {
+            return null;
+        }
+
+        return [
+            'show' => true,
+            'sunday_tarih' => $sunday,
+            'attendance_count' => $attendanceCount,
+            'message' => 'Dün Mesaiye Gelen ' . $attendanceCount
+                . ' Personel Var. Bildirimi Tamamlamak İster misiniz?',
+        ];
+    }
+
+    /**
+     * Lightweight Sunday attendance + completion snapshot (avoids recursive Monday prompt).
+     *
+     * @param array<string, mixed> $user
+     * @param int|null $activeSube
+     * @return array<string, mixed>
+     */
+    private static function buildSundaySnapshot(
+        PDO $pdo,
+        array $user,
+        Request $request,
+        $sunday,
+        $amirId,
+        $activeSube
+    ) {
+        $sunday = (string) $sunday;
+        $where = [
+            "p.aktif_durum = 'AKTIF'",
+            'p.ise_giris_tarihi <= :bagd_sun_giris',
+        ];
+        $params = ['bagd_sun_giris' => $sunday];
+        OrgScope::appendPersonelOrgFilter($where, $params, $user, $activeSube, 'p', 'bags', $pdo);
+
+        $attendanceProofCount = 0;
+        if (self::hasTable($pdo, 'gunluk_puantaj')) {
+            $params['bagd_sun_gp'] = $sunday;
+            $sql = '
+                SELECT gp.giris_saati AS puantaj_giris
+                FROM personeller p
+                INNER JOIN gunluk_puantaj gp ON gp.personel_id = p.id AND gp.tarih = :bagd_sun_gp
+                WHERE ' . implode(' AND ', $where) . '
+                  AND gp.giris_saati IS NOT NULL
+                  AND TRIM(gp.giris_saati) <> \'\'
+            ';
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute($params);
+            $attendanceProofCount = count($stmt->fetchAll(PDO::FETCH_ASSOC));
+        }
+
+        $tamamlama = self::fetchTamamlama($pdo, $amirId, $sunday, $activeSube);
+
+        return [
+            'attendance_proof_count' => $attendanceProofCount,
+            'tamamlandi_mi' => is_array($tamamlama),
         ];
     }
 

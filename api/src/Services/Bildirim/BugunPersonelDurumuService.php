@@ -22,6 +22,8 @@ class BugunPersonelDurumuService
 {
     public const WORKDAY_START = '08:30';
     public const ON_TIME_DEADLINE = '09:30';
+    /** Monday local deadline for prior Sunday mesai review. */
+    public const SUNDAY_REVIEW_DEADLINE = '12:00';
     public const TIMEZONE = 'Europe/Istanbul';
 
     public const COMPLETION_TAMAMLANDI = 'TAMAMLANDI';
@@ -117,9 +119,17 @@ class BugunPersonelDurumuService
                 }
 
                 $personeller = [];
+                $eksikGiris = 0;
                 foreach ($unit['rows'] as $rawRow) {
                     $personeller[] = self::mapPersonelRow($rawRow, (bool) $completion['tamamlandi_mi']);
+                    if (self::isMissingEntryEvidence(
+                        isset($rawRow['bildirim_turu']) ? $rawRow['bildirim_turu'] : null,
+                        isset($rawRow['puantaj_giris']) ? $rawRow['puantaj_giris'] : null
+                    )) {
+                        $eksikGiris++;
+                    }
                 }
+                $completion['eksik_giris'] = $eksikGiris;
                 $counts = self::buildStatusCounts($personeller);
                 foreach ($counts as $key => $value) {
                     if ($key === 'toplam') {
@@ -227,6 +237,68 @@ class BugunPersonelDurumuService
     }
 
     /**
+     * Live missing-entry evidence (ignores unit completion).
+     * Missing entry ≠ GELMEDI — person may be on-site without giriş/QR.
+     *
+     * @param string|null $bildirimTuru
+     * @param string|null $attendanceGirisSaati
+     */
+    public static function isMissingEntryEvidence($bildirimTuru, $attendanceGirisSaati = null)
+    {
+        $tur = strtoupper(trim((string) $bildirimTuru));
+        if (in_array($tur, self::$exceptionTurleri, true)) {
+            return false;
+        }
+
+        return self::nullableString($attendanceGirisSaati) === null;
+    }
+
+    /**
+     * Real attendance/mesai proof from puantaj giriş (no invented GELDI).
+     *
+     * @param string|null $attendanceGirisSaati
+     */
+    public static function hasAttendanceProof($attendanceGirisSaati)
+    {
+        return self::nullableString($attendanceGirisSaati) !== null;
+    }
+
+    /**
+     * @param string $tarih YYYY-MM-DD
+     */
+    public static function isSundayDate($tarih)
+    {
+        $tz = new DateTimeZone(self::TIMEZONE);
+        $day = DateTimeImmutable::createFromFormat('!Y-m-d', (string) $tarih, $tz);
+        if (!$day instanceof DateTimeImmutable) {
+            return false;
+        }
+
+        return (int) $day->format('w') === 0;
+    }
+
+    /**
+     * On-time deadline for the notification date (Europe/Istanbul).
+     * Normal day: same-day 09:30:00 inclusive.
+     * Sunday: next Monday 12:00:00 inclusive (normal 09:30 does not apply).
+     *
+     * @param string $tarih YYYY-MM-DD
+     */
+    public static function deadlineDateTime($tarih)
+    {
+        $tz = new DateTimeZone(self::TIMEZONE);
+        $day = DateTimeImmutable::createFromFormat('!Y-m-d', (string) $tarih, $tz);
+        if ($day instanceof DateTimeImmutable && (int) $day->format('w') === 0) {
+            return $day->modify('next monday')->setTime(12, 0, 0);
+        }
+
+        return new DateTimeImmutable(
+            (string) $tarih . ' ' . self::ON_TIME_DEADLINE . ':00',
+            $tz
+        );
+    }
+
+    /**
      * @param string|null $bildirimTuru
      * @deprecated Prefer resolvePersonDurum — kept for exception extraction only.
      */
@@ -290,6 +362,8 @@ class BugunPersonelDurumuService
      */
     public static function classifyCompletionStatus($tamamlandiAt, $tarih, DateTimeImmutable $now)
     {
+        $tz = new DateTimeZone(self::TIMEZONE);
+        $now = $now->setTimezone($tz);
         $deadline = self::deadlineDateTime($tarih);
         if ($tamamlandiAt !== null && trim((string) $tamamlandiAt) !== '') {
             $completed = self::parseServerDateTime((string) $tamamlandiAt);
@@ -326,14 +400,6 @@ class BugunPersonelDurumuService
         }
 
         return ($hour * 60) + $minute;
-    }
-
-    private static function deadlineDateTime($tarih)
-    {
-        return new DateTimeImmutable(
-            (string) $tarih . ' ' . self::ON_TIME_DEADLINE . ':00',
-            new DateTimeZone(self::TIMEZONE)
-        );
     }
 
     /**
@@ -622,16 +688,40 @@ class BugunPersonelDurumuService
 
         return [
             'status' => $status,
-            'status_label' => self::completionStatusLabel($status, $timeLabel),
+            'status_label' => self::completionStatusLabel($status, $timeLabel, $tarih),
             'tamamlandi_mi' => $found !== null,
             'tamamlandi_at' => $tamamlandiAt,
             'tamamlayan_user_id' => $found !== null ? $found['tamamlayan_user_id'] : null,
             'completion_id' => $found !== null ? $found['id'] : null,
+            'eksik_giris' => 0,
         ];
     }
 
-    private static function completionStatusLabel($status, $timeLabel)
+    /**
+     * @param string|null $timeLabel
+     * @param string|null $tarih
+     */
+    public static function completionStatusLabel($status, $timeLabel = null, $tarih = null)
     {
+        $isSunday = $tarih !== null && self::isSundayDate($tarih);
+        if ($isSunday) {
+            if ($status === self::COMPLETION_TAMAMLANDI) {
+                return $timeLabel !== null
+                    ? ('Zamanında Pazar Kontrolü · ' . $timeLabel)
+                    : 'Zamanında Pazar Kontrolü';
+            }
+            if ($status === self::COMPLETION_GEC_BILDIRILDI) {
+                return $timeLabel !== null
+                    ? ('Geç Bildirildi (Pazar mesaisi) · ' . $timeLabel)
+                    : 'Geç Bildirildi (Pazar mesaisi)';
+            }
+            if ($status === self::COMPLETION_SURESI_GECTI) {
+                return 'Pazar Mesaisi Bildirimi Süresi Geçti';
+            }
+
+            return 'Kontrol bekliyor';
+        }
+
         if ($status === self::COMPLETION_TAMAMLANDI) {
             return $timeLabel !== null ? ('Tamamlandı · ' . $timeLabel) : 'Tamamlandı';
         }

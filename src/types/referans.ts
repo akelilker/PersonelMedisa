@@ -5,6 +5,8 @@ export type IdOption = {
   parentId?: number | null;
   /** Org reference short code (bolumler/birimler.kisa_kod). */
   kisaKod?: string | null;
+  /** Company owner for SGK işveren / şube same-company filtering. */
+  sirketId?: number | null;
 };
 
 export type KeyOption = {

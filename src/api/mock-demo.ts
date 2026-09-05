@@ -9885,9 +9885,9 @@ export function resolveDemoApiResponse(
 
     if (pathname === "/referans/sgk-isverenler") {
       return ok([
-        { id: 1, ad: "Medisa" },
-        { id: 2, ad: "Karyapı" },
-        { id: 3, ad: "Şenay Mobilya" }
+        { id: 1, ad: "Medisa", sirket_id: 1 },
+        { id: 2, ad: "Karyapı", sirket_id: 2 },
+        { id: 3, ad: "Şenay Mobilya", sirket_id: 1 }
       ]);
     }
 

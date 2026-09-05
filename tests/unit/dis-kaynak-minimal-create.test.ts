@@ -18,6 +18,8 @@ function makeForm(overrides: Partial<CreatePersonelFormState> = {}): CreatePerso
     acilDurumTelefon: "",
     iseGirisTarihi: "2026-01-01",
     subeId: "",
+    sgkIsverenId: "",
+    calismaLokasyonuId: "",
     departmanId: "",
     bolumId: "",
     birimId: "",
@@ -29,7 +31,7 @@ function makeForm(overrides: Partial<CreatePersonelFormState> = {}): CreatePerso
     maasTutari: "",
     primKuraliId: "",
     ...overrides
-  } as CreatePersonelFormState;
+  };
 }
 
 describe("DIS_KAYNAK minimal personel create", () => {

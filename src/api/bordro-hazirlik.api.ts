@@ -43,6 +43,7 @@ export type BordroHazirlikPreflight = {
   >;
   readiness_domains?: BordroReadinessDomain[];
   candidate_gate?: BordroCandidateGate;
+  operasyonel_hazirlik?: BordroOperasyonelHazirlikOzet;
   policy_summary: {
     onayli_politika_id: number | null;
     policy_version_hash: string | null;
@@ -50,6 +51,68 @@ export type BordroHazirlikPreflight = {
   };
   correction_projection_hash: string;
   contract_version: string;
+};
+
+export type BordroOperasyonelGunOzeti = {
+  henuz_degerlendirilmedi: number;
+  eksik_giris: number;
+  aciklanmamis: number;
+  izinli: number;
+  raporlu: number;
+  gelmedi: number;
+  gec_geldi: number;
+  erken_cikti: number;
+  fazla_mesai_dakika: number;
+  puantaj_kontrol_bekleyen: number;
+};
+
+export type BordroOperasyonelPersonelSatiri = {
+  personel_id: number;
+  ad_soyad: string;
+  sicil_no?: string | null;
+  aktif_durum?: string | null;
+  cikis_tarihi?: string | null;
+  istihdam_baslangic: string;
+  istihdam_bitis: string;
+  operasyonel_hazir: boolean;
+  problem_kodlari: string[];
+  gun_ozeti: BordroOperasyonelGunOzeti;
+  etki_aday: { HAZIR: number; INCELEME_GEREKLI: number };
+  action_links: { puantaj: string; bugun: string; surec: string };
+  ornek_problem_gunleri: Array<{ tarih: string; kod: string }>;
+};
+
+export type BordroOperasyonelHazirlikOzet = {
+  sube_id: number;
+  yil: number;
+  ay: number;
+  donem: string;
+  donem_baslangic: string;
+  donem_bitis: string;
+  as_of: string;
+  period_state: string;
+  period_writable: boolean;
+  read_only: boolean;
+  ozet: {
+    toplam_personel: number;
+    bordroya_hazir_personel: number;
+    kontrol_gereken_personel: number;
+    henuz_degerlendirilmedi_gun: number;
+    eksik_giris_gun: number;
+    aciklanmamis_gun: number;
+    izinli_gun: number;
+    raporlu_gun: number;
+    devamsizlik_gun: number;
+    gec_gelme_gun: number;
+    erken_cikma_gun: number;
+    fazla_mesai_dakika: number;
+    puantaj_kontrol_bekleyen: number;
+  };
+  ready_criteria: string[];
+  kontrol_gerekenler: BordroOperasyonelPersonelSatiri[];
+  personel_satirlari: BordroOperasyonelPersonelSatiri[];
+  contract_version: string;
+  generated_at?: string;
 };
 
 export type BordroNetMaasEksikItem = {
@@ -182,6 +245,22 @@ export async function fetchBordroReadiness(params: {
   });
   const response = await apiRequest<ApiResponse<BordroHazirlikPreflight> | BordroHazirlikPreflight>(path);
   return unwrapData(response, "Bordro readiness alinamadi.");
+}
+
+export async function fetchBordroOperasyonelOzet(params: {
+  yil: number;
+  ay: number;
+  subeId: number;
+}): Promise<BordroOperasyonelHazirlikOzet> {
+  const path = appendQueryParams(endpoints.bordroHazirlik.operasyonelOzet, {
+    sube_id: params.subeId,
+    yil: params.yil,
+    ay: params.ay
+  });
+  const response = await apiRequest<ApiResponse<BordroOperasyonelHazirlikOzet> | BordroOperasyonelHazirlikOzet>(
+    path
+  );
+  return unwrapData(response, "Bordro operasyonel ozet alinamadi.");
 }
 
 export async function fetchBordroNetMaasEksikleri(params: {

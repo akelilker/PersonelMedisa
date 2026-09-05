@@ -37,6 +37,19 @@ class BordroHazirlikController
         self::preflight($request);
     }
 
+    /** Operational month-end preparation summary (attendance / open items). */
+    public static function operasyonelOzet(Request $request)
+    {
+        [$pdo, $user, $subeId] = self::context($request, 'bordro_on_izleme.view');
+        $yil = self::readQueryInt($request, 'yil', 2000, 2100);
+        $ay = self::readQueryInt($request, 'ay', 1, 12);
+        try {
+            JsonResponse::success(\Medisa\Api\Services\BordroOperasyonelHazirlikService::build($pdo, $subeId, $yil, $ay));
+        } catch (\Throwable $e) {
+            JsonResponse::serverError('Bordro operasyonel ozet olusturulamadi.');
+        }
+    }
+
     public static function netMaasEksikleri(Request $request)
     {
         [$pdo, $user, $subeId] = self::context($request, 'bordro_on_izleme.view');

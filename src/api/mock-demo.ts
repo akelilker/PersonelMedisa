@@ -1789,6 +1789,7 @@ function buildDemoBordroReadiness(yil: number, ay: number, subeId: number) {
         mesaj: d.aciklama
       }))
     },
+    operasyonel_hazirlik: buildDemoBordroOperasyonelHazirlik(yil, ay, subeId),
     policy_summary: {
       onayli_politika_id: approvedPolicy?.id ?? null,
       policy_version_hash: approvedPolicy?.policy_version_hash ?? null,
@@ -1796,6 +1797,80 @@ function buildDemoBordroReadiness(yil: number, ay: number, subeId: number) {
     },
     correction_projection_hash: "demo-correction-hash",
     contract_version: "S83_BORDRO_BUSINESS_DATA_READINESS_V1"
+  };
+}
+
+function buildDemoBordroOperasyonelHazirlik(yil: number, ay: number, subeId: number) {
+  const donem = `${yil}-${String(ay).padStart(2, "0")}`;
+  const donemBaslangic = `${donem}-01`;
+  const donemBitis = `${donem}-28`;
+  return {
+    sube_id: subeId,
+    yil,
+    ay,
+    donem,
+    donem_baslangic: donemBaslangic,
+    donem_bitis: donemBitis,
+    as_of: donemBitis,
+    period_state: "ACIK",
+    period_writable: true,
+    read_only: false,
+    ozet: {
+      toplam_personel: 2,
+      bordroya_hazir_personel: 1,
+      kontrol_gereken_personel: 1,
+      henuz_degerlendirilmedi_gun: 2,
+      eksik_giris_gun: 1,
+      aciklanmamis_gun: 0,
+      izinli_gun: 1,
+      raporlu_gun: 0,
+      devamsizlik_gun: 0,
+      gec_gelme_gun: 1,
+      erken_cikma_gun: 0,
+      fazla_mesai_dakika: 45,
+      puantaj_kontrol_bekleyen: 0
+    },
+    ready_criteria: [
+      "henuz_degerlendirilmedi_yok",
+      "cozulmemis_eksik_giris_yok",
+      "puantaj_kontrol_bekleyen_yok",
+      "etki_aday_hazir_inceleme_yok"
+    ],
+    kontrol_gerekenler: [
+      {
+        personel_id: 2,
+        ad_soyad: "Demo Kontrol",
+        sicil_no: "P-002",
+        aktif_durum: "AKTIF",
+        cikis_tarihi: null,
+        istihdam_baslangic: donemBaslangic,
+        istihdam_bitis: donemBitis,
+        operasyonel_hazir: false,
+        problem_kodlari: ["HENUZ_DEGERLENDIRILMEDI"],
+        gun_ozeti: {
+          henuz_degerlendirilmedi: 2,
+          eksik_giris: 1,
+          aciklanmamis: 0,
+          izinli: 0,
+          raporlu: 0,
+          gelmedi: 0,
+          gec_geldi: 0,
+          erken_cikti: 0,
+          fazla_mesai_dakika: 0,
+          puantaj_kontrol_bekleyen: 0
+        },
+        etki_aday: { HAZIR: 0, INCELEME_GEREKLI: 0 },
+        action_links: {
+          puantaj: "/puantaj?personel_id=2",
+          bugun: "bugun_personel_durumu",
+          surec: "/surecler?personel_id=2"
+        },
+        ornek_problem_gunleri: [{ tarih: `${donem}-03`, kod: "HENUZ_DEGERLENDIRILMEDI" }]
+      }
+    ],
+    personel_satirlari: [],
+    contract_version: "S96_BORDRO_OPERASYONEL_HAZIRLIK_V1",
+    generated_at: new Date().toISOString()
   };
 }
 
@@ -11593,6 +11668,16 @@ export function resolveDemoApiResponse(
     const ay = toNumber(requestUrl.searchParams.get("ay")) ?? 3;
     const subeId = toNumber(requestUrl.searchParams.get("sube_id")) ?? 1;
     return ok(buildDemoBordroReadiness(yil, ay, subeId));
+  }
+
+  if (pathname === "/bordro-hazirlik/operasyonel-ozet" && method === "GET") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "bordro_on_izleme.view");
+    if (permissionError) return permissionError;
+    const yil = toNumber(requestUrl.searchParams.get("yil")) ?? 2026;
+    const ay = toNumber(requestUrl.searchParams.get("ay")) ?? 3;
+    const subeId = toNumber(requestUrl.searchParams.get("sube_id")) ?? 1;
+    return ok(buildDemoBordroOperasyonelHazirlik(yil, ay, subeId));
   }
 
   if (pathname === "/bordro-hazirlik/net-maas-eksikleri" && method === "GET") {

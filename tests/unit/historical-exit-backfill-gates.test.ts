@@ -139,6 +139,15 @@ describe("historical exit backfill gates — runtime SHA", () => {
   it("defaults to dry-run and requires explicit --apply for mutation", () => {
     expect(isApplyRequested(["node", "script.mjs"])).toBe(false);
     expect(isApplyRequested(["node", "script.mjs", `--expected-sha=${SHA}`])).toBe(false);
+    expect(
+      isApplyRequested([
+        "node",
+        "script.mjs",
+        `--expected-sha=${SHA}`,
+        "--curl-bin=curl",
+        "--ftp-netrc=/tmp/ftp.curl",
+      ])
+    ).toBe(false);
     expect(isApplyRequested(["node", "script.mjs", `--expected-sha=${SHA}`, "--apply"])).toBe(
       true
     );

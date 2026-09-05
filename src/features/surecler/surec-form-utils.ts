@@ -77,6 +77,12 @@ function appendIlkIkiGunFirmaOderMiPayload<T extends CreateSurecPayload | Update
 }
 
 export function buildCreateSurecPayload(form: SurecFormState): CreateSurecPayload {
+  const baslangic = form.baslangicTarihi.trim();
+  const bitis = form.bitisTarihi.trim();
+  if (baslangic && bitis && bitis < baslangic) {
+    throw new Error("Bitiş tarihi başlangıç tarihinden önce olamaz.");
+  }
+
   return appendMazeretTamGunPayload(
     appendIlkIkiGunFirmaOderMiPayload(
     {
@@ -95,6 +101,12 @@ export function buildCreateSurecPayload(form: SurecFormState): CreateSurecPayloa
 }
 
 export function buildUpdateSurecPayload(form: SurecFormState): UpdateSurecPayload {
+  const baslangic = form.baslangicTarihi.trim();
+  const bitis = form.bitisTarihi.trim();
+  if (baslangic && bitis && bitis < baslangic) {
+    throw new Error("Bitiş tarihi başlangıç tarihinden önce olamaz.");
+  }
+
   return appendMazeretTamGunPayload(
     appendIlkIkiGunFirmaOderMiPayload(
     {

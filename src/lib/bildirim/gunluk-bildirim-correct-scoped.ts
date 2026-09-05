@@ -49,6 +49,7 @@ export function turRequiresAciklama(tur: string): boolean {
 export function evidenceLabel(evidence: string | null | undefined): string {
   const key = (evidence ?? "").toUpperCase();
   if (key === "EXCEPTION") return "Exception kaydı";
+  if (key === "RESMI_SUREC") return "Resmi süreç kaydı";
   if (key === "ATTENDANCE") return "Attendance kanıtı";
   if (key === "COMPLETION") return "Tamamlama → geldi";
   if (key === "UNASSESSED") return "Henüz değerlendirilmedi";

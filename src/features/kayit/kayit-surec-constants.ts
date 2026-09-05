@@ -72,37 +72,37 @@ export const DEVAMSIZLIK_SUB_CARDS: DevamsizlikSubCard[] = [
   {
     id: "izin",
     title: "İzin",
-    description: "Planlı ya da onaylı izin kaydı",
+    description: "Özlük süreç kaydı (Bugün’de İzinli görünür)",
     candidateKeys: ["IZIN"]
   },
   {
     id: "rapor",
     title: "Rapor",
-    description: "Hastalık veya istirahat raporu kaydı",
+    description: "Özlük süreç kaydı (Bugün’de Raporlu görünür)",
     candidateKeys: ["RAPOR"]
   },
   {
     id: "is_kazasi",
     title: "İş Kazası",
-    description: "İş kazasına bağlı devamsızlık kaydı",
+    description: "Özlük süreç kaydı (Bugün’de Raporlu görünür)",
     candidateKeys: ["IS_KAZASI"]
   },
   {
     id: "izinsiz",
     title: "İzinsiz Gelmedi",
-    description: "Mazeretsiz işe gelmeme kaydı",
+    description: "Özlük süreç kaydı (Bugün’de Gelmedi görünür)",
     candidateKeys: ["DEVAMSIZLIK"]
   },
   {
     id: "gec",
     title: "Geç Geldi",
-    description: "Mesai başlangıcından sonra giriş kaydı",
+    description: "Saatli günlük durum — Bugünkü Personel Durumu",
     candidateKeys: ["DEVAMSIZLIK"]
   },
   {
     id: "erken",
     title: "Erken Çıktı",
-    description: "Mesai bitiminden önce çıkış kaydı",
+    description: "Saatli günlük durum — Bugünkü Personel Durumu",
     candidateKeys: ["DEVAMSIZLIK"]
   }
 ];
@@ -132,12 +132,12 @@ export const PUANTAJ_SUBDOMAIN_CARDS: Array<{
   id: PuantajSubdomainId;
   title: string;
   description: string;
-  kind: "route" | "inline-devamsizlik" | "puantaj-route";
+  kind: "route" | "inline-devamsizlik" | "puantaj-route" | "bugun-modal";
 }> = [
   {
     id: "gunluk-hareketler",
     title: "Günlük Hareketler",
-    description: "Günlük bildirim ve tamamlama akışı",
+    description: "Birim amiri günlük bildirim / tamamlama listesi",
     kind: "route"
   },
   {
@@ -150,13 +150,15 @@ export const PUANTAJ_SUBDOMAIN_CARDS: Array<{
     id: card.id as PuantajSubdomainId,
     title: card.title,
     description: card.description,
-    kind: "inline-devamsizlik" as const
+    kind: (card.id === "gec" || card.id === "erken"
+      ? "bugun-modal"
+      : "inline-devamsizlik") as "inline-devamsizlik" | "bugun-modal"
   })),
   {
     id: "gorev",
-    title: "Görev",
-    description: "Görev / telafi çalışması puantaj kararları",
-    kind: "puantaj-route"
+    title: "Görevde",
+    description: "Bugünkü görev durumu — Bugünkü Personel Durumu",
+    kind: "bugun-modal"
   },
   {
     id: "fazla-mesai",

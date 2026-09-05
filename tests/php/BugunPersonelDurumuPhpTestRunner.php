@@ -261,5 +261,35 @@ bpdAssert(
     '085 audit table carries old→new'
 );
 
+// 8) resmi surec → Bugün exception overlay (read-only; no parallel gunluk write)
+bpdAssert(
+    BugunPersonelDurumuService::mapSurecToBugunExceptionTur('IZIN', 'YILLIK_IZIN') === 'IZINLI',
+    'IZIN surec → IZINLI'
+);
+bpdAssert(
+    BugunPersonelDurumuService::mapSurecToBugunExceptionTur('RAPOR', 'Raporlu_Hastalik') === 'RAPORLU',
+    'RAPOR surec → RAPORLU'
+);
+bpdAssert(
+    BugunPersonelDurumuService::mapSurecToBugunExceptionTur('IS_KAZASI', 'IS_KAZASI_BILDIRIMI') === 'RAPORLU',
+    'IS_KAZASI surec → RAPORLU'
+);
+bpdAssert(
+    BugunPersonelDurumuService::mapSurecToBugunExceptionTur('DEVAMSIZLIK', 'IZINSIZ_GELMEDI') === 'GELMEDI',
+    'IZINSIZ DEVAMSIZLIK → GELMEDI'
+);
+bpdAssert(
+    BugunPersonelDurumuService::mapSurecToBugunExceptionTur('DEVAMSIZLIK', 'MAZERETSIZ_GEC_GELDI') === null,
+    'GEC surec does not invent Bugün saatli status'
+);
+bpdAssert(
+    BugunPersonelDurumuService::effectiveExceptionTur(null, 'IZINLI') === 'IZINLI',
+    'surec overlay fills missing bildirim'
+);
+bpdAssert(
+    BugunPersonelDurumuService::effectiveExceptionTur('GEC_GELDI', 'IZINLI') === 'GEC_GELDI',
+    'bildirim exception wins over surec overlay'
+);
+
 bpdOk('BugunPersonelDurumuService pure semantics');
 echo "ALL_PASS bugun-personel-durumu\n";

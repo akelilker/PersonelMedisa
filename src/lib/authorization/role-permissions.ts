@@ -78,6 +78,7 @@ export type AppPermission =
   | "gunluk_bildirim.update_own_open"
   | "gunluk_bildirim.submit"
   | "gunluk_bildirim.request_correction"
+  | "gunluk_bildirim.correct_scoped"
   | "gunluk_bildirim.complete_day"
   | "haftalik_mutabakat.view"
   | "haftalik_mutabakat.approve"
@@ -203,6 +204,7 @@ const BASE_ROLE_PERMISSIONS: Record<
     "yonetim-paneli.manage",
     "aylik-ozet.view",
     "aylik-ozet.executive_ack",
+    "gunluk_bildirim.correct_scoped",
     "gunluk_bildirim.request_correction",
     "haftalik_mutabakat.view",
     "haftalik_mutabakat.reopen_request",
@@ -473,6 +475,7 @@ const BASE_ROLE_PERMISSIONS: Record<
     "revizyon.view_audit_history",
     "sgk_karar_paketi.prepare",
     "yillik_izin_hak_duzeltme.manage",
+    "gunluk_bildirim.correct_scoped",
     "arsiv.view",
     "arsiv.download",
     "retention.view"

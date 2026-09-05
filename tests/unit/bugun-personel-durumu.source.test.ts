@@ -108,16 +108,40 @@ describe("bugun personel durumu owners", () => {
     expect(countsSatisfyInvariant(counts)).toBe(false);
   });
 
-  it("documents correction history schema gap (no old→new owner without migration)", () => {
+  it("documents correction audit owner wired after migration 085", () => {
     const controller = read("api/src/Controllers/BildirimlerController.php");
-    const migration = read("api/migrations/005_gunluk_bildirimler.sql");
+    const migration = read("api/migrations/085_gunluk_bildirim_duzeltme_auditleri.sql");
+    const audit = read("api/src/Services/Bildirim/GunlukBildirimDuzeltmeAuditService.php");
     expect(controller).toContain("bildirim_turu = :bildirim_turu");
     expect(controller).toContain("correction_reason");
-    expect(migration).toContain("correction_reason");
-    expect(migration).toContain("correction_requested_by");
-    expect(migration).not.toContain("onceki_durum");
-    expect(migration).not.toContain("eski_bildirim_turu");
-    expect(migration).not.toMatch(/gunluk_bildirim.*history|bildirim_gecmis/i);
+    expect(controller).toContain("duzeltme_gecmisi");
+    expect(controller).toContain("gunluk_bildirim.correct_scoped");
+    expect(migration).toContain("gunluk_bildirim_duzeltme_auditleri");
+    expect(audit).toContain("appendInTransaction");
+    expect(audit).toContain("listByBildirimId");
+  });
+
+  it("exposes scoped correction for IK / GENEL and denies BIRIM_AMIRI / MUHASEBE / PERSONEL", () => {
+    expect(hasRolePermission("IK_SORUMLUSU", "gunluk_bildirim.correct_scoped")).toBe(true);
+    expect(hasRolePermission("GENEL_YONETICI", "gunluk_bildirim.correct_scoped")).toBe(true);
+    expect(hasRolePermission("SISTEM_YONETICISI", "gunluk_bildirim.correct_scoped")).toBe(false);
+    expect(hasRolePermission("BIRIM_AMIRI", "gunluk_bildirim.correct_scoped")).toBe(false);
+    expect(hasRolePermission("MUHASEBE", "gunluk_bildirim.correct_scoped")).toBe(false);
+    expect(hasRolePermission("PERSONEL", "gunluk_bildirim.correct_scoped")).toBe(false);
+  });
+
+  it("wires dashboard person edit owner without parallel CRUD", () => {
+    const modal = read("src/features/bildirimler/components/BugunPersonelDurumuModal.tsx");
+    const service = read("api/src/Services/Bildirim/BugunPersonelDurumuService.php");
+    expect(modal).toContain("Durumu Düzenle");
+    expect(modal).toContain("updateBildirim");
+    expect(modal).toContain("createBildirim");
+    expect(modal).toContain("duzeltme-gecmisi");
+    expect(modal).toContain("period_writable");
+    expect(modal).not.toContain("fetch(");
+    expect(service).toContain("bildirim_id");
+    expect(service).toContain("period_writable");
+    expect(service).toContain("evidence");
   });
 
   it("keeps PR #251 header summary and PR #254 birim amiri home owners intact", () => {

@@ -145,16 +145,39 @@ class GunlukBildirimDuzeltmeAuditService
             return [];
         }
 
-        $stmt = $pdo->prepare('
-            SELECT
-                id, gunluk_bildirim_id, personel_id, sube_id, tarih, olay_tipi,
-                actor_user_id, correction_reason,
-                eski_bildirim_turu, yeni_bildirim_turu,
-                eski_alanlar, yeni_alanlar, created_at
-            FROM gunluk_bildirim_duzeltme_auditleri
-            WHERE gunluk_bildirim_id = :id
-            ORDER BY id ASC
-        ');
+        $hasUsers = false;
+        try {
+            $probe = $pdo->query("SELECT 1 FROM users LIMIT 1");
+            $hasUsers = $probe !== false;
+        } catch (\Throwable $e) {
+            $hasUsers = false;
+        }
+
+        if ($hasUsers) {
+            $stmt = $pdo->prepare('
+                SELECT
+                    a.id, a.gunluk_bildirim_id, a.personel_id, a.sube_id, a.tarih, a.olay_tipi,
+                    a.actor_user_id, a.correction_reason,
+                    a.eski_bildirim_turu, a.yeni_bildirim_turu,
+                    a.eski_alanlar, a.yeni_alanlar, a.created_at,
+                    u.ad_soyad AS actor_ad_soyad
+                FROM gunluk_bildirim_duzeltme_auditleri a
+                LEFT JOIN users u ON u.id = a.actor_user_id
+                WHERE a.gunluk_bildirim_id = :id
+                ORDER BY a.id ASC
+            ');
+        } else {
+            $stmt = $pdo->prepare('
+                SELECT
+                    id, gunluk_bildirim_id, personel_id, sube_id, tarih, olay_tipi,
+                    actor_user_id, correction_reason,
+                    eski_bildirim_turu, yeni_bildirim_turu,
+                    eski_alanlar, yeni_alanlar, created_at
+                FROM gunluk_bildirim_duzeltme_auditleri
+                WHERE gunluk_bildirim_id = :id
+                ORDER BY id ASC
+            ');
+        }
         $stmt->execute(['id' => (int) $bildirimId]);
         $out = [];
         foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
@@ -178,6 +201,7 @@ class GunlukBildirimDuzeltmeAuditService
             'tarih' => (string) $row['tarih'],
             'olay_tipi' => (string) $row['olay_tipi'],
             'actor_user_id' => (int) $row['actor_user_id'],
+            'actor_ad_soyad' => self::nullableString(isset($row['actor_ad_soyad']) ? $row['actor_ad_soyad'] : null),
             'correction_reason' => self::nullableString(isset($row['correction_reason']) ? $row['correction_reason'] : null),
             'eski_bildirim_turu' => (string) $row['eski_bildirim_turu'],
             'yeni_bildirim_turu' => self::nullableString(isset($row['yeni_bildirim_turu']) ? $row['yeni_bildirim_turu'] : null),

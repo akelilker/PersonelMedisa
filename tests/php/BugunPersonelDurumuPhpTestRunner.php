@@ -151,27 +151,28 @@ bpdAssert(
     'count invariant rejects double-count drift'
 );
 
-// 7) correction old→new history: schema/update path does NOT preserve previous bildirim_turu
+// 7) correction old→new history lives on append-only audit owner (migration 085)
 $controller = file_get_contents($root . '/api/src/Controllers/BildirimlerController.php');
-$migration = file_get_contents($root . '/api/migrations/005_gunluk_bildirimler.sql');
+$migration005 = file_get_contents($root . '/api/migrations/005_gunluk_bildirimler.sql');
+$migration085 = file_get_contents($root . '/api/migrations/085_gunluk_bildirim_duzeltme_auditleri.sql');
 bpdAssert(
-    is_string($controller) && strpos($controller, 'bildirim_turu = :bildirim_turu') !== false,
-    'update overwrites bildirim_turu in place'
+    is_string($controller) && strpos($controller, 'GunlukBildirimDuzeltmeAuditService') !== false,
+    'update wires audit service'
 );
 bpdAssert(
-    is_string($migration)
-    && strpos($migration, 'correction_reason') !== false
-    && strpos($migration, 'onceki_durum') === false
-    && strpos($migration, 'eski_bildirim_turu') === false,
-    'gunluk_bildirimler has correction_reason but no old-state column'
+    is_string($controller) && strpos($controller, 'gunluk_bildirim.correct_scoped') !== false,
+    'scoped correction permission gated on update/create'
 );
 bpdAssert(
-    !file_exists($root . '/api/migrations') || true,
-    'correction history owner check reached'
+    is_string($migration005)
+    && strpos($migration005, 'correction_reason') !== false
+    && strpos($migration005, 'onceki_durum') === false,
+    'row table still overwrites tur; history not on gunluk_bildirimler'
 );
-
-// Documented product gap (test asserts absence of history fields on row)
-bpdOk('CORRECTION_HISTORY_BLOCKER: in-place UPDATE overwrites bildirim_turu; no onceki_durum/append history');
+bpdAssert(
+    is_string($migration085) && strpos($migration085, 'eski_bildirim_turu') !== false,
+    '085 audit table carries old→new'
+);
 
 bpdOk('BugunPersonelDurumuService pure semantics');
 echo "ALL_PASS bugun-personel-durumu\n";

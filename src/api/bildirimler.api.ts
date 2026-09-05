@@ -28,6 +28,17 @@ export type BildirimlerListParams = {
   limit?: number;
 };
 
+export type UpdateBildirimPayload = {
+  bildirim_turu?: string;
+  alt_tur?: string | null;
+  baslangic_saati?: string | null;
+  bitis_saati?: string | null;
+  dakika?: number | null;
+  aciklama?: string | null;
+  correction_reason?: string | null;
+  okundu_mi?: boolean;
+};
+
 export type CreateBildirimPayload = {
   tarih: string;
   departman_id?: number;
@@ -38,16 +49,7 @@ export type CreateBildirimPayload = {
   baslangic_saati?: string | null;
   bitis_saati?: string | null;
   dakika?: number | null;
-};
-
-export type UpdateBildirimPayload = {
-  bildirim_turu?: string;
-  alt_tur?: string | null;
-  baslangic_saati?: string | null;
-  bitis_saati?: string | null;
-  dakika?: number | null;
-  aciklama?: string | null;
-  okundu_mi?: boolean;
+  correction_reason?: string | null;
 };
 
 export type RequestBildirimCorrectionPayload = {

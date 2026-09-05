@@ -438,6 +438,7 @@ export function evaluateResidualPreimage({
 
 /**
  * Fail-closed preimage for HISTORICAL_EXIT_DATE_CORRECTION targets.
+ * Requires exact baslangic_tarihi AND bitis_tarihi == expected_old.
  */
 export function evaluateCorrectionPreimage({
   personelId,
@@ -446,6 +447,7 @@ export function evaluateCorrectionPreimage({
   aktifDurum,
   surecId,
   currentSurecExitDate,
+  currentSurecBitisDate,
   expectedOldExitDate,
   expectedNewExitDate,
   nonIptalIstenAyrilmaCount,
@@ -463,8 +465,15 @@ export function evaluateCorrectionPreimage({
   const newExpected =
     normalizeDateOnly(expectedNewExitDate) ??
     normalizeDateOnly(EXPECTED_EXIT_DATES[id] ?? null);
-  const current = normalizeDateOnly(currentSurecExitDate);
-  const oldMatch = current !== null && oldExpected !== null && current === oldExpected;
+  const currentBaslangic = normalizeDateOnly(currentSurecExitDate);
+  const currentBitis =
+    normalizeDateOnly(currentSurecBitisDate) ??
+    normalizeDateOnly(currentSurecExitDate);
+  const oldBaslangicMatch =
+    currentBaslangic !== null && oldExpected !== null && currentBaslangic === oldExpected;
+  const oldBitisMatch =
+    currentBitis !== null && oldExpected !== null && currentBitis === oldExpected;
+  const oldMatch = oldBaslangicMatch && oldBitisMatch;
   const countOk = Number(nonIptalIstenAyrilmaCount || 0) === 1;
   const correction_preimage_pass =
     nameExact && pasif && surecIdOk && oldMatch && countOk && newExpected !== null;
@@ -476,9 +485,11 @@ export function evaluateCorrectionPreimage({
     name_exact_pass: nameExact,
     pasif_pass: pasif,
     surec_id_pass: surecIdOk,
-    old_exit_date_pass: oldMatch,
+    old_exit_date_pass: oldBaslangicMatch,
+    old_bitis_tarihi_pass: oldBitisMatch,
     single_exit_pass: countOk,
-    current_exit_date: current,
+    current_exit_date: currentBaslangic,
+    current_bitis_tarihi: currentBitis,
     expected_old_exit_date: oldExpected,
     expected_new_exit_date: newExpected,
     correction_preimage_pass,

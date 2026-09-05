@@ -17,6 +17,7 @@ use PDO;
  *
  * Preserves surec identity (UPDATE same surec_id). Does not activate, cancel, or duplicate exit.
  * Remints lifecycle archive manifests after date correction.
+ * Durable audit is append-only; original surec.aciklama business text is preserved.
  */
 final class PersonelHistoricalExitDateCorrectionService
 {
@@ -53,7 +54,8 @@ final class PersonelHistoricalExitDateCorrectionService
      *   postimage:array<string,mixed>,
      *   retention_reconciliation:array<string,mixed>,
      *   audit:array<string,mixed>,
-     *   aciklama:string
+     *   aciklama:string,
+     *   old_aciklama:?string
      * }
      */
     public static function plan(
@@ -87,10 +89,11 @@ final class PersonelHistoricalExitDateCorrectionService
      *
      * Fail-closed order:
      * 1) Lock personel FOR UPDATE
-     * 2) Re-validate PASIF + hire/new-date rules + exact surec preimage
-     * 3) Lock target surec FOR UPDATE
-     * 4) UPDATE baslangic/bitis (+ audit aciklama) on same surec_id
-     * 5) Remint ArchiveManifestService lifecycle manifests
+     * 2) Re-validate PASIF + hire/new-date rules + exact surec preimage (baslangic+bitis)
+     * 3) Lock target surec FOR UPDATE and revalidate both dates
+     * 4) UPDATE baslangic/bitis on same surec_id (preserve aciklama)
+     * 5) Append durable audit
+     * 6) Remint ArchiveManifestService lifecycle manifests
      *
      * @return array{
      *   personel_id:int,
@@ -99,7 +102,8 @@ final class PersonelHistoricalExitDateCorrectionService
      *   old_exit_date:string,
      *   new_exit_date:string,
      *   already_applied:bool,
-     *   audit:array<string,mixed>
+     *   audit:array<string,mixed>,
+     *   audit_id:?int
      * }
      */
     public static function applyInTransaction(
@@ -109,7 +113,8 @@ final class PersonelHistoricalExitDateCorrectionService
         string $expectedOldExitDate,
         string $newExitDate,
         ?string $aciklama,
-        int $actorUserId
+        int $actorUserId,
+        ?string $mutationId = null
     ): array {
         $expectedOld = self::normalizeAndValidateExitDate(
             $expectedOldExitDate,
@@ -137,23 +142,44 @@ final class PersonelHistoricalExitDateCorrectionService
                 'new_exit_date' => $plan['new_exit_date'],
                 'already_applied' => true,
                 'audit' => $plan['audit'],
+                'audit_id' => null,
             ];
         }
 
         $lockedSurec = self::loadSurecForUpdate($pdo, $surecId);
-        self::assertSurecPreimage($lockedSurec, $personelId, $expectedOld);
+        self::assertSurecPreimageExactOld($lockedSurec, $personelId, $expectedOld);
 
+        $oldAciklama = isset($lockedSurec['aciklama']) ? (string) $lockedSurec['aciklama'] : null;
+        $reason = self::buildReason($aciklama, $expectedOld, $normalizedNew);
         $audit = self::buildAuditRecord(
             $actorUserId,
+            $mutationId,
             $personelId,
             $surecId,
             $expectedOld,
+            $expectedOld,
             $normalizedNew,
-            $plan['aciklama']
+            $normalizedNew,
+            $oldAciklama,
+            $reason
         );
 
-        self::updateSurecDates($pdo, $surecId, $normalizedNew, $plan['aciklama']);
+        self::updateSurecDates($pdo, $surecId, $normalizedNew);
+        $auditId = PersonelHistoricalExitDateCorrectionAuditService::appendInTransaction($pdo, [
+            'actor_user_id' => $actorUserId,
+            'mutation_id' => $mutationId,
+            'personel_id' => $personelId,
+            'surec_id' => $surecId,
+            'old_baslangic_tarihi' => $expectedOld,
+            'old_bitis_tarihi' => $expectedOld,
+            'new_baslangic_tarihi' => $normalizedNew,
+            'new_bitis_tarihi' => $normalizedNew,
+            'old_aciklama' => $oldAciklama,
+            'reason' => $reason,
+        ]);
         ArchiveManifestService::createPersonelLifecycleManifests($pdo, $personelId, $actorUserId);
+
+        $audit['audit_id'] = $auditId;
 
         return [
             'personel_id' => $personelId,
@@ -163,6 +189,7 @@ final class PersonelHistoricalExitDateCorrectionService
             'new_exit_date' => $normalizedNew,
             'already_applied' => false,
             'audit' => $audit,
+            'audit_id' => $auditId,
         ];
     }
 
@@ -179,7 +206,8 @@ final class PersonelHistoricalExitDateCorrectionService
      *   postimage:array<string,mixed>,
      *   retention_reconciliation:array<string,mixed>,
      *   audit:array<string,mixed>,
-     *   aciklama:string
+     *   aciklama:string,
+     *   old_aciklama:?string
      * }
      */
     private static function composePlanFromPersonel(
@@ -230,7 +258,7 @@ final class PersonelHistoricalExitDateCorrectionService
 
         $currentExit = self::normalizeDateOnly($target['baslangic_tarihi'] ?? null);
         $currentBitis = self::normalizeDateOnly($target['bitis_tarihi'] ?? null);
-        if ($currentExit === null) {
+        if ($currentExit === null || $currentBitis === null) {
             throw new PersonelValidationException(
                 'baslangic_tarihi',
                 'Mevcut ISTEN_AYRILMA cikis tarihi okunamadi.',
@@ -238,7 +266,65 @@ final class PersonelHistoricalExitDateCorrectionService
             );
         }
 
-        if ($currentExit !== $expectedOld) {
+        $oldAciklama = isset($target['aciklama']) ? (string) $target['aciklama'] : null;
+        $reason = self::buildReason($aciklama, $expectedOld, $normalizedNew);
+
+        // Service-level idempotency: exact same surec already at corrected new date.
+        if ($currentExit === $normalizedNew && $currentBitis === $normalizedNew) {
+            $audit = self::buildAuditRecord(
+                null,
+                null,
+                $personelId,
+                $surecId,
+                $currentExit,
+                $currentBitis,
+                $normalizedNew,
+                $normalizedNew,
+                $oldAciklama,
+                $reason
+            );
+
+            return [
+                'personel_id' => $personelId,
+                'surec_id' => $surecId,
+                'old_exit_date' => $currentExit,
+                'new_exit_date' => $normalizedNew,
+                'action' => self::ACTION_ALREADY_APPLIED,
+                'no_change' => true,
+                'preimage' => [
+                    'aktif_durum' => 'PASIF',
+                    'ise_giris_tarihi' => $hireDate,
+                    'surec_id' => $surecId,
+                    'surec_turu' => 'ISTEN_AYRILMA',
+                    'state' => strtoupper(trim((string) ($target['state'] ?? ''))),
+                    'old_exit_date' => $currentExit,
+                    'old_bitis_tarihi' => $currentBitis,
+                    'old_aciklama' => $oldAciklama,
+                    'isten_ayrilma_count' => 1,
+                ],
+                'postimage' => [
+                    'aktif_durum' => 'PASIF',
+                    'surec_id' => $surecId,
+                    'exit_date' => $normalizedNew,
+                    'bitis_tarihi' => $normalizedNew,
+                    'aciklama' => $oldAciklama,
+                ],
+                'retention_reconciliation' => [
+                    'required' => false,
+                    'action' => 'NONE',
+                    'owner' => 'ArchiveManifestService::createPersonelLifecycleManifests',
+                    'old_trigger_date' => $currentExit,
+                    'new_trigger_date' => $normalizedNew,
+                    'note' => 'Already at corrected date; no remint.',
+                ],
+                'audit' => $audit,
+                'aciklama' => $reason,
+                'old_aciklama' => $oldAciklama,
+            ];
+        }
+
+        // Exact preimage: both baslangic and bitis must equal expected_old.
+        if ($currentExit !== $expectedOld || $currentBitis !== $expectedOld) {
             throw new PersonelValidationException(
                 'baslangic_tarihi',
                 'Canli preimage beklenen eski cikis tarihi ile eslesmiyor.',
@@ -246,14 +332,17 @@ final class PersonelHistoricalExitDateCorrectionService
             );
         }
 
-        $aciklamaFinal = self::buildAciklama($aciklama, $expectedOld, $normalizedNew);
         $audit = self::buildAuditRecord(
+            null,
             null,
             $personelId,
             $surecId,
             $expectedOld,
+            $expectedOld,
             $normalizedNew,
-            $aciklamaFinal
+            $normalizedNew,
+            $oldAciklama,
+            $reason
         );
 
         $preimage = [
@@ -264,6 +353,7 @@ final class PersonelHistoricalExitDateCorrectionService
             'state' => strtoupper(trim((string) ($target['state'] ?? ''))),
             'old_exit_date' => $currentExit,
             'old_bitis_tarihi' => $currentBitis,
+            'old_aciklama' => $oldAciklama,
             'isten_ayrilma_count' => 1,
         ];
 
@@ -275,30 +365,6 @@ final class PersonelHistoricalExitDateCorrectionService
             'new_trigger_date' => $normalizedNew,
             'note' => 'Prior termination identities remain immutable; new identity uses corrected date.',
         ];
-
-        if ($currentExit === $normalizedNew) {
-            return [
-                'personel_id' => $personelId,
-                'surec_id' => $surecId,
-                'old_exit_date' => $currentExit,
-                'new_exit_date' => $normalizedNew,
-                'action' => self::ACTION_ALREADY_APPLIED,
-                'no_change' => true,
-                'preimage' => $preimage,
-                'postimage' => [
-                    'aktif_durum' => 'PASIF',
-                    'surec_id' => $surecId,
-                    'exit_date' => $normalizedNew,
-                    'bitis_tarihi' => $normalizedNew,
-                ],
-                'retention_reconciliation' => array_merge($retention, [
-                    'required' => false,
-                    'action' => 'NONE',
-                ]),
-                'audit' => $audit,
-                'aciklama' => $aciklamaFinal,
-            ];
-        }
 
         return [
             'personel_id' => $personelId,
@@ -313,10 +379,12 @@ final class PersonelHistoricalExitDateCorrectionService
                 'surec_id' => $surecId,
                 'exit_date' => $normalizedNew,
                 'bitis_tarihi' => $normalizedNew,
+                'aciklama' => $oldAciklama,
             ],
             'retention_reconciliation' => $retention,
             'audit' => $audit,
-            'aciklama' => $aciklamaFinal,
+            'aciklama' => $reason,
+            'old_aciklama' => $oldAciklama,
         ];
     }
 
@@ -439,9 +507,11 @@ final class PersonelHistoricalExitDateCorrectionService
     }
 
     /**
+     * Locked apply revalidation: baslangic AND bitis must both equal expected_old.
+     *
      * @param array<string, mixed> $surec
      */
-    private static function assertSurecPreimage(array $surec, int $personelId, string $expectedOld): void
+    private static function assertSurecPreimageExactOld(array $surec, int $personelId, string $expectedOld): void
     {
         if ((int) ($surec['personel_id'] ?? 0) !== $personelId) {
             throw new PersonelValidationException(
@@ -464,8 +534,9 @@ final class PersonelHistoricalExitDateCorrectionService
                 self::ERROR_SUREC_MISMATCH
             );
         }
-        $current = self::normalizeDateOnly($surec['baslangic_tarihi'] ?? null);
-        if ($current !== $expectedOld) {
+        $currentBaslangic = self::normalizeDateOnly($surec['baslangic_tarihi'] ?? null);
+        $currentBitis = self::normalizeDateOnly($surec['bitis_tarihi'] ?? null);
+        if ($currentBaslangic !== $expectedOld || $currentBitis !== $expectedOld) {
             throw new PersonelValidationException(
                 'baslangic_tarihi',
                 'Kilitli surec preimage beklenen eski tarihle eslesmiyor.',
@@ -474,13 +545,13 @@ final class PersonelHistoricalExitDateCorrectionService
         }
     }
 
-    private static function updateSurecDates(PDO $pdo, int $surecId, string $exitDate, string $aciklama): void
+    private static function updateSurecDates(PDO $pdo, int $surecId, string $exitDate): void
     {
+        // Preserve original business aciklama; provenance lives in durable audit.
         $stmt = $pdo->prepare(
             'UPDATE surecler
              SET baslangic_tarihi = :baslangic_tarihi,
-                 bitis_tarihi = :bitis_tarihi,
-                 aciklama = :aciklama
+                 bitis_tarihi = :bitis_tarihi
              WHERE id = :id
                AND surec_turu = \'ISTEN_AYRILMA\'
                AND state <> \'IPTAL\''
@@ -488,7 +559,6 @@ final class PersonelHistoricalExitDateCorrectionService
         $stmt->execute([
             'baslangic_tarihi' => $exitDate,
             'bitis_tarihi' => $exitDate,
-            'aciklama' => $aciklama,
             'id' => $surecId,
         ]);
         if ($stmt->rowCount() !== 1) {
@@ -500,7 +570,7 @@ final class PersonelHistoricalExitDateCorrectionService
         }
     }
 
-    private static function buildAciklama(?string $aciklama, string $oldDate, string $newDate): string
+    private static function buildReason(?string $aciklama, string $oldDate, string $newDate): string
     {
         $trimmed = trim((string) $aciklama);
         $default = self::CORRECTION_ACIKLAMA_PREFIX
@@ -520,20 +590,33 @@ final class PersonelHistoricalExitDateCorrectionService
      */
     private static function buildAuditRecord(
         ?int $actorUserId,
+        ?string $mutationId,
         int $personelId,
         int $surecId,
-        string $oldExitDate,
-        string $newExitDate,
+        string $oldBaslangic,
+        string $oldBitis,
+        string $newBaslangic,
+        string $newBitis,
+        ?string $oldAciklama,
         string $reason
     ): array {
+        $mutation = $mutationId !== null ? trim($mutationId) : '';
+
         return [
             'operation_type' => self::OPERATION_TYPE,
             'actor_user_id' => $actorUserId,
+            'mutation_id' => $mutation !== '' ? $mutation : null,
             'personel_id' => $personelId,
             'surec_id' => $surecId,
-            'old_exit_date' => $oldExitDate,
-            'new_exit_date' => $newExitDate,
+            'old_baslangic_tarihi' => $oldBaslangic,
+            'old_bitis_tarihi' => $oldBitis,
+            'new_baslangic_tarihi' => $newBaslangic,
+            'new_bitis_tarihi' => $newBitis,
+            'old_exit_date' => $oldBaslangic,
+            'new_exit_date' => $newBaslangic,
+            'old_aciklama' => $oldAciklama,
             'reason' => $reason,
+            'created_at' => RetentionClock::now()->format(DATE_ATOM),
             'timestamp' => RetentionClock::now()->format(DATE_ATOM),
         ];
     }

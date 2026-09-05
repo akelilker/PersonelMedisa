@@ -303,6 +303,7 @@ async function verifyCorrectionPreimage(token) {
       aktifDurum: p.aktif_durum,
       surecId,
       currentSurecExitDate: s.baslangic_tarihi,
+      currentSurecBitisDate: s.bitis_tarihi,
       expectedOldExitDate: row.payload.expected_old_exit_date,
       expectedNewExitDate: row.payload.exit_date,
       nonIptalIstenAyrilmaCount: nonIptalCount,
@@ -314,6 +315,8 @@ async function verifyCorrectionPreimage(token) {
       ise_giris_tarihi: p.ise_giris_tarihi ?? null,
       retention_trigger_date: p.retention_summary?.trigger_date ?? null,
       surec_state: s.state ?? null,
+      surec_baslangic_tarihi: s.baslangic_tarihi ?? null,
+      surec_bitis_tarihi: s.bitis_tarihi ?? null,
       surec_aciklama: s.aciklama ?? null,
     };
   }

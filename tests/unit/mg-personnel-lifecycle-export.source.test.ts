@@ -42,6 +42,9 @@ describe("MG personnel lifecycle export closeout sources", () => {
   it("rotates migration control plane to tip 085", () => {
     const preflight = read("api/src/Database/MigrationPreflightReport.php");
     expect(preflight).toContain("'085' => '085_gunluk_bildirim_duzeltme_auditleri.sql'");
+    expect(preflight).toContain(
+      "'086' => '086_personel_historical_exit_date_correction_auditleri.sql'",
+    );
     expect(preflight).toContain("EXPECTED_APPLIED_TIP = '084'");
     expect(preflight).toContain("gunluk_bildirim_duzeltme_auditleri");
   });

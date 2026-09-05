@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   EXPECTED_FULL_NAMES,
+  evaluateCorrectionPreimage,
   evaluateResidualPreimage,
   evaluateShaPreflight,
   isApplyRequested,
@@ -162,5 +163,43 @@ describe("historical exit backfill gates — runtime SHA", () => {
     expect(isApplyRequested(["node", "script.mjs", `--expected-sha=${SHA}`, "--apply"])).toBe(
       true
     );
+  });
+});
+
+describe("historical exit correction preimage — baslangic + bitis", () => {
+  it("passes only when baslangic and bitis both equal expected_old", () => {
+    const pass = evaluateCorrectionPreimage({
+      personelId: 202,
+      ad: "Ahmed Khalil",
+      soyad: "Alsamar",
+      aktifDurum: "PASIF",
+      surecId: 38,
+      currentSurecExitDate: "2026-07-30",
+      currentSurecBitisDate: "2026-07-30",
+      expectedOldExitDate: "2026-07-30",
+      expectedNewExitDate: "2025-12-31",
+      nonIptalIstenAyrilmaCount: 1,
+    });
+    expect(pass.correction_preimage_pass).toBe(true);
+    expect(pass.old_exit_date_pass).toBe(true);
+    expect(pass.old_bitis_tarihi_pass).toBe(true);
+  });
+
+  it("fails when bitis mismatches even if baslangic matches", () => {
+    const fail = evaluateCorrectionPreimage({
+      personelId: 202,
+      ad: "Ahmed Khalil",
+      soyad: "Alsamar",
+      aktifDurum: "PASIF",
+      surecId: 38,
+      currentSurecExitDate: "2026-07-30",
+      currentSurecBitisDate: "2026-08-01",
+      expectedOldExitDate: "2026-07-30",
+      expectedNewExitDate: "2025-12-31",
+      nonIptalIstenAyrilmaCount: 1,
+    });
+    expect(fail.old_exit_date_pass).toBe(true);
+    expect(fail.old_bitis_tarihi_pass).toBe(false);
+    expect(fail.correction_preimage_pass).toBe(false);
   });
 });

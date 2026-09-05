@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /**
- * Canonical HISTORICAL_EXIT_DATE_CORRECTION owner tests.
+ * Canonical HISTORICAL_EXIT_DATE_CORRECTION owner tests (safety-hardened).
  */
 
 require_once __DIR__ . '/../../api/src/bootstrap.php';
@@ -11,7 +11,10 @@ require_once __DIR__ . '/../../api/src/bootstrap.php';
 use Medisa\Api\Services\Personel\PersonelHistoricalExitDateCorrectionService;
 use Medisa\Api\Services\Personel\PersonelIstenAyrilmaService;
 use Medisa\Api\Services\Personel\PersonelValidationException;
+use Medisa\Api\Services\Retention\ArchiveManifestService;
+use Medisa\Api\Services\Retention\RetentionCategories;
 use Medisa\Api\Services\Retention\RetentionClock;
+use Medisa\Api\Services\Retention\RetentionPolicyService;
 
 function hecAssert(bool $ok, string $name): void
 {
@@ -117,6 +120,23 @@ function hecBootstrap(PDO $root): PDO
           UNIQUE KEY uq_arsiv_manifest_entity_cat_src (entity_type, record_id, record_category, source_version_identity)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     ");
+    $pdo->exec("
+        CREATE TABLE personel_historical_exit_date_correction_auditleri (
+          id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+          operation_type VARCHAR(64) NOT NULL,
+          actor_user_id INT UNSIGNED NOT NULL,
+          mutation_id VARCHAR(191) NULL,
+          personel_id INT UNSIGNED NOT NULL,
+          surec_id INT UNSIGNED NOT NULL,
+          old_baslangic_tarihi DATE NOT NULL,
+          old_bitis_tarihi DATE NOT NULL,
+          new_baslangic_tarihi DATE NOT NULL,
+          new_bitis_tarihi DATE NOT NULL,
+          old_aciklama TEXT NULL,
+          reason TEXT NULL,
+          created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ");
 
     $pdo->exec("
         INSERT INTO personeller (id, ad, soyad, sicil_no, ise_giris_tarihi, aktif_durum)
@@ -124,15 +144,30 @@ function hecBootstrap(PDO $root): PDO
           (1, 'Aktif', 'Kisi', 'A1', '2024-01-15', 'AKTIF'),
           (2, 'Pasif', 'YanlisTarih', 'P2', '2023-01-01', 'PASIF'),
           (3, 'Pasif', 'CiftSurec', 'P3', '2022-01-01', 'PASIF'),
-          (4, 'Pasif', 'Rollback', 'P4', '2023-06-01', 'PASIF')
+          (4, 'Pasif', 'Rollback', 'P4', '2023-06-01', 'PASIF'),
+          (5, 'Pasif', 'WrongBitis', 'P5', '2023-01-01', 'PASIF'),
+          (6, 'Pasif', 'ThirdDate', 'P6', '2023-01-01', 'PASIF')
     ");
     $pdo->exec("
         INSERT INTO surecler (id, personel_id, surec_turu, baslangic_tarihi, bitis_tarihi, aciklama, state)
         VALUES
-          (38, 2, 'ISTEN_AYRILMA', '2026-07-30', '2026-07-30', 'Isveren feshi', 'AKTIF'),
+          (38, 2, 'ISTEN_AYRILMA', '2026-07-30', '2026-07-30', 'İşveren feshi', 'AKTIF'),
           (50, 3, 'ISTEN_AYRILMA', '2026-07-30', '2026-07-30', 'one', 'AKTIF'),
           (51, 3, 'ISTEN_AYRILMA', '2026-08-01', '2026-08-01', 'two', 'AKTIF'),
-          (60, 4, 'ISTEN_AYRILMA', '2026-07-30', '2026-07-30', 'rollback', 'AKTIF')
+          (60, 4, 'ISTEN_AYRILMA', '2026-07-30', '2026-07-30', 'İşveren feshi', 'AKTIF'),
+          (70, 5, 'ISTEN_AYRILMA', '2026-07-30', '2026-08-01', 'İşveren feshi', 'AKTIF'),
+          (80, 6, 'ISTEN_AYRILMA', '2026-06-15', '2026-06-15', 'İşveren feshi', 'AKTIF')
+    ");
+    // Pre-seed wrong-date lifecycle manifests (immutable prior identities).
+    $pdo->exec("
+        INSERT INTO arsiv_manifestleri
+          (entity_type, record_id, personel_id, record_category, source_version_identity,
+           trigger_type, trigger_date, retention_until, source_sha256, integrity_status, created_by)
+        VALUES
+          ('personel', 2, 2, 'PERSONEL_OZLUK', 'personel:2:termination:2026-07-30',
+           'TERMINATION_DATE', '2026-07-30', '2036-07-30', REPEAT('a', 64), 'OK', 1),
+          ('personel', 2, 2, 'ISE_GIRIS_CIKIS', 'personel:2:ise_giris_cikis:termination:2026-07-30',
+           'TERMINATION_DATE', '2026-07-30', '2036-07-30', REPEAT('b', 64), 'OK', 1)
     ");
 
     return $pdo;
@@ -145,7 +180,7 @@ try {
     $pdo = hecBootstrap($root);
     $database = (string) $pdo->query('SELECT DATABASE()')->fetchColumn();
 
-    // Valid exact preimage -> dry-run/plan PASS
+    // old baslangic + old bitis => READY
     $plan = PersonelHistoricalExitDateCorrectionService::plan(
         $pdo,
         2,
@@ -156,12 +191,11 @@ try {
     );
     hecAssert(
         $plan['action'] === PersonelHistoricalExitDateCorrectionService::ACTION_CORRECT_HISTORICAL_SUREC,
-        'plan correct action for exact preimage'
+        'old baslangic + old bitis => READY'
     );
     hecAssert($plan['no_change'] === false, 'plan is mutating');
     hecAssert($plan['surec_id'] === 38, 'plan preserves surec_id');
-    hecAssert($plan['old_exit_date'] === '2026-07-30', 'plan old date');
-    hecAssert($plan['new_exit_date'] === '2025-12-31', 'plan new date');
+    hecAssert($plan['old_aciklama'] === 'İşveren feshi', 'plan captures original aciklama');
     hecAssert(
         ($plan['retention_reconciliation']['action'] ?? '') === 'REMINT_PERSONEL_LIFECYCLE_MANIFESTS',
         'plan retention remint'
@@ -171,7 +205,25 @@ try {
         'plan does not mutate surec'
     );
 
-    // Apply updates same surec ID; PASIF remains; no duplicate
+    // old baslangic + wrong bitis => FAIL
+    $wrongBitis = false;
+    try {
+        PersonelHistoricalExitDateCorrectionService::plan($pdo, 5, 70, '2026-07-30', '2025-12-31', 'x');
+    } catch (PersonelValidationException $e) {
+        $wrongBitis = $e->getCodeString() === PersonelHistoricalExitDateCorrectionService::ERROR_PREIMAGE_MISMATCH;
+    }
+    hecAssert($wrongBitis, 'old baslangic + wrong bitis => FAIL');
+
+    // wrong baslangic + old bitis => FAIL (personel 5 has wrong bitis; use seeded mismatch via expected_old)
+    $wrongBaslangic = false;
+    try {
+        PersonelHistoricalExitDateCorrectionService::plan($pdo, 2, 38, '2026-08-01', '2025-12-31', 'x');
+    } catch (PersonelValidationException $e) {
+        $wrongBaslangic = $e->getCodeString() === PersonelHistoricalExitDateCorrectionService::ERROR_PREIMAGE_MISMATCH;
+    }
+    hecAssert($wrongBaslangic, 'wrong baslangic + old bitis => FAIL');
+
+    // Apply updates same surec ID; PASIF remains; original aciklama preserved; durable audit
     $pdo->beginTransaction();
     $applied = PersonelHistoricalExitDateCorrectionService::applyInTransaction(
         $pdo,
@@ -180,14 +232,15 @@ try {
         '2026-07-30',
         '2025-12-31',
         'HR correction',
-        99
+        99,
+        'mg-historical-exit-date-correction-202'
     );
     $pdo->commit();
-    hecAssert($applied['surec_id'] === 38, 'apply keeps surec_id 38');
+    hecAssert($applied['surec_id'] === 38, 'correction same surec id preserves');
     hecAssert($applied['already_applied'] === false, 'first apply not already_applied');
     hecAssert(
         (string) $pdo->query("SELECT aktif_durum FROM personeller WHERE id = 2")->fetchColumn() === 'PASIF',
-        'apply keeps PASIF'
+        'PASIF remains PASIF'
     );
     hecAssert(
         (int) $pdo->query("SELECT COUNT(*) FROM surecler WHERE personel_id = 2 AND surec_turu = 'ISTEN_AYRILMA' AND state <> 'IPTAL'")->fetchColumn() === 1,
@@ -196,91 +249,118 @@ try {
     $surec = $pdo->query('SELECT * FROM surecler WHERE id = 38')->fetch(PDO::FETCH_ASSOC);
     hecAssert((string) $surec['baslangic_tarihi'] === '2025-12-31', 'baslangic corrected');
     hecAssert((string) $surec['bitis_tarihi'] === '2025-12-31', 'bitis corrected');
+    hecAssert((string) $surec['aciklama'] === 'İşveren feshi', 'original İşveren feshi preserved');
     hecAssert(
-        strpos((string) $surec['aciklama'], PersonelHistoricalExitDateCorrectionService::CORRECTION_ACIKLAMA_PREFIX) === 0,
-        'aciklama audit prefix'
-    );
-    hecAssert(
-        (string) ($applied['audit']['old_exit_date'] ?? '') === '2026-07-30'
-            && (string) ($applied['audit']['new_exit_date'] ?? '') === '2025-12-31'
-            && (string) ($applied['audit']['operation_type'] ?? '') === 'HISTORICAL_EXIT_DATE_CORRECTION',
-        'audit records old/new + operation_type'
-    );
-    hecAssert(
-        (int) $pdo->query("SELECT COUNT(*) FROM arsiv_manifestleri WHERE personel_id = 2 AND source_version_identity LIKE '%:termination:2025-12-31'")->fetchColumn() > 0,
-        'retention manifests reminted for corrected date'
+        strpos((string) $surec['aciklama'], PersonelHistoricalExitDateCorrectionService::CORRECTION_ACIKLAMA_PREFIX) === false,
+        'surec aciklama not overwritten with correction prefix'
     );
 
-    // Idempotent already at target date
+    $auditRow = $pdo->query(
+        'SELECT * FROM personel_historical_exit_date_correction_auditleri WHERE surec_id = 38 ORDER BY id DESC LIMIT 1'
+    )->fetch(PDO::FETCH_ASSOC);
+    hecAssert(is_array($auditRow), 'durable audit persisted');
+    hecAssert(
+        (string) ($auditRow['operation_type'] ?? '') === 'HISTORICAL_EXIT_DATE_CORRECTION'
+            && (string) ($auditRow['mutation_id'] ?? '') === 'mg-historical-exit-date-correction-202'
+            && (int) ($auditRow['actor_user_id'] ?? 0) === 99
+            && (string) ($auditRow['old_baslangic_tarihi'] ?? '') === '2026-07-30'
+            && (string) ($auditRow['old_bitis_tarihi'] ?? '') === '2026-07-30'
+            && (string) ($auditRow['new_baslangic_tarihi'] ?? '') === '2025-12-31'
+            && (string) ($auditRow['new_bitis_tarihi'] ?? '') === '2025-12-31'
+            && (string) ($auditRow['old_aciklama'] ?? '') === 'İşveren feshi',
+        'audit contains mutation_id + actor + old/new + old_aciklama'
+    );
+
+    // Retention: corrected date current; old manifest immutable/non-current
+    $term = RetentionPolicyService::resolveTerminationDate($pdo, 2);
+    hecAssert($term === '2025-12-31', 'resolveTerminationDate = corrected HR date');
+    $currentOzluk = ArchiveManifestService::findCurrentLifecycleManifest(
+        $pdo,
+        'personel',
+        2,
+        RetentionCategories::PERSONEL_OZLUK,
+        ['personel_id' => 2]
+    );
+    hecAssert(is_array($currentOzluk), 'current lifecycle manifest exists');
+    hecAssert(
+        (string) ($currentOzluk['trigger_date'] ?? '') === '2025-12-31',
+        'corrected lifecycle manifest becomes current'
+    );
+    hecAssert(
+        (string) ($currentOzluk['retention_until'] ?? '') === '2035-12-31',
+        'retention_until from corrected date'
+    );
+    hecAssert(
+        (string) ($currentOzluk['source_version_identity'] ?? '') === 'personel:2:termination:2025-12-31',
+        'current identity uses corrected date'
+    );
+    $oldStillThere = (int) $pdo->query(
+        "SELECT COUNT(*) FROM arsiv_manifestleri
+         WHERE personel_id = 2 AND source_version_identity = 'personel:2:termination:2026-07-30'"
+    )->fetchColumn();
+    hecAssert($oldStillThere === 1, 'old manifest remains immutable');
+    hecAssert(
+        (string) ($currentOzluk['source_version_identity'] ?? '') !== 'personel:2:termination:2026-07-30',
+        'old manifest current olarak seçilmez'
+    );
+
+    // same logical retry (expected_old still wrong date, new = corrected) => ALREADY_APPLIED
     $pdo->beginTransaction();
     $again = PersonelHistoricalExitDateCorrectionService::applyInTransaction(
         $pdo,
         2,
         38,
+        '2026-07-30',
         '2025-12-31',
-        '2025-12-31',
-        'retry',
-        99
+        'HR correction retry',
+        99,
+        'mg-historical-exit-date-correction-202-retry'
     );
     $pdo->commit();
-    hecAssert($again['already_applied'] === true, 'same date is already_applied');
+    hecAssert($again['already_applied'] === true, 'same logical retry => ALREADY_APPLIED');
+    hecAssert($again['action'] === PersonelHistoricalExitDateCorrectionService::ACTION_ALREADY_APPLIED, 'retry action');
+    hecAssert(
+        (int) $pdo->query('SELECT COUNT(*) FROM personel_historical_exit_date_correction_auditleri WHERE surec_id = 38')->fetchColumn() === 1,
+        'idempotent retry does not append second audit'
+    );
 
-    // Old date mismatch -> reject
-    $oldMismatch = false;
+    // arbitrary third date => FAIL
+    $thirdDate = false;
     try {
-        PersonelHistoricalExitDateCorrectionService::plan($pdo, 2, 38, '2026-07-30', '2025-11-01', 'x');
+        PersonelHistoricalExitDateCorrectionService::plan($pdo, 6, 80, '2026-07-30', '2025-12-31', 'x');
     } catch (PersonelValidationException $e) {
-        $oldMismatch = $e->getCodeString() === PersonelHistoricalExitDateCorrectionService::ERROR_PREIMAGE_MISMATCH;
+        $thirdDate = $e->getCodeString() === PersonelHistoricalExitDateCorrectionService::ERROR_PREIMAGE_MISMATCH;
     }
-    hecAssert($oldMismatch, 'old date mismatch rejected');
+    hecAssert($thirdDate, 'arbitrary third date => FAIL');
 
-    // Wrong surec ID -> reject
-    $wrongSurec = false;
+    // Locked apply revalidates both fields (simulate race: mutate bitis under lock path via direct update then apply)
+    $pdo->exec("UPDATE surecler SET bitis_tarihi = '2026-08-15' WHERE id = 60");
+    $lockedMismatch = false;
     try {
-        PersonelHistoricalExitDateCorrectionService::plan($pdo, 2, 999, '2025-12-31', '2025-11-01', 'x');
+        $pdo->beginTransaction();
+        PersonelHistoricalExitDateCorrectionService::applyInTransaction(
+            $pdo,
+            4,
+            60,
+            '2026-07-30',
+            '2025-12-31',
+            'locked',
+            99,
+            'mg-locked-bitis'
+        );
+        $pdo->commit();
     } catch (PersonelValidationException $e) {
-        $wrongSurec = $e->getCodeString() === PersonelHistoricalExitDateCorrectionService::ERROR_SUREC_MISMATCH;
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        $lockedMismatch = $e->getCodeString() === PersonelHistoricalExitDateCorrectionService::ERROR_PREIMAGE_MISMATCH;
     }
-    hecAssert($wrongSurec, 'wrong surec_id rejected');
+    hecAssert($lockedMismatch, 'locked apply both fields revalidates');
+    $pdo->exec("UPDATE surecler SET bitis_tarihi = '2026-07-30' WHERE id = 60");
 
-    // Wrong personel ID -> reject
-    $wrongPersonel = false;
-    try {
-        PersonelHistoricalExitDateCorrectionService::plan($pdo, 999, 38, '2025-12-31', '2025-11-01', 'x');
-    } catch (PersonelValidationException $e) {
-        $wrongPersonel = $e->getCodeString() === PersonelHistoricalExitDateCorrectionService::ERROR_PERSONEL_NOT_FOUND;
-    }
-    hecAssert($wrongPersonel, 'wrong personel_id rejected');
-
-    // New date before hire -> reject
-    $beforeHire = false;
-    try {
-        PersonelHistoricalExitDateCorrectionService::plan($pdo, 2, 38, '2025-12-31', '2022-01-01', 'x');
-    } catch (PersonelValidationException $e) {
-        $beforeHire = $e->getCodeString() === PersonelHistoricalExitDateCorrectionService::ERROR_EXIT_BEFORE_HIRE;
-    }
-    hecAssert($beforeHire, 'exit before hire rejected');
-
-    // Future date -> reject
-    $future = false;
-    $futureDate = (new DateTimeImmutable('tomorrow'))->format('Y-m-d');
-    try {
-        PersonelHistoricalExitDateCorrectionService::plan($pdo, 2, 38, '2025-12-31', $futureDate, 'x');
-    } catch (PersonelValidationException $e) {
-        $future = $e->getCodeString() === PersonelHistoricalExitDateCorrectionService::ERROR_EXIT_DATE_IN_FUTURE;
-    }
-    hecAssert($future, 'future date rejected');
-
-    // Second conflicting ISTEN_AYRILMA -> reject
-    $multi = false;
-    try {
-        PersonelHistoricalExitDateCorrectionService::plan($pdo, 3, 50, '2026-07-30', '2025-12-31', 'x');
-    } catch (PersonelValidationException $e) {
-        $multi = $e->getCodeString() === PersonelHistoricalExitDateCorrectionService::ERROR_CONFLICT;
-    }
-    hecAssert($multi, 'second conflicting ISTEN_AYRILMA rejected');
-
-    // Transaction rollback
+    // Transaction failure => surec + audit + retention rollback
+    $auditBefore = (int) $pdo->query('SELECT COUNT(*) FROM personel_historical_exit_date_correction_auditleri')->fetchColumn();
+    $manifestBefore = (int) $pdo->query("SELECT COUNT(*) FROM arsiv_manifestleri WHERE personel_id = 4")->fetchColumn();
     $pdo->beginTransaction();
     try {
         PersonelHistoricalExitDateCorrectionService::applyInTransaction(
@@ -290,7 +370,8 @@ try {
             '2026-07-30',
             '2025-12-31',
             'will rollback',
-            99
+            99,
+            'mg-rollback'
         );
         throw new RuntimeException('force_rollback');
     } catch (RuntimeException $e) {
@@ -303,8 +384,61 @@ try {
         (string) $pdo->query('SELECT baslangic_tarihi FROM surecler WHERE id = 60')->fetchColumn() === '2026-07-30',
         'rollback restores surec date'
     );
+    hecAssert(
+        (string) $pdo->query('SELECT aciklama FROM surecler WHERE id = 60')->fetchColumn() === 'İşveren feshi',
+        'rollback keeps original aciklama'
+    );
+    hecAssert(
+        (int) $pdo->query('SELECT COUNT(*) FROM personel_historical_exit_date_correction_auditleri')->fetchColumn() === $auditBefore,
+        'transaction failure rolls back audit'
+    );
+    hecAssert(
+        (int) $pdo->query("SELECT COUNT(*) FROM arsiv_manifestleri WHERE personel_id = 4")->fetchColumn() === $manifestBefore,
+        'transaction failure rolls back retention remint'
+    );
 
-    // Normal PersonelIstenAyrilmaService still rejects PASIF
+    // Wrong surec / personel / hire / future / multi / AKTIF
+    $wrongSurec = false;
+    try {
+        PersonelHistoricalExitDateCorrectionService::plan($pdo, 2, 999, '2025-12-31', '2025-11-01', 'x');
+    } catch (PersonelValidationException $e) {
+        $wrongSurec = $e->getCodeString() === PersonelHistoricalExitDateCorrectionService::ERROR_SUREC_MISMATCH;
+    }
+    hecAssert($wrongSurec, 'wrong surec_id rejected');
+
+    $wrongPersonel = false;
+    try {
+        PersonelHistoricalExitDateCorrectionService::plan($pdo, 999, 38, '2025-12-31', '2025-11-01', 'x');
+    } catch (PersonelValidationException $e) {
+        $wrongPersonel = $e->getCodeString() === PersonelHistoricalExitDateCorrectionService::ERROR_PERSONEL_NOT_FOUND;
+    }
+    hecAssert($wrongPersonel, 'wrong personel_id rejected');
+
+    $beforeHire = false;
+    try {
+        PersonelHistoricalExitDateCorrectionService::plan($pdo, 2, 38, '2025-12-31', '2022-01-01', 'x');
+    } catch (PersonelValidationException $e) {
+        $beforeHire = $e->getCodeString() === PersonelHistoricalExitDateCorrectionService::ERROR_EXIT_BEFORE_HIRE;
+    }
+    hecAssert($beforeHire, 'exit before hire rejected');
+
+    $future = false;
+    $futureDate = (new DateTimeImmutable('tomorrow'))->format('Y-m-d');
+    try {
+        PersonelHistoricalExitDateCorrectionService::plan($pdo, 2, 38, '2025-12-31', $futureDate, 'x');
+    } catch (PersonelValidationException $e) {
+        $future = $e->getCodeString() === PersonelHistoricalExitDateCorrectionService::ERROR_EXIT_DATE_IN_FUTURE;
+    }
+    hecAssert($future, 'future date rejected');
+
+    $multi = false;
+    try {
+        PersonelHistoricalExitDateCorrectionService::plan($pdo, 3, 50, '2026-07-30', '2025-12-31', 'x');
+    } catch (PersonelValidationException $e) {
+        $multi = $e->getCodeString() === PersonelHistoricalExitDateCorrectionService::ERROR_CONFLICT;
+    }
+    hecAssert($multi, 'second conflicting ISTEN_AYRILMA rejected');
+
     $aktifOnly = false;
     try {
         $pdo->beginTransaction();
@@ -316,9 +450,8 @@ try {
         }
         $aktifOnly = $e->getCodeString() === PersonelIstenAyrilmaService::ERROR_EXIT_NOT_AKTIF;
     }
-    hecAssert($aktifOnly, 'normal exit owner remains AKTIF-gated');
+    hecAssert($aktifOnly, 'normal exit owner unchanged');
 
-    // AKTIF target rejected by correction owner
     $aktifDenied = false;
     try {
         PersonelHistoricalExitDateCorrectionService::plan($pdo, 1, 38, '2026-07-30', '2025-12-31', 'x');

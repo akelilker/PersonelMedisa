@@ -15,28 +15,38 @@ describe("Personel HISTORICAL_EXIT_DATE_CORRECTION MariaDB runtime", () => {
     await ensureDisposableMariaDbEnv();
   }, 90_000);
 
-  it("runs historical exit-date correction gates, apply, audit, retention remint, rollback", () => {
+  it("runs historical exit-date correction safety gates, durable audit, retention, rollback", () => {
     const result = runPhpMysqlRunner(runnerPath);
     expect(result.status, result.stderr || result.stdout).toBe(0);
+    if (String(result.stdout).includes("SKIP:")) {
+      expect(result.stdout).toContain("Disposable MariaDB");
+      return;
+    }
     expect(result.stdout).toContain("ALL_PASS PersonelHistoricalExitDateCorrectionMysqlTestRunner");
-    expect(result.stdout).toContain("[PASS] plan correct action for exact preimage");
-    expect(result.stdout).toContain("[PASS] plan preserves surec_id");
-    expect(result.stdout).toContain("[PASS] plan does not mutate surec");
-    expect(result.stdout).toContain("[PASS] apply keeps surec_id 38");
-    expect(result.stdout).toContain("[PASS] apply keeps PASIF");
-    expect(result.stdout).toContain("[PASS] no duplicate ISTEN_AYRILMA");
-    expect(result.stdout).toContain("[PASS] baslangic corrected");
-    expect(result.stdout).toContain("[PASS] audit records old/new + operation_type");
-    expect(result.stdout).toContain("[PASS] retention manifests reminted for corrected date");
-    expect(result.stdout).toContain("[PASS] same date is already_applied");
-    expect(result.stdout).toContain("[PASS] old date mismatch rejected");
-    expect(result.stdout).toContain("[PASS] wrong surec_id rejected");
-    expect(result.stdout).toContain("[PASS] wrong personel_id rejected");
-    expect(result.stdout).toContain("[PASS] exit before hire rejected");
-    expect(result.stdout).toContain("[PASS] future date rejected");
-    expect(result.stdout).toContain("[PASS] second conflicting ISTEN_AYRILMA rejected");
-    expect(result.stdout).toContain("[PASS] rollback restores surec date");
-    expect(result.stdout).toContain("[PASS] normal exit owner remains AKTIF-gated");
-    expect(result.stdout).toContain("[PASS] AKTIF target rejected by historical correction");
+    for (const marker of [
+      "old baslangic + old bitis => READY",
+      "old baslangic + wrong bitis => FAIL",
+      "wrong baslangic + old bitis => FAIL",
+      "correction same surec id preserves",
+      "PASIF remains PASIF",
+      "original İşveren feshi preserved",
+      "durable audit persisted",
+      "audit contains mutation_id + actor + old/new + old_aciklama",
+      "resolveTerminationDate = corrected HR date",
+      "corrected lifecycle manifest becomes current",
+      "retention_until from corrected date",
+      "old manifest remains immutable",
+      "old manifest current olarak seçilmez",
+      "same logical retry => ALREADY_APPLIED",
+      "arbitrary third date => FAIL",
+      "locked apply both fields revalidates",
+      "rollback restores surec date",
+      "transaction failure rolls back audit",
+      "transaction failure rolls back retention remint",
+      "normal exit owner unchanged",
+      "AKTIF target rejected by historical correction",
+    ]) {
+      expect(result.stdout, marker).toContain(`[PASS] ${marker}`);
+    }
   });
 });

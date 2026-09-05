@@ -534,7 +534,8 @@ final class PersonelLifecycleBulkApplyService
                     $expectedOld,
                     $exitDate,
                     $aciklama !== '' ? $aciklama : null,
-                    $actorId
+                    $actorId,
+                    $mutationId !== '' ? $mutationId : null
                 );
                 $entityId = (int) ($result['surec_id'] ?? $surecId);
                 $applyResultHolder['entity_id'] = $entityId;

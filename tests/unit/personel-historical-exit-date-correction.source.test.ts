@@ -24,8 +24,15 @@ describe("Personel historical exit-date correction source contract", () => {
     expect(correction).toContain("ERROR_PREIMAGE_MISMATCH");
     expect(correction).toContain("createPersonelLifecycleManifests");
     expect(correction).toContain("FOR UPDATE");
+    expect(correction).toContain("currentBitis");
+    expect(correction).toContain("assertSurecPreimageExactOld");
+    expect(correction).toContain("ACTION_ALREADY_APPLIED");
+    expect(correction).toContain("PersonelHistoricalExitDateCorrectionAuditService::appendInTransaction");
     expect(correction).not.toContain("SET aktif_durum");
     expect(correction).not.toContain("aktif_durum = 'AKTIF'");
+    // Preserve business aciklama on surec; do not overwrite with audit prefix.
+    expect(correction).toContain("Preserve original business aciklama");
+    expect(correction).not.toMatch(/SET baslangic_tarihi[\s\S]*aciklama = :aciklama/);
 
     expect(backfill).toContain("HISTORICAL_EXIT_BACKFILL_CONFLICT");
     expect(backfill).not.toContain("CORRECT_HISTORICAL_ISTEN_AYRILMA");
@@ -44,10 +51,30 @@ describe("Personel historical exit-date correction source contract", () => {
     expect(contract).toContain("'HISTORICAL_EXIT_DATE_CORRECTION'");
     expect(dryRun).toContain("PersonelHistoricalExitDateCorrectionService::plan");
     expect(apply).toContain("PersonelHistoricalExitDateCorrectionService::applyInTransaction");
+    expect(apply).toContain("$mutationId !== '' ? $mutationId : null");
     expect(postcheck).toContain("OP_HISTORICAL_EXIT_DATE_CORRECTION");
   });
 
-  it("provides dedicated correction ops wrapper defaulting to dry-run", () => {
+  it("provides durable append-only audit owner via migration 086", () => {
+    const migration = read(
+      "api/migrations/086_personel_historical_exit_date_correction_auditleri.sql"
+    );
+    const audit = read(
+      "api/src/Services/Personel/PersonelHistoricalExitDateCorrectionAuditService.php"
+    );
+    expect(migration).toContain(
+      "CREATE TABLE IF NOT EXISTS personel_historical_exit_date_correction_auditleri"
+    );
+    expect(migration).toContain("trg_phedca_no_update");
+    expect(migration).toContain("trg_phedca_no_delete");
+    expect(migration).toContain("mutation_id");
+    expect(migration).toContain("old_aciklama");
+    expect(migration).toContain("PACK086_BLOCKER");
+    expect(audit).toContain("appendInTransaction");
+    expect(audit).toContain("personel_historical_exit_date_correction_auditleri");
+  });
+
+  it("provides dedicated correction ops wrapper defaulting to dry-run and validating bitis", () => {
     const wrapper = read(
       "ops/personnel-lifecycle/historical-exit-date-correction-production-apply.mjs"
     );
@@ -59,6 +86,7 @@ describe("Personel historical exit-date correction source contract", () => {
     expect(wrapper).toContain("isApplyRequested");
     expect(wrapper).toContain('production_mutation: DO_APPLY ? "REQUESTED" : "DRY_RUN_ONLY"');
     expect(wrapper).toContain("evaluateCorrectionPreimage");
+    expect(wrapper).toContain("currentSurecBitisDate: s.bitis_tarihi");
   });
 
   it("aligns backfill wrapper residual gate to ALREADY_APPLIED/CONFLICT domain semantics", () => {
@@ -70,6 +98,8 @@ describe("Personel historical exit-date correction source contract", () => {
     expect(gates).toContain("CREATE_ELIGIBLE");
     expect(gates).toContain("backfill_gate_pass");
     expect(gates).toContain("evaluateCorrectionPreimage");
+    expect(gates).toContain("old_bitis_tarihi_pass");
+    expect(gates).toContain("currentSurecBitisDate");
     expect(wrapper).toContain("PREIMAGE_CONFLICT");
     expect(wrapper).toContain("HISTORICAL_EXIT_DATE_CORRECTION");
     expect(wrapper).toContain("backfill_gate_pass");

@@ -175,7 +175,7 @@ final class OrganizasyonService
             $items[] = SubeReadModel::mapRow($row);
         }
 
-        return $items;
+        return self::attachMuhasebeYetkiPayloads($pdo, $items);
     }
 
     /** @return array<string, mixed>|null */
@@ -195,8 +195,13 @@ final class OrganizasyonService
         $stmt = $pdo->prepare($sql);
         $stmt->execute(['id' => $subeId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$row) {
+            return null;
+        }
 
-        return $row ? SubeReadModel::mapRow($row) : null;
+        $items = self::attachMuhasebeYetkiPayloads($pdo, [SubeReadModel::mapRow($row)]);
+
+        return $items[0] ?? null;
     }
 
     /** @return array<string, mixed> */
@@ -244,11 +249,15 @@ final class OrganizasyonService
         $durum = self::parseDurum($body);
         $departmanIds = self::parseDepartmanIds($body['departman_ids'] ?? []);
         $sgkIsverenId = self::parseNullableId($body, 'sgk_isveren_id');
+        $muhasebePlan = self::parseMuhasebeYetkiPlan($body);
 
         self::assertDepartmanIdsExist($pdo, $departmanIds);
         self::assertSubeKodUnique($pdo, $kod, null);
         self::assertSubeAdUniqueInSirket($pdo, $ad, $parentSirketId, null);
         self::assertSgkIsverenConsistent($pdo, $sgkIsverenId, $parentSirketId);
+        if ($muhasebePlan !== null) {
+            self::assertMuhasebeYetkiPlanValid($pdo, $muhasebePlan);
+        }
 
         $columns = ['kod', 'ad', 'durum'];
         $params = ['kod' => $kod, 'ad' => $ad, 'durum' => $durum];
@@ -275,6 +284,13 @@ final class OrganizasyonService
             $stmt->execute($params);
             $subeId = (int) $pdo->lastInsertId();
             self::replaceSubeDepartmanlar($pdo, $subeId, $departmanIds);
+            if ($muhasebePlan !== null) {
+                SubeMuhasebeYetkiSchema::replaceForSube(
+                    $pdo,
+                    $subeId,
+                    $muhasebePlan['enabled'] ? $muhasebePlan['user_ids'] : []
+                );
+            }
             if ($auditContext !== null) {
                 OrganizasyonAuditWriter::recordSubeOlusturma($pdo, [
                     'sube_id' => $subeId,
@@ -326,6 +342,7 @@ final class OrganizasyonService
         $departmanIds = array_key_exists('departman_ids', $body)
             ? self::parseDepartmanIds($body['departman_ids'])
             : null;
+        $muhasebePlan = self::parseMuhasebeYetkiPlan($body);
 
         $currentSirketId = isset($existing['sirket']['id']) ? (int) $existing['sirket']['id'] : null;
         $sgkIsverenId = array_key_exists('sgk_isveren_id', $body)
@@ -339,6 +356,9 @@ final class OrganizasyonService
             self::assertSubeAdUniqueInSirket($pdo, $ad, $currentSirketId, $id);
         }
         self::assertSgkIsverenConsistent($pdo, $sgkIsverenId, $currentSirketId);
+        if ($muhasebePlan !== null) {
+            self::assertMuhasebeYetkiPlanValid($pdo, $muhasebePlan);
+        }
 
         $sets = ['ad = :ad', 'durum = :durum'];
         $params = ['id' => $id, 'ad' => $ad, 'durum' => $durum];
@@ -354,7 +374,17 @@ final class OrganizasyonService
             if ($departmanIds !== null) {
                 self::replaceSubeDepartmanlar($pdo, $id, $departmanIds);
             }
+            if ($muhasebePlan !== null) {
+                SubeMuhasebeYetkiSchema::replaceForSube(
+                    $pdo,
+                    $id,
+                    $muhasebePlan['enabled'] ? $muhasebePlan['user_ids'] : []
+                );
+            }
             $pdo->commit();
+        } catch (OrganizasyonException $e) {
+            $pdo->rollBack();
+            throw $e;
         } catch (\Throwable $e) {
             $pdo->rollBack();
             throw new OrganizasyonException(500, 'INTERNAL_ERROR', 'Şube kaydı güncellenemedi.');
@@ -737,6 +767,195 @@ final class OrganizasyonService
         );
         foreach ($departmanIds as $departmanId) {
             $insert->execute(['sube_id' => $subeId, 'departman_id' => $departmanId]);
+        }
+    }
+
+    /**
+     * Attach branch accounting ACL fields. Missing schema → restriction disabled.
+     *
+     * @param array<int, array<string, mixed>> $items
+     * @return array<int, array<string, mixed>>
+     */
+    private static function attachMuhasebeYetkiPayloads(PDO $pdo, array $items): array
+    {
+        if (count($items) === 0) {
+            return $items;
+        }
+
+        $map = [];
+        if (SubeMuhasebeYetkiSchema::isReady($pdo)) {
+            $subeIds = [];
+            foreach ($items as $item) {
+                $subeId = (int) ($item['id'] ?? 0);
+                if ($subeId > 0) {
+                    $subeIds[] = $subeId;
+                }
+            }
+            $map = SubeMuhasebeYetkiSchema::loadRestrictedSubeUserMap($pdo, $subeIds);
+        }
+
+        foreach ($items as &$item) {
+            $subeId = (int) ($item['id'] ?? 0);
+            $userIds = $map[$subeId] ?? [];
+            $item['muhasebe_kisit_aktif'] = count($userIds) > 0;
+            $item['muhasebe_yetkili_user_ids'] = $userIds;
+            $item['muhasebe_yetkilileri'] = self::loadMuhasebeYetkiliStatuses($pdo, $userIds);
+        }
+        unset($item);
+
+        return $items;
+    }
+
+    /**
+     * Preserve ACL rows even when a selected user later becomes ineligible;
+     * surface eligibility so the edit screen can fail-closed without silent delete.
+     *
+     * @param array<int, int> $userIds
+     * @return array<int, array<string, mixed>>
+     */
+    private static function loadMuhasebeYetkiliStatuses(PDO $pdo, array $userIds): array
+    {
+        if (count($userIds) === 0) {
+            return [];
+        }
+
+        $placeholders = implode(', ', array_fill(0, count($userIds), '?'));
+        $stmt = $pdo->prepare(
+            "SELECT id, username, ad_soyad, rol, durum
+             FROM users
+             WHERE id IN ($placeholders)"
+        );
+        $stmt->execute(array_values($userIds));
+        $byId = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $id = (int) ($row['id'] ?? 0);
+            if ($id <= 0) {
+                continue;
+            }
+            $rol = strtoupper(trim((string) ($row['rol'] ?? '')));
+            $durum = strtoupper(trim((string) ($row['durum'] ?? '')));
+            $byId[$id] = [
+                'id' => $id,
+                'username' => (string) ($row['username'] ?? ''),
+                'ad_soyad' => (string) ($row['ad_soyad'] ?? ''),
+                'rol' => $rol,
+                'durum' => $durum,
+                'eligible' => $rol === 'MUHASEBE' && $durum === 'AKTIF',
+            ];
+        }
+
+        $ordered = [];
+        foreach ($userIds as $userId) {
+            if (isset($byId[$userId])) {
+                $ordered[] = $byId[$userId];
+                continue;
+            }
+            $ordered[] = [
+                'id' => $userId,
+                'username' => '',
+                'ad_soyad' => '',
+                'rol' => '',
+                'durum' => '',
+                'eligible' => false,
+            ];
+        }
+
+        return $ordered;
+    }
+
+    /**
+     * null = payload omitted (preserve existing ACL).
+     * enabled=false clears rows. enabled=true requires ≥1 eligible MUHASEBE user.
+     *
+     * @param array<string, mixed> $body
+     * @return array{enabled: bool, user_ids: array<int, int>}|null
+     */
+    private static function parseMuhasebeYetkiPlan(array $body): ?array
+    {
+        $hasFlag = array_key_exists('muhasebe_kisit_aktif', $body);
+        $hasIds = array_key_exists('muhasebe_yetkili_user_ids', $body);
+        if (!$hasFlag && !$hasIds) {
+            return null;
+        }
+
+        $enabled = $hasFlag
+            ? filter_var($body['muhasebe_kisit_aktif'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE)
+            : null;
+        if ($enabled === null && $hasFlag) {
+            throw OrganizasyonException::validation(
+                'muhasebe_kisit_aktif alanı true/false olmalıdır.',
+                'muhasebe_kisit_aktif'
+            );
+        }
+
+        $userIds = $hasIds ? self::parseDepartmanIds($body['muhasebe_yetkili_user_ids']) : [];
+
+        if ($enabled === null) {
+            // IDs alone: non-empty enables, empty disables.
+            $enabled = count($userIds) > 0;
+        }
+
+        if (!$enabled) {
+            return ['enabled' => false, 'user_ids' => []];
+        }
+
+        return ['enabled' => true, 'user_ids' => $userIds];
+    }
+
+    /**
+     * @param array{enabled: bool, user_ids: array<int, int>} $plan
+     */
+    private static function assertMuhasebeYetkiPlanValid(PDO $pdo, array $plan): void
+    {
+        if (!$plan['enabled']) {
+            if (!SubeMuhasebeYetkiSchema::isReady($pdo)) {
+                // Clearing a restriction that cannot exist is a no-op once schema lands.
+                return;
+            }
+
+            return;
+        }
+
+        if (!SubeMuhasebeYetkiSchema::isReady($pdo)) {
+            throw OrganizasyonException::conflict(
+                'SUBE_MUHASEBE_YETKILERI_TABLE_MISSING',
+                'Şube muhasebe yetkilisi kısıtı bu ortamda henüz kullanılamaz.'
+            );
+        }
+
+        if (count($plan['user_ids']) === 0) {
+            throw OrganizasyonException::validation(
+                'Muhasebe kısıtı açıkken en az bir muhasebe yetkilisi seçilmelidir.',
+                'muhasebe_yetkili_user_ids'
+            );
+        }
+
+        $placeholders = implode(', ', array_fill(0, count($plan['user_ids']), '?'));
+        $stmt = $pdo->prepare(
+            "SELECT id, rol, durum FROM users WHERE id IN ($placeholders)"
+        );
+        $stmt->execute(array_values($plan['user_ids']));
+        $found = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $id = (int) ($row['id'] ?? 0);
+            $rol = strtoupper(trim((string) ($row['rol'] ?? '')));
+            $durum = strtoupper(trim((string) ($row['durum'] ?? '')));
+            if ($id <= 0 || $rol !== 'MUHASEBE' || $durum !== 'AKTIF') {
+                throw OrganizasyonException::validation(
+                    'Yalnız aktif MUHASEBE kullanıcıları seçilebilir.',
+                    'muhasebe_yetkili_user_ids'
+                );
+            }
+            $found[$id] = true;
+        }
+
+        foreach ($plan['user_ids'] as $userId) {
+            if (!isset($found[$userId])) {
+                throw OrganizasyonException::validation(
+                    'Yalnız aktif MUHASEBE kullanıcıları seçilebilir.',
+                    'muhasebe_yetkili_user_ids'
+                );
+            }
         }
     }
 

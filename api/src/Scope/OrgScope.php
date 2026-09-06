@@ -7,6 +7,7 @@ namespace Medisa\Api\Scope;
 use Medisa\Api\Auth\RolePermissions;
 use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
+use Medisa\Api\Services\Organizasyon\SubeMuhasebeYetkiSchema;
 use Medisa\Api\Services\Personel\PersonelCalisanKapsamSchema;
 use Medisa\Api\Services\Personel\PersonelCalisanKapsamService;
 use Medisa\Api\Services\Personel\PersonelGeciciGorevlendirmeSchema;
@@ -282,6 +283,8 @@ class OrgScope
             JsonResponse::forbidden('Secili sube icin yetkiniz yok.');
         }
 
+        self::assertMuhasebeBranchAccountingVisibility($user, $requested, null);
+
         return $requested;
     }
 
@@ -394,6 +397,11 @@ class OrgScope
             if (count($allowedSgk) === 0 || $personelSgkId <= 0 || !in_array($personelSgkId, $allowedSgk, true)) {
                 JsonResponse::forbidden();
             }
+        }
+
+        // Branch accounting ACL applies only to MUHASEBE, after existing eligibility.
+        if ($subeId > 0) {
+            self::assertMuhasebeBranchAccountingVisibility($user, $subeId, $pdo instanceof PDO ? $pdo : null);
         }
 
         $scope = self::resolveActiveSubeId($user, $request);
@@ -572,6 +580,7 @@ class OrgScope
             $where[] = count($branchWhere) === 0
                 ? $sgkClause
                 : '((' . implode(' AND ', $branchWhere) . ') OR ' . $sgkClause . ')';
+            self::appendMuhasebeBranchAccountingListFilter($where, $params, $user, $col, $paramPrefix, $pdo);
 
             return;
         }
@@ -579,6 +588,7 @@ class OrgScope
         foreach ($branchWhere as $clause) {
             $where[] = $clause;
         }
+        self::appendMuhasebeBranchAccountingListFilter($where, $params, $user, $col, $paramPrefix, $pdo);
     }
 
     /**
@@ -770,6 +780,143 @@ class OrgScope
         }
 
         self::appendInFilter($where, $params, $column, $allowedSubeIds, $paramPrefix . '_allowed_sube_id');
+    }
+
+    /**
+     * Branch accounting visibility restriction — MUHASEBE only.
+     *
+     * Existing company/SGK/branch eligibility is evaluated first by the caller.
+     * Relation presence on the branch enables the restriction; empty = disabled.
+     * Selected user who later loses eligibility fails closed (role no longer
+     * MUHASEBE, or actor not in the selected set).
+     *
+     * @param array<string, mixed> $user
+     * @param PDO|null $pdo
+     */
+    public static function assertMuhasebeBranchAccountingVisibility(array $user, $subeId, $pdo = null)
+    {
+        if (self::normalizeRole($user) !== 'MUHASEBE') {
+            return;
+        }
+
+        $branchId = (int) $subeId;
+        if ($branchId <= 0) {
+            return;
+        }
+
+        $selected = self::resolveMuhasebeYetkiliUserIds($user, $branchId, $pdo);
+        if ($selected === null) {
+            // Restriction disabled or schema absent → keep existing MUHASEBE behaviour.
+            return;
+        }
+
+        $actorId = isset($user['id']) ? (int) $user['id'] : 0;
+        if ($actorId <= 0 || !in_array($actorId, $selected, true)) {
+            JsonResponse::forbidden('Bu subenin muhasebe verileri icin yetkiniz yok.');
+        }
+    }
+
+    /**
+     * List-filter counterpart of assertMuhasebeBranchAccountingVisibility.
+     *
+     * @param array<int, string> $where
+     * @param array<string, mixed> $params
+     * @param array<string, mixed> $user
+     * @param PDO|null $pdo
+     */
+    private static function appendMuhasebeBranchAccountingListFilter(
+        array &$where,
+        array &$params,
+        array $user,
+        $col,
+        $paramPrefix,
+        $pdo
+    ) {
+        if (self::normalizeRole($user) !== 'MUHASEBE') {
+            return;
+        }
+
+        $map = self::resolveMuhasebeYetkiMap($user, $pdo);
+        if (count($map) === 0) {
+            return;
+        }
+
+        $actorId = isset($user['id']) ? (int) $user['id'] : 0;
+        $denied = [];
+        foreach ($map as $subeId => $userIds) {
+            $branchId = (int) $subeId;
+            if ($branchId <= 0) {
+                continue;
+            }
+            $selected = self::normalizePositiveIds(is_array($userIds) ? $userIds : []);
+            if (count($selected) === 0) {
+                continue;
+            }
+            if ($actorId <= 0 || !in_array($actorId, $selected, true)) {
+                $denied[] = $branchId;
+            }
+        }
+
+        if (count($denied) === 0) {
+            return;
+        }
+
+        $placeholders = [];
+        foreach (array_values($denied) as $index => $deniedId) {
+            $key = $paramPrefix . '_muh_deny_' . $index;
+            $placeholders[] = ':' . $key;
+            $params[$key] = $deniedId;
+        }
+        $where[] = '(' . $col . 'sube_id IS NULL OR ' . $col . 'sube_id NOT IN ('
+            . implode(', ', $placeholders) . '))';
+    }
+
+    /**
+     * @param array<string, mixed> $user
+     * @param PDO|null $pdo
+     * @return array<int, int>|null null = restriction disabled
+     */
+    private static function resolveMuhasebeYetkiliUserIds(array $user, $subeId, $pdo)
+    {
+        $branchId = (int) $subeId;
+        $map = self::resolveMuhasebeYetkiMap($user, $pdo);
+        if (!isset($map[$branchId]) || !is_array($map[$branchId])) {
+            return null;
+        }
+
+        $selected = self::normalizePositiveIds($map[$branchId]);
+
+        return count($selected) > 0 ? $selected : null;
+    }
+
+    /**
+     * @param array<string, mixed> $user
+     * @param PDO|null $pdo
+     * @return array<int, array<int, int>>
+     */
+    private static function resolveMuhasebeYetkiMap(array $user, $pdo)
+    {
+        if (isset($user['sube_muhasebe_yetki_map']) && is_array($user['sube_muhasebe_yetki_map'])) {
+            $normalized = [];
+            foreach ($user['sube_muhasebe_yetki_map'] as $subeId => $userIds) {
+                $branchId = (int) $subeId;
+                if ($branchId <= 0 || !is_array($userIds)) {
+                    continue;
+                }
+                $ids = self::normalizePositiveIds($userIds);
+                if (count($ids) > 0) {
+                    $normalized[$branchId] = $ids;
+                }
+            }
+
+            return $normalized;
+        }
+
+        if ($pdo instanceof PDO && SubeMuhasebeYetkiSchema::isReady($pdo)) {
+            return SubeMuhasebeYetkiSchema::loadRestrictedSubeUserMap($pdo);
+        }
+
+        return [];
     }
 
     /**

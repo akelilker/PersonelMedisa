@@ -41,6 +41,7 @@ final class MigrationPreflightReport
      * This round covers:
      * - 085: append-only gunluk_bildirim_duzeltme_auditleri
      * - 086: append-only personel_historical_exit_date_correction_auditleri
+     * - 087: branch accounting visibility ACL (sube_muhasebe_yetkilileri)
      * Production is expected at tip 084; pending set is the round suffix.
      *
      * @var array<string, string>
@@ -48,6 +49,7 @@ final class MigrationPreflightReport
     public const ROUND_MIGRATIONS = [
         '085' => '085_gunluk_bildirim_duzeltme_auditleri.sql',
         '086' => '086_personel_historical_exit_date_correction_auditleri.sql',
+        '087' => '087_sube_muhasebe_yetkilileri.sql',
     ];
 
     /** Withdrawn 079. Must not appear anywhere in the canonical source. */
@@ -65,11 +67,12 @@ final class MigrationPreflightReport
     private const HIERARCHY_TABLES = ['sirketler', 'user_sirketler', 'user_sgk_isverenler'];
 
     /**
-     * Append-only audit tables this round creates. Absent is the preimage.
+     * Tables this round creates. Absent is the preimage.
      */
     private const ROUND_AUDIT_TABLES = [
         'gunluk_bildirim_duzeltme_auditleri',
         'personel_historical_exit_date_correction_auditleri',
+        'sube_muhasebe_yetkilileri',
     ];
 
     /**
@@ -486,7 +489,7 @@ final class MigrationPreflightReport
         }
         if ($pendingVersions === []) {
             // Nothing left to authorize; a further request would re-apply. The
-            // healthy end state is tip 086 exactly; an empty pending set on any
+            // healthy end state is tip 087 exactly; an empty pending set on any
             // other tip means the chain is not the one this gate authorizes.
             $blockers[] = $ledger['ready'] && $ledger['applied_tip'] === $roundTip
                 ? 'ROUND_ALREADY_COMPLETE'

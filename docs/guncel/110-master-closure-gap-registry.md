@@ -80,7 +80,7 @@ PRODUCTION_MIGRATION_TIP: 087
 | `MG-PERSONNEL-POST-BULK-ACCOUNT-014` | Bulk sonrası 14 AKTIF personel için PERSONEL hesabı | **INTENTIONAL_DEFER** (Priority C) | Exact ids 213–226; historical 136 reopen yok; QR/self-service late-phase. |
 | `MG-PERSONNEL-EXIT-DATE-202-208` | 202/208 historical exit dates | **CLOSED_CONFIRMED** | Historical correction applied; reopen yok. |
 | `MG-MANAGER-ALPER-SUNGUR` | Alper Sungur uygulama kullanıcısı | **USER_DATA_REQUIRED** | Production’da eşleşen user yok; kaynak olmadan hesap yaratılmaz. |
-| `MG-SGK-PERIOD-SUBE-12-13` | İzmir/Sakarya SGK bildirim dönemi | **TECHNICAL_GAP** (Priority A) | Runtime `SgkSirketPolitikaReadService` branch-scoped; 12/13 = `NO_APPROVED_POLICY` (revision inventory empty). Company decision `AY_1_SON_GUN` already known — seed/approve ops gate. |
+| `MG-SGK-PERIOD-SUBE-12-13` | İzmir/Sakarya SGK bildirim dönemi | **OPS_ROLLOUT_ACTIVE** / PRODUCTION_CONFIG / **READY_FOR_EXPLICIT_PRODUCTION_APPROVAL** | Runtime currently `NO_APPROVED_POLICY` for 12/13, but existing owner `SgkSirketPolitikaWriteService` import→submit→approve (dual-control) can create explicit `AY_1_SON_GUN`+`ONAYLANDI`. NOT a TECHNICAL_GAP. NO-APPLY targets in `a1-a2-a3-no-apply-remediation-plan.json`. |
 | `MG-PERSONNEL-NULL-LOCATION-016` | `calisma_lokasyonu_id` NULL | **DATA + BUSINESS** (Priority A) | Exact 16. AUTO=2 (160,211 → loc 5) NO-APPLY plan; 14 = HR_BUSINESS_DECISION_REQUIRED. |
 | `MG-PERSONNEL-NULL-BRANCH-001` | `sube_id` NULL | **BUSINESS_DECISION_REQUIRED** (Priority A) | Exact 1: personel_id 212. CAN_APPLY=NO. |
 
@@ -134,13 +134,13 @@ Açık teknik borç kalemi yoktur.
 ## Kalan güvenli iş sırası (kullanıcı/ops)
 
 **Priority A**
-1. Medisa sube 12/13 için `AY_1_SON_GUN` ONAYLANDI politika seed/approve (TECHNICAL_GAP).
+1. Medisa sube 12/13 SGK period: explicit dual-control import/submit/approve `AY_1_SON_GUN` (OPS_ROLLOUT_ACTIVE — existing owner; explicit production approval required).
 2. Personel location remediation: 2 AUTO candidate (160, 211) ayrı apply onayı; 14 HR kararı.
-3. Personel 212 `sube_id` (+ location) HR kararı.
+3. Personel 212 `sube_id` (+ location) HR kararı (no auto target).
 
 **Priority B**
 4. `SUBE_YONETICISI` remaining Medisa branches (1,5,6,12,13).
-5. Cross-company axis contradictions 120/158/219 (Şenay/Karyapı defer bitene veya purity kararı).
+5. Cross-company location/branch pairs 120/158/219 = DEFERRED_REVIEW (axes independent; not DATA_CONTRADICTION).
 
 **Priority C**
 6. Post-bulk PERSONEL accounts 213–226 / QR self-service INTENTIONAL_DEFER.

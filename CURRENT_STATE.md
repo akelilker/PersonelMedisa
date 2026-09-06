@@ -34,11 +34,15 @@ QR_SELF_SERVICE: INTENTIONAL_DEFER
 
 ## A1 — SGK period policy sube 12 / 13
 
-SGK_PERIOD_OWNER: SgkSirketPolitikaReadService::resolveForPeriod (branch-scoped; **no company inheritance**)
-BRANCH_1_4_5_6_7_8_9_10_11: AY_1_SON_GUN / ONAYLANDI (control set still live)
-BRANCH_12_IZMIR: RUNTIME_EFFECTIVE = NO_APPROVED_POLICY; revision inventory empty → TECHNICAL_GAP
-BRANCH_13_SAKARYA: RUNTIME_EFFECTIVE = NO_APPROVED_POLICY; revision inventory empty → TECHNICAL_GAP
-BUSINESS_DECISION: already 1_TO_MONTH_END / AY_1_SON_GUN for Medisa — seed/approve for 12/13 is ops gate, not reopen of company decision
+SGK_PERIOD_OWNER_RUNTIME: SgkSirketPolitikaReadService::resolveForPeriod (branch-scoped; no company inheritance)
+SGK_PERIOD_OWNER_WRITE: SgkSirketPolitikaWriteService::import → submit → approve (dual-control via SgkKararPaketiAuthz)
+A1_CLASSIFICATION: OPS_ROLLOUT_ACTIVE / PRODUCTION_CONFIG / READY_FOR_EXPLICIT_PRODUCTION_APPROVAL
+A1_CAN_BE_DONE_WITH_EXISTING_OWNER: YES
+BRANCH_12_CURRENT: NO_APPROVED_POLICY (revision inventory empty)
+BRANCH_13_CURRENT: NO_APPROVED_POLICY (revision inventory empty)
+NO_APPLY_TARGET: explicit AY_1_SON_GUN + ONAYLANDI for sube 12 (`S98-R1-POL-12`) and 13 (`S98-R1-POL-13`); clone control values from sube 1 (`SGK_ODENEK_MAHSUP_MODU=UCRET_MODELINE_GORE`)
+APPLIED_THIS_TURN: NO
+CONTROL_SET_1_2_4_5_6_7_8_9_10_11: still AY_1_SON_GUN / ONAYLANDI
 
 ## A2 / A3 residuals (exact fresh)
 
@@ -47,30 +51,30 @@ NULL_LOCATION_BY_BRANCH: sube1=11, sube2=3, sube6=1, sube_null=1
 AUTO_RESOLVABLE_LOCATION: 2 (personel_id 160 Sedanur Bulut, 211 Zeynep Günal → calisma_lokasyonu_id=5; NO-APPLY plan only)
 HR_BUSINESS_DECISION_REQUIRED_LOCATION: 14
 NULL_BRANCH_TOTAL: 1 (personel_id 212 İlker AKEL; location also NULL → HR_BUSINESS_DECISION_REQUIRED; CAN_APPLY=NO)
-CROSS_COMPANY_AXIS_CONTRADICTION: 3
-- 120 İsmail Özcan — branch 11 Şenay / SGK 3 / location 5→Medisa1
-- 158 Salih Efe — branch 11 Şenay / SGK 3 / location 5→Medisa1
-- 219 DOĞU BERKAN ATMACA — branch 10 Karyapı / SGK 1 / location 3→Medisa6
-No silent Medisa overwrite; BUSINESS_DECISION_REQUIRED while company rollouts deferred.
+CROSS_COMPANY_AXIS_PAIRS: 3 — DEFERRED_REVIEW (not DATA_CONTRADICTION)
+- 120 İsmail Özcan — branch 11 Şenay / SGK 3 / location 5
+- 158 Salih Efe — branch 11 Şenay / SGK 3 / location 5
+- 219 DOĞU BERKAN ATMACA — branch 10 Karyapı / SGK 1 / location 3
+Reason: branch ↔ work-location are independent axes; no schema/runtime same-branch mandate; Karyapı/Şenay INTENTIONAL_DEFER.
 
 NO_APPLY_PLAN: ops/organization-mapping/a1-a2-a3-no-apply-remediation-plan.json
 PLAN_CAN_APPLY_COUNT: 2 (not applied this turn)
 
-## FK matrix (fresh list API; INVALID_REF not join-probed)
+## FK matrix (fresh list + referans catalog integrity probe)
 
-| field | POPULATED | NULL | ACTIVE_NULL | PASIF_NULL |
-| --- | ---: | ---: | ---: | ---: |
-| sube_id | 152 | 1 | 1 | 0 |
-| departman_id | 146 | 7 | 7 | 0 |
-| bolum_id | 137 | 16 | 10 | 6 |
-| birim_id | 137 | 16 | 10 | 6 |
-| gorev_id | 141 | 12 | 12 | 0 |
-| pozisyon_id | 139 | 14 | 8 | 6 |
-| personel_tipi_id | 153 | 0 | 0 | 0 |
-| sgk_isveren_id | 130 | 23 | 17 | 6 |
-| calisma_lokasyonu_id | 137 | 16 | 12 | 4 |
+| field | POPULATED | NULL | ACTIVE_NULL | PASIF_NULL | INVALID_REF | INVALID_PERSONEL_IDS |
+| --- | ---: | ---: | ---: | ---: | ---: | --- |
+| sube_id | 152 | 1 | 1 | 0 | 0 | [] |
+| departman_id | 146 | 7 | 7 | 0 | 0 | [] |
+| bolum_id | 137 | 16 | 10 | 6 | 0 | [] |
+| birim_id | 137 | 16 | 10 | 6 | 0 | [] |
+| gorev_id | 141 | 12 | 12 | 0 | 0 | [] |
+| pozisyon_id | 139 | 14 | 8 | 6 | 0 | [] |
+| personel_tipi_id | 153 | 0 | 0 | 0 | 0 | [] |
+| sgk_isveren_id | 130 | 23 | 17 | 6 | 0 | [] |
+| calisma_lokasyonu_id | 137 | 16 | 12 | 4 | 0 | [] |
 
-EXPECTED_NULL / UNEXPECTED_NULL not asserted except where model already closed (DIS SGK non-financial / optional DIS org). Location/branch nulls above remain decision/remediation items.
+FK_REFERENCE_INTEGRITY: PASS (all INVALID_REF=0)
 
 ## SUBE_YONETICISI (readback only)
 
@@ -82,13 +86,13 @@ STATUS: BUSINESS_DECISION_REQUIRED (Priority B; not data cleanup)
 ## Priority rewrite (post evidence)
 
 PRIORITY_A:
-- A1 TECHNICAL_GAP — seed/approve AY_1_SON_GUN ONAYLANDI for Medisa sube 12 & 13
-- A2 DATA_REMEDIATION_READY_FOR_APPROVAL (2 AUTO) + BUSINESS_DECISION_REQUIRED (14)
-- A3 BUSINESS_DECISION_REQUIRED (personel 212)
+- A1 OPS_ROLLOUT_ACTIVE / PRODUCTION_CONFIG — READY_FOR_EXPLICIT_PRODUCTION_APPROVAL (seed/approve AY_1_SON_GUN for sube 12 & 13 via existing dual-control owner)
+- A2 DATA_REMEDIATION_READY_FOR_APPROVAL (2 AUTO: 160,211) + BUSINESS_DECISION_REQUIRED (14)
+- A3 BUSINESS_DECISION_REQUIRED (personel 212; no auto target)
 
 PRIORITY_B:
-- SUBE_YONETICISI remaining Medisa branches
-- Cross-company contradiction residuals (120/158/219) when defer ends or purity required
+- SUBE_YONETICISI remaining Medisa branches 1,5,6,12,13
+- Cross-company location/branch pairs 120/158/219 = DEFERRED_REVIEW
 
 PRIORITY_C:
 - PERSONEL accounts / QR / self-service INTENTIONAL_DEFER

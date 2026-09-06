@@ -8,8 +8,13 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../api/src/bootstrap.php';
 
+use Medisa\Api\Http\Request;
 use Medisa\Api\Services\Personel\PersonelHistoricalExitDateCorrectionService;
+use Medisa\Api\Services\Personel\PersonelImportException;
 use Medisa\Api\Services\Personel\PersonelIstenAyrilmaService;
+use Medisa\Api\Services\Personel\PersonelLifecycleBulkApplyService;
+use Medisa\Api\Services\Personel\PersonelLifecycleBulkDryRunService;
+use Medisa\Api\Services\Personel\PersonelLifecycleBulkRowContract;
 use Medisa\Api\Services\Personel\PersonelValidationException;
 use Medisa\Api\Services\Retention\ArchiveManifestService;
 use Medisa\Api\Services\Retention\RetentionCategories;
@@ -78,12 +83,18 @@ function hecBootstrap(PDO $root): PDO
           aktif_durum ENUM('AKTIF','PASIF') NOT NULL DEFAULT 'AKTIF',
           calisan_kapsami VARCHAR(32) NOT NULL DEFAULT 'IC_PERSONEL',
           sube_id INT UNSIGNED NULL,
+          bolum_id INT UNSIGNED NULL,
+          birim_id INT UNSIGNED NULL,
           tc_kimlik_no CHAR(11) NULL,
           dogum_tarihi DATE NULL,
           telefon VARCHAR(32) NULL,
           departman_id INT UNSIGNED NULL,
           gorev_id INT UNSIGNED NULL,
-          personel_tipi_id INT UNSIGNED NULL
+          personel_tipi_id INT UNSIGNED NULL,
+          sgk_isveren_id INT UNSIGNED NULL,
+          calisma_lokasyonu_id INT UNSIGNED NULL,
+          pozisyon_id INT UNSIGNED NULL,
+          bagli_amir_id INT UNSIGNED NULL
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     ");
     $pdo->exec("
@@ -137,6 +148,25 @@ function hecBootstrap(PDO $root): PDO
           created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     ");
+    $pdo->exec("
+        CREATE TABLE offline_mutation_idempotency (
+          id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+          actor_user_id INT UNSIGNED NOT NULL,
+          operation_scope VARCHAR(96) NOT NULL,
+          idempotency_key VARCHAR(128) NOT NULL,
+          payload_hash CHAR(64) NOT NULL,
+          state ENUM('CLAIMED', 'COMPLETED', 'FAILED') NOT NULL,
+          result_entity_type VARCHAR(32) NULL,
+          result_entity_id BIGINT UNSIGNED NULL,
+          result_entity_ref VARCHAR(96) NULL,
+          http_status SMALLINT UNSIGNED NOT NULL DEFAULT 200,
+          error_code VARCHAR(80) NULL,
+          created_at DATETIME(3) NOT NULL,
+          completed_at DATETIME(3) NULL,
+          PRIMARY KEY (id),
+          UNIQUE KEY uq_omi_actor_scope_key (actor_user_id, operation_scope, idempotency_key)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ");
 
     $pdo->exec("
         INSERT INTO personeller (id, ad, soyad, sicil_no, ise_giris_tarihi, aktif_durum)
@@ -146,7 +176,9 @@ function hecBootstrap(PDO $root): PDO
           (3, 'Pasif', 'CiftSurec', 'P3', '2022-01-01', 'PASIF'),
           (4, 'Pasif', 'Rollback', 'P4', '2023-06-01', 'PASIF'),
           (5, 'Pasif', 'WrongBitis', 'P5', '2023-01-01', 'PASIF'),
-          (6, 'Pasif', 'ThirdDate', 'P6', '2023-01-01', 'PASIF')
+          (6, 'Pasif', 'ThirdDate', 'P6', '2023-01-01', 'PASIF'),
+          (7, 'Pasif', 'ChecksumFix', 'P7', '2023-01-01', 'PASIF'),
+          (8, 'Pasif', 'StalePreimage', 'P8', '2023-01-01', 'PASIF')
     ");
     $pdo->exec("
         INSERT INTO surecler (id, personel_id, surec_turu, baslangic_tarihi, bitis_tarihi, aciklama, state)
@@ -156,7 +188,9 @@ function hecBootstrap(PDO $root): PDO
           (51, 3, 'ISTEN_AYRILMA', '2026-08-01', '2026-08-01', 'two', 'AKTIF'),
           (60, 4, 'ISTEN_AYRILMA', '2026-07-30', '2026-07-30', 'İşveren feshi', 'AKTIF'),
           (70, 5, 'ISTEN_AYRILMA', '2026-07-30', '2026-08-01', 'İşveren feshi', 'AKTIF'),
-          (80, 6, 'ISTEN_AYRILMA', '2026-06-15', '2026-06-15', 'İşveren feshi', 'AKTIF')
+          (80, 6, 'ISTEN_AYRILMA', '2026-06-15', '2026-06-15', 'İşveren feshi', 'AKTIF'),
+          (90, 7, 'ISTEN_AYRILMA', '2026-07-30', '2026-07-30', 'İşveren feshi', 'AKTIF'),
+          (91, 8, 'ISTEN_AYRILMA', '2026-07-30', '2026-07-30', 'İşveren feshi', 'AKTIF')
     ");
     // Pre-seed wrong-date lifecycle manifests (immutable prior identities).
     $pdo->exec("
@@ -179,6 +213,164 @@ $database = null;
 try {
     $pdo = hecBootstrap($root);
     $database = (string) $pdo->query('SELECT DATABASE()')->fetchColumn();
+
+    $gm = ['id' => 99, 'rol' => 'GENEL_YONETICI', 'username' => 'hec-gm'];
+    $request = new Request();
+    $deployedSha = str_repeat('a', 40);
+    $correctionRows = [[
+        'mutation_id' => 'mg-historical-exit-date-correction-checksum-7',
+        'operation_type' => PersonelLifecycleBulkRowContract::OP_HISTORICAL_EXIT_DATE_CORRECTION,
+        'personel_id' => 7,
+        'payload' => [
+            'surec_id' => 90,
+            'expected_old_exit_date' => '2026-07-30',
+            'exit_date' => '2025-12-31',
+            'aciklama' => 'HR deterministic checksum correction',
+        ],
+    ]];
+
+    // Deterministic consecutive correction dry-runs across wall-clock drift.
+    RetentionClock::setOverride(new DateTimeImmutable('2026-09-06T10:15:00+00:00'));
+    $dryA = PersonelLifecycleBulkDryRunService::dryRun(
+        $pdo,
+        $gm,
+        $request,
+        $correctionRows,
+        null,
+        $deployedSha
+    );
+    RetentionClock::setOverride(new DateTimeImmutable('2026-09-07T18:45:30+00:00'));
+    $dryB = PersonelLifecycleBulkDryRunService::dryRun(
+        $pdo,
+        $gm,
+        $request,
+        $correctionRows,
+        null,
+        $deployedSha
+    );
+    hecAssert(($dryA['can_apply'] ?? false) === true, 'DRY_RUN_A.can_apply = true');
+    hecAssert(($dryB['can_apply'] ?? false) === true, 'DRY_RUN_B.can_apply = true');
+    hecAssert(
+        (string) ($dryA['preimage_checksum'] ?? '') === (string) ($dryB['preimage_checksum'] ?? '')
+            && (string) ($dryA['preimage_checksum'] ?? '') !== '',
+        'consecutive correction dry-runs share preimage_checksum'
+    );
+    hecAssert(
+        (string) ($dryA['dry_run_checksum'] ?? '') === (string) ($dryB['dry_run_checksum'] ?? '')
+            && (string) ($dryA['dry_run_checksum'] ?? '') !== '',
+        'consecutive correction dry-runs share dry_run_checksum'
+    );
+    $planAudit = $dryA['satirlar'][0]['mutation_plan']['audit'] ?? null;
+    hecAssert(is_array($planAudit), 'dry-run mutation plan includes audit');
+    hecAssert(
+        !array_key_exists('created_at', $planAudit) && !array_key_exists('timestamp', $planAudit),
+        'hashed audit plan omits volatile created_at/timestamp'
+    );
+    echo 'DRY_RUN_A_CHECKSUM=' . (string) $dryA['dry_run_checksum'] . PHP_EOL;
+    echo 'DRY_RUN_B_CHECKSUM=' . (string) $dryB['dry_run_checksum'] . PHP_EOL;
+
+    // APPLY recomputes dry-run after further clock drift; prior checksum must still authorize.
+    RetentionClock::setOverride(new DateTimeImmutable('2026-09-08T01:00:00+00:00'));
+    $applyOk = PersonelLifecycleBulkApplyService::apply(
+        $pdo,
+        $gm,
+        $request,
+        $correctionRows,
+        (string) $dryA['dry_run_checksum'],
+        (string) $dryA['preimage_checksum'],
+        $deployedSha
+    );
+    hecAssert(
+        (int) ($applyOk['applied_count'] ?? 0) === 1 && (int) ($applyOk['failed_count'] ?? 1) === 0,
+        'apply-time recompute accepts prior dry-run checksum'
+    );
+    hecAssert(
+        (string) $pdo->query('SELECT baslangic_tarihi FROM surecler WHERE id = 90')->fetchColumn() === '2025-12-31'
+            && (string) $pdo->query('SELECT bitis_tarihi FROM surecler WHERE id = 90')->fetchColumn() === '2025-12-31',
+        'bulk apply correction mutates surec 90'
+    );
+    $bulkAudit = $pdo->query(
+        'SELECT * FROM personel_historical_exit_date_correction_auditleri WHERE surec_id = 90 ORDER BY id DESC LIMIT 1'
+    )->fetch(PDO::FETCH_ASSOC);
+    hecAssert(is_array($bulkAudit), 'bulk apply durable audit row exists');
+    hecAssert(
+        trim((string) ($bulkAudit['created_at'] ?? '')) !== '',
+        'durable audit created_at populated by DB default'
+    );
+    hecAssert(
+        (string) ($bulkAudit['mutation_id'] ?? '') === 'mg-historical-exit-date-correction-checksum-7'
+            && (int) ($bulkAudit['actor_user_id'] ?? 0) === 99
+            && (string) ($bulkAudit['old_baslangic_tarihi'] ?? '') === '2026-07-30'
+            && (string) ($bulkAudit['new_baslangic_tarihi'] ?? '') === '2025-12-31'
+            && (string) ($bulkAudit['old_aciklama'] ?? '') === 'İşveren feshi',
+        'bulk apply audit persists mutation/actor/dates/old_aciklama'
+    );
+    hecAssert(
+        (string) $pdo->query('SELECT aciklama FROM surecler WHERE id = 90')->fetchColumn() === 'İşveren feshi',
+        'bulk apply preserves original surec aciklama'
+    );
+    RetentionClock::clearOverride();
+
+    // Genuine stale preimage still fails closed after dry-run.
+    $staleRows = [[
+        'mutation_id' => 'mg-historical-exit-date-correction-stale-8',
+        'operation_type' => PersonelLifecycleBulkRowContract::OP_HISTORICAL_EXIT_DATE_CORRECTION,
+        'personel_id' => 8,
+        'payload' => [
+            'surec_id' => 91,
+            'expected_old_exit_date' => '2026-07-30',
+            'exit_date' => '2025-12-31',
+            'aciklama' => 'stale preimage probe',
+        ],
+    ]];
+    $dryStale = PersonelLifecycleBulkDryRunService::dryRun(
+        $pdo,
+        $gm,
+        $request,
+        $staleRows,
+        null,
+        $deployedSha
+    );
+    hecAssert(($dryStale['can_apply'] ?? false) === true, 'stale-preimage probe dry-run ready');
+    $pdo->exec("UPDATE surecler SET bitis_tarihi = '2026-08-15' WHERE id = 91");
+    $staleBlocked = false;
+    try {
+        PersonelLifecycleBulkApplyService::apply(
+            $pdo,
+            $gm,
+            $request,
+            $staleRows,
+            (string) $dryStale['dry_run_checksum'],
+            (string) $dryStale['preimage_checksum'],
+            $deployedSha
+        );
+    } catch (PersonelImportException $e) {
+        $staleBlocked = in_array($e->getCodeString(), ['DRY_RUN_STALE', 'PREIMAGE_STALE', 'CANNOT_APPLY'], true);
+    }
+    hecAssert($staleBlocked, 'genuine stale preimage rejected by checksum/can_apply gate');
+    hecAssert(
+        (string) $pdo->query('SELECT baslangic_tarihi FROM surecler WHERE id = 91')->fetchColumn() === '2026-07-30',
+        'stale reject leaves surec 91 unmutated'
+    );
+
+    // Mutation-relevant aciklama/preimage drift also invalidates prior checksum.
+    $pdo->exec("UPDATE surecler SET bitis_tarihi = '2026-07-30', aciklama = 'Mutated aciklama' WHERE id = 91");
+    $driftBlocked = false;
+    try {
+        PersonelLifecycleBulkApplyService::apply(
+            $pdo,
+            $gm,
+            $request,
+            $staleRows,
+            (string) $dryStale['dry_run_checksum'],
+            (string) $dryStale['preimage_checksum'],
+            $deployedSha
+        );
+    } catch (PersonelImportException $e) {
+        $driftBlocked = in_array($e->getCodeString(), ['DRY_RUN_STALE', 'PREIMAGE_STALE', 'CANNOT_APPLY'], true);
+    }
+    hecAssert($driftBlocked, 'aciklama/preimage drift rejects prior checksum');
+    $pdo->exec("UPDATE surecler SET aciklama = 'İşveren feshi' WHERE id = 91");
 
     // old baslangic + old bitis => READY
     $plan = PersonelHistoricalExitDateCorrectionService::plan(
@@ -259,6 +451,10 @@ try {
         'SELECT * FROM personel_historical_exit_date_correction_auditleri WHERE surec_id = 38 ORDER BY id DESC LIMIT 1'
     )->fetch(PDO::FETCH_ASSOC);
     hecAssert(is_array($auditRow), 'durable audit persisted');
+    hecAssert(
+        trim((string) ($auditRow['created_at'] ?? '')) !== '',
+        'direct-apply durable audit created_at populated'
+    );
     hecAssert(
         (string) ($auditRow['operation_type'] ?? '') === 'HISTORICAL_EXIT_DATE_CORRECTION'
             && (string) ($auditRow['mutation_id'] ?? '') === 'mg-historical-exit-date-correction-202'

@@ -24,6 +24,17 @@ describe("Personel HISTORICAL_EXIT_DATE_CORRECTION MariaDB runtime", () => {
     }
     expect(result.stdout).toContain("ALL_PASS PersonelHistoricalExitDateCorrectionMysqlTestRunner");
     for (const marker of [
+      "DRY_RUN_A.can_apply = true",
+      "DRY_RUN_B.can_apply = true",
+      "consecutive correction dry-runs share preimage_checksum",
+      "consecutive correction dry-runs share dry_run_checksum",
+      "hashed audit plan omits volatile created_at/timestamp",
+      "apply-time recompute accepts prior dry-run checksum",
+      "durable audit created_at populated by DB default",
+      "bulk apply audit persists mutation/actor/dates/old_aciklama",
+      "bulk apply preserves original surec aciklama",
+      "genuine stale preimage rejected by checksum/can_apply gate",
+      "aciklama/preimage drift rejects prior checksum",
       "old baslangic + old bitis => READY",
       "old baslangic + wrong bitis => FAIL",
       "wrong baslangic + old bitis => FAIL",
@@ -31,6 +42,7 @@ describe("Personel HISTORICAL_EXIT_DATE_CORRECTION MariaDB runtime", () => {
       "PASIF remains PASIF",
       "original İşveren feshi preserved",
       "durable audit persisted",
+      "direct-apply durable audit created_at populated",
       "audit contains mutation_id + actor + old/new + old_aciklama",
       "resolveTerminationDate = corrected HR date",
       "corrected lifecycle manifest becomes current",
@@ -48,5 +60,11 @@ describe("Personel HISTORICAL_EXIT_DATE_CORRECTION MariaDB runtime", () => {
     ]) {
       expect(result.stdout, marker).toContain(`[PASS] ${marker}`);
     }
+    expect(result.stdout).toMatch(/DRY_RUN_A_CHECKSUM=[a-f0-9]{64}/);
+    expect(result.stdout).toMatch(/DRY_RUN_B_CHECKSUM=[a-f0-9]{64}/);
+    const aMatch = String(result.stdout).match(/DRY_RUN_A_CHECKSUM=([a-f0-9]{64})/);
+    const bMatch = String(result.stdout).match(/DRY_RUN_B_CHECKSUM=([a-f0-9]{64})/);
+    expect(aMatch?.[1]).toBeTruthy();
+    expect(aMatch?.[1]).toBe(bMatch?.[1]);
   });
 });

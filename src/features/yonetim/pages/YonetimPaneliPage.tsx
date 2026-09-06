@@ -8,7 +8,7 @@ import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
 import { isApiRequestError } from "../../../api/api-client";
 import { fetchPersonellerList } from "../../../api/personeller.api";
-import { createDepartmanOption, fetchBirimOptions, fetchBolumOptions, fetchDepartmanOptions } from "../../../api/referans.api";
+import { createDepartmanOption, fetchBirimOptions, fetchBolumOptions, fetchDepartmanOptions, fetchSgkIsverenCatalog } from "../../../api/referans.api";
 import { createSurec, type CreateSurecPayload } from "../../../api/surecler.api";
 import {
   createSirketSube,
@@ -590,6 +590,8 @@ export function YonetimPaneliPage() {
   const [departmanOptions, setDepartmanOptions] = useState<IdOption[]>([]);
   const [bolumOptions, setBolumOptions] = useState<IdOption[]>([]);
   const [birimOptions, setBirimOptions] = useState<IdOption[]>([]);
+  // Full SGK catalog for user-scope grants — never derived from subeler.sgk_isveren defaults.
+  const [sgkIsverenOptions, setSgkIsverenOptions] = useState<YonetimOrgRelation[]>([]);
 
   const [editingKullaniciId, setEditingKullaniciId] = useState<number | null>(null);
   const [editingSubeId, setEditingSubeId] = useState<number | null>(null);
@@ -625,15 +627,6 @@ export function YonetimPaneliPage() {
 
   // Scope summaries are a shared surface, so they use the company-qualified name.
   const subeNameMap = useMemo(() => new Map(subeler.map((sube) => [sube.id, sube.tam_ad])), [subeler]);
-  const sgkIsverenOptions = useMemo(() => {
-    const map = new Map<number, YonetimOrgRelation>();
-    for (const sube of subeler) {
-      if (sube.sgk_isveren) {
-        map.set(sube.sgk_isveren.id, sube.sgk_isveren);
-      }
-    }
-    return Array.from(map.values()).sort((left, right) => left.ad.localeCompare(right.ad, "tr"));
-  }, [subeler]);
   const effectiveVarsayilanSubeIds = useMemo(() => {
     const ids = new Set(kullaniciForm.subeIds);
     for (const sube of subeler) {
@@ -747,6 +740,17 @@ export function YonetimPaneliPage() {
 
       setKullanicilar(kullaniciList);
       setSubeler(subeList);
+      // SGK scope catalog is best-effort: org-location schema may be absent on legacy backends.
+      try {
+        const sgkCatalog = await fetchSgkIsverenCatalog();
+        setSgkIsverenOptions(
+          sgkCatalog
+            .map((item) => ({ id: item.id, ad: item.ad, kod: item.kod }))
+            .sort((left, right) => left.ad.localeCompare(right.ad, "tr"))
+        );
+      } catch {
+        setSgkIsverenOptions([]);
+      }
       // Readiness and the company list are best-effort: on a pre-migration
       // backend the panel must still render the legacy flat branch UI.
       let readinessState: OrganizasyonReadiness | null = null;

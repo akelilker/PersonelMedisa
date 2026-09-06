@@ -18,7 +18,8 @@ function getObjectLabel(item: Record<string, unknown>) {
 }
 
 function readOptionalKisaKod(item: Record<string, unknown>): string | null {
-  const raw = item.kisa_kod ?? item.kisaKod;
+  // Pack6 refs use kisa_kod; SGK işveren / çalışma lokasyonu catalogs use kod.
+  const raw = item.kisa_kod ?? item.kisaKod ?? item.kod;
   if (typeof raw !== "string") {
     return null;
   }
@@ -204,10 +205,52 @@ export async function fetchSgkIsverenOptions(): Promise<IdOption[]> {
   }
 }
 
+/** Full SGK employer catalog for scope grants — not branch-default attachments. */
+export async function fetchSgkIsverenCatalog(): Promise<
+  Array<{ id: number; ad: string; kod: string | null; sirketId: number | null }>
+> {
+  try {
+    const response = await apiRequest<ApiResponse<unknown>>(endpoints.referans.sgkIsverenler);
+    const entries = extractListItems<unknown>(response.data);
+    const normalizedEntries =
+      entries.length > 0 ? entries : typeof response.data === "object" && response.data !== null ? [response.data] : [];
+    return normalizedEntries
+      .map((entry) => {
+        if (typeof entry !== "object" || entry === null) {
+          return null;
+        }
+        const item = entry as Record<string, unknown>;
+        const id = typeof item.id === "number" ? item.id : Number.parseInt(String(item.id ?? ""), 10);
+        if (!Number.isFinite(id) || id <= 0) {
+          return null;
+        }
+        const adRaw = typeof item.ad === "string" ? item.ad.trim() : "";
+        if (!adRaw) {
+          return null;
+        }
+        const kod = readOptionalKisaKod(item);
+        const rawSirket = item.sirket_id ?? item.sirketId;
+        let sirketId: number | null = null;
+        if (rawSirket !== undefined && rawSirket !== null && rawSirket !== "") {
+          const parsed =
+            typeof rawSirket === "number" ? rawSirket : Number.parseInt(String(rawSirket), 10);
+          if (Number.isFinite(parsed) && parsed > 0) {
+            sirketId = parsed;
+          }
+        }
+        return { id, ad: adRaw, kod, sirketId };
+      })
+      .filter((item): item is { id: number; ad: string; kod: string | null; sirketId: number | null } => item !== null);
+  } catch {
+    return [];
+  }
+}
+
 export async function fetchCalismaLokasyonuOptions(): Promise<IdOption[]> {
   try {
     const response = await apiRequest<ApiResponse<unknown>>(endpoints.referans.calismaLokasyonlari);
-    return normalizeIdOptions(response.data);
+    // parentId = catalog parent branch (calisma_lokasyonlari.sube_id); independent of personel.sube_id.
+    return normalizeIdOptions(response.data, "sube_id");
   } catch {
     return [];
   }

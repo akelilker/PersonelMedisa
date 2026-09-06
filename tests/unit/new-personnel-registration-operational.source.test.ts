@@ -96,7 +96,7 @@ describe("new personnel registration operational close", () => {
     expect(workspace).toContain("sirketId: sube.sirket?.id ?? null");
 
     const referans = read("api/src/Controllers/ReferansController.php");
-    expect(referans).toContain("SELECT id, ad, sirket_id FROM sgk_isverenler");
+    expect(referans).toContain("SELECT id, kod, ad, sirket_id FROM sgk_isverenler");
 
     const createService = read("api/src/Services/Personel/PersonelCreateService.php");
     expect(createService).toContain("validateCreateReferences");

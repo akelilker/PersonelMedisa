@@ -419,8 +419,9 @@ class ReferansController
             );
         }
 
+        // Catalog axis (not branch default): id/ad/kod + optional company parent.
         $stmt = $pdo->query(
-            "SELECT id, ad, sirket_id FROM sgk_isverenler WHERE durum = 'AKTIF' ORDER BY ad ASC, id ASC"
+            "SELECT id, kod, ad, sirket_id FROM sgk_isverenler WHERE durum = 'AKTIF' ORDER BY ad ASC, id ASC"
         );
         $rows = $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
         $items = [];
@@ -428,8 +429,10 @@ class ReferansController
             $sirketId = isset($row['sirket_id']) && $row['sirket_id'] !== null && $row['sirket_id'] !== ''
                 ? (int) $row['sirket_id']
                 : null;
+            $kod = isset($row['kod']) && is_string($row['kod']) ? trim($row['kod']) : '';
             $items[] = [
                 'id' => (int) $row['id'],
+                'kod' => $kod !== '' ? $kod : null,
                 'ad' => (string) $row['ad'],
                 'sirket_id' => $sirketId !== null && $sirketId > 0 ? $sirketId : null,
             ];
@@ -456,15 +459,22 @@ class ReferansController
             );
         }
 
+        // Catalog parentage (sube_id) is metadata only — not personel.sube_id and not an auth axis.
         $stmt = $pdo->query(
-            "SELECT id, ad FROM calisma_lokasyonlari WHERE durum = 'AKTIF' ORDER BY ad ASC, id ASC"
+            "SELECT id, kod, ad, sube_id FROM calisma_lokasyonlari WHERE durum = 'AKTIF' ORDER BY ad ASC, id ASC"
         );
         $rows = $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
         $items = [];
         foreach ($rows as $row) {
+            $subeId = isset($row['sube_id']) && $row['sube_id'] !== null && $row['sube_id'] !== ''
+                ? (int) $row['sube_id']
+                : null;
+            $kod = isset($row['kod']) && is_string($row['kod']) ? trim($row['kod']) : '';
             $items[] = [
                 'id' => (int) $row['id'],
+                'kod' => $kod !== '' ? $kod : null,
                 'ad' => (string) $row['ad'],
+                'sube_id' => $subeId !== null && $subeId > 0 ? $subeId : null,
             ];
         }
 

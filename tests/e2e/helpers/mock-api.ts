@@ -5640,8 +5640,8 @@ let personelBelgeKaydiIdCounter = 903;
         200,
         okBody({
           items: [
-            { id: 1, ad: "Fabrika" },
-            { id: 2, ad: "Ankara Ofis" }
+            { id: 1, kod: "FAB", ad: "Fabrika", sube_id: 1 },
+            { id: 2, kod: "ANK", ad: "Ankara Ofis", sube_id: 2 }
           ]
         })
       );

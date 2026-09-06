@@ -6018,8 +6018,8 @@ export function resolveDemoApiResponse(
   if (pathname === "/referans/calisma-lokasyonlari" && method === "GET") {
     return ok({
       items: [
-        { id: 1, ad: "Fabrika" },
-        { id: 2, ad: "Ankara Ofis" }
+        { id: 1, kod: "FAB", ad: "Fabrika", sube_id: 1 },
+        { id: 2, kod: "ANK", ad: "Ankara Ofis", sube_id: 2 }
       ]
     });
   }
@@ -9985,9 +9985,9 @@ export function resolveDemoApiResponse(
 
     if (pathname === "/referans/sgk-isverenler") {
       return ok([
-        { id: 1, ad: "Medisa", sirket_id: 1 },
-        { id: 2, ad: "Karyapı", sirket_id: 2 },
-        { id: 3, ad: "Şenay Mobilya", sirket_id: 1 }
+        { id: 1, kod: "MED", ad: "Medisa", sirket_id: 1 },
+        { id: 2, kod: "KAR", ad: "Karyapı", sirket_id: 2 },
+        { id: 3, kod: "SEN", ad: "Şenay Mobilya", sirket_id: 1 }
       ]);
     }
 

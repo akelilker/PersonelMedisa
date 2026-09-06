@@ -67,10 +67,50 @@ describe("branch accounting visibility owners", () => {
       karabuk_factory_model: string;
       duplicate_branch_created: boolean;
       work_location_targets: Array<{ calisma_lokasyonu_id: number; target_sube_id: number }>;
+      muhasebe_user_subeler_targets: {
+        username: string;
+        current_sube_ids: number[];
+        target_sube_ids: number[];
+        KEEP: number[];
+        ADD: number[];
+        REMOVE: number[];
+      };
+      production_state_pins: {
+        PRODUCTION_MIGRATION_TIP: string;
+        PRODUCTION_MIGRATION_PENDING: number;
+      };
+      production_mutation: number;
     };
     expect(parsed.duplicate_branch_created).toBe(false);
     expect(parsed.karabuk_factory_model).toContain("Fabrika");
     expect(parsed.work_location_targets.find((row) => row.calisma_lokasyonu_id === 5)?.target_sube_id).toBe(1);
     expect(plan).not.toMatch(/create.*Karabük.*şube/i);
+    expect(parsed.production_mutation).toBe(0);
+    expect(parsed.production_state_pins.PRODUCTION_MIGRATION_TIP).toBe("086");
+    expect(parsed.production_state_pins.PRODUCTION_MIGRATION_PENDING).toBe(1);
+    expect(parsed.muhasebe_user_subeler_targets.username).toBe("muhasebe");
+    expect(parsed.muhasebe_user_subeler_targets.current_sube_ids).toEqual([1, 2]);
+    expect(parsed.muhasebe_user_subeler_targets.target_sube_ids).toEqual([1, 2, 4, 5, 6, 12, 13]);
+    expect(parsed.muhasebe_user_subeler_targets.KEEP).toEqual([1, 2]);
+    expect(parsed.muhasebe_user_subeler_targets.ADD).toEqual([4, 5, 6, 12, 13]);
+    expect(parsed.muhasebe_user_subeler_targets.REMOVE).toEqual([]);
+  });
+
+  it("pins CURRENT_STATE + registry to prod tip 086 with only 087 pending", () => {
+    const current = read("CURRENT_STATE.md");
+    const registry = read("docs/guncel/110-master-closure-gap-registry.md");
+    expect(current).toMatch(/^CODE_MIGRATION_TIP: 087$/m);
+    expect(current).toMatch(/^PRODUCTION_MIGRATION_TIP: 086$/m);
+    expect(current).toMatch(/^PRODUCTION_MIGRATION_PENDING: 1$/m);
+    expect(current).toMatch(
+      /^PRODUCTION_DEPLOY_SHA: 07dd060ee2b473cd1292566a29990c59538c92c5$/m
+    );
+    expect(registry).toMatch(/^CODE_MIGRATION_TIP: 087$/m);
+    expect(registry).toMatch(/^PRODUCTION_MIGRATION_TIP: 086$/m);
+    expect(registry).toContain("| Migration 085 | **APPLIED** |");
+    expect(registry).toContain("| Migration 086 | **APPLIED** |");
+    expect(registry).toContain("| Migration 087 | **CODE_ONLY / UNAPPLIED** |");
+    expect(registry).toContain("**PASS @ 086**");
+    expect(registry).toContain("pending code tip `087` only");
   });
 });

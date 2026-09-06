@@ -1,5 +1,5 @@
 CODE_MIGRATION_TIP: 087
-PRODUCTION_MIGRATION_TIP: 084
+PRODUCTION_MIGRATION_TIP: 086
 
 # 110 — Canonical Closure / Gap Registry
 
@@ -11,16 +11,16 @@ PRODUCTION_MIGRATION_TIP: 084
 
 | Alan | Değer | Kanıt / sınır |
 | --- | --- | --- |
-| CODE_MIGRATION_TIP | **087** | Repodaki son migration: `087_sube_muhasebe_yetkilileri.sql` — şube bazlı muhasebe görünürlük ACL (`sube_muhasebe_yetkilileri`); relation presence = restriction enabled; additive, data write/backfill yok; idempotent; production'a henüz uygulanmadı. Bir önceki tip: `086_personel_historical_exit_date_correction_auditleri.sql`. Kod, production şema tip `084` ile geriye uyumlu |
-| PRODUCTION_MIGRATION_TIP | **084** | 084 production'a uygulandı (apply run `33897212291`). Tip `085`+`086`+`087` yalnız repo/code'da; production apply **YOK** (ayrı onay gerekir). Additive/backward-compatible; data backfill yok. Production tip `084` kalır ta ki round açıkça uygulanana kadar |
+| CODE_MIGRATION_TIP | **087** | Repodaki son migration: `087_sube_muhasebe_yetkilileri.sql` — şube bazlı muhasebe görünürlük ACL (`sube_muhasebe_yetkilileri`); relation presence = restriction enabled; additive, data write/backfill yok; idempotent; production'a henüz uygulanmadı. Bir önceki tip: `086_personel_historical_exit_date_correction_auditleri.sql`. Kod, production şema tip `086` ile geriye uyumlu |
+| PRODUCTION_MIGRATION_TIP | **086** | 085 + 086 production'a uygulandı (086 apply run `33993971923`). Tip `087` yalnız repo/code'da; production apply **YOK** (ayrı onay gerekir). Additive/backward-compatible; data backfill yok. Production tip `086` kalır ta ki 087 açıkça uygulanana kadar |
 | Migration 084 | **APPLIED** | Dosya: `api/migrations/084_gunluk_bildirim_tamamlama_header_summary.sql`. Durum: production applied |
-| Migration 085 | **CODE_ONLY / UNAPPLIED** | Dosya: `api/migrations/085_gunluk_bildirim_duzeltme_auditleri.sql`. Durum: code/repo migration mevcut; production henüz uygulanmadı; additive/backward-compatible; no data backfill; production apply ayrı onay gerektirir |
-| Migration 086 | **CODE_ONLY / UNAPPLIED** | Dosya: `api/migrations/086_personel_historical_exit_date_correction_auditleri.sql`. Durum: code/repo migration mevcut; production henüz uygulanmadı; additive/backward-compatible; no data backfill; production apply ayrı onay gerektirir |
+| Migration 085 | **APPLIED** | Dosya: `api/migrations/085_gunluk_bildirim_duzeltme_auditleri.sql`. Durum: production applied |
+| Migration 086 | **APPLIED** | Dosya: `api/migrations/086_personel_historical_exit_date_correction_auditleri.sql`. Durum: production applied (apply run `33993971923`) |
 | Migration 087 | **CODE_ONLY / UNAPPLIED** | Dosya: `api/migrations/087_sube_muhasebe_yetkilileri.sql`. Durum: code/repo migration mevcut; production henüz uygulanmadı; additive/backward-compatible; no data backfill; production apply ayrı onay gerektirir |
 | Organizasyon eşleme durumu | **CLOSED_CONFIRMED** | İlk production mapping uygulandı (MG-SIRKET-SUBE-PROD-MAPPING-001, apply run `33342644722`): 3 şirket, **o turda 10 şube**, 3 SGK işvereni eşlendi; postcheck PASS ve `data_ready = true`. Sonrasında Medisa’ya İzmir/Sakarya eklendi (canlı **12 şube**). 7 çalışma lokasyonu bilinçli **deferred** (`sube_id` NULL). Repo’daki mapping JSON = historical preimage; yeniden apply yok. Display owner = `SubeReadModel` (`ad` kısa, `tam_ad` türetilmiş) |
 | `MATRIX_DEVELOPMENT_BASELINE_SHA` | **`067692bba744808c06b6b7d802797c453859df53`** | Değişmez tarihsel kanıt: organizasyon eşleme apply operasyonunun pinlendiği deploy SHA'sı ve bu envanter matrix turunun geliştirme baseline'ı. "Güncel/son production SHA" iddiası **değildir**; main ilerledikçe güncellenmez. Apply yetkisi kanıtı için `MG-SIRKET-SUBE-PROD-MAPPING-001` satırındaki apply run kaydı esastır |
 | Otomatik sicil owner | **`PersonelSicilAllocator`** | `api/src/Services/Personel/PersonelSicilAllocator.php` + singleton tablo `personel_sicil_sequence` (migration 078); interaktif create'te `sicil_no` gönderilmez, backend tahsis eder |
-| Canlı migration doğrulaması | **PASS @ 084** | Production tip `084`; pending code tip `085`+`086`+`087` (unapplied; apply ayrı onay) |
+| Canlı migration doğrulaması | **PASS @ 086** | Production tip `086`; pending code tip `087` only (unapplied; apply ayrı onay) |
 
 ## Durum sözlüğü
 

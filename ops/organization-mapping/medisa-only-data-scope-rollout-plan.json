@@ -7,7 +7,13 @@
     "generated_at": "2026-08-31T21:15:03Z",
     "deployed_sha_at_inventory": "201286af5f275202062345594cc20472b62304f7",
     "inventory_checksum": "9e1a7a14fd98cbba53a46008e8bd9428eea7ca5014bd49ab42de828b8dd7fc5d",
-    "note": "Fresh live re-read required before any apply; username-level grant rows are NOT in this inventory."
+    "note": "Aggregate inventory; username-level grants resolved separately via READ-ONLY /yonetim/kullanicilar."
+  },
+  "exact_user_scope_read": {
+    "mode": "READ_ONLY_API_YONETIM_KULLANICILAR",
+    "generated_at": "2026-09-06T09:36:58.283Z",
+    "actor_user_id": 10,
+    "mutation": 0
   },
   "karabuk_factory_model": "Fabrika = Medisa Karabük branch (sube_id=1, kod=MRK); Karabük = work location (calisma_lokasyonu_id=5). Axes are independent.",
   "duplicate_branch_created": false,
@@ -34,9 +40,9 @@
   "user_sirketler_targets": {
     "live_total_rows": 0,
     "rows": [
-      { "username": "sedanurB", "sirket_id": 1, "action": "ADD" },
-      { "username": "zeynepG", "sirket_id": 1, "action": "ADD" },
-      { "username": "muhasebe", "sirket_id": 1, "action": "ADD" },
+      { "username": "sedanurB", "current": [], "target": [1], "KEEP": [], "ADD": [1], "REMOVE": [], "action": "ADD" },
+      { "username": "zeynepG", "current": [], "target": [1], "KEEP": [], "ADD": [1], "REMOVE": [], "action": "ADD" },
+      { "username": "muhasebe", "current": [], "target": [1], "KEEP": [], "ADD": [1], "REMOVE": [], "action": "ADD" },
       { "username": "ilkerA", "action": "KEEP_NONE_NO_EXPLICIT_GRANT" },
       { "username": "serhan.kose", "action": "KEEP_NONE_NO_EXPLICIT_GRANT" },
       { "username": "ilker.akel", "action": "NO_MUTATION_PASIF" }
@@ -46,9 +52,9 @@
   "user_sgk_isverenler_targets": {
     "live_total_rows": 0,
     "rows": [
-      { "username": "sedanurB", "sgk_isveren_id": 1, "action": "ADD" },
-      { "username": "zeynepG", "sgk_isveren_id": 1, "action": "ADD" },
-      { "username": "muhasebe", "sgk_isveren_id": 1, "action": "ADD" },
+      { "username": "sedanurB", "current": [], "target": [1], "KEEP": [], "ADD": [1], "REMOVE": [], "action": "ADD" },
+      { "username": "zeynepG", "current": [], "target": [1], "KEEP": [], "ADD": [1], "REMOVE": [], "action": "ADD" },
+      { "username": "muhasebe", "current": [], "target": [1], "KEEP": [], "ADD": [1], "REMOVE": [], "action": "ADD" },
       { "username": "ilkerA", "action": "KEEP_NONE_NO_EXPLICIT_GRANT" },
       { "username": "serhan.kose", "action": "KEEP_NONE_NO_EXPLICIT_GRANT" },
       { "username": "ilker.akel", "action": "NO_MUTATION_PASIF" }
@@ -56,28 +62,29 @@
     "remove": []
   },
   "muhasebe_user_subeler_targets": {
-    "role_assignment_count_live": 2,
+    "username": "muhasebe",
+    "user_id": 2,
+    "role": "MUHASEBE",
+    "durum": "AKTIF",
+    "current_sube_ids": [1, 2],
     "target_sube_ids": [1, 2, 4, 5, 6, 12, 13],
-    "note": "Inventory exposes MUHASEBE assignment_count=2 but not exact sube_id set per username. Exact ADD/REMOVE/KEEP requires a username-scoped live SELECT before apply.",
-    "provisional": {
-      "username": "muhasebe",
-      "target": [1, 2, 4, 5, 6, 12, 13],
-      "known_from_inventory": "exact ids UNKNOWN",
-      "branch_assignment_counts_hint": {
-        "1": 8,
-        "2": 6,
-        "4": 3,
-        "5": 2,
-        "6": 2,
-        "12": 0,
-        "13": 0
-      },
-      "action_until_live_user_rows_read": "BLOCKED_FOR_EXACT_DIFF"
-    }
+    "KEEP": [1, 2],
+    "ADD": [4, 5, 6, 12, 13],
+    "REMOVE": [],
+    "evidence": "READ-ONLY GET /yonetim/kullanicilar as AKTIF GENEL_YONETICI user_id=10 @ 2026-09-06T09:36:58.283Z; exact username muhasebe",
+    "action_until_live_user_rows_read": "RESOLVED_EXACT_DIFF_NO_APPLY"
   },
   "branch_accounting_acl_seed": {
     "default_for_medisa_rollout": "restriction DISABLED (no rows) until operators enable per branch in Şube Yönetimi",
     "production_seed_rows": []
+  },
+  "production_state_pins": {
+    "CODE_MIGRATION_TIP": "087",
+    "PRODUCTION_MIGRATION_TIP": "086",
+    "PRODUCTION_MIGRATION_PENDING": 1,
+    "PRODUCTION_DEPLOY_SHA": "07dd060ee2b473cd1292566a29990c59538c92c5",
+    "pending_migrations": ["087"],
+    "live_validation": "PASS @ 086"
   },
   "production_mutation": 0,
   "migration_apply": "NONE"

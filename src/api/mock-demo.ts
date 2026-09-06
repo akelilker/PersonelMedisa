@@ -376,6 +376,7 @@ type DemoMakineBakimKaydi = {
 
 type DemoYonetimKullanici = {
   id: number;
+  username?: string;
   ad_soyad: string;
   telefon?: string;
   kullanici_tipi: "IC_PERSONEL" | "HARICI";
@@ -396,6 +397,8 @@ type DemoSube = {
   sirket_id: number | null;
   departman_ids: number[];
   durum: "AKTIF" | "PASIF";
+  muhasebe_kisit_aktif?: boolean;
+  muhasebe_yetkili_user_ids?: number[];
 };
 
 type DemoSirket = {
@@ -4356,6 +4359,8 @@ function getSubeLabel(id: number | undefined) {
 
 function mapDemoSubeRow(item: DemoSube) {
   const sirket = demoState.sirketler.find((row) => row.id === item.sirket_id) ?? null;
+  const yetkiliIds = item.muhasebe_yetkili_user_ids ?? [];
+  const kisitAktif = Boolean(item.muhasebe_kisit_aktif) || yetkiliIds.length > 0;
 
   return {
     id: item.id,
@@ -4368,7 +4373,24 @@ function mapDemoSubeRow(item: DemoSube) {
     departman_adlari: item.departman_ids
       .map((departmanId) => getDepartmanLabel(departmanId))
       .filter((label): label is string => typeof label === "string"),
-    durum: item.durum
+    durum: item.durum,
+    muhasebe_kisit_aktif: kisitAktif,
+    muhasebe_yetkili_user_ids: kisitAktif ? yetkiliIds : [],
+    muhasebe_yetkilileri: kisitAktif
+      ? yetkiliIds.map((userId) => {
+          const user = demoState.yonetimKullanicilari.find((row) => row.id === userId);
+          const rol = user?.rol ?? "";
+          const durum = user?.durum ?? "";
+          return {
+            id: userId,
+            username: user?.username ?? "",
+            ad_soyad: user?.ad_soyad ?? "",
+            rol,
+            durum,
+            eligible: rol === "MUHASEBE" && durum === "AKTIF"
+          };
+        })
+      : []
   };
 }
 
@@ -4383,6 +4405,59 @@ function readDemoDepartmanIds(body: Record<string, unknown>): number[] | null {
   }
 
   return body.departman_ids.map((item) => toNumber(item)).filter((item): item is number => item !== null);
+}
+
+function parseDemoMuhasebeYetki(body: Record<string, unknown>): {
+  touched: boolean;
+  enabled: boolean;
+  userIds: number[];
+  error?: ReturnType<typeof demoRevizyonError>;
+} {
+  const hasFlag = body.muhasebe_kisit_aktif !== undefined;
+  const hasIds = body.muhasebe_yetkili_user_ids !== undefined;
+  if (!hasFlag && !hasIds) {
+    return { touched: false, enabled: false, userIds: [] };
+  }
+
+  const userIds = Array.isArray(body.muhasebe_yetkili_user_ids)
+    ? body.muhasebe_yetkili_user_ids
+        .map((item) => toNumber(item))
+        .filter((item): item is number => item !== null)
+    : [];
+
+  const enabled = hasFlag
+    ? body.muhasebe_kisit_aktif === true || body.muhasebe_kisit_aktif === "true" || body.muhasebe_kisit_aktif === 1
+    : userIds.length > 0;
+
+  if (!enabled) {
+    return { touched: true, enabled: false, userIds: [] };
+  }
+
+  if (userIds.length === 0) {
+    return {
+      touched: true,
+      enabled: true,
+      userIds: [],
+      error: demoRevizyonError(
+        "VALIDATION_ERROR",
+        "Muhasebe kisiti acikken en az bir muhasebe yetkilisi secilmelidir."
+      )
+    };
+  }
+
+  for (const userId of userIds) {
+    const user = demoState.yonetimKullanicilari.find((row) => row.id === userId);
+    if (!user || user.rol !== "MUHASEBE" || user.durum !== "AKTIF") {
+      return {
+        touched: true,
+        enabled: true,
+        userIds,
+        error: demoRevizyonError("VALIDATION_ERROR", "Yalniz aktif MUHASEBE kullanicilari secilebilir.")
+      };
+    }
+  }
+
+  return { touched: true, enabled: true, userIds: Array.from(new Set(userIds)) };
 }
 
 function validateDemoSubeWrite(
@@ -4415,6 +4490,11 @@ function validateDemoSubeWrite(
   if (duplicate) {
     const sirketAd = demoState.sirketler.find((item) => item.id === sirketId)?.ad ?? "Sirket";
     return demoRevizyonError("SUBE_AD_DUPLICATE", `${sirketAd} sirketinde ayni kisa adli sube zaten var.`);
+  }
+
+  const muhasebePlan = parseDemoMuhasebeYetki(body);
+  if (muhasebePlan.error) {
+    return muhasebePlan.error;
   }
 
   return null;
@@ -9563,13 +9643,16 @@ export function resolveDemoApiResponse(
       return validation;
     }
 
+    const muhasebePlan = parseDemoMuhasebeYetki(body);
     const next: DemoSube = {
       id: ++demoState.nextIds.sube,
       kod: (toStringValue(body.kod) ?? `SBE-${demoState.nextIds.sube}`).trim().toUpperCase(),
       ad: (toStringValue(body.ad) ?? "Yeni Sube").trim(),
       sirket_id: sirketId,
       departman_ids: readDemoDepartmanIds(body) ?? [],
-      durum: body.durum === "PASIF" ? "PASIF" : "AKTIF"
+      durum: body.durum === "PASIF" ? "PASIF" : "AKTIF",
+      muhasebe_kisit_aktif: muhasebePlan.touched ? muhasebePlan.enabled : false,
+      muhasebe_yetkili_user_ids: muhasebePlan.touched && muhasebePlan.enabled ? muhasebePlan.userIds : []
     };
     demoState.subeler.unshift(next);
     return ok(mapDemoSubeRow(next));
@@ -9596,9 +9679,14 @@ export function resolveDemoApiResponse(
       if (validation) {
         return validation;
       }
+      const muhasebePlan = parseDemoMuhasebeYetki(body);
       target.ad = (toStringValue(body.ad) ?? target.ad).trim();
       target.departman_ids = readDemoDepartmanIds(body) ?? target.departman_ids;
       target.durum = body.durum === "PASIF" ? "PASIF" : "AKTIF";
+      if (muhasebePlan.touched) {
+        target.muhasebe_kisit_aktif = muhasebePlan.enabled;
+        target.muhasebe_yetkili_user_ids = muhasebePlan.enabled ? muhasebePlan.userIds : [];
+      }
       return ok(mapDemoSubeRow(target));
     }
 
@@ -9619,6 +9707,10 @@ export function resolveDemoApiResponse(
   }
 
   if (pathname === "/yonetim/subeler" && method === "POST") {
+    const muhasebePlan = parseDemoMuhasebeYetki(body);
+    if (muhasebePlan.error) {
+      return muhasebePlan.error;
+    }
     const next: DemoSube = {
       id: ++demoState.nextIds.sube,
       kod: toStringValue(body.kod) ?? `SBE-${demoState.nextIds.sube}`,
@@ -9629,7 +9721,9 @@ export function resolveDemoApiResponse(
             .map((item) => toNumber(item))
             .filter((item): item is number => item !== null)
         : [],
-      durum: body.durum === "PASIF" ? "PASIF" : "AKTIF"
+      durum: body.durum === "PASIF" ? "PASIF" : "AKTIF",
+      muhasebe_kisit_aktif: muhasebePlan.touched ? muhasebePlan.enabled : false,
+      muhasebe_yetkili_user_ids: muhasebePlan.touched && muhasebePlan.enabled ? muhasebePlan.userIds : []
     };
     demoState.subeler.unshift(next);
     return ok(mapDemoSubeRow(next));
@@ -9643,6 +9737,11 @@ export function resolveDemoApiResponse(
       return null;
     }
 
+    const muhasebePlan = parseDemoMuhasebeYetki(body);
+    if (muhasebePlan.error) {
+      return muhasebePlan.error;
+    }
+
     Object.assign(target, {
       kod: toStringValue(body.kod) ?? target.kod,
       ad: toStringValue(body.ad) ?? target.ad,
@@ -9653,6 +9752,10 @@ export function resolveDemoApiResponse(
         : target.departman_ids,
       durum: body.durum === "PASIF" ? "PASIF" : "AKTIF"
     });
+    if (muhasebePlan.touched) {
+      target.muhasebe_kisit_aktif = muhasebePlan.enabled;
+      target.muhasebe_yetkili_user_ids = muhasebePlan.enabled ? muhasebePlan.userIds : [];
+    }
     return ok(mapDemoSubeRow(target));
   }
 

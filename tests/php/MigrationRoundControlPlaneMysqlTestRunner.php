@@ -3,10 +3,10 @@
 declare(strict_types=1);
 
 /**
- * Canonical migration round 085–086 — DB-backed acceptance against a real MariaDB.
+ * Canonical migration round 085–087 — DB-backed acceptance against a real MariaDB.
  *
- * Production preimage: tip 084 with 085+086 pending. Setup applies 080–084 from
- * real files; subjects under test are 085 then 086.
+ * Production preimage: tip 084 with 085+086+087 pending. Setup applies 080–084 from
+ * real files; subjects under test are 085 then 086 then 087.
  *
  * Nothing here touches production.
  *
@@ -23,8 +23,10 @@ use Medisa\Api\Database\MigrationSourceProvider;
 
 const MRC_MIGRATION_085 = '085_gunluk_bildirim_duzeltme_auditleri.sql';
 const MRC_MIGRATION_086 = '086_personel_historical_exit_date_correction_auditleri.sql';
+const MRC_MIGRATION_087 = '087_sube_muhasebe_yetkilileri.sql';
 const MRC_AUTHORIZED_CHECKSUM = '8918827085503147024e5b2fa51c0374a054f24660e618ac562da8d00bcf4be7';
 const MRC_AUTHORIZED_CHECKSUM_086 = 'e8effb50b17319acb9deaa5e4b8fca8257c7d4850648953f998b5bf0232012c5';
+const MRC_AUTHORIZED_CHECKSUM_087 = 'f9affaf648d869c5c192fba95f8f0014f53e9f71ca482e335125a4ce3951962f';
 
 /** Audit owners the completed 080–084 rounds left behind (084 added no audit table). */
 const MRC_PREDECESSOR_AUDIT_TABLES = [
@@ -324,7 +326,7 @@ $root->exec('CREATE DATABASE `' . $db . '` CHARACTER SET utf8mb4 COLLATE utf8mb4
 $apiDirectory = dirname(__DIR__, 2) . '/api';
 $filesystemSource = new FilesystemMigrationSourceProvider($apiDirectory . '/migrations');
 $sourceThrough084 = new MrcChainThrough($filesystemSource, 84);
-$source = new MrcChainThrough($filesystemSource, 86);
+$source = new MrcChainThrough($filesystemSource, 87);
 $deployedSha = str_repeat('b', 40);
 
 try {
@@ -347,15 +349,15 @@ try {
     $baselineRoles = mrcRoleValues($pdo);
 
     // -----------------------------------------------------------------
-    // 1) tip 084, 085+086 pending → apply ready
+    // 1) tip 084, 085+086+087 pending → apply ready
     // -----------------------------------------------------------------
     $report = MigrationPreflightReport::collect($pdo, $source, $deployedSha);
-    mrcAssert($report['result'] === 'PASS', 'a production tip 084 database is apply-ready for the 085-086 round');
+    mrcAssert($report['result'] === 'PASS', 'a production tip 084 database is apply-ready for the 085-087 round');
     mrcAssert($report['ledger']['applied_tip'] === '084', 'preflight reports production tip 084');
-    mrcAssert($report['bundle']['code_tip'] === '086', 'preflight reports code tip 086');
+    mrcAssert($report['bundle']['code_tip'] === '087', 'preflight reports code tip 087');
     mrcAssert(
-        $report['ledger']['pending_names'] === [MRC_MIGRATION_085, MRC_MIGRATION_086],
-        '085 and 086 are pending before the apply'
+        $report['ledger']['pending_names'] === [MRC_MIGRATION_085, MRC_MIGRATION_086, MRC_MIGRATION_087],
+        '085, 086 and 087 are pending before the apply'
     );
     mrcAssert(
         $report['bundle']['next_pending_name'] === MRC_MIGRATION_085,
@@ -383,7 +385,7 @@ try {
 
     $ledger = MigrationExecutionService::ledgerFacts($pdo, $source);
     mrcAssert($ledger['tip'] === '085', 'production tip is 085 after the apply');
-    mrcAssert($ledger['pending_versions'] === ['086'], '086 remains pending after 085');
+    mrcAssert($ledger['pending_versions'] === ['086', '087'], '086 and 087 remain pending after 085');
     mrcAssert(
         mrcTableExists($pdo, 'gunluk_bildirim_duzeltme_auditleri'),
         '085 created the correction audit owner'
@@ -406,7 +408,7 @@ try {
     // 3) Apply exactly 086
     // -----------------------------------------------------------------
     $midReport = MigrationPreflightReport::collect($pdo, $source, $deployedSha);
-    mrcAssert($midReport['result'] === 'PASS', 'tip 085 with 086 pending remains apply-ready');
+    mrcAssert($midReport['result'] === 'PASS', 'tip 085 with 086+087 pending remains apply-ready');
     mrcAssert(
         $midReport['bundle']['expected_pending_checksum'] === MRC_AUTHORIZED_CHECKSUM_086,
         'preflight resolves the pending 086 checksum'
@@ -416,7 +418,7 @@ try {
     mrcAssert($applied086['pending'] === ['086'], 'a targeted request applies exactly 086');
     $ledger086 = MigrationExecutionService::ledgerFacts($pdo, $source);
     mrcAssert($ledger086['tip'] === '086', 'production tip is 086 after the apply');
-    mrcAssert($ledger086['pending_versions'] === [], 'no migration is left pending');
+    mrcAssert($ledger086['pending_versions'] === ['087'], '087 remains pending after 086');
     mrcAssert(
         mrcTableExists($pdo, 'personel_historical_exit_date_correction_auditleri'),
         '086 created the historical exit correction audit owner'
@@ -432,7 +434,28 @@ try {
     mrcAssert($baselineCounts === mrcBusinessCounts($pdo), '086 wrote no business row');
 
     // -----------------------------------------------------------------
-    // 4) tip 086, pending 0 → round complete
+    // 4) Apply exactly 087
+    // -----------------------------------------------------------------
+    $mid087Report = MigrationPreflightReport::collect($pdo, $source, $deployedSha);
+    mrcAssert($mid087Report['result'] === 'PASS', 'tip 086 with 087 pending remains apply-ready');
+    mrcAssert(
+        $mid087Report['bundle']['expected_pending_checksum'] === MRC_AUTHORIZED_CHECKSUM_087,
+        'preflight resolves the pending 087 checksum'
+    );
+
+    $applied087 = MigrationExecutionService::apply($pdo, $source, null, '087');
+    mrcAssert($applied087['pending'] === ['087'], 'a targeted request applies exactly 087');
+    $ledger087 = MigrationExecutionService::ledgerFacts($pdo, $source);
+    mrcAssert($ledger087['tip'] === '087', 'production tip is 087 after the apply');
+    mrcAssert($ledger087['pending_versions'] === [], 'no migration is left pending');
+    mrcAssert(
+        mrcTableExists($pdo, 'sube_muhasebe_yetkilileri'),
+        '087 created the branch accounting ACL owner'
+    );
+    mrcAssert($baselineCounts === mrcBusinessCounts($pdo), '087 wrote no business row');
+
+    // -----------------------------------------------------------------
+    // 5) tip 087, pending 0 → round complete
     // -----------------------------------------------------------------
     $doneReport = MigrationPreflightReport::collect($pdo, $source, $deployedSha);
     mrcAssert($doneReport['result'] === 'BLOCKED', 'a completed round is not apply-ready again');

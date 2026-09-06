@@ -350,6 +350,18 @@
   gap: var(--space-3);
 }
 
+.yonetim-checkbox-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  font-size: 0.92rem;
+  line-height: 1.35;
+}
+
+.yonetim-checkbox-row input[type="checkbox"] {
+  margin-top: 0.15rem;
+}
+
 .yonetim-checkbox-title {
   color: var(--text-inverse);
   font-size: 0.95rem;

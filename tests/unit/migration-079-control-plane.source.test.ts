@@ -207,6 +207,7 @@ describe('read-only preflight owner', () => {
     expect(preflightOwner).toContain("'085' => '085_gunluk_bildirim_duzeltme_auditleri.sql'");
     expect(preflightOwner).toContain(
       "'086' => '086_personel_historical_exit_date_correction_auditleri.sql'",
+      "'087' => '087_sube_muhasebe_yetkilileri.sql'",
     );
     expect(preflightOwner).toContain(`WITHDRAWN_MIGRATION_NAME = '${WITHDRAWN_NAME}'`);
     expect(preflightOwner).toContain('WITHDRAWN_079_PRESENT_IN_SOURCE');
@@ -362,7 +363,7 @@ describe('control-plane workflow gates', () => {
     expect(gateIndex).toBeGreaterThan(0);
     expect(uploadIndex).toBeGreaterThan(gateIndex);
     expect(apply).toContain(
-      'ROUND_MIGRATIONS: "085_gunluk_bildirim_duzeltme_auditleri.sql 086_personel_historical_exit_date_correction_auditleri.sql"',
+      'ROUND_MIGRATIONS: "085_gunluk_bildirim_duzeltme_auditleri.sql 086_personel_historical_exit_date_correction_auditleri.sql 087_sube_muhasebe_yetkilileri.sql"',
     );
     expect(apply).toContain('PRE_ROUND_TIP: "084"');
   });

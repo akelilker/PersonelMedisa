@@ -101,6 +101,8 @@ type SubeFormState = {
   ad: string;
   departmanIds: number[];
   durum: KayitDurumu;
+  muhasebeKisitAktif: boolean;
+  muhasebeYetkiliUserIds: number[];
 };
 
 type SirketFormState = {
@@ -146,7 +148,9 @@ const INITIAL_SUBE_FORM: SubeFormState = {
   kod: "",
   ad: "",
   departmanIds: [],
-  durum: "AKTIF"
+  durum: "AKTIF",
+  muhasebeKisitAktif: false,
+  muhasebeYetkiliUserIds: []
 };
 
 const INITIAL_SIRKET_FORM: SirketFormState = {
@@ -325,11 +329,14 @@ function userFormFromItem(item: YonetimKullanici): KullaniciFormState {
 }
 
 function subeFormFromItem(item: YonetimSube): SubeFormState {
+  const selectedIds = item.muhasebe_yetkili_user_ids ?? [];
   return {
     kod: item.kod,
     ad: item.ad,
     departmanIds: item.departman_ids,
-    durum: item.durum
+    durum: item.durum,
+    muhasebeKisitAktif: Boolean(item.muhasebe_kisit_aktif) || selectedIds.length > 0,
+    muhasebeYetkiliUserIds: selectedIds
   };
 }
 
@@ -439,11 +446,21 @@ function toSubePayload(form: SubeFormState): UpsertYonetimSubePayload {
     throw new Error("En az bir departman seçilmelidir.");
   }
 
+  // Unchecked clears ACL even if stale multi-select state remains in the form.
+  const muhasebeKisitAktif = form.muhasebeKisitAktif;
+  const muhasebeYetkiliUserIds = muhasebeKisitAktif ? form.muhasebeYetkiliUserIds : [];
+
+  if (muhasebeKisitAktif && muhasebeYetkiliUserIds.length === 0) {
+    throw new Error("Muhasebe kısıtı açıkken en az bir muhasebe yetkilisi seçilmelidir.");
+  }
+
   return {
     kod,
     ad,
     departman_ids: form.departmanIds,
-    durum: form.durum
+    durum: form.durum,
+    muhasebe_kisit_aktif: muhasebeKisitAktif,
+    muhasebe_yetkili_user_ids: muhasebeYetkiliUserIds
   };
 }
 
@@ -598,6 +615,7 @@ export function YonetimPaneliPage() {
   const [kullaniciForm, setKullaniciForm] = useState<KullaniciFormState>(INITIAL_KULLANICI_FORM);
   const [subeForm, setSubeForm] = useState<SubeFormState>(INITIAL_SUBE_FORM);
   const [yeniDepartmanAdi, setYeniDepartmanAdi] = useState("");
+  const [muhasebeYetkiliQuery, setMuhasebeYetkiliQuery] = useState("");
 
   const personelOptions = useMemo(
     () =>
@@ -683,6 +701,58 @@ export function YonetimPaneliPage() {
     [departmanOptions, subeForm.departmanIds]
   );
   const selectedDepartmanSummary = selectedDepartmanLabels.length > 0 ? selectedDepartmanLabels.join(", ") : "Departman seçimi";
+
+  const eligibleMuhasebeOptions = useMemo(() => {
+    const fromUsers = kullanicilar
+      .filter((item) => item.rol === "MUHASEBE" && item.durum === "AKTIF")
+      .map((item) => ({
+        id: item.id,
+        label: item.ad_soyad || item.username || `Kullanıcı #${item.id}`,
+        username: item.username ?? "",
+        eligible: true as boolean
+      }));
+
+    // Preserve stored-but-ineligible selections for fail-closed display.
+    const editingSube =
+      editingSubeId != null ? subeler.find((item) => item.id === editingSubeId) ?? null : null;
+    const stored = (editingSube?.muhasebe_yetkilileri ?? []).map((item) => ({
+      id: item.id,
+      label: item.ad_soyad || item.username || `Kullanıcı #${item.id}`,
+      username: item.username,
+      eligible: item.eligible
+    }));
+
+    const byId = new Map<number, { id: number; label: string; username: string; eligible: boolean }>();
+    [...fromUsers, ...stored].forEach((item) => {
+      const existing = byId.get(item.id);
+      if (!existing || (existing.eligible && !item.eligible)) {
+        byId.set(item.id, item);
+      } else if (!existing.eligible && item.eligible) {
+        byId.set(item.id, item);
+      }
+    });
+
+    return Array.from(byId.values()).sort((left, right) => left.label.localeCompare(right.label, "tr"));
+  }, [kullanicilar, editingSubeId, subeler]);
+
+  const filteredMuhasebeOptions = useMemo(() => {
+    const query = muhasebeYetkiliQuery.trim().toLocaleLowerCase("tr-TR");
+    if (!query) {
+      return eligibleMuhasebeOptions;
+    }
+    return eligibleMuhasebeOptions.filter((item) => {
+      const haystack = `${item.label} ${item.username}`.toLocaleLowerCase("tr-TR");
+      return haystack.includes(query);
+    });
+  }, [eligibleMuhasebeOptions, muhasebeYetkiliQuery]);
+
+  const selectedMuhasebeLabels = useMemo(
+    () =>
+      eligibleMuhasebeOptions
+        .filter((item) => subeForm.muhasebeYetkiliUserIds.includes(item.id))
+        .map((item) => (item.eligible ? item.label : `${item.label} (uygunsuz)`)),
+    [eligibleMuhasebeOptions, subeForm.muhasebeYetkiliUserIds]
+  );
 
   const firstLoginSummary = useMemo(() => countPersonelFirstLoginStatus(kullanicilar), [kullanicilar]);
   const filteredKullanicilar = useMemo(
@@ -813,6 +883,7 @@ export function YonetimPaneliPage() {
     setEditingSubeId(null);
     setSubeForm(INITIAL_SUBE_FORM);
     setYeniDepartmanAdi("");
+    setMuhasebeYetkiliQuery("");
     setIsDepartmanCreateOpen(false);
     setIsSubeFormOpen(false);
     setFormErrorMessage(null);
@@ -1006,6 +1077,15 @@ export function YonetimPaneliPage() {
       departmanIds: prev.departmanIds.includes(departmanId)
         ? prev.departmanIds.filter((id) => id !== departmanId)
         : [...prev.departmanIds, departmanId]
+    }));
+  }
+
+  function toggleMuhasebeYetkiliSelection(userId: number) {
+    setSubeForm((prev) => ({
+      ...prev,
+      muhasebeYetkiliUserIds: prev.muhasebeYetkiliUserIds.includes(userId)
+        ? prev.muhasebeYetkiliUserIds.filter((id) => id !== userId)
+        : [...prev.muhasebeYetkiliUserIds, userId]
     }));
   }
 
@@ -1876,6 +1956,75 @@ export function YonetimPaneliPage() {
                   ))}
                 </div>
               </div>
+            </div>
+
+            <div className="yonetim-checkbox-section" data-testid="yonetim-sube-muhasebe-kisit">
+              <label className="yonetim-checkbox-row">
+                <input
+                  type="checkbox"
+                  checked={subeForm.muhasebeKisitAktif}
+                  data-testid="yonetim-sube-muhasebe-kisit-checkbox"
+                  onChange={(event) => {
+                    const checked = event.target.checked;
+                    setSubeForm((prev) => ({
+                      ...prev,
+                      muhasebeKisitAktif: checked,
+                      muhasebeYetkiliUserIds: checked ? prev.muhasebeYetkiliUserIds : []
+                    }));
+                    if (!checked) {
+                      setMuhasebeYetkiliQuery("");
+                    }
+                  }}
+                />
+                <span>Verileri Sadece İlgili Muhasebe Yetkilileri Görebilsin.</span>
+              </label>
+
+              {subeForm.muhasebeKisitAktif ? (
+                <div className="yonetim-selection-panel" data-testid="yonetim-sube-muhasebe-yetkili-panel">
+                  <div className="yonetim-departman-section-head">
+                    <p className="yonetim-checkbox-title">Muhasebe Yetkilileri</p>
+                    <p className="yonetim-hint">
+                      {selectedMuhasebeLabels.length > 0
+                        ? `Seçili: ${selectedMuhasebeLabels.join(", ")}`
+                        : "En az bir aktif muhasebe yetkilisi seçin."}
+                    </p>
+                  </div>
+                  <input
+                    className="form-input"
+                    type="search"
+                    value={muhasebeYetkiliQuery}
+                    onChange={(event) => setMuhasebeYetkiliQuery(event.target.value)}
+                    placeholder="Muhasebe yetkilisi ara"
+                    data-testid="yonetim-sube-muhasebe-yetkili-search"
+                  />
+                  <div className="yonetim-selection-grid yonetim-selection-grid--departmanlar">
+                    {filteredMuhasebeOptions.length === 0 ? (
+                      <p className="yonetim-hint">Seçilebilir aktif muhasebe kullanıcısı yok.</p>
+                    ) : (
+                      filteredMuhasebeOptions.map((item) => (
+                        <button
+                          key={item.id}
+                          type="button"
+                          className={`yonetim-selection-pill${subeForm.muhasebeYetkiliUserIds.includes(item.id) ? " is-selected" : ""}`}
+                          data-testid={`yonetim-sube-muhasebe-yetkili-option-${item.id}`}
+                          disabled={!item.eligible && !subeForm.muhasebeYetkiliUserIds.includes(item.id)}
+                          onClick={() => {
+                            if (!item.eligible && !subeForm.muhasebeYetkiliUserIds.includes(item.id)) {
+                              return;
+                            }
+                            toggleMuhasebeYetkiliSelection(item.id);
+                          }}
+                        >
+                          <strong>
+                            {item.label}
+                            {!item.eligible ? " (uygunsuz)" : ""}
+                          </strong>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                </div>
+              ) : null}
             </div>
 
             {formErrorMessage ? (

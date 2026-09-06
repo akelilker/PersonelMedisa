@@ -234,6 +234,7 @@ describe("the control plane authorizes the 084 to 085 round and nothing else", (
     expect(preflight).toContain("'085' => '085_gunluk_bildirim_duzeltme_auditleri.sql',");
     expect(preflight).toContain(
       "'086' => '086_personel_historical_exit_date_correction_auditleri.sql',",
+      "'087' => '087_sube_muhasebe_yetkilileri.sql',",
     );
     expect(preflight).not.toContain("'084' => '085_gunluk_bildirim_duzeltme_auditleri.sql',");
   });

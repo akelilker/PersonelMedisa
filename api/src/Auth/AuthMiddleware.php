@@ -10,6 +10,7 @@ use Medisa\Api\Database\UsersSchema;
 use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
 use Medisa\Api\Scope\OrgScope;
+use Medisa\Api\Services\Organizasyon\SubeMuhasebeYetkiSchema;
 use PDO;
 
 class AuthMiddleware
@@ -105,6 +106,11 @@ class AuthMiddleware
             'sgk_isveren_ids' => $sgkIsverenIds,
             'bolum_ids' => $bolumIds,
             'birim_ids' => $birimIds,
+            // Branch accounting ACL map (restricted branches only). Empty / absent
+            // means no branch-level accountant restriction is active.
+            'sube_muhasebe_yetki_map' => $rol === 'MUHASEBE'
+                ? SubeMuhasebeYetkiSchema::loadRestrictedSubeUserMap($pdo)
+                : [],
         ];
         if (array_key_exists('actor_identity_id', $row) && $row['actor_identity_id'] !== null && $row['actor_identity_id'] !== '') {
             $aid = (int) $row['actor_identity_id'];

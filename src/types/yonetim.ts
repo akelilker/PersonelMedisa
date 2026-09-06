@@ -107,6 +107,16 @@ export type YonetimOrgRelation = {
   ad: string;
 };
 
+export type YonetimSubeMuhasebeYetkili = {
+  id: number;
+  username: string;
+  ad_soyad: string;
+  rol: string;
+  durum: string;
+  /** false when the stored ACL row survived but the user is no longer eligible. */
+  eligible: boolean;
+};
+
 export type YonetimSube = {
   id: number;
   kod: string;
@@ -123,6 +133,13 @@ export type YonetimSube = {
   departman_ids: number[];
   departman_adlari: string[];
   durum: KayitDurumu;
+  /**
+   * Branch accounting visibility. Relation presence enables the restriction;
+   * empty selected ids means unrestricted MUHASEBE grant behaviour.
+   */
+  muhasebe_kisit_aktif?: boolean;
+  muhasebe_yetkili_user_ids?: number[];
+  muhasebe_yetkilileri?: YonetimSubeMuhasebeYetkili[];
 };
 
 export type UpsertYonetimSubePayload = {
@@ -131,6 +148,8 @@ export type UpsertYonetimSubePayload = {
   departman_ids: number[];
   durum: KayitDurumu;
   sgk_isveren_id?: number | null;
+  muhasebe_kisit_aktif?: boolean;
+  muhasebe_yetkili_user_ids?: number[];
 };
 
 export type YonetimSirket = {

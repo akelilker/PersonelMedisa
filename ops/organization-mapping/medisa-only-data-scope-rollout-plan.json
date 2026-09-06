@@ -1,0 +1,91 @@
+{
+  "phase": "MEDISA_ONLY_DATA_SCOPE_AND_BRANCH_ACCOUNTING_VISIBILITY",
+  "status": "PLAN_ONLY_NO_APPLY",
+  "inventory_source": {
+    "artifact": "organization-inventory",
+    "run_id": 33440087467,
+    "generated_at": "2026-08-31T21:15:03Z",
+    "deployed_sha_at_inventory": "201286af5f275202062345594cc20472b62304f7",
+    "inventory_checksum": "9e1a7a14fd98cbba53a46008e8bd9428eea7ca5014bd49ab42de828b8dd7fc5d",
+    "note": "Aggregate inventory; username-level grants resolved separately via READ-ONLY /yonetim/kullanicilar."
+  },
+  "exact_user_scope_read": {
+    "mode": "READ_ONLY_API_YONETIM_KULLANICILAR",
+    "generated_at": "2026-09-06T09:36:58.283Z",
+    "actor_user_id": 10,
+    "mutation": 0
+  },
+  "karabuk_factory_model": "Fabrika = Medisa Karabük branch (sube_id=1, kod=MRK); Karabük = work location (calisma_lokasyonu_id=5). Axes are independent.",
+  "duplicate_branch_created": false,
+  "current_data_company": "Medisa",
+  "karyapi_rollout": "DEFERRED",
+  "senay_rollout": "DEFERRED",
+  "do_not": [
+    "create new Karabük branch",
+    "rename Fabrika",
+    "create Genel Müdürlük branch/location",
+    "map Medisa work locations to Karyapı or Şenay",
+    "touch PASIF ilker.akel",
+    "add unnecessary company/SGK grants for GENEL_YONETICI"
+  ],
+  "work_location_targets": [
+    { "calisma_lokasyonu_id": 1, "kod": "ANKARA", "target_sube_id": 5, "target_ad": "Ankara", "live_sube_id": null, "action": "ADD" },
+    { "calisma_lokasyonu_id": 2, "kod": "GIRESUN", "target_sube_id": 2, "target_ad": "Giresun", "live_sube_id": null, "action": "ADD" },
+    { "calisma_lokasyonu_id": 3, "kod": "ISTANBUL", "target_sube_id": 6, "target_ad": "İstanbul", "live_sube_id": null, "action": "ADD" },
+    { "calisma_lokasyonu_id": 4, "kod": "IZMIR", "target_sube_id": 12, "target_ad": "İzmir", "live_sube_id": null, "action": "ADD" },
+    { "calisma_lokasyonu_id": 5, "kod": "KARABUK", "target_sube_id": 1, "target_ad": "Fabrika", "live_sube_id": null, "action": "ADD" },
+    { "calisma_lokasyonu_id": 6, "kod": "KAYSERI", "target_sube_id": 4, "target_ad": "Kayseri", "live_sube_id": null, "action": "ADD" },
+    { "calisma_lokasyonu_id": 7, "kod": "SAKARYA", "target_sube_id": 13, "target_ad": "Sakarya", "live_sube_id": null, "action": "ADD" }
+  ],
+  "user_sirketler_targets": {
+    "live_total_rows": 0,
+    "rows": [
+      { "username": "sedanurB", "current": [], "target": [1], "KEEP": [], "ADD": [1], "REMOVE": [], "action": "ADD" },
+      { "username": "zeynepG", "current": [], "target": [1], "KEEP": [], "ADD": [1], "REMOVE": [], "action": "ADD" },
+      { "username": "muhasebe", "current": [], "target": [1], "KEEP": [], "ADD": [1], "REMOVE": [], "action": "ADD" },
+      { "username": "ilkerA", "action": "KEEP_NONE_NO_EXPLICIT_GRANT" },
+      { "username": "serhan.kose", "action": "KEEP_NONE_NO_EXPLICIT_GRANT" },
+      { "username": "ilker.akel", "action": "NO_MUTATION_PASIF" }
+    ],
+    "remove": []
+  },
+  "user_sgk_isverenler_targets": {
+    "live_total_rows": 0,
+    "rows": [
+      { "username": "sedanurB", "current": [], "target": [1], "KEEP": [], "ADD": [1], "REMOVE": [], "action": "ADD" },
+      { "username": "zeynepG", "current": [], "target": [1], "KEEP": [], "ADD": [1], "REMOVE": [], "action": "ADD" },
+      { "username": "muhasebe", "current": [], "target": [1], "KEEP": [], "ADD": [1], "REMOVE": [], "action": "ADD" },
+      { "username": "ilkerA", "action": "KEEP_NONE_NO_EXPLICIT_GRANT" },
+      { "username": "serhan.kose", "action": "KEEP_NONE_NO_EXPLICIT_GRANT" },
+      { "username": "ilker.akel", "action": "NO_MUTATION_PASIF" }
+    ],
+    "remove": []
+  },
+  "muhasebe_user_subeler_targets": {
+    "username": "muhasebe",
+    "user_id": 2,
+    "role": "MUHASEBE",
+    "durum": "AKTIF",
+    "current_sube_ids": [1, 2],
+    "target_sube_ids": [1, 2, 4, 5, 6, 12, 13],
+    "KEEP": [1, 2],
+    "ADD": [4, 5, 6, 12, 13],
+    "REMOVE": [],
+    "evidence": "READ-ONLY GET /yonetim/kullanicilar as AKTIF GENEL_YONETICI user_id=10 @ 2026-09-06T09:36:58.283Z; exact username muhasebe",
+    "action_until_live_user_rows_read": "RESOLVED_EXACT_DIFF_NO_APPLY"
+  },
+  "branch_accounting_acl_seed": {
+    "default_for_medisa_rollout": "restriction DISABLED (no rows) until operators enable per branch in Şube Yönetimi",
+    "production_seed_rows": []
+  },
+  "production_state_pins": {
+    "CODE_MIGRATION_TIP": "087",
+    "PRODUCTION_MIGRATION_TIP": "086",
+    "PRODUCTION_MIGRATION_PENDING": 1,
+    "PRODUCTION_DEPLOY_SHA": "07dd060ee2b473cd1292566a29990c59538c92c5",
+    "pending_migrations": ["087"],
+    "live_validation": "PASS @ 086"
+  },
+  "production_mutation": 0,
+  "migration_apply": "NONE"
+}

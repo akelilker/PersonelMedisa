@@ -1,107 +1,109 @@
 CODE_MIGRATION_TIP: 087
-PRODUCTION_MIGRATION_TIP: 086
-PRODUCTION_MIGRATION_PENDING: 1
-PRODUCTION_DEPLOY_SHA: 07dd060ee2b473cd1292566a29990c59538c92c5
+PRODUCTION_MIGRATION_TIP: 087
+PRODUCTION_MIGRATION_PENDING: 0
+PRODUCTION_DEPLOY_SHA: fcee67186f1ceaec86624ecbe745f51f56330bcd
 
-# Final non-visual closeout inventory (2026-09-03, SELECT-only API; mutation=0)
+# Live state pin (2026-09-06/07 evidence lock — SELECT-only; mutation=0)
+
+Evidence sources: Deploy cPanel `34035970806` @ `fcee6718`; migration apply `34033315991` (087); inventory `orginv-34057486092-1` tip=087 pending=0; preflight PROD_TIP=087 PENDING=NONE; authenticated GET personnel/SGK policy readback.
+
 PERSONEL_TOTAL: 153
 PERSONEL_AKTIF: 144
 PERSONEL_PASIF_ARCHIVE: 9
-PERSONEL_IC: 134
-PERSONEL_DIS: 19
 USERS_TOTAL: 147
-PERSONEL_ROLE_USERS: 122 (all bound; unbound PERSONEL role = 0; duplicate bindings = 0)
-MANAGER_ONLY_BOUND_AKTIF: 17 (identity via non-PERSONEL users.personel_id — not a PERSONEL-role gap)
-UNBOUND_AKTIF_PERSONEL: 14 (ids 213–226 post-bulk creates; PERSONEL account provisioning DATA_REQUIRED / QR-adjacent — do not reopen 136 rollout)
-AKTIF_IC_MISSING_SGK: 0
-LEGACY_ROLE_ASSIGNED_REAL_USER_COUNT: 0
-USER_SIRKET_GRANTS: 0
-USER_SGK_ISVEREN_GRANTS: 0
+PERSONEL_ROLE_USERS: 122 (all bound; unbound PERSONEL-role = 0)
+ACTIVE_PERSONNEL_WITHOUT_ANY_USER_BINDING: 14 (exact ids 213–226; QR/self-service INTENTIONAL_DEFER — not Priority A)
+USER_SIRKET_GRANTS: 3
+USER_SGK_ISVEREN_GRANTS: 3
+SUBE_MUHASEBE_ACL_ROW_COUNT: 0 (restriction DISABLED until operators seed)
 
-MG_PERSONNEL_BULK_RECONCILIATION_PRODUCTION: CLOSED_CONFIRMED (BASE/deploy SHA 06bbe03 create/exit apply; live now 153 toplam / 144 aktif / 9 pasif; 202+208 are PASIF in archive but cikis_tarihi=NULL → DATA_INCONSISTENCY residual, not pending bulk-create reopen)
-MG_PERSONNEL_BULK_POSTCHECK_DYNAMIC_CONTRACT_001: CLOSED (merged PR #234; PersonelLifecycleBulkPostcheck dynamic contract live)
-MG_PERSONNEL_BULK_DRY_RUN_APPLY_PARITY_001: CLOSED (merged PR #232; PersonelLifecycleBulkMutationPlanner live)
-MG_PERSONNEL_DEFERRED_EXIT_CIKIS_DATE: DATA_REQUIRED (personel_id 202 Ahmed Khalil Alsamar + 208 Sefine Özcan — PASIF/archive; set real cikis_tarihi via employment-exit owner after approval; production mutation gated)
+## Hard-closed (do not reopen without new contradiction)
 
-ORG_HIERARCHY_SCHEMA_READY: true
-ORG_HIERARCHY_DATA_READY: true
-MG_SIRKET_SUBE_PROD_MAPPING_001: CLOSED_CONFIRMED (apply run 33342644722; 3 şirket + ilk 10 şube + 3 SGK eşlendi; postcheck PASS; canlıda ek Medisa şubeleri 12/İzmir + 13/Sakarya; toplam 12 şube; `subeler.ad` = kısa ad; görünen ad = SubeReadModel.tam_ad (DB kolonu değil); 7 çalışma lokasyonu deferred sube_id=NULL; eski mapping spec yeniden uygulanmaz)
-ORG_MAPPING_INVENTORY_OWNER: OrganizationMappingInventoryReport (SELECT-only, checksum'lı, PII'siz) + `ops-organization-inventory.yml`
-ORG_MAPPING_EXECUTION_OWNER: OrganizationInitialMappingService (operations-only; public API/UI'da re-parent YOK) + `apply-organization-mapping.yml`
-ORG_MAPPING_SPEC_OWNER: OrganizationMappingSpec (allowlist + preimage + inventory checksum pin; `ops/organization-mapping/*.json` = historical preimage artifact, canlı truth değil)
-ORG_BRANCH_DISPLAY_OWNER: SubeReadModel (kısa `ad` + türetilmiş `tam_ad`; frontend concat owner YOK)
-ORG_USER_SCOPE_ROLLOUT: CODE_READY (owners complete — merged PR #240; production user_sirketler/user_sgk_isverenler grants still 0; mutation gate separate — docs/guncel/140)
-ORG_LOCATION_SUBE_MAPPING: DEFERRED (calisma_lokasyonlari.sube_id bilinçli NULL)
-ORG_BRANCH_NAME_DB_HARDENING: CLOSED_NOT_NEEDED (tam_ad bilerek kolon değil; SubeReadModel owner)
-AYLIK_KAPANIS_SGK_REDESIGN: CLOSED_CONFIRMED (period-close/snapshot execution key remains (sube_id,yil,ay) — muhür/attendance is branch-operational; MaasHesaplamaSnapshotService freezes personeller.sgk_isveren_id + company labels into personel JSON and branch company/default-SGK into header; personel.sube_id may diverge from employer; missing SGK fail-closed at snapshot preflight; no employer-keyed close product)
-PAYROLL_SGK_INTEGRITY: CLOSED_CONFIRMED (merged PR #242; PersonelSgkCompanyConsistency live; aktif IC missing SGK = 0; personel_id=1 PASIF+cikis_tarihi=NULL = DATA_INCONSISTENCY deferred — resolver employment-overlap unchanged, PASIF shortcut YOK)
+PR_271: CLOSED
+MIGRATION_087: APPLIED / tip=087 / pending EMPTY
+PR_270: CLOSED
+MG_PERSONNEL_BULK_RECONCILIATION_PRODUCTION: CLOSED_CONFIRMED
+PERSONNEL_202_208_HISTORICAL_EXIT: CLOSED_CONFIRMED
+BORDRO_HAZIRLIK: CLOSED
+MAAS_HESAPLAMA: CLOSED
+MEDISA_WORK_LOCATION_CATALOG_MAPPING: APPLIED (7/7 lokasyon→şube; inventory orphan_lokasyon=0)
+MEDISA_APPROVED_USER_GRANTS: APPLIED (sedanurB/zeynepG/muhasebe company+SGK; muhasebe Medisa branches)
+KARYAPI_ROLLOUT: INTENTIONAL_DEFER
+SENAY_ROLLOUT: INTENTIONAL_DEFER
+QR_SELF_SERVICE: INTENTIONAL_DEFER
 
-PERSONEL_IMPORT_ROLLOUT: CLOSED_CONFIRMED
-PERSONEL_IMPORT_PHASE1_IC: 122 / CLOSED_PASS
-PERSONEL_IMPORT_PHASE2_DIS: 11 / CLOSED_PASS
-PERSONEL_DIS_CANONICAL_TARGET: 11
-PERSONEL_DIS_EXCLUDED_TERMINATED: MUHAMMAT FAWAZ, MUSTAFA HAMID (EXCLUDED_USER_CONFIRMED_TERMINATED — historical import exclusion lock; live id 226 sicil 487 "Muhammat Fawaz" is a separate post-bulk AKTIF DIS row — do not reopen Phase2 import; business confirm if duplicate/rehire)
-PERSONEL_IC_PHONE_DEFERRED: 0 / CLOSED_CONFIRMED
-MG_OPS_PERSONEL_PHONE_001: CLOSED_CONFIRMED (20/20 gerçek kullanıcı verisi; canonical write owner authenticated PUT /personeller/{id}; post-write readback match=20 missing=0 mismatch=0; sicil 216 tekil isim düzeltmesi dahil)
-PERSONEL_USER_BINDING_ROLLOUT_136: CLOSED_CONFIRMED (historical 136 PERSONEL provision+bind; do not restart)
-PERSONEL_ACCOUNT_ONBOARDING_FOR_POST_BULK_14: DATA_REQUIRED (ids 213–226; canonical owner PersonelAccountOnboardingService / secure onboarding — separate approval; QR-adjacent handoff)
-DIS_KAYNAK_MODEL: OPERASYONEL_NON_FINANCIAL (docs/guncel/130; migration 076 production applied; schema ready; assignment table live; production assignment count=0)
-DIS_ORG_OPTIONAL: YES
-DIS_EFFECTIVE_ORG_ASSIGNMENT_AWARE: YES
-DIS_REAL_PAYROLL_ELIGIBLE: HAYIR
-DIS_SGK_ELIGIBLE: HAYIR
-DIS_BANK_EXPORT_ELIGIBLE: HAYIR
-MG_OPS_DIS_ORG_COMPLETE_001: CLOSED
-MG_OPS_DIS_OPS_MODEL_001: CLOSED_CONFIRMED
-DIS_GERCEK_GOREVLENDIRME_ROLLOUT: AYRI_INSAN_OPERASYON_KARARI (teknik kapanışı bloke etmez)
+## A1 — SGK period policy sube 12 / 13
 
+SGK_PERIOD_OWNER_RUNTIME: SgkSirketPolitikaReadService::resolveForPeriod (branch-scoped; no company inheritance)
+SGK_PERIOD_OWNER_WRITE: SgkSirketPolitikaWriteService::import → submit → approve (dual-control via SgkKararPaketiAuthz)
+A1_CLASSIFICATION: OPS_ROLLOUT_ACTIVE / PRODUCTION_CONFIG / READY_FOR_EXPLICIT_PRODUCTION_APPROVAL
+A1_CAN_BE_DONE_WITH_EXISTING_OWNER: YES
+BRANCH_12_CURRENT: NO_APPROVED_POLICY (revision inventory empty)
+BRANCH_13_CURRENT: NO_APPROVED_POLICY (revision inventory empty)
+NO_APPLY_TARGET: explicit AY_1_SON_GUN + ONAYLANDI for sube 12 (`S98-R1-POL-12`) and 13 (`S98-R1-POL-13`); clone control values from sube 1 (`SGK_ODENEK_MAHSUP_MODU=UCRET_MODELINE_GORE`)
+APPLIED_THIS_TURN: NO
+CONTROL_SET_1_2_4_5_6_7_8_9_10_11: still AY_1_SON_GUN / ONAYLANDI
+
+## A2 / A3 residuals (exact fresh)
+
+NULL_LOCATION_TOTAL: 16
+NULL_LOCATION_BY_BRANCH: sube1=11, sube2=3, sube6=1, sube_null=1
+AUTO_RESOLVABLE_LOCATION: 2 (personel_id 160 Sedanur Bulut, 211 Zeynep Günal → calisma_lokasyonu_id=5; NO-APPLY plan only)
+HR_BUSINESS_DECISION_REQUIRED_LOCATION: 14
+NULL_BRANCH_TOTAL: 1 (personel_id 212 İlker AKEL; location also NULL → HR_BUSINESS_DECISION_REQUIRED; CAN_APPLY=NO)
+CROSS_COMPANY_AXIS_PAIRS: 3 — DEFERRED_REVIEW (not DATA_CONTRADICTION)
+- 120 İsmail Özcan — branch 11 Şenay / SGK 3 / location 5
+- 158 Salih Efe — branch 11 Şenay / SGK 3 / location 5
+- 219 DOĞU BERKAN ATMACA — branch 10 Karyapı / SGK 1 / location 3
+Reason: branch ↔ work-location are independent axes; no schema/runtime same-branch mandate; Karyapı/Şenay INTENTIONAL_DEFER.
+
+NO_APPLY_PLAN: ops/organization-mapping/a1-a2-a3-no-apply-remediation-plan.json
+PLAN_CAN_APPLY_COUNT: 2 (not applied this turn)
+
+## FK matrix (fresh list + referans catalog integrity probe)
+
+| field | POPULATED | NULL | ACTIVE_NULL | PASIF_NULL | INVALID_REF | INVALID_PERSONEL_IDS |
+| --- | ---: | ---: | ---: | ---: | ---: | --- |
+| sube_id | 152 | 1 | 1 | 0 | 0 | [] |
+| departman_id | 146 | 7 | 7 | 0 | 0 | [] |
+| bolum_id | 137 | 16 | 10 | 6 | 0 | [] |
+| birim_id | 137 | 16 | 10 | 6 | 0 | [] |
+| gorev_id | 141 | 12 | 12 | 0 | 0 | [] |
+| pozisyon_id | 139 | 14 | 8 | 6 | 0 | [] |
+| personel_tipi_id | 153 | 0 | 0 | 0 | 0 | [] |
+| sgk_isveren_id | 130 | 23 | 17 | 6 | 0 | [] |
+| calisma_lokasyonu_id | 137 | 16 | 12 | 4 | 0 | [] |
+
+FK_REFERENCE_INTEGRITY: PASS (all INVALID_REF=0)
+
+## SUBE_YONETICISI (readback only)
+
+MEDISA_BRANCHES: 1,2,4,5,6,12,13
+BRANCHES_WITH_ACTIVE_SUBE_YONETICISI: 2 (user 040), 4 (user 381)
+BRANCHES_WITHOUT_ACTIVE_SUBE_YONETICISI: 1,5,6,12,13
+STATUS: BUSINESS_DECISION_REQUIRED (Priority B; not data cleanup)
+
+## Priority rewrite (post evidence)
+
+PRIORITY_A:
+- A1 OPS_ROLLOUT_ACTIVE / PRODUCTION_CONFIG — READY_FOR_EXPLICIT_PRODUCTION_APPROVAL (seed/approve AY_1_SON_GUN for sube 12 & 13 via existing dual-control owner)
+- A2 DATA_REMEDIATION_READY_FOR_APPROVAL (2 AUTO: 160,211) + BUSINESS_DECISION_REQUIRED (14)
+- A3 BUSINESS_DECISION_REQUIRED (personel 212; no auto target)
+
+PRIORITY_B:
+- SUBE_YONETICISI remaining Medisa branches 1,5,6,12,13
+- Cross-company location/branch pairs 120/158/219 = DEFERRED_REVIEW
+
+PRIORITY_C:
+- PERSONEL accounts / QR / self-service INTENTIONAL_DEFER
+- Karyapı / Şenay company rollout INTENTIONAL_DEFER
+
+ORG_MAPPING_INVENTORY_OWNER: OrganizationMappingInventoryReport (SELECT-only)
+ORG_LOCATION_SUBE_MAPPING: APPLIED (catalog); personnel location fill = separate A2 gate
 SGK_CATALOG_LIVE_VERIFY: CLOSED_CONFIRMED
-SGK_CATALOG_TAMLIK: RESMI_KAYNAKLI_KISITLI / ONAYLANDI / kod_sayisi=19
-SGK_PERIOD_BRANCHES_1_4_5_6_7_8_9_10_11: AY_1_SON_GUN / ONAYLANDI
 UBGT_CALENDAR_LIVE_VERIFY: CLOSED_CONFIRMED
-UBGT_2026_AKTIF: 17 (TAM_GUN=14, YARIM_GUN=3, dup/conflict=0)
 PAYROLL_POLICY_REVISION: 3 / 14/14 / HAFTA_TATILI_GUNLERI=0
-
-SERBEST_ZAMAN_OPERASYON_OWNER: IK_SORUMLUSU
-SERBEST_ZAMAN_OPERATIONAL_CHAIN: BIRIM_AMIRI/BOLUM_YONETICISI → GENEL_YONETICI
-MG_SZ_6M_001: CLOSED
-
-RETENTION_POLICY: MINIMUM_10_YEARS
-MIN_RETENTION_YEARS: 10
-SHORTER_CATEGORY_RETENTION: DISABLED
-RETENTION_CATEGORY_COUNT: 15
-RETENTION_CATEGORY_LT_10_COUNT: 0
-PERSONNEL_RETENTION_ANCHOR: EMPLOYMENT_END_DATE_OR_LATER_APPLICABLE_ANCHOR
-ACTIVE_EMPLOYEE_DESTRUCTION: PROHIBITED
-MISSING_ANCHOR: FAIL_CLOSED
-LEGAL_HOLD_OVERRIDE: ENABLED
-LONGER_LEGAL_RETENTION_WINS: YES
-RETENTION_EXAMPLE_2010_START_2026_END_EARLIEST: 2036
-RETENTION_PHYSICAL_STATUS: CLOSED_CONFIRMED
-MG_RET_PHYS_001: CLOSED_CONFIRMED
-
-ARCHIVE_LIFECYCLE: CLOSED_CONFIRMED (PR #243/#244; aktif list vs archive/read-only; create path cannot mint PASIF; confirmed demo fixture purge fail-closed; rows 1–4 remain PASIF residuals pending shared-data-safe purge evidence)
-SUBE_YONETICISI_REAL_ASSIGNMENT_STATUS: PARTIAL (2 AKTIF assigned — username 381/Bora Bayazıt sube 4 + 040/Halil Şenay sube 2; remaining branches still USER_ASSIGNMENT_REQUIRED)
-MANAGER_USERS_VERIFIED: ilkerA GENEL_YONETICI AKTIF; serhan.kose GENEL_YONETICI AKTIF; sedanurB IK_SORUMLUSU AKTIF (no new drift); Savaş Şenay = PERSONEL user 452 bound personel_id 159 (not manager role); Alper Sungur = NO_PRODUCTION_USER (SOURCE_DATA_REQUIRED — do not invent)
-
-LEGACY_ROLE_AUTHORIZATION_ACTIVE: HAYIR
-LEGACY_ROLE_CLEANUP_REQUIRED: NO
-LEGACY_ROLE_SELECTABLE_COUNT: 0
-CANONICAL_AUTH_ROLE_COUNT: 9 (8 pre-081 + IK_PERSONELI via migration 081; production IK_PERSONELI assigned = 0)
-SYSTEM_TEST_ROLE_COUNT: 1 (AUTH_SMOKE_READONLY — teknik salt-okuma aktörü, personel rol borcu değildir)
-LEGACY_ROLE_ENUM_SCHEMA_COUNT: 0
-LEGACY_ROLE_ENUM_SCHEMA_SHRINK: MIGRATION_077_PRODUCTION_APPLIED
-MG_ROLE_ENUM_DEBT_001: CLOSED_CONFIRMED
-TECH_DEBT_NON_BLOCKING_COUNT: 0
-
-OLAGANUSTU_CALISMA: INTENTIONAL_DEFER
-MG_EXC_WORK_001: INTENTIONAL_DEFER
-QR_EMPLOYEE_ROLLOUT: DEFERRED_BY_USER
-
-FINAL_NON_VISUAL_CLOSEOUT: CLOSED_DOC_RECONCILE (no product-code MUST_FIX before UI polish; remaining = data/ops + optional/future + QR deferred)
-UI_POLISH_READY: YES (after this doc reconcile merges)
-
 TEKNIK_ANA_SISTEM: KAPALI
 BUG_COUNT: 0
-OPS_ROLLOUT_COUNT: 0
-MUST_FIX_BEFORE_UI_POLISH_COUNT: 0
+PRODUCTION_MUTATION_THIS_PIN: 0
+APPLICATION_CODE_CHANGE_THIS_PIN: 0

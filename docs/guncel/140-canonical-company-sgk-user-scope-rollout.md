@@ -1,6 +1,6 @@
 # 140 — Canonical company / SGK user-scope rollout inventory
 
-**Tür:** Read-only production rollout plan. **PRODUCTION MUTATION = 0** in this phase.
+**Tür:** Rollout inventory + live readback. Historical PLAN pins below are preserved; **current/live** values are explicit.
 
 ## Canonical axes
 
@@ -13,31 +13,40 @@
 
 Owner: `OrgScope` (+ `HrWriteScope` for `IK_PERSONELI` write companies). Session: `AuthMiddleware` / `LoginController`.
 
-## Production inventory (last read-only recon — grants still empty)
+## Live production inventory (2026-09-06 evidence lock)
 
-| Object | Expected state at code rollout |
-| --- | --- |
-| `user_sirketler` | count = 0 |
-| `user_sgk_isverenler` | count = 0 |
-| Active users / roles | unchanged; no role delete/merge |
-| Karyapı / Şenay operational users | **UNKNOWN / DEFERRED** — do not invent |
-
-Re-verify with SELECT-only inventory before any mutation gate. Do not trust this doc as live truth after later production writes.
-
-## Planned user-scope changes (FUTURE mutation gate only)
-
-| User | Target | Notes |
+| Object | Live state | Evidence |
 | --- | --- | --- |
-| `ilkerA` | keep `GENEL_YONETICI` | Cleanup of unnecessary per-branch grants = separate gate |
-| `serhan.kose` | Fabrika Müdürü → target `GENEL_YONETICI` | Separate production mutation gate |
-| `sedanurB` | keep `IK_SORUMLUSU` | Explicit org/company/SGK grants as needed; **not** `GENEL_YONETICI` |
-| demo `bolum_yoneticisi` / `birim_amiri` accounts | possible removal | Separate gate; **roles themselves stay** |
+| `PRODUCTION_MIGRATION_TIP` | **087** | apply `34033315991`; inventory pending=0 |
+| Live deploy SHA | `fcee67186f1ceaec86624ecbe745f51f56330bcd` | Deploy cPanel `34035970806` |
+| `user_sirketler` | **3** | inventory `orginv-34057486092-1` |
+| `user_sgk_isverenler` | **3** | same |
+| `user_subeler` | **31** | MUHASEBE Medisa branch scope included |
+| Work locations mapped | **7/7** | Medisa catalog mapping APPLIED |
+| `sube_muhasebe_yetkilileri` | **0 rows** | ACL restriction DISABLED (intentional) |
+| Karyapı / Şenay operational rollout | **INTENTIONAL_DEFER** | do not invent grants |
 
-**Do not apply any of the above in this phase.**
+Historical PLAN-only pins that said grants=0 / tip=086 / locations deferred are **not** current live truth.
+
+## Approved Medisa user-scope (APPLIED — do not reopen)
+
+| User | Live intent | Notes |
+| --- | --- | --- |
+| `ilkerA` | keep `GENEL_YONETICI` | No unnecessary explicit company/SGK grants required |
+| `serhan.kose` | `GENEL_YONETICI` | Same |
+| `sedanurB` | `IK_SORUMLUSU` + Medisa company/SGK | Applied |
+| `zeynepG` | Medisa company/SGK | Applied |
+| `muhasebe` | Medisa company/SGK + Medisa branches | Applied (incl. 12/13) |
 
 ## Explicit non-goals
 
 - Location → authorization axis
-- Production grant writes / migration apply / deploy
-- Multi-role remodel or role rename
-- Parallel scope resolver
+- Silent Karyapı/Şenay → Medisa personnel overwrite
+- QR / PERSONEL account late-phase as Priority A
+- Reopening PR #271 / migration 087 without new contradiction
+
+## Related residuals (Priority A — see CURRENT_STATE)
+
+- SGK period policy missing for Medisa sube **12/13** (`NO_APPROVED_POLICY`)
+- Personnel `calisma_lokasyonu_id` NULL = 16 (2 AUTO NO-APPLY candidates)
+- Personnel `sube_id` NULL = 1 (personel 212)

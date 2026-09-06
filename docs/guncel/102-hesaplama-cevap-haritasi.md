@@ -5,13 +5,15 @@
 **Tarih:** 2026-08-11 (refresh 2026-08-12 — master closure audit / S3F sonrası)
 **Motor sürümü (kod):** `S91C2_PAYROLL_ENGINE_V2`
 **Compliance kontratı:** `S87_PAYROLL_COMPLIANCE_V1`
-**Not:** Bu belge hesaplama haritasıdır. Production migration tip: **076** (canlı). Code tip **076** (`dis_kaynak_gecici_gorevlendirme`). QR pipeline S3C–S3F **CLOSED_PRODUCTION** (algoritmalar: `QR_INTERVAL_V1`, `QR_PUANTAJ_CANDIDATE_V1`, `QR_PUANTAJ_DECISION_V1`, `QR_CANDIDATE_HASH_V2`).
+**Not:** Bu belge hesaplama haritasıdır. Production migration tip: **087** (canlı; pending EMPTY). Code tip **087**. QR pipeline S3C–S3F **CLOSED_PRODUCTION** (algoritmalar: `QR_INTERVAL_V1`, `QR_PUANTAJ_CANDIDATE_V1`, `QR_PUANTAJ_DECISION_V1`, `QR_CANDIDATE_HASH_V2`). Historical tip pins (076/086) below remain archival notes only — not current/live.
 
 **2026-08-17 closure reconciliation:** SGK catalog `CLOSED_CONFIRMED`; UBGT `CLOSED_CONFIRMED`; payroll company policy `CLOSED_CONFIRMED`; active policy revision `3`, required/resolved `14/14`, missing `0`; `HAFTA_TATILI_GUNLERI=0` / Pazar; payroll policy preflight ready.
 
 **2026-08-27 personnel import rollout:** Phase1 `122 IC_PERSONEL` + Phase2 `11 DIS_KAYNAK` production apply `CLOSED_CONFIRMED` (`110` / `MG-OPS-PERSONEL-001`, `MG-EXT-ORG-DATA-001`). Canonical DIS hedefi 11; MUHAMMAT FAWAZ + MUSTAFA HAMİD = `EXCLUDED_USER_CONFIRMED_TERMINATED` (backlog’a eklenmez). 20 IC telefon deferred kalemi kapanmıştır: `MG-OPS-PERSONEL-PHONE-001` = `CLOSED_CONFIRMED`, `PERSONEL_IC_PHONE_DEFERRED = 0` (gerçek kullanıcı verisi, canonical write owner; import reopen yok). Personel import pending / 13 external expected ifadesi bayattır.
 
-**2026-08-27 SGK/UBGT live read-only verify:** `MG-OPS-SGK-CAT-001` + `MG-OPS-UBGT-001` → `CLOSED_CONFIRMED`. Canlı: SGK `RESMI_KAYNAKLI_KISITLI`/`ONAYLANDI`/`kod_sayisi=19`; şubeler `1,4,5,6,7,8,9,10,11` = `AY_1_SON_GUN`; UBGT 2026 = 17 aktif (`TAM_GUN=14`,`YARIM_GUN=3`, duplicate/conflict 0); company policy revision `3` (`14/14`), `HAFTA_TATILI_GUNLERI=0`. Seed/approve/write bu turda yok.
+**2026-08-27 SGK/UBGT live read-only verify (historical):** `MG-OPS-SGK-CAT-001` + `MG-OPS-UBGT-001` → `CLOSED_CONFIRMED`. O turda: SGK `RESMI_KAYNAKLI_KISITLI`/`ONAYLANDI`/`kod_sayisi=19`; şubeler `1,4,5,6,7,8,9,10,11` = `AY_1_SON_GUN`; UBGT 2026 = 17 aktif. Seed/approve/write yoktu.
+
+**2026-09-07 SGK period residual (live classification correction):** Medisa sube **12/13** runtime effective = `NO_APPROVED_POLICY` today, but this is **OPS_ROLLOUT_ACTIVE / PRODUCTION_CONFIG / READY_FOR_EXPLICIT_PRODUCTION_APPROVAL** — existing `SgkSirketPolitikaWriteService` dual-control path can create explicit `AY_1_SON_GUN`+`ONAYLANDI`. Not TECHNICAL_GAP. Control set `1,2,4,5,6,7,8,9,10,11` remains `AY_1_SON_GUN`/`ONAYLANDI`.
 
 **2026-08-28 DIS operasyonel/non-financial production kapanış:** `docs/guncel/130-dis-kaynak-operasyonel-finansal-ayrim.md`. Migration `076` canonical production applied (schema ready; `personel_gecici_gorevlendirmeler` live; assignment count=0). Directory-only zaman yasağı SUPERSEDED. DIS permanent org opsiyonel; effective org assignment-aware; QR/puantaj operasyonel olabilir; gerçek SGK/bordro/banka fail-closed. 11 production DIS kaydı mutasyona uğramadı; otomatik assignment yok; rol/user mutation yok. `MG-OPS-DIS-ORG-COMPLETE-001` → CLOSED; `MG-OPS-DIS-OPS-MODEL-001` → CLOSED_CONFIRMED. Gerçek görevlendirme rollout’u ayrı insan/operasyon kararıdır.
 
@@ -19,8 +21,8 @@
 `RetentionCategories::POLICY_RETENTION_YEARS` owner, provenance
 `USER_CONFIRMED_BUSINESS_DECISION`; typed physical destruction handlers exist but feature flag remains closed (`USER_GATED` / `110`).
 The SGK period decision is user-confirmed as `1_TO_MONTH_END` for Medisa, Karyapı, and
-Şenay Mobilya; runtime enum `AY_1_SON_GUN` for branches `1,4,5,6,7,8,9,10,11`;
-canonical approved-policy read surface canlıda doğrulanmıştır (`110` / `MG-OPS-SGK-CAT-001` = `CLOSED_CONFIRMED`).
+Şenay Mobilya; runtime enum `AY_1_SON_GUN` is live for branches `1,2,4,5,6,7,8,9,10,11`.
+Medisa branches **12/13** currently resolve `NO_APPROVED_POLICY` but are **READY_FOR_EXPLICIT_PRODUCTION_APPROVAL** via existing dual-control write owner (not a code TECHNICAL_GAP).
 
 ---
 
@@ -288,7 +290,7 @@ Kaynak: masaüstü `puantaj resmi durum.docx` (toplantı mevzuat özeti).
 | Yıl değiştiren hafta FM politikası | CLOSED (`110` MG-OT-YEAR-POL-001) — `ROLLING_12_MONTH_ACTUAL_DATE_V1` (`117`) |
 | Yıl değiştiren hafta FM path tutarlılığı | CLOSED (`110` MG-OT-YEAR-PATH-001) — Pack5 rolling owner |
 | Org location / org structure schema | Pack5/Pack6 + `071`–`072` production uygulanmış; gerçek SGK işvereni/lokasyon seed ve personel eşlemesi `USER_GATED` (`110`) |
-| SGK reporting period | **CLOSED_CONFIRMED** business decision + 2026-08-27 live verify: `AY_1_SON_GUN` for Medisa/Karyapı/Şenay branches `1,4,5,6,7,8,9,10,11`; `15_TO_NEXT_MONTH_14` and `MIXED_BY_INSURED` not used (`110` / `MG-OPS-SGK-CAT-001`) |
+| SGK reporting period | **CLOSED_CONFIRMED** business decision + live control set `1,2,4,5,6,7,8,9,10,11` = `AY_1_SON_GUN`; Medisa `12/13` = **OPS_ROLLOUT_ACTIVE** (`NO_APPROVED_POLICY` today; existing dual-control owner can close — Priority A) |
 | FSC (%25) aktif bant | S87 ile kapalı (INTENTIONAL_DEFER) |
 | Zorunlu/olağanüstü çalışma istisna modeli | Bilinçli kapsam dışı / karar bekler |
 | Bordro PDF / banka dosyası / SGK bildirgesi çıktısı | FUTURE (kısmi CSV var) |

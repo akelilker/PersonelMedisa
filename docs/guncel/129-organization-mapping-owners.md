@@ -339,14 +339,13 @@ production'da hiçbir mutation yapılmadı.
 | Apply run | `33342644722` |
 | Sonuç | postcheck PASS, `data_ready` **true** |
 | Kapsam | 3 şirket, 10 şube, 3 SGK işvereni eşlendi |
-| Çalışma lokasyonu | 7 lokasyon **deferred**; `sube_id` NULL kaldı |
+| Çalışma lokasyonu | **APPLIED (catalog)** — canlı 7/7 lokasyon `sube_id` mapped. Tarihsel ilk mapping turunda deferred idi (historical pin only). Personel location NULL fill = ayrı Priority A residual |
 | Yeniden apply | **yok** — eski spec yeniden uygulanmaz |
 
 Lokasyon kararı (kayıt): İzmir ve Sakarya çalışma lokasyonları **MEDISA**'ya
-aittir ve MEDISA altında **ayrı şube adaylarıdır** (`Medisa / İzmir`,
-`Medisa / Sakarya`). Şube oluşturma ve production lokasyon mapping'i
-yapılmamıştır; gerçek lokasyon eşlemesi yeni envanter matrisinin sonucunu ve
-ayrı bir production onayını bekler.
+aittir; şubeler `12`/`13` oluşturuldu ve catalog mapping **APPLIED**.
+Personel `calisma_lokasyonu_id` NULL satırları (16) ayrı remediation / HR kararıdır
+(`ops/organization-mapping/a1-a2-a3-no-apply-remediation-plan.json`).
 
 ## 7. Recovery
 

@@ -76,8 +76,15 @@ describe("branch accounting visibility owners", () => {
         REMOVE: number[];
       };
       production_state_pins: {
+        HISTORICAL_PRODUCTION_MIGRATION_TIP?: string;
+        HISTORICAL_PRODUCTION_MIGRATION_PENDING?: number;
+        PRODUCTION_MIGRATION_TIP?: string;
+        PRODUCTION_MIGRATION_PENDING?: number;
+      };
+      live_readback_after_plan?: {
         PRODUCTION_MIGRATION_TIP: string;
         PRODUCTION_MIGRATION_PENDING: number;
+        PRODUCTION_DEPLOY_SHA: string;
       };
       production_mutation: number;
     };
@@ -86,8 +93,11 @@ describe("branch accounting visibility owners", () => {
     expect(parsed.work_location_targets.find((row) => row.calisma_lokasyonu_id === 5)?.target_sube_id).toBe(1);
     expect(plan).not.toMatch(/create.*Karabük.*şube/i);
     expect(parsed.production_mutation).toBe(0);
-    expect(parsed.production_state_pins.PRODUCTION_MIGRATION_TIP).toBe("086");
-    expect(parsed.production_state_pins.PRODUCTION_MIGRATION_PENDING).toBe(1);
+    // Historical PLAN pin preserved; live readback is authoritative current state.
+    expect(parsed.production_state_pins.HISTORICAL_PRODUCTION_MIGRATION_TIP).toBe("086");
+    expect(parsed.production_state_pins.HISTORICAL_PRODUCTION_MIGRATION_PENDING).toBe(1);
+    expect(parsed.live_readback_after_plan?.PRODUCTION_MIGRATION_TIP).toBe("087");
+    expect(parsed.live_readback_after_plan?.PRODUCTION_MIGRATION_PENDING).toBe(0);
     expect(parsed.muhasebe_user_subeler_targets.username).toBe("muhasebe");
     expect(parsed.muhasebe_user_subeler_targets.current_sube_ids).toEqual([1, 2]);
     expect(parsed.muhasebe_user_subeler_targets.target_sube_ids).toEqual([1, 2, 4, 5, 6, 12, 13]);
@@ -96,21 +106,21 @@ describe("branch accounting visibility owners", () => {
     expect(parsed.muhasebe_user_subeler_targets.REMOVE).toEqual([]);
   });
 
-  it("pins CURRENT_STATE + registry to prod tip 086 with only 087 pending", () => {
+  it("pins CURRENT_STATE + registry to live prod tip 087 with pending empty", () => {
     const current = read("CURRENT_STATE.md");
     const registry = read("docs/guncel/110-master-closure-gap-registry.md");
     expect(current).toMatch(/^CODE_MIGRATION_TIP: 087$/m);
-    expect(current).toMatch(/^PRODUCTION_MIGRATION_TIP: 086$/m);
-    expect(current).toMatch(/^PRODUCTION_MIGRATION_PENDING: 1$/m);
+    expect(current).toMatch(/^PRODUCTION_MIGRATION_TIP: 087$/m);
+    expect(current).toMatch(/^PRODUCTION_MIGRATION_PENDING: 0$/m);
     expect(current).toMatch(
-      /^PRODUCTION_DEPLOY_SHA: 07dd060ee2b473cd1292566a29990c59538c92c5$/m
+      /^PRODUCTION_DEPLOY_SHA: fcee67186f1ceaec86624ecbe745f51f56330bcd$/m
     );
     expect(registry).toMatch(/^CODE_MIGRATION_TIP: 087$/m);
-    expect(registry).toMatch(/^PRODUCTION_MIGRATION_TIP: 086$/m);
+    expect(registry).toMatch(/^PRODUCTION_MIGRATION_TIP: 087$/m);
     expect(registry).toContain("| Migration 085 | **APPLIED** |");
     expect(registry).toContain("| Migration 086 | **APPLIED** |");
-    expect(registry).toContain("| Migration 087 | **CODE_ONLY / UNAPPLIED** |");
-    expect(registry).toContain("**PASS @ 086**");
-    expect(registry).toContain("pending code tip `087` only");
+    expect(registry).toContain("| Migration 087 | **APPLIED** |");
+    expect(registry).toContain("**PASS @ 087**");
+    expect(registry).toContain("pending EMPTY");
   });
 });

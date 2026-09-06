@@ -1,26 +1,26 @@
 CODE_MIGRATION_TIP: 087
-PRODUCTION_MIGRATION_TIP: 086
+PRODUCTION_MIGRATION_TIP: 087
 
 # 110 — Canonical Closure / Gap Registry
 
 **Tür:** Güncel durum kaydı ve sonraki iş seçimi için tek referans.
-**Güncelleme:** 2026-08-31 (organizasyon eşleme production kapanışı + envanter matrix kontratı reconcile)
-**Kapsam:** PersonelMedisa teknik ana sistem kapanışı + kullanıcı-gated kalan işlerin net sınıflandırması. Bu turda uygulama kodu / migration dosyası / seed / personel-assignment-rol-SGK-bordro-retention-imha mutasyonu yok.
+**Güncelleme:** 2026-09-07 (A1/A2/A3 evidence lock + doc reconcile; PRODUCTION_MUTATION=0)
+**Kapsam:** PersonelMedisa teknik ana sistem kapanışı + kullanıcı-gated kalan işlerin net sınıflandırması. Bu turda uygulama kodu / migration apply / personel-assignment-rol-SGK-bordro-retention-imha mutasyonu yok.
 
 ## Migration durumu
 
 | Alan | Değer | Kanıt / sınır |
 | --- | --- | --- |
-| CODE_MIGRATION_TIP | **087** | Repodaki son migration: `087_sube_muhasebe_yetkilileri.sql` — şube bazlı muhasebe görünürlük ACL (`sube_muhasebe_yetkilileri`); relation presence = restriction enabled; additive, data write/backfill yok; idempotent; production'a henüz uygulanmadı. Bir önceki tip: `086_personel_historical_exit_date_correction_auditleri.sql`. Kod, production şema tip `086` ile geriye uyumlu |
-| PRODUCTION_MIGRATION_TIP | **086** | 085 + 086 production'a uygulandı (086 apply run `33993971923`). Tip `087` yalnız repo/code'da; production apply **YOK** (ayrı onay gerekir). Additive/backward-compatible; data backfill yok. Production tip `086` kalır ta ki 087 açıkça uygulanana kadar |
+| CODE_MIGRATION_TIP | **087** | Repodaki son migration: `087_sube_muhasebe_yetkilileri.sql` — şube bazlı muhasebe görünürlük ACL (`sube_muhasebe_yetkilileri`); relation presence = restriction enabled; additive, data write/backfill yok; idempotent |
+| PRODUCTION_MIGRATION_TIP | **087** | 087 production applied (apply run `34033315991`); live tip=087; pending=EMPTY (inventory `orginv-34057486092-1`, preflight PROD_TIP=087) |
 | Migration 084 | **APPLIED** | Dosya: `api/migrations/084_gunluk_bildirim_tamamlama_header_summary.sql`. Durum: production applied |
 | Migration 085 | **APPLIED** | Dosya: `api/migrations/085_gunluk_bildirim_duzeltme_auditleri.sql`. Durum: production applied |
 | Migration 086 | **APPLIED** | Dosya: `api/migrations/086_personel_historical_exit_date_correction_auditleri.sql`. Durum: production applied (apply run `33993971923`) |
-| Migration 087 | **CODE_ONLY / UNAPPLIED** | Dosya: `api/migrations/087_sube_muhasebe_yetkilileri.sql`. Durum: code/repo migration mevcut; production henüz uygulanmadı; additive/backward-compatible; no data backfill; production apply ayrı onay gerektirir |
-| Organizasyon eşleme durumu | **CLOSED_CONFIRMED** | İlk production mapping uygulandı (MG-SIRKET-SUBE-PROD-MAPPING-001, apply run `33342644722`): 3 şirket, **o turda 10 şube**, 3 SGK işvereni eşlendi; postcheck PASS ve `data_ready = true`. Sonrasında Medisa’ya İzmir/Sakarya eklendi (canlı **12 şube**). 7 çalışma lokasyonu bilinçli **deferred** (`sube_id` NULL). Repo’daki mapping JSON = historical preimage; yeniden apply yok. Display owner = `SubeReadModel` (`ad` kısa, `tam_ad` türetilmiş) |
-| `MATRIX_DEVELOPMENT_BASELINE_SHA` | **`067692bba744808c06b6b7d802797c453859df53`** | Değişmez tarihsel kanıt: organizasyon eşleme apply operasyonunun pinlendiği deploy SHA'sı ve bu envanter matrix turunun geliştirme baseline'ı. "Güncel/son production SHA" iddiası **değildir**; main ilerledikçe güncellenmez. Apply yetkisi kanıtı için `MG-SIRKET-SUBE-PROD-MAPPING-001` satırındaki apply run kaydı esastır |
-| Otomatik sicil owner | **`PersonelSicilAllocator`** | `api/src/Services/Personel/PersonelSicilAllocator.php` + singleton tablo `personel_sicil_sequence` (migration 078); interaktif create'te `sicil_no` gönderilmez, backend tahsis eder |
-| Canlı migration doğrulaması | **PASS @ 086** | Production tip `086`; pending code tip `087` only (unapplied; apply ayrı onay) |
+| Migration 087 | **APPLIED** | Dosya: `api/migrations/087_sube_muhasebe_yetkilileri.sql`. Durum: production applied; ACL seed rows intentional empty (restriction DISABLED) |
+| Organizasyon eşleme durumu | **CLOSED_CONFIRMED** | İlk mapping apply `33342644722` (tarihsel: o turda 10 şube + lokasyon deferred). Canlı: **12 şube**; Medisa work-location catalog mapping **APPLIED** (7/7); Medisa approved user grants **APPLIED**. Karyapı/Şenay company rollout **INTENTIONAL_DEFER**. Display owner = `SubeReadModel` |
+| `MATRIX_DEVELOPMENT_BASELINE_SHA` | **`067692bba744808c06b6b7d802797c453859df53`** | Değişmez tarihsel kanıt (ilk mapping apply pin). Güncel live deploy SHA değildir — live = `fcee67186f1ceaec86624ecbe745f51f56330bcd` |
+| Otomatik sicil owner | **`PersonelSicilAllocator`** | `api/src/Services/Personel/PersonelSicilAllocator.php` + singleton tablo `personel_sicil_sequence` (migration 078) |
+| Canlı migration doğrulaması | **PASS @ 087** | Production tip `087`; pending EMPTY |
 
 ## Durum sözlüğü
 
@@ -76,10 +76,13 @@ PRODUCTION_MIGRATION_TIP: 086
 
 | ID | Konu | Durum | Not |
 | --- | --- | --- | --- |
-| `MG-SUBE-YONETICI-001` | `SUBE_YONETICISI` gerçek kullanıcı ataması | **USER_ASSIGNMENT_REQUIRED** (PARTIAL) | Canlıda 2 AKTIF: `381`/Bora Bayazıt → sube 4; `040`/Halil Şenay → sube 2. Kalan şubeler için explicit atama hâlâ iş sahibi kararı; tahmin/atama otomasyonu yok. |
-| `MG-PERSONNEL-POST-BULK-ACCOUNT-014` | Bulk sonrası 14 AKTIF personel için PERSONEL hesabı | **USER_DATA_REQUIRED** | ids 213–226; historical 136 rollout yeniden açılmaz; canonical onboarding owner + ayrı onay. QR handoff ile kesişebilir. |
-| `MG-PERSONNEL-EXIT-DATE-202-208` | 202/208 PASIF ama `cikis_tarihi` NULL | **USER_DATA_REQUIRED** | Archive’da; employment-exit owner ile gerçek çıkış tarihi. |
+| `MG-SUBE-YONETICI-001` | `SUBE_YONETICISI` gerçek kullanıcı ataması | **USER_ASSIGNMENT_REQUIRED** (PARTIAL) / Priority B | Canlıda 2 AKTIF: `381` → sube 4; `040` → sube 2. Medisa eksik: 1,5,6,12,13. Data cleanup ile karıştırılmaz. |
+| `MG-PERSONNEL-POST-BULK-ACCOUNT-014` | Bulk sonrası 14 AKTIF personel için PERSONEL hesabı | **INTENTIONAL_DEFER** (Priority C) | Exact ids 213–226; historical 136 reopen yok; QR/self-service late-phase. |
+| `MG-PERSONNEL-EXIT-DATE-202-208` | 202/208 historical exit dates | **CLOSED_CONFIRMED** | Historical correction applied; reopen yok. |
 | `MG-MANAGER-ALPER-SUNGUR` | Alper Sungur uygulama kullanıcısı | **USER_DATA_REQUIRED** | Production’da eşleşen user yok; kaynak olmadan hesap yaratılmaz. |
+| `MG-SGK-PERIOD-SUBE-12-13` | İzmir/Sakarya SGK bildirim dönemi | **TECHNICAL_GAP** (Priority A) | Runtime `SgkSirketPolitikaReadService` branch-scoped; 12/13 = `NO_APPROVED_POLICY` (revision inventory empty). Company decision `AY_1_SON_GUN` already known — seed/approve ops gate. |
+| `MG-PERSONNEL-NULL-LOCATION-016` | `calisma_lokasyonu_id` NULL | **DATA + BUSINESS** (Priority A) | Exact 16. AUTO=2 (160,211 → loc 5) NO-APPLY plan; 14 = HR_BUSINESS_DECISION_REQUIRED. |
+| `MG-PERSONNEL-NULL-BRANCH-001` | `sube_id` NULL | **BUSINESS_DECISION_REQUIRED** (Priority A) | Exact 1: personel_id 212. CAN_APPLY=NO. |
 
 ## Teknik borç (non-blocking)
 
@@ -95,7 +98,7 @@ Açık teknik borç kalemi yoktur.
 | `MG-SGK-BILDIRGE-001` | SGK bildirgesi çıktısı | **FUTURE** | |
 | `MG-SELF-PAY-001` | PERSONEL maaş/bordro self-view | **OUT_OF_SCOPE** | |
 | `MG-QR-REV-UX-001` | QR anomaly → kontrollü revizyon UX | **INTENTIONAL_DEFER** | |
-| `MG-ORG-LOCATION-BRANCH-MAP-001` | 7 çalışma lokasyonunun şube eşlemesi | **INTENTIONAL_DEFER** | İlk mapping'de bilinçli deferred; `sube_id` NULL kaldı ve readiness'i bloke etmiyor. Karar kaydı: İzmir ve Sakarya lokasyonları MEDISA'ya aittir ve MEDISA altında **ayrı şube adaylarıdır** (`Medisa / İzmir`, `Medisa / Sakarya`). Şube oluşturma yapılmadı; gerçek eşleme yeni envanter matrisinin (`personnel_location_branch_matrix`) sonucunu **ve** ayrı production onayını bekler. |
+| `MG-ORG-LOCATION-BRANCH-MAP-001` | 7 çalışma lokasyonunun şube eşlemesi | **CLOSED_CONFIRMED** (catalog) | Canlıda 7/7 lokasyon `sube_id` mapped (inventory orphan_lokasyon=0). Personel `calisma_lokasyonu_id` fill ayrı (`MG-PERSONNEL-NULL-LOCATION-016`). Tarihsel: ilk mapping turunda deferred idi — live truth değildir. |
 | `MG-FSC-025-001` | FSC %25 aktif bandı | **INTENTIONAL_DEFER** | |
 
 ## Final sınıflandırma özeti
@@ -124,13 +127,25 @@ Açık teknik borç kalemi yoktur.
 4. **`DIS_KAYNAK` modeli `CLOSED_CONFIRMED` (076).** Import reopen / migration re-apply yok.
 5. **Olağanüstü çalışma acil karar bekleyen açık iş değildir** (`INTENTIONAL_DEFER`).
 6. **Bordro PDF / banka / SGK filing / FSC / QR-revizyon UX bug veya OPS_ROLLOUT değildir.**
-7. **Organizasyon eşlemesi artık `CODE_READY / NOT_EXECUTED` değildir.** İlk production mapping çalıştırıldı (`33342644722`), `data_ready = true`; eski spec yeniden uygulanmaz. Kalan tek kalem 7 lokasyonun bilinçli deferred eşlemesidir ve bu bir bug değildir.
+7. **Organizasyon eşlemesi ve Medisa lokasyon katalog mapping kapanmıştır.** İlk şirket/şube/SGK mapping + sonraki Medisa location→branch apply live; eski deferred-location dili bayattır. Kalan Priority A = SGK period 12/13 + personel location/branch residuals (bkz. `CURRENT_STATE.md`, `ops/organization-mapping/a1-a2-a3-no-apply-remediation-plan.json`).
+8. **202/208 exit-date residual kapanmıştır** — Priority listesine girmez.
+9. **PR #271 / migration 087 / Medisa grants kapanmıştır** — yeni contradiction olmadan reopen yok.
 
 ## Kalan güvenli iş sırası (kullanıcı/ops)
 
-1. `SUBE_YONETICISI` explicit kullanıcı–şube atamaları (iş sahibi kararı).
-2. Fiziksel imha yalnız ayrı execution onayı + yedek kanıtı + bakım penceresi ile.
-3. Salt-okunur envanterin schema version `3` ile yeniden çalıştırılması (ayrı dispatch onayı), ardından 7 lokasyonun matris kanıtına dayalı kararı. İzmir/Sakarya şubeleri (`MDS-IZM` id 12, `MDS-SAK` id 13) canonical audited create owner ile oluşturuldu; envanter bunları audited extension olarak kabul eder.
+**Priority A**
+1. Medisa sube 12/13 için `AY_1_SON_GUN` ONAYLANDI politika seed/approve (TECHNICAL_GAP).
+2. Personel location remediation: 2 AUTO candidate (160, 211) ayrı apply onayı; 14 HR kararı.
+3. Personel 212 `sube_id` (+ location) HR kararı.
+
+**Priority B**
+4. `SUBE_YONETICISI` remaining Medisa branches (1,5,6,12,13).
+5. Cross-company axis contradictions 120/158/219 (Şenay/Karyapı defer bitene veya purity kararı).
+
+**Priority C**
+6. Post-bulk PERSONEL accounts 213–226 / QR self-service INTENTIONAL_DEFER.
+7. Karyapı / Şenay company rollout INTENTIONAL_DEFER.
+8. Fiziksel imha yalnız ayrı execution onayı + yedek kanıtı + bakım penceresi ile.
 
 > **Bayat madde kaldırıldı:** DIS bölüm/birim zorunluluk kararı (`130` + `076` rollout) kapanmıştır; import reopen maddesi geçersizdir.
 

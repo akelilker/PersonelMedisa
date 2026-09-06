@@ -79,12 +79,23 @@
     "production_seed_rows": []
   },
   "production_state_pins": {
-    "CODE_MIGRATION_TIP": "087",
-    "PRODUCTION_MIGRATION_TIP": "086",
-    "PRODUCTION_MIGRATION_PENDING": 1,
-    "PRODUCTION_DEPLOY_SHA": "07dd060ee2b473cd1292566a29990c59538c92c5",
-    "pending_migrations": ["087"],
-    "live_validation": "PASS @ 086"
+    "NOTE": "Historical PLAN pin at plan authoring time — NOT current/live. Live tip=087 pending=EMPTY deploy=fcee6718; see CURRENT_STATE.md and a1-a2-a3-no-apply-remediation-plan.json.",
+    "HISTORICAL_CODE_MIGRATION_TIP": "087",
+    "HISTORICAL_PRODUCTION_MIGRATION_TIP": "086",
+    "HISTORICAL_PRODUCTION_MIGRATION_PENDING": 1,
+    "HISTORICAL_PRODUCTION_DEPLOY_SHA": "07dd060ee2b473cd1292566a29990c59538c92c5",
+    "HISTORICAL_pending_migrations": ["087"],
+    "HISTORICAL_live_validation": "PASS @ 086 (pre-087-apply plan pin)"
+  },
+  "live_readback_after_plan": {
+    "as_of": "2026-09-06T20:45:00Z",
+    "PRODUCTION_MIGRATION_TIP": "087",
+    "PRODUCTION_MIGRATION_PENDING": 0,
+    "PRODUCTION_DEPLOY_SHA": "fcee67186f1ceaec86624ecbe745f51f56330bcd",
+    "user_sirketler": 3,
+    "user_sgk_isverenler": 3,
+    "work_locations_mapped": "7/7 APPLIED",
+    "plan_apply_status": "TARGETS_IN_THIS_FILE_WERE_APPLIED_IN_LATER_GATES — file retained as historical PLAN evidence"
   },
   "production_mutation": 0,
   "migration_apply": "NONE"

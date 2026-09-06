@@ -1,0 +1,280 @@
+{
+  "phase": "PERSONELMEDISA_A1_A2_A3_EVIDENCE_LOCK_AND_DATA_REMEDIATION_PREP",
+  "status": "PLAN_ONLY_NO_APPLY",
+  "generated_at": "2026-09-06T21:35:00Z",
+  "evidence": {
+    "live_sha": "fcee67186f1ceaec86624ecbe745f51f56330bcd",
+    "production_migration_tip": "087",
+    "pending_migrations": [],
+    "inventory_run_id": 34057486092,
+    "inventory_checksum": "d83929ea674dac94219801b8d80810b07720196c9b6abf6fc621786d38ac56b2",
+    "inventory_generated_at": "2026-09-06T20:30:02Z",
+    "api_read_mode": "READ_ONLY_JWT_GET",
+    "api_read_at": "2026-09-06T21:31:00Z",
+    "mutation": 0
+  },
+  "owners": {
+    "sgk_period_runtime": "SgkSirketPolitikaReadService::resolveForPeriod (per-sube_id; no company inheritance)",
+    "personnel_field_write": "authenticated PUT /personeller/{id} (PersonellerController) — NOT used this turn",
+    "plan_format": "ops/organization-mapping/* PLAN_ONLY_NO_APPLY JSON"
+  },
+  "a1_sgk_period": {
+    "status": "TECHNICAL_GAP",
+    "business_decision": "1_TO_MONTH_END / runtime AY_1_SON_GUN (Medisa canonical; already decided)",
+    "branch_12": {
+      "SUBE_ID": 12,
+      "SIRKET_ID": 1,
+      "SGK_ISVEREN_ID": 1,
+      "PERIOD_POLICY": "UNKNOWN",
+      "POLICY_SOURCE": "NONE",
+      "POLICY_OWNER": "SgkSirketPolitikaReadService",
+      "EXPLICIT_OR_INHERITED": "NEITHER",
+      "RUNTIME_EFFECTIVE_VALUE": "NO_APPROVED_POLICY",
+      "VERIFICATION_STATUS": "TECHNICAL_GAP",
+      "revision_inventory_count": 0
+    },
+    "branch_13": {
+      "SUBE_ID": 13,
+      "SIRKET_ID": 1,
+      "SGK_ISVEREN_ID": 1,
+      "PERIOD_POLICY": "UNKNOWN",
+      "POLICY_SOURCE": "NONE",
+      "POLICY_OWNER": "SgkSirketPolitikaReadService",
+      "EXPLICIT_OR_INHERITED": "NEITHER",
+      "RUNTIME_EFFECTIVE_VALUE": "NO_APPROVED_POLICY",
+      "VERIFICATION_STATUS": "TECHNICAL_GAP",
+      "revision_inventory_count": 0
+    },
+    "note": "Missing explicit ONAYLANDI row is a runtime gap: selector is branch-scoped only. Company-level inheritance does NOT exist. Next gate = dual-control import/approve AY_1_SON_GUN for sube 12 and 13 (separate approval)."
+  },
+  "approved_branch_location_candidates_only": {
+    "5": 1,
+    "2": 2,
+    "6": 3,
+    "12": 4,
+    "1": 5,
+    "4": 6,
+    "13": 7
+  },
+  "mutation_candidates": [
+    {
+      "PERSONEL_ID": 160,
+      "AD_SOYAD": "Sedanur Bulut",
+      "FIELD": "calisma_lokasyonu_id",
+      "CURRENT_VALUE": null,
+      "TARGET_VALUE": 5,
+      "EVIDENCE": "Medisa branch sube_id=1; SGK=1; approved mapping 1→5; user-confirmed physical Fabrika/Karabük work location (Medisa-only scope lock)",
+      "CLASSIFICATION": "AUTO_RESOLVABLE_FROM_APPROVED_CANONICAL_MAPPING",
+      "CAN_APPLY": "YES",
+      "BLOCKER": "NONE — awaiting explicit apply approval; this plan does not apply"
+    },
+    {
+      "PERSONEL_ID": 211,
+      "AD_SOYAD": "Zeynep Günal",
+      "FIELD": "calisma_lokasyonu_id",
+      "CURRENT_VALUE": null,
+      "TARGET_VALUE": 5,
+      "EVIDENCE": "Medisa branch sube_id=1; SGK=1; approved mapping 1→5; user-confirmed physical Fabrika/Karabük work location (Medisa-only scope lock)",
+      "CLASSIFICATION": "AUTO_RESOLVABLE_FROM_APPROVED_CANONICAL_MAPPING",
+      "CAN_APPLY": "YES",
+      "BLOCKER": "NONE — awaiting explicit apply approval; this plan does not apply"
+    }
+  ],
+  "non_apply_rows": [
+    {
+      "PERSONEL_ID": 1,
+      "FIELD": "calisma_lokasyonu_id",
+      "CURRENT_VALUE": null,
+      "TARGET_VALUE": null,
+      "CANDIDATE_FROM_BRANCH": 5,
+      "CLASSIFICATION": "HR_BUSINESS_DECISION_REQUIRED",
+      "CAN_APPLY": "NO",
+      "BLOCKER": "PASIF residual; physical location not proven by authoritative personnel state"
+    },
+    {
+      "PERSONEL_ID": 2,
+      "FIELD": "calisma_lokasyonu_id",
+      "CURRENT_VALUE": null,
+      "TARGET_VALUE": null,
+      "CANDIDATE_FROM_BRANCH": 2,
+      "CLASSIFICATION": "HR_BUSINESS_DECISION_REQUIRED",
+      "CAN_APPLY": "NO",
+      "BLOCKER": "PASIF residual; physical location not proven"
+    },
+    {
+      "PERSONEL_ID": 3,
+      "FIELD": "calisma_lokasyonu_id",
+      "CURRENT_VALUE": null,
+      "TARGET_VALUE": null,
+      "CANDIDATE_FROM_BRANCH": 2,
+      "CLASSIFICATION": "HR_BUSINESS_DECISION_REQUIRED",
+      "CAN_APPLY": "NO",
+      "BLOCKER": "PASIF test residual; physical location not proven"
+    },
+    {
+      "PERSONEL_ID": 4,
+      "FIELD": "calisma_lokasyonu_id",
+      "CURRENT_VALUE": null,
+      "TARGET_VALUE": null,
+      "CANDIDATE_FROM_BRANCH": 2,
+      "CLASSIFICATION": "HR_BUSINESS_DECISION_REQUIRED",
+      "CAN_APPLY": "NO",
+      "BLOCKER": "PASIF test residual; physical location not proven"
+    },
+    {
+      "PERSONEL_ID": 200,
+      "FIELD": "calisma_lokasyonu_id",
+      "CURRENT_VALUE": null,
+      "TARGET_VALUE": null,
+      "CANDIDATE_FROM_BRANCH": 5,
+      "CLASSIFICATION": "HR_BUSINESS_DECISION_REQUIRED",
+      "CAN_APPLY": "NO",
+      "BLOCKER": "Branch mapping is candidate only; physical location not proven"
+    },
+    {
+      "PERSONEL_ID": 201,
+      "FIELD": "calisma_lokasyonu_id",
+      "CURRENT_VALUE": null,
+      "TARGET_VALUE": null,
+      "CANDIDATE_FROM_BRANCH": 5,
+      "CLASSIFICATION": "HR_BUSINESS_DECISION_REQUIRED",
+      "CAN_APPLY": "NO",
+      "BLOCKER": "Branch mapping is candidate only; physical location not proven"
+    },
+    {
+      "PERSONEL_ID": 203,
+      "FIELD": "calisma_lokasyonu_id",
+      "CURRENT_VALUE": null,
+      "TARGET_VALUE": null,
+      "CANDIDATE_FROM_BRANCH": 5,
+      "CLASSIFICATION": "HR_BUSINESS_DECISION_REQUIRED",
+      "CAN_APPLY": "NO",
+      "BLOCKER": "Org labels mention Karabük Depo but are not authoritative location FK evidence"
+    },
+    {
+      "PERSONEL_ID": 204,
+      "FIELD": "calisma_lokasyonu_id",
+      "CURRENT_VALUE": null,
+      "TARGET_VALUE": null,
+      "CANDIDATE_FROM_BRANCH": 5,
+      "CLASSIFICATION": "HR_BUSINESS_DECISION_REQUIRED",
+      "CAN_APPLY": "NO",
+      "BLOCKER": "Branch mapping is candidate only; physical location not proven"
+    },
+    {
+      "PERSONEL_ID": 205,
+      "FIELD": "calisma_lokasyonu_id",
+      "CURRENT_VALUE": null,
+      "TARGET_VALUE": null,
+      "CANDIDATE_FROM_BRANCH": 5,
+      "CLASSIFICATION": "HR_BUSINESS_DECISION_REQUIRED",
+      "CAN_APPLY": "NO",
+      "BLOCKER": "Branch mapping is candidate only; physical location not proven"
+    },
+    {
+      "PERSONEL_ID": 206,
+      "FIELD": "calisma_lokasyonu_id",
+      "CURRENT_VALUE": null,
+      "TARGET_VALUE": null,
+      "CANDIDATE_FROM_BRANCH": 5,
+      "CLASSIFICATION": "HR_BUSINESS_DECISION_REQUIRED",
+      "CAN_APPLY": "NO",
+      "BLOCKER": "Branch mapping is candidate only; physical location not proven"
+    },
+    {
+      "PERSONEL_ID": 209,
+      "FIELD": "calisma_lokasyonu_id",
+      "CURRENT_VALUE": null,
+      "TARGET_VALUE": null,
+      "CANDIDATE_FROM_BRANCH": 5,
+      "CLASSIFICATION": "HR_BUSINESS_DECISION_REQUIRED",
+      "CAN_APPLY": "NO",
+      "BLOCKER": "Branch mapping is candidate only; physical location not proven"
+    },
+    {
+      "PERSONEL_ID": 210,
+      "FIELD": "calisma_lokasyonu_id",
+      "CURRENT_VALUE": null,
+      "TARGET_VALUE": null,
+      "CANDIDATE_FROM_BRANCH": 3,
+      "CLASSIFICATION": "HR_BUSINESS_DECISION_REQUIRED",
+      "CAN_APPLY": "NO",
+      "BLOCKER": "İstanbul branch candidate only; physical location not proven"
+    },
+    {
+      "PERSONEL_ID": 212,
+      "FIELD": "calisma_lokasyonu_id",
+      "CURRENT_VALUE": null,
+      "TARGET_VALUE": null,
+      "CANDIDATE_FROM_BRANCH": null,
+      "CLASSIFICATION": "HR_BUSINESS_DECISION_REQUIRED",
+      "CAN_APPLY": "NO",
+      "BLOCKER": "sube_id also NULL; no mapping candidate"
+    },
+    {
+      "PERSONEL_ID": 212,
+      "FIELD": "sube_id",
+      "CURRENT_VALUE": null,
+      "TARGET_VALUE": null,
+      "CLASSIFICATION": "HR_BUSINESS_DECISION_REQUIRED",
+      "CAN_APPLY": "NO",
+      "BLOCKER": "calisma_lokasyonu_id also NULL; location→branch AUTO gate fails"
+    },
+    {
+      "PERSONEL_ID": 217,
+      "FIELD": "calisma_lokasyonu_id",
+      "CURRENT_VALUE": null,
+      "TARGET_VALUE": null,
+      "CANDIDATE_FROM_BRANCH": 5,
+      "CLASSIFICATION": "HR_BUSINESS_DECISION_REQUIRED",
+      "CAN_APPLY": "NO",
+      "BLOCKER": "Branch mapping is candidate only; physical location not proven"
+    },
+    {
+      "PERSONEL_ID": 120,
+      "FIELD": "cross_company_residual",
+      "CURRENT_BRANCH": 11,
+      "CURRENT_SGK": 3,
+      "CURRENT_LOCATION": 5,
+      "LOCATION_MAPPED_BRANCH": 1,
+      "CONTRADICTION": "YES",
+      "CLASSIFICATION": "BUSINESS_DECISION_REQUIRED",
+      "CAN_APPLY": "NO",
+      "BLOCKER": "Şenay branch + Medisa-mapped location; Şenay rollout INTENTIONAL_DEFER; no silent Medisa overwrite"
+    },
+    {
+      "PERSONEL_ID": 158,
+      "FIELD": "cross_company_residual",
+      "CURRENT_BRANCH": 11,
+      "CURRENT_SGK": 3,
+      "CURRENT_LOCATION": 5,
+      "LOCATION_MAPPED_BRANCH": 1,
+      "CONTRADICTION": "YES",
+      "CLASSIFICATION": "BUSINESS_DECISION_REQUIRED",
+      "CAN_APPLY": "NO",
+      "BLOCKER": "Şenay branch + Medisa-mapped location; Şenay rollout INTENTIONAL_DEFER; no silent Medisa overwrite"
+    },
+    {
+      "PERSONEL_ID": 219,
+      "FIELD": "cross_company_residual",
+      "CURRENT_BRANCH": 10,
+      "CURRENT_SGK": 1,
+      "CURRENT_LOCATION": 3,
+      "LOCATION_MAPPED_BRANCH": 6,
+      "CONTRADICTION": "YES",
+      "CLASSIFICATION": "BUSINESS_DECISION_REQUIRED",
+      "CAN_APPLY": "NO",
+      "BLOCKER": "Karyapı branch + Medisa-mapped location; Karyapı rollout INTENTIONAL_DEFER; no silent Medisa overwrite"
+    }
+  ],
+  "counts": {
+    "AUTO_RESOLVABLE_COUNT": 2,
+    "BUSINESS_DECISION_REQUIRED_COUNT": 14,
+    "CROSS_COMPANY_DEFER_COUNT": 0,
+    "DATA_CONTRADICTION_COUNT": 3,
+    "PLAN_CAN_APPLY_COUNT": 2,
+    "note": "BUSINESS_DECISION_REQUIRED_COUNT = unique A2/A3 people excluding 2 AUTO (14). DATA_CONTRADICTION_COUNT = cross-company axis contradictions 120/158/219 (also require business decision; CAN_APPLY=NO)."
+  },
+  "production_mutation": 0,
+  "apply": "NONE"
+}

@@ -14,8 +14,17 @@ pinler. Bunları bugünkü production truth sanıp yeniden apply etmek yasaktır
 canlı şube adları / şirket bağları DB + `SubeReadModel` üzerinden okunur.
 
 Canlı özet (display modeli): `subeler.ad` = kısa ad; global görünen ad =
-`SubeReadModel.tam_ad` (DB kolonu değildir). Lokasyon→şube ve user şirket/SGK
-scope rollout ayrı deferred kalemlerdir.
+`SubeReadModel.tam_ad` (DB kolonu değildir).
+
+**Live (2026-09-06/07):** migration tip **087** / pending EMPTY; Medisa
+work-location catalog mapping **APPLIED** (7/7); Medisa approved user
+company/SGK/branch grants **APPLIED**; Karyapı/Şenay company rollout
+**INTENTIONAL_DEFER**. Personnel location/branch residuals and SGK period
+gap for sube 12/13: see `CURRENT_STATE.md` and
+`a1-a2-a3-no-apply-remediation-plan.json`.
+
+Historical note: early docs described location→şube and user şirket/SGK scope
+as deferred — that language is archival for the first mapping tour only.
 
 ## Publication boundary önkoşulu
 

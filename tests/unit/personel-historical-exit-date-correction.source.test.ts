@@ -28,11 +28,18 @@ describe("Personel historical exit-date correction source contract", () => {
     expect(correction).toContain("assertSurecPreimageExactOld");
     expect(correction).toContain("ACTION_ALREADY_APPLIED");
     expect(correction).toContain("PersonelHistoricalExitDateCorrectionAuditService::appendInTransaction");
+    expect(correction).toContain("Preserve original business aciklama");
     expect(correction).not.toContain("SET aktif_durum");
     expect(correction).not.toContain("aktif_durum = 'AKTIF'");
     // Preserve business aciklama on surec; do not overwrite with audit prefix.
-    expect(correction).toContain("Preserve original business aciklama");
     expect(correction).not.toMatch(/SET baslangic_tarihi[\s\S]*aciklama = :aciklama/);
+    // Dry-run checksum must not hash wall-clock audit fields.
+    expect(correction).not.toMatch(
+      /buildAuditRecord[\s\S]*?return \[[\s\S]*?'created_at'\s*=>\s*RetentionClock::now\(\)/
+    );
+    expect(correction).not.toMatch(
+      /buildAuditRecord[\s\S]*?return \[[\s\S]*?'timestamp'\s*=>\s*RetentionClock::now\(\)/
+    );
 
     expect(backfill).toContain("HISTORICAL_EXIT_BACKFILL_CONFLICT");
     expect(backfill).not.toContain("CORRECT_HISTORICAL_ISTEN_AYRILMA");

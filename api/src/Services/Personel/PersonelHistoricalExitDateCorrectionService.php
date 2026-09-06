@@ -602,6 +602,9 @@ final class PersonelHistoricalExitDateCorrectionService
     ): array {
         $mutation = $mutationId !== null ? trim($mutationId) : '';
 
+        // Deterministic plan/audit fields only — wall-clock must not enter the
+        // bulk dry-run checksum preimage. Durable created_at is owned by the
+        // audit table DEFAULT CURRENT_TIMESTAMP via appendInTransaction().
         return [
             'operation_type' => self::OPERATION_TYPE,
             'actor_user_id' => $actorUserId,
@@ -616,8 +619,6 @@ final class PersonelHistoricalExitDateCorrectionService
             'new_exit_date' => $newBaslangic,
             'old_aciklama' => $oldAciklama,
             'reason' => $reason,
-            'created_at' => RetentionClock::now()->format(DATE_ATOM),
-            'timestamp' => RetentionClock::now()->format(DATE_ATOM),
         ];
     }
 

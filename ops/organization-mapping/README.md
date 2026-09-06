@@ -14,8 +14,15 @@ pinler. Bunları bugünkü production truth sanıp yeniden apply etmek yasaktır
 canlı şube adları / şirket bağları DB + `SubeReadModel` üzerinden okunur.
 
 Canlı özet (display modeli): `subeler.ad` = kısa ad; global görünen ad =
-`SubeReadModel.tam_ad` (DB kolonu değildir). Lokasyon→şube ve user şirket/SGK
-scope rollout ayrı deferred kalemlerdir.
+`SubeReadModel.tam_ad` (DB kolonu değildir).
+
+**Medisa çalışma lokasyonu → şube map = APPLIED** (apply run `34037103819`;
+fresh inventory `34062358628` exact: 1→5, 2→2, 3→6, 4→12, 5→1, 6→4, 7→13).
+İlk şirket/şube/SGK mapping historical preimage yeniden uygulanmaz.
+
+**Medisa user scope (`user_sirketler` / `user_sgk_isverenler`) = APPLIED**
+(PR #271; fresh totals sirket=3 / sgk=3). Karyapı / Şenay grants **DEFERRED**.
+Organization-mapping owner user scope yazmaz; Yönetim API ayrıdır.
 
 ## Publication boundary önkoşulu
 
@@ -81,5 +88,8 @@ Kurallar:
   operasyonda değişmez.
 - Çalışma lokasyonu ilişkisi kanıtlanamıyorsa `target_sube_id: null` ile deferred
   bırakılır. Lokasyonun NULL kalması `data_ready`'yi bloke etmez.
+  **Medisa 7 lokasyon map’i production’da APPLIED’dır** (yukarıdaki poststate);
+  bu madde historical preimage kurallarını anlatır, canlı deferred iddiası değildir.
 - User scope (`user_sirketler`, `user_sgk_isverenler`) rollout'u bu operasyonun
-  **dışındadır** ve bu owner tarafından yazılmaz.
+  **dışındadır** ve bu owner tarafından yazılmaz. Medisa grants PR #271 ile
+  ayrı owner’dan APPLIED; Karyapı/Şenay DEFERRED.

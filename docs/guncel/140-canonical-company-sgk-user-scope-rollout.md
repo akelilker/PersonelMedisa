@@ -1,6 +1,7 @@
 # 140 — Canonical company / SGK user-scope rollout inventory
 
-**Tür:** Read-only production rollout plan. **PRODUCTION MUTATION = 0** in this phase.
+**Tür:** Canonical scope axes + Medisa production poststate pin.
+**PRODUCTION MUTATION = 0** in this doc reconcile.
 
 ## Canonical axes
 
@@ -13,31 +14,31 @@
 
 Owner: `OrgScope` (+ `HrWriteScope` for `IK_PERSONELI` write companies). Session: `AuthMiddleware` / `LoginController`.
 
-## Production inventory (last read-only recon — grants still empty)
+## Production poststate (fresh inventory `34062358628` @ deploy `fcee671…`)
 
-| Object | Expected state at code rollout |
+| Object | Live state |
 | --- | --- |
-| `user_sirketler` | count = 0 |
-| `user_sgk_isverenler` | count = 0 |
-| Active users / roles | unchanged; no role delete/merge |
-| Karyapı / Şenay operational users | **UNKNOWN / DEFERRED** — do not invent |
+| `user_sirketler` | count = **3** |
+| `user_sgk_isverenler` | count = **3** |
+| `user_subeler` | count = **31** |
+| MUHASEBE role `user_subeler` assignments | **7** (matches Medisa target branch set size) |
+| Karyapı / Şenay operational company grants | **DEFERRED** — sirket-total stays 3; do not invent |
+| Medisa accounting visibility ACL (`sube_muhasebe_yetkilileri`) | schema **087 APPLIED**; empty table = restriction **disabled**; inventory does not publish ACL row_count |
 
-Re-verify with SELECT-only inventory before any mutation gate. Do not trust this doc as live truth after later production writes.
+PR #271 Medisa user-scope grants = **APPLIED** (authoritative close). Organization inventory publishes totals/role assignment counts only — not per-username payloads. Username-level re-GET requires Yönetim API auth and is out of inventory owner surface.
 
-## Planned user-scope changes (FUTURE mutation gate only)
+## Planned / deferred (not Medisa PR271 reopen)
 
 | User | Target | Notes |
 | --- | --- | --- |
 | `ilkerA` | keep `GENEL_YONETICI` | Cleanup of unnecessary per-branch grants = separate gate |
 | `serhan.kose` | Fabrika Müdürü → target `GENEL_YONETICI` | Separate production mutation gate |
-| `sedanurB` | keep `IK_SORUMLUSU` | Explicit org/company/SGK grants as needed; **not** `GENEL_YONETICI` |
+| Karyapı / Şenay users | deferred | Do not invent grants |
 | demo `bolum_yoneticisi` / `birim_amiri` accounts | possible removal | Separate gate; **roles themselves stay** |
-
-**Do not apply any of the above in this phase.**
 
 ## Explicit non-goals
 
 - Location → authorization axis
-- Production grant writes / migration apply / deploy
+- Re-applying Medisa grants without new contradictory live evidence
 - Multi-role remodel or role rename
 - Parallel scope resolver

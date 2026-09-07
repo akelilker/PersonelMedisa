@@ -127,11 +127,24 @@ describe("no-apply location / name / branch-manager plans", () => {
       ),
     );
     expect(plan.production_mutation).toBe(0);
-    expect(plan.architecture.BRANCH_MANAGER_TECHNICAL_STATUS).toBe("ALREADY_SUPPORTED");
-    expect(plan.architecture.TECHNICAL_FIX_REQUIRED).toBe(false);
+    expect(plan.architecture.USER_SUBELER_SEMANTIC).toBe("ACCESS_SCOPE_ONLY");
+    expect(plan.architecture.BRANCH_MANAGER_ASSIGNMENT_OWNER).toContain("sube_sorumlu_yoneticiler");
+    expect(plan.architecture.TABLE_MODEL).toContain("sube_sorumlu_yoneticiler");
+    expect(plan.architecture.MUST_NOT_ENCODE_MANAGERS_AS).toBe("user_subeler");
+    expect(plan.architecture.BRANCH_MANAGER_TECHNICAL_STATUS).toBe(
+      "TECHNICAL_GAP_LOCAL_FIXABLE"
+    );
+    expect(plan.architecture.TECHNICAL_FIX_REQUIRED).toBe(true);
+    expect(plan.architecture.TECHNICAL_FIX_PR).toBe(278);
+    expect(plan.architecture.MANAGER_ASSIGNMENT_GRANTS_ACCESS).toBe(false);
     expect(plan.architecture.MULTI_BRANCH_SUPPORTED).toBe(true);
     expect(plan.architecture.ZERO_MANAGER_SUPPORTED).toBe(true);
     expect(plan.architecture.SAME_BRANCH_REQUIRED).toBe(false);
+    expect(plan.a1_formal_sgk_scope.axis).toBe("user_subeler");
+    expect(plan.future_apply_steps.join("\n")).toContain("sube_sorumlu_yoneticiler");
+    expect(plan.future_apply_steps.join("\n")).not.toContain(
+      "Write only user_subeler grants for managed branches"
+    );
     const kayseri = plan.medisa_map.find((r: { sube_id: number }) => r.sube_id === 4);
     expect(kayseri.surname).toBe("UNKNOWN_DO_NOT_GUESS");
     expect(kayseri.identity_status).toBe("BUSINESS_IDENTITY_DECISION_REQUIRED");

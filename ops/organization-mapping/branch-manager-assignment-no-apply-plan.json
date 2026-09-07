@@ -1,27 +1,41 @@
 {
-  "phase": "BUSINESS_TRUTH_AND_BRANCH_MANAGER_MODEL_LOCK",
+  "phase": "BRANCH_MANAGER_ASSIGNMENT_SEMANTICS_CORRECTION_GATE",
   "status": "PLAN_ONLY_NO_APPLY",
-  "generated_at": "2026-09-07T21:10:00Z",
+  "generated_at": "2026-09-07T22:10:00Z",
   "production_mutation": 0,
   "apply": "NONE",
   "product_rule_doc": "docs/guncel/141-business-truth-and-branch-manager-model-lock.md",
+  "semantics_doc": "docs/guncel/142-branch-manager-assignment-semantics.md",
   "architecture": {
-    "BRANCH_MANAGER_ASSIGNMENT_OWNER": "YonetimController.replaceUserSubeler",
-    "TABLE_MODEL": "user_subeler(user_id,sube_id) + users.rol=SUBE_YONETICISI",
+    "USER_SUBELER_SEMANTIC": "ACCESS_SCOPE_ONLY",
+    "BRANCH_MANAGER_ASSIGNMENT_OWNER": "OrganizasyonService.sorumlu_yonetici_user_ids → SubeSorumluYoneticiSchema → sube_sorumlu_yoneticiler",
+    "TABLE_MODEL": "sube_sorumlu_yoneticiler(sube_id,user_id) PRIMARY KEY (sube_id,user_id)",
+    "MIGRATION": "088_sube_sorumlu_yoneticiler.sql",
     "USER_OR_PERSON_LINK": "optional users.personel_id (identity only; not authz)",
+    "MULTI_ROLE_REQUIRED": false,
+    "PRIMARY_ROLE_CHANGE_REQUIRED": false,
     "MULTI_BRANCH_SUPPORTED": true,
     "ZERO_MANAGER_SUPPORTED": true,
+    "MULTIPLE_MANAGERS_PER_BRANCH_SUPPORTED": true,
     "SAME_BRANCH_REQUIRED": false,
     "PERSONNEL_HOME_BRANCH_SIDE_EFFECT": false,
     "PHYSICAL_LOCATION_SIDE_EFFECT": false,
-    "BRANCH_MANAGER_TECHNICAL_STATUS": "ALREADY_SUPPORTED",
-    "TECHNICAL_FIX_REQUIRED": false
+    "MANAGER_ASSIGNMENT_GRANTS_ACCESS": false,
+    "BRANCH_MANAGER_TECHNICAL_STATUS": "TECHNICAL_GAP_LOCAL_FIXABLE",
+    "TECHNICAL_FIX_REQUIRED": true,
+    "TECHNICAL_FIX_PR": 278,
+    "MUST_NOT_ENCODE_MANAGERS_AS": "user_subeler"
   },
   "canonical_separation": [
     "PERSONNEL_HOME_BRANCH",
     "PHYSICAL_WORK_LOCATION",
-    "MANAGED_BRANCH_ASSIGNMENTS"
+    "MANAGED_BRANCH_ASSIGNMENTS",
+    "GENERIC_BRANCH_ACCESS_SCOPE_user_subeler"
   ],
+  "a1_formal_sgk_scope": {
+    "axis": "user_subeler",
+    "note": "A1 preparer/approver explicit SGK branch scope remains user_subeler; do not conflate with manager responsibility"
+  },
   "must_not_mutate_on_assignment": [
     "personel.sube_id",
     "personel.calisma_lokasyonu_id",
@@ -31,13 +45,18 @@
     "bolum",
     "birim",
     "gorev",
-    "pozisyon"
+    "pozisyon",
+    "users.rol",
+    "user_subeler"
   ],
   "must_not": [
     "invoke PersonelKaliciSubeDegisikligiService",
     "fake local personnel transfer",
     "force a branch to have a local manager",
-    "special-case only Fabrika/Genel Merkez"
+    "special-case only Fabrika/Genel Merkez",
+    "encode branch managers through user_subeler",
+    "force primary role to SUBE_YONETICISI",
+    "introduce multi-role solely for manager assignment"
   ],
   "medisa_map": [
     {
@@ -105,11 +124,13 @@
   },
   "future_apply_steps": [
     "1. Hosting recovery",
-    "2. Live verify Sinem / Halil / Kübra identities",
-    "3. Resolve Kayseri Kübra surname (BUSINESS_IDENTITY_DECISION_REQUIRED)",
-    "4. Explicit user approval",
-    "5. Ensure role SUBE_YONETICISI where required (no personnel transfer)",
-    "6. Write only user_subeler grants for managed branches",
-    "7. Readback: personel.sube_id and calisma_lokasyonu_id unchanged"
+    "2. Merge/deploy ordered runtime including migration 088 (PR #278) — schema only, zero manager rows",
+    "3. Live verify Sinem / Halil / Kübra identities",
+    "4. Resolve Kayseri Kübra surname (BUSINESS_IDENTITY_DECISION_REQUIRED)",
+    "5. Explicit user approval",
+    "6. Write ONLY sube_sorumlu_yoneticiler rows for managed branches (OrganizasyonService.sorumlu_yonetici_user_ids)",
+    "7. Do NOT write manager facts into user_subeler; keep user_subeler for access/A1 SGK formal scope only",
+    "8. Do NOT force users.rol to SUBE_YONETICISI / no multi-role",
+    "9. Readback: personel.sube_id, calisma_lokasyonu_id, users.rol, and user_subeler unchanged by manager writes"
   ]
 }

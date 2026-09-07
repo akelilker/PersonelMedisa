@@ -1,16 +1,24 @@
 /**
- * A1 approver-candidate read-only probe helper.
+ * A1 approver read-only probe helper (Sinem Hamaloğlu business lock).
  * Plan-only / local prep: does NOT connect to production unless explicitly forced
  * with TARGET_ENV + A1_RO_PROBE_EXECUTE=1 and a DSN. Default is dry checklist mode.
  *
  * Mutation: never. Forbidden SQL verbs are rejected if a statement is supplied.
+ * Live username/role/scopes remain VERIFY_LIVE_REQUIRED until hosting recovery.
  */
 "use strict";
 
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-export const A1_APPROVER_CANDIDATES = Object.freeze(["343", "220", "017", "349"]);
+/** Historical local keys used to find Sinem for live verify — not certified live values. */
+export const A1_APPROVER_DISPLAY_NAME = "Sinem Hamaloğlu";
+export const A1_APPROVER_INTENDED_ROLE_MODEL = "BOLUM_YONETICISI";
+export const A1_APPROVER_PROBE_USERNAMES = Object.freeze(["sinemH"]);
+export const A1_APPROVER_LOCAL_USER_ID = 110;
+export const A1_APPROVER_LOCAL_PERSONEL_ID = 173;
+/** @deprecated retained empty so older imports do not crash; probe no longer uses sicil candidates */
+export const A1_APPROVER_CANDIDATES = Object.freeze([]);
 export const A1_PREPARER_USERNAME = "sedanurB";
 export const A1_EXCLUDED_SENAY_LINKED = Object.freeze(["005", "004"]);
 export const A1_REQUIRED_OUTPUT_COLUMNS = Object.freeze([
@@ -76,6 +84,10 @@ export function loadApproverProbeSql(sqlPath) {
  *   candidates: readonly string[],
  *   excluded: readonly string[],
  *   preparer: string,
+ *   approverDisplayName: string,
+ *   intendedRoleModel: string,
+ *   localUserId: number,
+ *   localPersonelId: number,
  *   requiredColumns: readonly string[],
  * }}
  */
@@ -104,9 +116,13 @@ export function buildApproverProbePlan(env = process.env) {
     targetEnv: targetEnv || null,
     canExecute,
     blockers,
-    candidates: A1_APPROVER_CANDIDATES,
+    candidates: A1_APPROVER_PROBE_USERNAMES,
     excluded: A1_EXCLUDED_SENAY_LINKED,
     preparer: A1_PREPARER_USERNAME,
+    approverDisplayName: A1_APPROVER_DISPLAY_NAME,
+    intendedRoleModel: A1_APPROVER_INTENDED_ROLE_MODEL,
+    localUserId: A1_APPROVER_LOCAL_USER_ID,
+    localPersonelId: A1_APPROVER_LOCAL_PERSONEL_ID,
     requiredColumns: A1_REQUIRED_OUTPUT_COLUMNS,
   };
 }

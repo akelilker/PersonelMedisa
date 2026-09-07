@@ -60,11 +60,32 @@ export function validatePersonnelDecisionPack(pack) {
         return { ok: false, code: `MISSING_COLUMN_${col}` };
       }
     }
-    if (rec.CLASS === "BUSINESS_DECISION_REQUIRED" && rec.PERSONEL_ID === 212) {
-      // Explicit lock: never auto-suggest a target for 212 in this pack.
-      if ("TARGET" in rec && rec.TARGET != null) {
-        return { ok: false, code: "PERSONEL_212_TARGET_FORBIDDEN" };
-      }
+  }
+  const classes = /** @type {Record<string, unknown>} */ (body.classes || {});
+  if (!Array.isArray(classes.AUTO_RESOLVABLE_BY_CONFIRMED_TRUTH)) {
+    return { ok: false, code: "AUTO_RESOLVABLE_REQUIRED" };
+  }
+  if (!Array.isArray(classes.BUSINESS_DECISION_REQUIRED)) {
+    return { ok: false, code: "BUSINESS_DECISION_REQUIRED_ARRAY" };
+  }
+  if (!Array.isArray(classes.CROSS_COMPANY_SEMANTICALLY_VALID)) {
+    return { ok: false, code: "CROSS_COMPANY_REQUIRED" };
+  }
+  // Locked loc5 set must remain no-apply until hosting recovery + preimage.
+  const expectedLoc5 = [200, 201, 203, 204, 205, 206, 209, 210, 212, 217];
+  const auto = classes.AUTO_RESOLVABLE_BY_CONFIRMED_TRUTH.map(Number);
+  for (const id of expectedLoc5) {
+    if (!auto.includes(id)) {
+      return { ok: false, code: `LOC5_TRUTH_MISSING_${id}` };
+    }
+  }
+  if (classes.BUSINESS_DECISION_REQUIRED.length !== 0) {
+    return { ok: false, code: "UNEXPECTED_BUSINESS_DECISION_ROWS" };
+  }
+  const cross = classes.CROSS_COMPANY_SEMANTICALLY_VALID.map(Number);
+  for (const id of [120, 158, 219]) {
+    if (!cross.includes(id)) {
+      return { ok: false, code: `CROSS_COMPANY_MISSING_${id}` };
     }
   }
   return { ok: true };

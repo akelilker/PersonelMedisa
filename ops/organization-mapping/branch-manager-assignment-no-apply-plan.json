@@ -1,0 +1,115 @@
+{
+  "phase": "BUSINESS_TRUTH_AND_BRANCH_MANAGER_MODEL_LOCK",
+  "status": "PLAN_ONLY_NO_APPLY",
+  "generated_at": "2026-09-07T21:10:00Z",
+  "production_mutation": 0,
+  "apply": "NONE",
+  "product_rule_doc": "docs/guncel/141-business-truth-and-branch-manager-model-lock.md",
+  "architecture": {
+    "BRANCH_MANAGER_ASSIGNMENT_OWNER": "YonetimController.replaceUserSubeler",
+    "TABLE_MODEL": "user_subeler(user_id,sube_id) + users.rol=SUBE_YONETICISI",
+    "USER_OR_PERSON_LINK": "optional users.personel_id (identity only; not authz)",
+    "MULTI_BRANCH_SUPPORTED": true,
+    "ZERO_MANAGER_SUPPORTED": true,
+    "SAME_BRANCH_REQUIRED": false,
+    "PERSONNEL_HOME_BRANCH_SIDE_EFFECT": false,
+    "PHYSICAL_LOCATION_SIDE_EFFECT": false,
+    "BRANCH_MANAGER_TECHNICAL_STATUS": "ALREADY_SUPPORTED",
+    "TECHNICAL_FIX_REQUIRED": false
+  },
+  "canonical_separation": [
+    "PERSONNEL_HOME_BRANCH",
+    "PHYSICAL_WORK_LOCATION",
+    "MANAGED_BRANCH_ASSIGNMENTS"
+  ],
+  "must_not_mutate_on_assignment": [
+    "personel.sube_id",
+    "personel.calisma_lokasyonu_id",
+    "company",
+    "sgk_isveren_id",
+    "departman",
+    "bolum",
+    "birim",
+    "gorev",
+    "pozisyon"
+  ],
+  "must_not": [
+    "invoke PersonelKaliciSubeDegisikligiService",
+    "fake local personnel transfer",
+    "force a branch to have a local manager",
+    "special-case only Fabrika/Genel Merkez"
+  ],
+  "medisa_map": [
+    {
+      "branch_label": "Fabrika/Karabük",
+      "sube_id": 1,
+      "manager_intent": "Sinem Hamaloğlu",
+      "assignment_class": "DEDICATED",
+      "identity_status": "VERIFY_LIVE_REQUIRED"
+    },
+    {
+      "branch_label": "Giresun",
+      "sube_id": 2,
+      "manager_intent": "Halil Şenay",
+      "assignment_class": "DEDICATED",
+      "identity_status": "VERIFY_LIVE_REQUIRED",
+      "local_historical_keys": {
+        "user_id": 50,
+        "username": "040",
+        "personel_id": 112
+      }
+    },
+    {
+      "branch_label": "Kayseri",
+      "sube_id": 4,
+      "manager_intent": "Kübra",
+      "surname": "UNKNOWN_DO_NOT_GUESS",
+      "assignment_class": "DEDICATED",
+      "identity_status": "BUSINESS_IDENTITY_DECISION_REQUIRED"
+    },
+    {
+      "branch_label": "İzmir",
+      "sube_id": 12,
+      "manager_intent": "Halil Şenay",
+      "assignment_class": "DEDICATED",
+      "identity_status": "VERIFY_LIVE_REQUIRED"
+    },
+    {
+      "branch_label": "Ankara",
+      "sube_id": 5,
+      "manager_intent": "Sinem Hamaloğlu",
+      "assignment_class": "TEMPORARY_CENTRAL",
+      "note": "no dedicated local manager currently; same canonical managed-branch model if assigned",
+      "identity_status": "VERIFY_LIVE_REQUIRED"
+    },
+    {
+      "branch_label": "İstanbul",
+      "sube_id": 6,
+      "manager_intent": "Sinem Hamaloğlu",
+      "assignment_class": "TEMPORARY_CENTRAL",
+      "note": "no dedicated local manager currently; same canonical managed-branch model if assigned",
+      "identity_status": "VERIFY_LIVE_REQUIRED"
+    },
+    {
+      "branch_label": "Sakarya",
+      "sube_id": 13,
+      "manager_intent": "Sinem Hamaloğlu",
+      "assignment_class": "TEMPORARY_CENTRAL",
+      "note": "no dedicated local manager currently; same canonical managed-branch model if assigned",
+      "identity_status": "VERIFY_LIVE_REQUIRED"
+    }
+  ],
+  "multi_branch_examples": {
+    "Halil_Senay_intended": [2, 12],
+    "Sinem_Hamaloglu_intended_if_assigned": [1, 5, 6, 13]
+  },
+  "future_apply_steps": [
+    "1. Hosting recovery",
+    "2. Live verify Sinem / Halil / Kübra identities",
+    "3. Resolve Kayseri Kübra surname (BUSINESS_IDENTITY_DECISION_REQUIRED)",
+    "4. Explicit user approval",
+    "5. Ensure role SUBE_YONETICISI where required (no personnel transfer)",
+    "6. Write only user_subeler grants for managed branches",
+    "7. Readback: personel.sube_id and calisma_lokasyonu_id unchanged"
+  ]
+}

@@ -1,7 +1,9 @@
--- A1 approver candidate RO probe — SELECT ONLY.
+-- A1 approver RO probe — SELECT ONLY.
 -- Forbidden: write DML/DDL. Allowed: SELECT projection below.
--- Candidates: usernames 343, 220, 017, 349. Excluded unless new evidence: 005, 004 (Senay-linked).
--- Preparer reference (not a candidate): sedanurB.
+-- Business-locked approver: Sinem Hamaloğlu (intended formal SGK role/model = BOLUM_YONETICISI; temporary assignment).
+-- Local historical keys for live re-verify (NOT live-certified): user_id=110, personel_id=173, username sinemH.
+-- Preparer reference (not approver): sedanurB.
+-- Do not guess live username/role/scopes; hosting recovery required.
 -- Required columns (exact projection):
 -- USERNAME, USER_ID, PERSONEL_ID, PERSONEL_NAME, ROLE, AKTIF, SIRKET, SUBE, DEPARTMAN,
 -- BOLUM, BIRIM, ACTOR_IDENTITY_STATUS, CURRENT_BOLUM_IDS, CURRENT_USER_SUBELER, MEDISA_FIT
@@ -53,6 +55,7 @@ SELECT
       WHERE us2.user_id = u.id
         AND sb.sirket_id = 1
     )
+    OR u.rol IN ('GENEL_YONETICI', 'SISTEM_YONETICISI', 'IK_SORUMLUSU', 'BOLUM_YONETICISI')
     THEN 'YES'
     ELSE 'NO'
   END AS MEDISA_FIT
@@ -60,5 +63,18 @@ FROM users u
 LEFT JOIN personeller p ON p.id = u.personel_id
 LEFT JOIN subeler s ON s.id = p.sube_id
 LEFT JOIN actor_identities ai ON ai.id = u.actor_identity_id
-WHERE u.username IN ('343', '220', '017', '349', 'sedanurB')
-ORDER BY FIELD(u.username, 'sedanurB', '343', '220', '017', '349');
+WHERE
+  u.username IN ('sedanurB', 'sinemH')
+  OR u.id = 110
+  OR u.personel_id = 173
+  OR (
+    p.ad = 'Sinem'
+    AND p.soyad = 'Hamaloğlu'
+  )
+ORDER BY
+  CASE
+    WHEN u.username = 'sedanurB' THEN 0
+    WHEN u.username = 'sinemH' OR u.id = 110 OR u.personel_id = 173 THEN 1
+    ELSE 2
+  END,
+  u.id ASC;

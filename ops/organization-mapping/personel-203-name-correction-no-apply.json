@@ -1,0 +1,51 @@
+{
+  "phase": "BUSINESS_TRUTH_AND_BRANCH_MANAGER_MODEL_LOCK",
+  "status": "PLAN_ONLY_NO_APPLY",
+  "generated_at": "2026-09-07T21:10:00Z",
+  "production_mutation": 0,
+  "apply": "NONE",
+  "PERSONEL_ID": 203,
+  "wrong_display_known": "MUHAMMED IRAKLI",
+  "correct_display": "Muhammed Mahmud",
+  "canonical_schema": {
+    "table": "personeller",
+    "fields": ["ad", "soyad"],
+    "not_fields": ["ad_soyad"],
+    "note": "personeller stores separate ad/soyad; users.ad_soyad is account display only"
+  },
+  "correction": {
+    "ad": "Muhammed",
+    "soyad": "Mahmud"
+  },
+  "allowed_mutations_future": ["personeller.ad", "personeller.soyad"],
+  "forbidden_mutations": [
+    "sube_id",
+    "calisma_lokasyonu_id",
+    "sgk_isveren_id",
+    "departman_id",
+    "bolum_id",
+    "birim_id",
+    "gorev_id",
+    "pozisyon",
+    "users.*"
+  ],
+  "preimage_guard": {
+    "PERSONEL_ID": 203,
+    "STATUS": "VERIFY_LIVE_REQUIRED",
+    "COMPANY": "VERIFY_LIVE_REQUIRED",
+    "BRANCH": "VERIFY_LIVE_REQUIRED",
+    "SGK": "VERIFY_LIVE_REQUIRED",
+    "CURRENT_LOCATION": "VERIFY_LIVE_REQUIRED",
+    "CURRENT_AD": "VERIFY_LIVE_REQUIRED",
+    "CURRENT_SOYAD": "VERIFY_LIVE_REQUIRED",
+    "TARGET_LOCATION": 5,
+    "TARGET_AD": "Muhammed",
+    "TARGET_SOYAD": "Mahmud",
+    "rule": "STOP_ON_PREIMAGE_DRIFT"
+  },
+  "also_location_truth": {
+    "plan": "ops/organization-mapping/fabrika-karabuk-loc5-no-apply-preimage-plan.json",
+    "TARGET_LOCATION": 5,
+    "note": "Name correction and loc5 may be sequenced separately after live preimage; neither applied this turn"
+  }
+}

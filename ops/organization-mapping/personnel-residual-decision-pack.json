@@ -1,25 +1,10 @@
 {
-  "phase": "HOSTING_INCIDENT_LOCAL_COMPLETION_SWEEP",
+  "phase": "BUSINESS_TRUTH_AND_BRANCH_MANAGER_MODEL_LOCK",
   "status": "DECISION_PACK_ONLY_NO_APPLY",
-  "generated_at": "2026-09-07T20:30:00Z",
-  "source_evidence": "CURRENT_STATE + a1-a2-a3-no-apply-remediation-plan + prior authoritative RO inventory (mutation=0)",
-  "note": "Targets are intentionally null. Do not invent branch/location assignments.",
+  "generated_at": "2026-09-07T21:10:00Z",
+  "source_evidence": "Authoritative business lock + prior RO inventory; hosting blocks live re-probe (mutation=0)",
+  "note": "Location truths below are locked but NOT APPLIED. Do not invent branch transfers. PASIF/test/historical null locations are not forced to loc5.",
   "rows": [
-    {
-      "PERSONEL_ID": 212,
-      "NAME": "İlker AKEL",
-      "STATUS": "AKTIF",
-      "COMPANY": null,
-      "BRANCH": null,
-      "SGK": null,
-      "CURRENT_LOCATION": null,
-      "DEPARTMENT": null,
-      "BOLUM": null,
-      "BIRIM": null,
-      "WHY_UNRESOLVED": "Both sube_id and calisma_lokasyonu_id are NULL; no approved automatic target",
-      "WHAT_BUSINESS_DECISION_IS_NEEDED": "Authoritative Medisa branch and/or work-location assignment (or confirm intentional residual)",
-      "CLASS": "BUSINESS_DECISION_REQUIRED"
-    },
     {
       "PERSONEL_ID": 120,
       "NAME": "İsmail Özcan",
@@ -66,10 +51,24 @@
       "CLASS": "CROSS_COMPANY_SEMANTICALLY_VALID_DEFER"
     }
   ],
+  "business_truth_resolved_loc5_no_apply": [
+    { "PERSONEL_ID": 200, "NAME": "RAED FAWAZ", "TARGET_LOCATION": 5, "CLASS": "BUSINESS_TRUTH_RESOLVED" },
+    { "PERSONEL_ID": 201, "NAME": "SAIF TAREQ JASIM AL-GBURI", "TARGET_LOCATION": 5, "CLASS": "BUSINESS_TRUTH_RESOLVED" },
+    { "PERSONEL_ID": 203, "NAME": "Muhammed Mahmud", "TARGET_LOCATION": 5, "CLASS": "BUSINESS_TRUTH_RESOLVED", "NAME_CORRECTION_REQUIRED": true },
+    { "PERSONEL_ID": 204, "NAME": "Abdullah Fetiyan", "TARGET_LOCATION": 5, "CLASS": "BUSINESS_TRUTH_RESOLVED" },
+    { "PERSONEL_ID": 205, "NAME": "ALADDİN DEREBAŞI", "TARGET_LOCATION": 5, "CLASS": "BUSINESS_TRUTH_RESOLVED" },
+    { "PERSONEL_ID": 206, "NAME": "ABDULLAH", "TARGET_LOCATION": 5, "CLASS": "BUSINESS_TRUTH_RESOLVED" },
+    { "PERSONEL_ID": 209, "NAME": "MUQTADA MAZIN KHALEE", "TARGET_LOCATION": 5, "CLASS": "BUSINESS_TRUTH_RESOLVED" },
+    { "PERSONEL_ID": 210, "NAME": "FAHRİ TAYLAN MERCAN", "TARGET_LOCATION": 5, "CLASS": "BUSINESS_TRUTH_RESOLVED" },
+    { "PERSONEL_ID": 212, "NAME": "İlker AKEL", "TARGET_LOCATION": 5, "CLASS": "BUSINESS_TRUTH_RESOLVED" },
+    { "PERSONEL_ID": 217, "NAME": "Görkem Vural", "TARGET_LOCATION": 5, "CLASS": "BUSINESS_TRUTH_RESOLVED" }
+  ],
   "classes": {
-    "AUTO_RESOLVABLE_BY_CONFIRMED_TRUTH": [],
-    "BUSINESS_DECISION_REQUIRED": [212],
-    "INTENTIONAL_HISTORICAL_OR_PASSIVE_RESIDUAL": "see live NULL_LOCATION_HR residuals after A2 close — requires fresh RO list when host recovers; not auto-targeted here",
+    "AUTO_RESOLVABLE_BY_CONFIRMED_TRUTH": [200, 201, 203, 204, 205, 206, 209, 210, 212, 217],
+    "BUSINESS_DECISION_REQUIRED": [],
+    "BUSINESS_IDENTITY_DECISION_REQUIRED": ["Kayseri manager Kübra — surname unknown"],
+    "NAME_CORRECTION_REQUIRED": [203],
+    "INTENTIONAL_HISTORICAL_OR_PASSIVE_RESIDUAL": "Other null-location HR residuals not in locked set — do not force loc5; refresh RO after host recovery",
     "INVALID_DATA": [],
     "CROSS_COMPANY_SEMANTICALLY_VALID": [120, 158, 219]
   },
@@ -78,5 +77,17 @@
     "A2_211": "Zeynep Günal location=5 CLOSED",
     "202_208": "CLOSED_CONFIRMED"
   },
+  "plans": {
+    "loc5_preimage": "ops/organization-mapping/fabrika-karabuk-loc5-no-apply-preimage-plan.json",
+    "name_203": "ops/organization-mapping/personel-203-name-correction-no-apply.json",
+    "branch_manager": "ops/organization-mapping/branch-manager-assignment-no-apply-plan.json"
+  },
+  "residual_unresolved_after_lock": [
+    "120/158/219 CROSS_COMPANY_SEMANTICALLY_VALID_DEFER",
+    "Kayseri Kübra surname BUSINESS_IDENTITY_DECISION_REQUIRED",
+    "Sinem live account/role/actor/scopes VERIFY_LIVE_REQUIRED",
+    "Halil live managed-branch grants VERIFY_LIVE_REQUIRED",
+    "Other PASIF/test/historical null locations not in locked set"
+  ],
   "production_mutation": 0
 }

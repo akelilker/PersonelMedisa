@@ -121,7 +121,11 @@ describe("branch accounting visibility owners", () => {
     expect(current).toContain("PR_274: MERGED");
     expect(current).toContain("DEPLOY_HELD_ON_HOSTING_INCIDENT");
     expect(current).toContain("A2_LOCATION_160_211: CLOSED");
-    expect(current).toContain("PAUSED_PENDING_HOST_RECOVERY_AND_FORMAL_ACTOR_SELECTION");
+    expect(current).toContain("PAUSED_PENDING_HOST_RECOVERY_AND_SINEM_LIVE_VERIFY");
+    expect(current).toContain("PREPARER: sedanurB");
+    expect(current).toContain("APPROVER: Sinem Hamaloğlu");
+    expect(current).toContain("TARGET_LOCATION: calisma_lokasyonu_id = 5");
+    expect(current).toContain("TECHNICAL_STATUS: ALREADY_SUPPORTED");
     expect(registry).toMatch(/^CODE_MIGRATION_TIP: 087$/m);
     expect(registry).toMatch(/^PRODUCTION_MIGRATION_TIP: 087$/m);
     expect(registry).toContain("| Migration 085 | **APPLIED** |");
@@ -131,7 +135,8 @@ describe("branch accounting visibility owners", () => {
     expect(registry).toContain("pending EMPTY");
     expect(registry).toContain("PR #274");
     expect(registry).toContain("DEPLOY_HELD");
-    expect(registry).toContain("A2 CLOSED");
-    expect(registry).toContain("PAUSED_PENDING_HOST_RECOVERY");
+    expect(registry).toContain("Sinem Hamaloğlu");
+    expect(registry).toContain("PAUSED_PENDING_HOST_RECOVERY_AND_SINEM_LIVE_VERIFY");
+    expect(registry).toContain("ALREADY_SUPPORTED");
   });
 });

@@ -1,14 +1,14 @@
 {
-  "phase": "PR272_EVIDENCE_CLASSIFICATION_CORRECTION_AND_EXACT_HEAD_GATE",
+  "phase": "HOSTING_INCIDENT_LOCAL_COMPLETION_SWEEP",
   "status": "PLAN_ONLY_NO_APPLY",
-  "generated_at": "2026-09-06T22:55:00Z",
+  "generated_at": "2026-09-07T20:30:00Z",
   "evidence": {
-    "live_sha": "fcee67186f1ceaec86624ecbe745f51f56330bcd",
+    "code_main_sha": "63f8c9052ca15c3f311e158b41b0afda09d2b874",
+    "live_sha": "9b4aac7919100c5421544824b0401e5046ab621e",
+    "pr274": "MERGED_CI_PASS_DEPLOY_HELD",
     "production_migration_tip": "087",
     "pending_migrations": [],
-    "inventory_run_id": 34057486092,
-    "fk_probe_at": "2026-09-06T22:54:00Z",
-    "api_read_mode": "READ_ONLY_JWT_GET",
+    "hosting": "EXTERNAL_PROVIDER_INCIDENT_CONTROL_PLANE_DEGRADED",
     "mutation": 0
   },
   "owners": {
@@ -16,22 +16,39 @@
     "sgk_period_write": "SgkSirketPolitikaWriteService::import/submit/approve",
     "sgk_period_validator": "SgkSirketPolitikaImportValidator::dryRun",
     "sgk_dual_control_authz": "SgkKararPaketiAuthz (denySelfApproval + denySamePerson)",
+    "formal_scope": "SgkKararPaketiAuthz::resolveExplicitBranchScope ← DB user_subeler (PR274)",
     "personnel_field_write": "authenticated PUT /personeller/{id} — NOT used this turn",
     "branch_location_axes": "PersonelKaliciSubeDegisikligiService preserves calisma_lokasyonu_id on branch move — axes independent"
   },
   "a1_sgk_period": {
-    "classification": "OPS_ROLLOUT_ACTIVE",
-    "subclass": "PRODUCTION_CONFIG",
-    "status": "READY_FOR_EXPLICIT_PRODUCTION_APPROVAL",
+    "classification": "PRODUCTION_CONFIG_WAITING",
+    "status": "PAUSED_PENDING_HOST_RECOVERY_AND_FORMAL_ACTOR_SELECTION",
     "A1_CAN_BE_DONE_WITH_EXISTING_OWNER": true,
     "business_decision": "1_TO_MONTH_END / runtime AY_1_SON_GUN (already decided for Medisa)",
-    "runtime_gap_note": "sube 12/13 currently resolve NO_APPROVED_POLICY because no explicit ONAYLANDI row exists; company inheritance does not exist; capacity to create rows via existing dual-control owner DOES exist",
+    "runtime_gap_note": "sube 12/13 resolve NO_APPROVED_POLICY until explicit ONAYLANDI rows exist; company inheritance does not exist",
+    "preparer": {
+      "username": "sedanurB",
+      "role": "IK_SORUMLUSU",
+      "actor_identity": "VERIFIED",
+      "prepare": true,
+      "approve": false,
+      "needs_explicit_user_subeler": [12, 13]
+    },
+    "approver": {
+      "status": "TBD_AFTER_LIVE_RO_VERIFY",
+      "candidates": ["343", "220", "017", "349"],
+      "excluded_senay_linked_unless_new_evidence": ["005", "004"],
+      "probe": "ops/sgk/a1-approver-candidate-ro-probe.sql"
+    },
+    "LOCKED_POLITIKA_HASH_12": "43e3a75e2c3f4c5f6eef72b2036d9498c4c847c9594923bab9e61691da4559af",
+    "LOCKED_POLITIKA_HASH_13": "c155365fb2670836ff6388248fd755634b832454872ed441efa8b94372d4b4bb",
     "control_clone_from_sube_1": {
       "bildirim_donem_tipi": "AY_1_SON_GUN",
       "degerler": { "SGK_ODENEK_MAHSUP_MODU": "UCRET_MODELINE_GORE" },
       "gecerlilik_baslangic_reference": "2026-08-01",
       "gecerlilik_bitis": null,
-      "state_target": "ONAYLANDI"
+      "state_target": "ONAYLANDI",
+      "aciklama": "S98 sirket SGK politikasi"
     },
     "NO_APPLY_TARGET_12": {
       "sube_id": 12,
@@ -40,9 +57,10 @@
       "gecerlilik_baslangic": "2026-08-01",
       "gecerlilik_bitis": null,
       "degerler": { "SGK_ODENEK_MAHSUP_MODU": "UCRET_MODELINE_GORE" },
+      "politika_hash": "43e3a75e2c3f4c5f6eef72b2036d9498c4c847c9594923bab9e61691da4559af",
       "current_runtime": "NO_APPROVED_POLICY",
       "target_runtime": "ONAYLANDI / AY_1_SON_GUN",
-      "CAN_APPLY": "YES_AFTER_EXPLICIT_APPROVAL",
+      "CAN_APPLY": "YES_AFTER_HOST_RECOVERY_AND_EXPLICIT_APPROVAL",
       "applied_this_turn": false
     },
     "NO_APPLY_TARGET_13": {
@@ -52,59 +70,50 @@
       "gecerlilik_baslangic": "2026-08-01",
       "gecerlilik_bitis": null,
       "degerler": { "SGK_ODENEK_MAHSUP_MODU": "UCRET_MODELINE_GORE" },
+      "politika_hash": "c155365fb2670836ff6388248fd755634b832454872ed441efa8b94372d4b4bb",
       "current_runtime": "NO_APPROVED_POLICY",
       "target_runtime": "ONAYLANDI / AY_1_SON_GUN",
-      "CAN_APPLY": "YES_AFTER_EXPLICIT_APPROVAL",
+      "CAN_APPLY": "YES_AFTER_HOST_RECOVERY_AND_EXPLICIT_APPROVAL",
       "applied_this_turn": false
     },
-    "REQUIRED_DUAL_CONTROL_STEPS": [
-      "1. POST /sgk-katalog-hazirlik/sirket-politikasi/dry-run with package for sube_id=12 (then 13) — SgkSirketPolitikaImportValidator",
-      "2. POST /sgk-katalog-hazirlik/sirket-politikasi/import with confirmation_text=SGK_POLITIKA_DRAFT_ONAY + matching politika_hash → state TASLAK (preparer actor)",
-      "3. POST /sgk-katalog-hazirlik/sirket-politikasi/submit → state ONAY_BEKLIYOR (same preparer)",
-      "4. POST /sgk-katalog-hazirlik/sirket-politikasi/approve by DIFFERENT actor identity (SgkKararPaketiAuthz denySelfApproval/denySamePerson) → state ONAYLANDI",
-      "5. GET /sgk-katalog-hazirlik/sirket-politikasi?yil=&ay= readback: sube 12 and 13 state=ONAYLANDI bildirim_donem_tipi=AY_1_SON_GUN",
-      "6. Optional: GET .../surumler?sube_id=12|13 revision inventory shows effective_for_requested_period=true"
+    "REQUIRED_DUAL_CONTROL_STEPS_AFTER_RECOVERY": [
+      "1. verify PR274 live (LIVE_SHA == 63f8c905…)",
+      "2. read-only approver identification via ops/sgk/a1-approver-candidate-ro-probe.sql",
+      "3. user chooses approver",
+      "4. explicit user approval for config writes",
+      "5. add sedanurB explicit user_subeler 12/13",
+      "6. create/verify/bind approver actor identity if needed",
+      "7. add approver explicit user_subeler 12/13",
+      "8. dual-control preflight",
+      "9. POST /sgk-katalog-hazirlik/sirket-politikasi/dry-run then import 12 with confirmation_text=SGK_POLITIKA_DRAFT_ONAY + politika_hash=43e3a75e…",
+      "10. submit 12",
+      "11. different actor approve 12",
+      "12. dry-run/import 13 with politika_hash=c155365f…",
+      "13. submit 13",
+      "14. different actor approve 13",
+      "15. GET readback state=ONAYLANDI bildirim_donem_tipi=AY_1_SON_GUN for 12 and 13",
+      "16. A1 CLOSED"
     ]
   },
-  "fk_reference_integrity": {
-    "probe": "personnel list JOIN-checked against /yonetim/subeler + /referans/* catalogs",
-    "result": "ALL_AXES_INVALID_REF_ZERO",
-    "matrix": {
-      "sube_id": { "TOTAL": 153, "POPULATED": 152, "NULL": 1, "ACTIVE_NULL": 1, "PASIF_NULL": 0, "INVALID_REF": 0, "INVALID_PERSONEL_IDS": [] },
-      "departman_id": { "TOTAL": 153, "POPULATED": 146, "NULL": 7, "ACTIVE_NULL": 7, "PASIF_NULL": 0, "INVALID_REF": 0, "INVALID_PERSONEL_IDS": [] },
-      "bolum_id": { "TOTAL": 153, "POPULATED": 137, "NULL": 16, "ACTIVE_NULL": 10, "PASIF_NULL": 6, "INVALID_REF": 0, "INVALID_PERSONEL_IDS": [] },
-      "birim_id": { "TOTAL": 153, "POPULATED": 137, "NULL": 16, "ACTIVE_NULL": 10, "PASIF_NULL": 6, "INVALID_REF": 0, "INVALID_PERSONEL_IDS": [] },
-      "gorev_id": { "TOTAL": 153, "POPULATED": 141, "NULL": 12, "ACTIVE_NULL": 12, "PASIF_NULL": 0, "INVALID_REF": 0, "INVALID_PERSONEL_IDS": [] },
-      "pozisyon_id": { "TOTAL": 153, "POPULATED": 139, "NULL": 14, "ACTIVE_NULL": 8, "PASIF_NULL": 6, "INVALID_REF": 0, "INVALID_PERSONEL_IDS": [] },
-      "personel_tipi_id": { "TOTAL": 153, "POPULATED": 153, "NULL": 0, "ACTIVE_NULL": 0, "PASIF_NULL": 0, "INVALID_REF": 0, "INVALID_PERSONEL_IDS": [] },
-      "sgk_isveren_id": { "TOTAL": 153, "POPULATED": 130, "NULL": 23, "ACTIVE_NULL": 17, "PASIF_NULL": 6, "INVALID_REF": 0, "INVALID_PERSONEL_IDS": [] },
-      "calisma_lokasyonu_id": { "TOTAL": 153, "POPULATED": 137, "NULL": 16, "ACTIVE_NULL": 12, "PASIF_NULL": 4, "INVALID_REF": 0, "INVALID_PERSONEL_IDS": [] }
-    }
+  "a2": {
+    "status": "CLOSED",
+    "applied": [
+      {
+        "PERSONEL_ID": 160,
+        "AD_SOYAD": "Sedanur Bulut",
+        "FIELD": "calisma_lokasyonu_id",
+        "TARGET_VALUE": 5,
+        "NOTE": "CLOSED — do not reopen"
+      },
+      {
+        "PERSONEL_ID": 211,
+        "AD_SOYAD": "Zeynep Günal",
+        "FIELD": "calisma_lokasyonu_id",
+        "TARGET_VALUE": 5,
+        "NOTE": "CLOSED — do not reopen"
+      }
+    ]
   },
-  "mutation_candidates": [
-    {
-      "PERSONEL_ID": 160,
-      "AD_SOYAD": "Sedanur Bulut",
-      "FIELD": "calisma_lokasyonu_id",
-      "CURRENT_VALUE": null,
-      "TARGET_VALUE": 5,
-      "EVIDENCE": "fresh: AKTIF sube=1 SGK=1 location=null; no contradiction; user-confirmed Fabrika physical; mapping 1→5",
-      "CLASSIFICATION": "AUTO_RESOLVABLE_FROM_APPROVED_CANONICAL_MAPPING",
-      "CAN_APPLY": "YES",
-      "BLOCKER": "NONE — awaiting explicit apply approval"
-    },
-    {
-      "PERSONEL_ID": 211,
-      "AD_SOYAD": "Zeynep Günal",
-      "FIELD": "calisma_lokasyonu_id",
-      "CURRENT_VALUE": null,
-      "TARGET_VALUE": 5,
-      "EVIDENCE": "fresh: AKTIF sube=1 SGK=1 location=null; no contradiction; user-confirmed Fabrika physical; mapping 1→5",
-      "CLASSIFICATION": "AUTO_RESOLVABLE_FROM_APPROVED_CANONICAL_MAPPING",
-      "CAN_APPLY": "YES",
-      "BLOCKER": "NONE — awaiting explicit apply approval"
-    }
-  ],
   "a3": {
     "PERSONEL_ID": 212,
     "CLASSIFICATION": "BUSINESS_DECISION_REQUIRED",
@@ -114,20 +123,12 @@
   },
   "cross_company": {
     "status": "DEFERRED_REVIEW",
-    "reason": "Branch and work-location are independent axes (PersonelKaliciSubeDegisikligiService preserves location on branch move; inventory matrix allows cross pairs). No schema/runtime same-branch requirement found. Karyapı/Şenay rollouts INTENTIONAL_DEFER. Rows retained for review; not DATA_CONTRADICTION.",
+    "reason": "Branch and work-location are independent axes. Karyapı/Şenay rollouts INTENTIONAL_DEFER. Not DATA_CONTRADICTION.",
     "rows": [
       { "PERSONEL_ID": 120, "SUBE_ID": 11, "SGK_ISVEREN_ID": 3, "CALISMA_LOKASYONU_ID": 5, "STATUS": "DEFERRED_REVIEW", "CAN_APPLY": "NO" },
       { "PERSONEL_ID": 158, "SUBE_ID": 11, "SGK_ISVEREN_ID": 3, "CALISMA_LOKASYONU_ID": 5, "STATUS": "DEFERRED_REVIEW", "CAN_APPLY": "NO" },
       { "PERSONEL_ID": 219, "SUBE_ID": 10, "SGK_ISVEREN_ID": 1, "CALISMA_LOKASYONU_ID": 3, "STATUS": "DEFERRED_REVIEW", "CAN_APPLY": "NO" }
     ]
-  },
-  "counts": {
-    "AUTO_RESOLVABLE_COUNT": 2,
-    "BUSINESS_DECISION_REQUIRED_COUNT": 14,
-    "CROSS_COMPANY_DEFER_COUNT": 3,
-    "DATA_CONTRADICTION_COUNT": 0,
-    "PLAN_CAN_APPLY_COUNT": 2,
-    "A1_READY_FOR_EXPLICIT_PRODUCTION_APPROVAL": true
   },
   "hard_closed_unchanged": {
     "202_208": "CLOSED_CONFIRMED",
@@ -136,7 +137,11 @@
     "work_location_catalog": "7/7 APPLIED",
     "medisa_grants": "APPLIED",
     "sube_muhasebe_acl_rows": 0,
-    "karyapi_senay": "INTENTIONAL_DEFER"
+    "karyapi_senay": "INTENTIONAL_DEFER",
+    "pr271": "CLOSED",
+    "pr272": "CLOSED",
+    "pr274_code": "MERGED_DO_NOT_REOPEN_WITHOUT_REGRESSION",
+    "a2_160_211": "CLOSED"
   },
   "production_mutation": 0,
   "apply": "NONE"

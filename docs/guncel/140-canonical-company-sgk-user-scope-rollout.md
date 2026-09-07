@@ -13,18 +13,21 @@
 
 Owner: `OrgScope` (+ `HrWriteScope` for `IK_PERSONELI` write companies). Session: `AuthMiddleware` / `LoginController`.
 
-## Live production inventory (2026-09-06 evidence lock)
+## Live production inventory (2026-09-07 hosting-incident pin)
 
 | Object | Live state | Evidence |
 | --- | --- | --- |
 | `PRODUCTION_MIGRATION_TIP` | **087** | apply `34033315991`; inventory pending=0 |
-| Live deploy SHA | `fcee67186f1ceaec86624ecbe745f51f56330bcd` | Deploy cPanel `34035970806` |
+| LIVE deploy SHA | `9b4aac7919100c5421544824b0401e5046ab621e` | Last successful deploy (PR274 not live) |
+| CODE_MAIN SHA | `63f8c9052ca15c3f311e158b41b0afda09d2b874` | PR #274 MERGED / CI PASS / DEPLOY_HELD |
 | `user_sirketler` | **3** | inventory `orginv-34057486092-1` |
 | `user_sgk_isverenler` | **3** | same |
 | `user_subeler` | **31** | MUHASEBE Medisa branch scope included |
 | Work locations mapped | **7/7** | Medisa catalog mapping APPLIED |
 | `sube_muhasebe_yetkilileri` | **0 rows** | ACL restriction DISABLED (intentional) |
 | Karyapı / Şenay operational rollout | **INTENTIONAL_DEFER** | do not invent grants |
+| A2 160/211 location | **CLOSED** | do not reopen |
+| A1 SGK period 12/13 | **PAUSED_PENDING_HOST_RECOVERY_AND_FORMAL_ACTOR_SELECTION** | no apply while hosting incident |
 
 Historical PLAN-only pins that said grants=0 / tip=086 / locations deferred are **not** current live truth.
 

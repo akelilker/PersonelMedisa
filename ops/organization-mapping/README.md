@@ -16,12 +16,14 @@ canlı şube adları / şirket bağları DB + `SubeReadModel` üzerinden okunur.
 Canlı özet (display modeli): `subeler.ad` = kısa ad; global görünen ad =
 `SubeReadModel.tam_ad` (DB kolonu değildir).
 
-**Live (2026-09-06/07):** migration tip **087** / pending EMPTY; Medisa
-work-location catalog mapping **APPLIED** (7/7); Medisa approved user
-company/SGK/branch grants **APPLIED**; Karyapı/Şenay company rollout
-**INTENTIONAL_DEFER**. Personnel location/branch residuals and SGK period
-gap for sube 12/13: see `CURRENT_STATE.md` and
-`a1-a2-a3-no-apply-remediation-plan.json`.
+**Live (2026-09-07):** CODE_MAIN `63f8c905` (PR #274 MERGED / CI PASS);
+LIVE deploy SHA `9b4aac79` (PR274 DEPLOY_HELD — hosting incident);
+migration tip **087** / pending EMPTY; Medisa work-location catalog mapping
+**APPLIED** (7/7); Medisa approved user company/SGK/branch grants **APPLIED**;
+A2 location 160/211 **CLOSED**; A1 SGK period 12/13
+**PAUSED_PENDING_HOST_RECOVERY_AND_FORMAL_ACTOR_SELECTION**;
+Karyapı/Şenay company rollout **INTENTIONAL_DEFER**. See `CURRENT_STATE.md`
+and `a1-a2-a3-no-apply-remediation-plan.json`.
 
 Historical note: early docs described location→şube and user şirket/SGK scope
 as deferred — that language is archival for the first mapping tour only.

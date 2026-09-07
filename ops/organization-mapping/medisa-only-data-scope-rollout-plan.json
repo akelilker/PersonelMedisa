@@ -79,7 +79,7 @@
     "production_seed_rows": []
   },
   "production_state_pins": {
-    "NOTE": "Historical PLAN pin at plan authoring time — NOT current/live. Live tip=087 pending=EMPTY deploy=fcee6718; see CURRENT_STATE.md and a1-a2-a3-no-apply-remediation-plan.json.",
+    "NOTE": "Historical PLAN pin at plan authoring time — NOT current/live. Live tip=087 pending=EMPTY LIVE_SHA=9b4aac79 CODE_MAIN=63f8c905 PR274 DEPLOY_HELD; see CURRENT_STATE.md and a1-a2-a3-no-apply-remediation-plan.json.",
     "HISTORICAL_CODE_MIGRATION_TIP": "087",
     "HISTORICAL_PRODUCTION_MIGRATION_TIP": "086",
     "HISTORICAL_PRODUCTION_MIGRATION_PENDING": 1,
@@ -88,10 +88,12 @@
     "HISTORICAL_live_validation": "PASS @ 086 (pre-087-apply plan pin)"
   },
   "live_readback_after_plan": {
-    "as_of": "2026-09-06T20:45:00Z",
+    "as_of": "2026-09-07T20:30:00Z",
     "PRODUCTION_MIGRATION_TIP": "087",
     "PRODUCTION_MIGRATION_PENDING": 0,
-    "PRODUCTION_DEPLOY_SHA": "fcee67186f1ceaec86624ecbe745f51f56330bcd",
+    "PRODUCTION_DEPLOY_SHA": "9b4aac7919100c5421544824b0401e5046ab621e",
+    "CODE_MAIN_SHA": "63f8c9052ca15c3f311e158b41b0afda09d2b874",
+    "PR274": "MERGED_CI_PASS_DEPLOY_HELD",
     "user_sirketler": 3,
     "user_sgk_isverenler": 3,
     "work_locations_mapped": "7/7 APPLIED",

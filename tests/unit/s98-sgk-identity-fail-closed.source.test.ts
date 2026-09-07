@@ -26,13 +26,16 @@ describe("S98 SGK dual-control identity fail-closed", () => {
     expect(authz).not.toContain("SGK_PREPARER_PERSONEL_LINK_REQUIRED");
     expect(authz).not.toContain("SGK_ACTOR_PERSONEL_SCHEMA_REQUIRED");
     expect(authz).not.toMatch(/static\s+\$cached/);
-    // Empty sube_ids must deny (no global bypass)
-    expect(authz).toMatch(/subeIds === \[\][\s\S]*SGK_ACTOR_SCOPE_NOT_READY/);
+    // Empty formal scope must deny (no global bypass) — resolved from user_subeler.
+    expect(authz).toContain("resolveExplicitBranchScope");
+    expect(authz).toContain("FROM user_subeler WHERE user_id = :user_id");
+    expect(authz).toMatch(/\$allowed === \[\][\s\S]*SGK_ACTOR_SCOPE_NOT_READY/);
+    expect(authz).toContain("function assertSubeScope(PDO $pdo, array $actor, $subeId)");
     // Missing schema must deny same-person path
     expect(authz).toMatch(/!self::actorIdentitySchemaSupported\(\$pdo\)[\s\S]*SGK_ACTOR_IDENTITY_SCHEMA_REQUIRED/);
   });
 
-  it("write services pass PDO into prepare/approve authz", () => {
+  it("write services pass PDO into prepare/approve/scope authz", () => {
     for (const path of [
       "api/src/Services/Payroll/SgkKatalogWriteService.php",
       "api/src/Services/Payroll/SgkSirketPolitikaWriteService.php",
@@ -46,6 +49,9 @@ describe("S98 SGK dual-control identity fail-closed", () => {
     );
     expect(read("api/src/Services/Payroll/SgkSirketPolitikaWriteService.php")).toContain(
       "SgkKararPaketiAuthz::assertApprove($pdo, $actor)",
+    );
+    expect(read("api/src/Services/Payroll/SgkSirketPolitikaWriteService.php")).toContain(
+      "SgkKararPaketiAuthz::assertSubeScope($pdo, $actor",
     );
   });
 

@@ -41,7 +41,7 @@ final class SgkSirketPolitikaWriteService
 
         $canonical = $dry['canonical_payload'] ?? [];
         $subeId = (int) ($canonical['sube_id'] ?? 0);
-        SgkKararPaketiAuthz::assertSubeScope($actor, $subeId);
+        SgkKararPaketiAuthz::assertSubeScope($pdo, $actor, $subeId);
         $surumKodu = (string) ($canonical['surum_kodu'] ?? '');
         $politikaHash = (string) ($dry['politika_hash'] ?? '');
         $actorId = (int) ($actor['id'] ?? 0);
@@ -152,7 +152,7 @@ final class SgkSirketPolitikaWriteService
         if ($surum === null) {
             return self::result(404, 'SGK_POLITIKA_SURUM_BULUNAMADI', 'Politika surumu bulunamadi.');
         }
-        SgkKararPaketiAuthz::assertSubeScope($actor, (int) ($surum['sube_id'] ?? 0));
+        SgkKararPaketiAuthz::assertSubeScope($pdo, $actor, (int) ($surum['sube_id'] ?? 0));
         if ((string) ($surum['state'] ?? '') !== 'TASLAK') {
             return self::result(400, 'SGK_POLITIKA_SUBMIT_STATE', 'Submit yalniz TASLAK uzerinden.');
         }
@@ -209,7 +209,7 @@ final class SgkSirketPolitikaWriteService
         if ($surum === null) {
             return self::result(404, 'SGK_POLITIKA_SURUM_BULUNAMADI', 'Politika surumu bulunamadi.');
         }
-        SgkKararPaketiAuthz::assertSubeScope($actor, (int) ($surum['sube_id'] ?? 0));
+        SgkKararPaketiAuthz::assertSubeScope($pdo, $actor, (int) ($surum['sube_id'] ?? 0));
         if ((string) ($surum['state'] ?? '') !== 'ONAY_BEKLIYOR') {
             return self::result(400, 'SGK_POLITIKA_APPROVE_STATE', 'Approve yalniz ONAY_BEKLIYOR uzerinden.');
         }

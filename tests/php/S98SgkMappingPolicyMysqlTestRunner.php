@@ -282,6 +282,10 @@ try {
     SgkKararPaketiAuthz::assertSubeScope($pdo, $bolumOk, 12);
     SgkKararPaketiAuthz::assertSubeScope($pdo, $bolumOk, 13);
     s98Assert(true, 'BOLUM approve + explicit 12/13 ALLOWED');
+    $bolumReady = SgkKararPaketiAuthz::formalActorReadiness($pdo, $bolumOk);
+    s98Assert(!empty($bolumReady['ready']), 'BOLUM approve-only formalActorReadiness ready=true');
+    s98Assert(($bolumReady['can_prepare'] ?? true) === false, 'BOLUM readiness can_prepare=false');
+    s98Assert(($bolumReady['can_approve'] ?? false) === true, 'BOLUM readiness can_approve=true');
     try {
         SgkKararPaketiAuthz::assertPrepare($pdo, $bolumOk);
         s98Assert(false, 'BOLUM prepare should deny');

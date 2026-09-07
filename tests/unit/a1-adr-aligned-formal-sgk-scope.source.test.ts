@@ -33,10 +33,16 @@ describe("A1 ADR-aligned formal SGK scope + BOLUM optional user_subeler", () => 
     expect(write).not.toMatch(/assertSubeScope\(\$actor,/);
   });
 
-  it("formalActorReadiness uses DB explicit branch scope", () => {
+  it("formalActorReadiness uses DB explicit branch scope and accept prepare or approve", () => {
     const authz = read("api/src/Services/Payroll/SgkKararPaketiAuthz.php");
     expect(authz).toMatch(
       /function formalActorReadiness[\s\S]*resolveExplicitBranchScope\(\$pdo, \$actor\)/,
+    );
+    expect(authz).toMatch(
+      /function formalActorReadiness[\s\S]*PERM_PREPARE[\s\S]*PERM_APPROVE[\s\S]*SGK_DUAL_CONTROL_FORBIDDEN/,
+    );
+    expect(authz).not.toMatch(
+      /function formalActorReadiness[\s\S]*assertPermission\(\$actor, self::PERM_PREPARE/,
     );
   });
 

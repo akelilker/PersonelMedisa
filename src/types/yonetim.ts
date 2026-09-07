@@ -99,6 +99,8 @@ export type YonetimActorIdentityRead = {
   branch_scope: number[];
   ready: boolean;
   readiness_code?: string | null;
+  can_prepare?: boolean;
+  can_approve?: boolean;
 };
 
 export type YonetimOrgRelation = {

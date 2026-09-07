@@ -13,7 +13,7 @@
 
 **2026-08-27 SGK/UBGT live read-only verify (historical):** `MG-OPS-SGK-CAT-001` + `MG-OPS-UBGT-001` → `CLOSED_CONFIRMED`. O turda: SGK `RESMI_KAYNAKLI_KISITLI`/`ONAYLANDI`/`kod_sayisi=19`; şubeler `1,4,5,6,7,8,9,10,11` = `AY_1_SON_GUN`; UBGT 2026 = 17 aktif. Seed/approve/write yoktu.
 
-**2026-09-07 SGK period residual (hosting-incident refresh):** Medisa sube **12/13** runtime effective = `NO_APPROVED_POLICY`. Classification = **PRODUCTION_CONFIG_WAITING** / **PAUSED_PENDING_HOST_RECOVERY_AND_FORMAL_ACTOR_SELECTION**. Existing `SgkSirketPolitikaWriteService` dual-control path remains the owner; locked hashes in `a1-a2-a3-no-apply-remediation-plan.json`. Not TECHNICAL_GAP. Control set `1,2,4,5,6,7,8,9,10,11` remains `AY_1_SON_GUN`/`ONAYLANDI`. PR #274 MERGED / DEPLOY_HELD; A2 160/211 CLOSED.
+**2026-09-07 SGK period residual (business-truth lock):** Medisa sube **12/13** runtime effective = `NO_APPROVED_POLICY`. Classification = **PRODUCTION_CONFIG_WAITING** / **PAUSED_PENDING_HOST_RECOVERY_AND_SINEM_LIVE_VERIFY**. Preparer `sedanurB`; approver Sinem Hamaloğlu (BOLUM_YONETICISI model; temporary; live identity VERIFY_LIVE_REQUIRED). Existing `SgkSirketPolitikaWriteService` dual-control path remains the owner; locked hashes in `a1-a2-a3-no-apply-remediation-plan.json`. Not TECHNICAL_GAP. Control set `1,2,4,5,6,7,8,9,10,11` remains `AY_1_SON_GUN`/`ONAYLANDI`. PR #274 MERGED / DEPLOY_HELD; A2 160/211 CLOSED.
 
 **2026-08-28 DIS operasyonel/non-financial production kapanış:** `docs/guncel/130-dis-kaynak-operasyonel-finansal-ayrim.md`. Migration `076` canonical production applied (schema ready; `personel_gecici_gorevlendirmeler` live; assignment count=0). Directory-only zaman yasağı SUPERSEDED. DIS permanent org opsiyonel; effective org assignment-aware; QR/puantaj operasyonel olabilir; gerçek SGK/bordro/banka fail-closed. 11 production DIS kaydı mutasyona uğramadı; otomatik assignment yok; rol/user mutation yok. `MG-OPS-DIS-ORG-COMPLETE-001` → CLOSED; `MG-OPS-DIS-OPS-MODEL-001` → CLOSED_CONFIRMED. Gerçek görevlendirme rollout’u ayrı insan/operasyon kararıdır.
 
@@ -22,7 +22,7 @@
 `USER_CONFIRMED_BUSINESS_DECISION`; typed physical destruction handlers exist but feature flag remains closed (`USER_GATED` / `110`).
 The SGK period decision is user-confirmed as `1_TO_MONTH_END` for Medisa, Karyapı, and
 Şenay Mobilya; runtime enum `AY_1_SON_GUN` is live for branches `1,2,4,5,6,7,8,9,10,11`.
-Medisa branches **12/13** currently resolve `NO_APPROVED_POLICY` and are **PAUSED_PENDING_HOST_RECOVERY_AND_FORMAL_ACTOR_SELECTION** (PRODUCTION_CONFIG_WAITING via existing dual-control write owner; not a code TECHNICAL_GAP).
+Medisa branches **12/13** currently resolve `NO_APPROVED_POLICY` and are **PAUSED_PENDING_HOST_RECOVERY_AND_SINEM_LIVE_VERIFY** (PRODUCTION_CONFIG_WAITING via existing dual-control write owner; not a code TECHNICAL_GAP).
 
 ---
 

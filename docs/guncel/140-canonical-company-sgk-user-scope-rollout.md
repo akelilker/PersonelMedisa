@@ -27,7 +27,7 @@ Owner: `OrgScope` (+ `HrWriteScope` for `IK_PERSONELI` write companies). Session
 | `sube_muhasebe_yetkilileri` | **0 rows** | ACL restriction DISABLED (intentional) |
 | Karyapı / Şenay operational rollout | **INTENTIONAL_DEFER** | do not invent grants |
 | A2 160/211 location | **CLOSED** | do not reopen |
-| A1 SGK period 12/13 | **PAUSED_PENDING_HOST_RECOVERY_AND_FORMAL_ACTOR_SELECTION** | no apply while hosting incident |
+| A1 SGK period 12/13 | **PAUSED_PENDING_HOST_RECOVERY_AND_SINEM_LIVE_VERIFY** | preparer `sedanurB` + approver Sinem Hamaloğlu locked; live verify + no apply while hosting incident |
 
 Historical PLAN-only pins that said grants=0 / tip=086 / locations deferred are **not** current live truth.
 

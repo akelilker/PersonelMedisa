@@ -1,7 +1,7 @@
 {
-  "phase": "HOSTING_INCIDENT_LOCAL_COMPLETION_SWEEP",
+  "phase": "BUSINESS_TRUTH_AND_BRANCH_MANAGER_MODEL_LOCK",
   "status": "PLAN_ONLY_NO_APPLY",
-  "generated_at": "2026-09-07T20:30:00Z",
+  "generated_at": "2026-09-07T21:10:00Z",
   "evidence": {
     "code_main_sha": "63f8c9052ca15c3f311e158b41b0afda09d2b874",
     "live_sha": "9b4aac7919100c5421544824b0401e5046ab621e",
@@ -18,12 +18,14 @@
     "sgk_dual_control_authz": "SgkKararPaketiAuthz (denySelfApproval + denySamePerson)",
     "formal_scope": "SgkKararPaketiAuthz::resolveExplicitBranchScope ← DB user_subeler (PR274)",
     "personnel_field_write": "authenticated PUT /personeller/{id} — NOT used this turn",
-    "branch_location_axes": "PersonelKaliciSubeDegisikligiService preserves calisma_lokasyonu_id on branch move — axes independent"
+    "branch_location_axes": "PersonelKaliciSubeDegisikligiService preserves calisma_lokasyonu_id on branch move — axes independent",
+    "branch_manager_assignment": "YonetimController.replaceUserSubeler + users.rol=SUBE_YONETICISI — independent of personel home/location"
   },
   "a1_sgk_period": {
     "classification": "PRODUCTION_CONFIG_WAITING",
-    "status": "PAUSED_PENDING_HOST_RECOVERY_AND_FORMAL_ACTOR_SELECTION",
+    "status": "PAUSED_PENDING_HOST_RECOVERY_AND_SINEM_LIVE_VERIFY",
     "A1_CAN_BE_DONE_WITH_EXISTING_OWNER": true,
+    "A1_PAIR_STATUS": "BUSINESS_LOCKED_TEMPORARY_ASSIGNMENT",
     "business_decision": "1_TO_MONTH_END / runtime AY_1_SON_GUN (already decided for Medisa)",
     "runtime_gap_note": "sube 12/13 resolve NO_APPROVED_POLICY until explicit ONAYLANDI rows exist; company inheritance does not exist",
     "preparer": {
@@ -35,9 +37,26 @@
       "needs_explicit_user_subeler": [12, 13]
     },
     "approver": {
-      "status": "TBD_AFTER_LIVE_RO_VERIFY",
-      "candidates": ["343", "220", "017", "349"],
-      "excluded_senay_linked_unless_new_evidence": ["005", "004"],
+      "display_name": "Sinem Hamaloğlu",
+      "intended_role_model": "BOLUM_YONETICISI",
+      "assignment_class": "TEMPORARY_BUSINESS_ASSIGNMENT_CHANGEABLE_LATER",
+      "status": "BUSINESS_LOCKED_LIVE_VERIFY_REQUIRED",
+      "live_identity": "VERIFY_LIVE_REQUIRED",
+      "local_historical_keys": {
+        "user_id": 110,
+        "personel_id": 173,
+        "username_last_closed": "sinemH",
+        "note": "Historical closeout / fixture keys only — re-verify live before any write"
+      },
+      "do_not_guess": [
+        "username",
+        "user_id",
+        "personel_id",
+        "current_role",
+        "actor_identity",
+        "current_branch_scope",
+        "current_bolum_ids"
+      ],
       "probe": "ops/sgk/a1-approver-candidate-ro-probe.sql"
     },
     "LOCKED_POLITIKA_HASH_12": "43e3a75e2c3f4c5f6eef72b2036d9498c4c847c9594923bab9e61691da4559af",
@@ -78,22 +97,55 @@
     },
     "REQUIRED_DUAL_CONTROL_STEPS_AFTER_RECOVERY": [
       "1. verify PR274 live (LIVE_SHA == 63f8c905…)",
-      "2. read-only approver identification via ops/sgk/a1-approver-candidate-ro-probe.sql",
-      "3. user chooses approver",
-      "4. explicit user approval for config writes",
+      "2. live verify Sinem exact identity/account/role",
+      "3. verify Sinem BOLUM_YONETICISI approval eligibility",
+      "4. explicit user approval for actor/scope config",
       "5. add sedanurB explicit user_subeler 12/13",
-      "6. create/verify/bind approver actor identity if needed",
-      "7. add approver explicit user_subeler 12/13",
-      "8. dual-control preflight",
+      "6. create/verify/bind Sinem actor identity if required",
+      "7. add Sinem explicit user_subeler 12/13",
+      "8. dual-control readiness",
       "9. POST /sgk-katalog-hazirlik/sirket-politikasi/dry-run then import 12 with confirmation_text=SGK_POLITIKA_DRAFT_ONAY + politika_hash=43e3a75e…",
       "10. submit 12",
-      "11. different actor approve 12",
+      "11. Sinem approve 12",
       "12. dry-run/import 13 with politika_hash=c155365f…",
       "13. submit 13",
-      "14. different actor approve 13",
+      "14. Sinem approve 13",
       "15. GET readback state=ONAYLANDI bildirim_donem_tipi=AY_1_SON_GUN for 12 and 13",
       "16. A1 CLOSED"
     ]
+  },
+  "location_truth_loc5": {
+    "status": "BUSINESS_TRUTH_RESOLVED_NO_APPLY",
+    "target_calisma_lokasyonu_id": 5,
+    "label": "Fabrika / Karabük",
+    "plan": "ops/organization-mapping/fabrika-karabuk-loc5-no-apply-preimage-plan.json",
+    "targets": [200, 201, 203, 204, 205, 206, 209, 210, 212, 217],
+    "closed_do_not_reopen": [160, 211],
+    "applied_this_turn": false
+  },
+  "name_correction_203": {
+    "status": "NAME_CORRECTION_REQUIRED_NO_APPLY",
+    "PERSONEL_ID": 203,
+    "wrong_display_known": "MUHAMMED IRAKLI",
+    "correct_name": "Muhammed Mahmud",
+    "canonical_fields": { "ad": "Muhammed", "soyad": "Mahmud" },
+    "plan": "ops/organization-mapping/personel-203-name-correction-no-apply.json",
+    "applied_this_turn": false
+  },
+  "branch_manager_model": {
+    "status": "PRODUCT_RULE_LOCKED",
+    "technical_status": "ALREADY_SUPPORTED",
+    "technical_fix_required": false,
+    "doc": "docs/guncel/141-business-truth-and-branch-manager-model-lock.md",
+    "assignment_plan": "ops/organization-mapping/branch-manager-assignment-no-apply-plan.json",
+    "rules": {
+      "zero_manager_allowed": true,
+      "multi_branch_manager_allowed": true,
+      "independent_of_home_branch": true,
+      "independent_of_physical_location": true,
+      "no_org_transfer_side_effect": true,
+      "temporary_central_uses_same_model": true
+    }
   },
   "a2": {
     "status": "CLOSED",
@@ -116,18 +168,18 @@
   },
   "a3": {
     "PERSONEL_ID": 212,
-    "CLASSIFICATION": "BUSINESS_DECISION_REQUIRED",
-    "CAN_APPLY": "NO",
-    "TARGET": null,
-    "BLOCKER": "sube_id and calisma_lokasyonu_id both NULL; no automatic target"
+    "CLASSIFICATION": "BUSINESS_TRUTH_RESOLVED_LOCATION_NO_APPLY",
+    "TARGET_LOCATION": 5,
+    "CAN_APPLY": "YES_AFTER_HOST_RECOVERY_LIVE_PREIMAGE_AND_EXPLICIT_APPROVAL",
+    "NOTE": "Physical location truth locked to loc5; home branch still live-verified at apply time; do not invent transfer"
   },
   "cross_company": {
-    "status": "DEFERRED_REVIEW",
+    "status": "CROSS_COMPANY_SEMANTICALLY_VALID_DEFER",
     "reason": "Branch and work-location are independent axes. Karyapı/Şenay rollouts INTENTIONAL_DEFER. Not DATA_CONTRADICTION.",
     "rows": [
-      { "PERSONEL_ID": 120, "SUBE_ID": 11, "SGK_ISVEREN_ID": 3, "CALISMA_LOKASYONU_ID": 5, "STATUS": "DEFERRED_REVIEW", "CAN_APPLY": "NO" },
-      { "PERSONEL_ID": 158, "SUBE_ID": 11, "SGK_ISVEREN_ID": 3, "CALISMA_LOKASYONU_ID": 5, "STATUS": "DEFERRED_REVIEW", "CAN_APPLY": "NO" },
-      { "PERSONEL_ID": 219, "SUBE_ID": 10, "SGK_ISVEREN_ID": 1, "CALISMA_LOKASYONU_ID": 3, "STATUS": "DEFERRED_REVIEW", "CAN_APPLY": "NO" }
+      { "PERSONEL_ID": 120, "SUBE_ID": 11, "SGK_ISVEREN_ID": 3, "CALISMA_LOKASYONU_ID": 5, "STATUS": "CROSS_COMPANY_SEMANTICALLY_VALID_DEFER", "CAN_APPLY": "NO" },
+      { "PERSONEL_ID": 158, "SUBE_ID": 11, "SGK_ISVEREN_ID": 3, "CALISMA_LOKASYONU_ID": 5, "STATUS": "CROSS_COMPANY_SEMANTICALLY_VALID_DEFER", "CAN_APPLY": "NO" },
+      { "PERSONEL_ID": 219, "SUBE_ID": 10, "SGK_ISVEREN_ID": 1, "CALISMA_LOKASYONU_ID": 3, "STATUS": "CROSS_COMPANY_SEMANTICALLY_VALID_DEFER", "CAN_APPLY": "NO" }
     ]
   },
   "hard_closed_unchanged": {
@@ -144,5 +196,6 @@
     "a2_160_211": "CLOSED"
   },
   "production_mutation": 0,
-  "apply": "NONE"
+  "apply": "NONE",
+  "next_gate": "HOSTING_RECOVERY_THEN_LIVE_PREIMAGE_VERIFY_AND_USER_APPROVED_APPLY"
 }

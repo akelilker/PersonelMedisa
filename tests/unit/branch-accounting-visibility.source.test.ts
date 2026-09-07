@@ -106,21 +106,21 @@ describe("branch accounting visibility owners", () => {
     expect(parsed.muhasebe_user_subeler_targets.REMOVE).toEqual([]);
   });
 
-  it("pins CURRENT_STATE + registry to live prod tip 087 with pending empty", () => {
+  it("pins CURRENT_STATE + registry to code tip 088 with prod tip 087 pending", () => {
     const current = read("CURRENT_STATE.md");
     const registry = read("docs/guncel/110-master-closure-gap-registry.md");
-    expect(current).toMatch(/^CODE_MIGRATION_TIP: 087$/m);
+    expect(current).toMatch(/^CODE_MIGRATION_TIP: 088$/m);
     expect(current).toMatch(/^PRODUCTION_MIGRATION_TIP: 087$/m);
-    expect(current).toMatch(/^PRODUCTION_MIGRATION_PENDING: 0$/m);
+    expect(current).toMatch(/^PRODUCTION_MIGRATION_PENDING: 1$/m);
     expect(current).toMatch(
       /^PRODUCTION_DEPLOY_SHA: fcee67186f1ceaec86624ecbe745f51f56330bcd$/m
     );
-    expect(registry).toMatch(/^CODE_MIGRATION_TIP: 087$/m);
+    expect(current).toContain("USER_SUBELER_SEMANTIC: ACCESS_SCOPE_ONLY");
+    expect(current).toContain("BRANCH_MANAGER_OWNER: sube_sorumlu_yoneticiler");
+    expect(registry).toMatch(/^CODE_MIGRATION_TIP: 088$/m);
     expect(registry).toMatch(/^PRODUCTION_MIGRATION_TIP: 087$/m);
-    expect(registry).toContain("| Migration 085 | **APPLIED** |");
-    expect(registry).toContain("| Migration 086 | **APPLIED** |");
     expect(registry).toContain("| Migration 087 | **APPLIED** |");
-    expect(registry).toContain("**PASS @ 087**");
-    expect(registry).toContain("pending EMPTY");
+    expect(registry).toContain("| Migration 088 | **CODE_ONLY_PENDING** |");
+    expect(registry).toContain("pending **088**");
   });
 });

@@ -103,6 +103,7 @@ type SubeFormState = {
   durum: KayitDurumu;
   muhasebeKisitAktif: boolean;
   muhasebeYetkiliUserIds: number[];
+  sorumluYoneticiUserIds: number[];
 };
 
 type SirketFormState = {
@@ -150,8 +151,18 @@ const INITIAL_SUBE_FORM: SubeFormState = {
   departmanIds: [],
   durum: "AKTIF",
   muhasebeKisitAktif: false,
-  muhasebeYetkiliUserIds: []
+  muhasebeYetkiliUserIds: [],
+  sorumluYoneticiUserIds: []
 };
+
+const SORUMLU_YONETICI_ELIGIBLE_ROLES = new Set([
+  "GENEL_YONETICI",
+  "SISTEM_YONETICISI",
+  "SUBE_YONETICISI",
+  "BOLUM_YONETICISI",
+  "BIRIM_AMIRI",
+  "IK_SORUMLUSU"
+]);
 
 const INITIAL_SIRKET_FORM: SirketFormState = {
   kod: "",
@@ -336,7 +347,8 @@ function subeFormFromItem(item: YonetimSube): SubeFormState {
     departmanIds: item.departman_ids,
     durum: item.durum,
     muhasebeKisitAktif: Boolean(item.muhasebe_kisit_aktif) || selectedIds.length > 0,
-    muhasebeYetkiliUserIds: selectedIds
+    muhasebeYetkiliUserIds: selectedIds,
+    sorumluYoneticiUserIds: item.sorumlu_yonetici_user_ids ?? []
   };
 }
 
@@ -460,7 +472,8 @@ function toSubePayload(form: SubeFormState): UpsertYonetimSubePayload {
     departman_ids: form.departmanIds,
     durum: form.durum,
     muhasebe_kisit_aktif: muhasebeKisitAktif,
-    muhasebe_yetkili_user_ids: muhasebeYetkiliUserIds
+    muhasebe_yetkili_user_ids: muhasebeYetkiliUserIds,
+    sorumlu_yonetici_user_ids: form.sorumluYoneticiUserIds
   };
 }
 
@@ -616,6 +629,7 @@ export function YonetimPaneliPage() {
   const [subeForm, setSubeForm] = useState<SubeFormState>(INITIAL_SUBE_FORM);
   const [yeniDepartmanAdi, setYeniDepartmanAdi] = useState("");
   const [muhasebeYetkiliQuery, setMuhasebeYetkiliQuery] = useState("");
+  const [sorumluYoneticiQuery, setSorumluYoneticiQuery] = useState("");
 
   const personelOptions = useMemo(
     () =>
@@ -754,6 +768,62 @@ export function YonetimPaneliPage() {
     [eligibleMuhasebeOptions, subeForm.muhasebeYetkiliUserIds]
   );
 
+  const eligibleSorumluYoneticiOptions = useMemo(() => {
+    const fromUsers = kullanicilar
+      .filter((item) => item.durum === "AKTIF" && SORUMLU_YONETICI_ELIGIBLE_ROLES.has(item.rol))
+      .map((item) => ({
+        id: item.id,
+        label: item.ad_soyad || item.username || `Kullanıcı #${item.id}`,
+        username: item.username ?? "",
+        rol: item.rol,
+        eligible: true as boolean
+      }));
+
+    const editingSube =
+      editingSubeId != null ? subeler.find((item) => item.id === editingSubeId) ?? null : null;
+    const stored = (editingSube?.sorumlu_yoneticiler ?? []).map((item) => ({
+      id: item.id,
+      label: item.ad_soyad || item.username || `Kullanıcı #${item.id}`,
+      username: item.username,
+      rol: item.rol,
+      eligible: item.eligible
+    }));
+
+    const byId = new Map<
+      number,
+      { id: number; label: string; username: string; rol: string; eligible: boolean }
+    >();
+    [...fromUsers, ...stored].forEach((item) => {
+      const existing = byId.get(item.id);
+      if (!existing || (existing.eligible && !item.eligible)) {
+        byId.set(item.id, item);
+      } else if (!existing.eligible && item.eligible) {
+        byId.set(item.id, item);
+      }
+    });
+
+    return Array.from(byId.values()).sort((left, right) => left.label.localeCompare(right.label, "tr"));
+  }, [kullanicilar, editingSubeId, subeler]);
+
+  const filteredSorumluYoneticiOptions = useMemo(() => {
+    const query = sorumluYoneticiQuery.trim().toLocaleLowerCase("tr-TR");
+    if (!query) {
+      return eligibleSorumluYoneticiOptions;
+    }
+    return eligibleSorumluYoneticiOptions.filter((item) => {
+      const haystack = `${item.label} ${item.username} ${item.rol}`.toLocaleLowerCase("tr-TR");
+      return haystack.includes(query);
+    });
+  }, [eligibleSorumluYoneticiOptions, sorumluYoneticiQuery]);
+
+  const selectedSorumluYoneticiLabels = useMemo(
+    () =>
+      eligibleSorumluYoneticiOptions
+        .filter((item) => subeForm.sorumluYoneticiUserIds.includes(item.id))
+        .map((item) => (item.eligible ? item.label : `${item.label} (uygunsuz)`)),
+    [eligibleSorumluYoneticiOptions, subeForm.sorumluYoneticiUserIds]
+  );
+
   const firstLoginSummary = useMemo(() => countPersonelFirstLoginStatus(kullanicilar), [kullanicilar]);
   const filteredKullanicilar = useMemo(
     () => kullanicilar.filter((item) => matchesPersonelFirstLoginFilter(item, firstLoginFilter)),
@@ -884,6 +954,7 @@ export function YonetimPaneliPage() {
     setSubeForm(INITIAL_SUBE_FORM);
     setYeniDepartmanAdi("");
     setMuhasebeYetkiliQuery("");
+    setSorumluYoneticiQuery("");
     setIsDepartmanCreateOpen(false);
     setIsSubeFormOpen(false);
     setFormErrorMessage(null);
@@ -1086,6 +1157,15 @@ export function YonetimPaneliPage() {
       muhasebeYetkiliUserIds: prev.muhasebeYetkiliUserIds.includes(userId)
         ? prev.muhasebeYetkiliUserIds.filter((id) => id !== userId)
         : [...prev.muhasebeYetkiliUserIds, userId]
+    }));
+  }
+
+  function toggleSorumluYoneticiSelection(userId: number) {
+    setSubeForm((prev) => ({
+      ...prev,
+      sorumluYoneticiUserIds: prev.sorumluYoneticiUserIds.includes(userId)
+        ? prev.sorumluYoneticiUserIds.filter((id) => id !== userId)
+        : [...prev.sorumluYoneticiUserIds, userId]
     }));
   }
 
@@ -2025,6 +2105,55 @@ export function YonetimPaneliPage() {
                   </div>
                 </div>
               ) : null}
+            </div>
+
+            <div className="yonetim-checkbox-section" data-testid="yonetim-sube-sorumlu-yonetici">
+              <div className="yonetim-departman-section-head">
+                <p className="yonetim-checkbox-title">Sorumlu Yönetici(ler)</p>
+                <p className="yonetim-hint">
+                  Şube sorumluluk atamasıdır; şube yetkisi / user_subeler erişim kapsamından ayrıdır.
+                  Boş bırakılabilir. Personel şube veya fiziksel lokasyon değişmez.
+                  {selectedSorumluYoneticiLabels.length > 0
+                    ? ` Seçili: ${selectedSorumluYoneticiLabels.join(", ")}`
+                    : " Yöneticisiz şube geçerlidir."}
+                </p>
+              </div>
+              <div className="yonetim-selection-panel" data-testid="yonetim-sube-sorumlu-yonetici-panel">
+                <input
+                  className="form-input"
+                  type="search"
+                  value={sorumluYoneticiQuery}
+                  onChange={(event) => setSorumluYoneticiQuery(event.target.value)}
+                  placeholder="Sorumlu yönetici ara"
+                  data-testid="yonetim-sube-sorumlu-yonetici-search"
+                />
+                <div className="yonetim-selection-grid yonetim-selection-grid--departmanlar">
+                  {filteredSorumluYoneticiOptions.length === 0 ? (
+                    <p className="yonetim-hint">Seçilebilir uygun kullanıcı yok.</p>
+                  ) : (
+                    filteredSorumluYoneticiOptions.map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        className={`yonetim-selection-pill${subeForm.sorumluYoneticiUserIds.includes(item.id) ? " is-selected" : ""}`}
+                        data-testid={`yonetim-sube-sorumlu-yonetici-option-${item.id}`}
+                        disabled={!item.eligible && !subeForm.sorumluYoneticiUserIds.includes(item.id)}
+                        onClick={() => {
+                          if (!item.eligible && !subeForm.sorumluYoneticiUserIds.includes(item.id)) {
+                            return;
+                          }
+                          toggleSorumluYoneticiSelection(item.id);
+                        }}
+                      >
+                        <strong>
+                          {item.label}
+                          {!item.eligible ? " (uygunsuz)" : ""}
+                        </strong>
+                      </button>
+                    ))
+                  )}
+                </div>
+              </div>
             </div>
 
             {formErrorMessage ? (

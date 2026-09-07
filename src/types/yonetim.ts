@@ -117,6 +117,16 @@ export type YonetimSubeMuhasebeYetkili = {
   eligible: boolean;
 };
 
+/** Durable branch-manager responsibility row (not user_subeler access scope). */
+export type YonetimSubeSorumluYonetici = {
+  id: number;
+  username: string;
+  ad_soyad: string;
+  rol: string;
+  durum: string;
+  eligible: boolean;
+};
+
 export type YonetimSube = {
   id: number;
   kod: string;
@@ -140,6 +150,12 @@ export type YonetimSube = {
   muhasebe_kisit_aktif?: boolean;
   muhasebe_yetkili_user_ids?: number[];
   muhasebe_yetkilileri?: YonetimSubeMuhasebeYetkili[];
+  /**
+   * Durable responsible manager assignment for this branch.
+   * Empty = zero managers (valid). Independent of user_subeler / home branch.
+   */
+  sorumlu_yonetici_user_ids?: number[];
+  sorumlu_yoneticiler?: YonetimSubeSorumluYonetici[];
 };
 
 export type UpsertYonetimSubePayload = {
@@ -150,6 +166,7 @@ export type UpsertYonetimSubePayload = {
   sgk_isveren_id?: number | null;
   muhasebe_kisit_aktif?: boolean;
   muhasebe_yetkili_user_ids?: number[];
+  sorumlu_yonetici_user_ids?: number[];
 };
 
 export type YonetimSirket = {

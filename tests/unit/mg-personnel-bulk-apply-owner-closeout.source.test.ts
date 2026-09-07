@@ -97,6 +97,7 @@ describe("MG personnel bulk apply owner closeout sources", () => {
     expect(preflight).toContain(
       "'086' => '086_personel_historical_exit_date_correction_auditleri.sql'",
       "'087' => '087_sube_muhasebe_yetkilileri.sql'",
+      "'088' => '088_sube_sorumlu_yoneticiler.sql'",
     );
     expect(preflight).toContain("EXPECTED_APPLIED_TIP = '084'");
     expect(preflight).not.toContain("'084' => '084_gunluk_bildirim_tamamlama_header_summary.sql'");

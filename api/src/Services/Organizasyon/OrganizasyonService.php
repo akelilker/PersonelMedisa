@@ -175,7 +175,10 @@ final class OrganizasyonService
             $items[] = SubeReadModel::mapRow($row);
         }
 
-        return self::attachMuhasebeYetkiPayloads($pdo, $items);
+        return self::attachSorumluYoneticiPayloads(
+            $pdo,
+            self::attachMuhasebeYetkiPayloads($pdo, $items)
+        );
     }
 
     /** @return array<string, mixed>|null */
@@ -199,7 +202,10 @@ final class OrganizasyonService
             return null;
         }
 
-        $items = self::attachMuhasebeYetkiPayloads($pdo, [SubeReadModel::mapRow($row)]);
+        $items = self::attachSorumluYoneticiPayloads(
+            $pdo,
+            self::attachMuhasebeYetkiPayloads($pdo, [SubeReadModel::mapRow($row)])
+        );
 
         return $items[0] ?? null;
     }
@@ -250,6 +256,7 @@ final class OrganizasyonService
         $departmanIds = self::parseDepartmanIds($body['departman_ids'] ?? []);
         $sgkIsverenId = self::parseNullableId($body, 'sgk_isveren_id');
         $muhasebePlan = self::parseMuhasebeYetkiPlan($body);
+        $sorumluPlan = self::parseSorumluYoneticiPlan($body);
 
         self::assertDepartmanIdsExist($pdo, $departmanIds);
         self::assertSubeKodUnique($pdo, $kod, null);
@@ -257,6 +264,9 @@ final class OrganizasyonService
         self::assertSgkIsverenConsistent($pdo, $sgkIsverenId, $parentSirketId);
         if ($muhasebePlan !== null) {
             self::assertMuhasebeYetkiPlanValid($pdo, $muhasebePlan);
+        }
+        if ($sorumluPlan !== null) {
+            self::assertSorumluYoneticiPlanValid($pdo, $sorumluPlan);
         }
 
         $columns = ['kod', 'ad', 'durum'];
@@ -290,6 +300,9 @@ final class OrganizasyonService
                     $subeId,
                     $muhasebePlan['enabled'] ? $muhasebePlan['user_ids'] : []
                 );
+            }
+            if ($sorumluPlan !== null) {
+                SubeSorumluYoneticiSchema::replaceForSube($pdo, $subeId, $sorumluPlan);
             }
             if ($auditContext !== null) {
                 OrganizasyonAuditWriter::recordSubeOlusturma($pdo, [
@@ -343,6 +356,7 @@ final class OrganizasyonService
             ? self::parseDepartmanIds($body['departman_ids'])
             : null;
         $muhasebePlan = self::parseMuhasebeYetkiPlan($body);
+        $sorumluPlan = self::parseSorumluYoneticiPlan($body);
 
         $currentSirketId = isset($existing['sirket']['id']) ? (int) $existing['sirket']['id'] : null;
         $sgkIsverenId = array_key_exists('sgk_isveren_id', $body)
@@ -358,6 +372,9 @@ final class OrganizasyonService
         self::assertSgkIsverenConsistent($pdo, $sgkIsverenId, $currentSirketId);
         if ($muhasebePlan !== null) {
             self::assertMuhasebeYetkiPlanValid($pdo, $muhasebePlan);
+        }
+        if ($sorumluPlan !== null) {
+            self::assertSorumluYoneticiPlanValid($pdo, $sorumluPlan);
         }
 
         $sets = ['ad = :ad', 'durum = :durum'];
@@ -380,6 +397,9 @@ final class OrganizasyonService
                     $id,
                     $muhasebePlan['enabled'] ? $muhasebePlan['user_ids'] : []
                 );
+            }
+            if ($sorumluPlan !== null) {
+                SubeSorumluYoneticiSchema::replaceForSube($pdo, $id, $sorumluPlan);
             }
             $pdo->commit();
         } catch (OrganizasyonException $e) {
@@ -954,6 +974,157 @@ final class OrganizasyonService
                 throw OrganizasyonException::validation(
                     'Yalnız aktif MUHASEBE kullanıcıları seçilebilir.',
                     'muhasebe_yetkili_user_ids'
+                );
+            }
+        }
+    }
+
+    /**
+     * Attach durable manager-responsibility payloads. Missing schema → zero managers.
+     *
+     * @param array<int, array<string, mixed>> $items
+     * @return array<int, array<string, mixed>>
+     */
+    private static function attachSorumluYoneticiPayloads(PDO $pdo, array $items): array
+    {
+        if (count($items) === 0) {
+            return $items;
+        }
+
+        $map = [];
+        if (SubeSorumluYoneticiSchema::isReady($pdo)) {
+            $subeIds = [];
+            foreach ($items as $item) {
+                $subeId = (int) ($item['id'] ?? 0);
+                if ($subeId > 0) {
+                    $subeIds[] = $subeId;
+                }
+            }
+            $map = SubeSorumluYoneticiSchema::loadSubeUserMap($pdo, $subeIds);
+        }
+
+        foreach ($items as &$item) {
+            $subeId = (int) ($item['id'] ?? 0);
+            $userIds = $map[$subeId] ?? [];
+            $item['sorumlu_yonetici_user_ids'] = $userIds;
+            $item['sorumlu_yoneticiler'] = self::loadSorumluYoneticiStatuses($pdo, $userIds);
+        }
+        unset($item);
+
+        return $items;
+    }
+
+    /**
+     * @param array<int, int> $userIds
+     * @return array<int, array<string, mixed>>
+     */
+    private static function loadSorumluYoneticiStatuses(PDO $pdo, array $userIds): array
+    {
+        if (count($userIds) === 0) {
+            return [];
+        }
+
+        $placeholders = implode(', ', array_fill(0, count($userIds), '?'));
+        $stmt = $pdo->prepare(
+            "SELECT id, username, ad_soyad, rol, durum
+             FROM users
+             WHERE id IN ($placeholders)"
+        );
+        $stmt->execute(array_values($userIds));
+        $byId = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $id = (int) ($row['id'] ?? 0);
+            if ($id <= 0) {
+                continue;
+            }
+            $rol = strtoupper(trim((string) ($row['rol'] ?? '')));
+            $durum = strtoupper(trim((string) ($row['durum'] ?? '')));
+            $byId[$id] = [
+                'id' => $id,
+                'username' => (string) ($row['username'] ?? ''),
+                'ad_soyad' => (string) ($row['ad_soyad'] ?? ''),
+                'rol' => $rol,
+                'durum' => $durum,
+                'eligible' => $durum === 'AKTIF' && SubeSorumluYoneticiSchema::isEligibleRole($rol),
+            ];
+        }
+
+        $ordered = [];
+        foreach ($userIds as $userId) {
+            if (isset($byId[$userId])) {
+                $ordered[] = $byId[$userId];
+                continue;
+            }
+            $ordered[] = [
+                'id' => $userId,
+                'username' => '',
+                'ad_soyad' => '',
+                'rol' => '',
+                'durum' => '',
+                'eligible' => false,
+            ];
+        }
+
+        return $ordered;
+    }
+
+    /**
+     * null = payload omitted (preserve existing managers).
+     * Present array (including empty) replaces the assignment set.
+     *
+     * @param array<string, mixed> $body
+     * @return array<int, int>|null
+     */
+    private static function parseSorumluYoneticiPlan(array $body): ?array
+    {
+        if (!array_key_exists('sorumlu_yonetici_user_ids', $body)) {
+            return null;
+        }
+
+        return self::parseDepartmanIds($body['sorumlu_yonetici_user_ids']);
+    }
+
+    /**
+     * @param array<int, int> $userIds
+     */
+    private static function assertSorumluYoneticiPlanValid(PDO $pdo, array $userIds): void
+    {
+        if (!SubeSorumluYoneticiSchema::isReady($pdo)) {
+            throw OrganizasyonException::conflict(
+                'SUBE_SORUMLU_YONETICILER_TABLE_MISSING',
+                'Şube sorumlu yönetici ataması bu ortamda henüz kullanılamaz.'
+            );
+        }
+
+        if (count($userIds) === 0) {
+            // Zero managers is a valid product state.
+            return;
+        }
+
+        $placeholders = implode(', ', array_fill(0, count($userIds), '?'));
+        $stmt = $pdo->prepare(
+            "SELECT id, rol, durum FROM users WHERE id IN ($placeholders)"
+        );
+        $stmt->execute(array_values($userIds));
+        $found = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $id = (int) ($row['id'] ?? 0);
+            $rol = strtoupper(trim((string) ($row['rol'] ?? '')));
+            $durum = strtoupper(trim((string) ($row['durum'] ?? '')));
+            if ($id <= 0 || $durum !== 'AKTIF' || !SubeSorumluYoneticiSchema::isEligibleRole($rol)) {
+                throw OrganizasyonException::validation(
+                    'Sorumlu yönetici yalnız uygun aktif kullanıcılar arasından seçilebilir.',
+                    'sorumlu_yonetici_user_ids'
+                );
+            }
+            $found[$id] = true;
+        }
+
+        foreach ($userIds as $userId) {
+            if (!isset($found[$userId])) {
+                throw OrganizasyonException::validation(
+                    'Sorumlu yönetici yalnız uygun aktif kullanıcılar arasından seçilebilir.',
+                    'sorumlu_yonetici_user_ids'
                 );
             }
         }

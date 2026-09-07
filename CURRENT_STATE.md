@@ -1,11 +1,19 @@
-CODE_MIGRATION_TIP: 087
+CODE_MIGRATION_TIP: 088
 PRODUCTION_MIGRATION_TIP: 087
-PRODUCTION_MIGRATION_PENDING: 0
+PRODUCTION_MIGRATION_PENDING: 1
 PRODUCTION_DEPLOY_SHA: fcee67186f1ceaec86624ecbe745f51f56330bcd
 
-# Live state pin (2026-09-06/07 evidence lock — SELECT-only; mutation=0)
+# Live state pin (2026-09-07 BRANCH_MANAGER_ASSIGNMENT_SEMANTICS_CORRECTION — SELECT-only; mutation=0)
 
-Evidence sources: Deploy cPanel `34035970806` @ `fcee6718`; migration apply `34033315991` (087); inventory `orginv-34057486092-1` tip=087 pending=0; preflight PROD_TIP=087 PENDING=NONE; authenticated GET personnel/SGK policy readback.
+CODE tip **088** (`088_sube_sorumlu_yoneticiler.sql`) — durable branch-manager
+responsibility owner, separate from `user_subeler` access scope.
+PRODUCTION tip remains **087**; pending **088** (not applied; hosting freeze).
+
+Evidence sources: Deploy cPanel `34035970806` @ `fcee6718`; migration apply `34033315991` (087); inventory `orginv-34057486092-1` tip=087 pending=0 at last live probe; code now ahead by 088.
+
+USER_SUBELER_SEMANTIC: ACCESS_SCOPE_ONLY
+BRANCH_MANAGER_OWNER: sube_sorumlu_yoneticiler (OrganizasyonService)
+A1_SCOPE_MODEL: unchanged (`user_subeler` formal SGK scope)
 
 PERSONEL_TOTAL: 153
 PERSONEL_AKTIF: 144

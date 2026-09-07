@@ -42,6 +42,7 @@ final class MigrationPreflightReport
      * - 085: append-only gunluk_bildirim_duzeltme_auditleri
      * - 086: append-only personel_historical_exit_date_correction_auditleri
      * - 087: branch accounting visibility ACL (sube_muhasebe_yetkilileri)
+     * - 088: durable branch manager responsibility (sube_sorumlu_yoneticiler)
      * Production is expected at tip 084; pending set is the round suffix.
      *
      * @var array<string, string>
@@ -50,6 +51,7 @@ final class MigrationPreflightReport
         '085' => '085_gunluk_bildirim_duzeltme_auditleri.sql',
         '086' => '086_personel_historical_exit_date_correction_auditleri.sql',
         '087' => '087_sube_muhasebe_yetkilileri.sql',
+        '088' => '088_sube_sorumlu_yoneticiler.sql',
     ];
 
     /** Withdrawn 079. Must not appear anywhere in the canonical source. */
@@ -73,6 +75,7 @@ final class MigrationPreflightReport
         'gunluk_bildirim_duzeltme_auditleri',
         'personel_historical_exit_date_correction_auditleri',
         'sube_muhasebe_yetkilileri',
+        'sube_sorumlu_yoneticiler',
     ];
 
     /**
@@ -489,7 +492,7 @@ final class MigrationPreflightReport
         }
         if ($pendingVersions === []) {
             // Nothing left to authorize; a further request would re-apply. The
-            // healthy end state is tip 087 exactly; an empty pending set on any
+            // healthy end state is tip 088 exactly; an empty pending set on any
             // other tip means the chain is not the one this gate authorizes.
             $blockers[] = $ledger['ready'] && $ledger['applied_tip'] === $roundTip
                 ? 'ROUND_ALREADY_COMPLETE'

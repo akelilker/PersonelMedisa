@@ -1,26 +1,21 @@
-CODE_MIGRATION_TIP: 087
+CODE_MIGRATION_TIP: 088
 PRODUCTION_MIGRATION_TIP: 087
 
 # 110 — Canonical Closure / Gap Registry
 
 **Tür:** Güncel durum kaydı ve sonraki iş seçimi için tek referans.
-**Güncelleme:** 2026-09-07 (A1/A2/A3 evidence lock + doc reconcile; PRODUCTION_MUTATION=0)
-**Kapsam:** PersonelMedisa teknik ana sistem kapanışı + kullanıcı-gated kalan işlerin net sınıflandırması. Bu turda uygulama kodu / migration apply / personel-assignment-rol-SGK-bordro-retention-imha mutasyonu yok.
+**Güncelleme:** 2026-09-07 (`BRANCH_MANAGER_ASSIGNMENT_SEMANTICS_CORRECTION_GATE`; migration 088 local; production tip 087; mutation=0)
+**Kapsam:** PersonelMedisa teknik ana sistem kapanışı + branch-manager semantics correction. Production write / deploy / migration apply **yok**.
 
 ## Migration durumu
 
 | Alan | Değer | Kanıt / sınır |
 | --- | --- | --- |
-| CODE_MIGRATION_TIP | **087** | Repodaki son migration: `087_sube_muhasebe_yetkilileri.sql` — şube bazlı muhasebe görünürlük ACL (`sube_muhasebe_yetkilileri`); relation presence = restriction enabled; additive, data write/backfill yok; idempotent |
-| PRODUCTION_MIGRATION_TIP | **087** | 087 production applied (apply run `34033315991`); live tip=087; pending=EMPTY (inventory `orginv-34057486092-1`, preflight PROD_TIP=087) |
-| Migration 084 | **APPLIED** | Dosya: `api/migrations/084_gunluk_bildirim_tamamlama_header_summary.sql`. Durum: production applied |
-| Migration 085 | **APPLIED** | Dosya: `api/migrations/085_gunluk_bildirim_duzeltme_auditleri.sql`. Durum: production applied |
-| Migration 086 | **APPLIED** | Dosya: `api/migrations/086_personel_historical_exit_date_correction_auditleri.sql`. Durum: production applied (apply run `33993971923`) |
-| Migration 087 | **APPLIED** | Dosya: `api/migrations/087_sube_muhasebe_yetkilileri.sql`. Durum: production applied; ACL seed rows intentional empty (restriction DISABLED) |
-| Organizasyon eşleme durumu | **CLOSED_CONFIRMED** | İlk mapping apply `33342644722` (tarihsel: o turda 10 şube + lokasyon deferred). Canlı: **12 şube**; Medisa work-location catalog mapping **APPLIED** (7/7); Medisa approved user grants **APPLIED**. Karyapı/Şenay company rollout **INTENTIONAL_DEFER**. Display owner = `SubeReadModel` |
-| `MATRIX_DEVELOPMENT_BASELINE_SHA` | **`067692bba744808c06b6b7d802797c453859df53`** | Değişmez tarihsel kanıt (ilk mapping apply pin). Güncel live deploy SHA değildir — live = `fcee67186f1ceaec86624ecbe745f51f56330bcd` |
-| Otomatik sicil owner | **`PersonelSicilAllocator`** | `api/src/Services/Personel/PersonelSicilAllocator.php` + singleton tablo `personel_sicil_sequence` (migration 078) |
-| Canlı migration doğrulaması | **PASS @ 087** | Production tip `087`; pending EMPTY |
+| CODE_MIGRATION_TIP | **088** | `088_sube_sorumlu_yoneticiler.sql` — durable branch manager responsibility (`sube_sorumlu_yoneticiler`); independent of `user_subeler` |
+| PRODUCTION_MIGRATION_TIP | **087** | Live tip **087**; pending **088** (not applied; hosting freeze) |
+| Migration 087 | **APPLIED** | `087_sube_muhasebe_yetkilileri.sql` |
+| Migration 088 | **CODE_ONLY_PENDING** | No production apply this turn |
+| Canlı migration doğrulaması | **PASS @ 087** / pending **088** | Hosting recovery required before apply |
 
 ## Durum sözlüğü
 

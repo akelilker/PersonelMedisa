@@ -79,7 +79,7 @@ jobs:
           # The canonical round: an ordered set applied one migration per request.
           # The gate accepts the whole round before it starts and its tail between
           # two applies, and always authorizes exactly the next pending migration.
-          ROUND_MIGRATIONS: "085_gunluk_bildirim_duzeltme_auditleri.sql 086_personel_historical_exit_date_correction_auditleri.sql 087_sube_muhasebe_yetkilileri.sql"
+          ROUND_MIGRATIONS: "085_gunluk_bildirim_duzeltme_auditleri.sql 086_personel_historical_exit_date_correction_auditleri.sql 087_sube_muhasebe_yetkilileri.sql 088_sube_sorumlu_yoneticiler.sql"
           PRE_ROUND_TIP: "084"
           WITHDRAWN_079: "079_aylik_kapanis_sube_scope_and_actor.sql"
         run: |

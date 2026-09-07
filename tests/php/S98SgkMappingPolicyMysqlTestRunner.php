@@ -126,6 +126,11 @@ try {
         durum ENUM('AKTIF','PASIF') NOT NULL DEFAULT 'AKTIF'
     ) ENGINE=InnoDB");
     $pdo->exec("CREATE TABLE subeler (id INT UNSIGNED NOT NULL PRIMARY KEY, kod VARCHAR(32) NOT NULL, ad VARCHAR(120) NOT NULL, durum ENUM('AKTIF','PASIF') NOT NULL DEFAULT 'AKTIF') ENGINE=InnoDB");
+    $pdo->exec('CREATE TABLE user_subeler (
+        user_id INT UNSIGNED NOT NULL,
+        sube_id INT UNSIGNED NOT NULL,
+        PRIMARY KEY (user_id, sube_id)
+    ) ENGINE=InnoDB');
     $pdo->exec('CREATE TABLE personeller (id INT UNSIGNED NOT NULL PRIMARY KEY, ad VARCHAR(80) NOT NULL) ENGINE=InnoDB');
     $pdo->exec('CREATE TABLE surecler (
         id INT UNSIGNED NOT NULL PRIMARY KEY,
@@ -154,6 +159,7 @@ try {
         (2, 'onaylayan.s98', 'GENEL_YONETICI', 'AKTIF'),
         (8, 'unlinked.s98', 'GENEL_YONETICI', 'AKTIF')");
     $pdo->exec("INSERT INTO subeler VALUES (1, 'MRK', 'Merkez', 'AKTIF')");
+    $pdo->exec('INSERT INTO user_subeler (user_id, sube_id) VALUES (1, 1), (2, 1)');
     $pdo->exec("INSERT INTO personeller VALUES (1, 'Fixture A'), (2, 'Fixture B'), (7, 'Test Personel')");
 
     applyS98Migration($pdo, '048_sgk_dual_control_actor_roles.sql');
@@ -202,8 +208,89 @@ try {
     ];
     SgkKararPaketiAuthz::assertPrepare($pdo, $prepOk);
     SgkKararPaketiAuthz::assertApprove($pdo, $apprOk);
-    SgkKararPaketiAuthz::assertSubeScope($apprOk, 1);
+    SgkKararPaketiAuthz::assertSubeScope($pdo, $apprOk, 1);
     s98Assert(true, 'linked scoped prepare/approve PASS');
+
+    // Visibility-cleared session sube_ids must not authorize; DB user_subeler does.
+    $pdo->exec("INSERT INTO subeler (id, kod, ad, durum) VALUES
+        (12, 'IZM', 'Izmir', 'AKTIF'),
+        (13, 'SAK', 'Sakarya', 'AKTIF')");
+    $ikSessionCleared = array_merge($prepOk, [
+        'rol' => 'IK_SORUMLUSU',
+        'sube_ids' => [],
+        'explicit_sube_ids' => [12, 13],
+    ]);
+    $pdo->exec('DELETE FROM user_subeler WHERE user_id = 1');
+    $pdo->exec('INSERT INTO user_subeler (user_id, sube_id) VALUES (1, 12), (1, 13)');
+    SgkKararPaketiAuthz::assertSubeScope($pdo, $ikSessionCleared, 12);
+    SgkKararPaketiAuthz::assertSubeScope($pdo, $ikSessionCleared, 13);
+    s98Assert(true, 'IK empty session + explicit user_subeler 12/13 ALLOWED');
+    try {
+        SgkKararPaketiAuthz::assertSubeScope($pdo, $ikSessionCleared, 1);
+        s98Assert(false, 'IK explicit 12/13 must not authorize branch 1');
+    } catch (RuntimeException $e) {
+        s98Assert($e->getMessage() === 'SGK_ACTOR_SCOPE_FORBIDDEN', 'IK wrong branch FORBIDDEN');
+    }
+    $pdo->exec('DELETE FROM user_subeler WHERE user_id = 1');
+    try {
+        SgkKararPaketiAuthz::assertSubeScope($pdo, array_merge($ikSessionCleared, ['sube_ids' => [12, 13]]), 12);
+        s98Assert(false, 'IK empty user_subeler must deny even if session lists branches');
+    } catch (RuntimeException $e) {
+        s98Assert($e->getMessage() === 'SGK_ACTOR_SCOPE_NOT_READY', 'IK empty explicit scope DENIED');
+    }
+    $pdo->exec('INSERT INTO user_subeler (user_id, sube_id) VALUES (1, 1)');
+
+    $gyEmpty = array_merge($apprOk, ['sube_ids' => []]);
+    $pdo->exec('DELETE FROM user_subeler WHERE user_id = 2');
+    try {
+        SgkKararPaketiAuthz::assertSubeScope($pdo, $gyEmpty, 12);
+        s98Assert(false, 'GY unrestricted empty explicit scope must deny');
+    } catch (RuntimeException $e) {
+        s98Assert($e->getMessage() === 'SGK_ACTOR_SCOPE_NOT_READY', 'GY empty explicit scope DENIED');
+    }
+    $pdo->exec('INSERT INTO user_subeler (user_id, sube_id) VALUES (2, 12)');
+    SgkKararPaketiAuthz::assertSubeScope($pdo, array_merge($gyEmpty, ['sube_ids' => []]), 12);
+    s98Assert(true, 'GY explicit user_subeler=[12] allows only 12');
+    try {
+        SgkKararPaketiAuthz::assertSubeScope($pdo, $gyEmpty, 13);
+        s98Assert(false, 'GY explicit [12] must not authorize 13');
+    } catch (RuntimeException $e) {
+        s98Assert($e->getMessage() === 'SGK_ACTOR_SCOPE_FORBIDDEN', 'GY no unrestricted bypass for 13');
+    }
+    $pdo->exec('DELETE FROM user_subeler WHERE user_id = 2');
+    $pdo->exec('INSERT INTO user_subeler (user_id, sube_id) VALUES (2, 1)');
+
+    // BOLUM approve with verified identity + explicit 12/13
+    $pdo->exec("INSERT INTO users (id, username, rol, durum) VALUES (3, 'bolum.s98', 'BOLUM_YONETICISI', 'AKTIF')");
+    if ((int) $pdo->query("SELECT COUNT(*) FROM actor_identities WHERE id = 5")->fetchColumn() === 0) {
+        $pdo->exec("INSERT INTO actor_identities
+            (id, identity_code, display_name, normalized_name, status, verification_source, personel_id)
+            VALUES (5, 'TEST_BOLUM_PERSON', 'Test Bolum Person', 'test bolum person', 'VERIFIED', 'HUMAN_CONFIRMED', NULL)");
+    }
+    $pdo->exec('UPDATE users SET actor_identity_id = 5 WHERE id = 3');
+    $pdo->exec('INSERT INTO user_subeler (user_id, sube_id) VALUES (3, 12), (3, 13)');
+    $bolumOk = [
+        'id' => 3,
+        'rol' => 'BOLUM_YONETICISI',
+        'username' => 'bolum.s98',
+        'durum' => 'AKTIF',
+        'actor_identity_id' => 5,
+        'actor_identity_status' => 'VERIFIED',
+        'sube_ids' => [],
+    ];
+    SgkKararPaketiAuthz::assertApprove($pdo, $bolumOk);
+    SgkKararPaketiAuthz::assertSubeScope($pdo, $bolumOk, 12);
+    SgkKararPaketiAuthz::assertSubeScope($pdo, $bolumOk, 13);
+    s98Assert(true, 'BOLUM approve + explicit 12/13 ALLOWED');
+    try {
+        SgkKararPaketiAuthz::assertPrepare($pdo, $bolumOk);
+        s98Assert(false, 'BOLUM prepare should deny');
+    } catch (RuntimeException $e) {
+        s98Assert($e->getMessage() === 'SGK_PREPARE_FORBIDDEN', 'BOLUM prepare DENIED');
+    }
+    // Remove temporary 12/13 branches so later collection count stays 3 (1,2,3).
+    $pdo->exec('DELETE FROM user_subeler WHERE sube_id IN (12, 13)');
+    $pdo->exec('DELETE FROM subeler WHERE id IN (12, 13)');
 
     // S1E: SGK approve shared across GENEL_YONETICI + BOLUM_YONETICISI (permission-first)
     s98Assert(RolePermissions::has(['rol' => 'GENEL_YONETICI'], 'sgk_karar_paketi.approve'), 'GY sgk approve YES');
@@ -313,18 +400,29 @@ try {
     } catch (RuntimeException $e) {
         s98Assert($e->getMessage() === 'SGK_PREPARE_FORBIDDEN', 'MUHASEBE prepare code');
     }
+    $pdo->exec('DELETE FROM user_subeler WHERE user_id = 1');
     try {
-        SgkKararPaketiAuthz::assertSubeScope(array_merge($prepOk, ['sube_ids' => []]), 1);
+        SgkKararPaketiAuthz::assertSubeScope($pdo, array_merge($prepOk, ['sube_ids' => []]), 1);
         s98Assert(false, 'empty scope should deny');
     } catch (RuntimeException $e) {
         s98Assert($e->getMessage() === 'SGK_ACTOR_SCOPE_NOT_READY', 'empty scope code');
     }
+    // In-memory sube_ids cannot authorize without DB user_subeler grant.
     try {
-        SgkKararPaketiAuthz::assertSubeScope(array_merge($prepOk, ['sube_ids' => [2]]), 1);
+        SgkKararPaketiAuthz::assertSubeScope($pdo, array_merge($prepOk, ['sube_ids' => [2]]), 1);
         s98Assert(false, 'wrong scope should deny');
+    } catch (RuntimeException $e) {
+        s98Assert($e->getMessage() === 'SGK_ACTOR_SCOPE_NOT_READY', 'wrong scope without DB grant is NOT_READY');
+    }
+    $pdo->exec('INSERT INTO user_subeler (user_id, sube_id) VALUES (1, 2)');
+    try {
+        SgkKararPaketiAuthz::assertSubeScope($pdo, array_merge($prepOk, ['sube_ids' => [2]]), 1);
+        s98Assert(false, 'wrong DB scope should deny');
     } catch (RuntimeException $e) {
         s98Assert($e->getMessage() === 'SGK_ACTOR_SCOPE_FORBIDDEN', 'wrong scope code');
     }
+    $pdo->exec('DELETE FROM user_subeler WHERE user_id = 1');
+    $pdo->exec('INSERT INTO user_subeler (user_id, sube_id) VALUES (1, 1)');
 
     $prepNoLink = SgkKararPaketiAuthz::denySamePerson($pdo, $apprOk, 99);
     s98Assert(($prepNoLink['code'] ?? '') === 'SGK_PREPARER_ACTOR_IDENTITY_REQUIRED', 'missing preparer actor identity link');

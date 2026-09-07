@@ -15,6 +15,10 @@ use RuntimeException;
  *
  * Formal write: identity + permission + verified actor_identity link + explicit scope (fail-closed).
  * Same-person owner: users.actor_identity_id (not personel master).
+ *
+ * Formal branch scope owner is DB `user_subeler` (ADR-0001). Visibility-cleared
+ * session `sube_ids` (e.g. IK org-global-read), company-expanded visibility, and
+ * OrgScope unrestricted empty-list semantics must never authorize SGK writes.
  */
 final class SgkKararPaketiAuthz
 {
@@ -53,28 +57,52 @@ final class SgkKararPaketiAuthz
     }
 
     /**
+     * Formal SGK branch membership: DB-backed explicit user_subeler only.
+     *
      * @param array<string,mixed> $actor
      */
-    public static function assertSubeScope(array $actor, $subeId): void
+    public static function assertSubeScope(PDO $pdo, array $actor, $subeId): void
     {
         $subeId = (int) $subeId;
         if ($subeId <= 0) {
             return;
         }
-        if (!isset($actor['sube_ids']) || !is_array($actor['sube_ids'])) {
+        $allowed = self::resolveExplicitBranchScope($pdo, $actor);
+        if ($allowed === []) {
             throw new RuntimeException('SGK_ACTOR_SCOPE_NOT_READY');
-        }
-        $subeIds = $actor['sube_ids'];
-        if ($subeIds === []) {
-            throw new RuntimeException('SGK_ACTOR_SCOPE_NOT_READY');
-        }
-        $allowed = [];
-        foreach ($subeIds as $id) {
-            $allowed[] = (int) $id;
         }
         if (!in_array($subeId, $allowed, true)) {
             throw new RuntimeException('SGK_ACTOR_SCOPE_FORBIDDEN');
         }
+    }
+
+    /**
+     * Canonical explicit formal SGK branch ids for an actor user.
+     * Empty list means not ready — never treat as unrestricted.
+     *
+     * @param array<string,mixed> $actor
+     * @return list<int>
+     */
+    public static function resolveExplicitBranchScope(PDO $pdo, array $actor): array
+    {
+        $userId = (int) ($actor['id'] ?? 0);
+        if ($userId <= 0) {
+            return [];
+        }
+
+        $stmt = $pdo->prepare(
+            'SELECT sube_id FROM user_subeler WHERE user_id = :user_id ORDER BY sube_id ASC'
+        );
+        $stmt->execute(['user_id' => $userId]);
+        $scope = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $subeId) {
+            $id = (int) $subeId;
+            if ($id > 0 && !in_array($id, $scope, true)) {
+                $scope[] = $id;
+            }
+        }
+
+        return $scope;
     }
 
     public static function isFormalUsername($username): bool
@@ -103,10 +131,11 @@ final class SgkKararPaketiAuthz
             self::assertPermission($actor, self::PERM_PREPARE, 'SGK_PREPARE_FORBIDDEN');
             self::assertActorIdentitySchemaRequired($pdo);
             self::assertActorIdentityLinkedAndVerified($pdo, $actor);
-            if (!isset($actor['sube_ids']) || !is_array($actor['sube_ids']) || count($actor['sube_ids']) === 0) {
+            $scope = self::resolveExplicitBranchScope($pdo, $actor);
+            if ($scope === []) {
                 throw new RuntimeException('SGK_ACTOR_SCOPE_NOT_READY');
             }
-            self::assertActiveActorScope($pdo, $actor['sube_ids']);
+            self::assertActiveActorScope($pdo, $scope);
 
             return ['ready' => true];
         } catch (RuntimeException $e) {

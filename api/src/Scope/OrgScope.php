@@ -931,6 +931,13 @@ class OrgScope
             JsonResponse::forbidden();
         }
 
+        // BOLUM org reach is owned by user_bolumler. Optional user_subeler used
+        // as formal SGK scope must not confine bolum personnel access.
+        $role = self::normalizeRole($user);
+        if (in_array($role, self::BOLUM_ASSIGNMENT_ROLES, true)) {
+            return;
+        }
+
         $assignedSube = self::allowedSubeIds($user);
         if (count($assignedSube) > 0 && !in_array((int) $personelSubeId, $assignedSube, true)) {
             JsonResponse::forbidden();

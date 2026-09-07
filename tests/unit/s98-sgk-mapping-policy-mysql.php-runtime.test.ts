@@ -16,6 +16,12 @@ describe("S98 SGK mapping + policy MariaDB acceptance", () => {
     expect(result.stdout).toContain("migration 047 applied + idempotent");
     expect(result.stdout).toContain("migration 048 actor_identity applied + idempotent");
     expect(result.stdout).toContain("linked scoped prepare/approve PASS");
+    expect(result.stdout).toContain("IK empty session + explicit user_subeler 12/13 ALLOWED");
+    expect(result.stdout).toContain("IK empty explicit scope DENIED");
+    expect(result.stdout).toContain("GY empty explicit scope DENIED");
+    expect(result.stdout).toContain("GY explicit user_subeler=[12] allows only 12");
+    expect(result.stdout).toContain("GY no unrestricted bypass for 13");
+    expect(result.stdout).toContain("BOLUM approve + explicit 12/13 ALLOWED");
     expect(result.stdout).toContain("distinct persons dual-control PASS");
     expect(result.stdout).toContain("missing actor identity link code");
     expect(result.stdout).toContain("missing preparer actor identity link");

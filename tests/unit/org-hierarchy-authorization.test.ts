@@ -120,6 +120,10 @@ describe("org hierarchy authorization contract", () => {
     expect(php).not.toMatch(
       /allowedBirimIds\(\$user\)\) === 0 && count\(self::allowedSubeIds\(\$user\)\) === 0/,
     );
+    // Optional formal SGK user_subeler must not confine BOLUM org access.
+    expect(php).toMatch(
+      /function assertActiveSubeNarrow[\s\S]*BOLUM_ASSIGNMENT_ROLES[\s\S]*return;[\s\S]*allowedSubeIds/,
+    );
     const yonetim = readFileSync(resolve(root, "api/src/Controllers/YonetimController.php"), "utf8");
     expect(yonetim).toContain("BOLUM_YONETICISI icin en az bir bolum atamasi zorunludur.");
     expect(yonetim).toContain("BIRIM_AMIRI icin en az bir birim atamasi zorunludur.");

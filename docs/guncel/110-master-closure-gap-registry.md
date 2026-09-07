@@ -4,7 +4,7 @@ PRODUCTION_MIGRATION_TIP: 087
 # 110 — Canonical Closure / Gap Registry
 
 **Tür:** Güncel durum kaydı ve sonraki iş seçimi için tek referans.
-**Güncelleme:** 2026-09-07 (`BUSINESS_TRUTH_AND_BRANCH_MANAGER_MODEL_LOCK`; A1 pair locked to sedanurB + Sinem; loc5 truth locked; BM model ALREADY_SUPPORTED; mutation=0)
+**Güncelleme:** 2026-09-07 (`BUSINESS_TRUTH_AND_BRANCH_MANAGER_MODEL_LOCK` + semantics correction; A1 pair locked; loc5 truth locked; BM tech = TECHNICAL_GAP_LOCAL_FIXABLE → PR #278; tip pins remain 087 on this PR; mutation=0)
 **Kapsam:** PersonelMedisa teknik ana sistem kapanışı + business-truth / branch-manager model kilidi. Production write / deploy / secret / FTP / migration apply / A1 apply / personel mutasyonu / branch-manager write **yok**.
 
 ## Migration durumu
@@ -45,7 +45,7 @@ PRODUCTION_MIGRATION_TIP: 087
 | `MG-A2-LOCATION-160-211` | Sedanur/Zeynep location fill | **CLOSED** | Do not reopen |
 | `MG-LOC5-ACTIVE-SET` | 200/201/203/204/205/206/209/210/212/217 → loc5 | **BUSINESS_TRUTH_RESOLVED_NO_APPLY** | Preimage plan ready; production write=0 |
 | `MG-NAME-203` | Muhammed Mahmud name correction | **BUSINESS_TRUTH_RESOLVED_NO_APPLY** | Only `ad`/`soyad`; no write |
-| `MG-BRANCH-MANAGER-MODEL` | Manager ≠ transfer product rule | **CLOSED** (product rule) / **ALREADY_SUPPORTED** (tech) | No runtime fix required |
+| `MG-BRANCH-MANAGER-MODEL` | Manager ≠ transfer / ≠ `user_subeler` access | **CLOSED** (product rule) / **TECHNICAL_GAP_LOCAL_FIXABLE** (tech) | Runtime owner = PR **#278** (`sube_sorumlu_yoneticiler`) |
 | `MG-BRANCH-MANAGER-MAP` | Medisa manager business map | **BUSINESS_TRUTH_RESOLVED_NO_APPLY** | Kayseri Kübra surname unresolved |
 | `MG-HOSTING-CONTROL-PLANE` | cPanel/FTP control plane | **EXTERNAL_PROVIDER_INCIDENT** | No credential/FTP mutation yet; blocks PR274 live + A1/loc/BM apply |
 
@@ -73,7 +73,7 @@ Karyapı / Şenay company rollout, QR self-service/mobile broad, PERSONEL self-s
 
 | Sınıf | Durum |
 | --- | --- |
-| **LOCAL_TECHNICAL_GAPS** | Branch-manager runtime = ALREADY_SUPPORTED; no code change this phase |
+| **LOCAL_TECHNICAL_GAPS** | Branch-manager durable owner = TECHNICAL_GAP_LOCAL_FIXABLE → PR #278 (088); this docs PR keeps tip **087** |
 | **PRODUCTION_CONFIG_GATES** | A1 12/13; sedanurB + Sinem explicit 12/13; loc5 apply; BM grants; 203 name |
 | **LIVE_VERIFY_GATES** | PR274 live SHA; Sinem identity; Halil managed branches; loc5 preimages |
 | **BUSINESS_DECISIONS** | Kayseri Kübra surname |

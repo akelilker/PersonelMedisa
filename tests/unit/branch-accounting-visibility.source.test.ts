@@ -125,7 +125,8 @@ describe("branch accounting visibility owners", () => {
     expect(current).toContain("PREPARER: sedanurB");
     expect(current).toContain("APPROVER: Sinem Hamaloğlu");
     expect(current).toContain("TARGET_LOCATION: calisma_lokasyonu_id = 5");
-    expect(current).toContain("TECHNICAL_STATUS: ALREADY_SUPPORTED");
+    expect(current).toContain("TECHNICAL_STATUS: TECHNICAL_GAP_LOCAL_FIXABLE");
+    expect(current).toContain("USER_SUBELER_SEMANTIC: ACCESS_SCOPE_ONLY");
     expect(registry).toMatch(/^CODE_MIGRATION_TIP: 087$/m);
     expect(registry).toMatch(/^PRODUCTION_MIGRATION_TIP: 087$/m);
     expect(registry).toContain("| Migration 085 | **APPLIED** |");
@@ -137,6 +138,7 @@ describe("branch accounting visibility owners", () => {
     expect(registry).toContain("DEPLOY_HELD");
     expect(registry).toContain("Sinem Hamaloğlu");
     expect(registry).toContain("PAUSED_PENDING_HOST_RECOVERY_AND_SINEM_LIVE_VERIFY");
-    expect(registry).toContain("ALREADY_SUPPORTED");
+    expect(registry).toContain("TECHNICAL_GAP_LOCAL_FIXABLE");
+    expect(registry).not.toContain("BM model ALREADY_SUPPORTED");
   });
 });

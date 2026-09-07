@@ -88,20 +88,24 @@ Plan: ops/organization-mapping/personel-203-name-correction-no-apply.json
 
 ## Branch manager — canonical product rule (LOCKED)
 
-Assignment is authorization/responsibility via `users.rol=SUBE_YONETICISI` + `user_subeler`.
+USER_SUBELER_SEMANTIC: ACCESS_SCOPE_ONLY (generic branch visibility / A1 formal SGK scope).
+Managed-branch responsibility is a separate durable business fact — NOT encoded as `user_subeler`.
+Prior ALREADY_SUPPORTED / `replaceUserSubeler`-as-manager-owner claim is RETRACTED.
+Canonical owner lands in follow-on PR **#278** (`sube_sorumlu_yoneticiler` / migration 088; tip pins stay **087** on this docs PR).
 It is NOT personnel branch / physical location / company / SGK / departman / bolum / birim / gorev / pozisyon transfer.
 
-PERSONNEL_HOME_BRANCH != PHYSICAL_WORK_LOCATION != MANAGED_BRANCH_ASSIGNMENTS
+PERSONNEL_HOME_BRANCH != PHYSICAL_WORK_LOCATION != MANAGED_BRANCH_ASSIGNMENTS != GENERIC_BRANCH_ACCESS
 
 - Branch MAY have zero managers (not mandatory).
 - Person MAY manage branch(es) different from home branch.
 - Person MAY work at Fabrika/Karabük and manage other branches.
 - Same person MAY manage multiple branches.
-- Assigning manager of branch X MUST NOT mutate personel.sube_id / calisma_lokasyonu_id / company / sgk / org fields.
+- Assigning manager of branch X MUST NOT mutate personel.sube_id / calisma_lokasyonu_id / company / sgk / org fields / users.rol / user_subeler.
 - MUST NOT invoke permanent branch transfer / imply physical presence at managed branch.
 - General product rule for all branches (not Fabrika/GM special-case).
+- No multi-role required; no forced demotion to SUBE_YONETICISI.
 
-TECHNICAL_STATUS: ALREADY_SUPPORTED (no runtime code change this phase)
+TECHNICAL_STATUS: TECHNICAL_GAP_LOCAL_FIXABLE (runtime owner = PR #278; this PR docs/pins only)
 NO_APPLY_ASSIGNMENT_PLAN: ops/organization-mapping/branch-manager-assignment-no-apply-plan.json
 
 ### Medisa branch manager business map (NO WRITE)

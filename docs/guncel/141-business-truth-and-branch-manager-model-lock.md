@@ -90,23 +90,30 @@ Rules:
 7. MUST NOT imply physical presence at the managed branch.
 8. Not a Fabrika/Genel Merkez special-case — general product rule for all branches.
 
-### Technical owner (already supported)
+### Technical owner (semantics correction)
 
 | Field | Value |
 | --- | --- |
-| BRANCH_MANAGER_ASSIGNMENT_OWNER | `YonetimController` user create/update → `replaceUserSubeler` |
-| TABLE/MODEL | `user_subeler (user_id, sube_id)` + `users.rol = SUBE_YONETICISI` |
+| USER_SUBELER_SEMANTIC | **ACCESS_SCOPE_ONLY** (visibility / A1 formal SGK scope — not manager responsibility) |
+| BRANCH_MANAGER_ASSIGNMENT_OWNER | **dedicated** `sube_sorumlu_yoneticiler` via `OrganizasyonService.sorumlu_yonetici_user_ids` (PR **#278** / migration **088**) |
+| MUST_NOT_ENCODE_MANAGERS_AS | `user_subeler` / forced `users.rol=SUBE_YONETICISI` |
 | USER_OR_PERSON_LINK | optional `users.personel_id` (identity only; not authz) |
 | MULTI_BRANCH_SUPPORTED | YES |
-| ZERO_MANAGER_SUPPORTED | YES (per branch); a `SUBE_YONETICISI` user still needs ≥1 grant |
+| ZERO_MANAGER_SUPPORTED | YES |
+| MULTIPLE_MANAGERS_PER_BRANCH | YES |
 | SAME_BRANCH_REQUIRED | NO |
 | PERSONNEL_HOME_BRANCH_SIDE_EFFECT | NO |
 | PHYSICAL_LOCATION_SIDE_EFFECT | NO |
-| BRANCH_MANAGER_TECHNICAL_STATUS | **ALREADY_SUPPORTED** |
-| TECHNICAL_FIX_REQUIRED | NO |
+| PRIMARY_ROLE_CHANGE_REQUIRED | NO |
+| MULTI_ROLE_REQUIRED | NO |
+| MANAGER_ASSIGNMENT_GRANTS_ACCESS | NO (access remains separate `user_subeler` / OrgScope) |
+| BRANCH_MANAGER_TECHNICAL_STATUS | **TECHNICAL_GAP_LOCAL_FIXABLE** (prior ALREADY_SUPPORTED claim RETRACTED) |
+| TECHNICAL_FIX_REQUIRED | YES → PR **#278** |
+| TECHNICAL_FIX_IN_THIS_PR | NO (docs/business-truth lock only; tip pins remain production **087**) |
 
-Authz scopes by managed-branch relation (`user_subeler`), not home-branch equality.
+Generic branch access authorization remains `user_subeler` / OrgScope — independent of manager responsibility rows.
 `PersonelKaliciSubeDegisikligiService` is a separate permanent branch-transfer owner and is not the manager-assignment path.
+See also follow-on `docs/guncel/142-branch-manager-assignment-semantics.md` on PR #278.
 
 ## Medisa branch manager business map (no write)
 

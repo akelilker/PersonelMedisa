@@ -1,0 +1,82 @@
+{
+  "phase": "HOSTING_INCIDENT_LOCAL_COMPLETION_SWEEP",
+  "status": "DECISION_PACK_ONLY_NO_APPLY",
+  "generated_at": "2026-09-07T20:30:00Z",
+  "source_evidence": "CURRENT_STATE + a1-a2-a3-no-apply-remediation-plan + prior authoritative RO inventory (mutation=0)",
+  "note": "Targets are intentionally null. Do not invent branch/location assignments.",
+  "rows": [
+    {
+      "PERSONEL_ID": 212,
+      "NAME": "İlker AKEL",
+      "STATUS": "AKTIF",
+      "COMPANY": null,
+      "BRANCH": null,
+      "SGK": null,
+      "CURRENT_LOCATION": null,
+      "DEPARTMENT": null,
+      "BOLUM": null,
+      "BIRIM": null,
+      "WHY_UNRESOLVED": "Both sube_id and calisma_lokasyonu_id are NULL; no approved automatic target",
+      "WHAT_BUSINESS_DECISION_IS_NEEDED": "Authoritative Medisa branch and/or work-location assignment (or confirm intentional residual)",
+      "CLASS": "BUSINESS_DECISION_REQUIRED"
+    },
+    {
+      "PERSONEL_ID": 120,
+      "NAME": "İsmail Özcan",
+      "STATUS": "AKTIF",
+      "COMPANY": "Şenay",
+      "BRANCH": 11,
+      "SGK": 3,
+      "CURRENT_LOCATION": 5,
+      "DEPARTMENT": null,
+      "BOLUM": null,
+      "BIRIM": null,
+      "WHY_UNRESOLVED": "Cross-company axis pair retained for review; axes are independent",
+      "WHAT_BUSINESS_DECISION_IS_NEEDED": "Confirm whether Şenay branch + Medisa location pairing is intentional after Şenay rollout decision",
+      "CLASS": "CROSS_COMPANY_SEMANTICALLY_VALID_DEFER"
+    },
+    {
+      "PERSONEL_ID": 158,
+      "NAME": "Salih Efe",
+      "STATUS": "AKTIF",
+      "COMPANY": "Şenay",
+      "BRANCH": 11,
+      "SGK": 3,
+      "CURRENT_LOCATION": 5,
+      "DEPARTMENT": null,
+      "BOLUM": null,
+      "BIRIM": null,
+      "WHY_UNRESOLVED": "Cross-company axis pair retained for review; axes are independent",
+      "WHAT_BUSINESS_DECISION_IS_NEEDED": "Confirm whether Şenay branch + Medisa location pairing is intentional after Şenay rollout decision",
+      "CLASS": "CROSS_COMPANY_SEMANTICALLY_VALID_DEFER"
+    },
+    {
+      "PERSONEL_ID": 219,
+      "NAME": "DOĞU BERKAN ATMACA",
+      "STATUS": "AKTIF",
+      "COMPANY": "Karyapı",
+      "BRANCH": 10,
+      "SGK": 1,
+      "CURRENT_LOCATION": 3,
+      "DEPARTMENT": null,
+      "BOLUM": null,
+      "BIRIM": null,
+      "WHY_UNRESOLVED": "Cross-company axis pair retained for review; axes are independent",
+      "WHAT_BUSINESS_DECISION_IS_NEEDED": "Confirm whether Karyapı branch + Medisa location pairing is intentional after Karyapı rollout decision",
+      "CLASS": "CROSS_COMPANY_SEMANTICALLY_VALID_DEFER"
+    }
+  ],
+  "classes": {
+    "AUTO_RESOLVABLE_BY_CONFIRMED_TRUTH": [],
+    "BUSINESS_DECISION_REQUIRED": [212],
+    "INTENTIONAL_HISTORICAL_OR_PASSIVE_RESIDUAL": "see live NULL_LOCATION_HR residuals after A2 close — requires fresh RO list when host recovers; not auto-targeted here",
+    "INVALID_DATA": [],
+    "CROSS_COMPANY_SEMANTICALLY_VALID": [120, 158, 219]
+  },
+  "closed_do_not_reopen": {
+    "A2_160": "Sedanur Bulut location=5 CLOSED",
+    "A2_211": "Zeynep Günal location=5 CLOSED",
+    "202_208": "CLOSED_CONFIRMED"
+  },
+  "production_mutation": 0
+}

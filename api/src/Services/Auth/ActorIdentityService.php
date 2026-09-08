@@ -542,6 +542,8 @@ final class ActorIdentityService
         $scope = $userId !== null ? self::loadUserScope($pdo, $userId) : [];
         $ready = false;
         $readinessCode = null;
+        $canPrepare = false;
+        $canApprove = false;
         if ($userId !== null) {
             $actor = [
                 'id' => $userId,
@@ -555,6 +557,8 @@ final class ActorIdentityService
             $readiness = SgkKararPaketiAuthz::formalActorReadiness($pdo, $actor);
             $ready = (bool) ($readiness['ready'] ?? false);
             $readinessCode = $readiness['code'] ?? null;
+            $canPrepare = (bool) ($readiness['can_prepare'] ?? false);
+            $canApprove = (bool) ($readiness['can_approve'] ?? false);
         }
 
         return [
@@ -565,6 +569,8 @@ final class ActorIdentityService
             'branch_scope' => $scope,
             'ready' => $ready,
             'readiness_code' => $readinessCode,
+            'can_prepare' => $canPrepare,
+            'can_approve' => $canApprove,
         ];
     }
 

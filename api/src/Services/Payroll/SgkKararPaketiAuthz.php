@@ -119,16 +119,21 @@ final class SgkKararPaketiAuthz
     }
 
     /**
-     * Canonical readiness projection used by management readback and SGK writes.
+     * Canonical readiness projection used by management readback.
+     * Dual-control ready when the actor can prepare and/or approve (not prepare-only).
      *
      * @param array<string,mixed> $actor
-     * @return array{ready: bool, code?: string}
+     * @return array{ready: bool, code?: string, can_prepare?: bool, can_approve?: bool}
      */
     public static function formalActorReadiness(PDO $pdo, array $actor): array
     {
         try {
             self::assertFormalActorIdentity($actor);
-            self::assertPermission($actor, self::PERM_PREPARE, 'SGK_PREPARE_FORBIDDEN');
+            $canPrepare = RolePermissions::has($actor, self::PERM_PREPARE);
+            $canApprove = RolePermissions::has($actor, self::PERM_APPROVE);
+            if (!$canPrepare && !$canApprove) {
+                throw new RuntimeException('SGK_DUAL_CONTROL_FORBIDDEN');
+            }
             self::assertActorIdentitySchemaRequired($pdo);
             self::assertActorIdentityLinkedAndVerified($pdo, $actor);
             $scope = self::resolveExplicitBranchScope($pdo, $actor);
@@ -137,7 +142,11 @@ final class SgkKararPaketiAuthz
             }
             self::assertActiveActorScope($pdo, $scope);
 
-            return ['ready' => true];
+            return [
+                'ready' => true,
+                'can_prepare' => $canPrepare,
+                'can_approve' => $canApprove,
+            ];
         } catch (RuntimeException $e) {
             return [
                 'ready' => false,

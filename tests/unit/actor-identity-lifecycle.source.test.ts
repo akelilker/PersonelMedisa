@@ -95,6 +95,8 @@ describe("formal SGK actor identity lifecycle", () => {
     expect(service).toContain("'actor_status'");
     expect(service).toContain("'branch_scope'");
     expect(service).toContain("'ready'");
+    expect(service).toContain("'can_prepare'");
+    expect(service).toContain("'can_approve'");
     expect(service).toContain("u.username, u.rol, u.durum");
     expect(service).toContain("'rol' => (string) ($row['rol'] ?? '')");
     expect(endpoints).toContain("actorIdentityDetail");

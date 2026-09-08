@@ -45,6 +45,7 @@ describe("MG personnel lifecycle export closeout sources", () => {
     expect(preflight).toContain(
       "'086' => '086_personel_historical_exit_date_correction_auditleri.sql'",
       "'087' => '087_sube_muhasebe_yetkilileri.sql'",
+      "'088' => '088_sube_sorumlu_yoneticiler.sql'",
     );
     expect(preflight).toContain("EXPECTED_APPLIED_TIP = '084'");
     expect(preflight).toContain("gunluk_bildirim_duzeltme_auditleri");

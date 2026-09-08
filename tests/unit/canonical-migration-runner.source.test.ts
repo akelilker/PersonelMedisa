@@ -26,13 +26,13 @@ describe('canonical migration runner contract', () => {
     expect(runner).toContain('GET_LOCK');
   });
 
-  it('owns the contiguous 001→087 filesystem migration chain', () => {
+  it('owns the contiguous 001→088 filesystem migration chain', () => {
     const numbers = migrations.map((name) => Number.parseInt(name.slice(0, 3), 10));
     expect(migrations[0]).toBe('001_initial_schema.sql');
-    expect(migrations.at(-1)).toBe('087_sube_muhasebe_yetkilileri.sql');
-    expect(migrations).toHaveLength(87);
-    expect(new Set(numbers).size).toBe(87);
-    expect(numbers).toEqual(Array.from({ length: 87 }, (_, index) => index + 1));
+    expect(migrations.at(-1)).toBe('088_sube_sorumlu_yoneticiler.sql');
+    expect(migrations).toHaveLength(88);
+    expect(new Set(numbers).size).toBe(88);
+    expect(numbers).toEqual(Array.from({ length: 88 }, (_, index) => index + 1));
     expect(migrations).toContain('074_qr_attendance_correction_and_inbox.sql');
     expect(migrations.indexOf('074_qr_attendance_correction_and_inbox.sql')).toBe(
       migrations.indexOf('075_personel_account_activation.sql') - 1,
@@ -64,6 +64,9 @@ describe('canonical migration runner contract', () => {
     expect(migrations.indexOf('086_personel_historical_exit_date_correction_auditleri.sql')).toBe(
       migrations.indexOf('087_sube_muhasebe_yetkilileri.sql') - 1,
     );
+    expect(migrations.indexOf('087_sube_muhasebe_yetkilileri.sql')).toBe(
+      migrations.indexOf('088_sube_sorumlu_yoneticiler.sql') - 1,
+    );
     expect(migrations.filter((name) => name.startsWith('075_'))).toHaveLength(1);
     expect(migrations.filter((name) => name.startsWith('076_'))).toHaveLength(1);
     expect(migrations.filter((name) => name.startsWith('077_'))).toHaveLength(1);
@@ -74,6 +77,7 @@ describe('canonical migration runner contract', () => {
     expect(migrations.filter((name) => name.startsWith('085_'))).toHaveLength(1);
     expect(migrations.filter((name) => name.startsWith('086_'))).toHaveLength(1);
     expect(migrations.filter((name) => name.startsWith('087_'))).toHaveLength(1);
+    expect(migrations.filter((name) => name.startsWith('088_'))).toHaveLength(1);
   });
 
   it('keeps the runner generic without hardcoded migration version pins', () => {

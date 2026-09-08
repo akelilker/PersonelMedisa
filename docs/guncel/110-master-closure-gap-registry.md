@@ -1,27 +1,28 @@
-CODE_MIGRATION_TIP: 087
+CODE_MIGRATION_TIP: 088
 PRODUCTION_MIGRATION_TIP: 087
 
 # 110 — Canonical Closure / Gap Registry
 
 **Tür:** Güncel durum kaydı ve sonraki iş seçimi için tek referans.
-**Güncelleme:** 2026-09-07 (`BUSINESS_TRUTH_AND_BRANCH_MANAGER_MODEL_LOCK` + semantics correction; A1 pair locked; loc5 truth locked; BM tech = TECHNICAL_GAP_LOCAL_FIXABLE → PR #278; tip pins remain 087 on this PR; mutation=0)
+**Güncelleme:** 2026-09-08 (`HOSTING_RECOVERY_TO_FULL_ORDERED_CLOSE_SWEEP`; code tip 088; production tip 087 pending 088; BM owner = `sube_sorumlu_yoneticiler`; mutation apply gates still explicit)
 **Kapsam:** PersonelMedisa teknik ana sistem kapanışı + business-truth / branch-manager model kilidi. Production write / deploy / secret / FTP / migration apply / A1 apply / personel mutasyonu / branch-manager write **yok**.
 
 ## Migration durumu
 
 | Alan | Değer | Kanıt / sınır |
 | --- | --- | --- |
-| CODE_MIGRATION_TIP | **087** | Repodaki son migration: `087_sube_muhasebe_yetkilileri.sql` |
-| PRODUCTION_MIGRATION_TIP | **087** | Live tip **087**, pending **EMPTY** (last authoritative inventory). Hosting incident does not reopen migration work. |
+| CODE_MIGRATION_TIP | **088** | `088_sube_sorumlu_yoneticiler.sql` — durable branch manager responsibility (`sube_sorumlu_yoneticiler`); independent of `user_subeler` |
+| PRODUCTION_MIGRATION_TIP | **087** | Live tip **087**; pending **088** (apply after #278 deploy) |
 | Migration 085 | **APPLIED** | `085_gunluk_bildirim_duzeltme_auditleri.sql` |
 | Migration 086 | **APPLIED** | `086_personel_historical_exit_date_correction_auditleri.sql` |
-| Migration 087 | **APPLIED** | Schema-only ACL table; empty rows = restriction disabled (intentional ACL=0) |
-| CODE_MAIN_SHA | **`63f8c9052ca15c3f311e158b41b0afda09d2b874`** | PR **#274 MERGED** / CI PASS |
-| PRODUCTION_DEPLOY_SHA (LIVE) | **`9b4aac7919100c5421544824b0401e5046ab621e`** | Last successful deploy. PR274 head **not live** — DEPLOY_HELD on EXTERNAL_PROVIDER_INCIDENT / CONTROL_PLANE_DEGRADED |
+| Migration 087 | **APPLIED** | `087_sube_muhasebe_yetkilileri.sql` |
+| Migration 088 | **CODE_ONLY_PENDING** | No production apply until explicit Apply cPanel migrations |
+| CODE_MAIN_SHA | **`f5551160cab7d12b2086d7146c7822f4dfdb469d`** | #274+#275+#276+#277 merged; #278 integrating |
+| PRODUCTION_DEPLOY_SHA (LIVE) | **`f5551160cab7d12b2086d7146c7822f4dfdb469d`** | After #277 deploy in recovery sweep |
 | PR #271 | **CLOSED** | Do not reopen |
 | PR #272 | **CLOSED** | Do not reopen |
-| PR #274 | **MERGED / DEPLOY_HELD** | Formal SGK scope from DB `user_subeler`; reopen only on concrete regression evidence |
-| Canlı migration doğrulaması | **PASS @ 087** | pending EMPTY |
+| PR #274 | **MERGED / DEPLOYED** | Recovery deploy PASS @ `63f8c905` |
+| Canlı migration doğrulaması | **PASS @ 087** / pending **088** | Hosting recovered; apply gated |
 
 ## Durum sözlüğü
 
@@ -73,7 +74,7 @@ Karyapı / Şenay company rollout, QR self-service/mobile broad, PERSONEL self-s
 
 | Sınıf | Durum |
 | --- | --- |
-| **LOCAL_TECHNICAL_GAPS** | Branch-manager durable owner = TECHNICAL_GAP_LOCAL_FIXABLE → PR #278 (088); this docs PR keeps tip **087** |
+| **LOCAL_TECHNICAL_GAPS** | Branch-manager durable owner shipping in #278 (088); apply + manager rows after deploy |
 | **PRODUCTION_CONFIG_GATES** | A1 12/13; sedanurB + Sinem explicit 12/13; loc5 apply; BM grants; 203 name |
 | **LIVE_VERIFY_GATES** | PR274 live SHA; Sinem identity; Halil managed branches; loc5 preimages |
 | **BUSINESS_DECISIONS** | Kayseri Kübra surname |

@@ -1,24 +1,24 @@
-CODE_MIGRATION_TIP: 087
+CODE_MIGRATION_TIP: 088
 PRODUCTION_MIGRATION_TIP: 087
-PRODUCTION_MIGRATION_PENDING: 0
-PRODUCTION_DEPLOY_SHA: 9b4aac7919100c5421544824b0401e5046ab621e
-CODE_MAIN_SHA: 63f8c9052ca15c3f311e158b41b0afda09d2b874
+PRODUCTION_MIGRATION_PENDING: 1
+PRODUCTION_DEPLOY_SHA: f5551160cab7d12b2086d7146c7822f4dfdb469d
+CODE_MAIN_SHA: f5551160cab7d12b2086d7146c7822f4dfdb469d
 
 # Live / code pin (2026-09-07 BUSINESS_TRUTH_AND_BRANCH_MANAGER_MODEL_LOCK — SELECT-only; mutation=0)
 
-CODE_MAIN: `63f8c905` = PR **#274 MERGED** (CI PASS). Deploy of that head is **HELD**.
-LIVE production SHA: `9b4aac79` (last successful deploy; older than CODE_MAIN).
-HOSTING: EXTERNAL_PROVIDER_INCIDENT / CONTROL_PLANE_DEGRADED — no credential mutation yet.
-Migration tip live + code: **087** / pending **EMPTY**.
-PHASE: BUSINESS_TRUTH_AND_BRANCH_MANAGER_MODEL_LOCK
+CODE_MAIN advancing through #275→#278. LIVE after #277 deploy: `f5551160`. PR274 recovery deploy PASS @ `63f8c905` earlier this sweep.
+HOSTING: RECOVERED (FTP/API healthy). Ordered merge/deploy sweep in progress.
+CODE tip **088** (`088_sube_sorumlu_yoneticiler.sql`); PRODUCTION tip **087**; pending **088**.
+PHASE: HOSTING_RECOVERY_TO_FULL_ORDERED_CLOSE_SWEEP
 APPLIED_THIS_TURN: NO
 
 ## Hard-closed (do not reopen without new contradiction)
 
 PR_271: CLOSED
 PR_272: CLOSED
-PR_274: MERGED / CI PASS / DEPLOY_HELD_ON_HOSTING_INCIDENT (do not reopen code unless concrete regression)
-MIGRATION_087: APPLIED / tip=087 / pending EMPTY
+PR_274: MERGED / CI PASS / DEPLOYED_RECOVERY (63f8c905); do not reopen code unless concrete regression
+MIGRATION_087: APPLIED
+MIGRATION_088: CODE_ONLY_PENDING (pending apply)
 PERSONNEL_202_208_HISTORICAL_EXIT: CLOSED_CONFIRMED
 A2_LOCATION_160_211: CLOSED (Sedanur Bulut / Zeynep Günal → calisma_lokasyonu_id=5 applied prior; reopen YOK)
 MEDISA_WORK_LOCATION_CATALOG_MAPPING: APPLIED (7/7)
@@ -88,10 +88,12 @@ Plan: ops/organization-mapping/personel-203-name-correction-no-apply.json
 
 ## Branch manager — canonical product rule (LOCKED)
 
-USER_SUBELER_SEMANTIC: ACCESS_SCOPE_ONLY (generic branch visibility / A1 formal SGK scope).
+USER_SUBELER_SEMANTIC: ACCESS_SCOPE_ONLY
+BRANCH_MANAGER_OWNER: sube_sorumlu_yoneticiler (OrganizasyonService / migration 088)
+A1_SCOPE_MODEL: unchanged (`user_subeler` formal SGK scope)
 Managed-branch responsibility is a separate durable business fact — NOT encoded as `user_subeler`.
 Prior ALREADY_SUPPORTED / `replaceUserSubeler`-as-manager-owner claim is RETRACTED.
-Canonical owner lands in follow-on PR **#278** (`sube_sorumlu_yoneticiler` / migration 088; tip pins stay **087** on this docs PR).
+Canonical owner ships in PR **#278** (code tip **088**; production tip remains **087** until explicit apply).
 It is NOT personnel branch / physical location / company / SGK / departman / bolum / birim / gorev / pozisyon transfer.
 
 PERSONNEL_HOME_BRANCH != PHYSICAL_WORK_LOCATION != MANAGED_BRANCH_ASSIGNMENTS != GENERIC_BRANCH_ACCESS
@@ -105,7 +107,7 @@ PERSONNEL_HOME_BRANCH != PHYSICAL_WORK_LOCATION != MANAGED_BRANCH_ASSIGNMENTS !=
 - General product rule for all branches (not Fabrika/GM special-case).
 - No multi-role required; no forced demotion to SUBE_YONETICISI.
 
-TECHNICAL_STATUS: TECHNICAL_GAP_LOCAL_FIXABLE (runtime owner = PR #278; this PR docs/pins only)
+TECHNICAL_STATUS: TECHNICAL_GAP_LOCAL_FIXABLE → CLOSED_IN_CODE by PR #278 (088 pending production apply)
 NO_APPLY_ASSIGNMENT_PLAN: ops/organization-mapping/branch-manager-assignment-no-apply-plan.json
 
 ### Medisa branch manager business map (NO WRITE)

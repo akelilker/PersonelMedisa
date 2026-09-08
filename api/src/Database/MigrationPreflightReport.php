@@ -27,33 +27,6 @@ final class MigrationPreflightReport
 {
     public const SCHEMA_VERSION = '1';
 
-    /** Expected production ledger tip before this round's first migration. */
-    public const EXPECTED_APPLIED_TIP = '084';
-
-    /**
-     * The migrations this round authorizes, in apply order. Each one is a
-     * separate canonical request with its own backup, so the gate must accept the
-     * chain both before the round starts and between two applies. The version
-     * number alone is never enough: slot 079 previously held a monthly-closing
-     * migration that was withdrawn as business-model wrong, so names are pinned
-     * next to versions here.
-     *
-     * This round covers:
-     * - 085: append-only gunluk_bildirim_duzeltme_auditleri
-     * - 086: append-only personel_historical_exit_date_correction_auditleri
-     * - 087: branch accounting visibility ACL (sube_muhasebe_yetkilileri)
-     * - 088: durable branch manager responsibility (sube_sorumlu_yoneticiler)
-     * Production is expected at tip 084; pending set is the round suffix.
-     *
-     * @var array<string, string>
-     */
-    public const ROUND_MIGRATIONS = [
-        '085' => '085_gunluk_bildirim_duzeltme_auditleri.sql',
-        '086' => '086_personel_historical_exit_date_correction_auditleri.sql',
-        '087' => '087_sube_muhasebe_yetkilileri.sql',
-        '088' => '088_sube_sorumlu_yoneticiler.sql',
-    ];
-
     /** Withdrawn 079. Must not appear anywhere in the canonical source. */
     public const WITHDRAWN_MIGRATION_NAME = '079_aylik_kapanis_sube_scope_and_actor.sql';
 
@@ -124,7 +97,7 @@ final class MigrationPreflightReport
             'bundle' => [
                 'migration_count' => count($bundle['migrations']),
                 'code_tip' => $bundle['code_tip'],
-                'round_versions' => array_keys(self::ROUND_MIGRATIONS),
+                'canonical_versions' => array_column($bundle['migrations'], 'version'),
                 'next_pending_version' => $ledger['pending_versions'][0] ?? 'NONE',
                 'next_pending_name' => $ledger['pending_names'][0] ?? 'NONE',
                 'expected_pending_checksum' => $bundle['expected_pending_checksum'],
@@ -138,6 +111,7 @@ final class MigrationPreflightReport
                 'applied_tip' => $ledger['applied_tip'],
                 'checksum_mismatch_versions' => $ledger['checksum_mismatch_versions'],
                 'gap_versions' => $ledger['gap_versions'],
+                'unknown_versions' => $ledger['unknown_versions'],
                 'pending_versions' => $ledger['pending_versions'],
                 'pending_names' => $ledger['pending_names'],
             ],
@@ -183,8 +157,9 @@ final class MigrationPreflightReport
     }
 
     /**
-     * Checksum of the next migration the round would apply, resolved only when
-     * that migration is the round member its version pins it to.
+     * Checksum of the next canonical migration. The ledger is already reconciled
+     * against the full source, so resolving this from the source itself avoids a
+     * stale, round-specific allowlist.
      *
      * @param array<string, mixed> $bundle
      * @param array<string, mixed> $ledger
@@ -193,7 +168,7 @@ final class MigrationPreflightReport
     {
         $version = $ledger['pending_versions'][0] ?? null;
         $name = $ledger['pending_names'][0] ?? null;
-        if ($version === null || (self::ROUND_MIGRATIONS[$version] ?? null) !== $name) {
+        if ($version === null || $name === null) {
             return 'NONE';
         }
 
@@ -221,6 +196,7 @@ final class MigrationPreflightReport
             'applied_tip' => 'NONE',
             'checksum_mismatch_versions' => [],
             'gap_versions' => [],
+            'unknown_versions' => [],
             'pending_versions' => [],
             'pending_names' => [],
         ];
@@ -240,6 +216,15 @@ final class MigrationPreflightReport
             $ledger[(string) $row['version']] = (string) $row['checksum'];
         }
         $facts['applied_count'] = count($ledger);
+        $knownVersions = [];
+        foreach ($migrations as $migration) {
+            $knownVersions[(string) $migration['version']] = true;
+        }
+        foreach (array_keys($ledger) as $version) {
+            if (!isset($knownVersions[$version])) {
+                $facts['unknown_versions'][] = $version;
+            }
+        }
 
         $appliedTip = 'NONE';
         $pendingSeen = false;
@@ -270,6 +255,9 @@ final class MigrationPreflightReport
         }
         if ($facts['gap_versions'] !== []) {
             $blockers[] = 'MIGRATION_LEDGER_GAP';
+        }
+        if ($facts['unknown_versions'] !== []) {
+            $blockers[] = 'MIGRATION_LEDGER_UNKNOWN_VERSION';
         }
 
         return $facts;
@@ -475,48 +463,10 @@ final class MigrationPreflightReport
      */
     private static function assertChainShape(array $bundle, array $ledger, array &$blockers): void
     {
-        $roundVersions = array_keys(self::ROUND_MIGRATIONS);
-        $roundTip = (string) $roundVersions[count($roundVersions) - 1];
-
-        if ($bundle['code_tip'] !== $roundTip) {
-            $blockers[] = 'CODE_TIP_UNEXPECTED';
-        }
-
-        // The pending set must be exactly what is left of the round: the whole
-        // round before it starts, or its tail between two applies. Anything else
-        // is either an unknown migration or a chain this gate cannot reason about.
-        $pendingVersions = $ledger['pending_versions'];
-        $expectedSuffixes = [];
-        for ($index = 0; $index < count($roundVersions); $index++) {
-            $expectedSuffixes[] = array_values(array_slice($roundVersions, $index));
-        }
-        if ($pendingVersions === []) {
-            // Nothing left to authorize; a further request would re-apply. The
-            // healthy end state is tip 088 exactly; an empty pending set on any
-            // other tip means the chain is not the one this gate authorizes.
-            $blockers[] = $ledger['ready'] && $ledger['applied_tip'] === $roundTip
-                ? 'ROUND_ALREADY_COMPLETE'
-                : 'APPLIED_TIP_UNEXPECTED';
-        } elseif (!in_array($pendingVersions, $expectedSuffixes, true)) {
-            $blockers[] = 'PENDING_NOT_ROUND_SUFFIX';
-        } else {
-            $expectedNames = [];
-            foreach ($pendingVersions as $version) {
-                $expectedNames[] = self::ROUND_MIGRATIONS[$version];
-            }
-            if ($ledger['pending_names'] !== $expectedNames) {
-                $blockers[] = 'PENDING_NAME_UNEXPECTED';
-            }
-
-            // The applied tip must be exactly the version before the next pending
-            // one, so a partially applied round is provable rather than assumed.
-            $firstPending = (string) $pendingVersions[0];
-            $expectedTip = $firstPending === (string) $roundVersions[0]
-                ? self::EXPECTED_APPLIED_TIP
-                : (string) $roundVersions[array_search($firstPending, $roundVersions, true) - 1];
-            if ($ledger['ready'] && $ledger['applied_tip'] !== $expectedTip) {
-                $blockers[] = 'APPLIED_TIP_UNEXPECTED';
-            }
+        if ($ledger['pending_versions'] === []) {
+            // A migration request without pending work must never become a
+            // success-shaped no-op. This is independent of any particular tip.
+            $blockers[] = 'NO_PENDING_MIGRATIONS';
         }
 
         if ($bundle['expected_pending_checksum'] === 'NONE') {

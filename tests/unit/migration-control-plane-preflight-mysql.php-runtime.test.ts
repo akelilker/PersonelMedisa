@@ -28,7 +28,7 @@ describe("migration 079 control plane: preflight, backup and the company/branch 
       "ledger has no checksum mismatch and no gap",
       "the withdrawn 079 is not pending",
       "a pre-079 database is not apply-ready for the current round",
-      "the blocker names the chain shape it refused instead of failing silently",
+      "the blocker names the missing migration preimage instead of failing silently",
       "sirketler carries id, kod, ad and durum",
       "company code and name are globally unique",
       "foreign key fk_subeler_sirket points at sirketler with ON DELETE RESTRICT",

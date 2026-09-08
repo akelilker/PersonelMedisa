@@ -131,9 +131,18 @@ jobs:
             run_cpanel_plain_ftp "$1"
           }
 
+          source "$GITHUB_WORKSPACE/scripts/deploy/cpanel-ftp-directory-lib.sh"
+
           WORK="$RUNNER_TEMP/organization-inventory"
           rm -rf "$WORK"
           mkdir -p "$WORK"
+
+          if ! ensure_cpanel_remote_directory "api/runtime/migration-control"; then
+            echo "INVENTORY_RESULT=BLOCKED"
+            echo "INVENTORY_REASON=CONTROL_PLANE_DIRECTORY_UNUSABLE"
+            run_cpanel_ftp "cls -1 api/runtime/migration-control;" >/dev/null 2>&1 || true
+            exit 1
+          fi
 
           # Deploy SHA parity: the inventory must be produced by the exact code the
           # caller authorized, otherwise the artifact describes an unknown owner.
@@ -192,7 +201,6 @@ jobs:
             > "$request_dir/request.${REQUEST_ID}.tmp"
 
           run_cpanel_ftp "
-            mkdir -p api/runtime/migration-control;
             lcd ${request_dir};
             put -O api/runtime/migration-control request.${REQUEST_ID}.tmp;
             mv api/runtime/migration-control/request.${REQUEST_ID}.tmp api/runtime/migration-control/request.pending.${REQUEST_ID}.json;

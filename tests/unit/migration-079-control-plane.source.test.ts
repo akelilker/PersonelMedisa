@@ -202,14 +202,10 @@ describe('read-only preflight owner', () => {
     expect(preflightOwner).toContain('information_schema.STATISTICS');
   });
 
-  it('expects the canonical round and rejects the withdrawn migration', () => {
-    expect(preflightOwner).toContain("EXPECTED_APPLIED_TIP = '084'");
-    expect(preflightOwner).toContain("'085' => '085_gunluk_bildirim_duzeltme_auditleri.sql'");
-    expect(preflightOwner).toContain(
-      "'086' => '086_personel_historical_exit_date_correction_auditleri.sql'",
-    );
-    expect(preflightOwner).toContain("'087' => '087_sube_muhasebe_yetkilileri.sql'");
-    expect(preflightOwner).toContain("'088' => '088_sube_sorumlu_yoneticiler.sql'");
+  it('derives canonical migration facts and rejects the withdrawn migration', () => {
+    expect(preflightOwner).toContain("array_column($bundle['migrations'], 'version')");
+    expect(preflightOwner).not.toContain('EXPECTED_APPLIED_TIP');
+    expect(preflightOwner).not.toContain('ROUND_MIGRATIONS');
     expect(preflightOwner).toContain(`WITHDRAWN_MIGRATION_NAME = '${WITHDRAWN_NAME}'`);
     expect(preflightOwner).toContain('WITHDRAWN_079_PRESENT_IN_SOURCE');
     expect(preflightOwner).toContain('WITHDRAWN_079_STRUCTURE_PRESENT');
@@ -247,11 +243,10 @@ describe('read-only preflight owner', () => {
 
   it('locks the expected chain shape', () => {
     for (const reason of [
-      'APPLIED_TIP_UNEXPECTED',
-      'PENDING_NOT_ROUND_SUFFIX',
-      'ROUND_ALREADY_COMPLETE',
+      'NO_PENDING_MIGRATIONS',
       'MIGRATION_CHECKSUM_MISMATCH',
       'MIGRATION_LEDGER_GAP',
+      'MIGRATION_LEDGER_UNKNOWN_VERSION',
       'PREIMAGE_OWNER_TABLE_MISSING',
       'PREIMAGE_RELATION_COLUMN_INCOMPATIBLE',
       'PREIMAGE_HIERARCHY_TABLE_MISSING',
@@ -344,8 +339,8 @@ describe('control-plane workflow gates', () => {
       'PREFLIGHT_NOT_PASS',
       'PREFLIGHT_SHA_MISMATCH',
       'PREFLIGHT_STALE',
-      'PROD_TIP_UNEXPECTED',
-      'PENDING_NOT_ROUND_SUFFIX',
+      'NO_PENDING_MIGRATIONS',
+      'MIGRATION_LEDGER_UNKNOWN_VERSION',
       'TARGET_NOT_NEXT_PENDING',
       'PENDING_CHECKSUM_MISMATCH',
       'APPLIED_MIGRATION_MODIFIED',
@@ -366,10 +361,8 @@ describe('control-plane workflow gates', () => {
     const uploadIndex = apply.indexOf('Upload one atomic migration request');
     expect(gateIndex).toBeGreaterThan(0);
     expect(uploadIndex).toBeGreaterThan(gateIndex);
-    expect(apply).toContain(
-      'ROUND_MIGRATIONS: "085_gunluk_bildirim_duzeltme_auditleri.sql 086_personel_historical_exit_date_correction_auditleri.sql 087_sube_muhasebe_yetkilileri.sql 088_sube_sorumlu_yoneticiler.sql"',
-    );
-    expect(apply).toContain('PRE_ROUND_TIP: "084"');
+    expect(apply).not.toContain('ROUND_MIGRATIONS');
+    expect(apply).not.toContain('PRE_ROUND_TIP');
   });
 
   it('authorizes exactly one migration per request and carries it into the payload', () => {

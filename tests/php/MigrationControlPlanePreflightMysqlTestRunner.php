@@ -375,13 +375,13 @@ try {
     );
     mcpAssert($report['bundle']['withdrawn_present'] === false, 'the withdrawn 079 is not pending');
 
-    // The preflight owner authorises the current round, not this historical one:
-    // a database that never received 079 must read as blocked, never as ready.
+    // The preflight requires the hierarchy/schema preimage before any later
+    // pending migration can be applied.
     mcpAssert($report['result'] === 'BLOCKED', 'a pre-079 database is not apply-ready for the current round');
     mcpAssert(
-        in_array('PENDING_NOT_ROUND_SUFFIX', $report['blockers'], true)
-            && in_array('CODE_TIP_UNEXPECTED', $report['blockers'], true),
-        'the blocker names the chain shape it refused instead of failing silently'
+        in_array('PREIMAGE_HIERARCHY_COLUMN_MISSING', $report['blockers'], true)
+            && in_array('PREIMAGE_HIERARCHY_TABLE_MISSING', $report['blockers'], true),
+        'the blocker names the missing migration preimage instead of failing silently'
     );
 
     // ---------------------------------------------------------------------

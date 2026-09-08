@@ -286,6 +286,8 @@ jobs:
             run_cpanel_plain_ftp "$1"
           }
 
+          source "$GITHUB_WORKSPACE/scripts/deploy/cpanel-ftp-directory-lib.sh"
+
           # A directory listing is the only pattern proven to observe this cPanel
           # control plane; a silently empty glob mirror made the busy guard fail
           # open and let unclaimed requests pile up.
@@ -293,6 +295,10 @@ jobs:
           rm -rf "$preflight_dir"
           mkdir -p "$preflight_dir"
           preflight_listing="$preflight_dir/control-listing.txt"
+          if ! ensure_cpanel_remote_directory "api/runtime/migration-control"; then
+            echo "MIGRATION_CONTROL_PLANE_PREFLIGHT_FAILED"
+            exit 1
+          fi
           preflight_commands="cls -1 api/runtime/migration-control > ${preflight_listing};"
           if ! run_cpanel_ftp "$preflight_commands" >/dev/null 2>&1; then
             echo "MIGRATION_CONTROL_PLANE_PREFLIGHT_FAILED"
@@ -345,9 +351,6 @@ jobs:
             > "$request_file"
 
           request_commands="
-            set cmd:fail-exit false;
-            mkdir -p api/runtime/migration-control;
-            set cmd:fail-exit true;
             lcd ${request_dir};
             put -O api/runtime/migration-control request.${REQUEST_ID}.tmp;
             mv api/runtime/migration-control/request.${REQUEST_ID}.tmp api/runtime/migration-control/request.pending.${REQUEST_ID}.json;

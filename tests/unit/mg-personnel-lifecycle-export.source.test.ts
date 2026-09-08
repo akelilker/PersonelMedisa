@@ -39,15 +39,10 @@ describe("MG personnel lifecycle export closeout sources", () => {
     expect(router).toContain("organizasyon-degisikligi");
   });
 
-  it("rotates migration control plane to tip 085", () => {
+  it("derives migration control-plane state from the canonical source", () => {
     const preflight = read("api/src/Database/MigrationPreflightReport.php");
-    expect(preflight).toContain("'085' => '085_gunluk_bildirim_duzeltme_auditleri.sql'");
-    expect(preflight).toContain(
-      "'086' => '086_personel_historical_exit_date_correction_auditleri.sql'",
-      "'087' => '087_sube_muhasebe_yetkilileri.sql'",
-      "'088' => '088_sube_sorumlu_yoneticiler.sql'",
-    );
-    expect(preflight).toContain("EXPECTED_APPLIED_TIP = '084'");
+    expect(preflight).toContain("array_column($bundle['migrations'], 'version')");
+    expect(preflight).toContain("MIGRATION_LEDGER_UNKNOWN_VERSION");
     expect(preflight).toContain("gunluk_bildirim_duzeltme_auditleri");
   });
 });

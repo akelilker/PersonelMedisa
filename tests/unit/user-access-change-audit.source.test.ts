@@ -228,16 +228,11 @@ describe("the update owner cannot change access unaudited", () => {
   });
 });
 
-describe("the control plane authorizes the 084 to 085 round and nothing else", () => {
-  it("pins production tip 084 as the only apply-ready preimage", () => {
-    expect(preflight).toContain("public const EXPECTED_APPLIED_TIP = '084';");
-    expect(preflight).toContain("'085' => '085_gunluk_bildirim_duzeltme_auditleri.sql',");
-    expect(preflight).toContain(
-      "'086' => '086_personel_historical_exit_date_correction_auditleri.sql',",
-      "'087' => '087_sube_muhasebe_yetkilileri.sql',",
-      "'088' => '088_sube_sorumlu_yoneticiler.sql',",
-    );
-    expect(preflight).not.toContain("'084' => '085_gunluk_bildirim_duzeltme_auditleri.sql',");
+describe("the control plane derives its state from the canonical ledger", () => {
+  it("does not pin an obsolete migration round or applied tip", () => {
+    expect(preflight).toContain("array_column($bundle['migrations'], 'version')");
+    expect(preflight).not.toContain("EXPECTED_APPLIED_TIP");
+    expect(preflight).not.toContain("ROUND_MIGRATIONS");
   });
 
   it("proves the completed round is present rather than trusting the ledger tip", () => {
@@ -246,8 +241,8 @@ describe("the control plane authorizes the 084 to 085 round and nothing else", (
     expect(preflight).toContain("private const PREDECESSOR_ROLE = 'IK_PERSONELI';");
   });
 
-  it("separates a completed round from an unexpected empty chain", () => {
-    expect(preflight).toContain("ROUND_ALREADY_COMPLETE");
-    expect(preflight).toContain("APPLIED_TIP_UNEXPECTED");
+  it("fails closed for an empty or unknown canonical ledger chain", () => {
+    expect(preflight).toContain("NO_PENDING_MIGRATIONS");
+    expect(preflight).toContain("MIGRATION_LEDGER_UNKNOWN_VERSION");
   });
 });

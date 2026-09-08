@@ -3,10 +3,10 @@
 declare(strict_types=1);
 
 /**
- * Canonical migration round 085–088 — DB-backed acceptance against a real MariaDB.
+ * Canonical migration chain 084–088 — DB-backed acceptance against a real MariaDB.
  *
- * Production preimage: tip 084 with 085+086+087+088 pending. Setup applies 080–084 from
- * real files; subjects under test are 085 then 086 then 087 then 088.
+ * Production preimage: tip 083 with 084+085+086+087+088 pending. Setup applies 080–083 from
+ * real files; subjects under test are 084 then 085 then 086 then 087 then 088.
  *
  * Nothing here touches production.
  *
@@ -21,6 +21,7 @@ use Medisa\Api\Database\MigrationPreflightReport;
 use Medisa\Api\Database\MigrationRunner;
 use Medisa\Api\Database\MigrationSourceProvider;
 
+const MRC_MIGRATION_084 = '084_gunluk_bildirim_tamamlama_header_summary.sql';
 const MRC_MIGRATION_085 = '085_gunluk_bildirim_duzeltme_auditleri.sql';
 const MRC_MIGRATION_086 = '086_personel_historical_exit_date_correction_auditleri.sql';
 const MRC_MIGRATION_087 = '087_sube_muhasebe_yetkilileri.sql';
@@ -341,7 +342,31 @@ try {
     MigrationExecutionService::apply($pdo, $sourceThrough084, null, '081');
     MigrationExecutionService::apply($pdo, $sourceThrough084, null, '082');
     MigrationExecutionService::apply($pdo, $sourceThrough084, null, '083');
-    MigrationExecutionService::apply($pdo, $sourceThrough084, null, '084');
+
+    // -----------------------------------------------------------------
+    // 1) tip 083, 084+085+086+087+088 pending → apply ready
+    // -----------------------------------------------------------------
+    $before084 = MigrationPreflightReport::collect($pdo, $source, $deployedSha);
+    mrcAssert($before084['result'] === 'PASS', 'a production tip 083 database is apply-ready for the canonical pending chain');
+    mrcAssert($before084['ledger']['applied_tip'] === '083', 'preflight reports production tip 083');
+    mrcAssert(
+        $before084['ledger']['pending_names'] === [
+            MRC_MIGRATION_084,
+            MRC_MIGRATION_085,
+            MRC_MIGRATION_086,
+            MRC_MIGRATION_087,
+            MRC_MIGRATION_088,
+        ],
+        '084 through 088 are pending before the first apply'
+    );
+    mrcAssert(
+        $before084['bundle']['next_pending_name'] === MRC_MIGRATION_084
+            && $before084['bundle']['expected_pending_checksum'] !== 'NONE',
+        'preflight resolves the next canonical pending migration checksum'
+    );
+
+    $applied084 = MigrationExecutionService::apply($pdo, $source, null, '084');
+    mrcAssert($applied084['pending'] === ['084'], 'a targeted request applies exactly 084');
     mrcAssert(
         MigrationExecutionService::ledgerFacts($pdo, $sourceThrough084)['tip'] === '084',
         'the preimage database is at production tip 084'
@@ -478,13 +503,13 @@ try {
     mrcAssert($baselineCounts === mrcBusinessCounts($pdo), '088 wrote no business row');
 
     // -----------------------------------------------------------------
-    // 6) tip 088, pending 0 → round complete
+    // 6) tip 088, pending 0 → no migration request may proceed
     // -----------------------------------------------------------------
     $doneReport = MigrationPreflightReport::collect($pdo, $source, $deployedSha);
     mrcAssert($doneReport['result'] === 'BLOCKED', 'a completed round is not apply-ready again');
     mrcAssert(
-        in_array('ROUND_ALREADY_COMPLETE', $doneReport['blockers'], true),
-        'the blocker names the completed round instead of failing silently'
+        in_array('NO_PENDING_MIGRATIONS', $doneReport['blockers'], true),
+        'the blocker names the empty canonical pending chain instead of failing silently'
     );
 
     $unknownTargetFailed = false;

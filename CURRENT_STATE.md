@@ -1,109 +1,144 @@
 CODE_MIGRATION_TIP: 087
 PRODUCTION_MIGRATION_TIP: 087
 PRODUCTION_MIGRATION_PENDING: 0
-PRODUCTION_DEPLOY_SHA: fcee67186f1ceaec86624ecbe745f51f56330bcd
+PRODUCTION_DEPLOY_SHA: 9b4aac7919100c5421544824b0401e5046ab621e
+CODE_MAIN_SHA: 63f8c9052ca15c3f311e158b41b0afda09d2b874
 
-# Live state pin (2026-09-06/07 evidence lock — SELECT-only; mutation=0)
+# Live / code pin (2026-09-07 BUSINESS_TRUTH_AND_BRANCH_MANAGER_MODEL_LOCK — SELECT-only; mutation=0)
 
-Evidence sources: Deploy cPanel `34035970806` @ `fcee6718`; migration apply `34033315991` (087); inventory `orginv-34057486092-1` tip=087 pending=0; preflight PROD_TIP=087 PENDING=NONE; authenticated GET personnel/SGK policy readback.
-
-PERSONEL_TOTAL: 153
-PERSONEL_AKTIF: 144
-PERSONEL_PASIF_ARCHIVE: 9
-USERS_TOTAL: 147
-PERSONEL_ROLE_USERS: 122 (all bound; unbound PERSONEL-role = 0)
-ACTIVE_PERSONNEL_WITHOUT_ANY_USER_BINDING: 14 (exact ids 213–226; QR/self-service INTENTIONAL_DEFER — not Priority A)
-USER_SIRKET_GRANTS: 3
-USER_SGK_ISVEREN_GRANTS: 3
-SUBE_MUHASEBE_ACL_ROW_COUNT: 0 (restriction DISABLED until operators seed)
+CODE_MAIN: `63f8c905` = PR **#274 MERGED** (CI PASS). Deploy of that head is **HELD**.
+LIVE production SHA: `9b4aac79` (last successful deploy; older than CODE_MAIN).
+HOSTING: EXTERNAL_PROVIDER_INCIDENT / CONTROL_PLANE_DEGRADED — no credential mutation yet.
+Migration tip live + code: **087** / pending **EMPTY**.
+PHASE: BUSINESS_TRUTH_AND_BRANCH_MANAGER_MODEL_LOCK
+APPLIED_THIS_TURN: NO
 
 ## Hard-closed (do not reopen without new contradiction)
 
 PR_271: CLOSED
+PR_272: CLOSED
+PR_274: MERGED / CI PASS / DEPLOY_HELD_ON_HOSTING_INCIDENT (do not reopen code unless concrete regression)
 MIGRATION_087: APPLIED / tip=087 / pending EMPTY
-PR_270: CLOSED
-MG_PERSONNEL_BULK_RECONCILIATION_PRODUCTION: CLOSED_CONFIRMED
 PERSONNEL_202_208_HISTORICAL_EXIT: CLOSED_CONFIRMED
-BORDRO_HAZIRLIK: CLOSED
-MAAS_HESAPLAMA: CLOSED
-MEDISA_WORK_LOCATION_CATALOG_MAPPING: APPLIED (7/7 lokasyon→şube; inventory orphan_lokasyon=0)
-MEDISA_APPROVED_USER_GRANTS: APPLIED (sedanurB/zeynepG/muhasebe company+SGK; muhasebe Medisa branches)
+A2_LOCATION_160_211: CLOSED (Sedanur Bulut / Zeynep Günal → calisma_lokasyonu_id=5 applied prior; reopen YOK)
+MEDISA_WORK_LOCATION_CATALOG_MAPPING: APPLIED (7/7)
+MEDISA_APPROVED_USER_GRANTS: APPLIED
 KARYAPI_ROLLOUT: INTENTIONAL_DEFER
 SENAY_ROLLOUT: INTENTIONAL_DEFER
 QR_SELF_SERVICE: INTENTIONAL_DEFER
+ACL_SUBE_MUHASEBE_ROWS: 0 intentional (restriction disabled while empty)
 
 ## A1 — SGK period policy sube 12 / 13
 
 SGK_PERIOD_OWNER_RUNTIME: SgkSirketPolitikaReadService::resolveForPeriod (branch-scoped; no company inheritance)
 SGK_PERIOD_OWNER_WRITE: SgkSirketPolitikaWriteService::import → submit → approve (dual-control via SgkKararPaketiAuthz)
-A1_CLASSIFICATION: OPS_ROLLOUT_ACTIVE / PRODUCTION_CONFIG / READY_FOR_EXPLICIT_PRODUCTION_APPROVAL
-A1_CAN_BE_DONE_WITH_EXISTING_OWNER: YES
-BRANCH_12_CURRENT: NO_APPROVED_POLICY (revision inventory empty)
-BRANCH_13_CURRENT: NO_APPROVED_POLICY (revision inventory empty)
-NO_APPLY_TARGET: explicit AY_1_SON_GUN + ONAYLANDI for sube 12 (`S98-R1-POL-12`) and 13 (`S98-R1-POL-13`); clone control values from sube 1 (`SGK_ODENEK_MAHSUP_MODU=UCRET_MODELINE_GORE`)
+A1_STATUS: PAUSED_PENDING_HOST_RECOVERY_AND_SINEM_LIVE_VERIFY
+A1_CLASSIFICATION: PRODUCTION_CONFIG_WAITING
+A1_CAN_BE_DONE_WITH_EXISTING_OWNER: YES (after host recovery + live Sinem verify + explicit approval)
+A1_PAIR_STATUS: BUSINESS_LOCKED_TEMPORARY_ASSIGNMENT
+BRANCH_12_CURRENT: NO_APPROVED_POLICY (until A1 apply)
+BRANCH_13_CURRENT: NO_APPROVED_POLICY (until A1 apply)
+LOCKED_POLITIKA_HASH_12: 43e3a75e2c3f4c5f6eef72b2036d9498c4c847c9594923bab9e61691da4559af
+LOCKED_POLITIKA_HASH_13: c155365fb2670836ff6388248fd755634b832454872ed441efa8b94372d4b4bb
+PREPARER: sedanurB (role IK_SORUMLUSU; actor_identity VERIFIED; prepare YES; approve NO; needs explicit user_subeler 12/13)
+APPROVER: Sinem Hamaloğlu (intended formal SGK approver role/model = BOLUM_YONETICISI; temporary business assignment; changeable later)
+APPROVER_LIVE_IDENTITY: VERIFY_LIVE_REQUIRED (do not guess username/user_id/personel_id/role/actor/scopes from hosting-blocked live)
+APPROVER_LOCAL_KEYS_HISTORICAL: user_id=110 / personel_id=173 / last closed username=sinemH — re-verify live before any write
 APPLIED_THIS_TURN: NO
-CONTROL_SET_1_2_4_5_6_7_8_9_10_11: still AY_1_SON_GUN / ONAYLANDI
-
-## A2 / A3 residuals (exact fresh)
-
-NULL_LOCATION_TOTAL: 16
-NULL_LOCATION_BY_BRANCH: sube1=11, sube2=3, sube6=1, sube_null=1
-AUTO_RESOLVABLE_LOCATION: 2 (personel_id 160 Sedanur Bulut, 211 Zeynep Günal → calisma_lokasyonu_id=5; NO-APPLY plan only)
-HR_BUSINESS_DECISION_REQUIRED_LOCATION: 14
-NULL_BRANCH_TOTAL: 1 (personel_id 212 İlker AKEL; location also NULL → HR_BUSINESS_DECISION_REQUIRED; CAN_APPLY=NO)
-CROSS_COMPANY_AXIS_PAIRS: 3 — DEFERRED_REVIEW (not DATA_CONTRADICTION)
-- 120 İsmail Özcan — branch 11 Şenay / SGK 3 / location 5
-- 158 Salih Efe — branch 11 Şenay / SGK 3 / location 5
-- 219 DOĞU BERKAN ATMACA — branch 10 Karyapı / SGK 1 / location 3
-Reason: branch ↔ work-location are independent axes; no schema/runtime same-branch mandate; Karyapı/Şenay INTENTIONAL_DEFER.
-
 NO_APPLY_PLAN: ops/organization-mapping/a1-a2-a3-no-apply-remediation-plan.json
-PLAN_CAN_APPLY_COUNT: 2 (not applied this turn)
+APPROVER_RO_PROBE: ops/sgk/a1-approver-candidate-ro-probe.sql + scripts/ops/a1-approver-candidate-ro-probe.mjs
+CANONICAL_MODEL_DOC: docs/guncel/141-business-truth-and-branch-manager-model-lock.md
 
-## FK matrix (fresh list + referans catalog integrity probe)
+### Exact recovery sequence (after hosting recovers) — NO execute now
 
-| field | POPULATED | NULL | ACTIVE_NULL | PASIF_NULL | INVALID_REF | INVALID_PERSONEL_IDS |
-| --- | ---: | ---: | ---: | ---: | ---: | --- |
-| sube_id | 152 | 1 | 1 | 0 | 0 | [] |
-| departman_id | 146 | 7 | 7 | 0 | 0 | [] |
-| bolum_id | 137 | 16 | 10 | 6 | 0 | [] |
-| birim_id | 137 | 16 | 10 | 6 | 0 | [] |
-| gorev_id | 141 | 12 | 12 | 0 | 0 | [] |
-| pozisyon_id | 139 | 14 | 8 | 6 | 0 | [] |
-| personel_tipi_id | 153 | 0 | 0 | 0 | 0 | [] |
-| sgk_isveren_id | 130 | 23 | 17 | 6 | 0 | [] |
-| calisma_lokasyonu_id | 137 | 16 | 12 | 4 | 0 | [] |
+1. verify PR274 live (LIVE_SHA == CODE_MAIN `63f8c905…`)
+2. live verify Sinem exact identity/account/role (keys + actor + scopes)
+3. verify Sinem BOLUM_YONETICISI approval eligibility for formal SGK
+4. explicit user approval for actor/scope config
+5. add sedanurB explicit branch 12/13
+6. create/verify/bind Sinem actor identity if required
+7. add Sinem explicit branch 12/13
+8. dual-control readiness
+9. import 12 (hash lock 43e3a75e…)
+10. submit 12
+11. Sinem approve 12
+12. import 13 (hash lock c155365f…)
+13. submit 13
+14. Sinem approve 13
+15. readback
+16. A1 CLOSED
 
-FK_REFERENCE_INTEGRITY: PASS (all INVALID_REF=0)
+No rerun unless payload/preimage changes.
 
-## SUBE_YONETICISI (readback only)
+## Physical work location business truth (NO APPLY)
 
-MEDISA_BRANCHES: 1,2,4,5,6,12,13
-BRANCHES_WITH_ACTIVE_SUBE_YONETICISI: 2 (user 040), 4 (user 381)
-BRANCHES_WITHOUT_ACTIVE_SUBE_YONETICISI: 1,5,6,12,13
-STATUS: BUSINESS_DECISION_REQUIRED (Priority B; not data cleanup)
+TARGET_LOCATION: calisma_lokasyonu_id = 5 (Fabrika / Karabük)
+NO_APPLY_PREIMAGE: ops/organization-mapping/fabrika-karabuk-loc5-no-apply-preimage-plan.json
 
-## Priority rewrite (post evidence)
+BUSINESS_TRUTH_RESOLVED / loc5 (pending future apply + live preimage guard):
+200, 201, 203, 204, 205, 206, 209, 210, 212, 217
 
-PRIORITY_A:
-- A1 OPS_ROLLOUT_ACTIVE / PRODUCTION_CONFIG — READY_FOR_EXPLICIT_PRODUCTION_APPROVAL (seed/approve AY_1_SON_GUN for sube 12 & 13 via existing dual-control owner)
-- A2 DATA_REMEDIATION_READY_FOR_APPROVAL (2 AUTO: 160,211) + BUSINESS_DECISION_REQUIRED (14)
-- A3 BUSINESS_DECISION_REQUIRED (personel 212; no auto target)
+CLOSED_DO_NOT_REOPEN:
+160 Sedanur Bulut → loc5
+211 Zeynep Günal → loc5
 
-PRIORITY_B:
-- SUBE_YONETICISI remaining Medisa branches 1,5,6,12,13
-- Cross-company location/branch pairs 120/158/219 = DEFERRED_REVIEW
+NAME_CORRECTION_203 (NO APPLY): wrong display known MUHAMMED IRAKLI → Muhammed Mahmud
+Schema fields only: personeller.ad / personeller.soyad (ad="Muhammed", soyad="Mahmud")
+Plan: ops/organization-mapping/personel-203-name-correction-no-apply.json
 
-PRIORITY_C:
-- PERSONEL accounts / QR / self-service INTENTIONAL_DEFER
-- Karyapı / Şenay company rollout INTENTIONAL_DEFER
+## Branch manager — canonical product rule (LOCKED)
 
-ORG_MAPPING_INVENTORY_OWNER: OrganizationMappingInventoryReport (SELECT-only)
-ORG_LOCATION_SUBE_MAPPING: APPLIED (catalog); personnel location fill = separate A2 gate
-SGK_CATALOG_LIVE_VERIFY: CLOSED_CONFIRMED
-UBGT_CALENDAR_LIVE_VERIFY: CLOSED_CONFIRMED
-PAYROLL_POLICY_REVISION: 3 / 14/14 / HAFTA_TATILI_GUNLERI=0
-TEKNIK_ANA_SISTEM: KAPALI
+USER_SUBELER_SEMANTIC: ACCESS_SCOPE_ONLY (generic branch visibility / A1 formal SGK scope).
+Managed-branch responsibility is a separate durable business fact — NOT encoded as `user_subeler`.
+Prior ALREADY_SUPPORTED / `replaceUserSubeler`-as-manager-owner claim is RETRACTED.
+Canonical owner lands in follow-on PR **#278** (`sube_sorumlu_yoneticiler` / migration 088; tip pins stay **087** on this docs PR).
+It is NOT personnel branch / physical location / company / SGK / departman / bolum / birim / gorev / pozisyon transfer.
+
+PERSONNEL_HOME_BRANCH != PHYSICAL_WORK_LOCATION != MANAGED_BRANCH_ASSIGNMENTS != GENERIC_BRANCH_ACCESS
+
+- Branch MAY have zero managers (not mandatory).
+- Person MAY manage branch(es) different from home branch.
+- Person MAY work at Fabrika/Karabük and manage other branches.
+- Same person MAY manage multiple branches.
+- Assigning manager of branch X MUST NOT mutate personel.sube_id / calisma_lokasyonu_id / company / sgk / org fields / users.rol / user_subeler.
+- MUST NOT invoke permanent branch transfer / imply physical presence at managed branch.
+- General product rule for all branches (not Fabrika/GM special-case).
+- No multi-role required; no forced demotion to SUBE_YONETICISI.
+
+TECHNICAL_STATUS: TECHNICAL_GAP_LOCAL_FIXABLE (runtime owner = PR #278; this PR docs/pins only)
+NO_APPLY_ASSIGNMENT_PLAN: ops/organization-mapping/branch-manager-assignment-no-apply-plan.json
+
+### Medisa branch manager business map (NO WRITE)
+
+| Branch | sube_id | Manager assignment intent |
+| --- | --- | --- |
+| Fabrika/Karabük | 1 | Sinem Hamaloğlu |
+| Giresun | 2 | Halil Şenay |
+| Kayseri | 4 | Kübra [SURNAME UNKNOWN — DO NOT GUESS] |
+| İzmir | 12 | Halil Şenay |
+| Ankara | 5 | no dedicated local; temporary/central = Sinem Hamaloğlu |
+| İstanbul | 6 | no dedicated local; temporary/central = Sinem Hamaloğlu |
+| Sakarya | 13 | no dedicated local; temporary/central = Sinem Hamaloğlu |
+
+temporary/central manager uses the same canonical managed-branch assignment model if assigned.
+Do not create fake local personnel transfer. Do not force a local manager.
+
+## Residuals after business-truth lock
+
+LOCATION_TARGETS_LOCKED_NO_APPLY: 200/201/203/204/205/206/209/210/212/217
+CLOSED_DO_NOT_REOPEN: 160/211 (+ 202/208 historical exit)
+CROSS_COMPANY_SEMANTICALLY_VALID_DEFER: 120 / 158 / 219
+KAYSERI_MANAGER_IDENTITY: BUSINESS_IDENTITY_DECISION_REQUIRED (Kübra surname unresolved)
+SINEM_LIVE_ACCOUNT: VERIFY_LIVE_REQUIRED
+HALIL_LIVE_MANAGED_BRANCHES: VERIFY_LIVE_REQUIRED
+NULL_LOCATION_HR_OTHER: do not force loc5 unless explicitly covered; refresh RO after host recovery
+PERSONNEL_DECISION_PACK: ops/organization-mapping/personnel-residual-decision-pack.json
+
+## FK / integrity (last authoritative RO inventory; not re-probed this turn)
+
+FK_REFERENCE_INTEGRITY: PASS (all INVALID_REF=0 at inventory `34057486092` / related probes)
+TECHNICAL_ANA_SISTEM: KAPALI
 BUG_COUNT: 0
 PRODUCTION_MUTATION_THIS_PIN: 0
-APPLICATION_CODE_CHANGE_THIS_PIN: 0
+DEPLOY: NONE
+NEXT_GATE: HOSTING_RECOVERY_THEN_LIVE_PREIMAGE_VERIFY_AND_USER_APPROVED_APPLY

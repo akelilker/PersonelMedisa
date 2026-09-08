@@ -113,8 +113,20 @@ describe("branch accounting visibility owners", () => {
     expect(current).toMatch(/^PRODUCTION_MIGRATION_TIP: 087$/m);
     expect(current).toMatch(/^PRODUCTION_MIGRATION_PENDING: 0$/m);
     expect(current).toMatch(
-      /^PRODUCTION_DEPLOY_SHA: fcee67186f1ceaec86624ecbe745f51f56330bcd$/m
+      /^PRODUCTION_DEPLOY_SHA: 9b4aac7919100c5421544824b0401e5046ab621e$/m
     );
+    expect(current).toMatch(
+      /^CODE_MAIN_SHA: 63f8c9052ca15c3f311e158b41b0afda09d2b874$/m
+    );
+    expect(current).toContain("PR_274: MERGED");
+    expect(current).toContain("DEPLOY_HELD_ON_HOSTING_INCIDENT");
+    expect(current).toContain("A2_LOCATION_160_211: CLOSED");
+    expect(current).toContain("PAUSED_PENDING_HOST_RECOVERY_AND_SINEM_LIVE_VERIFY");
+    expect(current).toContain("PREPARER: sedanurB");
+    expect(current).toContain("APPROVER: Sinem Hamaloğlu");
+    expect(current).toContain("TARGET_LOCATION: calisma_lokasyonu_id = 5");
+    expect(current).toContain("TECHNICAL_STATUS: TECHNICAL_GAP_LOCAL_FIXABLE");
+    expect(current).toContain("USER_SUBELER_SEMANTIC: ACCESS_SCOPE_ONLY");
     expect(registry).toMatch(/^CODE_MIGRATION_TIP: 087$/m);
     expect(registry).toMatch(/^PRODUCTION_MIGRATION_TIP: 087$/m);
     expect(registry).toContain("| Migration 085 | **APPLIED** |");
@@ -122,5 +134,11 @@ describe("branch accounting visibility owners", () => {
     expect(registry).toContain("| Migration 087 | **APPLIED** |");
     expect(registry).toContain("**PASS @ 087**");
     expect(registry).toContain("pending EMPTY");
+    expect(registry).toContain("PR #274");
+    expect(registry).toContain("DEPLOY_HELD");
+    expect(registry).toContain("Sinem Hamaloğlu");
+    expect(registry).toContain("PAUSED_PENDING_HOST_RECOVERY_AND_SINEM_LIVE_VERIFY");
+    expect(registry).toContain("TECHNICAL_GAP_LOCAL_FIXABLE");
+    expect(registry).not.toContain("BM model ALREADY_SUPPORTED");
   });
 });

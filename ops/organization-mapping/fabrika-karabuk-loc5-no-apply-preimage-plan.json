@@ -1,0 +1,161 @@
+{
+  "phase": "BUSINESS_TRUTH_AND_BRANCH_MANAGER_MODEL_LOCK",
+  "status": "PLAN_ONLY_NO_APPLY",
+  "generated_at": "2026-09-07T21:10:00Z",
+  "target_calisma_lokasyonu_id": 5,
+  "target_label": "Fabrika / Karabük",
+  "apply": "NONE",
+  "production_mutation": 0,
+  "hosting": "EXTERNAL_PROVIDER_INCIDENT_CONTROL_PLANE_DEGRADED",
+  "preimage_guard_rule": "STOP_ON_ANY_DRIFT_VS_CAPTURED_LIVE_PREIMAGE",
+  "required_preimage_fields": [
+    "PERSONEL_ID",
+    "STATUS",
+    "COMPANY",
+    "BRANCH",
+    "SGK",
+    "CURRENT_LOCATION",
+    "TARGET_LOCATION"
+  ],
+  "closed_do_not_reopen": [
+    {
+      "PERSONEL_ID": 160,
+      "NAME": "Sedanur Bulut",
+      "TARGET_LOCATION": 5,
+      "STATUS": "CLOSED_DO_NOT_REOPEN"
+    },
+    {
+      "PERSONEL_ID": 211,
+      "NAME": "Zeynep Günal",
+      "TARGET_LOCATION": 5,
+      "STATUS": "CLOSED_DO_NOT_REOPEN"
+    }
+  ],
+  "targets": [
+    {
+      "PERSONEL_ID": 200,
+      "NAME": "RAED FAWAZ",
+      "STATUS": "VERIFY_LIVE_REQUIRED",
+      "COMPANY": "VERIFY_LIVE_REQUIRED",
+      "BRANCH": "VERIFY_LIVE_REQUIRED",
+      "SGK": "VERIFY_LIVE_REQUIRED",
+      "CURRENT_LOCATION": "VERIFY_LIVE_REQUIRED",
+      "TARGET_LOCATION": 5,
+      "CLASS": "BUSINESS_TRUTH_RESOLVED_NO_APPLY"
+    },
+    {
+      "PERSONEL_ID": 201,
+      "NAME": "SAIF TAREQ JASIM AL-GBURI",
+      "STATUS": "VERIFY_LIVE_REQUIRED",
+      "COMPANY": "VERIFY_LIVE_REQUIRED",
+      "BRANCH": "VERIFY_LIVE_REQUIRED",
+      "SGK": "VERIFY_LIVE_REQUIRED",
+      "CURRENT_LOCATION": "VERIFY_LIVE_REQUIRED",
+      "TARGET_LOCATION": 5,
+      "CLASS": "BUSINESS_TRUTH_RESOLVED_NO_APPLY"
+    },
+    {
+      "PERSONEL_ID": 203,
+      "NAME": "Muhammed Mahmud",
+      "STATUS": "VERIFY_LIVE_REQUIRED",
+      "COMPANY": "VERIFY_LIVE_REQUIRED",
+      "BRANCH": "VERIFY_LIVE_REQUIRED",
+      "SGK": "VERIFY_LIVE_REQUIRED",
+      "CURRENT_LOCATION": "VERIFY_LIVE_REQUIRED",
+      "TARGET_LOCATION": 5,
+      "CLASS": "BUSINESS_TRUTH_RESOLVED_NO_APPLY",
+      "NAME_CORRECTION_REQUIRED": true
+    },
+    {
+      "PERSONEL_ID": 204,
+      "NAME": "Abdullah Fetiyan",
+      "STATUS": "VERIFY_LIVE_REQUIRED",
+      "COMPANY": "VERIFY_LIVE_REQUIRED",
+      "BRANCH": "VERIFY_LIVE_REQUIRED",
+      "SGK": "VERIFY_LIVE_REQUIRED",
+      "CURRENT_LOCATION": "VERIFY_LIVE_REQUIRED",
+      "TARGET_LOCATION": 5,
+      "CLASS": "BUSINESS_TRUTH_RESOLVED_NO_APPLY"
+    },
+    {
+      "PERSONEL_ID": 205,
+      "NAME": "ALADDİN DEREBAŞI",
+      "STATUS": "VERIFY_LIVE_REQUIRED",
+      "COMPANY": "VERIFY_LIVE_REQUIRED",
+      "BRANCH": "VERIFY_LIVE_REQUIRED",
+      "SGK": "VERIFY_LIVE_REQUIRED",
+      "CURRENT_LOCATION": "VERIFY_LIVE_REQUIRED",
+      "TARGET_LOCATION": 5,
+      "CLASS": "BUSINESS_TRUTH_RESOLVED_NO_APPLY"
+    },
+    {
+      "PERSONEL_ID": 206,
+      "NAME": "ABDULLAH",
+      "STATUS": "VERIFY_LIVE_REQUIRED",
+      "COMPANY": "VERIFY_LIVE_REQUIRED",
+      "BRANCH": "VERIFY_LIVE_REQUIRED",
+      "SGK": "VERIFY_LIVE_REQUIRED",
+      "CURRENT_LOCATION": "VERIFY_LIVE_REQUIRED",
+      "TARGET_LOCATION": 5,
+      "CLASS": "BUSINESS_TRUTH_RESOLVED_NO_APPLY"
+    },
+    {
+      "PERSONEL_ID": 209,
+      "NAME": "MUQTADA MAZIN KHALEE",
+      "STATUS": "VERIFY_LIVE_REQUIRED",
+      "COMPANY": "VERIFY_LIVE_REQUIRED",
+      "BRANCH": "VERIFY_LIVE_REQUIRED",
+      "SGK": "VERIFY_LIVE_REQUIRED",
+      "CURRENT_LOCATION": "VERIFY_LIVE_REQUIRED",
+      "TARGET_LOCATION": 5,
+      "CLASS": "BUSINESS_TRUTH_RESOLVED_NO_APPLY"
+    },
+    {
+      "PERSONEL_ID": 210,
+      "NAME": "FAHRİ TAYLAN MERCAN",
+      "STATUS": "VERIFY_LIVE_REQUIRED",
+      "COMPANY": "VERIFY_LIVE_REQUIRED",
+      "BRANCH": "VERIFY_LIVE_REQUIRED",
+      "SGK": "VERIFY_LIVE_REQUIRED",
+      "CURRENT_LOCATION": "VERIFY_LIVE_REQUIRED",
+      "TARGET_LOCATION": 5,
+      "CLASS": "BUSINESS_TRUTH_RESOLVED_NO_APPLY"
+    },
+    {
+      "PERSONEL_ID": 212,
+      "NAME": "İlker AKEL",
+      "STATUS": "VERIFY_LIVE_REQUIRED",
+      "COMPANY": "VERIFY_LIVE_REQUIRED",
+      "BRANCH": "VERIFY_LIVE_REQUIRED",
+      "SGK": "VERIFY_LIVE_REQUIRED",
+      "CURRENT_LOCATION": "VERIFY_LIVE_REQUIRED",
+      "TARGET_LOCATION": 5,
+      "CLASS": "BUSINESS_TRUTH_RESOLVED_NO_APPLY",
+      "NOTE": "Location truth locked; do not invent home-branch transfer"
+    },
+    {
+      "PERSONEL_ID": 217,
+      "NAME": "Görkem Vural",
+      "STATUS": "VERIFY_LIVE_REQUIRED",
+      "COMPANY": "VERIFY_LIVE_REQUIRED",
+      "BRANCH": "VERIFY_LIVE_REQUIRED",
+      "SGK": "VERIFY_LIVE_REQUIRED",
+      "CURRENT_LOCATION": "VERIFY_LIVE_REQUIRED",
+      "TARGET_LOCATION": 5,
+      "CLASS": "BUSINESS_TRUTH_RESOLVED_NO_APPLY"
+    }
+  ],
+  "future_apply_steps": [
+    "1. Hosting recovery",
+    "2. SELECT live preimage for each PERSONEL_ID (status/company/branch/sgk/current_location)",
+    "3. Compare against captured preimage; STOP on drift",
+    "4. Explicit user approval",
+    "5. Write only calisma_lokasyonu_id=5 (no branch/company/SGK/org mutation)",
+    "6. Readback"
+  ],
+  "do_not": [
+    "reopen 160/211",
+    "force loc5 on PASIF/test/historical rows not listed",
+    "mutate sube_id/company/sgk while applying location"
+  ]
+}

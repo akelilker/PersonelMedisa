@@ -113,10 +113,16 @@ describe("branch accounting visibility owners", () => {
     expect(current).toMatch(/^PRODUCTION_MIGRATION_TIP: 087$/m);
     expect(current).toMatch(/^PRODUCTION_MIGRATION_PENDING: 1$/m);
     expect(current).toMatch(
-      /^PRODUCTION_DEPLOY_SHA: fcee67186f1ceaec86624ecbe745f51f56330bcd$/m
+      /^PRODUCTION_DEPLOY_SHA: f5551160cab7d12b2086d7146c7822f4dfdb469d$/m
     );
     expect(current).toContain("USER_SUBELER_SEMANTIC: ACCESS_SCOPE_ONLY");
     expect(current).toContain("BRANCH_MANAGER_OWNER: sube_sorumlu_yoneticiler");
+    expect(current).toContain("USER_SUBELER_SEMANTIC: ACCESS_SCOPE_ONLY");
+    expect(current).toContain("PREPARER: sedanurB");
+    expect(current).toContain("APPROVER: Sinem Hamaloğlu");
+    expect(current).toContain("TECHNICAL_STATUS: TECHNICAL_GAP_LOCAL_FIXABLE");
+    expect(registry).toContain("TECHNICAL_GAP_LOCAL_FIXABLE");
+    expect(registry).not.toContain("BM model ALREADY_SUPPORTED");
     expect(registry).toMatch(/^CODE_MIGRATION_TIP: 088$/m);
     expect(registry).toMatch(/^PRODUCTION_MIGRATION_TIP: 087$/m);
     expect(registry).toContain("| Migration 087 | **APPLIED** |");

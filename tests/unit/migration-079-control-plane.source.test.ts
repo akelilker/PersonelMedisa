@@ -325,6 +325,9 @@ describe('control-plane workflow gates', () => {
     expect(diagnostics).toContain('^[0-9a-f]{64}$');
     expect(diagnostics).toContain('^[0-9]{3}$');
     expect(diagnostics).toContain('UNPRINTABLE');
+    expect(diagnostics).toContain(
+      "emit_scalar SUBE_SORUMLU_YONETICILER_TABLE_EXISTS '.schema.sube_sorumlu_yoneticiler.exists' '^(true|false)$'",
+    );
     expect(diagnostics).not.toContain('cat "$report"');
   });
 

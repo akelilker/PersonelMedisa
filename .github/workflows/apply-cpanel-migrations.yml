@@ -345,7 +345,9 @@ jobs:
             > "$request_file"
 
           request_commands="
+            set cmd:fail-exit false;
             mkdir -p api/runtime/migration-control;
+            set cmd:fail-exit true;
             lcd ${request_dir};
             put -O api/runtime/migration-control request.${REQUEST_ID}.tmp;
             mv api/runtime/migration-control/request.${REQUEST_ID}.tmp api/runtime/migration-control/request.pending.${REQUEST_ID}.json;

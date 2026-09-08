@@ -558,8 +558,18 @@ try {
         'the matrix publishes relation ids and a count, and nothing else'
     );
     omapAssert(
-        $inventory['schema_version'] === '3',
-        'the extended inventory contract is published as schema version 3'
+        $inventory['schema_version'] === '4',
+        'the extended inventory contract is published as schema version 4'
+    );
+    omapAssert(
+        $inventory['data']['allowed_personnel'] === []
+            && $inventory['data']['allowed_users'] === [],
+        'the allowlisted evidence sections stay empty when the required source schema is absent'
+    );
+    omapAssert(
+        $inventory['data']['manager_evidence'] === ['exists' => false, 'row_count' => 0, 'rows' => []]
+            && $inventory['data']['a1_policy_evidence'] === [],
+        'optional manager and A1 owners report their absent schema without a false failure'
     );
 
     omapAssert(

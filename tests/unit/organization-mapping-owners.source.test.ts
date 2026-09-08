@@ -107,8 +107,12 @@ describe('read-only organization inventory owner', () => {
     expect(inventoryOwner).not.toContain('request_hash');
   });
 
-  it('counts personnel and never selects a personal column', () => {
-    expect(inventoryOwner).not.toContain('ad_soyad');
+  it('limits personnel evidence to the explicit closeout allowlist', () => {
+    expect(inventoryOwner).toContain('WHERE p.id IN (200, 201, 203, 204, 205, 206, 209, 210, 212, 217)');
+    expect(inventoryOwner).toContain("'allowed_personnel' => self::allowedPersonnel($pdo)");
+    for (const field of ["'id' =>", "'ad' =>", "'soyad' =>", "'durum' =>", "'calisma_lokasyonu_id' =>", "'sube_id' =>", "'sirket_id' =>", "'sgk_isveren_id' =>"]) {
+      expect(inventoryOwner).toContain(field);
+    }
     expect(inventoryOwner).not.toContain('sicil_no');
     expect(inventoryOwner).not.toContain('tckn');
     expect(inventoryOwner).not.toContain('iban');
@@ -116,16 +120,20 @@ describe('read-only organization inventory owner', () => {
     expect(inventoryOwner).toContain('SELECT COUNT(*) FROM personeller p WHERE p.sube_id = s.id');
   });
 
-  it('summarises scope by role without naming a single user', () => {
+  it('keeps aggregate scope anonymous and exposes only bounded actor candidates', () => {
     expect(inventoryOwner).toContain('GROUP BY u.rol');
     expect(inventoryOwner).toContain("'user_sirket_total' =>");
     expect(inventoryOwner).toContain("'user_sgk_isveren_total' =>");
-    expect(inventoryOwner).not.toContain('u.username');
-    // user_id may appear as a join key; what must never happen is a user
-    // identifier reaching a published field.
-    expect(inventoryOwner).not.toMatch(/'user_id'\s*=>/);
-    expect(inventoryOwner).not.toMatch(/'username'\s*=>/);
-    expect(inventoryOwner).not.toMatch(/SELECT\s+[^']*\bus\.user_id\b[^']*FROM/);
+    expect(inventoryOwner).toContain("'allowed_users' => self::allowedUsers($pdo)");
+    expect(inventoryOwner).toContain("LOWER(u.username) = 'sedanurb'");
+    expect(inventoryOwner).toContain("u.ad_soyad IN ('Sinem Hamaloğlu', 'Halil Şenay')");
+    expect(inventoryOwner).toContain("LOWER(u.ad_soyad) LIKE '%kübra%'");
+    expect(inventoryOwner).toContain('LIMIT 8');
+    expect(inventoryOwner).toContain("'can_prepare' =>");
+    expect(inventoryOwner).toContain("'can_approve' =>");
+    expect(inventoryOwner).toContain("'scope_12' =>");
+    expect(inventoryOwner).toContain("'scope_13' =>");
+    expect(inventoryOwner).not.toContain('password_hash');
   });
 
   it('is deterministic: stable ordering plus a canonical-JSON checksum', () => {
@@ -208,8 +216,13 @@ describe('read-only organization inventory owner', () => {
     expect(inventoryOwner).toContain('INVENTORY_PERSONNEL_MATRIX_COUNT_MISMATCH');
   });
 
-  it('publishes the extended contract as inventory schema version 3', () => {
-    expect(inventoryOwner).toContain("public const SCHEMA_VERSION = '3'");
+  it('publishes the extended contract as inventory schema version 4', () => {
+    expect(inventoryOwner).toContain("public const SCHEMA_VERSION = '4'");
+    expect(inventoryOwner).toContain("'manager_evidence' => self::managerEvidence($pdo)");
+    expect(inventoryOwner).toContain("'a1_policy_evidence' => self::a1PolicyEvidence($pdo)");
+    expect(inventoryOwner).toContain("return ['exists' => false, 'row_count' => 0, 'rows' => []];");
+    expect(inventoryOwner).toContain("'mahsup_mode' =>");
+    expect(inventoryOwner).toContain("'policy_hash' =>");
   });
 
   it('publishes the branch set classification in the workflow log summary', () => {

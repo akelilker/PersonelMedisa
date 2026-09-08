@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Medisa\Api\Services\Organizasyon;
 
+use Medisa\Api\Services\Payroll\SgkKararPaketiAuthz;
 use PDO;
 use Throwable;
 
@@ -23,12 +24,11 @@ use Throwable;
  * inputs are a PDO handle and two opaque metadata strings that are never
  * interpolated into a query.
  *
- * PII: an organisation row (branch code, branch name, status) is reference data,
- * not personal data. Personnel rows are only ever counted, never selected, and no
- * user id, username or personnel column reaches the output. The scope summary
- * reports assignment totals per role, which is a count of grants, not of people.
- * The same rule holds for the location×branch matrix: it publishes relation ids
- * and a COUNT, so it says how many people share a combination and never who.
+ * PII: an organisation row (branch code, branch name, status) is reference data.
+ * The operational closeout also permits a fixed, bounded evidence allowlist:
+ * ten personnel ids and named actor candidates only. No request data, credential,
+ * contact, national-id, salary or unbounded user/personnel result is published.
+ * The scope summary and location×branch matrix remain anonymous aggregates.
  *
  * Determinism: rows are ordered by primary key, keys are emitted in a fixed
  * order, and the checksum covers the data section only — not `generated_at` —
@@ -37,7 +37,7 @@ use Throwable;
  */
 final class OrganizationMappingInventoryReport
 {
-    public const SCHEMA_VERSION = '3';
+    public const SCHEMA_VERSION = '4';
 
     /**
      * The historical production baseline: the branch id set the postcheck
@@ -71,6 +71,10 @@ final class OrganizationMappingInventoryReport
             'sgk_employers' => self::sgkEmployers($pdo),
             'work_locations' => self::workLocations($pdo),
             'scope_summary' => self::scopeSummary($pdo),
+            'allowed_personnel' => self::allowedPersonnel($pdo),
+            'allowed_users' => self::allowedUsers($pdo),
+            'manager_evidence' => self::managerEvidence($pdo),
+            'a1_policy_evidence' => self::a1PolicyEvidence($pdo),
             'personnel_location_branch_matrix' => self::personnelLocationBranchMatrix($pdo),
             'personnel_without_location_by_branch' => self::personnelWithoutLocationByBranch($pdo),
             'row_counts' => self::rowCounts($pdo),
@@ -400,6 +404,207 @@ final class OrganizationMappingInventoryReport
     }
 
     /**
+     * The operational closeout permits these exact personnel records only.
+     * This is deliberately a fixed query, not a caller-provided filter.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private static function allowedPersonnel(PDO $pdo): array
+    {
+        if (!self::columnsExist(
+            $pdo,
+            'personeller',
+            ['ad', 'soyad', 'aktif_durum', 'calisma_lokasyonu_id', 'sube_id', 'sgk_isveren_id']
+        )) {
+            return [];
+        }
+        $rows = self::query(
+            $pdo,
+            'SELECT p.id, p.ad, p.soyad, p.aktif_durum AS durum,
+                    p.calisma_lokasyonu_id, p.sube_id, s.sirket_id, p.sgk_isveren_id
+             FROM personeller p
+             LEFT JOIN subeler s ON s.id = p.sube_id
+             WHERE p.id IN (200, 201, 203, 204, 205, 206, 209, 210, 212, 217)
+             ORDER BY p.id ASC'
+        );
+
+        return array_map(static fn (array $row): array => [
+            'id' => (int) $row['id'],
+            'ad' => (string) $row['ad'],
+            'soyad' => (string) $row['soyad'],
+            'durum' => (string) $row['durum'],
+            'calisma_lokasyonu_id' => self::nullableInt($row['calisma_lokasyonu_id'] ?? null),
+            'sube_id' => self::nullableInt($row['sube_id'] ?? null),
+            'sirket_id' => self::nullableInt($row['sirket_id'] ?? null),
+            'sgk_isveren_id' => self::nullableInt($row['sgk_isveren_id'] ?? null),
+        ], $rows);
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private static function allowedUsers(PDO $pdo): array
+    {
+        if (!self::tableExists($pdo, 'actor_identities')
+            || !self::columnsExist(
+                $pdo,
+                'users',
+                ['username', 'ad_soyad', 'personel_id', 'durum', 'rol', 'actor_identity_id']
+            )) {
+            return [];
+        }
+
+        $rows = self::query(
+            $pdo,
+            "SELECT u.id AS user_id, u.username, u.ad_soyad, u.personel_id, u.durum,
+                    u.rol, u.actor_identity_id, ai.status AS actor_identity_status
+             FROM users u
+             LEFT JOIN actor_identities ai ON ai.id = u.actor_identity_id
+             WHERE LOWER(u.username) = 'sedanurb'
+                OR u.ad_soyad IN ('Sinem Hamaloğlu', 'Halil Şenay')
+                OR LOWER(u.ad_soyad) LIKE '%kübra%'
+             ORDER BY u.id ASC
+             LIMIT 8"
+        );
+
+        $items = [];
+        foreach ($rows as $row) {
+            $userId = (int) $row['user_id'];
+            $scope = self::userScope($pdo, $userId);
+            $actor = [
+                'id' => $userId,
+                'username' => (string) $row['username'],
+                'durum' => (string) $row['durum'],
+                'rol' => (string) $row['rol'],
+                'actor_identity_id' => self::nullableInt($row['actor_identity_id'] ?? null),
+                'actor_identity_status' => (string) ($row['actor_identity_status'] ?? ''),
+            ];
+            $readiness = SgkKararPaketiAuthz::formalActorReadiness($pdo, $actor);
+            $items[] = [
+                'user_id' => $userId,
+                'username' => (string) $row['username'],
+                'personel_id' => self::nullableInt($row['personel_id'] ?? null),
+                'durum' => (string) $row['durum'],
+                'rol' => (string) $row['rol'],
+                'actor_identity_status' => (string) ($row['actor_identity_status'] ?? 'NONE'),
+                'user_subeler' => $scope,
+                'user_sirketler' => self::userSirketScope($pdo, $userId),
+                'user_sgk_isverenler' => self::userSgkIsverenScope($pdo, $userId),
+                'can_prepare' => (bool) ($readiness['can_prepare'] ?? false),
+                'can_approve' => (bool) ($readiness['can_approve'] ?? false),
+                'scope_12' => in_array(12, $scope, true),
+                'scope_13' => in_array(13, $scope, true),
+            ];
+        }
+
+        return $items;
+    }
+
+    /**
+     * @return array{exists: bool, row_count: int, rows: list<array<string, int>>}
+     */
+    private static function managerEvidence(PDO $pdo): array
+    {
+        if (!self::tableExists($pdo, 'sube_sorumlu_yoneticiler')) {
+            return ['exists' => false, 'row_count' => 0, 'rows' => []];
+        }
+
+        $rows = self::query(
+            $pdo,
+            'SELECT sube_id, user_id
+             FROM sube_sorumlu_yoneticiler
+             ORDER BY sube_id ASC, user_id ASC'
+        );
+
+        return [
+            'exists' => true,
+            'row_count' => count($rows),
+            'rows' => array_map(static fn (array $row): array => [
+                'sube_id' => (int) $row['sube_id'],
+                'user_id' => (int) $row['user_id'],
+            ], $rows),
+        ];
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private static function a1PolicyEvidence(PDO $pdo): array
+    {
+        if (!self::tableExists($pdo, 'sgk_sirket_politika_surumleri')
+            || !self::tableExists($pdo, 'sgk_sirket_politika_degerleri')) {
+            return [];
+        }
+
+        $rows = self::query(
+            $pdo,
+            "SELECT p.sube_id, p.surum_kodu, p.bildirim_donem_tipi,
+                    p.gecerlilik_baslangic, p.gecerlilik_bitis, p.state,
+                    p.hazirlayan_id, p.onaylayan_id, p.politika_hash,
+                    v.deger AS mahsup_mode
+             FROM sgk_sirket_politika_surumleri p
+             LEFT JOIN sgk_sirket_politika_degerleri v
+               ON v.politika_surum_id = p.id
+              AND v.politika_kodu = 'SGK_ODENEK_MAHSUP_MODU'
+             WHERE p.sube_id IN (12, 13)
+             ORDER BY p.sube_id ASC, p.gecerlilik_baslangic ASC, p.id ASC"
+        );
+
+        return array_map(static fn (array $row): array => [
+            'sube_id' => (int) $row['sube_id'],
+            'surum_kodu' => (string) $row['surum_kodu'],
+            'bildirim_donem_tipi' => (string) $row['bildirim_donem_tipi'],
+            'effective_start' => $row['gecerlilik_baslangic'],
+            'effective_end' => $row['gecerlilik_bitis'],
+            'mahsup_mode' => $row['mahsup_mode'],
+            'lifecycle_state' => (string) $row['state'],
+            'prepare_actor' => self::nullableInt($row['hazirlayan_id'] ?? null),
+            'submit_actor' => null,
+            'approve_actor' => self::nullableInt($row['onaylayan_id'] ?? null),
+            'policy_hash' => (string) $row['politika_hash'],
+        ], $rows);
+    }
+
+    /** @return list<int> */
+    private static function userScope(PDO $pdo, int $userId): array
+    {
+        $statement = $pdo->prepare(
+            'SELECT sube_id FROM user_subeler WHERE user_id = :user_id ORDER BY sube_id ASC'
+        );
+        $statement->execute(['user_id' => $userId]);
+
+        return array_map(static fn ($value): int => (int) $value, $statement->fetchAll(PDO::FETCH_COLUMN));
+    }
+
+    /** @return list<int> */
+    private static function userSirketScope(PDO $pdo, int $userId): array
+    {
+        if (!self::tableExists($pdo, 'user_sirketler')) {
+            return [];
+        }
+        $statement = $pdo->prepare(
+            'SELECT sirket_id FROM user_sirketler WHERE user_id = :user_id ORDER BY sirket_id ASC'
+        );
+        $statement->execute(['user_id' => $userId]);
+
+        return array_map(static fn ($value): int => (int) $value, $statement->fetchAll(PDO::FETCH_COLUMN));
+    }
+
+    /** @return list<int> */
+    private static function userSgkIsverenScope(PDO $pdo, int $userId): array
+    {
+        if (!self::tableExists($pdo, 'user_sgk_isverenler')) {
+            return [];
+        }
+        $statement = $pdo->prepare(
+            'SELECT sgk_isveren_id FROM user_sgk_isverenler WHERE user_id = :user_id ORDER BY sgk_isveren_id ASC'
+        );
+        $statement->execute(['user_id' => $userId]);
+
+        return array_map(static fn ($value): int => (int) $value, $statement->fetchAll(PDO::FETCH_COLUMN));
+    }
+
+    /**
      * The `calisma_lokasyonu_id × sube_id` intersection of the personnel table,
      * for the rows that actually carry a work location.
      *
@@ -615,6 +820,55 @@ final class OrganizationMappingInventoryReport
         } catch (Throwable $exception) {
             return -1;
         }
+    }
+
+    private static function tableExists(PDO $pdo, string $table): bool
+    {
+        $statement = $pdo->prepare(
+            'SELECT 1
+             FROM information_schema.TABLES
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :table_name
+             LIMIT 1'
+        );
+        $statement->execute(['table_name' => $table]);
+        $exists = $statement->fetchColumn() !== false;
+        $statement->closeCursor();
+
+        return $exists;
+    }
+
+    private static function columnExists(PDO $pdo, string $table, string $column): bool
+    {
+        $statement = $pdo->prepare(
+            'SELECT 1
+             FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE()
+               AND TABLE_NAME = :table_name
+               AND COLUMN_NAME = :column_name
+             LIMIT 1'
+        );
+        $statement->execute([
+            'table_name' => $table,
+            'column_name' => $column,
+        ]);
+        $exists = $statement->fetchColumn() !== false;
+        $statement->closeCursor();
+
+        return $exists;
+    }
+
+    /**
+     * @param list<string> $columns
+     */
+    private static function columnsExist(PDO $pdo, string $table, array $columns): bool
+    {
+        foreach ($columns as $column) {
+            if (!self::columnExists($pdo, $table, $column)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /** @param mixed $value */

@@ -380,8 +380,8 @@ describe('cPanel incremental deploy planner', () => {
     );
     const verifyIdx = source.indexOf('verify_payload_before_sha');
     const finalizeIdx = source.indexOf('finalize_deploy_sha');
-    const callVerify = source.indexOf('verify_payload_before_sha\n');
-    const callFinalize = source.indexOf('finalize_deploy_sha\n');
+    const callVerify = source.indexOf('if ! verify_payload_before_sha; then');
+    const callFinalize = source.indexOf('if ! finalize_deploy_sha; then');
     expect(verifyIdx).toBeGreaterThanOrEqual(0);
     expect(finalizeIdx).toBeGreaterThan(verifyIdx);
     expect(callVerify).toBeGreaterThanOrEqual(0);
@@ -423,6 +423,10 @@ describe('cPanel incremental deploy planner', () => {
     const fnStart = source.indexOf('upload_verify_finalize()');
     const fnBody = source.slice(fnStart, source.indexOf('if [[ "$DEPLOY_MODE"'));
     expect(fnBody).toContain('run_cpanel_ftp "$commands"');
+    expect(fnBody).toContain('if ! run_cpanel_ftp "$commands"; then');
+    expect(fnBody).toContain('if ! verify_payload_before_sha; then');
+    expect(fnBody).toContain('if ! finalize_deploy_sha; then');
+    expect(fnBody).toContain('return 1');
     expect(fnBody.indexOf('verify_payload_before_sha')).toBeLessThan(
       fnBody.indexOf('finalize_deploy_sha'),
     );
@@ -440,7 +444,27 @@ describe('cPanel incremental deploy planner', () => {
       'utf8',
     );
     expect(source.match(/run_cpanel_ftp "\$FINALIZE_SHA_COMMANDS"/g)).toHaveLength(1);
-    expect(source).toContain('test "$(tr -d \'\\r\\n\' < "${remote_sha_path}")" = "${DEPLOY_SHA}"');
+    expect(source).toContain('if ! run_cpanel_ftp "$FINALIZE_SHA_COMMANDS"; then');
+    expect(source).toContain('if ! lftp_get_remote_to_local "api/.deploy-sha" "$remote_sha_path"; then');
+    expect(source).toContain('if [[ "$(tr -d \'\\r\\n\' < "${remote_sha_path}")" != "${DEPLOY_SHA}" ]]; then');
+  });
+
+  it('Q2) byte-parity failures cannot fall through to deploy-sha finalization', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), '.github/workflows/deploy-cpanel.yml'),
+      'utf8',
+    );
+    const verifyStart = source.indexOf('verify_payload_before_sha()');
+    const verifyEnd = source.indexOf('finalize_deploy_sha()', verifyStart);
+    const verifyBody = source.slice(verifyStart, verifyEnd);
+
+    expect(verifyBody).toContain(
+      'if ! lftp_get_remote_to_local "api/runtime-build/canonical-migrations.php" "$remote_bundle_path"; then',
+    );
+    expect(verifyBody).toContain('REMOTE_BUNDLE_PARITY=FAIL reason=SHA256_MISMATCH');
+    expect(verifyBody).toMatch(/REMOTE_BUNDLE_PARITY=FAIL[\s\S]*?return 1/);
+    expect(verifyBody).toMatch(/verify_uploaded_api_file_parity "\$api_path" \|\| return 1/);
+    expect(verifyBody).not.toContain('finalize_deploy_sha');
   });
 
   it('R) unsafe lftp command-separator path denies incremental / forces fallback', () => {
@@ -1093,7 +1117,7 @@ describe('cPanel incremental deploy workflow wiring', () => {
     expect(verifyIdx).toBeGreaterThanOrEqual(0);
     expect(parityIdx).toBeGreaterThan(verifyIdx);
     expect(source).toMatch(
-      /verify_payload_before_sha\n\s+finalize_deploy_sha/,
+      /if ! verify_payload_before_sha; then[\s\S]*?return 1[\s\S]*?if ! finalize_deploy_sha; then/,
     );
   });
 

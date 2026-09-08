@@ -347,9 +347,17 @@ jobs:
             local remote_bundle_path
             remote_bundle_path="$(mktemp)"
             echo "REMOTE_BUNDLE_GET starting"
-            lftp_get_remote_to_local "api/runtime-build/canonical-migrations.php" "$remote_bundle_path"
-            test "$(sha256sum "${remote_bundle_path}" | cut -d' ' -f1)" = \
-              "$(sha256sum "${LOCAL_REPO_DIR}/api/runtime-build/canonical-migrations.php" | cut -d' ' -f1)"
+            if ! lftp_get_remote_to_local "api/runtime-build/canonical-migrations.php" "$remote_bundle_path"; then
+              rm -f "$remote_bundle_path"
+              echo "REMOTE_BUNDLE_GET=FAIL reason=${LAST_READ_CLASS}"
+              return 1
+            fi
+            if [[ "$(sha256sum "${remote_bundle_path}" | cut -d' ' -f1)" != \
+                  "$(sha256sum "${LOCAL_REPO_DIR}/api/runtime-build/canonical-migrations.php" | cut -d' ' -f1)" ]]; then
+              rm -f "$remote_bundle_path"
+              echo "REMOTE_BUNDLE_PARITY=FAIL reason=SHA256_MISMATCH"
+              return 1
+            fi
             rm -f "${remote_bundle_path}"
             echo "REMOTE_BUNDLE_GET=SUCCESS"
 
@@ -365,12 +373,23 @@ jobs:
 
           finalize_deploy_sha() {
             echo "Deploy SHA finalization starting (marker write after payload verify)"
-            run_cpanel_ftp "$FINALIZE_SHA_COMMANDS"
+            if ! run_cpanel_ftp "$FINALIZE_SHA_COMMANDS"; then
+              echo "FINAL_SHA_WRITE=FAIL"
+              return 1
+            fi
             local remote_sha_path
             remote_sha_path="$(mktemp)"
             echo "FINAL_SHA_GET starting"
-            lftp_get_remote_to_local "api/.deploy-sha" "$remote_sha_path"
-            test "$(tr -d '\r\n' < "${remote_sha_path}")" = "${DEPLOY_SHA}"
+            if ! lftp_get_remote_to_local "api/.deploy-sha" "$remote_sha_path"; then
+              rm -f "$remote_sha_path"
+              echo "FINAL_SHA_GET=FAIL reason=${LAST_READ_CLASS}"
+              return 1
+            fi
+            if [[ "$(tr -d '\r\n' < "${remote_sha_path}")" != "${DEPLOY_SHA}" ]]; then
+              rm -f "$remote_sha_path"
+              echo "FINAL_SHA_PARITY=FAIL"
+              return 1
+            fi
             rm -f "${remote_sha_path}"
             echo "FINAL_SHA_GET=SUCCESS"
             echo "Deploy SHA finalization verified"
@@ -380,10 +399,20 @@ jobs:
             local label="$1"
             local commands="$2"
             echo "Deploy payload transfer path: ${label}"
-            run_cpanel_ftp "$commands"
+            if ! run_cpanel_ftp "$commands"; then
+              echo "DEPLOY_PAYLOAD_TRANSFER=FAIL path=${label}"
+              return 1
+            fi
             echo "Deploy payload pre-finalization verify: ${label}"
-            verify_payload_before_sha
-            finalize_deploy_sha
+            if ! verify_payload_before_sha; then
+              echo "DEPLOY_PAYLOAD_VERIFY=FAIL path=${label}"
+              return 1
+            fi
+            if ! finalize_deploy_sha; then
+              echo "DEPLOY_SHA_FINALIZE=FAIL path=${label}"
+              return 1
+            fi
+            return 0
           }
 
           if [[ "$DEPLOY_MODE" == "INCREMENTAL" ]]; then

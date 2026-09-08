@@ -314,6 +314,8 @@ jobs:
             run_cpanel_plain_ftp "$1"
           }
 
+          source "$GITHUB_WORKSPACE/scripts/deploy/cpanel-ftp-directory-lib.sh"
+
           WORK="$RUNNER_TEMP/migration-preflight"
           rm -rf "$WORK"
           mkdir -p "$WORK"
@@ -321,6 +323,11 @@ jobs:
           # Busy guard: the preflight shares the control plane with apply, so it
           # must never queue behind or race another request.
           listing="$WORK/control-listing.txt"
+          if ! ensure_cpanel_remote_directory "api/runtime/migration-control"; then
+            echo "PREFLIGHT_RESULT=BLOCKED"
+            echo "PREFLIGHT_REASON=CONTROL_PLANE_UNREACHABLE"
+            exit 1
+          fi
           if ! run_cpanel_ftp "cls -1 api/runtime/migration-control > ${listing};" >/dev/null 2>&1; then
             echo "PREFLIGHT_RESULT=BLOCKED"
             echo "PREFLIGHT_REASON=CONTROL_PLANE_UNREACHABLE"
@@ -358,7 +365,6 @@ jobs:
             > "$request_dir/request.${REQUEST_ID}.tmp"
 
           run_cpanel_ftp "
-            mkdir -p api/runtime/migration-control;
             lcd ${request_dir};
             put -O api/runtime/migration-control request.${REQUEST_ID}.tmp;
             mv api/runtime/migration-control/request.${REQUEST_ID}.tmp api/runtime/migration-control/request.pending.${REQUEST_ID}.json;
@@ -439,6 +445,7 @@ jobs:
           emit_list SUBE_COLUMNS '(.schema.subeler.columns | keys)'
           emit_list SGK_ISVEREN_COLUMNS '(.schema.sgk_isverenler.columns | keys)'
           emit_list LOKASYON_COLUMNS '(.schema.calisma_lokasyonlari.columns | keys)'
+          emit_scalar SUBE_SORUMLU_YONETICILER_TABLE_EXISTS '.schema.sube_sorumlu_yoneticiler.exists' '^(true|false)$'
           emit_scalar NEXT_PENDING_MIGRATION '.bundle.next_pending_name' '^[0-9]{3}_[a-z0-9_]+\.sql$'
           for guard in \
             sube_rows sgk_isveren_rows calisma_lokasyonu_rows personel_rows \

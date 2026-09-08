@@ -12,6 +12,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   classifyLftpReadLog,
   collectApiChangesFromDiffLines,
+  collectPayloadDirectories,
+  collectRemoteDirectoryTree,
   createDeployPlan,
   formatDeploySummary,
   isApiOwnedPath,
@@ -246,6 +248,71 @@ describe('cPanel incremental deploy planner', () => {
     expect(cmds.indexOf('put index.html')).toBeGreaterThan(entryIdx);
     expect(cmds.indexOf('--exclude index.html')).toBeGreaterThan(assetIdx);
     assertPayloadHasNoDeploySha(cmds);
+  });
+
+  it('H2) emits parent-first directory manifests for incremental and full-mirror payloads', () => {
+    expect(collectRemoteDirectoryTree(['api/runtime/migration-control', 'api/src'])).toEqual([
+      'api',
+      'api/runtime',
+      'api/src',
+      'api/runtime/migration-control',
+    ]);
+
+    const repo = makeRepoSkeleton();
+    const dist = makeDist();
+    const incremental = createDeployPlan({
+      previousSha: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      currentSha: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+      repoRoot: repo,
+      distDir: dist,
+      fetchOk: true,
+      ancestryOk: true,
+      diffLines: ['M\tapi/src/Router.php'],
+    });
+    expect(collectPayloadDirectories(incremental, 'INCREMENTAL')).toEqual([
+      'api',
+      'api/runtime',
+      'api/runtime-build',
+      'api/src',
+      'api/runtime/migration-control',
+    ]);
+
+    const fullDirectories = collectPayloadDirectories(incremental, 'FULL_MIRROR_FALLBACK');
+    for (const path of [
+      'api',
+      'api/bin',
+      'api/migrations',
+      'api/public',
+      'api/runtime',
+      'api/runtime-build',
+      'api/src',
+      'api/runtime/migration-control',
+    ]) {
+      expect(fullDirectories).toContain(path);
+    }
+  });
+
+  it('H3) both payload renderers delegate directory creation to the shared helper manifest', () => {
+    const repo = makeRepoSkeleton();
+    const dist = makeDist();
+    const incremental = createDeployPlan({
+      previousSha: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      currentSha: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+      repoRoot: repo,
+      distDir: dist,
+      fetchOk: true,
+      ancestryOk: true,
+      diffLines: ['M\tapi/src/Router.php'],
+    });
+    const ctx = {
+      localDistDir: dist,
+      localRepoDir: repo,
+      remoteTargetDir: '.',
+      deployShaLocalPath: '/tmp/.deploy-sha',
+    };
+
+    expect(renderIncrementalFtpCommands(incremental, ctx)).not.toContain('mkdir -p');
+    expect(renderFullMirrorFtpCommands(incremental, ctx)).not.toContain('mkdir -p');
   });
 
   it('J) payload transfer never writes deploy-sha; finalize is separate and last', () => {
@@ -1086,6 +1153,26 @@ describe('cPanel incremental deploy workflow wiring', () => {
     expect(source).not.toMatch(/--only-newer\b/);
     expect(planner).not.toMatch(/--only-newer\b/);
     expect(source).not.toMatch(/\becho\b[^\n]*\$\{?FTP_PASSWORD\}?/);
+  });
+
+  it('ensures each mode directory manifest before payload transfer through the shared helper', () => {
+    expect(source).toContain('source "${GITHUB_WORKSPACE}/scripts/deploy/cpanel-ftp-directory-lib.sh"');
+    expect(planner).toContain("join(outDir, 'payload-directories-active.list')");
+    expect(planner).toContain("join(outDir, 'payload-directories-full.list')");
+    expect(source).toContain('ensure_cpanel_remote_directory_at_root "$REMOTE_TARGET_DIR" "$remote_directory"');
+    expect(source).toContain(
+      'upload_verify_finalize "INCREMENTAL" "$ACTIVE_COMMANDS" "$ACTIVE_DIRECTORY_LIST"',
+    );
+    expect(source).toContain(
+      'upload_verify_finalize "FULL_MIRROR_FALLBACK" "$FULL_COMMANDS" "$FULL_DIRECTORY_LIST"',
+    );
+
+    const ensureIdx = source.indexOf('if ! ensure_payload_directories "$label" "$directory_list"; then');
+    const transferIdx = source.indexOf('if ! run_cpanel_ftp "$commands"; then', ensureIdx);
+    const finalizeIdx = source.indexOf('if ! finalize_deploy_sha; then', ensureIdx);
+    expect(ensureIdx).toBeGreaterThanOrEqual(0);
+    expect(transferIdx).toBeGreaterThan(ensureIdx);
+    expect(finalizeIdx).toBeGreaterThan(transferIdx);
   });
 
   it('publishes frontend entrypoints after assets and finalizes deploy-sha last', () => {

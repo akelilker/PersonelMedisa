@@ -49,6 +49,16 @@ export const ALWAYS_UPLOAD_PATHS = Object.freeze([
   'api/runtime-build/canonical-migrations.php',
 ]);
 
+/** Full-mirror destination roots derived from the owned API directory set. */
+export const FULL_MIRROR_API_DIRECTORIES = Object.freeze(
+  API_OWNED_PREFIXES.map((prefix) => prefix.replace(/\/$/, '')),
+);
+
+/** Protected runtime directories required by deploy/control-plane operation. */
+export const REQUIRED_DEPLOY_RUNTIME_DIRECTORIES = Object.freeze([
+  'api/runtime/migration-control',
+]);
+
 /** Never delete / never touch via incremental delete. */
 export const PROTECTED_PATH_PREFIXES = Object.freeze([
   'api/runtime/',
@@ -168,6 +178,54 @@ export function isLftpSafePath(path) {
   }
   // Keep incremental command generation boring and unambiguous.
   return /^[A-Za-z0-9._/-]+$/.test(normalized);
+}
+
+/**
+ * Expand safe relative directory targets into a parent-first, unique tree.
+ * @param {string[]} targets
+ */
+export function collectRemoteDirectoryTree(targets) {
+  const directories = new Set();
+  for (const target of targets) {
+    const normalized = normalizeRelativePath(target);
+    if (!normalized || !isLftpSafePath(normalized)) {
+      throw new Error(`UNSAFE_LFTP_DIRECTORY:${target}`);
+    }
+    const parts = normalized.split('/');
+    for (let depth = 1; depth <= parts.length; depth += 1) {
+      directories.add(parts.slice(0, depth).join('/'));
+    }
+  }
+  return [...directories].sort((left, right) => {
+    const depthDiff = left.split('/').length - right.split('/').length;
+    return depthDiff || left.localeCompare(right);
+  });
+}
+
+/**
+ * Canonical remote parent-directory manifest for either deploy mode.
+ * @param {DeployPlan} plan
+ * @param {DeployMode} mode
+ */
+export function collectPayloadDirectories(plan, mode = plan.mode) {
+  const targets = [...REQUIRED_DEPLOY_RUNTIME_DIRECTORIES];
+  const uploadPaths = [...plan.apiUploads, ...plan.alwaysUploads];
+
+  for (const path of uploadPaths) {
+    if (!isLftpSafePath(path)) {
+      throw new Error(`UNSAFE_LFTP_PATH:${path}`);
+    }
+    const directory = dirname(path).replace(/\\/g, '/');
+    if (directory && directory !== '.') {
+      targets.push(directory);
+    }
+  }
+
+  if (mode === 'FULL_MIRROR_FALLBACK') {
+    targets.push(...FULL_MIRROR_API_DIRECTORIES);
+  }
+
+  return collectRemoteDirectoryTree(targets);
 }
 
 /**
@@ -1081,14 +1139,12 @@ export function renderFullMirrorPayloadCommands(plan, ctx) {
               mirror -R --verbose --exclude api/ --exclude-glob '.git*' --exclude-glob '.cpanel*' ${entryExcludes} . .;
               !echo 'PHP API full mirror upload basliyor';
               lcd ${repo};
-              mkdir -p api;
               put -O api api/.htaccess;
               mirror -R --verbose api/public api/public;
               mirror -R --verbose api/src api/src;
               mirror -R --verbose api/bin api/bin;
               mirror -R --verbose api/migrations api/migrations;
               mirror -R --verbose api/runtime-build api/runtime-build;
-              mkdir -p api/runtime;
               put -O api/runtime api/runtime/.htaccess;
               !echo 'SPA entrypoint upload basliyor';
               lcd ${dist};
@@ -1134,17 +1190,6 @@ export function renderIncrementalPayloadCommands(plan, ctx) {
     .map((name) => `put ${lftpQuote(name)};`)
     .join('\n              ');
 
-  const mkdirCmds = new Set();
-  for (const path of [...plan.apiUploads, ...plan.alwaysUploads]) {
-    if (!isLftpSafePath(path)) {
-      throw new Error(`UNSAFE_LFTP_PATH:${path}`);
-    }
-    const dir = dirname(path).replace(/\\/g, '/');
-    if (dir && dir !== '.') {
-      mkdirCmds.add(`mkdir -p ${lftpQuote(dir)};`);
-    }
-  }
-
   const uploadCmds = [];
   for (const path of plan.apiUploads) {
     const dir = dirname(path).replace(/\\/g, '/');
@@ -1173,8 +1218,6 @@ export function renderIncrementalPayloadCommands(plan, ctx) {
               mirror -R --verbose --exclude api/ --exclude-glob '.git*' --exclude-glob '.cpanel*' ${entryExcludes} . .;
               !echo 'PHP API incremental upload basliyor';
               lcd ${repo};
-              mkdir -p api;
-              ${[...mkdirCmds].join('\n              ')}
               ${uploadCmds.join('\n              ') || '!echo no-api-uploads;'}
               !echo 'API exact deletes basliyor';
               ${deleteCmds.join('\n              ') || '!echo no-api-deletes;'}
@@ -1457,6 +1500,18 @@ function main() {
   writeFileSync(
     join(outDir, 'api-uploads.list'),
     plan.apiUploads.map((path) => `${renderLftpGitPath(path)}\n`).join(''),
+    'utf8',
+  );
+  writeFileSync(
+    join(outDir, 'payload-directories-active.list'),
+    collectPayloadDirectories(plan, plan.mode).map((path) => `${path}\n`).join(''),
+    'utf8',
+  );
+  writeFileSync(
+    join(outDir, 'payload-directories-full.list'),
+    collectPayloadDirectories(plan, 'FULL_MIRROR_FALLBACK')
+      .map((path) => `${path}\n`)
+      .join(''),
     'utf8',
   );
   writeFileSync(deployShaLocalPathOs, `${currentSha}\n`, 'utf8');

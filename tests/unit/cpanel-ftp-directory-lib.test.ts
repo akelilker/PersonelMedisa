@@ -40,6 +40,10 @@ describe('cPanel FTP directory ensure contract', () => {
       'AUTH_530_RC=PASS',
       'WRONG_REMOTE_ROOT_RC=PASS',
       'OTHER_FTP_ERROR_RC=PASS',
+      'REMOTE_FILE_NOT_DIRECTORY_RC=PASS',
+      'UNREADABLE_EXISTING_DIRECTORY_RC=PASS',
+      'INCREMENTAL_EXISTING_API_RC=PASS',
+      'FULL_MIRROR_EXISTING_API_RC=PASS',
       'HARNESS_FAIL=0',
     ]) {
       expect(output).toContain(assertion);
@@ -50,10 +54,11 @@ describe('cPanel FTP directory ensure contract', () => {
     const helper = readFileSync(helperPath, 'utf8');
 
     expect(helper).toContain('ensure_cpanel_remote_directory()');
-    expect(helper).toContain('cls -d ${remote_directory};');
-    expect(helper).toContain('mkdir -p ${remote_directory};');
+    expect(helper).toContain('ensure_cpanel_remote_directory_at_root()');
+    expect(helper).toContain('cd ${remote_root}; cd ${remote_directory}; cls -la;');
+    expect(helper).toContain('cd ${remote_root}; mkdir -p ${remote_directory};');
     expect(helper).toContain("550 Can't create directory: File exists");
-    expect(helper).toContain('&& run_cpanel_ftp "cls -d ${remote_directory};"');
+    expect(helper).toContain('probe_cpanel_remote_directory_at_root "$remote_root" "$remote_directory"');
     expect(helper).not.toMatch(/\b(?:put|mput|mv|rm -r|mysql|psql|sqlite3|curl|php)\b/);
     expect(helper).not.toContain('cmd:fail-exit false');
     expect(helper).not.toContain('|| true');

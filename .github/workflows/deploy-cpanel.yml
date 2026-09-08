@@ -219,6 +219,9 @@ jobs:
             run_cpanel_ftp_diagnosed "$ftp_commands" ""
           }
 
+          # shellcheck source=scripts/deploy/cpanel-ftp-directory-lib.sh
+          source "${GITHUB_WORKSPACE}/scripts/deploy/cpanel-ftp-directory-lib.sh"
+
           # Canonical GET owner used by previous-SHA, payload verify, and final SHA read-back.
           lftp_get_remote_to_local() {
             local remote_path="$1"
@@ -310,6 +313,8 @@ jobs:
           ACTIVE_COMMANDS="$(cat "$PLAN_DIR/ftp-active.commands")"
           FULL_COMMANDS="$(cat "$PLAN_DIR/ftp-full.commands")"
           FINALIZE_SHA_COMMANDS="$(cat "$PLAN_DIR/ftp-finalize-sha.commands")"
+          ACTIVE_DIRECTORY_LIST="$PLAN_DIR/payload-directories-active.list"
+          FULL_DIRECTORY_LIST="$PLAN_DIR/payload-directories-full.list"
 
           # Keep full-mirror command strings discoverable for safety/source contracts:
           # mirror -R --verbose api/public api/public
@@ -395,9 +400,29 @@ jobs:
             echo "Deploy SHA finalization verified"
           }
 
+          ensure_payload_directories() {
+            local label="$1"
+            local directory_list="$2"
+            local remote_directory
+
+            while IFS= read -r remote_directory; do
+              [[ -z "$remote_directory" ]] && continue
+              echo "DEPLOY_PAYLOAD_DIRECTORY_ENSURE_START path=${remote_directory} mode=${label}"
+              if ! ensure_cpanel_remote_directory_at_root "$REMOTE_TARGET_DIR" "$remote_directory"; then
+                echo "DEPLOY_PAYLOAD_DIRECTORY_ENSURE=FAIL path=${remote_directory} mode=${label}"
+                return 1
+              fi
+            done < "$directory_list"
+            echo "DEPLOY_PAYLOAD_DIRECTORY_ENSURE=PASS mode=${label}"
+          }
+
           upload_verify_finalize() {
             local label="$1"
             local commands="$2"
+            local directory_list="$3"
+            if ! ensure_payload_directories "$label" "$directory_list"; then
+              return 1
+            fi
             echo "Deploy payload transfer path: ${label}"
             if ! run_cpanel_ftp "$commands"; then
               echo "DEPLOY_PAYLOAD_TRANSFER=FAIL path=${label}"
@@ -416,15 +441,15 @@ jobs:
           }
 
           if [[ "$DEPLOY_MODE" == "INCREMENTAL" ]]; then
-            if ! upload_verify_finalize "INCREMENTAL" "$ACTIVE_COMMANDS"; then
+            if ! upload_verify_finalize "INCREMENTAL" "$ACTIVE_COMMANDS" "$ACTIVE_DIRECTORY_LIST"; then
               echo "INCREMENTAL transfer/verify/finalize failed; switching to FULL_MIRROR_FALLBACK"
               echo "FALLBACK_REASON=INCREMENTAL_TRANSFER_OR_VERIFY_FAILED"
               # On incremental failure the production marker must remain the previous SHA
               # until fallback payload verify PASS and a successful finalize.
-              upload_verify_finalize "FULL_MIRROR_FALLBACK" "$FULL_COMMANDS"
+              upload_verify_finalize "FULL_MIRROR_FALLBACK" "$FULL_COMMANDS" "$FULL_DIRECTORY_LIST"
             fi
           else
-            upload_verify_finalize "FULL_MIRROR_FALLBACK" "$FULL_COMMANDS"
+            upload_verify_finalize "FULL_MIRROR_FALLBACK" "$FULL_COMMANDS" "$FULL_DIRECTORY_LIST"
           fi
 
       - name: Verify deployed app with anonymous and authenticated read-only smoke

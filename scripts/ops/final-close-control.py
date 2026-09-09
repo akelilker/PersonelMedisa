@@ -90,7 +90,15 @@ def main():
                 time.sleep(10)
                 continue
             if status.get('request_id') == request_id and status.get('state') in ('SUCCEEDED', 'FAILED'):
-                require(status.get('state') == 'SUCCEEDED', 'FINAL_CLOSE_WORKER_FAILED')
+                if status.get('state') == 'FAILED':
+                    # Surface the worker's bounded reason/stage so a failure is
+                    # attributable. detail is printed only when it is a clean code;
+                    # anything else (PDO/secrets/personnel text) is never logged.
+                    for key in ('reason', 'stage', 'detail'):
+                        value = status.get(key)
+                        if isinstance(value, str) and re.fullmatch('[A-Z0-9_]+', value):
+                            print('FINAL_CLOSE_WORKER_' + key.upper() + '=' + value)
+                    raise RuntimeError('FINAL_CLOSE_WORKER_FAILED')
                 report = json.loads(get(base + 'final-close-report.json', 'report'))
                 require(report.get('request_id') == request_id and report.get('deployed_sha') == sha
                         and report.get('mode') == mode, 'FINAL_CLOSE_REPORT_CORRELATION_FAILED')

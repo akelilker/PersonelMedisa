@@ -184,6 +184,37 @@ class PersonellerController
         );
     }
 
+    /** Narrow CLI read: no archive-view audit or unrelated personnel fields. */
+    public static function finalCloseRead(int $personelId): array
+    {
+        if (PHP_SAPI !== 'cli' || !in_array($personelId, \Medisa\Api\Services\Operations\FinalClosePackage::PERSONNEL, true)) {
+            throw new \RuntimeException('FINAL_CLOSE_PERSONNEL_FORBIDDEN');
+        }
+        $row = self::fetchPersonelRowById(Connection::get(), $personelId);
+        if (!$row) {
+            throw new \RuntimeException('FINAL_CLOSE_PERSONNEL_MISSING');
+        }
+        $result = array_intersect_key($row, array_flip(['id', 'ad', 'soyad', 'aktif_durum', 'sube_id', 'sirket_id', 'calisma_lokasyonu_id']));
+        if (!array_key_exists('sirket_id', $result)) {
+            $branch = $row['sube_id'] === null ? null
+                : \Medisa\Api\Services\Organizasyon\OrganizasyonService::readSube(Connection::get(), (int) $row['sube_id']);
+            $result['sirket_id'] = $branch['sirket']['id'] ?? null;
+        }
+        foreach (['id', 'sube_id', 'sirket_id', 'calisma_lokasyonu_id'] as $key) {
+            if (!array_key_exists($key, $result)) {
+                throw new \RuntimeException('FINAL_CLOSE_PERSONNEL_PROJECTION_INCOMPLETE');
+            }
+            $result[$key] = $result[$key] === null ? null : (int) $result[$key];
+        }
+        // Hash only: unrelated identity/contact/salary data never leaves this owner.
+        foreach (['ad', 'soyad', 'calisma_lokasyonu_id', 'calisma_lokasyonu_adi', 'updated_at'] as $key) {
+            unset($row[$key]);
+        }
+        ksort($row);
+        $result['invariant_hash'] = hash('sha256', json_encode($row, JSON_THROW_ON_ERROR));
+        return $result;
+    }
+
     public static function detail(Request $request, $personelId)
     {
         $user = AuthMiddleware::authenticate($request, true);

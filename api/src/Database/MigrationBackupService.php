@@ -187,6 +187,15 @@ final class MigrationBackupService
      * explicit override nor that layout resolves, there is no safe place to write
      * a dump containing closing rows and the caller must abort.
      */
+    /** Private operations evidence shares the existing verified backup location. */
+    public static function operationsDirectory(string $apiDirectory): string
+    {
+        if (self::detectWebroot($apiDirectory) === null) {
+            throw new RuntimeException('BACKUP_LOCATION_UNRESOLVED');
+        }
+        return self::resolveDirectory($apiDirectory);
+    }
+
     private static function resolveDirectory(string $apiDirectory): string
     {
         $webroot = self::detectWebroot($apiDirectory);

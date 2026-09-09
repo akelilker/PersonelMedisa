@@ -32,6 +32,19 @@ use PDOException;
 class YonetimController
 {
 
+    /** Reuses the canonical user projection without publishing the user directory. */
+    public static function finalCloseRead(int $userId): array
+    {
+        if (PHP_SAPI !== 'cli' || !array_key_exists($userId, \Medisa\Api\Services\Operations\FinalClosePackage::USERS)) {
+            throw new \RuntimeException('FINAL_CLOSE_USER_FORBIDDEN');
+        }
+        $row = self::findKullaniciById(Connection::get(), $userId);
+        if (!$row) {
+            throw new \RuntimeException('FINAL_CLOSE_USER_MISSING');
+        }
+        return $row;
+    }
+
     public static function actorIdentityCreate(Request $request)
     {
         $admin = AuthMiddleware::authenticate($request, true);

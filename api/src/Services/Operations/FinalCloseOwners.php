@@ -9,7 +9,6 @@ use Medisa\Api\Controllers\PersonellerController;
 use Medisa\Api\Controllers\YonetimController;
 use Medisa\Api\Controllers\SgkKatalogHazirlikController;
 use Medisa\Api\Database\Connection;
-use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Services\Payroll\SgkSirketPolitikaImportValidator;
 use RuntimeException;
 
@@ -29,7 +28,12 @@ final class FinalCloseOwners
         return $ops;
     }
 
-    public static function invoke(array $frame): void
+    /**
+     * Runs one bounded operation. The read-only 'snapshot' operation returns the
+     * canonical snapshot so the transport can run it in-process; mutation owners
+     * terminate the child HTTP controller response and never return here.
+     */
+    public static function invoke(array $frame): ?array
     {
         if (PHP_SAPI !== 'cli' || array_keys($frame) !== ['operation', 'expected', 'identity_id']) {
             throw new RuntimeException('FINAL_CLOSE_FRAME_INVALID');
@@ -43,7 +47,9 @@ final class FinalCloseOwners
             FinalCloseSnapshot::matches($snapshot['users'][$id], $identity + ['id' => $id, 'durum' => 'AKTIF']);
         }
         if ($op === 'snapshot') {
-            JsonResponse::success($snapshot);
+            // Read-only canonical snapshot: return the array so the caller can run
+            // without a child process. Mutation operations never take this branch.
+            return $snapshot;
         }
         if (!is_string($frame['expected']) || !hash_equals(FinalCloseSnapshot::checksum($snapshot), $frame['expected'])) {
             throw new RuntimeException('FINAL_CLOSE_PREIMAGE_DRIFT');

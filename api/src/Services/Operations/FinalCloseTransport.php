@@ -6,7 +6,11 @@ namespace Medisa\Api\Services\Operations;
 
 use RuntimeException;
 
-/** One short-lived PHP process per existing HTTP controller (JsonResponse exits). */
+/**
+ * Snapshot/preflight reads run in-process inside the single lock-protected worker.
+ * Each mutation operation keeps one short-lived PHP process per existing HTTP
+ * controller (JsonResponse exits), and fails closed when proc_open is unavailable.
+ */
 final class FinalCloseTransport
 {
     private $apiDirectory;
@@ -15,6 +19,13 @@ final class FinalCloseTransport
 
     public function call(string $operation, ?string $expected = null, ?int $identityId = null): array
     {
+        // Read-only canonical snapshot: same FinalCloseOwners invocation the child
+        // used, executed in-process. Safe because snapshot reads never emit a
+        // JsonResponse/exit and never mutate; this removes the proc_open runtime
+        // dependency for the entire preflight and every postcheck snapshot refresh.
+        if ($operation === 'snapshot') {
+            return $this->callSnapshotInProcess();
+        }
         if (!function_exists('proc_open')) { throw new RuntimeException('FINAL_CLOSE_PROC_OPEN_UNAVAILABLE'); }
         $process = proc_open([PHP_BINARY, $this->apiDirectory . '/bin/final-close-owner.php'],
             [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
@@ -48,5 +59,19 @@ final class FinalCloseTransport
         }
         if (!is_array($result['data'])) { throw new RuntimeException('FINAL_CLOSE_OWNER_INVALID_DATA'); }
         return $result['data'];
+    }
+
+    /**
+     * In-process read-only owner invocation. Frame shape and bounded codes mirror
+     * the child path exactly; the operation never mutates so no exit boundary or
+     * JsonResponse capture is required.
+     */
+    private function callSnapshotInProcess(): array
+    {
+        $data = FinalCloseOwners::invoke(['operation' => 'snapshot', 'expected' => null, 'identity_id' => null]);
+        if (!is_array($data)) {
+            throw new RuntimeException('FINAL_CLOSE_OWNER_INVALID_DATA');
+        }
+        return $data;
     }
 }

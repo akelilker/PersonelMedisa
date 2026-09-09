@@ -431,7 +431,8 @@ try {
         ];
         if ($exception instanceof MigrationWorkerFailure && $exception->detail !== null) {
             $failureStatus['detail'] = $exception->detail;
-        } elseif (strpos($exception->getMessage(), 'FINAL_CLOSE_') === 0) {
+        } elseif (preg_match('/^[A-Z][A-Z0-9_]{2,100}$/D', $exception->getMessage()) === 1) {
+            // Bounded single-token code only: never raw PDO/PII message text.
             $failureStatus['detail'] = $exception->getMessage();
         }
         writeStatus($statusPath, [
@@ -522,10 +523,12 @@ function classifyWorkerFailure(Throwable $exception, string $stage): string
     if (in_array($message, $knownCodes, true)) {
         return $message;
     }
-    // Surface bounded owner codes verbatim so a worker failure is attributable.
-    // FINAL_CLOSE_* and BACKUP_* both carry a precise, publishable reason; without
-    // this they would collapse into the generic UNKNOWN_MIGRATION_FAILURE below.
-    if (preg_match('/^(?:FINAL_CLOSE|BACKUP)_[A-Z0-9_]+$/D', $message) === 1) {
+    // Surface bounded single-token owner codes verbatim so a worker failure is
+    // attributable. FINAL_CLOSE_*, BACKUP_* and other domain codes (e.g. SGK_*,
+    // SUBE_*) are all publishable reasons; without this they would collapse into
+    // the generic UNKNOWN_MIGRATION_FAILURE below. Free-text messages (PDO, PII)
+    // never match and stay hidden.
+    if (preg_match('/^[A-Z][A-Z0-9_]{2,100}$/D', $message) === 1) {
         return $message;
     }
     if ($stage === 'REQUEST_PARSE') {

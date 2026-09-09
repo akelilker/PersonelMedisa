@@ -1,0 +1,73 @@
+name: Final close canonical operations
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Bounded package operation
+        required: true
+        type: choice
+        default: FINAL_CLOSE_PREFLIGHT
+        options: [FINAL_CLOSE_PREFLIGHT, FINAL_CLOSE_APPLY]
+      confirmation:
+        description: Type the selected mode exactly
+        required: true
+        type: string
+      deployed_sha:
+        description: Exact deployed main SHA containing this implementation
+        required: true
+        type: string
+      preflight_checksum:
+        description: Fresh preflight checksum for APPLY; leave empty for PREFLIGHT
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cpanel-canonical-migration-control
+  cancel-in-progress: false
+
+jobs:
+  request:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      MODE: ${{ inputs.mode }}
+      CONFIRMATION: ${{ inputs.confirmation }}
+      DEPLOYED_SHA: ${{ inputs.deployed_sha }}
+      PREFLIGHT_CHECKSUM: ${{ inputs.preflight_checksum }}
+      REPOSITORY_PRIVATE: ${{ github.event.repository.private }}
+      FTP_SERVER: ${{ secrets.FTP_SERVER }}
+      FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+      FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+      FTP_PORT: ${{ secrets.FTP_PORT }}
+    steps:
+      - name: Enforce private canonical main and explicit authorization
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REPOSITORY" = "akelilker/PersonelMedisa"
+          test "$REPOSITORY_PRIVATE" = "true"
+          test "$GITHUB_REF" = "refs/heads/main"
+          test "$GITHUB_SHA" = "$DEPLOYED_SHA"
+          [[ "$DEPLOYED_SHA" =~ ^[a-f0-9]{40}$ ]]
+          test "$CONFIRMATION" = "$MODE"
+          case "$MODE" in
+            FINAL_CLOSE_PREFLIGHT) test -z "$PREFLIGHT_CHECKSUM" ;;
+            FINAL_CLOSE_APPLY) [[ "$PREFLIGHT_CHECKSUM" =~ ^[a-f0-9]{64}$ ]] ;;
+            *) exit 1 ;;
+          esac
+          test -n "$FTP_SERVER" && test -n "$FTP_USERNAME" && test -n "$FTP_PASSWORD"
+          test "$FTP_PORT" = "21"
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.deployed_sha }}
+          fetch-depth: 0
+      - name: Verify approved baseline ancestry
+        run: git merge-base --is-ancestor c9885ad34e8fa065a74a964368671554e001d1ed HEAD
+      - name: Install existing control-plane FTP client
+        run: sudo apt-get update && sudo apt-get install -y lftp
+      - name: Submit bounded request and verify correlated worker evidence
+        run: python3 scripts/ops/final-close-control.py

@@ -106,7 +106,7 @@ describe('migration 079 slot', () => {
 describe('migration worker control-plane stages', () => {
   it('supports exactly the canonical request modes and still defaults to apply', () => {
     expect(worker).toContain("'/^(APPLY|READ_ONLY_PREFLIGHT|READ_ONLY_ORGANIZATION_INVENTORY'");
-    expect(worker).toContain("|ORGANIZATION_MAPPING_PREFLIGHT|ORGANIZATION_MAPPING_APPLY)$/'");
+    expect(worker).toContain("|ORGANIZATION_MAPPING_PREFLIGHT|ORGANIZATION_MAPPING_APPLY|FINAL_CLOSE_PREFLIGHT|FINAL_CLOSE_APPLY)$/'");
     expect(worker).toContain(": 'APPLY';");
   });
 

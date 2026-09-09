@@ -103,7 +103,7 @@ try {
                 $request,
                 'mode',
                 '/^(APPLY|READ_ONLY_PREFLIGHT|READ_ONLY_ORGANIZATION_INVENTORY'
-                . '|ORGANIZATION_MAPPING_PREFLIGHT|ORGANIZATION_MAPPING_APPLY)$/'
+                . '|ORGANIZATION_MAPPING_PREFLIGHT|ORGANIZATION_MAPPING_APPLY|FINAL_CLOSE_PREFLIGHT|FINAL_CLOSE_APPLY)$/'
             )
             : 'APPLY';
         // Optional, and only meaningful for APPLY: the single migration version
@@ -117,6 +117,21 @@ try {
         $publishedSha = trim((string) @file_get_contents($deployShaPath));
         if (!preg_match('/^[a-f0-9]{40}$/i', $publishedSha) || !hash_equals($publishedSha, $deployedSha)) {
             throw new RuntimeException('DEPLOY_SHA_MISMATCH');
+        }
+
+        if ($mode === 'FINAL_CLOSE_PREFLIGHT' || $mode === 'FINAL_CLOSE_APPLY') {
+            $stage = $mode;
+            $report = \Medisa\Api\Services\Operations\FinalCloseService::run($request, $apiDirectory, $publishedSha);
+            writeJsonAtomically($controlDirectory . '/final-close-report.json', $report);
+            writeStatus($statusPath, [
+                'state' => $report['result'] === 'PASS' ? 'SUCCEEDED' : 'FAILED',
+                'request_id' => $requestId, 'deployed_sha' => $publishedSha, 'mode' => $mode,
+                'final_close_result' => $report['result'],
+                'preflight_checksum' => $report['preflight_checksum'],
+                'production_mutation_count' => $report['production_mutation_count'],
+            ]);
+            archiveRequest($processingPath, $controlDirectory . '/request.completed.' . safeId($requestId) . '.json');
+            exit($report['result'] === 'PASS' ? 0 : 1);
         }
 
         $stage = 'STATUS_WRITE';

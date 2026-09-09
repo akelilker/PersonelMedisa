@@ -25,8 +25,15 @@ final class FinalClosePostcheck
         } elseif (strpos($op, 'scope') === 0) {
             $id = (int) substr($op, 5);
             $expected['users'][$id]['sube_ids'] = FinalClosePackage::scopesAfter($id);
-            FinalCloseSnapshot::matches($after['actors'][$id], ['branch_scope' => FinalClosePackage::scopesAfter($id),
-                'actor_identity_id' => $before['actors'][$id]['actor_identity_id'], 'actor_status' => $before['actors'][$id]['actor_status']]);
+            $actorExpected = [
+                'branch_scope' => FinalClosePackage::scopesAfter($id),
+                'actor_identity_id' => $before['actors'][$id]['actor_identity_id'],
+                'actor_status' => $before['actors'][$id]['actor_status'],
+            ];
+            if ($id === 11) {
+                $actorExpected['can_prepare'] = true;
+            }
+            FinalCloseSnapshot::matches($after['actors'][$id], $actorExpected);
             $expected['actors'][$id] = $after['actors'][$id];
         } elseif ($op === 'identity_create' || $op === 'identity_verify') {
             FinalCloseSnapshot::matches($result, ['personel_id' => 173, 'actor_status' => $op === 'identity_create' ? 'PENDING' : 'VERIFIED']);

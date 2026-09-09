@@ -29,4 +29,14 @@ describe("cPanel migration worker bounded-reason contract", () => {
       classifier.indexOf("'UNKNOWN_MIGRATION_FAILURE'")
     );
   });
+
+  it("adds a bounded non-PII class/SQLSTATE diagnostic when the message is opaque", () => {
+    // For free-text exceptions (e.g. PDO) the worker records a sanitised token so
+    // the cause becomes attributable without leaking the raw message.
+    expect(worker).toContain("(new \\ReflectionClass($exception))->getShortName()");
+    expect(worker).toContain("$exception instanceof \\PDOException");
+    expect(worker).toContain("strtoupper((new \\ReflectionClass($exception))->getShortName())");
+    // The diagnostic is gated by the same bounded regex as the reason.
+    expect(worker).toContain("preg_match('/^[A-Z][A-Z0-9_]{2,100}$/D', $diag) === 1");
+  });
 });

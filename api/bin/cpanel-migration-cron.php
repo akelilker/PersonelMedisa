@@ -434,6 +434,18 @@ try {
         } elseif (preg_match('/^[A-Z][A-Z0-9_]{2,100}$/D', $exception->getMessage()) === 1) {
             // Bounded single-token code only: never raw PDO/PII message text.
             $failureStatus['detail'] = $exception->getMessage();
+        } elseif (!($exception instanceof MigrationWorkerFailure)) {
+            // Bounded, non-PII diagnostic so an opaque failure is attributable
+            // without leaking the raw message: exception class plus, for PDO, the
+            // SQLSTATE code (e.g. PDOEXCEPTION_42S22 -> missing column/relation).
+            $diag = strtoupper((new \ReflectionClass($exception))->getShortName());
+            if ($exception instanceof \PDOException) {
+                $state = preg_replace('/[^A-Za-z0-9_]/', '_', (string) $exception->getCode());
+                if ($state !== '') { $diag .= '_' . $state; }
+            }
+            if (preg_match('/^[A-Z][A-Z0-9_]{2,100}$/D', $diag) === 1) {
+                $failureStatus['detail'] = $diag;
+            }
         }
         writeStatus($statusPath, [
             ...$failureStatus,

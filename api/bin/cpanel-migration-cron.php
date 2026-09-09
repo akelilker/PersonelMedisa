@@ -431,6 +431,8 @@ try {
         ];
         if ($exception instanceof MigrationWorkerFailure && $exception->detail !== null) {
             $failureStatus['detail'] = $exception->detail;
+        } elseif (strpos($exception->getMessage(), 'FINAL_CLOSE_') === 0) {
+            $failureStatus['detail'] = $exception->getMessage();
         }
         writeStatus($statusPath, [
             ...$failureStatus,
@@ -518,6 +520,12 @@ function classifyWorkerFailure(Throwable $exception, string $stage): string
         'REQUEST_UNREADABLE',
     ];
     if (in_array($message, $knownCodes, true)) {
+        return $message;
+    }
+    // Surface bounded owner codes verbatim so a worker failure is attributable.
+    // FINAL_CLOSE_* and BACKUP_* both carry a precise, publishable reason; without
+    // this they would collapse into the generic UNKNOWN_MIGRATION_FAILURE below.
+    if (preg_match('/^(?:FINAL_CLOSE|BACKUP)_[A-Z0-9_]+$/D', $message) === 1) {
         return $message;
     }
     if ($stage === 'REQUEST_PARSE') {

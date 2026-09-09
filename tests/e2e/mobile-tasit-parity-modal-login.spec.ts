@@ -33,6 +33,11 @@ async function assertLoginTitleParity(page: Page) {
   await page.evaluate(async () => {
     await document.fonts.ready;
   });
+  // WebKit can resolve `document.fonts.ready` while `document.fonts.status` still
+  // reads "loading" (a known engine race). Poll for the webfont to be truly ready
+  // — bounded by the test timeout — so gutter/ink metrics are never measured
+  // mid-load. This keeps the parity intent without a flaky one-shot status read.
+  await page.waitForFunction(() => document.fonts.status === "loaded");
 
   const titleMetrics = await title.evaluate((el) => {
     const style = getComputedStyle(el);

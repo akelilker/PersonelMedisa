@@ -57,8 +57,14 @@ final class FinalCloseOwners
             $controller = PersonellerController::class; $method = 'update'; $id = 203;
             $body = ['ad' => 'Muhammed', 'soyad' => 'Mahmud'];
         } elseif (strpos($op, 'location') === 0) {
-            $controller = PersonellerController::class; $method = 'update'; $id = (int) substr($op, 8);
-            $body = ['calisma_lokasyonu_id' => 5];
+            // calisma_lokasyonu_id is a protected organization axis. Generic PUT
+            // deliberately rejects it; invoke the existing audited canonical owner.
+            $controller = PersonellerController::class; $method = 'organizasyonDegisikligi'; $id = (int) substr($op, 8);
+            $body = [
+                'preimage' => ['calisma_lokasyonu_id' => null],
+                'targets' => ['calisma_lokasyonu_id' => 5],
+                'gerekce' => 'Final production close Karabuk calisma lokasyonu atamasi',
+            ];
         } elseif (strpos($op, 'manager') === 0) {
             $method = 'subeGuncelle'; $id = (int) substr($op, 7);
             $body = ['sorumlu_yonetici_user_ids' => [FinalClosePackage::MANAGERS[$id]]];

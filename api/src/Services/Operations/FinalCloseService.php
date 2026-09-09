@@ -63,6 +63,14 @@ final class FinalCloseService
         $report['groups'] = [];
         $identityId = null;
         foreach (FinalCloseOwners::operations() as $operation) {
+            $dependencyBlocker = self::dependencyBlocker($operation, $report['groups']);
+            if ($dependencyBlocker !== null) {
+                $report['groups'][$operation] = ['result' => 'BLOCKED', 'reason' => $dependencyBlocker];
+                $report['result'] = 'PARTIAL_OR_BLOCKED';
+                self::writeEvidence($marker . '.receipt.json', $report);
+                continue;
+            }
+
             $before = $snapshot;
             try {
                 $result = $transport->call($operation, FinalCloseSnapshot::checksum($before), $identityId);
@@ -86,6 +94,49 @@ final class FinalCloseService
             self::writeEvidence($marker . '.receipt.json', $report);
         }
         return $report;
+    }
+
+    /**
+     * Dependency failures block only their own chain. Independent approved groups
+     * continue, but A1 never advances to TASLAK/ONAY_BEKLIYOR without both scopes
+     * and the verified/bound approver identity.
+     *
+     * @param array<string, array<string, mixed>> $groups
+     */
+    private static function dependencyBlocker(string $operation, array $groups): ?string
+    {
+        $passed = static function (string $name) use ($groups): bool {
+            return ($groups[$name]['result'] ?? null) === 'PASS';
+        };
+
+        if ($operation === 'identity_create' && !$passed('scope110')) {
+            return 'FINAL_CLOSE_IDENTITY_SCOPE_DEPENDENCY_BLOCKED';
+        }
+        if ($operation === 'identity_verify' && !$passed('identity_create')) {
+            return 'FINAL_CLOSE_IDENTITY_CREATE_DEPENDENCY_BLOCKED';
+        }
+        if ($operation === 'identity_bind' && !$passed('identity_verify')) {
+            return 'FINAL_CLOSE_IDENTITY_VERIFY_DEPENDENCY_BLOCKED';
+        }
+        if (strpos($operation, 'policy_') !== 0) {
+            return null;
+        }
+
+        foreach (['scope11', 'scope110', 'identity_bind'] as $dependency) {
+            if (!$passed($dependency)) {
+                return 'FINAL_CLOSE_A1_PREREQUISITE_BLOCKED';
+            }
+        }
+
+        $branch = (int) substr($operation, -2);
+        if (strpos($operation, 'policy_submit') === 0 && !$passed('policy_import' . $branch)) {
+            return 'FINAL_CLOSE_POLICY_IMPORT_DEPENDENCY_BLOCKED';
+        }
+        if (strpos($operation, 'policy_approve') === 0 && !$passed('policy_submit' . $branch)) {
+            return 'FINAL_CLOSE_POLICY_SUBMIT_DEPENDENCY_BLOCKED';
+        }
+
+        return null;
     }
 
     private static function writeEvidence(string $path, array $evidence): void

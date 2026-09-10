@@ -192,10 +192,10 @@ class PersonellerController
      * tipi, SGK employer, derived branch name) could decide whether a bounded
      * production preflight may run. The canonical model stores no company on the
      * personnel row — a person's company derives from the branch — so this reader
-     * answers exactly the preimage question with one statement, projecting only the
-     * preimage fields from the canonical personnel row plus the branch's stored
-     * company column. A branchless person keeps a NULL company: nothing is
-     * backfilled, and no read-model fallback runs.
+     * takes the canonical personnel row itself (the invariant source) plus the
+     * branch's company column under one explicit alias, in a single statement.
+     * A branchless person keeps a NULL company: nothing is backfilled and no
+     * read-model fallback runs.
      */
     public static function finalCloseRead(int $personelId): array
     {
@@ -204,11 +204,14 @@ class PersonellerController
         }
         $pdo = Connection::get();
         try {
+            // p.* keeps the whole canonical personnel row available to the invariant
+            // hash; the alias keeps the joined company out of that row's namespace.
             $stmt = $pdo->prepare(
-                'SELECT p.id, p.ad, p.soyad, p.aktif_durum, p.sube_id, s.sirket_id, p.calisma_lokasyonu_id'
+                'SELECT p.*, s.sirket_id AS final_close_sirket_id'
                 . ' FROM personeller p'
                 . ' LEFT JOIN subeler s ON s.id = p.sube_id'
-                . ' WHERE p.id = :id LIMIT 1'
+                . ' WHERE p.id = :id'
+                . ' LIMIT 1'
             );
             $stmt->execute(['id' => $personelId]);
             $row = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -220,30 +223,52 @@ class PersonellerController
         if (!$row) {
             throw new \RuntimeException('FINAL_CLOSE_PERSONNEL_MISSING');
         }
-        foreach (['id', 'ad', 'soyad', 'aktif_durum', 'sube_id', 'sirket_id', 'calisma_lokasyonu_id'] as $column) {
+        foreach (['id', 'ad', 'soyad', 'aktif_durum', 'sube_id', 'final_close_sirket_id', 'calisma_lokasyonu_id'] as $column) {
             if (!array_key_exists($column, $row)) {
                 throw new \RuntimeException('FINAL_CLOSE_PERSONNEL_PROJECTION_INCOMPLETE');
             }
         }
+        // Public projection: only the approved preimage fields leave this owner. The
+        // company is the branch's canonical column and a NULL branch stays NULL.
         $result = [
             'id' => (int) $row['id'],
             'ad' => $row['ad'],
             'soyad' => $row['soyad'],
             'aktif_durum' => $row['aktif_durum'],
             'sube_id' => $row['sube_id'] === null ? null : (int) $row['sube_id'],
-            'sirket_id' => $row['sirket_id'] === null ? null : (int) $row['sirket_id'],
+            'sirket_id' => $row['final_close_sirket_id'] === null ? null : (int) $row['final_close_sirket_id'],
             'calisma_lokasyonu_id' => $row['calisma_lokasyonu_id'] === null ? null : (int) $row['calisma_lokasyonu_id'],
         ];
-        // Hash only: unrelated identity/contact/salary data never leaves this owner,
-        // and the hash is taken from the raw canonical row — never from a joined or
-        // display value. The mutable-field exclusions stay as they were.
+        $result['invariant_hash'] = self::finalClosePersonnelInvariantHash($row);
+
+        return $result;
+    }
+
+    /**
+     * Canonical personnel invariant input: every column the personeller row owns,
+     * minus the fields this package mutates. The branch join is not part of the
+     * personnel invariant, so its alias is always dropped — the branch relation is
+     * attested by the branch preimage owner, never by the personnel-row hash.
+     *
+     * @param array<string, mixed> $row canonical personnel row (p.*) with the join alias
+     * @return array<string, mixed>
+     */
+    private static function finalClosePersonnelHashInput(array $row): array
+    {
+        unset($row['final_close_sirket_id']);
+        // Hash only: unrelated identity/contact/salary data never leaves this owner.
         foreach (['ad', 'soyad', 'calisma_lokasyonu_id', 'calisma_lokasyonu_adi', 'updated_at'] as $key) {
             unset($row[$key]);
         }
         ksort($row);
-        $result['invariant_hash'] = hash('sha256', json_encode($row, JSON_THROW_ON_ERROR));
 
-        return $result;
+        return $row;
+    }
+
+    /** @param array<string, mixed> $row canonical personnel row (p.*) with the join alias */
+    private static function finalClosePersonnelInvariantHash(array $row): string
+    {
+        return hash('sha256', json_encode(self::finalClosePersonnelHashInput($row), JSON_THROW_ON_ERROR));
     }
 
     public static function detail(Request $request, $personelId)

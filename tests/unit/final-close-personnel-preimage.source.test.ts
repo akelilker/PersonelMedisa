@@ -14,16 +14,19 @@ const readBody = controller.slice(
 );
 
 describe("final-close bounded personnel preimage read", () => {
-  it("reads the canonical personnel row plus the branch company column, nothing else", () => {
+  it("reads the canonical personeller row plus the branch company alias, nothing else", () => {
     expect(readStart).toBeGreaterThan(-1);
-    expect(readBody).toContain(
-      "'SELECT p.id, p.ad, p.soyad, p.aktif_durum, p.sube_id, s.sirket_id, p.calisma_lokasyonu_id'"
-    );
+    // p.* carries the whole canonical row so the invariant hash keeps its coverage.
+    expect(readBody).toContain("'SELECT p.*, s.sirket_id AS final_close_sirket_id'");
     expect(readBody).toContain("' FROM personeller p'");
     expect(readBody).toContain("' LEFT JOIN subeler s ON s.id = p.sube_id'");
-    expect(readBody).toContain("' WHERE p.id = :id LIMIT 1'");
+    expect(readBody).toContain("' WHERE p.id = :id'");
+    expect(readBody).toContain("' LIMIT 1'");
+    // The narrowed seven-field projection may never come back.
+    expect(readBody).not.toMatch(/SELECT p\.id, p\.ad/);
+    expect(readBody).not.toMatch(/SELECT p\.[a-z_]+(?:,| AS)/);
     // The company of a person is the branch's stored column; only that one
-    // relation may enter the statement.
+    // relation may enter the statement, and it enters under an explicit alias.
     expect(readBody.match(/JOIN\s+[a-z_]+/g) ?? []).toEqual(["JOIN subeler"]);
   });
 
@@ -50,12 +53,29 @@ describe("final-close bounded personnel preimage read", () => {
     }
   });
 
-  it("projects exactly the preimage fields and keeps NULL values as NULL", () => {
+  it("publishes exactly the approved preimage fields and keeps NULL values as NULL", () => {
+    const resultStart = readBody.indexOf("$result = [");
+    const resultBlock = readBody.slice(resultStart, readBody.indexOf("];", resultStart));
+    const resultKeys = [...resultBlock.matchAll(/^\s*'([a-z_]+)' =>/gm)].map((match) => match[1]);
+    expect(resultKeys).toEqual([
+      "id",
+      "ad",
+      "soyad",
+      "aktif_durum",
+      "sube_id",
+      "sirket_id",
+      "calisma_lokasyonu_id",
+    ]);
+    // The response keeps the public field name while the join alias stays internal.
+    expect(resultBlock).toContain(
+      "'sirket_id' => $row['final_close_sirket_id'] === null ? null : (int) $row['final_close_sirket_id'],"
+    );
+    expect(resultBlock).not.toContain("...$row");
+    expect(resultBlock).not.toContain("array_intersect_key");
     expect(readBody).toContain(
-      "foreach (['id', 'ad', 'soyad', 'aktif_durum', 'sube_id', 'sirket_id', 'calisma_lokasyonu_id'] as $column) {"
+      "foreach (['id', 'ad', 'soyad', 'aktif_durum', 'sube_id', 'final_close_sirket_id', 'calisma_lokasyonu_id'] as $column) {"
     );
     expect(readBody).toContain("'sube_id' => $row['sube_id'] === null ? null : (int) $row['sube_id'],");
-    expect(readBody).toContain("'sirket_id' => $row['sirket_id'] === null ? null : (int) $row['sirket_id'],");
     expect(readBody).toContain(
       "'calisma_lokasyonu_id' => $row['calisma_lokasyonu_id'] === null ? null : (int) $row['calisma_lokasyonu_id'],"
     );
@@ -69,14 +89,33 @@ describe("final-close bounded personnel preimage read", () => {
     expect(pkg).toContain("public const PERSONNEL = [200, 201, 203, 204, 205, 206, 209, 210, 212, 217]");
   });
 
-  it("hashes the raw canonical row and keeps the mutable-field exclusions", () => {
+  it("builds the invariant input from the canonical row and keeps the join alias out", () => {
+    expect(readBody).toContain("$result['invariant_hash'] = self::finalClosePersonnelInvariantHash($row);");
+    expect(readBody).toContain("private static function finalClosePersonnelHashInput(array $row): array");
+    expect(readBody).toContain("private static function finalClosePersonnelInvariantHash(array $row): string");
+    // The joined company alias is dropped before hashing, so the branch relation
+    // never becomes part of the personnel-row invariant.
+    expect(readBody).toContain("unset($row['final_close_sirket_id']);");
     expect(readBody).toContain(
       "foreach (['ad', 'soyad', 'calisma_lokasyonu_id', 'calisma_lokasyonu_adi', 'updated_at'] as $key) {"
     );
     expect(readBody).toContain("ksort($row);");
     expect(readBody).toContain(
-      "$result['invariant_hash'] = hash('sha256', json_encode($row, JSON_THROW_ON_ERROR));"
+      "return hash('sha256', json_encode(self::finalClosePersonnelHashInput($row), JSON_THROW_ON_ERROR));"
     );
+    // Never hash the public projection or a joined value.
+    expect(readBody).not.toMatch(/json_encode\(\$result/);
+    expect(readBody).not.toMatch(/json_encode\(\$row\b/);
+  });
+
+  it("keeps the behavioural runner that catches a narrowed hash input", () => {
+    const runner = read("tests/php/FinalClosePersonnelInvariantHashTestRunner.php");
+    const runnerWrapper = read("tests/unit/final-close-personnel-invariant-hash.php-runtime.test.ts");
+    expect(runner).toContain("finalClosePersonnelInvariantHash");
+    expect(runner).toContain("!array_key_exists('final_close_sirket_id', $hashInput)");
+    expect(runner).toContain("'canonical column changes the invariant: ' . $field");
+    expect(runner).toContain("echo 'verify-final-close-personnel-invariant-hash: OK' . PHP_EOL;");
+    expect(runnerWrapper).toContain("verify-final-close-personnel-invariant-hash: OK");
   });
 
   it("fails closed with the personnel owner's bounded codes only", () => {

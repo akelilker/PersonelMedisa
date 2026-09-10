@@ -13,7 +13,7 @@ final class FinalCloseService
     public static function run(array $request, string $apiDirectory, string $publishedSha): array
     {
         FinalClosePackage::validateRequest($request, $publishedSha);
-        $transport = new FinalCloseTransport($apiDirectory);
+        $transport = new FinalCloseTransport();
         $snapshot = $transport->call('snapshot');
         FinalCloseSnapshot::assertApprovedPreimage($snapshot);
         $checksum = FinalCloseSnapshot::checksum($snapshot);

@@ -9,6 +9,8 @@ use Medisa\Api\Controllers\PersonellerController;
 use Medisa\Api\Controllers\YonetimController;
 use Medisa\Api\Controllers\SgkKatalogHazirlikController;
 use Medisa\Api\Database\Connection;
+use Medisa\Api\Http\JsonResponse;
+use Medisa\Api\Http\ResponseCaptured;
 use Medisa\Api\Services\Payroll\SgkSirketPolitikaImportValidator;
 use RuntimeException;
 
@@ -29,11 +31,15 @@ final class FinalCloseOwners
     }
 
     /**
-     * Runs one bounded operation. The read-only 'snapshot' operation returns the
-     * canonical snapshot so the transport can run it in-process; mutation owners
-     * terminate the child HTTP controller response and never return here.
+     * Runs one bounded operation in-process and returns the canonical response
+     * frame (['data' => ..., 'meta' => [], 'errors' => [...]]). The read-only
+     * snapshot returns the snapshot as data; a mutation runs its existing HTTP
+     * controller whose JsonResponse is captured instead of emitted.
+     *
+     * @param array{operation: mixed, expected: mixed, identity_id: mixed} $frame
+     * @return array<string, mixed>
      */
-    public static function invoke(array $frame): ?array
+    public static function invoke(array $frame): array
     {
         if (PHP_SAPI !== 'cli' || array_keys($frame) !== ['operation', 'expected', 'identity_id']) {
             throw new RuntimeException('FINAL_CLOSE_FRAME_INVALID');
@@ -47,9 +53,9 @@ final class FinalCloseOwners
             FinalCloseSnapshot::matches($snapshot['users'][$id], $identity + ['id' => $id, 'durum' => 'AKTIF']);
         }
         if ($op === 'snapshot') {
-            // Read-only canonical snapshot: return the array so the caller can run
-            // without a child process. Mutation operations never take this branch.
-            return $snapshot;
+            // Read-only canonical snapshot: returned as data so the caller can run
+            // without a response scope. Mutation operations never take this branch.
+            return ['data' => $snapshot, 'meta' => [], 'errors' => []];
         }
         if (!is_string($frame['expected']) || !hash_equals(FinalCloseSnapshot::checksum($snapshot), $frame['expected'])) {
             throw new RuntimeException('FINAL_CLOSE_PREIMAGE_DRIFT');
@@ -107,10 +113,34 @@ final class FinalCloseOwners
             }
         }
         $request = new FinalCloseOwnerRequest($op, $actor, $body);
-        // No synthetic role/scope, cache override, password-change bypass or public token.
-        $authenticated = AuthMiddleware::authenticate($request, true);
-        FinalCloseSnapshot::matches($authenticated, ['id' => $actor] + FinalClosePackage::USERS[$actor]);
-        if ($id === null) { $controller::$method($request); } else { $controller::$method($request, $id); }
-        throw new RuntimeException('FINAL_CLOSE_OWNER_RESPONSE_MISSING');
+        // One long-lived worker runs several actors; re-derive identity per operation
+        // instead of reusing the first request's cached user.
+        AuthMiddleware::forgetAuthenticatedUser();
+        // The canonical HTTP controllers answer through JsonResponse, which emits and
+        // exits on the web. Inside this trusted CLI scope the response is captured
+        // (first response wins, matching exit) so the controller can run in-process;
+        // no route, token, synthetic role/scope or mutation API is added.
+        $captured = null;
+        JsonResponse::beginCapture();
+        try {
+            // No synthetic role/scope, cache override, password-change bypass or public token.
+            $authenticated = AuthMiddleware::authenticate($request, true);
+            FinalCloseSnapshot::matches($authenticated, ['id' => $actor] + FinalClosePackage::USERS[$actor]);
+            if ($id === null) { $controller::$method($request); } else { $controller::$method($request, $id); }
+            $captured = JsonResponse::capturedResponse();
+        } catch (ResponseCaptured $response) {
+            $captured = JsonResponse::capturedResponse();
+        } catch (\Throwable $error) {
+            // A response already produced before this secondary error is
+            // authoritative: on the web exit() would have prevented the later code.
+            $captured = JsonResponse::capturedResponse();
+            if ($captured === null) { throw $error; }
+        } finally {
+            JsonResponse::endCapture();
+        }
+        if (!is_array($captured)) {
+            throw new RuntimeException('FINAL_CLOSE_OWNER_RESPONSE_MISSING');
+        }
+        return $captured;
     }
 }

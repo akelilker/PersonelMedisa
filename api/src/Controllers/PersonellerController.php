@@ -184,35 +184,91 @@ class PersonellerController
         );
     }
 
-    /** Narrow CLI read: no archive-view audit or unrelated personnel fields. */
+    /**
+     * Narrow CLI read for the final-close preimage only.
+     *
+     * The personnel screen read (personelSelectSql + fetchPersonelRowById) joins the
+     * display read models, so a screen-level dependency (departman/gorev/personel
+     * tipi, SGK employer, derived branch name) could decide whether a bounded
+     * production preflight may run. The canonical model stores no company on the
+     * personnel row — a person's company derives from the branch — so this reader
+     * takes the canonical personnel row itself (the invariant source) plus the
+     * branch's company column under one explicit alias, in a single statement.
+     * A branchless person keeps a NULL company: nothing is backfilled and no
+     * read-model fallback runs.
+     */
     public static function finalCloseRead(int $personelId): array
     {
         if (PHP_SAPI !== 'cli' || !in_array($personelId, \Medisa\Api\Services\Operations\FinalClosePackage::PERSONNEL, true)) {
             throw new \RuntimeException('FINAL_CLOSE_PERSONNEL_FORBIDDEN');
         }
-        $row = self::fetchPersonelRowById(Connection::get(), $personelId);
+        $pdo = Connection::get();
+        try {
+            // p.* keeps the whole canonical personnel row available to the invariant
+            // hash; the alias keeps the joined company out of that row's namespace.
+            $stmt = $pdo->prepare(
+                'SELECT p.*, s.sirket_id AS final_close_sirket_id'
+                . ' FROM personeller p'
+                . ' LEFT JOIN subeler s ON s.id = p.sube_id'
+                . ' WHERE p.id = :id'
+                . ' LIMIT 1'
+            );
+            $stmt->execute(['id' => $personelId]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        } catch (\PDOException $error) {
+            // A canonical column that cannot be read is a bounded projection failure,
+            // never a partially derived or guessed preimage.
+            throw new \RuntimeException('FINAL_CLOSE_PERSONNEL_PROJECTION_INCOMPLETE');
+        }
         if (!$row) {
             throw new \RuntimeException('FINAL_CLOSE_PERSONNEL_MISSING');
         }
-        $result = array_intersect_key($row, array_flip(['id', 'ad', 'soyad', 'aktif_durum', 'sube_id', 'sirket_id', 'calisma_lokasyonu_id']));
-        if (!array_key_exists('sirket_id', $result)) {
-            $branch = $row['sube_id'] === null ? null
-                : \Medisa\Api\Services\Organizasyon\OrganizasyonService::readSube(Connection::get(), (int) $row['sube_id']);
-            $result['sirket_id'] = $branch['sirket']['id'] ?? null;
-        }
-        foreach (['id', 'sube_id', 'sirket_id', 'calisma_lokasyonu_id'] as $key) {
-            if (!array_key_exists($key, $result)) {
+        foreach (['id', 'ad', 'soyad', 'aktif_durum', 'sube_id', 'final_close_sirket_id', 'calisma_lokasyonu_id'] as $column) {
+            if (!array_key_exists($column, $row)) {
                 throw new \RuntimeException('FINAL_CLOSE_PERSONNEL_PROJECTION_INCOMPLETE');
             }
-            $result[$key] = $result[$key] === null ? null : (int) $result[$key];
         }
+        // Public projection: only the approved preimage fields leave this owner. The
+        // company is the branch's canonical column and a NULL branch stays NULL.
+        $result = [
+            'id' => (int) $row['id'],
+            'ad' => $row['ad'],
+            'soyad' => $row['soyad'],
+            'aktif_durum' => $row['aktif_durum'],
+            'sube_id' => $row['sube_id'] === null ? null : (int) $row['sube_id'],
+            'sirket_id' => $row['final_close_sirket_id'] === null ? null : (int) $row['final_close_sirket_id'],
+            'calisma_lokasyonu_id' => $row['calisma_lokasyonu_id'] === null ? null : (int) $row['calisma_lokasyonu_id'],
+        ];
+        $result['invariant_hash'] = self::finalClosePersonnelInvariantHash($row);
+
+        return $result;
+    }
+
+    /**
+     * Canonical personnel invariant input: every column the personeller row owns,
+     * minus the fields this package mutates. The branch join is not part of the
+     * personnel invariant, so its alias is always dropped — the branch relation is
+     * attested by the branch preimage owner, never by the personnel-row hash.
+     *
+     * @param array<string, mixed> $row canonical personnel row (p.*) with the join alias
+     * @return array<string, mixed>
+     */
+    private static function finalClosePersonnelHashInput(array $row): array
+    {
+        unset($row['final_close_sirket_id']);
         // Hash only: unrelated identity/contact/salary data never leaves this owner.
         foreach (['ad', 'soyad', 'calisma_lokasyonu_id', 'calisma_lokasyonu_adi', 'updated_at'] as $key) {
             unset($row[$key]);
         }
         ksort($row);
-        $result['invariant_hash'] = hash('sha256', json_encode($row, JSON_THROW_ON_ERROR));
-        return $result;
+
+        return $row;
+    }
+
+    /** @param array<string, mixed> $row canonical personnel row (p.*) with the join alias */
+    private static function finalClosePersonnelInvariantHash(array $row): string
+    {
+        return hash('sha256', json_encode(self::finalClosePersonnelHashInput($row), JSON_THROW_ON_ERROR));
     }
 
     public static function detail(Request $request, $personelId)

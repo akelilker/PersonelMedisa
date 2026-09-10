@@ -15,6 +15,13 @@ final class FinalCloseService
         FinalClosePackage::validateRequest($request, $publishedSha);
         $transport = new FinalCloseTransport();
         $snapshot = $transport->call('snapshot');
+        // Read-only all-drift diagnostic: a preflight reports every approved-preimage
+        // mismatch in one bounded, PII-free list instead of stopping at the first one.
+        // The mutation path keeps its fail-closed first-mismatch guard below.
+        $drifts = FinalCloseSnapshot::approvedPreimageDrifts($snapshot);
+        if ($request['mode'] === 'FINAL_CLOSE_PREFLIGHT' && $drifts !== []) {
+            return self::preflightDriftReport($request, $publishedSha, $drifts);
+        }
         FinalCloseSnapshot::assertApprovedPreimage($snapshot);
         $checksum = FinalCloseSnapshot::checksum($snapshot);
         $directory = MigrationBackupService::operationsDirectory($apiDirectory);
@@ -94,6 +101,30 @@ final class FinalCloseService
             self::writeEvidence($marker . '.receipt.json', $report);
         }
         return $report;
+    }
+
+    /**
+     * Bounded, PII-free FAILED preflight evidence. It carries no snapshot, no raw
+     * expected/actual value, no exception text or SQL and no freshly computed APPLY
+     * authorization checksum, so a failed preflight can never be replayed as an APPLY
+     * authorization: FinalClosePackage::validateRequest still demands a 64-char
+     * preflight checksum for FINAL_CLOSE_APPLY.
+     *
+     * @param array<string, mixed> $request
+     * @param array<int, string> $drifts
+     * @return array<string, mixed>
+     */
+    private static function preflightDriftReport(array $request, string $publishedSha, array $drifts): array
+    {
+        return [
+            'request_id' => $request['request_id'], 'mode' => $request['mode'],
+            'package_id' => FinalClosePackage::ID, 'deployed_sha' => $publishedSha,
+            'preflight_checksum' => null, 'result' => 'FAIL',
+            'operations' => FinalCloseOwners::operations(), 'readiness_blockers' => [],
+            'production_mutation_count' => 0,
+            'preimage_drift_count' => count($drifts),
+            'preimage_drifts' => array_values($drifts),
+        ];
     }
 
     /**

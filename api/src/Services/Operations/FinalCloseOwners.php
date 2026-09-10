@@ -49,13 +49,20 @@ final class FinalCloseOwners
             throw new RuntimeException('FINAL_CLOSE_OPERATION_FORBIDDEN');
         }
         $snapshot = FinalCloseSnapshot::collect();
-        foreach (FinalClosePackage::USERS as $id => $identity) {
-            FinalCloseSnapshot::matches($snapshot['users'][$id], $identity + ['id' => $id, 'durum' => 'AKTIF']);
-        }
         if ($op === 'snapshot') {
             // Read-only canonical snapshot: returned as data so the caller can run
             // without a response scope. Mutation operations never take this branch.
+            // The read-only path hands the raw canonical snapshot to its caller: the
+            // approved-preimage comparison is the snapshot's own canonical diagnostic
+            // owner (FinalCloseSnapshot::approvedPreimageDrifts), so a drift cannot
+            // stop the snapshot from being read.
             return ['data' => $snapshot, 'meta' => [], 'errors' => []];
+        }
+        // Mutation operations keep the fail-closed identity frame guard: a drifted
+        // user row must never reach a canonical write. FinalCloseService re-verifies
+        // the whole approved preimage before it authorizes anything.
+        foreach (FinalClosePackage::USERS as $id => $identity) {
+            FinalCloseSnapshot::matches($snapshot['users'][$id], $identity + ['id' => $id, 'durum' => 'AKTIF']);
         }
         if (!is_string($frame['expected']) || !hash_equals(FinalCloseSnapshot::checksum($snapshot), $frame['expected'])) {
             throw new RuntimeException('FINAL_CLOSE_PREIMAGE_DRIFT');

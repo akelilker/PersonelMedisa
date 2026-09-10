@@ -21,31 +21,75 @@ final class FinalCloseSnapshot
         if (PHP_SAPI !== 'cli') {
             throw new RuntimeException('FINAL_CLOSE_CLI_ONLY');
         }
-        $pdo = Connection::get();
+        $pdo = self::read('CONNECTION', static function () {
+            return Connection::get();
+        });
         $snapshot = ['personnel' => [], 'users' => [], 'actors' => [], 'branches' => [], 'policies' => []];
-        foreach (FinalClosePackage::PERSONNEL as $id) {
-            $snapshot['personnel'][$id] = PersonellerController::finalCloseRead($id);
-        }
-        foreach (FinalClosePackage::USERS as $id => $identity) {
-            $snapshot['users'][$id] = YonetimController::finalCloseRead($id);
-            $snapshot['actors'][$id] = ActorIdentityService::readForUser($pdo, $id);
-        }
-        if (!SubeSorumluYoneticiSchema::isReady($pdo)) {
-            throw new RuntimeException('FINAL_CLOSE_MANAGER_SCHEMA_REQUIRED');
-        }
-        foreach (OrganizasyonService::listSubeler($pdo) as $branch) {
-            $snapshot['branches'][(int) $branch['id']] = $branch;
-        }
-        foreach ([12, 13] as $id) {
-            $snapshot['policies'][$id] = SgkSirketPolitikaReadService::listRevisionInventory($pdo, $id, '2026-08-01', '9999-12-31');
-            foreach ($snapshot['policies'][$id] as &$policy) {
-                foreach (['hazirlayan_id', 'onaylayan_id'] as $key) {
-                    $policy[$key] = $policy[$key] === null ? null : (int) $policy[$key];
-                }
+        self::read('PERSONNEL_READ', static function () use ($pdo, &$snapshot) {
+            foreach (FinalClosePackage::PERSONNEL as $id) {
+                $snapshot['personnel'][$id] = PersonellerController::finalCloseRead($id);
             }
-            unset($policy);
-        }
+        });
+        self::read('USER_READ', static function () use ($pdo, &$snapshot) {
+            foreach (FinalClosePackage::USERS as $id => $identity) {
+                $snapshot['users'][$id] = YonetimController::finalCloseRead($id);
+            }
+        });
+        self::read('ACTOR_READ', static function () use ($pdo, &$snapshot) {
+            foreach (FinalClosePackage::USERS as $id => $identity) {
+                $snapshot['actors'][$id] = ActorIdentityService::readForUser($pdo, $id);
+            }
+        });
+        self::read('BRANCH_READ', static function () use ($pdo, &$snapshot) {
+            if (!SubeSorumluYoneticiSchema::isReady($pdo)) {
+                throw new RuntimeException('FINAL_CLOSE_MANAGER_SCHEMA_REQUIRED');
+            }
+            foreach (OrganizasyonService::listSubeler($pdo) as $branch) {
+                $snapshot['branches'][(int) $branch['id']] = $branch;
+            }
+        });
+        self::read('POLICY_READ', static function () use ($pdo, &$snapshot) {
+            foreach ([12, 13] as $id) {
+                $snapshot['policies'][$id] = SgkSirketPolitikaReadService::listRevisionInventory($pdo, $id, '2026-08-01', '9999-12-31');
+                foreach ($snapshot['policies'][$id] as &$policy) {
+                    foreach (['hazirlayan_id', 'onaylayan_id'] as $key) {
+                        $policy[$key] = $policy[$key] === null ? null : (int) $policy[$key];
+                    }
+                }
+                unset($policy);
+            }
+        });
         return $snapshot;
+    }
+
+    /**
+     * Runs one read boundary and converts an unknown throwable into a bounded stage
+     * code so an opaque PHP Error (for example "Call to a member function ... on
+     * null") becomes attributable instead of surfacing as a bare, uninformative
+     * detail. Known bounded single-token FINAL_CLOSE/BACKUP/domain codes are kept
+     * verbatim; raw exception text, SQL, PII and credentials are never surfaced.
+     *
+     * @param callable $read
+     * @return mixed
+     */
+    private static function read(string $step, callable $read)
+    {
+        try {
+            return $read();
+        } catch (\Throwable $error) {
+            $message = $error->getMessage();
+            if (is_string($message) && preg_match('/^[A-Z][A-Z0-9_]{2,100}$/D', $message) === 1) {
+                throw $error;
+            }
+            // Some domain owners carry their bounded code on a public property while
+            // getMessage() holds human text; surface that code instead of hiding it.
+            $vars = get_object_vars($error);
+            if (isset($vars['errorCode']) && is_string($vars['errorCode'])
+                && preg_match('/^[A-Z][A-Z0-9_]{2,100}$/D', $vars['errorCode']) === 1) {
+                throw new RuntimeException($vars['errorCode']);
+            }
+            throw new RuntimeException('FINAL_CLOSE_SNAPSHOT_' . $step . '_FAILED');
+        }
     }
 
     public static function assertApprovedPreimage(array $s): void

@@ -6,6 +6,36 @@ namespace Medisa\Api\Http;
 
 class JsonResponse
 {
+    /** @var bool */
+    private static $capturing = false;
+
+    /** @var array<string, mixed>|null First response produced inside the active capture scope. */
+    private static $captured = null;
+
+    /**
+     * Arms the narrow in-process capture scope used by trusted CLI owners. Outside
+     * this scope JsonResponse behaves exactly as before (emit + exit), so web
+     * behaviour is unchanged.
+     */
+    public static function beginCapture(): void
+    {
+        self::$capturing = true;
+        self::$captured = null;
+    }
+
+    /** Disarms capture and clears the captured response. Safe to call repeatedly. */
+    public static function endCapture(): void
+    {
+        self::$capturing = false;
+        self::$captured = null;
+    }
+
+    /** @return array<string, mixed>|null */
+    public static function capturedResponse()
+    {
+        return self::$captured;
+    }
+
     /** @param mixed $data */
     public static function success($data, $meta = [], $status = 200)
     {
@@ -70,6 +100,16 @@ class JsonResponse
     /** @param array<string, mixed> $payload */
     private static function send(array $payload, $status)
     {
+        if (self::$capturing) {
+            // Mirror exit() semantics without terminating the CLI worker: only the
+            // first response wins (as it would on the web) and a signal unwinds the
+            // controller so the capture scope can return the payload.
+            if (self::$captured === null) {
+                self::$captured = $payload;
+            }
+            throw new ResponseCaptured();
+        }
+
         if (!headers_sent()) {
             header('Content-Type: application/json; charset=utf-8');
             http_response_code((int) $status);

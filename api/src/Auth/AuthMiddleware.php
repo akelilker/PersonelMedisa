@@ -26,6 +26,17 @@ class AuthMiddleware
         }
     }
 
+    /**
+     * Clears the request-scoped cached user so the next authenticate() call
+     * re-derives the identity. Trusted in-process CLI owners run several actors
+     * (each with its own JWT) inside one worker process, so without this a stale
+     * cache would answer every later operation as the first actor.
+     */
+    public static function forgetAuthenticatedUser()
+    {
+        self::$user = null;
+    }
+
     /** @return array<string, mixed>|null */
     public static function authenticate(Request $request, $required = true, $allowPasswordChangeRequired = false)
     {

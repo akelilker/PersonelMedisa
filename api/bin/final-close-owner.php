@@ -12,18 +12,16 @@ try {
     $frame = json_decode($input, true, 32, JSON_THROW_ON_ERROR);
     if (!is_array($frame)) { throw new RuntimeException('FINAL_CLOSE_FRAME_INVALID'); }
     $data = \Medisa\Api\Services\Operations\FinalCloseOwners::invoke($frame);
-    // The read-only snapshot operation returns the snapshot; encode it in the same
-    // frame shape JsonResponse::success produces so the transport contract is
-    // identical for child and in-process execution. Mutation owners exit the
-    // controller response and never reach this point.
-    if (is_array($data)) {
-        echo json_encode(['data' => $data, 'meta' => [], 'errors' => []], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-        exit(0);
-    }
-    throw new RuntimeException('FINAL_CLOSE_OWNER_RESPONSE_MISSING');
+    // FinalCloseOwners::invoke now always returns the canonical response frame
+    // (['data' => ..., 'meta' => [], 'errors' => [...]]); the controller's
+    // JsonResponse is captured there instead of emitted/exiting, so this CLI
+    // wrapper emits the frame unchanged. The worker no longer spawns this binary
+    // (no proc_open), but it stays a compatible, web-inaccessible CLI entry.
+    echo json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    exit(0);
 } catch (\Throwable $error) {
     // Never emit exception messages from PDO, secrets, or personnel payloads.
     $reason = preg_match('/^FINAL_CLOSE_[A-Z_]+$/D', $error->getMessage()) ? $error->getMessage() : 'FINAL_CLOSE_OWNER_FAILED';
-    echo json_encode(['data' => null, 'errors' => [['code' => $reason]]]);
+    echo json_encode(['data' => null, 'meta' => [], 'errors' => [['code' => $reason]]]);
     exit(1);
 }

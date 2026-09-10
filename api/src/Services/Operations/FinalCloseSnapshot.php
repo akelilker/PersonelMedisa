@@ -9,7 +9,6 @@ use Medisa\Api\Controllers\YonetimController;
 use Medisa\Api\Database\Connection;
 use Medisa\Api\Services\Auth\ActorIdentityService;
 use Medisa\Api\Services\Organizasyon\OrganizasyonService;
-use Medisa\Api\Services\Organizasyon\SubeSorumluYoneticiSchema;
 use Medisa\Api\Services\Payroll\SgkSirketPolitikaReadService;
 use RuntimeException;
 
@@ -41,12 +40,13 @@ final class FinalCloseSnapshot
             }
         });
         self::read('BRANCH_READ', static function () use ($pdo, &$snapshot) {
-            if (!SubeSorumluYoneticiSchema::isReady($pdo)) {
-                throw new RuntimeException('FINAL_CLOSE_MANAGER_SCHEMA_REQUIRED');
-            }
-            foreach (OrganizasyonService::listSubeler($pdo) as $branch) {
-                $snapshot['branches'][(int) $branch['id']] = $branch;
-            }
+            // Bounded owner read: only the compiled target branches, only the
+            // preimage fields. The general UI branch read model stays out of the
+            // final-close path so a screen-level dependency cannot fail it.
+            $snapshot['branches'] = OrganizasyonService::readFinalCloseBranchPreimage(
+                $pdo,
+                array_keys(FinalClosePackage::MANAGERS)
+            );
         });
         self::read('POLICY_READ', static function () use ($pdo, &$snapshot) {
             foreach ([12, 13] as $id) {
@@ -109,11 +109,13 @@ final class FinalCloseSnapshot
         self::matches($s['users'][50], ['sube_ids' => [2]]);
         self::matches($s['actors'][110], ['actor_identity_id' => null, 'actor_status' => null]);
         self::matches($s['actors'][11], ['actor_status' => 'VERIFIED']);
-        foreach ($s['branches'] as $branch) {
-            self::matches($branch, ['sorumlu_yonetici_user_ids' => []]);
-        }
+        // Only the compiled target branches are attested. Every other branch
+        // (Kayseri/Kübra and the rest) stays outside the snapshot, the preimage
+        // check and therefore outside the write scope.
         foreach (array_keys(FinalClosePackage::MANAGERS) as $id) {
-            self::matches($s['branches'][$id] ?? [], ['id' => $id, 'durum' => 'AKTIF']);
+            self::matches($s['branches'][$id] ?? [], [
+                'id' => $id, 'durum' => 'AKTIF', 'sorumlu_yonetici_user_ids' => [],
+            ]);
         }
         if (($s['policies'][12] ?? null) !== [] || ($s['policies'][13] ?? null) !== []) {
             throw new RuntimeException('FINAL_CLOSE_POLICY_PREIMAGE_DRIFT');

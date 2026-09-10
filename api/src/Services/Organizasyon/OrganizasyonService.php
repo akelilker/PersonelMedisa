@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Medisa\Api\Services\Organizasyon;
 
 use PDO;
+use RuntimeException;
 
 /**
  * Canonical organisation domain owner: sirket -> (sgk_isveren | sube) -> lokasyon.
@@ -179,6 +180,74 @@ final class OrganizasyonService
             $pdo,
             self::attachMuhasebeYetkiPayloads($pdo, $items)
         );
+    }
+
+    /**
+     * Bounded branch preimage read for the final-close package only.
+     *
+     * The general UI read model (listSubeler) is deliberately not reused here: its
+     * departman GROUP BY and muhasebe/manager payload joins describe the whole
+     * branch catalogue for the screens, so an unrelated screen-level dependency
+     * could decide whether a bounded production preflight may run. This reader
+     * answers exactly three questions for the named targets — does the branch
+     * exist, is it AKTIF, which manager ids are recorded — and it fails closed
+     * with a bounded code instead of letting driver text escape.
+     *
+     * @param array<int, int> $subeIds only the compiled target branch ids
+     * @return array<int, array{id: int, durum: string, sorumlu_yonetici_user_ids: array<int, int>}>
+     */
+    public static function readFinalCloseBranchPreimage(PDO $pdo, array $subeIds): array
+    {
+        $ids = [];
+        foreach ($subeIds as $subeId) {
+            $id = is_int($subeId) ? $subeId : 0;
+            if ($id <= 0) {
+                throw new RuntimeException('FINAL_CLOSE_BRANCH_TARGET_INVALID');
+            }
+            $ids[$id] = $id;
+        }
+        if (count($ids) === 0) {
+            throw new RuntimeException('FINAL_CLOSE_BRANCH_TARGET_INVALID');
+        }
+
+        // The manager axis is the only relation this preimage owns. An unready
+        // schema must block the preflight instead of reading "no managers".
+        if (!SubeSorumluYoneticiSchema::isReady($pdo)) {
+            throw new RuntimeException('FINAL_CLOSE_MANAGER_SCHEMA_REQUIRED');
+        }
+
+        $placeholders = [];
+        $params = [];
+        foreach (array_values($ids) as $index => $subeId) {
+            $key = 'fcs' . $index;
+            $placeholders[] = ':' . $key;
+            $params[$key] = $subeId;
+        }
+        // Existence and status come from the organization owner itself; only the
+        // projected columns are read, because no UI join is needed to attest a
+        // target branch.
+        $stmt = $pdo->prepare(
+            'SELECT id, durum FROM subeler WHERE id IN (' . implode(', ', $placeholders) . ') ORDER BY id ASC'
+        );
+        $stmt->execute($params);
+
+        $managerIds = SubeSorumluYoneticiSchema::loadSubeUserMap($pdo, array_values($ids));
+        $branches = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $id = (int) $row['id'];
+            $branches[$id] = [
+                'id' => $id,
+                'durum' => strtoupper(trim((string) ($row['durum'] ?? ''))),
+                'sorumlu_yonetici_user_ids' => array_values($managerIds[$id] ?? []),
+            ];
+        }
+        foreach ($ids as $id) {
+            if (!isset($branches[$id])) {
+                throw new RuntimeException('FINAL_CLOSE_BRANCH_MISSING');
+            }
+        }
+
+        return $branches;
     }
 
     /** @return array<string, mixed>|null */

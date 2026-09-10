@@ -21,7 +21,6 @@ final class FinalClosePostcheck
             $id = (int) substr($op, 7);
             FinalCloseSnapshot::matches($after['branches'][$id], ['sorumlu_yonetici_user_ids' => [FinalClosePackage::MANAGERS[$id]]]);
             $expected['branches'][$id]['sorumlu_yonetici_user_ids'] = $after['branches'][$id]['sorumlu_yonetici_user_ids'];
-            $expected['branches'][$id]['sorumlu_yoneticiler'] = $after['branches'][$id]['sorumlu_yoneticiler'];
         } elseif (strpos($op, 'scope') === 0) {
             $id = (int) substr($op, 5);
             $expected['users'][$id]['sube_ids'] = FinalClosePackage::scopesAfter($id);

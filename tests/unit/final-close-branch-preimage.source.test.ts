@@ -70,11 +70,56 @@ describe("final-close bounded branch preimage read", () => {
     expect(narrowBody).toContain("throw new RuntimeException('FINAL_CLOSE_BRANCH_TABLE_READ_FAILED')");
     expect(narrowBody).toContain("throw new RuntimeException('FINAL_CLOSE_MANAGER_MAP_READ_FAILED')");
     // Two live reads, two bounded boundaries: the reads are never merged behind a
-    // single catch, so one failure can no longer mask the other.
-    expect((narrowBody.match(/catch \(\\Throwable \$error\) \{/g) ?? []).length).toBe(2);
+    // single catch, so one failure can no longer mask the other. The remaining
+    // reads (schema probe, both normalizations, target assertion) each own a
+    // boundary as well, so nothing attributable can escape to the caller.
+    expect((narrowBody.match(/catch \(\\Throwable \$error\) \{/g) ?? []).length).toBe(6);
     // The bounded code is the whole surfaced value: no driver/SQL text is attached.
     expect(narrowBody).not.toContain("getMessage()");
     expect(narrowBody).not.toContain("errorInfo");
+  });
+
+  it("attributes every remaining owner stage to its own bounded code", () => {
+    const schemaProbe = narrowBody.indexOf("SubeSorumluYoneticiSchema::isReady($pdo)");
+    const schemaCheckCode = narrowBody.indexOf("FINAL_CLOSE_MANAGER_SCHEMA_CHECK_FAILED");
+    const schemaRequired = narrowBody.indexOf(
+      "throw new RuntimeException('FINAL_CLOSE_MANAGER_SCHEMA_REQUIRED')"
+    );
+    const mapCode = narrowBody.indexOf("FINAL_CLOSE_MANAGER_MAP_READ_FAILED");
+    const mapNormalizeLoop = narrowBody.indexOf("$managerIds[$id] = array_values($managerIds[$id] ?? []);");
+    const mapNormalizeCode = narrowBody.indexOf("FINAL_CLOSE_MANAGER_MAP_NORMALIZE_FAILED");
+    const rowGuard = narrowBody.indexOf("if (!is_array($row) || (int) ($row['id'] ?? 0) <= 0) {");
+    const rowNormalizeCode = narrowBody.indexOf(
+      "throw new RuntimeException('FINAL_CLOSE_BRANCH_ROW_NORMALIZE_FAILED')"
+    );
+    const assertionProbe = narrowBody.indexOf("$missing[] = $id;");
+    const assertionCode = narrowBody.indexOf("FINAL_CLOSE_BRANCH_ASSERTION_FAILED");
+    const missingThrow = narrowBody.indexOf("throw new RuntimeException('FINAL_CLOSE_BRANCH_MISSING')");
+
+    // Each stage sits inside its own boundary, in owner order.
+    expect(schemaProbe).toBeGreaterThan(-1);
+    expect(schemaCheckCode).toBeGreaterThan(schemaProbe);
+    expect(schemaRequired).toBeGreaterThan(schemaCheckCode);
+    expect(mapNormalizeLoop).toBeGreaterThan(mapCode);
+    expect(mapNormalizeCode).toBeGreaterThan(mapNormalizeLoop);
+    expect(rowGuard).toBeGreaterThan(mapNormalizeCode);
+    expect(rowNormalizeCode).toBeGreaterThan(rowGuard);
+    expect(assertionProbe).toBeGreaterThan(rowNormalizeCode);
+    expect(assertionCode).toBeGreaterThan(assertionProbe);
+    // The target assertion keeps its own code: "branch missing" is still only
+    // reached by a target the read did not answer for.
+    expect(missingThrow).toBeGreaterThan(assertionCode);
+    expect(narrowBody).toContain("throw new RuntimeException('FINAL_CLOSE_BRANCH_TARGET_INVALID')");
+    expect(narrowBody).toContain("throw new RuntimeException('FINAL_CLOSE_BRANCH_ASSERTION_FAILED')");
+    expect(narrowBody).toContain("throw new RuntimeException('FINAL_CLOSE_MANAGER_SCHEMA_CHECK_FAILED')");
+    expect(narrowBody).toContain("throw new RuntimeException('FINAL_CLOSE_MANAGER_MAP_NORMALIZE_FAILED')");
+    // No owner code can be the caller's generic stage code, and every owner throw
+    // is a bounded literal rather than a concatenated/derived string.
+    expect(narrowBody).not.toContain("FINAL_CLOSE_SNAPSHOT_");
+    const throws = narrowBody.match(/throw new RuntimeException\(/g) ?? [];
+    const literalThrows = narrowBody.match(/throw new RuntimeException\('[A-Z][A-Z0-9_]{2,100}'\)/g) ?? [];
+    expect(throws.length).toBeGreaterThan(0);
+    expect(literalThrows.length).toBe(throws.length);
   });
 
   it("keeps the caller from collapsing the compiled codes into a generic stage code", () => {

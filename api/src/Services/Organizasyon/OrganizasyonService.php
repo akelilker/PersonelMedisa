@@ -193,6 +193,15 @@ final class OrganizasyonService
      * exist, is it AKTIF, which manager ids are recorded — and it fails closed
      * with a bounded code instead of letting driver text escape.
      *
+     * Every runtime surface of this owner answers a bounded single-token code, so
+     * a caller that wraps unknown throwables (FinalCloseSnapshot::read()) can never
+     * fall back to its generic stage code for an attributable failure:
+     * FINAL_CLOSE_BRANCH_TARGET_INVALID, FINAL_CLOSE_MANAGER_SCHEMA_CHECK_FAILED,
+     * FINAL_CLOSE_MANAGER_SCHEMA_REQUIRED, FINAL_CLOSE_BRANCH_TABLE_READ_FAILED,
+     * FINAL_CLOSE_MANAGER_MAP_READ_FAILED, FINAL_CLOSE_MANAGER_MAP_NORMALIZE_FAILED,
+     * FINAL_CLOSE_BRANCH_ROW_NORMALIZE_FAILED, FINAL_CLOSE_BRANCH_ASSERTION_FAILED
+     * and FINAL_CLOSE_BRANCH_MISSING. Raw driver/SQL text is never attached.
+     *
      * @param array<int, int> $subeIds only the compiled target branch ids
      * @return array<int, array{id: int, durum: string, sorumlu_yonetici_user_ids: array<int, int>}>
      */
@@ -210,9 +219,18 @@ final class OrganizasyonService
             throw new RuntimeException('FINAL_CLOSE_BRANCH_TARGET_INVALID');
         }
 
+        // Narrow stage: the schema-ready probe of the manager owner. A probe that
+        // cannot answer at all (a missing owner file or an engine-level error at
+        // the call site, before the probe body runs) is attributed here and never
+        // to a read of the target branch.
+        try {
+            $schemaReady = SubeSorumluYoneticiSchema::isReady($pdo);
+        } catch (\Throwable $error) {
+            throw new RuntimeException('FINAL_CLOSE_MANAGER_SCHEMA_CHECK_FAILED');
+        }
         // The manager axis is the only relation this preimage owns. An unready
         // schema must block the preflight instead of reading "no managers".
-        if (!SubeSorumluYoneticiSchema::isReady($pdo)) {
+        if ($schemaReady !== true) {
             throw new RuntimeException('FINAL_CLOSE_MANAGER_SCHEMA_REQUIRED');
         }
 
@@ -251,19 +269,50 @@ final class OrganizasyonService
             throw new RuntimeException('FINAL_CLOSE_MANAGER_MAP_READ_FAILED');
         }
 
-        $branches = [];
-        foreach ($rows as $row) {
-            $id = (int) $row['id'];
-            $branches[$id] = [
-                'id' => $id,
-                'durum' => strtoupper(trim((string) ($row['durum'] ?? ''))),
-                'sorumlu_yonetici_user_ids' => array_values($managerIds[$id] ?? []),
-            ];
-        }
-        foreach ($ids as $id) {
-            if (!isset($branches[$id])) {
-                throw new RuntimeException('FINAL_CLOSE_BRANCH_MISSING');
+        // Narrow stage: manager-map result normalization. A map entry that is not
+        // the owned list shape must fail closed here instead of degrading into
+        // "no managers recorded" or escaping as a bare PHP Error.
+        try {
+            foreach ($ids as $id) {
+                $managerIds[$id] = array_values($managerIds[$id] ?? []);
             }
+        } catch (\Throwable $error) {
+            throw new RuntimeException('FINAL_CLOSE_MANAGER_MAP_NORMALIZE_FAILED');
+        }
+
+        // Narrow stage: target row normalization. A row that is not the owned
+        // shape is a read defect and must never be reported as a missing target.
+        try {
+            $branches = [];
+            foreach ($rows as $row) {
+                if (!is_array($row) || (int) ($row['id'] ?? 0) <= 0) {
+                    throw new RuntimeException('FINAL_CLOSE_BRANCH_ROW_NORMALIZE_FAILED');
+                }
+                $id = (int) $row['id'];
+                $branches[$id] = [
+                    'id' => $id,
+                    'durum' => strtoupper(trim((string) ($row['durum'] ?? ''))),
+                    'sorumlu_yonetici_user_ids' => array_values($managerIds[$id] ?? []),
+                ];
+            }
+        } catch (\Throwable $error) {
+            throw new RuntimeException('FINAL_CLOSE_BRANCH_ROW_NORMALIZE_FAILED');
+        }
+
+        // Narrow stage: target assertion. Only a target the read did not answer
+        // for is a missing branch; anything unexpected here keeps its own code.
+        $missing = [];
+        try {
+            foreach ($ids as $id) {
+                if (!isset($branches[$id])) {
+                    $missing[] = $id;
+                }
+            }
+        } catch (\Throwable $error) {
+            throw new RuntimeException('FINAL_CLOSE_BRANCH_ASSERTION_FAILED');
+        }
+        if (count($missing) > 0) {
+            throw new RuntimeException('FINAL_CLOSE_BRANCH_MISSING');
         }
 
         return $branches;

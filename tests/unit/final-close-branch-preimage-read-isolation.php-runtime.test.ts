@@ -44,5 +44,34 @@ describe("final-close branch preimage read isolation php runtime", () => {
     expect(result.stdout).toContain(
       "[PASS] surfaced target-read failure is the bounded code only"
     );
+    // The remaining owner stages answer their own bounded code too: a target read
+    // that is not the owned row shape must never read as a missing branch or as
+    // the caller's generic stage code.
+    expect(result.stdout).toContain(
+      "[PASS] non-array target row => FINAL_CLOSE_BRANCH_ROW_NORMALIZE_FAILED"
+    );
+    expect(result.stdout).toContain(
+      "[PASS] id-less target row => FINAL_CLOSE_BRANCH_ROW_NORMALIZE_FAILED"
+    );
+    expect(result.stdout).toContain(
+      "[PASS] surfaced row-normalize failure is the bounded code only"
+    );
+    // Every owner throw is a bounded literal; the whole inventory is known.
+    expect(result.stdout).toContain("[PASS] owner exposes the full stage code inventory");
+    for (const code of [
+      "FINAL_CLOSE_BRANCH_TARGET_INVALID",
+      "FINAL_CLOSE_MANAGER_SCHEMA_CHECK_FAILED",
+      "FINAL_CLOSE_MANAGER_SCHEMA_REQUIRED",
+      "FINAL_CLOSE_BRANCH_TABLE_READ_FAILED",
+      "FINAL_CLOSE_MANAGER_MAP_READ_FAILED",
+      "FINAL_CLOSE_MANAGER_MAP_NORMALIZE_FAILED",
+      "FINAL_CLOSE_BRANCH_ROW_NORMALIZE_FAILED",
+      "FINAL_CLOSE_BRANCH_ASSERTION_FAILED",
+      "FINAL_CLOSE_BRANCH_MISSING",
+    ]) {
+      expect(result.stdout).toContain(`[PASS] owner code is bounded and known: ${code}`);
+    }
+    // The caller's generic stage code stays unreachable for this owner.
+    expect(result.stdout).not.toContain("FINAL_CLOSE_SNAPSHOT_BRANCH_READ_FAILED");
   });
 });

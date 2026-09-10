@@ -225,15 +225,34 @@ final class OrganizasyonService
         }
         // Existence and status come from the organization owner itself; only the
         // projected columns are read, because no UI join is needed to attest a
-        // target branch.
-        $stmt = $pdo->prepare(
-            'SELECT id, durum FROM subeler WHERE id IN (' . implode(', ', $placeholders) . ') ORDER BY id ASC'
-        );
-        $stmt->execute($params);
+        // target branch. A failure of this one read is attributed to the target
+        // table, so it cannot be mistaken for an unknown branch.
+        try {
+            $stmt = $pdo->prepare(
+                'SELECT id, durum FROM subeler WHERE id IN (' . implode(', ', $placeholders) . ') ORDER BY id ASC'
+            );
+            // A silent-mode driver answers false instead of throwing, so the
+            // statement shape is checked as well as the thrown failure.
+            $rows = $stmt !== false && $stmt->execute($params) === true
+                ? $stmt->fetchAll(PDO::FETCH_ASSOC)
+                : false;
+        } catch (\Throwable $error) {
+            $rows = false;
+        }
+        if (!is_array($rows)) {
+            throw new RuntimeException('FINAL_CLOSE_BRANCH_TABLE_READ_FAILED');
+        }
 
-        $managerIds = SubeSorumluYoneticiSchema::loadSubeUserMap($pdo, array_values($ids));
+        // The manager map is its own canonical read: a failure there must never be
+        // reported as a missing target branch or as "no managers recorded".
+        try {
+            $managerIds = SubeSorumluYoneticiSchema::loadSubeUserMap($pdo, array_values($ids));
+        } catch (\Throwable $error) {
+            throw new RuntimeException('FINAL_CLOSE_MANAGER_MAP_READ_FAILED');
+        }
+
         $branches = [];
-        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        foreach ($rows as $row) {
             $id = (int) $row['id'];
             $branches[$id] = [
                 'id' => $id,

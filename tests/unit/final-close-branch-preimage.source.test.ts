@@ -55,6 +55,36 @@ describe("final-close bounded branch preimage read", () => {
     expect(schema).toContain("return [];");
   });
 
+  it("isolates the target table read and the manager map read on their own bounded codes", () => {
+    const selectIndex = narrowBody.indexOf("'SELECT id, durum FROM subeler WHERE id IN ('");
+    const tableCodeIndex = narrowBody.indexOf("FINAL_CLOSE_BRANCH_TABLE_READ_FAILED");
+    const mapCallIndex = narrowBody.indexOf(
+      "SubeSorumluYoneticiSchema::loadSubeUserMap($pdo, array_values($ids))"
+    );
+    const mapCodeIndex = narrowBody.indexOf("FINAL_CLOSE_MANAGER_MAP_READ_FAILED");
+
+    expect(selectIndex).toBeGreaterThan(-1);
+    expect(tableCodeIndex).toBeGreaterThan(selectIndex);
+    expect(mapCallIndex).toBeGreaterThan(tableCodeIndex);
+    expect(mapCodeIndex).toBeGreaterThan(mapCallIndex);
+    expect(narrowBody).toContain("throw new RuntimeException('FINAL_CLOSE_BRANCH_TABLE_READ_FAILED')");
+    expect(narrowBody).toContain("throw new RuntimeException('FINAL_CLOSE_MANAGER_MAP_READ_FAILED')");
+    // Two live reads, two bounded boundaries: the reads are never merged behind a
+    // single catch, so one failure can no longer mask the other.
+    expect((narrowBody.match(/catch \(\\Throwable \$error\) \{/g) ?? []).length).toBe(2);
+    // The bounded code is the whole surfaced value: no driver/SQL text is attached.
+    expect(narrowBody).not.toContain("getMessage()");
+    expect(narrowBody).not.toContain("errorInfo");
+  });
+
+  it("keeps the caller from collapsing the compiled codes into a generic stage code", () => {
+    const bounded = snapshot.indexOf("/^[A-Z][A-Z0-9_]{2,100}$/D");
+    const generic = snapshot.indexOf("'FINAL_CLOSE_SNAPSHOT_' . $step . '_FAILED'");
+    expect(bounded).toBeGreaterThan(-1);
+    expect(generic).toBeGreaterThan(bounded);
+    expect(snapshot).not.toContain("getMessage() . ");
+  });
+
   it("attests exactly the six target branches as AKTIF with no recorded manager", () => {
     const preimage = snapshot.slice(
       snapshot.indexOf("public static function assertApprovedPreimage"),

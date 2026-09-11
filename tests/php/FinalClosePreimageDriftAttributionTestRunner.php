@@ -90,7 +90,7 @@ function fcpdaPreimage(): array
     foreach (FinalClosePackage::PERSONNEL as $id) {
         $s['personnel'][$id] = ['id' => $id, 'calisma_lokasyonu_id' => null];
     }
-    $s['personnel'][203] = $s['personnel'][203] + ['ad' => 'MUHAMMED IRAKLI', 'soyad' => '', 'aktif_durum' => 'AKTIF', 'sube_id' => 1, 'sirket_id' => 1];
+    $s['personnel'][203] = $s['personnel'][203] + ['ad' => 'MUHAMMED IRAKLI', 'soyad' => null, 'aktif_durum' => 'AKTIF', 'sube_id' => 1, 'sirket_id' => 1];
     $s['personnel'][210] = $s['personnel'][210] + ['sube_id' => 6];
     $s['personnel'][212] = $s['personnel'][212] + ['sube_id' => null, 'sirket_id' => null];
     $s['actors'][110] = ['actor_identity_id' => null, 'actor_status' => null];
@@ -391,7 +391,69 @@ fcpdaAssert(
     'one comparison owner, and its diagnostic block never serializes a value or an exception'
 );
 
-// 16) Final sweep: every token this run produced stays inside the bounded contract the
+// 16) Personel 203 is the single approved expectation whose live shape was re-verified:
+//     the canonical row keeps a NULL surname, so the approved contract expects NULL and
+//     a stale empty string stays a strict drift. NULL and '' are never treated as
+//     equivalent — not by the collector, not by the mutation guard and not by the
+//     generic comparator the apply-phase postcheck uses.
+$nullSurname = fcpdaPreimage();
+fcpdaAssert(
+    array_key_exists('soyad', $nullSurname['personnel'][203])
+        && $nullSurname['personnel'][203]['soyad'] === null,
+    'the approved personel 203 preimage carries the canonical NULL surname'
+);
+fcpdaAssert(
+    fcpdaDrifts($nullSurname) === [],
+    'a canonical NULL surname passes the approved personel 203 preimage'
+);
+
+$staleEmptySurname = fcpdaPreimage();
+$staleEmptySurname['personnel'][203]['soyad'] = '';
+$staleDrifts = fcpdaDrifts($staleEmptySurname);
+$staleGuard = '';
+try {
+    FinalCloseSnapshot::assertApprovedPreimage($staleEmptySurname);
+} catch (Throwable $error) {
+    $staleGuard = (string) $error->getMessage();
+}
+fcpdaRecord([$staleGuard]);
+fcpdaAssert(
+    $staleDrifts === [FCPDA_PREFIX . '_PERSONNEL_203_SOYAD_NULL']
+        && $staleGuard === FCPDA_PREFIX . '_PERSONNEL_203_SOYAD_NULL',
+    'a stale empty-string surname is a strict drift, never an equivalent of NULL'
+);
+
+$nullVersusEmpty = '';
+$emptyVersusNull = '';
+try {
+    FinalCloseSnapshot::matches(['soyad' => null], ['soyad' => '']);
+} catch (Throwable $error) {
+    $nullVersusEmpty = (string) $error->getMessage();
+}
+try {
+    FinalCloseSnapshot::matches(['soyad' => ''], ['soyad' => null]);
+} catch (Throwable $error) {
+    $emptyVersusNull = (string) $error->getMessage();
+}
+fcpdaRecord([$nullVersusEmpty, $emptyVersusNull]);
+fcpdaAssert(
+    $nullVersusEmpty === FCPDA_PREFIX && $emptyVersusNull === FCPDA_PREFIX,
+    'the generic comparator keeps NULL and an empty string strictly distinct'
+);
+
+// 17) The write side of personel 203 is untouched: the approved target correction still
+//     writes Muhammed / Mahmud and the preflight still publishes zero mutations.
+$nameOwnerSource = (string) file_get_contents(__DIR__ . '/../../api/src/Services/Operations/FinalCloseOwners.php');
+$namePostcheckSource = (string) file_get_contents(__DIR__ . '/../../api/src/Services/Operations/FinalClosePostcheck.php');
+fcpdaAssert(
+    strpos($nameOwnerSource, "\$body = ['ad' => 'Muhammed', 'soyad' => 'Mahmud'];") !== false
+        && strpos($namePostcheckSource, "\$expected['personnel'][203]['ad'] = 'Muhammed';") !== false
+        && strpos($namePostcheckSource, "\$expected['personnel'][203]['soyad'] = 'Mahmud';") !== false
+        && strpos($serviceSource, "'production_mutation_count' => 0,") !== false,
+    'the personel 203 target name correction stays Muhammed / Mahmud'
+);
+
+// 18) Final sweep: every token this run produced stays inside the bounded contract the
 //     worker, the transport and the control plane all apply.
 $allBounded = count($GLOBALS['fcpdaTokens']) > 0;
 $longest = 0;

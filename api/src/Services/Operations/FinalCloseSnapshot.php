@@ -168,7 +168,11 @@ final class FinalCloseSnapshot
         foreach (FinalClosePackage::PERSONNEL as $id) {
             self::comparisonDrifts($drifts, 'PERSONNEL', (int) $id, $s['personnel'][$id] ?? [], ['id' => $id, 'calisma_lokasyonu_id' => null]);
         }
-        self::comparisonDrifts($drifts, 'PERSONNEL', 203, $s['personnel'][203] ?? [], ['ad' => 'MUHAMMED IRAKLI', 'soyad' => '', 'aktif_durum' => 'AKTIF', 'sube_id' => 1, 'sirket_id' => 1]);
+        // Personel 203 is the one approved expectation aligned to a verified live shape:
+        // the canonical row keeps a NULL surname (attested by the FINAL_CLOSE_PREFLIGHT
+        // report of run 34568404855), so the approved contract expects NULL and a stale
+        // empty string stays a strict drift instead of an equivalent value.
+        self::comparisonDrifts($drifts, 'PERSONNEL', 203, $s['personnel'][203] ?? [], ['ad' => 'MUHAMMED IRAKLI', 'soyad' => null, 'aktif_durum' => 'AKTIF', 'sube_id' => 1, 'sirket_id' => 1]);
         self::comparisonDrifts($drifts, 'PERSONNEL', 210, $s['personnel'][210] ?? [], ['sube_id' => 6]);
         self::comparisonDrifts($drifts, 'PERSONNEL', 212, $s['personnel'][212] ?? [], ['sube_id' => null, 'sirket_id' => null]);
         foreach (FinalClosePackage::SCOPES_BEFORE as $id => $scope) {

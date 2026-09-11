@@ -132,12 +132,26 @@ describe("final-close bounded personnel preimage read", () => {
   it("keeps the approved preimage values in one collector and the generic detail read untouched", () => {
     expect(snapshot).toContain("PersonellerController::finalCloseRead($id)");
     expect(snapshot).toContain(
-      "self::comparisonDrifts($drifts, 'PERSONNEL', 203, $s['personnel'][203] ?? [], ['ad' => 'MUHAMMED IRAKLI', 'soyad' => '', 'aktif_durum' => 'AKTIF', 'sube_id' => 1, 'sirket_id' => 1]);"
+      "self::comparisonDrifts($drifts, 'PERSONNEL', 203, $s['personnel'][203] ?? [], ['ad' => 'MUHAMMED IRAKLI', 'soyad' => null, 'aktif_durum' => 'AKTIF', 'sube_id' => 1, 'sirket_id' => 1]);"
     );
     expect(snapshot).toContain(
       "self::comparisonDrifts($drifts, 'PERSONNEL', 212, $s['personnel'][212] ?? [], ['sube_id' => null, 'sirket_id' => null]);"
     );
     expect(controller).toContain("private static function fetchPersonelRowById(PDO $pdo, $personelId)");
     expect(controller).toContain("$select = self::personelSelectSql($pdo);");
+  });
+
+  it("keeps the verified canonical NULL surname of personel 203 raw and strictly compared", () => {
+    // The live canonical row of personel 203 holds a NULL surname (attested by the
+    // FINAL_CLOSE_PREFLIGHT report of run 34568404855), so the approved expectation is
+    // NULL and the bounded reader hands that NULL through untouched.
+    expect(snapshot).toContain(
+      "'ad' => 'MUHAMMED IRAKLI', 'soyad' => null, 'aktif_durum' => 'AKTIF', 'sube_id' => 1, 'sirket_id' => 1"
+    );
+    expect(snapshot).not.toContain("'soyad' => ''");
+    expect(readBody).toContain("'soyad' => $row['soyad'],");
+    // No NULL -> empty-string coercion may enter the final-close read path: the
+    // projection holds no empty-string literal at all.
+    expect(readBody).not.toContain("''");
   });
 });

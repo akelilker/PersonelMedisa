@@ -297,13 +297,34 @@ describe("final-close preimage drift attribution", () => {
       expect(postcheck).not.toContain(scope);
     }
     expect(collector).toContain(
-      "'ad' => 'MUHAMMED IRAKLI', 'soyad' => '', 'aktif_durum' => 'AKTIF', 'sube_id' => 1, 'sirket_id' => 1"
+      "'ad' => 'MUHAMMED IRAKLI', 'soyad' => null, 'aktif_durum' => 'AKTIF', 'sube_id' => 1, 'sirket_id' => 1"
     );
     expect(collector).toContain("['id' => $id, 'calisma_lokasyonu_id' => null]");
     expect(collector).toContain("['sube_id' => 6]");
     expect(collector).toContain("['sube_id' => null, 'sirket_id' => null]");
     expect(collector).toContain("['actor_status' => 'VERIFIED']");
     expect(collector).toContain("'durum' => 'AKTIF', 'sorumlu_yonetici_user_ids' => [],");
+  });
+
+  it("pins the canonical NULL surname of personel 203 and keeps NULL distinct from an empty string", () => {
+    // Re-verified live shape: the canonical surname is NULL, so the approved
+    // expectation is NULL and a stale empty string must stay a strict drift.
+    expect(collector).toContain(
+      "'ad' => 'MUHAMMED IRAKLI', 'soyad' => null, 'aktif_durum' => 'AKTIF', 'sube_id' => 1, 'sirket_id' => 1"
+    );
+    expect(snapshot).not.toContain("'soyad' => ''");
+    // The per-field comparator compares strictly and holds no empty-string literal, so
+    // no NULL/'' equivalence can hide a real drift on any approved field.
+    expect(comparison).toContain("if ($actual[$key] !== $expectedValue) {");
+    expect(comparison).not.toContain("''");
+    // NULL stays a shape-only class, never a MISSING side effect.
+    expect(helpers).toContain("if ($expected === null || $actual === null) {");
+    expect(helpers).toContain("return 'NULL';");
+    // The bounded reader stays raw: only the expectation was corrected.
+    expect(read("api/src/Controllers/PersonellerController.php")).toContain("'soyad' => $row['soyad'],");
+    // The approved target correction itself is untouched.
+    expect(postcheck).toContain("$expected['personnel'][203]['soyad'] = 'Mahmud';");
+    expect(owners).toContain("$body = ['ad' => 'Muhammed', 'soyad' => 'Mahmud'];");
   });
 
   it("stays PHP 7.4 compatible", () => {

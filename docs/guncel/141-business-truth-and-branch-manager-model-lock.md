@@ -54,7 +54,7 @@ Canonical schema: `personeller.ad`, `personeller.soyad` (not `ad_soyad`).
 | --- | --- | --- |
 | display | MUHAMMED IRAKLI | Muhammed Mahmud |
 | `ad` | (live VERIFY) | `Muhammed` |
-| `soyad` | (live VERIFY) | `Mahmud` |
+| `soyad` | `NULL` — canonical live preimage, verified by `FINAL_CLOSE_PREFLIGHT` run 34568404855 (was `(live VERIFY)`) | `Mahmud` |
 
 Only canonical name fields may change. No production write in this phase.
 

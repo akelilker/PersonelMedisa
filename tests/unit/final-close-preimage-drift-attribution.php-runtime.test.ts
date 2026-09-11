@@ -31,6 +31,11 @@ const PASS_NAMES = [
   "the control plane trusts a drift list only when it is correlated and bounded",
   "a failed preflight logs its correlated bounded tokens only, never raw report content",
   "one comparison owner, and its diagnostic block never serializes a value or an exception",
+  "the approved personel 203 preimage carries the canonical NULL surname",
+  "a canonical NULL surname passes the approved personel 203 preimage",
+  "a stale empty-string surname is a strict drift, never an equivalent of NULL",
+  "the generic comparator keeps NULL and an empty string strictly distinct",
+  "the personel 203 target name correction stays Muhammed / Mahmud",
 ];
 
 const TOKEN_SWEEP =

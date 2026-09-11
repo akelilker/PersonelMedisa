@@ -129,13 +129,13 @@ describe("final-close bounded personnel preimage read", () => {
     );
   });
 
-  it("leaves the approved preimage and the generic detail read untouched", () => {
+  it("keeps the approved preimage values in one collector and the generic detail read untouched", () => {
     expect(snapshot).toContain("PersonellerController::finalCloseRead($id)");
     expect(snapshot).toContain(
-      "self::matches($s['personnel'][203], ['ad' => 'MUHAMMED IRAKLI', 'soyad' => '', 'aktif_durum' => 'AKTIF', 'sube_id' => 1, 'sirket_id' => 1]);"
+      "self::comparisonDrifts($drifts, 'PERSONNEL', 203, $s['personnel'][203] ?? [], ['ad' => 'MUHAMMED IRAKLI', 'soyad' => '', 'aktif_durum' => 'AKTIF', 'sube_id' => 1, 'sirket_id' => 1]);"
     );
     expect(snapshot).toContain(
-      "self::matches($s['personnel'][212], ['sube_id' => null, 'sirket_id' => null]);"
+      "self::comparisonDrifts($drifts, 'PERSONNEL', 212, $s['personnel'][212] ?? [], ['sube_id' => null, 'sirket_id' => null]);"
     );
     expect(controller).toContain("private static function fetchPersonelRowById(PDO $pdo, $personelId)");
     expect(controller).toContain("$select = self::personelSelectSql($pdo);");

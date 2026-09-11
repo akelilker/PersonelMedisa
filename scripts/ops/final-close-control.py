@@ -15,6 +15,28 @@ def require(condition, code):
         raise RuntimeError(code)
 
 
+def preflight_drift_items(report, request_id, sha):
+    """Bounded drift tokens of one correlated FAILED preflight report.
+
+    A failed preflight reports every approved-preimage mismatch in one list. The
+    report is trusted only when it describes this exact request, and the list only
+    when it is a bounded list of bounded single tokens; anything else fails closed
+    instead of publishing raw report content (snapshot, preimage values, personnel or
+    user text, SQL).
+    """
+    require(report.get('request_id') == request_id and report.get('deployed_sha') == sha
+            and report.get('mode') == 'FINAL_CLOSE_PREFLIGHT',
+            'FINAL_CLOSE_PREIMAGE_REPORT_INVALID')
+    count, drifts = report.get('preimage_drift_count'), report.get('preimage_drifts')
+    require(report.get('result') == 'FAIL' and report.get('preflight_checksum') is None
+            and report.get('production_mutation_count') == 0
+            and isinstance(count, int) and not isinstance(count, bool)
+            and isinstance(drifts, list) and 0 < count <= 100 and count == len(drifts)
+            and all(isinstance(item, str) and re.fullmatch('[A-Z0-9_]{1,100}', item) for item in drifts),
+            'FINAL_CLOSE_PREIMAGE_DRIFT_INVALID')
+    return drifts
+
+
 def main():
     env = os.environ
     mode, sha = env['MODE'], env['DEPLOYED_SHA']
@@ -98,6 +120,18 @@ def main():
                         value = status.get(key)
                         if isinstance(value, str) and re.fullmatch('[A-Z0-9_]+', value):
                             print('FINAL_CLOSE_WORKER_' + key.upper() + '=' + value)
+                    if mode == 'FINAL_CLOSE_PREFLIGHT':
+                        # One failed preflight must not report only the first drift:
+                        # the correlated report is read read-only and only its bounded
+                        # tokens are logged, so a whole run is attributable at once.
+                        try:
+                            drift_report = json.loads(get(base + 'final-close-report.json', 'report'))
+                        except json.JSONDecodeError:
+                            raise RuntimeError('FINAL_CLOSE_PREIMAGE_REPORT_INVALID')
+                        drifts = preflight_drift_items(drift_report, request_id, sha)
+                        print('FINAL_CLOSE_PREIMAGE_DRIFT_COUNT=' + str(len(drifts)))
+                        for item in drifts:
+                            print('FINAL_CLOSE_PREIMAGE_DRIFT_ITEM=' + item)
                     raise RuntimeError('FINAL_CLOSE_WORKER_FAILED')
                 report = json.loads(get(base + 'final-close-report.json', 'report'))
                 require(report.get('request_id') == request_id and report.get('deployed_sha') == sha

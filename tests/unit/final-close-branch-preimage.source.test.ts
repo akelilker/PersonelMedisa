@@ -131,9 +131,11 @@ describe("final-close bounded branch preimage read", () => {
   });
 
   it("attests exactly the six target branches as AKTIF with no recorded manager", () => {
+    // The approved comparison table now runs from the fail-closed guard through the
+    // canonical all-drift collector, so the slice ends at the checksum owner.
     const preimage = snapshot.slice(
       snapshot.indexOf("public static function assertApprovedPreimage"),
-      snapshot.indexOf("public static function matches")
+      snapshot.indexOf("public static function checksum")
     );
     expect(preimage).toContain("foreach (array_keys(FinalClosePackage::MANAGERS) as $id) {");
     expect(preimage).toContain("'id' => $id, 'durum' => 'AKTIF', 'sorumlu_yonetici_user_ids' => [],");

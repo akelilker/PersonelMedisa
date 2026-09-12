@@ -9,8 +9,16 @@ import {
 } from "../../../api/personeller.api";
 import { ApiRequestError } from "../../../api/api-client";
 import { visibleImportError } from "../personel-import-error-messages";
+import { AppSelect } from "../../../components/form/AppSelect";
 import { AppModal } from "../../../components/modal/AppModal";
 import { useAuth } from "../../../state/auth.store";
+
+const IMPORT_HISTORY_STATUS_OPTIONS = [
+  { value: "", label: "Tümü" },
+  { value: "COMPLETED", label: "Tamamlandı" },
+  { value: "BASARISIZ", label: "Başarısız" },
+  { value: "CLAIMED", label: "İşlemde" }
+];
 
 type PersonelImportHistoryModalProps = {
   open: boolean;
@@ -325,33 +333,24 @@ export function PersonelImportHistoryModal({ open, onClose }: PersonelImportHist
       <div className="personel-import-history-filters form-field-grid" data-testid="personel-import-history-filters">
         <label>
           <span>Durum</span>
-          <select
+          <AppSelect
             value={statusFilter}
-            data-testid="personel-import-history-filter-status"
-            onChange={(event) => setStatusFilter(event.target.value)}
-          >
-            <option value="">Tümü</option>
-            <option value="COMPLETED">Tamamlandı</option>
-            <option value="BASARISIZ">Başarısız</option>
-            <option value="CLAIMED">İşlemde</option>
-          </select>
+            dataTestId="personel-import-history-filter-status"
+            onChange={setStatusFilter}
+            options={IMPORT_HISTORY_STATUS_OPTIONS}
+          />
         </label>
         <label>
           <span>Şube</span>
-          <select
+          <AppSelect
             value={subeFilter}
-            data-testid="personel-import-history-filter-sube"
-            onChange={(event) => setSubeFilter(event.target.value)}
-          >
-            <option value="">
-              {activeSubeId ? `Aktif şube (#${activeSubeId})` : "Tümü"}
-            </option>
-            {subeler.map((sube) => (
-              <option key={sube.id} value={String(sube.id)}>
-                {sube.ad}
-              </option>
-            ))}
-          </select>
+            dataTestId="personel-import-history-filter-sube"
+            onChange={setSubeFilter}
+            options={[
+              { value: "", label: activeSubeId ? `Aktif şube (#${activeSubeId})` : "Tümü" },
+              ...subeler.map((sube) => ({ value: String(sube.id), label: sube.ad }))
+            ]}
+          />
         </label>
         <label>
           <span>Başlangıç</span>

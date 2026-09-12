@@ -4,6 +4,7 @@ import type {
   KeyboardEventHandler,
   ReactNode
 } from "react";
+import { AppSelect } from "./AppSelect";
 
 export type FormFieldOption = { value: string; label: string };
 
@@ -77,24 +78,16 @@ export function FormField(props: FormFieldProps) {
     );
   } else if (props.as === "select") {
     control = (
-      <select
-        id={name}
+      <AppSelect
         name={name}
-        className="form-input"
+        value={value}
+        onChange={onChange}
+        options={props.selectOptions}
+        placeholderOption={props.placeholderOption}
         required={required}
         disabled={disabled}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-      >
-        {props.placeholderOption ? (
-          <option value={props.placeholderOption.value}>{props.placeholderOption.label}</option>
-        ) : null}
-        {props.selectOptions.map((opt, index) => (
-          <option key={`${name}-${index}-${opt.value}`} value={opt.value}>
-            {opt.label}
-          </option>
-        ))}
-      </select>
+        ariaLabel={label}
+      />
     );
   } else {
     control = (

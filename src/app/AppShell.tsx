@@ -15,6 +15,10 @@ import { useKayitModalController } from "../features/kayit/hooks/useKayitModalCo
 import { formatUiProfileLabel, formatUserRoleLabel } from "../lib/display/enum-display";
 import { resolveYonetimModalTitle } from "../lib/yonetim/yonetim-modal-title";
 import { useAuth } from "../state/auth.store";
+import { PersonelImportDryRunModal } from "../features/personeller/components/PersonelImportDryRunModal";
+import { PersonelImportHistoryModal } from "../features/personeller/components/PersonelImportHistoryModal";
+import { readPersonelKartBack } from "../features/personeller/personel-kart-nav";
+import { useRoleAccess } from "../hooks/use-role-access";
 
 export type AppShellOutletContext = {
   onKayitOpen: (tab: KayitTab) => void;
@@ -32,9 +36,13 @@ type ModuleModalConfig = {
   titleVariant?: "default" | "premium";
 };
 
-function resolveBackBar(pathname: string): { to: string; label: string } | null {
+function resolveBackBar(pathname: string, state?: unknown): { to: string; label: string } | null {
   if (/^\/personeller\/\d+$/.test(pathname)) {
-    return { to: "/personeller", label: "Personel listesine dön" };
+    const fromState = readPersonelKartBack(state);
+    if (fromState) {
+      return fromState;
+    }
+    return { to: "/personeller", label: "Personel Listesi" };
   }
   if (/^\/surecler\/\d+$/.test(pathname)) {
     return { to: "/surecler", label: "Süreç listesine dön" };
@@ -57,9 +65,12 @@ function resolveModuleModal(pathname: string, tabParam: string | null): ModuleMo
     return { title: "Belge Takip", closeTo: "/personeller", titleVariant: "premium" };
   }
   if (/^\/personeller\/\d+$/.test(pathname)) {
-    return { title: "Personel Kartı", closeTo: "/personeller", titleVariant: "premium" };
+    return { title: "Personel Kartı", closeTo: "/", titleVariant: "premium" };
   }
   if (pathname === "/personeller") {
+    return { title: "Personel Kartı", closeTo: "/", titleVariant: "premium" };
+  }
+  if (pathname === "/arsiv/personeller") {
     return { title: "Personel Kartı", closeTo: "/", titleVariant: "premium" };
   }
 
@@ -107,6 +118,16 @@ function resolveModuleModal(pathname: string, tabParam: string | null): ModuleMo
   return { title: "Modül", closeTo: "/" };
 }
 
+function PersonelKartHomeButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button type="button" className="modal-home-btn" onClick={onClick} aria-label="Ana sayfaya dön">
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" fill="none" />
+      </svg>
+    </button>
+  );
+}
+
 export function AppShell() {
   const { session, logout } = useAuth();
   const navigate = useNavigate();
@@ -123,7 +144,11 @@ export function AppShell() {
   const isModuleOverlayRoute = moduleModal !== null;
   const showShellHeaderActions = !isModuleOverlayRoute && !isLoginRoute;
   const showUserBar = !isLoginRoute && !isModuleOverlayRoute && !isHomeRoute;
-  const backBarTarget = resolveBackBar(pathname);
+  const backBarTarget = resolveBackBar(pathname, state);
+  const isPersonelKartModalRoute =
+    pathname === "/personeller" ||
+    pathname === "/arsiv/personeller" ||
+    /^\/personeller\/\d+$/.test(pathname);
   const activeSubeLabel = useMemo(() => {
     const activeSubeId = session?.active_sube_id;
     if (activeSubeId === null || activeSubeId === undefined) {
@@ -147,6 +172,10 @@ export function AppShell() {
   } = useKayitModalController(pathname, state);
 
   const [kayitFooterModel, setKayitFooterModel] = useState<KayitModalFooterModel | null>(null);
+  const [bulkImportOpen, setBulkImportOpen] = useState(false);
+  const [importHistoryOpen, setImportHistoryOpen] = useState(false);
+  const { hasPermission } = useRoleAccess();
+  const canApplyPersonelImport = hasPermission("personeller.import.apply");
   const handleKayitFooterModelChange = useCallback((model: KayitModalFooterModel | null) => {
     setKayitFooterModel(model);
   }, []);
@@ -203,6 +232,22 @@ export function AppShell() {
         {!isModuleOverlayRoute ? <Outlet context={outletContext} /> : null}
       </main>
 
+      {bulkImportOpen ? (
+        <PersonelImportDryRunModal
+          open={bulkImportOpen}
+          onClose={() => setBulkImportOpen(false)}
+          onHome={() => {
+            setBulkImportOpen(false);
+            closeKayitModal();
+          }}
+          canApply={canApplyPersonelImport}
+        />
+      ) : null}
+
+      {importHistoryOpen ? (
+        <PersonelImportHistoryModal open={importHistoryOpen} onClose={() => setImportHistoryOpen(false)} />
+      ) : null}
+
       {isKayitModalOpen ? (
         <AppModal
           title="Kayıt ve Süreç İşlemleri"
@@ -230,6 +275,8 @@ export function AppShell() {
             primaryActionLabel={kayitPrimaryLabel}
             primaryFormId={kayitPrimaryFormId}
             onFooterModelChange={handleKayitFooterModelChange}
+            onOpenBulkImport={canApplyPersonelImport ? () => setBulkImportOpen(true) : undefined}
+            onOpenImportHistory={canApplyPersonelImport ? () => setImportHistoryOpen(true) : undefined}
           />
         </AppModal>
       ) : null}
@@ -241,6 +288,11 @@ export function AppShell() {
           backLabel={moduleModal.backLabel}
           onBack={moduleModal.backLabel ? () => navigate(moduleModal.closeTo) : undefined}
           backTestId={moduleModal.backTestId}
+          headerStart={
+            isPersonelKartModalRoute ? (
+              <PersonelKartHomeButton onClick={() => navigate("/")} />
+            ) : undefined
+          }
           className={moduleModal.className}
           bodyClassName={moduleModal.bodyClassName}
           titleVariant={moduleModal.titleVariant}

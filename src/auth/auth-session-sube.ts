@@ -4,10 +4,11 @@ import { canonicalizeUserRole } from "../lib/authorization/canonicalize-user-rol
 
 /**
  * sube_ids / sube_list / active_sube_id tutarliligini tek yerde kurar.
- * - Global + bos sube_ids: tum subeler, active_sube_id null (varsayilan)
- * - Global + coklu sube_list: null = tum subeler gorunumu; tek sube gecici filtre
+ * - Global + bos sube_ids: tum subeler, active_sube_id null (varsayilan TUMU)
+ * - Coklu selector (atanmis veya list): active_sube_id === null → TÜMÜ (null kalir)
  * - Atanmis tek sube: active o sube
- * - Coklu atanmis: kayitli active listede degilse ilk (scoped roller)
+ * - Coklu: kayitli active listede degilse (non-null ama yetkisiz) → ilk id
+ * - Global + atanmis sube yok + gecersiz/eksik active → TUMU (null); ilk subeye dusmez
  */
 export function finalizeAuthSessionSube(session: AuthSession): AuthSession {
   const role = canonicalizeUserRole(session.user.rol);
@@ -41,8 +42,17 @@ export function finalizeAuthSessionSube(session: AuthSession): AuthSession {
     };
   }
 
+  // Multi-scope: keep null (TÜMÜ). Only fall back to first when current is non-null but not in selectorIds.
   const current = session.active_sube_id;
-  if (current !== null && typeof current === "number" && selectorIds.includes(current)) {
+  if (current === null) {
+    return {
+      ...session,
+      user: baseUser,
+      active_sube_id: null
+    };
+  }
+
+  if (typeof current === "number" && selectorIds.includes(current)) {
     return {
       ...session,
       user: baseUser,

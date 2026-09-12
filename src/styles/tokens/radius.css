@@ -1,6 +1,10 @@
 :root {
   --radius-sm: 6px;
+  --radius-control: 8px;
   --radius-md: 10px;
+  --radius-card: 12px;
   --radius-lg: 14px;
-  --modal-radius: var(--radius-lg);
+  --radius-hero: 18px;
+  --shell-top-radius: 20px;
+  --modal-radius: var(--radius-md);
 }

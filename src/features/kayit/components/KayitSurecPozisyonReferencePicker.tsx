@@ -1,5 +1,6 @@
+import { useMemo } from "react";
+import { AppSelectField } from "../../../components/form/AppSelect";
 import type { IdOption } from "../../../types/referans";
-import { optionLabel } from "../kayit-surec-utils";
 
 type KayitSurecPozisyonReferencePickerProps = {
   label: string;
@@ -13,6 +14,11 @@ type KayitSurecPozisyonReferencePickerProps = {
   onOpenChange: (isOpen: boolean) => void;
 };
 
+/**
+ * Kayıt ve Süreç → Pozisyon referans alanları.
+ * Sunum tamamen kanonik AppSelect owner'ına devredilmiştir; burada yalnız
+ * IdOption → select option eşlemesi ve açık durum köprüsü kalır.
+ */
 export function KayitSurecPozisyonReferencePicker({
   label,
   name,
@@ -24,66 +30,23 @@ export function KayitSurecPozisyonReferencePicker({
   onChange,
   onOpenChange
 }: KayitSurecPozisyonReferencePickerProps) {
-  const selectedLabel = optionLabel(options, value, "Seçiniz");
+  const selectOptions = useMemo(
+    () => options.map((option) => ({ value: String(option.id), label: option.label })),
+    [options]
+  );
 
   return (
-    <div className="form-section surec-position-picker">
-      <label className="form-label" id={`${name}-label`}>
-        {label}
-      </label>
-      <button
-        type="button"
-        className="form-input surec-position-picker-trigger"
-        role="combobox"
-        aria-labelledby={`${name}-label`}
-        aria-expanded={isOpen}
-        aria-controls={`${name}-panel`}
-        disabled={disabled}
-        onClick={() => {
-          if (disabled) {
-            return;
-          }
-          onOpenChange(!isOpen);
-        }}
-      >
-        <span>{selectedLabel === "-" ? "Seçiniz" : selectedLabel}</span>
-        <span aria-hidden="true">⌄</span>
-      </button>
-
-      {isOpen ? (
-        <div className="surec-position-picker-panel" id={`${name}-panel`}>
-          {!required ? (
-            <button
-              type="button"
-              className={`surec-position-picker-option${value === "" ? " is-active" : ""}`}
-              onClick={() => {
-                onChange("");
-                onOpenChange(false);
-              }}
-            >
-              Seçiniz
-            </button>
-          ) : null}
-          {options.map((option) => {
-            const optionValue = String(option.id);
-            const isActive = value === optionValue;
-
-            return (
-              <button
-                key={`${name}-${option.id}`}
-                type="button"
-                className={`surec-position-picker-option${isActive ? " is-active" : ""}`}
-                onClick={() => {
-                  onChange(optionValue);
-                  onOpenChange(false);
-                }}
-              >
-                {option.label}
-              </button>
-            );
-          })}
-        </div>
-      ) : null}
-    </div>
+    <AppSelectField
+      label={label}
+      name={name}
+      value={value}
+      options={selectOptions}
+      placeholderOption={{ value: "", label: "Seçiniz" }}
+      required={required}
+      disabled={disabled}
+      open={isOpen}
+      onOpenChange={onOpenChange}
+      onChange={onChange}
+    />
   );
 }

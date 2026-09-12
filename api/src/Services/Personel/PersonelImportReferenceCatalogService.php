@@ -17,17 +17,14 @@ use Throwable;
  */
 final class PersonelImportReferenceCatalogService
 {
-    public const FILENAME = 'personel-import-referanslari.csv';
+    public const FILENAME = 'yukleme-kilavuzu.csv';
     public const OPEN_BAGLI_SUBE = 'TUM_YETKILI_SUBELER';
     public const SHA_HEADER = 'X-Personel-Import-Reference-SHA256';
 
     public const CSV_COLUMNS = [
-        'referans_turu',
+        'bolum',
+        'baslik',
         'deger',
-        'bagli_sube',
-        'kullanilabilir',
-        'eslesme_sayisi',
-        'uyari_kodu',
         'aciklama',
     ];
 
@@ -151,53 +148,104 @@ final class PersonelImportReferenceCatalogService
         $gorevIndex = self::loadNameIndex($pdo, 'gorevler');
         $personelTipiIndex = self::loadNameIndex($pdo, 'personel_tipleri');
 
-        $rows = [];
+        $guideRows = [];
+        $addGuide = static function (array &$out, string $bolum, string $baslik, string $deger = '', string $aciklama = '') {
+            $out[] = [
+                'bolum' => $bolum,
+                'baslik' => $baslik,
+                'deger' => $deger,
+                'aciklama' => $aciklama,
+            ];
+        };
 
-        self::appendNameRows($rows, 'SUBE', $subeIndex, $scopeSubeIds, '');
-        // OPEN_BRANCH_DEPARTMENT: active departments are independent of sube_departmanlar.
-        self::appendNameRows($rows, 'DEPARTMAN', $departmanIndex, null, self::OPEN_BAGLI_SUBE);
-        self::appendNameRows($rows, 'GOREV', $gorevIndex, null, '');
-        self::appendNameRows($rows, 'PERSONEL_TIPI', $personelTipiIndex, null, '');
+        $addGuide($guideRows, '1. Şablon Nasıl Doldurulur?', 'Genel', '', 'Şablon dosyasındaki kolon başlıklarını değiştirmeyin. Her satır bir personel adayıdır.');
+        $addGuide($guideRows, '1. Şablon Nasıl Doldurulur?', 'Şube', '', 'Şube adını listede göründüğü tam adıyla yazın. Kısa veya ortak adlar (ör. yalnız Ankara) birden fazla şubeyle eşleşebilir; bu durumda aktarım durur.');
+        $addGuide($guideRows, '1. Şablon Nasıl Doldurulur?', 'Departman / Bölüm / Birim', '', 'Önce departman, sonra o departmana bağlı bölüm, sonra o bölüme bağlı birim yazın. Üst kayıt olmadan alt kayıt eşleşmez.');
+        $addGuide($guideRows, '1. Şablon Nasıl Doldurulur?', 'Yazım farkları', '', 'Büyük/küçük harf, Türkçe karakter (ş/s, ğ/g, ü/u, ö/o, ç/c, ı/i) ve fazla boşluk tek bir kayıtla net eşleşiyorsa sistem kabul eder; birden fazla kayıtla eşleşirse düzeltmeniz istenir.');
+        $addGuide($guideRows, '10. Dikkat Edilecek Noktalar', 'Belirsizlik', '', 'Örnek: Ankara tek başına kullanılamaz. Medisa Ankara veya Karyapı Ankara gibi listedeki tam adlardan uygun olanı yazın.');
+        $addGuide($guideRows, '10. Dikkat Edilecek Noktalar', 'Yetki', '', 'Yalnız yetkili olduğunuz şube ve kayıtlar listelenir. Listede olmayan değer kullanılamaz.');
+
+        $legacyRows = [];
+        self::appendNameRows($legacyRows, 'SUBE', $subeIndex, $scopeSubeIds, '');
+        self::appendNameRows($legacyRows, 'DEPARTMAN', $departmanIndex, null, self::OPEN_BAGLI_SUBE);
+        self::appendNameRows($legacyRows, 'GOREV', $gorevIndex, null, '');
+        self::appendNameRows($legacyRows, 'PERSONEL_TIPI', $personelTipiIndex, null, '');
 
         if (PersonelOrgLocationSchema::isReady($pdo)) {
             $sgkIsverenIndex = self::loadNameIndex($pdo, 'sgk_isverenler');
             $calismaLokasyonuIndex = self::loadNameIndex($pdo, 'calisma_lokasyonlari');
-            self::appendNameRows($rows, 'SGK_ISVEREN', $sgkIsverenIndex, null, '');
-            self::appendNameRows($rows, 'CALISMA_LOKASYONU', $calismaLokasyonuIndex, null, '');
+            self::appendNameRows($legacyRows, 'SGK_ISVEREN', $sgkIsverenIndex, null, '');
+            self::appendNameRows($legacyRows, 'CALISMA_LOKASYONU', $calismaLokasyonuIndex, null, '');
         }
 
         if (PersonelOrgStructureSchema::isReady($pdo)) {
-            self::appendHierarchicalBolumRows($pdo, $rows);
-            self::appendHierarchicalBirimRows($pdo, $rows);
+            self::appendHierarchicalBolumRows($pdo, $legacyRows);
+            self::appendHierarchicalBirimRows($pdo, $legacyRows);
             $pozisyonIndex = self::loadNameIndex($pdo, 'pozisyonlar');
-            self::appendNameRows($rows, 'POZISYON', $pozisyonIndex, null, '');
+            self::appendNameRows($legacyRows, 'POZISYON', $pozisyonIndex, null, '');
         }
 
-        $rows[] = [
+        $legacyRows[] = [
             'referans_turu' => 'CALISAN_KAPSAMI',
             'deger' => PersonelCalisanKapsamService::IC_PERSONEL,
             'bagli_sube' => '',
             'kullanilabilir' => 'EVET',
             'eslesme_sayisi' => '1',
             'uyari_kodu' => '',
-            'aciklama' => 'Ic Personel (varsayilan; kolon yoksa IC_PERSONEL).',
+            'aciklama' => 'İç Personel (varsayılan).',
         ];
-        $rows[] = [
+        $legacyRows[] = [
             'referans_turu' => 'CALISAN_KAPSAMI',
             'deger' => PersonelCalisanKapsamService::DIS_KAYNAK,
             'bagli_sube' => '',
             'kullanilabilir' => 'EVET',
             'eslesme_sayisi' => '1',
             'uyari_kodu' => '',
-            'aciklama' => 'Dis Kaynak / SGK Baska Isverende. Dizin kaydi; TC/soyad/dogum/telefon opsiyonel.',
+            'aciklama' => 'Dış Kaynak / SGK Başka İşverende.',
         ];
 
-        self::sortRows($rows);
+        self::sortRows($legacyRows);
 
-        $body = CsvResponse::buildSemicolon(self::CSV_COLUMNS, $rows);
+        $sectionMap = [
+            'SUBE' => '2. Kullanılabilir Şubeler',
+            'DEPARTMAN' => '3. Departman / Bölüm / Birim',
+            'BOLUM' => '3. Departman / Bölüm / Birim',
+            'BIRIM' => '3. Departman / Bölüm / Birim',
+            'GOREV' => '4. Görevler',
+            'POZISYON' => '5. Pozisyonlar',
+            'PERSONEL_TIPI' => '6. Statü / Personel Tipi',
+            'SGK_ISVEREN' => '7. SGK İşveren',
+            'CALISMA_LOKASYONU' => '8. Çalışma Lokasyonu',
+            'CALISAN_KAPSAMI' => '9. Çalışan Kapsamı',
+        ];
+
+        foreach ($legacyRows as $row) {
+            $tur = (string) ($row['referans_turu'] ?? '');
+            $bolum = $sectionMap[$tur] ?? ('Liste: ' . $tur);
+            $kullanilabilir = (string) ($row['kullanilabilir'] ?? '');
+            if ($kullanilabilir !== '' && $kullanilabilir !== 'EVET') {
+                continue;
+            }
+            $aciklama = (string) ($row['aciklama'] ?? '');
+            $bagli = (string) ($row['bagli_sube'] ?? '');
+            if ($bagli !== '' && $bagli !== self::OPEN_BAGLI_SUBE) {
+                $aciklama = trim($aciklama . ' Bağlı: ' . $bagli);
+            }
+            if ($tur === 'SUBE') {
+                $aciklama = 'Şube adını listede göründüğü tam adıyla yazın.';
+            }
+            $addGuide(
+                $guideRows,
+                $bolum,
+                $tur,
+                (string) ($row['deger'] ?? ''),
+                $aciklama
+            );
+        }
+
+        $body = CsvResponse::buildSemicolon(self::CSV_COLUMNS, $guideRows);
         $sha256 = hash('sha256', $body);
         $csv = "\xEF\xBB\xBF" . $body;
-
         return [
             'filename' => self::FILENAME,
             'csv' => $csv,
@@ -211,25 +259,129 @@ final class PersonelImportReferenceCatalogService
      * @param list<string> $hataKodlari
      * @return int|null
      */
-    public static function resolveExactUnique($name, array $index, $field, array &$hataKodlari)
+    /**
+     * Lookup-only normalization: whitespace collapse, TR case, safe diacritic fold.
+     * Never persist this string as canonical DB value.
+     */
+    public static function normalizeMatchKey($value): string
     {
-        $key = trim((string) $name);
-        if ($key === '') {
-            return null;
+        $s = trim((string) $value);
+        if ($s === '') {
+            return '';
         }
-        if (!isset($index[$key])) {
-            $hataKodlari[] = 'PERSONEL_IMPORT_REFERANS_BULUNAMADI';
+        $s = preg_replace('/\s+/u', ' ', $s);
+        if (!is_string($s)) {
+            return '';
+        }
+        // Turkish dotted/dotless I before generic lowercasing.
+        $s = str_replace(['İ', 'I'], ['i', 'ı'], $s);
+        $s = mb_strtolower($s, 'UTF-8');
+        $s = strtr($s, [
+            'ş' => 's',
+            'ğ' => 'g',
+            'ü' => 'u',
+            'ö' => 'o',
+            'ç' => 'c',
+            'ı' => 'i',
+        ]);
 
+        return $s;
+    }
+
+    /**
+     * @param array<string, list<int>> $index canonical name => ids
+     * @param list<string> $hataKodlari
+     * @param list<array{field:string,input:string,canonical:string}>|null $autoMatches
+     * @param list<array{field:string,input:string,candidates:list<string>}>|null $ambiguous
+     * @return int|null
+     */
+    public static function resolveExactUnique($name, array $index, $field, array &$hataKodlari, ?array &$autoMatches = null, ?array &$ambiguous = null, ?array &$unknownMatches = null)
+    {
+        $raw = trim((string) $name);
+        if ($raw === '') {
             return null;
         }
-        $ids = $index[$key];
-        if (count($ids) !== 1) {
+
+        if (isset($index[$raw])) {
+            $ids = array_values(array_unique(array_map('intval', $index[$raw])));
+            if (count($ids) === 1) {
+                return $ids[0];
+            }
             $hataKodlari[] = 'PERSONEL_IMPORT_REFERANS_BELIRSIZ';
+            if ($ambiguous !== null) {
+                $ambiguous[] = [
+                    'field' => (string) $field,
+                    'input' => $raw,
+                    'candidates' => array_keys(array_filter(
+                        $index,
+                        static function ($v, $k) use ($raw) {
+                            return $k === $raw;
+                        },
+                        ARRAY_FILTER_USE_BOTH
+                    )),
+                ];
+                // Prefer listing canonical names that share these ids
+                $cands = [];
+                foreach ($index as $canonical => $idList) {
+                    foreach ($idList as $id) {
+                        if (in_array((int) $id, $ids, true)) {
+                            $cands[(string) $canonical] = true;
+                        }
+                    }
+                }
+                $ambiguous[count($ambiguous) - 1]['candidates'] = array_keys($cands);
+            }
 
             return null;
         }
 
-        return (int) $ids[0];
+        $want = self::normalizeMatchKey($raw);
+        $idToCanonical = [];
+        foreach ($index as $canonical => $idList) {
+            if (self::normalizeMatchKey((string) $canonical) !== $want) {
+                continue;
+            }
+            foreach ($idList as $id) {
+                $idToCanonical[(int) $id] = (string) $canonical;
+            }
+        }
+
+        if (count($idToCanonical) === 0) {
+            $hataKodlari[] = 'PERSONEL_IMPORT_REFERANS_BULUNAMADI';
+            if ($unknownMatches !== null) {
+                $unknownMatches[] = [
+                    'field' => (string) $field,
+                    'input' => $raw,
+                ];
+            }
+
+            return null;
+        }
+
+        if (count($idToCanonical) > 1) {
+            $hataKodlari[] = 'PERSONEL_IMPORT_REFERANS_BELIRSIZ';
+            if ($ambiguous !== null) {
+                $ambiguous[] = [
+                    'field' => (string) $field,
+                    'input' => $raw,
+                    'candidates' => array_values(array_unique(array_values($idToCanonical))),
+                ];
+            }
+
+            return null;
+        }
+
+        $id = (int) array_key_first($idToCanonical);
+        $canonical = $idToCanonical[$id];
+        if ($autoMatches !== null && $raw !== $canonical) {
+            $autoMatches[] = [
+                'field' => (string) $field,
+                'input' => $raw,
+                'canonical' => $canonical,
+            ];
+        }
+
+        return $id;
     }
 
     /**
@@ -245,10 +397,13 @@ final class PersonelImportReferenceCatalogService
         array $byParent,
         $parentId,
         $field,
-        array &$hataKodlari
+        array &$hataKodlari,
+        ?array &$autoMatches = null,
+        ?array &$ambiguous = null,
+        ?array &$unknownMatches = null
     ) {
-        $key = trim((string) $name);
-        if ($key === '') {
+        $raw = trim((string) $name);
+        if ($raw === '') {
             return null;
         }
         if ($parentId === null || (int) $parentId < 1) {
@@ -263,19 +418,8 @@ final class PersonelImportReferenceCatalogService
             return null;
         }
         $index = $byParent[$parentKey];
-        if (!isset($index[$key])) {
-            $hataKodlari[] = 'PERSONEL_IMPORT_REFERANS_BULUNAMADI';
 
-            return null;
-        }
-        $ids = $index[$key];
-        if (count($ids) !== 1) {
-            $hataKodlari[] = 'PERSONEL_IMPORT_REFERANS_BELIRSIZ';
-
-            return null;
-        }
-
-        return (int) $ids[0];
+        return self::resolveExactUnique($raw, $index, $field, $hataKodlari, $autoMatches, $ambiguous, $unknownMatches);
     }
 
     /**

@@ -115,6 +115,12 @@
   padding: var(--space-4);
 }
 
+/* Fixed action footer overlays the body viewport; reserve scroll space on the body owner. */
+.modal-container--fixed-footer > .modal-body {
+  padding-bottom: calc(var(--space-4) + var(--modal-fixed-footer-content-reserve));
+  scroll-padding-bottom: var(--modal-fixed-footer-content-reserve);
+}
+
 .modal-footer {
   flex-shrink: 0;
   padding: var(--space-3) var(--space-4);
@@ -346,6 +352,10 @@ body.modal-open .modal-container {
 
   .modal-body {
     padding: var(--space-3);
+  }
+
+  .modal-container--fixed-footer > .modal-body {
+    padding-bottom: calc(var(--space-3) + var(--modal-fixed-footer-content-reserve));
   }
 
   .modal-footer {

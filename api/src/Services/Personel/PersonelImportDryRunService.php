@@ -335,7 +335,27 @@ final class PersonelImportDryRunService
                 || in_array('pozisyon', $headers, true);
             $hasScopeColumn = in_array('calisan_kapsami', $headers, true);
 
-            $resolved = self::resolveReferences($rowMap, $refCatalog, $hataKodlari, $hasOrgCols, $hasOrgStructCols);
+            $autoMatches = [];
+            $ambiguousMatches = [];
+            $unknownMatches = [];
+            $resolved = self::resolveReferences($rowMap, $refCatalog, $hataKodlari, $hasOrgCols, $hasOrgStructCols, $autoMatches, $ambiguousMatches, $unknownMatches);
+            foreach ($autoMatches as $m) {
+                $fieldLabel = self::referenceFieldLabel((string) ($m['field'] ?? ''));
+                $input = (string) ($m['input'] ?? '');
+                $canonical = (string) ($m['canonical'] ?? '');
+                $uyarilar[] = $fieldLabel . " '" . $input . "' → '" . $canonical . "' olarak eşleştirildi.";
+            }
+            foreach ($ambiguousMatches as $m) {
+                $fieldLabel = self::referenceFieldLabel((string) ($m['field'] ?? ''));
+                $input = (string) ($m['input'] ?? '');
+                $cands = isset($m['candidates']) && is_array($m['candidates']) ? $m['candidates'] : [];
+                $uyarilar[] = 'BELIRSIZ|' . $fieldLabel . '|' . $input . '|' . implode(' ;; ', array_map('strval', $cands));
+            }
+            foreach ($unknownMatches as $m) {
+                $fieldLabel = self::referenceFieldLabel((string) ($m['field'] ?? ''));
+                $input = (string) ($m['input'] ?? '');
+                $uyarilar[] = 'BULUNAMADI|' . $fieldLabel . '|' . $input;
+            }
 
             $importBody = [
                 'tc_kimlik_no' => $tcRaw,
@@ -851,37 +871,46 @@ final class PersonelImportDryRunService
      *   pozisyon_id: ?int
      * }
      */
+
+        private static function referenceFieldLabel(string $field): string
+    {
+        $map = [
+            'sube' => 'Şube',
+            'departman' => 'Departman',
+            'gorev' => 'Görev',
+            'personel_tipi' => 'Statü / Personel Tipi',
+            'sgk_isveren' => 'SGK İşveren',
+            'calisma_lokasyonu' => 'Çalışma Lokasyonu',
+            'bolum' => 'Bölüm',
+            'birim' => 'Birim',
+            'pozisyon' => 'Pozisyon',
+        ];
+
+        return $map[$field] ?? $field;
+    }
     private static function resolveReferences(
         array $rowMap,
         array $catalog,
         array &$hataKodlari,
         bool $hasOrgCols = false,
-        bool $hasOrgStructCols = false
+        bool $hasOrgStructCols = false,
+        ?array &$autoMatches = null,
+        ?array &$ambiguous = null,
+        ?array &$unknownMatches = null
     ) {
-        $subeId = PersonelImportReferenceCatalogService::resolveExactUnique(
-            $rowMap['sube'] ?? '',
-            $catalog['sube'],
-            'sube',
-            $hataKodlari
-        );
-        $departmanId = PersonelImportReferenceCatalogService::resolveExactUnique(
-            $rowMap['departman'] ?? '',
-            $catalog['departman'],
-            'departman',
-            $hataKodlari
-        );
-        $gorevId = PersonelImportReferenceCatalogService::resolveExactUnique(
-            $rowMap['gorev'] ?? '',
-            $catalog['gorev'],
-            'gorev',
-            $hataKodlari
-        );
-        $personelTipiId = PersonelImportReferenceCatalogService::resolveExactUnique(
-            $rowMap['personel_tipi'] ?? '',
-            $catalog['personel_tipi'],
-            'personel_tipi',
-            $hataKodlari
-        );
+        if ($autoMatches === null) {
+            $autoMatches = [];
+        }
+        if ($ambiguous === null) {
+            $ambiguous = [];
+        }
+        if ($unknownMatches === null) {
+            $unknownMatches = [];
+        }
+        $subeId = PersonelImportReferenceCatalogService::resolveExactUnique($rowMap['sube'] ?? '', $catalog['sube'], 'sube', $hataKodlari, $autoMatches, $ambiguous, $unknownMatches);
+        $departmanId = PersonelImportReferenceCatalogService::resolveExactUnique($rowMap['departman'] ?? '', $catalog['departman'], 'departman', $hataKodlari, $autoMatches, $ambiguous, $unknownMatches);
+        $gorevId = PersonelImportReferenceCatalogService::resolveExactUnique($rowMap['gorev'] ?? '', $catalog['gorev'], 'gorev', $hataKodlari, $autoMatches, $ambiguous, $unknownMatches);
+        $personelTipiId = PersonelImportReferenceCatalogService::resolveExactUnique($rowMap['personel_tipi'] ?? '', $catalog['personel_tipi'], 'personel_tipi', $hataKodlari, $autoMatches, $ambiguous, $unknownMatches);
 
         $sgkIsverenId = null;
         $calismaLokasyonuId = null;
@@ -889,25 +918,15 @@ final class PersonelImportDryRunService
             if (array_key_exists('sgk_isveren', $rowMap)) {
                 $raw = trim((string) $rowMap['sgk_isveren']);
                 if ($raw !== '') {
-                    $sgkIsverenId = PersonelImportReferenceCatalogService::resolveExactUnique(
-                        $raw,
-                        isset($catalog['sgk_isveren']) && is_array($catalog['sgk_isveren']) ? $catalog['sgk_isveren'] : [],
-                        'sgk_isveren',
-                        $hataKodlari
-                    );
+                    $sgkIsverenId = PersonelImportReferenceCatalogService::resolveExactUnique($raw, isset($catalog['sgk_isveren']) && is_array($catalog['sgk_isveren']) ? $catalog['sgk_isveren'] : [], 'sgk_isveren', $hataKodlari, $autoMatches, $ambiguous, $unknownMatches);
                 }
             }
             if (array_key_exists('calisma_lokasyonu', $rowMap)) {
                 $raw = trim((string) $rowMap['calisma_lokasyonu']);
                 if ($raw !== '') {
-                    $calismaLokasyonuId = PersonelImportReferenceCatalogService::resolveExactUnique(
-                        $raw,
-                        isset($catalog['calisma_lokasyonu']) && is_array($catalog['calisma_lokasyonu'])
+                    $calismaLokasyonuId = PersonelImportReferenceCatalogService::resolveExactUnique($raw, isset($catalog['calisma_lokasyonu']) && is_array($catalog['calisma_lokasyonu'])
                             ? $catalog['calisma_lokasyonu']
-                            : [],
-                        'calisma_lokasyonu',
-                        $hataKodlari
-                    );
+                            : [], 'calisma_lokasyonu', $hataKodlari, $autoMatches, $ambiguous, $unknownMatches);
                 }
             }
         }
@@ -919,40 +938,23 @@ final class PersonelImportDryRunService
             if (array_key_exists('bolum', $rowMap)) {
                 $raw = trim((string) $rowMap['bolum']);
                 if ($raw !== '') {
-                    $bolumId = PersonelImportReferenceCatalogService::resolveExactUniqueWithinParent(
-                        $raw,
-                        isset($catalog['bolum_by_departman']) && is_array($catalog['bolum_by_departman'])
+                    $bolumId = PersonelImportReferenceCatalogService::resolveExactUniqueWithinParent($raw, isset($catalog['bolum_by_departman']) && is_array($catalog['bolum_by_departman'])
                             ? $catalog['bolum_by_departman']
-                            : [],
-                        $departmanId,
-                        'bolum',
-                        $hataKodlari
-                    );
+                            : [], $departmanId, 'bolum', $hataKodlari, $autoMatches, $ambiguous, $unknownMatches);
                 }
             }
             if (array_key_exists('birim', $rowMap)) {
                 $raw = trim((string) $rowMap['birim']);
                 if ($raw !== '') {
-                    $birimId = PersonelImportReferenceCatalogService::resolveExactUniqueWithinParent(
-                        $raw,
-                        isset($catalog['birim_by_bolum']) && is_array($catalog['birim_by_bolum'])
+                    $birimId = PersonelImportReferenceCatalogService::resolveExactUniqueWithinParent($raw, isset($catalog['birim_by_bolum']) && is_array($catalog['birim_by_bolum'])
                             ? $catalog['birim_by_bolum']
-                            : [],
-                        $bolumId,
-                        'birim',
-                        $hataKodlari
-                    );
+                            : [], $bolumId, 'birim', $hataKodlari, $autoMatches, $ambiguous, $unknownMatches);
                 }
             }
             if (array_key_exists('pozisyon', $rowMap)) {
                 $raw = trim((string) $rowMap['pozisyon']);
                 if ($raw !== '') {
-                    $pozisyonId = PersonelImportReferenceCatalogService::resolveExactUnique(
-                        $raw,
-                        isset($catalog['pozisyon']) && is_array($catalog['pozisyon']) ? $catalog['pozisyon'] : [],
-                        'pozisyon',
-                        $hataKodlari
-                    );
+                    $pozisyonId = PersonelImportReferenceCatalogService::resolveExactUnique($raw, isset($catalog['pozisyon']) && is_array($catalog['pozisyon']) ? $catalog['pozisyon'] : [], 'pozisyon', $hataKodlari, $autoMatches, $ambiguous, $unknownMatches);
                 }
             }
         }

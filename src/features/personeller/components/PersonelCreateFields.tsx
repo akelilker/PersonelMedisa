@@ -1,13 +1,11 @@
 import {
-  useEffect,
   useLayoutEffect,
   useMemo,
-  useRef,
-  useState,
   type Dispatch,
   type SetStateAction
 } from "react";
-import { FormField, type FormFieldOption } from "../../../components/form/FormField";
+import { AppSelectField } from "../../../components/form/AppSelect";
+import { FormField } from "../../../components/form/FormField";
 import { mapUcretTipiSelectOptions } from "../../../lib/display/ucret-tipi-display";
 import { CALISAN_KAPSAMI_SELECT_OPTIONS } from "../../../lib/display/enum-display";
 import type { PersonelReferenceBundle } from "../../../data/app-data.types";
@@ -38,19 +36,6 @@ type PersonelCreateFieldsProps = {
   canManageUcret?: boolean;
 };
 
-type PersonelCreateSelectProps = {
-  label: string;
-  name: string;
-  value: string;
-  options: FormFieldOption[];
-  onChange: (value: string) => void;
-  isOpen: boolean;
-  onOpenChange: (isOpen: boolean) => void;
-  placeholderOption?: FormFieldOption;
-  required?: boolean;
-  disabled?: boolean;
-};
-
 function toSelectOptions(options: IdOption[]) {
   return options.map((option) => ({ value: String(option.id), label: option.label }));
 }
@@ -76,109 +61,6 @@ function refMissingNote(label: string, blocking: boolean) {
   );
 }
 
-function PersonelCreateSelect({
-  label,
-  name,
-  value,
-  options,
-  onChange,
-  isOpen,
-  onOpenChange,
-  placeholderOption,
-  required = false,
-  disabled = false
-}: PersonelCreateSelectProps) {
-  const rootRef = useRef<HTMLDivElement>(null);
-  const labelId = `${name}-label`;
-  const panelId = `${name}-panel`;
-  const allOptions = useMemo(
-    () => (placeholderOption ? [placeholderOption, ...options] : options),
-    [options, placeholderOption]
-  );
-  const selectedOption = allOptions.find((option) => option.value === value) ?? placeholderOption ?? null;
-  const isPlaceholderSelected = placeholderOption ? value === placeholderOption.value : false;
-
-  useEffect(() => {
-    if (!isOpen) {
-      return;
-    }
-
-    function handleMouseDown(event: MouseEvent) {
-      if (!rootRef.current?.contains(event.target as Node)) {
-        onOpenChange(false);
-      }
-    }
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        onOpenChange(false);
-      }
-    }
-
-    document.addEventListener("mousedown", handleMouseDown);
-    document.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      document.removeEventListener("mousedown", handleMouseDown);
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [isOpen, onOpenChange]);
-
-  return (
-    <div className="form-section personel-create-select" ref={rootRef}>
-      <label className="form-label" id={labelId}>
-        {label}
-      </label>
-      <button
-        type="button"
-        id={name}
-        className={`form-input personel-create-select-trigger${isOpen ? " is-open" : ""}${
-          isPlaceholderSelected ? " is-placeholder" : ""
-        }`}
-        role="combobox"
-        aria-labelledby={labelId}
-        aria-expanded={isOpen}
-        aria-controls={panelId}
-        aria-required={required}
-        disabled={disabled}
-        onClick={() => onOpenChange(!isOpen)}
-      >
-        <span>{selectedOption?.label ?? "Seçiniz"}</span>
-        <span className="personel-create-select-caret" aria-hidden="true">
-          v
-        </span>
-      </button>
-
-      {isOpen ? (
-        <div className="personel-create-select-panel" id={panelId} role="listbox" aria-labelledby={labelId}>
-          {allOptions.map((option) => {
-            const isSelected = value === option.value;
-            const isPlaceholder = placeholderOption ? option.value === placeholderOption.value : false;
-
-            return (
-              <button
-                key={`${name}-${option.value || "empty"}`}
-                type="button"
-                role="option"
-                aria-selected={isSelected}
-                className={`personel-create-select-option${isSelected ? " is-active" : ""}${
-                  isPlaceholder ? " is-placeholder" : ""
-                }`}
-                onClick={() => {
-                  onChange(option.value);
-                  onOpenChange(false);
-                }}
-              >
-                {option.label}
-              </button>
-            );
-          })}
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
 export function PersonelCreateFields({
   form,
   setForm,
@@ -197,7 +79,6 @@ export function PersonelCreateFields({
   className,
   canManageUcret = false
 }: PersonelCreateFieldsProps) {
-  const [openSelectName, setOpenSelectName] = useState<string | null>(null);
   const tcKimlikNoFieldError = fieldErrors?.tcKimlikNo;
   const subeIdFieldError = fieldErrors?.subeId;
 
@@ -206,9 +87,6 @@ export function PersonelCreateFields({
     [form.subeId, refs.sgkIsverenOptions, subeOptions]
   );
 
-  function setSelectOpen(name: string, isOpen: boolean) {
-    setOpenSelectName(isOpen ? name : null);
-  }
 
   function handleSubeChange(value: string) {
     const nextSgkOptions = filterSgkIsverenOptionsForSube(refs.sgkIsverenOptions, subeOptions, value);
@@ -286,7 +164,7 @@ export function PersonelCreateFields({
     <div className={className}>
       <div className="personel-form-columns">
         <div className="personel-form-column">
-          <PersonelCreateSelect
+          <AppSelectField
             label="Çalışan Kapsamı"
             name="create-calisan-kapsami"
             value={form.calisanKapsami}
@@ -299,8 +177,6 @@ export function PersonelCreateFields({
             }
             required
             options={CALISAN_KAPSAMI_SELECT_OPTIONS}
-            isOpen={openSelectName === "create-calisan-kapsami"}
-            onOpenChange={(isOpen) => setSelectOpen("create-calisan-kapsami", isOpen)}
           />
           <p className="personel-form-note personel-form-note--info" data-testid="create-sicil-auto-note">
             Sicil numarası kayıt sırasında otomatik atanacaktır.
@@ -378,15 +254,13 @@ export function PersonelCreateFields({
             onChange={(value) => setForm((prev) => ({ ...prev, dogumYeri: value }))}
             placeholder="Örn. İstanbul"
           />
-          <PersonelCreateSelect
+          <AppSelectField
             label="Kan Grubu"
             name="create-kan"
             value={form.kanGrubu}
             onChange={(value) => setForm((prev) => ({ ...prev, kanGrubu: value }))}
             placeholderOption={{ value: "", label: "Seçiniz" }}
             options={kanGrubuOptions}
-            isOpen={openSelectName === "create-kan"}
-            onOpenChange={(isOpen) => setSelectOpen("create-kan", isOpen)}
           />
         </div>
 
@@ -405,7 +279,7 @@ export function PersonelCreateFields({
             </p>
           ) : subeOptions.length > 0 ? (
             <>
-              <PersonelCreateSelect
+              <AppSelectField
                 label="Şube"
                 name="create-sube"
                 value={form.subeId}
@@ -413,8 +287,6 @@ export function PersonelCreateFields({
                 required={form.calisanKapsami !== "DIS_KAYNAK"}
                 placeholderOption={{ value: "", label: "Seçiniz" }}
                 options={toSelectOptions(subeOptions)}
-                isOpen={openSelectName === "create-sube"}
-                onOpenChange={(isOpen) => setSelectOpen("create-sube", isOpen)}
               />
               {subeIdFieldError ? (
                 <p className="personel-create-error" role="alert">
@@ -428,7 +300,7 @@ export function PersonelCreateFields({
           {form.calisanKapsami !== "DIS_KAYNAK" ? (
             refs.sgkIsverenOptions.length > 0 ? (
               <>
-                <PersonelCreateSelect
+                <AppSelectField
                   label="SGK İşveren"
                   name="create-sgk-isveren"
                   value={form.sgkIsverenId}
@@ -436,8 +308,6 @@ export function PersonelCreateFields({
                   required
                   placeholderOption={{ value: "", label: "Seçiniz" }}
                   options={toSelectOptions(filteredSgkIsverenOptions)}
-                  isOpen={openSelectName === "create-sgk-isveren"}
-                  onOpenChange={(isOpen) => setSelectOpen("create-sgk-isveren", isOpen)}
                   disabled={!form.subeId}
                 />
                 {form.subeId && filteredSgkIsverenOptions.length === 0 ? (
@@ -451,20 +321,18 @@ export function PersonelCreateFields({
             )
           ) : null}
           {form.calisanKapsami !== "DIS_KAYNAK" && refs.calismaLokasyonuOptions.length > 0 ? (
-            <PersonelCreateSelect
+            <AppSelectField
               label="Çalışma Lokasyonu"
               name="create-calisma-lokasyonu"
               value={form.calismaLokasyonuId}
               onChange={(value) => setForm((prev) => ({ ...prev, calismaLokasyonuId: value }))}
               placeholderOption={{ value: "", label: "Seçiniz" }}
               options={toSelectOptions(refs.calismaLokasyonuOptions)}
-              isOpen={openSelectName === "create-calisma-lokasyonu"}
-              onOpenChange={(isOpen) => setSelectOpen("create-calisma-lokasyonu", isOpen)}
             />
           ) : null}
           {refs.bagliAmirOptions.length > 0 ? (
             <>
-              <PersonelCreateSelect
+              <AppSelectField
                 label="Bağlı Amir"
                 name="create-bagli-amir"
                 value={form.bagliAmirId}
@@ -474,8 +342,6 @@ export function PersonelCreateFields({
                 }
                 placeholderOption={{ value: "", label: "Seçiniz" }}
                 options={toSelectOptions(refs.bagliAmirOptions)}
-                isOpen={openSelectName === "create-bagli-amir"}
-                onOpenChange={(isOpen) => setSelectOpen("create-bagli-amir", isOpen)}
               />
               {bagliAmirInfoMessage ? (
                 <p className="personel-form-note personel-form-note--info">{bagliAmirInfoMessage}</p>
@@ -489,7 +355,7 @@ export function PersonelCreateFields({
           )}
           {refs.departmanOptions.length > 0 ? (
             <>
-              <PersonelCreateSelect
+              <AppSelectField
                 label="Departman"
                 name="create-departman"
                 value={form.departmanId}
@@ -497,8 +363,6 @@ export function PersonelCreateFields({
                 required={form.calisanKapsami !== "DIS_KAYNAK"}
                 placeholderOption={{ value: "", label: "Seçiniz" }}
                 options={toSelectOptions(refs.departmanOptions)}
-                isOpen={openSelectName === "create-departman"}
-                onOpenChange={(isOpen) => setSelectOpen("create-departman", isOpen)}
               />
               {bagliAmirDepartmanWarning ? (
                 <p className="personel-form-note personel-form-note--warning">
@@ -510,7 +374,7 @@ export function PersonelCreateFields({
             refMissingNote("Departman", true)
           )}
           {refs.bolumOptions.length > 0 ? (
-            <PersonelCreateSelect
+            <AppSelectField
               label="Bölüm"
               name="create-bolum"
               value={form.bolumId}
@@ -531,13 +395,11 @@ export function PersonelCreateFields({
                   (opt) => !form.departmanId || String(opt.parentId ?? "") === form.departmanId
                 )
               )}
-              isOpen={openSelectName === "create-bolum"}
-              onOpenChange={(isOpen) => setSelectOpen("create-bolum", isOpen)}
               disabled={!form.departmanId}
             />
           ) : null}
           {refs.birimOptions.length > 0 ? (
-            <PersonelCreateSelect
+            <AppSelectField
               label="Birim"
               name="create-birim"
               value={form.birimId}
@@ -548,13 +410,11 @@ export function PersonelCreateFields({
                   (opt) => !form.bolumId || String(opt.parentId ?? "") === form.bolumId
                 )
               )}
-              isOpen={openSelectName === "create-birim"}
-              onOpenChange={(isOpen) => setSelectOpen("create-birim", isOpen)}
               disabled={!form.bolumId}
             />
           ) : null}
           {refs.gorevOptions.length > 0 ? (
-            <PersonelCreateSelect
+            <AppSelectField
               label="Görev / Unvan"
               name="create-gorev"
               value={form.gorevId}
@@ -562,26 +422,22 @@ export function PersonelCreateFields({
               required={form.calisanKapsami !== "DIS_KAYNAK"}
               placeholderOption={{ value: "", label: "Seçiniz" }}
               options={toSelectOptions(refs.gorevOptions)}
-              isOpen={openSelectName === "create-gorev"}
-              onOpenChange={(isOpen) => setSelectOpen("create-gorev", isOpen)}
             />
           ) : (
             refMissingNote("Görev / Unvan", true)
           )}
           {refs.pozisyonOptions.length > 0 ? (
-            <PersonelCreateSelect
+            <AppSelectField
               label="Pozisyon"
               name="create-pozisyon"
               value={form.pozisyonId}
               onChange={(value) => setForm((prev) => ({ ...prev, pozisyonId: value }))}
               placeholderOption={{ value: "", label: "Seçiniz" }}
               options={toSelectOptions(refs.pozisyonOptions)}
-              isOpen={openSelectName === "create-pozisyon"}
-              onOpenChange={(isOpen) => setSelectOpen("create-pozisyon", isOpen)}
             />
           ) : null}
           {refs.personelTipiOptions.length > 0 ? (
-            <PersonelCreateSelect
+            <AppSelectField
               label="Çalışma Tipi"
               name="create-personel-tipi"
               value={form.personelTipiId}
@@ -589,21 +445,17 @@ export function PersonelCreateFields({
               required={form.calisanKapsami !== "DIS_KAYNAK"}
               placeholderOption={{ value: "", label: "Seçiniz" }}
               options={toSelectOptions(refs.personelTipiOptions)}
-              isOpen={openSelectName === "create-personel-tipi"}
-              onOpenChange={(isOpen) => setSelectOpen("create-personel-tipi", isOpen)}
             />
           ) : (
             refMissingNote("Çalışma Tipi", true)
           )}
           {form.calisanKapsami !== "DIS_KAYNAK" && refs.ucretTipiOptions.length > 0 ? (
-            <PersonelCreateSelect
+            <AppSelectField
               label="Ücret Tipi"
               name="create-ucret-tipi"
               value={form.ucretTipiId}
               onChange={(value) => setForm((prev) => ({ ...prev, ucretTipiId: value }))}
               options={mapUcretTipiSelectOptions(refs.ucretTipiOptions)}
-              isOpen={openSelectName === "create-ucret-tipi"}
-              onOpenChange={(isOpen) => setSelectOpen("create-ucret-tipi", isOpen)}
             />
           ) : (
             refMissingNote("Ücret Tipi", false)

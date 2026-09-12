@@ -119,7 +119,8 @@ class PersonellerController
             }
         }
 
-        PersonelSearchPredicate::append($where, $params, $search, 'p', 'search', $pdo);
+        $includeOrgNames = PersonelOrgStructureSchema::hasPersonelScopeColumns($pdo);
+        PersonelSearchPredicate::append($where, $params, $search, 'p', 'search', $pdo, $includeOrgNames);
 
         $missingPredicate = PersonelCompletenessService::sqlHasMissingPredicate(
             'p',
@@ -149,12 +150,27 @@ class PersonellerController
 
         $offset = ($page - 1) * $limit;
         $select = self::personelSelectSql($pdo);
+
+        $sortRaw = strtolower(trim((string) ($request->getQuery('sort', $request->getQuery('sort_by', '')) ?: '')));
+        $dirRaw = strtolower(trim((string) ($request->getQuery('dir', $request->getQuery('sort_dir', 'asc')) ?: 'asc')));
+        $dirSql = $dirRaw === 'desc' ? 'DESC' : 'ASC';
+        $hasOrg = PersonelOrgStructureSchema::hasPersonelScopeColumns($pdo);
+        $orderExpressions = [
+            'ad' => "CONCAT_WS(' ', p.ad, p.soyad)",
+            'sube' => 's.ad',
+            'bolum' => $hasOrg ? "CONCAT_WS(' ', b.ad, bi.ad)" : 'd.ad',
+            'gorev' => 'g.ad',
+            'statu' => 'pt.ad',
+        ];
+        $orderExpr = $orderExpressions[$sortRaw] ?? 'p.id';
+        $orderBySql = $orderExpr . ' ' . $dirSql . ', p.id ASC';
+
         $sql = "
             SELECT {$select['columns']}
             FROM personeller p
             {$select['joins']}
             WHERE $whereSql
-            ORDER BY p.id ASC
+            ORDER BY {$orderBySql}
             LIMIT :limit OFFSET :offset
         ";
         $stmt = $pdo->prepare($sql);

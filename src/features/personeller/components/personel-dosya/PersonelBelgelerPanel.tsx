@@ -2,6 +2,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "re
 import { Link } from "react-router-dom";
 import { AppActionDialog } from "../../../../components/modal/AppActionDialog";
 import { AppModal } from "../../../../components/modal/AppModal";
+import { AppSelect } from "../../../../components/form/AppSelect";
 import { fetchPersonelBelgeDurumu } from "../../../../api/belgeler.api";
 import {
   cancelPersonelBelgeKaydi,
@@ -1028,22 +1029,20 @@ function renderBelgeFormFields(
         <label className="form-label" htmlFor="personel-belge-tipi">
           Kayıt tipi
         </label>
-        <select
+        <AppSelect
           id="personel-belge-tipi"
           value={draft.kayit_tipi}
-          onChange={(event) =>
+          options={PERSONEL_BELGE_KAYIT_TIPI_KEYS.map((tip) => ({
+            value: tip,
+            label: PERSONEL_BELGE_KAYIT_TIPI_LABELS[tip]
+          }))}
+          onChange={(value) =>
             setDraft((prev) => ({
               ...prev,
-              kayit_tipi: event.target.value as PersonelBelgeKayitTipi
+              kayit_tipi: value as PersonelBelgeKayitTipi
             }))
           }
-        >
-          {PERSONEL_BELGE_KAYIT_TIPI_KEYS.map((tip) => (
-            <option key={tip} value={tip}>
-              {PERSONEL_BELGE_KAYIT_TIPI_LABELS[tip]}
-            </option>
-          ))}
-        </select>
+        />
       </div>
       <div className="form-section">
         <label className="form-label" htmlFor="personel-belge-ad">

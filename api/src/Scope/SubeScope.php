@@ -67,15 +67,19 @@ class SubeScope
             return null;
         }
 
-        if ($preferredSubeId !== null && $preferredSubeId !== '') {
-            $preferred = (int) $preferredSubeId;
-            if ($preferred > 0 && in_array($preferred, $subeIds, true)) {
-                return $preferred;
-            }
-        }
-
         if (count($subeIds) === 1) {
             return $subeIds[0];
+        }
+
+        // Multi-scope: keep null (TÜMÜ). Only fall back to first when preferred is
+        // non-null but not in the authorized selector set.
+        if ($preferredSubeId === null || $preferredSubeId === '') {
+            return null;
+        }
+
+        $preferred = (int) $preferredSubeId;
+        if ($preferred > 0 && in_array($preferred, $subeIds, true)) {
+            return $preferred;
         }
 
         return $subeIds[0];

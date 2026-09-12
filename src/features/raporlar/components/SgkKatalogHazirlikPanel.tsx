@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { ApiRequestError } from "../../../api/api-client";
+import { AppSelect } from "../../../components/form/AppSelect";
 import {
   approveSgkKatalog,
   approveSgkSirketPolitikasi,
@@ -995,10 +996,15 @@ export function SgkKatalogHazirlikPanel() {
             </label>
             <label>
               Hedef türü
-              <select value={overrideTargetType} onChange={(e) => setOverrideTargetType(e.target.value as "SUREC" | "GUNLUK_PUANTAJ")} data-testid="sgk-override-target-type">
-                <option value="SUREC">Süreç</option>
-                <option value="GUNLUK_PUANTAJ">Günlük puantaj (mühür satırı)</option>
-              </select>
+              <AppSelect
+                value={overrideTargetType}
+                onChange={(value) => setOverrideTargetType(value as "SUREC" | "GUNLUK_PUANTAJ")}
+                dataTestId="sgk-override-target-type"
+                options={[
+                  { value: "SUREC", label: "Süreç" },
+                  { value: "GUNLUK_PUANTAJ", label: "Günlük puantaj (mühür satırı)" }
+                ]}
+              />
             </label>
             <label>
               Hedef ID

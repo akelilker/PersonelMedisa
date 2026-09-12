@@ -429,6 +429,57 @@ const DEMO_DEPARTMANLAR: DemoDepartman[] = [
   { id: 12, ad: "Ar-Ge" }
 ];
 
+type DemoBolum = {
+  id: number;
+  ad: string;
+  departman_id: number;
+};
+
+type DemoBirim = {
+  id: number;
+  ad: string;
+  bolum_id: number;
+};
+
+type DemoPozisyon = {
+  id: number;
+  ad: string;
+};
+
+/**
+ * Bolum referans listesi (departman_id ile bagli; sabit ID sirasi).
+ * Demo-only: production katalog cekilmez, sabit ve deterministiktir.
+ */
+const DEMO_BOLUMLER: DemoBolum[] = [
+  { id: 1, ad: "Muhasebe Bölümü", departman_id: 1 },
+  { id: 2, ad: "Finans Bölümü", departman_id: 2 },
+  { id: 3, ad: "Döşeme Üretim Bölümü", departman_id: 3 },
+  { id: 4, ad: "Panel Üretim Bölümü", departman_id: 4 },
+  { id: 5, ad: "Depo Bölümü", departman_id: 6 },
+  { id: 6, ad: "İdari İşler Bölümü", departman_id: 10 }
+];
+
+/** Birim referans listesi (bolum_id ile bagli; sabit ID sirasi). */
+const DEMO_BIRIMLER: DemoBirim[] = [
+  { id: 1, ad: "Muhasebe Birimi", bolum_id: 1 },
+  { id: 2, ad: "Finans Birimi", bolum_id: 2 },
+  { id: 3, ad: "Döşeme Hattı", bolum_id: 3 },
+  { id: 4, ad: "Kalite Kontrol Birimi", bolum_id: 3 },
+  { id: 5, ad: "Panel Hattı", bolum_id: 4 },
+  { id: 6, ad: "Sevkiyat Birimi", bolum_id: 5 },
+  { id: 7, ad: "İdari İşler Birimi", bolum_id: 6 }
+];
+
+/** Pozisyon referans listesi (sabit ID sirasi). */
+const DEMO_POZISYONLAR: DemoPozisyon[] = [
+  { id: 1, ad: "Operatör" },
+  { id: 2, ad: "Usta" },
+  { id: 3, ad: "Şef" },
+  { id: 4, ad: "Takım Lideri" },
+  { id: 5, ad: "Uzman" },
+  { id: 6, ad: "Yönetici" }
+];
+
 /** GÃ¶rev/unvan referans listesi (sabit ID sÄ±rasÄ±). */
 const DEMO_GOREVLER: Array<{ id: number; ad: string }> = [
   { id: 1, ad: "Genel Müdür" },
@@ -445,7 +496,8 @@ const DEMO_GOREVLER: Array<{ id: number; ad: string }> = [
   { id: 12, ad: "Güvenlik Personeli" },
   { id: 13, ad: "Satış Sonrası (SSH)" },
   { id: 14, ad: "Şoför" },
-  { id: 15, ad: "Aşçı" }
+  { id: 15, ad: "Aşçı" },
+  { id: 16, ad: "İnsan Kaynakları Sorumlusu" }
 ];
 
 const DEMO_GOREV_LABELS: Record<number, string> = DEMO_GOREVLER.reduce(
@@ -953,6 +1005,22 @@ const demoState: {
       id: 2,
       kod: "DPL",
       ad: "Depolama",
+      sirket_id: 2,
+      departman_ids: [6],
+      durum: "AKTIF"
+    },
+    {
+      id: 3,
+      kod: "ANK-M",
+      ad: "Medisa Ankara",
+      sirket_id: 1,
+      departman_ids: [1],
+      durum: "AKTIF"
+    },
+    {
+      id: 4,
+      kod: "ANK-K",
+      ad: "Karyapı Ankara",
       sirket_id: 2,
       departman_ids: [6],
       durum: "AKTIF"
@@ -5552,32 +5620,43 @@ export function resolveDemoApiResponse(
     const limit = toNumber(requestUrl.searchParams.get("limit")) ?? 10;
     const aktiflik = toStringValue(requestUrl.searchParams.get("aktiflik")) ?? "tum";
     const search = toStringValue(requestUrl.searchParams.get("search")) ?? "";
-    const subeId = toNumber(requestUrl.searchParams.get("sube_id"));
+    const querySubeId = toNumber(requestUrl.searchParams.get("sube_id"));
+    const headerRaw = readDemoRequestHeader(init, "X-Active-Sube-Id");
+    const headerSubeId =
+      headerRaw === undefined || headerRaw === "" ? null : toNumber(headerRaw);
+    // Explicit query sube_id wins; empty/omitted header does not force a branch.
+    const subeId = querySubeId !== null ? querySubeId : headerSubeId;
     const departmanId = toNumber(requestUrl.searchParams.get("departman_id"));
     const personelTipiId = toNumber(requestUrl.searchParams.get("personel_tipi_id"));
     const calisanKapsami = toStringValue(requestUrl.searchParams.get("calisan_kapsami"));
     const eksikBilgiRaw = (toStringValue(requestUrl.searchParams.get("eksik_bilgi")) ?? "").toLowerCase();
     const eksikBilgiOnly = ["1", "true", "yes", "eksik", "missing"].includes(eksikBilgiRaw);
+    const sortRaw = (toStringValue(requestUrl.searchParams.get("sort"))
+      ?? toStringValue(requestUrl.searchParams.get("sort_by"))
+      ?? "").toLowerCase();
+    const dirRaw = (toStringValue(requestUrl.searchParams.get("dir"))
+      ?? toStringValue(requestUrl.searchParams.get("sort_dir"))
+      ?? "asc").toLowerCase();
+    const dirMul = dirRaw === "desc" ? -1 : 1;
 
-    const scoped = demoState.personeller.filter((item) => {
-      if (aktiflik === "aktif" && item.aktif_durum !== "AKTIF") {
-        return false;
-      }
-      if (aktiflik === "pasif" && item.aktif_durum !== "PASIF") {
-        return false;
-      }
-      if (subeId !== null && item.sube_id !== subeId) {
-        return false;
-      }
-      if (departmanId !== null && item.departman_id !== departmanId) {
-        return false;
-      }
-      if (personelTipiId !== null && item.personel_tipi_id !== personelTipiId) {
-        return false;
-      }
-      if (calisanKapsami && (item.calisan_kapsami ?? "IC_PERSONEL") !== calisanKapsami) {
-        return false;
-      }
+    const enriched = demoState.personeller.map((item) => ({
+      ...item,
+      sube_adi: getSubeLabel(item.sube_id),
+      departman_adi: getDepartmanLabel(item.departman_id),
+      gorev_adi: getGorevAd(item.gorev_id),
+      personel_tipi_adi: getLabel(DEMO_PERSONEL_TIPI_LABELS, item.personel_tipi_id),
+      // bolum_adi / birim_adi if present on demo rows or via optional helpers
+      bolum_adi: (item as { bolum_adi?: string }).bolum_adi ?? null,
+      birim_adi: (item as { birim_adi?: string }).birim_adi ?? null
+    }));
+
+    const scoped = enriched.filter((item) => {
+      if (aktiflik === "aktif" && item.aktif_durum !== "AKTIF") return false;
+      if (aktiflik === "pasif" && item.aktif_durum !== "PASIF") return false;
+      if (subeId !== null && item.sube_id !== subeId) return false;
+      if (departmanId !== null && item.departman_id !== departmanId) return false;
+      if (personelTipiId !== null && item.personel_tipi_id !== personelTipiId) return false;
+      if (calisanKapsami && (item.calisan_kapsami ?? "IC_PERSONEL") !== calisanKapsami) return false;
       return personelSearchMatches(item, search);
     });
 
@@ -5585,19 +5664,44 @@ export function resolveDemoApiResponse(
       (item) => !evaluatePersonelCompleteness(item as Personel).is_complete
     ).length;
 
-    const filtered = eksikBilgiOnly
+    let filtered = eksikBilgiOnly
       ? scoped.filter((item) => !evaluatePersonelCompleteness(item as Personel).is_complete)
-      : scoped;
+      : scoped.slice();
+
+    const sortValue = (row: (typeof filtered)[number]): string => {
+      switch (sortRaw) {
+        case "ad":
+          return `${row.ad ?? ""} ${row.soyad ?? ""}`.toLocaleLowerCase("tr");
+        case "sube":
+          return String(row.sube_adi ?? "").toLocaleLowerCase("tr");
+        case "bolum":
+          return `${row.bolum_adi ?? row.departman_adi ?? ""} ${row.birim_adi ?? ""}`.toLocaleLowerCase("tr");
+        case "gorev":
+          return String(row.gorev_adi ?? "").toLocaleLowerCase("tr");
+        case "statu":
+          return String(row.personel_tipi_adi ?? "").toLocaleLowerCase("tr");
+        default:
+          return "";
+      }
+    };
+
+    if (sortRaw === "ad" || sortRaw === "sube" || sortRaw === "bolum" || sortRaw === "gorev" || sortRaw === "statu") {
+      filtered = filtered.sort((a, b) => {
+        const av = sortValue(a);
+        const bv = sortValue(b);
+        if (av < bv) return -1 * dirMul;
+        if (av > bv) return 1 * dirMul;
+        return (a.id ?? 0) - (b.id ?? 0);
+      });
+    } else {
+      filtered = filtered.sort((a, b) => (a.id ?? 0) - (b.id ?? 0));
+    }
 
     const start = (page - 1) * limit;
     const items = filtered.slice(start, start + limit).map((item) => {
       const completeness = evaluatePersonelCompleteness(item as Personel);
       return {
         ...item,
-        sube_adi: getSubeLabel(item.sube_id),
-        departman_adi: getDepartmanLabel(item.departman_id),
-        gorev_adi: getGorevAd(item.gorev_id),
-        personel_tipi_adi: getLabel(DEMO_PERSONEL_TIPI_LABELS, item.personel_tipi_id),
         bagli_amir_adi: getLabel(DEMO_BAGLI_AMIR_LABELS, item.bagli_amir_id),
         completeness: {
           is_complete: completeness.is_complete,
@@ -5610,9 +5714,7 @@ export function resolveDemoApiResponse(
     const totalPages = Math.max(1, Math.ceil(total / limit));
 
     return ok(
-      {
-        items
-      },
+      { items },
       {
         page,
         limit,
@@ -5733,6 +5835,7 @@ export function resolveDemoApiResponse(
     let gecerli = 0;
     let hatali = 0;
     let mevcut = 0;
+    let warningSayisi = 0;
 
     dataRows.forEach((line, index) => {
       const cells = line.split(delimiter).map((c) => c.trim());
@@ -5762,16 +5865,81 @@ export function resolveDemoApiResponse(
         hataKodlari.push("PERSONEL_IMPORT_GECERSIZ_TARIH");
       }
 
-      const resolve = (name: string, map: Map<string, number[]>) => {
-        const ids = map.get(name);
+      const normalizeKey = (value: string) =>
+        value
+          .trim()
+          .toLocaleLowerCase("tr-TR")
+          .replace(/ş/g, "s")
+          .replace(/ğ/g, "g")
+          .replace(/ü/g, "u")
+          .replace(/ö/g, "o")
+          .replace(/ç/g, "c")
+          .replace(/ı/g, "i")
+          .replace(/\s+/g, " ");
+
+      const resolveSmart = (
+        rawName: string,
+        map: Map<string, number[]>,
+        fieldLabel: string,
+        nameById: Map<number, string>
+      ) => {
+        const name = (rawName ?? "").trim();
         if (!name) return;
-        if (!ids || ids.length === 0) hataKodlari.push("PERSONEL_IMPORT_REFERANS_BULUNAMADI");
-        else if (ids.length > 1) hataKodlari.push("PERSONEL_IMPORT_REFERANS_BELIRSIZ");
+        // exact
+        const exact = map.get(name);
+        if (exact && exact.length === 1) return;
+        if (exact && exact.length > 1) {
+          hataKodlari.push("PERSONEL_IMPORT_REFERANS_BELIRSIZ");
+          const cands = exact.map((id) => nameById.get(id) ?? String(id));
+          uyarilar.push(`BELIRSIZ|${fieldLabel}|${name}|${cands.join(" ;; ")}`);
+          return;
+        }
+        // normalized unique / ambiguous / unknown
+        const want = normalizeKey(name);
+        const idToCanonical = new Map<number, string>();
+        for (const [canonical, ids] of map.entries()) {
+          if (normalizeKey(canonical) !== want) continue;
+          for (const id of ids) idToCanonical.set(id, canonical);
+        }
+        // short-name Ankara ambiguity: match if canonical ends with city token
+        if (idToCanonical.size === 0 && want.length >= 4) {
+          for (const [canonical, ids] of map.entries()) {
+            const nk = normalizeKey(canonical);
+            if (nk === want || nk.endsWith(" " + want) || nk.startsWith(want + " ")) {
+              for (const id of ids) idToCanonical.set(id, canonical);
+            }
+          }
+        }
+        if (idToCanonical.size === 0) {
+          hataKodlari.push("PERSONEL_IMPORT_REFERANS_BULUNAMADI");
+          uyarilar.push(`BULUNAMADI|${fieldLabel}|${name}`);
+          return;
+        }
+        if (idToCanonical.size > 1) {
+          hataKodlari.push("PERSONEL_IMPORT_REFERANS_BELIRSIZ");
+          uyarilar.push(
+            `BELIRSIZ|${fieldLabel}|${name}|${Array.from(idToCanonical.values()).join(" ;; ")}`
+          );
+          return;
+        }
+        const [[, canonical]] = Array.from(idToCanonical.entries());
+        if (canonical !== name) {
+          uyarilar.push(`${fieldLabel} '${name}' → '${canonical}' olarak eşleştirildi.`);
+        }
       };
-      resolve(row.sube ?? "", subeByName);
-      resolve(row.departman ?? "", departmanByName);
-      resolve(row.gorev ?? "", gorevByName);
-      resolve(row.personel_tipi ?? "", tipByName);
+
+      const subeNameById = new Map(demoState.subeler.map((s) => [s.id, s.ad] as const));
+      const depNameById = new Map(demoState.departmanlar.map((d) => [d.id, d.ad] as const));
+      const gorevNameById = new Map(demoState.gorevler.map((g) => [g.id, g.ad] as const));
+      const tipNameById = new Map(
+        Object.entries(DEMO_PERSONEL_TIPI_LABELS).map(([id, ad]) => [Number(id), ad] as const)
+      );
+
+      const uyarilar: string[] = [];
+      resolveSmart(row.sube ?? "", subeByName, "Şube", subeNameById);
+      resolveSmart(row.departman ?? "", departmanByName, "Departman", depNameById);
+      resolveSmart(row.gorev ?? "", gorevByName, "Görev", gorevNameById);
+      resolveSmart(row.personel_tipi ?? "", tipByName, "Statü / Personel Tipi", tipNameById);
 
       if (tc && seenTc.has(tc)) hataKodlari.push("PERSONEL_IMPORT_DOSYA_ICI_DUPLICATE_TC");
       if (tc) seenTc.add(tc);
@@ -5794,14 +5962,17 @@ export function resolveDemoApiResponse(
       const isValid = uniqueErrors.length === 0;
       if (isValid) gecerli += 1;
       else hatali += 1;
+      warningSayisi += uyarilar.length;
 
       satirlar.push({
         satir_no: index + 2,
         sicil_no: sicil,
+        ad: row.ad ?? "",
+        soyad: row.soyad ?? "",
         tc_kimlik_no_masked: masked,
         durum: isValid ? "GECERLI" : dbTc || dbSicil ? "MEVCUT" : "HATALI",
         hata_kodlari: uniqueErrors,
-        uyarilar: []
+        uyarilar
       });
     });
 
@@ -5820,7 +5991,7 @@ export function resolveDemoApiResponse(
         toplam_satir: dataRows.length,
         gecerli_satir: gecerli,
         hatali_satir: hatali,
-        warning_sayisi: 0,
+        warning_sayisi: warningSayisi,
         kayit_olusturulacak_aday: gecerli,
         veritabaninda_mevcut: mevcut
       },
@@ -10068,15 +10239,19 @@ export function resolveDemoApiResponse(
     }
 
     if (pathname === "/referans/bolumler") {
-      return ok([]);
+      const departmanId = toNumber(requestUrl.searchParams.get("departman_id"));
+      return ok(
+        departmanId === null ? DEMO_BOLUMLER : DEMO_BOLUMLER.filter((row) => row.departman_id === departmanId)
+      );
     }
 
     if (pathname === "/referans/birimler") {
-      return ok([]);
+      const bolumId = toNumber(requestUrl.searchParams.get("bolum_id"));
+      return ok(bolumId === null ? DEMO_BIRIMLER : DEMO_BIRIMLER.filter((row) => row.bolum_id === bolumId));
     }
 
     if (pathname === "/referans/pozisyonlar") {
-      return ok([]);
+      return ok(DEMO_POZISYONLAR);
     }
 
     if (pathname === "/referans/personel-tipleri") {

@@ -1,3 +1,7 @@
+:root {
+  --universal-btn-min-height: 32px;
+}
+
 .universal-btn-save,
 .universal-btn-cancel,
 .universal-btn-aux,
@@ -8,8 +12,8 @@ button {
 .universal-btn-save,
 .universal-btn-cancel,
 .universal-btn-aux {
-  min-height: 36px;
-  border-radius: var(--radius-sm);
+  min-height: var(--universal-btn-min-height);
+  border-radius: var(--radius-control);
 }
 
 .universal-btn-group {
@@ -45,14 +49,14 @@ button {
 
 .universal-btn-save,
 .universal-btn-cancel {
-  height: 36px;
-  border-radius: 8px;
+  height: 32px;
+  border-radius: var(--radius-control);
   border-width: 1px;
   border-style: solid;
   background: transparent;
   cursor: pointer;
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 11.5px;
+  font-weight: 500;
   line-height: 1;
   width: 100%;
   max-width: none;
@@ -78,35 +82,52 @@ button {
 
 .universal-btn-save:hover:not([disabled]),
 .universal-btn-save:focus-visible:not([disabled]) {
-  background: rgba(74, 222, 128, 0.1);
+  background: rgba(74, 222, 128, 0.15);
   border-color: var(--success);
   color: var(--success);
+  font-weight: 700;
   box-shadow: 0 0 0 2px rgba(74, 222, 128, 0.1);
 }
 
 .universal-btn-cancel {
-  color: var(--brand-red);
-  border-color: rgba(var(--theme-color-rgb), 0.5);
+  color: #d40000;
+  border-color: rgba(212, 0, 0, 0.5);
 }
 
 .universal-btn-cancel:hover:not([disabled]),
 .universal-btn-cancel:focus-visible:not([disabled]) {
-  background: rgba(var(--theme-color-rgb), 0.1);
-  border-color: var(--brand-red);
-  color: var(--brand-red-hover);
-  box-shadow: 0 0 0 2px rgba(var(--theme-color-rgb), 0.1);
+  background: rgba(212, 0, 0, 0.12);
+  border-color: #d40000;
+  color: #d40000;
+  font-weight: 700;
+  box-shadow: 0 0 0 2px rgba(212, 0, 0, 0.12);
 }
 
-/* Ikincil sayfa aksiyonlari: filtre, liste baglantisi, sayfalama — tek yardimci tur, universal save/cancel ile ayni dosyada */
+/* Destructive shared owner (Taşıt settings-btn-delete #ff4d4d) */
+.universal-btn-delete,
+.settings-btn-delete {
+  color: #ff4d4d;
+  border-color: rgba(255, 77, 77, 0.55);
+}
+
+.universal-btn-delete:hover:not([disabled]),
+.universal-btn-delete:focus-visible:not([disabled]),
+.settings-btn-delete:hover:not([disabled]),
+.settings-btn-delete:focus-visible:not([disabled]) {
+  background: rgba(255, 77, 77, 0.12);
+  border-color: #ff4d4d;
+  color: #ff4d4d;
+}
+
 .universal-btn-aux {
   justify-self: start;
   border: 1px solid var(--line-soft);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-control);
   background: transparent;
   color: inherit;
   padding: 0 12px;
   cursor: pointer;
-  font-size: 13px;
+  font-size: 12px;
   line-height: 1;
   font-weight: 500;
   transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease,

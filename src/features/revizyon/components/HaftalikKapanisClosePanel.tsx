@@ -3,6 +3,7 @@ import { createHaftalikKapanis } from "../../../api/haftalik-kapanis.api";
 import { getApiErrorMessage } from "../../../api/api-client";
 import { fetchDepartmanOptions } from "../../../api/referans.api";
 import { AppActionDialog } from "../../../components/modal/AppActionDialog";
+import { AppSelect } from "../../../components/form/AppSelect";
 import { useRoleAccess } from "../../../hooks/use-role-access";
 import {
   computeHaftaBitisFromMonday,
@@ -347,24 +348,18 @@ export function HaftalikKapanisClosePanel() {
           <label className="form-label" htmlFor="hk-close-departman">
             Departman
           </label>
-          <select
+          <AppSelect
             id="hk-close-departman"
-            data-testid="hk-close-departman"
-            className="form-input"
+            dataTestId="hk-close-departman"
             value={departmanId}
             disabled={isClosing}
-            onChange={(event) => {
+            placeholderOption={{ value: "", label: "Seçiniz" }}
+            options={departmanOptions.map((option) => ({ value: String(option.id), label: option.label }))}
+            onChange={(value) => {
               resetSuccessOnInputChange();
-              setDepartmanId(event.target.value);
+              setDepartmanId(value);
             }}
-          >
-            <option value="">Seçiniz</option>
-            {departmanOptions.map((option) => (
-              <option key={option.id} value={option.id}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+          />
         </>
       ) : null}
 

@@ -11,14 +11,14 @@
   margin: 0 auto;
   background: var(--bg);
   border-top: 0.5px solid var(--border-red-tech);
-  border-top-left-radius: var(--radius-lg);
-  border-top-right-radius: var(--radius-lg);
+  border-top-left-radius: var(--shell-top-radius);
+  border-top-right-radius: var(--shell-top-radius);
   overflow: hidden;
   overflow-x: hidden;
   /* Taşıt app-container depth: light lift + controlled dark inset (not outer red bloom). */
   box-shadow:
     0 2px 14px rgba(var(--theme-color-rgb), 0.1),
-    inset 0 0 48px rgba(10, 13, 28, 0.14);
+    inset 0 0 80px rgba(10, 13, 28, 0.22);
   /*
     * Modal shell contract:
     * - modal ustten app shell ust cercevesine kadar cikar
@@ -45,8 +45,8 @@
   border-top: 0.5px solid var(--border-red-tech);
   border-left: 0.5px solid var(--border-red-side);
   border-right: 0.5px solid var(--border-red-side);
-  border-top-left-radius: var(--radius-lg);
-  border-top-right-radius: var(--radius-lg);
+  border-top-left-radius: var(--shell-top-radius);
+  border-top-right-radius: var(--shell-top-radius);
   pointer-events: none;
   z-index: 2;
 }
@@ -160,7 +160,7 @@ body.modal-open .app-shell::before {
   padding: 0 var(--space-4);
   background: linear-gradient(180deg, var(--hero-gradient-start), var(--hero-gradient-end));
   border: 1px solid var(--border-subtle);
-  border-radius: 12px;
+  border-radius: var(--radius-card);
   cursor: pointer;
   text-align: center;
   transition: border-color 0.2s, background 0.2s, transform 0.2s, box-shadow 0.2s;
@@ -302,7 +302,7 @@ body.modal-open .app-shell::before {
 .kayit-tab-btn {
   min-height: 164px;
   border: 1px solid rgba(255, 255, 255, 0.28);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-card);
   background: transparent;
   color: var(--text-primary);
   font-size: 13px;
@@ -345,13 +345,13 @@ body.modal-open .app-shell::before {
 
 @media (max-width: 640px) {
   .app-shell {
-    border-top-left-radius: var(--radius-lg);
-    border-top-right-radius: var(--radius-lg);
+    border-top-left-radius: var(--shell-top-radius);
+    border-top-right-radius: var(--shell-top-radius);
   }
 
   .app-shell::before {
-    border-top-left-radius: var(--radius-lg);
-    border-top-right-radius: var(--radius-lg);
+    border-top-left-radius: var(--shell-top-radius);
+    border-top-right-radius: var(--shell-top-radius);
   }
 
   .user-chip strong,

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import footerLogo from "../../assets/brand/logo-footer.svg";
+import { getFooterVersionLabel, MEDISA_UI_VERSION } from "../../config/app-env";
 
 export function AppFooter() {
   const [isDimmed, setIsDimmed] = useState(true);
@@ -7,8 +8,13 @@ export function AppFooter() {
   const [online, setOnline] = useState(() =>
     typeof navigator !== "undefined" ? navigator.onLine : true
   );
+  const [versionLabel, setVersionLabel] = useState(MEDISA_UI_VERSION);
 
   const systemStatus: "ready" | "error" = online ? "ready" : "error";
+
+  useEffect(() => {
+    setVersionLabel(getFooterVersionLabel());
+  }, []);
 
   useEffect(() => {
     setIsDimmed(true);
@@ -48,7 +54,7 @@ export function AppFooter() {
   return (
     <footer id="app-footer" className={footerStateClasses || undefined}>
       <div className="footer-content">
-        <span className="version">v78.3</span>
+        <span className="version">{versionLabel}</span>
         <span className="brand">
           <img src={footerLogo} alt="MEDISA" />
         </span>

@@ -408,7 +408,13 @@ export function AppModal({
     >
       <div
         ref={dialogRef}
-        className={["modal-container", className].filter(Boolean).join(" ")}
+        className={[
+          "modal-container",
+          footer && (footerPlacement ?? "fixed") === "fixed" ? "modal-container--fixed-footer" : "",
+          className
+        ]
+          .filter(Boolean)
+          .join(" ")}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}

@@ -77,7 +77,7 @@ test.describe("Kayit Surec Görev / Organizasyon", () => {
     const kayitModal = await openOrganizasyonForAyse(page);
 
     await kayitModal.getByRole("combobox", { name: "Görev / Unvan" }).click();
-    await kayitModal.locator("#pozisyon-gorev-panel").getByRole("button", { name: "Üretim Müdürü" }).click();
+    await kayitModal.locator("#pozisyon-gorev-panel").getByRole("option", { name: "Üretim Müdürü" }).click();
     await fillOrgReason(kayitModal, "2026-08-01", "Gorev unvan degisikligi kaydi");
 
     const pozisyonKaydet = kayitModal.getByTestId("kayit-modal-footer-primary");
@@ -126,7 +126,7 @@ test.describe("Kayit Surec Görev / Organizasyon", () => {
     const kayitModal = await openOrganizasyonForAyse(page);
 
     await kayitModal.getByRole("combobox", { name: "Departman" }).click();
-    await kayitModal.locator("#pozisyon-departman-panel").getByRole("button", { name: "Finans" }).click();
+    await kayitModal.locator("#pozisyon-departman-panel").getByRole("option", { name: "Finans" }).click();
     await fillOrgReason(kayitModal, "2026-08-03", "Departman degisikligi kaydi");
 
     const orgPromise = page.waitForResponse(isOrgPost);
@@ -151,7 +151,7 @@ test.describe("Kayit Surec Görev / Organizasyon", () => {
 
     await kayitModal.getByRole("combobox", { name: "Bağlı Amir" }).click();
     const amirPanel = kayitModal.locator("#pozisyon-bagli-amir-panel");
-    await amirPanel.getByRole("button").nth(1).click();
+    await amirPanel.getByRole("option").nth(1).click();
 
     const putPromise = page.waitForResponse(isPersonelPut);
     const orgHits: string[] = [];

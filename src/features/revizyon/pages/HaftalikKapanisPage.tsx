@@ -4,6 +4,7 @@ import { ApiRequestError } from "../../../api/api-client";
 import { fetchPersonellerList } from "../../../api/personeller.api";
 import { fetchRevizyonKaynaklar } from "../../../api/revizyon-talebi.api";
 import { ErrorState } from "../../../components/states/ErrorState";
+import { AppSelect } from "../../../components/form/AppSelect";
 import { LoadingState } from "../../../components/states/LoadingState";
 import { useRoleAccess } from "../../../hooks/use-role-access";
 import { ROUTE_PERMISSION } from "../../../lib/authorization/role-permissions";
@@ -187,19 +188,17 @@ export function HaftalikKapanisPage() {
               <label className="form-label" htmlFor="hk-prefill-personel">
                 Personel
               </label>
-              <select
+              <AppSelect
                 id="hk-prefill-personel"
-                data-testid="hk-prefill-personel"
+                dataTestId="hk-prefill-personel"
                 value={personelId}
-                onChange={(event) => setPersonelId(event.target.value)}
-              >
-                <option value="">Seçiniz</option>
-                {personeller.map((personel) => (
-                  <option key={personel.id} value={personel.id}>
-                    {personel.ad} {personel.soyad} ({personel.sicil_no})
-                  </option>
-                ))}
-              </select>
+                placeholderOption={{ value: "", label: "Seçiniz" }}
+                options={personeller.map((personel) => ({
+                  value: String(personel.id),
+                  label: `${personel.ad} ${personel.soyad} (${personel.sicil_no})`
+                }))}
+                onChange={setPersonelId}
+              />
 
               <label className="form-label" htmlFor="hk-prefill-hafta">
                 Kapalı hafta başlangıcı (Pazartesi)

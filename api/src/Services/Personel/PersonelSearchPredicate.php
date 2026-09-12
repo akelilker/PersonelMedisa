@@ -105,7 +105,8 @@ final class PersonelSearchPredicate
         $raw,
         string $alias = 'p',
         string $paramPrefix = 'search',
-        ?PDO $pdo = null
+        ?PDO $pdo = null,
+        bool $includeOrgStructureNames = false
     ): void {
         $tokens = self::tokenize($raw);
         if ($tokens === []) {
@@ -113,7 +114,7 @@ final class PersonelSearchPredicate
         }
 
         $collate = self::collateSuffix($pdo);
-        $fields = self::searchableFieldExpressions($alias, $collate);
+        $fields = self::searchableFieldExpressions($alias, $collate, $includeOrgStructureNames);
         $prefix = preg_replace('/[^A-Za-z0-9_]/', '', $paramPrefix);
         $prefix = is_string($prefix) && $prefix !== '' ? $prefix : 'search';
 
@@ -136,16 +137,30 @@ final class PersonelSearchPredicate
      *
      * @return list<string>
      */
-    private static function searchableFieldExpressions(string $alias, string $collate): array
-    {
+    private static function searchableFieldExpressions(
+        string $alias,
+        string $collate,
+        bool $includeOrgStructureNames = false
+    ): array {
         $col = self::sanitizeAlias($alias) . '.';
 
-        return [
+        // Scalar subqueries keep COUNT(*) FROM personeller p valid without JOINs
+        // and never widen authorization (related rows only resolve names).
+        $fields = [
             "CONCAT_WS(' ', {$col}ad, {$col}soyad)" . $collate,
             $col . 'sicil_no' . $collate,
             $col . 'tc_kimlik_no' . $collate,
             $col . 'telefon' . $collate,
+            "(SELECT g.ad FROM gorevler g WHERE g.id = {$col}gorev_id LIMIT 1)" . $collate,
+            "(SELECT s.ad FROM subeler s WHERE s.id = {$col}sube_id LIMIT 1)" . $collate,
         ];
+
+        if ($includeOrgStructureNames) {
+            $fields[] = "(SELECT b.ad FROM bolumler b WHERE b.id = {$col}bolum_id LIMIT 1)" . $collate;
+            $fields[] = "(SELECT bi.ad FROM birimler bi WHERE bi.id = {$col}birim_id LIMIT 1)" . $collate;
+        }
+
+        return $fields;
     }
 
     private static function sanitizeAlias(string $alias): string

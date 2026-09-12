@@ -65,3 +65,35 @@ export function isRealBackendOnlyMode(): boolean {
   }
   return getApiMode() === "real" || !isDemoApiFallbackEnabled();
 }
+/** Medisa product UI version shown in the app footer (not npm/package version). */
+export const MEDISA_UI_VERSION = "v78.2";
+
+/**
+ * Taşit canonical footer device suffix:
+ * - standalone + iOS => " iOS PWA"
+ * - standalone => " PWA"
+ * - mobile browser => " Mobil"
+ * - desktop browser => ""
+ */
+export function getFooterDeviceSuffix(): string {
+  if (typeof window === "undefined" || typeof navigator === "undefined") {
+    return "";
+  }
+  const ua = navigator.userAgent || (navigator as Navigator & { vendor?: string }).vendor || "";
+  const isIOS = /iPad|iPhone|iPod/.test(ua) && !(window as Window & { MSStream?: unknown }).MSStream;
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
+  const isPWA =
+    window.matchMedia("(display-mode: standalone)").matches ||
+    (navigator as Navigator & { standalone?: boolean }).standalone === true;
+  if (isPWA) {
+    return isIOS ? " iOS PWA" : " PWA";
+  }
+  if (isMobile) {
+    return " Mobil";
+  }
+  return "";
+}
+
+export function getFooterVersionLabel(): string {
+  return `${MEDISA_UI_VERSION}${getFooterDeviceSuffix()}`;
+}

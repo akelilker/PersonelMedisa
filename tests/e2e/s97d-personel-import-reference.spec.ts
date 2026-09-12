@@ -1,14 +1,21 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { loginAsMockRole } from "./helpers/auth";
+
+/** Kanonik giris: Kayit ve Surec > Kayit footer linki. */
+async function openBulkImport(page: Page): Promise<void> {
+  await page.goto("/");
+  await page.getByTestId("menu-kayit-surec").click();
+  await page.getByTestId("kayit-bulk-import-link").click();
+  await expect(page.getByTestId("personel-import-dry-run-title")).toContainText("Toplu Kayıt Aktarma");
+}
 
 test.describe("S97-D personel import reference pack UI", () => {
   test("authorized user downloads reference CSV with BOM and required types", async ({ page }) => {
     await loginAsMockRole(page, "GENEL_YONETICI");
-    await page.goto("/personeller");
-    await page.getByTestId("personeller-import-dry-run-open").click();
+    await openBulkImport(page);
 
-    await expect(page.getByTestId("personel-import-reference-match-info")).toContainText(
-      "tam eşleşme kullanılır"
+    await expect(page.getByTestId("personel-import-references-download")).toContainText(
+      "Yükleme Kılavuzunu İndir"
     );
 
     const downloadPromise = page.waitForEvent("download");
@@ -40,8 +47,7 @@ test.describe("S97-D personel import reference pack UI", () => {
 
   test("scoped role CSV does not include other branch name", async ({ page }) => {
     await loginAsMockRole(page, "BOLUM_YONETICISI");
-    await page.goto("/personeller");
-    await page.getByTestId("personeller-import-dry-run-open").click();
+    await openBulkImport(page);
 
     const downloadPromise = page.waitForEvent("download");
     await page.getByTestId("personel-import-references-download").click();
@@ -61,8 +67,7 @@ test.describe("S97-D personel import reference pack UI", () => {
 
   test("ambiguous reference is not usable and formula injection is guarded", async ({ page }) => {
     await loginAsMockRole(page, "GENEL_YONETICI");
-    await page.goto("/personeller");
-    await page.getByTestId("personeller-import-dry-run-open").click();
+    await openBulkImport(page);
 
     const downloadPromise = page.waitForEvent("download");
     await page.getByTestId("personel-import-references-download").click();

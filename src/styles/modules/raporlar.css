@@ -173,7 +173,7 @@
 }
 
 .raporlar-table--premium th {
-  font-size: 0.78rem;
+  font-size: var(--medisa-table-header-size, 11.5px);
   text-transform: uppercase;
   letter-spacing: 0.04em;
   font-weight: 600;
@@ -182,7 +182,7 @@
 }
 
 .raporlar-table--premium td {
-  font-size: 0.875rem;
+  font-size: var(--medisa-table-body-size, 12px);
 }
 
 .raporlar-table-wrap {
@@ -206,10 +206,7 @@
 
 .raporlar-table th,
 .raporlar-table td {
-  text-align: left;
-  border: 1px solid var(--line-soft);
-  padding: 8px 10px;
-  vertical-align: top;
+  padding: var(--medisa-table-cell-pad-y, 6px) var(--medisa-table-cell-pad-x, 8px);
 }
 
 .raporlar-quick-nav {

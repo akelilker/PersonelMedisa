@@ -63,13 +63,11 @@ describe("PersonelImportDryRunModal reference pack", () => {
     delete document.body.dataset.modalOpenCount;
   });
 
-  it("shows exact reference info and downloads without clearing selected CSV/result", async () => {
+  it("shows canonical bulk import header and downloads references without clearing selected CSV/result", async () => {
     render(<PersonelImportDryRunModal open onClose={() => undefined} canApply />);
 
-    expect(screen.getByTestId("personel-import-reference-match-info")).toHaveTextContent(
-      "CSV’de şube, departman, görev ve personel tipi değerlerini referans dosyasında göründüğü şekilde yazın"
-    );
-    expect(screen.getByTestId("personel-import-reference-freshness-info")).toBeInTheDocument();
+    expect(screen.getByTestId("personel-import-dry-run-title")).toHaveTextContent("Toplu Kayıt Aktarma");
+    expect(screen.getByTestId("personel-import-references-download")).toBeInTheDocument();
 
     const file = new File(["header\n"], "personel.csv", { type: "text/csv" });
     fireEvent.change(screen.getByTestId("personel-import-file-input"), {

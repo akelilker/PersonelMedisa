@@ -6,10 +6,10 @@ import {
   useRef,
   useState,
   type FormEvent,
-  type KeyboardEvent,
   type SetStateAction
 } from "react";
 import { useNavigate } from "react-router-dom";
+import { AppSelectField } from "../../../components/form/AppSelect";
 import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
 import type { KayitTab } from "../../../components/main-menu/MainMenu";
@@ -216,6 +216,8 @@ type KayitSurecWorkspaceProps = {
   primaryActionLabel: string;
   primaryFormId: string;
   onFooterModelChange?: (model: KayitModalFooterModel | null) => void;
+  onOpenBulkImport?: () => void;
+  onOpenImportHistory?: () => void;
 };
 
 const EMPTY_REFS: PersonelReferenceBundle = {
@@ -241,7 +243,9 @@ export function KayitSurecWorkspace({
   initialOperation = null,
   primaryActionLabel,
   primaryFormId,
-  onFooterModelChange
+  onFooterModelChange,
+  onOpenBulkImport,
+  onOpenImportHistory
 }: KayitSurecWorkspaceProps) {
   const navigate = useNavigate();
   const { session } = useAuth();
@@ -386,69 +390,20 @@ export function KayitSurecWorkspace({
     return filteredOptions;
   }, [personelOptions, personeller, surecForm.personelId, surecPersonelSearch]);
 
-  const handleSurecPersonelComboboxKeyDownCapture = useCallback(
-    (event: KeyboardEvent<HTMLDivElement>) => {
-      if (!surecPersonelPickerOpen) {
-        return;
-      }
-      const searchEl = surecPersonelSearchInputRef.current;
-      if (!searchEl) {
-        return;
-      }
-      const active = document.activeElement;
-      if (active === searchEl || searchEl.contains(active)) {
-        return;
-      }
-      if (event.nativeEvent.isComposing) {
-        return;
-      }
+  const handleSurecPersonelPickerOpenChange = useCallback(
+    (isOpen: boolean) => {
+      setSurecPersonelPickerOpen(isOpen);
 
-      const { key } = event;
-
-      if (key === "Escape") {
-        return;
-      }
-      if (key === "Tab") {
-        return;
-      }
-      if (key.startsWith("Arrow")) {
-        return;
-      }
-      if (key === "Enter" || key === "Home" || key === "End" || key === "PageDown" || key === "PageUp") {
-        return;
-      }
-
-      if (key === "Backspace") {
-        event.preventDefault();
+      // Picker açıkken toolbar arama alanı da görünür kalır (tek arama state'i paylaşılır).
+      if (isOpen && !personelContextLocked) {
         setSurecSearchExpanded(true);
-        searchEl.focus({ preventScroll: true });
-        setSurecPersonelSearch((prev) => prev.slice(0, -1));
-        return;
-      }
-
-      if (key === "Delete") {
-        event.preventDefault();
-        setSurecSearchExpanded(true);
-        searchEl.focus({ preventScroll: true });
-        return;
-      }
-
-      if (key === " ") {
-        return;
-      }
-
-      if (key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey) {
-        event.preventDefault();
-        setSurecSearchExpanded(true);
-        searchEl.focus({ preventScroll: true });
-        setSurecPersonelSearch((prev) => prev + key);
       }
     },
-    [surecPersonelPickerOpen]
+    [personelContextLocked]
   );
 
   useLayoutEffect(() => {
-    if (!surecSearchExpanded) {
+    if (!surecSearchExpanded || surecPersonelPickerOpen) {
       return;
     }
     const id = window.requestAnimationFrame(() => {
@@ -1193,7 +1148,9 @@ export function KayitSurecWorkspace({
         primaryFormId,
         primaryDisabled: personelSubmitting,
         secondaryLabel: "Vazgeç",
-        onSecondaryClick: onClose
+        onSecondaryClick: onClose,
+        onOpenBulkImport,
+        onOpenImportHistory
       };
     }
 
@@ -1490,65 +1447,33 @@ export function KayitSurecWorkspace({
                       />
                       {personelOptions.length > 0 ? (
                         showSurecPersonelPickerSurface ? (
-                        <div
-                          className="surec-personel-combobox form-section"
-                          data-testid="kayit-surec-personel-picker"
-                          onKeyDownCapture={handleSurecPersonelComboboxKeyDownCapture}
-                        >
-                          <label className="form-label" id="surec-personel-combobox-label">
-                            Personel
-                          </label>
-                          <button
-                            type="button"
-                            className="form-input surec-personel-combobox-trigger"
-                            role="combobox"
-                            aria-labelledby="surec-personel-combobox-label"
-                            aria-expanded={surecPersonelPickerOpen}
-                            aria-controls="surec-personel-combobox-list"
-                            aria-disabled={personelContextLocked}
+                        <div data-testid="kayit-surec-personel-picker">
+                          <AppSelectField
+                            className="surec-personel-combobox"
+                            label="Personel"
+                            id="surec-create-personel-picker"
+                            dataTestId="surec-create-personel-select"
+                            value={surecForm.personelId}
                             disabled={personelContextLocked}
-                            onClick={() => {
-                              if (personelContextLocked) {
-                                return;
+                            open={surecPersonelPickerOpen}
+                            onOpenChange={handleSurecPersonelPickerOpenChange}
+                            onChange={selectSurecPersonel}
+                            options={filteredSurecPersonelOptions}
+                            searchable
+                            filterOptions={false}
+                            searchValue={surecPersonelSearch}
+                            onSearchValueChange={(next) => {
+                              setSurecPersonelSearch(next);
+
+                              if (next.trim()) {
+                                setSurecSearchExpanded(true);
                               }
-
-                              setSurecPersonelPickerOpen((isOpen) => {
-                                const next = !isOpen;
-
-                                if (next) {
-                                  setSurecSearchExpanded(true);
-                                }
-
-                                return next;
-                              });
                             }}
-                          >
-                            <span>{selectedSurecPersonelLabel}</span>
-                            <span aria-hidden="true">⌄</span>
-                          </button>
-
-                          {surecPersonelPickerOpen && !personelContextLocked ? (
-                            <div className="surec-personel-combobox-panel" id="surec-personel-combobox-list">
-                              <div className="surec-personel-combobox-options" role="listbox" aria-label="Personel listesi">
-                                {filteredSurecPersonelOptions.length > 0 ? (
-                                  filteredSurecPersonelOptions.map((option) => (
-                                    <button
-                                      key={option.value}
-                                      type="button"
-                                      role="option"
-                                      aria-selected={surecForm.personelId === option.value}
-                                      className={`surec-personel-combobox-option${surecForm.personelId === option.value ? " is-active" : ""}`}
-                                      onClick={() => selectSurecPersonel(option.value)}
-                                    >
-                                      {option.label}
-                                    </button>
-                                  ))
-                                ) : (
-                                  <p className="workspace-empty-hint">Aramaya uygun personel bulunamadı.</p>
-                                )}
-                              </div>
-                            </div>
-                          ) : null}
+                            searchPlaceholder="Ada, soyada veya sicile göre ara"
+                            searchInputTestId="kayit-surec-personel-panel-search"
+                            noResultsText="Aramaya uygun personel bulunamadı."
+                            ariaLabel="Personel listesi"
+                          />
                         </div>
                         ) : null
                       ) : (

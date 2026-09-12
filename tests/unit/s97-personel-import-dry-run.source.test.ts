@@ -9,15 +9,25 @@ function read(path: string) {
 }
 
 describe("S97 personel import dry-run source locks", () => {
-  it("keeps dry-run entry and forbids commit endpoint alias", () => {
+  it("keeps the canonical bulk import entry and forbids commit endpoint alias", () => {
     const modal = read("src/features/personeller/components/PersonelImportDryRunModal.tsx");
-    const page = read("src/features/personeller/pages/PersonellerPage.tsx");
+    const shell = read("src/app/AppShell.tsx");
+    const kayitFooter = read("src/features/kayit/components/KayitModalFooter.tsx");
     const endpoints = read("src/api/endpoints.ts");
 
-    expect(page).toContain("Toplu Personel Hazırlama");
-    expect(page).toContain("personeller-import-dry-run-open");
-    expect(page).toContain("PersonelImportDryRunModal");
-    expect(modal).toContain("Bu aşama yalnız doğrulama yapar. Personel, ücret veya bordro kaydı oluşturmaz.");
+    // Kanonik giris: Kayit ve Surec > Kayit footer linki (Personel listesi toolbar'i degil).
+    expect(kayitFooter).toContain("Excel&apos;den Toplu Kayıt Aktarmak İçin ");
+    expect(kayitFooter).toContain('data-testid="kayit-bulk-import-link"');
+    expect(shell).toContain("PersonelImportDryRunModal");
+    expect(shell).toContain("canApplyPersonelImport");
+
+    // Modal kanonik baslik + ana aksiyonlar (native file input gizli).
+    expect(modal).toContain('title="Toplu Kayıt Aktarma"');
+    expect(modal).toContain("Şablon Dosyası İndir");
+    expect(modal).toContain("Yükleme Kılavuzunu İndir");
+    expect(modal).toContain("Dosya Seç");
+    expect(modal).toContain("Dosyayı Kontrol Et");
+    expect(modal).toContain('data-testid="personel-import-file-input"');
     expect(modal).toContain("personel-import-dry-run-run");
     expect(modal).toContain("tc_kimlik_no_masked");
     expect(endpoints).toContain('importDryRun: "/personeller/import/dry-run"');

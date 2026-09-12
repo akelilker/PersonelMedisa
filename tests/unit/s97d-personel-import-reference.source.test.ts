@@ -70,11 +70,9 @@ describe("S97-D personel import reference pack source locks", () => {
     const modal = read("src/features/personeller/components/PersonelImportDryRunModal.tsx");
     const api = read("src/api/personeller.api.ts");
 
-    expect(modal).toContain("Geçerli Referansları İndir");
+    expect(modal).toContain("Yükleme Kılavuzunu İndir");
     expect(modal).toContain("personel-import-references-download");
-    expect(modal).toContain(
-      "CSV’de şube, departman, görev ve personel tipi değerlerini referans dosyasında göründüğü şekilde yazın"
-    );
+    expect(modal).toContain("Yükleme Kılavuzundaki adlardan birini kullanın.");
     expect(modal).toContain("downloadPersonelImportReferencesCsv");
     expect(modal).toContain("referencesDownloadGuardRef");
     expect(api).toContain("downloadPersonelImportReferencesCsv");

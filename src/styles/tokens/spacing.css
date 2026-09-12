@@ -9,13 +9,24 @@
   --shell-modal-top: 0px;
   --app-footer-height: 30px;
   --app-footer-real-height: 38px;
+  /* Taşit style-core: modal overlay bottom = footer-real-height + app-footer-gap */
   --app-footer-gap: 17px;
   --modal-footer-gap: var(--space-3);
   --modal-footer-reserve: calc(var(--app-footer-height) + var(--modal-footer-gap));
-  --modal-gap-above-footer: 8px;
-  --modal-footer-optical-reserve: 8px;
+  --modal-gap-above-footer: var(--app-footer-gap);
+  --modal-footer-optical-reserve: 0px;
+  /* Fixed modal action footer: body scroll must clear footer pad + btn + gap */
+  --modal-fixed-footer-action-height: 2.75rem;
+  --modal-fixed-footer-content-reserve: calc((var(--space-3) * 2) + var(--modal-fixed-footer-action-height) + var(--space-2));
   --shell-top-stack-gap: var(--space-2);
   --shell-top-stack-bottom-gap: 0px;
+}
+
+/* Taşit: desktop 641+ uses 14px modal↔footer gap */
+@media (min-width: 641px) {
+  :root {
+    --app-footer-gap: 14px;
+  }
 }
 
 @media (max-width: 640px) {

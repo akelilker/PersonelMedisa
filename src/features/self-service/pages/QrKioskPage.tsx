@@ -3,6 +3,7 @@ import QRCode from "qrcode";
 import { isApiRequestError } from "../../../api/api-client";
 import { fetchQrKioskToken } from "../../../api/qr.api";
 import { LoadingState } from "../../../components/states/LoadingState";
+import { AppSelect } from "../../../components/form/AppSelect";
 import { useAuth } from "../../../state/auth.store";
 import { GLOBAL_SCOPE_ROLES } from "../../../types/auth";
 import { canonicalizeUserRole } from "../../../lib/authorization/canonicalize-user-role";
@@ -127,22 +128,17 @@ export function QrKioskPage() {
         </header>
         <label htmlFor="qr-kiosk-local-sube">
           Şube
-          <select
+          <AppSelect
             id="qr-kiosk-local-sube"
-            data-testid="qr-kiosk-local-sube"
-            value={localSubeId ?? ""}
-            onChange={(event) => {
-              const next = Number.parseInt(event.target.value, 10);
+            dataTestId="qr-kiosk-local-sube"
+            value={localSubeId != null ? String(localSubeId) : ""}
+            placeholderOption={{ value: "", label: "Şube seçin" }}
+            options={subeList.map((sube) => ({ value: String(sube.id), label: sube.ad }))}
+            onChange={(value) => {
+              const next = Number.parseInt(value, 10);
               setLocalSubeId(Number.isFinite(next) && next > 0 ? next : null);
             }}
-          >
-            <option value="">Şube seçin</option>
-            {subeList.map((sube) => (
-              <option key={sube.id} value={sube.id}>
-                {sube.ad}
-              </option>
-            ))}
-          </select>
+          />
         </label>
         <button
           type="button"

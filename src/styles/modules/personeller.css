@@ -78,10 +78,16 @@
   background: transparent;
   color: var(--txt);
   cursor: pointer;
+  text-decoration: none;
 }
 
 .personeller-icon-btn:hover {
   background: rgba(255, 255, 255, 0.06);
+}
+
+.personeller-icon-btn--active {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--theme-color, #7dd3fc);
 }
 
 .personeller-add-icon-btn {
@@ -181,152 +187,9 @@
 
 .modal-body > .personeller-page .personeller-list-wrap,
 .modal-body > .personeller-page .personeller-table-wrap {
-  flex: 1;
-  min-height: 0;
-  max-height: none;
-  overflow-y: auto;
-}
-
-.modal-body > .personeller-page .personeller-toolbar,
-.modal-body > .personeller-page .personeller-filter-panel,
-.modal-body > .personeller-page .module-pagination {
-  flex-shrink: 0;
-}
-
-.personeller-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: var(--space-2);
-}
-
-.personeller-list--grid {
-  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
-}
-
-.personeller-item {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: start;
-  gap: var(--space-2);
-}
-
-.personeller-item--grid {
-  display: flex;
-  flex-direction: column;
-  grid-template-columns: unset;
-  grid-template-rows: unset;
-  align-content: start;
-  justify-items: stretch;
-  padding: 10px 8px;
-  text-align: center;
-}
-
-.personeller-card-preview {
-  flex: 1 1 auto;
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  min-width: 0;
-  color: inherit;
-  text-decoration: none;
-  border-radius: var(--radius-sm);
-  outline-offset: 2px;
-}
-
-.personeller-card-preview:hover {
-  background: rgba(255, 255, 255, 0.04);
-}
-
-.personeller-card-preview:focus-visible {
-  outline: 2px solid var(--theme-color);
-}
-
-.personeller-card-preview-static {
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
-.personeller-item-content--grid {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-1);
-  text-align: center;
-  min-width: 0;
-}
-
-.personeller-card-title {
-  font-weight: 700;
-  font-size: 0.9rem;
-  line-height: 1.2;
-  word-break: break-word;
-}
-
-.personeller-card-sub {
-  font-size: 0.78rem;
-  line-height: 1.25;
-  opacity: 0.88;
-  word-break: break-word;
-}
-
-.personeller-card-muted {
-  font-size: 0.72rem;
-  line-height: 1.2;
-  opacity: 0.5;
-  word-break: break-word;
-}
-
-.personeller-card-actions {
-  justify-content: center;
-  flex-wrap: wrap;
-  margin-top: 8px;
-}
-
-.personeller-card-actions .universal-btn-aux {
-  font-size: 12px;
-  padding: 4px 8px;
-  min-height: 28px;
-}
-
-.personeller-item--grid .module-item-actions {
-  justify-content: center;
-  flex-wrap: wrap;
-}
-
-.personeller-item-content {
-  display: grid;
-  gap: var(--space-1);
-}
-
-.personeller-item-badges {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-1);
-}
-
-.personeller-status-badge,
-.personeller-meta-badge {
-  border: 1px solid var(--line-soft);
-  border-radius: 999px;
-  padding: 2px 8px;
-  background: rgba(255, 255, 255, 0.02);
-}
-
-.personeller-item-meta {
-  display: grid;
-  gap: var(--space-1);
-}
-
-.personeller-item-meta p {
-  margin: 0;
-}
-
-.personeller-table-wrap {
   max-height: min(52vh, 520px);
   overflow: auto;
-  border: 1px solid var(--line-soft);
+  border: 1px solid var(--medisa-table-border, rgba(255, 255, 255, 0.08));
   border-radius: var(--radius-sm);
 }
 
@@ -334,45 +197,50 @@
   width: 100%;
   min-width: 640px;
   border-collapse: collapse;
-  font-size: 13px;
+  font-size: var(--medisa-table-body-size, 12px);
 }
 
 .personeller-table thead th {
   position: sticky;
   top: 0;
   z-index: 1;
-  padding: 10px 12px;
+  padding: var(--medisa-table-cell-pad-y, 6px) var(--medisa-table-cell-pad-x, 8px);
   text-align: left;
-  font-weight: 700;
-  font-size: 11px;
-  letter-spacing: 0.04em;
+  font-weight: 600;
+  font-size: var(--medisa-table-header-size, 11.5px);
+  letter-spacing: 0.03em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.92);
-  background: rgba(30, 30, 35, 0.98);
-  border-bottom: 1px solid var(--line-soft);
+  color: #ffffff;
+  background: rgba(13, 19, 31, 0.98);
+  border-bottom: 1px solid var(--medisa-table-border, rgba(255, 255, 255, 0.08));
   white-space: nowrap;
 }
 
 .personeller-table tbody td {
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--line-soft);
+  padding: var(--medisa-table-cell-pad-y, 6px) var(--medisa-table-cell-pad-x, 8px);
+  border-bottom: 1px solid var(--medisa-table-border, rgba(255, 255, 255, 0.08));
   vertical-align: middle;
   max-width: 200px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  color: var(--medisa-table-data-color, #a0aec0);
+  font-size: var(--medisa-table-body-size, 12px);
+  font-weight: 500;
+  line-height: 1.3;
 }
 
 .personeller-table tbody tr:nth-child(even) td {
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--medisa-table-zebra, rgba(255, 255, 255, 0.05));
 }
 
 .personeller-table tbody tr:nth-child(odd) td {
-  background: rgba(255, 255, 255, 0.01);
+  background: transparent;
 }
 
 .personeller-table-cell-strong {
-  font-weight: 600;
+  font-weight: 700;
+  color: var(--text-inverse);
   white-space: normal;
 }
 
@@ -400,7 +268,7 @@
 }
 
 .personeller-table-row-clickable:hover td {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--medisa-table-hover, rgba(255, 255, 255, 0.1));
 }
 
 .personeller-table-name-link {
@@ -1371,4 +1239,815 @@
 .personel-puantaj-ozet-actions {
   margin-bottom: var(--space-3);
   flex-wrap: wrap;
+}
+
+.personel-import-summary-card--ok strong { color: #22c55e; }
+.personel-import-summary-card--warn strong { color: #eab308; }
+.personel-import-summary-card--danger strong { color: #ef4444; }
+.personel-import-issue--ambiguous { border-color: rgba(239, 68, 68, 0.45); }
+.personel-import-issue ul { margin: 4px 0 0; padding-left: 18px; font-size: 12.5px; }
+
+/* === PERSONEL KARTI NAV + DENSE LIST (MEDISA_UI_PERSONEL_KARTI) === */
+.personeller-page--kart {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1 1 auto;
+  height: 100%;
+}
+
+.personeller-page--kart .personeller-toolbar--kart,
+.personeller-page--kart .vehicles-toolbar {
+  height: 36px;
+  min-height: 36px;
+  margin: 0;
+  margin-bottom: 0;
+  padding: 0 16px;
+  border-bottom: none;
+  border-top: none;
+  background: transparent;
+  position: relative;
+  z-index: 10;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.personeller-page--kart .personeller-toolbar-main {
+  width: 100%;
+  min-height: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.personeller-page--kart .personeller-toolbar-left,
+.personeller-page--kart .vt-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.personeller-page--kart .personeller-toolbar-right,
+.personeller-page--kart .vt-right {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  justify-content: flex-end;
+  flex: 0 0 auto;
+}
+
+.personeller-page--kart .personeller-toolbar-left:empty {
+  /* keep flex spacer so icons stay right */
+  display: flex;
+  min-width: 0;
+}
+
+.personeller-page--kart .personeller-toolbar-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.personeller-page--kart .personeller-icon-btn,
+.personeller-page--kart .vt-icon-btn {
+  min-width: 32px;
+  min-height: 32px;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--form-label-color, var(--txt, #f2f5f7));
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 0.2s, color 0.2s;
+  text-decoration: none;
+}
+
+.personeller-page--kart .personeller-icon-btn:hover,
+.personeller-page--kart .personeller-icon-btn:focus-visible,
+.personeller-page--kart .vt-icon-btn:hover,
+.personeller-page--kart .vt-icon-btn:focus-visible {
+  color: var(--theme-color);
+  background: transparent;
+  border: none;
+  outline: none;
+  transform: scale(1.15);
+}
+
+.personeller-page--kart .personeller-icon-btn--active {
+  color: var(--theme-color, #7dd3fc);
+  background: transparent;
+}
+
+.personeller-page--kart .personeller-icon-btn svg {
+  width: 22px;
+  height: 22px;
+}
+
+.personeller-page--kart .personeller-filter-panel {
+  margin-top: 6px;
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+
+.personeller-page--kart .personeller-filter-panel--search-only {
+  margin-top: 4px;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  gap: 4px;
+}
+
+.personeller-page--kart .personeller-filter-panel--search-only .personeller-filter-actions {
+  margin-top: 0;
+}
+
+.personeller-scope-stage {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  width: 100%;
+  padding: 12px 4px 20px;
+}
+
+.personeller-scope-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(82px, 110px));
+  justify-content: center;
+  justify-items: stretch;
+  gap: 12px;
+  width: 100%;
+  max-width: 920px;
+  margin-inline: auto;
+}
+
+.personeller-scope-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 6px;
+  min-width: 0;
+  min-height: 96px;
+  padding: 12px 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: var(--radius-card, 12px);
+  background: rgba(255, 255, 255, 0.03);
+  color: #f2f5f7;
+  text-align: center;
+  cursor: pointer;
+  transform: scale(1);
+  transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.personeller-scope-card:hover,
+.personeller-scope-card:focus-visible {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.34);
+  transform: scale(1.03);
+  outline: none;
+  z-index: 1;
+}
+
+.personeller-scope-card.is-selected,
+.personeller-scope-card[aria-pressed="true"] {
+  border-color: rgba(125, 211, 252, 0.55);
+  background: rgba(125, 211, 252, 0.1);
+  box-shadow: 0 0 0 1px rgba(125, 211, 252, 0.18);
+}
+
+/* Title: reserved 2-line block; natural wrap (no <br>); alias .personeller-scope-card-name */
+.personeller-scope-card-title,
+.personeller-scope-card-name {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: calc(1.25em * 2);
+  height: calc(1.25em * 2);
+  max-height: calc(1.25em * 2);
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.25;
+  text-align: center;
+  word-break: normal;
+  overflow-wrap: break-word;
+}
+
+/* Count block: number + Personel on shared Y across cards */
+.personeller-scope-card-count-block,
+.personeller-scope-card-count {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 2px;
+  width: 100%;
+  text-align: center;
+  color: #a0aec0;
+}
+
+.personeller-scope-card-count-num {
+  display: block;
+  min-height: 1.2em;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: #e2e8f0;
+  text-align: center;
+  width: 100%;
+}
+
+.personeller-scope-card-count-label {
+  display: block;
+  min-height: 1.2em;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.2;
+  color: #a0aec0;
+  text-align: center;
+  width: 100%;
+}
+
+.personeller-sort-btn {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  padding: 0;
+  cursor: pointer;
+}
+
+.personeller-name-stack {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.personeller-name-primary {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.personeller-name-secondary {
+  font-size: 11px;
+  font-weight: 500;
+  color: #a0aec0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.personeller-tc-cell {
+  white-space: nowrap;
+}
+
+/* T.C. value cell: 11 hane tam okunur (maskeli gösterim yok) */
+.personeller-tc-value {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: nowrap;
+}
+
+/* Bare red ! inside T.C. Kimlik cell — no badge/box/circle */
+.personeller-missing-bang {
+  display: inline;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  height: auto;
+  min-width: 0;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #ef4444;
+  font-size: inherit;
+  font-weight: 700;
+  line-height: 1;
+  cursor: help;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.personeller-missing-bang:focus-visible {
+  outline: 2px solid rgba(239, 68, 68, 0.7);
+  outline-offset: 2px;
+}
+
+/* Dense list: prefer fit in ~500px shell (Taşıt-style padding/font); no forced 720 min-width */
+.personeller-page--kart .personeller-table--dense {
+  table-layout: fixed;
+  width: 100%;
+  min-width: 0;
+  font-size: 12px;
+}
+
+/* Taşıt parity: header label centered inside its own column; wraps instead of colliding. */
+.personeller-page--kart .personeller-table--dense thead th {
+  height: 30px;
+  padding: 4px 6px;
+  text-align: center;
+  vertical-align: middle;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  white-space: normal;
+  overflow-wrap: normal;
+  word-break: keep-all;
+}
+
+.personeller-page--kart .personeller-table--dense .personeller-sort-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 100%;
+  min-width: 0;
+  text-align: center;
+  white-space: normal;
+  overflow-wrap: normal;
+  word-break: keep-all;
+}
+
+/* Column widths are owned by the page colgroup (view variant aware); do not duplicate here. */
+
+/* Taşıt row rhythm: 32px single-line row; row grows naturally for a 2-line cell. */
+.personeller-page--kart .personeller-table--dense tbody td {
+  height: 32px;
+  max-width: none;
+  padding: 4px 4px; /* Taşıt .list-cell 2px 4px parity */
+  text-align: center;
+  vertical-align: middle;
+  font-size: 12px;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: clip;
+  white-space: normal; /* wrap first; the 2-line clamp lives on the inner box */
+}
+
+.personeller-page--kart .personeller-table--dense .personeller-table-cell-strong {
+  text-align: center;
+  white-space: normal;
+}
+
+.personeller-page--kart .personeller-table--dense .personeller-name-stack {
+  text-align: center;
+  display: block; /* list: single primary line; search may add secondary */
+  min-width: 0;
+}
+
+/* Single line when it fits, else at most 2 lines, else ellipsis. */
+.personeller-page--kart .personeller-table--dense .personeller-name-primary {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Soft wrap fallback for long cells: single line when it fits, else max 2 lines then ellipsis. */
+.personeller-page--kart .personeller-table--dense tbody td.personeller-cell-wrap {
+  white-space: normal;
+}
+
+.personeller-page--kart .personeller-table--dense tbody td.personeller-cell-wrap > span {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* T.C. cell: 11 hane tam okunur + optional bare ! — never ellipsis */
+.personeller-page--kart .personeller-table--dense td.personeller-tc-cell {
+  white-space: nowrap;
+  overflow: visible;
+  text-overflow: clip;
+}
+
+.personeller-page--kart .personeller-table--dense td.personeller-tc-cell .personeller-tc-value,
+.personeller-page--kart .personeller-table--dense td.personeller-tc-cell .personeller-missing-bang {
+  display: inline;
+  vertical-align: baseline;
+}
+
+.personeller-page--kart .personeller-table--dense .personeller-tc-value {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: nowrap;
+}
+
+.personeller-page--kart .personeller-table--dense .personeller-missing-bang {
+  width: auto;
+  height: auto;
+  margin-left: 4px;
+  padding: 0;
+  border: 0;
+  border-width: 0;
+  background: transparent;
+  font-size: 12px;
+}
+
+/* Zebra + hover: Taşıt satır ritmi — koyu zeminde belirgin ama ağır olmayan ayrım.
+   Taşıt referansı: normal = modal bg, tek satır = 0.05 beyaz overlay, hover = 0.10.
+   Personel kart zemini daha açık (--bg-surface-elevated) olduğu için aynı görsel
+   ayrım seviyesi zebra 0.08 ile kuruldu; hover zebra farkını silmeden aydınlatır. */
+.personeller-page--kart .personeller-table--dense tbody tr:nth-child(odd) td {
+  background: transparent;
+}
+
+.personeller-page--kart .personeller-table--dense tbody tr:nth-child(even) td {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.personeller-page--kart .personeller-table--dense tbody tr:nth-child(odd):hover td {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.personeller-page--kart .personeller-table--dense tbody tr:nth-child(even):hover td {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+/* Kolon genişlikleri tek owner'da (inline <col style> yok; PACK V1/V2/V4 statik inline style yasağı). */
+.personeller-page--kart .personeller-table .personeller-col-kimlik {
+  width: 23%;
+}
+
+.personeller-page--kart .personeller-table .personeller-col-ad {
+  width: 26%;
+}
+
+.personeller-page--kart .personeller-table .personeller-col-bolum {
+  width: 19%;
+}
+
+.personeller-page--kart .personeller-table .personeller-col-gorev {
+  width: 18%;
+}
+
+.personeller-page--kart .personeller-table .personeller-col-statu {
+  width: 14%;
+}
+
+/* TÜMÜ (çoklu şube) görünümü: şube kolonu eklenir, tüm oranlar daralır. */
+.personeller-page--kart .personeller-table--scope .personeller-col-ad {
+  width: 23.2%;
+}
+
+.personeller-page--kart .personeller-table--scope .personeller-col-sube {
+  width: 14.2%;
+}
+
+.personeller-page--kart .personeller-table--scope .personeller-col-bolum {
+  width: 15.2%;
+}
+
+.personeller-page--kart .personeller-table--scope .personeller-col-gorev {
+  width: 14.2%;
+}
+
+.personeller-page--kart .personeller-table--scope .personeller-col-statu {
+  width: 10.2%;
+}
+
+@media (max-width: 768px) {
+  .personeller-page--kart .personeller-toolbar--kart,
+  .personeller-page--kart .vehicles-toolbar,
+  .personeller-page--kart .personeller-toolbar-main {
+    height: 44px;
+    min-height: 44px;
+  }
+
+  .personeller-page--kart .personeller-icon-btn,
+  .personeller-page--kart .vt-icon-btn {
+    min-width: 40px;
+    min-height: 40px;
+    width: 40px;
+    height: 40px;
+  }
+}
+
+@media (max-width: 720px) {
+  .personeller-scope-grid {
+    grid-template-columns: repeat(3, minmax(0, 110px));
+    justify-content: center;
+    width: max-content;
+    max-width: 100%;
+    margin-inline: auto;
+    gap: 8px;
+  }
+  /* Mobil/tablet: 11 haneli T.C. ve diğer kolonlar sıkışmasın; tablo doğal genişliğinde kalsın,
+     yatay kaydırma sarmalayıcıda (personeller-table-wrap overflow-x:auto) yapılır. */
+  .personeller-page--kart .personeller-table--dense {
+    min-width: 520px;
+  }
+}
+
+/* Mobil: yatay kaydırılabilir listenin sağ kenarında "devam var" göstergesi.
+   Overlay scroll konteynerinin dışındaki shell'de durur (scroll ile kaymaz),
+   yalnız gerçekten sağda içerik varken görünür, pointer-events'e kapalıdır. */
+@media (max-width: 720px) {
+  .personeller-page--kart .personeller-table-scroll-shell {
+    position: relative;
+  }
+
+  .personeller-page--kart .personeller-table-scroll-shell[data-scroll-more="true"]::after {
+    content: "";
+    position: absolute;
+    top: 1px;
+    right: 1px;
+    bottom: 1px;
+    width: 40px;
+    pointer-events: none;
+    border-top-right-radius: var(--radius-sm);
+    border-bottom-right-radius: var(--radius-sm);
+    background: linear-gradient(
+      to left,
+      rgba(8, 13, 22, 0.82) 0,
+      rgba(8, 13, 22, 0.44) 46%,
+      rgba(8, 13, 22, 0) 100%
+    );
+  }
+}
+/* === TOPLU KAYIT AKTARMA UX === */
+.kayit-modal-footer-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  width: 100%;
+}
+
+.kayit-bulk-import-hint {
+  margin: 0;
+  text-align: left;
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--text-secondary, #a0aec0);
+}
+
+.kayit-bulk-import-link {
+  display: inline;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  background: none;
+  color: var(--info);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.kayit-bulk-import-link:hover {
+  color: var(--text-primary);
+}
+
+.kayit-bulk-import-link:focus-visible {
+  outline: 2px solid rgba(var(--info-rgb), 0.7);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.personel-import-dry-run-modal .modal-body,
+.personel-import-dry-run-modal .modal-body--default {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.personel-import-layout {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+}
+
+.personel-import-back-bar {
+  flex: 0 0 auto;
+  align-self: stretch;
+  width: 100%;
+  margin: 0;
+  padding: 4px 0 10px;
+  border-bottom: 1px solid rgba(160, 174, 192, 0.16);
+  position: static;
+  z-index: auto;
+  background: transparent;
+  isolation: auto;
+}
+
+.personel-import-back-bar .universal-back-btn {
+  max-width: max-content;
+}
+
+.personel-import-stage {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  gap: 12px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding-top: 12px;
+}
+
+.personel-import-stage--has-result {
+  justify-content: flex-start;
+  align-items: stretch;
+}
+
+.personel-import-dry-run-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 720px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.personel-import-action-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  align-items: stretch;
+}
+
+.personel-import-action-row .universal-btn-aux,
+.personel-import-action-row .universal-btn-save,
+.personel-import-action-row .personel-import-file-picker {
+  width: 100%;
+  justify-content: center;
+}
+
+.personel-import-file-picker {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  position: relative;
+}
+
+.personel-import-file-input-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.personel-import-selected-file {
+  margin: 0;
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--text-secondary, #a0aec0);
+}
+
+.personel-import-issue-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.personel-import-issue {
+  border: 1px solid rgba(160, 174, 192, 0.25);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.personel-import-issue h4 {
+  margin: 0 0 6px;
+  font-size: 13px;
+}
+
+.personel-import-issue p {
+  margin: 0 0 4px;
+  font-size: 12.5px;
+}
+
+.personel-import-issue--auto {
+  border-color: rgba(234, 179, 8, 0.45);
+}
+
+.personel-import-issue--error {
+  border-color: rgba(239, 68, 68, 0.45);
+}
+
+.personel-import-issue .personel-import-issue-meta {
+  opacity: 0.75;
+  font-size: 11.5px;
+}
+
+.personel-import-summary,
+.personel-import-warning,
+.personel-import-ready,
+.personel-import-apply-success,
+.personel-import-errors,
+.form-field-error {
+  width: 100%;
+  max-width: 720px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+@media (max-width: 640px) {
+  .personel-import-action-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+
+.personel-import-blocking-error {
+  margin: 0 0 var(--space-3, 12px);
+  width: 100%;
+  max-width: 720px;
+  margin-left: auto;
+  margin-right: auto;
+  font-size: 13px;
+  font-weight: 600;
+  color: #ef4444;
+}
+
+@media (max-width: 640px) {
+  .personel-import-back-bar {
+    padding-bottom: 12px;
+    margin-bottom: 0;
+  }
+
+  .personel-import-stage {
+    padding-top: 14px;
+  }
+
+  .personel-import-dry-run-actions {
+    margin-top: 0;
+  }
+}
+
+
+/* Sticky apply footer: stage must not nest-scroll under fixed modal-footer; body is the scroll owner.
+   Note: overflow-x:hidden + overflow-y:visible computes to auto — set y to hidden so content grows into body. */
+.personel-import-dry-run-modal.modal-container--fixed-footer .personel-import-stage {
+  overflow-x: hidden;
+  overflow-y: hidden;
+  flex: 0 0 auto;
+  min-height: auto;
+  max-height: none;
+  justify-content: flex-start;
+}
+
+.personel-import-dry-run-modal.modal-container--fixed-footer .personel-import-layout {
+  flex: 0 0 auto;
+  min-height: auto;
+}
+
+/* Conscious overflow-x:auto — discoverable scroll if content still wider; prefer fit via min-width:0 above */
+.personeller-page--kart .personeller-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  width: 100%;
+  max-width: 100%;
 }

@@ -1,5 +1,51 @@
-.badge {
+.badge,
+.status-badge,
+.medisa-badge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 4px;
+  min-height: 20px;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm, 6px);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: #f0f0f0;
+  white-space: nowrap;
+}
+
+.badge--ok,
+.badge--success,
+.status-badge--ok,
+.medisa-badge--ok,
+.medisa-badge--success {
+  color: #4ade80;
+  border-color: rgba(74, 222, 128, 0.45);
+  background: rgba(74, 222, 128, 0.08);
+}
+
+.badge--warn,
+.status-badge--warn,
+.medisa-badge--warn {
+  color: #fbbf24;
+  border-color: rgba(245, 158, 11, 0.45);
+  background: rgba(245, 158, 11, 0.08);
+}
+
+.badge--danger,
+.status-badge--danger,
+.medisa-badge--danger {
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.5);
+  background: rgba(239, 68, 68, 0.08);
+}
+
+.badge--neutral,
+.status-badge--neutral,
+.medisa-badge--neutral {
+  color: #a0aec0;
+  border-color: rgba(255, 255, 255, 0.12);
 }

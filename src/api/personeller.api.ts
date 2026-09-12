@@ -17,6 +17,18 @@ export type PersonellerListParams = {
   eksik_bilgi?: boolean;
   page?: number;
   limit?: number;
+  /** Global list sort column (server-side). */
+  sort?: "ad" | "sube" | "bolum" | "gorev" | "statu";
+  /** Sort direction (alias: sort_dir). */
+  dir?: "asc" | "desc";
+  /**
+   * When true (or when `active_sube_header` is provided), explicit query `sube_id`
+   * wins over session `X-Active-Sube-Id`. Pass `active_sube_header: null` to omit
+   * the header entirely (ALL-scope counts).
+   */
+  prefer_query_sube?: boolean;
+  /** Override / suppress X-Active-Sube-Id for this request. */
+  active_sube_header?: number | null;
   /** Lets the caller cancel a superseded list query. */
   signal?: AbortSignal;
 };
@@ -422,12 +434,30 @@ export async function fetchPersonellerList(
     calisan_kapsami: params?.calisan_kapsami,
     eksik_bilgi: params?.eksik_bilgi ? "1" : undefined,
     page: params?.page,
-    limit: params?.limit
+    limit: params?.limit,
+    sort: params?.sort,
+    dir: params?.dir
   });
-  const response = await apiRequest<ApiResponse<unknown>>(
-    path,
-    params?.signal ? { signal: params.signal } : undefined
-  );
+
+  const init: { signal?: AbortSignal; headers?: HeadersInit; skipActiveSubeHeader?: boolean; activeSubeIdOverride?: number | null } =
+    params?.signal ? { signal: params.signal } : {};
+
+  // Explicit sube_id / count calls: query wins; align or suppress active header.
+  if (params?.prefer_query_sube || params?.active_sube_header !== undefined || params?.sube_id != null) {
+    if (params?.active_sube_header === null || (params?.prefer_query_sube && params?.sube_id == null && params?.active_sube_header === undefined)) {
+      init.skipActiveSubeHeader = true;
+      init.activeSubeIdOverride = null;
+      init.headers = { "X-Active-Sube-Id": "" };
+    } else {
+      const headerId = params?.active_sube_header ?? params?.sube_id ?? null;
+      if (headerId != null) {
+        init.activeSubeIdOverride = headerId;
+        init.headers = { "X-Active-Sube-Id": String(headerId) };
+      }
+    }
+  }
+
+  const response = await apiRequest<ApiResponse<unknown>>(path, init);
   const normalized = normalizePaginatedList<unknown>(response, {
     requestedPage: params?.page,
     requestedLimit: params?.limit
@@ -584,6 +614,8 @@ export async function applyPersonelKaliciSubeDegisikligi(
 export type PersonelImportDryRunRow = {
   satir_no: number;
   sicil_no: string;
+  ad?: string;
+  soyad?: string;
   tc_kimlik_no_masked: string;
   durum: "GECERLI" | "HATALI" | "MEVCUT" | string;
   hata_kodlari: string[];
@@ -663,6 +695,8 @@ function normalizeImportDryRunResult(value: unknown): PersonelImportDryRunResult
       return {
         satir_no: Number(r.satir_no ?? 0),
         sicil_no: String(r.sicil_no ?? ""),
+        ad: String(r.ad ?? ""),
+        soyad: String(r.soyad ?? ""),
         tc_kimlik_no_masked: String(r.tc_kimlik_no_masked ?? "***********"),
         durum: String(r.durum ?? "HATALI"),
         hata_kodlari: Array.isArray(r.hata_kodlari)

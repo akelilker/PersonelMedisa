@@ -15,6 +15,7 @@ import type {
   SerbestZamanDeadlineSummary
 } from "../../../types/serbest-zaman";
 import { serbestZamanDeadlineStateLabel } from "../raporlar-ia";
+import { AppSelect } from "../../../components/form/AppSelect";
 import { FormField } from "../../../components/form/FormField";
 import { getApiErrorMessage } from "../../../api/api-client";
 
@@ -256,19 +257,12 @@ aciklama: "Serbest zaman kullanımı."
         </label>
         <label>
           Durum
-          <select
+          <AppSelect
             value={durum}
-            onChange={(event) =>
-              setDurum(event.target.value as "" | SerbestZamanDeadlineState)
-            }
-            data-testid="serbest-zaman-takip-durum"
-          >
-            {DURUM_OPTIONS.map((opt) => (
-              <option key={opt.value || "all"} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
+            onChange={(value) => setDurum(value as "" | SerbestZamanDeadlineState)}
+            dataTestId="serbest-zaman-takip-durum"
+            options={DURUM_OPTIONS}
+          />
         </label>
         <label>
           Personel ID

@@ -1,0 +1,233 @@
+/* ==========================================================================
+   Kanonik seçim owner'ı (AppSelect)
+   --------------------------------------------------------------------------
+   Taşıt referansındaki (`medisa-boxed-select`) görsel/davranış modeli Personel
+   token'ları ve diline uyarlanmıştır.
+
+   Kontrat:
+   - `.app-select-native` görünmez değer sahibidir (etiket/required/name burada).
+   - `.app-select-trigger` görsel alandır; açıkken ince kırmızı aktif kenarlık alır.
+   - Seçenekler tek blok değil, ayrı ince çerçeveli koyu kartlardır.
+   - Blur/dim tek kural: body[data-app-picker-open] + .app-picker-blurred.
+   ========================================================================== */
+
+.app-select {
+  position: relative;
+  display: block;
+  width: 100%;
+  min-width: 0;
+}
+
+/* Açık picker kendi yığın bağlamında öne çıkar; panel sonraki kartların altında kalmaz. */
+.app-select.is-open {
+  z-index: 40;
+}
+
+/* Görünmez native select: değer, etiket ilişkisi ve form semantiği burada kalır. */
+.app-select-native {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  opacity: 0;
+  cursor: pointer;
+}
+
+/* Native seçenek listesi hiç gösterilmez; görünür liste kanonik paneldir. */
+.app-select-native option {
+  display: none;
+}
+
+.app-select-trigger {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  width: 100%;
+  box-sizing: border-box;
+  text-align: left;
+  cursor: pointer;
+  /* Tıklama native select'e aittir. */
+  pointer-events: none;
+}
+
+.app-select-trigger-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-select-trigger-text.is-placeholder {
+  color: rgba(230, 234, 245, 0.5);
+}
+
+.app-select-chevron {
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+  margin-left: 2px;
+  color: rgba(228, 232, 240, 0.72);
+  transition: transform 0.18s ease;
+}
+
+.app-select.is-open .app-select-chevron {
+  transform: rotate(180deg);
+}
+
+.app-select:hover .app-select-trigger {
+  border-color: var(--border-strong);
+}
+
+/* Aktif/focus: ince kırmızı kenarlık (metin karakteri değil gerçek chevron). */
+.app-select.is-open .app-select-trigger,
+.app-select:focus-within .app-select-trigger {
+  border-color: rgba(var(--theme-color-rgb), 0.62);
+  box-shadow:
+    inset 0 0 0 1px rgba(var(--theme-color-rgb), 0.16),
+    0 0 0 1px rgba(var(--theme-color-rgb), 0.08);
+}
+
+.app-select.is-disabled .app-select-trigger {
+  opacity: 0.58;
+  cursor: not-allowed;
+}
+
+/* --- Kanonik seçenek paneli (picker ağacı içinde, blur dışında) --- */
+.app-picker-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 10060;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px 6px;
+  box-sizing: border-box;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  /* Fallback; ölçüm sonrası JS imperative olarak daraltır. */
+  max-height: 320px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+
+.app-picker-panel[data-placement="above"] {
+  top: auto;
+  bottom: calc(100% + 6px);
+}
+
+.app-picker-panel::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.app-select-option {
+  display: block;
+  width: 100%;
+  min-height: 30px;
+  margin: 0;
+  padding: 6px 10px;
+  box-sizing: border-box;
+  border: 1px solid rgba(190, 200, 214, 0.42);
+  border-radius: 6px;
+  background: var(--bg-surface);
+  background-clip: padding-box;
+  color: rgba(240, 244, 248, 0.96);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.2;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 120ms ease, color 120ms ease, background-color 120ms ease;
+}
+
+/* Arama satırı: panelin üstünde, canonical form dilinde ve sabit kalır. */
+.app-picker-search {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 0 0 2px;
+  background: var(--bg-panel);
+}
+
+.app-picker-search-input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.app-picker-empty {
+  margin: 0;
+  padding: 8px 6px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+@media (hover: hover) {
+  .app-select-option:hover {
+    border-color: rgba(190, 200, 214, 0.78);
+    background: var(--bg-panel);
+    color: var(--text-inverse);
+  }
+}
+
+.app-select-option:focus-visible,
+.app-select-option.is-active {
+  border-color: rgba(190, 200, 214, 0.78);
+  background: var(--bg-panel);
+  color: var(--text-inverse);
+  outline: none;
+}
+
+/* Seçili: belirgin ama ağır bordo blok değil — ince marka aksanı + net kenarlık. */
+.app-select-option[aria-selected="true"] {
+  border-color: rgba(190, 200, 214, 0.88);
+  background: var(--bg-panel);
+  color: var(--text-inverse);
+  box-shadow: inset 2px 0 0 rgba(var(--theme-color-rgb), 0.9);
+}
+
+.app-select-option.is-placeholder {
+  color: var(--text-muted);
+}
+
+@media (max-width: 640px) {
+  .app-select-option {
+    min-height: 36px;
+  }
+
+  .app-picker-panel {
+    gap: 5px;
+  }
+}
+
+/* --- Blur kontratı: picker açıkken yalnız picker dışı yüzey bulanır --- */
+body[data-app-picker-open="1"] .app-picker-blurred {
+  filter: blur(2px);
+  opacity: 0.92;
+  pointer-events: none;
+  transition: filter 0.18s ease, opacity 0.18s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-select-option,
+  .app-select-chevron,
+  .app-select-trigger,
+  body[data-app-picker-open="1"] .app-picker-blurred {
+    transition: none;
+  }
+}

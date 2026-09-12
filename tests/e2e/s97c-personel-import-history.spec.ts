@@ -1,12 +1,18 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { loginAsMockRole, login, waitForAuthSession, MOCK_ROLE_LOGIN } from "./helpers/auth";
 import { mockApi } from "./helpers/mock-api";
+
+/** Kanonik giris: Kayit ve Surec > Kayit footer linki ("Import Geçmişi"). */
+async function openImportHistory(page: Page): Promise<void> {
+  await page.goto("/");
+  await page.getByTestId("menu-kayit-surec").click();
+  await page.getByTestId("personeller-import-history-open").click();
+}
 
 test.describe("S97-C personel import history UI", () => {
   test("authorized user sees empty import history state", async ({ page }) => {
     await loginAsMockRole(page, "GENEL_YONETICI");
-    await page.goto("/personeller");
-    await page.getByTestId("personeller-import-history-open").click();
+    await openImportHistory(page);
     await expect(page.getByTestId("personel-import-history-title")).toBeVisible();
     await expect(page.getByTestId("personel-import-history-empty")).toContainText(
       "Henüz tamamlanmış veya başarısız bir personel import işlemi bulunmuyor."
@@ -22,8 +28,7 @@ test.describe("S97-C personel import history UI", () => {
     await mockApi(page, "GENEL_YONETICI", { personelImportHistorySeed: "completed" });
     await login(page, MOCK_ROLE_LOGIN.GENEL_YONETICI);
     await waitForAuthSession(page, "GENEL_YONETICI");
-    await page.goto("/personeller");
-    await page.getByTestId("personeller-import-history-open").click();
+    await openImportHistory(page);
     await expect(page.getByTestId("personel-import-history-list")).toBeVisible();
     await page.getByTestId("personel-import-history-open-91001").click();
     await expect(page.getByTestId("personel-import-history-detail")).toBeVisible();
@@ -48,8 +53,9 @@ test.describe("S97-C personel import history UI", () => {
 
   test("birim amiri cannot see history action and endpoint returns 403", async ({ page }) => {
     await loginAsMockRole(page, "BIRIM_AMIRI");
-    await page.goto("/personeller");
+    await page.goto("/");
     await expect(page.getByTestId("personeller-import-history-open")).toHaveCount(0);
+    await expect(page.getByTestId("personel-import-history-title")).toHaveCount(0);
 
     const status = await page.evaluate(async () => {
       const raw =

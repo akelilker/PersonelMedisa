@@ -8,6 +8,7 @@ import {
   submitRevizyonTalebi
 } from "../../../api/revizyon-talebi.api";
 import { FormField } from "../../../components/form/FormField";
+import { AppSelect } from "../../../components/form/AppSelect";
 import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
 import { useRoleAccess } from "../../../hooks/use-role-access";
@@ -213,20 +214,18 @@ export function RevizyonTalebiCreatePage() {
         <label className="form-label" htmlFor="revizyon-personel">
           Personel
         </label>
-        <select
+        <AppSelect
           id="revizyon-personel"
           name="personel_id"
           value={personelId}
-          onChange={(event) => setPersonelId(event.target.value)}
+          onChange={setPersonelId}
           required
-        >
-          <option value="">Seçiniz</option>
-          {personeller.map((personel) => (
-            <option key={personel.id} value={personel.id}>
-              {personel.ad} {personel.soyad} ({personel.sicil_no})
-            </option>
-          ))}
-        </select>
+          placeholderOption={{ value: "", label: "Seçiniz" }}
+          options={personeller.map((personel) => ({
+            value: String(personel.id),
+            label: `${personel.ad} ${personel.soyad} (${personel.sicil_no})`
+          }))}
+        />
 
         <FormField
           label="Kapalı hafta başlangıcı (Pazartesi)"
@@ -246,21 +245,19 @@ export function RevizyonTalebiCreatePage() {
         <label className="form-label" htmlFor="revizyon-kaynak">
           Kaynak kayıt
         </label>
-        <select
+        <AppSelect
           id="revizyon-kaynak"
           name="kaynak"
           value={kaynakKey}
-          onChange={(event) => setKaynakKey(event.target.value)}
+          onChange={setKaynakKey}
           required
           disabled={isLoadingKaynak || kaynaklar.length === 0}
-        >
-          <option value="">Seçiniz</option>
-          {kaynaklar.map((kaynak) => (
-            <option key={`${kaynak.kaynak_tipi}:${kaynak.kaynak_id}`} value={`${kaynak.kaynak_tipi}:${kaynak.kaynak_id}`}>
-              {kaynak.goruntuleme_etiketi}
-            </option>
-          ))}
-        </select>
+          placeholderOption={{ value: "", label: "Seçiniz" }}
+          options={kaynaklar.map((kaynak) => ({
+            value: `${kaynak.kaynak_tipi}:${kaynak.kaynak_id}`,
+            label: kaynak.goruntuleme_etiketi
+          }))}
+        />
 
         <FormField
           label="Eski değer (sunucu)"
@@ -278,20 +275,15 @@ export function RevizyonTalebiCreatePage() {
         <label className="form-label" htmlFor="revizyon-tipi">
           Revizyon tipi
         </label>
-        <select
+        <AppSelect
           id="revizyon-tipi"
           name="revizyon_tipi"
           value={revizyonTipi}
-          onChange={(event) => setRevizyonTipi(event.target.value as RevizyonTipi)}
+          onChange={(value) => setRevizyonTipi(value as RevizyonTipi)}
           required
-        >
-          <option value="">Seçiniz</option>
-          {uygunTipler.map((tipi) => (
-            <option key={tipi} value={tipi}>
-              {formatRevizyonTipiLabel(tipi)}
-            </option>
-          ))}
-        </select>
+          placeholderOption={{ value: "", label: "Seçiniz" }}
+          options={uygunTipler.map((tipi) => ({ value: tipi, label: formatRevizyonTipiLabel(tipi) }))}
+        />
 
         <label className="form-label" htmlFor="talep-edilen-deger">
           Talep edilen yeni değer

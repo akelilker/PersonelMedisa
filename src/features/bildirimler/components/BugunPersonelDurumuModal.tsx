@@ -1,4 +1,5 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { AppSelect } from "../../../components/form/AppSelect";
 import { AppModal } from "../../../components/modal/AppModal";
 import {
   createBildirim,
@@ -441,10 +442,41 @@ export function BugunPersonelDurumuModal({ open, onClose }: BugunPersonelDurumuM
         {crumb ? <p className="bugun-personel-crumb">{crumb}</p> : null}
         {loading ? <p className="bugun-personel-state">Yükleniyor…</p> : null}
         {error ? (
-          <div className="bugun-personel-state bugun-personel-state--error">
-            <p>{error}</p>
-            <button type="button" className="btn btn-secondary" onClick={() => void load(navToAnchor(nav))}>
-              Yenile
+          <div className="bugun-personel-state bugun-personel-state--error" role="alert">
+            <p>Veriler Yüklenemedi. Yenile Simgesine Basın.</p>
+            <button
+              type="button"
+              className="bugun-personel-refresh-btn"
+              aria-label="Yenile"
+              title="Yenile"
+              onClick={() => void load(navToAnchor(nav))}
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path
+                  d="M20 5v5h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                <path
+                  d="M4 19v-5h5"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                <path
+                  d="M5.5 9a7 7 0 0 1 11.9-3.1L20 10M18.5 15a7 7 0 0 1-11.9 3.1L4 14"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
             </button>
           </div>
         ) : null}
@@ -630,23 +662,21 @@ export function BugunPersonelDurumuModal({ open, onClose }: BugunPersonelDurumuM
               >
                 <label className="bugun-personel-field">
                   <span>Durum</span>
-                  <select
+                  <AppSelect
                     value={editForm.bildirimTuru}
-                    onChange={(e) =>
+                    onChange={(value) =>
                       setEditForm((prev) =>
                         prev
-                          ? { ...prev, bildirimTuru: e.target.value as ScopedCorrectableTur }
+                          ? { ...prev, bildirimTuru: value as ScopedCorrectableTur }
                           : prev
                       )
                     }
-                    data-testid="bugun-edit-tur"
-                  >
-                    {SCOPED_CORRECTABLE_TURLER.map((tur) => (
-                      <option key={tur} value={tur}>
-                        {SCOPED_CORRECTABLE_TUR_LABEL[tur]}
-                      </option>
-                    ))}
-                  </select>
+                    options={SCOPED_CORRECTABLE_TURLER.map((tur) => ({
+                      value: tur,
+                      label: SCOPED_CORRECTABLE_TUR_LABEL[tur]
+                    }))}
+                    dataTestId="bugun-edit-tur"
+                  />
                 </label>
 
                 {turNeedsTimeFields(editForm.bildirimTuru) ? (

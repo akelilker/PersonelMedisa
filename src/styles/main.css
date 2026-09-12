@@ -55,6 +55,10 @@
 /* 5.1 Canonical veri yüzeyi owner'ı — feature layout kurallarından sonra uygulanır */
 @import "./components/table.css";
 
+/* 5.2 Kanonik seçim/picker owner'ı — tüm seçim alanları tek kontrat kullanır */
+@import "./components/app-select.css";
+
+
 /* 6. Platforma Özel Stiller */
 @import "./platform/mobile.css";
 @import "./platform/desktop.css";

@@ -30,12 +30,71 @@
   color: #a0aec0;
 }
 
-.bugun-personel-state--error {
+.modal-body--bugun-personel:has(.bugun-personel-state--error) {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+}
+
+.bugun-personel-panel:has(.bugun-personel-state--error) {
+  flex: 1 1 auto;
+  min-height: 280px;
+  justify-content: center;
+}
+
+.bugun-personel-state--error {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
   align-items: center;
-  color: #f5b5b5;
+  justify-content: center;
+  width: 100%;
+  min-height: 240px;
+  padding: 24px 16px;
+  text-align: center;
+  color: #ffffff;
+}
+
+.bugun-personel-state--error p {
+  margin: 0;
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.bugun-personel-refresh-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: #4ade80;
+  cursor: pointer;
+  box-shadow: none;
+}
+
+.bugun-personel-refresh-btn svg {
+  width: 26px;
+  height: 26px;
+  display: block;
+}
+
+.bugun-personel-refresh-btn:hover,
+.bugun-personel-refresh-btn:focus-visible {
+  color: #86efac;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(74, 222, 128, 0.35);
+}
+
+.bugun-personel-refresh-btn:focus-visible {
+  outline: 2px solid rgba(74, 222, 128, 0.7);
+  outline-offset: 2px;
 }
 
 .bugun-personel-branch-list,
@@ -287,6 +346,7 @@
 
 .bugun-personel-field input,
 .bugun-personel-field select,
+.bugun-personel-field .app-select-trigger,
 .bugun-personel-field textarea {
   width: 100%;
   padding: 6px 8px;

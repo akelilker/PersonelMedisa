@@ -6,7 +6,7 @@
   overflow: hidden;
   background: linear-gradient(180deg, var(--hero-gradient-start), var(--hero-gradient-end));
   border: 1px solid var(--line-hero-card);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-hero);
   padding: 12px 16px;
   margin-bottom: 8px;
   box-shadow:

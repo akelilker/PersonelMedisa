@@ -1,11 +1,18 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { loginAsMockRole } from "./helpers/auth";
+
+/** Kanonik giris: Kayit ve Surec > Kayit footer linki. */
+async function openBulkImport(page: Page): Promise<void> {
+  await page.goto("/");
+  await page.getByTestId("menu-kayit-surec").click();
+  await page.getByTestId("kayit-bulk-import-link").click();
+  await expect(page.getByTestId("personel-import-dry-run-title")).toContainText("Toplu Kayıt Aktarma");
+}
 
 test.describe("S97-B personel import apply UI", () => {
   test("dry-run ready state opens apply confirm and completes synthetic apply", async ({ page }) => {
     await loginAsMockRole(page, "GENEL_YONETICI");
-    await page.goto("/personeller");
-    await page.getByTestId("personeller-import-dry-run-open").click();
+    await openBulkImport(page);
 
     const csv = [
       "tc_kimlik_no;sicil_no;ad;soyad;dogum_tarihi;dogum_yeri;telefon;kan_grubu;acil_durum_kisi;acil_durum_telefon;ise_giris_tarihi;sube;departman;gorev;personel_tipi",
@@ -38,7 +45,8 @@ test.describe("S97-B personel import apply UI", () => {
 
   test("birim amiri cannot open import apply entry", async ({ page }) => {
     await loginAsMockRole(page, "BIRIM_AMIRI");
-    await page.goto("/personeller");
-    await expect(page.getByTestId("personeller-import-dry-run-open")).toHaveCount(0);
+    await page.goto("/");
+    await expect(page.getByTestId("kayit-bulk-import-link")).toHaveCount(0);
+    await expect(page.getByTestId("personel-import-apply-open")).toHaveCount(0);
   });
 });

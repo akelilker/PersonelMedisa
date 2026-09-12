@@ -47,6 +47,8 @@ import {
 } from "../features/personeller/personel-edit-utils";
 const PAGE_SIZE = 10;
 
+export type PersonelListSortKey = "ad" | "sube" | "bolum" | "gorev" | "statu";
+
 export type PersonelListFilters = {
   search: string;
   aktiflik: "aktif" | "pasif" | "tum";
@@ -147,6 +149,8 @@ export function usePersoneller() {
     applied: { ...INITIAL_LIST_FILTERS },
     page: 1
   });
+  const [sortKey, setSortKeyState] = useState<PersonelListSortKey | null>(null);
+  const [sortDir, setSortDirState] = useState<"asc" | "desc">("asc");
 
   const [isFetching, setIsFetching] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -166,7 +170,7 @@ export function usePersoneller() {
 
   const listKey = useMemo(
     () =>
-      dataCacheKeys.personellerList(
+      `${dataCacheKeys.personellerList(
         activeSube,
         appliedFilters.search,
         appliedFilters.aktiflik,
@@ -175,7 +179,7 @@ export function usePersoneller() {
         listPage,
         appliedFilters.calisanKapsami,
         appliedFilters.eksikBilgi
-      ),
+      )}|sort=${sortKey ?? "id"}|dir=${sortDir}`,
     [
       activeSube,
       appliedFilters.aktiflik,
@@ -184,7 +188,9 @@ export function usePersoneller() {
       appliedFilters.calisanKapsami,
       appliedFilters.eksikBilgi,
       appliedFilters.search,
-      listPage
+      listPage,
+      sortDir,
+      sortKey
     ]
   );
 
@@ -247,6 +253,9 @@ export function usePersoneller() {
       calisan_kapsami: appliedFilters.calisanKapsami || undefined,
       eksik_bilgi: appliedFilters.eksikBilgi === "eksik",
       sube_id: getSubeIdForApiRequest(),
+      sort: sortKey ?? undefined,
+      dir: sortKey ? sortDir : undefined,
+      prefer_query_sube: true,
       page,
       limit: PAGE_SIZE,
       signal
@@ -257,7 +266,9 @@ export function usePersoneller() {
       appliedFilters.personelTipiId,
       appliedFilters.calisanKapsami,
       appliedFilters.eksikBilgi,
-      appliedFilters.search
+      appliedFilters.search,
+      sortDir,
+      sortKey
     ]
   );
 
@@ -519,6 +530,22 @@ export function usePersoneller() {
     [applyFilterPatch]
   );
 
+  const setSort = useCallback((key: PersonelListSortKey | null, dir?: "asc" | "desc") => {
+    setSortKeyState((prevKey) => {
+      if (key === null) {
+        setSortDirState("asc");
+        return null;
+      }
+      if (prevKey === key) {
+        setSortDirState((d) => (dir ? dir : d === "asc" ? "desc" : "asc"));
+        return prevKey;
+      }
+      setSortDirState(dir ?? "asc");
+      return key;
+    });
+    setListQuery((prev) => (prev.page === 1 ? prev : { ...prev, page: 1 }));
+  }, []);
+
   const setPage = useCallback((next: number | ((p: number) => number)) => {
     setListQuery((prev) => ({
       ...prev,
@@ -714,7 +741,10 @@ export function usePersoneller() {
     setDraftPersonelTipiId,
     setDraftCalisanKapsami,
     setDraftEksikBilgi,
-    setPage
+    setPage,
+    sortKey,
+    sortDir,
+    setSort
   };
 }
 

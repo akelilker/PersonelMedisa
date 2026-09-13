@@ -189,7 +189,12 @@ final class PersonelOrganizasyonDegisikligiService
                 }
                 self::validateReference($pdo, $field, $after);
                 if ($field === 'sgk_isveren_id') {
-                    self::assertSgkCompanyCompatible($pdo, $after, self::normalizeFieldValue('sube_id', $current['sube_id'] ?? null));
+                    self::assertSgkCompanyCompatible(
+                        $pdo,
+                        $after,
+                        self::normalizeFieldValue('sube_id', $current['sube_id'] ?? null),
+                        PersonelCalisanKapsamService::resolveFromRow($current)
+                    );
                 }
                 $changes[] = $field;
                 $oldValues[$field] = $before;
@@ -326,6 +331,10 @@ final class PersonelOrganizasyonDegisikligiService
         if (PersonelOrgLocationSchema::isReady($pdo)) {
             $cols = array_merge($cols, ['sgk_isveren_id', 'calisma_lokasyonu_id']);
         }
+        // Kapsam ekseni, SGK company kuralının IC/DIS ayrımı için okunur.
+        if (PersonelCalisanKapsamSchema::isReady($pdo)) {
+            $cols[] = 'calisan_kapsami';
+        }
         $sql = 'SELECT ' . implode(', ', $cols) . ' FROM personeller WHERE id = :id LIMIT 1';
         $stmt = $pdo->prepare($sql);
         $stmt->execute(['id' => $personelId]);
@@ -456,10 +465,16 @@ final class PersonelOrganizasyonDegisikligiService
         }
     }
 
-    /** @param mixed $sgkIsverenId @param mixed $subeId */
-    private static function assertSgkCompanyCompatible(PDO $pdo, $sgkIsverenId, $subeId): void
+    /**
+     * IC: SGK işvereni ile şube şirketi aynı olmalı. DIS (Harici Personel):
+     * SGK/bordro kaynağı şirketten bağımsızdır, farklı şirket geçerlidir.
+     *
+     * @param mixed $sgkIsverenId
+     * @param mixed $subeId
+     */
+    private static function assertSgkCompanyCompatible(PDO $pdo, $sgkIsverenId, $subeId, string $kapsam): void
     {
-        $result = PersonelSgkCompanyConsistency::evaluate($pdo, $sgkIsverenId, $subeId);
+        $result = PersonelSgkCompanyConsistency::evaluateForKapsam($pdo, $kapsam, $sgkIsverenId, $subeId);
         if ($result['ok']) {
             return;
         }

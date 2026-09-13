@@ -2,10 +2,11 @@ import { expect, test, type Page } from "@playwright/test";
 import { loginAsMockRole, login, waitForAuthSession, MOCK_ROLE_LOGIN } from "./helpers/auth";
 import { mockApi } from "./helpers/mock-api";
 
-/** Kanonik giris: Kayit ve Surec > Kayit footer linki ("Import Geçmişi"). */
+/** Kanonik giris: Kayit > Toplu Kayıt Aktarma içindeki "Import Geçmişi". */
 async function openImportHistory(page: Page): Promise<void> {
   await page.goto("/");
   await page.getByTestId("menu-kayit-surec").click();
+  await page.getByTestId("kayit-bulk-import-link").click();
   await page.getByTestId("personeller-import-history-open").click();
 }
 
@@ -54,7 +55,7 @@ test.describe("S97-C personel import history UI", () => {
   test("birim amiri cannot see history action and endpoint returns 403", async ({ page }) => {
     await loginAsMockRole(page, "BIRIM_AMIRI");
     await page.goto("/");
-    await expect(page.getByTestId("personeller-import-history-open")).toHaveCount(0);
+    await expect(page.getByTestId("menu-kayit-surec")).toHaveCount(0);
     await expect(page.getByTestId("personel-import-history-title")).toHaveCount(0);
 
     const status = await page.evaluate(async () => {

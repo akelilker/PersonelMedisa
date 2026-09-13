@@ -32,7 +32,7 @@ async function fillRequiredPersonelFields(modal: Locator, options?: { includeSub
 
   await selectCreateOption(modal, "Departman", "Döşeme");
   await selectCreateOption(modal, "Unvan", "Genel Müdür");
-  await selectCreateOption(modal, "Personel Tipi", "Tam Zamanlı");
+  await selectCreateOption(modal, "Statü", "Mavi Yaka");
 }
 
 test.describe("Kayit yeni personel", () => {
@@ -125,7 +125,7 @@ test.describe("Kayit yeni personel", () => {
     await selectCreateOption(kayitModal, "Şube", "Merkez");
     await selectCreateOption(kayitModal, "Departman", "Döşeme");
     await selectCreateOption(kayitModal, "Unvan", "Genel Müdür");
-    await selectCreateOption(kayitModal, "Personel Tipi", "Tam Zamanlı");
+    await selectCreateOption(kayitModal, "Statü", "Mavi Yaka");
     await kayitModal.getByRole("button", { name: "Kaydet" }).click();
 
     await expect(kayitModal.getByRole("heading", { name: /CacheSync E2E/i })).toBeVisible({

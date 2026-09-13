@@ -169,6 +169,7 @@ final class PersonelKaliciSubeDegisikligiService
             self::assertActorScope($user, $currentSubeId, $targetSubeId);
             self::assertSgkSirketConsistency(
                 $pdo,
+                PersonelCalisanKapsamService::resolveFromRow($current),
                 self::nullableId($current['sgk_isveren_id'] ?? null),
                 self::nullableId($target['sirket_id'] ?? null),
                 $hierarchyReady
@@ -246,6 +247,10 @@ final class PersonelKaliciSubeDegisikligiService
         if ($orgLocationReady) {
             $columns .= ', sgk_isveren_id, calisma_lokasyonu_id';
         }
+        // Kapsam ekseni SGK company kuralının IC/DIS ayrımı için gerekir.
+        if (PersonelCalisanKapsamSchema::isReady($pdo)) {
+            $columns .= ', calisan_kapsami';
+        }
 
         $stmt = $pdo->prepare("SELECT {$columns} FROM personeller WHERE id = :id FOR UPDATE");
         $stmt->execute(['id' => $personelId]);
@@ -297,16 +302,27 @@ final class PersonelKaliciSubeDegisikligiService
     }
 
     /**
-     * A person's payroll employer and their branch must stay inside one company.
+     * A person's payroll employer and their branch must stay inside one company —
+     * for IC_PERSONEL only. DIS_KAYNAK (Harici Personel) may carry another
+     * company's SGK employer; the physical branch and the bordro source are
+     * separate axes, so no company match is required there.
+     *
      * Canonical evaluator: PersonelSgkCompanyConsistency (no duplicated SQL).
      * This owner keeps its historical error code for branch-move API clients.
      */
     private static function assertSgkSirketConsistency(
         PDO $pdo,
+        string $kapsam,
         ?int $sgkIsverenId,
         ?int $targetSirketId,
         bool $hierarchyReady
     ): void {
+        if (PersonelCalisanKapsamService::resolveFromRow(['calisan_kapsami' => $kapsam])
+            === PersonelCalisanKapsamService::DIS_KAYNAK
+        ) {
+            return;
+        }
+
         if ($sgkIsverenId === null) {
             return;
         }
@@ -319,7 +335,12 @@ final class PersonelKaliciSubeDegisikligiService
             );
         }
 
-        $result = PersonelSgkCompanyConsistency::evaluateAgainstSirket($pdo, $sgkIsverenId, $targetSirketId);
+        $result = PersonelSgkCompanyConsistency::evaluateAgainstSirketForKapsam(
+            $pdo,
+            $kapsam,
+            $sgkIsverenId,
+            $targetSirketId
+        );
         if ($result['ok']) {
             return;
         }

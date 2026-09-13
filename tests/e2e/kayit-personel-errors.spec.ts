@@ -32,7 +32,7 @@ async function fillRequiredPersonelFields(modal: Locator, options?: { tcKimlikNo
   await selectCreateOption(modal, "Şube", options?.sube ?? "Merkez");
   await selectCreateOption(modal, "Departman", "Döşeme");
   await selectCreateOption(modal, "Unvan", "Genel Müdür");
-  await selectCreateOption(modal, "Personel Tipi", "Tam Zamanlı");
+  await selectCreateOption(modal, "Statü", "Mavi Yaka");
 }
 
 function trackRuntimeSignals(page: Page) {

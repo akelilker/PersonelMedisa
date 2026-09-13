@@ -316,12 +316,13 @@ try {
         p7fAssert($e->getField() === 'tc_kimlik_no', 'supplied invalid external TC rejected');
     }
 
-    try {
-        PersonelCalisanKapsamService::assertSgkIsverenAllowed('DIS_KAYNAK', 1);
-        p7fAssert(false, 'external SGK owner rejected');
-    } catch (PersonelValidationException $e) {
-        p7fAssert($e->getCodeString() === 'DIS_KAYNAK_SGK_ISVEREN_YASAK', 'external SGK owner rejected');
-    }
+    // SGK/bordro kaynağı bağımsız eksendir: DIS_KAYNAK personel başka şirketin
+    // SGK işverenini taşıyabilir; finansal/sgk tahakkuk kapısı ayrı owner'dadır.
+    p7fAssert(
+        PersonelCalisanKapsamService::resolveFromRow(['calisan_kapsami' => 'DIS_KAYNAK'])
+            === PersonelCalisanKapsamService::DIS_KAYNAK,
+        'external scope resolved for SGK-source axis'
+    );
 
     $pdo->exec("CREATE TABLE subeler (id INT UNSIGNED NOT NULL PRIMARY KEY, ad VARCHAR(120) NOT NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
     $pdo->exec("CREATE TABLE departmanlar (id INT UNSIGNED NOT NULL PRIMARY KEY, ad VARCHAR(120) NOT NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");

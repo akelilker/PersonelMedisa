@@ -51,6 +51,8 @@ describe("canonical company / branch / SGK / work-location gap closure", () => {
     const deps = read("src/features/personeller/personel-create-org-deps.ts");
     expect(deps).toContain("filterSgkIsverenOptionsForSube");
     expect(deps).toContain("fail-closed");
-    expect(deps).not.toContain("calismaLokasyonu");
+    expect(deps).toContain("filterStatuOptionsForCreate");
+    expect(deps).toContain("mapCalismaLokasyonuDisplayOptions");
+    expect(deps).not.toContain("calisma_lokasyonu_id");
   });
 });

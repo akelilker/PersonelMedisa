@@ -20,6 +20,14 @@ Yeni otoriter model: **zaman/operasyon ≠ finansal/işveren**.
 | A) `calisan_kapsami` | SGK / ücret / gerçek bordro / banka yükümlülüğü | `DIS_KAYNAK` = PersonelMedisa işveren mali kapsamı dışında |
 | B) Organizasyon bağlantısı | Şube/Dep/Bölüm/Birim | Tamamı veya bir kısmı NULL olabilir (bağlantısız havuz meşru) |
 | C) Rol / yetki | `RolePermissions` + `OrgScope` | DIS olduğu için rol engellenmez |
+| D) SGK / bordro kaynağı | `sgk_isveren_id` (hangi işveren üzerinden SGK/bordro) | Farklı şirketin AKTİF SGK işvereni geçerli; NULL (Bağ-Kur) da geçerli |
+| E) Fiili çalışma yeri | `calisma_lokasyonu_id` | Şubeden bağımsız; DIS'in gerçekten çalıştığı yer |
+
+> **2026-09-13 güncellemesi (phase `EMPLOYMENT_SCOPE_WORKPLACE_INSURANCE_MODEL_CORRECTION`):**
+> `assertSgkIsverenAllowed` / `DIS_KAYNAK_SGK_ISVEREN_YASAK` **kaldırıldı**. SGK işvereni
+> bir finansal kapsam kanıtı değil, bordro kaynağı bilgisidir; aynı-şirket invariant'ı
+> yalnız `IC_PERSONEL` için `PersonelSgkCompanyConsistency` üzerinden uygulanır.
+> Finansal ayrım (`assertFinancialEligible`, `sqlFinancialEligiblePredicate`) korunur.
 
 ## Operasyonel vs finansal owner
 
@@ -27,7 +35,6 @@ Merkezi owner: `PersonelCalisanKapsamService`
 
 - `assertTimeOperationalEligible` — DIS org veya aktif geçici görevlendirme ile **dahil** (effective `sube_id` şart)
 - `assertFinancialEligible` / `sqlIcPersonelPredicate` — DIS **kesin dışarıda**
-- `assertSgkIsverenAllowed` — `DIS_KAYNAK_SGK_ISVEREN_YASAK` korunur
 - Ambiguous `assertOperationalEligible*` **kaldırıldı**; caller'lar explicit time/finans seçer
 
 ## Effective org (canonical)

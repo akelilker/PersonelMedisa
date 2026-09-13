@@ -461,8 +461,9 @@ final class PersonelImportDryRunService
             $payloadCandidate = is_array($fieldResult['payload'] ?? null) ? $fieldResult['payload'] : null;
             if ($payloadCandidate !== null) {
                 try {
-                    PersonelSgkCompanyConsistency::assertCompatible(
+                    PersonelSgkCompanyConsistency::assertCompatibleForKapsam(
                         $pdo,
+                        (string) ($payloadCandidate['calisan_kapsami'] ?? PersonelCalisanKapsamService::IC_PERSONEL),
                         $payloadCandidate['sgk_isveren_id'] ?? null,
                         $payloadCandidate['sube_id'] ?? null
                     );

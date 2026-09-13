@@ -10,6 +10,14 @@
 3. **Owner:** `PersonelSgkCompanyConsistency` — used by create, import dry-run/apply, organizasyon değişikliği, and kalıcı şube değişikliği (historical API error codes preserved on branch move).
 4. **Completeness:** IC_PERSONEL missing SGK → incomplete; DIS_KAYNAK ignores SGK key.
 5. **DIS_KAYNAK:** SGK remains forbidden / forced NULL.
+   → **SUPERSEDED (2026-09-13, phase `EMPLOYMENT_SCOPE_WORKPLACE_INSURANCE_MODEL_CORRECTION`):**
+   SGK/bordro kaynağı bağımsız bir eksendir. `DIS_KAYNAK` (Harici Personel) başka
+   şirketin AKTİF SGK işverenini taşıyabilir (ör. Şenay Mobilya bordrolu, Medisa
+   fabrikasında çalışan) veya hiç SGK işvereni olmayabilir (Bağ-Kur). Aynı-şirket
+   invariant'ı **yalnız `IC_PERSONEL`** için korunur; DIS için şirket eşleşmesi
+   aranmaz. Katalog geçerliliği `PersonelOrgLocationSchema::existsActiveSgkIsveren`
+   ile doğrulanır. Finansal kapı (`assertFinancialEligible` / `sqlFinancialEligiblePredicate`)
+   değişmemiştir: DIS hâlâ ücret/bordro/SGK tahakkukunun dışındadır.
 
 ## Archive residual (personel_id=1)
 

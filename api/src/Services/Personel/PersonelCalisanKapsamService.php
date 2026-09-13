@@ -13,8 +13,15 @@ use PDO;
  * calisan_kapsami = işveren finansal/SGK yükümlülüğü sınırı (IC vs DIS).
  * Rol ve organizasyon bağlantısından bağımsızdır.
  *
+ * Dört eksen birbirinden bağımsızdır: çalışan kapsamı, statü (personel_tipi_id),
+ * fiili çalışma yeri (calisma_lokasyonu_id) ve SGK/bordro kaynağı (sgk_isveren_id).
+ *
  * A) Zaman/operasyon: DIS dahil olabilir (org veya aktif görevlendirme gerekir).
  * B) Finansal/işveren: yalnız IC_PERSONEL.
+ *
+ * sgk_isveren_id bu sınıfın finansal kapsamına kanıt değildir: DIS_KAYNAK bir
+ * personel başka şirketin SGK işvereniyle (bordro kaynağı) izlenebilir; kişi
+ * yine finansal/SGK tahakkuk akışlarının dışında kalır.
  */
 final class PersonelCalisanKapsamService
 {
@@ -25,7 +32,6 @@ final class PersonelCalisanKapsamService
     public const ERROR_OPERASYON = 'PERSONEL_OPERASYON_KAPSAM_DISI';
     public const ERROR_FINANSAL = 'PERSONEL_FINANSAL_KAPSAM_DISI';
     public const ERROR_ORG_SCOPE = 'PERSONEL_OPERASYON_ORG_SCOPE_YOK';
-    public const ERROR_SGK_YASAK = 'DIS_KAYNAK_SGK_ISVEREN_YASAK';
     public const ERROR_SCHEMA = PersonelCalisanKapsamSchema::ERROR_CODE;
 
     /**
@@ -219,24 +225,6 @@ final class PersonelCalisanKapsamService
             'personel_id',
             'Bu personel DIS_KAYNAK kapsamindadir; ucret/SGK/gercek bordro islemi yapilamaz.',
             self::ERROR_FINANSAL
-        );
-    }
-
-    /**
-     * @param mixed $sgkIsverenId
-     */
-    public static function assertSgkIsverenAllowed(string $kapsam, $sgkIsverenId): void
-    {
-        if ($kapsam !== self::DIS_KAYNAK) {
-            return;
-        }
-        if ($sgkIsverenId === null || $sgkIsverenId === '') {
-            return;
-        }
-        throw new PersonelValidationException(
-            'sgk_isveren_id',
-            'DIS_KAYNAK personeline PersonelMedisa SGK isvereni atanamaz.',
-            self::ERROR_SGK_YASAK
         );
     }
 

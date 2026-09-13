@@ -110,6 +110,8 @@ type DemoPersonel = {
   ucret_tipi_id?: number;
   maas_tutari?: number;
   net_maas_tutari?: number;
+  sgk_isveren_id?: number;
+  calisma_lokasyonu_id?: number;
 };
 
 type DemoSurec = {
@@ -1328,8 +1330,8 @@ function applyDemoBelgeDurumPut(personelId: number, body: Record<string, unknown
 }
 
 const DEMO_PERSONEL_TIPI_LABELS: Record<number, string> = {
-  1: "Tam Zamanlı",
-  2: "Yarı Zamanlı"
+  1: "Mavi Yaka",
+  2: "Beyaz Yaka"
 };
 
 const DEMO_BAGLI_AMIR_LABELS: Record<number, string> = {
@@ -5629,6 +5631,7 @@ export function resolveDemoApiResponse(
     const departmanId = toNumber(requestUrl.searchParams.get("departman_id"));
     const personelTipiId = toNumber(requestUrl.searchParams.get("personel_tipi_id"));
     const calisanKapsami = toStringValue(requestUrl.searchParams.get("calisan_kapsami"));
+    const calismaLokasyonuId = toNumber(requestUrl.searchParams.get("calisma_lokasyonu_id"));
     const eksikBilgiRaw = (toStringValue(requestUrl.searchParams.get("eksik_bilgi")) ?? "").toLowerCase();
     const eksikBilgiOnly = ["1", "true", "yes", "eksik", "missing"].includes(eksikBilgiRaw);
     const sortRaw = (toStringValue(requestUrl.searchParams.get("sort"))
@@ -5657,6 +5660,8 @@ export function resolveDemoApiResponse(
       if (departmanId !== null && item.departman_id !== departmanId) return false;
       if (personelTipiId !== null && item.personel_tipi_id !== personelTipiId) return false;
       if (calisanKapsami && (item.calisan_kapsami ?? "IC_PERSONEL") !== calisanKapsami) return false;
+      // Fiili çalışma yeri filtresi: bordro/SGK kaynağından bağımsız.
+      if (calismaLokasyonuId !== null && (item.calisma_lokasyonu_id ?? null) !== calismaLokasyonuId) return false;
       return personelSearchMatches(item, search);
     });
 
@@ -6150,14 +6155,15 @@ export function resolveDemoApiResponse(
   }
 
   if (pathname === "/personeller" && method === "POST") {
-    const subeId = toNumber(body.sube_id);
-    if (subeId === null) {
-      return demoRevizyonError("VALIDATION_ERROR", "Şube seçilmelidir.");
-    }
-
     const calisanKapsami = toStringValue(body.calisan_kapsami) === "DIS_KAYNAK"
       ? "DIS_KAYNAK"
       : "IC_PERSONEL";
+    const subeId = toNumber(body.sube_id);
+    // DIS_KAYNAK organizasyonel olarak bağlantısız kalabilir (migration 076).
+    if (subeId === null && calisanKapsami !== "DIS_KAYNAK") {
+      return demoRevizyonError("VALIDATION_ERROR", "Şube seçilmelidir.");
+    }
+
     const next: DemoPersonel = {
       id: ++demoState.nextIds.personel,
       tc_kimlik_no: toStringValue(body.tc_kimlik_no) ?? (calisanKapsami === "DIS_KAYNAK" ? "" : "00000000000"),
@@ -6165,7 +6171,11 @@ export function resolveDemoApiResponse(
       soyad: toStringValue(body.soyad) ?? (calisanKapsami === "DIS_KAYNAK" ? "" : "Personel"),
       aktif_durum: (toStringValue(body.aktif_durum) as "AKTIF" | "PASIF") ?? "AKTIF",
       calisan_kapsami: calisanKapsami,
-      sube_id: subeId,
+      sube_id: subeId ?? undefined,
+      // SGK/bordro kaynağı ve fiili çalışma yeri bağımsız eksenlerdir; DIS için
+      // farklı şirketin SGK işvereni geçerlidir.
+      sgk_isveren_id: toNumber(body.sgk_isveren_id) ?? undefined,
+      calisma_lokasyonu_id: toNumber(body.calisma_lokasyonu_id) ?? undefined,
       telefon: toStringValue(body.telefon) ?? undefined,
       dogum_tarihi: toStringValue(body.dogum_tarihi) ?? undefined,
       sicil_no: demoResolveCreateSicilNo(toStringValue(body.sicil_no)),
@@ -10256,8 +10266,11 @@ export function resolveDemoApiResponse(
 
     if (pathname === "/referans/personel-tipleri") {
       return ok([
-        { id: 1, ad: "Tam Zamanlı" },
-        { id: 2, ad: "Yarı Zamanlı" }
+        { id: 1, ad: "Mavi Yaka" },
+        { id: 2, ad: "Beyaz Yaka" },
+        { id: 3, ad: "Diğer" },
+        { id: 4, ad: "Sözleşmeli" },
+        { id: 5, ad: "Tam Zamanlı" }
       ]);
     }
 

@@ -15,7 +15,8 @@ describe("DIS_KAYNAK operasyonel/non-financial model", () => {
     expect(service).toContain("assertFinancialEligible");
     expect(service).toContain("PERSONEL_FINANSAL_KAPSAM_DISI");
     expect(service).toContain("PERSONEL_OPERASYON_ORG_SCOPE_YOK");
-    expect(service).toContain("DIS_KAYNAK_SGK_ISVEREN_YASAK");
+    // SGK işvereni artık bağımsız bordro-kaynağı ekseni: DIS için blanket yasak yok.
+    expect(service).not.toContain("DIS_KAYNAK_SGK_ISVEREN_YASAK");
     expect(service).toContain("sqlFinancialEligiblePredicate");
     expect(service).toContain("sqlTimeOperationalEligiblePredicate");
   });

@@ -110,6 +110,82 @@ final class PersonelSgkCompanyConsistency
     }
 
     /**
+     * Scope-aware SGK işvereni ↔ şube şirketi kuralı.
+     *
+     * IC_PERSONEL : personelin SGK işvereni ile şubenin şirketi aynı olmalıdır
+     *               (mevcut aynı-şirket invariant'ı korunur).
+     * DIS_KAYNAK  : SGK/bordro kaynağı fiili organizasyon şubesinden bağımsızdır.
+     *               Başka şirketin AKTİF SGK işvereni geçerli olabilir
+     *               (ör. Şenay Mobilya bordrolu, Medisa fabrikasında çalışan kişi).
+     *               Şirket eşleşmesi aranmaz; katalog geçerliliği ayrı owner'da
+     *               (PersonelOrgLocationSchema::existsActiveSgkIsveren) doğrulanır.
+     *
+     * @param mixed $sgkIsverenId
+     * @param mixed $subeId
+     * @return array{ok:bool, code:?string, message:?string, sgk_sirket_id:?int, sube_sirket_id:?int}
+     */
+    public static function evaluateForKapsam(PDO $pdo, string $kapsam, $sgkIsverenId, $subeId): array
+    {
+        return self::evaluateAgainstSirketForKapsam(
+            $pdo,
+            $kapsam,
+            $sgkIsverenId,
+            self::resolveSubeSirketId($pdo, self::nullablePositiveInt($subeId))
+        );
+    }
+
+    /**
+     * Same scope rule when the target company is already known (e.g. branch move).
+     *
+     * @param mixed $sgkIsverenId
+     * @return array{ok:bool, code:?string, message:?string, sgk_sirket_id:?int, sube_sirket_id:?int}
+     */
+    public static function evaluateAgainstSirketForKapsam(PDO $pdo, string $kapsam, $sgkIsverenId, ?int $sirketId): array
+    {
+        if (self::isDisKaynakKapsam($kapsam)) {
+            return [
+                'ok' => true,
+                'code' => null,
+                'message' => null,
+                'sgk_sirket_id' => null,
+                'sube_sirket_id' => $sirketId,
+            ];
+        }
+
+        return self::evaluateAgainstSirket($pdo, $sgkIsverenId, $sirketId);
+    }
+
+    /**
+     * @param mixed $sgkIsverenId
+     * @param mixed $subeId
+     */
+    public static function assertCompatibleForKapsam(PDO $pdo, string $kapsam, $sgkIsverenId, $subeId): void
+    {
+        $result = self::evaluateForKapsam($pdo, $kapsam, $sgkIsverenId, $subeId);
+        if ($result['ok']) {
+            return;
+        }
+
+        throw new PersonelValidationException(
+            'sgk_isveren_id',
+            (string) $result['message'],
+            (string) $result['code']
+        );
+    }
+
+    /**
+     * Kapsam çözümü PersonelCalisanKapsamService'e aittir; eksik/boş değer
+     * IC_PERSONEL'e düşer, yani şema öncesi durumda katı kural korunur.
+     *
+     * @param mixed $kapsam
+     */
+    private static function isDisKaynakKapsam($kapsam): bool
+    {
+        return PersonelCalisanKapsamService::resolveFromRow(['calisan_kapsami' => $kapsam])
+            === PersonelCalisanKapsamService::DIS_KAYNAK;
+    }
+
+    /**
      * @param mixed $sgkIsverenId
      * @param mixed $subeId
      */

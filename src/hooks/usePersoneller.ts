@@ -55,6 +55,8 @@ export type PersonelListFilters = {
   departmanId: string;
   personelTipiId: string;
   calisanKapsami: "" | "IC_PERSONEL" | "DIS_KAYNAK";
+  /** Fiili çalışma yeri: "fabrikada kimler çalışıyor?" sorusunun filtresi. */
+  calismaLokasyonuId: string;
   eksikBilgi: "tum" | "eksik";
 };
 
@@ -76,6 +78,7 @@ const INITIAL_LIST_FILTERS: PersonelListFilters = {
   departmanId: "",
   personelTipiId: "",
   calisanKapsami: "",
+  calismaLokasyonuId: "",
   eksikBilgi: "tum"
 };
 
@@ -178,7 +181,8 @@ export function usePersoneller() {
         appliedFilters.personelTipiId,
         listPage,
         appliedFilters.calisanKapsami,
-        appliedFilters.eksikBilgi
+        appliedFilters.eksikBilgi,
+        appliedFilters.calismaLokasyonuId
       )}|sort=${sortKey ?? "id"}|dir=${sortDir}`,
     [
       activeSube,
@@ -186,6 +190,7 @@ export function usePersoneller() {
       appliedFilters.departmanId,
       appliedFilters.personelTipiId,
       appliedFilters.calisanKapsami,
+      appliedFilters.calismaLokasyonuId,
       appliedFilters.eksikBilgi,
       appliedFilters.search,
       listPage,
@@ -251,6 +256,7 @@ export function usePersoneller() {
       aktiflik: appliedFilters.aktiflik,
       personel_tipi_id: parseOptionalPositiveInt(appliedFilters.personelTipiId),
       calisan_kapsami: appliedFilters.calisanKapsami || undefined,
+      calisma_lokasyonu_id: parseOptionalPositiveInt(appliedFilters.calismaLokasyonuId),
       eksik_bilgi: appliedFilters.eksikBilgi === "eksik",
       sube_id: getSubeIdForApiRequest(),
       sort: sortKey ?? undefined,
@@ -265,6 +271,7 @@ export function usePersoneller() {
       appliedFilters.departmanId,
       appliedFilters.personelTipiId,
       appliedFilters.calisanKapsami,
+      appliedFilters.calismaLokasyonuId,
       appliedFilters.eksikBilgi,
       appliedFilters.search,
       sortDir,
@@ -525,6 +532,11 @@ export function usePersoneller() {
     [applyFilterPatch]
   );
 
+  const setDraftCalismaLokasyonuId = useCallback(
+    (calismaLokasyonuId: string) => applyFilterPatch({ calismaLokasyonuId }),
+    [applyFilterPatch]
+  );
+
   const setDraftEksikBilgi = useCallback(
     (eksikBilgi: "tum" | "eksik") => applyFilterPatch({ eksikBilgi }),
     [applyFilterPatch]
@@ -740,6 +752,7 @@ export function usePersoneller() {
     setDraftDepartmanId,
     setDraftPersonelTipiId,
     setDraftCalisanKapsami,
+    setDraftCalismaLokasyonuId,
     setDraftEksikBilgi,
     setPage,
     sortKey,

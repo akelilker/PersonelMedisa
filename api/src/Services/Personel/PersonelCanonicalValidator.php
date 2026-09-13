@@ -188,14 +188,9 @@ final class PersonelCanonicalValidator
             $payload['pozisyon_id'] = self::optionalPositiveInt($body, 'pozisyon_id');
         }
 
-        PersonelCalisanKapsamService::assertSgkIsverenAllowed(
-            $kapsam,
-            $payload['sgk_isveren_id'] ?? null
-        );
-        if ($kapsam === PersonelCalisanKapsamService::DIS_KAYNAK) {
-            $payload['sgk_isveren_id'] = null;
-        }
-
+        // SGK/bordro kaynağı ayrı bir eksendir: IC için zorunlu ve şube şirketiyle
+        // aynı olmalıdır (PersonelCreateService), DIS için opsiyoneldir ve başka
+        // şirketin AKTİF SGK işvereni olabilir. Burada değer sıfırlanmaz.
         return $payload;
     }
 
@@ -514,9 +509,7 @@ final class PersonelCanonicalValidator
             return ['payload' => $normalized, 'errors' => []];
         } catch (PersonelValidationException $e) {
             $code = 'PERSONEL_IMPORT_EKSIK_ALAN';
-            if ($e->getCodeString() === PersonelCalisanKapsamService::ERROR_SGK_YASAK) {
-                $code = PersonelCalisanKapsamService::ERROR_SGK_YASAK;
-            } elseif ($e->getCodeString() === PersonelSgkCompanyConsistency::ERROR_REQUIRED) {
+            if ($e->getCodeString() === PersonelSgkCompanyConsistency::ERROR_REQUIRED) {
                 $code = PersonelSgkCompanyConsistency::ERROR_REQUIRED;
             } elseif ($e->getCodeString() === PersonelSgkCompanyConsistency::ERROR_MISMATCH
                 || $e->getCodeString() === PersonelSgkCompanyConsistency::ERROR_HIERARCHY) {

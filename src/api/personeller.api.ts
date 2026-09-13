@@ -13,6 +13,8 @@ export type PersonellerListParams = {
   aktiflik?: "aktif" | "pasif" | "tum";
   personel_tipi_id?: number;
   calisan_kapsami?: "IC_PERSONEL" | "DIS_KAYNAK";
+  /** Fiili çalışma yeri filtresi (bordro/SGK kaynağından bağımsız). */
+  calisma_lokasyonu_id?: number;
   /** When true, only personel with master-data gaps (server-side). */
   eksik_bilgi?: boolean;
   page?: number;
@@ -432,6 +434,7 @@ export async function fetchPersonellerList(
     aktiflik: params?.aktiflik,
     personel_tipi_id: params?.personel_tipi_id,
     calisan_kapsami: params?.calisan_kapsami,
+    calisma_lokasyonu_id: params?.calisma_lokasyonu_id,
     eksik_bilgi: params?.eksik_bilgi ? "1" : undefined,
     page: params?.page,
     limit: params?.limit,

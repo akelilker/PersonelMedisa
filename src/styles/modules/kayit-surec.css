@@ -359,7 +359,22 @@
 }
 
 .kayit-workspace-grid--personel-form input[type="date"].form-input:invalid {
-  color: rgba(230, 234, 245, 0.5);
+  color: var(--text-muted);
+  opacity: 1;
+}
+
+/* Boş native date input replika metni: diğer placeholderlarla aynı canonical gri ton. */
+.kayit-workspace-grid--personel-form input[type="date"].form-input:invalid::-webkit-datetime-edit {
+  color: var(--text-muted);
+  opacity: 1;
+}
+
+.kayit-workspace-grid--personel-form input[type="date"].form-input:invalid::-webkit-datetime-edit-text,
+.kayit-workspace-grid--personel-form input[type="date"].form-input:invalid::-webkit-datetime-edit-month-field,
+.kayit-workspace-grid--personel-form input[type="date"].form-input:invalid::-webkit-datetime-edit-day-field,
+.kayit-workspace-grid--personel-form input[type="date"].form-input:invalid::-webkit-datetime-edit-year-field {
+  color: var(--text-muted);
+  opacity: 1;
 }
 
 /* Seçim alanları: kanonik owner (AppSelect) — feature CSS yalnız yerleşim taşır. */
@@ -368,8 +383,8 @@
   width: 20px;
   height: 20px;
   margin-left: 4px;
-  opacity: 1;
-  filter: grayscale(1) invert(0.88) brightness(1.12) contrast(1.08);
+  opacity: 0.92;
+  filter: grayscale(0.35) invert(0.78) brightness(1.28) contrast(1.1);
   cursor: pointer;
 }
 
@@ -548,8 +563,8 @@
   width: 18px;
   height: 18px;
   margin-left: 6px;
-  opacity: 1;
-  filter: grayscale(1) invert(0.72) brightness(0.9) contrast(0.9);
+  opacity: 0.92;
+  filter: grayscale(0.35) invert(0.78) brightness(1.28) contrast(1.1);
   cursor: pointer;
 }
 

@@ -110,14 +110,8 @@ final class PersonelIncompleteCreateService
             $payload['pozisyon_id'] = PersonelCanonicalValidator::optionalPositiveIntPublic($body, 'pozisyon_id');
         }
 
-        if ($kapsam === PersonelCalisanKapsamService::DIS_KAYNAK) {
-            $payload['sgk_isveren_id'] = null;
-        } else {
-            PersonelCalisanKapsamService::assertSgkIsverenAllowed(
-                $kapsam,
-                $payload['sgk_isveren_id'] ?? null
-            );
-        }
+        // SGK/bordro kaynağı ayrı eksen: DIS için farklı şirketin AKTİF SGK
+        // işvereni geçerli olabilir, bu yüzden değer sıfırlanmaz.
 
         if ($payload['kan_grubu'] !== null && !in_array($payload['kan_grubu'], PersonelCanonicalValidator::validKanGruplari(), true)) {
             throw new PersonelValidationException('kan_grubu', 'Gecersiz kan grubu.');

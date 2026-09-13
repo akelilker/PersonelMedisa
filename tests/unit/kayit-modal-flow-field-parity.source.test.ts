@@ -72,9 +72,10 @@ describe("kayit modal flow actions + field surface parity", () => {
 
     const { left, right } = splitCreateColumns(createFields);
 
-    // Sicil is backend-allocated: the create form carries an info note, not an input.
+    // Sicil is backend-allocated: the create form carries no sicil note or input.
     expect(createFields).not.toContain('name="create-sicil"');
-    expect(left).toContain("Sicil numarası kayıt sırasında otomatik atanacaktır.");
+    expect(createFields).not.toContain("Sicil numarası kayıt sırasında otomatik atanacaktır.");
+    expect(createFields).not.toContain("create-sicil-auto-note");
 
     const leftNames = [...left.matchAll(/name="(create-[^"]+)"/g)].map((m) => m[1]);
     const rightNames = [...right.matchAll(/name="(create-[^"]+)"/g)].map((m) => m[1]);
@@ -109,9 +110,10 @@ describe("kayit modal flow actions + field surface parity", () => {
     expect(leftNames.at(-1)).toBe("create-kan");
     expect(rightNames.at(-1)).toBe("create-maas");
     expect(createFields).toContain("Görev / Unvan");
-    expect(createFields).toContain("Çalışma Tipi");
+    expect(createFields).toContain("Statü");
+    expect(createFields).not.toContain("Çalışma Tipi");
     expect(createFields).toContain("Çalışma Lokasyonu");
-    expect(createFields).toContain("filterSgkIsverenOptionsForSube");
+    expect(createFields).toContain("filterSgkIsverenOptionsForCreate");
   });
 
   it("empty references: keeps canonical conditional render for Bölüm/Birim/Pozisyon", () => {

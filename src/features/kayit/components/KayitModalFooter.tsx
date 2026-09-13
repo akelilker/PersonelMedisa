@@ -6,8 +6,6 @@ type KayitModalFooterModel = {
   onSecondaryClick?: () => void;
   /** Shown above Kaydet on Kayıt tab — opens Toplu Kayıt Aktarma. */
   onOpenBulkImport?: () => void;
-  /** Shown above Kaydet on Kayıt tab — opens Import Geçmişi (salt okunur kanıt). */
-  onOpenImportHistory?: () => void;
 };
 
 type KayitModalFooterProps = {
@@ -33,18 +31,6 @@ export function KayitModalFooter({ model }: KayitModalFooterProps) {
             onClick={model.onOpenBulkImport}
           >
             Tıklayınız.
-          </button>
-        </p>
-      ) : null}
-      {model.onOpenImportHistory ? (
-        <p className="kayit-bulk-import-hint">
-          <button
-            type="button"
-            className="kayit-bulk-import-link"
-            data-testid="personeller-import-history-open"
-            onClick={model.onOpenImportHistory}
-          >
-            Import Geçmişi
           </button>
         </p>
       ) : null}

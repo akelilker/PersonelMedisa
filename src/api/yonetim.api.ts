@@ -13,11 +13,13 @@ import type {
   PersonelHesapOnboardingResult,
   OrganizasyonReadiness,
   UpsertYonetimKullaniciPayload,
+  UpsertYonetimSgkIsverenPayload,
   UpsertYonetimSirketPayload,
   UpsertYonetimSubePayload,
   YonetimActorIdentityRead,
   YonetimKullanici,
   YonetimOrgRelation,
+  YonetimSgkIsveren,
   YonetimSirket,
   YonetimSube
 } from "../types/yonetim";
@@ -225,6 +227,39 @@ function normalizeYonetimSirket(data: unknown): YonetimSirket {
   };
 }
 
+function normalizeYonetimSgkIsveren(data: unknown): YonetimSgkIsveren {
+  const record = toRecord(data);
+  if (!record) {
+    throw new Error("SGK isveren yaniti beklenen formatta degil.");
+  }
+
+  const id = readNumber(record.id);
+  const ad = readString(record.ad);
+  if (!id || !ad) {
+    throw new Error("SGK isveren yaniti zorunlu alanlari icermiyor.");
+  }
+
+  // Nested relation is the canonical read shape; the flat sirket_id/sirket_ad
+  // projection keeps an employer readable on a schema without the join.
+  const nestedSirket = normalizeOrgRelation(record.sirket);
+  const flatSirketId = readNumber(record.sirket_id ?? record.sirketId);
+  const flatSirketAd = readString(record.sirket_ad ?? record.sirketAd);
+  const sirket =
+    nestedSirket ??
+    (flatSirketId !== undefined && flatSirketId > 0 && flatSirketAd !== undefined
+      ? { id: flatSirketId, kod: readString(record.sirket_kod ?? record.sirketKod) ?? null, ad: flatSirketAd }
+      : null);
+
+  return {
+    id,
+    kod: readString(record.kod) ?? null,
+    ad,
+    durum: normalizeKayitDurumu(record.durum),
+    sirket,
+    sube_sayisi: readNumber(record.sube_sayisi) ?? 0
+  };
+}
+
 function normalizeYonetimSube(data: unknown): YonetimSube {
   const record = toRecord(data);
   if (!record) {
@@ -238,6 +273,26 @@ function normalizeYonetimSube(data: unknown): YonetimSube {
     throw new Error("Sube yaniti zorunlu alanlari icermiyor.");
   }
 
+  // SGK company filter (filterSgkIsverenOptionsForSube) reads sirket.id. Prefer
+  // the nested read-model relation; fall back to the flat sirket_id + sirket_ad
+  // projection so a şube whose sirket relation is missing still keeps its
+  // company link instead of silently yielding an empty SGK employer list.
+  const nestedSirket = normalizeOrgRelation(record.sirket);
+  const flatSirketId = readNumber(record.sirket_id);
+  const flatSirketAd = readString(record.sirket_ad ?? record.sirketAd);
+  const sirket =
+    nestedSirket ??
+    (flatSirketId !== undefined &&
+      flatSirketId > 0 &&
+      flatSirketAd !== undefined &&
+      flatSirketAd.trim() !== ""
+      ? {
+          id: flatSirketId,
+          kod: readString(record.sirket_kod ?? record.sirketKod) ?? null,
+          ad: flatSirketAd
+        }
+      : null);
+
   return {
     id,
     kod,
@@ -245,7 +300,7 @@ function normalizeYonetimSube(data: unknown): YonetimSube {
     // Never rebuilt here: the backend read model owns the derived display name.
     // On a legacy/unmapped record it already equals the raw short name.
     tam_ad: readString(record.tam_ad) ?? ad,
-    sirket: normalizeOrgRelation(record.sirket),
+    sirket,
     sgk_isveren: normalizeOrgRelation(record.sgk_isveren),
     departman_ids: readNumberArray(record.departman_ids),
     departman_adlari: Array.isArray(record.departman_adlari)
@@ -564,6 +619,46 @@ export async function deleteSirketSube(
   );
   if (Array.isArray(response.errors) && response.errors.length > 0) {
     throwYonetimApiError(response, "Şube silinemedi.");
+  }
+}
+
+/**
+ * Management read of the SGK employer catalog: PASIF rows and the owning company
+ * are part of the contract, unlike the AKTIF-only /referans projection.
+ */
+export async function fetchYonetimSgkIsverenleri(): Promise<YonetimSgkIsveren[]> {
+  const response = await apiRequest<ApiResponse<unknown>>(endpoints.yonetim.sgkIsverenler);
+  const record = toRecord(response.data);
+  return extractListItems(record?.items ?? response.data).map(normalizeYonetimSgkIsveren);
+}
+
+export async function createYonetimSgkIsveren(
+  payload: UpsertYonetimSgkIsverenPayload
+): Promise<YonetimSgkIsveren> {
+  const response = await apiRequest<ApiResponse<unknown>>(endpoints.yonetim.sgkIsverenler, {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+  return normalizeYonetimSgkIsveren(response.data);
+}
+
+export async function updateYonetimSgkIsveren(
+  sgkIsverenId: number | string,
+  payload: UpsertYonetimSgkIsverenPayload
+): Promise<YonetimSgkIsveren> {
+  const response = await apiRequest<ApiResponse<unknown>>(endpoints.yonetim.sgkIsverenDetail(sgkIsverenId), {
+    method: "PUT",
+    body: JSON.stringify(payload)
+  });
+  return normalizeYonetimSgkIsveren(response.data);
+}
+
+export async function deleteYonetimSgkIsveren(sgkIsverenId: number | string): Promise<void> {
+  const response = await apiRequest<ApiResponse<unknown>>(endpoints.yonetim.sgkIsverenDetail(sgkIsverenId), {
+    method: "DELETE"
+  });
+  if (Array.isArray(response.errors) && response.errors.length > 0) {
+    throwYonetimApiError(response, "SGK işvereni silinemedi.");
   }
 }
 

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { FormField } from "../../../components/form/FormField";
 import { EmptyState } from "../../../components/states/EmptyState";
@@ -16,6 +16,7 @@ import { getPersonelMissingFields, resolvePersonelCompleteness } from "../person
 import { PERSONEL_SEARCH_MAX_LENGTH } from "../personel-search-query";
 import type { PersonelKartPhase } from "../personel-kart-nav";
 import { usePersonelScopeCounts } from "../hooks/usePersonelScopeCounts";
+import { mapCalismaLokasyonuDisplayOptions } from "../personel-create-org-deps";
 import type { PersonelListSortKey } from "../../../hooks/usePersoneller";
 
 function IconSearch(props: { className?: string }) {
@@ -91,6 +92,7 @@ export function PersonellerPage() {
     setDraftDepartmanId,
     setDraftPersonelTipiId,
     setDraftCalisanKapsami,
+    setDraftCalismaLokasyonuId,
     setDraftEksikBilgi,
     setPage,
     sortKey,
@@ -117,6 +119,16 @@ export function PersonellerPage() {
   const page = listQuery.page;
   const departmanFilterOptions = toSelectOptions(refs.departmanOptions);
   const personelTipiFilterOptions = toSelectOptions(refs.personelTipiOptions);
+  // "Fabrikada kimler çalışıyor?": fiili çalışma yeri filtresi. Bordro/SGK
+  // kaynağı farklı olsa bile fiilen o lokasyonda çalışan personel listelenir.
+  const calismaLokasyonuFilterOptions = useMemo(
+    () =>
+      mapCalismaLokasyonuDisplayOptions(refs.calismaLokasyonuOptions).map((option) => ({
+        value: String(option.id),
+        label: option.label
+      })),
+    [refs.calismaLokasyonuOptions]
+  );
 
   const branches = session?.sube_list ?? [];
   const multiScope = branches.length > 1;
@@ -422,6 +434,17 @@ export function PersonellerPage() {
                 placeholderOption={{ value: "", label: "Tümü" }}
                 selectOptions={CALISAN_KAPSAMI_SELECT_OPTIONS}
               />
+              {calismaLokasyonuFilterOptions.length > 0 ? (
+                <FormField
+                  as="select"
+                  label="Çalışma Lokasyonu"
+                  name="personel-filter-calisma-lokasyonu"
+                  value={draft.calismaLokasyonuId}
+                  onChange={setDraftCalismaLokasyonuId}
+                  placeholderOption={{ value: "", label: "Tümü" }}
+                  selectOptions={calismaLokasyonuFilterOptions}
+                />
+              ) : null}
               <FormField
                 as="select"
                 label="Eksik Bilgi"

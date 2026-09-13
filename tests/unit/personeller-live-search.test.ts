@@ -477,6 +477,7 @@ describe("Personeller live search", () => {
       departmanId: "",
       personelTipiId: "",
       calisanKapsami: "",
+      calismaLokasyonuId: "",
       eksikBilgi: "tum"
     });
     expect(personellerApiMock.fetchPersonellerList.mock.calls.length).toBeLessThanOrEqual(before + 1);

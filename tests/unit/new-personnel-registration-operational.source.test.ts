@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   filterSgkIsverenOptionsForSube,
+  filterStatuOptionsForCreate,
+  mapCalismaLokasyonuDisplayOptions,
   resolveSgkIsverenAfterSubeChange
 } from "../../src/features/personeller/personel-create-org-deps";
 import { buildCreatePersonelPayload } from "../../src/features/personeller/personel-create-utils";
@@ -41,6 +43,64 @@ describe("new personnel registration operational close", () => {
     const medisaSgk = filterSgkIsverenOptionsForSube(sgkOptions, subeOptions, "10");
     expect(resolveSgkIsverenAfterSubeChange("2", medisaSgk)).toBe("");
     expect(resolveSgkIsverenAfterSubeChange("1", medisaSgk)).toBe("1");
+  });
+
+  it("never auto-selects an SGK employer and keeps stale selection closed", () => {
+    const medisaSgk = filterSgkIsverenOptionsForSube(sgkOptions, subeOptions, "10");
+    expect(medisaSgk.length).toBeGreaterThan(0);
+    expect(resolveSgkIsverenAfterSubeChange("", medisaSgk)).toBe("");
+  });
+
+  it("filters Statü to Mavi/Beyaz Yaka without hardcoding backend ids", () => {
+    const catalog = [
+      { id: 11, label: "Mavi Yaka" },
+      { id: 22, label: "Beyaz Yaka" },
+      { id: 33, label: "Diğer" },
+      { id: 44, label: "Sözleşmeli" },
+      { id: 55, label: "Tam Zamanlı" }
+    ];
+    expect(filterStatuOptionsForCreate(catalog).map((option) => option.label)).toEqual([
+      "Mavi Yaka",
+      "Beyaz Yaka"
+    ]);
+  });
+
+  it("uses the canonical short branch name owner for the Şube picker", () => {
+    const workspace = read("src/features/kayit/components/KayitSurecWorkspace.tsx");
+    expect(workspace).toContain("label: sube.ad,");
+    expect(workspace).toContain("sirketId: sube.sirket?.id ?? null");
+    expect(workspace).not.toContain("label: sube.tam_ad");
+  });
+
+  it("keeps the empty date input on the canonical muted placeholder tone", () => {
+    const css = read("src/styles/modules/kayit-surec.css");
+    expect(css).toContain(
+      '.kayit-workspace-grid--personel-form input[type="date"].form-input:invalid'
+    );
+    expect(css).toContain(
+      '.kayit-workspace-grid--personel-form input[type="date"].form-input:invalid::-webkit-datetime-edit'
+    );
+    expect(css).toContain("color: var(--text-muted)");
+    expect(css).not.toContain("rgba(230, 234, 245, 0.5)");
+    expect(css).toContain("::-webkit-calendar-picker-indicator");
+  });
+
+  it("keeps the create form free of a separate Çalışma Tipi picker and sicil note", () => {
+    const createFields = read("src/features/personeller/components/PersonelCreateFields.tsx");
+    expect(createFields).not.toContain("Çalışma Tipi");
+    expect(createFields).toContain('label="Statü"');
+    expect(createFields).not.toContain("Sicil numarası kayıt sırasında otomatik atanacaktır.");
+    expect(createFields).toContain("statuOptions");
+    expect(createFields).toContain("calismaLokasyonuDisplayOptions");
+  });
+
+  it("maps work-location labels to city names without touching codes", () => {
+    expect(
+      mapCalismaLokasyonuDisplayOptions([
+        { id: 1, label: "ANKARA — Ankara" },
+        { id: 2, label: "İzmir" }
+      ]).map((option) => option.label)
+    ).toEqual(["Ankara", "İzmir"]);
   });
 
   it("create payload carries org + SGK + optional çalışma lokasyonu", () => {

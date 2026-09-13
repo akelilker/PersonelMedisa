@@ -175,6 +175,24 @@ final class OrganizasyonSchema
         return self::$sgkRelationReady;
     }
 
+    /**
+     * Relation table probe for callers that must decide between "this relation
+     * exists and may hold dependents" and "this database predates it".
+     *
+     * Controllers and services must not grow their own information_schema probes;
+     * ask this class.
+     */
+    public static function hasTable(PDO $pdo, string $table): bool
+    {
+        return self::tableExists($pdo, $table);
+    }
+
+    /** Column probe with the same contract as hasTable(). */
+    public static function hasColumn(PDO $pdo, string $table, string $column): bool
+    {
+        return self::columnExists($pdo, $table, $column);
+    }
+
     /** Test helper — clear the request-scope cache. */
     public static function resetCache(): void
     {

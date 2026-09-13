@@ -140,8 +140,10 @@ final class PersonelCreateService
                 $aktifDurum,
                 $payload['sgk_isveren_id'] ?? null
             );
-            PersonelSgkCompanyConsistency::assertCompatible(
+            // IC: aynı şirket invariant'ı. DIS: SGK kaynağı şirketten bağımsızdır.
+            PersonelSgkCompanyConsistency::assertCompatibleForKapsam(
                 $pdo,
+                $kapsam,
                 $payload['sgk_isveren_id'] ?? null,
                 $payload['sube_id'] ?? null
             );

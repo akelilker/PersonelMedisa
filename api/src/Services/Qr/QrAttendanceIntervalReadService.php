@@ -154,23 +154,14 @@ class QrAttendanceIntervalReadService
                 }
                 $rosterWhere[] = 'p.sube_id IN (' . implode(', ', $keys) . ')';
             }
-            // Prefer excluding DIS_KAYNAK when column exists; soft-fail to all AKTIF.
-            $calisanFilter = '';
-            try {
-                $col = $pdo->query("SHOW COLUMNS FROM personeller LIKE 'calisan_kapsami'");
-                if ($col !== false && $col->fetch(PDO::FETCH_ASSOC)) {
-                    $calisanFilter = " AND IFNULL(p.calisan_kapsami, 'IC_PERSONEL') <> 'DIS_KAYNAK'";
-                }
-                if ($col !== false) {
-                    $col->closeCursor();
-                }
-            } catch (\Throwable $e) {
-                $calisanFilter = '';
-            }
+            // Fiili çalışan envanteri: DIS_KAYNAK (Harici Personel) de izlenir.
+            // Bordro/SGK kaynağı farklı bir şirket olsa bile fiilen bu şubede
+            // çalışan kişi roster'da görünür; kapsam ekseni finansal tahakkuku
+            // etkiler, yokluk/devam takibini değil.
             $rosterSql = 'SELECT p.id, p.ad, p.soyad, p.sicil_no, p.sube_id, s.ad AS sube_ad
                 FROM personeller p
                 LEFT JOIN subeler s ON s.id = p.sube_id
-                WHERE ' . implode(' AND ', $rosterWhere) . $calisanFilter . '
+                WHERE ' . implode(' AND ', $rosterWhere) . '
                 ORDER BY p.id ASC';
             $rosterStmt = $pdo->prepare($rosterSql);
             foreach ($rosterParams as $key => $value) {

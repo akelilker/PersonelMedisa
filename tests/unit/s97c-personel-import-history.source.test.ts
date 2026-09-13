@@ -16,7 +16,7 @@ describe("S97-C personel import history source locks", () => {
     const status = read("api/src/Services/Personel/PersonelImportHistoryStatus.php");
     const controller = read("api/src/Controllers/PersonellerController.php");
     const shell = read("src/app/AppShell.tsx");
-    const kayitFooter = read("src/features/kayit/components/KayitModalFooter.tsx");
+    const bulkModal = read("src/features/personeller/components/PersonelImportDryRunModal.tsx");
     const modal = read("src/features/personeller/components/PersonelImportHistoryModal.tsx");
     const messages = read("src/features/personeller/personel-import-error-messages.ts");
 
@@ -46,9 +46,11 @@ describe("S97-C personel import history source locks", () => {
     expect(status).toContain("BASARISIZ");
     expect(status).toContain("CLAIMED");
     expect(status).not.toContain("'FAILED'");
-    // Kanonik giris: Kayit ve Surec > Kayit footer linki; modal AppShell tarafindan render edilir.
-    expect(kayitFooter).toContain("personeller-import-history-open");
-    expect(kayitFooter).toContain("Import Geçmişi");
+    // Kanonik giris: Kayit > Toplu Kayıt Aktarma içindeki Import Geçmişi; footer girişi yok.
+    const kayitFooter = read("src/features/kayit/components/KayitModalFooter.tsx");
+    expect(kayitFooter).not.toContain("personeller-import-history-open");
+    expect(kayitFooter).not.toContain("Import Geçmişi");
+    expect(bulkModal).toContain('data-testid="personeller-import-history-open"');
     expect(shell).toContain("PersonelImportHistoryModal");
     expect(shell).toContain("canApplyPersonelImport");
     expect(modal).toContain(

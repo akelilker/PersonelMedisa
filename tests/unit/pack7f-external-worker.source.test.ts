@@ -18,7 +18,9 @@ describe("Pack7F external worker source locks", () => {
     expect(service).not.toContain("function assertOperationalEligible");
     expect(service).toContain("assertTimeOperationalEligible");
     expect(service).toContain("assertFinancialEligible");
-    expect(service).toContain("DIS_KAYNAK_SGK_ISVEREN_YASAK");
+    // SGK/bordro kaynağı ayrı eksen: DIS_KAYNAK için blanket yasak kaldırıldı.
+    expect(service).not.toContain("DIS_KAYNAK_SGK_ISVEREN_YASAK");
+    expect(service).not.toContain("assertSgkIsverenAllowed");
   });
 
   it("keeps candidate filters and direct-action guards in operational owners", () => {

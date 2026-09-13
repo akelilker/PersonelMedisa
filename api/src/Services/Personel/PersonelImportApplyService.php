@@ -308,7 +308,6 @@ final class PersonelImportApplyService
             }
             if ($e->getCodeString() === PersonelOrgLocationSchema::ERROR_CODE
                 || $e->getCodeString() === PersonelCalisanKapsamSchema::ERROR_CODE
-                || $e->getCodeString() === PersonelCalisanKapsamService::ERROR_SGK_YASAK
             ) {
                 self::recordFailureAuditOutsideTx(
                     $pdo,

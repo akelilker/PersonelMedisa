@@ -241,6 +241,7 @@ export function AppShell() {
             closeKayitModal();
           }}
           canApply={canApplyPersonelImport}
+          onOpenImportHistory={canApplyPersonelImport ? () => setImportHistoryOpen(true) : undefined}
         />
       ) : null}
 
@@ -276,7 +277,6 @@ export function AppShell() {
             primaryFormId={kayitPrimaryFormId}
             onFooterModelChange={handleKayitFooterModelChange}
             onOpenBulkImport={canApplyPersonelImport ? () => setBulkImportOpen(true) : undefined}
-            onOpenImportHistory={canApplyPersonelImport ? () => setImportHistoryOpen(true) : undefined}
           />
         </AppModal>
       ) : null}

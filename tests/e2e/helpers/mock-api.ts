@@ -4446,9 +4446,9 @@ let personelBelgeKaydiIdCounter = 903;
     if (target.personel_tipi_id !== undefined) {
       target.personel_tipi_adi =
         target.personel_tipi_id === 1
-          ? "Tam Zamanlı"
+          ? "Mavi Yaka"
           : target.personel_tipi_id === 2
-            ? "Yarı Zamanlı"
+            ? "Beyaz Yaka"
             : target.personel_tipi_adi;
     } else {
       target.personel_tipi_adi = undefined;
@@ -5383,7 +5383,7 @@ let personelBelgeKaydiIdCounter = 903;
         departman_adi: departmanId ? getDepartmanLabel(departmanId) : undefined,
         gorev_adi: gorevId ? getGorevLabel(gorevId) : undefined,
         personel_tipi_adi:
-          personelTipiId === 1 ? "Tam Zamanlı" : personelTipiId === 2 ? "Yarı Zamanlı" : undefined
+          personelTipiId === 1 ? "Mavi Yaka" : personelTipiId === 2 ? "Beyaz Yaka" : undefined
       };
 
       personeller.unshift(created);
@@ -8690,8 +8690,11 @@ let personelBelgeKaydiIdCounter = 903;
           route,
           200,
           okBody([
-            { id: 1, ad: "Tam Zamanlı" },
-            { id: 2, ad: "Yarı Zamanlı" }
+            { id: 1, ad: "Mavi Yaka" },
+            { id: 2, ad: "Beyaz Yaka" },
+            { id: 3, ad: "Diğer" },
+            { id: 4, ad: "Sözleşmeli" },
+            { id: 5, ad: "Tam Zamanlı" }
           ])
         );
         return;

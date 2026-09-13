@@ -24,6 +24,7 @@ type PersonelImportDryRunModalProps = {
   onHome?: () => void;
   canApply?: boolean;
   onApplied?: () => void;
+  onOpenImportHistory?: () => void;
 };
 
 const APPLY_CONFIRM_MESSAGE =
@@ -163,7 +164,8 @@ export function PersonelImportDryRunModal({
   onClose,
   onHome,
   canApply = false,
-  onApplied
+  onApplied,
+  onOpenImportHistory
 }: PersonelImportDryRunModalProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const referencesDownloadGuardRef = useRef(false);
@@ -445,6 +447,17 @@ export function PersonelImportDryRunModal({
             >
               {isDownloadingReferences ? "Kılavuz indiriliyor..." : "Yükleme Kılavuzunu İndir"}
             </button>
+            {onOpenImportHistory ? (
+              <button
+                type="button"
+                className="universal-btn-aux"
+                data-testid="personeller-import-history-open"
+                onClick={onOpenImportHistory}
+                disabled={busy}
+              >
+                Import Geçmişi
+              </button>
+            ) : null}
           </div>
           <div className="personel-import-action-row">
             <div className="personel-import-file-picker">

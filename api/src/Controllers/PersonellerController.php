@@ -67,6 +67,8 @@ class PersonellerController
         );
         $departmanId = (int) ($request->getQuery('departman_id', 0) ?: 0);
         $personelTipiId = (int) ($request->getQuery('personel_tipi_id', 0) ?: 0);
+        // Fiili çalışma yeri filtresi (şube yetkisinden bağımsız daraltma).
+        $calismaLokasyonuId = (int) ($request->getQuery('calisma_lokasyonu_id', 0) ?: 0);
         $calisanKapsami = strtoupper(trim((string) $request->getQuery('calisan_kapsami', '')));
         $eksikBilgiRaw = strtolower(trim((string) $request->getQuery('eksik_bilgi', '')));
         $eksikBilgiOnly = in_array($eksikBilgiRaw, ['1', 'true', 'yes', 'eksik', 'missing'], true);
@@ -104,6 +106,20 @@ class PersonellerController
         if ($personelTipiId > 0) {
             $where[] = 'p.personel_tipi_id = :personel_tipi_id';
             $params['personel_tipi_id'] = $personelTipiId;
+        }
+
+        // "Fabrikada kimler çalışıyor?" sorgusu: fiili çalışma yeri filtresi.
+        // Bordro/SGK kaynağı (şirket) farklı olsa bile fiilen bu lokasyonda
+        // çalışan yetki kapsamındaki tüm personel sonuçta görünür. Yetki
+        // daraltması yukarıdaki OrgScope filtresinde kalır; bu filtre yalnız
+        // sonucu daraltır, kapsamı genişletmez.
+        if ($calismaLokasyonuId > 0) {
+            if (!PersonelOrgLocationSchema::isReady($pdo)) {
+                $where[] = '1=0';
+            } else {
+                $where[] = 'p.calisma_lokasyonu_id = :calisma_lokasyonu_id';
+                $params['calisma_lokasyonu_id'] = $calismaLokasyonuId;
+            }
         }
 
         if ($calisanKapsami === PersonelCalisanKapsamService::IC_PERSONEL
@@ -625,15 +641,9 @@ class PersonellerController
             }
         }
         if ($resultingKapsam === PersonelCalisanKapsamService::DIS_KAYNAK) {
-            try {
-                PersonelCalisanKapsamService::assertSgkIsverenAllowed(
-                    $resultingKapsam,
-                    array_key_exists('sgk_isveren_id', $payload) ? $payload['sgk_isveren_id'] : null
-                );
-            } catch (PersonelValidationException $e) {
-                JsonResponse::error(422, $e->getCodeString(), $e->getMessage(), $e->getField());
-            }
-            $payload['sgk_isveren_id'] = null;
+            // SGK/bordro kaynağı fiili organizasyon şubesinden bağımsızdır: DIS
+            // personelde başka şirketin AKTİF SGK işvereni geçerlidir, bu yüzden
+            // değer burada sıfırlanmaz. Gerçek bordro/maaş üretimi hâlâ kapalıdır.
             if ($hasSalary) {
                 JsonResponse::error(
                     409,

@@ -166,7 +166,7 @@ export function buildCreatePersonelPayload(form: CreatePersonelFormState): Creat
     : parseRequiredPositiveInt(form.gorevId, "Görev / Unvan");
   const personelTipiId = isDisKaynak
     ? parseOptionalPositiveInt(form.personelTipiId)
-    : parseRequiredPositiveInt(form.personelTipiId, "Çalışma Tipi");
+    : parseRequiredPositiveInt(form.personelTipiId, "Statü");
   const bagliAmirId = parseOptionalPositiveInt(form.bagliAmirId);
   const ucretTipiId = parseOptionalPositiveInt(form.ucretTipiId);
   const primKuraliId = parseOptionalPositiveInt(form.primKuraliId);
@@ -209,7 +209,7 @@ export function buildCreatePersonelPayload(form: CreatePersonelFormState): Creat
       : {}),
     ...(calismaLokasyonuId !== undefined ? { calisma_lokasyonu_id: calismaLokasyonuId } : {}),
     ...(isDisKaynak
-      ? { sgk_isveren_id: null }
+      ? { sgk_isveren_id: parseOptionalPositiveInt(form.sgkIsverenId) ?? null }
       : { sgk_isveren_id: parseRequiredPositiveInt(form.sgkIsverenId, "SGK İşveren") }),
     ...(!isDisKaynak && ucretTipiId !== undefined ? { ucret_tipi_id: ucretTipiId } : {}),
     ...(!isDisKaynak && primKuraliId !== undefined ? { prim_kurali_id: primKuraliId } : {}),

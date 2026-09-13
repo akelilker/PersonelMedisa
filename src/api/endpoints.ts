@@ -322,6 +322,8 @@ export const endpoints = {
     sirketSubeler: (id: number | string) => `/yonetim/sirketler/${id}/subeler`,
     sirketSubeDetail: (sirketId: number | string, subeId: number | string) =>
       `/yonetim/sirketler/${sirketId}/subeler/${subeId}`,
+    sgkIsverenler: "/yonetim/sgk-isverenler",
+    sgkIsverenDetail: (id: number | string) => `/yonetim/sgk-isverenler/${id}`,
     aylikOzet: "/yonetim/aylik-ozet",
     aylikOzetBolumOnay: "/yonetim/aylik-ozet/bolum-onay",
     aylikOzetKapat: "/yonetim/aylik-ozet/ay-kapat"

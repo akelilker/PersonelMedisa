@@ -321,9 +321,10 @@ export const dataCacheKeys = {
     personelTipiId: string,
     page: number,
     calisanKapsami = "",
-    eksikBilgi = ""
+    eksikBilgi = "",
+    calismaLokasyonuId = ""
   ) =>
-    `personeller:list:s${subeSeg(subeId)}:${search}|${aktiflik}|${departmanId}|${personelTipiId}|${page}${calisanKapsami ? `|${calisanKapsami}` : ""}${eksikBilgi === "eksik" ? `|eksik:eksik` : ""}`,
+    `personeller:list:s${subeSeg(subeId)}:${search}|${aktiflik}|${departmanId}|${personelTipiId}|${page}${calisanKapsami ? `|${calisanKapsami}` : ""}${calismaLokasyonuId ? `|lok:${calismaLokasyonuId}` : ""}${eksikBilgi === "eksik" ? `|eksik:eksik` : ""}`,
   personelDetail: (subeId: number | null, id: number) =>
     `personeller:detail:s${subeSeg(subeId)}:${id}`,
   referansPersonel: () => `referans:personel-bundle`,
@@ -907,12 +908,13 @@ type PersonellerListCacheFilters = {
   personelTipiId: string;
   page: number;
   calisanKapsami: string;
+  calismaLokasyonuId: string;
   eksikBilgi: string;
 };
 
 function parsePersonellerListCacheKeySuffix(suffix: string): PersonellerListCacheFilters | null {
   const parts = suffix.split("|");
-  if (parts.length < 5 || parts.length > 7) {
+  if (parts.length < 5 || parts.length > 8) {
     return null;
   }
 
@@ -922,11 +924,14 @@ function parsePersonellerListCacheKeySuffix(suffix: string): PersonellerListCach
   }
 
   let calisanKapsami = "";
+  let calismaLokasyonuId = "";
   let eksikBilgi = "";
   for (let i = 5; i < parts.length; i += 1) {
     const part = parts[i] ?? "";
     if (part.startsWith("eksik:")) {
       eksikBilgi = part.slice("eksik:".length);
+    } else if (part.startsWith("lok:")) {
+      calismaLokasyonuId = part.slice("lok:".length);
     } else {
       calisanKapsami = part;
     }
@@ -939,6 +944,7 @@ function parsePersonellerListCacheKeySuffix(suffix: string): PersonellerListCach
     personelTipiId: parts[3],
     page,
     calisanKapsami,
+    calismaLokasyonuId,
     eksikBilgi
   };
 }
@@ -970,7 +976,7 @@ function personelMatchesSearchFilter(created: Personel, search: string): boolean
 }
 
 function personelMatchesOptionalIdFilter(
-  createdValue: number | undefined,
+  createdValue: number | null | undefined,
   filterValue: string
 ): boolean {
   const trimmed = filterValue.trim();
@@ -1008,6 +1014,10 @@ function personelMatchesListCacheFilters(created: Personel, filters: Personeller
   }
 
   if (filters.calisanKapsami && (created.calisan_kapsami ?? "IC_PERSONEL") !== filters.calisanKapsami) {
+    return false;
+  }
+
+  if (!personelMatchesOptionalIdFilter(created.calisma_lokasyonu_id, filters.calismaLokasyonuId)) {
     return false;
   }
 
@@ -1059,6 +1069,10 @@ function personelMatchesListFiltersForUpdate(
   }
 
   if (filters.calisanKapsami && (personel.calisan_kapsami ?? "IC_PERSONEL") !== filters.calisanKapsami) {
+    return false;
+  }
+
+  if (!personelMatchesOptionalIdFilter(personel.calisma_lokasyonu_id, filters.calismaLokasyonuId)) {
     return false;
   }
 

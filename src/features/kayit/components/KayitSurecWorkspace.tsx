@@ -217,7 +217,6 @@ type KayitSurecWorkspaceProps = {
   primaryFormId: string;
   onFooterModelChange?: (model: KayitModalFooterModel | null) => void;
   onOpenBulkImport?: () => void;
-  onOpenImportHistory?: () => void;
 };
 
 const EMPTY_REFS: PersonelReferenceBundle = {
@@ -244,8 +243,7 @@ export function KayitSurecWorkspace({
   primaryActionLabel,
   primaryFormId,
   onFooterModelChange,
-  onOpenBulkImport,
-  onOpenImportHistory
+  onOpenBulkImport
 }: KayitSurecWorkspaceProps) {
   const navigate = useNavigate();
   const { session } = useAuth();
@@ -714,7 +712,7 @@ export function KayitSurecWorkspace({
           .filter((sube) => sube.durum === "AKTIF")
           .map((sube) => ({
             id: sube.id,
-            label: sube.tam_ad,
+            label: sube.ad,
             sirketId: sube.sirket?.id ?? null
           }))
       );
@@ -1149,8 +1147,7 @@ export function KayitSurecWorkspace({
         primaryDisabled: personelSubmitting,
         secondaryLabel: "Vazgeç",
         onSecondaryClick: onClose,
-        onOpenBulkImport,
-        onOpenImportHistory
+        onOpenBulkImport
       };
     }
 

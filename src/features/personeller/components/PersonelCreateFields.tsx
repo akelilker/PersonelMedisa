@@ -12,7 +12,9 @@ import type { PersonelReferenceBundle } from "../../../data/app-data.types";
 import type { CreatePersonelFormState } from "../../../hooks/usePersoneller";
 import type { IdOption } from "../../../types/referans";
 import {
-  filterSgkIsverenOptionsForSube,
+  filterSgkIsverenOptionsForCreate,
+  filterStatuOptionsForCreate,
+  mapCalismaLokasyonuDisplayOptions,
   resolveSgkIsverenAfterSubeChange
 } from "../personel-create-org-deps";
 
@@ -83,19 +85,61 @@ export function PersonelCreateFields({
   const subeIdFieldError = fieldErrors?.subeId;
 
   const filteredSgkIsverenOptions = useMemo(
-    () => filterSgkIsverenOptionsForSube(refs.sgkIsverenOptions, subeOptions, form.subeId),
-    [form.subeId, refs.sgkIsverenOptions, subeOptions]
+    () =>
+      filterSgkIsverenOptionsForCreate(
+        refs.sgkIsverenOptions,
+        subeOptions,
+        form.subeId,
+        form.calisanKapsami
+      ),
+    [form.calisanKapsami, form.subeId, refs.sgkIsverenOptions, subeOptions]
+  );
+
+  const statuOptions = useMemo(
+    () => filterStatuOptionsForCreate(refs.personelTipiOptions),
+    [refs.personelTipiOptions]
+  );
+
+  const calismaLokasyonuDisplayOptions = useMemo(
+    () => mapCalismaLokasyonuDisplayOptions(refs.calismaLokasyonuOptions),
+    [refs.calismaLokasyonuOptions]
   );
 
 
   function handleSubeChange(value: string) {
-    const nextSgkOptions = filterSgkIsverenOptionsForSube(refs.sgkIsverenOptions, subeOptions, value);
+    const nextSgkOptions = filterSgkIsverenOptionsForCreate(
+      refs.sgkIsverenOptions,
+      subeOptions,
+      value,
+      form.calisanKapsami
+    );
     setForm((prev) => ({
       ...prev,
       subeId: value,
       sgkIsverenId: resolveSgkIsverenAfterSubeChange(prev.sgkIsverenId, nextSgkOptions)
     }));
     onFieldErrorClear?.("subeId");
+  }
+
+  function handleCalisanKapsamiChange(value: string) {
+    const nextKapsam: "IC_PERSONEL" | "DIS_KAYNAK" =
+      value === "DIS_KAYNAK" ? "DIS_KAYNAK" : "IC_PERSONEL";
+    setForm((prev) => {
+      // Kapsam değişince seçenek kümesi değişir (DIS: tüm aktif katalog).
+      // Kullanıcının açık seçimi geçerli kaldığı sürece korunur; otomatik
+      // seçim yapılmaz, yalnız geçersiz kalan seçim temizlenir.
+      const nextSgkOptions = filterSgkIsverenOptionsForCreate(
+        refs.sgkIsverenOptions,
+        subeOptions,
+        prev.subeId,
+        nextKapsam
+      );
+      return {
+        ...prev,
+        calisanKapsami: nextKapsam,
+        sgkIsverenId: resolveSgkIsverenAfterSubeChange(prev.sgkIsverenId, nextSgkOptions)
+      };
+    });
   }
 
   function handleDepartmanChange(value: string) {
@@ -168,19 +212,11 @@ export function PersonelCreateFields({
             label="Çalışan Kapsamı"
             name="create-calisan-kapsami"
             value={form.calisanKapsami}
-            onChange={(value) =>
-              setForm((prev) => ({
-                ...prev,
-                calisanKapsami: value === "DIS_KAYNAK" ? "DIS_KAYNAK" : "IC_PERSONEL",
-                ...(value === "DIS_KAYNAK" ? { sgkIsverenId: "" } : {})
-              }))
-            }
+            onChange={handleCalisanKapsamiChange}
             required
             options={CALISAN_KAPSAMI_SELECT_OPTIONS}
+            placeholderOption={undefined}
           />
-          <p className="personel-form-note personel-form-note--info" data-testid="create-sicil-auto-note">
-            Sicil numarası kayıt sırasında otomatik atanacaktır.
-          </p>
           <FormField
             label="T.C. Kimlik No"
             name="create-tc"
@@ -297,37 +333,37 @@ export function PersonelCreateFields({
           ) : (
             refMissingNote("Şube", true)
           )}
-          {form.calisanKapsami !== "DIS_KAYNAK" ? (
-            refs.sgkIsverenOptions.length > 0 ? (
-              <>
-                <AppSelectField
-                  label="SGK İşveren"
-                  name="create-sgk-isveren"
-                  value={form.sgkIsverenId}
-                  onChange={(value) => setForm((prev) => ({ ...prev, sgkIsverenId: value }))}
-                  required
-                  placeholderOption={{ value: "", label: "Seçiniz" }}
-                  options={toSelectOptions(filteredSgkIsverenOptions)}
-                  disabled={!form.subeId}
-                />
-                {form.subeId && filteredSgkIsverenOptions.length === 0 ? (
-                  <p className="personel-form-note personel-form-note--warning" role="status">
-                    Seçilen şubenin şirketiyle uyumlu SGK işvereni bulunamadı.
-                  </p>
-                ) : null}
-              </>
-            ) : (
-              refMissingNote("SGK işveren", true)
-            )
-          ) : null}
-          {form.calisanKapsami !== "DIS_KAYNAK" && refs.calismaLokasyonuOptions.length > 0 ? (
+          {refs.sgkIsverenOptions.length > 0 ? (
+            <>
+              <AppSelectField
+                label="SGK İşveren"
+                name="create-sgk-isveren"
+                value={form.sgkIsverenId}
+                onChange={(value) => setForm((prev) => ({ ...prev, sgkIsverenId: value }))}
+                required={form.calisanKapsami !== "DIS_KAYNAK"}
+                placeholderOption={{ value: "", label: "Seçiniz" }}
+                options={toSelectOptions(filteredSgkIsverenOptions)}
+                disabled={form.calisanKapsami !== "DIS_KAYNAK" && !form.subeId}
+              />
+              {form.calisanKapsami !== "DIS_KAYNAK" &&
+              form.subeId &&
+              filteredSgkIsverenOptions.length === 0 ? (
+                <p className="personel-form-note personel-form-note--warning" role="status">
+                  Bu şirket için uygun SGK işvereni bulunamadı.
+                </p>
+              ) : null}
+            </>
+          ) : (
+            refMissingNote("SGK işveren", form.calisanKapsami !== "DIS_KAYNAK")
+          )}
+          {refs.calismaLokasyonuOptions.length > 0 ? (
             <AppSelectField
               label="Çalışma Lokasyonu"
               name="create-calisma-lokasyonu"
               value={form.calismaLokasyonuId}
               onChange={(value) => setForm((prev) => ({ ...prev, calismaLokasyonuId: value }))}
               placeholderOption={{ value: "", label: "Seçiniz" }}
-              options={toSelectOptions(refs.calismaLokasyonuOptions)}
+              options={toSelectOptions(calismaLokasyonuDisplayOptions)}
             />
           ) : null}
           {refs.bagliAmirOptions.length > 0 ? (
@@ -436,18 +472,18 @@ export function PersonelCreateFields({
               options={toSelectOptions(refs.pozisyonOptions)}
             />
           ) : null}
-          {refs.personelTipiOptions.length > 0 ? (
+          {statuOptions.length > 0 ? (
             <AppSelectField
-              label="Çalışma Tipi"
+              label="Statü"
               name="create-personel-tipi"
               value={form.personelTipiId}
               onChange={(value) => setForm((prev) => ({ ...prev, personelTipiId: value }))}
               required={form.calisanKapsami !== "DIS_KAYNAK"}
               placeholderOption={{ value: "", label: "Seçiniz" }}
-              options={toSelectOptions(refs.personelTipiOptions)}
+              options={toSelectOptions(statuOptions)}
             />
           ) : (
-            refMissingNote("Çalışma Tipi", true)
+            refMissingNote("Statü", true)
           )}
           {form.calisanKapsami !== "DIS_KAYNAK" && refs.ucretTipiOptions.length > 0 ? (
             <AppSelectField

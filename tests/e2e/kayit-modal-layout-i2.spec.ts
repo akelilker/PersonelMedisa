@@ -129,8 +129,8 @@ test.describe("I2 Kayit modal viewport layout", () => {
     await kayitModal.getByRole("option", { name: "Döşeme" }).click();
     await kayitModal.getByRole("combobox", { name: "Unvan" }).click();
     await kayitModal.getByRole("option", { name: "Genel Müdür" }).click();
-    await kayitModal.getByRole("combobox", { name: "Personel Tipi" }).click();
-    await kayitModal.getByRole("option", { name: "Tam Zamanlı" }).click();
+    await kayitModal.getByRole("combobox", { name: "Statü" }).click();
+    await kayitModal.getByRole("option", { name: "Mavi Yaka" }).click();
 
     await kayitModal.getByTestId("kayit-modal-footer-primary").click();
     await expect(kayitModal.locator(".personel-create-error")).toContainText("Şube seçilmelidir.");

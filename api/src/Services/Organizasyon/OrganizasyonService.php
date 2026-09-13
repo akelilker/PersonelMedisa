@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Medisa\Api\Services\Organizasyon;
 
+use Medisa\Api\Services\Personel\PersonelCalisanKapsamSchema;
 use PDO;
+use PDOException;
 use RuntimeException;
 
 /**
@@ -23,6 +25,14 @@ final class OrganizasyonService
     private const DURUMLAR = ['AKTIF', 'PASIF'];
 
     private const SUBE_DELETE_BLOCKED_MESSAGE = 'Şubede Kayıtlı Personel Gözükmektedir. Kayıtlı Personel Varken Silme İşlemi Yapılamaz.';
+
+    /** sgk_isverenler.kod VARCHAR(64) — the catalog column owns the limit. */
+    private const SGK_ISVEREN_KOD_MAX_LENGTH = 64;
+
+    /** sgk_isverenler.ad VARCHAR(191) — the catalog column owns the limit. */
+    private const SGK_ISVEREN_AD_MAX_LENGTH = 191;
+
+    private const SGK_ISVEREN_DELETE_BLOCKED_MESSAGE = 'SGK işvereni şube, personel veya yetki kapsamına bağlı olduğu için silinemez. Kaydı pasife alabilirsiniz.';
 
     // ---------------------------------------------------------------- companies
 
@@ -132,6 +142,175 @@ final class OrganizasyonService
 
         $stmt = $pdo->prepare('DELETE FROM sirketler WHERE id = :id');
         $stmt->execute(['id' => $id]);
+
+        return ['id' => $id, 'deleted' => true];
+    }
+
+    // ------------------------------------------------------------ sgk employers
+
+    /**
+     * Canonical SGK employer catalog read for organisation management.
+     *
+     * Deliberately separate from /referans/sgk-isverenler: the management surface
+     * must see PASIF rows and the owning company too, so that deactivation and
+     * company consistency stay visible instead of being silently filtered away.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public static function listSgkIsverenleri(PDO $pdo): array
+    {
+        self::assertSgkRelationReady($pdo);
+
+        $stmt = $pdo->query(self::sgkIsverenSelect($pdo) . ' ORDER BY e.ad ASC, e.id ASC');
+        $rows = $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
+
+        $items = [];
+        foreach ($rows as $row) {
+            $items[] = self::mapSgkIsverenRow($row);
+        }
+
+        return $items;
+    }
+
+    /** @return array<string, mixed> */
+    public static function readSgkIsveren(PDO $pdo, $sgkIsverenId): array
+    {
+        self::assertSgkRelationReady($pdo);
+        $item = self::findSgkIsveren($pdo, self::parseId($sgkIsverenId, 'id'));
+        if ($item === null) {
+            throw OrganizasyonException::notFound('SGK işvereni bulunamadı.');
+        }
+
+        return $item;
+    }
+
+    /**
+     * @param array<string, mixed> $body
+     * @return array<string, mixed>
+     */
+    public static function createSgkIsveren(PDO $pdo, array $body): array
+    {
+        self::assertSgkRelationReady($pdo);
+        self::assertSgkSirketSchemaReady($pdo);
+
+        $sirketId = self::requireSirketId($pdo, $body);
+        $kod = self::requireText($body, 'kod', 'SGK işveren kodu zorunludur.', self::SGK_ISVEREN_KOD_MAX_LENGTH);
+        $ad = self::requireText($body, 'ad', 'SGK işveren adı zorunludur.', self::SGK_ISVEREN_AD_MAX_LENGTH);
+        $durum = self::parseDurum($body);
+
+        self::assertSgkIsverenKodUnique($pdo, $kod, null);
+        self::assertSgkIsverenAdUnique($pdo, $ad, null);
+
+        try {
+            $stmt = $pdo->prepare(
+                'INSERT INTO sgk_isverenler (sirket_id, kod, ad, durum) VALUES (:sirket_id, :kod, :ad, :durum)'
+            );
+            $stmt->execute(['sirket_id' => $sirketId, 'kod' => $kod, 'ad' => $ad, 'durum' => $durum]);
+        } catch (PDOException $e) {
+            self::throwSgkIsverenDuplicateOrRethrow($pdo, $e, $kod, $ad, null);
+            throw new OrganizasyonException(500, 'INTERNAL_ERROR', 'SGK işvereni kaydı oluşturulamadı.');
+        }
+
+        return self::readSgkIsveren($pdo, (int) $pdo->lastInsertId());
+    }
+
+    /**
+     * @param array<string, mixed> $body
+     * @return array<string, mixed>
+     */
+    public static function updateSgkIsveren(PDO $pdo, $sgkIsverenId, array $body): array
+    {
+        self::assertSgkRelationReady($pdo);
+        $id = self::parseId($sgkIsverenId, 'id');
+        $existing = self::findSgkIsveren($pdo, $id);
+        if ($existing === null) {
+            throw OrganizasyonException::notFound('SGK işvereni bulunamadı.');
+        }
+
+        $kodProvided = array_key_exists('kod', $body);
+        $kod = $kodProvided
+            ? self::requireText($body, 'kod', 'SGK işveren kodu zorunludur.', self::SGK_ISVEREN_KOD_MAX_LENGTH)
+            : null;
+        // A code the payload does not carry is preserved exactly as stored (null stays null).
+        $storedKod = $existing['kod'] === null ? null : (string) $existing['kod'];
+        $ad = array_key_exists('ad', $body)
+            ? self::requireText($body, 'ad', 'SGK işveren adı zorunludur.', self::SGK_ISVEREN_AD_MAX_LENGTH)
+            : (string) $existing['ad'];
+        $durum = array_key_exists('durum', $body) ? self::parseDurum($body) : (string) $existing['durum'];
+
+        $existingSirketId = isset($existing['sirket']['id']) ? (int) $existing['sirket']['id'] : null;
+        $sirketId = $existingSirketId;
+        if (array_key_exists('sirket_id', $body)) {
+            self::assertSgkSirketSchemaReady($pdo);
+            $sirketId = self::requireSirketId($pdo, $body);
+            if ($sirketId !== $existingSirketId) {
+                // Moving an employer between companies can invalidate the company
+                // consistency of every branch and personnel row already pointing at
+                // it, so it is verified server-side before the write, never guessed.
+                self::assertSgkIsverenSirketChangeSafe($pdo, $id, $sirketId);
+            }
+        }
+
+        if ($kod !== null && SubeReadModel::normalizeName($kod) !== SubeReadModel::normalizeName((string) $storedKod)) {
+            self::assertSgkIsverenKodUnique($pdo, $kod, $id);
+        }
+        if (SubeReadModel::normalizeName($ad) !== SubeReadModel::normalizeName((string) $existing['ad'])) {
+            self::assertSgkIsverenAdUnique($pdo, $ad, $id);
+        }
+
+        $sets = ['kod = :kod', 'ad = :ad', 'durum = :durum'];
+        $params = ['id' => $id, 'kod' => $kod ?? $storedKod, 'ad' => $ad, 'durum' => $durum];
+        if ($sirketId !== null && OrganizasyonSchema::isSchemaReady($pdo)) {
+            $sets[] = 'sirket_id = :sirket_id';
+            $params['sirket_id'] = $sirketId;
+        }
+
+        try {
+            $stmt = $pdo->prepare('UPDATE sgk_isverenler SET ' . implode(', ', $sets) . ' WHERE id = :id');
+            $stmt->execute($params);
+        } catch (PDOException $e) {
+            self::throwSgkIsverenDuplicateOrRethrow($pdo, $e, $kod ?? (string) $storedKod, $ad, $id);
+            throw new OrganizasyonException(500, 'INTERNAL_ERROR', 'SGK işvereni kaydı güncellenemedi.');
+        }
+
+        return self::readSgkIsveren($pdo, $id);
+    }
+
+    /**
+     * Physical delete is never the default: a referenced employer is refused and
+     * the caller is pointed at pasife alma, exactly like sirket/sube deletes.
+     *
+     * @return array<string, mixed>
+     */
+    public static function deleteSgkIsveren(PDO $pdo, $sgkIsverenId): array
+    {
+        self::assertSgkRelationReady($pdo);
+        $id = self::parseId($sgkIsverenId, 'id');
+        if (self::findSgkIsveren($pdo, $id) === null) {
+            throw OrganizasyonException::notFound('SGK işvereni bulunamadı.');
+        }
+
+        if (array_sum(self::sgkIsverenDependencyCounts($pdo, $id)) > 0) {
+            throw OrganizasyonException::conflict(
+                'SGK_ISVEREN_HAS_DEPENDENTS',
+                self::SGK_ISVEREN_DELETE_BLOCKED_MESSAGE
+            );
+        }
+
+        try {
+            $stmt = $pdo->prepare('DELETE FROM sgk_isverenler WHERE id = :id');
+            $stmt->execute(['id' => $id]);
+        } catch (PDOException $e) {
+            // FK RESTRICT is the last line of defence for a reference the count
+            // probe cannot see; it must surface as the same explainable 409.
+            if (self::isForeignKeyViolation($e)) {
+                throw OrganizasyonException::conflict(
+                    'SGK_ISVEREN_HAS_DEPENDENTS',
+                    self::SGK_ISVEREN_DELETE_BLOCKED_MESSAGE
+                );
+            }
+            throw new OrganizasyonException(500, 'INTERNAL_ERROR', 'SGK işvereni kaydı silinemedi.');
+        }
 
         return ['id' => $id, 'deleted' => true];
     }
@@ -496,9 +675,10 @@ final class OrganizasyonService
         $sorumluPlan = self::parseSorumluYoneticiPlan($body);
 
         $currentSirketId = isset($existing['sirket']['id']) ? (int) $existing['sirket']['id'] : null;
+        $existingSgkIsverenId = isset($existing['sgk_isveren']['id']) ? (int) $existing['sgk_isveren']['id'] : null;
         $sgkIsverenId = array_key_exists('sgk_isveren_id', $body)
             ? self::parseNullableId($body, 'sgk_isveren_id')
-            : (isset($existing['sgk_isveren']['id']) ? (int) $existing['sgk_isveren']['id'] : null);
+            : $existingSgkIsverenId;
 
         if ($departmanIds !== null) {
             self::assertDepartmanIdsExist($pdo, $departmanIds);
@@ -506,7 +686,14 @@ final class OrganizasyonService
         if (SubeReadModel::normalizeName($ad) !== SubeReadModel::normalizeName((string) $existing['ad'])) {
             self::assertSubeAdUniqueInSirket($pdo, $ad, $currentSirketId, $id);
         }
-        self::assertSgkIsverenConsistent($pdo, $sgkIsverenId, $currentSirketId);
+        // Only a new or changed attachment is held to the AKTIF / same-company rule;
+        // an untouched mapping is never silently rewritten by an unrelated edit.
+        self::assertSgkIsverenConsistent(
+            $pdo,
+            $sgkIsverenId,
+            $currentSirketId,
+            $sgkIsverenId !== $existingSgkIsverenId
+        );
         if ($muhasebePlan !== null) {
             self::assertMuhasebeYetkiPlanValid($pdo, $muhasebePlan);
         }
@@ -743,23 +930,291 @@ final class OrganizasyonService
     }
 
     /**
-     * A branch and its payroll employer must sit under the same company. The
-     * relation is never guessed from a name or from a sibling branch.
+     * Shared SGK employer projection: catalog fields + owning company + reference
+     * count. Degrades to the pre-079 shape (no company axis) instead of failing.
      */
-    private static function assertSgkIsverenConsistent(PDO $pdo, ?int $sgkIsverenId, ?int $sirketId): void
+    private static function sgkIsverenSelect(PDO $pdo): string
     {
+        $ready = OrganizasyonSchema::isSchemaReady($pdo);
+        $durumColumn = OrganizasyonSchema::hasColumn($pdo, 'sgk_isverenler', 'durum')
+            ? 'e.durum'
+            : 'NULL AS durum';
+
+        return 'SELECT e.id, e.kod, e.ad, ' . $durumColumn
+            . ($ready ? ', e.sirket_id, c.kod AS sirket_kod, c.ad AS sirket_ad' : ', NULL AS sirket_id, NULL AS sirket_kod, NULL AS sirket_ad')
+            . ', (SELECT COUNT(*) FROM subeler s WHERE s.sgk_isveren_id = e.id) AS sube_sayisi'
+            . ' FROM sgk_isverenler e'
+            . ($ready ? ' LEFT JOIN sirketler c ON c.id = e.sirket_id' : '');
+    }
+
+    /** @return array<string, mixed>|null */
+    private static function findSgkIsveren(PDO $pdo, int $sgkIsverenId): ?array
+    {
+        $stmt = $pdo->prepare(self::sgkIsverenSelect($pdo) . ' WHERE e.id = :id LIMIT 1');
+        $stmt->execute(['id' => $sgkIsverenId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        return $row ? self::mapSgkIsverenRow($row) : null;
+    }
+
+    /**
+     * @param array<string, mixed> $row
+     * @return array<string, mixed>
+     */
+    private static function mapSgkIsverenRow(array $row): array
+    {
+        return [
+            'id' => (int) $row['id'],
+            'kod' => self::nullableText($row['kod'] ?? null),
+            'ad' => (string) $row['ad'],
+            'durum' => strtoupper(trim((string) ($row['durum'] ?? 'AKTIF'))) === 'PASIF' ? 'PASIF' : 'AKTIF',
+            'sirket' => self::sgkRelation(
+                $row['sirket_id'] ?? null,
+                $row['sirket_kod'] ?? null,
+                $row['sirket_ad'] ?? null
+            ),
+            'sube_sayisi' => (int) ($row['sube_sayisi'] ?? 0),
+        ];
+    }
+
+    /**
+     * @param mixed $id
+     * @param mixed $kod
+     * @param mixed $ad
+     * @return array<string, mixed>|null
+     */
+    private static function sgkRelation($id, $kod, $ad): ?array
+    {
+        $parsed = (int) $id;
+        if ($parsed <= 0) {
+            return null;
+        }
+
+        return ['id' => $parsed, 'kod' => self::nullableText($kod), 'ad' => (string) $ad];
+    }
+
+    /** @param mixed $value */
+    private static function nullableText($value): ?string
+    {
+        $text = $value === null ? '' : trim((string) $value);
+
+        return $text === '' ? null : $text;
+    }
+
+    private static function assertSgkRelationReady(PDO $pdo): void
+    {
+        if (!OrganizasyonSchema::isSgkRelationReady($pdo)) {
+            throw OrganizasyonException::conflict(
+                'SGK_ISVEREN_SCHEMA_NOT_READY',
+                'SGK işvereni şeması hazır değil. Migration 064 uygulanmadan bu işlem yapılamaz.'
+            );
+        }
+    }
+
+    private static function assertSgkSirketSchemaReady(PDO $pdo): void
+    {
+        if (!OrganizasyonSchema::isSchemaReady($pdo)) {
+            throw OrganizasyonException::schemaNotReady();
+        }
+    }
+
+    /** @param array<string, mixed> $body */
+    private static function requireSirketId(PDO $pdo, array $body): int
+    {
+        if (!array_key_exists('sirket_id', $body) || $body['sirket_id'] === null || $body['sirket_id'] === '') {
+            throw OrganizasyonException::validation('SGK işvereni için şirket seçimi zorunludur.', 'sirket_id');
+        }
+        $sirketId = self::parseId($body['sirket_id'], 'sirket_id');
+        if (self::findSirket($pdo, $sirketId) === null) {
+            throw OrganizasyonException::validation('Seçilen şirket bulunamadı.', 'sirket_id');
+        }
+
+        return $sirketId;
+    }
+
+    private static function assertSgkIsverenKodUnique(PDO $pdo, string $kod, ?int $excludeId): void
+    {
+        if (self::existsWithNormalized($pdo, 'sgk_isverenler', 'kod', $kod, $excludeId)) {
+            throw OrganizasyonException::conflict(
+                'DUPLICATE_SGK_ISVEREN_KOD',
+                'Bu SGK işveren kodu zaten kayıtlı.',
+                'kod'
+            );
+        }
+    }
+
+    private static function assertSgkIsverenAdUnique(PDO $pdo, string $ad, ?int $excludeId): void
+    {
+        if (self::existsWithNormalized($pdo, 'sgk_isverenler', 'ad', $ad, $excludeId)) {
+            throw OrganizasyonException::conflict(
+                'DUPLICATE_SGK_ISVEREN_AD',
+                'Bu SGK işveren adı zaten kayıtlı.',
+                'ad'
+            );
+        }
+    }
+
+    /**
+     * UNIQUE(kod) / UNIQUE(ad) are the real concurrency guard; re-check on 1062 so
+     * the caller gets the explainable duplicate code instead of a driver 500.
+     */
+    private static function throwSgkIsverenDuplicateOrRethrow(
+        PDO $pdo,
+        PDOException $e,
+        string $kod,
+        string $ad,
+        ?int $excludeId
+    ): void {
+        if (!self::isDuplicateKeyException($e)) {
+            return;
+        }
+
+        self::assertSgkIsverenKodUnique($pdo, $kod, $excludeId);
+        self::assertSgkIsverenAdUnique($pdo, $ad, $excludeId);
+        throw OrganizasyonException::conflict('DUPLICATE_SGK_ISVEREN_AD', 'Bu SGK işveren adı zaten kayıtlı.', 'ad');
+    }
+
+    /**
+     * Reference counts for one SGK employer. A relation this database does not
+     * have cannot hold a row, so a missing table/column contributes zero instead
+     * of blocking the delete.
+     *
+     * @return array<string, int>
+     */
+    private static function sgkIsverenDependencyCounts(PDO $pdo, int $sgkIsverenId): array
+    {
+        $counts = [];
+        if (OrganizasyonSchema::isSgkRelationReady($pdo)) {
+            $counts['sube'] = self::countWhere(
+                $pdo,
+                'SELECT COUNT(*) FROM subeler WHERE sgk_isveren_id = :id',
+                ['id' => $sgkIsverenId]
+            );
+        }
+        if (OrganizasyonSchema::hasColumn($pdo, 'personeller', 'sgk_isveren_id')) {
+            $counts['personel'] = self::countWhere(
+                $pdo,
+                'SELECT COUNT(*) FROM personeller WHERE sgk_isveren_id = :id',
+                ['id' => $sgkIsverenId]
+            );
+        }
+        if (OrganizasyonSchema::hasTable($pdo, 'user_sgk_isverenler')) {
+            $counts['scope'] = self::countWhere(
+                $pdo,
+                'SELECT COUNT(*) FROM user_sgk_isverenler WHERE sgk_isveren_id = :id',
+                ['id' => $sgkIsverenId]
+            );
+        }
+
+        return $counts;
+    }
+
+    /**
+     * Fail closed when moving an employer to another company would break an
+     * already-stored relation: a branch of company Y, and an IC_PERSONEL row of a
+     * company-Y branch, both contradict the new company X.
+     *
+     * DIS_KAYNAK is deliberately excluded: the payroll/SGK source of a Harici
+     * personel is an independent axis from its branch company (employment-scope
+     * model, 2026-09-13), so a Harici row never freezes an employer's company
+     * mapping. Without the scope axis (pre-066) every row still counts, which
+     * keeps the older schema fail-closed.
+     */
+    private static function assertSgkIsverenSirketChangeSafe(PDO $pdo, int $sgkIsverenId, int $newSirketId): void
+    {
+        if (!OrganizasyonSchema::hasColumn($pdo, 'subeler', 'sirket_id')) {
+            return;
+        }
+
+        $mismatchedBranches = self::countWhere(
+            $pdo,
+            'SELECT COUNT(*) FROM subeler
+             WHERE sgk_isveren_id = :id AND sirket_id IS NOT NULL AND sirket_id <> :sirket_id',
+            ['id' => $sgkIsverenId, 'sirket_id' => $newSirketId]
+        );
+
+        $mismatchedPersonel = 0;
+        if (OrganizasyonSchema::hasColumn($pdo, 'personeller', 'sgk_isveren_id')) {
+            $icOnly = PersonelCalisanKapsamSchema::isReady($pdo)
+                ? " AND IFNULL(p.calisan_kapsami, 'IC_PERSONEL') = 'IC_PERSONEL'"
+                : '';
+            $mismatchedPersonel = self::countWhere(
+                $pdo,
+                'SELECT COUNT(*) FROM personeller p
+                 INNER JOIN subeler s ON s.id = p.sube_id
+                 WHERE p.sgk_isveren_id = :id AND s.sirket_id IS NOT NULL AND s.sirket_id <> :sirket_id'
+                . $icOnly,
+                ['id' => $sgkIsverenId, 'sirket_id' => $newSirketId]
+            );
+        }
+
+        if ($mismatchedBranches > 0 || $mismatchedPersonel > 0) {
+            throw OrganizasyonException::conflict(
+                'SGK_ISVEREN_SIRKET_CHANGE_BLOCKED',
+                'Bu SGK işverenine bağlı şube veya personel kayıtları seçilen şirkete ait değil. '
+                . 'Şirket değişikliği mevcut şirket tutarlılığını bozacağı için reddedildi.'
+            );
+        }
+    }
+
+    private static function isDuplicateKeyException(PDOException $e): bool
+    {
+        $sqlState = isset($e->errorInfo[0]) ? (string) $e->errorInfo[0] : '';
+        $driverCode = isset($e->errorInfo[1]) ? (int) $e->errorInfo[1] : 0;
+
+        return $sqlState === '23000' || $driverCode === 1062;
+    }
+
+    private static function isForeignKeyViolation(PDOException $e): bool
+    {
+        $sqlState = isset($e->errorInfo[0]) ? (string) $e->errorInfo[0] : '';
+        $driverCode = isset($e->errorInfo[1]) ? (int) $e->errorInfo[1] : 0;
+
+        return $sqlState === '23000' && in_array($driverCode, [1451, 1452], true);
+    }
+
+    /**
+     * A branch and its payroll employer must sit under the same company, and a
+     * NEW or CHANGED attachment may only target an AKTIF employer. The relation is
+     * never guessed from a name, a city or a sibling branch.
+     *
+     * An unchanged attachment is exempt from the AKTIF / "company defined" rule so
+     * that editing a branch whose employer was later deactivated (or is still
+     * unmapped) never silently rewrites or drops the stored mapping.
+     */
+    private static function assertSgkIsverenConsistent(
+        PDO $pdo,
+        ?int $sgkIsverenId,
+        ?int $sirketId,
+        bool $isNewAssignment = true
+    ): void {
         if ($sgkIsverenId === null) {
             return;
         }
 
         $ready = OrganizasyonSchema::isSchemaReady($pdo);
+        $hasDurum = OrganizasyonSchema::hasColumn($pdo, 'sgk_isverenler', 'durum');
         $stmt = $pdo->prepare(
-            'SELECT id' . ($ready ? ', sirket_id' : '') . ' FROM sgk_isverenler WHERE id = :id LIMIT 1'
+            'SELECT id'
+            . ($ready ? ', sirket_id' : '')
+            . ($hasDurum ? ', durum' : '')
+            . ' FROM sgk_isverenler WHERE id = :id LIMIT 1'
         );
         $stmt->execute(['id' => $sgkIsverenId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$row) {
             throw OrganizasyonException::validation('Geçersiz SGK işvereni seçimi.', 'sgk_isveren_id');
+        }
+
+        if ($isNewAssignment && $hasDurum) {
+            $durum = strtoupper(trim((string) ($row['durum'] ?? '')));
+            if ($durum !== '' && $durum !== 'AKTIF') {
+                throw OrganizasyonException::conflict(
+                    'SGK_ISVEREN_PASIF',
+                    'Pasif SGK işvereni yeni bir şubeye bağlanamaz. Kaydı aktife alın veya başka bir SGK işvereni seçin.',
+                    'sgk_isveren_id'
+                );
+            }
         }
 
         if (!$ready || $sirketId === null) {
@@ -769,7 +1224,19 @@ final class OrganizasyonService
         $employerSirketId = ($row['sirket_id'] === null || $row['sirket_id'] === '')
             ? null
             : (int) $row['sirket_id'];
-        if ($employerSirketId !== null && $employerSirketId !== $sirketId) {
+        if ($employerSirketId === null) {
+            if ($isNewAssignment) {
+                throw OrganizasyonException::conflict(
+                    'SGK_ISVEREN_SIRKET_UNMAPPED',
+                    'Seçilen SGK işvereni bir şirkete bağlı değil. Önce SGK işverenini bir şirkete bağlayın.',
+                    'sgk_isveren_id'
+                );
+            }
+
+            return;
+        }
+
+        if ($employerSirketId !== $sirketId) {
             throw OrganizasyonException::conflict(
                 'SGK_ISVEREN_SIRKET_MISMATCH',
                 'Seçilen SGK işvereni bu şirkete bağlı değil.',

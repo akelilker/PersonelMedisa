@@ -61,14 +61,9 @@ final class PersonelBasicUpdateService
         }
         $payload = PersonelOrganizasyonDegisikligiService::stripProtectedOrgFieldsFromGenericPut($payload);
 
-        $resultingKapsam = array_key_exists('calisan_kapsami', $payload)
-            ? (string) $payload['calisan_kapsami']
-            : PersonelCalisanKapsamService::resolveFromRow($current);
-
-        if ($resultingKapsam === PersonelCalisanKapsamService::DIS_KAYNAK) {
-            PersonelCalisanKapsamService::assertSgkIsverenAllowed($resultingKapsam, null);
-            unset($payload['sgk_isveren_id']);
-        }
+        // DIS_KAYNAK artık SGK/bordro kaynağını taşıyabilir (şirketten bağımsız
+        // eksen). sgk_isveren_id zaten bu owner'ın allowedColumns'unda değildir;
+        // organizasyon ekseni canonical org owner'ında yönetilir.
 
         self::validateReferences($pdo, $payload, $personelId);
 

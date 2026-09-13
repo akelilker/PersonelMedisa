@@ -961,6 +961,21 @@ class Router
             OrganizasyonController::sirketSil($this->request, $matches[1]);
         }
 
+        // SGK employer catalog management lives on the same organisation owner as
+        // sirketler/subeler; /referans/sgk-isverenler stays a read-only projection.
+        if ($path === '/yonetim/sgk-isverenler' && $method === 'GET') {
+            OrganizasyonController::sgkIsverenleri($this->request);
+        }
+        if ($path === '/yonetim/sgk-isverenler' && $method === 'POST') {
+            OrganizasyonController::sgkIsverenOlustur($this->request);
+        }
+        if ($method === 'PUT' && preg_match('#^/yonetim/sgk-isverenler/(\d+)$#', $path, $matches)) {
+            OrganizasyonController::sgkIsverenGuncelle($this->request, $matches[1]);
+        }
+        if ($method === 'DELETE' && preg_match('#^/yonetim/sgk-isverenler/(\d+)$#', $path, $matches)) {
+            OrganizasyonController::sgkIsverenSil($this->request, $matches[1]);
+        }
+
         if ($path === '/yonetim/subeler' && $method === 'GET') {
             YonetimController::subeler($this->request);
         }

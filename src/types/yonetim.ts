@@ -185,6 +185,27 @@ export type UpsertYonetimSirketPayload = {
   durum: KayitDurumu;
 };
 
+/**
+ * SGK employer catalog row owned by the organisation (sirket -> sgk_isveren ->
+ * sube) hierarchy. `sirket` is null only while the employer is still unmapped.
+ */
+export type YonetimSgkIsveren = {
+  id: number;
+  kod: string | null;
+  ad: string;
+  durum: KayitDurumu;
+  sirket: YonetimOrgRelation | null;
+  /** How many branches are currently attached to this employer. */
+  sube_sayisi: number;
+};
+
+export type UpsertYonetimSgkIsverenPayload = {
+  sirket_id: number;
+  kod: string;
+  ad: string;
+  durum: KayitDurumu;
+};
+
 export type OrganizasyonReadiness = {
   schema_ready: boolean;
   data_ready: boolean;

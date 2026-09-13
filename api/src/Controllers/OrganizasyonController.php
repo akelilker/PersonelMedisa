@@ -98,6 +98,55 @@ class OrganizasyonController
         });
     }
 
+    // ----------------------------------------------------------- sgk employers
+
+    /**
+     * Management read of the SGK employer catalog. The create form needs PASIF
+     * rows and the owning company, which /referans/sgk-isverenler deliberately
+     * does not expose; both reads stay on the same owner (OrganizasyonService).
+     */
+    public static function sgkIsverenleri(Request $request)
+    {
+        $user = AuthMiddleware::authenticate($request, true);
+        self::assertRead($user);
+
+        self::run(function (PDO $pdo) {
+            JsonResponse::success(['items' => OrganizasyonService::listSgkIsverenleri($pdo)]);
+        });
+    }
+
+    public static function sgkIsverenOlustur(Request $request)
+    {
+        $user = AuthMiddleware::authenticate($request, true);
+        self::assertManage($user);
+        $body = $request->getJsonBody();
+
+        self::run(function (PDO $pdo) use ($body) {
+            JsonResponse::success(OrganizasyonService::createSgkIsveren($pdo, $body), [], 201);
+        });
+    }
+
+    public static function sgkIsverenGuncelle(Request $request, $sgkIsverenId)
+    {
+        $user = AuthMiddleware::authenticate($request, true);
+        self::assertManage($user);
+        $body = $request->getJsonBody();
+
+        self::run(function (PDO $pdo) use ($sgkIsverenId, $body) {
+            JsonResponse::success(OrganizasyonService::updateSgkIsveren($pdo, $sgkIsverenId, $body));
+        });
+    }
+
+    public static function sgkIsverenSil(Request $request, $sgkIsverenId)
+    {
+        $user = AuthMiddleware::authenticate($request, true);
+        self::assertManage($user);
+
+        self::run(function (PDO $pdo) use ($sgkIsverenId) {
+            JsonResponse::success(OrganizasyonService::deleteSgkIsveren($pdo, $sgkIsverenId));
+        });
+    }
+
     public static function sirketSubeleri(Request $request, $sirketId)
     {
         $user = AuthMiddleware::authenticate($request, true);

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent, type KeyboardEvent } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import { AppSelectField } from "../../../components/form/AppSelect";
 import { FormField } from "../../../components/form/FormField";
 import { AppActionDialog } from "../../../components/modal/AppActionDialog";
 import { AppModal } from "../../../components/modal/AppModal";
@@ -13,18 +14,22 @@ import { createSurec, type CreateSurecPayload } from "../../../api/surecler.api"
 import {
   createSirketSube,
   createYonetimKullanici,
+  createYonetimSgkIsveren,
   createYonetimSirket,
   createYonetimSube,
   deleteSirketSube,
+  deleteYonetimSgkIsveren,
   deleteYonetimSirket,
   deleteYonetimSube,
   fetchOrganizasyonReadiness,
   fetchYonetimKullanicilari,
+  fetchYonetimSgkIsverenleri,
   fetchYonetimSirketleri,
   fetchYonetimSubeleri,
   resetYonetimKullaniciBaslangicSifresi,
   updateSirketSube,
   updateYonetimKullanici,
+  updateYonetimSgkIsveren,
   updateYonetimSirket,
   updateYonetimSube
 } from "../../../api/yonetim.api";
@@ -54,13 +59,20 @@ import type {
   KullaniciTipi,
   OrganizasyonReadiness,
   UpsertYonetimKullaniciPayload,
+  UpsertYonetimSgkIsverenPayload,
   UpsertYonetimSirketPayload,
   UpsertYonetimSubePayload,
   YonetimKullanici,
   YonetimOrgRelation,
+  YonetimSgkIsveren,
   YonetimSirket,
   YonetimSube
 } from "../../../types/yonetim";
+import {
+  filterSgkIsverenOptionsForSirket,
+  resolveSgkIsverenAfterSirketChange,
+  toSgkIsverenSelectOptions
+} from "../../../lib/yonetim/sgk-isveren-options";
 
 type ActiveTab = "kullanicilar" | "subeler" | "mevzuat" | "saklama";
 type YonetimViewMode = "card" | "list";
@@ -101,9 +113,18 @@ type SubeFormState = {
   ad: string;
   departmanIds: number[];
   durum: KayitDurumu;
+  /** Şirkete bağlı SGK işvereni seçimi ("" = bağlantı yok). */
+  sgkIsverenId: string;
   muhasebeKisitAktif: boolean;
   muhasebeYetkiliUserIds: number[];
   sorumluYoneticiUserIds: number[];
+};
+
+type SgkIsverenFormState = {
+  sirketId: string;
+  kod: string;
+  ad: string;
+  durum: KayitDurumu;
 };
 
 type SirketFormState = {
@@ -150,6 +171,7 @@ const INITIAL_SUBE_FORM: SubeFormState = {
   ad: "",
   departmanIds: [],
   durum: "AKTIF",
+  sgkIsverenId: "",
   muhasebeKisitAktif: false,
   muhasebeYetkiliUserIds: [],
   sorumluYoneticiUserIds: []
@@ -170,9 +192,17 @@ const INITIAL_SIRKET_FORM: SirketFormState = {
   durum: "AKTIF"
 };
 
+const INITIAL_SGK_ISVEREN_FORM: SgkIsverenFormState = {
+  sirketId: "",
+  kod: "",
+  ad: "",
+  durum: "AKTIF"
+};
+
 const YONETIM_KULLANICI_FORM_ID = "yonetim-kullanici-form";
 const YONETIM_SUBE_FORM_ID = "yonetim-sube-form";
 const YONETIM_SIRKET_FORM_ID = "yonetim-sirket-form";
+const YONETIM_SGK_ISVEREN_FORM_ID = "yonetim-sgk-isveren-form";
 const REAL_KULLANICI_API_UNSUPPORTED_HINT =
   "Telefon, notlar ve kullanıcı tipi V1 canlı API'de desteklenmiyor. Bağlı personel eşlemesi kaydedilir.";
 const BIRIM_AMIRI_ATANDI_SUREC_TURU = "BIRIM_AMIRI_ATANDI";
@@ -346,6 +376,7 @@ function subeFormFromItem(item: YonetimSube): SubeFormState {
     ad: item.ad,
     departmanIds: item.departman_ids,
     durum: item.durum,
+    sgkIsverenId: item.sgk_isveren?.id != null ? String(item.sgk_isveren.id) : "",
     muhasebeKisitAktif: Boolean(item.muhasebe_kisit_aktif) || selectedIds.length > 0,
     muhasebeYetkiliUserIds: selectedIds,
     sorumluYoneticiUserIds: item.sorumlu_yonetici_user_ids ?? []
@@ -446,7 +477,10 @@ function toSirketPayload(form: SirketFormState, isEdit: boolean): UpsertYonetimS
   return isEdit ? { ad, durum: form.durum } : { kod, ad, durum: form.durum };
 }
 
-function toSubePayload(form: SubeFormState): UpsertYonetimSubePayload {
+function toSubePayload(
+  form: SubeFormState,
+  sgkContext?: { allowedSgkIsverenIds: number[] }
+): UpsertYonetimSubePayload {
   const kod = form.kod.trim().toUpperCase();
   const ad = form.ad.trim();
 
@@ -466,7 +500,7 @@ function toSubePayload(form: SubeFormState): UpsertYonetimSubePayload {
     throw new Error("Muhasebe kısıtı açıkken en az bir muhasebe yetkilisi seçilmelidir.");
   }
 
-  return {
+  const payload: UpsertYonetimSubePayload = {
     kod,
     ad,
     departman_ids: form.departmanIds,
@@ -475,6 +509,50 @@ function toSubePayload(form: SubeFormState): UpsertYonetimSubePayload {
     muhasebe_yetkili_user_ids: muhasebeYetkiliUserIds,
     sorumlu_yonetici_user_ids: form.sorumluYoneticiUserIds
   };
+
+  // Şirket bağlamı olmayan (legacy) ekranda alan gönderilmez: mevcut eşleme
+  // kazara temizlenmesin. Şirket bağlamı varken seçim listeye karşı doğrulanır.
+  if (sgkContext) {
+    const selected = form.sgkIsverenId.trim();
+    if (selected) {
+      const parsed = Number.parseInt(selected, 10);
+      if (!Number.isInteger(parsed) || !sgkContext.allowedSgkIsverenIds.includes(parsed)) {
+        throw new Error("Seçilen SGK işvereni bu şirkete ait değil veya aktif değil.");
+      }
+      payload.sgk_isveren_id = parsed;
+    } else {
+      payload.sgk_isveren_id = null;
+    }
+  }
+
+  return payload;
+}
+
+function sgkIsverenFormFromItem(item: YonetimSgkIsveren): SgkIsverenFormState {
+  return {
+    sirketId: item.sirket?.id != null ? String(item.sirket.id) : "",
+    kod: item.kod ?? "",
+    ad: item.ad,
+    durum: item.durum
+  };
+}
+
+function toSgkIsverenPayload(form: SgkIsverenFormState): UpsertYonetimSgkIsverenPayload {
+  const kod = form.kod.trim();
+  const ad = form.ad.trim();
+  const sirketId = Number.parseInt(form.sirketId, 10);
+
+  if (!Number.isInteger(sirketId) || sirketId <= 0) {
+    throw new Error("SGK işvereni için şirket seçimi zorunludur.");
+  }
+  if (!kod) {
+    throw new Error("SGK işveren kodu zorunludur.");
+  }
+  if (!ad) {
+    throw new Error("SGK işveren adı zorunludur.");
+  }
+
+  return { sirket_id: sirketId, kod, ad, durum: form.durum };
 }
 
 function formatSubeScopeLabel(subeIds: number[], subeNameMap: Map<number, string>) {
@@ -622,6 +700,18 @@ export function YonetimPaneliPage() {
   const [birimOptions, setBirimOptions] = useState<IdOption[]>([]);
   // Full SGK catalog for user-scope grants — never derived from subeler.sgk_isveren defaults.
   const [sgkIsverenOptions, setSgkIsverenOptions] = useState<YonetimOrgRelation[]>([]);
+  // Organisation management view of the same catalog: PASIF rows and owning
+  // company included, because şube mapping and deactivation are managed here.
+  const [sgkIsverenleri, setSgkIsverenleri] = useState<YonetimSgkIsveren[]>([]);
+  // A failed catalog read must never look like "this company has no employer":
+  // while the list is unavailable the branch form neither offers nor writes SGK.
+  const [isSgkIsverenCatalogLoaded, setIsSgkIsverenCatalogLoaded] = useState(false);
+  const [isSgkIsverenFormOpen, setIsSgkIsverenFormOpen] = useState(false);
+  const [editingSgkIsverenId, setEditingSgkIsverenId] = useState<number | null>(null);
+  const [sgkIsverenForm, setSgkIsverenForm] = useState<SgkIsverenFormState>(INITIAL_SGK_ISVEREN_FORM);
+  const [isSgkIsverenDeleteDialogOpen, setIsSgkIsverenDeleteDialogOpen] = useState(false);
+  const [sgkIsverenDeleteDialogError, setSgkIsverenDeleteDialogError] = useState<string | null>(null);
+  const [sgkIsverenDeleteError, setSgkIsverenDeleteError] = useState<string | null>(null);
 
   const [editingKullaniciId, setEditingKullaniciId] = useState<number | null>(null);
   const [editingSubeId, setEditingSubeId] = useState<number | null>(null);
@@ -690,6 +780,54 @@ export function YonetimPaneliPage() {
   // Company detail is the one screen scoped to a single company, so it shows the
   // short name; every shared listing keeps the company-qualified name.
   const subeListLabel = (item: YonetimSube) => (selectedSirketId != null ? item.ad : item.tam_ad);
+
+  const visibleSgkIsverenleri = useMemo(
+    () =>
+      selectedSirketId == null
+        ? sgkIsverenleri
+        : sgkIsverenleri.filter((item) => item.sirket?.id === selectedSirketId),
+    [sgkIsverenleri, selectedSirketId]
+  );
+  // The branch being edited keeps its own employer visible even after it was
+  // deactivated; a foreign-company selection is never offered.
+  const editingSubeSgkIsverenId = useMemo(
+    () =>
+      editingSubeId == null
+        ? null
+        : subeler.find((item) => item.id === editingSubeId)?.sgk_isveren?.id ?? null,
+    [editingSubeId, subeler]
+  );
+  const subeSgkIsverenOptions = useMemo(
+    () => filterSgkIsverenOptionsForSirket(sgkIsverenleri, selectedSirketId, editingSubeSgkIsverenId),
+    [sgkIsverenleri, selectedSirketId, editingSubeSgkIsverenId]
+  );
+  const subeSgkIsverenSelectOptions = useMemo(
+    () => toSgkIsverenSelectOptions(subeSgkIsverenOptions),
+    [subeSgkIsverenOptions]
+  );
+  const subeSgkIsverenAllowedIds = useMemo(
+    () => subeSgkIsverenOptions.map((item) => item.id),
+    [subeSgkIsverenOptions]
+  );
+  const sgkIsverenSirketSelectOptions = useMemo(
+    () => sirketler.map((item) => ({ value: String(item.id), label: item.ad })),
+    [sirketler]
+  );
+
+  // Company context changed (or the stored mapping is inconsistent): the stale
+  // selection is dropped instead of being carried into the write payload. This
+  // only runs with a loaded catalog — an unavailable catalog is not "no options".
+  const hasSgkIsverenContext =
+    isSgkIsverenCatalogLoaded && hierarchyMode && selectedSirketId != null;
+  useEffect(() => {
+    if (!isSubeFormOpen || !hasSgkIsverenContext) {
+      return;
+    }
+    const next = resolveSgkIsverenAfterSirketChange(subeForm.sgkIsverenId, subeSgkIsverenOptions);
+    if (next !== subeForm.sgkIsverenId) {
+      setSubeForm((prev) => ({ ...prev, sgkIsverenId: next }));
+    }
+  }, [isSubeFormOpen, hasSgkIsverenContext, subeForm.sgkIsverenId, subeSgkIsverenOptions]);
 
   function openSirketDetay(sirketId: number) {
     const next = new URLSearchParams(searchParams);
@@ -906,8 +1044,19 @@ export function YonetimPaneliPage() {
         } catch {
           setSirketler([]);
         }
+        // SGK employer catalog is best-effort too: migration 064 may be older than
+        // the running panel, and şube yönetimi must still render.
+        try {
+          setSgkIsverenleri(await fetchYonetimSgkIsverenleri());
+          setIsSgkIsverenCatalogLoaded(true);
+        } catch {
+          setSgkIsverenleri([]);
+          setIsSgkIsverenCatalogLoaded(false);
+        }
       } else {
         setSirketler([]);
+        setSgkIsverenleri([]);
+        setIsSgkIsverenCatalogLoaded(false);
       }
       setPersoneller(personelList.items);
       setDepartmanOptions(sortIdOptions(departmanList));
@@ -915,6 +1064,7 @@ export function YonetimPaneliPage() {
       setBirimOptions(sortIdOptions(birimList));
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Yönetim paneli yüklenemedi.");
+      setIsSgkIsverenCatalogLoaded(false);
     } finally {
       setIsLoading(false);
     }
@@ -1070,6 +1220,103 @@ export function YonetimPaneliPage() {
       await loadPanel();
     } catch (error) {
       setSirketDeleteDialogError(error instanceof Error ? error.message : "Şirket silinemedi.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  function resetSgkIsverenEditor() {
+    setEditingSgkIsverenId(null);
+    setSgkIsverenForm(INITIAL_SGK_ISVEREN_FORM);
+    setIsSgkIsverenFormOpen(false);
+    setSgkIsverenDeleteError(null);
+    setIsSgkIsverenDeleteDialogOpen(false);
+    setSgkIsverenDeleteDialogError(null);
+    setFormErrorMessage(null);
+  }
+
+  function openYeniSgkIsverenForm() {
+    setSuccessMessage(null);
+    setErrorMessage(null);
+    setFormErrorMessage(null);
+    setSgkIsverenDeleteError(null);
+    setEditingSgkIsverenId(null);
+    // Şirket detayında şirket alanı hazır gelir; kullanıcı yine de değiştirebilir.
+    setSgkIsverenForm({
+      ...INITIAL_SGK_ISVEREN_FORM,
+      sirketId: selectedSirketId != null ? String(selectedSirketId) : ""
+    });
+    setIsSgkIsverenFormOpen(true);
+  }
+
+  function openSgkIsverenEditor(item: YonetimSgkIsveren) {
+    setSuccessMessage(null);
+    setErrorMessage(null);
+    setFormErrorMessage(null);
+    setSgkIsverenDeleteError(null);
+    setEditingSgkIsverenId(item.id);
+    setSgkIsverenForm(sgkIsverenFormFromItem(item));
+    setIsSgkIsverenFormOpen(true);
+  }
+
+  async function handleSgkIsverenSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (isSubmitting) {
+      return;
+    }
+
+    setIsSubmitting(true);
+    setFormErrorMessage(null);
+    setSuccessMessage(null);
+
+    try {
+      const payload = toSgkIsverenPayload(sgkIsverenForm);
+      if (editingSgkIsverenId != null) {
+        await updateYonetimSgkIsveren(editingSgkIsverenId, payload);
+        setSuccessMessage("SGK işvereni güncellendi.");
+      } else {
+        await createYonetimSgkIsveren(payload);
+        setSuccessMessage("SGK işvereni eklendi.");
+      }
+
+      resetSgkIsverenEditor();
+      await loadPanel();
+    } catch (error) {
+      setFormErrorMessage(error instanceof Error ? error.message : "SGK işvereni kaydedilemedi.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  function openSgkIsverenDeleteDialog() {
+    if (editingSgkIsverenId == null || isSubmitting || !canManageYonetimPanel) {
+      return;
+    }
+    setSgkIsverenDeleteError(null);
+    setSgkIsverenDeleteDialogError(null);
+    setIsSgkIsverenDeleteDialogOpen(true);
+  }
+
+  async function confirmSgkIsverenDelete() {
+    if (editingSgkIsverenId == null || isSubmitting || !canManageYonetimPanel) {
+      return;
+    }
+
+    setIsSubmitting(true);
+    setSgkIsverenDeleteError(null);
+    setSgkIsverenDeleteDialogError(null);
+    setSuccessMessage(null);
+
+    try {
+      await deleteYonetimSgkIsveren(editingSgkIsverenId);
+      setIsSgkIsverenDeleteDialogOpen(false);
+      resetSgkIsverenEditor();
+      setSuccessMessage("SGK işvereni silindi.");
+      await loadPanel();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "SGK işvereni silinemedi.";
+      setSgkIsverenDeleteError(message);
+      setSgkIsverenDeleteDialogError(message);
     } finally {
       setIsSubmitting(false);
     }
@@ -1245,7 +1492,13 @@ export function YonetimPaneliPage() {
     setSuccessMessage(null);
 
     try {
-      const payload = toSubePayload(subeForm);
+      // Şirket bağlamı varsa SGK seçimi o şirketin AKTIF kayıtlarına karşı,
+      // backend'in uyguladığı invariantla aynı şekilde doğrulanır. Katalog
+      // okunamadıysa alan hiç gönderilmez: mevcut eşleme korunur.
+      const payload = toSubePayload(
+        subeForm,
+        hasSgkIsverenContext ? { allowedSgkIsverenIds: subeSgkIsverenAllowedIds } : undefined
+      );
       // In hierarchy mode the parent company comes from the route/state, never
       // from a form field, so the nested endpoints own the write.
       if (editingSubeId != null) {
@@ -1682,6 +1935,75 @@ export function YonetimPaneliPage() {
               </table>
             </div>
           )}
+
+          {hierarchyMode ? (
+            <div
+              className="yonetim-checkbox-section"
+              role="group"
+              aria-label="SGK işverenleri"
+              data-testid="yonetim-sgk-isveren-section"
+            >
+              <div className="yonetim-departman-section-head">
+                <p className="yonetim-checkbox-title">SGK İşverenleri</p>
+                <p className="yonetim-hint">
+                  Şirket bazlı SGK işvereni kataloğu. Şube–SGK eşlemesi yalnız bu kayıtlar üzerinden
+                  kurulur; şube adından, ilden veya lokasyondan türetilmez.
+                </p>
+              </div>
+              <div className="yonetim-create-row">
+                <button
+                  type="button"
+                  className="yonetim-create-link"
+                  data-testid="yonetim-sgk-isveren-yeni"
+                  onClick={openYeniSgkIsverenForm}
+                >
+                  + Yeni SGK İşvereni
+                </button>
+              </div>
+
+              {!isSgkIsverenCatalogLoaded ? (
+                <p className="yonetim-hint" role="status" data-testid="yonetim-sgk-isveren-load-error">
+                  SGK işveren listesi şu anda okunamadı. Sayfa yenilendiğinde tekrar denenecek; mevcut
+                  şube eşlemeleri korunur.
+                </p>
+              ) : visibleSgkIsverenleri.length === 0 ? (
+                <EmptyState
+                  title="SGK işvereni tanımı yok"
+                  message={
+                    selectedSirketId == null
+                      ? "Henüz SGK işvereni kaydı yok. İlk kaydı buradan oluşturup şirkete bağlayabilirsin."
+                      : "Bu şirkete bağlı SGK işvereni bulunmuyor. Yeni SGK işvereni oluşturup bu şirkete bağlayabilirsin."
+                  }
+                />
+              ) : (
+                <div className="yonetim-card-grid yonetim-card-grid--branches">
+                  {visibleSgkIsverenleri.map((item) => (
+                    <article
+                      key={item.id}
+                      className="yonetim-entity-card yonetim-entity-card--branch-preview"
+                      data-testid={`yonetim-sgk-isveren-card-${item.id}`}
+                    >
+                      <div className="yonetim-card-meta">
+                        <strong>{item.ad}</strong>
+                        <span>{item.kod ?? "—"}</span>
+                      </div>
+                      <p>{item.sirket ? item.sirket.ad : "Şirket bağlantısı tanımlı değil"}</p>
+                      <p>{item.sube_sayisi} şube</p>
+                      <p>Durum: {DURUM_LABELS[item.durum]}</p>
+                      <button
+                        type="button"
+                        className="yonetim-create-link"
+                        data-testid={`yonetim-sgk-isveren-duzenle-${item.id}`}
+                        onClick={() => openSgkIsverenEditor(item)}
+                      >
+                        Düzenle
+                      </button>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : null}
         </section>
       ) : null}
 
@@ -1975,6 +2297,37 @@ export function YonetimPaneliPage() {
                   </button>
                 </div>
               </div>
+            </div>
+
+            <div
+              className="yonetim-checkbox-section"
+              role="group"
+              aria-label="SGK işvereni"
+              data-testid="yonetim-sube-sgk-isveren-section"
+            >
+              <div className="yonetim-departman-section-head">
+                <p className="yonetim-checkbox-title">SGK İşvereni</p>
+                <p className="yonetim-hint" data-testid="yonetim-sube-sgk-isveren-note">
+                  {!hierarchyMode
+                    ? "Şirket hiyerarşisi hazır olmadığı için SGK işvereni bu formdan değiştirilemez; mevcut eşleme korunur."
+                    : !isSgkIsverenCatalogLoaded
+                      ? "SGK işveren listesi bu oturumda okunamadı; mevcut eşleme korunur ve bu formdan değiştirilemez."
+                      : subeSgkIsverenSelectOptions.length === 0
+                        ? "Bu şirkete ait aktif SGK işvereni bulunmuyor. Aşağıdaki SGK İşverenleri bölümünden oluşturup şirkete bağlayabilirsiniz."
+                        : "Yalnız bu şirkete ait aktif SGK işverenleri seçilebilir. Şube adı veya ilden eşleme türetilmez."}
+                </p>
+              </div>
+              {hasSgkIsverenContext ? (
+                <AppSelectField
+                  label="Şube SGK İşvereni"
+                  name="yonetim-sube-sgk-isveren"
+                  value={subeForm.sgkIsverenId}
+                  onChange={(value) => setSubeForm((prev) => ({ ...prev, sgkIsverenId: value }))}
+                  placeholderOption={{ value: "", label: "Seçiniz" }}
+                  options={subeSgkIsverenSelectOptions}
+                  dataTestId="yonetim-sube-sgk-isveren"
+                />
+              ) : null}
             </div>
 
             <div className="yonetim-checkbox-section">
@@ -2293,6 +2646,128 @@ export function YonetimPaneliPage() {
             if (!isSubmitting) {
               setIsSirketDeleteDialogOpen(false);
               setSirketDeleteDialogError(null);
+            }
+          }}
+        />
+      ) : null}
+
+      {isSgkIsverenFormOpen ? (
+        <AppModal
+          title={editingSgkIsverenId != null ? "SGK İşvereni Düzenle" : "Yeni SGK İşvereni"}
+          backLabel="Şirket ve Şube Yönetimi"
+          onBack={resetSgkIsverenEditor}
+          onClose={resetSgkIsverenEditor}
+        >
+          <form className="yonetim-form-stack" id={YONETIM_SGK_ISVEREN_FORM_ID} onSubmit={handleSgkIsverenSubmit}>
+            <div className="form-field-grid">
+              <AppSelectField
+                label="Şirket"
+                name="yonetim-sgk-isveren-sirket"
+                value={sgkIsverenForm.sirketId}
+                onChange={(value) => setSgkIsverenForm((prev) => ({ ...prev, sirketId: value }))}
+                required
+                placeholderOption={{ value: "", label: "Seçiniz" }}
+                options={sgkIsverenSirketSelectOptions}
+                dataTestId="yonetim-sgk-isveren-sirket"
+              />
+              <FormField
+                label="SGK İşveren Kodu"
+                name="yonetim-sgk-isveren-kod"
+                value={sgkIsverenForm.kod}
+                onChange={(value) => setSgkIsverenForm((prev) => ({ ...prev, kod: value }))}
+                required
+              />
+              <FormField
+                label="SGK İşveren Adı"
+                name="yonetim-sgk-isveren-ad"
+                value={sgkIsverenForm.ad}
+                onChange={(value) => setSgkIsverenForm((prev) => ({ ...prev, ad: value }))}
+                required
+                placeholder="MEDISA BURSA"
+              />
+              <div className="yonetim-durum-row">
+                <span className="yonetim-durum-label">Durum</span>
+                <div className="yonetim-durum-toggle" role="group" aria-label="Durum">
+                  <button
+                    type="button"
+                    className={`yonetim-durum-btn${sgkIsverenForm.durum === "AKTIF" ? " is-active" : ""}`}
+                    aria-pressed={sgkIsverenForm.durum === "AKTIF"}
+                    onClick={() => setSgkIsverenForm((prev) => ({ ...prev, durum: "AKTIF" }))}
+                  >
+                    {DURUM_LABELS.AKTIF}
+                  </button>
+                  <button
+                    type="button"
+                    className={`yonetim-durum-btn${sgkIsverenForm.durum === "PASIF" ? " is-active" : ""}`}
+                    aria-pressed={sgkIsverenForm.durum === "PASIF"}
+                    onClick={() => setSgkIsverenForm((prev) => ({ ...prev, durum: "PASIF" }))}
+                  >
+                    {DURUM_LABELS.PASIF}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <p className="yonetim-hint" data-testid="yonetim-sgk-isveren-form-hint">
+              {editingSgkIsverenId != null
+                ? "Şirket değişikliği, bağlı şube veya personel kayıtlarının şirket tutarlılığını bozacaksa sunucu tarafında reddedilir."
+                : "Pasif SGK işvereni yeni bir şubeye bağlanamaz. Bağlı kaydı silmek yerine pasife alın."}
+            </p>
+
+            {formErrorMessage ? (
+              <p className="yonetim-inline-error" role="alert" data-testid="yonetim-sgk-isveren-form-error">
+                {formErrorMessage}
+              </p>
+            ) : null}
+
+            {sgkIsverenDeleteError ? (
+              <p className="yonetim-inline-error" role="alert">
+                {sgkIsverenDeleteError}
+              </p>
+            ) : null}
+
+            <div className="form-actions-row">
+              <button type="submit" className="universal-btn-save" data-testid="yonetim-sgk-isveren-kaydet">
+                {editingSgkIsverenId != null ? "SGK İşverenini Güncelle" : "SGK İşverenini Kaydet"}
+              </button>
+              <button type="button" className="universal-btn-cancel" onClick={resetSgkIsverenEditor}>
+                Vazgeç
+              </button>
+            </div>
+
+            {editingSgkIsverenId != null && canManageYonetimPanel ? (
+              <div className="form-actions-row">
+                <button
+                  type="button"
+                  className="universal-btn-cancel"
+                  data-testid="yonetim-sgk-isveren-sil"
+                  onClick={openSgkIsverenDeleteDialog}
+                  disabled={isSubmitting}
+                >
+                  SGK İşverenini Sil
+                </button>
+              </div>
+            ) : null}
+          </form>
+        </AppModal>
+      ) : null}
+
+      {isSgkIsverenDeleteDialogOpen ? (
+        <AppActionDialog
+          open
+          testId="yonetim-sgk-isveren-delete-dialog"
+          title="SGK İşverenini Sil"
+          description="Bu SGK işverenini silmek istediğinize emin misiniz? Şube, personel veya yetki kapsamına bağlı bir kayıt silinemez; bunun yerine pasife alın."
+          confirmLabel="SGK İşverenini Sil"
+          submitLabel="Siliniyor..."
+          destructive
+          isSubmitting={isSubmitting}
+          errorMessage={sgkIsverenDeleteDialogError}
+          onConfirm={confirmSgkIsverenDelete}
+          onCancel={() => {
+            if (!isSubmitting) {
+              setIsSgkIsverenDeleteDialogOpen(false);
+              setSgkIsverenDeleteDialogError(null);
             }
           }}
         />

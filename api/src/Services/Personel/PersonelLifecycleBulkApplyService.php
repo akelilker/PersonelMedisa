@@ -256,11 +256,19 @@ final class PersonelLifecycleBulkApplyService
                     return ['entity_id' => (int) ($replay['result_entity_id'] ?? $personelId), 'replay' => true];
                 }
 
+                // Axes of one row share a single transaction, so a field an earlier axis
+                // already moved must be validated by the next axis against the post-axis
+                // value. Without this the plan preimage of an overlapping field (e.g.
+                // basic bagli_amir_id vs organization preimage) is stale by construction.
+                $postAxisValues = [];
+
                 if (isset($axes['basic'])) {
                     $payload = is_array($axes['basic']['payload'] ?? null) ? $axes['basic']['payload'] : [];
                     PersonelBasicUpdateService::apply($pdo, $user, $request, $personelId, $payload);
+                    $postAxisValues = self::readPostAxisValues($pdo, $personelId, array_keys($payload));
                 }
                 if (isset($axes['organization'])) {
+                    $targets = is_array($axes['organization']['targets'] ?? null) ? $axes['organization']['targets'] : [];
                     PersonelOrganizasyonDegisikligiService::applyInTransaction(
                         $pdo,
                         $user,
@@ -268,20 +276,31 @@ final class PersonelLifecycleBulkApplyService
                         $personelId,
                         [
                             'gerekce' => (string) ($plan['gerekce'] ?? ''),
-                            'preimage' => is_array($axes['organization']['preimage'] ?? null) ? $axes['organization']['preimage'] : [],
-                            'targets' => is_array($axes['organization']['targets'] ?? null) ? $axes['organization']['targets'] : [],
+                            'preimage' => self::rebaseAxisPreimage(
+                                is_array($axes['organization']['preimage'] ?? null) ? $axes['organization']['preimage'] : [],
+                                $postAxisValues
+                            ),
+                            'targets' => $targets,
                         ],
                         $auditContext
                     );
+                    $postAxisValues = array_merge(
+                        $postAxisValues,
+                        self::readPostAxisValues($pdo, $personelId, array_keys($targets))
+                    );
                 }
                 if (isset($axes['branch'])) {
+                    $expectedSubeId = $axes['branch']['preimage_sube_id'] ?? null;
+                    if (array_key_exists('sube_id', $postAxisValues)) {
+                        $expectedSubeId = $postAxisValues['sube_id'];
+                    }
                     PersonelKaliciSubeDegisikligiService::applyInTransaction(
                         $pdo,
                         $user,
                         $personelId,
                         [
                             'yeni_sube_id' => $axes['branch']['yeni_sube_id'] ?? null,
-                            'beklenen_mevcut_sube_id' => $axes['branch']['preimage_sube_id'] ?? null,
+                            'beklenen_mevcut_sube_id' => $expectedSubeId,
                             'gerekce' => (string) ($plan['gerekce'] ?? ''),
                         ],
                         $auditContext
@@ -623,6 +642,66 @@ final class PersonelLifecycleBulkApplyService
                 );
             }
         }
+    }
+
+    /**
+     * Post-axis values for the fields an earlier axis of the same row was allowed to
+     * write. Only whitelisted personel columns are read, and the transaction owner
+     * already holds the row lock, so this sees exactly this row's own axis writes.
+     *
+     * @param list<string> $candidateFields
+     * @return array<string, mixed>
+     */
+    private static function readPostAxisValues(PDO $pdo, int $personelId, array $candidateFields): array
+    {
+        $columns = [];
+        foreach ($candidateFields as $field) {
+            $field = (string) $field;
+            if ($field !== '' && in_array($field, self::rebasableFields(), true)) {
+                $columns[$field] = $field;
+            }
+        }
+        if (count($columns) === 0) {
+            return [];
+        }
+
+        $stmt = $pdo->prepare(
+            'SELECT ' . implode(', ', array_values($columns)) . ' FROM personeller WHERE id = :id FOR UPDATE'
+        );
+        $stmt->execute(['id' => $personelId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        return is_array($row) ? $row : [];
+    }
+
+    /**
+     * Rebase only the overlapping keys: fields the next axis does not expect keep the
+     * plan preimage, so unrelated drift still fail-closes through the owner checks.
+     *
+     * @param array<string, mixed> $preimage
+     * @param array<string, mixed> $postAxisValues
+     * @return array<string, mixed>
+     */
+    private static function rebaseAxisPreimage(array $preimage, array $postAxisValues): array
+    {
+        foreach ($postAxisValues as $field => $value) {
+            if (array_key_exists($field, $preimage)) {
+                $preimage[$field] = $value;
+            }
+        }
+
+        return $preimage;
+    }
+
+    /** @return list<string> */
+    private static function rebasableFields(): array
+    {
+        return array_values(array_unique(array_merge(
+            ['sube_id'],
+            PersonelOrganizasyonDegisikligiService::WORK_INFO_FIELDS,
+            PersonelOrganizasyonDegisikligiService::TRACKED_FIELDS,
+            PersonelBasicUpdateService::allowedColumns()
+        )));
     }
 
     /** @param mixed $value */

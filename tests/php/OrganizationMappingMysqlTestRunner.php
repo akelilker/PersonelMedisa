@@ -677,7 +677,7 @@ try {
             && $inventory['data']['personnel_evidence']['available'] === false
             && $inventory['data']['personnel_evidence']['boundary_violation_ids'] === []
             && $inventory['data']['personnel_evidence']['id_allowlist']
-                === [160, 200, 201, 203, 204, 205, 206, 209, 210, 211, 212, 217],
+                === [160, 173, 200, 201, 203, 204, 205, 206, 209, 210, 211, 212, 213, 217],
         'the allowlisted evidence sections stay empty when the required source schema is absent'
     );
     omapAssert(
@@ -775,9 +775,8 @@ try {
     }
     omapAssert(
         $resolution === [
-            'Abdullah Omar Muhammed' => ['RESOLVED', [220]],
-            'Ahmet Kaçar' => ['AMBIGUOUS', [230, 231]],
-            'Aysun Özdemir' => ['UNRESOLVED', []],
+            'Ahmet Kaçar' => ['RESOLVED', [220]],
+            'Aysun Özdemir' => ['AMBIGUOUS', [230, 231]],
             'Esat Kaçar' => ['UNRESOLVED', []],
             'Melih Güler' => ['UNRESOLVED', []],
             'Mustafa Mahmud' => ['UNRESOLVED', []],
@@ -785,9 +784,9 @@ try {
         'a business-truth identity resolves once, is reported unresolved, or publishes nothing as ambiguous'
     );
     omapAssert(
-        $evidenceSummary['id_allowlist'] === [160, 200, 201, 203, 204, 205, 206, 209, 210, 211, 212, 217]
+        $evidenceSummary['id_allowlist'] === [160, 173, 200, 201, 203, 204, 205, 206, 209, 210, 211, 212, 213, 217]
             && $evidenceSummary['id_allowlist_matched_ids'] === [203, 210]
-            && $evidenceSummary['id_allowlist_missing_ids'] === [160, 200, 201, 204, 205, 206, 209, 211, 212, 217]
+            && $evidenceSummary['id_allowlist_missing_ids'] === [160, 173, 200, 201, 204, 205, 206, 209, 211, 212, 213, 217]
             && $evidenceSummary['evidence_complete'] === false,
         'the bounded id allowlist reports every member it could not find instead of widening itself'
     );

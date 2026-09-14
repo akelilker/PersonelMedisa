@@ -73,8 +73,10 @@ final class OrganizationMappingInventoryReport
      * The personnel evidence allowlist, part one: canonical ids.
      *
      * `FinalClosePackage::PERSONNEL` (200, 201, 203, 204, 205, 206, 209, 210,
-     * 212, 217) plus the two rows the business-truth lock already recorded a
-     * canonical id for (160 Sedanur Bulut, 211 Zeynep Günal).
+     * 212, 217) plus the rows the business-truth lock already recorded a
+     * canonical id for (160 Sedanur Bulut, 211 Zeynep Günal) and the final
+     * preimage gap closed this phase (173 Sinem Hamaloğlu, 213 Abdullah Omar
+     * Muhammed).
      *
      * The package constant itself is *not* reused and *not* grown: it is an
      * immutable apply authorization, while this list is a read scope. Widening an
@@ -82,7 +84,7 @@ final class OrganizationMappingInventoryReport
      * the two lists are kept deliberately separate — with the read scope the
      * larger one.
      */
-    private const REMEDIATION_PERSONNEL_IDS = [160, 200, 201, 203, 204, 205, 206, 209, 210, 211, 212, 217];
+    private const REMEDIATION_PERSONNEL_IDS = [160, 173, 200, 201, 203, 204, 205, 206, 209, 210, 211, 212, 213, 217];
 
     /**
      * The personnel evidence allowlist, part two: remediation identities whose
@@ -106,7 +108,6 @@ final class OrganizationMappingInventoryReport
      * @var list<array{0: string, 1: string}>
      */
     private const REMEDIATION_PERSONNEL_IDENTITIES = [
-        ['Abdullah Omar', 'Muhammed'],
         ['Ahmet', 'Kaçar'],
         ['Aysun', 'Özdemir'],
         ['Esat', 'Kaçar'],

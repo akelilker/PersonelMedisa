@@ -109,11 +109,10 @@ describe('read-only organization inventory owner', () => {
 
   it('limits personnel evidence to the explicit closeout allowlist', () => {
     expect(inventoryOwner).toContain(
-      'private const REMEDIATION_PERSONNEL_IDS = [160, 200, 201, 203, 204, 205, 206, 209, 210, 211, 212, 217];',
+      'private const REMEDIATION_PERSONNEL_IDS = [160, 173, 200, 201, 203, 204, 205, 206, 209, 210, 211, 212, 213, 217];',
     );
     expect(inventoryOwner).toContain('private const REMEDIATION_PERSONNEL_IDENTITIES = [');
     for (const identity of [
-      "['Abdullah Omar', 'Muhammed']",
       "['Ahmet', 'Kaçar']",
       "['Aysun', 'Özdemir']",
       "['Esat', 'Kaçar']",

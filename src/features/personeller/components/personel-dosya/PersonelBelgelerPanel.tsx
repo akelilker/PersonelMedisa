@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { AppActionDialog } from "../../../../components/modal/AppActionDialog";
 import { AppModal } from "../../../../components/modal/AppModal";
 import { AppSelect } from "../../../../components/form/AppSelect";
+import { AppDatePicker } from "../../../../components/form/AppDatePicker";
 import { fetchPersonelBelgeDurumu } from "../../../../api/belgeler.api";
 import {
   cancelPersonelBelgeKaydi,
@@ -1079,22 +1080,20 @@ function renderBelgeFormFields(
         <label className="form-label" htmlFor="personel-belge-baslangic">
           Başlangıç tarihi
         </label>
-        <input
+        <AppDatePicker
           id="personel-belge-baslangic"
-          type="date"
           value={draft.baslangic_tarihi ?? ""}
-          onChange={(event) => setDraft((prev) => ({ ...prev, baslangic_tarihi: event.target.value }))}
+          onChange={(value) => setDraft((prev) => ({ ...prev, baslangic_tarihi: value }))}
         />
       </div>
       <div className="form-section">
         <label className="form-label" htmlFor="personel-belge-bitis">
           Bitiş / geçerlilik tarihi
         </label>
-        <input
+        <AppDatePicker
           id="personel-belge-bitis"
-          type="date"
           value={draft.bitis_tarihi ?? ""}
-          onChange={(event) => setDraft((prev) => ({ ...prev, bitis_tarihi: event.target.value }))}
+          onChange={(value) => setDraft((prev) => ({ ...prev, bitis_tarihi: value }))}
         />
       </div>
       <div className="form-section">

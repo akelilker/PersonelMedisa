@@ -9,7 +9,7 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent
 } from "react";
-import { activateAppPicker, deactivateAppPicker } from "./app-picker-layer";
+import { activateAppPicker, applyPickerPanelGeometry, deactivateAppPicker, measurePickerPanel } from "./app-picker-layer";
 
 /**
  * PersonelMedisa kanonik seçim owner'ı.
@@ -23,6 +23,12 @@ import { activateAppPicker, deactivateAppPicker } from "./app-picker-layer";
  *   dışında kalır, scroll container ile birlikte hareket eder ve modal'a scope'lu
  *   otomasyon sorguları (`getByRole("option")`, `#<name>-panel`) çalışmaya devam eder.
  * - Picker açıkken blur tek shared kontratla uygulanır (bkz. app-picker-layer.ts).
+ * - Placeholder yalnız trigger metnidir ve native `<select>` içinde boş değer
+ *   olarak kalır; panelde İKİNCİ bir "Seçiniz" kartı olarak tekrar etmez.
+ *   Opsiyonel alanda açık temizleme ihtiyacı kanonik temizleme satırı ile
+ *   çözülür (`data-app-select-clear`), placeholder hack'i ile değil.
+ * - Panel geometrisi (flip/max-height/yatay clamp) tek owner'dan gelir
+ *   (`measurePickerPanel` / `applyPickerPanelGeometry`).
  */
 
 export type AppSelectOption = { value: string; label: string };
@@ -64,10 +70,8 @@ export type AppSelectProps = {
 
 type PanelPlacement = "above" | "below";
 
-const PANEL_GAP = 6;
-const PANEL_MARGIN = 8;
-const PANEL_MAX_HEIGHT = 320;
-const PANEL_MIN_HEIGHT = 120;
+/** Opsiyonel alanın kanonik temizleme satırı etiketi (placeholder metni tekrar etmez). */
+const CLEAR_SELECTION_LABEL = "Seçimi temizle";
 
 type ActivePickerHandle = { close: () => void };
 
@@ -76,27 +80,6 @@ let activePickerCloser: ActivePickerHandle | null = null;
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
-}
-
-/** Panelin yerleşebileceği görünür alan: en yakın kırpıcı ata ∩ viewport. */
-function resolveVisibleClip(root: HTMLElement): { top: number; bottom: number } {
-  const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 800;
-  let node = root.parentElement;
-
-  while (node && node !== document.body) {
-    const style = window.getComputedStyle(node);
-    if (/(auto|scroll|hidden)/.test(style.overflowY)) {
-      const rect = node.getBoundingClientRect();
-      return {
-        top: Math.max(rect.top, 0),
-        bottom: Math.min(rect.bottom, viewportHeight)
-      };
-    }
-
-    node = node.parentElement;
-  }
-
-  return { top: 0, bottom: viewportHeight };
 }
 
 function moveIndex(current: number, delta: number, length: number) {
@@ -179,18 +162,36 @@ export function AppSelect({
   const selectedOption = selectedIndex >= 0 ? allOptions[selectedIndex] : null;
   const isPlaceholderSelected = placeholderOption ? value === placeholderOption.value : false;
 
+  /**
+   * Panel kartları: placeholder KART olarak render edilmez (trigger'da görünür).
+   * Opsiyonel alanda değer seçiliyken açık temizleme satırı eklenir.
+   */
+  const panelItems = useMemo<AppSelectOption[]>(() => {
+    const optionCards = placeholderOption
+      ? allOptions.filter((option) => option.value !== placeholderOption.value)
+      : allOptions;
+
+    if (placeholderOption && !required && !isPlaceholderSelected) {
+      return [{ value: placeholderOption.value, label: CLEAR_SELECTION_LABEL }, ...optionCards];
+    }
+
+    return optionCards;
+  }, [allOptions, isPlaceholderSelected, placeholderOption, required]);
+
+  const activeOptionIndex = panelItems.findIndex((option) => option.value === value);
+
   const visibleOptions = useMemo(() => {
     if (!shouldFilterOptions) {
-      return allOptions;
+      return panelItems;
     }
 
     const query = normalizeSearchText(searchQuery ?? "");
     if (!query) {
-      return allOptions;
+      return panelItems;
     }
 
-    return allOptions.filter((option) => normalizeSearchText(option.label).includes(query));
-  }, [allOptions, searchQuery, shouldFilterOptions]);
+    return panelItems.filter((option) => normalizeSearchText(option.label).includes(query));
+  }, [panelItems, searchQuery, shouldFilterOptions]);
 
   const setSearchQuery = useCallback(
     (next: string) => {
@@ -243,10 +244,10 @@ export function AppSelect({
     }
 
     activePickerCloser = selfHandle.current;
-    setActiveIndex(selectedIndex >= 0 ? selectedIndex : 0);
+    setActiveIndex(activeOptionIndex >= 0 ? activeOptionIndex : 0);
     setOpen(true);
     selectRef.current?.focus({ preventScroll: true });
-  }, [disabled, selectedIndex, setOpen]);
+  }, [disabled, setOpen, activeOptionIndex]);
 
   const commit = useCallback(
     (next: string | undefined) => {
@@ -268,29 +269,15 @@ export function AppSelect({
 
   const measurePanel = useCallback(() => {
     const root = rootRef.current;
-    if (!root) {
+    const panel = panelRef.current;
+    if (!root || !panel) {
       return;
     }
 
-    const rect = root.getBoundingClientRect();
-    const clip = resolveVisibleClip(root);
-    const naturalHeight = panelRef.current?.scrollHeight ?? 0;
-    const desired = clamp(naturalHeight || 260, PANEL_MIN_HEIGHT, PANEL_MAX_HEIGHT);
-    const spaceBelow = clip.bottom - rect.bottom - PANEL_GAP - PANEL_MARGIN;
-    const spaceAbove = rect.top - clip.top - PANEL_GAP - PANEL_MARGIN;
-    const placement: PanelPlacement =
-      spaceBelow < Math.min(160, desired) && spaceAbove > spaceBelow ? "above" : "below";
-    const maxHeight = Math.max(
-      PANEL_MIN_HEIGHT,
-      Math.min(PANEL_MAX_HEIGHT, placement === "above" ? spaceAbove : spaceBelow)
-    );
-
-    setPanelPlacement(placement);
-
-    // Yükseklik sınırı imperative yazılır: JSX inline style kullanılmaz (visual guard kontratı).
-    if (panelRef.current) {
-      panelRef.current.style.maxHeight = `${maxHeight}px`;
-    }
+    // Geometri tek kanonik owner'dan gelir: flip + max-height + yatay clamp.
+    const geometry = measurePickerPanel(root, panel);
+    setPanelPlacement(geometry.placement);
+    applyPickerPanelGeometry(panel, geometry);
   }, []);
 
   // Blur kontratı: açıkken picker dışındaki yüzey bulanır, kapanınca tamamen kalkar.
@@ -604,19 +591,21 @@ export function AppSelect({
 
           {visibleOptions.map((option, index) => {
             const isSelected = option.value === value;
-            const isPlaceholder = placeholderOption ? option.value === placeholderOption.value : false;
+            const isClearRow = placeholderOption ? option.value === placeholderOption.value : false;
+            const itemId = isClearRow ? `${panelId}-clear` : optionElementId(panelId, index);
 
             return (
               <button
-                key={optionElementId(panelId, index)}
-                id={optionElementId(panelId, index)}
+                key={itemId}
+                id={itemId}
                 type="button"
                 role="option"
                 aria-selected={isSelected}
+                data-app-select-clear={isClearRow ? "1" : undefined}
                 className={[
                   "app-select-option",
                   index === activeIndex ? "is-active" : "",
-                  isPlaceholder ? "is-placeholder" : ""
+                  isClearRow ? "is-clear" : ""
                 ]
                   .filter(Boolean)
                   .join(" ")}

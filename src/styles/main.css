@@ -57,6 +57,7 @@
 
 /* 5.2 Kanonik seçim/picker owner'ı — tüm seçim alanları tek kontrat kullanır */
 @import "./components/app-select.css";
+@import "./components/app-date-picker.css";
 
 
 /* 6. Platforma Özel Stiller */

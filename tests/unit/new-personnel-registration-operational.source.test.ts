@@ -65,11 +65,14 @@ describe("new personnel registration operational close", () => {
     ]);
   });
 
-  it("uses the canonical short branch name owner for the Şube picker", () => {
+  it("uses the canonical adaptive branch label owner for the Şube picker", () => {
     const workspace = read("src/features/kayit/components/KayitSurecWorkspace.tsx");
-    expect(workspace).toContain("label: sube.ad,");
+    // Kısa ad benzersizse kısa ad; aynı kısa ad birden fazla şirkette varsa tam_ad.
+    expect(workspace).toContain("resolveSubeDisplayLabels(");
+    expect(workspace).toContain("label: subeLabels.get(sube.id) ?? sube.ad,");
     expect(workspace).toContain("sirketId: sube.sirket?.id ?? null");
-    expect(workspace).not.toContain("label: sube.tam_ad");
+    expect(workspace).not.toMatch(/label:\s*sube\.tam_ad/);
+    expect(workspace).not.toMatch(/`\$\{sube\.sirket/);
   });
 
   it("keeps the empty date input on the canonical muted placeholder tone", () => {

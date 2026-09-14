@@ -1,0 +1,249 @@
+/* ==========================================================================
+   Kanonik takvim (AppDatePicker)
+   --------------------------------------------------------------------------
+   Kontrat:
+   - Görsel dil AppSelect panel ailesiyle aynıdır (koyu tema, ince koyu kartlar,
+     marka kırmızısı aksan, aynı radius/kenarlık/gölge token'ları).
+   - `.app-date-picker-native` görünmez DEĞER sahibidir (name/required/min/max).
+     Native popup kullanılmaz: pointer-events kapalı, tabIndex -1.
+   - Takvim paneli `.app-picker-panel` ölçüm/blur kontratını paylaşır; ekstra
+     picker-specific hack yoktur.
+   ========================================================================== */
+
+.app-date-picker {
+  position: relative;
+  display: block;
+  width: 100%;
+  min-width: 0;
+}
+
+.app-date-picker.is-open {
+  z-index: 40;
+}
+
+/* Görünmez native input: yalnız değer/etiket/form semantiği taşır. */
+.app-date-picker-native {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.app-date-picker-trigger {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  width: 100%;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.app-date-picker-trigger:hover {
+  border-color: var(--border-strong);
+}
+
+.app-date-picker.is-open .app-date-picker-trigger,
+.app-date-picker-trigger:focus-visible {
+  border-color: rgba(var(--theme-color-rgb), 0.62);
+  box-shadow:
+    inset 0 0 0 1px rgba(var(--theme-color-rgb), 0.16),
+    0 0 0 1px rgba(var(--theme-color-rgb), 0.08);
+  outline: none;
+}
+
+.app-date-picker.is-disabled .app-date-picker-trigger {
+  opacity: 0.58;
+  cursor: not-allowed;
+}
+
+.app-date-picker-value {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-date-picker-value.is-placeholder {
+  color: rgba(230, 234, 245, 0.5);
+}
+
+/* --- Takvim paneli: AppSelect paneliyle aynı blok içi düzen --- */
+
+.app-date-panel {
+  gap: 6px;
+}
+
+.app-date-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.app-date-nav,
+.app-date-head-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  box-sizing: border-box;
+  border: 1px solid rgba(190, 200, 214, 0.42);
+  border-radius: 6px;
+  background: var(--bg-surface);
+  color: rgba(240, 244, 248, 0.96);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 120ms ease, color 120ms ease, background-color 120ms ease;
+}
+
+.app-date-nav {
+  flex: 0 0 28px;
+  width: 28px;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.app-date-head-btn {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 4px 8px;
+}
+
+.app-date-head-btn:hover,
+.app-date-head-btn:focus-visible,
+.app-date-nav:hover,
+.app-date-nav:focus-visible {
+  border-color: rgba(190, 200, 214, 0.78);
+  background: var(--bg-panel);
+  color: var(--text-inverse);
+  outline: none;
+}
+
+.app-date-weekdays,
+.app-date-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.app-date-weekday {
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.app-date-cell {
+  min-height: 30px;
+  padding: 4px 2px;
+  box-sizing: border-box;
+  border: 1px solid rgba(190, 200, 214, 0.42);
+  border-radius: 6px;
+  background: var(--bg-surface);
+  color: rgba(240, 244, 248, 0.96);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 120ms ease, color 120ms ease, background-color 120ms ease;
+}
+
+.app-date-cell.is-outside {
+  color: var(--text-muted);
+  opacity: 0.72;
+}
+
+.app-date-cell:disabled {
+  opacity: 0.36;
+  cursor: not-allowed;
+}
+
+.app-date-cell.is-today {
+  border-color: rgba(var(--theme-color-rgb), 0.5);
+}
+
+.app-date-cell:hover:not(:disabled),
+.app-date-cell:focus-visible {
+  border-color: rgba(190, 200, 214, 0.78);
+  background: var(--bg-panel);
+  color: var(--text-inverse);
+  outline: none;
+}
+
+.app-date-cell.is-selected {
+  border-color: rgba(190, 200, 214, 0.88);
+  background: var(--bg-panel);
+  color: var(--text-inverse);
+  box-shadow: inset 2px 0 0 rgba(var(--theme-color-rgb), 0.9);
+}
+
+/* Ay ızgarası: 3 sütun; yıl ızgarası: 4 sütun + panel içi scroll (decade navigation). */
+.app-date-grid--months {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.app-date-grid--years {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.app-date-foot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-top: 2px;
+}
+
+.app-date-action {
+  min-height: 28px;
+  padding: 4px 10px;
+  box-sizing: border-box;
+  border: 1px dashed rgba(190, 200, 214, 0.42);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 120ms ease, color 120ms ease;
+}
+
+.app-date-action:hover,
+.app-date-action:focus-visible {
+  border-color: rgba(190, 200, 214, 0.78);
+  color: var(--text-inverse);
+  outline: none;
+}
+
+@media (max-width: 640px) {
+  .app-date-cell {
+    min-height: 34px;
+  }
+
+  .app-date-head-btn,
+  .app-date-nav,
+  .app-date-action {
+    min-height: 32px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-date-cell,
+  .app-date-head-btn,
+  .app-date-nav,
+  .app-date-action,
+  .app-date-picker-trigger {
+    transition: none;
+  }
+}

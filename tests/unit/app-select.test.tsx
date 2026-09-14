@@ -199,7 +199,7 @@ describe("AppSelect canonical picker", () => {
     expect(disabledSelect.getAttribute("aria-expanded")).toBe("false");
   });
 
-  it("renders the field wrapper with a real label, placeholder option and aria-controls", () => {
+  it("renders the field wrapper with a real label, no duplicate placeholder card and aria-controls", () => {
     render(
       <div className="modal-container">
         <div className="modal-body">
@@ -218,10 +218,68 @@ describe("AppSelect canonical picker", () => {
     const select = screen.getByLabelText("Çalışan Kapsamı");
     expect(select.getAttribute("aria-expanded")).toBe("false");
     fireEvent.click(select);
-    expect(within(appPickerPanel()).getByRole("option", { name: "Seçiniz" })).not.toBeNull();
+
+    // Placeholder yalnız trigger metnidir: panelde ikinci bir "Seçiniz" kartı yoktur.
+    expect(document.querySelector('[data-app-select-trigger="1"]')?.textContent).toContain("Seçiniz");
+    expect(within(appPickerPanel()).queryByRole("option", { name: "Seçiniz" })).toBeNull();
+    expect(within(appPickerPanel()).getByRole("option", { name: "İç Kaynak" })).not.toBeNull();
+    // Boş değerde temizleme satırı gösterilmez (temizlenecek seçim yok).
+    expect(document.querySelector('[data-app-select-clear="1"]')).toBeNull();
     expect(select.getAttribute("aria-controls")).toBe(
       document.querySelector('[data-app-select-panel="1"]')?.getAttribute("id")
     );
+  });
+
+  it("keeps the optional clear capability as a canonical clear row (not a placeholder card)", () => {
+    const onChange = vi.fn();
+    render(
+      <div className="modal-container">
+        <div className="modal-body">
+          <AppSelectField
+            label="Kan Grubu"
+            name="create-kan"
+            value="A Rh+"
+            onChange={onChange}
+            placeholderOption={{ value: "", label: "Seçiniz" }}
+            options={[{ value: "A Rh+", label: "A Rh+" }]}
+          />
+        </div>
+      </div>
+    );
+
+    fireEvent.click(screen.getByLabelText("Kan Grubu"));
+
+    const panel = appPickerPanel();
+    expect(within(panel).queryByRole("option", { name: "Seçiniz" })).toBeNull();
+    const clearRow = panel.querySelector('[data-app-select-clear="1"]');
+    expect(clearRow).not.toBeNull();
+    expect(clearRow?.textContent).toBe("Seçimi temizle");
+
+    fireEvent.click(clearRow as HTMLElement);
+    expect(onChange).toHaveBeenCalledWith("");
+    expect(document.querySelector('[data-app-select-panel="1"]')).toBeNull();
+  });
+
+  it("never offers clearing on a required field", () => {
+    render(
+      <div className="modal-container">
+        <div className="modal-body">
+          <AppSelectField
+            label="Departman"
+            name="create-departman"
+            value="3"
+            onChange={() => undefined}
+            required
+            placeholderOption={{ value: "", label: "Seçiniz" }}
+            options={[{ value: "3", label: "Üretim" }]}
+          />
+        </div>
+      </div>
+    );
+
+    fireEvent.click(screen.getByLabelText("Departman"));
+    expect(document.querySelector('[data-app-select-clear="1"]')).toBeNull();
+    expect(within(appPickerPanel()).getByRole("option", { name: "Üretim" })).not.toBeNull();
   });
 });
 

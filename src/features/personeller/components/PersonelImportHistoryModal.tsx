@@ -10,6 +10,7 @@ import {
 import { ApiRequestError } from "../../../api/api-client";
 import { visibleImportError } from "../personel-import-error-messages";
 import { AppSelect } from "../../../components/form/AppSelect";
+import { AppDatePicker } from "../../../components/form/AppDatePicker";
 import { AppModal } from "../../../components/modal/AppModal";
 import { useAuth } from "../../../state/auth.store";
 
@@ -354,20 +355,18 @@ export function PersonelImportHistoryModal({ open, onClose }: PersonelImportHist
         </label>
         <label>
           <span>Başlangıç</span>
-          <input
-            type="date"
+          <AppDatePicker
             value={dateFrom}
-            data-testid="personel-import-history-filter-from"
-            onChange={(event) => setDateFrom(event.target.value)}
+            onChange={setDateFrom}
+            dataTestId="personel-import-history-filter-from"
           />
         </label>
         <label>
           <span>Bitiş</span>
-          <input
-            type="date"
+          <AppDatePicker
             value={dateTo}
-            data-testid="personel-import-history-filter-to"
-            onChange={(event) => setDateTo(event.target.value)}
+            onChange={setDateTo}
+            dataTestId="personel-import-history-filter-to"
           />
         </label>
         <button

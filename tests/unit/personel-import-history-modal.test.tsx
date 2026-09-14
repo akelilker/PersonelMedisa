@@ -146,6 +146,47 @@ describe("PersonelImportHistoryModal", () => {
     });
   });
 
+  it("uses the canonical themed date pickers for the Başlangıç/Bitiş filter and keeps the query contract", async () => {
+    listMock.mockResolvedValue({ items: [], next_cursor: null });
+
+    render(
+      <MemoryRouter>
+        <PersonelImportHistoryModal open onClose={() => undefined} />
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      expect(listMock).toHaveBeenCalled();
+    });
+
+    // Tema dışı beyaz native input kalktı: görünen alan kanonik trigger'dır.
+    const filterFrom = screen.getByTestId("personel-import-history-filter-from") as HTMLInputElement;
+    const filterTo = screen.getByTestId("personel-import-history-filter-to") as HTMLInputElement;
+    expect(filterFrom.getAttribute("type")).toBe("date");
+    expect(filterTo.getAttribute("type")).toBe("date");
+    expect(filterFrom.closest(".app-date-picker")).not.toBeNull();
+
+    const triggers = document.querySelectorAll('[data-app-date-trigger="1"]');
+    expect(triggers).toHaveLength(2);
+    triggers.forEach((trigger) => {
+      expect(trigger.classList.contains("form-input")).toBe(true);
+    });
+    expect(screen.getByTestId("personel-import-history-filter-from").previousElementSibling).toBe(
+      triggers[0]
+    );
+
+    // Tarih query kontratı (date_from/date_to) aynen korunur.
+    fireEvent.change(filterFrom, { target: { value: "2026-08-01" } });
+    fireEvent.change(filterTo, { target: { value: "2026-08-31" } });
+    fireEvent.click(screen.getByTestId("personel-import-history-filter-apply"));
+
+    await waitFor(() => {
+      expect(listMock).toHaveBeenLastCalledWith(
+        expect.objectContaining({ date_from: "2026-08-01", date_to: "2026-08-31" })
+      );
+    });
+  });
+
   it("shows schema-not-ready error without crashing", async () => {
     const { ApiRequestError } = await import("../../src/api/api-client");
     listMock.mockRejectedValue(

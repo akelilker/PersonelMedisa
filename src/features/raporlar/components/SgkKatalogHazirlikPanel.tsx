@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ApiRequestError } from "../../../api/api-client";
 import { AppSelect } from "../../../components/form/AppSelect";
+import { AppDatePicker } from "../../../components/form/AppDatePicker";
 import {
   approveSgkKatalog,
   approveSgkSirketPolitikasi,
@@ -1012,7 +1013,11 @@ export function SgkKatalogHazirlikPanel() {
             </label>
             <label>
               Tarih
-              <input type="date" value={overrideTarih} onChange={(e) => setOverrideTarih(e.target.value)} data-testid="sgk-override-tarih" />
+              <AppDatePicker
+                value={overrideTarih}
+                onChange={setOverrideTarih}
+                dataTestId="sgk-override-tarih"
+              />
             </label>
             <label>
               Yeni eksik gün kodu

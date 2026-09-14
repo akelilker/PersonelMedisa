@@ -254,6 +254,115 @@ function omapSeed(PDO $pdo): void
         'INSERT INTO user_subeler (user_id, sube_id) VALUES (50, 2), (51, 7), (51, 8)'
     );
 }
+/**
+ * The canonical personnel/reference shape the remediation evidence reads
+ * (001 + 065 + 066 columns, plus the user columns the manager link needs).
+ *
+ * It is seeded into a *separate* database on purpose: the production-shaped
+ * fixture the mapping sections use must stay exactly as it was, so widened
+ * personnel evidence can never be proven by weakening the mapping fixture.
+ *
+ * The identity rows are inserted from the owner's own allowlist constant, not
+ * from a copy of it, so the fixture cannot drift from the contract it proves.
+ */
+function omapSeedPersonnelEvidenceSchema(PDO $pdo): void
+{
+    $pdo->exec(
+        "ALTER TABLE personeller
+            ADD COLUMN ad VARCHAR(80) NULL,
+            ADD COLUMN soyad VARCHAR(80) NULL,
+            ADD COLUMN aktif_durum VARCHAR(16) NOT NULL DEFAULT 'AKTIF',
+            ADD COLUMN calisan_kapsami VARCHAR(16) NOT NULL DEFAULT 'IC_PERSONEL',
+            ADD COLUMN personel_tipi_id INT UNSIGNED NULL,
+            ADD COLUMN departman_id INT UNSIGNED NULL,
+            ADD COLUMN bolum_id INT UNSIGNED NULL,
+            ADD COLUMN birim_id INT UNSIGNED NULL,
+            ADD COLUMN gorev_id INT UNSIGNED NULL,
+            ADD COLUMN pozisyon_id INT UNSIGNED NULL,
+            ADD COLUMN bagli_amir_id INT UNSIGNED NULL"
+    );
+    foreach ([
+        'personel_tipleri' => 'Test Personnel Type',
+        'departmanlar' => 'Test Department',
+        'bolumler' => 'Test Section',
+        'birimler' => 'Test Unit',
+        'gorevler' => 'Test Job Title',
+        'pozisyonlar' => 'Test Position',
+    ] as $table => $label) {
+        $pdo->exec(
+            'CREATE TABLE ' . $table . ' (
+                id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+                ad VARCHAR(120) NOT NULL,
+                PRIMARY KEY (id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+        );
+        $pdo->exec("INSERT INTO " . $table . " (id, ad) VALUES (1, '" . $label . "')");
+    }
+
+    $pdo->exec(
+        'CREATE TABLE actor_identities (
+            id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+            status VARCHAR(32) NOT NULL,
+            PRIMARY KEY (id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+    );
+    $pdo->exec(
+        "ALTER TABLE users
+            ADD COLUMN ad_soyad VARCHAR(120) NULL,
+            ADD COLUMN personel_id INT UNSIGNED NULL,
+            ADD COLUMN durum VARCHAR(16) NOT NULL DEFAULT 'AKTIF',
+            ADD COLUMN actor_identity_id INT UNSIGNED NULL"
+    );
+    $pdo->exec("INSERT INTO actor_identities (id, status) VALUES (1, 'VERIFIED')");
+    $pdo->exec(
+        "INSERT INTO users (id, username, rol, ad_soyad, personel_id, durum, actor_identity_id)
+         VALUES (110, 'sinemH', 'GENEL_YONETICI', 'Sinem Hamaloğlu', 173, 'AKTIF', 1)"
+    );
+
+    // Two id-allowlisted rows, a fully populated row outside both allowlist keys
+    // (the decoy: same shape, different id), one identity-resolvable row and one
+    // deliberate duplicate pair that must stay unpublished as ambiguous.
+    $pdo->exec(
+        "INSERT INTO personeller
+            (id, ad_soyad, ad, soyad, sube_id, sgk_isveren_id, calisma_lokasyonu_id,
+             calisan_kapsami, personel_tipi_id, departman_id, bolum_id, birim_id, gorev_id,
+             pozisyon_id, bagli_amir_id)
+         VALUES
+            (203, 'Fixture Bounded A', 'Muhammed', 'Mahmud', 1, 1, 1,
+             'IC_PERSONEL', 1, 1, 1, 1, 1, 1, 110),
+            (210, 'Fixture Bounded B', 'Fahri Taylan', 'Mercan', 6, 1, NULL,
+             'DIS_KAYNAK', 1, NULL, NULL, NULL, NULL, NULL, 52),
+            (999, 'Decoy Personel', 'Decoy', 'Personel', 1, 1, 1,
+             'IC_PERSONEL', 1, 1, 1, 1, 1, 1, 110)"
+    );
+
+    $identities = (new ReflectionClassConstant(
+        OrganizationMappingInventoryReport::class,
+        'REMEDIATION_PERSONNEL_IDENTITIES'
+    ))->getValue();
+    $insert = $pdo->prepare(
+        'INSERT INTO personeller (id, ad_soyad, ad, soyad, sube_id, sgk_isveren_id, bagli_amir_id)
+         VALUES (:id, :ad_soyad, :ad, :soyad, 1, 1, 110)'
+    );
+    $resolved = $identities[0];
+    $insert->execute([
+        'id' => 220,
+        'ad_soyad' => $resolved[0] . ' ' . $resolved[1],
+        'ad' => $resolved[0],
+        'soyad' => $resolved[1],
+    ]);
+    $ambiguous = $identities[1];
+    foreach ([230, 231] as $ambiguousId) {
+        $insert->execute([
+            'id' => $ambiguousId,
+            'ad_soyad' => $ambiguous[0] . ' ' . $ambiguous[1],
+            'ad' => $ambiguous[0],
+            'soyad' => $ambiguous[1],
+        ]);
+    }
+}
+
+
 
 /** Byte-level fingerprint of every owner the mapping could possibly touch. */
 function omapFingerprint(PDO $pdo): string
@@ -418,10 +527,11 @@ $conflictDb = 'medisa_orgmap_conflict_' . $suffix;
 $partialDb = 'medisa_orgmap_partial_' . $suffix;
 $extDb = 'medisa_orgmap_ext_' . $suffix;
 $extBlockedDb = 'medisa_orgmap_extblocked_' . $suffix;
+$evidenceDb = 'medisa_orgmap_evidence_' . $suffix;
 
 $rootDsn = preg_replace('/;?dbname=[^;]*/i', '', $dsn) ?: $dsn;
 $root = omapPdo($rootDsn);
-foreach ([$db, $conflictDb, $partialDb, $extDb, $extBlockedDb] as $name) {
+foreach ([$db, $conflictDb, $partialDb, $extDb, $extBlockedDb, $evidenceDb] as $name) {
     $root->exec('CREATE DATABASE `' . $name . '` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
 }
 
@@ -558,12 +668,16 @@ try {
         'the matrix publishes relation ids and a count, and nothing else'
     );
     omapAssert(
-        $inventory['schema_version'] === '4',
-        'the extended inventory contract is published as schema version 4'
+        $inventory['schema_version'] === '5',
+        'the extended inventory contract is published as schema version 5'
     );
     omapAssert(
         $inventory['data']['allowed_personnel'] === []
-            && $inventory['data']['allowed_users'] === [],
+            && $inventory['data']['allowed_users'] === []
+            && $inventory['data']['personnel_evidence']['available'] === false
+            && $inventory['data']['personnel_evidence']['boundary_violation_ids'] === []
+            && $inventory['data']['personnel_evidence']['id_allowlist']
+                === [160, 200, 201, 203, 204, 205, 206, 209, 210, 211, 212, 217],
         'the allowlisted evidence sections stay empty when the required source schema is absent'
     );
     omapAssert(
@@ -602,6 +716,131 @@ try {
         OrganizationMappingInventoryReport::checksum($inventory['data']) === $inventory['inventory_checksum'],
         'the published checksum is reproducible from the data section alone'
     );
+
+    // -----------------------------------------------------------------------
+    // 1b) Bounded personnel remediation evidence
+    // -----------------------------------------------------------------------
+    // A dedicated database: the remediation evidence needs the canonical
+    // personnel/reference shape, and proving it must not touch the
+    // production-shaped fixture the mapping sections below rely on.
+    $evidence = omapPdo(preg_replace('/dbname=[^;]+/i', 'dbname=' . $evidenceDb, $dsn) ?: $dsn);
+    omapCreateSchema($evidence);
+    omapSeed($evidence);
+    omapSeedPersonnelEvidenceSchema($evidence);
+    OrganizasyonSchema::resetCache();
+
+    $evidenceBefore = omapFingerprint($evidence);
+    $evidenceInventory = OrganizationMappingInventoryReport::collect($evidence, OMAP_SHA, OMAP_TIP);
+    omapAssert(
+        omapFingerprint($evidence) === $evidenceBefore,
+        'the personnel evidence read is SELECT-only: every bounded organisation row stays byte-identical'
+    );
+
+    $evidenceSummary = $evidenceInventory['data']['personnel_evidence'];
+    $publishedIds = [];
+    $publishedById = [];
+    foreach ($evidenceInventory['data']['allowed_personnel'] as $row) {
+        $publishedIds[] = $row['id'];
+        $publishedById[$row['id']] = $row;
+    }
+    omapAssert(
+        $publishedIds === [203, 210, 220],
+        'only the bounded allowlist rows are published: two by canonical id, one resolved from its identity'
+    );
+    omapAssert(
+        $evidenceSummary['available'] === true
+            && $evidenceSummary['published_count'] === 3
+            && $publishedById[203]['provenance'] === 'id_allowlist'
+            && $publishedById[220]['provenance'] === 'identity_resolution',
+        'each published row states which allowlist key admitted it'
+    );
+    omapAssert(
+        strpos((string) json_encode($evidenceInventory), 'Decoy Personel') === false
+            && !in_array(999, $publishedIds, true),
+        'a fully populated personnel row outside both allowlist keys never reaches the payload'
+    );
+    omapAssert(
+        !in_array(230, $publishedIds, true) && !in_array(231, $publishedIds, true),
+        'an ambiguous identity publishes no row at all'
+    );
+    omapAssert(
+        $evidenceSummary['boundary_violation_ids'] === []
+            && !in_array('REMEDIATION_PERSONNEL_ALLOWLIST_BOUNDARY_VIOLATION', $evidenceInventory['blockers'], true),
+        'a read that stays inside the allowlist raises no boundary violation blocker'
+    );
+
+    $resolution = [];
+    foreach ($evidenceSummary['identity_resolution'] as $entry) {
+        $resolution[$entry['key']] = [$entry['state'], $entry['matched_row_ids']];
+    }
+    omapAssert(
+        $resolution === [
+            'Abdullah Omar Muhammed' => ['RESOLVED', [220]],
+            'Ahmet Kaçar' => ['AMBIGUOUS', [230, 231]],
+            'Aysun Özdemir' => ['UNRESOLVED', []],
+            'Esat Kaçar' => ['UNRESOLVED', []],
+            'Melih Güler' => ['UNRESOLVED', []],
+            'Mustafa Mahmud' => ['UNRESOLVED', []],
+        ],
+        'a business-truth identity resolves once, is reported unresolved, or publishes nothing as ambiguous'
+    );
+    omapAssert(
+        $evidenceSummary['id_allowlist'] === [160, 200, 201, 203, 204, 205, 206, 209, 210, 211, 212, 217]
+            && $evidenceSummary['id_allowlist_matched_ids'] === [203, 210]
+            && $evidenceSummary['id_allowlist_missing_ids'] === [160, 200, 201, 204, 205, 206, 209, 211, 212, 217]
+            && $evidenceSummary['evidence_complete'] === false,
+        'the bounded id allowlist reports every member it could not find instead of widening itself'
+    );
+
+    omapAssert(
+        $publishedById[203]['bagli_amir_id'] === 110
+            && $publishedById[203]['bagli_amir_user_id'] === 110
+            && $publishedById[203]['bagli_amir_username'] === 'sinemH'
+            && $publishedById[203]['bagli_amir_personel_id'] === 173
+            && $publishedById[203]['bagli_amir_ad_soyad'] === 'Sinem Hamaloğlu'
+            && $publishedById[203]['bagli_amir_identity_published'] === true,
+        'bagli_amir_id is a users.id and its identity is copied from the published user allowlist'
+    );
+    omapAssert(
+        (int) $evidence->query('SELECT COUNT(*) FROM personeller WHERE id = 110')->fetchColumn() === 0,
+        'the published bagli_amir_id is a users.id, not a personnel id'
+    );
+    omapAssert(
+        $publishedById[210]['bagli_amir_id'] === 52
+            && $publishedById[210]['bagli_amir_user_id'] === null
+            && $publishedById[210]['bagli_amir_username'] === null
+            && $publishedById[210]['bagli_amir_personel_id'] === null
+            && $publishedById[210]['bagli_amir_ad_soyad'] === null
+            && $publishedById[210]['bagli_amir_identity_published'] === false,
+        'a manager outside the user allowlist contributes the relation id and no identity'
+    );
+    omapAssert(
+        $publishedById[203]['durum'] === 'AKTIF'
+            && $publishedById[203]['calisan_kapsami'] === 'IC_PERSONEL'
+            && $publishedById[203]['sirket_id'] === null
+            && $publishedById[203]['sube_id'] === 1
+            && $publishedById[203]['personel_tipi_id'] === 1
+            && $publishedById[203]['personel_tipi_label'] === 'Test Personnel Type'
+            && $publishedById[203]['calisma_lokasyonu_id'] === 1
+            && $publishedById[203]['calisma_lokasyonu_label'] === 'Test Location One'
+            && $publishedById[203]['sgk_isveren_id'] === 1
+            && $publishedById[203]['sgk_isveren_label'] === 'Test Payroll One'
+            && $publishedById[203]['departman_id'] === 1
+            && $publishedById[203]['departman_label'] === 'Test Department'
+            && $publishedById[203]['bolum_id'] === 1
+            && $publishedById[203]['bolum_label'] === 'Test Section'
+            && $publishedById[203]['birim_id'] === 1
+            && $publishedById[203]['birim_label'] === 'Test Unit'
+            && $publishedById[203]['gorev_unvan'] === 'Test Job Title'
+            && $publishedById[203]['pozisyon_id'] === 1
+            && $publishedById[203]['pozisyon_label'] === 'Test Position'
+            && $publishedById[210]['calisan_kapsami'] === 'DIS_KAYNAK'
+            && $publishedById[210]['calisma_lokasyonu_id'] === null,
+        'each bounded row publishes its canonical org relations with catalogue labels only'
+    );
+    // The evidence database is evidence only: the mapping sections below must
+    // keep reading the production-shaped fixture they were pinned to.
+    OrganizasyonSchema::resetCache();
 
     // -----------------------------------------------------------------------
     // 2) Spec validation
@@ -1372,7 +1611,7 @@ try {
 } finally {
     putenv('MEDISA_MIGRATION_BACKUP_DIR');
     omapRemoveTree($sandbox);
-    foreach ([$db, $conflictDb, $partialDb, $extDb, $extBlockedDb] as $name) {
+    foreach ([$db, $conflictDb, $partialDb, $extDb, $extBlockedDb, $evidenceDb] as $name) {
         $root->exec('DROP DATABASE IF EXISTS `' . $name . '`');
     }
 }

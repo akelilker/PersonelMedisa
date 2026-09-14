@@ -22,13 +22,28 @@ use Throwable;
  * Read-only is structural, not a promise: every statement below is a SELECT, the
  * table names are literals in this file, and no caller can inject SQL — the only
  * inputs are a PDO handle and two opaque metadata strings that are never
- * interpolated into a query.
+ * interpolated into a query. The personnel evidence statement is the single
+ * exception to the literal style: it binds parameters, and every one of them
+ * comes from a class constant in this file (`REMEDIATION_PERSONNEL_IDS`,
+ * `REMEDIATION_PERSONNEL_IDENTITIES`), so binding cannot widen the allowlist a
+ * caller never supplies.
  *
  * PII: an organisation row (branch code, branch name, status) is reference data.
  * The operational closeout also permits a fixed, bounded evidence allowlist:
  * ten personnel ids and named actor candidates only. No request data, credential,
  * contact, national-id, salary or unbounded user/personnel result is published.
  * The scope summary and location×branch matrix remain anonymous aggregates.
+ *
+ * Personnel remediation evidence (`allowed_personnel` + `personnel_evidence`) is
+ * the same bounded model, grown for one purpose: turning the approved business
+ * truth into a mutation plan needs each remediation person's *current* org
+ * relations, so the plan is written against a real preimage instead of a guess.
+ * The publication boundary itself does not move — membership is decided by the
+ * compiled id allowlist plus the business-truth identities whose canonical id is
+ * not ledgered yet, every identity has to resolve to exactly one row, a manager
+ * identity is only published for a user this owner already publishes in
+ * `allowed_users`, reference labels are catalogue names rather than personal
+ * data, and a row outside both keys is a blocker rather than a row.
  *
  * Determinism: rows are ordered by primary key, keys are emitted in a fixed
  * order, and the checksum covers the data section only — not `generated_at` —
@@ -37,7 +52,7 @@ use Throwable;
  */
 final class OrganizationMappingInventoryReport
 {
-    public const SCHEMA_VERSION = '4';
+    public const SCHEMA_VERSION = '5';
 
     /**
      * The historical production baseline: the branch id set the postcheck
@@ -55,6 +70,54 @@ final class OrganizationMappingInventoryReport
     private const FORBIDDEN_BRANCH_IDS = [3];
 
     /**
+     * The personnel evidence allowlist, part one: canonical ids.
+     *
+     * `FinalClosePackage::PERSONNEL` (200, 201, 203, 204, 205, 206, 209, 210,
+     * 212, 217) plus the two rows the business-truth lock already recorded a
+     * canonical id for (160 Sedanur Bulut, 211 Zeynep Günal).
+     *
+     * The package constant itself is *not* reused and *not* grown: it is an
+     * immutable apply authorization, while this list is a read scope. Widening an
+     * evidence read must never widen what an apply gate is allowed to mutate, so
+     * the two lists are kept deliberately separate — with the read scope the
+     * larger one.
+     */
+    private const REMEDIATION_PERSONNEL_IDS = [160, 200, 201, 203, 204, 205, 206, 209, 210, 211, 212, 217];
+
+    /**
+     * The personnel evidence allowlist, part two: remediation identities whose
+     * canonical id is not ledgered yet.
+     *
+     * They are used exactly once per read, to resolve a real id from the approved
+     * business truth, because a mutation plan must not be written against a
+     * guessed id. Each pair is matched as the canonical `(ad, soyad)` tuple; the
+     * database collation decides that match, and this list only ever *narrows*
+     * what may be published:
+     *
+     *  - a pair that matches one row resolves that row;
+     *  - a pair that matches no row is reported unresolved;
+     *  - a pair that matches several rows is reported ambiguous and publishes
+     *    nothing — an identity is never guessed, not even for evidence.
+     *
+     * Once the resolved id is ledgered in the business truth, the pair belongs in
+     * `REMEDIATION_PERSONNEL_IDS` and is deleted here; the list is expected to
+     * shrink to empty, never to drift.
+     *
+     * @var list<array{0: string, 1: string}>
+     */
+    private const REMEDIATION_PERSONNEL_IDENTITIES = [
+        ['Abdullah Omar', 'Muhammed'],
+        ['Ahmet', 'Kaçar'],
+        ['Aysun', 'Özdemir'],
+        ['Esat', 'Kaçar'],
+        ['Melih', 'Güler'],
+        ['Mustafa', 'Mahmud'],
+    ];
+
+    /** Hard ceiling on the personnel evidence statement, in rows. */
+    private const PERSONNEL_EVIDENCE_ROW_LIMIT = 64;
+
+    /**
      * Collect the full inventory.
      *
      * @param string $deployedSha exact deploy SHA the collecting worker is pinned to
@@ -65,14 +128,21 @@ final class OrganizationMappingInventoryReport
     {
         $readiness = OrganizasyonSchema::report($pdo);
 
+        // The personnel evidence links each bounded row to the actor it reports
+        // to, so the user allowlist is collected first and reused: a manager
+        // identity is published only for a user this owner already publishes.
+        $allowedUsers = self::allowedUsers($pdo);
+        $personnelEvidence = self::allowedPersonnel($pdo, $allowedUsers);
+
         $data = [
             'baseline_branch_ids' => self::BASELINE_BRANCH_IDS,
             'branches' => self::branches($pdo),
             'sgk_employers' => self::sgkEmployers($pdo),
             'work_locations' => self::workLocations($pdo),
             'scope_summary' => self::scopeSummary($pdo),
-            'allowed_personnel' => self::allowedPersonnel($pdo),
-            'allowed_users' => self::allowedUsers($pdo),
+            'allowed_personnel' => $personnelEvidence['rows'],
+            'personnel_evidence' => $personnelEvidence['summary'],
+            'allowed_users' => $allowedUsers,
             'manager_evidence' => self::managerEvidence($pdo),
             'a1_policy_evidence' => self::a1PolicyEvidence($pdo),
             'personnel_location_branch_matrix' => self::personnelLocationBranchMatrix($pdo),
@@ -404,40 +474,271 @@ final class OrganizationMappingInventoryReport
     }
 
     /**
-     * The operational closeout permits these exact personnel records only.
-     * This is deliberately a fixed query, not a caller-provided filter.
+     * The operational closeout remediation scope: the exact personnel records
+     * whose current org relations an approved mutation plan has to be written
+     * against.
      *
-     * @return list<array<string, mixed>>
+     * Membership comes from `REMEDIATION_PERSONNEL_IDS` and
+     * `REMEDIATION_PERSONNEL_IDENTITIES` only — both are literals in this file and
+     * neither is reachable from a caller. The statement binds parameters (the id
+     * allowlist, and the identity pairs twice: once to select, once so the
+     * database itself states that a returned row matched an allowlisted
+     * identity), because the boundary must be the statement's own filter and not
+     * a PHP-side re-derivation of it.
+     *
+     * Resolution is fail-closed per identity: no matching row, or more than one,
+     * publishes nothing for that identity and is reported instead. A returned row
+     * that is neither id-allowlisted nor identity-matched is impossible by
+     * construction, so it is reported as a boundary violation and turned into a
+     * blocker rather than published.
+     *
+     * `bagli_amir_id` keeps its canonical semantics — `users.id`, never a
+     * personnel id; `ReferansController` states the same write contract
+     * (`bagli_amir_id` → `users.id`). The manager's identity is copied from the
+     * user allowlist this owner already publishes, so a manager outside that list
+     * contributes the relation id and nothing else.
+     *
+     * @param list<array<string, mixed>> $publishedUsers
+     * @return array{rows: list<array<string, mixed>>, summary: array<string, mixed>}
      */
-    private static function allowedPersonnel(PDO $pdo): array
+    private static function allowedPersonnel(PDO $pdo, array $publishedUsers): array
     {
-        if (!self::columnsExist(
-            $pdo,
-            'personeller',
-            ['ad', 'soyad', 'aktif_durum', 'calisma_lokasyonu_id', 'sube_id', 'sgk_isveren_id']
-        )) {
-            return [];
+        $identities = self::REMEDIATION_PERSONNEL_IDENTITIES;
+        $summary = [
+            'available' => false,
+            'id_allowlist' => self::REMEDIATION_PERSONNEL_IDS,
+            'id_allowlist_matched_ids' => [],
+            'id_allowlist_missing_ids' => self::REMEDIATION_PERSONNEL_IDS,
+            'identity_allowlist' => array_map(
+                static fn (array $identity): string => trim($identity[0] . ' ' . $identity[1]),
+                $identities
+            ),
+            'identity_resolution' => [],
+            'identity_matched_row_ids' => [],
+            'identity_unattributed_row_ids' => [],
+            'unresolved_identities' => [],
+            'ambiguous_identities' => [],
+            'published_count' => 0,
+            'boundary_violation_ids' => [],
+            'evidence_complete' => false,
+        ];
+
+        if (!self::columnsExist($pdo, 'personeller', [
+            'ad', 'soyad', 'aktif_durum', 'calisan_kapsami', 'calisma_lokasyonu_id', 'sube_id',
+            'sgk_isveren_id', 'personel_tipi_id', 'departman_id', 'bolum_id', 'birim_id', 'gorev_id',
+            'pozisyon_id', 'bagli_amir_id',
+        ])) {
+            return ['rows' => [], 'summary' => $summary];
         }
-        $rows = self::query(
-            $pdo,
-            'SELECT p.id, p.ad, p.soyad, p.aktif_durum AS durum,
-                    p.calisma_lokasyonu_id, p.sube_id, s.sirket_id, p.sgk_isveren_id
+
+        $idPlaceholders = implode(', ', array_fill(0, count(self::REMEDIATION_PERSONNEL_IDS), '?'));
+        $identityTuplePlaceholders = implode(', ', array_fill(0, count($identities), '(?, ?)'));
+        $identityParameters = [];
+        foreach ($identities as $identity) {
+            $identityParameters[] = $identity[0];
+            $identityParameters[] = $identity[1];
+        }
+
+        $statement = $pdo->prepare(
+            'SELECT p.id, p.ad, p.soyad, p.aktif_durum AS durum, p.calisan_kapsami,
+                    p.sube_id, s.sirket_id, p.sgk_isveren_id,
+                    p.calisma_lokasyonu_id, l.ad AS calisma_lokasyonu_label,
+                    e.ad AS sgk_isveren_label,
+                    p.personel_tipi_id, pt.ad AS personel_tipi_label,
+                    p.departman_id, d.ad AS departman_label,
+                    p.bolum_id, b.ad AS bolum_label,
+                    p.birim_id, br.ad AS birim_label,
+                    p.gorev_id, g.ad AS gorev_unvan,
+                    p.pozisyon_id, pz.ad AS pozisyon_label,
+                    p.bagli_amir_id,
+                    CASE WHEN (p.ad, p.soyad) IN (' . $identityTuplePlaceholders . ') THEN 1 ELSE 0 END
+                        AS identity_match
              FROM personeller p
              LEFT JOIN subeler s ON s.id = p.sube_id
-             WHERE p.id IN (200, 201, 203, 204, 205, 206, 209, 210, 212, 217)
-             ORDER BY p.id ASC'
+             LEFT JOIN calisma_lokasyonlari l ON l.id = p.calisma_lokasyonu_id
+             LEFT JOIN sgk_isverenler e ON e.id = p.sgk_isveren_id
+             LEFT JOIN personel_tipleri pt ON pt.id = p.personel_tipi_id
+             LEFT JOIN departmanlar d ON d.id = p.departman_id
+             LEFT JOIN bolumler b ON b.id = p.bolum_id
+             LEFT JOIN birimler br ON br.id = p.birim_id
+             LEFT JOIN gorevler g ON g.id = p.gorev_id
+             LEFT JOIN pozisyonlar pz ON pz.id = p.pozisyon_id
+             WHERE p.id IN (' . $idPlaceholders . ')
+                OR (p.ad, p.soyad) IN (' . $identityTuplePlaceholders . ')
+             ORDER BY p.id ASC
+             LIMIT ' . self::PERSONNEL_EVIDENCE_ROW_LIMIT
         );
 
-        return array_map(static fn (array $row): array => [
-            'id' => (int) $row['id'],
-            'ad' => (string) $row['ad'],
-            'soyad' => (string) $row['soyad'],
-            'durum' => (string) $row['durum'],
-            'calisma_lokasyonu_id' => self::nullableInt($row['calisma_lokasyonu_id'] ?? null),
-            'sube_id' => self::nullableInt($row['sube_id'] ?? null),
-            'sirket_id' => self::nullableInt($row['sirket_id'] ?? null),
-            'sgk_isveren_id' => self::nullableInt($row['sgk_isveren_id'] ?? null),
-        ], $rows);
+        try {
+            // Placeholder order follows the statement text: the projection's CASE
+            // selector first, then the id key, then the identity key.
+            $statement->execute(array_merge(
+                $identityParameters,
+                self::REMEDIATION_PERSONNEL_IDS,
+                $identityParameters
+            ));
+            $fetched = $statement->fetchAll(PDO::FETCH_ASSOC);
+            $statement->closeCursor();
+        } catch (Throwable $exception) {
+            return ['rows' => [], 'summary' => $summary];
+        }
+
+        $idAllowlist = array_flip(self::REMEDIATION_PERSONNEL_IDS);
+        $identityStates = [];
+        foreach ($identities as $identity) {
+            $identityStates[self::identityKey($identity[0], $identity[1])] = [
+                'key' => trim($identity[0] . ' ' . $identity[1]),
+                'matched_row_ids' => [],
+            ];
+        }
+
+        $identityMatchedIds = [];
+        $unattributed = [];
+        foreach (is_array($fetched) ? $fetched : [] as $row) {
+            $rowId = (int) $row['id'];
+            if (array_key_exists($rowId, $idAllowlist) || (int) $row['identity_match'] !== 1) {
+                continue;
+            }
+            $identityMatchedIds[] = $rowId;
+            $key = self::identityKey((string) $row['ad'], (string) $row['soyad']);
+            if (isset($identityStates[$key])) {
+                $identityStates[$key]['matched_row_ids'][] = $rowId;
+            } else {
+                // The database matched an allowlisted pair but this process could
+                // not fold the row's own name to it. The row stays unpublished:
+                // an identity that cannot be attributed is not evidence.
+                $unattributed[] = $rowId;
+            }
+        }
+
+        $usersById = [];
+        foreach ($publishedUsers as $user) {
+            $userId = self::nullableInt($user['user_id'] ?? null);
+            if ($userId !== null) {
+                $usersById[$userId] = $user;
+            }
+        }
+
+        $rows = [];
+        $idMatched = [];
+        $violations = [];
+        foreach (is_array($fetched) ? $fetched : [] as $row) {
+            $rowId = (int) $row['id'];
+            $viaId = array_key_exists($rowId, $idAllowlist);
+            if (!$viaId) {
+                if ((int) $row['identity_match'] !== 1) {
+                    // Off both allowlist keys: the boundary failed, so nothing is
+                    // published from this row and the read is blocked.
+                    $violations[] = $rowId;
+                    continue;
+                }
+                $key = self::identityKey((string) $row['ad'], (string) $row['soyad']);
+                if (count($identityStates[$key]['matched_row_ids'] ?? []) !== 1) {
+                    // Ambiguous or unattributable: reported above, never published.
+                    continue;
+                }
+            }
+            if ($viaId) {
+                $idMatched[] = $rowId;
+            }
+
+            $managerId = self::nullableInt($row['bagli_amir_id'] ?? null);
+            $manager = $managerId === null ? null : ($usersById[$managerId] ?? null);
+            $rows[] = [
+                'id' => $rowId,
+                'ad' => (string) $row['ad'],
+                'soyad' => (string) $row['soyad'],
+                'durum' => (string) $row['durum'],
+                'calisan_kapsami' => (string) $row['calisan_kapsami'],
+                'sirket_id' => self::nullableInt($row['sirket_id'] ?? null),
+                'sube_id' => self::nullableInt($row['sube_id'] ?? null),
+                'personel_tipi_id' => self::nullableInt($row['personel_tipi_id'] ?? null),
+                'personel_tipi_label' => self::nullableString($row['personel_tipi_label'] ?? null),
+                'calisma_lokasyonu_id' => self::nullableInt($row['calisma_lokasyonu_id'] ?? null),
+                'calisma_lokasyonu_label' => self::nullableString($row['calisma_lokasyonu_label'] ?? null),
+                'sgk_isveren_id' => self::nullableInt($row['sgk_isveren_id'] ?? null),
+                'sgk_isveren_label' => self::nullableString($row['sgk_isveren_label'] ?? null),
+                'departman_id' => self::nullableInt($row['departman_id'] ?? null),
+                'departman_label' => self::nullableString($row['departman_label'] ?? null),
+                'bolum_id' => self::nullableInt($row['bolum_id'] ?? null),
+                'bolum_label' => self::nullableString($row['bolum_label'] ?? null),
+                'birim_id' => self::nullableInt($row['birim_id'] ?? null),
+                'birim_label' => self::nullableString($row['birim_label'] ?? null),
+                // `gorev_unvan` is the canonical label of `gorev_id` (gorevler.ad);
+                // migration 065 records that unvan stays owned by gorev_id.
+                'gorev_unvan' => self::nullableString($row['gorev_unvan'] ?? null),
+                'pozisyon_id' => self::nullableInt($row['pozisyon_id'] ?? null),
+                'pozisyon_label' => self::nullableString($row['pozisyon_label'] ?? null),
+                // Canonical semantics: bagli_amir_id is users.id, never a personnel id.
+                'bagli_amir_id' => $managerId,
+                'bagli_amir_user_id' => $manager === null ? null : (int) $manager['user_id'],
+                'bagli_amir_username' => $manager === null ? null : (string) $manager['username'],
+                'bagli_amir_personel_id' => $manager === null
+                    ? null
+                    : self::nullableInt($manager['personel_id'] ?? null),
+                'bagli_amir_ad_soyad' => $manager === null
+                    ? null
+                    : self::nullableString($manager['ad_soyad'] ?? null),
+                'bagli_amir_identity_published' => $manager !== null,
+                'provenance' => $viaId ? 'id_allowlist' : 'identity_resolution',
+            ];
+        }
+
+        $identityResolution = [];
+        $unresolved = [];
+        $ambiguous = [];
+        $attributedCount = 0;
+        foreach ($identityStates as $state) {
+            $count = count($state['matched_row_ids']);
+            $attributedCount += $count;
+            $resolution = $count === 1 ? 'RESOLVED' : ($count === 0 ? 'UNRESOLVED' : 'AMBIGUOUS');
+            if ($resolution === 'UNRESOLVED') {
+                $unresolved[] = $state['key'];
+            }
+            if ($resolution === 'AMBIGUOUS') {
+                $ambiguous[] = $state['key'];
+            }
+            $identityResolution[] = [
+                'key' => $state['key'],
+                'state' => $resolution,
+                'matched_row_ids' => $state['matched_row_ids'],
+            ];
+        }
+        $missingIds = array_values(array_diff(self::REMEDIATION_PERSONNEL_IDS, $idMatched));
+
+        $summary['available'] = true;
+        $summary['id_allowlist_matched_ids'] = $idMatched;
+        $summary['id_allowlist_missing_ids'] = $missingIds;
+        $summary['identity_resolution'] = $identityResolution;
+        $summary['identity_matched_row_ids'] = $identityMatchedIds;
+        $summary['identity_unattributed_row_ids'] = $unattributed;
+        $summary['unresolved_identities'] = $unresolved;
+        $summary['ambiguous_identities'] = $ambiguous;
+        $summary['published_count'] = count($rows);
+        $summary['boundary_violation_ids'] = array_values(array_unique($violations));
+        $summary['evidence_complete'] = $violations === []
+            && $missingIds === []
+            && $unresolved === []
+            && $ambiguous === []
+            && $unattributed === []
+            && $attributedCount === count($identityMatchedIds);
+
+        return ['rows' => $rows, 'summary' => $summary];
+    }
+
+    /**
+     * Case-folded `ad`+`soyad` key. It exists only to attribute a row the
+     * database already matched to its allowlist entry, so it is never published
+     * and never decides membership.
+     */
+    private static function identityKey(string $ad, string $soyad): string
+    {
+        return self::normalizeIdentityPart($ad) . "\n" . self::normalizeIdentityPart($soyad);
+    }
+
+    private static function normalizeIdentityPart(string $value): string
+    {
+        return mb_strtolower(trim($value), 'UTF-8');
     }
 
     /**
@@ -483,6 +784,10 @@ final class OrganizationMappingInventoryReport
             $items[] = [
                 'user_id' => $userId,
                 'username' => (string) $row['username'],
+                // Published because the personnel evidence names the manager a
+                // bounded row reports to, and it may only ever name a user this
+                // section already publishes.
+                'ad_soyad' => (string) $row['ad_soyad'],
                 'personel_id' => self::nullableInt($row['personel_id'] ?? null),
                 'durum' => (string) $row['durum'],
                 'rol' => (string) $row['rol'],
@@ -778,6 +1083,12 @@ final class OrganizationMappingInventoryReport
         if ($data['personnel_matrix_reconciled'] !== true) {
             $blockers[] = 'INVENTORY_PERSONNEL_MATRIX_COUNT_MISMATCH';
         }
+        // A personnel row that is on neither allowlist key proves the evidence
+        // statement no longer matches its own boundary. Fail closed: the read is
+        // blocked instead of publishing a row the allowlist does not cover.
+        if (($data['personnel_evidence']['boundary_violation_ids'] ?? []) !== []) {
+            $blockers[] = 'REMEDIATION_PERSONNEL_ALLOWLIST_BOUNDARY_VIOLATION';
+        }
         foreach (['subeler', 'sgk_isverenler', 'calisma_lokasyonlari', 'personeller'] as $table) {
             if ($data['row_counts'][$table] < 0) {
                 $blockers[] = 'INVENTORY_COUNT_UNEVALUABLE';
@@ -880,5 +1191,21 @@ final class OrganizationMappingInventoryReport
         $parsed = (int) $value;
 
         return $parsed > 0 ? $parsed : null;
+    }
+
+    /**
+     * A reference label: NULL and an empty label both mean "no label", so a row
+     * without the relation never carries a phantom name.
+     *
+     * @param mixed $value
+     */
+    private static function nullableString($value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+        $text = (string) $value;
+
+        return $text === '' ? null : $text;
     }
 }

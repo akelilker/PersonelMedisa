@@ -10,6 +10,7 @@ import {
 } from "react";
 import { useNavigate } from "react-router-dom";
 import { AppSelectField } from "../../../components/form/AppSelect";
+import { resolveSubeDisplayLabels } from "../../../lib/organizasyon/sube-display-label";
 import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
 import type { KayitTab } from "../../../components/main-menu/MainMenu";
@@ -707,14 +708,19 @@ export function KayitSurecWorkspace({
         fetchYonetimSubeleri()
       ]);
 
+      const aktifSubeler = subeler.filter((sube) => sube.durum === "AKTIF");
+      const subeLabels = resolveSubeDisplayLabels(
+        aktifSubeler.map((sube) => ({ id: sube.id, ad: sube.ad, tamAd: sube.tam_ad ?? null }))
+      );
+
       setSubeOptions(
-        subeler
-          .filter((sube) => sube.durum === "AKTIF")
-          .map((sube) => ({
-            id: sube.id,
-            label: sube.ad,
-            sirketId: sube.sirket?.id ?? null
-          }))
+        aktifSubeler.map((sube) => ({
+          id: sube.id,
+          // Adaptive kanonik etiket: kısa ad benzersizse kısa ad, aynı kısa ad
+          // birden fazla şirkette varsa şirket ile ayrışan `tam_ad`.
+          label: subeLabels.get(sube.id) ?? sube.ad,
+          sirketId: sube.sirket?.id ?? null
+        }))
       );
       setSubeLoadError(null);
 

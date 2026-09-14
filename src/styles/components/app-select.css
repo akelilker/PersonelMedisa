@@ -152,6 +152,9 @@
   font-weight: 500;
   line-height: 1.2;
   text-align: left;
+  /* Uzun seçenekler paneli yatayda büyütmez: satır içinde sarar. */
+  overflow-wrap: anywhere;
+  white-space: normal;
   cursor: pointer;
   transition: border-color 120ms ease, color 120ms ease, background-color 120ms ease;
 }
@@ -201,8 +204,12 @@
   box-shadow: inset 2px 0 0 rgba(var(--theme-color-rgb), 0.9);
 }
 
-.app-select-option.is-placeholder {
+/* Kanonik temizleme satırı: opsiyonel alanda seçimi kaldırır (placeholder kartı değildir). */
+.app-select-option.is-clear {
+  border-style: dashed;
+  background: transparent;
   color: var(--text-muted);
+  font-weight: 500;
 }
 
 @media (max-width: 640px) {

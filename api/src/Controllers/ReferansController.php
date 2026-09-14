@@ -481,6 +481,19 @@ class ReferansController
         JsonResponse::success(['items' => $items]);
     }
 
+    /**
+     * Bağlı amir seçenekleri (Kayıt formu + Personel Kartı).
+     *
+     * Kontrat:
+     * - Yalnız AKTIF kullanıcılar; personel kaydı olmayan/olmayan hesap yoktur.
+     * - Uygunluk canonical rol eksenidir: PERSONEL (ajan seviyesi) ve
+     *   AUTH_SMOKE_READONLY (teknik smoke aktörü) HARİÇ tüm yönetim rolleri.
+     *   Böylece üst düzey yönetici (GENEL_YONETICI / SISTEM_YONETICISI) ve
+     *   şube/İK yöneticileri de bağlı amir olarak seçilebilir.
+     * - Yazma kontratı (`bagli_amir_id` → users.id + durum=AKTIF) ile aynı tablo:
+     *   liste yazma kontratından daha dar olamaz.
+     * - Otomatik seçim yok; self/cycle koruması çağıran form kontratlarındadır.
+     */
     public static function bagliAmirler(Request $request)
     {
         AuthMiddleware::authenticate($request, true);
@@ -495,7 +508,7 @@ class ReferansController
             "SELECT id, ad_soyad
              FROM users
              WHERE durum = 'AKTIF'
-               AND rol IN ('GENEL_YONETICI', 'BOLUM_YONETICISI', 'BIRIM_AMIRI', 'MUHASEBE')
+               AND rol NOT IN ('PERSONEL', 'AUTH_SMOKE_READONLY')
              ORDER BY ad_soyad ASC, id ASC"
         );
         $rows = $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];

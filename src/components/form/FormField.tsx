@@ -5,6 +5,7 @@ import type {
   ReactNode
 } from "react";
 import { AppSelect } from "./AppSelect";
+import { AppDatePicker } from "./AppDatePicker";
 
 export type FormFieldOption = { value: string; label: string };
 
@@ -87,6 +88,22 @@ export function FormField(props: FormFieldProps) {
         required={required}
         disabled={disabled}
         ariaLabel={label}
+      />
+    );
+  } else if (props.type === "date") {
+    // Tarih alanları kanonik temalı takvim owner'ından gelir; native beyaz
+    // browser input'u ve native picker popup'ı kullanılmaz. Wire formatı ISO kalır.
+    control = (
+      <AppDatePicker
+        name={name}
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+        required={required}
+        disabled={disabled}
+        min={typeof props.min === "string" ? props.min : undefined}
+        dataTestId={props.dataTestId}
+        onInvalid={props.onInvalid}
       />
     );
   } else {

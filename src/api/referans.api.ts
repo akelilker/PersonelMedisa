@@ -1,6 +1,7 @@
 import type { ApiResponse } from "../types/api";
 import type { IdOption, KeyOption } from "../types/referans";
 import { formatReferenceValue } from "../features/personeller/components/personel-dosya/personel-dosya-format-utils";
+import { sortDepartmanDisplayOptions } from "../lib/organizasyon/departman-display-order";
 import { apiRequest } from "./api-client";
 import { endpoints } from "./endpoints";
 import { extractListItems } from "./response-normalizers";
@@ -120,7 +121,9 @@ function normalizeKeyOptions(data: unknown): KeyOption[] {
 
 export async function fetchDepartmanOptions(): Promise<IdOption[]> {
   const response = await apiRequest<ApiResponse<unknown>>(endpoints.referans.departmanlar);
-  return normalizeIdOptions(response.data);
+  // Kanonik business display order (alfabetik değil) tek owner'dan uygulanır;
+  // bilinmeyen/yeni departmanlar listeden düşmez.
+  return sortDepartmanDisplayOptions(normalizeIdOptions(response.data));
 }
 
 export async function createDepartmanOption(ad: string): Promise<IdOption> {

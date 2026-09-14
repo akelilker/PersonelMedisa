@@ -1,6 +1,7 @@
 import { finalizeAuthSessionSube } from "../auth/auth-session-sube";
 import { isRealBackendOnlyMode } from "../config/app-env";
 import { canonicalizeUserRole } from "../lib/authorization/canonicalize-user-role";
+import { resolveSubeDisplayLabels } from "../lib/organizasyon/sube-display-label";
 import { flushPreAuthTelemetry } from "../logging/client-telemetry";
 import type { AuthSession, LoginCredentials } from "../types/auth";
 import { apiRequest, ApiRequestError } from "./api-client";
@@ -111,7 +112,23 @@ function readSubeList(record: Record<string, unknown>): AuthSession["sube_list"]
       });
     }
   }
-  return out.length ? out : undefined;
+  if (out.length === 0) {
+    return undefined;
+  }
+
+  // Adaptive kanonik şube etiketi: kısa ad benzersizse kısa ad, aynı kısa ad
+  // birden fazla şirkette varsa backend'in türettiği `tam_ad` (ön ek/elle
+  // birleştirme yok). `ad` bu oturumun görünen etiketidir; `kisa_ad`/`tam_ad`
+  // alanları olduğu gibi korunur.
+  const labels = resolveSubeDisplayLabels(
+    out.map((item) => ({
+      id: item.id,
+      ad: item.kisa_ad ?? item.ad,
+      tamAd: item.tam_ad ?? null
+    }))
+  );
+
+  return out.map((item) => ({ ...item, ad: labels.get(item.id) ?? item.ad }));
 }
 
 function extractErrorMessage(payload: unknown): string | null {

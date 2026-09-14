@@ -99,3 +99,113 @@ export function resetAppPickerOwner(): void {
   activeRoot = null;
   clearAppPickerBlur();
 }
+
+/* ==========================================================================
+   Panel geometrisi (canonical owner)
+   --------------------------------------------------------------------------
+   Tüm kanonik picker'lar (AppSelect, AppDatePicker) aynı ölçüm/konumlandırma
+   kontratını kullanır. Amaç:
+   - dikey: yer yoksa yukarı aç (data-placement), max-height + internal scroll
+   - yatay: panel viewport/modal sınırından sağa taşmaz; trigger genişliğinden
+     anlamsız fazla genişlemez
+   - mobile: ekran dışına çıkmaz
+   Pixel workaround ve picker başına CSS hack yoktur; değerler imperative
+   yazılır (JSX inline style kullanılmaz).
+   ========================================================================== */
+
+export type PickerPanelPlacement = "above" | "below";
+
+export const PICKER_PANEL_GAP = 6;
+export const PICKER_PANEL_MARGIN = 8;
+export const PICKER_PANEL_MAX_HEIGHT = 320;
+export const PICKER_PANEL_MIN_HEIGHT = 120;
+
+export type PickerVisibleClip = { top: number; bottom: number; left: number; right: number };
+
+function isClippingOverflow(value: string): boolean {
+  return /(auto|scroll|hidden)/.test(value);
+}
+
+/**
+ * Panelin yerleşebileceği görünür kutu: en yakın kırpıcı ata ∩ viewport.
+ * Yatay ve dikey aynı yürüyüşte hesaplanır.
+ */
+export function resolvePickerVisibleClip(root: HTMLElement): PickerVisibleClip {
+  const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 1024;
+  const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 800;
+  const clip: PickerVisibleClip = { top: 0, bottom: viewportHeight, left: 0, right: viewportWidth };
+  let node = root.parentElement;
+
+  while (node && node !== document.body) {
+    const style = window.getComputedStyle(node);
+    if (isClippingOverflow(style.overflowY) || isClippingOverflow(style.overflowX)) {
+      const rect = node.getBoundingClientRect();
+
+      return {
+        top: Math.max(rect.top, 0),
+        bottom: Math.min(rect.bottom, viewportHeight),
+        left: Math.max(rect.left, 0),
+        right: Math.min(rect.right, viewportWidth)
+      };
+    }
+
+    node = node.parentElement;
+  }
+
+  return clip;
+}
+
+export type PickerPanelGeometry = {
+  placement: PickerPanelPlacement;
+  maxHeight: number;
+  maxWidth: number;
+  width: number;
+  offsetLeft: number;
+};
+
+function clampNumber(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
+}
+
+/**
+ * Panel geometrisini ölçer. `root` = picker'ın konumlandırma referansı
+ * (`.app-select` / `.app-date-picker`).
+ */
+export function measurePickerPanel(root: HTMLElement, panel: HTMLElement): PickerPanelGeometry {
+  const rect = root.getBoundingClientRect();
+  const clip = resolvePickerVisibleClip(root);
+  const naturalHeight = panel.scrollHeight || 0;
+  const desiredHeight = clampNumber(naturalHeight || 260, PICKER_PANEL_MIN_HEIGHT, PICKER_PANEL_MAX_HEIGHT);
+  const spaceBelow = clip.bottom - rect.bottom - PICKER_PANEL_GAP - PICKER_PANEL_MARGIN;
+  const spaceAbove = rect.top - clip.top - PICKER_PANEL_GAP - PICKER_PANEL_MARGIN;
+  const placement: PickerPanelPlacement =
+    spaceBelow < Math.min(160, desiredHeight) && spaceAbove > spaceBelow ? "above" : "below";
+  const maxHeight = Math.max(
+    PICKER_PANEL_MIN_HEIGHT,
+    Math.min(PICKER_PANEL_MAX_HEIGHT, placement === "above" ? spaceAbove : spaceBelow)
+  );
+
+  const availableWidth = Math.max(0, clip.right - clip.left - PICKER_PANEL_MARGIN * 2);
+  const naturalWidth = Math.max(rect.width, panel.scrollWidth || 0);
+  const width = Math.max(0, Math.min(naturalWidth, availableWidth || naturalWidth));
+  // Tercih: trigger soluna hizalı. Sağ sınırı aşarsa sola kaydır, sol sınırı aşarsa geri clamp et.
+  const preferredLeft = rect.left;
+  const overflowRight = preferredLeft + width - (clip.right - PICKER_PANEL_MARGIN);
+  let offsetLeft = overflowRight > 0 ? -overflowRight : 0;
+  const minOffset = clip.left + PICKER_PANEL_MARGIN - preferredLeft;
+  offsetLeft = Math.max(offsetLeft, Math.min(0, minOffset));
+
+  return { placement, maxHeight, maxWidth: availableWidth, width, offsetLeft };
+}
+
+/** Geometriyi imperative uygular (JSX inline style yok). */
+export function applyPickerPanelGeometry(panel: HTMLElement, geometry: PickerPanelGeometry): void {
+  panel.style.maxHeight = `${geometry.maxHeight}px`;
+  panel.style.maxWidth = `${geometry.maxWidth}px`;
+  panel.style.right = "auto";
+
+  if (geometry.width > 0) {
+    panel.style.width = `${geometry.width}px`;
+    panel.style.left = `${geometry.offsetLeft}px`;
+  }
+}

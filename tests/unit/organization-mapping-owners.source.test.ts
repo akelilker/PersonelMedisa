@@ -108,9 +108,57 @@ describe('read-only organization inventory owner', () => {
   });
 
   it('limits personnel evidence to the explicit closeout allowlist', () => {
-    expect(inventoryOwner).toContain('WHERE p.id IN (200, 201, 203, 204, 205, 206, 209, 210, 212, 217)');
-    expect(inventoryOwner).toContain("'allowed_personnel' => self::allowedPersonnel($pdo)");
-    for (const field of ["'id' =>", "'ad' =>", "'soyad' =>", "'durum' =>", "'calisma_lokasyonu_id' =>", "'sube_id' =>", "'sirket_id' =>", "'sgk_isveren_id' =>"]) {
+    expect(inventoryOwner).toContain(
+      'private const REMEDIATION_PERSONNEL_IDS = [160, 200, 201, 203, 204, 205, 206, 209, 210, 211, 212, 217];',
+    );
+    expect(inventoryOwner).toContain('private const REMEDIATION_PERSONNEL_IDENTITIES = [');
+    for (const identity of [
+      "['Abdullah Omar', 'Muhammed']",
+      "['Ahmet', 'Kaçar']",
+      "['Aysun', 'Özdemir']",
+      "['Esat', 'Kaçar']",
+      "['Melih', 'Güler']",
+      "['Mustafa', 'Mahmud']",
+    ]) {
+      expect(inventoryOwner).toContain(identity);
+    }
+    expect(inventoryOwner).toContain("'allowed_personnel' => $personnelEvidence['rows']");
+    expect(inventoryOwner).toContain("'personnel_evidence' => $personnelEvidence['summary']");
+    // Membership comes from those two compiled keys only; the statement binds
+    // them instead of interpolating a caller value.
+    expect(inventoryOwner).toContain("WHERE p.id IN (' . $idPlaceholders . ')");
+    expect(inventoryOwner).toContain("OR (p.ad, p.soyad) IN (' . $identityTuplePlaceholders . ')");
+    expect(inventoryOwner).toContain('self::REMEDIATION_PERSONNEL_IDS,');
+    expect(inventoryOwner).toContain("LIMIT ' . self::PERSONNEL_EVIDENCE_ROW_LIMIT");
+    for (const field of [
+      "'id' =>",
+      "'ad' =>",
+      "'soyad' =>",
+      "'durum' =>",
+      "'calisan_kapsami' =>",
+      "'calisma_lokasyonu_id' =>",
+      "'calisma_lokasyonu_label' =>",
+      "'sube_id' =>",
+      "'sirket_id' =>",
+      "'sgk_isveren_id' =>",
+      "'sgk_isveren_label' =>",
+      "'personel_tipi_id' =>",
+      "'personel_tipi_label' =>",
+      "'departman_id' =>",
+      "'departman_label' =>",
+      "'bolum_id' =>",
+      "'bolum_label' =>",
+      "'birim_id' =>",
+      "'birim_label' =>",
+      "'gorev_unvan' =>",
+      "'pozisyon_id' =>",
+      "'pozisyon_label' =>",
+      "'bagli_amir_id' =>",
+      "'bagli_amir_user_id' =>",
+      "'bagli_amir_username' =>",
+      "'bagli_amir_personel_id' =>",
+      "'bagli_amir_ad_soyad' =>",
+    ]) {
       expect(inventoryOwner).toContain(field);
     }
     expect(inventoryOwner).not.toContain('sicil_no');
@@ -124,7 +172,11 @@ describe('read-only organization inventory owner', () => {
     expect(inventoryOwner).toContain('GROUP BY u.rol');
     expect(inventoryOwner).toContain("'user_sirket_total' =>");
     expect(inventoryOwner).toContain("'user_sgk_isveren_total' =>");
-    expect(inventoryOwner).toContain("'allowed_users' => self::allowedUsers($pdo)");
+    // Collected once and reused: the personnel evidence may only name a manager
+    // this allowlist already publishes.
+    expect(inventoryOwner).toContain('$allowedUsers = self::allowedUsers($pdo);');
+    expect(inventoryOwner).toContain("'allowed_users' => $allowedUsers,");
+    expect(inventoryOwner).toContain('self::allowedPersonnel($pdo, $allowedUsers)');
     expect(inventoryOwner).toContain("LOWER(u.username) = 'sedanurb'");
     expect(inventoryOwner).toContain("u.ad_soyad IN ('Sinem Hamaloğlu', 'Halil Şenay')");
     expect(inventoryOwner).toContain("LOWER(u.ad_soyad) LIKE '%kübra%'");
@@ -216,13 +268,79 @@ describe('read-only organization inventory owner', () => {
     expect(inventoryOwner).toContain('INVENTORY_PERSONNEL_MATRIX_COUNT_MISMATCH');
   });
 
-  it('publishes the extended contract as inventory schema version 4', () => {
-    expect(inventoryOwner).toContain("public const SCHEMA_VERSION = '4'");
+  it('publishes the extended contract as inventory schema version 5', () => {
+    expect(inventoryOwner).toContain("public const SCHEMA_VERSION = '5'");
     expect(inventoryOwner).toContain("'manager_evidence' => self::managerEvidence($pdo)");
     expect(inventoryOwner).toContain("'a1_policy_evidence' => self::a1PolicyEvidence($pdo)");
     expect(inventoryOwner).toContain("return ['exists' => false, 'row_count' => 0, 'rows' => []];");
     expect(inventoryOwner).toContain("'mahsup_mode' =>");
     expect(inventoryOwner).toContain("'policy_hash' =>");
+  });
+
+  it('keeps the personnel evidence fail-closed: id key, identity key and a violation guard', () => {
+    const evidenceBlock = inventoryOwner.slice(
+      inventoryOwner.indexOf('private static function allowedPersonnel('),
+      inventoryOwner.indexOf('private static function identityKey('),
+    );
+    expect(evidenceBlock.length).toBeGreaterThan(0);
+    // Deterministic, capped and read-only: a widened filter can never dump the
+    // personnel table into the artifact.
+    expect(evidenceBlock).toContain('ORDER BY p.id ASC');
+    expect(evidenceBlock).toContain("LIMIT ' . self::PERSONNEL_EVIDENCE_ROW_LIMIT");
+    // The database itself states that a returned row matched an allowlisted
+    // identity; a row it does not match is a boundary violation, not a row.
+    expect(evidenceBlock).toContain('AS identity_match');
+    expect(evidenceBlock).toContain('$violations[] = $rowId;');
+    expect(evidenceBlock).toContain('// Ambiguous or unattributable: reported above, never published.');
+    expect(inventoryOwner).toContain('REMEDIATION_PERSONNEL_ALLOWLIST_BOUNDARY_VIOLATION');
+    // No row is ever published from an identity that did not resolve exactly once.
+    expect(evidenceBlock).toContain("if (count($identityStates[$key]['matched_row_ids'] ?? []) !== 1) {");
+    expect(evidenceBlock).toContain(
+      "$resolution = $count === 1 ? 'RESOLVED' : ($count === 0 ? 'UNRESOLVED' : 'AMBIGUOUS');",
+    );
+    for (const field of [
+      "'available' => false",
+      "'id_allowlist' => self::REMEDIATION_PERSONNEL_IDS",
+      "'id_allowlist_missing_ids' => self::REMEDIATION_PERSONNEL_IDS",
+      "'identity_resolution' => []",
+      "'identity_matched_row_ids' => []",
+      "'identity_unattributed_row_ids' => []",
+      "'unresolved_identities' => []",
+      "'ambiguous_identities' => []",
+      "'boundary_violation_ids' => []",
+      "'evidence_complete' => false",
+      "'provenance' => $viaId ? 'id_allowlist' : 'identity_resolution',",
+    ]) {
+      expect(inventoryOwner).toContain(field);
+    }
+    // The new path is still structurally read-only.
+    for (const forbidden of [
+      /\bINSERT\s+INTO\b/i,
+      /\bUPDATE\s+[a-z_]+\s+SET\b/i,
+      /\bDELETE\s+FROM\b/i,
+      /\bTRUNCATE\b/i,
+    ]) {
+      expect(evidenceBlock).not.toMatch(forbidden);
+    }
+    expect(evidenceBlock).not.toContain('->exec(');
+    expect(evidenceBlock).not.toContain('beginTransaction');
+  });
+
+  it('binds bagli_amir_id to users.id and copies the manager identity from the user allowlist', () => {
+    expect(inventoryOwner).toContain('// Canonical semantics: bagli_amir_id is users.id, never a personnel id.');
+    expect(inventoryOwner).toContain("'bagli_amir_id' => $managerId,");
+    expect(inventoryOwner).toContain('$manager = $managerId === null ? null : ($usersById[$managerId] ?? null);');
+    expect(inventoryOwner).toContain('$usersById[$userId] = $user;');
+    expect(inventoryOwner).toContain("'bagli_amir_identity_published' => $manager !== null,");
+    // The manager identity is a copy of the user row this owner already
+    // publishes, so the personnel evidence opens no second user boundary.
+    expect(inventoryOwner).toContain("'ad_soyad' => (string) $row['ad_soyad'],");
+    expect(inventoryOwner).toContain(
+      "'bagli_amir_username' => $manager === null ? null : (string) $manager['username'],",
+    );
+    expect(inventoryOwner).toContain("'allowed_users' => $allowedUsers,");
+    // bagli_amir_id is a users.id: it is never resolved by joining personeller.
+    expect(inventoryOwner).not.toContain('JOIN personeller');
   });
 
   it('publishes the branch set classification in the workflow log summary', () => {

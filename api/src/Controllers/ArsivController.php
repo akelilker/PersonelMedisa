@@ -53,6 +53,9 @@ class ArsivController
             $where[] = 'p.sube_id IN (' . implode(', ', $placeholders) . ')';
         }
         PersonelSearchPredicate::append($where, $params, $search, 'p', 'search', $pdo);
+        // Archive search shares the canonical operational exclusion: a TEST_FIXTURE personel is
+        // never a user-facing archive record either (retention/audit owners keep their own reads).
+        PersonelArchiveGate::appendOperationalExclusion($pdo, $where);
 
         $whereSql = implode(' AND ', $where);
         $countStmt = $pdo->prepare("SELECT COUNT(*) AS total FROM personeller p WHERE $whereSql");
@@ -156,6 +159,12 @@ class ArsivController
         $stmt->execute(['id' => $personelId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$row) {
+            JsonResponse::notFound();
+        }
+
+        // Archive detail follows the archive list: a TEST_FIXTURE personel has no user-facing
+        // archive record. Retention/audit evidence stays readable through the retention owner.
+        if (PersonelArchiveGate::isOperationallyHidden($pdo, $personelId)) {
             JsonResponse::notFound();
         }
 

@@ -6,6 +6,7 @@ namespace Medisa\Api\Services\Retention;
 
 use DateTime;
 use Medisa\Api\Http\JsonResponse;
+use Medisa\Api\Services\Personel\TestFixturePersonelClassificationService;
 use PDO;
 use RuntimeException;
 
@@ -220,5 +221,39 @@ class PersonelArchiveGate
     public static function forceAktifUnlessArchiveView(array $user, $requestedAktiflik)
     {
         return self::effectiveListAktiflik($user, $requestedAktiflik);
+    }
+
+    /**
+     * Canonical operational read exclusion for personel queries.
+     *
+     * TEST_FIXTURE-classified personel (tombstoned or not) is not a real employee, so every
+     * user-facing personel read surface (aktif/pasif lists, archive search, counts, filter
+     * results, selection pools, exports, daily rosters) must exclude it here — one owner, one
+     * predicate — instead of patching individual screens. The predicate is AND-combined with the
+     * caller's existing `$where` list and never widens authorization.
+     *
+     * Retention/audit owners (retention imha, archive manifests, classification owner) read the
+     * row directly and intentionally stay unfiltered.
+     *
+     * @param list<string> $where
+     * @param mixed        $alias
+     */
+    public static function appendOperationalExclusion(PDO $pdo, array &$where, $alias = 'p')
+    {
+        $predicate = TestFixturePersonelClassificationService::sqlOperationalVisibilityExclusion($pdo, $alias);
+        if ($predicate !== null) {
+            $where[] = $predicate;
+        }
+    }
+
+    /**
+     * Detail-surface equivalent: a tombstoned / classified TEST_FIXTURE personel behaves as if it
+     * does not exist for normal personel detail access.
+     *
+     * @param mixed $personelId
+     */
+    public static function isOperationallyHidden(PDO $pdo, $personelId)
+    {
+        return TestFixturePersonelClassificationService::isOperationallyHidden($pdo, $personelId);
     }
 }

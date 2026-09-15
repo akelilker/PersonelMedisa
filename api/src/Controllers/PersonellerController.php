@@ -137,6 +137,9 @@ class PersonellerController
 
         $includeOrgNames = PersonelOrgStructureSchema::hasPersonelScopeColumns($pdo);
         PersonelSearchPredicate::append($where, $params, $search, 'p', 'search', $pdo, $includeOrgNames);
+        // TEST_FIXTURE personel is not a real employee: keep it out of the active/passive list,
+        // its counts and every filter result through the canonical retention/archive owner.
+        PersonelArchiveGate::appendOperationalExclusion($pdo, $where);
 
         $missingPredicate = PersonelCompletenessService::sqlHasMissingPredicate(
             'p',
@@ -323,6 +326,12 @@ class PersonellerController
         $stmt->execute(['id' => $personelId]);
         $exists = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$exists) {
+            JsonResponse::notFound();
+        }
+
+        // Normal personel detail access: a TEST_FIXTURE personel is not a user-facing record.
+        // Retention/audit owners read the row through their own owners, not through this surface.
+        if (PersonelArchiveGate::isOperationallyHidden($pdo, $personelId)) {
             JsonResponse::notFound();
         }
 

@@ -273,10 +273,11 @@ function normalizeYonetimSube(data: unknown): YonetimSube {
     throw new Error("Sube yaniti zorunlu alanlari icermiyor.");
   }
 
-  // SGK company filter (filterSgkIsverenOptionsForSube) reads sirket.id. Prefer
-  // the nested read-model relation; fall back to the flat sirket_id + sirket_ad
-  // projection so a şube whose sirket relation is missing still keeps its
-  // company link instead of silently yielding an empty SGK employer list.
+  // Şube listesi ve şirket bazlı görünüm şubenin kendi şirket bağına dayanır.
+  // Prefer the nested read-model relation; fall back to the flat sirket_id +
+  // sirket_ad projection so a şube whose sirket relation is missing still keeps
+  // its company link instead of silently dropping out of the company view.
+  // (Şube SGK işvereni seçimi bu bağdan bağımsızdır: sgk-isveren-options.ts.)
   const nestedSirket = normalizeOrgRelation(record.sirket);
   const flatSirketId = readNumber(record.sirket_id);
   const flatSirketAd = readString(record.sirket_ad ?? record.sirketAd);

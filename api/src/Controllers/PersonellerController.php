@@ -1831,7 +1831,7 @@ class PersonellerController
             ];
             if ($mapped['calisan_kapsami'] === PersonelCalisanKapsamService::DIS_KAYNAK) {
                 $mapped['info_only_notice'] =
-                    'DIŞ KAYNAK — BİLGİ AMAÇLIDIR / ÜCRET VE SGK TAHAKKUKU OLUŞTURMAZ';
+                    'HARİCİ PERSONEL — BİLGİ AMAÇLIDIR / ÜCRET VE SGK TAHAKKUKU OLUŞTURMAZ';
             }
         } catch (\Throwable $e) {
             $mapped['org_status'] = PersonelOperationalContextService::ORG_BAGLANTISIZ;

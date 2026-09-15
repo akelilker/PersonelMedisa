@@ -7,7 +7,7 @@ describe("SGK employer self-service: catalog CRUD, branch mapping and fail-close
     await ensureDisposableMariaDbEnv();
   }, 90_000);
 
-  it("owns the employer catalog and keeps every şube mapping company-consistent", () => {
+  it("owns the employer catalog and keeps every şube mapping on the active-employer rule", () => {
     const result = runPhpMysqlRunner(
       resolve(process.cwd(), "tests/php/SgkIsverenSelfServiceMysqlTestRunner.php")
     );
@@ -36,16 +36,15 @@ describe("SGK employer self-service: catalog CRUD, branch mapping and fail-close
       "update cannot unmap an employer from its company",
       // branch mapping
       "a pasif employer cannot be attached to a new branch",
-      "an employer without a company cannot be attached to a mapped branch",
-      "another company employer cannot be attached to this branch",
+      "another company employer can be attached to this branch",
+      "an employer without a company can be attached to a branch",
       "an unknown employer id is refused on branch create",
       "branch create persists subeler.sgk_isveren_id",
       "one employer can serve many branches",
       "branch update persists a changed employer",
       "an unchanged pasif mapping is preserved instead of silently rewritten",
       "branch update refuses an explicit switch to a pasif employer",
-      "branch update refuses a foreign-company employer",
-      "branch update refuses an employer without a company",
+      "branch update accepts another company employer",
       // company change fail-closed
       "moving an employer that company-1 branches point at is refused",
       "an unmapped employer can be bound to a company from the management screen",

@@ -201,7 +201,7 @@ final class PersonelImportReferenceCatalogService
             'kullanilabilir' => 'EVET',
             'eslesme_sayisi' => '1',
             'uyari_kodu' => '',
-            'aciklama' => 'Dış Kaynak / SGK Başka İşverende.',
+            'aciklama' => 'Harici Personel.',
         ];
 
         self::sortRows($legacyRows);

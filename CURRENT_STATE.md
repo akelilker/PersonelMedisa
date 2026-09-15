@@ -1,26 +1,30 @@
 CODE_MIGRATION_TIP: 088
 PRODUCTION_MIGRATION_TIP: 087
 PRODUCTION_MIGRATION_PENDING: 1
-PRODUCTION_DEPLOY_SHA: f5551160cab7d12b2086d7146c7822f4dfdb469d
-CODE_MAIN_SHA: f5551160cab7d12b2086d7146c7822f4dfdb469d
+PRODUCTION_DEPLOY_SHA: d96182a2a4b4cb5e9e6d7c867d3486d7ac4061b2
+CODE_MAIN_SHA: d96182a2a4b4cb5e9e6d7c867d3486d7ac4061b2
 
-# Live / code pin (2026-09-07 BUSINESS_TRUTH_AND_BRANCH_MANAGER_MODEL_LOCK — SELECT-only; mutation=0)
+# Live / code pin (2026-09-15 PERSONELMEDISA_FINAL_CLEANUP — SELECT-only; mutation=0)
 
-CODE_MAIN advancing through #275→#278. LIVE after #277 deploy: `f5551160`. PR274 recovery deploy PASS @ `63f8c905` earlier this sweep.
-HOSTING: RECOVERED (FTP/API healthy). Ordered merge/deploy sweep in progress.
+CODE_MAIN advanced #275→#301. LIVE after #301 deploy: `d96182a2` (Deploy cPanel run `34936838710` SUCCESS; `FINAL_SHA_GET=SUCCESS` parity; canlı bundle `index-DY8cYDBX.js` / `index-Dl13eR2G.css`; anonim `smoke:live` OK). Earlier live pins this sweep: `34b2fd30` (#300), `ef2c8db5` (#299), `eb8aa517`, `f5551160` (#277), `63f8c905` (PR274 recovery deploy).
+HOSTING: RECOVERED (FTP/API healthy). Ordered merge/deploy sweep CLOSED through #301 — kuyrukta merge/deploy yok.
 CODE tip **088** (`088_sube_sorumlu_yoneticiler.sql`); PRODUCTION tip **087**; pending **088**.
-PHASE: HOSTING_RECOVERY_TO_FULL_ORDERED_CLOSE_SWEEP
-APPLIED_THIS_TURN: NO
+PHASE: PERSONELMEDISA_FINAL_CLEANUP
+APPLIED_THIS_TURN: NO (docs/cleanup only)
 
 ## Hard-closed (do not reopen without new contradiction)
 
 PR_271: CLOSED
 PR_272: CLOSED
 PR_274: MERGED / CI PASS / DEPLOYED_RECOVERY (63f8c905); do not reopen code unless concrete regression
+PR_299: MERGED / CI PASS / DEPLOYED (ef2c8db5, run 34905632936) — multi-axis bulk preimage rebase; CLOSED, do not reopen
+PR_300: MERGED / CI PASS / DEPLOYED (34b2fd30, run 34934712615) — bagli amir context via users.personel_id; CLOSED, do not reopen
+PR_301: MERGED / CI PASS / DEPLOYED (d96182a2, run 34936838710) — bagli amir create-flow resolution via users.personel_id; CLOSED, do not reopen
+PERSONNEL_MASTER_DATA_REMEDIATION: APPLIED_14_OF_14 (dry-run + apply + readback PASS; plan artifact consumed, residual apply yok)
 MIGRATION_087: APPLIED
 MIGRATION_088: CODE_ONLY_PENDING (pending apply)
 PERSONNEL_202_208_HISTORICAL_EXIT: CLOSED_CONFIRMED
-A2_LOCATION_160_211: CLOSED (Sedanur Bulut / Zeynep Günal → calisma_lokasyonu_id=5 applied prior; reopen YOK)
+A2_LOCATION_160_211: APPLIED (Sedanur Bulut 160 / Zeynep Günal 211 → calisma_lokasyonu_id=5 + bagli_amir_id=110 under ef2c8db5 / PR #299; reopen YOK)
 MEDISA_WORK_LOCATION_CATALOG_MAPPING: APPLIED (7/7)
 MEDISA_APPROVED_USER_GRANTS: APPLIED
 KARYAPI_ROLLOUT: INTENTIONAL_DEFER
@@ -70,20 +74,30 @@ CANONICAL_MODEL_DOC: docs/guncel/141-business-truth-and-branch-manager-model-loc
 
 No rerun unless payload/preimage changes.
 
-## Physical work location business truth (NO APPLY)
+## Physical work location business truth (APPLIED — eski NO_APPLY notları uzlaştırıldı)
 
 TARGET_LOCATION: calisma_lokasyonu_id = 5 (Fabrika / Karabük)
-NO_APPLY_PREIMAGE: ops/organization-mapping/fabrika-karabuk-loc5-no-apply-preimage-plan.json
+STATUS: APPLIED — eski "NO APPLY / pending future apply + live preimage guard" ifadeleri ARTIK GEÇERSİZ (2026-09-14/15 apply kanıtı).
+HISTORICAL_NO_APPLY_PREIMAGE: ops/organization-mapping/fabrika-karabuk-loc5-no-apply-preimage-plan.json (tarihsel artifact; apply tamamlandı)
+APPLY_EVIDENCE: dry-run + apply + bağımsız readback PASS; plan artifact'i (untracked, production/business veri içeriyordu) cleanup kapsamında silindi.
 
-BUSINESS_TRUTH_RESOLVED / loc5 (pending future apply + live preimage guard):
-200, 201, 203, 204, 205, 206, 209, 210, 212, 217
+APPLIED_ROWS_14_OF_14: 143, 160, 173, 200, 201, 203, 204, 205, 206, 209, 210, 211, 213, 218
+- run-1 12 satır @ `eb8aa517` (Deploy run 34889636597); residual 160/211 @ `ef2c8db5` (PR #299 deploy); failure_count 0
+- 160 Sedanur Bulut: calisma_lokasyonu_id null → 5, bagli_amir_id null → 110, birim_id null → 24
+- 211 Zeynep Günal: calisma_lokasyonu_id null → 5, bagli_amir_id 10 → 110, birim_id → 'İnsan Kaynakları' (RESOLVED_EXISTING)
+- 210 FAHRİ TAYLAN MERCAN: calisma_lokasyonu_id 5 → 3 (İstanbul) — eski listedeki "210 → loc5 bekliyor" ifadesi YANLIŞTI
+- 203 / 205 / 206 / 209: yalnız org alanları (departman/bolum/birim/gorev) — loc5 hedefi yoktu
+- 143 / 213: calisan_kapsami IC_PERSONEL → DIS_KAYNAK (org/lokasyon değişimi yok; 213 sgk_isveren_id 1 DO_NOT_TOUCH)
 
-CLOSED_DO_NOT_REOPEN:
-160 Sedanur Bulut → loc5
-211 Zeynep Günal → loc5
+CLOSED_DO_NOT_REOPEN (artık "pending apply" değil, APPLIED):
+160 Sedanur Bulut → loc5 (APPLIED @ ef2c8db5)
+211 Zeynep Günal → loc5 (APPLIED @ ef2c8db5)
 
-NAME_CORRECTION_203 (NO APPLY): wrong display known MUHAMMED IRAKLI → Muhammed Mahmud
-Schema fields only: personeller.ad / personeller.soyad (ad="Muhammed", soyad="Mahmud")
+NOT_APPLIED_BY_DESIGN: 212 (İlker AKEL), 217 (Görkem Vural) — truth dışı bulgu, dokunulmadı
+NO_OP_NO_MUTATION: 214, 215, 216 (target = mevcut durum)
+
+NAME_CORRECTION_203 (hâlâ PLAN_ONLY_NO_APPLY): kayıtlı görünen ad MUHAMMED IRAKLI → hedef Muhammed Mahmud
+Schema fields only: personeller.ad / personeller.soyad (ad="Muhammed", soyad="Mahmud"); master-data paketinde 203 için yalnız org alanları apply edildi, ad/soyad mutasyonu yapılmadı
 Plan: ops/organization-mapping/personel-203-name-correction-no-apply.json
 
 ## Branch manager — canonical product rule (LOCKED)
@@ -125,15 +139,16 @@ NO_APPLY_ASSIGNMENT_PLAN: ops/organization-mapping/branch-manager-assignment-no-
 temporary/central manager uses the same canonical managed-branch assignment model if assigned.
 Do not create fake local personnel transfer. Do not force a local manager.
 
-## Residuals after business-truth lock
+## Residuals after business-truth lock (2026-09-15 güncel)
 
-LOCATION_TARGETS_LOCKED_NO_APPLY: 200/201/203/204/205/206/209/210/212/217
-CLOSED_DO_NOT_REOPEN: 160/211 (+ 202/208 historical exit)
+PERSONNEL_MASTER_DATA_REMEDIATION: APPLIED_14_OF_14 — CLOSED (143/160/173/200/201/203/204/205/206/209/210/211/213/218)
+LOCATION_TARGETS: APPLIED (200/201/203/204/205/206/209 reconciled; 210 → loc3 İstanbul; 212/217 NOT_APPLIED_BY_DESIGN; 214/215/216 NO-OP)
+CLOSED_DO_NOT_REOPEN: 160/211 (APPLIED @ ef2c8db5 / PR #299) + 202/208 historical exit
 CROSS_COMPANY_SEMANTICALLY_VALID_DEFER: 120 / 158 / 219
 KAYSERI_MANAGER_IDENTITY: BUSINESS_IDENTITY_DECISION_REQUIRED (Kübra surname unresolved)
 SINEM_LIVE_ACCOUNT: VERIFY_LIVE_REQUIRED
 HALIL_LIVE_MANAGED_BRANCHES: VERIFY_LIVE_REQUIRED
-NULL_LOCATION_HR_OTHER: do not force loc5 unless explicitly covered; refresh RO after host recovery
+NULL_LOCATION_HR_OTHER: do not force loc5 unless explicitly covered; hosting RECOVERED (2026-09-15) — gerekirse RO refresh
 PERSONNEL_DECISION_PACK: ops/organization-mapping/personnel-residual-decision-pack.json
 
 ## FK / integrity (last authoritative RO inventory; not re-probed this turn)
@@ -141,6 +156,6 @@ PERSONNEL_DECISION_PACK: ops/organization-mapping/personnel-residual-decision-pa
 FK_REFERENCE_INTEGRITY: PASS (all INVALID_REF=0 at inventory `34057486092` / related probes)
 TECHNICAL_ANA_SISTEM: KAPALI
 BUG_COUNT: 0
-PRODUCTION_MUTATION_THIS_PIN: 0
-DEPLOY: NONE
-NEXT_GATE: HOSTING_RECOVERY_THEN_LIVE_PREIMAGE_VERIFY_AND_USER_APPROVED_APPLY
+PRODUCTION_MUTATION_THIS_PIN: 0 (bu pin turu docs/cleanup only)
+DEPLOY: d96182a2a4b4cb5e9e6d7c867d3486d7ac4061b2 (PR #301 otomatik deploy, Deploy run 34936838710 SUCCESS; deployed SHA == merge SHA)
+NEXT_GATE: personnel/master-data remediation için AÇIK GATE YOK (#299/#300/#301 CLOSED); kalan açık işler A1 SGK (BUSINESS_LOCKED) ve identity doğrulamaları

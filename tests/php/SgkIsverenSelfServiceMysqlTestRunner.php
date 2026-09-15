@@ -522,12 +522,26 @@ try {
 
     // --------------------------------------------- company change fail-closed
 
-    sgkSelfRefuses(
-        static function () use ($pdo, $ids): void {
-            OrganizasyonService::updateSgkIsveren($pdo, $ids['bursa'], ['sirket_id' => $ids['senay']]);
-        },
-        'SGK_ISVEREN_SIRKET_CHANGE_BLOCKED',
-        'moving an employer that company-1 branches point at is refused'
+    // 2026-09-15 model: cross-company şube eşleşmesi artık bir employer şirket
+    // değişikliğini bloke etmez; yalnız IC personel bağı fail-closed kalır.
+    $branchBound = OrganizasyonService::createSgkIsveren($pdo, [
+        'sirket_id' => $ids['medisa'],
+        'kod' => 'MED-BND',
+        'ad' => 'Medisa Sube Bagli',
+    ]);
+    $branchBoundId = (int) $branchBound['id'];
+    $boundBranch = OrganizasyonService::createSube($pdo, [
+        'kod' => 'MED-BND-SB',
+        'ad' => 'Bagli Sgk',
+        'departman_ids' => [],
+        'sgk_isveren_id' => $branchBoundId,
+    ], $ids['medisa']);
+    $boundBranchId = (int) $boundBranch['id'];
+    $branchRemapped = OrganizasyonService::updateSgkIsveren($pdo, $branchBoundId, ['sirket_id' => $ids['senay']]);
+    sgkSelfAssert(
+        $branchRemapped['sirket']['id'] === $ids['senay']
+            && (int) sgkSelfSubeRow($pdo, $boundBranchId)['sgk_isveren_id'] === $branchBoundId,
+        'a branch pointing at the employer does not block an employer company change'
     );
 
     $unmappedMapped = OrganizasyonService::updateSgkIsveren($pdo, $ids['unmapped'], ['sirket_id' => $ids['senay']]);

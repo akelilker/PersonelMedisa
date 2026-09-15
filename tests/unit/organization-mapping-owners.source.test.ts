@@ -221,10 +221,12 @@ describe('read-only organization inventory owner', () => {
       'BRANCH_CREATE_AUDIT_UNREADABLE',
       'BRANCH_SET_NOT_PROVABLE',
       'DOCUMENTED_BRANCH_IDS_MISSING',
-      'BRANCH_SGK_COMPANY_MISMATCH',
     ]) {
       expect(inventoryOwner).toContain(blocker);
     }
+    // 2026-09-15 model: şube şirketi ile SGK işvereninin şirketi farklı olabilir,
+    // bu yüzden cross-company eşleşme inventory blocker'ı değildir.
+    expect(inventoryOwner).not.toContain('BRANCH_SGK_COMPANY_MISMATCH');
   });
 
   it('publishes the anonymous location x branch personnel matrix', () => {
@@ -268,7 +270,7 @@ describe('read-only organization inventory owner', () => {
   });
 
   it('publishes the extended contract as inventory schema version 5', () => {
-    expect(inventoryOwner).toContain("public const SCHEMA_VERSION = '5'");
+    expect(inventoryOwner).toContain("public const SCHEMA_VERSION = '6'");
     expect(inventoryOwner).toContain("'manager_evidence' => self::managerEvidence($pdo)");
     expect(inventoryOwner).toContain("'a1_policy_evidence' => self::a1PolicyEvidence($pdo)");
     expect(inventoryOwner).toContain("return ['exists' => false, 'row_count' => 0, 'rows' => []];");
@@ -427,9 +429,10 @@ describe('mapping spec owner', () => {
     expect(specOwner).toContain('SPEC_BRANCH_MAPPING_UNEXPECTED');
   });
 
-  it('keeps branch and payroll company decisions consistent', () => {
+  it('decides every payroll employer without tying it to the branch company', () => {
     expect(specOwner).toContain('SPEC_SGK_MAPPING_INCOMPLETE');
-    expect(specOwner).toContain('SPEC_BRANCH_SGK_COMPANY_CONFLICT');
+    // 2026-09-15 model: şube şirketi ile SGK işvereninin şirketi farklı olabilir.
+    expect(specOwner).not.toContain('SPEC_BRANCH_SGK_COMPANY_CONFLICT');
   });
 
   it('supports a deferred, explicitly unresolved work location', () => {
@@ -544,10 +547,11 @@ describe('operations-only initial mapping owner', () => {
       'MAPPING_POST_SGK_UNMAPPED',
       'MAPPING_POST_LOCATION_UNMAPPED',
       'MAPPING_POST_ROW_COUNT_CHANGED',
-      'MAPPING_POST_BRANCH_SGK_MISMATCH',
     ]) {
       expect(mappingOwner).toContain(reason);
     }
+    // 2026-09-15 model: cross-company şube/SGK eşleşmesi postcondition değildir.
+    expect(mappingOwner).not.toContain('MAPPING_POST_BRANCH_SGK_MISMATCH');
   });
 
   it('cannot start without verified backup evidence', () => {
@@ -558,9 +562,10 @@ describe('operations-only initial mapping owner', () => {
     expect(applyBody.indexOf('assertBackupEvidence')).toBeLessThan(applyBody.indexOf('beginTransaction'));
   });
 
-  it('proves readiness and the zero mismatch count in the postcheck', () => {
+  it('proves readiness in the postcheck without a branch/payroll mismatch verdict', () => {
     expect(mappingOwner).toContain("'data_ready' => (bool) \$readiness['data_ready']");
-    expect(mappingOwner).toContain('sube_sgk_sirket_mismatch_count');
+    expect(mappingOwner).toContain("'blocker_count' => count(");
+    expect(mappingOwner).not.toContain('sube_sgk_sirket_mismatch_count');
     expect(mappingOwner).toContain("'unexpected_deltas' =>");
     expect(mappingOwner).toContain("'backup_reference' =>");
   });

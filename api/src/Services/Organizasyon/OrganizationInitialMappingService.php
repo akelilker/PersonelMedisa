@@ -274,7 +274,6 @@ final class OrganizationInitialMappingService
                 'data_ready' => (bool) $readiness['data_ready'],
                 'blocker_count' => count($readiness['blockers']),
                 'blockers' => $readiness['blockers'],
-                'sube_sgk_sirket_mismatch_count' => (int) $readiness['counts']['sube_sgk_sirket_mismatch_count'],
             ],
             'unexpected_deltas' => array_values(array_unique($unexpected)),
             'backup_reference' => [
@@ -741,20 +740,12 @@ final class OrganizationInitialMappingService
         if ($unmappedSgk !== 0) {
             throw OrganizationMappingFailure::of('MAPPING_POST_SGK_UNMAPPED_PRESENT');
         }
-        $mismatch = self::scalar(
-            $pdo,
-            'SELECT COUNT(*) FROM subeler s
-             INNER JOIN sgk_isverenler e ON e.id = s.sgk_isveren_id
-             WHERE s.sirket_id IS NOT NULL AND e.sirket_id IS NOT NULL AND e.sirket_id <> s.sirket_id'
-        );
-        if ($mismatch !== 0) {
-            throw OrganizationMappingFailure::of('MAPPING_POST_BRANCH_SGK_MISMATCH');
-        }
+        // 2026-09-15 model: şube şirketi ile SGK işvereninin şirketi farklı
+        // olabilir, bu yüzden cross-company eşleşme bir postcondition değildir.
 
         return [
             'unmapped_sube_count' => $unmappedBranches,
             'unmapped_sgk_isveren_count' => $unmappedSgk,
-            'sube_sgk_sirket_mismatch_count' => $mismatch,
             'row_counts' => $rowCounts,
         ];
     }

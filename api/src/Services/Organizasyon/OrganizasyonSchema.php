@@ -90,7 +90,6 @@ final class OrganizasyonSchema
             'unmapped_sgk_isveren_count' => 0,
             'orphan_sube_sirket_count' => 0,
             'orphan_lokasyon_sube_count' => 0,
-            'sube_sgk_sirket_mismatch_count' => 0,
         ];
 
         if ($schemaReady) {
@@ -115,16 +114,10 @@ final class OrganizasyonSchema
                  WHERE l.sube_id IS NOT NULL
                    AND NOT EXISTS (SELECT 1 FROM subeler s WHERE s.id = l.sube_id)'
             );
-            // A branch and its payroll employer must belong to the same company.
-            $counts['sube_sgk_sirket_mismatch_count'] = self::count(
-                $pdo,
-                'SELECT COUNT(*) FROM subeler s
-                 INNER JOIN sgk_isverenler e ON e.id = s.sgk_isveren_id
-                 WHERE s.sirket_id IS NOT NULL
-                   AND e.sirket_id IS NOT NULL
-                   AND e.sirket_id <> s.sirket_id'
-            );
-
+            // 2026-09-15 model: şube şirketi ile SGK işvereninin şirketi farklı
+            // olabilir, bu yüzden cross-company eşleşme burada sayılmaz ve
+            // blocker üretmez. Şube SGK kaynağı yalnız aktif-employer kuralına
+            // tabidir (OrganizasyonService::assertSgkIsverenConsistent).
             if ($counts['sirket_count'] === 0) {
                 $blockers[] = 'SIRKET_KAYDI_YOK';
             }
@@ -139,9 +132,6 @@ final class OrganizasyonSchema
             }
             if ($counts['orphan_lokasyon_sube_count'] > 0) {
                 $blockers[] = 'LOKASYON_SUBE_ORPHAN';
-            }
-            if ($counts['sube_sgk_sirket_mismatch_count'] > 0) {
-                $blockers[] = 'SUBE_SGK_SIRKET_MISMATCH';
             }
         }
 

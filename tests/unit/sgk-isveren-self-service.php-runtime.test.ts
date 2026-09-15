@@ -46,7 +46,7 @@ describe("SGK employer self-service: catalog CRUD, branch mapping and fail-close
       "branch update refuses an explicit switch to a pasif employer",
       "branch update accepts another company employer",
       // company change fail-closed
-      "moving an employer that company-1 branches point at is refused",
+      "a branch pointing at the employer does not block an employer company change",
       "an unmapped employer can be bound to a company from the management screen",
       "an unreferenced employer can be re-mapped to another company",
       "a company change that would desync a stored personnel relation is refused",

@@ -535,8 +535,7 @@ export async function fetchOrganizasyonReadiness(): Promise<OrganizasyonReadines
       unmapped_sube_count: readNumber(counts.unmapped_sube_count) ?? 0,
       unmapped_sgk_isveren_count: readNumber(counts.unmapped_sgk_isveren_count) ?? 0,
       orphan_sube_sirket_count: readNumber(counts.orphan_sube_sirket_count) ?? 0,
-      orphan_lokasyon_sube_count: readNumber(counts.orphan_lokasyon_sube_count) ?? 0,
-      sube_sgk_sirket_mismatch_count: readNumber(counts.sube_sgk_sirket_mismatch_count) ?? 0
+      orphan_lokasyon_sube_count: readNumber(counts.orphan_lokasyon_sube_count) ?? 0
     },
     blockers: Array.isArray(record.blockers)
       ? record.blockers.map((item) => readString(item)).filter((item): item is string => typeof item === "string")

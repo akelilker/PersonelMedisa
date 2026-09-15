@@ -216,7 +216,6 @@ export type OrganizasyonReadiness = {
     unmapped_sgk_isveren_count: number;
     orphan_sube_sirket_count: number;
     orphan_lokasyon_sube_count: number;
-    sube_sgk_sirket_mismatch_count: number;
   };
   blockers: string[];
 };

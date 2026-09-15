@@ -1110,13 +1110,15 @@ final class OrganizasyonService
 
     /**
      * Fail closed when moving an employer to another company would break an
-     * already-stored relation: a branch of company Y, and an IC_PERSONEL row of a
-     * company-Y branch, both contradict the new company X.
+     * already-stored relation: an IC_PERSONEL row of a company-Y branch
+     * contradicts the new company X.
      *
-     * DIS_KAYNAK is deliberately excluded: the payroll/SGK source of a Harici
-     * personel is an independent axis from its branch company (employment-scope
-     * model, 2026-09-13), so a Harici row never freezes an employer's company
-     * mapping. Without the scope axis (pre-066) every row still counts, which
+     * Şube tarafı bilinçli olarak kapsam dışıdır: şube şirketi ile
+     * `sgk_isveren.sirket_id` farklı olabilir (2026-09-15 model), bu yüzden
+     * cross-company eşleşen şubeler bir employer şirket değişikliğini bloke
+     * etmez. DIS_KAYNAK da dışarıdadır: Harici personelin SGK kaynağı şube
+     * şirketinden bağımsız bir eksendir (2026-09-13 employment-scope modeli).
+     * Without the scope axis (pre-066) every personnel row still counts, which
      * keeps the older schema fail-closed.
      */
     private static function assertSgkIsverenSirketChangeSafe(PDO $pdo, int $sgkIsverenId, int $newSirketId): void
@@ -1124,13 +1126,6 @@ final class OrganizasyonService
         if (!OrganizasyonSchema::hasColumn($pdo, 'subeler', 'sirket_id')) {
             return;
         }
-
-        $mismatchedBranches = self::countWhere(
-            $pdo,
-            'SELECT COUNT(*) FROM subeler
-             WHERE sgk_isveren_id = :id AND sirket_id IS NOT NULL AND sirket_id <> :sirket_id',
-            ['id' => $sgkIsverenId, 'sirket_id' => $newSirketId]
-        );
 
         $mismatchedPersonel = 0;
         if (OrganizasyonSchema::hasColumn($pdo, 'personeller', 'sgk_isveren_id')) {
@@ -1147,11 +1142,11 @@ final class OrganizasyonService
             );
         }
 
-        if ($mismatchedBranches > 0 || $mismatchedPersonel > 0) {
+        if ($mismatchedPersonel > 0) {
             throw OrganizasyonException::conflict(
                 'SGK_ISVEREN_SIRKET_CHANGE_BLOCKED',
-                'Bu SGK işverenine bağlı şube veya personel kayıtları seçilen şirkete ait değil. '
-                . 'Şirket değişikliği mevcut şirket tutarlılığını bozacağı için reddedildi.'
+                'Bu SGK işverenine bağlı iç personel kayıtları seçilen şirkete ait değil. '
+                . 'Şirket değişikliği mevcut iç personel şirket tutarlılığını bozacağı için reddedildi.'
             );
         }
     }

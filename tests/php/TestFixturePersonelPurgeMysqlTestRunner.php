@@ -15,6 +15,7 @@ use Medisa\Api\Services\Personel\PersonelValidationException;
 use Medisa\Api\Services\Personel\TestFixturePersonelArchiveException;
 use Medisa\Api\Services\Personel\TestFixturePersonelClassificationService;
 use Medisa\Api\Services\Personel\TestFixturePersonelPurgeService;
+use Medisa\Api\Services\Retention\PersonelArchiveGate;
 use Medisa\Api\Services\Retention\RetentionCategories;
 
 function tfpAssert(bool $ok, string $name): void
@@ -458,9 +459,153 @@ try {
         'payroll snapshot blocker is sealed ledger owned by snapshot service (BORDRO)'
     );
 
+    // --- Retention-safe tombstone (de-identify, no hard delete) ------------------------------
+    $tomb = tfpInsertPersonel($pdo, '10000000015', 'TMB-1');
+    tfpClassify($pdo, $tomb, $gy);
+    $pdo->exec(
+        "INSERT INTO puantaj_aylik_muhur_satirlari (muhur_id, personel_id, tarih)
+         VALUES ({$muhurId}, {$tomb}, '2026-08-16')"
+    );
+    $pdo->exec(
+        "INSERT INTO maas_hesaplama_personel_snapshotlari (donem_snapshot_id, personel_id) VALUES (12, {$tomb})"
+    );
+
+    $tombDry = TestFixturePersonelPurgeService::tombstone($pdo, $tomb, $gy, true, null);
+    tfpAssert(($tombDry['status'] ?? '') === 'DRY_RUN', 'tombstone dry-run status DRY_RUN');
+    tfpAssert(
+        ($tombDry['executed'] ?? true) === false
+        && ($tombDry['hard_delete'] ?? true) === false
+        && ($tombDry['rows_deleted'] ?? 1) === 0,
+        'tombstone dry-run deletes nothing'
+    );
+    tfpAssert(
+        (int) $pdo->query("SELECT COUNT(*) FROM personeller WHERE id = {$tomb} AND ad = 'Fixture'")->fetchColumn() === 1,
+        'tombstone dry-run keeps PII preimage'
+    );
+
+    $deniedTombConfirm = false;
+    try {
+        TestFixturePersonelPurgeService::tombstone($pdo, $tomb, $gy, false, TestFixturePersonelPurgeService::CONFIRM_TOKEN);
+    } catch (TestFixturePersonelArchiveException $e) {
+        $deniedTombConfirm = $e->getErrorCode() === TestFixturePersonelPurgeService::CODE_TOMBSTONE_CONFIRM_REQUIRED;
+    }
+    tfpAssert($deniedTombConfirm, 'tombstone with hard-purge confirm token DENY');
+
+    $deniedTombReal = false;
+    try {
+        TestFixturePersonelPurgeService::tombstone(
+            $pdo,
+            $real,
+            $gy,
+            false,
+            TestFixturePersonelPurgeService::CONFIRM_TOKEN_TOMBSTONE
+        );
+    } catch (TestFixturePersonelArchiveException $e) {
+        $deniedTombReal = $e->getErrorCode() === TestFixturePersonelPurgeService::CODE_REAL_EMPLOYEE;
+    }
+    tfpAssert($deniedTombReal, 'real personel tombstone DENY');
+
+    $tombDone = TestFixturePersonelPurgeService::tombstone(
+        $pdo,
+        $tomb,
+        $gy,
+        false,
+        TestFixturePersonelPurgeService::CONFIRM_TOKEN_TOMBSTONE
+    );
+    tfpAssert(
+        ($tombDone['status'] ?? '') === TestFixturePersonelPurgeService::STATUS_TOMBSTONED,
+        'tombstone executes for classified fixture'
+    );
+    $tombRow = $pdo->query(
+        'SELECT ad, soyad, tc_kimlik_no, sicil_no, aktif_durum FROM personeller WHERE id = ' . $tomb
+    )->fetch(PDO::FETCH_ASSOC);
+    tfpAssert(
+        is_array($tombRow)
+        && $tombRow['ad'] === 'DESTROYED'
+        && $tombRow['soyad'] === 'PERSONEL'
+        && $tombRow['tc_kimlik_no'] === '9' . str_pad((string) $tomb, 10, '0', STR_PAD_LEFT)
+        && $tombRow['sicil_no'] === 'D-' . $tomb
+        && strtoupper((string) $tombRow['aktif_durum']) === 'PASIF',
+        'tombstone de-identifies PII and forces PASIF'
+    );
+    tfpAssert(
+        (int) $pdo->query('SELECT COUNT(*) FROM personeller WHERE id = ' . $tomb)->fetchColumn() === 1,
+        'tombstone keeps the personel row (no hard delete)'
+    );
+    tfpAssert(
+        (int) $pdo->query(
+            "SELECT COUNT(*) FROM personel_test_fixture_siniflandirmalari WHERE personel_id = {$tomb} AND state = 'AKTIF'"
+        )->fetchColumn() === 1,
+        'classification evidence stays AKTIF after tombstone'
+    );
+    tfpAssert(
+        (int) $pdo->query(
+            "SELECT COUNT(*) FROM personel_test_fixture_archive_kayitlari
+             WHERE personel_id = {$tomb} AND lifecycle_type = 'TEST_FIXTURE_TOMBSTONE'"
+        )->fetchColumn() === 1,
+        'tombstone writes id-preserving lifecycle evidence'
+    );
+    tfpAssert(
+        (int) $pdo->query('SELECT COUNT(*) FROM puantaj_aylik_muhur_satirlari WHERE personel_id = ' . $tomb)->fetchColumn() === 1
+        && (int) $pdo->query('SELECT COUNT(*) FROM maas_hesaplama_personel_snapshotlari WHERE personel_id = ' . $tomb)->fetchColumn() === 1,
+        'sealed puantaj + payroll snapshot evidence preserved'
+    );
+
+    $tombAgain = TestFixturePersonelPurgeService::tombstone(
+        $pdo,
+        $tomb,
+        $gy,
+        false,
+        TestFixturePersonelPurgeService::CONFIRM_TOKEN_TOMBSTONE
+    );
+    tfpAssert(($tombAgain['status'] ?? '') === 'ALREADY_TOMBSTONED', 'tombstone is idempotent');
+    tfpAssert(
+        (int) $pdo->query(
+            "SELECT COUNT(*) FROM personel_test_fixture_archive_kayitlari
+             WHERE personel_id = {$tomb} AND lifecycle_type = 'TEST_FIXTURE_TOMBSTONE'"
+        )->fetchColumn() === 1,
+        'repeated tombstone does not duplicate evidence'
+    );
+
+    // --- Canonical operational read exclusion (list / archive / count / detail) ---------------
+    $listWhere = [];
+    PersonelArchiveGate::appendOperationalExclusion($pdo, $listWhere);
+    $listSql = 'SELECT COUNT(*) FROM personeller p WHERE ' . implode(' AND ', $listWhere);
+    tfpAssert((int) $pdo->query($listSql)->fetchColumn() > 0, 'operational list still returns real personel');
+    tfpAssert(
+        (int) $pdo->query($listSql . ' AND p.id = ' . $tomb)->fetchColumn() === 0,
+        'tombstoned fixture missing from operational list/count'
+    );
+    tfpAssert(
+        (int) $pdo->query($listSql . ' AND p.id = ' . $real)->fetchColumn() === 1,
+        'real personel NOT excluded from operational surfaces'
+    );
+    tfpAssert(
+        (int) $pdo->query($listSql . ' AND p.id = ' . $unclassified)->fetchColumn() === 1,
+        'unclassified personel NOT excluded from operational surfaces'
+    );
+
+    $archiveWhere = ["p.aktif_durum = 'PASIF'"];
+    PersonelArchiveGate::appendOperationalExclusion($pdo, $archiveWhere);
+    $archiveSql = 'SELECT COUNT(*) FROM personeller p WHERE ' . implode(' AND ', $archiveWhere);
+    tfpAssert(
+        (int) $pdo->query($archiveSql . ' AND p.id = ' . $tomb)->fetchColumn() === 0,
+        'tombstoned fixture missing from archive search'
+    );
+    tfpAssert(
+        PersonelArchiveGate::isOperationallyHidden($pdo, $tomb) === true
+        && PersonelArchiveGate::isOperationallyHidden($pdo, $real) === false,
+        'detail exclusion applies to fixture only'
+    );
+
     $svc = (string) file_get_contents(__DIR__ . '/../../api/src/Services/Personel/TestFixturePersonelPurgeService.php');
     tfpAssert(strpos($svc, 'personel_id === 1') === false, 'no hardcoded personel id');
     tfpAssert(strpos($svc, 'DELETE FROM personeller') !== false, 'personel delete only inside fixture purge owner');
+    tfpAssert(
+        strpos($svc, 'PersonelOzlukDestructionHandler::tombstonePersonelIdentity') !== false,
+        'tombstone reuses canonical PERSONEL_OZLUK de-identify primitive'
+    );
+    tfpAssert(strpos($svc, "'hard_delete' => false") !== false, 'tombstone never claims a delete');
 
     echo 'verify-test-fixture-personel-purge-mysql: OK' . PHP_EOL;
 } finally {

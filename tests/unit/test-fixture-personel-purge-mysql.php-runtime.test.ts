@@ -69,6 +69,58 @@ describe("test fixture personel purge owner", () => {
     expect(validatorSrc).toContain("CREATE_PASIF_FORBIDDEN");
     expect(validatorSrc).toContain("requireCreateAktifDurum");
     expect(incompleteSrc).toContain("requireCreateAktifDurum");
+    // Retention-safe tombstone mode (de-identify, no hard delete) on the same owner.
+    expect(purgeSrc).toContain("TOMBSTONE_TEST_FIXTURE");
+    expect(purgeSrc).toContain("MODE_RETENTION_SAFE_TOMBSTONE");
+    expect(purgeSrc).toContain("TEST_FIXTURE_TOMBSTONE");
+    expect(purgeSrc).toContain("PersonelOzlukDestructionHandler::tombstonePersonelIdentity");
+    expect(purgeSrc).toContain("'hard_delete' => false");
+    expect(controllerSrc).toContain("resolveMode");
+    expect(controllerSrc).toContain("retention_safe_tombstone");
+    expect(controllerSrc).toContain("TestFixturePersonelPurgeService::tombstone(");
+  });
+
+  it("keeps the operational read exclusion in one canonical owner", () => {
+    const destructiveSrc = readFileSync(
+      resolve(root, "api/src/Services/Retention/PhysicalDestruction/Handlers/PersonelOzlukDestructionHandler.php"),
+      "utf8",
+    );
+    const classificationSrc = readFileSync(
+      resolve(root, "api/src/Services/Personel/TestFixturePersonelClassificationService.php"),
+      "utf8",
+    );
+    const archiveGateSrc = readFileSync(
+      resolve(root, "api/src/Services/Retention/PersonelArchiveGate.php"),
+      "utf8",
+    );
+    const personellerSrc = readFileSync(
+      resolve(root, "api/src/Controllers/PersonellerController.php"),
+      "utf8",
+    );
+    const arsivSrc = readFileSync(resolve(root, "api/src/Controllers/ArsivController.php"), "utf8");
+    const exportSrc = readFileSync(
+      resolve(root, "api/src/Services/Personel/PersonelExportService.php"),
+      "utf8",
+    );
+
+    // Canonical PERSONEL_OZLUK de-identify primitive is shared, not duplicated.
+    expect(destructiveSrc).toContain("public static function tombstonePersonelIdentity");
+    expect(destructiveSrc).toContain("self::tombstonePersonelIdentity($pdo, $personelId)");
+    expect(classificationSrc).toContain("sqlOperationalVisibilityExclusion");
+    expect(classificationSrc).toContain("isOperationallyHidden");
+    expect(archiveGateSrc).toContain("appendOperationalExclusion");
+
+    // Read surfaces call the single owner; only that owner knows the classification table.
+    expect(personellerSrc).toContain("PersonelArchiveGate::appendOperationalExclusion($pdo, $where)");
+    expect(personellerSrc).toContain("PersonelArchiveGate::isOperationallyHidden($pdo, $personelId)");
+    expect(arsivSrc).toContain("PersonelArchiveGate::appendOperationalExclusion($pdo, $where)");
+    expect(arsivSrc).toContain("PersonelArchiveGate::isOperationallyHidden($pdo, $personelId)");
+    expect(exportSrc).toContain("PersonelArchiveGate::appendOperationalExclusion($pdo, $where)");
+    expect(personellerSrc).not.toContain("personel_test_fixture_siniflandirmalari");
+    expect(arsivSrc).not.toContain("personel_test_fixture_siniflandirmalari");
+    expect(exportSrc).not.toContain("personel_test_fixture_siniflandirmalari");
+    // Retention/audit read owners stay unfiltered by design.
+    expect(destructiveSrc).not.toContain("appendOperationalExclusion");
   });
 
   it("runs focused MariaDB purge + archive-invariant scenarios", () => {
@@ -96,5 +148,19 @@ describe("test fixture personel purge owner", () => {
     expect(result.stdout).toContain(
       "[PASS] payroll snapshot blocker is sealed ledger owned by snapshot service (BORDRO)",
     );
+    expect(result.stdout).toContain("[PASS] tombstone dry-run deletes nothing");
+    expect(result.stdout).toContain("[PASS] tombstone with hard-purge confirm token DENY");
+    expect(result.stdout).toContain("[PASS] real personel tombstone DENY");
+    expect(result.stdout).toContain("[PASS] tombstone de-identifies PII and forces PASIF");
+    expect(result.stdout).toContain("[PASS] tombstone keeps the personel row (no hard delete)");
+    expect(result.stdout).toContain("[PASS] classification evidence stays AKTIF after tombstone");
+    expect(result.stdout).toContain("[PASS] tombstone writes id-preserving lifecycle evidence");
+    expect(result.stdout).toContain("[PASS] sealed puantaj + payroll snapshot evidence preserved");
+    expect(result.stdout).toContain("[PASS] tombstone is idempotent");
+    expect(result.stdout).toContain("[PASS] tombstoned fixture missing from operational list/count");
+    expect(result.stdout).toContain("[PASS] real personel NOT excluded from operational surfaces");
+    expect(result.stdout).toContain("[PASS] unclassified personel NOT excluded from operational surfaces");
+    expect(result.stdout).toContain("[PASS] tombstoned fixture missing from archive search");
+    expect(result.stdout).toContain("[PASS] detail exclusion applies to fixture only");
   });
 });

@@ -83,6 +83,40 @@ final class PersonelOzlukDestructionHandler implements DestructionHandlerInterfa
             $usersUnbound = (int) $u->rowCount();
         }
 
+        // Same canonical tombstone primitive the retention-safe TEST_FIXTURE tombstone owner uses.
+        // User unbinding deliberately stays at this imha owner and is not part of the primitive.
+        self::tombstonePersonelIdentity($pdo, $personelId);
+
+        return [
+            'result_code' => PhysicalDestructionCodes::CODE_DESTRUCTION_EXECUTED,
+            'summary' => [
+                'rows_anonymized' => [
+                    'personeller' => 1,
+                ],
+                'users_unbound' => $usersUnbound,
+                'files_deleted' => 0,
+            ],
+        ];
+    }
+
+    /**
+     * Canonical PERSONEL_OZLUK de-identify primitive (ANONYMIZE_FIELDS).
+     *
+     * Replaces identity/contact columns with non-PII labels, mints a unique synthetic TC from the
+     * preserved id and forces PASIF. No row is deleted: FK-restricted historical evidence (sealed
+     * puantaj muhur lines, payroll snapshots, archive access audit, closed period artifacts) keeps
+     * resolving `personeller.id` as its technical reference. User bindings are NOT touched here —
+     * unbinding stays at the imha request owner, so a real business user is never silently moved.
+     *
+     * @return array<string, mixed>
+     */
+    public static function tombstonePersonelIdentity(PDO $pdo, $personelId)
+    {
+        $personelId = (int) $personelId;
+        if ($personelId <= 0) {
+            throw new RuntimeException(PhysicalDestructionCodes::CODE_DESTRUCTION_EXECUTION_INVALID);
+        }
+
         // Unique synthetic TC: 9 + zero-padded id (11 chars). Non-PII tombstone labels.
         $tc = '9' . str_pad((string) $personelId, 10, '0', STR_PAD_LEFT);
         if (strlen($tc) !== 11) {
@@ -110,7 +144,7 @@ final class PersonelOzlukDestructionHandler implements DestructionHandlerInterfa
             'id' => $personelId,
         ]);
         if ((int) $upd->rowCount() < 1) {
-            // MySQL may report 0 if values already match — verify tombstone.
+            // MySQL may report 0 when values already match; verify the tombstone.
             $check = $pdo->prepare('SELECT ad, soyad, tc_kimlik_no FROM personeller WHERE id = :id');
             $check->execute(['id' => $personelId]);
             $after = $check->fetch(PDO::FETCH_ASSOC);
@@ -124,16 +158,13 @@ final class PersonelOzlukDestructionHandler implements DestructionHandlerInterfa
         }
 
         return [
-            'result_code' => PhysicalDestructionCodes::CODE_DESTRUCTION_EXECUTED,
-            'summary' => [
-                'rows_anonymized' => [
-                    'personeller' => 1,
-                ],
-                'users_unbound' => $usersUnbound,
-                'files_deleted' => 0,
-            ],
+            'personel_id' => $personelId,
+            'tc_kimlik_no' => $tc,
+            'sicil_no' => 'D-' . $personelId,
+            'row_anonymized' => true,
         ];
     }
+
 
     /**
      * Conservative last-stage gate — other retained category sources still present.

@@ -84,6 +84,8 @@ final class PersonelExportService
         } elseif ($aktiflik === 'pasif') {
             $where[] = "p.aktif_durum = 'PASIF'";
         }
+        // Same canonical exclusion as the personel list: TEST_FIXTURE personel never exports.
+        PersonelArchiveGate::appendOperationalExclusion($pdo, $where);
 
         $whereSql = implode(' AND ', $where);
         $countStmt = $pdo->prepare("SELECT COUNT(*) AS total FROM personeller p WHERE $whereSql");

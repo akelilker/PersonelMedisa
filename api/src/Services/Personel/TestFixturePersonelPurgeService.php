@@ -4,13 +4,19 @@ declare(strict_types=1);
 
 namespace Medisa\Api\Services\Personel;
 
+use Medisa\Api\Services\Retention\PhysicalDestruction\Handlers\PersonelOzlukDestructionHandler;
 use Medisa\Api\Services\Retention\RetentionCategories;
 use PDO;
 
 /**
- * Canonical owner: fail-closed hard purge of confirmed TEST_FIXTURE personel.
- * Not a generic personel delete. Requires persisted classification evidence.
- * Shared/unknown/historical-real dependencies DENY. Linked business users are preserved.
+ * Canonical owner: TEST_FIXTURE personel lifecycle. Two explicit operations, one owner:
+ *
+ * - purge(): fail-closed HARD delete of confirmed TEST_FIXTURE personel. Requires persisted
+ *   classification evidence. Shared/unknown/historical-real dependencies DENY. Linked business
+ *   users are preserved.
+ * - tombstone(): retention-safe destruction. The PII is de-identified through the canonical
+ *   PERSONEL_OZLUK ANONYMIZE_FIELDS primitive while the row (and therefore every FK-restricted
+ *   historical evidence reference) is preserved.
  *
  * Relation classification is owner-attributed: sealed ledger/snapshot rows are owned by the
  * retention destruction owner, closed period artifacts by the aylik kapanis owner, and
@@ -20,12 +26,20 @@ use PDO;
 class TestFixturePersonelPurgeService
 {
     public const CONFIRM_TOKEN = 'PURGE_TEST_FIXTURE';
+    public const CONFIRM_TOKEN_TOMBSTONE = 'TOMBSTONE_TEST_FIXTURE';
+    public const MODE_HARD_PURGE = 'hard_purge';
+    public const MODE_RETENTION_SAFE_TOMBSTONE = 'retention_safe_tombstone';
+    public const STATUS_TOMBSTONED = 'TOMBSTONED';
+    public const LIFECYCLE_TYPE_TOMBSTONE = 'TEST_FIXTURE_TOMBSTONE';
     public const CODE_REAL_EMPLOYEE = 'REAL_EMPLOYEE_OR_UNCLASSIFIED';
+
     public const CODE_SHARED_OR_UNKNOWN = 'SHARED_OR_UNKNOWN_DEPENDENCY';
     public const CODE_HISTORICAL = 'HISTORICAL_OR_SHARED_DEPENDENCY';
     public const CODE_AUDIT_IMMUTABLE = 'AUDIT_APPEND_ONLY_RETENTION_REQUIRED';
     public const CODE_USER_NOT_FIXTURE = 'USER_NOT_FIXTURE';
     public const CODE_CONFIRM_REQUIRED = 'PURGE_CONFIRM_REQUIRED';
+    /** Tombstone is a different, non-destructive operation: it needs its own confirm token. */
+    public const CODE_TOMBSTONE_CONFIRM_REQUIRED = 'TOMBSTONE_CONFIRM_REQUIRED';
 
     public const CLASS_CONFIRMED_DEMO = 'CONFIRMED_DEMO_DEPENDENCY';
     public const CLASS_GENERATED_DEMO = 'GENERATED_FROM_DEMO';
@@ -47,6 +61,8 @@ class TestFixturePersonelPurgeService
     public const OWNER_PUANTAJ_DESTRUCTION = 'Medisa\\Api\\Services\\Retention\\PhysicalDestruction\\Handlers\\PuantajDestructionHandler';
     public const OWNER_MAAS_SNAPSHOT_SERVICE = 'Medisa\\Api\\Services\\MaasHesaplamaSnapshotService';
     public const OWNER_AYLIK_KAPANIS = 'Medisa\\Api\\Controllers\\YonetimController';
+    /** PERSONEL_OZLUK de-identify primitive owner (ANONYMIZE_FIELDS tombstone). */
+    public const OWNER_PERSONEL_OZLUK_TOMBSTONE = 'Medisa\\Api\\Services\\Retention\\PhysicalDestruction\\Handlers\\PersonelOzlukDestructionHandler';
 
     /**
      * @param array<string, mixed> $actor
@@ -145,10 +161,247 @@ class TestFixturePersonelPurgeService
     }
 
     /**
+     * Retention-safe destruction of TEST_FIXTURE personel: de-identify (tombstone) instead of
+     * hard delete.
+     *
+     * The PII de-identify itself is delegated to the canonical PERSONEL_OZLUK ANONYMIZE_FIELDS
+     * primitive (PersonelOzlukDestructionHandler). No row is deleted, no FK is touched and no
+     * retention evidence is rewritten, so sealed puantaj muhur lines, immutable payroll
+     * snapshots, append-only archive access audit rows and closed period artifacts all keep their
+     * `personeller.id` technical reference.
+     *
+     * The classification row intentionally stays AKTIF: it is the persisted evidence the canonical
+     * operational read owner uses to keep the tombstoned fixture off every user-facing surface.
+     * User bindings are never moved by this owner (a real business user is not ours to unbind).
+     *
+     * @param array<string, mixed> $actor
+     * @return array<string, mixed>
+     */
+    public static function tombstone(PDO $pdo, $personelId, array $actor, $dryRun = true, $confirm = null)
+    {
+        if (!TestFixturePersonelClassificationService::schemaReady($pdo)
+            || !TestFixturePersonelArchiveService::archiveSchemaReady($pdo)
+        ) {
+            throw new TestFixturePersonelArchiveException(
+                'SCHEMA_NOT_READY',
+                'Test fixture tombstone semasi hazir degil.',
+                503
+            );
+        }
+
+        $personelId = (int) $personelId;
+        if ($personelId <= 0) {
+            throw new TestFixturePersonelArchiveException('PERSONEL_NOT_FOUND', 'Personel bulunamadi.', 404, 'personel_id');
+        }
+
+        $dryRun = self::isTruthy($dryRun, true);
+        if (!$dryRun && trim((string) $confirm) !== self::CONFIRM_TOKEN_TOMBSTONE) {
+            throw new TestFixturePersonelArchiveException(
+                self::CODE_TOMBSTONE_CONFIRM_REQUIRED,
+                'Tombstone icin confirm=' . self::CONFIRM_TOKEN_TOMBSTONE . ' zorunlu.',
+                422,
+                'confirm'
+            );
+        }
+
+        $ownsTransaction = !$pdo->inTransaction();
+        if ($ownsTransaction) {
+            $pdo->beginTransaction();
+        }
+
+        try {
+            $personel = self::lockPersonel($pdo, $personelId);
+            if ($personel === null) {
+                throw new TestFixturePersonelArchiveException('PERSONEL_NOT_FOUND', 'Personel bulunamadi.', 404, 'personel_id');
+            }
+
+            $classification = TestFixturePersonelClassificationService::findActive($pdo, $personelId);
+            if ($classification === null) {
+                throw new TestFixturePersonelArchiveException(
+                    self::CODE_REAL_EMPLOYEE,
+                    'TEST_FIXTURE siniflandirmasi yok; gercek/unknown personel tombstone edilemez.',
+                    409,
+                    'classification'
+                );
+            }
+
+            $preimage = self::tombstonePreimage($personel, $classification);
+            $alreadyRecorded = self::hasTombstoneKayit($pdo, $personelId);
+
+            if ($dryRun) {
+                if ($ownsTransaction) {
+                    $pdo->rollBack();
+                }
+
+                return [
+                    'status' => 'DRY_RUN',
+                    'mode' => self::MODE_RETENTION_SAFE_TOMBSTONE,
+                    'personel_id' => $personelId,
+                    'preimage' => $preimage,
+                    'classification' => $preimage['classification'],
+                    'canonical_owner' => 'TestFixturePersonelPurgeService',
+                    'destruction_owner' => self::OWNER_PERSONEL_OZLUK_TOMBSTONE,
+                    'operational_visibility' => 'EXCLUDED_BY_CLASSIFICATION_EVIDENCE',
+                    'linked_users' => self::inventoryUsers($pdo, $personelId),
+                    'user_action' => 'PRESERVE_USER_BINDINGS',
+                    'already_recorded' => $alreadyRecorded,
+                    'hard_delete' => false,
+                    'rows_deleted' => 0,
+                    'historical_evidence_preserved' => true,
+                    'expected_postimage' => [
+                        'personel_exists' => true,
+                        'pii_deidentified' => true,
+                        'aktif_durum' => 'PASIF',
+                        'classification_state' => 'AKTIF',
+                    ],
+                    'executed' => false,
+                    'fake_employment_exit_created' => false,
+                ];
+            }
+
+            $identity = PersonelOzlukDestructionHandler::tombstonePersonelIdentity($pdo, $personelId);
+            $evidence = self::persistTombstoneEvidence($pdo, $preimage, $actor);
+
+            if ($ownsTransaction) {
+                $pdo->commit();
+            }
+
+            return [
+                'status' => $alreadyRecorded ? 'ALREADY_TOMBSTONED' : self::STATUS_TOMBSTONED,
+                'mode' => self::MODE_RETENTION_SAFE_TOMBSTONE,
+                'personel_id' => $personelId,
+                'preimage' => $preimage,
+                'classification' => $preimage['classification'],
+                'canonical_owner' => 'TestFixturePersonelPurgeService',
+                'destruction_owner' => self::OWNER_PERSONEL_OZLUK_TOMBSTONE,
+                'operational_visibility' => 'EXCLUDED_BY_CLASSIFICATION_EVIDENCE',
+                'identity' => [
+                    'ad' => 'DESTROYED',
+                    'soyad' => 'PERSONEL',
+                    'tc_kimlik_no' => $identity['tc_kimlik_no'],
+                    'sicil_no' => $identity['sicil_no'],
+                ],
+                'evidence' => $evidence,
+                'user_action' => 'PRESERVE_USER_BINDINGS',
+                'hard_delete' => false,
+                'rows_deleted' => 0,
+                'historical_evidence_preserved' => true,
+                'rollback_recovery' => 'TOMBSTONE_IRREVERSIBLE_PII',
+                'postimage' => [
+                    'personel_exists' => true,
+                    'pii_deidentified' => true,
+                    'aktif_durum' => 'PASIF',
+                    'classification_state' => 'AKTIF',
+                ],
+                'executed' => true,
+                'fake_employment_exit_created' => false,
+            ];
+        } catch (\Throwable $e) {
+            if ($ownsTransaction && $pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+
+            throw $e;
+        }
+    }
+
+    /**
      * @param array<string, mixed> $personel
      * @param array<string, mixed> $classification
      * @return array<string, mixed>
      */
+    /**
+     * @param array<string, mixed> $personel
+     * @param array<string, mixed> $classification
+     * @return array<string, mixed>
+     */
+    private static function tombstonePreimage(array $personel, array $classification)
+    {
+        return [
+            'personel_id' => (int) $personel['id'],
+            'sicil_no' => isset($personel['sicil_no']) ? (string) $personel['sicil_no'] : null,
+            'aktif_durum' => isset($personel['aktif_durum']) ? (string) $personel['aktif_durum'] : null,
+            'sube_id' => isset($personel['sube_id']) ? (int) $personel['sube_id'] : null,
+            'bolum_id' => isset($personel['bolum_id']) && $personel['bolum_id'] !== null
+                ? (int) $personel['bolum_id'] : null,
+            'birim_id' => isset($personel['birim_id']) && $personel['birim_id'] !== null
+                ? (int) $personel['birim_id'] : null,
+            'classification' => [
+                'sinif' => (string) $classification['sinif'],
+                'evidence_kodu' => (string) $classification['evidence_kodu'],
+                'state' => (string) $classification['state'],
+            ],
+        ];
+    }
+
+    /**
+     * @param mixed $personelId
+     */
+    private static function hasTombstoneKayit(PDO $pdo, $personelId)
+    {
+        $stmt = $pdo->prepare(
+            'SELECT COUNT(*) FROM personel_test_fixture_archive_kayitlari
+             WHERE personel_id = :pid AND lifecycle_type = :lifecycle'
+        );
+        $stmt->execute([
+            'pid' => (int) $personelId,
+            'lifecycle' => self::LIFECYCLE_TYPE_TOMBSTONE,
+        ]);
+
+        return (int) $stmt->fetchColumn() > 0;
+    }
+
+    /**
+     * Id-preserving technical audit reference for the tombstone: the canonical lifecycle evidence
+     * table the archive event already uses, only `lifecycle_type` differs. The personel id stays
+     * the technical reference, no PII is written.
+     *
+     * @param array<string, mixed> $preimage
+     * @param array<string, mixed> $actor
+     * @return array<string, mixed>
+     */
+    private static function persistTombstoneEvidence(PDO $pdo, array $preimage, array $actor)
+    {
+        $personelId = (int) $preimage['personel_id'];
+        if (self::hasTombstoneKayit($pdo, $personelId)) {
+            return [
+                'persisted' => false,
+                'reason' => 'already_recorded',
+                'lifecycle_type' => self::LIFECYCLE_TYPE_TOMBSTONE,
+            ];
+        }
+
+        $actorId = isset($actor['id']) ? (int) $actor['id'] : 0;
+        if ($actorId <= 0) {
+            throw new TestFixturePersonelArchiveException('ACTOR_REQUIRED', 'Tombstone actor zorunlu.', 403);
+        }
+
+        $archivedAt = (new \DateTimeImmutable('now'))->format('Y-m-d H:i:s.u');
+        $stmt = $pdo->prepare(
+            'INSERT INTO personel_test_fixture_archive_kayitlari
+                (personel_id, lifecycle_type, archived_at, archived_by, sube_id, bolum_id, birim_id,
+                 classification_evidence_kodu)
+             VALUES
+                (:pid, :lifecycle, :archived_at, :archived_by, :sube_id, :bolum_id, :birim_id, :evidence)'
+        );
+        $stmt->execute([
+            'pid' => $personelId,
+            'lifecycle' => self::LIFECYCLE_TYPE_TOMBSTONE,
+            'archived_at' => $archivedAt,
+            'archived_by' => $actorId,
+            'sube_id' => $preimage['sube_id'],
+            'bolum_id' => $preimage['bolum_id'],
+            'birim_id' => $preimage['birim_id'],
+            'evidence' => (string) ($preimage['classification']['evidence_kodu'] ?? ''),
+        ]);
+
+        return [
+            'persisted' => true,
+            'id' => (int) $pdo->lastInsertId(),
+            'lifecycle_type' => self::LIFECYCLE_TYPE_TOMBSTONE,
+        ];
+    }
+
     public static function buildPlan(PDO $pdo, array $personel, array $classification)
     {
         $personelId = (int) $personel['id'];
@@ -823,13 +1076,34 @@ class TestFixturePersonelPurgeService
     /** @return array<string, mixed>|null */
     private static function lockPersonel(PDO $pdo, $personelId)
     {
+        // bolum_id / birim_id exist only after the org-structure migration (065); a pre-migration
+        // environment reads them as NULL instead of failing the lock.
+        $columns = 'id, aktif_durum, sicil_no, ad, soyad, sube_id';
+        $hasBolum = self::columnExists($pdo, 'personeller', 'bolum_id');
+        $hasBirim = self::columnExists($pdo, 'personeller', 'birim_id');
+        if ($hasBolum) {
+            $columns .= ', bolum_id';
+        }
+        if ($hasBirim) {
+            $columns .= ', birim_id';
+        }
+
         $stmt = $pdo->prepare(
-            'SELECT id, aktif_durum, sicil_no, ad, soyad, sube_id FROM personeller WHERE id = :id LIMIT 1 FOR UPDATE'
+            'SELECT ' . $columns . ' FROM personeller WHERE id = :id LIMIT 1 FOR UPDATE'
         );
         $stmt->execute(['id' => (int) $personelId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!is_array($row)) {
+            return null;
+        }
+        if (!$hasBolum) {
+            $row['bolum_id'] = null;
+        }
+        if (!$hasBirim) {
+            $row['birim_id'] = null;
+        }
 
-        return is_array($row) ? $row : null;
+        return $row;
     }
 
     private static function tableExists(PDO $pdo, $table)

@@ -78,6 +78,49 @@ class TestFixturePersonelClassificationService
     }
 
     /**
+     * Canonical operational (user-facing) visibility exclusion predicate.
+     *
+     * A personel carrying an AKTIF TEST_FIXTURE classification is not a real employee, so it must
+     * never be returned by an operational surface: aktif/pasif lists, archive/personel search,
+     * counts and filter results, selection pools, normal detail access, exports and daily rosters.
+     *
+     * Retention/audit owners (retention imha, archive manifests, classification owner itself) read
+     * the personel row directly and are deliberately NOT filtered by this predicate, so historical
+     * payroll snapshots and sealed puantaj evidence keep resolving `personeller.id`.
+     *
+     * Returns null when the classification schema is absent, so a non-migrated environment never
+     * breaks its read queries (classification evidence simply does not exist there yet).
+     *
+     * @param mixed $alias
+     * @return string|null
+     */
+    public static function sqlOperationalVisibilityExclusion(PDO $pdo, $alias = 'p')
+    {
+        if (!self::schemaReady($pdo)) {
+            return null;
+        }
+        $safe = preg_replace('/[^A-Za-z0-9_]/', '', (string) $alias);
+        if (!is_string($safe) || $safe === '') {
+            $safe = 'p';
+        }
+
+        return "NOT EXISTS (SELECT 1 FROM personel_test_fixture_siniflandirmalari c"
+            . " WHERE c.personel_id = {$safe}.id"
+            . " AND c.sinif = '" . self::SINIF_TEST_FIXTURE . "'"
+            . " AND c.state = 'AKTIF')";
+    }
+
+    /**
+     * Single-row equivalent of sqlOperationalVisibilityExclusion for detail surfaces.
+     *
+     * @param mixed $personelId
+     */
+    public static function isOperationallyHidden(PDO $pdo, $personelId)
+    {
+        return self::isActiveTestFixture($pdo, $personelId);
+    }
+
+    /**
      * Persist TEST_FIXTURE classification via HTTP-safe evidence contract.
      * Idempotent when same evidence already AKTIF.
      *

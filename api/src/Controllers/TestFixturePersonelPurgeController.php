@@ -15,9 +15,13 @@ use Medisa\Api\Services\Personel\TestFixturePersonelPurgeService;
 use PDO;
 
 /**
- * Canonical HTTP owner for TEST_FIXTURE purge (not generic personel delete).
+ * Canonical HTTP owner for TEST_FIXTURE personel lifecycle (not generic personel delete).
  * POST /personeller/{id}/test-fixture-purge
- * Default dry_run=true. Execute requires confirm=PURGE_TEST_FIXTURE.
+ *
+ * mode=hard_purge (default, fail-closed hard delete): confirm=PURGE_TEST_FIXTURE
+ * mode=retention_safe_tombstone (PII de-identify, no delete): confirm=TOMBSTONE_TEST_FIXTURE
+ *
+ * Default dry_run=true for both modes.
  */
 class TestFixturePersonelPurgeController
 {
@@ -55,6 +59,8 @@ class TestFixturePersonelPurgeController
             JsonResponse::error(422, 'VALIDATION_ERROR', 'Purge payload eligibility bypass alanlari yasak.');
         }
 
+        $mode = self::resolveMode($body);
+
         $dryRun = true;
         if (array_key_exists('dry_run', $body)) {
             $raw = $body['dry_run'];
@@ -63,6 +69,13 @@ class TestFixturePersonelPurgeController
         $confirm = array_key_exists('confirm', $body) ? $body['confirm'] : null;
 
         try {
+            if ($mode === TestFixturePersonelPurgeService::MODE_RETENTION_SAFE_TOMBSTONE) {
+                // Retention-safe destruction: de-identify only, FK evidence stays intact.
+                JsonResponse::success(
+                    TestFixturePersonelPurgeService::tombstone($pdo, $id, $user, $dryRun, $confirm)
+                );
+            }
+
             $result = TestFixturePersonelPurgeService::purge($pdo, $id, $user, $dryRun, $confirm);
             if (($result['purge_safe'] ?? false) !== true) {
                 JsonResponse::error(
@@ -80,6 +93,31 @@ class TestFixturePersonelPurgeController
         } catch (\Throwable $e) {
             JsonResponse::serverError('Test fixture purge basarisiz.');
         }
+    }
+
+    /**
+     * Fixture lifecycle mode selector. Absent `mode` keeps the historical fail-closed hard purge,
+     * so an existing caller never changes behaviour by omission.
+     *
+     * @param array<string, mixed> $body
+     * @return string
+     */
+    private static function resolveMode(array $body)
+    {
+        if (!array_key_exists('mode', $body)) {
+            return TestFixturePersonelPurgeService::MODE_HARD_PURGE;
+        }
+        $raw = strtolower(trim((string) $body['mode']));
+        if ($raw === TestFixturePersonelPurgeService::MODE_RETENTION_SAFE_TOMBSTONE || $raw === 'tombstone') {
+            return TestFixturePersonelPurgeService::MODE_RETENTION_SAFE_TOMBSTONE;
+        }
+        if ($raw === TestFixturePersonelPurgeService::MODE_HARD_PURGE || $raw === 'purge') {
+            return TestFixturePersonelPurgeService::MODE_HARD_PURGE;
+        }
+
+        JsonResponse::error(422, 'VALIDATION_ERROR', 'Gecersiz test fixture mode.', 'mode');
+
+        return TestFixturePersonelPurgeService::MODE_HARD_PURGE;
     }
 
     /** @return array<string, mixed>|null */

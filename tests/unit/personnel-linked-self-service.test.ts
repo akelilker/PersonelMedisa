@@ -95,6 +95,53 @@ describe("personnel-linked self-service authorization", () => {
     expect(ctx).toContain("client personel_id is never trusted");
   });
 
+  it("self-service-only role cannot reach the management reference read surface", () => {
+    const referans = readFileSync(
+      resolve(root, "api/src/Controllers/ReferansController.php"),
+      "utf8"
+    );
+    const guardCall = "self::assertReferenceReadAllowed($user);";
+
+    const helperStart = referans.indexOf(
+      "private static function assertReferenceReadAllowed("
+    );
+    expect(helperStart).toBeGreaterThan(-1);
+    const helperEnd = referans.indexOf(
+      "\n    private static function listByTable(",
+      helperStart
+    );
+    const helper = referans.slice(helperStart, helperEnd);
+    // Role-based fail-closed: the self-service-only role never reads reference data.
+    expect(helper).toContain("'PERSONEL'");
+    expect(helper).toContain("403");
+    expect(helper).toContain("SELF_SERVICE_ONLY_ROLE_FORBIDDEN");
+
+    // Every authenticated reference read entry point carries the guard.
+    const readOwners = [
+      "public static function sgkIsverenler(",
+      "public static function calismaLokasyonlari(",
+      "public static function bagliAmirler(",
+      "public static function surecTurleri(",
+      "public static function ucretTipleri(",
+      "public static function primKurallari(",
+      "public static function bildirimTurleri(",
+      "private static function listByTable(",
+      "private static function listHierarchical("
+    ];
+    for (const owner of readOwners) {
+      const start = referans.indexOf(owner);
+      expect(start, `${owner} missing`).toBeGreaterThan(-1);
+      const rest = referans.slice(start);
+      const bounds = [
+        rest.indexOf("\n    public static function", 1),
+        rest.indexOf("\n    private static function", 1)
+      ].filter((index) => index > 0);
+      const block = bounds.length > 0 ? rest.slice(0, Math.min(...bounds)) : rest;
+      expect(block, `${owner} must deny the self-service-only role`).toContain(guardCall);
+    }
+    expect(referans.split(guardCall).length - 1).toBe(readOwners.length);
+  });
+
   it("FE permission hydration consumes personel_id (useRoleAccess + ProtectedRoute)", () => {
     const hook = readFileSync(resolve(root, "src/hooks/use-role-access.ts"), "utf8");
     const route = readFileSync(resolve(root, "src/router/ProtectedRoute.tsx"), "utf8");

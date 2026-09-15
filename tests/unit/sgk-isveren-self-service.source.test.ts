@@ -2,8 +2,8 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
-  filterSgkIsverenOptionsForSirket,
-  resolveSgkIsverenAfterSirketChange,
+  filterActiveSgkIsverenOptions,
+  resolveSgkIsverenSelection,
   toSgkIsverenSelectOptions
 } from "../../src/lib/yonetim/sgk-isveren-options";
 import type { YonetimSgkIsveren } from "../../src/types/yonetim";
@@ -95,24 +95,28 @@ describe("SGK employer self-service organisation management", () => {
     expect(optionsHelper).not.toContain("Kayseri");
     expect(optionsHelper).not.toContain("Ankara");
 
-    // The filter reads the stored company relation only.
-    expect(optionsHelper).toContain("option.sirket?.id !== sirketId");
-    expect(optionsHelper).toContain("if (sirketId == null || sirketId <= 0) {");
-    expect(page).toContain("filterSgkIsverenOptionsForSirket(sgkIsverenleri, selectedSirketId");
+    // 2026-09-15 business kararı: seçim listesi şirkete göre filtrelenmez.
+    expect(optionsHelper).not.toContain("option.sirket");
+    expect(optionsHelper).toContain('option.durum === "AKTIF"');
+    expect(page).toContain("filterActiveSgkIsverenOptions(sgkIsverenleri, editingSubeSgkIsverenId)");
+    expect(page).not.toContain("filterSgkIsverenOptionsForSirket");
   });
 
-  it("keeps the same-company branch mapping invariant in the canonical owner", () => {
-    expect(service).toContain("SGK_ISVEREN_SIRKET_MISMATCH");
-    expect(service).toContain("SGK_ISVEREN_SIRKET_UNMAPPED");
+  it("keeps the branch employer mapping independent from the branch company", () => {
+    // Şube yazımının tek invariantı AKTIF işveren kuralıdır. Şirket eşleşmesi
+    // (mismatch) ve şirketsiz kayıt 2026-09-15 kararıyla şube tarafında kaldırıldı:
+    // şube şirketi ile sgk_isveren.sirket_id farklı olabilir.
+    expect(service).not.toContain("SGK_ISVEREN_SIRKET_MISMATCH");
+    expect(service).not.toContain("SGK_ISVEREN_SIRKET_UNMAPPED");
     expect(service).toContain("SGK_ISVEREN_PASIF");
     expect(service).toContain("SGK_ISVEREN_HAS_DEPENDENTS");
     expect(service).toContain("SGK_ISVEREN_SIRKET_CHANGE_BLOCKED");
     expect(service).toContain("private static function assertSgkIsverenConsistent");
     expect(service).toContain("$sgkIsverenId !== $existingSgkIsverenId");
-    // Employment-scope parity: only IC_PERSONEL can block an employer company
-    // change; a DIS_KAYNAK (Harici) row keeps its independent SGK source.
-    expect(service).toContain("PersonelCalisanKapsamSchema::isReady($pdo)");
-    expect(service).toContain("IFNULL(p.calisan_kapsami, 'IC_PERSONEL') = 'IC_PERSONEL'");
+    // Personel tarafı ayrı owner ve bu fazda değişmedi: IC aynı-şirket kuralı durur.
+    expect(read("api/src/Services/Personel/PersonelSgkCompanyConsistency.php")).toContain(
+      "const ERROR_MISMATCH"
+    );
     // Physical delete stays blocked instead of cascading.
     expect(service).toContain("sgkIsverenDependencyCounts");
     expect(service).toContain("user_sgk_isverenler WHERE sgk_isveren_id = :id");
@@ -156,8 +160,8 @@ describe("SGK employer self-service organisation management", () => {
     expect(page).toContain("payload.sgk_isveren_id = parsed");
     expect(page).toContain("payload.sgk_isveren_id = null");
     expect(page).toContain("allowedSgkIsverenIds: subeSgkIsverenAllowedIds");
-    expect(page).toContain("resolveSgkIsverenAfterSirketChange");
-    expect(page).toContain("Bu şirkete ait aktif SGK işvereni bulunmuyor.");
+    expect(page).toContain("resolveSgkIsverenSelection");
+    expect(page).toContain("Aktif SGK işvereni bulunmuyor.");
     // An unreadable catalog never looks like "no employer": the mapping is
     // preserved and no SGK key is sent for this branch write.
     expect(page).toContain("isSgkIsverenCatalogLoaded");
@@ -165,7 +169,7 @@ describe("SGK employer self-service organisation management", () => {
     expect(page).toContain("hasSgkIsverenContext ? { allowedSgkIsverenIds: subeSgkIsverenAllowedIds } : undefined");
   });
 
-  it("filters employer options by the selected company company-consistently", () => {
+  it("offers every active employer regardless of the branch company", () => {
     const options = [
       sgk(1, "MEDISA MERKEZ", 1),
       sgk(2, "MEDISA BURSA", 1),
@@ -173,33 +177,35 @@ describe("SGK employer self-service organisation management", () => {
       sgk(4, "MEDISA PASIF", 1, "PASIF")
     ];
 
-    expect(filterSgkIsverenOptionsForSirket(options, 1).map((item) => item.id)).toEqual([1, 2]);
-    expect(filterSgkIsverenOptionsForSirket(options, 2).map((item) => item.id)).toEqual([3]);
-    expect(filterSgkIsverenOptionsForSirket(options, null)).toEqual([]);
-    expect(filterSgkIsverenOptionsForSirket(options, 0)).toEqual([]);
-
-    // Two employers of the same company are both offered.
-    expect(filterSgkIsverenOptionsForSirket(options, 1).length).toBe(2);
-    // A foreign company employer is never offered.
-    expect(filterSgkIsverenOptionsForSirket(options, 1).some((item) => item.id === 3)).toBe(false);
-    // An unmapped employer cannot be attached to a mapped branch.
-    expect(filterSgkIsverenOptionsForSirket([sgk(9, "ESLESMEMIS", null)], 1)).toEqual([]);
+    // 2026-09-15: şube şirketi ile SGK işvereninin şirketi farklı olabilir, bu
+    // yüzden katalogdaki tüm aktif SGK işverenleri sunulur.
+    expect(filterActiveSgkIsverenOptions(options).map((item) => item.id)).toEqual([1, 2, 3]);
+    expect(filterActiveSgkIsverenOptions(options).some((item) => item.id === 3)).toBe(true);
+    // Şirketsiz (henüz eşlenmemiş) aktif kayıt da seçilebilir.
+    expect(filterActiveSgkIsverenOptions([sgk(9, "ESLESMEMIS", null)]).map((item) => item.id)).toEqual([
+      9
+    ]);
+    expect(filterActiveSgkIsverenOptions([])).toEqual([]);
   });
 
   it("keeps a deactivated employer visible only while it is the stored mapping", () => {
-    const options = [sgk(1, "MEDISA MERKEZ", 1), sgk(4, "MEDISA PASIF", 1, "PASIF")];
+    const options = [
+      sgk(1, "MEDISA MERKEZ", 1),
+      sgk(3, "SENAY MERKEZ", 2),
+      sgk(4, "MEDISA PASIF", 1, "PASIF")
+    ];
 
-    expect(filterSgkIsverenOptionsForSirket(options, 1).map((item) => item.id)).toEqual([1]);
-    expect(filterSgkIsverenOptionsForSirket(options, 1, 4).map((item) => item.id)).toEqual([1, 4]);
-    expect(toSgkIsverenSelectOptions(filterSgkIsverenOptionsForSirket(options, 1, 4))).toContainEqual({
+    expect(filterActiveSgkIsverenOptions(options).map((item) => item.id)).toEqual([1, 3]);
+    expect(filterActiveSgkIsverenOptions(options, 4).map((item) => item.id)).toEqual([1, 3, 4]);
+    expect(toSgkIsverenSelectOptions(filterActiveSgkIsverenOptions(options, 4))).toContainEqual({
       value: "4",
       label: "MEDISA PASIF (pasif)"
     });
 
-    // A stale selection never survives a company change silently.
-    expect(resolveSgkIsverenAfterSirketChange("3", filterSgkIsverenOptionsForSirket(options, 1))).toBe("");
-    expect(resolveSgkIsverenAfterSirketChange("1", filterSgkIsverenOptionsForSirket(options, 1))).toBe("1");
-    expect(resolveSgkIsverenAfterSirketChange("", options)).toBe("");
+    // A stale selection never survives a catalog reload silently.
+    expect(resolveSgkIsverenSelection("9", filterActiveSgkIsverenOptions(options))).toBe("");
+    expect(resolveSgkIsverenSelection("1", filterActiveSgkIsverenOptions(options))).toBe("1");
+    expect(resolveSgkIsverenSelection("", options)).toBe("");
   });
 
   it("does not add a new personnel-create business rule", () => {

@@ -380,7 +380,6 @@ jobs:
           emit_scalar MAPPING_SCHEMA_READY "$pc" '.readiness.schema_ready' '^(true|false)$'
           emit_scalar MAPPING_DATA_READY "$pc" '.readiness.data_ready' '^(true|false)$'
           emit_scalar MAPPING_READINESS_BLOCKER_COUNT "$pc" '.readiness.blocker_count' '^[0-9]{1,6}$'
-          emit_scalar MAPPING_SGK_MISMATCH_COUNT "$pc" '.readiness.sube_sgk_sirket_mismatch_count' '^-?[0-9]{1,12}$'
           emit_list MAPPING_UNEXPECTED_DELTAS "$pc" '.unexpected_deltas'
           for table in sirketler subeler sgk_isverenler calisma_lokasyonlari personeller user_subeler user_sirketler user_sgk_isverenler; do
             emit_scalar "MAPPING_ROWS_$(echo "$table" | tr '[:lower:]' '[:upper:]')" "$pc" ".row_counts.${table}" '^-?[0-9]{1,12}$'

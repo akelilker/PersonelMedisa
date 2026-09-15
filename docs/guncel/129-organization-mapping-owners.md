@@ -72,7 +72,7 @@ taraftan SQL, tablo adı veya filtre kabul edilmez. Kaynak testi
   `unaudited_extension_branch_ids`, `duplicate_extension_audit_branch_ids`,
   `mismatched_extension_audit_branch_ids`, `missing_baseline_branch_ids`,
   `branch_create_audit_ready`, `branch_set_valid`, `unexpected_branch_ids`,
-  `missing_branch_ids`, orphan/mismatch sayıları (bkz. §2.2).
+  `missing_branch_ids`, orphan sayıları (bkz. §2.2).
 - **Scope:** `user_sube_total`, rol bazında `assignment_count`,
     70|  `user_sirket_total`, `user_sgk_isveren_total`.
 
@@ -158,8 +158,8 @@ satırının `gerekce` ve `request_hash` alanları envantere **girmez**.
 Şube count beklentisi sabit değildir: `expected_branch_count` =
 baseline + doğrulanmış audited extension sayısı. `branch_set_valid` bu dört
 koşulun tamamıdır: eksik baseline yok, beklenmeyen ID yok, duplicate audit yok,
-kimlik uyuşmazlığı yok ve ID 3 yok. Live şube tarafındaki
-şirket/SGK/orphan/mismatch kontrolleri aynen korunur.
+kimlik uyuşmazlığı yok ve ID 3 yok. Live şube tarafındaki şirket/orphan
+kontrolleri aynen korunur.
 
 GATE 3 sonrası beklenen production değerleri: baseline 10, audited extension
 `12,13`, unaudited/duplicate/missing yok, toplam şube 12, `branch_set_valid`
@@ -208,9 +208,9 @@ Kurallar ve reason code'ları:
   `SPEC_BRANCH_MAPPING_UNEXPECTED`,
 - ID 3 → `SPEC_FORBIDDEN_BRANCH_ID`,
 - tanımsız şirket referansı → `SPEC_UNKNOWN_COMPANY_REFERENCE`,
-- şube ile SGK işvereninin şirketi çelişiyorsa →
-  `SPEC_BRANCH_SGK_COMPANY_CONFLICT` (commit sonunda
-  `sube_sgk_sirket_mismatch_count` sıfır olmak zorundadır),
+- bir şubenin mevcut SGK işvereni spec içinde karara bağlanmamışsa →
+  `SPEC_SGK_MAPPING_INCOMPLETE`; şube şirketi ile SGK işvereninin şirketi ise
+  **farklı olabilir** (2026-09-15 model, aşağıda §5 Readiness sözleşmesi),
 - şirket kodları global unique ve immutable; şirket `kod` ile adreslenir, id ile
   değil.
 
@@ -235,7 +235,7 @@ exact deploy SHA (`hash_equals`), production tip exact `079`, pending migration
 sayısı `0`, worker idle (control plane), inventory checksum'ın **payload'dan
 yeniden hesaplanması**, `schema_ready`, row count ve preservation sayıları,
 şube ID kümesi, her şube/SGK/lokasyon satırının exact preimage'ı, şirket kod/ad
-çakışması, mismatch üretecek mapping yokluğu. Preflight hiçbir satır yazmaz ve
+çakışması. Preflight hiçbir satır yazmaz ve
 `spec_checksum` yayınlar; apply aynı checksum'ı taşıyan spec ile çalışır.
 
    150|### Backup
@@ -273,13 +273,16 @@ retry yoktur.
    180|spec checksum, company rows/codes, şube ve SGK şirket eşlemeleri, opsiyonel
 lokasyon eşlemeleri, onaylı short adlar, row counts, ID koruması,
 personel/user scope koruması, readiness (`schema_ready`, `data_ready`, blocker
-sayısı, mismatch sayısı), `unexpected_deltas` ve backup referansı.
+sayısı), `unexpected_deltas` ve backup referansı.
 
 ### Readiness sözleşmesi
 
 `OrganizasyonSchema` kontratına göre `data_ready` ancak şirket kaydı varsa, **tüm**
-şubeler ve **tüm** SGK işverenleri eşlenmişse, orphan yoksa ve
-`sube_sgk_sirket_mismatch_count = 0` ise true olur. Çalışma lokasyonunun NULL
+şubeler ve **tüm** SGK işverenleri eşlenmişse ve orphan yoksa true olur. Şube
+şirketi ile SGK işvereninin şirketinin ayrışması **blocker değildir**
+(2026-09-15 model): readiness `sube_sgk_sirket_mismatch_count` sayacı,
+`SUBE_SGK_SIRKET_MISMATCH` ve `BRANCH_SGK_COMPANY_MISMATCH` kararları kaldırıldı;
+envanter kontratı `SCHEMA_VERSION` `5` → `6` oldu. Çalışma lokasyonunun NULL
    190|kalması blocker **değildir**: deferred lokasyonlar readiness'i bloke etmez.
 MariaDB testi bunu doğrudan doğrular (üç lokasyon eşlenmemişken `data_ready` true).
 

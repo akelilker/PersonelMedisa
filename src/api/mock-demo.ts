@@ -9716,8 +9716,7 @@ export function resolveDemoApiResponse(
         unmapped_sube_count: unmapped,
         unmapped_sgk_isveren_count: 0,
         orphan_sube_sirket_count: 0,
-        orphan_lokasyon_sube_count: 0,
-        sube_sgk_sirket_mismatch_count: 0
+        orphan_lokasyon_sube_count: 0
       },
       blockers: unmapped > 0 ? ["SUBE_SIRKET_UNMAPPED"] : []
     });

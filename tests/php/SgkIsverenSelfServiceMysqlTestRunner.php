@@ -9,8 +9,11 @@ declare(strict_types=1);
  * company-consistent branch mapping, against a disposable MariaDB:
  *   - catalog create / update / soft state (AKTIF-PASIF) / guarded delete
  *   - N:1: one employer serves many branches, one company owns many employers
- *   - fail-closed: pasif / unmapped / foreign-company employer, unsafe delete,
- *     company change that would invalidate a stored relation
+ *   - fail-closed: pasif employer, unsafe delete, company change that would
+ *     invalidate a stored relation
+ *   - company-independent branch mapping (2026-09-15): bir şube herhangi bir
+ *     AKTIF SGK işverenini seçebilir — şirketi farklı olsa veya hiç şirketi
+ *     olmasa bile (ör. Medisa şubesi Şenay/Karyapı SGK işverenini seçer)
  *   - şube create/update persists subeler.sgk_isveren_id
  *   - PersonelSgkCompanyConsistency keeps its unchanged same-company rule
  *
@@ -409,29 +412,30 @@ try {
         'SGK_ISVEREN_PASIF',
         'a pasif employer cannot be attached to a new branch'
     );
-    sgkSelfRefuses(
-        static function () use ($pdo, $ids): void {
-            OrganizasyonService::createSube($pdo, [
-                'kod' => 'MED-NOMAP-SB',
-                'ad' => 'Eslesmemis Sgk',
-                'departman_ids' => [],
-                'sgk_isveren_id' => $ids['unmapped'],
-            ], $ids['medisa']);
-        },
-        'SGK_ISVEREN_SIRKET_UNMAPPED',
-        'an employer without a company cannot be attached to a mapped branch'
+    // 2026-09-15 model: şube şirketi ile sgk_isveren.sirket_id farklı olabilir
+    // (ör. Medisa şubesi Şenay/Karyapı SGK işverenini seçer), bu yüzden şirket
+    // eşleşmesi ve şirketsiz kayıt şube tarafında reddedilmez.
+    $crossCompanyBranch = OrganizasyonService::createSube($pdo, [
+        'kod' => 'MED-CROSS-SB',
+        'ad' => 'Yabanci Sgk',
+        'departman_ids' => [],
+        'sgk_isveren_id' => $ids['senayMerkez'],
+    ], $ids['medisa']);
+    $crossCompanyBranchId = (int) $crossCompanyBranch['id'];
+    sgkSelfAssert(
+        $crossCompanyBranch['sgk_isveren']['id'] === $ids['senayMerkez']
+            && (int) sgkSelfSubeRow($pdo, $crossCompanyBranchId)['sgk_isveren_id'] === $ids['senayMerkez'],
+        'another company employer can be attached to this branch'
     );
-    sgkSelfRefuses(
-        static function () use ($pdo, $ids): void {
-            OrganizasyonService::createSube($pdo, [
-                'kod' => 'MED-CROSS-SB',
-                'ad' => 'Yabanci Sgk',
-                'departman_ids' => [],
-                'sgk_isveren_id' => $ids['senayMerkez'],
-            ], $ids['medisa']);
-        },
-        'SGK_ISVEREN_SIRKET_MISMATCH',
-        'another company employer cannot be attached to this branch'
+    $unmappedBranch = OrganizasyonService::createSube($pdo, [
+        'kod' => 'SNY-NOMAP-SB',
+        'ad' => 'Eslesmemis Sgk',
+        'departman_ids' => [],
+        'sgk_isveren_id' => $ids['unmapped'],
+    ], $ids['senay']);
+    sgkSelfAssert(
+        $unmappedBranch['sgk_isveren']['id'] === $ids['unmapped'],
+        'an employer without a company can be attached to a branch'
     );
     sgkSelfRefuses(
         static function () use ($pdo, $ids): void {
@@ -504,39 +508,40 @@ try {
         'SGK_ISVEREN_PASIF',
         'branch update refuses an explicit switch to a pasif employer'
     );
-    sgkSelfRefuses(
-        static function () use ($pdo, $bursaBranchId, $ids): void {
-            OrganizasyonService::updateSube(
-                $pdo,
-                $bursaBranchId,
-                ['sgk_isveren_id' => $ids['senayMerkez']],
-                $ids['medisa']
-            );
-        },
-        'SGK_ISVEREN_SIRKET_MISMATCH',
-        'branch update refuses a foreign-company employer'
+    $switched = OrganizasyonService::updateSube(
+        $pdo,
+        $bursaBranchId,
+        ['sgk_isveren_id' => $ids['senayMerkez']],
+        $ids['medisa']
     );
-    sgkSelfRefuses(
-        static function () use ($pdo, $bursaBranchId, $ids): void {
-            OrganizasyonService::updateSube(
-                $pdo,
-                $bursaBranchId,
-                ['sgk_isveren_id' => $ids['unmapped']],
-                $ids['medisa']
-            );
-        },
-        'SGK_ISVEREN_SIRKET_UNMAPPED',
-        'branch update refuses an employer without a company'
+    sgkSelfAssert(
+        $switched['sgk_isveren']['id'] === $ids['senayMerkez']
+            && (int) sgkSelfSubeRow($pdo, $bursaBranchId)['sgk_isveren_id'] === $ids['senayMerkez'],
+        'branch update accepts another company employer'
     );
 
     // --------------------------------------------- company change fail-closed
 
-    sgkSelfRefuses(
-        static function () use ($pdo, $ids): void {
-            OrganizasyonService::updateSgkIsveren($pdo, $ids['bursa'], ['sirket_id' => $ids['senay']]);
-        },
-        'SGK_ISVEREN_SIRKET_CHANGE_BLOCKED',
-        'moving an employer that company-1 branches point at is refused'
+    // 2026-09-15 model: cross-company şube eşleşmesi artık bir employer şirket
+    // değişikliğini bloke etmez; yalnız IC personel bağı fail-closed kalır.
+    $branchBound = OrganizasyonService::createSgkIsveren($pdo, [
+        'sirket_id' => $ids['medisa'],
+        'kod' => 'MED-BND',
+        'ad' => 'Medisa Sube Bagli',
+    ]);
+    $branchBoundId = (int) $branchBound['id'];
+    $boundBranch = OrganizasyonService::createSube($pdo, [
+        'kod' => 'MED-BND-SB',
+        'ad' => 'Bagli Sgk',
+        'departman_ids' => [],
+        'sgk_isveren_id' => $branchBoundId,
+    ], $ids['medisa']);
+    $boundBranchId = (int) $boundBranch['id'];
+    $branchRemapped = OrganizasyonService::updateSgkIsveren($pdo, $branchBoundId, ['sirket_id' => $ids['senay']]);
+    sgkSelfAssert(
+        $branchRemapped['sirket']['id'] === $ids['senay']
+            && (int) sgkSelfSubeRow($pdo, $boundBranchId)['sgk_isveren_id'] === $branchBoundId,
+        'a branch pointing at the employer does not block an employer company change'
     );
 
     $unmappedMapped = OrganizasyonService::updateSgkIsveren($pdo, $ids['unmapped'], ['sirket_id' => $ids['senay']]);

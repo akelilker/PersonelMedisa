@@ -297,7 +297,7 @@ jobs:
           for table in sirketler subeler sgk_isverenler calisma_lokasyonlari personeller user_subeler user_sirketler user_sgk_isverenler; do
             emit_scalar "ROWS_$(echo "$table" | tr '[:lower:]' '[:upper:]')" ".data.row_counts.${table}" '^-?[0-9]{1,12}$'
           done
-          for guard in unmapped_sube_count unmapped_sgk_isveren_count orphan_sube_sirket_count orphan_lokasyon_sube_count sube_sgk_sirket_mismatch_count; do
+          for guard in unmapped_sube_count unmapped_sgk_isveren_count orphan_sube_sirket_count orphan_lokasyon_sube_count; do
             emit_scalar "GUARD_$(echo "$guard" | tr '[:lower:]' '[:upper:]')" ".data.orphan_counts.${guard}" '^-?[0-9]{1,12}$'
           done
           emit_scalar USER_SUBE_TOTAL '.data.scope_summary.user_sube_total' '^-?[0-9]{1,12}$'

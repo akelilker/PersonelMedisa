@@ -4,29 +4,23 @@ import type { YonetimSgkIsveren } from "../../types/yonetim";
 /**
  * Şube formundaki SGK işvereni seçenekleri.
  *
- * İki kural birlikte uygulanır:
- *  1. yalnız seçili şirkete ait SGK işverenleri (başka şirketin kaydı asla
- *     görünmez; backend de aynı invariantı doğrular),
- *  2. yalnız AKTIF kayıtlar — ancak şubenin hâlihazırda bağlı olduğu kayıt PASIF
- *     olsa bile listede kalır. Aksi halde ilgisiz bir düzenleme mevcut eşlemeyi
- *     sessizce düşürürdü.
+ * 2026-09-15 business kararı: şube şirketi ile `sgk_isveren.sirket_id` farklı
+ * olabilir (ör. Medisa şubesi Karyapı veya Şenay SGK işverenini seçebilir).
+ * Bu yüzden seçim listesi şirkete göre filtrelenmez; katalogdaki TÜM AKTIF SGK
+ * işverenleri sunulur ve yeni eklenen bir SGK işvereni otomatik olarak listede
+ * görünür. Şirketsiz (henüz eşlenmemiş) AKTIF kayıtlar da seçilebilir.
  *
- * Şirket bilinmiyorsa (legacy/şirketsiz kayıt) liste boştur: fail-closed.
+ * Tek kural: yalnız AKTIF kayıtlar — ancak şubenin hâlihazırda bağlı olduğu
+ * kayıt PASIF olsa bile listede kalır. Aksi halde ilgisiz bir düzenleme mevcut
+ * eşlemeyi sessizce düşürürdü.
+ *
  * Şube adı, ili veya lokasyonu üzerinden hiçbir SGK eşlemesi türetilmez.
  */
-export function filterSgkIsverenOptionsForSirket(
+export function filterActiveSgkIsverenOptions(
   options: YonetimSgkIsveren[],
-  sirketId: number | null,
   keepSgkIsverenId: number | null = null
 ): YonetimSgkIsveren[] {
-  if (sirketId == null || sirketId <= 0) {
-    return [];
-  }
-
   return options.filter((option) => {
-    if (option.sirket?.id !== sirketId) {
-      return false;
-    }
     if (option.durum === "AKTIF") {
       return true;
     }
@@ -36,10 +30,11 @@ export function filterSgkIsverenOptionsForSirket(
 }
 
 /**
- * Şirket bağlamı değiştiğinde artık geçerli olmayan seçim korunmaz; sessizce
- * taşınmak yerine temizlenir (backend yine fail-closed doğrular).
+ * Seçim listesi değiştiğinde (katalog yenilendi, kayıt silindi) artık listede
+ * olmayan seçim korunmaz; sessizce taşınmak yerine temizlenir (backend kaydı
+ * yine fail-closed doğrular).
  */
-export function resolveSgkIsverenAfterSirketChange(
+export function resolveSgkIsverenSelection(
   currentSgkIsverenId: string,
   allowedOptions: YonetimSgkIsveren[]
 ): string {

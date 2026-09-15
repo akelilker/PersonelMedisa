@@ -668,8 +668,8 @@ try {
         'the matrix publishes relation ids and a count, and nothing else'
     );
     omapAssert(
-        $inventory['schema_version'] === '5',
-        'the extended inventory contract is published as schema version 5'
+        $inventory['schema_version'] === '6',
+        'the extended inventory contract is published as schema version 6'
     );
     omapAssert(
         $inventory['data']['allowed_personnel'] === []
@@ -898,12 +898,23 @@ try {
         'a spec that decides only some branches is rejected'
     );
 
+    // 2026-09-15 model: şube şirketi ile SGK işvereninin şirketi farklı olabilir;
+    // cross-company eşleşme spec conflict'i değildir. Yalnız işverenin şirket
+    // kararı eksikse spec reddedilir (SPEC_SGK_MAPPING_INCOMPLETE).
     $crossCompany = $specArray;
     $crossCompany['branch_mappings'][0]['target_company_kod'] = 'TESTCO-B';
+    $crossCompanySpec = OrganizationMappingSpec::parse($crossCompany);
     omapAssert(
-        (omapFailure(static fn () => OrganizationMappingSpec::parse($crossCompany)))?->reason
-            === 'SPEC_BRANCH_SGK_COMPANY_CONFLICT',
-        'a branch whose company disagrees with its payroll employer is rejected'
+        $crossCompanySpec->branchMappings()[0]['target_company_kod'] === 'TESTCO-B',
+        'a branch may target a company other than its payroll employer company'
+    );
+
+    $withoutEmployerDecision = $specArray;
+    array_pop($withoutEmployerDecision['sgk_mappings']);
+    omapAssert(
+        (omapFailure(static fn () => OrganizationMappingSpec::parse($withoutEmployerDecision)))?->reason
+            === 'SPEC_SGK_MAPPING_INCOMPLETE',
+        'a branch employer the spec never decides is rejected'
     );
 
     $unknownCompany = $specArray;
@@ -1154,10 +1165,6 @@ try {
         'data_ready turns true once companies, branches and payroll employers are mapped'
     );
     omapAssert(
-        $postcheck['readiness']['sube_sgk_sirket_mismatch_count'] === 0,
-        'the branch/payroll company mismatch count is zero after the commit'
-    );
-    omapAssert(
         (int) $pdo->query('SELECT COUNT(*) FROM calisma_lokasyonlari WHERE sube_id IS NULL')->fetchColumn() === 3,
         'three work locations are still unmapped'
     );
@@ -1283,7 +1290,7 @@ try {
     );
 
     // -----------------------------------------------------------------------
-    // 9) Fail-closed: company conflicts and mismatch rollback
+    // 9) Fail-closed: company conflicts and pinned-employer rollback
     // -----------------------------------------------------------------------
     $conflict = omapPdo((preg_replace('/dbname=[^;]+/i', 'dbname=' . $conflictDb, $dsn) ?: $dsn));
     omapCreateSchema($conflict);
@@ -1344,14 +1351,14 @@ try {
     );
     $conflict->exec('DELETE FROM sirketler WHERE id = 80');
 
-    // A payroll employer pinned to a company the branch spec disagrees with must
-    // roll the whole operation back rather than commit a mismatch.
+    // A payroll employer already pinned to another company must roll the whole
+    // operation back rather than silently re-parent a mapped row.
     $conflict->exec("INSERT INTO sirketler (id, kod, ad) VALUES (81, 'TESTCO-C', 'Test Company C')");
     $conflict->exec('UPDATE sgk_isverenler SET sirket_id = 81 WHERE id = 1');
     OrganizasyonSchema::resetCache();
     $mismatchInventory = OrganizationMappingInventoryReport::collect($conflict, OMAP_SHA, OMAP_TIP);
     $mismatchSpecArray = omapSpecArray($mismatchInventory);
-    // Employer 1 is now in TESTCO-C while its branches are decided for TESTCO-A.
+    // Employer 1 is already in TESTCO-C while the spec decides TESTCO-A for it.
     $mismatchSpecArray['sgk_mappings'][0]['target_company_kod'] = 'TESTCO-A';
     $mismatchSpec = OrganizationMappingSpec::parse($mismatchSpecArray);
     $mismatchBefore = omapFingerprint($conflict);
@@ -1367,11 +1374,11 @@ try {
     ));
     omapAssert(
         $mismatchFailure !== null,
-        'a branch/payroll company mismatch is refused'
+        'an employer already pinned to another company is refused'
     );
     omapAssert(
         omapFingerprint($conflict) === $mismatchBefore,
-        'the mismatch rollback restores the exact preimage, including company rows'
+        'the employer-company conflict rollback restores the exact preimage'
     );
 
     // -----------------------------------------------------------------------
@@ -1557,26 +1564,26 @@ try {
         'a later rename or status change does not invalidate the create audit'
     );
 
-    // The company/SGK and orphan guards keep working alongside the new rules.
+    // Şube şirketi ile SGK işvereninin şirketi farklı olabilir (2026-09-15 model):
+    // cross-company eşleşme ne inventory ne readiness blocker'ıdır.
     $extBlocked->exec("INSERT INTO sirketler (id, kod, ad) VALUES (70, 'TESTCO-X', 'Test Company X'), (71, 'TESTCO-Y', 'Test Company Y')");
     $extBlocked->exec('UPDATE subeler SET sirket_id = 70 WHERE id = 1');
     $extBlocked->exec('UPDATE sgk_isverenler SET sirket_id = 71 WHERE id = 1');
     OrganizasyonSchema::resetCache();
-    $guarded = OrganizationMappingInventoryReport::collect($extBlocked, OMAP_SHA, OMAP_TIP);
+    $crossCompanyMapped = OrganizationMappingInventoryReport::collect($extBlocked, OMAP_SHA, OMAP_TIP);
     omapAssert(
-        $guarded['data']['orphan_counts']['sube_sgk_sirket_mismatch_count'] > 0
-            && in_array('BRANCH_SGK_COMPANY_MISMATCH', $guarded['blockers'], true),
-        'the branch/payroll company mismatch guard is untouched by the new model'
+        !in_array('BRANCH_SGK_COMPANY_MISMATCH', $crossCompanyMapped['blockers'], true)
+            && !in_array('SUBE_SGK_SIRKET_MISMATCH', $crossCompanyMapped['readiness_blockers'], true),
+        'a branch mapped to another company payroll employer is not a blocker'
     );
     omapAssert(
-        array_keys($guarded['data']['orphan_counts']) === [
+        array_keys($crossCompanyMapped['data']['orphan_counts']) === [
             'orphan_sube_sirket_count',
             'orphan_lokasyon_sube_count',
-            'sube_sgk_sirket_mismatch_count',
             'unmapped_sube_count',
             'unmapped_sgk_isveren_count',
         ],
-        'every orphan and mismatch counter is still published'
+        'every orphan counter is still published'
     );
 
     // A vanished baseline branch stays a blocker.

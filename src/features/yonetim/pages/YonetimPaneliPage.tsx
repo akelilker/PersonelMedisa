@@ -69,8 +69,8 @@ import type {
   YonetimSube
 } from "../../../types/yonetim";
 import {
-  filterSgkIsverenOptionsForSirket,
-  resolveSgkIsverenAfterSirketChange,
+  filterActiveSgkIsverenOptions,
+  resolveSgkIsverenSelection,
   toSgkIsverenSelectOptions
 } from "../../../lib/yonetim/sgk-isveren-options";
 
@@ -511,13 +511,14 @@ function toSubePayload(
   };
 
   // Şirket bağlamı olmayan (legacy) ekranda alan gönderilmez: mevcut eşleme
-  // kazara temizlenmesin. Şirket bağlamı varken seçim listeye karşı doğrulanır.
+  // kazara temizlenmesin. Şirket bağlamı varken seçim, sunulan aktif SGK
+  // işveren listesine karşı doğrulanır (şirket farkı engel değildir).
   if (sgkContext) {
     const selected = form.sgkIsverenId.trim();
     if (selected) {
       const parsed = Number.parseInt(selected, 10);
       if (!Number.isInteger(parsed) || !sgkContext.allowedSgkIsverenIds.includes(parsed)) {
-        throw new Error("Seçilen SGK işvereni bu şirkete ait değil veya aktif değil.");
+        throw new Error("Seçilen SGK işvereni listede yok veya aktif değil.");
       }
       payload.sgk_isveren_id = parsed;
     } else {
@@ -789,7 +790,8 @@ export function YonetimPaneliPage() {
     [sgkIsverenleri, selectedSirketId]
   );
   // The branch being edited keeps its own employer visible even after it was
-  // deactivated; a foreign-company selection is never offered.
+  // deactivated. Seçim listesi şirkete göre filtrelenmez: şube şirketi ile SGK
+  // işvereninin şirketi farklı olabilir (2026-09-15 business kararı).
   const editingSubeSgkIsverenId = useMemo(
     () =>
       editingSubeId == null
@@ -798,8 +800,8 @@ export function YonetimPaneliPage() {
     [editingSubeId, subeler]
   );
   const subeSgkIsverenOptions = useMemo(
-    () => filterSgkIsverenOptionsForSirket(sgkIsverenleri, selectedSirketId, editingSubeSgkIsverenId),
-    [sgkIsverenleri, selectedSirketId, editingSubeSgkIsverenId]
+    () => filterActiveSgkIsverenOptions(sgkIsverenleri, editingSubeSgkIsverenId),
+    [sgkIsverenleri, editingSubeSgkIsverenId]
   );
   const subeSgkIsverenSelectOptions = useMemo(
     () => toSgkIsverenSelectOptions(subeSgkIsverenOptions),
@@ -814,16 +816,16 @@ export function YonetimPaneliPage() {
     [sirketler]
   );
 
-  // Company context changed (or the stored mapping is inconsistent): the stale
-  // selection is dropped instead of being carried into the write payload. This
-  // only runs with a loaded catalog — an unavailable catalog is not "no options".
+  // Katalog yenilendiğinde (veya kayıt silindiğinde) listede olmayan seçim
+  // taşınmaz, temizlenir. Bu yalnızca katalog okunmuşken çalışır — okunamayan
+  // katalog "seçenek yok" anlamına gelmez.
   const hasSgkIsverenContext =
     isSgkIsverenCatalogLoaded && hierarchyMode && selectedSirketId != null;
   useEffect(() => {
     if (!isSubeFormOpen || !hasSgkIsverenContext) {
       return;
     }
-    const next = resolveSgkIsverenAfterSirketChange(subeForm.sgkIsverenId, subeSgkIsverenOptions);
+    const next = resolveSgkIsverenSelection(subeForm.sgkIsverenId, subeSgkIsverenOptions);
     if (next !== subeForm.sgkIsverenId) {
       setSubeForm((prev) => ({ ...prev, sgkIsverenId: next }));
     }
@@ -2313,8 +2315,8 @@ export function YonetimPaneliPage() {
                     : !isSgkIsverenCatalogLoaded
                       ? "SGK işveren listesi bu oturumda okunamadı; mevcut eşleme korunur ve bu formdan değiştirilemez."
                       : subeSgkIsverenSelectOptions.length === 0
-                        ? "Bu şirkete ait aktif SGK işvereni bulunmuyor. Aşağıdaki SGK İşverenleri bölümünden oluşturup şirkete bağlayabilirsiniz."
-                        : "Yalnız bu şirkete ait aktif SGK işverenleri seçilebilir. Şube adı veya ilden eşleme türetilmez."}
+                        ? "Aktif SGK işvereni bulunmuyor. Aşağıdaki SGK İşverenleri bölümünden oluşturabilirsiniz."
+                        : "Yalnız aktif SGK işverenleri seçilebilir; şube şirketi ile SGK işvereninin şirketi farklı olabilir. Şube adı veya ilden eşleme türetilmez."}
                 </p>
               </div>
               {hasSgkIsverenContext ? (

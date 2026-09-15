@@ -68,7 +68,7 @@ class PersonelMobileCapabilityService
                 'puantaj_write' => false,
                 'izin_write' => false,
                 'coming_soon_message' => null,
-                'info_only_notice' => 'DIŞ KAYNAK — BİLGİ AMAÇLIDIR / ÜCRET VE SGK TAHAKKUKU OLUŞTURMAZ',
+                'info_only_notice' => 'HARİCİ PERSONEL — BİLGİ AMAÇLIDIR / ÜCRET VE SGK TAHAKKUKU OLUŞTURMAZ',
             ];
         }
 

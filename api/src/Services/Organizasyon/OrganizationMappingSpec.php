@@ -470,9 +470,10 @@ final class OrganizationMappingSpec
             );
         }
 
-        // A branch and the payroll employer it already points at must land in the
-        // same company, otherwise the commit could not leave
-        // sube_sgk_sirket_mismatch_count at zero.
+        // A branch's payroll employer must be decided by the spec, otherwise the
+        // commit would leave that employer without a company. Şube şirketi ile SGK
+        // işvereninin şirketi ise farklı olabilir (2026-09-15 model): hedef
+        // şirketlerinin ayrışması reddedilmez.
         $sgkTargets = [];
         foreach ($spec['sgk_mappings'] as $mapping) {
             $sgkTargets[$mapping['sgk_isveren_id']] = $mapping['target_company_kod'];
@@ -485,12 +486,6 @@ final class OrganizationMappingSpec
             if (!isset($sgkTargets[$sgkId])) {
                 throw OrganizationMappingFailure::of(
                     'SPEC_SGK_MAPPING_INCOMPLETE',
-                    'sube_id=' . $mapping['sube_id'] . ' sgk_isveren_id=' . $sgkId
-                );
-            }
-            if ($sgkTargets[$sgkId] !== $mapping['target_company_kod']) {
-                throw OrganizationMappingFailure::of(
-                    'SPEC_BRANCH_SGK_COMPANY_CONFLICT',
                     'sube_id=' . $mapping['sube_id'] . ' sgk_isveren_id=' . $sgkId
                 );
             }

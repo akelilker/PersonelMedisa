@@ -30,8 +30,8 @@ const IMPORT_ERROR_MESSAGES: Record<string, string> = {
   PERSONEL_IMPORT_SOURCE_REQUIRED: "Kaynak özeti geçersiz.",
   PERSONEL_IMPORT_IDEMPOTENCY_CONFLICT: "Aynı aktarım anahtarı farklı bir kaynakla kullanılmış.",
   PERSONEL_IMPORT_UCRET_KARARI_BEKLENIYOR: "Ücret ve bordro alanları bu aktarımda kullanılamaz.",
-  DIS_KAYNAK_SGK_ISVEREN_YASAK: "Dış kaynak personeline PersonelMedisa SGK işvereni atanamaz.",
-  PERSONEL_OPERASYON_KAPSAM_DISI: "Bu dış kaynak kaydı operasyonel işlemlerde kullanılamaz."
+  DIS_KAYNAK_SGK_ISVEREN_YASAK: "Harici Personel kaydına PersonelMedisa SGK işvereni atanamaz.",
+  PERSONEL_OPERASYON_KAPSAM_DISI: "Bu Harici Personel kaydı operasyonel işlemlerde kullanılamaz."
 };
 
 export function importErrorMessage(code: string): string {

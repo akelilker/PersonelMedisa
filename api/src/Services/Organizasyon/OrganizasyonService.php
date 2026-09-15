@@ -577,7 +577,7 @@ final class OrganizasyonService
         self::assertDepartmanIdsExist($pdo, $departmanIds);
         self::assertSubeKodUnique($pdo, $kod, null);
         self::assertSubeAdUniqueInSirket($pdo, $ad, $parentSirketId, null);
-        self::assertSgkIsverenConsistent($pdo, $sgkIsverenId, $parentSirketId);
+        self::assertSgkIsverenConsistent($pdo, $sgkIsverenId);
         if ($muhasebePlan !== null) {
             self::assertMuhasebeYetkiPlanValid($pdo, $muhasebePlan);
         }
@@ -686,12 +686,11 @@ final class OrganizasyonService
         if (SubeReadModel::normalizeName($ad) !== SubeReadModel::normalizeName((string) $existing['ad'])) {
             self::assertSubeAdUniqueInSirket($pdo, $ad, $currentSirketId, $id);
         }
-        // Only a new or changed attachment is held to the AKTIF / same-company rule;
-        // an untouched mapping is never silently rewritten by an unrelated edit.
+        // Only a NEW or CHANGED attachment is held to the AKTIF rule; an untouched
+        // mapping is never silently rewritten by an unrelated edit.
         self::assertSgkIsverenConsistent(
             $pdo,
             $sgkIsverenId,
-            $currentSirketId,
             $sgkIsverenId !== $existingSgkIsverenId
         );
         if ($muhasebePlan !== null) {
@@ -1111,13 +1110,15 @@ final class OrganizasyonService
 
     /**
      * Fail closed when moving an employer to another company would break an
-     * already-stored relation: a branch of company Y, and an IC_PERSONEL row of a
-     * company-Y branch, both contradict the new company X.
+     * already-stored relation: an IC_PERSONEL row of a company-Y branch
+     * contradicts the new company X.
      *
-     * DIS_KAYNAK is deliberately excluded: the payroll/SGK source of a Harici
-     * personel is an independent axis from its branch company (employment-scope
-     * model, 2026-09-13), so a Harici row never freezes an employer's company
-     * mapping. Without the scope axis (pre-066) every row still counts, which
+     * Şube tarafı bilinçli olarak kapsam dışıdır: şube şirketi ile
+     * `sgk_isveren.sirket_id` farklı olabilir (2026-09-15 model), bu yüzden
+     * cross-company eşleşen şubeler bir employer şirket değişikliğini bloke
+     * etmez. DIS_KAYNAK da dışarıdadır: Harici personelin SGK kaynağı şube
+     * şirketinden bağımsız bir eksendir (2026-09-13 employment-scope modeli).
+     * Without the scope axis (pre-066) every personnel row still counts, which
      * keeps the older schema fail-closed.
      */
     private static function assertSgkIsverenSirketChangeSafe(PDO $pdo, int $sgkIsverenId, int $newSirketId): void
@@ -1125,13 +1126,6 @@ final class OrganizasyonService
         if (!OrganizasyonSchema::hasColumn($pdo, 'subeler', 'sirket_id')) {
             return;
         }
-
-        $mismatchedBranches = self::countWhere(
-            $pdo,
-            'SELECT COUNT(*) FROM subeler
-             WHERE sgk_isveren_id = :id AND sirket_id IS NOT NULL AND sirket_id <> :sirket_id',
-            ['id' => $sgkIsverenId, 'sirket_id' => $newSirketId]
-        );
 
         $mismatchedPersonel = 0;
         if (OrganizasyonSchema::hasColumn($pdo, 'personeller', 'sgk_isveren_id')) {
@@ -1148,11 +1142,11 @@ final class OrganizasyonService
             );
         }
 
-        if ($mismatchedBranches > 0 || $mismatchedPersonel > 0) {
+        if ($mismatchedPersonel > 0) {
             throw OrganizasyonException::conflict(
                 'SGK_ISVEREN_SIRKET_CHANGE_BLOCKED',
-                'Bu SGK işverenine bağlı şube veya personel kayıtları seçilen şirkete ait değil. '
-                . 'Şirket değişikliği mevcut şirket tutarlılığını bozacağı için reddedildi.'
+                'Bu SGK işverenine bağlı iç personel kayıtları seçilen şirkete ait değil. '
+                . 'Şirket değişikliği mevcut iç personel şirket tutarlılığını bozacağı için reddedildi.'
             );
         }
     }
@@ -1174,29 +1168,29 @@ final class OrganizasyonService
     }
 
     /**
-     * A branch and its payroll employer must sit under the same company, and a
-     * NEW or CHANGED attachment may only target an AKTIF employer. The relation is
-     * never guessed from a name, a city or a sibling branch.
+     * A NEW or CHANGED attachment may only target an AKTIF employer.
      *
-     * An unchanged attachment is exempt from the AKTIF / "company defined" rule so
-     * that editing a branch whose employer was later deactivated (or is still
-     * unmapped) never silently rewrites or drops the stored mapping.
+     * 2026-09-15 business kararı: şube şirketi ile `sgk_isveren.sirket_id` farklı
+     * olabilir. Bu yüzden şirket eşleşmesi (mismatch) veya şirketsiz kayıt burada
+     * reddedilmez; şube SGK kaynağı yalnız aktif-employer kuralına tabidir. İlişki
+     * hiçbir zaman addan, ilden veya kardeş şubeden tahmin edilmez.
+     *
+     * An unchanged attachment is exempt from the AKTIF rule so that editing a
+     * branch whose employer was later deactivated never silently rewrites or
+     * drops the stored mapping.
      */
     private static function assertSgkIsverenConsistent(
         PDO $pdo,
         ?int $sgkIsverenId,
-        ?int $sirketId,
         bool $isNewAssignment = true
     ): void {
         if ($sgkIsverenId === null) {
             return;
         }
 
-        $ready = OrganizasyonSchema::isSchemaReady($pdo);
         $hasDurum = OrganizasyonSchema::hasColumn($pdo, 'sgk_isverenler', 'durum');
         $stmt = $pdo->prepare(
             'SELECT id'
-            . ($ready ? ', sirket_id' : '')
             . ($hasDurum ? ', durum' : '')
             . ' FROM sgk_isverenler WHERE id = :id LIMIT 1'
         );
@@ -1206,40 +1200,15 @@ final class OrganizasyonService
             throw OrganizasyonException::validation('Geçersiz SGK işvereni seçimi.', 'sgk_isveren_id');
         }
 
-        if ($isNewAssignment && $hasDurum) {
-            $durum = strtoupper(trim((string) ($row['durum'] ?? '')));
-            if ($durum !== '' && $durum !== 'AKTIF') {
-                throw OrganizasyonException::conflict(
-                    'SGK_ISVEREN_PASIF',
-                    'Pasif SGK işvereni yeni bir şubeye bağlanamaz. Kaydı aktife alın veya başka bir SGK işvereni seçin.',
-                    'sgk_isveren_id'
-                );
-            }
-        }
-
-        if (!$ready || $sirketId === null) {
+        if (!$isNewAssignment || !$hasDurum) {
             return;
         }
 
-        $employerSirketId = ($row['sirket_id'] === null || $row['sirket_id'] === '')
-            ? null
-            : (int) $row['sirket_id'];
-        if ($employerSirketId === null) {
-            if ($isNewAssignment) {
-                throw OrganizasyonException::conflict(
-                    'SGK_ISVEREN_SIRKET_UNMAPPED',
-                    'Seçilen SGK işvereni bir şirkete bağlı değil. Önce SGK işverenini bir şirkete bağlayın.',
-                    'sgk_isveren_id'
-                );
-            }
-
-            return;
-        }
-
-        if ($employerSirketId !== $sirketId) {
+        $durum = strtoupper(trim((string) ($row['durum'] ?? '')));
+        if ($durum !== '' && $durum !== 'AKTIF') {
             throw OrganizasyonException::conflict(
-                'SGK_ISVEREN_SIRKET_MISMATCH',
-                'Seçilen SGK işvereni bu şirkete bağlı değil.',
+                'SGK_ISVEREN_PASIF',
+                'Pasif SGK işvereni yeni bir şubeye bağlanamaz. Kaydı aktife alın veya başka bir SGK işvereni seçin.',
                 'sgk_isveren_id'
             );
         }

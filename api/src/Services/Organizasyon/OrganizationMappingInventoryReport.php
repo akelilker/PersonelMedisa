@@ -52,7 +52,7 @@ use Throwable;
  */
 final class OrganizationMappingInventoryReport
 {
-    public const SCHEMA_VERSION = '5';
+    public const SCHEMA_VERSION = '6';
 
     /**
      * The historical production baseline: the branch id set the postcheck
@@ -152,7 +152,6 @@ final class OrganizationMappingInventoryReport
             'orphan_counts' => [
                 'orphan_sube_sirket_count' => (int) $readiness['counts']['orphan_sube_sirket_count'],
                 'orphan_lokasyon_sube_count' => (int) $readiness['counts']['orphan_lokasyon_sube_count'],
-                'sube_sgk_sirket_mismatch_count' => (int) $readiness['counts']['sube_sgk_sirket_mismatch_count'],
                 'unmapped_sube_count' => (int) $readiness['counts']['unmapped_sube_count'],
                 'unmapped_sgk_isveren_count' => (int) $readiness['counts']['unmapped_sgk_isveren_count'],
             ],
@@ -1078,9 +1077,8 @@ final class OrganizationMappingInventoryReport
         if ($data['orphan_counts']['orphan_lokasyon_sube_count'] > 0) {
             $blockers[] = 'LOCATION_BRANCH_ORPHAN';
         }
-        if ($data['orphan_counts']['sube_sgk_sirket_mismatch_count'] > 0) {
-            $blockers[] = 'BRANCH_SGK_COMPANY_MISMATCH';
-        }
+        // Şube şirketi ile SGK işvereninin şirketi farklı olabilir (2026-09-15
+        // model): cross-company eşleşme burada blocker değildir.
         if ($data['personnel_matrix_reconciled'] !== true) {
             $blockers[] = 'INVENTORY_PERSONNEL_MATRIX_COUNT_MISMATCH';
         }

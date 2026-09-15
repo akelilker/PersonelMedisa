@@ -113,7 +113,7 @@ describe("branch accounting visibility owners", () => {
     expect(current).toMatch(/^PRODUCTION_MIGRATION_TIP: 087$/m);
     expect(current).toMatch(/^PRODUCTION_MIGRATION_PENDING: 1$/m);
     expect(current).toMatch(
-      /^PRODUCTION_DEPLOY_SHA: f5551160cab7d12b2086d7146c7822f4dfdb469d$/m
+      /^PRODUCTION_DEPLOY_SHA: d96182a2a4b4cb5e9e6d7c867d3486d7ac4061b2$/m
     );
     expect(current).toContain("USER_SUBELER_SEMANTIC: ACCESS_SCOPE_ONLY");
     expect(current).toContain("BRANCH_MANAGER_OWNER: sube_sorumlu_yoneticiler");

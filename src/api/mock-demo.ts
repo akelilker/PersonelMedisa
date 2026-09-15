@@ -10304,10 +10304,17 @@ export function resolveDemoApiResponse(
     }
 
     if (pathname === "/referans/bagli-amirler") {
-      return ok([
-        { id: 1, ad: "Demo Amir" },
-        { id: 2, ad: "İkinci Amir" }
-      ]);
+      // bagli_amir_id = users.id; personel context ekseni users.personel_id'dir.
+      return ok(
+        [
+          { id: 1, ad: "Demo Amir" },
+          { id: 2, ad: "İkinci Amir" }
+        ].map((option) => ({
+          ...option,
+          personel_id:
+            demoState.yonetimKullanicilari.find((kullanici) => kullanici.id === option.id)?.personel_id ?? null
+        }))
+      );
     }
 
     if (pathname === "/referans/ucret-tipleri") {

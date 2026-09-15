@@ -7,6 +7,7 @@ namespace Medisa\Api\Controllers;
 use Medisa\Api\Auth\AuthMiddleware;
 use Medisa\Api\Auth\RolePermissions;
 use Medisa\Api\Database\Connection;
+use Medisa\Api\Database\UsersSchema;
 use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
 use Medisa\Api\Services\Personel\PersonelOrgLocationSchema;
@@ -492,6 +493,9 @@ class ReferansController
      *   şube/İK yöneticileri de bağlı amir olarak seçilebilir.
      * - Yazma kontratı (`bagli_amir_id` → users.id + durum=AKTIF) ile aynı tablo:
      *   liste yazma kontratından daha dar olamaz.
+     * - `personel_id` (`users.personel_id`), seçilen amirin personel context'ine
+     *   (departman/şube) geçişin tek owner'ıdır; `bagli_amir_id` asla personel id
+     *   gibi okunmaz. Personel kaydı olmayan yönetim hesabında `null` kalır.
      * - Otomatik seçim yok; self/cycle koruması çağıran form kontratlarındadır.
      */
     public static function bagliAmirler(Request $request)
@@ -504,8 +508,14 @@ class ReferansController
             JsonResponse::serverError('Veritabani baglantisi kurulamadi.');
         }
 
+        $hasPersonelId = UsersSchema::hasPersonelId($pdo);
+        $selectCols = 'id, ad_soyad';
+        if ($hasPersonelId) {
+            $selectCols .= ', personel_id';
+        }
+
         $stmt = $pdo->query(
-            "SELECT id, ad_soyad
+            "SELECT {$selectCols}
              FROM users
              WHERE durum = 'AKTIF'
                AND rol NOT IN ('PERSONEL', 'AUTH_SMOKE_READONLY')
@@ -514,9 +524,13 @@ class ReferansController
         $rows = $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
         $items = [];
         foreach ($rows as $row) {
+            $personelId = $hasPersonelId && isset($row['personel_id']) && $row['personel_id'] !== null
+                ? (int) $row['personel_id']
+                : null;
             $items[] = [
                 'id' => (int) $row['id'],
                 'ad' => (string) $row['ad_soyad'],
+                'personel_id' => $personelId !== null && $personelId > 0 ? $personelId : null,
             ];
         }
 

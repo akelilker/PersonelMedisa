@@ -13,7 +13,9 @@ import {
   fetchPrimKuraliOptions,
   fetchSgkIsverenOptions,
   fetchCalismaLokasyonuOptions,
-  fetchUcretTipiOptions
+  fetchUcretTipiOptions,
+  resolveBagliAmirPersonelId,
+  type BagliAmirLookupOption
 } from "../api/referans.api";
 import { createSurec, fetchSureclerList } from "../api/surecler.api";
 import { fetchZimmetlerList } from "../api/zimmetler.api";
@@ -97,9 +99,24 @@ const INITIAL_EDIT_PERSONEL_FORM: EditPersonelFormState = {
   effectiveDate: ""
 };
 
-async function fetchBagliAmirContext(amirId: number): Promise<BagliAmirContext | null> {
+/**
+ * Bağlı amir context'i.
+ *
+ * `bagli_amir_id` kanonik olarak `users.id`'dir; personel context'i (departman/şube)
+ * yalnız `users.personel_id` üzerinden çözülür. Amir user'ı bir personel kaydına
+ * bağlı değilse context üretilmez — amir id'si asla personel id gibi okunmaz.
+ */
+async function fetchBagliAmirContext(
+  amirUserId: number,
+  bagliAmirOptions: readonly BagliAmirLookupOption[]
+): Promise<BagliAmirContext | null> {
+  const personelId = resolveBagliAmirPersonelId(amirUserId, bagliAmirOptions);
+  if (personelId === null) {
+    return null;
+  }
+
   try {
-    const personel = await fetchPersonelDetail(amirId);
+    const personel = await fetchPersonelDetail(personelId);
     return buildBagliAmirContext(personel);
   } catch {
     return null;
@@ -527,7 +544,7 @@ function usePersonelDetailEdit(
     }
 
     void (async () => {
-      const context = await fetchBagliAmirContext(amirId);
+      const context = await fetchBagliAmirContext(amirId, personelRefs.bagliAmirOptions);
       if (!cancelled) {
         setEditBagliAmirContext(context);
       }
@@ -536,7 +553,7 @@ function usePersonelDetailEdit(
     return () => {
       cancelled = true;
     };
-  }, [personel?.bagli_amir_id]);
+  }, [personel?.bagli_amir_id, personelRefs.bagliAmirOptions]);
 
   const discardEdit = useCallback(() => {
     if (!personel) {
@@ -552,10 +569,10 @@ function usePersonelDetailEdit(
     }
 
     void (async () => {
-      const context = await fetchBagliAmirContext(amirId);
+      const context = await fetchBagliAmirContext(amirId, personelRefs.bagliAmirOptions);
       setEditBagliAmirContext(context);
     })();
-  }, [personel]);
+  }, [personel, personelRefs.bagliAmirOptions]);
 
   const handleEditDepartmanChange = useCallback((departmanId: string) => {
     setEditForm((prev) => {
@@ -602,7 +619,7 @@ function usePersonelDetailEdit(
     }
 
     void (async () => {
-      const context = await fetchBagliAmirContext(amirId);
+      const context = await fetchBagliAmirContext(amirId, personelRefs.bagliAmirOptions);
       setEditBagliAmirContext(context);
       if (!context?.departmanId) {
         return;
@@ -612,7 +629,7 @@ function usePersonelDetailEdit(
         prev.bagliAmirId === bagliAmirId ? { ...prev, departmanId: context.departmanId } : prev
       );
     })();
-  }, []);
+  }, [personelRefs.bagliAmirOptions]);
 
   const updatePersonelHandler = useCallback(
     async (event: FormEvent<HTMLFormElement>, canEdit: boolean) => {

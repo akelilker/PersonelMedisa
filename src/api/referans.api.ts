@@ -81,6 +81,30 @@ function normalizeIdOptions(data: unknown, parentKey?: string): IdOption[] {
     .filter((item): item is IdOption => item !== null);
 }
 
+function readBagliAmirPersonelIds(data: unknown): Map<number, number | null> {
+  const personelIdByUserId = new Map<number, number | null>();
+  for (const entry of extractListItems<unknown>(data)) {
+    if (typeof entry !== "object" || entry === null) {
+      continue;
+    }
+
+    const item = entry as Record<string, unknown>;
+    const userId = readPositiveId(item.id);
+    if (userId === null) {
+      continue;
+    }
+
+    personelIdByUserId.set(userId, readPositiveId(item.personel_id ?? item.personelId));
+  }
+
+  return personelIdByUserId;
+}
+
+function readPositiveId(value: unknown): number | null {
+  const parsed = typeof value === "number" ? value : Number.parseInt(String(value ?? ""), 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
 function normalizeKeyOptions(data: unknown): KeyOption[] {
   const entries = extractListItems<unknown>(data);
   const normalizedEntries =
@@ -259,9 +283,43 @@ export async function fetchCalismaLokasyonuOptions(): Promise<IdOption[]> {
   }
 }
 
-export async function fetchBagliAmirOptions(): Promise<IdOption[]> {
+export type BagliAmirOption = IdOption & {
+  /**
+   * `users.personel_id`. `bagli_amir_id` kanonik olarak `users.id`'dir; amirin
+   * personel context'ine (departman/şube) geçiş yalnız bu alan üzerinden yapılır.
+   * Personel kaydına bağlı olmayan yönetim hesabında `null` kalır.
+   */
+  personelId: number | null;
+};
+
+/**
+ * Amir lookup ekseni. Referans bundle'ı yalın `IdOption[]` taşıyabildiği için
+ * `personelId` burada opsiyoneldir; bilinmiyorsa context üretilmez.
+ */
+export type BagliAmirLookupOption = IdOption & { personelId?: number | null };
+
+export async function fetchBagliAmirOptions(): Promise<BagliAmirOption[]> {
   const response = await apiRequest<ApiResponse<unknown>>(endpoints.referans.bagliAmirler);
-  return normalizeIdOptions(response.data);
+  const personelIdByUserId = readBagliAmirPersonelIds(response.data);
+  return normalizeIdOptions(response.data).map((option) => ({
+    ...option,
+    personelId: personelIdByUserId.get(option.id) ?? null
+  }));
+}
+
+/**
+ * Bağlı amir user id → personel id çözümü (`users.id` → `users.personel_id`).
+ * Seçenek listesinde bulunmayan ya da personel kaydı olmayan amir için `null`.
+ */
+export function resolveBagliAmirPersonelId(
+  amirUserId: number | null | undefined,
+  options: readonly BagliAmirLookupOption[]
+): number | null {
+  if (typeof amirUserId !== "number" || !Number.isFinite(amirUserId) || amirUserId <= 0) {
+    return null;
+  }
+
+  return options.find((option) => option.id === amirUserId)?.personelId ?? null;
 }
 
 export async function fetchUcretTipiOptions(): Promise<IdOption[]> {

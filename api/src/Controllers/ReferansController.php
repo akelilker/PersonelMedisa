@@ -404,7 +404,8 @@ class ReferansController
 
     public static function sgkIsverenler(Request $request)
     {
-        AuthMiddleware::authenticate($request, true);
+        $user = AuthMiddleware::authenticate($request, true);
+        self::assertReferenceReadAllowed($user);
 
         try {
             $pdo = Connection::get();
@@ -444,7 +445,8 @@ class ReferansController
 
     public static function calismaLokasyonlari(Request $request)
     {
-        AuthMiddleware::authenticate($request, true);
+        $user = AuthMiddleware::authenticate($request, true);
+        self::assertReferenceReadAllowed($user);
 
         try {
             $pdo = Connection::get();
@@ -500,7 +502,8 @@ class ReferansController
      */
     public static function bagliAmirler(Request $request)
     {
-        AuthMiddleware::authenticate($request, true);
+        $user = AuthMiddleware::authenticate($request, true);
+        self::assertReferenceReadAllowed($user);
 
         try {
             $pdo = Connection::get();
@@ -539,7 +542,8 @@ class ReferansController
 
     public static function surecTurleri(Request $request)
     {
-        AuthMiddleware::authenticate($request, true);
+        $user = AuthMiddleware::authenticate($request, true);
+        self::assertReferenceReadAllowed($user);
 
         JsonResponse::success([
             'items' => [
@@ -559,7 +563,8 @@ class ReferansController
 
     public static function ucretTipleri(Request $request)
     {
-        AuthMiddleware::authenticate($request, true);
+        $user = AuthMiddleware::authenticate($request, true);
+        self::assertReferenceReadAllowed($user);
 
         JsonResponse::success([
             'items' => [
@@ -572,7 +577,8 @@ class ReferansController
 
     public static function primKurallari(Request $request)
     {
-        AuthMiddleware::authenticate($request, true);
+        $user = AuthMiddleware::authenticate($request, true);
+        self::assertReferenceReadAllowed($user);
 
         JsonResponse::success([
             'items' => [
@@ -585,7 +591,8 @@ class ReferansController
 
     public static function bildirimTurleri(Request $request)
     {
-        AuthMiddleware::authenticate($request, true);
+        $user = AuthMiddleware::authenticate($request, true);
+        self::assertReferenceReadAllowed($user);
 
         JsonResponse::success([
             'items' => [
@@ -600,9 +607,36 @@ class ReferansController
         ]);
     }
 
+    /**
+     * Self-service boundary for the reference read surface.
+     *
+     * PERSONEL is the self-service-only role: its whole contract is "my own data
+     * through /me". The reference pickers below feed management forms, and
+     * `bagli-amirler` additionally returns other people's names, so reaching them
+     * would break that contract — the permission matrix cannot express it because
+     * these reads carry no permission today, and inventing one would widen the
+     * published role matrices for a surface PERSONEL never uses.
+     *
+     * Fail-closed by role only: every other role keeps exactly today's access, and
+     * an unresolved/legacy role is not silently widened into a deny either.
+     *
+     * @param array<string, mixed> $user
+     */
+    private static function assertReferenceReadAllowed(array $user)
+    {
+        if (RolePermissions::normalizeRole(isset($user['rol']) ? (string) $user['rol'] : '') === 'PERSONEL') {
+            JsonResponse::error(
+                403,
+                'SELF_SERVICE_ONLY_ROLE_FORBIDDEN',
+                'Bu kaynak self-service hesabi icin kullanilamaz.'
+            );
+        }
+    }
+
     private static function listByTable(Request $request, $table)
     {
-        AuthMiddleware::authenticate($request, true);
+        $user = AuthMiddleware::authenticate($request, true);
+        self::assertReferenceReadAllowed($user);
 
         $allowed = ['departmanlar', 'gorevler', 'personel_tipleri', 'pozisyonlar'];
         if (!in_array($table, $allowed, true)) {
@@ -638,7 +672,8 @@ class ReferansController
 
     private static function listHierarchical(Request $request, $table)
     {
-        AuthMiddleware::authenticate($request, true);
+        $user = AuthMiddleware::authenticate($request, true);
+        self::assertReferenceReadAllowed($user);
 
         $allowed = [
             'bolumler' => 'departman_id',

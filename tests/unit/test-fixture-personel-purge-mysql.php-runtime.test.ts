@@ -53,6 +53,19 @@ describe("test fixture personel purge owner", () => {
     expect(purgeSrc).toContain("USER_NOT_FIXTURE");
     expect(purgeSrc).toContain("PURGE_TEST_FIXTURE");
     expect(purgeSrc).not.toMatch(/personel_id === 1/);
+    // Owner-attributed relation classification (audit / sealed / closed period).
+    expect(purgeSrc).toContain("AUDIT_APPEND_ONLY_RETENTION_REQUIRED");
+    expect(purgeSrc).toContain("CLASS_AUDIT_APPEND_ONLY");
+    expect(purgeSrc).toContain("CLASS_SEALED_HISTORICAL");
+    expect(purgeSrc).toContain("CLASS_CLOSED_PERIOD_ARTIFACT");
+    expect(purgeSrc).toContain("append_only_archive_access_audit");
+    expect(purgeSrc).toContain("closed_period_summary_artifact");
+    expect(purgeSrc).toContain("ArchiveAccessService");
+    expect(purgeSrc).toContain("PuantajDestructionHandler");
+    expect(purgeSrc).toContain("MaasHesaplamaSnapshotService");
+    expect(purgeSrc).toContain("HANDOFF_RETENTION_IMHA");
+    expect(purgeSrc).toContain("RetentionCategories::PUANTAJ");
+    expect(purgeSrc).toContain("RetentionCategories::BORDRO");
     expect(validatorSrc).toContain("CREATE_PASIF_FORBIDDEN");
     expect(validatorSrc).toContain("requireCreateAktifDurum");
     expect(incompleteSrc).toContain("requireCreateAktifDurum");
@@ -70,5 +83,18 @@ describe("test fixture personel purge owner", () => {
     expect(result.stdout).toContain("[PASS] historical real dependency → purge blocked");
     expect(result.stdout).toContain("[PASS] purge plan deterministic");
     expect(result.stdout).toContain("[PASS] real personel no exit → archive DENY (create PASIF)");
+    expect(result.stdout).toContain("[PASS] archive access audit → purge FAIL CLOSED");
+    expect(result.stdout).toContain("[PASS] audit blocker names archive access audit owner");
+    expect(result.stdout).toContain("[PASS] audit row preserved (audit integrity)");
+    expect(result.stdout).toContain("[PASS] open period summary is fixture-owned → purge PASS");
+    expect(result.stdout).toContain("[PASS] other personel summary row preserved");
+    expect(result.stdout).toContain("[PASS] closed period summary → purge FAIL CLOSED");
+    expect(result.stdout).toContain("[PASS] closed period blocker hands off to aylik kapanis owner");
+    expect(result.stdout).toContain("[PASS] sealed muhur line → purge FAIL CLOSED");
+    expect(result.stdout).toContain("[PASS] sealed muhur line blocker is retention-owned (PUANTAJ)");
+    expect(result.stdout).toContain("[PASS] payroll snapshot ledger → purge FAIL CLOSED");
+    expect(result.stdout).toContain(
+      "[PASS] payroll snapshot blocker is sealed ledger owned by snapshot service (BORDRO)",
+    );
   });
 });

@@ -4,12 +4,18 @@ declare(strict_types=1);
 
 namespace Medisa\Api\Services\Personel;
 
+use Medisa\Api\Services\Retention\RetentionCategories;
 use PDO;
 
 /**
  * Canonical owner: fail-closed hard purge of confirmed TEST_FIXTURE personel.
  * Not a generic personel delete. Requires persisted classification evidence.
  * Shared/unknown/historical-real dependencies DENY. Linked business users are preserved.
+ *
+ * Relation classification is owner-attributed: sealed ledger/snapshot rows are owned by the
+ * retention destruction owner, closed period artifacts by the aylik kapanis owner, and
+ * append-only access audit rows by the archive access audit owner. None of those are
+ * deletable by this owner (fail-closed + explicit handoff); audit integrity is never broken.
  */
 class TestFixturePersonelPurgeService
 {
@@ -17,6 +23,7 @@ class TestFixturePersonelPurgeService
     public const CODE_REAL_EMPLOYEE = 'REAL_EMPLOYEE_OR_UNCLASSIFIED';
     public const CODE_SHARED_OR_UNKNOWN = 'SHARED_OR_UNKNOWN_DEPENDENCY';
     public const CODE_HISTORICAL = 'HISTORICAL_OR_SHARED_DEPENDENCY';
+    public const CODE_AUDIT_IMMUTABLE = 'AUDIT_APPEND_ONLY_RETENTION_REQUIRED';
     public const CODE_USER_NOT_FIXTURE = 'USER_NOT_FIXTURE';
     public const CODE_CONFIRM_REQUIRED = 'PURGE_CONFIRM_REQUIRED';
 
@@ -24,6 +31,22 @@ class TestFixturePersonelPurgeService
     public const CLASS_GENERATED_DEMO = 'GENERATED_FROM_DEMO';
     public const CLASS_SHARED_OR_REAL = 'SHARED_OR_REAL_REFERENCE';
     public const CLASS_UNKNOWN = 'UNKNOWN';
+    /** Append-only audit relation: its owner never deletes, so fixture purge must not either. */
+    public const CLASS_AUDIT_APPEND_ONLY = 'AUDIT_APPEND_ONLY';
+    /** Sealed/immutable ledger or snapshot evidence; destruction belongs to retention imha. */
+    public const CLASS_SEALED_HISTORICAL = 'SEALED_HISTORICAL_EVIDENCE';
+    /** Approved/closed period artifact; the period owner forbids post-close rewrite. */
+    public const CLASS_CLOSED_PERIOD_ARTIFACT = 'CLOSED_PERIOD_ARTIFACT';
+
+    public const HANDOFF_RETENTION_IMHA = 'RETENTION_IMHA_OWNER';
+    public const HANDOFF_ARCHIVE_ACCESS_AUDIT = 'ARCHIVE_ACCESS_AUDIT_OWNER';
+    public const HANDOFF_AYLIK_KAPANIS = 'AYLIK_KAPANIS_OWNER';
+
+    /** Owner labels (service/controller that owns the row lifecycle). */
+    public const OWNER_ARCHIVE_ACCESS_SERVICE = 'Medisa\\Api\\Services\\Retention\\ArchiveAccessService';
+    public const OWNER_PUANTAJ_DESTRUCTION = 'Medisa\\Api\\Services\\Retention\\PhysicalDestruction\\Handlers\\PuantajDestructionHandler';
+    public const OWNER_MAAS_SNAPSHOT_SERVICE = 'Medisa\\Api\\Services\\MaasHesaplamaSnapshotService';
+    public const OWNER_AYLIK_KAPANIS = 'Medisa\\Api\\Controllers\\YonetimController';
 
     /**
      * @param array<string, mixed> $actor
@@ -151,23 +174,20 @@ class TestFixturePersonelPurgeService
                 continue;
             }
             $class = (string) ($dep['class'] ?? self::CLASS_UNKNOWN);
-            if ($class === self::CLASS_SHARED_OR_REAL) {
-                $blockers[] = [
-                    'code' => self::CODE_HISTORICAL,
-                    'table' => $dep['table'],
-                    'row_count' => $dep['row_count'],
-                    'class' => $class,
-                    'reason' => $dep['reason'] ?? 'historical_or_shared',
-                ];
-            } elseif ($class === self::CLASS_UNKNOWN) {
-                $blockers[] = [
-                    'code' => self::CODE_SHARED_OR_UNKNOWN,
-                    'table' => $dep['table'],
-                    'row_count' => $dep['row_count'],
-                    'class' => $class,
-                    'reason' => $dep['reason'] ?? 'unknown_dependency',
-                ];
+            $code = self::blockerCodeForClass($class);
+            if ($code === null) {
+                continue;
             }
+            $blockers[] = [
+                'code' => $code,
+                'table' => $dep['table'],
+                'row_count' => $dep['row_count'],
+                'class' => $class,
+                'reason' => $dep['reason'] ?? ($class === self::CLASS_UNKNOWN ? 'unknown_dependency' : 'historical_or_shared'),
+                'owner' => $dep['owner'] ?? null,
+                'retention_category' => $dep['retention_category'] ?? null,
+                'handoff' => $dep['handoff'] ?? null,
+            ];
         }
 
         $purgeSafe = count($blockers) === 0;
@@ -214,6 +234,33 @@ class TestFixturePersonelPurgeService
     }
 
     /**
+     * Canonical blocker mapping per relation class.
+     * null = fixture-owned dependent (not a blocker).
+     *
+     * @param mixed $class
+     * @return string|null
+     */
+    private static function blockerCodeForClass($class)
+    {
+        $class = (string) $class;
+        if ($class === self::CLASS_AUDIT_APPEND_ONLY) {
+            return self::CODE_AUDIT_IMMUTABLE;
+        }
+        if (in_array($class, [
+            self::CLASS_SHARED_OR_REAL,
+            self::CLASS_SEALED_HISTORICAL,
+            self::CLASS_CLOSED_PERIOD_ARTIFACT,
+        ], true)) {
+            return self::CODE_HISTORICAL;
+        }
+        if ($class === self::CLASS_UNKNOWN) {
+            return self::CODE_SHARED_OR_UNKNOWN;
+        }
+
+        return null;
+    }
+
+    /**
      * @return list<array<string, mixed>>
      */
     private static function inventoryDependencies(PDO $pdo, $personelId)
@@ -240,13 +287,17 @@ class TestFixturePersonelPurgeService
                     'delete_rule' => $ref['delete_rule'],
                     'class' => self::CLASS_UNKNOWN,
                     'reason' => 'count_failed',
+                    'owner' => null,
+                    'retention_category' => null,
+                    'handoff' => null,
                     'shared_other_personel' => null,
+                    'historical_semantics' => false,
                 ];
                 continue;
             }
 
             $shared = self::sharedOtherPersonel($pdo, $table, $personelId);
-            $classMeta = self::classifyDependency($table, $ref['delete_rule'], $count, $shared);
+            $classMeta = self::classifyDependency($pdo, $personelId, $table, $ref['delete_rule'], $count, $shared);
             $out[] = [
                 'table' => $table,
                 'column' => $column,
@@ -254,6 +305,9 @@ class TestFixturePersonelPurgeService
                 'delete_rule' => $ref['delete_rule'],
                 'class' => $classMeta['class'],
                 'reason' => $classMeta['reason'],
+                'owner' => $classMeta['owner'],
+                'retention_category' => $classMeta['retention_category'],
+                'handoff' => $classMeta['handoff'],
                 'shared_other_personel' => $shared,
                 'historical_semantics' => $classMeta['historical'],
             ];
@@ -353,62 +407,172 @@ class TestFixturePersonelPurgeService
     }
 
     /**
-     * @return array{class:string,reason:string,historical:bool}
+     * @param mixed $deleteRule
+     * @param mixed $count
+     * @param mixed $sharedOther
+     * @return array{class:string,reason:string,historical:bool,owner:?string,retention_category:?string,handoff:?string}
      */
-    private static function classifyDependency($table, $deleteRule, $count, $sharedOther)
+    private static function classifyDependency(PDO $pdo, $personelId, $table, $deleteRule, $count, $sharedOther)
     {
         $table = (string) $table;
         if ($count <= 0) {
-            return ['class' => self::CLASS_GENERATED_DEMO, 'reason' => 'empty', 'historical' => false];
+            return self::classification(self::CLASS_GENERATED_DEMO, 'empty', false);
         }
+
+        // Owner-attributed relations win over FK/sharing heuristics: a per-personel row can
+        // share a period with another personel and still be a fixture-owned dependent row.
+        $catalog = self::relationOwnerCatalog();
+        if (isset($catalog[$table])) {
+            $entry = $catalog[$table];
+
+            return self::classification(
+                (string) $entry['class'],
+                (string) $entry['reason'],
+                (bool) $entry['historical'],
+                (string) $entry['owner'],
+                $entry['retention_category'] !== null ? (string) $entry['retention_category'] : null,
+                (string) $entry['handoff']
+            );
+        }
+
+        if ($table === 'aylik_ozet_satirlari') {
+            return self::classifyAylikOzetSatirlari($pdo, $personelId);
+        }
+
         if ($sharedOther !== null && (int) $sharedOther > 0) {
-            return [
-                'class' => self::CLASS_SHARED_OR_REAL,
-                'reason' => 'shared_period_with_other_personel',
-                'historical' => true,
-            ];
+            return self::classification(self::CLASS_SHARED_OR_REAL, 'shared_period_with_other_personel', true);
         }
         if ($table === 'users' || $table === 'user_personel_binding_auditleri') {
-            return [
-                'class' => self::CLASS_GENERATED_DEMO,
-                'reason' => 'user_binding_evaluated_separately',
-                'historical' => false,
-            ];
+            return self::classification(self::CLASS_GENERATED_DEMO, 'user_binding_evaluated_separately', false);
         }
         if (self::isHistoricalTable($table)) {
-            return [
-                'class' => self::CLASS_SHARED_OR_REAL,
-                'reason' => 'historical_ledger_or_snapshot',
-                'historical' => true,
-            ];
+            return self::classification(self::CLASS_SHARED_OR_REAL, 'historical_ledger_or_snapshot', true);
         }
         if (self::isFixtureOwnedTable($table)) {
-            return [
-                'class' => $table === 'personel_test_fixture_siniflandirmalari'
+            return self::classification(
+                $table === 'personel_test_fixture_siniflandirmalari'
                     || $table === 'personel_test_fixture_archive_kayitlari'
                     || $table === 'personel_bordro_kapsamlari'
                     ? self::CLASS_CONFIRMED_DEMO
                     : self::CLASS_GENERATED_DEMO,
-                'reason' => 'fixture_owned',
-                'historical' => false,
-            ];
+                'fixture_owned',
+                false
+            );
         }
 
+        return self::classification(self::CLASS_UNKNOWN, 'unlisted_relation', false);
+    }
+
+    /**
+     * Owner-attributed classification for relations whose deletion cannot be decided from FK
+     * metadata alone (live dry-run blockers, 2026-09-15).
+     *
+     * Every entry names the canonical owner of the row lifecycle. Deletion for these relations
+     * belongs to that owner's contract, never to the fixture purge:
+     * - ArchiveAccessService writes the append-only archive access audit and never deletes.
+     * - The PUANTAJ muhur lines are sealed period evidence (retention imha owner).
+     * - The payroll personel snapshot is part of an immutable hashed period snapshot
+     *   (BORDRO retention owner preserves period snapshots).
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    private static function relationOwnerCatalog()
+    {
         return [
-            'class' => self::CLASS_UNKNOWN,
-            'reason' => 'unlisted_relation',
-            'historical' => false,
+            'arsiv_erisim_auditleri' => [
+                'class' => self::CLASS_AUDIT_APPEND_ONLY,
+                'reason' => 'append_only_archive_access_audit',
+                'historical' => true,
+                'owner' => self::OWNER_ARCHIVE_ACCESS_SERVICE,
+                'retention_category' => null,
+                'handoff' => self::HANDOFF_ARCHIVE_ACCESS_AUDIT,
+            ],
+            'puantaj_aylik_muhur_satirlari' => [
+                'class' => self::CLASS_SEALED_HISTORICAL,
+                'reason' => 'sealed_period_evidence_line',
+                'historical' => true,
+                'owner' => self::OWNER_PUANTAJ_DESTRUCTION,
+                'retention_category' => RetentionCategories::PUANTAJ,
+                'handoff' => self::HANDOFF_RETENTION_IMHA,
+            ],
+            'maas_hesaplama_personel_snapshotlari' => [
+                'class' => self::CLASS_SEALED_HISTORICAL,
+                'reason' => 'immutable_payroll_snapshot_ledger',
+                'historical' => true,
+                'owner' => self::OWNER_MAAS_SNAPSHOT_SERVICE,
+                'retention_category' => RetentionCategories::BORDRO,
+                'handoff' => self::HANDOFF_RETENTION_IMHA,
+            ],
+        ];
+    }
+
+    /**
+     * aylik_ozet_satirlari = one row per personel per month, owned by the aylik kapanis flow.
+     * That owner protects approved/closed rows (UPDATE ... AND kapanis_durumu <> 'KAPANDI'),
+     * so a KAPANDI row is a closed period artifact and is never rewritten by a purge.
+     * An open fixture row is derived from the fixture's own data and leaves with the personel
+     * (FK ON DELETE CASCADE).
+     *
+     * @return array{class:string,reason:string,historical:bool,owner:?string,retention_category:?string,handoff:?string}
+     */
+    private static function classifyAylikOzetSatirlari(PDO $pdo, $personelId)
+    {
+        if (!self::columnExists($pdo, 'aylik_ozet_satirlari', 'kapanis_durumu')) {
+            return self::classification(
+                self::CLASS_CLOSED_PERIOD_ARTIFACT,
+                'closed_period_state_unverifiable',
+                true,
+                self::OWNER_AYLIK_KAPANIS,
+                null,
+                self::HANDOFF_AYLIK_KAPANIS
+            );
+        }
+
+        $stmt = $pdo->prepare(
+            "SELECT COUNT(*) FROM aylik_ozet_satirlari
+             WHERE personel_id = :pid AND UPPER(kapanis_durumu) = 'KAPANDI'"
+        );
+        $stmt->execute(['pid' => (int) $personelId]);
+        if ((int) $stmt->fetchColumn() > 0) {
+            return self::classification(
+                self::CLASS_CLOSED_PERIOD_ARTIFACT,
+                'closed_period_summary_artifact',
+                true,
+                self::OWNER_AYLIK_KAPANIS,
+                null,
+                self::HANDOFF_AYLIK_KAPANIS
+            );
+        }
+
+        return self::classification(self::CLASS_GENERATED_DEMO, 'fixture_owned_open_period_summary', false);
+    }
+
+    /**
+     * @param mixed $owner
+     * @param mixed $retentionCategory
+     * @param mixed $handoff
+     * @return array{class:string,reason:string,historical:bool,owner:?string,retention_category:?string,handoff:?string}
+     */
+    private static function classification($class, $reason, $historical, $owner = null, $retentionCategory = null, $handoff = null)
+    {
+        return [
+            'class' => (string) $class,
+            'reason' => (string) $reason,
+            'historical' => (bool) $historical,
+            'owner' => $owner !== null ? (string) $owner : null,
+            'retention_category' => $retentionCategory !== null ? (string) $retentionCategory : null,
+            'handoff' => $handoff !== null ? (string) $handoff : null,
         ];
     }
 
     private static function isHistoricalTable($table)
     {
         $table = (string) $table;
+        // aylik_ozet_satirlari, puantaj_aylik_muhur_satirlari and
+        // maas_hesaplama_personel_snapshotlari are owner-classified in
+        // relationOwnerCatalog()/classifyAylikOzetSatirlari() instead of this list.
         $exact = [
-            'maas_hesaplama_personel_snapshotlari',
             'maas_hesaplama_adaylari',
-            'puantaj_aylik_muhur_satirlari',
-            'aylik_ozet_satirlari',
             'personel_bordro_devirleri',
             'personel_bordro_devir_auditleri',
         ];

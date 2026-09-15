@@ -15,6 +15,7 @@ use Medisa\Api\Services\Personel\PersonelValidationException;
 use Medisa\Api\Services\Personel\TestFixturePersonelArchiveException;
 use Medisa\Api\Services\Personel\TestFixturePersonelClassificationService;
 use Medisa\Api\Services\Personel\TestFixturePersonelPurgeService;
+use Medisa\Api\Services\Retention\RetentionCategories;
 
 function tfpAssert(bool $ok, string $name): void
 {
@@ -158,6 +159,22 @@ function tfpClassify(PDO $pdo, int $personelId, array $actor): void
     );
 }
 
+/**
+ * @param array<string, mixed> $plan
+ * @return list<array<string, mixed>>
+ */
+function tfpBlockersForTable(array $plan, string $table): array
+{
+    $out = [];
+    foreach (($plan['blockers'] ?? []) as $blocker) {
+        if ((string) ($blocker['table'] ?? '') === $table) {
+            $out[] = $blocker;
+        }
+    }
+
+    return $out;
+}
+
 $root = tfpRootPdo();
 $database = 'medisa_tfp_' . bin2hex(random_bytes(4));
 $root->exec('CREATE DATABASE `' . $database . '` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
@@ -178,6 +195,29 @@ try {
             personel_id INT UNSIGNED NOT NULL,
             seal_hash CHAR(64) NULL,
             payload_json JSON NULL
+        )"
+    );
+    $pdo->exec(
+        "CREATE TABLE IF NOT EXISTS puantaj_aylik_muhurleri (
+            id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+            sube_id INT UNSIGNED NOT NULL,
+            yil SMALLINT UNSIGNED NOT NULL,
+            ay TINYINT UNSIGNED NOT NULL,
+            donem CHAR(7) NOT NULL,
+            muhurlenen_kayit_sayisi INT UNSIGNED NOT NULL DEFAULT 0
+        )"
+    );
+    $pdo->exec(
+        "CREATE TABLE IF NOT EXISTS puantaj_aylik_muhur_satirlari (
+            id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+            muhur_id INT UNSIGNED NOT NULL,
+            personel_id INT UNSIGNED NOT NULL,
+            tarih DATE NOT NULL,
+            kontrol_durumu VARCHAR(32) NOT NULL DEFAULT 'BEKLIYOR',
+            CONSTRAINT fk_tfp_muhur_satir_muhur FOREIGN KEY (muhur_id)
+                REFERENCES puantaj_aylik_muhurleri (id) ON DELETE CASCADE,
+            CONSTRAINT fk_tfp_muhur_satir_personel FOREIGN KEY (personel_id)
+                REFERENCES personeller (id) ON DELETE CASCADE
         )"
     );
 
@@ -301,6 +341,122 @@ try {
         $deniedPasif = $e->getCodeString() === 'CREATE_PASIF_FORBIDDEN';
     }
     tfpAssert($deniedPasif, 'real personel no exit → archive DENY (create PASIF)');
+
+    $audit = tfpInsertPersonel($pdo, '10000000009', 'AUD-1');
+    tfpClassify($pdo, $audit, $gy);
+    $pdo->exec(
+        "INSERT INTO arsiv_erisim_auditleri
+            (actor_user_id, target_type, target_id, personel_id, action, route_source)
+         VALUES (10, 'personel', {$audit}, {$audit}, 'VIEW', 'purge-test-runner')"
+    );
+    $auditPlan = TestFixturePersonelPurgeService::purge($pdo, $audit, $gy, true, null);
+    tfpAssert(($auditPlan['purge_safe'] ?? true) === false, 'archive access audit → purge FAIL CLOSED');
+    $auditBlockers = tfpBlockersForTable($auditPlan, 'arsiv_erisim_auditleri');
+    tfpAssert(
+        ($auditBlockers[0]['code'] ?? '') === TestFixturePersonelPurgeService::CODE_AUDIT_IMMUTABLE,
+        'audit blocker uses canonical append-only audit code'
+    );
+    tfpAssert(
+        ($auditBlockers[0]['owner'] ?? '') === TestFixturePersonelPurgeService::OWNER_ARCHIVE_ACCESS_SERVICE
+        && ($auditBlockers[0]['handoff'] ?? '') === TestFixturePersonelPurgeService::HANDOFF_ARCHIVE_ACCESS_AUDIT,
+        'audit blocker names archive access audit owner'
+    );
+    tfpAssert(
+        ($auditPlan['delete_order'] ?? [1]) === [],
+        'audit-blocked plan has empty delete order'
+    );
+    tfpAssert(
+        (int) $pdo->query('SELECT COUNT(*) FROM arsiv_erisim_auditleri')->fetchColumn() === 1,
+        'audit row preserved (audit integrity)'
+    );
+
+    $openOzet = tfpInsertPersonel($pdo, '10000000010', 'OZT-1');
+    $otherOzet = tfpInsertPersonel($pdo, '10000000011', 'OZT-2');
+    tfpClassify($pdo, $openOzet, $gy);
+    $pdo->exec(
+        "INSERT INTO aylik_ozet_satirlari (ay, personel_id, ad_soyad, sube, bolum, kapanis_durumu)
+         VALUES ('2026-06', {$openOzet}, 'Fixture Person', 'Sube A', 'Dep', 'ACIK'),
+                ('2026-06', {$otherOzet}, 'Other Person', 'Sube A', 'Dep', 'ACIK')"
+    );
+    $openPlan = TestFixturePersonelPurgeService::purge(
+        $pdo,
+        $openOzet,
+        $gy,
+        false,
+        TestFixturePersonelPurgeService::CONFIRM_TOKEN
+    );
+    tfpAssert(($openPlan['executed'] ?? false) === true, 'open period summary is fixture-owned → purge PASS');
+    tfpAssert(
+        (int) $pdo->query('SELECT COUNT(*) FROM aylik_ozet_satirlari WHERE personel_id = ' . $openOzet)->fetchColumn() === 0,
+        'open fixture summary row removed with personel'
+    );
+    tfpAssert(
+        (int) $pdo->query('SELECT COUNT(*) FROM aylik_ozet_satirlari WHERE personel_id = ' . $otherOzet)->fetchColumn() === 1,
+        'other personel summary row preserved'
+    );
+
+    $closedOzet = tfpInsertPersonel($pdo, '10000000012', 'OZT-3');
+    tfpClassify($pdo, $closedOzet, $gy);
+    $pdo->exec(
+        "INSERT INTO aylik_ozet_satirlari (ay, personel_id, ad_soyad, sube, bolum, kapanis_durumu)
+         VALUES ('2026-07', {$closedOzet}, 'Fixture Person', 'Sube A', 'Dep', 'KAPANDI')"
+    );
+    $closedPlan = TestFixturePersonelPurgeService::purge($pdo, $closedOzet, $gy, true, null);
+    tfpAssert(($closedPlan['purge_safe'] ?? true) === false, 'closed period summary → purge FAIL CLOSED');
+    $closedBlockers = tfpBlockersForTable($closedPlan, 'aylik_ozet_satirlari');
+    tfpAssert(
+        ($closedBlockers[0]['code'] ?? '') === TestFixturePersonelPurgeService::CODE_HISTORICAL
+        && ($closedBlockers[0]['class'] ?? '') === TestFixturePersonelPurgeService::CLASS_CLOSED_PERIOD_ARTIFACT,
+        'closed period summary blocker is closed-period artifact'
+    );
+    tfpAssert(
+        ($closedBlockers[0]['handoff'] ?? '') === TestFixturePersonelPurgeService::HANDOFF_AYLIK_KAPANIS
+        && ($closedBlockers[0]['owner'] ?? '') === TestFixturePersonelPurgeService::OWNER_AYLIK_KAPANIS,
+        'closed period blocker hands off to aylik kapanis owner'
+    );
+    tfpAssert(
+        (int) $pdo->query('SELECT COUNT(*) FROM aylik_ozet_satirlari WHERE personel_id = ' . $closedOzet)->fetchColumn() === 1,
+        'closed period summary preserved'
+    );
+
+    $sealed = tfpInsertPersonel($pdo, '10000000013', 'MHR-1');
+    tfpClassify($pdo, $sealed, $gy);
+    $pdo->exec(
+        "INSERT INTO puantaj_aylik_muhurleri (sube_id, yil, ay, donem, muhurlenen_kayit_sayisi)
+         VALUES (1, 2026, 8, '2026-08', 1)"
+    );
+    $muhurId = (int) $pdo->lastInsertId();
+    $pdo->exec(
+        "INSERT INTO puantaj_aylik_muhur_satirlari (muhur_id, personel_id, tarih)
+         VALUES ({$muhurId}, {$sealed}, '2026-08-15')"
+    );
+    $sealedPlan = TestFixturePersonelPurgeService::purge($pdo, $sealed, $gy, true, null);
+    tfpAssert(($sealedPlan['purge_safe'] ?? true) === false, 'sealed muhur line → purge FAIL CLOSED');
+    $sealedBlockers = tfpBlockersForTable($sealedPlan, 'puantaj_aylik_muhur_satirlari');
+    tfpAssert(
+        ($sealedBlockers[0]['class'] ?? '') === TestFixturePersonelPurgeService::CLASS_SEALED_HISTORICAL
+        && ($sealedBlockers[0]['retention_category'] ?? '') === RetentionCategories::PUANTAJ,
+        'sealed muhur line blocker is retention-owned (PUANTAJ)'
+    );
+    tfpAssert(
+        ($sealedBlockers[0]['handoff'] ?? '') === TestFixturePersonelPurgeService::HANDOFF_RETENTION_IMHA,
+        'sealed muhur line blocker hands off to retention imha'
+    );
+
+    $payroll = tfpInsertPersonel($pdo, '10000000014', 'PAY-1');
+    tfpClassify($pdo, $payroll, $gy);
+    $pdo->exec(
+        "INSERT INTO maas_hesaplama_personel_snapshotlari (donem_snapshot_id, personel_id) VALUES (11, {$payroll})"
+    );
+    $payrollPlan = TestFixturePersonelPurgeService::purge($pdo, $payroll, $gy, true, null);
+    tfpAssert(($payrollPlan['purge_safe'] ?? true) === false, 'payroll snapshot ledger → purge FAIL CLOSED');
+    $payrollBlockers = tfpBlockersForTable($payrollPlan, 'maas_hesaplama_personel_snapshotlari');
+    tfpAssert(
+        ($payrollBlockers[0]['class'] ?? '') === TestFixturePersonelPurgeService::CLASS_SEALED_HISTORICAL
+        && ($payrollBlockers[0]['retention_category'] ?? '') === RetentionCategories::BORDRO
+        && ($payrollBlockers[0]['owner'] ?? '') === TestFixturePersonelPurgeService::OWNER_MAAS_SNAPSHOT_SERVICE,
+        'payroll snapshot blocker is sealed ledger owned by snapshot service (BORDRO)'
+    );
 
     $svc = (string) file_get_contents(__DIR__ . '/../../api/src/Services/Personel/TestFixturePersonelPurgeService.php');
     tfpAssert(strpos($svc, 'personel_id === 1') === false, 'no hardcoded personel id');

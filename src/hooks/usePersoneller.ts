@@ -17,7 +17,9 @@ import {
   fetchPrimKuraliOptions,
   fetchSgkIsverenOptions,
   fetchCalismaLokasyonuOptions,
-  fetchUcretTipiOptions
+  fetchUcretTipiOptions,
+  resolveBagliAmirPersonelId,
+  type BagliAmirLookupOption
 } from "../api/referans.api";
 import { emptyPaginated, makeTempId, type PersonelReferenceBundle } from "../data/app-data.types";
 import {
@@ -136,9 +138,24 @@ export const INITIAL_CREATE_PERSONEL_FORM: CreatePersonelFormState = {
   primKuraliId: ""
 };
 
-async function fetchBagliAmirContext(amirId: number): Promise<BagliAmirContext | null> {
+/**
+ * Bağlı amir context'i.
+ *
+ * `bagli_amir_id` kanonik olarak `users.id`'dir; personel context'i (departman/şube)
+ * yalnız `users.personel_id` üzerinden çözülür. Amir user'ı bir personel kaydına
+ * bağlı değilse context üretilmez — amir id'si asla personel id gibi okunmaz.
+ */
+async function fetchBagliAmirContext(
+  amirUserId: number,
+  bagliAmirOptions: readonly BagliAmirLookupOption[]
+): Promise<BagliAmirContext | null> {
+  const personelId = resolveBagliAmirPersonelId(amirUserId, bagliAmirOptions);
+  if (personelId === null) {
+    return null;
+  }
+
   try {
-    const personel = await fetchPersonelDetail(amirId);
+    const personel = await fetchPersonelDetail(personelId);
     return buildBagliAmirContext(personel);
   } catch {
     return null;
@@ -572,12 +589,12 @@ export function usePersoneller() {
       setCreateBagliAmirContext(null);
     } else {
       void (async () => {
-        const context = await fetchBagliAmirContext(amirId);
+        const context = await fetchBagliAmirContext(amirId, refs.bagliAmirOptions);
         setCreateBagliAmirContext(context);
       })();
     }
     setIsCreateModalOpen(true);
-  }, [createForm.bagliAmirId]);
+  }, [createForm.bagliAmirId, refs.bagliAmirOptions]);
 
   const closeCreateModal = useCallback(() => {
     setIsCreateModalOpen(false);
@@ -628,7 +645,7 @@ export function usePersoneller() {
     }
 
     void (async () => {
-      const context = await fetchBagliAmirContext(amirId);
+      const context = await fetchBagliAmirContext(amirId, refs.bagliAmirOptions);
       setCreateBagliAmirContext(context);
       if (!context?.departmanId) {
         return;
@@ -638,7 +655,7 @@ export function usePersoneller() {
         prev.bagliAmirId === bagliAmirId ? { ...prev, departmanId: context.departmanId } : prev
       );
     })();
-  }, []);
+  }, [refs.bagliAmirOptions]);
 
   const createPersonelHandler = useCallback(
     async (event: FormEvent<HTMLFormElement>, canCreate: boolean) => {

@@ -70,10 +70,12 @@ try {
     $pdo->exec(
         "CREATE TABLE subeler (
             id INT UNSIGNED NOT NULL PRIMARY KEY,
+            kod VARCHAR(32) NOT NULL,
             ad VARCHAR(64) NOT NULL
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
     );
-    $pdo->exec("INSERT INTO subeler (id, ad) VALUES (1, 'Merkez'), (2, 'Depo')");
+    // Canonical SubeReadModel contract: subeler reads (id, kod, ad); deterministic test codes.
+    $pdo->exec("INSERT INTO subeler (id, kod, ad) VALUES (1, 'MERKEZ', 'Merkez'), (2, 'DEPO', 'Depo')");
     $pdo->exec("INSERT INTO users (id, username) VALUES (10, 'u10'), (11, 'u11')");
     $pdo->exec(
         "INSERT INTO personeller (id, ad, soyad, sicil_no, sube_id, aktif_durum)

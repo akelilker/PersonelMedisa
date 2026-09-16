@@ -110,6 +110,7 @@ function s3eR1Schema(PDO $pdo): void
     $pdo->exec(
         "CREATE TABLE subeler (
             id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+            kod VARCHAR(32) NOT NULL,
             ad VARCHAR(64) NOT NULL
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
     );
@@ -194,7 +195,8 @@ function s3eR1Schema(PDO $pdo): void
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
     );
 
-    $pdo->exec("INSERT INTO subeler (id, ad) VALUES (1, 'Merkez')");
+    // Canonical SubeReadModel contract: subeler reads (id, kod, ad); deterministic test code.
+    $pdo->exec("INSERT INTO subeler (id, kod, ad) VALUES (1, 'MERKEZ', 'Merkez')");
     $pdo->exec("INSERT INTO users (id, username) VALUES (10, 'u10')");
     $pdo->exec("INSERT INTO personeller (id, sube_id, ad, soyad) VALUES (1, 1, 'A', 'B')");
 }

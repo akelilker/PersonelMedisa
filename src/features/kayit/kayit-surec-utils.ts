@@ -13,10 +13,40 @@ export function formatPersonelAdSoyad(personel: { ad?: string | null; soyad?: st
   return [ad, soyad].filter(Boolean).join(" ");
 }
 
+/**
+ * Personel seçim listesi görünür label'ı: yalnız **Ad Soyad**.
+ * Bölüm / Birim / Pozisyon liste item'ında gösterilmez; arama kontratı ayrı yürür
+ * (bkz. KayitSurecWorkspace searchable alanları).
+ */
 export function formatPersonelLabel(personel: Personel) {
-  const name = formatPersonelAdSoyad(personel);
-  const meta = [personel.departman_adi, personel.gorev_adi].filter(Boolean).join(" • ");
-  return meta ? `${name} • ${meta}` : name;
+  return formatPersonelAdSoyad(personel);
+}
+
+/**
+ * Seçim listesi için personel id → görünür label haritası.
+ * Yalnız Ad Soyad gösterilir; aynı Ad Soyad gerçekten birden fazla personelde
+ * geçiyorsa (ambiguity) tek ek bilgi olarak "Sicil X" eklenir. Bölüm/birim/pozisyon
+ * hiçbir durumda label'a girmez.
+ */
+export function buildPersonelSelectLabels(personeller: Personel[]) {
+  const nameCounts = new Map<string, number>();
+  for (const personel of personeller) {
+    const key = formatPersonelAdSoyad(personel).toLocaleLowerCase("tr-TR");
+    if (!key) {
+      continue;
+    }
+    nameCounts.set(key, (nameCounts.get(key) ?? 0) + 1);
+  }
+
+  const labels = new Map<number, string>();
+  for (const personel of personeller) {
+    const name = formatPersonelAdSoyad(personel);
+    const ambiguous = (nameCounts.get(name.toLocaleLowerCase("tr-TR")) ?? 0) > 1;
+    const sicil = String(personel.sicil_no ?? "").trim();
+    labels.set(personel.id, ambiguous && sicil ? `${name} • Sicil ${sicil}` : name);
+  }
+
+  return labels;
 }
 
 export function normalizePersonelSearchText(value: string | number | null | undefined) {

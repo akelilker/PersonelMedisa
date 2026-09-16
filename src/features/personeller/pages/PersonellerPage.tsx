@@ -472,7 +472,9 @@ export function PersonellerPage() {
           <div className="personeller-scope-grid" data-testid="personeller-scope-grid">
             <button
               type="button"
-              className={`personeller-scope-card${selectedScopeId === null ? " is-selected" : ""}`}
+              className={`app-card app-card--compact app-card--tinted personeller-scope-card${
+                selectedScopeId === null ? " is-selected" : ""
+              }`}
               data-testid="personeller-scope-all"
               aria-pressed={selectedScopeId === null}
               onClick={() => enterListFromScope(null)}
@@ -489,7 +491,9 @@ export function PersonellerPage() {
               <button
                 key={branch.id}
                 type="button"
-                className={`personeller-scope-card${selectedScopeId === branch.id ? " is-selected" : ""}`}
+                className={`app-card app-card--compact app-card--tinted personeller-scope-card${
+                  selectedScopeId === branch.id ? " is-selected" : ""
+                }`}
                 data-testid={`personeller-scope-${branch.id}`}
                 aria-pressed={selectedScopeId === branch.id}
                 onClick={() => enterListFromScope(branch.id)}

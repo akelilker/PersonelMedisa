@@ -1389,48 +1389,72 @@
 
 .personeller-scope-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(82px, 110px));
-  justify-content: center;
-  justify-items: stretch;
-  gap: 12px;
+  /* Canonical Medisa kart grid kontratı: masaüstü 5 eşit kolon (Ayarlar/Şube kart listesi ile aynı). */
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: var(--space-2);
   width: 100%;
   max-width: 920px;
   margin-inline: auto;
 }
 
+/* Kart yüzeyi canonical .app-card owner'ında (src/styles/components/card.css).
+   Bu blok yalnız yerleşim + tipografi + etkileşim durumları tutar.
+   Geometry/state referansı: Taşıt Medisa .branch-card (tasitlar-base.css:3234-3320)
+   → kare kutu (aspect-ratio 1/1), 8px radius, --border-faint-02 zemin,
+   hover/active: yalnız border parlar + sınırlı scale; dolu renkli zemin yok. */
 .personeller-scope-card {
+  --app-card-radius: var(--radius-control);
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: flex-start;
-  gap: 6px;
+  justify-content: center;
+  gap: 2px;
   min-width: 0;
-  min-height: 96px;
-  padding: 12px 8px 10px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: var(--radius-card, 12px);
-  background: rgba(255, 255, 255, 0.03);
-  color: #f2f5f7;
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+  color: var(--text-primary);
   text-align: center;
   cursor: pointer;
-  transform: scale(1);
-  transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+  transition: border-color 0.2s, box-shadow 0.2s;
 }
 
-.personeller-scope-card:hover,
+/* Klavye odağı: repo canonical interactive-card davranışı (bugun-personel-branch-card),
+   generic mavi focus ring yerine belirgin border. */
 .personeller-scope-card:focus-visible {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.34);
-  transform: scale(1.03);
+  border-color: var(--border-strong);
   outline: none;
-  z-index: 1;
 }
 
+/* Masaüstü hover (Taşıt: yalnız hover-yetenekli işaretçide) */
+@media (hover: hover) and (pointer: fine) {
+  .personeller-scope-card:hover {
+    border-color: var(--border-strong);
+    transform: scale(1.04);
+    transform-origin: center;
+    z-index: 5;
+  }
+}
+
+/* Dokunmatik: Taşıt mobil davranışı (hover yok → basılı durumda aynı vurgu) */
+@media (hover: none) {
+  .personeller-scope-card:active {
+    border-color: var(--border-strong);
+    transform: scale(1.04);
+    transform-origin: center;
+    z-index: 5;
+  }
+}
+
+/* Seçili şube: theme border + hafif ring + güçlü metin; dolu renkli zemin yok. */
 .personeller-scope-card.is-selected,
 .personeller-scope-card[aria-pressed="true"] {
-  border-color: rgba(125, 211, 252, 0.55);
-  background: rgba(125, 211, 252, 0.1);
-  box-shadow: 0 0 0 1px rgba(125, 211, 252, 0.18);
+  border-color: rgba(var(--theme-color-rgb), 0.82);
+  box-shadow: 0 0 0 1px var(--red-glow-subtle);
+}
+
+.personeller-scope-card.is-selected .personeller-scope-card-title,
+.personeller-scope-card[aria-pressed="true"] .personeller-scope-card-title {
+  color: var(--text-inverse);
 }
 
 /* Title: reserved 2-line block; natural wrap (no <br>); alias .personeller-scope-card-name */
@@ -1761,12 +1785,8 @@
 
 @media (max-width: 720px) {
   .personeller-scope-grid {
-    grid-template-columns: repeat(3, minmax(0, 110px));
-    justify-content: center;
-    width: max-content;
-    max-width: 100%;
-    margin-inline: auto;
-    gap: 8px;
+    /* Canonical mobil kontrat: 3 eşit kolon (Şube/Kullanıcı kart listesi ile aynı). */
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
   /* Mobil/tablet: 11 haneli T.C. ve diğer kolonlar sıkışmasın; tablo doğal genişliğinde kalsın,
      yatay kaydırma sarmalayıcıda (personeller-table-wrap overflow-x:auto) yapılır. */

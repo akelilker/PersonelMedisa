@@ -37,12 +37,18 @@ describe("S3F QR puantaj candidate review / apply", () => {
     await ensureDisposableMariaDbEnv();
   }, 90_000);
 
-  it("locks migration 058 tip + append-only ledger + 052-057 present", () => {
+  it("locks QR decision ledger migration 058 ordering + append-only ledger + 052-057 present", () => {
     const migrations = readdirSync(resolve(process.cwd(), "api/migrations"))
       .filter((name) => /^\d{3}_.+\.sql$/.test(name))
       .sort();
-    expect(migrations.at(-1)).toBe("087_sube_muhasebe_yetkilileri.sql");
-    expect(migrations).toContain("058_qr_puantaj_candidate_decision_ledger.sql");
+    // This spec owns 058 only: it must exist and stay appended directly after 057.
+    // The repo migration tip is owned by the migration runner specs and changes with
+    // every unrelated future migration, so it is deliberately not pinned here.
+    const ledgerMigration = "058_qr_puantaj_candidate_decision_ledger.sql";
+    const ledgerIndex = migrations.indexOf(ledgerMigration);
+    expect(ledgerIndex).toBeGreaterThan(-1);
+    expect(migrations[ledgerIndex - 1]).toMatch(/^057_/);
+    expect(migrations).toContain(ledgerMigration);
 
     for (const n of ["052", "053", "054", "055", "056", "057"] as const) {
       expect(migrations.some((m) => m.startsWith(`${n}_`))).toBe(true);

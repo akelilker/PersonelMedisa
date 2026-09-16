@@ -87,6 +87,17 @@ describe("mobile attendance approval UX source contracts", () => {
     expect(scan).toContain("late-early-info-modal");
   });
 
+  it("guards correction apply with period lock + canonical reopen semantics", () => {
+    const corr = read("api/src/Services/Qr/QrAttendanceCorrectionService.php");
+    expect(corr).toContain("PuantajDonemKilidiService::acquireForDate");
+    expect(corr).toContain("PuantajDonemPeriodService::assertCanonicalWriteAllowed");
+    expect(corr).toContain("QR_CORRECTION_PERIOD_LOCKED");
+    expect(corr).toContain("QR_CORRECTION_NO_PUANTAJ_ROW");
+    expect(corr).toContain("muhur_id = NULL");
+    expect(corr).toContain("kontrol_durumu = 'BEKLIYOR'");
+    expect(corr).toContain("resolvePeriodLockContext");
+  });
+
   it("exposes attendance mobile routes", () => {
     const router = read("api/src/Router.php");
     expect(router).toContain("'/me/attendance/today'");

@@ -1,0 +1,35 @@
+---
+description: "PersonelMedisa görsel dil ve görsel faz governance: Medisa Taşıt Yönetim ailesi görsel dil, Grok'un rolü, canonical owner zorunluluğu, mikro görev bölünmesi yasağı, faz sırası, reopen/merge-deploy kuralları."
+alwaysApply: true
+---
+
+# Görsel dil ve görsel faz governance
+
+## Görsel dil
+
+- PersonelMedisa görsel dili Medisa Taşıt Yönetim Sistemi ile aynı ürün ailesinde kalır (`tasitmedisa` referansı; eski projenin teknik borcu taşınmaz).
+- Görsel dilin canonical owner'ları: `src/styles/components/*` (card/table/form/picker yüzeyleri) ve `docs/guncel/03-ui-bilesen-sozlesmesi.md`.
+
+## Otorite
+
+- Business logic, component sahipliği, modal/form davranışı ve teknik mimari için tek otorite PersonelMedisa reposudur.
+- Grok yalnız görsel fikir, UX değerlendirmesi, alternatif yerleşim ve tasarım yorumu için kullanılabilir; ürettiği fikir repo'nun canonical owner'ı içinde uygulanır. Grok teknik/business karar mercii değildir.
+
+## Yasaklar
+
+- Yeni paralel UI sistemi veya ikinci modal/form altyapısı.
+- Dosya sonu CSS override'ları, `!important`, negatif margin veya transform ile geçici hizalama.
+- Mevcut owner'ı bypass eden geçici çözüm.
+
+## Çalışma biçimi (görsel faz)
+
+- Önce mevcut ekranın canonical component / theme / modal / form owner'ı bulunur; tasarım kararı mümkün olduğunca mevcut yapı içinde uygulanır.
+- Aynı görsel hedef mikro görevlere bölünmez. Sıra tek kontrollü görevde tamamlanır: research → mevcut owner ve root cause → Grok görsel değerlendirmesi → net tasarım kararı → gerekli bağımlı değişiklikler → focused test → final rapor.
+- PASS/CLOSED konular yalnız yeni somut kanıt çıkarsa yeniden açılır.
+- Merge ve deploy ayrı açık onay gerektirir.
+
+## Faz sırası ve kapsam sınırı
+
+- Bu kural görsel faz başladığında geçerlidir.
+- Mevcut ana ürün fazı **PERSONEL QR ATTENDANCE current-state / gap scan**'dir.
+- Personel Detay redesign; QR attendance, saha rollout, puantaj doğrulaması ve personel go-live tamamlandıktan sonra yapılır.

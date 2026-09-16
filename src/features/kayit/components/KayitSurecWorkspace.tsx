@@ -110,6 +110,7 @@ import {
   type PuantajSubdomainId
 } from "../kayit-surec-constants";
 import {
+  buildPersonelSelectLabels,
   formatPersonelLabel,
   normalizePersonelSearchText,
   resetSurecFormKeepingPersonel,
@@ -342,13 +343,16 @@ export function KayitSurecWorkspace({
     belgeDurumSaving ||
     belgeFileMutating;
 
+  // Seçim listesi label'ları: yalnız Ad Soyad (gerçek ad-soyad çakışması varsa "Sicil X").
+  const personelSelectLabels = useMemo(() => buildPersonelSelectLabels(personeller), [personeller]);
+
   const personelOptions = useMemo(
     () =>
       personeller.map((personel) => ({
         value: String(personel.id),
-        label: formatPersonelLabel(personel)
+        label: personelSelectLabels.get(personel.id) ?? formatPersonelLabel(personel)
       })),
-    [personeller]
+    [personelSelectLabels, personeller]
   );
 
   const filteredSurecPersonelOptions = useMemo(() => {
@@ -362,6 +366,7 @@ export function KayitSurecWorkspace({
       const searchable = [
         personel.ad,
         personel.soyad,
+        personel.sicil_no,
         personel.tc_kimlik_no,
         personel.telefon,
         personel.departman_adi,
@@ -375,19 +380,25 @@ export function KayitSurecWorkspace({
 
     const filteredOptions = filteredPersoneller.map((personel) => ({
       value: String(personel.id),
-      label: formatPersonelLabel(personel)
+      label: personelSelectLabels.get(personel.id) ?? formatPersonelLabel(personel)
     }));
 
     if (surecForm.personelId && !filteredOptions.some((option) => option.value === surecForm.personelId)) {
       const selectedPersonel = personeller.find((personel) => String(personel.id) === surecForm.personelId);
 
       if (selectedPersonel) {
-        return [{ value: String(selectedPersonel.id), label: formatPersonelLabel(selectedPersonel) }, ...filteredOptions];
+        return [
+          {
+            value: String(selectedPersonel.id),
+            label: personelSelectLabels.get(selectedPersonel.id) ?? formatPersonelLabel(selectedPersonel)
+          },
+          ...filteredOptions
+        ];
       }
     }
 
     return filteredOptions;
-  }, [personelOptions, personeller, surecForm.personelId, surecPersonelSearch]);
+  }, [personelSelectLabels, personeller, surecForm.personelId, surecPersonelSearch]);
 
   const handleSurecPersonelPickerOpenChange = useCallback(
     (isOpen: boolean) => {
@@ -499,7 +510,9 @@ export function KayitSurecWorkspace({
     initialKalemTuru: "CEZA"
   });
 
-  const selectedSurecPersonelLabel = selectedSurecPersonel ? formatPersonelLabel(selectedSurecPersonel) : "Seçiniz";
+  const selectedSurecPersonelLabel = selectedSurecPersonel
+    ? personelSelectLabels.get(selectedSurecPersonel.id) ?? formatPersonelLabel(selectedSurecPersonel)
+    : "Seçiniz";
 
   const hasPozisyonDiff = Boolean(
     selectedSurecPersonel && hasOrganizasyonFormDiff(pozisyonForm, selectedSurecPersonel)

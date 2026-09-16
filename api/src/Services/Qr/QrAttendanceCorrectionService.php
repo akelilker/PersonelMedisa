@@ -7,6 +7,9 @@ namespace Medisa\Api\Services\Qr;
 use Medisa\Api\Auth\DualControl;
 use Medisa\Api\Services\Attendance\AttendanceCorrectionApproverResolver;
 use Medisa\Api\Services\Personel\PersonelOperationalContextService;
+use Medisa\Api\Services\PuantajDonemKilidiService;
+use Medisa\Api\Services\PuantajDonemPeriodService;
+use Medisa\Api\Services\PuantajDonemReopenException;
 use Medisa\Api\Services\SelfService\PersonelInboxNotificationService;
 use Medisa\Api\Services\SelfService\PersonelMobileCapabilityService;
 use Medisa\Api\Services\SelfService\SelfPersonelContext;
@@ -208,6 +211,30 @@ class QrAttendanceCorrectionService
         $stmt = $pdo->prepare('SELECT * FROM qr_attendance_correction_requests WHERE id = :id LIMIT 1 FOR UPDATE');
         $pdo->beginTransaction();
         try {
+            // Period serialization lock must precede canonical row locks (QR candidate apply parity).
+            $lockInfo = self::resolvePeriodLockContext($pdo, $requestId);
+            $periodLock = PuantajDonemKilidiService::acquireForDate(
+                $pdo,
+                (int) $lockInfo['sube_id'],
+                (string) $lockInfo['business_date']
+            );
+            if ($action === 'ONAYLA') {
+                try {
+                    PuantajDonemPeriodService::assertCanonicalWriteAllowed(
+                        $pdo,
+                        (int) $periodLock['sube_id'],
+                        (int) $periodLock['yil'],
+                        (int) $periodLock['ay']
+                    );
+                } catch (PuantajDonemReopenException $e) {
+                    throw new QrAttendanceException(
+                        'QR_CORRECTION_PERIOD_LOCKED',
+                        'Donem muhurlu veya kilitli oldugu icin duzeltme uygulanamaz.',
+                        409
+                    );
+                }
+            }
+
             $stmt->execute(['id' => $requestId]);
             $row = $stmt->fetch(PDO::FETCH_ASSOC);
             if (!is_array($row)) {
@@ -230,6 +257,15 @@ class QrAttendanceCorrectionService
             $now = self::utcNow();
             if ($action === 'ONAYLA') {
                 $gunlukId = self::applyEffectiveTime($pdo, $row);
+                if ($gunlukId === null) {
+                    $pdo->rollBack();
+                    throw new QrAttendanceException(
+                        'QR_CORRECTION_NO_PUANTAJ_ROW',
+                        'Bu tarih icin gunluk puantaj kaydi bulunamadi; duzeltme uygulanmadi.',
+                        409,
+                        'source_event_id'
+                    );
+                }
                 $upd = $pdo->prepare(
                     "UPDATE qr_attendance_correction_requests
                      SET status = 'ONAYLANDI',
@@ -365,6 +401,33 @@ class QrAttendanceCorrectionService
         return $count;
     }
 
+    /**
+     * Source QR event branch + business date for period lock acquisition.
+     * Scan-time cross-branch denial guarantees event sube_id is the personel working branch.
+     *
+     * @return array{sube_id:int,business_date:string}
+     */
+    private static function resolvePeriodLockContext(PDO $pdo, $requestId)
+    {
+        $stmt = $pdo->prepare(
+            'SELECT e.sube_id, r.business_date
+             FROM qr_attendance_correction_requests r
+             INNER JOIN qr_attendance_events e ON e.id = r.source_event_id
+             WHERE r.id = :id
+             LIMIT 1'
+        );
+        $stmt->execute(['id' => (int) $requestId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!is_array($row)) {
+            throw new QrAttendanceException('NOT_FOUND', 'Duzeltme talebi bulunamadi.', 404);
+        }
+
+        return [
+            'sube_id' => (int) $row['sube_id'],
+            'business_date' => (string) $row['business_date'],
+        ];
+    }
+
     /** @return int|null gunluk_puantaj id when updated */
     private static function applyEffectiveTime(PDO $pdo, array $row)
     {
@@ -382,7 +445,15 @@ class QrAttendanceCorrectionService
                 return null;
             }
             $col = $eventType === 'CIKIS' ? 'cikis_saati' : 'giris_saati';
-            $upd = $pdo->prepare("UPDATE gunluk_puantaj SET {$col} = :t WHERE id = :id");
+            $upd = $pdo->prepare(
+                "UPDATE gunluk_puantaj
+                 SET {$col} = :t,
+                     kontrol_durumu = 'BEKLIYOR',
+                     state = 'ACIK',
+                     muhur_id = NULL,
+                     updated_at = CURRENT_TIMESTAMP
+                 WHERE id = :id"
+            );
             $upd->execute(['t' => $time, 'id' => (int) $id]);
 
             return (int) $id;

@@ -34,6 +34,16 @@ Bu proje React + Vite + TypeScript tabanlı PersonelMedisa uygulamasıdır. Kod 
 - Responsive davranış masaüstü/mobil/PWA etkileriyle birlikte düşünülür.
 - Ortak component değiştiyse kullanan ana ekranlarda hızlı regresyon kontrolü yapılır.
 
+## Görsel dil ve görsel faz governance
+
+- Görsel dil Medisa Taşıt Yönetim Sistemi ile aynı ürün ailesinde kalır (`tasitmedisa` referansı); eski projenin teknik borcu taşınmaz.
+- Business logic, component sahipliği, modal/form davranışı ve teknik mimari için tek otorite bu repo'dur. Grok yalnız görsel fikir / UX değerlendirmesi / alternatif yerleşim / tasarım yorumu için kullanılabilir.
+- Yeni paralel UI sistemi, ikinci modal/form altyapısı, dosya sonu CSS override'ları veya mevcut owner'ı bypass eden geçici çözüm kurulmaz.
+- Önce ekranın canonical component/theme/modal/form owner'ı bulunur; karar mümkün olduğunca mevcut yapı içinde uygulanır.
+- Aynı görsel hedef mikro görevlere bölünmez; research → owner ve root cause → Grok görsel değerlendirmesi → net tasarım kararı → bağımlı değişiklikler → focused test → final rapor tek kontrollü görevde tamamlanır.
+- PASS/CLOSED konular yalnız yeni somut kanıt çıkarsa yeniden açılır; merge ve deploy ayrı açık onay gerektirir.
+- Faz sırası: mevcut ana ürün fazı **PERSONEL QR ATTENDANCE current-state / gap scan**'dir. Personel Detay redesign; QR attendance, saha rollout, puantaj doğrulaması ve personel go-live sonrasında yapılır. Görsel faz bu sıradan sonra başlar.
+
 ## Test ve doğrulama
 
 Kod değişikliği sonrası kapsamına göre en az şu kontrolleri çalıştır:

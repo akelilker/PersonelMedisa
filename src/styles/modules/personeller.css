@@ -1380,7 +1380,10 @@
   justify-content: center;
   min-height: 0;
   width: 100%;
-  padding: 12px 4px 20px;
+  /* Alt boşluk üstten geniş: stage, grid'i kendi içerik alanında merkezlediği için
+     toolbar + boşluk bütçesi grid'i modal body merkezinden +10px aşağı kaydırıyordu.
+     Padding'i dengeleyince grid modal body merkezine oturur (transform/margin hack yok). */
+  padding: 12px 4px 40px;
 }
 
 .personeller-scope-grid {

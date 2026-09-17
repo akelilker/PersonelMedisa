@@ -69,6 +69,13 @@
   color: rgba(230, 234, 245, 0.5);
 }
 
+/* Picker açıkken boş durumun "Seçiniz" metni trigger'da görünmez: liste zaten açıktır ve
+   metin dikkat dağıtmaz. Seçili değerde etiket her durumda görünür kalır (layout korunur,
+   bu yüzden gizleme visibility ile yapılır; DOM/otomasyon metni bozulmaz). */
+.app-select.is-open .app-select-trigger-text.is-placeholder {
+  visibility: hidden;
+}
+
 .app-select-chevron {
   flex: 0 0 16px;
   width: 16px;

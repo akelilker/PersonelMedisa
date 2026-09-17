@@ -201,11 +201,12 @@
   gap: var(--space-3);
 }
 
-/* Personel Kartı: action satırı (Ara / Arşiv) kırmızı header alt sınırına yakın durur.
-   Body'nin varsayılan üst nefesi(--space-4) kart fazında --space-1'e iner; yatay
-   padding değişmediği için sağ hizalama ve kart gridi aynı kalır. */
+/* Personel Kartı: action satırı (Ara / Filtre / Arşiv) kırmızı header alt sınırına
+   yaslanır. Kart yüzeyinde body'nin üst nefesi kalkar; dikey boşluğu yalnızca
+   toolbar row'u taşır. Yatay padding değişmediği için sağ hizalama ve kart gridi
+   aynı kalır. */
 .modal-body:has(> .personeller-page--kart) {
-  padding-top: var(--space-1);
+  padding-top: 0;
 }
 
 .modal-header-spacer {

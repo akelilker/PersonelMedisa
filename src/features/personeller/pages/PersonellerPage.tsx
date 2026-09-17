@@ -376,6 +376,7 @@ export function PersonellerPage() {
             <div className="personeller-filter-search form-field-grid">
               <FormField
                 label="Ara"
+                labelHidden
                 name="personel-filter-search"
                 type="search"
                 placeholder="Ad soyad, kimlik no, görev, bölüm, birim, şube"

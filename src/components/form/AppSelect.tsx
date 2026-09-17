@@ -161,6 +161,11 @@ export function AppSelect({
   const selectedIndex = allOptions.findIndex((option) => option.value === value);
   const selectedOption = selectedIndex >= 0 ? allOptions[selectedIndex] : null;
   const isPlaceholderSelected = placeholderOption ? value === placeholderOption.value : false;
+  /**
+   * Görünen metin placeholder mı: placeholder opsiyonu seçili ya da eşleşen opsiyon yok.
+   * Böylece boş durumdaki "Seçiniz" placeholder görünümünde kalır, seçili adla karışmaz.
+   */
+  const showsPlaceholderText = isPlaceholderSelected || !selectedOption;
 
   /**
    * Panel kartları: placeholder KART olarak render edilmez (trigger'da görünür).
@@ -541,7 +546,7 @@ export function AppSelect({
       </select>
 
       <div className="app-select-trigger form-input" data-app-select-trigger="1" aria-hidden="true">
-        <span className={`app-select-trigger-text${isPlaceholderSelected ? " is-placeholder" : ""}`}>
+        <span className={`app-select-trigger-text${showsPlaceholderText ? " is-placeholder" : ""}`}>
           {selectedOption?.label ?? "Seçiniz"}
         </span>
         <svg

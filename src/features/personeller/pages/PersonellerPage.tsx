@@ -76,8 +76,6 @@ export function PersonellerPage() {
   const {
     listQuery,
     personeller,
-    hasNextPage,
-    totalPages,
     isLoading,
     isRefreshing,
     isCurrentQueryResolved,
@@ -94,7 +92,6 @@ export function PersonellerPage() {
     setDraftCalisanKapsami,
     setDraftCalismaLokasyonuId,
     setDraftEksikBilgi,
-    setPage,
     sortKey,
     sortDir,
     setSort
@@ -116,7 +113,6 @@ export function PersonellerPage() {
   const { draft, applied } = listQuery;
   const isArchiveRoute = location.pathname.startsWith("/arsiv/personeller");
   const isArchiveMode = canViewArsiv && (isArchiveRoute || draft.aktiflik === "pasif");
-  const page = listQuery.page;
   const departmanFilterOptions = toSelectOptions(refs.departmanOptions);
   const personelTipiFilterOptions = toSelectOptions(refs.personelTipiOptions);
   // "Fabrikada kimler çalışıyor?": fiili çalışma yeri filtresi. Bordro/SGK
@@ -644,21 +640,6 @@ export function PersonellerPage() {
                 </tbody>
               </table>
               </div>
-            </div>
-          ) : null}
-
-          {!isLoading && !errorMessage && personeller.length > 0 && (hasNextPage || page > 1) ? (
-            <div className="module-pagination personeller-pagination" data-testid="personeller-pagination">
-              <button type="button" className="universal-btn-aux" disabled={page <= 1} onClick={() => setPage(Math.max(1, page - 1))}>
-                Önceki
-              </button>
-              <span className="module-page-info">
-                Sayfa {page}
-                {totalPages != null ? ` / ${totalPages}` : ""}
-              </span>
-              <button type="button" className="universal-btn-aux" disabled={!hasNextPage} onClick={() => setPage(page + 1)}>
-                Sonraki
-              </button>
             </div>
           ) : null}
         </>

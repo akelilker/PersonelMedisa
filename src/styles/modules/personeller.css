@@ -1297,7 +1297,8 @@
 .personeller-page--kart .vt-right {
   display: flex;
   align-items: center;
-  gap: 2px;
+  /* Action ikonları (Ara / Filtre / Arşiv) arasında okunur yatay nefes. */
+  gap: 6px;
   justify-content: flex-end;
   flex: 0 0 auto;
 }

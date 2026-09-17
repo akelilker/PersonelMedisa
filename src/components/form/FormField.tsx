@@ -11,6 +11,8 @@ export type FormFieldOption = { value: string; label: string };
 
 type FormFieldBase = {
   label: string;
+  /** Görsel olarak etiketsiz alanlar: etiket yalnız ekran okuyucuya kalır. */
+  labelHidden?: boolean;
   name: string;
   value: string;
   onChange: (value: string) => void;
@@ -59,7 +61,16 @@ type FormFieldAsTextarea = FormFieldBase & {
 export type FormFieldProps = FormFieldAsInput | FormFieldAsSelect | FormFieldAsTextarea;
 
 export function FormField(props: FormFieldProps) {
-  const { label, name, value, onChange, required = false, placeholder, disabled = false } = props;
+  const {
+    label,
+    labelHidden = false,
+    name,
+    value,
+    onChange,
+    required = false,
+    placeholder,
+    disabled = false
+  } = props;
 
   let control: ReactNode;
 
@@ -133,7 +144,7 @@ export function FormField(props: FormFieldProps) {
 
   return (
     <div className="form-section">
-      <label className="form-label" htmlFor={name}>
+      <label className={labelHidden ? "form-label visually-hidden" : "form-label"} htmlFor={name}>
         {label}
       </label>
       {control}

@@ -111,13 +111,11 @@
   background: rgba(255, 255, 255, 0.08);
 }
 
+/* Ara/Filtre paneli ayırıcı çizgisiz sıkı yüzeydir: üst/alt separator ve
+   onlara ait dikey boşluk yoktur. */
 .personeller-filter-panel {
   display: grid;
   gap: var(--space-2);
-  padding: var(--space-2) 0;
-  border: none;
-  border-top: 1px solid var(--line-soft);
-  border-bottom: 1px solid var(--line-soft);
 }
 
 .personeller-filter-primary .form-label,
@@ -1365,16 +1363,9 @@
   height: 22px;
 }
 
-.personeller-page--kart .personeller-filter-panel {
-  margin-top: 6px;
-  padding-top: 6px;
-  padding-bottom: 6px;
-}
-
+/* Separator kalktığı için çizgi çerçevesi boşluğu (margin/padding) yoktur;
+   yalnız Ara panelinde input ↔ Temizle arası sıkı kalır. */
 .personeller-page--kart .personeller-filter-panel--search-only {
-  margin-top: 4px;
-  padding-top: 4px;
-  padding-bottom: 4px;
   gap: 4px;
 }
 

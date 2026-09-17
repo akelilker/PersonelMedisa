@@ -185,10 +185,10 @@
   max-height: min(56vh, 560px);
 }
 
+/* Personel Kartı listesi tek scroll yüzeyidir: yükseklik modal gövdesinden gelir,
+   sabit 52vh penceresi yoktur (Taşıt "scroll yalnız liste alanında" kontratı). */
 .modal-body > .personeller-page .personeller-list-wrap,
 .modal-body > .personeller-page .personeller-table-wrap {
-  max-height: min(52vh, 520px);
-  overflow: auto;
   border: 1px solid var(--medisa-table-border, rgba(255, 255, 255, 0.08));
   border-radius: var(--radius-sm);
 }
@@ -1299,8 +1299,9 @@
 .personeller-page--kart .vt-right {
   display: flex;
   align-items: center;
-  /* Action ikonları (Ara / Filtre / Arşiv) arasında okunur yatay nefes. */
-  gap: 6px;
+  /* Action ikonları (Ara / Filtre / Arşiv) arasında okunur yatay nefes.
+     Taşıt `.vt-right` taban değeri: 12px. */
+  gap: 12px;
   justify-content: flex-end;
   flex: 0 0 auto;
 }
@@ -1314,7 +1315,8 @@
 .personeller-page--kart .personeller-toolbar-back {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  /* Sol ok ile "Şubeler" etiketi arası kontrat: 4px. */
+  gap: 4px;
   margin: 0;
   padding: 0;
   border: none;
@@ -1460,7 +1462,8 @@
   color: var(--text-inverse);
 }
 
-/* Title: reserved 2-line block; natural wrap (no <br>); alias .personeller-scope-card-name */
+/* Title: reserved 2-line block; natural wrap (no <br>); alias .personeller-scope-card-name.
+   Default: beyaz + normal weight; kalınlık yalnız hover'da (seçili durum rengi ayrı kural). */
 .personeller-scope-card-title,
 .personeller-scope-card-name {
   display: block;
@@ -1471,11 +1474,19 @@
   max-height: calc(1.25em * 2);
   overflow: hidden;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 400;
   line-height: 1.25;
+  color: var(--text-inverse);
   text-align: center;
   word-break: normal;
   overflow-wrap: break-word;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .personeller-scope-card:hover .personeller-scope-card-title,
+  .personeller-scope-card:hover .personeller-scope-card-name {
+    font-weight: 700;
+  }
 }
 
 /* Count block: number + Personel on shared Y across cards */
@@ -2067,9 +2078,24 @@
   min-height: auto;
 }
 
-/* Conscious overflow-x:auto — discoverable scroll if content still wider; prefer fit via min-width:0 above */
+/* Tek scroll yüzeyi: liste alanı modal gövdesinin kalan yüksekliğini alır.
+   Dikey kaydırma yalnız liste içerik alanında olur; modal gövdesi/personel sayfası kaymaz.
+   Scrollbar görünmez (repo global politikası: globals.css), wheel/trackpad/touch/klavye çalışır.
+   Conscious overflow-x:auto — discoverable scroll if content still wider; prefer fit via min-width:0 above */
+.personeller-page--kart .personeller-table-scroll-shell {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 .personeller-page--kart .personeller-table-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
   overflow-x: auto;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
   width: 100%;
   max-width: 100%;

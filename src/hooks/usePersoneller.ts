@@ -47,7 +47,13 @@ import {
   buildBagliAmirFormGuidance,
   type BagliAmirContext
 } from "../features/personeller/personel-edit-utils";
-const PAGE_SIZE = 10;
+/**
+ * Personel Kartı liste yüzeyi tek sayfa akar; sayfa gezinmesi yoktur.
+ * Backend (`PersonellerController::list`) limiti `min(250, ...)` ile sınırlar,
+ * bu yüzden tek istekte alınabilecek en geniş kayıt aralığı istenir ve liste
+ * içerik alanı dikey scroll ile gezilir.
+ */
+export const PERSONEL_LIST_LIMIT = 250;
 
 export type PersonelListSortKey = "ad" | "sube" | "bolum" | "gorev" | "statu";
 
@@ -66,12 +72,11 @@ export type PersonelListFilters = {
  * `draft` is what the inputs show (raw text included), `applied` is what the API
  * is actually queried with. Every filter except the text box is applied the moment
  * it changes; the text box lands in `applied` after the debounce (or immediately
- * on Enter / clear).
+ * on Enter / clear). Liste tek sayfa akar, bu yüzden sayfa durumu yoktur.
  */
 export type PersonelListQueryState = {
   draft: PersonelListFilters;
   applied: PersonelListFilters;
-  page: number;
 };
 
 const INITIAL_LIST_FILTERS: PersonelListFilters = {
@@ -166,8 +171,7 @@ export function usePersoneller() {
   const revision = useAppDataRevision();
   const [listQuery, setListQuery] = useState<PersonelListQueryState>({
     draft: { ...INITIAL_LIST_FILTERS },
-    applied: { ...INITIAL_LIST_FILTERS },
-    page: 1
+    applied: { ...INITIAL_LIST_FILTERS }
   });
   const [sortKey, setSortKeyState] = useState<PersonelListSortKey | null>(null);
   const [sortDir, setSortDirState] = useState<"asc" | "desc">("asc");
@@ -184,7 +188,6 @@ export function usePersoneller() {
   const [createBagliAmirContext, setCreateBagliAmirContext] = useState<BagliAmirContext | null>(null);
 
   const appliedFilters = listQuery.applied;
-  const listPage = listQuery.page;
 
   const activeSube = useMemo(() => getActiveSube(), [revision]);
 
@@ -196,7 +199,8 @@ export function usePersoneller() {
         appliedFilters.aktiflik,
         appliedFilters.departmanId,
         appliedFilters.personelTipiId,
-        listPage,
+        // Liste tek sayfa: cache key kontratı ilk sayfa segmentini korur.
+        1,
         appliedFilters.calisanKapsami,
         appliedFilters.eksikBilgi,
         appliedFilters.calismaLokasyonuId
@@ -210,7 +214,6 @@ export function usePersoneller() {
       appliedFilters.calismaLokasyonuId,
       appliedFilters.eksikBilgi,
       appliedFilters.search,
-      listPage,
       sortDir,
       sortKey
     ]
@@ -239,8 +242,6 @@ export function usePersoneller() {
   const isCurrentQueryResolved = listSnapshot !== undefined;
 
   const personeller = shownSnapshot?.items ?? [];
-  const hasNextPage = shownSnapshot?.pagination.hasNextPage ?? false;
-  const totalPages = shownSnapshot?.pagination.totalPages ?? null;
   const missingPersonelTotal = shownSnapshot?.missingPersonelTotal ?? null;
 
   const refs = useMemo((): PersonelReferenceBundle => {
@@ -267,7 +268,7 @@ export function usePersoneller() {
   );
 
   const listRequestParams = useCallback(
-    (page: number, signal?: AbortSignal) => ({
+    (signal?: AbortSignal) => ({
       search: appliedFilters.search || undefined,
       departman_id: parseOptionalPositiveInt(appliedFilters.departmanId),
       aktiflik: appliedFilters.aktiflik,
@@ -279,8 +280,8 @@ export function usePersoneller() {
       sort: sortKey ?? undefined,
       dir: sortKey ? sortDir : undefined,
       prefer_query_sube: true,
-      page,
-      limit: PAGE_SIZE,
+      page: 1,
+      limit: PERSONEL_LIST_LIMIT,
       signal
     }),
     [
@@ -298,14 +299,14 @@ export function usePersoneller() {
 
   const refetch = useCallback(async () => {
     const lease = acquireDedupedRequest(listKey, (signal) =>
-      fetchPersonellerList(listRequestParams(listPage, signal))
+      fetchPersonellerList(listRequestParams(signal))
     );
     try {
       await fetchWithCacheMerge(listKey, () => lease.promise);
     } finally {
       lease.release();
     }
-  }, [listKey, listPage, listRequestParams]);
+  }, [listKey, listRequestParams]);
 
   // Monotonic id: only the newest query may touch loading/error state, so a slow
   // response that lands after a newer one can never overwrite the current result.
@@ -327,7 +328,7 @@ export function usePersoneller() {
     setErrorMessage(null);
 
     const lease = acquireDedupedRequest(listKey, (signal) =>
-      fetchPersonellerList(listRequestParams(listPage, signal))
+      fetchPersonellerList(listRequestParams(signal))
     );
 
     void (async () => {
@@ -357,7 +358,7 @@ export function usePersoneller() {
     return () => {
       lease.release();
     };
-  }, [listKey, listPage, listRequestParams]);
+  }, [listKey, listRequestParams]);
 
   useEffect(() => {
     let cancelled = false;
@@ -432,12 +433,10 @@ export function usePersoneller() {
 
   useEffect(() => cancelPendingSearch, [cancelPendingSearch]);
 
-  /** Commits the normalized search text and restarts pagination. */
+  /** Commits the normalized search text; liste tek sayfa olduğu için sayfa sıfırlama yoktur. */
   const applySearch = useCallback((search: string) => {
     setListQuery((prev) =>
-      prev.applied.search === search && prev.page === 1
-        ? prev
-        : { ...prev, applied: { ...prev.applied, search }, page: 1 }
+      prev.applied.search === search ? prev : { ...prev, applied: { ...prev.applied, search } }
     );
   }, []);
 
@@ -453,8 +452,7 @@ export function usePersoneller() {
         const draft = { ...prev.draft, ...patch };
         return {
           draft,
-          applied: { ...draft, search: normalizePersonelSearchQuery(draft.search) },
-          page: 1
+          applied: { ...draft, search: normalizePersonelSearchQuery(draft.search) }
         };
       });
     },
@@ -500,8 +498,7 @@ export function usePersoneller() {
       cancelPendingSearch();
       setListQuery((prev) => ({
         ...prev,
-        applied: { ...prev.draft, search: normalizePersonelSearchQuery(prev.draft.search) },
-        page: 1
+        applied: { ...prev.draft, search: normalizePersonelSearchQuery(prev.draft.search) }
       }));
     },
     [cancelPendingSearch]
@@ -524,8 +521,7 @@ export function usePersoneller() {
     cancelPendingSearch();
     setListQuery({
       draft: { ...INITIAL_LIST_FILTERS },
-      applied: { ...INITIAL_LIST_FILTERS },
-      page: 1
+      applied: { ...INITIAL_LIST_FILTERS }
     });
   }, [cancelPendingSearch]);
 
@@ -572,14 +568,6 @@ export function usePersoneller() {
       setSortDirState(dir ?? "asc");
       return key;
     });
-    setListQuery((prev) => (prev.page === 1 ? prev : { ...prev, page: 1 }));
-  }, []);
-
-  const setPage = useCallback((next: number | ((p: number) => number)) => {
-    setListQuery((prev) => ({
-      ...prev,
-      page: typeof next === "function" ? next(prev.page) : next
-    }));
   }, []);
 
   const openCreateModal = useCallback(() => {
@@ -690,7 +678,6 @@ export function usePersoneller() {
           setIsCreateModalOpen(false);
           setCreateForm(INITIAL_CREATE_PERSONEL_FORM);
           setCreateBagliAmirContext(null);
-          setListQuery((prev) => ({ ...prev, page: 1 }));
           await fetchWithCacheMerge(pageOneKey, () =>
             runDeduped(pageOneKey, () =>
               fetchPersonellerList({
@@ -702,7 +689,7 @@ export function usePersoneller() {
                 eksik_bilgi: listQuery.applied.eksikBilgi === "eksik",
                 sube_id: getSubeIdForApiRequest(),
                 page: 1,
-                limit: PAGE_SIZE
+                limit: PERSONEL_LIST_LIMIT
               })
             )
           );
@@ -722,7 +709,6 @@ export function usePersoneller() {
           setIsCreateModalOpen(false);
           setCreateForm(INITIAL_CREATE_PERSONEL_FORM);
           setCreateBagliAmirContext(null);
-          setListQuery((prev) => ({ ...prev, page: 1 }));
           void processSyncQueue();
         }
       } catch (error) {
@@ -737,8 +723,6 @@ export function usePersoneller() {
   return {
     listQuery,
     personeller,
-    hasNextPage,
-    totalPages,
     missingPersonelTotal,
     /** First load only: there is nothing to keep on screen yet. */
     isLoading: isFetching && personeller.length === 0,
@@ -771,7 +755,6 @@ export function usePersoneller() {
     setDraftCalisanKapsami,
     setDraftCalismaLokasyonuId,
     setDraftEksikBilgi,
-    setPage,
     sortKey,
     sortDir,
     setSort

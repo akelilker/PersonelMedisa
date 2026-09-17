@@ -9,7 +9,7 @@ import {
   normalizePersonelSearchQuery,
   personelSearchMatches
 } from "../../src/features/personeller/personel-search-query";
-import { usePersoneller } from "../../src/hooks/usePersoneller";
+import { PERSONEL_LIST_LIMIT, usePersoneller } from "../../src/hooks/usePersoneller";
 import type { Personel } from "../../src/types/personel";
 
 const personellerApiMock = vi.hoisted(() => ({
@@ -40,6 +40,7 @@ vi.mock("../../src/state/auth.store", () => ({
 type ListParams = {
   search?: string;
   page?: number;
+  limit?: number;
   calisan_kapsami?: string;
   signal?: AbortSignal;
 };
@@ -281,16 +282,8 @@ describe("Personeller live search", () => {
     expect(view.result.current.listQuery.applied.search).toBe("473");
   });
 
-  it("applies a dropdown filter instantly and resets pagination to page 1", async () => {
+  it("applies a dropdown filter instantly on the single list surface", async () => {
     const view = await renderPersoneller();
-
-    act(() => {
-      view.result.current.setPage(3);
-    });
-    await settle();
-    await waitFor(() => {
-      expect(view.result.current.listQuery.page).toBe(3);
-    });
 
     act(() => {
       view.result.current.setDraftCalisanKapsami("DIS_KAYNAK");
@@ -298,12 +291,26 @@ describe("Personeller live search", () => {
     await settle();
 
     expect(view.result.current.listQuery.applied.calisanKapsami).toBe("DIS_KAYNAK");
-    expect(view.result.current.listQuery.page).toBe(1);
     await waitFor(() => {
       expect(
         callParams().some((p) => p.calisan_kapsami === "DIS_KAYNAK" && p.page === 1)
       ).toBe(true);
     });
+  });
+
+  it("personel listesi tek sayfa: pagination durumu ve tek istek limiti", async () => {
+    const view = await renderPersoneller();
+
+    // Pagination sözleşmesi kaldırıldı: sayfa durumu, sayfa setter'ı ve sayfa bilgisi yok.
+    expect("page" in view.result.current.listQuery).toBe(false);
+    expect("setPage" in view.result.current).toBe(false);
+    expect("hasNextPage" in view.result.current).toBe(false);
+    expect("totalPages" in view.result.current).toBe(false);
+
+    await waitFor(() => {
+      expect(callParams().length).toBeGreaterThan(0);
+    });
+    expect(callParams().every((p) => p.page === 1 && p.limit === PERSONEL_LIST_LIMIT)).toBe(true);
   });
 
   it("a pending search is committed together with an instant filter change", async () => {

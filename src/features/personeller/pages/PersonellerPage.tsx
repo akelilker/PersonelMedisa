@@ -379,6 +379,9 @@ export function PersonellerPage() {
                 labelHidden
                 name="personel-filter-search"
                 type="search"
+                /* Panel büyüteçten açıldığı anda alan mount olur; autoFocus ile
+                   ilk tuş ikinci tıklama gerekmeden doğrudan buraya düşer. */
+                autoFocus
                 placeholder="Ad soyad, kimlik no, görev, bölüm, birim, şube"
                 autoComplete="off"
                 maxLength={PERSONEL_SEARCH_MAX_LENGTH}

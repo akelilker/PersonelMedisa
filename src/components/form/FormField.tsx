@@ -29,6 +29,9 @@ type FormFieldAsInput = FormFieldBase & {
   onCompositionStart?: CompositionEventHandler<HTMLInputElement>;
   onCompositionEnd?: CompositionEventHandler<HTMLInputElement>;
   autoComplete?: string;
+  /** Panel/alan açılışında imleç doğrudan alana gelsin (kullanıcı tıklamasıyla
+   *  mount olan alanlarda ekstra ref/effect gerekmez). */
+  autoFocus?: boolean;
   maxLength?: number;
   dataTestId?: string;
   min?: number | string;
@@ -131,6 +134,7 @@ export function FormField(props: FormFieldProps) {
         step={props.step}
         maxLength={props.maxLength}
         autoComplete={props.autoComplete}
+        autoFocus={props.autoFocus}
         data-testid={props.dataTestId}
         value={value}
         onChange={(event) => onChange(event.target.value)}

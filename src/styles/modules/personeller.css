@@ -1463,7 +1463,7 @@
 }
 
 /* Title: reserved 2-line block; natural wrap (no <br>); alias .personeller-scope-card-name.
-   Default: beyaz + normal weight; kalınlık yalnız hover'da (seçili durum rengi ayrı kural). */
+   Default: beyaz + ince weight (300); kalınlık yalnız hover'da (600) (seçili durum rengi ayrı kural). */
 .personeller-scope-card-title,
 .personeller-scope-card-name {
   display: block;
@@ -1474,7 +1474,7 @@
   max-height: calc(1.25em * 2);
   overflow: hidden;
   font-size: 13px;
-  font-weight: 400;
+  font-weight: 300;
   line-height: 1.25;
   color: var(--text-inverse);
   text-align: center;
@@ -1485,7 +1485,7 @@
 @media (hover: hover) and (pointer: fine) {
   .personeller-scope-card:hover .personeller-scope-card-title,
   .personeller-scope-card:hover .personeller-scope-card-name {
-    font-weight: 700;
+    font-weight: 600;
   }
 }
 

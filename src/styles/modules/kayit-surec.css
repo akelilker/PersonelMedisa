@@ -531,11 +531,15 @@
   gap: 3px;
 }
 
-/* Trigger içindeki görünür metin (placeholder veya seçilen ad) yatayda ortalı okunur.
-   Metin kalan alanı kaplar, chevron sağda kalır; seçenek kartları soldan hizalı kalır. */
+/* Trigger içindeki görünür metin (seçilen ad veya placeholder) yatayda gerçek ortada
+   durur: chevron + trigger gap'i yalnız sağda yer kapladığı için aynı genişlik solda da
+   ayrılır ve metin trigger merkezine oturur. Chevron sağda kalır, seçenek kartları
+   soldan hizalı kalır. */
 .surec-personel-combobox .app-select-trigger-text {
   flex: 1 1 auto;
   text-align: center;
+  /* Chevron kutusu 16px + kendi 2px margin'i = 18px, artı trigger'ın yatay gap'i. */
+  padding-left: calc(var(--space-2) + 18px);
 }
 
 /* Personel bağlam seçici: kanonik owner (AppSelect searchable) — feature CSS yalnız yerleşim taşır. */

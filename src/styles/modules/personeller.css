@@ -1258,8 +1258,10 @@
 
 .personeller-page--kart .personeller-toolbar--kart,
 .personeller-page--kart .vehicles-toolbar {
-  height: 36px;
-  min-height: 36px;
+  /* Action satırı ikon kutusu yüksekliğine iner (32px): 36px row'un ikon üstünde
+     bıraktığı 2px slack kalkar, ikon grubu header alt sınırına yaslanır. */
+  height: 32px;
+  min-height: 32px;
   margin: 0;
   margin-bottom: 0;
   padding: 0 16px;
@@ -1276,8 +1278,8 @@
 
 .personeller-page--kart .personeller-toolbar-main {
   width: 100%;
-  min-height: 36px;
-  height: 36px;
+  min-height: 32px;
+  height: 32px;
   display: flex;
   align-items: center;
   justify-content: space-between;

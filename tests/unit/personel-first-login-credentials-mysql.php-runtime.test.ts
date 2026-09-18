@@ -9,7 +9,7 @@ describe("PERSONEL canonical first-login credential disposable MariaDB acceptanc
     await ensureDisposableMariaDbEnv();
   }, 90_000);
 
-  it("proves canonical username, template password, forced change, ilkerA invariant and fail-closed cohorts", () => {
+  it("proves canonical username, template password, forced change, ilkerA invariant, read-only preflight and fail-closed cohorts", () => {
     const result = runPhpMysqlRunner(runnerPath);
     expect(result.status, result.stderr || result.stdout).toBe(0);
     expect(result.stdout).toContain("[DONE] PersonelFirstLoginCredentialsMysqlTestRunner");
@@ -38,6 +38,20 @@ describe("PERSONEL canonical first-login credential disposable MariaDB acceptanc
     expect(result.stdout).toContain("[PASS] O: eski template sifresi DENIED");
     expect(result.stdout).toContain("[PASS] P: PASIF anomaly login fail-closed");
     expect(result.stdout).toContain("[PASS] K: ilkerA before/after exact invariant");
+
+    // PERSONEL_FIRST_LOGIN_PREFLIGHT: read-only control-plane report owner, disposable
+    // DB uzerinde PASS + ilkera_touched=false + beklenen plan + sifir mutation kaniti.
+    expect(result.stdout).toContain("[PASS] PERSONEL_FIRST_LOGIN_PREFLIGHT: result PASS");
+    expect(result.stdout).toContain("[PASS] PERSONEL_FIRST_LOGIN_PREFLIGHT: production_mutation_count = 0");
+    expect(result.stdout).toContain("[PASS] PERSONEL_FIRST_LOGIN_PREFLIGHT: decision_apply = false");
+    expect(result.stdout).toContain("[PASS] PERSONEL_FIRST_LOGIN_PREFLIGHT: ilkera_touched = false");
+    expect(result.stdout).toContain("[PASS] PERSONEL_FIRST_LOGIN_PREFLIGHT: cohort reconcile dogrulandi");
+    expect(result.stdout).toContain("[PASS] PERSONEL_FIRST_LOGIN_PREFLIGHT: beklenen username plan");
+    expect(result.stdout).toContain("[PASS] PERSONEL_FIRST_LOGIN_PREFLIGHT: plan satiri sinirli alan kumesi");
+    expect(result.stdout).toContain("[PASS] PERSONEL_FIRST_LOGIN_PREFLIGHT: users BEFORE == AFTER (sifir mutation)");
+    expect(result.stdout).toContain(
+      "[PASS] PERSONEL_FIRST_LOGIN_PREFLIGHT: personeller BEFORE == AFTER (sifir mutation)",
+    );
     expect(result.stdout).not.toContain("[FAIL]");
   });
 });

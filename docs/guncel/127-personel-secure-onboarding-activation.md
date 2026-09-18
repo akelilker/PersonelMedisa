@@ -58,6 +58,25 @@ Grandfathered. Migration yalnız güvenli varsayılanlarla sütun/tablo ekler:
 - rol/bağlantı değiştirmez
 - davet üretmez
 
+## Legacy PERSONEL hesaplarin canonical hizalanmasi (089)
+
+Tek canonical hesap modeli kapanışı: hiç aktive edilmemiş (personel tarafından hiç
+kullanılmamış) legacy PERSONEL hesapları da aynı secure aktivasyon modeline alınır.
+
+| Kural | Değer |
+|------|--------|
+| Owner | `089_personel_legacy_account_activation.sql` |
+| Hedef cohort | `rol = 'PERSONEL'` AND `activation_required = 0` AND `activated_at_utc IS NULL` |
+| Yazılan alanlar | `activation_required = 1`, `must_change_password = 1` |
+| Dokunulmayanlar | `username`, `personel_id` binding, `rol`, `durum`, `password_hash`, şube/bölüm/birim/şirket/SGK atamaları, personel kayıtları |
+| Kapsam dışı | PERSONEL dışı tüm kullanıcılar; zaten `activation_required = 1` olan hesaplar; bir kez aktive edilmiş (`activated_at_utc NOT NULL`) hesaplar |
+| Şifre hash'i | **Yeniden yazılmaz.** `LoginController`, `activation_required = 1` hesabı şifre doğrulamasından önce `401 INVALID_CREDENTIALS` ile fail-closed eder |
+| Davet | Migration davet üretmez; bağlantı yalnız yönetim panelinden `aktivasyon-yenile` ile üretilir |
+| Idempotent | Aynı koşulda tekrar çalıştırıldığında hedef satır kalmaz (0 row affected) |
+| Denetim olayı | `LEGACY_ACCOUNT_ACTIVATION_TAKEOVER` (`personel_account_onboarding_audit`; actor yok, secret yok) |
+| Aktivasyon sonrası | `activation_required = 0`, `must_change_password = 0`, `activated_at_utc` set |
+
+
 ## DIS_KAYNAK
 
 Aynı teknik onboarding/aktivasyon serbesttir.

@@ -18,10 +18,21 @@ export function normalizeApiRequestPath(path: string): string {
 }
 
 /**
+ * Zorunlu sifre degisimi (must_change_password) bir yetki hatasi degildir; kendi
+ * `/change-password` rotasi vardir. Bu kod global `/yetkisiz` yonlendirmesini tetiklemez.
+ */
+const NON_FORBIDDEN_ERROR_CODES = new Set(["PASSWORD_CHANGE_REQUIRED"]);
+
+/**
  * Whether a 403 response should emit the global auth-forbidden event (/yetkisiz redirect).
  * Default true: unknown endpoints keep the existing global forbidden behavior.
  */
-export function shouldEmitGlobalAuthForbidden(path: string, method?: string): boolean {
+export function shouldEmitGlobalAuthForbidden(path: string, method?: string, code?: string | null): boolean {
+  const normalizedCode = typeof code === "string" ? code.trim().toUpperCase() : "";
+  if (normalizedCode && NON_FORBIDDEN_ERROR_CODES.has(normalizedCode)) {
+    return false;
+  }
+
   const normalizedMethod = normalizeRequestMethod(method);
   const normalizedPath = normalizeApiRequestPath(path);
 

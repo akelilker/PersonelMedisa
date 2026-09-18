@@ -476,7 +476,7 @@ function emitStatusSideEffects(
   }
 
   if (isForbiddenStatus(status)) {
-    if (shouldEmitGlobalAuthForbidden(path, method)) {
+    if (shouldEmitGlobalAuthForbidden(path, method, extractFirstApiError(payload)?.code ?? null)) {
       emitAuthForbidden({ status, path });
     }
     return;

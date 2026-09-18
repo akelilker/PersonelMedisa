@@ -23,6 +23,14 @@ class PersonelAccountOnboardingService
     public const EVENT_LINK_REISSUED = 'ACTIVATION_LINK_REISSUED';
     public const EVENT_ACTIVATION_COMPLETED = 'ACTIVATION_COMPLETED';
     public const EVENT_ACTIVATION_REVOKED = 'ACTIVATION_REVOKED';
+    /** Canonical first-login credential gecisi (username + template sifre hash + zorunlu degisim). */
+    public const EVENT_FIRST_LOGIN_CREDENTIALS_APPLIED = 'PERSONEL_FIRST_LOGIN_CREDENTIALS_APPLIED';
+
+    /**
+     * Canonical first-login gecisinde mutation cohort'undan HARIC tutulan rezerve kullanici adlari.
+     * Bu hesaplarin username / password_hash / rol / durum / personel_id / scope alanlari degismez.
+     */
+    public const PROTECTED_USERNAMES = ['ilkerA'];
 
     public const ERR_NAME_REQUIRED = 'PERSONEL_NAME_REQUIRED_FOR_ACCOUNT';
     public const ERR_USERNAME_COLLISION = 'PERSONEL_USERNAME_COLLISION';
@@ -34,6 +42,8 @@ class PersonelAccountOnboardingService
     public const ERR_ACTIVATION_INVALID = 'ACTIVATION_LINK_INVALID';
     public const ERR_NOT_PENDING = 'ACTIVATION_NOT_REQUIRED';
     public const ERR_SCHEMA = 'SCHEMA_NOT_READY';
+    /** Collision halinde hicbir mutation yapilmaz; blocker cagirana raporlanir. */
+    public const ERR_CANONICAL_USERNAME_COLLISION = 'PERSONEL_CANONICAL_USERNAME_COLLISION';
 
     /**
      * Create/bind PERSONEL account for eligible personel and issue one-time activation URL.
@@ -460,6 +470,263 @@ class PersonelAccountOnboardingService
         return $namePart . $initial;
     }
 
+    /**
+     * Baslangic (template) sifresi kurali: soyadin ASCII TitleCase hali + "123".
+     *   KOSE -> Kose123, CELIK -> Celik123, SENAY -> Senay123
+     *
+     * Deterministik ve yalniz server-side'dir. Plaintext hicbir yerde saklanmaz,
+     * loglanmaz, response'a konmaz; users.password_hash'e yalniz hash'i yazilir.
+     */
+    public static function buildPersonelInitialPasswordFromNames($adRaw, $soyadRaw)
+    {
+        // Username kurali ile ayni ad/soyad onkosullari gecerlidir.
+        self::buildPersonelUsernameFromNames($adRaw, $soyadRaw);
+
+        $surnameToken = self::foldToLowerAsciiToken($soyadRaw);
+        if ($surnameToken === '') {
+            JsonResponse::badRequest(
+                'Personel hesabi icin gecerli ad ve soyad zorunludur.',
+                self::ERR_NAME_REQUIRED,
+                'soyad'
+            );
+        }
+
+        return ucfirst($surnameToken) . '123';
+    }
+
+    /**
+     * PERSONEL canonical first-login credential gecisi (canonical sahip).
+     *
+     * Cohort (yalniz bu satirlar):
+     *   u.rol = 'PERSONEL'
+     *   u.durum = 'AKTIF'
+     *   u.username PROTECTED_USERNAMES disinda (rezerve hesaplar korunur)
+     *   bagli personel var ve bagli personel aktif_durum = 'AKTIF'
+     *
+     * Mutation (apply = true):
+     *   username             = buildPersonelUsernameFromNames(personel.ad, personel.soyad)
+     *   activation_required  = 0
+     *   must_change_password = 1
+     *   password_hash        = PasswordHasher::hash(soyad ASCII TitleCase + "123")
+     *
+     * Degismeyen alanlar: rol, durum, personel_id, activated_at_utc, sube/bolum/birim/
+     * sirket/sgk atamalari ve personeller kayitlari. PASIF/anomaly hesaplar cohort
+     * disindadir; login fail-closed davranislari zayiflatilmaz.
+     *
+     * Fail-closed: canonical username cakismasi (cohort ici veya cohort disi bir kullanici)
+     * varsa hicbir satir mutate edilmez; sonuc blocked = true + collisions ile doner.
+     * Plaintext sifre ve hash loglanmaz; response'a konmaz.
+     *
+     * @param int|null $actorUserId Audit izi icin aktor; apply sirasinda zorunludur.
+     * @param bool $apply false ise dry-run: hicbir yazma yapilmaz.
+     * @return array<string, mixed>
+     */
+    public static function migrateCanonicalFirstLoginCredentials(PDO $pdo, $actorUserId = null, $apply = false)
+    {
+        if (!UsersSchema::hasPersonelId($pdo)
+            || !UsersSchema::hasActivationRequired($pdo)
+            || !UsersSchema::hasMustChangePassword($pdo)
+            || !self::hasOnboardingAuditTable($pdo)
+        ) {
+            JsonResponse::error(
+                409,
+                self::ERR_SCHEMA,
+                'Personel first-login credential semasi hazir degil.'
+            );
+        }
+
+        $protected = [];
+        foreach (self::PROTECTED_USERNAMES as $reserved) {
+            $protected[strtolower((string) $reserved)] = true;
+        }
+
+        $excluded = [
+            'protected_username' => [],
+            'user_not_active' => [],
+            'binding_missing' => [],
+            'bound_personel_missing' => [],
+            'bound_personel_not_active' => [],
+            'name_unresolved' => [],
+        ];
+        $candidates = [];
+        $credentialSource = [];
+
+        foreach (self::loadPersonelCredentialRows($pdo) as $row) {
+            $userId = (int) $row['user_id'];
+            $username = (string) $row['username'];
+            $entry = [
+                'user_id' => $userId,
+                'username' => $username,
+                'durum' => (string) $row['user_durum'],
+                'personel_id' => $row['personel_id'] !== null ? (int) $row['personel_id'] : null,
+            ];
+
+            if (isset($protected[strtolower($username)])) {
+                $excluded['protected_username'][] = $entry;
+                continue;
+            }
+            if ((string) $row['user_durum'] !== 'AKTIF') {
+                // PASIF/kapatilmis hesap: login zaten durum kapisinda fail-closed; dokunulmaz.
+                $excluded['user_not_active'][] = $entry;
+                continue;
+            }
+            $personelId = $row['personel_id'] !== null ? (int) $row['personel_id'] : 0;
+            if ($personelId <= 0) {
+                $excluded['binding_missing'][] = $entry;
+                continue;
+            }
+            if ($row['personel_row_id'] === null) {
+                $excluded['bound_personel_missing'][] = $entry;
+                continue;
+            }
+            if (strtoupper(trim((string) $row['personel_aktif_durum'])) !== 'AKTIF') {
+                $excluded['bound_personel_not_active'][] = $entry;
+                continue;
+            }
+            $canonical = self::canonicalUsernameOrNull($row['personel_ad'], $row['personel_soyad']);
+            if ($canonical === null) {
+                $excluded['name_unresolved'][] = $entry;
+                continue;
+            }
+
+            $entry['personel_id'] = $personelId;
+            $entry['canonical_username'] = $canonical;
+            $candidates[] = $entry;
+            $credentialSource[$userId] = [
+                'ad' => $row['personel_ad'],
+                'soyad' => $row['personel_soyad'],
+                'before_activation_required' => (int) ($row['activation_required'] ?? 0),
+                'before_must_change_password' => (int) ($row['must_change_password'] ?? 0),
+            ];
+        }
+
+        $collisions = self::detectCanonicalUsernameCollisions($pdo, $candidates);
+        $plan = [];
+        foreach ($candidates as $candidate) {
+            $plan[] = [
+                'user_id' => $candidate['user_id'],
+                'personel_id' => $candidate['personel_id'],
+                'old_username' => $candidate['username'],
+                'new_username' => $candidate['canonical_username'],
+                'username_changed' => $candidate['username'] !== $candidate['canonical_username'],
+            ];
+        }
+
+        if (count($collisions) > 0) {
+            return [
+                'apply' => false,
+                'blocked' => true,
+                'blocker' => self::ERR_CANONICAL_USERNAME_COLLISION,
+                'collisions' => $collisions,
+                'target_count' => count($plan),
+                'plan' => $plan,
+                'excluded' => $excluded,
+                'applied_count' => 0,
+                'audit_event' => null,
+            ];
+        }
+
+        if (!$apply) {
+            return [
+                'apply' => false,
+                'blocked' => false,
+                'blocker' => null,
+                'collisions' => [],
+                'target_count' => count($plan),
+                'plan' => $plan,
+                'excluded' => $excluded,
+                'applied_count' => 0,
+                'audit_event' => null,
+            ];
+        }
+
+        $actor = $actorUserId === null ? 0 : (int) $actorUserId;
+        if ($actor <= 0) {
+            JsonResponse::badRequest('Actor user id zorunludur.', 'VALIDATION_ERROR', 'actor_user_id');
+        }
+
+        $pdo->beginTransaction();
+        try {
+            $update = $pdo->prepare(
+                "UPDATE users
+                    SET username = :new_username,
+                        activation_required = 0,
+                        must_change_password = 1,
+                        password_hash = :password_hash
+                  WHERE id = :id
+                    AND rol = 'PERSONEL'
+                    AND username = :old_username"
+            );
+            $audit = $pdo->prepare(
+                'INSERT INTO personel_account_onboarding_audit
+                    (event_type, user_id, personel_id, actor_user_id, invitation_id, detail_json, created_at_utc)
+                 VALUES
+                    (:event_type, :user_id, :personel_id, :actor_user_id, NULL, :detail_json, :created)'
+            );
+
+            $applied = [];
+            foreach ($plan as $item) {
+                $source = $credentialSource[$item['user_id']];
+                $update->execute([
+                    'new_username' => $item['new_username'],
+                    'password_hash' => PasswordHasher::hash(
+                        self::buildPersonelInitialPasswordFromNames($source['ad'], $source['soyad'])
+                    ),
+                    'id' => $item['user_id'],
+                    'old_username' => $item['old_username'],
+                ]);
+                if ($update->rowCount() !== 1) {
+                    throw new \RuntimeException('FIRST_LOGIN_CREDENTIAL_ROW_MISMATCH');
+                }
+                // Audit izi: secret (plaintext sifre / hash) asla yazilmaz.
+                $audit->execute([
+                    'event_type' => self::EVENT_FIRST_LOGIN_CREDENTIALS_APPLIED,
+                    'user_id' => $item['user_id'],
+                    'personel_id' => $item['personel_id'],
+                    'actor_user_id' => $actor,
+                    'detail_json' => json_encode([
+                        'source' => 'canonical_first_login_credentials',
+                        'before' => [
+                            'username' => $item['old_username'],
+                            'activation_required' => $source['before_activation_required'],
+                            'must_change_password' => $source['before_must_change_password'],
+                        ],
+                        'after' => [
+                            'username' => $item['new_username'],
+                            'activation_required' => 0,
+                            'must_change_password' => 1,
+                        ],
+                    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                    'created' => self::utcNow(),
+                ]);
+                $applied[] = $item;
+            }
+
+            $pdo->commit();
+        } catch (\Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            JsonResponse::error(
+                500,
+                'FIRST_LOGIN_CREDENTIALS_APPLY_FAILED',
+                'Canonical first-login credential gecisi uygulanamadi.'
+            );
+        }
+
+        return [
+            'apply' => true,
+            'blocked' => false,
+            'blocker' => null,
+            'collisions' => [],
+            'target_count' => count($plan),
+            'plan' => $plan,
+            'excluded' => $excluded,
+            'applied_count' => count($applied),
+            'audit_event' => self::EVENT_FIRST_LOGIN_CREDENTIALS_APPLIED,
+        ];
+    }
+
     public static function normalizeOverrideUsername($raw)
     {
         $username = trim((string) $raw);
@@ -572,6 +839,117 @@ class PersonelAccountOnboardingService
             header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
             header('Pragma: no-cache');
             header('Referrer-Policy: no-referrer');
+        }
+    }
+
+    /**
+     * Ad/soyad gecersizse JsonResponse uretmeden null doner (dry-run fail-closed kalir).
+     *
+     * @return string|null
+     */
+    private static function canonicalUsernameOrNull($ad, $soyad)
+    {
+        $adTrim = trim((string) $ad);
+        $soyadTrim = trim((string) $soyad);
+        if ($adTrim === '' || $soyadTrim === '') {
+            return null;
+        }
+        $parts = preg_split('/\s+/u', $adTrim);
+        $firstAd = is_array($parts) && isset($parts[0]) ? trim((string) $parts[0]) : '';
+        if (self::foldToLowerAsciiToken($firstAd) === '' || self::foldSurnameInitial($soyadTrim) === '') {
+            return null;
+        }
+
+        return self::buildPersonelUsernameFromNames($adTrim, $soyadTrim);
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private static function loadPersonelCredentialRows(PDO $pdo)
+    {
+        $stmt = $pdo->query(
+            "SELECT u.id AS user_id, u.username, u.durum AS user_durum, u.personel_id,
+                    u.activation_required, u.must_change_password,
+                    p.id AS personel_row_id, p.ad AS personel_ad, p.soyad AS personel_soyad,
+                    p.aktif_durum AS personel_aktif_durum
+               FROM users u
+               LEFT JOIN personeller p ON p.id = u.personel_id
+              WHERE u.rol = 'PERSONEL'
+              ORDER BY u.id ASC"
+        );
+
+        return $stmt ? ($stmt->fetchAll(PDO::FETCH_ASSOC) ?: []) : [];
+    }
+
+    /**
+     * Cohort ici ve cohort disi canonical username cakismalarini bulur.
+     *
+     * @param array<int, array<string, mixed>> $candidates
+     * @return array<int, array<string, mixed>>
+     */
+    private static function detectCanonicalUsernameCollisions(PDO $pdo, array $candidates)
+    {
+        if (count($candidates) === 0) {
+            return [];
+        }
+
+        $candidateUserIds = [];
+        $byCanonical = [];
+        foreach ($candidates as $candidate) {
+            $userId = (int) $candidate['user_id'];
+            $candidateUserIds[$userId] = true;
+            $key = strtolower((string) $candidate['canonical_username']);
+            if (!isset($byCanonical[$key])) {
+                $byCanonical[$key] = [];
+            }
+            $byCanonical[$key][] = $userId;
+        }
+
+        $takenOutsideCohort = [];
+        $stmt = $pdo->query('SELECT id, username FROM users');
+        foreach (($stmt ? ($stmt->fetchAll(PDO::FETCH_ASSOC) ?: []) : []) as $other) {
+            $otherId = (int) $other['id'];
+            if (isset($candidateUserIds[$otherId])) {
+                continue;
+            }
+            $takenOutsideCohort[strtolower((string) $other['username'])] = $otherId;
+        }
+
+        $collisions = [];
+        foreach ($byCanonical as $key => $userIds) {
+            if (count($userIds) > 1) {
+                $collisions[] = [
+                    'canonical_username' => $key,
+                    'scope' => 'cohort',
+                    'user_ids' => $userIds,
+                ];
+            }
+            if (isset($takenOutsideCohort[$key])) {
+                $collisions[] = [
+                    'canonical_username' => $key,
+                    'scope' => 'outside_cohort',
+                    'user_ids' => [$takenOutsideCohort[$key]],
+                ];
+            }
+        }
+
+        return $collisions;
+    }
+
+    private static function hasOnboardingAuditTable(PDO $pdo)
+    {
+        try {
+            $stmt = $pdo->query(
+                "SELECT COUNT(*) FROM information_schema.TABLES
+                 WHERE TABLE_SCHEMA = DATABASE()
+                   AND TABLE_NAME = 'personel_account_onboarding_audit'"
+            );
+            $count = $stmt ? (int) $stmt->fetchColumn() : 0;
+
+            return $count > 0;
+        } catch (\Throwable $e) {
+            return false;
         }
     }
 

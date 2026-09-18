@@ -6,6 +6,7 @@ use Medisa\Api\Database\Connection;
 use Medisa\Api\Database\MigrationBackupService;
 use Medisa\Api\Database\MigrationExecutionService;
 use Medisa\Api\Database\MigrationPreflightReport;
+use Medisa\Api\Services\Auth\PersonelFirstLoginCredentialsPreflightReport;
 use Medisa\Api\Services\Organizasyon\OrganizationInitialMappingService;
 use Medisa\Api\Services\Organizasyon\OrganizationMappingFailure;
 use Medisa\Api\Services\Organizasyon\OrganizationMappingInventoryReport;
@@ -25,6 +26,7 @@ $controlDirectory = is_string($controlDirectory) && $controlDirectory !== ''
     : $apiDirectory . '/runtime/migration-control';
 $statusPath = $controlDirectory . '/status.json';
 $preflightPath = $controlDirectory . '/preflight.json';
+$personelFirstLoginPreflightPath = $controlDirectory . '/personel-first-login-preflight.json';
 $inventoryPath = $controlDirectory . '/organization-inventory.json';
 $mappingPreflightPath = $controlDirectory . '/organization-mapping-preflight.json';
 $mappingPostcheckPath = $controlDirectory . '/organization-mapping-postcheck.json';
@@ -103,7 +105,8 @@ try {
                 $request,
                 'mode',
                 '/^(APPLY|READ_ONLY_PREFLIGHT|READ_ONLY_ORGANIZATION_INVENTORY'
-                . '|ORGANIZATION_MAPPING_PREFLIGHT|ORGANIZATION_MAPPING_APPLY|FINAL_CLOSE_PREFLIGHT|FINAL_CLOSE_APPLY)$/'
+                . '|ORGANIZATION_MAPPING_PREFLIGHT|ORGANIZATION_MAPPING_APPLY|FINAL_CLOSE_PREFLIGHT|FINAL_CLOSE_APPLY'
+                . '|PERSONEL_FIRST_LOGIN_CREDENTIALS_PREFLIGHT)$/'
             )
             : 'APPLY';
         // Optional, and only meaningful for APPLY: the single migration version
@@ -144,6 +147,44 @@ try {
 
         $baseline = getenv('MEDISA_MIGRATION_BASELINE');
         $baseline = is_string($baseline) && $baseline !== '' ? trim($baseline) : null;
+
+        // PERSONEL first-login credential rollout, read-only. The canonical decision
+        // owner (PersonelAccountOnboardingService) is asked for its dry-run plan and
+        // the result is reduced to publishable evidence; this mode has no apply
+        // counterpart and never writes a credential, so the branch can only read.
+        // It is deliberately placed before the migration preflight so no migration
+        // stage — and no backup — is reachable from it.
+        if ($mode === 'PERSONEL_FIRST_LOGIN_CREDENTIALS_PREFLIGHT') {
+            $stage = 'PERSONEL_FIRST_LOGIN_PREFLIGHT';
+            try {
+                $pdo = Connection::get();
+                $report = PersonelFirstLoginCredentialsPreflightReport::collect($pdo, $deployedSha);
+                $report['request_id'] = $requestId;
+                writeJsonAtomically($personelFirstLoginPreflightPath, $report);
+            } catch (\Throwable $exception) {
+                throw MigrationWorkerFailure::fromThrowable($stage, $exception);
+            }
+
+            $stage = 'STATUS_WRITE';
+            writeStatus($statusPath, [
+                'state' => 'SUCCEEDED',
+                'request_id' => $requestId,
+                'deployed_sha' => strtolower($deployedSha),
+                'mode' => $mode,
+                'personel_first_login_result' => (string) $report['result'],
+                'personel_total' => (int) $report['personel_total'],
+                'target_count' => (int) $report['target_count'],
+                'collision_count' => (int) $report['collision_count'],
+                'name_unresolved_count' => (int) $report['name_unresolved_count'],
+                'ilkera_touched' => $report['ilkera_touched'] === true,
+            ]);
+            $stage = 'REQUEST_ARCHIVE';
+            archiveRequest(
+                $processingPath,
+                $controlDirectory . '/request.completed.' . safeId($requestId) . '.json'
+            );
+            exit(0);
+        }
 
         if ($mode === 'READ_ONLY_PREFLIGHT') {
             $stage = 'PREFLIGHT';

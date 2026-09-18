@@ -57,7 +57,7 @@ function writeRequest(
   controlDirectory: string,
   requestId: string,
   deployedSha: string,
-  mode?: 'APPLY' | 'READ_ONLY_PREFLIGHT',
+  mode?: 'APPLY' | 'READ_ONLY_PREFLIGHT' | 'PERSONEL_FIRST_LOGIN_CREDENTIALS_PREFLIGHT',
 ) {
   writeFileSync(
     join(controlDirectory, `request.pending.${requestId}.json`),
@@ -219,6 +219,67 @@ describe('cPanel migration cron worker runtime', () => {
       expect(status.stage).toBe('PREFLIGHT');
       expect(status.mode).toBe('READ_ONLY_PREFLIGHT');
       expect(readdirSync(fixture.controlDirectory)).not.toContain('preflight.json');
+    } finally {
+      rmSync(fixture.directory, { recursive: true, force: true });
+    }
+  });
+
+  it('reaches the personel first-login preflight stage and writes no report without a database', () => {
+    const fixture = makeFixture();
+    const deployedSha = '1'.repeat(40);
+    try {
+      mkdirSync(fixture.controlDirectory, { recursive: true });
+      writeBundle(fixture.bundlePath);
+      writeFileSync(fixture.deployShaPath, deployedSha);
+      writeRequest(
+        fixture.controlDirectory,
+        'personel-preflight-1',
+        deployedSha,
+        'PERSONEL_FIRST_LOGIN_CREDENTIALS_PREFLIGHT',
+      );
+      expect(runWorker(fixture.controlDirectory, fixture.deployShaPath, fixture.bundlePath)).toBe(1);
+      const status = JSON.parse(readFileSync(join(fixture.controlDirectory, 'status.json'), 'utf8'));
+      expect(status.state).toBe('FAILED');
+      expect(status.stage).toBe('PERSONEL_FIRST_LOGIN_PREFLIGHT');
+      expect(status.mode).toBe('PERSONEL_FIRST_LOGIN_CREDENTIALS_PREFLIGHT');
+      expect(status.exit_code).toBe(1);
+
+      // The mode is read-only: a failed read must leave no report behind, and it
+      // must not create any apply or backup artifact on the way out.
+      const entries = readdirSync(fixture.controlDirectory);
+      expect(entries).not.toContain('personel-first-login-preflight.json');
+      expect(entries).not.toContain('preflight.json');
+      expect(status.applied_versions).toBeUndefined();
+      expect(status.backup_readback).toBeUndefined();
+      expect(status.backup_file).toBeUndefined();
+      expect(JSON.stringify(status)).not.toMatch(/password|dsn|stack trace/i);
+      expect(readdirSync(fixture.controlDirectory).filter((name) => name.startsWith('request.failed.'))).toHaveLength(1);
+    } finally {
+      rmSync(fixture.directory, { recursive: true, force: true });
+    }
+  });
+
+  it('has no apply counterpart for the personel first-login mode', () => {
+    const fixture = makeFixture();
+    const deployedSha = '2'.repeat(40);
+    try {
+      mkdirSync(fixture.controlDirectory, { recursive: true });
+      writeFileSync(fixture.deployShaPath, deployedSha);
+      writeFileSync(
+        join(fixture.controlDirectory, 'request.pending.personel-apply.json'),
+        JSON.stringify({
+          schema_version: 1,
+          request_id: 'personel-apply',
+          deployed_sha: deployedSha,
+          requested_at: '2026-08-18T05:00:00Z',
+          mode: 'PERSONEL_FIRST_LOGIN_CREDENTIALS_APPLY',
+        }),
+      );
+      expect(runWorker(fixture.controlDirectory, fixture.deployShaPath, fixture.bundlePath)).toBe(1);
+      const status = JSON.parse(readFileSync(join(fixture.controlDirectory, 'status.json'), 'utf8'));
+      expect(status.reason).toBe('REQUEST_INVALID');
+      expect(status.stage).toBe('REQUEST_PARSE');
+      expect(readdirSync(fixture.controlDirectory)).not.toContain('personel-first-login-preflight.json');
     } finally {
       rmSync(fixture.directory, { recursive: true, force: true });
     }

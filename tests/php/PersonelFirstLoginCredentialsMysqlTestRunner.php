@@ -22,6 +22,7 @@ use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
 use Medisa\Api\Http\ResponseCaptured;
 use Medisa\Api\Services\Auth\PersonelAccountOnboardingService;
+use Medisa\Api\Services\Auth\PersonelFirstLoginCredentialsPreflightReport;
 
 /** Reservation invariant: bu kullanici adi hicbir kosulda degismemeli. */
 const PFLC_PROTECTED_USER_ID = 11;
@@ -286,6 +287,22 @@ function pflcRowById(PDO $pdo, int $userId): array
 }
 
 /**
+ * Tam tablo goruntusu: "sifir DB mutation" kanitini satir bazinda karsilastirmak icin.
+ *
+ * @return list<array<string, mixed>>
+ */
+function pflcSnapshot(PDO $pdo, string $sql): array
+{
+    $stmt = $pdo->query($sql);
+    if ($stmt === false) {
+        return [];
+    }
+    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    return is_array($rows) ? array_values($rows) : [];
+}
+
+/**
  * Business karari scenario (ayri disposable DB):
  *   - explicit override: 108 -> hakanAc, 109 -> hakanAt, 206 -> abdullah / Abdullah123
  *   - 5 kayit ad/soyad business correction (exact preimage guard'li)
@@ -381,6 +398,144 @@ function pflcRunBusinessDecisionScenario(PDO $root): void
         sort($correctedIds);
         pflcAssert($correctedIds === [200, 201, 207, 209, 210], 'BIZ: name correction plani 5 kayit');
         pflcAssert((string) pflcRowById($pdo, 502)['username'] === '176', 'BIZ: dry-run hicbir satiri mutate etmedi');
+
+        // ------------------------------------------------------------------
+        // PERSONEL_FIRST_LOGIN_PREFLIGHT (read-only control-plane report owner)
+        //
+        // Disposable DB uzerinde kanit: report PASS, ilkera_touched=false, beklenen
+        // username plan ve users/personeller BEFORE == AFTER yani sifir mutation.
+        // Bu blok canonical karar sahibini apply=false ile cagirir; hicbir yazma
+        // yolu yoktur, bu yuzden asagidaki APPLY adimindan ONCE kosar.
+        // ------------------------------------------------------------------
+        $pflcUsersBefore = pflcSnapshot(
+            $pdo,
+            'SELECT id, username, password_hash, activation_required, must_change_password, rol, durum, personel_id FROM users ORDER BY id ASC'
+        );
+        $pflcPersonelBefore = pflcSnapshot(
+            $pdo,
+            'SELECT id, ad, soyad, aktif_durum FROM personeller ORDER BY id ASC'
+        );
+
+        $preflight = PersonelFirstLoginCredentialsPreflightReport::collect($pdo, str_repeat('a', 40));
+
+        pflcAssert(
+            ($preflight['mode'] ?? null) === PersonelFirstLoginCredentialsPreflightReport::MODE,
+            'PERSONEL_FIRST_LOGIN_PREFLIGHT: report mode'
+        );
+        pflcAssert(($preflight['schema_version'] ?? null) === '1', 'PERSONEL_FIRST_LOGIN_PREFLIGHT: schema_version = 1');
+        pflcAssert(($preflight['result'] ?? null) === 'PASS', 'PERSONEL_FIRST_LOGIN_PREFLIGHT: result PASS');
+        pflcAssert(($preflight['blockers'] ?? ['x']) === [], 'PERSONEL_FIRST_LOGIN_PREFLIGHT: blocker yok');
+        pflcAssert(
+            ($preflight['production_mutation_count'] ?? -1) === 0,
+            'PERSONEL_FIRST_LOGIN_PREFLIGHT: production_mutation_count = 0'
+        );
+        pflcAssert(
+            ($preflight['decision_apply'] ?? true) === false,
+            'PERSONEL_FIRST_LOGIN_PREFLIGHT: decision_apply = false'
+        );
+        pflcAssert(
+            ($preflight['decision_applied_count'] ?? -1) === 0,
+            'PERSONEL_FIRST_LOGIN_PREFLIGHT: decision_applied_count = 0'
+        );
+        pflcAssert(($preflight['ilkera_touched'] ?? true) === false, 'PERSONEL_FIRST_LOGIN_PREFLIGHT: ilkera_touched = false');
+        pflcAssert(
+            ($preflight['protected_username_in_plan_count'] ?? -1) === 0,
+            'PERSONEL_FIRST_LOGIN_PREFLIGHT: rezerve hesap planda yok'
+        );
+        pflcAssert(
+            ($preflight['protected_username_excluded_count'] ?? -1) === 1,
+            'PERSONEL_FIRST_LOGIN_PREFLIGHT: ilkerA protected_username olarak dislandi'
+        );
+        pflcAssert(
+            ($preflight['cohort_reconciled'] ?? false) === true,
+            'PERSONEL_FIRST_LOGIN_PREFLIGHT: cohort reconcile dogrulandi'
+        );
+        pflcAssert(
+            ($preflight['personel_total'] ?? -1) === 10,
+            'PERSONEL_FIRST_LOGIN_PREFLIGHT: personel_total = 10'
+        );
+        pflcAssert(($preflight['target_count'] ?? -1) === 8, 'PERSONEL_FIRST_LOGIN_PREFLIGHT: target_count = 8');
+        pflcAssert(($preflight['excluded_total'] ?? -1) === 2, 'PERSONEL_FIRST_LOGIN_PREFLIGHT: excluded_total = 2');
+        pflcAssert(
+            ($preflight['excluded_counts']['protected_username'] ?? -1) === 1
+                && ($preflight['excluded_counts']['bound_personel_not_active'] ?? -1) === 1
+                && ($preflight['excluded_counts']['user_not_active'] ?? -1) === 0
+                && ($preflight['excluded_counts']['binding_missing'] ?? -1) === 0
+                && ($preflight['excluded_counts']['bound_personel_missing'] ?? -1) === 0
+                && ($preflight['excluded_counts']['name_unresolved'] ?? -1) === 0,
+            'PERSONEL_FIRST_LOGIN_PREFLIGHT: excluded bucket dagilimi'
+        );
+        pflcAssert(($preflight['collision_count'] ?? -1) === 0, 'PERSONEL_FIRST_LOGIN_PREFLIGHT: collision_count = 0');
+        pflcAssert(
+            ($preflight['name_unresolved_count'] ?? -1) === 0,
+            'PERSONEL_FIRST_LOGIN_PREFLIGHT: name_unresolved_count = 0'
+        );
+        pflcAssert(
+            ($preflight['name_correction_count'] ?? -1) === 5
+                && ($preflight['name_correction_preimage_mismatch_count'] ?? -1) === 0,
+            'PERSONEL_FIRST_LOGIN_PREFLIGHT: name correction 5 / preimage mismatch 0'
+        );
+        pflcAssert(
+            ($preflight['business_override_count'] ?? -1) === 3,
+            'PERSONEL_FIRST_LOGIN_PREFLIGHT: business_override_count = 3'
+        );
+
+        $preflightPlanByPersonel = [];
+        $preflightUsernames = [];
+        foreach ($preflight['plan'] as $preflightRow) {
+            $preflightPlanByPersonel[(int) $preflightRow['personel_id']] = $preflightRow;
+            $preflightUsernames[] = (string) $preflightRow['new_username'];
+            // PII siniri: report plan satiri ad/soyad preimage'i TASIMAZ ve yalnizca
+            // sinirli alan kumesini yayinlar.
+            $preflightRowKeys = array_keys($preflightRow);
+            sort($preflightRowKeys);
+            pflcAssert(
+                $preflightRowKeys === [
+                    'business_override',
+                    'name_correction_preimage_match',
+                    'name_correction_present',
+                    'new_username',
+                    'old_username',
+                    'personel_id',
+                    'user_id',
+                    'username_changed',
+                ],
+                'PERSONEL_FIRST_LOGIN_PREFLIGHT: plan satiri sinirli alan kumesi'
+            );
+            pflcAssert(
+                ($preflightRow['name_correction_preimage_match'] === null)
+                    === (($preflightRow['name_correction_present'] ?? true) === false),
+                'PERSONEL_FIRST_LOGIN_PREFLIGHT: preimage match yalnizca correction varken anlamli'
+            );
+        }
+        sort($preflightUsernames);
+        $expectedPreflightUsernames = ['abdullah', 'fahriM', 'hakanAc', 'hakanAt', 'muqtadaK', 'oktayE', 'raedF', 'saifA'];
+        sort($expectedPreflightUsernames);
+        pflcAssert(
+            $preflightUsernames === $expectedPreflightUsernames,
+            'PERSONEL_FIRST_LOGIN_PREFLIGHT: beklenen username plan'
+        );
+        foreach ($expectedUsernames as $personelId => $expectedUsername) {
+            pflcAssert(
+                (string) ($preflightPlanByPersonel[$personelId]['new_username'] ?? '') === $expectedUsername,
+                'PERSONEL_FIRST_LOGIN_PREFLIGHT: plan personel ' . $personelId . ' -> ' . $expectedUsername
+            );
+        }
+
+        // Sifir mutation kaniti: report collect cagrisi iki tablonun hicbir satirini
+        // degistirmemeli. Karsilastirma bilincli olarak TAM satir kumesidir.
+        pflcAssert(
+            pflcSnapshot(
+                $pdo,
+                'SELECT id, username, password_hash, activation_required, must_change_password, rol, durum, personel_id FROM users ORDER BY id ASC'
+            ) === $pflcUsersBefore,
+            'PERSONEL_FIRST_LOGIN_PREFLIGHT: users BEFORE == AFTER (sifir mutation)'
+        );
+        pflcAssert(
+            pflcSnapshot($pdo, 'SELECT id, ad, soyad, aktif_durum FROM personeller ORDER BY id ASC')
+                === $pflcPersonelBefore,
+            'PERSONEL_FIRST_LOGIN_PREFLIGHT: personeller BEFORE == AFTER (sifir mutation)'
+        );
 
         $apply = PersonelAccountOnboardingService::migrateCanonicalFirstLoginCredentials($pdo, 1, true);
         pflcAssert($apply['apply'] === true && $apply['applied_count'] === 8, 'BIZ: apply applied_count = 8');

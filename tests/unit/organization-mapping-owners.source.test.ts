@@ -650,7 +650,8 @@ describe('mapping backup owner', () => {
 describe('control-plane worker modes', () => {
   it('accepts the canonical worker modes including final-close', () => {
     expect(worker).toContain('/^(APPLY|READ_ONLY_PREFLIGHT|READ_ONLY_ORGANIZATION_INVENTORY');
-    expect(worker).toContain("|ORGANIZATION_MAPPING_PREFLIGHT|ORGANIZATION_MAPPING_APPLY|FINAL_CLOSE_PREFLIGHT|FINAL_CLOSE_APPLY)$/'");
+    expect(worker).toContain("|ORGANIZATION_MAPPING_PREFLIGHT|ORGANIZATION_MAPPING_APPLY|FINAL_CLOSE_PREFLIGHT|FINAL_CLOSE_APPLY'");
+    expect(worker).toContain("|PERSONEL_FIRST_LOGIN_CREDENTIALS_PREFLIGHT)$/'");
   });
 
   it('pins every mode to the exact deployed sha with hash_equals', () => {

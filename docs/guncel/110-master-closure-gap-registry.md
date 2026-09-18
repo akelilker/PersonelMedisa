@@ -1,4 +1,4 @@
-CODE_MIGRATION_TIP: 088
+CODE_MIGRATION_TIP: 089
 PRODUCTION_MIGRATION_TIP: 087
 
 # 110 — Canonical Closure / Gap Registry
@@ -11,12 +11,13 @@ PRODUCTION_MIGRATION_TIP: 087
 
 | Alan | Değer | Kanıt / sınır |
 | --- | --- | --- |
-| CODE_MIGRATION_TIP | **088** | `088_sube_sorumlu_yoneticiler.sql` — durable branch manager responsibility (`sube_sorumlu_yoneticiler`); independent of `user_subeler` |
-| PRODUCTION_MIGRATION_TIP | **087** | Live tip **087**; pending **088** (apply after #278 deploy) |
+| CODE_MIGRATION_TIP | **089** | `089_personel_legacy_account_activation.sql` — hic aktive edilmemis legacy PERSONEL hesaplarini canonical secure activation modeline alir (`activation_required=1`, `must_change_password=1`) |
+| PRODUCTION_MIGRATION_TIP | **087** | Live tip **087**; pending **088** + **089** (explicit Apply cPanel migrations gerektirir) |
 | Migration 085 | **APPLIED** | `085_gunluk_bildirim_duzeltme_auditleri.sql` |
 | Migration 086 | **APPLIED** | `086_personel_historical_exit_date_correction_auditleri.sql` |
 | Migration 087 | **APPLIED** | `087_sube_muhasebe_yetkilileri.sql` |
 | Migration 088 | **CODE_ONLY_PENDING** | No production apply until explicit Apply cPanel migrations |
+| Migration 089 | **CODE_ONLY_PENDING** | Legacy PERSONEL hesaplarinin canonical secure activation modeline hizalanmasi; production apply explicit onay ister |
 | CODE_MAIN_SHA | **`f5551160cab7d12b2086d7146c7822f4dfdb469d`** | #274+#275+#276+#277 merged; #278 integrating |
 | PRODUCTION_DEPLOY_SHA (LIVE) | **`f5551160cab7d12b2086d7146c7822f4dfdb469d`** | After #277 deploy in recovery sweep |
 | PR #271 | **CLOSED** | Do not reopen |

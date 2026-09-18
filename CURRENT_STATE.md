@@ -1,6 +1,6 @@
-CODE_MIGRATION_TIP: 088
+CODE_MIGRATION_TIP: 089
 PRODUCTION_MIGRATION_TIP: 087
-PRODUCTION_MIGRATION_PENDING: 1
+PRODUCTION_MIGRATION_PENDING: 2
 PRODUCTION_DEPLOY_SHA: d96182a2a4b4cb5e9e6d7c867d3486d7ac4061b2
 CODE_MAIN_SHA: d96182a2a4b4cb5e9e6d7c867d3486d7ac4061b2
 
@@ -8,9 +8,9 @@ CODE_MAIN_SHA: d96182a2a4b4cb5e9e6d7c867d3486d7ac4061b2
 
 CODE_MAIN advanced #275→#301. LIVE after #301 deploy: `d96182a2` (Deploy cPanel run `34936838710` SUCCESS; `FINAL_SHA_GET=SUCCESS` parity; canlı bundle `index-DY8cYDBX.js` / `index-Dl13eR2G.css`; anonim `smoke:live` OK). Earlier live pins this sweep: `34b2fd30` (#300), `ef2c8db5` (#299), `eb8aa517`, `f5551160` (#277), `63f8c905` (PR274 recovery deploy).
 HOSTING: RECOVERED (FTP/API healthy). Ordered merge/deploy sweep CLOSED through #301 — kuyrukta merge/deploy yok.
-CODE tip **088** (`088_sube_sorumlu_yoneticiler.sql`); PRODUCTION tip **087**; pending **088**.
-PHASE: PERSONELMEDISA_FINAL_CLEANUP
-APPLIED_THIS_TURN: NO (docs/cleanup only)
+CODE tip **089** (`089_personel_legacy_account_activation.sql`); PRODUCTION tip **087**; pending **088** + **089**.
+PHASE: PERSONEL_ACCOUNT_CANONICAL_UNIFICATION
+APPLIED_THIS_TURN: NO (migration 089 yalniz code; production apply ayrı explicit onay ister)
 
 ## Hard-closed (do not reopen without new contradiction)
 

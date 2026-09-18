@@ -10,7 +10,9 @@ import type {
   KullaniciTipi,
   PersonelActivationMetaResponse,
   PersonelActivationStatus,
+  PersonelHesapFirstLoginResult,
   PersonelHesapOnboardingResult,
+  PersonelHesapOnboardingUser,
   OrganizasyonReadiness,
   UpsertYonetimKullaniciPayload,
   UpsertYonetimSgkIsverenPayload,
@@ -693,22 +695,15 @@ export async function ustOnayVer(filters: AylikOzetFilters): Promise<AylikOzetRe
   return buildAylikOzetResponse(filters, data);
 }
 
-function normalizePersonelHesapOnboardingResult(data: unknown): PersonelHesapOnboardingResult {
-  const record = toRecord(data);
-  if (!record) {
-    throw new Error("Personel hesap onboarding yaniti beklenen formatta degil.");
-  }
-
-  const userRecord = toRecord(record.user);
-  const activationRecord = toRecord(record.activation);
+function buildPersonelHesapOnboardingUser(userRecord: Record<string, unknown> | null): {
+  record: PersonelHesapOnboardingUser;
+  userId: number;
+  username: string;
+} | null {
   const userId = userRecord ? readNumber(userRecord.id) : undefined;
   const username = userRecord ? readString(userRecord.username) : undefined;
-  const activationUrl = activationRecord ? readString(activationRecord.activation_url) : undefined;
-  const createdAt = activationRecord ? readString(activationRecord.created_at_utc) : undefined;
-  const expiresAt = activationRecord ? readString(activationRecord.expires_at_utc) : undefined;
-
-  if (!userId || !username || !activationUrl || !createdAt || !expiresAt) {
-    throw new Error("Personel hesap onboarding yaniti zorunlu alanlari icermiyor.");
+  if (!userId || !username) {
+    return null;
   }
 
   const activationRequired = userRecord
@@ -719,7 +714,9 @@ function normalizePersonelHesapOnboardingResult(data: unknown): PersonelHesapOnb
     : undefined;
 
   return {
-    user: {
+    userId,
+    username,
+    record: {
       id: userId,
       username,
       rol: userRecord ? readString(userRecord.rol) : undefined,
@@ -727,10 +724,52 @@ function normalizePersonelHesapOnboardingResult(data: unknown): PersonelHesapOnb
       personel_id: userRecord ? (readNumber(userRecord.personel_id) ?? null) : null,
       ...(activationRequired === undefined ? {} : { activation_required: activationRequired }),
       ...(mustChangePassword === undefined ? {} : { must_change_password: mustChangePassword }),
-      activated_at_utc: userRecord
-        ? readStringOrNull(userRecord.activated_at_utc)
-        : null
-    },
+      activated_at_utc: userRecord ? readStringOrNull(userRecord.activated_at_utc) : null
+    }
+  };
+}
+
+/**
+ * Canonical yeni hesap create yolu: yalniz user bilgisi + ilk giris modeli doner.
+ * Aktivasyon URL'i zorunlu degildir ve secret tasinmaz.
+ */
+function normalizePersonelHesapFirstLoginResult(data: unknown): PersonelHesapFirstLoginResult {
+  const record = toRecord(data);
+  if (!record) {
+    throw new Error("Personel hesap onboarding yaniti beklenen formatta degil.");
+  }
+
+  const built = buildPersonelHesapOnboardingUser(toRecord(record.user));
+  if (!built) {
+    throw new Error("Personel hesap onboarding yaniti zorunlu alanlari icermiyor.");
+  }
+
+  return {
+    user: built.record,
+    credential_model: readString(record.credential_model),
+    message: readString(record.message)
+  };
+}
+
+/** Legacy aktivasyon daveti sonucu (reissue yolu); activation_url zorunludur. */
+function normalizePersonelHesapOnboardingResult(data: unknown): PersonelHesapOnboardingResult {
+  const record = toRecord(data);
+  if (!record) {
+    throw new Error("Personel hesap onboarding yaniti beklenen formatta degil.");
+  }
+
+  const built = buildPersonelHesapOnboardingUser(toRecord(record.user));
+  const activationRecord = toRecord(record.activation);
+  const activationUrl = activationRecord ? readString(activationRecord.activation_url) : undefined;
+  const createdAt = activationRecord ? readString(activationRecord.created_at_utc) : undefined;
+  const expiresAt = activationRecord ? readString(activationRecord.expires_at_utc) : undefined;
+
+  if (!built || !activationUrl || !createdAt || !expiresAt) {
+    throw new Error("Personel hesap onboarding yaniti zorunlu alanlari icermiyor.");
+  }
+
+  return {
+    user: built.record,
     activation: {
       activation_url: activationUrl,
       created_at_utc: createdAt,
@@ -744,7 +783,7 @@ function normalizePersonelHesapOnboardingResult(data: unknown): PersonelHesapOnb
 export async function createPersonelHesapOnboarding(
   personelId: number | string,
   usernameOverride?: string
-): Promise<PersonelHesapOnboardingResult> {
+): Promise<PersonelHesapFirstLoginResult> {
   const body =
     usernameOverride !== undefined && usernameOverride.trim() !== ""
       ? { username: usernameOverride.trim() }
@@ -753,7 +792,7 @@ export async function createPersonelHesapOnboarding(
     endpoints.yonetim.personelHesapOnboarding(personelId),
     { method: "POST", body: JSON.stringify(body) }
   );
-  return normalizePersonelHesapOnboardingResult(response.data);
+  return normalizePersonelHesapFirstLoginResult(response.data);
 }
 
 export async function reissuePersonelAktivasyon(

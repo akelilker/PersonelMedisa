@@ -53,7 +53,7 @@ describe("personel secure onboarding frontend contracts", () => {
     expect(panel).not.toMatch(/\bamir\b/i);
     expect(panel).toContain("Aktivasyon Bekliyor");
     expect(panel).toContain(
-      "Hesap oluşturulduktan sonra personel kendi şifresini aktivasyon bağlantısı üzerinden"
+      "Hesap oluşturulduğunda personel, şirket kuralına göre belirlenen başlangıç şifresi ile"
     );
   });
 
@@ -71,6 +71,58 @@ describe("personel secure onboarding frontend contracts", () => {
     expect(panel).toContain("navigator.clipboard.writeText");
     expect(panel).toContain("Yeni Aktivasyon Bağlantısı Oluştur");
     expect(panel).not.toMatch(/localStorage|sessionStorage|indexedDB/i);
+  });
+
+  it("canonical yeni hesap create UX'i first-login modelini anlatir, aktivasyon linki beklemez", () => {
+    const panel = read("src/features/yonetim/components/PersonelHesapOnboardingPanel.tsx");
+    expect(panel).toContain("Onayla ve Hesap Oluştur");
+    expect(panel).toContain("Hesap ilk girişe hazır");
+    expect(panel).toContain("İlk girişte şifresini değiştirmesi gerekir");
+    expect(panel).toContain("Başlangıç şifresi şirket kuralına göre");
+    expect(panel).toContain("personel-hesap-onboarding-first-login");
+
+    // Create sonucu bloku aktivasyon URL'i / meta uretmez ve link aksiyonu icermez.
+    const createdBlock = panel.slice(
+      panel.indexOf('data-testid="personel-hesap-onboarding-first-login"'),
+      panel.indexOf('data-testid="personel-hesap-onboarding-issued"')
+    );
+    expect(createdBlock).not.toContain("activation");
+    expect(createdBlock).not.toContain("Bağlantıyı Kopyala");
+    expect(createdBlock).not.toContain("handleReissue");
+
+    // Create akisi aktivasyon meta cagrisini tetiklemez.
+    const createHandler = panel.slice(
+      panel.indexOf("async function handleCreate()"),
+      panel.indexOf("async function handleReissue()")
+    );
+    expect(createHandler).not.toContain("fetchPersonelAktivasyonMeta");
+    expect(createHandler).not.toContain("result.activation");
+  });
+
+  it("api contract: create yolu activation_url zorunlu tutmaz, reissue legacy kalir", () => {
+    const api = read("src/api/yonetim.api.ts");
+    const createFn = api.slice(
+      api.indexOf("export async function createPersonelHesapOnboarding("),
+      api.indexOf("export async function reissuePersonelAktivasyon(")
+    );
+    expect(createFn).toContain("PersonelHesapFirstLoginResult");
+    expect(createFn).not.toContain("activation_url");
+    expect(createFn).not.toContain("activation");
+
+    const firstLoginNormalizer = api.slice(
+      api.indexOf("function normalizePersonelHesapFirstLoginResult("),
+      api.indexOf("Legacy aktivasyon daveti sonucu (reissue yolu)")
+    );
+    expect(firstLoginNormalizer).not.toContain("activation_url");
+    expect(firstLoginNormalizer).not.toContain("record.activation");
+
+    const types = read("src/types/yonetim.ts");
+    expect(types).toContain("PersonelHesapFirstLoginResult");
+    const firstLoginType = types.slice(
+      types.indexOf("export type PersonelHesapFirstLoginResult = {"),
+      types.indexOf("};", types.indexOf("export type PersonelHesapFirstLoginResult = {"))
+    );
+    expect(firstLoginType).not.toContain("activation");
   });
 
   it("activation page: autocomplete, success copy, mobile auth shell", () => {

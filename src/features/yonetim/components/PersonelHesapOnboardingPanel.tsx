@@ -8,6 +8,7 @@ import {
 } from "../../../api/yonetim.api";
 import type {
   PersonelActivationInvitationMeta,
+  PersonelHesapFirstLoginResult,
   PersonelHesapOnboardingResult
 } from "../../../types/yonetim";
 import { buildPersonelUsernameFromNames } from "../personelUsernameFromNames";
@@ -15,6 +16,7 @@ import { buildPersonelUsernameFromNames } from "../personelUsernameFromNames";
 export type PersonelHesapOnboardingBoundUser = {
   id: number;
   activation_required?: boolean;
+  must_change_password?: boolean;
   username?: string;
 };
 
@@ -54,6 +56,9 @@ export function PersonelHesapOnboardingPanel({
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [isWorking, setIsWorking] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  /** Canonical first-login create sonucu (aktivasyon linki yok). */
+  const [created, setCreated] = useState<PersonelHesapFirstLoginResult | null>(null);
+  /** Legacy aktivasyon daveti sonucu; yalniz gecmis activation_required=true hesaplar icin. */
   const [issued, setIssued] = useState<PersonelHesapOnboardingResult | null>(null);
   const [copyStatus, setCopyStatus] = useState<string | null>(null);
   const [meta, setMeta] = useState<PersonelActivationInvitationMeta | null>(null);
@@ -82,6 +87,7 @@ export function PersonelHesapOnboardingPanel({
         setBoundUser({
           id: match.id,
           activation_required: match.activation_required,
+          must_change_password: match.must_change_password,
           username: match.username
         });
         setHasBoundUser(true);
@@ -130,7 +136,8 @@ export function PersonelHesapOnboardingPanel({
     personelAktif &&
     suggestedUsername.length > 0 &&
     hasBoundUser === false &&
-    !issued;
+    !issued &&
+    !created;
 
   async function handleCreate() {
     if (!eligible || isWorking) {
@@ -145,21 +152,18 @@ export function PersonelHesapOnboardingPanel({
           ? usernameOverride.trim()
           : undefined;
       const result = await createPersonelHesapOnboarding(personelId, override);
-      setIssued(result);
+      // Canonical first-login modeli: aktivasyon linki/daveti uretilmez, meta beklenmez.
+      setCreated(result);
       setBoundUser({
         id: result.user.id,
-        activation_required: true,
+        activation_required: result.user.activation_required === true,
+        must_change_password: result.user.must_change_password !== false,
         username: result.user.username
       });
       setHasBoundUser(true);
       setConfirmOpen(false);
       setUsernameCollision(false);
-      setMeta({
-        created_at_utc: result.activation.created_at_utc,
-        expires_at_utc: result.activation.expires_at_utc,
-        is_expired: false,
-        is_valid: true
-      });
+      setMeta(null);
     } catch (error) {
       if (isApiRequestError(error) && error.code === "PERSONEL_USERNAME_COLLISION") {
         setUsernameCollision(true);
@@ -272,8 +276,8 @@ export function PersonelHesapOnboardingPanel({
       {eligible && confirmOpen ? (
         <div className="yonetim-form-stack" data-testid="personel-hesap-onboarding-confirm">
           <p className="yonetim-hint">
-            Hesap oluşturulduktan sonra personel kendi şifresini aktivasyon bağlantısı üzerinden
-            belirleyecektir.
+            Hesap oluşturulduğunda personel, şirket kuralına göre belirlenen başlangıç şifresi ile
+            ilk girişini yapar ve ilk girişte şifresini değiştirmesi gerekir.
           </p>
           <label className="form-field">
             <span>Kullanıcı adı</span>
@@ -293,7 +297,7 @@ export function PersonelHesapOnboardingPanel({
           ) : null}
           <div className="yonetim-create-row">
             <button type="button" className="universal-btn-save" disabled={isWorking} onClick={() => void handleCreate()}>
-              {isWorking ? "Oluşturuluyor…" : "Onayla ve Bağlantı Oluştur"}
+              {isWorking ? "Oluşturuluyor…" : "Onayla ve Hesap Oluştur"}
             </button>
             <button type="button" className="yonetim-panel-action" disabled={isWorking} onClick={() => setConfirmOpen(false)}>
               Vazgeç
@@ -302,7 +306,22 @@ export function PersonelHesapOnboardingPanel({
         </div>
       ) : null}
 
-      {issued ? (
+      {created ? (
+        <div className="yonetim-form-stack" data-testid="personel-hesap-onboarding-first-login">
+          <p>
+            Kullanıcı adı: <strong>{created.user.username}</strong>
+          </p>
+          <p data-testid="personel-hesap-ilk-giris-hazir">
+            <strong>Hesap ilk girişe hazır</strong>
+          </p>
+          <p className="yonetim-hint" role="status">
+            İlk girişte şifresini değiştirmesi gerekir. Başlangıç şifresi şirket kuralına göre
+            oluşturulur ve ilk girişte değiştirilir.
+          </p>
+        </div>
+      ) : null}
+
+      {!created && issued ? (
         <div className="yonetim-form-stack" data-testid="personel-hesap-onboarding-issued">
           <p>
             Kullanıcı adı: <strong>{issued.user.username}</strong>
@@ -322,7 +341,7 @@ export function PersonelHesapOnboardingPanel({
         </div>
       ) : null}
 
-      {!issued && activationPending ? (
+      {!created && !issued && activationPending ? (
         <div className="yonetim-form-stack" data-testid="personel-hesap-aktivasyon-bekliyor">
           <p>
             <strong>Aktivasyon Bekliyor</strong>
@@ -350,11 +369,18 @@ export function PersonelHesapOnboardingPanel({
         </div>
       ) : null}
 
-      {!issued && accountActive ? (
-        <p data-testid="personel-hesap-aktif">
-          <strong>Hesap Aktif</strong>
-          {boundUser?.username ? ` — ${boundUser.username}` : null}
-        </p>
+      {!created && !issued && accountActive ? (
+        <div className="yonetim-form-stack" data-testid="personel-hesap-aktif">
+          <p>
+            <strong>Hesap Aktif</strong>
+            {boundUser?.username ? ` — ${boundUser.username}` : null}
+          </p>
+          {boundUser?.must_change_password === true ? (
+            <p className="yonetim-hint" data-testid="personel-hesap-ilk-giris-bekliyor">
+              İlk girişte şifresini değiştirmesi gerekir.
+            </p>
+          ) : null}
+        </div>
       ) : null}
 
       {errorMessage ? (

@@ -21,6 +21,16 @@
   grid-template-columns: 1fr;
   justify-items: stretch;
   min-height: 38px;
+  /*
+   * Vertical breath: the header stack already leaves 16px above the row
+   * (--shell-top-stack-gap plus the hero's own 8px bottom margin), while the row
+   * box ended flush against the first content card below (0px) — so the icons
+   * and the branch selector sat at the bottom of the header band. The row owns
+   * the matching bottom breath here (margin, so the row's own min-height /
+   * align-items centering contract stays untouched), which puts the content
+   * optically centered between the header frame and the next content frame.
+   */
+  margin-bottom: var(--space-4);
 }
 
 .icons-row-left {
@@ -99,6 +109,18 @@
 
 .notification-wrap > .icon-btn svg {
   overflow: visible;
+}
+
+/*
+ * Minimal (home) header: the wrapper is a block box, so an inline-level bell
+ * button created a line box whose descender pushed the icon ~1.6px above the
+ * row's optical center (and inflated .icons-row-right, the notifications
+ * panel's 100% anchor). A block-level grid box removes that line box while
+ * keeping the icon box identical; the ≤640px ".icon-btn" grid/place-items rules
+ * still apply unchanged.
+ */
+.icons-row--minimal .notification-wrap > .icon-btn {
+  display: grid;
 }
 
 .notification-wrap > .icon-btn.notification-pulse {

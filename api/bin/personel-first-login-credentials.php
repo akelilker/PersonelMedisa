@@ -14,6 +14,9 @@ declare(strict_types=1);
  *   - Varsayilan davranis dry-run'dir; mutation yalniz --apply + exact --confirm ile olur.
  *   - Mutation cohort'u: rol = 'PERSONEL', durum = 'AKTIF', bagli personel AKTIF,
  *     PersonelAccountOnboardingService::PROTECTED_USERNAMES (ilkerA) HARIC.
+ *   - Kullanici adi/sifre karari canonical owner'dadir (explicit business override'lar dahil).
+ *   - Personel ad/soyad business correction plani ayni transaction'da uygulanir; exact preimage
+ *     uyusmazsa hicbir satir yazilmaz.
  *   - Canonical username cakismasi varsa hicbir satir mutate edilmez (fail-closed).
  *   - Plaintext sifre ve password_hash ASLA loglanmaz, dosyaya yazilmaz veya ciktiya konmaz.
  */
@@ -124,6 +127,18 @@ try {
                 $result['plan'] ?? [],
                 static function ($row) {
                     return isset($row['username_changed']) && $row['username_changed'] === true;
+                }
+            )),
+            'name_correction_count' => count(array_filter(
+                $result['plan'] ?? [],
+                static function ($row) {
+                    return isset($row['name_correction']) && is_array($row['name_correction']);
+                }
+            )),
+            'business_override_count' => count(array_filter(
+                $result['plan'] ?? [],
+                static function ($row) {
+                    return isset($row['business_override']) && $row['business_override'] === true;
                 }
             )),
             'collisions' => $result['collisions'],

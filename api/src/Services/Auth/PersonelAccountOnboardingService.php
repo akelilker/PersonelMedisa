@@ -32,6 +32,55 @@ class PersonelAccountOnboardingService
      */
     public const PROTECTED_USERNAMES = ['ilkerA'];
 
+    /**
+     * Explicit business override'lari (business karari; generic kuralin ONUNDE gelir).
+     * Key = personel_id. Map'te olmayan hesaplar generic canonical kurala tabidir.
+     *
+     * - 108 / 109: generic kural iki hesap icin de `hakanA` uretiyordu; cakismayi cozmek icin
+     *   her hesaba ayri deterministic kullanici adi verildi. `hakanA` artik kullanilmaz.
+     * - 206: kayitli ad/soyad yalniz "ABDULLAH"; soyad UYDURULMAZ ve personeller.soyad alanina
+     *   deger yazilmaz. Bu hesap generic soyad kuralinin explicit exception'idir.
+     *
+     * `initial_password` yalniz generic kuralin uretemedigi exception icin tanimlidir; diger
+     * hesaplarin sifre materyali canonical soyad kuralindan (soyad ASCII TitleCase + "123")
+     * uretilir. Plaintext hicbir yerde saklanmaz; yalnizca PasswordHasher ile hash'lenir.
+     */
+    public const PERSONEL_CREDENTIAL_OVERRIDES = [
+        108 => ['username' => 'hakanAc'],
+        109 => ['username' => 'hakanAt'],
+        206 => ['username' => 'abdullah', 'initial_password' => 'Abdullah123'],
+    ];
+
+    /**
+     * Personel master data (yalniz `ad` / `soyad`) business correction plan'i — first-login rollout.
+     * Key = personel_id. `from` exact preimage'dir: apply aninda satir bu degerle uyusmuyorsa
+     * fail-closed davranilir ve hicbir satir yazilmaz. `to` canonical username/sifre kuralinin
+     * dayanagidir. 206 bu map'te YOKTUR; o hesabin soyad alani degistirilmez.
+     * Ad/soyad disinda personel alani degismez.
+     */
+    public const PERSONEL_NAME_CORRECTIONS = [
+        200 => [
+            'from' => ['ad' => 'RAED FAWAZ', 'soyad' => null],
+            'to' => ['ad' => 'Raed', 'soyad' => 'Fawaz'],
+        ],
+        201 => [
+            'from' => ['ad' => 'SAIF TAREQ JASIM AL-GBURI', 'soyad' => null],
+            'to' => ['ad' => 'Saif Tareq Jasim', 'soyad' => 'Al-Gburi'],
+        ],
+        207 => [
+            'from' => ['ad' => 'OKTAY ERSÖZ', 'soyad' => null],
+            'to' => ['ad' => 'Oktay', 'soyad' => 'Ersöz'],
+        ],
+        209 => [
+            'from' => ['ad' => 'MUQTADA MAZIN KHALEE', 'soyad' => null],
+            'to' => ['ad' => 'Muqtada Mazin', 'soyad' => 'Khalee'],
+        ],
+        210 => [
+            'from' => ['ad' => 'FAHRİ TAYLAN MERCAN', 'soyad' => null],
+            'to' => ['ad' => 'Fahri Taylan', 'soyad' => 'Mercan'],
+        ],
+    ];
+
     public const ERR_NAME_REQUIRED = 'PERSONEL_NAME_REQUIRED_FOR_ACCOUNT';
     public const ERR_USERNAME_COLLISION = 'PERSONEL_USERNAME_COLLISION';
     public const ERR_USERNAME_INVALID = 'PERSONEL_USERNAME_INVALID';
@@ -44,6 +93,8 @@ class PersonelAccountOnboardingService
     public const ERR_SCHEMA = 'SCHEMA_NOT_READY';
     /** Collision halinde hicbir mutation yapilmaz; blocker cagirana raporlanir. */
     public const ERR_CANONICAL_USERNAME_COLLISION = 'PERSONEL_CANONICAL_USERNAME_COLLISION';
+    /** Name correction preimage uyusmazsa hicbir mutation yapilmaz (fail-closed). */
+    public const ERR_NAME_CORRECTION_PREIMAGE = 'PERSONEL_NAME_CORRECTION_PREIMAGE_MISMATCH';
 
     /**
      * Create/bind PERSONEL account for eligible personel and issue one-time activation URL.
@@ -495,6 +546,76 @@ class PersonelAccountOnboardingService
     }
 
     /**
+     * Personel icin explicit business name correction'i (varsa) doner; yoksa null.
+     *
+     * @return array{from: array{ad: string|null, soyad: string|null}, to: array{ad: string, soyad: string}}|null
+     */
+    public static function personelNameCorrectionFor($personelId)
+    {
+        $id = (int) $personelId;
+        $correction = self::PERSONEL_NAME_CORRECTIONS[$id] ?? null;
+
+        return is_array($correction) ? $correction : null;
+    }
+
+    /**
+     * Personel icin canonical username. Oncelik sirasi:
+     *   1) explicit business override (PERSONEL_CREDENTIAL_OVERRIDES)
+     *   2) business name correction uygulanmis ad/soyad uzerinden canonical kural
+     *   3) kayitli ad/soyad uzerinden canonical kural
+     *
+     * Cozulemeyen kayitlarda JsonResponse uretmeden null doner (dry-run fail-closed kalir).
+     *
+     * @return string|null
+     */
+    public static function resolvePersonelCanonicalUsername($personelId, $ad, $soyad)
+    {
+        $id = (int) $personelId;
+        $override = self::PERSONEL_CREDENTIAL_OVERRIDES[$id] ?? null;
+        if (is_array($override) && isset($override['username'])) {
+            return (string) $override['username'];
+        }
+
+        $correction = self::personelNameCorrectionFor($id);
+        if ($correction !== null) {
+            $ad = $correction['to']['ad'];
+            $soyad = $correction['to']['soyad'];
+        }
+
+        return self::canonicalUsernameOrNull($ad, $soyad);
+    }
+
+    /**
+     * Personel icin template sifre materyali (yalniz bellekte; hash'lenir, saklanmaz/loglanmaz).
+     * Override'da `initial_password` varsa o kullanilir; aksi halde canonical soyad kurali
+     * (business name correction uygulanmis soyad uzerinden) gecerlidir.
+     * Cozulemeyen kayitlarda null doner.
+     *
+     * @return string|null
+     */
+    public static function resolvePersonelInitialPasswordMaterial($personelId, $ad, $soyad)
+    {
+        $id = (int) $personelId;
+        $override = self::PERSONEL_CREDENTIAL_OVERRIDES[$id] ?? null;
+        if (is_array($override) && isset($override['initial_password'])) {
+            return (string) $override['initial_password'];
+        }
+
+        if (self::resolvePersonelCanonicalUsername($id, $ad, $soyad) === null) {
+            return null;
+        }
+
+        $correction = self::personelNameCorrectionFor($id);
+        $effectiveSoyad = $correction !== null ? $correction['to']['soyad'] : $soyad;
+        $token = self::foldToLowerAsciiToken($effectiveSoyad);
+        if ($token === '') {
+            return null;
+        }
+
+        return ucfirst($token) . '123';
+    }
+
+    /**
      * PERSONEL canonical first-login credential gecisi (canonical sahip).
      *
      * Cohort (yalniz bu satirlar):
@@ -504,17 +625,20 @@ class PersonelAccountOnboardingService
      *   bagli personel var ve bagli personel aktif_durum = 'AKTIF'
      *
      * Mutation (apply = true):
-     *   username             = buildPersonelUsernameFromNames(personel.ad, personel.soyad)
+     *   username             = business override varsa o; aksi halde canonical ad/soyad kurali
+     *                          (PERSONEL_CREDENTIAL_OVERRIDES > PERSONEL_NAME_CORRECTIONS > kayit)
      *   activation_required  = 0
      *   must_change_password = 1
-     *   password_hash        = PasswordHasher::hash(soyad ASCII TitleCase + "123")
+     *   password_hash        = PasswordHasher::hash(template sifre materyali)
+     *   personeller.ad/soyad = PERSONEL_NAME_CORRECTIONS (yalniz ad/soyad; exact preimage guard'li)
      *
      * Degismeyen alanlar: rol, durum, personel_id, activated_at_utc, sube/bolum/birim/
-     * sirket/sgk atamalari ve personeller kayitlari. PASIF/anomaly hesaplar cohort
-     * disindadir; login fail-closed davranislari zayiflatilmaz.
+     * sirket/sgk atamalari. PASIF/anomaly hesaplar cohort disindadir; login fail-closed
+     * davranislari zayiflatilmaz.
      *
      * Fail-closed: canonical username cakismasi (cohort ici veya cohort disi bir kullanici)
-     * varsa hicbir satir mutate edilmez; sonuc blocked = true + collisions ile doner.
+     * ya da planlanan name correction'in exact preimage uyusmazligi varsa hicbir satir
+     * mutate edilmez; sonuc blocked = true + blocker/collisions ile doner.
      * Plaintext sifre ve hash loglanmaz; response'a konmaz.
      *
      * @param int|null $actorUserId Audit izi icin aktor; apply sirasinda zorunludur.
@@ -583,18 +707,43 @@ class PersonelAccountOnboardingService
                 $excluded['bound_personel_not_active'][] = $entry;
                 continue;
             }
-            $canonical = self::canonicalUsernameOrNull($row['personel_ad'], $row['personel_soyad']);
+            $correction = self::personelNameCorrectionFor($personelId);
+            $override = self::PERSONEL_CREDENTIAL_OVERRIDES[$personelId] ?? null;
+            $effectiveAd = $correction !== null ? $correction['to']['ad'] : $row['personel_ad'];
+            $effectiveSoyad = $correction !== null ? $correction['to']['soyad'] : $row['personel_soyad'];
+
+            $canonical = self::resolvePersonelCanonicalUsername($personelId, $effectiveAd, $effectiveSoyad);
             if ($canonical === null) {
+                $excluded['name_unresolved'][] = $entry;
+                continue;
+            }
+            $material = self::resolvePersonelInitialPasswordMaterial($personelId, $effectiveAd, $effectiveSoyad);
+            if ($material === null) {
+                // Username cozulup sifre materyali cozulemezse mutation yapilmaz (fail-closed).
                 $excluded['name_unresolved'][] = $entry;
                 continue;
             }
 
             $entry['personel_id'] = $personelId;
             $entry['canonical_username'] = $canonical;
+            $entry['business_override'] = is_array($override) && isset($override['username']);
+            $entry['name_correction'] = $correction === null ? null : [
+                'from' => [
+                    'ad' => $correction['from']['ad'],
+                    'soyad' => $correction['from']['soyad'],
+                ],
+                'to' => [
+                    'ad' => $correction['to']['ad'],
+                    'soyad' => $correction['to']['soyad'],
+                ],
+                'preimage_match' => self::nullableStringEquals($row['personel_ad'], $correction['from']['ad'])
+                    && self::nullableStringEquals($row['personel_soyad'], $correction['from']['soyad']),
+            ];
             $candidates[] = $entry;
             $credentialSource[$userId] = [
-                'ad' => $row['personel_ad'],
-                'soyad' => $row['personel_soyad'],
+                'ad' => $effectiveAd,
+                'soyad' => $effectiveSoyad,
+                'name_correction' => $correction,
                 'before_activation_required' => (int) ($row['activation_required'] ?? 0),
                 'before_must_change_password' => (int) ($row['must_change_password'] ?? 0),
             ];
@@ -609,6 +758,8 @@ class PersonelAccountOnboardingService
                 'old_username' => $candidate['username'],
                 'new_username' => $candidate['canonical_username'],
                 'username_changed' => $candidate['username'] !== $candidate['canonical_username'],
+                'business_override' => $candidate['business_override'],
+                'name_correction' => $candidate['name_correction'],
             ];
         }
 
@@ -618,6 +769,22 @@ class PersonelAccountOnboardingService
                 'blocked' => true,
                 'blocker' => self::ERR_CANONICAL_USERNAME_COLLISION,
                 'collisions' => $collisions,
+                'target_count' => count($plan),
+                'plan' => $plan,
+                'excluded' => $excluded,
+                'applied_count' => 0,
+                'audit_event' => null,
+            ];
+        }
+
+        $correctionMismatches = self::nameCorrectionPreimageMismatches($plan);
+        if (count($correctionMismatches) > 0) {
+            return [
+                'apply' => false,
+                'blocked' => true,
+                'blocker' => self::ERR_NAME_CORRECTION_PREIMAGE,
+                'collisions' => [],
+                'name_corrections' => $correctionMismatches,
                 'target_count' => count($plan),
                 'plan' => $plan,
                 'excluded' => $excluded,
@@ -665,16 +832,48 @@ class PersonelAccountOnboardingService
             );
 
             $applied = [];
+            $nameCorrectionTargets = self::plannedNameCorrections($plan);
+            if (count($nameCorrectionTargets) > 0) {
+                // Yalniz ad/soyad yazilir; exact `from` preimage kosulu saglanmazsa rollback.
+                $correctionUpdate = $pdo->prepare(
+                    "UPDATE personeller
+                        SET ad = :new_ad,
+                            soyad = :new_soyad
+                      WHERE id = :personel_id
+                        AND ad <=> :old_ad
+                        AND soyad <=> :old_soyad"
+                );
+                foreach ($nameCorrectionTargets as $target) {
+                    $correctionUpdate->execute([
+                        'new_ad' => $target['to']['ad'],
+                        'new_soyad' => $target['to']['soyad'],
+                        'personel_id' => $target['personel_id'],
+                        'old_ad' => $target['from']['ad'],
+                        'old_soyad' => $target['from']['soyad'],
+                    ]);
+                    if ($correctionUpdate->rowCount() !== 1) {
+                        throw new \RuntimeException(self::ERR_NAME_CORRECTION_PREIMAGE);
+                    }
+                }
+            }
+
             foreach ($plan as $item) {
                 $source = $credentialSource[$item['user_id']];
+                $material = self::resolvePersonelInitialPasswordMaterial(
+                    $item['personel_id'],
+                    $source['ad'],
+                    $source['soyad']
+                );
+                if ($material === null) {
+                    throw new \RuntimeException('FIRST_LOGIN_PASSWORD_MATERIAL_UNRESOLVED');
+                }
                 $update->execute([
                     'new_username' => $item['new_username'],
-                    'password_hash' => PasswordHasher::hash(
-                        self::buildPersonelInitialPasswordFromNames($source['ad'], $source['soyad'])
-                    ),
+                    'password_hash' => PasswordHasher::hash($material),
                     'id' => $item['user_id'],
                     'old_username' => $item['old_username'],
                 ]);
+                unset($material);
                 if ($update->rowCount() !== 1) {
                     throw new \RuntimeException('FIRST_LOGIN_CREDENTIAL_ROW_MISMATCH');
                 }
@@ -686,6 +885,7 @@ class PersonelAccountOnboardingService
                     'actor_user_id' => $actor,
                     'detail_json' => json_encode([
                         'source' => 'canonical_first_login_credentials',
+                        'business_override' => $item['business_override'],
                         'before' => [
                             'username' => $item['old_username'],
                             'activation_required' => $source['before_activation_required'],
@@ -696,6 +896,16 @@ class PersonelAccountOnboardingService
                             'activation_required' => 0,
                             'must_change_password' => 1,
                         ],
+                        'name_correction' => is_array($source['name_correction']) ? [
+                            'before' => [
+                                'ad' => $source['name_correction']['from']['ad'],
+                                'soyad' => $source['name_correction']['from']['soyad'],
+                            ],
+                            'after' => [
+                                'ad' => $source['name_correction']['to']['ad'],
+                                'soyad' => $source['name_correction']['to']['soyad'],
+                            ],
+                        ] : null,
                     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
                     'created' => self::utcNow(),
                 ]);
@@ -706,6 +916,13 @@ class PersonelAccountOnboardingService
         } catch (\Throwable $e) {
             if ($pdo->inTransaction()) {
                 $pdo->rollBack();
+            }
+            if ($e instanceof \RuntimeException && $e->getMessage() === self::ERR_NAME_CORRECTION_PREIMAGE) {
+                JsonResponse::error(
+                    409,
+                    self::ERR_NAME_CORRECTION_PREIMAGE,
+                    'Personel ad/soyad preimage apply aninda uyusmadi; hicbir satir yazilmadi.'
+                );
             }
             JsonResponse::error(
                 500,
@@ -840,6 +1057,65 @@ class PersonelAccountOnboardingService
             header('Pragma: no-cache');
             header('Referrer-Policy: no-referrer');
         }
+    }
+
+    /**
+     * Plan icindeki name correction hedefleri (personel_id + from/to).
+     *
+     * @param array<int, array<string, mixed>> $plan
+     * @return array<int, array<string, mixed>>
+     */
+    private static function plannedNameCorrections(array $plan)
+    {
+        $targets = [];
+        foreach ($plan as $item) {
+            $correction = $item['name_correction'] ?? null;
+            if (!is_array($correction)) {
+                continue;
+            }
+            $targets[] = [
+                'personel_id' => (int) $item['personel_id'],
+                'from' => $correction['from'],
+                'to' => $correction['to'],
+            ];
+        }
+
+        return $targets;
+    }
+
+    /**
+     * Preimage'i uyusmayan name correction'lari doner (apply oncesi blocked gate).
+     *
+     * @param array<int, array<string, mixed>> $plan
+     * @return array<int, array<string, mixed>>
+     */
+    private static function nameCorrectionPreimageMismatches(array $plan)
+    {
+        $mismatches = [];
+        foreach ($plan as $item) {
+            $correction = $item['name_correction'] ?? null;
+            if (!is_array($correction) || ($correction['preimage_match'] ?? false) === true) {
+                continue;
+            }
+            $mismatches[] = [
+                'user_id' => (int) $item['user_id'],
+                'personel_id' => (int) $item['personel_id'],
+                'expected_from' => $correction['from'],
+                'planned_to' => $correction['to'],
+            ];
+        }
+
+        return $mismatches;
+    }
+
+    /** NULL-safe string karsilastirmasi (name correction exact preimage kontrolu). */
+    private static function nullableStringEquals($actual, $expected)
+    {
+        if ($actual === null || $expected === null) {
+            return $actual === null && $expected === null;
+        }
+
+        return (string) $actual === (string) $expected;
     }
 
     /**

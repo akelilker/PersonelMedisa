@@ -222,7 +222,7 @@ function pflcSeedCatalog(PDO $pdo): void
     $pdo->exec("INSERT INTO gorevler (id, ad, durum) VALUES (1, 'Gorev', 'AKTIF')");
 }
 
-function pflcInsertPersonel(PDO $pdo, int $id, string $ad, string $soyad, string $aktifDurum): void
+function pflcInsertPersonel(PDO $pdo, int $id, string $ad, ?string $soyad, string $aktifDurum): void
 {
     $stmt = $pdo->prepare(
         'INSERT INTO personeller (
@@ -285,6 +285,257 @@ function pflcRowById(PDO $pdo, int $userId): array
     return is_array($row) ? $row : [];
 }
 
+/**
+ * Business karari scenario (ayri disposable DB):
+ *   - explicit override: 108 -> hakanAc, 109 -> hakanAt, 206 -> abdullah / Abdullah123
+ *   - 5 kayit ad/soyad business correction (exact preimage guard'li)
+ *   - ilkerA invariant, PASIF bagli hesap fail-closed
+ *   - template credential ilk girisi -> zorunlu sifre degisimi -> eski template DENIED
+ */
+function pflcRunBusinessDecisionScenario(PDO $root): void
+{
+    $bizDb = 'medisa_pflc_biz_' . bin2hex(random_bytes(4));
+    $root->exec('CREATE DATABASE `' . $bizDb . '` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
+
+    try {
+        $pdo = pflcPdoForDb($bizDb);
+        pflcApplyCanonicalSchema($pdo);
+        pflcSeedCatalog($pdo);
+        $legacyHash = PasswordHasher::hash('LegacyPass-24chars!!');
+
+        // Kayitli (preimage) ad/soyad: name correction plani tam olarak bu degerlerle eslesmeli.
+        pflcInsertPersonel($pdo, 108, 'Hakan', 'Açıkgöz', 'AKTIF');
+        pflcInsertPersonel($pdo, 109, 'Hakan', 'Atay', 'AKTIF');
+        pflcInsertPersonel($pdo, 200, 'RAED FAWAZ', null, 'AKTIF');
+        pflcInsertPersonel($pdo, 201, 'SAIF TAREQ JASIM AL-GBURI', null, 'AKTIF');
+        pflcInsertPersonel($pdo, 206, 'ABDULLAH', null, 'AKTIF');
+        pflcInsertPersonel($pdo, 207, 'OKTAY ERSÖZ', null, 'AKTIF');
+        pflcInsertPersonel($pdo, 209, 'MUQTADA MAZIN KHALEE', null, 'AKTIF');
+        pflcInsertPersonel($pdo, 210, 'FAHRİ TAYLAN MERCAN', null, 'AKTIF');
+        pflcInsertPersonel($pdo, 220, 'Pasif', 'Kisi', 'PASIF');
+        pflcInsertPersonel($pdo, 230, 'İlker', 'Akel', 'AKTIF');
+
+        // Actor FK'si icin auditte kullanilacak yonetim kullanicisi.
+        pflcInsertUser($pdo, 1, 'admin', $legacyHash, 'Admin', 'GENEL_YONETICI', 'AKTIF', null);
+
+        $bindings = [
+            500 => [108, '329'],
+            501 => [109, '006'],
+            502 => [200, '176'],
+            503 => [201, '197'],
+            504 => [206, '283'],
+            505 => [207, '285'],
+            506 => [209, '375'],
+            507 => [210, '407'],
+            508 => [220, '4475'],
+            509 => [230, 'ilkerA'],
+        ];
+        foreach ($bindings as $userId => $binding) {
+            pflcInsertUser($pdo, (int) $userId, (string) $binding[1], $legacyHash, 'Biz Kisi', 'PERSONEL', 'AKTIF', (int) $binding[0]);
+        }
+        pflcApply($pdo, '089_personel_legacy_account_activation.sql');
+
+        $expectedUsernames = [
+            108 => 'hakanAc',
+            109 => 'hakanAt',
+            200 => 'raedF',
+            201 => 'saifA',
+            206 => 'abdullah',
+            207 => 'oktayE',
+            209 => 'muqtadaK',
+            210 => 'fahriM',
+        ];
+
+        $protectedBefore = pflcRowById($pdo, 509);
+        $dry = PersonelAccountOnboardingService::migrateCanonicalFirstLoginCredentials($pdo, 1, false);
+        pflcAssert($dry['apply'] === false && $dry['blocked'] === false, 'BIZ: dry-run blocked=false');
+        pflcAssert($dry['target_count'] === 8, 'BIZ: dry-run target_count = 8');
+        pflcAssert(count($dry['collisions']) === 0, 'BIZ: USERNAME_COLLISION_COUNT = 0');
+        pflcAssert(count($dry['excluded']['name_unresolved']) === 0, 'BIZ: NAME_UNRESOLVED_COUNT = 0');
+        pflcAssert(count($dry['excluded']['protected_username']) === 1, 'BIZ: ilkerA protected_username olarak dislandi');
+        pflcAssert(count($dry['excluded']['bound_personel_not_active']) === 1, 'BIZ: PASIF personel bagli hesap dislandi');
+
+        $planByPersonel = [];
+        foreach ($dry['plan'] as $planRow) {
+            $planByPersonel[(int) $planRow['personel_id']] = $planRow;
+        }
+        foreach ($expectedUsernames as $personelId => $expectedUsername) {
+            pflcAssert(
+                isset($planByPersonel[$personelId]) && (string) $planByPersonel[$personelId]['new_username'] === $expectedUsername,
+                'BIZ: plan personel ' . $personelId . ' -> ' . $expectedUsername
+            );
+        }
+        pflcAssert(($planByPersonel[206]['business_override'] ?? null) === true, 'BIZ: 206 explicit business override');
+        pflcAssert(($planByPersonel[108]['business_override'] ?? null) === true, 'BIZ: 108 explicit business override');
+        $correctedIds = [];
+        foreach ($dry['plan'] as $planRow) {
+            if (!is_array($planRow['name_correction'])) {
+                continue;
+            }
+            pflcAssert(
+                ($planRow['name_correction']['preimage_match'] ?? false) === true,
+                'BIZ: name correction preimage match personel ' . $planRow['personel_id']
+            );
+            $correctedIds[] = (int) $planRow['personel_id'];
+        }
+        sort($correctedIds);
+        pflcAssert($correctedIds === [200, 201, 207, 209, 210], 'BIZ: name correction plani 5 kayit');
+        pflcAssert((string) pflcRowById($pdo, 502)['username'] === '176', 'BIZ: dry-run hicbir satiri mutate etmedi');
+
+        $apply = PersonelAccountOnboardingService::migrateCanonicalFirstLoginCredentials($pdo, 1, true);
+        pflcAssert($apply['apply'] === true && $apply['applied_count'] === 8, 'BIZ: apply applied_count = 8');
+
+        $userIdByPersonel = [
+            108 => 500,
+            109 => 501,
+            200 => 502,
+            201 => 503,
+            206 => 504,
+            207 => 505,
+            209 => 506,
+            210 => 507,
+        ];
+        $templatePasswords = [
+            108 => 'Acikgoz123',
+            109 => 'Atay123',
+            200 => 'Fawaz123',
+            201 => 'Algburi123',
+            206 => 'Abdullah123',
+            207 => 'Ersoz123',
+            209 => 'Khalee123',
+            210 => 'Mercan123',
+        ];
+        foreach ($userIdByPersonel as $personelId => $userId) {
+            $row = pflcRowById($pdo, $userId);
+            pflcAssert(
+                (string) $row['username'] === $expectedUsernames[$personelId],
+                'BIZ: ' . $personelId . ' username = ' . $expectedUsernames[$personelId]
+            );
+            pflcAssert(
+                PasswordHasher::verify($templatePasswords[$personelId], (string) $row['password_hash']),
+                'BIZ: ' . $personelId . ' template sifre hash dogrulandi'
+            );
+            pflcAssert(
+                (int) $row['activation_required'] === 0 && (int) $row['must_change_password'] === 1,
+                'BIZ: ' . $personelId . ' activation_required=0 / must_change_password=1'
+            );
+            pflcAssert(
+                (string) $row['rol'] === 'PERSONEL' && (int) $row['personel_id'] === $personelId,
+                'BIZ: ' . $personelId . ' rol/personel_id korundu'
+            );
+        }
+
+        $personelName = static function (PDO $conn, int $personelId): array {
+            $stmt = $conn->prepare('SELECT ad, soyad FROM personeller WHERE id = :id LIMIT 1');
+            $stmt->execute(['id' => $personelId]);
+            $found = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            return is_array($found) ? $found : [];
+        };
+        pflcAssert($personelName($pdo, 200) === ['ad' => 'Raed', 'soyad' => 'Fawaz'], 'BIZ: 200 name correction uygulandi');
+        pflcAssert($personelName($pdo, 201) === ['ad' => 'Saif Tareq Jasim', 'soyad' => 'Al-Gburi'], 'BIZ: 201 name correction uygulandi');
+        pflcAssert($personelName($pdo, 207) === ['ad' => 'Oktay', 'soyad' => 'Ersöz'], 'BIZ: 207 name correction uygulandi');
+        pflcAssert($personelName($pdo, 209) === ['ad' => 'Muqtada Mazin', 'soyad' => 'Khalee'], 'BIZ: 209 name correction uygulandi');
+        pflcAssert($personelName($pdo, 210) === ['ad' => 'Fahri Taylan', 'soyad' => 'Mercan'], 'BIZ: 210 name correction uygulandi');
+        pflcAssert($personelName($pdo, 206) === ['ad' => 'ABDULLAH', 'soyad' => null], 'ABDULLAH_SURNAME_MUTATED=NO (206 ad/soyad dokunulmadi)');
+        pflcAssert($personelName($pdo, 108) === ['ad' => 'Hakan', 'soyad' => 'Açıkgöz'], 'BIZ: 108 ad/soyad dokunulmadi');
+        pflcAssert($personelName($pdo, 109) === ['ad' => 'Hakan', 'soyad' => 'Atay'], 'BIZ: 109 ad/soyad dokunulmadi');
+        pflcAssert($personelName($pdo, 230) === ['ad' => 'İlker', 'soyad' => 'Akel'], 'BIZ: ilkerA personel kaydi dokunulmadi');
+
+        // K) ilkerA before/after exact invariant + plan disi
+        pflcAssert(pflcRowById($pdo, 509) === $protectedBefore, 'K: ilkerA before/after exact invariant');
+        pflcAssert(
+            count(array_filter($apply['plan'], static function ($row) {
+                return (int) $row['user_id'] === 509;
+            })) === 0,
+            'K: ilkerA apply planinda yok'
+        );
+
+        // P) PASIF bagli hesap mutation almadi; login fail-closed kalir
+        $anomalyRow = pflcRowById($pdo, 508);
+        pflcAssert((string) $anomalyRow['username'] === '4475', 'P: PASIF bagli hesap username dokunulmadi');
+        pflcAssert((int) $anomalyRow['activation_required'] === 1, 'P: PASIF bagli hesap activation_required=1');
+        pflcAssert(
+            PasswordHasher::verify('LegacyPass-24chars!!', (string) $anomalyRow['password_hash']),
+            'P: PASIF bagli hesap password_hash dokunulmadi'
+        );
+
+        // L-O) ilk giris -> zorunlu sifre degisimi -> eski template DENIED -> yeni sifre SUCCESS
+        $GLOBALS['config']['db_host'] = '127.0.0.1';
+        $GLOBALS['config']['db_name'] = $bizDb;
+        $GLOBALS['config']['db_user'] = 'test';
+        $GLOBALS['config']['db_password'] = 'test';
+        $GLOBALS['config']['jwt_secret'] = str_repeat('pflc-biz-secret-', 3);
+        $GLOBALS['config']['jwt_ttl_seconds'] = 3600;
+        pflcSetPdo($pdo);
+
+        $raedLogin = pflcCapture(static function (): void {
+            LoginController::login(pflcRequest(['username' => 'raedF', 'password' => 'Fawaz123']));
+        });
+        pflcAssert(!empty($raedLogin['data']['token']), 'L: template credential ilk giris SUCCESS (raedF / Fawaz123)');
+        pflcAssert(
+            ($raedLogin['data']['must_change_password'] ?? null) === true,
+            'M: login must_change_password=1 -> /change-password rotasi'
+        );
+        pflcAssert(($raedLogin['data']['user']['rol'] ?? null) === 'PERSONEL', 'PERSONEL post-login rolu');
+
+        $abdullahLogin = pflcCapture(static function (): void {
+            LoginController::login(pflcRequest(['username' => 'abdullah', 'password' => 'Abdullah123']));
+        });
+        pflcAssert(!empty($abdullahLogin['data']['token']), 'L: abdullah template credential SUCCESS (Abdullah123)');
+
+        $oldSicilLogin = pflcCapture(static function (): void {
+            LoginController::login(pflcRequest(['username' => '176', 'password' => 'LegacyPass-24chars!!']));
+        });
+        pflcAssert(pflcErrorCode($oldSicilLogin) === 'INVALID_CREDENTIALS', 'BIZ: eski sicil credential DENIED');
+
+        pflcSetAuthUser(['id' => 502, 'rol' => 'PERSONEL', 'must_change_password' => true]);
+        $change = pflcCapture(static function (): void {
+            ChangePasswordController::change(
+                pflcRequest(
+                    ['current_password' => 'Fawaz123', 'new_password' => 'YeniSifre-2026'],
+                    '/auth/change-password'
+                )
+            );
+        });
+        pflcAssert(pflcErrorCode($change) === null, 'M: forced password change PASS');
+        pflcAssert(
+            ($change['data']['must_change_password'] ?? null) === false,
+            'M: change-password must_change_password=false dondu'
+        );
+        $raedAfterChange = pflcRowById($pdo, 502);
+        pflcAssert((int) $raedAfterChange['must_change_password'] === 0, 'M: DB must_change_password = 0');
+        pflcAssert(
+            PasswordHasher::verify('YeniSifre-2026', (string) $raedAfterChange['password_hash']),
+            'M: yeni sifre hash dogrulandi'
+        );
+        pflcSetAuthUser(null);
+
+        $oldTemplateLogin = pflcCapture(static function (): void {
+            LoginController::login(pflcRequest(['username' => 'raedF', 'password' => 'Fawaz123']));
+        });
+        pflcAssert(pflcErrorCode($oldTemplateLogin) === 'INVALID_CREDENTIALS', 'O: eski template sifresi DENIED');
+
+        $newPasswordLogin = pflcCapture(static function (): void {
+            LoginController::login(pflcRequest(['username' => 'raedF', 'password' => 'YeniSifre-2026']));
+        });
+        pflcAssert(!empty($newPasswordLogin['data']['token']), 'N: yeni sifre ile login SUCCESS');
+        pflcAssert(($newPasswordLogin['data']['must_change_password'] ?? null) === false, 'N: must_change_password=0');
+
+        $blockedPasif = pflcCapture(static function (): void {
+            LoginController::login(pflcRequest(['username' => '4475', 'password' => 'LegacyPass-24chars!!']));
+        });
+        pflcAssert(pflcErrorCode($blockedPasif) === 'INVALID_CREDENTIALS', 'P: PASIF anomaly login fail-closed');
+        $blockedIlker = pflcCapture(static function (): void {
+            LoginController::login(pflcRequest(['username' => 'ilkerA', 'password' => 'Akel123']));
+        });
+        pflcAssert(pflcErrorCode($blockedIlker) === 'INVALID_CREDENTIALS', 'K: ilkerA login fail-closed (dokunulmadi)');
+        pflcSetAuthUser(null);
+    } finally {
+        $root->exec('DROP DATABASE IF EXISTS `' . $bizDb . '`');
+    }
+}
+
 // ---------------------------------------------------------------------------
 // MAIN senaryo: canonical cohort gecisi + ilk giris + zorunlu sifre degisimi
 // ---------------------------------------------------------------------------
@@ -302,24 +553,26 @@ try {
 
     $legacyTemplateHash = PasswordHasher::hash('LegacyPass-24chars!!');
 
-    // 201 = rezerve hesabin personel kaydi; 204/205 = anomaly fixture'lari.
-    pflcInsertPersonel($pdo, 200, 'Serhan', 'Köse', 'AKTIF');
-    pflcInsertPersonel($pdo, 201, 'İlker', 'Akel', 'AKTIF');
-    pflcInsertPersonel($pdo, 202, 'Musa', 'Taş', 'AKTIF');
-    pflcInsertPersonel($pdo, 203, 'Emre', 'ÇELİK', 'AKTIF');
-    pflcInsertPersonel($pdo, 204, 'Ayse', 'Demir', 'AKTIF');
-    pflcInsertPersonel($pdo, 205, 'Pasif', 'Personel', 'PASIF');
-    pflcInsertPersonel($pdo, 207, '', '', 'AKTIF');
+    // 401 = rezerve hesabin personel kaydi; 404/405/407 = anomaly fixture'lari.
+    // NOT: fixture id'leri explicit business override/correction id'lerinden (108/109/200/201/
+    // 206/207/209/210) kasitli olarak ayridir; is karari senaryosu ayri DB'de kosar.
+    pflcInsertPersonel($pdo, 400, 'Serhan', 'Köse', 'AKTIF');
+    pflcInsertPersonel($pdo, 401, 'İlker', 'Akel', 'AKTIF');
+    pflcInsertPersonel($pdo, 402, 'Musa', 'Taş', 'AKTIF');
+    pflcInsertPersonel($pdo, 403, 'Emre', 'ÇELİK', 'AKTIF');
+    pflcInsertPersonel($pdo, 404, 'Ayse', 'Demir', 'AKTIF');
+    pflcInsertPersonel($pdo, 405, 'Pasif', 'Personel', 'PASIF');
+    pflcInsertPersonel($pdo, 407, '', '', 'AKTIF');
 
     pflcInsertUser($pdo, 1, 'admin', $legacyTemplateHash, 'Admin', 'GENEL_YONETICI', 'AKTIF', null);
-    pflcInsertUser($pdo, 10, '4471', $legacyTemplateHash, 'Serhan Kose', 'PERSONEL', 'AKTIF', 200);
-    pflcInsertUser($pdo, 11, PFLC_PROTECTED_USERNAME, $legacyTemplateHash, 'Ilker Akel', 'PERSONEL', 'AKTIF', 201);
-    pflcInsertUser($pdo, 12, '4472', $legacyTemplateHash, 'Musa Tas', 'PERSONEL', 'AKTIF', 202);
-    pflcInsertUser($pdo, 13, '4473', $legacyTemplateHash, 'Emre Celik', 'PERSONEL', 'AKTIF', 203);
-    pflcInsertUser($pdo, 14, '4474', $legacyTemplateHash, 'Ayse Demir', 'PERSONEL', 'PASIF', 204);
-    pflcInsertUser($pdo, 15, '4475', $legacyTemplateHash, 'Pasif Personel', 'PERSONEL', 'AKTIF', 205);
+    pflcInsertUser($pdo, 10, '4471', $legacyTemplateHash, 'Serhan Kose', 'PERSONEL', 'AKTIF', 400);
+    pflcInsertUser($pdo, 11, PFLC_PROTECTED_USERNAME, $legacyTemplateHash, 'Ilker Akel', 'PERSONEL', 'AKTIF', 401);
+    pflcInsertUser($pdo, 12, '4472', $legacyTemplateHash, 'Musa Tas', 'PERSONEL', 'AKTIF', 402);
+    pflcInsertUser($pdo, 13, '4473', $legacyTemplateHash, 'Emre Celik', 'PERSONEL', 'AKTIF', 403);
+    pflcInsertUser($pdo, 14, '4474', $legacyTemplateHash, 'Ayse Demir', 'PERSONEL', 'PASIF', 404);
+    pflcInsertUser($pdo, 15, '4475', $legacyTemplateHash, 'Pasif Personel', 'PERSONEL', 'AKTIF', 405);
     pflcInsertUser($pdo, 16, '4476', $legacyTemplateHash, 'Bindingsiz', 'PERSONEL', 'AKTIF', null);
-    pflcInsertUser($pdo, 18, '4478', $legacyTemplateHash, 'Adsiz Kayit', 'PERSONEL', 'AKTIF', 207);
+    pflcInsertUser($pdo, 18, '4478', $legacyTemplateHash, 'Adsiz Kayit', 'PERSONEL', 'AKTIF', 407);
 
     // FK'li ortamda "bagli personel yok" anomalisi: yalniz fixture icin FK bypass.
     $pdo->exec('SET FOREIGN_KEY_CHECKS = 0');
@@ -382,7 +635,7 @@ try {
     );
     pflcAssert((int) $serhan['activation_required'] === 0, 'F: hedef activation_required = 0');
     pflcAssert((int) $serhan['must_change_password'] === 1, 'F: hedef must_change_password = 1');
-    pflcAssert((string) $serhan['rol'] === 'PERSONEL' && (int) $serhan['personel_id'] === 200, 'rol/personel_id korundu');
+    pflcAssert((string) $serhan['rol'] === 'PERSONEL' && (int) $serhan['personel_id'] === 400, 'rol/personel_id korundu');
 
     // B) Turkish normalization
     pflcAssert(
@@ -430,7 +683,7 @@ try {
     );
     pflcAssert(
         (string) $protectedAfter['rol'] === 'PERSONEL' && (string) $protectedAfter['durum'] === 'AKTIF'
-            && (int) $protectedAfter['personel_id'] === 201,
+            && (int) $protectedAfter['personel_id'] === 401,
         'G: rezerve hesap rol/durum/personel_id dokunulmadi'
     );
     pflcAssert(
@@ -543,6 +796,9 @@ try {
         pflcAuditCount($collidePdo, 'PERSONEL_FIRST_LOGIN_CREDENTIALS_APPLIED') === 0,
         'H: collision halinde audit izi yazilmadi'
     );
+
+    // Business karari senaryosu (explicit override + name correction + ilk giris zinciri).
+    pflcRunBusinessDecisionScenario($root);
 
     echo '[DONE] PersonelFirstLoginCredentialsMysqlTestRunner' . PHP_EOL;
 } finally {

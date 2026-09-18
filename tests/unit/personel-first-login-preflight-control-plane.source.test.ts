@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { spawnSync } from 'node:child_process';
 import { describe, expect, it } from 'vitest';
 
 const read = (relativePath: string) => readFileSync(resolve(process.cwd(), relativePath), 'utf8');
@@ -10,6 +11,7 @@ const service = read('api/src/Services/Auth/PersonelAccountOnboardingService.php
 const workflow = read('.github/workflows/ops-personel-first-login-preflight.yml');
 const heavyRunner = read('tests/php/PersonelFirstLoginCredentialsMysqlTestRunner.php');
 const cliWorker = read('api/bin/personel-first-login-credentials.php');
+const cleanlinessLib = read('scripts/deploy/cpanel-control-plane-cleanliness-lib.sh');
 
 /**
  * The negative boundary assertions must judge the executable code, not the
@@ -282,12 +284,53 @@ describe('personel first-login preflight workflow', () => {
     expect(workflow).not.toContain('--dry-run');
   });
 
-  it('verifies the control plane is left clean after the read', () => {
-    expect(workflow).toContain('LEFTOVER_PENDING_REQUEST');
-    expect(workflow).toContain('LEFTOVER_PROCESSING_REQUEST');
-    expect(workflow).toContain('FAILED_REQUEST_PRESENT');
-    expect(workflow).toContain('REQUEST_NOT_ARCHIVED');
-    expect(workflow).toContain('PREFLIGHT_CONTROL_PLANE_CLEAN=YES');
+  it('judges only this run\u2019s own request, never the archived control-plane history', () => {
+    const step = workflow.slice(workflow.indexOf('Verify control plane is left clean'));
+    expect(step.length).toBeGreaterThan(0);
+
+    // The production false failure was a global grep over the whole listing: it
+    // re-judged request.failed.* files this run did not create.
+    expect(step).not.toMatch(/grep -q 'request\\?\.failed\\?\.'/);
+    expect(step).not.toMatch(/grep -q 'request\\?\.pending\\?\.'/);
+    expect(step).not.toMatch(/grep -q 'request\\?\.processing\\?\.'/);
+
+    expect(step).toContain(
+      'source "$GITHUB_WORKSPACE/scripts/deploy/cpanel-control-plane-cleanliness-lib.sh"',
+    );
+    expect(step).toContain(
+      'assert_control_plane_clean_for_request "$before_listing" "$after_listing" "$request_id"',
+    );
+    expect(step).toContain(
+      'before_listing="$RUNNER_TEMP/personel-first-login-preflight/control-listing.txt"',
+    );
+    expect(step).toContain('PREFLIGHT_CONTROL_PLANE_CLEAN=YES');
+    expect(step).toContain('PREFLIGHT_REASON=${reason}');
+
+    // The baseline has to be captured before this run writes its request, or the
+    // delta would contain this run's own request file.
+    const baselineIndex = workflow.indexOf('PREFLIGHT_CONTROL_PLANE_BASELINE=');
+    expect(baselineIndex).toBeGreaterThan(0);
+    expect(baselineIndex).toBeLessThan(workflow.indexOf('request.pending.${REQUEST_ID}.json'));
+  });
+
+  it('keeps the current-request contract in one owner that never deletes anything', () => {
+    expect(cleanlinessLib).toContain('assert_control_plane_clean_for_request()');
+    expect(cleanlinessLib).toContain('normalize_control_plane_listing()');
+    for (const reason of [
+      'CONTROL_PLANE_LEFTOVER_PENDING_REQUEST',
+      'CONTROL_PLANE_LEFTOVER_PROCESSING_REQUEST',
+      'CONTROL_PLANE_FAILED_REQUEST_PRESENT',
+      'CONTROL_PLANE_REQUEST_NOT_ARCHIVED',
+      'CONTROL_PLANE_UNEXPECTED_DELTA',
+    ]) {
+      expect(cleanlinessLib).toContain(reason);
+    }
+    // A historical failure is only ever judged through the delta, never by a
+    // global pattern match over the whole listing.
+    expect(cleanlinessLib).not.toMatch(/grep -q 'request\\?\.failed/);
+    expect(cleanlinessLib).toContain('grep -vxF -f "$work/before.txt"');
+    // Read-only by construction: the contract never removes a remote file.
+    expect(cleanlinessLib).not.toMatch(/^\s*(rm|mv|put|mput|mrm)\s+.*migration-control/m);
   });
 });
 
@@ -298,5 +341,56 @@ describe('personel first-login heavy acceptance coverage', () => {
     // Zero mutation proof: the whole users/personeller tables are compared.
     expect(heavyRunner).toContain('SELECT id, username, password_hash, activation_required, must_change_password, rol, durum, personel_id FROM users ORDER BY id ASC');
     expect(heavyRunner).toContain('SELECT id, ad, soyad, aktif_durum FROM personeller ORDER BY id ASC');
+  });
+});
+
+describe('personel first-login control-plane cleanliness runtime', () => {
+  /**
+   * The production run failed with PREFLIGHT_REASON=FAILED_REQUEST_PRESENT while
+   * its own payload reported PASS and 90 pre-existing request.* files sat in the
+   * control plane. This drives the real shell contract against fixtures: the
+   * historical failures must pass, and this run's own states must still block.
+   */
+  it('separates this run\u2019s request state from archived control-plane history', () => {
+    const script = resolve(process.cwd(), 'scripts/deploy/test-cpanel-control-plane-cleanliness-lib.sh');
+    const bashCandidates = ['C:/Program Files/Git/bin/bash.exe', '/usr/bin/bash', 'bash'];
+    let result: ReturnType<typeof spawnSync> | null = null;
+    let output = '';
+
+    for (const bin of bashCandidates) {
+      const attempt = spawnSync(bin, [script], {
+        cwd: process.cwd(),
+        encoding: 'utf8',
+        env: process.env,
+      });
+      if (attempt.error && (attempt.error as NodeJS.ErrnoException).code === 'ENOENT') {
+        continue;
+      }
+      output = `${attempt.stdout ?? ''}\n${attempt.stderr ?? ''}`;
+      result = attempt;
+      if (attempt.status === 0 && output.includes('HARNESS_FAIL=0')) {
+        break;
+      }
+    }
+
+    expect(result).not.toBeNull();
+    expect(result?.status, output).toBe(0);
+    for (const assertion of [
+      // Historical failed requests + this run completed cleanly => PASS.
+      'HISTORICAL_FAILED_CURRENT_COMPLETED_RC=PASS',
+      'FALSE_FAILURE_FIXTURE_HAS_HISTORICAL_FAILED=PASS',
+      // This run's own states => BLOCKED.
+      'CURRENT_FAILED_RC=PASS',
+      'CURRENT_PENDING_RC=PASS',
+      'CURRENT_PROCESSING_LEFTOVER_RC=PASS',
+      'CURRENT_NOT_ARCHIVED_RC=PASS',
+      'UNEXPECTED_DELTA_RC=PASS',
+      'FOREIGN_COMPLETION_ONLY_RC=PASS',
+      // A fresh control plane with a clean completion still passes.
+      'EMPTY_BEFORE_COMPLETED_RC=PASS',
+      'HARNESS_FAIL=0',
+    ]) {
+      expect(output).toContain(assertion);
+    }
   });
 });

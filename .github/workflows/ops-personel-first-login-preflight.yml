@@ -244,7 +244,10 @@ jobs:
 
           # Every request file already present is listed before the write, so the
           # request this step submits is provably the only new control-plane entry.
+          # This file is kept at this exact path: the final cleanliness step diffs
+          # the post-run listing against it instead of judging archived history.
           echo "PREFLIGHT_CONTROL_PLANE_FILES_BEFORE=$(grep -c 'request\.' "$listing" || true)"
+          echo "PREFLIGHT_CONTROL_PLANE_BASELINE=${listing}"
 
           REQUEST_ID="pflcpre-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           echo "PREFLIGHT_REQUEST_ID=${REQUEST_ID}"
@@ -448,9 +451,11 @@ jobs:
           echo "PREFLIGHT_REASON=NONE"
 
       # The control plane must be back to its pre-run shape plus exactly one new
-      # artifact: this mode's report. A leftover request.pending/processing file
-      # would mean the worker died mid-request, which is itself evidence that the
-      # read-only surface is not healthy.
+      # entry: this run's own archived request. The judgement is scoped to this
+      # run's request id and to the delta against the pre-write listing, so the
+      # archived completed/failed requests of earlier operations can never be
+      # read as evidence about this run. A leftover request.pending/processing
+      # entry of this run, or a request.failed entry of this run, still blocks.
       - name: Verify control plane is left clean
         if: success()
         run: |
@@ -492,27 +497,19 @@ jobs:
             echo "PREFLIGHT_REASON=FINAL_CONTROL_PLANE_UNREACHABLE"
             exit 1
           fi
-          if grep -q 'request\.pending\.' "${work}/control-listing-after.txt"; then
+          source "$GITHUB_WORKSPACE/scripts/deploy/cpanel-control-plane-cleanliness-lib.sh"
+
+          # Baseline: the listing the collect step captured before it wrote this
+          # run's request. Everything already in it is history this run did not
+          # create, so it is never re-judged - including earlier failures.
+          before_listing="$RUNNER_TEMP/personel-first-login-preflight/control-listing.txt"
+          after_listing="${work}/control-listing-after.txt"
+
+          if ! reason="$(assert_control_plane_clean_for_request "$before_listing" "$after_listing" "$request_id")"; then
             echo "PREFLIGHT_RESULT=BLOCKED"
-            echo "PREFLIGHT_REASON=LEFTOVER_PENDING_REQUEST"
+            echo "PREFLIGHT_REASON=${reason}"
             exit 1
           fi
-          if grep -q 'request\.processing\.' "${work}/control-listing-after.txt"; then
-            echo "PREFLIGHT_RESULT=BLOCKED"
-            echo "PREFLIGHT_REASON=LEFTOVER_PROCESSING_REQUEST"
-            exit 1
-          fi
-          if grep -q 'request\.failed\.' "${work}/control-listing-after.txt"; then
-            echo "PREFLIGHT_RESULT=BLOCKED"
-            echo "PREFLIGHT_REASON=FAILED_REQUEST_PRESENT"
-            exit 1
-          fi
-          grep -qF "request.completed.${request_id}.json" "${work}/control-listing-after.txt" \
-            || {
-              echo "PREFLIGHT_RESULT=BLOCKED"
-              echo "PREFLIGHT_REASON=REQUEST_NOT_ARCHIVED"
-              exit 1
-            }
 
           echo "PREFLIGHT_CONTROL_PLANE_CLEAN=YES"
 

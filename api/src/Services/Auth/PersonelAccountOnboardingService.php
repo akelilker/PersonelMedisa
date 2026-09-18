@@ -93,6 +93,15 @@ class PersonelAccountOnboardingService
             'from' => ['ad' => 'FAHRİ TAYLAN MERCAN', 'soyad' => null],
             'to' => ['ad' => 'Fahri Taylan', 'soyad' => 'Mercan'],
         ],
+        // 219: kayitli bolunme yanlistir (ad = tek kelime, soyad = iki kelime).
+        // Kilitli kural son kelimeyi soyad, onceki tum kelimeleri ad yapar; boylece
+        // canonical username `doguB` yerine `doguA` ve sifre `Atmaca123` olur.
+        // Bu personelin henuz PERSONEL hesabi YOKTUR; correction ancak hesap
+        // acildiginda plan'a girer ve preimage guard'i ile uygulanir.
+        219 => [
+            'from' => ['ad' => 'DOĞU', 'soyad' => 'BERKAN ATMACA'],
+            'to' => ['ad' => 'Doğu Berkan', 'soyad' => 'Atmaca'],
+        ],
     ];
 
     public const ERR_NAME_REQUIRED = 'PERSONEL_NAME_REQUIRED_FOR_ACCOUNT';

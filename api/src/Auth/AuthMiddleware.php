@@ -11,6 +11,7 @@ use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
 use Medisa\Api\Scope\OrgScope;
 use Medisa\Api\Services\Organizasyon\SubeMuhasebeYetkiSchema;
+use Medisa\Api\Services\SelfService\SelfPersonelContext;
 use PDO;
 
 class AuthMiddleware
@@ -136,6 +137,15 @@ class AuthMiddleware
         } else {
             self::$user['personel_id'] = null;
         }
+
+        // Canonical collar (DB read model) travels with the session user so
+        // permission decisions never trust a client-supplied collar. Unavailable
+        // / null value stays null and the PERSONEL QR entitlement fails closed.
+        $collar = self::$user['personel_id'] !== null
+            ? SelfPersonelContext::loadCollar($pdo, (int) self::$user['personel_id'])
+            : ['personel_tipi_id' => null, 'personel_tipi_ad' => null];
+        self::$user['personel_tipi_id'] = $collar['personel_tipi_id'];
+        self::$user['personel_tipi_ad'] = $collar['personel_tipi_ad'];
 
         if (!empty(self::$user['actor_identity_id'])) {
             self::$user['actor_identity_status'] = self::loadActorIdentityStatus($pdo, (int) self::$user['actor_identity_id']);

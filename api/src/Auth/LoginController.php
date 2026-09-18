@@ -13,6 +13,7 @@ use Medisa\Api\Scope\OrgScope;
 use Medisa\Api\Scope\SubeScope;
 use Medisa\Api\Services\Organizasyon\SubeReadModel;
 use Medisa\Api\Services\Personel\PersonelOrgStructureSchema;
+use Medisa\Api\Services\SelfService\SelfPersonelContext;
 use PDO;
 
 class LoginController
@@ -157,6 +158,13 @@ class LoginController
         ];
         if ($hasPersonelId) {
             $userPayload['personel_id'] = $personelIdPayload;
+            // Canonical collar read model mirror (DB-authoritative; never from the
+            // client). PER (personel_tipi_id → personel_tipleri.ad).
+            $collar = $personelIdPayload !== null
+                ? SelfPersonelContext::loadCollar($pdo, $personelIdPayload)
+                : ['personel_tipi_id' => null, 'personel_tipi_ad' => null];
+            $userPayload['personel_tipi_id'] = $collar['personel_tipi_id'];
+            $userPayload['personel_tipi_ad'] = $collar['personel_tipi_ad'];
         }
 
         $response = [

@@ -237,7 +237,12 @@ function normalizeAuthSession(payload: unknown): AuthSession | null {
       explicit_sube_ids: readIdList(userSource, "explicit_sube_ids"),
       sirket_ids: readIdList(userSource, "sirket_ids"),
       sgk_isveren_ids: readIdList(userSource, "sgk_isveren_ids"),
-      personel_id
+      personel_id,
+      // Canonical collar mirror from the login payload (backend read model).
+      // Absent in legacy sessions: the PERSONEL QR gate then fails closed.
+      personel_tipi_id: readNumber(userSource.personel_tipi_id ?? userSource.personelTipiId),
+      personel_tipi_ad:
+        readString(userSource.personel_tipi_ad) ?? readString(userSource.personelTipiAd)
     }
   };
 

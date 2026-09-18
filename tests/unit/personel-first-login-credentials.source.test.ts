@@ -340,9 +340,9 @@ describe("PERSONEL username/first-login business kararlari (explicit override + 
     expect(phpResolve("password", 206, "ABDULLAH", null)).toBe("Abdullah123");
   });
 
-  it("name correction plani yalniz ad/soyad alanlari icin ve beklenen 5 kayit icin tanimli", () => {
+  it("name correction plani yalniz ad/soyad alanlari icin ve beklenen 6 kayit icin tanimli", () => {
     const map = phpBusinessMaps();
-    expect(Object.keys(map.corrections).sort()).toEqual(["200", "201", "207", "209", "210"]);
+    expect(Object.keys(map.corrections).sort()).toEqual(["200", "201", "207", "209", "210", "219"]);
     for (const correction of Object.values(map.corrections)) {
       expect(Object.keys(correction.to).sort()).toEqual(["ad", "soyad"]);
       expect(Object.keys(correction.from).sort()).toEqual(["ad", "soyad"]);
@@ -352,6 +352,21 @@ describe("PERSONEL username/first-login business kararlari (explicit override + 
     expect(map.corrections["207"].to).toEqual({ ad: "Oktay", soyad: "Ersöz" });
     expect(map.corrections["209"].to).toEqual({ ad: "Muqtada Mazin", soyad: "Khalee" });
     expect(map.corrections["210"].to).toEqual({ ad: "Fahri Taylan", soyad: "Mercan" });
+    // 219: kayitli bolunme duzeltilir; preimage exact kayitli degerdir.
+    expect(map.corrections["219"].from).toEqual({ ad: "DOĞU", soyad: "BERKAN ATMACA" });
+    expect(map.corrections["219"].to).toEqual({ ad: "Doğu Berkan", soyad: "Atmaca" });
+  });
+
+  it("219: son kelime soyad kurali ile kilitli canonical sonuc (doguA / Atmaca123)", () => {
+    // Kayitli (yanlis) bolunme: ad tek kelime, soyad iki kelime -> doguB uretirdi.
+    expect(phpRule("username", "DOĞU", "BERKAN ATMACA")).toBe("doguB");
+    // Kilitli kural kendi basina: son kelime soyad, onceki tum kelimeler ad.
+    expect(phpRule("username", "Doğu Berkan", "Atmaca")).toBe("doguA");
+    expect(phpRule("password", "Doğu Berkan", "Atmaca")).toBe("Atmaca123");
+    // Canonical owner kayitli satir icin correction'i uygular.
+    expect(phpResolve("username", 219, "DOĞU", "BERKAN ATMACA")).toBe("doguA");
+    expect(phpResolve("password", 219, "DOĞU", "BERKAN ATMACA")).toBe("Atmaca123");
+    expect(phpPasswordHashRoundTrip(219, "DOĞU", "BERKAN ATMACA")).toBe("OK");
   });
 
   it("I: business karari setinde username collision yok", () => {

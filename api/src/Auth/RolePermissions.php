@@ -448,8 +448,75 @@ class RolePermissions
         'maas_hesaplama_adaylari.manage',
     ];
 
+    /**
+     * Canonical collar that may use PERSONEL self-service QR.
+     * Owner chain: personeller.personel_tipi_id → personel_tipleri.ad.
+     * `ucret_tipi` is intentionally NOT a collar source (no business mapping).
+     */
+    public const QR_SELF_SERVICE_COLLAR = 'Mavi Yaka';
+
+    /**
+     * Self-service QR capabilities. For the PERSONEL role these are additionally
+     * gated by the canonical collar and fail closed for Beyaz Yaka / Diğer /
+     * unknown collar. Management roles keep the personnel-linked baseline
+     * behaviour of this phase unchanged.
+     *
+     * @var array<int, string>
+     */
+    public const QR_SELF_SERVICE_PERMISSIONS = [
+        'self_service.qr.scan',
+        'self_service.qr.events.view',
+    ];
+
     /** @var array<string, array<int, string>>|null */
     private static $resolvedMatrix = null;
+
+    /** @param mixed $permission */
+    public static function isQrSelfServicePermission($permission)
+    {
+        return in_array(trim((string) $permission), self::QR_SELF_SERVICE_PERMISSIONS, true);
+    }
+
+    /**
+     * Canonical collar business value → QR eligibility. Fail-closed: only an
+     * explicit "Mavi Yaka" (case/whitespace tolerant) is eligible.
+     *
+     * @param mixed $collarAd
+     */
+    public static function collarAllowsQrSelfService($collarAd)
+    {
+        if (!is_string($collarAd) && !is_int($collarAd) && !is_float($collarAd)) {
+            return false;
+        }
+        $given = self::normalizeCollar($collarAd);
+        if ($given === '') {
+            return false;
+        }
+
+        return $given === self::normalizeCollar(self::QR_SELF_SERVICE_COLLAR);
+    }
+
+    /**
+     * PERSONEL-role QR decision from the DB-authoritative auth user collar.
+     * Missing / null / unresolvable collar → denied.
+     *
+     * @param array<string, mixed> $user
+     */
+    public static function personelCollarAllowsQr(array $user)
+    {
+        return self::collarAllowsQrSelfService($user['personel_tipi_ad'] ?? null);
+    }
+
+    /** @param mixed $value */
+    private static function normalizeCollar($value)
+    {
+        $collapsed = preg_replace('/\s+/u', ' ', trim((string) $value));
+        $text = $collapsed === null ? trim((string) $value) : $collapsed;
+
+        return function_exists('mb_strtolower')
+            ? mb_strtolower($text, 'UTF-8')
+            : strtolower($text);
+    }
 
     /**
      * Canonical role → permission map, including the derived IK_PERSONELI row.
@@ -507,6 +574,15 @@ class RolePermissions
         $permission = trim((string) $permission);
         if ($permission === '') {
             return false;
+        }
+
+        // PERSONEL self-service QR is collar-gated (fail-closed). Management roles
+        // with a personnel binding keep the personnel-linked baseline unchanged.
+        if (
+            self::isQrSelfServicePermission($permission)
+            && self::normalizeRole(isset($user['rol']) ? (string) $user['rol'] : '') === 'PERSONEL'
+        ) {
+            return self::personelCollarAllowsQr($user);
         }
 
         // personel_id binding → own self-service baseline (role-independent).

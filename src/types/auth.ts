@@ -55,6 +55,17 @@ export type AuthUser = {
   birim_ids?: number[];
   /** Optional self-service binding from login payload (DB-authoritative on /me). */
   personel_id?: number | null;
+  /**
+   * Canonical collar read model mirror (personeller.personel_tipi_id), from the
+   * login payload. Never client-supplied: it is written by the backend only and
+   * the backend remains the authorization owner for every gate.
+   */
+  personel_tipi_id?: number | null;
+  /**
+   * Canonical collar business value: personel_tipi_id → personel_tipleri.ad.
+   * PERSONEL self-service QR is only effective for "Mavi Yaka".
+   */
+  personel_tipi_ad?: string | null;
 };
 
 export type AuthSession = {

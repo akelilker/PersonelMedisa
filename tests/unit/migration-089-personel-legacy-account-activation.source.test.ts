@@ -76,11 +76,13 @@ describe("migration 089: PERSONEL legacy hesap canonical hizalamasi", () => {
     expect(login).toMatch(/activation_required[\s\S]*PasswordHasher::verify/);
   });
 
-  it("canonical onboarding owner'i davet uretimi ve sifre sahipligini korur", () => {
+  it("canonical onboarding owner'i legacy davet uretimini ve sifre sahipligini korur", () => {
     const service = read("api/src/Services/Auth/PersonelAccountOnboardingService.php");
     expect(service).toContain("reissueActivation");
     expect(service).toContain("ERR_NOT_PENDING");
-    expect(service).toContain("generateUnusableInternalSecret");
+    expect(service).toContain("issueInvitationLocked");
+    // Yeni hesap create yolu artik canonical first-login template sifresini sahiplenir.
+    expect(service).toContain("resolvePersonelInitialPasswordMaterial");
     // Ayni hedef cohort: legacy hesaplar bu owner'in bekleyen hesap kosuluna dahil olur.
     expect(service).toContain("u.activation_required");
   });

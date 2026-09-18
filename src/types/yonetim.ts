@@ -36,17 +36,30 @@ export type PersonelActivationIssue = {
   reissued: boolean;
 };
 
+export type PersonelHesapOnboardingUser = {
+  id: number;
+  username: string;
+  rol?: string;
+  durum?: string;
+  personel_id?: number | null;
+  activation_required?: boolean;
+  must_change_password?: boolean;
+  activated_at_utc?: string | null;
+};
+
+/**
+ * Canonical yeni hesap create sonucu: template baslangic sifresi + zorunlu ilk giris
+ * sifre degisimi. Aktivasyon daveti/linki ve secret tasimaz.
+ */
+export type PersonelHesapFirstLoginResult = {
+  user: PersonelHesapOnboardingUser;
+  credential_model?: string;
+  message?: string;
+};
+
+/** Legacy aktivasyon daveti sonucu (yalniz gecmis activation_required=true hesaplar). */
 export type PersonelHesapOnboardingResult = {
-  user: {
-    id: number;
-    username: string;
-    rol?: string;
-    durum?: string;
-    personel_id?: number | null;
-    activation_required?: boolean;
-    must_change_password?: boolean;
-    activated_at_utc?: string | null;
-  };
+  user: PersonelHesapOnboardingUser;
   activation: PersonelActivationIssue;
   message?: string;
 };

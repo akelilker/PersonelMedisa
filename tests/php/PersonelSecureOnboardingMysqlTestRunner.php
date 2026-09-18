@@ -9,7 +9,14 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../api/src/bootstrap.php';
 
+use Medisa\Api\Auth\AuthMiddleware;
+use Medisa\Api\Auth\ChangePasswordController;
+use Medisa\Api\Auth\LoginController;
 use Medisa\Api\Auth\PasswordHasher;
+use Medisa\Api\Database\Connection;
+use Medisa\Api\Http\JsonResponse;
+use Medisa\Api\Http\Request;
+use Medisa\Api\Http\ResponseCaptured;
 use Medisa\Api\Services\Auth\PersonelAccountOnboardingService;
 use Medisa\Api\Services\SelfService\PersonelMobileCapabilityService;
 
@@ -19,6 +26,93 @@ function psoAssert(bool $ok, string $name): void
         throw new RuntimeException('[FAIL] ' . $name);
     }
     echo '[PASS] ' . $name . PHP_EOL;
+}
+
+/** Login/change-password akisi icin Connection singleton'i test DB'sine baglar. */
+function psoSetPdo(PDO $pdo): void
+{
+    $ref = new ReflectionClass(Connection::class);
+    $prop = $ref->getProperty('pdo');
+    $prop->setAccessible(true);
+    $prop->setValue(null, $pdo);
+}
+
+function psoSetAuthUser($user): void
+{
+    $ref = new ReflectionClass(AuthMiddleware::class);
+    $prop = $ref->getProperty('user');
+    $prop->setAccessible(true);
+    $prop->setValue(null, $user);
+}
+
+/** @param array<string, mixed> $body */
+function psoRequest(array $body, string $path = '/auth/login'): Request
+{
+    $request = new Request();
+    $ref = new ReflectionClass($request);
+    foreach ([
+        'method' => 'POST',
+        'path' => $path,
+        'headers' => [],
+        'jsonBody' => $body,
+        'rawBody' => (string) json_encode($body, JSON_UNESCAPED_UNICODE),
+        'rawBodyLoaded' => true,
+        'jsonBodyParsed' => true,
+    ] as $name => $value) {
+        if (!$ref->hasProperty($name)) {
+            continue;
+        }
+        $prop = $ref->getProperty($name);
+        $prop->setAccessible(true);
+        $prop->setValue($request, $value);
+    }
+
+    return $request;
+}
+
+/**
+ * JsonResponse uretimini exit() olmadan yakalar.
+ *
+ * @return array<string, mixed>
+ */
+function psoCapture(callable $fn): array
+{
+    JsonResponse::beginCapture();
+    $captured = null;
+    try {
+        $fn();
+        $captured = JsonResponse::capturedResponse();
+    } catch (ResponseCaptured $capturedSignal) {
+        $captured = JsonResponse::capturedResponse();
+    } finally {
+        JsonResponse::endCapture();
+    }
+
+    return is_array($captured) ? $captured : [];
+}
+
+/** @return array{invitation: array<string, mixed>, issued: array<string, mixed>} */
+function psoLegacyActivationFixture(PDO $pdo, int $userId, array $actor): array
+{
+    // Create yolu davet uretmez; legacy akis yalniz gecmis activation_required=1 hesaplar icindir.
+    $pdo->exec('UPDATE users SET activation_required = 1 WHERE id = ' . $userId);
+    $issued = PersonelAccountOnboardingService::reissueActivation($pdo, $userId, $actor);
+    $invitation = $pdo->query(
+        'SELECT * FROM personel_account_activation_invitations
+          WHERE user_id = ' . $userId . ' ORDER BY id DESC LIMIT 1'
+    )->fetch(PDO::FETCH_ASSOC);
+    if (!is_array($invitation)) {
+        throw new RuntimeException('[FAIL] legacy activation fixture invitation missing');
+    }
+
+    return ['invitation' => $invitation, 'issued' => $issued];
+}
+
+function psoTokenFromUrl(string $url): string
+{
+    parse_str(parse_url($url, PHP_URL_FRAGMENT) ?: '', $fragment);
+
+    return (string) ($fragment['token'] ?? '');
 }
 
 function psoChildPdo(): PDO
@@ -331,7 +425,8 @@ try {
          (15, '15151515151', 'Mgr', 'Bound', '1996-01-01', '5550000015', 'G', '5550000015', 'MGR-001', '2021-01-01', 1, 1, 1, 'AKTIF', 'IC_PERSONEL'),
          (16, '16161616161', 'Özkan', 'Erçin', '1997-01-01', '5550000016', 'H', '5550000016', 'SIC-OZ', '2021-01-01', 1, 1, 1, 'AKTIF', 'IC_PERSONEL'),
          (17, '17171717171', 'Kürşat', 'Kederoğlu', '1998-01-01', '5550000017', 'I', '5550000017', 'SIC-KU', '2021-01-01', 1, 1, 1, 'AKTIF', 'IC_PERSONEL'),
-         (18, '18181818181', 'Mehmet Ali', 'Yılmaz', '1999-01-01', '5550000018', 'J', '5550000018', 'SIC-MA', '2021-01-01', 1, 1, 1, 'AKTIF', 'IC_PERSONEL')"
+         (18, '18181818181', 'Mehmet Ali', 'Yılmaz', '1999-01-01', '5550000018', 'J', '5550000018', 'SIC-MA', '2021-01-01', 1, 1, 1, 'AKTIF', 'IC_PERSONEL'),
+         (19, '19191919191', 'Serhan', 'Köse', '1990-06-01', '5550000019', 'K', '5550000019', 'SIC-SK', '2021-01-01', 1, 1, 1, 'AKTIF', 'IC_PERSONEL')"
     );
 
     // Bind legacy u2 to personel 1 (grandfathered).
@@ -391,21 +486,37 @@ try {
         'builder Mehmet Ali YILMAZ → mehmetY'
     );
 
-    // 1–3: create IC_PERSONEL account with name-based username (sicil not used)
+    // 1–3: create IC_PERSONEL account -> canonical first-login model (aktivasyon linki YOK)
     $result = PersonelAccountOnboardingService::onboardAndIssue($pdo, 10, $actor);
     psoAssert(($result['user']['username'] ?? '') === 'ilkerA', 'username exactly ilkerA from names');
     psoAssert(($result['user']['rol'] ?? '') === 'PERSONEL', 'default role PERSONEL');
-    psoAssert(($result['user']['activation_required'] ?? false) === true, 'activation_required set');
+    psoAssert(($result['user']['activation_required'] ?? true) === false, 'new account activation_required=false');
+    psoAssert(($result['user']['must_change_password'] ?? false) === true, 'new account must_change_password=true');
+    psoAssert(
+        ($result['credential_model'] ?? '') === PersonelAccountOnboardingService::CREDENTIAL_MODEL_FIRST_LOGIN,
+        'credential_model=FIRST_LOGIN_TEMPLATE'
+    );
+    psoAssert(!isset($result['activation']), 'no activation payload on new account create');
     psoAssert(!isset($result['user']['username_source']), 'username_source not returned');
-    psoAssert(isset($result['activation']['activation_url']), 'activation_url present once');
-    psoAssert(strpos($result['activation']['activation_url'], '#token=') !== false, 'url uses fragment transport');
-    psoAssert(!isset($result['password']) && !isset($result['user']['password']), 'random internal credential never returned');
+    psoAssert(!isset($result['password']) && !isset($result['user']['password']), 'plaintext credential never returned');
+    psoAssert(
+        strpos((string) json_encode($result), 'Akel123') === false,
+        'template plaintext never returned in response'
+    );
 
     $userRow = $pdo->query('SELECT * FROM users WHERE username = \'ilkerA\'')->fetch(PDO::FETCH_ASSOC);
     psoAssert(is_array($userRow), 'account created');
     psoAssert((int) $userRow['personel_id'] === 10, 'binding through personel_id');
-    psoAssert((int) $userRow['activation_required'] === 1, 'DB activation_required=1');
-    psoAssert((int) $userRow['must_change_password'] === 1, 'must_change_password=1 while pending');
+    psoAssert((int) $userRow['activation_required'] === 0, 'DB activation_required=0');
+    psoAssert((int) $userRow['must_change_password'] === 1, 'DB must_change_password=1');
+    psoAssert(
+        PasswordHasher::verify('Akel123', (string) $userRow['password_hash']),
+        'template baslangic sifresi Akel123 hash ile dogrulandi'
+    );
+    psoAssert(
+        (int) $pdo->query('SELECT COUNT(*) FROM personel_account_activation_invitations')->fetchColumn() === 0,
+        'create pathi aktivasyon daveti uretmedi'
+    );
 
     $bindAudit = (int) $pdo->query(
         'SELECT COUNT(*) FROM user_personel_binding_audit WHERE user_id = ' . (int) $userRow['id'] . " AND action = 'SET'"
@@ -417,17 +528,15 @@ try {
     )->fetchColumn();
     psoAssert($onboardAudit === 1, 'PERSONEL_ACCOUNT_CREATED audit');
 
-    $inv = $pdo->query(
-        'SELECT * FROM personel_account_activation_invitations WHERE user_id = ' . (int) $userRow['id'] . ' ORDER BY id DESC LIMIT 1'
-    )->fetch(PDO::FETCH_ASSOC);
-    psoAssert(is_array($inv), 'invitation row exists');
+    // Legacy aktivasyon fixture'i: create yolu davet uretmedigi icin davet yalniz legacy reissue owner'indan alinir.
+    $legacyFixture = psoLegacyActivationFixture($pdo, (int) $userRow['id'], $actor);
+    $inv = $legacyFixture['invitation'];
+    psoAssert(
+        isset($legacyFixture['issued']['activation']['activation_url']),
+        'legacy reissue activation_url returns'
+    );
     psoAssert(strlen((string) $inv['token_hash']) === 64, 'token_hash sha256 hex length');
-    // Extract raw token from URL for redeem tests
-    $url = $result['activation']['activation_url'];
-    $parts = parse_url($url);
-    $fragment = $parts['fragment'] ?? '';
-    parse_str($fragment, $fragParams);
-    $rawToken = (string) ($fragParams['token'] ?? '');
+    $rawToken = psoTokenFromUrl((string) $legacyFixture['issued']['activation']['activation_url']);
     psoAssert(strlen($rawToken) >= 64, 'token >=256-bit entropy (64 hex chars)');
     psoAssert(PersonelAccountOnboardingService::hashToken($rawToken) === $inv['token_hash'], 'DB stores hash only matching raw');
     $rawInDb = (int) $pdo->query(
@@ -546,11 +655,12 @@ try {
     $status2 = PersonelAccountOnboardingService::activationStatus($pdo, $rawToken);
     psoAssert(($status2['valid'] ?? true) === false, 'consumed token status invalid');
 
-    // Reissue flow on DIS_KAYNAK pending user
+    // Reissue flow on legacy activation-pending user (DIS_KAYNAK personeli)
     $disUserId = (int) $disResult['user']['id'];
-    $disUrl1 = $disResult['activation']['activation_url'];
-    parse_str(parse_url($disUrl1, PHP_URL_FRAGMENT) ?: '', $disFrag1);
-    $disToken1 = (string) ($disFrag1['token'] ?? '');
+    // Create yolu davet uretmez: legacy fixture ile activation_required=1 + davet yaratilir.
+    $disFixture = psoLegacyActivationFixture($pdo, $disUserId, $actor);
+    $disUrl1 = (string) ($disFixture['issued']['activation']['activation_url'] ?? '');
+    $disToken1 = psoTokenFromUrl($disUrl1);
 
     $reissue = PersonelAccountOnboardingService::reissueActivation($pdo, $disUserId, $actor);
     $disUrl2 = $reissue['activation']['activation_url'];
@@ -715,6 +825,94 @@ try {
     // Existing collideY account username remains untouched by other onboarding
     $stillTaken = $pdo->query("SELECT username FROM users WHERE username = 'collideY'")->fetch(PDO::FETCH_ASSOC);
     psoAssert(is_array($stillTaken), 'existing colliding username account preserved');
+
+    // ---------------------------------------------------------------------------
+    // NEW ACCOUNT ACCEPTANCE: canonical create -> ilk giris -> zorunlu sifre degisimi
+    // ---------------------------------------------------------------------------
+    $GLOBALS['config']['db_host'] = '127.0.0.1';
+    $GLOBALS['config']['db_name'] = $database;
+    $GLOBALS['config']['db_user'] = (string) (getenv('MEDISA_TEST_MYSQL_USER') ?: 'root');
+    // PDO dogrudan enjekte edilir; bu deger yalniz medisa_config_ready() icin doldurulur.
+    $GLOBALS['config']['db_password'] = 'test';
+    $GLOBALS['config']['jwt_secret'] = str_repeat('pso-first-login-', 4);
+    $GLOBALS['config']['jwt_ttl_seconds'] = 3600;
+    psoSetPdo($pdo);
+
+    $serhanOnboard = PersonelAccountOnboardingService::onboardAndIssue($pdo, 19, $actor);
+    $serhanUserId = (int) ($serhanOnboard['user']['id'] ?? 0);
+    psoAssert(($serhanOnboard['user']['username'] ?? '') === 'serhanK', 'NEW: Serhan Kose -> serhanK');
+    psoAssert(($serhanOnboard['user']['personel_id'] ?? 0) === 19, 'NEW: personel_id binding');
+    psoAssert(($serhanOnboard['user']['activation_required'] ?? true) === false, 'NEW: activation_required=false');
+    psoAssert(($serhanOnboard['user']['must_change_password'] ?? false) === true, 'NEW: must_change_password=true');
+    psoAssert(!isset($serhanOnboard['activation']), 'NEW: activation URL returned=NO');
+
+    $serhanRow = $pdo->query('SELECT * FROM users WHERE id = ' . $serhanUserId)->fetch(PDO::FETCH_ASSOC);
+    psoAssert((int) $serhanRow['activation_required'] === 0, 'NEW: DB activation_required=0');
+    psoAssert((int) $serhanRow['must_change_password'] === 1, 'NEW: DB must_change_password=1');
+    psoAssert(
+        PasswordHasher::verify('Kose123', (string) $serhanRow['password_hash']),
+        'NEW: Kose123 hash ile dogrulandi'
+    );
+    $serhanInvitations = (int) $pdo->query(
+        'SELECT COUNT(*) FROM personel_account_activation_invitations WHERE user_id = ' . $serhanUserId
+    )->fetchColumn();
+    psoAssert($serhanInvitations === 0, 'NEW: activation invitation created=0');
+
+    // Ilk giris: username + template sifre -> SUCCESS + must_change_password
+    psoSetAuthUser(null);
+    $firstLogin = psoCapture(static function (): void {
+        LoginController::login(psoRequest(['username' => 'serhanK', 'password' => 'Kose123']));
+    });
+    psoAssert(!empty($firstLogin['data']['token']), 'NEW: template credential ile login SUCCESS');
+    psoAssert(($firstLogin['data']['must_change_password'] ?? null) === true, 'NEW: login must_change_password=true');
+    psoAssert(($firstLogin['data']['user']['rol'] ?? null) === 'PERSONEL', 'NEW: login rol PERSONEL');
+
+    // Zorunlu sifre degisimi (forced password change)
+    psoSetAuthUser(['id' => $serhanUserId, 'rol' => 'PERSONEL', 'must_change_password' => true]);
+    $forcedChange = psoCapture(static function (): void {
+        ChangePasswordController::change(
+            psoRequest(
+                ['current_password' => 'Kose123', 'new_password' => 'YeniSifre-2026'],
+                '/auth/change-password'
+            )
+        );
+    });
+    psoAssert(
+        ($forcedChange['data']['must_change_password'] ?? null) === false,
+        'NEW: change-password must_change_password=false'
+    );
+    $serhanAfterChange = $pdo->query('SELECT * FROM users WHERE id = ' . $serhanUserId)->fetch(PDO::FETCH_ASSOC);
+    psoAssert((int) $serhanAfterChange['must_change_password'] === 0, 'NEW: DB must_change_password=0');
+    psoAssert(
+        PasswordHasher::verify('YeniSifre-2026', (string) $serhanAfterChange['password_hash']),
+        'NEW: yeni kalici sifre hash ile dogrulandi'
+    );
+
+    // Degisim sonrasi template sifresi DENIED, yeni sifre SUCCESS
+    psoSetAuthUser(null);
+    $templateAfterChange = psoCapture(static function (): void {
+        LoginController::login(psoRequest(['username' => 'serhanK', 'password' => 'Kose123']));
+    });
+    psoAssert(
+        ($templateAfterChange['errors'][0]['code'] ?? null) === 'INVALID_CREDENTIALS',
+        'NEW: POST_CHANGE template sifresi DENIED'
+    );
+    $newPasswordLogin = psoCapture(static function (): void {
+        LoginController::login(psoRequest(['username' => 'serhanK', 'password' => 'YeniSifre-2026']));
+    });
+    psoAssert(!empty($newPasswordLogin['data']['token']), 'NEW: POST_CHANGE yeni sifre ile SUCCESS');
+    psoAssert(
+        ($newPasswordLogin['data']['must_change_password'] ?? null) === false,
+        'NEW: POST_CHANGE must_change_password=false'
+    );
+    psoSetAuthUser(null);
+
+    // Collision davranisi korunuyor: ayni isim ikinci kez hesap acamaz.
+    $duplicateSerhan = psoFinishChild(psoSpawnChild(['onboard', '19'], $dbDsn));
+    psoAssert(
+        psoExtractErrorCode($duplicateSerhan) === PersonelAccountOnboardingService::ERR_ALREADY_PROVISIONED,
+        'NEW: ikinci create fail-closed (ALREADY_PROVISIONED)'
+    );
 
     $t1 = PersonelAccountOnboardingService::generateActivationToken();
     $t2 = PersonelAccountOnboardingService::generateActivationToken();

@@ -12,7 +12,15 @@ use PDO;
 use PDOException;
 
 /**
- * Canonical owner for future PERSONEL secure account onboarding + activation.
+ * Canonical owner for PERSONEL account onboarding.
+ *
+ * Yeni PERSONEL hesabi: canonical username + template baslangic sifresi + zorunlu ilk giris
+ * sifre degisimi (`activation_required = 0`, `must_change_password = 1`). Bu yolda aktivasyon
+ * daveti/linki URETILMEZ.
+ *
+ * Legacy aktivasyon akisi (davet/reissue/redeem) yalniz gecmis `activation_required = 1`
+ * hesaplar icin korunur; yeni hesap create yolu bu akisi kullanmaz.
+ *
  * Does not replace generic management-user creation.
  */
 class PersonelAccountOnboardingService
@@ -25,6 +33,12 @@ class PersonelAccountOnboardingService
     public const EVENT_ACTIVATION_REVOKED = 'ACTIVATION_REVOKED';
     /** Canonical first-login credential gecisi (username + template sifre hash + zorunlu degisim). */
     public const EVENT_FIRST_LOGIN_CREDENTIALS_APPLIED = 'PERSONEL_FIRST_LOGIN_CREDENTIALS_APPLIED';
+
+    /**
+     * Yeni hesap create yolunun canonical credential modeli (secret tasimaz):
+     * template baslangic sifresi + zorunlu ilk giris sifre degisimi.
+     */
+    public const CREDENTIAL_MODEL_FIRST_LOGIN = 'FIRST_LOGIN_TEMPLATE';
 
     /**
      * Canonical first-login gecisinde mutation cohort'undan HARIC tutulan rezerve kullanici adlari.
@@ -97,7 +111,17 @@ class PersonelAccountOnboardingService
     public const ERR_NAME_CORRECTION_PREIMAGE = 'PERSONEL_NAME_CORRECTION_PREIMAGE_MISMATCH';
 
     /**
-     * Create/bind PERSONEL account for eligible personel and issue one-time activation URL.
+     * Personel icin canonical first-login modelinde hesap olusturur ve `personel_id` ile baglar.
+     *
+     * Uretilen state:
+     *   username             = explicit business override > canonical ad/soyad kurali
+     *   password_hash        = PasswordHasher::hash(template sifre materyali)
+     *   activation_required  = 0
+     *   must_change_password = 1
+     *
+     * Ayrica: otomatik sayi suffix'i yok; cakismada yetkilinin verdigi `username` override'i
+     * kullanilir. Bu yolda aktivasyon daveti/linki uretilmez. Plaintext sifre DB'ye yazilmaz,
+     * loglanmaz, audit'e konmaz ve response'ta donmez.
      *
      * @param array<string, mixed> $actorUser
      * @param string|null $usernameOverride Çakışma durumunda yetkili tarafından verilen alternatif kullanıcı adı
@@ -117,13 +141,22 @@ class PersonelAccountOnboardingService
             $personel = self::lockPersonelRow($pdo, $personelId);
             self::assertEligibleForOnboarding($pdo, $personel);
 
-            $suggested = self::buildPersonelUsernameFromNames(
-                $personel['ad'] ?? null,
-                $personel['soyad'] ?? null
-            );
+            $ad = $personel['ad'] ?? null;
+            $soyad = $personel['soyad'] ?? null;
+            // Canonical username owner'i: override > name correction > kayitli ad/soyad.
+            $canonicalUsername = self::resolvePersonelCanonicalUsername($personelId, $ad, $soyad);
+            if ($canonicalUsername === null) {
+                JsonResponse::badRequest(
+                    'Personel hesabi icin gecerli ad ve soyad zorunludur.',
+                    self::ERR_NAME_REQUIRED,
+                    'ad'
+                );
+            }
+            $suggested = $canonicalUsername;
             $username = $usernameOverride !== null && trim((string) $usernameOverride) !== ''
                 ? self::normalizeOverrideUsername($usernameOverride)
                 : $suggested;
+            $usernameOverridden = $username !== $suggested;
 
             $existing = self::findBoundUserForPersonel($pdo, $personelId);
 
@@ -139,15 +172,22 @@ class PersonelAccountOnboardingService
 
             self::assertUsernameAvailableForNewAccount($pdo, $username, $personelId, $suggested);
 
-            $adSoyad = trim((string) ($personel['ad'] ?? '') . ' ' . (string) ($personel['soyad'] ?? ''));
+            $adSoyad = trim((string) $ad . ' ' . (string) $soyad);
             if ($adSoyad === '') {
                 $adSoyad = $username;
             }
 
-            $internalSecret = self::generateUnusableInternalSecret();
-            $passwordHash = PasswordHasher::hash($internalSecret);
-            // Discard plaintext immediately (do not return/log).
-            $internalSecret = null;
+            // Template sifre materyali yalniz bellekte tutulur; hemen hash'lenir ve plaintext silinir.
+            $passwordMaterial = self::resolvePersonelInitialPasswordMaterial($personelId, $ad, $soyad);
+            if ($passwordMaterial === null) {
+                JsonResponse::badRequest(
+                    'Personel hesabi icin gecerli ad ve soyad zorunludur.',
+                    self::ERR_NAME_REQUIRED,
+                    'ad'
+                );
+            }
+            $passwordHash = PasswordHasher::hash($passwordMaterial);
+            $passwordMaterial = null;
 
             $insertCols = 'username, password_hash, ad_soyad, rol, durum';
             $insertVals = ':username, :password_hash, :ad_soyad, :rol, :durum';
@@ -159,12 +199,11 @@ class PersonelAccountOnboardingService
                 'durum' => 'AKTIF',
             ];
 
-            if (UsersSchema::hasMustChangePassword($pdo)) {
-                $insertCols .= ', must_change_password';
-                $insertVals .= ', 1';
-            }
-            $insertCols .= ', activation_required';
+            // Canonical first-login state: aktivasyon linki yok, zorunlu ilk giris sifre degisimi var.
+            $insertCols .= ', must_change_password';
             $insertVals .= ', 1';
+            $insertCols .= ', activation_required';
+            $insertVals .= ', 0';
             if (UsersSchema::hasVarsayilanSubeId($pdo)) {
                 $subeId = isset($personel['sube_id']) && $personel['sube_id'] !== null && $personel['sube_id'] !== ''
                     ? (int) $personel['sube_id']
@@ -191,10 +230,15 @@ class PersonelAccountOnboardingService
             }
 
             $userId = (int) $pdo->lastInsertId();
+            // Audit izi: plaintext sifre / hash / davet token'i asla yazilmaz.
             self::writeAudit($pdo, self::EVENT_ACCOUNT_CREATED, $userId, $personelId, $actorId, null, [
                 'username' => $username,
                 'suggested_username' => $suggested,
+                'username_overridden' => $usernameOverridden,
                 'rol' => 'PERSONEL',
+                'credential_model' => self::CREDENTIAL_MODEL_FIRST_LOGIN,
+                'activation_required' => 0,
+                'must_change_password' => 1,
             ]);
 
             $bindAction = UserPersonelBindingService::applyBinding($pdo, $userId, $personelId, $actorId);
@@ -202,12 +246,9 @@ class PersonelAccountOnboardingService
                 'binding_action' => $bindAction,
             ]);
 
-            $invitation = self::issueInvitationLocked($pdo, $userId, $actorId, null, false);
-            self::writeAudit($pdo, self::EVENT_LINK_ISSUED, $userId, $personelId, $actorId, (int) $invitation['id'], []);
-
             $pdo->commit();
 
-            return self::buildIssueResponse($pdo, $userId, $username, $invitation, false);
+            return self::buildFirstLoginResponse($pdo, $userId, $username);
         } catch (\Throwable $e) {
             if ($pdo->inTransaction()) {
                 $pdo->rollBack();
@@ -224,7 +265,7 @@ class PersonelAccountOnboardingService
      */
     public static function reissueActivation(PDO $pdo, $userId, array $actorUser)
     {
-        self::assertSchemaReady($pdo);
+        self::assertInvitationSchemaReady($pdo);
         $userId = (int) $userId;
         $actorId = isset($actorUser['id']) ? (int) $actorUser['id'] : 0;
         if ($userId <= 0 || $actorId <= 0) {
@@ -280,7 +321,7 @@ class PersonelAccountOnboardingService
      */
     public static function completeActivation(PDO $pdo, $rawToken, $newPassword, $newPasswordConfirmation = null)
     {
-        self::assertSchemaReady($pdo);
+        self::assertInvitationSchemaReady($pdo);
         $rawToken = is_string($rawToken) ? trim($rawToken) : '';
         if ($rawToken === '' || strlen($rawToken) < 32) {
             JsonResponse::error(400, self::ERR_ACTIVATION_INVALID, 'Aktivasyon baglantisi gecersiz veya suresi dolmus.');
@@ -376,7 +417,7 @@ class PersonelAccountOnboardingService
      */
     public static function activationStatus(PDO $pdo, $rawToken)
     {
-        self::assertSchemaReady($pdo);
+        self::assertInvitationSchemaReady($pdo);
         $rawToken = is_string($rawToken) ? trim($rawToken) : '';
         if ($rawToken === '' || strlen($rawToken) < 32) {
             return ['valid' => false, 'reason' => 'invalid'];
@@ -1021,11 +1062,6 @@ class PersonelAccountOnboardingService
         return bin2hex(random_bytes(32));
     }
 
-    public static function generateUnusableInternalSecret()
-    {
-        return bin2hex(random_bytes(32));
-    }
-
     public static function activationTtlMinutes()
     {
         $ttl = (int) medisa_config('personel_activation_ttl_minutes', 1440);
@@ -1229,16 +1265,33 @@ class PersonelAccountOnboardingService
         }
     }
 
+    /**
+     * Yeni hesap create + canonical first-login state icin gerekli kolonlar.
+     * Davet tablosu bu yolun onkosulu DEGILDIR (create yolu davet uretmez).
+     */
     private static function assertSchemaReady(PDO $pdo)
     {
         if (!UsersSchema::hasPersonelId($pdo)
             || !UsersSchema::hasActivationRequired($pdo)
-            || !self::hasInvitationTable($pdo)
+            || !UsersSchema::hasMustChangePassword($pdo)
         ) {
             JsonResponse::error(
                 409,
                 self::ERR_SCHEMA,
-                'Personel hesap aktivasyon semasi hazir degil.'
+                'Personel hesap semasi hazir degil (personel_id / activation_required / must_change_password gerekli).'
+            );
+        }
+    }
+
+    /** Legacy aktivasyon akisi icin ek olarak davet tablosu gerekir. */
+    private static function assertInvitationSchemaReady(PDO $pdo)
+    {
+        self::assertSchemaReady($pdo);
+        if (!self::hasInvitationTable($pdo)) {
+            JsonResponse::error(
+                409,
+                self::ERR_SCHEMA,
+                'Personel aktivasyon davet semasi hazir degil.'
             );
         }
     }
@@ -1522,6 +1575,44 @@ class PersonelAccountOnboardingService
     }
 
     /**
+     * Yeni hesap create yolu (canonical first-login) response'u.
+     * Secret (plaintext / hash / davet token'i) icermez ve aktivasyon URL'i donmez.
+     *
+     * @return array<string, mixed>
+     */
+    private static function buildFirstLoginResponse(PDO $pdo, $userId, $username)
+    {
+        $userCols = 'id, username, rol, durum, personel_id, activation_required, must_change_password';
+        if (UsersSchema::hasActivatedAtUtc($pdo)) {
+            $userCols .= ', activated_at_utc';
+        }
+        $stmt = $pdo->prepare("SELECT $userCols FROM users WHERE id = :id LIMIT 1");
+        $stmt->execute(['id' => (int) $userId]);
+        $user = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!is_array($user)) {
+            throw new \RuntimeException('FIRST_LOGIN_ACCOUNT_ROW_MISSING');
+        }
+
+        return [
+            'user' => [
+                'id' => (int) $user['id'],
+                'username' => (string) $user['username'],
+                'rol' => (string) $user['rol'],
+                'durum' => (string) $user['durum'],
+                'personel_id' => isset($user['personel_id']) ? (int) $user['personel_id'] : null,
+                'activation_required' => ((int) ($user['activation_required'] ?? 0)) === 1,
+                'must_change_password' => ((int) ($user['must_change_password'] ?? 0)) === 1,
+                'activated_at_utc' => $user['activated_at_utc'] ?? null,
+            ],
+            'credential_model' => self::CREDENTIAL_MODEL_FIRST_LOGIN,
+            'message' => 'Personel hesabi olusturuldu. Personel, sirket kuralina gore belirlenen '
+                . 'baslangic sifresi ile ilk girisi yapip sifresini degistirmelidir.',
+        ];
+    }
+
+    /**
+     * Legacy aktivasyon daveti response'u (yalniz gecmis `activation_required = 1` hesaplar).
+     *
      * @param array<string, mixed> $invitation
      * @return array<string, mixed>
      */

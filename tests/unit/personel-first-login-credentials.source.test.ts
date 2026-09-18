@@ -181,6 +181,31 @@ describe("PERSONEL canonical first-login gecisi (owner kontratlari)", () => {
     expect(worker).toContain("ACTOR_USER_ID_REQUIRED");
     expect(worker).toContain("migrateCanonicalFirstLoginCredentials");
   });
+
+  it("yeni hesap create yolu ayni canonical first-login modelini kullanir", () => {
+    const create = service.slice(
+      service.indexOf("public static function onboardAndIssue("),
+      service.indexOf("public static function reissueActivation(")
+    );
+    expect(create).toContain("resolvePersonelCanonicalUsername");
+    expect(create).toContain("resolvePersonelInitialPasswordMaterial");
+    expect(create).toContain("PasswordHasher::hash($passwordMaterial)");
+    expect(create).toMatch(/must_change_password';\s*\n\s*\$insertVals \.= ', 1';/);
+    expect(create).toMatch(/activation_required';\s*\n\s*\$insertVals \.= ', 0';/);
+    // Aktivasyon daveti/linki yok; secret response'ta yok.
+    expect(create).not.toContain("issueInvitationLocked");
+    expect(create).not.toContain("activation_url");
+    expect(create).toContain("buildFirstLoginResponse");
+
+    const response = service.slice(
+      service.indexOf("private static function buildFirstLoginResponse("),
+      service.indexOf("private static function buildIssueResponse(")
+    );
+    expect(response).not.toContain("'activation'");
+    expect(response).not.toContain("password_hash");
+    expect(response).not.toContain("password_material");
+    expect(response).toContain("credential_model");
+  });
 });
 
 describe("zorunlu sifre degisimi global /yetkisiz yonlendirmesi uretmez", () => {

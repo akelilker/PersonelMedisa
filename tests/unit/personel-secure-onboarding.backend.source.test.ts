@@ -79,14 +79,63 @@ describe("personel secure onboarding backend source contracts", () => {
     expect(activation).toContain("array_key_exists('rol'");
   });
 
+  it("new account create pathi canonical first-login template modelini kullanir", () => {
+    const service = read("api/src/Services/Auth/PersonelAccountOnboardingService.php");
+    const create = service.slice(
+      service.indexOf("public static function onboardAndIssue("),
+      service.indexOf("public static function reissueActivation(")
+    );
+    // Canonical owner'lar: override > name correction > kayitli ad/soyad.
+    expect(create).toContain("resolvePersonelCanonicalUsername");
+    expect(create).toContain("resolvePersonelInitialPasswordMaterial");
+    expect(create).toContain("PasswordHasher::hash($passwordMaterial)");
+    expect(create).toContain("CREDENTIAL_MODEL_FIRST_LOGIN");
+    // Hedef state: aktivasyon gerekmez, ilk giris sifre degisimi zorunlu.
+    expect(create).toContain("must_change_password");
+    expect(create).toContain("activation_required");
+    expect(create).toMatch(/activation_required';\s*\n\s*\$insertVals \.= ', 0';/);
+    expect(create).toMatch(/must_change_password';\s*\n\s*\$insertVals \.= ', 1';/);
+    // Yeni hesap yolu aktivasyon linki/daveti uretmez.
+    expect(create).not.toContain("issueInvitationLocked");
+    expect(create).not.toContain("EVENT_LINK_ISSUED");
+    expect(create).not.toContain("buildActivationUrl");
+    expect(create).not.toContain("generateUnusableInternalSecret");
+    expect(create).not.toContain("activation_url");
+    expect(create).toContain("buildFirstLoginResponse");
+  });
+
+  it("legacy aktivasyon daveti/reissue akisi korunur ve create yolu tarafindan kullanilmaz", () => {
+    const service = read("api/src/Services/Auth/PersonelAccountOnboardingService.php");
+    expect(service).toContain("reissueActivation");
+    expect(service).toContain("issueInvitationLocked");
+    expect(service).toContain("ERR_NOT_PENDING");
+    expect(service).toContain("assertInvitationSchemaReady");
+    // Create yolu davet tablosunu onkosul saymaz; davet guard'i ayri owner'dir.
+    const schemaGuard = service.slice(
+      service.indexOf("private static function assertSchemaReady(PDO $pdo)"),
+      service.indexOf("private static function assertInvitationSchemaReady(PDO $pdo)")
+    );
+    expect(schemaGuard).toContain("hasMustChangePassword");
+    expect(schemaGuard).not.toContain("hasInvitationTable");
+    const invitationGuard = service.slice(
+      service.indexOf("private static function assertInvitationSchemaReady(PDO $pdo)"),
+      service.indexOf("private static function hasInvitationTable(PDO $pdo)")
+    );
+    expect(invitationGuard).toContain("hasInvitationTable");
+  });
+
   it("never persists raw activation token or returns internal password", () => {
     const service = read("api/src/Services/Auth/PersonelAccountOnboardingService.php");
     expect(service).toContain("token_hash");
-    expect(service).toContain("generateUnusableInternalSecret");
-    expect(service).toMatch(/\$internalSecret\s*=\s*null/);
+    // Legacy davet token'i yalniz hash olarak saklanir; plaintext sifre response'a donmez.
+    expect(service).toMatch(/\$url = self::buildActivationUrl\(/);
+    expect(service).toMatch(/unset\(\$invitation\['raw_token'\]\)/);
     expect(service).toContain("$detail['token']");
     expect(service).toContain("$detail['activation_url']");
+    expect(service).toContain("$detail['password_hash']");
     expect(service).not.toMatch(/INSERT[\s\S]{0,80}raw_token/);
+    // Create yolu plaintext'i bellekte hemen birakir.
+    expect(service).toMatch(/\$passwordMaterial = null;/);
   });
 
   it("config owns app_public_url and activation TTL", () => {

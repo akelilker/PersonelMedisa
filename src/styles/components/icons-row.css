@@ -7,9 +7,19 @@
   min-height: 34px;
 }
 
+/*
+ * Home (minimal) header carries two groups on one row: today's personnel summary
+ * + branch selector on the left, notification bell + settings on the right. The
+ * row item therefore spans the full width — a shrink-to-fit ("justify-items:
+ * end") box leaves no free space to separate the groups — and the auto margin on
+ * .notification-wrap pins the trailing icons to the edge.
+ * Dropdown containing blocks stay unchanged: .sube-selector-wrap and
+ * .notification-wrap remain static, so both panels still resolve
+ * .icons-row-right (with their 100vw caps) exactly as before.
+ */
 .icons-row--minimal {
   grid-template-columns: 1fr;
-  justify-items: end;
+  justify-items: stretch;
   min-height: 38px;
 }
 
@@ -55,7 +65,12 @@
 }
 
 .icons-row--minimal .icons-row-right {
+  justify-content: flex-start;
   gap: 14px;
+}
+
+.icons-row--minimal .notification-wrap {
+  margin-left: auto;
 }
 
 /*

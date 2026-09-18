@@ -55,22 +55,25 @@ class MeController
             'calisan_kapsami' => $ctx['calisan_kapsami'] ?? null,
         ], false);
 
+        // QR read surface: collar-gated for the PERSONEL role (fail-closed).
         $lastQr = null;
-        try {
-            $todayRange = self::istanbulTodayRange();
-            $history = QrAttendanceEventService::listForSelf(
-                $pdo,
-                (int) $ctx['personel_id'],
-                $todayRange['from'],
-                $todayRange['to']
-            );
-            if (!empty($history['items'][0]) && is_array($history['items'][0])) {
-                $lastQr = $history['items'][0];
+        if (RolePermissions::has($user, 'self_service.qr.events.view')) {
+            try {
+                $todayRange = self::istanbulTodayRange();
+                $history = QrAttendanceEventService::listForSelf(
+                    $pdo,
+                    (int) $ctx['personel_id'],
+                    $todayRange['from'],
+                    $todayRange['to']
+                );
+                if (!empty($history['items'][0]) && is_array($history['items'][0])) {
+                    $lastQr = $history['items'][0];
+                }
+            } catch (QrAttendanceException $e) {
+                $lastQr = null;
+            } catch (\Throwable $e) {
+                $lastQr = null;
             }
-        } catch (QrAttendanceException $e) {
-            $lastQr = null;
-        } catch (\Throwable $e) {
-            $lastQr = null;
         }
 
         JsonResponse::success([

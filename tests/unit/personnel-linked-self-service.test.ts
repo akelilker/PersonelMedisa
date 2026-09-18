@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import {
   SELF_SERVICE_BASELINE_PERMISSIONS,
+  collarAllowsQrSelfService,
   getEffectivePermissions,
   getRolePermissions,
   hasPersonnelLinkedSelfServiceEligibility,
@@ -28,10 +29,75 @@ describe("personnel-linked self-service authorization", () => {
   });
 
   it("PERSONEL + personel_id: self YES, management NO", () => {
-    expect(hasUserPermission("PERSONEL", "self_service.view", 158)).toBe(true);
-    expect(hasUserPermission("PERSONEL", "self_service.qr.scan", 158)).toBe(true);
-    expect(hasUserPermission("PERSONEL", "personeller.view", 158)).toBe(false);
-    expect(hasUserPermission("PERSONEL", "puantaj.update", 158)).toBe(false);
+    expect(hasUserPermission("PERSONEL", "self_service.view", 158, "Mavi Yaka")).toBe(true);
+    expect(hasUserPermission("PERSONEL", "personeller.view", 158, "Mavi Yaka")).toBe(false);
+    expect(hasUserPermission("PERSONEL", "puantaj.update", 158, "Mavi Yaka")).toBe(false);
+  });
+
+  it("A) PERSONEL + Mavi Yaka: QR allowed (scan + events)", () => {
+    expect(hasUserPermission("PERSONEL", "self_service.qr.scan", 158, "Mavi Yaka")).toBe(true);
+    expect(hasUserPermission("PERSONEL", "self_service.qr.events.view", 158, "Mavi Yaka")).toBe(true);
+    expect(getEffectivePermissions("PERSONEL", 158, "Mavi Yaka")).toContain("self_service.qr.scan");
+  });
+
+  it("B) PERSONEL + Beyaz Yaka: QR denied", () => {
+    expect(hasUserPermission("PERSONEL", "self_service.qr.scan", 158, "Beyaz Yaka")).toBe(false);
+    expect(hasUserPermission("PERSONEL", "self_service.qr.events.view", 158, "Beyaz Yaka")).toBe(false);
+    expect(getEffectivePermissions("PERSONEL", 158, "Beyaz Yaka")).not.toContain("self_service.qr.scan");
+  });
+
+  it("C) PERSONEL + Diğer: QR denied", () => {
+    expect(hasUserPermission("PERSONEL", "self_service.qr.scan", 158, "Diğer")).toBe(false);
+    expect(hasUserPermission("PERSONEL", "self_service.qr.events.view", 158, "Diğer")).toBe(false);
+  });
+
+  it("D) PERSONEL + null/unknown collar: QR denied (fail-closed)", () => {
+    // 'MAVİ YAKA' (Turkish dotted uppercase) stays denied on both sides: PHP
+    // mb_strtolower and JS toLowerCase map it to "i" + combining dot, not "i".
+    for (const collar of [null, undefined, "", "   ", "Bilinmeyen Statu", "MAVI", "MAVİ YAKA"]) {
+      expect(
+        hasUserPermission("PERSONEL", "self_service.qr.scan", 158, collar),
+        `collar=${JSON.stringify(collar)}`
+      ).toBe(false);
+    }
+  });
+
+  it("D-parity) ASCII case folding matches the canonical collar on both sides", () => {
+    expect(hasUserPermission("PERSONEL", "self_service.qr.scan", 158, "MAVI YAKA")).toBe(true);
+    expect(collarAllowsQrSelfService("  mavi   yaka  ")).toBe(true);
+  });
+
+  it("G) Non-QR own self-service is preserved for every collar", () => {
+    const nonQrSelf = [
+      "self_service.view",
+      "self_service.puantaj.view",
+      "self_service.yillik_izin.view",
+      "self_service.fazla_calisma.view",
+      "self_service.attendance.correct"
+    ] as const;
+    for (const collar of ["Mavi Yaka", "Beyaz Yaka", "Diğer", null]) {
+      for (const permission of nonQrSelf) {
+        expect(
+          hasUserPermission("PERSONEL", permission, 158, collar),
+          `${permission} collar=${JSON.stringify(collar)}`
+        ).toBe(true);
+      }
+    }
+  });
+
+  it("H) Management role + personel_id stays collar-independent", () => {
+    for (const role of [
+      "GENEL_YONETICI",
+      "IK_SORUMLUSU",
+      "SUBE_YONETICISI",
+      "BOLUM_YONETICISI",
+      "BIRIM_AMIRI"
+    ] as const) {
+      expect(hasUserPermission(role, "self_service.qr.scan", 173, "Beyaz Yaka")).toBe(true);
+      expect(hasUserPermission(role, "self_service.qr.events.view", 173, "Beyaz Yaka")).toBe(true);
+      expect(hasUserPermission(role, "self_service.qr.scan", 173, null)).toBe(true);
+      expect(getEffectivePermissions(role, 173, "Beyaz Yaka")).toContain("self_service.qr.scan");
+    }
   });
 
   it("BOLUM_YONETICISI + personel_id: management + self (Sinem/Ismail shape)", () => {
@@ -157,6 +223,100 @@ describe("personnel-linked self-service authorization", () => {
     expect(menu).not.toMatch(/Öz Servis\s*\/\s*QR/i);
     expect(routes).toContain('requirePermission="self_service.view"');
     expect(routes).toContain('path="self"');
+  });
+
+  it("E/F) FE QR UI and route gate follow the canonical collar", () => {
+    const home = readFileSync(
+      resolve(root, "src/features/self-service/pages/PersonelSelfServiceHomePage.tsx"),
+      "utf8"
+    );
+    expect(home).toContain('hasPermission("self_service.qr.scan")');
+    const qrGateIdx = home.indexOf("{qrEnabled ? (");
+    const gateEndIdx = home.indexOf(") : null}", qrGateIdx);
+    expect(qrGateIdx).toBeGreaterThan(-1);
+    expect(gateEndIdx).toBeGreaterThan(qrGateIdx);
+    for (const testId of ["self-qr-scan-link", "self-qr-history-link"]) {
+      const idx = home.indexOf(`data-testid="${testId}"`);
+      expect(idx, testId).toBeGreaterThan(qrGateIdx);
+      expect(idx, testId).toBeLessThan(gateEndIdx);
+    }
+    // QR scan buttons sit behind the same gate with a non-QR notice fallback.
+    expect(home).toContain(") : qrEnabled ? (");
+    expect(home).toContain('data-testid="giris-scan-not-entitled"');
+    expect(home).toContain('data-testid="cikis-scan-not-entitled"');
+
+    // Direct route access is denied by the shared route guard.
+    const route = readFileSync(resolve(root, "src/router/ProtectedRoute.tsx"), "utf8");
+    expect(route).toContain("session.user.personel_tipi_ad");
+    expect(route).toContain("personelId, personelTipiAd");
+    const hook = readFileSync(resolve(root, "src/hooks/use-role-access.ts"), "utf8");
+    expect(hook).toContain("personelTipiAd");
+    const authApi = readFileSync(resolve(root, "src/api/auth.api.ts"), "utf8");
+    expect(authApi).toContain("personel_tipi_ad");
+  });
+
+  it("BE QR surfaces are collar-gated (authoritative, not FE-only)", () => {
+    const perms = readFileSync(rolePermissionsPhp, "utf8");
+    expect(perms).toContain("QR_SELF_SERVICE_COLLAR = 'Mavi Yaka'");
+    expect(perms).toContain("personel_tipi_ad");
+    // ucret_tipi is documented as not a collar source and is never read.
+    expect(perms).toContain("ucret_tipi` is intentionally NOT a collar source");
+    expect(perms).not.toContain("ucret_tipi_id");
+    expect(perms).not.toMatch(/p\.ucret_tipi/);
+
+    const ctx = readFileSync(selfContextPhp, "utf8");
+    expect(ctx).toContain("LEFT JOIN personel_tipleri pt ON pt.id = p.personel_tipi_id");
+    expect(ctx).toContain("function loadCollar");
+
+    const middleware = readFileSync(resolve(root, "api/src/Auth/AuthMiddleware.php"), "utf8");
+    expect(middleware).toContain("SelfPersonelContext::loadCollar");
+    expect(middleware).toContain("personel_tipi_ad");
+
+    const login = readFileSync(resolve(root, "api/src/Auth/LoginController.php"), "utf8");
+    expect(login).toContain("SelfPersonelContext::loadCollar");
+
+    const me = readFileSync(meControllerPhp, "utf8");
+    expect(me).toContain("RolePermissions::assert($user, 'self_service.qr.scan')");
+    expect(me).toContain("RolePermissions::assert($user, 'self_service.qr.events.view')");
+    expect(me).toContain("if (RolePermissions::has($user, 'self_service.qr.events.view'))");
+
+    const today = readFileSync(
+      resolve(root, "api/src/Services/Qr/QrAttendanceTodayService.php"),
+      "utf8"
+    );
+    expect(today).toContain("RolePermissions::has($authUser, 'self_service.qr.scan')");
+    expect(today).toContain("$caps['qr_scan'] = false;");
+  });
+
+  it("I/J) login destination unchanged: PERSONEL → self-service home, manager → main app", () => {
+    const routes = readFileSync(resolve(root, "src/app/routes.tsx"), "utf8");
+    const start = routes.indexOf("function HomeIndexMainMenu()");
+    expect(start).toBeGreaterThan(-1);
+    const end = routes.indexOf("\nfunction ", start + 1);
+    const block = routes.slice(start, end);
+    // PERSONEL keeps the dedicated self-service home.
+    expect(block).toContain('session?.user.rol === "PERSONEL"');
+    expect(block).toContain("<PersonelSelfServiceHomePage />");
+    // Management roles keep the main application (MainMenu), not self-service.
+    expect(block).toContain("ctx.showMainMenu ? <MainMenu");
+    // The collar decision never changes the login destination.
+    const collarIdx = block.indexOf("personel_tipi");
+    expect(collarIdx).toBe(-1);
+  });
+
+  it("K/L) 219 canonical rule and ilkerA reservation owners are untouched", () => {
+    const onboarding = readFileSync(
+      resolve(root, "api/src/Services/Auth/PersonelAccountOnboardingService.php"),
+      "utf8"
+    );
+    expect(onboarding).toContain("const PROTECTED_USERNAMES = ['ilkerA']");
+    expect(onboarding).toContain("'ad' => 'Doğu Berkan', 'soyad' => 'Atmaca'");
+    // Collar work must never add a person-specific authorization rule.
+    for (const owner of [rolePermissionsPhp, meControllerPhp, selfContextPhp]) {
+      const source = readFileSync(owner, "utf8");
+      expect(source, owner).not.toMatch(/\b219\b/);
+      expect(source, owner).not.toMatch(/ilkerA/i);
+    }
   });
 
   it("PHP matrix runner PASS", () => {

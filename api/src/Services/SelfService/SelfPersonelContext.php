@@ -100,6 +100,18 @@ class SelfPersonelContext
         $soyad = (string) ($personel['soyad'] ?? '');
         $adSoyad = trim($ad . ' ' . $soyad);
 
+        // Canonical collar read model (personel_tipi_id → personel_tipleri.ad).
+        // Missing / unresolvable value stays null so QR entitlement fails closed.
+        $personelTipiIdRaw = $personel['personel_tipi_id'] ?? null;
+        $personelTipiId = ($personelTipiIdRaw === null || $personelTipiIdRaw === '')
+            ? null
+            : (int) $personelTipiIdRaw;
+        if ($personelTipiId !== null && $personelTipiId <= 0) {
+            $personelTipiId = null;
+        }
+        $personelTipiAdRaw = $personel['personel_tipi_ad'] ?? null;
+        $personelTipiAd = $personelTipiAdRaw === null ? '' : trim((string) $personelTipiAdRaw);
+
         $subeId = isset($personel['sube_id']) && $personel['sube_id'] !== null && (int) $personel['sube_id'] > 0
             ? (int) $personel['sube_id']
             : null;
@@ -159,12 +171,62 @@ class SelfPersonelContext
             'dogum_tarihi' => $personel['dogum_tarihi'] ?? null,
             'telefon' => $personel['telefon'] ?? null,
             'ise_giris_tarihi' => $personel['ise_giris_tarihi'] ?? null,
-            'personel_tipi_id' => isset($personel['personel_tipi_id']) && $personel['personel_tipi_id'] !== null
-                ? (int) $personel['personel_tipi_id']
-                : null,
+            'personel_tipi_id' => $personelTipiId,
+            'personel_tipi_ad' => $personelTipiAd === '' ? null : $personelTipiAd,
             'calisan_kapsami' => $personel['calisan_kapsami'] ?? null,
             'org_status' => $opCtx['org_status'],
             'operational_scope' => $opCtx,
+        ];
+    }
+
+    /**
+     * Canonical collar read model for the auth/session chain:
+     * personeller.personel_tipi_id → personel_tipleri.ad.
+     *
+     * Used by AuthMiddleware / LoginController so the DB-authoritative collar
+     * travels with the authenticated user and permission decisions never trust
+     * a client-supplied collar. Unavailable schema/binding/value → nulls
+     * (fail-closed: the PERSONEL QR entitlement is denied).
+     *
+     * @param int $personelId
+     * @return array{personel_tipi_id:int|null,personel_tipi_ad:string|null}
+     */
+    public static function loadCollar(PDO $pdo, $personelId)
+    {
+        $empty = ['personel_tipi_id' => null, 'personel_tipi_ad' => null];
+        $personelId = (int) $personelId;
+        if ($personelId <= 0) {
+            return $empty;
+        }
+
+        try {
+            $stmt = $pdo->prepare(
+                'SELECT p.personel_tipi_id AS personel_tipi_id, pt.ad AS personel_tipi_ad
+                 FROM personeller p
+                 LEFT JOIN personel_tipleri pt ON pt.id = p.personel_tipi_id
+                 WHERE p.id = :id
+                 LIMIT 1'
+            );
+            $stmt->execute(['id' => $personelId]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        } catch (\Throwable $e) {
+            return $empty;
+        }
+        if (!is_array($row)) {
+            return $empty;
+        }
+
+        $idRaw = $row['personel_tipi_id'] ?? null;
+        $id = ($idRaw === null || $idRaw === '') ? null : (int) $idRaw;
+        if ($id !== null && $id <= 0) {
+            $id = null;
+        }
+        $adRaw = $row['personel_tipi_ad'] ?? null;
+        $ad = $adRaw === null ? '' : trim((string) $adRaw);
+
+        return [
+            'personel_tipi_id' => $id,
+            'personel_tipi_ad' => $ad === '' ? null : $ad,
         ];
     }
 
@@ -213,6 +275,7 @@ class SelfPersonelContext
                 p.telefon,
                 p.ise_giris_tarihi,
                 p.personel_tipi_id,
+                pt.ad AS personel_tipi_ad,
                 p.calisan_kapsami,
                 s.ad AS sube_ad,
                 d.ad AS departman_ad,
@@ -225,6 +288,7 @@ class SelfPersonelContext
              LEFT JOIN bolumler b ON b.id = p.bolum_id
              LEFT JOIN birimler bi ON bi.id = p.birim_id
              LEFT JOIN gorevler g ON g.id = p.gorev_id
+             LEFT JOIN personel_tipleri pt ON pt.id = p.personel_tipi_id
              WHERE p.id = :id
              LIMIT 1',
             'SELECT

@@ -148,6 +148,53 @@ export const SELF_SERVICE_BASELINE_PERMISSIONS: readonly AppPermission[] = [
   "self_service.attendance.correct"
 ];
 
+/**
+ * PERSONEL self-service QR capabilities. Mirrors RolePermissions::QR_SELF_SERVICE_PERMISSIONS.
+ * Effective only with the canonical "Mavi Yaka" collar; management roles keep the
+ * personnel-linked baseline. The backend re-decides every request — this is the UX mirror.
+ */
+export const QR_SELF_SERVICE_PERMISSIONS: readonly AppPermission[] = [
+  "self_service.qr.scan",
+  "self_service.qr.events.view"
+];
+
+/**
+ * Canonical collar that may use PERSONEL self-service QR.
+ * Owner chain: personeller.personel_tipi_id → personel_tipleri.ad.
+ */
+export const PERSONEL_QR_COLLAR = "Mavi Yaka";
+
+/**
+ * Fail-closed: only an explicit canonical "Mavi Yaka" is eligible.
+ *
+ * Locale-independent `toLowerCase` deliberately mirrors PHP `mb_strtolower` in
+ * RolePermissions so frontend and backend agree on every collar string.
+ */
+export function collarAllowsQrSelfService(personelTipiAd?: string | null): boolean {
+  if (typeof personelTipiAd !== "string") {
+    return false;
+  }
+  const given = personelTipiAd.trim().replace(/\s+/g, " ").toLowerCase();
+  if (given === "") {
+    return false;
+  }
+  return given === PERSONEL_QR_COLLAR.toLowerCase();
+}
+
+/**
+ * PERSONEL-only collar restriction. Management roles (`+ personel_id`) are out of
+ * scope in this phase and keep their existing self-service QR behaviour.
+ */
+function isPersonelQrRestricted(
+  role: UserRole | string | null | undefined,
+  permission: AppPermission
+): boolean {
+  return (
+    canonicalizeUserRole(role ?? null) === "PERSONEL" &&
+    QR_SELF_SERVICE_PERMISSIONS.includes(permission)
+  );
+}
+
 const BASE_ROLE_PERMISSIONS: Record<
   Exclude<UserRole, "IK_PERSONELI">,
   readonly AppPermission[]
@@ -595,12 +642,19 @@ export function hasPersonnelLinkedSelfServiceEligibility(
 /**
  * Effective permission check: role matrix + personnel-linked self-service baseline.
  * Mirrors api/src/Auth/RolePermissions::has.
+ *
+ * `personelTipiAd` is the canonical collar carried on the DB-authoritative session
+ * user; it is only consulted for the PERSONEL-role QR capabilities.
  */
 export function hasUserPermission(
   role: UserRole | string | null | undefined,
   permission: AppPermission,
-  personelId?: number | null
+  personelId?: number | null,
+  personelTipiAd?: string | null
 ): boolean {
+  if (isPersonelQrRestricted(role, permission)) {
+    return collarAllowsQrSelfService(personelTipiAd);
+  }
   if (
     hasPersonnelLinkedSelfServiceEligibility(personelId) &&
     SELF_SERVICE_BASELINE_PERMISSIONS.includes(permission)
@@ -612,15 +666,22 @@ export function hasUserPermission(
 
 export function getEffectivePermissions(
   role: UserRole | string | null | undefined,
-  personelId?: number | null
+  personelId?: number | null,
+  personelTipiAd?: string | null
 ): readonly AppPermission[] {
-  const rolePerms = getRolePermissions(role);
-  if (!hasPersonnelLinkedSelfServiceEligibility(personelId)) {
-    return rolePerms;
+  const merged = new Set<AppPermission>(getRolePermissions(role));
+  if (hasPersonnelLinkedSelfServiceEligibility(personelId)) {
+    for (const permission of SELF_SERVICE_BASELINE_PERMISSIONS) {
+      merged.add(permission);
+    }
   }
-  const merged = new Set<AppPermission>(rolePerms);
-  for (const permission of SELF_SERVICE_BASELINE_PERMISSIONS) {
-    merged.add(permission);
+  if (
+    canonicalizeUserRole(role ?? null) === "PERSONEL" &&
+    !collarAllowsQrSelfService(personelTipiAd)
+  ) {
+    for (const permission of QR_SELF_SERVICE_PERMISSIONS) {
+      merged.delete(permission);
+    }
   }
   return [...merged];
 }

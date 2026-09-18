@@ -25,9 +25,14 @@ export function ProtectedRoute({ children, requirePermission, requireAll, requir
   }
 
   const personelId = session.user.personel_id ?? null;
+  // Canonical collar mirror: gates the PERSONEL self-service QR routes. The
+  // backend 403 remains the authority; this is the fail-closed UX denial.
+  const personelTipiAd = session.user.personel_tipi_ad ?? null;
 
   if (requireAny && requireAny.length > 0) {
-    const allowed = requireAny.some((p) => hasUserPermission(session.user.rol, p, personelId));
+    const allowed = requireAny.some((p) =>
+      hasUserPermission(session.user.rol, p, personelId, personelTipiAd)
+    );
     if (!allowed) {
       return <Navigate to="/yetkisiz" replace />;
     }
@@ -39,7 +44,9 @@ export function ProtectedRoute({ children, requirePermission, requireAll, requir
   ];
 
   if (permissions.length > 0) {
-    const allowed = permissions.every((p) => hasUserPermission(session.user.rol, p, personelId));
+    const allowed = permissions.every((p) =>
+      hasUserPermission(session.user.rol, p, personelId, personelTipiAd)
+    );
     if (!allowed) {
       return <Navigate to="/yetkisiz" replace />;
     }

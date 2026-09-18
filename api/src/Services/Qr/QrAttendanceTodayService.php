@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Medisa\Api\Services\Qr;
 
+use Medisa\Api\Auth\RolePermissions;
 use Medisa\Api\Services\SelfService\PersonelMobileCapabilityService;
 use Medisa\Api\Services\SelfService\SelfPersonelContext;
 use PDO;
@@ -21,6 +22,11 @@ class QrAttendanceTodayService
     {
         $ctx = SelfPersonelContext::resolveForSelfService($authUser, $pdo, true);
         $caps = PersonelMobileCapabilityService::resolve($pdo, (int) $ctx['personel_id'], $ctx);
+        // PERSONEL self-service QR capability is collar-gated (fail-closed).
+        // Management roles keep the personnel-linked behaviour of this phase.
+        if (!RolePermissions::has($authUser, 'self_service.qr.scan')) {
+            $caps['qr_scan'] = false;
+        }
         $today = self::istanbulToday();
 
         $giris = null;

@@ -94,7 +94,12 @@ final class SgkIsverenBildirimDonemiReadService
     {
         try {
             if ($pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite') {
-                return false;
+                $stmt = $pdo->prepare(
+                    "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = :t"
+                );
+                $stmt->execute(['t' => self::TABLE]);
+
+                return (int) $stmt->fetchColumn() === 1;
             }
             $stmt = $pdo->prepare(
                 'SELECT COUNT(*) FROM information_schema.TABLES

@@ -69,22 +69,65 @@ CREATE TABLE IF NOT EXISTS sgk_isveren_bildirim_donemi_surumleri (
   CONSTRAINT chk_sgk_ibds_onay CHECK (state <> 'ONAYLANDI' OR (onaylayan_id IS NOT NULL AND onay_zamani IS NOT NULL))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Drift guard: an existing table must match the intended employer-scoped shape.
-SET @p090_bad := (
+-- Fail-closed canonical shape guard.
+--
+-- CREATE TABLE IF NOT EXISTS is a no-op when a table already exists, so a
+-- previously half-created / drifted table would silently survive. The canonical
+-- employer-period shape is re-verified from information_schema after the create:
+-- missing required columns, incompatible column shapes or a missing employer FK
+-- raise PACK090_BLOCKER and abort the migration. This guard never ALTERs, guesses,
+-- repairs, rewrites or seeds anything.
+SET @p090_required_column_count := 13;
+SET @p090_present_column_count := (
   SELECT COUNT(*)
   FROM information_schema.COLUMNS
   WHERE TABLE_SCHEMA = DATABASE()
     AND TABLE_NAME = 'sgk_isveren_bildirim_donemi_surumleri'
-    AND (
-      (COLUMN_NAME = 'sgk_isveren_id' AND NOT (DATA_TYPE = 'int' AND COLUMN_TYPE LIKE '%unsigned%' AND IS_NULLABLE = 'NO'))
-      OR (COLUMN_NAME = 'bildirim_donem_tipi' AND COLUMN_TYPE NOT LIKE '%AY_1_SON_GUN%')
-      OR (COLUMN_NAME = 'bildirim_donem_tipi' AND COLUMN_TYPE NOT LIKE '%AY_15_SONRAKI_AY_14%')
-      OR (COLUMN_NAME = 'state' AND COLUMN_TYPE NOT LIKE '%ONAYLANDI%')
+    AND COLUMN_NAME IN (
+      'id', 'sgk_isveren_id', 'surum_kodu', 'bildirim_donem_tipi',
+      'gecerlilik_baslangic', 'gecerlilik_bitis', 'state', 'dogrulama_kaynagi',
+      'aciklama', 'hazirlayan_id', 'onaylayan_id', 'onay_zamani', 'created_at'
     )
 );
+
+SET @p090_bad_columns := (
+  SELECT COUNT(*)
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'sgk_isveren_bildirim_donemi_surumleri'
+    AND COLUMN_NAME IN (
+      'id', 'sgk_isveren_id', 'surum_kodu', 'bildirim_donem_tipi',
+      'gecerlilik_baslangic', 'gecerlilik_bitis', 'state', 'dogrulama_kaynagi', 'aciklama'
+    )
+    AND (
+      (COLUMN_NAME = 'id' AND NOT (DATA_TYPE = 'int' AND COLUMN_TYPE LIKE '%unsigned%' AND IS_NULLABLE = 'NO'))
+      OR (COLUMN_NAME = 'sgk_isveren_id' AND NOT (DATA_TYPE = 'int' AND COLUMN_TYPE LIKE '%unsigned%' AND IS_NULLABLE = 'NO'))
+      OR (COLUMN_NAME = 'surum_kodu' AND NOT (DATA_TYPE = 'varchar' AND IS_NULLABLE = 'NO'))
+      OR (COLUMN_NAME = 'bildirim_donem_tipi' AND NOT (COLUMN_TYPE LIKE '%AY_1_SON_GUN%' AND COLUMN_TYPE LIKE '%AY_15_SONRAKI_AY_14%' AND IS_NULLABLE = 'NO'))
+      OR (COLUMN_NAME = 'gecerlilik_baslangic' AND NOT (DATA_TYPE = 'date' AND IS_NULLABLE = 'NO'))
+      OR (COLUMN_NAME = 'gecerlilik_bitis' AND NOT (DATA_TYPE = 'date' AND IS_NULLABLE = 'YES'))
+      OR (COLUMN_NAME = 'state' AND NOT (COLUMN_TYPE LIKE '%ONAYLANDI%' AND IS_NULLABLE = 'NO'))
+      OR (COLUMN_NAME = 'dogrulama_kaynagi' AND NOT (DATA_TYPE = 'varchar' AND IS_NULLABLE = 'NO'))
+      OR (COLUMN_NAME = 'aciklama' AND NOT (DATA_TYPE = 'varchar' AND IS_NULLABLE = 'NO'))
+    )
+);
+
+SET @p090_employer_fk := (
+  SELECT COUNT(*)
+  FROM information_schema.KEY_COLUMN_USAGE
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'sgk_isveren_bildirim_donemi_surumleri'
+    AND COLUMN_NAME = 'sgk_isveren_id'
+    AND REFERENCED_TABLE_NAME = 'sgk_isverenler'
+    AND REFERENCED_COLUMN_NAME = 'id'
+);
+
+SET @p090_bad := (IF(@p090_present_column_count = @p090_required_column_count, 0, 1))
+               + @p090_bad_columns
+               + (IF(@p090_employer_fk > 0, 0, 1));
 SET @p090_sql := IF(
   @p090_bad > 0,
-  'SIGNAL SQLSTATE ''45000'' SET MESSAGE_TEXT = ''PACK090_BLOCKER: sgk_isveren_bildirim_donemi_surumleri column drift''',
+  'SIGNAL SQLSTATE ''45000'' SET MESSAGE_TEXT = ''PACK090_BLOCKER: sgk_isveren_bildirim_donemi_surumleri canonical shape/column/FK drift''',
   'DO 0'
 );
 PREPARE p090_stmt FROM @p090_sql;

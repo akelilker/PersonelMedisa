@@ -159,7 +159,7 @@ final class SgkPrimGunuService
                 }
             }
 
-            $periodChoice = self::resolvePersonelBildirimDonemi($personel, $status, $companyPolicy, $employerPeriods);
+            $periodChoice = self::resolvePersonelBildirimDonemi($personel, $employerPeriods);
             $bildirimDonemCozumlemesi[(int) $personelId] = $periodChoice + ['personel_id' => (int) $personelId];
 
             $engineInput = [
@@ -197,7 +197,7 @@ final class SgkPrimGunuService
             }
 
             $result = SgkPrimGunuEngine::calculate($engineInput);
-            if ($periodChoice['kaynak'] === 'SGK_ISVEREN') {
+            if (in_array($periodChoice['kaynak'], ['SGK_ISVEREN', 'SGK_ISVEREN_MISSING'], true)) {
                 if ($periodChoice['state'] === SgkIsverenBildirimDonemiReadService::STATE_CONFLICT) {
                     $result = self::appendBlocker($result, [
                         'severity' => 'BLOCKER',
@@ -308,13 +308,17 @@ final class SgkPrimGunuService
     }
 
     /**
+     * Canonical SGK reporting-period source is ONLY personeller.sgk_isveren_id ->
+     * SgkIsverenBildirimDonemiReadService. Branch, company, physical location,
+     * legacy branch policy and legacy personnel-status period overrides are never
+     * used. A missing/null/invalid employer identity is fail-closed to NO_PERIOD;
+     * the payroll preflight keeps the SGK_ISVEREN_MISSING contract.
+     *
      * @param array<string,mixed> $personel
-     * @param array<string,mixed>|null $status
-     * @param array<string,mixed> $companyPolicy
      * @param array<int, array<string,mixed>> $employerPeriods
      * @return array{kaynak: string, sgk_isveren_id: int|null, state: string, bildirim_donem_tipi: string|null}
      */
-    private static function resolvePersonelBildirimDonemi(array $personel, ?array $status, array $companyPolicy, array $employerPeriods): array
+    private static function resolvePersonelBildirimDonemi(array $personel, array $employerPeriods): array
     {
         $employerId = isset($personel['sgk_isveren_id']) ? (int) $personel['sgk_isveren_id'] : 0;
         if ($employerId > 0) {
@@ -334,18 +338,13 @@ final class SgkPrimGunuService
             ];
         }
 
-        // Legacy unmapped personel (pre-064 organization schema). Payroll snapshot
-        // preflight still fails closed with SGK_ISVEREN_MISSING whenever the org
-        // schema exists; this path only preserves rows without employer identity.
-        $tip = $status !== null && (string) $status['bildirim_donem_tipi'] !== 'SIRKET_POLITIKASINDAN'
-            ? (string) $status['bildirim_donem_tipi']
-            : (string) ($companyPolicy['politika']['bildirim_donem_tipi'] ?? '');
-
+        // Missing / null / invalid employer identity -> no canonical reporting
+        // period. Never fall back to legacy personnel status or branch policy.
         return [
-            'kaynak' => 'LEGACY_UNMAPPED',
+            'kaynak' => 'SGK_ISVEREN_MISSING',
             'sgk_isveren_id' => null,
-            'state' => (string) ($companyPolicy['state'] ?? SgkSirketPolitikaReadService::STATE_NO_APPROVED_POLICY),
-            'bildirim_donem_tipi' => $tip !== '' ? $tip : null,
+            'state' => SgkIsverenBildirimDonemiReadService::STATE_NO_PERIOD,
+            'bildirim_donem_tipi' => null,
         ];
     }
 

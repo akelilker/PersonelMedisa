@@ -108,7 +108,7 @@ function periodResolution(int $subeId, array $personeller): array
 }
 
 /** @return array<string, mixed> */
-function periodPersonel(int $id, string $ad, int $sgkIsverenId): array
+function periodPersonel(int $id, string $ad, ?int $sgkIsverenId): array
 {
     return [
         'id' => $id,
@@ -160,6 +160,53 @@ function periodInsertEmployerPeriod(
     ]);
 }
 
+/**
+ * Runs migration 090 against its own disposable database so a drifted
+ * pre-existing table can be observed before the migration runs.
+ *
+ * @return array{blocked: bool, message: string|null, table: bool, columns: int}
+ */
+function periodGuardRun(PDO $root, ?string $preExistingDdl, int $applyCount = 1): array
+{
+    $database = 'medisa_sgk_guard_' . bin2hex(random_bytes(5));
+    $root->exec("CREATE DATABASE `$database` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+    $dsn = (string) preg_replace('/dbname=[^;]+/', 'dbname=' . $database, getenv('MEDISA_TEST_MYSQL_DSN') ?: '');
+    $pdo = new PDO($dsn, getenv('MEDISA_TEST_MYSQL_USER') ?: '', getenv('MEDISA_TEST_MYSQL_PASSWORD') ?: '', [
+        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+        PDO::ATTR_EMULATE_PREPARES => false,
+        PDO::MYSQL_ATTR_USE_BUFFERED_QUERY => true,
+    ]);
+    try {
+        $pdo->exec('CREATE TABLE users (id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY, ad VARCHAR(80) NULL) ENGINE=InnoDB');
+        $pdo->exec('CREATE TABLE sgk_isverenler (id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY, kod VARCHAR(64) NULL, ad VARCHAR(191) NOT NULL) ENGINE=InnoDB');
+        $pdo->exec('CREATE TABLE subeler (id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY, ad VARCHAR(120) NOT NULL) ENGINE=InnoDB');
+        if ($preExistingDdl !== null) {
+            $pdo->exec($preExistingDdl);
+        }
+        $blocked = false;
+        $message = null;
+        for ($i = 0; $i < $applyCount; $i++) {
+            try {
+                applyPeriodMigration($pdo, '090_sgk_isveren_bildirim_donemi_owner.sql');
+            } catch (PDOException $e) {
+                $blocked = true;
+                $message = $e->getMessage();
+                break;
+            }
+        }
+        $table = (int) $pdo->query("SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'sgk_isveren_bildirim_donemi_surumleri'")->fetchColumn() === 1;
+        $columns = $table
+            ? (int) $pdo->query("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'sgk_isveren_bildirim_donemi_surumleri'")->fetchColumn()
+            : 0;
+
+        return ['blocked' => $blocked, 'message' => $message, 'table' => $table, 'columns' => $columns];
+    } finally {
+        unset($pdo);
+        $root->exec("DROP DATABASE IF EXISTS `$database`");
+    }
+}
+
 $root = periodPdo();
 $database = 'medisa_sgk_period_' . bin2hex(random_bytes(5));
 $root->exec("CREATE DATABASE `$database` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
@@ -204,7 +251,8 @@ try {
             (103, 'Izmir Personel', 1),
             (104, 'Karyapi Personel', 2),
             (105, 'Dizin Personel', 1),
-            (106, 'Isverensiz Donem Personel', 3)"
+            (106, 'Isverensiz Donem Personel', 3),
+            (107, 'Legacy Isverensiz Personel', NULL)"
     );
 
     // 036 is the legacy branch-scoped SGK owner + immutable snapshot schema.
@@ -224,6 +272,66 @@ try {
     periodAssert(
         (int) $pdo->query("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'sgk_sirket_politika_surumleri' AND COLUMN_NAME = 'bildirim_donem_tipi'")->fetchColumn() === 1,
         '036 legacy branch policy owner destructive degismedi'
+    );
+
+    // --- 090 fail-closed schema guard: disposable DB per scenario A-F ---
+    $guardCanonicalColumns = "
+        id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+        sgk_isveren_id INT UNSIGNED NOT NULL,
+        surum_kodu VARCHAR(80) NOT NULL,
+        bildirim_donem_tipi ENUM('AY_1_SON_GUN', 'AY_15_SONRAKI_AY_14') NOT NULL,
+        gecerlilik_baslangic DATE NOT NULL,
+        gecerlilik_bitis DATE NULL,
+        state ENUM('TASLAK', 'ONAY_BEKLIYOR', 'ONAYLANDI', 'IPTAL') NOT NULL DEFAULT 'TASLAK',
+        dogrulama_kaynagi VARCHAR(64) NOT NULL DEFAULT 'EXPLICIT_EMPLOYER_PERIOD',
+        aciklama VARCHAR(1000) NOT NULL,
+        hazirlayan_id INT UNSIGNED NULL,
+        onaylayan_id INT UNSIGNED NULL,
+        onay_zamani DATETIME NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (id)";
+    $guardEmployerFk = ', CONSTRAINT fk_sgk_ibds_isveren FOREIGN KEY (sgk_isveren_id) REFERENCES sgk_isverenler (id)';
+    $guardDdl = static function (string $columns, string $extra = ''): string {
+        return 'CREATE TABLE sgk_isveren_bildirim_donemi_surumleri (' . $columns . $extra
+            . ') ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci';
+    };
+    $guardBlocked = static function (array $result): bool {
+        return $result['blocked'] === true && strpos((string) $result['message'], 'PACK090_BLOCKER') !== false;
+    };
+
+    $guardA = periodGuardRun($root, null, 1);
+    periodAssert($guardA['blocked'] === false && $guardA['table'] === true && $guardA['columns'] === 13, 'MIG-A clean apply PASS');
+    $guardB = periodGuardRun($root, null, 2);
+    periodAssert($guardB['blocked'] === false && $guardB['table'] === true && $guardB['columns'] === 13, 'MIG-B second apply PASS');
+    $guardC = periodGuardRun($root, $guardDdl($guardCanonicalColumns, $guardEmployerFk), 1);
+    periodAssert($guardC['blocked'] === false && $guardC['table'] === true, 'MIG-C pre-existing canonical table PASS');
+
+    $partialColumns = (string) preg_replace('/^\s*sgk_isveren_id INT UNSIGNED NOT NULL,\s*$/m', '', $guardCanonicalColumns);
+    $guardD = periodGuardRun($root, $guardDdl($partialColumns), 1);
+    periodAssert($guardBlocked($guardD) && $guardD['table'] === true, 'MIG-D partial table missing sgk_isveren_id BLOCKED');
+
+    $wrongEnumColumns = str_replace("ENUM('AY_1_SON_GUN', 'AY_15_SONRAKI_AY_14')", "ENUM('AY_1_SON_GUN')", $guardCanonicalColumns);
+    $guardE = periodGuardRun($root, $guardDdl($wrongEnumColumns, $guardEmployerFk), 1);
+    periodAssert($guardBlocked($guardE), 'MIG-E wrong bildirim_donem_tipi enum BLOCKED');
+
+    $guardF = periodGuardRun($root, $guardDdl($guardCanonicalColumns), 1);
+    periodAssert($guardBlocked($guardF), 'MIG-F missing employer FK BLOCKED');
+
+    $guardF2 = periodGuardRun(
+        $root,
+        $guardDdl($guardCanonicalColumns, ', CONSTRAINT fk_sgk_ibds_isveren FOREIGN KEY (sgk_isveren_id) REFERENCES subeler (id)'),
+        1
+    );
+    periodAssert($guardBlocked($guardF2), 'MIG-F2 wrong employer FK BLOCKED');
+
+    // Legacy personnel-status reporting-period override. It must never become the
+    // runtime reporting period now that the employer axis owns it.
+    $pdo->exec(
+        "INSERT INTO sgk_personel_sigortalilik_surumleri (
+            personel_id, sigortalilik_statusu, sozlesme_turu, bildirim_donem_tipi,
+            gecerlilik_baslangic, gecerlilik_bitis, state, aciklama, onaylayan_id, onay_zamani
+         ) VALUES (107, '4A', 'TAM_SURELI', 'AY_15_SONRAKI_AY_14', '2024-01-01', NULL,
+            'ONAYLANDI', 'legacy personnel period override', 2, '2026-01-02 00:00:00')"
     );
 
     // Employer reporting-period truth (explicit, verified). Draft rows are excluded.
@@ -346,6 +454,44 @@ try {
         JsonResponse::endCapture();
     }
     periodAssert($financialExclusion, 'J DIS_KAYNAK finansal kapsam disi kalir');
+
+    // K) Missing employer identity -> NO_PERIOD. Legacy branch policy and legacy
+    // personnel status carry AY_15_SONRAKI_AY_14 but are never used as the runtime
+    // reporting period; payroll fails closed with SGK_ISVEREN_MISSING semantics.
+    $legacyPolicy = SgkSirketPolitikaReadService::resolveForPeriod($pdo, 1, '2026-03-01', '2026-03-31');
+    periodAssert(
+        ($legacyPolicy['politika']['bildirim_donem_tipi'] ?? null) === 'AY_15_SONRAKI_AY_14',
+        'K legacy branch policy AY_15 hala mevcut (ama runtime donem degil)'
+    );
+    $resK = SgkPrimGunuService::calculateResolution($pdo, periodResolution(1, [
+        107 => periodPersonel(107, 'Legacy Isverensiz Personel', null),
+    ]));
+    $cozumK = $resK['bildirim_donem_cozumlemesi'][107] ?? [];
+    periodAssert(
+        ($cozumK['kaynak'] ?? '') === 'SGK_ISVEREN_MISSING' && array_key_exists('sgk_isveren_id', $cozumK) && $cozumK['sgk_isveren_id'] === null,
+        'K employer yok -> kaynak SGK_ISVEREN_MISSING ve employer id null'
+    );
+    periodAssert(
+        ($cozumK['state'] ?? '') === SgkIsverenBildirimDonemiReadService::STATE_NO_PERIOD,
+        'K employer yok -> state NO_PERIOD'
+    );
+    periodAssert(
+        array_key_exists('bildirim_donem_tipi', $cozumK) && $cozumK['bildirim_donem_tipi'] === null,
+        'K legacy AY_15_SONRAKI_AY_14 runtime reporting period olarak kullanilmaz'
+    );
+    periodAssert(
+        in_array(SgkPrimGunuService::BLOCKER_ISVEREN_BILDIRIM_DONEMI_YOK, periodBlockerCodes($resK, 107), true),
+        'K employer yok -> fail-closed SGK blocker'
+    );
+    periodAssert(
+        array_key_exists('hesaplanan_prim_gunu', $resK['results_by_personel'][107] ?? [])
+            && $resK['results_by_personel'][107]['hesaplanan_prim_gunu'] === null,
+        'K prim gunu uretilmez (fail-closed)'
+    );
+    periodAssert(
+        in_array('SGK_PRIM_GUNU_HESAPLANAMADI', periodBlockerCodes($resK, 107), true),
+        'K engine girdisi legacy AY_15 donemi almaz (null donem blocker)'
+    );
 
     echo 'verify-sgk-isveren-bildirim-donemi-owner-mysql: OK' . PHP_EOL;
 } finally {

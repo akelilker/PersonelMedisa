@@ -426,7 +426,8 @@ try {
          (16, '16161616161', 'Özkan', 'Erçin', '1997-01-01', '5550000016', 'H', '5550000016', 'SIC-OZ', '2021-01-01', 1, 1, 1, 'AKTIF', 'IC_PERSONEL'),
          (17, '17171717171', 'Kürşat', 'Kederoğlu', '1998-01-01', '5550000017', 'I', '5550000017', 'SIC-KU', '2021-01-01', 1, 1, 1, 'AKTIF', 'IC_PERSONEL'),
          (18, '18181818181', 'Mehmet Ali', 'Yılmaz', '1999-01-01', '5550000018', 'J', '5550000018', 'SIC-MA', '2021-01-01', 1, 1, 1, 'AKTIF', 'IC_PERSONEL'),
-         (19, '19191919191', 'Serhan', 'Köse', '1990-06-01', '5550000019', 'K', '5550000019', 'SIC-SK', '2021-01-01', 1, 1, 1, 'AKTIF', 'IC_PERSONEL')"
+         (19, '19191919191', 'Serhan', 'Köse', '1990-06-01', '5550000019', 'K', '5550000019', 'SIC-SK', '2021-01-01', 1, 1, 1, 'AKTIF', 'IC_PERSONEL'),
+         (219, '21921921921', 'DOĞU', 'BERKAN ATMACA', '1992-02-02', '5550000219', 'L', '5550000219', 'SIC-219', '2021-02-01', 1, 1, 1, 'AKTIF', 'IC_PERSONEL')"
     );
 
     // Bind legacy u2 to personel 1 (grandfathered).
@@ -912,6 +913,163 @@ try {
     psoAssert(
         psoExtractErrorCode($duplicateSerhan) === PersonelAccountOnboardingService::ERR_ALREADY_PROVISIONED,
         'NEW: ikinci create fail-closed (ALREADY_PROVISIONED)'
+    );
+
+    // ---------------------------------------------------------------------------
+    // PERSONEL 219: canonical onboarding + master-data correction (AYNI transaction)
+    // ---------------------------------------------------------------------------
+    $p219Before = $pdo->query('SELECT ad, soyad FROM personeller WHERE id = 219')->fetch(PDO::FETCH_ASSOC);
+    psoAssert(
+        $p219Before['ad'] === 'DOĞU' && $p219Before['soyad'] === 'BERKAN ATMACA',
+        '219 locked preimage fixture (DOĞU / BERKAN ATMACA)'
+    );
+
+    // B) ad preimage mismatch -> fail-closed; hicbir mutation (user/binding/audit) yok
+    $pdo->exec("UPDATE personeller SET ad = 'YANLIS' WHERE id = 219");
+    $adMismatch = psoCapture(static function () use ($pdo, $actor): void {
+        PersonelAccountOnboardingService::onboardAndIssue($pdo, 219, $actor);
+    });
+    psoAssert(
+        ($adMismatch['errors'][0]['code'] ?? '') === PersonelAccountOnboardingService::ERR_NAME_CORRECTION_PREIMAGE,
+        '219 ad preimage mismatch fail-closed'
+    );
+    $afterAdMismatch = $pdo->query('SELECT ad, soyad FROM personeller WHERE id = 219')->fetch(PDO::FETCH_ASSOC);
+    psoAssert(
+        $afterAdMismatch['ad'] === 'YANLIS' && $afterAdMismatch['soyad'] === 'BERKAN ATMACA',
+        '219 ad mismatch leaves master data unchanged'
+    );
+    psoAssert(
+        (int) $pdo->query('SELECT COUNT(*) FROM users WHERE personel_id = 219')->fetchColumn() === 0,
+        '219 ad mismatch creates no user'
+    );
+    psoAssert(
+        (int) $pdo->query('SELECT COUNT(*) FROM personel_account_onboarding_audit WHERE personel_id = 219')->fetchColumn() === 0,
+        '219 ad mismatch writes no onboarding audit'
+    );
+    psoAssert(
+        (int) $pdo->query('SELECT COUNT(*) FROM user_personel_binding_audit WHERE new_personel_id = 219')->fetchColumn() === 0,
+        '219 ad mismatch writes no binding audit'
+    );
+    $pdo->exec("UPDATE personeller SET ad = 'DOĞU' WHERE id = 219");
+
+    // C) soyad preimage mismatch -> ayni fail-closed davranis
+    $pdo->exec("UPDATE personeller SET soyad = 'YANLIS SOYAD' WHERE id = 219");
+    $soyadMismatch = psoCapture(static function () use ($pdo, $actor): void {
+        PersonelAccountOnboardingService::onboardAndIssue($pdo, 219, $actor);
+    });
+    psoAssert(
+        ($soyadMismatch['errors'][0]['code'] ?? '') === PersonelAccountOnboardingService::ERR_NAME_CORRECTION_PREIMAGE,
+        '219 soyad preimage mismatch fail-closed'
+    );
+    $afterSoyadMismatch = $pdo->query('SELECT ad, soyad FROM personeller WHERE id = 219')->fetch(PDO::FETCH_ASSOC);
+    psoAssert(
+        $afterSoyadMismatch['ad'] === 'DOĞU' && $afterSoyadMismatch['soyad'] === 'YANLIS SOYAD',
+        '219 soyad mismatch leaves master data unchanged'
+    );
+    $pdo->exec("UPDATE personeller SET soyad = 'BERKAN ATMACA' WHERE id = 219");
+
+    // D) doguA collision -> correction dahil tüm transaction rollback
+    $doguCollideHash = password_hash('CollidePass-24chars!!!!!', PASSWORD_BCRYPT);
+    $pdo->exec(
+        "INSERT INTO users (username, password_hash, ad_soyad, rol, durum, must_change_password)
+         VALUES ('doguA', " . $pdo->quote($doguCollideHash) . ", 'Collide Dogu', 'GENEL_YONETICI', 'AKTIF', 0)"
+    );
+    $doguCollision = psoCapture(static function () use ($pdo, $actor): void {
+        PersonelAccountOnboardingService::onboardAndIssue($pdo, 219, $actor);
+    });
+    psoAssert(
+        ($doguCollision['errors'][0]['code'] ?? '') === PersonelAccountOnboardingService::ERR_USERNAME_COLLISION,
+        '219 doguA collision fail-closed'
+    );
+    $afterCollision = $pdo->query('SELECT ad, soyad FROM personeller WHERE id = 219')->fetch(PDO::FETCH_ASSOC);
+    psoAssert(
+        $afterCollision['ad'] === 'DOĞU' && $afterCollision['soyad'] === 'BERKAN ATMACA',
+        '219 collision rolls back master-data correction'
+    );
+    psoAssert(
+        (int) $pdo->query('SELECT COUNT(*) FROM users WHERE personel_id = 219')->fetchColumn() === 0,
+        '219 collision creates no bound user'
+    );
+    $pdo->exec("DELETE FROM users WHERE username = 'doguA'");
+
+    // A) happy path: master-data correction + user create + binding tek transaction
+    $dogu = PersonelAccountOnboardingService::onboardAndIssue($pdo, 219, $actor);
+    psoAssert(($dogu['user']['username'] ?? '') === 'doguA', '219 canonical username doguA');
+    psoAssert(($dogu['user']['personel_id'] ?? 0) === 219, '219 binding personel_id');
+    psoAssert(($dogu['user']['rol'] ?? '') === 'PERSONEL', '219 rol PERSONEL');
+    psoAssert(($dogu['user']['activation_required'] ?? true) === false, '219 activation_required=false');
+    psoAssert(($dogu['user']['must_change_password'] ?? false) === true, '219 must_change_password=true');
+    psoAssert(!isset($dogu['activation']), '219 no activation payload');
+
+    $doguRow = $pdo->query("SELECT * FROM users WHERE username = 'doguA'")->fetch(PDO::FETCH_ASSOC);
+    psoAssert(is_array($doguRow), '219 account created');
+    psoAssert((string) $doguRow['ad_soyad'] === 'Doğu Berkan Atmaca', '219 users.ad_soyad corrected canonical');
+    psoAssert((int) $doguRow['activation_required'] === 0, '219 DB activation_required=0');
+    psoAssert((int) $doguRow['must_change_password'] === 1, '219 DB must_change_password=1');
+    psoAssert(
+        PasswordHasher::verify('Atmaca123', (string) $doguRow['password_hash']),
+        '219 initial password Atmaca123 hash ile dogrulandi'
+    );
+    $doguPersonel = $pdo->query('SELECT ad, soyad FROM personeller WHERE id = 219')->fetch(PDO::FETCH_ASSOC);
+    psoAssert($doguPersonel['ad'] === 'Doğu Berkan', '219 master ad corrected');
+    psoAssert($doguPersonel['soyad'] === 'Atmaca', '219 master soyad corrected');
+    psoAssert(
+        (int) $pdo->query(
+            'SELECT COUNT(*) FROM user_personel_binding_audit
+             WHERE user_id = ' . (int) $doguRow['id'] . " AND action = 'SET' AND new_personel_id = 219"
+        )->fetchColumn() === 1,
+        '219 binding audit exact'
+    );
+    $doguAuditRow = $pdo->query(
+        "SELECT detail_json FROM personel_account_onboarding_audit
+          WHERE event_type = 'PERSONEL_ACCOUNT_CREATED' AND user_id = " . (int) $doguRow['id']
+    )->fetch(PDO::FETCH_ASSOC);
+    psoAssert(is_array($doguAuditRow), '219 account-created audit exists');
+    $doguDetail = (string) ($doguAuditRow['detail_json'] ?? '');
+    psoAssert(
+        strpos($doguDetail, 'name_correction') !== false
+            && strpos($doguDetail, 'DOĞU') !== false
+            && strpos($doguDetail, 'Doğu Berkan') !== false,
+        '219 audit records before/after name correction'
+    );
+    psoAssert(strpos($doguDetail, 'Atmaca123') === false, '219 audit has no plaintext password');
+    psoAssert(strpos($doguDetail, 'password_hash') === false, '219 audit has no password_hash');
+    psoAssert(strpos((string) json_encode($dogu), 'Atmaca123') === false, '219 response has no plaintext password');
+
+    // E) existing binding -> ALREADY_PROVISIONED; correction commit EDILMEZ
+    $pdo->exec("UPDATE personeller SET ad = 'DOĞU', soyad = 'BERKAN ATMACA' WHERE id = 219");
+    $doguRebind = psoCapture(static function () use ($pdo, $actor): void {
+        PersonelAccountOnboardingService::onboardAndIssue($pdo, 219, $actor);
+    });
+    psoAssert(
+        ($doguRebind['errors'][0]['code'] ?? '') === PersonelAccountOnboardingService::ERR_ALREADY_PROVISIONED,
+        '219 existing binding fail-closed ALREADY_PROVISIONED'
+    );
+    $afterRebind = $pdo->query('SELECT ad, soyad FROM personeller WHERE id = 219')->fetch(PDO::FETCH_ASSOC);
+    psoAssert(
+        $afterRebind['ad'] === 'DOĞU' && $afterRebind['soyad'] === 'BERKAN ATMACA',
+        '219 existing binding does not commit master-data correction'
+    );
+    psoAssert(
+        (int) $pdo->query('SELECT COUNT(*) FROM users WHERE personel_id = 219')->fetchColumn() === 1,
+        '219 existing binding no duplicate user'
+    );
+    $pdo->exec("UPDATE personeller SET ad = 'Doğu Berkan', soyad = 'Atmaca' WHERE id = 219");
+
+    // 5) correction'siz personel: master data degismez (mevcut davranis korunur)
+    $p19After = $pdo->query('SELECT ad, soyad FROM personeller WHERE id = 19')->fetch(PDO::FETCH_ASSOC);
+    psoAssert(
+        $p19After['ad'] === 'Serhan' && $p19After['soyad'] === 'Köse',
+        '19 no-correction master data unchanged'
+    );
+
+    // 7) ilkerA / personel 10 untouched
+    $p10After = $pdo->query('SELECT ad, soyad FROM personeller WHERE id = 10')->fetch(PDO::FETCH_ASSOC);
+    psoAssert($p10After['ad'] === 'İlker' && $p10After['soyad'] === 'Akel', 'ilkerA personel master data untouched');
+    $ilkerUser = $pdo->query("SELECT username, personel_id, rol FROM users WHERE username = 'ilkerA'")->fetch(PDO::FETCH_ASSOC);
+    psoAssert(
+        is_array($ilkerUser) && (int) $ilkerUser['personel_id'] === 10 && $ilkerUser['rol'] === 'PERSONEL',
+        'ilkerA user untouched'
     );
 
     $t1 = PersonelAccountOnboardingService::generateActivationToken();

@@ -22,6 +22,7 @@ use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
 use Medisa\Api\Http\ResponseCaptured;
 use Medisa\Api\Services\Auth\PersonelAccountOnboardingService;
+use Medisa\Api\Services\Auth\PersonelFirstLoginCredentialsApplyReport;
 use Medisa\Api\Services\Auth\PersonelFirstLoginCredentialsPreflightReport;
 
 /** Reservation invariant: bu kullanici adi hicbir kosulda degismemeli. */
@@ -692,6 +693,485 @@ function pflcRunBusinessDecisionScenario(PDO $root): void
 }
 
 // ---------------------------------------------------------------------------
+// APPLY YOLU senaryosu (PERSONEL_FIRST_LOGIN_CREDENTIALS_APPLY)
+//
+// Disposable DB uzerinde kanit: fingerprint pinleme, cohort drift fail-closed,
+// doguA/219 scope exclusion, preimage'nin yazimdan ONCE alinmasi, secret-free
+// cikti, excluded 9 / ilkerA dokunulmamisligi ve rerun'un degistirilmis sifreyi
+// geri yukleyememesi. Hicbir production baglantisi yoktur.
+// ---------------------------------------------------------------------------
+function pflcRunApplyPathScenario(PDO $root): void
+{
+    $applyDb = 'medisa_pflc_apply_' . bin2hex(random_bytes(4));
+    $root->exec('CREATE DATABASE `' . $applyDb . '` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
+
+    try {
+        $pdo = pflcPdoForDb($applyDb);
+        pflcApplyCanonicalSchema($pdo);
+        pflcSeedCatalog($pdo);
+        $legacyHash = PasswordHasher::hash('LegacyPass-24chars!!');
+
+        // Hedef cohort: 3 hedef (biri explicit business override, ikisi canonical name
+        // correction'li), 1 rezerve (ilkerA) ve 1 PASIF-bagli anomaly (excluded).
+        // Name correction / override id'leri production id'leriyle AYNI olmak zorundadir;
+        // kanonik kurallar gercek id'lere baglidir ve burada yeniden yazilmaz.
+        pflcInsertPersonel($pdo, 108, 'Hakan', 'Açıkgöz', 'AKTIF');
+        pflcInsertPersonel($pdo, 200, 'RAED FAWAZ', null, 'AKTIF');
+        pflcInsertPersonel($pdo, 210, 'FAHRİ TAYLAN MERCAN', null, 'AKTIF');
+        pflcInsertPersonel($pdo, 219, 'DOĞU', 'BERKAN ATMACA', 'AKTIF');
+        pflcInsertPersonel($pdo, 220, 'Pasif', 'Kisi', 'PASIF');
+        pflcInsertPersonel($pdo, 230, 'İlker', 'Akel', 'AKTIF');
+
+        pflcInsertUser($pdo, 1, 'admin', $legacyHash, 'Admin', 'GENEL_YONETICI', 'AKTIF', null);
+        pflcInsertUser($pdo, 600, '4600', $legacyHash, 'Hakan Acikgoz', 'PERSONEL', 'AKTIF', 108);
+        pflcInsertUser($pdo, 601, '4601', $legacyHash, 'Raed Fawaz', 'PERSONEL', 'AKTIF', 200);
+        pflcInsertUser($pdo, 602, '4602', $legacyHash, 'Fahri Taylan Mercan', 'PERSONEL', 'AKTIF', 210);
+        pflcInsertUser($pdo, 603, PFLC_PROTECTED_USERNAME, $legacyHash, 'Ilker Akel', 'PERSONEL', 'AKTIF', 230);
+        pflcInsertUser($pdo, 604, '4604', $legacyHash, 'Pasif Kisi', 'PERSONEL', 'AKTIF', 220);
+        pflcInsertUser($pdo, 605, '4605', $legacyHash, 'Dogu Berkan Atmaca', 'PERSONEL', 'AKTIF', 219);
+        pflcApply($pdo, '089_personel_legacy_account_activation.sql');
+
+        $pflcBefore = pflcCredentialRows($pdo);
+        $pflcProtectedBefore = pflcRowById($pdo, 603);
+        $pflcExcludedBefore = pflcRowById($pdo, 604);
+
+        // --- 1) SCOPE EXCLUSION: 219 plana girerse apply hicbir satir yazmaz -----------
+        $scopeDry = PersonelAccountOnboardingService::migrateCanonicalFirstLoginCredentials($pdo, 1, false);
+        pflcAssert($scopeDry['blocked'] === true, 'APPLY: 219 plana girince dry-run blocked');
+        pflcAssert(
+            $scopeDry['blocker'] === PersonelAccountOnboardingService::ERR_ROLLOUT_SCOPE_VIOLATION,
+            'APPLY: 219 scope violation blocker kodu (' . (string) ($scopeDry['blocker'] ?? 'null') . ')'
+        );
+
+        $scopePreimageCalls = 0;
+        $scopeReport = PersonelFirstLoginCredentialsApplyReport::run(
+            $pdo,
+            str_repeat('b', 40),
+            str_repeat('c', 64),
+            static function () use (&$scopePreimageCalls): string {
+                ++$scopePreimageCalls;
+
+                return str_repeat('d', 64);
+            }
+        );
+        pflcAssert(($scopeReport['result'] ?? 'PASS') === 'BLOCKED', 'APPLY: 219 scope violation -> BLOCKED');
+        pflcAssert(
+            ($scopeReport['blocker'] ?? null) === PersonelAccountOnboardingService::ERR_ROLLOUT_SCOPE_VIOLATION,
+            'APPLY: 219 scope violation report blocker (' . (string) ($scopeReport['blocker'] ?? 'null') . ')'
+        );
+        pflcAssert(
+            (int) ($scopeReport['rollout_excluded_in_plan_count'] ?? -1) === 1,
+            'APPLY: 219 plan disi sayildi (rollout_excluded_in_plan_count = 1)'
+        );
+        pflcAssert($scopePreimageCalls === 0, 'APPLY: blocked apply preimage URETMEZ');
+        pflcAssert(
+            (int) ($scopeReport['production_mutation_count'] ?? -1) === 0,
+            'APPLY: 219 scope violation -> sifir mutation'
+        );
+        pflcAssert(pflcCredentialRows($pdo) === $pflcBefore, 'APPLY: 219 scope violation hicbir satiri mutate etmedi');
+
+        // doguA'nin kendi personel kaydi DEGISMEDI (hesap create YOK).
+        $dogu = pflcRowById($pdo, 605);
+        pflcAssert((string) $dogu['username'] === '4605', 'APPLY: doguA bagli hesap dokunulmadi (DOGUA_CREATED=NO)');
+        pflcAssert((int) $dogu['activation_required'] === 1, 'APPLY: doguA bagli hesap fail-closed kaldi');
+
+        // --- 2) 219 kohort disi kalirsa (doguA henuz user DEGIL) plan temiz -------------
+        $pdo->exec('SET FOREIGN_KEY_CHECKS = 0');
+        $pdo->exec('DELETE FROM users WHERE id = 605');
+        $pdo->exec('SET FOREIGN_KEY_CHECKS = 1');
+        // Preimage/mutation karsilastirmalari icin baseline yeniden alinir.
+        $pflcBefore = pflcCredentialRows($pdo);
+
+        $dry = PersonelAccountOnboardingService::migrateCanonicalFirstLoginCredentials($pdo, 1, false);
+        pflcAssert($dry['blocked'] === false && $dry['apply'] === false, 'APPLY: temiz cohort dry-run blocked=false');
+        pflcAssert($dry['target_count'] === 3, 'APPLY: dry-run target_count = 3');
+        pflcAssert(
+            (int) $dry['excluded']['protected_username'][0]['user_id'] === 603
+                && (int) $dry['excluded']['bound_personel_not_active'][0]['user_id'] === 604,
+            'APPLY: excluded 2 satir (protected + PASIF bagli)'
+        );
+        $fingerprint = (string) ($dry['plan_fingerprint'] ?? '');
+        pflcAssert((bool) preg_match('/^[a-f0-9]{64}$/', $fingerprint), 'APPLY: plan fingerprint sha256 hex');
+
+        $usernamePlan = [];
+        foreach ($dry['plan'] as $planRow) {
+            $usernamePlan[(int) $planRow['personel_id']] = (string) $planRow['new_username'];
+        }
+        pflcAssert(
+            $usernamePlan === [108 => 'hakanAc', 200 => 'raedF', 210 => 'fahriM'],
+            'APPLY: beklenen canonical username plani'
+        );
+
+        // Ayni DB durumundan ayni fingerprint uretilir (deterministik, secret-free).
+        pflcAssert(
+            PersonelAccountOnboardingService::migrateCanonicalFirstLoginCredentials($pdo, 1, false)['plan_fingerprint']
+                === $fingerprint,
+            'APPLY: fingerprint deterministik'
+        );
+        pflcAssert(
+            strpos($fingerprint, 'Acikgoz123') === false && strpos($fingerprint, '$2y$') === false,
+            'APPLY: fingerprint plaintext/hash icermez'
+        );
+
+        // --- 3) Yanlis / eksik fingerprint -> apply YOK --------------------------------
+        $neverCalled = 0;
+        $neverPersist = static function () use (&$neverCalled): string {
+            ++$neverCalled;
+
+            return str_repeat('e', 64);
+        };
+
+        $malformed = PersonelFirstLoginCredentialsApplyReport::run(
+            $pdo,
+            str_repeat('b', 40),
+            'NOT_A_FINGERPRINT',
+            $neverPersist
+        );
+        pflcAssert(
+            ($malformed['blocker'] ?? null) === PersonelFirstLoginCredentialsApplyReport::BLOCKER_FINGERPRINT_INVALID,
+            'APPLY: gecersiz fingerprint formati -> FINGERPRINT_INVALID'
+        );
+        pflcAssert($neverCalled === 0, 'APPLY: gecersiz fingerprint -> preimage uretilmedi');
+        pflcAssert(pflcCredentialRows($pdo) === $pflcBefore, 'APPLY: gecersiz fingerprint -> mutation yok');
+
+        $stale = PersonelFirstLoginCredentialsApplyReport::run(
+            $pdo,
+            str_repeat('b', 40),
+            str_repeat('c', 64),
+            $neverPersist
+        );
+        pflcAssert(
+            ($stale['blocker'] ?? null) === PersonelAccountOnboardingService::ERR_PLAN_FINGERPRINT_MISMATCH,
+            'APPLY: stale fingerprint -> PLAN_FINGERPRINT_MISMATCH'
+        );
+        pflcAssert(
+            ($stale['plan_fingerprint'] ?? null) === $fingerprint,
+            'APPLY: report yeniden uretilen fingerprint\'i yayinlar'
+        );
+        pflcAssert($neverCalled === 0, 'APPLY: stale fingerprint -> preimage uretilmedi');
+        pflcAssert(pflcCredentialRows($pdo) === $pflcBefore, 'APPLY: stale fingerprint -> mutation yok');
+
+        // --- 4) Cohort drift -> pin tutmaz, apply YOK ----------------------------------
+        pflcInsertPersonel($pdo, 700, 'Yeni', 'Kisi', 'AKTIF');
+        pflcInsertUser($pdo, 700, '4700', $legacyHash, 'Yeni Kisi', 'PERSONEL', 'AKTIF', 700);
+        // Karsilastirma baseline'i drift fixture'i dahil edecek sekilde yeniden alinir.
+        $driftBefore = pflcCredentialRows($pdo);
+        $drift = PersonelFirstLoginCredentialsApplyReport::run(
+            $pdo,
+            str_repeat('b', 40),
+            $fingerprint,
+            $neverPersist
+        );
+        pflcAssert(
+            ($drift['blocker'] ?? null) === PersonelAccountOnboardingService::ERR_PLAN_FINGERPRINT_MISMATCH,
+            'APPLY: cohort drift -> PLAN_FINGERPRINT_MISMATCH'
+        );
+        pflcAssert((int) ($drift['target_count'] ?? -1) === 4, 'APPLY: drift sonrasi plan 4 hedefe cikti');
+        pflcAssert($neverCalled === 0, 'APPLY: drift -> preimage uretilmedi');
+        pflcAssert(pflcCredentialRows($pdo) === $driftBefore, 'APPLY: drift -> mutation yok');
+
+        $pdo->exec('DELETE FROM users WHERE id = 700');
+        $pdo->exec('DELETE FROM personeller WHERE id = 700');
+
+        // --- 5) Preimage persist edilemezse apply YOK ----------------------------------
+        $persistFailCalled = 0;
+        $persistFail = PersonelFirstLoginCredentialsApplyReport::run(
+            $pdo,
+            str_repeat('b', 40),
+            $fingerprint,
+            static function () use (&$persistFailCalled): string {
+                ++$persistFailCalled;
+
+                throw new RuntimeException('PREIMAGE_WRITE_FAILED');
+            }
+        );
+        pflcAssert(
+            ($persistFail['blocker'] ?? null) === PersonelFirstLoginCredentialsApplyReport::BLOCKER_PREIMAGE_PERSIST_FAILED,
+            'APPLY: preimage persist hatasi -> PREIMAGE_PERSIST_FAILED'
+        );
+        pflcAssert($persistFailCalled === 1, 'APPLY: preimage callback bir kez denendi');
+        pflcAssert(
+            ($persistFail['preimage_written'] ?? true) === false,
+            'APPLY: preimage persist edilemedi olarak raporlandi'
+        );
+        pflcAssert(pflcCredentialRows($pdo) === $pflcBefore, 'APPLY: preimage hatasi -> mutation yok');
+
+        // --- 6) Basarili apply: preimage YAZIMDAN ONCE, sonuc exact --------------------
+        $capturedPreimage = null;
+        $preimageSawUnchangedDb = false;
+        $preimageCalls = 0;
+        $report = PersonelFirstLoginCredentialsApplyReport::run(
+            $pdo,
+            str_repeat('b', 40),
+            $fingerprint,
+            static function (array $preimage) use (
+                &$capturedPreimage,
+                &$preimageSawUnchangedDb,
+                &$preimageCalls,
+                $pdo,
+                $pflcBefore
+            ): string {
+                ++$preimageCalls;
+                $capturedPreimage = $preimage;
+                // Preimage alindigi ANDA DB hala apply oncesi durumda olmali: yazim yok.
+                $preimageSawUnchangedDb = pflcCredentialRows($pdo) === $pflcBefore;
+
+                return str_repeat('f', 64);
+            }
+        );
+        pflcAssert($preimageCalls === 1, 'APPLY: preimage callback tam bir kez calisti');
+        pflcAssert($preimageSawUnchangedDb, 'APPLY: preimage YAZIMDAN ONCE alindi (DB hala pre-mutation)');
+        if (is_array($capturedPreimage)) {
+            $preimageUsernames = array_column($capturedPreimage['targets'] ?? [], 'username');
+            sort($preimageUsernames);
+            $preimageSawUnchangedDb = $preimageUsernames === ['4600', '4601', '4602'];
+        }
+        pflcAssert($preimageSawUnchangedDb, 'APPLY: preimage eski (pre-mutation) username degerlerini tasir');
+        pflcAssert(is_array($capturedPreimage), 'APPLY: preimage uretildi');
+        pflcAssert(
+            (string) ($capturedPreimage['purpose'] ?? '') === PersonelFirstLoginCredentialsApplyReport::PREIMAGE_PURPOSE,
+            'APPLY: preimage purpose etiketi'
+        );
+        pflcAssert(
+            count($capturedPreimage['targets'] ?? []) === 3,
+            'APPLY: preimage 3 hedef satiri tasir'
+        );
+        pflcAssert(
+            array_column($capturedPreimage['targets'] ?? [], 'user_id') === [600, 601, 602],
+            'APPLY: preimage yalnizca mutate edilecek kullanicilari tasir'
+        );
+        $preimageBlob = (string) json_encode($capturedPreimage);
+        pflcAssert(
+            count(array_filter($capturedPreimage['targets'], static function (array $row): bool {
+                return strpos((string) $row['password_hash'], '$2y$') === 0;
+            })) === 3,
+            'APPLY: preimage recovery icin ESKI password_hash tasir'
+        );
+        pflcAssert(
+            strpos($preimageBlob, 'Acikgoz123') === false
+                && strpos($preimageBlob, 'Fawaz123') === false
+                && strpos($preimageBlob, 'Mercan123') === false,
+            'APPLY: preimage plaintext sifre TASIMAZ'
+        );
+
+        pflcAssert(($report['result'] ?? 'BLOCKED') === 'PASS', 'APPLY: basarili apply PASS');
+        pflcAssert(($report['decision_apply'] ?? false) === true, 'APPLY: decision_apply = true');
+        pflcAssert((int) $report['applied_count'] === 3, 'APPLY: applied_count = 3');
+        pflcAssert((int) $report['target_count'] === 3, 'APPLY: target_count = 3');
+        pflcAssert((int) $report['user_mutation_count'] === 3, 'APPLY: user_mutation_count = 3');
+        pflcAssert((int) $report['name_correction_mutation_count'] === 2, 'APPLY: name_correction_mutation_count = 2');
+        pflcAssert((int) $report['production_mutation_count'] === 5, 'APPLY: production_mutation_count = 5');
+        pflcAssert((int) $report['personel_total'] === 5, 'APPLY: personel_total = 5');
+        pflcAssert((int) $report['excluded_total'] === 2, 'APPLY: excluded_total = 2');
+        pflcAssert(($report['cohort_reconciled'] ?? false) === true, 'APPLY: cohort reconcile');
+        pflcAssert(($report['credential_targets_reconciled'] ?? false) === true, 'APPLY: credential targets reconcile');
+        pflcAssert((int) $report['credential_target_mismatch_count'] === 0, 'APPLY: credential mismatch = 0');
+        pflcAssert(($report['name_corrections_reconciled'] ?? false) === true, 'APPLY: name corrections reconcile');
+        pflcAssert(($report['excluded_unchanged'] ?? false) === true, 'APPLY: excluded 2 satir UNCHANGED');
+        pflcAssert((int) $report['excluded_changed_count'] === 0, 'APPLY: excluded changed = 0');
+        pflcAssert(($report['ilkera_unchanged'] ?? false) === true, 'APPLY: ilkerA UNCHANGED');
+        pflcAssert(($report['ilkera_touched'] ?? true) === false, 'APPLY: ILKERA_TOUCHED = NO');
+        pflcAssert((int) $report['protected_username_in_plan_count'] === 0, 'APPLY: rezerve hesap planda yok');
+        pflcAssert(
+            ($report['rollout_ledger_recorded'] ?? false) === true
+                && ($report['rollout_ledger_event'] ?? null) === PersonelAccountOnboardingService::EVENT_FIRST_LOGIN_ROLLOUT_APPLIED,
+            'APPLY: one-shot rollout ledger kaydi'
+        );
+        pflcAssert(($report['preimage_written'] ?? false) === true, 'APPLY: preimage_written = true');
+        pflcAssert(
+            ($report['preimage_sha256'] ?? '') === str_repeat('f', 64),
+            'APPLY: preimage sha256 raporlandi'
+        );
+        pflcAssert(($report['preimage_published'] ?? true) === false, 'APPLY: preimage YAYINLANMADI');
+        pflcAssert(($report['preimage_contains_password_hash'] ?? false) === true, 'APPLY: preimage hash icerdigi beyan edildi');
+        pflcAssert((int) $report['rollout_excluded_in_plan_count'] === 0, 'APPLY: rollout scope violation yok (doguA user degil)');
+        pflcAssert(($report['plan_fingerprint'] ?? null) === $fingerprint, 'APPLY: plan fingerprint pini tuttu');
+
+        // Sinirli / PII'siz plan satiri alan kumesi (preflight ile ayni kontrat).
+        foreach ($report['plan'] as $reportRow) {
+            $rowKeys = array_keys($reportRow);
+            sort($rowKeys);
+            pflcAssert(
+                $rowKeys === [
+                    'business_override',
+                    'name_correction_preimage_match',
+                    'name_correction_present',
+                    'new_username',
+                    'old_username',
+                    'personel_id',
+                    'user_id',
+                    'username_changed',
+                ],
+                'APPLY: plan satiri sinirli alan kumesi'
+            );
+        }
+
+        // Secret-free cikti: report hicbir seviyede password_hash / ham preimage alani
+        // yayinlamaz ve plaintext sifre ya da bcrypt oneki TASIMAZ.
+        $reportKeys = [];
+        $walk = static function ($node) use (&$walk, &$reportKeys): void {
+            if (!is_array($node)) {
+                return;
+            }
+            foreach ($node as $key => $value) {
+                if (is_string($key)) {
+                    $reportKeys[] = $key;
+                }
+                $walk($value);
+            }
+        };
+        $walk($report);
+        foreach (['password_hash', 'password', 'targets', 'name_corrections', 'preimage'] as $forbiddenKey) {
+            pflcAssert(
+                !in_array($forbiddenKey, $reportKeys, true),
+                'APPLY: report "' . $forbiddenKey . '" alanini YAYINLAMAZ'
+            );
+        }
+        $reportBlob = (string) json_encode($report);
+        foreach (['Acikgoz123', 'Fawaz123', 'Mercan123', '$2y$'] as $forbiddenValue) {
+            pflcAssert(
+                strpos($reportBlob, $forbiddenValue) === false,
+                'APPLY: report secret TASIMAZ (' . $forbiddenValue . ')'
+            );
+        }
+
+        // Uygulanan durum: username / activation / must_change_password / hash.
+        $appliedTemplates = [600 => 'Acikgoz123', 601 => 'Fawaz123', 602 => 'Mercan123'];
+        $appliedUsernames = [600 => 'hakanAc', 601 => 'raedF', 602 => 'fahriM'];
+        foreach ($appliedUsernames as $userId => $expectedUsername) {
+            $row = pflcRowById($pdo, $userId);
+            pflcAssert((string) $row['username'] === $expectedUsername, 'APPLY: user ' . $userId . ' username applied');
+            pflcAssert((int) $row['activation_required'] === 0, 'APPLY: user ' . $userId . ' activation_required = 0');
+            pflcAssert((int) $row['must_change_password'] === 1, 'APPLY: user ' . $userId . ' must_change_password = 1');
+            pflcAssert(
+                PasswordHasher::verify($appliedTemplates[$userId], (string) $row['password_hash']),
+                'APPLY: user ' . $userId . ' template sifre hash dogrulandi'
+            );
+            pflcAssert((string) $row['rol'] === 'PERSONEL', 'APPLY: user ' . $userId . ' rol korundu');
+        }
+        pflcAssert(pflcRowById($pdo, 603) === $pflcProtectedBefore, 'APPLY: ilkerA before/after exact invariant');
+        pflcAssert(pflcRowById($pdo, 604) === $pflcExcludedBefore, 'APPLY: excluded PASIF hesap UNCHANGED');
+
+        // Name correction exact expected state (canonical 2 kayit).
+        $stmt = $pdo->query('SELECT ad, soyad FROM personeller WHERE id = 200');
+        $corrected = $stmt ? $stmt->fetch(PDO::FETCH_ASSOC) : [];
+        pflcAssert(
+            $corrected === ['ad' => 'Raed', 'soyad' => 'Fawaz'],
+            'APPLY: name correction exact expected state (200 -> Raed Fawaz)'
+        );
+        $stmt = $pdo->query('SELECT ad, soyad FROM personeller WHERE id = 210');
+        $corrected = $stmt ? $stmt->fetch(PDO::FETCH_ASSOC) : [];
+        pflcAssert(
+            $corrected === ['ad' => 'Fahri Taylan', 'soyad' => 'Mercan'],
+            'APPLY: name correction exact expected state (210 -> Fahri Taylan Mercan)'
+        );
+
+        // --- 7) Replay: tamamlanmis cohort -> FAIL-CLOSED ------------------------------
+        $replayBefore = pflcCredentialRows($pdo);
+        $replay = PersonelFirstLoginCredentialsApplyReport::run(
+            $pdo,
+            str_repeat('b', 40),
+            $fingerprint,
+            $neverPersist
+        );
+        pflcAssert(($replay['result'] ?? 'PASS') === 'BLOCKED', 'APPLY: replay -> BLOCKED');
+        pflcAssert($neverCalled === 0, 'APPLY: replay -> preimage uretilmedi');
+        pflcAssert(
+            (string) ($replay['blocker'] ?? '') !== '',
+            'APPLY: replay blocker sinirli bir kod doner (' . (string) ($replay['blocker'] ?? 'null') . ')'
+        );
+        pflcAssert(pflcCredentialRows($pdo) === $replayBefore, 'APPLY: replay hicbir satiri mutate etmedi');
+
+        // --- 7b) ONE-SHOT LEDGER: plan yeniden temiz olsa bile rerun YAZMAZ ------------
+        // En guclu replay senaryosu: name correction'lar kayitli `from` haline doner,
+        // yani plan yeniden uretilebilir ve hedefler tekrar "uygun" gorunur. Cohort
+        // ledger kaydi yoksa bu rerun sifreleri resetlerdi.
+        $pdo->prepare('UPDATE personeller SET ad = :ad, soyad = NULL WHERE id = 200')->execute(['ad' => 'RAED FAWAZ']);
+        $pdo->prepare('UPDATE personeller SET ad = :ad, soyad = NULL WHERE id = 210')
+            ->execute(['ad' => 'FAHRİ TAYLAN MERCAN']);
+        $postDry = PersonelAccountOnboardingService::migrateCanonicalFirstLoginCredentials($pdo, 1, false);
+        pflcAssert(
+            $postDry['blocked'] === false && $postDry['target_count'] === 3,
+            'APPLY: correction preimage geri alindi -> plan yeniden uretilebilir (3 hedef)'
+        );
+        $postFingerprint = (string) ($postDry['plan_fingerprint'] ?? '');
+        pflcAssert($postFingerprint !== '', 'APPLY: post-apply dry-run fingerprint uretir');
+        pflcAssert($postFingerprint !== $fingerprint, 'APPLY: post-apply fingerprint pinlenen degerden FARKLI');
+
+        $postReplay = PersonelFirstLoginCredentialsApplyReport::run(
+            $pdo,
+            str_repeat('b', 40),
+            $postFingerprint,
+            $neverPersist
+        );
+        pflcAssert(
+            (string) ($postReplay['blocker'] ?? '') === PersonelAccountOnboardingService::ERR_ROLLOUT_ALREADY_APPLIED,
+            'APPLY: yeniden pinlenen fingerprint de ROLLOUT_ALREADY_APPLIED '
+                . '(' . (string) ($postReplay['blocker'] ?? 'null') . ')'
+        );
+        pflcAssert($neverCalled === 0, 'APPLY: post-apply rerun -> preimage uretilmedi');
+        pflcAssert(pflcCredentialRows($pdo) === $replayBefore, 'APPLY: post-apply rerun -> mutation yok');
+        pflcAssert(
+            pflcAuditCount($pdo, PersonelAccountOnboardingService::EVENT_FIRST_LOGIN_ROLLOUT_APPLIED) === 1,
+            'APPLY: rollout ledger tek kayit'
+        );
+
+        // --- 8) Sifresini degistirmis kullanici rerun ile RESET EDILMEZ -----------------
+        $changedHash = PasswordHasher::hash('Kullanici-Yeni-Sifre-2026');
+        $pdo->prepare('UPDATE users SET password_hash = :h, must_change_password = 0 WHERE id = 600')
+            ->execute(['h' => $changedHash]);
+
+        $guarded = PersonelFirstLoginCredentialsApplyReport::run(
+            $pdo,
+            str_repeat('b', 40),
+            $postFingerprint,
+            $neverPersist
+        );
+        pflcAssert(($guarded['result'] ?? 'PASS') === 'BLOCKED', 'APPLY: changed-password kullanici icin rerun BLOCKED');
+        pflcAssert(
+            pflcHashOf($pdo, 600) === $changedHash,
+            'APPLY: CHANGED_PASSWORD_RESET_PROTECTED (template sifre geri yuklenmedi)'
+        );
+        pflcAssert((int) pflcRowById($pdo, 600)['must_change_password'] === 0, 'APPLY: kullanici sifre degisimi durumu korundu');
+        pflcAssert(
+            PasswordHasher::verify('YeniSifre-2026', pflcHashOf($pdo, 600)) === false,
+            'APPLY: yeni sifre hash degismedi'
+        );
+        pflcAssert(
+            PasswordHasher::verify('Kullanici-Yeni-Sifre-2026', pflcHashOf($pdo, 600)),
+            'APPLY: kullanicinin sectigi sifre hala gecerli'
+        );
+        pflcAssert(
+            PasswordHasher::verify('Acikgoz123', pflcHashOf($pdo, 600)) === false,
+            'APPLY: template sifre rerun ile GERI YUKLENMEDI'
+        );
+
+        // --- 9) Canonical owner seviyesinde replay guard dogrudan ----------------------
+        $directReplay = PersonelAccountOnboardingService::migrateCanonicalFirstLoginCredentials(
+            $pdo,
+            1,
+            true,
+            $postFingerprint
+        );
+        pflcAssert($directReplay['blocked'] === true, 'APPLY: owner seviyesinde replay blocked');
+        pflcAssert(
+            $directReplay['blocker'] === PersonelAccountOnboardingService::ERR_ROLLOUT_ALREADY_APPLIED,
+            'APPLY: owner seviyesinde ROLLOUT_ALREADY_APPLIED (' . (string) ($directReplay['blocker'] ?? 'null') . ')'
+        );
+        pflcAssert(
+            pflcHashOf($pdo, 600) === $changedHash,
+            'APPLY: owner replay guard sifre degisimini korudu'
+        );
+        pflcAssert(
+            pflcAuditCount($pdo, PersonelAccountOnboardingService::EVENT_FIRST_LOGIN_CREDENTIALS_APPLIED) === 3,
+            'APPLY: replay credential audit izi ACMADI'
+        );
+    } finally {
+        $root->exec('DROP DATABASE IF EXISTS `' . $applyDb . '`');
+    }
+}
+
+// ---------------------------------------------------------------------------
 // MAIN senaryo: canonical cohort gecisi + ilk giris + zorunlu sifre degisimi
 // ---------------------------------------------------------------------------
 
@@ -954,6 +1434,9 @@ try {
 
     // Business karari senaryosu (explicit override + name correction + ilk giris zinciri).
     pflcRunBusinessDecisionScenario($root);
+
+    // Kontrollu APPLY yolu: fingerprint pini, preimage, replay ve secret-free cikti.
+    pflcRunApplyPathScenario($root);
 
     echo '[DONE] PersonelFirstLoginCredentialsMysqlTestRunner' . PHP_EOL;
 } finally {

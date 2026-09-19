@@ -157,6 +157,7 @@ final class PersonelFirstLoginCredentialsPreflightReport
             'ilkera_touched' => false,
             'decision_apply' => false,
             'decision_applied_count' => 0,
+            'plan_fingerprint' => null,
             'owner_blocked' => false,
             'owner_blocker' => null,
             'refusal_code' => $code,
@@ -303,6 +304,11 @@ final class PersonelFirstLoginCredentialsPreflightReport
             'ilkera_touched' => $ilkeraTouched,
             'decision_apply' => $decisionApply,
             'decision_applied_count' => $appliedCount,
+            // Apply yolu bu exact plana pinlenir; deger canonical sahipten gelir ve
+            // secret-free'dir (yalniz sha256 hex).
+            'plan_fingerprint' => is_string($result['plan_fingerprint'] ?? null)
+                ? (string) $result['plan_fingerprint']
+                : null,
             'owner_blocked' => $ownerBlocked,
             'owner_blocker' => $ownerBlocker,
             'refusal_code' => null,

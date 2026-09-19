@@ -26,9 +26,11 @@ function executablePhp(source: string): string {
 const reportOwnerCode = executablePhp(reportOwner);
 
 const PERSONEL_BRANCH = "if ($mode === 'PERSONEL_FIRST_LOGIN_CREDENTIALS_PREFLIGHT') {";
+const APPLY_BRANCH = "if ($mode === 'PERSONEL_FIRST_LOGIN_CREDENTIALS_APPLY') {";
 const READ_ONLY_BRANCH = "if ($mode === 'READ_ONLY_PREFLIGHT') {";
 
-const personelBlock = worker.slice(worker.indexOf(PERSONEL_BRANCH), worker.indexOf(READ_ONLY_BRANCH));
+const personelBlock = worker.slice(worker.indexOf(PERSONEL_BRANCH), worker.indexOf(APPLY_BRANCH));
+const applyBlock = worker.slice(worker.indexOf(APPLY_BRANCH), worker.indexOf(READ_ONLY_BRANCH));
 
 const EXPECTED_USERNAMES = [
   'abdullah',
@@ -42,10 +44,13 @@ const EXPECTED_USERNAMES = [
 ];
 
 describe('personel first-login read-only control-plane mode', () => {
-  it('is allowlisted as its own mode with no apply counterpart', () => {
-    expect(worker).toContain("|PERSONEL_FIRST_LOGIN_CREDENTIALS_PREFLIGHT)$/'");
-    // The mode is read-only by construction: there is nothing to authorize a write with.
-    expect(worker).not.toContain('PERSONEL_FIRST_LOGIN_CREDENTIALS_APPLY');
+  it('is allowlisted as its own read-only mode with a separate apply sibling', () => {
+    expect(worker).toContain("|PERSONEL_FIRST_LOGIN_CREDENTIALS_PREFLIGHT|PERSONEL_FIRST_LOGIN_CREDENTIALS_APPLY)$/'");
+    // The apply sibling exists but is its own branch and its own owner; the read-only
+    // block below never reaches it and never calls apply = true.
+    expect(worker).toContain(APPLY_BRANCH);
+    expect(applyBlock).not.toContain('PersonelFirstLoginCredentialsPreflightReport');
+    expect(personelBlock).not.toContain('PersonelFirstLoginCredentialsApplyReport');
     expect(worker).not.toContain('PERSONEL_FIRST_LOGIN_CREDENTIALS_DRY_RUN');
   });
 
@@ -167,6 +172,16 @@ describe('personel first-login preflight report owner', () => {
     expect(worker).not.toMatch(/EXPECTED_PERSONEL_TOTAL|EXPECTED_TARGET_COUNT|EXPECTED_EXCLUDED_TOTAL/);
   });
 
+  it('publishes the canonical plan fingerprint so apply can be pinned to it', () => {
+    // The value is produced by the canonical owner, never recomputed here, and stays a
+    // secret-free sha256 hex.
+    expect(service).toContain('firstLoginPlanFingerprint');
+    expect(service).toContain("hash('sha256'");
+    expect(reportOwner).toContain("'plan_fingerprint' =>");
+    expect(reportOwnerCode).toContain("$result['plan_fingerprint']");
+    expect(reportOwnerCode).not.toContain('hash(\'sha256\'');
+  });
+
   it('does not take over the canonical CLI worker', () => {
     expect(reportOwnerCode).not.toContain('personel-first-login-credentials.php');
     expect(cliWorker).toContain('migrateCanonicalFirstLoginCredentials');
@@ -180,10 +195,20 @@ describe('personel first-login preflight workflow', () => {
     expect(workflow).toContain('test "$CONFIRMATION" = "$MODE"');
     // No mode choice list: an operator cannot select anything but the read-only mode.
     expect(workflow).not.toContain('options: [');
-    // The apply literal exists exactly once, and only as the deployed-worker guard
-    // that refuses a worker carrying an apply sibling for this mode.
+    // The apply literal only appears as the paired-build parity gate: the read-only mode
+    // asserts the deployed worker carries the reviewed, fingerprint-pinned apply sibling
+    // instead of falsely treating its presence as a read-only violation.
     expect(workflow.match(/PERSONEL_FIRST_LOGIN_CREDENTIALS_APPLY/g) ?? []).toHaveLength(1);
-    expect(workflow).toContain('UNEXPECTED_PERSONEL_FIRST_LOGIN_APPLY_MODE');
+    expect(workflow).not.toContain('UNEXPECTED_PERSONEL_FIRST_LOGIN_APPLY_MODE');
+    for (const gate of [
+      'PERSONEL_FIRST_LOGIN_APPLY_MODE_MISSING',
+      'PERSONEL_FIRST_LOGIN_APPLY_OWNER_MISSING',
+      'PERSONEL_FIRST_LOGIN_APPLY_FINGERPRINT_GATE_MISSING',
+    ]) {
+      expect(workflow).toContain(gate);
+    }
+    expect(workflow).toContain('PREFLIGHT_APPLY_MODE_PRESENT=YES');
+    expect(workflow).toContain("emit_scalar PLAN_FINGERPRINT '.plan_fingerprint' '^[0-9a-f]{64}$'");
     expect(workflow).toContain('group: cpanel-canonical-migration-control');
     expect(workflow).toContain('permissions:\n  contents: read');
   });
@@ -262,7 +287,7 @@ describe('personel first-login preflight workflow', () => {
     expect(workflow).toContain('PREFLIGHT_REPORT_REQUEST_MISMATCH');
     expect(workflow).toContain('PREFLIGHT_REPORT_SHA_MISMATCH');
     expect(workflow).toContain('REMOTE_WORKER_PARITY_MISMATCH');
-    expect(workflow).toContain('UNEXPECTED_PERSONEL_FIRST_LOGIN_APPLY_MODE');
+    expect(workflow).toContain('PERSONEL_FIRST_LOGIN_APPLY_MODE_MISSING');
   });
 
   it('writes a request with no field that could ask for a mutation', () => {

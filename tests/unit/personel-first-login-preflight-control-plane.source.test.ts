@@ -325,6 +325,9 @@ describe('personel first-login preflight workflow', () => {
     expect(step).toContain(
       'assert_control_plane_clean_for_request "$before_listing" "$after_listing" "$request_id"',
     );
+    // The read-only preflight caller declares no allowlist, so it keeps the original
+    // contract exactly: this run's archived request and nothing else.
+    expect(step).not.toContain('expected_extra');
     expect(step).toContain(
       'before_listing="$RUNNER_TEMP/personel-first-login-preflight/control-listing.txt"',
     );
@@ -356,6 +359,25 @@ describe('personel first-login preflight workflow', () => {
     expect(cleanlinessLib).toContain('grep -vxF -f "$work/before.txt"');
     // Read-only by construction: the contract never removes a remote file.
     expect(cleanlinessLib).not.toMatch(/^\s*(rm|mv|put|mput|mrm)\s+.*migration-control/m);
+  });
+
+  it('accepts extra delta entries only through an exact opt-in allowlist', () => {
+    // The allowlist is opt-in: absent by default, so the preflight caller is unchanged.
+    expect(cleanlinessLib).toContain('local -a expected_extra=("$@")');
+    expect(cleanlinessLib).toContain('CONTROL_PLANE_ALLOWLIST_ENTRY_INVALID');
+    // A glob, a request.* entry or a path separator is refused instead of widening the list.
+    expect(cleanlinessLib).toContain("== *'*'*");
+    expect(cleanlinessLib).toContain("== *'/'*");
+    expect(cleanlinessLib).toContain('== request.*');
+    // This run's own request state is judged BEFORE the allowlist, so an allowlist entry
+    // can never excuse a pending/failed/processing request file.
+    const requestStateIndex = cleanlinessLib.indexOf('request.processing.*)');
+    const allowlistMatchIndex = cleanlinessLib.indexOf('for candidate in "${expected_extra[@]:-}"');
+    expect(requestStateIndex).toBeGreaterThan(0);
+    expect(allowlistMatchIndex).toBeGreaterThan(requestStateIndex);
+    // The exact allowlist is an equality test, never a pattern match.
+    expect(cleanlinessLib).toContain('"$entry" == "$candidate"');
+    expect(cleanlinessLib).not.toMatch(/\[\[\s*"\$entry"\s*==\s*\$candidate\s*\]\]/);
   });
 });
 
@@ -413,6 +435,20 @@ describe('personel first-login control-plane cleanliness runtime', () => {
       'FOREIGN_COMPLETION_ONLY_RC=PASS',
       // A fresh control plane with a clean completion still passes.
       'EMPTY_BEFORE_COMPLETED_RC=PASS',
+      // The first-ever APPLY's own two outputs: PASS only with the exact allowlist,
+      // and still BLOCKED without it.
+      'APPLY_OWN_OUTPUTS_ALLOWLISTED_RC=PASS',
+      'APPLY_OWN_OUTPUTS_NO_ALLOWLIST_RC=PASS',
+      'ALLOWLIST_PLUS_UNKNOWN_DELTA_RC=PASS',
+      // Request state and pattern entries are never allowlistable.
+      'CURRENT_PENDING_WITH_ALLOWLIST_RC=PASS',
+      'CURRENT_FAILED_WITH_ALLOWLIST_RC=PASS',
+      'CURRENT_PROCESSING_LEAK_WITH_ALLOWLIST_RC=PASS',
+      'ALLOWLIST_GLOB_REFUSED_RC=PASS',
+      'ALLOWLIST_REQUEST_ENTRY_REFUSED_RC=PASS',
+      'ALLOWLIST_PATH_REFUSED_RC=PASS',
+      // The preflight caller keeps the original contract.
+      'PREFLIGHT_CALLER_NO_EXTRAS_RC=PASS',
       'HARNESS_FAIL=0',
     ]) {
       expect(output).toContain(assertion);

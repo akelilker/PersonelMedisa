@@ -516,7 +516,18 @@ jobs:
           before_listing="$RUNNER_TEMP/personel-first-login-apply/control-listing.txt"
           after_listing="${work}/control-listing-after.txt"
 
-          if ! reason="$(assert_control_plane_clean_for_request "$before_listing" "$after_listing" "$request_id")"; then
+          # The first-ever APPLY legitimately persists its own two control-plane outputs beside
+          # this run's archived request: the secret-free apply report and the recovery preimage.
+          # They are named EXACTLY here — no wildcard and no operation-prefix pattern — so any
+          # other delta still blocks, and an entry here can never excuse a pending, failed or
+          # processing request file. Naming the preimage is a delta declaration only: it is still
+          # never fetched and never published by this workflow.
+          expected_extra=(
+            "personel-first-login-apply.json"
+            "personel-first-login-apply-preimage.json"
+          )
+
+          if ! reason="$(assert_control_plane_clean_for_request "$before_listing" "$after_listing" "$request_id" "${expected_extra[@]}")"; then
             echo "APPLY_RESULT=BLOCKED"
             echo "APPLY_REASON=${reason}"
             exit 1

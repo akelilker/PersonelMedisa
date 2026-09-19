@@ -1,29 +1,30 @@
-CODE_MIGRATION_TIP: 089
+CODE_MIGRATION_TIP: 090
 PRODUCTION_MIGRATION_TIP: 087
 
 # 110 — Canonical Closure / Gap Registry
 
 **Tür:** Güncel durum kaydı ve sonraki iş seçimi için tek referans.
-**Güncelleme:** 2026-09-08 (`HOSTING_RECOVERY_TO_FULL_ORDERED_CLOSE_SWEEP`; code tip 088; production tip 087 pending 088; BM owner = `sube_sorumlu_yoneticiler`; mutation apply gates still explicit)
+**Güncelleme:** 2026-09-19 (`SGK_REPORTING_PERIOD_CANONICAL_OWNER_CORRECTION`; code tip 090; production tip 087 pending 088+089+090; SGK reporting-period owner = `SGK_ISVEREN`; A1 12/13 branch-specific period SUPERSEDED; BM owner = `sube_sorumlu_yoneticiler`; mutation apply gates still explicit)
 **Kapsam:** PersonelMedisa teknik ana sistem kapanışı + business-truth / branch-manager model kilidi. Production write / deploy / secret / FTP / migration apply / A1 apply / personel mutasyonu / branch-manager write **yok**.
 
 ## Migration durumu
 
 | Alan | Değer | Kanıt / sınır |
 | --- | --- | --- |
-| CODE_MIGRATION_TIP | **089** | `089_personel_legacy_account_activation.sql` — hic aktive edilmemis legacy PERSONEL hesaplarini canonical secure activation modeline alir (`activation_required=1`, `must_change_password=1`) |
-| PRODUCTION_MIGRATION_TIP | **087** | Live tip **087**; pending **088** + **089** (explicit Apply cPanel migrations gerektirir) |
+| CODE_MIGRATION_TIP | **090** | `090_sgk_isveren_bildirim_donemi_owner.sql` — SGK bildirim donemi canonical owner'i SUBE degil SGK_ISVEREN eksenidir (additive, seed yok; A1 12/13 branch-specific period modelini supersede eder) |
+| PRODUCTION_MIGRATION_TIP | **087** | Live tip **087**; pending **088** + **089** + **090** (explicit Apply cPanel migrations gerektirir) |
 | Migration 085 | **APPLIED** | `085_gunluk_bildirim_duzeltme_auditleri.sql` |
 | Migration 086 | **APPLIED** | `086_personel_historical_exit_date_correction_auditleri.sql` |
 | Migration 087 | **APPLIED** | `087_sube_muhasebe_yetkilileri.sql` |
 | Migration 088 | **CODE_ONLY_PENDING** | No production apply until explicit Apply cPanel migrations |
 | Migration 089 | **CODE_ONLY_PENDING** | Legacy PERSONEL hesaplarinin canonical secure activation modeline hizalanmasi; production apply explicit onay ister |
+| Migration 090 | **CODE_ONLY_PENDING** | `090_sgk_isveren_bildirim_donemi_owner.sql` — SGK bildirim donemi owner'i SGK_ISVEREN eksenine tasindi; branch-specific period fix'i supersede eder; production apply explicit onay ister |
 | CODE_MAIN_SHA | **`f5551160cab7d12b2086d7146c7822f4dfdb469d`** | #274+#275+#276+#277 merged; #278 integrating |
 | PRODUCTION_DEPLOY_SHA (LIVE) | **`f5551160cab7d12b2086d7146c7822f4dfdb469d`** | After #277 deploy in recovery sweep |
 | PR #271 | **CLOSED** | Do not reopen |
 | PR #272 | **CLOSED** | Do not reopen |
 | PR #274 | **MERGED / DEPLOYED** | Recovery deploy PASS @ `63f8c905` |
-| Canlı migration doğrulaması | **PASS @ 087** / pending **088** | Hosting recovered; apply gated |
+| Canlı migration doğrulaması | **PASS @ 087** / pending **088** + **089** + **090** | Hosting recovered; apply gated |
 
 ## Durum sözlüğü
 
@@ -41,9 +42,14 @@ PRODUCTION_MIGRATION_TIP: 087
 
 ## A1 / A2 / location / branch-manager
 
+A1_SUPERSEDED_BY: SUPERSEDED_BY_SGK_EMPLOYER_PERIOD_OWNER_CORRECTION
+REPORTING_PERIOD_CANONICAL_AXIS: SGK_ISVEREN
+BRANCH_SPECIFIC_PERIOD_REQUIRED: NO
+A1_12_13_TARGET_FIX: NO — 12/13 branch-specific period rows are NOT the target fix.
+
 | ID | Konu | Durum | Not |
 | --- | --- | --- | --- |
-| `MG-A1-SGK-PERIOD-12-13` | İzmir/Sakarya SGK period dual-control apply | **PRODUCTION_CONFIG_WAITING** / **PAUSED_PENDING_HOST_RECOVERY_AND_SINEM_LIVE_VERIFY** | Preparer `sedanurB`; approver **Sinem Hamaloğlu** (BOLUM_YONETICISI model; temporary); live identity VERIFY_LIVE_REQUIRED; **no apply now** |
+| `MG-A1-SGK-PERIOD-12-13` | İzmir/Sakarya SGK period dual-control apply | **SUPERSEDED_BY_SGK_EMPLOYER_PERIOD_OWNER_CORRECTION** | Historical: Preparer `sedanurB`; approver **Sinem Hamaloğlu**; 12/13 ayni `sgk_isveren_id=1` eksenindedir → branch-specific period row hedef fix degil; **no apply now**. Eski kanit arsiv olarak kalir. |
 | `MG-A2-LOCATION-160-211` | Sedanur/Zeynep location fill | **CLOSED** | Do not reopen |
 | `MG-LOC5-ACTIVE-SET` | 200/201/203/204/205/206/209/210/212/217 → loc5 | **BUSINESS_TRUTH_RESOLVED_NO_APPLY** | Preimage plan ready; production write=0 |
 | `MG-NAME-203` | Muhammed Mahmud name correction | **BUSINESS_TRUTH_RESOLVED_NO_APPLY** | Only `ad`/`soyad`; no write |
@@ -63,7 +69,7 @@ PRODUCTION_MIGRATION_TIP: 087
 | `MG-KAYSERI-KUBRA-IDENTITY` | Kayseri manager Kübra surname | **BUSINESS_IDENTITY_DECISION_REQUIRED** |
 | `MG-SINEM-LIVE-VERIFY` | Sinem account/role/actor/scopes | **LIVE_DATA_VERIFY_WAITING** |
 | `MG-PERSONNEL-POST-BULK-ACCOUNT-014` | Post-bulk PERSONEL accounts | **INTENTIONAL_DEFER** |
-| `MG-SGK-PERIOD-BRANCH-12-13` | A1 period policy | **PRODUCTION_CONFIG_WAITING** (paused) |
+| `MG-SGK-PERIOD-BRANCH-12-13` | A1 period policy | **SUPERSEDED_BY_SGK_EMPLOYER_PERIOD_OWNER_CORRECTION** (branch-specific period hedef fix degil) |
 | `MG-NULL-LOCATION-HR-RESIDUAL` | Other null locations not in locked set | do not force loc5; RO refresh after host recovery |
 | `MG-CROSS-COMPANY-120-158-219` | Cross-company axis pairs | **CROSS_COMPANY_SEMANTICALLY_VALID_DEFER** |
 
@@ -76,7 +82,7 @@ Karyapı / Şenay company rollout, QR self-service/mobile broad, PERSONEL self-s
 | Sınıf | Durum |
 | --- | --- |
 | **LOCAL_TECHNICAL_GAPS** | Branch-manager durable owner shipping in #278 (088); apply + manager rows after deploy |
-| **PRODUCTION_CONFIG_GATES** | A1 12/13; sedanurB + Sinem explicit 12/13; loc5 apply; BM grants; 203 name |
+| **PRODUCTION_CONFIG_GATES** | A1 12/13 branch-specific period **SUPERSEDED** (owner correction); loc5 apply; BM grants; 203 name |
 | **LIVE_VERIFY_GATES** | PR274 live SHA; Sinem identity; Halil managed branches; loc5 preimages |
 | **BUSINESS_DECISIONS** | Kayseri Kübra surname |
 | **INTENTIONAL_DEFERS** | Karyapı/Şenay/QR/self-service/polish; 120/158/219 |

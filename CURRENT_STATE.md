@@ -1,6 +1,6 @@
-CODE_MIGRATION_TIP: 089
+CODE_MIGRATION_TIP: 090
 PRODUCTION_MIGRATION_TIP: 087
-PRODUCTION_MIGRATION_PENDING: 2
+PRODUCTION_MIGRATION_PENDING: 3
 PRODUCTION_DEPLOY_SHA: d96182a2a4b4cb5e9e6d7c867d3486d7ac4061b2
 CODE_MAIN_SHA: d96182a2a4b4cb5e9e6d7c867d3486d7ac4061b2
 
@@ -8,7 +8,7 @@ CODE_MAIN_SHA: d96182a2a4b4cb5e9e6d7c867d3486d7ac4061b2
 
 CODE_MAIN advanced #275→#301. LIVE after #301 deploy: `d96182a2` (Deploy cPanel run `34936838710` SUCCESS; `FINAL_SHA_GET=SUCCESS` parity; canlı bundle `index-DY8cYDBX.js` / `index-Dl13eR2G.css`; anonim `smoke:live` OK). Earlier live pins this sweep: `34b2fd30` (#300), `ef2c8db5` (#299), `eb8aa517`, `f5551160` (#277), `63f8c905` (PR274 recovery deploy).
 HOSTING: RECOVERED (FTP/API healthy). Ordered merge/deploy sweep CLOSED through #301 — kuyrukta merge/deploy yok.
-CODE tip **089** (`089_personel_legacy_account_activation.sql`); PRODUCTION tip **087**; pending **088** + **089**.
+CODE tip **090** (`090_sgk_isveren_bildirim_donemi_owner.sql`); PRODUCTION tip **087**; pending **088** + **089** + **090**.
 PHASE: PERSONEL_ACCOUNT_CANONICAL_UNIFICATION
 APPLIED_THIS_TURN: NO (migration 089 yalniz code; production apply ayrı explicit onay ister)
 
@@ -32,16 +32,29 @@ SENAY_ROLLOUT: INTENTIONAL_DEFER
 QR_SELF_SERVICE: INTENTIONAL_DEFER
 ACL_SUBE_MUHASEBE_ROWS: 0 intentional (restriction disabled while empty)
 
-## A1 — SGK period policy sube 12 / 13
+## A1 — SGK period policy sube 12 / 13 — SUPERSEDED
 
-SGK_PERIOD_OWNER_RUNTIME: SgkSirketPolitikaReadService::resolveForPeriod (branch-scoped; no company inheritance)
-SGK_PERIOD_OWNER_WRITE: SgkSirketPolitikaWriteService::import → submit → approve (dual-control via SgkKararPaketiAuthz)
-A1_STATUS: PAUSED_PENDING_HOST_RECOVERY_AND_SINEM_LIVE_VERIFY
+A1_SUPERSEDED_BY: SUPERSEDED_BY_SGK_EMPLOYER_PERIOD_OWNER_CORRECTION
+A1_SUPERSEDED_REASON: SGK bildirim donemi owner'i SUBE degil SGK_ISVEREN'dir; Medisa branch 1/2/4/5/6/12/13 ayni sgk_isveren_id=1 eksenindedir, bu yuzden 12/13 icin branch-specific period policy gereksinimi yanlis modeldi.
+REPORTING_PERIOD_IS_MANAGEMENT_CHOICE: NO
+REPORTING_PERIOD_CANONICAL_AXIS: SGK_ISVEREN
+BRANCH_SPECIFIC_PERIOD_REQUIRED: NO
+A1_12_13_TARGET_FIX: NO — 12/13 branch-specific period rows are NOT the target fix.
+A1_STATUS: SUPERSEDED (historical evidence preserved; no branch-specific apply)
+SGK_PERIOD_OWNER_RUNTIME: SgkIsverenBildirimDonemiReadService::resolveForPeriod (SGK_ISVEREN axis; source = personeller.sgk_isveren_id)
+SGK_PERIOD_OWNER_WRITE: employer-scoped prepare/submit/approve owner (090 code tip; production apply yok)
+SGK_PERIOD_OWNER_WRITE_LEGACY: SgkSirketPolitikaWriteService::import → submit → approve (branch-scoped; management policy owner olarak korunuyor)
+LEGACY_MANAGEMENT_POLICY_UNCHANGED: SGK_ODENEK_MAHSUP_MODU ve benzeri policy semantics bu fazda degismedi.
+
+### A1 historical evidence (do not re-apply as-is)
+
+SGK_PERIOD_OWNER_RUNTIME_HISTORICAL: SgkSirketPolitikaReadService::resolveForPeriod (branch-scoped; no company inheritance)
+A1_STATUS_HISTORICAL: PAUSED_PENDING_HOST_RECOVERY_AND_SINEM_LIVE_VERIFY
 A1_CLASSIFICATION: PRODUCTION_CONFIG_WAITING
 A1_CAN_BE_DONE_WITH_EXISTING_OWNER: YES (after host recovery + live Sinem verify + explicit approval)
 A1_PAIR_STATUS: BUSINESS_LOCKED_TEMPORARY_ASSIGNMENT
-BRANCH_12_CURRENT: NO_APPROVED_POLICY (until A1 apply)
-BRANCH_13_CURRENT: NO_APPROVED_POLICY (until A1 apply)
+BRANCH_12_CURRENT: NO_APPROVED_POLICY (historical; branch-specific apply artik hedef fix degil)
+BRANCH_13_CURRENT: NO_APPROVED_POLICY (historical; branch-specific apply artik hedef fix degil)
 LOCKED_POLITIKA_HASH_12: 43e3a75e2c3f4c5f6eef72b2036d9498c4c847c9594923bab9e61691da4559af
 LOCKED_POLITIKA_HASH_13: c155365fb2670836ff6388248fd755634b832454872ed441efa8b94372d4b4bb
 PREPARER: sedanurB (role IK_SORUMLUSU; actor_identity VERIFIED; prepare YES; approve NO; needs explicit user_subeler 12/13)

@@ -27,7 +27,7 @@ Owner: `OrgScope` (+ `HrWriteScope` for `IK_PERSONELI` write companies). Session
 | `sube_muhasebe_yetkilileri` | **0 rows** | ACL restriction DISABLED (intentional) |
 | Karyapı / Şenay operational rollout | **INTENTIONAL_DEFER** | do not invent grants |
 | A2 160/211 location | **CLOSED** | do not reopen |
-| A1 SGK period 12/13 | **PAUSED_PENDING_HOST_RECOVERY_AND_SINEM_LIVE_VERIFY** | preparer `sedanurB` + approver Sinem Hamaloğlu locked; live verify + no apply while hosting incident |
+| A1 SGK period 12/13 | **SUPERSEDED_BY_SGK_EMPLOYER_PERIOD_OWNER_CORRECTION** | 12/13 branch-specific period rows are NOT the target fix; SGK bildirim donemi owner'i SGK_ISVEREN eksenidir. Historical evidence preserved (preparer `sedanurB` + approver Sinem Hamaloğlu locked; no apply). |
 
 Historical PLAN-only pins that said grants=0 / tip=086 / locations deferred are **not** current live truth.
 
@@ -50,6 +50,6 @@ Historical PLAN-only pins that said grants=0 / tip=086 / locations deferred are 
 
 ## Related residuals (Priority A — see CURRENT_STATE)
 
-- SGK period policy missing for Medisa sube **12/13** (`NO_APPROVED_POLICY`)
+- SGK period policy missing for Medisa sube **12/13** (`NO_APPROVED_POLICY`) — **SUPERSEDED_BY_SGK_EMPLOYER_PERIOD_OWNER_CORRECTION**: 12/13 branch-specific period rows are NOT the target fix; reporting period follows `sgk_isveren_id` (Medisa = 1)
 - Personnel `calisma_lokasyonu_id` NULL = 16 (2 AUTO NO-APPLY candidates)
 - Personnel `sube_id` NULL = 1 (personel 212)

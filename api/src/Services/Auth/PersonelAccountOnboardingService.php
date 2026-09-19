@@ -33,6 +33,12 @@ class PersonelAccountOnboardingService
     public const EVENT_ACTIVATION_REVOKED = 'ACTIVATION_REVOKED';
     /** Canonical first-login credential gecisi (username + template sifre hash + zorunlu degisim). */
     public const EVENT_FIRST_LOGIN_CREDENTIALS_APPLIED = 'PERSONEL_FIRST_LOGIN_CREDENTIALS_APPLIED';
+    /**
+     * Rollout seviyesinde TEK SEFERLIK ledger izi (user_id ve personel_id NULL). Cohort'un
+     * tamami bir kez uygulandigini kanitlar; apply yolu bu kaydi gorunce fail-closed durur.
+     * Boyutce: rollout basina tek satir; secret tasimaz (yalniz fingerprint + sayilar).
+     */
+    public const EVENT_FIRST_LOGIN_ROLLOUT_APPLIED = 'PERSONEL_FIRST_LOGIN_ROLLOUT_APPLIED';
 
     /**
      * Yeni hesap create yolunun canonical credential modeli (secret tasimaz):
@@ -45,6 +51,16 @@ class PersonelAccountOnboardingService
      * Bu hesaplarin username / password_hash / rol / durum / personel_id / scope alanlari degismez.
      */
     public const PROTECTED_USERNAMES = ['ilkerA'];
+
+    /**
+     * Bu first-login credential rollout'unun kapsami DISINDA tutulan personel id'leri.
+     *
+     * 219 (doguA / Dogu Berkan Atmaca) henuz PERSONEL hesabi DEGILDIR ve bu rollout'a
+     * DAHIL EDILMEZ; kendi ayri canonical onboarding operasyonu ile acilacaktir. Hesap
+     * bir gun once acilirsa plana girer ve apply fail-closed durur: bu liste sessizce
+     * genisleyen bir cohort degil, kilitli bir kapsam siniridir.
+     */
+    public const ROLLOUT_EXCLUDED_PERSONEL_IDS = [219];
 
     /**
      * Explicit business override'lari (business karari; generic kuralin ONUNDE gelir).
@@ -118,6 +134,20 @@ class PersonelAccountOnboardingService
     public const ERR_CANONICAL_USERNAME_COLLISION = 'PERSONEL_CANONICAL_USERNAME_COLLISION';
     /** Name correction preimage uyusmazsa hicbir mutation yapilmaz (fail-closed). */
     public const ERR_NAME_CORRECTION_PREIMAGE = 'PERSONEL_NAME_CORRECTION_PREIMAGE_MISMATCH';
+    /**
+     * Apply, cagiranin pinledigi plan fingerprint'i ile yeniden uretilen plan uyusmazsa
+     * hicbir mutation yapilmaz. Cohort drift / SHA drift apply'i fail-closed durdurur.
+     */
+    public const ERR_PLAN_FINGERPRINT_MISMATCH = 'PERSONEL_FIRST_LOGIN_PLAN_FINGERPRINT_MISMATCH';
+    /**
+     * Bu rollout daha once uygulanmissa ikinci kez calistirilmaz. Replay, ilk girisinden
+     * sonra sifresini degistirmis bir kullanicinin template sifresini geri yuklememelidir.
+     */
+    public const ERR_ROLLOUT_ALREADY_APPLIED = 'PERSONEL_FIRST_LOGIN_ROLLOUT_ALREADY_APPLIED';
+    /**
+     * ROLLOUT_EXCLUDED_PERSONEL_IDS icindeki bir personel plana girerse cohort fail-closed durur.
+     */
+    public const ERR_ROLLOUT_SCOPE_VIOLATION = 'PERSONEL_FIRST_LOGIN_ROLLOUT_SCOPE_VIOLATION';
 
     /**
      * Personel icin canonical first-login modelinde hesap olusturur ve `personel_id` ile baglar.
@@ -691,12 +721,24 @@ class PersonelAccountOnboardingService
      * mutate edilmez; sonuc blocked = true + blocker/collisions ile doner.
      * Plaintext sifre ve hash loglanmaz; response'a konmaz.
      *
-     * @param int|null $actorUserId Audit izi icin aktor; apply sirasinda zorunludur.
+     * @param int|null $actorUserId Audit izi icin aktor; pinned fingerprint olmadan apply zorunludur.
      * @param bool $apply false ise dry-run: hicbir yazma yapilmaz.
+     * @param string|null $expectedPlanFingerprint Apply'in pinledigi plan fingerprint'i. Verilirse
+     *        plan bu degerle exact eslesmeli; aksi halde hicbir satir yazilmaz.
+     *
+     * Replay siniri: apply yalnizca TEK SEFERDIR. Cohort seviyesinde
+     * EVENT_FIRST_LOGIN_ROLLOUT_APPLIED kaydi ya da satir seviyesinde daha once uygulanmis bir
+     * hedef varsa apply hicbir satir mutate etmeden blocked doner. Bu yuzden ilk giristen sonra
+     * sifresini degistirmis bir kullanicinin template sifresi bir rerun ile geri yuklenemez.
+     *
      * @return array<string, mixed>
      */
-    public static function migrateCanonicalFirstLoginCredentials(PDO $pdo, $actorUserId = null, $apply = false)
-    {
+    public static function migrateCanonicalFirstLoginCredentials(
+        PDO $pdo,
+        $actorUserId = null,
+        $apply = false,
+        ?string $expectedPlanFingerprint = null
+    ) {
         if (!UsersSchema::hasPersonelId($pdo)
             || !UsersSchema::hasActivationRequired($pdo)
             || !UsersSchema::hasMustChangePassword($pdo)
@@ -813,6 +855,10 @@ class PersonelAccountOnboardingService
             ];
         }
 
+        // Deterministic, SECRET-FREE plan fingerprint (plaintext sifre / hash asla girmez).
+        // Apply bu exact degere pinlenir; cohort kayarsa apply hicbir satir yazmaz.
+        $planFingerprint = self::firstLoginPlanFingerprint($plan, $excluded);
+
         if (count($collisions) > 0) {
             return [
                 'apply' => false,
@@ -824,6 +870,7 @@ class PersonelAccountOnboardingService
                 'excluded' => $excluded,
                 'applied_count' => 0,
                 'audit_event' => null,
+                'plan_fingerprint' => $planFingerprint,
             ];
         }
 
@@ -840,6 +887,25 @@ class PersonelAccountOnboardingService
                 'excluded' => $excluded,
                 'applied_count' => 0,
                 'audit_event' => null,
+                'plan_fingerprint' => $planFingerprint,
+            ];
+        }
+
+        // Kapsam siniri: rollout disi bir personel plana girerse hicbir satir yazilmaz.
+        $rolloutScopeViolations = self::rolloutScopeViolations($plan);
+        if (count($rolloutScopeViolations) > 0) {
+            return [
+                'apply' => false,
+                'blocked' => true,
+                'blocker' => self::ERR_ROLLOUT_SCOPE_VIOLATION,
+                'collisions' => [],
+                'rollout_scope_violations' => $rolloutScopeViolations,
+                'target_count' => count($plan),
+                'plan' => $plan,
+                'excluded' => $excluded,
+                'applied_count' => 0,
+                'audit_event' => null,
+                'plan_fingerprint' => $planFingerprint,
             ];
         }
 
@@ -854,13 +920,77 @@ class PersonelAccountOnboardingService
                 'excluded' => $excluded,
                 'applied_count' => 0,
                 'audit_event' => null,
+                'plan_fingerprint' => $planFingerprint,
+            ];
+        }
+
+        // SAME-COHORT GATE: cagiranin pinledigi plan ile yeniden uretilen plan ayni olmali.
+        if ($expectedPlanFingerprint !== null
+            && strtolower(trim($expectedPlanFingerprint)) !== $planFingerprint
+        ) {
+            return [
+                'apply' => false,
+                'blocked' => true,
+                'blocker' => self::ERR_PLAN_FINGERPRINT_MISMATCH,
+                'collisions' => [],
+                'target_count' => count($plan),
+                'plan' => $plan,
+                'excluded' => $excluded,
+                'applied_count' => 0,
+                'audit_event' => null,
+                'plan_fingerprint' => $planFingerprint,
+                'expected_plan_fingerprint' => strtolower(trim((string) $expectedPlanFingerprint)),
+            ];
+        }
+
+        // ONE-SHOT / REPLAY GATE (cohort seviyesi): rollout bir kez uygulanir.
+        if (self::firstLoginRolloutApplied($pdo)) {
+            return [
+                'apply' => false,
+                'blocked' => true,
+                'blocker' => self::ERR_ROLLOUT_ALREADY_APPLIED,
+                'collisions' => [],
+                'target_count' => count($plan),
+                'plan' => $plan,
+                'excluded' => $excluded,
+                'applied_count' => 0,
+                'audit_event' => null,
+                'plan_fingerprint' => $planFingerprint,
+            ];
+        }
+
+        // ONE-SHOT / REPLAY GATE (satir seviyesi): daha once uygulanmis hedef tekrar yazilmaz.
+        $appliedUserIds = self::firstLoginCredentialAppliedUserIds($pdo);
+        $replayedUserIds = [];
+        foreach ($plan as $item) {
+            $userId = (int) $item['user_id'];
+            if (isset($appliedUserIds[$userId])) {
+                $replayedUserIds[] = $userId;
+            }
+        }
+        if (count($replayedUserIds) > 0) {
+            return [
+                'apply' => false,
+                'blocked' => true,
+                'blocker' => self::ERR_ROLLOUT_ALREADY_APPLIED,
+                'collisions' => [],
+                'target_count' => count($plan),
+                'plan' => $plan,
+                'excluded' => $excluded,
+                'applied_count' => 0,
+                'audit_event' => null,
+                'plan_fingerprint' => $planFingerprint,
+                'replayed_user_ids' => $replayedUserIds,
             ];
         }
 
         $actor = $actorUserId === null ? 0 : (int) $actorUserId;
-        if ($actor <= 0) {
+        // Pinlenmis bir kontrol duzlemi apply'inda insan aktoru yoktur; audit izi NULL aktorle
+        // ve request/fingerprint kanitlariyla tutulur. Pinsiz apply hala aktor ister.
+        if ($actor <= 0 && $expectedPlanFingerprint === null) {
             JsonResponse::badRequest('Actor user id zorunludur.', 'VALIDATION_ERROR', 'actor_user_id');
         }
+        $actorAuditId = $actor > 0 ? $actor : null;
 
         $pdo->beginTransaction();
         try {
@@ -932,7 +1062,7 @@ class PersonelAccountOnboardingService
                     'event_type' => self::EVENT_FIRST_LOGIN_CREDENTIALS_APPLIED,
                     'user_id' => $item['user_id'],
                     'personel_id' => $item['personel_id'],
-                    'actor_user_id' => $actor,
+                    'actor_user_id' => $actorAuditId,
                     'detail_json' => json_encode([
                         'source' => 'canonical_first_login_credentials',
                         'business_override' => $item['business_override'],
@@ -961,6 +1091,19 @@ class PersonelAccountOnboardingService
                 ]);
                 $applied[] = $item;
             }
+
+            // One-shot rollout ledger: bu exact cohort'un uygulandigi, mutation'larla AYNI
+            // transaction icinde kaydedilir. Sonraki bir apply bu kaydi gorup fail-closed durur;
+            // boylece rerun, sifresini degistirmis bir kullanicinin template sifresini geri yuklemez.
+            // Secret tasimaz: yalniz fingerprint + sayilar.
+            self::writeAudit($pdo, self::EVENT_FIRST_LOGIN_ROLLOUT_APPLIED, null, null, $actorAuditId, null, [
+                'source' => 'canonical_first_login_credentials',
+                'plan_fingerprint' => $planFingerprint,
+                'target_count' => count($plan),
+                'applied_count' => count($applied),
+                'name_correction_count' => count($nameCorrectionTargets),
+                'actor_source' => $actorAuditId === null ? 'control_plane' : 'actor_user_id',
+            ]);
 
             $pdo->commit();
         } catch (\Throwable $e) {
@@ -991,7 +1134,131 @@ class PersonelAccountOnboardingService
             'excluded' => $excluded,
             'applied_count' => count($applied),
             'audit_event' => self::EVENT_FIRST_LOGIN_CREDENTIALS_APPLIED,
+            'rollout_ledger_event' => self::EVENT_FIRST_LOGIN_ROLLOUT_APPLIED,
+            'plan_fingerprint' => $planFingerprint,
+            'name_correction_count' => count($nameCorrectionTargets),
         ];
+    }
+
+    /**
+     * Deterministic, SECRET-FREE plan fingerprint.
+     *
+     * Pinlenen cohort'un tamamini kapsar: plan satirlari (user/personel id, eski-yeni kullanici
+     * adi, override/correction ve correction preimage'i) ve excluded bucket'lari. Plaintext sifre
+     * veya password_hash ASLA bu girdiye girmez; cikti da yalnizca sha256 hex'tir. Ayni DB
+     * durumundan her zaman ayni deger uretilir, bu yuzden apply oncesi dry-run ile apply
+     * anindaki plan ayni fingerprint'e sahip olmak zorundadir.
+     *
+     * @param array<int, array<string, mixed>> $plan
+     * @param array<string, array<int, array<string, mixed>>> $excluded
+     */
+    public static function firstLoginPlanFingerprint(array $plan, array $excluded): string
+    {
+        $rows = [];
+        foreach ($plan as $item) {
+            $correction = is_array($item['name_correction'] ?? null) ? $item['name_correction'] : null;
+            $rows[] = [
+                'user_id' => (int) ($item['user_id'] ?? 0),
+                'personel_id' => (int) ($item['personel_id'] ?? 0),
+                'old_username' => (string) ($item['old_username'] ?? ''),
+                'new_username' => (string) ($item['new_username'] ?? ''),
+                'username_changed' => ($item['username_changed'] ?? false) === true,
+                'business_override' => ($item['business_override'] ?? false) === true,
+                'name_correction' => $correction === null ? null : [
+                    'from_ad' => $correction['from']['ad'] ?? null,
+                    'from_soyad' => $correction['from']['soyad'] ?? null,
+                    'to_ad' => $correction['to']['ad'] ?? null,
+                    'to_soyad' => $correction['to']['soyad'] ?? null,
+                    'preimage_match' => ($correction['preimage_match'] ?? false) === true,
+                ],
+            ];
+        }
+        usort($rows, static function (array $a, array $b): int {
+            return $a['user_id'] <=> $b['user_id'];
+        });
+
+        $excludedRows = [];
+        foreach ($excluded as $bucket => $bucketRows) {
+            foreach (is_array($bucketRows) ? $bucketRows : [] as $row) {
+                if (!is_array($row)) {
+                    continue;
+                }
+                $excludedRows[] = [
+                    'bucket' => (string) $bucket,
+                    'user_id' => (int) ($row['user_id'] ?? 0),
+                    'username' => (string) ($row['username'] ?? ''),
+                ];
+            }
+        }
+        usort($excludedRows, static function (array $a, array $b): int {
+            return [$a['bucket'], $a['user_id']] <=> [$b['bucket'], $b['user_id']];
+        });
+
+        $canonical = json_encode([
+            'schema' => 'PERSONEL_FIRST_LOGIN_PLAN_V1',
+            'rows' => $rows,
+            'excluded' => $excludedRows,
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+        return hash('sha256', $canonical === false ? '' : $canonical);
+    }
+
+    /**
+     * Cohort seviyesi one-shot kaniti: bu rollout daha once uygulandi mi?
+     */
+    public static function firstLoginRolloutApplied(PDO $pdo): bool
+    {
+        $stmt = $pdo->prepare(
+            'SELECT COUNT(*) FROM personel_account_onboarding_audit WHERE event_type = :event'
+        );
+        $stmt->execute(['event' => self::EVENT_FIRST_LOGIN_ROLLOUT_APPLIED]);
+
+        return (int) $stmt->fetchColumn() > 0;
+    }
+
+    /**
+     * Satir seviyesi replay kaniti: daha once first-login credential gecisi uygulanmis user id seti.
+     *
+     * @return array<int, bool>
+     */
+    private static function firstLoginCredentialAppliedUserIds(PDO $pdo): array
+    {
+        $stmt = $pdo->prepare(
+            'SELECT DISTINCT user_id FROM personel_account_onboarding_audit
+              WHERE event_type = :event AND user_id IS NOT NULL'
+        );
+        $stmt->execute(['event' => self::EVENT_FIRST_LOGIN_CREDENTIALS_APPLIED]);
+        $userIds = [];
+        foreach (($stmt->fetchAll(PDO::FETCH_ASSOC) ?: []) as $row) {
+            $userId = (int) ($row['user_id'] ?? 0);
+            if ($userId > 0) {
+                $userIds[$userId] = true;
+            }
+        }
+
+        return $userIds;
+    }
+
+    /**
+     * Rollout kapsami disindaki personel id'lerini iceren plan satirlari.
+     *
+     * @param array<int, array<string, mixed>> $plan
+     * @return array<int, array<string, mixed>>
+     */
+    private static function rolloutScopeViolations(array $plan): array
+    {
+        $violations = [];
+        foreach ($plan as $item) {
+            $personelId = (int) ($item['personel_id'] ?? 0);
+            if (in_array($personelId, self::ROLLOUT_EXCLUDED_PERSONEL_IDS, true)) {
+                $violations[] = [
+                    'user_id' => (int) ($item['user_id'] ?? 0),
+                    'personel_id' => $personelId,
+                ];
+            }
+        }
+
+        return $violations;
     }
 
     public static function normalizeOverrideUsername($raw)

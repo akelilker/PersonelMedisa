@@ -1,43 +1,39 @@
-name: Ops personel first-login preflight (read-only)
+name: Ops personel first-login APPLY (credential rollout)
 
-# PERSONEL canonical first-login credential rollout icin SALT-OKUNUR production preflight.
+# PERSONEL canonical first-login credential rollout icin KONTROLLU APPLY.
 #
-# Tek mod: PERSONEL_FIRST_LOGIN_CREDENTIALS_PREFLIGHT. Kontrol duzlemine tek bir
-# request birakir; worker production DB'de SADECE SELECT calistirip canonical
-# karar sahibinden (PersonelAccountOnboardingService) dry-run planini ister ve
-# personel-first-login-preflight.json uretir. INSERT/UPDATE/DELETE/DDL, migration
-# apply, backup, ledger yazimi, username/password/activation mutation ve APPLY
-# modu bu yolda YOKTUR; modun apply karsiligi da yoktur.
+# Tek mod: PERSONEL_FIRST_LOGIN_CREDENTIALS_APPLY. Kontrol duzlemine tek bir request
+# birakir; o request yalnizca mode + deployed_sha + expected_plan_fingerprint tasir.
+# Personel id, username, password, filter, SQL veya aktor alani YOKTUR: cohort ve
+# credential materyali canonical sahipte (PersonelAccountOnboardingService) kalir.
 #
-# Bu workflow'un apply yetkisi yoktur ve apply request'i yazamaz. Ayrica
-# api/bin/personel-first-login-credentials.php (canonical CLI worker) BURADAN
-# CAGRILMAZ: o worker cPanel host'una ozel DB erisimi gerektirir, bu yuzden
-# ayni canonical karar sahibi kontrol duzlemi uzerinden salt-okunur sorgulanir.
+# Bu workflow'un yetkisi ACIK ve TEHLIKELIDIR: canonical owner'in apply yolunu cagirir
+# ve production'da 125 PERSONEL hesabinin username + template sifre hash + zorunlu
+# ilk giris sifre degisimi state'ini yazar. Bu yuzden:
+#   - exact confirmation token zorunludur (APPLY_PERSONEL_FIRST_LOGIN_CREDENTIALS),
+#   - request, preflight artifact'indan okunan EXACT plan fingerprint'ine pinlenir;
+#     cohort kayarsa canonical owner hicbir satir yazmaz,
+#   - repository private degilse request birakilmadan ONCE durur,
+#   - apply TEK SEFERDIR: tamamlanmis rollout / daha once uygulanmis hedef fail-closed durur.
 #
-# Log sozlesmesi: yalnizca sayilar ve reason code. Plan satirlari (kullanici adi
-# ve personel id) log'a dokulmez; artifact olarak yayinlanir ve yalnizca plan
-# kapsaminda beklenen kullanici adi kumesi MATCH/MISMATCH olarak ozetlenir.
-#
-# Bu artifact'in gizliligi TAMAMEN repository visibility'sine baglidir: GitHub
-# Actions artifact'i public repository'de signed-in herhangi bir kullanici
-# indirebilir. Bu yuzden artifact yolu "her zaman private" degildir ve public
-# repository'de guvenli kabul EDILEMEZ.
-#
-# Fail-closed sinir: repository private degilse preflight operasyonu
-# control-plane request'i birakilmadan ONCE durur
-# (PUBLIC_REPOSITORY_ARTIFACT_EXPOSURE). retention-days dusurmek, artifact adini
-# gizlemek veya yalnizca uyarmak cozum degildir; kullanici adi/plan verisi
-# public repository'de kisa sureli de yayinlanmaz.
+# Log sozlesmesi: yalnizca sayilar, reason code ve plan fingerprint. Plan satirlari
+# artifact olarak yayinlanir. Plaintext sifre, password_hash ve recovery preimage
+# ASLA loglanmaz ve ASLA artifact olarak yuklenmez: preimage kontrol duzleminde
+# 0600 ile kalir (bkz. PersonelFirstLoginCredentialsApplyReport).
 
 on:
   workflow_dispatch:
     inputs:
       confirmation:
-        description: Type PERSONEL_FIRST_LOGIN_CREDENTIALS_PREFLIGHT to authorize this read
+        description: Type APPLY_PERSONEL_FIRST_LOGIN_CREDENTIALS to authorize this write
         required: true
         type: string
       deployed_sha:
-        description: Exact deployed commit SHA containing this preflight mode
+        description: Exact deployed commit SHA containing this apply mode
+        required: true
+        type: string
+      expected_plan_fingerprint:
+        description: Exact plan fingerprint published by the read-only preflight
         required: true
         type: string
 
@@ -49,8 +45,8 @@ permissions:
   contents: read
 
 jobs:
-  preflight:
-    name: Read-only personel first-login preflight
+  apply:
+    name: Controlled personel first-login credential apply
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
@@ -60,7 +56,9 @@ jobs:
       FTP_PORT: ${{ secrets.FTP_PORT }}
       CONFIRMATION: ${{ inputs.confirmation }}
       DEPLOYED_SHA: ${{ inputs.deployed_sha }}
-      MODE: PERSONEL_FIRST_LOGIN_CREDENTIALS_PREFLIGHT
+      EXPECTED_PLAN_FINGERPRINT_INPUT: ${{ inputs.expected_plan_fingerprint }}
+      MODE: PERSONEL_FIRST_LOGIN_CREDENTIALS_APPLY
+      APPLY_CONFIRMATION_TOKEN: APPLY_PERSONEL_FIRST_LOGIN_CREDENTIALS
       REPOSITORY_PRIVATE: ${{ github.event.repository.private }}
       POLL_ATTEMPTS: "91"
       POLL_INTERVAL_SECONDS: "10"
@@ -69,19 +67,11 @@ jobs:
       # ---------------------------------------------------------------------
       # BIR SEFERLIK production pin'leri.
       #
-      # Bu sayilar YALNIZCA bu tek seferlik rollout dogrulamasinda beklenir ve
-      # kasitli olarak workflow icinde tutulur. Canonical karar sahibine
-      # (PersonelAccountOnboardingService) veya report owner'ina GOMULMEZ: orada
-      # sayi beklemek, cohort degistiginde gercek veriyi "beklenen" degere
-      # uydurmaya calisan bir fail-open yolu olurdu. Burada gate, kanit
-      # beklenenden saparsa isi DURDURUR.
-      #
-      # TUREV: EXCLUDED_TOTAL = user_not_active + bound_personel_not_active
-      # (4 + 5) ve diger excluded bucket'lar 0'dir. PERSONEL_TOTAL = TARGET_COUNT
-      # + EXCLUDED_TOTAL (125 + 9).
-      #
-      # Bir sonraki rollout'ta bu pin'ler guncellenmelidir; guncellenmezse gate
-      # bilincli olarak BLOCKED verir, sessizce gecmez.
+      # Bu sayilar YALNIZCA bu tek seferlik rollout apply'inda beklenir ve kasitli
+      # olarak workflow icinde tutulur; canonical karar sahibine veya report
+      # owner'ina GOMULMEZ. Orda sayi beklemek, cohort degistiginde gercek veriyi
+      # "beklenen" degere uydurmaya calisan bir fail-open yolu olurdu. Burada gate,
+      # kanit beklenenden saparsa isi DURDURUR; sessizce gecmez.
       # ---------------------------------------------------------------------
       EXPECTED_PERSONEL_TOTAL: "134"
       EXPECTED_TARGET_COUNT: "125"
@@ -93,39 +83,50 @@ jobs:
       EXPECTED_EXCLUDED_BOUND_PERSONEL_MISSING: "0"
       EXPECTED_NAME_UNRESOLVED: "0"
       EXPECTED_NAME_CORRECTION_COUNT: "5"
+      EXPECTED_NAME_CORRECTION_PREIMAGE_MISMATCH: "0"
       EXPECTED_BUSINESS_OVERRIDE_COUNT: "3"
       EXPECTED_COLLISION_COUNT: "0"
       EXPECTED_PROTECTED_IN_PLAN: "0"
+      EXPECTED_ROLLOUT_EXCLUDED_IN_PLAN: "0"
+      EXPECTED_APPLY_COUNT: "125"
+      EXPECTED_USER_MUTATION_COUNT: "125"
+      EXPECTED_NAME_CORRECTION_MUTATION_COUNT: "5"
+      # users satirlari + personeller name correction satirlari (125 + 5).
+      EXPECTED_PRODUCTION_MUTATION_COUNT: "130"
       # Explicit business override + name correction ile beklenen plan kullanici adlari.
       EXPECTED_USERNAME_PLAN: "abdullah,fahriM,hakanAc,hakanAt,muqtadaK,oktayE,raedF,saifA"
 
     steps:
-      # Publication boundary gate. Runs before checkout, before any FTP contact
-      # and before any control-plane request, so a public repository never even
-      # asks production for a credential rollout plan. The value comes from
-      # GitHub's canonical repository context, not from an input, and anything
-      # other than an explicit "true" (including a missing context on an
-      # unexpected event) blocks: default-deny, not default-publish.
+      # Publication boundary gate. Runs before checkout, before any FTP contact and
+      # before any control-plane request, so a public repository never asks production
+      # for a credential rollout. The value comes from GitHub's canonical repository
+      # context, not from an input, and anything other than an explicit "true"
+      # (including a missing context on an unexpected event) blocks: default-deny.
       - name: Validate repository publication boundary
         run: |
           set -euo pipefail
           if [ "${REPOSITORY_PRIVATE:-}" != "true" ]; then
-            echo "PREFLIGHT_RESULT=BLOCKED"
-            echo "PREFLIGHT_REASON=PUBLIC_REPOSITORY_ARTIFACT_EXPOSURE"
+            echo "APPLY_RESULT=BLOCKED"
+            echo "APPLY_REASON=PUBLIC_REPOSITORY_ARTIFACT_EXPOSURE"
             exit 1
           fi
 
-      - name: Validate explicit request
+      - name: Validate explicit apply request
         run: |
           set -euo pipefail
-          test "$CONFIRMATION" = "$MODE" || {
-            echo "PREFLIGHT_RESULT=BLOCKED"
-            echo "PREFLIGHT_REASON=CONFIRMATION_MISMATCH"
+          test "$CONFIRMATION" = "$APPLY_CONFIRMATION_TOKEN" || {
+            echo "APPLY_RESULT=BLOCKED"
+            echo "APPLY_REASON=CONFIRMATION_MISMATCH"
             exit 1
           }
           [[ "$DEPLOYED_SHA" =~ ^[0-9a-fA-F]{40}$ ]] || {
-            echo "PREFLIGHT_RESULT=BLOCKED"
-            echo "PREFLIGHT_REASON=DEPLOYED_SHA_INPUT_INVALID"
+            echo "APPLY_RESULT=BLOCKED"
+            echo "APPLY_REASON=DEPLOYED_SHA_INPUT_INVALID"
+            exit 1
+          }
+          [[ "${EXPECTED_PLAN_FINGERPRINT_INPUT,,}" =~ ^[0-9a-f]{64}$ ]] || {
+            echo "APPLY_RESULT=BLOCKED"
+            echo "APPLY_REASON=PLAN_FINGERPRINT_INPUT_INVALID"
             exit 1
           }
           test -n "$FTP_SERVER" || (echo "FTP_SERVER secret is missing." && exit 1)
@@ -142,7 +143,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y lftp
 
-      - name: Collect read-only personel first-login preflight
+      - name: Dispatch controlled apply and collect evidence
         run: |
           set -euo pipefail
 
@@ -173,26 +174,26 @@ jobs:
           }
 
           block() {
-            echo "PREFLIGHT_RESULT=BLOCKED"
-            echo "PREFLIGHT_REASON=$1"
+            echo "APPLY_RESULT=BLOCKED"
+            echo "APPLY_REASON=$1"
             exit 1
           }
 
           source "$GITHUB_WORKSPACE/scripts/deploy/cpanel-ftp-directory-lib.sh"
 
-          WORK="$RUNNER_TEMP/personel-first-login-preflight"
+          WORK="$RUNNER_TEMP/personel-first-login-apply"
           rm -rf "$WORK"
           mkdir -p "$WORK"
 
           if ! ensure_cpanel_remote_directory "api/runtime/migration-control"; then
-            echo "PREFLIGHT_RESULT=BLOCKED"
-            echo "PREFLIGHT_REASON=CONTROL_PLANE_DIRECTORY_UNUSABLE"
+            echo "APPLY_RESULT=BLOCKED"
+            echo "APPLY_REASON=CONTROL_PLANE_DIRECTORY_UNUSABLE"
             run_cpanel_ftp "cls -1 api/runtime/migration-control;" >/dev/null 2>&1 || true
             exit 1
           fi
 
-          # Deploy SHA parity: the report must be produced by the exact code the
-          # caller authorized, otherwise the numbers describe an unknown owner.
+          # Deploy SHA parity: the write must be performed by the exact code the caller
+          # authorized, otherwise the mutation semantics are unknown.
           if ! run_cpanel_ftp "
             get api/.deploy-sha -o ${WORK}/deploy-sha.txt;
             get api/bin/cpanel-migration-cron.php -o ${WORK}/remote-worker.php;
@@ -201,35 +202,28 @@ jobs:
           fi
           remote_sha="$(tr -d '\r\n' < "${WORK}/deploy-sha.txt" 2>/dev/null || true)"
           [[ "${remote_sha,,}" == "${DEPLOYED_SHA,,}" ]] || block DEPLOY_SHA_MISMATCH
-          echo "PREFLIGHT_DEPLOY_SHA_MATCH=YES"
+          echo "APPLY_DEPLOY_SHA_MATCH=YES"
 
-          # Worker parity + mode ownership. A deployed worker that is not this
-          # branch's worker either does not know the read-only mode or is not the
-          # reviewed read-only implementation, so no request is written for it.
+          # Worker parity + apply-mode ownership. A deployed worker that is not this
+          # branch's worker is not the reviewed apply implementation, so no request is
+          # written for it.
           local_worker_sha="$(sha256sum api/bin/cpanel-migration-cron.php | cut -d' ' -f1)"
           remote_worker_sha="$(sha256sum "${WORK}/remote-worker.php" | cut -d' ' -f1)"
           [[ "$local_worker_sha" == "$remote_worker_sha" ]] || block REMOTE_WORKER_PARITY_MISMATCH
-          grep -q 'PERSONEL_FIRST_LOGIN_CREDENTIALS_PREFLIGHT' "${WORK}/remote-worker.php" \
-            || block REMOTE_WORKER_MODE_MISSING
-          grep -q 'PersonelFirstLoginCredentialsPreflightReport' "${WORK}/remote-worker.php" \
-            || block REMOTE_WORKER_REPORT_OWNER_MISSING
-          # The paired APPLY sibling now exists on this worker: its own request mode and
-          # its own report owner. Its presence does not widen THIS read-only mode — this
-          # mode only writes a read-only request, and the read-only proof below still
-          # requires decision_apply=false and mutation_count=0. Assert instead that the
-          # apply sibling is the reviewed, fingerprint-pinned one; a blanket "no apply
-          # sibling" check would now be a false failure against the paired build.
           grep -q 'PERSONEL_FIRST_LOGIN_CREDENTIALS_APPLY' "${WORK}/remote-worker.php" \
-            || block PERSONEL_FIRST_LOGIN_APPLY_MODE_MISSING
+            || block REMOTE_WORKER_APPLY_MODE_MISSING
           grep -q 'PersonelFirstLoginCredentialsApplyReport' "${WORK}/remote-worker.php" \
-            || block PERSONEL_FIRST_LOGIN_APPLY_OWNER_MISSING
+            || block REMOTE_WORKER_APPLY_OWNER_MISSING
           grep -q 'expected_plan_fingerprint' "${WORK}/remote-worker.php" \
-            || block PERSONEL_FIRST_LOGIN_APPLY_FINGERPRINT_GATE_MISSING
-          echo "PREFLIGHT_WORKER_PARITY=YES"
-          echo "PREFLIGHT_APPLY_MODE_PRESENT=YES"
+            || block REMOTE_WORKER_FINGERPRINT_GATE_MISSING
+          # The canonical decision owner must be the deployed one; the apply path is not
+          # allowed to grow a second credential implementation.
+          grep -q 'PersonelAccountOnboardingService' "${WORK}/remote-worker.php" \
+            || block REMOTE_WORKER_CANONICAL_OWNER_MISSING
+          echo "APPLY_WORKER_PARITY=YES"
 
-          # Busy guard: the preflight shares the control plane with apply and with
-          # the mapping operations, so it must never queue behind or race another
+          # Busy guard: the control plane is shared with the read-only preflight and the
+          # mapping operations, so the apply must never queue behind or race another
           # request.
           listing="$WORK/control-listing.txt"
           if ! run_cpanel_ftp "cls -1 api/runtime/migration-control > ${listing};" >/dev/null 2>&1; then
@@ -248,27 +242,24 @@ jobs:
               fi
             fi
           fi
-          echo "PREFLIGHT_WORKER_IDLE=YES"
+          echo "APPLY_WORKER_IDLE=YES"
 
-          # Every request file already present is listed before the write, so the
-          # request this step submits is provably the only new control-plane entry.
-          # This file is kept at this exact path: the final cleanliness step diffs
-          # the post-run listing against it instead of judging archived history.
-          echo "PREFLIGHT_CONTROL_PLANE_FILES_BEFORE=$(grep -c 'request\.' "$listing" || true)"
-          echo "PREFLIGHT_CONTROL_PLANE_BASELINE=${listing}"
+          echo "APPLY_CONTROL_PLANE_FILES_BEFORE=$(grep -c 'request\.' "$listing" || true)"
+          echo "APPLY_CONTROL_PLANE_BASELINE=${listing}"
 
-          REQUEST_ID="pflcpre-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          echo "PREFLIGHT_REQUEST_ID=${REQUEST_ID}"
+          REQUEST_ID="pflcapply-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          echo "APPLY_REQUEST_ID=${REQUEST_ID}"
           request_dir="$WORK/request"
           mkdir -p "$request_dir"
-          # The request carries a mode and a SHA and nothing else: no personel id,
-          # no username, no SQL, no filter and no apply flag. There is no field an
-          # operator could use to ask for a mutation.
+          # The request carries a mode, a SHA and the pinned plan fingerprint and nothing
+          # else: no personel id, no username, no password, no SQL, no filter and no actor.
+          # There is no field an operator could use to ask for a different cohort.
           jq -n \
             --arg request_id "$REQUEST_ID" \
             --arg deployed_sha "$DEPLOYED_SHA" \
             --arg requested_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-            '{schema_version: 1, request_id: $request_id, deployed_sha: $deployed_sha, requested_at: $requested_at, mode: "PERSONEL_FIRST_LOGIN_CREDENTIALS_PREFLIGHT"}' \
+            --arg expected_plan_fingerprint "${EXPECTED_PLAN_FINGERPRINT_INPUT,,}" \
+            '{schema_version: 1, request_id: $request_id, deployed_sha: $deployed_sha, requested_at: $requested_at, mode: "PERSONEL_FIRST_LOGIN_CREDENTIALS_APPLY", expected_plan_fingerprint: $expected_plan_fingerprint}' \
             > "$request_dir/request.${REQUEST_ID}.tmp"
 
           run_cpanel_ftp "
@@ -296,48 +287,43 @@ jobs:
             sleep "$POLL_INTERVAL_SECONDS"
           done
 
-          echo "PREFLIGHT_WORKER_STATE=${worker_state}"
+          echo "APPLY_WORKER_STATE=${worker_state}"
+
+          mkdir -p "$GITHUB_WORKSPACE/apply-artifact"
+          report="$WORK/personel-first-login-apply.json"
+          report_fetched="NO"
+          if run_cpanel_ftp "get api/runtime/migration-control/personel-first-login-apply.json -o ${report};" >/dev/null 2>&1; then
+            report_fetched="YES"
+            cp "$report" "$GITHUB_WORKSPACE/apply-artifact/personel-first-login-apply.json"
+          fi
+          # The recovery preimage is NEVER fetched and NEVER published: it carries the old
+          # password_hash and stays a 0600 control-plane runtime artifact.
+
           if [[ "$worker_state" == "FAILED" ]]; then
-            reason="$(jq -r 'if (.reason | type) == "string" and (.reason | test("^[A-Z0-9_]+$")) then .reason else "UNKNOWN_PREFLIGHT_FAILURE" end' "$status_file" 2>/dev/null || echo UNKNOWN_PREFLIGHT_FAILURE)"
+            reason="$(jq -r 'if (.reason | type) == "string" and (.reason | test("^[A-Z0-9_]+$")) then .reason else "UNKNOWN_APPLY_FAILURE" end' "$status_file" 2>/dev/null || echo UNKNOWN_APPLY_FAILURE)"
             stage="$(jq -r 'if (.stage | type) == "string" and (.stage | test("^[A-Z0-9_]+$")) then .stage else "UNKNOWN" end' "$status_file" 2>/dev/null || echo UNKNOWN)"
-            echo "PREFLIGHT_STAGE=${stage}"
-            echo "PREFLIGHT_RESULT=BLOCKED"
-            echo "PREFLIGHT_REASON=${reason}"
+            echo "APPLY_STAGE=${stage}"
+            echo "APPLY_REPORT_FETCHED=${report_fetched}"
+            echo "APPLY_RESULT=BLOCKED"
+            echo "APPLY_REASON=${reason}"
             exit 1
           fi
           if [[ "$worker_state" != "SUCCEEDED" ]]; then
             block WAITING_FOR_CRON_TICK
           fi
+          [[ "$report_fetched" == "YES" ]] || block APPLY_REPORT_UNREADABLE
 
-          report="$WORK/personel-first-login-preflight.json"
-          if ! run_cpanel_ftp "get api/runtime/migration-control/personel-first-login-preflight.json -o ${report};" >/dev/null 2>&1; then
-            block PREFLIGHT_REPORT_UNREADABLE
-          fi
+          # The report must be the one this request produced, pinned to the same SHA, mode
+          # and fingerprint, otherwise a stale report would be read as this run's evidence.
+          [[ "$(jq -r '.request_id // ""' "$report" 2>/dev/null || true)" == "$REQUEST_ID" ]] || block APPLY_REPORT_REQUEST_MISMATCH
+          [[ "$(jq -r '.deployed_sha // ""' "$report" 2>/dev/null || true)" == "${DEPLOYED_SHA,,}" ]] || block APPLY_REPORT_SHA_MISMATCH
+          [[ "$(jq -r '.mode // ""' "$report" 2>/dev/null || true)" == "$MODE" ]] || block APPLY_REPORT_MODE_MISMATCH
+          [[ "$(jq -r '.expected_plan_fingerprint // ""' "$report" 2>/dev/null || true)" == "${EXPECTED_PLAN_FINGERPRINT_INPUT,,}" ]] || block APPLY_REPORT_FINGERPRINT_INPUT_MISMATCH
+          [[ "$(jq -r '.plan_fingerprint // ""' "$report" 2>/dev/null || true)" == "${EXPECTED_PLAN_FINGERPRINT_INPUT,,}" ]] || block APPLY_REPORT_PLAN_FINGERPRINT_MISMATCH
 
-          # The report must be the one this request produced, pinned to the same
-          # SHA, otherwise a stale report from an earlier run would be read as
-          # this run's evidence.
-          [[ "$(jq -r '.request_id // ""' "$report" 2>/dev/null || true)" == "$REQUEST_ID" ]] || block PREFLIGHT_REPORT_REQUEST_MISMATCH
-          [[ "$(jq -r '.deployed_sha // ""' "$report" 2>/dev/null || true)" == "${DEPLOYED_SHA,,}" ]] || block PREFLIGHT_REPORT_SHA_MISMATCH
-          [[ "$(jq -r '.mode // ""' "$report" 2>/dev/null || true)" == "$MODE" ]] || block PREFLIGHT_REPORT_MODE_MISMATCH
-
-          # Read-only proof, straight from the decision the report reduced: the
-          # canonical owner was called with apply = false, so it can neither claim
-          # a write nor report an applied row count, and this mode declares zero
-          # production mutations.
-          [[ "$(jq -r '.decision_apply' "$report" 2>/dev/null || echo true)" == "false" ]] || block READ_ONLY_PROOF_DECISION_APPLY
-          [[ "$(jq -r '.decision_applied_count' "$report" 2>/dev/null || echo -1)" == "0" ]] || block READ_ONLY_PROOF_APPLIED_COUNT
-          [[ "$(jq -r '.production_mutation_count' "$report" 2>/dev/null || echo -1)" == "0" ]] || block READ_ONLY_PROOF_MUTATION_COUNT
-          echo "READ_ONLY_PROOF=APPLY_FALSE_APPLIED_COUNT_ZERO_MUTATION_COUNT_ZERO"
-
-          mkdir -p "$GITHUB_WORKSPACE/preflight-artifact"
-          cp "$report" "$GITHUB_WORKSPACE/preflight-artifact/personel-first-login-preflight.json"
-
-          # Bounded, allowlisted summary. Plan rows stay in the artifact; only
-          # counts, the expected-username match and reason codes reach this log.
-          # The fallback triggers on a missing field only. `a // b` would also fire
-          # on `false`, which printed every false boolean as NONE and made an
-          # absent field indistinguishable from a proven negative.
+          # Bounded, allowlisted summary. Plan rows stay in the artifact; only counts, the
+          # expected-username match and reason codes reach this log. `a // b` is avoided as
+          # the fallback: it would also fire on `false` and hide a proven negative.
           emit_scalar() {
             local label="$1"
             local filter="$2"
@@ -348,11 +334,9 @@ jobs:
             echo "${label}=${value}"
           }
 
-          emit_scalar PREFLIGHT_SCHEMA_VERSION '.schema_version' '^[0-9]{1,3}$'
-          emit_scalar PREFLIGHT_GENERATED_AT '.generated_at' '^[0-9TZ:.+-]{1,64}$'
-          emit_scalar PREFLIGHT_DEPLOY_SHA '.deployed_sha' '^[0-9a-f]{40}$'
-          # Apply yolu bu exact plana pinlenir; deger preflight artifact'inda yayinlanir.
-          emit_scalar PLAN_FINGERPRINT '.plan_fingerprint' '^[0-9a-f]{64}$'
+          emit_scalar APPLY_SCHEMA_VERSION '.schema_version' '^[0-9]{1,3}$'
+          emit_scalar APPLY_GENERATED_AT '.generated_at' '^[0-9TZ:.+-]{1,64}$'
+          emit_scalar APPLY_DEPLOY_SHA '.deployed_sha' '^[0-9a-f]{40}$'
           emit_scalar PERSONEL_TOTAL '.personel_total' '^-?[0-9]{1,12}$'
           emit_scalar TARGET_COUNT '.target_count' '^-?[0-9]{1,12}$'
           emit_scalar EXCLUDED_TOTAL '.excluded_total' '^-?[0-9]{1,12}$'
@@ -362,35 +346,49 @@ jobs:
           emit_scalar EXCLUDED_BINDING_MISSING '.excluded_counts.binding_missing' '^-?[0-9]{1,12}$'
           emit_scalar EXCLUDED_BOUND_PERSONEL_MISSING '.excluded_counts.bound_personel_missing' '^-?[0-9]{1,12}$'
           emit_scalar NAME_UNRESOLVED_COUNT '.name_unresolved_count' '^-?[0-9]{1,12}$'
-          emit_scalar COLLISION_COUNT '.collision_count' '^-?[0-9]{1,12}$'
           emit_scalar NAME_CORRECTION_COUNT '.name_correction_count' '^-?[0-9]{1,12}$'
           emit_scalar NAME_CORRECTION_PREIMAGE_MISMATCH_COUNT '.name_correction_preimage_mismatch_count' '^-?[0-9]{1,12}$'
           emit_scalar BUSINESS_OVERRIDE_COUNT '.business_override_count' '^-?[0-9]{1,12}$'
+          emit_scalar COLLISION_COUNT '.collision_count' '^-?[0-9]{1,12}$'
           emit_scalar COHORT_RECONCILED '.cohort_reconciled' '^(true|false)$'
           emit_scalar PROTECTED_USERNAME_IN_PLAN_COUNT '.protected_username_in_plan_count' '^-?[0-9]{1,12}$'
+          emit_scalar ROLLOUT_EXCLUDED_IN_PLAN_COUNT '.rollout_excluded_in_plan_count' '^-?[0-9]{1,12}$'
           emit_scalar ILKERA_TOUCHED '.ilkera_touched' '^(true|false)$'
-          emit_scalar PREFLIGHT_BLOCKER_COUNT '[.blockers[]?] | length' '^[0-9]{1,6}$'
-          emit_scalar PREFLIGHT_RESULT '.result' '^(PASS|BLOCKED)$'
+          emit_scalar DECISION_APPLY '.decision_apply' '^(true|false)$'
+          emit_scalar APPLIED_COUNT '.applied_count' '^-?[0-9]{1,12}$'
+          emit_scalar USER_MUTATION_COUNT '.user_mutation_count' '^-?[0-9]{1,12}$'
+          emit_scalar NAME_CORRECTION_MUTATION_COUNT '.name_correction_mutation_count' '^-?[0-9]{1,12}$'
+          emit_scalar PRODUCTION_MUTATION_COUNT '.production_mutation_count' '^-?[0-9]{1,12}$'
+          emit_scalar CREDENTIAL_TARGETS_RECONCILED '.credential_targets_reconciled' '^(true|false)$'
+          emit_scalar EXCLUDED_UNCHANGED '.excluded_unchanged' '^(true|false)$'
+          emit_scalar ILKERA_UNCHANGED '.ilkera_unchanged' '^(true|false)$'
+          emit_scalar ROLLOUT_LEDGER_RECORDED '.rollout_ledger_recorded' '^(true|false)$'
+          emit_scalar PREIMAGE_WRITTEN '.preimage_written' '^(true|false)$'
+          emit_scalar PREIMAGE_SHA256 '.preimage_sha256' '^[0-9a-f]{64}$'
+          emit_scalar PLAN_FINGERPRINT '.plan_fingerprint' '^[0-9a-f]{64}$'
+          emit_scalar BLOCKER_COUNT '[.blockers[]?] | length' '^[0-9]{1,6}$'
+          emit_scalar APPLY_RESULT '.result' '^(PASS|BLOCKED)$'
 
           if [[ "$(jq -r '.result // "BLOCKED"' "$report" 2>/dev/null || echo BLOCKED)" != "PASS" ]]; then
-            echo "PREFLIGHT_BLOCKERS=$(jq -r '[.blockers[]? | tostring] | join(",")' "$report" 2>/dev/null | tr -cd 'A-Z0-9_,' || true)"
-            echo "PREFLIGHT_PLAN_READY=NO"
+            echo "APPLY_BLOCKERS=$(jq -r '[.blockers[]? | tostring] | join(",")' "$report" 2>/dev/null | tr -cd 'A-Z0-9_,' || true)"
+            echo "APPLY_REASON=$(jq -r 'if (.blocker | type) == "string" and (.blocker | test("^[A-Z0-9_]+$")) then .blocker else "UNKNOWN_APPLY_BLOCKER" end' "$report" 2>/dev/null || echo UNKNOWN_APPLY_BLOCKER)"
+            echo "APPLY_RESULT=BLOCKED"
             exit 1
           fi
-          echo "PREFLIGHT_PLAN_READY=YES"
 
-      # One-time production expectations, hard fail-closed. This gate runs only
-      # after the read-only proof above, and it never writes anything anywhere: a
-      # mismatch stops the workflow so the operator re-derives the expectation
-      # instead of proceeding on drifted numbers.
-      - name: Enforce one-time production expectations
+      # Hard fail-closed expectation gates. These run only after the report is proven to
+      # be this run's own, and they never write anything anywhere: a mismatch stops the
+      # workflow so the operator re-derives the expectation instead of proceeding on
+      # drifted numbers. The cohort pins are re-checked here because the apply owner
+      # re-derived the plan from production moments before the write.
+      - name: Enforce one-time production apply expectations
         run: |
           set -euo pipefail
 
-          report="$GITHUB_WORKSPACE/preflight-artifact/personel-first-login-preflight.json"
+          report="$GITHUB_WORKSPACE/apply-artifact/personel-first-login-apply.json"
           [[ -f "$report" ]] || {
-            echo "PREFLIGHT_RESULT=BLOCKED"
-            echo "PREFLIGHT_REASON=PREFLIGHT_REPORT_NOT_PUBLISHED"
+            echo "APPLY_RESULT=BLOCKED"
+            echo "APPLY_REASON=APPLY_REPORT_NOT_PUBLISHED"
             exit 1
           }
 
@@ -404,8 +402,8 @@ jobs:
               echo "EXPECTED_GATE_${label}=MISMATCH"
               echo "EXPECTED_GATE_${label}_EXPECTED=${expected}"
               echo "EXPECTED_GATE_${label}_ACTUAL=${actual}"
-              echo "PREFLIGHT_RESULT=BLOCKED"
-              echo "PREFLIGHT_REASON=PRODUCTION_EXPECTATION_MISMATCH_${label}"
+              echo "APPLY_RESULT=BLOCKED"
+              echo "APPLY_REASON=PRODUCTION_EXPECTATION_MISMATCH_${label}"
               exit 1
             fi
             echo "EXPECTED_GATE_${label}=MATCH"
@@ -421,28 +419,36 @@ jobs:
           gate EXCLUDED_BOUND_PERSONEL_MISSING '.excluded_counts.bound_personel_missing' "$EXPECTED_EXCLUDED_BOUND_PERSONEL_MISSING"
           gate NAME_UNRESOLVED_COUNT '.name_unresolved_count' "$EXPECTED_NAME_UNRESOLVED"
           gate NAME_CORRECTION_COUNT '.name_correction_count' "$EXPECTED_NAME_CORRECTION_COUNT"
-          gate NAME_CORRECTION_PREIMAGE_MISMATCH_COUNT '.name_correction_preimage_mismatch_count' "0"
+          gate NAME_CORRECTION_PREIMAGE_MISMATCH_COUNT '.name_correction_preimage_mismatch_count' "$EXPECTED_NAME_CORRECTION_PREIMAGE_MISMATCH"
           gate BUSINESS_OVERRIDE_COUNT '.business_override_count' "$EXPECTED_BUSINESS_OVERRIDE_COUNT"
           gate COLLISION_COUNT '.collision_count' "$EXPECTED_COLLISION_COUNT"
           gate PROTECTED_USERNAME_IN_PLAN_COUNT '.protected_username_in_plan_count' "$EXPECTED_PROTECTED_IN_PLAN"
+          gate ROLLOUT_EXCLUDED_IN_PLAN_COUNT '.rollout_excluded_in_plan_count' "$EXPECTED_ROLLOUT_EXCLUDED_IN_PLAN"
           gate COHORT_RECONCILED '.cohort_reconciled' "true"
           gate ILKERA_TOUCHED '.ilkera_touched' "false"
-          gate DECISION_APPLY '.decision_apply' "false"
-          gate DECISION_APPLIED_COUNT '.decision_applied_count' "0"
-          gate PRODUCTION_MUTATION_COUNT '.production_mutation_count' "0"
-          gate PREFLIGHT_RESULT '.result' "PASS"
+          gate DECISION_APPLY '.decision_apply' "true"
+          gate APPLIED_COUNT '.applied_count' "$EXPECTED_APPLY_COUNT"
+          gate USER_MUTATION_COUNT '.user_mutation_count' "$EXPECTED_USER_MUTATION_COUNT"
+          gate NAME_CORRECTION_MUTATION_COUNT '.name_correction_mutation_count' "$EXPECTED_NAME_CORRECTION_MUTATION_COUNT"
+          gate PRODUCTION_MUTATION_COUNT '.production_mutation_count' "$EXPECTED_PRODUCTION_MUTATION_COUNT"
+          gate CREDENTIAL_TARGETS_RECONCILED '.credential_targets_reconciled' "true"
+          gate EXCLUDED_UNCHANGED '.excluded_unchanged' "true"
+          gate ILKERA_UNCHANGED '.ilkera_unchanged' "true"
+          gate ROLLOUT_LEDGER_RECORDED '.rollout_ledger_recorded' "true"
+          gate PREIMAGE_WRITTEN '.preimage_written' "true"
+          gate PLAN_FINGERPRINT '.plan_fingerprint' "${EXPECTED_PLAN_FINGERPRINT_INPUT,,}"
+          gate APPLY_RESULT '.result' "PASS"
           gate BLOCKER_COUNT '[.blockers[]?] | length' "0"
 
-          # The rollout's business truth: the override/correction accounts must be
-          # in the plan with the canonical usernames, and every plan username must
-          # be unique (a duplicate would mean a plan the apply owner cannot run).
+          # The rollout's business truth: the override/correction accounts must be in the
+          # plan with the canonical usernames, and every plan username must be unique.
           actual_usernames="$(jq -r '[.plan[]?.new_username | strings] | unique | sort | join(",")' "$report" 2>/dev/null || echo "")"
           plan_rows="$(jq -r '[.plan[]?] | length' "$report" 2>/dev/null || echo -1)"
           unique_usernames="$(jq -r '[.plan[]?.new_username | strings] | unique | length' "$report" 2>/dev/null || echo -1)"
           [[ "$plan_rows" == "$unique_usernames" ]] || {
             echo "EXPECTED_GATE_PLAN_USERNAME_UNIQUE=MISMATCH"
-            echo "PREFLIGHT_RESULT=BLOCKED"
-            echo "PREFLIGHT_REASON=PLAN_USERNAME_NOT_UNIQUE"
+            echo "APPLY_RESULT=BLOCKED"
+            echo "APPLY_REASON=PLAN_USERNAME_NOT_UNIQUE"
             exit 1
           }
           echo "EXPECTED_GATE_PLAN_USERNAME_UNIQUE=MATCH"
@@ -450,29 +456,27 @@ jobs:
           for username in ${EXPECTED_USERNAME_PLAN//,/ }; do
             if ! printf '%s' ",${actual_usernames}," | grep -qF ",${username},"; then
               echo "EXPECTED_GATE_USERNAME_${username}=MISSING"
-              echo "PREFLIGHT_RESULT=BLOCKED"
-              echo "PREFLIGHT_REASON=EXPECTED_USERNAME_MISSING"
+              echo "APPLY_RESULT=BLOCKED"
+              echo "APPLY_REASON=EXPECTED_USERNAME_MISSING"
               exit 1
             fi
             echo "EXPECTED_GATE_USERNAME_${username}=PRESENT"
           done
 
-          echo "PREFLIGHT_RESULT=PASS"
-          echo "PREFLIGHT_REASON=NONE"
+          echo "APPLY_RESULT=PASS"
+          echo "APPLY_REASON=NONE"
 
-      # The control plane must be back to its pre-run shape plus exactly one new
-      # entry: this run's own archived request. The judgement is scoped to this
-      # run's request id and to the delta against the pre-write listing, so the
-      # archived completed/failed requests of earlier operations can never be
-      # read as evidence about this run. A leftover request.pending/processing
-      # entry of this run, or a request.failed entry of this run, still blocks.
+      # The control plane must be back to its pre-run shape plus exactly one new entry:
+      # this run's own archived request. The judgement is scoped to this run's request id
+      # and to the delta against the pre-write listing, so archived requests of earlier
+      # operations can never be read as evidence about this run.
       - name: Verify control plane is left clean
         if: success()
         run: |
           set -euo pipefail
 
-          request_id="pflcpre-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          work="$RUNNER_TEMP/personel-first-login-final"
+          request_id="pflcapply-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          work="$RUNNER_TEMP/personel-first-login-apply-final"
           rm -rf "$work"
           mkdir -p "$work"
 
@@ -503,31 +507,30 @@ jobs:
           }
 
           if ! run_cpanel_ftp "cls -1 api/runtime/migration-control > ${work}/control-listing-after.txt;" >/dev/null 2>&1; then
-            echo "PREFLIGHT_RESULT=BLOCKED"
-            echo "PREFLIGHT_REASON=FINAL_CONTROL_PLANE_UNREACHABLE"
+            echo "APPLY_RESULT=BLOCKED"
+            echo "APPLY_REASON=FINAL_CONTROL_PLANE_UNREACHABLE"
             exit 1
           fi
           source "$GITHUB_WORKSPACE/scripts/deploy/cpanel-control-plane-cleanliness-lib.sh"
 
-          # Baseline: the listing the collect step captured before it wrote this
-          # run's request. Everything already in it is history this run did not
-          # create, so it is never re-judged - including earlier failures.
-          before_listing="$RUNNER_TEMP/personel-first-login-preflight/control-listing.txt"
+          before_listing="$RUNNER_TEMP/personel-first-login-apply/control-listing.txt"
           after_listing="${work}/control-listing-after.txt"
 
           if ! reason="$(assert_control_plane_clean_for_request "$before_listing" "$after_listing" "$request_id")"; then
-            echo "PREFLIGHT_RESULT=BLOCKED"
-            echo "PREFLIGHT_REASON=${reason}"
+            echo "APPLY_RESULT=BLOCKED"
+            echo "APPLY_REASON=${reason}"
             exit 1
           fi
 
-          echo "PREFLIGHT_CONTROL_PLANE_CLEAN=YES"
+          echo "APPLY_CONTROL_PLANE_CLEAN=YES"
 
-      - name: Publish preflight artifact
+      # Publish the SECRET-FREE report only. The recovery preimage is deliberately not part
+      # of this path, so it can never leave the control plane.
+      - name: Publish apply evidence artifact
         if: always() && github.event.repository.private == true
         uses: actions/upload-artifact@v6
         with:
-          name: personel-first-login-preflight
-          path: preflight-artifact/
+          name: personel-first-login-apply
+          path: apply-artifact/
           retention-days: 7
           if-no-files-found: warn

@@ -6,6 +6,7 @@ use Medisa\Api\Database\Connection;
 use Medisa\Api\Database\MigrationBackupService;
 use Medisa\Api\Database\MigrationExecutionService;
 use Medisa\Api\Database\MigrationPreflightReport;
+use Medisa\Api\Services\Auth\PersonelFirstLoginCredentialsApplyReport;
 use Medisa\Api\Services\Auth\PersonelFirstLoginCredentialsPreflightReport;
 use Medisa\Api\Services\Organizasyon\OrganizationInitialMappingService;
 use Medisa\Api\Services\Organizasyon\OrganizationMappingFailure;
@@ -27,6 +28,7 @@ $controlDirectory = is_string($controlDirectory) && $controlDirectory !== ''
 $statusPath = $controlDirectory . '/status.json';
 $preflightPath = $controlDirectory . '/preflight.json';
 $personelFirstLoginPreflightPath = $controlDirectory . '/personel-first-login-preflight.json';
+$personelFirstLoginApplyPath = $controlDirectory . '/personel-first-login-apply.json';
 $inventoryPath = $controlDirectory . '/organization-inventory.json';
 $mappingPreflightPath = $controlDirectory . '/organization-mapping-preflight.json';
 $mappingPostcheckPath = $controlDirectory . '/organization-mapping-postcheck.json';
@@ -106,7 +108,7 @@ try {
                 'mode',
                 '/^(APPLY|READ_ONLY_PREFLIGHT|READ_ONLY_ORGANIZATION_INVENTORY'
                 . '|ORGANIZATION_MAPPING_PREFLIGHT|ORGANIZATION_MAPPING_APPLY|FINAL_CLOSE_PREFLIGHT|FINAL_CLOSE_APPLY'
-                . '|PERSONEL_FIRST_LOGIN_CREDENTIALS_PREFLIGHT)$/'
+                . '|PERSONEL_FIRST_LOGIN_CREDENTIALS_PREFLIGHT|PERSONEL_FIRST_LOGIN_CREDENTIALS_APPLY)$/'
             )
             : 'APPLY';
         // Optional, and only meaningful for APPLY: the single migration version
@@ -114,6 +116,14 @@ try {
         // model carry none and keep draining the whole pending chain.
         $targetVersion = array_key_exists('target_version', $request)
             ? requireString($request, 'target_version', '/^\d{3}$/')
+            : null;
+        // The personel first-login credential rollout apply mode is fingerprint-pinned:
+        // the request must carry the exact plan fingerprint the operator read from the
+        // read-only preflight artifact. It is validated here with the other request
+        // fields so a malformed or unpinned request never enters the apply stage, and it
+        // is not accepted from any other mode.
+        $expectedPlanFingerprint = $mode === 'PERSONEL_FIRST_LOGIN_CREDENTIALS_APPLY'
+            ? requireString($request, 'expected_plan_fingerprint', '/^[a-f0-9]{64}$/')
             : null;
 
         $stage = 'DEPLOY_SHA_CHECK';
@@ -177,6 +187,69 @@ try {
                 'collision_count' => (int) $report['collision_count'],
                 'name_unresolved_count' => (int) $report['name_unresolved_count'],
                 'ilkera_touched' => $report['ilkera_touched'] === true,
+            ]);
+            $stage = 'REQUEST_ARCHIVE';
+            archiveRequest(
+                $processingPath,
+                $controlDirectory . '/request.completed.' . safeId($requestId) . '.json'
+            );
+            exit(0);
+        }
+
+        // PERSONEL first-login credential rollout APPLY. This is the only sibling of the
+        // read-only preflight above and the only branch in this worker that mutates
+        // credentials.
+        if ($mode === 'PERSONEL_FIRST_LOGIN_CREDENTIALS_APPLY') {
+            // The pinned fingerprint was already validated in the parse stage, so this
+            // branch cannot be entered unpinned. The request carries no personel id,
+            // username, password, filter, SQL or actor: the cohort and the credential
+            // material stay canonical.
+            $stage = 'PERSONEL_FIRST_LOGIN_APPLY';
+            // The recovery preimage is persisted here, outside the publish path, and is
+            // never uploaded as an artifact: it carries the OLD password_hash and no
+            // plaintext password.
+            $preimagePath = $controlDirectory . '/personel-first-login-apply-preimage.json';
+            try {
+                $pdo = Connection::get();
+                $report = PersonelFirstLoginCredentialsApplyReport::run(
+                    $pdo,
+                    $deployedSha,
+                    $expectedPlanFingerprint,
+                    static function (array $preimage) use ($preimagePath): string {
+                        writeJsonAtomically($preimagePath, $preimage);
+                        $digest = hash_file('sha256', $preimagePath);
+
+                        return is_string($digest) ? $digest : '';
+                    }
+                );
+                $report['request_id'] = $requestId;
+                writeJsonAtomically($personelFirstLoginApplyPath, $report);
+            } catch (\Throwable $exception) {
+                throw MigrationWorkerFailure::fromThrowable($stage, $exception);
+            }
+
+            // A blocked apply is a FAILED request: the report is already published so the
+            // operator can read the bounded reason, but nothing claims success.
+            if (($report['result'] ?? 'BLOCKED') !== 'PASS') {
+                throw new MigrationWorkerFailure(
+                    is_string($report['blocker'] ?? null) ? $report['blocker'] : 'PERSONEL_FIRST_LOGIN_APPLY_BLOCKED',
+                    $stage,
+                    1
+                );
+            }
+
+            $stage = 'STATUS_WRITE';
+            writeStatus($statusPath, [
+                'state' => 'SUCCEEDED',
+                'request_id' => $requestId,
+                'deployed_sha' => strtolower($deployedSha),
+                'mode' => $mode,
+                'personel_first_login_apply_result' => (string) $report['result'],
+                'personel_first_login_apply_plan_fingerprint' => (string) $report['plan_fingerprint'],
+                'personel_first_login_apply_applied_count' => (int) $report['applied_count'],
+                'personel_first_login_apply_mutation_count' => (int) $report['production_mutation_count'],
+                'personel_first_login_apply_reconciled' => ($report['credential_targets_reconciled'] ?? false) === true,
+                'ilkera_touched' => ($report['ilkera_touched'] ?? false) === true,
             ]);
             $stage = 'REQUEST_ARCHIVE';
             archiveRequest(

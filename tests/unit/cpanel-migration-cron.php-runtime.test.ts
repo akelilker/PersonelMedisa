@@ -259,7 +259,7 @@ describe('cPanel migration cron worker runtime', () => {
     }
   });
 
-  it('has no apply counterpart for the personel first-login mode', () => {
+  it('requires the pinned plan fingerprint before the personel first-login apply stage', () => {
     const fixture = makeFixture();
     const deployedSha = '2'.repeat(40);
     try {
@@ -275,11 +275,43 @@ describe('cPanel migration cron worker runtime', () => {
           mode: 'PERSONEL_FIRST_LOGIN_CREDENTIALS_APPLY',
         }),
       );
+      // No expected_plan_fingerprint: the apply mode is fingerprint-pinned, so an unpinned
+      // request is rejected during request parsing instead of reaching the apply stage.
       expect(runWorker(fixture.controlDirectory, fixture.deployShaPath, fixture.bundlePath)).toBe(1);
       const status = JSON.parse(readFileSync(join(fixture.controlDirectory, 'status.json'), 'utf8'));
       expect(status.reason).toBe('REQUEST_INVALID');
       expect(status.stage).toBe('REQUEST_PARSE');
       expect(readdirSync(fixture.controlDirectory)).not.toContain('personel-first-login-preflight.json');
+      expect(readdirSync(fixture.controlDirectory)).not.toContain('personel-first-login-apply.json');
+      expect(readdirSync(fixture.controlDirectory)).not.toContain('personel-first-login-apply-preimage.json');
+    } finally {
+      rmSync(fixture.directory, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects a malformed plan fingerprint for the personel first-login apply mode', () => {
+    const fixture = makeFixture();
+    const deployedSha = '3'.repeat(40);
+    try {
+      mkdirSync(fixture.controlDirectory, { recursive: true });
+      writeFileSync(fixture.deployShaPath, deployedSha);
+      writeFileSync(
+        join(fixture.controlDirectory, 'request.pending.personel-apply-bad-pin.json'),
+        JSON.stringify({
+          schema_version: 1,
+          request_id: 'personel-apply-bad-pin',
+          deployed_sha: deployedSha,
+          requested_at: '2026-08-18T05:00:00Z',
+          mode: 'PERSONEL_FIRST_LOGIN_CREDENTIALS_APPLY',
+          expected_plan_fingerprint: 'NOT_A_FINGERPRINT',
+        }),
+      );
+      expect(runWorker(fixture.controlDirectory, fixture.deployShaPath, fixture.bundlePath)).toBe(1);
+      const status = JSON.parse(readFileSync(join(fixture.controlDirectory, 'status.json'), 'utf8'));
+      expect(status.reason).toBe('REQUEST_INVALID');
+      expect(status.stage).toBe('REQUEST_PARSE');
+      expect(readdirSync(fixture.controlDirectory)).not.toContain('personel-first-login-apply.json');
+      expect(readdirSync(fixture.controlDirectory)).not.toContain('personel-first-login-apply-preimage.json');
     } finally {
       rmSync(fixture.directory, { recursive: true, force: true });
     }

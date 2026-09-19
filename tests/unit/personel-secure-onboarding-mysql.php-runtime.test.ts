@@ -22,5 +22,7 @@ describe("PersonelSecureOnboarding disposable MariaDB acceptance", () => {
     expect(result.stdout).toContain("[PASS] concurrent redeem exactly one success");
     expect(result.stdout).toContain("[PASS] competing reissue waited on locked user row");
     expect(result.stdout).toContain("[PASS] generic PERSONEL+personel_id create blocked PERSONEL_USE_SECURE_ONBOARDING");
+    expect(result.stdout).toContain("[PASS] 219 canonical username doguA");
+    expect(result.stdout).toContain("[PASS] 219 collision rolls back master-data correction");
   });
 });

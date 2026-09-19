@@ -209,6 +209,13 @@ class PersonelAccountOnboardingService
                 );
             }
 
+            // Business name correction (varsa) hesap create ile AYNI transaction icinde uygulanir.
+            // Correction yoksa kayitli ad/soyad aynen kalir; mevcut onboarding davranisi degismez.
+            // Exact preimage uyusmazsa hicbir mutation yapilmadan fail-closed doner.
+            $nameCorrection = self::applyOnboardingNameCorrection($pdo, $personel);
+            $ad = $nameCorrection['ad'];
+            $soyad = $nameCorrection['soyad'];
+
             self::assertUsernameAvailableForNewAccount($pdo, $username, $personelId, $suggested);
 
             $adSoyad = trim((string) $ad . ' ' . (string) $soyad);
@@ -257,6 +264,11 @@ class PersonelAccountOnboardingService
                 $stmt->execute($params);
             } catch (PDOException $e) {
                 if (self::isUniqueViolation($e)) {
+                    // Collision halinde bu transaction'da yapilmis olabilecek onceki
+                    // mutation'lar (ornegin master-data name correction) da geri alinir.
+                    if ($pdo->inTransaction()) {
+                        $pdo->rollBack();
+                    }
                     JsonResponse::error(
                         409,
                         self::ERR_USERNAME_COLLISION,
@@ -278,6 +290,7 @@ class PersonelAccountOnboardingService
                 'credential_model' => self::CREDENTIAL_MODEL_FIRST_LOGIN,
                 'activation_required' => 0,
                 'must_change_password' => 1,
+                'name_correction' => $nameCorrection['correction'],
             ]);
 
             $bindAction = UserPersonelBindingService::applyBinding($pdo, $userId, $personelId, $actorId);
@@ -1137,6 +1150,86 @@ class PersonelAccountOnboardingService
             'rollout_ledger_event' => self::EVENT_FIRST_LOGIN_ROLLOUT_APPLIED,
             'plan_fingerprint' => $planFingerprint,
             'name_correction_count' => count($nameCorrectionTargets),
+        ];
+    }
+
+    /**
+     * onboardAndIssue icin business name correction (varsa) — hesap create ile AYNI transaction.
+     *
+     * `PERSONEL_NAME_CORRECTIONS` explicit business map'i TEK owner'dir; generic son-kelime
+     * parser veya ayri correction tablosu yoktur. Map'te kaydi olmayan personel icin hicbir
+     * yazma yapilmaz ve kayitli ad/soyad aynen dondurulur (mevcut davranis korunur).
+     *
+     * Correction varsa kilitli satirin ad/soyad degeri `from` ile exact (NULL-safe) eslesmeli;
+     * eslesmezse hicbir mutation yapilmadan fail-closed doner. Eslesirse yalniz ad/soyad
+     * guncellenir ve rowCount tam 1 olmalidir; aksi halde tüm transaction rollback edilir.
+     *
+     * @param array<string, mixed> $personel lockPersonelRow cikisi (ad/soyad preimage kaynagi)
+     * @return array{ad: string, soyad: string, correction: array<string, mixed>|null}
+     */
+    private static function applyOnboardingNameCorrection(PDO $pdo, array $personel)
+    {
+        $personelId = (int) ($personel['id'] ?? 0);
+        $currentAd = $personel['ad'] ?? null;
+        $currentSoyad = $personel['soyad'] ?? null;
+        $correction = self::personelNameCorrectionFor($personelId);
+        if ($correction === null) {
+            return [
+                'ad' => (string) $currentAd,
+                'soyad' => (string) $currentSoyad,
+                'correction' => null,
+            ];
+        }
+
+        if (!self::nullableStringEquals($currentAd, $correction['from']['ad'])
+            || !self::nullableStringEquals($currentSoyad, $correction['from']['soyad'])
+        ) {
+            JsonResponse::error(
+                409,
+                self::ERR_NAME_CORRECTION_PREIMAGE,
+                'Personel ad/soyad preimage uyusmadi; hicbir satir yazilmadi.',
+                'personel_id'
+            );
+        }
+
+        // Yalniz ad/soyad yazilir; exact `from` preimage kosulu saglanmazsa rollback olur.
+        $update = $pdo->prepare(
+            "UPDATE personeller
+                SET ad = :new_ad,
+                    soyad = :new_soyad
+              WHERE id = :personel_id
+                AND ad <=> :old_ad
+                AND soyad <=> :old_soyad"
+        );
+        $update->execute([
+            'new_ad' => $correction['to']['ad'],
+            'new_soyad' => $correction['to']['soyad'],
+            'personel_id' => $personelId,
+            'old_ad' => $correction['from']['ad'],
+            'old_soyad' => $correction['from']['soyad'],
+        ]);
+        if ($update->rowCount() !== 1) {
+            JsonResponse::error(
+                409,
+                self::ERR_NAME_CORRECTION_PREIMAGE,
+                'Personel ad/soyad preimage uyusmadi; hicbir satir yazilmadi.',
+                'personel_id'
+            );
+        }
+
+        return [
+            'ad' => (string) $correction['to']['ad'],
+            'soyad' => (string) $correction['to']['soyad'],
+            'correction' => [
+                'before' => [
+                    'ad' => $correction['from']['ad'],
+                    'soyad' => $correction['from']['soyad'],
+                ],
+                'after' => [
+                    'ad' => $correction['to']['ad'],
+                    'soyad' => $correction['to']['soyad'],
+                ],
+            ],
         ];
     }
 

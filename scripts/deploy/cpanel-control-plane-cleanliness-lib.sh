@@ -20,8 +20,17 @@
 #   request.completed.<id>.json  -> required (this request finished)
 #   any other new entry          -> BLOCKED (this run left something unexpected)
 #
-# Pre-existing files, failed or completed, are present in both listings and are
-# never re-judged. Nothing is deleted.
+# A caller may additionally declare an EXACT allowlist of expected extra delta
+# entries: some operations legitimately persist their own control-plane outputs
+# beside the archived request (for example the first-ever APPLY writes its
+# secret-free report and its recovery preimage once). The allowlist is exact
+# filenames only — no wildcard and no pattern — so it can never widen into
+# "ignore this operation's prefix". Everything not named there still blocks, and
+# an allowlist entry can never unblock a request.pending/processing/failed file.
+#
+# Default (no allowlist argument) is the previous contract: the archived request
+# and nothing else. Pre-existing files, failed or completed, are present in both
+# listings and are never re-judged. Nothing is deleted.
 
 # Normalize an `lftp cls -1` listing: drop CR and blank lines, take basenames,
 # dedupe and sort so the delta is stable and empty lines never become grep
@@ -45,11 +54,28 @@ assert_control_plane_clean_for_request() {
   local before_listing="${1:-}"
   local after_listing="${2:-}"
   local request_id="${3:-}"
+  # Optional exact allowlist of additional expected delta filenames. Absent by
+  # default, so the preflight caller keeps its previous semantics unchanged.
+  shift "$(( $# < 3 ? $# : 3 ))"
+  local -a expected_extra=("$@")
 
   if [[ ! "$request_id" =~ ^[A-Za-z0-9._-]{1,128}$ ]]; then
     echo "CONTROL_PLANE_REQUEST_ID_INVALID"
     return 2
   fi
+  # An allowlist entry is an exact basename. A glob, a request.* entry or a path
+  # separator would turn the exact list into a pattern that can silently widen,
+  # so the invocation is refused instead.
+  local declared_extra
+  for declared_extra in "${expected_extra[@]:-}"; do
+    [[ -z "$declared_extra" ]] && continue
+    if [[ "$declared_extra" == *'*'* || "$declared_extra" == *'?'* || "$declared_extra" == *'['* \
+       || "$declared_extra" == *'/'* || "$declared_extra" == *'\'* || "$declared_extra" == *..* \
+       || "$declared_extra" == request.* || ! "$declared_extra" =~ ^[A-Za-z0-9._-]{1,128}$ ]]; then
+      echo "CONTROL_PLANE_ALLOWLIST_ENTRY_INVALID"
+      return 2
+    fi
+  done
   if [[ ! -f "$before_listing" ]]; then
     echo "CONTROL_PLANE_BEFORE_LISTING_MISSING"
     return 2
@@ -92,6 +118,9 @@ assert_control_plane_clean_for_request() {
   while IFS= read -r entry; do
     [[ -z "$entry" ]] && continue
     [[ "$entry" == "$completed" ]] && continue
+    # This run's own request states are judged BEFORE the allowlist, so an
+    # allowlist entry can never be used to excuse a pending/failed/processing
+    # request file.
     case "$entry" in
       request.processing.*)
         echo "CONTROL_PLANE_LEFTOVER_PROCESSING_REQUEST"
@@ -108,12 +137,21 @@ assert_control_plane_clean_for_request() {
         rm -rf "$work"
         return 1
         ;;
-      *)
-        echo "CONTROL_PLANE_UNEXPECTED_DELTA"
-        rm -rf "$work"
-        return 1
-        ;;
     esac
+
+    local entry_allowlisted=""
+    local candidate
+    for candidate in "${expected_extra[@]:-}"; do
+      if [[ -n "$candidate" && "$entry" == "$candidate" ]]; then
+        entry_allowlisted="1"
+        break
+      fi
+    done
+    [[ -n "$entry_allowlisted" ]] && continue
+
+    echo "CONTROL_PLANE_UNEXPECTED_DELTA"
+    rm -rf "$work"
+    return 1
   done < "$work/delta.txt"
 
   if ! grep -qxF "$completed" "$work/after.txt"; then

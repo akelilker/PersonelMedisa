@@ -382,8 +382,19 @@ describe('personel first-login apply workflow', () => {
   });
 
   it('never fetches or publishes the recovery preimage', () => {
-    expect(workflow).not.toContain('personel-first-login-apply-preimage.json');
+    // The preimage filename now appears in exactly one place: the control-plane delta
+    // allowlist, which only DECLARES that the worker persisted it. The preimage is still
+    // never read over FTP, never copied and never uploaded, so no preimage value — the old
+    // password_hash — can leave the control plane.
+    expect(workflow.match(/personel-first-login-apply-preimage\.json/g) ?? []).toHaveLength(1);
+    const allowlistBlock = workflow.slice(
+      workflow.indexOf('expected_extra=('),
+      workflow.indexOf(')', workflow.indexOf('expected_extra=(')),
+    );
+    expect(allowlistBlock).toContain('"personel-first-login-apply-preimage.json"');
     expect(workflow).not.toMatch(/get\s+\S*preimage/i);
+    expect(workflow).not.toMatch(/put\s+\S*preimage/i);
+    expect(workflow).not.toMatch(/cp\s+\S*preimage/i);
     // The only uploaded path is the secret-free report artifact.
     expect(workflow).toContain('path: apply-artifact/');
     expect(workflow).not.toContain('path: ${{');
@@ -472,8 +483,15 @@ describe('personel first-login apply workflow', () => {
       'source "$GITHUB_WORKSPACE/scripts/deploy/cpanel-control-plane-cleanliness-lib.sh"',
     );
     expect(step).toContain(
-      'assert_control_plane_clean_for_request "$before_listing" "$after_listing" "$request_id"',
+      'assert_control_plane_clean_for_request "$before_listing" "$after_listing" "$request_id" "${expected_extra[@]}"',
     );
+    // The first-ever APPLY legitimately persists its own two control-plane outputs. They are
+    // declared as an EXACT allowlist of two filenames — never a wildcard, never a
+    // personel-first-login-* prefix — so an unrelated new file still blocks.
+    expect(step).toContain('expected_extra=(');
+    expect(step).toContain('"personel-first-login-apply.json"');
+    expect(step).toContain('"personel-first-login-apply-preimage.json"');
+    expect(step).not.toMatch(/personel-first-login-\*/);
     expect(step).toContain('before_listing="$RUNNER_TEMP/personel-first-login-apply/control-listing.txt"');
     expect(step).toContain('APPLY_CONTROL_PLANE_CLEAN=YES');
     // A historical failed request must never be re-judged by a global pattern match.

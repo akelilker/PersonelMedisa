@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
 # Runtime harness for the control-plane cleanliness contract.
 #
-# Covers the production false failure directly: a pre-existing historical
-# request.failed.* file must not fail a run whose own request completed, while
-# this run's own pending/processing/failed states must still block.
+# Covers the production false failures directly:
+#   * a pre-existing historical request.failed.* file must not fail a run whose own
+#     request completed, while this run's own pending/processing/failed states must
+#     still block;
+#   * the first-ever APPLY's own two control-plane outputs are accepted only when the
+#     caller declares them as an EXACT allowlist, and an allowlist entry never excuses
+#     this run's own request state, a wildcard or an unrelated new file.
 set -u
 cd "$(dirname "$0")/../.."
 
@@ -59,10 +63,17 @@ run_case() {
   local expected_reason="$3"
   local before_listing="$4"
   local after_listing="$5"
+  shift 5
 
   local output
   local rc=0
-  output="$(assert_control_plane_clean_for_request "$before_listing" "$after_listing" "$REQUEST_ID")" || rc=$?
+  # No extra argument means the preflight contract: the archived request and
+  # nothing else. Any extra arguments are the caller's exact allowlist.
+  if (( $# > 0 )); then
+    output="$(assert_control_plane_clean_for_request "$before_listing" "$after_listing" "$REQUEST_ID" "$@")" || rc=$?
+  else
+    output="$(assert_control_plane_clean_for_request "$before_listing" "$after_listing" "$REQUEST_ID")" || rc=$?
+  fi
 
   assert_eq "${name}_RC" "$expected_rc" "$rc"
   assert_eq "${name}_REASON" "$expected_reason" "$output"
@@ -111,6 +122,69 @@ run_case "EMPTY_BEFORE_COMPLETED" 0 "" "$WORK/c7.before" "$WORK/c7.after"
 write_listing "$WORK/c8.before" "${HISTORICAL[@]}"
 write_listing "$WORK/c8.after" "${HISTORICAL[@]}" "request.completed.pflcpre-99999999999-1.json"
 run_case "FOREIGN_COMPLETION_ONLY" 1 "CONTROL_PLANE_UNEXPECTED_DELTA" "$WORK/c8.before" "$WORK/c8.after"
+
+# ---------------------------------------------------------------------------
+# First-ever APPLY: it legitimately persists its own two control-plane outputs
+# beside this run's archived request. The caller declares them as an EXACT
+# allowlist; the default (preflight) contract stays untouched.
+# ---------------------------------------------------------------------------
+ALLOW_APPLY=(
+  "personel-first-login-apply.json"
+  "personel-first-login-apply-preimage.json"
+)
+
+# 9) The production false negative: this run's completed request plus its own two
+#    outputs, with the exact allowlist declared -> PASS.
+write_listing "$WORK/c9.before" "${HISTORICAL[@]}"
+write_listing "$WORK/c9.after" "${HISTORICAL[@]}" "$COMPLETED" "${ALLOW_APPLY[@]}"
+run_case "APPLY_OWN_OUTPUTS_ALLOWLISTED" 0 "" "$WORK/c9.before" "$WORK/c9.after" "${ALLOW_APPLY[@]}"
+
+# 10) The same delta with NO allowlist -> still BLOCKED. The default contract did
+#     not get weaker for every other caller.
+run_case "APPLY_OWN_OUTPUTS_NO_ALLOWLIST" 1 "CONTROL_PLANE_UNEXPECTED_DELTA" "$WORK/c9.before" "$WORK/c9.after"
+
+# 11) An allowlisted output plus one unrelated new file -> BLOCKED. The allowlist
+#     never becomes "ignore everything this operation writes".
+write_listing "$WORK/c11.before" "${HISTORICAL[@]}"
+write_listing "$WORK/c11.after" "${HISTORICAL[@]}" "$COMPLETED" "${ALLOW_APPLY[@]}" "random.json"
+run_case "ALLOWLIST_PLUS_UNKNOWN_DELTA" 1 "CONTROL_PLANE_UNEXPECTED_DELTA" "$WORK/c11.before" "$WORK/c11.after" "${ALLOW_APPLY[@]}"
+
+# 12) This run's own pending request -> BLOCKED even with an allowlist present.
+#     A pending/failed/processing request can never be excused by an allowlist.
+write_listing "$WORK/c12.before" "${HISTORICAL[@]}"
+write_listing "$WORK/c12.after" "${HISTORICAL[@]}" "$PENDING" "${ALLOW_APPLY[@]}"
+run_case "CURRENT_PENDING_WITH_ALLOWLIST" 1 "CONTROL_PLANE_LEFTOVER_PENDING_REQUEST" \
+  "$WORK/c12.before" "$WORK/c12.after" "${ALLOW_APPLY[@]}"
+
+# 13) This run's own failed request -> BLOCKED even with an allowlist present.
+write_listing "$WORK/c13.before" "${HISTORICAL[@]}"
+write_listing "$WORK/c13.after" "${HISTORICAL[@]}" "$FAILED" "${ALLOW_APPLY[@]}"
+run_case "CURRENT_FAILED_WITH_ALLOWLIST" 1 "CONTROL_PLANE_FAILED_REQUEST_PRESENT" \
+  "$WORK/c13.before" "$WORK/c13.after" "${ALLOW_APPLY[@]}"
+
+# 14) A mid-flight worker leak -> BLOCKED even with an allowlist present.
+write_listing "$WORK/c14.before" "${HISTORICAL[@]}"
+write_listing "$WORK/c14.after" "${HISTORICAL[@]}" "request.processing.0011aabb22cc33dd44ee55ff.json" "${ALLOW_APPLY[@]}"
+run_case "CURRENT_PROCESSING_LEAK_WITH_ALLOWLIST" 1 "CONTROL_PLANE_LEFTOVER_PROCESSING_REQUEST" \
+  "$WORK/c14.before" "$WORK/c14.after" "${ALLOW_APPLY[@]}"
+
+# 15) Preflight caller: no allowlist argument at all, clean completion -> PASS.
+write_listing "$WORK/c15.before" "${HISTORICAL[@]}"
+write_listing "$WORK/c15.after" "${HISTORICAL[@]}" "$COMPLETED"
+run_case "PREFLIGHT_CALLER_NO_EXTRAS" 0 "" "$WORK/c15.before" "$WORK/c15.after"
+
+# 16) A wildcard in the allowlist is refused instead of silently widening.
+run_case "ALLOWLIST_GLOB_REFUSED" 2 "CONTROL_PLANE_ALLOWLIST_ENTRY_INVALID" \
+  "$WORK/c15.before" "$WORK/c15.after" "personel-first-login-*.json"
+
+# 17) A request.* entry in the allowlist is refused: request state is never
+#     allowlistable.
+run_case "ALLOWLIST_REQUEST_ENTRY_REFUSED" 2 "CONTROL_PLANE_ALLOWLIST_ENTRY_INVALID" \
+  "$WORK/c15.before" "$WORK/c15.after" "$PENDING"
+
+# 18) A path-shaped allowlist entry is refused too.
+run_case "ALLOWLIST_PATH_REFUSED" 2 "CONTROL_PLANE_ALLOWLIST_ENTRY_INVALID" \
+  "$WORK/c15.before" "$WORK/c15.after" "../migration-control/personel-first-login-apply.json"
 
 # Negative control: the fixture for case 1 really does contain a historical
 # failed request, which is exactly what used to trigger the false failure.

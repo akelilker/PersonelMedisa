@@ -1,6 +1,19 @@
+import { fileURLToPath } from "node:url";
 import pkg from "./package.json";
 import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
+
+/**
+ * Inert replacement for `./mock-demo` used on production builds only.
+ *
+ * The statically imported demo resolver in `api-client.ts` (plus the dynamic
+ * `import("./mock-demo")` call sites) otherwise pull the whole mock seed layer
+ * into the main chunk even when `VITE_DEMO_API_FALLBACK=false`, because the
+ * env flag is read through a runtime object and never tree-shaken.
+ */
+const MOCK_DEMO_PRODUCTION_STUB = fileURLToPath(
+  new URL("./src/api/mock-demo.production-stub.ts", import.meta.url)
+);
 
 function normalizeViteBase(raw: string | undefined): string {
   const t = raw?.trim();
@@ -20,10 +33,19 @@ function normalizeViteBase(raw: string | undefined): string {
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
   const base = normalizeViteBase(env.VITE_APP_BASE_PATH);
+  const isProductionBuild = mode === "production";
 
   return {
     base,
     plugins: [react()],
+    // Production artifact must not carry demo/mock seed data. `vite build`
+    // (and the cPanel deploy) runs in "production" mode; `vite` dev, `vite build
+    // --mode development`, and both vitest configs keep the real module.
+    resolve: isProductionBuild
+      ? {
+          alias: [{ find: /^\.\/mock-demo$/, replacement: MOCK_DEMO_PRODUCTION_STUB }]
+        }
+      : undefined,
     define: {
       "import.meta.env.VITE_PKG_VERSION": JSON.stringify(pkg.version)
     }

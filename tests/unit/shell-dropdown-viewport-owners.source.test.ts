@@ -61,6 +61,22 @@ describe("shell dropdown viewport-safe owners", () => {
     expect(icons).toMatch(
       /\.icons-row--minimal\s+\.sube-selector-dropdown\s*\{[^}]*margin-inline:\s*auto/s
     );
+    expect(icons).toMatch(/\.icons-row--minimal\s+\.sube-selector-dropdown\s*\{[^}]*top:\s*100%/s);
+  });
+
+  it("keeps bell/gear under şube scrim (toggle only above overlay)", () => {
+    const notifications = read("src/styles/components/notifications.css");
+    expect(notifications).toMatch(
+      /:has\(\.icons-row\s+\.sube-selector-dropdown\.open\)\s+\.sube-selector-toggle/s
+    );
+    expect(notifications).not.toMatch(
+      /:has\(\.icons-row\s+\.settings-dropdown\.open\)\s+\.icons-row\s*\{[^}]*z-index:\s*3/s
+    );
+  });
+
+  it("extends home shell side rails through footer band (no bottom cut)", () => {
+    const shell = read("src/styles/layout/app-shell.css");
+    expect(shell).toMatch(/body\.app-home-route\s+\.app-shell::before\s*\{[^}]*inset:\s*0/s);
   });
 
   it("applies content-wrap blur when sube selector is open (same as notifications)", () => {

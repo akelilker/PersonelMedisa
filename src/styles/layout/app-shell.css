@@ -70,8 +70,7 @@ body.app-home-route {
 
 body.app-home-route .app-shell::before {
   box-shadow: none;
-  /* Run side rails to shell bottom; footer band continues the frame (no gap/cut). */
-  inset: 0;
+  /* Side rails: default bottom inset (footer top). Full-height pseudo caused red stubs on footer glow. */
 }
 
 .app-shell > * {

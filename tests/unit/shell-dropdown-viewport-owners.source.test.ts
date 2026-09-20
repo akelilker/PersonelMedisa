@@ -77,9 +77,13 @@ describe("shell dropdown viewport-safe owners", () => {
     );
   });
 
-  it("extends home shell side rails through footer band (no bottom cut)", () => {
+  it("stops home shell side rails at footer top (no inset:0 stubs on footer glow)", () => {
     const shell = read("src/styles/layout/app-shell.css");
-    expect(shell).toMatch(/body\.app-home-route\s+\.app-shell::before\s*\{[^}]*inset:\s*0/s);
+    expect(shell).toMatch(/body\.app-home-route\s+\.app-shell::before/s);
+    expect(shell).not.toMatch(/body\.app-home-route\s+\.app-shell::before\s*\{[^}]*inset:\s*0/s);
+    expect(shell).toMatch(
+      /\.app-shell::before\s*\{[^}]*inset:\s*0\s+0\s*\n\s*calc\(var\(--app-footer-real-height\)/s
+    );
   });
 
   it("applies content-wrap blur when sube selector is open (same as notifications)", () => {

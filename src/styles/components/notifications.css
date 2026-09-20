@@ -252,6 +252,11 @@ body:not(.modal-open):has(.icons-row .settings-dropdown.open) .app-shell {
 body:not(.modal-open):has(.icons-row .settings-dropdown.open) .content-wrap {
   overflow-y: visible;
   position: relative;
+}
+
+/* Notifications / settings menus stack above footer; şube scrim stays below shell frame. */
+body:not(.modal-open):has(.icons-row .notifications-dropdown.open) .content-wrap,
+body:not(.modal-open):has(.icons-row .settings-menu-dropdown.open) .content-wrap {
   z-index: calc(var(--z-footer) + 15);
 }
 
@@ -274,8 +279,15 @@ body:not(.modal-open):has(.icons-row .sube-selector-dropdown.open) .content-wrap
   -webkit-backdrop-filter: blur(6px);
 }
 
-body:not(.modal-open):has(.icons-row .settings-dropdown.open) .icons-row {
+body:not(.modal-open):has(.icons-row .notifications-dropdown.open) .icons-row,
+body:not(.modal-open):has(.icons-row .settings-menu-dropdown.open) .icons-row {
   z-index: 3;
+}
+
+/* Şube menu: bell/gear stay under scrim; toggle + list remain interactive above it. */
+body:not(.modal-open):has(.icons-row .sube-selector-dropdown.open) .sube-selector-toggle {
+  position: relative;
+  z-index: 2;
 }
 
 @media (max-width: 640px) {

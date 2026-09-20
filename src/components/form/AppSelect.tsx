@@ -9,7 +9,13 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent
 } from "react";
-import { activateAppPicker, applyPickerPanelGeometry, deactivateAppPicker, measurePickerPanel } from "./app-picker-layer";
+import {
+  activateAppPicker,
+  applyPickerPanelGeometry,
+  clampNumber,
+  deactivateAppPicker,
+  measurePickerPanel
+} from "./app-picker-layer";
 
 /**
  * PersonelMedisa kanonik seçim owner'ı.
@@ -78,10 +84,6 @@ type ActivePickerHandle = { close: () => void };
 /** Aynı anda tek kanonik picker açık kalır (state bozulmasını önleyen registry). */
 let activePickerCloser: ActivePickerHandle | null = null;
 
-function clamp(value: number, min: number, max: number) {
-  return Math.min(Math.max(value, min), max);
-}
-
 function moveIndex(current: number, delta: number, length: number) {
   if (length <= 0) {
     return -1;
@@ -91,7 +93,7 @@ function moveIndex(current: number, delta: number, length: number) {
     return delta > 0 ? 0 : length - 1;
   }
 
-  return clamp(current + delta, 0, length - 1);
+  return clampNumber(current + delta, 0, length - 1);
 }
 
 /** Türkçe uyumlu, aksan/kılasör farkını yok sayan arama normalizasyonu (canonical owner). */

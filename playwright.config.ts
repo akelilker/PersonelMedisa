@@ -10,7 +10,10 @@ export default defineConfig({
   timeout: 60_000,
   use: {
     baseURL: "http://127.0.0.1:4173",
-    headless: true
+    headless: true,
+    // PR #327 registers a pass-through SW for PWA installability. WebKit routes fetch
+    // through the worker, which bypasses Playwright `page.route` mocks and yields 404 login.
+    serviceWorkers: "block"
   },
   projects: [
     {

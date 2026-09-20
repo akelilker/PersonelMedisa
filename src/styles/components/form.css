@@ -99,7 +99,6 @@ select.form-input {
   color: var(--txt-muted);
 }
 
-.form-success,
 .puantaj-form-success {
   margin: 0;
   color: var(--green);

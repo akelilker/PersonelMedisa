@@ -39,7 +39,6 @@ body {
 
 /* Shared 2-column / auto-fit form collapse */
 @media (max-width: 640px) {
-  .two-column-grid,
   .universal-btn-group,
   .form-field-grid,
   .yonetim-selection-grid--departmanlar,

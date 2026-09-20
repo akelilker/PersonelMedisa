@@ -104,14 +104,11 @@ button {
 }
 
 /* Destructive shared owner (Taşıt settings-btn-delete #ff4d4d) */
-.universal-btn-delete,
 .settings-btn-delete {
   color: #ff4d4d;
   border-color: rgba(255, 77, 77, 0.55);
 }
 
-.universal-btn-delete:hover:not([disabled]),
-.universal-btn-delete:focus-visible:not([disabled]),
 .settings-btn-delete:hover:not([disabled]),
 .settings-btn-delete:focus-visible:not([disabled]) {
   background: rgba(255, 77, 77, 0.12);

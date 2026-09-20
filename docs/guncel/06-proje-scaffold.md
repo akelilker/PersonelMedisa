@@ -340,7 +340,6 @@ src/styles/
   layout/
     app-shell.css
     content-wrap.css
-    grid.css
   components/
     hero.css
     icons-row.css

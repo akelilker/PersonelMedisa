@@ -209,6 +209,13 @@
   padding-top: 0;
 }
 
+/* Personel Detayı: üst ritim Taşıt detay ekranındaki hizada başlar. Body üst
+   nefesi kalkar; header ile ilk satır arasındaki mesafeyi back-bar kendi
+   padding-top'u (8px omurga) taşır. Yatay padding değişmez. */
+.modal-body:has(> .personel-detay-page) {
+  padding-top: 0;
+}
+
 .modal-header-spacer {
   grid-column: 1;
   width: 34px;

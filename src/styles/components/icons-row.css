@@ -170,9 +170,9 @@
   left: 0;
   right: 0;
   margin-inline: auto;
-  /* Flush under header row, then ~one compact şube row higher than fixed 36px offset. */
+  /* Flush under header row, nudged up ~2 compact rows so last option clears footer glow. */
   top: 100%;
-  margin-top: -30px;
+  margin-top: -62px;
 }
 
 /*

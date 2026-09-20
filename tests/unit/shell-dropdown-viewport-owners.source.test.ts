@@ -62,6 +62,9 @@ describe("shell dropdown viewport-safe owners", () => {
       /\.icons-row--minimal\s+\.sube-selector-dropdown\s*\{[^}]*margin-inline:\s*auto/s
     );
     expect(icons).toMatch(/\.icons-row--minimal\s+\.sube-selector-dropdown\s*\{[^}]*top:\s*100%/s);
+    expect(icons).toMatch(
+      /\.icons-row--minimal\s+\.sube-selector-dropdown\s*\{[^}]*margin-top:\s*-62px/s
+    );
   });
 
   it("keeps bell/gear under şube scrim (toggle only above overlay)", () => {

@@ -236,12 +236,13 @@ function mhsReset(PDO $pdo): void
         VALUES (1, 7, '4A', 'TAM_SURELI', 'SIRKET_POLITIKASINDAN', '2026-01-01', 'ONAYLANDI', 'test', 1, NOW()),
                (2, 8, '4A', 'TAM_SURELI', 'SIRKET_POLITIKASINDAN', '2026-01-01', 'ONAYLANDI', 'test', 1, NOW()),
                (3, 9, '4A', 'TAM_SURELI', 'SIRKET_POLITIKASINDAN', '2026-01-01', 'ONAYLANDI', 'test', 1, NOW())");
-    // Canonical employer reporting period (SGK_ISVEREN axis), not branch policy.
+    // Canonical employer reporting period (SGK_ISVEREN axis), factual verified state.
     $pdo->exec("INSERT INTO sgk_isveren_bildirim_donemi_surumleri
         (id, sgk_isveren_id, surum_kodu, bildirim_donem_tipi, gecerlilik_baslangic, gecerlilik_bitis,
-         state, dogrulama_kaynagi, aciklama, onaylayan_id, onay_zamani)
+         state, dogrulama_kaynagi, dogrulama_kanit_hash, aciklama, dogrulayan_id, dogrulama_zamani)
         VALUES (1, 1, 'MEDISA-2026', 'AY_1_SON_GUN', '2024-01-01', NULL,
-         'ONAYLANDI', 'EXPLICIT_EMPLOYER_PERIOD', 'canonical employer period', 1, NOW())");
+         'DOGRULANDI', 'EXPLICIT_EMPLOYER_PERIOD', REPEAT('a', 64),
+         'canonical employer period', 1, NOW())");
     $pdo->exec("INSERT INTO mevzuat_parametreleri
         (parametre_kodu, deger_tipi, sayisal_deger, birim, gecerlilik_baslangic)
         VALUES ('SGK_GUNLUK_TABAN', 'SAYISAL', 100, 'TRY', '2026-01-01'),

@@ -13,11 +13,13 @@
 
 Owner: `OrgScope` (+ `HrWriteScope` for `IK_PERSONELI` write companies). Session: `AuthMiddleware` / `LoginController`.
 
-## Live production inventory (2026-09-07 hosting-incident pin)
+## Historical production inventory (2026-09-07 hosting-incident pin) — historical evidence, NOT current tip
+
+**CURRENT canonical pins (2026-09-20):** `CODE_MIGRATION_TIP = 091`; `LAST_VERIFIED_PRODUCTION_MIGRATION_TIP = 089`; `FRESH_PRODUCTION_MIGRATION_READBACK = BLOCKED_EXTERNAL_GITHUB_ACTIONS_BILLING`. The `087` row below is a historical readback of apply `34033315991`, not the current production tip. Authoritative source: `CURRENT_STATE.md` + `docs/guncel/110-master-closure-gap-registry.md`.
 
 | Object | Live state | Evidence |
 | --- | --- | --- |
-| `PRODUCTION_MIGRATION_TIP` | **087** | apply `34033315991`; inventory pending=0 |
+| `PRODUCTION_MIGRATION_TIP` | **087** (historical pin, not current) | apply `34033315991`; inventory pending=0 |
 | LIVE deploy SHA | `9b4aac7919100c5421544824b0401e5046ab621e` | Last successful deploy (PR274 not live) |
 | CODE_MAIN SHA | `63f8c9052ca15c3f311e158b41b0afda09d2b874` | PR #274 MERGED / CI PASS / DEPLOY_HELD |
 | `user_sirketler` | **3** | inventory `orginv-34057486092-1` |

@@ -14,7 +14,7 @@ describe("branch manager assignment semantics (088)", () => {
     const migrations = readdirSync(resolve(root, "api/migrations"))
       .filter((f) => /^\d+_/.test(f))
       .sort();
-    expect(migrations.at(-1)).toBe("090_sgk_isveren_bildirim_donemi_owner.sql");
+    expect(migrations.at(-1)).toBe("091_sgk_isveren_bildirim_donemi_reconcile.sql");
 
     const sql = read("api/migrations/088_sube_sorumlu_yoneticiler.sql");
     expect(sql).toContain("CREATE TABLE IF NOT EXISTS sube_sorumlu_yoneticiler");

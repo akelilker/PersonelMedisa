@@ -208,19 +208,19 @@ final class SgkPrimGunuService
                         'tarih_bitis' => $periodEnd,
                         'kaynak_surec_id' => null,
                         'kaynak_belge_id' => null,
-                        'cozum_onerisi' => 'SGK isvereni icin tek bir onayli ve tarih etkili bildirim donemi birakin.',
+                        'cozum_onerisi' => 'SGK isvereni icin tek bir dogrulanmis ve tarih etkili bildirim donemi birakin.',
                     ]);
-                } elseif ($periodChoice['state'] !== SgkIsverenBildirimDonemiReadService::STATE_APPROVED) {
+                } elseif ($periodChoice['state'] !== SgkIsverenBildirimDonemiReadService::STATE_DOGRULANDI) {
                     $result = self::appendBlocker($result, [
                         'severity' => 'BLOCKER',
                         'code' => self::BLOCKER_ISVEREN_BILDIRIM_DONEMI_YOK,
-                        'message' => 'IC personelin SGK isvereni icin onayli bildirim donemi tanimi yok.',
+                        'message' => 'IC personelin SGK isvereni icin dogrulanmis bildirim donemi tanimi yok.',
                         'domain' => 'SGK',
                         'tarih_baslangic' => $periodStart,
                         'tarih_bitis' => $periodEnd,
                         'kaynak_surec_id' => null,
                         'kaynak_belge_id' => null,
-                        'cozum_onerisi' => 'SGK isvereninin bildirim donemi tipini acikca dogrulayip onaylayin.',
+                        'cozum_onerisi' => 'SGK isvereninin bildirim donemi tipini acikca dogrulayin.',
                     ]);
                 }
             }

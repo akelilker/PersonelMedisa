@@ -41,12 +41,12 @@ function createSnapshotSchema(PDO $pdo): void
     $pdo->exec('CREATE TABLE subeler (id INTEGER PRIMARY KEY, kod TEXT, ad TEXT)');
     $pdo->exec('CREATE TABLE sgk_isverenler (id INTEGER PRIMARY KEY, kod TEXT, ad TEXT)');
     $pdo->exec('CREATE TABLE calisma_lokasyonlari (id INTEGER PRIMARY KEY, ad TEXT)');
-    // Canonical SGK reporting-period owner (employer axis) for the fixture.
+    // Canonical SGK reporting-period owner (employer axis, factual verification) for the fixture.
     $pdo->exec('CREATE TABLE sgk_isveren_bildirim_donemi_surumleri (
         id INTEGER PRIMARY KEY, sgk_isveren_id INTEGER NOT NULL, surum_kodu TEXT NOT NULL,
         bildirim_donem_tipi TEXT NOT NULL, gecerlilik_baslangic TEXT NOT NULL, gecerlilik_bitis TEXT,
-        state TEXT NOT NULL, dogrulama_kaynagi TEXT NOT NULL, aciklama TEXT NOT NULL,
-        hazirlayan_id INTEGER, onaylayan_id INTEGER, onay_zamani TEXT,
+        state TEXT NOT NULL, dogrulama_kaynagi TEXT NOT NULL, dogrulama_kanit_hash TEXT NOT NULL,
+        aciklama TEXT NOT NULL, dogrulayan_id INTEGER, dogrulama_zamani TEXT,
         created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     )');
     $pdo->exec('CREATE TABLE departmanlar (id INTEGER PRIMARY KEY, ad TEXT)');
@@ -282,12 +282,14 @@ function resetSnapshotData(PDO $pdo): void
     ) VALUES
         (7, '11111111111', 'Ali', 'Yilmaz', 'S007', '2020-01-01', '1990-01-01', 1, 'AKTIF', 1, 1, 1),
         (8, '22222222222', 'Ayse', 'Demir', 'S008', '2020-01-01', '1991-01-01', 1, 'AKTIF', 1, 1, 1)");
-    // Canonical employer reporting period (SGK_ISVEREN axis), not branch policy.
+    // Canonical employer reporting period (SGK_ISVEREN axis), factual verified state.
+    $employerPeriodHash = str_repeat('c', 64);
     $pdo->exec("INSERT INTO sgk_isveren_bildirim_donemi_surumleri
         (id, sgk_isveren_id, surum_kodu, bildirim_donem_tipi, gecerlilik_baslangic, gecerlilik_bitis,
-         state, dogrulama_kaynagi, aciklama, onaylayan_id, onay_zamani)
+         state, dogrulama_kaynagi, dogrulama_kanit_hash, aciklama, dogrulayan_id, dogrulama_zamani)
         VALUES (1, 1, 'MEDISA-2026', 'AY_1_SON_GUN', '2024-01-01', NULL,
-         'ONAYLANDI', 'EXPLICIT_EMPLOYER_PERIOD', 'canonical employer period', 99, '2026-01-02 00:00:00')");
+         'DOGRULANDI', 'EXPLICIT_EMPLOYER_PERIOD', '$employerPeriodHash',
+         'canonical employer period', 99, '2026-01-02 00:00:00')");
     $manifestHash = str_repeat('a', 64);
     $policyHash = str_repeat('b', 64);
     $pdo->exec("INSERT INTO sgk_eksik_gun_katalog_surumleri

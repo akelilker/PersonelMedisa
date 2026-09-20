@@ -59,7 +59,7 @@ describe("canonical migration bundle", () => {
       expect(firstBytes.equals(readFileSync(second))).toBe(true);
 
       const bundle = firstBytes.toString("utf8");
-      expect((bundle.match(/'version' => '/g) ?? []).length).toBe(91);
+      expect((bundle.match(/'version' => '/g) ?? []).length).toBe(92);
       expect(bundle).toContain("'name' => 'migration_ledger.sql'");
       expect(bundle).toContain(
         "'name' => '067_personel_canonical_reference_gate.sql'",
@@ -126,6 +126,9 @@ describe("canonical migration bundle", () => {
       );
       expect(bundle).toContain(
         "'name' => '090_sgk_isveren_bildirim_donemi_owner.sql'",
+      );
+      expect(bundle).toContain(
+        "'name' => '091_sgk_isveren_bildirim_donemi_reconcile.sql'",
       );
 
       const checksum068 = createHash("sha256")
@@ -242,7 +245,7 @@ describe("canonical migration bundle", () => {
           `require '${phpRoot}/api/src/bootstrap.php';`,
           `$provider = new Medisa\\Api\\Database\\BundledMigrationSourceProvider('${phpBundle}');`,
           `$rows = $provider->all();`,
-          `if (count($rows) !== 91 || $rows[0]['version'] !== '000' || $rows[70]['version'] !== '070' || $rows[71]['version'] !== '071' || $rows[72]['version'] !== '072' || $rows[73]['version'] !== '073' || $rows[74]['version'] !== '074' || $rows[75]['version'] !== '075' || $rows[76]['version'] !== '076' || $rows[77]['version'] !== '077' || $rows[78]['version'] !== '078' || $rows[79]['version'] !== '079' || $rows[80]['version'] !== '080' || $rows[81]['version'] !== '081' || $rows[82]['version'] !== '082' || $rows[83]['version'] !== '083' || $rows[84]['version'] !== '084' || $rows[85]['version'] !== '085' || $rows[86]['version'] !== '086' || $rows[87]['version'] !== '087' || $rows[88]['version'] !== '088' || $rows[89]['version'] !== '089' || $rows[90]['version'] !== '090') { exit(1); }`,
+          `if (count($rows) !== 92 || $rows[0]['version'] !== '000' || $rows[70]['version'] !== '070' || $rows[71]['version'] !== '071' || $rows[72]['version'] !== '072' || $rows[73]['version'] !== '073' || $rows[74]['version'] !== '074' || $rows[75]['version'] !== '075' || $rows[76]['version'] !== '076' || $rows[77]['version'] !== '077' || $rows[78]['version'] !== '078' || $rows[79]['version'] !== '079' || $rows[80]['version'] !== '080' || $rows[81]['version'] !== '081' || $rows[82]['version'] !== '082' || $rows[83]['version'] !== '083' || $rows[84]['version'] !== '084' || $rows[85]['version'] !== '085' || $rows[86]['version'] !== '086' || $rows[87]['version'] !== '087' || $rows[88]['version'] !== '088' || $rows[89]['version'] !== '089' || $rows[90]['version'] !== '090' || $rows[91]['version'] !== '091') { exit(1); }`,
           "echo 'RAW_SQL_MISSING_PRODUCTION_SIMULATION=PASS';",
         ].join(" ");
         const result = spawnSync("php", ["-r", script], {

@@ -14,17 +14,22 @@ use PDOException;
  * branch, company or physical location. Payroll resolves it from
  * personeller.sgk_isveren_id and never infers it from the organizational branch axis.
  *
+ * The reporting period is verified factual employer configuration, NOT a management
+ * approval decision. This owner therefore has no approval workflow: the canonical
+ * factual states are DOGRULANMADI / DOGRULANDI / IPTAL, and only DOGRULANDI rows are
+ * effective at runtime. Unverified and cancelled rows never enter runtime.
+ *
  * Legal values (locked):
  *   AY_1_SON_GUN         = 1st of month -> real calendar month end (28/29/30/31)
  *   AY_15_SONRAKI_AY_14  = 15th of month -> 14th of the following month
  *
- * Draft / approval-pending / cancelled rows never enter runtime. When more than
- * one approved row is effective for the same employer interval the read is
- * fail-closed with CONFLICT, exactly like the legacy branch-scoped selector.
+ * Missing employer identity, missing table, missing period and more than one
+ * effective row for the same employer interval are all fail-closed: they never
+ * fabricate a period. Overlap is reported as CONFLICT.
  */
 final class SgkIsverenBildirimDonemiReadService
 {
-    public const STATE_APPROVED = 'ONAYLANDI';
+    public const STATE_DOGRULANDI = 'DOGRULANDI';
     public const STATE_NO_PERIOD = 'NO_PERIOD';
     public const STATE_CONFLICT = 'CONFLICT';
 
@@ -50,7 +55,7 @@ final class SgkIsverenBildirimDonemiReadService
                 "SELECT *
                  FROM sgk_isveren_bildirim_donemi_surumleri
                  WHERE sgk_isveren_id = :sgk_isveren_id
-                   AND state = 'ONAYLANDI'
+                   AND state = 'DOGRULANDI'
                    AND gecerlilik_baslangic <= :bitis
                    AND (gecerlilik_bitis IS NULL OR gecerlilik_bitis >= :baslangic)
                  ORDER BY gecerlilik_baslangic DESC, id DESC"
@@ -86,7 +91,7 @@ final class SgkIsverenBildirimDonemiReadService
         return [
             'donem' => $donem,
             'bildirim_donem_tipi' => $tip,
-            'state' => self::STATE_APPROVED,
+            'state' => self::STATE_DOGRULANDI,
         ];
     }
 

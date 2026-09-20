@@ -58,5 +58,15 @@ describe("shell dropdown viewport-safe owners", () => {
     expect(icons).toMatch(/\.sube-selector-wrap\s*\{[^}]*display:\s*inline-flex/s);
     expect(icons).not.toMatch(/\.sube-selector-wrap\s*\{[^}]*position:\s*relative/s);
     expect(icons).toMatch(/\.sube-selector-dropdown\s*\{[^}]*right:\s*0/s);
+    expect(icons).toMatch(
+      /\.icons-row--minimal\s+\.sube-selector-dropdown\s*\{[^}]*margin-inline:\s*auto/s
+    );
+  });
+
+  it("applies content-wrap blur when sube selector is open (same as notifications)", () => {
+    const notifications = read("src/styles/components/notifications.css");
+    expect(notifications).toMatch(
+      /:has\(\.icons-row\s+\.sube-selector-dropdown\.open\)\s+\.content-wrap::after/s
+    );
   });
 });

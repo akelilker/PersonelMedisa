@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
+import { PwaInstallBar } from "../../../components/shell/PwaInstallBar";
 import { useAuth } from "../../../state/auth.store";
 
 type LoginLocationState = {
@@ -59,6 +60,7 @@ export function LoginPage() {
 
   return (
     <section className="auth-login" aria-label="Giriş">
+      <PwaInstallBar />
       <div className="auth-login-stage">
         <form className="auth-login-form" onSubmit={handleLogin}>
           <label className="auth-field">

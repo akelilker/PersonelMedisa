@@ -1,6 +1,6 @@
 import { MEDISA_AUTH_SESSION_KEY } from "../auth/auth-constants";
 import type { AuthSession } from "../types/auth";
-import { getAppEnv, getAppVersion, isDevRuntime } from "../config/app-env";
+import { isDevRuntime } from "../config/app-env";
 import {
   API_FAIL_STORE_KEY,
   ERROR_STORE_KEY,

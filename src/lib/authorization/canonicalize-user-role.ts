@@ -1,5 +1,5 @@
 import type { UserRole } from "../../types/auth";
-import { ALL_ROLES, TECHNICAL_ROLES } from "../../types/auth";
+import { ALL_ROLES } from "../../types/auth";
 
 const CANONICAL_SET = new Set<string>(ALL_ROLES);
 
@@ -23,11 +23,4 @@ export function canonicalizeUserRole(value: unknown): UserRole | null {
   }
 
   return null;
-}
-
-export function isTechnicalRole(role: UserRole | null | undefined): boolean {
-  if (!role) {
-    return false;
-  }
-  return (TECHNICAL_ROLES as readonly string[]).includes(role);
 }

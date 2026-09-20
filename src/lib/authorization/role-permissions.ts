@@ -781,8 +781,6 @@ export const BILDIRIM_DETAIL_ALLOWED_ROLES = getRolesWithPermission("bildirimler
 export const PUANTAJ_ALLOWED_ROLES = getRolesWithPermission("puantaj.view");
 export const RAPORLAR_ALLOWED_ROLES = getRolesWithPermission("raporlar.view");
 export const FINANS_ALLOWED_ROLES = getRolesWithPermission("finans.view");
-export const AYLIK_OZET_ALLOWED_ROLES = getRolesWithPermission("aylik-ozet.view");
-export const ISG_ALLOWED_ROLES = getRolesWithPermission("isg.view");
 
 /** Liste rotalari: genel veya sube kapsamli goruntuleme */
 export const PERSONELLER_LIST_ANY: AppPermission[] = ["personeller.view", "personeller.view.sube"];

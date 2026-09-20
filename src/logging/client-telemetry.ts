@@ -5,7 +5,7 @@
  * Delivery: best-effort, bounded, recursion-guarded; failures must not re-enter logging.
  */
 
-import { getAppEnv, getAppVersion, isDevRuntime, isProductionBuild } from "../config/app-env";
+import { getAppEnv, getAppVersion } from "../config/app-env";
 import { getAuthTokenForApi } from "../auth/auth-token-provider";
 import { MEDISA_AUTH_SESSION_KEY } from "../auth/auth-constants";
 import type { AuthSession } from "../types/auth";
@@ -422,8 +422,4 @@ export function buildBaseTelemetryFields(source?: string): {
     route_template: toRouteTemplate(route),
     ...(source ? { source: sanitizeTelemetryText(source, 64) } : {})
   };
-}
-
-export function shouldAttachLocalStack(): boolean {
-  return !isProductionBuild() || isDevRuntime();
 }

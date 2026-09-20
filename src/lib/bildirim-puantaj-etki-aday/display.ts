@@ -120,16 +120,6 @@ export function buildConflictFieldComparisons(
   });
 }
 
-export function defaultConflictKararTuru(detail: Pick<
-  BildirimPuantajEtkiAdayDetail,
-  "conflict_default_karar" | "conflict_class"
->): BildirimPuantajEtkiConflictKararTuru {
-  if (detail.conflict_default_karar === "ADAY_ETKISIYLE_REVIZE_ET") {
-    return "ADAY_ETKISIYLE_REVIZE_ET";
-  }
-  return "MEVCUT_PUANTAJI_KORU";
-}
-
 export function formatConflictKararTuruLabel(karar: BildirimPuantajEtkiConflictKararTuru | string): string {
   if (karar === "ADAY_ETKISIYLE_REVIZE_ET") {
     return "Aday Etkisiyle Revize Et";

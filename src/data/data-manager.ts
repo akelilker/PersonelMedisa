@@ -4,7 +4,6 @@ import { ApiRequestError } from "../api/api-client";
 import {
   cancelBildirim,
   createBildirim,
-  fetchBildirimlerList,
   fetchGunlukTamamlamalariHeader,
   updateBildirim
 } from "../api/bildirimler.api";
@@ -94,10 +93,6 @@ function createEmptyAppData(fingerprint: string | null): AppData {
   };
 }
 
-export function getFallbackData(): AppData {
-  return createEmptyAppData(null);
-}
-
 export function getSafeAppDataFallback(): AppData {
   return createEmptyAppData(getActorFingerprint(getSession()));
 }
@@ -141,20 +136,6 @@ export function ensureAppData(): AppData {
 
 export function getAppData(): AppData {
   return ensureAppData();
-}
-
-export function hasUsableData(): boolean {
-  const data = ensureAppData();
-  if (data.schemaVersion !== APP_DATA_SCHEMA_VERSION) {
-    return false;
-  }
-
-  const currentFingerprint = getActorFingerprint(getSession());
-  if (data.ownerFingerprint !== currentFingerprint) {
-    return false;
-  }
-
-  return typeof data.cache === "object" && data.cache !== null;
 }
 
 function bumpRevision(data: AppData): void {
@@ -272,19 +253,6 @@ export function initAppDataFromStorage(): AppData {
 
   notifyAppData();
   return window.appData;
-}
-
-export function setAppData(partial: Partial<Pick<AppData, "cache">> & Partial<Pick<AppData, "updatedAt">>): void {
-  const data = ensureAppData();
-  if (partial.cache) {
-    data.cache = { ...data.cache, ...partial.cache };
-  }
-  if (partial.updatedAt !== undefined) {
-    data.updatedAt = partial.updatedAt;
-  }
-  bumpRevision(data);
-  persistAppData();
-  notifyAppData();
 }
 
 /** Aktif sube tek kaynak: auth oturumu (session). */
@@ -1121,30 +1089,6 @@ export function commitPersonelUpdateToCaches(updated: Personel): void {
       };
     });
   }
-}
-
-export function replacePersonelInListCache(listKey: string, tempId: number, created: Personel): void {
-  mergeCacheEntry<PaginatedResult<Personel>>(listKey, (prev) => {
-    if (!prev) {
-      return { ...emptyPaginated<Personel>(), items: [created] };
-    }
-    return {
-      ...prev,
-      items: prev.items.map((item) => (item.id === tempId ? created : item))
-    };
-  });
-}
-
-export function removeQueuedTempPersonel(listKey: string, tempId: number): void {
-  mergeCacheEntry<PaginatedResult<Personel>>(listKey, (prev) => {
-    if (!prev) {
-      return emptyPaginated<Personel>();
-    }
-    return {
-      ...prev,
-      items: prev.items.filter((item) => item.id !== tempId)
-    };
-  });
 }
 
 export function draftPersonelFromPayload(payload: CreatePersonelPayload, tempId: number): Personel {

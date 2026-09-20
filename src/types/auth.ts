@@ -90,13 +90,6 @@ export type LoginCredentials = {
   rememberMe?: boolean;
 };
 
-export const MANAGEMENT_ROLES: UserRole[] = [
-  "GENEL_YONETICI",
-  "SUBE_YONETICISI",
-  "BOLUM_YONETICISI",
-  "MUHASEBE"
-];
-
 /** Insan kullanici olusturma / rol picker — exact 9 canonical human roles. */
 export const ASSIGNABLE_USER_ROLES: UserRole[] = [
   "PERSONEL",

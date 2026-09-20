@@ -76,12 +76,6 @@ export function validateTcKimlikNo(value: string) {
   }
 }
 
-export function validatePhoneNumber(value: string, label: string) {
-  if (!/^05\d{9}$/.test(value)) {
-    throw new Error(`${label} 05xx xxx xx xx formatında olmalıdır.`);
-  }
-}
-
 export function resolvePersonelMaasTutari(personel: {
   net_maas_tutari?: number | null;
   maas_tutari?: number | null;

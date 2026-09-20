@@ -21,7 +21,7 @@ import {
   resolveBagliAmirPersonelId,
   type BagliAmirLookupOption
 } from "../api/referans.api";
-import { emptyPaginated, makeTempId, type PersonelReferenceBundle } from "../data/app-data.types";
+import { makeTempId, type PersonelReferenceBundle } from "../data/app-data.types";
 import {
   dataCacheKeys,
   draftPersonelFromPayload,

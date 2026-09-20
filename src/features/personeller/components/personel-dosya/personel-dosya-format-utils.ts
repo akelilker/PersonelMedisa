@@ -9,10 +9,6 @@ export function formatDetailValue(value: string | null | undefined) {
   return trimmed ? trimmed : "-";
 }
 
-export function formatDetailNumber(value: number | null | undefined) {
-  return typeof value === "number" ? String(value) : "-";
-}
-
 export function formatNullableScalar(value: string | number | boolean | null | undefined | object) {
   if (value === null || value === undefined) {
     return "-";

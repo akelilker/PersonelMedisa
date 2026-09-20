@@ -20,11 +20,9 @@ import {
   TURKISH_MONTH_NAMES,
   TURKISH_WEEKDAY_SHORT_NAMES,
   addDaysIso,
-  addYearsIso,
   buildMonthMatrix,
   buildYearRange,
   formatIsoToDisplay,
-  formatMonthYearLabel,
   isIsoDateString,
   isIsoWithinRange,
   parseIsoDate,
@@ -594,22 +592,6 @@ export function AppDatePicker({
           </div>
         </div>
       ) : null}
-    </div>
-  );
-}
-
-export type AppDatePickerFieldProps = AppDatePickerProps & { label: string };
-
-/** `.form-section` + etiket sarmalayıcısı (kanonik alan biçimi). */
-export function AppDatePickerField({ label, name, id, className, ...rest }: AppDatePickerFieldProps) {
-  const controlId = name ?? id;
-
-  return (
-    <div className={["form-section", "app-date-picker-field", className ?? ""].filter(Boolean).join(" ")}>
-      <label className="form-label" htmlFor={controlId}>
-        {label}
-      </label>
-      <AppDatePicker {...rest} name={name} id={id} />
     </div>
   );
 }

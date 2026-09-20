@@ -143,18 +143,6 @@ const COMPLIANCE_LEVEL_LABELS: Record<string, string> = {
   UYARI: "Uyarı"
 };
 
-const ISG_MAKINE_DURUM_LABELS: Record<string, string> = {
-  AKTIF: "Aktif",
-  ARIZALI: "Arızalı",
-  PASIF: "Pasif"
-};
-
-const ISG_BAKIM_DURUM_LABELS: Record<string, string> = {
-  GUNCEL: "Güncel",
-  GECIKMIS: "Gecikmiş",
-  EKSIK_VERI: "Eksik Veri"
-};
-
 const ZIMMET_URUN_TURU_LABELS: Record<string, string> = {
   AYAKKABI: "Ayakkabı",
   KASK: "Kask",
@@ -281,14 +269,6 @@ export function formatPuantajStateLabel(value: GunlukPuantajState | null | undef
 
 export function formatComplianceLevelLabel(value: ComplianceUyariSeviye | null | undefined): string {
   return formatMappedLabel(value, COMPLIANCE_LEVEL_LABELS);
-}
-
-export function formatIsgMakineDurumLabel(value: string | null | undefined): string {
-  return formatMappedLabel(value, ISG_MAKINE_DURUM_LABELS);
-}
-
-export function formatIsgBakimDurumuLabel(value: string | null | undefined): string {
-  return formatMappedLabel(value, ISG_BAKIM_DURUM_LABELS);
 }
 
 export function formatZimmetUrunTuruLabel(value: string | null | undefined): string {

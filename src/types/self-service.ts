@@ -236,5 +236,3 @@ export const SELF_SERVICE_ERROR_CODES = [
   "QR_REQUEST_NONCE_INVALID",
   "QR_IDEMPOTENCY_CONFLICT"
 ] as const;
-
-export type SelfServiceErrorCode = (typeof SELF_SERVICE_ERROR_CODES)[number];

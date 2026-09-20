@@ -109,19 +109,6 @@ export function hasOrganizasyonFormDiff(form: OrganizasyonFormState, personel: P
   return hasOrgTrackedDiff(form, personel) || hasBasicWorkInfoDiff(form, personel);
 }
 
-/** @deprecated Use hasOrganizasyonFormDiff */
-export function hasPozisyonOrganizationalDiff(
-  form: { departmanId: string; gorevId: string; bagliAmirId: string; personelTipiId: string },
-  personel: Personel
-) {
-  return (
-    form.departmanId !== toOptionalIdValue(personel.departman_id) ||
-    form.gorevId !== toOptionalIdValue(personel.gorev_id) ||
-    form.bagliAmirId !== toOptionalIdValue(personel.bagli_amir_id) ||
-    form.personelTipiId !== toOptionalIdValue(personel.personel_tipi_id)
-  );
-}
-
 /**
  * Sparse targets for every mutable axis (tracked org + work info) in one payload.
  * Single canonical POST keeps the save atomic — no follow-up basic PUT.

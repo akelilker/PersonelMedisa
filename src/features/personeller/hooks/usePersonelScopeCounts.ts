@@ -2,13 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import { fetchPersonellerList } from "../../../api/personeller.api";
 import type { SubeInfo } from "../../../types/auth";
 
-export type PersonelScopeCard = {
-  id: number | "all";
-  name: string;
-  count: number | null;
-  loading: boolean;
-};
-
 /**
  * Per-branch + ALL counts via GET /personeller?limit=1 meta.total.
  * Explicit `sube_id` for each branch; ALL omits sube_id and suppresses session

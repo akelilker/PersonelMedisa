@@ -257,31 +257,6 @@ export function findActiveOlusumByOdemeTercihiId(
   return null;
 }
 
-/** Active-only lookup (cancelled olusum is not active). */
-export function findOlusumByOdemeTercihiId(
-  events: readonly SerbestZamanEvent[],
-  odemeTercihiId: number
-): SerbestZamanOlusumEvent | null {
-  return findActiveOlusumByOdemeTercihiId(events, odemeTercihiId);
-}
-
-export function findOlusumBySnapshotId(
-  events: readonly SerbestZamanEvent[],
-  snapshotId: number
-): SerbestZamanOlusumEvent | null {
-  for (const event of events) {
-    if (
-      event.event_tipi === "SERBEST_ZAMAN_OLUSUM" &&
-      event.kaynak_snapshot_id === snapshotId &&
-      !isEventCancelled(events, event.id)
-    ) {
-      return event;
-    }
-  }
-
-  return null;
-}
-
 export function olusturOlusumEvent(params: {
   tercih: FazlaCalismaOdemeTercihi;
   mevcutEvents: readonly SerbestZamanEvent[];

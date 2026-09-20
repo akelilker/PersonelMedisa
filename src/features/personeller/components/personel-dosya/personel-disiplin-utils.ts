@@ -7,7 +7,7 @@ import {
 import { getSurecTimelineSortWeight } from "../../../../lib/surec-history-sort";
 import type { FinansKalem } from "../../../../types/finans";
 import type { Surec } from "../../../../types/surec";
-import { formatDetailValue, formatIsoDateDetail } from "./personel-dosya-format-utils";
+import { formatIsoDateDetail } from "./personel-dosya-format-utils";
 
 function normalizeSurecTypeToken(value: string | null | undefined) {
   return typeof value === "string" ? value.trim().toUpperCase() : "";

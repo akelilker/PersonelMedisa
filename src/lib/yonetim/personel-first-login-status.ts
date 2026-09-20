@@ -14,10 +14,6 @@ export function isPersonelBoundUser(item: PersonelFirstLoginUserLike): boolean {
   return item.personel_id != null && Number(item.personel_id) > 0;
 }
 
-export function isPersonelActivationPending(item: PersonelFirstLoginUserLike): boolean {
-  return isPersonelBoundUser(item) && item.activation_required === true;
-}
-
 /** PERSONEL-bound only; unbound legacy/admin accounts get no first-login label. */
 export function resolvePersonelFirstLoginLabel(item: PersonelFirstLoginUserLike): string | null {
   if (!isPersonelBoundUser(item)) {

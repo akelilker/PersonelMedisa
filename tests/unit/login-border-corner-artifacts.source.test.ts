@@ -18,7 +18,9 @@ describe("login form control corner artifacts", () => {
     expect(auth).toMatch(
       /\.auth-field input:not\(\[type="checkbox"\]\)\s*\{[^}]*border:\s*1px solid rgba\(255, 255, 255, 0\.35\)/s
     );
-    expect(auth).toMatch(/\.auth-field input:not\(\[type="checkbox"\]\)\s*\{[^}]*background:\s*#0f1418/s);
+    expect(auth).toMatch(
+      /\.auth-field input:not\(\[type="checkbox"\]\)\s*\{[^}]*background:\s*var\(--bg-field\)/s
+    );
     expect(auth).toMatch(
       /\.auth-field input:not\(\[type="checkbox"\]\)\s*\{[^}]*box-shadow:\s*none/s
     );

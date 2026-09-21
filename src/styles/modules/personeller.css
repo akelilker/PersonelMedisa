@@ -229,11 +229,11 @@
 }
 
 .personeller-table tbody tr:nth-child(even) td {
-  background: var(--medisa-table-zebra, rgba(255, 255, 255, 0.05));
+  background: var(--medisa-table-zebra);
 }
 
 .personeller-table tbody tr:nth-child(odd) td {
-  background: transparent;
+  background: var(--medisa-table-surface);
 }
 
 .personeller-table-cell-strong {
@@ -266,7 +266,7 @@
 }
 
 .personeller-table-row-clickable:hover td {
-  background: var(--medisa-table-hover, rgba(255, 255, 255, 0.1));
+  background: var(--medisa-table-hover);
 }
 
 .personeller-table-name-link {
@@ -1783,25 +1783,7 @@
   font-size: 12px;
 }
 
-/* Zebra + hover: Taşıt satır ritmi — koyu zeminde belirgin ama ağır olmayan ayrım.
-   Taşıt referansı: normal = modal bg, tek satır = 0.05 beyaz overlay, hover = 0.10.
-   Personel kart zemini daha açık (--bg-surface-elevated) olduğu için aynı görsel
-   ayrım seviyesi zebra 0.08 ile kuruldu; hover zebra farkını silmeden aydınlatır. */
-.personeller-page--kart .personeller-table--dense tbody tr:nth-child(odd) td {
-  background: transparent;
-}
-
-.personeller-page--kart .personeller-table--dense tbody tr:nth-child(even) td {
-  background: rgba(255, 255, 255, 0.08);
-}
-
-.personeller-page--kart .personeller-table--dense tbody tr:nth-child(odd):hover td {
-  background: rgba(255, 255, 255, 0.12);
-}
-
-.personeller-page--kart .personeller-table--dense tbody tr:nth-child(even):hover td {
-  background: rgba(255, 255, 255, 0.16);
-}
+/* Zebra + hover: canonical owner table.css (--medisa-table-* tokens, Taşıt parity). */
 
 /* Kolon genişlikleri tek owner'da (inline <col style> yok; PACK V1/V2/V4 statik inline style yasağı). */
 .personeller-page--kart .personeller-table .personeller-col-kimlik {

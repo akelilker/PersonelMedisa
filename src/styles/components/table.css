@@ -10,9 +10,6 @@
   --medisa-table-cell-pad-x: 8px;
   --medisa-table-header-size: 11.5px;
   --medisa-table-body-size: 12px;
-  --medisa-table-border: rgba(255, 255, 255, 0.08);
-  --medisa-table-zebra: rgba(255, 255, 255, 0.05);
-  --medisa-table-hover: rgba(255, 255, 255, 0.1);
   --medisa-table-data-color: var(--text-secondary);
 }
 
@@ -33,7 +30,7 @@
   -webkit-overflow-scrolling: touch;
   border: 1px solid var(--medisa-table-border);
   border-radius: var(--radius-sm);
-  background: var(--bg-surface-elevated);
+  background: var(--medisa-table-surface);
 }
 
 .app-table,
@@ -116,6 +113,19 @@
 .module-table tbody tr:last-child td,
 .data-table tbody tr:last-child td {
   border-bottom: none;
+}
+
+.app-table tbody tr:nth-child(odd) td,
+.raporlar-table tbody tr:nth-child(odd) td,
+.yonetim-table tbody tr:nth-child(odd) td,
+.yonetim-list-table tbody tr:nth-child(odd) td,
+.personeller-table tbody tr:nth-child(odd) td,
+.personel-belge-kayit-table tbody tr:nth-child(odd) td,
+.personel-zimmet-table tbody tr:nth-child(odd) td,
+.puantaj-etki-aday-table tbody tr:nth-child(odd) td,
+.module-table tbody tr:nth-child(odd) td,
+.data-table tbody tr:nth-child(odd) td {
+  background: var(--medisa-table-surface);
 }
 
 .app-table tbody tr:nth-child(even) td,
@@ -228,12 +238,16 @@
 
 .raporlar-table-wrap--premium {
   border-color: var(--medisa-table-border);
-  background: var(--bg-surface-elevated);
+  background: var(--medisa-table-surface);
 }
 
 .raporlar-table--premium th {
   color: var(--text-primary);
   background: var(--bg-surface);
+}
+
+.raporlar-table--premium td {
+  color: var(--medisa-table-data-color);
 }
 
 .app-list,

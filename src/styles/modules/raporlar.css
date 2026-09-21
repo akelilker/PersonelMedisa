@@ -168,8 +168,8 @@
 
 .raporlar-table-wrap--premium {
   border-radius: var(--radius-sm);
-  border: 1px solid var(--line-soft);
-  background: var(--text-inverse);
+  border: 1px solid var(--medisa-table-border);
+  background: var(--medisa-table-surface);
 }
 
 .raporlar-table--premium th {
@@ -177,12 +177,13 @@
   text-transform: uppercase;
   letter-spacing: 0.04em;
   font-weight: 600;
-  color: var(--text-muted);
-  background: rgba(0, 0, 0, 0.02);
+  color: var(--text-primary);
+  background: var(--bg-surface);
 }
 
 .raporlar-table--premium td {
   font-size: var(--medisa-table-body-size, 12px);
+  color: var(--medisa-table-data-color);
 }
 
 .raporlar-table-wrap {

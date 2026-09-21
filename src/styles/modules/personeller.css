@@ -321,33 +321,21 @@
 }
 
 .personel-dosya-hero {
-  display: grid;
-  gap: var(--space-3);
-}
-
-.personel-dosya-hero-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-2);
-}
-
-.personel-dosya-hero-copy {
-  display: grid;
-  gap: 6px;
-}
-
-.personel-dosya-kicker {
   margin: 0;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--txt-muted);
+  padding: 2px 0 0;
+}
+
+.personel-dosya-hero-identity {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px 10px;
+  text-align: center;
 }
 
 /* Kimlik satırı Taşıt detay plaka/marka tonuna iner (15px mobil, 16px masaüstü). */
-.personel-dosya-hero-copy h3 {
+.personel-dosya-hero-name {
   margin: 0;
   font-size: 15px;
   font-weight: 700;
@@ -357,9 +345,69 @@
 }
 
 @media (min-width: 641px) {
-  .personel-dosya-hero-copy h3 {
+  .personel-dosya-hero-name {
     font-size: 16px;
   }
+}
+
+.personel-dosya-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  min-height: 32px;
+  margin: 0;
+  padding: 0;
+}
+
+.personel-dosya-toolbar-spacer {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.personel-dosya-toolbar-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+}
+
+.personel-dosya-toolbar-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 30px;
+  padding: 4px 8px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--form-label-color, var(--txt));
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.personel-dosya-toolbar-btn:hover,
+.personel-dosya-toolbar-btn:focus-visible {
+  color: var(--theme-color);
+}
+
+.personel-dosya-tab-nav {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  margin: 0 calc(-1 * var(--space-1));
+  padding: 0 var(--space-1);
+  background: var(--modal-surface, var(--bg, #0f1419));
+}
+
+.personel-dosya-genel-ust {
+  display: grid;
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
 }
 
 .personel-dosya-status {
@@ -388,14 +436,6 @@
   background: currentColor;
 }
 
-.personel-dosya-sub {
-  margin: 0;
-  color: var(--text-secondary, var(--txt-gray, #a0aec0));
-  font-size: 15px;
-  font-weight: 600;
-  line-height: 1.2;
-}
-
 .personel-dosya-actions-row {
   display: flex;
   align-items: center;
@@ -420,8 +460,6 @@
 .personel-dosya-hero-grid {
   display: grid;
   gap: var(--space-2);
-  padding-top: var(--space-2);
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
 }
 
@@ -554,14 +592,20 @@
 .personel-kart-tablist {
   display: flex;
   flex-wrap: nowrap;
+  justify-content: center;
   gap: 0;
-  margin-bottom: var(--space-2);
+  margin-bottom: 0;
   padding-bottom: 0;
   border-bottom: 1px solid var(--line-soft);
   overflow-x: auto;
   max-width: 100%;
   -webkit-overflow-scrolling: touch;
-  scrollbar-width: thin;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.personel-kart-tablist::-webkit-scrollbar {
+  display: none;
 }
 
 .personel-kart-tab {
@@ -1009,13 +1053,8 @@
     min-width: 640px;
   }
 
-  .personel-dosya-hero-head {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
   .personel-dosya-status {
-    justify-self: start;
+    justify-self: center;
   }
 
   .personel-dosya-actions-row {

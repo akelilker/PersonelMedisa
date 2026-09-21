@@ -105,8 +105,8 @@ describe("otomatik sicil — frontend create sözleşmesi", () => {
 
     expect(personelToEditForm(personel).sicilNo).toBe("040");
 
-    const hero = read("src/features/personeller/components/personel-dosya/PersonelDosyaHero.tsx");
-    expect(hero).toContain('fieldValue("sicil_no"');
+    const genelUst = read("src/features/personeller/components/personel-dosya/PersonelDosyaGenelUst.tsx");
+    expect(genelUst).toContain('fieldValue("sicil_no"');
 
     const inlineEdit = read(
       "src/features/personeller/components/personel-dosya/PersonelInlineEditForm.tsx"

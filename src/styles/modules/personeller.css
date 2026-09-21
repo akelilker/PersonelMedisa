@@ -346,9 +346,20 @@
   color: var(--txt-muted);
 }
 
+/* Kimlik satırı Taşıt detay plaka/marka tonuna iner (15px mobil, 16px masaüstü). */
 .personel-dosya-hero-copy h3 {
   margin: 0;
-  font-size: 1.3rem;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: 0.02em;
+  color: var(--txt);
+}
+
+@media (min-width: 641px) {
+  .personel-dosya-hero-copy h3 {
+    font-size: 16px;
+  }
 }
 
 .personel-dosya-status {
@@ -379,9 +390,10 @@
 
 .personel-dosya-sub {
   margin: 0;
-  color: var(--txt-muted);
-  font-size: 13px;
-  line-height: 1.45;
+  color: var(--text-secondary, var(--txt-gray, #a0aec0));
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.2;
 }
 
 .personel-dosya-actions-row {

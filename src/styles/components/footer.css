@@ -137,6 +137,21 @@ body:not(.login-page):not(.admin-report-page) #app-footer {
   opacity: 0.8;
 }
 
+/*
+ * Phones own a full-bleed footer band (Taşıt style-core ≤640): the hairline
+ * side rails belong to the desktop shell frame, and the band grows with the
+ * bottom safe area instead of squeezing the version/brand/status row into a
+ * fixed height once viewport-fit=cover makes env(safe-area-inset-bottom) live.
+ */
+@media (max-width: 640px) {
+  #app-footer {
+    border-left: none;
+    border-right: none;
+    height: calc(var(--app-footer-real-height) + env(safe-area-inset-bottom, 0px));
+    min-height: calc(var(--app-footer-real-height) + env(safe-area-inset-bottom, 0px));
+  }
+}
+
 @media (min-width: 769px) {
   body:not(.login-page):not(.admin-report-page) #app-footer {
     border-top: 1px solid var(--footer-top-border);

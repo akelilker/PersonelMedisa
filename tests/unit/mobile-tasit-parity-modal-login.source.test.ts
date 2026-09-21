@@ -64,6 +64,7 @@ describe("mobile Taşıt parity modal/login source guards", () => {
     expect(hero).toMatch(/\.hero\.hero-with-session\s*\{[^}]*overflow:\s*visible/s);
   });
 
+<<<<<<< HEAD
   it("keeps mobile login form in natural flow (no viewport-height centering)", () => {
     const auth = read("src/styles/modules/auth.css");
     expect(auth).toMatch(/\.auth-login\s*\{[^}]*justify-content:\s*flex-start/s);
@@ -71,6 +72,21 @@ describe("mobile Taşıt parity modal/login source guards", () => {
     expect(auth).not.toMatch(/\.auth-login\s*\{[^}]*min-height:\s*100%/s);
     expect(auth).toMatch(
       /@media\s*\(max-width:\s*640px\)\s*\{[^}]*\.auth-login\s*\{[^}]*justify-content:\s*flex-start/s
+=======
+  it("centers whole mobile login form block without splitting fields or changing gap", () => {
+    const auth = read("src/styles/modules/auth.css");
+    const page = read("src/features/auth/pages/LoginPage.tsx");
+    expect(page).not.toMatch(/auth-login-form-middle/);
+    expect(auth).toMatch(/\.auth-login-form\s*\{[^}]*gap:\s*12px/s);
+    expect(auth).not.toMatch(/auth-login-form-middle/);
+    expect(auth).toMatch(/\.auth-login\s*\{[^}]*min-height:\s*0/s);
+    expect(auth).not.toMatch(/\.auth-login\s*\{[^}]*min-height:\s*100%/s);
+    expect(auth).toMatch(
+      /@media\s*\(max-width:\s*640px\)[\s\S]*\.auth-login\s*\{[^}]*justify-content:\s*center/s
+    );
+    expect(auth).toMatch(
+      /@media\s*\(max-width:\s*640px\)[\s\S]*\.auth-login\s*\{[^}]*flex:\s*1\s+1\s+auto/s
+>>>>>>> 07970110 (fix(login): revert split layout; center whole mobile form block)
     );
   });
 

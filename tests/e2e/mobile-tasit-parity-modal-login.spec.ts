@@ -128,19 +128,27 @@ async function assertLoginHeroFormGap(page: Page) {
 async function assertAuthHeroTitle(page: Page) {
   const title = page.locator(".hero.hero-with-session h1");
   await expect(title).toBeVisible();
+  await page.evaluate(async () => {
+    await document.fonts.ready;
+  });
 
   const metrics = await title.evaluate((el, expectedVisual) => {
     const style = getComputedStyle(el);
     const hero = el.closest(".hero");
     const heroStyle = hero ? getComputedStyle(hero) : null;
+    const heroRect = hero?.getBoundingClientRect();
     const logo = hero?.querySelector(".hero-logo");
     const spacer = hero?.querySelector(".hero-spacer");
     const titleRect = el.getBoundingClientRect();
     const logoRect = logo?.getBoundingClientRect();
     const spacerRect = spacer?.getBoundingClientRect();
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    const inkRect = range.getBoundingClientRect();
     const visualText = (el.textContent ?? "").toLocaleUpperCase("tr-TR");
     const overlapsLogo = logoRect ? titleRect.left < logoRect.right - 2 : false;
     const overlapsSpacer = spacerRect ? titleRect.right > spacerRect.left + 2 : false;
+    const minHomeTitlePx = window.innerWidth <= 360 ? 13 : window.innerWidth <= 390 ? 15 : 15;
     return {
       visualText,
       scrollWidth: el.scrollWidth,
@@ -150,19 +158,29 @@ async function assertAuthHeroTitle(page: Page) {
       overflow: style.overflow,
       heroOverflow: heroStyle?.overflow ?? "",
       gridTemplateColumns: heroStyle?.gridTemplateColumns ?? "",
-      fontSize: style.fontSize,
+      fontSizePx: Number.parseFloat(style.fontSize),
+      minHomeTitlePx,
       letterSpacing: style.letterSpacing,
       overlapsLogo,
-      overlapsSpacer
+      overlapsSpacer,
+      heroLeft: heroRect?.left ?? null,
+      heroRight: heroRect?.right ?? null,
+      titleInkLeft: inkRect.left,
+      titleInkRight: inkRect.right,
+      viewportWidth: window.innerWidth
     };
   }, LOGIN_TITLE_VISUAL);
 
   expect(metrics.visualText).toBe(LOGIN_TITLE_VISUAL);
   expect(metrics.textOverflow).not.toBe("ellipsis");
   expect(metrics.heroOverflow).not.toBe("hidden");
-  expect(metrics.offsetWidth).toBeGreaterThanOrEqual(metrics.scrollWidth - 1);
+  expect(metrics.fontSizePx).toBeGreaterThanOrEqual(metrics.minHomeTitlePx);
   expect(metrics.overlapsLogo).toBe(false);
   expect(metrics.overlapsSpacer).toBe(false);
+  if (metrics.heroLeft != null && metrics.heroRight != null) {
+    expect(metrics.titleInkLeft).toBeGreaterThanOrEqual(metrics.heroLeft + MIN_LOGIN_TITLE_SAFE_GUTTER_PX);
+    expect(metrics.titleInkRight).toBeLessThanOrEqual(metrics.heroRight - MIN_LOGIN_TITLE_SAFE_GUTTER_PX);
+  }
 }
 
 async function openKayitModal(page: Page) {

@@ -310,6 +310,17 @@ body.login-page .hero .animated-line {
     padding: 0;
   }
 
+  body.app-home-route section.hero.hero-with-session > h1 {
+    overflow: visible;
+    text-overflow: clip;
+    font-size: clamp(15px, 4.35vw, 20px);
+    letter-spacing: clamp(0.45px, 0.2vw, 1.35px);
+    line-height: 1.2;
+    padding: 0 2px 0 0;
+    align-self: center;
+    transform: translateY(-2px);
+  }
+
   .hero h1 {
     font-size: clamp(18.5px, 5.15vw, 23px);
     letter-spacing: 1.8px;
@@ -391,8 +402,37 @@ body.login-page .hero .animated-line {
   }
 
   body:not(.login-page) .hero .animated-line {
-    height: 2.5px;
+    height: 2.7px;
     opacity: 0.72;
+    background: linear-gradient(
+      90deg,
+      rgba(var(--theme-color-rgb), 0.06),
+      rgba(var(--theme-color-rgb), 0.9) 50%,
+      rgba(var(--theme-color-rgb), 0.06)
+    );
+    box-shadow: 0 2px 10px rgba(var(--theme-color-rgb), 0.3);
+  }
+
+  body.app-home-route .hero.hero-with-session {
+    --hero-logo-width: 38px;
+    --hero-spacer-width: 26px;
+    min-height: 71px;
+    width: calc(100% + 4px);
+    max-width: calc(100% + 4px);
+    margin-left: -2px;
+    margin-right: -2px;
+    box-sizing: border-box;
+    border-color: rgba(140, 158, 176, 0.6);
+    box-shadow:
+      0 4px 16px rgba(0, 0, 0, 0.4),
+      0 4px 18px rgba(var(--theme-color-rgb), 0.045),
+      inset 0 1px 0 rgba(184, 198, 212, 0.2),
+      inset 0 -1px 0 rgba(28, 36, 50, 0.52);
+  }
+
+  body.app-home-route .hero-with-session .hero-logo picture {
+    width: 38px;
+    max-width: 38px;
   }
 }
 
@@ -400,6 +440,11 @@ body.login-page .hero .animated-line {
   section.hero.hero-with-session > h1 {
     font-size: 10px;
     letter-spacing: 0.45px;
+  }
+
+  body.app-home-route section.hero.hero-with-session > h1 {
+    font-size: clamp(14px, 4.1vw, 17px);
+    letter-spacing: 0.55px;
   }
 }
 
@@ -417,5 +462,10 @@ body.login-page .hero .animated-line {
   section.hero.hero-with-session > h1 {
     font-size: 10px;
     letter-spacing: 0.42px;
+  }
+
+  body.app-home-route section.hero.hero-with-session > h1 {
+    font-size: clamp(13.5px, 3.95vw, 16px);
+    letter-spacing: 0.5px;
   }
 }

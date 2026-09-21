@@ -152,6 +152,58 @@ body:not(.login-page):not(.admin-report-page) #app-footer {
   }
 }
 
+/* Taşıt driver-shell login footer band */
+body.login-page #app-footer.login-footer {
+  border-top: 1px solid rgba(128, 128, 128, 0.52);
+  border-left: 0.5px solid rgba(255, 255, 255, 0.2);
+  border-right: 0.5px solid rgba(255, 255, 255, 0.2);
+  box-shadow:
+    0 -1px 0 rgba(255, 255, 255, 0.12),
+    0 -16px 30px rgba(var(--theme-color-rgb), 0.42);
+  height: calc(var(--app-footer-real-height) + env(safe-area-inset-bottom, 0px));
+  min-height: calc(var(--app-footer-real-height) + env(safe-area-inset-bottom, 0px));
+  padding-bottom: calc(2px + env(safe-area-inset-bottom, 0px));
+}
+
+body.login-page #app-footer.login-footer .footer-content {
+  padding: 4px 12px;
+  padding-bottom: 4px;
+  font-size: 13px;
+  color: #bbb;
+  line-height: 1.4;
+}
+
+body.login-page #app-footer.login-footer .version {
+  color: rgba(240, 240, 240, 0.82);
+  font-weight: 500;
+}
+
+body.login-page #app-footer.login-footer .status.status-ready {
+  color: #4ade80;
+  font-weight: 600;
+}
+
+body.login-page #app-footer.login-footer .status.status-error {
+  color: #ef4444;
+  font-weight: 600;
+}
+
+body.login-page #app-footer.login-footer .brand img {
+  height: calc(12.5px + 1.5pt);
+  opacity: 0.4;
+  filter: drop-shadow(0 0 6px rgba(var(--theme-color-rgb), 0.4));
+}
+
+@media (max-width: 640px) {
+  body.login-page #app-footer.login-footer {
+    border-left: none;
+    border-right: none;
+    box-shadow:
+      0 -1px 0 var(--footer-top-highlight),
+      var(--footer-red-glow);
+  }
+}
+
 @media (min-width: 769px) {
   body:not(.login-page):not(.admin-report-page) #app-footer {
     border-top: 1px solid var(--footer-top-border);

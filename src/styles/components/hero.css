@@ -159,6 +159,9 @@ body.login-page .hero {
   grid-template-rows: auto auto;
   row-gap: 6px;
   align-items: center;
+  padding-top: 10px;
+  padding-bottom: 10px;
+  margin-bottom: 0;
 }
 
 body.login-page .hero-logo {
@@ -269,29 +272,33 @@ body.login-page .hero .animated-line {
   }
 
   body.login-page .hero {
-    /* Login uses the same header proportions as the Taşıt reference.
-       The title still scales down on narrow phones so it remains whole. */
-    --hero-logo-width: 43px;
+    /* Taşıt driver-shell login hero (≤640): taller band + wider logo column */
+    --hero-logo-width: 48px;
+    --hero-spacer-width: 1px;
     padding: 12px 12px 12px 3px;
     column-gap: var(--space-2);
-    min-height: 65px;
+    min-height: 72px;
   }
 
   body.login-page .hero h1 {
     overflow: visible;
     text-overflow: clip;
     white-space: nowrap;
-    font-size: clamp(14px, 4.5vw, 20px);
-    letter-spacing: clamp(0.7px, 0.3vw, 1.8px);
-    padding: 0;
+    /* Slightly tighter than Taşıt clamp: longer “PERSONEL YÖNETİM…” ink fit at 375–393 */
+    font-size: clamp(16.5px, 5.05vw, 21px);
+    letter-spacing: clamp(0.15px, 0.05vw, 0.72px);
+    padding: 0 2px;
+    line-height: 1.2;
   }
 
   body.login-page .hero-logo {
-    margin-right: clamp(4px, 1.5vw, 8px);
+    width: 48px;
+    flex: 0 0 48px;
+    margin-right: 15px;
   }
 
   body.login-page .hero-logo img {
-    height: 33px;
+    height: 36px;
   }
 
   /* Session hero: equal side tracks keep title centered; 76px meta overflows
@@ -419,8 +426,8 @@ body.login-page .hero .animated-line {
   }
 
   body.login-page .hero h1 {
-    font-size: clamp(13px, 4.25vw, 15.3px);
-    letter-spacing: clamp(0.6px, 0.28vw, 1px);
+    font-size: clamp(15.5px, 5vw, 17px);
+    letter-spacing: clamp(0.15px, 0.06vw, 0.6px);
   }
 
   section.hero.hero-with-session > h1 {

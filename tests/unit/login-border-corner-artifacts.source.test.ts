@@ -9,75 +9,55 @@ function read(relPath: string): string {
 }
 
 describe("login form control corner artifacts", () => {
-  it("replaces hairline inset rings with opaque 1px borders and soft glow", () => {
+  it("uses Taşıt login opaque 1px borders without subpixel inset rings", () => {
     const auth = read("src/styles/modules/auth.css");
     const input = /\.auth-field input:not\(\[type="checkbox"\]\)\s*\{[^}]*\}/s;
 
-    expect(auth).toMatch(/\.auth-field input:not\(\[type="checkbox"\]\)\s*\{[^}]*height:\s*40px/s);
-    expect(auth).toMatch(/\.auth-field input:not\(\[type="checkbox"\]\)\s*\{[^}]*padding:\s*0 14px/s);
+    expect(auth).toMatch(/\.auth-field input:not\(\[type="checkbox"\]\)\s*\{[^}]*padding:\s*7px 15px/s);
     expect(auth).toMatch(/\.auth-field input:not\(\[type="checkbox"\]\)\s*\{[^}]*border-radius:\s*8px/s);
-    expect(auth).toMatch(/\.auth-field input:not\(\[type="checkbox"\]\)\s*\{[^}]*border:\s*1px solid #4e565c/s);
     expect(auth).toMatch(
-      /\.auth-field input:not\(\[type="checkbox"\]\)\s*\{[^}]*background-clip:\s*padding-box/s
+      /\.auth-field input:not\(\[type="checkbox"\]\)\s*\{[^}]*border:\s*1px solid rgba\(255, 255, 255, 0\.35\)/s
     );
+    expect(auth).toMatch(/\.auth-field input:not\(\[type="checkbox"\]\)\s*\{[^}]*background:\s*#0f1418/s);
     expect(auth).toMatch(
-      /\.auth-field input:not\(\[type="checkbox"\]\)\s*\{[^}]*filter:\s*drop-shadow\(0 0 8px rgba\(255, 255, 255, 0\.06\)\)/s
+      /\.auth-field input:not\(\[type="checkbox"\]\)\s*\{[^}]*box-shadow:\s*none/s
     );
-    expect(auth).not.toMatch(/inset 0 0 0 0\.5px/);
-    expect(input.exec(auth)?.[0] ?? "").not.toMatch(/overflow:\s*hidden/);
+    expect(input.exec(auth)?.[0] ?? "").not.toMatch(/inset 0 0 0 0\.5px/);
+    expect(input.exec(auth)?.[0] ?? "").not.toMatch(/filter:\s*drop-shadow/);
     expect(auth).toMatch(
       /\.auth-field input:not\(\[type="checkbox"\]\):focus\s*\{[^}]*border-color:\s*var\(--theme-color\)/s
     );
-    expect(auth).toMatch(
-      /\.auth-field input:not\(\[type="checkbox"\]\):focus\s*\{[^}]*filter:\s*drop-shadow\(0 0 10px rgba\(var\(--theme-color-rgb\)/s
-    );
   });
 
-  it("keeps checkbox size and red frame without inset corner highlights", () => {
+  it("keeps checkbox size and Taşıt red inset frame without solid border bleed", () => {
     const auth = read("src/styles/modules/auth.css");
 
     expect(auth).toMatch(
-      /\.auth-field-inline input\[type="checkbox"\]\s*\{[^}]*width:\s*20px/s
+      /\.auth-field-inline input\[type="checkbox"\]\s*\{[^}]*width:\s*18px/s
     );
     expect(auth).toMatch(
-      /\.auth-field-inline input\[type="checkbox"\]\s*\{[^}]*height:\s*20px/s
+      /\.auth-field-inline input\[type="checkbox"\]\s*\{[^}]*height:\s*18px/s
     );
     expect(auth).toMatch(
-      /\.auth-field-inline input\[type="checkbox"\]\s*\{[^}]*padding:\s*0/s
+      /\.auth-field-inline input\[type="checkbox"\]\s*\{[^}]*box-shadow:\s*inset 0 0 0 0\.5px rgba\(var\(--theme-color-rgb\), 0\.6\)/s
     );
     expect(auth).toMatch(
-      /\.auth-field-inline input\[type="checkbox"\]\s*\{[^}]*border:\s*1px solid #c41414/s
-    );
-    expect(auth).toMatch(
-      /\.auth-field-inline input\[type="checkbox"\]\s*\{[^}]*background-clip:\s*padding-box/s
-    );
-    expect(auth).toMatch(
-      /\.auth-field-inline input\[type="checkbox"\]\s*\{[^}]*overflow:\s*hidden/s
+      /\.auth-field-inline input\[type="checkbox"\]:checked\s*\{[^}]*center\/55% no-repeat/s
     );
     expect(auth).not.toMatch(
-      /\.auth-field-inline input\[type="checkbox"\]\s*\{[^}]*inset 0 1px 0/s
-    );
-    expect(auth).toMatch(
-      /\.auth-field-inline input\[type="checkbox"\]:checked::after\s*\{[^}]*border-radius:\s*2px/s
-    );
-    expect(auth).toMatch(
-      /\.auth-field-inline input\[type="checkbox"\]:checked::after\s*\{[^}]*inset:\s*4px/s
+      /\.auth-field-inline input\[type="checkbox"\]\s*\{[^}]*border:\s*1px solid #c41414/s
     );
   });
 
-  it("scopes button corner clipping to the login submit owner only", () => {
+  it("scopes login submit to Taşıt transparent green-outline button", () => {
     const auth = read("src/styles/modules/auth.css");
     const buttons = read("src/styles/components/buttons.css");
 
-    expect(auth).toMatch(/\.auth-login-form \.universal-btn-save\s*\{[^}]*height:\s*44px/s);
+    expect(auth).toMatch(/\.auth-login-form \.universal-btn-save\s*\{[^}]*border:\s*1px solid #1a5d35/s);
+    expect(auth).toMatch(/\.auth-login-form \.universal-btn-save\s*\{[^}]*background:\s*transparent/s);
     expect(auth).toMatch(/\.auth-login-form \.universal-btn-save\s*\{[^}]*border-radius:\s*8px/s);
-    expect(auth).toMatch(/\.auth-login-form \.universal-btn-save\s*\{[^}]*border-color:\s*#3da86a/s);
     expect(auth).toMatch(
-      /\.auth-login-form \.universal-btn-save\s*\{[^}]*background-clip:\s*padding-box/s
-    );
-    expect(auth).toMatch(/\.auth-login-form \.universal-btn-save\s*\{[^}]*overflow:\s*hidden/s);
-    expect(auth).toMatch(
-      /\.auth-login-form \.universal-btn-save:hover:not\(\[disabled\]\),\s*\.auth-login-form \.universal-btn-save:focus-visible:not\(\[disabled\]\)\s*\{[^}]*box-shadow:\s*inset 0 0 10px rgba\(74, 222, 128/s
+      /\.auth-login-form \.universal-btn-save:hover:not\(\[disabled\]\),\s*\.auth-login-form \.universal-btn-save:focus-visible:not\(\[disabled\]\)\s*\{[^}]*background:\s*rgba\(74, 222, 128, 0\.12\)/s
     );
 
     expect(buttons).toMatch(/\.universal-btn-save\s*\{[^}]*border-color:\s*rgba\(74, 222, 128, 0\.5\)/s);

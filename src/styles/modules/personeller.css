@@ -372,13 +372,22 @@
   outline-offset: 2px;
 }
 
-.personel-dosya-tab-nav {
+/* Kimlik + sekme şeridi modal gövdesinde kayarken üstte sabit kalır (Taşıt detay sticky identity). */
+.personel-dosya-sticky-head {
   position: sticky;
   top: 0;
   z-index: 4;
+  display: grid;
+  gap: var(--space-2);
   margin: 0 calc(-1 * var(--space-1));
-  padding: 0 var(--space-1);
+  padding: 0 var(--space-1) var(--space-1);
   background: var(--modal-surface, var(--bg, #0f1419));
+  box-shadow: 0 1px 0 var(--line-soft);
+}
+
+.personel-dosya-tab-nav {
+  margin: 0;
+  padding: 0;
 }
 
 .personel-dosya-genel-ust {
@@ -533,6 +542,17 @@
 .personel-dosya-record-list {
   display: grid;
   gap: 0;
+}
+
+@media (min-width: 721px) {
+  .personel-dosya-section--dense-grid .personel-dosya-record-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: var(--space-4);
+  }
+
+  .personel-dosya-section--dense-grid .personel-dosya-record.is-missing {
+    grid-column: 1 / -1;
+  }
 }
 
 .personel-dosya-record {

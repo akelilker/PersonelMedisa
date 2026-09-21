@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { EmptyState } from "../../../components/states/EmptyState";
 import { ErrorState } from "../../../components/states/ErrorState";
@@ -6,28 +6,23 @@ import { LoadingState } from "../../../components/states/LoadingState";
 import { useRoleAccess } from "../../../hooks/use-role-access";
 import { usePersonelDetail } from "../../../hooks/usePersonelDetail";
 import {
-  PERSONEL_DOSYA_TABS,
-  PersonelDosyaActionRow,
   PersonelDosyaHero,
   PersonelDosyaMissingInfoGateway,
   PersonelDosyaTabList,
   PersonelDosyaTabPanels,
   type PersonelDosyaTabId
 } from "../components/personel-dosya";
+import {
+  personelTabQueryValue,
+  resolvePersonelTab
+} from "../components/personel-dosya/personel-dosya-tab-query";
 import { usePersonelKartGatewayReturn } from "../hooks/usePersonelKartGatewayReturn";
 import { getPersonelMissingFields } from "../personel-missing-info";
-
-function resolvePersonelTab(raw: string | null): PersonelDosyaTabId | null {
-  if (!raw) return null;
-  if (raw === "genel" || raw === "ucret") return "genel-bilgiler";
-  const match = PERSONEL_DOSYA_TABS.find((tab) => tab.id === raw);
-  return match ? match.id : null;
-}
 
 export function PersonelDetayPage() {
   const location = useLocation();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { personelId } = useParams();
   const parsedPersonelId = Number.parseInt(personelId ?? "", 10);
   const hasValidId = !Number.isNaN(parsedPersonelId) && parsedPersonelId > 0;
@@ -89,14 +84,39 @@ export function PersonelDetayPage() {
     parsedPersonelId
   });
 
+  const syncTabInUrl = useCallback(
+    (tabId: PersonelDosyaTabId, replace = true) => {
+      const canonical = personelTabQueryValue(tabId);
+      if (searchParams.get("tab") === canonical) {
+        return;
+      }
+      const next = new URLSearchParams(searchParams);
+      next.set("tab", canonical);
+      setSearchParams(next, { replace });
+    },
+    [searchParams, setSearchParams]
+  );
+
   useEffect(() => {
     const fromQuery = resolvePersonelTab(searchParams.get("tab"));
-    setActiveTab(fromQuery ?? "genel-bilgiler");
+    const nextTab = fromQuery ?? "genel-bilgiler";
+    setActiveTab(nextTab);
     setIsActionMenuOpen(false);
-  }, [parsedPersonelId, searchParams, location.pathname]);
+    if (!fromQuery && searchParams.get("tab")) {
+      syncTabInUrl(nextTab);
+    }
+  }, [parsedPersonelId, searchParams, location.pathname, syncTabInUrl]);
+
+  const handleTabChange = useCallback(
+    (tabId: PersonelDosyaTabId) => {
+      setActiveTab(tabId);
+      syncTabInUrl(tabId);
+    },
+    [syncTabInUrl]
+  );
 
   function handleOpenSurecHistory() {
-    setActiveTab("surec-gecmisi");
+    handleTabChange("surec-gecmisi");
   }
 
   const pageHeading =
@@ -138,15 +158,17 @@ export function PersonelDetayPage() {
             </div>
           ) : null}
 
-          <PersonelDosyaHero personel={personel} />
+          <div className="personel-dosya-sticky-head" data-testid="personel-dosya-sticky-head">
+            <PersonelDosyaHero personel={personel} />
 
-          <div className="personel-dosya-tab-nav">
-            <PersonelDosyaTabList
-              activeTab={effectiveActiveTab}
-              onTabChange={setActiveTab}
-              directoryOnly={isDisKaynak}
-              missingCounts={{ "genel-bilgiler": missingOnGenel }}
-            />
+            <div className="personel-dosya-tab-nav">
+              <PersonelDosyaTabList
+                activeTab={effectiveActiveTab}
+                onTabChange={handleTabChange}
+                directoryOnly={isDisKaynak}
+                missingCounts={{ "genel-bilgiler": missingOnGenel }}
+              />
+            </div>
           </div>
 
           <PersonelDosyaMissingInfoGateway
@@ -164,7 +186,7 @@ export function PersonelDetayPage() {
 
           <PersonelDosyaTabPanels
             activeTab={effectiveActiveTab}
-            onTabChange={setActiveTab}
+            onTabChange={handleTabChange}
             personel={personel}
             surecler={surecHistory}
             surecHistoryHasMore={surecHistoryHasMore}

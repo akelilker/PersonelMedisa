@@ -2,6 +2,7 @@ import type { Personel } from "../../../../types/personel";
 import type { Surec } from "../../../../types/surec";
 import { PersonelHesapOnboardingPanel } from "../../../yonetim/components/PersonelHesapOnboardingPanel";
 import { getPersonelMissingFieldKeys, type PersonelMissingFieldKey } from "../../personel-missing-info";
+import { PERSONEL_DOSYA_MISSING_VALUE } from "./personel-dosya-missing-copy";
 import { DossierRecord, DossierSection } from "./personel-dosya-dossier";
 import { formatDetailValue, formatIsoDateDetail, formatReferenceValue } from "./personel-dosya-format-utils";
 import { PersonelIzinOzetSection } from "./PersonelIzinOzetSection";
@@ -46,7 +47,7 @@ export function PersonelKartPanelGenelBilgiler({
   const missingKeys = getPersonelMissingFieldKeys(personel);
 
   function displayValue(key: PersonelMissingFieldKey, value: string): string {
-    return missingKeys.has(key) ? "Bilgi girilmemiş" : value;
+    return missingKeys.has(key) ? PERSONEL_DOSYA_MISSING_VALUE : value;
   }
 
   return (
@@ -54,6 +55,7 @@ export function PersonelKartPanelGenelBilgiler({
       <DossierSection
         title="Kimlik ve İletişim"
         description="Temel kimlik, iletişim ve lokasyon verileri bu dosyada salt okunur izlenir."
+        denseGrid
       >
         <DossierRecord
           label="T.C. Kimlik No"
@@ -78,6 +80,7 @@ export function PersonelKartPanelGenelBilgiler({
       <DossierSection
         title="Organizasyon ve Acil Durum"
         description="Bağlı organizasyon, yönetim hattı ve acil durum bilgileri burada tutulur."
+        denseGrid
       >
         <DossierRecord
           label="SGK İşvereni"

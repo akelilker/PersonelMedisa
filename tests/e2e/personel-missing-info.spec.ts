@@ -14,10 +14,10 @@ test.describe("personel eksik bilgi UX", () => {
     await mockApi(page, "GENEL_YONETICI");
     await login(page, { username: "yonetici", password: "secret" });
 
-    await page.goto("/personeller");
-    await expect(page.getByTestId("personel-eksik-bilgi-1")).toContainText("eksik bilgi");
+    await page.goto("/personeller?view=list");
+    await expect(page.getByRole("button", { name: /Eksik bilgiler:.*Bölüm.*Birim/i }).first()).toBeVisible();
 
-    await page.getByRole("link", { name: /Ayşe Yılmaz.*kişisinin kartını aç/i }).first().click();
+    await page.getByRole("row", { name: /Ayşe Yılmaz.*kartını aç/i }).first().click();
     await expect(page).toHaveURL(/\/personeller\/1$/);
 
     await expect(page.getByTestId("personel-eksik-bilgi-ozeti")).toContainText(
@@ -25,9 +25,10 @@ test.describe("personel eksik bilgi UX", () => {
     );
     await expect(page.getByRole("tab", { name: /Genel/ })).toContainText("2");
 
-    const missingFields = page.locator(".personel-dosya-field.is-missing");
+    const missingFields = page.locator(".personel-dosya-record.is-missing");
     await expect(missingFields.filter({ hasText: "Bölüm" })).toContainText("Bilgi girilmemiş");
     await expect(missingFields.filter({ hasText: "Birim" })).toContainText("Bilgi girilmemiş");
+    await expect(missingFields.first()).toContainText("eksik bilgi bağlantısına tıklayın");
 
     await page.getByTestId("personel-eksik-bilgi-tamamla").click();
 
@@ -43,5 +44,17 @@ test.describe("personel eksik bilgi UX", () => {
 
     await kayitModal.getByRole("button", { name: "Kapat" }).click();
     await expect(page).toHaveURL(/\/personeller\/1$/);
+  });
+
+  test("sekme degisimi URL tab parametresini yazir ve deep-link okur", async ({ page }) => {
+    await mockApi(page, "GENEL_YONETICI");
+    await login(page, { username: "yonetici", password: "secret" });
+
+    await page.goto("/personeller/1?tab=disiplin");
+    await expect(page.getByRole("tab", { name: /Disiplin/ })).toHaveAttribute("aria-selected", "true");
+
+    await page.getByRole("tab", { name: /Genel/ }).click();
+    await expect(page).toHaveURL(/\/personeller\/1\?tab=genel-bilgiler/);
+    await expect(page.getByRole("tab", { name: /Genel/ })).toHaveAttribute("aria-selected", "true");
   });
 });

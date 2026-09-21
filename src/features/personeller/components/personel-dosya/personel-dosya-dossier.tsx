@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { PERSONEL_DOSYA_MISSING_FIELD_HINT } from "./personel-dosya-missing-copy";
 
 export function DossierField({
   label,
@@ -18,7 +19,9 @@ export function DossierField({
         {label}
       </span>
       <strong className={valueClassName ?? "personel-dosya-field-value"}>{value}</strong>
-      {missing ? <span className="personel-dosya-field-missing-hint">Bu bilgi eksik</span> : null}
+      {missing ? (
+        <span className="personel-dosya-field-missing-hint">{PERSONEL_DOSYA_MISSING_FIELD_HINT}</span>
+      ) : null}
     </div>
   );
 }
@@ -39,7 +42,9 @@ export function DossierRecord({
         {label}
       </span>
       <span className="personel-dosya-record-value">{value}</span>
-      {missing ? <span className="personel-dosya-field-missing-hint">Bu bilgi eksik</span> : null}
+      {missing ? (
+        <span className="personel-dosya-field-missing-hint">{PERSONEL_DOSYA_MISSING_FIELD_HINT}</span>
+      ) : null}
     </div>
   );
 }
@@ -47,14 +52,18 @@ export function DossierRecord({
 export function DossierSection({
   title,
   description,
-  children
+  children,
+  denseGrid = false
 }: {
   title: string;
   description?: string;
   children: ReactNode;
+  denseGrid?: boolean;
 }) {
   return (
-    <section className="personel-dosya-section">
+    <section
+      className={`personel-dosya-section${denseGrid ? " personel-dosya-section--dense-grid" : ""}`}
+    >
       <div className="personel-dosya-section-head">
         <h3>{title}</h3>
         {description ? <p>{description}</p> : null}

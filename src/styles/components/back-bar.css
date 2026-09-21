@@ -7,6 +7,15 @@
   padding-bottom: var(--space-1);
 }
 
+.universal-back-bar.has-end-content {
+  justify-content: flex-start;
+}
+
+.universal-back-bar-end {
+  margin-left: auto;
+  flex: 0 0 auto;
+}
+
 .universal-back-btn {
   display: inline-flex;
   align-items: center;

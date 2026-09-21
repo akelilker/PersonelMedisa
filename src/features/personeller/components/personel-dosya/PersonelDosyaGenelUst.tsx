@@ -12,12 +12,10 @@ const MISSING_VALUE = "Bilgi girilmemiş";
 
 export function PersonelDosyaGenelUst({
   personel,
-  canViewUcret,
-  onOpenMissingInfo
+  canViewUcret
 }: {
   personel: Personel;
   canViewUcret: boolean;
-  onOpenMissingInfo?: (targetTab: "genel" | "pozisyon") => void;
 }) {
   const durumLabel =
     personel.aktif_durum === "PASIF"
@@ -35,31 +33,6 @@ export function PersonelDosyaGenelUst({
 
   return (
     <section className="personel-dosya-genel-ust" data-testid="personel-dosya-genel-ust">
-      {missingFields.length > 0 ? (
-        <div className="personel-dosya-completeness-summary" data-testid="personel-eksik-bilgi-ozeti" role="status">
-          <div className="personel-dosya-missing-copy">
-            <span className="personel-dosya-missing-count">
-              {missingFields.length} eksik bilgi bulunuyor.
-            </span>
-            <ul className="personel-dosya-missing-list">
-              {missingFields.map((field) => (
-                <li key={field.key}>{field.label}</li>
-              ))}
-            </ul>
-          </div>
-          {onOpenMissingInfo ? (
-            <button
-              type="button"
-              className="universal-btn-aux personel-dosya-missing-action"
-              data-testid="personel-eksik-bilgi-tamamla"
-              onClick={() => onOpenMissingInfo(missingFields[0]?.editTarget ?? "genel")}
-            >
-              Kayıt ve Süreç'te tamamla
-            </button>
-          ) : null}
-        </div>
-      ) : null}
-
       <div className="personel-dosya-hero-grid">
         <DossierField label="Ad/Soyad" value={fullName} />
         <DossierField

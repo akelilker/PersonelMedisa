@@ -9,9 +9,9 @@ import {
   PERSONEL_DOSYA_TABS,
   PersonelDosyaActionRow,
   PersonelDosyaHero,
+  PersonelDosyaMissingInfoGateway,
   PersonelDosyaTabList,
   PersonelDosyaTabPanels,
-  PersonelDosyaToolbar,
   type PersonelDosyaTabId
 } from "../components/personel-dosya";
 import { usePersonelKartGatewayReturn } from "../hooks/usePersonelKartGatewayReturn";
@@ -140,12 +140,6 @@ export function PersonelDetayPage() {
 
           <PersonelDosyaHero personel={personel} />
 
-          <PersonelDosyaToolbar
-            onOpenHistory={handleOpenSurecHistory}
-            onOpenDocuments={() => setActiveTab("egitim-belgeler")}
-            onPrint={() => window.print()}
-          />
-
           <div className="personel-dosya-tab-nav">
             <PersonelDosyaTabList
               activeTab={effectiveActiveTab}
@@ -154,6 +148,13 @@ export function PersonelDetayPage() {
               missingCounts={{ "genel-bilgiler": missingOnGenel }}
             />
           </div>
+
+          <PersonelDosyaMissingInfoGateway
+            personel={personel}
+            onOpenMissingInfo={
+              canUpdatePersonel && !isArchived && canWriteOnPersonel ? handleOpenMissingInfo : undefined
+            }
+          />
 
           {!canWriteOnPersonel ? (
             <p className="personel-write-scope-notice" role="status" data-testid="personel-write-scope-notice">
@@ -187,9 +188,6 @@ export function PersonelDetayPage() {
             canApproveBordroKapsam={false}
             canManageAccountOnboarding={canManageAccountOnboarding && !isArchived}
             directoryOnly={isDisKaynak}
-            onOpenMissingInfo={
-              canUpdatePersonel && !isArchived && canWriteOnPersonel ? handleOpenMissingInfo : undefined
-            }
             genelActionRow={
               !isArchived && !isDisKaynak
                 ? {

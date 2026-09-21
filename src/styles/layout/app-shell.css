@@ -332,7 +332,7 @@ body.modal-open .app-shell::before {
 }
 
 @media (min-width: 769px) {
-  body:not(.app-home-route):not(.login-page):not(.admin-report-page) .app-shell::before {
+  body:not(.login-page):not(.admin-report-page) .app-shell::before {
     border-left-width: 0.7px;
     border-right-width: 0.7px;
     border-top-color: rgba(var(--theme-color-rgb), 0.78);

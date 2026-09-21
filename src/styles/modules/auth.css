@@ -218,30 +218,32 @@ body.login-page {
   border: 1px solid #1a5d35;
   background: transparent;
   background-clip: padding-box;
-  overflow: hidden;
+  overflow: visible;
   box-shadow: none;
-  transition: background 0.2s, color 0.2s, border-color 0.2s, transform 0.2s;
+  transform-origin: center;
+  transition: color 0.2s, border-color 0.2s, transform 0.15s ease;
 }
 
 .auth-login-form .universal-btn-save:hover:not([disabled]),
 .auth-login-form .universal-btn-save:focus-visible:not([disabled]) {
-  background: rgba(74, 222, 128, 0.12);
+  background: transparent;
   color: var(--green);
-  border-color: rgba(74, 222, 128, 0.7);
-  transform: translateY(-1px);
+  border-color: rgba(74, 222, 128, 0.9);
+  transform: scale(1.03);
   box-shadow: none;
 }
 
 .auth-login-form .universal-btn-save:active:not([disabled]) {
-  background: rgba(74, 222, 128, 0.18);
+  background: transparent;
   border-color: var(--green);
-  transform: none;
+  transform: scale(1.02);
 }
 
 .auth-login-form .universal-btn-save[disabled] {
   background: transparent;
-  color: #666;
-  border-color: #555;
+  color: var(--green);
+  border-color: #1a5d35;
+  opacity: 0.55;
   cursor: not-allowed;
   transform: none;
 }

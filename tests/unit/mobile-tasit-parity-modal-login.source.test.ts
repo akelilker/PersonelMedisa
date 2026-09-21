@@ -50,7 +50,7 @@ describe("mobile Taşıt parity modal/login source guards", () => {
   it("keeps mobile login hero band aligned with Taşıt driver-shell proportions", () => {
     const hero = read("src/styles/components/hero.css");
     const mobile = hero.match(/@media\s*\(max-width:\s*640px\)\s*\{([\s\S]*?)\n\}(?=\s*@media|\s*$)/)?.[1] ?? "";
-    expect(mobile).toMatch(/body\.login-page \.hero\s*\{[^}]*min-height:\s*72px/s);
+    expect(mobile).toMatch(/body\.login-page \.hero\s*\{[^}]*min-height:\s*76px/s);
     expect(mobile).toMatch(/body\.login-page \.hero-logo\s*\{[^}]*width:\s*48px/s);
     expect(mobile).toMatch(/body\.login-page \.hero-logo img\s*\{[^}]*height:\s*36px/s);
     expect(mobile).toMatch(/body\.login-page \.hero h1\s*\{[^}]*font-size:\s*clamp\(/s);
@@ -62,6 +62,16 @@ describe("mobile Taşıt parity modal/login source guards", () => {
     expect(hero).toMatch(/section\.hero\.hero-with-session > h1\s*\{[^}]*overflow:\s*hidden/s);
     expect(hero).toMatch(/section\.hero\.hero-with-session > h1\s*\{[^}]*text-overflow:\s*clip/s);
     expect(hero).toMatch(/\.hero\.hero-with-session\s*\{[^}]*overflow:\s*visible/s);
+  });
+
+  it("keeps mobile home hero title without ellipsis (full PERSONEL title)", () => {
+    const hero = read("src/styles/components/hero.css");
+    expect(hero).toMatch(
+      /body\.app-home-route section\.hero\.hero-with-session > h1\s*\{[^}]*text-overflow:\s*clip/s
+    );
+    expect(hero).not.toMatch(
+      /body\.app-home-route section\.hero\.hero-with-session > h1\s*\{[^}]*text-overflow:\s*ellipsis/s
+    );
   });
 
   it("centers whole mobile login form block without splitting fields or changing gap", () => {

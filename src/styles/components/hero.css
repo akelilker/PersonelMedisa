@@ -204,6 +204,13 @@ body.login-page .hero .animated-line {
     padding-inline: 16px;
   }
 
+  .hero.hero-with-session {
+    min-height: 68px;
+    padding-top: 14px;
+    padding-bottom: 14px;
+    margin-bottom: 4px;
+  }
+
   .hero-logo,
   .hero-spacer,
   body.login-page .hero-logo,
@@ -216,13 +223,13 @@ body.login-page .hero .animated-line {
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto auto;
     align-items: start;
-    align-self: center;
+    align-self: stretch;
     justify-items: center;
-    gap: 2px;
+    gap: 4px;
     margin-left: 0;
     margin-right: 8px;
-    transform: translateY(0);
-    padding: 0;
+    transform: translateY(3px);
+    padding: 2px 0 4px;
   }
 
   .hero-with-session .hero-session-meta {
@@ -241,9 +248,16 @@ body.login-page .hero .animated-line {
     /* Sit on the shared column-2 track bottom so a tall session logo
        does not inflate title→line distance when logo spans both rows. */
     align-self: end;
-    /* 20px + 1.8px tracking overflows the 331px center track (~492px hero shell). */
+    /* PERSONEL title is longer than Taşıt — 19px + ~1.55px tracking fits 331px track. */
     font-size: 19px;
-    letter-spacing: 1.8px;
+    letter-spacing: 1.55px;
+  }
+
+  .hero-with-session .hero-session-user {
+    align-self: stretch;
+    padding: 0 2px 1px;
+    line-height: 1.05;
+    transform: translateY(4px);
   }
 
   .animated-line,
@@ -275,9 +289,9 @@ body.login-page .hero .animated-line {
     /* Taşıt driver-shell login hero (≤640): taller band + wider logo column */
     --hero-logo-width: 48px;
     --hero-spacer-width: 1px;
-    padding: 12px 12px 12px 3px;
+    padding: 14px 12px 14px 6px;
     column-gap: var(--space-2);
-    min-height: 72px;
+    min-height: 76px;
   }
 
   body.login-page .hero h1 {
@@ -426,8 +440,8 @@ body.login-page .hero .animated-line {
   }
 
   body.login-page .hero h1 {
-    font-size: clamp(15.5px, 5vw, 17px);
-    letter-spacing: clamp(0.15px, 0.06vw, 0.6px);
+    font-size: clamp(14.5px, 4.85vw, 16.5px);
+    letter-spacing: clamp(0.08px, 0.035vw, 0.42px);
   }
 
   section.hero.hero-with-session > h1 {
@@ -450,6 +464,7 @@ body.login-page .hero .animated-line {
     column-gap: 0;
     row-gap: 0;
     overflow: hidden;
+    margin-bottom: 4px;
     min-height: 71px;
     width: calc(100% + 4px);
     max-width: calc(100% + 4px);
@@ -518,12 +533,13 @@ body.login-page .hero .animated-line {
     grid-column: unset;
     grid-row: unset;
     align-self: center;
-    font-size: clamp(calc(18.5px - 0.5pt), 5.15vw, calc(23px - 0.5pt));
-    letter-spacing: 1.8px;
+    /* Longer “PERSONEL …” ink: Taşıt geometry with tighter tracking — no ellipsis. */
+    font-size: clamp(16px, 4.85vw, calc(21.5px - 0.5pt));
+    letter-spacing: clamp(0.35px, 0.13vw, 0.88px);
     line-height: 1.2;
     transform: translateY(-2px);
     overflow: hidden;
-    text-overflow: ellipsis;
+    text-overflow: clip;
     white-space: nowrap;
     padding: 0 2px 0 0;
     -webkit-font-smoothing: antialiased;

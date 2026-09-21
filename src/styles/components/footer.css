@@ -219,6 +219,15 @@ body.login-page #app-footer.login-footer .brand img {
   }
 }
 
+/* Desktop shell: Taşıt style-core footer wordmark scale (mobile band uses 20px below). */
+@media (min-width: 641px) {
+  body:not(.login-page):not(.admin-report-page) #app-footer .footer-content .brand img {
+    max-height: 20px;
+    height: 20px;
+    width: auto;
+  }
+}
+
 @media (min-width: 769px) {
   body:not(.login-page):not(.admin-report-page) #app-footer {
     border-top: 1px solid var(--footer-top-border);

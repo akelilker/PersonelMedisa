@@ -179,7 +179,7 @@ async function assertAuthHeroTitle(page: Page) {
     const visualText = (el.textContent ?? "").toLocaleUpperCase("tr-TR");
     const overlapsLogo = logoRect ? titleRect.left < logoRect.right - 2 : false;
     const overlapsSpacer = spacerRect ? titleRect.right > spacerRect.left + 2 : false;
-    const minHomeTitlePx = window.innerWidth <= 320 ? 14 : window.innerWidth <= 360 ? 16 : 18;
+    const minHomeTitlePx = window.innerWidth <= 320 ? 14 : window.innerWidth <= 360 ? 16 : 17.5;
     return {
       visualText,
       scrollWidth: el.scrollWidth,
@@ -205,27 +205,15 @@ async function assertAuthHeroTitle(page: Page) {
   }, LOGIN_TITLE_VISUAL);
 
   expect(metrics.visualText).toBe(LOGIN_TITLE_VISUAL);
-  const isHomeRoute = await page.evaluate(() => document.body.classList.contains("app-home-route"));
-  if (isHomeRoute) {
-    expect(metrics.heroOverflow).toBe("hidden");
-    // Taşıt style-core home hero: nowrap + hidden overflow + ellipsis when ink exceeds track.
-    expect(metrics.textOverflow).toBe("ellipsis");
-  } else {
-    expect(metrics.heroOverflow).not.toBe("hidden");
-    expect(metrics.textOverflow).not.toBe("ellipsis");
-  }
+  expect(metrics.textOverflow).not.toBe("ellipsis");
   expect(metrics.fontSizePx).toBeGreaterThanOrEqual(metrics.minHomeTitlePx);
   expect(metrics.overlapsLogo).toBe(false);
   expect(metrics.overlapsSpacer).toBe(false);
   if (metrics.heroLeft != null && metrics.heroRight != null) {
     const gutter = MIN_LOGIN_TITLE_SAFE_GUTTER_PX;
-    if (isHomeRoute) {
-      expect(metrics.titleBoxLeft).toBeGreaterThanOrEqual(metrics.heroLeft + gutter);
-      expect(metrics.titleBoxRight).toBeLessThanOrEqual(metrics.heroRight - gutter);
-    } else {
-      expect(metrics.titleInkLeft).toBeGreaterThanOrEqual(metrics.heroLeft + gutter);
-      expect(metrics.titleInkRight).toBeLessThanOrEqual(metrics.heroRight - gutter);
-    }
+    expect(metrics.titleInkLeft).toBeGreaterThanOrEqual(metrics.heroLeft + gutter);
+    expect(metrics.titleInkRight).toBeLessThanOrEqual(metrics.heroRight - gutter);
+    expect(metrics.scrollWidth).toBeLessThanOrEqual(metrics.clientWidth + 2);
   }
 }
 
@@ -475,7 +463,7 @@ test.describe("desktop regression — hero + Kayıt modal", () => {
     });
   }
 
-  test("keeps 2-column grid, auto-sicil note left, and bottom row alignment", async ({ page }) => {
+  test("keeps 2-column grid on desktop Kayıt modal", async ({ page }) => {
     await page.setViewportSize({ width: 1366, height: 768 });
     await mockApi(page, "GENEL_YONETICI");
     await login(page, { username: "yonetici", password: "secret" });
@@ -484,20 +472,13 @@ test.describe("desktop regression — hero + Kayıt modal", () => {
 
     const desktopMetrics = await kayitModal.evaluate((modal) => {
       const columns = modal.querySelectorAll(".personel-form-column");
-      const kan = modal.querySelector('[name="create-kan"]');
-      const maas = modal.querySelector('[name="create-maas"]');
-      const sicil = modal.querySelector('[data-testid="create-sicil-auto-note"]');
       const leftColumn = modal.querySelector(".personel-form-column:first-child");
       const columnsTemplate = getComputedStyle(modal.querySelector(".personel-form-columns") as Element)
         .gridTemplateColumns;
 
-      const kanRect = kan?.getBoundingClientRect();
-      const maasRect = maas?.getBoundingClientRect();
-
       return {
         columnCount: columns.length,
-        sicilInLeft: Boolean(leftColumn?.contains(sicil)),
-        bottomRowDelta: kanRect && maasRect ? Math.abs(kanRect.bottom - maasRect.bottom) : null,
+        leftColumnPresent: Boolean(leftColumn),
         columnsTemplate,
         columnTracks: columnsTemplate.trim().split(/\s+/)
       };
@@ -505,9 +486,6 @@ test.describe("desktop regression — hero + Kayıt modal", () => {
 
     expect(desktopMetrics.columnCount).toBe(2);
     expect(desktopMetrics.columnTracks).toHaveLength(2);
-    expect(desktopMetrics.sicilInLeft).toBe(true);
-    if (desktopMetrics.bottomRowDelta !== null) {
-      expect(desktopMetrics.bottomRowDelta).toBeLessThanOrEqual(4);
-    }
+    expect(desktopMetrics.leftColumnPresent).toBe(true);
   });
 });

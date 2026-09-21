@@ -128,8 +128,15 @@ async function assertLoginHeroFormGap(page: Page) {
 async function assertAuthHeroTitle(page: Page) {
   const title = page.locator(".hero.hero-with-session h1");
   await expect(title).toBeVisible();
-  await page.evaluate(async () => {
-    await document.fonts.ready;
+  await page.waitForFunction(() => document.body.classList.contains("app-home-route"));
+  await page.waitForFunction(() => document.fonts.status === "loaded");
+  await page.waitForFunction(() => {
+    const el = document.querySelector(".hero.hero-with-session h1");
+    if (!el) {
+      return false;
+    }
+    const size = Number.parseFloat(getComputedStyle(el).fontSize);
+    return Number.isFinite(size) && size > 0;
   });
 
   const metrics = await title.evaluate((el, expectedVisual) => {

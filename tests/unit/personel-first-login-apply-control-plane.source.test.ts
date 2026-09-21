@@ -329,7 +329,7 @@ describe('personel first-login canonical owner apply contract', () => {
 
 describe('personel first-login apply workflow', () => {
   it('is a single fixed apply mode behind an exact confirmation token', () => {
-    expect(workflow).toContain('name: Ops personel first-login APPLY (credential rollout)');
+    expect(workflow).toContain('name: HISTORICAL — Ops personel first-login APPLY (2026-09-19 rollout; NOT headcount)');
     expect(workflow).toContain('MODE: PERSONEL_FIRST_LOGIN_CREDENTIALS_APPLY');
     expect(workflow).toContain('APPLY_CONFIRMATION_TOKEN: APPLY_PERSONEL_FIRST_LOGIN_CREDENTIALS');
     expect(workflow).toContain('test "$CONFIRMATION" = "$APPLY_CONFIRMATION_TOKEN"');

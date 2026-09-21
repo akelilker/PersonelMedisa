@@ -13,8 +13,9 @@ const MOBILE_VIEWPORTS = [
   { width: 320, height: 720 }
 ] as const;
 
-const MAX_LOGIN_HERO_FORM_GAP_PX = 48;
 const MIN_LOGIN_TITLE_SAFE_GUTTER_PX = 8;
+const MAX_LOGIN_FORM_BLOCK_CENTER_DELTA_Y_PX = 48;
+const MAX_LOGIN_FORM_BLOCK_CENTER_DELTA_X_PX = 8;
 
 async function assertNoHorizontalOverflow(page: Page) {
   const metrics = await page.evaluate(() => ({
@@ -97,31 +98,54 @@ async function assertLoginTitleParity(page: Page) {
   expect(titleMetrics.visible).toBe(true);
 }
 
-async function assertLoginHeroFormGap(page: Page) {
-  const gapMetrics = await page.evaluate(() => {
+async function assertLoginFormBlockCentered(page: Page) {
+  const metrics = await page.evaluate(() => {
     const hero = document.querySelector("body.login-page .hero");
+    const footer = document.querySelector("#app-footer");
     const form = document.querySelector(".auth-login-form");
-    const heroRect = hero?.getBoundingClientRect();
-    const formRect = form?.getBoundingClientRect();
     const authLogin = document.querySelector(".auth-login");
     const authStyle = authLogin ? getComputedStyle(authLogin) : null;
+    const heroRect = hero?.getBoundingClientRect();
+    const footerRect = footer?.getBoundingClientRect();
+    const formRect = form?.getBoundingClientRect();
+    const slotTop = heroRect?.bottom ?? 0;
+    const slotBottom = footerRect?.top ?? window.innerHeight;
+    const slotCenterY = (slotTop + slotBottom) / 2;
+    const formCenterY = formRect ? formRect.top + formRect.height / 2 : null;
+    const formCenterX = formRect ? formRect.left + formRect.width / 2 : null;
+    const viewportCenterX = window.innerWidth / 2;
+    const children = form ? Array.from(form.children) : [];
+    const childGaps: number[] = [];
+    for (let index = 1; index < children.length; index += 1) {
+      const previous = children[index - 1].getBoundingClientRect();
+      const current = children[index].getBoundingClientRect();
+      childGaps.push(current.top - previous.bottom);
+    }
     return {
-      heroFormGapPx: heroRect && formRect ? formRect.top - heroRect.bottom : null,
       authJustify: authStyle?.justifyContent ?? "",
       authMinHeight: authStyle?.minHeight ?? "",
-      innerHeight: window.innerHeight,
+      centerDeltaY:
+        formCenterY != null ? Math.abs(formCenterY - slotCenterY) : null,
+      centerDeltaX:
+        formCenterX != null ? Math.abs(formCenterX - viewportCenterX) : null,
+      childGaps,
       visualViewportHeight: window.visualViewport?.height ?? null,
-      footerTop: document.querySelector("#app-footer")?.getBoundingClientRect().top ?? null
+      footerTop: footerRect?.top ?? null
     };
   });
 
-  expect(gapMetrics.heroFormGapPx).not.toBeNull();
-  expect(gapMetrics.heroFormGapPx!).toBeGreaterThanOrEqual(0);
-  expect(gapMetrics.heroFormGapPx!).toBeLessThanOrEqual(MAX_LOGIN_HERO_FORM_GAP_PX);
-  expect(gapMetrics.authJustify).toBe("flex-start");
-  expect(gapMetrics.authMinHeight).not.toBe("100%");
-  if (gapMetrics.visualViewportHeight != null) {
-    expect(gapMetrics.footerTop!).toBeLessThanOrEqual(gapMetrics.visualViewportHeight + 1);
+  expect(metrics.authJustify).toBe("center");
+  expect(metrics.authMinHeight).not.toBe("100%");
+  expect(metrics.centerDeltaY).not.toBeNull();
+  expect(metrics.centerDeltaX).not.toBeNull();
+  expect(metrics.centerDeltaY!).toBeLessThanOrEqual(MAX_LOGIN_FORM_BLOCK_CENTER_DELTA_Y_PX);
+  expect(metrics.centerDeltaX!).toBeLessThanOrEqual(MAX_LOGIN_FORM_BLOCK_CENTER_DELTA_X_PX);
+  for (const gap of metrics.childGaps) {
+    expect(gap).toBeGreaterThanOrEqual(8);
+    expect(gap).toBeLessThanOrEqual(20);
+  }
+  if (metrics.visualViewportHeight != null) {
+    expect(metrics.footerTop!).toBeLessThanOrEqual(metrics.visualViewportHeight + 1);
   }
 }
 
@@ -281,7 +305,7 @@ test.describe("mobile Taşıt parity — login", () => {
       await page.goto("/login");
       await assertNoHorizontalOverflow(page);
       await assertLoginTitleParity(page);
-      await assertLoginHeroFormGap(page);
+      await assertLoginFormBlockCentered(page);
     });
   }
 });

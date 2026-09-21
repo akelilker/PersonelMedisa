@@ -258,10 +258,12 @@ body.login-page {
 }
 
 @media (max-width: 640px) {
+  /* Masaüstü ile aynı mantık: tüm form tek blok, alanlar arası 12px grid gap değişmez. */
   .auth-login {
-    flex: 0 1 auto;
+    flex: 1 1 auto;
     min-height: 0;
-    justify-content: flex-start;
+    justify-content: center;
+    align-items: center;
     padding: 0 0 36px;
   }
 
@@ -276,6 +278,8 @@ body.login-page {
   .auth-login-form {
     width: 100%;
     gap: 12px;
+    margin-left: auto;
+    margin-right: auto;
   }
 }
 

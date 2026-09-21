@@ -310,17 +310,6 @@ body.login-page .hero .animated-line {
     padding: 0;
   }
 
-  body.app-home-route section.hero.hero-with-session > h1 {
-    overflow: visible;
-    text-overflow: clip;
-    font-size: clamp(15px, 4.35vw, 20px);
-    letter-spacing: clamp(0.45px, 0.2vw, 1.35px);
-    line-height: 1.2;
-    padding: 0 2px 0 0;
-    align-self: center;
-    transform: translateY(-2px);
-  }
-
   .hero h1 {
     font-size: clamp(18.5px, 5.15vw, 23px);
     letter-spacing: 1.8px;
@@ -413,27 +402,6 @@ body.login-page .hero .animated-line {
     box-shadow: 0 2px 10px rgba(var(--theme-color-rgb), 0.3);
   }
 
-  body.app-home-route .hero.hero-with-session {
-    --hero-logo-width: 38px;
-    --hero-spacer-width: 26px;
-    min-height: 71px;
-    width: calc(100% + 4px);
-    max-width: calc(100% + 4px);
-    margin-left: -2px;
-    margin-right: -2px;
-    box-sizing: border-box;
-    border-color: rgba(140, 158, 176, 0.6);
-    box-shadow:
-      0 4px 16px rgba(0, 0, 0, 0.4),
-      0 4px 18px rgba(var(--theme-color-rgb), 0.045),
-      inset 0 1px 0 rgba(184, 198, 212, 0.2),
-      inset 0 -1px 0 rgba(28, 36, 50, 0.52);
-  }
-
-  body.app-home-route .hero-with-session .hero-logo picture {
-    width: 38px;
-    max-width: 38px;
-  }
 }
 
 @media (max-width: 375px) {
@@ -442,10 +410,6 @@ body.login-page .hero .animated-line {
     letter-spacing: 0.45px;
   }
 
-  body.app-home-route section.hero.hero-with-session > h1 {
-    font-size: clamp(14px, 4.1vw, 17px);
-    letter-spacing: 0.55px;
-  }
 }
 
 @media (max-width: 360px) {
@@ -465,7 +429,127 @@ body.login-page .hero .animated-line {
   }
 
   body.app-home-route section.hero.hero-with-session > h1 {
-    font-size: clamp(13.5px, 3.95vw, 16px);
-    letter-spacing: 0.5px;
+    font-size: clamp(14px, 4.75vw, calc(20.5px - 0.5pt));
+    letter-spacing: clamp(0.55px, 0.24vw, 1.1px);
+  }
+}
+
+/*
+ * Mobile authenticated home (`app-home-route`): Taşıt style-core flex hero takeover.
+ * Inner routes keep the session grid hero; home shell matches Taşıt main header geometry.
+ */
+@media (max-width: 640px) {
+  body.app-home-route .hero.hero-with-session {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    grid-template-columns: unset;
+    grid-template-rows: unset;
+    column-gap: 0;
+    row-gap: 0;
+    overflow: hidden;
+    min-height: 71px;
+    width: calc(100% + 4px);
+    max-width: calc(100% + 4px);
+    margin-left: -2px;
+    margin-right: -2px;
+    padding: 12px 12px 12px 3px;
+    box-sizing: border-box;
+    border-color: rgba(140, 158, 176, 0.6);
+    box-shadow:
+      0 4px 16px rgba(0, 0, 0, 0.4),
+      0 4px 18px rgba(var(--theme-color-rgb), 0.045),
+      inset 0 1px 0 rgba(184, 198, 212, 0.2),
+      inset 0 -1px 0 rgba(28, 36, 50, 0.52);
+  }
+
+  body.app-home-route .hero.hero-with-session .hero-logo {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex: 0 0 43px;
+    width: 43px;
+    max-width: 43px;
+    margin-right: 8px;
+    margin-left: 0;
+    gap: 4px;
+    align-self: center;
+    transform: translate(-1px, 1px);
+    overflow: visible;
+  }
+
+  body.app-home-route .hero.hero-with-session .hero-logo picture {
+    width: 43px;
+    max-width: 43px;
+    transform: translate(2px, 3px);
+  }
+
+  body.app-home-route .hero.hero-with-session .hero-logo img {
+    height: 33px;
+    width: auto;
+    transform: translateY(0);
+  }
+
+  body.app-home-route .hero.hero-with-session .hero-session-meta {
+    width: 82px;
+    max-width: 82px;
+    overflow: hidden;
+    transform: translate(13px, 5px);
+  }
+
+  body.app-home-route .hero.hero-with-session .hero-session-user {
+    font-size: 9.5px;
+    line-height: 1.06;
+    max-width: 82px;
+    max-height: 2.16em;
+    white-space: normal;
+    text-overflow: clip;
+  }
+
+  body.app-home-route section.hero.hero-with-session > h1 {
+    flex: 1;
+    min-width: 0;
+    grid-column: unset;
+    grid-row: unset;
+    align-self: center;
+    font-size: clamp(14.5px, 4.85vw, calc(23px - 0.5pt));
+    letter-spacing: clamp(0.6px, 0.26vw, 1.35px);
+    line-height: 1.2;
+    transform: translateY(-2px);
+    overflow: hidden;
+    text-overflow: clip;
+    white-space: nowrap;
+    padding: 0 2px 0 0;
+  }
+
+  body.app-home-route .hero.hero-with-session .hero-spacer {
+    flex: 0 0 1px;
+    width: 1px;
+    min-width: 1px;
+    grid-column: unset;
+    grid-row: unset;
+  }
+
+  body.app-home-route .hero.hero-with-session .animated-line {
+    position: absolute;
+    bottom: 19px;
+    left: 50%;
+    right: auto;
+    top: auto;
+    transform: translateX(-50%);
+    grid-column: unset;
+    grid-row: unset;
+    justify-self: unset;
+    align-self: unset;
+    width: 88%;
+    height: 2.7px;
+    opacity: 0.72;
+    background: linear-gradient(
+      90deg,
+      rgba(var(--theme-color-rgb), 0.06),
+      rgba(var(--theme-color-rgb), 0.9) 50%,
+      rgba(var(--theme-color-rgb), 0.06)
+    );
+    box-shadow: 0 2px 10px rgba(var(--theme-color-rgb), 0.3);
   }
 }

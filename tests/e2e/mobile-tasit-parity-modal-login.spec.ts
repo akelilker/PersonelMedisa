@@ -155,7 +155,7 @@ async function assertAuthHeroTitle(page: Page) {
     const visualText = (el.textContent ?? "").toLocaleUpperCase("tr-TR");
     const overlapsLogo = logoRect ? titleRect.left < logoRect.right - 2 : false;
     const overlapsSpacer = spacerRect ? titleRect.right > spacerRect.left + 2 : false;
-    const minHomeTitlePx = window.innerWidth <= 360 ? 13 : window.innerWidth <= 390 ? 15 : 15;
+    const minHomeTitlePx = window.innerWidth <= 320 ? 14 : window.innerWidth <= 360 ? 16 : 18;
     return {
       visualText,
       scrollWidth: el.scrollWidth,
@@ -180,7 +180,12 @@ async function assertAuthHeroTitle(page: Page) {
 
   expect(metrics.visualText).toBe(LOGIN_TITLE_VISUAL);
   expect(metrics.textOverflow).not.toBe("ellipsis");
-  expect(metrics.heroOverflow).not.toBe("hidden");
+  const isHomeRoute = await page.evaluate(() => document.body.classList.contains("app-home-route"));
+  if (isHomeRoute) {
+    expect(metrics.heroOverflow).toBe("hidden");
+  } else {
+    expect(metrics.heroOverflow).not.toBe("hidden");
+  }
   expect(metrics.fontSizePx).toBeGreaterThanOrEqual(metrics.minHomeTitlePx);
   expect(metrics.overlapsLogo).toBe(false);
   expect(metrics.overlapsSpacer).toBe(false);

@@ -298,6 +298,16 @@ export function PersonelCreateFields({
             placeholderOption={{ value: "", label: "Seçiniz" }}
             options={kanGrubuOptions}
           />
+          {refs.calismaLokasyonuOptions.length > 0 ? (
+            <AppSelectField
+              label="Çalışma Lokasyonu"
+              name="create-calisma-lokasyonu"
+              value={form.calismaLokasyonuId}
+              onChange={(value) => setForm((prev) => ({ ...prev, calismaLokasyonuId: value }))}
+              placeholderOption={{ value: "", label: "Seçiniz" }}
+              options={toSelectOptions(calismaLokasyonuDisplayOptions)}
+            />
+          ) : null}
         </div>
 
         <div className="personel-form-column">
@@ -356,16 +366,6 @@ export function PersonelCreateFields({
           ) : (
             refMissingNote("SGK işveren", form.calisanKapsami !== "DIS_KAYNAK")
           )}
-          {refs.calismaLokasyonuOptions.length > 0 ? (
-            <AppSelectField
-              label="Çalışma Lokasyonu"
-              name="create-calisma-lokasyonu"
-              value={form.calismaLokasyonuId}
-              onChange={(value) => setForm((prev) => ({ ...prev, calismaLokasyonuId: value }))}
-              placeholderOption={{ value: "", label: "Seçiniz" }}
-              options={toSelectOptions(calismaLokasyonuDisplayOptions)}
-            />
-          ) : null}
           {refs.bagliAmirOptions.length > 0 ? (
             <>
               <AppSelectField

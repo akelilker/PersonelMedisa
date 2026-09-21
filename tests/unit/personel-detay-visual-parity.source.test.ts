@@ -16,6 +16,8 @@ describe("personel detay visual parity owners (tasit reference)", () => {
     expect(css).toMatch(/\.personel-dosya-field-value[\s\S]*color:\s*var\(--text-secondary\)/s);
     expect(css).toMatch(/\.personel-dosya-hero-name[\s\S]*font-size:\s*15px/s);
     expect(css).toMatch(/@media \(min-width: 641px\)[\s\S]*\.personel-dosya-hero-name[\s\S]*font-size:\s*16px/s);
+    expect(css).toMatch(/\.personel-dosya-sticky-head[\s\S]*position:\s*sticky/s);
+    expect(css).toMatch(/\.personel-dosya-section--dense-grid[\s\S]*grid-template-columns:\s*repeat\(2/s);
   });
 
   it("aligns modal body rhythm for personel detay overlay", () => {

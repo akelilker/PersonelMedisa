@@ -1,4 +1,4 @@
-name: Ops personel first-login APPLY (credential rollout)
+name: HISTORICAL — Ops personel first-login APPLY (2026-09-19 rollout; NOT headcount)
 
 # PERSONEL canonical first-login credential rollout icin KONTROLLU APPLY.
 #
@@ -65,7 +65,10 @@ jobs:
       TOTAL_POLL_WINDOW_SECONDS: "900"
 
       # ---------------------------------------------------------------------
-      # BIR SEFERLIK production pin'leri.
+      # BIR SEFERLIK production pin'leri — TARIHSEL ROLLOUT KANITI, PERSONEL MEVCUDU DEGILDIR.
+      # 134/125 degerleri 19.09.2026 first-login account cohort'udur; aktif personel headcount'i icin KULLANILMAZ.
+      # Guncel HR snapshot kaniti: docs/guncel/145-personel-aktif-mevcudu-source-of-truth-2026-09-21.md
+      #
       #
       # Bu sayilar YALNIZCA bu tek seferlik rollout apply'inda beklenir ve kasitli
       # olarak workflow icinde tutulur; canonical karar sahibine veya report

@@ -125,6 +125,36 @@ async function assertLoginHeroFormGap(page: Page) {
   }
 }
 
+async function assertLoginMiddleClusterCentered(page: Page) {
+  const metrics = await page.evaluate(() => {
+    const form = document.querySelector(".auth-login-form");
+    const username = form?.querySelector(":scope > .auth-field");
+    const middle = form?.querySelector(".auth-login-form-middle");
+    const submit = form?.querySelector(".universal-btn-save");
+    const usernameRect = username?.getBoundingClientRect();
+    const middleRect = middle?.getBoundingClientRect();
+    const submitRect = submit?.getBoundingClientRect();
+    const slotCenter =
+      usernameRect && submitRect ? (usernameRect.bottom + submitRect.top) / 2 : null;
+    const middleCenter = middleRect ? middleRect.top + middleRect.height / 2 : null;
+    const passwordField = middle?.querySelector(".auth-field:not(.auth-field-inline)");
+    const passwordRect = passwordField?.getBoundingClientRect();
+    const formRect = form?.getBoundingClientRect();
+    return {
+      centerDelta:
+        slotCenter != null && middleCenter != null ? Math.abs(middleCenter - slotCenter) : null,
+      passwordCenterX: passwordRect ? passwordRect.left + passwordRect.width / 2 : null,
+      formCenterX: formRect ? formRect.left + formRect.width / 2 : null
+    };
+  });
+
+  expect(metrics.centerDelta).not.toBeNull();
+  expect(metrics.centerDelta!).toBeLessThan(28);
+  if (metrics.passwordCenterX != null && metrics.formCenterX != null) {
+    expect(Math.abs(metrics.passwordCenterX - metrics.formCenterX)).toBeLessThan(6);
+  }
+}
+
 async function assertAuthHeroTitle(page: Page) {
   const title = page.locator(".hero.hero-with-session h1");
   await expect(title).toBeVisible();
@@ -282,6 +312,7 @@ test.describe("mobile Taşıt parity — login", () => {
       await assertNoHorizontalOverflow(page);
       await assertLoginTitleParity(page);
       await assertLoginHeroFormGap(page);
+      await assertLoginMiddleClusterCentered(page);
     });
   }
 });

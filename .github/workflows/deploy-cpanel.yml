@@ -18,6 +18,8 @@ concurrency:
   group: deploy-cpanel-production
   cancel-in-progress: false
 
+# Ops: push to main retriggers this workflow when manual dispatch/rerun is unavailable.
+
 jobs:
   deploy:
     name: Build and upload

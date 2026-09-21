@@ -17,6 +17,7 @@ import { resolveYonetimModalTitle } from "../lib/yonetim/yonetim-modal-title";
 import { useAuth } from "../state/auth.store";
 import { PersonelImportDryRunModal } from "../features/personeller/components/PersonelImportDryRunModal";
 import { PersonelImportHistoryModal } from "../features/personeller/components/PersonelImportHistoryModal";
+import { PersonelDetayPrintButton } from "../features/personeller/components/personel-dosya/PersonelDetayPrintButton";
 import { readPersonelKartBack } from "../features/personeller/personel-kart-nav";
 import { useRoleAccess } from "../hooks/use-role-access";
 
@@ -149,6 +150,7 @@ export function AppShell() {
     pathname === "/personeller" ||
     pathname === "/arsiv/personeller" ||
     /^\/personeller\/\d+$/.test(pathname);
+  const isPersonelDetayRoute = /^\/personeller\/\d+$/.test(pathname);
   const activeSubeLabel = useMemo(() => {
     const activeSubeId = session?.active_sube_id;
     if (activeSubeId === null || activeSubeId === undefined) {
@@ -300,7 +302,13 @@ export function AppShell() {
           {isYonetimRoute ? (
             <BackBar to="/" label="Ayarlar" testId="yonetim-back-ayarlar" />
           ) : null}
-          {backBarTarget ? <BackBar to={backBarTarget.to} label={backBarTarget.label} /> : null}
+          {backBarTarget ? (
+            <BackBar
+              to={backBarTarget.to}
+              label={backBarTarget.label}
+              endContent={isPersonelDetayRoute ? <PersonelDetayPrintButton /> : undefined}
+            />
+          ) : null}
           <Outlet context={outletContext} />
         </AppModal>
       ) : null}

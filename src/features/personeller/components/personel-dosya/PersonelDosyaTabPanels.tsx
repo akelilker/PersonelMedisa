@@ -46,7 +46,6 @@ export type PersonelDosyaTabPanelsProps = {
   canApproveBordroKapsam?: boolean;
   canManageAccountOnboarding?: boolean;
   directoryOnly?: boolean;
-  onOpenMissingInfo?: (targetTab: "genel" | "pozisyon") => void;
   genelActionRow?: PersonelDosyaGenelActionRowProps | null;
 };
 
@@ -76,7 +75,6 @@ export function PersonelDosyaTabPanels({
   canApproveBordroKapsam = false,
   canManageAccountOnboarding = false,
   directoryOnly = false,
-  onOpenMissingInfo,
   genelActionRow = null
 }: PersonelDosyaTabPanelsProps) {
   function handleOpenSurecHistory() {
@@ -93,11 +91,7 @@ export function PersonelDosyaTabPanels({
           aria-labelledby="personel-kart-tab-genel-bilgiler"
           hidden={activeTab !== "genel-bilgiler"}
         >
-          <PersonelDosyaGenelUst
-            personel={personel}
-            canViewUcret={canViewUcret}
-            onOpenMissingInfo={onOpenMissingInfo}
-          />
+          <PersonelDosyaGenelUst personel={personel} canViewUcret={canViewUcret} />
           {genelActionRow ? (
             <PersonelDosyaActionRow
               canAccessSurecler={genelActionRow.canAccessSurecler}

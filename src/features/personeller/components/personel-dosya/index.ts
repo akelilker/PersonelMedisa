@@ -2,8 +2,9 @@ export { PersonelBelgelerPanel, type PersonelBelgelerPanelProps } from "./Person
 export { PersonelDisiplinPanel } from "./PersonelDisiplinPanel";
 export { PersonelDosyaActionRow } from "./PersonelDosyaActionRow";
 export { PersonelDosyaGenelUst } from "./PersonelDosyaGenelUst";
+export { PersonelDetayPrintButton } from "./PersonelDetayPrintButton";
 export { PersonelDosyaHero } from "./PersonelDosyaHero";
-export { PersonelDosyaToolbar } from "./PersonelDosyaToolbar";
+export { PersonelDosyaMissingInfoGateway } from "./PersonelDosyaMissingInfoGateway";
 export { PersonelDosyaTabPanels, type PersonelDosyaTabPanelsProps } from "./PersonelDosyaTabPanels";
 export { PERSONEL_DOSYA_TABS, PersonelDosyaTabList, type PersonelDosyaTabId } from "./PersonelDosyaTabs";
 export { PersonelInlineEditForm, type PersonelInlineEditFormProps } from "./PersonelInlineEditForm";

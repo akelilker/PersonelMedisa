@@ -15,9 +15,12 @@ export function PersonelDosyaHero({ personel }: { personel: Personel }) {
     <header className="personel-dosya-hero" data-testid="personel-dosya-hero">
       <div className="personel-dosya-hero-identity">
         <h3 className="personel-dosya-hero-name">{fullName}</h3>
-        <div className={`personel-dosya-status${personel.aktif_durum === "PASIF" ? " is-passive" : ""}`}>
+        <div
+          className={`personel-dosya-status${personel.aktif_durum === "PASIF" ? " is-passive" : ""}`}
+          aria-label={durumLabel}
+          title={durumLabel}
+        >
           <span className="personel-dosya-status-dot" aria-hidden="true" />
-          <span>{durumLabel}</span>
         </div>
       </div>
     </header>

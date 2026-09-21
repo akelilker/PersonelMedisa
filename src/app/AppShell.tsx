@@ -313,7 +313,7 @@ export function AppShell() {
         </AppModal>
       ) : null}
 
-      <AppFooter />
+      <AppFooter loginFooter={isLoginRoute} />
     </div>
   );
 }

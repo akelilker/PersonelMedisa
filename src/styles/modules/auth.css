@@ -1,3 +1,8 @@
+/* Login route: Taşıt driver-shell login footer band height */
+body.login-page {
+  --app-footer-real-height: 46px;
+}
+
 .auth-login {
   flex: 0 1 auto;
   min-width: 0;
@@ -7,7 +12,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: flex-start;
-  padding: var(--space-4) 0 clamp(36px, 8vh, 72px);
+  padding: var(--space-1) 0 clamp(36px, 8vh, 72px);
 }
 
 /* Desktop: fill remaining body between hero and footer, then optically center the form. */
@@ -27,84 +32,117 @@
   min-width: 0;
 }
 
+.auth-login-container {
+  width: 100%;
+  max-width: 400px;
+  min-width: 0;
+  margin-left: auto;
+  margin-right: auto;
+  padding: 24px 30px;
+  box-sizing: border-box;
+  overflow-x: hidden;
+}
+
 .auth-login-form {
   display: grid;
-  gap: 22px;
+  gap: 12px;
   width: min(100%, 392px);
+  min-width: 0;
 }
 
 .auth-field {
   display: grid;
-  gap: var(--space-2);
+  gap: 8px;
+  margin: 0;
 }
 
 .auth-field span {
-  color: var(--text-primary);
-  font-size: 15px;
+  color: var(--form-label-color, #ffffff);
+  font-size: 14px;
   line-height: 1.15;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .auth-field input:not([type="checkbox"]) {
   width: 100%;
-  height: 40px;
-  border: 1px solid #4e565c;
+  max-width: 100%;
+  min-height: 0;
+  padding: 7px 15px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
   border-radius: 8px;
-  background: var(--bg-field);
+  background: #0f1418;
+  background-color: #0f1418;
   background-clip: padding-box;
-  color: var(--text-primary);
-  padding: 0 14px;
+  color: var(--data-value-color, #a0aec0);
   box-shadow: none;
-  filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.06));
-  font-size: 15px;
-  line-height: 1;
+  filter: none;
+  font-size: 16px;
+  line-height: 1.25;
+  box-sizing: border-box;
+  transition: border-color 0.2s;
+}
+
+.auth-field input:not([type="checkbox"])::placeholder {
+  color: rgba(160, 174, 192, 0.6);
+  opacity: 1;
 }
 
 .auth-field input:not([type="checkbox"]):focus {
   outline: none;
   border-color: var(--theme-color);
-  filter: drop-shadow(0 0 10px rgba(var(--theme-color-rgb), 0.32));
+  box-shadow: none;
+}
+
+.auth-field input:not([type="checkbox"]):valid:not(:focus) {
+  border-color: var(--theme-color);
+}
+
+.auth-field input:not([type="checkbox"]):not(:focus):not(:valid):placeholder-shown {
+  border-color: rgba(255, 255, 255, 0.35);
 }
 
 .auth-field input:not([type="checkbox"]):-webkit-autofill,
 .auth-field input:not([type="checkbox"]):-webkit-autofill:hover,
 .auth-field input:not([type="checkbox"]):-webkit-autofill:active {
-  -webkit-text-fill-color: var(--text-primary);
-  caret-color: var(--text-primary);
-  border: 1px solid #4e565c;
-  box-shadow: 0 0 0 1000px var(--bg-field) inset;
-  -webkit-box-shadow: 0 0 0 1000px var(--bg-field) inset;
-  filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.06));
-  transition: background-color 9999s ease-out 0s;
+  -webkit-text-fill-color: var(--data-value-color, #a0aec0);
+  caret-color: var(--data-value-color, #a0aec0);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  box-shadow: 0 0 0 30px #0f1418 inset;
+  -webkit-box-shadow: 0 0 0 30px #0f1418 inset;
+  filter: none;
+  transition: background-color 5000s ease-in-out 0s;
 }
 
-.auth-field input:not([type="checkbox"]):-webkit-autofill:focus {
-  -webkit-text-fill-color: var(--text-primary);
-  caret-color: var(--text-primary);
+.auth-field input:not([type="checkbox"]):-webkit-autofill:focus,
+.auth-field input:not([type="checkbox"]):-webkit-autofill:valid {
+  -webkit-text-fill-color: var(--data-value-color, #a0aec0);
+  caret-color: var(--data-value-color, #a0aec0);
   border-color: var(--theme-color);
-  box-shadow: 0 0 0 1000px var(--bg-field) inset;
-  -webkit-box-shadow: 0 0 0 1000px var(--bg-field) inset;
-  filter: drop-shadow(0 0 10px rgba(var(--theme-color-rgb), 0.32));
-  transition: background-color 9999s ease-out 0s;
+  box-shadow: 0 0 0 30px #0f1418 inset;
+  -webkit-box-shadow: 0 0 0 30px #0f1418 inset;
 }
 
 .auth-field-inline {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: 8px;
+  margin: 8px 0 0;
 }
 
 .auth-field-inline input[type="checkbox"] {
   appearance: none;
-  width: 20px;
-  height: 20px;
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  min-height: 18px;
   margin: 0;
   padding: 0;
-  border: 1px solid #c41414;
-  border-radius: var(--radius-sm);
-  background: rgba(12, 16, 24, 0.94);
-  background-clip: padding-box;
-  box-shadow: inset 0 0 6px rgba(var(--theme-color-rgb), 0.12);
+  border: none;
+  border-radius: 4px;
+  background: #0f1418;
+  background-color: #0f1418;
+  box-shadow: inset 0 0 0 0.5px rgba(var(--theme-color-rgb), 0.6);
   overflow: hidden;
   flex-shrink: 0;
   position: relative;
@@ -112,16 +150,10 @@
 }
 
 .auth-field-inline input[type="checkbox"]:checked {
-  background: rgba(var(--theme-color-rgb), 0.18);
-  border-color: var(--theme-color);
-}
-
-.auth-field-inline input[type="checkbox"]:checked::after {
-  content: "";
-  position: absolute;
-  inset: 4px;
-  border-radius: 2px;
-  background: var(--theme-color);
+  background: #0f1418
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23d40000' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'%3E%3C/polyline%3E%3C/svg%3E")
+    center/55% no-repeat;
+  box-shadow: inset 0 0 0 0.5px var(--theme-color);
 }
 
 .auth-field-inline input[type="checkbox"]:focus-visible {
@@ -130,19 +162,21 @@
 }
 
 .auth-field-inline span {
-  color: rgba(240, 240, 240, 0.92);
+  color: var(--data-value-color, #a0aec0);
   font-size: 14px;
   line-height: 1.35;
-  font-weight: 500;
+  font-weight: 400;
+  cursor: pointer;
 }
 
 .auth-error {
   margin: 0;
-  padding: 10px 12px;
-  border: 1px solid rgba(var(--theme-color-rgb), 0.24);
-  border-radius: 12px;
-  background: rgba(var(--theme-color-rgb), 0.08);
+  padding: 12px;
+  border-left: 3px solid var(--red);
+  border-radius: 4px;
+  background: rgba(239, 68, 68, 0.12);
   color: var(--red);
+  font-size: 14px;
 }
 
 .auth-success {
@@ -173,20 +207,54 @@
 }
 
 .auth-login-form .universal-btn-save {
-  height: 44px;
+  width: 100%;
+  min-height: 44px;
+  margin-top: 4px;
+  padding: 12px;
   border-radius: 8px;
   font-size: 15px;
-  font-weight: 600;
-  border-color: #3da86a;
-  background-color: var(--bg-field);
+  font-weight: 300;
+  color: var(--green);
+  border: 1px solid #1a5d35;
+  background: transparent;
   background-clip: padding-box;
   overflow: hidden;
-  box-shadow: inset 0 0 8px rgba(74, 222, 128, 0.08);
+  box-shadow: none;
+  transition: background 0.2s, color 0.2s, border-color 0.2s, transform 0.2s;
 }
 
 .auth-login-form .universal-btn-save:hover:not([disabled]),
 .auth-login-form .universal-btn-save:focus-visible:not([disabled]) {
-  box-shadow: inset 0 0 10px rgba(74, 222, 128, 0.16);
+  background: rgba(74, 222, 128, 0.12);
+  color: var(--green);
+  border-color: rgba(74, 222, 128, 0.7);
+  transform: translateY(-1px);
+  box-shadow: none;
+}
+
+.auth-login-form .universal-btn-save:active:not([disabled]) {
+  background: rgba(74, 222, 128, 0.18);
+  border-color: var(--green);
+  transform: none;
+}
+
+.auth-login-form .universal-btn-save[disabled] {
+  background: transparent;
+  color: #666;
+  border-color: #555;
+  cursor: not-allowed;
+  transform: none;
+}
+
+@media (min-width: 641px) {
+  .auth-login-form .universal-btn-save {
+    width: min(160px, 100%);
+    align-self: center;
+    justify-self: center;
+    min-height: 34px;
+    padding: 9px 24px;
+    font-weight: 600;
+  }
 }
 
 @media (max-width: 640px) {
@@ -194,28 +262,25 @@
     flex: 0 1 auto;
     min-height: 0;
     justify-content: flex-start;
-    padding: var(--space-3) 0 36px;
+    padding: 0 0 36px;
+  }
+
+  .auth-login-container {
+    max-width: min(400px, 100%);
+    padding-left: 16px;
+    padding-right: 16px;
+    padding-top: 0;
+    padding-bottom: 0;
   }
 
   .auth-login-form {
     width: 100%;
-    gap: 16px;
-  }
-
-  .auth-field span {
-    font-size: 14px;
-  }
-
-  .auth-field-inline span {
-    font-size: 13px;
+    gap: 12px;
   }
 }
 
 /* ---------------------------------------------------------------------------
    Login PWA yükleme satırı — Taşıt driver-shell login parity (yeşil metin + İptal X).
-   Satır yalnızca `beforeinstallprompt` yakalandığında ve uygulama standalone
-   değilken render edilir (bkz. src/components/shell/PwaInstallBar.tsx). iOS/Safari
-   bu olayı hiç tetiklemediği için orada görünmez.
    --------------------------------------------------------------------------- */
 .pwa-install-bar {
   display: inline-flex;
@@ -227,7 +292,6 @@
   margin: 0 0 8px;
 }
 
-/* Satır görünürken üst boşluğu satır devralır: hero→form dikey ritmi sabit kalır. */
 .auth-login:has(> .pwa-install-bar) {
   padding-top: 0;
 }

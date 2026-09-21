@@ -135,7 +135,7 @@ export function AppShell() {
   const { pathname, state } = useLocation();
   const [searchParams] = useSearchParams();
 
-  const isLoginRoute = pathname === "/login" || pathname === "/personel-aktivasyon";
+  const isLoginRoute = pathname === "/login";
   const isHomeRoute = pathname === "/";
   const isYonetimRoute = pathname === "/yonetim-paneli";
   const moduleModal = useMemo(

@@ -41,7 +41,6 @@ import { SaklamaLegalHoldPanel } from "../components/SaklamaLegalHoldPanel";
 import { YonetimOrgScopeFields } from "../components/YonetimSubeScopeField";
 import { isRealYonetimKullaniciApi } from "../../../lib/yonetim/kullanici-api-contract";
 import {
-  PERSONEL_ACTIVATION_PENDING_LABEL,
   PERSONEL_FIRST_LOGIN_COMPLETE_LABEL,
   PERSONEL_FIRST_LOGIN_PENDING_LABEL,
   countPersonelFirstLoginStatus,
@@ -145,7 +144,7 @@ const DURUM_LABELS: Record<KayitDurumu, string> = {
 
 const FIRST_LOGIN_FILTER_OPTIONS: Array<{ value: PersonelFirstLoginFilter; label: string }> = [
   { value: "all", label: "Tümü" },
-  { value: "pending", label: `${PERSONEL_ACTIVATION_PENDING_LABEL} / ${PERSONEL_FIRST_LOGIN_PENDING_LABEL}` },
+  { value: "pending", label: PERSONEL_FIRST_LOGIN_PENDING_LABEL },
   { value: "completed", label: PERSONEL_FIRST_LOGIN_COMPLETE_LABEL }
 ];
 
@@ -1696,7 +1695,7 @@ export function YonetimPaneliPage() {
                     {firstLoginLabel ? (
                       <span
                         className={
-                          item.activation_required === true || item.must_change_password === true
+                          item.must_change_password === true
                             ? "yonetim-first-login-badge yonetim-first-login-badge--pending"
                             : "yonetim-first-login-badge yonetim-first-login-badge--complete"
                         }
@@ -1753,7 +1752,7 @@ export function YonetimPaneliPage() {
                         {firstLoginLabel ? (
                           <span
                             className={
-                              item.activation_required === true || item.must_change_password === true
+                              item.must_change_password === true
                                 ? "yonetim-first-login-badge yonetim-first-login-badge--pending"
                                 : "yonetim-first-login-badge yonetim-first-login-badge--complete"
                             }

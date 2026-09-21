@@ -1,21 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { isApiRequestError } from "../../../api/api-client";
-import {
-  createPersonelHesapOnboarding,
-  fetchPersonelAktivasyonMeta,
-  fetchYonetimKullanicilari,
-  reissuePersonelAktivasyon
-} from "../../../api/yonetim.api";
-import type {
-  PersonelActivationInvitationMeta,
-  PersonelHesapFirstLoginResult,
-  PersonelHesapOnboardingResult
-} from "../../../types/yonetim";
+import { createPersonelHesapOnboarding, fetchYonetimKullanicilari } from "../../../api/yonetim.api";
+import type { PersonelHesapFirstLoginResult } from "../../../types/yonetim";
 import { buildPersonelUsernameFromNames } from "../personelUsernameFromNames";
 
 export type PersonelHesapOnboardingBoundUser = {
   id: number;
-  activation_required?: boolean;
   must_change_password?: boolean;
   username?: string;
 };
@@ -29,17 +19,6 @@ export type PersonelHesapOnboardingPanelProps = {
   boundUser?: PersonelHesapOnboardingBoundUser | null;
 };
 
-function formatUtcLabel(value: string | undefined): string {
-  if (!value) {
-    return "—";
-  }
-  const parsed = Date.parse(value.includes("T") ? value : `${value}Z`);
-  if (Number.isNaN(parsed)) {
-    return value;
-  }
-  return new Date(parsed).toLocaleString("tr-TR");
-}
-
 export function PersonelHesapOnboardingPanel({
   personelId,
   ad,
@@ -48,27 +27,17 @@ export function PersonelHesapOnboardingPanel({
   hasBoundUser: hasBoundUserProp,
   boundUser: boundUserProp
 }: PersonelHesapOnboardingPanelProps) {
-  const [boundUser, setBoundUser] = useState<PersonelHesapOnboardingBoundUser | null>(
-    boundUserProp ?? null
-  );
+  const [boundUser, setBoundUser] = useState<PersonelHesapOnboardingBoundUser | null>(boundUserProp ?? null);
   const [hasBoundUser, setHasBoundUser] = useState<boolean | undefined>(hasBoundUserProp);
   const [isLoadingBound, setIsLoadingBound] = useState(hasBoundUserProp === undefined);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [isWorking, setIsWorking] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  /** Canonical first-login create sonucu (aktivasyon linki yok). */
   const [created, setCreated] = useState<PersonelHesapFirstLoginResult | null>(null);
-  /** Legacy aktivasyon daveti sonucu; yalniz gecmis activation_required=true hesaplar icin. */
-  const [issued, setIssued] = useState<PersonelHesapOnboardingResult | null>(null);
-  const [copyStatus, setCopyStatus] = useState<string | null>(null);
-  const [meta, setMeta] = useState<PersonelActivationInvitationMeta | null>(null);
   const [usernameCollision, setUsernameCollision] = useState(false);
   const [usernameOverride, setUsernameOverride] = useState("");
 
-  const suggestedUsername = useMemo(
-    () => buildPersonelUsernameFromNames(ad, soyad),
-    [ad, soyad]
-  );
+  const suggestedUsername = useMemo(() => buildPersonelUsernameFromNames(ad, soyad), [ad, soyad]);
 
   const resolveBoundUser = useCallback(async () => {
     if (boundUserProp != null || hasBoundUserProp === true || hasBoundUserProp === false) {
@@ -83,18 +52,8 @@ export function PersonelHesapOnboardingPanel({
     try {
       const users = await fetchYonetimKullanicilari();
       const match = users.find((item) => item.personel_id === personelId) ?? null;
-      if (match) {
-        setBoundUser({
-          id: match.id,
-          activation_required: match.activation_required,
-          must_change_password: match.must_change_password,
-          username: match.username
-        });
-        setHasBoundUser(true);
-      } else {
-        setBoundUser(null);
-        setHasBoundUser(false);
-      }
+      setBoundUser(match ? { id: match.id, must_change_password: match.must_change_password, username: match.username } : null);
+      setHasBoundUser(match !== null);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Bağlı hesap bilgisi okunamadı.");
       setHasBoundUser(undefined);
@@ -107,70 +66,30 @@ export function PersonelHesapOnboardingPanel({
     void resolveBoundUser();
   }, [resolveBoundUser]);
 
-  useEffect(() => {
-    if (!boundUser || boundUser.activation_required !== true) {
-      setMeta(null);
-      return;
-    }
-
-    let cancelled = false;
-    void (async () => {
-      try {
-        const response = await fetchPersonelAktivasyonMeta(boundUser.id);
-        if (!cancelled) {
-          setMeta(response.activation_invitation);
-        }
-      } catch {
-        if (!cancelled) {
-          setMeta(null);
-        }
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [boundUser]);
-
-  const eligible =
-    personelAktif &&
-    suggestedUsername.length > 0 &&
-    hasBoundUser === false &&
-    !issued &&
-    !created;
+  const eligible = personelAktif && suggestedUsername.length > 0 && hasBoundUser === false && !created;
 
   async function handleCreate() {
-    if (!eligible || isWorking) {
-      return;
-    }
+    if (!eligible || isWorking) return;
+
     setIsWorking(true);
     setErrorMessage(null);
-    setCopyStatus(null);
     try {
-      const override =
-        usernameCollision && usernameOverride.trim() !== ""
-          ? usernameOverride.trim()
-          : undefined;
+      const override = usernameCollision && usernameOverride.trim() !== "" ? usernameOverride.trim() : undefined;
       const result = await createPersonelHesapOnboarding(personelId, override);
-      // Canonical first-login modeli: aktivasyon linki/daveti uretilmez, meta beklenmez.
       setCreated(result);
       setBoundUser({
         id: result.user.id,
-        activation_required: result.user.activation_required === true,
         must_change_password: result.user.must_change_password !== false,
         username: result.user.username
       });
       setHasBoundUser(true);
       setConfirmOpen(false);
       setUsernameCollision(false);
-      setMeta(null);
     } catch (error) {
       if (isApiRequestError(error) && error.code === "PERSONEL_USERNAME_COLLISION") {
         setUsernameCollision(true);
         setUsernameOverride((prev) => (prev.trim() !== "" ? prev : suggestedUsername));
-        setErrorMessage(
-          error.message || "Bu kullanıcı adı zaten kullanılıyor. Farklı bir kullanıcı adı belirleyin."
-        );
+        setErrorMessage(error.message || "Bu kullanıcı adı zaten kullanılıyor. Farklı bir kullanıcı adı belirleyin.");
       } else {
         setErrorMessage(
           isApiRequestError(error)
@@ -185,90 +104,20 @@ export function PersonelHesapOnboardingPanel({
     }
   }
 
-  async function handleReissue() {
-    if (!boundUser || isWorking) {
-      return;
-    }
-    setIsWorking(true);
-    setErrorMessage(null);
-    setCopyStatus(null);
-    try {
-      const result = await reissuePersonelAktivasyon(boundUser.id);
-      setIssued(result);
-      setBoundUser({
-        id: result.user.id,
-        activation_required: true,
-        username: result.user.username
-      });
-      setMeta({
-        created_at_utc: result.activation.created_at_utc,
-        expires_at_utc: result.activation.expires_at_utc,
-        is_expired: false,
-        is_valid: true
-      });
-    } catch (error) {
-      setErrorMessage(
-        isApiRequestError(error)
-          ? error.message
-          : error instanceof Error
-            ? error.message
-            : "Aktivasyon bağlantısı yenilenemedi."
-      );
-    } finally {
-      setIsWorking(false);
-    }
-  }
-
-  function resolveDisplayActivationUrl(rawUrl: string): string {
-    if (rawUrl.startsWith("http://") || rawUrl.startsWith("https://")) {
-      return rawUrl;
-    }
-    return `${window.location.origin}${rawUrl.startsWith("/") ? "" : "/"}${rawUrl}`;
-  }
-
-  async function handleCopyLink() {
-    const rawUrl = issued?.activation.activation_url;
-    if (!rawUrl) {
-      return;
-    }
-    const url = resolveDisplayActivationUrl(rawUrl);
-    try {
-      await navigator.clipboard.writeText(url);
-      setCopyStatus("Bağlantı panoya kopyalandı.");
-    } catch {
-      setCopyStatus("Kopyalama başarısız. Bağlantıyı manuel seçin.");
-    }
-  }
-
-  const activationPending = boundUser?.activation_required === true;
-  const accountActive = hasBoundUser === true && boundUser != null && boundUser.activation_required !== true;
-
   return (
     <div className="yonetim-workspace-panel" data-testid="personel-hesap-onboarding-panel">
       <p className="yonetim-workspace-panel-title">Personel hesabı</p>
-
       {isLoadingBound ? <p className="yonetim-hint">Hesap durumu yükleniyor…</p> : null}
-
-      {!isLoadingBound && !personelAktif ? (
-        <p className="yonetim-hint">Pasif personel için hesap oluşturulamaz.</p>
-      ) : null}
-
-      {!isLoadingBound && personelAktif && !suggestedUsername ? (
-        <p className="yonetim-hint">Hesap oluşturmak için ad ve soyad zorunludur.</p>
-      ) : null}
+      {!isLoadingBound && !personelAktif ? <p className="yonetim-hint">Pasif personel için hesap oluşturulamaz.</p> : null}
+      {!isLoadingBound && personelAktif && !suggestedUsername ? <p className="yonetim-hint">Hesap oluşturmak için ad ve soyad zorunludur.</p> : null}
 
       {eligible && !confirmOpen ? (
-        <button
-          type="button"
-          className="universal-btn-save"
-          data-testid="personel-hesap-olustur"
-          onClick={() => {
-            setConfirmOpen(true);
-            setErrorMessage(null);
-            setUsernameCollision(false);
-            setUsernameOverride("");
-          }}
-        >
+        <button type="button" className="universal-btn-save" data-testid="personel-hesap-olustur" onClick={() => {
+          setConfirmOpen(true);
+          setErrorMessage(null);
+          setUsernameCollision(false);
+          setUsernameOverride("");
+        }}>
           Personel Hesabı Oluştur
         </button>
       ) : null}
@@ -276,118 +125,38 @@ export function PersonelHesapOnboardingPanel({
       {eligible && confirmOpen ? (
         <div className="yonetim-form-stack" data-testid="personel-hesap-onboarding-confirm">
           <p className="yonetim-hint">
-            Hesap oluşturulduğunda personel, şirket kuralına göre belirlenen başlangıç şifresi ile
-            ilk girişini yapar ve ilk girişte şifresini değiştirmesi gerekir.
+            Hesap oluşturulduğunda personel, şirket kuralına göre belirlenen başlangıç şifresi ile ilk girişini yapar ve şifresini değiştirmesi gerekir.
           </p>
           <label className="form-field">
             <span>Kullanıcı adı</span>
-            <input
-              type="text"
-              value={usernameCollision ? usernameOverride : suggestedUsername}
-              readOnly={!usernameCollision}
-              onChange={(event) => setUsernameOverride(event.target.value)}
-              data-testid="personel-hesap-username"
-            />
+            <input type="text" value={usernameCollision ? usernameOverride : suggestedUsername} readOnly={!usernameCollision} onChange={(event) => setUsernameOverride(event.target.value)} data-testid="personel-hesap-username" />
           </label>
-          {usernameCollision ? (
-            <p className="yonetim-hint">
-              Önerilen kullanıcı adı dolu. Farklı bir kullanıcı adı belirleyin; sistem otomatik sayı
-              eklemez.
-            </p>
-          ) : null}
+          {usernameCollision ? <p className="yonetim-hint">Önerilen kullanıcı adı dolu. Farklı bir kullanıcı adı belirleyin; sistem otomatik sayı eklemez.</p> : null}
           <div className="yonetim-create-row">
             <button type="button" className="universal-btn-save" disabled={isWorking} onClick={() => void handleCreate()}>
               {isWorking ? "Oluşturuluyor…" : "Onayla ve Hesap Oluştur"}
             </button>
-            <button type="button" className="yonetim-panel-action" disabled={isWorking} onClick={() => setConfirmOpen(false)}>
-              Vazgeç
-            </button>
+            <button type="button" className="yonetim-panel-action" disabled={isWorking} onClick={() => setConfirmOpen(false)}>Vazgeç</button>
           </div>
         </div>
       ) : null}
 
       {created ? (
         <div className="yonetim-form-stack" data-testid="personel-hesap-onboarding-first-login">
-          <p>
-            Kullanıcı adı: <strong>{created.user.username}</strong>
-          </p>
-          <p data-testid="personel-hesap-ilk-giris-hazir">
-            <strong>Hesap ilk girişe hazır</strong>
-          </p>
-          <p className="yonetim-hint" role="status">
-            İlk girişte şifresini değiştirmesi gerekir. Başlangıç şifresi şirket kuralına göre
-            oluşturulur ve ilk girişte değiştirilir.
-          </p>
+          <p>Kullanıcı adı: <strong>{created.user.username}</strong></p>
+          <p data-testid="personel-hesap-ilk-giris-hazir"><strong>Hesap ilk girişe hazır</strong></p>
+          <p className="yonetim-hint" role="status">İlk girişte şifresini değiştirmesi gerekir. Başlangıç şifresi şirket kuralına göre oluşturulur ve ilk girişte değiştirilir.</p>
         </div>
       ) : null}
 
-      {!created && issued ? (
-        <div className="yonetim-form-stack" data-testid="personel-hesap-onboarding-issued">
-          <p>
-            Kullanıcı adı: <strong>{issued.user.username}</strong>
-          </p>
-          <label className="form-field">
-            <span>Aktivasyon bağlantısı (yalnızca bir kez gösterilir)</span>
-            <input type="text" readOnly value={resolveDisplayActivationUrl(issued.activation.activation_url)} />
-          </label>
-          <p className="yonetim-hint" role="status">
-            Bu bağlantı güvenlik nedeniyle daha sonra tekrar görüntülenemez.
-            Kaybolursa yeni bağlantı oluşturabilirsiniz.
-          </p>
-          <button type="button" className="universal-btn-save" onClick={() => void handleCopyLink()}>
-            Bağlantıyı Kopyala
-          </button>
-          {copyStatus ? <p className="yonetim-hint">{copyStatus}</p> : null}
-        </div>
-      ) : null}
-
-      {!created && !issued && activationPending ? (
-        <div className="yonetim-form-stack" data-testid="personel-hesap-aktivasyon-bekliyor">
-          <p>
-            <strong>Aktivasyon Bekliyor</strong>
-            {boundUser?.username ? ` — ${boundUser.username}` : null}
-          </p>
-          {meta ? (
-            <p className="yonetim-hint">
-              Oluşturulma: {formatUtcLabel(meta.created_at_utc)}
-              {" · "}
-              Son geçerlilik: {formatUtcLabel(meta.expires_at_utc)}
-              {meta.is_expired ? " (süresi dolmuş)" : null}
-            </p>
-          ) : (
-            <p className="yonetim-hint">Bekleyen aktivasyon meta bilgisi yükleniyor veya yok.</p>
-          )}
-          <button
-            type="button"
-            className="universal-btn-save"
-            disabled={isWorking}
-            data-testid="personel-aktivasyon-yenile"
-            onClick={() => void handleReissue()}
-          >
-            {isWorking ? "Oluşturuluyor…" : "Yeni Aktivasyon Bağlantısı Oluştur"}
-          </button>
-        </div>
-      ) : null}
-
-      {!created && !issued && accountActive ? (
+      {!created && hasBoundUser === true && boundUser != null ? (
         <div className="yonetim-form-stack" data-testid="personel-hesap-aktif">
-          <p>
-            <strong>Hesap Aktif</strong>
-            {boundUser?.username ? ` — ${boundUser.username}` : null}
-          </p>
-          {boundUser?.must_change_password === true ? (
-            <p className="yonetim-hint" data-testid="personel-hesap-ilk-giris-bekliyor">
-              İlk girişte şifresini değiştirmesi gerekir.
-            </p>
-          ) : null}
+          <p><strong>Hesap Aktif</strong>{boundUser.username ? ` — ${boundUser.username}` : null}</p>
+          {boundUser.must_change_password === true ? <p className="yonetim-hint" data-testid="personel-hesap-ilk-giris-bekliyor">İlk girişte şifresini değiştirmesi gerekir.</p> : null}
         </div>
       ) : null}
 
-      {errorMessage ? (
-        <p className="auth-error" role="alert">
-          {errorMessage}
-        </p>
-      ) : null}
+      {errorMessage ? <p className="auth-error" role="alert">{errorMessage}</p> : null}
     </div>
   );
 }

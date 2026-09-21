@@ -144,12 +144,9 @@ async function assertLoginFormBlockCentered(page: Page) {
     expect(gap).toBeGreaterThanOrEqual(8);
     expect(gap).toBeLessThanOrEqual(20);
   }
-<<<<<<< HEAD
-=======
   if (metrics.visualViewportHeight != null) {
     expect(metrics.footerTop!).toBeLessThanOrEqual(metrics.visualViewportHeight + 1);
   }
->>>>>>> 07970110 (fix(login): revert split layout; center whole mobile form block)
 }
 
 async function assertAuthHeroTitle(page: Page) {
@@ -308,11 +305,7 @@ test.describe("mobile Taşıt parity — login", () => {
       await page.goto("/login");
       await assertNoHorizontalOverflow(page);
       await assertLoginTitleParity(page);
-<<<<<<< HEAD
-      await assertLoginHeroFormGap(page);
-=======
       await assertLoginFormBlockCentered(page);
->>>>>>> 07970110 (fix(login): revert split layout; center whole mobile form block)
     });
   }
 });

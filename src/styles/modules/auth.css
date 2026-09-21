@@ -226,7 +226,7 @@ body.login-page {
 
 .auth-login-form .universal-btn-save:hover:not([disabled]),
 .auth-login-form .universal-btn-save:focus-visible:not([disabled]) {
-  background: transparent;
+  background: rgba(74, 222, 128, 0.12);
   color: var(--green);
   border-color: rgba(74, 222, 128, 0.9);
   transform: scale(1.03);

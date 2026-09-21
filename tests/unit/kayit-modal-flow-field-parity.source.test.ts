@@ -25,9 +25,8 @@ function splitCreateColumns(source: string): { left: string; right: string } {
 function assertColumnBottomAlignmentCss(kayitCss: string, createFields: string) {
   expect(kayitCss).toMatch(/\.personel-form-columns\s*\{[^}]*align-items:\s*stretch/s);
   expect(kayitCss).toMatch(/\.personel-form-column\s*\{[^}]*display:\s*flex/s);
-  expect(kayitCss).toMatch(
-    /\.personel-form-column:first-child\s*>\s*:last-child\s*\{[^}]*margin-top:\s*auto/s
-  );
+  expect(kayitCss).toMatch(/\.personel-form-column\s*\{[^}]*justify-content:\s*space-between/s);
+  expect(kayitCss).not.toMatch(/\.personel-form-column[^}]*margin-top:\s*auto/s);
   expect(kayitCss).not.toMatch(/personel-form-field-unit/);
   expect(createFields).not.toMatch(/personel-form-column--(?:left|right)/);
   expect(createFields).not.toMatch(/personel-form-field-unit/);

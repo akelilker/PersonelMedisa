@@ -22,12 +22,12 @@ function splitCreateColumns(source: string): { left: string; right: string } {
   return { left: parts[1], right: parts[2] };
 }
 
-function assertNoSpacerHacks(kayitCss: string, createFields: string) {
-  expect(kayitCss).toMatch(/\.personel-form-column\s*\{[^}]*display:\s*grid/s);
-  expect(kayitCss).toMatch(/\.personel-form-column\s*\{[^}]*align-content:\s*start/s);
-  expect(kayitCss).not.toMatch(/\.personel-form-column\s*>\s*:last-child\s*\{[^}]*margin-top:\s*auto/s);
-  expect(kayitCss).not.toMatch(/\.personel-form-columns\s*\{[^}]*align-items:\s*stretch/s);
-  expect(kayitCss).not.toMatch(/\.personel-form-column\s*\{[^}]*display:\s*flex/s);
+function assertColumnBottomAlignmentCss(kayitCss: string, createFields: string) {
+  expect(kayitCss).toMatch(/\.personel-form-columns\s*\{[^}]*align-items:\s*stretch/s);
+  expect(kayitCss).toMatch(/\.personel-form-column\s*\{[^}]*display:\s*flex/s);
+  expect(kayitCss).toMatch(
+    /\.personel-form-column:first-child\s*>\s*:last-child\s*\{[^}]*margin-top:\s*auto/s
+  );
   expect(kayitCss).not.toMatch(/personel-form-field-unit/);
   expect(createFields).not.toMatch(/personel-form-column--(?:left|right)/);
   expect(createFields).not.toMatch(/personel-form-field-unit/);
@@ -65,10 +65,10 @@ describe("kayit modal flow actions + field surface parity", () => {
     expect(formCss).not.toMatch(/\.form-input\s*\{[^}]*background:\s*var\(--bg-surface-elevated\)/s);
   });
 
-  it("populated references: 11/12 columns, natural bottom row, no spacer hacks", () => {
+  it("populated references: 11/12 columns, sol kolon taban hizası (flex + margin-top auto)", () => {
     const kayitCss = read(KAYIT_CSS);
     const createFields = read(CREATE_FIELDS);
-    assertNoSpacerHacks(kayitCss, createFields);
+    assertColumnBottomAlignmentCss(kayitCss, createFields);
 
     const { left, right } = splitCreateColumns(createFields);
 

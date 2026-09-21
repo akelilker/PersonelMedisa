@@ -190,7 +190,7 @@ describe('personel first-login preflight report owner', () => {
 
 describe('personel first-login preflight workflow', () => {
   it('is a single fixed read-only mode behind an explicit confirmation', () => {
-    expect(workflow).toContain('name: Ops personel first-login preflight (read-only)');
+    expect(workflow).toContain('name: HISTORICAL — Ops personel first-login preflight (2026-09-19 rollout; NOT headcount)');
     expect(workflow).toContain('MODE: PERSONEL_FIRST_LOGIN_CREDENTIALS_PREFLIGHT');
     expect(workflow).toContain('test "$CONFIRMATION" = "$MODE"');
     // No mode choice list: an operator cannot select anything but the read-only mode.

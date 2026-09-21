@@ -214,6 +214,20 @@
    padding-top'u (8px omurga) taşır. Yatay padding değişmez. */
 .modal-body:has(> .personel-detay-page) {
   padding-top: 0;
+  gap: var(--space-3);
+}
+
+/* Geri çubuğu + detay kartı arası Taşıt detay / import back-bar ayracı ile aynı ritim. */
+.modal-body:has(> .personel-detay-page) > .universal-back-bar {
+  align-self: stretch;
+  width: 100%;
+  margin: 0;
+  padding: 4px 0 10px;
+  border-bottom: 1px solid rgba(160, 174, 192, 0.16);
+}
+
+.modal-body:has(> .personel-detay-page) > .universal-back-bar .universal-back-btn {
+  max-width: max-content;
 }
 
 .modal-header-spacer {

@@ -65,7 +65,7 @@ describe("kayit modal flow actions + field surface parity", () => {
     expect(formCss).not.toMatch(/\.form-input\s*\{[^}]*background:\s*var\(--bg-surface-elevated\)/s);
   });
 
-  it("populated references: 10/12 columns, natural bottom row, no spacer hacks", () => {
+  it("populated references: 11/12 columns, natural bottom row, no spacer hacks", () => {
     const kayitCss = read(KAYIT_CSS);
     const createFields = read(CREATE_FIELDS);
     assertNoSpacerHacks(kayitCss, createFields);
@@ -90,13 +90,13 @@ describe("kayit modal flow actions + field surface parity", () => {
       "create-acil-kisi",
       "create-acil-tel",
       "create-dogum-yeri",
-      "create-kan"
+      "create-kan",
+      "create-calisma-lokasyonu"
     ]);
     expect(rightNames).toEqual([
       "create-ise-giris",
       "create-sube",
       "create-sgk-isveren",
-      "create-calisma-lokasyonu",
       "create-bagli-amir",
       "create-departman",
       "create-bolum",
@@ -107,7 +107,7 @@ describe("kayit modal flow actions + field surface parity", () => {
       "create-ucret-tipi",
       "create-maas"
     ]);
-    expect(leftNames.at(-1)).toBe("create-kan");
+    expect(leftNames.at(-1)).toBe("create-calisma-lokasyonu");
     expect(rightNames.at(-1)).toBe("create-maas");
     expect(createFields).toContain("Görev / Unvan");
     expect(createFields).toContain("Statü");

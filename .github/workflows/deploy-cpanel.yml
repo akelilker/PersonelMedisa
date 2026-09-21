@@ -19,6 +19,7 @@ concurrency:
   cancel-in-progress: false
 
 # Ops: push to main retriggers this workflow when manual dispatch/rerun is unavailable.
+# Retrigger deploy: Actions billing restored 2026-09-21 (Ilker); Kayıt layout on main tip.
 
 jobs:
   deploy:

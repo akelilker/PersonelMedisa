@@ -1,13 +1,24 @@
 import type { Personel } from "../../../../types/personel";
 import type { Surec } from "../../../../types/surec";
 import type { Zimmet } from "../../../../types/zimmet";
-import { getPersonelMissingFields } from "../../personel-missing-info";
 import { PersonelBelgelerPanel } from "./PersonelBelgelerPanel";
 import { PersonelDisiplinPanel } from "./PersonelDisiplinPanel";
-import { PersonelDosyaTabList, type PersonelDosyaTabId } from "./PersonelDosyaTabs";
+import { PersonelDosyaActionRow } from "./PersonelDosyaActionRow";
+import { PersonelDosyaGenelUst } from "./PersonelDosyaGenelUst";
+import type { PersonelDosyaTabId } from "./PersonelDosyaTabs";
 import { PersonelKartPanelGenelBilgiler } from "./PersonelKartPanelGenelBilgiler";
 import { PersonelSurecGecmisiPanel } from "./PersonelSurecGecmisiPanel";
 import { PersonelZimmetEnvanterPanel } from "./PersonelZimmetEnvanterPanel";
+
+export type PersonelDosyaGenelActionRowProps = {
+  canAccessSurecler: boolean;
+  canCreateSurec: boolean;
+  isActionMenuOpen: boolean;
+  onToggleActionMenu: () => void;
+  onCloseActionMenu: () => void;
+  onOpenSurecModal: () => void;
+  onOpenSurecHistory: () => void;
+};
 
 export type PersonelDosyaTabPanelsProps = {
   activeTab: PersonelDosyaTabId;
@@ -35,6 +46,8 @@ export type PersonelDosyaTabPanelsProps = {
   canApproveBordroKapsam?: boolean;
   canManageAccountOnboarding?: boolean;
   directoryOnly?: boolean;
+  onOpenMissingInfo?: (targetTab: "genel" | "pozisyon") => void;
+  genelActionRow?: PersonelDosyaGenelActionRowProps | null;
 };
 
 export function PersonelDosyaTabPanels({
@@ -62,81 +75,96 @@ export function PersonelDosyaTabPanels({
   canManageBordroKapsam = false,
   canApproveBordroKapsam = false,
   canManageAccountOnboarding = false,
-  directoryOnly = false
+  directoryOnly = false,
+  onOpenMissingInfo,
+  genelActionRow = null
 }: PersonelDosyaTabPanelsProps) {
   function handleOpenSurecHistory() {
     onTabChange("surec-gecmisi");
   }
 
-  const missingOnGenel = getPersonelMissingFields(personel).length;
-
   return (
     <>
-      <PersonelDosyaTabList
-        activeTab={activeTab}
-        onTabChange={onTabChange}
-        directoryOnly={directoryOnly}
-        missingCounts={{ "genel-bilgiler": missingOnGenel }}
-      />
+      {!directoryOnly ? (
+        <div
+          id="personel-kart-panel-genel-bilgiler"
+          role="tabpanel"
+          className="personel-kart-panel"
+          aria-labelledby="personel-kart-tab-genel-bilgiler"
+          hidden={activeTab !== "genel-bilgiler"}
+        >
+          <PersonelDosyaGenelUst
+            personel={personel}
+            canViewUcret={canViewUcret}
+            onOpenMissingInfo={onOpenMissingInfo}
+          />
+          {genelActionRow ? (
+            <PersonelDosyaActionRow
+              canAccessSurecler={genelActionRow.canAccessSurecler}
+              canCreateSurec={genelActionRow.canCreateSurec}
+              isActionMenuOpen={genelActionRow.isActionMenuOpen}
+              onToggleActionMenu={genelActionRow.onToggleActionMenu}
+              onCloseActionMenu={genelActionRow.onCloseActionMenu}
+              onOpenSurecModal={genelActionRow.onOpenSurecModal}
+              onOpenSurecHistory={genelActionRow.onOpenSurecHistory}
+            />
+          ) : null}
+          <PersonelKartPanelGenelBilgiler
+            personel={personel}
+            surecler={surecler}
+            canViewPuantaj={canViewPuantaj}
+            canViewRevizyon={canViewRevizyon}
+            canCreateRevizyon={canCreateRevizyon}
+            canViewFinans={canViewFinans}
+            canViewBordro={canViewBordro}
+            canViewUcret={canViewUcret}
+            canManageUcret={canManageUcret}
+            canViewBordroKapsam={canViewBordroKapsam}
+            canManageBordroKapsam={canManageBordroKapsam}
+            canApproveBordroKapsam={canApproveBordroKapsam}
+            canManageAccountOnboarding={canManageAccountOnboarding}
+            isActive={activeTab === "genel-bilgiler"}
+            onOpenSurecHistory={handleOpenSurecHistory}
+          />
+        </div>
+      ) : null}
 
-      {!directoryOnly ? <div
-        id="personel-kart-panel-genel-bilgiler"
-        role="tabpanel"
-        className="personel-kart-panel"
-        aria-labelledby="personel-kart-tab-genel-bilgiler"
-        hidden={activeTab !== "genel-bilgiler"}
-      >
-        <PersonelKartPanelGenelBilgiler
-          personel={personel}
-          surecler={surecler}
-          canViewPuantaj={canViewPuantaj}
-          canViewRevizyon={canViewRevizyon}
-          canCreateRevizyon={canCreateRevizyon}
-          canViewFinans={canViewFinans}
-          canViewBordro={canViewBordro}
-          canViewUcret={canViewUcret}
-          canManageUcret={canManageUcret}
-          canViewBordroKapsam={canViewBordroKapsam}
-          canManageBordroKapsam={canManageBordroKapsam}
-          canApproveBordroKapsam={canApproveBordroKapsam}
-          canManageAccountOnboarding={canManageAccountOnboarding}
-          isActive={activeTab === "genel-bilgiler"}
-          onOpenSurecHistory={handleOpenSurecHistory}
-        />
-      </div> : null}
+      {!directoryOnly ? (
+        <div
+          id="personel-kart-panel-egitim-belgeler"
+          role="tabpanel"
+          className="personel-kart-panel"
+          aria-labelledby="personel-kart-tab-egitim-belgeler"
+          hidden={activeTab !== "egitim-belgeler"}
+        >
+          <PersonelBelgelerPanel
+            personel={personel}
+            isActive={activeTab === "egitim-belgeler"}
+            allowMutations={false}
+          />
+        </div>
+      ) : null}
 
-      {!directoryOnly ? <div
-        id="personel-kart-panel-egitim-belgeler"
-        role="tabpanel"
-        className="personel-kart-panel"
-        aria-labelledby="personel-kart-tab-egitim-belgeler"
-        hidden={activeTab !== "egitim-belgeler"}
-      >
-        <PersonelBelgelerPanel
-          personel={personel}
-          isActive={activeTab === "egitim-belgeler"}
-          allowMutations={false}
-        />
-      </div> : null}
-
-      {!directoryOnly ? <div
-        id="personel-kart-panel-disiplin"
-        role="tabpanel"
-        className="personel-kart-panel"
-        aria-labelledby="personel-kart-tab-disiplin"
-        hidden={activeTab !== "disiplin"}
-      >
-        <PersonelDisiplinPanel
-          personel={personel}
-          surecler={surecler}
-          isActive={activeTab === "disiplin"}
-          isSurecHistoryLoading={isSurecHistoryLoading}
-          surecHistoryErrorMessage={surecHistoryErrorMessage}
-          canViewFinans={canViewFinans}
-          canAccessSurecler={canAccessSurecler}
-          onOpenSurecHistory={handleOpenSurecHistory}
-        />
-      </div> : null}
+      {!directoryOnly ? (
+        <div
+          id="personel-kart-panel-disiplin"
+          role="tabpanel"
+          className="personel-kart-panel"
+          aria-labelledby="personel-kart-tab-disiplin"
+          hidden={activeTab !== "disiplin"}
+        >
+          <PersonelDisiplinPanel
+            personel={personel}
+            surecler={surecler}
+            isActive={activeTab === "disiplin"}
+            isSurecHistoryLoading={isSurecHistoryLoading}
+            surecHistoryErrorMessage={surecHistoryErrorMessage}
+            canViewFinans={canViewFinans}
+            canAccessSurecler={canAccessSurecler}
+            onOpenSurecHistory={handleOpenSurecHistory}
+          />
+        </div>
+      ) : null}
 
       <div
         id="personel-kart-panel-zimmet-envanter"

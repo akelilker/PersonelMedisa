@@ -229,8 +229,8 @@ describe("employment scope / workplace / insurance model (owner wiring)", () => 
     const detail = read("src/features/personeller/components/personel-dosya/PersonelKartPanelGenelBilgiler.tsx");
     expect(detail).toContain('label="SGK İşvereni"');
     expect(detail).toContain('label="Çalışma Lokasyonu"');
-    const hero = read("src/features/personeller/components/personel-dosya/PersonelDosyaHero.tsx");
-    expect(hero).toContain("Çalışan Kapsamı");
-    expect(hero).toContain("personel_tipi_id");
+    const genelUst = read("src/features/personeller/components/personel-dosya/PersonelDosyaGenelUst.tsx");
+    expect(genelUst).toContain("Çalışan Kapsamı");
+    expect(genelUst).toContain("personel_tipi_id");
   });
 });

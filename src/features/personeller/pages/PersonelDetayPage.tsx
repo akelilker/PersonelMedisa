@@ -9,10 +9,13 @@ import {
   PERSONEL_DOSYA_TABS,
   PersonelDosyaActionRow,
   PersonelDosyaHero,
+  PersonelDosyaTabList,
   PersonelDosyaTabPanels,
+  PersonelDosyaToolbar,
   type PersonelDosyaTabId
 } from "../components/personel-dosya";
 import { usePersonelKartGatewayReturn } from "../hooks/usePersonelKartGatewayReturn";
+import { getPersonelMissingFields } from "../personel-missing-info";
 
 function resolvePersonelTab(raw: string | null): PersonelDosyaTabId | null {
   if (!raw) return null;
@@ -106,6 +109,8 @@ export function PersonelDetayPage() {
     personel?.retention_summary?.retention_until ??
     null;
 
+  const missingOnGenel = personel ? getPersonelMissingFields(personel).length : 0;
+
   return (
     <section className="personel-detay-page personel-dosya-page" aria-label={pageHeading}>
       <h2 className="personeller-sr-only">{pageHeading}</h2>
@@ -133,30 +138,27 @@ export function PersonelDetayPage() {
             </div>
           ) : null}
 
-          <PersonelDosyaHero
-            personel={personel}
-            canViewUcret={canViewUcret}
-            onOpenMissingInfo={
-              canUpdatePersonel && !isArchived && canWriteOnPersonel ? handleOpenMissingInfo : undefined
-            }
+          <PersonelDosyaHero personel={personel} />
+
+          <PersonelDosyaToolbar
+            onOpenHistory={handleOpenSurecHistory}
+            onOpenDocuments={() => setActiveTab("egitim-belgeler")}
+            onPrint={() => window.print()}
           />
+
+          <div className="personel-dosya-tab-nav">
+            <PersonelDosyaTabList
+              activeTab={effectiveActiveTab}
+              onTabChange={setActiveTab}
+              directoryOnly={isDisKaynak}
+              missingCounts={{ "genel-bilgiler": missingOnGenel }}
+            />
+          </div>
 
           {!canWriteOnPersonel ? (
             <p className="personel-write-scope-notice" role="status" data-testid="personel-write-scope-notice">
               Bu işlem İK sorumlusu tarafından gerçekleştirilmelidir.
             </p>
-          ) : null}
-
-          {!isArchived && !isDisKaynak ? (
-            <PersonelDosyaActionRow
-              canAccessSurecler={canAccessSureclerEffective}
-              canCreateSurec={canCreateSurecEffective}
-              isActionMenuOpen={isActionMenuOpen}
-              onToggleActionMenu={() => setIsActionMenuOpen((prev) => !prev)}
-              onCloseActionMenu={() => setIsActionMenuOpen(false)}
-              onOpenSurecModal={handleOpenSurecModal}
-              onOpenSurecHistory={handleOpenSurecHistory}
-            />
           ) : null}
 
           <PersonelDosyaTabPanels
@@ -185,6 +187,22 @@ export function PersonelDetayPage() {
             canApproveBordroKapsam={false}
             canManageAccountOnboarding={canManageAccountOnboarding && !isArchived}
             directoryOnly={isDisKaynak}
+            onOpenMissingInfo={
+              canUpdatePersonel && !isArchived && canWriteOnPersonel ? handleOpenMissingInfo : undefined
+            }
+            genelActionRow={
+              !isArchived && !isDisKaynak
+                ? {
+                    canAccessSurecler: canAccessSureclerEffective,
+                    canCreateSurec: canCreateSurecEffective,
+                    isActionMenuOpen,
+                    onToggleActionMenu: () => setIsActionMenuOpen((prev) => !prev),
+                    onCloseActionMenu: () => setIsActionMenuOpen(false),
+                    onOpenSurecModal: handleOpenSurecModal,
+                    onOpenSurecHistory: handleOpenSurecHistory
+                  }
+                : null
+            }
           />
         </div>
       ) : null}

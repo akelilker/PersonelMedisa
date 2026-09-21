@@ -69,10 +69,11 @@
   }
 }
 
+/* Mobil (≤640): Taşıt style-core — kırmızı çerçeve ve yan çizgiler daha net */
 @media (max-width: 640px) {
   :root {
-    --border-red-tech: rgba(var(--theme-color-rgb), 0.4);
-    --border-red-side: rgba(var(--theme-color-rgb), 0.6);
-    --red-glow-subtle: rgba(var(--theme-color-rgb), 0.12);
+    --border-red-tech: rgba(var(--theme-color-rgb), 0.78);
+    --border-red-side: rgba(var(--theme-color-rgb), 0.78);
+    --red-glow-subtle: rgba(var(--theme-color-rgb), 0.18);
   }
 }

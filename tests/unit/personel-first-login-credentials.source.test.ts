@@ -185,7 +185,7 @@ describe("PERSONEL canonical first-login gecisi (owner kontratlari)", () => {
   it("yeni hesap create yolu ayni canonical first-login modelini kullanir", () => {
     const create = service.slice(
       service.indexOf("public static function onboardAndIssue("),
-      service.indexOf("public static function reissueActivation(")
+      service.indexOf("public static function rejectGenericPersonelBoundCreate(")
     );
     expect(create).toContain("resolvePersonelCanonicalUsername");
     expect(create).toContain("resolvePersonelInitialPasswordMaterial");
@@ -199,7 +199,7 @@ describe("PERSONEL canonical first-login gecisi (owner kontratlari)", () => {
 
     const response = service.slice(
       service.indexOf("private static function buildFirstLoginResponse("),
-      service.indexOf("private static function buildIssueResponse(")
+      service.indexOf("private static function writeAudit(")
     );
     expect(response).not.toContain("'activation'");
     expect(response).not.toContain("password_hash");

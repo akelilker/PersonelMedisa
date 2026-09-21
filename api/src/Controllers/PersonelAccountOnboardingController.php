@@ -46,41 +46,4 @@ class PersonelAccountOnboardingController
         JsonResponse::success($result);
     }
 
-    public static function reissue(Request $request, $kullaniciId)
-    {
-        $user = AuthMiddleware::authenticate($request, true);
-        RolePermissions::assert($user, 'yonetim-paneli.manage');
-
-        try {
-            $pdo = Connection::get();
-        } catch (\Throwable $e) {
-            JsonResponse::serverError('Veritabani baglantisi kurulamadi.');
-        }
-
-        try {
-            $result = PersonelAccountOnboardingService::reissueActivation($pdo, (int) $kullaniciId, $user);
-        } catch (\Throwable $e) {
-            JsonResponse::serverError('Aktivasyon baglantisi yenilenemedi.');
-        }
-
-        PersonelAccountOnboardingService::sendNoStoreHeaders();
-        JsonResponse::success($result);
-    }
-
-    public static function pendingMeta(Request $request, $kullaniciId)
-    {
-        $user = AuthMiddleware::authenticate($request, true);
-        RolePermissions::assert($user, 'yonetim-paneli.manage');
-
-        try {
-            $pdo = Connection::get();
-        } catch (\Throwable $e) {
-            JsonResponse::serverError('Veritabani baglantisi kurulamadi.');
-        }
-
-        $meta = PersonelAccountOnboardingService::getPendingInvitationMeta($pdo, (int) $kullaniciId);
-        JsonResponse::success([
-            'activation_invitation' => $meta,
-        ]);
-    }
 }

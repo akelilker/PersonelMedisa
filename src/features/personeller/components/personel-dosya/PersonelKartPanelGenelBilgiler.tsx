@@ -145,8 +145,8 @@ export function PersonelKartPanelGenelBilgiler({
 
       {canManageAccountOnboarding ? (
         <DossierSection
-          title="Personel hesabı ve aktivasyon"
-          description="Güvenli hesap oluşturma ve aktivasyon bağlantısı Yönetici / İK tarafından buradan yönetilir."
+          title="Personel hesabı"
+          description="Başlangıç şifresiyle hesap oluşturma ve zorunlu ilk giriş şifre değişimi Yönetici / İK tarafından buradan yönetilir."
         >
           <PersonelHesapOnboardingPanel
             personelId={personel.id}

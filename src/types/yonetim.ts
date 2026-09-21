@@ -2,8 +2,6 @@ import type { UserRole } from "./auth";
 
 export type KullaniciTipi = "IC_PERSONEL" | "HARICI";
 export type KayitDurumu = "AKTIF" | "PASIF";
-export type PersonelActivationStatus = "PENDING" | "ACTIVE";
-
 export type YonetimKullanici = {
   id: number;
   username?: string;
@@ -15,9 +13,6 @@ export type YonetimKullanici = {
   personel_ad_soyad?: string | null;
   /** Canonical DB flag; omitted when schema column absent. Never a credential secret. */
   must_change_password?: boolean;
-  activation_required?: boolean;
-  activation_status?: PersonelActivationStatus;
-  activated_at_utc?: string | null;
   sube_ids: number[];
   bolum_ids?: number[];
   birim_ids?: number[];
@@ -29,22 +24,13 @@ export type YonetimKullanici = {
   notlar?: string;
 };
 
-export type PersonelActivationIssue = {
-  activation_url: string;
-  created_at_utc: string;
-  expires_at_utc: string;
-  reissued: boolean;
-};
-
 export type PersonelHesapOnboardingUser = {
   id: number;
   username: string;
   rol?: string;
   durum?: string;
   personel_id?: number | null;
-  activation_required?: boolean;
   must_change_password?: boolean;
-  activated_at_utc?: string | null;
 };
 
 /**
@@ -55,25 +41,6 @@ export type PersonelHesapFirstLoginResult = {
   user: PersonelHesapOnboardingUser;
   credential_model?: string;
   message?: string;
-};
-
-/** Legacy aktivasyon daveti sonucu (yalniz gecmis activation_required=true hesaplar). */
-export type PersonelHesapOnboardingResult = {
-  user: PersonelHesapOnboardingUser;
-  activation: PersonelActivationIssue;
-  message?: string;
-};
-
-export type PersonelActivationInvitationMeta = {
-  invitation_id?: number;
-  created_at_utc: string;
-  expires_at_utc: string;
-  is_expired: boolean;
-  is_valid: boolean;
-};
-
-export type PersonelActivationMetaResponse = {
-  activation_invitation: PersonelActivationInvitationMeta | null;
 };
 
 export type UpsertYonetimKullaniciPayload = {

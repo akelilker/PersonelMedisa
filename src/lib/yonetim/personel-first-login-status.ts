@@ -2,12 +2,10 @@ export type PersonelFirstLoginFilter = "all" | "pending" | "completed";
 
 export const PERSONEL_FIRST_LOGIN_PENDING_LABEL = "İlk Giriş Bekliyor";
 export const PERSONEL_FIRST_LOGIN_COMPLETE_LABEL = "İlk Giriş Tamamlandı";
-export const PERSONEL_ACTIVATION_PENDING_LABEL = "Aktivasyon Bekliyor";
 
 export type PersonelFirstLoginUserLike = {
   personel_id?: number | null;
   must_change_password?: boolean;
-  activation_required?: boolean;
 };
 
 export function isPersonelBoundUser(item: PersonelFirstLoginUserLike): boolean {
@@ -18,10 +16,6 @@ export function isPersonelBoundUser(item: PersonelFirstLoginUserLike): boolean {
 export function resolvePersonelFirstLoginLabel(item: PersonelFirstLoginUserLike): string | null {
   if (!isPersonelBoundUser(item)) {
     return null;
-  }
-
-  if (item.activation_required === true) {
-    return PERSONEL_ACTIVATION_PENDING_LABEL;
   }
 
   if (item.must_change_password === true) {
@@ -48,10 +42,10 @@ export function matchesPersonelFirstLoginFilter(
   }
 
   if (filter === "pending") {
-    return item.activation_required === true || item.must_change_password === true;
+    return item.must_change_password === true;
   }
 
-  return item.activation_required !== true && item.must_change_password === false;
+  return item.must_change_password === false;
 }
 
 export function countPersonelFirstLoginStatus(items: PersonelFirstLoginUserLike[]): {
@@ -65,7 +59,7 @@ export function countPersonelFirstLoginStatus(items: PersonelFirstLoginUserLike[
     if (!isPersonelBoundUser(item)) {
       continue;
     }
-    if (item.activation_required === true || item.must_change_password === true) {
+    if (item.must_change_password === true) {
       pending += 1;
     } else if (item.must_change_password === false) {
       completed += 1;

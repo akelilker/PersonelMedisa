@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  PERSONEL_ACTIVATION_PENDING_LABEL,
   PERSONEL_FIRST_LOGIN_COMPLETE_LABEL,
   PERSONEL_FIRST_LOGIN_PENDING_LABEL,
   countPersonelFirstLoginStatus,
@@ -15,16 +14,6 @@ describe("personel first-login status visibility", () => {
     ).toBe(PERSONEL_FIRST_LOGIN_PENDING_LABEL);
   });
 
-  it("activation_required=true → Aktivasyon Bekliyor (over must_change_password)", () => {
-    expect(
-      resolvePersonelFirstLoginLabel({
-        personel_id: 12,
-        activation_required: true,
-        must_change_password: true
-      })
-    ).toBe(PERSONEL_ACTIVATION_PENDING_LABEL);
-  });
-
   it("F: PERSONEL-bound must_change_password=false → İlk Giriş Tamamlandı", () => {
     expect(
       resolvePersonelFirstLoginLabel({ personel_id: 12, must_change_password: false })
@@ -33,12 +22,10 @@ describe("personel first-login status visibility", () => {
 
   it("G: Bekliyor filtresi yalnız pending PERSONEL-bound kayıtları döner", () => {
     const pending = { personel_id: 1, must_change_password: true };
-    const activationPending = { personel_id: 5, activation_required: true };
     const completed = { personel_id: 2, must_change_password: false };
     const admin = { personel_id: null, must_change_password: true };
 
     expect(matchesPersonelFirstLoginFilter(pending, "pending")).toBe(true);
-    expect(matchesPersonelFirstLoginFilter(activationPending, "pending")).toBe(true);
     expect(matchesPersonelFirstLoginFilter(completed, "pending")).toBe(false);
     expect(matchesPersonelFirstLoginFilter(admin, "pending")).toBe(false);
   });
@@ -47,16 +34,10 @@ describe("personel first-login status visibility", () => {
     const pending = { personel_id: 1, must_change_password: true };
     const completed = { personel_id: 2, must_change_password: false };
     const admin = { personel_id: null, must_change_password: false };
-    const stillActivating = {
-      personel_id: 3,
-      activation_required: true,
-      must_change_password: false
-    };
 
     expect(matchesPersonelFirstLoginFilter(completed, "completed")).toBe(true);
     expect(matchesPersonelFirstLoginFilter(pending, "completed")).toBe(false);
     expect(matchesPersonelFirstLoginFilter(admin, "completed")).toBe(false);
-    expect(matchesPersonelFirstLoginFilter(stillActivating, "completed")).toBe(false);
   });
 
   it("I: non-PERSONEL legacy/admin misleading status almıyor", () => {
@@ -72,10 +53,9 @@ describe("personel first-login status visibility", () => {
       { personel_id: 3, must_change_password: true },
       { personel_id: null, must_change_password: true },
       { personel_id: 4 },
-      { personel_id: 5, activation_required: true }
     ]);
 
-    expect(counts).toEqual({ pending: 3, completed: 1 });
+    expect(counts).toEqual({ pending: 2, completed: 1 });
   });
 
   it("Tümü filtresi tüm kayıtları geçirir", () => {

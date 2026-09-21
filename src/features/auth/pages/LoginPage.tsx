@@ -77,30 +77,32 @@ export function LoginPage() {
             />
           </label>
 
-          <label className="auth-field">
-            <span>Şifre</span>
-            <input
-              type="password"
-              name="password"
-              autoComplete="current-password"
-              placeholder="••••••"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              required
-            />
-          </label>
+          <div className="auth-login-form-middle">
+            <label className="auth-field">
+              <span>Şifre</span>
+              <input
+                type="password"
+                name="password"
+                autoComplete="current-password"
+                placeholder="••••••"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                required
+              />
+            </label>
 
-          <label className="auth-field auth-field-inline">
-            <input
-              type="checkbox"
-              name="rememberMe"
-              checked={rememberMe}
-              onChange={(event) => setRememberMe(event.target.checked)}
-            />
-            <span>Beni hatırla</span>
-          </label>
+            <label className="auth-field auth-field-inline">
+              <input
+                type="checkbox"
+                name="rememberMe"
+                checked={rememberMe}
+                onChange={(event) => setRememberMe(event.target.checked)}
+              />
+              <span>Beni hatırla</span>
+            </label>
 
-          {formError ? <p className="auth-error">{formError}</p> : null}
+            {formError ? <p className="auth-error">{formError}</p> : null}
+          </div>
 
           <button
             type="submit"

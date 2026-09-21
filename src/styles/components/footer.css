@@ -98,7 +98,7 @@ body:not(.login-page):not(.admin-report-page) #app-footer {
   display: inline-flex;
   justify-content: flex-end;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   font-size: 13px;
   font-weight: 600;
   white-space: nowrap;
@@ -113,10 +113,14 @@ body:not(.login-page):not(.admin-report-page) #app-footer {
 
 .status-ready {
   color: var(--success);
+  font-weight: 600;
+  text-shadow: 0 0 8px rgba(74, 222, 128, 0.4);
 }
 
 .status-error {
   color: var(--danger);
+  font-weight: 600;
+  text-shadow: 0 0 8px rgba(239, 68, 68, 0.35);
 }
 
 #app-footer.dimmed .version,
@@ -149,6 +153,17 @@ body:not(.login-page):not(.admin-report-page) #app-footer {
     border-right: none;
     height: calc(var(--app-footer-real-height) + env(safe-area-inset-bottom, 0px));
     min-height: calc(var(--app-footer-real-height) + env(safe-area-inset-bottom, 0px));
+  }
+
+  body.app-home-route #app-footer .footer-content {
+    height: 100%;
+    align-items: center;
+    padding: 4px 12px;
+    padding-bottom: 4px;
+  }
+
+  body.app-home-route #app-footer .brand img {
+    max-height: 14.27px;
   }
 }
 

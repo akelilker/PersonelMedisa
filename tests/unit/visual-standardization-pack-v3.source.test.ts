@@ -10,6 +10,7 @@ const PUANTAJ_CSS = join(STYLES_ROOT, "modules", "puantaj.css");
 const PERSONELLER_CSS = join(STYLES_ROOT, "modules", "personeller.css");
 const YONETIM_CSS = join(STYLES_ROOT, "modules", "yonetim.css");
 const RAPORLAR_CSS = join(STYLES_ROOT, "modules", "raporlar.css");
+const COLORS_CSS = join(STYLES_ROOT, "tokens", "colors.css");
 
 function read(path: string): string {
   return readFileSync(path, "utf8");
@@ -90,5 +91,20 @@ describe("PACK V3 table/list standardization invariants", () => {
     expect(source).toContain(".personeller-list");
     expect(source).toContain(".puantaj-etki-aday-card-list");
     expect(source).toContain("list-style: none");
+  });
+
+  it("keeps Taşıt-aligned zebra/surface tokens in colors.css and dense list overrides out of personeller.css", () => {
+    const colors = read(COLORS_CSS);
+    expect(colors).toContain("--medisa-table-surface: var(--bg-app);");
+    expect(colors).toContain("--medisa-table-zebra: rgba(255, 255, 255, 0.05);");
+    expect(colors).toContain("--medisa-table-hover: rgba(255, 255, 255, 0.1);");
+    expect(colors).toContain("--medisa-table-zebra: rgba(255, 255, 255, 0.06);");
+
+    const table = read(TABLE_CSS);
+    expect(table).toContain("background: var(--medisa-table-surface);");
+    expect(table).toContain("nth-child(odd) td");
+
+    const personeller = read(PERSONELLER_CSS);
+    expect(personeller).not.toMatch(/personeller-table--dense tbody tr:nth-child\(even\) td[\s\S]*0\.08/);
   });
 });

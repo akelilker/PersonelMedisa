@@ -30,6 +30,11 @@
   --border-red-side: rgba(var(--theme-color-rgb), 0.6);
   --red-glow-subtle: rgba(var(--theme-color-rgb), 0.12);
   --bg: var(--bg-app);
+  /* Taşıt style-core list/table surfaces (raporlar stok-list-row + view-list parity) */
+  --medisa-table-surface: var(--bg-app);
+  --medisa-table-border: rgba(255, 255, 255, 0.08);
+  --medisa-table-zebra: rgba(255, 255, 255, 0.05);
+  --medisa-table-hover: rgba(255, 255, 255, 0.1);
   --modal-bg: var(--bg-app);
   --modal-header-red-gradient:
     linear-gradient(180deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.02) 5%, rgba(255, 255, 255, 0) 12%),
@@ -75,5 +80,7 @@
     --border-red-tech: rgba(var(--theme-color-rgb), 0.78);
     --border-red-side: rgba(var(--theme-color-rgb), 0.78);
     --red-glow-subtle: rgba(var(--theme-color-rgb), 0.18);
+    /* Taşıt mobil liste: açık zebra satırı 0.06 (tasitlar-extra / raporlar stok-list-row) */
+    --medisa-table-zebra: rgba(255, 255, 255, 0.06);
   }
 }

@@ -95,4 +95,17 @@ describe("shell dropdown viewport-safe owners", () => {
       /:has\(\.icons-row\s+\.settings-menu-dropdown\.open\)\s+\.content-wrap::after/s
     );
   });
+
+  it("extends shell dropdown scrim through fixed footer (not clipped at content-wrap bottom)", () => {
+    const notifications = read("src/styles/components/notifications.css");
+    expect(notifications).toMatch(
+      /:has\(\.icons-row\s+\.settings-dropdown\.open\)\s+\.content-wrap::after\s*\{[^}]*bottom:\s*calc\(-1 \* \(var\(--app-footer-real-height\)/s
+    );
+    expect(notifications).not.toMatch(
+      /:has\(\.icons-row\s+\.settings-dropdown\.open\)\s+\.content-wrap::after\s*\{[^}]*--app-footer-gap/s
+    );
+    expect(notifications).toMatch(
+      /:has\(\.icons-row\s+\.settings-dropdown\.open\)\s+\.app-shell::before\s*\{[^}]*inset:\s*0/s
+    );
+  });
 });

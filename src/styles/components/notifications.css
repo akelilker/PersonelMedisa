@@ -252,19 +252,23 @@ body:not(.modal-open):has(.icons-row .settings-dropdown.open) .app-shell {
 body:not(.modal-open):has(.icons-row .settings-dropdown.open) .content-wrap {
   overflow-y: visible;
   position: relative;
+  /* Scrim extends over fixed #app-footer; stack content column above footer. */
+  z-index: calc(var(--z-footer) + 15);
 }
 
-/* Notifications / settings menus stack above footer; şube scrim stays below shell frame. */
-body:not(.modal-open):has(.icons-row .notifications-dropdown.open) .content-wrap,
-body:not(.modal-open):has(.icons-row .settings-menu-dropdown.open) .content-wrap {
-  z-index: calc(var(--z-footer) + 15);
+/*
+ * Side rails + inset glow span footer while scrim is active (footer sits outside .content-wrap).
+ * Default app-shell::before bottom inset stays in app-shell.css when menus are closed.
+ */
+body:not(.modal-open):has(.icons-row .settings-dropdown.open) .app-shell::before {
+  inset: 0;
 }
 
 body:not(.modal-open):has(.icons-row .settings-dropdown.open) .content-wrap::after {
   content: "";
   position: absolute;
-  inset: 0 0 calc(var(--app-footer-real-height) + var(--app-footer-gap) + 8px + env(safe-area-inset-bottom, 0px))
-    0;
+  inset: 0;
+  bottom: calc(-1 * (var(--app-footer-real-height) + env(safe-area-inset-bottom, 0px)));
   background: linear-gradient(180deg, rgba(5, 9, 15, 0.18) 0%, rgba(5, 9, 15, 0.42) 100%);
   backdrop-filter: none;
   -webkit-backdrop-filter: none;

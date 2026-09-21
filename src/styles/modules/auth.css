@@ -259,25 +259,13 @@ body.login-page {
 
 @media (max-width: 640px) {
   .auth-login {
-    flex: 1 1 auto;
+    flex: 0 1 auto;
     min-height: 0;
     justify-content: flex-start;
-    align-items: stretch;
     padding: 0 0 36px;
   }
 
-  .auth-login-stage {
-    flex: 1 1 auto;
-    flex-direction: column;
-    align-items: stretch;
-    min-height: 0;
-  }
-
   .auth-login-container {
-    flex: 1 1 auto;
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
     max-width: min(400px, 100%);
     padding-left: 16px;
     padding-right: 16px;
@@ -286,50 +274,8 @@ body.login-page {
   }
 
   .auth-login-form {
-    flex: 1 1 auto;
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
     width: 100%;
-    gap: 0;
-  }
-
-  .auth-login-form > .auth-field:first-of-type {
-    flex: 0 0 auto;
-  }
-
-  /* Kullanıcı adı ile Giriş Yap arası: şifre + hatırla (+ hata) dikey/yatay orta */
-  .auth-login-form-middle {
-    flex: 1 1 auto;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
     gap: 12px;
-    width: 100%;
-    min-height: 0;
-    padding: 12px 0;
-    box-sizing: border-box;
-  }
-
-  .auth-login-form-middle > .auth-field:not(.auth-field-inline) {
-    width: 100%;
-    align-self: stretch;
-  }
-
-  .auth-login-form-middle > .auth-field-inline {
-    align-self: center;
-    margin-top: 0;
-  }
-
-  .auth-login-form-middle > .auth-error {
-    width: 100%;
-    align-self: stretch;
-  }
-
-  .auth-login-form > .universal-btn-save {
-    flex: 0 0 auto;
-    margin-top: auto;
   }
 }
 

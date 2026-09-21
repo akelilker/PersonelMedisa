@@ -64,20 +64,13 @@ describe("mobile Taşıt parity modal/login source guards", () => {
     expect(hero).toMatch(/\.hero\.hero-with-session\s*\{[^}]*overflow:\s*visible/s);
   });
 
-  it("centers mobile login middle cluster between username and submit", () => {
+  it("keeps mobile login form in natural flow (no viewport-height centering)", () => {
     const auth = read("src/styles/modules/auth.css");
-    const page = read("src/features/auth/pages/LoginPage.tsx");
-    expect(page).toMatch(/auth-login-form-middle/);
+    expect(auth).toMatch(/\.auth-login\s*\{[^}]*justify-content:\s*flex-start/s);
     expect(auth).toMatch(/\.auth-login\s*\{[^}]*min-height:\s*0/s);
     expect(auth).not.toMatch(/\.auth-login\s*\{[^}]*min-height:\s*100%/s);
     expect(auth).toMatch(
-      /@media\s*\(max-width:\s*640px\)[\s\S]*\.auth-login-form-middle\s*\{[^}]*justify-content:\s*center/s
-    );
-    expect(auth).toMatch(
-      /@media\s*\(max-width:\s*640px\)[\s\S]*\.auth-login-form-middle\s*\{[^}]*align-items:\s*center/s
-    );
-    expect(auth).toMatch(
-      /@media\s*\(max-width:\s*640px\)[\s\S]*\.auth-login\s*\{[^}]*flex:\s*1\s+1\s+auto/s
+      /@media\s*\(max-width:\s*640px\)\s*\{[^}]*\.auth-login\s*\{[^}]*justify-content:\s*flex-start/s
     );
   });
 

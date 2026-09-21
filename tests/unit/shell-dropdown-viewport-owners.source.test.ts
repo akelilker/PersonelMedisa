@@ -86,10 +86,13 @@ describe("shell dropdown viewport-safe owners", () => {
     );
   });
 
-  it("applies content-wrap blur when sube selector is open (same as notifications)", () => {
+  it("applies content-wrap blur when sube selector or settings menu is open (same as notifications)", () => {
     const notifications = read("src/styles/components/notifications.css");
     expect(notifications).toMatch(
       /:has\(\.icons-row\s+\.sube-selector-dropdown\.open\)\s+\.content-wrap::after/s
+    );
+    expect(notifications).toMatch(
+      /:has\(\.icons-row\s+\.settings-menu-dropdown\.open\)\s+\.content-wrap::after/s
     );
   });
 });

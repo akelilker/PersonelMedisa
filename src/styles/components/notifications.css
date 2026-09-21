@@ -272,8 +272,9 @@ body:not(.modal-open):has(.icons-row .settings-dropdown.open) .content-wrap::aft
   z-index: 1;
 }
 
-/* Shell dropdown açıkken arka plan yüzeyi hafifçe bulanıklaşır (bildirim + şube seçici). */
+/* Shell dropdown açıkken arka plan yüzeyi hafifçe bulanıklaşır (bildirim + ayarlar + şube seçici). */
 body:not(.modal-open):has(.icons-row .notifications-dropdown.open) .content-wrap::after,
+body:not(.modal-open):has(.icons-row .settings-menu-dropdown.open) .content-wrap::after,
 body:not(.modal-open):has(.icons-row .sube-selector-dropdown.open) .content-wrap::after {
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);

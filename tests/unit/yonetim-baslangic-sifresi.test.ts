@@ -48,6 +48,7 @@ describe("yonetim user modal: derived initial password model", () => {
     expect(page).toContain("yonetim-kullanici-sifre-sifirla-confirm");
     expect(page).toContain("Başlangıç Şifresine Sıfırla");
     expect(page).toContain("resetYonetimKullaniciBaslangicSifresi");
+    expect(page).toContain("yonetim-baslangic-sifresi-username-guard");
   });
 
   it("keeps the modal-scoped submit error owner intact", () => {

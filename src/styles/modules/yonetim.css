@@ -958,6 +958,10 @@
   padding-right: 2.25rem;
 }
 
+.yonetim-kullanici-search-field input[type="search"]::-webkit-search-cancel-button {
+  display: none;
+}
+
 .yonetim-kullanici-search-clear {
   position: absolute;
   right: 10px;

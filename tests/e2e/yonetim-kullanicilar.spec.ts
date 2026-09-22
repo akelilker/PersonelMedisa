@@ -68,6 +68,12 @@ test.describe("yonetim kullanicilar API (S44)", () => {
 
     await page.getByLabel("İlk giriş durumu").selectOption("completed");
     await expect(page.getByText("Filtreye uygun kullanıcı yok")).toBeVisible();
+
+    await page.getByLabel("İlk giriş durumu").selectOption("all");
+    await page.getByLabel("Kullanıcı ara").fill("zzzz-no-match");
+    await expect(page.getByText("Sonuç bulunamadı")).toBeVisible();
+    await page.getByTestId("yonetim-kullanici-search-clear").click();
+    await expect(page.locator(".yonetim-card-grid--users article")).toHaveCount(3);
   });
 
   test("GENEL_YONETICI creates kullanici with username/password fields in UI", async ({ page }) => {

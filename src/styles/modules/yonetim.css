@@ -938,8 +938,66 @@
   font-size: 1.14rem;
 }
 
+.yonetim-kullanici-list-filters {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 280px);
+  gap: var(--space-3);
+  align-items: end;
+}
+
+.yonetim-kullanici-search-field {
+  position: relative;
+  min-width: 0;
+}
+
+.yonetim-kullanici-search-field .form-section {
+  margin: 0;
+}
+
+.yonetim-kullanici-search-field .form-input {
+  padding-right: 2.25rem;
+}
+
+.yonetim-kullanici-search-field input[type="search"]::-webkit-search-cancel-button {
+  display: none;
+}
+
+.yonetim-kullanici-search-clear {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(236, 240, 247, 0.88);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.yonetim-kullanici-search-clear:hover {
+  background: rgba(255, 255, 255, 0.14);
+  color: var(--text-inverse);
+}
+
 .yonetim-kullanici-first-login-filter {
   max-width: 280px;
+}
+
+@media (max-width: 720px) {
+  .yonetim-kullanici-list-filters {
+    grid-template-columns: 1fr;
+  }
+
+  .yonetim-kullanici-first-login-filter {
+    max-width: none;
+  }
 }
 
 .yonetim-first-login-badge {

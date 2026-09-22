@@ -138,7 +138,7 @@ export const INITIAL_CREATE_PERSONEL_FORM: CreatePersonelFormState = {
   dogumYeri: "",
   kanGrubu: "",
   bagliAmirId: "",
-  ucretTipiId: "1",
+  ucretTipiId: "3",
   maasTutari: "",
   primKuraliId: ""
 };

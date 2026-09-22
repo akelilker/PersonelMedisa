@@ -237,7 +237,7 @@
   align-self: stretch;
   width: 100%;
   margin: 0;
-  padding: 4px 0 10px;
+  padding: 4px 0 4px;
   border-bottom: 1px solid rgba(160, 174, 192, 0.16);
   position: relative;
   z-index: 8;

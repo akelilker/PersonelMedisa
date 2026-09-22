@@ -51,6 +51,12 @@ describe("personel detay visual parity owners (tasit reference)", () => {
     const mirror = read("src/features/personeller/components/personel-dosya/PersonelDosyaKayitMirrorFields.tsx");
     expect(mirror).toMatch(/personel-form-columns/);
     expect(mirror).not.toContain("Temel kimlik, iletişim ve lokasyon verileri");
+    expect(mirror).not.toContain("Pasiflik Etiketi");
+
+    const tabScrollerBlock = css.match(/\.personel-kart-tab-scroller \{[^}]+\}/)?.[0] ?? "";
+    expect(tabScrollerBlock).not.toContain("border-bottom");
+    const activeTabBlock = css.match(/\.personel-kart-tab\.is-active \{[^}]+\}/)?.[0] ?? "";
+    expect(activeTabBlock).toContain("box-shadow: inset 0 -2px 0 var(--theme-color)");
 
     const genelPanel = read("src/features/personeller/components/personel-dosya/PersonelKartPanelGenelBilgiler.tsx");
     expect(genelPanel).not.toContain("Kimlik ve İletişim");

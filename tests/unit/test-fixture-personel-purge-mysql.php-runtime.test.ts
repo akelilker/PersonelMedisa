@@ -98,6 +98,7 @@ describe("test fixture personel purge owner", () => {
       "utf8",
     );
     const arsivSrc = readFileSync(resolve(root, "api/src/Controllers/ArsivController.php"), "utf8");
+    const raporlarSrc = readFileSync(resolve(root, "api/src/Controllers/RaporlarController.php"), "utf8");
     const exportSrc = readFileSync(
       resolve(root, "api/src/Services/Personel/PersonelExportService.php"),
       "utf8",
@@ -115,9 +116,11 @@ describe("test fixture personel purge owner", () => {
     expect(personellerSrc).toContain("PersonelArchiveGate::isOperationallyHidden($pdo, $personelId)");
     expect(arsivSrc).toContain("PersonelArchiveGate::appendOperationalExclusion($pdo, $where)");
     expect(arsivSrc).toContain("PersonelArchiveGate::isOperationallyHidden($pdo, $personelId)");
+    expect(raporlarSrc).toContain("PersonelArchiveGate::appendOperationalExclusion($pdo, $where, $personelAlias)");
     expect(exportSrc).toContain("PersonelArchiveGate::appendOperationalExclusion($pdo, $where)");
     expect(personellerSrc).not.toContain("personel_test_fixture_siniflandirmalari");
     expect(arsivSrc).not.toContain("personel_test_fixture_siniflandirmalari");
+    expect(raporlarSrc).not.toContain("personel_test_fixture_siniflandirmalari");
     expect(exportSrc).not.toContain("personel_test_fixture_siniflandirmalari");
     // Retention/audit read owners stay unfiltered by design.
     expect(destructiveSrc).not.toContain("appendOperationalExclusion");

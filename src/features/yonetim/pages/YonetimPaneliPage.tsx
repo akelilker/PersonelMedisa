@@ -48,6 +48,11 @@ import {
   resolvePersonelFirstLoginLabel,
   type PersonelFirstLoginFilter
 } from "../../../lib/yonetim/personel-first-login-status";
+import {
+  KULLANICI_SEARCH_MAX_LENGTH,
+  matchesKullaniciSearch,
+  normalizeKullaniciSearchQuery
+} from "../../../lib/yonetim/kullanici-search";
 import type { UserRole } from "../../../types/auth";
 import { ASSIGNABLE_USER_ROLES, WRITE_COMPANY_SCOPED_ROLES } from "../../../types/auth";
 import type { Personel } from "../../../types/personel";
@@ -686,6 +691,7 @@ export function YonetimPaneliPage() {
 
   const [kullanicilar, setKullanicilar] = useState<YonetimKullanici[]>([]);
   const [firstLoginFilter, setFirstLoginFilter] = useState<PersonelFirstLoginFilter>("all");
+  const [kullaniciSearchQuery, setKullaniciSearchQuery] = useState("");
   const [subeler, setSubeler] = useState<YonetimSube[]>([]);
   const [sirketler, setSirketler] = useState<YonetimSirket[]>([]);
   const [readiness, setReadiness] = useState<OrganizasyonReadiness | null>(null);
@@ -964,9 +970,30 @@ export function YonetimPaneliPage() {
   );
 
   const firstLoginSummary = useMemo(() => countPersonelFirstLoginStatus(kullanicilar), [kullanicilar]);
+  const trimmedKullaniciSearch = normalizeKullaniciSearchQuery(kullaniciSearchQuery);
+  const kullaniciSearchActive = trimmedKullaniciSearch.length > 0;
   const filteredKullanicilar = useMemo(
-    () => kullanicilar.filter((item) => matchesPersonelFirstLoginFilter(item, firstLoginFilter)),
-    [kullanicilar, firstLoginFilter]
+    () =>
+      kullanicilar.filter((item) => {
+        if (!matchesPersonelFirstLoginFilter(item, firstLoginFilter)) {
+          return false;
+        }
+
+        return matchesKullaniciSearch(
+          {
+            displayName: formatKullaniciDisplayName(item),
+            cardLabel: formatKullaniciCardLabel(item),
+            adSoyad: item.ad_soyad,
+            personelAdSoyad: item.personel_ad_soyad,
+            username: item.username,
+            roleLabel: formatUserRoleLabel(item.rol),
+            subeScopeLabel: formatSubeScopeLabel(item.sube_ids, subeNameMap),
+            kullaniciTipiLabel: KULLANICI_TIPI_LABELS[item.kullanici_tipi]
+          },
+          trimmedKullaniciSearch
+        );
+      }),
+    [kullanicilar, firstLoginFilter, trimmedKullaniciSearch, subeNameMap, personeller, personelDisplayNameMap]
   );
 
   function formatKullaniciDisplayName(item: YonetimKullanici) {
@@ -1636,19 +1663,48 @@ export function YonetimPaneliPage() {
             </article>
           </div>
 
-          <div className="yonetim-kullanici-first-login-filter" data-testid="yonetim-kullanici-first-login-filter">
-            <FormField
-              as="select"
-              label="İlk giriş durumu"
-              name="yonetim-kullanici-first-login-filter"
-              value={firstLoginFilter}
-              onChange={(value) =>
-                setFirstLoginFilter(
-                  value === "pending" || value === "completed" ? value : "all"
-                )
-              }
-              selectOptions={FIRST_LOGIN_FILTER_OPTIONS}
-            />
+          <div className="yonetim-kullanici-list-filters" data-testid="yonetim-kullanici-list-filters">
+            <div className="yonetim-kullanici-search-field">
+              <FormField
+                label="Kullanıcı ara"
+                name="yonetim-kullanici-search"
+                type="search"
+                placeholder="Kullanıcı ara…"
+                autoComplete="off"
+                maxLength={KULLANICI_SEARCH_MAX_LENGTH}
+                dataTestId="yonetim-kullanici-search-input"
+                value={kullaniciSearchQuery}
+                onChange={setKullaniciSearchQuery}
+              />
+              {kullaniciSearchQuery ? (
+                <button
+                  type="button"
+                  className="yonetim-kullanici-search-clear"
+                  aria-label="Aramayı temizle"
+                  data-testid="yonetim-kullanici-search-clear"
+                  onClick={() => setKullaniciSearchQuery("")}
+                >
+                  ×
+                </button>
+              ) : null}
+            </div>
+            <div
+              className="yonetim-kullanici-first-login-filter"
+              data-testid="yonetim-kullanici-first-login-filter"
+            >
+              <FormField
+                as="select"
+                label="İlk giriş durumu"
+                name="yonetim-kullanici-first-login-filter"
+                value={firstLoginFilter}
+                onChange={(value) =>
+                  setFirstLoginFilter(
+                    value === "pending" || value === "completed" ? value : "all"
+                  )
+                }
+                selectOptions={FIRST_LOGIN_FILTER_OPTIONS}
+              />
+            </div>
           </div>
 
           <div className="yonetim-create-row">
@@ -1664,11 +1720,19 @@ export function YonetimPaneliPage() {
 
           {filteredKullanicilar.length === 0 ? (
             <EmptyState
-              title={kullanicilar.length === 0 ? "Kullanıcı kaydı yok" : "Filtreye uygun kullanıcı yok"}
+              title={
+                kullanicilar.length === 0
+                  ? "Kullanıcı kaydı yok"
+                  : kullaniciSearchActive
+                    ? "Sonuç bulunamadı"
+                    : "Filtreye uygun kullanıcı yok"
+              }
               message={
                 kullanicilar.length === 0
                   ? "İlk kullanıcı atamasını buradan oluşturabilirsin."
-                  : "İlk giriş filtresini değiştirerek diğer kullanıcıları görebilirsin."
+                  : kullaniciSearchActive
+                    ? "Arama metnini veya ilk giriş filtresini değiştirmeyi deneyin."
+                    : "İlk giriş filtresini değiştirerek diğer kullanıcıları görebilirsin."
               }
             />
           ) : kullaniciViewMode === "card" ? (

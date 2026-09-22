@@ -136,15 +136,17 @@ export function AppShell() {
   const [searchParams] = useSearchParams();
 
   const isLoginRoute = pathname === "/login";
+  const isChangePasswordRoute = pathname === "/change-password";
+  const isAuthSurfaceRoute = isLoginRoute || isChangePasswordRoute;
   const isHomeRoute = pathname === "/";
   const isYonetimRoute = pathname === "/yonetim-paneli";
   const moduleModal = useMemo(
-    () => (isLoginRoute ? null : resolveModuleModal(pathname, searchParams.get("tab"))),
-    [isLoginRoute, pathname, searchParams]
+    () => (isAuthSurfaceRoute ? null : resolveModuleModal(pathname, searchParams.get("tab"))),
+    [isAuthSurfaceRoute, pathname, searchParams]
   );
   const isModuleOverlayRoute = moduleModal !== null;
-  const showShellHeaderActions = !isModuleOverlayRoute && !isLoginRoute;
-  const showUserBar = !isLoginRoute && !isModuleOverlayRoute && !isHomeRoute;
+  const showShellHeaderActions = !isModuleOverlayRoute && !isAuthSurfaceRoute;
+  const showUserBar = !isAuthSurfaceRoute && !isModuleOverlayRoute && !isHomeRoute;
   const backBarTarget = resolveBackBar(pathname, state);
   const isPersonelKartModalRoute =
     pathname === "/personeller" ||
@@ -313,7 +315,7 @@ export function AppShell() {
         </AppModal>
       ) : null}
 
-      <AppFooter loginFooter={isLoginRoute} />
+      <AppFooter loginFooter={isAuthSurfaceRoute} />
     </div>
   );
 }

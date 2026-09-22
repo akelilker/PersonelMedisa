@@ -63,7 +63,39 @@ body.login-page {
   font-weight: 500;
 }
 
-.auth-field input:not([type="checkbox"]) {
+.auth-field-row {
+  display: grid;
+  grid-template-columns: minmax(8.25rem, 46%) minmax(0, 1fr);
+  column-gap: 10px;
+  row-gap: 4px;
+  align-items: center;
+  margin: 0;
+}
+
+.auth-field-row > span {
+  color: var(--form-label-color, #ffffff);
+  font-size: 13px;
+  line-height: 1.2;
+  font-weight: 500;
+  text-align: left;
+}
+
+.auth-change-password-title {
+  margin: 0 0 8px;
+  font-size: 22px;
+  line-height: 1.15;
+  font-weight: 700;
+  color: var(--text-primary);
+  text-align: center;
+}
+
+.auth-change-password-lead {
+  margin-bottom: 12px;
+  text-align: center;
+}
+
+.auth-field input:not([type="checkbox"]),
+.auth-field-row input:not([type="checkbox"]) {
   width: 100%;
   max-width: 100%;
   min-height: 0;
@@ -82,28 +114,35 @@ body.login-page {
   transition: border-color 0.2s;
 }
 
-.auth-field input:not([type="checkbox"])::placeholder {
+.auth-field input:not([type="checkbox"])::placeholder,
+.auth-field-row input:not([type="checkbox"])::placeholder {
   color: rgba(160, 174, 192, 0.6);
   opacity: 1;
 }
 
-.auth-field input:not([type="checkbox"]):focus {
+.auth-field input:not([type="checkbox"]):focus,
+.auth-field-row input:not([type="checkbox"]):focus {
   outline: none;
   border-color: var(--theme-color);
   box-shadow: none;
 }
 
-.auth-field input:not([type="checkbox"]):valid:not(:focus) {
+.auth-field input:not([type="checkbox"]):valid:not(:focus),
+.auth-field-row input:not([type="checkbox"]):valid:not(:focus) {
   border-color: var(--theme-color);
 }
 
-.auth-field input:not([type="checkbox"]):not(:focus):not(:valid):placeholder-shown {
+.auth-field input:not([type="checkbox"]):not(:focus):not(:valid):placeholder-shown,
+.auth-field-row input:not([type="checkbox"]):not(:focus):not(:valid):placeholder-shown {
   border-color: rgba(255, 255, 255, 0.35);
 }
 
 .auth-field input:not([type="checkbox"]):-webkit-autofill,
 .auth-field input:not([type="checkbox"]):-webkit-autofill:hover,
-.auth-field input:not([type="checkbox"]):-webkit-autofill:active {
+.auth-field input:not([type="checkbox"]):-webkit-autofill:active,
+.auth-field-row input:not([type="checkbox"]):-webkit-autofill,
+.auth-field-row input:not([type="checkbox"]):-webkit-autofill:hover,
+.auth-field-row input:not([type="checkbox"]):-webkit-autofill:active {
   -webkit-text-fill-color: var(--data-value-color, #a0aec0);
   caret-color: var(--data-value-color, #a0aec0);
   border: 1px solid rgba(255, 255, 255, 0.35);
@@ -114,7 +153,9 @@ body.login-page {
 }
 
 .auth-field input:not([type="checkbox"]):-webkit-autofill:focus,
-.auth-field input:not([type="checkbox"]):-webkit-autofill:valid {
+.auth-field input:not([type="checkbox"]):-webkit-autofill:valid,
+.auth-field-row input:not([type="checkbox"]):-webkit-autofill:focus,
+.auth-field-row input:not([type="checkbox"]):-webkit-autofill:valid {
   -webkit-text-fill-color: var(--data-value-color, #a0aec0);
   caret-color: var(--data-value-color, #a0aec0);
   border-color: var(--theme-color);
@@ -256,6 +297,24 @@ body.login-page {
     min-height: 34px;
     padding: 9px 24px;
     font-weight: 600;
+  }
+}
+
+@media (max-width: 640px) {
+  .auth-change-password-form .auth-field-row {
+    grid-template-columns: minmax(7.5rem, 48%) minmax(0, 1fr);
+    column-gap: 8px;
+  }
+
+  .auth-change-password-form .auth-field-row > span {
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 360px) {
+  .auth-change-password-form .auth-field-row {
+    grid-template-columns: 1fr;
+    align-items: stretch;
   }
 }
 

@@ -153,11 +153,11 @@ body {
     padding-right: max(12px, env(safe-area-inset-right, 0px));
   }
 
-  /* Hero session chip: wider than compact logo track; ellipsis only for very long names */
+  /* Hero session chip: room for typical ad soyad; ellipsis only when still overflowing */
   .hero-with-session .hero-session-meta {
     transform: none;
-    width: 76px;
-    max-width: 76px;
+    width: min(104px, 30vw);
+    max-width: min(104px, 30vw);
     overflow: visible;
   }
 

@@ -20,6 +20,7 @@ use Medisa\Api\Scope\OrgScope;
 use Medisa\Api\Scope\SubeScope;
 use Medisa\Api\Services\Auth\UserPersonelBindingService;
 use Medisa\Api\Services\Auth\PersonelAccountOnboardingService;
+use Medisa\Api\Services\Auth\BoundUserCanonicalUsernameReconciliationService;
 use Medisa\Api\Services\Auth\ActorIdentityException;
 use Medisa\Api\Services\Auth\ActorIdentityService;
 use Medisa\Api\Services\Organizasyon\OrganizasyonAuditContext;
@@ -1155,30 +1156,68 @@ class YonetimController
         }
 
         $body = $request->getJsonBody();
-        $username = array_key_exists('username', $body)
-            ? trim((string) $body['username'])
-            : (string) $existing['username'];
-        $password = array_key_exists('password', $body) ? (string) $body['password'] : '';
         $resetToInitial = self::parseInitialPasswordResetIntent($body);
-        $adSoyad = array_key_exists('ad_soyad', $body)
-            ? trim((string) $body['ad_soyad'])
-            : (string) $existing['ad_soyad'];
-        $rol = array_key_exists('rol', $body)
-            ? strtoupper(trim((string) $body['rol']))
-            : (string) $existing['rol'];
-        $durum = array_key_exists('durum', $body)
-            ? strtoupper(trim((string) $body['durum']))
-            : (string) $existing['durum'];
+        $fixCanonicalUsername = self::parseCanonicalUsernameFixIntent($body);
+        $password = array_key_exists('password', $body) ? (string) $body['password'] : '';
 
-        $subeIdsProvided = array_key_exists('sube_ids', $body);
-        $bolumIdsProvided = array_key_exists('bolum_ids', $body);
-        $birimIdsProvided = array_key_exists('birim_ids', $body);
-        $sirketIdsProvided = array_key_exists('sirket_ids', $body);
-        $sgkIsverenIdsProvided = array_key_exists('sgk_isveren_ids', $body);
-        $varsayilanProvided = array_key_exists('varsayilan_sube_id', $body);
-        $requestedVarsayilan = $varsayilanProvided ? self::parseOptionalInt($body['varsayilan_sube_id']) : null;
-        $personelIdProvided = array_key_exists('personel_id', $body);
-        $requestedPersonelId = $personelIdProvided ? self::parseOptionalInt($body['personel_id']) : null;
+        // Dedicated intents stay exclusive: password reset never rewrites username,
+        // and canonical username fix never touches password / must_change_password.
+        if ($fixCanonicalUsername && $resetToInitial) {
+            JsonResponse::badRequest(
+                'Canonical kullanici adi duzeltmesi ile baslangic sifresi sifirlama ayni istekte kullanilamaz.',
+                'VALIDATION_ERROR',
+                'canonical_username_duzelt'
+            );
+        }
+        if ($fixCanonicalUsername && $password !== '') {
+            JsonResponse::badRequest(
+                'Canonical kullanici adi duzeltmesi ile sifre alani ayni istekte kullanilamaz.',
+                'VALIDATION_ERROR',
+                'canonical_username_duzelt'
+            );
+        }
+
+        if ($fixCanonicalUsername) {
+            $fixPlan = BoundUserCanonicalUsernameReconciliationService::requireCanonicalUsernameFix(
+                $pdo,
+                $existing
+            );
+            $username = (string) $fixPlan['username'];
+            $adSoyad = (string) $existing['ad_soyad'];
+            $rol = (string) $existing['rol'];
+            $durum = (string) $existing['durum'];
+            $subeIdsProvided = false;
+            $bolumIdsProvided = false;
+            $birimIdsProvided = false;
+            $sirketIdsProvided = false;
+            $sgkIsverenIdsProvided = false;
+            $varsayilanProvided = false;
+            $requestedVarsayilan = null;
+            $personelIdProvided = false;
+            $requestedPersonelId = null;
+        } else {
+            $username = array_key_exists('username', $body)
+                ? trim((string) $body['username'])
+                : (string) $existing['username'];
+            $adSoyad = array_key_exists('ad_soyad', $body)
+                ? trim((string) $body['ad_soyad'])
+                : (string) $existing['ad_soyad'];
+            $rol = array_key_exists('rol', $body)
+                ? strtoupper(trim((string) $body['rol']))
+                : (string) $existing['rol'];
+            $durum = array_key_exists('durum', $body)
+                ? strtoupper(trim((string) $body['durum']))
+                : (string) $existing['durum'];
+            $subeIdsProvided = array_key_exists('sube_ids', $body);
+            $bolumIdsProvided = array_key_exists('bolum_ids', $body);
+            $birimIdsProvided = array_key_exists('birim_ids', $body);
+            $sirketIdsProvided = array_key_exists('sirket_ids', $body);
+            $sgkIsverenIdsProvided = array_key_exists('sgk_isveren_ids', $body);
+            $varsayilanProvided = array_key_exists('varsayilan_sube_id', $body);
+            $requestedVarsayilan = $varsayilanProvided ? self::parseOptionalInt($body['varsayilan_sube_id']) : null;
+            $personelIdProvided = array_key_exists('personel_id', $body);
+            $requestedPersonelId = $personelIdProvided ? self::parseOptionalInt($body['personel_id']) : null;
+        }
 
         $currentSubeIds = self::loadSubeIdsByUserIds($pdo, [$kullaniciId])[$kullaniciId] ?? [];
         $currentBolumIds = UserOrgAssignmentSchema::loadBolumIdsByUserIds($pdo, [$kullaniciId])[$kullaniciId] ?? [];
@@ -1231,6 +1270,12 @@ class YonetimController
             PasswordPolicy::assertValidNewPassword($password);
             $passwordHash = PasswordHasher::hash($password);
         } elseif ($resetToInitial) {
+            // Username must already be canonical for bound accounts. Reset never
+            // rewrites username — the dedicated canonical fix intent owns that.
+            BoundUserCanonicalUsernameReconciliationService::assertUsernameCanonicalForInitialPasswordReset(
+                $pdo,
+                $existing
+            );
             // The name is resolved from stored state only, never from the request:
             // a bound personnel record owns it, otherwise the stored user field does.
             $passwordHash = InitialPassword::requireHashForName(
@@ -1925,6 +1970,30 @@ class YonetimController
                 'Baslangic sifresi sifirlama alani boolean olmalidir.',
                 'VALIDATION_ERROR',
                 'baslangic_sifresine_sifirla'
+            );
+        }
+
+        return $value;
+    }
+
+    /**
+     * Boolean-only intent: rewrite username to the bound-personel canonical
+     * template. Never combined with password writes.
+     *
+     * @param array<string, mixed> $body
+     */
+    private static function parseCanonicalUsernameFixIntent(array $body)
+    {
+        if (!array_key_exists('canonical_username_duzelt', $body)) {
+            return false;
+        }
+
+        $value = $body['canonical_username_duzelt'];
+        if (!is_bool($value)) {
+            JsonResponse::badRequest(
+                'Canonical kullanici adi duzeltme alani boolean olmalidir.',
+                'VALIDATION_ERROR',
+                'canonical_username_duzelt'
             );
         }
 

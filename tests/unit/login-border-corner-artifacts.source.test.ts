@@ -11,23 +11,31 @@ function read(relPath: string): string {
 describe("login form control corner artifacts", () => {
   it("uses Taşıt login opaque 1px borders without subpixel inset rings", () => {
     const auth = read("src/styles/modules/auth.css");
-    const input = /\.auth-field input:not\(\[type="checkbox"\]\)\s*\{[^}]*\}/s;
 
-    expect(auth).toMatch(/\.auth-field input:not\(\[type="checkbox"\]\)\s*\{[^}]*padding:\s*7px 15px/s);
-    expect(auth).toMatch(/\.auth-field input:not\(\[type="checkbox"\]\)\s*\{[^}]*border-radius:\s*8px/s);
+    // The input block is canonical whether the selector is the legacy single
+    // `.auth-field input` form or the current combined form that also covers
+    // `.auth-field-row input` in the same block.
+    const input = /\.auth-field input:not\(\[type="checkbox"\]\)(?:,\s*\.auth-field-row input:not\(\[type="checkbox"\]\))?\s*\{([^}]*)\}/s;
+    const inputBlock = input.exec(auth)?.[1] ?? "";
+
+    expect(inputBlock).toMatch(/padding:\s*7px 15px/);
+    expect(inputBlock).toMatch(/border-radius:\s*8px/);
+    expect(inputBlock).toMatch(/border:\s*1px solid rgba\(255, 255, 255, 0\.35\)/);
+    expect(inputBlock).toMatch(/background:\s*var\(--bg-field\)/);
+    expect(inputBlock).toMatch(/background-clip:\s*padding-box/);
+    expect(inputBlock).toMatch(/box-shadow:\s*none/);
+    expect(inputBlock).not.toMatch(/inset 0 0 0 0\.5px/);
+    expect(inputBlock).not.toMatch(/filter:\s*drop-shadow/);
+
+    // When the row variant exists, both selectors must share the same block.
+    if (auth.includes(".auth-field-row")) {
+      expect(auth).toMatch(
+        /\.auth-field input:not\(\[type="checkbox"\]\),\s*\.auth-field-row input:not\(\[type="checkbox"\]\)\s*\{/s
+      );
+    }
+
     expect(auth).toMatch(
-      /\.auth-field input:not\(\[type="checkbox"\]\)\s*\{[^}]*border:\s*1px solid rgba\(255, 255, 255, 0\.35\)/s
-    );
-    expect(auth).toMatch(
-      /\.auth-field input:not\(\[type="checkbox"\]\)\s*\{[^}]*background:\s*var\(--bg-field\)/s
-    );
-    expect(auth).toMatch(
-      /\.auth-field input:not\(\[type="checkbox"\]\)\s*\{[^}]*box-shadow:\s*none/s
-    );
-    expect(input.exec(auth)?.[0] ?? "").not.toMatch(/inset 0 0 0 0\.5px/);
-    expect(input.exec(auth)?.[0] ?? "").not.toMatch(/filter:\s*drop-shadow/);
-    expect(auth).toMatch(
-      /\.auth-field input:not\(\[type="checkbox"\]\):focus\s*\{[^}]*border-color:\s*var\(--theme-color\)/s
+      /\.auth-field input:not\(\[type="checkbox"\]\):focus(?:,\s*\.auth-field-row input:not\(\[type="checkbox"\]\):focus)?\s*\{[^}]*border-color:\s*var\(--theme-color\)/s
     );
   });
 

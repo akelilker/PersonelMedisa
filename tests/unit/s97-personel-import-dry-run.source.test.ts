@@ -59,7 +59,8 @@ describe("S97 personel import dry-run source locks", () => {
     const service = read("api/src/Services/Personel/PersonelImportDryRunService.php");
     const validator = read("api/src/Services/Personel/PersonelCanonicalValidator.php");
     const migration = read("api/migrations/049_personel_acil_durum_nullable.sql");
-    const panel = read("src/features/personeller/components/personel-dosya/PersonelKartPanelGenelBilgiler.tsx");
+    const mirror = read("src/features/personeller/components/personel-dosya/PersonelDosyaKayitMirrorFields.tsx");
+    const missingInfo = read("src/features/personeller/personel-missing-info.ts");
 
     expect(service).toContain("'acil_durum_kisi'");
     expect(service).toContain("'acil_durum_telefon'");
@@ -73,8 +74,9 @@ describe("S97 personel import dry-run source locks", () => {
     expect(validator).not.toContain("Acil durum telefonu zorunludur.");
     expect(migration).toContain("MODIFY COLUMN acil_durum_kisi VARCHAR(120) NULL");
     expect(migration).toContain("MODIFY COLUMN acil_durum_telefon VARCHAR(32) NULL");
-    expect(panel).toContain("Acil Durum Bilgisi");
-    expect(panel).toContain("Bilgi eksik");
-    expect(panel).toContain("import/bordro engeli değildir");
+    expect(mirror).toContain('label="Acil Durum Kişisi"');
+    expect(mirror).toContain('label="Acil Durum Telefon"');
+    expect(missingInfo).not.toContain('"acil_durum_kisi"');
+    expect(missingInfo).not.toContain('"acil_durum_telefon"');
   });
 });

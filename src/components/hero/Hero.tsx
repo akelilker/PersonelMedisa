@@ -20,7 +20,11 @@ export function Hero({ title, userLabel }: HeroProps) {
         </picture>
         {showUserLabel ? (
           <div className="hero-session-meta" aria-live="polite">
-            <span className="hero-session-user" data-testid="hero-session-user">
+            <span
+              className="hero-session-user"
+              data-testid="hero-session-user"
+              title={trimmedUserLabel}
+            >
               {trimmedUserLabel}
             </span>
           </div>

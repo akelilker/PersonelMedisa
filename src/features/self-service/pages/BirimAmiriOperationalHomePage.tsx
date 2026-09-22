@@ -9,6 +9,7 @@ import { formatEksikGirisAttention } from "../../../lib/bildirim/gunluk-bildirim
 import { useAuth } from "../../../state/auth.store";
 import type { BirimAmiriGunlukDurum } from "../../../types/bildirim";
 import type { MeIdentity } from "../../../types/self-service";
+import { SelfServiceQrShortcuts } from "../components/SelfServiceQrShortcuts";
 import {
   formatBirimAmiriPersonelStatusLine,
   istanbulBusinessDate
@@ -127,6 +128,10 @@ export function BirimAmiriOperationalHomePage() {
           </div>
         </div>
       </section>
+
+      {/* Rol bağımsız QR/kart hakkı: bağlı mavi yaka personeli olan BIRIM_AMIRI
+       * kendi giriş/çıkışını okutabilir; PERSONEL rolüne düşürülmez. */}
+      <SelfServiceQrShortcuts title="Kendi QR / Kart Okutmam" />
 
       {pazarPrompt?.show ? (
         <section className="pm-section" data-testid="birim-amiri-pazar-mesai-prompt">

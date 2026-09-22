@@ -11,6 +11,7 @@ use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
 use Medisa\Api\Scope\SubeScope;
 use Medisa\Api\Services\Organizasyon\SubeReadModel;
+use Medisa\Api\Services\Retention\PersonelArchiveGate;
 use Medisa\Api\Services\SgkPrimGunuService;
 use PDO;
 
@@ -300,7 +301,7 @@ class RaporlarController
       SubeScope::appendSubeFilter($where, $params, $scope, $allowedSubeIds, 'm.sube_id', 'muhur');
     }
 
-    self::appendPersonelFilters($where, $params, $filters, 'p');
+    self::appendPersonelFilters($pdo, $where, $params, $filters, 'p');
     self::appendSnapshotDateFilters($where, $params, $filters);
 
     $whereSql = implode(' AND ', $where);
@@ -358,7 +359,7 @@ class RaporlarController
 
     SubeScope::appendSubeFilter($where, $params, $scope, $allowedSubeIds, 'p.sube_id');
 
-    self::appendPersonelFilters($where, $params, $filters, 'p');
+    self::appendPersonelFilters($pdo, $where, $params, $filters, 'p');
 
     $gpDateSql = self::buildLiveDateSql($filters, $donem, $params);
     $whereSql = implode(' AND ', $where);
@@ -424,7 +425,7 @@ class RaporlarController
       SubeScope::appendSubeFilter($where, $params, $scope, $allowedSubeIds, 'm.sube_id', 'muhur');
     }
 
-    self::appendPersonelFilters($where, $params, $filters, 'p');
+    self::appendPersonelFilters($pdo, $where, $params, $filters, 'p');
     self::appendSnapshotDateFilters($where, $params, $filters);
     self::appendDevamsizlikAbsenceFilter($where, 'snap');
 
@@ -478,7 +479,7 @@ class RaporlarController
 
     SubeScope::appendSubeFilter($where, $params, $scope, $allowedSubeIds, 'p.sube_id');
 
-    self::appendPersonelFilters($where, $params, $filters, 'p');
+    self::appendPersonelFilters($pdo, $where, $params, $filters, 'p');
     self::appendLiveDateFilters($where, $params, $filters, $donem, 'gp.tarih');
     self::appendDevamsizlikAbsenceFilter($where, 'gp');
 
@@ -539,7 +540,7 @@ class RaporlarController
       SubeScope::appendSubeFilter($where, $params, $scope, $allowedSubeIds, 'm.sube_id', 'muhur');
     }
 
-    self::appendPersonelFilters($where, $params, $filters, 'p');
+    self::appendPersonelFilters($pdo, $where, $params, $filters, 'p');
     self::appendSnapshotDateFilters($where, $params, $filters);
     self::appendIzinFilter($where, 'snap');
 
@@ -597,7 +598,7 @@ class RaporlarController
 
     SubeScope::appendSubeFilter($where, $params, $scope, $allowedSubeIds, 'p.sube_id');
 
-    self::appendPersonelFilters($where, $params, $filters, 'p');
+    self::appendPersonelFilters($pdo, $where, $params, $filters, 'p');
     self::appendLiveDateFilters($where, $params, $filters, $donem, 'gp.tarih');
     self::appendIzinFilter($where, 'gp');
 
@@ -654,7 +655,7 @@ class RaporlarController
 
     SubeScope::appendSubeFilter($where, $params, $scope, $allowedSubeIds, 'p.sube_id');
 
-    self::appendPersonelFilters($where, $params, $filters, 'p');
+    self::appendPersonelFilters($pdo, $where, $params, $filters, 'p');
     self::appendSurecDateFilters($where, $params, $filters);
 
     $whereSql = implode(' AND ', $where);
@@ -714,7 +715,7 @@ class RaporlarController
       SubeScope::appendSubeFilter($where, $params, $scope, $allowedSubeIds, 'm.sube_id', 'muhur');
     }
 
-    self::appendPersonelFilters($where, $params, $filters, 'p');
+    self::appendPersonelFilters($pdo, $where, $params, $filters, 'p');
     self::appendSnapshotDateFilters($where, $params, $filters);
     self::appendBildirimReportFilter($where, 'snap');
 
@@ -772,7 +773,7 @@ class RaporlarController
 
     SubeScope::appendSubeFilter($where, $params, $scope, $allowedSubeIds, 'p.sube_id');
 
-    self::appendPersonelFilters($where, $params, $filters, 'p');
+    self::appendPersonelFilters($pdo, $where, $params, $filters, 'p');
     self::appendLiveDateFilters($where, $params, $filters, $donem, 'gp.tarih');
     self::appendBildirimReportFilter($where, 'gp');
 
@@ -886,7 +887,7 @@ class RaporlarController
 
     SubeScope::appendSubeFilter($where, $params, $scope, $allowedSubeIds, 'p.sube_id');
 
-    self::appendPersonelFilters($where, $params, $filters, 'p');
+    self::appendPersonelFilters($pdo, $where, $params, $filters, 'p');
     self::appendFinansDonemFilters($where, $params, $filters, 'fk');
     self::appendFinansKalemFilter($where, $params, $kalemSet);
 
@@ -1091,8 +1092,10 @@ class RaporlarController
   }
 
   /** @param array<int, string> $where @param array<string, mixed> $params */
-  private static function appendPersonelFilters(array &$where, array &$params, array $filters, $personelAlias)
+  private static function appendPersonelFilters(PDO $pdo, array &$where, array &$params, array $filters, $personelAlias)
   {
+    PersonelArchiveGate::appendOperationalExclusion($pdo, $where, $personelAlias);
+
     if ($filters['personel_id'] !== null) {
       $where[] = $personelAlias . '.id = :personel_id';
       $params['personel_id'] = $filters['personel_id'];

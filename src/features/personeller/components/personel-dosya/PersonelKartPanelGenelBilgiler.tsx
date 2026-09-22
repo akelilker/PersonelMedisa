@@ -52,11 +52,7 @@ export function PersonelKartPanelGenelBilgiler({
 
   return (
     <div className="personel-dosya-sections">
-      <DossierSection
-        title="Kimlik ve İletişim"
-        description="Temel kimlik, iletişim ve lokasyon verileri bu dosyada salt okunur izlenir."
-        denseGrid
-      >
+      <DossierSection title="Kimlik ve İletişim">
         <DossierRecord
           label="T.C. Kimlik No"
           value={displayValue("tc_kimlik_no", formatDetailValue(personel.tc_kimlik_no))}
@@ -77,11 +73,7 @@ export function PersonelKartPanelGenelBilgiler({
         <DossierRecord label="Şube" value={formatReferenceValue(personel.sube_adi, personel.sube_id)} />
       </DossierSection>
 
-      <DossierSection
-        title="Organizasyon ve Acil Durum"
-        description="Bağlı organizasyon, yönetim hattı ve acil durum bilgileri burada tutulur."
-        denseGrid
-      >
+      <DossierSection title="Organizasyon ve Acil Durum">
         <DossierRecord
           label="SGK İşvereni"
           value={formatReferenceValue(personel.sgk_isveren_adi, personel.sgk_isveren_id)}

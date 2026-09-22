@@ -13,25 +13,46 @@ function boxesOverlap(a: Box, b: Box, epsilon = 1): boolean {
   return !separated;
 }
 
-test("Genel kimlik alanı hücreleri çakışmaz ve sekme kromu opak", async ({ page }) => {
+test("Genel kimlik alanı dikey, alt yazı yok, sekme kromu opak", async ({ page }) => {
   await mockApi(page, "GENEL_YONETICI");
   await login(page, { username: "yonetici", password: "secret" });
-  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/personeller/1");
 
   await expect(page.getByTestId("personel-dosya-sticky-head")).toBeVisible();
   await expect(page.locator(".modal-body .universal-back-bar")).toBeVisible();
 
-  const tabListBg = await page.locator(".personel-kart-tablist").evaluate((el) => {
-    const style = window.getComputedStyle(el);
-    return style.backgroundColor;
-  });
-  expect(tabListBg).not.toBe("rgba(0, 0, 0, 0)");
+  await expect(
+    page.getByText("Temel kimlik, iletişim ve lokasyon verileri bu dosyada salt okunur izlenir.")
+  ).toHaveCount(0);
 
-  const records = page.locator(
-    "#personel-kart-panel-genel-bilgiler .personel-dosya-section--dense-grid .personel-dosya-record:not(.is-missing)"
-  );
+  const kimlikSection = page
+    .locator("#personel-kart-panel-genel-bilgiler .personel-dosya-section")
+    .filter({ hasText: "Kimlik ve İletişim" });
+  const records = kimlikSection.locator(".personel-dosya-record:not(.is-missing)");
   await expect(records.first()).toBeVisible();
+
+  const tcRecord = kimlikSection.locator(".personel-dosya-record").filter({ hasText: "T.C. Kimlik No" });
+  await tcRecord.scrollIntoViewIfNeeded();
+  const layout = await tcRecord.evaluate((node) => {
+    const label = node.querySelector(".personel-dosya-record-label");
+    const value = node.querySelector(".personel-dosya-record-value");
+    if (!label || !value) {
+      return null;
+    }
+    const labelRect = label.getBoundingClientRect();
+    const valueRect = value.getBoundingClientRect();
+    return {
+      labelBottom: labelRect.bottom,
+      valueTop: valueRect.top,
+      leftDelta: Math.abs(labelRect.left - valueRect.left)
+    };
+  });
+  expect(layout).not.toBeNull();
+  if (layout) {
+    expect(layout.valueTop).toBeGreaterThanOrEqual(layout.labelBottom - 2);
+    expect(layout.leftDelta).toBeLessThan(4);
+  }
 
   const boxes = await records.evaluateAll((nodes) =>
     nodes.map((node) => {
@@ -48,12 +69,10 @@ test("Genel kimlik alanı hücreleri çakışmaz ve sekme kromu opak", async ({ 
 
   const tabList = page.locator(".personel-kart-tablist");
   const tabTopBeforeScroll = await tabList.evaluate((el) => el.getBoundingClientRect().top);
-
   const scrollRegion = page.getByTestId("personel-dosya-tab-scroll");
   await scrollRegion.evaluate((el) => {
     el.scrollTop = el.scrollHeight;
   });
-
   const tabTopAfterScroll = await tabList.evaluate((el) => el.getBoundingClientRect().top);
   expect(Math.abs(tabTopBeforeScroll - tabTopAfterScroll)).toBeLessThan(1);
 });

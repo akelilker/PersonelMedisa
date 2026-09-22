@@ -124,27 +124,59 @@ if (!plHas($u, 'self_service.qr.scan')) {
 }
 plOk('D-parity: ASCII_CASE_FOLD matches canonical collar');
 
-// H) Management role + personel_id keeps the existing contract, collar-independent
-foreach (['GENEL_YONETICI', 'IK_SORUMLUSU', 'SUBE_YONETICISI', 'BOLUM_YONETICISI', 'BIRIM_AMIRI'] as $rol) {
-    $u = ['id' => 1, 'rol' => $rol, 'personel_id' => 173, 'personel_tipi_ad' => 'Beyaz Yaka'];
-    if (!plHas($u, 'self_service.qr.scan') || !plHas($u, 'self_service.qr.events.view')) {
-        plFail("H: {$rol} + personel_id QR must stay allowed (collar-independent)");
+// H) QR/kart entitlement is ROLE-INDEPENDENT: bound personel + canonical collar.
+// Management roles keep their management authority and are never demoted.
+foreach (['GENEL_YONETICI', 'IK_SORUMLUSU', 'SUBE_YONETICISI', 'BOLUM_YONETICISI', 'BIRIM_AMIRI', 'MUHASEBE'] as $rol) {
+    $mavi = plUser($rol, 173, RolePermissions::QR_SELF_SERVICE_COLLAR);
+    if (!plHas($mavi, 'self_service.qr.scan') || !plHas($mavi, 'self_service.qr.events.view')) {
+        plFail("H: {$rol} + Mavi Yaka QR must be allowed");
     }
-    if (!plHas($u, 'self_service.view')) {
+    if (!plHas($mavi, 'self_service.view')) {
         plFail("H: {$rol} + personel_id must keep self service");
     }
-}
-plOk('H: MANAGEMENT_SELF_CONTRACT collar_independent=YES');
 
-// PERSONEL without binding → role matrix still grants self (existing behavior)
+    $beyaz = plUser($rol, 173, 'Beyaz Yaka');
+    if (plHas($beyaz, 'self_service.qr.scan') || plHas($beyaz, 'self_service.qr.events.view')) {
+        plFail("H: {$rol} + Beyaz Yaka QR must be denied");
+    }
+    if (!plHas($beyaz, 'self_service.view')) {
+        plFail("H: {$rol} + Beyaz Yaka must keep non-QR self service");
+    }
+
+    $unbound = plUser($rol, null, RolePermissions::QR_SELF_SERVICE_COLLAR);
+    if (plHas($unbound, 'self_service.qr.scan') || plHas($unbound, 'self_service.view')) {
+        plFail("H: {$rol} without personel_id must not get self service");
+    }
+}
+plOk('H: QR_ENTITLEMENT role_independent=YES collar_gated=YES');
+
+// H2) Management authority survives the QR decision (no role demotion, no widening).
+$birimMavi = plUser('BIRIM_AMIRI', 173, RolePermissions::QR_SELF_SERVICE_COLLAR);
+if (!plHas($birimMavi, 'puantaj.amir_kontrol') || plHas($birimMavi, 'puantaj.update')) {
+    plFail('H2: BIRIM_AMIRI management matrix must stay intact with QR');
+}
+$birimBeyaz = plUser('BIRIM_AMIRI', 173, 'Beyaz Yaka');
+if (!plHas($birimBeyaz, 'puantaj.amir_kontrol')) {
+    plFail('H2: BIRIM_AMIRI Beyaz Yaka must keep management authority');
+}
+$bolumBeyaz = plUser('BOLUM_YONETICISI', 173, 'Beyaz Yaka');
+if (!plHas($bolumBeyaz, 'aylik_bolum_onayi.approve') || plHas($bolumBeyaz, 'self_service.qr.scan')) {
+    plFail('H2: BOLUM_YONETICISI Beyaz Yaka management=YES qr=NO required');
+}
+plOk('H2: MANAGEMENT_AUTHORITY preserved_both_collars');
+
+// PERSONEL without binding → role matrix still grants non-QR self; QR fails closed.
 $u = plUser('PERSONEL', null);
 if (!plHas($u, 'self_service.view')) {
     plFail('PERSONEL without binding should still have role self_service');
 }
-plOk('PERSONEL_NO_BINDING role_self_preserved');
+if (plHas($u, 'self_service.qr.scan')) {
+    plFail('PERSONEL without binding must not have QR');
+}
+plOk('PERSONEL_NO_BINDING role_self_preserved qr=DENIED');
 
 // BOLUM_YONETICISI + personel_id → management + self
-$u = plUser('BOLUM_YONETICISI', 173); // Sinem-shape
+$u = plUser('BOLUM_YONETICISI', 173, RolePermissions::QR_SELF_SERVICE_COLLAR); // Sinem-shape
 if (!plHas($u, 'personeller.view') || !plHas($u, 'aylik_bolum_onayi.approve')) {
     plFail('BOLUM+binding management missing');
 }
@@ -158,7 +190,7 @@ if (!plHas($u, 'self_service.qr.scan') || !plHas($u, 'self_service.qr.events.vie
 }
 plOk('BOLUM_YONETICISI+personel_id management+self=YES (Sinem-shape)');
 
-$u = plUser('BOLUM_YONETICISI', 120); // İsmail-shape
+$u = plUser('BOLUM_YONETICISI', 120, RolePermissions::QR_SELF_SERVICE_COLLAR); // İsmail-shape
 if (!plHas($u, 'personeller.view') || !plHas($u, 'self_service.qr.scan')) {
     plFail('Ismail-shape management+self failed');
 }
@@ -192,7 +224,7 @@ if (plHas($u, 'self_service.view')) {
 plOk('GENEL_YONETICI+null self=NO');
 
 // Salih post-fix simulation: PERSONEL today; if promoted BOLUM + bolum4 binding preserved via personel_id
-$salihAsManager = plUser('BOLUM_YONETICISI', 158);
+$salihAsManager = plUser('BOLUM_YONETICISI', 158, RolePermissions::QR_SELF_SERVICE_COLLAR);
 if (!plHas($salihAsManager, 'aylik_bolum_onayi.approve')) {
     plFail('Salih simulation management missing');
 }
@@ -221,7 +253,7 @@ if (plHas($u, 'self_service.view')) {
 plOk('MISSING_BINDING_KEY self=NO');
 
 // Legacy unknown role: self via binding only; no management fail-open
-$u = plUser('SGK_KARAR_ONAY_YETKILISI', 50);
+$u = plUser('SGK_KARAR_ONAY_YETKILISI', 50, RolePermissions::QR_SELF_SERVICE_COLLAR);
 if (plHas($u, 'personeller.view') || plHas($u, 'sgk_karar_paketi.approve')) {
     plFail('legacy role must not gain management via binding');
 }

@@ -25,8 +25,8 @@ export function ProtectedRoute({ children, requirePermission, requireAll, requir
   }
 
   const personelId = session.user.personel_id ?? null;
-  // Canonical collar mirror: gates the PERSONEL self-service QR routes. The
-  // backend 403 remains the authority; this is the fail-closed UX denial.
+  // Canonical QR/kart mirror: rol bağımsız (bağlı personel + kanonik mavi yaka).
+  // The backend 403 remains the authority; this is the fail-closed UX denial.
   const personelTipiAd = session.user.personel_tipi_ad ?? null;
 
   if (requireAny && requireAny.length > 0) {

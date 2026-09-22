@@ -1,16 +1,18 @@
 // @vitest-environment jsdom
 
 /**
- * Focused render-level proof for the PERSONEL collar → QR entitlement gate.
+ * Focused render-level proof for the role-independent QR/kart entitlement gate.
  *
  * Owner chain under test:
- *   session.user.personel_tipi_ad (DB mirror, written by the backend only)
- *     → useRoleAccess → hasUserPermission (collar gate)
- *       → PersonelSelfServiceHomePage QR UI + ProtectedRoute QR routes.
+ *   session.user.personel_id + session.user.personel_tipi_ad (DB mirror, backend-only)
+ *     → useRoleAccess → hasUserPermission (rol bağımsız collar gate)
+ *       → SelfServiceQrShortcuts (tek QR CTA owner'ı)
+ *         → PersonelSelfServiceHomePage / BirimAmiriOperationalHomePage / HomeIndex
+ *       → ProtectedRoute QR routes (permission-based, role condition YOK).
  *
  * The backend 403 (RolePermissions::assert) remains the authority; these tests
- * prove the fail-closed UX mirror for E) / F) and that non-QR own self-service
- * survives for every collar (G).
+ * prove the fail-closed UX mirror for E) / F) / H) and that non-QR own
+ * self-service survives for every collar (G).
  */
 
 import "@testing-library/jest-dom/vitest";
@@ -20,7 +22,9 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import type { AttendanceTodayResponse } from "../../src/api/attendance-mobile.api";
 import type { AuthSession } from "../../src/types/auth";
 import { ProtectedRoute } from "../../src/router/ProtectedRoute";
+import { BirimAmiriOperationalHomePage } from "../../src/features/self-service/pages/BirimAmiriOperationalHomePage";
 import { PersonelSelfServiceHomePage } from "../../src/features/self-service/pages/PersonelSelfServiceHomePage";
+import { SelfServiceQrShortcuts } from "../../src/features/self-service/components/SelfServiceQrShortcuts";
 
 const sessionState = vi.hoisted(() => ({ current: null as unknown }));
 
@@ -67,7 +71,19 @@ vi.mock("../../src/api/me.api", () => ({
   fetchMe: vi.fn(async () => ({ completeness: { missing_count: 0 }, last_qr_event: null }))
 }));
 
-function setSession(rol: string, personelTipiAd: string | null) {
+vi.mock("../../src/api/bildirimler.api", () => ({
+  fetchBirimGunlukDurum: vi.fn(async () => ({
+    tarih: "2026-09-19",
+    bolum_ad: "Operasyon",
+    birim_ad: "Vardiya",
+    ozet: { toplam: 0, gelen: 0, gelmeyen: 0, izinli: 0, eksik_giris: 0 },
+    tamamlandi_mi: false,
+    bildirim: null,
+    pazar_mesai_prompt: { show: false, message: "" }
+  }))
+}));
+
+function setSession(rol: string, personelTipiAd: string | null, personelId: number | null = 158) {
   sessionState.current = {
     token: "test-token",
     ui_profile: "yonetim",
@@ -78,7 +94,7 @@ function setSession(rol: string, personelTipiAd: string | null) {
       id: 7,
       ad_soyad: "Test Kullanıcı",
       rol,
-      personel_id: 158,
+      personel_id: personelId,
       personel_tipi_ad: personelTipiAd,
       sube_ids: [1],
       sirket_ids: [],
@@ -147,12 +163,97 @@ describe("PERSONEL collar → QR UI entitlement (render level)", () => {
     }
   });
 
-  it("H) management role keeps the collar-independent personnel-linked contract", async () => {
-    setSession("BOLUM_YONETICISI", "Beyaz Yaka");
+  it("H) bound manager roles follow the same role-independent collar gate", async () => {
+    for (const role of ["BIRIM_AMIRI", "BOLUM_YONETICISI", "SUBE_YONETICISI"] as const) {
+      setSession(role, "Mavi Yaka");
+      await renderHome();
+
+      expect(screen.getByTestId("self-qr-scan-link"), role).toBeInTheDocument();
+      expect(screen.getByTestId("self-qr-history-link"), role).toBeInTheDocument();
+      expect(screen.getByTestId("giris-scan"), role).toBeInTheDocument();
+      cleanup();
+    }
+  });
+
+  it("H2) bound Beyaz Yaka manager keeps own info but gets no QR", async () => {
+    for (const role of ["BIRIM_AMIRI", "BOLUM_YONETICISI"] as const) {
+      setSession(role, "Beyaz Yaka");
+      await renderHome();
+
+      expect(screen.queryByTestId("self-qr-scan-link"), role).toBeNull();
+      expect(screen.queryByTestId("self-qr-history-link"), role).toBeNull();
+      expect(screen.queryByTestId("giris-scan"), role).toBeNull();
+      // G) kendi bilgisi ve non-QR self-service korunur.
+      expect(screen.getByTestId("personel-mobile-header"), role).toHaveTextContent("Self Personel");
+      expect(screen.getByTestId("giris-scan-not-entitled"), role).toBeInTheDocument();
+      cleanup();
+    }
+  });
+
+  it("H3) unbound manager never gets QR even with a canonical collar value", async () => {
+    setSession("BIRIM_AMIRI", "Mavi Yaka", null);
     await renderHome();
 
-    expect(screen.getByTestId("giris-scan")).toBeInTheDocument();
-    expect(screen.getByTestId("self-qr-scan-link")).toBeInTheDocument();
+    expect(screen.queryByTestId("self-qr-scan-link")).toBeNull();
+    expect(screen.queryByTestId("giris-scan")).toBeNull();
+    expect(screen.getByTestId("giris-scan-not-entitled")).toBeInTheDocument();
+  });
+});
+
+describe("H4) BIRIM_AMIRI operational home QR reachability (render level)", () => {
+  async function renderManagerHome() {
+    render(
+      <MemoryRouter initialEntries={["/"]}>
+        <BirimAmiriOperationalHomePage />
+      </MemoryRouter>
+    );
+    await screen.findByTestId("birim-amiri-operational-home");
+  }
+
+  it("shows the shared QR CTA for a bound Mavi Yaka manager", async () => {
+    setSession("BIRIM_AMIRI", "Mavi Yaka");
+    await renderManagerHome();
+
+    expect(screen.getByTestId("self-service-qr-section")).toBeInTheDocument();
+    expect(screen.getByTestId("self-qr-scan-link")).toHaveAttribute("href", "/self/qr-okut");
+    expect(screen.getByTestId("self-qr-history-link")).toHaveAttribute("href", "/self/qr-hareketleri");
+    // Yönetim yüzeyi kaybolmaz.
+    expect(screen.getByTestId("birim-amiri-edit-daily")).toBeInTheDocument();
+  });
+
+  it("renders no QR CTA for a bound Beyaz Yaka manager", async () => {
+    setSession("BIRIM_AMIRI", "Beyaz Yaka");
+    await renderManagerHome();
+
+    expect(screen.queryByTestId("self-service-qr-section")).toBeNull();
+    expect(screen.queryByTestId("self-qr-scan-link")).toBeNull();
+    expect(screen.getByTestId("birim-amiri-edit-daily")).toBeInTheDocument();
+  });
+});
+
+describe("H5) BOLUM_YONETICISI self-service/QR entry via the shared owner", () => {
+  it("bound Mavi Yaka manager reaches /self and the QR surface", () => {
+    setSession("BOLUM_YONETICISI", "Mavi Yaka");
+    render(
+      <MemoryRouter initialEntries={["/"]}>
+        <SelfServiceQrShortcuts title="Kendi QR / Kart Okutmam" showSelfServiceHomeLink />
+      </MemoryRouter>
+    );
+
+    expect(screen.getByTestId("self-service-home-link")).toHaveAttribute("href", "/self");
+    expect(screen.getByTestId("self-qr-scan-link")).toHaveAttribute("href", "/self/qr-okut");
+    expect(screen.getByTestId("self-qr-history-link")).toHaveAttribute("href", "/self/qr-hareketleri");
+  });
+
+  it("bound Beyaz Yaka manager gets no QR entry", () => {
+    setSession("BOLUM_YONETICISI", "Beyaz Yaka");
+    const { container } = render(
+      <MemoryRouter initialEntries={["/"]}>
+        <SelfServiceQrShortcuts title="Kendi QR / Kart Okutmam" showSelfServiceHomeLink />
+      </MemoryRouter>
+    );
+
+    expect(container).toBeEmptyDOMElement();
   });
 });
 
@@ -190,9 +291,20 @@ describe("F) direct QR route follows the same collar gate", () => {
     }
   });
 
-  it("keeps the management route contract unchanged", () => {
-    setSession("BOLUM_YONETICISI", "Beyaz Yaka");
+  it("F2) manager roles use the same permission-based guard (no role condition)", () => {
+    setSession("BOLUM_YONETICISI", "Mavi Yaka");
     renderScanRoute();
     expect(screen.getByText("QR-SCAN-ALLOWED")).toBeInTheDocument();
+    cleanup();
+
+    setSession("BIRIM_AMIRI", "Mavi Yaka");
+    renderScanRoute();
+    expect(screen.getByText("QR-SCAN-ALLOWED")).toBeInTheDocument();
+    cleanup();
+
+    setSession("BOLUM_YONETICISI", "Beyaz Yaka");
+    renderScanRoute();
+    expect(screen.queryByText("QR-SCAN-ALLOWED")).toBeNull();
+    expect(screen.getByText("YETKISIZ")).toBeInTheDocument();
   });
 });

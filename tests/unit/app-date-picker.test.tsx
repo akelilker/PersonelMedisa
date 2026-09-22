@@ -124,6 +124,8 @@ describe("AppDatePicker kanonik takvim", () => {
     expect(trigger).not.toBeNull();
     expect(trigger?.classList.contains("form-input")).toBe(true);
     expect(trigger?.textContent).toContain("12.04.1991");
+    expect(trigger?.querySelector(".app-date-picker-icon")).not.toBeNull();
+    expect(trigger?.querySelector(".app-select-chevron")).toBeNull();
   });
 
   it("boş değerde kanonik gg.aa.yyyy placeholder gösterilir", () => {
@@ -146,6 +148,7 @@ describe("AppDatePicker kanonik takvim", () => {
     expect(document.querySelector(".modal-header")?.classList.contains(APP_PICKER_BLUR_CLASS)).toBe(true);
     expect(document.querySelector(".app-date-picker")?.classList.contains(APP_PICKER_BLUR_CLASS)).toBe(false);
     expect(dateCell("2026-09-14").getAttribute("aria-pressed")).toBe("true");
+    expect(document.querySelector('[data-app-date-scrim="1"]')).not.toBeNull();
   });
 
   it("gün seçimi ISO yayar ve paneli kapatır", () => {
@@ -188,6 +191,16 @@ describe("AppDatePicker kanonik takvim", () => {
     });
 
     expect(document.querySelector('[data-app-date-panel="1"]')).toBeNull();
+  });
+
+  it("scrim tıklaması paneli kapatır", () => {
+    renderPicker({ value: "2026-09-14" });
+
+    fireEvent.click(document.querySelector('[data-app-date-trigger="1"]') as HTMLElement);
+    fireEvent.pointerDown(document.querySelector('[data-app-date-scrim="1"]') as HTMLElement);
+
+    expect(document.querySelector('[data-app-date-panel="1"]')).toBeNull();
+    expect(document.querySelector('[data-app-date-scrim="1"]')).toBeNull();
   });
 
   it("required alanda Temizle yoktur; opsiyonel alanda Temizle değeri boşaltır", () => {
@@ -261,6 +274,8 @@ describe("takvim tema kontratı (native beyaz input kalktı)", () => {
   it("takvim kartları koyu kanonik yüzeyi ve marka token'larını kullanır", () => {
     expect(css).toMatch(/\.app-date-cell\s*\{[^}]*background:\s*var\(--bg-surface\)/s);
     expect(css).toMatch(/\.app-date-cell\.is-selected\s*\{[^}]*var\(--theme-color-rgb\)/s);
+    expect(css).toMatch(/\.app-date-picker-icon\s*\{[^}]*var\(--text-muted\)/s);
+    expect(css).toMatch(/\.app-date-picker-scrim\s*\{/s);
     expect(css).not.toContain("!important");
     expect(css).not.toMatch(/#[0-9a-fA-F]{3,6}\b/);
   });

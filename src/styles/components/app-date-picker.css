@@ -18,7 +18,7 @@
 }
 
 .app-date-picker.is-open {
-  z-index: 40;
+  z-index: 10055;
 }
 
 /* Görünmez native input: yalnız değer/etiket/form semantiği taşır. */
@@ -75,6 +75,31 @@
 
 .app-date-picker-value.is-placeholder {
   color: rgba(230, 234, 245, 0.5);
+}
+
+.app-date-picker-icon {
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
+  margin-left: 2px;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.app-date-picker-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 10050;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: rgba(5, 8, 12, 0.42);
+  cursor: default;
+}
+
+.app-date-picker.is-open .app-date-picker-trigger,
+.app-date-picker.is-open .app-picker-panel {
+  z-index: 10061;
 }
 
 /* --- Takvim paneli: AppSelect paneliyle aynı blok içi düzen --- */

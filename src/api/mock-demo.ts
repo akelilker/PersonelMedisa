@@ -12283,6 +12283,51 @@ export function resolveDemoApiResponse(
     return ok(politika);
   }
 
+  const sirketPolitikaDetailMatch = pathname.match(/^\/sirket-calisma-politikalari\/(\d+)$/);
+  if (sirketPolitikaDetailMatch && method === "GET") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "sirket_parametreleri.view");
+    if (permissionError) return permissionError;
+    const id = Number.parseInt(sirketPolitikaDetailMatch[1] ?? "", 10);
+    const politika = sirketPolitikaDemoState.items.find((item) => item.id === id);
+    if (!politika) return demoRevizyonError("NOT_FOUND", "Politika bulunamadi.");
+    const degerler = (politika.degerler ?? []).map((raw) => {
+      const kod = String(raw.parametre_kodu ?? "");
+      const meta = SIRKET_POLITIKA_KATALOG.find((item) => item.parametre_kodu === kod);
+      const degerTipi = String(raw.deger_tipi ?? meta?.deger_tipi ?? "SAYISAL");
+      const sayisal =
+        raw.sayisal_deger != null && String(raw.sayisal_deger).trim() !== ""
+          ? String(raw.sayisal_deger)
+          : null;
+      const metin =
+        raw.metin_deger != null && String(raw.metin_deger).trim() !== ""
+          ? String(raw.metin_deger)
+          : null;
+      return {
+        parametre_kodu: kod,
+        etiket: meta?.etiket ?? kod,
+        deger_tipi: degerTipi,
+        sayisal_deger: sayisal,
+        metin_deger: metin,
+        birim: meta?.birim ?? null,
+        mevcut_deger: degerTipi === "METIN" ? metin : sayisal
+      };
+    });
+    return ok({
+      id: politika.id,
+      revision_no: 1,
+      state: politika.state,
+      gecerlilik_baslangic: politika.gecerlilik_baslangic,
+      gecerlilik_bitis: politika.gecerlilik_bitis,
+      aciklama: politika.aciklama,
+      belge_id: null,
+      belge_sha256: null,
+      evidence_status: "MISSING",
+      policy_version_hash: politika.policy_version_hash,
+      degerler
+    });
+  }
+
   const sirketPolitikaSubmitMatch = pathname.match(/^\/sirket-calisma-politikalari\/(\d+)\/onaya-gonder$/);
   if (sirketPolitikaSubmitMatch && method === "POST") {
     const actor = readDemoApiActor(init);

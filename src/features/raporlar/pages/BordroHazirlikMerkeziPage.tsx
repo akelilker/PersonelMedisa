@@ -22,6 +22,7 @@ import {
   approveSirketPolitika,
   createSirketPolitikaDraft,
   evidenceStatusLabel,
+  fetchSirketPolitikaDetail,
   fetchSirketPolitikaKararOzeti,
   fetchSirketPolitikaKatalog,
   fetchSirketPolitikalari,
@@ -127,6 +128,16 @@ function formatMoney(value: string | null | undefined): string {
   return `${new Intl.NumberFormat("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(parsed)} TL`;
 }
 
+function formatPolitikaDegerValue(deger: SirketPolitikaDeger): string {
+  if (deger.mevcut_deger != null && String(deger.mevcut_deger).trim() !== "") {
+    return String(deger.mevcut_deger);
+  }
+  if (deger.deger_tipi === "METIN") {
+    return deger.metin_deger?.trim() ? deger.metin_deger : "—";
+  }
+  return deger.sayisal_deger?.trim() ? deger.sayisal_deger : "—";
+}
+
 export function BordroHazirlikMerkeziPage() {
   const [searchParams] = useSearchParams();
   const { hasPermission } = useRoleAccess();
@@ -162,6 +173,9 @@ export function BordroHazirlikMerkeziPage() {
   const [policyBelgeSha256, setPolicyBelgeSha256] = useState("");
   const [policyEvidenceError, setPolicyEvidenceError] = useState<string | null>(null);
   const [kararOzeti, setKararOzeti] = useState<SirketPolitikaKararOzeti | null>(null);
+  const [selectedPolitikaDetail, setSelectedPolitikaDetail] = useState<SirketCalismaPolitikasi | null>(null);
+  const [politikaDetailLoading, setPolitikaDetailLoading] = useState(false);
+  const [politikaDetailError, setPolitikaDetailError] = useState<string | null>(null);
   const [selectedAdayId, setSelectedAdayId] = useState<number | null>(null);
   const [selectedKalemler, setSelectedKalemler] = useState<Awaited<ReturnType<typeof fetchMaasHesaplamaAdayKalemler>> | null>(null);
   const [kontrolNotu, setKontrolNotu] = useState("");
@@ -346,6 +360,20 @@ export function BordroHazirlikMerkeziPage() {
 
   if (!canView) {
     return <ErrorState message="Bordro hazırlık merkezine erişim yetkiniz yok." />;
+  }
+
+  async function handleViewPolitika(id: number) {
+    setPolitikaDetailLoading(true);
+    setPolitikaDetailError(null);
+    setSelectedPolitikaDetail(null);
+    try {
+      const detail = await fetchSirketPolitikaDetail(id);
+      setSelectedPolitikaDetail(detail);
+    } catch (error) {
+      setPolitikaDetailError(error instanceof Error ? error.message : "Politika detayı yüklenemedi.");
+    } finally {
+      setPolitikaDetailLoading(false);
+    }
   }
 
   async function handleCreatePolicyDraft() {
@@ -1034,40 +1062,127 @@ export function BordroHazirlikMerkeziPage() {
                       {politika.gecerlilik_bitis ? ` → ${politika.gecerlilik_bitis}` : ""}
                     </td>
                     <td>
-                      {canManagePolicy && politika.state === "TASLAK" ? (
+                      <div className="form-actions-row">
                         <button
                           type="button"
-                          data-testid={`bordro-politika-submit-${politika.id}`}
-                          disabled={!evidenceReady}
-                          title={!evidenceReady ? "Karar belgesi kanıtı gerekli" : undefined}
-                          onClick={() => void handleSubmitPolicy(politika.id)}
+                          data-testid={`bordro-politika-goruntule-${politika.id}`}
+                          onClick={() => void handleViewPolitika(politika.id)}
                         >
-                          Onaya Gönder
+                          Görüntüle
                         </button>
-                      ) : null}
-                      {canApprove && politika.state === "ONAY_BEKLIYOR" ? (
-                        <button
-                          type="button"
-                          data-testid={`bordro-politika-approve-${politika.id}`}
-                          disabled={approveDisabled}
-                          title={
-                            selfApprover
-                              ? "Hazırlayan onaylayamaz"
-                              : !evidenceReady
-                                ? "Kanıt geçerli değil"
-                                : undefined
-                          }
-                          onClick={() => void handleApprovePolicy(politika.id)}
-                        >
-                          Onayla
-                        </button>
-                      ) : null}
+                        {canManagePolicy && politika.state === "TASLAK" ? (
+                          <button
+                            type="button"
+                            data-testid={`bordro-politika-submit-${politika.id}`}
+                            disabled={!evidenceReady}
+                            title={!evidenceReady ? "Karar belgesi kanıtı gerekli" : undefined}
+                            onClick={() => void handleSubmitPolicy(politika.id)}
+                          >
+                            Onaya Gönder
+                          </button>
+                        ) : null}
+                        {canApprove && politika.state === "ONAY_BEKLIYOR" ? (
+                          <button
+                            type="button"
+                            data-testid={`bordro-politika-approve-${politika.id}`}
+                            disabled={approveDisabled}
+                            title={
+                              selfApprover
+                                ? "Hazırlayan onaylayamaz"
+                                : !evidenceReady
+                                  ? "Kanıt geçerli değil"
+                                  : undefined
+                            }
+                            onClick={() => void handleApprovePolicy(politika.id)}
+                          >
+                            Onayla
+                          </button>
+                        ) : null}
+                      </div>
                     </td>
                   </tr>
                 );
               })}
             </tbody>
           </table>
+
+          <section className="kapanis-issue-section" data-testid="bordro-politika-detay">
+            <h3>Politika detayı (salt okunur)</h3>
+            {politikaDetailLoading ? (
+              <LoadingState label="Politika detayı yükleniyor..." />
+            ) : null}
+            {politikaDetailError ? (
+              <p className="yonetim-error" data-testid="bordro-politika-detay-hata">
+                {politikaDetailError}
+              </p>
+            ) : null}
+            {!politikaDetailLoading && !politikaDetailError && !selectedPolitikaDetail ? (
+              <p className="personel-puantaj-summary-note" data-testid="bordro-politika-detay-bos">
+                Onaylı veya listedeki bir politikanın parametre değerlerini görmek için satırdaki Görüntüle
+                aksiyonunu kullanın. Taslak formu otomatik doldurulmaz.
+              </p>
+            ) : null}
+            {!politikaDetailLoading && selectedPolitikaDetail ? (
+              <>
+                <div className="kapanis-ozet-grid" data-testid="bordro-politika-detay-meta">
+                  <div>
+                    <strong>Politika ID</strong>
+                    <p data-testid="bordro-politika-detay-id">{selectedPolitikaDetail.id}</p>
+                  </div>
+                  <div>
+                    <strong>Revizyon</strong>
+                    <p data-testid="bordro-politika-detay-revizyon">{selectedPolitikaDetail.revision_no}</p>
+                  </div>
+                  <div>
+                    <strong>Durum</strong>
+                    <p data-testid="bordro-politika-detay-durum">
+                      {formatSurecStateLabel(selectedPolitikaDetail.state)}
+                    </p>
+                  </div>
+                  <div>
+                    <strong>Geçerlilik</strong>
+                    <p data-testid="bordro-politika-detay-gecerlilik">
+                      {selectedPolitikaDetail.gecerlilik_baslangic}
+                      {selectedPolitikaDetail.gecerlilik_bitis
+                        ? ` → ${selectedPolitikaDetail.gecerlilik_bitis}`
+                        : " → açık"}
+                    </p>
+                  </div>
+                </div>
+                {(selectedPolitikaDetail.degerler ?? []).length === 0 ? (
+                  <p data-testid="bordro-politika-detay-degerler-bos">
+                    Bu politika için kayıtlı parametre değeri bulunamadı.
+                  </p>
+                ) : (
+                  <table className="yonetim-table" data-testid="bordro-politika-detay-degerler">
+                    <thead>
+                      <tr>
+                        <th>Parametre</th>
+                        <th>Kod</th>
+                        <th>Değer</th>
+                        <th>Birim</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(selectedPolitikaDetail.degerler ?? []).map((deger) => (
+                        <tr
+                          key={deger.parametre_kodu}
+                          data-testid={`bordro-politika-detay-deger-${deger.parametre_kodu}`}
+                        >
+                          <td>{deger.etiket}</td>
+                          <td>{deger.parametre_kodu}</td>
+                          <td data-testid={`bordro-politika-detay-deger-value-${deger.parametre_kodu}`}>
+                            {formatPolitikaDegerValue(deger)}
+                          </td>
+                          <td>{deger.birim ?? "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </>
+            ) : null}
+          </section>
         </section>
       ) : null}
 

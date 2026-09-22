@@ -22,10 +22,10 @@ describe("app-home hero session name under logo", () => {
     const block = appHomeHeroBlock(hero);
 
     expect(block).toMatch(
-      /body\.app-home-route \.hero\.hero-with-session \.hero-logo\s*\{[^}]*flex:\s*0\s+0\s+auto/s
+      /body\.app-home-route \.hero\.hero-with-session \.hero-logo\s*\{[^}]*flex:\s*0\s+1\s+auto/s
     );
     expect(block).toMatch(
-      /body\.app-home-route \.hero\.hero-with-session \.hero-logo\s*\{[^}]*max-width:\s*min\(118px,\s*34vw\)/s
+      /body\.app-home-route \.hero\.hero-with-session \.hero-logo\s*\{[^}]*max-width:\s*min\(112px,\s*30vw\)/s
     );
     expect(block).not.toMatch(
       /body\.app-home-route \.hero\.hero-with-session \.hero-logo\s*\{[^}]*flex:\s*0\s+0\s+43px/s

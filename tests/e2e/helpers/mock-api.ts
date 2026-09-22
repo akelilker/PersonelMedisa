@@ -83,6 +83,8 @@ type MockApiOptions = {
     personel_id: number | null;
     personel_tipi_ad?: string | null;
   };
+  /** Override login user display name (hero session chip regression). */
+  sessionAdSoyad?: string;
 };
 
 function isoDateDaysFrom(referenceDate: Date, days: number): string {
@@ -4810,7 +4812,7 @@ let personelBelgeKaydiIdCounter = 903;
             .map((item) => ({ id: item.id, ad: item.ad })),
           user: {
             id: MOCK_ROLE_USER_ID[role],
-            ad_soyad: "Mock Kullanıcı",
+            ad_soyad: options.sessionAdSoyad ?? "Mock Kullanıcı",
             rol: role,
             sube_ids: mockUserSubeIds,
             birim_ids: role === "BIRIM_AMIRI" ? [10] : [],

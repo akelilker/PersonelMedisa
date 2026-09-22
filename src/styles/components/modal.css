@@ -42,6 +42,8 @@
   overflow: hidden;
   box-sizing: border-box;
   border: 1px solid var(--modal-border);
+  border-top-color: var(--modal-border-top);
+  border-bottom-color: var(--modal-border-bottom);
   border-radius: var(--modal-radius);
   background: var(--modal-bg);
   background-clip: padding-box;
@@ -69,7 +71,9 @@
   border-top-right-radius: inherit;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   background-clip: padding-box;
-  box-shadow: none;
+  box-shadow:
+    inset 0 1px 0 rgba(236, 242, 250, 0.12),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.05);
   overflow: hidden;
 }
 
@@ -94,7 +98,7 @@
 .modal-header h2.premium-title {
   font-weight: var(--premium-title-weight);
   letter-spacing: var(--premium-title-letter-spacing);
-  background: var(--modal-premium-title-gradient);
+  background: var(--premium-title-gradient);
   background-size: 100% 180%;
   background-position: 50% 54%;
   -webkit-background-clip: text;
@@ -102,7 +106,7 @@
   -webkit-text-fill-color: transparent;
   color: transparent;
   filter: brightness(1.01);
-  text-shadow: var(--modal-premium-title-shadow);
+  text-shadow: var(--premium-title-shadow);
 }
 
 .modal-body {
@@ -209,6 +213,41 @@
   padding-top: 0;
 }
 
+/* Personel Detayı: üst ritim Taşıt detay ekranındaki hizada başlar. Body üst
+   nefesi kalkar; header ile ilk satır arasındaki mesafeyi back-bar kendi
+   padding-top'u (8px omurga) taşır. Yatay padding değişmez. */
+.modal-body:has(> .personel-detay-page) {
+  padding-top: 0;
+  gap: 4px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.modal-body:has(> .personel-detay-page) > .personel-detay-page {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Geri çubuğu + detay kartı arası Taşıt detay / import back-bar ayracı ile aynı ritim. */
+.modal-body:has(> .personel-detay-page) > .universal-back-bar {
+  flex: 0 0 auto;
+  align-self: stretch;
+  width: 100%;
+  margin: 0;
+  padding: 4px 0 4px;
+  border-bottom: 1px solid rgba(160, 174, 192, 0.16);
+  position: relative;
+  z-index: 8;
+  background: var(--modal-bg);
+}
+
+.modal-body:has(> .personel-detay-page) > .universal-back-bar .universal-back-btn {
+  max-width: max-content;
+}
+
 .modal-header-spacer {
   grid-column: 1;
   width: 34px;
@@ -310,12 +349,31 @@ body.modal-open {
 }
 
 body.modal-open .modal-container {
-  box-shadow: none;
-  outline: 1px solid rgba(214, 222, 232, 0.34);
+  outline: 1px solid var(--modal-outline);
   outline-offset: -1px;
-  border-color: rgba(184, 192, 201, 0.42);
-  border-top-color: rgba(200, 208, 216, 0.48);
-  border-bottom-color: rgba(168, 176, 186, 0.4);
+  border-color: var(--modal-border);
+  border-top-color: var(--modal-border-top);
+  border-bottom-color: var(--modal-border-bottom);
+  box-shadow: var(--modal-chrome-glow);
+}
+
+@media (min-width: 641px) {
+  body.modal-open .modal-overlay .modal-container {
+    border-top-width: 1px;
+    border-color: transparent;
+    outline-color: transparent;
+  }
+
+  body.modal-open .modal-overlay .modal-container::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    box-sizing: border-box;
+    border: 1px solid var(--modal-desktop-ring);
+    border-radius: inherit;
+    pointer-events: none;
+    z-index: 21;
+  }
 }
 
 @media (max-width: 640px) {
@@ -333,12 +391,25 @@ body.modal-open .modal-container {
     width: 100%;
     max-width: 100%;
     border-radius: var(--radius-sm) var(--radius-sm) 0 0;
-    border-left-width: 0;
-    border-right-width: 0;
+  }
+
+  body.modal-open .modal-header {
+    background: var(--modal-header-red-gradient);
+    background-size: 100% 100%;
   }
 
   body.modal-open .modal-container {
-    border-bottom-color: rgba(168, 176, 186, 0.4);
+    border-width: 1px;
+    border-style: solid;
+    border-color: var(--modal-border);
+    border-top-color: var(--modal-border-top);
+    border-bottom-color: var(--modal-border-bottom);
+    outline: 1px solid var(--modal-outline);
+    outline-offset: -1px;
+    box-shadow:
+      var(--modal-chrome-glow),
+      inset 0 1px 0 rgba(255, 255, 255, 0.04),
+      inset 0 0.5px 0 0 rgba(255, 255, 255, 0.12);
   }
 }
 

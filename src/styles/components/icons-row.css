@@ -155,11 +155,24 @@
 }
 
 .sube-selector-dropdown {
-  /* Anchor to the toggle's right edge so a viewport-wide panel opens leftward
-   * into the shell (left:0 overflows past the phone right edge). */
+  /* Module header: toggle sits on the trailing edge — anchor panel to right. */
   left: auto;
   right: 0;
   top: 36px;
+}
+
+/*
+ * Home (minimal): toggle moved to the leading edge of the full-width row, but
+ * the panel should stay centered in the work screen (not pinned to right:0 of
+ * icons-row-right). Fixed width + horizontal margins centers without transform.
+ */
+.icons-row--minimal .sube-selector-dropdown {
+  left: 0;
+  right: 0;
+  margin-inline: auto;
+  /* Flush under header row, nudged up ~2 compact rows so last option clears footer glow. */
+  top: 100%;
+  margin-top: -62px;
 }
 
 /*
@@ -184,6 +197,21 @@
       calc(var(--app-shell-max-width) - 24px)
     );
     max-width: calc(100vw - 24px);
+  }
+}
+
+.settings-dropdown.sube-selector-dropdown button {
+  min-height: 0;
+  padding: 8px 12px;
+  font-size: 13px;
+  line-height: 1.25;
+  text-align: left;
+}
+
+@media (max-width: 640px) {
+  .settings-dropdown.sube-selector-dropdown button {
+    padding: 7px 10px;
+    font-size: 12.5px;
   }
 }
 

@@ -47,11 +47,11 @@ describe("otomatik sicil — frontend create sözleşmesi", () => {
     vi.restoreAllMocks();
   });
 
-  it("create formu sicil girişi istemiyor, bilgilendirme gösteriyor", () => {
+  it("create formu sicil girişi ve ayrı bir bilgilendirme notu göstermiyor", () => {
     const createFields = read("src/features/personeller/components/PersonelCreateFields.tsx");
     expect(createFields).not.toContain('name="create-sicil"');
     expect(createFields).not.toContain("sicilNo");
-    expect(createFields).toContain("Sicil numarası kayıt sırasında otomatik atanacaktır.");
+    expect(createFields).not.toContain("Sicil numarası kayıt sırasında otomatik atanacaktır.");
 
     const formState = read("src/hooks/usePersoneller.ts");
     expect(formState).not.toContain("sicilNo");
@@ -105,8 +105,10 @@ describe("otomatik sicil — frontend create sözleşmesi", () => {
 
     expect(personelToEditForm(personel).sicilNo).toBe("040");
 
-    const hero = read("src/features/personeller/components/personel-dosya/PersonelDosyaHero.tsx");
-    expect(hero).toContain('fieldValue("sicil_no"');
+    const mirror = read(
+      "src/features/personeller/components/personel-dosya/PersonelDosyaKayitMirrorFields.tsx"
+    );
+    expect(mirror).toContain('fieldValue("sicil_no"');
 
     const inlineEdit = read(
       "src/features/personeller/components/personel-dosya/PersonelInlineEditForm.tsx"

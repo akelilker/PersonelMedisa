@@ -30,17 +30,28 @@
   --border-red-side: rgba(var(--theme-color-rgb), 0.6);
   --red-glow-subtle: rgba(var(--theme-color-rgb), 0.12);
   --bg: var(--bg-app);
+  /* Taşıt style-core list/table surfaces (raporlar stok-list-row + view-list parity) */
+  --medisa-table-surface: var(--bg-app);
+  --medisa-table-border: rgba(255, 255, 255, 0.08);
+  --medisa-table-zebra: rgba(255, 255, 255, 0.05);
+  --medisa-table-hover: rgba(255, 255, 255, 0.1);
   --modal-bg: var(--bg-app);
   --modal-header-red-gradient:
     linear-gradient(180deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.02) 5%, rgba(255, 255, 255, 0) 12%),
     linear-gradient(180deg, rgba(212, 0, 0, 0.36) 0%, rgba(212, 0, 0, 0.22) 18%, rgba(212, 0, 0, 0.08) 34%, rgba(212, 0, 0, 0) 48%),
     linear-gradient(180deg, #790000 0%, #700000 30%, #580000 52%, #420205 72%, #32050a 82%, #20080f 90%, #120b14 96%, var(--modal-bg) 100%);
-  --modal-title-color: #d1dbe4;
-  --modal-title-shadow: 0 1px 0 rgba(0, 0, 0, 0.55), 0 0 5px rgba(214, 224, 232, 0.12);
+  --modal-title-color: #ffffff;
+  --modal-title-shadow: 0 1px 0 rgba(0, 0, 0, 0.55), 0 0 6px rgba(255, 255, 255, 0.18);
   --modal-title-weight: 700;
   --modal-premium-title-gradient: linear-gradient(to bottom, #f8fbfd 0%, #ffffff 38%, #dce6ed 57%, #f5f9fc 100%);
   --modal-premium-title-shadow: 0 1px 1px rgba(0, 0, 0, 0.38), 0 0 2px rgba(255, 255, 255, 0.2);
-  --modal-border: rgba(255, 255, 255, 0.35);
+  /* Taşıt style-core modal chrome (outline + tiered edge + optional red lift) */
+  --modal-border: rgba(184, 192, 201, 0.42);
+  --modal-border-top: rgba(200, 208, 216, 0.48);
+  --modal-border-bottom: rgba(168, 176, 186, 0.4);
+  --modal-outline: rgba(214, 222, 232, 0.34);
+  --modal-desktop-ring: #9ca4ac;
+  --modal-chrome-glow: 0 0 40px rgba(0, 0, 0, 0.42), 0 0 24px var(--red-glow-subtle);
   --bg-content: var(--bg-surface);
   --txt: var(--text-primary);
   --txt-primary: var(--text-primary);
@@ -54,7 +65,7 @@
   --hero-title-gradient: linear-gradient(to bottom, #c6d2dc 0%, #f4f8fb 36%, #aab8c5 56%, #dce5ec 100%);
   --premium-title-gradient: linear-gradient(to bottom, #ccd7e1 0%, #f4f8fb 38%, #adbdca 56%, #e2ebf2 100%);
   /* Tighter halo than prior 7px/0.22 — depth without letter-edge haze (menu resting). */
-  --premium-title-shadow: 0 1px 1px rgba(0, 0, 0, 0.28), 0 0 4px rgba(214, 224, 232, 0.14);
+  --premium-title-shadow: 0 1px 1px rgba(0, 0, 0, 0.26), 0 0 7px rgba(214, 224, 232, 0.22);
   --premium-title-weight: 700;
   --premium-title-letter-spacing: 0.085em;
   --green: var(--success);
@@ -66,13 +77,17 @@
   :root {
     --modal-premium-title-gradient: linear-gradient(to bottom, #ffffff 0%, #ffffff 42%, #f6fbff 58%, #ffffff 100%);
     --modal-premium-title-shadow: 0 1px 1px rgba(0, 0, 0, 0.46), 0 0 6px rgba(255, 255, 255, 0.42), 0 0 12px rgba(255, 255, 255, 0.14);
+    --premium-title-shadow: 0 1px 1px rgba(0, 0, 0, 0.26), 0 0 7px rgba(214, 224, 232, 0.26);
   }
 }
 
+/* Mobil (≤640): Taşıt style-core — kırmızı çerçeve ve yan çizgiler daha net */
 @media (max-width: 640px) {
   :root {
-    --border-red-tech: rgba(var(--theme-color-rgb), 0.4);
-    --border-red-side: rgba(var(--theme-color-rgb), 0.6);
-    --red-glow-subtle: rgba(var(--theme-color-rgb), 0.12);
+    --border-red-tech: rgba(var(--theme-color-rgb), 0.78);
+    --border-red-side: rgba(var(--theme-color-rgb), 0.78);
+    --red-glow-subtle: rgba(var(--theme-color-rgb), 0.18);
+    /* Taşıt mobil liste: açık zebra satırı 0.06 (tasitlar-extra / raporlar stok-list-row) */
+    --medisa-table-zebra: rgba(255, 255, 255, 0.06);
   }
 }

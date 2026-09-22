@@ -22,7 +22,7 @@ describe("desktop hero title fit", () => {
     // Regression: 20px + 1.8px tracking clipped "Personel Yönetim Sistemi"
     // in the ~331px center track of the 492px desktop hero shell.
     expect(desktop).toMatch(/\.hero h1,\s*body\.login-page \.hero h1\s*\{[^}]*font-size:\s*19px/s);
-    expect(desktop).toMatch(/\.hero h1,\s*body\.login-page \.hero h1\s*\{[^}]*letter-spacing:\s*1\.8px/s);
+    expect(desktop).toMatch(/\.hero h1,\s*body\.login-page \.hero h1\s*\{[^}]*letter-spacing:\s*1\.55px/s);
     expect(desktop).not.toMatch(/\.hero h1,\s*body\.login-page \.hero h1\s*\{[^}]*font-size:\s*20px/s);
   });
 

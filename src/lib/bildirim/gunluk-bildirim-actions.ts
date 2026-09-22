@@ -2,14 +2,6 @@ import type { AppPermission } from "../authorization/role-permissions";
 import type { Bildirim } from "../../types/bildirim";
 
 export const GUNLUK_BILDIRIM_EDITABLE_STATES = ["TASLAK", "DUZELTME_ISTENDI"] as const;
-export const GUNLUK_BILDIRIM_LOCKED_STATES = ["IPTAL", "HAFTALIK_MUTABAKATA_ALINDI"] as const;
-
-const GUNLUK_BILDIRIM_KNOWN_STATES = [
-  ...GUNLUK_BILDIRIM_EDITABLE_STATES,
-  "GONDERILDI",
-  "GEC_GONDERILDI",
-  ...GUNLUK_BILDIRIM_LOCKED_STATES
-] as const;
 
 export function normalizeGunlukBildirimState(state: string | null | undefined): string {
   return (state ?? "").trim().toUpperCase();
@@ -18,27 +10,6 @@ export function normalizeGunlukBildirimState(state: string | null | undefined): 
 export function isGunlukBildirimEditableState(state: string | null | undefined): boolean {
   const normalized = normalizeGunlukBildirimState(state);
   return (GUNLUK_BILDIRIM_EDITABLE_STATES as readonly string[]).includes(normalized);
-}
-
-export function isGunlukBildirimLockedState(state: string | null | undefined): boolean {
-  const normalized = normalizeGunlukBildirimState(state);
-  if (!normalized) {
-    return true;
-  }
-
-  if ((GUNLUK_BILDIRIM_LOCKED_STATES as readonly string[]).includes(normalized)) {
-    return true;
-  }
-
-  if (isGunlukBildirimEditableState(normalized)) {
-    return false;
-  }
-
-  if (normalized === "GONDERILDI" || normalized === "GEC_GONDERILDI") {
-    return false;
-  }
-
-  return !(GUNLUK_BILDIRIM_KNOWN_STATES as readonly string[]).includes(normalized);
 }
 
 export function isGunlukBildirimOwner(

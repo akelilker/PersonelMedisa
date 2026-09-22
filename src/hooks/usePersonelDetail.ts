@@ -38,11 +38,7 @@ import {
   shouldRedirectDetailAfterSubeMismatch
 } from "../lib/detail-sube-context";
 import { parseOptionalPositiveInt } from "../features/personeller/personel-create-utils";
-import {
-  computeHasLifecycleDiff,
-  lifecycleSnapshotToPersonelPatch,
-  snapshotFromLifecycleForm
-} from "../lib/personel-lifecycle-diff";
+import { computeHasLifecycleDiff } from "../lib/personel-lifecycle-diff";
 import { sortSurecHistoryDescending } from "../lib/surec-history-sort";
 import type { PaginatedResult, PaginationMeta } from "../types/api";
 import { runDeduped } from "../lib/in-flight-dedupe";

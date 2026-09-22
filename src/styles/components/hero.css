@@ -159,6 +159,9 @@ body.login-page .hero {
   grid-template-rows: auto auto;
   row-gap: 6px;
   align-items: center;
+  padding-top: 10px;
+  padding-bottom: 10px;
+  margin-bottom: 0;
 }
 
 body.login-page .hero-logo {
@@ -201,6 +204,13 @@ body.login-page .hero .animated-line {
     padding-inline: 16px;
   }
 
+  .hero.hero-with-session {
+    min-height: 68px;
+    padding-top: 14px;
+    padding-bottom: 14px;
+    margin-bottom: 4px;
+  }
+
   .hero-logo,
   .hero-spacer,
   body.login-page .hero-logo,
@@ -213,13 +223,13 @@ body.login-page .hero .animated-line {
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto auto;
     align-items: start;
-    align-self: center;
+    align-self: stretch;
     justify-items: center;
-    gap: 2px;
+    gap: 4px;
     margin-left: 0;
     margin-right: 8px;
-    transform: translateY(0);
-    padding: 0;
+    transform: translateY(3px);
+    padding: 2px 0 4px;
   }
 
   .hero-with-session .hero-session-meta {
@@ -238,9 +248,16 @@ body.login-page .hero .animated-line {
     /* Sit on the shared column-2 track bottom so a tall session logo
        does not inflate title→line distance when logo spans both rows. */
     align-self: end;
-    /* 20px + 1.8px tracking overflows the 331px center track (~492px hero shell). */
+    /* PERSONEL title is longer than Taşıt — 19px + ~1.55px tracking fits 331px track. */
     font-size: 19px;
-    letter-spacing: 1.8px;
+    letter-spacing: 1.55px;
+  }
+
+  .hero-with-session .hero-session-user {
+    align-self: stretch;
+    padding: 0 2px 1px;
+    line-height: 1.05;
+    transform: translateY(4px);
   }
 
   .animated-line,
@@ -269,29 +286,33 @@ body.login-page .hero .animated-line {
   }
 
   body.login-page .hero {
-    /* Login uses the same header proportions as the Taşıt reference.
-       The title still scales down on narrow phones so it remains whole. */
-    --hero-logo-width: 43px;
-    padding: 12px 12px 12px 3px;
+    /* Taşıt driver-shell login hero (≤640): taller band + wider logo column */
+    --hero-logo-width: 48px;
+    --hero-spacer-width: 1px;
+    padding: 14px 12px 14px 6px;
     column-gap: var(--space-2);
-    min-height: 65px;
+    min-height: 76px;
   }
 
   body.login-page .hero h1 {
     overflow: visible;
     text-overflow: clip;
     white-space: nowrap;
-    font-size: clamp(14px, 4.5vw, 20px);
-    letter-spacing: clamp(0.7px, 0.3vw, 1.8px);
-    padding: 0;
+    /* Slightly tighter than Taşıt clamp: longer “PERSONEL YÖNETİM…” ink fit at 375–393 */
+    font-size: clamp(16.5px, 5.05vw, 21px);
+    letter-spacing: clamp(0.15px, 0.05vw, 0.72px);
+    padding: 0 2px;
+    line-height: 1.2;
   }
 
   body.login-page .hero-logo {
-    margin-right: clamp(4px, 1.5vw, 8px);
+    width: 48px;
+    flex: 0 0 48px;
+    margin-right: 15px;
   }
 
   body.login-page .hero-logo img {
-    height: 33px;
+    height: 36px;
   }
 
   /* Session hero: equal side tracks keep title centered; 76px meta overflows
@@ -343,8 +364,8 @@ body.login-page .hero .animated-line {
   }
 
   .hero-with-session .hero-session-meta {
-    width: 76px;
-    max-width: 76px;
+    width: min(104px, 30vw);
+    max-width: min(104px, 30vw);
     align-self: flex-start;
     overflow: visible;
     transform: none;
@@ -352,9 +373,12 @@ body.login-page .hero .animated-line {
 
   .hero-with-session .hero-session-user {
     font-size: 9.5px;
-    line-height: 1.06;
-    max-height: 1.06em;
-    max-width: 76px;
+    line-height: 1.12;
+    max-width: 100%;
+    max-height: 2.3em;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    text-overflow: ellipsis;
   }
 
   .hero-with-session .hero-session-sube {
@@ -391,9 +415,17 @@ body.login-page .hero .animated-line {
   }
 
   body:not(.login-page) .hero .animated-line {
-    height: 2.5px;
+    height: 2.7px;
     opacity: 0.72;
+    background: linear-gradient(
+      90deg,
+      rgba(var(--theme-color-rgb), 0.06),
+      rgba(var(--theme-color-rgb), 0.9) 50%,
+      rgba(var(--theme-color-rgb), 0.06)
+    );
+    box-shadow: 0 2px 10px rgba(var(--theme-color-rgb), 0.3);
   }
+
 }
 
 @media (max-width: 375px) {
@@ -401,6 +433,7 @@ body.login-page .hero .animated-line {
     font-size: 10px;
     letter-spacing: 0.45px;
   }
+
 }
 
 @media (max-width: 360px) {
@@ -410,12 +443,184 @@ body.login-page .hero .animated-line {
   }
 
   body.login-page .hero h1 {
-    font-size: clamp(13px, 4.25vw, 15.3px);
-    letter-spacing: clamp(0.6px, 0.28vw, 1px);
+    font-size: clamp(14.5px, 4.85vw, 16.5px);
+    letter-spacing: clamp(0.08px, 0.035vw, 0.42px);
   }
 
   section.hero.hero-with-session > h1 {
     font-size: 10px;
     letter-spacing: 0.42px;
+  }
+}
+
+/*
+ * Mobile authenticated home (`app-home-route`): Taşıt style-core flex hero takeover.
+ * Inner routes keep the session grid hero; home shell matches Taşıt main header geometry.
+ */
+@media (max-width: 640px) {
+  body.app-home-route .hero.hero-with-session {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    grid-template-columns: unset;
+    grid-template-rows: unset;
+    column-gap: 0;
+    row-gap: 0;
+    overflow: visible;
+    margin-bottom: 4px;
+    min-height: 71px;
+    width: calc(100% + 4px);
+    max-width: calc(100% + 4px);
+    margin-left: -2px;
+    margin-right: -2px;
+    padding: 12px 12px 12px 3px;
+    box-sizing: border-box;
+    border-color: rgba(140, 158, 176, 0.6);
+    box-shadow:
+      0 4px 16px rgba(0, 0, 0, 0.4),
+      0 4px 18px rgba(var(--theme-color-rgb), 0.045),
+      inset 0 1px 0 rgba(184, 198, 212, 0.2),
+      inset 0 -1px 0 rgba(28, 36, 50, 0.52);
+  }
+
+  body.app-home-route .hero.hero-with-session .hero-logo {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    /* Logo picture stays ~43px; session meta must share this flex column width. */
+    flex: 0 1 auto;
+    width: auto;
+    min-width: 43px;
+    max-width: min(112px, 30vw);
+    margin-right: 6px;
+    margin-left: 0;
+    gap: 4px;
+    align-self: center;
+    transform: translate(-1px, 1px);
+    overflow: visible;
+  }
+
+  body.app-home-route .hero.hero-with-session .hero-logo picture {
+    width: 43px;
+    max-width: 43px;
+    transform: translate(2px, 3px);
+  }
+
+  body.app-home-route .hero.hero-with-session .hero-logo img {
+    height: 35px;
+    width: auto;
+    transform: translateY(0);
+  }
+
+  body.app-home-route .hero.hero-with-session .hero-session-meta {
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    align-self: stretch;
+    overflow: visible;
+    transform: translate(0, 4px);
+  }
+
+  body.app-home-route .hero.hero-with-session .hero-session-user {
+    font-size: 9.5px;
+    line-height: 1.12;
+    letter-spacing: 0;
+    max-width: 100%;
+    max-height: 2.35em;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    word-break: normal;
+    overflow-wrap: break-word;
+    text-align: center;
+  }
+
+  body.app-home-route section.hero.hero-with-session > h1 {
+    flex: 1 1 0;
+    min-width: 0;
+    grid-column: unset;
+    grid-row: unset;
+    align-self: center;
+    /* Longer “PERSONEL …” ink: Taşıt geometry with tighter tracking — no ellipsis. */
+    font-size: clamp(16px, 4.85vw, calc(21.5px - 0.5pt));
+    letter-spacing: clamp(0.35px, 0.13vw, 0.88px);
+    line-height: 1.2;
+    transform: translateY(-2px);
+    overflow: hidden;
+    text-overflow: clip;
+    white-space: nowrap;
+    padding: 0 2px 0 0;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    text-shadow: none;
+  }
+
+  body.app-home-route .hero.hero-with-session .hero-spacer {
+    flex: 0 0 1px;
+    width: 1px;
+    min-width: 1px;
+    grid-column: unset;
+    grid-row: unset;
+  }
+
+  body.app-home-route .hero.hero-with-session .animated-line {
+    position: absolute;
+    bottom: 19px;
+    left: 50%;
+    right: auto;
+    top: auto;
+    transform: translateX(-50%);
+    grid-column: unset;
+    grid-row: unset;
+    justify-self: unset;
+    align-self: unset;
+    width: 88%;
+    height: 2.7px;
+    opacity: 0.72;
+    background: linear-gradient(
+      90deg,
+      rgba(var(--theme-color-rgb), 0.06),
+      rgba(var(--theme-color-rgb), 0.9) 50%,
+      rgba(var(--theme-color-rgb), 0.06)
+    );
+    box-shadow: 0 2px 10px rgba(var(--theme-color-rgb), 0.3);
+  }
+
+  @media (max-width: 393px) {
+    body.app-home-route .hero.hero-with-session .hero-logo {
+      max-width: min(104px, 28.5vw);
+      margin-right: 5px;
+    }
+  }
+
+  @media (max-width: 360px) {
+    body.app-home-route .hero.hero-with-session .hero-logo {
+      max-width: min(94px, 26.5vw);
+      margin-right: 4px;
+    }
+
+    body.app-home-route section.hero.hero-with-session > h1 {
+      font-size: clamp(16px, 4.45vw, 17px);
+      letter-spacing: clamp(0.1px, 0.04vw, 0.38px);
+    }
+  }
+
+  @media (max-width: 320px) {
+    body.app-home-route .hero.hero-with-session .hero-logo {
+      max-width: min(84px, 26vw);
+      margin-right: 3px;
+    }
+
+    body.app-home-route .hero.hero-with-session .hero-session-user {
+      font-size: 9px;
+      line-height: 1.1;
+    }
+
+    body.app-home-route section.hero.hero-with-session > h1 {
+      font-size: clamp(14px, 4.15vw, 15.5px);
+      letter-spacing: 0.12px;
+      padding: 0 1px 0 0;
+    }
   }
 }

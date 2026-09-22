@@ -1,25 +1,4 @@
-import type { AylikBildirimOnayOzet } from "../../types/aylik-bildirim-onay";
-
-export type AylikBildirimOnayCounts = {
-  toplam_bildirim: number;
-  mutabakata_alinan: number;
-  mutabakatli_hafta: number;
-  eksik_hafta: number;
-  taslak: number;
-  duzeltme_istendi: number;
-  gonderildi: number;
-};
-
-export type AylikBildirimOnayHafta = {
-  hafta_baslangic: string;
-  hafta_bitis: string;
-  mutabakat_id: number | null;
-  state: string | null;
-  bildirim_sayisi: number;
-  mutabakata_alinan_sayisi: number;
-  eksik_mi: boolean;
-  blok_nedeni: string | null;
-};
+import type { AylikBildirimOnayCounts, AylikBildirimOnayOzet } from "../../types/aylik-bildirim-onay";
 
 export function getCurrentMonthValue(reference = new Date()): string {
   return `${reference.getFullYear()}-${String(reference.getMonth() + 1).padStart(2, "0")}`;

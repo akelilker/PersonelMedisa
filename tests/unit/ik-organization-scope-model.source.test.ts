@@ -209,7 +209,6 @@ describe("login account removal owner", () => {
   it("revokes access without deleting the account or its personnel record", () => {
     expect(YONETIM).toContain("'durum' => 'PASIF',");
     expect(YONETIM).toContain("PasswordHasher::hash(bin2hex(random_bytes(32)))");
-    expect(YONETIM).toContain("self::revokePendingActivationInvitations($pdo, $kullaniciId);");
     expect(YONETIM).toContain("UserPersonelBindingService::applyBinding($pdo, $kullaniciId, null, $actorUserId);");
     // The personnel row itself is never written by this owner.
     expect(YONETIM).not.toMatch(/DELETE FROM personeller/);
@@ -218,7 +217,7 @@ describe("login account removal owner", () => {
 
   it("rolls back the business mutation when the audit write fails", () => {
     const start = YONETIM.indexOf("public static function kullaniciErisimKaldir");
-    const body = YONETIM.slice(start, YONETIM.indexOf("private static function revokePendingActivationInvitations"));
+    const body = YONETIM.slice(start, YONETIM.indexOf("private static function assertKullaniciYonetimi"));
     expect(body).toContain("$pdo->beginTransaction();");
     expect(body).toContain("$pdo->rollBack();");
     // Audit rows are written inside the same transaction as the revocation.

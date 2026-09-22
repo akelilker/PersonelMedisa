@@ -58,5 +58,54 @@ describe("shell dropdown viewport-safe owners", () => {
     expect(icons).toMatch(/\.sube-selector-wrap\s*\{[^}]*display:\s*inline-flex/s);
     expect(icons).not.toMatch(/\.sube-selector-wrap\s*\{[^}]*position:\s*relative/s);
     expect(icons).toMatch(/\.sube-selector-dropdown\s*\{[^}]*right:\s*0/s);
+    expect(icons).toMatch(
+      /\.icons-row--minimal\s+\.sube-selector-dropdown\s*\{[^}]*margin-inline:\s*auto/s
+    );
+    expect(icons).toMatch(/\.icons-row--minimal\s+\.sube-selector-dropdown\s*\{[^}]*top:\s*100%/s);
+    expect(icons).toMatch(
+      /\.icons-row--minimal\s+\.sube-selector-dropdown\s*\{[^}]*margin-top:\s*-62px/s
+    );
+  });
+
+  it("keeps bell/gear under şube scrim (toggle only above overlay)", () => {
+    const notifications = read("src/styles/components/notifications.css");
+    expect(notifications).toMatch(
+      /:has\(\.icons-row\s+\.sube-selector-dropdown\.open\)\s+\.sube-selector-toggle/s
+    );
+    expect(notifications).not.toMatch(
+      /:has\(\.icons-row\s+\.settings-dropdown\.open\)\s+\.icons-row\s*\{[^}]*z-index:\s*3/s
+    );
+  });
+
+  it("stops home shell side rails at footer top (no inset:0 stubs on footer glow)", () => {
+    const shell = read("src/styles/layout/app-shell.css");
+    expect(shell).toMatch(/body\.app-home-route\s+\.app-shell::before/s);
+    expect(shell).not.toMatch(/body\.app-home-route\s+\.app-shell::before\s*\{[^}]*inset:\s*0/s);
+    expect(shell).toMatch(
+      /\.app-shell::before\s*\{[^}]*inset:\s*0\s+0\s*\n\s*calc\(var\(--app-footer-real-height\)/s
+    );
+  });
+
+  it("applies content-wrap blur when sube selector or settings menu is open (same as notifications)", () => {
+    const notifications = read("src/styles/components/notifications.css");
+    expect(notifications).toMatch(
+      /:has\(\.icons-row\s+\.sube-selector-dropdown\.open\)\s+\.content-wrap::after/s
+    );
+    expect(notifications).toMatch(
+      /:has\(\.icons-row\s+\.settings-menu-dropdown\.open\)\s+\.content-wrap::after/s
+    );
+  });
+
+  it("extends shell dropdown scrim through fixed footer (not clipped at content-wrap bottom)", () => {
+    const notifications = read("src/styles/components/notifications.css");
+    expect(notifications).toMatch(
+      /:has\(\.icons-row\s+\.settings-dropdown\.open\)\s+\.content-wrap::after\s*\{[^}]*bottom:\s*calc\(-1 \* \(var\(--app-footer-real-height\)/s
+    );
+    expect(notifications).not.toMatch(
+      /:has\(\.icons-row\s+\.settings-dropdown\.open\)\s+\.content-wrap::after\s*\{[^}]*--app-footer-gap/s
+    );
+    expect(notifications).toMatch(
+      /:has\(\.icons-row\s+\.settings-dropdown\.open\)\s+\.app-shell::before\s*\{[^}]*inset:\s*0/s
+    );
   });
 });

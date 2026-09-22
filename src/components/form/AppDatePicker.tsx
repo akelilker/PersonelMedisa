@@ -20,11 +20,9 @@ import {
   TURKISH_MONTH_NAMES,
   TURKISH_WEEKDAY_SHORT_NAMES,
   addDaysIso,
-  addYearsIso,
   buildMonthMatrix,
   buildYearRange,
   formatIsoToDisplay,
-  formatMonthYearLabel,
   isIsoDateString,
   isIsoWithinRange,
   parseIsoDate,
@@ -386,15 +384,18 @@ export function AppDatePicker({
           {displayValue || placeholderText}
         </span>
         <svg
-          className="app-select-chevron"
+          className="app-date-picker-icon"
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
-          strokeWidth="2"
+          strokeWidth="1.75"
+          strokeLinecap="round"
+          strokeLinejoin="round"
           aria-hidden="true"
           focusable="false"
         >
-          <path d="M6 9l6 6 6-6" />
+          <rect x="3" y="4.5" width="18" height="17" rx="2" />
+          <path d="M16 2.5v4M8 2.5v4M3 10.5h18" />
         </svg>
       </button>
 
@@ -414,6 +415,20 @@ export function AppDatePicker({
         onChange={(event) => onChange(event.target.value)}
         onInvalid={onInvalid}
       />
+
+      {isOpen ? (
+        <button
+          type="button"
+          className="app-date-picker-scrim"
+          data-app-date-scrim="1"
+          tabIndex={-1}
+          aria-label="Takvimi kapat"
+          onPointerDown={(event) => {
+            event.preventDefault();
+            closePanel(false);
+          }}
+        />
+      ) : null}
 
       {isOpen ? (
         <div
@@ -594,22 +609,6 @@ export function AppDatePicker({
           </div>
         </div>
       ) : null}
-    </div>
-  );
-}
-
-export type AppDatePickerFieldProps = AppDatePickerProps & { label: string };
-
-/** `.form-section` + etiket sarmalayıcısı (kanonik alan biçimi). */
-export function AppDatePickerField({ label, name, id, className, ...rest }: AppDatePickerFieldProps) {
-  const controlId = name ?? id;
-
-  return (
-    <div className={["form-section", "app-date-picker-field", className ?? ""].filter(Boolean).join(" ")}>
-      <label className="form-label" htmlFor={controlId}>
-        {label}
-      </label>
-      <AppDatePicker {...rest} name={name} id={id} />
     </div>
   );
 }

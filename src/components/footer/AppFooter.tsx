@@ -2,7 +2,11 @@ import { useEffect, useState } from "react";
 import footerLogo from "../../assets/brand/logo-footer.svg";
 import { getFooterVersionLabel, MEDISA_UI_VERSION } from "../../config/app-env";
 
-export function AppFooter() {
+type AppFooterProps = {
+  loginFooter?: boolean;
+};
+
+export function AppFooter({ loginFooter = false }: AppFooterProps) {
   const [isDimmed, setIsDimmed] = useState(true);
   const [isDelayed, setIsDelayed] = useState(false);
   const [online, setOnline] = useState(() =>
@@ -52,7 +56,10 @@ export function AppFooter() {
   const statusLabel = systemStatus === "ready" ? "Sistem Hazır" : "Bağlantı Yok";
 
   return (
-    <footer id="app-footer" className={footerStateClasses || undefined}>
+    <footer
+      id="app-footer"
+      className={[loginFooter ? "login-footer" : "", footerStateClasses].filter(Boolean).join(" ") || undefined}
+    >
       <div className="footer-content">
         <span className="version">{versionLabel}</span>
         <span className="brand">

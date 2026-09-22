@@ -22,7 +22,6 @@
 /* 3. Sayfa Yerleşim Stilleri (Layout) */
 @import "./layout/app-shell.css";
 @import "./layout/content-wrap.css";
-@import "./layout/grid.css";
 
 /* 4. Yeniden Kullanılabilir Bileşen Stilleri */
 @import "./components/hero.css";

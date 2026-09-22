@@ -4,7 +4,6 @@ import { ApiRequestError } from "../api/api-client";
 import {
   cancelBildirim,
   createBildirim,
-  fetchBildirimlerList,
   fetchGunlukTamamlamalariHeader,
   updateBildirim
 } from "../api/bildirimler.api";
@@ -19,6 +18,12 @@ import {
   updatePersonel,
   type CreatePersonelPayload
 } from "../api/personeller.api";
+import {
+  PERSONELLER_LIST_ANY,
+  SURECLER_LIST_ANY,
+  getEffectivePermissions,
+  type AppPermission
+} from "../lib/authorization/role-permissions";
 import { resolvePersonelCompleteness } from "../features/personeller/personel-missing-info";
 import {
   fetchBagliAmirOptions,
@@ -63,6 +68,16 @@ const MAX_SYNC_ATTEMPTS = 5;
 /** PROCESSING stuck beyond this age is recovered to FAILED_RETRYABLE (same Idempotency-Key). */
 export const STALE_PROCESSING_MS = 5 * 60 * 1000;
 
+/**
+ * Bootstrap referans bundle'inin okundugu yuzeyler: personel kartı/formu ve
+ * personel detayı. Bu izinlerden biri yoksa (orn. self-service-only PERSONEL)
+ * yonetim referans kataloglari hic istenmez; boylece beklenen bir 403 uretilmez.
+ */
+const PERSONEL_REFERENCE_READ_PERMISSIONS: readonly AppPermission[] = [
+  ...PERSONELLER_LIST_ANY,
+  "personeller.detail.view"
+];
+
 export function subscribeAppData(onStoreChange: () => void): () => void {
   listeners.add(onStoreChange);
   return () => {
@@ -92,10 +107,6 @@ function createEmptyAppData(fingerprint: string | null): AppData {
     updatedAt: null,
     cache: {},
   };
-}
-
-export function getFallbackData(): AppData {
-  return createEmptyAppData(null);
 }
 
 export function getSafeAppDataFallback(): AppData {
@@ -141,20 +152,6 @@ export function ensureAppData(): AppData {
 
 export function getAppData(): AppData {
   return ensureAppData();
-}
-
-export function hasUsableData(): boolean {
-  const data = ensureAppData();
-  if (data.schemaVersion !== APP_DATA_SCHEMA_VERSION) {
-    return false;
-  }
-
-  const currentFingerprint = getActorFingerprint(getSession());
-  if (data.ownerFingerprint !== currentFingerprint) {
-    return false;
-  }
-
-  return typeof data.cache === "object" && data.cache !== null;
 }
 
 function bumpRevision(data: AppData): void {
@@ -272,19 +269,6 @@ export function initAppDataFromStorage(): AppData {
 
   notifyAppData();
   return window.appData;
-}
-
-export function setAppData(partial: Partial<Pick<AppData, "cache">> & Partial<Pick<AppData, "updatedAt">>): void {
-  const data = ensureAppData();
-  if (partial.cache) {
-    data.cache = { ...data.cache, ...partial.cache };
-  }
-  if (partial.updatedAt !== undefined) {
-    data.updatedAt = partial.updatedAt;
-  }
-  bumpRevision(data);
-  persistAppData();
-  notifyAppData();
 }
 
 /** Aktif sube tek kaynak: auth oturumu (session). */
@@ -1123,30 +1107,6 @@ export function commitPersonelUpdateToCaches(updated: Personel): void {
   }
 }
 
-export function replacePersonelInListCache(listKey: string, tempId: number, created: Personel): void {
-  mergeCacheEntry<PaginatedResult<Personel>>(listKey, (prev) => {
-    if (!prev) {
-      return { ...emptyPaginated<Personel>(), items: [created] };
-    }
-    return {
-      ...prev,
-      items: prev.items.map((item) => (item.id === tempId ? created : item))
-    };
-  });
-}
-
-export function removeQueuedTempPersonel(listKey: string, tempId: number): void {
-  mergeCacheEntry<PaginatedResult<Personel>>(listKey, (prev) => {
-    if (!prev) {
-      return emptyPaginated<Personel>();
-    }
-    return {
-      ...prev,
-      items: prev.items.filter((item) => item.id !== tempId)
-    };
-  });
-}
-
 export function draftPersonelFromPayload(payload: CreatePersonelPayload, tempId: number): Personel {
   return {
     id: tempId,
@@ -1636,6 +1596,25 @@ export type LoadDataFromServerOptions = {
   force?: boolean;
 };
 
+/** Oturumun efektif izinleri (rol matrisi + personel bagli self-service tabani). */
+function getSessionEffectivePermissions(): ReadonlySet<AppPermission> {
+  const session = getSession();
+  return new Set(
+    getEffectivePermissions(
+      session?.user.rol ?? null,
+      session?.user.personel_id ?? null,
+      session?.user.personel_tipi_ad ?? null
+    )
+  );
+}
+
+function grantsAnyPermission(
+  permissions: ReadonlySet<AppPermission>,
+  required: readonly AppPermission[]
+): boolean {
+  return required.some((permission) => permissions.has(permission));
+}
+
 export async function loadDataFromServer(options?: LoadDataFromServerOptions): Promise<void> {
   const force = options?.force === true;
   const signature = buildProtectedDataLoadSignature();
@@ -1657,79 +1636,107 @@ export async function loadDataFromServer(options?: LoadDataFromServerOptions): P
   protectedDataLoadInFlight = (async () => {
     const sube = getActiveSube();
     const subeQ = getSubeIdForApiRequest();
-    const tasks: Array<Promise<void>> = [
-      (async () => {
-        const key = dataCacheKeys.personellerList(sube, "", "tum", "", "", 1);
-        try {
-          const data = await fetchPersonellerList({ aktiflik: "tum", page: 1, limit: 10, sube_id: subeQ });
-          setCacheEntry(key, data);
-        } catch {
-          /* sessiz */
-        }
-      })(),
-      (async () => {
-        const key = dataCacheKeys.bildirimlerHeader(sube);
-        try {
-          const data = await fetchGunlukTamamlamalariHeader({
-            page: 1,
-            limit: 8,
-            sube_id: subeQ
-          });
-          setCacheEntry(key, data);
-        } catch {
-          /* sessiz */
-        }
-      })(),
-      (async () => {
-        const key = dataCacheKeys.referansPersonel();
-        try {
-          const bundle: PersonelReferenceBundle = {
-            departmanOptions: await fetchDepartmanOptions(),
-            bolumOptions: await fetchBolumOptions(),
-            birimOptions: await fetchBirimOptions(),
-            gorevOptions: await fetchGorevOptions(),
-            pozisyonOptions: await fetchPozisyonOptions(),
-            personelTipiOptions: await fetchPersonelTipiOptions(),
-            sgkIsverenOptions: await fetchSgkIsverenOptions(),
-            calismaLokasyonuOptions: await fetchCalismaLokasyonuOptions(),
-            bagliAmirOptions: await fetchBagliAmirOptions(),
-            ucretTipiOptions: await fetchUcretTipiOptions(),
-            primKuraliOptions: await fetchPrimKuraliOptions()
-          };
-          setCacheEntry(key, bundle);
-        } catch {
-          /* sessiz */
-        }
-      })(),
-      (async () => {
-        const key = dataCacheKeys.surecTuruRef();
-        try {
-          const data = await fetchSurecTuruOptions();
-          setCacheEntry(key, data);
-        } catch {
-          /* sessiz */
-        }
-      })(),
-      (async () => {
-        const key = dataCacheKeys.bildirimRef();
-        try {
-          const [departman, bildirimTuru, personeller] = await Promise.all([
-            fetchDepartmanOptions(),
-            fetchBildirimTuruOptions(),
-            fetchPersonellerList({
-              aktiflik: "aktif",
-              calisan_kapsami: "IC_PERSONEL",
-              sube_id: subeQ,
+    // Bootstrap preload oturumun efektif izinleriyle sinirlanir: kullanicinin
+    // erisemeyecegi yonetim verisi (personel listesi, bildirim ozeti, yonetim
+    // referans kataloglari) hic istenmez; beklenen 403 uretilmez.
+    const permissions = getSessionEffectivePermissions();
+    const tasks: Array<Promise<void>> = [];
+
+    if (grantsAnyPermission(permissions, PERSONELLER_LIST_ANY)) {
+      tasks.push(
+        (async () => {
+          const key = dataCacheKeys.personellerList(sube, "", "tum", "", "", 1);
+          try {
+            const data = await fetchPersonellerList({ aktiflik: "tum", page: 1, limit: 10, sube_id: subeQ });
+            setCacheEntry(key, data);
+          } catch {
+            /* sessiz */
+          }
+        })()
+      );
+    }
+
+    if (permissions.has("bildirimler.view")) {
+      tasks.push(
+        (async () => {
+          const key = dataCacheKeys.bildirimlerHeader(sube);
+          try {
+            const data = await fetchGunlukTamamlamalariHeader({
               page: 1,
-              limit: BILDIRIM_PERSONEL_FETCH_LIMIT
-            })
-          ]);
-          setCacheEntry(key, { departman, bildirimTuru, personeller: personeller.items });
-        } catch {
-          /* sessiz */
-        }
-      })()
-    ];
+              limit: 8,
+              sube_id: subeQ
+            });
+            setCacheEntry(key, data);
+          } catch {
+            /* sessiz */
+          }
+        })()
+      );
+    }
+
+    if (grantsAnyPermission(permissions, PERSONEL_REFERENCE_READ_PERMISSIONS)) {
+      tasks.push(
+        (async () => {
+          const key = dataCacheKeys.referansPersonel();
+          try {
+            const bundle: PersonelReferenceBundle = {
+              departmanOptions: await fetchDepartmanOptions(),
+              bolumOptions: await fetchBolumOptions(),
+              birimOptions: await fetchBirimOptions(),
+              gorevOptions: await fetchGorevOptions(),
+              pozisyonOptions: await fetchPozisyonOptions(),
+              personelTipiOptions: await fetchPersonelTipiOptions(),
+              sgkIsverenOptions: await fetchSgkIsverenOptions(),
+              calismaLokasyonuOptions: await fetchCalismaLokasyonuOptions(),
+              bagliAmirOptions: await fetchBagliAmirOptions(),
+              ucretTipiOptions: await fetchUcretTipiOptions(),
+              primKuraliOptions: await fetchPrimKuraliOptions()
+            };
+            setCacheEntry(key, bundle);
+          } catch {
+            /* sessiz */
+          }
+        })()
+      );
+    }
+
+    if (grantsAnyPermission(permissions, SURECLER_LIST_ANY)) {
+      tasks.push(
+        (async () => {
+          const key = dataCacheKeys.surecTuruRef();
+          try {
+            const data = await fetchSurecTuruOptions();
+            setCacheEntry(key, data);
+          } catch {
+            /* sessiz */
+          }
+        })()
+      );
+    }
+
+    if (permissions.has("bildirimler.view")) {
+      tasks.push(
+        (async () => {
+          const key = dataCacheKeys.bildirimRef();
+          try {
+            const [departman, bildirimTuru, personeller] = await Promise.all([
+              fetchDepartmanOptions(),
+              fetchBildirimTuruOptions(),
+              fetchPersonellerList({
+                aktiflik: "aktif",
+                calisan_kapsami: "IC_PERSONEL",
+                sube_id: subeQ,
+                page: 1,
+                limit: BILDIRIM_PERSONEL_FETCH_LIMIT
+              })
+            ]);
+            setCacheEntry(key, { departman, bildirimTuru, personeller: personeller.items });
+          } catch {
+            /* sessiz */
+          }
+        })()
+      );
+    }
 
     await Promise.allSettled(tasks);
     persistAppData();

@@ -20,15 +20,13 @@ import {
   commitPersonelUpdateToCaches,
   dataCacheKeys,
   deleteCacheEntry,
-  getActiveSube,
-  getSubeIdForApiRequest
+  getActiveSube
 } from "../../../data/data-manager";
 import {
   applyPersonelKaliciSubeDegisikligi,
   applyPersonelOrganizasyonDegisikligi,
   createPersonel,
-  fetchPersonellerList,
-  updatePersonel
+  fetchPersonellerList
 } from "../../../api/personeller.api";
 import { fetchYonetimSubeleri } from "../../../api/yonetim.api";
 import {

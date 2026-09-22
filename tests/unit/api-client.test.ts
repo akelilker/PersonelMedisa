@@ -642,6 +642,63 @@ describe("apiRequest", () => {
 
     expect(forbiddenListener).not.toHaveBeenCalled();
   });
+
+  it("does not emit global forbidden for 403 GET /referans/* bootstrap catalog", async () => {
+    const fetchMock = vi.fn(async () =>
+      createJsonResponse(
+        {
+          data: null,
+          meta: {},
+          errors: [
+            {
+              code: "SELF_SERVICE_ONLY_ROLE_FORBIDDEN",
+              message: "Bu kaynak self-service hesabi icin kullanilamaz."
+            }
+          ]
+        },
+        403
+      )
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const forbiddenListener = vi.fn();
+    window.addEventListener(AUTH_FORBIDDEN_EVENT, (event) => {
+      forbiddenListener((event as CustomEvent<{ status: number; path: string }>).detail);
+    });
+
+    await expect(apiRequest("/referans/departmanlar")).rejects.toMatchObject({
+      status: 403,
+      code: "SELF_SERVICE_ONLY_ROLE_FORBIDDEN"
+    });
+
+    expect(forbiddenListener).not.toHaveBeenCalled();
+  });
+
+  it("does not emit global forbidden for 403 GET /bildirimler/gunluk-tamamlamalari (bootstrap header)", async () => {
+    const fetchMock = vi.fn(async () =>
+      createJsonResponse(
+        {
+          data: null,
+          meta: {},
+          errors: [{ code: "FORBIDDEN", message: "Bu kaynak icin yetkin yok." }]
+        },
+        403
+      )
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const forbiddenListener = vi.fn();
+    window.addEventListener(AUTH_FORBIDDEN_EVENT, (event) => {
+      forbiddenListener((event as CustomEvent<{ status: number; path: string }>).detail);
+    });
+
+    await expect(apiRequest("/bildirimler/gunluk-tamamlamalari?page=1&limit=8")).rejects.toMatchObject({
+      status: 403,
+      code: "FORBIDDEN"
+    });
+
+    expect(forbiddenListener).not.toHaveBeenCalled();
+  });
 });
 
 describe("transport helpers", () => {
@@ -798,5 +855,20 @@ describe("shouldEmitGlobalAuthForbidden", () => {
     expect(shouldEmitGlobalAuthForbidden("/gunluk-puantaj/2/2026-01-01", "GET")).toBe(true);
     expect(shouldEmitGlobalAuthForbidden("/yonetim/kullanicilar", "GET")).toBe(true);
     expect(shouldEmitGlobalAuthForbidden("/unknown-endpoint", "GET")).toBe(true);
+  });
+
+  it("suppresses global forbidden for login bootstrap reference catalogs and header preview", () => {
+    // Bootstrap referans kataloglari: self-service-only rol icin 403 beklenir.
+    expect(shouldEmitGlobalAuthForbidden("/referans/departmanlar", "GET")).toBe(false);
+    expect(shouldEmitGlobalAuthForbidden("/referans/bagli-amirler", "GET")).toBe(false);
+    expect(shouldEmitGlobalAuthForbidden("/api/referans/personel-tipleri", "GET")).toBe(false);
+    expect(shouldEmitGlobalAuthForbidden("/referans/surec-turleri?x=1", "GET")).toBe(false);
+    // Header gunluk tamamlama onizlemesi: bildirimler.view olmayan rolde 403 beklenir.
+    expect(shouldEmitGlobalAuthForbidden("/bildirimler/gunluk-tamamlamalari", "GET")).toBe(false);
+    expect(
+      shouldEmitGlobalAuthForbidden("/bildirimler/gunluk-tamamlamalari?page=1&limit=8", "GET")
+    ).toBe(false);
+    // Bootstrap disi kullanim (create) global fallback'te kalir.
+    expect(shouldEmitGlobalAuthForbidden("/referans/departmanlar", "POST")).toBe(true);
   });
 });

@@ -1,14 +1,16 @@
+import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 
 type BackBarProps = {
   to: string;
   label: string;
   testId?: string;
+  endContent?: ReactNode;
 };
 
-export function BackBar({ to, label, testId }: BackBarProps) {
+export function BackBar({ to, label, testId, endContent }: BackBarProps) {
   return (
-    <div className="universal-back-bar">
+    <div className={`universal-back-bar${endContent ? " has-end-content" : ""}`}>
       <Link to={to} className="universal-back-btn" aria-label={label} data-testid={testId}>
         <svg
           className="back-icon-svg"
@@ -28,6 +30,7 @@ export function BackBar({ to, label, testId }: BackBarProps) {
         </svg>
         <span className="universal-back-label">{label}</span>
       </Link>
+      {endContent ? <div className="universal-back-bar-end">{endContent}</div> : null}
     </div>
   );
 }

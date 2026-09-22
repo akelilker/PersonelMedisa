@@ -1,11 +1,8 @@
 import type { KeyOption } from "../../types/referans";
 import type { Personel } from "../../types/personel";
 import { INITIAL_SUREC_FORM } from "../../hooks/useSurecler";
+import { normalizeEnumKey } from "../../lib/display/enum-display";
 import { DEVAMSIZLIK_SUB_CARDS, type DevamsizlikSubId } from "./kayit-surec-constants";
-
-export function normalizeEnumKey(value: string) {
-  return value.trim().replace(/-/g, "_").toUpperCase();
-}
 
 export function formatPersonelAdSoyad(personel: { ad?: string | null; soyad?: string | null }) {
   const ad = String(personel.ad ?? "").trim();
@@ -121,17 +118,4 @@ export function optionLabel(options: Array<{ id: number; label: string }>, value
 
 export function parsePozisyonId(value: string) {
   return value ? Number.parseInt(value, 10) : null;
-}
-
-/** @deprecated Prefer hasOrganizasyonFormDiff from kayit-surec-pozisyon */
-export function hasPozisyonOrganizationalDiff(
-  form: { departmanId: string; gorevId: string; bagliAmirId: string; personelTipiId: string },
-  personel: Personel
-) {
-  return (
-    form.departmanId !== toOptionalIdValue(personel.departman_id) ||
-    form.gorevId !== toOptionalIdValue(personel.gorev_id) ||
-    form.bagliAmirId !== toOptionalIdValue(personel.bagli_amir_id) ||
-    form.personelTipiId !== toOptionalIdValue(personel.personel_tipi_id)
-  );
 }

@@ -17,12 +17,12 @@ import { YonetimPaneliPage } from "../features/yonetim/pages/YonetimPaneliPage";
 import { ResmiTatilTakvimiPage } from "../features/yonetim/pages/ResmiTatilTakvimiPage";
 import { LoginPage } from "../features/auth/pages/LoginPage";
 import { ChangePasswordPage } from "../features/auth/pages/ChangePasswordPage";
-import { PersonelAktivasyonPage } from "../features/auth/pages/PersonelAktivasyonPage";
 import { PersonelSelfServiceHomePage } from "../features/self-service/pages/PersonelSelfServiceHomePage";
 import { BirimAmiriOperationalHomePage } from "../features/self-service/pages/BirimAmiriOperationalHomePage";
 import { PersonelQrScanPage } from "../features/self-service/pages/PersonelQrScanPage";
 import { PersonelQrHistoryPage } from "../features/self-service/pages/PersonelQrHistoryPage";
 import { QrKioskPage } from "../features/self-service/pages/QrKioskPage";
+import { SelfServiceQrShortcuts } from "../features/self-service/components/SelfServiceQrShortcuts";
 import { InternalDiagnosticsPage } from "./InternalDiagnosticsPage";
 import { HaftalikKapanisPage } from "../features/revizyon/pages/HaftalikKapanisPage";
 import { RevizyonMerkeziPage } from "../features/revizyon/pages/RevizyonMerkeziPage";
@@ -51,7 +51,15 @@ function HomeIndexMainMenu() {
   if (session?.user.rol === "BIRIM_AMIRI") {
     return <BirimAmiriOperationalHomePage />;
   }
-  return ctx.showMainMenu ? <MainMenu onKayitOpen={ctx.onKayitOpen} /> : null;
+  return (
+    <>
+      {ctx.showMainMenu ? <MainMenu onKayitOpen={ctx.onKayitOpen} /> : null}
+      {/* Yönetici rolü korunur; bağlı personeli kanonik QR kapsamındaysa
+       * (BOLUM_YONETICISI vb.) kendi QR/kart yüzeyine normal navigasyonla ulaşır.
+       * Yönetim yetkisi verilmez, rol düşürülmez. Hak yoksa hiç render edilmez. */}
+      <SelfServiceQrShortcuts title="Kendi QR / Kart Okutmam" showSelfServiceHomeLink />
+    </>
+  );
 }
 
 function SelfServiceHomeRoute() {
@@ -88,7 +96,6 @@ export function AppRoutes() {
       <Route element={<AppLayout />}>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/change-password" element={<ChangePasswordPage />} />
-        <Route path="/personel-aktivasyon" element={<PersonelAktivasyonPage />} />
       </Route>
 
       <Route path="/yetkisiz" element={<UnauthorizedPage />} />

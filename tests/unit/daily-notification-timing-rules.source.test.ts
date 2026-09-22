@@ -56,7 +56,9 @@ describe("daily notification timing rules", () => {
     expect(home).toContain("birim-amiri-pazar-mesai-prompt");
     expect(home).toContain("birim-amiri-eksik-giris-warning");
     expect(home).toContain("focusTarih");
-    expect(home).not.toContain("/self/qr-okut");
+    // QR kısayolları paylaşılan owner'dan gelir; günlük bildirim akışı değişmez.
+    expect(home).toContain("<SelfServiceQrShortcuts");
+    expect(home).not.toContain("giris-scan");
 
     const modal = read("src/features/bildirimler/components/BugunPersonelDurumuModal.tsx");
     expect(modal).toContain("eksik_giris");

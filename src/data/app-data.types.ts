@@ -5,16 +5,12 @@ import type {
 import type { CreatePersonelPayload, UpdatePersonelPayload } from "../api/personeller.api";
 import type { CreateSurecPayload, UpdateSurecPayload } from "../api/surecler.api";
 import type { PaginatedResult } from "../types/api";
-import type { Bildirim } from "../types/bildirim";
 import type {
   CreateFinansKalemPayload,
-  FinansKalem,
   UpdateFinansKalemPayload
 } from "../types/finans";
-import type { Personel } from "../types/personel";
 import type { UpsertGunlukPuantajPayload } from "../types/puantaj";
 import type { IdOption } from "../types/referans";
-import type { Surec } from "../types/surec";
 
 export const APP_DATA_STORAGE_KEY = "medisa_app_data";
 export const APP_SYNC_QUEUE_KEY = "medisa_sync_queue";
@@ -126,8 +122,3 @@ export function emptyPaginated<T>(): PaginatedResult<T> {
 export function makeTempId(): number {
   return -Math.abs(Date.now());
 }
-
-export type CachedPersonelList = PaginatedResult<Personel>;
-export type CachedSurecList = PaginatedResult<Surec>;
-export type CachedBildirimList = PaginatedResult<Bildirim>;
-export type CachedFinansList = PaginatedResult<FinansKalem>;

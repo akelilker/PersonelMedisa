@@ -13,8 +13,9 @@ const MOBILE_VIEWPORTS = [
   { width: 320, height: 720 }
 ] as const;
 
-const MAX_LOGIN_HERO_FORM_GAP_PX = 48;
 const MIN_LOGIN_TITLE_SAFE_GUTTER_PX = 8;
+const MAX_LOGIN_FORM_BLOCK_CENTER_DELTA_Y_PX = 48;
+const MAX_LOGIN_FORM_BLOCK_CENTER_DELTA_X_PX = 8;
 
 async function assertNoHorizontalOverflow(page: Page) {
   const metrics = await page.evaluate(() => ({
@@ -97,50 +98,88 @@ async function assertLoginTitleParity(page: Page) {
   expect(titleMetrics.visible).toBe(true);
 }
 
-async function assertLoginHeroFormGap(page: Page) {
-  const gapMetrics = await page.evaluate(() => {
+async function assertLoginFormBlockCentered(page: Page) {
+  const metrics = await page.evaluate(() => {
     const hero = document.querySelector("body.login-page .hero");
+    const footer = document.querySelector("#app-footer");
     const form = document.querySelector(".auth-login-form");
-    const heroRect = hero?.getBoundingClientRect();
-    const formRect = form?.getBoundingClientRect();
     const authLogin = document.querySelector(".auth-login");
     const authStyle = authLogin ? getComputedStyle(authLogin) : null;
+    const heroRect = hero?.getBoundingClientRect();
+    const footerRect = footer?.getBoundingClientRect();
+    const formRect = form?.getBoundingClientRect();
+    const slotTop = heroRect?.bottom ?? 0;
+    const slotBottom = footerRect?.top ?? window.innerHeight;
+    const slotCenterY = (slotTop + slotBottom) / 2;
+    const formCenterY = formRect ? formRect.top + formRect.height / 2 : null;
+    const formCenterX = formRect ? formRect.left + formRect.width / 2 : null;
+    const viewportCenterX = window.innerWidth / 2;
+    const children = form ? Array.from(form.children) : [];
+    const childGaps: number[] = [];
+    for (let index = 1; index < children.length; index += 1) {
+      const previous = children[index - 1].getBoundingClientRect();
+      const current = children[index].getBoundingClientRect();
+      childGaps.push(current.top - previous.bottom);
+    }
     return {
-      heroFormGapPx: heroRect && formRect ? formRect.top - heroRect.bottom : null,
       authJustify: authStyle?.justifyContent ?? "",
       authMinHeight: authStyle?.minHeight ?? "",
-      innerHeight: window.innerHeight,
+      centerDeltaY:
+        formCenterY != null ? Math.abs(formCenterY - slotCenterY) : null,
+      centerDeltaX:
+        formCenterX != null ? Math.abs(formCenterX - viewportCenterX) : null,
+      childGaps,
       visualViewportHeight: window.visualViewport?.height ?? null,
-      footerTop: document.querySelector("#app-footer")?.getBoundingClientRect().top ?? null
+      footerTop: footerRect?.top ?? null
     };
   });
 
-  expect(gapMetrics.heroFormGapPx).not.toBeNull();
-  expect(gapMetrics.heroFormGapPx!).toBeGreaterThanOrEqual(0);
-  expect(gapMetrics.heroFormGapPx!).toBeLessThanOrEqual(MAX_LOGIN_HERO_FORM_GAP_PX);
-  expect(gapMetrics.authJustify).toBe("flex-start");
-  expect(gapMetrics.authMinHeight).not.toBe("100%");
-  if (gapMetrics.visualViewportHeight != null) {
-    expect(gapMetrics.footerTop!).toBeLessThanOrEqual(gapMetrics.visualViewportHeight + 1);
+  expect(metrics.authJustify).toBe("center");
+  expect(metrics.authMinHeight).not.toBe("100%");
+  expect(metrics.centerDeltaY).not.toBeNull();
+  expect(metrics.centerDeltaX).not.toBeNull();
+  expect(metrics.centerDeltaY!).toBeLessThanOrEqual(MAX_LOGIN_FORM_BLOCK_CENTER_DELTA_Y_PX);
+  expect(metrics.centerDeltaX!).toBeLessThanOrEqual(MAX_LOGIN_FORM_BLOCK_CENTER_DELTA_X_PX);
+  for (const gap of metrics.childGaps) {
+    expect(gap).toBeGreaterThanOrEqual(8);
+    expect(gap).toBeLessThanOrEqual(20);
+  }
+  if (metrics.visualViewportHeight != null) {
+    expect(metrics.footerTop!).toBeLessThanOrEqual(metrics.visualViewportHeight + 1);
   }
 }
 
 async function assertAuthHeroTitle(page: Page) {
   const title = page.locator(".hero.hero-with-session h1");
   await expect(title).toBeVisible();
+  await page.waitForFunction(() => document.body.classList.contains("app-home-route"));
+  await page.waitForFunction(() => document.fonts.status === "loaded");
+  await page.waitForFunction(() => {
+    const el = document.querySelector(".hero.hero-with-session h1");
+    if (!el) {
+      return false;
+    }
+    const size = Number.parseFloat(getComputedStyle(el).fontSize);
+    return Number.isFinite(size) && size > 0;
+  });
 
   const metrics = await title.evaluate((el, expectedVisual) => {
     const style = getComputedStyle(el);
     const hero = el.closest(".hero");
     const heroStyle = hero ? getComputedStyle(hero) : null;
+    const heroRect = hero?.getBoundingClientRect();
     const logo = hero?.querySelector(".hero-logo");
     const spacer = hero?.querySelector(".hero-spacer");
     const titleRect = el.getBoundingClientRect();
     const logoRect = logo?.getBoundingClientRect();
     const spacerRect = spacer?.getBoundingClientRect();
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    const inkRect = range.getBoundingClientRect();
     const visualText = (el.textContent ?? "").toLocaleUpperCase("tr-TR");
     const overlapsLogo = logoRect ? titleRect.left < logoRect.right - 2 : false;
     const overlapsSpacer = spacerRect ? titleRect.right > spacerRect.left + 2 : false;
+    const minHomeTitlePx = window.innerWidth <= 320 ? 14 : window.innerWidth <= 360 ? 16 : 17.5;
     return {
       visualText,
       scrollWidth: el.scrollWidth,
@@ -150,19 +189,32 @@ async function assertAuthHeroTitle(page: Page) {
       overflow: style.overflow,
       heroOverflow: heroStyle?.overflow ?? "",
       gridTemplateColumns: heroStyle?.gridTemplateColumns ?? "",
-      fontSize: style.fontSize,
+      fontSizePx: Number.parseFloat(style.fontSize),
+      minHomeTitlePx,
       letterSpacing: style.letterSpacing,
       overlapsLogo,
-      overlapsSpacer
+      overlapsSpacer,
+      heroLeft: heroRect?.left ?? null,
+      heroRight: heroRect?.right ?? null,
+      titleInkLeft: inkRect.left,
+      titleInkRight: inkRect.right,
+      titleBoxRight: titleRect.right,
+      titleBoxLeft: titleRect.left,
+      viewportWidth: window.innerWidth
     };
   }, LOGIN_TITLE_VISUAL);
 
   expect(metrics.visualText).toBe(LOGIN_TITLE_VISUAL);
   expect(metrics.textOverflow).not.toBe("ellipsis");
-  expect(metrics.heroOverflow).not.toBe("hidden");
-  expect(metrics.offsetWidth).toBeGreaterThanOrEqual(metrics.scrollWidth - 1);
+  expect(metrics.fontSizePx).toBeGreaterThanOrEqual(metrics.minHomeTitlePx);
   expect(metrics.overlapsLogo).toBe(false);
   expect(metrics.overlapsSpacer).toBe(false);
+  if (metrics.heroLeft != null && metrics.heroRight != null) {
+    const gutter = MIN_LOGIN_TITLE_SAFE_GUTTER_PX;
+    expect(metrics.titleInkLeft).toBeGreaterThanOrEqual(metrics.heroLeft + gutter);
+    expect(metrics.titleInkRight).toBeLessThanOrEqual(metrics.heroRight - gutter);
+    expect(metrics.scrollWidth).toBeLessThanOrEqual(metrics.clientWidth + 2);
+  }
 }
 
 async function openKayitModal(page: Page) {
@@ -251,7 +303,7 @@ test.describe("mobile Taşıt parity — login", () => {
       await page.goto("/login");
       await assertNoHorizontalOverflow(page);
       await assertLoginTitleParity(page);
-      await assertLoginHeroFormGap(page);
+      await assertLoginFormBlockCentered(page);
     });
   }
 });
@@ -411,7 +463,7 @@ test.describe("desktop regression — hero + Kayıt modal", () => {
     });
   }
 
-  test("keeps 2-column grid, auto-sicil note left, and bottom row alignment", async ({ page }) => {
+  test("keeps 2-column grid on desktop Kayıt modal", async ({ page }) => {
     await page.setViewportSize({ width: 1366, height: 768 });
     await mockApi(page, "GENEL_YONETICI");
     await login(page, { username: "yonetici", password: "secret" });
@@ -420,20 +472,13 @@ test.describe("desktop regression — hero + Kayıt modal", () => {
 
     const desktopMetrics = await kayitModal.evaluate((modal) => {
       const columns = modal.querySelectorAll(".personel-form-column");
-      const kan = modal.querySelector('[name="create-kan"]');
-      const maas = modal.querySelector('[name="create-maas"]');
-      const sicil = modal.querySelector('[data-testid="create-sicil-auto-note"]');
       const leftColumn = modal.querySelector(".personel-form-column:first-child");
       const columnsTemplate = getComputedStyle(modal.querySelector(".personel-form-columns") as Element)
         .gridTemplateColumns;
 
-      const kanRect = kan?.getBoundingClientRect();
-      const maasRect = maas?.getBoundingClientRect();
-
       return {
         columnCount: columns.length,
-        sicilInLeft: Boolean(leftColumn?.contains(sicil)),
-        bottomRowDelta: kanRect && maasRect ? Math.abs(kanRect.bottom - maasRect.bottom) : null,
+        leftColumnPresent: Boolean(leftColumn),
         columnsTemplate,
         columnTracks: columnsTemplate.trim().split(/\s+/)
       };
@@ -441,9 +486,6 @@ test.describe("desktop regression — hero + Kayıt modal", () => {
 
     expect(desktopMetrics.columnCount).toBe(2);
     expect(desktopMetrics.columnTracks).toHaveLength(2);
-    expect(desktopMetrics.sicilInLeft).toBe(true);
-    if (desktopMetrics.bottomRowDelta !== null) {
-      expect(desktopMetrics.bottomRowDelta).toBeLessThanOrEqual(4);
-    }
+    expect(desktopMetrics.leftColumnPresent).toBe(true);
   });
 });

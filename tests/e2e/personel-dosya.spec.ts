@@ -568,7 +568,7 @@ test.describe("personel dosyasi surec akisi", () => {
 
     await page.goto("/personeller/4");
     await expect(page).toHaveURL(/\/personeller\/4$/);
-    await expect(page.locator(".personel-dosya-hero")).toContainText(/Maas Eksik/i);
+    await expect(page.locator(".personel-dosya-genel-ust")).toContainText(/Maas Eksik/i);
 
     await expect(page.getByTestId("personel-maas-eksik-uyari")).toBeVisible();
     await expect(page.getByTestId("personel-maas-eksik-uyari")).toHaveText("Maaþ bilgisi eksik.");
@@ -727,7 +727,7 @@ test.describe("personel dosyasi surec akisi", () => {
     await closeKayitSurecModal(page);
     await reopenPersonelKart(page);
 
-    await expect(page.locator(".personel-dosya-hero")).toContainText(/Finans/i);
+    await expect(page.locator(".personel-dosya-genel-ust")).toContainText(/Finans/i);
 
     await page.getByRole("tab", { name: "Süreç Geçmiþi" }).click();
     const timeline = page.locator("#personel-kart-panel-surec-gecmisi").locator("[data-testid='personel-surec-timeline']");

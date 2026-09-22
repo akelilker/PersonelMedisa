@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ApiRequestError, getApiErrorDetail } from "../api/api-client";
+import { getApiErrorDetail } from "../api/api-client";
 import {
   applyBildirimPuantajEtkiAday,
   cakismaCozBildirimPuantajEtkiAdayi,

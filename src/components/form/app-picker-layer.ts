@@ -163,7 +163,7 @@ export type PickerPanelGeometry = {
   offsetLeft: number;
 };
 
-function clampNumber(value: number, min: number, max: number): number {
+export function clampNumber(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
 

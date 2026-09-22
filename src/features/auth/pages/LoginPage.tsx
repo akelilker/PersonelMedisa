@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
+import { PwaInstallBar } from "../../../components/shell/PwaInstallBar";
 import { useAuth } from "../../../state/auth.store";
 
 type LoginLocationState = {
@@ -59,14 +60,17 @@ export function LoginPage() {
 
   return (
     <section className="auth-login" aria-label="Giriş">
+      <PwaInstallBar />
       <div className="auth-login-stage">
-        <form className="auth-login-form" onSubmit={handleLogin}>
+        <div className="auth-login-container">
+          <form className="auth-login-form" onSubmit={handleLogin}>
           <label className="auth-field">
             <span>Kullanıcı Adı</span>
             <input
               type="text"
               name="username"
               autoComplete="username"
+              placeholder="Örn: Savaş"
               value={username}
               onChange={(event) => setUsername(event.target.value)}
               required
@@ -79,6 +83,7 @@ export function LoginPage() {
               type="password"
               name="password"
               autoComplete="current-password"
+              placeholder="••••••"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               required
@@ -104,7 +109,8 @@ export function LoginPage() {
           >
             {isSubmitting ? "Giriş Yapılıyor..." : "Giriş Yap"}
           </button>
-        </form>
+          </form>
+        </div>
       </div>
     </section>
   );

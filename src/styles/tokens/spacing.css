@@ -22,6 +22,11 @@
   --shell-top-stack-bottom-gap: 0px;
 }
 
+/* Authenticated home: Taşıt-tight hero → icon row (8px hero margin + 8px stack gap → 4+4). */
+body.app-home-route {
+  --shell-top-stack-gap: var(--space-1);
+}
+
 /* Taşit: desktop 641+ uses 14px modal↔footer gap */
 @media (min-width: 641px) {
   :root {

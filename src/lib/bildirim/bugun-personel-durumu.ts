@@ -1,5 +1,4 @@
 import type {
-  BugunPersonelDurumu,
   BugunPersonelDurumuPerson,
   BugunPersonelDurumuStatusCounts
 } from "../../types/bildirim";
@@ -80,8 +79,4 @@ export function countsSatisfyInvariant(counts: BugunPersonelDurumuStatusCounts):
     counts.erken_cikti +
     counts.henuz_degerlendirilmedi;
   return sum === counts.toplam;
-}
-
-export function summarizeAttentionFromPayload(payload: BugunPersonelDurumu): number {
-  return payload.attention_count;
 }

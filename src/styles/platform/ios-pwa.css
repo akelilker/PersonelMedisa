@@ -30,6 +30,7 @@
   }
 
   .modal-overlay {
+    top: env(safe-area-inset-top, 0px);
     bottom: calc(
       var(--app-footer-real-height) + var(--modal-gap-above-footer) +
         env(safe-area-inset-bottom, 0px)

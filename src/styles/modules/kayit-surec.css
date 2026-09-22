@@ -15,7 +15,13 @@
   overflow-x: hidden;
   overflow-y: auto;
   padding: 0;
+  /* .modal-body grid gap (16px) would float flow footer away from form content. */
+  gap: 6px;
   overscroll-behavior: contain;
+}
+
+.modal-body--kayit-surec > .kayit-workspace {
+  flex: 0 0 auto;
 }
 
 .modal-container--kayit-surec .modal-body {
@@ -26,7 +32,7 @@
   flex: none;
   width: min(100%, 960px);
   margin-inline: auto;
-  padding: var(--space-4) clamp(12px, 2vw, 18px) calc(12px + env(safe-area-inset-bottom, 0px));
+  padding: 6px clamp(12px, 2vw, 18px) calc(12px + env(safe-area-inset-bottom, 0px));
   box-sizing: border-box;
 }
 
@@ -66,6 +72,18 @@
 /* Kayıt sekmesi: sekme satırı ile içerik ızgarası arası (varsayılan 12px yerine sıkı ritim) */
 .kayit-workspace--personel-kayit {
   gap: 6px;
+}
+
+/* Kayıt sekmesi: Excel linki form kolonlarının hemen altında kalsın (scroll-body alt boşluğu). */
+.kayit-workspace--personel-kayit .kayit-workspace-scroll-body {
+  padding-bottom: 4px;
+}
+
+/* Kırmızı header altı — tab satırı yukarı (60px min-height + flex-end boş bandı kaldır). */
+.modal-container--kayit-surec .kayit-workspace-tabs {
+  min-height: 0;
+  align-items: center;
+  padding-block: 6px 0;
 }
 
 .kayit-workspace--surec-search {
@@ -636,6 +654,7 @@
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 28px;
   position: relative;
+  align-items: stretch;
 }
 
 .personel-form-columns::after {
@@ -651,9 +670,10 @@
 }
 
 .personel-form-column {
-  display: grid;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
   gap: var(--space-2);
-  align-content: start;
   min-width: 0;
   padding-inline: 2px;
 }

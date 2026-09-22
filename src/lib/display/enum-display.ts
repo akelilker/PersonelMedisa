@@ -2,7 +2,6 @@ import type { UiProfile, UserRole } from "../../types/auth";
 import type { FinansDurum } from "../../types/finans";
 import type { PersonelCalisanKapsami } from "../../types/personel";
 import type { ComplianceUyariSeviye, GunlukPuantajState } from "../../types/puantaj";
-import type { AylikOzetAggregateState, KullaniciTipi } from "../../types/yonetim";
 
 const TR_LOCALE = "tr-TR";
 
@@ -91,11 +90,6 @@ const COMMON_STATE_LABELS: Record<string, string> = {
   YENI: "Yeni"
 };
 
-const KULLANICI_TIPI_LABELS: Record<KullaniciTipi, string> = {
-  IC_PERSONEL: "İç Personel",
-  HARICI: "Harici"
-};
-
 export const CALISAN_KAPSAMI_LABELS: Record<PersonelCalisanKapsami, string> = {
   IC_PERSONEL: "Dahili Personel",
   DIS_KAYNAK: "Harici Personel"
@@ -147,18 +141,6 @@ const COMPLIANCE_LEVEL_LABELS: Record<string, string> = {
   BILGI: "Bilgi",
   KRITIK: "Kritik",
   UYARI: "Uyarı"
-};
-
-const ISG_MAKINE_DURUM_LABELS: Record<string, string> = {
-  AKTIF: "Aktif",
-  ARIZALI: "Arızalı",
-  PASIF: "Pasif"
-};
-
-const ISG_BAKIM_DURUM_LABELS: Record<string, string> = {
-  GUNCEL: "Güncel",
-  GECIKMIS: "Gecikmiş",
-  EKSIK_VERI: "Eksik Veri"
 };
 
 const ZIMMET_URUN_TURU_LABELS: Record<string, string> = {
@@ -289,14 +271,6 @@ export function formatComplianceLevelLabel(value: ComplianceUyariSeviye | null |
   return formatMappedLabel(value, COMPLIANCE_LEVEL_LABELS);
 }
 
-export function formatIsgMakineDurumLabel(value: string | null | undefined): string {
-  return formatMappedLabel(value, ISG_MAKINE_DURUM_LABELS);
-}
-
-export function formatIsgBakimDurumuLabel(value: string | null | undefined): string {
-  return formatMappedLabel(value, ISG_BAKIM_DURUM_LABELS);
-}
-
 export function formatZimmetUrunTuruLabel(value: string | null | undefined): string {
   return formatMappedLabel(value, ZIMMET_URUN_TURU_LABELS);
 }
@@ -309,14 +283,6 @@ export function formatZimmetKayitDurumuLabel(value: string | null | undefined): 
   return formatMappedLabel(value, ZIMMET_KAYIT_DURUMU_LABELS);
 }
 
-export function formatKullaniciTipiLabel(value: KullaniciTipi | null | undefined): string {
-  if (!value) {
-    return "-";
-  }
-
-  return KULLANICI_TIPI_LABELS[value] ?? humanizeEnumFallback(value);
-}
-
 export function formatCalisanKapsamiLabel(
   value: PersonelCalisanKapsami | null | undefined
 ): string {
@@ -325,10 +291,6 @@ export function formatCalisanKapsamiLabel(
   }
 
   return CALISAN_KAPSAMI_LABELS[value] ?? humanizeEnumFallback(value);
-}
-
-export function formatAylikOzetStateLabel(value: AylikOzetAggregateState | null | undefined): string {
-  return formatMappedLabel(value, COMMON_STATE_LABELS);
 }
 
 const RETENTION_CATEGORY_LABELS: Record<string, string> = {

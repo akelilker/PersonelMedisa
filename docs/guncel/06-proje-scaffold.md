@@ -340,7 +340,6 @@ src/styles/
   layout/
     app-shell.css
     content-wrap.css
-    grid.css
   components/
     hero.css
     icons-row.css
@@ -450,11 +449,9 @@ Projeye başlarken en erken oluşturulması gereken dosyalar:
 ```text
 src/app/App.tsx
 src/app/AppShell.tsx
-src/api/client.ts
 src/components/hero/Hero.tsx
 src/components/footer/AppFooter.tsx
 src/components/modal/AppModal.tsx
-src/components/buttons/UniversalButtonGroup.tsx
 src/components/form/FormField.tsx
 src/features/personeller/pages/PersonellerPage.tsx
 src/features/personeller/pages/PersonelDetayPage.tsx

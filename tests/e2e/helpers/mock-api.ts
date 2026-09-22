@@ -73,6 +73,18 @@ type MockApiOptions = {
   personelImportHistorySeed?: "empty" | "completed";
   /** S98: allow mapping/policy write flow mocks to return success shapes. */
   sgkMappingPolicyFlow?: "default" | "writable";
+  /**
+   * Login payload personnel binding. `personel_tipi_ad` mirrors the
+   * DB-authoritative collar read model that decides the role-independent
+   * QR/kart entitlement, so E2E can exercise Mavi Yaka / Beyaz Yaka without
+   * touching the app role.
+   */
+  personelBinding?: {
+    personel_id: number | null;
+    personel_tipi_ad?: string | null;
+  };
+  /** Override login user display name (hero session chip regression). */
+  sessionAdSoyad?: string;
 };
 
 function isoDateDaysFrom(referenceDate: Date, days: number): string {
@@ -2082,7 +2094,9 @@ export async function mockApi(page: Page, role: MockUserRole, options: MockApiOp
       departman_id: 3,
       gorev_id: 1,
       personel_tipi_id: 1,
-      birim_id: 10,
+      sgk_isveren_id: 1,
+      calisma_lokasyonu_id: 1,
+      pozisyon_id: 1,
       bagli_amir_id: 9,
       sube_adi: "Merkez",
       departman_adi: "Döşeme",
@@ -4798,11 +4812,17 @@ let personelBelgeKaydiIdCounter = 903;
             .map((item) => ({ id: item.id, ad: item.ad })),
           user: {
             id: MOCK_ROLE_USER_ID[role],
-            ad_soyad: "Mock Kullanıcı",
+            ad_soyad: options.sessionAdSoyad ?? "Mock Kullanıcı",
             rol: role,
             sube_ids: mockUserSubeIds,
             birim_ids: role === "BIRIM_AMIRI" ? [10] : [],
-            personel_id: role === "BIRIM_AMIRI" ? 1 : null
+            personel_id: options.personelBinding
+              ? options.personelBinding.personel_id
+              : role === "BIRIM_AMIRI"
+                ? 1
+                : null,
+            // Collar read model: absent means "not entitled" (fail-closed).
+            personel_tipi_ad: options.personelBinding?.personel_tipi_ad ?? null
           }
         })
       );

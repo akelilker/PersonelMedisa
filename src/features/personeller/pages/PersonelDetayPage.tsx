@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { EmptyState } from "../../../components/states/EmptyState";
 import { ErrorState } from "../../../components/states/ErrorState";
@@ -6,25 +6,23 @@ import { LoadingState } from "../../../components/states/LoadingState";
 import { useRoleAccess } from "../../../hooks/use-role-access";
 import { usePersonelDetail } from "../../../hooks/usePersonelDetail";
 import {
-  PERSONEL_DOSYA_TABS,
-  PersonelDosyaActionRow,
   PersonelDosyaHero,
+  PersonelDosyaMissingInfoGateway,
+  PersonelDosyaTabList,
   PersonelDosyaTabPanels,
   type PersonelDosyaTabId
 } from "../components/personel-dosya";
+import {
+  personelTabQueryValue,
+  resolvePersonelTab
+} from "../components/personel-dosya/personel-dosya-tab-query";
 import { usePersonelKartGatewayReturn } from "../hooks/usePersonelKartGatewayReturn";
-
-function resolvePersonelTab(raw: string | null): PersonelDosyaTabId | null {
-  if (!raw) return null;
-  if (raw === "genel" || raw === "ucret") return "genel-bilgiler";
-  const match = PERSONEL_DOSYA_TABS.find((tab) => tab.id === raw);
-  return match ? match.id : null;
-}
+import { getPersonelMissingFields } from "../personel-missing-info";
 
 export function PersonelDetayPage() {
   const location = useLocation();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { personelId } = useParams();
   const parsedPersonelId = Number.parseInt(personelId ?? "", 10);
   const hasValidId = !Number.isNaN(parsedPersonelId) && parsedPersonelId > 0;
@@ -44,6 +42,7 @@ export function PersonelDetayPage() {
   const initialTab = resolvePersonelTab(searchParams.get("tab")) ?? "genel-bilgiler";
   const [activeTab, setActiveTab] = useState<PersonelDosyaTabId>(initialTab);
   const [isActionMenuOpen, setIsActionMenuOpen] = useState(false);
+  const tabScrollRef = useRef<HTMLDivElement | null>(null);
 
   const detail = usePersonelDetail(parsedPersonelId, hasValidId, {
     canViewSurecler,
@@ -86,14 +85,45 @@ export function PersonelDetayPage() {
     parsedPersonelId
   });
 
+  const syncTabInUrl = useCallback(
+    (tabId: PersonelDosyaTabId, replace = true) => {
+      const canonical = personelTabQueryValue(tabId);
+      if (searchParams.get("tab") === canonical) {
+        return;
+      }
+      const next = new URLSearchParams(searchParams);
+      next.set("tab", canonical);
+      setSearchParams(next, { replace });
+    },
+    [searchParams, setSearchParams]
+  );
+
   useEffect(() => {
     const fromQuery = resolvePersonelTab(searchParams.get("tab"));
-    setActiveTab(fromQuery ?? "genel-bilgiler");
+    const nextTab = fromQuery ?? "genel-bilgiler";
+    setActiveTab(nextTab);
     setIsActionMenuOpen(false);
-  }, [parsedPersonelId, searchParams, location.pathname]);
+    if (tabScrollRef.current) {
+      tabScrollRef.current.scrollTop = 0;
+    }
+    if (!fromQuery && searchParams.get("tab")) {
+      syncTabInUrl(nextTab);
+    }
+  }, [parsedPersonelId, searchParams, location.pathname, syncTabInUrl]);
+
+  const handleTabChange = useCallback(
+    (tabId: PersonelDosyaTabId) => {
+      setActiveTab(tabId);
+      syncTabInUrl(tabId);
+      if (tabScrollRef.current) {
+        tabScrollRef.current.scrollTop = 0;
+      }
+    },
+    [syncTabInUrl]
+  );
 
   function handleOpenSurecHistory() {
-    setActiveTab("surec-gecmisi");
+    handleTabChange("surec-gecmisi");
   }
 
   const pageHeading =
@@ -105,6 +135,8 @@ export function PersonelDetayPage() {
     personel?.retention_summary?.earliest_destruction_review_date ??
     personel?.retention_summary?.retention_until ??
     null;
+
+  const missingOnGenel = personel ? getPersonelMissingFields(personel).length : 0;
 
   return (
     <section className="personel-detay-page personel-dosya-page" aria-label={pageHeading}>
@@ -133,35 +165,40 @@ export function PersonelDetayPage() {
             </div>
           ) : null}
 
-          <PersonelDosyaHero
-            personel={personel}
-            canViewUcret={canViewUcret}
-            onOpenMissingInfo={
-              canUpdatePersonel && !isArchived && canWriteOnPersonel ? handleOpenMissingInfo : undefined
-            }
-          />
+          <div className="personel-dosya-sticky-head" data-testid="personel-dosya-sticky-head">
+            <PersonelDosyaHero personel={personel} />
 
-          {!canWriteOnPersonel ? (
-            <p className="personel-write-scope-notice" role="status" data-testid="personel-write-scope-notice">
-              Bu işlem İK sorumlusu tarafından gerçekleştirilmelidir.
-            </p>
-          ) : null}
+            <div className="personel-dosya-tab-nav">
+              <PersonelDosyaTabList
+                activeTab={effectiveActiveTab}
+                onTabChange={handleTabChange}
+                directoryOnly={isDisKaynak}
+                missingCounts={{ "genel-bilgiler": missingOnGenel }}
+              />
+            </div>
+          </div>
 
-          {!isArchived && !isDisKaynak ? (
-            <PersonelDosyaActionRow
-              canAccessSurecler={canAccessSureclerEffective}
-              canCreateSurec={canCreateSurecEffective}
-              isActionMenuOpen={isActionMenuOpen}
-              onToggleActionMenu={() => setIsActionMenuOpen((prev) => !prev)}
-              onCloseActionMenu={() => setIsActionMenuOpen(false)}
-              onOpenSurecModal={handleOpenSurecModal}
-              onOpenSurecHistory={handleOpenSurecHistory}
+          <div
+            ref={tabScrollRef}
+            className="personel-dosya-tab-scroll"
+            data-testid="personel-dosya-tab-scroll"
+          >
+            <PersonelDosyaMissingInfoGateway
+              personel={personel}
+              onOpenMissingInfo={
+                canUpdatePersonel && !isArchived && canWriteOnPersonel ? handleOpenMissingInfo : undefined
+              }
             />
-          ) : null}
 
-          <PersonelDosyaTabPanels
+            {!canWriteOnPersonel ? (
+              <p className="personel-write-scope-notice" role="status" data-testid="personel-write-scope-notice">
+                Bu işlem İK sorumlusu tarafından gerçekleştirilmelidir.
+              </p>
+            ) : null}
+
+            <PersonelDosyaTabPanels
             activeTab={effectiveActiveTab}
-            onTabChange={setActiveTab}
+            onTabChange={handleTabChange}
             personel={personel}
             surecler={surecHistory}
             surecHistoryHasMore={surecHistoryHasMore}
@@ -185,7 +222,21 @@ export function PersonelDetayPage() {
             canApproveBordroKapsam={false}
             canManageAccountOnboarding={canManageAccountOnboarding && !isArchived}
             directoryOnly={isDisKaynak}
-          />
+            genelActionRow={
+              !isArchived && !isDisKaynak
+                ? {
+                    canAccessSurecler: canAccessSureclerEffective,
+                    canCreateSurec: canCreateSurecEffective,
+                    isActionMenuOpen,
+                    onToggleActionMenu: () => setIsActionMenuOpen((prev) => !prev),
+                    onCloseActionMenu: () => setIsActionMenuOpen(false),
+                    onOpenSurecModal: handleOpenSurecModal,
+                    onOpenSurecHistory: handleOpenSurecHistory
+                  }
+                : null
+            }
+            />
+          </div>
         </div>
       ) : null}
     </section>

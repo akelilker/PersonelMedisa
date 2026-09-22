@@ -54,8 +54,6 @@ export type OrganizasyonFormState = {
   effectiveDate: string;
 };
 
-export type PozisyonFormState = OrganizasyonFormState;
-
 type DevamsizlikSubCard = {
   id: DevamsizlikSubId;
   title: string;

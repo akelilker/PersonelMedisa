@@ -1,8 +1,6 @@
-import type { AuthSession, AuthUser, LoginCredentials } from "../types/auth";
+import type { AuthSession, LoginCredentials } from "../types/auth";
 import { GLOBAL_SCOPE_ROLES } from "../types/auth";
-import { apiRequest } from "../api/api-client";
 import { login as requestLoginSession } from "../api/auth.api";
-import { endpoints } from "../api/endpoints";
 import { canonicalizeUserRole } from "../lib/authorization/canonicalize-user-role";
 import { MEDISA_AUTH_SESSION_KEY } from "./auth-constants";
 import { finalizeAuthSessionSube } from "./auth-session-sube";
@@ -131,15 +129,6 @@ export function getSession(): AuthSession | null {
 
 export function getToken(): string | null {
   return getSession()?.token ?? null;
-}
-
-export function getCurrentUser(): AuthUser | null {
-  return getSession()?.user ?? null;
-}
-
-/** Oturumdaki yetkili sube id listesi (bos = tum subeler). */
-export function getAllowedSubeIds(): number[] {
-  return getSession()?.user.sube_ids ?? [];
 }
 
 /** Secili aktif sube; tum sube modunda null. */

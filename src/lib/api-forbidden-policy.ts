@@ -116,5 +116,20 @@ export function shouldEmitGlobalAuthForbidden(path: string, method?: string, cod
     return false;
   }
 
+  // Bootstrap referans kataloglari: yalnizca yonetim formlarini besler ve
+  // self-service-only rol (PERSONEL) icin 403 beklenir
+  // (SELF_SERVICE_ONLY_ROLE_FORBIDDEN). Beklenen bootstrap 403'u global
+  // /yetkisiz yonlendirmesine cevrilmez; dogrudan korunan bir rotaya giris
+  // zaten ProtectedRoute tarafindan reddedilir.
+  if (normalizedMethod === "GET" && normalizedPath.startsWith("/referans/")) {
+    return false;
+  }
+
+  // Header bildirim onizlemesi / gunluk tamamlama listesi: bildirimler.view
+  // olmayan rollerde 403 beklenir, global redirect yapma.
+  if (normalizedMethod === "GET" && normalizedPath === "/bildirimler/gunluk-tamamlamalari") {
+    return false;
+  }
+
   return true;
 }

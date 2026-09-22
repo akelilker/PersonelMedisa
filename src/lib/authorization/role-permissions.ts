@@ -149,9 +149,11 @@ export const SELF_SERVICE_BASELINE_PERMISSIONS: readonly AppPermission[] = [
 ];
 
 /**
- * PERSONEL self-service QR capabilities. Mirrors RolePermissions::QR_SELF_SERVICE_PERMISSIONS.
- * Effective only with the canonical "Mavi Yaka" collar; management roles keep the
- * personnel-linked baseline. The backend re-decides every request — this is the UX mirror.
+ * Self-service QR/kart okutma capabilities. Mirrors RolePermissions::QR_SELF_SERVICE_PERMISSIONS.
+ *
+ * Role-independent: granted by the bound personel + canonical collar decision
+ * (`hasQrSelfServiceEntitlement`), never by the application role. The backend
+ * re-decides every request — this is the UX mirror.
  */
 export const QR_SELF_SERVICE_PERMISSIONS: readonly AppPermission[] = [
   "self_service.qr.scan",
@@ -182,16 +184,24 @@ export function collarAllowsQrSelfService(personelTipiAd?: string | null): boole
 }
 
 /**
- * PERSONEL-only collar restriction. Management roles (`+ personel_id`) are out of
- * scope in this phase and keep their existing self-service QR behaviour.
+ * Canonical QR/kart okutma entitlement — role bağımsız.
+ *
+ * Kanonik iş kuralı: kendi giriş/çıkışını okutma hakkı bir *çalışan kapsamı*
+ * kararıdır, uygulama rolü kararı değildir. Bağlı ve aktif personeli kanonik
+ * "Mavi Yaka" collar'ında olan her hesap bu hakkı alır — BIRIM_AMIRI /
+ * BOLUM_YONETICISI / SUBE_YONETICISI gibi yönetici rolleri dahil. Bu kullanıcı
+ * QR okutacak diye PERSONEL rolüne düşürülmez ve yönetim yetkileri korunur.
+ *
+ * Fail-closed: bağlantı yok ya da collar kanonik değer değilse hak verilmez.
+ * Backend (RolePermissions::hasQrSelfServiceEntitlement) otoritedir.
  */
-function isPersonelQrRestricted(
-  role: UserRole | string | null | undefined,
-  permission: AppPermission
+export function hasQrSelfServiceEntitlement(
+  personelId?: number | null,
+  personelTipiAd?: string | null
 ): boolean {
   return (
-    canonicalizeUserRole(role ?? null) === "PERSONEL" &&
-    QR_SELF_SERVICE_PERMISSIONS.includes(permission)
+    hasPersonnelLinkedSelfServiceEligibility(personelId) &&
+    collarAllowsQrSelfService(personelTipiAd)
   );
 }
 
@@ -643,8 +653,9 @@ export function hasPersonnelLinkedSelfServiceEligibility(
  * Effective permission check: role matrix + personnel-linked self-service baseline.
  * Mirrors api/src/Auth/RolePermissions::has.
  *
- * `personelTipiAd` is the canonical collar carried on the DB-authoritative session
- * user; it is only consulted for the PERSONEL-role QR capabilities.
+ * The QR/kart capabilities are decided role-independently from the bound personel
+ * and the canonical collar; they are never inherited from the application role.
+ * `personelTipiAd` is the DB-authoritative collar carried on the session user.
  */
 export function hasUserPermission(
   role: UserRole | string | null | undefined,
@@ -652,8 +663,8 @@ export function hasUserPermission(
   personelId?: number | null,
   personelTipiAd?: string | null
 ): boolean {
-  if (isPersonelQrRestricted(role, permission)) {
-    return collarAllowsQrSelfService(personelTipiAd);
+  if (QR_SELF_SERVICE_PERMISSIONS.includes(permission)) {
+    return hasQrSelfServiceEntitlement(personelId, personelTipiAd);
   }
   if (
     hasPersonnelLinkedSelfServiceEligibility(personelId) &&
@@ -675,10 +686,8 @@ export function getEffectivePermissions(
       merged.add(permission);
     }
   }
-  if (
-    canonicalizeUserRole(role ?? null) === "PERSONEL" &&
-    !collarAllowsQrSelfService(personelTipiAd)
-  ) {
+  // Rol bağımsız QR/kart kapısı: hak yoksa izin matrisi de göstermez.
+  if (!hasQrSelfServiceEntitlement(personelId, personelTipiAd)) {
     for (const permission of QR_SELF_SERVICE_PERMISSIONS) {
       merged.delete(permission);
     }
@@ -781,8 +790,6 @@ export const BILDIRIM_DETAIL_ALLOWED_ROLES = getRolesWithPermission("bildirimler
 export const PUANTAJ_ALLOWED_ROLES = getRolesWithPermission("puantaj.view");
 export const RAPORLAR_ALLOWED_ROLES = getRolesWithPermission("raporlar.view");
 export const FINANS_ALLOWED_ROLES = getRolesWithPermission("finans.view");
-export const AYLIK_OZET_ALLOWED_ROLES = getRolesWithPermission("aylik-ozet.view");
-export const ISG_ALLOWED_ROLES = getRolesWithPermission("isg.view");
 
 /** Liste rotalari: genel veya sube kapsamli goruntuleme */
 export const PERSONELLER_LIST_ANY: AppPermission[] = ["personeller.view", "personeller.view.sube"];

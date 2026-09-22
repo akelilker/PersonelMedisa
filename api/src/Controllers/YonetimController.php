@@ -20,6 +20,7 @@ use Medisa\Api\Scope\OrgScope;
 use Medisa\Api\Scope\SubeScope;
 use Medisa\Api\Services\Auth\UserPersonelBindingService;
 use Medisa\Api\Services\Auth\PersonelAccountOnboardingService;
+use Medisa\Api\Services\Auth\BoundUserCanonicalUsernameReconciliationService;
 use Medisa\Api\Services\Auth\ActorIdentityException;
 use Medisa\Api\Services\Auth\ActorIdentityService;
 use Medisa\Api\Services\Organizasyon\OrganizasyonAuditContext;
@@ -918,7 +919,6 @@ class YonetimController
         $hasVarsayilan = UsersSchema::hasVarsayilanSubeId($pdo);
         $hasPersonelId = UsersSchema::hasPersonelId($pdo);
         $hasMustChangePassword = UsersSchema::hasMustChangePassword($pdo);
-        $hasActivationRequired = UsersSchema::hasActivationRequired($pdo);
         $selectCols = ['id', 'username', 'ad_soyad', 'rol', 'durum'];
         if ($hasVarsayilan) {
             $selectCols[] = 'varsayilan_sube_id';
@@ -928,12 +928,6 @@ class YonetimController
         }
         if ($hasMustChangePassword) {
             $selectCols[] = 'must_change_password';
-        }
-        if ($hasActivationRequired) {
-            $selectCols[] = 'activation_required';
-        }
-        if (UsersSchema::hasActivatedAtUtc($pdo)) {
-            $selectCols[] = 'activated_at_utc';
         }
         $selectSql = 'SELECT ' . implode(', ', $selectCols) . ' FROM users ORDER BY id ASC';
         $stmt = $pdo->query($selectSql);
@@ -1162,30 +1156,68 @@ class YonetimController
         }
 
         $body = $request->getJsonBody();
-        $username = array_key_exists('username', $body)
-            ? trim((string) $body['username'])
-            : (string) $existing['username'];
-        $password = array_key_exists('password', $body) ? (string) $body['password'] : '';
         $resetToInitial = self::parseInitialPasswordResetIntent($body);
-        $adSoyad = array_key_exists('ad_soyad', $body)
-            ? trim((string) $body['ad_soyad'])
-            : (string) $existing['ad_soyad'];
-        $rol = array_key_exists('rol', $body)
-            ? strtoupper(trim((string) $body['rol']))
-            : (string) $existing['rol'];
-        $durum = array_key_exists('durum', $body)
-            ? strtoupper(trim((string) $body['durum']))
-            : (string) $existing['durum'];
+        $fixCanonicalUsername = self::parseCanonicalUsernameFixIntent($body);
+        $password = array_key_exists('password', $body) ? (string) $body['password'] : '';
 
-        $subeIdsProvided = array_key_exists('sube_ids', $body);
-        $bolumIdsProvided = array_key_exists('bolum_ids', $body);
-        $birimIdsProvided = array_key_exists('birim_ids', $body);
-        $sirketIdsProvided = array_key_exists('sirket_ids', $body);
-        $sgkIsverenIdsProvided = array_key_exists('sgk_isveren_ids', $body);
-        $varsayilanProvided = array_key_exists('varsayilan_sube_id', $body);
-        $requestedVarsayilan = $varsayilanProvided ? self::parseOptionalInt($body['varsayilan_sube_id']) : null;
-        $personelIdProvided = array_key_exists('personel_id', $body);
-        $requestedPersonelId = $personelIdProvided ? self::parseOptionalInt($body['personel_id']) : null;
+        // Dedicated intents stay exclusive: password reset never rewrites username,
+        // and canonical username fix never touches password / must_change_password.
+        if ($fixCanonicalUsername && $resetToInitial) {
+            JsonResponse::badRequest(
+                'Canonical kullanici adi duzeltmesi ile baslangic sifresi sifirlama ayni istekte kullanilamaz.',
+                'VALIDATION_ERROR',
+                'canonical_username_duzelt'
+            );
+        }
+        if ($fixCanonicalUsername && $password !== '') {
+            JsonResponse::badRequest(
+                'Canonical kullanici adi duzeltmesi ile sifre alani ayni istekte kullanilamaz.',
+                'VALIDATION_ERROR',
+                'canonical_username_duzelt'
+            );
+        }
+
+        if ($fixCanonicalUsername) {
+            $fixPlan = BoundUserCanonicalUsernameReconciliationService::requireCanonicalUsernameFix(
+                $pdo,
+                $existing
+            );
+            $username = (string) $fixPlan['username'];
+            $adSoyad = (string) $existing['ad_soyad'];
+            $rol = (string) $existing['rol'];
+            $durum = (string) $existing['durum'];
+            $subeIdsProvided = false;
+            $bolumIdsProvided = false;
+            $birimIdsProvided = false;
+            $sirketIdsProvided = false;
+            $sgkIsverenIdsProvided = false;
+            $varsayilanProvided = false;
+            $requestedVarsayilan = null;
+            $personelIdProvided = false;
+            $requestedPersonelId = null;
+        } else {
+            $username = array_key_exists('username', $body)
+                ? trim((string) $body['username'])
+                : (string) $existing['username'];
+            $adSoyad = array_key_exists('ad_soyad', $body)
+                ? trim((string) $body['ad_soyad'])
+                : (string) $existing['ad_soyad'];
+            $rol = array_key_exists('rol', $body)
+                ? strtoupper(trim((string) $body['rol']))
+                : (string) $existing['rol'];
+            $durum = array_key_exists('durum', $body)
+                ? strtoupper(trim((string) $body['durum']))
+                : (string) $existing['durum'];
+            $subeIdsProvided = array_key_exists('sube_ids', $body);
+            $bolumIdsProvided = array_key_exists('bolum_ids', $body);
+            $birimIdsProvided = array_key_exists('birim_ids', $body);
+            $sirketIdsProvided = array_key_exists('sirket_ids', $body);
+            $sgkIsverenIdsProvided = array_key_exists('sgk_isveren_ids', $body);
+            $varsayilanProvided = array_key_exists('varsayilan_sube_id', $body);
+            $requestedVarsayilan = $varsayilanProvided ? self::parseOptionalInt($body['varsayilan_sube_id']) : null;
+            $personelIdProvided = array_key_exists('personel_id', $body);
+            $requestedPersonelId = $personelIdProvided ? self::parseOptionalInt($body['personel_id']) : null;
+        }
 
         $currentSubeIds = self::loadSubeIdsByUserIds($pdo, [$kullaniciId])[$kullaniciId] ?? [];
         $currentBolumIds = UserOrgAssignmentSchema::loadBolumIdsByUserIds($pdo, [$kullaniciId])[$kullaniciId] ?? [];
@@ -1238,6 +1270,12 @@ class YonetimController
             PasswordPolicy::assertValidNewPassword($password);
             $passwordHash = PasswordHasher::hash($password);
         } elseif ($resetToInitial) {
+            // Username must already be canonical for bound accounts. Reset never
+            // rewrites username — the dedicated canonical fix intent owns that.
+            BoundUserCanonicalUsernameReconciliationService::assertUsernameCanonicalForInitialPasswordReset(
+                $pdo,
+                $existing
+            );
             // The name is resolved from stored state only, never from the request:
             // a bound personnel record owns it, otherwise the stored user field does.
             $passwordHash = InitialPassword::requireHashForName(
@@ -1496,8 +1534,7 @@ class YonetimController
      * What is removed is everything that makes the account usable: it is
      * deactivated (AuthMiddleware rejects a non-AKTIF user, so every issued token
      * stops working on its next request), its credential is replaced by an
-     * unusable random secret, any pending activation invitation is revoked, and
-     * all organisation scope grants are cleared.
+     * unusable random secret, and all organisation scope grants are cleared.
      *
      * A bound personnel record is never touched: the binding is cleared through
      * its own audited owner and the personeller row survives untouched.
@@ -1614,8 +1651,6 @@ class YonetimController
             $stmt = $pdo->prepare($sql);
             $stmt->execute($params);
 
-            self::revokePendingActivationInvitations($pdo, $kullaniciId);
-
             $scopeAxes = [
                 OrganizasyonAuditWriter::SCOPE_SUBE => $currentSubeIds,
                 OrganizasyonAuditWriter::SCOPE_SIRKET => $currentSirketIds,
@@ -1663,36 +1698,6 @@ class YonetimController
         }
 
         JsonResponse::success($updated);
-    }
-
-    /**
-     * Pending activation invitations are a second, token-shaped way into the
-     * account, so they are revoked with it. Absent schema is not an error: there
-     * is then nothing to revoke.
-     */
-    private static function revokePendingActivationInvitations(PDO $pdo, $kullaniciId)
-    {
-        try {
-            $table = $pdo->query("SHOW TABLES LIKE 'personel_account_activation_invitations'");
-            $exists = $table !== false && $table->fetch(PDO::FETCH_NUM) !== false;
-            if ($table !== false) {
-                $table->closeCursor();
-            }
-            if (!$exists) {
-                return;
-            }
-        } catch (\Throwable $e) {
-            return;
-        }
-
-        $stmt = $pdo->prepare(
-            'UPDATE personel_account_activation_invitations
-                SET revoked_at_utc = UTC_TIMESTAMP()
-              WHERE user_id = :user_id
-                AND revoked_at_utc IS NULL
-                AND consumed_at_utc IS NULL'
-        );
-        $stmt->execute(['user_id' => (int) $kullaniciId]);
     }
 
     /** @param array<string, mixed> $user */
@@ -1755,18 +1760,6 @@ class YonetimController
 
         if ($hasMustChangePasswordColumn) {
             $mapped['must_change_password'] = self::readStoredMustChangePasswordFromRow($row);
-        }
-
-        if (array_key_exists('activation_required', $row)) {
-            $mapped['activation_required'] = ((int) ($row['activation_required'] ?? 0)) === 1;
-            if ($mapped['activation_required']) {
-                $mapped['activation_status'] = 'PENDING';
-            } elseif (array_key_exists('activated_at_utc', $row) && $row['activated_at_utc']) {
-                $mapped['activation_status'] = 'ACTIVE';
-                $mapped['activated_at_utc'] = (string) $row['activated_at_utc'];
-            } else {
-                $mapped['activation_status'] = 'ACTIVE';
-            }
         }
 
         return $mapped;
@@ -1877,12 +1870,6 @@ class YonetimController
         if ($hasMustChangePassword) {
             $cols[] = 'must_change_password';
         }
-        if (UsersSchema::hasActivationRequired($pdo)) {
-            $cols[] = 'activation_required';
-        }
-        if (UsersSchema::hasActivatedAtUtc($pdo)) {
-            $cols[] = 'activated_at_utc';
-        }
         $sql = 'SELECT ' . implode(', ', $cols) . ' FROM users WHERE id = :id LIMIT 1';
         $stmt = $pdo->prepare($sql);
         $stmt->execute(['id' => $userId]);
@@ -1983,6 +1970,30 @@ class YonetimController
                 'Baslangic sifresi sifirlama alani boolean olmalidir.',
                 'VALIDATION_ERROR',
                 'baslangic_sifresine_sifirla'
+            );
+        }
+
+        return $value;
+    }
+
+    /**
+     * Boolean-only intent: rewrite username to the bound-personel canonical
+     * template. Never combined with password writes.
+     *
+     * @param array<string, mixed> $body
+     */
+    private static function parseCanonicalUsernameFixIntent(array $body)
+    {
+        if (!array_key_exists('canonical_username_duzelt', $body)) {
+            return false;
+        }
+
+        $value = $body['canonical_username_duzelt'];
+        if (!is_bool($value)) {
+            JsonResponse::badRequest(
+                'Canonical kullanici adi duzeltme alani boolean olmalidir.',
+                'VALIDATION_ERROR',
+                'canonical_username_duzelt'
             );
         }
 

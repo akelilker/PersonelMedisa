@@ -5,7 +5,7 @@ import {
   fetchFinansKalemList,
   updateFinansKalem
 } from "../api/finans.api";
-import { emptyPaginated, makeTempId } from "../data/app-data.types";
+import { emptyPaginated } from "../data/app-data.types";
 import {
   dataCacheKeys,
   enqueueSyncOperation,

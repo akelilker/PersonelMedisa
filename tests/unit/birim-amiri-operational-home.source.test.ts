@@ -18,18 +18,35 @@ describe("BIRIM_AMIRI operational home owners", () => {
     expect(home).not.toContain("Üst Amire Gönder");
   });
 
-  it("operational home has no QR CTA and keeps daily notification entry on /bildirimler", () => {
+  it("operational home reuses the canonical QR owner and keeps daily notification entry on /bildirimler", () => {
     const home = read("src/features/self-service/pages/BirimAmiriOperationalHomePage.tsx");
     expect(home).toContain('to="/bildirimler"');
     expect(home).toContain("Günlük Bildirimi Düzenle");
     expect(home).toContain("Günlük Bildirimi Tamamla");
-    expect(home).not.toContain("/self/qr-okut");
-    expect(home).not.toContain("self-qr-scan-link");
-    expect(home).not.toContain("giris-scan");
+    // QR CTA/link owner'ı paylaşılan component'tir: paralel QR UI yok.
+    expect(home).toContain("<SelfServiceQrShortcuts");
+    expect(home).not.toContain('data-testid="self-qr-scan-link"');
+    expect(home).not.toContain('data-testid="giris-scan"');
+    // Read-only attendance boxes stay read-only for the manager home.
+    expect(home).toContain("pm-attendance-grid--readonly");
     expect(home).toContain("Kendi Bilgilerim");
     expect(home).toContain("Birimim");
     expect(home).toContain("birim-amiri-pazar-mesai-prompt");
     expect(home).toContain("birim-amiri-eksik-giris-warning");
+  });
+
+  it("QR entitlement owner is role-independent and shared (no role demotion)", () => {
+    const shortcuts = read("src/features/self-service/components/SelfServiceQrShortcuts.tsx");
+    expect(shortcuts).toContain('hasPermission("self_service.qr.scan")');
+    expect(shortcuts).toContain('data-testid="self-qr-scan-link"');
+    expect(shortcuts).toContain('data-testid="self-qr-history-link"');
+    // Rol kararı component'te yok; karar permission owner'ında.
+    expect(shortcuts).not.toContain('"PERSONEL"');
+
+    const routes = read("src/app/routes.tsx");
+    expect(routes).toContain("<SelfServiceQrShortcuts");
+    expect(routes).toContain('session?.user.rol === "BIRIM_AMIRI"');
+    expect(routes).toContain("<BirimAmiriOperationalHomePage />");
   });
 
   it("backend unit roster uses OrgScope and does not reuse fetchGunlukRoster fallback", () => {
@@ -60,9 +77,12 @@ describe("BIRIM_AMIRI operational home owners", () => {
     expect(shell).toContain("tamamlama-");
   });
 
-  it("PERSONEL self-service page still owns QR scan CTAs", () => {
+  it("PERSONEL self-service page delegates QR scan CTAs to the shared owner", () => {
     const selfHome = read("src/features/self-service/pages/PersonelSelfServiceHomePage.tsx");
-    expect(selfHome).toContain("self-qr-scan-link");
+    expect(selfHome).toContain("<SelfServiceQrShortcuts />");
     expect(selfHome).toContain("giris-scan");
+    const shortcuts = read("src/features/self-service/components/SelfServiceQrShortcuts.tsx");
+    expect(shortcuts).toContain("self-qr-scan-link");
+    expect(shortcuts).toContain("self-qr-history-link");
   });
 });

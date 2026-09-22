@@ -449,17 +449,20 @@ class RolePermissions
     ];
 
     /**
-     * Canonical collar that may use PERSONEL self-service QR.
+     * Canonical collar that may use self-service QR/kart okutma.
      * Owner chain: personeller.personel_tipi_id → personel_tipleri.ad.
      * `ucret_tipi` is intentionally NOT a collar source (no business mapping).
      */
     public const QR_SELF_SERVICE_COLLAR = 'Mavi Yaka';
 
     /**
-     * Self-service QR capabilities. For the PERSONEL role these are additionally
-     * gated by the canonical collar and fail closed for Beyaz Yaka / Diğer /
-     * unknown collar. Management roles keep the personnel-linked baseline
-     * behaviour of this phase unchanged.
+     * Self-service QR/kart okutma capabilities.
+     *
+     * Role-independent: decided by the personnel binding + canonical collar
+     * (`hasQrSelfServiceEntitlement`), never by the application role. A bound
+     * BIRIM_AMIRI / BOLUM_YONETICISI keeps its management matrix and additionally
+     * gains its own entry/exit scanning right. Beyaz Yaka / Diğer / unknown
+     * collar fails closed.
      *
      * @var array<int, string>
      */
@@ -497,7 +500,7 @@ class RolePermissions
     }
 
     /**
-     * PERSONEL-role QR decision from the DB-authoritative auth user collar.
+     * Canonical collar decision from the DB-authoritative auth user collar.
      * Missing / null / unresolvable collar → denied.
      *
      * @param array<string, mixed> $user
@@ -505,6 +508,25 @@ class RolePermissions
     public static function personelCollarAllowsQr(array $user)
     {
         return self::collarAllowsQrSelfService($user['personel_tipi_ad'] ?? null);
+    }
+
+    /**
+     * Role-independent QR/kart okutma entitlement.
+     *
+     * Kanonik iş kuralı: kendi giriş/çıkışını okutma hakkı bir *çalışan kapsamı*
+     * kararıdır, uygulama rolü kararı değildir. Bağlı ve aktif personeli kanonik
+     * "Mavi Yaka" collar'ında olan her hesap bu hakkı alır — yönetici rolleri
+     * (BIRIM_AMIRI / BOLUM_YONETICISI / SUBE_YONETICISI ...) dahil. Bu kullanıcı
+     * QR okutacak diye PERSONEL rolüne düşürülmez ve yönetim yetkileri korunur.
+     *
+     * Fail-closed: bağlantı yok ya da collar kanonik değer değilse hak verilmez.
+     *
+     * @param array<string, mixed> $user
+     */
+    public static function hasQrSelfServiceEntitlement(array $user)
+    {
+        return self::hasPersonnelLinkedSelfServiceEligibility($user)
+            && self::personelCollarAllowsQr($user);
     }
 
     /** @param mixed $value */
@@ -576,13 +598,11 @@ class RolePermissions
             return false;
         }
 
-        // PERSONEL self-service QR is collar-gated (fail-closed). Management roles
-        // with a personnel binding keep the personnel-linked baseline unchanged.
-        if (
-            self::isQrSelfServicePermission($permission)
-            && self::normalizeRole(isset($user['rol']) ? (string) $user['rol'] : '') === 'PERSONEL'
-        ) {
-            return self::personelCollarAllowsQr($user);
+        // QR/kart okutma: rol bağımsız (bağlı personel + kanonik mavi yaka).
+        // Yönetici rolleri de kendi giriş/çıkışını okutabilir; rol bu kararı
+        // ne genişletir ne daraltır.
+        if (self::isQrSelfServicePermission($permission)) {
+            return self::hasQrSelfServiceEntitlement($user);
         }
 
         // personel_id binding → own self-service baseline (role-independent).

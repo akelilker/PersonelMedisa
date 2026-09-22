@@ -22,8 +22,8 @@ class QrAttendanceTodayService
     {
         $ctx = SelfPersonelContext::resolveForSelfService($authUser, $pdo, true);
         $caps = PersonelMobileCapabilityService::resolve($pdo, (int) $ctx['personel_id'], $ctx);
-        // PERSONEL self-service QR capability is collar-gated (fail-closed).
-        // Management roles keep the personnel-linked behaviour of this phase.
+        // QR/kart okutma yetkisi rol bağımsızdır: bağlı personel + kanonik collar.
+        // Yönetici roller de kendi giriş/çıkışını okutabilir.
         if (!RolePermissions::has($authUser, 'self_service.qr.scan')) {
             $caps['qr_scan'] = false;
         }

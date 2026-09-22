@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import {
   ackInboxPopup,
   createAttendanceCorrection,
@@ -15,6 +15,7 @@ import { LoadingState } from "../../../components/states/LoadingState";
 import { useRoleAccess } from "../../../hooks/use-role-access";
 import type { MeIdentity } from "../../../types/self-service";
 import { BackgroundlessNoticeModal } from "../components/BackgroundlessNoticeModal";
+import { SelfServiceQrShortcuts } from "../components/SelfServiceQrShortcuts";
 import { PersonelMobileCapabilityService } from "../personel-mobile-capability";
 
 type NoticeState =
@@ -42,8 +43,8 @@ const COMING_SOON = PersonelMobileCapabilityService.MESSAGE_COMING_SOON;
 export function PersonelSelfServiceHomePage() {
   const navigate = useNavigate();
   const { hasPermission } = useRoleAccess();
-  // PERSONEL self-service QR is collar-gated (canonical "Mavi Yaka"); management
-  // roles keep the personnel-linked behaviour. Backend remains the authority.
+  // QR/kart okutma yetkisi rol bağımsızdır (bağlı personel + kanonik mavi yaka).
+  // Backend otoritedir; bu UX aynasıdır.
   const qrEnabled = hasPermission("self_service.qr.scan");
   const [loading, setLoading] = useState(true);
   const [today, setToday] = useState<AttendanceTodayResponse | null>(null);
@@ -368,16 +369,7 @@ export function PersonelSelfServiceHomePage() {
         </div>
       ) : null}
 
-      {qrEnabled ? (
-        <nav className="pm-secondary-nav" aria-label="Self-service kısayollar">
-          <Link to="/self/qr-okut" data-testid="self-qr-scan-link">
-            QR Okut
-          </Link>
-          <Link to="/self/qr-hareketleri" data-testid="self-qr-history-link">
-            QR Hareketlerim
-          </Link>
-        </nav>
-      ) : null}
+      <SelfServiceQrShortcuts />
 
       <footer className="pm-footer" data-testid="personel-mobile-footer">
         <div className="pm-footer-accent pm-footer-accent--left" aria-hidden="true" />

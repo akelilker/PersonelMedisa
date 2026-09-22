@@ -1,4 +1,4 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { changePassword } from "../../../api/auth.api";
 import { ApiRequestError } from "../../../api/api-client";
@@ -12,6 +12,14 @@ export function ChangePasswordPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    document.body.classList.add("login-page");
+
+    return () => {
+      document.body.classList.remove("login-page");
+    };
+  }, []);
 
   if (!isAuthenticated || !session) {
     return <Navigate to="/login" replace />;
@@ -51,54 +59,60 @@ export function ChangePasswordPage() {
   }
 
   return (
-    <section className="login-page" data-testid="change-password-page">
-      <form className="login-card" onSubmit={(e) => void handleSubmit(e)}>
-        <h1>Şifre Belirleme</h1>
-        <p className="login-hint">Devam etmek için yeni şifrenizi belirleyin.</p>
-        <label>
-          Mevcut / geçici şifre
-          <input
-            type="password"
-            name="current_password"
-            autoComplete="current-password"
-            value={currentPassword}
-            onChange={(e) => setCurrentPassword(e.target.value)}
-            required
-          />
-        </label>
-        <label>
-          Yeni şifre
-          <input
-            type="password"
-            name="new_password"
-            autoComplete="new-password"
-            value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
-            minLength={8}
-            required
-          />
-        </label>
-        <label>
-          Yeni şifre (tekrar)
-          <input
-            type="password"
-            name="confirm_password"
-            autoComplete="new-password"
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            minLength={8}
-            required
-          />
-        </label>
-        {error ? (
-          <p className="login-error" role="alert">
-            {error}
+    <section className="auth-login" aria-label="Şifre Belirleme" data-testid="change-password-page">
+      <div className="auth-login-stage">
+        <div className="auth-login-container">
+          <h1 className="auth-change-password-title">Şifre Belirleme</h1>
+          <p className="auth-muted auth-change-password-lead">
+            Devam etmek için yeni şifrenizi belirleyin.
           </p>
-        ) : null}
-        <button type="submit" disabled={submitting}>
-          {submitting ? "Kaydediliyor…" : "Şifreyi Kaydet"}
-        </button>
-      </form>
+          <form className="auth-login-form auth-change-password-form" onSubmit={(e) => void handleSubmit(e)}>
+            <label className="auth-field-row">
+              <span>Mevcut / geçici şifre</span>
+              <input
+                type="password"
+                name="current_password"
+                autoComplete="current-password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                required
+              />
+            </label>
+            <label className="auth-field-row">
+              <span>Yeni şifre</span>
+              <input
+                type="password"
+                name="new_password"
+                autoComplete="new-password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                minLength={8}
+                required
+              />
+            </label>
+            <label className="auth-field-row">
+              <span>Yeni şifre (tekrar)</span>
+              <input
+                type="password"
+                name="confirm_password"
+                autoComplete="new-password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                minLength={8}
+                required
+              />
+            </label>
+            {error ? (
+              <p className="auth-error" role="alert">
+                {error}
+              </p>
+            ) : null}
+            <button type="submit" className="universal-btn-save" disabled={submitting}>
+              {submitting ? "Kaydediliyor…" : "Şifreyi Kaydet"}
+            </button>
+          </form>
+        </div>
+      </div>
     </section>
   );
 }

@@ -226,11 +226,12 @@ describe("employment scope / workplace / insurance model (owner wiring)", () => 
     expect(deps).toContain("filterSgkIsverenOptionsForCreate");
     expect(deps).toContain("SGK/bordro kaynağı fiili organizasyon şubesinden");
 
-    const detail = read("src/features/personeller/components/personel-dosya/PersonelKartPanelGenelBilgiler.tsx");
-    expect(detail).toContain('label="SGK İşvereni"');
-    expect(detail).toContain('label="Çalışma Lokasyonu"');
-    const genelUst = read("src/features/personeller/components/personel-dosya/PersonelDosyaGenelUst.tsx");
-    expect(genelUst).toContain("Çalışan Kapsamı");
-    expect(genelUst).toContain("personel_tipi_id");
+    const mirror = read(
+      "src/features/personeller/components/personel-dosya/PersonelDosyaKayitMirrorFields.tsx"
+    );
+    expect(mirror).toContain('label="SGK İşveren"');
+    expect(mirror).toContain('label="Çalışma Lokasyonu"');
+    expect(mirror).toContain("Çalışan Kapsamı");
+    expect(mirror).toContain("personel_tipi_id");
   });
 });

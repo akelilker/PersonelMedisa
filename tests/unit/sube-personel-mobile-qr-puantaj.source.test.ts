@@ -68,7 +68,11 @@ describe("sube + personel mobile QR puantaj wiring", () => {
     const home = read("src/features/self-service/pages/PersonelSelfServiceHomePage.tsx");
     expect(home).toContain("self-missing-info-warning");
     expect(home).toContain("self-last-qr-event");
-    expect(home).toContain("self-qr-scan-link");
+    // QR CTA/link owner'ı paylaşılan component'tir (rol bağımsız karar).
+    expect(home).toContain("<SelfServiceQrShortcuts />");
+    const shortcuts = read("src/features/self-service/components/SelfServiceQrShortcuts.tsx");
+    expect(shortcuts).toContain("self-qr-scan-link");
+    expect(shortcuts).toContain('hasPermission("self_service.qr.scan")');
   });
 
   it("gates manager QR kiosk CTA and live summary by permission", () => {

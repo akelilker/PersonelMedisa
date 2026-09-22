@@ -14,7 +14,8 @@ const {
   fetchSurecTuruOptions,
   fetchBildirimTuruOptions,
   getTokenMock,
-  getActiveSubeIdMock
+  getActiveSubeIdMock,
+  getSessionMock
 } = vi.hoisted(() => ({
   fetchPersonellerList: vi.fn(async () => ({ items: [], meta: { page: 1, limit: 10, total: 0 } })),
   fetchGunlukTamamlamalariHeader: vi.fn(async () => ({
@@ -30,7 +31,8 @@ const {
   fetchSurecTuruOptions: vi.fn(async () => []),
   fetchBildirimTuruOptions: vi.fn(async () => []),
   getTokenMock: vi.fn<() => string | null>(() => null),
-  getActiveSubeIdMock: vi.fn<() => number | null>(() => null)
+  getActiveSubeIdMock: vi.fn<() => number | null>(() => null),
+  getSessionMock: vi.fn<() => unknown>(() => null)
 }));
 
 vi.mock("../../src/api/personeller.api", () => ({
@@ -79,7 +81,8 @@ vi.mock("../../src/auth/auth-manager", async (importOriginal) => {
   return {
     ...actual,
     getToken: getTokenMock,
-    getActiveSubeId: getActiveSubeIdMock
+    getActiveSubeId: getActiveSubeIdMock,
+    getSession: getSessionMock
   };
 });
 
@@ -89,13 +92,33 @@ import {
   resetProtectedDataLoadGate
 } from "../../src/data/data-manager";
 
+/** Management session: bootstrap preload'un tum izinleri karsilanir. */
+function managementSession() {
+  return {
+    token: "tok-1",
+    ui_profile: "yonetim",
+    active_sube_id: null,
+    user: {
+      id: 1,
+      ad_soyad: "Yonetici",
+      rol: "GENEL_YONETICI",
+      role: "GENEL_YONETICI",
+      sube_ids: [],
+      personel_id: null,
+      personel_tipi_ad: null
+    }
+  };
+}
+
 describe("S90 loadDataFromServer auth gate", () => {
   beforeEach(() => {
     resetProtectedDataLoadGate();
     getTokenMock.mockReset();
     getActiveSubeIdMock.mockReset();
+    getSessionMock.mockReset();
     getTokenMock.mockReturnValue(null);
     getActiveSubeIdMock.mockReturnValue(null);
+    getSessionMock.mockReturnValue(managementSession());
     fetchPersonellerList.mockClear();
     fetchGunlukTamamlamalariHeader.mockClear();
     fetchDepartmanOptions.mockClear();

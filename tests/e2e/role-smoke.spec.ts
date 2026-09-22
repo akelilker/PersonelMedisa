@@ -105,7 +105,11 @@ test.describe("Rol bazli smoke", () => {
   test("Birim amiri self-service tabanli home gorur; yazma owner'ina giremez; ikincil akislarla gunluk kayda iner", async ({
     page
   }) => {
-    await mockApi(page, "BIRIM_AMIRI");
+    // Kanonik: bağlı ama Beyaz Yaka → QR/kart hakkı yok. Bu bir çalışan kapsamı
+    // kararıdır, rol kararı değil; yönetici yetkileri etkilenmez.
+    await mockApi(page, "BIRIM_AMIRI", {
+      personelBinding: { personel_id: 1, personel_tipi_ad: "Beyaz Yaka" }
+    });
     await login(page, users.birimAmiri);
     await expect(page).toHaveURL("/");
 

@@ -8,6 +8,7 @@ import {
   getEffectivePermissions,
   getRolePermissions,
   hasPersonnelLinkedSelfServiceEligibility,
+  hasQrSelfServiceEntitlement,
   hasRolePermission,
   hasUserPermission
 } from "../../src/lib/authorization/role-permissions";
@@ -85,7 +86,9 @@ describe("personnel-linked self-service authorization", () => {
     }
   });
 
-  it("H) Management role + personel_id stays collar-independent", () => {
+  it("H) QR/kart entitlement is role-independent: bound personel + canonical collar", () => {
+    // Kanonik kural: QR hakkı uygulama rolüyle verilmez; bağlı personel ve
+    // kanonik collar ile verilir. Yönetim rolleri de aynı kapıdan geçer.
     for (const role of [
       "GENEL_YONETICI",
       "IK_SORUMLUSU",
@@ -93,10 +96,35 @@ describe("personnel-linked self-service authorization", () => {
       "BOLUM_YONETICISI",
       "BIRIM_AMIRI"
     ] as const) {
-      expect(hasUserPermission(role, "self_service.qr.scan", 173, "Beyaz Yaka")).toBe(true);
-      expect(hasUserPermission(role, "self_service.qr.events.view", 173, "Beyaz Yaka")).toBe(true);
-      expect(hasUserPermission(role, "self_service.qr.scan", 173, null)).toBe(true);
-      expect(getEffectivePermissions(role, 173, "Beyaz Yaka")).toContain("self_service.qr.scan");
+      expect(hasUserPermission(role, "self_service.qr.scan", 173, "Mavi Yaka")).toBe(true);
+      expect(hasUserPermission(role, "self_service.qr.events.view", 173, "Mavi Yaka")).toBe(true);
+      expect(getEffectivePermissions(role, 173, "Mavi Yaka")).toContain("self_service.qr.scan");
+    }
+  });
+
+  it("H2) bound Beyaz Yaka manager loses QR but keeps management + non-QR self", () => {
+    for (const role of ["BIRIM_AMIRI", "BOLUM_YONETICISI", "SUBE_YONETICISI"] as const) {
+      expect(hasUserPermission(role, "self_service.qr.scan", 173, "Beyaz Yaka")).toBe(false);
+      expect(hasUserPermission(role, "self_service.qr.events.view", 173, "Beyaz Yaka")).toBe(false);
+      expect(getEffectivePermissions(role, 173, "Beyaz Yaka")).not.toContain("self_service.qr.scan");
+      // Yönetim yetkisi ve non-QR self-service korunur.
+      expect(hasUserPermission(role, "self_service.view", 173, "Beyaz Yaka")).toBe(true);
+      expect(getEffectivePermissions(role, 173, "Beyaz Yaka")).toContain("self_service.view");
+    }
+    expect(hasUserPermission("BOLUM_YONETICISI", "aylik_bolum_onayi.approve", 173, "Beyaz Yaka")).toBe(true);
+    expect(hasUserPermission("BIRIM_AMIRI", "puantaj.amir_kontrol", 173, "Beyaz Yaka")).toBe(true);
+  });
+
+  it("H3) unbound user never gets QR, even with a canonical collar value", () => {
+    for (const role of ["PERSONEL", "BIRIM_AMIRI", "BOLUM_YONETICISI", "GENEL_YONETICI"] as const) {
+      for (const binding of [null, undefined, 0, -1]) {
+        expect(
+          hasUserPermission(role, "self_service.qr.scan", binding, "Mavi Yaka"),
+          `${role} binding=${String(binding)}`
+        ).toBe(false);
+        expect(hasUserPermission(role, "self_service.qr.events.view", binding, "Mavi Yaka")).toBe(false);
+      }
+      expect(hasQrSelfServiceEntitlement(null, "Mavi Yaka")).toBe(false);
     }
   });
 
@@ -105,11 +133,11 @@ describe("personnel-linked self-service authorization", () => {
     expect(hasUserPermission("BOLUM_YONETICISI", "personeller.view", 173)).toBe(true);
     expect(hasUserPermission("BOLUM_YONETICISI", "aylik_bolum_onayi.approve", 173)).toBe(true);
     expect(hasUserPermission("BOLUM_YONETICISI", "self_service.view", 173)).toBe(true);
-    expect(hasUserPermission("BOLUM_YONETICISI", "self_service.qr.scan", 173)).toBe(true);
-    expect(hasUserPermission("BOLUM_YONETICISI", "self_service.qr.events.view", 173)).toBe(true);
+    expect(hasUserPermission("BOLUM_YONETICISI", "self_service.qr.scan", 173, "Mavi Yaka")).toBe(true);
+    expect(hasUserPermission("BOLUM_YONETICISI", "self_service.qr.events.view", 173, "Mavi Yaka")).toBe(true);
     // İsmail-shape
     expect(hasUserPermission("BOLUM_YONETICISI", "personeller.view", 120)).toBe(true);
-    expect(hasUserPermission("BOLUM_YONETICISI", "self_service.qr.scan", 120)).toBe(true);
+    expect(hasUserPermission("BOLUM_YONETICISI", "self_service.qr.scan", 120, "Mavi Yaka")).toBe(true);
   });
 
   it("BOLUM_YONETICISI + null: management YES, self NO", () => {
@@ -133,14 +161,19 @@ describe("personnel-linked self-service authorization", () => {
     expect(hasPersonnelLinkedSelfServiceEligibility(-1)).toBe(false);
     expect(hasUserPermission("BOLUM_YONETICISI", "self_service.view", 0)).toBe(false);
     expect(hasUserPermission("BOLUM_YONETICISI", "self_service.view", undefined)).toBe(false);
+    expect(hasUserPermission("BOLUM_YONETICISI", "self_service.qr.scan", 0, "Mavi Yaka")).toBe(false);
   });
 
   it("Salih post-fix simulation: BOLUM + personel_id=158 preserves QR/self", () => {
-    const perms = getEffectivePermissions("BOLUM_YONETICISI", 158);
+    const perms = getEffectivePermissions("BOLUM_YONETICISI", 158, "Mavi Yaka");
     expect(perms).toContain("aylik_bolum_onayi.approve");
     expect(perms).toContain("self_service.qr.scan");
     expect(perms).toContain("self_service.qr.events.view");
     expect(perms).toContain("self_service.puantaj.view");
+    // Rol düşürülmez: yönetim izinleri hâlâ yerinde.
+    const beyaz = getEffectivePermissions("BOLUM_YONETICISI", 158, "Beyaz Yaka");
+    expect(beyaz).toContain("aylik_bolum_onayi.approve");
+    expect(beyaz).not.toContain("self_service.qr.scan");
   });
 
   it("legacy unknown role gains only self baseline via binding (no management fail-open)", () => {
@@ -225,40 +258,59 @@ describe("personnel-linked self-service authorization", () => {
     expect(routes).toContain('path="self"');
   });
 
-  it("E/F) FE QR UI and route gate follow the canonical collar", () => {
+  it("E/F) FE QR surface owner is shared and the route gate stays permission-based", () => {
     const home = readFileSync(
       resolve(root, "src/features/self-service/pages/PersonelSelfServiceHomePage.tsx"),
       "utf8"
     );
     expect(home).toContain('hasPermission("self_service.qr.scan")');
-    const qrGateIdx = home.indexOf("{qrEnabled ? (");
-    const gateEndIdx = home.indexOf(") : null}", qrGateIdx);
-    expect(qrGateIdx).toBeGreaterThan(-1);
-    expect(gateEndIdx).toBeGreaterThan(qrGateIdx);
-    for (const testId of ["self-qr-scan-link", "self-qr-history-link"]) {
-      const idx = home.indexOf(`data-testid="${testId}"`);
-      expect(idx, testId).toBeGreaterThan(qrGateIdx);
-      expect(idx, testId).toBeLessThan(gateEndIdx);
-    }
-    // QR scan buttons sit behind the same gate with a non-QR notice fallback.
+    // QR CTA/link owner tek: paylaşılan component. Paralel QR UI yok.
+    expect(home).toContain("<SelfServiceQrShortcuts />");
+    expect(home).not.toContain('data-testid="self-qr-scan-link"');
+    expect(home).not.toContain('data-testid="self-qr-history-link"');
+    // QR scan buttons sit behind the same decision with a non-QR notice fallback.
     expect(home).toContain(") : qrEnabled ? (");
     expect(home).toContain('data-testid="giris-scan-not-entitled"');
     expect(home).toContain('data-testid="cikis-scan-not-entitled"');
 
-    // Direct route access is denied by the shared route guard.
+    const shortcuts = readFileSync(
+      resolve(root, "src/features/self-service/components/SelfServiceQrShortcuts.tsx"),
+      "utf8"
+    );
+    expect(shortcuts).toContain('hasPermission("self_service.qr.scan")');
+    for (const testId of ["self-qr-scan-link", "self-qr-history-link"]) {
+      expect(shortcuts).toContain(`data-testid="${testId}"`);
+    }
+
+    // Personnel-linked management homes reuse the same owner (no parallel UI).
+    const birimHome = readFileSync(
+      resolve(root, "src/features/self-service/pages/BirimAmiriOperationalHomePage.tsx"),
+      "utf8"
+    );
+    expect(birimHome).toContain("<SelfServiceQrShortcuts");
+    const routes = readFileSync(resolve(root, "src/app/routes.tsx"), "utf8");
+    expect(routes).toContain("<SelfServiceQrShortcuts");
+
+    // Direct route access is denied by the shared, permission-based route guard.
     const route = readFileSync(resolve(root, "src/router/ProtectedRoute.tsx"), "utf8");
     expect(route).toContain("session.user.personel_tipi_ad");
     expect(route).toContain("personelId, personelTipiAd");
+    // QR route guard must never re-introduce a role condition.
+    expect(route).not.toMatch(/rol\s*===?\s*"PERSONEL"/);
     const hook = readFileSync(resolve(root, "src/hooks/use-role-access.ts"), "utf8");
     expect(hook).toContain("personelTipiAd");
     const authApi = readFileSync(resolve(root, "src/api/auth.api.ts"), "utf8");
     expect(authApi).toContain("personel_tipi_ad");
   });
 
-  it("BE QR surfaces are collar-gated (authoritative, not FE-only)", () => {
+  it("BE QR surfaces are role-independent collar-gated (authoritative, not FE-only)", () => {
     const perms = readFileSync(rolePermissionsPhp, "utf8");
     expect(perms).toContain("QR_SELF_SERVICE_COLLAR = 'Mavi Yaka'");
     expect(perms).toContain("personel_tipi_ad");
+    // Rol bağımsız tek karar noktası; PERSONEL-only kapı kalmadı.
+    expect(perms).toContain("function hasQrSelfServiceEntitlement");
+    expect(perms).toContain("return self::hasQrSelfServiceEntitlement($user);");
+    expect(perms).not.toMatch(/normalizeRole\([^)]*\)\s*===\s*'PERSONEL'\s*\n\s*&&\s*self::isQrSelfServicePermission/);
     // ucret_tipi is documented as not a collar source and is never read.
     expect(perms).toContain("ucret_tipi` is intentionally NOT a collar source");
     expect(perms).not.toContain("ucret_tipi_id");

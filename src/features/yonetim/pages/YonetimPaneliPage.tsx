@@ -27,6 +27,7 @@ import {
   fetchYonetimSirketleri,
   fetchYonetimSubeleri,
   resetYonetimKullaniciBaslangicSifresi,
+  fixYonetimKullaniciCanonicalUsername,
   updateSirketSube,
   updateYonetimKullanici,
   updateYonetimSgkIsveren,
@@ -53,6 +54,7 @@ import {
   matchesKullaniciSearch,
   normalizeKullaniciSearchQuery
 } from "../../../lib/yonetim/kullanici-search";
+import { resolveBoundUserCanonicalUsernameView } from "../../../lib/yonetim/bound-user-canonical-username";
 import type { UserRole } from "../../../types/auth";
 import { ASSIGNABLE_USER_ROLES, WRITE_COMPANY_SCOPED_ROLES } from "../../../types/auth";
 import type { Personel } from "../../../types/personel";
@@ -684,6 +686,7 @@ export function YonetimPaneliPage() {
   // ErrorState renders behind it and hides the list behind the overlay.
   const [formErrorMessage, setFormErrorMessage] = useState<string | null>(null);
   const [sifreResetConfirmOpen, setSifreResetConfirmOpen] = useState(false);
+  const [canonicalUsernameFixConfirmOpen, setCanonicalUsernameFixConfirmOpen] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [subeDeleteError, setSubeDeleteError] = useState<string | null>(null);
   const [isSubeDeleteDialogOpen, setIsSubeDeleteDialogOpen] = useState(false);
@@ -752,6 +755,24 @@ export function YonetimPaneliPage() {
 
   const isSecurePersonelCreatePath =
     editingKullaniciId == null && kullaniciForm.rol === "PERSONEL";
+
+  const boundCanonicalUsernameView = useMemo(() => {
+    if (editingKullaniciId == null || !kullaniciForm.personelId) {
+      return null;
+    }
+    const linkedPersonel = personeller.find(
+      (personel) => personel.id === Number.parseInt(kullaniciForm.personelId, 10)
+    );
+    if (!linkedPersonel) {
+      return null;
+    }
+    return resolveBoundUserCanonicalUsernameView({
+      actualUsername: kullaniciForm.username,
+      personelAd: linkedPersonel.ad,
+      personelSoyad: linkedPersonel.soyad,
+      personelAktifDurum: linkedPersonel.aktif_durum
+    });
+  }, [editingKullaniciId, kullaniciForm.personelId, kullaniciForm.username, personeller]);
 
   // Scope summaries are a shared surface, so they use the company-qualified name.
   const subeNameMap = useMemo(() => new Map(subeler.map((sube) => [sube.id, sube.tam_ad])), [subeler]);
@@ -1125,6 +1146,7 @@ export function YonetimPaneliPage() {
     setIsKullaniciFormOpen(false);
     setFormErrorMessage(null);
     setSifreResetConfirmOpen(false);
+    setCanonicalUsernameFixConfirmOpen(false);
   }
 
   function resetSubeEditor() {
@@ -1490,6 +1512,14 @@ export function YonetimPaneliPage() {
       return;
     }
 
+    if (boundCanonicalUsernameView?.mismatch) {
+      setFormErrorMessage(
+        "Kullanıcı adı canonical personel şablonuyla uyuşmuyor. Önce kullanıcı adını canonical şablona düzeltin."
+      );
+      setSifreResetConfirmOpen(false);
+      return;
+    }
+
     setIsSubmitting(true);
     setFormErrorMessage(null);
     setSuccessMessage(null);
@@ -1503,6 +1533,42 @@ export function YonetimPaneliPage() {
     } catch (error) {
       setFormErrorMessage(
         error instanceof Error ? error.message : "Başlangıç şifresine sıfırlama yapılamadı."
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function handleCanonicalUsernameDuzelt() {
+    if (isSubmitting || editingKullaniciId == null) {
+      return;
+    }
+    if (!boundCanonicalUsernameView?.canOfferFix) {
+      setFormErrorMessage(
+        boundCanonicalUsernameView && !boundCanonicalUsernameView.personelActive
+          ? "Bağlı personel aktif değil; kullanıcı adı düzeltilmez."
+          : "Canonical kullanıcı adı düzeltmesi bu hesap için uygun değil."
+      );
+      return;
+    }
+
+    setIsSubmitting(true);
+    setFormErrorMessage(null);
+    setSuccessMessage(null);
+
+    try {
+      const updated = await fixYonetimKullaniciCanonicalUsername(editingKullaniciId);
+      const nextUsername = String(updated.username ?? boundCanonicalUsernameView.expectedUsername);
+      setCanonicalUsernameFixConfirmOpen(false);
+      setKullaniciForm((prev) => ({
+        ...prev,
+        username: nextUsername
+      }));
+      setSuccessMessage("Kullanıcı adı canonical personel şablonuna düzeltildi. Şifre değişmedi.");
+      await loadPanel();
+    } catch (error) {
+      setFormErrorMessage(
+        error instanceof Error ? error.message : "Canonical kullanıcı adı düzeltilemedi."
       );
     } finally {
       setIsSubmitting(false);
@@ -2102,6 +2168,61 @@ export function YonetimPaneliPage() {
                 onChange={(value) => setKullaniciForm((prev) => ({ ...prev, username: value }))}
                 required
               />
+              {boundCanonicalUsernameView ? (
+                <div className="yonetim-form-stack" data-testid="yonetim-canonical-username">
+                  <p className="yonetim-hint" data-testid="yonetim-canonical-username-expected">
+                    Canonical personel kullanıcı adı: <strong>{boundCanonicalUsernameView.expectedUsername}</strong>
+                  </p>
+                  {boundCanonicalUsernameView.mismatch ? (
+                    <p className="yonetim-hint" data-testid="yonetim-canonical-username-mismatch">
+                      Bu kullanıcı adı canonical personel şablonuyla uyuşmuyor.
+                    </p>
+                  ) : null}
+                  {boundCanonicalUsernameView.canOfferFix ? (
+                    !canonicalUsernameFixConfirmOpen ? (
+                      <button
+                        type="button"
+                        className="yonetim-panel-action"
+                        data-testid="yonetim-kullanici-canonical-username-duzelt"
+                        disabled={isSubmitting}
+                        onClick={() => {
+                          setFormErrorMessage(null);
+                          setCanonicalUsernameFixConfirmOpen(true);
+                        }}
+                      >
+                        Kullanıcı adını canonical şablona düzelt
+                      </button>
+                    ) : (
+                      <div
+                        className="yonetim-create-row"
+                        data-testid="yonetim-kullanici-canonical-username-duzelt-confirm"
+                      >
+                        <p className="yonetim-hint">
+                          Kullanıcı adı <strong>{boundCanonicalUsernameView.expectedUsername}</strong> olacak.
+                          Rol, yetki, personel bağlantısı ve şifre değişmez.
+                        </p>
+                        <button
+                          type="button"
+                          className="universal-btn-save"
+                          data-testid="yonetim-kullanici-canonical-username-duzelt-onayla"
+                          disabled={isSubmitting}
+                          onClick={() => void handleCanonicalUsernameDuzelt()}
+                        >
+                          {isSubmitting ? "Düzeltiliyor…" : "Onayla"}
+                        </button>
+                        <button
+                          type="button"
+                          className="yonetim-panel-action"
+                          disabled={isSubmitting}
+                          onClick={() => setCanonicalUsernameFixConfirmOpen(false)}
+                        >
+                          Vazgeç
+                        </button>
+                      </div>
+                    )
+                  ) : null}
+                </div>
+              ) : null}
               {!isSecurePersonelCreatePath ? (
                 editingKullaniciId == null ? (
                   <p className="yonetim-hint" data-testid="yonetim-baslangic-sifresi-hint">
@@ -2114,12 +2235,18 @@ export function YonetimPaneliPage() {
                       Şifre bu formdan belirlenmez. Gerekiyorsa hesabı ilk giriş durumuna alın; kullanıcı
                       ad soyadından üretilen başlangıç şifresiyle girip kendi kalıcı şifresini belirler.
                     </p>
+                    {boundCanonicalUsernameView?.mismatch ? (
+                      <p className="yonetim-hint" data-testid="yonetim-baslangic-sifresi-username-guard">
+                        Başlangıç şifresine sıfırlamadan önce kullanıcı adını canonical şablona düzeltin.
+                        Bu işlem kullanıcı adını sessizce değiştirmez.
+                      </p>
+                    ) : null}
                     {!sifreResetConfirmOpen ? (
                       <button
                         type="button"
                         className="yonetim-panel-action"
                         data-testid="yonetim-kullanici-sifre-sifirla"
-                        disabled={isSubmitting}
+                        disabled={isSubmitting || Boolean(boundCanonicalUsernameView?.mismatch)}
                         onClick={() => {
                           setFormErrorMessage(null);
                           setSifreResetConfirmOpen(true);

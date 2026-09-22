@@ -1,7 +1,11 @@
 .personeller-page,
 .personel-detay-page {
-  display: grid;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
   gap: var(--space-3);
+  min-height: 0;
+  overflow: hidden;
 }
 
 .personeller-sr-only {
@@ -306,8 +310,12 @@
 }
 
 .personel-detail-card {
-  display: grid;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
   gap: var(--space-3);
+  overflow: hidden;
 }
 
 /* Detay kartı tek kolon grid: varsayılan min-width:auto yüzünden panel içindeki
@@ -372,17 +380,32 @@
   outline-offset: 2px;
 }
 
-/* Kimlik + sekme şeridi modal gövdesinde kayarken üstte sabit kalır (Taşıt detay sticky identity). */
+/* Kimlik + sekme şeridi sabit krom: yalnız .personel-dosya-tab-scroll kayar (Taşıt detay). */
 .personel-dosya-sticky-head {
-  position: sticky;
-  top: 0;
-  z-index: 4;
+  position: relative;
+  z-index: 6;
+  flex: 0 0 auto;
   display: grid;
   gap: var(--space-2);
   margin: 0 calc(-1 * var(--space-1));
   padding: 0 var(--space-1) var(--space-1);
-  background: var(--modal-surface, var(--bg, #0f1419));
+  background: var(--modal-bg);
   box-shadow: 0 1px 0 var(--line-soft);
+  isolation: isolate;
+}
+
+.personel-dosya-tab-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  background: var(--modal-bg);
+  scroll-padding-top: var(--space-2);
 }
 
 .personel-dosya-tab-nav {
@@ -442,8 +465,20 @@
 
 .personel-dosya-hero-grid {
   display: grid;
-  gap: var(--space-2);
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--space-2) var(--space-4);
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (min-width: 721px) {
+  .personel-dosya-hero-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1024px) {
+  .personel-dosya-hero-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 .personel-dosya-field {
@@ -544,15 +579,45 @@
   gap: 0;
 }
 
+.personel-dosya-section--dense-grid .personel-dosya-record-list {
+  gap: var(--space-3) var(--space-4);
+  grid-template-columns: minmax(0, 1fr);
+}
+
 @media (min-width: 721px) {
   .personel-dosya-section--dense-grid .personel-dosya-record-list {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    column-gap: var(--space-4);
   }
+}
 
-  .personel-dosya-section--dense-grid .personel-dosya-record.is-missing {
-    grid-column: 1 / -1;
+@media (min-width: 1024px) {
+  .personel-dosya-section--dense-grid .personel-dosya-record-list {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
+}
+
+.personel-dosya-section--dense-grid .personel-dosya-record {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  align-content: start;
+  gap: 4px;
+  padding: 0;
+  border-bottom: none;
+}
+
+.personel-dosya-section--dense-grid .personel-dosya-record-label,
+.personel-dosya-section--dense-grid .personel-dosya-record-value {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.personel-dosya-section--dense-grid .personel-dosya-record.is-missing {
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(150px, 220px) minmax(0, 1fr);
+  grid-template-rows: auto;
+  gap: var(--space-2);
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .personel-dosya-record {
@@ -561,6 +626,7 @@
   gap: var(--space-2);
   padding: 8px 0;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  min-width: 0;
 }
 
 .personel-dosya-record:last-child {
@@ -583,19 +649,67 @@
   color: var(--text-secondary);
 }
 
+.personel-kart-tab-scroller {
+  display: grid;
+  grid-template-columns: 1fr;
+  align-items: stretch;
+  max-width: 100%;
+  border-bottom: 1px solid var(--line-soft);
+  background: var(--modal-bg);
+}
+
+.personel-kart-tab-scroller.is-overflowing {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 2px;
+}
+
+.personel-kart-tab-scroll-btn {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  min-width: 28px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(226, 232, 240, 0.9);
+  cursor: pointer;
+  transition: color 0.2s ease, background 0.2s ease;
+}
+
+.personel-kart-tab-scroll-btn:hover:not(:disabled),
+.personel-kart-tab-scroll-btn:focus-visible:not(:disabled) {
+  color: var(--text-inverse);
+  background: rgba(var(--theme-color-rgb), 0.14);
+  outline: 2px solid rgba(var(--theme-color-rgb), 0.75);
+  outline-offset: 1px;
+}
+
+.personel-kart-tab-scroll-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
 .personel-kart-tablist {
   display: flex;
   flex-wrap: nowrap;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 0;
   margin-bottom: 0;
   padding-bottom: 0;
-  border-bottom: 1px solid var(--line-soft);
+  min-width: 0;
   overflow-x: auto;
   max-width: 100%;
+  background: var(--modal-bg);
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
   -ms-overflow-style: none;
+}
+
+.personel-kart-tab-scroller:not(.is-overflowing) .personel-kart-tablist {
+  justify-content: center;
 }
 
 .personel-kart-tablist::-webkit-scrollbar {
@@ -1032,9 +1146,14 @@
 }
 
 @media (max-width: 720px) {
-  .personel-kart-tablist {
+  .personel-kart-tab-scroller:not(.is-overflowing) .personel-kart-tablist {
     margin-inline: calc(-1 * var(--space-1));
     padding-inline: var(--space-1);
+  }
+
+  .personel-kart-tab-scroll-btn {
+    width: 32px;
+    min-width: 32px;
   }
 
   .personel-kart-tab {

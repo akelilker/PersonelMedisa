@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { EmptyState } from "../../../components/states/EmptyState";
 import { ErrorState } from "../../../components/states/ErrorState";
@@ -42,6 +42,7 @@ export function PersonelDetayPage() {
   const initialTab = resolvePersonelTab(searchParams.get("tab")) ?? "genel-bilgiler";
   const [activeTab, setActiveTab] = useState<PersonelDosyaTabId>(initialTab);
   const [isActionMenuOpen, setIsActionMenuOpen] = useState(false);
+  const tabScrollRef = useRef<HTMLDivElement | null>(null);
 
   const detail = usePersonelDetail(parsedPersonelId, hasValidId, {
     canViewSurecler,
@@ -102,6 +103,9 @@ export function PersonelDetayPage() {
     const nextTab = fromQuery ?? "genel-bilgiler";
     setActiveTab(nextTab);
     setIsActionMenuOpen(false);
+    if (tabScrollRef.current) {
+      tabScrollRef.current.scrollTop = 0;
+    }
     if (!fromQuery && searchParams.get("tab")) {
       syncTabInUrl(nextTab);
     }
@@ -111,6 +115,9 @@ export function PersonelDetayPage() {
     (tabId: PersonelDosyaTabId) => {
       setActiveTab(tabId);
       syncTabInUrl(tabId);
+      if (tabScrollRef.current) {
+        tabScrollRef.current.scrollTop = 0;
+      }
     },
     [syncTabInUrl]
   );
@@ -171,20 +178,25 @@ export function PersonelDetayPage() {
             </div>
           </div>
 
-          <PersonelDosyaMissingInfoGateway
-            personel={personel}
-            onOpenMissingInfo={
-              canUpdatePersonel && !isArchived && canWriteOnPersonel ? handleOpenMissingInfo : undefined
-            }
-          />
+          <div
+            ref={tabScrollRef}
+            className="personel-dosya-tab-scroll"
+            data-testid="personel-dosya-tab-scroll"
+          >
+            <PersonelDosyaMissingInfoGateway
+              personel={personel}
+              onOpenMissingInfo={
+                canUpdatePersonel && !isArchived && canWriteOnPersonel ? handleOpenMissingInfo : undefined
+              }
+            />
 
-          {!canWriteOnPersonel ? (
-            <p className="personel-write-scope-notice" role="status" data-testid="personel-write-scope-notice">
-              Bu işlem İK sorumlusu tarafından gerçekleştirilmelidir.
-            </p>
-          ) : null}
+            {!canWriteOnPersonel ? (
+              <p className="personel-write-scope-notice" role="status" data-testid="personel-write-scope-notice">
+                Bu işlem İK sorumlusu tarafından gerçekleştirilmelidir.
+              </p>
+            ) : null}
 
-          <PersonelDosyaTabPanels
+            <PersonelDosyaTabPanels
             activeTab={effectiveActiveTab}
             onTabChange={handleTabChange}
             personel={personel}
@@ -223,7 +235,8 @@ export function PersonelDetayPage() {
                   }
                 : null
             }
-          />
+            />
+          </div>
         </div>
       ) : null}
     </section>

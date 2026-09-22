@@ -219,15 +219,29 @@
 .modal-body:has(> .personel-detay-page) {
   padding-top: 0;
   gap: 4px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.modal-body:has(> .personel-detay-page) > .personel-detay-page {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 /* Geri çubuğu + detay kartı arası Taşıt detay / import back-bar ayracı ile aynı ritim. */
 .modal-body:has(> .personel-detay-page) > .universal-back-bar {
+  flex: 0 0 auto;
   align-self: stretch;
   width: 100%;
   margin: 0;
   padding: 4px 0 10px;
   border-bottom: 1px solid rgba(160, 174, 192, 0.16);
+  position: relative;
+  z-index: 8;
+  background: var(--modal-bg);
 }
 
 .modal-body:has(> .personel-detay-page) > .universal-back-bar .universal-back-btn {

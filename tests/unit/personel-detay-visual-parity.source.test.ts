@@ -46,13 +46,14 @@ describe("personel detay visual parity owners (tasit reference)", () => {
     expect(css).toMatch(/@media \(min-width: 641px\)[\s\S]*\.personel-dosya-hero-name[\s\S]*font-size:\s*16px/s);
     expect(css).toMatch(/\.personel-dosya-sticky-head[\s\S]*background:\s*var\(--modal-bg\)/s);
     expect(css).toMatch(/\.personel-kart-tablist[\s\S]*background:\s*var\(--modal-bg\)/s);
-    expect(css).toMatch(
-      /\.personel-detail-card #personel-kart-panel-genel-bilgiler \.personel-dosya-record-list[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\)/s
-    );
+    expect(css).toMatch(/\.personel-detail-card \.personel-dosya-kayit-mirror \.personel-form-column/s);
+
+    const mirror = read("src/features/personeller/components/personel-dosya/PersonelDosyaKayitMirrorFields.tsx");
+    expect(mirror).toMatch(/personel-form-columns/);
+    expect(mirror).not.toContain("Temel kimlik, iletişim ve lokasyon verileri");
 
     const genelPanel = read("src/features/personeller/components/personel-dosya/PersonelKartPanelGenelBilgiler.tsx");
-    expect(genelPanel).not.toContain("Temel kimlik, iletişim ve lokasyon verileri");
-    expect(genelPanel).not.toContain("Bağlı organizasyon, yönetim hattı ve acil durum");
+    expect(genelPanel).not.toContain("Kimlik ve İletişim");
     expect(genelPanel).not.toMatch(/denseGrid/);
   });
 

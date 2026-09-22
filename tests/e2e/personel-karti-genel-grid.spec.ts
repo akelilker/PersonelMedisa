@@ -2,75 +2,46 @@ import { expect, test } from "@playwright/test";
 import { login } from "./helpers/auth";
 import { mockApi } from "./helpers/mock-api";
 
-type Box = { top: number; left: number; right: number; bottom: number };
-
-function boxesOverlap(a: Box, b: Box, epsilon = 1): boolean {
-  const separated =
-    a.right <= b.left + epsilon ||
-    b.right <= a.left + epsilon ||
-    a.bottom <= b.top + epsilon ||
-    b.bottom <= a.top + epsilon;
-  return !separated;
-}
-
-test("Genel kimlik alanı dikey, alt yazı yok, sekme kromu opak", async ({ page }) => {
+test("Genel kayıt iki kolon, alt yazı yok, sekme kromu opak", async ({ page }) => {
   await mockApi(page, "GENEL_YONETICI");
   await login(page, { username: "yonetici", password: "secret" });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/personeller/1");
 
   await expect(page.getByTestId("personel-dosya-sticky-head")).toBeVisible();
-  await expect(page.locator(".modal-body .universal-back-bar")).toBeVisible();
-
+  await expect(page.getByTestId("personel-dosya-kayit-mirror")).toBeVisible();
   await expect(
     page.getByText("Temel kimlik, iletişim ve lokasyon verileri bu dosyada salt okunur izlenir.")
   ).toHaveCount(0);
 
-  const kimlikSection = page
-    .locator("#personel-kart-panel-genel-bilgiler .personel-dosya-section")
-    .filter({ hasText: "Kimlik ve İletişim" });
-  const records = kimlikSection.locator(".personel-dosya-record:not(.is-missing)");
-  await expect(records.first()).toBeVisible();
+  const columnsTemplate = await page
+    .getByTestId("personel-dosya-kayit-mirror")
+    .locator(".personel-form-columns")
+    .evaluate((el) => window.getComputedStyle(el).gridTemplateColumns);
+  expect(columnsTemplate.split(" ").filter(Boolean).length).toBe(2);
 
-  const tcRecord = kimlikSection.locator(".personel-dosya-record").filter({ hasText: "T.C. Kimlik No" });
-  await tcRecord.scrollIntoViewIfNeeded();
-  const layout = await tcRecord.evaluate((node) => {
-    const label = node.querySelector(".personel-dosya-record-label");
-    const value = node.querySelector(".personel-dosya-record-value");
-    if (!label || !value) {
-      return null;
-    }
-    const labelRect = label.getBoundingClientRect();
-    const valueRect = value.getBoundingClientRect();
-    return {
-      labelBottom: labelRect.bottom,
-      valueTop: valueRect.top,
-      leftDelta: Math.abs(labelRect.left - valueRect.left)
-    };
-  });
-  expect(layout).not.toBeNull();
-  if (layout) {
-    expect(layout.valueTop).toBeGreaterThanOrEqual(layout.labelBottom - 2);
-    expect(layout.leftDelta).toBeLessThan(4);
+  const mirror = page.getByTestId("personel-dosya-kayit-mirror");
+  const columns = mirror.locator(".personel-form-column");
+  await expect(columns).toHaveCount(2);
+
+  const leftTc = columns.nth(0).getByText("T.C. Kimlik No", { exact: true });
+  const rightSube = columns.nth(1).getByText("Şube", { exact: true });
+  const tcBox = await leftTc.boundingBox();
+  const subeBox = await rightSube.boundingBox();
+  expect(tcBox).not.toBeNull();
+  expect(subeBox).not.toBeNull();
+  if (tcBox && subeBox) {
+    expect(subeBox.x).toBeGreaterThan(tcBox.x + 40);
   }
 
-  const boxes = await records.evaluateAll((nodes) =>
-    nodes.map((node) => {
-      const rect = node.getBoundingClientRect();
-      return { top: rect.top, left: rect.left, right: rect.right, bottom: rect.bottom };
-    })
-  );
-
-  for (let i = 0; i < boxes.length; i += 1) {
-    for (let j = i + 1; j < boxes.length; j += 1) {
-      expect(boxesOverlap(boxes[i], boxes[j]), `record ${i} overlaps record ${j}`).toBe(false);
-    }
+  const artifactPath = process.env.PERSONEL_KARTI_GENEL_ARTIFACT;
+  if (artifactPath) {
+    await mirror.screenshot({ path: artifactPath });
   }
 
   const tabList = page.locator(".personel-kart-tablist");
   const tabTopBeforeScroll = await tabList.evaluate((el) => el.getBoundingClientRect().top);
-  const scrollRegion = page.getByTestId("personel-dosya-tab-scroll");
-  await scrollRegion.evaluate((el) => {
+  await page.getByTestId("personel-dosya-tab-scroll").evaluate((el) => {
     el.scrollTop = el.scrollHeight;
   });
   const tabTopAfterScroll = await tabList.evaluate((el) => el.getBoundingClientRect().top);

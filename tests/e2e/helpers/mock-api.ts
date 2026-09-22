@@ -11258,6 +11258,64 @@ let personelBelgeKaydiIdCounter = 903;
       return;
     }
 
+    const sirketPolitikaDetailMatch = path.match(/^\/api\/sirket-calisma-politikalari\/(\d+)$/);
+    if (sirketPolitikaDetailMatch && method === "GET") {
+      if (await denyUnlessRolePermission(route, "sirket_parametreleri.view")) {
+        return;
+      }
+      const id = Number.parseInt(sirketPolitikaDetailMatch[1] ?? "", 10);
+      const politika = sirketPolitikalari.find((item) => item.id === id);
+      if (!politika) {
+        await fulfillJson(route, 404, errorBody("NOT_FOUND", "Politika bulunamadi."));
+        return;
+      }
+      const katalog = [
+        { parametre_kodu: "NORMAL_AY_GUN_SAYISI", etiket: "Normal Ay Gün Sayısı", birim: "GUN" },
+        { parametre_kodu: "GUNLUK_CALISMA_SAATI", etiket: "Günlük Çalışma Saati", birim: "SAAT" },
+        { parametre_kodu: "AYLIK_NORMAL_CALISMA_SAATI", etiket: "Aylık Normal Çalışma Saati", birim: "SAAT" },
+        { parametre_kodu: "HAFTALIK_IS_GUNU_SAYISI", etiket: "Haftalık İş Günü Sayısı", birim: "GUN" },
+        { parametre_kodu: "HAFTA_TATILI_HESAP_MODU", etiket: "Hafta Tatili Hesap Modu", birim: "MOD" },
+        { parametre_kodu: "HAFTA_TATILI_CARPANI", etiket: "Hafta Tatili Çarpanı", birim: "CARPAN" },
+        { parametre_kodu: "FAZLA_MESAI_CARPANI", etiket: "Fazla Mesai Çarpanı", birim: "CARPAN" },
+        { parametre_kodu: "FAZLA_SURELERLE_CALISMA_CARPANI", etiket: "Fazla Sürelerle Çalışma Çarpanı", birim: "CARPAN" },
+        { parametre_kodu: "UBGT_CARPANI", etiket: "UBGT Çarpanı", birim: "CARPAN" },
+        { parametre_kodu: "UBGT_HESAP_MODU", etiket: "UBGT Hesap Modu", birim: "MOD" }
+      ];
+      const rawDegerler = Array.isArray(politika.degerler) ? politika.degerler : [];
+      const degerler = rawDegerler.map((raw: Record<string, unknown>) => {
+        const kod = String(raw.parametre_kodu ?? "");
+        const meta = katalog.find((item) => item.parametre_kodu === kod);
+        const sayisal =
+          raw.sayisal_deger != null && String(raw.sayisal_deger).trim() !== ""
+            ? String(raw.sayisal_deger)
+            : null;
+        const metin =
+          raw.metin_deger != null && String(raw.metin_deger).trim() !== ""
+            ? String(raw.metin_deger)
+            : null;
+        const degerTipi = metin != null && sayisal == null ? "METIN" : "SAYISAL";
+        return {
+          parametre_kodu: kod,
+          etiket: meta?.etiket ?? kod,
+          deger_tipi: degerTipi,
+          sayisal_deger: sayisal,
+          metin_deger: metin,
+          birim: meta?.birim ?? null,
+          mevcut_deger: degerTipi === "METIN" ? metin : sayisal
+        };
+      });
+      await fulfillJson(
+        route,
+        200,
+        okBody({
+          ...politika,
+          revision_no: politika.revision_no ?? 1,
+          degerler
+        })
+      );
+      return;
+    }
+
     const sirketPolitikaSubmitMatch = path.match(/^\/api\/sirket-calisma-politikalari\/(\d+)\/onaya-gonder$/);
     if (sirketPolitikaSubmitMatch && method === "POST") {
       if (await denyUnlessRolePermission(route, "sirket_parametreleri.manage")) {

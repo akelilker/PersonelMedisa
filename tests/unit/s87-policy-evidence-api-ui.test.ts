@@ -57,4 +57,28 @@ describe("S87 policy evidence API/UI contract", () => {
     expect(page).toContain("belge_id: evidence.belge_id");
     expect(page).toContain("belge_sha256: evidence.belge_sha256");
   });
+
+  it("BordroHazirlik UI shows approved policy values read-only via fetchSirketPolitikaDetail", () => {
+    const page = readFileSync(
+      resolve(process.cwd(), "src/features/raporlar/pages/BordroHazirlikMerkeziPage.tsx"),
+      "utf8"
+    );
+    const api = readFileSync(resolve(process.cwd(), "src/api/sirket-calisma-politikasi.api.ts"), "utf8");
+    expect(api).toContain("export async function fetchSirketPolitikaDetail");
+    expect(page).toContain("fetchSirketPolitikaDetail");
+    expect(page).toContain("bordro-politika-goruntule-");
+    expect(page).toContain("Görüntüle");
+    expect(page).toContain("bordro-politika-detay");
+    expect(page).toContain("bordro-politika-detay-meta");
+    expect(page).toContain("bordro-politika-detay-degerler");
+    expect(page).toContain("bordro-politika-detay-hata");
+    expect(page).toContain("bordro-politika-detay-bos");
+    expect(page).toContain("bordro-politika-detay-degerler-bos");
+    expect(page).toContain("handleViewPolitika");
+    expect(page).toContain("Politika detayı (salt okunur)");
+    // Read-only view must not auto-fill the draft form from detail values.
+    expect(page).not.toMatch(/setPolicyForm\([^)]*selectedPolitikaDetail/);
+    expect(page).not.toMatch(/setPolicyForm\([^)]*degerler/);
+    expect(page).toContain("değerler otomatik doldurulmaz");
+  });
 });

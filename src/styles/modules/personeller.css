@@ -328,42 +328,14 @@
   min-width: 0;
 }
 
-/* Personel Kartı modalı dar yüzey: özet ve Genel detay kayıtları tek kolon dikey (kayıt sırası). */
-.personel-detail-card .personel-dosya-hero-grid {
-  grid-template-columns: minmax(0, 1fr);
-}
-
-.personel-detail-card #personel-kart-panel-genel-bilgiler .personel-dosya-record-list {
-  grid-template-columns: minmax(0, 1fr);
+/* Personel Kartı Genel: Kayıt formu ile aynı iki kolon (personel-form-columns owner kayit-surec.css). */
+.personel-detail-card .personel-dosya-kayit-mirror .personel-form-column {
+  justify-content: flex-start;
   gap: var(--space-3);
 }
 
-.personel-detail-card #personel-kart-panel-genel-bilgiler .personel-dosya-record {
-  grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: auto auto;
-  align-content: start;
-  gap: 4px;
-  padding: 0 0 var(--space-2);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-}
-
-.personel-detail-card #personel-kart-panel-genel-bilgiler .personel-dosya-record:last-child {
-  border-bottom: none;
-  padding-bottom: 0;
-}
-
-.personel-detail-card #personel-kart-panel-genel-bilgiler .personel-dosya-record-label,
-.personel-detail-card #personel-kart-panel-genel-bilgiler .personel-dosya-record-value {
+.personel-detail-card .personel-dosya-kayit-mirror .personel-dosya-field {
   min-width: 0;
-  overflow-wrap: anywhere;
-}
-
-.personel-detail-card #personel-kart-panel-genel-bilgiler .personel-dosya-record.is-missing {
-  grid-column: auto;
-  grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: auto auto auto;
-  gap: 4px;
-  padding: var(--space-2);
 }
 
 .personel-dosya-hero {

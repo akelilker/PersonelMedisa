@@ -24,6 +24,20 @@ describe("Kayıt modal UI polish source locks", () => {
     expect(kayitCss).toContain(".kayit-workspace-grid--personel-form .app-select-trigger-text.is-placeholder");
   });
 
+  it("extends Kayıt form center red divider downward with subtle glow", () => {
+    const kayitCss = read("src/styles/modules/kayit-surec.css");
+
+    expect(kayitCss).toMatch(
+      /\.kayit-workspace-grid--personel-form \.personel-form-columns::after[\s\S]*bottom: -14px/
+    );
+    expect(kayitCss).toMatch(
+      /\.kayit-workspace-grid--personel-form \.personel-form-columns::after[\s\S]*background: rgba\(var\(--theme-color-rgb\), 0\.26\)/
+    );
+    expect(kayitCss).toMatch(
+      /\.kayit-workspace-grid--personel-form \.personel-form-columns::after[\s\S]*box-shadow: 0 0 10px rgba\(var\(--theme-color-rgb\), 0\.32\)/
+    );
+  });
+
   it("defaults new personel ücret tipi to Saatlik (id 3)", () => {
     expect(INITIAL_CREATE_PERSONEL_FORM.ucretTipiId).toBe("3");
   });

@@ -356,6 +356,13 @@
   gap: var(--space-4);
 }
 
+/* Kayıt form: orta kırmızı ayırıcı — Taşıt Kayıt/Detay ritmi; hafif parlaklık + aşağı uzatma. */
+.kayit-workspace-grid--personel-form .personel-form-columns::after {
+  bottom: -14px;
+  background: rgba(var(--theme-color-rgb), 0.26);
+  box-shadow: 0 0 10px rgba(var(--theme-color-rgb), 0.32);
+}
+
 .kayit-workspace-grid--personel-form .personel-form-column {
   gap: 2px;
 }

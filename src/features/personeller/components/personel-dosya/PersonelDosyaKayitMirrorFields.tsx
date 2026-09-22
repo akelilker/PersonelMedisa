@@ -144,7 +144,6 @@ export function PersonelDosyaKayitMirrorFields({ personel }: { personel: Persone
                 : "personel-dosya-field-value"
             }
           />
-          <DossierField label="Pasiflik Etiketi" value={formatDetailValue(personel.pasiflik_durumu_etiketi)} />
         </div>
       </div>
     </div>

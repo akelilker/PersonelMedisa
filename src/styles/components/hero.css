@@ -205,10 +205,11 @@ body.login-page .hero .animated-line {
   }
 
   .hero.hero-with-session {
-    min-height: 68px;
-    padding-top: 14px;
-    padding-bottom: 14px;
+    min-height: 64px;
+    padding-top: 12px;
+    padding-bottom: 12px;
     margin-bottom: 4px;
+    overflow: visible;
   }
 
   .hero-logo,
@@ -225,17 +226,19 @@ body.login-page .hero .animated-line {
     align-items: start;
     align-self: stretch;
     justify-items: center;
-    gap: 4px;
+    gap: 3px;
     margin-left: 0;
     margin-right: 8px;
-    transform: translateY(3px);
-    padding: 2px 0 4px;
+    transform: translateY(1px);
+    padding: 2px 0 2px;
+    overflow: visible;
   }
 
   .hero-with-session .hero-session-meta {
     box-sizing: border-box;
     justify-self: stretch;
     padding: 0 2px;
+    overflow: visible;
   }
 
   .hero-with-session .hero-logo picture {
@@ -255,9 +258,11 @@ body.login-page .hero .animated-line {
 
   .hero-with-session .hero-session-user {
     align-self: stretch;
-    padding: 0 2px 1px;
-    line-height: 1.05;
-    transform: translateY(4px);
+    padding: 0 2px 0;
+    line-height: 1.2;
+    overflow: visible;
+    text-overflow: clip;
+    transform: none;
   }
 
   .animated-line,

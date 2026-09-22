@@ -1,9 +1,13 @@
+import { mkdirSync } from "node:fs";
 import { expect, test } from "@playwright/test";
 import { login } from "./helpers/auth";
 import { mockApi } from "./helpers/mock-api";
 
+const WALKTHROUGH_DIR = "/opt/cursor/artifacts/screenshots";
+
 test.describe("Kayıt modal UI polish", () => {
   test.beforeEach(async ({ page }) => {
+    mkdirSync(WALKTHROUGH_DIR, { recursive: true });
     await page.setViewportSize({ width: 1366, height: 768 });
     await mockApi(page, "GENEL_YONETICI");
     await login(page, { username: "yonetici", password: "secret" });
@@ -38,6 +42,8 @@ test.describe("Kayıt modal UI polish", () => {
     expect(ucretTipi).toContain("Saatlik");
 
     await expect(kayitModal.getByTestId("kayit-bulk-import-link")).toHaveText("Tıklayınız.");
+
+    await kayitModal.screenshot({ path: `${WALKTHROUGH_DIR}/kayit-surec-kayit-tab-polish.png` });
   });
 
   test("Toplu Kayıt Aktarma: back bar, no rule, centered action grid", async ({ page }) => {
@@ -79,5 +85,7 @@ test.describe("Kayıt modal UI polish", () => {
 
     await expect(importModal.getByTestId("personel-import-back-kayit")).toBeVisible();
     await expect(importModal.getByTestId("personel-import-template-download")).toBeVisible();
+
+    await importModal.screenshot({ path: `${WALKTHROUGH_DIR}/toplu-kayit-aktarma-polish.png` });
   });
 });

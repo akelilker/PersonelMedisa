@@ -39,6 +39,16 @@ function snapPdo(string $path): PDO
 function createSnapshotSchema(PDO $pdo): void
 {
     $pdo->exec('CREATE TABLE subeler (id INTEGER PRIMARY KEY, kod TEXT, ad TEXT)');
+    $pdo->exec('CREATE TABLE sgk_isverenler (id INTEGER PRIMARY KEY, kod TEXT, ad TEXT)');
+    $pdo->exec('CREATE TABLE calisma_lokasyonlari (id INTEGER PRIMARY KEY, ad TEXT)');
+    // Canonical SGK reporting-period owner (employer axis, factual verification) for the fixture.
+    $pdo->exec('CREATE TABLE sgk_isveren_bildirim_donemi_surumleri (
+        id INTEGER PRIMARY KEY, sgk_isveren_id INTEGER NOT NULL, surum_kodu TEXT NOT NULL,
+        bildirim_donem_tipi TEXT NOT NULL, gecerlilik_baslangic TEXT NOT NULL, gecerlilik_bitis TEXT,
+        state TEXT NOT NULL, dogrulama_kaynagi TEXT NOT NULL, dogrulama_kanit_hash TEXT NOT NULL,
+        aciklama TEXT NOT NULL, dogrulayan_id INTEGER, dogrulama_zamani TEXT,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )');
     $pdo->exec('CREATE TABLE departmanlar (id INTEGER PRIMARY KEY, ad TEXT)');
     $pdo->exec('CREATE TABLE gorevler (id INTEGER PRIMARY KEY, ad TEXT)');
     $pdo->exec('CREATE TABLE personel_tipleri (id INTEGER PRIMARY KEY, ad TEXT)');
@@ -47,7 +57,8 @@ function createSnapshotSchema(PDO $pdo): void
         ise_giris_tarihi TEXT, sube_id INTEGER NOT NULL, departman_id INTEGER, gorev_id INTEGER,
         personel_tipi_id INTEGER, bagli_amir_id INTEGER, aktif_durum TEXT NOT NULL DEFAULT \'AKTIF\',
         dogum_tarihi TEXT,
-        ucret_tipi_id INTEGER, maas_tutari REAL, prim_kurali_id INTEGER
+        ucret_tipi_id INTEGER, maas_tutari REAL, prim_kurali_id INTEGER,
+        sgk_isveren_id INTEGER, calisma_lokasyonu_id INTEGER
     )');
     $pdo->exec('CREATE TABLE surecler (
         id INTEGER PRIMARY KEY, personel_id INTEGER NOT NULL, surec_turu TEXT NOT NULL, alt_tur TEXT,
@@ -257,17 +268,28 @@ function resetSnapshotData(PDO $pdo): void
         'sgk_personel_sigortalilik_surumleri', 'sgk_sirket_politika_degerleri',
         'sgk_sirket_politika_surumleri', 'sgk_eksik_gun_kod_cakismalari',
         'sgk_eksik_gun_kodlari', 'sgk_eksik_gun_katalog_surumleri',
+        'sgk_isveren_bildirim_donemi_surumleri', 'calisma_lokasyonlari', 'sgk_isverenler',
         'personel_ucret_gecmisi', 'surecler', 'personeller', 'subeler',
     ] as $table) {
         $pdo->exec('DELETE FROM ' . $table);
     }
     $pdo->exec("INSERT INTO subeler (id, kod, ad) VALUES (1, 'MRK', 'Merkez'), (2, 'SB2', 'Sube 2')");
+    $pdo->exec("INSERT INTO sgk_isverenler (id, kod, ad) VALUES (1, 'MEDISA', 'Medisa')");
+    $pdo->exec("INSERT INTO calisma_lokasyonlari (id, ad) VALUES (1, 'Merkez')");
     $pdo->exec("INSERT INTO personeller (
         id, tc_kimlik_no, ad, soyad, sicil_no, ise_giris_tarihi, dogum_tarihi,
-        sube_id, aktif_durum, ucret_tipi_id
+        sube_id, aktif_durum, ucret_tipi_id, sgk_isveren_id, calisma_lokasyonu_id
     ) VALUES
-        (7, '11111111111', 'Ali', 'Yilmaz', 'S007', '2020-01-01', '1990-01-01', 1, 'AKTIF', 1),
-        (8, '22222222222', 'Ayse', 'Demir', 'S008', '2020-01-01', '1991-01-01', 1, 'AKTIF', 1)");
+        (7, '11111111111', 'Ali', 'Yilmaz', 'S007', '2020-01-01', '1990-01-01', 1, 'AKTIF', 1, 1, 1),
+        (8, '22222222222', 'Ayse', 'Demir', 'S008', '2020-01-01', '1991-01-01', 1, 'AKTIF', 1, 1, 1)");
+    // Canonical employer reporting period (SGK_ISVEREN axis), factual verified state.
+    $employerPeriodHash = str_repeat('c', 64);
+    $pdo->exec("INSERT INTO sgk_isveren_bildirim_donemi_surumleri
+        (id, sgk_isveren_id, surum_kodu, bildirim_donem_tipi, gecerlilik_baslangic, gecerlilik_bitis,
+         state, dogrulama_kaynagi, dogrulama_kanit_hash, aciklama, dogrulayan_id, dogrulama_zamani)
+        VALUES (1, 1, 'MEDISA-2026', 'AY_1_SON_GUN', '2024-01-01', NULL,
+         'DOGRULANDI', 'EXPLICIT_EMPLOYER_PERIOD', '$employerPeriodHash',
+         'canonical employer period', 99, '2026-01-02 00:00:00')");
     $manifestHash = str_repeat('a', 64);
     $policyHash = str_repeat('b', 64);
     $pdo->exec("INSERT INTO sgk_eksik_gun_katalog_surumleri

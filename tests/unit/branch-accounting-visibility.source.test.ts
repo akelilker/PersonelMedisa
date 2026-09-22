@@ -106,28 +106,33 @@ describe("branch accounting visibility owners", () => {
     expect(parsed.muhasebe_user_subeler_targets.REMOVE).toEqual([]);
   });
 
-  it("pins CURRENT_STATE + registry to code tip 089 with prod tip 087 pending", () => {
+  it("pins CURRENT_STATE + registry to code tip 091 with LAST_VERIFIED prod tip 089", () => {
     const current = read("CURRENT_STATE.md");
     const registry = read("docs/guncel/110-master-closure-gap-registry.md");
-    expect(current).toMatch(/^CODE_MIGRATION_TIP: 089$/m);
-    expect(current).toMatch(/^PRODUCTION_MIGRATION_TIP: 087$/m);
+    expect(current).toMatch(/^CODE_MIGRATION_TIP: 091$/m);
+    expect(current).toMatch(/^PRODUCTION_MIGRATION_TIP: 089$/m);
+    expect(current).toMatch(/^LAST_VERIFIED_PRODUCTION_MIGRATION_TIP: 089$/m);
+    expect(current).toMatch(
+      /^FRESH_PRODUCTION_MIGRATION_READBACK: BLOCKED_EXTERNAL_GITHUB_ACTIONS_BILLING$/m
+    );
     expect(current).toMatch(/^PRODUCTION_MIGRATION_PENDING: 2$/m);
     expect(current).toMatch(
       /^PRODUCTION_DEPLOY_SHA: d96182a2a4b4cb5e9e6d7c867d3486d7ac4061b2$/m
     );
     expect(current).toContain("USER_SUBELER_SEMANTIC: ACCESS_SCOPE_ONLY");
     expect(current).toContain("BRANCH_MANAGER_OWNER: sube_sorumlu_yoneticiler");
-    expect(current).toContain("USER_SUBELER_SEMANTIC: ACCESS_SCOPE_ONLY");
-    expect(current).toContain("PREPARER: sedanurB");
-    expect(current).toContain("APPROVER: Sinem Hamaloğlu");
+    expect(current).toContain("PREPARER_HISTORICAL: sedanurB");
+    expect(current).toContain("APPROVER_HISTORICAL: Sinem Hamaloğlu");
     expect(current).toContain("TECHNICAL_STATUS: TECHNICAL_GAP_LOCAL_FIXABLE");
     expect(registry).toContain("TECHNICAL_GAP_LOCAL_FIXABLE");
     expect(registry).not.toContain("BM model ALREADY_SUPPORTED");
-    expect(registry).toMatch(/^CODE_MIGRATION_TIP: 089$/m);
-    expect(registry).toMatch(/^PRODUCTION_MIGRATION_TIP: 087$/m);
+    expect(registry).toMatch(/^CODE_MIGRATION_TIP: 091$/m);
+    expect(registry).toMatch(/^PRODUCTION_MIGRATION_TIP: 089$/m);
     expect(registry).toContain("| Migration 087 | **APPLIED** |");
-    expect(registry).toContain("| Migration 088 | **CODE_ONLY_PENDING** |");
-    expect(registry).toContain("| Migration 089 | **CODE_ONLY_PENDING** |");
-    expect(registry).toContain("pending **088**");
+    expect(registry).toContain("| Migration 088 | **APPLIED** |");
+    expect(registry).toContain("| Migration 089 | **APPLIED** |");
+    expect(registry).toContain("| Migration 090 | **CODE_ONLY_PENDING** |");
+    expect(registry).toContain("| Migration 091 | **CODE_ONLY_PENDING** |");
+    expect(registry).toContain("BLOCKED_EXTERNAL_GITHUB_ACTIONS_BILLING");
   });
 });

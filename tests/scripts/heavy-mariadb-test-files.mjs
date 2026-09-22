@@ -74,6 +74,7 @@ export const heavyMariaDbTestFiles = [
   "tests/unit/serbest-zaman-mysql.php-runtime.test.ts",
   "tests/unit/serbest-zaman-pack4b-mysql.php-runtime.test.ts",
   "tests/unit/sgk-isveren-self-service.php-runtime.test.ts",
+  "tests/unit/sgk-isveren-bildirim-donemi-owner-mysql.php-runtime.test.ts",
   "tests/unit/sgk-owner-migration-mysql.php-runtime.test.ts",
   "tests/unit/sirket-sube-hiyerarsisi.php-runtime.test.ts",
   "tests/unit/surecler-detail-update-cancel-mysql.php-runtime.test.ts",

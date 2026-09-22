@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Medisa\Api\Services;
 
+use Medisa\Api\Services\Payroll\SgkIsverenBildirimDonemiReadService;
 use Medisa\Api\Services\Payroll\SgkManuelKodOverrideService;
 use Medisa\Api\Services\Payroll\SgkPrimGunuEngine;
 use Medisa\Api\Services\Payroll\SgkSirketPolitikaReadService;
@@ -11,10 +12,18 @@ use PDO;
 use PDOException;
 
 require_once __DIR__ . '/Payroll/SgkManuelKodOverrideService.php';
+require_once __DIR__ . '/Payroll/SgkIsverenBildirimDonemiReadService.php';
 
 /** S85-B SGK kaynak cozumleme, snapshot persistence ve read-only query owner'i. */
 final class SgkPrimGunuService
 {
+    /**
+     * Canonical SGK bildirim donemi comes from the SGK employer axis. These are
+     * fail-closed when the employer period is missing or ambiguous.
+     */
+    public const BLOCKER_ISVEREN_BILDIRIM_DONEMI_YOK = 'SGK_ISVEREN_BILDIRIM_DONEMI_YOK';
+    public const BLOCKER_ISVEREN_BILDIRIM_DONEMI_CAKISMA = 'SGK_ISVEREN_BILDIRIM_DONEMI_CAKISMA';
+
     /** @return array<string, mixed> */
     public static function calculateResolution(PDO $pdo, array $resolution)
     {
@@ -38,6 +47,16 @@ final class SgkPrimGunuService
                 'state' => SgkSirketPolitikaReadService::STATE_NO_APPROVED_POLICY,
             ];
         }
+        // The branch-scoped company policy above remains the management policy owner
+        // (remuneration / SGK_ODENEK_MAHSUP_MODU and friends). The SGK reporting
+        // period is NOT read from it anymore: it is an employer fact owned by the
+        // SGK employer axis (personeller.sgk_isveren_id).
+        $employerPeriods = self::resolveEmployerBildirimDonemleri(
+            $pdo,
+            $resolution['personeller'] ?? [],
+            $periodStart,
+            $periodEnd
+        );
         $statuses = self::loadPersonnelStatuses($pdo, array_keys($resolution['personeller']), $periodStart, $periodEnd);
         $mapping = self::loadProcessMappings($pdo, $catalog['surum_id'] ?? null);
         $documents = self::loadDocuments($pdo, $resolution['izinler']);
@@ -108,6 +127,7 @@ final class SgkPrimGunuService
 
         $results = [];
         $items = [];
+        $bildirimDonemCozumlemesi = [];
         foreach ($resolution['personeller'] as $personelId => $personel) {
             $statusRows = $statuses[(int) $personelId] ?? [];
             $status = count($statusRows) === 1 ? $statusRows[0] : null;
@@ -139,12 +159,13 @@ final class SgkPrimGunuService
                 }
             }
 
+            $periodChoice = self::resolvePersonelBildirimDonemi($personel, $employerPeriods);
+            $bildirimDonemCozumlemesi[(int) $personelId] = $periodChoice + ['personel_id' => (int) $personelId];
+
             $engineInput = [
                 'donem_baslangic' => $periodStart,
                 'donem_bitis' => $periodEnd,
-                'bildirim_donem_tipi' => $status !== null && (string) $status['bildirim_donem_tipi'] !== 'SIRKET_POLITIKASINDAN'
-                    ? (string) $status['bildirim_donem_tipi']
-                    : ($companyPolicy['politika']['bildirim_donem_tipi'] ?? null),
+                'bildirim_donem_tipi' => $periodChoice['bildirim_donem_tipi'],
                 'personel' => $personelInput,
                 'puantajlar' => $attendanceByPerson[(int) $personelId] ?? [],
                 'surecler' => $processes,
@@ -176,6 +197,33 @@ final class SgkPrimGunuService
             }
 
             $result = SgkPrimGunuEngine::calculate($engineInput);
+            if (in_array($periodChoice['kaynak'], ['SGK_ISVEREN', 'SGK_ISVEREN_MISSING'], true)) {
+                if ($periodChoice['state'] === SgkIsverenBildirimDonemiReadService::STATE_CONFLICT) {
+                    $result = self::appendBlocker($result, [
+                        'severity' => 'BLOCKER',
+                        'code' => self::BLOCKER_ISVEREN_BILDIRIM_DONEMI_CAKISMA,
+                        'message' => 'SGK isvereni icin ayni donemde birden fazla gecerli bildirim donemi tanimi var.',
+                        'domain' => 'SGK',
+                        'tarih_baslangic' => $periodStart,
+                        'tarih_bitis' => $periodEnd,
+                        'kaynak_surec_id' => null,
+                        'kaynak_belge_id' => null,
+                        'cozum_onerisi' => 'SGK isvereni icin tek bir dogrulanmis ve tarih etkili bildirim donemi birakin.',
+                    ]);
+                } elseif ($periodChoice['state'] !== SgkIsverenBildirimDonemiReadService::STATE_DOGRULANDI) {
+                    $result = self::appendBlocker($result, [
+                        'severity' => 'BLOCKER',
+                        'code' => self::BLOCKER_ISVEREN_BILDIRIM_DONEMI_YOK,
+                        'message' => 'IC personelin SGK isvereni icin dogrulanmis bildirim donemi tanimi yok.',
+                        'domain' => 'SGK',
+                        'tarih_baslangic' => $periodStart,
+                        'tarih_bitis' => $periodEnd,
+                        'kaynak_surec_id' => null,
+                        'kaynak_belge_id' => null,
+                        'cozum_onerisi' => 'SGK isvereninin bildirim donemi tipini acikca dogrulayin.',
+                    ]);
+                }
+            }
             if ($reportPresent && $companyPolicy['politika'] !== null
                 && ($companyPolicy['degerler']['SGK_ODENEK_MAHSUP_MODU'] ?? '') !== 'UCRET_MODELINE_GORE') {
                 $result = self::appendBlocker($result, [
@@ -216,9 +264,87 @@ final class SgkPrimGunuService
             'items' => $items,
             'catalog' => $catalog,
             'company_policy' => $companyPolicy,
+            'bildirim_donem_cozumlemesi' => $bildirimDonemCozumlemesi,
             'source_hash' => SgkPrimGunuEngine::hashCanonical(array_map(static function (array $result) {
                 return $result['sgk_hesap_hash'];
             }, $results)),
+        ];
+    }
+
+    /**
+     * Canonical SGK reporting-period resolution for the SGK employers present in
+     * the period. Keyed by sgk_isveren_id; never derived from branch/company.
+     *
+     * @param array<int|string, array<string,mixed>> $personeller
+     * @return array<int, array{donem: array<string,mixed>|null, bildirim_donem_tipi: string|null, state: string}>
+     */
+    private static function resolveEmployerBildirimDonemleri(PDO $pdo, array $personeller, string $from, string $to): array
+    {
+        $employerIds = [];
+        foreach ($personeller as $personel) {
+            if (!is_array($personel)) {
+                continue;
+            }
+            $employerId = isset($personel['sgk_isveren_id']) ? (int) $personel['sgk_isveren_id'] : 0;
+            if ($employerId > 0) {
+                $employerIds[$employerId] = true;
+            }
+        }
+
+        $resolved = [];
+        foreach (array_keys($employerIds) as $employerId) {
+            try {
+                $resolved[$employerId] = SgkIsverenBildirimDonemiReadService::resolveForPeriod($pdo, (int) $employerId, $from, $to);
+            } catch (\Throwable $e) {
+                $resolved[$employerId] = [
+                    'donem' => null,
+                    'bildirim_donem_tipi' => null,
+                    'state' => SgkIsverenBildirimDonemiReadService::STATE_NO_PERIOD,
+                ];
+            }
+        }
+
+        return $resolved;
+    }
+
+    /**
+     * Canonical SGK reporting-period source is ONLY personeller.sgk_isveren_id ->
+     * SgkIsverenBildirimDonemiReadService. Branch, company, physical location,
+     * legacy branch policy and legacy personnel-status period overrides are never
+     * used. A missing/null/invalid employer identity is fail-closed to NO_PERIOD;
+     * the payroll preflight keeps the SGK_ISVEREN_MISSING contract.
+     *
+     * @param array<string,mixed> $personel
+     * @param array<int, array<string,mixed>> $employerPeriods
+     * @return array{kaynak: string, sgk_isveren_id: int|null, state: string, bildirim_donem_tipi: string|null}
+     */
+    private static function resolvePersonelBildirimDonemi(array $personel, array $employerPeriods): array
+    {
+        $employerId = isset($personel['sgk_isveren_id']) ? (int) $personel['sgk_isveren_id'] : 0;
+        if ($employerId > 0) {
+            $employerPeriod = $employerPeriods[$employerId] ?? null;
+            $state = is_array($employerPeriod)
+                ? (string) $employerPeriod['state']
+                : SgkIsverenBildirimDonemiReadService::STATE_NO_PERIOD;
+            $tip = is_array($employerPeriod) && $employerPeriod['bildirim_donem_tipi'] !== null
+                ? (string) $employerPeriod['bildirim_donem_tipi']
+                : null;
+
+            return [
+                'kaynak' => 'SGK_ISVEREN',
+                'sgk_isveren_id' => $employerId,
+                'state' => $state,
+                'bildirim_donem_tipi' => $tip,
+            ];
+        }
+
+        // Missing / null / invalid employer identity -> no canonical reporting
+        // period. Never fall back to legacy personnel status or branch policy.
+        return [
+            'kaynak' => 'SGK_ISVEREN_MISSING',
+            'sgk_isveren_id' => null,
+            'state' => SgkIsverenBildirimDonemiReadService::STATE_NO_PERIOD,
+            'bildirim_donem_tipi' => null,
         ];
     }
 

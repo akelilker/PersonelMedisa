@@ -207,6 +207,7 @@ function mhsReset(PDO $pdo): void
         'maas_hesaplama_snapshot_auditleri', 'maas_hesaplama_girdi_snapshotlari',
         'maas_hesaplama_personel_snapshotlari', 'maas_hesaplama_donem_snapshotlari',
         'sgk_is_goremezlik_finans_kayitlari', 'sgk_personel_sigortalilik_surumleri',
+        'sgk_isveren_bildirim_donemi_surumleri',
         'sgk_belge_surec_baglantilari', 'sgk_eksik_gun_belgeleri', 'sgk_sirket_politika_degerleri',
         'sgk_sirket_politika_surumleri', 'sgk_surec_neden_eslemeleri',
         'sgk_eksik_gun_kod_cakismalari', 'sgk_eksik_gun_kodlari', 'sgk_eksik_gun_katalog_surumleri',
@@ -235,6 +236,13 @@ function mhsReset(PDO $pdo): void
         VALUES (1, 7, '4A', 'TAM_SURELI', 'SIRKET_POLITIKASINDAN', '2026-01-01', 'ONAYLANDI', 'test', 1, NOW()),
                (2, 8, '4A', 'TAM_SURELI', 'SIRKET_POLITIKASINDAN', '2026-01-01', 'ONAYLANDI', 'test', 1, NOW()),
                (3, 9, '4A', 'TAM_SURELI', 'SIRKET_POLITIKASINDAN', '2026-01-01', 'ONAYLANDI', 'test', 1, NOW())");
+    // Canonical employer reporting period (SGK_ISVEREN axis), factual verified state.
+    $pdo->exec("INSERT INTO sgk_isveren_bildirim_donemi_surumleri
+        (id, sgk_isveren_id, surum_kodu, bildirim_donem_tipi, gecerlilik_baslangic, gecerlilik_bitis,
+         state, dogrulama_kaynagi, dogrulama_kanit_hash, aciklama, dogrulayan_id, dogrulama_zamani)
+        VALUES (1, 1, 'MEDISA-2026', 'AY_1_SON_GUN', '2024-01-01', NULL,
+         'DOGRULANDI', 'EXPLICIT_EMPLOYER_PERIOD', REPEAT('a', 64),
+         'canonical employer period', 1, NOW())");
     $pdo->exec("INSERT INTO mevzuat_parametreleri
         (parametre_kodu, deger_tipi, sayisal_deger, birim, gecerlilik_baslangic)
         VALUES ('SGK_GUNLUK_TABAN', 'SAYISAL', 100, 'TRY', '2026-01-01'),
@@ -245,6 +253,15 @@ try {
     // Base schema (FK hedefleri gercek migration kolon tipleriyle uyumlu)
     $pdo->exec('CREATE TABLE subeler (id INT UNSIGNED NOT NULL PRIMARY KEY, kod VARCHAR(32), ad VARCHAR(120)) ENGINE=InnoDB');
     $pdo->exec('CREATE TABLE users (id INT UNSIGNED NOT NULL PRIMARY KEY) ENGINE=InnoDB');
+    // Canonical org-location axis (064 shape): required for the SGK employer-period owner.
+    $pdo->exec("CREATE TABLE sgk_isverenler (
+        id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY, kod VARCHAR(32) NULL, ad VARCHAR(191) NOT NULL,
+        durum VARCHAR(16) NOT NULL DEFAULT 'AKTIF'
+    ) ENGINE=InnoDB");
+    $pdo->exec("CREATE TABLE calisma_lokasyonlari (
+        id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY, ad VARCHAR(191) NOT NULL,
+        durum VARCHAR(16) NOT NULL DEFAULT 'AKTIF'
+    ) ENGINE=InnoDB");
     $pdo->exec('CREATE TABLE departmanlar (id INT UNSIGNED NOT NULL PRIMARY KEY, ad VARCHAR(120)) ENGINE=InnoDB');
     $pdo->exec('CREATE TABLE gorevler (id INT UNSIGNED NOT NULL PRIMARY KEY, ad VARCHAR(120)) ENGINE=InnoDB');
     $pdo->exec('CREATE TABLE personel_tipleri (id INT UNSIGNED NOT NULL PRIMARY KEY, ad VARCHAR(120)) ENGINE=InnoDB');
@@ -254,7 +271,8 @@ try {
         departman_id INT UNSIGNED NULL, gorev_id INT UNSIGNED NULL, personel_tipi_id INT UNSIGNED NULL,
         bagli_amir_id INT UNSIGNED NULL, aktif_durum VARCHAR(16) NOT NULL DEFAULT 'AKTIF',
         dogum_tarihi DATE NULL,
-        ucret_tipi_id INT UNSIGNED NULL, maas_tutari DECIMAL(12,2) NULL, prim_kurali_id INT UNSIGNED NULL
+        ucret_tipi_id INT UNSIGNED NULL, maas_tutari DECIMAL(12,2) NULL, prim_kurali_id INT UNSIGNED NULL,
+        sgk_isveren_id INT UNSIGNED NULL, calisma_lokasyonu_id INT UNSIGNED NULL
     ) ENGINE=InnoDB");
     $pdo->exec("CREATE TABLE surecler (
         id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY, personel_id INT UNSIGNED NOT NULL,
@@ -333,6 +351,7 @@ try {
         '020_maas_hesaplama_snapshotlari.sql',
         '021_maas_hesaplama_snapshot_guvenlik_indexleri.sql',
         '036_sgk_prim_gunu_owner.sql',
+        '090_sgk_isveren_bildirim_donemi_owner.sql',
     ] as $file) {
         $sql = file_get_contents(__DIR__ . '/../../api/migrations/' . $file);
         foreach (mhsSplitMigrationStatements((string) $sql) as $statement) {
@@ -381,12 +400,15 @@ try {
 
     $pdo->exec("INSERT INTO subeler VALUES (1, 'MRK', 'Merkez'), (2, 'SB2', 'Sube 2')");
     $pdo->exec('INSERT INTO users VALUES (1), (11), (12), (13), (14), (15), (16), (17), (18), (19), (20), (99)');
+    $pdo->exec("INSERT INTO sgk_isverenler (id, kod, ad) VALUES (1, 'MEDISA', 'Medisa')");
+    $pdo->exec("INSERT INTO calisma_lokasyonlari (id, ad) VALUES (1, 'Merkez')");
     $pdo->exec("INSERT INTO personeller (
-        id, tc_kimlik_no, ad, soyad, sicil_no, ise_giris_tarihi, dogum_tarihi, sube_id, ucret_tipi_id
+        id, tc_kimlik_no, ad, soyad, sicil_no, ise_giris_tarihi, dogum_tarihi, sube_id, ucret_tipi_id,
+        sgk_isveren_id, calisma_lokasyonu_id
     ) VALUES
-        (7, '11111111111', 'Ali', 'Yilmaz', 'S007', '2020-01-01', '1990-01-01', 1, 1),
-        (8, '22222222222', 'Ayse', 'Demir', 'S008', '2020-01-01', '1991-01-01', 1, 1),
-        (9, '33333333333', 'Can', 'Kaya', 'S009', '2020-01-01', '1992-01-01', 2, 1)");
+        (7, '11111111111', 'Ali', 'Yilmaz', 'S007', '2020-01-01', '1990-01-01', 1, 1, 1, 1),
+        (8, '22222222222', 'Ayse', 'Demir', 'S008', '2020-01-01', '1991-01-01', 1, 1, 1, 1),
+        (9, '33333333333', 'Can', 'Kaya', 'S009', '2020-01-01', '1992-01-01', 2, 1, 1, 1)");
 
     $actor = ['id' => 99, 'rol' => 'MUHASEBE'];
 

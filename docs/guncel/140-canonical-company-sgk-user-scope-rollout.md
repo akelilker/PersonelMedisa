@@ -13,11 +13,13 @@
 
 Owner: `OrgScope` (+ `HrWriteScope` for `IK_PERSONELI` write companies). Session: `AuthMiddleware` / `LoginController`.
 
-## Live production inventory (2026-09-07 hosting-incident pin)
+## Historical production inventory (2026-09-07 hosting-incident pin) — historical evidence, NOT current tip
+
+**CURRENT canonical pins (2026-09-20):** `CODE_MIGRATION_TIP = 091`; `LAST_VERIFIED_PRODUCTION_MIGRATION_TIP = 089`; `FRESH_PRODUCTION_MIGRATION_READBACK = BLOCKED_EXTERNAL_GITHUB_ACTIONS_BILLING`. The `087` row below is a historical readback of apply `34033315991`, not the current production tip. Authoritative source: `CURRENT_STATE.md` + `docs/guncel/110-master-closure-gap-registry.md`.
 
 | Object | Live state | Evidence |
 | --- | --- | --- |
-| `PRODUCTION_MIGRATION_TIP` | **087** | apply `34033315991`; inventory pending=0 |
+| `PRODUCTION_MIGRATION_TIP` | **087** (historical pin, not current) | apply `34033315991`; inventory pending=0 |
 | LIVE deploy SHA | `9b4aac7919100c5421544824b0401e5046ab621e` | Last successful deploy (PR274 not live) |
 | CODE_MAIN SHA | `63f8c9052ca15c3f311e158b41b0afda09d2b874` | PR #274 MERGED / CI PASS / DEPLOY_HELD |
 | `user_sirketler` | **3** | inventory `orginv-34057486092-1` |
@@ -27,7 +29,7 @@ Owner: `OrgScope` (+ `HrWriteScope` for `IK_PERSONELI` write companies). Session
 | `sube_muhasebe_yetkilileri` | **0 rows** | ACL restriction DISABLED (intentional) |
 | Karyapı / Şenay operational rollout | **INTENTIONAL_DEFER** | do not invent grants |
 | A2 160/211 location | **CLOSED** | do not reopen |
-| A1 SGK period 12/13 | **PAUSED_PENDING_HOST_RECOVERY_AND_SINEM_LIVE_VERIFY** | preparer `sedanurB` + approver Sinem Hamaloğlu locked; live verify + no apply while hosting incident |
+| A1 SGK period 12/13 | **SUPERSEDED_BY_SGK_EMPLOYER_PERIOD_OWNER_CORRECTION** | 12/13 branch-specific period rows are NOT the target fix; SGK bildirim donemi owner'i SGK_ISVEREN eksenidir. Historical evidence preserved (preparer `sedanurB` + approver Sinem Hamaloğlu locked; no apply). |
 
 Historical PLAN-only pins that said grants=0 / tip=086 / locations deferred are **not** current live truth.
 
@@ -50,6 +52,6 @@ Historical PLAN-only pins that said grants=0 / tip=086 / locations deferred are 
 
 ## Related residuals (Priority A — see CURRENT_STATE)
 
-- SGK period policy missing for Medisa sube **12/13** (`NO_APPROVED_POLICY`)
+- SGK period policy missing for Medisa sube **12/13** (`NO_APPROVED_POLICY`) — **SUPERSEDED_BY_SGK_EMPLOYER_PERIOD_OWNER_CORRECTION**: 12/13 branch-specific period rows are NOT the target fix; reporting period follows `sgk_isveren_id` (Medisa = 1)
 - Personnel `calisma_lokasyonu_id` NULL = 16 (2 AUTO NO-APPLY candidates)
 - Personnel `sube_id` NULL = 1 (personel 212)

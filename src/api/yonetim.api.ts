@@ -424,6 +424,20 @@ export async function resetYonetimKullaniciBaslangicSifresi(
   return normalizeYonetimKullanici(response.data);
 }
 
+/**
+ * Rewrite username to the bound-personel canonical template.
+ * Password / must_change_password are intentionally untouched.
+ */
+export async function fixYonetimKullaniciCanonicalUsername(
+  kullaniciId: number | string
+): Promise<YonetimKullanici> {
+  const response = await apiRequest<ApiResponse<unknown>>(endpoints.yonetim.kullaniciDetail(kullaniciId), {
+    method: "PUT",
+    body: JSON.stringify({ canonical_username_duzelt: true })
+  });
+  return normalizeYonetimKullanici(response.data);
+}
+
 export async function createYonetimActorIdentity(userId: number | string): Promise<YonetimActorIdentityRead> {
   const response = await apiRequest<ApiResponse<YonetimActorIdentityRead>>(endpoints.yonetim.actorIdentities, {
     method: "POST",

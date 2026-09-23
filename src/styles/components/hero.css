@@ -474,11 +474,11 @@ body.login-page .hero .animated-line {
     overflow: visible;
     margin-bottom: 4px;
     min-height: 71px;
-    width: calc(100% + 4px);
-    max-width: calc(100% + 4px);
-    margin-left: -2px;
-    margin-right: -2px;
-    padding: 12px 12px 12px 3px;
+    width: 100%;
+    max-width: 100%;
+    margin-left: 0;
+    margin-right: 0;
+    padding: 12px 12px 12px 6px;
     box-sizing: border-box;
     border-color: rgba(140, 158, 176, 0.6);
     box-shadow:
@@ -499,16 +499,18 @@ body.login-page .hero .animated-line {
     max-width: min(112px, 30vw);
     margin-right: 6px;
     margin-left: 0;
+    padding-left: 2px;
     gap: 4px;
     align-self: center;
-    transform: translate(-1px, 1px);
+    transform: translate(0, 1px);
     overflow: visible;
+    box-sizing: border-box;
   }
 
   body.app-home-route .hero.hero-with-session .hero-logo picture {
     width: 43px;
     max-width: 43px;
-    transform: translate(2px, 3px);
+    transform: translate(1px, 3px);
   }
 
   body.app-home-route .hero.hero-with-session .hero-logo img {
@@ -525,6 +527,7 @@ body.login-page .hero .animated-line {
     align-self: stretch;
     overflow: visible;
     transform: translate(0, 4px);
+    padding-inline: 1px;
   }
 
   body.app-home-route .hero.hero-with-session .hero-session-user {

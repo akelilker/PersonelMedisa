@@ -163,7 +163,7 @@ body:not(.login-page):not(.admin-report-page) #app-footer {
   }
 
   body.app-home-route #app-footer .brand img {
-    max-height: 14.27px;
+    max-height: calc(14.27px + 1.5pt);
   }
 }
 

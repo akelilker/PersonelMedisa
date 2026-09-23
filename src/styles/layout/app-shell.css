@@ -390,6 +390,11 @@ body.modal-open .app-shell::before {
       0 0 9px rgba(214, 188, 132, 0.12);
   }
 
+  body.app-home-route #main-menu.menu-container {
+    padding-inline: 8px;
+    box-sizing: border-box;
+  }
+
   body.app-home-route .app-shell {
     border-top: 0.5px solid rgba(var(--theme-color-rgb), 0.82);
     box-shadow:

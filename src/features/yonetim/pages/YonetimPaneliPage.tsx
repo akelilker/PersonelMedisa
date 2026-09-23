@@ -39,6 +39,7 @@ import { KullaniciActorIdentityPanel } from "../components/KullaniciActorIdentit
 import { KullaniciRoleSummaryPanel } from "../components/KullaniciRoleSummaryPanel";
 import { MevzuatParametreleriPanel } from "../components/MevzuatParametreleriPanel";
 import { SaklamaLegalHoldPanel } from "../components/SaklamaLegalHoldPanel";
+import { UcretTipiEnvanteriPanel } from "../components/UcretTipiEnvanteriPanel";
 import { YonetimOrgScopeFields } from "../components/YonetimSubeScopeField";
 import { isRealYonetimKullaniciApi } from "../../../lib/yonetim/kullanici-api-contract";
 import {
@@ -80,7 +81,7 @@ import {
   toSgkIsverenSelectOptions
 } from "../../../lib/yonetim/sgk-isveren-options";
 
-type ActiveTab = "kullanicilar" | "subeler" | "mevzuat" | "saklama";
+type ActiveTab = "kullanicilar" | "subeler" | "mevzuat" | "saklama" | "ucret-tipi-envanteri";
 type YonetimViewMode = "card" | "list";
 
 function resolveYonetimActiveTab(tabParam: string | null): ActiveTab {
@@ -93,6 +94,9 @@ function resolveYonetimActiveTab(tabParam: string | null): ActiveTab {
   }
   if (normalized === "saklama" || normalized === "legal-hold" || normalized === "retention") {
     return "saklama";
+  }
+  if (normalized === "ucret-tipi-envanteri" || normalized === "ucret-tipi" || normalized === "ucret-envanteri") {
+    return "ucret-tipi-envanteri";
   }
   return "kullanicilar";
 }
@@ -2144,6 +2148,10 @@ export function YonetimPaneliPage() {
 
       {!isLoading && !errorMessage && activeTab === "saklama" && canViewSaklama ? (
         <SaklamaLegalHoldPanel />
+      ) : null}
+
+      {!isLoading && !errorMessage && activeTab === "ucret-tipi-envanteri" ? (
+        <UcretTipiEnvanteriPanel />
       ) : null}
 
       {isKullaniciFormOpen ? (

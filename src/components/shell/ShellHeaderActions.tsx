@@ -672,6 +672,17 @@ export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeade
               Saklama ve İmha
             </button>
           ) : null}
+          {canViewYonetimPanel ? (
+            <button
+              type="button"
+              data-testid="settings-ucret-tipi-envanteri"
+              onClick={() => {
+                navigateTo("/yonetim-paneli?tab=ucret-tipi-envanteri");
+              }}
+            >
+              Ücret Tipi Envanteri
+            </button>
+          ) : null}
           {canViewResmiTatilTakvimi ? (
             <button
               type="button"

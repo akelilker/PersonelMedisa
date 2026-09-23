@@ -10,6 +10,14 @@ describe("yonetim modal title mapping", () => {
     expect(resolveYonetimModalTitle("subeler")).toBe("ŞİRKET VE ŞUBE YÖNETİMİ");
     expect(resolveYonetimModalTitle("mevzuat")).toBe("MEVZUAT PARAMETRELERİ");
     expect(resolveYonetimModalTitle("saklama")).toBe("SAKLAMA VE İMHA YÖNETİMİ");
+    expect(resolveYonetimModalTitle("ucret-tipi-envanteri")).toBe("ÜCRET TİPİ ENVANTERİ");
+  });
+
+  it("does not show kullanıcı title for envanter aliases", () => {
+    expect(resolveYonetimPanelTab("ucret-tipi-envanteri")).toBe("ucret-tipi-envanteri");
+    expect(resolveYonetimPanelTab("ucret-tipi")).toBe("ucret-tipi-envanteri");
+    expect(resolveYonetimPanelTab("ucret-envanteri")).toBe("ucret-tipi-envanteri");
+    expect(resolveYonetimModalTitle("ucret-tipi")).not.toBe("KULLANICI YÖNETİMİ");
   });
 
   it("does not show kullanıcı title for saklama aliases", () => {

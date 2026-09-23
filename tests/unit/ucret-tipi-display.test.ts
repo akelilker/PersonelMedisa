@@ -1,10 +1,21 @@
 import { describe, expect, it } from "vitest";
 import {
   displayUcretTipiLabel,
-  mapUcretTipiSelectOptions
+  mapUcretTipiSelectOptions,
+  resolveUcretTipiModeli
 } from "../../src/lib/display/ucret-tipi-display";
 
 describe("ucret-tipi-display", () => {
+  it("resolves canonical wage models from ucret_tipi_id (BELIRSIZ → null)", () => {
+    expect(resolveUcretTipiModeli(1)).toBe("MAKTU_AYLIK");
+    expect(resolveUcretTipiModeli(2)).toBe("GUNLUK");
+    expect(resolveUcretTipiModeli(3)).toBe("SAATLIK");
+    expect(resolveUcretTipiModeli(0)).toBeNull();
+    expect(resolveUcretTipiModeli(4)).toBeNull();
+    expect(resolveUcretTipiModeli(null)).toBeNull();
+    expect(resolveUcretTipiModeli(undefined)).toBeNull();
+  });
+
   it("keeps Aylık, Günlük and Saatlik as distinct labels by id", () => {
     expect(displayUcretTipiLabel("ignored", 1)).toBe("Aylık");
     expect(displayUcretTipiLabel("ignored", 2)).toBe("Günlük");

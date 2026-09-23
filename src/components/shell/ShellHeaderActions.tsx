@@ -212,6 +212,16 @@ export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeade
     return { kind: "multi" as const };
   }, [selectorIds, subeList]);
 
+  const activeSubeFilterLabel = useMemo(() => {
+    if (activeSubeId != null) {
+      return subeList.find((sube) => sube.id === activeSubeId)?.ad ?? `Şube ${activeSubeId}`;
+    }
+    if (isGlobalBranchSelector || subeControl.kind === "all") {
+      return "Tüm şubeler";
+    }
+    return "Şube";
+  }, [activeSubeId, isGlobalBranchSelector, subeControl.kind, subeList]);
+
   useEffect(() => {
     setIsNotificationsOpen(false);
     setIsSettingsOpen(false);
@@ -446,26 +456,38 @@ export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeade
             <button
               type="button"
               className="icon-btn sube-selector-toggle"
+              data-testid="header-sube-selector-toggle"
               onClick={() => {
                 setIsSubeOpen((prev) => !prev);
                 setIsNotificationsOpen(false);
                 setIsSettingsOpen(false);
               }}
-              aria-label="Şube seç"
+              aria-label={`Şube filtresi: ${activeSubeFilterLabel}`}
               aria-expanded={isSubeOpen}
-              title="Şube değiştir"
+              title={`Şube filtresi: ${activeSubeFilterLabel}`}
             >
-              <span className="sube-selector-label">
-                {activeSubeId != null
-                  ? subeList.find((sube) => sube.id === activeSubeId)?.ad ?? `Şube ${activeSubeId}`
-                  : isGlobalBranchSelector
-                    ? "Tüm şubeler"
-                    : "Şube"}
-              </span>
               <svg
+                className="sube-selector-building-icon"
                 xmlns="http://www.w3.org/2000/svg"
-                width="16"
-                height="16"
+                width="22"
+                height="22"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18" />
+                <path d="M6 12h12" />
+                <path d="M10 6h.01M14 6h.01M10 10h.01M14 10h.01M10 14h.01M14 14h.01M10 18h.01M14 18h.01" />
+              </svg>
+              <svg
+                className="sube-selector-chevron"
+                xmlns="http://www.w3.org/2000/svg"
+                width="14"
+                height="14"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"

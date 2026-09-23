@@ -60,6 +60,17 @@ describe("Personel yeniden aktif (PASIF -> AKTIF) MariaDB runtime", () => {
     expect(result.stdout).toContain(
       "[PASS] DIS -> IC still requires dogum_tarihi when telefon is empty"
     );
+    expect(result.stdout).toContain("[PASS] empty dogum + payload fills and activates");
+    expect(result.stdout).toContain(
+      "[PASS] empty dogum + payload persists dogum_tarihi atomically"
+    );
+    expect(result.stdout).toContain("[PASS] empty dogum + payload leaves telefon null");
+    expect(result.stdout).toContain("[PASS] empty dogum + payload cancels the exit surec");
+    expect(result.stdout).toContain("REACTIVATE_DOGUM_TARIH_CONFLICT");
+    expect(result.stdout).toContain("[PASS] dogum conflict keeps PASIF");
+    expect(result.stdout).toContain(
+      "[PASS] dogum conflict does not overwrite existing dogum_tarihi"
+    );
 
     // Atomicity after the mutation.
     expect(result.stdout).toContain("[PASS] atomic rollback restores PASIF");

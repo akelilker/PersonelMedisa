@@ -64,6 +64,14 @@ describe("personel yeniden aktif (PASIF -> AKTIF canonical lifecycle) source con
     // No hardcoded live ids: the target branch/SGK employer come from the request.
     expect(service).not.toMatch(/Karab[üu]k/i);
     expect(service).not.toMatch(/\b(217|383)\b/);
+    expect(service).not.toMatch(/İşe Giriş Bildirgeleri/i);
+    expect(service).not.toMatch(/Görkem Vural\.pdf/i);
+
+    // dogum_tarihi is a yeniden-aktif-only payload axis (empty-row fill / conflict).
+    expect(service).toContain("ERROR_DOGUM_CONFLICT");
+    expect(service).toContain("resolveDogumTarihi");
+    expect(service).toContain("dogum_tarihi = :dogum_tarihi");
+    expect(service).toContain("PersonelCanonicalValidator::normalizeDateToCanonical");
 
     // Telefon is contact-only: the shared IC identity contract must not require it.
     const kapsam = read("api/src/Services/Personel/PersonelCalisanKapsamService.php");

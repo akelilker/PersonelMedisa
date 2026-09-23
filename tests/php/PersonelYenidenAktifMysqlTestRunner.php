@@ -259,7 +259,8 @@ function pyaBootstrap(PDO $root): PDO
     // 8 DIS->IC complete identity with empty telefon, 9 SGK company mismatch,
     // 10 manifest preservation, 11 short gerekce, 12 audit actor FK failure,
     // 13 DIS->IC incomplete identity (missing TC), 14 DIS->IC missing dogum
-    // (telefon empty must not mask other required identity fields).
+    // (payload may fill atomically; telefon empty must not mask required fields),
+    // 15 DIS->IC populated dogum rejects a differing payload.
     $pdo->exec("INSERT INTO personeller
         (id, ad, soyad, sicil_no, ise_giris_tarihi, aktif_durum, calisan_kapsami, sube_id, sgk_isveren_id,
          tc_kimlik_no, dogum_tarihi, telefon)
@@ -277,7 +278,8 @@ function pyaBootstrap(PDO $root): PDO
         (11, 'Gerekce', 'Kisa', 'K1', '2022-01-10', 'PASIF', 'IC_PERSONEL', 21, 11, '10000000146', '1990-05-05', '5551112233'),
         (12, 'Atomik', 'Rollback', 'A1', '2022-01-10', 'PASIF', 'IC_PERSONEL', 21, 11, '10000000146', '1990-05-05', '5551112233'),
         (13, 'DisKaynak', 'EksikKimlik', 'D3', '2022-01-10', 'PASIF', 'DIS_KAYNAK', 21, 11, NULL, NULL, NULL),
-        (14, 'DisKaynak', 'EksikDogum', 'D4', '2022-01-10', 'PASIF', 'DIS_KAYNAK', 21, 11, '10000000146', NULL, NULL)
+        (14, 'DisKaynak', 'EksikDogum', 'D4', '2022-01-10', 'PASIF', 'DIS_KAYNAK', 21, 11, '10000000146', NULL, NULL),
+        (15, 'DisKaynak', 'DogumCakisma', 'D5', '2022-01-10', 'PASIF', 'DIS_KAYNAK', 21, 11, '10000000146', '1991-08-12', NULL)
     ");
 
     $pdo->exec("INSERT INTO surecler (personel_id, surec_turu, baslangic_tarihi, aciklama, state) VALUES
@@ -294,7 +296,8 @@ function pyaBootstrap(PDO $root): PDO
         (11, 'ISTEN_AYRILMA', '2026-01-15', 'ayrilma', 'AKTIF'),
         (12, 'ISTEN_AYRILMA', '2026-01-15', 'ayrilma', 'AKTIF'),
         (13, 'ISTEN_AYRILMA', '2026-01-15', 'ayrilma', 'AKTIF'),
-        (14, 'ISTEN_AYRILMA', '2026-01-15', 'ayrilma', 'AKTIF')
+        (14, 'ISTEN_AYRILMA', '2026-01-15', 'ayrilma', 'AKTIF'),
+        (15, 'ISTEN_AYRILMA', '2026-01-15', 'ayrilma', 'AKTIF')
     ");
 
     // Active legal hold on personel 5 only (target_record_id keeps it record-scoped;
@@ -609,6 +612,74 @@ try {
     pyaAssert(
         pyaScalar($pdo, 'SELECT telefon FROM personeller WHERE id = 14') === null,
         'missing-dogum rejection does not invent a telefon value'
+    );
+    pyaAssert(
+        pyaScalar($pdo, 'SELECT dogum_tarihi FROM personeller WHERE id = 14') === null,
+        'missing-dogum rejection leaves dogum_tarihi null'
+    );
+
+    // Synthetic fixture date only — never a live personnel document value.
+    $payloadDogum = '1987-04-19';
+    $filledDogum = pyaReactivate($pdo, 14, [
+        'gerekce' => 'eksik dogum payload ile tamamlandi',
+        'calisan_kapsami' => 'IC_PERSONEL',
+        'dogum_tarihi' => $payloadDogum,
+    ]);
+    pyaAssert(pyaStatus($pdo, 14) === 'AKTIF', 'empty dogum + payload fills and activates');
+    pyaAssert(
+        (string) pyaScalar($pdo, 'SELECT calisan_kapsami FROM personeller WHERE id = 14') === 'IC_PERSONEL',
+        'empty dogum + payload persists IC_PERSONEL'
+    );
+    pyaAssert(
+        (string) pyaScalar($pdo, 'SELECT dogum_tarihi FROM personeller WHERE id = 14') === $payloadDogum,
+        'empty dogum + payload persists dogum_tarihi atomically'
+    );
+    pyaAssert(
+        pyaScalar($pdo, 'SELECT telefon FROM personeller WHERE id = 14') === null,
+        'empty dogum + payload leaves telefon null'
+    );
+    pyaAssert((int) ($filledDogum['audit_id'] ?? 0) > 0, 'empty dogum + payload writes audit');
+    pyaAssert(count($filledDogum['lifecycle_manifest_ids'] ?? []) >= 2, 'empty dogum + payload mints manifests');
+    $dogumAudit = $pdo->query(
+        'SELECT degisen_alanlar, eski_degerler, yeni_degerler
+         FROM personel_organizasyon_degisiklik_auditleri WHERE personel_id = 14 ORDER BY id DESC LIMIT 1'
+    )->fetch();
+    $dogumChanged = json_decode((string) ($dogumAudit['degisen_alanlar'] ?? '[]'), true);
+    pyaAssert(
+        in_array('dogum_tarihi', is_array($dogumChanged) ? $dogumChanged : [], true),
+        'empty dogum + payload audit lists dogum_tarihi'
+    );
+    pyaAssert(
+        (string) pyaScalar($pdo, "SELECT state FROM surecler WHERE personel_id = 14 AND surec_turu = 'ISTEN_AYRILMA'") === 'IPTAL',
+        'empty dogum + payload cancels the exit surec'
+    );
+
+    pyaReject(
+        $pdo,
+        15,
+        [
+            'gerekce' => 'dogum cakismasi',
+            'calisan_kapsami' => 'IC_PERSONEL',
+            'dogum_tarihi' => '1980-01-01',
+        ],
+        PersonelYenidenAktifService::ERROR_DOGUM_CONFLICT
+    );
+    pyaAssert(pyaStatus($pdo, 15) === 'PASIF', 'dogum conflict keeps PASIF');
+    pyaAssert(
+        (string) pyaScalar($pdo, 'SELECT calisan_kapsami FROM personeller WHERE id = 15') === 'DIS_KAYNAK',
+        'dogum conflict keeps DIS_KAYNAK'
+    );
+    pyaAssert(
+        (string) pyaScalar($pdo, 'SELECT dogum_tarihi FROM personeller WHERE id = 15') === '1991-08-12',
+        'dogum conflict does not overwrite existing dogum_tarihi'
+    );
+    pyaAssert(
+        (string) pyaScalar($pdo, "SELECT state FROM surecler WHERE personel_id = 15") === 'AKTIF',
+        'dogum conflict leaves the exit surec open'
+    );
+    pyaAssert(
+        pyaCount($pdo, 'SELECT COUNT(*) FROM personel_organizasyon_degisiklik_auditleri WHERE personel_id = 15') === 0,
+        'dogum conflict writes no audit'
     );
 
     $disToIc = pyaReactivate($pdo, 8, ['gerekce' => 'ic personel gecisi', 'calisan_kapsami' => 'IC_PERSONEL']);

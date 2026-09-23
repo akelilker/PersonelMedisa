@@ -27,6 +27,8 @@ use PDO;
  * Axis ownership (no parallel systems, no bypassed owners):
  *   - aktif_durum + the DIS_KAYNAK → IC_PERSONEL kapsam transition: this owner,
  *     validating internal identity through PersonelCalisanKapsamService.
+ *   - dogum_tarihi (yalnızca bu payload): empty-on-row may be filled atomically
+ *     for the IC identity check; a populated row rejects a differing payload.
  *   - hedef şube: delegated to PersonelKaliciSubeDegisikligiService (the
  *     canonical permanent branch-change owner) when a different branch is asked.
  *   - sgk_isveren_id / personel_tipi_id: delegated to
@@ -54,6 +56,7 @@ final class PersonelYenidenAktifService
     public const ERROR_KAPSAM_TRANSITION = 'REACTIVATE_KAPSAM_TRANSITION_INVALID';
     public const ERROR_KAPSAM_SCHEMA = 'REACTIVATE_KAPSAM_SCHEMA_NOT_READY';
     public const ERROR_SGK_INCONSISTENT = 'REACTIVATE_SGK_SIRKET_UYUSMAZLIGI';
+    public const ERROR_DOGUM_CONFLICT = 'REACTIVATE_DOGUM_TARIH_CONFLICT';
     public const ERROR_CONFLICT = 'REACTIVATE_PREIMAGE_CONFLICT';
     public const ERROR_READBACK = 'REACTIVATE_READBACK_MISMATCH';
 
@@ -67,7 +70,8 @@ final class PersonelYenidenAktifService
      * @param array<string, mixed> $user
      * @param array<string, mixed> $body gerekce (required), optional
      *                                    calisan_kapsami / yeni_sube_id /
-     *                                    sgk_isveren_id / personel_tipi_id
+     *                                    sgk_isveren_id / personel_tipi_id /
+     *                                    dogum_tarihi (only when row is empty)
      * @return array<string, mixed>
      */
     public static function applyInTransaction(
@@ -146,6 +150,11 @@ final class PersonelYenidenAktifService
 
         $gerekce = self::parseGerekce($body);
 
+        // Resolve dogum before any write: empty-on-row may accept a payload fill
+        // for the IC identity contract; a populated row rejects a differing value.
+        // This stays inside the reactivation owner — no generic archive update.
+        $dogumResolution = self::resolveDogumTarihi($current, $body);
+
         // Lifecycle manifests must be minted while the record is still PASIF:
         // the archived period's baseline is frozen at the reactivation boundary,
         // and ArchiveManifestService is INSERT-only, so existing rows are never
@@ -168,6 +177,12 @@ final class PersonelYenidenAktifService
         ];
         $target = $before;
         $changed = [];
+
+        if ($dogumResolution['should_write']) {
+            $before['dogum_tarihi'] = null;
+            $target['dogum_tarihi'] = $dogumResolution['effective'];
+            $changed[] = 'dogum_tarihi';
+        }
 
         // 1) Hedef şube — canonical permanent branch-change owner.
         $targetSubeId = self::parseTargetSubeId($body);
@@ -201,6 +216,9 @@ final class PersonelYenidenAktifService
             }
             $merged = $current;
             $merged['calisan_kapsami'] = $targetKapsam;
+            if ($dogumResolution['effective'] !== null) {
+                $merged['dogum_tarihi'] = $dogumResolution['effective'];
+            }
             PersonelCalisanKapsamService::assertInternalIdentityComplete($merged);
             $target['calisan_kapsami'] = $targetKapsam;
             $changed[] = 'calisan_kapsami';
@@ -255,6 +273,10 @@ final class PersonelYenidenAktifService
         if (in_array('calisan_kapsami', $changed, true)) {
             $setParts[] = 'calisan_kapsami = :calisan_kapsami';
             $params['calisan_kapsami'] = $target['calisan_kapsami'];
+        }
+        if (in_array('dogum_tarihi', $changed, true)) {
+            $setParts[] = 'dogum_tarihi = :dogum_tarihi';
+            $params['dogum_tarihi'] = $target['dogum_tarihi'];
         }
         $stmt = $pdo->prepare(
             'UPDATE personeller SET ' . implode(', ', $setParts)
@@ -449,6 +471,74 @@ final class PersonelYenidenAktifService
                 $e->getField()
             );
         }
+    }
+
+    /**
+     * Resolve dogum_tarihi for this reactivation only.
+     *
+     * - Empty on row + valid payload → use for IC identity and write atomically.
+     * - Empty on row + absent/blank payload → leave empty (IC assert fail-closes).
+     * - Populated on row + absent payload → keep existing (no rewrite).
+     * - Populated on row + matching payload → keep existing (no rewrite).
+     * - Populated on row + differing payload → fail-closed conflict.
+     *
+     * @param array<string, mixed> $current
+     * @param array<string, mixed> $body
+     * @return array{effective: ?string, should_write: bool}
+     */
+    private static function resolveDogumTarihi(array $current, array $body): array
+    {
+        $existingCanonical = self::canonicalDogumFromRow($current['dogum_tarihi'] ?? null);
+        $payloadRaw = array_key_exists('dogum_tarihi', $body) ? $body['dogum_tarihi'] : null;
+        $payloadBlank = $payloadRaw === null || trim((string) $payloadRaw) === '';
+
+        if ($existingCanonical !== null) {
+            if (!$payloadBlank) {
+                $payloadCanonical = PersonelCanonicalValidator::normalizeDateToCanonical($payloadRaw);
+                if ($payloadCanonical === null) {
+                    throw OrganizasyonException::validation('Geçersiz doğum tarihi.', 'dogum_tarihi');
+                }
+                if ($payloadCanonical !== $existingCanonical) {
+                    throw new OrganizasyonException(
+                        409,
+                        self::ERROR_DOGUM_CONFLICT,
+                        'Kayıttaki doğum tarihi ile gönderilen değer uyuşmuyor; yeniden aktif etme reddedildi.',
+                        'dogum_tarihi'
+                    );
+                }
+            }
+
+            return ['effective' => $existingCanonical, 'should_write' => false];
+        }
+
+        if ($payloadBlank) {
+            return ['effective' => null, 'should_write' => false];
+        }
+
+        $payloadCanonical = PersonelCanonicalValidator::normalizeDateToCanonical($payloadRaw);
+        if ($payloadCanonical === null) {
+            throw OrganizasyonException::validation('Geçersiz doğum tarihi.', 'dogum_tarihi');
+        }
+
+        return ['effective' => $payloadCanonical, 'should_write' => true];
+    }
+
+    /** @param mixed $value */
+    private static function canonicalDogumFromRow($value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+        $raw = trim((string) $value);
+        if ($raw === '') {
+            return null;
+        }
+        // MySQL DATE/DATETIME strings: take the calendar date prefix only.
+        if (preg_match('/^(\d{4}-\d{2}-\d{2})/', $raw, $m) === 1) {
+            $raw = $m[1];
+        }
+
+        return PersonelCanonicalValidator::normalizeDateToCanonical($raw);
     }
 
     /**

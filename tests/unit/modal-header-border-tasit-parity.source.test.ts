@@ -29,4 +29,14 @@ describe("modal header + frame Taşıt parity (chrome only)", () => {
     expect(modal).not.toMatch(/border-left-width:\s*0/);
     expect(modal).toMatch(/body\.modal-open \.modal-header[\s\S]*--modal-header-red-gradient/);
   });
+
+  it("renders Taşıt-style semi-transparent brand marker on modal container", () => {
+    const modal = read("src/styles/components/modal.css");
+    expect(modal).toMatch(/\.modal-container::after[\s\S]*bottom:\s*8px/);
+    expect(modal).toMatch(/\.modal-container::after[\s\S]*right:\s*8px/);
+    expect(modal).toMatch(/\.modal-container::after[\s\S]*width:\s*36px/);
+    expect(modal).toMatch(/\.modal-container::after[\s\S]*opacity:\s*0\.2/);
+    expect(modal).toMatch(/\.modal-container::after[\s\S]*pointer-events:\s*none/);
+    expect(modal).toMatch(/marker\.png/);
+  });
 });

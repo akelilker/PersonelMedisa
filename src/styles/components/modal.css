@@ -50,6 +50,27 @@
   box-shadow: var(--shadow-md);
 }
 
+/* Modal container: Taşıt parity brand marker (semi-transparent M, bottom-right). */
+.modal-container::after {
+  content: "";
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  width: 36px;
+  height: 36px;
+  background-image: url("../../assets/brand/marker.png");
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  opacity: 0.2;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.modal-container.hide-marker::after {
+  display: none;
+}
+
 .modal-container--yonetim .modal-header {
   border-bottom: none;
   box-shadow: none;

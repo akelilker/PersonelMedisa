@@ -33,6 +33,7 @@ use Medisa\Api\Services\Personel\PersonelExportService;
 use Medisa\Api\Services\Personel\PersonelLifecycleBulkApplyService;
 use Medisa\Api\Services\Personel\PersonelLifecycleBulkDryRunService;
 use Medisa\Api\Services\Personel\PersonelOrganizasyonDegisikligiService;
+use Medisa\Api\Services\Personel\PersonelKaliciSubeDegisikligiService;
 use Medisa\Api\Services\Personel\PersonelOrgLocationSchema;
 use Medisa\Api\Services\Personel\PersonelOrgStructureSchema;
 use Medisa\Api\Services\Personel\PersonelSearchPredicate;

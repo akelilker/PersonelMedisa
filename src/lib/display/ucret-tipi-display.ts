@@ -1,11 +1,37 @@
 import type { IdOption } from "../../types/referans";
 
+/** Canonical ücret modeli kodları — bordro/SGK tarafındaki adlarla aynı yazım. */
+export type UcretTipiModeli = "MAKTU_AYLIK" | "GUNLUK" | "SAATLIK";
+
 /** PHP ReferansController::ucretTipleri — id korunur, görünen etiket katalogla hizalı. */
-const ID_TO_LABEL: Record<number, "Aylık" | "Günlük" | "Saatlik"> = {
-  1: "Aylık",
-  2: "Günlük",
-  3: "Saatlik"
+const ID_TO_MODEL: Record<number, UcretTipiModeli> = {
+  1: "MAKTU_AYLIK",
+  2: "GUNLUK",
+  3: "SAATLIK"
 };
+
+const MODEL_TO_LABEL: Record<UcretTipiModeli, string> = {
+  MAKTU_AYLIK: "Aylık",
+  GUNLUK: "Günlük",
+  SAATLIK: "Saatlik"
+};
+
+/**
+ * `personeller.ucret_tipi_id` → canonical ücret modeli.
+ * Backend `SgkPrimGunuService::wageModel` ile aynı eşleme; 1/2/3 dışındaki
+ * değerler için `null` döner (BELIRSIZ).
+ */
+export function resolveUcretTipiModeli(id: number | null | undefined): UcretTipiModeli | null {
+  if (id === null || id === undefined) {
+    return null;
+  }
+  return ID_TO_MODEL[id] ?? null;
+}
+
+/** Canonical ücret modelinin görünen etiketi (Aylık / Günlük / Saatlik). */
+export function displayUcretTipiModeliLabel(model: UcretTipiModeli): string {
+  return MODEL_TO_LABEL[model];
+}
 
 function normalizeForMatch(value: string) {
   return value
@@ -20,8 +46,9 @@ function normalizeForMatch(value: string) {
  * `value` (id) ve ham `ad` API tarafında bozulmaz.
  */
 export function displayUcretTipiLabel(raw: string | null | undefined, id?: number): string {
-  if (id !== undefined && ID_TO_LABEL[id] !== undefined) {
-    return ID_TO_LABEL[id];
+  const model = resolveUcretTipiModeli(id);
+  if (model !== null) {
+    return MODEL_TO_LABEL[model];
   }
 
   const s = (raw ?? "").trim();

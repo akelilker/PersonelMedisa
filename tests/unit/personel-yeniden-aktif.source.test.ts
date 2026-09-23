@@ -64,6 +64,15 @@ describe("personel yeniden aktif (PASIF -> AKTIF canonical lifecycle) source con
     // No hardcoded live ids: the target branch/SGK employer come from the request.
     expect(service).not.toMatch(/Karab[üu]k/i);
     expect(service).not.toMatch(/\b(217|383)\b/);
+
+    // Telefon is contact-only: the shared IC identity contract must not require it.
+    const kapsam = read("api/src/Services/Personel/PersonelCalisanKapsamService.php");
+    const assertFn = kapsam.slice(kapsam.indexOf("function assertInternalIdentityComplete"));
+    expect(assertFn).toContain("tc_kimlik_no");
+    expect(assertFn).toContain("soyad");
+    expect(assertFn).toContain("dogum_tarihi");
+    expect(assertFn).not.toContain("Ic personel icin telefon zorunludur.");
+    expect(phpCodeOnly(assertFn)).not.toMatch(/\$merged\['telefon'\]/);
   });
 
   it("never bypasses or weakens PersonelArchiveGate", () => {

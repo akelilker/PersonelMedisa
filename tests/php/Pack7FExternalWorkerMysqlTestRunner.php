@@ -305,6 +305,31 @@ try {
         p7fAssert($e->getField() === 'tc_kimlik_no', 'external to internal requires full identity');
     }
 
+    // Telefon iletişim alanıdır: empty/null IC identity'yi engellemez.
+    try {
+        PersonelCalisanKapsamService::assertInternalIdentityComplete([
+            'tc_kimlik_no' => '33333333333',
+            'soyad' => 'Personel',
+            'dogum_tarihi' => '1990-01-01',
+            'telefon' => null,
+        ]);
+        p7fAssert(true, 'internal identity complete without telefon');
+    } catch (PersonelValidationException $e) {
+        p7fAssert(false, 'internal identity complete without telefon (got ' . $e->getField() . ')');
+    }
+
+    try {
+        PersonelCalisanKapsamService::assertInternalIdentityComplete([
+            'tc_kimlik_no' => '33333333333',
+            'soyad' => 'Personel',
+            'dogum_tarihi' => '',
+            'telefon' => null,
+        ]);
+        p7fAssert(false, 'internal identity still requires dogum_tarihi');
+    } catch (PersonelValidationException $e) {
+        p7fAssert($e->getField() === 'dogum_tarihi', 'internal identity still requires dogum_tarihi');
+    }
+
     try {
         PersonelCanonicalValidator::normalizeAndValidateCreatePayload([
             'calisan_kapsami' => 'DIS_KAYNAK', 'tc_kimlik_no' => '123', 'ad' => 'Hata',

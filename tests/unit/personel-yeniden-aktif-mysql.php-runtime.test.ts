@@ -51,9 +51,15 @@ describe("Personel yeniden aktif (PASIF -> AKTIF) MariaDB runtime", () => {
     expect(result.stdout).toContain("PERSONEL_SGK_SIRKET_UYUSMAZligi");
     expect(result.stdout).toContain("REACTIVATE_KAPSAM_TRANSITION_INVALID");
 
-    // DIS_KAYNAK -> IC_PERSONEL identity contract.
+    // DIS_KAYNAK -> IC_PERSONEL identity contract (telefon optional; dogum/TC fail-closed).
     expect(result.stdout).toContain("[PASS] DIS -> IC happy path persists IC_PERSONEL");
+    expect(result.stdout).toContain(
+      "[PASS] DIS -> IC with empty telefon leaves telefon null (no placeholder)"
+    );
     expect(result.stdout).toContain("[PASS] DIS -> IC rejects incomplete internal identity");
+    expect(result.stdout).toContain(
+      "[PASS] DIS -> IC still requires dogum_tarihi when telefon is empty"
+    );
 
     // Atomicity after the mutation.
     expect(result.stdout).toContain("[PASS] atomic rollback restores PASIF");

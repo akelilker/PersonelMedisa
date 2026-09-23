@@ -256,8 +256,10 @@ function pyaBootstrap(PDO $root): PDO
 
     // 1 happy path, 2 already AKTIF, 3 no open exit, 4 two open exits,
     // 5 legal hold, 6 test fixture, 7 DIS->IC with no SGK,
-    // 8 DIS->IC complete, 9 SGK company mismatch, 10 manifest preservation,
-    // 11 short gerekce, 12 audit actor FK failure, 13 DIS->IC incomplete identity.
+    // 8 DIS->IC complete identity with empty telefon, 9 SGK company mismatch,
+    // 10 manifest preservation, 11 short gerekce, 12 audit actor FK failure,
+    // 13 DIS->IC incomplete identity (missing TC), 14 DIS->IC missing dogum
+    // (telefon empty must not mask other required identity fields).
     $pdo->exec("INSERT INTO personeller
         (id, ad, soyad, sicil_no, ise_giris_tarihi, aktif_durum, calisan_kapsami, sube_id, sgk_isveren_id,
          tc_kimlik_no, dogum_tarihi, telefon)
@@ -269,12 +271,13 @@ function pyaBootstrap(PDO $root): PDO
         (5, 'Hukuki', 'Hold', 'H1', '2022-01-10', 'PASIF', 'IC_PERSONEL', 21, 11, '10000000146', '1990-05-05', '5551112233'),
         (6, 'Test', 'Fixture', 'T1', '2022-01-10', 'PASIF', 'IC_PERSONEL', 21, 11, '10000000146', '1990-05-05', '5551112233'),
         (7, 'DisKaynak', 'SgkSiz', 'D1', '2022-01-10', 'PASIF', 'DIS_KAYNAK', 21, NULL, '10000000146', '1990-05-05', '5551112233'),
-        (8, 'DisKaynak', 'TamKimlik', 'D2', '2022-01-10', 'PASIF', 'DIS_KAYNAK', 21, 11, '10000000146', '1990-05-05', '5551112233'),
+        (8, 'DisKaynak', 'TamKimlik', 'D2', '2022-01-10', 'PASIF', 'DIS_KAYNAK', 21, 11, '10000000146', '1990-05-05', NULL),
         (9, 'Sgk', 'Uyusmaz', 'U1', '2022-01-10', 'PASIF', 'IC_PERSONEL', 21, 12, '10000000146', '1990-05-05', '5551112233'),
         (10, 'Manifest', 'Korunum', 'M1', '2022-01-10', 'PASIF', 'IC_PERSONEL', 21, 11, '10000000146', '1990-05-05', '5551112233'),
         (11, 'Gerekce', 'Kisa', 'K1', '2022-01-10', 'PASIF', 'IC_PERSONEL', 21, 11, '10000000146', '1990-05-05', '5551112233'),
         (12, 'Atomik', 'Rollback', 'A1', '2022-01-10', 'PASIF', 'IC_PERSONEL', 21, 11, '10000000146', '1990-05-05', '5551112233'),
-        (13, 'DisKaynak', 'EksikKimlik', 'D3', '2022-01-10', 'PASIF', 'DIS_KAYNAK', 21, 11, NULL, NULL, NULL)
+        (13, 'DisKaynak', 'EksikKimlik', 'D3', '2022-01-10', 'PASIF', 'DIS_KAYNAK', 21, 11, NULL, NULL, NULL),
+        (14, 'DisKaynak', 'EksikDogum', 'D4', '2022-01-10', 'PASIF', 'DIS_KAYNAK', 21, 11, '10000000146', NULL, NULL)
     ");
 
     $pdo->exec("INSERT INTO surecler (personel_id, surec_turu, baslangic_tarihi, aciklama, state) VALUES
@@ -290,7 +293,8 @@ function pyaBootstrap(PDO $root): PDO
         (10, 'ISTEN_AYRILMA', '2026-01-15', 'ayrilma', 'AKTIF'),
         (11, 'ISTEN_AYRILMA', '2026-01-15', 'ayrilma', 'AKTIF'),
         (12, 'ISTEN_AYRILMA', '2026-01-15', 'ayrilma', 'AKTIF'),
-        (13, 'ISTEN_AYRILMA', '2026-01-15', 'ayrilma', 'AKTIF')
+        (13, 'ISTEN_AYRILMA', '2026-01-15', 'ayrilma', 'AKTIF'),
+        (14, 'ISTEN_AYRILMA', '2026-01-15', 'ayrilma', 'AKTIF')
     ");
 
     // Active legal hold on personel 5 only (target_record_id keeps it record-scoped;
@@ -588,6 +592,25 @@ try {
         'incomplete-identity rejection keeps DIS_KAYNAK'
     );
 
+    $missingDogum = 'NO_ERROR';
+    try {
+        pyaReactivate($pdo, 14, ['gerekce' => 'eksik dogum', 'calisan_kapsami' => 'IC_PERSONEL']);
+    } catch (PersonelValidationException $e) {
+        $missingDogum = (string) $e->getField();
+    } catch (OrganizasyonException $e) {
+        $missingDogum = (string) $e->field;
+    }
+    pyaAssert($missingDogum === 'dogum_tarihi', 'DIS -> IC still requires dogum_tarihi when telefon is empty');
+    pyaAssert(pyaStatus($pdo, 14) === 'PASIF', 'missing-dogum rejection keeps PASIF');
+    pyaAssert(
+        (string) pyaScalar($pdo, 'SELECT calisan_kapsami FROM personeller WHERE id = 14') === 'DIS_KAYNAK',
+        'missing-dogum rejection keeps DIS_KAYNAK'
+    );
+    pyaAssert(
+        pyaScalar($pdo, 'SELECT telefon FROM personeller WHERE id = 14') === null,
+        'missing-dogum rejection does not invent a telefon value'
+    );
+
     $disToIc = pyaReactivate($pdo, 8, ['gerekce' => 'ic personel gecisi', 'calisan_kapsami' => 'IC_PERSONEL']);
     pyaAssert(pyaStatus($pdo, 8) === 'AKTIF', 'DIS -> IC happy path flips to AKTIF');
     pyaAssert(
@@ -595,6 +618,10 @@ try {
         'DIS -> IC happy path persists IC_PERSONEL'
     );
     pyaAssert((string) ($disToIc['calisan_kapsami'] ?? '') === 'IC_PERSONEL', 'DIS -> IC result reports kapsam');
+    pyaAssert(
+        pyaScalar($pdo, 'SELECT telefon FROM personeller WHERE id = 8') === null,
+        'DIS -> IC with empty telefon leaves telefon null (no placeholder)'
+    );
 
     // Unsupported kapsam direction is rejected (no IC -> DIS back door).
     pyaReject(

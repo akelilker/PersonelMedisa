@@ -259,7 +259,11 @@ final class PersonelCalisanKapsamService
     }
 
     /**
-     * Resulting IC_PERSONEL identity after update merge must satisfy full internal contract.
+     * Resulting IC_PERSONEL identity after update/kapsam merge must satisfy the
+     * internal identity contract (TC, soyad, dogum tarihi).
+     *
+     * Telefon iletişim alanıdır; bordro/SGK kimlik sözleşmesinin parçası değildir
+     * ve boş/null olduğunda IC_PERSONEL geçişini engellemez.
      *
      * @param array<string, mixed> $merged
      */
@@ -278,9 +282,6 @@ final class PersonelCalisanKapsamService
         $dogum = trim((string) ($merged['dogum_tarihi'] ?? ''));
         if ($dogum === '' || !PersonelCanonicalValidator::isValidDateString($dogum)) {
             throw new PersonelValidationException('dogum_tarihi', 'Ic personel icin dogum tarihi zorunludur.');
-        }
-        if (trim((string) ($merged['telefon'] ?? '')) === '') {
-            throw new PersonelValidationException('telefon', 'Ic personel icin telefon zorunludur.');
         }
     }
 }

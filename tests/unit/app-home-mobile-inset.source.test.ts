@@ -22,21 +22,27 @@ describe("app-home mobile shell inset (hero + menu)", () => {
     const block = appHomeHeroBlock(hero);
 
     expect(block).toMatch(
-      /body\.app-home-route \.hero\.hero-with-session\s*\{[^}]*width:\s*100%/s
+      /body\.app-home-route \.hero\.hero-with-session\s*\{[^}]*width:\s*calc\(100%\s*-\s*4px\)/s
     );
     expect(block).not.toMatch(/calc\(100%\s*\+\s*4px\)/);
     expect(block).not.toMatch(/margin-left:\s*-2px/);
     expect(block).not.toMatch(/margin-right:\s*-2px/);
   });
 
-  it("adds horizontal breathing room on the mobile home content track", () => {
+  it("insets the home hero and main menu without widening the whole content track", () => {
+    const hero = read("src/styles/components/hero.css");
+    const block = appHomeHeroBlock(hero);
+    expect(block).toMatch(
+      /body\.app-home-route \.hero\.hero-with-session\s*\{[^}]*width:\s*calc\(100%\s*-\s*4px\)/s
+    );
+    expect(block).not.toMatch(/calc\(100%\s*\+\s*4px\)/);
+    expect(block).not.toMatch(/margin-left:\s*-2px/);
+
+    const shell = read("src/styles/layout/app-shell.css");
+    expect(shell).toMatch(/body\.app-home-route #main-menu\.menu-container\s*\{[^}]*padding-inline:\s*8px/s);
+
     const contentWrap = read("src/styles/layout/content-wrap.css");
-    expect(contentWrap).toMatch(
-      /@media\s*\(max-width:\s*640px\)\s*\{[^}]*body\.app-home-route \.content-wrap\s*\{[^}]*padding-left:\s*8px/s
-    );
-    expect(contentWrap).toMatch(
-      /@media\s*\(max-width:\s*640px\)\s*\{[^}]*body\.app-home-route \.content-wrap\s*\{[^}]*padding-right:\s*8px/s
-    );
+    expect(contentWrap).not.toMatch(/body\.app-home-route \.content-wrap/);
   });
 
   it("gives the session name column a little left inset under the logo", () => {

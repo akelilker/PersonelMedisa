@@ -34,11 +34,3 @@ body.login-page .content-wrap {
 body.login-page .content-wrap::-webkit-scrollbar {
   display: none;
 }
-
-/* Mobile home: keep hero + main-menu card borders off the shell side rails. */
-@media (max-width: 640px) {
-  body.app-home-route .content-wrap {
-    padding-left: 8px;
-    padding-right: 8px;
-  }
-}

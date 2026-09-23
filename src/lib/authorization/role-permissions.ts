@@ -11,6 +11,7 @@ export type AppPermission =
   | "personeller.create"
   | "personeller.import.apply"
   | "personeller.update"
+  | "personeller.reaktif"
   | "personeller.test_fixture.classify"
   | "personeller.test_fixture.archive"
   | "personeller.test_fixture.purge"
@@ -215,6 +216,7 @@ const BASE_ROLE_PERMISSIONS: Record<
     "personeller.create",
     "personeller.import.apply",
     "personeller.update",
+    "personeller.reaktif",
     "personeller.test_fixture.classify",
     "personeller.test_fixture.archive",
     "personeller.test_fixture.purge",
@@ -483,6 +485,7 @@ const BASE_ROLE_PERMISSIONS: Record<
     "personeller.create",
     "personeller.import.apply",
     "personeller.update",
+    "personeller.reaktif",
     "personeller.test_fixture.classify",
     "personeller.test_fixture.archive",
     "personeller.test_fixture.purge",

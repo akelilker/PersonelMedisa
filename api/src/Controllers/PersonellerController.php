@@ -40,9 +40,11 @@ use Medisa\Api\Services\Personel\PersonelSearchPredicate;
 use Medisa\Api\Services\Personel\PersonelSicilAllocationException;
 use Medisa\Api\Services\Personel\PersonelSicilAllocator;
 use Medisa\Api\Services\Personel\PersonelValidationException;
+use Medisa\Api\Services\Personel\PersonelYenidenAktifService;
 use Medisa\Api\Services\OfflineMutationIdempotencyService;
 use Medisa\Api\Services\PersonelUcretException;
 use Medisa\Api\Services\PersonelUcretService;
+use Medisa\Api\Services\Retention\ArchiveAccessService;
 use Medisa\Api\Services\Retention\PersonelArchiveGate;
 use PDO;
 
@@ -1887,6 +1889,139 @@ class PersonellerController
         } catch (PersonelValidationException $e) {
             JsonResponse::error(409, $e->getCodeString() ?: 'VALIDATION_ERROR', $e->getMessage(), $e->getField());
         }
+    }
+
+    /**
+     * Reactivate an archived (PASIF) personel. The narrow, audited counterpart
+     * of PersonelIstenAyrilmaService: the archive gate stays intact, and the
+     * archived period plus its manifests/audit rows remain immutable.
+     */
+    public static function yenidenAktif(Request $request, $personelId)
+    {
+        $user = AuthMiddleware::authenticate($request, true);
+        // Two independent gates: archive visibility AND the reactivation grant.
+        ArchiveAccessService::assertPasifAccess($user);
+        RolePermissions::assert($user, 'personeller.reaktif');
+
+        $personelId = (int) $personelId;
+        if ($personelId <= 0) {
+            JsonResponse::notFound();
+        }
+
+        $body = $request->getJsonBody();
+        if (!is_array($body)) {
+            $body = [];
+        }
+
+        try {
+            $pdo = Connection::get();
+        } catch (\Throwable $e) {
+            JsonResponse::serverError('Veritabani baglantisi kurulamadi.');
+        }
+
+        $actorId = (int) ($user['id'] ?? 0);
+        $idemKey = OfflineMutationIdempotencyService::readKey($request);
+        $idemScope = 'personeller.yeniden-aktif:' . $personelId;
+        $idemHash = OfflineMutationIdempotencyService::hashPayload([
+            'op' => $idemScope,
+            'personel_id' => $personelId,
+            'payload' => $body,
+        ]);
+
+        try {
+            $auditContext = OrganizasyonAuditContext::fromRequest($request, $user, $idemKey);
+        } catch (OrganizasyonException $e) {
+            JsonResponse::error($e->httpStatus, $e->errorCode, $e->getMessage(), $e->field);
+        }
+
+        if ($idemKey !== null) {
+            $replay = OfflineMutationIdempotencyService::findCompletedReplay(
+                $pdo,
+                $actorId,
+                $idemScope,
+                $idemKey,
+                $idemHash
+            );
+            if (is_array($replay)) {
+                self::respondYenidenAktif($pdo, $user, $personelId, (int) ($replay['http_status'] ?? 200));
+            }
+        }
+
+        $pdo->beginTransaction();
+        try {
+            if ($idemKey !== null) {
+                $claimed = OfflineMutationIdempotencyService::claimInTransaction(
+                    $pdo,
+                    $actorId,
+                    $idemScope,
+                    $idemKey,
+                    $idemHash
+                );
+                if (is_array($claimed)) {
+                    $pdo->commit();
+                    self::respondYenidenAktif($pdo, $user, $personelId, (int) ($claimed['http_status'] ?? 200));
+                }
+            }
+
+            $result = PersonelYenidenAktifService::applyInTransaction(
+                $pdo,
+                $user,
+                $request,
+                $personelId,
+                $body,
+                $auditContext
+            );
+
+            if ($idemKey !== null) {
+                OfflineMutationIdempotencyService::completeInTransaction(
+                    $pdo,
+                    $actorId,
+                    $idemScope,
+                    $idemKey,
+                    200,
+                    'personel',
+                    $personelId,
+                    null
+                );
+            }
+
+            $pdo->commit();
+        } catch (OrganizasyonException $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            JsonResponse::error($e->httpStatus, $e->errorCode, $e->getMessage(), $e->field);
+        } catch (PersonelValidationException $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            JsonResponse::error(422, $e->getCodeString() ?: 'VALIDATION_ERROR', $e->getMessage(), $e->getField());
+        } catch (\Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            JsonResponse::serverError('Personel yeniden aktif edilemedi.');
+        }
+
+        self::respondYenidenAktif($pdo, $user, $personelId, 200, $result);
+    }
+
+    /**
+     * @param array<string, mixed> $user
+     * @param array<string, mixed>|null $result
+     */
+    private static function respondYenidenAktif(PDO $pdo, array $user, $personelId, $status, ?array $result = null)
+    {
+        $row = self::fetchPersonelRowById($pdo, $personelId);
+        if (!$row) {
+            JsonResponse::serverError('Yeniden aktif etme dogrulanamadi.');
+        }
+
+        $meta = $result === null
+            ? ['replay' => true]
+            : ['yeniden_aktif' => $result, 'replay' => (bool) ($result['replay'] ?? false)];
+
+        JsonResponse::success(self::mapPersonelRow($row, $user), $meta, (int) $status);
     }
 
     /**

@@ -182,7 +182,7 @@ final class PersonelGeciciGorevlendirmeService
         $role = OrgScope::normalizeRole($user);
         $allowedCentral = OrgScope::isUnrestricted($user) || OrgScope::isOrganizationGlobalRead($user);
         if (!$allowedCentral) {
-            JsonResponse::forbidden('Dis kaynak havuzu icin yetki yok.');
+            JsonResponse::forbidden('Harici Personel havuzu icin yetki yok.');
         }
 
         $sql = "SELECT p.id, p.sicil_no, p.ad, p.soyad, p.calisan_kapsami,
@@ -382,7 +382,7 @@ final class PersonelGeciciGorevlendirmeService
         if (!PersonelCalisanKapsamService::isDisKaynak($pdo, $personelId)) {
             throw new PersonelValidationException(
                 'personel_id',
-                'Gecici gorevlendirme yalniz DIS_KAYNAK personel icin kullanilir.'
+                'Gecici gorevlendirme yalniz Harici Personel icin kullanilir.'
             );
         }
 

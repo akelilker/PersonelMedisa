@@ -10,7 +10,7 @@ const sampleFields = {
   username: "zeki.yilmaz",
   roleLabel: "Birim Amiri",
   subeScopeLabel: "Medisa Fabrika",
-  kullaniciTipiLabel: "İç Personel"
+  kullaniciTipiLabel: "Dahili Personel"
 };
 
 describe("kullanici search", () => {

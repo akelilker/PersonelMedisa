@@ -1145,8 +1145,8 @@ final class OrganizasyonService
         if ($mismatchedPersonel > 0) {
             throw OrganizasyonException::conflict(
                 'SGK_ISVEREN_SIRKET_CHANGE_BLOCKED',
-                'Bu SGK işverenine bağlı iç personel kayıtları seçilen şirkete ait değil. '
-                . 'Şirket değişikliği mevcut iç personel şirket tutarlılığını bozacağı için reddedildi.'
+                'Bu SGK işverenine bağlı Dahili Personel kayıtları seçilen şirkete ait değil. '
+                . 'Şirket değişikliği mevcut Dahili Personel şirket tutarlılığını bozacağı için reddedildi.'
             );
         }
     }

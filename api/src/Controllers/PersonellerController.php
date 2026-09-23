@@ -436,7 +436,7 @@ class PersonellerController
             JsonResponse::error(
                 409,
                 PersonelCalisanKapsamService::ERROR_OPERASYON,
-                'DIS_KAYNAK personeline maas/bordro kaydi olusturulamaz.',
+                'Harici Personel kaydina maas/bordro kaydi olusturulamaz.',
                 'calisan_kapsami'
             );
         }
@@ -660,7 +660,7 @@ class PersonellerController
                 JsonResponse::error(
                     409,
                     PersonelCalisanKapsamService::ERROR_OPERASYON,
-                    'DIS_KAYNAK personeline maas/bordro kaydi olusturulamaz.',
+                    'Harici Personel kaydina maas/bordro kaydi olusturulamaz.',
                     'calisan_kapsami'
                 );
             }

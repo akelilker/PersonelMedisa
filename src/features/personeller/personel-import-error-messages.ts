@@ -10,7 +10,7 @@ const IMPORT_ERROR_MESSAGES: Record<string, string> = {
   PERSONEL_IMPORT_SATIR_SINIRI: "Dosyada izin verilen satır sayısı aşılıyor.",
   PERSONEL_IMPORT_GECERSIZ_TC: "T.C. Kimlik No geçersiz.",
   PERSONEL_IMPORT_EKSIK_ALAN: "Zorunlu alan eksik.",
-  PERSONEL_IMPORT_EKSIK_TELEFON: "İç personelin telefonu daha sonra Kayıt ve Süreç üzerinden tamamlanabilir.",
+  PERSONEL_IMPORT_EKSIK_TELEFON: "Dahili Personelin telefonu daha sonra Kayıt ve Süreç üzerinden tamamlanabilir.",
   PERSONEL_IMPORT_GECERSIZ_TARIH: "Tarih bilgisi geçersiz.",
   PERSONEL_IMPORT_REFERANS_BULUNAMADI: "Bu değer sistemde bulunamadı.",
   PERSONEL_IMPORT_REFERANS_BELIRSIZ: "Birden fazla kayıt ile eşleşiyor.",

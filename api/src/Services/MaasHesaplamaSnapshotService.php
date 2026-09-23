@@ -476,7 +476,7 @@ class MaasHesaplamaSnapshotService
                 $items[] = self::issue(
                     self::SEVERITY_BLOCKER,
                     self::BLOCKER_SGK_ISVEREN_MISSING,
-                    'IC personelin SGK isvereni eksik; bordro snapshot olusturulamaz.',
+                    'Dahili Personelin SGK isvereni eksik; bordro snapshot olusturulamaz.',
                     'personel',
                     $personelId,
                     $personelId,

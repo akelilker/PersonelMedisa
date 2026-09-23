@@ -144,8 +144,8 @@ type SirketFormState = {
 };
 
 const KULLANICI_TIPI_LABELS: Record<KullaniciTipi, string> = {
-  IC_PERSONEL: "İç Personel",
-  HARICI: "Harici"
+  IC_PERSONEL: "Dahili Personel",
+  HARICI: "Harici Personel"
 };
 
 const DURUM_LABELS: Record<KayitDurumu, string> = {
@@ -416,7 +416,7 @@ function toKullaniciPayload(
   }
 
   if (!realKullaniciApi && form.kullaniciTipi === "IC_PERSONEL" && !form.personelId) {
-    throw new Error("İç personel kullanıcıları için personel seçimi zorunludur.");
+    throw new Error("Dahili Personel kullanıcıları için personel seçimi zorunludur.");
   }
 
   if (
@@ -2311,8 +2311,8 @@ export function YonetimPaneliPage() {
                     }))
                   }
                   selectOptions={[
-                    { value: "IC_PERSONEL", label: "İç Personel" },
-                    { value: "HARICI", label: "Harici" }
+                    { value: "IC_PERSONEL", label: KULLANICI_TIPI_LABELS.IC_PERSONEL },
+                    { value: "HARICI", label: KULLANICI_TIPI_LABELS.HARICI }
                   ]}
                 />
               ) : null}

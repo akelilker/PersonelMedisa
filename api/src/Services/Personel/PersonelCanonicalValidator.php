@@ -168,7 +168,7 @@ final class PersonelCanonicalValidator
             $payload['sgk_isveren_id'] = self::requirePositiveInt(
                 $body,
                 'sgk_isveren_id',
-                'Aktif IC personel icin SGK isvereni zorunludur.'
+                'Aktif Dahili Personel icin SGK isvereni zorunludur.'
             );
         } elseif (array_key_exists('sgk_isveren_id', $body)) {
             $payload['sgk_isveren_id'] = self::optionalPositiveInt($body, 'sgk_isveren_id');

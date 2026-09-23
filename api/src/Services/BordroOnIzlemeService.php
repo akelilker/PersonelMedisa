@@ -415,7 +415,7 @@ class BordroOnIzlemeService
         }
         throw new MaasHesaplamaException(
             \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::ERROR_OPERASYON,
-            'DIS_KAYNAK personeli bulunan bordro çalıştırması işleme alınamaz.',
+            'Harici Personel bulunan bordro çalıştırması işleme alınamaz.',
             409
         );
     }

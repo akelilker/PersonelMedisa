@@ -38,7 +38,7 @@ final class PersonelSgkCompanyConsistency
 
         throw new PersonelValidationException(
             'sgk_isveren_id',
-            'Aktif IC personel icin SGK isvereni zorunludur.',
+            'Aktif Dahili Personel icin SGK isvereni zorunludur.',
             self::ERROR_REQUIRED
         );
     }

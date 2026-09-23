@@ -214,7 +214,7 @@ final class SgkPrimGunuService
                     $result = self::appendBlocker($result, [
                         'severity' => 'BLOCKER',
                         'code' => self::BLOCKER_ISVEREN_BILDIRIM_DONEMI_YOK,
-                        'message' => 'IC personelin SGK isvereni icin dogrulanmis bildirim donemi tanimi yok.',
+                        'message' => 'Dahili Personelin SGK isvereni icin dogrulanmis bildirim donemi tanimi yok.',
                         'domain' => 'SGK',
                         'tarih_baslangic' => $periodStart,
                         'tarih_bitis' => $periodEnd,

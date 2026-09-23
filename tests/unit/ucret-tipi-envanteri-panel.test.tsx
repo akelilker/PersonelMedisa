@@ -45,7 +45,7 @@ afterEach(() => {
 });
 
 describe("Ücret Tipi Envanteri paneli (salt okunur)", () => {
-  it("canonical read API'sini aktif + iç personel kapsamıyla çağırır", async () => {
+  it("canonical read API'sini aktif + Dahili Personel kapsamıyla çağırır", async () => {
     mockPage([personel({ id: 1, ucret_tipi_id: 3 })]);
     render(<UcretTipiEnvanteriPanel />);
     await screen.findByTestId("ucret-tipi-envanteri-sayaclar");
@@ -133,14 +133,14 @@ describe("Ücret Tipi Envanteri paneli (salt okunur)", () => {
     expect(listMock).toHaveBeenCalledTimes(1);
   });
 
-  it("aktif iç personel yoksa boş durumu gösterir", async () => {
+  it("aktif Dahili Personel yoksa boş durumu gösterir", async () => {
     mockPage([]);
 
     render(<UcretTipiEnvanteriPanel />);
     await screen.findByTestId("ucret-tipi-envanteri-empty");
 
     expect(screen.getByTestId("ucret-tipi-envanteri-empty")).toHaveTextContent(
-      "Aktif iç personel bulunamadı."
+      "Aktif Dahili Personel bulunamadı."
     );
     expect(screen.queryByTestId("ucret-tipi-envanteri-tablo")).toBeNull();
   });

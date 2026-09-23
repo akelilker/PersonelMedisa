@@ -59,7 +59,7 @@ final class SgkManuelKodOverrideService
             return self::error(
                 409,
                 \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::ERROR_OPERASYON,
-                'Bu personel dizin kaydidir (DIS_KAYNAK); operasyonel islem yapilamaz.'
+                'Bu personel Harici Personel dizin kaydidir; operasyonel islem yapilamaz.'
             );
         }
 

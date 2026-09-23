@@ -29,7 +29,7 @@ describe("canonical payroll SGK integrity", () => {
   it("fail-closes active IC create without SGK and wires create/import owners", () => {
     const canonical = read("api/src/Services/Personel/PersonelCanonicalValidator.php");
     expect(canonical).toContain("assertRequiredForActiveIc");
-    expect(canonical).toContain("Aktif IC personel icin SGK isvereni zorunludur");
+    expect(canonical).toContain("Aktif Dahili Personel icin SGK isvereni zorunludur");
 
     const create = read("api/src/Services/Personel/PersonelCreateService.php");
     expect(create).toContain("PersonelSgkCompanyConsistency::assertRequiredForActiveIc");

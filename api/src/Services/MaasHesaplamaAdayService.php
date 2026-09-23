@@ -847,7 +847,7 @@ class MaasHesaplamaAdayService
         }
         throw new MaasHesaplamaException(
             \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::ERROR_OPERASYON,
-            'DIS_KAYNAK personeli bulunan maaş snapshotı işleme alınamaz.',
+            'Harici Personel bulunan maaş snapshotı işleme alınamaz.',
             409
         );
     }

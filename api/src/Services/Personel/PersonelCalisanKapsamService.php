@@ -175,7 +175,7 @@ final class PersonelCalisanKapsamService
         JsonResponse::error(
             409,
             self::ERROR_ORG_SCOPE,
-            'DIS_KAYNAK personeli icin kalici org baglantisi veya aktif gecici gorevlendirme gerekir.',
+            'Harici Personel icin kalici org baglantisi veya aktif gecici gorevlendirme gerekir.',
             'personel_id'
         );
     }
@@ -195,7 +195,7 @@ final class PersonelCalisanKapsamService
         }
         throw new PersonelValidationException(
             'personel_id',
-            'DIS_KAYNAK personeli icin kalici org baglantisi veya aktif gecici gorevlendirme gerekir.',
+            'Harici Personel icin kalici org baglantisi veya aktif gecici gorevlendirme gerekir.',
             self::ERROR_ORG_SCOPE
         );
     }
@@ -211,7 +211,7 @@ final class PersonelCalisanKapsamService
         JsonResponse::error(
             409,
             self::ERROR_FINANSAL,
-            'Bu personel DIS_KAYNAK kapsamindadir; ucret/SGK/gercek bordro islemi yapilamaz.',
+            'Bu personel Harici Personel kapsamindadir; ucret/SGK/gercek bordro islemi yapilamaz.',
             'personel_id'
         );
     }
@@ -223,7 +223,7 @@ final class PersonelCalisanKapsamService
         }
         throw new PersonelValidationException(
             'personel_id',
-            'Bu personel DIS_KAYNAK kapsamindadir; ucret/SGK/gercek bordro islemi yapilamaz.',
+            'Bu personel Harici Personel kapsamindadir; ucret/SGK/gercek bordro islemi yapilamaz.',
             self::ERROR_FINANSAL
         );
     }
@@ -273,15 +273,15 @@ final class PersonelCalisanKapsamService
         if ($tc === '' || !PersonelCanonicalValidator::isValidTcKimlikNo($tc)) {
             throw new PersonelValidationException(
                 'tc_kimlik_no',
-                'Ic personel icin gecerli T.C. Kimlik No zorunludur.'
+                'Dahili Personel icin gecerli T.C. Kimlik No zorunludur.'
             );
         }
         if (trim((string) ($merged['soyad'] ?? '')) === '') {
-            throw new PersonelValidationException('soyad', 'Ic personel icin soyad zorunludur.');
+            throw new PersonelValidationException('soyad', 'Dahili Personel icin soyad zorunludur.');
         }
         $dogum = trim((string) ($merged['dogum_tarihi'] ?? ''));
         if ($dogum === '' || !PersonelCanonicalValidator::isValidDateString($dogum)) {
-            throw new PersonelValidationException('dogum_tarihi', 'Ic personel icin dogum tarihi zorunludur.');
+            throw new PersonelValidationException('dogum_tarihi', 'Dahili Personel icin dogum tarihi zorunludur.');
         }
     }
 }

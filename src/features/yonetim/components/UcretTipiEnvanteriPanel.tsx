@@ -24,7 +24,7 @@ const DURUM_BADGE_CLASS: Record<UcretTipiEnvanteriDurum, string> = {
 };
 
 /**
- * Salt okunur canonical read: GET /personeller (aktif + iç personel).
+ * Salt okunur canonical read: GET /personeller (aktif + Dahili Personel).
  * Yazma, güncelleme veya toplu düzeltme çağrısı yapılmaz.
  */
 async function fetchAktifIcPersoneller(signal: AbortSignal): Promise<{
@@ -125,16 +125,16 @@ export function UcretTipiEnvanteriPanel() {
       {!isLoading && !errorMessage && envanter ? (
         <>
           <p className="yonetim-hint" role="status">
-            Salt okunur envanter: dağılım yalnız aktif iç personelin kanonik ücret tipi alanından okunur.
+            Salt okunur envanter: dağılım yalnız aktif Dahili Personelin kanonik ücret tipi alanından okunur.
             Bu ekran hiçbir kaydı değiştirmez ve ücret tipi atamaz.
           </p>
           <p className="yonetim-hint">
-            Dış kaynak (DIS_KAYNAK) personel ücret tipi kapsamı dışındadır; bu envantere dahil edilmez.
+            Harici Personel ücret tipi kapsamı dışındadır; bu envantere dahil edilmez.
           </p>
 
           <div className="yonetim-summary-grid" data-testid="ucret-tipi-envanteri-sayaclar">
             <article className="yonetim-summary-card" data-testid="ucret-tipi-envanteri-toplam">
-              <span>Aktif iç personel</span>
+              <span>Aktif Dahili Personel</span>
               <strong>{envanter.toplam}</strong>
             </article>
             {UCRET_TIPI_ENVANTERI_BUCKET_KEYS.map((key) => (
@@ -160,7 +160,7 @@ export function UcretTipiEnvanteriPanel() {
 
           {envanter.satirlar.length === 0 ? (
             <p className="yonetim-hint" data-testid="ucret-tipi-envanteri-empty">
-              Aktif iç personel bulunamadı.
+              Aktif Dahili Personel bulunamadı.
             </p>
           ) : (
             <div className="yonetim-list-table-wrap">

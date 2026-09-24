@@ -481,7 +481,7 @@ export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeade
               >
                 <path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18" />
                 <path d="M6 12h12" />
-                <path d="M10 6h.01M14 6h.01M10 10h.01M14 10h.01M10 14h.01M14 14h.01M10 18h.01M14 18h.01" />
+                <path d="M8 7h2v2H8zM14 7h2v2h-2zM8 11h2v2H8zM14 11h2v2h-2zM8 15h2v2H8zM14 15h2v2h-2z" />
               </svg>
               <svg
                 className="sube-selector-chevron"

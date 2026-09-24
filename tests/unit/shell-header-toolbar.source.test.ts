@@ -48,6 +48,23 @@ describe("home shell header toolbar polish", () => {
     );
   });
 
+  it("centers the hero branch label under the accent line without moving session user", () => {
+    const hero = read("src/styles/components/hero.css");
+    expect(hero).toMatch(/\.hero-with-session \.hero-session-sube\s*\{[^}]*bottom:\s*6px/s);
+    expect(hero).toMatch(
+      /body\.app-home-route \.hero\.hero-with-session \.hero-session-sube\s*\{[^}]*bottom:\s*3px/s
+    );
+    expect(hero).not.toMatch(/\.hero-session-user\s*\{[^}]*bottom:/s);
+  });
+
+  it("matches home icons→menu gap to hero→icons gap", () => {
+    const icons = read("src/styles/components/icons-row.css");
+    expect(icons).toMatch(
+      /\.icons-row--minimal\s*\{[^}]*margin-bottom:\s*calc\(var\(--shell-top-stack-gap\)\s*\+\s*4px\)/s
+    );
+    expect(icons).not.toMatch(/\.icons-row--minimal\s*\{[^}]*margin-bottom:\s*var\(--space-4\)/s);
+  });
+
   it("keeps calendar badge hover tied to header button", () => {
     const bugunCss = read("src/styles/modules/bugun-personel-durumu.css");
     expect(bugunCss).toMatch(

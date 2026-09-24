@@ -22,15 +22,11 @@
   justify-items: stretch;
   min-height: 38px;
   /*
-   * Vertical breath: the header stack already leaves 16px above the row
-   * (--shell-top-stack-gap plus the hero's own 8px bottom margin), while the row
-   * box ended flush against the first content card below (0px) — so the icons
-   * and the branch selector sat at the bottom of the header band. The row owns
-   * the matching bottom breath here (margin, so the row's own min-height /
-   * align-items centering contract stays untouched), which puts the content
-   * optically centered between the header frame and the next content frame.
+   * Match the hero → icons gap on home: shell-top-stack gap + session-hero
+   * margin-bottom (4px + 4px on app-home-route). Previously space-4 (16px)
+   * made icons → menu roughly 2× the hero → icons breath.
    */
-  margin-bottom: var(--space-4);
+  margin-bottom: calc(var(--shell-top-stack-gap) + 4px);
 }
 
 .icons-row-left {

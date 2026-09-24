@@ -70,17 +70,34 @@
   font-size: clamp(8px, 1.55vw, 10px);
 }
 
+/*
+ * Selected branch label: same horizontal band as .hero-session-user, centered
+ * across the hero width. Absolute so it never joins the logo flex/grid track or
+ * collides with the username column; ellipsis keeps long names to one line.
+ */
 .hero-session-sube {
+  position: absolute;
+  left: 50%;
+  bottom: 11px;
+  z-index: 2;
+  box-sizing: border-box;
   display: block;
-  width: 100%;
-  max-width: 100%;
+  width: max-content;
+  max-width: min(46%, calc(100% - var(--hero-logo-width) - var(--hero-spacer-width) - 48px));
+  margin: 0;
+  padding: 0 4px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   text-align: center;
-  color: rgba(205, 216, 228, 0.86);
-  font-size: clamp(7px, 1.35vw, 9px);
+  transform: translateX(-50%);
+  pointer-events: none;
+  font-weight: 600;
   line-height: 1.1;
+  letter-spacing: 0.01em;
+  color: rgba(190, 204, 218, 0.68);
+  font-size: clamp(8px, 1.55vw, 10px);
+  -webkit-font-smoothing: antialiased;
 }
 
 .hero-logo picture {
@@ -265,6 +282,13 @@ body.login-page .hero .animated-line {
     transform: none;
   }
 
+  .hero-with-session .hero-session-sube {
+    bottom: 12px;
+    max-width: min(280px, calc(100% - 160px));
+    font-size: 10px;
+    line-height: 1.2;
+  }
+
   .animated-line,
   body.login-page .hero .animated-line {
     grid-column: 2;
@@ -387,9 +411,10 @@ body.login-page .hero .animated-line {
   }
 
   .hero-with-session .hero-session-sube {
-    font-size: 8.5px;
-    line-height: 1.06;
-    max-height: 1.06em;
+    bottom: 10px;
+    max-width: min(42%, calc(100% - 120px));
+    font-size: 9.5px;
+    line-height: 1.12;
   }
 
   .hero-logo img {
@@ -542,6 +567,14 @@ body.login-page .hero .animated-line {
     word-break: normal;
     overflow-wrap: break-word;
     text-align: center;
+  }
+
+  body.app-home-route .hero.hero-with-session .hero-session-sube {
+    /* Align with .hero-session-user band under the logo (above accent line). */
+    bottom: 8px;
+    max-width: min(40vw, calc(100% - 2 * min(112px, 30vw) - 28px));
+    font-size: 9.5px;
+    line-height: 1.12;
   }
 
   body.app-home-route section.hero.hero-with-session > h1 {

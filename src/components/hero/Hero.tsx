@@ -7,8 +7,9 @@ type HeroProps = {
   subeLabel?: string | null;
 };
 
-export function Hero({ title, userLabel }: HeroProps) {
+export function Hero({ title, userLabel, subeLabel }: HeroProps) {
   const trimmedUserLabel = userLabel?.trim() ?? "";
+  const trimmedSubeLabel = subeLabel?.trim() ?? "";
   const showUserLabel = trimmedUserLabel.length > 0;
 
   return (
@@ -31,6 +32,15 @@ export function Hero({ title, userLabel }: HeroProps) {
         ) : null}
       </div>
       <h1>{title}</h1>
+      {trimmedSubeLabel ? (
+        <span
+          className="hero-session-sube"
+          data-testid="hero-session-sube"
+          title={trimmedSubeLabel}
+        >
+          {trimmedSubeLabel}
+        </span>
+      ) : null}
       <div className="hero-spacer" aria-hidden="true" />
       <div className="animated-line" aria-hidden="true" />
     </section>

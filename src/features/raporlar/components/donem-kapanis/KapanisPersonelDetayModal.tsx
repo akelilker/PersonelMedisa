@@ -88,7 +88,7 @@ export function KapanisPersonelDetayModal({ issue, params, onClose }: KapanisPer
             <div className="module-pagination">
               <button
                 type="button"
-                className="state-action-btn"
+                className="universal-btn-aux"
                 disabled={!hasPrevPage || isLoading}
                 onClick={() => void refetch(Math.max(1, currentPage - 1))}
               >
@@ -97,7 +97,7 @@ export function KapanisPersonelDetayModal({ issue, params, onClose }: KapanisPer
               <span className="module-page-info">Sayfa {currentPage}</span>
               <button
                 type="button"
-                className="state-action-btn"
+                className="universal-btn-aux"
                 disabled={!hasNextPage || isLoading}
                 onClick={() => void refetch(currentPage + 1)}
               >

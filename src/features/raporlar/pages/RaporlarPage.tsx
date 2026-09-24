@@ -867,7 +867,7 @@ export function RaporlarPage() {
           <div className="module-pagination">
             <button
               type="button"
-              className="state-action-btn"
+              className="universal-btn-aux"
               onClick={() => void loadRapor(Math.max(1, page - 1))}
               disabled={isLoading || page <= 1}
             >
@@ -879,7 +879,7 @@ export function RaporlarPage() {
             </span>
             <button
               type="button"
-              className="state-action-btn"
+              className="universal-btn-aux"
               onClick={() => void loadRapor(page + 1)}
               disabled={isLoading || !hasNextPage}
             >

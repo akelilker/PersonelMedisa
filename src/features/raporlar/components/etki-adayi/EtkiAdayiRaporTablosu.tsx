@@ -116,7 +116,7 @@ export function EtkiAdayiRaporTablosu({
       <div className="module-pagination" data-testid="etki-adayi-rapor-pagination">
         <button
           type="button"
-          className="state-action-btn"
+          className="universal-btn-aux"
           disabled={!hasPrevPage}
           onClick={() => onPageChange(Math.max(1, page - 1))}
         >
@@ -126,7 +126,7 @@ export function EtkiAdayiRaporTablosu({
           Sayfa {page}
           {totalPages ? ` / ${totalPages}` : ""}
         </span>
-        <button type="button" className="state-action-btn" disabled={!hasNextPage} onClick={() => onPageChange(page + 1)}>
+        <button type="button" className="universal-btn-aux" disabled={!hasNextPage} onClick={() => onPageChange(page + 1)}>
           Sonraki
         </button>
       </div>

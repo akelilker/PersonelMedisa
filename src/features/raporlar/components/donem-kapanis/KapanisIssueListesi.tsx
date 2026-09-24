@@ -47,7 +47,7 @@ function IssueRow({
         {issue.count > 0 ? (
           <button
             type="button"
-            className="state-action-btn"
+            className="universal-btn-aux"
             data-testid={`donem-kapanis-issue-detail-${issue.code}`}
             onClick={() => onShowItems(issue)}
           >

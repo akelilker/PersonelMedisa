@@ -42,7 +42,15 @@ export function PersonelKartPanelGenelBilgiler({
   onOpenSurecHistory?: () => void;
 }) {
   return (
-    <div className="personel-dosya-sections">
+    <div
+      className="personel-dosya-sections personel-dosya-zone personel-dosya-zone--operasyon"
+      data-testid="personel-dosya-zone-operasyon"
+      data-zone="operasyon"
+    >
+      <div className="personel-dosya-zone-head">
+        <h3 className="personel-dosya-zone-title">Operasyonel özetler</h3>
+      </div>
+
       {canManageAccountOnboarding ? (
         <DossierSection
           title="Personel hesabı"

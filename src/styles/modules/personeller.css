@@ -328,7 +328,8 @@
   min-width: 0;
 }
 
-/* Personel Kartı Genel: Kayıt formu ile aynı iki kolon (personel-form-columns owner kayit-surec.css). */
+/* Personel Kartı Genel: Kayıt formu ile aynı iki kolon (personel-form-columns owner kayit-surec.css).
+   Global kayit-surec mobil kuralına dokunulmaz; yalnız detay kartında dar ekranda tek kolon. */
 .personel-detail-card .personel-dosya-kayit-mirror .personel-form-column {
   justify-content: flex-start;
   gap: var(--space-3);
@@ -338,34 +339,111 @@
   min-width: 0;
 }
 
+@media (max-width: 640px) {
+  .personel-detail-card .personel-dosya-kayit-mirror .personel-form-columns {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-3);
+  }
+
+  .personel-detail-card .personel-dosya-kayit-mirror .personel-form-columns::after {
+    display: none;
+  }
+}
+
+.personel-archive-banner,
+.personel-write-scope-notice,
+.personel-dosya-info-notice {
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--txt-muted);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.45;
+}
+
+.personel-archive-banner strong {
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
 .personel-dosya-hero {
+  display: grid;
+  gap: var(--space-2);
   margin: 0;
   padding: 0;
+  min-width: 0;
 }
 
 .personel-dosya-hero-identity {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 8px 10px;
-  text-align: center;
+  text-align: left;
+  min-width: 0;
 }
 
 /* Kimlik satırı Taşıt detay plaka/marka tonuna iner (15px mobil, 16px masaüstü). */
 .personel-dosya-hero-name {
   margin: 0;
+  min-width: 0;
   font-size: 15px;
   font-weight: 700;
   line-height: 1.2;
   letter-spacing: 0.02em;
   color: var(--txt);
+  overflow-wrap: anywhere;
 }
 
 @media (min-width: 641px) {
   .personel-dosya-hero-name {
     font-size: 16px;
   }
+}
+
+.personel-dosya-hero-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  min-width: 0;
+}
+
+.personel-dosya-hero-chip {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 6px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.personel-dosya-hero-chip-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--txt-muted);
+}
+
+.personel-dosya-hero-chip-value {
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.personel-dosya-hero-org {
+  margin: 0;
+  min-width: 0;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--txt-muted);
+  overflow-wrap: anywhere;
 }
 
 .personel-dosya-print-btn {
@@ -425,30 +503,70 @@
 .personel-dosya-genel-ust {
   display: grid;
   gap: var(--space-3);
-  margin-bottom: var(--space-2);
+  margin-bottom: 0;
+}
+
+.personel-dosya-zone {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.personel-dosya-zone--operasyon {
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--line-soft);
+}
+
+.personel-dosya-zone-head {
+  margin: 0;
+  padding: 0;
+}
+
+.personel-dosya-zone-title {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--txt-muted);
 }
 
 .personel-dosya-status {
   display: inline-flex;
   align-items: center;
+  gap: 6px;
   flex: 0 0 auto;
+  max-width: 100%;
   padding: 0;
   border: none;
   background: none;
   color: var(--success);
 }
 
+.personel-dosya-status.is-passive {
+  color: var(--danger);
+}
+
 .personel-dosya-status.is-passive .personel-dosya-status-dot {
-  background: var(--danger);
+  background: currentColor;
   box-shadow: 0 0 0 2px rgba(248, 113, 113, 0.28);
 }
 
 .personel-dosya-status-dot {
   width: 8px;
   height: 8px;
+  flex: 0 0 auto;
   border-radius: 50%;
   background: currentColor;
   box-shadow: 0 0 0 2px rgba(74, 222, 128, 0.28);
+}
+
+.personel-dosya-status-label {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: inherit;
+  overflow-wrap: anywhere;
 }
 
 .personel-dosya-actions-row {
@@ -456,6 +574,7 @@
   align-items: center;
   justify-content: flex-end;
   gap: var(--space-2);
+  margin: 0;
   padding-bottom: var(--space-2);
   border-bottom: 1px solid var(--line-soft);
 }
@@ -564,6 +683,20 @@
 .personel-dosya-section-head {
   display: grid;
   gap: var(--space-1);
+  min-width: 0;
+}
+
+.personel-dosya-section-head--with-action {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.personel-dosya-section-head--with-action > div {
+  min-width: 0;
+  flex: 1 1 12rem;
 }
 
 .personel-dosya-section-head h3,
@@ -766,6 +899,35 @@
 .personel-puantaj-summary-card {
   display: grid;
   gap: 6px;
+}
+
+/* Detay gövdesinde özet tile / dosya satır ritmi — global card.css yüzeyi büyütülmez. */
+.personel-detail-card .personel-puantaj-summary-card {
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.personel-detail-card .personel-puantaj-summary-card:last-child {
+  border-bottom: none;
+}
+
+.personel-detail-card .personel-surec-card,
+.personel-detail-card .personel-surec-item {
+  padding: 8px 0;
+  border-color: rgba(255, 255, 255, 0.06);
+  border-radius: 0;
+  background: transparent;
+}
+
+.personel-qr-history,
+.personel-qr-history-table-wrap {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.personel-qr-history-table-wrap {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
 }
 
 .personel-puantaj-summary-kicker {
@@ -1172,10 +1334,6 @@
   .personel-belge-kayit-table,
   .personel-zimmet-table {
     min-width: 640px;
-  }
-
-  .personel-dosya-status {
-    justify-self: center;
   }
 
   .personel-dosya-actions-row {

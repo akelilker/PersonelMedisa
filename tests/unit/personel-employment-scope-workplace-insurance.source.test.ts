@@ -231,7 +231,10 @@ describe("employment scope / workplace / insurance model (owner wiring)", () => 
     );
     expect(mirror).toContain('label="SGK İşveren"');
     expect(mirror).toContain('label="Çalışma Lokasyonu"');
-    expect(mirror).toContain("Çalışan Kapsamı");
     expect(mirror).toContain("personel_tipi_id");
+
+    const hero = read("src/features/personeller/components/personel-dosya/PersonelDosyaHero.tsx");
+    expect(hero).toContain("formatCalisanKapsamiLabel");
+    expect(hero).toContain("personel-dosya-hero-kapsam");
   });
 });

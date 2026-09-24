@@ -46,21 +46,40 @@ function extractMirrorColumnLabels(source: string, columnIndex: number): string[
   return labels;
 }
 
-describe("personel dosya kayit mirror order", () => {
-  it("matches PersonelCreateFields left/right label order (read-only kart)", () => {
-    const create = read("src/features/personeller/components/PersonelCreateFields.tsx");
-    const mirror = read("src/features/personeller/components/personel-dosya/PersonelDosyaKayitMirrorFields.tsx");
+/** Sticky hero kimlik alanına taşınan kayıt etiketleri — aynada tekrar edilmez. */
+const HERO_OWNED_MIRROR_LABELS = new Set([
+  "Çalışan Kapsamı",
+  "Ad",
+  "Soyad",
+  "Şube",
+  "Departman",
+  "Görev / Unvan",
+  "Sicil No",
+  "Çalışma Durumu"
+]);
 
-    const createLeft = extractCreateColumnLabels(create, 0);
-    const createRight = extractCreateColumnLabels(create, 1);
+describe("personel dosya kayit mirror order", () => {
+  it("keeps create-form field order for non-hero mirror labels", () => {
+    const create = read("src/features/personeller/components/PersonelCreateFields.tsx");
+    const mirror = read(
+      "src/features/personeller/components/personel-dosya/PersonelDosyaKayitMirrorFields.tsx"
+    );
+
+    const createLeft = extractCreateColumnLabels(create, 0).filter(
+      (label) => !HERO_OWNED_MIRROR_LABELS.has(label)
+    );
+    const createRight = extractCreateColumnLabels(create, 1).filter(
+      (label) =>
+        !HERO_OWNED_MIRROR_LABELS.has(label) && label !== "Ücret Tipi" && label !== "Net Maaş"
+    );
     const mirrorLeft = extractMirrorColumnLabels(mirror, 0);
     const mirrorRight = extractMirrorColumnLabels(mirror, 1);
 
     expect(mirrorLeft.slice(0, createLeft.length)).toEqual(createLeft);
+    expect(mirrorRight.slice(0, createRight.length)).toEqual(createRight);
 
-    const createRightCore = createRight.filter(
-      (label) => label !== "Ücret Tipi" && label !== "Net Maaş"
-    );
-    expect(mirrorRight.slice(0, createRightCore.length)).toEqual(createRightCore);
+    for (const label of HERO_OWNED_MIRROR_LABELS) {
+      expect(mirror).not.toContain(`label="${label}"`);
+    }
   });
 });

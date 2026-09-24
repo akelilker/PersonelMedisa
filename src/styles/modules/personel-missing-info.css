@@ -101,6 +101,30 @@
   text-decoration-color: rgba(var(--theme-color-rgb), 0.45);
 }
 
+/* Personel Detay: eksik alan gürültüsünü yumuşat — liste badge/summary dokunulmaz. */
+.personel-detail-card .personel-dosya-field.is-missing,
+.personel-detail-card .personel-dosya-record.is-missing {
+  border-color: rgba(var(--theme-color-rgb), 0.28);
+  background: rgba(var(--theme-color-rgb), 0.03);
+}
+
+.personel-detail-card .personel-dosya-field.is-missing .personel-dosya-field-label,
+.personel-detail-card .personel-dosya-record.is-missing .personel-dosya-record-label {
+  color: var(--text-secondary);
+}
+
+.personel-detail-card .personel-dosya-field-missing-hint {
+  text-decoration: none;
+  color: var(--txt-muted);
+  font-weight: 500;
+}
+
+.personel-detail-card .personel-dosya-missing-gateway,
+.personel-detail-card .personel-dosya-missing-gateway.is-readonly {
+  text-decoration: none;
+  font-weight: 600;
+}
+
 .personel-kart-tab-missing-badge {
   display: inline-flex;
   align-items: center;

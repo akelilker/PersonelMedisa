@@ -9,6 +9,9 @@ import { formatEksikGirisAttention } from "../../../lib/bildirim/gunluk-bildirim
 import { useAuth } from "../../../state/auth.store";
 import type { BirimAmiriGunlukDurum } from "../../../types/bildirim";
 import type { MeIdentity } from "../../../types/self-service";
+import { useRoleAccess } from "../../../hooks/use-role-access";
+import { OwnQrAttendanceBoxes } from "../components/OwnQrAttendanceBoxes";
+import { QrPuantajExpectationNote } from "../components/QrPuantajExpectationNote";
 import { SelfServiceQrShortcuts } from "../components/SelfServiceQrShortcuts";
 import {
   formatBirimAmiriPersonelStatusLine,
@@ -17,7 +20,10 @@ import {
 
 export function BirimAmiriOperationalHomePage() {
   const { session } = useAuth();
+  const { hasPermission } = useRoleAccess();
   const navigate = useNavigate();
+  // QR/kart: rol bağımsız (bağlı + Mavi Yaka). Yönetim yetkileri korunur.
+  const qrEnabled = hasPermission("self_service.qr.scan");
   const [loading, setLoading] = useState(true);
   const [today, setToday] = useState<AttendanceTodayResponse | null>(null);
   const [identity, setIdentity] = useState<MeIdentity | null>(null);
@@ -113,20 +119,30 @@ export function BirimAmiriOperationalHomePage() {
             </div>
           ) : null}
         </dl>
-        <div className="pm-attendance-grid pm-attendance-grid--readonly" data-testid="birim-amiri-own-attendance">
-          <div className="pm-attendance-box">
-            <p className="pm-box-label">Giriş Saati</p>
-            <p className="pm-box-time">
-              {today?.giris?.display_local_time ?? today?.giris?.local_time ?? "—"}
-            </p>
+        {today ? (
+          <OwnQrAttendanceBoxes
+            today={today}
+            qrEnabled={qrEnabled}
+            testId="birim-amiri-own-attendance"
+            onScanGiris={() => navigate("/self/qr-okut?event=GIRIS")}
+            onScanCikis={() => navigate("/self/qr-okut?event=CIKIS")}
+          />
+        ) : (
+          <div
+            className="pm-attendance-grid pm-attendance-grid--readonly"
+            data-testid="birim-amiri-own-attendance"
+          >
+            <div className="pm-attendance-box">
+              <p className="pm-box-label">Giriş Saati</p>
+              <p className="pm-box-time">—</p>
+            </div>
+            <div className="pm-attendance-box">
+              <p className="pm-box-label">Çıkış Saati</p>
+              <p className="pm-box-time">—</p>
+            </div>
           </div>
-          <div className="pm-attendance-box">
-            <p className="pm-box-label">Çıkış Saati</p>
-            <p className="pm-box-time">
-              {today?.cikis?.display_local_time ?? today?.cikis?.local_time ?? "—"}
-            </p>
-          </div>
-        </div>
+        )}
+        {qrEnabled ? <QrPuantajExpectationNote /> : null}
       </section>
 
       {/* Rol bağımsız QR/kart hakkı: bağlı mavi yaka personeli olan BIRIM_AMIRI

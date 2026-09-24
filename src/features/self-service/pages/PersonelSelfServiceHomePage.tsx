@@ -15,6 +15,8 @@ import { LoadingState } from "../../../components/states/LoadingState";
 import { useRoleAccess } from "../../../hooks/use-role-access";
 import type { MeIdentity } from "../../../types/self-service";
 import { BackgroundlessNoticeModal } from "../components/BackgroundlessNoticeModal";
+import { OwnQrAttendanceBoxes } from "../components/OwnQrAttendanceBoxes";
+import { QrPuantajExpectationNote } from "../components/QrPuantajExpectationNote";
 import { SelfServiceQrShortcuts } from "../components/SelfServiceQrShortcuts";
 import { PersonelMobileCapabilityService } from "../personel-mobile-capability";
 
@@ -255,104 +257,44 @@ export function PersonelSelfServiceHomePage() {
         </div>
       ) : null}
 
-      <div className="pm-attendance-grid" data-testid="personel-attendance-boxes">
-        <div className="pm-attendance-box" data-testid="attendance-box-giris">
-          {today.giris ? (
-            <>
-              <p className="pm-box-label">Giriş Saati</p>
-              <p className="pm-box-time">{today.giris.display_local_time ?? today.giris.local_time}</p>
-              {today.pending_giris_correction ? (
-                <p className="pm-box-pending">Bekliyor</p>
-              ) : (
-                <button
-                  type="button"
-                  className="pm-box-action"
-                  data-testid="giris-duzelt"
-                  onClick={() =>
-                    guardOrRun("attendance_correct", () => {
-                      setCorrectDraft({
-                        eventId: today.giris!.id,
-                        eventType: "GIRIS",
-                        currentTime: today.giris!.display_local_time ?? today.giris!.local_time
-                      });
-                      setCorrectTime(today.giris!.display_local_time ?? today.giris!.local_time);
-                    })
-                  }
-                >
-                  Düzelt
-                </button>
-              )}
-            </>
-          ) : qrEnabled ? (
-            <button
-              type="button"
-              className="pm-box-main-action"
-              data-testid="giris-scan"
-              aria-label="Giriş için QR okut"
-              onClick={() =>
-                guardOrRun("qr_scan", () => {
-                  navigate("/self/qr-okut?event=GIRIS");
-                })
-              }
-            >
-              GİRİŞ
-            </button>
-          ) : (
-            <p className="self-service-muted" data-testid="giris-scan-not-entitled">
-              QR giriş bu hesap için tanımlı değil.
-            </p>
-          )}
-        </div>
+      <OwnQrAttendanceBoxes
+        today={today}
+        qrEnabled={qrEnabled}
+        testId="personel-attendance-boxes"
+        allowCorrection
+        onScanGiris={() =>
+          guardOrRun("qr_scan", () => {
+            navigate("/self/qr-okut?event=GIRIS");
+          })
+        }
+        onScanCikis={() =>
+          guardOrRun("qr_scan", () => {
+            navigate("/self/qr-okut?event=CIKIS");
+          })
+        }
+        onCorrectGiris={(event) =>
+          guardOrRun("attendance_correct", () => {
+            setCorrectDraft({
+              eventId: event.id,
+              eventType: "GIRIS",
+              currentTime: event.display_local_time ?? event.local_time
+            });
+            setCorrectTime(event.display_local_time ?? event.local_time);
+          })
+        }
+        onCorrectCikis={(event) =>
+          guardOrRun("attendance_correct", () => {
+            setCorrectDraft({
+              eventId: event.id,
+              eventType: "CIKIS",
+              currentTime: event.display_local_time ?? event.local_time
+            });
+            setCorrectTime(event.display_local_time ?? event.local_time);
+          })
+        }
+      />
 
-        <div className="pm-attendance-box" data-testid="attendance-box-cikis">
-          {today.cikis ? (
-            <>
-              <p className="pm-box-label">Çıkış Saati</p>
-              <p className="pm-box-time">{today.cikis.display_local_time ?? today.cikis.local_time}</p>
-              {today.pending_cikis_correction ? (
-                <p className="pm-box-pending">Bekliyor</p>
-              ) : (
-                <button
-                  type="button"
-                  className="pm-box-action"
-                  data-testid="cikis-duzelt"
-                  onClick={() =>
-                    guardOrRun("attendance_correct", () => {
-                      setCorrectDraft({
-                        eventId: today.cikis!.id,
-                        eventType: "CIKIS",
-                        currentTime: today.cikis!.display_local_time ?? today.cikis!.local_time
-                      });
-                      setCorrectTime(today.cikis!.display_local_time ?? today.cikis!.local_time);
-                    })
-                  }
-                >
-                  Düzelt
-                </button>
-              )}
-            </>
-          ) : qrEnabled ? (
-            <button
-              type="button"
-              className="pm-box-main-action"
-              data-testid="cikis-scan"
-              aria-label="Çıkış için QR okut"
-              disabled={!today.can_scan_cikis && Boolean(caps?.qr_scan)}
-              onClick={() =>
-                guardOrRun("qr_scan", () => {
-                  navigate("/self/qr-okut?event=CIKIS");
-                })
-              }
-            >
-              ÇIKIŞ
-            </button>
-          ) : (
-            <p className="self-service-muted" data-testid="cikis-scan-not-entitled">
-              QR çıkış bu hesap için tanımlı değil.
-            </p>
-          )}
-        </div>
-      </div>
+      {qrEnabled ? <QrPuantajExpectationNote /> : null}
 
       {missingCount > 0 ? (
         <div className="pm-secondary-card" role="status" data-testid="self-missing-info-warning">

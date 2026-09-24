@@ -26,13 +26,22 @@ describe("BIRIM_AMIRI operational home owners", () => {
     // QR CTA/link owner'ı paylaşılan component'tir: paralel QR UI yok.
     expect(home).toContain("<SelfServiceQrShortcuts");
     expect(home).not.toContain('data-testid="self-qr-scan-link"');
+    // Pilot UX parity: own GİRİŞ/ÇIKIŞ scan CTAs via shared OwnQrAttendanceBoxes (not inline).
+    expect(home).toContain("<OwnQrAttendanceBoxes");
+    expect(home).toContain("qrEnabled={qrEnabled}");
+    expect(home).toContain('hasPermission("self_service.qr.scan")');
     expect(home).not.toContain('data-testid="giris-scan"');
-    // Read-only attendance boxes stay read-only for the manager home.
+    // Fallback empty state when today is unavailable (no parallel scan UI).
     expect(home).toContain("pm-attendance-grid--readonly");
     expect(home).toContain("Kendi Bilgilerim");
     expect(home).toContain("Birimim");
     expect(home).toContain("birim-amiri-pazar-mesai-prompt");
     expect(home).toContain("birim-amiri-eksik-giris-warning");
+
+    const boxes = read("src/features/self-service/components/OwnQrAttendanceBoxes.tsx");
+    expect(boxes).toContain('data-testid="giris-scan"');
+    expect(boxes).toContain('data-testid="cikis-scan"');
+    expect(boxes).toContain('data-testid="giris-scan-not-entitled"');
   });
 
   it("QR entitlement owner is role-independent and shared (no role demotion)", () => {
@@ -80,7 +89,12 @@ describe("BIRIM_AMIRI operational home owners", () => {
   it("PERSONEL self-service page delegates QR scan CTAs to the shared owner", () => {
     const selfHome = read("src/features/self-service/pages/PersonelSelfServiceHomePage.tsx");
     expect(selfHome).toContain("<SelfServiceQrShortcuts />");
-    expect(selfHome).toContain("giris-scan");
+    expect(selfHome).toContain("<OwnQrAttendanceBoxes");
+    expect(selfHome).toContain("qrEnabled={qrEnabled}");
+    expect(selfHome).not.toContain('data-testid="giris-scan"');
+    const boxes = read("src/features/self-service/components/OwnQrAttendanceBoxes.tsx");
+    expect(boxes).toContain("giris-scan");
+    expect(boxes).toContain("cikis-scan");
     const shortcuts = read("src/features/self-service/components/SelfServiceQrShortcuts.tsx");
     expect(shortcuts).toContain("self-qr-scan-link");
     expect(shortcuts).toContain("self-qr-history-link");

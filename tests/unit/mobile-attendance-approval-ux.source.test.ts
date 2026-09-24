@@ -37,9 +37,13 @@ describe("mobile attendance approval UX source contracts", () => {
     expect(home).toContain("PERSONEL YÖN. SİST.");
     expect(home).toContain("ANASAYFA");
     expect(home).toContain("pm-header-accent");
-    expect(home).toContain("attendance-box-giris");
-    expect(home).toContain("attendance-box-cikis");
+    expect(home).toContain("OwnQrAttendanceBoxes");
+    expect(home).toContain('testId="personel-attendance-boxes"');
     expect(home).toContain("BackgroundlessNoticeModal");
+
+    const boxes = read("src/features/self-service/components/OwnQrAttendanceBoxes.tsx");
+    expect(boxes).toContain("attendance-box-giris");
+    expect(boxes).toContain("attendance-box-cikis");
   });
 
   it("keeps DIS_KAYNAK shell + operational QR/attendance capabilities", () => {

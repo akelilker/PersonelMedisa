@@ -268,10 +268,22 @@ describe("personnel-linked self-service authorization", () => {
     expect(home).toContain("<SelfServiceQrShortcuts />");
     expect(home).not.toContain('data-testid="self-qr-scan-link"');
     expect(home).not.toContain('data-testid="self-qr-history-link"');
-    // QR scan buttons sit behind the same decision with a non-QR notice fallback.
-    expect(home).toContain(") : qrEnabled ? (");
-    expect(home).toContain('data-testid="giris-scan-not-entitled"');
-    expect(home).toContain('data-testid="cikis-scan-not-entitled"');
+    // GİRİŞ/ÇIKIŞ kutuları OwnQrAttendanceBoxes owner'ında; page qrEnabled'i prop olarak iletir.
+    expect(home).toContain("<OwnQrAttendanceBoxes");
+    expect(home).toContain("qrEnabled={qrEnabled}");
+    expect(home).not.toContain('data-testid="giris-scan"');
+    expect(home).not.toContain('data-testid="giris-scan-not-entitled"');
+
+    const boxes = readFileSync(
+      resolve(root, "src/features/self-service/components/OwnQrAttendanceBoxes.tsx"),
+      "utf8"
+    );
+    expect(boxes).toContain("qrEnabled");
+    expect(boxes).toContain(") : qrEnabled ? (");
+    expect(boxes).toContain('data-testid="giris-scan"');
+    expect(boxes).toContain('data-testid="cikis-scan"');
+    expect(boxes).toContain('data-testid="giris-scan-not-entitled"');
+    expect(boxes).toContain('data-testid="cikis-scan-not-entitled"');
 
     const shortcuts = readFileSync(
       resolve(root, "src/features/self-service/components/SelfServiceQrShortcuts.tsx"),
@@ -288,6 +300,8 @@ describe("personnel-linked self-service authorization", () => {
       "utf8"
     );
     expect(birimHome).toContain("<SelfServiceQrShortcuts");
+    expect(birimHome).toContain("<OwnQrAttendanceBoxes");
+    expect(birimHome).toContain("qrEnabled={qrEnabled}");
     const routes = readFileSync(resolve(root, "src/app/routes.tsx"), "utf8");
     expect(routes).toContain("<SelfServiceQrShortcuts");
 

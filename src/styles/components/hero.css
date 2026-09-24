@@ -95,8 +95,8 @@
   font-weight: 600;
   line-height: 1.1;
   letter-spacing: 0.01em;
-  color: rgba(190, 204, 218, 0.68);
-  font-size: clamp(8px, 1.55vw, 10px);
+  color: rgba(210, 222, 234, 0.86);
+  font-size: clamp(10px, 2vw, 13px);
   -webkit-font-smoothing: antialiased;
 }
 
@@ -285,7 +285,7 @@ body.login-page .hero .animated-line {
   .hero-with-session .hero-session-sube {
     bottom: 12px;
     max-width: min(280px, calc(100% - 160px));
-    font-size: 10px;
+    font-size: 13px;
     line-height: 1.2;
   }
 
@@ -413,7 +413,7 @@ body.login-page .hero .animated-line {
   .hero-with-session .hero-session-sube {
     bottom: 10px;
     max-width: min(42%, calc(100% - 120px));
-    font-size: 9.5px;
+    font-size: 11.5px;
     line-height: 1.12;
   }
 
@@ -573,7 +573,7 @@ body.login-page .hero .animated-line {
     /* Align with .hero-session-user band under the logo (above accent line). */
     bottom: 8px;
     max-width: min(40vw, calc(100% - 2 * min(112px, 30vw) - 28px));
-    font-size: 9.5px;
+    font-size: 11.5px;
     line-height: 1.12;
   }
 

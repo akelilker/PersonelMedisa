@@ -241,9 +241,10 @@ function bootstrapSurecSchema(PDO $pdo): void
           (10, '11111111111', 'Ayse', 'Yilmaz', '1990-01-01', 'S10', '2020-01-01', 1, 'AKTIF', 'IC_PERSONEL'),
           (20, '22222222222', 'Mehmet', 'Demir', '1988-01-01', 'S20', '2020-01-01', 2, 'AKTIF', 'IC_PERSONEL'),
           (30, NULL, 'ExternalOther', NULL, NULL, 'S30', '2026-01-01', 2, 'AKTIF', 'DIS_KAYNAK'),
-          (40, NULL, 'ExternalOwn', NULL, NULL, 'S40', '2026-01-01', 1, 'AKTIF', 'DIS_KAYNAK')
+          (40, NULL, 'ExternalOwn', NULL, NULL, 'S40', '2026-01-01', 1, 'AKTIF', 'DIS_KAYNAK'),
+          (50, NULL, 'Cikmis', 'Personel', NULL, 'S50', '2020-01-01', 1, 'PASIF', 'IC_PERSONEL')
     ");
-    $pdo->exec('UPDATE personeller SET bolum_id = 31, birim_id = 41 WHERE id IN (10, 40)');
+    $pdo->exec('UPDATE personeller SET bolum_id = 31, birim_id = 41 WHERE id IN (10, 40, 50)');
     $pdo->exec('UPDATE personeller SET bolum_id = 32, birim_id = 42 WHERE id IN (20, 30)');
     $pdo->exec("
         INSERT INTO surecler (id, personel_id, surec_turu, alt_tur, baslangic_tarihi, bitis_tarihi, ucretli_mi, aciklama, state)
@@ -252,7 +253,8 @@ function bootstrapSurecSchema(PDO $pdo): void
           (101, 20, 'RAPOR', 'Raporlu_Hastalik', '2026-07-02', NULL, 0, 'Rapor', 'AKTIF'),
           (102, 10, 'IZIN', NULL, '2026-06-01', '2026-06-02', 1, 'Tamam', 'TAMAMLANDI'),
           (103, 30, 'IZIN', NULL, '2026-07-03', '2026-07-04', 1, 'External other', 'AKTIF'),
-          (104, 40, 'IZIN', NULL, '2026-07-03', '2026-07-04', 1, 'External own', 'AKTIF')
+          (104, 40, 'IZIN', NULL, '2026-07-03', '2026-07-04', 1, 'External own', 'AKTIF'),
+          (106, 50, 'ISTEN_AYRILMA', NULL, '2026-05-01', '2026-05-01', 0, 'Cikis sureci', 'AKTIF')
     ");
 }
 
@@ -273,6 +275,15 @@ surecAssert(strpos($controllerSource, "RolePermissions::assert(\$user, 'surecler
 surecAssert(strpos($controllerSource, "RolePermissions::assert(\$user, 'surecler.create')") !== false, 'create permission matrix');
 surecAssert(strpos($controllerSource, 'function assertCreateRole') === false, 'no hardcoded create allowlist method');
 surecAssert(strpos($controllerSource, 'DELETE FROM surecler') === false, 'no hard delete');
+surecAssert(strpos($controllerSource, 'ISTEN_AYRILMA_CANCEL_NOT_ALLOWED') !== false, 'exit cancel guard code present');
+surecAssert(
+    strpos($controllerSource, "=== 'ISTEN_AYRILMA'") !== false,
+    'exit cancel guard keys on surec_turu ISTEN_AYRILMA'
+);
+surecAssert(
+    strpos($controllerSource, 'ISTEN_AYRILMA_CANCEL_NOT_ALLOWED') < strpos($controllerSource, '// Idempotent: already cancelled.'),
+    'exit cancel guard is fail-closed before idempotent replay'
+);
 
 $root = surecPdo($dsn);
 bootstrapSurecSchema($root);
@@ -367,6 +378,28 @@ surecAssert($istenUpdate['status'] === 200, 'HTTP update → ISTEN_AYRILMA → 2
 $personelAktif = (string) $pdo->query('SELECT aktif_durum FROM personeller WHERE id = 10')->fetchColumn();
 surecAssert($personelAktif === 'AKTIF', 'update ISTEN_AYRILMA does not passivate personel');
 
+// Generic cancel must fail closed once the row is ISTEN_AYRILMA (no state change).
+$istenCancel = invokeSurecHttp($pdo, $gy, 'POST', '/surecler/100/iptal');
+surecAssert($istenCancel['status'] === 409, 'HTTP cancel ISTEN_AYRILMA (via update) → 409');
+surecAssert(
+    ($istenCancel['payload']['errors'][0]['code'] ?? '') === 'ISTEN_AYRILMA_CANCEL_NOT_ALLOWED',
+    'cancel ISTEN_AYRILMA (via update) code'
+);
+surecAssert(
+    (string) $pdo->query('SELECT state FROM surecler WHERE id = 100')->fetchColumn() === 'AKTIF',
+    'guarded cancel keeps surec AKTIF'
+);
+
+// Restore IZIN so the generic cancel contract below stays unchanged.
+$restoreIzin = invokeSurecHttp($pdo, $gy, 'PUT', '/surecler/100', [
+    'surec_turu' => 'IZIN',
+    'baslangic_tarihi' => '2026-07-01',
+    'bitis_tarihi' => '2026-07-06',
+    'ucretli_mi' => true,
+    'aciklama' => 'Guncellendi',
+]);
+surecAssert($restoreIzin['status'] === 200, 'restore IZIN before generic cancel contract → 200');
+
 $tamamUpdate = invokeSurecHttp($pdo, $gy, 'PUT', '/surecler/102', [
     'aciklama' => 'nope',
 ]);
@@ -385,6 +418,29 @@ surecAssert($count === 1, 'cancel is soft (row remains)');
 $cancelAgain = invokeSurecHttp($pdo, $gy, 'POST', '/surecler/100/iptal');
 surecAssert($cancelAgain['status'] === 200, 'HTTP cancel idempotent → 200');
 surecAssert(($cancelAgain['payload']['data']['state'] ?? '') === 'IPTAL', 'idempotent state');
+
+// The orphan-risk case: personel PASIF + single open ISTEN_AYRILMA. Cancelling it
+// here would leave the personel PASIF with zero open exit surec, so
+// PersonelYenidenAktifService::resolveSingleOpenExitSurec would reject the record
+// (REACTIVATE_EXIT_SUREC_MISSING). The guard must preserve both rows untouched.
+$exitCancel = invokeSurecHttp($pdo, $gy, 'POST', '/surecler/106/iptal');
+surecAssert($exitCancel['status'] === 409, 'HTTP cancel ISTEN_AYRILMA → 409');
+surecAssert(
+    ($exitCancel['payload']['errors'][0]['code'] ?? '') === 'ISTEN_AYRILMA_CANCEL_NOT_ALLOWED',
+    'cancel ISTEN_AYRILMA code'
+);
+surecAssert(
+    (string) $pdo->query('SELECT state FROM surecler WHERE id = 106')->fetchColumn() === 'AKTIF',
+    'cancel ISTEN_AYRILMA keeps surec AKTIF'
+);
+surecAssert(
+    (string) $pdo->query('SELECT aktif_durum FROM personeller WHERE id = 50')->fetchColumn() === 'PASIF',
+    'cancel ISTEN_AYRILMA keeps personel PASIF (no orphan side effect)'
+);
+surecAssert(
+    (int) $pdo->query("SELECT COUNT(*) FROM surecler WHERE personel_id = 50 AND surec_turu = 'ISTEN_AYRILMA' AND state NOT IN ('IPTAL', 'TAMAMLANDI')")->fetchColumn() === 1,
+    'open exit surec preserved for yeniden-aktif'
+);
 
 $iptalUpdate = invokeSurecHttp($pdo, $gy, 'PUT', '/surecler/100', [
     'aciklama' => 'after cancel',

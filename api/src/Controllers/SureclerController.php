@@ -19,6 +19,8 @@ use PDO;
 
 class SureclerController
 {
+    public const ERROR_ISTEN_AYRILMA_CANCEL_NOT_ALLOWED = 'ISTEN_AYRILMA_CANCEL_NOT_ALLOWED';
+
     public static function list(Request $request)
     {
         $user = AuthMiddleware::authenticate($request, true);
@@ -495,6 +497,22 @@ class SureclerController
         }
 
         SubeScope::assertPersonelAccess($user, $request, self::personelOrgFromSurecRow($existing));
+
+        // Fail-closed: ISTEN_AYRILMA is the canonical lifecycle exit owned by
+        // PersonelIstenAyrilmaService (PASIF + retention manifests) and has no
+        // reverse path through this generic cancel. Cancelling it would leave
+        // the personel PASIF with zero open exit surec, which the only way back
+        // (PersonelYenidenAktifService::resolveSingleOpenExitSurec) rejects with
+        // REACTIVATE_EXIT_SUREC_MISSING — an orphan record stuck in PASIF.
+        // The audited yeniden-aktif flow is the canonical resolution, so the
+        // generic cancel is denied before any idempotent replay or write.
+        if (strtoupper(trim((string) ($existing['surec_turu'] ?? ''))) === 'ISTEN_AYRILMA') {
+            JsonResponse::error(
+                409,
+                self::ERROR_ISTEN_AYRILMA_CANCEL_NOT_ALLOWED,
+                'İşten ayrılma süreci manuel iptal edilemez. Yeniden aktif akışı kullanılmalıdır.'
+            );
+        }
 
         $state = strtoupper((string) ($existing['state'] ?? ''));
         if ($state === 'IPTAL') {

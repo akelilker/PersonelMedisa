@@ -143,6 +143,9 @@ describe("retention archive gate source contract", () => {
     expect(list).toContain('hasPermission("arsiv.view")');
     expect(list).toContain("Arşiv — Medisa saklama politikası");
     expect(list).toContain(">Arşiv<");
+    // Liste arşiv bandı kanonik .personel-archive-banner owner'ını kullanır.
+    expect(list).toContain('className="personel-archive-banner"');
+    expect(list).not.toContain("personeller-archive-banner");
 
     const detail = readFileSync(
       resolve(root, "src/features/personeller/pages/PersonelDetayPage.tsx"),

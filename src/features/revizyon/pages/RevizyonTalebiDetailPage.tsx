@@ -280,7 +280,7 @@ export function RevizyonTalebiDetailPage() {
         <div>
           <dt>Durum</dt>
           <dd>
-            <span className="personeller-status-badge">{formatRevizyonDurumLabel(talep.durum)}</span>
+            <span className="status-badge">{formatRevizyonDurumLabel(talep.durum)}</span>
           </dd>
         </div>
       </dl>

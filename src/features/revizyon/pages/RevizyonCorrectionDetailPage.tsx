@@ -166,7 +166,7 @@ export function RevizyonCorrectionDetailPage() {
         <div>
           <dt>Durum</dt>
           <dd>
-            <span className="personeller-status-badge">
+            <span className="status-badge">
               {correction.iptal_edildi_mi ? "İptal" : "Aktif"}
             </span>
           </dd>

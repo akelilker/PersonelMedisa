@@ -181,7 +181,7 @@ export function RevizyonMerkeziPage() {
                   <td>{talep.etkilenen_tarih}</td>
                   <td>{formatRevizyonTipiLabel(talep.revizyon_tipi)}</td>
                   <td>
-                    <span className="personeller-status-badge">{formatRevizyonDurumLabel(talep.durum)}</span>
+                    <span className="status-badge">{formatRevizyonDurumLabel(talep.durum)}</span>
                   </td>
                   {canViewFinance ? (
                     <td>{talep.bordro_etki_var_mi ? "Var" : "Yok"}</td>

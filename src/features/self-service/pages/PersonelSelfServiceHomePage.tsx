@@ -120,7 +120,7 @@ export function PersonelSelfServiceHomePage() {
       } else if (isApiRequestError(cause) && cause.code === "SELF_SERVICE_PERSONEL_INACTIVE") {
         setError("inactive");
       } else {
-        setError(cause instanceof Error ? cause.message : "Özet yüklenemedi.");
+        setError("Özet yüklenemedi. Tekrar deneyin.");
       }
     } finally {
       setLoading(false);
@@ -203,7 +203,7 @@ export function PersonelSelfServiceHomePage() {
     return (
       <section className="states-page state-error" data-testid="personel-self-service-error">
         <h2>Özet yüklenemedi</h2>
-        <p>{error ?? "Bilinmeyen hata"}</p>
+        <p>{error ?? "Özet yüklenemedi. Tekrar deneyin."}</p>
         <button type="button" className="self-service-action" onClick={() => void load()}>
           Tekrar dene
         </button>
@@ -326,8 +326,7 @@ export function PersonelSelfServiceHomePage() {
       ) : (
         <div className="pm-secondary-card" data-testid="personel-qr-closed-notice" role="status">
           <p>
-            Bu hesap için QR giriş/çıkış kapalıdır. Öz servis özetiniz görüntülenmeye devam eder; QR
-            hakkı yalnızca uygun personel bağında açılır.
+            QR giriş/çıkış bu personel için henüz açık değil. Öz servis özetiniz görüntülenmeye devam eder.
           </p>
         </div>
       )}
@@ -387,9 +386,7 @@ export function PersonelSelfServiceHomePage() {
                 const message =
                   isApiRequestError(cause) && cause.code === "MOBILE_CAPABILITY_PENDING_SCOPE"
                     ? COMING_SOON
-                    : cause instanceof Error
-                      ? cause.message
-                      : "Düzeltme talebi oluşturulamadı.";
+                    : "Düzeltme talebi oluşturulamadı. Tekrar deneyin.";
                 setNotice({ title: "Düzeltme Talebi", body: message });
               } finally {
                 setCorrectBusy(false);

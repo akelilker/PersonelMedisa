@@ -189,7 +189,15 @@ export function validateOrganizasyonSubmit(
   }
 
   if (basicDiff && !form.personelTipiId) {
-    return { ok: false, message: "Çalışma tipi boş bırakılamaz." };
+    const isDisKaynak = personel.calisan_kapsami === "DIS_KAYNAK";
+    const hadStatu =
+      typeof personel.personel_tipi_id === "number" &&
+      Number.isFinite(personel.personel_tipi_id) &&
+      personel.personel_tipi_id > 0;
+    // Harici Personelde boş Statü domain olarak izinlidir; mevcut Statü temizlenemez.
+    if (!isDisKaynak || hadStatu) {
+      return { ok: false, message: "Statü boş bırakılamaz." };
+    }
   }
 
   if (form.bolumId && !form.departmanId) {

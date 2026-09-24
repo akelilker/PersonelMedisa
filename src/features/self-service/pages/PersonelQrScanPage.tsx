@@ -61,7 +61,7 @@ function mapScanError(error: unknown): string {
     case "NETWORK_ERROR":
       return "Bağlantı yok, işlem kaydedilmedi.";
     default:
-      return error.message || "Kayıt oluşturulamadı.";
+      return "Kayıt oluşturulamadı. Tekrar deneyin.";
   }
 }
 
@@ -146,7 +146,7 @@ export function PersonelQrScanPage() {
     } catch (error) {
       setPhase({
         kind: "error",
-        message: error instanceof Error ? error.message : "Kamera açılamadı."
+        message: "Kamera açılamadı. Tekrar deneyin."
       });
     }
   };
@@ -242,12 +242,12 @@ export function PersonelQrScanPage() {
               {phase.idempotent ? (
                 <div>
                   <dt>Not</dt>
-                  <dd>İşlem zaten kaydedilmişti (idempotent).</dd>
+                  <dd>Bu işlem daha önce kaydedilmiş.</dd>
                 </div>
               ) : null}
             </dl>
             <p className="self-service-muted">
-              Bu kayıt puantaja otomatik yazılmaz; İK incelemesi ve aday uygulaması sonrasında işlenir.
+              Bu kayıt puantaja otomatik yazılmaz; kontrol edildikten sonra puantaja işlenir.
             </p>
             <div className="qr-scan-actions">
               <button

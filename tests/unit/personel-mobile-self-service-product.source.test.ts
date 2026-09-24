@@ -60,6 +60,11 @@ describe("personel mobile/PWA self-service productization", () => {
     expect(scan).toContain('submit("CIKIS")');
     expect(scan).toContain("FORBIDDEN");
     expect(scan).toContain("puantaja otomatik yazılmaz");
+    expect(scan).toContain("Bu işlem daha önce kaydedilmiş.");
+    expect(scan).toContain("Kayıt oluşturulamadı. Tekrar deneyin.");
+    expect(scan).not.toContain("(idempotent)");
+    expect(scan).not.toContain("candidate / apply");
+    expect(scan).not.toMatch(/default:\s*\n\s*return error\.message/);
 
     const scanner = read("src/features/self-service/qr/qr-scanner.ts");
     expect(scanner).toContain("Kamera için güvenli bağlantı (HTTPS) gerekir.");
@@ -80,8 +85,10 @@ describe("personel mobile/PWA self-service productization", () => {
     expect(history).toContain("Şube uyuşmazlığı");
     expect(history).toContain("qr-event-badge");
     expect(history).toContain("formatSelfServiceDateTime");
+    expect(history).toContain("QR hareketleri yüklenemedi. Tekrar deneyin.");
     expect(history).not.toContain("Henuz QR hareketi yok");
     expect(history).not.toContain("Cikis eksik");
+    expect(history).not.toMatch(/\? error\.message/);
   });
 
   it("locks kiosk model note + CSS owner without parallel style system", () => {
@@ -89,6 +96,18 @@ describe("personel mobile/PWA self-service productization", () => {
     expect(note).toContain("qr-kiosk-model-note");
     expect(note).toContain("Şube kiosk ekranındaki QR kodunu");
     expect(note).toContain("Kendi kimlik QR");
+
+    const expectation = read("src/features/self-service/components/QrPuantajExpectationNote.tsx");
+    expect(expectation).toContain(
+      "QR giriş/çıkış kaydı puantaja otomatik yazılmaz. Kayıt kontrol edildikten sonra puantaja işlenir."
+    );
+    expect(expectation).not.toContain("candidate / apply");
+    expect(expectation).not.toContain("aday uygulaması");
+
+    const home = read("src/features/self-service/pages/PersonelSelfServiceHomePage.tsx");
+    expect(home).toContain("Özet yüklenemedi. Tekrar deneyin.");
+    expect(home).toContain("QR giriş/çıkış bu personel için henüz açık değil");
+    expect(home).not.toMatch(/setError\(cause instanceof Error \? cause\.message/);
 
     const css = read("src/features/self-service/self-service.css");
     expect(css).toContain(".qr-scan-cta-zone");

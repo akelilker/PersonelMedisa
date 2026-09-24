@@ -191,7 +191,7 @@ const PERSONEL_MISSING_FIELD_RULES: readonly PersonelMissingFieldRule[] = [
   },
   {
     key: "personel_tipi_id",
-    label: "Personel Tipi",
+    label: "Statü",
     category: "ISTIHDAM",
     severity: "CRITICAL",
     editTarget: "pozisyon",

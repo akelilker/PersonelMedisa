@@ -68,9 +68,7 @@ export function PersonelQrHistoryPage() {
             kind: "error",
             message: unbound
               ? "Personel bağlantınız yok veya QR hareketleri bu hesap için kapalı."
-              : isApiRequestError(error)
-                ? error.message
-                : "Hareketler yüklenemedi."
+              : "QR hareketleri yüklenemedi. Tekrar deneyin."
           });
         }
       }

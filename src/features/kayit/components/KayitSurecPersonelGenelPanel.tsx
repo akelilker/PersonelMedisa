@@ -115,7 +115,7 @@ export function KayitSurecPersonelGenelPanel({
       { label: "Görev / Unvan", value: formatGeneralField(personel.gorev_adi) },
       { label: "Pozisyon", value: formatGeneralField(personel.pozisyon_adi) },
       { label: "Bağlı Amir", value: formatGeneralField(personel.bagli_amir_adi) },
-      { label: "Personel Tipi", value: formatGeneralField(personel.personel_tipi_adi) }
+      { label: "Statü", value: formatGeneralField(personel.personel_tipi_adi) }
     ],
     [personel]
   );

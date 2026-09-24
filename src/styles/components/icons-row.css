@@ -148,7 +148,7 @@
 .sube-selector-icon {
   display: block;
   flex-shrink: 0;
-  opacity: 0.52;
+  opacity: 0.78;
   transition: opacity 0.2s ease;
 }
 
@@ -156,7 +156,7 @@
   display: block;
   flex-shrink: 0;
   margin-top: 2px;
-  opacity: 0.4;
+  opacity: 0.78;
   transition: opacity 0.2s ease;
 }
 

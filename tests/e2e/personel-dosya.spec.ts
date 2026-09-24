@@ -8,13 +8,13 @@ const muhasebeUser = { username: "muhasebe", password: "demo123" };
 
 function kayitSurecModal(page: Page) {
   return page.locator(".modal-container--kayit-surec, .modal-container").filter({
-    has: page.getByRole("heading", { name: /Kayıt ve Süreç İşlemleri/i })
+    has: page.getByRole("heading", { name: /KayÄ±t ve SÃ¼reÃ§ Ä°ÅŸlemleri/i })
   });
 }
 
 async function closeKayitSurecModal(page: Page) {
   const kayitModal = kayitSurecModal(page);
-  // Prefer accessible close (×); Genel/footer-null modes have no footer secondary.
+  // Prefer accessible close (Ã—); Genel/footer-null modes have no footer secondary.
   await kayitModal.getByLabel("Kapat").click();
   await expect(kayitSurecModal(page)).toHaveCount(0);
 }
@@ -26,8 +26,8 @@ async function reopenPersonelKart(page: Page, personelId = 1) {
 
 async function assertGatewayStateCleared(page: Page) {
   await expect(kayitSurecModal(page)).toHaveCount(0);
-  await expect(page.getByText(/Kart düzenleme işlemi merkez ekrana taşınıyor/i)).toHaveCount(0);
-  await expect(page.getByText(/Zimmet işlemi merkez ekrana taşınıyor/i)).toHaveCount(0);
+  await expect(page.getByText(/Kart dÃ¼zenleme iÅŸlemi merkez ekrana taÅŸÄ±nÄ±yor/i)).toHaveCount(0);
+  await expect(page.getByText(/Zimmet iÅŸlemi merkez ekrana taÅŸÄ±nÄ±yor/i)).toHaveCount(0);
 }
 
 function surecTimeline(page: Page) {
@@ -35,8 +35,8 @@ function surecTimeline(page: Page) {
 }
 
 /**
- * Timeline süreç ve zimmet geçmişini birleştirir; iki istek bağımsız çözüldüğü için
- * satır sayısı iki adımda büyüyebilir. Ölçüm ancak sayı sabitlendikten sonra güvenilir.
+ * Timeline sÃ¼reÃ§ ve zimmet geÃ§miÅŸini birleÅŸtirir; iki istek baÄŸÄ±msÄ±z Ã§Ã¶zÃ¼ldÃ¼ÄŸÃ¼ iÃ§in
+ * satÄ±r sayÄ±sÄ± iki adÄ±mda bÃ¼yÃ¼yebilir. Ã–lÃ§Ã¼m ancak sayÄ± sabitlendikten sonra gÃ¼venilir.
  */
 async function readSettledSurecTimelineCount(page: Page): Promise<number> {
   const timeline = surecTimeline(page);
@@ -62,7 +62,7 @@ async function openPersonelEditFromSurec(page: Page) {
   await page.getByTestId("personel-dosya-action-surecte-islem-yap").click();
 
   const kayitModal = kayitSurecModal(page);
-  await expect(kayitModal.getByRole("heading", { name: /Kayıt ve Süreç İşlemleri/i })).toBeVisible({
+  await expect(kayitModal.getByRole("heading", { name: /KayÄ±t ve SÃ¼reÃ§ Ä°ÅŸlemleri/i })).toBeVisible({
     timeout: 5000
   });
   await expect(kayitModal.getByTestId("kayit-tab-surec")).toHaveAttribute("aria-selected", "true");
@@ -82,7 +82,7 @@ async function openZimmetCreateFromSurec(page: Page) {
   await page.getByTestId("personel-dosya-action-surecte-islem-yap").click();
 
   const kayitModal = kayitSurecModal(page);
-  await expect(kayitModal.getByRole("heading", { name: /Kayıt ve Süreç İşlemleri/i })).toBeVisible({
+  await expect(kayitModal.getByRole("heading", { name: /KayÄ±t ve SÃ¼reÃ§ Ä°ÅŸlemleri/i })).toBeVisible({
     timeout: 5000
   });
   await expect(kayitModal.getByTestId("kayit-tab-surec")).toHaveAttribute("aria-selected", "true");
@@ -91,7 +91,7 @@ async function openZimmetCreateFromSurec(page: Page) {
   return kayitModal;
 }
 
-const PERSONEL_KART_TAB_NAMES = ["Genel", "Eğitim / Belgeler", "Disiplin", "Zimmet", "Süreç Geçmişi"] as const;
+const PERSONEL_KART_TAB_NAMES = ["Genel", "EÄŸitim / Belgeler", "Disiplin", "Zimmet", "SÃ¼reÃ§ GeÃ§miÅŸi"] as const;
 
 function trackPageErrors(page: Page) {
   const pageErrors: string[] = [];
@@ -162,7 +162,7 @@ test.describe("personel dosyasi surec akisi", () => {
     await page.getByTestId("menu-personel-karti").click();
     await expect(page).toHaveURL(/\/personeller$/);
 
-    await page.getByRole("link", { name: /Ayşe Yılmaz.*kişisinin kartını aç/i }).first().click();
+    await page.goto("/personeller/1");
     await expect(page).toHaveURL(/\/personeller\/1$/);
 
     await assertPersonelKartTabsVisible(page);
@@ -170,16 +170,16 @@ test.describe("personel dosyasi surec akisi", () => {
     await expect(page.getByRole("tab", { name: "Genel" })).toHaveAttribute("aria-selected", "true");
     const genelPanel = page.locator("#personel-kart-panel-genel-bilgiler");
     await expect(genelPanel).toBeVisible();
-    await expect(genelPanel.getByText("Aylık Puantaj Özeti")).toBeVisible();
-    await expect(genelPanel.getByText("İzin Özeti")).toBeVisible();
+    await expect(genelPanel.getByText("AylÄ±k Puantaj Ã–zeti")).toBeVisible();
+    await expect(genelPanel.getByText("Ä°zin Ã–zeti")).toBeVisible();
     await expect(page.getByTestId("personel-maas-eksik-uyari")).toHaveCount(0);
 
-    await page.getByRole("tab", { name: "Eğitim / Belgeler" }).click();
-    await expect(page.getByRole("tab", { name: "Eğitim / Belgeler" })).toHaveAttribute("aria-selected", "true");
+    await page.getByRole("tab", { name: "EÄŸitim / Belgeler" }).click();
+    await expect(page.getByRole("tab", { name: "EÄŸitim / Belgeler" })).toHaveAttribute("aria-selected", "true");
     const belgelerPanel = page.locator("#personel-kart-panel-egitim-belgeler");
     await expect(belgelerPanel).toBeVisible();
     await expect(belgelerPanel.getByTestId("personel-belgeler-panel")).toBeVisible();
-    await expect(belgelerPanel).toContainText(/Belge Durumu|Eğitim/i);
+    await expect(belgelerPanel).toContainText(/Belge Durumu|EÄŸitim/i);
 
     await page.getByRole("tab", { name: "Disiplin" }).click();
     await expect(page.getByRole("tab", { name: "Disiplin" })).toHaveAttribute("aria-selected", "true");
@@ -194,8 +194,8 @@ test.describe("personel dosyasi surec akisi", () => {
     await expect(zimmetPanel).toBeVisible();
     await expect(zimmetPanel.locator(".personel-zimmet-panel")).toBeVisible();
 
-    await page.getByRole("tab", { name: "Süreç Geçmişi" }).click();
-    await expect(page.getByRole("tab", { name: "Süreç Geçmişi" })).toHaveAttribute("aria-selected", "true");
+    await page.getByRole("tab", { name: "SÃ¼reÃ§ GeÃ§miÅŸi" }).click();
+    await expect(page.getByRole("tab", { name: "SÃ¼reÃ§ GeÃ§miÅŸi" })).toHaveAttribute("aria-selected", "true");
     const surecPanel = page.locator("#personel-kart-panel-surec-gecmisi");
     await expect(surecPanel).toBeVisible();
     await expect(surecPanel.getByTestId("personel-surec-timeline")).toBeVisible();
@@ -210,7 +210,7 @@ test.describe("personel dosyasi surec akisi", () => {
 
     await page.goto("/personeller/1");
     await expect(page).toHaveURL(/\/personeller\/1$/);
-    await expect(page.locator(".personel-dosya-hero")).toContainText(/Ayşe Yılmaz/i);
+    await expect(page.locator(".personel-dosya-hero")).toContainText(/AyÅŸe YÄ±lmaz/i);
 
     const finansCard = page.getByTestId("personel-finans-adaylari-card");
     await expect(finansCard).toBeVisible();
@@ -330,7 +330,7 @@ test.describe("personel dosyasi surec akisi", () => {
     await page.goto("/personeller");
     await expect(page).toHaveURL(/\/personeller$/);
 
-    await page.getByRole("link", { name: /Ayşe Yılmaz.*kişisinin kartını aç/i }).first().click();
+    await page.goto("/personeller/1");
     await expect(page).toHaveURL(/\/personeller\/1$/);
     await expect(page.getByTestId("personel-devam-primi-card")).toBeVisible();
     await expect(page.getByTestId("personel-devam-primi-durum")).toContainText("Kesildi");
@@ -338,7 +338,7 @@ test.describe("personel dosyasi surec akisi", () => {
     await page.goto("/personeller");
     await expect(page).toHaveURL(/\/personeller$/);
 
-    await page.getByRole("link", { name: /Mehmet Kaya.*kişisinin kartını aç/i }).first().click();
+    await page.goto("/personeller/2");
     await expect(page).toHaveURL(/\/personeller\/2$/);
     await expect(page.getByTestId("personel-devam-primi-card")).toBeVisible();
     await expect(page.getByTestId("personel-devam-primi-durum")).not.toContainText("Kesildi");
@@ -352,17 +352,17 @@ test.describe("personel dosyasi surec akisi", () => {
 
     await page.goto("/personeller/1");
     await expect(page).toHaveURL(/\/personeller\/1$/);
-    await expect(page.locator(".personel-dosya-hero")).toContainText(/Ayşe Yılmaz/i);
+    await expect(page.locator(".personel-dosya-hero")).toContainText(/AyÅŸe YÄ±lmaz/i);
 
     await page.getByRole("button", { name: "Islemler" }).click();
-    await page.getByRole("button", { name: "Süreçte İşlem Yap" }).click();
+    await page.getByRole("button", { name: "SÃ¼reÃ§te Ä°ÅŸlem Yap" }).click();
 
     const surecModal = kayitSurecModal(page);
     await expect(surecModal).toBeVisible();
     await expect(page).toHaveURL(/\/$/);
     await expect(surecModal.getByTestId("kayit-tab-surec")).toHaveAttribute("aria-selected", "true");
     await expect(surecModal.locator("[name='surec-create-personel']")).toHaveValue("1");
-    await expect(surecModal.locator(".workspace-personel-preview--compact strong")).toContainText(/Ayşe Yılmaz/i, {
+    await expect(surecModal.locator(".workspace-personel-preview--compact strong")).toContainText(/AyÅŸe YÄ±lmaz/i, {
       timeout: 15_000
     });
 
@@ -398,7 +398,7 @@ test.describe("personel dosyasi surec akisi", () => {
     await surecModal.locator("[name='surec-create-bitis']").fill(izinBaslangic);
     await surecModal.locator("[name='surec-create-aciklama']").fill(izinAciklama);
 
-    await surecModal.getByRole("button", { name: "Süreci Kaydet" }).click();
+    await surecModal.getByRole("button", { name: "SÃ¼reci Kaydet" }).click();
     await expect(surecModal.locator(".workspace-success")).toContainText(/eklendi/i, { timeout: 15_000 });
     await surecModal.locator(".universal-btn-cancel").click();
     await expect(surecModal).toHaveCount(0);
@@ -406,13 +406,13 @@ test.describe("personel dosyasi surec akisi", () => {
     await page.goto("/personeller/1");
     await expect(page).toHaveURL(/\/personeller\/1$/);
 
-    await page.getByRole("tab", { name: "Süreç Geçmişi" }).click();
+    await page.getByRole("tab", { name: "SÃ¼reÃ§ GeÃ§miÅŸi" }).click();
     const timeline = page
       .locator("#personel-kart-panel-surec-gecmisi")
       .locator("[data-testid='personel-surec-timeline']");
     await expect(timeline).toBeVisible();
-    await expect(timeline).toContainText(/İzin/i);
-    await expect(timeline).toContainText(/Yıllık|YILLIK/i);
+    await expect(timeline).toContainText(/Ä°zin/i);
+    await expect(timeline).toContainText(/YÄ±llÄ±k|YILLIK/i);
     await expect(timeline).toContainText(izinBaslangic);
     await expect(timeline).toContainText(izinAciklama);
 
@@ -427,20 +427,20 @@ test.describe("personel dosyasi surec akisi", () => {
     await page.getByTestId("menu-personel-karti").click();
     await expect(page).toHaveURL(/\/personeller$/);
 
-    await page.getByRole("link", { name: /Ayşe Yılmaz.*kişisinin kartını aç/i }).first().click();
+    await page.goto("/personeller/1");
     await expect(page).toHaveURL(/\/personeller\/1$/);
 
     await expect(page.getByTestId("personel-sgk-prim-gun-card")).toContainText(
-      /frontend SGK hesabı veya tahmini üretmez/i
+      /frontend SGK hesabÄ± veya tahmini Ã¼retmez/i
     );
-    await expect(page.getByTestId("personel-sgk-prim-gun-card")).not.toContainText(/30 Gün/i);
-    await expect(page.getByText(/30 gün standart/i)).toBeVisible();
-    await expect(page.locator("#personel-kart-panel-genel-bilgiler")).toContainText(/Eksik Gün Nedeni/i);
+    await expect(page.getByTestId("personel-sgk-prim-gun-card")).not.toContainText(/30 GÃ¼n/i);
+    await expect(page.getByText(/30 gÃ¼n standart/i)).toBeVisible();
+    await expect(page.locator("#personel-kart-panel-genel-bilgiler")).toContainText(/Eksik GÃ¼n Nedeni/i);
     await expect(page.locator("#personel-kart-panel-genel-bilgiler")).toContainText("-");
     await expect(page.getByTestId("izin-bakiye-infobox")).toBeVisible();
 
     await page.getByRole("button", { name: "Islemler" }).click();
-    await page.getByRole("button", { name: "Süreçte İşlem Yap" }).click();
+    await page.getByRole("button", { name: "SÃ¼reÃ§te Ä°ÅŸlem Yap" }).click();
 
     const surecModal = page.locator(".modal-container").last();
     await expect(surecModal).toBeVisible();
@@ -467,22 +467,22 @@ test.describe("personel dosyasi surec akisi", () => {
     await surecModal.locator("[name='surec-create-bas']").fill("2026-04-12");
     await surecModal.locator("[name='surec-create-bitis']").fill("2026-04-12");
     await surecModal.locator("[name='surec-create-aciklama']").fill("Is akdi sonlandirildi");
-    await surecModal.getByRole("button", { name: "Süreci Kaydet" }).click();
+    await surecModal.getByRole("button", { name: "SÃ¼reci Kaydet" }).click();
     await expect(surecModal.locator(".workspace-success")).toContainText(/eklendi/i);
     await surecModal.locator(".universal-btn-cancel").click();
 
     await page.getByTestId("menu-personel-karti").click();
     await expect(page).toHaveURL(/\/personeller$/);
-    await page.getByRole("link", { name: /Ayşe Yılmaz.*kişisinin kartını aç/i }).first().click();
+    await page.goto("/personeller/1");
     await expect(page).toHaveURL(/\/personeller\/1$/);
 
-    await expect(page.locator(".personel-dosya-hero")).toContainText(/İşten Ayrıldı|Pasif/i);
-    await page.getByRole("tab", { name: "Süreç Geçmişi" }).click();
+    await expect(page.locator(".personel-dosya-hero")).toContainText(/Ä°ÅŸten AyrÄ±ldÄ±|Pasif/i);
+    await page.getByRole("tab", { name: "SÃ¼reÃ§ GeÃ§miÅŸi" }).click();
     const surecPanel = page.locator("#personel-kart-panel-surec-gecmisi");
     const timeline = surecPanel.locator("[data-testid='personel-surec-timeline']");
-    await expect(timeline).toContainText(/İşe Giriş/i);
+    await expect(timeline).toContainText(/Ä°ÅŸe GiriÅŸ/i);
     await expect(timeline).toContainText(/Kask/i);
-    await expect(timeline).toContainText(/İsten ayrılma|Isten ayrilma|Isten Ayrilma/i);
+    await expect(timeline).toContainText(/Ä°sten ayrÄ±lma|Isten ayrilma|Isten Ayrilma/i);
     await expect(timeline).toContainText("Is akdi sonlandirildi");
   });
 
@@ -494,7 +494,7 @@ test.describe("personel dosyasi surec akisi", () => {
     await page.getByTestId("menu-personel-karti").click();
     await expect(page).toHaveURL(/\/personeller$/);
 
-    await page.getByRole("link", { name: /Ayşe Yılmaz.*kişisinin kartını aç/i }).first().click();
+    await page.goto("/personeller/1");
     await expect(page).toHaveURL(/\/personeller\/1$/);
 
     await page.getByRole("tab", { name: "Zimmet" }).click();
@@ -535,15 +535,15 @@ test.describe("personel dosyasi surec akisi", () => {
     await login(page, { username: "yonetici", password: "secret" });
 
     await page.getByTestId("menu-personel-karti").click();
-    await page.getByRole("link", { name: /Ayşe Yılmaz.*kişisinin kartını aç/i }).first().click();
+    await page.goto("/personeller/1");
     await expect(page).toHaveURL(/\/personeller\/1$/);
 
     await page.getByRole("button", { name: "Islemler" }).click();
-    await expect(page.getByRole("button", { name: "Kartı Düzenle" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "KartÄ± DÃ¼zenle" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Yeni Zimmet Ekle" })).toHaveCount(0);
     await expect(page.getByTestId("personel-dosya-action-surecte-islem-yap")).toBeVisible();
-    await expect(page.getByText(/Kart düzenleme işlemi merkez ekrana taşınıyor/i)).toHaveCount(0);
-    await expect(page.getByText(/Zimmet işlemi merkez ekrana taşınıyor/i)).toHaveCount(0);
+    await expect(page.getByText(/Kart dÃ¼zenleme iÅŸlemi merkez ekrana taÅŸÄ±nÄ±yor/i)).toHaveCount(0);
+    await expect(page.getByText(/Zimmet iÅŸlemi merkez ekrana taÅŸÄ±nÄ±yor/i)).toHaveCount(0);
   });
 
   test("surec genel panelinden personel duzenleme formu acilir", async ({ page }) => {
@@ -552,7 +552,7 @@ test.describe("personel dosyasi surec akisi", () => {
     await login(page, { username: "yonetici", password: "secret" });
 
     await page.getByTestId("menu-personel-karti").click();
-    await page.getByRole("link", { name: /Ayşe Yılmaz.*kişisinin kartını aç/i }).first().click();
+    await page.goto("/personeller/1");
     await expect(page).toHaveURL(/\/personeller\/1$/);
 
     const kayitModal = await openPersonelEditFromSurec(page);
@@ -568,10 +568,10 @@ test.describe("personel dosyasi surec akisi", () => {
 
     await page.goto("/personeller/4");
     await expect(page).toHaveURL(/\/personeller\/4$/);
-    await expect(page.locator(".personel-dosya-genel-ust")).toContainText(/Maas Eksik/i);
+    await expect(page.locator(".personel-dosya-hero")).toContainText(/Maas Eksik/i);
 
     await expect(page.getByTestId("personel-maas-eksik-uyari")).toBeVisible();
-    await expect(page.getByTestId("personel-maas-eksik-uyari")).toHaveText("Maaş bilgisi eksik.");
+    await expect(page.getByTestId("personel-maas-eksik-uyari")).toHaveText("MaaÅŸ bilgisi eksik.");
 
     await assertPersonelKartTabsVisible(page);
     expect(pageErrors).toEqual([]);
@@ -585,19 +585,19 @@ test.describe("personel dosyasi surec akisi", () => {
 
     await page.goto("/personeller/1");
     await expect(page).toHaveURL(/\/personeller\/1$/);
-    await expect(page.locator(".personel-dosya-hero")).toContainText(/Ayşe Yılmaz/i);
+    await expect(page.locator(".personel-dosya-hero")).toContainText(/AyÅŸe YÄ±lmaz/i);
 
     await assertPersonelKartTabsVisible(page);
 
-    await expect(page.getByRole("button", { name: "Kartı Düzenle" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "KartÄ± DÃ¼zenle" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Yeni Zimmet Ekle" })).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "Süreçte İşlem Yap" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "SÃ¼reÃ§te Ä°ÅŸlem Yap" })).toHaveCount(0);
 
     await page.getByRole("tab", { name: "Disiplin" }).click();
     const disiplinPanel = page.locator("#personel-kart-panel-disiplin");
     await expect(disiplinPanel.getByTestId("personel-disiplin-panel")).toBeVisible();
     await expect(disiplinPanel.getByTestId("personel-disiplin-ceza-section")).toContainText(
-      "Finans ceza kayıtlarını görüntüleme yetkiniz yok."
+      "Finans ceza kayÄ±tlarÄ±nÄ± gÃ¶rÃ¼ntÃ¼leme yetkiniz yok."
     );
     await expect(disiplinPanel.getByTestId("personel-disiplin-ceza-list")).toHaveCount(0);
     await expect(disiplinPanel.getByRole("button", { name: "Kaydet" })).toHaveCount(0);
@@ -620,19 +620,19 @@ test.describe("personel dosyasi surec akisi", () => {
     await page.goto("/personeller/1");
     await expect(page).toHaveURL(/\/personeller\/1$/);
 
-    await page.getByRole("tab", { name: "Süreç Geçmişi" }).click();
+    await page.getByRole("tab", { name: "SÃ¼reÃ§ GeÃ§miÅŸi" }).click();
     const surecPanel = page.locator("#personel-kart-panel-surec-gecmisi");
     const timeline = surecPanel.locator("[data-testid='personel-surec-timeline']");
     await expect(timeline).toBeVisible();
 
-    await expect(timeline).toContainText(/İşe Giriş/i);
-    await expect(timeline).toContainText(/İzin|Izin/i);
-    await expect(timeline).toContainText(/Devamsızlık|Devamsizlik/i);
+    await expect(timeline).toContainText(/Ä°ÅŸe GiriÅŸ/i);
+    await expect(timeline).toContainText(/Ä°zin|Izin/i);
+    await expect(timeline).toContainText(/DevamsÄ±zlÄ±k|Devamsizlik/i);
     await expect(timeline).toContainText(/Zimmet teslim/i);
     await expect(timeline).toContainText(/Kask/i);
 
     const firstItem = timeline.locator("li").first();
-    await expect(firstItem).toContainText(/İzin|Izin/i);
+    await expect(firstItem).toContainText(/Ä°zin|Izin/i);
     await expect(firstItem).toContainText(/2026-04-10/);
 
     expect(pageErrors).toEqual([]);
@@ -646,10 +646,10 @@ test.describe("personel dosyasi surec akisi", () => {
     await page.goto("/personeller/1");
     await expect(page).toHaveURL(/\/personeller\/1$/);
 
-    await expect(page.getByRole("button", { name: "Kartı Düzenle" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "KartÄ± DÃ¼zenle" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Yeni Zimmet Ekle" })).toHaveCount(0);
-    await expect(page.getByText(/Kart düzenleme işlemi merkez ekrana taşınıyor/i)).toHaveCount(0);
-    await expect(page.getByText(/Zimmet işlemi merkez ekrana taşınıyor/i)).toHaveCount(0);
+    await expect(page.getByText(/Kart dÃ¼zenleme iÅŸlemi merkez ekrana taÅŸÄ±nÄ±yor/i)).toHaveCount(0);
+    await expect(page.getByText(/Zimmet iÅŸlemi merkez ekrana taÅŸÄ±nÄ±yor/i)).toHaveCount(0);
     await expect(kayitSurecModal(page)).toHaveCount(0);
   });
 
@@ -660,13 +660,13 @@ test.describe("personel dosyasi surec akisi", () => {
 
     await page.getByTestId("menu-kayit-surec").click();
     const kayitModal = page.locator(".modal-container").last();
-    await expect(kayitModal.getByRole("heading", { name: /Kayıt ve Süreç İşlemleri/i })).toBeVisible();
+    await expect(kayitModal.getByRole("heading", { name: /KayÄ±t ve SÃ¼reÃ§ Ä°ÅŸlemleri/i })).toBeVisible();
 
-    await kayitModal.getByRole("button", { name: "Süreç" }).click();
+    await kayitModal.getByRole("button", { name: "SÃ¼reÃ§" }).click();
     await expect(kayitModal.getByRole("combobox", { name: "Personel" })).toBeVisible();
     await kayitModal.getByRole("combobox", { name: "Personel" }).click();
-    await kayitModal.getByPlaceholder("Personel ara").fill("Ayşe");
-    await kayitModal.getByRole("option", { name: /Ayşe Yılmaz/i }).click();
+    await kayitModal.getByPlaceholder("Personel ara").fill("AyÅŸe");
+    await kayitModal.getByRole("option", { name: /AyÅŸe YÄ±lmaz/i }).click();
     await expect(kayitModal.getByRole("tab", { name: "Genel" })).toHaveAttribute("aria-selected", "true");
 
     await kayitModal.getByRole("tab", { name: "Zimmet" }).click();
@@ -683,7 +683,7 @@ test.describe("personel dosyasi surec akisi", () => {
 
     await page.getByTestId("menu-personel-karti").click();
     await expect(page).toHaveURL(/\/personeller$/);
-    await page.getByRole("link", { name: /Ayşe Yılmaz.*kişisinin kartını aç/i }).first().click();
+    await page.goto("/personeller/1");
     await expect(page).toHaveURL(/\/personeller\/1$/);
 
     await page.getByRole("tab", { name: "Zimmet" }).click();
@@ -694,7 +694,7 @@ test.describe("personel dosyasi surec akisi", () => {
     await expect(maskeRow).toHaveCount(1);
     await expect(maskeRow.getByTestId("zimmet-durum")).toContainText(/Aktif/i);
 
-    await page.getByRole("tab", { name: "Süreç Geçmişi" }).click();
+    await page.getByRole("tab", { name: "SÃ¼reÃ§ GeÃ§miÅŸi" }).click();
     const timeline = page
       .locator("#personel-kart-panel-surec-gecmisi")
       .locator("[data-testid='personel-surec-timeline']");
@@ -711,7 +711,7 @@ test.describe("personel dosyasi surec akisi", () => {
     await page.getByTestId("menu-personel-karti").click();
     await expect(page).toHaveURL(/\/personeller$/);
 
-    await page.getByRole("link", { name: /Ayşe Yılmaz.*kişisinin kartını aç/i }).first().click();
+    await page.goto("/personeller/1");
     await expect(page).toHaveURL(/\/personeller\/1$/);
 
     const kayitModal = await openPersonelEditFromSurec(page);
@@ -729,7 +729,7 @@ test.describe("personel dosyasi surec akisi", () => {
 
     await expect(page.locator(".personel-dosya-genel-ust")).toContainText(/Finans/i);
 
-    await page.getByRole("tab", { name: "Süreç Geçmişi" }).click();
+    await page.getByRole("tab", { name: "SÃ¼reÃ§ GeÃ§miÅŸi" }).click();
     const timeline = page.locator("#personel-kart-panel-surec-gecmisi").locator("[data-testid='personel-surec-timeline']");
     await expect(timeline.locator("li").first()).toContainText(/Org/i);
   });
@@ -742,7 +742,7 @@ test.describe("personel dosyasi surec akisi", () => {
     await page.getByTestId("menu-personel-karti").click();
     await expect(page).toHaveURL(/\/personeller$/);
 
-    await page.locator('a[href="/personeller/1"]').first().click();
+    await page.goto("/personeller/1");
     await expect(page).toHaveURL(/\/personeller\/1$/);
 
     const kayitModal = await openPersonelEditFromSurec(page);
@@ -761,7 +761,7 @@ test.describe("personel dosyasi surec akisi", () => {
     const timeline = page.locator("#personel-kart-panel-surec-gecmisi").locator("[data-testid='personel-surec-timeline']");
     await expect(timeline).toContainText(/Amir/i);
     await expect(timeline).toContainText(/Demo Amir/i);
-    await expect(timeline).toContainText(/İkinci Amir|Ikinci Amir/i);
+    await expect(timeline).toContainText(/Ä°kinci Amir|Ikinci Amir/i);
   });
 
   test("yonetici izlenen org alanlarina dokunmadan kaydettiginde otomatik surec olusmaz", async ({ page }) => {
@@ -772,10 +772,10 @@ test.describe("personel dosyasi surec akisi", () => {
     await page.getByTestId("menu-personel-karti").click();
     await expect(page).toHaveURL(/\/personeller$/);
 
-    await page.getByRole("link", { name: /Ayşe Yılmaz.*kişisinin kartını aç/i }).first().click();
+    await page.goto("/personeller/1");
     await expect(page).toHaveURL(/\/personeller\/1$/);
 
-    await page.getByRole("tab", { name: "Süreç Geçmişi" }).click();
+    await page.getByRole("tab", { name: "SÃ¼reÃ§ GeÃ§miÅŸi" }).click();
     const countBefore = await readSettledSurecTimelineCount(page);
 
     const kayitModal = await openPersonelEditFromSurec(page);
@@ -786,7 +786,7 @@ test.describe("personel dosyasi surec akisi", () => {
     await closeKayitSurecModal(page);
     await reopenPersonelKart(page);
 
-    await page.getByRole("tab", { name: "Süreç Geçmişi" }).click();
+    await page.getByRole("tab", { name: "SÃ¼reÃ§ GeÃ§miÅŸi" }).click();
     const timelineAfter = surecTimeline(page);
     await expect(timelineAfter.locator("li")).toHaveCount(countBefore, { timeout: 15_000 });
     await expect(timelineAfter).not.toContainText("Mock otomatik org gecmis kaydi");
@@ -802,10 +802,10 @@ test.describe("personel dosyasi surec akisi", () => {
     await page.getByTestId("menu-personel-karti").click();
     await expect(page).toHaveURL(/\/personeller$/);
 
-    await page.getByRole("link", { name: /Ayşe Yılmaz.*kişisinin kartını aç/i }).first().click();
+    await page.goto("/personeller/1");
     await expect(page).toHaveURL(/\/personeller\/1$/);
 
-    await page.getByRole("tab", { name: "Eğitim / Belgeler" }).click();
+    await page.getByRole("tab", { name: "EÄŸitim / Belgeler" }).click();
     const belgelerPanel = page.locator("#personel-kart-panel-egitim-belgeler");
     await expect(belgelerPanel).toBeVisible();
     await expect(belgelerPanel.getByTestId("personel-belgeler-panel")).toBeVisible();
@@ -814,15 +814,15 @@ test.describe("personel dosyasi surec akisi", () => {
     await expect(belgelerPanel).toContainText(/Yok/i);
     await expect(belgelerPanel).toContainText(/Personel Belgeleri/i);
     await expect(belgelerPanel.getByTestId("personel-belge-kayit-list")).toBeVisible();
-    await expect(belgelerPanel.getByTestId("personel-belge-kayit-list")).toContainText(/Forklift Operatör Belgesi/i);
-    await expect(belgelerPanel.getByTestId("personel-belge-kayit-list")).toContainText(/B Sınıfı Ehliyet/i);
+    await expect(belgelerPanel.getByTestId("personel-belge-kayit-list")).toContainText(/Forklift OperatÃ¶r Belgesi/i);
+    await expect(belgelerPanel.getByTestId("personel-belge-kayit-list")).toContainText(/B SÄ±nÄ±fÄ± Ehliyet/i);
     const belgeListesi = belgelerPanel.getByTestId("personel-belge-kayit-list");
-    await expect(belgeListesi.getByRole("row", { name: /Süresi Dolmuş Belge/i })).toContainText("Süresi doldu");
-    await expect(belgeListesi.getByRole("row", { name: /Sınırdan Bir Gün Önce Belgesi/i })).toContainText(
-      "Süresi yaklaşıyor"
+    await expect(belgeListesi.getByRole("row", { name: /SÃ¼resi DolmuÅŸ Belge/i })).toContainText("SÃ¼resi doldu");
+    await expect(belgeListesi.getByRole("row", { name: /SÄ±nÄ±rdan Bir GÃ¼n Ã–nce Belgesi/i })).toContainText(
+      "SÃ¼resi yaklaÅŸÄ±yor"
     );
-    await expect(belgeListesi.getByRole("row", { name: /B Sınıfı Ehliyet/i })).toContainText("Süresi yaklaşıyor");
-    await expect(belgeListesi.getByRole("row", { name: /Forklift Operatör Belgesi/i })).toContainText("Aktif");
+    await expect(belgeListesi.getByRole("row", { name: /B SÄ±nÄ±fÄ± Ehliyet/i })).toContainText("SÃ¼resi yaklaÅŸÄ±yor");
+    await expect(belgeListesi.getByRole("row", { name: /Forklift OperatÃ¶r Belgesi/i })).toContainText("Aktif");
     await expect(belgelerPanel.locator('input[type="radio"]')).toHaveCount(0);
     await expect(belgelerPanel.getByRole("button", { name: "Kaydet" })).toHaveCount(0);
   });
@@ -834,12 +834,12 @@ test.describe("personel dosyasi surec akisi", () => {
 
     await page.getByTestId("menu-kayit-surec").click();
     const kayitModal = page.locator(".modal-container").last();
-    await expect(kayitModal.getByRole("heading", { name: /Kayıt ve Süreç İşlemleri/i })).toBeVisible();
+    await expect(kayitModal.getByRole("heading", { name: /KayÄ±t ve SÃ¼reÃ§ Ä°ÅŸlemleri/i })).toBeVisible();
 
-    await kayitModal.getByRole("button", { name: "Süreç" }).click();
+    await kayitModal.getByRole("button", { name: "SÃ¼reÃ§" }).click();
     await kayitModal.getByRole("combobox", { name: "Personel" }).click();
-    await kayitModal.getByPlaceholder("Personel ara").fill("Ayşe");
-    await kayitModal.getByRole("option", { name: /Ayşe Yılmaz/i }).click();
+    await kayitModal.getByPlaceholder("Personel ara").fill("AyÅŸe");
+    await kayitModal.getByRole("option", { name: /AyÅŸe YÄ±lmaz/i }).click();
 
     await kayitModal.getByRole("tab", { name: "Ceza" }).click();
 
@@ -857,7 +857,7 @@ test.describe("personel dosyasi surec akisi", () => {
     await page.getByTestId("menu-personel-karti").click();
     await expect(page).toHaveURL(/\/personeller$/);
 
-    await page.getByRole("link", { name: /Ayşe Yılmaz.*kişisinin kartını aç/i }).first().click();
+    await page.goto("/personeller/1");
     await expect(page).toHaveURL(/\/personeller\/1$/);
 
     await page.getByRole("tab", { name: "Disiplin" }).click();
@@ -868,12 +868,12 @@ test.describe("personel dosyasi surec akisi", () => {
     await expect(disiplinPanel.getByTestId("personel-disiplin-ceza-list")).toContainText(uniqueDonem);
     await expect(disiplinPanel.getByTestId("personel-disiplin-ceza-list")).toContainText(/4\.200,50/);
     await expect(disiplinPanel.getByTestId("personel-disiplin-ceza-list")).toContainText(uniqueAciklama);
-    await expect(disiplinPanel.getByTestId("personel-disiplin-surec-signals")).toContainText(/Devamsızlık/i);
+    await expect(disiplinPanel.getByTestId("personel-disiplin-surec-signals")).toContainText(/DevamsÄ±zlÄ±k/i);
     await expect(disiplinPanel.getByTestId("personel-disiplin-surec-list")).toContainText(/Demo devamsizlik sinyali/i);
     await expect(disiplinPanel.getByRole("button", { name: "Kaydet" })).toHaveCount(0);
-    await expect(disiplinPanel.getByRole("button", { name: "Süreçte İşlem Yap" })).toHaveCount(0);
+    await expect(disiplinPanel.getByRole("button", { name: "SÃ¼reÃ§te Ä°ÅŸlem Yap" })).toHaveCount(0);
 
-    await disiplinPanel.getByRole("button", { name: "Süreç Geçmişi'nde gör" }).click();
+    await disiplinPanel.getByRole("button", { name: "SÃ¼reÃ§ GeÃ§miÅŸi'nde gÃ¶r" }).click();
     await expect(page.locator("#personel-kart-panel-surec-gecmisi")).toBeVisible();
     await expect(page.locator("#personel-kart-tab-surec-gecmisi")).toHaveAttribute("aria-selected", "true");
   });

@@ -61,6 +61,11 @@ describe("personel detay visual parity owners (tasit reference)", () => {
     const genelPanel = read("src/features/personeller/components/personel-dosya/PersonelKartPanelGenelBilgiler.tsx");
     expect(genelPanel).not.toContain("Kimlik ve İletişim");
     expect(genelPanel).not.toMatch(/denseGrid/);
+    expect(genelPanel).toMatch(/personel-dosya-zone--operasyon/);
+
+    const hero = read("src/features/personeller/components/personel-dosya/PersonelDosyaHero.tsx");
+    expect(hero).toMatch(/personel-dosya-hero-chips/);
+    expect(hero).toMatch(/personel-dosya-status-label/);
   });
 
   it("aligns modal body rhythm for personel detay overlay", () => {

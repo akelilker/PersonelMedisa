@@ -91,7 +91,6 @@ export function PersonelDosyaTabPanels({
           aria-labelledby="personel-kart-tab-genel-bilgiler"
           hidden={activeTab !== "genel-bilgiler"}
         >
-          <PersonelDosyaGenelUst personel={personel} canViewUcret={canViewUcret} />
           {genelActionRow ? (
             <PersonelDosyaActionRow
               canAccessSurecler={genelActionRow.canAccessSurecler}
@@ -103,6 +102,7 @@ export function PersonelDosyaTabPanels({
               onOpenSurecHistory={genelActionRow.onOpenSurecHistory}
             />
           ) : null}
+          <PersonelDosyaGenelUst personel={personel} canViewUcret={canViewUcret} />
           <PersonelKartPanelGenelBilgiler
             personel={personel}
             surecler={surecler}

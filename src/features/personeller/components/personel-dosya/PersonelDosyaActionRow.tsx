@@ -54,7 +54,7 @@ export function PersonelDosyaActionRow({
   }
 
   return (
-    <div className="personel-dosya-actions-row">
+    <div className="personel-dosya-actions-row" data-testid="personel-dosya-actions-row">
       <div className="personel-dosya-actions-spacer" aria-hidden="true" />
       <div className="personel-dosya-action-host">
         <button

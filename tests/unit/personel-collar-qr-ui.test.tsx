@@ -210,23 +210,28 @@ describe("H4) BIRIM_AMIRI operational home QR reachability (render level)", () =
     await screen.findByTestId("birim-amiri-operational-home");
   }
 
-  it("shows the shared QR CTA for a bound Mavi Yaka manager", async () => {
+  it("shows the shared QR CTA and GİRİŞ/ÇIKIŞ boxes for a bound Mavi Yaka manager", async () => {
     setSession("BIRIM_AMIRI", "Mavi Yaka");
     await renderManagerHome();
 
     expect(screen.getByTestId("self-service-qr-section")).toBeInTheDocument();
     expect(screen.getByTestId("self-qr-scan-link")).toHaveAttribute("href", "/self/qr-okut");
     expect(screen.getByTestId("self-qr-history-link")).toHaveAttribute("href", "/self/qr-hareketleri");
+    // Pilot UX parity: amir home own boxes expose the same GİRİŞ CTA as PERSONEL.
+    expect(screen.getByTestId("birim-amiri-own-attendance")).toBeInTheDocument();
+    expect(screen.getByTestId("giris-scan")).toBeInTheDocument();
+    expect(screen.getByTestId("qr-puantaj-expectation-note")).toBeInTheDocument();
     // Yönetim yüzeyi kaybolmaz.
     expect(screen.getByTestId("birim-amiri-edit-daily")).toBeInTheDocument();
   });
 
-  it("renders no QR CTA for a bound Beyaz Yaka manager", async () => {
+  it("renders no QR CTA or scan boxes for a bound Beyaz Yaka manager", async () => {
     setSession("BIRIM_AMIRI", "Beyaz Yaka");
     await renderManagerHome();
 
     expect(screen.queryByTestId("self-service-qr-section")).toBeNull();
     expect(screen.queryByTestId("self-qr-scan-link")).toBeNull();
+    expect(screen.queryByTestId("giris-scan")).toBeNull();
     expect(screen.getByTestId("birim-amiri-edit-daily")).toBeInTheDocument();
   });
 });

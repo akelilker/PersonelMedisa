@@ -53,10 +53,10 @@ async function decodeWithJsQr(video: HTMLVideoElement): Promise<string | null> {
  */
 export async function startQrScanner(options: StartOptions): Promise<QrScannerHandle> {
   if (!window.isSecureContext) {
-    throw new Error("Kamera icin guvenli baglanti (HTTPS) gerekir.");
+    throw new Error("Kamera için güvenli bağlantı (HTTPS) gerekir.");
   }
   if (!navigator.mediaDevices?.getUserMedia) {
-    throw new Error("Bu cihaz kamera erisimini desteklemiyor.");
+    throw new Error("Bu cihaz kamera erişimini desteklemiyor.");
   }
 
   let stream: MediaStream;
@@ -71,15 +71,15 @@ export async function startQrScanner(options: StartOptions): Promise<QrScannerHa
     const name =
       error && typeof error === "object" && "name" in error ? String((error as { name?: unknown }).name) : "";
     if (name === "NotAllowedError" || name === "PermissionDeniedError") {
-      throw new Error("Kamera izni reddedildi. Tarayici ayarlarindan kamera erisimini acin.");
+      throw new Error("Kamera izni reddedildi. Tarayıcı ayarlarından kamera erişimini açın.");
     }
     if (name === "NotFoundError" || name === "DevicesNotFoundError") {
-      throw new Error("Bu cihazda kullanilabilir kamera bulunamadi.");
+      throw new Error("Bu cihazda kullanılabilir kamera bulunamadı.");
     }
     if (name === "NotReadableError" || name === "TrackStartError") {
-      throw new Error("Kamera baska bir uygulama tarafindan kullaniliyor olabilir.");
+      throw new Error("Kamera başka bir uygulama tarafından kullanılıyor olabilir.");
     }
-    throw new Error("Kamera izni reddedildi veya kamera acilamadi.");
+    throw new Error("Kamera açılamadı. İzinleri ve HTTPS bağlantısını kontrol edin.");
   }
 
   const video = options.video;

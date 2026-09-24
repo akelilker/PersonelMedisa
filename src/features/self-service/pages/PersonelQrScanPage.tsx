@@ -4,6 +4,7 @@ import { isApiRequestError } from "../../../api/api-client";
 import { createQrRequestNonce, postMeQrScan } from "../../../api/qr.api";
 import type { MeQrAttendanceEvent, QrEventType } from "../../../types/self-service";
 import { BackgroundlessNoticeModal } from "../components/BackgroundlessNoticeModal";
+import { QrPuantajExpectationNote } from "../components/QrPuantajExpectationNote";
 import { startQrScanner, type QrScannerHandle } from "../qr/qr-scanner";
 
 type Phase =
@@ -28,31 +29,31 @@ function mapScanError(error: unknown): string {
   }
   switch (error.code) {
     case "QR_TOKEN_EXPIRED":
-      return "QR süresi doldu. Tekrar okutun.";
+      return "QR süresi doldu. Kiosk ekranındaki yeni kodu tekrar okutun.";
     case "QR_TOKEN_INVALID":
     case "QR_SIGNATURE_INVALID":
-      return "QR kodu geçersiz.";
+      return "QR kodu geçersiz. Kiosk ekranındaki güncel kodu okutun.";
     case "QR_CROSS_BRANCH_DENIED":
-      return "Bu QR sizin çalışma şubenize ait değil.";
+      return "Bu QR sizin çalışma şubenize ait değil. Kendi şube kiosk kodunu okutun.";
     case "QR_IDEMPOTENCY_CONFLICT":
       return "İşlem zaten kaydedilmiş.";
     case "QR_OPEN_SHIFT_EXISTS":
-      return "Açık giriş kaydı varken yeni giriş yapılamaz.";
+      return "Açık giriş kaydı varken yeni giriş yapılamaz. Önce çıkış veya düzeltme gerekir.";
     case "QR_NO_OPEN_SHIFT":
-      return "Açık giriş olmadan çıkış kaydedilemez.";
+      return "Açık giriş olmadan çıkış kaydedilemez. Önce giriş okutun.";
     case "MOBILE_CAPABILITY_PENDING_SCOPE":
       return "Yapım Aşamasındadır. Onay Bekleyen Kapsamlar Tamamlandığında Kullanıma Açılacaktır.";
     case "QR_REPLAY":
     case "QR_JTI_REUSED":
-      return "QR daha önce kullanıldı.";
+      return "Bu QR daha önce kullanıldı. Kiosk ekranındaki yeni kodu okutun.";
     case "SELF_SERVICE_BINDING_REQUIRED":
-      return "Personel bağlantınız yok.";
+      return "Personel bağlantınız yok. QR okutma için hesabınızın personel kaydına bağlanması gerekir.";
     case "SELF_SERVICE_PERSONEL_INACTIVE":
     case "PERSONEL_INACTIVE":
       return "Personel hesabınız aktif değil.";
     case "QR_CONFIG_NOT_READY":
     case "QR_SCHEMA_NOT_READY":
-      return "QR servisi şu an hazır değil.";
+      return "QR servisi şu an hazır değil. Yönetiminize bildirin.";
     case "NETWORK_ERROR":
       return "Bağlantı yok, işlem kaydedilmedi.";
     default:
@@ -169,10 +170,12 @@ export function PersonelQrScanPage() {
         <h2>QR Okut {presetEvent ? `— ${presetEvent === "GIRIS" ? "Giriş" : "Çıkış"}` : ""}</h2>
         <p>
           {presetEvent
-            ? "Şube QR kodunu okutun; seçtiğiniz işlem sunucuda doğrulanır."
-            : "Önce QR kodu okutun, sonra Giriş veya Çıkış seçin."}
+            ? "Şube kiosk ekranındaki QR kodunu okutun; seçtiğiniz işlem sunucuda doğrulanır. Kendi kimlik QR’ınızı göstermezsiniz."
+            : "Önce şube kiosk QR kodunu okutun, sonra Giriş veya Çıkış seçin."}
         </p>
       </header>
+
+      <QrPuantajExpectationNote />
 
       <div className="qr-scan-video-wrap">
         <video ref={videoRef} className="qr-scan-video" playsInline muted />

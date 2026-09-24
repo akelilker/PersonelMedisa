@@ -87,6 +87,9 @@ describe("Pack7F external worker source locks", () => {
     expect(controller).toContain("calisan_kapsami = :calisan_kapsami");
     expect(page).toContain("Çalışan Kapsamı");
     expect(page).toContain("formatCalisanKapsamiLabel");
+    // Harici Personel rozeti kanonik badge owner'ını kullanır (badge.css: .status-badge).
+    expect(page).toContain('className="status-badge"');
+    expect(page).not.toContain("personeller-status-badge");
     expect(page).toContain("formatPersonelName");
     expect(detailPage).toContain("directoryOnly={isDisKaynak}");
     expect(surecWorkspace).toContain("isSelectedPersonelDirectoryOnly");

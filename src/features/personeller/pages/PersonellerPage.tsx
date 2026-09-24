@@ -282,7 +282,7 @@ export function PersonellerPage() {
       </h2>
 
       {isArchiveMode ? (
-        <p className="personeller-archive-banner" data-testid="personeller-arsiv-banner" role="status">
+        <p className="personel-archive-banner" data-testid="personeller-arsiv-banner" role="status">
           Arşiv — Medisa saklama politikası
         </p>
       ) : null}
@@ -620,7 +620,7 @@ export function PersonellerPage() {
                               <span className="personeller-name-secondary">{orgSecondaryLine(personel)}</span>
                             ) : null}
                             {personel.calisan_kapsami === "DIS_KAYNAK" ? (
-                              <span className="personeller-status-badge">{formatCalisanKapsamiLabel("DIS_KAYNAK")}</span>
+                              <span className="status-badge">{formatCalisanKapsamiLabel("DIS_KAYNAK")}</span>
                             ) : null}
                           </div>
                         </td>

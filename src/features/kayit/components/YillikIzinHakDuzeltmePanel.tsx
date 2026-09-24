@@ -162,8 +162,8 @@ export function YillikIzinHakDuzeltmePanel({
 
   return (
     <div className="surec-shell-panel" data-testid="yillik-izin-hak-duzeltme-panel">
-      <h3 className="surec-shell-panel-title">İzin Hak Düzeltmesi</h3>
-      <p className="surec-shell-panel-desc">
+      <h3 className="surec-shell-summary-kicker">İzin Hak Düzeltmesi</h3>
+      <p className="personel-form-note personel-form-note--info">
         Bu işlem yasal hak formülünü değiştirmez; izin hak geçmişine imzalı gün hareketi ekler.
       </p>
 

@@ -52,4 +52,16 @@ describe("Kayıt modal UI polish source locks", () => {
       /\.personel-import-dry-run-modal:not\(\.modal-container--fixed-footer\)[\s\S]*justify-content: center/
     );
   });
+
+  it("keeps İzin Hak Düzeltmesi panel header on the canonical kicker and note owners", () => {
+    const panel = read("src/features/kayit/components/YillikIzinHakDuzeltmePanel.tsx");
+
+    expect(panel).toContain('className="surec-shell-summary-kicker"');
+    expect(panel).toContain('className="personel-form-note personel-form-note--info"');
+    expect(panel).not.toContain("surec-shell-panel-title");
+    expect(panel).not.toContain("surec-shell-panel-desc");
+
+    expect(read("src/styles/modules/kayit-surec.css")).toContain(".surec-shell-summary-kicker");
+    expect(read("src/styles/modules/personeller.css")).toContain(".personel-form-note--info");
+  });
 });

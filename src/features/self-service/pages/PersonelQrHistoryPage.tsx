@@ -2,12 +2,15 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { isApiRequestError } from "../../../api/api-client";
 import { fetchMeQrAraliklari, fetchMeQrHareketleri } from "../../../api/qr.api";
+import { EmptyState } from "../../../components/states/EmptyState";
 import { LoadingState } from "../../../components/states/LoadingState";
 import type {
   MeQrAraliklariResponse,
   MeQrAttendanceEvent,
   MeQrIntervalAnomaly
 } from "../../../types/self-service";
+import { QrPuantajExpectationNote } from "../components/QrPuantajExpectationNote";
+import { formatSelfServiceDateTime, qrEventTypeLabel } from "../self-service-datetime";
 
 type Status =
   | { kind: "loading" }
@@ -30,12 +33,12 @@ function formatDuration(seconds: number): string {
 
 function anomalyLabel(anomaly: MeQrIntervalAnomaly): string {
   if (anomaly.type === "MISSING_CIKIS") {
-    return "Cikis eksik";
+    return "Çıkış eksik";
   }
   if (anomaly.type === "MISSING_GIRIS") {
-    return "Giris eksik";
+    return "Giriş eksik";
   }
-  return "Sube uyusmazligi";
+  return "Şube uyuşmazlığı";
 }
 
 export function PersonelQrHistoryPage() {
@@ -58,9 +61,14 @@ export function PersonelQrHistoryPage() {
         }
       } catch (error) {
         if (!cancelled) {
+          const unbound =
+            isApiRequestError(error) &&
+            (error.code === "SELF_SERVICE_BINDING_REQUIRED" || error.code === "FORBIDDEN");
           setStatus({
             kind: "error",
-            message: isApiRequestError(error) ? error.message : "Hareketler yuklenemedi."
+            message: unbound
+              ? "Personel bağlantınız yok veya QR hareketleri bu hesap için kapalı."
+              : "QR hareketleri yüklenemedi. Tekrar deneyin."
           });
         }
       }
@@ -71,7 +79,7 @@ export function PersonelQrHistoryPage() {
   }, []);
 
   if (status.kind === "loading") {
-    return <LoadingState label="QR hareketleri yukleniyor..." />;
+    return <LoadingState label="QR hareketleri yükleniyor..." />;
   }
 
   if (status.kind === "error") {
@@ -79,19 +87,22 @@ export function PersonelQrHistoryPage() {
       <section className="states-page state-error" data-testid="personel-qr-history-error">
         <h2>QR Hareketlerim</h2>
         <p>{status.message}</p>
-        <Link to="/">Ozet</Link>
+        <Link to="/">Özet</Link>
       </section>
     );
   }
 
   const { intervals } = status;
+  const hasIntervals = intervals.intervals.length > 0 || intervals.anomalies.length > 0;
 
   return (
-    <section className="self-service-home" data-testid="personel-qr-history-page">
+    <section className="personel-mobile-shell self-service-home" data-testid="personel-qr-history-page">
       <header className="self-service-home__header">
         <h2>QR Hareketlerim</h2>
         <p>Ham giriş/çıkış kayıtları ve QR giriş/çıkış eşleşmeleri.</p>
       </header>
+
+      <QrPuantajExpectationNote />
 
       <section className="qr-interval-section" data-testid="personel-qr-intervals-section">
         <h3>QR Eşleşmeleri</h3>
@@ -104,8 +115,13 @@ export function PersonelQrHistoryPage() {
           {formatDuration(intervals.summary.complete_duration_seconds)}
         </p>
 
-        {intervals.intervals.length === 0 && intervals.anomalies.length === 0 ? (
-          <p className="self-service-muted">Bu dönemde QR eşleşmesi yok.</p>
+        {!hasIntervals ? (
+          <div data-testid="personel-qr-intervals-empty">
+            <EmptyState
+              title="Eşleşme yok"
+              message="Bu dönemde tamamlanmış QR giriş/çıkış eşleşmesi yok."
+            />
+          </div>
         ) : null}
 
         {intervals.intervals.length > 0 ? (
@@ -117,12 +133,12 @@ export function PersonelQrHistoryPage() {
               >
                 <strong>Tam eşleşme</strong>
                 <span>
-                  {new Date(item.entry_at).toLocaleString("tr-TR")} →{" "}
-                  {new Date(item.exit_at).toLocaleString("tr-TR")}
+                  {formatSelfServiceDateTime(item.entry_at)} →{" "}
+                  {formatSelfServiceDateTime(item.exit_at)}
                 </span>
                 <span>{formatDuration(item.duration_seconds)}</span>
-                <span>{item.sube.ad || `Sube #${item.sube.id}`}</span>
-                {item.spans_local_midnight ? <span>Gece yarisi asan</span> : null}
+                <span>{item.sube.ad || `Şube #${item.sube.id}`}</span>
+                {item.spans_local_midnight ? <span>Gece yarısını aşan</span> : null}
               </li>
             ))}
           </ul>
@@ -142,7 +158,7 @@ export function PersonelQrHistoryPage() {
                 <strong>{anomalyLabel(anomaly)}</strong>
                 <span>
                   {anomaly.occurred_at
-                    ? new Date(anomaly.occurred_at).toLocaleString("tr-TR")
+                    ? formatSelfServiceDateTime(anomaly.occurred_at)
                     : anomaly.local_date}
                 </span>
                 {anomaly.type === "BRANCH_MISMATCH" ? (
@@ -152,7 +168,7 @@ export function PersonelQrHistoryPage() {
                       (anomaly.exit_sube.ad || `#${anomaly.exit_sube.id}`)}
                   </span>
                 ) : (
-                  <span>{anomaly.sube.ad || `Sube #${anomaly.sube.id}`}</span>
+                  <span>{anomaly.sube.ad || `Şube #${anomaly.sube.id}`}</span>
                 )}
               </li>
             ))}
@@ -161,27 +177,35 @@ export function PersonelQrHistoryPage() {
       </section>
 
       <section data-testid="personel-qr-raw-history-section">
-        <h3>Ham QR Kayitlari</h3>
+        <h3>Ham QR Kayıtları</h3>
         {status.items.length === 0 ? (
-          <p className="self-service-muted">Henuz QR hareketi yok.</p>
+          <div data-testid="personel-qr-raw-empty">
+            <EmptyState
+              title="Hareket yok"
+              message="Henüz QR giriş/çıkış kaydı yok. Kiosk ekranındaki kodu okuttuğunuzda burada görünür."
+            />
+          </div>
         ) : (
-          <ul className="qr-history-list">
+          <ul className="qr-history-list" data-testid="personel-qr-raw-list">
             {status.items.map((item) => (
               <li key={item.id} className="qr-history-item">
-                <strong>{item.event_type === "GIRIS" ? "Giris" : "Cikis"}</strong>
-                <span>{new Date(item.occurred_at).toLocaleString("tr-TR")}</span>
-                <span>{item.sube.ad || `Sube #${item.sube.id}`}</span>
+                <span
+                  className={`qr-event-badge qr-event-badge--${item.event_type === "GIRIS" ? "giris" : "cikis"}`}
+                >
+                  {qrEventTypeLabel(item.event_type)}
+                </span>
+                <strong>{formatSelfServiceDateTime(item.occurred_at)}</strong>
+                <span>{item.sube.ad || `Şube #${item.sube.id}`}</span>
               </li>
             ))}
           </ul>
         )}
       </section>
 
-      <p>
-        <Link to="/">Ozet</Link>
-        {" · "}
+      <nav className="pm-secondary-nav" aria-label="QR sayfa bağlantıları">
+        <Link to="/">Özet</Link>
         <Link to="/self/qr-okut">QR Okut</Link>
-      </p>
+      </nav>
     </section>
   );
 }

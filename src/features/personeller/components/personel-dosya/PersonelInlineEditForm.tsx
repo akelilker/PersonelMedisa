@@ -105,8 +105,8 @@ export function PersonelInlineEditForm({
           className="personel-form-note personel-form-note--info"
           data-testid="personel-edit-org-yonlendirme"
         >
-          Departman, bölüm, birim, görev/unvan, pozisyon, bağlı amir, çalışma lokasyonu ve SGK değişiklikleri
-          Süreç → Görev / Organizasyon sekmesinden yapılır.
+          Departman, bölüm, birim, görev/unvan, pozisyon, bağlı amir, Statü, çalışma lokasyonu ve SGK
+          değişiklikleri Süreç → Görev / Organizasyon sekmesinden yapılır.
         </p>
         <p
           className="personel-form-note personel-form-note--info"

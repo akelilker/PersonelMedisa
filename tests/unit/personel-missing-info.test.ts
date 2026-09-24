@@ -131,7 +131,7 @@ describe("personel-missing-info", () => {
     ]);
   });
 
-  it("Personel Tipi eksikliği mevcut Pozisyon owner'ına yönlenir", () => {
+  it("Statü eksikliği mevcut Pozisyon owner'ına yönlenir", () => {
     const missing = getPersonelMissingFields({
       ...completePersonel,
       personel_tipi_id: undefined
@@ -140,7 +140,7 @@ describe("personel-missing-info", () => {
     expect(missing).toEqual([
       {
         key: "personel_tipi_id",
-        label: "Personel Tipi",
+        label: "Statü",
         category: "ISTIHDAM",
         severity: "CRITICAL",
         editTarget: "pozisyon"

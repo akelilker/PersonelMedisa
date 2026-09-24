@@ -257,7 +257,7 @@ class PersonelCompletenessService
             ],
             [
                 'key' => 'personel_tipi_id',
-                'label' => 'Personel Tipi',
+                'label' => 'Statü',
                 'category' => self::CATEGORY_ISTIHDAM,
                 'severity' => self::SEVERITY_CRITICAL,
                 'edit_target' => 'pozisyon',

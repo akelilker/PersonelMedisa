@@ -1,6 +1,7 @@
-import type { Dispatch, FormEvent, SetStateAction } from "react";
+import { useMemo, type Dispatch, type FormEvent, type SetStateAction } from "react";
 import { FormField } from "../../../components/form/FormField";
 import type { PersonelReferenceBundle } from "../../../data/app-data.types";
+import { filterStatuOptionsForCreate } from "../../personeller/personel-create-org-deps";
 import type { Personel } from "../../../types/personel";
 import type { IdOption } from "../../../types/referans";
 import { formatGeneralField } from "../kayit-surec-utils";
@@ -39,6 +40,10 @@ function filterByParent(options: IdOption[], parentId: string) {
   return options.filter((opt) => String(opt.parentId ?? "") === parentId);
 }
 
+function hasPositivePersonelTipiId(value: number | null | undefined): boolean {
+  return typeof value === "number" && Number.isFinite(value) && value > 0;
+}
+
 export function KayitSurecPersonelOrganizasyonPanel({
   personel,
   form,
@@ -64,6 +69,12 @@ export function KayitSurecPersonelOrganizasyonPanel({
 }: Props) {
   const bolumOptions = filterByParent(refs.bolumOptions, form.departmanId);
   const birimOptions = filterByParent(refs.birimOptions, form.bolumId);
+  const isDisKaynak = personel.calisan_kapsami === "DIS_KAYNAK";
+  const statuOptions = useMemo(
+    () => filterStatuOptionsForCreate(refs.personelTipiOptions),
+    [refs.personelTipiOptions]
+  );
+  const statuUnset = !form.personelTipiId && !hasPositivePersonelTipiId(personel.personel_tipi_id);
 
   return (
     <div className="surec-position-panel" data-testid="kayit-surec-organizasyon-panel">
@@ -166,7 +177,10 @@ export function KayitSurecPersonelOrganizasyonPanel({
 
           <div className="surec-person-placeholder surec-org-section-mid">
             <strong>Çalışma Bilgileri</strong>
-            <p>Bağlı amir ve çalışma tipi, organizasyon alanlarıyla aynı kaydet işleminde atomik olarak uygulanır.</p>
+            <p>
+              Bağlı amir ve Statü (Mavi Yaka / Beyaz Yaka), organizasyon alanlarıyla aynı kaydet işleminde
+              atomik olarak uygulanır.
+            </p>
           </div>
 
           <div className="surec-position-grid">
@@ -180,16 +194,21 @@ export function KayitSurecPersonelOrganizasyonPanel({
               onChange={(value) => setForm((prev) => ({ ...prev, bagliAmirId: value }))}
             />
             <KayitSurecPozisyonReferencePicker
-              label="Çalışma Tipi"
+              label="Statü"
               name="pozisyon-personel-tipi"
               value={form.personelTipiId}
-              options={refs.personelTipiOptions}
+              options={statuOptions}
               isOpen={openPicker === "personel-tipi"}
               onOpenChange={(isOpen) => setOpenPicker(isOpen ? "personel-tipi" : null)}
               onChange={(value) => setForm((prev) => ({ ...prev, personelTipiId: value }))}
-              required
+              required={!isDisKaynak}
             />
           </div>
+          {statuUnset ? (
+            <p className="personel-form-note personel-form-note--warning" role="status" data-testid="org-statu-qr-hint">
+              Personel Statüsü belirlenmedi. QR kullanımı Mavi Yaka Statüsünde açılır.
+            </p>
+          ) : null}
 
           <FormField
             as="select"

@@ -126,6 +126,10 @@ describe("PERSONEL collar → QR UI entitlement (render level)", () => {
     expect(screen.queryByTestId("giris-scan-not-entitled")).toBeNull();
     expect(screen.getByTestId("self-qr-scan-link")).toBeInTheDocument();
     expect(screen.getByTestId("self-qr-history-link")).toBeInTheDocument();
+    expect(screen.getByTestId("personel-today-attendance-section")).toBeInTheDocument();
+    expect(screen.getByTestId("qr-kiosk-model-note")).toBeInTheDocument();
+    expect(screen.getByTestId("qr-puantaj-expectation-note")).toBeInTheDocument();
+    expect(screen.getByTestId("personel-today-empty")).toBeInTheDocument();
   });
 
   it("E) PERSONEL + Beyaz Yaka: QR actions hidden, own info preserved", async () => {
@@ -136,6 +140,8 @@ describe("PERSONEL collar → QR UI entitlement (render level)", () => {
     expect(screen.queryByTestId("self-qr-scan-link")).toBeNull();
     expect(screen.queryByTestId("self-qr-history-link")).toBeNull();
     expect(screen.getByTestId("giris-scan-not-entitled")).toBeInTheDocument();
+    expect(screen.getByTestId("personel-qr-closed-notice")).toBeInTheDocument();
+    expect(screen.queryByTestId("qr-kiosk-model-note")).toBeNull();
     // G) non-QR own self-service surfaces stay available.
     expect(screen.getByTestId("attendance-box-cikis")).toBeInTheDocument();
     expect(screen.getByTestId("personel-mobile-header")).toHaveTextContent("Self Personel");
@@ -198,6 +204,28 @@ describe("PERSONEL collar → QR UI entitlement (render level)", () => {
     expect(screen.queryByTestId("giris-scan")).toBeNull();
     expect(screen.getByTestId("giris-scan-not-entitled")).toBeInTheDocument();
   });
+
+  it("shows incomplete-day warning when giriş exists without çıkış", async () => {
+    const { fetchAttendanceToday } = await import("../../src/api/attendance-mobile.api");
+    vi.mocked(fetchAttendanceToday).mockResolvedValueOnce({
+      ...attendance,
+      giris: {
+        id: 11,
+        local_time: "08:12",
+        display_local_time: "08:12"
+      },
+      can_scan_giris: false,
+      can_scan_cikis: true
+    } as unknown as AttendanceTodayResponse);
+
+    setSession("PERSONEL", "Mavi Yaka");
+    await renderHome();
+
+    expect(screen.getByTestId("personel-incomplete-day-warning")).toHaveTextContent(
+      "çıkış için şube kiosk QR"
+    );
+    expect(screen.queryByTestId("personel-today-empty")).toBeNull();
+  });
 });
 
 describe("H4) BIRIM_AMIRI operational home QR reachability (render level)", () => {
@@ -220,6 +248,7 @@ describe("H4) BIRIM_AMIRI operational home QR reachability (render level)", () =
     // Pilot UX parity: amir home own boxes expose the same GİRİŞ CTA as PERSONEL.
     expect(screen.getByTestId("birim-amiri-own-attendance")).toBeInTheDocument();
     expect(screen.getByTestId("giris-scan")).toBeInTheDocument();
+    expect(screen.getByTestId("qr-kiosk-model-note")).toBeInTheDocument();
     expect(screen.getByTestId("qr-puantaj-expectation-note")).toBeInTheDocument();
     // Yönetim yüzeyi kaybolmaz.
     expect(screen.getByTestId("birim-amiri-edit-daily")).toBeInTheDocument();

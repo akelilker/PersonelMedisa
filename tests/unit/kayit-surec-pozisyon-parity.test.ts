@@ -6,7 +6,8 @@ import {
   executeKaliciSubeDegisikligi,
   executeOrganizasyonPersonnelUpdate,
   hasOrganizasyonFormDiff,
-  hasOrgTrackedDiff
+  hasOrgTrackedDiff,
+  validateOrganizasyonSubmit
 } from "../../src/features/kayit/kayit-surec-pozisyon";
 import type { Personel } from "../../src/types/personel";
 
@@ -213,6 +214,55 @@ describe("canonical organizasyon personnel update", () => {
       bagli_amir_id: 11,
       personel_tipi_id: 2
     });
+  });
+
+  it("assigns Statü later for Harici Personel with null personel_tipi_id", async () => {
+    const personel = makePersonel({
+      calisan_kapsami: "DIS_KAYNAK",
+      personel_tipi_id: null,
+      personel_tipi_adi: null
+    });
+    const form = createOrganizasyonFormFromPersonel(personel);
+    form.personelTipiId = "1";
+    expect(validateOrganizasyonSubmit(form, personel)).toEqual({ ok: true });
+    const updated = makePersonel({
+      calisan_kapsami: "DIS_KAYNAK",
+      personel_tipi_id: 1,
+      personel_tipi_adi: "Mavi Yaka"
+    });
+    const applyOrganizasyon = vi.fn().mockResolvedValue({ personel: updated });
+    const result = await executeOrganizasyonPersonnelUpdate({
+      personel,
+      form,
+      deps: { applyOrganizasyon }
+    });
+    expect(result.status).toBe("full_success");
+    expect(applyOrganizasyon).toHaveBeenCalledWith(
+      1,
+      expect.objectContaining({
+        targets: { personel_tipi_id: 1 }
+      })
+    );
+  });
+
+  it("allows Harici work-info change while Statü stays empty", () => {
+    const personel = makePersonel({
+      calisan_kapsami: "DIS_KAYNAK",
+      personel_tipi_id: null,
+      personel_tipi_adi: null,
+      bagli_amir_id: null
+    });
+    const form = createOrganizasyonFormFromPersonel(personel);
+    form.bagliAmirId = "10";
+    expect(validateOrganizasyonSubmit(form, personel)).toEqual({ ok: true });
+  });
+
+  it("rejects clearing an existing Statü", () => {
+    const personel = makePersonel({ personel_tipi_id: 1 });
+    const form = createOrganizasyonFormFromPersonel(personel);
+    form.personelTipiId = "";
+    const result = validateOrganizasyonSubmit(form, personel);
+    expect(result).toEqual({ ok: false, message: "Statü boş bırakılamaz." });
   });
 
   it("kalici sube transfer validates and calls branch owner", async () => {

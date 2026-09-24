@@ -217,6 +217,11 @@ export function PersonelCreateFields({
             options={CALISAN_KAPSAMI_SELECT_OPTIONS}
             placeholderOption={undefined}
           />
+          {form.calisanKapsami === "DIS_KAYNAK" ? (
+            <p className="personel-form-note personel-form-note--info" role="note" data-testid="create-harici-kapsam-note">
+              Harici Personel — Medisa ücret/SGK tahakkukuna dahil değildir. Kendi firmasında SGK’sı olabilir.
+            </p>
+          ) : null}
           <FormField
             label="T.C. Kimlik No"
             name="create-tc"
@@ -485,6 +490,11 @@ export function PersonelCreateFields({
           ) : (
             refMissingNote("Statü", true)
           )}
+          {form.calisanKapsami === "DIS_KAYNAK" && !form.personelTipiId ? (
+            <p className="personel-form-note personel-form-note--info" role="note" data-testid="create-statu-qr-hint">
+              Statü boş bırakılabilir. QR kullanımı sonradan Mavi Yaka Statüsü atandığında açılır.
+            </p>
+          ) : null}
           {form.calisanKapsami !== "DIS_KAYNAK" && refs.ucretTipiOptions.length > 0 ? (
             <AppSelectField
               label="Ücret Tipi"

@@ -65,15 +65,16 @@ export function OwnQrAttendanceBoxes({
             type="button"
             className="pm-box-main-action"
             data-testid="giris-scan"
-            aria-label="Giriş için QR okut"
+            aria-label="Giriş için kiosk QR okut"
             onClick={onScanGiris}
           >
             GİRİŞ
           </button>
         ) : (
-          <p className="self-service-muted" data-testid="giris-scan-not-entitled">
-            QR giriş bu hesap için tanımlı değil.
-          </p>
+          <div className="pm-box-closed" data-testid="giris-scan-not-entitled">
+            <p className="pm-box-label">Giriş</p>
+            <p className="self-service-muted">QR bu hesap için kapalı</p>
+          </div>
         )}
       </div>
 
@@ -100,16 +101,17 @@ export function OwnQrAttendanceBoxes({
             type="button"
             className="pm-box-main-action"
             data-testid="cikis-scan"
-            aria-label="Çıkış için QR okut"
+            aria-label="Çıkış için kiosk QR okut"
             disabled={!today.can_scan_cikis && capsQr}
             onClick={onScanCikis}
           >
             ÇIKIŞ
           </button>
         ) : (
-          <p className="self-service-muted" data-testid="cikis-scan-not-entitled">
-            QR çıkış bu hesap için tanımlı değil.
-          </p>
+          <div className="pm-box-closed" data-testid="cikis-scan-not-entitled">
+            <p className="pm-box-label">Çıkış</p>
+            <p className="self-service-muted">QR bu hesap için kapalı</p>
+          </div>
         )}
       </div>
     </div>

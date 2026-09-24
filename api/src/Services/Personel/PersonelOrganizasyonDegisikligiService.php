@@ -428,7 +428,7 @@ final class PersonelOrganizasyonDegisikligiService
     {
         if ($value === null) {
             if ($field === 'personel_tipi_id') {
-                throw OrganizasyonException::validation('Personel tipi boş bırakılamaz.', 'personel_tipi_id');
+                throw OrganizasyonException::validation('Statü boş bırakılamaz.', 'personel_tipi_id');
             }
 
             return;

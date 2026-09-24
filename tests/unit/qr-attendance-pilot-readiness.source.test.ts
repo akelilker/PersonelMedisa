@@ -62,6 +62,7 @@ describe("QR attendance pilot readiness contracts", () => {
     expect(scanPage).toContain("Kiosk ekranındaki yeni kodu tekrar okutun");
     expect(scanPage).toContain("Kendi şube kiosk kodunu okutun");
     expect(scanPage).toContain("Kendi kimlik QR");
+    expect(scanPage).toContain("qr-scan-cta-zone");
 
     const scanner = read("src/features/self-service/qr/qr-scanner.ts");
     expect(scanner).toContain("Kamera için güvenli bağlantı (HTTPS) gerekir.");
@@ -69,5 +70,14 @@ describe("QR attendance pilot readiness contracts", () => {
     expect(scanner).toContain("Bu cihazda kullanılabilir kamera bulunamadı.");
     expect(scanner).toContain("BarcodeDetector");
     expect(scanner).toContain("jsqr");
+  });
+
+  it("wires kiosk model note on personel and amir homes", () => {
+    const note = read("src/features/self-service/components/QrKioskModelNote.tsx");
+    expect(note).toContain("qr-kiosk-model-note");
+    const personel = read("src/features/self-service/pages/PersonelSelfServiceHomePage.tsx");
+    expect(personel).toContain("QrKioskModelNote");
+    const amir = read("src/features/self-service/pages/BirimAmiriOperationalHomePage.tsx");
+    expect(amir).toContain("QrKioskModelNote");
   });
 });

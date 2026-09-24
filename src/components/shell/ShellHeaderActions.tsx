@@ -467,7 +467,7 @@ export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeade
               title={`Şube filtresi: ${activeSubeFilterLabel}`}
             >
               <svg
-                className="sube-selector-building-icon"
+                className="sube-selector-icon"
                 xmlns="http://www.w3.org/2000/svg"
                 width="22"
                 height="22"
@@ -479,9 +479,10 @@ export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeade
                 strokeLinejoin="round"
                 aria-hidden="true"
               >
-                <path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18" />
-                <path d="M6 12h12" />
-                <path d="M10 6h.01M14 6h.01M10 10h.01M14 10h.01M10 14h.01M14 14h.01M10 18h.01M14 18h.01" />
+                <path
+                  d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"
+                />
+                <circle cx="12" cy="10" r="3" />
               </svg>
               <svg
                 className="sube-selector-chevron"

@@ -9,10 +9,11 @@ function read(rel: string) {
 }
 
 describe("home shell header toolbar polish", () => {
-  it("uses building icon branch control with accessible filter label", () => {
+  it("uses map-pin icon branch control with accessible filter label", () => {
     const shell = read("src/components/shell/ShellHeaderActions.tsx");
     expect(shell).toContain('data-testid="header-sube-selector-toggle"');
-    expect(shell).toContain("sube-selector-building-icon");
+    expect(shell).toContain("sube-selector-icon");
+    expect(shell).not.toContain("sube-selector-building-icon");
     expect(shell).not.toContain("sube-selector-label");
     expect(shell).toContain("activeSubeFilterLabel");
     expect(shell).toMatch(/aria-label=\{`Şube filtresi: \$\{activeSubeFilterLabel\}`\}/);

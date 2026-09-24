@@ -11,6 +11,7 @@ import type { BirimAmiriGunlukDurum } from "../../../types/bildirim";
 import type { MeIdentity } from "../../../types/self-service";
 import { useRoleAccess } from "../../../hooks/use-role-access";
 import { OwnQrAttendanceBoxes } from "../components/OwnQrAttendanceBoxes";
+import { QrKioskModelNote } from "../components/QrKioskModelNote";
 import { QrPuantajExpectationNote } from "../components/QrPuantajExpectationNote";
 import { SelfServiceQrShortcuts } from "../components/SelfServiceQrShortcuts";
 import {
@@ -142,7 +143,12 @@ export function BirimAmiriOperationalHomePage() {
             </div>
           </div>
         )}
-        {qrEnabled ? <QrPuantajExpectationNote /> : null}
+        {qrEnabled ? (
+          <>
+            <QrKioskModelNote />
+            <QrPuantajExpectationNote />
+          </>
+        ) : null}
       </section>
 
       {/* Rol bağımsız QR/kart hakkı: bağlı mavi yaka personeli olan BIRIM_AMIRI

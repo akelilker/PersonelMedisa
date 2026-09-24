@@ -16,9 +16,11 @@ import { useRoleAccess } from "../../../hooks/use-role-access";
 import type { MeIdentity } from "../../../types/self-service";
 import { BackgroundlessNoticeModal } from "../components/BackgroundlessNoticeModal";
 import { OwnQrAttendanceBoxes } from "../components/OwnQrAttendanceBoxes";
+import { QrKioskModelNote } from "../components/QrKioskModelNote";
 import { QrPuantajExpectationNote } from "../components/QrPuantajExpectationNote";
 import { SelfServiceQrShortcuts } from "../components/SelfServiceQrShortcuts";
 import { PersonelMobileCapabilityService } from "../personel-mobile-capability";
+import { formatSelfServiceClock, qrEventTypeLabel } from "../self-service-datetime";
 
 type NoticeState =
   | null
@@ -179,8 +181,11 @@ export function PersonelSelfServiceHomePage() {
   if (error === "unbound") {
     return (
       <section className="states-page" data-testid="personel-unbound-page">
-        <h2>Hesabınız personel kaydıyla eşleştirilmemiş.</h2>
-        <p>Yöneticiniz hesabınızı bir personel kaydına bağladıktan sonra bu ekran açılır.</p>
+        <h2>Personel bağlantısı yok</h2>
+        <p>
+          Hesabınız bir personel kaydına bağlı değil. QR giriş/çıkış ve öz servis özeti bu yüzden
+          kapalıdır. Yöneticiniz hesabınızı bağladıktan sonra bu ekran açılır.
+        </p>
       </section>
     );
   }
@@ -188,8 +193,8 @@ export function PersonelSelfServiceHomePage() {
   if (error === "inactive") {
     return (
       <section className="states-page" data-testid="personel-inactive-page">
-        <h2>Personel hesabınız aktif değil.</h2>
-        <p>Aktif personel kaydı olmadan self-service özeti görüntülenemez.</p>
+        <h2>Personel hesabınız aktif değil</h2>
+        <p>Aktif personel kaydı olmadan öz servis özeti ve QR giriş/çıkış kullanılamaz.</p>
       </section>
     );
   }
@@ -199,6 +204,9 @@ export function PersonelSelfServiceHomePage() {
       <section className="states-page state-error" data-testid="personel-self-service-error">
         <h2>Özet yüklenemedi</h2>
         <p>{error ?? "Bilinmeyen hata"}</p>
+        <button type="button" className="self-service-action" onClick={() => void load()}>
+          Tekrar dene
+        </button>
       </section>
     );
   }
@@ -209,12 +217,13 @@ export function PersonelSelfServiceHomePage() {
   const missingCount = identity?.completeness?.missing_count ?? 0;
   const lastQr = identity?.last_qr_event ?? null;
   const lastQrLabel = lastQr
-    ? `${lastQr.event_type === "GIRIS" ? "Giriş" : "Çıkış"} — ${new Intl.DateTimeFormat("tr-TR", {
-        timeZone: "Europe/Istanbul",
-        hour: "2-digit",
-        minute: "2-digit"
-      }).format(new Date(lastQr.occurred_at))}`
+    ? `${qrEventTypeLabel(lastQr.event_type)} — ${formatSelfServiceClock(lastQr.occurred_at)}`
     : null;
+  const hasTodayPunch = Boolean(today.giris || today.cikis);
+  const incompleteDay =
+    qrEnabled && today.giris && !today.cikis
+      ? "Bugün giriş kaydınız var; çıkış için şube kiosk QR’ını okutun."
+      : null;
 
   return (
     <section className="personel-mobile-shell" data-testid="personel-self-service-page">
@@ -257,44 +266,71 @@ export function PersonelSelfServiceHomePage() {
         </div>
       ) : null}
 
-      <OwnQrAttendanceBoxes
-        today={today}
-        qrEnabled={qrEnabled}
-        testId="personel-attendance-boxes"
-        allowCorrection
-        onScanGiris={() =>
-          guardOrRun("qr_scan", () => {
-            navigate("/self/qr-okut?event=GIRIS");
-          })
-        }
-        onScanCikis={() =>
-          guardOrRun("qr_scan", () => {
-            navigate("/self/qr-okut?event=CIKIS");
-          })
-        }
-        onCorrectGiris={(event) =>
-          guardOrRun("attendance_correct", () => {
-            setCorrectDraft({
-              eventId: event.id,
-              eventType: "GIRIS",
-              currentTime: event.display_local_time ?? event.local_time
-            });
-            setCorrectTime(event.display_local_time ?? event.local_time);
-          })
-        }
-        onCorrectCikis={(event) =>
-          guardOrRun("attendance_correct", () => {
-            setCorrectDraft({
-              eventId: event.id,
-              eventType: "CIKIS",
-              currentTime: event.display_local_time ?? event.local_time
-            });
-            setCorrectTime(event.display_local_time ?? event.local_time);
-          })
-        }
-      />
+      <section className="pm-section" data-testid="personel-today-attendance-section" aria-labelledby="personel-today-heading">
+        <h2 id="personel-today-heading" className="pm-section-title">
+          Bugünkü Giriş / Çıkış
+        </h2>
+        <OwnQrAttendanceBoxes
+          today={today}
+          qrEnabled={qrEnabled}
+          testId="personel-attendance-boxes"
+          allowCorrection
+          onScanGiris={() =>
+            guardOrRun("qr_scan", () => {
+              navigate("/self/qr-okut?event=GIRIS");
+            })
+          }
+          onScanCikis={() =>
+            guardOrRun("qr_scan", () => {
+              navigate("/self/qr-okut?event=CIKIS");
+            })
+          }
+          onCorrectGiris={(event) =>
+            guardOrRun("attendance_correct", () => {
+              setCorrectDraft({
+                eventId: event.id,
+                eventType: "GIRIS",
+                currentTime: event.display_local_time ?? event.local_time
+              });
+              setCorrectTime(event.display_local_time ?? event.local_time);
+            })
+          }
+          onCorrectCikis={(event) =>
+            guardOrRun("attendance_correct", () => {
+              setCorrectDraft({
+                eventId: event.id,
+                eventType: "CIKIS",
+                currentTime: event.display_local_time ?? event.local_time
+              });
+              setCorrectTime(event.display_local_time ?? event.local_time);
+            })
+          }
+        />
+        {qrEnabled && !hasTodayPunch ? (
+          <p className="self-service-muted" data-testid="personel-today-empty" role="status">
+            Bugün henüz giriş/çıkış kaydı yok. Kiosk ekranındaki QR’ı okutarak başlayın.
+          </p>
+        ) : null}
+        {incompleteDay ? (
+          <div className="self-service-home__warnings" role="status" data-testid="personel-incomplete-day-warning">
+            <p>{incompleteDay}</p>
+          </div>
+        ) : null}
+      </section>
 
-      {qrEnabled ? <QrPuantajExpectationNote /> : null}
+      {qrEnabled ? (
+        <>
+          <QrKioskModelNote />
+          <QrPuantajExpectationNote />
+        </>
+      ) : (
+        <div className="pm-secondary-card" data-testid="personel-qr-closed-notice" role="status">
+          <p>
+            Bu hesap için QR giriş/çıkış kapalıdır. Öz servis özetiniz görüntülenmeye devam eder; QR
+            hakkı yalnızca uygun personel bağında açılır.
+          </p>
+        </div>
+      )}
 
       {missingCount > 0 ? (
         <div className="pm-secondary-card" role="status" data-testid="self-missing-info-warning">
@@ -308,6 +344,11 @@ export function PersonelSelfServiceHomePage() {
         <div className="pm-secondary-card" data-testid="self-last-qr-event">
           <p className="pm-box-label">Son QR hareketi</p>
           <p>{lastQrLabel}</p>
+        </div>
+      ) : qrEnabled ? (
+        <div className="pm-secondary-card" data-testid="self-last-qr-empty" role="status">
+          <p className="pm-box-label">Son QR hareketi</p>
+          <p className="self-service-muted">Henüz kayıtlı QR hareketi yok.</p>
         </div>
       ) : null}
 

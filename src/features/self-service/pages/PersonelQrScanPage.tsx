@@ -6,6 +6,7 @@ import type { MeQrAttendanceEvent, QrEventType } from "../../../types/self-servi
 import { BackgroundlessNoticeModal } from "../components/BackgroundlessNoticeModal";
 import { QrPuantajExpectationNote } from "../components/QrPuantajExpectationNote";
 import { startQrScanner, type QrScannerHandle } from "../qr/qr-scanner";
+import { formatSelfServiceClock, qrEventTypeLabel } from "../self-service-datetime";
 
 type Phase =
   | { kind: "idle" }
@@ -51,6 +52,9 @@ function mapScanError(error: unknown): string {
     case "SELF_SERVICE_PERSONEL_INACTIVE":
     case "PERSONEL_INACTIVE":
       return "Personel hesabınız aktif değil.";
+    case "FORBIDDEN":
+    case "UNAUTHORIZED":
+      return "Bu işlem için yetkiniz yok. QR okutma yalnızca uygun personel hesabında açılır.";
     case "QR_CONFIG_NOT_READY":
     case "QR_SCHEMA_NOT_READY":
       return "QR servisi şu an hazır değil. Yönetiminize bildirin.";
@@ -58,18 +62,6 @@ function mapScanError(error: unknown): string {
       return "Bağlantı yok, işlem kaydedilmedi.";
     default:
       return error.message || "Kayıt oluşturulamadı.";
-  }
-}
-
-function formatEventClock(iso: string): string {
-  try {
-    return new Intl.DateTimeFormat("tr-TR", {
-      timeZone: "Europe/Istanbul",
-      hour: "2-digit",
-      minute: "2-digit"
-    }).format(new Date(iso));
-  } catch {
-    return new Date(iso).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
   }
 }
 
@@ -164,10 +156,12 @@ export function PersonelQrScanPage() {
     await submitToken(phase.token, eventType);
   };
 
+  const presetLabel = presetEvent ? qrEventTypeLabel(presetEvent) : null;
+
   return (
-    <section className="self-service-home qr-scan-page" data-testid="personel-qr-scan-page">
+    <section className="personel-mobile-shell qr-scan-page" data-testid="personel-qr-scan-page">
       <header className="self-service-home__header">
-        <h2>QR Okut {presetEvent ? `— ${presetEvent === "GIRIS" ? "Giriş" : "Çıkış"}` : ""}</h2>
+        <h2>QR Okut{presetLabel ? ` — ${presetLabel}` : ""}</h2>
         <p>
           {presetEvent
             ? "Şube kiosk ekranındaki QR kodunu okutun; seçtiğiniz işlem sunucuda doğrulanır. Kendi kimlik QR’ınızı göstermezsiniz."
@@ -177,73 +171,117 @@ export function PersonelQrScanPage() {
 
       <QrPuantajExpectationNote />
 
-      <div className="qr-scan-video-wrap">
+      <div className="qr-scan-video-wrap" data-testid="qr-scan-video-wrap">
         <video ref={videoRef} className="qr-scan-video" playsInline muted />
+        {phase.kind === "idle" || phase.kind === "scanning" ? (
+          <p className="qr-scan-video-hint" aria-hidden={phase.kind !== "scanning"}>
+            {phase.kind === "scanning" ? "Kodu çerçeveye hizalayın" : "Kamera kapalı"}
+          </p>
+        ) : null}
       </div>
 
-      {phase.kind === "idle" ? (
-        <button type="button" className="self-service-action" data-testid="qr-scan-start" onClick={() => void beginScan()}>
-          Kamerayı aç
-        </button>
-      ) : null}
-
-      {phase.kind === "scanning" ? (
-        <p className="self-service-muted" data-testid="qr-scan-scanning">
-          QR kodu çerçeveye hizalayın...
-        </p>
-      ) : null}
-
-      {phase.kind === "choose" ? (
-        <div className="qr-scan-actions" data-testid="qr-scan-choose">
-          <button type="button" className="self-service-action" onClick={() => void submit("GIRIS")}>
-            Giriş
+      <div className="qr-scan-cta-zone" data-testid="qr-scan-cta-zone">
+        {phase.kind === "idle" ? (
+          <button
+            type="button"
+            className="self-service-action self-service-action--primary"
+            data-testid="qr-scan-start"
+            onClick={() => void beginScan()}
+          >
+            Kamerayı aç
           </button>
-          <button type="button" className="self-service-action" onClick={() => void submit("CIKIS")}>
-            Çıkış
-          </button>
-        </div>
-      ) : null}
+        ) : null}
 
-      {phase.kind === "submitting" ? <p className="self-service-muted">Kaydediliyor...</p> : null}
+        {phase.kind === "scanning" ? (
+          <p className="self-service-muted" data-testid="qr-scan-scanning">
+            QR kodu çerçeveye hizalayın...
+          </p>
+        ) : null}
 
-      {phase.kind === "success" ? (
-        <article className="state-card self-service-card" data-testid="qr-scan-success">
-          <h3>
-            {phase.event.event_type === "GIRIS" ? "Giriş kaydedildi" : "Çıkış kaydedildi"} —{" "}
-            {formatEventClock(phase.event.occurred_at)}
-          </h3>
-          <dl className="self-service-dl">
-            <div>
-              <dt>Şube</dt>
-              <dd>{phase.event.sube.ad || `#${phase.event.sube.id}`}</dd>
-            </div>
-            {phase.idempotent ? (
+        {phase.kind === "choose" ? (
+          <div className="qr-scan-actions" data-testid="qr-scan-choose">
+            <button
+              type="button"
+              className="self-service-action self-service-action--primary"
+              onClick={() => void submit("GIRIS")}
+            >
+              GİRİŞ
+            </button>
+            <button
+              type="button"
+              className="self-service-action self-service-action--primary"
+              onClick={() => void submit("CIKIS")}
+            >
+              ÇIKIŞ
+            </button>
+          </div>
+        ) : null}
+
+        {phase.kind === "submitting" ? (
+          <p className="self-service-muted" data-testid="qr-scan-submitting">
+            Kaydediliyor...
+          </p>
+        ) : null}
+
+        {phase.kind === "success" ? (
+          <article className="state-card self-service-card qr-scan-success-card" data-testid="qr-scan-success">
+            <p
+              className={`qr-event-badge qr-event-badge--${phase.event.event_type === "GIRIS" ? "giris" : "cikis"}`}
+            >
+              {qrEventTypeLabel(phase.event.event_type)}
+            </p>
+            <h3>
+              {phase.event.event_type === "GIRIS" ? "Giriş kaydedildi" : "Çıkış kaydedildi"} —{" "}
+              {formatSelfServiceClock(phase.event.occurred_at)}
+            </h3>
+            <dl className="self-service-dl">
               <div>
-                <dt>Not</dt>
-                <dd>İşlem zaten kaydedilmişti (idempotent).</dd>
+                <dt>Şube</dt>
+                <dd>{phase.event.sube.ad || `#${phase.event.sube.id}`}</dd>
               </div>
-            ) : null}
-          </dl>
-          <button type="button" className="self-service-action" onClick={() => navigate("/")}>
-            Anasayfaya Dön
-          </button>
-        </article>
-      ) : null}
+              {phase.idempotent ? (
+                <div>
+                  <dt>Not</dt>
+                  <dd>İşlem zaten kaydedilmişti (idempotent).</dd>
+                </div>
+              ) : null}
+            </dl>
+            <p className="self-service-muted">
+              Bu kayıt puantaja otomatik yazılmaz; İK incelemesi ve aday uygulaması sonrasında işlenir.
+            </p>
+            <div className="qr-scan-actions">
+              <button
+                type="button"
+                className="self-service-action self-service-action--primary"
+                onClick={() => navigate("/")}
+              >
+                Anasayfaya Dön
+              </button>
+              <Link to="/self/qr-hareketleri" className="self-service-action">
+                QR Hareketlerim
+              </Link>
+            </div>
+          </article>
+        ) : null}
 
-      {phase.kind === "error" ? (
-        <div className="self-service-home__warnings" role="alert" data-testid="qr-scan-error">
-          <p>{phase.message}</p>
-          <button type="button" className="self-service-action" onClick={() => void beginScan()}>
-            Tekrar dene
-          </button>
-        </div>
-      ) : null}
+        {phase.kind === "error" ? (
+          <div className="self-service-home__warnings" role="alert" data-testid="qr-scan-error">
+            <p>{phase.message}</p>
+            <button
+              type="button"
+              className="self-service-action self-service-action--primary"
+              onClick={() => void beginScan()}
+            >
+              Tekrar dene
+            </button>
+          </div>
+        ) : null}
+      </div>
 
-      <p>
+      <nav className="pm-secondary-nav qr-scan-footer-nav" aria-label="QR sayfa bağlantıları">
         <Link to="/">Özet</Link>
-        {" · "}
         <Link to="/self/qr-hareketleri">QR Hareketlerim</Link>
-      </p>
+      </nav>
 
       <BackgroundlessNoticeModal
         open={infoNotice !== null}

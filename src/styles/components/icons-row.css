@@ -148,14 +148,21 @@
 .sube-selector-icon {
   display: block;
   flex-shrink: 0;
+  opacity: 0.52;
+  transition: opacity 0.2s ease;
 }
 
 .sube-selector-chevron {
   display: block;
   flex-shrink: 0;
   margin-top: 2px;
-  opacity: 0.7;
+  opacity: 0.4;
   transition: opacity 0.2s ease;
+}
+
+.sube-selector-toggle:hover .sube-selector-icon,
+.sube-selector-toggle:focus-visible .sube-selector-icon {
+  opacity: 1;
 }
 
 .sube-selector-toggle:hover .sube-selector-chevron,

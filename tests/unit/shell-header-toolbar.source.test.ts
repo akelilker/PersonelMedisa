@@ -18,6 +18,16 @@ describe("home shell header toolbar polish", () => {
     expect(shell).toContain("activeSubeFilterLabel");
     expect(shell).toMatch(/aria-label=\{`Şube filtresi: \$\{activeSubeFilterLabel\}`\}/);
     expect(shell).toMatch(/title=\{`Şube filtresi: \$\{activeSubeFilterLabel\}`\}/);
+    expect(shell).toMatch(/className="sube-selector-icon"[\s\S]*?width="19"/);
+    expect(shell).toMatch(/className="sube-selector-chevron"[\s\S]*?width="12"/);
+  });
+
+  it("softens the branch selector icon until hover or focus", () => {
+    const icons = read("src/styles/components/icons-row.css");
+    expect(icons).toMatch(/\.sube-selector-icon\s*\{[^}]*opacity:\s*0\.52/s);
+    expect(icons).toMatch(
+      /\.sube-selector-toggle:hover \.sube-selector-icon,\s*\.sube-selector-toggle:focus-visible \.sube-selector-icon\s*\{[^}]*opacity:\s*1/s
+    );
   });
 
   it("keeps calendar badge hover tied to header button", () => {

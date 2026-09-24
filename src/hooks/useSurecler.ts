@@ -30,6 +30,10 @@ import {
   shouldRedirectDetailAfterSubeMismatch
 } from "../lib/detail-sube-context";
 import {
+  ISTEN_AYRILMA_CANCEL_NOT_ALLOWED_MESSAGE,
+  isSurecTuruCancelBlocked
+} from "../lib/surec-cancel-policy";
+import {
   buildCreateSurecPayload,
   buildUpdateSurecPayload,
   parsePositiveInt,
@@ -465,6 +469,11 @@ export function useSurecler() {
         setErrorMessage("Bu süreci iptal etmek için yetkin bulunmuyor.");
         return;
       }
+      if (isSurecTuruCancelBlocked(surec.surec_turu)) {
+        // Fail-closed: ISTEN_AYRILMA generic iptal edilemez (backend 409 ile de reddeder).
+        setErrorMessage(ISTEN_AYRILMA_CANCEL_NOT_ALLOWED_MESSAGE);
+        return;
+      }
       setCancelDialogError(null);
       setPendingCancelSurec(surec);
     },
@@ -482,6 +491,13 @@ export function useSurecler() {
   const confirmCancelSurec = useCallback(async () => {
     const surec = pendingCancelSurec;
     if (!surec || cancelingSurecId !== null) {
+      return;
+    }
+
+    // Defense in depth: yalnız ISTEN_AYRILMA engellenir, diğer türler etkilenmez.
+    if (isSurecTuruCancelBlocked(surec.surec_turu)) {
+      setCancelDialogError(ISTEN_AYRILMA_CANCEL_NOT_ALLOWED_MESSAGE);
+      setPendingCancelSurec(null);
       return;
     }
 

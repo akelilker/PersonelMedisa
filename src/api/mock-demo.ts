@@ -40,6 +40,11 @@ import {
 import { deriveSubeTamAd, normalizeOrgName } from "../lib/organizasyon/sube-display-name";
 import { assertRevizyonTransition } from "../lib/revizyon-talebi/revizyon-state";
 import {
+  ISTEN_AYRILMA_CANCEL_NOT_ALLOWED_CODE,
+  ISTEN_AYRILMA_CANCEL_NOT_ALLOWED_MESSAGE,
+  isSurecTuruCancelBlocked
+} from "../lib/surec-cancel-policy";
+import {
   canApproveOrRejectRevizyon,
   canCancelRevizyon,
   canCreateRevizyonForPersonel,
@@ -7266,6 +7271,13 @@ export function resolveDemoApiResponse(
     const surec = demoState.surecler.find((item) => item.id === id);
     if (!surec) {
       return demoRevizyonError("NOT_FOUND", "Surec bulunamadi.");
+    }
+    // Backend parity: SureclerController::cancel ISTEN_AYRILMA icin fail-closed reddeder.
+    if (isSurecTuruCancelBlocked(surec.surec_turu)) {
+      return demoRevizyonError(
+        ISTEN_AYRILMA_CANCEL_NOT_ALLOWED_CODE,
+        ISTEN_AYRILMA_CANCEL_NOT_ALLOWED_MESSAGE
+      );
     }
     const state = String(surec.state ?? "").toUpperCase();
     if (state === "TAMAMLANDI") {

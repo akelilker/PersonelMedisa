@@ -9,6 +9,7 @@ import { LoadingState } from "../../../components/states/LoadingState";
 import { SubeDetailListNotice } from "../../../components/states/SubeDetailListNotice";
 import { useRoleAccess } from "../../../hooks/use-role-access";
 import { useSurecler } from "../../../hooks/useSurecler";
+import { isSurecTuruCancelBlocked } from "../../../lib/surec-cancel-policy";
 import { formatSurecStateLabel, formatSurecTuruLabel } from "../../../lib/display/enum-display";
 import type { KeyOption } from "../../../types/referans";
 import type { Surec } from "../../../types/surec";
@@ -119,6 +120,13 @@ export function SurecTakipPage() {
     void updateSurecHandler(event, canEditSurec);
   }
 
+  // ISTEN_AYRILMA generic iptal edilemez: personeli PASIF bırakır ve açık çıkış
+  // sürecini sıfırlar (bkz. src/lib/surec-cancel-policy.ts). Diğer süreç
+  // türlerinde iptal aksiyonu aynen korunur.
+  function canCancelThisSurec(surec: Surec): boolean {
+    return canCancelSurec && !isSurecTuruCancelBlocked(surec.surec_turu);
+  }
+
   return (
     <section className="surec-page">
       <div className="surecler-header-row">
@@ -218,7 +226,7 @@ export function SurecTakipPage() {
                   Tarih: {surec.baslangic_tarihi ?? "-"} / {surec.bitis_tarihi ?? "-"}
                 </p>
               </div>
-              {canOpenSurecDetail || canEditSurec || canCancelSurec ? (
+              {canOpenSurecDetail || canEditSurec || canCancelThisSurec(surec) ? (
                 <div className="module-item-actions">
                   {canOpenSurecDetail ? (
                     <Link to={`/surecler/${surec.id}`} className="universal-btn-aux">
@@ -235,7 +243,7 @@ export function SurecTakipPage() {
                       Düzenle
                     </button>
                   ) : null}
-                  {canCancelSurec ? (
+                  {canCancelThisSurec(surec) ? (
                     <button
                       type="button"
                       className="universal-btn-aux"

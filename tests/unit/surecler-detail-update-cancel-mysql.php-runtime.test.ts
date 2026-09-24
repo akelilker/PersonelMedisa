@@ -27,6 +27,12 @@ describe("SureclerController detail/update/cancel MariaDB", () => {
     expect(controllerSource).toContain("surecler.cancel");
     expect(controllerSource).not.toContain("DELETE FROM surecler");
     expect(controllerSource).toContain("AND state NOT IN");
+    // ISTEN_AYRILMA generic cancel is fail-closed (orphan PASIF bug).
+    expect(controllerSource).toContain("ISTEN_AYRILMA_CANCEL_NOT_ALLOWED");
+    expect(controllerSource).toContain("manuel iptal edilemez");
+    expect(controllerSource.indexOf("ISTEN_AYRILMA_CANCEL_NOT_ALLOWED")).toBeLessThan(
+      controllerSource.indexOf("// Idempotent: already cancelled.")
+    );
   });
 
   it("runs HTTP detail/update/cancel acceptance on MariaDB", () => {
@@ -45,5 +51,16 @@ describe("SureclerController detail/update/cancel MariaDB", () => {
     expect(result.stdout).toContain("[PASS] cancel is soft (row remains)");
     expect(result.stdout).toContain("[PASS] HTTP cancel idempotent → 200");
     expect(result.stdout).toContain("[PASS] HTTP cancel TAMAMLANDI → 409");
+    // ISTEN_AYRILMA cancel guard: 409 + no surec/personel side effect.
+    expect(result.stdout).toContain("[PASS] exit cancel guard code present");
+    expect(result.stdout).toContain("[PASS] exit cancel guard is fail-closed before idempotent replay");
+    expect(result.stdout).toContain("[PASS] HTTP cancel ISTEN_AYRILMA → 409");
+    expect(result.stdout).toContain("[PASS] HTTP cancel ISTEN_AYRILMA (via update) → 409");
+    expect(result.stdout).toContain("[PASS] cancel ISTEN_AYRILMA code");
+    expect(result.stdout).toContain("[PASS] cancel ISTEN_AYRILMA keeps surec AKTIF");
+    expect(result.stdout).toContain("[PASS] guarded cancel keeps surec AKTIF");
+    expect(result.stdout).toContain("[PASS] cancel ISTEN_AYRILMA keeps personel PASIF (no orphan side effect)");
+    expect(result.stdout).toContain("[PASS] open exit surec preserved for yeniden-aktif");
+    expect(result.stdout).toContain("[PASS] restore IZIN before generic cancel contract → 200");
   });
 });

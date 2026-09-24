@@ -202,6 +202,24 @@ describe("S93-E3B cancel dialog hooks", () => {
     expect(result.current.cancelDialogError).toBeTruthy();
   });
 
+  it("useSurecler: ISTEN_AYRILMA için iptal dialogu açılmaz ve API çağrılmaz", async () => {
+    const { result } = renderHook(() => useSurecler());
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    act(() => {
+      result.current.openCancelSurecDialog(makeSurec({ surec_turu: "ISTEN_AYRILMA" }), true);
+    });
+
+    expect(result.current.pendingCancelSurec).toBeNull();
+    expect(result.current.errorMessage).toContain("Yeniden aktif akışı");
+
+    await act(async () => {
+      await result.current.confirmCancelSurec();
+    });
+
+    expect(cancelSurecMock).not.toHaveBeenCalled();
+  });
+
   it("useFinans: dialog açar ve confirm tek cancelFinansKalem çağırır", async () => {
     const { result } = renderHook(() => useFinans());
     await waitFor(() => expect(result.current.isLoading).toBe(false));

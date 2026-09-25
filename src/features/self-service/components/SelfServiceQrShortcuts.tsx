@@ -42,7 +42,7 @@ export function SelfServiceQrShortcuts({
         QR Okut
       </Link>
       <Link to="/self/qr-hareketleri" data-testid="self-qr-history-link">
-        QR Hareketlerim
+        Giriş / Çıkış Geçmişim
       </Link>
     </nav>
   );

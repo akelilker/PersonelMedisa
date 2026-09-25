@@ -71,7 +71,7 @@ export async function startQrScanner(options: StartOptions): Promise<QrScannerHa
     const name =
       error && typeof error === "object" && "name" in error ? String((error as { name?: unknown }).name) : "";
     if (name === "NotAllowedError" || name === "PermissionDeniedError") {
-      throw new Error("Kamera izni reddedildi. Tarayıcı ayarlarından kamera erişimini açın.");
+      throw new Error("Telefon Ayarlarınızdan Kamera Erişimine İzin Verin.");
     }
     if (name === "NotFoundError" || name === "DevicesNotFoundError") {
       throw new Error("Bu cihazda kullanılabilir kamera bulunamadı.");

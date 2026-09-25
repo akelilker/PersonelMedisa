@@ -2,9 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { isApiRequestError } from "../../../api/api-client";
 import { createQrRequestNonce, postMeQrScan } from "../../../api/qr.api";
-import type { MeQrAttendanceEvent, QrEventType } from "../../../types/self-service";
+import type { MeQrAttendanceEvent, MeQrEarlyExitConfirm, QrEventType } from "../../../types/self-service";
 import { BackgroundlessNoticeModal } from "../components/BackgroundlessNoticeModal";
-import { QrPuantajExpectationNote } from "../components/QrPuantajExpectationNote";
 import { startQrScanner, type QrScannerHandle } from "../qr/qr-scanner";
 import { formatSelfServiceClock, qrEventTypeLabel } from "../self-service-datetime";
 
@@ -21,21 +20,36 @@ type Phase =
     }
   | { kind: "error"; message: string };
 
+type LateEarlyNotice = {
+  title: string;
+  body: string;
+};
+
+function lateEarlyModalTitle(kind: string): string {
+  if (kind === "LATE_ENTRY_INFO") {
+    return "Geç Giriş";
+  }
+  if (kind === "EARLY_EXIT_INFO") {
+    return "Erken Çıkış";
+  }
+  return "Bilgi";
+}
+
 function mapScanError(error: unknown): string {
   if (!isApiRequestError(error)) {
     if (typeof navigator !== "undefined" && navigator.onLine === false) {
-      return "Bağlantı yok, işlem kaydedilmedi.";
+      return "İnternet Bağlantısı Yok. İşlem Kaydedilmedi.";
     }
     return "Bağlantı kurulamadı, kayıt oluşturulmadı.";
   }
   switch (error.code) {
     case "QR_TOKEN_EXPIRED":
-      return "QR süresi doldu. Kiosk ekranındaki yeni kodu tekrar okutun.";
+      return "QR Kodunun Süresi Doldu. Yeni Kodu Okutun.";
     case "QR_TOKEN_INVALID":
     case "QR_SIGNATURE_INVALID":
       return "QR kodu geçersiz. Kiosk ekranındaki güncel kodu okutun.";
     case "QR_CROSS_BRANCH_DENIED":
-      return "Bu QR sizin çalışma şubenize ait değil. Kendi şube kiosk kodunu okutun.";
+      return "Bu QR Kodu Çalışma Yerinizle Eşleşmiyor.";
     case "QR_IDEMPOTENCY_CONFLICT":
       return "İşlem zaten kaydedilmiş.";
     case "QR_OPEN_SHIFT_EXISTS":
@@ -59,7 +73,7 @@ function mapScanError(error: unknown): string {
     case "QR_SCHEMA_NOT_READY":
       return "QR servisi şu an hazır değil. Yönetiminize bildirin.";
     case "NETWORK_ERROR":
-      return "Bağlantı yok, işlem kaydedilmedi.";
+      return "İnternet Bağlantısı Yok. İşlem Kaydedilmedi.";
     default:
       return "Kayıt oluşturulamadı. Tekrar deneyin.";
   }
@@ -75,7 +89,12 @@ export function PersonelQrScanPage() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const scannerRef = useRef<QrScannerHandle | null>(null);
   const [phase, setPhase] = useState<Phase>({ kind: "idle" });
-  const [infoNotice, setInfoNotice] = useState<string | null>(null);
+  const [lateEarlyNotice, setLateEarlyNotice] = useState<LateEarlyNotice | null>(null);
+  const [earlyExitPending, setEarlyExitPending] = useState<{
+    token: string;
+    eventType: QrEventType;
+    confirm: MeQrEarlyExitConfirm;
+  } | null>(null);
   const submittingRef = useRef(false);
 
   const stopScanner = () => {
@@ -89,7 +108,11 @@ export function PersonelQrScanPage() {
     };
   }, []);
 
-  const submitToken = async (token: string, eventType: QrEventType) => {
+  const submitToken = async (
+    token: string,
+    eventType: QrEventType,
+    options?: { earlyExitConfirmed?: boolean }
+  ) => {
     if (submittingRef.current) return;
     submittingRef.current = true;
     setPhase({ kind: "submitting", token, eventType });
@@ -97,21 +120,35 @@ export function PersonelQrScanPage() {
       const response = await postMeQrScan({
         token,
         event_type: eventType,
-        request_nonce: createQrRequestNonce()
+        request_nonce: createQrRequestNonce(),
+        early_exit_confirmed: options?.earlyExitConfirmed
       });
-      const lateEarly =
-        response && typeof response === "object" && "late_early_info" in response
-          ? (response as { late_early_info?: { kind: string; message: string; delta_dakika: number } | null })
-              .late_early_info
-          : null;
+      if (response.confirmation_required && response.early_exit_confirm) {
+        setEarlyExitPending({
+          token,
+          eventType,
+          confirm: response.early_exit_confirm
+        });
+        setPhase({ kind: "idle" });
+        return;
+      }
+      if (!response.event) {
+        setPhase({ kind: "error", message: "Kayıt oluşturulamadı. Tekrar deneyin." });
+        return;
+      }
+      const lateEarly = response.late_early_info ?? null;
       setPhase({
         kind: "success",
         event: response.event,
         idempotent: response.idempotent,
-        lateEarly: lateEarly ?? null
+        lateEarly
       });
+      stopScanner();
       if (lateEarly?.message) {
-        setInfoNotice(lateEarly.message);
+        setLateEarlyNotice({
+          title: lateEarlyModalTitle(lateEarly.kind),
+          body: lateEarly.message
+        });
       }
     } catch (error) {
       setPhase({ kind: "error", message: mapScanError(error) });
@@ -143,10 +180,10 @@ export function PersonelQrScanPage() {
           setPhase({ kind: "error", message });
         }
       });
-    } catch (error) {
+    } catch {
       setPhase({
         kind: "error",
-        message: "Kamera açılamadı. Tekrar deneyin."
+        message: "Kamera Açılamadı. Tekrar Deneyin."
       });
     }
   };
@@ -156,13 +193,14 @@ export function PersonelQrScanPage() {
     await submitToken(phase.token, eventType);
   };
 
+  const videoCollapsed = phase.kind === "success";
+
   return (
     <section className="personel-mobile-shell qr-scan-page" data-testid="personel-qr-scan-page">
-      <p className="qr-scan-lead" data-testid="qr-scan-lead">
-        Şube kiosk ekranındaki QR kodunu okutun.
-      </p>
-
-      <div className="qr-scan-video-wrap" data-testid="qr-scan-video-wrap">
+      <div
+        className={`qr-scan-video-wrap${videoCollapsed ? " qr-scan-video-wrap--collapsed" : ""}`}
+        data-testid="qr-scan-video-wrap"
+      >
         <video ref={videoRef} className="qr-scan-video" playsInline muted />
         {phase.kind === "idle" || phase.kind === "scanning" ? (
           <p className="qr-scan-video-hint" aria-hidden={phase.kind !== "scanning"}>
@@ -179,13 +217,13 @@ export function PersonelQrScanPage() {
             data-testid="qr-scan-start"
             onClick={() => void beginScan()}
           >
-            Kamerayı aç
+            QR Okut
           </button>
         ) : null}
 
         {phase.kind === "scanning" ? (
           <p className="self-service-muted" data-testid="qr-scan-scanning">
-            QR kodu çerçeveye hizalayın...
+            QR Okutun
           </p>
         ) : null}
 
@@ -222,7 +260,7 @@ export function PersonelQrScanPage() {
               {qrEventTypeLabel(phase.event.event_type)}
             </p>
             <h3>
-              {phase.event.event_type === "GIRIS" ? "Giriş kaydedildi" : "Çıkış kaydedildi"} —{" "}
+              {phase.event.event_type === "GIRIS" ? "Giriş Kaydedildi" : "Çıkış Kaydedildi"} —{" "}
               {formatSelfServiceClock(phase.event.occurred_at)}
             </h3>
             <dl className="self-service-dl">
@@ -237,9 +275,6 @@ export function PersonelQrScanPage() {
                 </div>
               ) : null}
             </dl>
-            <p className="self-service-muted">
-              Bu kayıt puantaja otomatik yazılmaz; kontrol edildikten sonra puantaja işlenir.
-            </p>
             <div className="qr-scan-actions">
               <button
                 type="button"
@@ -249,7 +284,7 @@ export function PersonelQrScanPage() {
                 Anasayfaya Dön
               </button>
               <Link to="/self/qr-hareketleri" className="self-service-action">
-                QR Hareketlerim
+                Giriş / Çıkış Geçmişim
               </Link>
             </div>
           </article>
@@ -269,20 +304,30 @@ export function PersonelQrScanPage() {
         ) : null}
       </div>
 
-      <QrPuantajExpectationNote />
-
-      <nav className="pm-secondary-nav qr-scan-footer-nav" aria-label="QR sayfa bağlantıları">
-        <Link to="/">Özet</Link>
-        <Link to="/self/qr-hareketleri">QR Hareketlerim</Link>
-      </nav>
+      <BackgroundlessNoticeModal
+        open={lateEarlyNotice !== null}
+        title={lateEarlyNotice?.title ?? "Bilgi"}
+        body={lateEarlyNotice?.body ?? ""}
+        infoTooltip="Bilgi Amaçlıdır."
+        onClose={() => setLateEarlyNotice(null)}
+        testId="late-early-info-modal"
+      />
 
       <BackgroundlessNoticeModal
-        open={infoNotice !== null}
-        title="Bilgi"
-        body={infoNotice ?? ""}
-        infoTooltip="Bilgi Amaçlıdır."
-        onClose={() => setInfoNotice(null)}
-        testId="late-early-info-modal"
+        open={earlyExitPending !== null}
+        title="Erken Çıkış"
+        body={earlyExitPending?.confirm.message ?? ""}
+        primaryLabel="Evet"
+        secondaryLabel="Hayır"
+        onSecondary={() => setEarlyExitPending(null)}
+        onPrimary={() => {
+          if (!earlyExitPending) return;
+          const pending = earlyExitPending;
+          setEarlyExitPending(null);
+          void submitToken(pending.token, pending.eventType, { earlyExitConfirmed: true });
+        }}
+        onClose={() => setEarlyExitPending(null)}
+        testId="early-exit-confirm-modal"
       />
     </section>
   );

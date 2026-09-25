@@ -1,206 +1,273 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { isApiRequestError } from "../../../api/api-client";
-import { fetchMeQrAraliklari, fetchMeQrHareketleri } from "../../../api/qr.api";
-import { EmptyState } from "../../../components/states/EmptyState";
+import { fetchMeQrHareketleri } from "../../../api/qr.api";
 import { LoadingState } from "../../../components/states/LoadingState";
-import type {
-  MeQrAraliklariResponse,
-  MeQrAttendanceEvent,
-  MeQrIntervalAnomaly
-} from "../../../types/self-service";
-import { QrPuantajExpectationNote } from "../components/QrPuantajExpectationNote";
-import { formatSelfServiceDateTime, qrEventTypeLabel } from "../self-service-datetime";
+import type { MeQrAttendanceEvent, MeQrHistoryDay } from "../../../types/self-service";
+import { formatSelfServiceClock } from "../self-service-datetime";
+
+const WEEKDAYS = ["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"] as const;
 
 type Status =
   | { kind: "loading" }
   | {
       kind: "ready";
-      items: MeQrAttendanceEvent[];
-      intervals: MeQrAraliklariResponse;
+      from: string;
+      to: string;
+      days: MeQrHistoryDay[];
     }
   | { kind: "error"; message: string };
 
-function formatDuration(seconds: number): string {
-  const safe = Math.max(0, Math.floor(seconds));
-  const h = Math.floor(safe / 3600);
-  const m = Math.floor((safe % 3600) / 60);
-  if (h <= 0) {
-    return `${m} dk`;
-  }
-  return `${h} sa ${m} dk`;
+function parseYmd(ymd: string): { year: number; month: number; day: number } {
+  const [y, m, d] = ymd.split("-").map((part) => Number.parseInt(part, 10));
+  return { year: y, month: m, day: d };
 }
 
-function anomalyLabel(anomaly: MeQrIntervalAnomaly): string {
-  if (anomaly.type === "MISSING_CIKIS") {
-    return "Çıkış eksik";
+function formatYmd(year: number, month: number, day: number): string {
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+function istanbulLocalDate(iso: string): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Istanbul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).format(new Date(iso));
+}
+
+function deriveDaysFromItems(items: MeQrAttendanceEvent[]): MeQrHistoryDay[] {
+  const byDate = new Map<
+    string,
+    { giris: MeQrHistoryDay["giris"]; cikis: MeQrHistoryDay["cikis"]; girisUtc: string; cikisUtc: string }
+  >();
+
+  for (const item of items) {
+    const date = istanbulLocalDate(item.occurred_at);
+    const time = formatSelfServiceClock(item.occurred_at);
+    if (!byDate.has(date)) {
+      byDate.set(date, { giris: null, cikis: null, girisUtc: "", cikisUtc: "" });
+    }
+    const row = byDate.get(date)!;
+    if (item.event_type === "GIRIS") {
+      if (!row.giris || item.occurred_at < row.girisUtc) {
+        row.giris = { id: item.id, time, occurred_at: item.occurred_at, status: null };
+        row.girisUtc = item.occurred_at;
+      }
+    } else if (item.event_type === "CIKIS") {
+      if (!row.cikis || item.occurred_at > row.cikisUtc) {
+        row.cikis = { id: item.id, time, occurred_at: item.occurred_at, status: null };
+        row.cikisUtc = item.occurred_at;
+      }
+    }
   }
-  if (anomaly.type === "MISSING_GIRIS") {
-    return "Giriş eksik";
-  }
-  return "Şube uyuşmazlığı";
+
+  return [...byDate.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, row]) => {
+      const statusLines: string[] = [];
+      if (!row.giris) {
+        statusLines.push("Giriş Kaydı Bulunamadı.");
+      }
+      if (!row.cikis) {
+        statusLines.push("Çıkış Kaydı Bulunamadı.");
+      }
+      return {
+        date,
+        has_events: row.giris != null || row.cikis != null,
+        giris: row.giris,
+        cikis: row.cikis,
+        status_lines: statusLines
+      };
+    });
+}
+
+function monthRange(year: number, month: number): { from: string; to: string } {
+  const from = formatYmd(year, month, 1);
+  const lastDay = new Date(year, month, 0).getDate();
+  const to = formatYmd(year, month, lastDay);
+  return { from, to };
+}
+
+function formatMonthTitle(year: number, month: number): string {
+  const label = new Intl.DateTimeFormat("tr-TR", { month: "long", year: "numeric" }).format(
+    new Date(year, month - 1, 1)
+  );
+  return label.charAt(0).toUpperCase() + label.slice(1);
+}
+
+function formatDetailDate(ymd: string): string {
+  const { year, month, day } = parseYmd(ymd);
+  return new Intl.DateTimeFormat("tr-TR", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    weekday: "long"
+  }).format(new Date(year, month - 1, day));
 }
 
 export function PersonelQrHistoryPage() {
+  const now = new Date();
+  const [viewYear, setViewYear] = useState(now.getFullYear());
+  const [viewMonth, setViewMonth] = useState(now.getMonth() + 1);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [status, setStatus] = useState<Status>({ kind: "loading" });
 
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const [history, intervals] = await Promise.all([
-          fetchMeQrHareketleri(),
-          fetchMeQrAraliklari()
-        ]);
-        if (!cancelled) {
-          setStatus({
-            kind: "ready",
-            items: history.items,
-            intervals
-          });
-        }
-      } catch (error) {
-        if (!cancelled) {
-          const unbound =
-            isApiRequestError(error) &&
-            (error.code === "SELF_SERVICE_BINDING_REQUIRED" || error.code === "FORBIDDEN");
-          setStatus({
-            kind: "error",
-            message: unbound
-              ? "Personel bağlantınız yok veya QR hareketleri bu hesap için kapalı."
-              : "QR hareketleri yüklenemedi. Tekrar deneyin."
-          });
-        }
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
+  const loadMonth = useCallback(async (year: number, month: number) => {
+    setStatus({ kind: "loading" });
+    const { from, to } = monthRange(year, month);
+    try {
+      const history = await fetchMeQrHareketleri({ from, to });
+      const days =
+        history.days && history.days.length > 0
+          ? history.days
+          : deriveDaysFromItems(history.items);
+      setStatus({ kind: "ready", from: history.from, to: history.to, days });
+    } catch (error) {
+      const unbound =
+        isApiRequestError(error) &&
+        (error.code === "SELF_SERVICE_BINDING_REQUIRED" || error.code === "FORBIDDEN");
+      setStatus({
+        kind: "error",
+        message: unbound
+          ? "Personel bağlantınız yok veya QR hareketleri bu hesap için kapalı."
+          : "QR hareketleri yüklenemedi. Tekrar deneyin."
+      });
+    }
   }, []);
 
+  useEffect(() => {
+    void loadMonth(viewYear, viewMonth);
+  }, [loadMonth, viewYear, viewMonth]);
+
+  const daysByDate = useMemo(() => {
+    if (status.kind !== "ready") {
+      return new Map<string, MeQrHistoryDay>();
+    }
+    return new Map(status.days.map((day) => [day.date, day]));
+  }, [status]);
+
+  const calendarCells = useMemo(() => {
+    const first = new Date(viewYear, viewMonth - 1, 1);
+    const lastDay = new Date(viewYear, viewMonth, 0).getDate();
+    const startOffset = (first.getDay() + 6) % 7;
+    const cells: Array<{ date: string | null; dayNum: number | null }> = [];
+    for (let i = 0; i < startOffset; i += 1) {
+      cells.push({ date: null, dayNum: null });
+    }
+    for (let day = 1; day <= lastDay; day += 1) {
+      cells.push({ date: formatYmd(viewYear, viewMonth, day), dayNum: day });
+    }
+    return cells;
+  }, [viewMonth, viewYear]);
+
+  const selectedDay = selectedDate ? daysByDate.get(selectedDate) ?? null : null;
+
+  function shiftMonth(delta: number) {
+    const cursor = new Date(viewYear, viewMonth - 1 + delta, 1);
+    setViewYear(cursor.getFullYear());
+    setViewMonth(cursor.getMonth() + 1);
+    setSelectedDate(null);
+  }
+
   if (status.kind === "loading") {
-    return <LoadingState label="QR hareketleri yükleniyor..." />;
+    return <LoadingState label="Giriş / çıkış geçmişi yükleniyor..." />;
   }
 
   if (status.kind === "error") {
     return (
       <section className="states-page state-error" data-testid="personel-qr-history-error">
-        <h2>QR Hareketlerim</h2>
         <p>{status.message}</p>
         <Link to="/">Özet</Link>
       </section>
     );
   }
 
-  const { intervals } = status;
-  const hasIntervals = intervals.intervals.length > 0 || intervals.anomalies.length > 0;
-
   return (
-    <section className="personel-mobile-shell self-service-home" data-testid="personel-qr-history-page">
-      <header className="self-service-home__header">
-        <h2>QR Hareketlerim</h2>
-        <p>Ham giriş/çıkış kayıtları ve QR giriş/çıkış eşleşmeleri.</p>
-      </header>
+    <section className="personel-mobile-shell qr-history-page" data-testid="personel-qr-history-page">
+      <div className="qr-history-toolbar" data-testid="qr-history-calendar">
+        <button type="button" className="qr-history-nav" aria-label="Önceki ay" onClick={() => shiftMonth(-1)}>
+          ‹
+        </button>
+        <p className="qr-history-month">{formatMonthTitle(viewYear, viewMonth)}</p>
+        <button type="button" className="qr-history-nav" aria-label="Sonraki ay" onClick={() => shiftMonth(1)}>
+          ›
+        </button>
+      </div>
 
-      <QrPuantajExpectationNote />
+      <div className="qr-history-weekdays" aria-hidden="true">
+        {WEEKDAYS.map((label) => (
+          <span key={label} className="qr-history-weekday">
+            {label}
+          </span>
+        ))}
+      </div>
 
-      <section className="qr-interval-section" data-testid="personel-qr-intervals-section">
-        <h3>QR Eşleşmeleri</h3>
-        <p className="self-service-muted">
-          QR eşleşme süresi gösterilir. Kanonik çalışma süresi / puantaj hesabı sonraki fazdadır.
-        </p>
-        <p className="self-service-muted">
-          Tam eşleşme: {intervals.summary.complete_interval_count} · Anomali:{" "}
-          {intervals.summary.anomaly_count} · Toplam eşleşme:{" "}
-          {formatDuration(intervals.summary.complete_duration_seconds)}
-        </p>
+      <div className="qr-history-grid" role="grid" aria-label="Ay takvimi">
+        {calendarCells.map((cell, index) => {
+          if (!cell.date || cell.dayNum == null) {
+            return <div key={`empty-${index}`} className="qr-history-cell qr-history-cell--empty" />;
+          }
+          const dayData = daysByDate.get(cell.date);
+          const hasEvents = Boolean(dayData?.has_events || dayData?.giris || dayData?.cikis);
+          const isSelected = selectedDate === cell.date;
+          return (
+            <button
+              key={cell.date}
+              type="button"
+              className={[
+                "qr-history-cell",
+                hasEvents ? "qr-history-cell--has-events" : "",
+                isSelected ? "qr-history-cell--selected" : ""
+              ]
+                .filter(Boolean)
+                .join(" ")}
+              aria-pressed={isSelected}
+              onClick={() => setSelectedDate(cell.date)}
+            >
+              <span className="qr-history-day-num">{cell.dayNum}</span>
+              {hasEvents ? <span className="qr-history-day-dot" aria-hidden="true" /> : null}
+            </button>
+          );
+        })}
+      </div>
 
-        {!hasIntervals ? (
-          <div data-testid="personel-qr-intervals-empty">
-            <EmptyState
-              title="Eşleşme yok"
-              message="Bu dönemde tamamlanmış QR giriş/çıkış eşleşmesi yok."
-            />
-          </div>
-        ) : null}
-
-        {intervals.intervals.length > 0 ? (
-          <ul className="qr-history-list" data-testid="personel-qr-intervals-list">
-            {intervals.intervals.map((item) => (
-              <li
-                key={`${item.entry_event_id}-${item.exit_event_id}`}
-                className="qr-history-item"
-              >
-                <strong>Tam eşleşme</strong>
-                <span>
-                  {formatSelfServiceDateTime(item.entry_at)} →{" "}
-                  {formatSelfServiceDateTime(item.exit_at)}
-                </span>
-                <span>{formatDuration(item.duration_seconds)}</span>
-                <span>{item.sube.ad || `Şube #${item.sube.id}`}</span>
-                {item.spans_local_midnight ? <span>Gece yarısını aşan</span> : null}
-              </li>
-            ))}
-          </ul>
-        ) : null}
-
-        {intervals.anomalies.length > 0 ? (
-          <ul className="qr-history-list" data-testid="personel-qr-anomalies-list">
-            {intervals.anomalies.map((anomaly, index) => (
-              <li
-                key={
-                  anomaly.type === "BRANCH_MISMATCH"
-                    ? `mm-${anomaly.entry_event_id}-${anomaly.exit_event_id}`
-                    : `an-${anomaly.event_id}-${index}`
-                }
-                className="qr-history-item"
-              >
-                <strong>{anomalyLabel(anomaly)}</strong>
-                <span>
-                  {anomaly.occurred_at
-                    ? formatSelfServiceDateTime(anomaly.occurred_at)
-                    : anomaly.local_date}
-                </span>
-                {anomaly.type === "BRANCH_MISMATCH" ? (
-                  <span>
-                    {(anomaly.entry_sube.ad || `#${anomaly.entry_sube.id}`) +
-                      " → " +
-                      (anomaly.exit_sube.ad || `#${anomaly.exit_sube.id}`)}
-                  </span>
-                ) : (
-                  <span>{anomaly.sube.ad || `Şube #${anomaly.sube.id}`}</span>
-                )}
-              </li>
-            ))}
-          </ul>
-        ) : null}
-      </section>
-
-      <section data-testid="personel-qr-raw-history-section">
-        <h3>Ham QR Kayıtları</h3>
-        {status.items.length === 0 ? (
-          <div data-testid="personel-qr-raw-empty">
-            <EmptyState
-              title="Hareket yok"
-              message="Henüz QR giriş/çıkış kaydı yok. Kiosk ekranındaki kodu okuttuğunuzda burada görünür."
-            />
-          </div>
-        ) : (
-          <ul className="qr-history-list" data-testid="personel-qr-raw-list">
-            {status.items.map((item) => (
-              <li key={item.id} className="qr-history-item">
-                <span
-                  className={`qr-event-badge qr-event-badge--${item.event_type === "GIRIS" ? "giris" : "cikis"}`}
-                >
-                  {qrEventTypeLabel(item.event_type)}
-                </span>
-                <strong>{formatSelfServiceDateTime(item.occurred_at)}</strong>
-                <span>{item.sube.ad || `Şube #${item.sube.id}`}</span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+      {selectedDate ? (
+        <section className="qr-history-detail" data-testid="qr-history-day-detail">
+          <h3 className="qr-history-detail-date">{formatDetailDate(selectedDate)}</h3>
+          {selectedDay ? (
+            <>
+              <dl className="qr-history-detail-dl">
+                <div>
+                  <dt>Giriş</dt>
+                  <dd>{selectedDay.giris?.time ?? "—"}</dd>
+                </div>
+                <div>
+                  <dt>Çıkış</dt>
+                  <dd>{selectedDay.cikis?.time ?? "—"}</dd>
+                </div>
+              </dl>
+              {selectedDay.status_lines.length > 0 ? (
+                <ul className="qr-history-status-lines">
+                  {selectedDay.status_lines.map((line) => (
+                    <li key={line}>{line}</li>
+                  ))}
+                </ul>
+              ) : null}
+              {selectedDay.giris?.status?.label ? (
+                <p className="qr-history-event-status">Giriş: {selectedDay.giris.status.label}</p>
+              ) : null}
+              {selectedDay.cikis?.status?.label ? (
+                <p className="qr-history-event-status">Çıkış: {selectedDay.cikis.status.label}</p>
+              ) : null}
+            </>
+          ) : (
+            <p className="self-service-muted">Bu gün için kayıt yok.</p>
+          )}
+        </section>
+      ) : (
+        <p className="self-service-muted qr-history-hint">Detay için bir gün seçin.</p>
+      )}
 
       <nav className="pm-secondary-nav" aria-label="QR sayfa bağlantıları">
         <Link to="/">Özet</Link>

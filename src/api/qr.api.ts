@@ -2,9 +2,14 @@ import type { ApiResponse } from "../types/api";
 import type {
   MeQrAraliklariResponse,
   MeQrAttendanceEvent,
+  MeQrEarlyExitConfirm,
   MeQrHareketleriResponse,
+  MeQrHistoryDay,
+  MeQrHistoryDayEvent,
+  MeQrHistoryDayEventStatus,
   MeQrInterval,
   MeQrIntervalAnomaly,
+  MeQrLateEarlyInfo,
   MeQrScanResponse,
   ManagerQrAttendanceItem,
   ManagerQrAttendanceResponse,
@@ -101,41 +106,115 @@ export function createQrRequestNonce(): string {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
+function normalizeLateEarlyInfo(raw: unknown): MeQrLateEarlyInfo | null {
+  const row = toRecord(raw);
+  if (!row) return null;
+  const kind = readString(row.kind);
+  const message = readString(row.message);
+  const delta = readNumber(row.delta_dakika);
+  if (!kind || !message || delta === null) return null;
+  return { kind, message, delta_dakika: delta };
+}
+
+function normalizeEarlyExitConfirm(raw: unknown): MeQrEarlyExitConfirm | null {
+  const row = toRecord(raw);
+  if (!row) return null;
+  const kind = readString(row.kind);
+  const message = readString(row.message);
+  const delta = readNumber(row.delta_dakika);
+  if (!kind || !message || delta === null) return null;
+  return { kind, message, delta_dakika: delta };
+}
+
+function normalizeHistoryDayEventStatus(raw: unknown): MeQrHistoryDayEventStatus | null {
+  const row = toRecord(raw);
+  if (!row) return null;
+  const kind = readString(row.kind);
+  const label = readString(row.label) ?? readString(row.message);
+  const delta = readNumber(row.delta_dakika);
+  if (!kind || !label || delta === null) return null;
+  return { kind, label, delta_dakika: delta };
+}
+
+function normalizeHistoryDayEvent(raw: unknown): MeQrHistoryDayEvent | null {
+  const row = toRecord(raw);
+  if (!row) return null;
+  const id = readNumber(row.id);
+  const time = readString(row.time);
+  const occurredAt = readString(row.occurred_at);
+  if (id == null || !time || !occurredAt) return null;
+  const statusRaw = row.status;
+  const status =
+    statusRaw === null || statusRaw === undefined
+      ? null
+      : normalizeHistoryDayEventStatus(statusRaw);
+  return {
+    id,
+    time,
+    occurred_at: occurredAt,
+    status
+  };
+}
+
+function normalizeHistoryDay(raw: unknown): MeQrHistoryDay | null {
+  const row = toRecord(raw);
+  if (!row) return null;
+  const date = readString(row.date);
+  if (!date) return null;
+  const girisRaw = row.giris;
+  const cikisRaw = row.cikis;
+  const statusLinesRaw = Array.isArray(row.status_lines) ? row.status_lines : [];
+  return {
+    date,
+    has_events: Boolean(row.has_events),
+    giris: girisRaw == null ? null : normalizeHistoryDayEvent(girisRaw),
+    cikis: cikisRaw == null ? null : normalizeHistoryDayEvent(cikisRaw),
+    status_lines: statusLinesRaw.filter((line): line is string => typeof line === "string")
+  };
+}
+
 export async function postMeQrScan(input: {
   token: string;
   event_type: QrEventType;
   request_nonce: string;
+  early_exit_confirmed?: boolean;
 }): Promise<MeQrScanResponse> {
   if (shouldPreferDemoApi()) {
     demoUnavailable();
+  }
+  const body: Record<string, unknown> = {
+    token: input.token,
+    event_type: input.event_type,
+    request_nonce: input.request_nonce
+  };
+  if (input.early_exit_confirmed) {
+    body.early_exit_confirmed = true;
   }
   const response = await apiRequest<ApiResponse<unknown>>(endpoints.me.qrScan, {
     method: "POST",
     headers: {
       "Content-Type": "application/json"
     },
-    body: JSON.stringify({
-      token: input.token,
-      event_type: input.event_type,
-      request_nonce: input.request_nonce
-    })
+    body: JSON.stringify(body)
   });
   const data = toRecord(unwrapData(response, "/me/qr-scan yaniti gecersiz."));
   if (!data) {
     throw new ApiRequestError("/me/qr-scan yaniti gecersiz.", 500, { code: "INVALID_RESPONSE" });
   }
+  const confirmationRequired = Boolean(data.confirmation_required);
+  const eventRaw = data.event;
+  let event: MeQrAttendanceEvent | null = null;
+  if (eventRaw != null) {
+    event = normalizeEvent(eventRaw);
+  } else if (!confirmationRequired) {
+    throw new ApiRequestError("QR event alanlari eksik.", 500, { code: "INVALID_RESPONSE" });
+  }
   return {
-    event: normalizeEvent(data.event),
+    event,
     idempotent: Boolean(data.idempotent),
-    late_early_info: (() => {
-      const raw = toRecord(data.late_early_info);
-      if (!raw) return null;
-      const kind = readString(raw.kind);
-      const message = readString(raw.message);
-      const delta = readNumber(raw.delta_dakika);
-      if (!kind || !message || delta === null) return null;
-      return { kind, message, delta_dakika: delta };
-    })()
+    confirmation_required: confirmationRequired,
+    early_exit_confirm: normalizeEarlyExitConfirm(data.early_exit_confirm),
+    late_early_info: normalizeLateEarlyInfo(data.late_early_info)
   };
 }
 
@@ -158,10 +237,15 @@ export async function fetchMeQrHareketleri(params?: {
     });
   }
   const itemsRaw = Array.isArray(data.items) ? data.items : [];
+  const daysRaw = Array.isArray(data.days) ? data.days : [];
+  const days = daysRaw
+    .map((day) => normalizeHistoryDay(day))
+    .filter((day): day is MeQrHistoryDay => day !== null);
   return {
     from: readString(data.from) ?? "",
     to: readString(data.to) ?? "",
-    items: itemsRaw.map((item) => normalizeEvent(item))
+    items: itemsRaw.map((item) => normalizeEvent(item)),
+    ...(days.length > 0 ? { days } : {})
   };
 }
 

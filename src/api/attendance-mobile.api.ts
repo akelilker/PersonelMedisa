@@ -18,6 +18,7 @@ export type AttendanceBoxEvent = {
   occurred_at: string;
   local_time: string;
   display_local_time?: string;
+  correction_allowed?: boolean;
 };
 
 export type AttendanceTodayResponse = {
@@ -84,7 +85,7 @@ export async function createAttendanceCorrection(payload: {
   const data = unwrap(response, "correction");
   return {
     id: Number(data.id),
-    message: String(data.message ?? "Düzeltme talebiniz Yöneticinize iletildi."),
+    message: String(data.message ?? "Düzeltme Talebiniz Amirinize İletildi."),
     status: String(data.status ?? "BEKLIYOR")
   };
 }

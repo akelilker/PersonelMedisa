@@ -24,6 +24,41 @@ type OwnQrAttendanceBoxesProps = {
   onCorrectCikis?: (event: AttendanceEvent) => void;
 };
 
+function PencilIcon() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+    </svg>
+  );
+}
+
+function canShowCorrection(
+  allowCorrection: boolean,
+  pending: boolean,
+  event: AttendanceEvent | null,
+  onCorrect?: (event: AttendanceEvent) => void
+): event is AttendanceEvent {
+  return (
+    allowCorrection &&
+    !pending &&
+    event != null &&
+    event.correction_allowed === true &&
+    onCorrect != null
+  );
+}
+
 /**
  * Own-day GİRİŞ/ÇIKIŞ kutuları — PERSONEL home ve Mavi Yaka BIRIM_AMIRI home ortak owner.
  * Düzeltme opsiyonel; yönetim rolü / route bu bileşenden etkilenmez.
@@ -45,18 +80,25 @@ export function OwnQrAttendanceBoxes({
       <div className="pm-attendance-box" data-testid="attendance-box-giris">
         {today.giris ? (
           <>
-            <p className="pm-box-label">Giriş Saati</p>
+            <p className="pm-box-label">GİRİŞ</p>
             <p className="pm-box-time">{today.giris.display_local_time ?? today.giris.local_time}</p>
             {today.pending_giris_correction ? (
               <p className="pm-box-pending">Bekliyor</p>
-            ) : allowCorrection && onCorrectGiris ? (
+            ) : null}
+            {canShowCorrection(
+              allowCorrection,
+              Boolean(today.pending_giris_correction),
+              today.giris,
+              onCorrectGiris
+            ) ? (
               <button
                 type="button"
-                className="pm-box-action"
+                className="pm-box-pencil"
                 data-testid="giris-duzelt"
-                onClick={() => onCorrectGiris(today.giris!)}
+                aria-label="Giriş Saati Düzeltme Talebi"
+                onClick={() => onCorrectGiris!(today.giris!)}
               >
-                Düzelt
+                <PencilIcon />
               </button>
             ) : null}
           </>
@@ -81,18 +123,25 @@ export function OwnQrAttendanceBoxes({
       <div className="pm-attendance-box" data-testid="attendance-box-cikis">
         {today.cikis ? (
           <>
-            <p className="pm-box-label">Çıkış Saati</p>
+            <p className="pm-box-label">ÇIKIŞ</p>
             <p className="pm-box-time">{today.cikis.display_local_time ?? today.cikis.local_time}</p>
             {today.pending_cikis_correction ? (
               <p className="pm-box-pending">Bekliyor</p>
-            ) : allowCorrection && onCorrectCikis ? (
+            ) : null}
+            {canShowCorrection(
+              allowCorrection,
+              Boolean(today.pending_cikis_correction),
+              today.cikis,
+              onCorrectCikis
+            ) ? (
               <button
                 type="button"
-                className="pm-box-action"
+                className="pm-box-pencil"
                 data-testid="cikis-duzelt"
-                onClick={() => onCorrectCikis(today.cikis!)}
+                aria-label="Çıkış Saati Düzeltme Talebi"
+                onClick={() => onCorrectCikis!(today.cikis!)}
               >
-                Düzelt
+                <PencilIcon />
               </button>
             ) : null}
           </>

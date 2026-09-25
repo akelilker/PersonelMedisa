@@ -123,13 +123,14 @@ describe("PERSONEL collar → QR UI entitlement (render level)", () => {
     await renderHome();
 
     expect(screen.getByTestId("giris-scan")).toBeInTheDocument();
+    expect(screen.getByTestId("cikis-scan")).toBeInTheDocument();
     expect(screen.queryByTestId("giris-scan-not-entitled")).toBeNull();
-    expect(screen.getByTestId("self-qr-scan-link")).toBeInTheDocument();
-    expect(screen.getByTestId("self-qr-history-link")).toBeInTheDocument();
+    // Independent QR Okut shortcut removed; GİRİŞ/ÇIKIŞ cards are the CTA.
+    expect(screen.queryByTestId("self-qr-scan-link")).toBeNull();
+    expect(screen.queryByTestId("personel-mobile-header")).toBeNull();
     expect(screen.getByTestId("personel-today-attendance-section")).toBeInTheDocument();
-    expect(screen.getByTestId("qr-kiosk-model-note")).toBeInTheDocument();
-    expect(screen.getByTestId("qr-puantaj-expectation-note")).toBeInTheDocument();
-    expect(screen.getByTestId("personel-today-empty")).toBeInTheDocument();
+    expect(screen.queryByTestId("qr-kiosk-model-note")).toBeNull();
+    expect(screen.queryByTestId("personel-today-empty")).toBeNull();
   });
 
   it("E) PERSONEL + Beyaz Yaka: QR actions hidden, own info preserved", async () => {
@@ -138,13 +139,12 @@ describe("PERSONEL collar → QR UI entitlement (render level)", () => {
 
     expect(screen.queryByTestId("giris-scan")).toBeNull();
     expect(screen.queryByTestId("self-qr-scan-link")).toBeNull();
-    expect(screen.queryByTestId("self-qr-history-link")).toBeNull();
     expect(screen.getByTestId("giris-scan-not-entitled")).toBeInTheDocument();
     expect(screen.getByTestId("personel-qr-closed-notice")).toBeInTheDocument();
     expect(screen.queryByTestId("qr-kiosk-model-note")).toBeNull();
     // G) non-QR own self-service surfaces stay available.
     expect(screen.getByTestId("attendance-box-cikis")).toBeInTheDocument();
-    expect(screen.getByTestId("personel-mobile-header")).toHaveTextContent("Self Personel");
+    expect(screen.queryByTestId("personel-mobile-header")).toBeNull();
   });
 
   it("E) PERSONEL + Diğer: QR actions hidden, own info preserved", async () => {
@@ -174,9 +174,11 @@ describe("PERSONEL collar → QR UI entitlement (render level)", () => {
       setSession(role, "Mavi Yaka");
       await renderHome();
 
-      expect(screen.getByTestId("self-qr-scan-link"), role).toBeInTheDocument();
-      expect(screen.getByTestId("self-qr-history-link"), role).toBeInTheDocument();
+      // PersonelSelfServiceHomePage no longer hosts SelfServiceQrShortcuts;
+      // entitlement still surfaces via GİRİŞ/ÇIKIŞ cards.
+      expect(screen.queryByTestId("self-qr-scan-link"), role).toBeNull();
       expect(screen.getByTestId("giris-scan"), role).toBeInTheDocument();
+      expect(screen.getByTestId("cikis-scan"), role).toBeInTheDocument();
       cleanup();
     }
   });
@@ -187,11 +189,10 @@ describe("PERSONEL collar → QR UI entitlement (render level)", () => {
       await renderHome();
 
       expect(screen.queryByTestId("self-qr-scan-link"), role).toBeNull();
-      expect(screen.queryByTestId("self-qr-history-link"), role).toBeNull();
       expect(screen.queryByTestId("giris-scan"), role).toBeNull();
-      // G) kendi bilgisi ve non-QR self-service korunur.
-      expect(screen.getByTestId("personel-mobile-header"), role).toHaveTextContent("Self Personel");
+      // G) non-QR own boxes remain (closed state).
       expect(screen.getByTestId("giris-scan-not-entitled"), role).toBeInTheDocument();
+      expect(screen.getByTestId("personel-qr-closed-notice"), role).toBeInTheDocument();
       cleanup();
     }
   });
@@ -205,7 +206,7 @@ describe("PERSONEL collar → QR UI entitlement (render level)", () => {
     expect(screen.getByTestId("giris-scan-not-entitled")).toBeInTheDocument();
   });
 
-  it("shows incomplete-day warning when giriş exists without çıkış", async () => {
+  it("open-shift day shows recorded giriş and enabled çıkış CTA without helper copy", async () => {
     const { fetchAttendanceToday } = await import("../../src/api/attendance-mobile.api");
     vi.mocked(fetchAttendanceToday).mockResolvedValueOnce({
       ...attendance,
@@ -221,9 +222,9 @@ describe("PERSONEL collar → QR UI entitlement (render level)", () => {
     setSession("PERSONEL", "Mavi Yaka");
     await renderHome();
 
-    expect(screen.getByTestId("personel-incomplete-day-warning")).toHaveTextContent(
-      "çıkış için şube kiosk QR"
-    );
+    expect(screen.getByTestId("attendance-box-giris")).toHaveTextContent("08:12");
+    expect(screen.getByTestId("cikis-scan")).toBeEnabled();
+    expect(screen.queryByTestId("personel-incomplete-day-warning")).toBeNull();
     expect(screen.queryByTestId("personel-today-empty")).toBeNull();
   });
 });

@@ -68,7 +68,7 @@ Verification yapmak mutation değildir; write/apply ayrıca explicit onay ister.
 
 | ID | Konu | Not |
 | --- | --- | --- |
-| `BL-QR-PILOT-OPS` | QR pilot checklist maddeleri (secret/HTTPS/roster/smoke) | Kod hazır; saha/ops tick gerekir — `QR_ATTENDANCE_PILOT_READINESS_CHECKLIST.md` |
+| `BL-QR-PILOT-OPS` | QR pilot checklist maddeleri (secret/HTTPS/roster/smoke) | **PARTIAL_REMOTE_PASS 2026-09-25:** HTTPS + secret/TTL mint (`ttl=60`) + `/qr-kiosk` + token Fabrika/Kayseri OK (secret değeri okunmadı). Kalan: kamera/cihaz/roster/smoke saha tick — `QR_ATTENDANCE_PILOT_READINESS_CHECKLIST.md` |
 | `BL-SINEM-HALIL-LIVE` | Sinem / Halil live identity & managed-branch verify | Live certify OK: Sinem `sinemH`/`110`/`173`; Halil `040`/`50`/`112` |
 | `BL-KAYSERI-KUBRA` | Kayseri manager Kübra Güneş | **BLOCKER CLOSED / APPLIED** (2026-09-25): user `64` / `kubraG` / personel `126`; `rol=SUBE_YONETICISI`; Kayseri access `[4]`; Kayseri manager assignment `[64]` |
 | `BL-NAME-203` | personel 203 ad/soyad | Live: `Muhammed` / `Mahmud` — **doğru; işlem yapılmadı** |
@@ -113,5 +113,6 @@ POST_PR403_KUBRA_FINAL_CLOSURE (2026-09-25): Kübra `PERSONEL` → `SUBE_YONETIC
 
 ## Next gate
 
-1. QR D kararları kodlanmaz; pilot ops (`BL-QR-PILOT-OPS`) ayrı.
-2. Karyapı/Şenay + 120/158/219 rollout sonra.
+1. `BL-QR-PILOT-OPS` kalan saha tick’leri (kamera/cihaz/roster/GİRİŞ-ÇIKIŞ smoke) — remote config/HTTPS/kiosk mint PASS.
+2. QR D kararları kodlanmaz (device bind / offline / anomaly UX).
+3. Karyapı/Şenay + 120/158/219 rollout sonra.

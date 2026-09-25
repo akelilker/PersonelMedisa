@@ -21,16 +21,16 @@
 
 ## 2) Production config (değer yazma yok)
 
-- [ ] `qr_signing_secret` production `medisa_config` içinde tanımlı mı? (değer bu belgeye / chate / log’a **asla** yazılmaz)
-- [ ] Secret placeholder (`CHANGE_ME…`) veya &lt;32 karakter değil mi?
-- [ ] `qr_ttl_seconds` 30–120 aralığında mı? (geçersiz → sunucu default 60)
-- [ ] Eksik secret → yalnız QR uçları `QR_CONFIG_NOT_READY` (503); uygulama genelinin ayakta kaldığı doğrulandı mı?
+- [x] `qr_signing_secret` production `medisa_config` içinde tanımlı mı? (değer bu belgeye / chate / log’a **asla** yazılmaz) — **REMOTE_PASS 2026-09-25:** `GET /qr-kiosk/token?sube_id=1|4` → 200 + token (secret değeri okunmadı/yazılmadı)
+- [x] Secret placeholder (`CHANGE_ME…`) veya &lt;32 karakter değil mi? — **REMOTE_PASS 2026-09-25:** mint başarılı ⇒ placeholder/fail-closed path değil (`QR_CONFIG_NOT_READY` yok)
+- [x] `qr_ttl_seconds` 30–120 aralığında mı? (geçersiz → sunucu default 60) — **REMOTE_PASS 2026-09-25:** `ttl_seconds=60`
+- [ ] Eksik secret → yalnız QR uçları `QR_CONFIG_NOT_READY` (503); uygulama genelinin ayakta kaldığı doğrulandı mı? — negatif config testi bu turda yapılmadı
 
 ---
 
 ## 3) HTTPS / kamera / cihaz
 
-- [ ] Kiosk ve personel app **HTTPS** (secure context) üzerinden açılıyor
+- [x] Kiosk ve personel app **HTTPS** (secure context) üzerinden açılıyor — **REMOTE_PASS 2026-09-25:** `https://www.karmotors.com.tr/personelmedisa/`
 - [ ] Kamera izni akışı test edildi (izin reddi / kamera yok / başka app kullanıyor mesajları)
 - [ ] iPhone Safari smoke
 - [ ] Android Chrome smoke
@@ -40,7 +40,7 @@
 
 ## 4) Kiosk
 
-- [ ] `/qr-kiosk` yetkili hesapla açılıyor (`qr.kiosk.display`)
+- [x] `/qr-kiosk` yetkili hesapla açılıyor (`qr.kiosk.display`) — **REMOTE_PASS 2026-09-25:** route 200; token mint `ilkerA`/`GENEL_YONETICI` + `sube_id` Fabrika/Kayseri
 - [ ] Token TTL içinde yenileniyor; süre dolunca personelde “QR süresi doldu” mesajı bekleniyor
 - [ ] Ekran kilidi / sleep politikası saha için uygun
 - [ ] Yanlış şube QR → `QR_CROSS_BRANCH_DENIED` (personelin güncel şubesi ↔ token `sube_id`)
@@ -89,3 +89,11 @@
 ---
 
 **Owner referansları:** `QrTokenService`, `QrConfig`, `QrAttendanceEventService`, `QrPuantajCandidateDecisionService`, `RolePermissions::hasQrSelfServiceEntitlement`, `docs/guncel/105–109`.
+
+---
+
+## Remote verify log (BL-QR-PILOT-OPS)
+
+| Tarih | Kanıt | Sonuç |
+| --- | --- | --- |
+| 2026-09-25 | HTTPS + `/api/health` 200 + `/qr-kiosk` 200 + `/qr-kiosk/token?sube_id=1|4` 200, `ttl_seconds=60`, secret değeri okunmadı | **PARTIAL_REMOTE_PASS** — config/HTTPS/kiosk mint OK; kamera/cihaz/roster/smoke saha tick’leri açık |

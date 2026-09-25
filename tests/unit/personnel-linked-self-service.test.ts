@@ -278,7 +278,8 @@ describe("personnel-linked self-service authorization", () => {
       "utf8"
     );
     expect(boxes).toContain("qrEnabled");
-    expect(boxes).toContain(") : qrEnabled ? (");
+    expect(boxes).toContain("const girisActionable = qrEnabled && today.can_scan_giris;");
+    expect(boxes).toContain("const cikisActionable = qrEnabled && today.can_scan_cikis;");
     expect(boxes).toContain('data-testid="giris-scan"');
     expect(boxes).toContain('data-testid="cikis-scan"');
     expect(boxes).toContain('data-testid="giris-scan-not-entitled"');

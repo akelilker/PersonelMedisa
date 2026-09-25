@@ -57,6 +57,7 @@ POST_PR403 kullanıcı kararı (2026-09-25). Bu turda **kodlama yok**; yalnız k
 | `BL-QR-OFFLINE` | Offline QR write | **YAPILMAYACAK** — QR yalnız online; internet yoksa kayıt yok; kuyruk/sonradan gönderim yok | Offline write yok |
 | `BL-QR-ANOMALY-REV` | Hatalı/eksik/çift giriş-çıkış | Personel kendi kaydını düzeltemez; amire bildirim; düzeltme yetkisi amirde. **Bu turda kodlanmaz** — yalnız karar | Hint-only / controlled self-revision yok |
 | `BL-KARYAPI-SENAY` | Karyapı / Şenay rollout | **Daha sonra** | Grant/assignment uydurma |
+| `BL-SERHAN-MEDISA-ACCESS` | Serhan Köse Medisa şube erişimi | Sinem Hamaloğlu gibi **Medisa** aktif şubelerde yetkili (`user_subeler`). Karyapı/Şenay rollout dışı. Ankara/İstanbul/Sakarya için ayrıca `sube_sorumlu_yoneticiler` yazılmaz — erişim kararı; şube sorumlusu ataması değil | Karar kaydı; bu PR’da apply yok |
 
 ---
 
@@ -93,13 +94,14 @@ Verification yapmak mutation değildir; write/apply ayrıca explicit onay ister.
 ## Decision registry (özet)
 
 POST_PR403 kaydedildi (kodlama yok):
-`BL-FORM-HINT` · `BL-QR-DEVICE-BIND` · `BL-QR-OFFLINE` · `BL-QR-ANOMALY-REV` · `BL-KARYAPI-SENAY`.
+`BL-FORM-HINT` · `BL-QR-DEVICE-BIND` · `BL-QR-OFFLINE` · `BL-QR-ANOMALY-REV` · `BL-KARYAPI-SENAY` · `BL-SERHAN-MEDISA-ACCESS`.
 
 ---
 
 ## Operational approval registry (özet)
 
 ID listesi (E): `BL-QR-PILOT-OPS` · `BL-SINEM-HALIL-LIVE` · `BL-KAYSERI-KUBRA` · `BL-NAME-203` · `BL-BM-ASSIGN-WRITE` · `BL-CROSS-COMPANY` · `BL-STALE-BRANCH-DELETE`.
+Access apply (ayrı): Sinem + Serhan Medisa-all `user_subeler` — karar D’de; write bu turda yok.
 
 Ayrım: live identity verification / business truth confirmation ≠ production write. Write/apply yalnız ayrı onayla.
 

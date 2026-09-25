@@ -105,20 +105,61 @@ export type MeQrAttendanceEvent = {
   };
 };
 
+export type MeQrLateEarlyInfo = {
+  kind: string;
+  message: string;
+  delta_dakika: number;
+};
+
+export type MeQrEarlyExitConfirm = {
+  kind: string;
+  message: string;
+  delta_dakika: number;
+};
+
 export type MeQrScanResponse = {
-  event: MeQrAttendanceEvent;
+  event: MeQrAttendanceEvent | null;
   idempotent: boolean;
-  late_early_info?: {
-    kind: string;
-    message: string;
-    delta_dakika: number;
-  } | null;
+  confirmation_required?: boolean;
+  early_exit_confirm?: MeQrEarlyExitConfirm | null;
+  late_early_info?: MeQrLateEarlyInfo | null;
+};
+
+export type MeQrHistoryDayEventStatus = {
+  kind: string;
+  label: string;
+  delta_dakika: number;
+};
+
+export type MeQrHistoryPendingCorrection = {
+  id: number;
+  status: string;
+  status_label: string;
+  requested_local_time: string;
+};
+
+export type MeQrHistoryDayEvent = {
+  id: number;
+  time: string;
+  occurred_at: string;
+  status: MeQrHistoryDayEventStatus | null;
+  correction_allowed?: boolean;
+  pending_correction?: MeQrHistoryPendingCorrection | null;
+};
+
+export type MeQrHistoryDay = {
+  date: string;
+  has_events: boolean;
+  giris: MeQrHistoryDayEvent | null;
+  cikis: MeQrHistoryDayEvent | null;
+  status_lines: string[];
 };
 
 export type MeQrHareketleriResponse = {
   from: string;
   to: string;
   items: MeQrAttendanceEvent[];
+  days?: MeQrHistoryDay[];
 };
 
 export type MeQrIntervalSube = {

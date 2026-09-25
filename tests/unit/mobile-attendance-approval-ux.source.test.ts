@@ -32,14 +32,17 @@ describe("mobile attendance approval UX source contracts", () => {
     expect(hasRolePermission("SUBE_YONETICISI", "attendance.correction.decide")).toBe(false);
 
     const home = read("src/features/self-service/pages/PersonelSelfServiceHomePage.tsx");
-    expect(home.toLowerCase()).not.toContain("amir");
-    expect(home).toContain("Yöneticinize");
-    expect(home).toContain("pm-context-bar");
+    expect(home).not.toContain("pm-context-bar");
     expect(home).not.toContain("PERSONEL YÖN. SİST.");
     expect(home).not.toContain("ANASAYFA");
     expect(home).toContain("OwnQrAttendanceBoxes");
     expect(home).toContain('testId="personel-attendance-boxes"');
+    expect(home).toContain("AttendanceCorrectionRequestModal");
     expect(home).toContain("BackgroundlessNoticeModal");
+
+    const correctModal = read("src/features/self-service/components/AttendanceCorrectionRequestModal.tsx");
+    expect(correctModal).toContain("Amirinize");
+    expect(correctModal).toContain("Giriş Saatinizle İlgili Düzeltme Talebi Oluşturulsun mu?");
 
     const boxes = read("src/features/self-service/components/OwnQrAttendanceBoxes.tsx");
     expect(boxes).toContain("attendance-box-giris");

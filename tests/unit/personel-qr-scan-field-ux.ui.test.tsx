@@ -32,14 +32,12 @@ function renderScan(entry = "/self/qr-okut") {
 }
 
 describe("PersonelQrScanPage field UX", () => {
-  it("idle: shows short lead + Kamerayı aç CTA without duplicate page heading", () => {
+  it("idle: shows QR Okut CTA without duplicate page heading", () => {
     renderScan();
-    expect(screen.getByTestId("qr-scan-lead")).toHaveTextContent(
-      "Şube kiosk ekranındaki QR kodunu okutun."
-    );
-    expect(screen.getByTestId("qr-scan-start")).toBeInTheDocument();
+    expect(screen.getByTestId("qr-scan-start")).toHaveTextContent("QR Okut");
     expect(screen.getByTestId("qr-scan-cta-zone")).toContainElement(screen.getByTestId("qr-scan-start"));
     expect(screen.queryByRole("heading", { level: 2 })).toBeNull();
+    expect(screen.queryByTestId("qr-scan-lead")).toBeNull();
   });
 
   it("CTA click starts camera path and enters scanning state", async () => {
@@ -48,7 +46,7 @@ describe("PersonelQrScanPage field UX", () => {
     await waitFor(() => {
       expect(startQrScanner).toHaveBeenCalledTimes(1);
     });
-    expect(screen.getByTestId("qr-scan-scanning")).toBeInTheDocument();
+    expect(screen.getByTestId("qr-scan-scanning")).toHaveTextContent("QR Okutun");
     expect(screen.getByTestId("qr-scan-video-wrap")).toHaveTextContent("Kodu çerçeveye hizalayın");
   });
 
@@ -69,7 +67,7 @@ describe("PersonelQrScanPage field UX", () => {
   it("error state keeps retry CTA reachable", async () => {
     startQrScanner.mockImplementation(async ({ onError }: { onError: (m: string) => void }) => {
       queueMicrotask(() =>
-        onError("Kamera izni reddedildi. Tarayıcı ayarlarından kamera erişimini açın.")
+        onError("Telefon Ayarlarınızdan Kamera Erişimine İzin Verin.")
       );
       return { stop: vi.fn() };
     });

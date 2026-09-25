@@ -12,12 +12,20 @@ export type MobileCapabilities = {
   coming_soon_message: string | null;
 };
 
+export type AttendanceBoxEventStatus = {
+  kind: string;
+  label: string;
+  delta_dakika: number;
+};
+
 export type AttendanceBoxEvent = {
   id: number;
   event_type: "GIRIS" | "CIKIS";
   occurred_at: string;
   local_time: string;
   display_local_time?: string;
+  correction_allowed?: boolean;
+  status?: AttendanceBoxEventStatus | null;
 };
 
 export type AttendanceTodayResponse = {
@@ -84,7 +92,7 @@ export async function createAttendanceCorrection(payload: {
   const data = unwrap(response, "correction");
   return {
     id: Number(data.id),
-    message: String(data.message ?? "Düzeltme talebiniz Yöneticinize iletildi."),
+    message: String(data.message ?? "Düzeltme Talebiniz Amirinize İletildi."),
     status: String(data.status ?? "BEKLIYOR")
   };
 }

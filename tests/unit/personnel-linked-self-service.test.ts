@@ -264,11 +264,10 @@ describe("personnel-linked self-service authorization", () => {
       "utf8"
     );
     expect(home).toContain('hasPermission("self_service.qr.scan")');
-    // QR CTA/link owner tek: paylaşılan component. Paralel QR UI yok.
-    expect(home).toContain("<SelfServiceQrShortcuts />");
+    // PERSONEL product home: OwnQrAttendanceBoxes only — no shortcut strip / employer notes.
+    expect(home).not.toContain("<SelfServiceQrShortcuts");
     expect(home).not.toContain('data-testid="self-qr-scan-link"');
     expect(home).not.toContain('data-testid="self-qr-history-link"');
-    // GİRİŞ/ÇIKIŞ kutuları OwnQrAttendanceBoxes owner'ında; page qrEnabled'i prop olarak iletir.
     expect(home).toContain("<OwnQrAttendanceBoxes");
     expect(home).toContain("qrEnabled={qrEnabled}");
     expect(home).not.toContain('data-testid="giris-scan"');

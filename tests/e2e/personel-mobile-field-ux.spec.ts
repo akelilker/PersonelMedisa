@@ -29,11 +29,12 @@ test.describe("personel mobile field UX — QR scan modal", () => {
 
       const modalTitle = page.locator(".modal-header h2").first();
       await expect(modalTitle).toBeVisible();
-      await expect(modalTitle).toHaveText("QR ile Giriş");
+      await expect(modalTitle).toHaveText("Giriş");
       await expect(modalTitle).not.toHaveText("Modül");
 
       const cta = page.getByTestId("qr-scan-start");
       await expect(cta).toBeVisible();
+      await expect(cta).toHaveText("QR Okut");
       const ctaBox = await cta.boundingBox();
       expect(ctaBox).toBeTruthy();
       expect(ctaBox!.y + ctaBox!.height).toBeLessThanOrEqual(viewport.height + 1);
@@ -72,10 +73,10 @@ test.describe("personel mobile field UX — QR scan modal", () => {
     }
   });
 
-  test("CIKIS preset title is QR ile Çıkış; no-preset title is QR Okut", async ({ page }) => {
+  test("CIKIS preset title is Çıkış; no-preset title is QR Okut", async ({ page }) => {
     await page.setViewportSize({ width: 393, height: 852 });
     await openQrScan(page, "CIKIS");
-    await expect(page.locator(".modal-header h2").first()).toHaveText("QR ile Çıkış");
+    await expect(page.locator(".modal-header h2").first()).toHaveText("Çıkış");
 
     await openQrScan(page);
     await expect(page.locator(".modal-header h2").first()).toHaveText("QR Okut");

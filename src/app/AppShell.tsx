@@ -59,10 +59,10 @@ function resolveBackBar(pathname: string, state?: unknown): { to: string; label:
 
 function resolveQrScanModalTitle(eventParam: string | null): string {
   if (eventParam === "GIRIS") {
-    return "QR ile Giriş";
+    return "Giriş";
   }
   if (eventParam === "CIKIS") {
-    return "QR ile Çıkış";
+    return "Çıkış";
   }
   return "QR Okut";
 }
@@ -134,7 +134,7 @@ function resolveModuleModal(
     return { title: resolveQrScanModalTitle(eventParam), closeTo: "/" };
   }
   if (pathname === "/self/qr-hareketleri") {
-    return { title: "QR Hareketlerim", closeTo: "/" };
+    return { title: "Giriş / Çıkış Geçmişim", closeTo: "/" };
   }
   if (pathname === "/self") {
     return { title: "Öz Servis", closeTo: "/" };
@@ -239,8 +239,8 @@ export function AppShell() {
         <div className="shell-top-stack">
           <Hero
             title="Personel Yönetim Sistemi"
-            userLabel={session?.user.ad_soyad}
-            subeLabel={activeSubeLabel}
+            userLabel={session?.user.rol === "PERSONEL" ? null : session?.user.ad_soyad}
+            subeLabel={session?.user.rol === "PERSONEL" ? null : activeSubeLabel}
           />
           {showShellHeaderActions ? <ShellHeaderActions contextLabel="Ana panel" minimal={isHomeRoute} /> : null}
         </div>

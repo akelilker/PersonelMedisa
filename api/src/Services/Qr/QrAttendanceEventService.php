@@ -127,6 +127,37 @@ class QrAttendanceEventService
         $issuedAt = self::unixToUtcMicro((int) $claims['iat']);
         $expiresAt = self::unixToUtcMicro((int) $claims['exp']);
 
+        // Early-exit pre-confirm: server authoritative. No event write until confirmed.
+        $earlyExitConfirmed = !empty($body['early_exit_confirmed']);
+        $earlyExitConfirm = null;
+        if (
+            $eventType === 'CIKIS'
+            && !$earlyExitConfirmed
+            && empty($body['__skip_late_early'])
+        ) {
+            $confirmBusinessDate = (new \DateTimeImmutable($occurredAt, new \DateTimeZone('UTC')))
+                ->setTimezone(new \DateTimeZone('Europe/Istanbul'))
+                ->format('Y-m-d');
+            $confirmPlanned = \Medisa\Api\Services\Attendance\LateEarlyInfoService::loadPlannedDay(
+                $pdo,
+                $personelId,
+                $confirmBusinessDate
+            );
+            $earlyExitConfirm = \Medisa\Api\Services\Attendance\LateEarlyInfoService::evaluateEarlyExitConfirmation(
+                $occurredAt,
+                $confirmPlanned
+            );
+            if (is_array($earlyExitConfirm)) {
+                return [
+                    'event' => null,
+                    'idempotent' => false,
+                    'confirmation_required' => true,
+                    'early_exit_confirm' => $earlyExitConfirm,
+                    'late_early_info' => null,
+                ];
+            }
+        }
+
         try {
             $stmt = $pdo->prepare(
                 'INSERT INTO qr_attendance_events
@@ -206,12 +237,18 @@ class QrAttendanceEventService
             );
             if (is_array($lateEarly)) {
                 try {
+                    $notifTitle = isset($lateEarly['notification_title'])
+                        ? (string) $lateEarly['notification_title']
+                        : ($lateEarly['kind'] === 'LATE_ENTRY_INFO' ? 'Geç Giriş' : 'Erken Çıkış');
+                    $notifBody = isset($lateEarly['notification_body'])
+                        ? (string) $lateEarly['notification_body']
+                        : (string) $lateEarly['message'];
                     \Medisa\Api\Services\SelfService\PersonelInboxNotificationService::create(
                         $pdo,
                         $userId,
                         $lateEarly['kind'],
-                        $lateEarly['kind'] === 'LATE_ENTRY_INFO' ? 'Geç Giriş Bilgisi' : 'Erken Çıkış Bilgisi',
-                        (string) $lateEarly['message'],
+                        $notifTitle,
+                        $notifBody,
                         $personelId,
                         null,
                         [
@@ -231,6 +268,8 @@ class QrAttendanceEventService
         return [
             'event' => $publicEvent,
             'idempotent' => false,
+            'confirmation_required' => false,
+            'early_exit_confirm' => null,
             'late_early_info' => $lateEarly,
         ];
     }
@@ -339,15 +378,148 @@ class QrAttendanceEventService
             'to_utc' => $range['to_exclusive_utc'],
         ]);
         $items = [];
+        $byDay = [];
         while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-            $items[] = [
+            $occurredUtc = (string) $row['occurred_at_utc'];
+            $localDate = (new \DateTimeImmutable($occurredUtc, new \DateTimeZone('UTC')))
+                ->setTimezone(new \DateTimeZone('Europe/Istanbul'))
+                ->format('Y-m-d');
+            $localTime = (new \DateTimeImmutable($occurredUtc, new \DateTimeZone('UTC')))
+                ->setTimezone(new \DateTimeZone('Europe/Istanbul'))
+                ->format('H:i');
+            $public = [
                 'id' => (int) $row['id'],
                 'event_type' => (string) $row['event_type'],
-                'occurred_at' => self::formatUtcForClient((string) $row['occurred_at_utc']),
+                'occurred_at' => self::formatUtcForClient($occurredUtc),
                 'sube' => [
                     'id' => (int) $row['sube_id'],
                     'ad' => (string) ($row['sube_ad'] ?? ''),
                 ],
+            ];
+            $items[] = $public;
+            if (!isset($byDay[$localDate])) {
+                $byDay[$localDate] = [
+                    'date' => $localDate,
+                    'giris' => null,
+                    'cikis' => null,
+                    'giris_utc' => null,
+                    'cikis_utc' => null,
+                ];
+            }
+            if ($public['event_type'] === 'GIRIS') {
+                // First GIRIS of the day chronologically → keep earliest (list is DESC)
+                if ($byDay[$localDate]['giris'] === null || $occurredUtc < (string) $byDay[$localDate]['giris_utc']) {
+                    $byDay[$localDate]['giris'] = [
+                        'id' => $public['id'],
+                        'time' => $localTime,
+                        'occurred_at' => $public['occurred_at'],
+                    ];
+                    $byDay[$localDate]['giris_utc'] = $occurredUtc;
+                }
+            } elseif ($public['event_type'] === 'CIKIS') {
+                // Last CIKIS of the day → keep latest
+                if ($byDay[$localDate]['cikis'] === null || $occurredUtc > (string) $byDay[$localDate]['cikis_utc']) {
+                    $byDay[$localDate]['cikis'] = [
+                        'id' => $public['id'],
+                        'time' => $localTime,
+                        'occurred_at' => $public['occurred_at'],
+                    ];
+                    $byDay[$localDate]['cikis_utc'] = $occurredUtc;
+                }
+            }
+        }
+
+        $days = [];
+        ksort($byDay);
+        foreach ($byDay as $day) {
+            $planned = \Medisa\Api\Services\Attendance\LateEarlyInfoService::loadPlannedDay(
+                $pdo,
+                $personelId,
+                (string) $day['date']
+            );
+            $statusLines = [];
+            $girisStatus = null;
+            $cikisStatus = null;
+            if ($day['giris'] === null) {
+                $statusLines[] = 'Giriş Kaydı Bulunamadı.';
+            } else {
+                $late = \Medisa\Api\Services\Attendance\LateEarlyInfoService::evaluateAfterScan(
+                    'GIRIS',
+                    (string) $day['giris_utc'],
+                    $planned
+                );
+                if (is_array($late)) {
+                    $girisStatus = [
+                        'kind' => $late['kind'],
+                        'label' => isset($late['card_label']) ? (string) $late['card_label'] : (string) $late['message'],
+                        'delta_dakika' => (int) $late['delta_dakika'],
+                    ];
+                    $statusLines[] = $girisStatus['label'];
+                } else {
+                    $girisStatus = ['kind' => 'NORMAL', 'label' => 'Normal', 'delta_dakika' => 0];
+                }
+            }
+            if ($day['cikis'] === null) {
+                $statusLines[] = 'Çıkış Kaydı Bulunamadı.';
+            } else {
+                $early = \Medisa\Api\Services\Attendance\LateEarlyInfoService::evaluateAfterScan(
+                    'CIKIS',
+                    (string) $day['cikis_utc'],
+                    $planned
+                );
+                if (is_array($early)) {
+                    $cikisStatus = [
+                        'kind' => $early['kind'],
+                        'label' => isset($early['card_label']) ? (string) $early['card_label'] : (string) $early['message'],
+                        'delta_dakika' => (int) $early['delta_dakika'],
+                    ];
+                    $statusLines[] = $cikisStatus['label'];
+                } else {
+                    $cikisStatus = ['kind' => 'NORMAL', 'label' => 'Normal', 'delta_dakika' => 0];
+                }
+            }
+            if (
+                $day['giris'] !== null
+                && $day['cikis'] !== null
+                && $girisStatus !== null
+                && $cikisStatus !== null
+                && $girisStatus['kind'] === 'NORMAL'
+                && $cikisStatus['kind'] === 'NORMAL'
+                && $statusLines === []
+            ) {
+                $statusLines[] = 'Normal';
+            } elseif (
+                $day['giris'] !== null
+                && $day['cikis'] !== null
+                && $girisStatus !== null
+                && $cikisStatus !== null
+                && $girisStatus['kind'] === 'NORMAL'
+                && $cikisStatus['kind'] === 'NORMAL'
+            ) {
+                // both normal — ensure single Normal line
+                $statusLines = ['Normal'];
+            }
+
+            $days[] = [
+                'date' => $day['date'],
+                'has_events' => true,
+                'giris' => $day['giris'] === null
+                    ? null
+                    : [
+                        'id' => $day['giris']['id'],
+                        'time' => $day['giris']['time'],
+                        'occurred_at' => $day['giris']['occurred_at'],
+                        'status' => $girisStatus,
+                    ],
+                'cikis' => $day['cikis'] === null
+                    ? null
+                    : [
+                        'id' => $day['cikis']['id'],
+                        'time' => $day['cikis']['time'],
+                        'occurred_at' => $day['cikis']['occurred_at'],
+                        'status' => $cikisStatus,
+                    ],
+                'status_lines' => $statusLines,
             ];
         }
 
@@ -355,6 +527,7 @@ class QrAttendanceEventService
             'from' => $range['from'],
             'to' => $range['to'],
             'items' => $items,
+            'days' => $days,
         ];
     }
 

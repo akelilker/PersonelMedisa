@@ -230,10 +230,21 @@ class MeController
 
         try {
             $result = QrAttendanceEventService::scan($pdo, $user, $body);
+            if (!empty($result['confirmation_required'])) {
+                JsonResponse::success([
+                    'event' => null,
+                    'idempotent' => false,
+                    'confirmation_required' => true,
+                    'early_exit_confirm' => $result['early_exit_confirm'] ?? null,
+                    'late_early_info' => null,
+                ], [], 200);
+            }
             $status = !empty($result['idempotent']) ? 200 : 201;
             JsonResponse::success([
                 'event' => $result['event'],
                 'idempotent' => (bool) $result['idempotent'],
+                'confirmation_required' => false,
+                'early_exit_confirm' => null,
                 'late_early_info' => $result['late_early_info'] ?? null,
             ], [], $status);
         } catch (QrAttendanceException $e) {

@@ -78,6 +78,20 @@ class QrAttendanceCorrectionService
             throw new QrAttendanceException('NOT_FOUND', 'QR hareketi bulunamadi.', 404, 'source_event_id');
         }
 
+        $allowed = \Medisa\Api\Services\Attendance\AttendanceBusinessDayService::isCorrectionAllowedNow(
+            $pdo,
+            (int) $ctx['personel_id'],
+            (string) $event['occurred_at_utc']
+        );
+        if (!$allowed) {
+            throw new QrAttendanceException(
+                'CORRECTION_WINDOW_CLOSED',
+                'Bu Kayıt İçin Düzeltme Talebi Süresi Doldu. Amirinizle Görüşün.',
+                409,
+                'source_event_id'
+            );
+        }
+
         $pending = $pdo->prepare(
             "SELECT id FROM qr_attendance_correction_requests
              WHERE source_event_id = :eid AND status = 'BEKLIYOR' LIMIT 1"
@@ -283,8 +297,15 @@ class QrAttendanceCorrectionService
                     'gp_id' => $gunlukId,
                     'id' => $requestId,
                 ]);
-                $personnelTitle = 'Düzeltme Talebiniz Onaylandı.';
-                $personnelBody = 'Talebiniz, Yöneticiniz Tarafından Onaylandı.';
+                $eventType = (string) $row['event_type'];
+                $effectiveLocal = (string) $row['requested_local_time'];
+                if ($eventType === 'CIKIS') {
+                    $personnelTitle = 'Düzeltme Talebiniz Uygun Görüldü.';
+                    $personnelBody = 'Güncellenen Çıkış Saati ' . $effectiveLocal;
+                } else {
+                    $personnelTitle = 'Düzeltme Talebiniz Uygun Görüldü.';
+                    $personnelBody = 'Güncellenen Giriş Saati ' . $effectiveLocal;
+                }
                 $kind = 'ATTENDANCE_CORRECTION_APPROVED';
             } else {
                 $upd = $pdo->prepare(
@@ -299,8 +320,14 @@ class QrAttendanceCorrectionService
                     'now' => $now,
                     'id' => $requestId,
                 ]);
-                $personnelTitle = 'Düzeltme Talebiniz Reddedildi.';
-                $personnelBody = 'Talebiniz, Yöneticiniz Tarafından Uygun Görülmedi.';
+                $eventType = (string) $row['event_type'];
+                if ($eventType === 'CIKIS') {
+                    $personnelTitle = 'Çıkış Saati Düzeltme Talebiniz Uygun Bulunmadı.';
+                    $personnelBody = 'Çıkış Saati Düzeltme Talebiniz Uygun Bulunmadı.';
+                } else {
+                    $personnelTitle = 'Giriş Saati Düzeltme Talebiniz Uygun Bulunmadı.';
+                    $personnelBody = 'Giriş Saati Düzeltme Talebiniz Uygun Bulunmadı.';
+                }
                 $kind = 'ATTENDANCE_CORRECTION_REJECTED';
             }
 
@@ -490,7 +517,7 @@ class QrAttendanceCorrectionService
             'decision_at' => $row['decision_at_utc'] !== null
                 ? self::formatClient((string) $row['decision_at_utc'])
                 : null,
-            'message' => 'Düzeltme talebiniz Yöneticinize iletildi.',
+            'message' => 'Düzeltme Talebiniz Amirinize İletildi.',
         ];
     }
 

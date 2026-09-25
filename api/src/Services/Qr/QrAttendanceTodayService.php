@@ -59,6 +59,7 @@ class QrAttendanceTodayService
                         'id' => (int) $row['id'],
                         'event_type' => (string) $row['event_type'],
                         'occurred_at' => self::formatClient((string) $row['occurred_at_utc']),
+                        'occurred_at_utc' => (string) $row['occurred_at_utc'],
                         'local_time' => self::hhmm((string) $row['occurred_at_utc']),
                     ];
                     if ($item['event_type'] === 'GIRIS') {
@@ -79,16 +80,32 @@ class QrAttendanceTodayService
                     // Effective approved overlay for display
                     if ($giris) {
                         $giris['display_local_time'] = self::effectiveDisplayTime($pdo, (int) $giris['id'], $giris['local_time']);
+                        $giris['correction_allowed'] = self::correctionAllowedForEvent(
+                            $pdo,
+                            (int) $ctx['personel_id'],
+                            (string) $giris['occurred_at_utc']
+                        );
+                        unset($giris['occurred_at_utc']);
                     }
                     if ($cikis) {
                         $cikis['display_local_time'] = self::effectiveDisplayTime($pdo, (int) $cikis['id'], $cikis['local_time']);
+                        $cikis['correction_allowed'] = self::correctionAllowedForEvent(
+                            $pdo,
+                            (int) $ctx['personel_id'],
+                            (string) $cikis['occurred_at_utc']
+                        );
+                        unset($cikis['occurred_at_utc']);
                     }
                 } else {
                     if ($giris) {
                         $giris['display_local_time'] = $giris['local_time'];
+                        $giris['correction_allowed'] = false;
+                        unset($giris['occurred_at_utc']);
                     }
                     if ($cikis) {
                         $cikis['display_local_time'] = $cikis['local_time'];
+                        $cikis['correction_allowed'] = false;
+                        unset($cikis['occurred_at_utc']);
                     }
                 }
             } catch (\Throwable $e) {
@@ -114,6 +131,22 @@ class QrAttendanceTodayService
             'pending_giris_correction' => $pendingGirisCorrection,
             'pending_cikis_correction' => $pendingCikisCorrection,
         ];
+    }
+
+    private static function correctionAllowedForEvent(PDO $pdo, $personelId, $occurredAtUtc)
+    {
+        if ($occurredAtUtc === '') {
+            return false;
+        }
+        try {
+            return \Medisa\Api\Services\Attendance\AttendanceBusinessDayService::isCorrectionAllowedNow(
+                $pdo,
+                $personelId,
+                $occurredAtUtc
+            );
+        } catch (\Throwable $e) {
+            return false;
+        }
     }
 
     /** @return array<string, mixed>|null */

@@ -49,6 +49,14 @@ $early = \Medisa\Api\Services\Attendance\LateEarlyInfoService::evaluateAfterScan
 );
 acaAssert(is_array($early) && (int) $early['delta_dakika'] === 25, 'early exit delta 25');
 
+// Default 30dk: +12 late → no info
+$lateTol = \Medisa\Api\Services\Attendance\LateEarlyInfoService::evaluateAfterScan(
+    'GIRIS',
+    '2026-08-25 05:42:00.000000',
+    ['beklenen_giris_saati' => '08:30']
+);
+acaAssert($lateTol === null, 'default 30dk swallows +12 late');
+
 $capsDis = \Medisa\Api\Services\SelfService\PersonelMobileCapabilityService::resolve(
     null,
     1,

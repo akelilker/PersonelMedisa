@@ -117,4 +117,37 @@ leAssert(LateEarlyInfoService::DEFAULT_ERKEN_TOLERANS_DK === 30, 'default erken 
 $r = LateEarlyInfoService::evaluateAfterScan('GIRIS', '2026-09-25 05:42:00.000000', $planned, 0, 0);
 leAssert(is_array($r) && (int) $r['delta_dakika'] === 12, 'explicit 0 tolerance late 12');
 
+// Multi-cycle: second GIRIS is not late
+$r = LateEarlyInfoService::evaluateAfterScan(
+    'GIRIS',
+    '2026-09-25 09:05:00.000000',
+    $planned,
+    null,
+    null,
+    ['is_first_giris' => false]
+);
+leAssert($r === null, 'second giris same day → no late');
+
+// Multi-cycle: mid-day CIKIS write path suppresses early-exit info
+$r = LateEarlyInfoService::evaluateAfterScan(
+    'CIKIS',
+    '2026-09-25 08:20:00.000000',
+    $planned,
+    null,
+    null,
+    ['evaluate_early_exit' => false]
+);
+leAssert($r === null, 'mid-day cikis write → no early-exit info');
+
+// Final CIKIS early still evaluates when flagged
+$r = LateEarlyInfoService::evaluateAfterScan(
+    'CIKIS',
+    '2026-09-25 14:09:00.000000',
+    $planned,
+    null,
+    null,
+    ['is_final_cikis' => true, 'evaluate_early_exit' => true]
+);
+leAssert(is_array($r) && (int) $r['delta_dakika'] === 31, 'final cikis early 31 still warns');
+
 echo "[OK] LateEarlyPolicyPureTestRunner\n";

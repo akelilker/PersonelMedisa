@@ -23,6 +23,7 @@
 .settings-dropdown.settings-menu-dropdown {
   right: 0;
   left: auto;
+  top: 100%;
   box-sizing: border-box;
   width: min(
     300px,

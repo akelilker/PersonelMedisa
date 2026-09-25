@@ -52,8 +52,9 @@ const TODAY_LATE = {
       delta_dakika: 38
     }
   },
-  can_scan_giris: false,
+  can_scan_giris: true,
   can_scan_cikis: false,
+  next_action: "GIRIS",
   pending_giris_correction: null,
   pending_cikis_correction: null
 };
@@ -94,13 +95,25 @@ const HISTORY_DAYS = {
         pending_correction: null
       },
       cikis: null,
-      status_lines: ["35dk Gecikme", "Çıkış Kaydı Bulunamadı."]
+      status_lines: ["35dk Gecikme", "Çıkış Kaydı Bulunamadı."],
+      events: [
+        {
+          id: 201,
+          event_type: "GIRIS",
+          time: "09:05",
+          occurred_at: "2026-09-24T09:05:00+03:00",
+          status: { kind: "LATE_ENTRY_INFO", label: "35dk Gecikme", delta_dakika: 35 },
+          correction_allowed: true,
+          pending_correction: null
+        }
+      ]
     },
     {
       date: "2026-09-25",
       has_events: true,
       giris: {
         id: 101,
+        event_type: "GIRIS",
         time: "09:01",
         occurred_at: "2026-09-25T09:01:00+03:00",
         status: { kind: "LATE_ENTRY_INFO", label: "31dk Gecikme", delta_dakika: 31 },
@@ -109,6 +122,7 @@ const HISTORY_DAYS = {
       },
       cikis: {
         id: 102,
+        event_type: "CIKIS",
         time: "17:02",
         occurred_at: "2026-09-25T17:02:00+03:00",
         status: {
@@ -119,7 +133,31 @@ const HISTORY_DAYS = {
         correction_allowed: true,
         pending_correction: null
       },
-      status_lines: ["31dk Gecikme", "Normal Mesai Bitiminden 38dk Önce Çıkış Yaptınız."]
+      status_lines: ["31dk Gecikme", "Normal Mesai Bitiminden 38dk Önce Çıkış Yaptınız."],
+      events: [
+        {
+          id: 101,
+          event_type: "GIRIS",
+          time: "09:01",
+          occurred_at: "2026-09-25T09:01:00+03:00",
+          status: { kind: "LATE_ENTRY_INFO", label: "31dk Gecikme", delta_dakika: 31 },
+          correction_allowed: true,
+          pending_correction: null
+        },
+        {
+          id: 102,
+          event_type: "CIKIS",
+          time: "17:02",
+          occurred_at: "2026-09-25T17:02:00+03:00",
+          status: {
+            kind: "EARLY_EXIT_INFO",
+            label: "Normal Mesai Bitiminden 38dk Önce Çıkış Yaptınız.",
+            delta_dakika: 38
+          },
+          correction_allowed: true,
+          pending_correction: null
+        }
+      ]
     }
   ]
 };
@@ -150,7 +188,8 @@ async function installPersonelSelfServiceMocks(
         },
         cikis: null,
         can_scan_giris: false,
-        can_scan_cikis: true
+        can_scan_cikis: true,
+        next_action: "CIKIS"
       }
     : TODAY_LATE;
 
@@ -283,14 +322,23 @@ test.describe("PERSONEL self-service UX v2 — mobile product", () => {
       expect(girisBox!.y).toBeLessThan(viewport.height);
       expect(cikisBox!.y).toBeLessThan(viewport.height);
 
-      await expect(page.getByTestId("giris-status-label")).toHaveText("31dk Gecikme");
+      await expect(page.getByTestId("giris-scan")).toBeVisible();
       await expect(page.getByTestId("cikis-status-label")).toContainText(
         "Normal Mesai Bitiminden 38dk Önce"
       );
+      await expect(page.getByTestId("attendance-box-giris")).toContainText("09:01");
+      await expect(page.getByTestId("attendance-box-cikis")).toContainText("17:02");
 
       await expect(page.getByTestId("header-attendance-history")).toBeVisible();
       await expect(page.getByTestId("header-settings-toggle")).toBeVisible();
       await expect(page.locator("#notifications-toggle-btn")).toBeVisible();
+
+      await page.locator("#notifications-toggle-btn").click();
+      await expect(page.locator("#notifications-dropdown")).toBeVisible();
+      await page.keyboard.press("Escape");
+      await page.getByTestId("header-settings-toggle").click();
+      await expect(page.locator("#settings-menu")).toBeVisible();
+      await page.keyboard.press("Escape");
 
       const overflow = await page.evaluate(
         () => document.documentElement.scrollWidth - window.innerWidth
@@ -379,6 +427,8 @@ test.describe("PERSONEL self-service UX v2 — mobile product", () => {
     await expect(page.getByTestId("qr-history-day-detail")).toBeVisible();
     await expect(page.getByTestId("history-giris-time")).toHaveText("09:01");
     await expect(page.getByTestId("history-cikis-time")).toHaveText("17:02");
+    await expect(page.getByTestId("qr-history-event-timeline")).toBeVisible();
+    await expect(page.getByRole("link", { name: "Özet" })).toHaveCount(0);
 
     const bodyText = await page.getByTestId("personel-qr-history-page").innerText();
     expect(bodyText).not.toContain("Anomali");

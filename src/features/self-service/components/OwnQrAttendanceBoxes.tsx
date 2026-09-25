@@ -9,6 +9,7 @@ type OwnQrAttendanceBoxesProps = {
     | "cikis"
     | "can_scan_giris"
     | "can_scan_cikis"
+    | "next_action"
     | "pending_giris_correction"
     | "pending_cikis_correction"
     | "capabilities"
@@ -59,9 +60,19 @@ function canShowCorrection(
   );
 }
 
+function BoxClock({ event }: { event: AttendanceEvent | null }) {
+  if (!event) {
+    return null;
+  }
+  return (
+    <p className="pm-box-time">{event.display_local_time ?? event.local_time}</p>
+  );
+}
+
 /**
  * Own-day GİRİŞ/ÇIKIŞ kutuları — PERSONEL home ve Mavi Yaka BIRIM_AMIRI home ortak owner.
- * Düzeltme opsiyonel; yönetim rolü / route bu bileşenden etkilenmez.
+ * Multi-cycle: kartlar daima görünür; yalnızca backend next_action / can_scan_* actionable yapar.
+ * Saat gösterimi action yüzeyini öldürmez.
  */
 export function OwnQrAttendanceBoxes({
   today,
@@ -73,16 +84,33 @@ export function OwnQrAttendanceBoxes({
   onCorrectGiris,
   onCorrectCikis
 }: OwnQrAttendanceBoxesProps) {
-  const capsQr = Boolean(today.capabilities?.qr_scan);
+  const girisActionable = qrEnabled && today.can_scan_giris;
+  const cikisActionable = qrEnabled && today.can_scan_cikis;
 
   return (
     <div className="pm-attendance-grid" data-testid={testId}>
       <div className="pm-attendance-box" data-testid="attendance-box-giris">
-        {today.giris ? (
+        {!qrEnabled ? (
+          <div className="pm-box-closed" data-testid="giris-scan-not-entitled">
+            <p className="pm-box-label">Giriş</p>
+            <p className="self-service-muted">QR bu hesap için kapalı</p>
+          </div>
+        ) : girisActionable ? (
+          <button
+            type="button"
+            className="pm-box-main-action pm-box-main-action--with-time"
+            data-testid="giris-scan"
+            aria-label="Giriş için kiosk QR okut"
+            onClick={onScanGiris}
+          >
+            <span className="pm-box-label">GİRİŞ</span>
+            <BoxClock event={today.giris} />
+          </button>
+        ) : (
           <>
             <p className="pm-box-label">GİRİŞ</p>
-            <p className="pm-box-time">{today.giris.display_local_time ?? today.giris.local_time}</p>
-            {today.giris.status?.label ? (
+            <BoxClock event={today.giris} />
+            {today.giris?.status?.label ? (
               <p className="pm-box-status" data-testid="giris-status-label">
                 {today.giris.status.label}
               </p>
@@ -107,30 +135,31 @@ export function OwnQrAttendanceBoxes({
               </button>
             ) : null}
           </>
-        ) : qrEnabled ? (
-          <button
-            type="button"
-            className="pm-box-main-action"
-            data-testid="giris-scan"
-            aria-label="Giriş için kiosk QR okut"
-            onClick={onScanGiris}
-          >
-            GİRİŞ
-          </button>
-        ) : (
-          <div className="pm-box-closed" data-testid="giris-scan-not-entitled">
-            <p className="pm-box-label">Giriş</p>
-            <p className="self-service-muted">QR bu hesap için kapalı</p>
-          </div>
         )}
       </div>
 
       <div className="pm-attendance-box" data-testid="attendance-box-cikis">
-        {today.cikis ? (
+        {!qrEnabled ? (
+          <div className="pm-box-closed" data-testid="cikis-scan-not-entitled">
+            <p className="pm-box-label">Çıkış</p>
+            <p className="self-service-muted">QR bu hesap için kapalı</p>
+          </div>
+        ) : cikisActionable ? (
+          <button
+            type="button"
+            className="pm-box-main-action pm-box-main-action--with-time"
+            data-testid="cikis-scan"
+            aria-label="Çıkış için kiosk QR okut"
+            onClick={onScanCikis}
+          >
+            <span className="pm-box-label">ÇIKIŞ</span>
+            <BoxClock event={today.cikis} />
+          </button>
+        ) : (
           <>
             <p className="pm-box-label">ÇIKIŞ</p>
-            <p className="pm-box-time">{today.cikis.display_local_time ?? today.cikis.local_time}</p>
-            {today.cikis.status?.label ? (
+            <BoxClock event={today.cikis} />
+            {today.cikis?.status?.label ? (
               <p className="pm-box-status" data-testid="cikis-status-label">
                 {today.cikis.status.label}
               </p>
@@ -155,22 +184,6 @@ export function OwnQrAttendanceBoxes({
               </button>
             ) : null}
           </>
-        ) : qrEnabled ? (
-          <button
-            type="button"
-            className="pm-box-main-action"
-            data-testid="cikis-scan"
-            aria-label="Çıkış için kiosk QR okut"
-            disabled={!today.can_scan_cikis && capsQr}
-            onClick={onScanCikis}
-          >
-            ÇIKIŞ
-          </button>
-        ) : (
-          <div className="pm-box-closed" data-testid="cikis-scan-not-entitled">
-            <p className="pm-box-label">Çıkış</p>
-            <p className="self-service-muted">QR bu hesap için kapalı</p>
-          </div>
         )}
       </div>
     </div>

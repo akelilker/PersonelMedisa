@@ -28,13 +28,21 @@ class QrAttendancePresentationService
      *   pending_correction:array<string,mixed>|null
      * }
      */
+    /**
+     * @param array{
+     *   is_first_giris?:bool,
+     *   is_final_cikis?:bool,
+     *   suppress_early_until_planned_end_passed?:bool
+     * }|null $sequence
+     */
     public static function presentDayEvent(
         PDO $pdo,
         $personelId,
         $eventId,
         $eventType,
         $occurredAtUtc,
-        $businessDateYmd
+        $businessDateYmd,
+        array $sequence = null
     ) {
         $eventId = (int) $eventId;
         $rawLocal = self::hhmmFromUtc((string) $occurredAtUtc);
@@ -53,11 +61,13 @@ class QrAttendancePresentationService
             (string) $eventType,
             (string) $businessDateYmd,
             (string) $effectiveLocal,
-            (string) $occurredAtUtc
+            (string) $occurredAtUtc,
+            $sequence
         );
 
         return [
             'id' => $eventId,
+            'event_type' => (string) $eventType,
             'time' => (string) $effectiveLocal,
             'occurred_at' => self::formatClient((string) $occurredAtUtc),
             'status' => $status,
@@ -69,6 +79,7 @@ class QrAttendancePresentationService
     /**
      * Today-box shape (adds local_time / display_local_time / event_type).
      *
+     * @param array<string, mixed>|null $sequence
      * @return array<string, mixed>
      */
     public static function presentTodayBoxEvent(
@@ -77,7 +88,8 @@ class QrAttendancePresentationService
         $eventId,
         $eventType,
         $occurredAtUtc,
-        $businessDateYmd
+        $businessDateYmd,
+        array $sequence = null
     ) {
         $day = self::presentDayEvent(
             $pdo,
@@ -85,7 +97,8 @@ class QrAttendancePresentationService
             $eventId,
             $eventType,
             $occurredAtUtc,
-            $businessDateYmd
+            $businessDateYmd,
+            $sequence
         );
         $rawLocal = self::hhmmFromUtc((string) $occurredAtUtc);
 
@@ -101,6 +114,11 @@ class QrAttendancePresentationService
     }
 
     /**
+     * @param array{
+     *   is_first_giris?:bool,
+     *   is_final_cikis?:bool,
+     *   suppress_early_until_planned_end_passed?:bool
+     * }|null $sequence
      * @return array{kind:string,label:string,delta_dakika:int}|null
      */
     public static function statusForEffective(
@@ -109,12 +127,20 @@ class QrAttendancePresentationService
         $eventType,
         $businessDateYmd,
         $effectiveLocalHhmm,
-        $fallbackOccurredAtUtc
+        $fallbackOccurredAtUtc,
+        array $sequence = null
     ) {
         try {
             $planned = LateEarlyInfoService::loadPlannedDay($pdo, $personelId, $businessDateYmd);
             $evalClock = self::effectiveClockIso($businessDateYmd, $effectiveLocalHhmm, $fallbackOccurredAtUtc);
-            $info = LateEarlyInfoService::evaluateAfterScan($eventType, $evalClock, $planned);
+            $info = LateEarlyInfoService::evaluateAfterScan(
+                $eventType,
+                $evalClock,
+                $planned,
+                null,
+                null,
+                $sequence
+            );
             if (!is_array($info)) {
                 return null;
             }

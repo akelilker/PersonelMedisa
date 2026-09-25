@@ -21,6 +21,13 @@ class LateEarlyInfoService
 
     /**
      * @param array<string, mixed>|null $gunlukPuantajRow expects beklenen_giris_saati / beklenen_cikis_saati HH:MM
+     * @param array{
+     *   is_first_giris?:bool,
+     *   is_final_cikis?:bool,
+     *   suppress_early_until_planned_end_passed?:bool,
+     *   evaluate_early_exit?:bool
+     * }|null $sequence Multi-cycle day context. Late only on first GIRIS;
+     *        early-exit status only on final CIKIS of the day sequence.
      * @return array{kind:string,message:string,delta_dakika:int,card_label:?string,notification_title:string,notification_body:string}|null
      */
     public static function evaluateAfterScan(
@@ -28,11 +35,13 @@ class LateEarlyInfoService
         $occurredAtIsoOrUtc,
         array $gunlukPuantajRow = null,
         $gecToleransDk = null,
-        $erkenToleransDk = null
+        $erkenToleransDk = null,
+        array $sequence = null
     ) {
         $eventType = strtoupper(trim((string) $eventType));
         $gecToleransDk = $gecToleransDk === null ? self::DEFAULT_GEC_TOLERANS_DK : max(0, (int) $gecToleransDk);
         $erkenToleransDk = $erkenToleransDk === null ? self::DEFAULT_ERKEN_TOLERANS_DK : max(0, (int) $erkenToleransDk);
+        $sequence = is_array($sequence) ? $sequence : [];
 
         $occurredLocal = self::toIstanbulMinutes($occurredAtIsoOrUtc);
         if ($occurredLocal === null) {
@@ -40,6 +49,10 @@ class LateEarlyInfoService
         }
 
         if ($eventType === 'GIRIS') {
+            // Same-day re-entry after a completed cycle is operational, not "late".
+            if (array_key_exists('is_first_giris', $sequence) && empty($sequence['is_first_giris'])) {
+                return null;
+            }
             $beklenen = self::hhmmToMinutes(
                 is_array($gunlukPuantajRow) ? ($gunlukPuantajRow['beklenen_giris_saati'] ?? null) : null
             );
@@ -65,11 +78,26 @@ class LateEarlyInfoService
         }
 
         if ($eventType === 'CIKIS') {
+            // Mid-day operational exits are not final early-exit status.
+            if (array_key_exists('evaluate_early_exit', $sequence) && empty($sequence['evaluate_early_exit'])) {
+                return null;
+            }
+            if (array_key_exists('is_final_cikis', $sequence) && empty($sequence['is_final_cikis'])) {
+                return null;
+            }
             $beklenen = self::hhmmToMinutes(
                 is_array($gunlukPuantajRow) ? ($gunlukPuantajRow['beklenen_cikis_saati'] ?? null) : null
             );
             if ($beklenen === null) {
                 return null;
+            }
+            if (!empty($sequence['suppress_early_until_planned_end_passed'])) {
+                $nowLocal = self::toIstanbulMinutes(
+                    (new \DateTimeImmutable('now', new \DateTimeZone('UTC')))->format('Y-m-d H:i:s.u')
+                );
+                if ($nowLocal !== null && $nowLocal < $beklenen) {
+                    return null;
+                }
             }
             $delta = $beklenen - $occurredLocal;
             // Late exit or within early tolerance → no post-info.

@@ -140,6 +140,7 @@ export type MeQrHistoryPendingCorrection = {
 
 export type MeQrHistoryDayEvent = {
   id: number;
+  event_type?: "GIRIS" | "CIKIS" | string;
   time: string;
   occurred_at: string;
   status: MeQrHistoryDayEventStatus | null;
@@ -150,6 +151,8 @@ export type MeQrHistoryDayEvent = {
 export type MeQrHistoryDay = {
   date: string;
   has_events: boolean;
+  /** Chronological full-day timeline (multi-cycle). */
+  events?: MeQrHistoryDayEvent[];
   giris: MeQrHistoryDayEvent | null;
   cikis: MeQrHistoryDayEvent | null;
   status_lines: string[];

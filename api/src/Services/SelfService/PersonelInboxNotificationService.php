@@ -14,15 +14,21 @@ class PersonelInboxNotificationService
 {
     public static function assertSchemaReady(PDO $pdo)
     {
-        $stmt = $pdo->query("SHOW TABLES LIKE 'personel_inbox_notifications'");
-        if ($stmt === false || $stmt->fetch(PDO::FETCH_NUM) === false) {
-            if ($stmt !== false) {
-                $stmt->closeCursor();
-            }
-            throw new \RuntimeException('PERSONEL_INBOX_SCHEMA_NOT_READY');
+        $driver = (string) $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+        if ($driver === 'sqlite') {
+            $stmt = $pdo->query(
+                "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'personel_inbox_notifications' LIMIT 1"
+            );
+            $ready = $stmt !== false && (int) $stmt->fetchColumn() === 1;
+        } else {
+            $stmt = $pdo->query("SHOW TABLES LIKE 'personel_inbox_notifications'");
+            $ready = $stmt !== false && $stmt->fetch(PDO::FETCH_NUM) !== false;
         }
         if ($stmt !== false) {
             $stmt->closeCursor();
+        }
+        if (!$ready) {
+            throw new \RuntimeException('PERSONEL_INBOX_SCHEMA_NOT_READY');
         }
     }
 

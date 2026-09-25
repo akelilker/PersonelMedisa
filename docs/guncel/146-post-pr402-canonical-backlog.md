@@ -46,15 +46,17 @@ Sınıflar: **A** CLOSED_ALREADY_LIVE · **B** SAFE_HOUSEKEEPING · **C** TECHNI
 
 ---
 
-## D) PRODUCT DECISION REQUIRED
+## D) PRODUCT DECISION — POST_PR403 recorded
 
-| ID | Konu | Neden | Default safe (koru; implement etme) |
+POST_PR403 kullanıcı kararı (2026-09-25). Bu turda **kodlama yok**; yalnız karar kaydı.
+
+| ID | Konu | Karar | Safe state |
 | --- | --- | --- | --- |
-| `BL-FORM-HINT` | Orphan `form-hint` class (CSS yok; canonical aday `.form-help`) | Unresolved design decision; bug vs bilerek unstyled | Current UI çalışıyorsa dokunma; metin görünür kalır |
-| `BL-QR-DEVICE-BIND` | Device binding | Security/product; foundation yok (threat model: opsiyonel gelecek) | Deferred — device binding yok |
-| `BL-QR-OFFLINE` | Offline QR write | Explicit NO in S3C/pilot; spoof riski | Offline QR write yok |
-| `BL-QR-ANOMALY-REV` | Anomaly → revizyon kontrollü UX | Intentional defer; candidate/decision foundation var, kontrollü UX yok | Hint-only / controlled revision açılmamış |
-| `BL-KARYAPI-SENAY` | Karyapı / Şenay company rollout | Intentional defer | Rollout defer — grant/assignment uydurma |
+| `BL-FORM-HINT` | Orphan `form-hint` | Şimdilik dokunulmayacak | Current UI korunur |
+| `BL-QR-DEVICE-BIND` | Device binding | **YAPILMAYACAK** — işçi sayısı fazla; kontrol edilemez | Device binding yok |
+| `BL-QR-OFFLINE` | Offline QR write | **YAPILMAYACAK** — QR yalnız online; internet yoksa kayıt yok; kuyruk/sonradan gönderim yok | Offline write yok |
+| `BL-QR-ANOMALY-REV` | Hatalı/eksik/çift giriş-çıkış | Personel kendi kaydını düzeltemez; amire bildirim; düzeltme yetkisi amirde. **Bu turda kodlanmaz** — yalnız karar | Hint-only / controlled self-revision yok |
+| `BL-KARYAPI-SENAY` | Karyapı / Şenay rollout | **Daha sonra** | Grant/assignment uydurma |
 
 ---
 
@@ -66,12 +68,12 @@ Verification yapmak mutation değildir; write/apply ayrıca explicit onay ister.
 | ID | Konu | Not |
 | --- | --- | --- |
 | `BL-QR-PILOT-OPS` | QR pilot checklist maddeleri (secret/HTTPS/roster/smoke) | Kod hazır; saha/ops tick gerekir — `QR_ATTENDANCE_PILOT_READINESS_CHECKLIST.md` |
-| `BL-SINEM-HALIL-LIVE` | Sinem / Halil live identity & managed-branch verify | Salt-okunur live verify; write yok |
-| `BL-KAYSERI-KUBRA` | Kayseri manager Kübra kimliği/soyadı | Business identity / live verification; kimlik doğrulanmadan assignment/write yok; olası write ayrıca production mutation onayı |
-| `BL-NAME-203` | personel 203 ad/soyad düzeltmesi | Business/master-data doğruluğu; doğru değer doğrulanmadan apply yok; doğru isim uydurma; production data mutate etme |
-| `BL-BM-ASSIGN-WRITE` | Medisa branch-manager assignment rows | Model CLOSED; production row write ayrı onay + preimage |
+| `BL-SINEM-HALIL-LIVE` | Sinem / Halil live identity & managed-branch verify | Inventory `36113851793`: Sinem user `110` / Halil user `50` tekil; managed-branch write ayrı |
+| `BL-KAYSERI-KUBRA` | Kayseri manager Kübra Güneş | Live identity OK (`kubraG` / user `64` / personel `126`). **BLOCKER:** `rol=PERSONEL` → `sube_sorumlu_yoneticiler` ELIGIBLE_ROLES dışı; rol değiştirmeden assignment yazılamaz |
+| `BL-NAME-203` | personel 203 ad/soyad | Inventory: `Muhammed` / `Mahmud` — **doğru; işlem yapılmadı** |
+| `BL-BM-ASSIGN-WRITE` | Medisa branch-manager assignment rows | POST_PR403 hedef harita onaylı; live apply **STOPPED** (Kübra role + İlker/Zeynep user live certify + Halil location preimage) |
 | `BL-CROSS-COMPANY` | 120 / 158 / 219 | Semantically valid defer; mutate etme |
-| `BL-STALE-BRANCH-DELETE` | Remote `cline/fw8ry7m8` delete | Safe=YES; yine de explicit delete onayı |
+| `BL-STALE-BRANCH-DELETE` | Remote `cline/fw8ry7m8` delete | POST_PR403: unique=0 / open PR=none → remote delete applied |
 
 ---
 
@@ -90,7 +92,7 @@ Verification yapmak mutation değildir; write/apply ayrıca explicit onay ister.
 
 ## Decision registry (özet)
 
-Ayrıntılı `DECISION / WHY / OPTIONS / DEFAULT_SAFE_STATE` final raporda; burada yalnız ID listesi:
+POST_PR403 kaydedildi (kodlama yok):
 `BL-FORM-HINT` · `BL-QR-DEVICE-BIND` · `BL-QR-OFFLINE` · `BL-QR-ANOMALY-REV` · `BL-KARYAPI-SENAY`.
 
 ---
@@ -101,10 +103,15 @@ ID listesi (E): `BL-QR-PILOT-OPS` · `BL-SINEM-HALIL-LIVE` · `BL-KAYSERI-KUBRA`
 
 Ayrım: live identity verification / business truth confirmation ≠ production write. Write/apply yalnız ayrı onayla.
 
+POST_PR403 live inventory: run `36113851793` @ deploy `730caecc` / tip `091` — PASS.
+BM apply: **STOPPED_NO_PARTIAL_APPLY** (see E notes).
+
 ---
 
 ## Next gate
 
-1. Kullanıcı: D maddeleri (form-hint + QR future üçlüsü + Karyapı/Şenay); safe defaults korunur, implement edilmez.
-2. Ops: E maddeleri (QR pilot tick, identity/business-truth verify, BM write, name-203 apply, stale branch delete) — verify ≠ mutate.
-3. Safe housekeeping closure: B maddeleri explicit onayla.
+1. Kübra Güneş manager eligibility: rol ürün kararı (PERSONEL → eligible role) **veya** ELIGIBLE_ROLES ürün değişikliği — ikisi de bu turda yasaklandı; ayrı onay.
+2. İlker / Zeynep: canlı `users` satırı (username/user_id/rol) inventory veya Yönetim readback ile certify; ID tahmin yok.
+3. Halil `calisma_lokasyonu_id` preimage + İzmir (`id=4`) apply; Giresun/İzmir manager + access ayrı.
+4. Sonra `BL-BM-ASSIGN-WRITE` hedef harita (Fabrika×4, Giresun/İzmir Halil, Kayseri Kübra, Ankara/İstanbul/Sakarya=0).
+5. QR D kararları kodlanmaz; pilot ops (`BL-QR-PILOT-OPS`) ayrı.

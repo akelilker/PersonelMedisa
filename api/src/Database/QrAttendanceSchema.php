@@ -14,12 +14,30 @@ class QrAttendanceSchema
 {
     public static function hasTable(PDO $pdo)
     {
-        $stmt = $pdo->query("SHOW TABLES LIKE 'qr_attendance_events'");
-        if (!$stmt) {
+        try {
+            $stmt = $pdo->query("SHOW TABLES LIKE 'qr_attendance_events'");
+            if ($stmt) {
+                $row = $stmt->fetch(PDO::FETCH_NUM);
+                if (is_array($row) && isset($row[0]) && (string) $row[0] === 'qr_attendance_events') {
+                    return true;
+                }
+            }
+        } catch (\Throwable $e) {
+            // Non-MySQL drivers (focused SQLite runners).
+        }
+        try {
+            $stmt = $pdo->query(
+                "SELECT 1 AS ok FROM sqlite_master WHERE type = 'table' AND name = 'qr_attendance_events' LIMIT 1"
+            );
+            if ($stmt) {
+                $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+                return is_array($row);
+            }
+        } catch (\Throwable $e) {
             return false;
         }
-        $row = $stmt->fetch(PDO::FETCH_NUM);
 
-        return is_array($row) && isset($row[0]) && (string) $row[0] === 'qr_attendance_events';
+        return false;
     }
 }

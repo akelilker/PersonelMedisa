@@ -85,6 +85,13 @@ class QrAttendanceTodayService
                             (int) $ctx['personel_id'],
                             (string) $giris['occurred_at_utc']
                         );
+                        $giris['status'] = self::lateEarlyStatusForEvent(
+                            $pdo,
+                            (int) $ctx['personel_id'],
+                            'GIRIS',
+                            (string) $giris['occurred_at_utc'],
+                            $today
+                        );
                         unset($giris['occurred_at_utc']);
                     }
                     if ($cikis) {
@@ -94,17 +101,38 @@ class QrAttendanceTodayService
                             (int) $ctx['personel_id'],
                             (string) $cikis['occurred_at_utc']
                         );
+                        $cikis['status'] = self::lateEarlyStatusForEvent(
+                            $pdo,
+                            (int) $ctx['personel_id'],
+                            'CIKIS',
+                            (string) $cikis['occurred_at_utc'],
+                            $today
+                        );
                         unset($cikis['occurred_at_utc']);
                     }
                 } else {
                     if ($giris) {
                         $giris['display_local_time'] = $giris['local_time'];
                         $giris['correction_allowed'] = false;
+                        $giris['status'] = self::lateEarlyStatusForEvent(
+                            $pdo,
+                            (int) $ctx['personel_id'],
+                            'GIRIS',
+                            (string) $giris['occurred_at_utc'],
+                            $today
+                        );
                         unset($giris['occurred_at_utc']);
                     }
                     if ($cikis) {
                         $cikis['display_local_time'] = $cikis['local_time'];
                         $cikis['correction_allowed'] = false;
+                        $cikis['status'] = self::lateEarlyStatusForEvent(
+                            $pdo,
+                            (int) $ctx['personel_id'],
+                            'CIKIS',
+                            (string) $cikis['occurred_at_utc'],
+                            $today
+                        );
                         unset($cikis['occurred_at_utc']);
                     }
                 }
@@ -146,6 +174,43 @@ class QrAttendanceTodayService
             );
         } catch (\Throwable $e) {
             return false;
+        }
+    }
+
+    /**
+     * Presentation status from LateEarlyInfoService (30dk policy). null within tolerance / no planned.
+     *
+     * @return array{kind:string,label:string,delta_dakika:int}|null
+     */
+    private static function lateEarlyStatusForEvent(PDO $pdo, $personelId, $eventType, $occurredAtUtc, $businessDate)
+    {
+        if ($occurredAtUtc === '') {
+            return null;
+        }
+        try {
+            $planned = \Medisa\Api\Services\Attendance\LateEarlyInfoService::loadPlannedDay(
+                $pdo,
+                $personelId,
+                $businessDate
+            );
+            $info = \Medisa\Api\Services\Attendance\LateEarlyInfoService::evaluateAfterScan(
+                $eventType,
+                $occurredAtUtc,
+                $planned
+            );
+            if (!is_array($info)) {
+                return null;
+            }
+
+            return [
+                'kind' => (string) $info['kind'],
+                'label' => isset($info['card_label'])
+                    ? (string) $info['card_label']
+                    : (string) $info['message'],
+                'delta_dakika' => (int) $info['delta_dakika'],
+            ];
+        } catch (\Throwable $e) {
+            return null;
         }
     }
 

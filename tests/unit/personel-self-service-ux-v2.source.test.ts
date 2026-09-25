@@ -49,5 +49,24 @@ describe("PERSONEL_SELF_SERVICE_PRODUCT_UX_V2 notification + policy owners", () 
     expect(home).not.toContain("SelfServiceQrShortcuts");
     expect(home).not.toContain("Bugünkü Giriş");
     expect(home).toContain("Giriş Saatinizle İlgili Düzeltme Talebi Oluşturulsun mu?");
+
+    const shell = read("src/app/AppShell.tsx");
+    expect(shell).toContain('session?.user.rol === "PERSONEL" ? null : session?.user.ad_soyad');
+
+    const header = read("src/components/shell/ShellHeaderActions.tsx");
+    expect(header).toContain("subeControl.kind === \"multi\" && !isPersonelRole");
+
+    const today = read("api/src/Services/Qr/QrAttendanceTodayService.php");
+    expect(today).toContain("lateEarlyStatusForEvent");
+    expect(today).toContain("card_label");
+
+    const businessDay = read("api/src/Services/Attendance/AttendanceBusinessDayService.php");
+    expect(businessDay).toContain("resolveWorkDay");
+    expect(businessDay).toContain("fail closed");
+    expect(businessDay).toContain("No Mon–Fri hardcode");
+    expect(businessDay).toContain("No 08:30/17:40 invent");
+    expect(businessDay).toContain("loadPlannedDay");
+    expect(businessDay).not.toMatch(/return\s+\[\s*1\s*,\s*2\s*,\s*3\s*,\s*4\s*,\s*5\s*\]/);
+    expect(businessDay).not.toMatch(/loadRecentBeklenenCikis/);
   });
 });

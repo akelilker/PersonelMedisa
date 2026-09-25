@@ -82,6 +82,11 @@ export function OwnQrAttendanceBoxes({
           <>
             <p className="pm-box-label">GİRİŞ</p>
             <p className="pm-box-time">{today.giris.display_local_time ?? today.giris.local_time}</p>
+            {today.giris.status?.label ? (
+              <p className="pm-box-status" data-testid="giris-status-label">
+                {today.giris.status.label}
+              </p>
+            ) : null}
             {today.pending_giris_correction ? (
               <p className="pm-box-pending">Bekliyor</p>
             ) : null}
@@ -125,6 +130,11 @@ export function OwnQrAttendanceBoxes({
           <>
             <p className="pm-box-label">ÇIKIŞ</p>
             <p className="pm-box-time">{today.cikis.display_local_time ?? today.cikis.local_time}</p>
+            {today.cikis.status?.label ? (
+              <p className="pm-box-status" data-testid="cikis-status-label">
+                {today.cikis.status.label}
+              </p>
+            ) : null}
             {today.pending_cikis_correction ? (
               <p className="pm-box-pending">Bekliyor</p>
             ) : null}

@@ -157,6 +157,22 @@ export function PersonelQrScanPage() {
     }
   };
 
+  const submitTokenRef = useRef(submitToken);
+  submitTokenRef.current = submitToken;
+
+  // Playwright-only seam: drive confirm path without camera decode.
+  useEffect(() => {
+    const w = window as unknown as {
+      __pmQrScanSubmitForTest?: (token: string, eventType: QrEventType) => void;
+    };
+    w.__pmQrScanSubmitForTest = (token, eventType) => {
+      void submitTokenRef.current(token, eventType);
+    };
+    return () => {
+      delete w.__pmQrScanSubmitForTest;
+    };
+  }, []);
+
   const beginScan = async () => {
     stopScanner();
     setPhase({ kind: "scanning" });

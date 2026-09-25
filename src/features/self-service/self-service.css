@@ -396,7 +396,7 @@
   justify-content: center;
   gap: 6px;
   min-height: 112px;
-  height: 112px;
+  height: auto;
   padding: 10px;
   box-sizing: border-box;
   border: 1.15px solid rgba(255, 255, 255, 0.28);
@@ -482,6 +482,18 @@
   margin: 0;
   font-size: 0.8rem;
   color: var(--txt-muted);
+}
+
+.pm-box-status {
+  margin: 0;
+  max-width: 100%;
+  padding: 0 4px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.25;
+  text-align: center;
+  color: var(--brand-red, #c62828);
+  overflow-wrap: anywhere;
 }
 
 .pm-section {
@@ -690,7 +702,7 @@
 .pm-notice-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 1200;
+  z-index: calc(var(--z-modal, 10100) + 40);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -774,7 +786,7 @@
   }
   .pm-attendance-box {
     min-height: 104px;
-    height: 104px;
+    height: auto;
     padding: 8px;
   }
   .pm-box-time {

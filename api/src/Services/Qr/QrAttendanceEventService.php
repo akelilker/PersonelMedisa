@@ -124,6 +124,16 @@ class QrAttendanceEventService
         self::assertOpenShiftTransition($pdo, $personelId, $eventType);
 
         $occurredAt = self::utcNowMicro();
+        // Internal test clock only (never invent planned times). Production clients omit this.
+        if (!empty($body['__test_occurred_at']) && is_string($body['__test_occurred_at'])) {
+            $candidate = trim((string) $body['__test_occurred_at']);
+            if (
+                $candidate !== ''
+                && \Medisa\Api\Services\Attendance\LateEarlyInfoService::toIstanbulMinutes($candidate) !== null
+            ) {
+                $occurredAt = $candidate;
+            }
+        }
         $issuedAt = self::unixToUtcMicro((int) $claims['iat']);
         $expiresAt = self::unixToUtcMicro((int) $claims['exp']);
 

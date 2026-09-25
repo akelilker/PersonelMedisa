@@ -12,6 +12,12 @@ export type MobileCapabilities = {
   coming_soon_message: string | null;
 };
 
+export type AttendanceBoxEventStatus = {
+  kind: string;
+  label: string;
+  delta_dakika: number;
+};
+
 export type AttendanceBoxEvent = {
   id: number;
   event_type: "GIRIS" | "CIKIS";
@@ -19,6 +25,7 @@ export type AttendanceBoxEvent = {
   local_time: string;
   display_local_time?: string;
   correction_allowed?: boolean;
+  status?: AttendanceBoxEventStatus | null;
 };
 
 export type AttendanceTodayResponse = {

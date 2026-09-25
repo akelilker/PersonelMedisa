@@ -186,11 +186,23 @@ export function PersonelQrHistoryPage() {
   return (
     <section className="personel-mobile-shell qr-history-page" data-testid="personel-qr-history-page">
       <div className="qr-history-toolbar" data-testid="qr-history-calendar">
-        <button type="button" className="qr-history-nav" aria-label="Önceki ay" onClick={() => shiftMonth(-1)}>
+        <button
+          type="button"
+          className="qr-history-nav"
+          aria-label="Önceki ay"
+          data-testid="qr-history-month-prev"
+          onClick={() => shiftMonth(-1)}
+        >
           ‹
         </button>
         <p className="qr-history-month">{formatMonthTitle(viewYear, viewMonth)}</p>
-        <button type="button" className="qr-history-nav" aria-label="Sonraki ay" onClick={() => shiftMonth(1)}>
+        <button
+          type="button"
+          className="qr-history-nav"
+          aria-label="Sonraki ay"
+          data-testid="qr-history-month-next"
+          onClick={() => shiftMonth(1)}
+        >
           ›
         </button>
       </div>
@@ -215,6 +227,7 @@ export function PersonelQrHistoryPage() {
             <button
               key={cell.date}
               type="button"
+              data-testid={`qr-history-day-${cell.date}`}
               className={[
                 "qr-history-cell",
                 hasEvents ? "qr-history-cell--has-events" : "",

@@ -35,11 +35,27 @@ class UsersSchema
             if ($col !== false) {
                 $col->closeCursor();
             }
-
-            return $exists;
+            if ($exists) {
+                return true;
+            }
+        } catch (\Throwable $e) {
+            // Non-MySQL drivers (focused SQLite runners).
+        }
+        try {
+            $stmt = $pdo->query("PRAGMA table_info(users)");
+            if ($stmt === false) {
+                return false;
+            }
+            while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                if (isset($row['name']) && (string) $row['name'] === 'personel_id') {
+                    return true;
+                }
+            }
         } catch (\Throwable $e) {
             return false;
         }
+
+        return false;
     }
 
     public static function hasMustChangePassword(PDO $pdo): bool

@@ -479,7 +479,7 @@ export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeade
           <button
             type="button"
             className="icon-btn"
-            data-testid="personel-qr-history-header-btn"
+            data-testid="header-attendance-history"
             aria-label="Giriş / Çıkış Geçmişim"
             title="Giriş / Çıkış Geçmişim"
             onClick={() => navigateTo("/self/qr-hareketleri")}
@@ -553,8 +553,9 @@ export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeade
           </span>
         ) : null}
         {/* Multi-sube switch must remain on home (minimal): module routes use
-         * overlay chrome without ShellHeaderActions after modules canonicalize. */}
-        {subeControl.kind === "multi" ? (
+         * overlay chrome without ShellHeaderActions after modules canonicalize.
+         * PERSONEL product home: no org/şube chrome — employee has fixed assignment. */}
+        {subeControl.kind === "multi" && !isPersonelRole ? (
           <div className="sube-selector-wrap">
             <button
               type="button"

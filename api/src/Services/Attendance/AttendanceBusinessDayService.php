@@ -11,7 +11,8 @@ use PDO;
 
 /**
  * Europe/Istanbul business-day navigation for attendance correction windows.
- * Uses resmi tatil + şirket çalışma politikası hafta tatili — no hardcoded Sat/Sun/17:40.
+ * Fail-closed: unresolved tatil or çalışma politikası ⇒ not a usable work day.
+ * No Mon–Fri hardcode. No 08:30/17:40 invent.
  */
 class AttendanceBusinessDayService
 {
@@ -19,6 +20,8 @@ class AttendanceBusinessDayService
 
     /**
      * First work day strictly after $fromYmd (exclusive).
+     * Returns null when no work day can be resolved within lookahead
+     * (including when calendar resolution is unresolved).
      *
      * @return string|null Y-m-d
      */
@@ -32,42 +35,47 @@ class AttendanceBusinessDayService
         $max = max(1, min(60, (int) $maxLookaheadDays));
         for ($i = 1; $i <= $max; $i++) {
             $candidate = $dt->modify('+' . $i . ' day')->format('Y-m-d');
-            if (self::isWorkDay($pdo, $candidate)) {
+            $flag = self::resolveWorkDay($pdo, $candidate);
+            if ($flag === true) {
                 return $candidate;
+            }
+            // false = non-work → keep looking
+            // null = unresolved → fail closed (cannot navigate past unknown day safely)
+            if ($flag === null) {
+                return null;
             }
         }
 
         return null;
     }
 
-    public static function isWorkDay(PDO $pdo, $ymd)
+    /**
+     * Tri-state work-day resolution.
+     *
+     * @return bool|null true = work day, false = non-work, null = unresolved (fail-closed)
+     */
+    public static function resolveWorkDay(PDO $pdo, $ymd)
     {
         $ymd = (string) $ymd;
+        $dt = \DateTimeImmutable::createFromFormat('!Y-m-d', $ymd, new \DateTimeZone(self::TZ));
+        if ($dt === false) {
+            return null;
+        }
+
         try {
             $ubgt = ResmiTatilTakvimiService::resolveActiveForDate($pdo, $ymd, 'UBGT');
-            if (is_array($ubgt)) {
-                return false;
-            }
         } catch (\Throwable $e) {
-            // If tatil service fails, continue with hafta tatili only.
+            return null;
+        }
+        if (is_array($ubgt)) {
+            return false;
         }
 
         $haftaTatiliDays = self::resolveHaftaTatiliWeekdays($pdo, $ymd);
         if ($haftaTatiliDays === null) {
-            // Policy unresolved: treat Mon–Fri as work days (ISO), never invent mesai hours.
-            $dt = \DateTimeImmutable::createFromFormat('!Y-m-d', $ymd, new \DateTimeZone(self::TZ));
-            if ($dt === false) {
-                return false;
-            }
-            $w = (int) $dt->format('N'); // 1=Mon … 7=Sun
-
-            return $w >= 1 && $w <= 5;
+            return null;
         }
 
-        $dt = \DateTimeImmutable::createFromFormat('!Y-m-d', $ymd, new \DateTimeZone(self::TZ));
-        if ($dt === false) {
-            return false;
-        }
         $weekday = (int) $dt->format('w'); // 0=Sun … 6=Sat
         if (in_array($weekday, $haftaTatiliDays, true)) {
             return false;
@@ -77,13 +85,17 @@ class AttendanceBusinessDayService
     }
 
     /**
-     * Deadline Instant (UTC DateTimeImmutable) = next work day + normal mesai bitiş.
-     * Planned end source order:
-     * 1) gunluk_puantaj.beklenen_cikis_saati on next work day
-     * 2) gunluk_puantaj.beklenen_cikis_saati on event day
-     * 3) most recent beklenen_cikis_saati for personel on/before event day
-     *
-     * Returns null when mesai bitiş cannot be resolved without inventing a clock time.
+     * @deprecated Prefer resolveWorkDay() tri-state. true only when positively a work day.
+     */
+    public static function isWorkDay(PDO $pdo, $ymd)
+    {
+        return self::resolveWorkDay($pdo, $ymd) === true;
+    }
+
+    /**
+     * Deadline Instant (UTC) = next work day + that day's canonical beklenen_cikis_saati.
+     * Does NOT copy event-day or recent previous clocks onto the next work day.
+     * Returns null when next work day or its planned exit cannot be resolved.
      *
      * @return \DateTimeImmutable|null UTC
      */
@@ -97,29 +109,15 @@ class AttendanceBusinessDayService
             return null;
         }
 
-        $plannedHhmm = null;
         $nextPlanned = LateEarlyInfoService::loadPlannedDay($pdo, $personelId, $nextWork);
-        if (is_array($nextPlanned)) {
-            $mins = LateEarlyInfoService::hhmmToMinutes($nextPlanned['beklenen_cikis_saati'] ?? null);
-            if ($mins !== null) {
-                $plannedHhmm = sprintf('%02d:%02d', intdiv($mins, 60), $mins % 60);
-            }
-        }
-        if ($plannedHhmm === null) {
-            $eventPlanned = LateEarlyInfoService::loadPlannedDay($pdo, $personelId, $eventDate);
-            if (is_array($eventPlanned)) {
-                $mins = LateEarlyInfoService::hhmmToMinutes($eventPlanned['beklenen_cikis_saati'] ?? null);
-                if ($mins !== null) {
-                    $plannedHhmm = sprintf('%02d:%02d', intdiv($mins, 60), $mins % 60);
-                }
-            }
-        }
-        if ($plannedHhmm === null) {
-            $plannedHhmm = LateEarlyInfoService::findRecentBeklenenCikis($pdo, $personelId, $eventDate);
-        }
-        if ($plannedHhmm === null) {
+        if (!is_array($nextPlanned)) {
             return null;
         }
+        $mins = LateEarlyInfoService::hhmmToMinutes($nextPlanned['beklenen_cikis_saati'] ?? null);
+        if ($mins === null) {
+            return null;
+        }
+        $plannedHhmm = sprintf('%02d:%02d', intdiv($mins, 60), $mins % 60);
 
         $local = \DateTimeImmutable::createFromFormat(
             'Y-m-d H:i:s',
@@ -140,7 +138,6 @@ class AttendanceBusinessDayService
     {
         $deadline = self::resolveCorrectionDeadlineUtc($pdo, $personelId, $eventOccurredAtUtc);
         if ($deadline === null) {
-            // Cannot resolve mesai bitiş without inventing → fail closed (no pencil / API deny).
             return false;
         }
         if ($nowUtc === null) {
@@ -153,7 +150,7 @@ class AttendanceBusinessDayService
     }
 
     /**
-     * @return array<int, int>|null
+     * @return array<int, int>|null null = politika unresolved
      */
     private static function resolveHaftaTatiliWeekdays(PDO $pdo, $ymd)
     {
@@ -180,7 +177,10 @@ class AttendanceBusinessDayService
             $raw = SirketCalismaPolitikasiCatalog::LEGACY_HAFTA_TATILI_GUNLERI;
         }
         $parsed = SirketCalismaPolitikasiCatalog::parseHaftaTatiliGunleri($raw);
+        if (!($parsed['ok'] ?? false) || !isset($parsed['days']) || !is_array($parsed['days'])) {
+            return null;
+        }
 
-        return is_array($parsed) ? $parsed : null;
+        return array_map('intval', $parsed['days']);
     }
 }

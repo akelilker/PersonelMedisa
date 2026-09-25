@@ -48,24 +48,27 @@ Sınıflar: **A** CLOSED_ALREADY_LIVE · **B** SAFE_HOUSEKEEPING · **C** TECHNI
 
 ## D) PRODUCT DECISION REQUIRED
 
-| ID | Konu | Neden | Default safe |
+| ID | Konu | Neden | Default safe (koru; implement etme) |
 | --- | --- | --- | --- |
-| `BL-FORM-HINT` | Orphan `form-hint` class (CSS yok; canonical aday `.form-help`) | Bug vs tasarım tercihi; remap #397-benzeri mi, bilerek unstyled mı | Dokunma; metin görünür kalır |
-| `BL-QR-DEVICE-BIND` | Device binding | Security/product; foundation yok (threat model: opsiyonel gelecek) | Binding yok |
-| `BL-QR-OFFLINE` | Offline QR write | Explicit NO in S3C/pilot; spoof riski | Offline write yok |
-| `BL-QR-ANOMALY-REV` | Anomaly → revizyon kontrollü UX | Intentional defer (hint only); candidate/decision foundation var, kontrollü UX yok | Hint-only / mevcut revision ayrı |
-| `BL-KAYSERI-KUBRA` | Kayseri manager Kübra soyadı | Business identity | Assignment yazma |
-| `BL-NAME-203` | personel 203 ad/soyad düzeltmesi | Business truth plan-only | No apply |
-| `BL-KARYAPI-SENAY` | Karyapı / Şenay company rollout | Intentional defer | Grant uydurma |
+| `BL-FORM-HINT` | Orphan `form-hint` class (CSS yok; canonical aday `.form-help`) | Unresolved design decision; bug vs bilerek unstyled | Current UI çalışıyorsa dokunma; metin görünür kalır |
+| `BL-QR-DEVICE-BIND` | Device binding | Security/product; foundation yok (threat model: opsiyonel gelecek) | Deferred — device binding yok |
+| `BL-QR-OFFLINE` | Offline QR write | Explicit NO in S3C/pilot; spoof riski | Offline QR write yok |
+| `BL-QR-ANOMALY-REV` | Anomaly → revizyon kontrollü UX | Intentional defer; candidate/decision foundation var, kontrollü UX yok | Hint-only / controlled revision açılmamış |
+| `BL-KARYAPI-SENAY` | Karyapı / Şenay company rollout | Intentional defer | Rollout defer — grant/assignment uydurma |
 
 ---
 
 ## E) OPERATIONAL APPROVAL REQUIRED
 
+E sınıfı ayrımı (okunur tut): **(1)** read-only / live identity verification · **(2)** business truth confirmation · **(3)** production write approval.
+Verification yapmak mutation değildir; write/apply ayrıca explicit onay ister.
+
 | ID | Konu | Not |
 | --- | --- | --- |
 | `BL-QR-PILOT-OPS` | QR pilot checklist maddeleri (secret/HTTPS/roster/smoke) | Kod hazır; saha/ops tick gerekir — `QR_ATTENDANCE_PILOT_READINESS_CHECKLIST.md` |
 | `BL-SINEM-HALIL-LIVE` | Sinem / Halil live identity & managed-branch verify | Salt-okunur live verify; write yok |
+| `BL-KAYSERI-KUBRA` | Kayseri manager Kübra kimliği/soyadı | Business identity / live verification; kimlik doğrulanmadan assignment/write yok; olası write ayrıca production mutation onayı |
+| `BL-NAME-203` | personel 203 ad/soyad düzeltmesi | Business/master-data doğruluğu; doğru değer doğrulanmadan apply yok; doğru isim uydurma; production data mutate etme |
 | `BL-BM-ASSIGN-WRITE` | Medisa branch-manager assignment rows | Model CLOSED; production row write ayrı onay + preimage |
 | `BL-CROSS-COMPANY` | 120 / 158 / 219 | Semantically valid defer; mutate etme |
 | `BL-STALE-BRANCH-DELETE` | Remote `cline/fw8ry7m8` delete | Safe=YES; yine de explicit delete onayı |
@@ -88,12 +91,20 @@ Sınıflar: **A** CLOSED_ALREADY_LIVE · **B** SAFE_HOUSEKEEPING · **C** TECHNI
 ## Decision registry (özet)
 
 Ayrıntılı `DECISION / WHY / OPTIONS / DEFAULT_SAFE_STATE` final raporda; burada yalnız ID listesi:
-`BL-FORM-HINT` · `BL-QR-DEVICE-BIND` · `BL-QR-OFFLINE` · `BL-QR-ANOMALY-REV` · `BL-KAYSERI-KUBRA` · `BL-NAME-203` · `BL-KARYAPI-SENAY`.
+`BL-FORM-HINT` · `BL-QR-DEVICE-BIND` · `BL-QR-OFFLINE` · `BL-QR-ANOMALY-REV` · `BL-KARYAPI-SENAY`.
+
+---
+
+## Operational approval registry (özet)
+
+ID listesi (E): `BL-QR-PILOT-OPS` · `BL-SINEM-HALIL-LIVE` · `BL-KAYSERI-KUBRA` · `BL-NAME-203` · `BL-BM-ASSIGN-WRITE` · `BL-CROSS-COMPANY` · `BL-STALE-BRANCH-DELETE`.
+
+Ayrım: live identity verification / business truth confirmation ≠ production write. Write/apply yalnız ayrı onayla.
 
 ---
 
 ## Next gate
 
-1. Kullanıcı: D maddeleri (özellikle form-hint + QR future üçlüsü).
-2. Ops: E maddeleri (QR pilot tick, identity verify, BM write, stale branch delete).
+1. Kullanıcı: D maddeleri (form-hint + QR future üçlüsü + Karyapı/Şenay); safe defaults korunur, implement edilmez.
+2. Ops: E maddeleri (QR pilot tick, identity/business-truth verify, BM write, name-203 apply, stale branch delete) — verify ≠ mutate.
 3. Safe housekeeping closure: B maddeleri explicit onayla.

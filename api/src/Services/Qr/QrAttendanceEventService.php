@@ -32,10 +32,12 @@ class QrAttendanceEventService
 
     /**
      * @param array<string, mixed> $authUser
-     * @param array<string, mixed> $body
-     * @return array{event:array<string,mixed>,idempotent:bool}
+     * @param array<string, mixed> $body Public HTTP contract only: token, event_type, request_nonce, early_exit_confirmed
+     * @param array<string, mixed>|null $internalOptions Test/service-only. NEVER built from HTTP body.
+     *        Supported keys: occurred_at_utc (string), skip_late_early (bool)
+     * @return array{event:?array<string,mixed>,idempotent:bool,confirmation_required?:bool,early_exit_confirm?:?array,late_early_info?:?array}
      */
-    public static function scan(PDO $pdo, array $authUser, array $body)
+    public static function scan(PDO $pdo, array $authUser, array $body, array $internalOptions = null)
     {
         self::assertSchemaReady($pdo);
         QrConfig::assertReady();
@@ -123,10 +125,11 @@ class QrAttendanceEventService
 
         self::assertOpenShiftTransition($pdo, $personelId, $eventType);
 
+        $internal = is_array($internalOptions) ? $internalOptions : [];
         $occurredAt = self::utcNowMicro();
-        // Internal test clock only (never invent planned times). Production clients omit this.
-        if (!empty($body['__test_occurred_at']) && is_string($body['__test_occurred_at'])) {
-            $candidate = trim((string) $body['__test_occurred_at']);
+        // Internal service/test clock only — never read from HTTP body.
+        if (!empty($internal['occurred_at_utc']) && is_string($internal['occurred_at_utc'])) {
+            $candidate = trim((string) $internal['occurred_at_utc']);
             if (
                 $candidate !== ''
                 && \Medisa\Api\Services\Attendance\LateEarlyInfoService::toIstanbulMinutes($candidate) !== null
@@ -134,6 +137,7 @@ class QrAttendanceEventService
                 $occurredAt = $candidate;
             }
         }
+        $skipLateEarly = !empty($internal['skip_late_early']);
         $issuedAt = self::unixToUtcMicro((int) $claims['iat']);
         $expiresAt = self::unixToUtcMicro((int) $claims['exp']);
 
@@ -143,7 +147,7 @@ class QrAttendanceEventService
         if (
             $eventType === 'CIKIS'
             && !$earlyExitConfirmed
-            && empty($body['__skip_late_early'])
+            && !$skipLateEarly
         ) {
             $confirmBusinessDate = (new \DateTimeImmutable($occurredAt, new \DateTimeZone('UTC')))
                 ->setTimezone(new \DateTimeZone('Europe/Istanbul'))
@@ -231,7 +235,7 @@ class QrAttendanceEventService
 
         $publicEvent = self::publicEvent($pdo, $row);
         $lateEarly = null;
-        if (empty($body['__skip_late_early'])) {
+        if (!$skipLateEarly) {
             $businessDate = (new \DateTimeImmutable((string) $row['occurred_at_utc'], new \DateTimeZone('UTC')))
                 ->setTimezone(new \DateTimeZone('Europe/Istanbul'))
                 ->format('Y-m-d');
@@ -394,9 +398,6 @@ class QrAttendanceEventService
             $localDate = (new \DateTimeImmutable($occurredUtc, new \DateTimeZone('UTC')))
                 ->setTimezone(new \DateTimeZone('Europe/Istanbul'))
                 ->format('Y-m-d');
-            $localTime = (new \DateTimeImmutable($occurredUtc, new \DateTimeZone('UTC')))
-                ->setTimezone(new \DateTimeZone('Europe/Istanbul'))
-                ->format('H:i');
             $public = [
                 'id' => (int) $row['id'],
                 'event_type' => (string) $row['event_type'],
@@ -421,8 +422,7 @@ class QrAttendanceEventService
                 if ($byDay[$localDate]['giris'] === null || $occurredUtc < (string) $byDay[$localDate]['giris_utc']) {
                     $byDay[$localDate]['giris'] = [
                         'id' => $public['id'],
-                        'time' => $localTime,
-                        'occurred_at' => $public['occurred_at'],
+                        'occurred_at_utc' => $occurredUtc,
                     ];
                     $byDay[$localDate]['giris_utc'] = $occurredUtc;
                 }
@@ -431,8 +431,7 @@ class QrAttendanceEventService
                 if ($byDay[$localDate]['cikis'] === null || $occurredUtc > (string) $byDay[$localDate]['cikis_utc']) {
                     $byDay[$localDate]['cikis'] = [
                         'id' => $public['id'],
-                        'time' => $localTime,
-                        'occurred_at' => $public['occurred_at'],
+                        'occurred_at_utc' => $occurredUtc,
                     ];
                     $byDay[$localDate]['cikis_utc'] = $occurredUtc;
                 }
@@ -442,93 +441,45 @@ class QrAttendanceEventService
         $days = [];
         ksort($byDay);
         foreach ($byDay as $day) {
-            $planned = \Medisa\Api\Services\Attendance\LateEarlyInfoService::loadPlannedDay(
-                $pdo,
-                $personelId,
-                (string) $day['date']
-            );
             $statusLines = [];
-            $girisStatus = null;
-            $cikisStatus = null;
+            $girisPresented = null;
+            $cikisPresented = null;
             if ($day['giris'] === null) {
                 $statusLines[] = 'Giriş Kaydı Bulunamadı.';
             } else {
-                $late = \Medisa\Api\Services\Attendance\LateEarlyInfoService::evaluateAfterScan(
+                $girisPresented = QrAttendancePresentationService::presentDayEvent(
+                    $pdo,
+                    $personelId,
+                    (int) $day['giris']['id'],
                     'GIRIS',
-                    (string) $day['giris_utc'],
-                    $planned
+                    (string) $day['giris']['occurred_at_utc'],
+                    (string) $day['date']
                 );
-                if (is_array($late)) {
-                    $girisStatus = [
-                        'kind' => $late['kind'],
-                        'label' => isset($late['card_label']) ? (string) $late['card_label'] : (string) $late['message'],
-                        'delta_dakika' => (int) $late['delta_dakika'],
-                    ];
-                    $statusLines[] = $girisStatus['label'];
-                } else {
-                    $girisStatus = ['kind' => 'NORMAL', 'label' => 'Normal', 'delta_dakika' => 0];
+                if (is_array($girisPresented['status'] ?? null)) {
+                    $statusLines[] = (string) $girisPresented['status']['label'];
                 }
             }
             if ($day['cikis'] === null) {
                 $statusLines[] = 'Çıkış Kaydı Bulunamadı.';
             } else {
-                $early = \Medisa\Api\Services\Attendance\LateEarlyInfoService::evaluateAfterScan(
+                $cikisPresented = QrAttendancePresentationService::presentDayEvent(
+                    $pdo,
+                    $personelId,
+                    (int) $day['cikis']['id'],
                     'CIKIS',
-                    (string) $day['cikis_utc'],
-                    $planned
+                    (string) $day['cikis']['occurred_at_utc'],
+                    (string) $day['date']
                 );
-                if (is_array($early)) {
-                    $cikisStatus = [
-                        'kind' => $early['kind'],
-                        'label' => isset($early['card_label']) ? (string) $early['card_label'] : (string) $early['message'],
-                        'delta_dakika' => (int) $early['delta_dakika'],
-                    ];
-                    $statusLines[] = $cikisStatus['label'];
-                } else {
-                    $cikisStatus = ['kind' => 'NORMAL', 'label' => 'Normal', 'delta_dakika' => 0];
+                if (is_array($cikisPresented['status'] ?? null)) {
+                    $statusLines[] = (string) $cikisPresented['status']['label'];
                 }
-            }
-            if (
-                $day['giris'] !== null
-                && $day['cikis'] !== null
-                && $girisStatus !== null
-                && $cikisStatus !== null
-                && $girisStatus['kind'] === 'NORMAL'
-                && $cikisStatus['kind'] === 'NORMAL'
-                && $statusLines === []
-            ) {
-                $statusLines[] = 'Normal';
-            } elseif (
-                $day['giris'] !== null
-                && $day['cikis'] !== null
-                && $girisStatus !== null
-                && $cikisStatus !== null
-                && $girisStatus['kind'] === 'NORMAL'
-                && $cikisStatus['kind'] === 'NORMAL'
-            ) {
-                // both normal — ensure single Normal line
-                $statusLines = ['Normal'];
             }
 
             $days[] = [
                 'date' => $day['date'],
                 'has_events' => true,
-                'giris' => $day['giris'] === null
-                    ? null
-                    : [
-                        'id' => $day['giris']['id'],
-                        'time' => $day['giris']['time'],
-                        'occurred_at' => $day['giris']['occurred_at'],
-                        'status' => $girisStatus,
-                    ],
-                'cikis' => $day['cikis'] === null
-                    ? null
-                    : [
-                        'id' => $day['cikis']['id'],
-                        'time' => $day['cikis']['time'],
-                        'occurred_at' => $day['cikis']['occurred_at'],
-                        'status' => $cikisStatus,
-                    ],
+                'giris' => $girisPresented,
+                'cikis' => $cikisPresented,
                 'status_lines' => $statusLines,
             ];
         }

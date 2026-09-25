@@ -140,12 +140,16 @@ $before = eecsCount($pdo);
 $beforeCikis = eecsCount($pdo, 'CIKIS');
 
 // CASE A — 18dk early, no confirm → confirmation_required, no write
-$resA = QrAttendanceEventService::scan($pdo, $ctx['auth'], [
-    'token' => $token,
-    'event_type' => 'CIKIS',
-    'request_nonce' => eecsNonce(10),
-    '__test_occurred_at' => $early18Utc,
-]);
+$resA = QrAttendanceEventService::scan(
+    $pdo,
+    $ctx['auth'],
+    [
+        'token' => $token,
+        'event_type' => 'CIKIS',
+        'request_nonce' => eecsNonce(10),
+    ],
+    ['occurred_at_utc' => $early18Utc]
+);
 eecsAssert(!empty($resA['confirmation_required']), 'A confirmation_required');
 eecsAssert(is_array($resA['early_exit_confirm'] ?? null), 'A early_exit_confirm payload');
 eecsAssert((int) $resA['early_exit_confirm']['delta_dakika'] === 18, 'A delta 18');
@@ -155,13 +159,17 @@ eecsAssert(eecsCount($pdo) === $before, 'A event count unchanged');
 eecsAssert(eecsCount($pdo, 'CIKIS') === $beforeCikis, 'A no CIKIS row');
 
 // CASE B — same QR, Evet with new nonce → exactly one CIKIS, no post-info (18 ≤ 30)
-$resB = QrAttendanceEventService::scan($pdo, $ctx['auth'], [
-    'token' => $token,
-    'event_type' => 'CIKIS',
-    'request_nonce' => eecsNonce(11),
-    'early_exit_confirmed' => true,
-    '__test_occurred_at' => $early18Utc,
-]);
+$resB = QrAttendanceEventService::scan(
+    $pdo,
+    $ctx['auth'],
+    [
+        'token' => $token,
+        'event_type' => 'CIKIS',
+        'request_nonce' => eecsNonce(11),
+        'early_exit_confirmed' => true,
+    ],
+    ['occurred_at_utc' => $early18Utc]
+);
 eecsAssert(empty($resB['confirmation_required']), 'B no confirmation_required');
 eecsAssert(is_array($resB['event'] ?? null), 'B event written');
 eecsAssert(($resB['event']['event_type'] ?? '') === 'CIKIS', 'B CIKIS type');
@@ -169,13 +177,17 @@ eecsAssert(($resB['late_early_info'] ?? null) === null, 'B no post late_early_in
 eecsAssert(eecsCount($pdo, 'CIKIS') === $beforeCikis + 1, 'B exactly one CIKIS');
 
 // CASE D — duplicate confirm/retry same jti+type → idempotent, still one CIKIS
-$resD = QrAttendanceEventService::scan($pdo, $ctx['auth'], [
-    'token' => $token,
-    'event_type' => 'CIKIS',
-    'request_nonce' => eecsNonce(12),
-    'early_exit_confirmed' => true,
-    '__test_occurred_at' => $early18Utc,
-]);
+$resD = QrAttendanceEventService::scan(
+    $pdo,
+    $ctx['auth'],
+    [
+        'token' => $token,
+        'event_type' => 'CIKIS',
+        'request_nonce' => eecsNonce(12),
+        'early_exit_confirmed' => true,
+    ],
+    ['occurred_at_utc' => $early18Utc]
+);
 eecsAssert(!empty($resD['idempotent']), 'D idempotent replay');
 eecsAssert(eecsCount($pdo, 'CIKIS') === $beforeCikis + 1, 'D still exactly one CIKIS');
 
@@ -186,13 +198,17 @@ $ctxC = eecsSeed($pdoC);
 eecsOpenShift($pdoC, $ctxC);
 $mintedC = QrTokenService::mint($ctxC['sube_id']);
 $beforeC = eecsCount($pdoC, 'CIKIS');
-$resC = QrAttendanceEventService::scan($pdoC, $ctxC['auth'], [
-    'token' => $mintedC['token'],
-    'event_type' => 'CIKIS',
-    'request_nonce' => eecsNonce(20),
-    'early_exit_confirmed' => true,
-    '__test_occurred_at' => $early31Utc,
-]);
+$resC = QrAttendanceEventService::scan(
+    $pdoC,
+    $ctxC['auth'],
+    [
+        'token' => $mintedC['token'],
+        'event_type' => 'CIKIS',
+        'request_nonce' => eecsNonce(20),
+        'early_exit_confirmed' => true,
+    ],
+    ['occurred_at_utc' => $early31Utc]
+);
 eecsAssert(empty($resC['confirmation_required']), 'C confirmed write');
 eecsAssert(eecsCount($pdoC, 'CIKIS') === $beforeC + 1, 'C exactly one CIKIS');
 eecsAssert(is_array($resC['late_early_info'] ?? null), 'C late_early_info present');

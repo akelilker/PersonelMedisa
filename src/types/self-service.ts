@@ -131,11 +131,20 @@ export type MeQrHistoryDayEventStatus = {
   delta_dakika: number;
 };
 
+export type MeQrHistoryPendingCorrection = {
+  id: number;
+  status: string;
+  status_label: string;
+  requested_local_time: string;
+};
+
 export type MeQrHistoryDayEvent = {
   id: number;
   time: string;
   occurred_at: string;
   status: MeQrHistoryDayEventStatus | null;
+  correction_allowed?: boolean;
+  pending_correction?: MeQrHistoryPendingCorrection | null;
 };
 
 export type MeQrHistoryDay = {

@@ -35,11 +35,19 @@ describe("PERSONEL_SELF_SERVICE_PRODUCT_UX_V2 notification + policy owners", () 
     expect(event).toContain("early_exit_confirmed");
     expect(event).toContain("confirmation_required");
     expect(event).toContain("evaluateEarlyExitConfirmation");
+    expect(event).toContain("array $internalOptions = null");
+    expect(event).not.toContain("__test_occurred_at");
+    expect(event).not.toContain("__skip_late_early");
 
     const correction = read("api/src/Services/Qr/QrAttendanceCorrectionService.php");
     expect(correction).toContain("CORRECTION_WINDOW_CLOSED");
     expect(correction).toContain("AttendanceBusinessDayService::isCorrectionAllowedNow");
     expect(correction).toContain("Düzeltme Talebiniz Amirinize İletildi.");
+
+    const presentation = read("api/src/Services/Qr/QrAttendancePresentationService.php");
+    expect(presentation).toContain("presentDayEvent");
+    expect(presentation).toContain("presentTodayBoxEvent");
+    expect(presentation).toContain("approvedEffectiveLocalTime");
   });
 
   it("personel home no longer hosts duplicate bell or employer leakage surfaces", () => {
@@ -48,17 +56,23 @@ describe("PERSONEL_SELF_SERVICE_PRODUCT_UX_V2 notification + policy owners", () 
     expect(home).not.toContain("self-missing-info-warning");
     expect(home).not.toContain("SelfServiceQrShortcuts");
     expect(home).not.toContain("Bugünkü Giriş");
-    expect(home).toContain("Giriş Saatinizle İlgili Düzeltme Talebi Oluşturulsun mu?");
+    expect(home).toContain("AttendanceCorrectionRequestModal");
+
+    const history = read("src/features/self-service/pages/PersonelQrHistoryPage.tsx");
+    expect(history).toContain("AttendanceCorrectionRequestModal");
+    expect(history).toContain("history-giris-correct");
+    expect(history).toContain("Giriş / Çıkış Geçmişi Yüklenemedi. Tekrar Deneyin.");
+    expect(history).not.toContain('to="/self/qr-okut"');
+    expect(history).not.toContain(">QR Okut<");
 
     const shell = read("src/app/AppShell.tsx");
     expect(shell).toContain('session?.user.rol === "PERSONEL" ? null : session?.user.ad_soyad');
 
     const header = read("src/components/shell/ShellHeaderActions.tsx");
-    expect(header).toContain("subeControl.kind === \"multi\" && !isPersonelRole");
+    expect(header).toContain('subeControl.kind === "multi" && !isPersonelRole');
 
     const today = read("api/src/Services/Qr/QrAttendanceTodayService.php");
-    expect(today).toContain("lateEarlyStatusForEvent");
-    expect(today).toContain("card_label");
+    expect(today).toContain("QrAttendancePresentationService::presentTodayBoxEvent");
 
     const businessDay = read("api/src/Services/Attendance/AttendanceBusinessDayService.php");
     expect(businessDay).toContain("resolveWorkDay");

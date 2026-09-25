@@ -7,6 +7,7 @@ import type {
   MeQrHistoryDay,
   MeQrHistoryDayEvent,
   MeQrHistoryDayEventStatus,
+  MeQrHistoryPendingCorrection,
   MeQrInterval,
   MeQrIntervalAnomaly,
   MeQrLateEarlyInfo,
@@ -136,6 +137,22 @@ function normalizeHistoryDayEventStatus(raw: unknown): MeQrHistoryDayEventStatus
   return { kind, label, delta_dakika: delta };
 }
 
+function normalizeHistoryPendingCorrection(raw: unknown): MeQrHistoryPendingCorrection | null {
+  const row = toRecord(raw);
+  if (!row) return null;
+  const id = readNumber(row.id);
+  const status = readString(row.status);
+  const statusLabel = readString(row.status_label);
+  const requested = readString(row.requested_local_time);
+  if (id == null || !status || !statusLabel || !requested) return null;
+  return {
+    id,
+    status,
+    status_label: statusLabel,
+    requested_local_time: requested
+  };
+}
+
 function normalizeHistoryDayEvent(raw: unknown): MeQrHistoryDayEvent | null {
   const row = toRecord(raw);
   if (!row) return null;
@@ -148,11 +165,17 @@ function normalizeHistoryDayEvent(raw: unknown): MeQrHistoryDayEvent | null {
     statusRaw === null || statusRaw === undefined
       ? null
       : normalizeHistoryDayEventStatus(statusRaw);
+  const pendingRaw = row.pending_correction;
   return {
     id,
     time,
     occurred_at: occurredAt,
-    status
+    status,
+    correction_allowed: row.correction_allowed === true,
+    pending_correction:
+      pendingRaw === null || pendingRaw === undefined
+        ? null
+        : normalizeHistoryPendingCorrection(pendingRaw)
   };
 }
 

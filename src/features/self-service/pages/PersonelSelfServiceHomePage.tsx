@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ackInboxPopup,
-  createAttendanceCorrection,
   decideAttendanceCorrection,
   fetchAttendanceToday,
   fetchInboxNotifications,
@@ -11,6 +10,7 @@ import {
 import { isApiRequestError, shouldPreferDemoApi } from "../../../api/api-client";
 import { LoadingState } from "../../../components/states/LoadingState";
 import { useRoleAccess } from "../../../hooks/use-role-access";
+import { AttendanceCorrectionRequestModal } from "../components/AttendanceCorrectionRequestModal";
 import { BackgroundlessNoticeModal } from "../components/BackgroundlessNoticeModal";
 import { OwnQrAttendanceBoxes } from "../components/OwnQrAttendanceBoxes";
 import { PersonelMobileCapabilityService } from "../personel-mobile-capability";
@@ -46,8 +46,6 @@ export function PersonelSelfServiceHomePage() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<NoticeState>(null);
   const [correctDraft, setCorrectDraft] = useState<CorrectDraft | null>(null);
-  const [correctTime, setCorrectTime] = useState("");
-  const [correctBusy, setCorrectBusy] = useState(false);
 
   const load = useCallback(async () => {
     if (shouldPreferDemoApi()) {
@@ -183,13 +181,6 @@ export function PersonelSelfServiceHomePage() {
     );
   }
 
-  const correctionQuestion =
-    correctDraft?.eventType === "GIRIS"
-      ? "Giriş Saatinizle İlgili Düzeltme Talebi Oluşturulsun mu?"
-      : correctDraft?.eventType === "CIKIS"
-        ? "Çıkış Saatinizle İlgili Düzeltme Talebi Oluşturulsun mu?"
-        : "";
-
   return (
     <section className="personel-mobile-shell" data-testid="personel-self-service-page">
       <section className="pm-section" data-testid="personel-today-attendance-section">
@@ -215,7 +206,6 @@ export function PersonelSelfServiceHomePage() {
                 eventType: "GIRIS",
                 currentTime: event.display_local_time ?? event.local_time
               });
-              setCorrectTime(event.display_local_time ?? event.local_time);
             })
           }
           onCorrectCikis={(event) =>
@@ -225,7 +215,6 @@ export function PersonelSelfServiceHomePage() {
                 eventType: "CIKIS",
                 currentTime: event.display_local_time ?? event.local_time
               });
-              setCorrectTime(event.display_local_time ?? event.local_time);
             })
           }
         />
@@ -245,59 +234,20 @@ export function PersonelSelfServiceHomePage() {
         <div className="pm-footer-accent pm-footer-accent--right" aria-hidden="true" />
       </footer>
 
-      {correctDraft ? (
-        <BackgroundlessNoticeModal
-          open
-          title="Düzeltme Talebi"
-          body={correctionQuestion}
-          primaryLabel={correctBusy ? "Gönderiliyor..." : "Evet"}
-          secondaryLabel="Hayır"
-          onSecondary={() => setCorrectDraft(null)}
-          onPrimary={() => {
-            if (!correctTime) return;
-            void (async () => {
-              setCorrectBusy(true);
-              try {
-                const result = await createAttendanceCorrection({
-                  source_event_id: correctDraft.eventId,
-                  requested_local_time: correctTime
-                });
-                setCorrectDraft(null);
-                setNotice({
-                  title: "Düzeltme Talebi",
-                  body: result.message || "Düzeltme Talebiniz Amirinize İletildi."
-                });
-                await load();
-              } catch (cause) {
-                let message = "Düzeltme talebi oluşturulamadı. Tekrar deneyin.";
-                if (isApiRequestError(cause) && cause.code === "MOBILE_CAPABILITY_PENDING_SCOPE") {
-                  message = COMING_SOON;
-                } else if (isApiRequestError(cause) && cause.code === "CORRECTION_WINDOW_CLOSED") {
-                  message =
-                    cause.message ||
-                    "Bu Kayıt İçin Düzeltme Talebi Süresi Doldu. Amirinizle Görüşün.";
-                }
-                setNotice({ title: "Düzeltme Talebi", body: message });
-              } finally {
-                setCorrectBusy(false);
-              }
-            })();
-          }}
-          onClose={() => setCorrectDraft(null)}
-          testId="attendance-correct-modal"
-        >
-          <label className="pm-correct-label">
-            Yeni saat
-            <input
-              type="time"
-              required
-              value={correctTime}
-              onChange={(e) => setCorrectTime(e.target.value)}
-              data-testid="attendance-correct-time"
-            />
-          </label>
-        </BackgroundlessNoticeModal>
-      ) : null}
+      <AttendanceCorrectionRequestModal
+        open={correctDraft !== null}
+        eventId={correctDraft?.eventId ?? 0}
+        eventType={correctDraft?.eventType ?? "GIRIS"}
+        initialTime={correctDraft?.currentTime ?? ""}
+        onClose={() => setCorrectDraft(null)}
+        onSuccess={(message) => {
+          setNotice({ title: "Düzeltme Talebi", body: message });
+          void load();
+        }}
+        onError={(message) => {
+          setNotice({ title: "Düzeltme Talebi", body: message });
+        }}
+      />
 
       <BackgroundlessNoticeModal
         open={notice !== null}

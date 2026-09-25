@@ -11,6 +11,8 @@ use PDO;
 
 /**
  * Mobile home attendance box state for today (Istanbul business date).
+ * Presentation (effective time / status / correction_allowed) owned by
+ * QrAttendancePresentationService — shared with History.
  */
 class QrAttendanceTodayService
 {
@@ -22,12 +24,11 @@ class QrAttendanceTodayService
     {
         $ctx = SelfPersonelContext::resolveForSelfService($authUser, $pdo, true);
         $caps = PersonelMobileCapabilityService::resolve($pdo, (int) $ctx['personel_id'], $ctx);
-        // QR/kart okutma yetkisi rol bağımsızdır: bağlı personel + kanonik collar.
-        // Yönetici roller de kendi giriş/çıkışını okutabilir.
         if (!RolePermissions::has($authUser, 'self_service.qr.scan')) {
             $caps['qr_scan'] = false;
         }
         $today = self::istanbulToday();
+        $personelId = (int) $ctx['personel_id'];
 
         $giris = null;
         $cikis = null;
@@ -47,94 +48,50 @@ class QrAttendanceTodayService
                      ORDER BY occurred_at_utc ASC, id ASC'
                 );
                 $stmt->execute([
-                    'pid' => (int) $ctx['personel_id'],
+                    'pid' => $personelId,
                     'from_utc' => $range['from_utc'],
                     'to_utc' => $range['to_exclusive_utc'],
                 ]);
+                $rawGiris = null;
+                $rawCikis = null;
                 while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
                     if (!is_array($row)) {
                         continue;
                     }
-                    $item = [
-                        'id' => (int) $row['id'],
-                        'event_type' => (string) $row['event_type'],
-                        'occurred_at' => self::formatClient((string) $row['occurred_at_utc']),
-                        'occurred_at_utc' => (string) $row['occurred_at_utc'],
-                        'local_time' => self::hhmm((string) $row['occurred_at_utc']),
-                    ];
-                    if ($item['event_type'] === 'GIRIS') {
-                        $giris = $item;
-                    } elseif ($item['event_type'] === 'CIKIS') {
-                        $cikis = $item;
+                    if ((string) $row['event_type'] === 'GIRIS') {
+                        $rawGiris = $row;
+                    } elseif ((string) $row['event_type'] === 'CIKIS') {
+                        $rawCikis = $row;
                     }
                 }
 
-                $corrTable = $pdo->query("SHOW TABLES LIKE 'qr_attendance_correction_requests'");
-                $hasCorr = $corrTable !== false && $corrTable->fetch(PDO::FETCH_NUM) !== false;
-                if ($corrTable !== false) {
-                    $corrTable->closeCursor();
+                if ($rawGiris !== null) {
+                    $giris = QrAttendancePresentationService::presentTodayBoxEvent(
+                        $pdo,
+                        $personelId,
+                        (int) $rawGiris['id'],
+                        'GIRIS',
+                        (string) $rawGiris['occurred_at_utc'],
+                        $today
+                    );
+                    $pendingGirisCorrection = QrAttendancePresentationService::pendingForEvent(
+                        $pdo,
+                        (int) $rawGiris['id']
+                    );
                 }
-                if ($hasCorr) {
-                    $pendingGirisCorrection = self::pendingForEvent($pdo, $giris ? (int) $giris['id'] : 0);
-                    $pendingCikisCorrection = self::pendingForEvent($pdo, $cikis ? (int) $cikis['id'] : 0);
-                    // Effective approved overlay for display
-                    if ($giris) {
-                        $giris['display_local_time'] = self::effectiveDisplayTime($pdo, (int) $giris['id'], $giris['local_time']);
-                        $giris['correction_allowed'] = self::correctionAllowedForEvent(
-                            $pdo,
-                            (int) $ctx['personel_id'],
-                            (string) $giris['occurred_at_utc']
-                        );
-                        $giris['status'] = self::lateEarlyStatusForEvent(
-                            $pdo,
-                            (int) $ctx['personel_id'],
-                            'GIRIS',
-                            (string) $giris['occurred_at_utc'],
-                            $today
-                        );
-                        unset($giris['occurred_at_utc']);
-                    }
-                    if ($cikis) {
-                        $cikis['display_local_time'] = self::effectiveDisplayTime($pdo, (int) $cikis['id'], $cikis['local_time']);
-                        $cikis['correction_allowed'] = self::correctionAllowedForEvent(
-                            $pdo,
-                            (int) $ctx['personel_id'],
-                            (string) $cikis['occurred_at_utc']
-                        );
-                        $cikis['status'] = self::lateEarlyStatusForEvent(
-                            $pdo,
-                            (int) $ctx['personel_id'],
-                            'CIKIS',
-                            (string) $cikis['occurred_at_utc'],
-                            $today
-                        );
-                        unset($cikis['occurred_at_utc']);
-                    }
-                } else {
-                    if ($giris) {
-                        $giris['display_local_time'] = $giris['local_time'];
-                        $giris['correction_allowed'] = false;
-                        $giris['status'] = self::lateEarlyStatusForEvent(
-                            $pdo,
-                            (int) $ctx['personel_id'],
-                            'GIRIS',
-                            (string) $giris['occurred_at_utc'],
-                            $today
-                        );
-                        unset($giris['occurred_at_utc']);
-                    }
-                    if ($cikis) {
-                        $cikis['display_local_time'] = $cikis['local_time'];
-                        $cikis['correction_allowed'] = false;
-                        $cikis['status'] = self::lateEarlyStatusForEvent(
-                            $pdo,
-                            (int) $ctx['personel_id'],
-                            'CIKIS',
-                            (string) $cikis['occurred_at_utc'],
-                            $today
-                        );
-                        unset($cikis['occurred_at_utc']);
-                    }
+                if ($rawCikis !== null) {
+                    $cikis = QrAttendancePresentationService::presentTodayBoxEvent(
+                        $pdo,
+                        $personelId,
+                        (int) $rawCikis['id'],
+                        'CIKIS',
+                        (string) $rawCikis['occurred_at_utc'],
+                        $today
+                    );
+                    $pendingCikisCorrection = QrAttendancePresentationService::pendingForEvent(
+                        $pdo,
+                        (int) $rawCikis['id']
+                    );
                 }
             } catch (\Throwable $e) {
                 // Schema not ready — empty boxes.
@@ -145,7 +102,7 @@ class QrAttendanceTodayService
             'business_date' => $today,
             'capabilities' => $caps,
             'personel' => [
-                'id' => (int) $ctx['personel_id'],
+                'id' => $personelId,
                 'ad_soyad' => (string) $ctx['ad_soyad'],
                 'sube_ad' => (string) ($ctx['sube_ad'] ?? ''),
                 'bolum_ad' => $ctx['bolum_ad'] ?? null,
@@ -161,119 +118,8 @@ class QrAttendanceTodayService
         ];
     }
 
-    private static function correctionAllowedForEvent(PDO $pdo, $personelId, $occurredAtUtc)
-    {
-        if ($occurredAtUtc === '') {
-            return false;
-        }
-        try {
-            return \Medisa\Api\Services\Attendance\AttendanceBusinessDayService::isCorrectionAllowedNow(
-                $pdo,
-                $personelId,
-                $occurredAtUtc
-            );
-        } catch (\Throwable $e) {
-            return false;
-        }
-    }
-
-    /**
-     * Presentation status from LateEarlyInfoService (30dk policy). null within tolerance / no planned.
-     *
-     * @return array{kind:string,label:string,delta_dakika:int}|null
-     */
-    private static function lateEarlyStatusForEvent(PDO $pdo, $personelId, $eventType, $occurredAtUtc, $businessDate)
-    {
-        if ($occurredAtUtc === '') {
-            return null;
-        }
-        try {
-            $planned = \Medisa\Api\Services\Attendance\LateEarlyInfoService::loadPlannedDay(
-                $pdo,
-                $personelId,
-                $businessDate
-            );
-            $info = \Medisa\Api\Services\Attendance\LateEarlyInfoService::evaluateAfterScan(
-                $eventType,
-                $occurredAtUtc,
-                $planned
-            );
-            if (!is_array($info)) {
-                return null;
-            }
-
-            return [
-                'kind' => (string) $info['kind'],
-                'label' => isset($info['card_label'])
-                    ? (string) $info['card_label']
-                    : (string) $info['message'],
-                'delta_dakika' => (int) $info['delta_dakika'],
-            ];
-        } catch (\Throwable $e) {
-            return null;
-        }
-    }
-
-    /** @return array<string, mixed>|null */
-    private static function pendingForEvent(PDO $pdo, $eventId)
-    {
-        if ($eventId <= 0) {
-            return null;
-        }
-        $stmt = $pdo->prepare(
-            "SELECT id, status, requested_local_time, original_occurred_at_utc
-             FROM qr_attendance_correction_requests
-             WHERE source_event_id = :eid AND status = 'BEKLIYOR'
-             LIMIT 1"
-        );
-        $stmt->execute(['eid' => (int) $eventId]);
-        $row = $stmt->fetch(PDO::FETCH_ASSOC);
-        if (!is_array($row)) {
-            return null;
-        }
-
-        return [
-            'id' => (int) $row['id'],
-            'status' => 'BEKLIYOR',
-            'status_label' => 'Bekliyor',
-            'requested_local_time' => (string) $row['requested_local_time'],
-        ];
-    }
-
-    private static function effectiveDisplayTime(PDO $pdo, $eventId, $fallback)
-    {
-        $stmt = $pdo->prepare(
-            "SELECT effective_local_time
-             FROM qr_attendance_correction_requests
-             WHERE source_event_id = :eid AND status = 'ONAYLANDI'
-             ORDER BY id DESC
-             LIMIT 1"
-        );
-        $stmt->execute(['eid' => (int) $eventId]);
-        $val = $stmt->fetchColumn();
-        if ($val !== false && $val !== null && trim((string) $val) !== '') {
-            return (string) $val;
-        }
-
-        return (string) $fallback;
-    }
-
     private static function istanbulToday()
     {
         return (new \DateTimeImmutable('now', new \DateTimeZone('Europe/Istanbul')))->format('Y-m-d');
-    }
-
-    private static function hhmm($utc)
-    {
-        return (new \DateTimeImmutable((string) $utc, new \DateTimeZone('UTC')))
-            ->setTimezone(new \DateTimeZone('Europe/Istanbul'))
-            ->format('H:i');
-    }
-
-    private static function formatClient($utc)
-    {
-        return (new \DateTimeImmutable((string) $utc, new \DateTimeZone('UTC')))
-            ->setTimezone(new \DateTimeZone('Europe/Istanbul'))
-            ->format('c');
     }
 }

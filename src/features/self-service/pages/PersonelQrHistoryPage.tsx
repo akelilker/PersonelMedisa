@@ -3,8 +3,13 @@ import { Link } from "react-router-dom";
 import { isApiRequestError } from "../../../api/api-client";
 import { fetchMeQrHareketleri } from "../../../api/qr.api";
 import { LoadingState } from "../../../components/states/LoadingState";
-import type { MeQrAttendanceEvent, MeQrHistoryDay } from "../../../types/self-service";
+import type { MeQrAttendanceEvent, MeQrHistoryDay, MeQrHistoryDayEvent } from "../../../types/self-service";
 import { formatSelfServiceClock } from "../self-service-datetime";
+import {
+  AttendanceCorrectionRequestModal,
+  type AttendanceCorrectionEventType
+} from "../components/AttendanceCorrectionRequestModal";
+import { BackgroundlessNoticeModal } from "../components/BackgroundlessNoticeModal";
 
 const WEEKDAYS = ["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"] as const;
 
@@ -17,6 +22,12 @@ type Status =
       days: MeQrHistoryDay[];
     }
   | { kind: "error"; message: string };
+
+type CorrectDraft = {
+  eventId: number;
+  eventType: AttendanceCorrectionEventType;
+  currentTime: string;
+};
 
 function parseYmd(ymd: string): { year: number; month: number; day: number } {
   const [y, m, d] = ymd.split("-").map((part) => Number.parseInt(part, 10));
@@ -51,12 +62,26 @@ function deriveDaysFromItems(items: MeQrAttendanceEvent[]): MeQrHistoryDay[] {
     const row = byDate.get(date)!;
     if (item.event_type === "GIRIS") {
       if (!row.giris || item.occurred_at < row.girisUtc) {
-        row.giris = { id: item.id, time, occurred_at: item.occurred_at, status: null };
+        row.giris = {
+          id: item.id,
+          time,
+          occurred_at: item.occurred_at,
+          status: null,
+          correction_allowed: false,
+          pending_correction: null
+        };
         row.girisUtc = item.occurred_at;
       }
     } else if (item.event_type === "CIKIS") {
       if (!row.cikis || item.occurred_at > row.cikisUtc) {
-        row.cikis = { id: item.id, time, occurred_at: item.occurred_at, status: null };
+        row.cikis = {
+          id: item.id,
+          time,
+          occurred_at: item.occurred_at,
+          status: null,
+          correction_allowed: false,
+          pending_correction: null
+        };
         row.cikisUtc = item.occurred_at;
       }
     }
@@ -106,12 +131,42 @@ function formatDetailDate(ymd: string): string {
   }).format(new Date(year, month - 1, day));
 }
 
+function PencilIcon() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+    </svg>
+  );
+}
+
+function canShowHistoryCorrection(event: MeQrHistoryDayEvent | null | undefined): boolean {
+  return Boolean(
+    event &&
+      event.correction_allowed === true &&
+      !event.pending_correction
+  );
+}
+
 export function PersonelQrHistoryPage() {
   const now = new Date();
   const [viewYear, setViewYear] = useState(now.getFullYear());
   const [viewMonth, setViewMonth] = useState(now.getMonth() + 1);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [status, setStatus] = useState<Status>({ kind: "loading" });
+  const [correctDraft, setCorrectDraft] = useState<CorrectDraft | null>(null);
+  const [notice, setNotice] = useState<{ title: string; body: string } | null>(null);
 
   const loadMonth = useCallback(async (year: number, month: number) => {
     setStatus({ kind: "loading" });
@@ -130,8 +185,8 @@ export function PersonelQrHistoryPage() {
       setStatus({
         kind: "error",
         message: unbound
-          ? "Personel bağlantınız yok veya QR hareketleri bu hesap için kapalı."
-          : "QR hareketleri yüklenemedi. Tekrar deneyin."
+          ? "Personel bağlantınız yok veya giriş / çıkış geçmişi bu hesap için kapalı."
+          : "Giriş / Çıkış Geçmişi Yüklenemedi. Tekrar Deneyin."
       });
     }
   }, []);
@@ -250,28 +305,86 @@ export function PersonelQrHistoryPage() {
           <h3 className="qr-history-detail-date">{formatDetailDate(selectedDate)}</h3>
           {selectedDay ? (
             <>
-              <dl className="qr-history-detail-dl">
-                <div>
-                  <dt>Giriş</dt>
-                  <dd>{selectedDay.giris?.time ?? "—"}</dd>
+              <div className="qr-history-event-row">
+                <div className="qr-history-event-main">
+                  <span className="qr-history-event-label">Giriş</span>
+                  <span className="qr-history-event-time" data-testid="history-giris-time">
+                    {selectedDay.giris?.time ?? "—"}
+                  </span>
                 </div>
-                <div>
-                  <dt>Çıkış</dt>
-                  <dd>{selectedDay.cikis?.time ?? "—"}</dd>
+                {selectedDay.giris?.pending_correction ? (
+                  <span className="qr-history-pending" data-testid="history-giris-pending">
+                    Bekliyor
+                  </span>
+                ) : null}
+                {canShowHistoryCorrection(selectedDay.giris) ? (
+                  <button
+                    type="button"
+                    className="pm-box-pencil"
+                    data-testid="history-giris-correct"
+                    aria-label="Giriş düzeltme talebi"
+                    onClick={() => {
+                      if (!selectedDay.giris) return;
+                      setCorrectDraft({
+                        eventId: selectedDay.giris.id,
+                        eventType: "GIRIS",
+                        currentTime: selectedDay.giris.time
+                      });
+                    }}
+                  >
+                    <PencilIcon />
+                  </button>
+                ) : null}
+              </div>
+              {selectedDay.giris?.status?.label ? (
+                <p className="qr-history-event-status" data-testid="history-giris-status">
+                  {selectedDay.giris.status.label}
+                </p>
+              ) : null}
+
+              <div className="qr-history-event-row">
+                <div className="qr-history-event-main">
+                  <span className="qr-history-event-label">Çıkış</span>
+                  <span className="qr-history-event-time" data-testid="history-cikis-time">
+                    {selectedDay.cikis?.time ?? "—"}
+                  </span>
                 </div>
-              </dl>
+                {selectedDay.cikis?.pending_correction ? (
+                  <span className="qr-history-pending" data-testid="history-cikis-pending">
+                    Bekliyor
+                  </span>
+                ) : null}
+                {canShowHistoryCorrection(selectedDay.cikis) ? (
+                  <button
+                    type="button"
+                    className="pm-box-pencil"
+                    data-testid="history-cikis-correct"
+                    aria-label="Çıkış düzeltme talebi"
+                    onClick={() => {
+                      if (!selectedDay.cikis) return;
+                      setCorrectDraft({
+                        eventId: selectedDay.cikis.id,
+                        eventType: "CIKIS",
+                        currentTime: selectedDay.cikis.time
+                      });
+                    }}
+                  >
+                    <PencilIcon />
+                  </button>
+                ) : null}
+              </div>
+              {selectedDay.cikis?.status?.label ? (
+                <p className="qr-history-event-status" data-testid="history-cikis-status">
+                  {selectedDay.cikis.status.label}
+                </p>
+              ) : null}
+
               {selectedDay.status_lines.length > 0 ? (
                 <ul className="qr-history-status-lines">
                   {selectedDay.status_lines.map((line) => (
                     <li key={line}>{line}</li>
                   ))}
                 </ul>
-              ) : null}
-              {selectedDay.giris?.status?.label ? (
-                <p className="qr-history-event-status">Giriş: {selectedDay.giris.status.label}</p>
-              ) : null}
-              {selectedDay.cikis?.status?.label ? (
-                <p className="qr-history-event-status">Çıkış: {selectedDay.cikis.status.label}</p>
               ) : null}
             </>
           ) : (
@@ -282,10 +395,32 @@ export function PersonelQrHistoryPage() {
         <p className="self-service-muted qr-history-hint">Detay için bir gün seçin.</p>
       )}
 
-      <nav className="pm-secondary-nav" aria-label="QR sayfa bağlantıları">
+      <nav className="pm-secondary-nav" aria-label="Sayfa bağlantıları">
         <Link to="/">Özet</Link>
-        <Link to="/self/qr-okut">QR Okut</Link>
       </nav>
+
+      <AttendanceCorrectionRequestModal
+        open={correctDraft !== null}
+        eventId={correctDraft?.eventId ?? 0}
+        eventType={correctDraft?.eventType ?? "GIRIS"}
+        initialTime={correctDraft?.currentTime ?? ""}
+        onClose={() => setCorrectDraft(null)}
+        onSuccess={(message) => {
+          setNotice({ title: "Düzeltme Talebi", body: message });
+          void loadMonth(viewYear, viewMonth);
+        }}
+        onError={(message) => {
+          setNotice({ title: "Düzeltme Talebi", body: message });
+        }}
+      />
+
+      <BackgroundlessNoticeModal
+        open={notice !== null}
+        title={notice?.title ?? ""}
+        body={notice?.body ?? ""}
+        onClose={() => setNotice(null)}
+        testId="history-notice-modal"
+      />
     </section>
   );
 }

@@ -22,10 +22,14 @@ describe("personel mobile/PWA self-service productization", () => {
     expect(home).toContain("personel-unbound-page");
     expect(home).toContain("QR giriş/çıkış");
     expect(home).not.toContain("<SelfServiceQrShortcuts />");
-    expect(home).toContain("Düzeltme Talebiniz Amirinize İletildi.");
-    expect(home).toContain("CORRECTION_WINDOW_CLOSED");
+    expect(home).toContain("AttendanceCorrectionRequestModal");
     expect(home).not.toContain("startQrScanner");
     expect(home).not.toMatch(/INSERT\s+INTO\s+gunluk_puantaj/i);
+
+    const correctModal = read("src/features/self-service/components/AttendanceCorrectionRequestModal.tsx");
+    expect(correctModal).toContain("Düzeltme Talebiniz Amirinize İletildi.");
+    expect(correctModal).toContain("CORRECTION_WINDOW_CLOSED");
+    expect(correctModal).toContain("Giriş Saatinizle İlgili Düzeltme Talebi Oluşturulsun mu?");
   });
 
   it("locks shared attendance boxes fail-closed copy and amir parity wiring", () => {
@@ -96,7 +100,10 @@ describe("personel mobile/PWA self-service productization", () => {
     expect(history).toContain("fetchMeQrHareketleri");
     expect(history).toContain("Pzt");
     expect(history).toContain("Giriş Kaydı Bulunamadı.");
-    expect(history).toContain("QR hareketleri yüklenemedi. Tekrar deneyin.");
+    expect(history).toContain("Giriş / Çıkış Geçmişi Yüklenemedi. Tekrar Deneyin.");
+    expect(history).toContain("AttendanceCorrectionRequestModal");
+    expect(history).toContain("history-giris-correct");
+    expect(history).not.toContain('to="/self/qr-okut"');
     expect(history).not.toContain("Henuz QR hareketi yok");
     expect(history).not.toMatch(/\? error\.message/);
   });

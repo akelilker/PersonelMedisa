@@ -73,9 +73,29 @@ const HISTORY_DAYS = {
       event_type: "CIKIS",
       occurred_at: "2026-09-25T17:02:00+03:00",
       sube: { id: 1, ad: "Merkez" }
+    },
+    {
+      id: 201,
+      event_type: "GIRIS",
+      occurred_at: "2026-09-24T09:05:00+03:00",
+      sube: { id: 1, ad: "Merkez" }
     }
   ],
   days: [
+    {
+      date: "2026-09-24",
+      has_events: true,
+      giris: {
+        id: 201,
+        time: "09:05",
+        occurred_at: "2026-09-24T09:05:00+03:00",
+        status: { kind: "LATE_ENTRY_INFO", label: "35dk Gecikme", delta_dakika: 35 },
+        correction_allowed: true,
+        pending_correction: null
+      },
+      cikis: null,
+      status_lines: ["35dk Gecikme", "Çıkış Kaydı Bulunamadı."]
+    },
     {
       date: "2026-09-25",
       has_events: true,
@@ -83,7 +103,9 @@ const HISTORY_DAYS = {
         id: 101,
         time: "09:01",
         occurred_at: "2026-09-25T09:01:00+03:00",
-        status: { kind: "LATE_ENTRY_INFO", label: "31dk Gecikme", delta_dakika: 31 }
+        status: { kind: "LATE_ENTRY_INFO", label: "31dk Gecikme", delta_dakika: 31 },
+        correction_allowed: true,
+        pending_correction: null
       },
       cikis: {
         id: 102,
@@ -93,7 +115,9 @@ const HISTORY_DAYS = {
           kind: "EARLY_EXIT_INFO",
           label: "Normal Mesai Bitiminden 38dk Önce Çıkış Yaptınız.",
           delta_dakika: 38
-        }
+        },
+        correction_allowed: true,
+        pending_correction: null
       },
       status_lines: ["31dk Gecikme", "Normal Mesai Bitiminden 38dk Önce Çıkış Yaptınız."]
     }
@@ -108,7 +132,10 @@ async function fulfillOk(route: import("@playwright/test").Route, data: unknown,
   });
 }
 
-async function installPersonelSelfServiceMocks(page: Page, options?: { openShift?: boolean }) {
+async function installPersonelSelfServiceMocks(
+  page: Page,
+  options?: { openShift?: boolean; historyDays?: typeof HISTORY_DAYS }
+) {
   const today = options?.openShift
     ? {
         ...TODAY_LATE,
@@ -127,6 +154,8 @@ async function installPersonelSelfServiceMocks(page: Page, options?: { openShift
       }
     : TODAY_LATE;
 
+  let historyPayload = structuredClone(options?.historyDays ?? HISTORY_DAYS);
+
   await page.route("**/api/me/attendance/today**", async (route) => {
     await fulfillOk(route, today);
   });
@@ -134,7 +163,47 @@ async function installPersonelSelfServiceMocks(page: Page, options?: { openShift
     await fulfillOk(route, { items: [], pending_popups: [] });
   });
   await page.route("**/api/me/qr-hareketleri**", async (route) => {
-    await fulfillOk(route, HISTORY_DAYS);
+    await fulfillOk(route, historyPayload);
+  });
+  await page.route("**/api/me/attendance/correction-requests**", async (route) => {
+    if (route.request().method() === "POST") {
+      const body = route.request().postDataJSON() as { source_event_id?: number };
+      const eventId = Number(body?.source_event_id ?? 0);
+      historyPayload = {
+        ...historyPayload,
+        days: historyPayload.days.map((day) => {
+          const patchEvent = (event: (typeof day)["giris"]) => {
+            if (!event || event.id !== eventId) return event;
+            return {
+              ...event,
+              correction_allowed: false,
+              pending_correction: {
+                id: 9001,
+                status: "BEKLIYOR",
+                status_label: "Bekliyor",
+                requested_local_time: event.time
+              }
+            };
+          };
+          return {
+            ...day,
+            giris: patchEvent(day.giris),
+            cikis: patchEvent(day.cikis)
+          };
+        })
+      };
+      await fulfillOk(
+        route,
+        {
+          id: 9001,
+          status: "BEKLIYOR",
+          message: "Düzeltme Talebiniz Amirinize İletildi."
+        },
+        201
+      );
+      return;
+    }
+    await fulfillOk(route, { items: [] });
   });
   await page.route("**/api/me/qr-scan**", async (route) => {
     const body = route.request().postDataJSON() as {
@@ -308,17 +377,53 @@ test.describe("PERSONEL self-service UX v2 — mobile product", () => {
     await expect(dayBtn).toBeVisible();
     await dayBtn.click();
     await expect(page.getByTestId("qr-history-day-detail")).toBeVisible();
-    await expect(page.getByTestId("qr-history-day-detail")).toContainText("Giriş");
-    await expect(page.getByTestId("qr-history-day-detail")).toContainText("09:01");
-    await expect(page.getByTestId("qr-history-day-detail")).toContainText("Çıkış");
-    await expect(page.getByTestId("qr-history-day-detail")).toContainText("17:02");
+    await expect(page.getByTestId("history-giris-time")).toHaveText("09:01");
+    await expect(page.getByTestId("history-cikis-time")).toHaveText("17:02");
 
     const bodyText = await page.getByTestId("personel-qr-history-page").innerText();
     expect(bodyText).not.toContain("Anomali");
     expect(bodyText).not.toContain("Kanonik");
     expect(bodyText).not.toContain("Ham QR");
     expect(bodyText).not.toContain("Eşleşme");
+    expect(bodyText).not.toContain("Puantaj Adayı");
+    await expect(page.getByRole("link", { name: "QR Okut" })).toHaveCount(0);
   });
+
+  for (const viewport of MOBILE_VIEWPORTS) {
+    test(`${viewport.label}: history previous-day correction pencil → modal → pending`, async ({
+      page
+    }) => {
+      await page.setViewportSize({ width: viewport.width, height: viewport.height });
+      await loginPersonel(page);
+
+      await page.getByTestId("header-attendance-history").click();
+      await expect(page.getByTestId("personel-qr-history-page")).toBeVisible();
+      await expect(page.getByRole("link", { name: "QR Okut" })).toHaveCount(0);
+
+      await page.getByTestId("qr-history-day-2026-09-24").click();
+      await expect(page.getByTestId("history-giris-time")).toHaveText("09:05");
+      await expect(page.getByTestId("history-giris-correct")).toBeVisible();
+
+      await page.getByTestId("history-giris-correct").click();
+      const modal = page.getByTestId("attendance-correct-modal");
+      await expect(modal).toBeVisible();
+      await expect(modal).toContainText("Giriş Saatinizle İlgili Düzeltme Talebi Oluşturulsun mu?");
+      await expect(page.getByTestId("attendance-correct-modal-secondary")).toHaveText("Hayır");
+      await expect(page.getByTestId("attendance-correct-modal-primary")).toHaveText("Evet");
+
+      await page.getByTestId("attendance-correct-time").fill("08:30");
+      await page.getByTestId("attendance-correct-modal-primary").click();
+
+      await expect(page.getByTestId("history-notice-modal")).toBeVisible();
+      await expect(page.getByTestId("history-notice-modal")).toContainText(
+        "Düzeltme Talebiniz Amirinize İletildi."
+      );
+      await page.getByTestId("history-notice-modal-close").click();
+
+      await expect(page.getByTestId("history-giris-pending")).toHaveText("Bekliyor");
+      await expect(page.getByTestId("history-giris-correct")).toHaveCount(0);
+    });
+  }
 
   test("430x932: QR scan titles + idle/scanning copy + success collapse", async ({ page }) => {
     await page.setViewportSize({ width: 430, height: 932 });

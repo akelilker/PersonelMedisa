@@ -15,7 +15,7 @@ Owner: `OrgScope` (+ `HrWriteScope` for `IK_PERSONELI` write companies). Session
 
 ## Historical production inventory (2026-09-07 hosting-incident pin) — historical evidence, NOT current tip
 
-**CURRENT canonical pins (2026-09-20):** `CODE_MIGRATION_TIP = 091`; `LAST_VERIFIED_PRODUCTION_MIGRATION_TIP = 089`; `FRESH_PRODUCTION_MIGRATION_READBACK = BLOCKED_EXTERNAL_GITHUB_ACTIONS_BILLING`. The `087` row below is a historical readback of apply `34033315991`, not the current production tip. Authoritative source: `CURRENT_STATE.md` + `docs/guncel/110-master-closure-gap-registry.md`.
+**CURRENT canonical pins (POST_PR402):** `CODE_MIGRATION_TIP = 091`; `LAST_VERIFIED_PRODUCTION_MIGRATION_TIP = 091`; deploy `5c6ae773` (#402). The 2026-09-20 “prod tip 089 / billing blocked” sentence is **STALE**. The `087` row below is a historical readback of apply `34033315991`, not the current production tip. Authoritative source: `CURRENT_STATE.md` + `docs/guncel/146-post-pr402-canonical-backlog.md` (110 SUPERSEDED for active backlog).
 
 | Object | Live state | Evidence |
 | --- | --- | --- |

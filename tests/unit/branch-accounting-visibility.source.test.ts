@@ -106,33 +106,39 @@ describe("branch accounting visibility owners", () => {
     expect(parsed.muhasebe_user_subeler_targets.REMOVE).toEqual([]);
   });
 
-  it("pins CURRENT_STATE + registry to code tip 091 with LAST_VERIFIED prod tip 089", () => {
+  it("pins CURRENT_STATE + registry to code/prod tip 091 after POST_PR402 consolidation", () => {
     const current = read("CURRENT_STATE.md");
     const registry = read("docs/guncel/110-master-closure-gap-registry.md");
+    const backlog = read("docs/guncel/146-post-pr402-canonical-backlog.md");
     expect(current).toMatch(/^CODE_MIGRATION_TIP: 091$/m);
-    expect(current).toMatch(/^PRODUCTION_MIGRATION_TIP: 089$/m);
-    expect(current).toMatch(/^LAST_VERIFIED_PRODUCTION_MIGRATION_TIP: 089$/m);
+    expect(current).toMatch(/^PRODUCTION_MIGRATION_TIP: 091$/m);
+    expect(current).toMatch(/^LAST_VERIFIED_PRODUCTION_MIGRATION_TIP: 091$/m);
     expect(current).toMatch(
-      /^FRESH_PRODUCTION_MIGRATION_READBACK: BLOCKED_EXTERNAL_GITHUB_ACTIONS_BILLING$/m
+      /^FRESH_PRODUCTION_MIGRATION_READBACK: ACTIONS_APPLY_EVIDENCE_2026_09_22$/m
     );
-    expect(current).toMatch(/^PRODUCTION_MIGRATION_PENDING: 2$/m);
+    expect(current).toMatch(/^PRODUCTION_MIGRATION_PENDING: 0$/m);
     expect(current).toMatch(
-      /^PRODUCTION_DEPLOY_SHA: d96182a2a4b4cb5e9e6d7c867d3486d7ac4061b2$/m
+      /^PRODUCTION_DEPLOY_SHA: 5c6ae7734d394022ea1ff65c5683da91c095e0eb$/m
     );
+    expect(current).toContain("ACTIVE_BACKLOG_OWNER: docs/guncel/146-post-pr402-canonical-backlog.md");
     expect(current).toContain("USER_SUBELER_SEMANTIC: ACCESS_SCOPE_ONLY");
     expect(current).toContain("BRANCH_MANAGER_OWNER: sube_sorumlu_yoneticiler");
     expect(current).toContain("PREPARER_HISTORICAL: sedanurB");
     expect(current).toContain("APPROVER_HISTORICAL: Sinem Hamaloğlu");
     expect(current).toContain("TECHNICAL_STATUS: TECHNICAL_GAP_LOCAL_FIXABLE");
     expect(registry).toContain("TECHNICAL_GAP_LOCAL_FIXABLE");
+    expect(registry).toContain("SUPERSEDED");
     expect(registry).not.toContain("BM model ALREADY_SUPPORTED");
     expect(registry).toMatch(/^CODE_MIGRATION_TIP: 091$/m);
-    expect(registry).toMatch(/^PRODUCTION_MIGRATION_TIP: 089$/m);
+    expect(registry).toMatch(/^PRODUCTION_MIGRATION_TIP: 091$/m);
     expect(registry).toContain("| Migration 087 | **APPLIED** |");
     expect(registry).toContain("| Migration 088 | **APPLIED** |");
     expect(registry).toContain("| Migration 089 | **APPLIED** |");
-    expect(registry).toContain("| Migration 090 | **CODE_ONLY_PENDING** |");
-    expect(registry).toContain("| Migration 091 | **CODE_ONLY_PENDING** |");
-    expect(registry).toContain("BLOCKED_EXTERNAL_GITHUB_ACTIONS_BILLING");
+    expect(registry).toContain("| Migration 090 | **APPLIED**");
+    expect(registry).toContain("| Migration 091 | **APPLIED**");
+    expect(registry).not.toContain("CODE_ONLY_PENDING");
+    expect(backlog).toContain("146 — Post-PR402 Canonical Backlog");
+    expect(backlog).toContain("BL-FORM-HINT");
+    expect(backlog).toContain("STALE_SAFE_TO_DELETE=YES");
   });
 });

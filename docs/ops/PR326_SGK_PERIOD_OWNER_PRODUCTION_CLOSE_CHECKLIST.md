@@ -1,10 +1,14 @@
 # PR #326 — SGK İşveren Bildirim Dönemi Owner — Production Close Checklist
 
-Durum: **HAZIRLIK (henüz production'a uygulanmadı)**
+> **POST_PR402 STATUS: CLOSED_APPLIED (historical checklist).**
+> PR #326 MERGED (`8e137f2c`, 2026-09-22). Migration **090** Apply run `35781766535` SUCCESS; migration **091** Apply run `35791415567` SUCCESS.
+> Active backlog: `docs/guncel/146-post-pr402-canonical-backlog.md`. Do not re-run this checklist as if pending.
+
+Durum: **CLOSED_APPLIED** (eski “henüz production'a uygulanmadı” ifadesi **STALE**)
 Kapsam: 090 (canonical factual owner) + 091 (legacy approved consensus reconciliation)
 Son çıktı: `CLOSED_PRODUCTION`
 
-## Sabit referanslar
+## Sabit referanslar (pre-apply archive)
 
 | Alan | Değer |
 | --- | --- |
@@ -13,7 +17,7 @@ Son çıktı: `CLOSED_PRODUCTION`
 | main referans (pre-merge) | `cd9c6c7e257a97f5964ebd36abb31bc6c8580ec0` |
 | Migration 090 | `api/migrations/090_sgk_isveren_bildirim_donemi_owner.sql` |
 | Migration 091 | `api/migrations/091_sgk_isveren_bildirim_donemi_reconcile.sql` |
-| Beklenen production tip | `089` (090/091 pending) |
+| Production tip (pre-apply expected) | `089` → **applied to 091** (see CURRENT_STATE) |
 
 ## Kullanılacak tooling (owner)
 

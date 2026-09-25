@@ -1,11 +1,11 @@
 # 102 — Hesaplama Cevap Haritası
 
 **Amaç:** Aylardır işlenen kodların *neyi nasıl hesapladığını* tek bakışta görmek.
-**Durum kaynağı:** Ürün freeze ve yayın kapıları için `CURRENT_STATE.md` esas alınır. Açık/kapalı backlog: `110-master-closure-gap-registry.md`. Bu belge backlog değildir; **okuma / toplantı / denetim haritasıdır**.
+**Durum kaynağı:** Ürün freeze ve yayın kapıları için `CURRENT_STATE.md` esas alınır. Açık/kapalı backlog: `146-post-pr402-canonical-backlog.md` (110 SUPERSEDED). Bu belge backlog değildir; **okuma / toplantı / denetim haritasıdır**.
 **Tarih:** 2026-08-11 (refresh 2026-08-12 — master closure audit / S3F sonrası)
 **Motor sürümü (kod):** `S91C2_PAYROLL_ENGINE_V2`
 **Compliance kontratı:** `S87_PAYROLL_COMPLIANCE_V1`
-**Not:** Bu belge hesaplama haritasıdır. **Canonical pin (2026-09-20):** `CODE_MIGRATION_TIP = 091`; `LAST_VERIFIED_PRODUCTION_MIGRATION_TIP = 089`; fresh production readback `BLOCKED_EXTERNAL_GITHUB_ACTIONS_BILLING` (Actions billing). Aşağıdaki historical tip pins (076/086/087) arşiv notudur — current/live tip DEĞİLDİR. QR pipeline S3C–S3F **CLOSED_PRODUCTION** (algoritmalar: `QR_INTERVAL_V1`, `QR_PUANTAJ_CANDIDATE_V1`, `QR_PUANTAJ_DECISION_V1`, `QR_CANDIDATE_HASH_V2`).
+**Not:** Bu belge hesaplama haritasıdır. **Canonical pin (POST_PR402):** `CODE_MIGRATION_TIP = 091`; `LAST_VERIFIED_PRODUCTION_MIGRATION_TIP = 091`; deploy `5c6ae773` (#402). Eski 2026-09-20 “prod tip 089 / billing blocked” pin'i **STALE**. Aşağıdaki historical tip pins (076/086/087) arşiv notudur — current/live tip DEĞİLDİR. QR pipeline S3C–S3F **CLOSED_PRODUCTION** (algoritmalar: `QR_INTERVAL_V1`, `QR_PUANTAJ_CANDIDATE_V1`, `QR_PUANTAJ_DECISION_V1`, `QR_CANDIDATE_HASH_V2`).
 
 **2026-08-17 closure reconciliation:** SGK catalog `CLOSED_CONFIRMED`; UBGT `CLOSED_CONFIRMED`; payroll company policy `CLOSED_CONFIRMED`; active policy revision `3`, required/resolved `14/14`, missing `0`; `HAFTA_TATILI_GUNLERI=0` / Pazar; payroll policy preflight ready.
 

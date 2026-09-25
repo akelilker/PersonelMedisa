@@ -156,20 +156,11 @@ export function PersonelQrScanPage() {
     await submitToken(phase.token, eventType);
   };
 
-  const presetLabel = presetEvent ? qrEventTypeLabel(presetEvent) : null;
-
   return (
     <section className="personel-mobile-shell qr-scan-page" data-testid="personel-qr-scan-page">
-      <header className="self-service-home__header">
-        <h2>QR Okut{presetLabel ? ` — ${presetLabel}` : ""}</h2>
-        <p>
-          {presetEvent
-            ? "Şube kiosk ekranındaki QR kodunu okutun; seçtiğiniz işlem sunucuda doğrulanır. Kendi kimlik QR’ınızı göstermezsiniz."
-            : "Önce şube kiosk QR kodunu okutun, sonra Giriş veya Çıkış seçin."}
-        </p>
-      </header>
-
-      <QrPuantajExpectationNote />
+      <p className="qr-scan-lead" data-testid="qr-scan-lead">
+        Şube kiosk ekranındaki QR kodunu okutun.
+      </p>
 
       <div className="qr-scan-video-wrap" data-testid="qr-scan-video-wrap">
         <video ref={videoRef} className="qr-scan-video" playsInline muted />
@@ -277,6 +268,8 @@ export function PersonelQrScanPage() {
           </div>
         ) : null}
       </div>
+
+      <QrPuantajExpectationNote />
 
       <nav className="pm-secondary-nav qr-scan-footer-nav" aria-label="QR sayfa bağlantıları">
         <Link to="/">Özet</Link>

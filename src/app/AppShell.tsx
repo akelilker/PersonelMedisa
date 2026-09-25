@@ -57,7 +57,21 @@ function resolveBackBar(pathname: string, state?: unknown): { to: string; label:
   return null;
 }
 
-function resolveModuleModal(pathname: string, tabParam: string | null): ModuleModalConfig | null {
+function resolveQrScanModalTitle(eventParam: string | null): string {
+  if (eventParam === "GIRIS") {
+    return "QR ile Giriş";
+  }
+  if (eventParam === "CIKIS") {
+    return "QR ile Çıkış";
+  }
+  return "QR Okut";
+}
+
+function resolveModuleModal(
+  pathname: string,
+  tabParam: string | null,
+  eventParam: string | null
+): ModuleModalConfig | null {
   if (pathname === "/") {
     return null;
   }
@@ -116,6 +130,16 @@ function resolveModuleModal(pathname: string, tabParam: string | null): ModuleMo
     return { title: "Resmî Tatil Takvimi", closeTo: "/", titleVariant: "premium" };
   }
 
+  if (pathname === "/self/qr-okut") {
+    return { title: resolveQrScanModalTitle(eventParam), closeTo: "/" };
+  }
+  if (pathname === "/self/qr-hareketleri") {
+    return { title: "QR Hareketlerim", closeTo: "/" };
+  }
+  if (pathname === "/self") {
+    return { title: "Öz Servis", closeTo: "/" };
+  }
+
   return { title: "Modül", closeTo: "/" };
 }
 
@@ -141,7 +165,10 @@ export function AppShell() {
   const isHomeRoute = pathname === "/";
   const isYonetimRoute = pathname === "/yonetim-paneli";
   const moduleModal = useMemo(
-    () => (isAuthSurfaceRoute ? null : resolveModuleModal(pathname, searchParams.get("tab"))),
+    () =>
+      isAuthSurfaceRoute
+        ? null
+        : resolveModuleModal(pathname, searchParams.get("tab"), searchParams.get("event")),
     [isAuthSurfaceRoute, pathname, searchParams]
   );
   const isModuleOverlayRoute = moduleModal !== null;

@@ -123,7 +123,8 @@ describe("PERSONEL collar → QR UI entitlement (render level)", () => {
     await renderHome();
 
     expect(screen.getByTestId("giris-scan")).toBeInTheDocument();
-    expect(screen.getByTestId("cikis-scan")).toBeInTheDocument();
+    expect(screen.queryByTestId("cikis-scan")).toBeNull();
+    expect(screen.getByTestId("attendance-box-cikis")).toHaveTextContent("ÇIKIŞ");
     expect(screen.queryByTestId("giris-scan-not-entitled")).toBeNull();
     // Independent QR Okut shortcut removed; GİRİŞ/ÇIKIŞ cards are the CTA.
     expect(screen.queryByTestId("self-qr-scan-link")).toBeNull();
@@ -178,7 +179,8 @@ describe("PERSONEL collar → QR UI entitlement (render level)", () => {
       // entitlement still surfaces via GİRİŞ/ÇIKIŞ cards.
       expect(screen.queryByTestId("self-qr-scan-link"), role).toBeNull();
       expect(screen.getByTestId("giris-scan"), role).toBeInTheDocument();
-      expect(screen.getByTestId("cikis-scan"), role).toBeInTheDocument();
+      expect(screen.queryByTestId("cikis-scan"), role).toBeNull();
+      expect(screen.getByTestId("attendance-box-cikis"), role).toHaveTextContent("ÇIKIŞ");
       cleanup();
     }
   });
@@ -216,7 +218,8 @@ describe("PERSONEL collar → QR UI entitlement (render level)", () => {
         display_local_time: "08:12"
       },
       can_scan_giris: false,
-      can_scan_cikis: true
+      can_scan_cikis: true,
+      next_action: "CIKIS"
     } as unknown as AttendanceTodayResponse);
 
     setSession("PERSONEL", "Mavi Yaka");
@@ -224,8 +227,37 @@ describe("PERSONEL collar → QR UI entitlement (render level)", () => {
 
     expect(screen.getByTestId("attendance-box-giris")).toHaveTextContent("08:12");
     expect(screen.getByTestId("cikis-scan")).toBeEnabled();
+    expect(screen.queryByTestId("giris-scan")).toBeNull();
     expect(screen.queryByTestId("personel-incomplete-day-warning")).toBeNull();
     expect(screen.queryByTestId("personel-today-empty")).toBeNull();
+  });
+
+  it("completed cycle re-enables GİRİŞ CTA while showing prior clocks", async () => {
+    const { fetchAttendanceToday } = await import("../../src/api/attendance-mobile.api");
+    vi.mocked(fetchAttendanceToday).mockResolvedValueOnce({
+      ...attendance,
+      giris: {
+        id: 11,
+        local_time: "12:05",
+        display_local_time: "12:05"
+      },
+      cikis: {
+        id: 12,
+        local_time: "11:20",
+        display_local_time: "11:20"
+      },
+      can_scan_giris: true,
+      can_scan_cikis: false,
+      next_action: "GIRIS"
+    } as unknown as AttendanceTodayResponse);
+
+    setSession("PERSONEL", "Mavi Yaka");
+    await renderHome();
+
+    expect(screen.getByTestId("giris-scan")).toBeInTheDocument();
+    expect(screen.getByTestId("giris-scan")).toHaveTextContent("12:05");
+    expect(screen.getByTestId("attendance-box-cikis")).toHaveTextContent("11:20");
+    expect(screen.queryByTestId("cikis-scan")).toBeNull();
   });
 });
 

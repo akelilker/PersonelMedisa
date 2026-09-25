@@ -62,8 +62,12 @@ describe("PERSONEL_SELF_SERVICE_PRODUCT_UX_V2 notification + policy owners", () 
     expect(history).toContain("AttendanceCorrectionRequestModal");
     expect(history).toContain("history-giris-correct");
     expect(history).toContain("Giriş / Çıkış Geçmişi Yüklenemedi. Tekrar Deneyin.");
+    expect(history).toContain("qr-history-event-timeline");
     expect(history).not.toContain('to="/self/qr-okut"');
     expect(history).not.toContain(">QR Okut<");
+    expect(history).not.toContain("pm-secondary-nav");
+    expect(history).not.toContain(">Özet<");
+    expect(history).not.toContain('to="/"');
 
     const shell = read("src/app/AppShell.tsx");
     expect(shell).toContain('session?.user.rol === "PERSONEL" ? null : session?.user.ad_soyad');
@@ -73,6 +77,26 @@ describe("PERSONEL_SELF_SERVICE_PRODUCT_UX_V2 notification + policy owners", () 
 
     const today = read("api/src/Services/Qr/QrAttendanceTodayService.php");
     expect(today).toContain("QrAttendancePresentationService::presentTodayBoxEvent");
+    expect(today).toContain("next_action");
+    expect(today).toContain("resolveOpenShiftState");
+    expect(today).not.toContain("&& $giris === null");
+
+    const event = read("api/src/Services/Qr/QrAttendanceEventService.php");
+    expect(event).toContain("resolveOpenShiftState");
+    expect(event).toContain("AFTER_HOURS_REENTRY_INFO");
+    expect(event).toContain("Mesai Bitiminden Sonra Tekrar İşyerine Giriş Yapmıştır.");
+    expect(event).toContain("'evaluate_early_exit' => false");
+    expect(event).toContain("'events' => $events");
+
+    const boxes = read("src/features/self-service/components/OwnQrAttendanceBoxes.tsx");
+    expect(boxes).toContain("can_scan_giris");
+    expect(boxes).toContain("can_scan_cikis");
+    expect(boxes).toContain("pm-box-main-action--with-time");
+    expect(boxes).not.toMatch(/today\.giris \? \(/);
+
+    const notifications = read("src/styles/components/notifications.css");
+    expect(notifications).toContain("overflow: visible");
+    expect(notifications).toContain("overflow pairing");
 
     const businessDay = read("api/src/Services/Attendance/AttendanceBusinessDayService.php");
     expect(businessDay).toContain("resolveWorkDay");

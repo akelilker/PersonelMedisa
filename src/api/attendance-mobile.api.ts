@@ -41,6 +41,8 @@ export type AttendanceTodayResponse = {
   };
   giris: AttendanceBoxEvent | null;
   cikis: AttendanceBoxEvent | null;
+  /** Canonical next QR action from backend open-shift state (`GIRIS` | `CIKIS` | null). */
+  next_action?: "GIRIS" | "CIKIS" | null;
   can_scan_giris: boolean;
   can_scan_cikis: boolean;
   pending_giris_correction: { id: number; status: string; status_label: string; requested_local_time: string } | null;

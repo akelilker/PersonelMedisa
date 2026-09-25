@@ -69,12 +69,12 @@ Verification yapmak mutation değildir; write/apply ayrıca explicit onay ister.
 | ID | Konu | Not |
 | --- | --- | --- |
 | `BL-QR-PILOT-OPS` | QR pilot checklist maddeleri (secret/HTTPS/roster/smoke) | Kod hazır; saha/ops tick gerekir — `QR_ATTENDANCE_PILOT_READINESS_CHECKLIST.md` |
-| `BL-SINEM-HALIL-LIVE` | Sinem / Halil live identity & managed-branch verify | Inventory `36113851793`: Sinem user `110` / Halil user `50` tekil; managed-branch write ayrı |
-| `BL-KAYSERI-KUBRA` | Kayseri manager Kübra Güneş | Live identity OK (`kubraG` / user `64` / personel `126`). **BLOCKER:** `rol=PERSONEL` → `sube_sorumlu_yoneticiler` ELIGIBLE_ROLES dışı; rol değiştirmeden assignment yazılamaz |
-| `BL-NAME-203` | personel 203 ad/soyad | Inventory: `Muhammed` / `Mahmud` — **doğru; işlem yapılmadı** |
-| `BL-BM-ASSIGN-WRITE` | Medisa branch-manager assignment rows | POST_PR403 hedef harita onaylı; live apply **STOPPED** (Kübra role + İlker/Zeynep user live certify + Halil location preimage) |
-| `BL-CROSS-COMPANY` | 120 / 158 / 219 | Semantically valid defer; mutate etme |
-| `BL-STALE-BRANCH-DELETE` | Remote `cline/fw8ry7m8` delete | POST_PR403: unique=0 / open PR=none → remote delete applied |
+| `BL-SINEM-HALIL-LIVE` | Sinem / Halil live identity & managed-branch verify | Live certify OK: Sinem `sinemH`/`110`/`173`; Halil `040`/`50`/`112` |
+| `BL-KAYSERI-KUBRA` | Kayseri manager Kübra Güneş | Live identity OK (`kubraG` / user `64` / personel `126`). **BLOCKER:** `rol=PERSONEL` → ELIGIBLE_ROLES dışı; manager yazılmadı. Kayseri `user_subeler=[4]` access eklendi |
+| `BL-NAME-203` | personel 203 ad/soyad | Live: `Muhammed` / `Mahmud` — **doğru; işlem yapılmadı** |
+| `BL-BM-ASSIGN-WRITE` | Medisa branch-manager + Medisa access apply | **APPLIED** (2026-09-25): Fabrika managers=`[ilkerA,sedanurB,sinemH,zeynepG]`; Giresun/İzmir=`Halil`; Ankara/İstanbul/Sakarya=`[]`; Sinem+Serhan(`serhan.kose`/`9`) Medisa-all `user_subeler`; Halil access `[2,12]`. Kübra manager **BLOCKED_ROLE_PERSONEL** |
+| `BL-CROSS-COMPANY` | 120 / 158 / 219 | Semantically valid defer; mutate etme — **UNTOUCHED** |
+| `BL-STALE-BRANCH-DELETE` | Remote `cline/fw8ry7m8` delete | Confirmed absent on origin (POST_PR403 delete) |
 
 ---
 
@@ -101,19 +101,16 @@ POST_PR403 kaydedildi (kodlama yok):
 ## Operational approval registry (özet)
 
 ID listesi (E): `BL-QR-PILOT-OPS` · `BL-SINEM-HALIL-LIVE` · `BL-KAYSERI-KUBRA` · `BL-NAME-203` · `BL-BM-ASSIGN-WRITE` · `BL-CROSS-COMPANY` · `BL-STALE-BRANCH-DELETE`.
-Access apply (ayrı): Sinem + Serhan Medisa-all `user_subeler` — karar D’de; write bu turda yok.
-
-Ayrım: live identity verification / business truth confirmation ≠ production write. Write/apply yalnız ayrı onayla.
+Access + BM apply: **POST_PR403_WIDE_CLOSURE** canlıda uygulandı (API/`user_subeler` + `sube_sorumlu_yoneticiler`). Serhan hesabı = `serhan.kose` user `9` (PERSONEL `serhanK`/`104` dokunulmadı).
 
 POST_PR403 live inventory: run `36113851793` @ deploy `730caecc` / tip `091` — PASS.
-BM apply: **STOPPED_NO_PARTIAL_APPLY** (see E notes).
+Halil çalışma yeri: zaten İzmir (`calisma_lokasyonu_id=4`) — lokasyon yazılmadı.
+İlker=`ilkerA`/`10`; Zeynep=`zeynepG`/`148` — Fabrika manager yazıldı.
 
 ---
 
 ## Next gate
 
-1. Kübra Güneş manager eligibility: rol ürün kararı (PERSONEL → eligible role) **veya** ELIGIBLE_ROLES ürün değişikliği — ikisi de bu turda yasaklandı; ayrı onay.
-2. İlker / Zeynep: canlı `users` satırı (username/user_id/rol) inventory veya Yönetim readback ile certify; ID tahmin yok.
-3. Halil `calisma_lokasyonu_id` preimage + İzmir (`id=4`) apply; Giresun/İzmir manager + access ayrı.
-4. Sonra `BL-BM-ASSIGN-WRITE` hedef harita (Fabrika×4, Giresun/İzmir Halil, Kayseri Kübra, Ankara/İstanbul/Sakarya=0).
-5. QR D kararları kodlanmaz; pilot ops (`BL-QR-PILOT-OPS`) ayrı.
+1. Kübra Güneş manager eligibility: rol ürün kararı (PERSONEL → eligible role) **veya** ELIGIBLE_ROLES ürün değişikliği — tek kalan BM blocker.
+2. QR D kararları kodlanmaz; pilot ops (`BL-QR-PILOT-OPS`) ayrı.
+3. Karyapı/Şenay + 120/158/219 rollout sonra.

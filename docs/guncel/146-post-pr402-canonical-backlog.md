@@ -70,9 +70,9 @@ Verification yapmak mutation değildir; write/apply ayrıca explicit onay ister.
 | --- | --- | --- |
 | `BL-QR-PILOT-OPS` | QR pilot checklist maddeleri (secret/HTTPS/roster/smoke) | Kod hazır; saha/ops tick gerekir — `QR_ATTENDANCE_PILOT_READINESS_CHECKLIST.md` |
 | `BL-SINEM-HALIL-LIVE` | Sinem / Halil live identity & managed-branch verify | Live certify OK: Sinem `sinemH`/`110`/`173`; Halil `040`/`50`/`112` |
-| `BL-KAYSERI-KUBRA` | Kayseri manager Kübra Güneş | Live identity OK (`kubraG` / user `64` / personel `126`). **BLOCKER:** `rol=PERSONEL` → ELIGIBLE_ROLES dışı; manager yazılmadı. Kayseri `user_subeler=[4]` access eklendi |
+| `BL-KAYSERI-KUBRA` | Kayseri manager Kübra Güneş | **BLOCKER CLOSED / APPLIED** (2026-09-25): user `64` / `kubraG` / personel `126`; `rol=SUBE_YONETICISI`; Kayseri access `[4]`; Kayseri manager assignment `[64]` |
 | `BL-NAME-203` | personel 203 ad/soyad | Live: `Muhammed` / `Mahmud` — **doğru; işlem yapılmadı** |
-| `BL-BM-ASSIGN-WRITE` | Medisa branch-manager + Medisa access apply | **APPLIED** (2026-09-25): Fabrika managers=`[ilkerA,sedanurB,sinemH,zeynepG]`; Giresun/İzmir=`Halil`; Ankara/İstanbul/Sakarya=`[]`; Sinem+Serhan(`serhan.kose`/`9`) Medisa-all `user_subeler`; Halil access `[2,12]`. Kübra manager **BLOCKED_ROLE_PERSONEL** |
+| `BL-BM-ASSIGN-WRITE` | Medisa branch-manager + Medisa access apply | **CLOSED/APPLIED** (POST_PR403 Medisa branch-manager hedef haritası): Fabrika=`[10,11,110,148]`; Giresun/İzmir=`[50]`; Kayseri=`[64]` Kübra; Ankara/İstanbul/Sakarya=`[]`; Sinem+Serhan Medisa-all access; Halil `[2,12]`. Kübra blocker yok |
 | `BL-CROSS-COMPANY` | 120 / 158 / 219 | Semantically valid defer; mutate etme — **UNTOUCHED** |
 | `BL-STALE-BRANCH-DELETE` | Remote `cline/fw8ry7m8` delete | Confirmed absent on origin (POST_PR403 delete) |
 
@@ -107,10 +107,11 @@ POST_PR403 live inventory: run `36113851793` @ deploy `730caecc` / tip `091` —
 Halil çalışma yeri: zaten İzmir (`calisma_lokasyonu_id=4`) — lokasyon yazılmadı.
 İlker=`ilkerA`/`10`; Zeynep=`zeynepG`/`148` — Fabrika manager yazıldı.
 
+POST_PR403_KUBRA_FINAL_CLOSURE (2026-09-25): Kübra `PERSONEL` → `SUBE_YONETICISI` (API `PUT /yonetim/kullanicilar/64`); Kayseri manager `[64]` (`PUT /yonetim/subeler/4` / `sorumlu_yonetici_user_ids`). Personel `126` alanları + access `[4]` korunmuş.
+
 ---
 
 ## Next gate
 
-1. Kübra Güneş manager eligibility: rol ürün kararı (PERSONEL → eligible role) **veya** ELIGIBLE_ROLES ürün değişikliği — tek kalan BM blocker.
-2. QR D kararları kodlanmaz; pilot ops (`BL-QR-PILOT-OPS`) ayrı.
-3. Karyapı/Şenay + 120/158/219 rollout sonra.
+1. QR D kararları kodlanmaz; pilot ops (`BL-QR-PILOT-OPS`) ayrı.
+2. Karyapı/Şenay + 120/158/219 rollout sonra.

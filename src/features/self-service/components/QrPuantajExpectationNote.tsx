@@ -9,7 +9,7 @@ export function QrPuantajExpectationNote() {
       data-testid="qr-puantaj-expectation-note"
       role="note"
     >
-      QR giriş/çıkış kaydı puantaja otomatik yazılmaz. Kayıt kontrol edildikten sonra puantaja işlenir.
+      QR kaydı kontrol sonrası puantaja işlenir.
     </p>
   );
 }

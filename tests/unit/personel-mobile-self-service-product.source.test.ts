@@ -50,7 +50,7 @@ describe("personel mobile/PWA self-service productization", () => {
     expect(scan).toContain("QrPuantajExpectationNote");
     expect(scan).toContain("Kiosk ekranındaki yeni kodu tekrar okutun");
     expect(scan).toContain("Kendi şube kiosk kodunu okutun");
-    expect(scan).toContain("Kendi kimlik QR");
+    expect(scan).toContain("Şube kiosk ekranındaki QR kodunu okutun.");
     expect(scan).toContain("Giriş kaydedildi");
     expect(scan).toContain("Çıkış kaydedildi");
     expect(scan).toContain('data-testid="qr-scan-cta-zone"');
@@ -65,6 +65,7 @@ describe("personel mobile/PWA self-service productization", () => {
     expect(scan).not.toContain("(idempotent)");
     expect(scan).not.toContain("candidate / apply");
     expect(scan).not.toMatch(/default:\s*\n\s*return error\.message/);
+    expect(scan).not.toContain("self-service-home__header");
 
     const scanner = read("src/features/self-service/qr/qr-scanner.ts");
     expect(scanner).toContain("Kamera için güvenli bağlantı (HTTPS) gerekir.");
@@ -94,13 +95,11 @@ describe("personel mobile/PWA self-service productization", () => {
   it("locks kiosk model note + CSS owner without parallel style system", () => {
     const note = read("src/features/self-service/components/QrKioskModelNote.tsx");
     expect(note).toContain("qr-kiosk-model-note");
-    expect(note).toContain("Şube kiosk ekranındaki QR kodunu");
+    expect(note).toContain("Şube kiosk QR");
     expect(note).toContain("Kendi kimlik QR");
 
     const expectation = read("src/features/self-service/components/QrPuantajExpectationNote.tsx");
-    expect(expectation).toContain(
-      "QR giriş/çıkış kaydı puantaja otomatik yazılmaz. Kayıt kontrol edildikten sonra puantaja işlenir."
-    );
+    expect(expectation).toContain("QR kaydı kontrol sonrası puantaja işlenir.");
     expect(expectation).not.toContain("candidate / apply");
     expect(expectation).not.toContain("aday uygulaması");
 
@@ -116,6 +115,8 @@ describe("personel mobile/PWA self-service productization", () => {
     expect(css).toContain(".pm-box-closed");
     expect(css).toContain("safe-area-inset-bottom");
     expect(css).toContain("min-height: 48px");
+    expect(css).toContain(".pm-context-bar");
+    expect(css).toContain("36dvh");
 
     const main = read("src/styles/main.css");
     expect(main).toContain('../features/self-service/self-service.css');

@@ -165,14 +165,6 @@ export function PersonelSelfServiceHomePage() {
   if (shouldPreferDemoApi()) {
     return (
       <section className="personel-mobile-shell" data-testid="personel-self-service-page">
-        <header className="pm-header">
-          <div className="pm-header-accent pm-header-accent--left" aria-hidden="true" />
-          <div className="pm-header-main">
-            <p className="pm-product-title">PERSONEL YÖN. SİST.</p>
-            <p className="pm-page-title">ANASAYFA</p>
-          </div>
-          <div className="pm-header-accent pm-header-accent--right" aria-hidden="true" />
-        </header>
         <p className="self-service-muted">Demo modda personel eşlemesi yok.</p>
       </section>
     );
@@ -227,27 +219,21 @@ export function PersonelSelfServiceHomePage() {
 
   return (
     <section className="personel-mobile-shell" data-testid="personel-self-service-page">
-      <header className="pm-header" data-testid="personel-mobile-header">
-        <div className="pm-header-accent pm-header-accent--left" aria-hidden="true" />
-        <div className="pm-header-main">
-          <p className="pm-product-title">PERSONEL YÖN. SİST.</p>
-          <p className="pm-page-title">ANASAYFA</p>
-          <p className="pm-user-line">{today.personel.ad_soyad}</p>
-          {orgLine ? <p className="pm-org-line">{orgLine}</p> : null}
+      <header className="pm-context-bar" data-testid="personel-mobile-header">
+        <div className="pm-context-bar__main">
+          <p className="pm-context-bar__name">{today.personel.ad_soyad}</p>
+          {orgLine ? <p className="pm-context-bar__org">{orgLine}</p> : null}
         </div>
-        <div className="pm-header-actions">
-          <button
-            type="button"
-            className="pm-bell"
-            aria-label="Bildirimler"
-            data-testid="personel-notification-bell"
-            onClick={() => setInboxOpen((v) => !v)}
-          >
-            🔔
-            {unreadCount > 0 ? <span className="pm-bell-badge">{unreadCount}</span> : null}
-          </button>
-        </div>
-        <div className="pm-header-accent pm-header-accent--right" aria-hidden="true" />
+        <button
+          type="button"
+          className="pm-bell"
+          aria-label="Bildirimler"
+          data-testid="personel-notification-bell"
+          onClick={() => setInboxOpen((v) => !v)}
+        >
+          🔔
+          {unreadCount > 0 ? <span className="pm-bell-badge">{unreadCount}</span> : null}
+        </button>
       </header>
 
       {inboxOpen ? (
@@ -307,24 +293,24 @@ export function PersonelSelfServiceHomePage() {
           }
         />
         {qrEnabled && !hasTodayPunch ? (
-          <p className="self-service-muted" data-testid="personel-today-empty" role="status">
-            Bugün henüz giriş/çıkış kaydı yok. Kiosk ekranındaki QR’ı okutarak başlayın.
+          <p className="self-service-muted pm-inline-hint" data-testid="personel-today-empty" role="status">
+            Bugün henüz kayıt yok — kiosk QR ile başlayın.
           </p>
         ) : null}
         {incompleteDay ? (
-          <div className="self-service-home__warnings" role="status" data-testid="personel-incomplete-day-warning">
+          <div className="pm-callout" role="status" data-testid="personel-incomplete-day-warning">
             <p>{incompleteDay}</p>
           </div>
         ) : null}
       </section>
 
       {qrEnabled ? (
-        <>
+        <div className="pm-help-strip" data-testid="personel-qr-help-strip">
           <QrKioskModelNote />
           <QrPuantajExpectationNote />
-        </>
+        </div>
       ) : (
-        <div className="pm-secondary-card" data-testid="personel-qr-closed-notice" role="status">
+        <div className="pm-callout" data-testid="personel-qr-closed-notice" role="status">
           <p>
             QR giriş/çıkış bu personel için henüz açık değil. Öz servis özetiniz görüntülenmeye devam eder.
           </p>
@@ -332,7 +318,7 @@ export function PersonelSelfServiceHomePage() {
       )}
 
       {missingCount > 0 ? (
-        <div className="pm-secondary-card" role="status" data-testid="self-missing-info-warning">
+        <div className="pm-callout pm-callout--warning" role="status" data-testid="self-missing-info-warning">
           <p>
             Eksik bilgileriniz var ({missingCount}). Profilinizi tamamlamak için yöneticinizle iletişime geçin.
           </p>
@@ -340,12 +326,16 @@ export function PersonelSelfServiceHomePage() {
       ) : null}
 
       {lastQrLabel ? (
-        <div className="pm-secondary-card" data-testid="self-last-qr-event">
+        <div className="pm-secondary-card pm-secondary-card--compact" data-testid="self-last-qr-event">
           <p className="pm-box-label">Son QR hareketi</p>
           <p>{lastQrLabel}</p>
         </div>
       ) : qrEnabled ? (
-        <div className="pm-secondary-card" data-testid="self-last-qr-empty" role="status">
+        <div
+          className="pm-secondary-card pm-secondary-card--compact"
+          data-testid="self-last-qr-empty"
+          role="status"
+        >
           <p className="pm-box-label">Son QR hareketi</p>
           <p className="self-service-muted">Henüz kayıtlı QR hareketi yok.</p>
         </div>

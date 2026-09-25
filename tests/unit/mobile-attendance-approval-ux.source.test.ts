@@ -34,9 +34,9 @@ describe("mobile attendance approval UX source contracts", () => {
     const home = read("src/features/self-service/pages/PersonelSelfServiceHomePage.tsx");
     expect(home.toLowerCase()).not.toContain("amir");
     expect(home).toContain("Yöneticinize");
-    expect(home).toContain("PERSONEL YÖN. SİST.");
-    expect(home).toContain("ANASAYFA");
-    expect(home).toContain("pm-header-accent");
+    expect(home).toContain("pm-context-bar");
+    expect(home).not.toContain("PERSONEL YÖN. SİST.");
+    expect(home).not.toContain("ANASAYFA");
     expect(home).toContain("OwnQrAttendanceBoxes");
     expect(home).toContain('testId="personel-attendance-boxes"');
     expect(home).toContain("BackgroundlessNoticeModal");

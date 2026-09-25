@@ -39,7 +39,7 @@ describe("QR attendance pilot readiness contracts", () => {
 
     const note = read("src/features/self-service/components/QrPuantajExpectationNote.tsx");
     expect(note).toContain("qr-puantaj-expectation-note");
-    expect(note).toContain("puantaja otomatik yazılmaz");
+    expect(note).toContain("puantaja işlenir");
 
     const personel = read("src/features/self-service/pages/PersonelSelfServiceHomePage.tsx");
     expect(personel).toContain("OwnQrAttendanceBoxes");
@@ -61,7 +61,7 @@ describe("QR attendance pilot readiness contracts", () => {
     expect(scanPage).toContain("QrPuantajExpectationNote");
     expect(scanPage).toContain("Kiosk ekranındaki yeni kodu tekrar okutun");
     expect(scanPage).toContain("Kendi şube kiosk kodunu okutun");
-    expect(scanPage).toContain("Kendi kimlik QR");
+    expect(scanPage).toContain("Şube kiosk ekranındaki QR kodunu okutun.");
     expect(scanPage).toContain("qr-scan-cta-zone");
 
     const scanner = read("src/features/self-service/qr/qr-scanner.ts");

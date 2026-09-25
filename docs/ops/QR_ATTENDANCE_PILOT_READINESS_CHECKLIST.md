@@ -82,7 +82,7 @@
 
 - Device binding / offline QR yazma
 - Anomaly → revizyon kontrollü UX
-- Migration 090/091 apply
+- ~~Migration 090/091 apply~~ → **APPLIED** (POST_PR402; see CURRENT_STATE / 146)
 - Görsel redesign / Personel Detay redesign
 - Production personel mutasyonu
 

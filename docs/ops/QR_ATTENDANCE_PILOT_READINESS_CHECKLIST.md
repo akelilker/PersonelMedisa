@@ -31,8 +31,9 @@
 ## 3) HTTPS / kamera / cihaz
 
 - [x] Kiosk ve personel app **HTTPS** (secure context) üzerinden açılıyor — **REMOTE_PASS 2026-09-25:** `https://www.karmotors.com.tr/personelmedisa/`
-- [ ] Kamera izni akışı test edildi (izin reddi / kamera yok / başka app kullanıyor mesajları)
-- [ ] iPhone Safari smoke
+- [ ] Kamera izni akışı test edildi (izin reddi / kamera yok / başka app kullanıyor mesajları) — **FIELD_DEVICE_SMOKE_PENDING** (fiziksel iPhone)
+- [x] Idle `Kamerayı aç` CTA mobil viewport’ta görünür — **AUTOMATED_PASS 2026-09-25:** PR #405 merged/deployed `bf07ab07`; e2e 430×932 + 393×852 PASS; live bundle contains titles + CTA
+- [ ] iPhone Safari / PWA smoke (gerçek kamera permission + QR okutma)
 - [ ] Android Chrome smoke
 - [ ] BarcodeDetector yoksa jsqr fallback çalışıyor
 
@@ -97,3 +98,4 @@
 | Tarih | Kanıt | Sonuç |
 | --- | --- | --- |
 | 2026-09-25 | HTTPS + `/api/health` 200 + `/qr-kiosk` 200 + `/qr-kiosk/token?sube_id=1|4` 200, `ttl_seconds=60`, secret değeri okunmadı | **PARTIAL_REMOTE_PASS** — config/HTTPS/kiosk mint OK; kamera/cihaz/roster/smoke saha tick’leri açık |
+| 2026-09-25 | PR #405 MERGED/DEPLOYED `bf07ab07` (Deploy run `36144289989`); live smoke OK; bundle titles `QR ile Giriş/Çıkış` + `Kamerayı aç` + `pm-context-bar`; e2e 430×932/393×852 CTA PASS | **PARTIAL_REMOTE_PASS** — mobile CTA/layout FIXED; **FIELD_DEVICE_SMOKE_PENDING** (fiziksel kamera + gerçek QR GİRİŞ/ÇIKIŞ) |

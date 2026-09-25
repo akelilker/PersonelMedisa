@@ -1,9 +1,9 @@
 # 146 — Post-PR402 Canonical Backlog
 
 **Tür:** Aktif backlog otoritesi (POST_PR402 consolidation).
-**Baseline:** `origin/main` / production deploy `5c6ae7734d394022ea1ff65c5683da91c095e0eb` (PR **#402**).
+**Baseline:** `origin/main` / production deploy `bf07ab0712d709a33ce6bd5ae4c61cb47aa62134` (PR **#405**).
 **Migration tip:** code **091** / production **091** (last verified apply evidence: Actions runs `35781766535` → 090, `35791415567` → 091).
-**Yasaklar bu belgede:** app code · migration apply · production mutation · remote branch delete · #395–#402 reopen.
+**Yasaklar bu belgede:** app code · migration apply · production mutation · remote branch delete · #395–#405 reopen.
 
 **Süperseeded active sources:** `CURRENT_STATE.md` (tips/SHA pin only; residual detail → burada), `docs/guncel/110-master-closure-gap-registry.md` (**SUPERSEDED** for active backlog).
 
@@ -16,6 +16,7 @@ Sınıflar: **A** CLOSED_ALREADY_LIVE · **B** SAFE_HOUSEKEEPING · **C** TECHNI
 | ID | Konu | Kanıt |
 | --- | --- | --- |
 | `BL-PR-395-402` | Visual/shell/QR pilot/self-service polish sweep | PRs #395–#402 MERGED; Deploy cPanel SUCCESS @ `5c6ae773` (#402) |
+| `BL-PR-405` | QR mobile camera CTA + personel home field UX | PR #405 MERGED `bf07ab07`; Deploy cPanel SUCCESS run `36144289989`; automated 430x932/393x852 CTA PASS; live bundle titles + `pm-context-bar` verified |
 | `BL-PR-326` | SGK bildirim dönemi owner → `SGK_ISVEREN` | PR #326 MERGED `8e137f2c` (2026-09-22) |
 | `BL-MIG-090` | Factual employer-period owner table | Apply run `35781766535` SUCCESS; 091 preflight `GATE_PROD_TIP=090` |
 | `BL-MIG-091` | Guarded legacy consensus reconcile | Apply run `35791415567` SUCCESS; backup `medisa-pre-091-…` VERIFIED |
@@ -68,7 +69,7 @@ Verification yapmak mutation değildir; write/apply ayrıca explicit onay ister.
 
 | ID | Konu | Not |
 | --- | --- | --- |
-| `BL-QR-PILOT-OPS` | QR pilot checklist maddeleri (secret/HTTPS/roster/smoke) | **PARTIAL_REMOTE_PASS 2026-09-25:** HTTPS + secret/TTL mint (`ttl=60`) + `/qr-kiosk` + token Fabrika/Kayseri OK (secret değeri okunmadı). Kalan: kamera/cihaz/roster/smoke saha tick — `QR_ATTENDANCE_PILOT_READINESS_CHECKLIST.md` |
+| `BL-QR-PILOT-OPS` | QR pilot checklist maddeleri (secret/HTTPS/roster/smoke) | **PARTIAL_REMOTE_PASS 2026-09-25 (güncel):** HTTPS + secret/TTL mint (`ttl=60`) + `/qr-kiosk` + token Fabrika/Kayseri OK. **PR #405:** iPhone PWA `Kamerayı aç` CTA clip bug FIXED/MERGED/DEPLOYED (`bf07ab07`); automated 430×932 + 393×852 PASS; personel home duplicate product header cleaned. **Kalan saha tick:** fiziksel cihaz kamera permission + gerçek QR GİRİŞ/ÇIKIŞ — `QR_ATTENDANCE_PILOT_READINESS_CHECKLIST.md` |
 | `BL-SINEM-HALIL-LIVE` | Sinem / Halil live identity & managed-branch verify | Live certify OK: Sinem `sinemH`/`110`/`173`; Halil `040`/`50`/`112` |
 | `BL-KAYSERI-KUBRA` | Kayseri manager Kübra Güneş | **BLOCKER CLOSED / APPLIED** (2026-09-25): user `64` / `kubraG` / personel `126`; `rol=SUBE_YONETICISI`; Kayseri access `[4]`; Kayseri manager assignment `[64]` |
 | `BL-NAME-203` | personel 203 ad/soyad | Live: `Muhammed` / `Mahmud` — **doğru; işlem yapılmadı** |
@@ -113,6 +114,7 @@ POST_PR403_KUBRA_FINAL_CLOSURE (2026-09-25): Kübra `PERSONEL` → `SUBE_YONETIC
 
 ## Next gate
 
-1. `BL-QR-PILOT-OPS` kalan saha tick’leri (kamera/cihaz/roster/GİRİŞ-ÇIKIŞ smoke) — remote config/HTTPS/kiosk mint PASS.
+1. `BL-QR-PILOT-OPS` kalan **fiziksel cihaz** tick’leri (iPhone kamera permission + gerçek kiosk QR GİRİŞ/ÇIKIŞ) — remote config/HTTPS/kiosk mint + mobile CTA layout PASS (`bf07ab07` / #405).
 2. QR D kararları kodlanmaz (device bind / offline / anomaly UX).
 3. Karyapı/Şenay + 120/158/219 rollout sonra.
+4. Personel home ek bilgi kartları (çalışılan süre / izin / fazla mesai vb.) — kullanıcı ayrıca tarif edecek; **NOT_STARTED**.

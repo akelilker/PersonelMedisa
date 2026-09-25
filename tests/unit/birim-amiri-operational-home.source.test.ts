@@ -86,9 +86,9 @@ describe("BIRIM_AMIRI operational home owners", () => {
     expect(shell).toContain("tamamlama-");
   });
 
-  it("PERSONEL self-service page delegates QR scan CTAs to the shared owner", () => {
+  it("PERSONEL self-service page uses OwnQrAttendanceBoxes without shortcut strip", () => {
     const selfHome = read("src/features/self-service/pages/PersonelSelfServiceHomePage.tsx");
-    expect(selfHome).toContain("<SelfServiceQrShortcuts />");
+    expect(selfHome).not.toContain("<SelfServiceQrShortcuts");
     expect(selfHome).toContain("<OwnQrAttendanceBoxes");
     expect(selfHome).toContain("qrEnabled={qrEnabled}");
     expect(selfHome).not.toContain('data-testid="giris-scan"');

@@ -59,17 +59,19 @@ describe("sube + personel mobile QR puantaj wiring", () => {
     expect(login).toContain("$rol === 'PERSONEL'");
   });
 
-  it("exposes last QR + completeness on /me and mobile home", () => {
+  it("exposes completeness on /me; PERSONEL home uses OwnQrAttendanceBoxes without employer chrome", () => {
     const me = read("api/src/Controllers/MeController.php");
     expect(me).toContain("PersonelCompletenessService::evaluate");
     expect(me).toContain("last_qr_event");
     expect(me).toContain("completeness");
 
     const home = read("src/features/self-service/pages/PersonelSelfServiceHomePage.tsx");
-    expect(home).toContain("self-missing-info-warning");
-    expect(home).toContain("self-last-qr-event");
-    // QR CTA/link owner'ı paylaşılan component'tir (rol bağımsız karar).
-    expect(home).toContain("<SelfServiceQrShortcuts />");
+    expect(home).toContain("<OwnQrAttendanceBoxes");
+    expect(home).toContain('testId="personel-attendance-boxes"');
+    expect(home).not.toContain("self-missing-info-warning");
+    expect(home).not.toContain("self-last-qr-event");
+    expect(home).not.toContain("<SelfServiceQrShortcuts");
+    // Shared QR link owner remains available for manager surfaces.
     const shortcuts = read("src/features/self-service/components/SelfServiceQrShortcuts.tsx");
     expect(shortcuts).toContain("self-qr-scan-link");
     expect(shortcuts).toContain('hasPermission("self_service.qr.scan")');
@@ -93,10 +95,10 @@ describe("sube + personel mobile QR puantaj wiring", () => {
     const scan = read("src/features/self-service/pages/PersonelQrScanPage.tsx");
     expect(scan).toContain('submit("GIRIS")');
     expect(scan).toContain('submit("CIKIS")');
-    expect(scan).toContain("QR süresi doldu");
-    expect(scan).toContain("Bu QR sizin çalışma şubenize ait değil");
-    expect(scan).toContain("Bağlantı yok, işlem kaydedilmedi");
-    expect(scan).toContain("Giriş kaydedildi");
+    expect(scan).toContain("QR Kodunun Süresi Doldu. Yeni Kodu Okutun.");
+    expect(scan).toContain("Bu QR Kodu Çalışma Yerinizle Eşleşmiyor.");
+    expect(scan).toContain("İnternet Bağlantısı Yok. İşlem Kaydedilmedi.");
+    expect(scan).toContain("Giriş Kaydedildi");
 
     const scanner = read("src/features/self-service/qr/qr-scanner.ts");
     expect(scanner).toContain("NotAllowedError");

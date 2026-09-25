@@ -1,9 +1,9 @@
 # 146 — Post-PR402 Canonical Backlog
 
 **Tür:** Aktif backlog otoritesi (POST_PR402 consolidation).
-**Baseline:** `origin/main` / production deploy `5c6ae7734d394022ea1ff65c5683da91c095e0eb` (PR **#402**).
+**Baseline:** `origin/main` / production deploy `bf07ab0712d709a33ce6bd5ae4c61cb47aa62134` (PR **#405**).
 **Migration tip:** code **091** / production **091** (last verified apply evidence: Actions runs `35781766535` → 090, `35791415567` → 091).
-**Yasaklar bu belgede:** app code · migration apply · production mutation · remote branch delete · #395–#402 reopen.
+**Yasaklar bu belgede:** app code · migration apply · production mutation · remote branch delete · #395–#405 reopen.
 
 **Süperseeded active sources:** `CURRENT_STATE.md` (tips/SHA pin only; residual detail → burada), `docs/guncel/110-master-closure-gap-registry.md` (**SUPERSEDED** for active backlog).
 
@@ -16,6 +16,7 @@ Sınıflar: **A** CLOSED_ALREADY_LIVE · **B** SAFE_HOUSEKEEPING · **C** TECHNI
 | ID | Konu | Kanıt |
 | --- | --- | --- |
 | `BL-PR-395-402` | Visual/shell/QR pilot/self-service polish sweep | PRs #395–#402 MERGED; Deploy cPanel SUCCESS @ `5c6ae773` (#402) |
+| `BL-PR-405` | QR mobile camera CTA + personel home field UX | PR #405 MERGED `bf07ab07`; Deploy cPanel SUCCESS run `36144289989`; automated 430x932/393x852 CTA PASS; live bundle titles + `pm-context-bar` verified |
 | `BL-PR-326` | SGK bildirim dönemi owner → `SGK_ISVEREN` | PR #326 MERGED `8e137f2c` (2026-09-22) |
 | `BL-MIG-090` | Factual employer-period owner table | Apply run `35781766535` SUCCESS; 091 preflight `GATE_PROD_TIP=090` |
 | `BL-MIG-091` | Guarded legacy consensus reconcile | Apply run `35791415567` SUCCESS; backup `medisa-pre-091-…` VERIFIED |
@@ -46,15 +47,18 @@ Sınıflar: **A** CLOSED_ALREADY_LIVE · **B** SAFE_HOUSEKEEPING · **C** TECHNI
 
 ---
 
-## D) PRODUCT DECISION REQUIRED
+## D) PRODUCT DECISION — POST_PR403 recorded
 
-| ID | Konu | Neden | Default safe (koru; implement etme) |
+POST_PR403 kullanıcı kararı (2026-09-25). Bu turda **kodlama yok**; yalnız karar kaydı.
+
+| ID | Konu | Karar | Safe state |
 | --- | --- | --- | --- |
-| `BL-FORM-HINT` | Orphan `form-hint` class (CSS yok; canonical aday `.form-help`) | Unresolved design decision; bug vs bilerek unstyled | Current UI çalışıyorsa dokunma; metin görünür kalır |
-| `BL-QR-DEVICE-BIND` | Device binding | Security/product; foundation yok (threat model: opsiyonel gelecek) | Deferred — device binding yok |
-| `BL-QR-OFFLINE` | Offline QR write | Explicit NO in S3C/pilot; spoof riski | Offline QR write yok |
-| `BL-QR-ANOMALY-REV` | Anomaly → revizyon kontrollü UX | Intentional defer; candidate/decision foundation var, kontrollü UX yok | Hint-only / controlled revision açılmamış |
-| `BL-KARYAPI-SENAY` | Karyapı / Şenay company rollout | Intentional defer | Rollout defer — grant/assignment uydurma |
+| `BL-FORM-HINT` | Orphan `form-hint` | Şimdilik dokunulmayacak | Current UI korunur |
+| `BL-QR-DEVICE-BIND` | Device binding | **YAPILMAYACAK** — işçi sayısı fazla; kontrol edilemez | Device binding yok |
+| `BL-QR-OFFLINE` | Offline QR write | **YAPILMAYACAK** — QR yalnız online; internet yoksa kayıt yok; kuyruk/sonradan gönderim yok | Offline write yok |
+| `BL-QR-ANOMALY-REV` | Hatalı/eksik/çift giriş-çıkış | Personel kendi kaydını düzeltemez; amire bildirim; düzeltme yetkisi amirde. **Bu turda kodlanmaz** — yalnız karar | Hint-only / controlled self-revision yok |
+| `BL-KARYAPI-SENAY` | Karyapı / Şenay rollout | **Daha sonra** | Grant/assignment uydurma |
+| `BL-SERHAN-MEDISA-ACCESS` | Serhan Köse Medisa şube erişimi | Sinem Hamaloğlu gibi **Medisa** aktif şubelerde yetkili (`user_subeler`). Karyapı/Şenay rollout dışı. Ankara/İstanbul/Sakarya için ayrıca `sube_sorumlu_yoneticiler` yazılmaz — erişim kararı; şube sorumlusu ataması değil | Karar kaydı; bu PR’da apply yok |
 
 ---
 
@@ -65,13 +69,13 @@ Verification yapmak mutation değildir; write/apply ayrıca explicit onay ister.
 
 | ID | Konu | Not |
 | --- | --- | --- |
-| `BL-QR-PILOT-OPS` | QR pilot checklist maddeleri (secret/HTTPS/roster/smoke) | Kod hazır; saha/ops tick gerekir — `QR_ATTENDANCE_PILOT_READINESS_CHECKLIST.md` |
-| `BL-SINEM-HALIL-LIVE` | Sinem / Halil live identity & managed-branch verify | Salt-okunur live verify; write yok |
-| `BL-KAYSERI-KUBRA` | Kayseri manager Kübra kimliği/soyadı | Business identity / live verification; kimlik doğrulanmadan assignment/write yok; olası write ayrıca production mutation onayı |
-| `BL-NAME-203` | personel 203 ad/soyad düzeltmesi | Business/master-data doğruluğu; doğru değer doğrulanmadan apply yok; doğru isim uydurma; production data mutate etme |
-| `BL-BM-ASSIGN-WRITE` | Medisa branch-manager assignment rows | Model CLOSED; production row write ayrı onay + preimage |
-| `BL-CROSS-COMPANY` | 120 / 158 / 219 | Semantically valid defer; mutate etme |
-| `BL-STALE-BRANCH-DELETE` | Remote `cline/fw8ry7m8` delete | Safe=YES; yine de explicit delete onayı |
+| `BL-QR-PILOT-OPS` | QR pilot checklist maddeleri (secret/HTTPS/roster/smoke) | **PARTIAL_REMOTE_PASS 2026-09-25 (güncel):** HTTPS + secret/TTL mint (`ttl=60`) + `/qr-kiosk` + token Fabrika/Kayseri OK. **PR #405:** iPhone PWA `Kamerayı aç` CTA clip bug FIXED/MERGED/DEPLOYED (`bf07ab07`); automated 430×932 + 393×852 PASS; personel home duplicate product header cleaned. **Kalan saha tick:** fiziksel cihaz kamera permission + gerçek QR GİRİŞ/ÇIKIŞ — `QR_ATTENDANCE_PILOT_READINESS_CHECKLIST.md` |
+| `BL-SINEM-HALIL-LIVE` | Sinem / Halil live identity & managed-branch verify | Live certify OK: Sinem `sinemH`/`110`/`173`; Halil `040`/`50`/`112` |
+| `BL-KAYSERI-KUBRA` | Kayseri manager Kübra Güneş | **BLOCKER CLOSED / APPLIED** (2026-09-25): user `64` / `kubraG` / personel `126`; `rol=SUBE_YONETICISI`; Kayseri access `[4]`; Kayseri manager assignment `[64]` |
+| `BL-NAME-203` | personel 203 ad/soyad | Live: `Muhammed` / `Mahmud` — **doğru; işlem yapılmadı** |
+| `BL-BM-ASSIGN-WRITE` | Medisa branch-manager + Medisa access apply | **CLOSED/APPLIED** (POST_PR403 Medisa branch-manager hedef haritası): Fabrika=`[10,11,110,148]`; Giresun/İzmir=`[50]`; Kayseri=`[64]` Kübra; Ankara/İstanbul/Sakarya=`[]`; Sinem+Serhan Medisa-all access; Halil `[2,12]`. Kübra blocker yok |
+| `BL-CROSS-COMPANY` | 120 / 158 / 219 | Semantically valid defer; mutate etme — **UNTOUCHED** |
+| `BL-STALE-BRANCH-DELETE` | Remote `cline/fw8ry7m8` delete | Confirmed absent on origin (POST_PR403 delete) |
 
 ---
 
@@ -90,21 +94,27 @@ Verification yapmak mutation değildir; write/apply ayrıca explicit onay ister.
 
 ## Decision registry (özet)
 
-Ayrıntılı `DECISION / WHY / OPTIONS / DEFAULT_SAFE_STATE` final raporda; burada yalnız ID listesi:
-`BL-FORM-HINT` · `BL-QR-DEVICE-BIND` · `BL-QR-OFFLINE` · `BL-QR-ANOMALY-REV` · `BL-KARYAPI-SENAY`.
+POST_PR403 kaydedildi (kodlama yok):
+`BL-FORM-HINT` · `BL-QR-DEVICE-BIND` · `BL-QR-OFFLINE` · `BL-QR-ANOMALY-REV` · `BL-KARYAPI-SENAY` · `BL-SERHAN-MEDISA-ACCESS`.
 
 ---
 
 ## Operational approval registry (özet)
 
 ID listesi (E): `BL-QR-PILOT-OPS` · `BL-SINEM-HALIL-LIVE` · `BL-KAYSERI-KUBRA` · `BL-NAME-203` · `BL-BM-ASSIGN-WRITE` · `BL-CROSS-COMPANY` · `BL-STALE-BRANCH-DELETE`.
+Access + BM apply: **POST_PR403_WIDE_CLOSURE** canlıda uygulandı (API/`user_subeler` + `sube_sorumlu_yoneticiler`). Serhan hesabı = `serhan.kose` user `9` (PERSONEL `serhanK`/`104` dokunulmadı).
 
-Ayrım: live identity verification / business truth confirmation ≠ production write. Write/apply yalnız ayrı onayla.
+POST_PR403 live inventory: run `36113851793` @ deploy `730caecc` / tip `091` — PASS.
+Halil çalışma yeri: zaten İzmir (`calisma_lokasyonu_id=4`) — lokasyon yazılmadı.
+İlker=`ilkerA`/`10`; Zeynep=`zeynepG`/`148` — Fabrika manager yazıldı.
+
+POST_PR403_KUBRA_FINAL_CLOSURE (2026-09-25): Kübra `PERSONEL` → `SUBE_YONETICISI` (API `PUT /yonetim/kullanicilar/64`); Kayseri manager `[64]` (`PUT /yonetim/subeler/4` / `sorumlu_yonetici_user_ids`). Personel `126` alanları + access `[4]` korunmuş.
 
 ---
 
 ## Next gate
 
-1. Kullanıcı: D maddeleri (form-hint + QR future üçlüsü + Karyapı/Şenay); safe defaults korunur, implement edilmez.
-2. Ops: E maddeleri (QR pilot tick, identity/business-truth verify, BM write, name-203 apply, stale branch delete) — verify ≠ mutate.
-3. Safe housekeeping closure: B maddeleri explicit onayla.
+1. `BL-QR-PILOT-OPS` kalan **fiziksel cihaz** tick’leri (iPhone kamera permission + gerçek kiosk QR GİRİŞ/ÇIKIŞ) — remote config/HTTPS/kiosk mint + mobile CTA layout PASS (`bf07ab07` / #405).
+2. QR D kararları kodlanmaz (device bind / offline / anomaly UX).
+3. Karyapı/Şenay + 120/158/219 rollout sonra.
+4. Personel home ek bilgi kartları (çalışılan süre / izin / fazla mesai vb.) — kullanıcı ayrıca tarif edecek; **NOT_STARTED**.

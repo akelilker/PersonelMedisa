@@ -57,6 +57,26 @@ export function PersonelSelfServiceHomePage() {
   const [correctDraft, setCorrectDraft] = useState<CorrectDraft | null>(null);
   const [leaveModalOpen, setLeaveModalOpen] = useState(false);
 
+  const refreshIzinBakiye = useCallback(() => {
+    if (!izinViewEnabled) {
+      setIzinBakiye(null);
+      setIzinLoading(false);
+      return;
+    }
+    setIzinLoading(true);
+    void Promise.resolve()
+      .then(() => fetchMeYillikIzinBakiye())
+      .then((bakiye) => {
+        setIzinBakiye(bakiye);
+      })
+      .catch(() => {
+        setIzinBakiye(null);
+      })
+      .finally(() => {
+        setIzinLoading(false);
+      });
+  }, [izinViewEnabled]);
+
   const load = useCallback(async () => {
     if (shouldPreferDemoApi()) {
       setLoading(false);
@@ -106,22 +126,6 @@ export function PersonelSelfServiceHomePage() {
         });
       }
       setError(null);
-      if (izinViewEnabled) {
-        setIzinLoading(true);
-        void fetchMeYillikIzinBakiye()
-          .then((bakiye) => {
-            setIzinBakiye(bakiye);
-          })
-          .catch(() => {
-            setIzinBakiye(null);
-          })
-          .finally(() => {
-            setIzinLoading(false);
-          });
-      } else {
-        setIzinBakiye(null);
-        setIzinLoading(false);
-      }
     } catch (cause) {
       if (isApiRequestError(cause) && cause.code === "SELF_SERVICE_BINDING_REQUIRED") {
         setError("unbound");
@@ -133,11 +137,18 @@ export function PersonelSelfServiceHomePage() {
     } finally {
       setLoading(false);
     }
-  }, [izinViewEnabled]);
+  }, []);
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (loading || error || !today) {
+      return;
+    }
+    refreshIzinBakiye();
+  }, [loading, error, today, refreshIzinBakiye]);
 
   const izinView = izinBakiye ? buildSelfServiceYillikIzinView(izinBakiye) : null;
 

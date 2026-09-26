@@ -35,7 +35,8 @@ const {
   fetchGunlukTamamlamalariHeader,
   fetchDepartmanOptions,
   fetchSurecTuruOptions,
-  fetchBildirimTuruOptions
+  fetchBildirimTuruOptions,
+  fetchMeYillikIzinBakiye
 } = vi.hoisted(() => ({
   fetchPersonellerList: vi.fn(async () => ({ items: [], meta: { page: 1, limit: 10, total: 0 } })),
   fetchGunlukTamamlamalariHeader: vi.fn(async () => ({
@@ -44,7 +45,30 @@ const {
   })),
   fetchDepartmanOptions: vi.fn(async () => []),
   fetchSurecTuruOptions: vi.fn(async () => []),
-  fetchBildirimTuruOptions: vi.fn(async () => [])
+  fetchBildirimTuruOptions: vi.fn(async () => []),
+  fetchMeYillikIzinBakiye: vi.fn(async () => ({
+    personel_id: 158,
+    contract_version: "s2c-v1",
+    ise_giris_tarihi: "2020-01-01",
+    referans_tarih: "2026-09-22",
+    kidem_yil: 6,
+    yas: null,
+    yas_istisna_uygulandi: false,
+    mevcut_yillik_hak_gun: 20,
+    birikmis_yasal_hak_gun: 94,
+    yasal_hak_gun: 94,
+    manuel_duzeltme_gun: 0,
+    efektif_hak_gun: 94,
+    kullanilan_gun: 10,
+    ham_kalan_gun: 84,
+    kalan_gun: 84,
+    takvim_dogrulandi_mi: true,
+    eksik_takvim_tarihleri: [],
+    sayilan_normal_gun: 10,
+    haric_tutulan_hafta_tatili_gun: 0,
+    haric_tutulan_ubgt_gun: 0,
+    duzeltme_adet: 0
+  }))
 }));
 
 vi.mock("../../src/api/api-client", async (importOriginal) => {
@@ -71,7 +95,8 @@ vi.mock("../../src/api/attendance-mobile.api", () => ({
 }));
 
 vi.mock("../../src/api/me.api", () => ({
-  fetchMe: vi.fn(async () => ({ completeness: { missing_count: 0 }, last_qr_event: null }))
+  fetchMe: vi.fn(async () => ({ completeness: { missing_count: 0 }, last_qr_event: null })),
+  fetchMeYillikIzinBakiye
 }));
 
 vi.mock("../../src/api/personeller.api", () => ({
@@ -180,6 +205,7 @@ describe("login sonrasi rol ana ekrani", () => {
     fetchDepartmanOptions.mockClear();
     fetchSurecTuruOptions.mockClear();
     fetchBildirimTuruOptions.mockClear();
+    fetchMeYillikIzinBakiye.mockClear();
   });
 
   afterEach(() => {
@@ -203,6 +229,18 @@ describe("login sonrasi rol ana ekrani", () => {
     expect(fetchDepartmanOptions).not.toHaveBeenCalled();
     expect(fetchSurecTuruOptions).not.toHaveBeenCalled();
     expect(fetchBildirimTuruOptions).not.toHaveBeenCalled();
+  });
+
+  it("PERSONEL izin bakiye hatasi ana ozet ekranini dusurmez", async () => {
+    fetchMeYillikIzinBakiye.mockRejectedValueOnce(new Error("izin unavailable"));
+    storeSession(buildSession({ rol: "PERSONEL", personelId: 158, personelTipiAd: "Mavi Yaka" }));
+
+    renderAt("/");
+
+    await screen.findByTestId("personel-self-service-page");
+    expect(screen.queryByTestId("personel-self-service-error")).toBeNull();
+    expect(screen.getByTestId("personel-attendance-boxes")).toBeInTheDocument();
+    expect(screen.queryByTestId("personel-leave-row")).toBeNull();
   });
 
   it("bagli mavi yaka BOLUM_YONETICISI login → ana ekran + QR kisayolu erisilebilir", async () => {

@@ -12,13 +12,14 @@
   z-index: var(--z-footer);
   /*
    * Safe-area tek katman (Taşıt driver-shell): chrome bandı = --app-footer-real-height;
-   * home-indicator boşluğu yalnız padding-bottom. content-box so the inset grows the
-   * band once — do not also add env(safe-area-inset-bottom) into height/min-height
-   * (that double-counted the empty strip under the version/brand/status row on iOS PWA).
+   * home-indicator boşluğu yalnız padding-bottom. border-box keeps border-top/side
+   * inside the measured band (content-box was adding them to getBoundingClientRect:
+   * 39px tall / 500.66px wide). Height grows by the same inset so padding-bottom does
+   * not squeeze the version/brand/status row — do not also pad safe-area from ios-pwa.css.
    */
-  height: var(--app-footer-real-height);
-  min-height: var(--app-footer-real-height);
-  box-sizing: content-box;
+  height: calc(var(--app-footer-real-height) + env(safe-area-inset-bottom, 0px));
+  min-height: calc(var(--app-footer-real-height) + env(safe-area-inset-bottom, 0px));
+  box-sizing: border-box;
   padding-top: 0;
   padding-bottom: env(safe-area-inset-bottom, 0px);
   border-top: 0.8px solid var(--footer-top-border);
@@ -149,8 +150,9 @@ body:not(.login-page):not(.admin-report-page) #app-footer {
 
 /*
  * Phones own a full-bleed footer band (Taşıt style-core ≤640): the hairline
- * side rails belong to the desktop shell frame. Safe-area growth stays on
- * padding-bottom (content-box) so the chrome row keeps --app-footer-real-height.
+ * side rails belong to the desktop shell frame. Safe-area stays on
+ * padding-bottom (border-box + matching height inset) so the chrome row keeps
+ * --app-footer-real-height when inset is 0.
  */
 @media (max-width: 640px) {
   #app-footer {

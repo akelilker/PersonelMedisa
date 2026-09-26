@@ -31,11 +31,37 @@ describe("personel mobile field UX closure contracts", () => {
     expect(css).toContain(".qr-scan-cta-zone");
     expect(css).toContain(".qr-scan-video-wrap--collapsed");
     expect(css).not.toContain("!important");
+    // Compound owner must beat .personel-mobile-shell display:grid (same-specificity trap).
+    expect(css).toMatch(
+      /\.personel-mobile-shell\.qr-scan-page\s*\{[^}]*display:\s*flex;/s
+    );
+    expect(css).toMatch(
+      /\.personel-mobile-shell\.qr-scan-page\s*\{[^}]*flex-direction:\s*column;/s
+    );
     const scan = read("src/features/self-service/pages/PersonelQrScanPage.tsx");
     expect(scan).not.toContain("innerHeight");
     expect(scan).not.toContain("userAgent");
     expect(scan).toContain('data-testid="qr-scan-start"');
     expect(scan).toContain("QR Okut");
+  });
+
+  it("keeps actionable attendance as a single card surface", () => {
+    const css = read("src/features/self-service/self-service.css");
+    expect(css).toContain(".pm-attendance-box");
+    expect(css).toContain(".pm-box-main-action");
+    expect(css).toMatch(
+      /\.pm-attendance-box:has\(\s*>\s*\.pm-box-main-action\s*\)\s*\{[^}]*padding:\s*0;/s
+    );
+    expect(css).toMatch(
+      /\.pm-box-main-action\s*\{[^}]*border:\s*none;/s
+    );
+    expect(css).toMatch(
+      /\.pm-box-main-action:focus-visible\s*\{[^}]*outline:\s*2px solid/s
+    );
+    // Nested second frame must not come from shared border with .pm-box-action.
+    expect(css).not.toMatch(
+      /\.pm-box-main-action\s*,\s*\.pm-box-action\s*\{[^}]*border:\s*1px solid/s
+    );
   });
 
   it("keeps personel home minimal and attendance CTAs", () => {

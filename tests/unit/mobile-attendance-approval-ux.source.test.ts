@@ -81,7 +81,7 @@ describe("mobile attendance approval UX source contracts", () => {
     expect(sql).not.toMatch(/^\s*INSERT\s+/im);
   });
 
-  it("wires late/early info-only path with Bilgi Amaçlıdır tooltip contract", () => {
+  it("wires late/early info inline on the scan result without a blocking modal", () => {
     const late = read("api/src/Services/Attendance/LateEarlyInfoService.php");
     expect(late).toContain("FINANCIAL_EFFECT = NONE");
     expect(late).toContain("AUTOMATIC_PUANTAJ_EFFECT = NONE");
@@ -89,9 +89,9 @@ describe("mobile attendance approval UX source contracts", () => {
     expect(late).toContain("beklenen_cikis_saati");
 
     const scan = read("src/features/self-service/pages/PersonelQrScanPage.tsx");
-    expect(scan).toContain('infoTooltip="Bilgi Amaçlıdır."');
-    expect(scan).not.toContain("Bilgi Amaçlıdır.</");
-    expect(scan).toContain("late-early-info-modal");
+    expect(scan).toContain('data-testid="qr-scan-late-early-info"');
+    expect(scan).not.toContain("late-early-info-modal");
+    expect(scan).toContain("late_early_info");
   });
 
   it("guards correction apply with period lock + canonical reopen semantics", () => {

@@ -32,9 +32,18 @@ test.describe("personel mobile field UX — QR scan modal", () => {
       await expect(modalTitle).toHaveText("Giriş");
       await expect(modalTitle).not.toHaveText("Modül");
 
-      const cta = page.getByTestId("qr-scan-start");
+      await expect
+        .poll(async () => {
+          const scanning = await page.getByTestId("qr-scan-scanning").count();
+          const error = await page.getByTestId("qr-scan-error").count();
+          return scanning + error;
+        })
+        .toBeGreaterThan(0);
+      const cta =
+        (await page.getByTestId("qr-scan-scanning").count()) > 0
+          ? page.getByTestId("qr-scan-scanning")
+          : page.getByTestId("qr-scan-error");
       await expect(cta).toBeVisible();
-      await expect(cta).toHaveText("QR Okut");
       const ctaBox = await cta.boundingBox();
       expect(ctaBox).toBeTruthy();
       expect(ctaBox!.y + ctaBox!.height).toBeLessThanOrEqual(viewport.height + 1);
@@ -87,7 +96,6 @@ test.describe("personel mobile field UX — QR scan modal", () => {
   }) => {
     await page.setViewportSize({ width: 393, height: 852 });
     await openQrScan(page, "GIRIS");
-    await page.getByTestId("qr-scan-start").click();
 
     await expect
       .poll(async () => {

@@ -367,7 +367,7 @@ test.describe("PERSONEL self-service UX v2 — mobile product", () => {
 
     await page.goto("/self/qr-okut?event=CIKIS");
     await expect(page.locator(".modal-header h2").first()).toHaveText("Çıkış");
-    await expect(page.getByTestId("qr-scan-start")).toHaveText("QR Okut");
+    await expect(page.getByTestId("qr-scan-start")).toHaveCount(0);
 
     await page.waitForFunction(
       () =>
@@ -485,12 +485,11 @@ test.describe("PERSONEL self-service UX v2 — mobile product", () => {
 
     await page.goto("/self/qr-okut?event=GIRIS");
     await expect(page.locator(".modal-header h2").first()).toHaveText("Giriş");
-    await expect(page.getByTestId("qr-scan-start")).toHaveText("QR Okut");
+    await expect(page.getByTestId("qr-scan-start")).toHaveCount(0);
 
     await page.goto("/self/qr-okut?event=CIKIS");
     await expect(page.locator(".modal-header h2").first()).toHaveText("Çıkış");
 
-    await page.getByTestId("qr-scan-start").click();
     await expect
       .poll(async () => {
         const scanning = await page.getByTestId("qr-scan-scanning").count();
@@ -510,10 +509,10 @@ test.describe("PERSONEL self-service UX v2 — mobile product", () => {
       const zone = document.querySelector('[data-testid="qr-scan-cta-zone"]');
       if (zone) {
         zone.innerHTML =
-          '<article data-testid="qr-scan-success"><h3>Giriş Kaydedildi — 08:31</h3></article>';
+          '<article data-testid="qr-scan-success"><h3>Girişiniz kaydedildi 08:31</h3></article>';
       }
     });
     await expect(page.getByTestId("qr-scan-video-wrap")).toHaveClass(/collapsed/);
-    await expect(page.getByTestId("qr-scan-success")).toContainText("Giriş Kaydedildi");
+    await expect(page.getByTestId("qr-scan-success")).toContainText("Girişiniz kaydedildi");
   });
 });

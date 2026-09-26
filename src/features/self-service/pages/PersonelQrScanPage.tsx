@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { isApiRequestError } from "../../../api/api-client";
 import { createQrRequestNonce, postMeQrScan } from "../../../api/qr.api";
 import type { MeQrAttendanceEvent, MeQrEarlyExitConfirm, QrEventType } from "../../../types/self-service";
 import { BackgroundlessNoticeModal } from "../components/BackgroundlessNoticeModal";
-import { startQrScanner, type QrScannerHandle } from "../qr/qr-scanner";
-import { formatSelfServiceClock, qrEventTypeLabel } from "../self-service-datetime";
+import { startQrScanner, takePrimedQrCamera, type QrScannerHandle } from "../qr/qr-scanner";
+import { formatSelfServiceClock } from "../self-service-datetime";
 
 type Phase =
   | { kind: "idle" }
@@ -20,27 +20,12 @@ type Phase =
     }
   | { kind: "error"; message: string };
 
-type LateEarlyNotice = {
-  title: string;
-  body: string;
-};
-
-function lateEarlyModalTitle(kind: string): string {
-  if (kind === "LATE_ENTRY_INFO") {
-    return "Geç Giriş";
-  }
-  if (kind === "EARLY_EXIT_INFO") {
-    return "Erken Çıkış";
-  }
-  return "Bilgi";
-}
-
 function mapScanError(error: unknown): string {
   if (!isApiRequestError(error)) {
     if (typeof navigator !== "undefined" && navigator.onLine === false) {
       return "İnternet Bağlantısı Yok. İşlem Kaydedilmedi.";
     }
-    return "Bağlantı kurulamadı, kayıt oluşturulmadı.";
+    return "Bağlantı hatası. İşlem kaydedilmedi.";
   }
   switch (error.code) {
     case "QR_TOKEN_EXPIRED":
@@ -71,25 +56,31 @@ function mapScanError(error: unknown): string {
       return "Bu işlem için yetkiniz yok. QR okutma yalnızca uygun personel hesabında açılır.";
     case "QR_CONFIG_NOT_READY":
     case "QR_SCHEMA_NOT_READY":
-      return "QR servisi şu an hazır değil. Yönetiminize bildirin.";
+      return "Şu an işlem yapılamıyor. Yöneticinize bildirin.";
     case "NETWORK_ERROR":
       return "İnternet Bağlantısı Yok. İşlem Kaydedilmedi.";
     default:
-      return "Kayıt oluşturulamadı. Tekrar deneyin.";
+      return "Sıra dışı işlem. Kayıt oluşturulamadı. Tekrar deneyin.";
   }
+}
+
+function cameraStartError(error: unknown): string {
+  if (error instanceof Error && error.message.trim()) {
+    return error.message;
+  }
+  return "Kamera açılamadı. Tekrar deneyin.";
 }
 
 export function PersonelQrScanPage() {
   const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
   const preset = searchParams.get("event");
   const presetEvent: QrEventType | null =
     preset === "GIRIS" || preset === "CIKIS" ? preset : null;
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const scannerRef = useRef<QrScannerHandle | null>(null);
-  const [phase, setPhase] = useState<Phase>({ kind: "idle" });
-  const [lateEarlyNotice, setLateEarlyNotice] = useState<LateEarlyNotice | null>(null);
+  const scanGeneration = useRef(0);
+  const [phase, setPhase] = useState<Phase>(presetEvent ? { kind: "scanning" } : { kind: "idle" });
   const [earlyExitPending, setEarlyExitPending] = useState<{
     token: string;
     eventType: QrEventType;
@@ -144,12 +135,6 @@ export function PersonelQrScanPage() {
         lateEarly
       });
       stopScanner();
-      if (lateEarly?.message) {
-        setLateEarlyNotice({
-          title: lateEarlyModalTitle(lateEarly.kind),
-          body: lateEarly.message
-        });
-      }
     } catch (error) {
       setPhase({ kind: "error", message: mapScanError(error) });
     } finally {
@@ -173,18 +158,23 @@ export function PersonelQrScanPage() {
     };
   }, []);
 
-  const beginScan = async () => {
+  const beginScan = async (generation?: number) => {
+    const gen = generation ?? ++scanGeneration.current;
     stopScanner();
     setPhase({ kind: "scanning" });
     const video = videoRef.current;
     if (!video) {
-      setPhase({ kind: "error", message: "Kamera alanı hazır değil." });
+      if (scanGeneration.current !== gen) return;
+      setPhase({ kind: "error", message: "Kamera açılamadı. Tekrar deneyin." });
       return;
     }
+    const primed = takePrimedQrCamera();
     try {
-      scannerRef.current = await startQrScanner({
+      const handle = await startQrScanner({
         video,
+        stream: primed,
         onResult: (result) => {
+          if (scanGeneration.current !== gen) return;
           stopScanner();
           if (presetEvent) {
             void submitToken(result.rawValue, presetEvent);
@@ -192,17 +182,35 @@ export function PersonelQrScanPage() {
             setPhase({ kind: "choose", token: result.rawValue });
           }
         },
-        onError: (message) => {
-          setPhase({ kind: "error", message });
+        onError: () => {
+          if (scanGeneration.current !== gen) return;
+          stopScanner();
+          setPhase({ kind: "error", message: "QR kodu okunamadı. Tekrar deneyin." });
         }
       });
-    } catch {
-      setPhase({
-        kind: "error",
-        message: "Kamera Açılamadı. Tekrar Deneyin."
-      });
+      if (scanGeneration.current !== gen) {
+        handle.stop();
+        return;
+      }
+      scannerRef.current = handle;
+    } catch (error) {
+      if (scanGeneration.current !== gen) return;
+      setPhase({ kind: "error", message: cameraStartError(error) });
     }
   };
+
+  const beginScanRef = useRef(beginScan);
+  beginScanRef.current = beginScan;
+
+  useEffect(() => {
+    if (!presetEvent) return;
+    const gen = ++scanGeneration.current;
+    void beginScanRef.current(gen);
+    return () => {
+      scanGeneration.current += 1;
+      stopScanner();
+    };
+  }, [presetEvent]);
 
   const submit = async (eventType: QrEventType) => {
     if (phase.kind !== "choose") return;
@@ -210,6 +218,24 @@ export function PersonelQrScanPage() {
   };
 
   const videoCollapsed = phase.kind === "success";
+  const showManualStart = phase.kind === "idle" && presetEvent === null && earlyExitPending === null;
+  const successClock =
+    phase.kind === "success" ? formatSelfServiceClock(phase.event.occurred_at) : "";
+  const successLead =
+    phase.kind === "success"
+      ? phase.event.event_type === "GIRIS"
+        ? `Girişiniz kaydedildi ${successClock}`
+        : `Çıkışınız kaydedildi ${successClock}`
+      : "";
+
+  const dismissEarlyExit = () => {
+    setEarlyExitPending(null);
+    if (presetEvent) {
+      void beginScan();
+      return;
+    }
+    setPhase({ kind: "idle" });
+  };
 
   return (
     <section className="personel-mobile-shell qr-scan-page" data-testid="personel-qr-scan-page">
@@ -226,7 +252,7 @@ export function PersonelQrScanPage() {
       </div>
 
       <div className="qr-scan-cta-zone" data-testid="qr-scan-cta-zone">
-        {phase.kind === "idle" ? (
+        {showManualStart ? (
           <button
             type="button"
             className="self-service-action self-service-action--primary"
@@ -269,40 +295,18 @@ export function PersonelQrScanPage() {
         ) : null}
 
         {phase.kind === "success" ? (
-          <article className="state-card self-service-card qr-scan-success-card" data-testid="qr-scan-success">
-            <p
-              className={`qr-event-badge qr-event-badge--${phase.event.event_type === "GIRIS" ? "giris" : "cikis"}`}
-            >
-              {qrEventTypeLabel(phase.event.event_type)}
-            </p>
-            <h3>
-              {phase.event.event_type === "GIRIS" ? "Giriş Kaydedildi" : "Çıkış Kaydedildi"} —{" "}
-              {formatSelfServiceClock(phase.event.occurred_at)}
-            </h3>
-            <dl className="self-service-dl">
-              <div>
-                <dt>Şube</dt>
-                <dd>{phase.event.sube.ad || `#${phase.event.sube.id}`}</dd>
-              </div>
-              {phase.idempotent ? (
-                <div>
-                  <dt>Not</dt>
-                  <dd>Bu işlem daha önce kaydedilmiş.</dd>
-                </div>
-              ) : null}
-            </dl>
-            <div className="qr-scan-actions">
-              <button
-                type="button"
-                className="self-service-action self-service-action--primary"
-                onClick={() => navigate("/")}
-              >
-                Anasayfaya Dön
-              </button>
-              <Link to="/self/qr-hareketleri" className="self-service-action">
-                Giriş / Çıkış Geçmişim
-              </Link>
-            </div>
+          <article
+            className="state-card self-service-card qr-scan-success-card"
+            data-testid="qr-scan-success"
+            role="status"
+          >
+            <h3>{successLead}</h3>
+            {phase.idempotent ? <p>Bu işlem daha önce kaydedilmiş.</p> : null}
+            {phase.lateEarly?.message ? (
+              <p data-testid="qr-scan-late-early-info" role="status">
+                {phase.lateEarly.message}
+              </p>
+            ) : null}
           </article>
         ) : null}
 
@@ -321,28 +325,19 @@ export function PersonelQrScanPage() {
       </div>
 
       <BackgroundlessNoticeModal
-        open={lateEarlyNotice !== null}
-        title={lateEarlyNotice?.title ?? "Bilgi"}
-        body={lateEarlyNotice?.body ?? ""}
-        infoTooltip="Bilgi Amaçlıdır."
-        onClose={() => setLateEarlyNotice(null)}
-        testId="late-early-info-modal"
-      />
-
-      <BackgroundlessNoticeModal
         open={earlyExitPending !== null}
         title="Erken Çıkış"
         body={earlyExitPending?.confirm.message ?? ""}
         primaryLabel="Evet"
         secondaryLabel="Hayır"
-        onSecondary={() => setEarlyExitPending(null)}
+        onSecondary={dismissEarlyExit}
         onPrimary={() => {
           if (!earlyExitPending) return;
           const pending = earlyExitPending;
           setEarlyExitPending(null);
           void submitToken(pending.token, pending.eventType, { earlyExitConfirmed: true });
         }}
-        onClose={() => setEarlyExitPending(null)}
+        onClose={dismissEarlyExit}
         testId="early-exit-confirm-modal"
       />
     </section>

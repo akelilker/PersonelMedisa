@@ -9,7 +9,9 @@ import { PersonelQrScanPage } from "../../src/features/self-service/pages/Person
 const startQrScanner = vi.fn();
 
 vi.mock("../../src/features/self-service/qr/qr-scanner", () => ({
-  startQrScanner: (...args: unknown[]) => startQrScanner(...args)
+  startQrScanner: (...args: unknown[]) => startQrScanner(...args),
+  takePrimedQrCamera: () => null,
+  primeQrCamera: () => undefined
 }));
 
 afterEach(() => {
@@ -38,6 +40,15 @@ describe("PersonelQrScanPage field UX", () => {
     expect(screen.getByTestId("qr-scan-cta-zone")).toContainElement(screen.getByTestId("qr-scan-start"));
     expect(screen.queryByRole("heading", { level: 2 })).toBeNull();
     expect(screen.queryByTestId("qr-scan-lead")).toBeNull();
+  });
+
+  it("preset event opens the camera without a separate QR button", async () => {
+    renderScan("/self/qr-okut?event=GIRIS");
+    expect(screen.queryByTestId("qr-scan-start")).toBeNull();
+    await waitFor(() => {
+      expect(startQrScanner).toHaveBeenCalled();
+    });
+    expect(screen.getByTestId("qr-scan-scanning")).toHaveTextContent("QR Okutun");
   });
 
   it("CTA click starts camera path and enters scanning state", async () => {

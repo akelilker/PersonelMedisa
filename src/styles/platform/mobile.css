@@ -118,12 +118,13 @@ body {
   }
 
   .modal-home-btn,
-  .modal-close-btn,
-  .modal-header-spacer {
-    width: 44px;
-    height: 44px;
+  .modal-close-btn {
+    box-sizing: border-box;
+    width: auto;
+    height: auto;
     min-width: 44px;
     min-height: 44px;
+    padding: 12px;
   }
 
   .modal-back-btn {

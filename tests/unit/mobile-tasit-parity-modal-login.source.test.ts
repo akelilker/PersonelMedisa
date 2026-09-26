@@ -11,9 +11,12 @@ function read(relPath: string): string {
 describe("mobile Taşıt parity modal/login source guards", () => {
   it("keeps one mobile modal↔footer rhythm shared by every role", () => {
     const spacing = read("src/styles/tokens/spacing.css");
-    // Mobile matches the desktop token value: the old 6px mobile-only override left
-    // modals visually welded to the fixed AppFooter on phones.
-    expect(spacing).toMatch(
+    // Taşıt style-core: mobile gap is the 17px --app-footer-gap. Desktop 641+ narrows
+    // that token to 14px. Do not re-pin a separate mobile 14px on --modal-gap-above-footer.
+    expect(spacing).toMatch(/--app-footer-gap:\s*17px/);
+    expect(spacing).toMatch(/--modal-gap-above-footer:\s*var\(--app-footer-gap\)/);
+    expect(spacing).toMatch(/@media\s*\(min-width:\s*641px\)\s*\{[^}]*--app-footer-gap:\s*14px/s);
+    expect(spacing).not.toMatch(
       /@media\s*\(max-width:\s*640px\)\s*\{[^}]*--modal-gap-above-footer:\s*14px/s
     );
     expect(spacing).toMatch(
@@ -27,7 +30,10 @@ describe("mobile Taşıt parity modal/login source guards", () => {
     expect(modal).toMatch(/\.modal-overlay\s*\{[^}]*transform:\s*none/s);
     expect(modal).toMatch(/\.modal-overlay\s*\{[^}]*max-width:\s*none/s);
     expect(modal).toContain("@media (max-width: 480px)");
-    expect(modal).toMatch(/\.modal-container\s*\{[^}]*border-radius:\s*0/s);
+    expect(modal).toMatch(
+      /@media\s*\(max-width:\s*640px\)\s*\{[\s\S]*\.modal-container\s*\{[^}]*border-radius:\s*var\(--modal-radius,\s*10px\)/
+    );
+    expect(modal).not.toMatch(/\.modal-container\s*\{[^}]*border-radius:\s*0/s);
   });
 
   it("keeps Kayıt personel form 2-column grid on mobile", () => {

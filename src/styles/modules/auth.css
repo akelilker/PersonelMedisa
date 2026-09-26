@@ -1,24 +1,6 @@
 /* Login route: Taşıt driver-shell login footer band height */
 body.login-page {
   --app-footer-real-height: 46px;
-  /*
-   * iOS keyboard containment (login surface only).
-   * html/body/#root define only min-height, so .app-shell's `height: 100%` stays
-   * indefinite and the DOCUMENT becomes the scroll owner. When the iOS keyboard
-   * opens, Safari scrolls the document to reveal the focused field; the fixed
-   * footer is anchored to the layout viewport, so it rides up with the shift and
-   * iOS does not restore the offset on blur — the footer stays mispositioned.
-   * Pinning the login surface to a definite viewport frame makes .content-wrap
-   * (overflow-y: auto) the only scroll owner, so the layout returns to its
-   * original position once the keyboard closes.
-   */
-  position: fixed;
-  inset: 0;
-  overflow: hidden;
-}
-
-body.login-page #root {
-  height: 100%;
 }
 
 .auth-login {

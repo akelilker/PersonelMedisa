@@ -274,7 +274,9 @@ async function assertKayitModalGeometry(page: Page, kayitModal: ReturnType<typeo
   expect(metrics.modalRightEdgePx).toBeGreaterThanOrEqual(-1);
   expect(metrics.modalRightEdgePx).toBeLessThanOrEqual(1);
   expect(metrics.modalFooterGapPx).toBeGreaterThan(0);
-  expect(metrics.modalFooterGapPx).toBeCloseTo(6, 1);
+  // User decision: mobile --modal-gap-above-footer intentionally departs from the
+  // Taşıt 6px rhythm and matches the 14px desktop value on every role's modal.
+  expect(metrics.modalFooterGapPx).toBeCloseTo(14, 1);
   if (metrics.bodyLeft != null && metrics.bodyRight != null) {
     expect(metrics.bodyLeft).toBeGreaterThanOrEqual(metrics.modalLeftEdgePx - 1);
     expect(metrics.bodyRight).toBeLessThanOrEqual(metrics.viewportWidth - metrics.modalRightEdgePx + 1);

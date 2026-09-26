@@ -303,7 +303,8 @@ test.describe("PERSONEL self-service UX v2 — mobile product", () => {
 
       await expect(page.getByTestId("personel-mobile-header")).toHaveCount(0);
       await expect(page.getByTestId("personel-notification-bell")).toHaveCount(0);
-      await expect(page.getByTestId("hero-session-user")).toHaveCount(0);
+      // Session identity stays in the shell hero band; branch label stays hidden.
+      await expect(page.getByTestId("hero-session-user")).toHaveText("Ayşe Yılmaz");
       await expect(page.getByTestId("hero-session-sube")).toHaveCount(0);
       await expect(page.getByTestId("header-sube-selector-toggle")).toHaveCount(0);
       await expect(page.getByTestId("personel-self-service-page").getByText("Ayşe Yılmaz")).toHaveCount(0);
@@ -345,11 +346,14 @@ test.describe("PERSONEL self-service UX v2 — mobile product", () => {
       );
       expect(overflow).toBeLessThanOrEqual(1);
 
-      const footer = page.getByTestId("personel-mobile-footer");
+      // PERSONEL surface uses the same fixed AppFooter as the admin shell (no mini footer).
+      await expect(page.getByTestId("personel-mobile-footer")).toHaveCount(0);
+      const footer = page.locator("#app-footer");
       await expect(footer).toBeVisible();
       const footerBox = await footer.boundingBox();
       expect(footerBox).toBeTruthy();
-      expect(footerBox!.y + footerBox!.height).toBeLessThanOrEqual(viewport.height + 2);
+      expect(footerBox!.y + footerBox!.height).toBeGreaterThanOrEqual(viewport.height - 2);
+      expect(footerBox!.height).toBeGreaterThanOrEqual(38);
     });
   }
 

@@ -38,8 +38,11 @@ body.app-home-route {
   :root {
     --app-footer-height: 30px;
     --app-footer-real-height: 38px;
-    /* Taşıt mobile parity: visible modal↔footer separation (shell comment: ~6px rhythm). */
-    --modal-gap-above-footer: 6px;
+    /* One modal↔footer rhythm on every viewport and every role: the mobile
+       special-case (6px) left the modal visually welded to the footer on phones.
+       Kept as the token's own value so both admin and PERSONEL modals — which
+       consume only --modal-gap-above-footer — stay identical. */
+    --modal-gap-above-footer: 14px;
     --modal-footer-optical-reserve: 0px;
   }
 }

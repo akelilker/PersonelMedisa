@@ -182,7 +182,7 @@ export function PersonelSelfServiceHomePage() {
   }
 
   return (
-    <section className="personel-mobile-shell" data-testid="personel-self-service-page">
+    <section className="personel-mobile-shell self-home-page" data-testid="personel-self-service-page">
       <section className="pm-section" data-testid="personel-today-attendance-section">
         <OwnQrAttendanceBoxes
           today={today}
@@ -227,12 +227,6 @@ export function PersonelSelfServiceHomePage() {
           </p>
         </div>
       ) : null}
-
-      <footer className="pm-footer" data-testid="personel-mobile-footer">
-        <div className="pm-footer-accent pm-footer-accent--left" aria-hidden="true" />
-        <span>PersonelMedisa</span>
-        <div className="pm-footer-accent pm-footer-accent--right" aria-hidden="true" />
-      </footer>
 
       <AttendanceCorrectionRequestModal
         open={correctDraft !== null}

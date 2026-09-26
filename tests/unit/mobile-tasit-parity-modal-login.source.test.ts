@@ -9,10 +9,12 @@ function read(relPath: string): string {
 }
 
 describe("mobile Taşıt parity modal/login source guards", () => {
-  it("keeps mobile modal↔footer gap token at Taşıt rhythm (~6px)", () => {
+  it("keeps one mobile modal↔footer rhythm shared by every role", () => {
     const spacing = read("src/styles/tokens/spacing.css");
+    // Mobile matches the desktop token value: the old 6px mobile-only override left
+    // modals visually welded to the fixed AppFooter on phones.
     expect(spacing).toMatch(
-      /@media\s*\(max-width:\s*640px\)\s*\{[^}]*--modal-gap-above-footer:\s*6px/s
+      /@media\s*\(max-width:\s*640px\)\s*\{[^}]*--modal-gap-above-footer:\s*14px/s
     );
     expect(spacing).toMatch(
       /@media\s*\(max-width:\s*640px\)\s*\{[^}]*--modal-footer-optical-reserve:\s*0px/s

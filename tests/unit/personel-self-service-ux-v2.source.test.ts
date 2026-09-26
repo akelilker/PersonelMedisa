@@ -70,7 +70,10 @@ describe("PERSONEL_SELF_SERVICE_PRODUCT_UX_V2 notification + policy owners", () 
     expect(history).not.toContain('to="/"');
 
     const shell = read("src/app/AppShell.tsx");
-    expect(shell).toContain('session?.user.rol === "PERSONEL" ? null : session?.user.ad_soyad');
+    // PERSONEL identity lives in the shell hero band: name restored, branch label
+    // still suppressed for the personnel shell.
+    expect(shell).toContain("userLabel={session?.user.ad_soyad}");
+    expect(shell).toContain('subeLabel={session?.user.rol === "PERSONEL" ? null : activeSubeLabel}');
 
     const header = read("src/components/shell/ShellHeaderActions.tsx");
     expect(header).toContain('subeControl.kind === "multi" && !isPersonelRole');

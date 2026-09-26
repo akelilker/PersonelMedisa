@@ -1,13 +1,8 @@
 /* ==========================================================================
    iOS PWA / standalone presentation owner (PACK V4)
    No UA sniffing — display-mode + safe-area only.
+   Footer safe-area padding is owned by components/footer.css (tek katman).
    ========================================================================== */
-
-@supports (padding: max(0px)) {
-  #app-footer {
-    padding-bottom: max(2px, env(safe-area-inset-bottom, 0px));
-  }
-}
 
 @media (display-mode: standalone) {
   html,

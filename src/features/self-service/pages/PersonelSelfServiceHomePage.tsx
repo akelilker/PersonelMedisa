@@ -14,6 +14,7 @@ import { AttendanceCorrectionRequestModal } from "../components/AttendanceCorrec
 import { BackgroundlessNoticeModal } from "../components/BackgroundlessNoticeModal";
 import { OwnQrAttendanceBoxes } from "../components/OwnQrAttendanceBoxes";
 import { PersonelMobileCapabilityService } from "../personel-mobile-capability";
+import { primeQrCamera } from "../qr/qr-scanner";
 
 type NoticeState =
   | null
@@ -191,11 +192,13 @@ export function PersonelSelfServiceHomePage() {
           allowCorrection
           onScanGiris={() =>
             guardOrRun("qr_scan", () => {
+              primeQrCamera();
               navigate("/self/qr-okut?event=GIRIS");
             })
           }
           onScanCikis={() =>
             guardOrRun("qr_scan", () => {
+              primeQrCamera();
               navigate("/self/qr-okut?event=CIKIS");
             })
           }

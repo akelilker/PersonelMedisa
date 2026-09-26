@@ -61,8 +61,8 @@ describe("personel mobile/PWA self-service productization", () => {
     expect(scan).toContain("Bu QR Kodu Çalışma Yerinizle Eşleşmiyor.");
     expect(scan).toContain("İnternet Bağlantısı Yok. İşlem Kaydedilmedi.");
     expect(scan).not.toContain("Şube kiosk ekranındaki QR kodunu okutun.");
-    expect(scan).toContain("Giriş Kaydedildi");
-    expect(scan).toContain("Çıkış Kaydedildi");
+    expect(scan).toContain("Girişiniz kaydedildi");
+    expect(scan).toContain("Çıkışınız kaydedildi");
     expect(scan).toContain('data-testid="qr-scan-cta-zone"');
     expect(scan).toContain('data-testid="qr-scan-success"');
     expect(scan).toContain('data-testid="qr-scan-error"');
@@ -76,7 +76,9 @@ describe("personel mobile/PWA self-service productization", () => {
     expect(scan).toContain("QR Okutun");
     expect(scan).toContain("early_exit_confirmed");
     expect(scan).toContain("early-exit-confirm-modal");
-    expect(scan).toContain("Giriş / Çıkış Geçmişim");
+    expect(scan).toContain('data-testid="qr-scan-late-early-info"');
+    expect(scan).not.toContain("late-early-info-modal");
+    expect(scan).not.toContain("Giriş / Çıkış Geçmişim");
     expect(scan).toContain("qr-scan-video-wrap--collapsed");
     expect(scan).not.toContain("(idempotent)");
     expect(scan).not.toContain("candidate / apply");

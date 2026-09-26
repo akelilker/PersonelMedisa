@@ -10,7 +10,52 @@ type StartOptions = {
   video: HTMLVideoElement;
   onResult: (result: QrScanResult) => void;
   onError?: (message: string) => void;
+  stream?: Promise<MediaStream> | MediaStream | null;
 };
+
+const CAMERA_REQUEST: MediaStreamConstraints = {
+  audio: false,
+  video: {
+    facingMode: { ideal: "environment" }
+  }
+};
+
+let primedCamera: Promise<MediaStream> | null = null;
+
+function mapCameraError(error: unknown): Error {
+  const name =
+    error && typeof error === "object" && "name" in error ? String((error as { name?: unknown }).name) : "";
+  if (name === "NotAllowedError" || name === "PermissionDeniedError") {
+    return new Error("Kamera izni yok. Telefon Ayarlarınızdan Kamera Erişimine İzin Verin.");
+  }
+  if (name === "NotFoundError" || name === "DevicesNotFoundError") {
+    return new Error("Bu cihazda kullanılabilir kamera bulunamadı.");
+  }
+  if (name === "NotReadableError" || name === "TrackStartError") {
+    return new Error("Kamera başka bir uygulama tarafından kullanılıyor olabilir.");
+  }
+  return new Error("Kamera açılamadı. Tekrar deneyin.");
+}
+
+/** Call from the attendance-card click so the camera permission stays in that gesture. */
+export function primeQrCamera(): void {
+  if (primedCamera) return;
+  if (typeof window === "undefined") return;
+  if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) return;
+  const pending = navigator.mediaDevices.getUserMedia(CAMERA_REQUEST);
+  primedCamera = pending.catch((error: unknown) => {
+    if (primedCamera === pending) {
+      primedCamera = null;
+    }
+    throw error;
+  });
+}
+
+export function takePrimedQrCamera(): Promise<MediaStream> | null {
+  const pending = primedCamera;
+  primedCamera = null;
+  return pending;
+}
 
 type BarcodeDetectorLike = {
   detect: (source: HTMLVideoElement) => Promise<Array<{ rawValue?: string }>>;
@@ -61,25 +106,11 @@ export async function startQrScanner(options: StartOptions): Promise<QrScannerHa
 
   let stream: MediaStream;
   try {
-    stream = await navigator.mediaDevices.getUserMedia({
-      audio: false,
-      video: {
-        facingMode: { ideal: "environment" }
-      }
-    });
+    stream = options.stream
+      ? await Promise.resolve(options.stream)
+      : await navigator.mediaDevices.getUserMedia(CAMERA_REQUEST);
   } catch (error) {
-    const name =
-      error && typeof error === "object" && "name" in error ? String((error as { name?: unknown }).name) : "";
-    if (name === "NotAllowedError" || name === "PermissionDeniedError") {
-      throw new Error("Telefon Ayarlarınızdan Kamera Erişimine İzin Verin.");
-    }
-    if (name === "NotFoundError" || name === "DevicesNotFoundError") {
-      throw new Error("Bu cihazda kullanılabilir kamera bulunamadı.");
-    }
-    if (name === "NotReadableError" || name === "TrackStartError") {
-      throw new Error("Kamera başka bir uygulama tarafından kullanılıyor olabilir.");
-    }
-    throw new Error("Kamera açılamadı. İzinleri ve HTTPS bağlantısını kontrol edin.");
+    throw mapCameraError(error);
   }
 
   const video = options.video;

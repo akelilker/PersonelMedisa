@@ -98,7 +98,7 @@ describe("sube + personel mobile QR puantaj wiring", () => {
     expect(scan).toContain("QR Kodunun Süresi Doldu. Yeni Kodu Okutun.");
     expect(scan).toContain("Bu QR Kodu Çalışma Yerinizle Eşleşmiyor.");
     expect(scan).toContain("İnternet Bağlantısı Yok. İşlem Kaydedilmedi.");
-    expect(scan).toContain("Giriş Kaydedildi");
+    expect(scan).toContain("Girişiniz kaydedildi");
 
     const scanner = read("src/features/self-service/qr/qr-scanner.ts");
     expect(scanner).toContain("NotAllowedError");

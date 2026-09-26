@@ -69,6 +69,7 @@ describe("personel mobile field UX closure contracts", () => {
     expect(home).not.toContain("pm-context-bar");
     expect(home).not.toContain('data-testid="personel-notification-bell"');
     expect(home).not.toContain('data-testid="self-missing-info-warning"');
+    expect(home).toContain("primeQrCamera()");
     expect(home).toContain('navigate("/self/qr-okut?event=GIRIS")');
     expect(home).toContain('navigate("/self/qr-okut?event=CIKIS")');
     expect(home).not.toContain("PERSONEL YÖN. SİST.");

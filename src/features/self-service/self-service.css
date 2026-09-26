@@ -176,6 +176,8 @@
   max-width: 420px;
   margin-inline: auto;
   flex-shrink: 0;
+  justify-items: center;
+  text-align: center;
   padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
 }
 
@@ -245,25 +247,12 @@
   gap: var(--space-2);
 }
 
-.qr-scan-page {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
-}
-
 .qr-scan-lead {
   margin: 0;
   font-size: 0.92rem;
   line-height: 1.35;
   color: var(--txt-muted);
   text-align: center;
-}
-
-.qr-scan-page .qr-puantaj-expectation-note {
-  margin: 0;
-  text-align: center;
-  font-size: 0.82rem;
 }
 
 /* Personel mobile shell (Taşıt-parity visual language) */
@@ -275,6 +264,25 @@
   min-width: 0;
   max-width: 100%;
   overflow-x: hidden;
+}
+
+/*
+ * QR scan layout owner: compound selector beats .personel-mobile-shell display:grid
+ * so camera + CTA stay a compact flex column (no modal-height row stretch).
+ */
+.personel-mobile-shell.qr-scan-page {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: stretch;
+  gap: var(--space-2);
+  padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+}
+
+.personel-mobile-shell.qr-scan-page .qr-puantaj-expectation-note {
+  margin: 0;
+  text-align: center;
+  font-size: 0.82rem;
 }
 
 .pm-header {
@@ -453,7 +461,6 @@
   font-weight: 800;
 }
 
-.pm-box-main-action,
 .pm-box-action {
   min-height: 48px;
   min-width: 96px;
@@ -466,17 +473,36 @@
   cursor: pointer;
 }
 
+/* Actionable GİRİŞ/ÇIKIŞ: single card surface — outer box border only */
+.pm-attendance-box:has(> .pm-box-main-action) {
+  padding: 0;
+}
+
 .pm-box-main-action {
+  box-sizing: border-box;
   width: 100%;
   height: 100%;
-  min-height: 96px;
+  min-height: 112px;
+  min-width: 0;
+  padding: 10px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 4px;
+  border: none;
+  border-radius: inherit;
+  background: transparent;
+  color: inherit;
+  font-weight: 800;
   font-size: 1.05rem;
   letter-spacing: 0.03em;
+  cursor: pointer;
+}
+
+.pm-box-main-action:focus-visible {
+  outline: 2px solid var(--brand-red, #c62828);
+  outline-offset: -2px;
 }
 
 .pm-box-main-action--with-time .pm-box-label {
@@ -801,6 +827,13 @@
   .pm-attendance-box {
     min-height: 104px;
     height: auto;
+    padding: 8px;
+  }
+  .pm-attendance-box:has(> .pm-box-main-action) {
+    padding: 0;
+  }
+  .pm-box-main-action {
+    min-height: 104px;
     padding: 8px;
   }
   .pm-box-time {

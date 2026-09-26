@@ -89,7 +89,9 @@ class YillikIzinBakiyeService
         $duzeltmeAdet = YillikIzinHakDuzeltmeLedgerService::countByPersonelAsOf($pdo, $personelId, $ref);
         $usedOzeti = YillikIzinKullanimService::computeForPersonel($pdo, $personelId, $ref);
 
-        return self::buildResponse($personelId, $ref, $legal, $manualNet, $usedOzeti, $duzeltmeAdet);
+        $iseGiris = isset($personel['ise_giris_tarihi']) ? trim((string) $personel['ise_giris_tarihi']) : '';
+
+        return self::buildResponse($personelId, $ref, $legal, $manualNet, $usedOzeti, $duzeltmeAdet, $iseGiris !== '' ? $iseGiris : null);
     }
 
     /**
@@ -130,7 +132,7 @@ class YillikIzinBakiyeService
      * } $usedOzeti
      * @return array<string, mixed>
      */
-    private static function buildResponse($personelId, $referansTarih, array $legal, $manualNet, array $usedOzeti, $duzeltmeAdet)
+    private static function buildResponse($personelId, $referansTarih, array $legal, $manualNet, array $usedOzeti, $duzeltmeAdet, $iseGirisTarihi = null)
     {
         $used = array_key_exists('kullanilan_gun', $usedOzeti) ? $usedOzeti['kullanilan_gun'] : null;
         $mevcut = array_key_exists('mevcut_yillik_hak_gun', $legal)
@@ -155,6 +157,9 @@ class YillikIzinBakiyeService
         return [
             'personel_id' => (int) $personelId,
             'contract_version' => self::CONTRACT_VERSION,
+            'ise_giris_tarihi' => $iseGirisTarihi !== null && trim((string) $iseGirisTarihi) !== ''
+                ? trim((string) $iseGirisTarihi)
+                : null,
             'referans_tarih' => $referansTarih,
             'annual_band_semantic' => self::ANNUAL_BAND_SEMANTIC,
             'balance_legal_semantic' => self::BALANCE_LEGAL_SEMANTIC,

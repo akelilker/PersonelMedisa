@@ -8,12 +8,17 @@ import {
   type AttendanceTodayResponse
 } from "../../../api/attendance-mobile.api";
 import { isApiRequestError, shouldPreferDemoApi } from "../../../api/api-client";
+import { fetchMeYillikIzinBakiye } from "../../../api/me.api";
 import { LoadingState } from "../../../components/states/LoadingState";
 import { useRoleAccess } from "../../../hooks/use-role-access";
+import type { YillikIzinBakiye } from "../../../types/yillik-izin-hak-duzeltme";
 import { AttendanceCorrectionRequestModal } from "../components/AttendanceCorrectionRequestModal";
 import { BackgroundlessNoticeModal } from "../components/BackgroundlessNoticeModal";
 import { OwnQrAttendanceBoxes } from "../components/OwnQrAttendanceBoxes";
+import { SelfServiceYillikIzinInfoModal } from "../components/SelfServiceYillikIzinInfoModal";
+import { SelfServiceYillikIzinLeaveRow } from "../components/SelfServiceYillikIzinLeaveRow";
 import { PersonelMobileCapabilityService } from "../personel-mobile-capability";
+import { buildSelfServiceYillikIzinView } from "../personel-self-service-yillik-izin-view";
 import { primeQrCamera } from "../qr/qr-scanner";
 
 type NoticeState =
@@ -42,11 +47,15 @@ export function PersonelSelfServiceHomePage() {
   const navigate = useNavigate();
   const { hasPermission } = useRoleAccess();
   const qrEnabled = hasPermission("self_service.qr.scan");
+  const izinViewEnabled = hasPermission("self_service.yillik_izin.view");
   const [loading, setLoading] = useState(true);
   const [today, setToday] = useState<AttendanceTodayResponse | null>(null);
+  const [izinBakiye, setIzinBakiye] = useState<YillikIzinBakiye | null>(null);
+  const [izinLoading, setIzinLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<NoticeState>(null);
   const [correctDraft, setCorrectDraft] = useState<CorrectDraft | null>(null);
+  const [leaveModalOpen, setLeaveModalOpen] = useState(false);
 
   const load = useCallback(async () => {
     if (shouldPreferDemoApi()) {
@@ -97,6 +106,22 @@ export function PersonelSelfServiceHomePage() {
         });
       }
       setError(null);
+      if (izinViewEnabled) {
+        setIzinLoading(true);
+        void fetchMeYillikIzinBakiye()
+          .then((bakiye) => {
+            setIzinBakiye(bakiye);
+          })
+          .catch(() => {
+            setIzinBakiye(null);
+          })
+          .finally(() => {
+            setIzinLoading(false);
+          });
+      } else {
+        setIzinBakiye(null);
+        setIzinLoading(false);
+      }
     } catch (cause) {
       if (isApiRequestError(cause) && cause.code === "SELF_SERVICE_BINDING_REQUIRED") {
         setError("unbound");
@@ -108,11 +133,13 @@ export function PersonelSelfServiceHomePage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [izinViewEnabled]);
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  const izinView = izinBakiye ? buildSelfServiceYillikIzinView(izinBakiye) : null;
 
   const caps = today?.capabilities;
   const comingSoon = caps?.coming_soon_message ?? COMING_SOON;
@@ -184,6 +211,15 @@ export function PersonelSelfServiceHomePage() {
 
   return (
     <section className="personel-mobile-shell self-home-page" data-testid="personel-self-service-page">
+      {izinViewEnabled && (izinLoading || izinView) ? (
+        <SelfServiceYillikIzinLeaveRow
+          loading={izinLoading}
+          disabled={!izinView}
+          text={izinView?.rowText ?? "İzin bilgisi yüklenemedi"}
+          onOpen={() => setLeaveModalOpen(true)}
+        />
+      ) : null}
+
       <section className="pm-section" data-testid="personel-today-attendance-section">
         <OwnQrAttendanceBoxes
           today={today}
@@ -244,6 +280,12 @@ export function PersonelSelfServiceHomePage() {
         onError={(message) => {
           setNotice({ title: "Düzeltme Talebi", body: message });
         }}
+      />
+
+      <SelfServiceYillikIzinInfoModal
+        open={leaveModalOpen}
+        view={izinView}
+        onClose={() => setLeaveModalOpen(false)}
       />
 
       <BackgroundlessNoticeModal

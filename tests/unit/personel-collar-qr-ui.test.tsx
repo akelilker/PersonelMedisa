@@ -68,7 +68,30 @@ vi.mock("../../src/api/attendance-mobile.api", () => ({
 }));
 
 vi.mock("../../src/api/me.api", () => ({
-  fetchMe: vi.fn(async () => ({ completeness: { missing_count: 0 }, last_qr_event: null }))
+  fetchMe: vi.fn(async () => ({ completeness: { missing_count: 0 }, last_qr_event: null })),
+  fetchMeYillikIzinBakiye: vi.fn(async () => ({
+    personel_id: 158,
+    contract_version: "s2c-v1",
+    ise_giris_tarihi: "2020-01-01",
+    referans_tarih: "2026-09-19",
+    kidem_yil: 6,
+    yas: null,
+    yas_istisna_uygulandi: false,
+    mevcut_yillik_hak_gun: 20,
+    birikmis_yasal_hak_gun: 94,
+    yasal_hak_gun: 94,
+    manuel_duzeltme_gun: 0,
+    efektif_hak_gun: 94,
+    kullanilan_gun: 10,
+    ham_kalan_gun: 84,
+    kalan_gun: 84,
+    takvim_dogrulandi_mi: true,
+    eksik_takvim_tarihleri: [],
+    sayilan_normal_gun: 10,
+    haric_tutulan_hafta_tatili_gun: 0,
+    haric_tutulan_ubgt_gun: 0,
+    duzeltme_adet: 0
+  }))
 }));
 
 vi.mock("../../src/api/bildirimler.api", () => ({

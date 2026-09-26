@@ -7,10 +7,13 @@ function read(path: string): string {
 }
 
 describe("personel mobile/PWA self-service productization", () => {
-  it("locks simplified personel home (attendance boxes only)", () => {
+  it("locks personel home attendance focus with compact annual leave row", () => {
     const home = read("src/features/self-service/pages/PersonelSelfServiceHomePage.tsx");
     expect(home).toContain('data-testid="personel-today-attendance-section"');
     expect(home).toContain("OwnQrAttendanceBoxes");
+    expect(home).toContain("SelfServiceYillikIzinLeaveRow");
+    expect(home).toContain("fetchMeYillikIzinBakiye");
+    expect(home).toContain("self_service.yillik_izin.view");
     expect(home).not.toContain("QrKioskModelNote");
     expect(home).not.toContain("QrPuantajExpectationNote");
     expect(home).not.toContain('data-testid="personel-today-empty"');
@@ -127,6 +130,7 @@ describe("personel mobile/PWA self-service productization", () => {
     expect(home).not.toMatch(/setError\(cause instanceof Error \? cause\.message/);
 
     const css = read("src/features/self-service/self-service.css");
+    expect(css).toContain(".pm-leave-row");
     expect(css).toContain(".qr-scan-cta-zone");
     expect(css).toContain(".self-service-action--primary");
     expect(css).toContain(".qr-event-badge");

@@ -3832,6 +3832,7 @@ function buildDemoYillikIzinBakiye(personelId: number, referansTarih?: string) {
     return {
       personel_id: personelId,
       contract_version: "s2c-v1",
+      ise_giris_tarihi: null,
       referans_tarih: ref,
       annual_band_semantic: "CURRENT_SERVICE_YEAR_BAND",
       balance_legal_semantic: "CUMULATIVE_STATUTORY_ACCRUAL_AS_OF_REFERENCE_DATE",
@@ -3886,6 +3887,7 @@ function buildDemoYillikIzinBakiye(personelId: number, referansTarih?: string) {
   return {
     personel_id: personelId,
     contract_version: "s2c-v1",
+    ise_giris_tarihi: personel.ise_giris_tarihi ?? null,
     referans_tarih: ref,
     annual_band_semantic: "CURRENT_SERVICE_YEAR_BAND",
     balance_legal_semantic: "CUMULATIVE_STATUTORY_ACCRUAL_AS_OF_REFERENCE_DATE",

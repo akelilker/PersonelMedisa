@@ -34,25 +34,25 @@ test.describe("personel mobile field UX — QR scan modal", () => {
 
       await expect
         .poll(async () => {
-          const scanning = await page.getByTestId("qr-scan-scanning").count();
+          const frame = await page.getByText("Kodu çerçeveye hizalayın").count();
           const error = await page.getByTestId("qr-scan-error").count();
-          return scanning + error;
+          return frame + error;
         })
         .toBeGreaterThan(0);
-      const cta =
-        (await page.getByTestId("qr-scan-scanning").count()) > 0
-          ? page.getByTestId("qr-scan-scanning")
+      const anchor =
+        (await page.getByText("Kodu çerçeveye hizalayın").count()) > 0
+          ? page.getByText("Kodu çerçeveye hizalayın")
           : page.getByTestId("qr-scan-error");
-      await expect(cta).toBeVisible();
-      const ctaBox = await cta.boundingBox();
-      expect(ctaBox).toBeTruthy();
-      expect(ctaBox!.y + ctaBox!.height).toBeLessThanOrEqual(viewport.height + 1);
-      expect(ctaBox!.y).toBeGreaterThanOrEqual(0);
+      await expect(anchor).toBeVisible();
+      const anchorBox = await anchor.boundingBox();
+      expect(anchorBox).toBeTruthy();
+      expect(anchorBox!.y + anchorBox!.height).toBeLessThanOrEqual(viewport.height + 1);
+      expect(anchorBox!.y).toBeGreaterThanOrEqual(0);
 
       const preview = page.getByTestId("qr-scan-video-wrap");
       const previewBox = await preview.boundingBox();
       expect(previewBox).toBeTruthy();
-      expect(previewBox!.height).toBeLessThanOrEqual(Math.round(viewport.height * 0.42) + 8);
+      expect(previewBox!.height).toBeGreaterThan(viewport.height * 0.45);
 
       const docOverflow = await page.evaluate(() => {
         return document.documentElement.scrollWidth - window.innerWidth;
@@ -68,13 +68,13 @@ test.describe("personel mobile field UX — QR scan modal", () => {
     await page.getByTestId("qr-scan-start").click();
     await expect
       .poll(async () => {
-        const scanning = await page.getByTestId("qr-scan-scanning").count();
+        const frame = await page.getByText("Kodu çerçeveye hizalayın").count();
         const error = await page.getByTestId("qr-scan-error").count();
-        return scanning + error;
+        return frame + error;
       })
       .toBeGreaterThan(0);
 
-    if ((await page.getByTestId("qr-scan-scanning").count()) > 0) {
+    if ((await page.getByText("Kodu çerçeveye hizalayın").count()) > 0) {
       await expect(page.getByTestId("qr-scan-video-wrap")).toContainText("Kodu çerçeveye hizalayın");
     } else {
       await expect(page.getByTestId("qr-scan-error")).toBeVisible();
@@ -91,38 +91,50 @@ test.describe("personel mobile field UX — QR scan modal", () => {
     await expect(page.locator(".modal-header h2").first()).toHaveText("QR Okut");
   });
 
-  test("393x852: scanning label stays compact under camera (no modal stretch gap)", async ({
-    page
-  }) => {
+  test("393x852: preview fills the modal body and the frame stays centered", async ({ page }) => {
     await page.setViewportSize({ width: 393, height: 852 });
     await openQrScan(page, "GIRIS");
 
     await expect
       .poll(async () => {
-        const scanning = await page.getByTestId("qr-scan-scanning").count();
+        const frame = await page.getByText("Kodu çerçeveye hizalayın").count();
         const error = await page.getByTestId("qr-scan-error").count();
-        return scanning + error;
+        return frame + error;
       })
       .toBeGreaterThan(0);
 
-    if ((await page.getByTestId("qr-scan-scanning").count()) === 0) {
-      // Camera permission denied in CI/agent — geometry only applies to scanning phase.
+    if ((await page.getByText("Kodu çerçeveye hizalayın").count()) === 0) {
       await expect(page.getByTestId("qr-scan-error")).toBeVisible();
       return;
     }
 
     const camera = page.getByTestId("qr-scan-video-wrap");
-    const scanning = page.getByTestId("qr-scan-scanning");
-    await expect(scanning).toHaveText("QR Okutun");
-
+    const frame = page.getByText("Kodu çerçeveye hizalayın");
     const cameraBox = await camera.boundingBox();
-    const scanningBox = await scanning.boundingBox();
+    const frameBox = await frame.boundingBox();
+    const bodyBox = await page.locator(".modal-body").boundingBox();
     expect(cameraBox).toBeTruthy();
-    expect(scanningBox).toBeTruthy();
+    expect(frameBox).toBeTruthy();
+    expect(bodyBox).toBeTruthy();
+    expect(cameraBox!.width).toBeGreaterThan(bodyBox!.width * 0.9);
+    expect(cameraBox!.height).toBeGreaterThan(bodyBox!.height * 0.7);
 
-    const gap = scanningBox!.y - (cameraBox!.y + cameraBox!.height);
-    expect(gap).toBeGreaterThanOrEqual(0);
-    expect(gap).toBeLessThanOrEqual(48);
+    const cameraCenterX = cameraBox!.x + cameraBox!.width / 2;
+    const cameraCenterY = cameraBox!.y + cameraBox!.height / 2;
+    const frameCenterX = frameBox!.x + frameBox!.width / 2;
+    const frameCenterY = frameBox!.y + frameBox!.height / 2;
+    expect(Math.abs(cameraCenterX - frameCenterX)).toBeLessThan(12);
+    expect(Math.abs(cameraCenterY - frameCenterY)).toBeLessThan(12);
+
+    const overflow = await page.evaluate(() => {
+      const body = document.querySelector(".modal-body");
+      return {
+        modal: body ? body.scrollHeight - body.clientHeight : 0,
+        page: document.documentElement.scrollHeight - document.documentElement.clientHeight
+      };
+    });
+    expect(overflow.modal).toBeLessThanOrEqual(1);
+    expect(overflow.page).toBeLessThanOrEqual(1);
   });
 });
 

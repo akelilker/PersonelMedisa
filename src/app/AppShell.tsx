@@ -239,7 +239,7 @@ export function AppShell() {
         <div className="shell-top-stack">
           <Hero
             title="Personel Yönetim Sistemi"
-            userLabel={session?.user.rol === "PERSONEL" ? null : session?.user.ad_soyad}
+            userLabel={session?.user.ad_soyad}
             subeLabel={session?.user.rol === "PERSONEL" ? null : activeSubeLabel}
           />
           {showShellHeaderActions ? <ShellHeaderActions contextLabel="Ana panel" minimal={isHomeRoute} /> : null}

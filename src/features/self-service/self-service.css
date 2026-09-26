@@ -273,7 +273,9 @@
 .personel-mobile-shell.qr-scan-page {
   display: flex;
   flex-direction: column;
-  justify-content: flex-start;
+  /* Camera + its label/CTA are one compact block; the modal body stretches this shell,
+     so centering balances the leftover height instead of dumping it under the button. */
+  justify-content: center;
   align-items: stretch;
   gap: var(--space-2);
   padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
@@ -283,6 +285,46 @@
   margin: 0;
   text-align: center;
   font-size: 0.82rem;
+}
+
+/*
+ * PERSONEL self-service home: the GİRİŞ/ÇIKIŞ block is the screen's single focus.
+ * The shell takes over the leftover viewport height (content-wrap flex takeover) and
+ * the two cards split it as one stacked column, so the screen reads as a deliberate
+ * pair of large tiles instead of two small boxes with a dead tail beneath them.
+ * Capped on tall viewports; the cap keeps the tiles proportionate and centers the block.
+ */
+.personel-mobile-shell.self-home-page {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  flex: 1 0 auto;
+  gap: var(--space-3);
+}
+
+.self-home-page > .pm-section {
+  flex: 1 1 auto;
+  max-height: 636px;
+  min-height: 0;
+}
+
+.self-home-page .pm-attendance-grid {
+  grid-template-columns: minmax(0, 1fr);
+  grid-auto-rows: minmax(148px, 1fr);
+  gap: var(--space-3);
+}
+
+.self-home-page .pm-attendance-box {
+  min-height: 148px;
+}
+
+/* Focus surfaces scale their own type with the tile, not with the shared card default. */
+.self-home-page .pm-box-label {
+  font-size: 1rem;
+}
+
+.self-home-page .pm-box-time {
+  font-size: clamp(1.5rem, 7vw, 2rem);
 }
 
 .pm-header {
@@ -413,10 +455,8 @@
   min-width: 0;
 }
 
+/* Shared correction-pencil surface (GİRİŞ/ÇIKIŞ cards + Geçmiş timeline rows). */
 .pm-box-pencil {
-  position: absolute;
-  right: 4px;
-  bottom: 4px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -428,6 +468,18 @@
   background: rgba(255, 255, 255, 0.04);
   color: inherit;
   cursor: pointer;
+}
+
+/*
+ * Corner pinning belongs to the owning card, not to the shared button: only
+ * .pm-attendance-box is a positioned ancestor, so the pencil there sits in the
+ * card corner while in-flow consumers (Geçmiş rows) keep it in their own grid
+ * cell instead of escaping to the modal container's bottom-right brand marker.
+ */
+.pm-attendance-box > .pm-box-pencil {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
 }
 
 .pm-box-pencil:focus-visible {
@@ -507,10 +559,6 @@
 
 .pm-box-main-action--with-time .pm-box-label {
   color: inherit;
-}
-
-.pm-box-main-action--with-time .pm-box-time {
-  font-size: 1.2rem;
 }
 
 .pm-box-main-action:disabled {
@@ -698,6 +746,7 @@
   color: #fde68a;
 }
 
+/* Birim Amiri operational home footer band (PERSONEL home uses the shared AppFooter). */
 .pm-footer {
   display: grid;
   grid-template-columns: 8px 1fr 8px;
@@ -869,6 +918,10 @@
 .qr-history-page {
   display: grid;
   gap: var(--space-3);
+  /* Compact calendar: rows keep their touch-sized natural height instead of being
+     stretched by the modal body, so the selected day's Giriş/Çıkış detail lands
+     directly under the grid and stays inside the same screen. */
+  align-content: start;
 }
 
 .qr-history-toolbar {
@@ -990,6 +1043,12 @@
   font-weight: 800;
 }
 
+/*
+ * Geçmiş event row: line 1 = time + Giriş/Çıkış label with the trailing
+ * pending state / correction action; line 2 = the long correction or status copy,
+ * full width. Placement is explicit so the auto-placer can never drop the long
+ * description into the trailing column beside the timestamp.
+ */
 .qr-history-event-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -1010,10 +1069,21 @@
 }
 
 .qr-history-event-main {
+  grid-area: 1 / 1;
   display: flex;
   align-items: baseline;
   gap: 10px;
   min-width: 0;
+}
+
+/*
+ * Trailing cell of line 1. "Bekliyor" and the pencil are mutually exclusive —
+ * a pending correction hides the correction action — so they may share it.
+ */
+.qr-history-pending,
+.qr-history-event-row > .pm-box-pencil {
+  grid-area: 1 / 2;
+  justify-self: end;
 }
 
 .qr-history-event-label {
@@ -1040,9 +1110,12 @@
 }
 
 .qr-history-event-status {
+  grid-area: 2 / 1 / 3 / -1;
   margin: 0;
   font-size: 0.85rem;
+  line-height: 1.35;
   color: var(--txt-muted);
+  overflow-wrap: anywhere;
 }
 
 .qr-history-hint {

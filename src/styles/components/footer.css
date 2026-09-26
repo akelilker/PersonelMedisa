@@ -10,11 +10,17 @@
   background: var(--bg);
   isolation: isolate;
   z-index: var(--z-footer);
+  /*
+   * Safe-area tek katman (Taşıt driver-shell): chrome bandı = --app-footer-real-height;
+   * home-indicator boşluğu yalnız padding-bottom. content-box so the inset grows the
+   * band once — do not also add env(safe-area-inset-bottom) into height/min-height
+   * (that double-counted the empty strip under the version/brand/status row on iOS PWA).
+   */
   height: var(--app-footer-real-height);
   min-height: var(--app-footer-real-height);
-  box-sizing: border-box;
-  padding-top: 2px;
-  padding-bottom: calc(2px + env(safe-area-inset-bottom, 0px));
+  box-sizing: content-box;
+  padding-top: 0;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
   border-top: 0.8px solid var(--footer-top-border);
   border-left: 0.5px solid var(--footer-side-border);
   border-right: 0.5px solid var(--footer-side-border);
@@ -143,16 +149,13 @@ body:not(.login-page):not(.admin-report-page) #app-footer {
 
 /*
  * Phones own a full-bleed footer band (Taşıt style-core ≤640): the hairline
- * side rails belong to the desktop shell frame, and the band grows with the
- * bottom safe area instead of squeezing the version/brand/status row into a
- * fixed height once viewport-fit=cover makes env(safe-area-inset-bottom) live.
+ * side rails belong to the desktop shell frame. Safe-area growth stays on
+ * padding-bottom (content-box) so the chrome row keeps --app-footer-real-height.
  */
 @media (max-width: 640px) {
   #app-footer {
     border-left: none;
     border-right: none;
-    height: calc(var(--app-footer-real-height) + env(safe-area-inset-bottom, 0px));
-    min-height: calc(var(--app-footer-real-height) + env(safe-area-inset-bottom, 0px));
   }
 
   body.app-home-route #app-footer .footer-content {
@@ -175,9 +178,6 @@ body.login-page #app-footer.login-footer {
   box-shadow:
     0 -1px 0 rgba(255, 255, 255, 0.12),
     0 -16px 30px rgba(var(--theme-color-rgb), 0.42);
-  height: calc(var(--app-footer-real-height) + env(safe-area-inset-bottom, 0px));
-  min-height: calc(var(--app-footer-real-height) + env(safe-area-inset-bottom, 0px));
-  padding-bottom: calc(2px + env(safe-area-inset-bottom, 0px));
 }
 
 body.login-page #app-footer.login-footer .footer-content {

@@ -25,9 +25,12 @@ describe("modal header + frame Taşıt parity (chrome only)", () => {
 
   it("keeps visible modal frame when modal-open (mobile retains side borders)", () => {
     const modal = read("src/styles/components/modal.css");
-    expect(modal).toMatch(/body\.modal-open \.modal-container[\s\S]*var\(--modal-chrome-glow\)/);
+    expect(modal).toMatch(/body\.modal-open \.modal-container[\s\S]*box-shadow:\s*none/);
+    expect(modal).not.toMatch(/var\(--modal-chrome-glow\)/);
     expect(modal).not.toMatch(/border-left-width:\s*0/);
     expect(modal).toMatch(/body\.modal-open \.modal-header[\s\S]*--modal-header-red-gradient/);
+    expect(modal).toMatch(/\.modal-header\s*\{[^}]*height:\s*60px/);
+    expect(modal).toMatch(/\.modal-header\s*\{[^}]*border-bottom:\s*none/);
   });
 
   it("renders Taşıt-style semi-transparent brand marker on modal container", () => {

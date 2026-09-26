@@ -27,10 +27,17 @@ body.app-home-route {
   --shell-top-stack-gap: var(--space-1);
 }
 
-/* Taşit: desktop 641+ uses 14px modal↔footer gap */
+/* Taşıt style-core: desktop 641+ overlay gap is 14px. Mobile stays on the 17px root. */
 @media (min-width: 641px) {
   :root {
     --app-footer-gap: 14px;
+  }
+}
+
+/* Taşıt style-core: short landscape phones pull the modal toward the footer. */
+@media (max-height: 500px) and (orientation: landscape) and (pointer: coarse) {
+  :root {
+    --modal-gap-above-footer: 2px;
   }
 }
 
@@ -38,11 +45,8 @@ body.app-home-route {
   :root {
     --app-footer-height: 30px;
     --app-footer-real-height: 38px;
-    /* One modal↔footer rhythm on every viewport and every role: the mobile
-       special-case (6px) left the modal visually welded to the footer on phones.
-       Kept as the token's own value so both admin and PERSONEL modals — which
-       consume only --modal-gap-above-footer — stay identical. */
-    --modal-gap-above-footer: 14px;
+    /* Modal↔footer gap follows --app-footer-gap (17px). Do not pin a separate
+       14px here — that welded the shell off the Taşıt mobile rhythm. */
     --modal-footer-optical-reserve: 0px;
   }
 }

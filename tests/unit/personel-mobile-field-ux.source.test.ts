@@ -22,12 +22,14 @@ describe("personel mobile field UX closure contracts", () => {
     expect(shell).toContain('return { title: "Modül", closeTo: "/" };');
   });
 
-  it("keeps camera CTA reachable via height-capped preview owner CSS", () => {
+  it("keeps the camera preview filling leftover modal height without page scroll", () => {
     const css = read("src/features/self-service/self-service.css");
     expect(css).toContain(".qr-scan-video-wrap");
-    expect(css).toContain("36svh");
-    expect(css).toContain("36dvh");
-    expect(css).toContain("aspect-ratio: 3 / 4");
+    expect(css).toContain("flex: 1 1 auto");
+    expect(css).toContain("object-fit: cover");
+    expect(css).toContain("overflow: hidden");
+    expect(css).not.toContain("36svh");
+    expect(css).not.toContain("36dvh");
     expect(css).toContain(".qr-scan-cta-zone");
     expect(css).toContain(".qr-scan-video-wrap--collapsed");
     expect(css).not.toContain("!important");

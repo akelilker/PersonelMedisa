@@ -126,46 +126,56 @@
   color: var(--danger);
 }
 
-.qr-scan-video-wrap--collapsed {
-  display: none;
-}
-
 .qr-scan-video-wrap {
   position: relative;
-  height: min(36svh, 300px);
-  width: auto;
-  max-width: min(100%, 420px);
-  margin-inline: auto;
-  aspect-ratio: 3 / 4;
+  display: grid;
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
+  container-type: size;
+  flex: 1 1 auto;
+  align-self: stretch;
+  width: 100%;
+  max-width: none;
+  min-height: 0;
+  height: auto;
+  margin: 0;
   overflow: hidden;
   border-radius: var(--radius-md);
   background: var(--bg-field);
 }
 
-@supports (height: 100dvh) {
-  .qr-scan-video-wrap {
-    height: min(36dvh, 300px);
-  }
+.qr-scan-video-wrap.qr-scan-video-wrap--collapsed {
+  display: none;
 }
 
 .qr-scan-video {
+  grid-area: 1 / 1;
   width: 100%;
   height: 100%;
+  min-height: 0;
   object-fit: cover;
+  object-position: center;
 }
 
 .qr-scan-video-hint {
-  position: absolute;
-  left: 12px;
-  right: 12px;
-  bottom: 12px;
+  grid-area: 1 / 1;
+  place-self: center;
+  z-index: 1;
+  box-sizing: border-box;
+  width: min(68cqmin, 280px);
+  height: min(68cqmin, 280px);
   margin: 0;
-  padding: 8px 10px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 10px 12px;
+  border: 2px solid rgba(245, 245, 245, 0.9);
   border-radius: var(--radius-md);
-  background: rgba(5, 8, 12, 0.55);
+  background: transparent;
   color: #f5f5f5;
   font-size: 0.85rem;
+  line-height: 1.3;
   text-align: center;
+  text-shadow: 0 1px 2px rgba(5, 8, 12, 0.9);
   pointer-events: none;
 }
 
@@ -179,6 +189,10 @@
   justify-items: center;
   text-align: center;
   padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+}
+
+.qr-scan-cta-zone:not(:has(*)) {
+  display: none;
 }
 
 .qr-scan-actions {
@@ -267,18 +281,32 @@
 }
 
 /*
- * QR scan layout owner: compound selector beats .personel-mobile-shell display:grid
- * so camera + CTA stay a compact flex column (no modal-height row stretch).
+ * QR scan layout owner: compound selector beats .personel-mobile-shell display:grid.
+ * The shell fills the modal body; the preview takes the leftover height and the CTA
+ * keeps its own height, so the page does not scroll.
  */
+.modal-body:has(> .qr-scan-page) {
+  grid-template-rows: minmax(0, 1fr);
+  overflow: hidden;
+}
+
 .personel-mobile-shell.qr-scan-page {
   display: flex;
   flex-direction: column;
-  /* Camera + its label/CTA are one compact block; the modal body stretches this shell,
-     so centering balances the leftover height instead of dumping it under the button. */
-  justify-content: center;
+  justify-content: flex-start;
   align-items: stretch;
   gap: var(--space-2);
-  padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  box-sizing: border-box;
+  height: 100%;
+  max-height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.personel-mobile-shell.qr-scan-page:has(.qr-scan-video-wrap--collapsed) {
+  justify-content: center;
 }
 
 .personel-mobile-shell.qr-scan-page .qr-puantaj-expectation-note {
@@ -894,11 +922,6 @@
 }
 
 @media (min-width: 720px) {
-  .qr-scan-video-wrap {
-    height: min(52vh, 420px);
-    max-width: 420px;
-  }
-
   .qr-scan-cta-zone .self-service-action--primary {
     width: auto;
     min-width: 220px;

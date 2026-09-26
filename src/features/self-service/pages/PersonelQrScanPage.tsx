@@ -263,12 +263,6 @@ export function PersonelQrScanPage() {
           </button>
         ) : null}
 
-        {phase.kind === "scanning" ? (
-          <p className="self-service-muted" data-testid="qr-scan-scanning">
-            QR Okutun
-          </p>
-        ) : null}
-
         {phase.kind === "choose" ? (
           <div className="qr-scan-actions" data-testid="qr-scan-choose">
             <button

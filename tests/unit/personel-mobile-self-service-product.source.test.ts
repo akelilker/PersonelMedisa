@@ -73,7 +73,7 @@ describe("personel mobile/PWA self-service productization", () => {
     expect(scan).toContain("Bu işlem daha önce kaydedilmiş.");
     expect(scan).toContain("Kayıt oluşturulamadı. Tekrar deneyin.");
     expect(scan).toContain("QR Okut");
-    expect(scan).toContain("QR Okutun");
+    expect(scan).not.toContain("QR Okutun");
     expect(scan).toContain("early_exit_confirmed");
     expect(scan).toContain("early-exit-confirm-modal");
     expect(scan).toContain('data-testid="qr-scan-late-early-info"');
@@ -135,7 +135,7 @@ describe("personel mobile/PWA self-service productization", () => {
     expect(css).toContain(".qr-history-grid");
     expect(css).toContain("safe-area-inset-bottom");
     expect(css).toContain("min-height: 48px");
-    expect(css).toContain("36dvh");
+    expect(css).toContain("object-fit: cover");
 
     const main = read("src/styles/main.css");
     expect(main).toContain('../features/self-service/self-service.css');

@@ -492,14 +492,14 @@ test.describe("PERSONEL self-service UX v2 — mobile product", () => {
 
     await expect
       .poll(async () => {
-        const scanning = await page.getByTestId("qr-scan-scanning").count();
+        const frame = await page.getByText("Kodu çerçeveye hizalayın").count();
         const error = await page.getByTestId("qr-scan-error").count();
-        return scanning + error;
+        return frame + error;
       })
       .toBeGreaterThan(0);
 
-    if ((await page.getByTestId("qr-scan-scanning").count()) > 0) {
-      await expect(page.getByTestId("qr-scan-scanning")).toHaveText("QR Okutun");
+    if ((await page.getByText("Kodu çerçeveye hizalayın").count()) > 0) {
+      await expect(page.getByTestId("qr-scan-video-wrap")).toContainText("Kodu çerçeveye hizalayın");
     }
 
     // Force success layout + collapsed camera without live camera decode.

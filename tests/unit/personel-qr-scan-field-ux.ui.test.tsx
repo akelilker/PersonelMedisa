@@ -48,7 +48,8 @@ describe("PersonelQrScanPage field UX", () => {
     await waitFor(() => {
       expect(startQrScanner).toHaveBeenCalled();
     });
-    expect(screen.getByTestId("qr-scan-scanning")).toHaveTextContent("QR Okutun");
+    expect(screen.queryByTestId("qr-scan-scanning")).toBeNull();
+    expect(screen.getByTestId("qr-scan-video-wrap")).toHaveTextContent("Kodu çerçeveye hizalayın");
   });
 
   it("CTA click starts camera path and enters scanning state", async () => {
@@ -57,7 +58,7 @@ describe("PersonelQrScanPage field UX", () => {
     await waitFor(() => {
       expect(startQrScanner).toHaveBeenCalledTimes(1);
     });
-    expect(screen.getByTestId("qr-scan-scanning")).toHaveTextContent("QR Okutun");
+    expect(screen.queryByTestId("qr-scan-scanning")).toBeNull();
     expect(screen.getByTestId("qr-scan-video-wrap")).toHaveTextContent("Kodu çerçeveye hizalayın");
   });
 

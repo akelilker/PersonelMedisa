@@ -61,6 +61,29 @@
   z-index: 0;
 }
 
+/*
+ * Home frame watermark. ::before/::after stay the red rail and inset glow.
+ * Sits inside that rail, 8px from the inner corner, under shell content.
+ */
+body.app-home-route .app-shell-marker {
+  position: absolute;
+  right: 8px;
+  bottom: calc(var(--app-footer-real-height) + env(safe-area-inset-bottom, 0px) + 8px);
+  width: 36px;
+  height: 36px;
+  background-image: url("../../assets/brand/marker.png");
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  opacity: 0.2;
+  z-index: 0;
+  pointer-events: none;
+}
+
+body.modal-open .app-shell-marker {
+  visibility: hidden;
+}
+
 body.app-home-route .app-shell::before {
   box-shadow: none;
   /* Side rails: default bottom inset (footer top). Full-height pseudo caused red stubs on footer glow. */

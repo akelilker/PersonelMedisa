@@ -373,6 +373,7 @@ export function AppShell() {
 
   return (
     <div className="app-container app-shell">
+      {isHomeRoute && !isAuthSurfaceRoute ? <span className="app-shell-marker" aria-hidden="true" /> : null}
       <main className="content-wrap">
         <div className="shell-top-stack">
           <Hero

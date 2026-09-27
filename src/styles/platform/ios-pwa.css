@@ -43,4 +43,29 @@
   .modal-footer {
     transform: translateZ(0);
   }
+
+  /*
+   * All routes: iOS still shifts the layout or visual viewport while the keyboard
+   * is open even when html/body overflow is hidden (reset.css). Fixed #app-footer
+   * stays on the layout viewport bottom; stale document/visual offsets after blur
+   * (or after login-page is removed post-auth) look like a dark band under the
+   * footer. Pin the shell frame once here — not per-route in auth.css (PR 410).
+   */
+  body {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    overflow: hidden;
+  }
+
+  body #root {
+    height: 100%;
+    min-height: 0;
+  }
+
+  /* Login / change-password: no internal scroll track (form is flex-centered). */
+  body.login-page .content-wrap {
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
 }

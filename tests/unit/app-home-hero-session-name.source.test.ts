@@ -27,7 +27,7 @@ describe("app-home hero session name under logo", () => {
     // Width-scaled cap: never wider than 112px, but gives width back on narrow
     // phones so the full PERSONEL title keeps its track next to a long name.
     expect(block).toMatch(
-      /body\.app-home-route \.hero\.hero-with-session \.hero-logo\s*\{[^}]*max-width:\s*clamp\(72px,\s*19\.5vw,\s*112px\)/s
+      /body\.app-home-route \.hero\.hero-with-session \.hero-logo\s*\{[^}]*max-width:\s*clamp\(68px,\s*19vw,\s*112px\)/s
     );
     expect(block).not.toMatch(
       /body\.app-home-route \.hero\.hero-with-session \.hero-logo\s*\{[^}]*flex:\s*0\s+0\s+43px/s
@@ -84,10 +84,10 @@ describe("app-home hero session name under logo", () => {
       /body\.app-home-route \.hero\.hero-with-session\s*\{[^}]*min-height:\s*79px/s
     );
     expect(block).toMatch(
-      /body\.app-home-route \.hero\.hero-with-session \.hero-logo picture\s*\{[^}]*width:\s*56px/s
+      /body\.app-home-route \.hero\.hero-with-session \.hero-logo picture\s*\{[^}]*width:\s*50px/s
     );
     expect(block).toMatch(
-      /body\.app-home-route \.hero\.hero-with-session \.hero-logo img\s*\{[^}]*height:\s*46px/s
+      /body\.app-home-route \.hero\.hero-with-session \.hero-logo img\s*\{[^}]*height:\s*41px/s
     );
     expect(block).toMatch(
       /body\.app-home-route \.hero\.hero-with-session \.hero-session-user\s*\{[^}]*font-size:\s*10\.5px/s

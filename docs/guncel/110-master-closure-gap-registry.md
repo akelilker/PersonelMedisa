@@ -1,4 +1,4 @@
-CODE_MIGRATION_TIP: 091
+CODE_MIGRATION_TIP: 092
 PRODUCTION_MIGRATION_TIP: 091
 LAST_VERIFIED_PRODUCTION_MIGRATION_TIP: 091
 FRESH_PRODUCTION_MIGRATION_READBACK: ACTIONS_APPLY_EVIDENCE_2026_09_22
@@ -13,9 +13,9 @@ This file is retained as a **historical archive** of the 2026-09-20 SGK employer
 
 | Alan | Archive value (2026-09-20) | Current truth (see CURRENT_STATE / 146) |
 | --- | --- | --- |
-| CODE_MIGRATION_TIP | 091 | **091** (unchanged filesystem tip) |
+| CODE_MIGRATION_TIP | 091 | **092** (filesystem tip; production still 091) |
 | PRODUCTION_MIGRATION_TIP | 089 (stale) | **091** APPLIED |
-| PRODUCTION_MIGRATION_PENDING | 2 (`090`+`091`) | **0** |
+| PRODUCTION_MIGRATION_PENDING | 2 (`090`+`091`) | **1** (`092` not applied) |
 | PR #326 | OPEN (stale) | **MERGED** |
 | PRODUCTION_DEPLOY_SHA | `d96182a2` (#301) | `5c6ae773` (#402) |
 | FRESH_READBACK | BLOCKED_EXTERNAL_GITHUB_ACTIONS_BILLING | ACTIONS_APPLY_EVIDENCE_2026_09_22 |
@@ -24,16 +24,17 @@ This file is retained as a **historical archive** of the 2026-09-20 SGK employer
 
 | Alan | Değer |
 | --- | --- |
-| CODE_MIGRATION_TIP | **091** |
+| CODE_MIGRATION_TIP | **092** |
 | PRODUCTION_MIGRATION_TIP | **091** |
 | LAST_VERIFIED_PRODUCTION_MIGRATION_TIP | **091** |
 | FRESH_PRODUCTION_MIGRATION_READBACK | **ACTIONS_APPLY_EVIDENCE_2026_09_22** |
-| PRODUCTION_MIGRATION_PENDING | **0** |
+| PRODUCTION_MIGRATION_PENDING | **1** (`092` not applied) |
 | Migration 087 | **APPLIED** |
 | Migration 088 | **APPLIED** |
 | Migration 089 | **APPLIED** |
 | Migration 090 | **APPLIED** (Actions `35781766535`) |
 | Migration 091 | **APPLIED** (Actions `35791415567`) |
+| Migration 092 | **NOT_APPLIED** (filesystem only; disposable MariaDB acceptance PASS) |
 | CODE_MAIN_SHA / PRODUCTION_DEPLOY_SHA | `5c6ae7734d394022ea1ff65c5683da91c095e0eb` |
 | PR #326 | **MERGED** |
 | PR #402 | **MERGED / DEPLOYED** |

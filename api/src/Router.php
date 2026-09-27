@@ -152,7 +152,10 @@ class Router
         if ($path === '/duyurular' && $method === 'POST') {
             PersonelSelfProductController::duyuruCreate($this->request);
         }
-        if ($path === '/me/profil-foto' && ($method === 'GET' || $method === 'PUT')) {
+        if ($path === '/me/profil-foto' && $method === 'GET') {
+            PersonelSelfProductController::selfProfilFoto($this->request);
+        }
+        if ($path === '/me/profil-foto' && $method === 'PUT') {
             PersonelSelfProductController::selfProfilFoto($this->request);
         }
         if (($method === 'GET' || $method === 'PUT') && preg_match('#^/personeller/(\d+)/profil-foto$#', $path, $matches)) {

@@ -2,9 +2,8 @@
   .content-wrap {
     padding: var(--space-1);
     padding-top: max(12px, env(safe-area-inset-top, 0px));
-    padding-bottom: calc(
-      var(--app-footer-real-height) + var(--app-footer-gap) + 16px + env(safe-area-inset-bottom, 0px)
-    );
+    /* Footer is in-flow in the shell column on desktop — do not double-reserve its height. */
+    padding-bottom: calc(var(--app-footer-gap) + var(--space-4) + env(safe-area-inset-bottom, 0px));
   }
 }
 

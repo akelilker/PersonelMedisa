@@ -5,18 +5,25 @@
 }
 
 /*
- * App shell owns scrolling: header and footer are fixed on every screen, the
- * document never scrolls, and .content-wrap is the single scroll owner.
- * html/body/#root need a definite height (not only min-height) so
- * .app-shell { height: 100% } resolves against the viewport instead of falling
- * back to auto. Without this the DOCUMENT becomes the scroll owner and, on iOS,
- * the keyboard shifts the fixed footer without restoring it on blur.
+ * App shell owns scrolling: the document never scrolls and .content-wrap is the
+ * single scroll owner. Mobile keeps #app-footer viewport-fixed; desktop (641+)
+ * docks it in the shell flex column (footer.css).
+ * html/body/#root need a definite height (not only min-height) so the shell
+ * resolves against the viewport instead of falling back to auto. #root is a flex
+ * column so .app-shell fills the chain even when React mounts sibling nodes.
  */
 html,
 body,
 #root {
   margin: 0;
   height: 100%;
+}
+
+#root {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
 }
 
 html,

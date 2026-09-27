@@ -329,6 +329,21 @@
   overscroll-behavior: contain;
 }
 
+@media (max-width: 640px) {
+  body.app-home-route .personel-mobile-shell.self-home-page {
+    gap: 6px;
+  }
+
+  body.app-home-route .self-home-main {
+    gap: 6px;
+  }
+
+  body.app-home-route .self-home-page .pm-attendance-box,
+  body.app-home-route .self-home-page .pm-box-main-action {
+    min-height: 68px;
+  }
+}
+
 .self-home-main {
   display: flex;
   flex-direction: column;

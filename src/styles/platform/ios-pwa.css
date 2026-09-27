@@ -43,4 +43,28 @@
   .modal-footer {
     transform: translateZ(0);
   }
+
+  /*
+   * Login / change-password: iOS still shifts the layout or visual viewport while
+   * the keyboard is open even when html/body overflow is hidden (reset.css). The
+   * fixed footer rides the stale offset after blur; hero lives in .content-wrap so
+   * any retained scrollTop looks like a ~safe-area gap at top/bottom. Pin the auth
+   * surface to the layout viewport (PR 410); global reset alone is insufficient.
+   */
+  body.login-page {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    overflow: hidden;
+  }
+
+  body.login-page #root {
+    height: 100%;
+    min-height: 0;
+  }
+
+  body.login-page .content-wrap {
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
 }

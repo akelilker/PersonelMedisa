@@ -268,6 +268,43 @@ export function AppShell() {
     };
   }, [isHomeRoute, isLoginRoute]);
 
+  useEffect(() => {
+    if (!isAuthSurfaceRoute) {
+      return;
+    }
+
+    const resetAuthViewportScroll = () => {
+      window.scrollTo(0, 0);
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+      const content = document.querySelector<HTMLElement>(".app-shell .content-wrap");
+      if (content) {
+        content.scrollTop = 0;
+      }
+    };
+
+    const viewport = window.visualViewport;
+    const onViewportChange = () => {
+      if (!viewport) {
+        return;
+      }
+      if (viewport.height >= window.innerHeight - 4) {
+        resetAuthViewportScroll();
+      }
+    };
+
+    resetAuthViewportScroll();
+    viewport?.addEventListener("resize", onViewportChange);
+    viewport?.addEventListener("scroll", onViewportChange);
+    document.addEventListener("focusout", resetAuthViewportScroll, true);
+
+    return () => {
+      viewport?.removeEventListener("resize", onViewportChange);
+      viewport?.removeEventListener("scroll", onViewportChange);
+      document.removeEventListener("focusout", resetAuthViewportScroll, true);
+    };
+  }, [isAuthSurfaceRoute]);
+
   const outletContext = useMemo<AppShellOutletContext>(
     () => ({
       onKayitOpen: openKayitModal,

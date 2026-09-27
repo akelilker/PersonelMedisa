@@ -505,6 +505,8 @@ body.login-page .hero .animated-line {
     margin-right: auto;
     padding: 13px 12px 11px 6px;
     box-sizing: border-box;
+    /* Inter 800 ink width (Node/opentype) for accent line centering under left-aligned title. */
+    --hero-home-title-ink-w: 337px;
     border-color: rgba(140, 158, 176, 0.6);
     box-shadow:
       0 4px 16px rgba(0, 0, 0, 0.4),
@@ -517,13 +519,13 @@ body.login-page .hero .animated-line {
     display: flex;
     flex-direction: column;
     align-items: center;
-    /* Logo picture ~50px; session meta shares this column (up to 112px). */
+    /* Logo picture ~54px; session meta shares this column (up to 112px). */
     grid-column: 1;
     grid-row: 1 / -1;
     flex: 0 1 auto;
     width: auto;
-    min-width: 50px;
-    max-width: clamp(68px, 19vw, 112px);
+    min-width: 54px;
+    max-width: clamp(70px, 19.2vw, 112px);
     margin-right: 6px;
     margin-left: 0;
     padding-left: 2px;
@@ -535,13 +537,13 @@ body.login-page .hero .animated-line {
   }
 
   body.app-home-route .hero.hero-with-session .hero-logo picture {
-    width: 50px;
-    max-width: 50px;
+    width: 54px;
+    max-width: 54px;
     transform: translate(1px, 1px);
   }
 
   body.app-home-route .hero.hero-with-session .hero-logo img {
-    height: 41px;
+    height: 44px;
     width: auto;
     transform: translateY(0);
   }
@@ -586,11 +588,10 @@ body.login-page .hero .animated-line {
     grid-row: 1;
     min-width: 0;
     align-self: center;
-    /* Longer “PERSONEL …” ink: Taşıt geometry with tighter tracking — no ellipsis.
-       Sized against the narrowest session column on the clamp's own width ramp,
-       so the full title stays inside its flex track even with a long session name. */
-    /* Ink ∝ font-size; vw ramp tuned from WebKit titleInkRight vs heroRight−8 (PR #422 fail → ~2.5px pay). */
-    font-size: clamp(17px, 4.71vw, calc(21.5px - 0.5pt));
+    /* Left-align ink after logo column + 6px margin; sizes from Inter 800 metrics (heroRight = vw−6). */
+    text-align: left;
+    background-position: 0% 50%;
+    font-size: 22.65px;
     letter-spacing: clamp(0px, 0.03vw, 0.3px);
     line-height: 1.2;
     transform: translateY(-2px);
@@ -619,9 +620,10 @@ body.login-page .hero .animated-line {
     top: auto;
     bottom: auto;
     transform: none;
-    justify-self: center;
+    justify-self: start;
     align-self: start;
-    width: 82%;
+    width: calc(var(--hero-home-title-ink-w) * 0.82);
+    margin-left: calc(var(--hero-home-title-ink-w) * 0.09);
     height: 2.7px;
     opacity: 0.72;
     background: linear-gradient(
@@ -633,21 +635,59 @@ body.login-page .hero .animated-line {
     box-shadow: 0 2px 10px rgba(var(--theme-color-rgb), 0.3);
   }
 
-  @media (max-width: 360px) {
+  @media (max-width: 393px) {
+    body.app-home-route .hero.hero-with-session {
+      --hero-home-title-ink-w: 300px;
+    }
+
     body.app-home-route section.hero.hero-with-session > h1 {
-      font-size: clamp(16px, 4.76vw, 17.25px);
+      font-size: 20.15px;
+    }
+  }
+
+  @media (max-width: 390px) {
+    body.app-home-route .hero.hero-with-session {
+      --hero-home-title-ink-w: 297px;
+    }
+
+    body.app-home-route section.hero.hero-with-session > h1 {
+      font-size: 19.95px;
+    }
+  }
+
+  @media (max-width: 375px) {
+    body.app-home-route .hero.hero-with-session {
+      --hero-home-title-ink-w: 283px;
+    }
+
+    body.app-home-route section.hero.hero-with-session > h1 {
+      font-size: 18.95px;
+    }
+  }
+
+  @media (max-width: 360px) {
+    body.app-home-route .hero.hero-with-session {
+      --hero-home-title-ink-w: 268px;
+    }
+
+    body.app-home-route section.hero.hero-with-session > h1 {
+      font-size: 17.95px;
       letter-spacing: clamp(0.1px, 0.04vw, 0.38px);
     }
   }
 
   @media (max-width: 320px) {
+    body.app-home-route .hero.hero-with-session {
+      --hero-home-title-ink-w: 227px;
+    }
+
     body.app-home-route .hero.hero-with-session .hero-session-user {
       font-size: 9px;
       line-height: 1.1;
     }
 
     body.app-home-route section.hero.hero-with-session > h1 {
-      font-size: clamp(14px, 4.58vw, 15px);
+      font-size: 15.2px;
       letter-spacing: 0.12px;
       padding: 0 1px 0 0;
     }

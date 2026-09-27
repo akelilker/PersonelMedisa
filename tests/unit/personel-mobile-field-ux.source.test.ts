@@ -17,6 +17,8 @@ describe("personel mobile field UX closure contracts", () => {
     expect(shell).toContain('"Çıkış"');
     expect(shell).toContain('"QR Okut"');
     expect(shell).toContain('"Giriş / Çıkış Geçmişim"');
+    expect(shell).toContain("modal-container--self-qr-history");
+    expect(shell).toContain("SelfServiceModalHomeButton");
     expect(shell).toContain('"Öz Servis"');
     expect(shell).toContain('searchParams.get("event")');
     expect(shell).toContain('return { title: "Modül", closeTo: "/" };');

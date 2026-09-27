@@ -134,7 +134,13 @@ function resolveModuleModal(
     return { title: resolveQrScanModalTitle(eventParam), closeTo: "/" };
   }
   if (pathname === "/self/qr-hareketleri") {
-    return { title: "Giriş / Çıkış Geçmişim", closeTo: "/" };
+    return {
+      title: "Giriş / Çıkış Geçmişim",
+      closeTo: "/",
+      className: "modal-container--self-qr-history",
+      bodyClassName: "modal-body--self-qr-history",
+      titleVariant: "premium"
+    };
   }
   if (pathname === "/self") {
     return { title: "Öz Servis", closeTo: "/" };
@@ -148,6 +154,35 @@ function PersonelKartHomeButton({ onClick }: { onClick: () => void }) {
     <button type="button" className="modal-home-btn" onClick={onClick} aria-label="Ana sayfaya dön">
       <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
         <path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" fill="none" />
+      </svg>
+    </button>
+  );
+}
+
+/** Taşıt monthly-todo-modal home control: stroke icon, 24px (22px desktop via modal-home-btn). */
+function SelfServiceModalHomeButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      className="modal-home-btn"
+      onClick={onClick}
+      aria-label="Ana sayfaya dön"
+      title="Ana sayfa"
+    >
+      <svg
+        width="24"
+        height="24"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+        focusable="false"
+      >
+        <path d="M3 10.5 12 3l9 7.5" />
+        <path d="M5 10v10h14V10" />
       </svg>
     </button>
   );
@@ -179,6 +214,7 @@ export function AppShell() {
     pathname === "/personeller" ||
     pathname === "/arsiv/personeller" ||
     /^\/personeller\/\d+$/.test(pathname);
+  const isSelfQrHistoryModalRoute = pathname === "/self/qr-hareketleri";
   const isPersonelDetayRoute = /^\/personeller\/\d+$/.test(pathname);
   const activeSubeLabel = useMemo(() => {
     const activeSubeId = session?.active_sube_id;
@@ -322,6 +358,8 @@ export function AppShell() {
           headerStart={
             isPersonelKartModalRoute ? (
               <PersonelKartHomeButton onClick={() => navigate("/")} />
+            ) : isSelfQrHistoryModalRoute ? (
+              <SelfServiceModalHomeButton onClick={() => navigate("/")} />
             ) : undefined
           }
           className={moduleModal.className}

@@ -1109,7 +1109,7 @@
 
 /*
  * PERSONEL QR kamera (Giriş/Çıkış) modal — Taşıt #monthly-todo-modal chrome (scoped owner).
- * Preview is edge-to-edge inside the modal frame; red lift stays inset (no outer bleed).
+ * Preview is flush top/bottom; 2px horizontal inset inside the modal frame; red lift stays inset (no outer bleed).
  */
 body.modal-open .modal-overlay:has(.modal-container--self-qr-scan) {
   isolation: isolate;
@@ -1142,6 +1142,9 @@ body.modal-open .modal-container--self-qr-scan .modal-header h2.premium-title {
 }
 
 .modal-body--self-qr-scan .qr-scan-video-wrap {
+  box-sizing: border-box;
+  width: calc(100% - 4px);
+  margin-inline: 2px;
   border-radius: 0;
   background: #05080c;
 }

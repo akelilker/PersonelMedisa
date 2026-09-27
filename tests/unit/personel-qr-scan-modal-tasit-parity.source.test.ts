@@ -19,7 +19,7 @@ describe("PERSONEL QR kamera modal Taşıt monthly-todo parity", () => {
     expect(shell).toMatch(/isSelfQrScanModalRoute[\s\S]*SelfServiceModalHomeButton/);
   });
 
-  it("keeps camera preview flush inside modal body (chrome lift is global modal owner)", () => {
+  it("insets camera preview 2px horizontally inside modal body (chrome lift is global modal owner)", () => {
     const css = read("src/features/self-service/self-service.css");
     const modal = read("src/styles/components/modal.css");
     expect(css).toMatch(
@@ -27,6 +27,12 @@ describe("PERSONEL QR kamera modal Taşıt monthly-todo parity", () => {
     );
     expect(css).toMatch(
       /\.modal-body--self-qr-scan \.qr-scan-video-wrap[\s\S]*border-radius:\s*0/s
+    );
+    expect(css).toMatch(
+      /\.modal-body--self-qr-scan \.qr-scan-video-wrap[\s\S]*width:\s*calc\(100% - 4px\)/s
+    );
+    expect(css).toMatch(
+      /\.modal-body--self-qr-scan \.qr-scan-video-wrap[\s\S]*margin-inline:\s*2px/s
     );
     expect(css).not.toMatch(
       /\.modal-container--self-qr-scan[\s\S]*box-shadow:\s*none/s

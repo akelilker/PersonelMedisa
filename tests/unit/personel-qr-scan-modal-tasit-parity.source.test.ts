@@ -19,13 +19,9 @@ describe("PERSONEL QR kamera modal Taşıt monthly-todo parity", () => {
     expect(shell).toMatch(/isSelfQrScanModalRoute[\s\S]*SelfServiceModalHomeButton/);
   });
 
-  it("keeps camera preview flush inside modal frame with inset red lift", () => {
+  it("keeps camera preview flush inside modal body (chrome lift is global modal owner)", () => {
     const css = read("src/features/self-service/self-service.css");
-    const spacing = read("src/styles/tokens/spacing.css");
-    expect(spacing).toMatch(/--app-footer-gap:\s*20px/);
-    expect(css).toMatch(
-      /\.modal-overlay:has\(\.modal-container--self-qr-scan\)[\s\S]*--app-footer-gap/s
-    );
+    const modal = read("src/styles/components/modal.css");
     expect(css).toMatch(
       /\.modal-body--self-qr-scan:has\(> \.qr-scan-page\)[\s\S]*padding:\s*0/s
     );
@@ -33,13 +29,10 @@ describe("PERSONEL QR kamera modal Taşıt monthly-todo parity", () => {
       /\.modal-body--self-qr-scan \.qr-scan-video-wrap[\s\S]*border-radius:\s*0/s
     );
     expect(css).not.toMatch(
-      /\.modal-body--self-qr-scan \.personel-mobile-shell\.qr-scan-page[\s\S]*calc\(100% \+ 3px\)/s
+      /\.modal-container--self-qr-scan[\s\S]*inset 0 0 22px/s
     );
-    expect(css).toMatch(
-      /\.modal-container--self-qr-scan[\s\S]*overflow:\s*hidden/s
-    );
-    expect(css).toMatch(
-      /@media\s*\(max-width:\s*640px\)[\s\S]*\.modal-container--self-qr-scan[\s\S]*inset 0 0 22px/s
+    expect(modal).toMatch(
+      /@media\s*\(max-width:\s*640px\)[\s\S]*var\(--modal-inset-chrome-lift\)/s
     );
     expect(css).not.toContain("!important");
   });

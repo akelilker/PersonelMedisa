@@ -46,11 +46,14 @@
   --modal-premium-title-gradient: linear-gradient(to bottom, #f8fbfd 0%, #ffffff 38%, #dce6ed 57%, #f5f9fc 100%);
   --modal-premium-title-shadow: 0 1px 1px rgba(0, 0, 0, 0.38), 0 0 2px rgba(255, 255, 255, 0.2);
   /* Taşıt style-core modal chrome (outline + tiered edge + optional red lift) */
-  --modal-border: rgba(184, 192, 201, 0.42);
-  --modal-border-top: rgba(200, 208, 216, 0.48);
-  --modal-border-bottom: rgba(168, 176, 186, 0.4);
-  --modal-outline: rgba(214, 222, 232, 0.34);
+  --modal-border: rgba(184, 192, 201, 0.48);
+  --modal-border-top: rgba(200, 208, 216, 0.54);
+  --modal-border-bottom: rgba(168, 176, 186, 0.56);
+  --modal-outline: rgba(214, 222, 232, 0.4);
   --modal-desktop-ring: #9ca4ac;
+  /* Inset only — red lift stays inside the frame (no outer bleed). */
+  --modal-inset-chrome-lift:
+    inset 0 0 22px rgba(var(--theme-color-rgb), 0.1), inset 0 1px 0 rgba(var(--theme-color-rgb), 0.14);
   --modal-chrome-glow: 0 0 40px rgba(0, 0, 0, 0.42), 0 0 24px var(--red-glow-subtle);
   --bg-content: var(--bg-surface);
   --txt: var(--text-primary);

@@ -35,6 +35,7 @@ describe("modal header + frame Taşıt parity (chrome only)", () => {
     expect(modal).toMatch(/body\.modal-open \.modal-header[\s\S]*--modal-header-red-gradient/);
     expect(modal).toMatch(/\.modal-header\s*\{[^}]*height:\s*60px/);
     expect(modal).toMatch(/\.modal-header\s*\{[^}]*border-bottom:\s*none/);
+    expect(modal).not.toMatch(/\.modal-header[\s\S]*inset 0 -1px 0 rgba\(0,\s*0,\s*0,\s*0\.05\)/);
   });
 
   it("renders Taşıt-style semi-transparent brand marker on modal container", () => {

@@ -29,7 +29,7 @@ describe("PERSONEL QR kamera modal Taşıt monthly-todo parity", () => {
       /\.modal-body--self-qr-scan \.qr-scan-video-wrap[\s\S]*border-radius:\s*0/s
     );
     expect(css).not.toMatch(
-      /\.modal-container--self-qr-scan[\s\S]*inset 0 0 22px/s
+      /\.modal-container--self-qr-scan[\s\S]*box-shadow:\s*none/s
     );
     expect(modal).toMatch(
       /@media\s*\(max-width:\s*640px\)[\s\S]*var\(--modal-inset-chrome-lift\)/s

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Medisa\Api\Services\Qr;
 
 use Medisa\Api\Auth\RolePermissions;
+use Medisa\Api\Services\Attendance\LateEarlyInfoService;
 use Medisa\Api\Services\SelfService\PersonelMobileCapabilityService;
 use Medisa\Api\Services\SelfService\SelfPersonelContext;
 use PDO;
@@ -145,6 +146,11 @@ class QrAttendanceTodayService
             }
         }
 
+        $mesaiBitimineKalan = null;
+        if (!empty($caps['qr_scan']) && $nextAction === 'CIKIS') {
+            $mesaiBitimineKalan = self::mesaiBitimineKalanLabel($pdo, $personelId, $today);
+        }
+
         return [
             'business_date' => $today,
             'capabilities' => $caps,
@@ -163,7 +169,30 @@ class QrAttendanceTodayService
             'can_scan_cikis' => !empty($caps['qr_scan']) && $canScanCikis,
             'pending_giris_correction' => $pendingGirisCorrection,
             'pending_cikis_correction' => $pendingCikisCorrection,
+            'mesai_bitimine_kalan_label' => $mesaiBitimineKalan,
         ];
+    }
+
+    private static function mesaiBitimineKalanLabel(PDO $pdo, $personelId, $businessDateYmd)
+    {
+        try {
+            $planned = LateEarlyInfoService::loadPlannedDay($pdo, (int) $personelId, (string) $businessDateYmd);
+            $beklenenCikis = is_array($planned) ? ($planned['beklenen_cikis_saati'] ?? null) : null;
+            $exitMins = LateEarlyInfoService::hhmmToMinutes($beklenenCikis);
+            if ($exitMins === null) {
+                return null;
+            }
+            $now = new \DateTimeImmutable('now', new \DateTimeZone('Europe/Istanbul'));
+            $nowMins = (int) $now->format('G') * 60 + (int) $now->format('i');
+            $delta = $exitMins - $nowMins;
+            if ($delta <= 0) {
+                return null;
+            }
+
+            return LateEarlyInfoService::formatDurationHuman($delta);
+        } catch (\Throwable $e) {
+            return null;
+        }
     }
 
     private static function istanbulToday()

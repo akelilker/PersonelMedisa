@@ -47,6 +47,8 @@ export type AttendanceTodayResponse = {
   can_scan_cikis: boolean;
   pending_giris_correction: { id: number; status: string; status_label: string; requested_local_time: string } | null;
   pending_cikis_correction: { id: number; status: string; status_label: string; requested_local_time: string } | null;
+  /** Human duration until planned exit when an open shift exists; null when unknown. */
+  mesai_bitimine_kalan_label?: string | null;
 };
 
 export type InboxNotification = {

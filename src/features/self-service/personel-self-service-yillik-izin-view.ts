@@ -12,10 +12,16 @@ export type SelfServiceYillikIzinView = {
   pendingMessage: string | null;
   iseGirisLabel: string;
   kidemLabel: string;
+  kidemCalisiyorLabel: string;
   toplamLabel: string;
   kullanilanLabel: string;
   kalanLabel: string;
 };
+
+function formatKidemCalisiyor(iseGiris: string, referans?: string): string {
+  const kidem = hesaplaKidemYilAy(iseGiris, referans);
+  return `${kidem.yil} yıl ${kidem.ay} aydır çalışıyor`;
+}
 
 function formatGunValue(value: number | null): string {
   return value === null ? "Kesinleştirilemedi" : `${value} gün`;
@@ -44,6 +50,7 @@ export function buildSelfServiceYillikIzinView(bakiye: YillikIzinBakiye): SelfSe
   const pendingMessage = buildPendingMessage(iseGiris);
   const kidem = hesaplaKidemYilAy(iseGiris, referans);
   const kidemLabel = `${kidem.yil} yıl / ${kidem.ay} ay`;
+  const kidemCalisiyorLabel = formatKidemCalisiyor(iseGiris, referans);
 
   if (!hakBasladi) {
     const message = pendingMessage ?? "İzin hakkınız henüz başlamadı";
@@ -53,6 +60,7 @@ export function buildSelfServiceYillikIzinView(bakiye: YillikIzinBakiye): SelfSe
       pendingMessage: message,
       iseGirisLabel: formatIsoDateDetail(iseGiris),
       kidemLabel,
+      kidemCalisiyorLabel,
       toplamLabel: "0 gün",
       kullanilanLabel: formatGunValue(bakiye.kullanilan_gun),
       kalanLabel: "0 gün"
@@ -67,6 +75,7 @@ export function buildSelfServiceYillikIzinView(bakiye: YillikIzinBakiye): SelfSe
     pendingMessage: null,
     iseGirisLabel: formatIsoDateDetail(iseGiris),
     kidemLabel,
+    kidemCalisiyorLabel,
     toplamLabel: formatGunValue(bakiye.efektif_hak_gun),
     kullanilanLabel: formatGunValue(bakiye.kullanilan_gun),
     kalanLabel: formatGunValue(bakiye.kalan_gun)

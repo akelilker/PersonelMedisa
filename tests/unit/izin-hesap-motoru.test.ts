@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  hesaplaIlkYillikIzinHakTarihi,
   hesaplaKidemYil,
+  hesaplaKidemYilAy,
+  yillikIzinHakkiBasladiMi,
   hesaplaYas,
   hesaplaYillikIzinGun,
   hesaplaIzinHakEdis,
@@ -68,6 +71,22 @@ describe("hesaplaKidemYil", () => {
 
   it("5 yıl tam", () => {
     expect(hesaplaKidemYil("2021-04-13", "2026-04-13")).toBe(5);
+  });
+});
+
+describe("self-service izin tarih yardımcıları", () => {
+  it("ilk yıllık izin hakkı işe giriş + 1 yıl", () => {
+    expect(hesaplaIlkYillikIzinHakTarihi("2025-08-11")).toBe("2026-08-11");
+  });
+
+  it("hak başlangıcından önce başlamadı", () => {
+    expect(yillikIzinHakkiBasladiMi("2025-08-11", "2026-08-10")).toBe(false);
+    expect(yillikIzinHakkiBasladiMi("2025-08-11", "2026-08-11")).toBe(true);
+  });
+
+  it("kıdem yıl/ay gösterimi", () => {
+    expect(hesaplaKidemYilAy("2023-01-15", "2026-03-14")).toEqual({ yil: 3, ay: 1 });
+    expect(hesaplaKidemYilAy("2023-01-15", "2026-03-15")).toEqual({ yil: 3, ay: 2 });
   });
 });
 

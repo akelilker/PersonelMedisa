@@ -33,6 +33,8 @@ export type ReverseYillikIzinHakDuzeltmePayload = {
 export type YillikIzinBakiye = {
   personel_id: number;
   contract_version: string;
+  /** Hire date mirror for self-service display (S2C balance read). */
+  ise_giris_tarihi?: string | null;
   referans_tarih?: string | null;
   annual_band_semantic?: string;
   balance_legal_semantic?: string;

@@ -90,6 +90,7 @@ export function normalizeYillikIzinBakiye(data: unknown): YillikIzinBakiye {
   return {
     personel_id: personelId,
     contract_version: toStringValue(record.contract_version) ?? "",
+    ise_giris_tarihi: toStringValue(record.ise_giris_tarihi) ?? null,
     referans_tarih: toStringValue(record.referans_tarih) ?? null,
     annual_band_semantic: toStringValue(record.annual_band_semantic),
     balance_legal_semantic: toStringValue(record.balance_legal_semantic),

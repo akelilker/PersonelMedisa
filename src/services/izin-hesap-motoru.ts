@@ -206,6 +206,55 @@ function anniversaryDate(hire: Date, completedYears: number): Date {
   return new Date(hire.getFullYear() + completedYears, hire.getMonth(), hire.getDate());
 }
 
+/** First service-year anniversary when cumulative statutory accrual begins (Owner B). */
+export function hesaplaIlkYillikIzinHakTarihi(iseGirisTarihi: string): string | null {
+  const giris = parseDate(iseGirisTarihi);
+  if (!giris) {
+    return null;
+  }
+  return formatDateKey(anniversaryDate(giris, 1));
+}
+
+export function yillikIzinHakkiBasladiMi(iseGirisTarihi: string, referansTarih?: string): boolean {
+  const ilkHak = hesaplaIlkYillikIzinHakTarihi(iseGirisTarihi);
+  if (!ilkHak) {
+    return false;
+  }
+  const baslangic = parseDate(ilkHak);
+  const ref = referansTarih ? parseDate(referansTarih) ?? today() : today();
+  if (!baslangic) {
+    return false;
+  }
+  return ref >= baslangic;
+}
+
+export function hesaplaKidemYilAy(
+  iseGirisTarihi: string,
+  referansTarih?: string
+): { yil: number; ay: number } {
+  const giris = parseDate(iseGirisTarihi);
+  if (!giris) {
+    return { yil: 0, ay: 0 };
+  }
+  const ref = referansTarih ? parseDate(referansTarih) ?? today() : today();
+  if (ref < giris) {
+    return { yil: 0, ay: 0 };
+  }
+
+  let yil = ref.getFullYear() - giris.getFullYear();
+  let ay = ref.getMonth() - giris.getMonth();
+  const gun = ref.getDate() - giris.getDate();
+  if (gun < 0) {
+    ay -= 1;
+  }
+  if (ay < 0) {
+    yil -= 1;
+    ay += 12;
+  }
+
+  return { yil: Math.max(yil, 0), ay: Math.max(ay, 0) };
+}
+
 /**
  * Owner B — cumulative statutory accrued entitlement through referans_tarih.
  * Sums Owner A (annual band) at each completed service-year anniversary.

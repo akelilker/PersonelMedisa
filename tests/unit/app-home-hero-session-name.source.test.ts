@@ -43,6 +43,12 @@ describe("app-home hero session name under logo", () => {
       /body\.app-home-route \.hero\.hero-with-session \.hero-session-meta\s*\{[^}]*width:\s*max-content/s
     );
     expect(block).toMatch(
+      /body\.app-home-route \.hero\.hero-with-session \.hero-session-meta\s*\{[^}]*align-self:\s*flex-start/s
+    );
+    expect(block).not.toMatch(
+      /body\.app-home-route \.hero\.hero-with-session \.hero-session-meta\s*\{[^}]*align-self:\s*center/s
+    );
+    expect(block).toMatch(
       /body\.app-home-route \.hero\.hero-with-session \.hero-session-user\s*\{[^}]*white-space:\s*nowrap/s
     );
     expect(block).toMatch(

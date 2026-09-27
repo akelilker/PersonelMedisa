@@ -67,18 +67,18 @@ describe("mobile Taşıt parity modal/login source guards", () => {
 
   it("keeps authenticated session hero title visible without ellipsis clipping", () => {
     const hero = read("src/styles/components/hero.css");
-    expect(hero).toMatch(/section\.hero\.hero-with-session > h1\s*\{[^}]*overflow:\s*hidden/s);
-    expect(hero).toMatch(/section\.hero\.hero-with-session > h1\s*\{[^}]*text-overflow:\s*clip/s);
+    expect(hero).toMatch(/section\.hero\.hero-with-session \.hero-title-stack > h1\s*\{[^}]*overflow:\s*hidden/s);
+    expect(hero).toMatch(/section\.hero\.hero-with-session \.hero-title-stack > h1\s*\{[^}]*text-overflow:\s*clip/s);
     expect(hero).toMatch(/\.hero\.hero-with-session\s*\{[^}]*overflow:\s*visible/s);
   });
 
   it("keeps mobile home hero title without ellipsis (full PERSONEL title)", () => {
     const hero = read("src/styles/components/hero.css");
     expect(hero).toMatch(
-      /body\.app-home-route section\.hero\.hero-with-session > h1\s*\{[^}]*text-overflow:\s*clip/s
+      /body\.app-home-route \.hero\.hero-with-session \.hero-title-stack > h1\s*\{[^}]*text-overflow:\s*clip/s
     );
     expect(hero).not.toMatch(
-      /body\.app-home-route section\.hero\.hero-with-session > h1\s*\{[^}]*text-overflow:\s*ellipsis/s
+      /body\.app-home-route \.hero\.hero-with-session \.hero-title-stack > h1\s*\{[^}]*text-overflow:\s*ellipsis/s
     );
   });
 

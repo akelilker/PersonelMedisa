@@ -31,7 +31,10 @@ export function Hero({ title, userLabel, subeLabel }: HeroProps) {
           </div>
         ) : null}
       </div>
-      <h1>{title}</h1>
+      <div className="hero-title-stack">
+        <h1>{title}</h1>
+        <div className="animated-line" aria-hidden="true" />
+      </div>
       {trimmedSubeLabel ? (
         <span
           className="hero-session-sube"
@@ -42,7 +45,6 @@ export function Hero({ title, userLabel, subeLabel }: HeroProps) {
         </span>
       ) : null}
       <div className="hero-spacer" aria-hidden="true" />
-      <div className="animated-line" aria-hidden="true" />
     </section>
   );
 }

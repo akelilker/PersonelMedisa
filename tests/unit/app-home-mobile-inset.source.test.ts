@@ -53,7 +53,7 @@ describe("app-home mobile shell inset (hero + menu)", () => {
       /body\.app-home-route \.hero\.hero-with-session \.hero-logo\s*\{[^}]*padding-left:\s*2px/s
     );
     expect(block).toMatch(
-      /body\.app-home-route \.hero\.hero-with-session \.hero-session-meta\s*\{[^}]*padding-inline:\s*1px/s
+      /body\.app-home-route \.hero\.hero-with-session \.hero-session-meta\s*\{[^}]*padding-inline:\s*0/s
     );
   });
 });

@@ -24,8 +24,6 @@ describe("app-home hero session name under logo", () => {
     expect(block).toMatch(
       /body\.app-home-route \.hero\.hero-with-session \.hero-logo\s*\{[^}]*flex:\s*0\s+1\s+auto/s
     );
-    // Width-scaled cap: never wider than 112px, but gives width back on narrow
-    // phones so the full PERSONEL title keeps its track next to a long name.
     expect(block).toMatch(
       /body\.app-home-route \.hero\.hero-with-session \.hero-logo\s*\{[^}]*max-width:\s*clamp\(68px,\s*19vw,\s*112px\)/s
     );
@@ -37,42 +35,39 @@ describe("app-home hero session name under logo", () => {
     );
   });
 
-  it("lets session meta fill the logo column with multiline wrap instead of single-line ellipsis", () => {
+  it("keeps session name on one line with ellipsis instead of multiline wrap", () => {
     const hero = read("src/styles/components/hero.css");
     const block = appHomeHeroBlock(hero);
 
     expect(block).toMatch(
-      /body\.app-home-route \.hero\.hero-with-session \.hero-session-meta\s*\{[^}]*width:\s*100%/s
+      /body\.app-home-route \.hero\.hero-with-session \.hero-session-meta\s*\{[^}]*width:\s*max-content/s
     );
     expect(block).toMatch(
-      /body\.app-home-route \.hero\.hero-with-session \.hero-session-user\s*\{[^}]*white-space:\s*normal/s
+      /body\.app-home-route \.hero\.hero-with-session \.hero-session-user\s*\{[^}]*white-space:\s*nowrap/s
     );
     expect(block).toMatch(
-      /body\.app-home-route \.hero\.hero-with-session \.hero-session-user\s*\{[^}]*overflow-wrap:\s*break-word/s
-    );
-    expect(block).toMatch(
-      /body\.app-home-route \.hero\.hero-with-session \.hero-session-user\s*\{[^}]*text-overflow:\s*clip/s
+      /body\.app-home-route \.hero\.hero-with-session \.hero-session-user\s*\{[^}]*text-overflow:\s*ellipsis/s
     );
     expect(block).not.toMatch(
-      /body\.app-home-route \.hero\.hero-with-session \.hero-session-user\s*\{[^}]*text-overflow:\s*ellipsis/s
+      /body\.app-home-route \.hero\.hero-with-session \.hero-session-user\s*\{[^}]*overflow-wrap:\s*break-word/s
     );
   });
 
-  it("keeps the PERSONEL title in the center grid track with room to shrink", () => {
+  it("centers the PERSONEL title stack in the hero with a 4px title-to-line gap", () => {
     const hero = read("src/styles/components/hero.css");
     const block = appHomeHeroBlock(hero);
 
     expect(block).toMatch(
-      /body\.app-home-route section\.hero\.hero-with-session > h1\s*\{[^}]*grid-column:\s*2/s
+      /body\.app-home-route \.hero\.hero-with-session \.hero-title-stack\s*\{[^}]*grid-column:\s*2/s
     );
     expect(block).toMatch(
-      /body\.app-home-route section\.hero\.hero-with-session > h1\s*\{[^}]*min-width:\s*0/s
+      /body\.app-home-route \.hero\.hero-with-session \.hero-title-stack\s*\{[^}]*gap:\s*4px/s
     );
     expect(block).toMatch(
-      /body\.app-home-route \.hero\.hero-with-session \.animated-line\s*\{[^}]*grid-column:\s*2/s
+      /body\.app-home-route \.hero\.hero-with-session \.hero-title-stack > h1\s*\{[^}]*min-width:\s*0/s
     );
     expect(block).toMatch(
-      /body\.app-home-route \.hero\.hero-with-session \.animated-line\s*\{[^}]*justify-self:\s*center/s
+      /body\.app-home-route \.hero\.hero-with-session \.hero-title-stack \.animated-line\s*\{[^}]*width:\s*78%/s
     );
   });
 

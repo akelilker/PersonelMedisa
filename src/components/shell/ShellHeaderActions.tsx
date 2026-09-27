@@ -448,6 +448,9 @@ export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeade
     }
   }
 
+  const showPersonelHomeLogout = isPersonelRole && minimal;
+  const showSettingsGearMenu = !showPersonelHomeLogout;
+
   const notificationButtonClassName = [
     "icon-btn",
     hasCriticalUnread ? "notification-red" : "",
@@ -735,16 +738,41 @@ export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeade
         <button
           type="button"
           className="icon-btn"
-          data-testid="header-settings-toggle"
+          data-testid={showPersonelHomeLogout ? "header-logout-btn" : "header-settings-toggle"}
           onClick={() => {
+            if (showPersonelHomeLogout) {
+              setIsNotificationsOpen(false);
+              setIsSubeOpen(false);
+              logout();
+              return;
+            }
             setIsSettingsOpen((prev) => !prev);
             setIsNotificationsOpen(false);
             setIsSubeOpen(false);
           }}
-          aria-label="Ayar menüsü"
-          aria-expanded={isSettingsOpen}
+          aria-label={showPersonelHomeLogout ? "Çıkış" : "Ayar menüsü"}
+          aria-expanded={showPersonelHomeLogout ? undefined : isSettingsOpen}
         >
-          <svg
+          {showPersonelHomeLogout ? (
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M10 17l5-5-5-5" />
+              <path d="M15 12H3" />
+              <path d="M21 19V5a2 2 0 0 0-2-2h-5" />
+              <path d="M21 19a2 2 0 0 1-2 2h-5" />
+            </svg>
+          ) : (
+            <svg
             xmlns="http://www.w3.org/2000/svg"
             width="20"
             height="20"
@@ -759,8 +787,10 @@ export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeade
             <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" />
             <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.6h.09a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9v.09a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
           </svg>
+          )}
         </button>
 
+        {showSettingsGearMenu ? (
         <div
           id="settings-menu"
           className={`settings-dropdown settings-menu-dropdown${isSettingsOpen ? " open" : ""}`}
@@ -842,6 +872,7 @@ export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeade
             Çıkış
           </button>
         </div>
+        ) : null}
       </div>
     </div>
     {canViewBugunPersonelDurumu ? (

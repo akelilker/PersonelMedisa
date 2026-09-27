@@ -39,7 +39,7 @@ test.describe("app-home header session name", () => {
     expect(metrics.logoWidth).toBeGreaterThan(52);
     expect(metrics.userScrollWidth).toBeLessThanOrEqual(metrics.userClientWidth + 1);
     expect(metrics.userScrollHeight).toBeLessThanOrEqual(metrics.userClientHeight + 1);
-    expect(metrics.whiteSpace).toBe("normal");
-    expect(metrics.textOverflow).not.toBe("ellipsis");
+    expect(metrics.whiteSpace).toBe("nowrap");
+    expect(metrics.textOverflow).toBe("ellipsis");
   });
 });

@@ -316,18 +316,18 @@
 }
 
 /*
- * PERSONEL self-service home: the GİRİŞ/ÇIKIŞ block is the screen's single focus.
- * The shell takes over the leftover viewport height (content-wrap flex takeover) and
- * the two cards split it as one stacked column, so the screen reads as a deliberate
- * pair of large tiles instead of two small boxes with a dead tail beneath them.
- * Capped on tall viewports; the cap keeps the tiles proportionate and centers the block.
+ * PERSONEL self-service home: annual leave row + compact GİRİŞ/ÇIKIŞ (no viewport-filling tiles).
  */
 .personel-mobile-shell.self-home-page {
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  flex: 1 0 auto;
-  gap: var(--space-3);
+  flex: 1 1 auto;
+  min-height: 0;
+  gap: var(--space-2);
+  justify-content: flex-start;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
 }
 
 .self-home-page > .pm-leave-row {
@@ -336,9 +336,50 @@
 }
 
 .self-home-page > .pm-section {
-  flex: 1 1 auto;
-  max-height: min(636px, calc(100dvh - 220px));
+  flex: 0 0 auto;
+  width: 100%;
   min-height: 0;
+}
+
+.self-home-page > .pm-callout {
+  flex: 0 0 auto;
+}
+
+.self-home-page .pm-attendance-grid {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-auto-rows: auto;
+  min-height: 0;
+  gap: var(--space-2);
+}
+
+.self-home-page .pm-attendance-box {
+  min-height: 72px;
+}
+
+.self-home-page .pm-box-main-action {
+  min-height: 72px;
+  padding: 8px 10px;
+  font-size: 0.92rem;
+}
+
+.self-home-page .pm-box-label {
+  font-size: 0.82rem;
+}
+
+.self-home-page .pm-box-time {
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.self-home-page .pm-box-status {
+  font-size: 0.68rem;
+  line-height: 1.2;
+}
+
+@media (min-width: 720px) {
+  .self-home-page .pm-attendance-grid {
+    max-width: 520px;
+  }
 }
 
 .pm-leave-row {
@@ -397,25 +438,6 @@
   font-size: 0.9rem;
   font-weight: 600;
   text-align: right;
-}
-
-.self-home-page .pm-attendance-grid {
-  grid-template-columns: minmax(0, 1fr);
-  grid-auto-rows: minmax(148px, 1fr);
-  gap: var(--space-3);
-}
-
-.self-home-page .pm-attendance-box {
-  min-height: 148px;
-}
-
-/* Focus surfaces scale their own type with the tile, not with the shared card default. */
-.self-home-page .pm-box-label {
-  font-size: 1rem;
-}
-
-.self-home-page .pm-box-time {
-  font-size: clamp(1.5rem, 7vw, 2rem);
 }
 
 .pm-header {

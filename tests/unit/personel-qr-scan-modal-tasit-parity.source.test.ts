@@ -19,8 +19,10 @@ describe("PERSONEL QR kamera modal Taşıt monthly-todo parity", () => {
     expect(shell).toMatch(/isSelfQrScanModalRoute[\s\S]*SelfServiceModalHomeButton/);
   });
 
-  it("keeps camera preview flush inside modal frame with inset red lift and +3px body fill", () => {
+  it("keeps camera preview flush inside modal frame with inset red lift", () => {
     const css = read("src/features/self-service/self-service.css");
+    const spacing = read("src/styles/tokens/spacing.css");
+    expect(spacing).toMatch(/--app-footer-gap:\s*20px/);
     expect(css).toMatch(
       /\.modal-overlay:has\(\.modal-container--self-qr-scan\)[\s\S]*--app-footer-gap/s
     );
@@ -30,8 +32,8 @@ describe("PERSONEL QR kamera modal Taşıt monthly-todo parity", () => {
     expect(css).toMatch(
       /\.modal-body--self-qr-scan \.qr-scan-video-wrap[\s\S]*border-radius:\s*0/s
     );
-    expect(css).toMatch(
-      /\.modal-body--self-qr-scan \.personel-mobile-shell\.qr-scan-page[\s\S]*height:\s*calc\(100% \+ 3px\)/s
+    expect(css).not.toMatch(
+      /\.modal-body--self-qr-scan \.personel-mobile-shell\.qr-scan-page[\s\S]*calc\(100% \+ 3px\)/s
     );
     expect(css).toMatch(
       /\.modal-container--self-qr-scan[\s\S]*overflow:\s*hidden/s

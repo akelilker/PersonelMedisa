@@ -1059,13 +1059,6 @@ body.modal-open .modal-container--self-qr-scan .modal-header h2.premium-title {
   overflow: hidden;
 }
 
-.modal-body--self-qr-scan .personel-mobile-shell.qr-scan-page {
-  flex: 1 1 auto;
-  min-height: 0;
-  height: calc(100% + 3px);
-  max-height: calc(100% + 3px);
-}
-
 .modal-body--self-qr-scan .qr-scan-video-wrap {
   border-radius: 0;
   background: #05080c;

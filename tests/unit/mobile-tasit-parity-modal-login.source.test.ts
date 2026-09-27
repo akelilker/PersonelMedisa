@@ -11,9 +11,9 @@ function read(relPath: string): string {
 describe("mobile Taşıt parity modal/login source guards", () => {
   it("keeps one mobile modal↔footer rhythm shared by every role", () => {
     const spacing = read("src/styles/tokens/spacing.css");
-    // Taşıt style-core: mobile gap is the 17px --app-footer-gap. Desktop 641+ narrows
+    // Taşıt style-core: mobile gap is the 20px --app-footer-gap. Desktop 641+ narrows
     // that token to 14px. Do not re-pin a separate mobile 14px on --modal-gap-above-footer.
-    expect(spacing).toMatch(/--app-footer-gap:\s*17px/);
+    expect(spacing).toMatch(/--app-footer-gap:\s*20px/);
     expect(spacing).toMatch(/--modal-gap-above-footer:\s*var\(--app-footer-gap\)/);
     expect(spacing).toMatch(/@media\s*\(min-width:\s*641px\)\s*\{[^}]*--app-footer-gap:\s*14px/s);
     expect(spacing).not.toMatch(

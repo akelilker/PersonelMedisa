@@ -578,15 +578,15 @@ body.login-page .hero .animated-line {
 
   body.app-home-route .hero.hero-with-session .hero-session-meta {
     box-sizing: border-box;
-    /* Name ink is not locked to the logo picture width; grows under the logo
-       toward the title track without reflowing the logo/title grid geometry. */
+    /* Grow toward the title track from the logo column’s left edge only — centering
+       a max-content box let long names bleed past the hero’s left padding. */
     width: max-content;
     max-width: min(clamp(72px, 36vw, 132px), calc(100vw - 152px));
     min-width: 0;
-    align-self: center;
+    align-self: flex-start;
     overflow: hidden;
     transform: translate(0, 4px);
-    padding-inline: 0;
+    padding-inline: 1px;
   }
 
   body.app-home-route .hero.hero-with-session .hero-session-user {

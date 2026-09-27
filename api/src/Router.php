@@ -30,6 +30,7 @@ use Medisa\Api\Controllers\FazlaCalismaOdemeTercihiController;
 use Medisa\Api\Controllers\SerbestZamanController;
 use Medisa\Api\Controllers\MaasHesaplamaController;
 use Medisa\Api\Controllers\MeController;
+use Medisa\Api\Controllers\PersonelSelfProductController;
 use Medisa\Api\Controllers\AttendanceMobileController;
 use Medisa\Api\Controllers\MevzuatParametreController;
 use Medisa\Api\Controllers\QrKioskController;
@@ -118,8 +119,44 @@ class Router
         if ($path === '/me/attendance/today' && $method === 'GET') {
             AttendanceMobileController::today($this->request);
         }
+        if ($path === '/me/attendance/correction-requests' && $method === 'GET') {
+            AttendanceMobileController::listCorrections($this->request);
+        }
         if ($path === '/me/attendance/correction-requests' && $method === 'POST') {
             AttendanceMobileController::createCorrection($this->request);
+        }
+        if ($path === '/me/izinler' && $method === 'GET') {
+            PersonelSelfProductController::izinler($this->request);
+        }
+        if ($path === '/me/izin-talepleri' && $method === 'POST') {
+            SureclerController::createSelfIzin($this->request);
+        }
+        if ($path === '/me/avans-talepleri' && $method === 'GET') {
+            PersonelSelfProductController::avansList($this->request);
+        }
+        if ($path === '/me/avans-talepleri' && $method === 'POST') {
+            PersonelSelfProductController::avansCreate($this->request);
+        }
+        if ($path === '/me/geri-bildirimler' && $method === 'GET') {
+            PersonelSelfProductController::geriBildirimList($this->request);
+        }
+        if ($path === '/me/geri-bildirimler' && $method === 'POST') {
+            PersonelSelfProductController::geriBildirimCreate($this->request);
+        }
+        if ($path === '/me/duyurular' && $method === 'GET') {
+            PersonelSelfProductController::duyurular($this->request);
+        }
+        if ($method === 'POST' && preg_match('#^/me/duyurular/(\d+)/okundu$#', $path, $matches)) {
+            PersonelSelfProductController::duyuruOkundu($this->request, $matches[1]);
+        }
+        if ($path === '/duyurular' && $method === 'POST') {
+            PersonelSelfProductController::duyuruCreate($this->request);
+        }
+        if ($path === '/me/profil-foto' && ($method === 'GET' || $method === 'PUT')) {
+            PersonelSelfProductController::selfProfilFoto($this->request);
+        }
+        if (($method === 'GET' || $method === 'PUT') && preg_match('#^/personeller/(\d+)/profil-foto$#', $path, $matches)) {
+            PersonelSelfProductController::managedProfilFoto($this->request, $matches[1]);
         }
         if ($path === '/me/inbox-notifications' && $method === 'GET') {
             AttendanceMobileController::inbox($this->request);

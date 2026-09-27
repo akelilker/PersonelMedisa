@@ -14,6 +14,13 @@ export const endpoints = {
     qrAraliklari: "/me/qr-araliklari",
     attendanceToday: "/me/attendance/today",
     attendanceCorrectionRequests: "/me/attendance/correction-requests",
+    izinler: "/me/izinler",
+    izinTalepleri: "/me/izin-talepleri",
+    avansTalepleri: "/me/avans-talepleri",
+    geriBildirimler: "/me/geri-bildirimler",
+    duyurular: "/me/duyurular",
+    duyuruOkundu: (id: number | string) => `/me/duyurular/${id}/okundu`,
+    profilFoto: "/me/profil-foto",
     inboxNotifications: "/me/inbox-notifications",
     ackInboxPopup: (id: number | string) => `/me/inbox-notifications/${id}/ack-popup`
   },

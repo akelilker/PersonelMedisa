@@ -38,6 +38,24 @@ class AttendanceMobileController
         }
     }
 
+    public static function listCorrections(Request $request)
+    {
+        $user = AuthMiddleware::authenticate($request, true);
+        RolePermissions::assert($user, 'self_service.attendance.correct');
+        try {
+            $pdo = Connection::get();
+        } catch (\Throwable $e) {
+            JsonResponse::serverError('Veritabani baglantisi kurulamadi.');
+        }
+        try {
+            JsonResponse::success(QrAttendanceCorrectionService::listForSelf($pdo, $user));
+        } catch (QrAttendanceException $e) {
+            JsonResponse::error($e->getHttpStatus(), $e->getErrorCode(), $e->getMessage(), $e->getField());
+        } catch (\Throwable $e) {
+            JsonResponse::serverError('Duzeltme talepleri yuklenemedi.');
+        }
+    }
+
     public static function createCorrection(Request $request)
     {
         $user = AuthMiddleware::authenticate($request, true);

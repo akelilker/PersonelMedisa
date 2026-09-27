@@ -41,8 +41,10 @@ describe("PERSONEL mobile product phase 1 shell", () => {
 
     const history = read("src/features/self-service/pages/PersonelQrHistoryPage.tsx");
     expect(history).toContain("fetchMeQrHareketleri");
-    expect(history).not.toContain("aylık toplam");
-    expect(history).not.toContain("fetchMeFazlaCalisma");
+    expect(history).toContain("fetchMePuantaj");
+    expect(history).toContain("fetchMeFazlaCalisma");
+    expect(history).toContain("buildHistoryMonthSummary");
+    expect(history).toContain("qr-history-event-timeline");
 
     const shortcuts = read("src/features/self-service/components/SelfServiceQrShortcuts.tsx");
     expect(shortcuts).toContain("self-qr-history-link");
@@ -65,14 +67,15 @@ describe("PERSONEL mobile product phase 1 shell", () => {
     const talepler = read("src/features/self-service/pages/PersonelSelfServiceTaleplerPage.tsx");
     expect(talepler).toContain("AttendanceCorrectionRequestModal");
     expect(talepler).toContain("fetchAttendanceToday");
-    expect(talepler).toContain("Yakında");
-    expect(talepler).not.toContain("fetch(");
-    expect(talepler).not.toMatch(/method:\s*"POST"/);
+    expect(talepler).toContain("createSelfIzinTalebi");
+    expect(talepler).toContain("createSelfAvansTalebi");
+    expect(talepler).toContain("createSelfGeriBildirim");
+    expect(talepler).not.toContain("fetchInboxNotifications");
 
     const duyurular = read("src/features/self-service/pages/PersonelSelfServiceDuyurularPage.tsx");
     expect(duyurular).toContain("Henüz duyuru bulunmuyor");
+    expect(duyurular).toContain("fetchSelfDuyurular");
     expect(duyurular).not.toContain("fetchInboxNotifications");
-    expect(duyurular).not.toContain("fetchMe");
 
     const fazla = read("src/features/self-service/pages/PersonelSelfServiceFazlaMesaiPage.tsx");
     expect(fazla).toContain("fetchMeFazlaCalisma");

@@ -316,6 +316,42 @@ async function installPersonelSelfServiceMocks(
     }
     await fulfillOk(route, { items: [] });
   });
+  await page.route("**/api/me/duyurular**", async (route) => {
+    if (route.request().method() !== "GET") {
+      await route.fallback();
+      return;
+    }
+    await fulfillOk(route, { items: [], unread_count: 0 });
+  });
+  await page.route("**/api/me/profil-foto**", async (route) => {
+    await fulfillOk(route, { has_photo: false, mime_type: null, image_base64: null });
+  });
+  await page.route("**/api/me/izinler**", async (route) => {
+    await fulfillOk(route, { personel_id: 173, bakiye: null, aktif: null, gecmis: [] });
+  });
+  await page.route("**/api/me/avans-talepleri**", async (route) => {
+    await fulfillOk(route, { items: [] });
+  });
+  await page.route("**/api/me/geri-bildirimler**", async (route) => {
+    await fulfillOk(route, { items: [] });
+  });
+  await page.route("**/api/me/puantaj**", async (route) => {
+    await fulfillOk(route, {
+      personel_id: 173,
+      from: "2026-09-01",
+      to: "2026-09-30",
+      items: [],
+      ozet: {
+        calisma_gun_adet: 0,
+        gec_kalma_adet: 0,
+        gec_kalma_dakika_toplam: 0,
+        erken_cikis_adet: 0,
+        erken_cikis_dakika_toplam: 0,
+        fazla_calisma_dakika_toplam: 0,
+        net_calisma_dakika_toplam: null
+      }
+    });
+  });
   await page.route("**/api/me/qr-scan**", async (route) => {
     const body = route.request().postDataJSON() as {
       early_exit_confirmed?: boolean;
@@ -567,10 +603,10 @@ test.describe("PERSONEL self-service UX v2 — mobile product", () => {
 
     await page.getByTestId("personel-menu-talepler").click();
     await expect(page.getByTestId("personel-talep-duzeltme-giris")).toBeVisible();
-    await expect(page.getByTestId("personel-talep-izin")).toBeDisabled();
-    await expect(page.getByTestId("personel-talep-avans")).toBeDisabled();
-    await expect(page.getByTestId("personel-talep-oneri")).toBeDisabled();
-    await expect(page.getByTestId("personel-talepler-page")).toContainText("Yakında");
+    await expect(page.getByTestId("personel-talep-izin")).toBeVisible();
+    await expect(page.getByTestId("personel-talep-avans")).toBeVisible();
+    await expect(page.getByTestId("personel-talep-oneri")).toBeVisible();
+    await expect(page.getByTestId("personel-talepler-page")).not.toContainText("Yakında");
     await page.getByRole("button", { name: "Ana sayfaya dön" }).click();
 
     await page.getByTestId("personel-menu-duyurular").click();

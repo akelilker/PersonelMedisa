@@ -9,6 +9,7 @@ import {
 } from "../../../api/attendance-mobile.api";
 import { isApiRequestError, shouldPreferDemoApi } from "../../../api/api-client";
 import { fetchMe, fetchMeYillikIzinBakiye } from "../../../api/me.api";
+import { fetchSelfProfilFoto, selfProfilFotoSrc } from "../../../api/self-product.api";
 import { LoadingState } from "../../../components/states/LoadingState";
 import { useRoleAccess } from "../../../hooks/use-role-access";
 import type { MeIdentity } from "../../../types/self-service";
@@ -61,6 +62,7 @@ export function PersonelSelfServiceHomePage() {
   const [correctDraft, setCorrectDraft] = useState<CorrectDraft | null>(null);
   const [leaveModalOpen, setLeaveModalOpen] = useState(false);
   const [me, setMe] = useState<MeIdentity | null>(null);
+  const [photoSrc, setPhotoSrc] = useState<string | null>(null);
 
   const refreshIzinBakiye = useCallback(() => {
     if (!izinViewEnabled) {
@@ -146,6 +148,7 @@ export function PersonelSelfServiceHomePage() {
   useEffect(() => {
     if (shouldPreferDemoApi()) {
       setMe(null);
+      setPhotoSrc(null);
       return;
     }
     let cancelled = false;
@@ -158,6 +161,17 @@ export function PersonelSelfServiceHomePage() {
       .catch(() => {
         if (!cancelled) {
           setMe(null);
+        }
+      });
+    void fetchSelfProfilFoto()
+      .then((photo) => {
+        if (!cancelled) {
+          setPhotoSrc(selfProfilFotoSrc(photo));
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setPhotoSrc(null);
         }
       });
     return () => {
@@ -247,7 +261,7 @@ export function PersonelSelfServiceHomePage() {
 
   return (
     <section className="personel-mobile-shell self-home-page" data-testid="personel-self-service-page">
-      {identityView ? <PersonelSelfServiceIdentity view={identityView} /> : null}
+      {identityView ? <PersonelSelfServiceIdentity view={identityView} photoSrc={photoSrc} /> : null}
       <div className="self-home-main" data-testid="personel-self-home-main">
         <PersonelSelfServiceHomeInfoBlock
           view={homeInfoView}

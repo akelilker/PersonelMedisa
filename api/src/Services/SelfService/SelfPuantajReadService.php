@@ -104,6 +104,7 @@ class SelfPuantajReadService
         $erkenCikisAdet = 0;
         $erkenCikisToplam = 0;
         $fazlaCalismaToplam = 0;
+        $netCalismaToplam = null;
 
         foreach ($rows as $row) {
             $mapped = self::mapSafeRow($row, $optional);
@@ -132,6 +133,14 @@ class SelfPuantajReadService
             if ($fm !== null && (int) $fm > 0) {
                 $fazlaCalismaToplam += (int) $fm;
             }
+
+            $net = $mapped['net_calisma_suresi_dakika'];
+            if ($net !== null) {
+                if ($netCalismaToplam === null) {
+                    $netCalismaToplam = 0;
+                }
+                $netCalismaToplam += (int) $net;
+            }
         }
 
         return [
@@ -146,6 +155,8 @@ class SelfPuantajReadService
                 'erken_cikis_adet' => $erkenCikisAdet,
                 'erken_cikis_dakika_toplam' => $erkenCikisToplam,
                 'fazla_calisma_dakika_toplam' => $fazlaCalismaToplam,
+                // Null when the column is absent or every row lacks an authoritative net minute.
+                'net_calisma_dakika_toplam' => $netCalismaToplam,
             ],
         ];
     }

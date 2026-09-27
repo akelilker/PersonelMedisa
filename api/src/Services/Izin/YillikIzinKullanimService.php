@@ -376,6 +376,77 @@ class YillikIzinKullanimService
     }
 
     /**
+     * Canonical leave-window day count and return-to-work day.
+     * Uses the same gun tipi classifier as annual-leave usage. Unclassified days stay null.
+     *
+     * @param mixed $personelId
+     * @param mixed $baslangic
+     * @param mixed $bitis
+     * @param mixed $today
+     * @return array{
+     *   gun:int|null,
+     *   takvim_dogrulandi_mi:bool,
+     *   ise_donus_tarihi:string|null,
+     *   bitime_kalan_gun:int|null
+     * }
+     */
+    public static function summarizeWindow(PDO $pdo, $personelId, $baslangic, $bitis, $today)
+    {
+        $bas = self::parseDateKey((string) $baslangic);
+        $bit = self::parseDateKey($bitis !== null && trim((string) $bitis) !== '' ? (string) $bitis : (string) $baslangic);
+        $todayKey = self::parseDateKey((string) $today);
+        if ($bas === null || $bit === null || $bit < $bas) {
+            return [
+                'gun' => null,
+                'takvim_dogrulandi_mi' => false,
+                'ise_donus_tarihi' => null,
+                'bitime_kalan_gun' => null,
+            ];
+        }
+
+        $dates = self::listInclusiveDateKeys($bas, $bit);
+        $puantajMap = self::fetchPuantajGunTipiMap($pdo, (int) $personelId, $dates);
+        $haftaTatiliDays = self::resolveHaftaTatiliWeekdays($pdo, $dates);
+        $classified = self::classifyDates($dates, $puantajMap, $pdo, $haftaTatiliDays);
+
+        $iseDonus = null;
+        $cursor = \DateTimeImmutable::createFromFormat('!Y-m-d', $bit);
+        if ($cursor !== false) {
+            for ($i = 0; $i < 14; $i++) {
+                $cursor = $cursor->modify('+1 day');
+                $key = $cursor->format('Y-m-d');
+                $tip = self::resolveGunTipi($pdo, $key, [], $haftaTatiliDays);
+                if ($tip === null) {
+                    break;
+                }
+                if ($tip !== 'Hafta_Tatili_Pazar' && $tip !== 'UBGT_Resmi_Tatil') {
+                    $iseDonus = $key;
+                    break;
+                }
+            }
+        }
+
+        $kalan = null;
+        if ($todayKey !== null && $classified['takvim_dogrulandi_mi']) {
+            if ($todayKey > $bit) {
+                $kalan = 0;
+            } else {
+                $start = $todayKey < $bas ? $bas : $todayKey;
+                $remainDates = self::listInclusiveDateKeys($start, $bit);
+                $remain = self::classifyDates($remainDates, $puantajMap, $pdo, $haftaTatiliDays);
+                $kalan = $remain['takvim_dogrulandi_mi'] ? $remain['kullanilan_gun'] : null;
+            }
+        }
+
+        return [
+            'gun' => $classified['kullanilan_gun'],
+            'takvim_dogrulandi_mi' => (bool) $classified['takvim_dogrulandi_mi'],
+            'ise_donus_tarihi' => $iseDonus,
+            'bitime_kalan_gun' => $kalan,
+        ];
+    }
+
+    /**
      * @return array{
      *   kullanilan_gun:int|null,
      *   sayilan_normal_gun:int,

@@ -221,7 +221,8 @@ function normalizePuantajOzet(value: unknown): MePuantajOzet {
     gec_kalma_dakika_toplam: readNumber(record.gec_kalma_dakika_toplam) ?? 0,
     erken_cikis_adet: readNumber(record.erken_cikis_adet) ?? 0,
     erken_cikis_dakika_toplam: readNumber(record.erken_cikis_dakika_toplam) ?? 0,
-    fazla_calisma_dakika_toplam: readNumber(record.fazla_calisma_dakika_toplam) ?? 0
+    fazla_calisma_dakika_toplam: readNumber(record.fazla_calisma_dakika_toplam) ?? 0,
+    net_calisma_dakika_toplam: readNullableNumber(record.net_calisma_dakika_toplam)
   };
 }
 

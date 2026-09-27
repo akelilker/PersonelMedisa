@@ -212,6 +212,46 @@ class QrAttendanceCorrectionService
      * @param array<string, mixed> $body
      * @return array<string, mixed>
      */
+    /**
+     * Self list. Scoped to the bound personel only; caller personel_id is ignored.
+     *
+     * @param array<string, mixed> $authUser
+     * @return array{items:array<int, array<string, mixed>>}
+     */
+    public static function listForSelf(PDO $pdo, array $authUser)
+    {
+        self::assertSchemaReady($pdo);
+        $ctx = SelfPersonelContext::resolveForSelfService($authUser, $pdo, true);
+        $stmt = $pdo->prepare(
+            'SELECT id, business_date, event_type, explanation, status, decision_note, requested_local_time
+             FROM qr_attendance_correction_requests
+             WHERE personel_id = :pid
+             ORDER BY business_date DESC, id DESC
+             LIMIT 100'
+        );
+        $stmt->execute(['pid' => (int) $ctx['personel_id']]);
+        $items = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $eventType = (string) ($row['event_type'] ?? '');
+            $items[] = [
+                'id' => (int) $row['id'],
+                'tarih' => (string) $row['business_date'],
+                'talep_turu' => $eventType === 'CIKIS' ? 'CIKIS_DUZELTME' : 'GIRIS_DUZELTME',
+                'event_type' => $eventType,
+                'aciklama' => $row['explanation'] !== null && trim((string) $row['explanation']) !== ''
+                    ? (string) $row['explanation']
+                    : null,
+                'durum' => (string) $row['status'],
+                'sonuc' => $row['decision_note'] !== null && trim((string) $row['decision_note']) !== ''
+                    ? (string) $row['decision_note']
+                    : null,
+                'istenen_saat' => (string) $row['requested_local_time'],
+            ];
+        }
+
+        return ['items' => $items];
+    }
+
     public static function decide(PDO $pdo, array $authUser, $requestId, array $body)
     {
         self::assertSchemaReady($pdo);

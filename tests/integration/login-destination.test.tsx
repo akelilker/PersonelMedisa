@@ -237,10 +237,14 @@ describe("login sonrasi rol ana ekrani", () => {
 
     renderAt("/");
 
-    await screen.findByTestId("personel-self-service-page");
+    await screen.findByTestId("personel-attendance-boxes");
     expect(screen.queryByTestId("personel-self-service-error")).toBeNull();
-    expect(screen.getByTestId("personel-attendance-boxes")).toBeInTheDocument();
-    expect(screen.queryByTestId("personel-leave-row")).toBeNull();
+    await waitFor(() => {
+      expect(fetchMeYillikIzinBakiye).toHaveBeenCalled();
+    });
+    await waitFor(() => {
+      expect(screen.queryByTestId("personel-leave-row")).toBeNull();
+    });
   });
 
   it("bagli mavi yaka BOLUM_YONETICISI login → ana ekran + QR kisayolu erisilebilir", async () => {

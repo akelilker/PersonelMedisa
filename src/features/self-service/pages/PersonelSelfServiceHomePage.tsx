@@ -51,7 +51,6 @@ export function PersonelSelfServiceHomePage() {
   const [loading, setLoading] = useState(true);
   const [today, setToday] = useState<AttendanceTodayResponse | null>(null);
   const [izinBakiye, setIzinBakiye] = useState<YillikIzinBakiye | null>(null);
-  const [izinLoading, setIzinLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<NoticeState>(null);
   const [correctDraft, setCorrectDraft] = useState<CorrectDraft | null>(null);
@@ -60,10 +59,8 @@ export function PersonelSelfServiceHomePage() {
   const refreshIzinBakiye = useCallback(() => {
     if (!izinViewEnabled) {
       setIzinBakiye(null);
-      setIzinLoading(false);
       return;
     }
-    setIzinLoading(true);
     void Promise.resolve()
       .then(() => fetchMeYillikIzinBakiye())
       .then((bakiye) => {
@@ -71,9 +68,6 @@ export function PersonelSelfServiceHomePage() {
       })
       .catch(() => {
         setIzinBakiye(null);
-      })
-      .finally(() => {
-        setIzinLoading(false);
       });
   }, [izinViewEnabled]);
 
@@ -222,11 +216,9 @@ export function PersonelSelfServiceHomePage() {
 
   return (
     <section className="personel-mobile-shell self-home-page" data-testid="personel-self-service-page">
-      {izinViewEnabled && (izinLoading || izinView) ? (
+      {izinViewEnabled && izinView ? (
         <SelfServiceYillikIzinLeaveRow
-          loading={izinLoading}
-          disabled={!izinView}
-          text={izinView?.rowText ?? "İzin bilgisi yüklenemedi"}
+          text={izinView.rowText}
           onOpen={() => setLeaveModalOpen(true)}
         />
       ) : null}

@@ -999,6 +999,8 @@
 }
 
 .pm-notice-surface {
+  position: relative;
+  isolation: isolate;
   width: min(420px, calc(100vw - 32px));
   padding: 16px;
   border: 1.15px solid rgba(255, 255, 255, 0.35);
@@ -1147,6 +1149,8 @@ body.modal-open .modal-container--self-qr-scan .modal-header h2.premium-title {
   margin-inline: 2px;
   border-radius: 0;
   background: #05080c;
+  position: relative;
+  z-index: 1;
 }
 
 /*

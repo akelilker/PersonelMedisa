@@ -48,22 +48,29 @@
   background: var(--modal-bg);
   background-clip: padding-box;
   box-shadow: none;
+  /* Local stack: watermark stays above this fill and under in-flow content. */
+  isolation: isolate;
 }
 
-/* Modal container: Taşıt parity brand marker (semi-transparent M, bottom-right). */
-.modal-container::after {
+/*
+ * Taşıt frame watermark (36px, 8px inset, opacity 0.2).
+ * z-index -1 keeps it under text, buttons, and the QR camera.
+ * isolation on the host keeps that negative layer above the frame fill.
+ */
+.modal-container::after,
+.pm-notice-surface::after {
   content: "";
   position: absolute;
   bottom: 8px;
   right: 8px;
-  width: 44px;
-  height: 44px;
+  width: 36px;
+  height: 36px;
   background-image: url("../../assets/brand/marker.png");
   background-size: contain;
   background-repeat: no-repeat;
   background-position: center;
   opacity: 0.2;
-  z-index: 0;
+  z-index: -1;
   pointer-events: none;
 }
 
@@ -154,7 +161,8 @@
   flex-shrink: 0;
   padding: var(--space-3) var(--space-4);
   border-top: 1px solid var(--border-default);
-  background: var(--modal-bg);
+  /* Same fill as the container; opaque background was covering the corner watermark. */
+  background: transparent;
 }
 
 /* Flow: actions live inside .modal-body and scroll with content (no chrome separator). */

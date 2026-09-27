@@ -269,11 +269,7 @@ export function AppShell() {
   }, [isHomeRoute, isLoginRoute]);
 
   useEffect(() => {
-    if (!isAuthSurfaceRoute) {
-      return;
-    }
-
-    const resetAuthViewportScroll = () => {
+    const resetShellViewportScroll = () => {
       window.scrollTo(0, 0);
       document.documentElement.scrollTop = 0;
       document.body.scrollTop = 0;
@@ -289,21 +285,21 @@ export function AppShell() {
         return;
       }
       if (viewport.height >= window.innerHeight - 4) {
-        resetAuthViewportScroll();
+        resetShellViewportScroll();
       }
     };
 
-    resetAuthViewportScroll();
+    resetShellViewportScroll();
     viewport?.addEventListener("resize", onViewportChange);
     viewport?.addEventListener("scroll", onViewportChange);
-    document.addEventListener("focusout", resetAuthViewportScroll, true);
+    document.addEventListener("focusout", resetShellViewportScroll, true);
 
     return () => {
       viewport?.removeEventListener("resize", onViewportChange);
       viewport?.removeEventListener("scroll", onViewportChange);
-      document.removeEventListener("focusout", resetAuthViewportScroll, true);
+      document.removeEventListener("focusout", resetShellViewportScroll, true);
     };
-  }, [isAuthSurfaceRoute]);
+  }, [pathname]);
 
   const outletContext = useMemo<AppShellOutletContext>(
     () => ({

@@ -13,7 +13,8 @@ const RAPOR_ENDPOINTS: Record<RaporTipi, string> = {
   ceza: endpoints.raporlar.ceza,
   "ekstra-prim": endpoints.raporlar.ekstraPrim,
   "is-kazasi": endpoints.raporlar.isKazasi,
-  bildirim: endpoints.raporlar.bildirim
+  bildirim: endpoints.raporlar.bildirim,
+  puantaj: endpoints.raporlar.puantaj
 };
 
 function toRecord(value: unknown): Record<string, unknown> | null {
@@ -120,4 +121,50 @@ export async function fetchRapor(
       effective_sube_id: toNumber(metaRecord?.effective_sube_id)
     }
   };
+}
+
+export async function downloadPuantajRaporXlsx(filters?: RaporFiltreleri): Promise<void> {
+  const { ApiRequestError, buildApiUrl } = await import("./api-client");
+  const { getAuthTokenForApi } = await import("../auth/auth-token-provider");
+  const { getActiveSubeIdForApiHeader } = await import("../auth/auth-manager");
+  const { puantajRaporuXlsxFilename } = await import("../features/raporlar/puantaj-raporu-filename");
+
+  const path = appendQueryParams(endpoints.raporlar.puantajXlsx, {
+    personel_id: filters?.personel_id,
+    departman_id: filters?.departman_id,
+    sube_id: filters?.sube_id,
+    baslangic_tarihi: filters?.baslangic_tarihi,
+    bitis_tarihi: filters?.bitis_tarihi,
+    aktiflik: filters?.aktiflik,
+    muhur_id: filters?.muhur_id,
+    donem: filters?.donem
+  });
+  const headers = new Headers();
+  const token = getAuthTokenForApi();
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+  const activeSube = getActiveSubeIdForApiHeader();
+  if (activeSube) {
+    headers.set("X-Active-Sube-Id", activeSube);
+  }
+
+  const response = await fetch(buildApiUrl(path), { headers });
+  if (!response.ok) {
+    throw new ApiRequestError("Puantaj raporu Excel dosyası indirilemedi.", response.status, {
+      code: "EXPORT_FAILED"
+    });
+  }
+  const blob = await response.blob();
+  const disposition = response.headers.get("Content-Disposition") ?? "";
+  const filenameMatch = /filename="([^"]+)"/.exec(disposition);
+  const filename =
+    filenameMatch?.[1] ??
+    puantajRaporuXlsxFilename(filters?.baslangic_tarihi, filters?.bitis_tarihi);
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
 }

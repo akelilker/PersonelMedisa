@@ -4,6 +4,8 @@ import type {
   HaftalikKapanisSnapshotSatir,
   HaftalikKapanisSonuc,
   HaftalikKapanisState,
+  YillikFazlaCalismaKapsam,
+  YillikFazlaCalismaKapsamSatiri,
   YillikFazlaCalismaOzeti
 } from "../types/haftalik-kapanis";
 import {
@@ -418,4 +420,45 @@ export async function fetchYillikFazlaCalismaOzeti(
     personelId: personel_id,
     yil: yilNum
   });
+}
+
+export async function fetchYillikFazlaCalismaKapsami(
+  yil: number | string
+): Promise<YillikFazlaCalismaKapsam> {
+  const yilNum = parsePositiveIntParam(yil, "yil");
+  const response = await apiRequest<ApiResponse<unknown>>(
+    endpoints.haftalikKapanis.yillikFazlaCalismaKapsam(yilNum)
+  );
+
+  if (Array.isArray(response.errors) && response.errors.length > 0) {
+    const first = response.errors[0];
+    throw new ApiRequestError(
+      typeof first?.message === "string" ? first.message : "Yillik fazla calisma kapsami alinamadi.",
+      400,
+      { code: typeof first?.code === "string" ? first.code : "INVALID_QUERY" }
+    );
+  }
+
+  const record = toRecord(response.data) ?? {};
+  const rawRows = Array.isArray(record.personeller) ? record.personeller : [];
+  const personeller: YillikFazlaCalismaKapsamSatiri[] = rawRows.map((item) => {
+    const row = toRecord(item) ?? {};
+    const personelId = toOptionalNumber(row.personel_id) ?? 0;
+    const ozet = normalizeYillikFazlaCalismaOzeti(item, {
+      personelId: personelId > 0 ? personelId : 1,
+      yil: yilNum
+    });
+    const adSoyad = typeof row.ad_soyad === "string" ? row.ad_soyad.trim() : "";
+    return {
+      ...ozet,
+      personel_id: personelId > 0 ? personelId : ozet.personel_id,
+      ad_soyad: adSoyad
+    };
+  });
+
+  return {
+    yil: toOptionalNumber(record.yil) ?? yilNum,
+    personeller,
+    kapsam_kesildi_mi: record.kapsam_kesildi_mi === true
+  };
 }

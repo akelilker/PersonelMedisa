@@ -153,7 +153,9 @@ export const endpoints = {
     close: "/haftalik-kapanis",
     detail: (id: number | string) => `/haftalik-kapanis/${id}`,
     yillikFazlaCalisma: (personelId: number | string, yil: number | string) =>
-      `/haftalik-kapanis/yillik-fazla-calisma?personel_id=${personelId}&yil=${yil}`
+      `/haftalik-kapanis/yillik-fazla-calisma?personel_id=${personelId}&yil=${yil}`,
+    yillikFazlaCalismaKapsam: (yil: number | string) =>
+      `/haftalik-kapanis/yillik-fazla-calisma-kapsam?yil=${yil}`
   },
   revizyonTalepleri: {
     list: "/haftalik-kapanis/revizyon-talepleri",
@@ -192,7 +194,9 @@ export const endpoints = {
     ceza: "/raporlar/ceza",
     ekstraPrim: "/raporlar/ekstra-prim",
     isKazasi: "/raporlar/is-kazasi",
-    bildirim: "/raporlar/bildirim"
+    bildirim: "/raporlar/bildirim",
+    puantaj: "/raporlar/puantaj",
+    puantajXlsx: "/raporlar/puantaj/export.xlsx"
   },
   maasHesaplama: {
     preflight: "/maas-hesaplama/preflight",

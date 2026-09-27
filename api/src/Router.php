@@ -878,6 +878,9 @@ class Router
         if ($path === '/haftalik-kapanis/yillik-fazla-calisma' && $method === 'GET') {
             HaftalikKapanisController::yillikFazlaCalisma($this->request);
         }
+        if ($path === '/haftalik-kapanis/yillik-fazla-calisma-kapsam' && $method === 'GET') {
+            HaftalikKapanisController::yillikFazlaCalismaKapsam($this->request);
+        }
         if ($path === '/haftalik-kapanis' && $method === 'POST') {
             HaftalikKapanisController::create($this->request);
         }
@@ -1036,6 +1039,10 @@ class Router
         }
         if ($method === 'POST' && preg_match('#^/ek-odeme-kesinti/(\d+)/iptal$#', $path, $matches)) {
             EkOdemeKesintiController::cancel($this->request, $matches[1]);
+        }
+
+        if ($path === '/raporlar/puantaj/export.xlsx' && $method === 'GET') {
+            RaporlarController::exportPuantajXlsx($this->request);
         }
 
         if ($method === 'GET' && preg_match('#^/raporlar/([^/]+)$#', $path, $matches)) {

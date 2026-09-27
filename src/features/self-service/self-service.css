@@ -943,6 +943,19 @@
   color: #fde68a;
 }
 
+.pm-callout--critical {
+  border-color: rgba(248, 113, 113, 0.7);
+  color: #fecaca;
+}
+
+.pm-fazla-mesai-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
 /* Birim Amiri operational home footer band (PERSONEL home uses the shared AppFooter). */
 .pm-footer {
   display: grid;

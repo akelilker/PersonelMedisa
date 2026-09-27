@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { Link, Navigate, useSearchParams } from "react-router-dom";
 import { fetchDepartmanOptions } from "../../../api/referans.api";
-import { fetchRapor } from "../../../api/raporlar.api";
+import { downloadPuantajRaporXlsx, fetchRapor } from "../../../api/raporlar.api";
+import { shouldPreferDemoApi } from "../../../api/api-client";
 import {
   bolumOnayiVer,
   fetchAylikKapanisOzeti,
@@ -20,6 +21,8 @@ import {
   isRaporLiveKaynak
 } from "../../../lib/display/rapor-kaynak-labels";
 import { downloadReportCsv } from "../../../reports/export-report";
+import { buildStoredXlsx, downloadXlsxBytes } from "../../../reports/stored-xlsx";
+import { puantajRaporuXlsxFilename } from "../puantaj-raporu-filename";
 import type { IdOption } from "../../../types/referans";
 import type {
   RaporAktiflik,
@@ -88,6 +91,18 @@ function createInitialQueryExtraFilters(searchParams: URLSearchParams): RaporQue
   return parseRaporlarQueryPrefill(searchParams).extraFilters;
 }
 
+function puantajAyValue(baslangic: string, bitis: string): string {
+  const match = /^(\d{4}-\d{2})-01$/.exec(baslangic);
+  if (!match) {
+    return "";
+  }
+  const range = donemToAyTarihAraligi(match[1]);
+  if (!range || range.baslangic !== baslangic || range.bitis !== bitis) {
+    return "";
+  }
+  return match[1];
+}
+
 const RAPOR_OPTIONS: Array<{ value: RaporTipi; label: string }> = [
   { value: "personel-ozet", label: "Personel Özeti" },
   { value: "izin", label: "İzin" },
@@ -96,7 +111,8 @@ const RAPOR_OPTIONS: Array<{ value: RaporTipi; label: string }> = [
   { value: "ceza", label: "Ceza" },
   { value: "ekstra-prim", label: "Ekstra Prim" },
   { value: "is-kazasi", label: "İş Kazası" },
-  { value: "bildirim", label: "Günlük Kayıt" }
+  { value: "bildirim", label: "Günlük Kayıt" },
+  { value: "puantaj", label: "Puantaj Raporu" }
 ];
 
 function parseOptionalPositiveInt(value: string): number | undefined {
@@ -377,7 +393,7 @@ function AylikKapanisOzetiSection() {
     >
       <div className="yonetim-header-row raporlar-aylik-head">
         <h2>Aylık Kapanış Özeti</h2>
-        <p className="raporlar-aylik-lead">Ay sonu puantaj ve onay durumunu görüntüleyin; gerekirse Excel ile aktarın.</p>
+        <p className="raporlar-aylik-lead">Ay sonu puantaj ve onay durumunu görüntüleyin; gerekirse Excel/CSV ile aktarın.</p>
       </div>
 
       <form className="form-filter-panel raporlar-aylik-filters" onSubmit={handleAylikFilterSubmit}>
@@ -441,7 +457,7 @@ function AylikKapanisOzetiSection() {
               downloadReportCsv(`aylik-kapanis-ozeti-${filters.ay}.csv`, Object.keys(exportRows[0]), exportRows);
             }}
           >
-            Excel&apos;e Aktar
+            Excel/CSV İndir
           </button>
           {aylikRaporlarLink ? (
             <Link to={aylikRaporlarLink} data-testid="aylik-ozet-raporlarda-goruntule">
@@ -621,6 +637,26 @@ export function RaporlarPage() {
   const [reportMeta, setReportMeta] = useState<RaporReportMeta | null>(null);
 
   const columns = useMemo(() => getRaporColumns(form.raporTipi), [form.raporTipi]);
+  const puantajPrintCaption = useMemo(() => {
+    const ay = puantajAyValue(form.baslangicTarihi, form.bitisTarihi);
+    const range = ay
+      ? `Ay: ${ay}`
+      : form.baslangicTarihi && form.bitisTarihi
+        ? `Tarih: ${form.baslangicTarihi} – ${form.bitisTarihi}`
+        : form.baslangicTarihi
+          ? `Tarih: ${form.baslangicTarihi}`
+          : "Tarih: tüm kayıtlar";
+    const sayfa = totalPages ? `Sayfa ${page} / ${totalPages}` : `Sayfa ${page}`;
+    return `${range} · ${sayfa}`;
+  }, [form.baslangicTarihi, form.bitisTarihi, page, totalPages]);
+
+  useEffect(() => {
+    const clearPrintMode = () => {
+      document.body.classList.remove("puantaj-raporu-print");
+    };
+    window.addEventListener("afterprint", clearPrintMode);
+    return () => window.removeEventListener("afterprint", clearPrintMode);
+  }, []);
 
   function buildRaporFilters(
     nextPage: number,
@@ -704,6 +740,64 @@ export function RaporlarPage() {
       void loadRapor(1, { form: nextForm, extraFilters: nextExtraFilters });
     }
   }, [searchQueryKey, activeSurface]);
+
+  async function exportPuantajCsv() {
+    try {
+      const result = await fetchRapor("puantaj", {
+        ...buildRaporFilters(1, form, queryExtraFilters),
+        limit: 100
+      });
+      const exportColumns = getRaporColumns("puantaj");
+      const headers = exportColumns.map((column) => column.label);
+      const exportRows = result.rows.map((row) => {
+        const record: Record<string, unknown> = {};
+        for (const column of exportColumns) {
+          record[column.label] = row[column.key] ?? "";
+        }
+        return record;
+      });
+      const stamp =
+        form.baslangicTarihi && form.bitisTarihi
+          ? `${form.baslangicTarihi}_${form.bitisTarihi}`
+          : "tum";
+      downloadReportCsv(`puantaj-raporu-${stamp}.csv`, headers, exportRows);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Puantaj raporu dışa aktarılamadı.");
+    }
+  }
+
+  async function exportPuantajXlsx() {
+    try {
+      const filters = {
+        ...buildRaporFilters(1, form, queryExtraFilters),
+        limit: 100
+      };
+      if (shouldPreferDemoApi()) {
+        const result = await fetchRapor("puantaj", filters);
+        const exportColumns = getRaporColumns("puantaj");
+        const headers = exportColumns.map((column) => column.label);
+        const sheetRows = result.rows.map((row) =>
+          exportColumns.map((column) => {
+            const value = row[column.key];
+            return value === null || value === undefined ? "" : String(value);
+          })
+        );
+        downloadXlsxBytes(
+          puantajRaporuXlsxFilename(form.baslangicTarihi, form.bitisTarihi),
+          buildStoredXlsx("Puantaj Raporu", headers, sheetRows)
+        );
+        return;
+      }
+      await downloadPuantajRaporXlsx(filters);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Puantaj raporu Excel dosyası indirilemedi.");
+    }
+  }
+
+  function printPuantajRapor() {
+    document.body.classList.add("puantaj-raporu-print");
+    window.print();
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -799,6 +893,25 @@ export function RaporlarPage() {
             value={form.bitisTarihi}
             onChange={(value) => setForm((prev) => ({ ...prev, bitisTarihi: value }))}
           />
+          {form.raporTipi === "puantaj" ? (
+            <FormField
+              label="Ay"
+              name="rapor-ay"
+              type="month"
+              value={puantajAyValue(form.baslangicTarihi, form.bitisTarihi)}
+              onChange={(value) => {
+                const range = donemToAyTarihAraligi(value);
+                if (!range) {
+                  return;
+                }
+                setForm((prev) => ({
+                  ...prev,
+                  baslangicTarihi: range.baslangic,
+                  bitisTarihi: range.bitis
+                }));
+              }}
+            />
+          ) : null}
           <FormField
             as="select"
             label="Aktiflik"
@@ -827,6 +940,13 @@ export function RaporlarPage() {
             Temizle
           </button>
         </div>
+        {form.raporTipi === "puantaj" ? (
+          <p className="raporlar-panel-hint" data-testid="puantaj-raporu-hint">
+            Günlük puantaj satırları yetki kapsamınızla sınırlıdır. Giriş, çıkış, net çalışma, geç
+            kalma, erken çıkış ve izin/devamsızlık dayanağı kayıttaki değerlerdir. Fazla mesai bu
+            satırda tutulmaz.
+          </p>
+        ) : null}
       </form>
 
       {isLoading ? <LoadingState label="Rapor hazırlanıyor..." /> : null}
@@ -842,8 +962,47 @@ export function RaporlarPage() {
           <div className="raporlar-result-heading">
             <h3>Sonuçlar</h3>
             <span>Detay satırından Personel Kartı’na geçebilirsiniz.</span>
+            {form.raporTipi === "puantaj" ? (
+              <div className="puantaj-raporu-export-actions">
+                <button
+                  type="button"
+                  className="universal-btn-aux"
+                  data-testid="puantaj-raporu-excel"
+                  onClick={() => {
+                    void exportPuantajXlsx();
+                  }}
+                >
+                  Excel
+                </button>
+                <button
+                  type="button"
+                  className="universal-btn-aux"
+                  data-testid="puantaj-raporu-csv"
+                  onClick={() => {
+                    void exportPuantajCsv();
+                  }}
+                >
+                  CSV
+                </button>
+                <button
+                  type="button"
+                  className="universal-btn-aux"
+                  data-testid="puantaj-raporu-yazdir"
+                  onClick={printPuantajRapor}
+                >
+                  Yazdır / PDF
+                </button>
+              </div>
+            ) : null}
           </div>
           <RaporKaynakMetaBand reportMeta={reportMeta} kayitSayisi={total ?? rows.length} />
+          <div className={form.raporTipi === "puantaj" ? "puantaj-raporu-print-sheet" : undefined} data-testid={form.raporTipi === "puantaj" ? "puantaj-raporu-print-sheet" : undefined}>
+            {form.raporTipi === "puantaj" ? (
+              <div className="puantaj-raporu-print-head">
+                <h3>Puantaj Raporu</h3>
+                <p data-testid="puantaj-raporu-print-filtre">{puantajPrintCaption}</p>
+              </div>
+            ) : null}
           <div className="raporlar-table-wrap raporlar-table-wrap--premium">
             <table className="raporlar-table raporlar-table--premium">
               <thead>
@@ -863,6 +1022,7 @@ export function RaporlarPage() {
                 ))}
               </tbody>
             </table>
+          </div>
           </div>
           <div className="module-pagination">
             <button

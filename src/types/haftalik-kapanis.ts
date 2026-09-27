@@ -65,3 +65,13 @@ export type YillikFazlaCalismaOzeti = {
   atlanan_duplicate_hafta_sayisi: number;
   atlanan_eksik_hafta_sayisi: number;
 };
+
+export type YillikFazlaCalismaKapsamSatiri = YillikFazlaCalismaOzeti & {
+  ad_soyad: string;
+};
+
+export type YillikFazlaCalismaKapsam = {
+  yil: number;
+  personeller: YillikFazlaCalismaKapsamSatiri[];
+  kapsam_kesildi_mi: boolean;
+};

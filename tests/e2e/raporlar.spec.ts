@@ -625,7 +625,7 @@ test.describe("raporlar detayli liste smoke", () => {
     await expect(aylikSection.locator("h2")).toContainText("Aylık Kapanış Özeti");
     await expect(aylikSection.locator(".raporlar-table tbody tr")).toHaveCount(2);
 
-    const exportButton = aylikSection.getByRole("button", { name: "Excel'e Aktar" });
+    const exportButton = aylikSection.getByRole("button", { name: "Excel/CSV İndir" });
     await expect(exportButton).toBeVisible();
 
     const downloadPromise = page.waitForEvent("download");
@@ -694,7 +694,7 @@ test.describe("raporlar rol ve aylik filtre smoke", () => {
 
     const tableBody = aylikSection.locator(".raporlar-table tbody");
     const subeSelect = aylikSection.locator('[name="aylik-ozet-sube"]');
-    const exportButton = aylikSection.getByRole("button", { name: "Excel'e Aktar" });
+    const exportButton = aylikSection.getByRole("button", { name: "Excel/CSV İndir" });
 
     async function exportCsvContent() {
       const downloadPromise = page.waitForEvent("download");
@@ -775,7 +775,7 @@ test.describe("raporlar rol ve aylik filtre smoke", () => {
     await expect(tableBody.locator("tr")).toHaveCount(1);
     await expect(tableBody).toContainText("Ayşe Yılmaz");
     await expect(tableBody).not.toContainText("Mehmet Kaya");
-    await expect(aylikSection.getByRole("button", { name: "Excel'e Aktar" })).toBeVisible();
+    await expect(aylikSection.getByRole("button", { name: "Excel/CSV İndir" })).toBeVisible();
     expect(runtimeErrors).toEqual([]);
   });
 
@@ -806,7 +806,7 @@ test.describe("raporlar rol ve aylik filtre smoke", () => {
     await expect(tableBody.locator("tr")).toHaveCount(1);
     await expect(tableBody).toContainText("Mehmet Kaya");
     await expect(tableBody).not.toContainText("Ayşe Yılmaz");
-    await expect(aylikSection.getByRole("button", { name: "Excel'e Aktar" })).toBeVisible();
+    await expect(aylikSection.getByRole("button", { name: "Excel/CSV İndir" })).toBeVisible();
     expect(runtimeErrors).toEqual([]);
   });
 

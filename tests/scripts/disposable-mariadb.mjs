@@ -29,6 +29,7 @@ function candidateMysqldPaths() {
   const fromEnv = process.env.MEDISA_TEST_MYSQLD_PATH;
   const candidates = [
     fromEnv,
+    "C:\\Program Files\\MariaDB 13.0\\bin\\mysqld.exe",
     "C:\\Program Files\\MariaDB 12.3\\bin\\mysqld.exe",
     "C:\\Program Files\\MariaDB 11.4\\bin\\mysqld.exe",
     "C:\\Program Files\\MariaDB 10.11\\bin\\mysqld.exe",
@@ -398,11 +399,11 @@ export async function stopDisposableMariaDb() {
   rmSync(managedPidFile, { force: true });
 }
 
-export function runPhpMysqlRunner(runnerPath) {
+export function runPhpMysqlRunner(runnerPath, extraArgs = []) {
   const releaseExecutionLock = acquireExecutionLock(runnerPath);
   try {
     const timeout = Number.parseInt(process.env.MEDISA_TEST_PHP_RUNNER_TIMEOUT_MS ?? "", 10) || DEFAULT_PHP_RUNNER_TIMEOUT_MS;
-    const result = spawnSync("php", [...phpMysqlBootstrapArgs(), runnerPath], {
+    const result = spawnSync("php", [...phpMysqlBootstrapArgs(), runnerPath, ...extraArgs], {
       encoding: "utf8",
       cwd: repoRoot,
       env: process.env,

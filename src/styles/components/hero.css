@@ -490,21 +490,20 @@ body.login-page .hero .animated-line {
  */
 @media (max-width: 640px) {
   body.app-home-route .hero.hero-with-session {
-    display: flex;
-    flex-wrap: nowrap;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) 1px;
+    grid-template-rows: auto auto;
     align-items: center;
-    grid-template-columns: unset;
-    grid-template-rows: unset;
     column-gap: 0;
-    row-gap: 0;
+    row-gap: 3px;
     overflow: visible;
     margin-bottom: 4px;
-    min-height: 71px;
+    min-height: 79px;
     width: calc(100% - 4px);
     max-width: calc(100% - 4px);
     margin-left: auto;
     margin-right: auto;
-    padding: 12px 12px 12px 6px;
+    padding: 13px 12px 11px 6px;
     box-sizing: border-box;
     border-color: rgba(140, 158, 176, 0.6);
     box-shadow:
@@ -518,31 +517,31 @@ body.login-page .hero .animated-line {
     display: flex;
     flex-direction: column;
     align-items: center;
-    /* Logo picture stays ~43px; session meta shares this flex column width.
-       The column may grow to 112px, but must give width back on narrow phones:
-       PERSONEL title + session name must both fit without clipping. */
+    /* Logo picture ~50px; session meta shares this column (up to 112px). */
+    grid-column: 1;
+    grid-row: 1 / -1;
     flex: 0 1 auto;
     width: auto;
-    min-width: 43px;
-    max-width: clamp(62px, 18vw, 112px);
+    min-width: 50px;
+    max-width: clamp(68px, 19vw, 112px);
     margin-right: 6px;
     margin-left: 0;
     padding-left: 2px;
     gap: 4px;
     align-self: center;
-    transform: translate(0, 1px);
+    transform: translate(0, 0);
     overflow: visible;
     box-sizing: border-box;
   }
 
   body.app-home-route .hero.hero-with-session .hero-logo picture {
-    width: 43px;
-    max-width: 43px;
-    transform: translate(1px, 3px);
+    width: 50px;
+    max-width: 50px;
+    transform: translate(1px, 1px);
   }
 
   body.app-home-route .hero.hero-with-session .hero-logo img {
-    height: 35px;
+    height: 41px;
     width: auto;
     transform: translateY(0);
   }
@@ -559,8 +558,8 @@ body.login-page .hero .animated-line {
   }
 
   body.app-home-route .hero.hero-with-session .hero-session-user {
-    font-size: 9.5px;
-    line-height: 1.12;
+    font-size: 10.5px;
+    line-height: 1.14;
     letter-spacing: 0;
     max-width: 100%;
     /* Narrow session column on phones: allow three wrapped lines for long names
@@ -583,10 +582,9 @@ body.login-page .hero .animated-line {
   }
 
   body.app-home-route section.hero.hero-with-session > h1 {
-    flex: 1 1 0;
+    grid-column: 2;
+    grid-row: 1;
     min-width: 0;
-    grid-column: unset;
-    grid-row: unset;
     align-self: center;
     /* Longer “PERSONEL …” ink: Taşıt geometry with tighter tracking — no ellipsis.
        Sized against the narrowest session column on the clamp's own width ramp,
@@ -605,25 +603,24 @@ body.login-page .hero .animated-line {
   }
 
   body.app-home-route .hero.hero-with-session .hero-spacer {
-    flex: 0 0 1px;
+    grid-column: 3;
+    grid-row: 1 / -1;
     width: 1px;
     min-width: 1px;
-    grid-column: unset;
-    grid-row: unset;
   }
 
   body.app-home-route .hero.hero-with-session .animated-line {
-    position: absolute;
-    bottom: 19px;
-    left: 50%;
+    grid-column: 2;
+    grid-row: 2;
+    position: static;
+    left: auto;
     right: auto;
     top: auto;
-    transform: translateX(-50%);
-    grid-column: unset;
-    grid-row: unset;
-    justify-self: unset;
-    align-self: unset;
-    width: 88%;
+    bottom: auto;
+    transform: none;
+    justify-self: center;
+    align-self: start;
+    width: 78%;
     height: 2.7px;
     opacity: 0.72;
     background: linear-gradient(

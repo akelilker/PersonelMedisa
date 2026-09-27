@@ -27,7 +27,7 @@ describe("app-home hero session name under logo", () => {
     // Width-scaled cap: never wider than 112px, but gives width back on narrow
     // phones so the full PERSONEL title keeps its track next to a long name.
     expect(block).toMatch(
-      /body\.app-home-route \.hero\.hero-with-session \.hero-logo\s*\{[^}]*max-width:\s*clamp\(62px,\s*18vw,\s*112px\)/s
+      /body\.app-home-route \.hero\.hero-with-session \.hero-logo\s*\{[^}]*max-width:\s*clamp\(68px,\s*19vw,\s*112px\)/s
     );
     expect(block).not.toMatch(
       /body\.app-home-route \.hero\.hero-with-session \.hero-logo\s*\{[^}]*flex:\s*0\s+0\s+43px/s
@@ -58,12 +58,39 @@ describe("app-home hero session name under logo", () => {
     );
   });
 
-  it("keeps the PERSONEL title on a shrinkable flex track", () => {
+  it("keeps the PERSONEL title in the center grid track with room to shrink", () => {
     const hero = read("src/styles/components/hero.css");
     const block = appHomeHeroBlock(hero);
 
     expect(block).toMatch(
-      /body\.app-home-route section\.hero\.hero-with-session > h1\s*\{[^}]*flex:\s*1\s+1\s+0/s
+      /body\.app-home-route section\.hero\.hero-with-session > h1\s*\{[^}]*grid-column:\s*2/s
+    );
+    expect(block).toMatch(
+      /body\.app-home-route section\.hero\.hero-with-session > h1\s*\{[^}]*min-width:\s*0/s
+    );
+    expect(block).toMatch(
+      /body\.app-home-route \.hero\.hero-with-session \.animated-line\s*\{[^}]*grid-column:\s*2/s
+    );
+    expect(block).toMatch(
+      /body\.app-home-route \.hero\.hero-with-session \.animated-line\s*\{[^}]*justify-self:\s*center/s
+    );
+  });
+
+  it("uses taller home hero band and larger logo ink on mobile", () => {
+    const hero = read("src/styles/components/hero.css");
+    const block = appHomeHeroBlock(hero);
+
+    expect(block).toMatch(
+      /body\.app-home-route \.hero\.hero-with-session\s*\{[^}]*min-height:\s*79px/s
+    );
+    expect(block).toMatch(
+      /body\.app-home-route \.hero\.hero-with-session \.hero-logo picture\s*\{[^}]*width:\s*50px/s
+    );
+    expect(block).toMatch(
+      /body\.app-home-route \.hero\.hero-with-session \.hero-logo img\s*\{[^}]*height:\s*41px/s
+    );
+    expect(block).toMatch(
+      /body\.app-home-route \.hero\.hero-with-session \.hero-session-user\s*\{[^}]*font-size:\s*10\.5px/s
     );
   });
 });

@@ -17,6 +17,10 @@ function present(value: string | null | undefined): string | null {
  */
 export function buildPersonelSelfIdentityView(me: MeIdentity): PersonelSelfIdentityView | null {
   const personel = me.personel;
+  if (!personel) {
+    const fallback = present(me.ad_soyad);
+    return fallback ? { adSoyad: fallback, organization: [] } : null;
+  }
   const adSoyad =
     present(personel.ad_soyad) ??
     present(`${personel.ad} ${personel.soyad}`) ??

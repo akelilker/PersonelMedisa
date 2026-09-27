@@ -45,6 +45,7 @@ export const heavyMariaDbTestFiles = [
   "tests/unit/personel-ucret-mysql.php-runtime.test.ts",
   "tests/unit/personel-unified-search-mysql.php-runtime.test.ts",
   "tests/unit/puantaj-donem-kilidi-mysql.php-runtime.test.ts",
+  "tests/unit/puantaj-raporu-xlsx-mysql.php-runtime.test.ts",
   "tests/unit/referans-departman-create-mysql.php-runtime.test.ts",
   "tests/unit/retention-physical-destruction-mysql.php-runtime.test.ts",
   "tests/unit/retention-physical-pack3b-mysql.php-runtime.test.ts",
@@ -82,5 +83,6 @@ export const heavyMariaDbTestFiles = [
   "tests/unit/test-fixture-personel-archive-mysql.php-runtime.test.ts",
   "tests/unit/test-fixture-personel-purge-mysql.php-runtime.test.ts",
   "tests/unit/user-access-change-audit.php-runtime.test.ts",
+  "tests/unit/yillik-fazla-calisma-kapsam-mysql.php-runtime.test.ts",
   "tests/unit/zimmetler-create-list-mysql.php-runtime.test.ts"
 ];

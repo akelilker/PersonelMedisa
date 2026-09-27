@@ -61,13 +61,6 @@
   z-index: 0;
 }
 
-/* Canonical home-route body marker (legacy dashboard-page / home-page retired). */
-body.app-home-route {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-lg, 16px);
-}
-
 body.app-home-route .app-shell::before {
   box-shadow: none;
   /* Side rails: default bottom inset (footer top). Full-height pseudo caused red stubs on footer glow. */
@@ -210,6 +203,13 @@ body.modal-open .app-shell::before {
 }
 
 @media (min-width: 641px) {
+  #root > .app-shell {
+    flex: 1 1 auto;
+    min-height: 0;
+    height: auto;
+    max-height: 100%;
+  }
+
   .menu-container {
     gap: 13px;
   }

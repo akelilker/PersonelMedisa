@@ -15,7 +15,7 @@ describe("modal header + frame Taşıt parity (chrome only)", () => {
     expect(colors).toContain("--modal-outline:");
     expect(colors).toContain("--modal-desktop-ring:");
     expect(colors).toContain("--modal-chrome-glow:");
-    expect(colors).toContain("--modal-inset-chrome-lift:");
+    expect(colors).toContain("--modal-outline:");
   });
 
   it("routes premium modal titles through canonical premium-title gradient", () => {
@@ -28,8 +28,9 @@ describe("modal header + frame Taşıt parity (chrome only)", () => {
     const modal = read("src/styles/components/modal.css");
     expect(modal).toMatch(/body\.modal-open \.modal-container[\s\S]*overflow:\s*hidden/);
     expect(modal).toMatch(
-      /@media\s*\(max-width:\s*640px\)[\s\S]*body\.modal-open \.modal-container[\s\S]*var\(--modal-inset-chrome-lift\)/s
+      /@media\s*\(max-width:\s*640px\)[\s\S]*body\.modal-open \.modal-container[\s\S]*var\(--modal-outline\)/s
     );
+    expect(modal).not.toMatch(/border-left-color:\s*var\(--border-red-side\)/);
     expect(modal).not.toMatch(/var\(--modal-chrome-glow\)/);
     expect(modal).not.toMatch(/border-left-width:\s*0/);
     expect(modal).toMatch(/body\.modal-open \.modal-header[\s\S]*--modal-header-red-gradient/);

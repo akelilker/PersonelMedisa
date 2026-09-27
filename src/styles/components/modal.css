@@ -477,13 +477,11 @@ body.modal-open .modal-container {
     border-color: var(--modal-border);
     border-top-color: var(--modal-border-top);
     border-bottom-color: var(--modal-border-bottom);
-    border-left-color: var(--border-red-side);
-    border-right-color: var(--border-red-side);
     border-bottom-left-radius: 12px;
     border-bottom-right-radius: 12px;
     outline: 1px solid var(--modal-outline);
     outline-offset: -1px;
-    box-shadow: var(--modal-inset-chrome-lift);
+    box-shadow: none;
     overflow: hidden;
   }
 

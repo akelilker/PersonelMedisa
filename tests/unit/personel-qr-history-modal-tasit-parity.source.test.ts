@@ -43,7 +43,7 @@ describe("PERSONEL Giriş/Çıkış Geçmişim modal Taşıt monthly-todo parity
       /\.modal-container--self-qr-history[\s\S]*box-shadow:\s*none/s
     );
     const modal = read("src/styles/components/modal.css");
-    expect(modal).toMatch(/var\(--modal-inset-chrome-lift\)/);
+    expect(modal).toMatch(/var\(--modal-desktop-ring\)/);
     expect(css).toMatch(
       /\.modal-body--self-qr-history:has\(> \.qr-history-page\)[\s\S]*overflow-y:\s*auto/s
     );

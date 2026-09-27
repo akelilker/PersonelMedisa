@@ -325,7 +325,8 @@
   min-height: 0;
   gap: var(--space-2);
   justify-content: flex-start;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
   overscroll-behavior: contain;
 }
 
@@ -347,7 +348,7 @@
 .self-home-main {
   display: flex;
   flex-direction: column;
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   min-height: 0;
   gap: var(--space-2);
   width: 100%;
@@ -406,6 +407,127 @@
 .pm-self-home-info__izin-row {
   width: 100%;
   margin-top: 2px;
+}
+
+.pm-self-identity {
+  display: grid;
+  gap: 2px;
+  flex: 0 0 auto;
+  padding: 6px 10px;
+  border: 1px solid var(--line-hero-card, rgba(255, 255, 255, 0.18));
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.pm-self-identity__name {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.pm-self-identity__org {
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.3;
+  color: var(--txt-muted);
+}
+
+.pm-self-menu {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px;
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 0;
+}
+
+.pm-self-menu__item {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  min-height: 48px;
+  padding: 8px 12px;
+  border: 1px solid var(--line-hero-card, rgba(255, 255, 255, 0.18));
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.04);
+  color: inherit;
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 700;
+  line-height: 1.2;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.pm-self-menu__item:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.pm-self-menu__item:focus-visible {
+  outline: 2px solid rgba(var(--theme-color-rgb), 0.7);
+  outline-offset: 2px;
+}
+
+.pm-self-subpage {
+  align-content: start;
+}
+
+.pm-self-request-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pm-self-request {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+  min-height: 48px;
+  padding: 10px 12px;
+  border: 1px solid var(--line-hero-card, rgba(255, 255, 255, 0.18));
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.04);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.pm-self-request--soon {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  cursor: default;
+}
+
+.pm-self-request__title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.pm-self-request__soon {
+  flex: 0 0 auto;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--txt-muted);
+}
+
+.pm-self-request__actions {
+  display: grid;
+  gap: 8px;
+}
+
+@media (min-width: 720px) {
+  .pm-self-menu {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 .self-home-page .pm-attendance-grid {
@@ -1204,6 +1326,36 @@ body.modal-open .modal-container--self-qr-history .modal-header h2.premium-title
   body.modal-open .modal-container--self-qr-history .modal-header h2.premium-title {
     letter-spacing: 0.12em;
   }
+}
+
+/*
+ * PERSONEL self-product menu modals (İzinlerim, Talepler, Duyurular, Fazla Mesaim, Profilim).
+ * Same footer clearance as the history modal; history/scan chrome selectors stay untouched.
+ */
+body.modal-open .modal-overlay:has(.modal-container--self-product) {
+  isolation: isolate;
+  background: var(--bg);
+  background-color: var(--bg);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  bottom: calc(
+    var(--app-footer-real-height) + var(--app-footer-gap) + env(safe-area-inset-bottom, 0px)
+  );
+}
+
+body.modal-open .modal-container--self-product {
+  background: var(--modal-bg);
+}
+
+body.modal-open .modal-container--self-product .modal-header {
+  border-bottom: none;
+}
+
+.modal-body--self-product {
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
 }
 
 .qr-history-page {

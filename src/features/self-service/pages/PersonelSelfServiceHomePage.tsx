@@ -8,15 +8,19 @@ import {
   type AttendanceTodayResponse
 } from "../../../api/attendance-mobile.api";
 import { isApiRequestError, shouldPreferDemoApi } from "../../../api/api-client";
-import { fetchMeYillikIzinBakiye } from "../../../api/me.api";
+import { fetchMe, fetchMeYillikIzinBakiye } from "../../../api/me.api";
 import { LoadingState } from "../../../components/states/LoadingState";
 import { useRoleAccess } from "../../../hooks/use-role-access";
+import type { MeIdentity } from "../../../types/self-service";
 import type { YillikIzinBakiye } from "../../../types/yillik-izin-hak-duzeltme";
 import { AttendanceCorrectionRequestModal } from "../components/AttendanceCorrectionRequestModal";
 import { BackgroundlessNoticeModal } from "../components/BackgroundlessNoticeModal";
 import { OwnQrAttendanceBoxes } from "../components/OwnQrAttendanceBoxes";
 import { SelfServiceYillikIzinInfoModal } from "../components/SelfServiceYillikIzinInfoModal";
 import { PersonelSelfServiceHomeInfoBlock } from "../components/PersonelSelfServiceHomeInfoBlock";
+import { PersonelSelfServiceIdentity } from "../components/PersonelSelfServiceIdentity";
+import { PersonelSelfServiceMenu } from "../components/PersonelSelfServiceMenu";
+import { buildPersonelSelfIdentityView } from "../personel-self-identity-view";
 import { PersonelMobileCapabilityService } from "../personel-mobile-capability";
 import { buildPersonelSelfServiceHomeInfoView } from "../personel-self-service-home-view";
 import { buildSelfServiceYillikIzinView } from "../personel-self-service-yillik-izin-view";
@@ -56,6 +60,7 @@ export function PersonelSelfServiceHomePage() {
   const [notice, setNotice] = useState<NoticeState>(null);
   const [correctDraft, setCorrectDraft] = useState<CorrectDraft | null>(null);
   const [leaveModalOpen, setLeaveModalOpen] = useState(false);
+  const [me, setMe] = useState<MeIdentity | null>(null);
 
   const refreshIzinBakiye = useCallback(() => {
     if (!izinViewEnabled) {
@@ -139,6 +144,28 @@ export function PersonelSelfServiceHomePage() {
   }, [load]);
 
   useEffect(() => {
+    if (shouldPreferDemoApi()) {
+      setMe(null);
+      return;
+    }
+    let cancelled = false;
+    void fetchMe()
+      .then((identity) => {
+        if (!cancelled) {
+          setMe(identity);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setMe(null);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
     if (loading || error || !today) {
       return;
     }
@@ -216,9 +243,11 @@ export function PersonelSelfServiceHomePage() {
   }
 
   const homeInfoView = buildPersonelSelfServiceHomeInfoView(today, izinViewEnabled ? izinView : null);
+  const identityView = me ? buildPersonelSelfIdentityView(me) : null;
 
   return (
     <section className="personel-mobile-shell self-home-page" data-testid="personel-self-service-page">
+      {identityView ? <PersonelSelfServiceIdentity view={identityView} /> : null}
       <div className="self-home-main" data-testid="personel-self-home-main">
         <PersonelSelfServiceHomeInfoBlock
           view={homeInfoView}
@@ -266,6 +295,8 @@ export function PersonelSelfServiceHomePage() {
           />
         </section>
       </div>
+
+      <PersonelSelfServiceMenu />
 
       {!qrEnabled ? (
         <div className="pm-callout" data-testid="personel-qr-closed-notice" role="status">

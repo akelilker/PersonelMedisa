@@ -21,6 +21,11 @@ import { PersonelSelfServiceHomePage } from "../features/self-service/pages/Pers
 import { BirimAmiriOperationalHomePage } from "../features/self-service/pages/BirimAmiriOperationalHomePage";
 import { PersonelQrScanPage } from "../features/self-service/pages/PersonelQrScanPage";
 import { PersonelQrHistoryPage } from "../features/self-service/pages/PersonelQrHistoryPage";
+import { PersonelSelfServiceDuyurularPage } from "../features/self-service/pages/PersonelSelfServiceDuyurularPage";
+import { PersonelSelfServiceFazlaMesaiPage } from "../features/self-service/pages/PersonelSelfServiceFazlaMesaiPage";
+import { PersonelSelfServiceIzinlerimPage } from "../features/self-service/pages/PersonelSelfServiceIzinlerimPage";
+import { PersonelSelfServiceProfilPage } from "../features/self-service/pages/PersonelSelfServiceProfilPage";
+import { PersonelSelfServiceTaleplerPage } from "../features/self-service/pages/PersonelSelfServiceTaleplerPage";
 import { QrKioskPage } from "../features/self-service/pages/QrKioskPage";
 import { SelfServiceQrShortcuts } from "../features/self-service/components/SelfServiceQrShortcuts";
 import { InternalDiagnosticsPage } from "./InternalDiagnosticsPage";
@@ -133,6 +138,46 @@ export function AppRoutes() {
           element={
             <ProtectedRoute requirePermission="self_service.qr.events.view">
               <PersonelQrHistoryPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="self/izinlerim"
+          element={
+            <ProtectedRoute requirePermission="self_service.yillik_izin.view">
+              <PersonelSelfServiceIzinlerimPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="self/talepler"
+          element={
+            <ProtectedRoute requirePermission="self_service.view">
+              <PersonelSelfServiceTaleplerPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="self/duyurular"
+          element={
+            <ProtectedRoute requirePermission="self_service.view">
+              <PersonelSelfServiceDuyurularPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="self/fazla-mesai"
+          element={
+            <ProtectedRoute requirePermission="self_service.fazla_calisma.view">
+              <PersonelSelfServiceFazlaMesaiPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="self/profil"
+          element={
+            <ProtectedRoute requirePermission="self_service.view">
+              <PersonelSelfServiceProfilPage />
             </ProtectedRoute>
           }
         />

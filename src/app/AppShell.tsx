@@ -166,6 +166,32 @@ function PersonelKartHomeButton({ onClick }: { onClick: () => void }) {
 }
 
 /** Taşıt monthly-todo-modal home control: stroke icon, 24px (22px desktop via modal-home-btn). */
+const KEYBOARD_VIEWPORT_SHRINK_PX = 80;
+
+function isKeyboardFieldTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+  if (target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement) {
+    return true;
+  }
+  if (target instanceof HTMLInputElement) {
+    const nonKeyboardTypes = new Set([
+      "button",
+      "checkbox",
+      "color",
+      "file",
+      "hidden",
+      "image",
+      "radio",
+      "reset",
+      "submit"
+    ]);
+    return !nonKeyboardTypes.has(target.type);
+  }
+  return target.isContentEditable;
+}
+
 function SelfServiceModalHomeButton({ onClick }: { onClick: () => void }) {
   return (
     <button
@@ -269,37 +295,73 @@ export function AppShell() {
   }, [isHomeRoute, isLoginRoute]);
 
   useEffect(() => {
-    const resetShellViewportScroll = () => {
+    const resetDocumentScroll = () => {
       window.scrollTo(0, 0);
       document.documentElement.scrollTop = 0;
       document.body.scrollTop = 0;
+    };
+
+    const resetAuthContentScroll = () => {
       const content = document.querySelector<HTMLElement>(".app-shell .content-wrap");
       if (content) {
         content.scrollTop = 0;
       }
     };
 
+    const resetAfterKeyboardDismiss = () => {
+      resetDocumentScroll();
+      if (isAuthSurfaceRoute) {
+        resetAuthContentScroll();
+      }
+    };
+
+    resetDocumentScroll();
+    if (isAuthSurfaceRoute) {
+      resetAuthContentScroll();
+    }
+
+    let keyboardViewportWasShrunk = false;
     const viewport = window.visualViewport;
     const onViewportChange = () => {
       if (!viewport) {
         return;
       }
-      if (viewport.height >= window.innerHeight - 4) {
-        resetShellViewportScroll();
+      const layoutHeight = window.innerHeight;
+      if (viewport.height < layoutHeight - KEYBOARD_VIEWPORT_SHRINK_PX) {
+        keyboardViewportWasShrunk = true;
+        return;
+      }
+      if (!keyboardViewportWasShrunk) {
+        return;
+      }
+      if (viewport.height >= layoutHeight - 4) {
+        keyboardViewportWasShrunk = false;
+        resetAfterKeyboardDismiss();
       }
     };
 
-    resetShellViewportScroll();
+    const onFocusOut = (event: FocusEvent) => {
+      if (!isKeyboardFieldTarget(event.target)) {
+        return;
+      }
+      window.requestAnimationFrame(() => {
+        if (isKeyboardFieldTarget(document.activeElement)) {
+          return;
+        }
+        resetAfterKeyboardDismiss();
+      });
+    };
+
     viewport?.addEventListener("resize", onViewportChange);
     viewport?.addEventListener("scroll", onViewportChange);
-    document.addEventListener("focusout", resetShellViewportScroll, true);
+    document.addEventListener("focusout", onFocusOut, true);
 
     return () => {
       viewport?.removeEventListener("resize", onViewportChange);
       viewport?.removeEventListener("scroll", onViewportChange);
-      document.removeEventListener("focusout", resetShellViewportScroll, true);
+      document.removeEventListener("focusout", onFocusOut, true);
     };
-  }, [pathname]);
+  }, [pathname, isAuthSurfaceRoute]);
 
   const outletContext = useMemo<AppShellOutletContext>(
     () => ({

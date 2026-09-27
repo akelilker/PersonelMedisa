@@ -28,13 +28,18 @@ describe("iOS PWA shell viewport contract", () => {
     expect(standaloneBlock).toMatch(/body\.login-page \.content-wrap\s*\{[^}]*overflow:\s*hidden/s);
   });
 
-  it("resets shell viewport scroll from AppShell on navigation and keyboard close", () => {
+  it("resets document scroll on navigation; content-wrap only on auth + keyboard dismiss", () => {
     const shell = read("src/app/AppShell.tsx");
+    expect(shell).toMatch(/resetDocumentScroll/);
+    expect(shell).toMatch(/document\.documentElement\.scrollTop\s*=\s*0/);
+    expect(shell).toMatch(/resetAuthContentScroll/);
+    expect(shell).toMatch(/if\s*\(\s*isAuthSurfaceRoute\s*\)\s*\{[^}]*resetAuthContentScroll/s);
+    expect(shell).toMatch(/isKeyboardFieldTarget/);
+    expect(shell).toMatch(/keyboardViewportWasShrunk/);
+    expect(shell).toMatch(/KEYBOARD_VIEWPORT_SHRINK_PX/);
     expect(shell).toMatch(/visualViewport/);
-    expect(shell).toMatch(/content\.scrollTop\s*=\s*0/);
     expect(shell).toMatch(/focusout/);
-    expect(shell).not.toMatch(/if\s*\(\s*!isAuthSurfaceRoute\s*\)/);
-    expect(shell).toMatch(/\},\s*\[pathname\]\s*\)/);
+    expect(shell).toMatch(/\},\s*\[pathname,\s*isAuthSurfaceRoute\]\s*\)/);
   });
 
   it("keeps global document scroll lock in reset.css (PR 410 follow-up)", () => {

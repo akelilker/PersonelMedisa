@@ -77,6 +77,9 @@ describe("PERSONEL_SELF_SERVICE_PRODUCT_UX_V2 notification + policy owners", () 
 
     const header = read("src/components/shell/ShellHeaderActions.tsx");
     expect(header).toContain('subeControl.kind === "multi" && !isPersonelRole');
+    expect(header).toContain("showPersonelHomeLogout");
+    expect(header).toContain('aria-label={showPersonelHomeLogout ? "Çıkış" : "Ayar menüsü"}');
+    expect(header).toContain('<path d="M10 17l5-5-5-5" />');
 
     const today = read("api/src/Services/Qr/QrAttendanceTodayService.php");
     expect(today).toContain("QrAttendancePresentationService::presentTodayBoxEvent");

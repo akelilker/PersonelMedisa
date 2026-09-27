@@ -18,15 +18,13 @@ body.modal-open .content-wrap {
 }
 
 /*
- * PERSONEL self-service home: single-focus surface. The attendance block claims the
- * leftover viewport height so its own composition fills the screen instead of leaving
- * a dead tail above the footer (same flex-column takeover pattern as body.login-page
- * below). Scoped by the page's own shell class, so the content track itself keeps its
- * normal geometry on every other route.
+ * PERSONEL self-service home: keep the content track fixed-height; the shell scrolls
+ * internally only when late/early status copy needs extra room.
  */
 .content-wrap:has(> .self-home-page) {
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 body.login-page .content-wrap {

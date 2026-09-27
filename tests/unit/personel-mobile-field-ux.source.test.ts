@@ -84,6 +84,8 @@ describe("personel mobile field UX closure contracts", () => {
     const css = read("src/features/self-service/self-service.css");
     expect(css).toContain(".pm-callout--warning");
     expect(css).toContain("min-height: 112px");
+    expect(css).toMatch(/\.self-home-page \.pm-attendance-grid[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\)\s*minmax\(0,\s*1fr\)/);
+    expect(css).not.toMatch(/\.self-home-page \.pm-attendance-grid[\s\S]*minmax\(148px/);
     expect(css).toMatch(
       /\.personel-mobile-shell\s*\{[^}]*padding:\s*4px 0 var\(--space-3\);/s
     );

@@ -10,7 +10,7 @@
   --app-footer-height: 30px;
   --app-footer-real-height: 38px;
   /* Taşit style-core: modal overlay bottom = footer-real-height + app-footer-gap */
-  --app-footer-gap: 17px;
+  --app-footer-gap: 20px;
   --modal-footer-gap: var(--space-3);
   --modal-footer-reserve: calc(var(--app-footer-height) + var(--modal-footer-gap));
   --modal-gap-above-footer: var(--app-footer-gap);
@@ -27,7 +27,7 @@ body.app-home-route {
   --shell-top-stack-gap: var(--space-1);
 }
 
-/* Taşıt style-core: desktop 641+ overlay gap is 14px. Mobile stays on the 17px root. */
+/* Taşıt style-core: desktop 641+ overlay gap is 14px. Mobile stays on the 20px root. */
 @media (min-width: 641px) {
   :root {
     --app-footer-gap: 14px;
@@ -45,7 +45,7 @@ body.app-home-route {
   :root {
     --app-footer-height: 30px;
     --app-footer-real-height: 38px;
-    /* Modal↔footer gap follows --app-footer-gap (17px). Do not pin a separate
+    /* Modal↔footer gap follows --app-footer-gap (20px). Do not pin a separate
        14px here — that welded the shell off the Taşıt mobile rhythm. */
     --modal-footer-optical-reserve: 0px;
   }

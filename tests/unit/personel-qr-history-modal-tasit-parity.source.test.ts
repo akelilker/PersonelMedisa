@@ -39,6 +39,11 @@ describe("PERSONEL Giriş/Çıkış Geçmişim modal Taşıt monthly-todo parity
     expect(css).toMatch(
       /@media\s*\(max-width:\s*640px\)[\s\S]*\.modal-container--self-qr-history \.modal-header h2\.premium-title[\s\S]*letter-spacing:\s*0\.12em/s
     );
+    expect(css).not.toMatch(
+      /\.modal-container--self-qr-history[\s\S]*box-shadow:\s*none/s
+    );
+    const modal = read("src/styles/components/modal.css");
+    expect(modal).toMatch(/var\(--modal-inset-chrome-lift\)/);
     expect(css).toMatch(
       /\.modal-body--self-qr-history:has\(> \.qr-history-page\)[\s\S]*overflow-y:\s*auto/s
     );

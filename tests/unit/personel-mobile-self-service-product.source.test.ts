@@ -11,7 +11,8 @@ describe("personel mobile/PWA self-service productization", () => {
     const home = read("src/features/self-service/pages/PersonelSelfServiceHomePage.tsx");
     expect(home).toContain('data-testid="personel-today-attendance-section"');
     expect(home).toContain("OwnQrAttendanceBoxes");
-    expect(home).toContain("SelfServiceYillikIzinLeaveRow");
+    expect(home).toContain("PersonelSelfServiceHomeInfoBlock");
+    expect(home).toContain("buildPersonelSelfServiceHomeInfoView");
     expect(home).toContain("fetchMeYillikIzinBakiye");
     expect(home).toContain("self_service.yillik_izin.view");
     expect(home).not.toContain("QrKioskModelNote");
@@ -92,6 +93,7 @@ describe("personel mobile/PWA self-service productization", () => {
     expect(scanner).toContain("Kamera için güvenli bağlantı (HTTPS) gerekir.");
     expect(scanner).toContain("Telefon Ayarlarınızdan Kamera Erişimine İzin Verin.");
     expect(scanner).toContain("Bu cihazda kullanılabilir kamera bulunamadı.");
+    expect(scanner).toContain('name === "AbortError"');
   });
 
   it("locks QR history calendar UX without technical interval copy", () => {

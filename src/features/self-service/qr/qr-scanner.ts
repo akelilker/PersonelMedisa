@@ -22,9 +22,12 @@ const CAMERA_REQUEST: MediaStreamConstraints = {
 
 let primedCamera: Promise<MediaStream> | null = null;
 
-function mapCameraError(error: unknown): Error {
+export function mapCameraError(error: unknown): Error {
   const name =
     error && typeof error === "object" && "name" in error ? String((error as { name?: unknown }).name) : "";
+  if (name === "AbortError" || name === "TimeoutError") {
+    return new Error("Kamera açılamadı. Tekrar deneyin.");
+  }
   if (name === "NotAllowedError" || name === "PermissionDeniedError") {
     return new Error("Kamera izni yok. Telefon Ayarlarınızdan Kamera Erişimine İzin Verin.");
   }
@@ -33,6 +36,11 @@ function mapCameraError(error: unknown): Error {
   }
   if (name === "NotReadableError" || name === "TrackStartError") {
     return new Error("Kamera başka bir uygulama tarafından kullanılıyor olabilir.");
+  }
+  const message =
+    error instanceof Error && error.message.trim() ? error.message.trim() : "";
+  if (/^the operation was aborted\.?$/i.test(message)) {
+    return new Error("Kamera açılamadı. Tekrar deneyin.");
   }
   return new Error("Kamera açılamadı. Tekrar deneyin.");
 }
@@ -106,9 +114,15 @@ export async function startQrScanner(options: StartOptions): Promise<QrScannerHa
 
   let stream: MediaStream;
   try {
-    stream = options.stream
-      ? await Promise.resolve(options.stream)
-      : await navigator.mediaDevices.getUserMedia(CAMERA_REQUEST);
+    if (options.stream) {
+      try {
+        stream = await Promise.resolve(options.stream);
+      } catch {
+        stream = await navigator.mediaDevices.getUserMedia(CAMERA_REQUEST);
+      }
+    } else {
+      stream = await navigator.mediaDevices.getUserMedia(CAMERA_REQUEST);
+    }
   } catch (error) {
     throw mapCameraError(error);
   }

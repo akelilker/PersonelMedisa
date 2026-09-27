@@ -58,7 +58,7 @@ describe("app-home hero session name under logo", () => {
     );
   });
 
-  it("keeps the PERSONEL title in the center grid track with room to shrink", () => {
+  it("keeps the PERSONEL title in the center grid track sized to ink without WebKit overflow", () => {
     const hero = read("src/styles/components/hero.css");
     const block = appHomeHeroBlock(hero);
 
@@ -66,7 +66,10 @@ describe("app-home hero session name under logo", () => {
       /body\.app-home-route section\.hero\.hero-with-session > h1\s*\{[^}]*grid-column:\s*2/s
     );
     expect(block).toMatch(
-      /body\.app-home-route section\.hero\.hero-with-session > h1\s*\{[^}]*min-width:\s*0/s
+      /body\.app-home-route section\.hero\.hero-with-session > h1\s*\{[^}]*min-width:\s*min-content/s
+    );
+    expect(block).toMatch(
+      /body\.app-home-route section\.hero\.hero-with-session > h1\s*\{[^}]*width:\s*max-content/s
     );
     expect(block).toMatch(
       /body\.app-home-route \.hero\.hero-with-session \.animated-line\s*\{[^}]*grid-column:\s*2/s

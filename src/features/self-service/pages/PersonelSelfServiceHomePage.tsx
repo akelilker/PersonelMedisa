@@ -16,8 +16,9 @@ import { AttendanceCorrectionRequestModal } from "../components/AttendanceCorrec
 import { BackgroundlessNoticeModal } from "../components/BackgroundlessNoticeModal";
 import { OwnQrAttendanceBoxes } from "../components/OwnQrAttendanceBoxes";
 import { SelfServiceYillikIzinInfoModal } from "../components/SelfServiceYillikIzinInfoModal";
-import { SelfServiceYillikIzinLeaveRow } from "../components/SelfServiceYillikIzinLeaveRow";
+import { PersonelSelfServiceHomeInfoBlock } from "../components/PersonelSelfServiceHomeInfoBlock";
 import { PersonelMobileCapabilityService } from "../personel-mobile-capability";
+import { buildPersonelSelfServiceHomeInfoView } from "../personel-self-service-home-view";
 import { buildSelfServiceYillikIzinView } from "../personel-self-service-yillik-izin-view";
 import { primeQrCamera } from "../qr/qr-scanner";
 
@@ -214,17 +215,20 @@ export function PersonelSelfServiceHomePage() {
     );
   }
 
+  const homeInfoView = buildPersonelSelfServiceHomeInfoView(today, izinViewEnabled ? izinView : null);
+
   return (
     <section className="personel-mobile-shell self-home-page" data-testid="personel-self-service-page">
-      {izinViewEnabled && izinView ? (
-        <SelfServiceYillikIzinLeaveRow
-          text={izinView.rowText}
-          onOpen={() => setLeaveModalOpen(true)}
+      <div className="self-home-main" data-testid="personel-self-home-main">
+        <PersonelSelfServiceHomeInfoBlock
+          view={homeInfoView}
+          onOpenIzinModal={
+            izinViewEnabled && izinView ? () => setLeaveModalOpen(true) : undefined
+          }
         />
-      ) : null}
 
-      <section className="pm-section" data-testid="personel-today-attendance-section">
-        <OwnQrAttendanceBoxes
+        <section className="pm-section" data-testid="personel-today-attendance-section">
+          <OwnQrAttendanceBoxes
           today={today}
           qrEnabled={qrEnabled}
           testId="personel-attendance-boxes"
@@ -259,8 +263,9 @@ export function PersonelSelfServiceHomePage() {
               });
             })
           }
-        />
-      </section>
+          />
+        </section>
+      </div>
 
       {!qrEnabled ? (
         <div className="pm-callout" data-testid="personel-qr-closed-notice" role="status">

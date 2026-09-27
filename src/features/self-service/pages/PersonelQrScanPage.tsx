@@ -4,7 +4,12 @@ import { isApiRequestError } from "../../../api/api-client";
 import { createQrRequestNonce, postMeQrScan } from "../../../api/qr.api";
 import type { MeQrAttendanceEvent, MeQrEarlyExitConfirm, QrEventType } from "../../../types/self-service";
 import { BackgroundlessNoticeModal } from "../components/BackgroundlessNoticeModal";
-import { startQrScanner, takePrimedQrCamera, type QrScannerHandle } from "../qr/qr-scanner";
+import {
+  mapCameraError,
+  startQrScanner,
+  takePrimedQrCamera,
+  type QrScannerHandle
+} from "../qr/qr-scanner";
 import { formatSelfServiceClock } from "../self-service-datetime";
 
 type Phase =
@@ -62,13 +67,6 @@ function mapScanError(error: unknown): string {
     default:
       return "Sıra dışı işlem. Kayıt oluşturulamadı. Tekrar deneyin.";
   }
-}
-
-function cameraStartError(error: unknown): string {
-  if (error instanceof Error && error.message.trim()) {
-    return error.message;
-  }
-  return "Kamera açılamadı. Tekrar deneyin.";
 }
 
 export function PersonelQrScanPage() {
@@ -195,7 +193,7 @@ export function PersonelQrScanPage() {
       scannerRef.current = handle;
     } catch (error) {
       if (scanGeneration.current !== gen) return;
-      setPhase({ kind: "error", message: cameraStartError(error) });
+      setPhase({ kind: "error", message: mapCameraError(error).message });
     }
   };
 

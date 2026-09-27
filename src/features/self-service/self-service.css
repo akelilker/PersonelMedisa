@@ -1024,6 +1024,83 @@
 }
 
 /*
+ * PERSONEL QR kamera (Giriş/Çıkış) modal — Taşıt #monthly-todo-modal chrome (scoped owner).
+ * Preview is edge-to-edge inside the modal frame; red lift stays inset (no outer bleed).
+ */
+body.modal-open .modal-overlay:has(.modal-container--self-qr-scan) {
+  isolation: isolate;
+  background: var(--bg);
+  background-color: var(--bg);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  bottom: calc(
+    var(--app-footer-real-height) + var(--app-footer-gap) + env(safe-area-inset-bottom, 0px)
+  );
+}
+
+body.modal-open .modal-container--self-qr-scan {
+  background: var(--modal-bg);
+  box-shadow: none;
+  overflow: hidden;
+}
+
+body.modal-open .modal-container--self-qr-scan .modal-header {
+  border-bottom: none;
+}
+
+body.modal-open .modal-container--self-qr-scan .modal-header h2.premium-title {
+  letter-spacing: var(--premium-title-letter-spacing);
+}
+
+.modal-body--self-qr-scan:has(> .qr-scan-page) {
+  padding: 0;
+  gap: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.modal-body--self-qr-scan .personel-mobile-shell.qr-scan-page {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: calc(100% + 3px);
+  max-height: calc(100% + 3px);
+}
+
+.modal-body--self-qr-scan .qr-scan-video-wrap {
+  border-radius: 0;
+  background: #05080c;
+}
+
+@media (max-width: 640px) {
+  body.modal-open .modal-overlay:has(.modal-container--self-qr-scan) .modal-container {
+    border-bottom-left-radius: 12px;
+    border-bottom-right-radius: 12px;
+    border-color: rgba(184, 192, 201, 0.48);
+    border-top-color: rgba(200, 208, 216, 0.54);
+    border-bottom-color: rgba(168, 176, 186, 0.56);
+    border-left-color: var(--border-red-side);
+    border-right-color: var(--border-red-side);
+    outline: 1px solid rgba(214, 222, 232, 0.4);
+    outline-offset: -1px;
+    box-shadow:
+      inset 0 0 22px rgba(var(--theme-color-rgb), 0.1),
+      inset 0 1px 0 rgba(var(--theme-color-rgb), 0.14);
+  }
+
+  body.modal-open .modal-container--self-qr-scan .modal-header {
+    border-top: none;
+    border-bottom: none;
+    box-shadow:
+      inset 0 1px 0 rgba(236, 242, 250, 0.14),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.05);
+  }
+
+  body.modal-open .modal-container--self-qr-scan .modal-header h2.premium-title {
+    letter-spacing: 0.12em;
+  }
+}
+
+/*
  * PERSONEL Giriş/Çıkış Geçmişim modal — Taşıt #monthly-todo-modal chrome (scoped owner).
  * Global modal shell (PR #412) is untouched; only this route's overlay/container/header.
  */

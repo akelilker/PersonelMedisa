@@ -131,7 +131,13 @@ function resolveModuleModal(
   }
 
   if (pathname === "/self/qr-okut") {
-    return { title: resolveQrScanModalTitle(eventParam), closeTo: "/" };
+    return {
+      title: resolveQrScanModalTitle(eventParam),
+      closeTo: "/",
+      className: "modal-container--self-qr-scan",
+      bodyClassName: "modal-body--self-qr-scan",
+      titleVariant: "premium"
+    };
   }
   if (pathname === "/self/qr-hareketleri") {
     return {
@@ -215,6 +221,7 @@ export function AppShell() {
     pathname === "/arsiv/personeller" ||
     /^\/personeller\/\d+$/.test(pathname);
   const isSelfQrHistoryModalRoute = pathname === "/self/qr-hareketleri";
+  const isSelfQrScanModalRoute = pathname === "/self/qr-okut";
   const isPersonelDetayRoute = /^\/personeller\/\d+$/.test(pathname);
   const activeSubeLabel = useMemo(() => {
     const activeSubeId = session?.active_sube_id;
@@ -358,8 +365,8 @@ export function AppShell() {
           headerStart={
             isPersonelKartModalRoute ? (
               <PersonelKartHomeButton onClick={() => navigate("/")} />
-            ) : isSelfQrHistoryModalRoute ? (
-              <SelfServiceModalHomeButton onClick={() => navigate("/")} />
+            ) : isSelfQrHistoryModalRoute || isSelfQrScanModalRoute ? (
+              <SelfServiceModalHomeButton onClick={() => navigate(moduleModal.closeTo)} />
             ) : undefined
           }
           className={moduleModal.className}

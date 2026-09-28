@@ -36,7 +36,6 @@ function baseToday(overrides: Partial<AttendanceTodayResponse> = {}): Attendance
     can_scan_cikis: true,
     pending_giris_correction: null,
     pending_cikis_correction: null,
-    mesai_bitimine_kalan_label: "2 Saat 15dk",
     ...overrides
   };
 }
@@ -75,7 +74,7 @@ describe("buildPersonelSelfServiceHomeInfoView", () => {
     expect(view.izinModalRow?.text).toBe("Kalan izin: 84 gün");
     expect(view.rows.find((r) => r.label === "Kıdem")?.value).toContain("aydır çalışıyor");
     expect(view.rows.find((r) => r.label === "Bugün giriş")?.value).toBe("09:00");
-    expect(view.rows.find((r) => r.label === "Mesai bitimine kalan")?.value).toBe("2 Saat 15dk");
+    expect(view.rows.some((r) => r.label === "Mesai bitimine kalan")).toBe(false);
   });
 
   it("hak başlamadan önce bekleme metnini modal satırına taşır", () => {

@@ -56,12 +56,7 @@ export function buildPersonelSelfServiceHomeInfoView(
 
   rows.push(
     { label: "Bugün giriş", value: eventClock(today.giris), testId: "personel-home-bugun-giris" },
-    { label: "Bugün çıkış", value: eventClock(today.cikis), testId: "personel-home-bugun-cikis" },
-    {
-      label: "Mesai bitimine kalan",
-      value: dash(today.mesai_bitimine_kalan_label),
-      testId: "personel-home-mesai-kalan"
-    }
+    { label: "Bugün çıkış", value: eventClock(today.cikis), testId: "personel-home-bugun-cikis" }
   );
 
   return { rows, izinModalRow };

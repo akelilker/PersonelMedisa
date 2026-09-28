@@ -145,8 +145,8 @@ describe("PERSONEL collar → QR UI entitlement (render level)", () => {
     setSession("PERSONEL", "Mavi Yaka");
     await renderHome();
 
-    expect(screen.getByTestId("giris-scan")).toBeInTheDocument();
-    expect(screen.queryByTestId("cikis-scan")).toBeNull();
+    expect(screen.getByTestId("giris-scan")).toBeEnabled();
+    expect(screen.getByTestId("cikis-scan")).toBeDisabled();
     expect(screen.getByTestId("attendance-box-cikis")).toHaveTextContent("ÇIKIŞ");
     expect(screen.queryByTestId("giris-scan-not-entitled")).toBeNull();
     // Independent QR Okut shortcut removed; GİRİŞ/ÇIKIŞ cards are the CTA.
@@ -201,8 +201,8 @@ describe("PERSONEL collar → QR UI entitlement (render level)", () => {
       // PersonelSelfServiceHomePage no longer hosts SelfServiceQrShortcuts;
       // entitlement still surfaces via GİRİŞ/ÇIKIŞ cards.
       expect(screen.queryByTestId("self-qr-scan-link"), role).toBeNull();
-      expect(screen.getByTestId("giris-scan"), role).toBeInTheDocument();
-      expect(screen.queryByTestId("cikis-scan"), role).toBeNull();
+      expect(screen.getByTestId("giris-scan"), role).toBeEnabled();
+      expect(screen.getByTestId("cikis-scan"), role).toBeDisabled();
       expect(screen.getByTestId("attendance-box-cikis"), role).toHaveTextContent("ÇIKIŞ");
       cleanup();
     }
@@ -250,7 +250,7 @@ describe("PERSONEL collar → QR UI entitlement (render level)", () => {
 
     expect(screen.getByTestId("attendance-box-giris")).toHaveTextContent("08:12");
     expect(screen.getByTestId("cikis-scan")).toBeEnabled();
-    expect(screen.queryByTestId("giris-scan")).toBeNull();
+    expect(screen.getByTestId("giris-scan")).toBeDisabled();
     expect(screen.queryByTestId("personel-incomplete-day-warning")).toBeNull();
     expect(screen.queryByTestId("personel-today-empty")).toBeNull();
   });
@@ -277,10 +277,10 @@ describe("PERSONEL collar → QR UI entitlement (render level)", () => {
     setSession("PERSONEL", "Mavi Yaka");
     await renderHome();
 
-    expect(screen.getByTestId("giris-scan")).toBeInTheDocument();
+    expect(screen.getByTestId("giris-scan")).toBeEnabled();
     expect(screen.getByTestId("giris-scan")).toHaveTextContent("12:05");
     expect(screen.getByTestId("attendance-box-cikis")).toHaveTextContent("11:20");
-    expect(screen.queryByTestId("cikis-scan")).toBeNull();
+    expect(screen.getByTestId("cikis-scan")).toBeDisabled();
   });
 });
 

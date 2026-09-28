@@ -87,6 +87,9 @@ describe("PERSONEL_SELF_SERVICE_PRODUCT_UX_V2 notification + policy owners", () 
     expect(today).toContain("next_action");
     expect(today).toContain("resolveOpenShiftState");
     expect(today).not.toContain("&& $giris === null");
+    expect(today).toContain("planned_shift");
+    expect(today).toContain("plannedShiftPayload");
+    expect(today).not.toContain("mesai_bitimine_kalan_label");
 
     const event = read("api/src/Services/Qr/QrAttendanceEventService.php");
     expect(event).toContain("resolveOpenShiftState");
@@ -98,7 +101,7 @@ describe("PERSONEL_SELF_SERVICE_PRODUCT_UX_V2 notification + policy owners", () 
     const boxes = read("src/features/self-service/components/OwnQrAttendanceBoxes.tsx");
     expect(boxes).toContain("can_scan_giris");
     expect(boxes).toContain("can_scan_cikis");
-    expect(boxes).toContain("pm-box-main-action--with-time");
+    expect(boxes).toContain("useIstanbulMinuteClock");
     expect(boxes).not.toMatch(/today\.giris \? \(/);
 
     const notifications = read("src/styles/components/notifications.css");

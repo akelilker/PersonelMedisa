@@ -146,10 +146,7 @@ class QrAttendanceTodayService
             }
         }
 
-        $mesaiBitimineKalan = null;
-        if (!empty($caps['qr_scan']) && $nextAction === 'CIKIS') {
-            $mesaiBitimineKalan = self::mesaiBitimineKalanLabel($pdo, $personelId, $today);
-        }
+        $plannedShift = self::plannedShiftPayload($pdo, $personelId, $today);
 
         return [
             'business_date' => $today,
@@ -169,27 +166,32 @@ class QrAttendanceTodayService
             'can_scan_cikis' => !empty($caps['qr_scan']) && $canScanCikis,
             'pending_giris_correction' => $pendingGirisCorrection,
             'pending_cikis_correction' => $pendingCikisCorrection,
-            'mesai_bitimine_kalan_label' => $mesaiBitimineKalan,
+            'planned_shift' => $plannedShift,
         ];
     }
 
-    private static function mesaiBitimineKalanLabel(PDO $pdo, $personelId, $businessDateYmd)
+    /**
+     * Canonical planned shift window for client countdown (no server-side stale labels).
+     *
+     * @return array<string, string|null>|null
+     */
+    private static function plannedShiftPayload(PDO $pdo, $personelId, $businessDateYmd)
     {
         try {
             $planned = LateEarlyInfoService::loadPlannedDay($pdo, (int) $personelId, (string) $businessDateYmd);
-            $beklenenCikis = is_array($planned) ? ($planned['beklenen_cikis_saati'] ?? null) : null;
-            $exitMins = LateEarlyInfoService::hhmmToMinutes($beklenenCikis);
-            if ($exitMins === null) {
+            if (!is_array($planned)) {
                 return null;
             }
-            $now = new \DateTimeImmutable('now', new \DateTimeZone('Europe/Istanbul'));
-            $nowMins = (int) $now->format('G') * 60 + (int) $now->format('i');
-            $delta = $exitMins - $nowMins;
-            if ($delta <= 0) {
+            $giris = isset($planned['beklenen_giris_saati']) ? trim((string) $planned['beklenen_giris_saati']) : '';
+            $cikis = isset($planned['beklenen_cikis_saati']) ? trim((string) $planned['beklenen_cikis_saati']) : '';
+            if ($giris === '' && $cikis === '') {
                 return null;
             }
 
-            return LateEarlyInfoService::formatDurationHuman($delta);
+            return [
+                'beklenen_giris_saati' => $giris !== '' ? $giris : null,
+                'beklenen_cikis_saati' => $cikis !== '' ? $cikis : null,
+            ];
         } catch (\Throwable $e) {
             return null;
         }

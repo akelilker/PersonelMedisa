@@ -1,4 +1,10 @@
 import type { AttendanceTodayResponse } from "../../../api/attendance-mobile.api";
+import {
+  hasPlannedShift,
+  mesaiBitimineKalanLabel,
+  mesaiyeKalanLabel
+} from "../attendance-shift-countdown";
+import { useIstanbulMinuteClock } from "../hooks/useIstanbulMinuteClock";
 
 type AttendanceEvent = NonNullable<AttendanceTodayResponse["giris"]>;
 
@@ -13,6 +19,7 @@ type OwnQrAttendanceBoxesProps = {
     | "pending_giris_correction"
     | "pending_cikis_correction"
     | "capabilities"
+    | "planned_shift"
   >;
   /** Role-independent QR entitlement mirror (`self_service.qr.scan`). */
   qrEnabled: boolean;
@@ -69,10 +76,21 @@ function BoxClock({ event }: { event: AttendanceEvent | null }) {
   );
 }
 
+function CountdownBlock({ title, value }: { title: string; value: string }) {
+  return (
+    <>
+      <p className="pm-box-countdown-title">{title}</p>
+      <p className="pm-box-time" data-testid="pm-box-countdown-value">
+        {value}
+      </p>
+    </>
+  );
+}
+
 /**
  * Own-day GİRİŞ/ÇIKIŞ kutuları — PERSONEL home ve Mavi Yaka BIRIM_AMIRI home ortak owner.
  * Multi-cycle: kartlar daima görünür; yalnızca backend next_action / can_scan_* actionable yapar.
- * Saat gösterimi action yüzeyini öldürmez.
+ * Shift countdown client-side (planned_shift + Istanbul minute clock).
  */
 export function OwnQrAttendanceBoxes({
   today,
@@ -84,41 +102,64 @@ export function OwnQrAttendanceBoxes({
   onCorrectGiris,
   onCorrectCikis
 }: OwnQrAttendanceBoxesProps) {
+  const minuteTick = useIstanbulMinuteClock();
+  const now = new Date(minuteTick);
+  const planned = today.planned_shift ?? null;
+  const shiftKnown = hasPlannedShift(planned);
+
   const girisActionable = qrEnabled && today.can_scan_giris;
   const cikisActionable = qrEnabled && today.can_scan_cikis;
 
+  const girisCountdown =
+    shiftKnown && girisActionable
+      ? mesaiyeKalanLabel(planned?.beklenen_giris_saati, now)
+      : null;
+  const cikisCountdown =
+    shiftKnown && cikisActionable
+      ? mesaiBitimineKalanLabel(planned?.beklenen_cikis_saati, now)
+      : null;
+
   return (
     <div className="pm-attendance-grid" data-testid={testId}>
-      <div className="pm-attendance-box" data-testid="attendance-box-giris">
+      <div
+        className={[
+          "pm-attendance-box",
+          girisActionable ? "pm-attendance-box--actionable" : "pm-attendance-box--idle-giris"
+        ].join(" ")}
+        data-testid="attendance-box-giris"
+      >
         {!qrEnabled ? (
           <div className="pm-box-closed" data-testid="giris-scan-not-entitled">
             <p className="pm-box-label">Giriş</p>
             <p className="self-service-muted">QR bu hesap için kapalı</p>
           </div>
-        ) : girisActionable ? (
-          <button
-            type="button"
-            className="pm-box-main-action pm-box-main-action--with-time"
-            data-testid="giris-scan"
-            aria-label="Giriş için kiosk QR okut"
-            onClick={onScanGiris}
-          >
-            <span className="pm-box-label">GİRİŞ</span>
-            <BoxClock event={today.giris} />
-          </button>
         ) : (
           <>
-            <p className="pm-box-label">GİRİŞ</p>
-            <BoxClock event={today.giris} />
-            {today.giris?.status?.label ? (
+            <button
+              type="button"
+              className="pm-box-main-action pm-box-main-action--with-time"
+              data-testid="giris-scan"
+              aria-label="Giriş için kiosk QR okut"
+              disabled={!girisActionable}
+              onClick={girisActionable ? onScanGiris : undefined}
+            >
+              <span className="pm-box-label">GİRİŞ</span>
+              {girisCountdown ? (
+                <CountdownBlock title="Mesaiye Kalan Süre" value={girisCountdown} />
+              ) : (
+                <BoxClock event={today.giris} />
+              )}
+            </button>
+            {!girisActionable && today.giris?.status?.label ? (
               <p className="pm-box-status" data-testid="giris-status-label">
                 {today.giris.status.label}
               </p>
             ) : null}
-            {today.pending_giris_correction ? (
+            {!girisActionable && today.pending_giris_correction ? (
               <p className="pm-box-pending">Bekliyor</p>
             ) : null}
-            {canShowCorrection(
+            {!girisActionable &&
+            canShowCorrection(
               allowCorrection,
               Boolean(today.pending_giris_correction),
               today.giris,
@@ -138,36 +179,45 @@ export function OwnQrAttendanceBoxes({
         )}
       </div>
 
-      <div className="pm-attendance-box" data-testid="attendance-box-cikis">
+      <div
+        className={[
+          "pm-attendance-box",
+          cikisActionable ? "pm-attendance-box--actionable" : "pm-attendance-box--idle-cikis"
+        ].join(" ")}
+        data-testid="attendance-box-cikis"
+      >
         {!qrEnabled ? (
           <div className="pm-box-closed" data-testid="cikis-scan-not-entitled">
             <p className="pm-box-label">Çıkış</p>
             <p className="self-service-muted">QR bu hesap için kapalı</p>
           </div>
-        ) : cikisActionable ? (
-          <button
-            type="button"
-            className="pm-box-main-action pm-box-main-action--with-time"
-            data-testid="cikis-scan"
-            aria-label="Çıkış için kiosk QR okut"
-            onClick={onScanCikis}
-          >
-            <span className="pm-box-label">ÇIKIŞ</span>
-            <BoxClock event={today.cikis} />
-          </button>
         ) : (
           <>
-            <p className="pm-box-label">ÇIKIŞ</p>
-            <BoxClock event={today.cikis} />
-            {today.cikis?.status?.label ? (
+            <button
+              type="button"
+              className="pm-box-main-action pm-box-main-action--with-time"
+              data-testid="cikis-scan"
+              aria-label="Çıkış için kiosk QR okut"
+              disabled={!cikisActionable}
+              onClick={cikisActionable ? onScanCikis : undefined}
+            >
+              <span className="pm-box-label">ÇIKIŞ</span>
+              {cikisCountdown ? (
+                <CountdownBlock title="Mesai Bitimine Kalan" value={cikisCountdown} />
+              ) : (
+                <BoxClock event={today.cikis} />
+              )}
+            </button>
+            {!cikisActionable && today.cikis?.status?.label ? (
               <p className="pm-box-status" data-testid="cikis-status-label">
                 {today.cikis.status.label}
               </p>
             ) : null}
-            {today.pending_cikis_correction ? (
+            {!cikisActionable && today.pending_cikis_correction ? (
               <p className="pm-box-pending">Bekliyor</p>
             ) : null}
-            {canShowCorrection(
+            {!cikisActionable &&
+            canShowCorrection(
               allowCorrection,
               Boolean(today.pending_cikis_correction),
               today.cikis,

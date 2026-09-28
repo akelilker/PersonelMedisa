@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 import type { MeIdentity } from "../../src/types/self-service";
 import { formatSelfServiceMinutes } from "../../src/features/self-service/format-self-service-minutes";
 import { buildPersonelSelfIdentityView } from "../../src/features/self-service/personel-self-identity-view";
-import { PERSONEL_SELF_MENU } from "../../src/features/self-service/personel-self-service-menu";
+import {
+  PERSONEL_SELF_HOME_DOCK_MENU,
+  PERSONEL_SELF_MENU
+} from "../../src/features/self-service/personel-self-service-menu";
 
 function identity(overrides: Partial<MeIdentity["personel"]> = {}): MeIdentity {
   return {
@@ -58,7 +61,7 @@ describe("PERSONEL mobile product phase 1 identity", () => {
     expect(formatSelfServiceMinutes(16200)).toBe("270 saat");
   });
 
-  it("locks the six menu routes", () => {
+  it("keeps the full self menu registry for routes and modals", () => {
     expect(PERSONEL_SELF_MENU.map((item) => item.label)).toEqual([
       "Geçmiş",
       "İzinlerim",
@@ -74,6 +77,21 @@ describe("PERSONEL mobile product phase 1 identity", () => {
       "/self/duyurular",
       "/self/fazla-mesai",
       "/self/profil"
+    ]);
+  });
+
+  it("limits the home dock to four icon entries without duyurular or profil", () => {
+    expect(PERSONEL_SELF_HOME_DOCK_MENU.map((item) => item.id)).toEqual([
+      "gecmis",
+      "izinlerim",
+      "talepler",
+      "fazla-mesai"
+    ]);
+    expect(PERSONEL_SELF_HOME_DOCK_MENU.map((item) => item.testId)).toEqual([
+      "personel-menu-gecmis",
+      "personel-menu-izinlerim",
+      "personel-menu-talepler",
+      "personel-menu-fazla-mesai"
     ]);
   });
 });

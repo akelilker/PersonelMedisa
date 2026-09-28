@@ -24,6 +24,13 @@ describe("PERSONEL mobile product phase 1 shell", () => {
     const identity = read("src/features/self-service/components/PersonelSelfServiceIdentity.tsx");
     expect(identity).not.toContain("<img");
     expect(identity).not.toContain("avatar");
+
+    const menu = read("src/features/self-service/components/PersonelSelfServiceMenu.tsx");
+    expect(menu).toContain("PERSONEL_SELF_HOME_DOCK_MENU");
+    expect(menu).toContain('className="pm-self-dock"');
+    expect(menu).not.toContain("personel-menu-duyurular");
+    expect(menu).not.toContain("personel-menu-profil");
+    expect(menu).not.toContain("fetchSelfDuyurular");
   });
 
   it("removes the PERSONEL header history icon and keeps the history route", () => {

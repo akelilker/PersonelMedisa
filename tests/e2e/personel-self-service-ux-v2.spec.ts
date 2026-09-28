@@ -442,6 +442,11 @@ test.describe("PERSONEL self-service UX v2 — mobile product", () => {
 
       await expect(page.getByTestId("header-attendance-history")).toHaveCount(0);
       await expect(page.getByTestId("personel-menu-gecmis")).toBeVisible();
+      await expect(page.getByTestId("personel-menu-izinlerim")).toBeVisible();
+      await expect(page.getByTestId("personel-menu-talepler")).toBeVisible();
+      await expect(page.getByTestId("personel-menu-fazla-mesai")).toBeVisible();
+      await expect(page.getByTestId("personel-menu-duyurular")).toHaveCount(0);
+      await expect(page.getByTestId("personel-menu-profil")).toHaveCount(0);
       await expect(page.getByTestId("personel-self-menu")).toBeVisible();
       await expect(page.getByTestId("header-settings-toggle")).toHaveCount(0);
       await expect(page.getByTestId("header-logout-btn")).toBeVisible();
@@ -589,7 +594,9 @@ test.describe("PERSONEL self-service UX v2 — mobile product", () => {
     });
   }
 
-  test("430x932: six menu opens real owners without fake announcements", async ({ page }) => {
+  test("430x932: dock and header duyurular open real owners without fake announcements", async ({
+    page
+  }) => {
     await page.setViewportSize({ width: 430, height: 932 });
     await loginPersonel(page);
 
@@ -609,7 +616,7 @@ test.describe("PERSONEL self-service UX v2 — mobile product", () => {
     await expect(page.getByTestId("personel-talepler-page")).not.toContainText("Yakında");
     await page.getByRole("button", { name: "Ana sayfaya dön" }).click();
 
-    await page.getByTestId("personel-menu-duyurular").click();
+    await page.getByTestId("personel-shell-duyurular-link").click();
     await expect(page.getByTestId("personel-duyurular-empty")).toHaveText("Henüz duyuru bulunmuyor");
     await page.getByRole("button", { name: "Ana sayfaya dön" }).click();
 
@@ -619,14 +626,7 @@ test.describe("PERSONEL self-service UX v2 — mobile product", () => {
     await expect(page.getByTestId("personel-fazla-durum")).toHaveText("Limit içinde");
     await page.getByRole("button", { name: "Ana sayfaya dön" }).click();
 
-    await page.getByTestId("personel-menu-profil").click();
-    await expect(page.getByTestId("personel-profil-ad-soyad")).toHaveText("Ayşe Yılmaz");
-    await expect(page.getByTestId("personel-profil-sube")).toHaveText("Merkez");
-    await expect(page.getByTestId("personel-profil-bolum")).toHaveText("Operasyon");
-    await expect(page.getByTestId("personel-profil-birim")).toHaveText("Saha");
-    await expect(page.getByTestId("personel-profil-gorev")).toHaveText("Teknisyen");
-    await expect(page.getByTestId("personel-profil-ise-giris")).toHaveText("01.01.2020");
-    await expect(page.getByTestId("personel-profil-page").locator("img")).toHaveCount(0);
+    await expect(page.getByTestId("personel-menu-profil")).toHaveCount(0);
   });
 
   test("430x932: QR scan titles + idle/scanning copy + success collapse", async ({ page }) => {

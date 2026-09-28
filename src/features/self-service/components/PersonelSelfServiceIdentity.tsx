@@ -51,6 +51,11 @@ export function PersonelSelfServiceIdentity({
             onClick={openPhotoPicker}
           >
             <PersonelSelfPortrait name={view.adSoyad} photoSrc={photoSrc} />
+            {!photoSrc ? (
+              <span className="pm-self-identity__photo-add-badge" aria-hidden="true">
+                +
+              </span>
+            ) : null}
           </button>
           <input
             ref={fileInputRef}

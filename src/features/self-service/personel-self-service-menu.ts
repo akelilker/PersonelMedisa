@@ -20,7 +20,7 @@ export const PERSONEL_SELF_MENU: readonly PersonelSelfMenuItem[] = [
     to: "/self/qr-hareketleri",
     permission: "self_service.qr.events.view",
     testId: "personel-menu-gecmis",
-    modalTitle: "Giriş / Çıkış Geçmişim"
+    modalTitle: "Çalışma Geçmişi"
   },
   {
     id: "izinlerim",

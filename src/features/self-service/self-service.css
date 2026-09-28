@@ -342,6 +342,17 @@
   body.app-home-route .self-home-page .pm-box-main-action {
     min-height: 68px;
   }
+
+  body.app-home-route .self-home-page .pm-attendance-box:has(> .pm-box-status) {
+    min-height: 0;
+    padding-bottom: 6px;
+  }
+
+  body.app-home-route .self-home-page .pm-attendance-box:has(> .pm-box-status) > .pm-box-main-action {
+    min-height: 58px;
+    height: auto;
+    flex: 0 0 auto;
+  }
 }
 
 .self-home-main {
@@ -667,8 +678,10 @@ body.app-personel-shell.app-home-route .personel-mobile-shell.self-home-page > .
 }
 
 .self-home-page .pm-box-status {
-  font-size: 0.68rem;
-  line-height: 1.2;
+  flex: 0 0 auto;
+  font-size: 0.66rem;
+  line-height: 1.22;
+  padding: 0 4px 2px;
 }
 
 @media (min-width: 720px) {
@@ -973,7 +986,8 @@ body.app-personel-shell.app-home-route .personel-mobile-shell.self-home-page > .
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
-  overflow: hidden;
+  overflow: visible;
+  max-height: none;
 }
 
 .pm-box-pencil:focus-visible {
@@ -1022,6 +1036,15 @@ body.app-personel-shell.app-home-route .personel-mobile-shell.self-home-page > .
 /* Actionable GİRİŞ/ÇIKIŞ: single card surface — outer box border only */
 .pm-attendance-box:has(> .pm-box-main-action) {
   padding: 0;
+}
+
+.pm-attendance-box:has(> .pm-box-status) {
+  justify-content: flex-start;
+}
+
+.pm-attendance-box:has(> .pm-box-status) > .pm-box-main-action {
+  height: auto;
+  flex: 0 0 auto;
 }
 
 .pm-box-main-action {

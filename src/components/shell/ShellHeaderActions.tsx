@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { shouldPreferDemoApi } from "../../api/api-client";
+import { fetchSelfDuyurular } from "../../api/self-product.api";
 import { getAppData, useAppDataRevision } from "../../data/data-manager";
 import { BugunPersonelDurumuModal } from "../../features/bildirimler/components/BugunPersonelDurumuModal";
 import { useBildirimlerHeaderPreview } from "../../hooks/useBildirimler";
@@ -139,6 +141,7 @@ export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeade
   const [readNotificationIds, setReadNotificationIds] = useState<Record<string, true>>({});
   const [personelInboxItems, setPersonelInboxItems] = useState<InboxNotification[]>([]);
   const [personelInboxLoading, setPersonelInboxLoading] = useState(false);
+  const [personelDuyuruUnread, setPersonelDuyuruUnread] = useState(0);
 
   const {
     items: headerTamamlamalar,
@@ -273,6 +276,28 @@ export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeade
       .finally(() => {
         if (!cancelled) {
           setPersonelInboxLoading(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isPersonelRole, minimal, location.pathname]);
+
+  useEffect(() => {
+    if (!isPersonelRole || !minimal || shouldPreferDemoApi()) {
+      setPersonelDuyuruUnread(0);
+      return;
+    }
+    let cancelled = false;
+    void fetchSelfDuyurular()
+      .then((result) => {
+        if (!cancelled) {
+          setPersonelDuyuruUnread(Math.max(0, result.unread_count));
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setPersonelDuyuruUnread(0);
         }
       });
     return () => {
@@ -462,7 +487,31 @@ export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeade
 
   return (
     <>
-    <div className={`icons-row${minimal ? " icons-row--minimal" : ""}`} ref={rootRef}>
+    <div
+      className={`icons-row${minimal ? " icons-row--minimal" : ""}${isPersonelRole && minimal ? " icons-row--personel" : ""}`}
+      ref={rootRef}
+    >
+      {isPersonelRole && minimal ? (
+        <div className="icons-row-left">
+          <Link
+            to="/self/duyurular"
+            className="pm-shell-duyurular-link"
+            data-testid="personel-shell-duyurular-link"
+            onClick={() => {
+              setIsNotificationsOpen(false);
+              setIsSettingsOpen(false);
+              setIsSubeOpen(false);
+            }}
+          >
+            Duyurular
+            {personelDuyuruUnread > 0 ? (
+              <span className="pm-shell-duyurular-badge" data-testid="personel-shell-duyuru-badge">
+                {personelDuyuruUnread > 99 ? "99+" : personelDuyuruUnread}
+              </span>
+            ) : null}
+          </Link>
+        </div>
+      ) : null}
       {!minimal ? (
         <div className="icons-row-left">
           <span className="shell-context-label" title="Aktif ekran">

@@ -87,6 +87,8 @@ class MeController
                 'ad' => (string) $ctx['ad'],
                 'soyad' => (string) $ctx['soyad'],
                 'ad_soyad' => (string) $ctx['ad_soyad'],
+                'sicil_no' => $ctx['sicil_no'] ?? null,
+                'ise_giris_tarihi' => $ctx['ise_giris_tarihi'] ?? null,
                 'sube_id' => (int) $ctx['sube_id'],
                 'sube_ad' => (string) $ctx['sube_ad'],
                 'departman_id' => $ctx['departman_id'],

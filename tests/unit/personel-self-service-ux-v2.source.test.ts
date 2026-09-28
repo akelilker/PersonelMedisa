@@ -71,16 +71,17 @@ describe("PERSONEL_SELF_SERVICE_PRODUCT_UX_V2 notification + policy owners", () 
     expect(history).not.toContain('to="/"');
 
     const shell = read("src/app/AppShell.tsx");
-    // PERSONEL identity lives in the shell hero band: name restored, branch label
-    // still suppressed for the personnel shell.
-    expect(shell).toContain("userLabel={session?.user.ad_soyad}");
-    expect(shell).toContain('subeLabel={session?.user.rol === "PERSONEL" ? null : activeSubeLabel}');
+    expect(shell).toContain("isPersonelShellRole ? null : session?.user.ad_soyad");
+    expect(shell).toContain('variant={isPersonelShellRole ? "personel-shell" : "default"}');
+    expect(shell).toContain("app-personel-shell");
 
     const header = read("src/components/shell/ShellHeaderActions.tsx");
     expect(header).toContain('subeControl.kind === "multi" && !isPersonelRole');
     expect(header).toContain("showPersonelHomeLogout");
     expect(header).toContain('aria-label={showPersonelHomeLogout ? "Çıkış" : "Ayar menüsü"}');
     expect(header).toContain('<path d="M10 17l5-5-5-5" />');
+    expect(header).toContain("personel-shell-duyurular-link");
+    expect(header).toContain("fetchSelfDuyurular");
 
     const today = read("api/src/Services/Qr/QrAttendanceTodayService.php");
     expect(today).toContain("QrAttendancePresentationService::presentTodayBoxEvent");
@@ -107,6 +108,14 @@ describe("PERSONEL_SELF_SERVICE_PRODUCT_UX_V2 notification + policy owners", () 
     const notifications = read("src/styles/components/notifications.css");
     expect(notifications).toContain("overflow: visible");
     expect(notifications).toContain("overflow pairing");
+
+    const meController = read("api/src/Controllers/MeController.php");
+    expect(meController).toContain("'sicil_no' =>");
+    expect(meController).toContain("'ise_giris_tarihi' =>");
+
+    const selfCss = read("src/features/self-service/self-service.css");
+    expect(selfCss).toContain(".pm-self-identity--home");
+    expect(selfCss).not.toContain(".pm-self-home-info");
 
     const businessDay = read("api/src/Services/Attendance/AttendanceBusinessDayService.php");
     expect(businessDay).toContain("resolveWorkDay");

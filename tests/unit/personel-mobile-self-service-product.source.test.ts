@@ -11,10 +11,10 @@ describe("personel mobile/PWA self-service productization", () => {
     const home = read("src/features/self-service/pages/PersonelSelfServiceHomePage.tsx");
     expect(home).toContain('data-testid="personel-today-attendance-section"');
     expect(home).toContain("OwnQrAttendanceBoxes");
-    expect(home).toContain("PersonelSelfServiceHomeInfoBlock");
-    expect(home).toContain("buildPersonelSelfServiceHomeInfoView");
-    expect(home).toContain("fetchMeYillikIzinBakiye");
-    expect(home).toContain("self_service.yillik_izin.view");
+    expect(home).not.toContain("PersonelSelfServiceHomeInfoBlock");
+    expect(home).not.toContain("buildPersonelSelfServiceHomeInfoView");
+    expect(home).not.toContain("fetchMeYillikIzinBakiye");
+    expect(home).not.toContain("SelfServiceYillikIzinInfoModal");
     expect(home).not.toContain("QrKioskModelNote");
     expect(home).not.toContain("QrPuantajExpectationNote");
     expect(home).not.toContain('data-testid="personel-today-empty"');
@@ -132,7 +132,7 @@ describe("personel mobile/PWA self-service productization", () => {
     expect(home).not.toMatch(/setError\(cause instanceof Error \? cause\.message/);
 
     const css = read("src/features/self-service/self-service.css");
-    expect(css).toContain(".pm-leave-row");
+    expect(css).toContain(".pm-self-identity--home");
     expect(css).toContain(".qr-scan-cta-zone");
     expect(css).toContain(".self-service-action--primary");
     expect(css).toContain(".qr-event-badge");

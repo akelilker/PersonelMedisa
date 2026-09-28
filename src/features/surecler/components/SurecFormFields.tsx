@@ -23,6 +23,8 @@ type SurecFormFieldsProps = {
   personelFieldDisabled?: boolean;
   showSurecTuruField?: boolean;
   altTurField?: AltTurFieldConfig;
+  /** When set, alt selection may also update surecTuru (combined İzin ve Devamsızlık card). */
+  onAltTurSelect?: (previous: SurecFormState, altTur: string) => SurecFormState;
   useOperationControls?: boolean;
   showAltTurField?: boolean;
   showUcretliField?: boolean;
@@ -94,6 +96,7 @@ export function SurecFormFields({
   personelFieldDisabled = false,
   showSurecTuruField = true,
   altTurField,
+  onAltTurSelect,
   useOperationControls = false,
   showAltTurField = true,
   showUcretliField = true,
@@ -194,13 +197,15 @@ export function SurecFormFields({
               form.altTur,
               altTurField.options,
               (value) =>
-                setForm((prev) => ({
-                  ...prev,
-                  altTur: value,
-                  ilkIkiGunFirmaOderMi: isHastalikRaporSureci(prev.surecTuru, value)
-                    ? prev.ilkIkiGunFirmaOderMi
-                    : null
-                }))
+                setForm((prev) => {
+                  const next = onAltTurSelect ? onAltTurSelect(prev, value) : { ...prev, altTur: value };
+                  return {
+                    ...next,
+                    ilkIkiGunFirmaOderMi: isHastalikRaporSureci(next.surecTuru, next.altTur)
+                      ? next.ilkIkiGunFirmaOderMi
+                      : null
+                  };
+                })
             )
           : (
               <FormField
@@ -209,13 +214,15 @@ export function SurecFormFields({
                 name="surec-create-alt"
                 value={form.altTur}
                 onChange={(value) =>
-                  setForm((prev) => ({
-                    ...prev,
-                    altTur: value,
-                    ilkIkiGunFirmaOderMi: isHastalikRaporSureci(prev.surecTuru, value)
-                      ? prev.ilkIkiGunFirmaOderMi
-                      : null
-                  }))
+                  setForm((prev) => {
+                    const next = onAltTurSelect ? onAltTurSelect(prev, value) : { ...prev, altTur: value };
+                    return {
+                      ...next,
+                      ilkIkiGunFirmaOderMi: isHastalikRaporSureci(next.surecTuru, next.altTur)
+                        ? next.ilkIkiGunFirmaOderMi
+                        : null
+                    };
+                  })
                 }
                 required
                 placeholderOption={{ value: "", label: "Seçiniz" }}

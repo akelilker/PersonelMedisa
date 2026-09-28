@@ -56,7 +56,7 @@ Sekme görevleri:
 
 - `Genel`: Kayıt ekranında sorulan bütün personel bilgilerini okunur şekilde gösterir. Kısa özet değil, yayılmış personel dosyası görünümüdür.
 - `Genel` içinde sağ üstte personel fotoğrafı alanı bulunur. İlk sürümde fotoğraf yükleme alanı placeholder olabilir; gerçek upload entegrasyonu ayrı pakettir.
-- `İzin / Devamsızlık`: izin, rapor, iş kazası, izinsiz gelmedi, geç geldi, erken çıktı gibi yokluk ve devam durumlarını toplar.
+- Puantaj altındaki `İzin ve Devamsızlık` karosu yıllık, mazeret, ücretsiz izin ve izinsiz gelmedi kayıtlarını toplar. `Rapor` ve `İş Kazası` ayrı karolardır. Geç geldi ve erken çıktı saatli günlük durum olarak ayrı kalır.
 - `Pozisyon`: bölüm, bağlı amir, görev / unvan ve çalışma tipi değişikliklerini toplar; güncel personel bilgisi ve tarihçe sistem tarafından otomatik güncellenir.
 - `Belgeler`: forklift operatör belgesi, ehliyet, sertifika, sağlık belgesi, özel yetkinlik ve personel dosyası evraklarını toplar.
 - `Mali İşlemler`: avans ve ekstra prim gibi para etkili işlemleri toplar.

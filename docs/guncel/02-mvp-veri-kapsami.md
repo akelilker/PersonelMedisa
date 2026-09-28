@@ -251,7 +251,7 @@ UI operasyon aileleri:
 
 Gruplama kararı:
 
-- `izin`, `devamsizlik`, `rapor` ve `is_kazasi` kullanıcı arayüzünde `İzin / Devamsızlık` ailesi altında toplanır.
+- Puantaj kayıt karolarında `İzin ve Devamsızlık` yıllık, mazeret, ücretsiz izin ve izinsiz gelmedi seçeneklerini toplar. `Rapor` ve `İş Kazası` ayrı karolardır. Domain türleri `IZIN`, `DEVAMSIZLIK`, `RAPOR` ve `IS_KAZASI` ayrı kalır.
 - `departman`, `bağlı amir`, `görev / unvan` ve `çalışma tipi` değişiklikleri `Pozisyon` ailesinde ele alınır.
 - `ekstra_prim` ve `avans` kullanıcı arayüzünde `Mali İşlemler` ailesi altında toplanır.
 - `isten_ayrilma` ayrı lifecycle işlemidir; `Devamsızlık` altında gösterilmez.

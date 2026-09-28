@@ -92,7 +92,7 @@ export function KayitSurecPersonelPuantajPanel({
   return (
     <div className="surec-shell-panel" data-testid="kayit-surec-puantaj-panel">
       <p className="workspace-empty-hint" data-testid="kayit-surec-puantaj-owner-hint">
-        <strong>Puantaj</strong> — İzin / Rapor / İş Kazası / İzinsiz = özlük süreç kaydı. Geç / Erken /
+        <strong>Puantaj</strong> — İzin ve Devamsızlık / Rapor / İş Kazası = özlük süreç kaydı. Geç / Erken /
         Görevde = Bugünkü Personel Durumu (saatli günlük durum).
       </p>
 
@@ -102,8 +102,8 @@ export function KayitSurecPersonelPuantajPanel({
           <p>
             Henüz değerlendirilmedi, geç geldi, gelmedi ve eksik günlük kayıtlar Bugünkü Personel Durumu
             üzerinden okunur
-            {canCorrectScoped ? "; günlük düzeltme de orada yapılır" : ""}. İzin / rapor / izinsiz için
-            aşağıdaki özlük kayıtlarını kullan. Puantaj satırı düzenleme yetkisi yoksa satır ekranı yerine
+            {canCorrectScoped ? "; günlük düzeltme de orada yapılır" : ""}. İzin ve devamsızlık / rapor / iş
+            kazası için aşağıdaki özlük kayıtlarını kullan. Puantaj satırı düzenleme yetkisi yoksa satır ekranı yerine
             Bugün açılır.
           </p>
           <button

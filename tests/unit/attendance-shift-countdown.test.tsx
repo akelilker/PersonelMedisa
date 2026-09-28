@@ -65,7 +65,13 @@ vi.mock("../../src/features/self-service/hooks/useIstanbulMinuteClock", () => ({
 describe("OwnQrAttendanceBoxes countdown render", () => {
   type TodayArg = {
     giris?: Record<string, unknown> | null;
-    izinli_bugun?: boolean;
+    cikis?: Record<string, unknown> | null;
+    can_scan_giris?: boolean;
+    can_scan_cikis?: boolean;
+    bugun_calisma_beklentisi?: {
+      bekleniyor: boolean | null;
+      neden: "IZINLI" | "RAPORLU" | "GELMEDI" | null;
+    } | null;
     planned_shift?: { beklenen_giris_saati: string | null; beklenen_cikis_saati: string | null } | null;
   };
 
@@ -85,7 +91,7 @@ describe("OwnQrAttendanceBoxes countdown render", () => {
               cikis: null,
               can_scan_giris: true,
               can_scan_cikis: false,
-              izinli_bugun: false,
+              bugun_calisma_beklentisi: { bekleniyor: true, neden: null },
               ...today
             } as never
           }
@@ -122,7 +128,7 @@ describe("OwnQrAttendanceBoxes countdown render", () => {
   it("hides late warning when on leave today", async () => {
     clock.now = Date.parse("2026-09-25T09:43:00+03:00");
     const { screen } = await setup({
-      izinli_bugun: true,
+      bugun_calisma_beklentisi: { bekleniyor: false, neden: "IZINLI" },
       planned_shift: { beklenen_giris_saati: "09:00", beklenen_cikis_saati: "17:40" }
     });
 
@@ -142,6 +148,61 @@ describe("OwnQrAttendanceBoxes countdown render", () => {
       planned_shift: { beklenen_giris_saati: "09:00", beklenen_cikis_saati: "17:40" }
     });
 
+    expect(screen.queryByTestId("giris-late-warning")).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ["IZINLI"],
+    ["RAPORLU"],
+    ["GELMEDI"]
+  ] as const)("hides late warning and pre-shift countdown when bekleniyor is false (%s)", async (neden) => {
+    clock.now = Date.parse("2026-09-25T08:00:00+03:00");
+    const countdown = await setup({
+      bugun_calisma_beklentisi: { bekleniyor: false, neden },
+      planned_shift: { beklenen_giris_saati: "09:00", beklenen_cikis_saati: "17:40" }
+    });
+    expect(countdown.screen.queryByText("Mesaiye Kalan Süre")).not.toBeInTheDocument();
+    expect(countdown.screen.getByTestId("giris-scan")).toBeEnabled();
+    cleanup();
+
+    clock.now = Date.parse("2026-09-25T09:43:00+03:00");
+    const late = await setup({
+      bugun_calisma_beklentisi: { bekleniyor: false, neden },
+      planned_shift: { beklenen_giris_saati: "09:00", beklenen_cikis_saati: "17:40" }
+    });
+    expect(late.screen.queryByTestId("giris-late-warning")).not.toBeInTheDocument();
+    expect(late.screen.getByTestId("giris-scan")).toBeEnabled();
+  });
+
+  it("hides late warning and pre-shift countdown when bekleniyor is null", async () => {
+    clock.now = Date.parse("2026-09-25T09:43:00+03:00");
+    const { screen } = await setup({
+      bugun_calisma_beklentisi: { bekleniyor: null, neden: null },
+      planned_shift: { beklenen_giris_saati: "09:00", beklenen_cikis_saati: "17:40" }
+    });
+    expect(screen.queryByTestId("giris-late-warning")).not.toBeInTheDocument();
+    expect(screen.queryByText("Mesaiye Kalan Süre")).not.toBeInTheDocument();
+    expect(screen.getByTestId("giris-scan")).toBeEnabled();
+  });
+
+  it("keeps mesai bitimine countdown on an open shift even when work was not expected", async () => {
+    clock.now = Date.parse("2026-09-25T15:00:00+03:00");
+    const { screen } = await setup({
+      giris: {
+        id: 1,
+        event_type: "GIRIS",
+        occurred_at: "2026-09-25T06:00:00Z",
+        local_time: "09:00",
+        display_local_time: "09:00"
+      },
+      can_scan_giris: false,
+      can_scan_cikis: true,
+      bugun_calisma_beklentisi: { bekleniyor: false, neden: "RAPORLU" },
+      planned_shift: { beklenen_giris_saati: "09:00", beklenen_cikis_saati: "17:40" }
+    });
+
+    expect(screen.getByText("Mesai Bitimine Kalan")).toBeInTheDocument();
+    expect(screen.getByTestId("cikis-scan")).toBeEnabled();
     expect(screen.queryByTestId("giris-late-warning")).not.toBeInTheDocument();
   });
 

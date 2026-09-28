@@ -290,6 +290,94 @@ bpdAssert(
     BugunPersonelDurumuService::effectiveExceptionTur('GEC_GELDI', 'IZINLI') === 'GEC_GELDI',
     'bildirim exception wins over surec overlay'
 );
+bpdAssert(
+    BugunPersonelDurumuService::mapSurecToBugunExceptionTur('GOREVDE', null) === null,
+    'GOREVDE is not a covering surec exception'
+);
+
+$serviceSrc = file_get_contents($root . '/api/src/Services/Bildirim/BugunPersonelDurumuService.php');
+$todaySrc = file_get_contents($root . '/api/src/Services/Qr/QrAttendanceTodayService.php');
+bpdAssert(is_string($serviceSrc) && substr_count($serviceSrc, 'FROM surecler') === 1, 'one covering surecler SQL');
+bpdAssert(is_string($todaySrc) && strpos($todaySrc, 'hasApprovedLeaveToday') === false, 'leave-only SQL removed');
+bpdAssert(is_string($todaySrc) && strpos($todaySrc, 'FROM surecler') === false, 'today does not own a second SQL');
+bpdAssert(is_string($todaySrc) && strpos($todaySrc, 'fetchCoveringSurecExceptionMap') !== false, 'today uses shared core');
+
+$none = BugunPersonelDurumuService::calismaBeklentisiFromCover(true, null);
+bpdAssert($none['bekleniyor'] === true && $none['neden'] === null, 'resolved empty → expected');
+$izin = BugunPersonelDurumuService::calismaBeklentisiFromCover(true, 'IZINLI');
+bpdAssert($izin['bekleniyor'] === false && $izin['neden'] === 'IZINLI', 'IZINLI suppresses expectation');
+$rapor = BugunPersonelDurumuService::calismaBeklentisiFromCover(true, 'RAPORLU');
+bpdAssert($rapor['bekleniyor'] === false && $rapor['neden'] === 'RAPORLU', 'RAPORLU suppresses expectation');
+$gelmedi = BugunPersonelDurumuService::calismaBeklentisiFromCover(true, 'GELMEDI');
+bpdAssert($gelmedi['bekleniyor'] === false && $gelmedi['neden'] === 'GELMEDI', 'GELMEDI suppresses expectation');
+$unknown = BugunPersonelDurumuService::calismaBeklentisiFromCover(false, null);
+bpdAssert($unknown['bekleniyor'] === null && $unknown['neden'] === null, 'unresolved → null/null');
+
+$precedence = BugunPersonelDurumuService::reduceCoveringSurecRows([
+    ['personel_id' => 7, 'surec_turu' => 'DEVAMSIZLIK', 'alt_tur' => 'MAZERETSIZ_GEC_GELDI'],
+    ['personel_id' => 7, 'surec_turu' => 'IZIN', 'alt_tur' => 'YILLIK_IZIN'],
+    ['personel_id' => 8, 'surec_turu' => 'RAPOR', 'alt_tur' => 'Raporlu_Hastalik'],
+    ['personel_id' => 8, 'surec_turu' => 'IZIN', 'alt_tur' => 'YILLIK_IZIN'],
+]);
+bpdAssert(($precedence[7] ?? null) === 'IZINLI', 'unmapped newer row falls through to first mappable');
+bpdAssert(($precedence[8] ?? null) === 'RAPORLU', 'id DESC first mappable wins');
+
+if (!in_array('sqlite', PDO::getAvailableDrivers(), true)) {
+    bpdFail('pdo_sqlite required for covering-surec SQL checks');
+}
+
+$todayYmd = '2026-09-28';
+$missing = BugunPersonelDurumuService::fetchCoveringSurecExceptionMap(new PDO('sqlite::memory:'), [1], $todayYmd);
+bpdAssert($missing['resolved'] === false, 'missing surecler schema is unresolved');
+
+$pdo = new PDO('sqlite::memory:');
+$pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+$pdo->exec('CREATE TABLE surecler (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    personel_id INTEGER NOT NULL,
+    surec_turu TEXT NOT NULL,
+    alt_tur TEXT,
+    state TEXT NOT NULL,
+    baslangic_tarihi TEXT NOT NULL,
+    bitis_tarihi TEXT
+)');
+$insert = $pdo->prepare('INSERT INTO surecler (personel_id, surec_turu, alt_tur, state, baslangic_tarihi, bitis_tarihi) VALUES (?, ?, ?, ?, ?, ?)');
+$insert->execute([1, 'IZIN', 'YILLIK_IZIN', 'IPTAL', '2026-09-26', '2026-09-30']);
+$insert->execute([2, 'IZIN', 'MAZERET_IZNI', 'AKTIF', '2026-09-26', '2026-09-30']);
+$insert->execute([3, 'RAPOR', 'Raporlu_Hastalik', 'AKTIF', '2026-09-26', '2026-09-30']);
+$insert->execute([4, 'IS_KAZASI', 'IS_KAZASI_BILDIRIMI', 'AKTIF', '2026-09-01', null]);
+$insert->execute([5, 'DEVAMSIZLIK', 'IZINSIZ_GELMEDI', 'AKTIF', '2026-09-28', '2026-09-28']);
+$insert->execute([6, 'IZIN', 'UCRETSIZ_IZIN', 'AKTIF', '2026-09-29', '2026-09-30']);
+$insert->execute([9, 'GOREVDE', null, 'AKTIF', '2026-09-01', null]);
+$insert->execute([10, 'IZIN', 'YILLIK_IZIN', 'AKTIF', '2026-09-28', '2026-09-28']);
+$insert->execute([10, 'DEVAMSIZLIK', 'MAZERETSIZ_GEC_GELDI', 'AKTIF', '2026-09-28', '2026-09-28']);
+$insert->execute([11, 'IZIN', 'YILLIK_IZIN', 'AKTIF', '2026-09-20', '2026-09-28']);
+$insert->execute([11, 'RAPOR', 'Raporlu_Analik', 'AKTIF', '2026-09-20', '2026-09-28']);
+
+$empty = BugunPersonelDurumuService::fetchCoveringSurecExceptionMap($pdo, [99], $todayYmd);
+bpdAssert($empty['resolved'] === true && $empty['map'] === [], 'successful query with no row');
+$emptyBeklenti = BugunPersonelDurumuService::calismaBeklentisiFromCover(true, null);
+bpdAssert($emptyBeklenti['bekleniyor'] === true && $emptyBeklenti['neden'] === null, 'no row → bekleniyor true');
+
+$cover = BugunPersonelDurumuService::fetchCoveringSurecExceptionMap($pdo, [1, 2, 3, 4, 5, 6, 9, 10, 11], $todayYmd);
+bpdAssert($cover['resolved'] === true, 'covering query resolved');
+bpdAssert(!isset($cover['map'][1]), 'non-AKTIF does not suppress');
+bpdAssert(($cover['map'][2] ?? null) === 'IZINLI', 'range-covered IZIN');
+bpdAssert(($cover['map'][3] ?? null) === 'RAPORLU', 'RAPOR maps RAPORLU');
+bpdAssert(($cover['map'][4] ?? null) === 'RAPORLU', 'open-ended IS_KAZASI maps RAPORLU');
+bpdAssert(($cover['map'][5] ?? null) === 'GELMEDI', 'IZINSIZ_GELMEDI maps GELMEDI');
+bpdAssert(!isset($cover['map'][6]), 'future start is outside range');
+bpdAssert(!isset($cover['map'][9]), 'GOREVDE is outside covering surec SQL');
+bpdAssert(($cover['map'][10] ?? null) === 'IZINLI', 'newer unmapped row does not hide older IZIN');
+bpdAssert(($cover['map'][11] ?? null) === 'RAPORLU', 'newer covering RAPOR wins over older IZIN');
+
+$broken = new PDO('sqlite::memory:');
+$broken->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+$broken->exec('CREATE TABLE surecler (id INTEGER PRIMARY KEY)');
+$failed = BugunPersonelDurumuService::fetchCoveringSurecExceptionMap($broken, [1], $todayYmd);
+bpdAssert($failed['resolved'] === false && $failed['map'] === [], 'query failure is unresolved');
+$failedBeklenti = BugunPersonelDurumuService::calismaBeklentisiFromCover(false, null);
+bpdAssert($failedBeklenti['bekleniyor'] === null && $failedBeklenti['neden'] === null, 'query failure → null/null');
 
 bpdOk('BugunPersonelDurumuService pure semantics');
 echo "ALL_PASS bugun-personel-durumu\n";

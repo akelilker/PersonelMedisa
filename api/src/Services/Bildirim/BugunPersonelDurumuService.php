@@ -799,25 +799,28 @@ class BugunPersonelDurumuService
     }
 
     /**
-     * @param array<int, array<string, mixed>> $rows
+     * One covering-surec query for many personel ids.
+     * resolved=false is schema/query failure, not "no row".
+     *
+     * @param array<int, mixed> $personelIds
      * @param string $tarih
-     * @return array<int, string> personel_id → Bugün exception turu
+     * @return array{resolved: bool, map: array<int, string>}
      */
-    private static function fetchCoveringSurecExceptionTurByPersonel(PDO $pdo, array $rows, $tarih)
+    public static function fetchCoveringSurecExceptionMap(PDO $pdo, array $personelIds, $tarih)
     {
-        if (!self::hasTable($pdo, 'surecler')) {
-            return [];
-        }
-
         $ids = [];
-        foreach ($rows as $row) {
-            $id = (int) ($row['personel_id'] ?? 0);
+        foreach ($personelIds as $id) {
+            $id = (int) $id;
             if ($id > 0) {
                 $ids[$id] = $id;
             }
         }
+
+        if (!self::hasTable($pdo, 'surecler')) {
+            return ['resolved' => false, 'map' => []];
+        }
         if (count($ids) === 0) {
-            return [];
+            return ['resolved' => true, 'map' => []];
         }
 
         $placeholders = [];
@@ -843,12 +846,27 @@ class BugunPersonelDurumuService
         try {
             $stmt = $pdo->prepare($sql);
             $stmt->execute($params);
+            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
         } catch (\Throwable $e) {
-            return [];
+            return ['resolved' => false, 'map' => []];
         }
 
+        return [
+            'resolved' => true,
+            'map' => self::reduceCoveringSurecRows(is_array($rows) ? $rows : []),
+        ];
+    }
+
+    /**
+     * id DESC rows: first mappable resmi süreç wins per personel.
+     *
+     * @param array<int, array<string, mixed>> $rows
+     * @return array<int, string>
+     */
+    public static function reduceCoveringSurecRows(array $rows)
+    {
         $map = [];
-        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        foreach ($rows as $row) {
             $personelId = (int) ($row['personel_id'] ?? 0);
             if ($personelId < 1 || isset($map[$personelId])) {
                 continue;
@@ -863,6 +881,48 @@ class BugunPersonelDurumuService
         }
 
         return $map;
+    }
+
+    /**
+     * @param bool $resolved
+     * @param string|null $exceptionTur
+     * @return array{bekleniyor: bool|null, neden: string|null}
+     */
+    public static function calismaBeklentisiFromCover($resolved, $exceptionTur)
+    {
+        if (!$resolved) {
+            return ['bekleniyor' => null, 'neden' => null];
+        }
+
+        $tur = strtoupper(trim((string) $exceptionTur));
+        if (in_array($tur, ['IZINLI', 'RAPORLU', 'GELMEDI'], true)) {
+            return ['bekleniyor' => false, 'neden' => $tur];
+        }
+
+        return ['bekleniyor' => true, 'neden' => null];
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $rows
+     * @param string $tarih
+     * @return array<int, string> personel_id → Bugün exception turu
+     */
+    private static function fetchCoveringSurecExceptionTurByPersonel(PDO $pdo, array $rows, $tarih)
+    {
+        $ids = [];
+        foreach ($rows as $row) {
+            $id = (int) ($row['personel_id'] ?? 0);
+            if ($id > 0) {
+                $ids[$id] = $id;
+            }
+        }
+
+        $cover = self::fetchCoveringSurecExceptionMap($pdo, array_values($ids), $tarih);
+        if (!$cover['resolved']) {
+            return [];
+        }
+
+        return $cover['map'];
     }
 
     /**

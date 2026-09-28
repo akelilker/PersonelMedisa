@@ -52,8 +52,19 @@ export type AttendanceTodayResponse = {
     beklenen_giris_saati: string | null;
     beklenen_cikis_saati: string | null;
   } | null;
-  /** Bugün onaylı (AKTIF) bir izin süreci kapsıyor mu. */
-  izinli_bugun: boolean;
+  /**
+   * Canonical: is a normal shift expected today?
+   * null bekleniyor = covering-surec resolver could not decide (fail closed on late warning).
+   */
+  bugun_calisma_beklentisi?: {
+    bekleniyor: boolean | null;
+    neden: "IZINLI" | "RAPORLU" | "GELMEDI" | null;
+  } | null;
+  /**
+   * @deprecated Cached-client alias. Not "on leave".
+   * true when work is not positively expected, so old `!izinli_bugun` does not show a false late warning.
+   */
+  izinli_bugun?: boolean;
 };
 
 export type InboxNotification = {

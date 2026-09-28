@@ -21,7 +21,7 @@ type OwnQrAttendanceBoxesProps = {
     | "pending_cikis_correction"
     | "capabilities"
     | "planned_shift"
-    | "izinli_bugun"
+    | "bugun_calisma_beklentisi"
   >;
   /** Role-independent QR entitlement mirror (`self_service.qr.scan`). */
   qrEnabled: boolean;
@@ -111,9 +111,10 @@ export function OwnQrAttendanceBoxes({
 
   const girisActionable = qrEnabled && today.can_scan_giris;
   const cikisActionable = qrEnabled && today.can_scan_cikis;
+  const workExpected = today.bugun_calisma_beklentisi?.bekleniyor === true;
 
   const girisCountdown =
-    shiftKnown && girisActionable
+    shiftKnown && girisActionable && workExpected
       ? mesaiyeKalanLabel(planned?.beklenen_giris_saati, now)
       : null;
   const cikisCountdown =
@@ -121,11 +122,11 @@ export function OwnQrAttendanceBoxes({
       ? mesaiBitimineKalanLabel(planned?.beklenen_cikis_saati, now)
       : null;
 
-  // İşe geç kalındı (bilgilendirme): bugün giriş yok, planlı giriş saati geçmiş, izinli değil.
+  // İşe geç kalındı yalnız pozitif çalışma beklentisi varken (false ve unknown bastırır).
   const girisGec =
     !today.giris &&
     isGirisSaatiGecti(planned?.beklenen_giris_saati, now) &&
-    !today.izinli_bugun;
+    workExpected;
 
   return (
     <div className="pm-attendance-grid" data-testid={testId}>

@@ -10,8 +10,8 @@ export type PersonelSelfMenuItem = {
 };
 
 /**
- * PERSONEL product home menu. Geçmiş keeps the existing history route/modal.
- * The other five open self-product modals; they do not replace manager shortcuts.
+ * PERSONEL product menu registry. Geçmiş keeps the existing history route/modal.
+ * Self-product routes open modals; they do not replace manager shortcuts.
  */
 export const PERSONEL_SELF_MENU: readonly PersonelSelfMenuItem[] = [
   {
@@ -63,6 +63,18 @@ export const PERSONEL_SELF_MENU: readonly PersonelSelfMenuItem[] = [
     modalTitle: "Profilim"
   }
 ];
+
+/** PERSONEL ana ekran alt dock — Duyurular üst megafonda, Profilim foto dokunuşunda. */
+export const PERSONEL_SELF_HOME_DOCK_IDS: readonly PersonelSelfMenuItem["id"][] = [
+  "gecmis",
+  "izinlerim",
+  "talepler",
+  "fazla-mesai"
+];
+
+export const PERSONEL_SELF_HOME_DOCK_MENU: readonly PersonelSelfMenuItem[] = PERSONEL_SELF_MENU.filter(
+  (item) => PERSONEL_SELF_HOME_DOCK_IDS.includes(item.id)
+);
 
 const SELF_PRODUCT_PATHS = new Set(
   PERSONEL_SELF_MENU.filter((item) => item.id !== "gecmis").map((item) => item.to)

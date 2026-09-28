@@ -1,0 +1,18 @@
+- generic [ref=e34]:
+  - main [ref=e35]:
+    - generic [ref=e36]:
+      - generic [ref=e37]:
+        - img "MEDISA" [ref=e40]
+        - heading "Personel Yönetim Sistemi" [level=1] [ref=e42]
+      - generic [ref=e44]:
+        - link "Duyurular" [ref=e46] [cursor=pointer]:
+          - /url: /self/duyurular
+        - generic [ref=e57]:
+          - button "Bildirimleri aç" [ref=e59] [cursor=pointer]
+          - button "Çıkış" [ref=e63] [cursor=pointer]
+    - paragraph [ref=e69]: Demo modda personel eşlemesi yok.
+  - contentinfo [ref=e70]:
+    - generic [ref=e71]:
+      - generic [ref=e72]: v78.2
+      - img "MEDISA" [ref=e74]
+      - generic [ref=e75]: Sistem Hazır

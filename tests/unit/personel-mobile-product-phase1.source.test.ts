@@ -14,8 +14,9 @@ describe("PERSONEL mobile product phase 1 shell", () => {
     expect(home).toContain("PersonelSelfServiceIdentity");
     expect(home).toContain("PersonelSelfServiceMenu");
     expect(home).toContain("OwnQrAttendanceBoxes");
-    expect(home).toContain("PersonelSelfServiceHomeInfoBlock");
-    expect(home).toContain("fetchMeYillikIzinBakiye");
+    expect(home).not.toContain("PersonelSelfServiceHomeInfoBlock");
+    expect(home).not.toContain("fetchMeYillikIzinBakiye");
+    expect(home).toContain("useSelfProfilFoto");
     expect(home).toContain("AttendanceCorrectionRequestModal");
     expect(home).not.toContain("<img");
     expect(home).not.toContain("avatar");
@@ -85,7 +86,8 @@ describe("PERSONEL mobile product phase 1 shell", () => {
 
     const profil = read("src/features/self-service/pages/PersonelSelfServiceProfilPage.tsx");
     expect(profil).toContain("fetchMe(");
-    expect(profil).toContain("fetchMeYillikIzinBakiye");
+    expect(profil).toContain("ise_giris_tarihi");
+    expect(profil).toContain("useSelfProfilFoto");
     expect(profil).not.toContain("tc_kimlik");
     expect(profil).not.toContain("<img");
   });

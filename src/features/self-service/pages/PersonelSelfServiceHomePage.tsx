@@ -8,23 +8,18 @@ import {
   type AttendanceTodayResponse
 } from "../../../api/attendance-mobile.api";
 import { isApiRequestError, shouldPreferDemoApi } from "../../../api/api-client";
-import { fetchMe, fetchMeYillikIzinBakiye } from "../../../api/me.api";
-import { fetchSelfProfilFoto, selfProfilFotoSrc } from "../../../api/self-product.api";
+import { fetchMe } from "../../../api/me.api";
 import { LoadingState } from "../../../components/states/LoadingState";
 import { useRoleAccess } from "../../../hooks/use-role-access";
 import type { MeIdentity } from "../../../types/self-service";
-import type { YillikIzinBakiye } from "../../../types/yillik-izin-hak-duzeltme";
 import { AttendanceCorrectionRequestModal } from "../components/AttendanceCorrectionRequestModal";
 import { BackgroundlessNoticeModal } from "../components/BackgroundlessNoticeModal";
 import { OwnQrAttendanceBoxes } from "../components/OwnQrAttendanceBoxes";
-import { SelfServiceYillikIzinInfoModal } from "../components/SelfServiceYillikIzinInfoModal";
-import { PersonelSelfServiceHomeInfoBlock } from "../components/PersonelSelfServiceHomeInfoBlock";
 import { PersonelSelfServiceIdentity } from "../components/PersonelSelfServiceIdentity";
 import { PersonelSelfServiceMenu } from "../components/PersonelSelfServiceMenu";
+import { useSelfProfilFoto } from "../hooks/use-self-profil-foto";
 import { buildPersonelSelfIdentityView } from "../personel-self-identity-view";
 import { PersonelMobileCapabilityService } from "../personel-mobile-capability";
-import { buildPersonelSelfServiceHomeInfoView } from "../personel-self-service-home-view";
-import { buildSelfServiceYillikIzinView } from "../personel-self-service-yillik-izin-view";
 import { primeQrCamera } from "../qr/qr-scanner";
 
 type NoticeState =
@@ -53,31 +48,13 @@ export function PersonelSelfServiceHomePage() {
   const navigate = useNavigate();
   const { hasPermission } = useRoleAccess();
   const qrEnabled = hasPermission("self_service.qr.scan");
-  const izinViewEnabled = hasPermission("self_service.yillik_izin.view");
   const [loading, setLoading] = useState(true);
   const [today, setToday] = useState<AttendanceTodayResponse | null>(null);
-  const [izinBakiye, setIzinBakiye] = useState<YillikIzinBakiye | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<NoticeState>(null);
   const [correctDraft, setCorrectDraft] = useState<CorrectDraft | null>(null);
-  const [leaveModalOpen, setLeaveModalOpen] = useState(false);
   const [me, setMe] = useState<MeIdentity | null>(null);
-  const [photoSrc, setPhotoSrc] = useState<string | null>(null);
-
-  const refreshIzinBakiye = useCallback(() => {
-    if (!izinViewEnabled) {
-      setIzinBakiye(null);
-      return;
-    }
-    void Promise.resolve()
-      .then(() => fetchMeYillikIzinBakiye())
-      .then((bakiye) => {
-        setIzinBakiye(bakiye);
-      })
-      .catch(() => {
-        setIzinBakiye(null);
-      });
-  }, [izinViewEnabled]);
+  const { photoSrc, onPhotoSelected } = useSelfProfilFoto();
 
   const load = useCallback(async () => {
     if (shouldPreferDemoApi()) {
@@ -148,7 +125,6 @@ export function PersonelSelfServiceHomePage() {
   useEffect(() => {
     if (shouldPreferDemoApi()) {
       setMe(null);
-      setPhotoSrc(null);
       return;
     }
     let cancelled = false;
@@ -163,30 +139,10 @@ export function PersonelSelfServiceHomePage() {
           setMe(null);
         }
       });
-    void fetchSelfProfilFoto()
-      .then((photo) => {
-        if (!cancelled) {
-          setPhotoSrc(selfProfilFotoSrc(photo));
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setPhotoSrc(null);
-        }
-      });
     return () => {
       cancelled = true;
     };
   }, []);
-
-  useEffect(() => {
-    if (loading || error || !today) {
-      return;
-    }
-    refreshIzinBakiye();
-  }, [loading, error, today, refreshIzinBakiye]);
-
-  const izinView = izinBakiye ? buildSelfServiceYillikIzinView(izinBakiye) : null;
 
   const caps = today?.capabilities;
   const comingSoon = caps?.coming_soon_message ?? COMING_SOON;
@@ -256,56 +212,54 @@ export function PersonelSelfServiceHomePage() {
     );
   }
 
-  const homeInfoView = buildPersonelSelfServiceHomeInfoView(today, izinViewEnabled ? izinView : null);
   const identityView = me ? buildPersonelSelfIdentityView(me) : null;
 
   return (
     <section className="personel-mobile-shell self-home-page" data-testid="personel-self-service-page">
-      {identityView ? <PersonelSelfServiceIdentity view={identityView} photoSrc={photoSrc} /> : null}
-      <div className="self-home-main" data-testid="personel-self-home-main">
-        <PersonelSelfServiceHomeInfoBlock
-          view={homeInfoView}
-          onOpenIzinModal={
-            izinViewEnabled && izinView ? () => setLeaveModalOpen(true) : undefined
-          }
+      {identityView ? (
+        <PersonelSelfServiceIdentity
+          view={identityView}
+          photoSrc={photoSrc}
+          onPhotoSelected={onPhotoSelected}
         />
-
+      ) : null}
+      <div className="self-home-main" data-testid="personel-self-home-main">
         <section className="pm-section" data-testid="personel-today-attendance-section">
           <OwnQrAttendanceBoxes
-          today={today}
-          qrEnabled={qrEnabled}
-          testId="personel-attendance-boxes"
-          allowCorrection
-          onScanGiris={() =>
-            guardOrRun("qr_scan", () => {
-              primeQrCamera();
-              navigate("/self/qr-okut?event=GIRIS");
-            })
-          }
-          onScanCikis={() =>
-            guardOrRun("qr_scan", () => {
-              primeQrCamera();
-              navigate("/self/qr-okut?event=CIKIS");
-            })
-          }
-          onCorrectGiris={(event) =>
-            guardOrRun("attendance_correct", () => {
-              setCorrectDraft({
-                eventId: event.id,
-                eventType: "GIRIS",
-                currentTime: event.display_local_time ?? event.local_time
-              });
-            })
-          }
-          onCorrectCikis={(event) =>
-            guardOrRun("attendance_correct", () => {
-              setCorrectDraft({
-                eventId: event.id,
-                eventType: "CIKIS",
-                currentTime: event.display_local_time ?? event.local_time
-              });
-            })
-          }
+            today={today}
+            qrEnabled={qrEnabled}
+            testId="personel-attendance-boxes"
+            allowCorrection
+            onScanGiris={() =>
+              guardOrRun("qr_scan", () => {
+                primeQrCamera();
+                navigate("/self/qr-okut?event=GIRIS");
+              })
+            }
+            onScanCikis={() =>
+              guardOrRun("qr_scan", () => {
+                primeQrCamera();
+                navigate("/self/qr-okut?event=CIKIS");
+              })
+            }
+            onCorrectGiris={(event) =>
+              guardOrRun("attendance_correct", () => {
+                setCorrectDraft({
+                  eventId: event.id,
+                  eventType: "GIRIS",
+                  currentTime: event.display_local_time ?? event.local_time
+                });
+              })
+            }
+            onCorrectCikis={(event) =>
+              guardOrRun("attendance_correct", () => {
+                setCorrectDraft({
+                  eventId: event.id,
+                  eventType: "CIKIS",
+                  currentTime: event.display_local_time ?? event.local_time
+                });
+              })
+            }
           />
         </section>
       </div>
@@ -333,12 +287,6 @@ export function PersonelSelfServiceHomePage() {
         onError={(message) => {
           setNotice({ title: "Düzeltme Talebi", body: message });
         }}
-      />
-
-      <SelfServiceYillikIzinInfoModal
-        open={leaveModalOpen}
-        view={izinView}
-        onClose={() => setLeaveModalOpen(false)}
       />
 
       <BackgroundlessNoticeModal

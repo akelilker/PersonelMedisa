@@ -21,6 +21,7 @@ import { PersonelDetayPrintButton } from "../features/personeller/components/per
 import { readPersonelKartBack } from "../features/personeller/personel-kart-nav";
 import { personelSelfProductModalTitle } from "../features/self-service/personel-self-service-menu";
 import { useRoleAccess } from "../hooks/use-role-access";
+import { canonicalizeUserRole } from "../lib/authorization/canonicalize-user-role";
 
 export type AppShellOutletContext = {
   onKayitOpen: (tab: KayitTab) => void;
@@ -288,6 +289,7 @@ export function AppShell() {
   const [importHistoryOpen, setImportHistoryOpen] = useState(false);
   const { hasPermission } = useRoleAccess();
   const canApplyPersonelImport = hasPermission("personeller.import.apply");
+  const isPersonelShellRole = canonicalizeUserRole(session?.user.rol) === "PERSONEL";
   const handleKayitFooterModelChange = useCallback((model: KayitModalFooterModel | null) => {
     setKayitFooterModel(model);
   }, []);
@@ -305,6 +307,14 @@ export function AppShell() {
       document.body.classList.remove("app-home-route");
     };
   }, [isHomeRoute, isLoginRoute]);
+
+  useEffect(() => {
+    document.body.classList.toggle("app-personel-shell", isPersonelShellRole && !isAuthSurfaceRoute);
+
+    return () => {
+      document.body.classList.remove("app-personel-shell");
+    };
+  }, [isPersonelShellRole, isAuthSurfaceRoute]);
 
   useEffect(() => {
     const resetDocumentScroll = () => {
@@ -390,8 +400,9 @@ export function AppShell() {
         <div className="shell-top-stack">
           <Hero
             title="Personel Yönetim Sistemi"
-            userLabel={session?.user.ad_soyad}
-            subeLabel={session?.user.rol === "PERSONEL" ? null : activeSubeLabel}
+            userLabel={isPersonelShellRole ? null : session?.user.ad_soyad}
+            subeLabel={isPersonelShellRole ? null : activeSubeLabel}
+            variant={isPersonelShellRole ? "personel-shell" : "default"}
           />
           {showShellHeaderActions ? <ShellHeaderActions contextLabel="Ana panel" minimal={isHomeRoute} /> : null}
         </div>

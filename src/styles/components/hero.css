@@ -734,4 +734,108 @@ body.login-page .hero .animated-line {
       padding: 0 1px 0 0;
     }
   }
+
+  /*
+   * PERSONEL self-service shell: Taşıt home header geometry without session name;
+   * ~8px shorter than the session hero band above.
+   */
+  body.app-home-route .hero.hero--personel-shell {
+    display: grid;
+    grid-template-columns: auto minmax(min-content, 1fr) 1px;
+    grid-template-rows: auto;
+    align-items: center;
+    column-gap: 0;
+    row-gap: 0;
+    overflow: visible;
+    margin-bottom: 4px;
+    min-height: 71px;
+    width: calc(100% - 4px);
+    max-width: calc(100% - 4px);
+    margin-left: auto;
+    margin-right: auto;
+    padding: 9px 12px 7px 6px;
+    box-sizing: border-box;
+    --hero-home-title-ink-w: 338px;
+    border-color: rgba(140, 158, 176, 0.6);
+    box-shadow:
+      0 4px 16px rgba(0, 0, 0, 0.4),
+      0 4px 18px rgba(var(--theme-color-rgb), 0.045),
+      inset 0 1px 0 rgba(184, 198, 212, 0.2),
+      inset 0 -1px 0 rgba(28, 36, 50, 0.52);
+  }
+
+  body.app-home-route .hero.hero--personel-shell .hero-logo {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    grid-column: 1;
+    grid-row: 1;
+    flex: 0 1 auto;
+    width: auto;
+    min-width: 54px;
+    max-width: 54px;
+    margin-right: 6px;
+    margin-left: 0;
+    padding-left: 2px;
+    align-self: center;
+    transform: translate(0, 0);
+  }
+
+  body.app-home-route .hero.hero--personel-shell .hero-logo picture {
+    width: 54px;
+    max-width: 54px;
+    transform: translate(1px, 1px);
+  }
+
+  body.app-home-route .hero.hero--personel-shell .hero-logo img {
+    height: 44px;
+    width: auto;
+  }
+
+  body.app-home-route .hero.hero--personel-shell .hero-title-stack {
+    grid-column: 2;
+    grid-row: 1;
+    align-self: center;
+    min-width: 0;
+    justify-self: stretch;
+    text-align: left;
+    padding: 0;
+  }
+
+  body.app-home-route .hero.hero--personel-shell .hero-title-stack > h1 {
+    text-align: left;
+    background-position: 0% 50%;
+    font-size: min(21.4px, calc(4.977vw - 0.12px));
+    letter-spacing: clamp(0px, 0.03vw, 0.3px);
+    line-height: 1.2;
+    transform: none;
+    overflow: hidden;
+    text-overflow: clip;
+    white-space: nowrap;
+    padding: 0 3px 0 0;
+  }
+
+  body.app-home-route .hero.hero--personel-shell .hero-spacer {
+    grid-column: 3;
+    grid-row: 1;
+    width: 1px;
+    min-width: 1px;
+  }
+
+  body.app-home-route .hero.hero--personel-shell .hero-title-stack .animated-line {
+    position: static;
+    justify-self: start;
+    align-self: start;
+    width: calc(var(--hero-home-title-ink-w) * 0.82);
+    margin-left: calc(var(--hero-home-title-ink-w) * 0.09);
+    height: 2.7px;
+    opacity: 0.72;
+    background: linear-gradient(
+      90deg,
+      rgba(var(--theme-color-rgb), 0.06),
+      rgba(var(--theme-color-rgb), 0.9) 50%,
+      rgba(var(--theme-color-rgb), 0.06)
+    );
+    box-shadow: 0 2px 10px rgba(var(--theme-color-rgb), 0.3);
+  }
 }

@@ -81,6 +81,8 @@
 }
 
 .icons-row--minimal.icons-row--personel .icons-row-left {
+  display: flex;
+  align-items: center;
   min-width: 0;
 }
 
@@ -90,10 +92,9 @@
 }
 
 .pm-shell-duyurular-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 38px;
+  position: relative;
+  display: inline-grid;
+  place-items: center;
   padding: 0 4px;
   color: rgba(240, 240, 240, 0.92);
   font-size: 13px;
@@ -101,6 +102,11 @@
   letter-spacing: 0.02em;
   text-decoration: none;
   white-space: nowrap;
+  overflow: visible;
+}
+
+.icons-row--minimal.icons-row--personel .pm-shell-duyurular-link {
+  padding-bottom: 2px;
 }
 
 .pm-shell-duyurular-link:hover,
@@ -109,18 +115,21 @@
 }
 
 .pm-shell-duyurular-badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 20px;
-  height: 20px;
-  padding: 0 6px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
   border-radius: 999px;
-  background: rgba(var(--theme-color-rgb), 0.92);
+  background: var(--brand-red, #c62828);
   color: #fff;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
-  line-height: 1;
+  line-height: 16px;
 }
 
 .icons-row--minimal .notification-wrap {

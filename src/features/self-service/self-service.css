@@ -342,6 +342,17 @@
   body.app-home-route .self-home-page .pm-box-main-action {
     min-height: 68px;
   }
+
+  body.app-home-route .self-home-page .pm-attendance-box:has(> .pm-box-status) {
+    min-height: 0;
+    padding-bottom: 6px;
+  }
+
+  body.app-home-route .self-home-page .pm-attendance-box:has(> .pm-box-status) > .pm-box-main-action {
+    min-height: 58px;
+    height: auto;
+    flex: 0 0 auto;
+  }
 }
 
 .self-home-main {
@@ -667,8 +678,10 @@ body.app-personel-shell.app-home-route .personel-mobile-shell.self-home-page > .
 }
 
 .self-home-page .pm-box-status {
-  font-size: 0.68rem;
-  line-height: 1.2;
+  flex: 0 0 auto;
+  font-size: 0.66rem;
+  line-height: 1.22;
+  padding: 0 4px 2px;
 }
 
 @media (min-width: 720px) {
@@ -886,9 +899,31 @@ body.app-personel-shell.app-home-route .personel-mobile-shell.self-home-page > .
   border-color: rgba(198, 40, 40, 0.38);
 }
 
-.pm-attendance-box--idle-giris:not(.pm-attendance-box--actionable),
+.pm-attendance-box--idle-giris:not(.pm-attendance-box--actionable) {
+  border-color: rgba(46, 125, 50, 0.52);
+  background: rgba(0, 0, 0, 0.14);
+}
+
 .pm-attendance-box--idle-cikis:not(.pm-attendance-box--actionable) {
-  opacity: 0.72;
+  border-color: rgba(198, 40, 40, 0.52);
+  background: rgba(0, 0, 0, 0.14);
+}
+
+.pm-attendance-box--idle-giris:not(.pm-attendance-box--actionable) .pm-box-main-action:disabled,
+.pm-attendance-box--idle-cikis:not(.pm-attendance-box--actionable) .pm-box-main-action:disabled {
+  opacity: 1;
+  cursor: default;
+  color: rgba(255, 255, 255, 0.94);
+}
+
+.pm-attendance-box--idle-giris:not(.pm-attendance-box--actionable) .pm-box-label,
+.pm-attendance-box--idle-cikis:not(.pm-attendance-box--actionable) .pm-box-label {
+  color: rgba(240, 240, 240, 0.9);
+}
+
+.pm-attendance-box--idle-giris:not(.pm-attendance-box--actionable) .pm-box-time,
+.pm-attendance-box--idle-cikis:not(.pm-attendance-box--actionable) .pm-box-time {
+  color: rgba(255, 255, 255, 0.96);
 }
 
 .pm-box-countdown-title {
@@ -938,8 +973,21 @@ body.app-personel-shell.app-home-route .personel-mobile-shell.self-home-page > .
  */
 .pm-attendance-box > .pm-box-pencil {
   position: absolute;
+  top: 4px;
   right: 4px;
-  bottom: 4px;
+  z-index: 1;
+}
+
+.pm-attendance-box:has(> .pm-box-pencil) .pm-box-status {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  padding-right: 46px;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: visible;
+  max-height: none;
 }
 
 .pm-box-pencil:focus-visible {
@@ -990,6 +1038,15 @@ body.app-personel-shell.app-home-route .personel-mobile-shell.self-home-page > .
   padding: 0;
 }
 
+.pm-attendance-box:has(> .pm-box-status) {
+  justify-content: flex-start;
+}
+
+.pm-attendance-box:has(> .pm-box-status) > .pm-box-main-action {
+  height: auto;
+  flex: 0 0 auto;
+}
+
 .pm-box-main-action {
   box-sizing: border-box;
   width: 100%;
@@ -1022,8 +1079,7 @@ body.app-personel-shell.app-home-route .personel-mobile-shell.self-home-page > .
 }
 
 .pm-box-main-action:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
+  cursor: default;
 }
 
 .pm-box-pending {

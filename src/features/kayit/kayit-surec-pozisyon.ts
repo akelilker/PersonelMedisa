@@ -264,34 +264,6 @@ export async function executeOrganizasyonPersonnelUpdate(params: {
   return { status: "full_success", updated, surecWarning };
 }
 
-/** @deprecated Prefer executeOrganizasyonPersonnelUpdate */
-export async function executePozisyonPersonnelUpdate(params: {
-  personel: Personel;
-  form: OrganizasyonFormState;
-  aciklama: string;
-  deps: {
-    updatePersonel?: OrganizasyonWriteDeps["updatePersonel"];
-    createSurec: NonNullable<OrganizasyonWriteDeps["createSurec"]>;
-    applyOrganizasyon?: OrganizasyonWriteDeps["applyOrganizasyon"];
-  };
-}): Promise<OrganizasyonWriteResult> {
-  if (!params.deps.applyOrganizasyon) {
-    return {
-      status: "validation_error",
-      message: "Organizasyon değişikliği canonical owner gerektirir."
-    };
-  }
-
-  return executeOrganizasyonPersonnelUpdate({
-    personel: params.personel,
-    form: { ...params.form, aciklama: params.aciklama || params.form.aciklama },
-    deps: {
-      applyOrganizasyon: params.deps.applyOrganizasyon,
-      createSurec: params.deps.createSurec
-    }
-  });
-}
-
 export function validateKaliciSubeSubmit(params: {
   personel: Personel;
   yeniSubeId: string;

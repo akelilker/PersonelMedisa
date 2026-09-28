@@ -243,25 +243,3 @@ export function YonetimOrgScopeFields(props: YonetimOrgScopeFieldsProps) {
     </>
   );
 }
-
-/** @deprecated Prefer YonetimOrgScopeFields */
-export function YonetimSubeScopeField(props: {
-  subeler: YonetimSube[];
-  selectedSubeIds: number[];
-  onToggleSube: (subeId: number) => void;
-}) {
-  return (
-    <YonetimOrgScopeFields
-      role="SUBE_YONETICISI"
-      subeler={props.subeler}
-      bolumler={[]}
-      birimler={[]}
-      selectedSubeIds={props.selectedSubeIds}
-      selectedBolumIds={[]}
-      selectedBirimIds={[]}
-      onToggleSube={props.onToggleSube}
-      onToggleBolum={() => undefined}
-      onToggleBirim={() => undefined}
-    />
-  );
-}

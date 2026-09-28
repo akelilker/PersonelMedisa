@@ -77,6 +77,7 @@ import {
   olusturIptalEvent
 } from "../services/serbest-zaman-event-motoru";
 import { aggregateYillikFazlaCalisma } from "../services/yillik-fazla-calisma-aggregate";
+import { birimAmiriPersonelKapsamda } from "../services/fazla-mesai-durum";
 import {
   computeGecerlilikDurumu,
   deriveTakipDurumu,
@@ -8717,6 +8718,84 @@ export function resolveDemoApiResponse(
       correctionId,
       readDemoRevizyonActor(init)
     );
+  }
+
+  if (pathname === "/haftalik-kapanis/yillik-fazla-calisma-kapsam" && method === "GET") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "puantaj.view");
+    if (permissionError) {
+      return permissionError;
+    }
+
+    const yil = toNumber(requestUrl.searchParams.get("yil"));
+    if (yil === null || yil < 1) {
+      return {
+        data: null,
+        meta: {},
+        errors: [
+          {
+            code: "INVALID_QUERY",
+            message: "yil pozitif tam sayi olmalidir."
+          }
+        ]
+      };
+    }
+
+    const linked =
+      actor.role === "BIRIM_AMIRI" && actor.linkedPersonelId != null
+        ? demoState.personeller.find((item) => item.id === actor.linkedPersonelId)
+        : undefined;
+    const actorBirimIds =
+      actor.role === "BIRIM_AMIRI" && typeof linked?.birim_id === "number" && linked.birim_id > 0
+        ? [linked.birim_id]
+        : [];
+
+    const scopedKapanislar = Object.values(demoState.kapanisById).filter((kapanis) => {
+      const subeId = (kapanis as HaftalikKapanisSonuc & { sube_id?: number }).sube_id ?? 1;
+      if (actor.subeIds.length > 0 && !actor.subeIds.includes(subeId) && actor.role !== "BIRIM_AMIRI") {
+        return false;
+      }
+      return true;
+    });
+
+    const roster = demoState.personeller.filter((personel) => {
+      if (actor.role === "BIRIM_AMIRI") {
+        return birimAmiriPersonelKapsamda(actorBirimIds, personel.birim_id);
+      }
+      if (actor.role === "BOLUM_YONETICISI") {
+        return (
+          typeof personel.departman_id === "number" && actor.departmanIds.includes(personel.departman_id)
+        );
+      }
+      if (
+        actor.subeIds.length > 0 &&
+        actor.role !== "GENEL_YONETICI" &&
+        actor.role !== "SISTEM_YONETICISI"
+      ) {
+        return typeof personel.sube_id === "number" && actor.subeIds.includes(personel.sube_id);
+      }
+      return true;
+    });
+
+    const limit = 200;
+    const kesildi = roster.length > limit;
+    const personeller = roster.slice(0, limit).map((personel) => {
+      const ozet = aggregateYillikFazlaCalisma({
+        kapanislar: scopedKapanislar,
+        personel_id: personel.id,
+        yil
+      });
+      return {
+        ...ozet,
+        ad_soyad: `${personel.ad} ${personel.soyad}`.trim()
+      };
+    });
+
+    return ok({
+      yil,
+      personeller,
+      kapsam_kesildi_mi: kesildi
+    });
   }
 
   if (pathname === "/haftalik-kapanis/yillik-fazla-calisma" && method === "GET") {

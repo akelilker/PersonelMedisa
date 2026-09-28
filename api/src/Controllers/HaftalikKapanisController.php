@@ -9,10 +9,12 @@ use Medisa\Api\Auth\RolePermissions;
 use Medisa\Api\Database\Connection;
 use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
+use Medisa\Api\Scope\OrgScope;
 use Medisa\Api\Scope\SubeScope;
 use Medisa\Api\Services\Personel\PersonelOrgStructureSchema;
 use Medisa\Api\Services\Payroll\FazlaCalismaYillikLimitService;
 use Medisa\Api\Services\Payroll\PayrollComplianceGuard;
+use Medisa\Api\Services\Retention\PersonelArchiveGate;
 use PDO;
 use PDOException;
 
@@ -23,6 +25,7 @@ use PDOException;
  * - POST create  → puantaj.haftalik_kapanis.manage
  * - GET detail   → puantaj.view
  * - GET yillik   → puantaj.view
+ * - GET kapsam   → puantaj.view + OrgScope (birim/bölüm/şube)
  *
  * Mutabakat onkosulu:
  * - En az bir haftalik_bildirim_mutabakatlari satiri (sube_id, hafta_baslangic) ve hepsi TAMAMLANDI.
@@ -244,6 +247,117 @@ class HaftalikKapanisController
 
         $ozet = self::aggregateYillik($pdo, $personelId, $yil, (int) $personel['sube_id']);
         JsonResponse::success($ozet);
+    }
+
+    /**
+     * Scoped roster yearly overtime. Reuses summarizeYillikRows; no client-side math.
+     * BIRIM_AMIRI is confined by OrgScope::appendPersonelOrgFilter (user_birimler).
+     */
+    public static function yillikFazlaCalismaKapsam(Request $request)
+    {
+        $user = AuthMiddleware::authenticate($request, true);
+        RolePermissions::assert($user, 'puantaj.view');
+
+        $yilRaw = $request->getQuery('yil');
+        $yil = ($yilRaw === null || trim((string) $yilRaw) === '')
+            ? (int) (new \DateTimeImmutable('now', new \DateTimeZone('Europe/Istanbul')))->format('Y')
+            : self::parsePositiveInt($yilRaw);
+        if ($yil === null || $yil < 1) {
+            JsonResponse::badRequest('yil pozitif tam sayi olmalidir.', 'INVALID_QUERY');
+        }
+
+        $pdo = self::connection();
+        self::assertTablesReady($pdo);
+
+        $activeSube = OrgScope::resolveActiveSubeId($user, $request);
+        $where = ['1=1'];
+        $params = [];
+        OrgScope::appendPersonelOrgFilter($where, $params, $user, $activeSube, 'p', 'yfc', $pdo);
+        PersonelArchiveGate::appendOperationalExclusion($pdo, $where, 'p');
+
+        $limit = 200;
+        $sql = '
+            SELECT p.id, p.sube_id,
+              TRIM(CONCAT(COALESCE(p.ad, \'\'), \' \', COALESCE(p.soyad, \'\'))) AS ad_soyad
+            FROM personeller p
+            WHERE ' . implode(' AND ', $where) . '
+            ORDER BY p.id ASC
+            LIMIT ' . ($limit + 1);
+        $stmt = $pdo->prepare($sql);
+        foreach ($params as $key => $value) {
+            $stmt->bindValue(':' . $key, $value);
+        }
+        $stmt->execute();
+        $roster = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        $kesildi = count($roster) > $limit;
+        if ($kesildi) {
+            $roster = array_slice($roster, 0, $limit);
+        }
+
+        $byPersonel = [];
+        $ids = [];
+        foreach ($roster as $row) {
+            $id = (int) $row['id'];
+            if ($id < 1) {
+                continue;
+            }
+            $ids[] = $id;
+            $byPersonel[$id] = [
+                'ad_soyad' => trim((string) ($row['ad_soyad'] ?? '')),
+                'rows' => [],
+            ];
+        }
+
+        if (count($ids) > 0) {
+            $placeholders = [];
+            $rowParams = [];
+            foreach ($ids as $index => $id) {
+                $key = 'kapsam_personel_' . $index;
+                $placeholders[] = ':' . $key;
+                $rowParams[$key] = $id;
+            }
+            $rowSql = '
+                SELECT
+                    s.kapanis_id,
+                    s.personel_id,
+                    s.yil,
+                    s.hafta_baslangic,
+                    s.fazla_calisma_dakika,
+                    s.tam_hafta_verisi,
+                    s.state,
+                    k.sube_id
+                FROM haftalik_kapanis_satirlari s
+                INNER JOIN haftalik_kapanislar k ON k.id = s.kapanis_id
+                INNER JOIN personeller p ON p.id = s.personel_id AND k.sube_id = p.sube_id
+                WHERE s.state = \'KAPANDI\'
+                  AND s.personel_id IN (' . implode(', ', $placeholders) . ')
+            ';
+            $rowStmt = $pdo->prepare($rowSql);
+            foreach ($rowParams as $key => $value) {
+                $rowStmt->bindValue(':' . $key, $value, PDO::PARAM_INT);
+            }
+            $rowStmt->execute();
+            foreach ($rowStmt->fetchAll(PDO::FETCH_ASSOC) ?: [] as $satir) {
+                $personelId = (int) $satir['personel_id'];
+                if (!isset($byPersonel[$personelId])) {
+                    continue;
+                }
+                $byPersonel[$personelId]['rows'][] = $satir;
+            }
+        }
+
+        $personeller = [];
+        foreach ($ids as $id) {
+            $ozet = self::summarizeYillikRows($id, (int) $yil, $byPersonel[$id]['rows']);
+            $ozet['ad_soyad'] = $byPersonel[$id]['ad_soyad'];
+            $personeller[] = $ozet;
+        }
+
+        JsonResponse::success([
+            'yil' => (int) $yil,
+            'personeller' => $personeller,
+            'kapsam_kesildi_mi' => $kesildi,
+        ]);
     }
 
     private static function connection()
@@ -891,9 +1005,24 @@ class HaftalikKapanisController
             'sube_id' => (int) $personelSubeId,
         ]);
 
+        return self::summarizeYillikRows(
+            (int) $personelId,
+            (int) $yil,
+            $stmt->fetchAll(PDO::FETCH_ASSOC) ?: []
+        );
+    }
+
+    /**
+     * Same ISO-week display aggregate as the single-person read.
+     *
+     * @param array<int, array<string, mixed>> $rows
+     * @return array<string, mixed>
+     */
+    private static function summarizeYillikRows($personelId, $yil, array $rows)
+    {
         $byHafta = [];
         $atlananEksik = 0;
-        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        foreach ($rows as $row) {
             $satirYil = $row['yil'] !== null ? (int) $row['yil'] : (int) substr((string) $row['hafta_baslangic'], 0, 4);
             if ($satirYil !== (int) $yil) {
                 continue;

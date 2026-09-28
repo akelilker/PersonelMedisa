@@ -205,6 +205,9 @@ if (($argv[1] ?? '') === '--http-child') {
     if ($method === 'GET' && $path === '/haftalik-kapanis/yillik-fazla-calisma') {
         HaftalikKapanisController::yillikFazlaCalisma($request);
     }
+    if ($method === 'GET' && $path === '/haftalik-kapanis/yillik-fazla-calisma-kapsam') {
+        HaftalikKapanisController::yillikFazlaCalismaKapsam($request);
+    }
     if ($method === 'GET' && preg_match('#^/haftalik-kapanis/(\d+)$#', $path, $matches)) {
         HaftalikKapanisController::detail($request, $matches[1]);
     }
@@ -570,10 +573,115 @@ function seedAggregateSatir(
     return $kapanisId;
 }
 
+/**
+ * Focused BIRIM_AMIRI acceptance for yillikFazlaCalismaKapsam.
+ * Reuses the haftalik kapanis fixture seed. Does not run the full suite.
+ */
+function runYillikFazlaCalismaKapsamAcceptance(string $dsn): void
+{
+    $root = hkPdo($dsn);
+    $dbName = '';
+    try {
+        bootstrapHkSchema($root);
+        $dbName = (string) $root->query('SELECT DATABASE()')->fetchColumn();
+        $scopedDsn = preg_replace('/dbname=[^;]+/', 'dbname=' . $dbName, $dsn);
+        if (!is_string($scopedDsn) || $scopedDsn === '') {
+            throw new RuntimeException('scoped dsn missing');
+        }
+        $pdo = hkPdo($scopedDsn);
+
+        $pdo->exec('INSERT INTO birimler (id, bolum_id) VALUES (42, 31)');
+        $pdo->exec('UPDATE personeller SET birim_id = 42 WHERE id = 30');
+        $pdo->exec("
+            INSERT INTO personeller (
+              id, tc_kimlik_no, ad, soyad, dogum_tarihi, sicil_no, ise_giris_tarihi, sube_id, departman_id, aktif_durum
+            ) VALUES
+              (40, '44444444444', 'Deniz', 'Ak', '1992-01-01', 'S40', '2020-01-01', 1, 3, 'AKTIF')
+        ");
+        $pdo->exec('UPDATE personeller SET bolum_id = 31, birim_id = 41 WHERE id = 40');
+
+        seedAggregateSatir($pdo, 1, 10, '2027-01-04', '2027-01-10', 2027, 100, 1, null);
+        seedAggregateSatir($pdo, 1, 10, '2027-01-11', '2027-01-17', 2027, 9999, 0, null);
+        seedAggregateSatir($pdo, 1, 40, '2027-01-18', '2027-01-24', 2027, 16201, 1, null);
+        seedAggregateSatir($pdo, 1, 30, '2027-02-01', '2027-02-07', 2027, 500, 1, null);
+        seedAggregateSatir($pdo, 2, 20, '2027-02-08', '2027-02-14', 2027, 700, 1, null);
+
+        $ba = ['id' => 2, 'rol' => 'BIRIM_AMIRI', 'sube_ids' => [1], 'birim_ids' => [41]];
+        $gy = ['id' => 1, 'rol' => 'GENEL_YONETICI', 'sube_ids' => []];
+        $subeHeader = ['x-active-sube-id' => '1'];
+
+        $kapsam = invokeHkHttp($pdo, $ba, 'GET', '/haftalik-kapanis/yillik-fazla-calisma-kapsam', [], $subeHeader, [
+            'yil' => '2027',
+        ]);
+        hkAssert($kapsam['status'] === 200, 'BA kapsam → 200');
+        $personeller = $kapsam['payload']['data']['personeller'] ?? null;
+        hkAssert(is_array($personeller), 'BA kapsam personeller array');
+        $ids = [];
+        $byId = [];
+        foreach ($personeller as $row) {
+            $id = (int) ($row['personel_id'] ?? 0);
+            $ids[] = $id;
+            $byId[$id] = $row;
+        }
+        hkAssert(in_array(10, $ids, true), 'BA kapsam includes own birim personel');
+        hkAssert(in_array(40, $ids, true), 'BA kapsam includes second own birim personel');
+        hkAssert(!in_array(30, $ids, true), 'BA kapsam excludes other birim personel');
+        hkAssert(!in_array(20, $ids, true), 'BA kapsam excludes other sube personel');
+        hkAssert(($kapsam['payload']['data']['kapsam_kesildi_mi'] ?? null) === false, 'BA kapsam not truncated');
+
+        $gyKapsam = invokeHkHttp($pdo, $gy, 'GET', '/haftalik-kapanis/yillik-fazla-calisma-kapsam', [], $subeHeader, [
+            'yil' => '2027',
+        ]);
+        hkAssert($gyKapsam['status'] === 200, 'GY kapsam → 200');
+        $gyIds = [];
+        foreach (($gyKapsam['payload']['data']['personeller'] ?? []) as $row) {
+            $gyIds[] = (int) ($row['personel_id'] ?? 0);
+        }
+        hkAssert(in_array(30, $gyIds, true), 'GY active sube includes other birim personel');
+        hkAssert(!in_array(20, $gyIds, true), 'GY active sube excludes other sube personel');
+
+        $expected = [
+            10 => ['kullanilan_dakika' => 100, 'limit_asildi_mi' => false, 'limit_yaklasiyor_mu' => false],
+            40 => ['kullanilan_dakika' => 16201, 'limit_asildi_mi' => true, 'limit_yaklasiyor_mu' => true],
+        ];
+        foreach ($expected as $personelId => $known) {
+            $single = invokeHkHttp($pdo, $ba, 'GET', '/haftalik-kapanis/yillik-fazla-calisma', [], $subeHeader, [
+                'personel_id' => (string) $personelId,
+                'yil' => '2027',
+            ]);
+            hkAssert($single['status'] === 200, 'BA canonical aggregate personel ' . $personelId . ' → 200');
+            $canonical = $single['payload']['data'] ?? [];
+            $roster = $byId[$personelId] ?? [];
+            foreach (['yillik_limit_dakika', 'kullanilan_dakika', 'kalan_dakika', 'limit_yaklasiyor_mu', 'limit_asildi_mi'] as $field) {
+                hkAssert(
+                    array_key_exists($field, $roster) && array_key_exists($field, $canonical) && $roster[$field] === $canonical[$field],
+                    'BA kapsam ' . $field . ' matches canonical aggregate personel ' . $personelId
+                );
+            }
+            hkAssert((int) $roster['yillik_limit_dakika'] === 16200, 'BA kapsam limit 16200 personel ' . $personelId);
+            hkAssert((int) $roster['kullanilan_dakika'] === $known['kullanilan_dakika'], 'BA kapsam seeded kullanilan personel ' . $personelId);
+            hkAssert((int) $roster['kalan_dakika'] === max(0, 16200 - $known['kullanilan_dakika']), 'BA kapsam seeded kalan personel ' . $personelId);
+            hkAssert($roster['limit_asildi_mi'] === $known['limit_asildi_mi'], 'BA kapsam seeded asildi personel ' . $personelId);
+            hkAssert($roster['limit_yaklasiyor_mu'] === $known['limit_yaklasiyor_mu'], 'BA kapsam seeded yaklasiyor personel ' . $personelId);
+        }
+
+        echo "verify-yillik-fazla-calisma-kapsam-mysql: OK\n";
+    } finally {
+        if ($dbName !== '') {
+            $root->exec('DROP DATABASE IF EXISTS `' . str_replace('`', '', $dbName) . '`');
+        }
+    }
+}
+
 $dsn = getenv('MEDISA_TEST_MYSQL_DSN') ?: '';
 if ($dsn === '') {
     fwrite(STDERR, "MEDISA_TEST_MYSQL_DSN missing\n");
     exit(1);
+}
+
+if (($argv[1] ?? '') === '--kapsam-only') {
+    runYillikFazlaCalismaKapsamAcceptance($dsn);
+    exit(0);
 }
 
 $routerSource = (string) file_get_contents(__DIR__ . '/../../api/src/Router.php');

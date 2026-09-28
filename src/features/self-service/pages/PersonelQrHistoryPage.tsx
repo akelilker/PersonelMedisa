@@ -1,8 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { isApiRequestError } from "../../../api/api-client";
+import { fetchMeFazlaCalisma, fetchMePuantaj } from "../../../api/me.api";
 import { fetchMeQrHareketleri } from "../../../api/qr.api";
 import { LoadingState } from "../../../components/states/LoadingState";
-import type { MeQrAttendanceEvent, MeQrHistoryDay, MeQrHistoryDayEvent } from "../../../types/self-service";
+import type { MePuantajGun, MeQrAttendanceEvent, MeQrHistoryDay, MeQrHistoryDayEvent } from "../../../types/self-service";
+import { SelfServiceFactList, type SelfServiceFact } from "../components/SelfServiceFactList";
+import {
+  buildHistoryDayWorkFacts,
+  buildHistoryMonthSummary
+} from "../personel-self-history-summary";
 import { formatSelfServiceClock } from "../self-service-datetime";
 import {
   AttendanceCorrectionRequestModal,
@@ -172,6 +178,8 @@ export function PersonelQrHistoryPage() {
   const [status, setStatus] = useState<Status>({ kind: "loading" });
   const [correctDraft, setCorrectDraft] = useState<CorrectDraft | null>(null);
   const [notice, setNotice] = useState<{ title: string; body: string } | null>(null);
+  const [monthFacts, setMonthFacts] = useState<SelfServiceFact[]>([]);
+  const [puantajByDate, setPuantajByDate] = useState<Map<string, MePuantajGun>>(new Map());
 
   const loadMonth = useCallback(async (year: number, month: number) => {
     setStatus({ kind: "loading" });
@@ -182,6 +190,17 @@ export function PersonelQrHistoryPage() {
         history.days && history.days.length > 0
           ? history.days
           : deriveDaysFromItems(history.items);
+      const [puantaj, fazla] = await Promise.all([
+        fetchMePuantaj({ from, to }).catch(() => null),
+        fetchMeFazlaCalisma({ from, to }).catch(() => null)
+      ]);
+      setMonthFacts(
+        buildHistoryMonthSummary({
+          ozet: puantaj?.ozet ?? null,
+          fazlaDonemDakika: fazla?.donem_ozet ? fazla.donem_ozet.fazla_calisma_dakika_toplam : null
+        })
+      );
+      setPuantajByDate(new Map((puantaj?.items ?? []).map((item) => [item.tarih, item])));
       setStatus({ kind: "ready", from: history.from, to: history.to, days });
     } catch (error) {
       const unbound =
@@ -193,6 +212,8 @@ export function PersonelQrHistoryPage() {
           ? "Personel bağlantınız yok veya giriş / çıkış geçmişi bu hesap için kapalı."
           : "Giriş / Çıkış Geçmişi Yüklenemedi. Tekrar Deneyin."
       });
+      setMonthFacts([]);
+      setPuantajByDate(new Map());
     }
   }, []);
 
@@ -223,6 +244,7 @@ export function PersonelQrHistoryPage() {
 
   const selectedDay = selectedDate ? daysByDate.get(selectedDate) ?? null : null;
   const selectedEvents = dayEvents(selectedDay);
+  const selectedWorkFacts = selectedDate ? buildHistoryDayWorkFacts(puantajByDate.get(selectedDate) ?? null) : [];
 
   function shiftMonth(delta: number) {
     const cursor = new Date(viewYear, viewMonth - 1 + delta, 1);
@@ -266,6 +288,10 @@ export function PersonelQrHistoryPage() {
           ›
         </button>
       </div>
+
+      {monthFacts.length > 0 ? (
+        <SelfServiceFactList rows={monthFacts} testId="qr-history-month-summary" />
+      ) : null}
 
       <div className="qr-history-weekdays" aria-hidden="true">
         {WEEKDAYS.map((label) => (
@@ -313,6 +339,9 @@ export function PersonelQrHistoryPage() {
       {selectedDate ? (
         <section className="qr-history-detail" data-testid="qr-history-day-detail">
           <h3 className="qr-history-detail-date">{formatDetailDate(selectedDate)}</h3>
+          {selectedWorkFacts.length > 0 ? (
+            <SelfServiceFactList rows={selectedWorkFacts} testId="qr-history-day-work" />
+          ) : null}
           {selectedEvents.length > 0 ? (
             <ul className="qr-history-timeline" data-testid="qr-history-event-timeline">
               {selectedEvents.map((event) => {

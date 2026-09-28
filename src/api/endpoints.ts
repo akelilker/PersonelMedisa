@@ -14,6 +14,13 @@ export const endpoints = {
     qrAraliklari: "/me/qr-araliklari",
     attendanceToday: "/me/attendance/today",
     attendanceCorrectionRequests: "/me/attendance/correction-requests",
+    izinler: "/me/izinler",
+    izinTalepleri: "/me/izin-talepleri",
+    avansTalepleri: "/me/avans-talepleri",
+    geriBildirimler: "/me/geri-bildirimler",
+    duyurular: "/me/duyurular",
+    duyuruOkundu: (id: number | string) => `/me/duyurular/${id}/okundu`,
+    profilFoto: "/me/profil-foto",
     inboxNotifications: "/me/inbox-notifications",
     ackInboxPopup: (id: number | string) => `/me/inbox-notifications/${id}/ack-popup`
   },
@@ -153,7 +160,9 @@ export const endpoints = {
     close: "/haftalik-kapanis",
     detail: (id: number | string) => `/haftalik-kapanis/${id}`,
     yillikFazlaCalisma: (personelId: number | string, yil: number | string) =>
-      `/haftalik-kapanis/yillik-fazla-calisma?personel_id=${personelId}&yil=${yil}`
+      `/haftalik-kapanis/yillik-fazla-calisma?personel_id=${personelId}&yil=${yil}`,
+    yillikFazlaCalismaKapsam: (yil: number | string) =>
+      `/haftalik-kapanis/yillik-fazla-calisma-kapsam?yil=${yil}`
   },
   revizyonTalepleri: {
     list: "/haftalik-kapanis/revizyon-talepleri",
@@ -192,7 +201,9 @@ export const endpoints = {
     ceza: "/raporlar/ceza",
     ekstraPrim: "/raporlar/ekstra-prim",
     isKazasi: "/raporlar/is-kazasi",
-    bildirim: "/raporlar/bildirim"
+    bildirim: "/raporlar/bildirim",
+    puantaj: "/raporlar/puantaj",
+    puantajXlsx: "/raporlar/puantaj/export.xlsx"
   },
   maasHesaplama: {
     preflight: "/maas-hesaplama/preflight",

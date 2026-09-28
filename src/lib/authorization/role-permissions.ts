@@ -133,7 +133,8 @@ export type AppPermission =
   | "self_service.qr.events.view"
   | "self_service.attendance.correct"
   | "attendance.correction.decide"
-  | "qr.kiosk.display";
+  | "qr.kiosk.display"
+  | "duyurular.manage";
 
 /**
  * Canonical self-service baseline — same set as PERSONEL role matrix.
@@ -310,7 +311,8 @@ const BASE_ROLE_PERMISSIONS: Record<
     "retention.destruction.execute",
     "retention.destruction.view",
     "qr.kiosk.display",
-    "attendance.correction.decide"
+    "attendance.correction.decide",
+    "duyurular.manage"
   ],
   BOLUM_YONETICISI: [
     "personeller.view",
@@ -538,7 +540,8 @@ const BASE_ROLE_PERMISSIONS: Record<
     "gunluk_bildirim.correct_scoped",
     "arsiv.view",
     "arsiv.download",
-    "retention.view"
+    "retention.view",
+    "duyurular.manage"
   ],
   /**
    * IT Müdürü / teknik uygulama yöneticisi.
@@ -611,7 +614,8 @@ const IK_PERSONELI_WITHHELD_PERMISSIONS: readonly AppPermission[] = [
   "sirket_parametreleri.manage",
   "personel_bordro_kapsam.manage",
   "maas_hesaplama.manage",
-  "maas_hesaplama_adaylari.manage"
+  "maas_hesaplama_adaylari.manage",
+  "duyurular.manage"
 ];
 
 /**

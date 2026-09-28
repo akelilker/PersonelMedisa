@@ -2,12 +2,18 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { fetchAttendanceToday, type AttendanceTodayResponse } from "../../../api/attendance-mobile.api";
 import { fetchBirimGunlukDurum } from "../../../api/bildirimler.api";
+import { fetchYillikFazlaCalismaKapsami } from "../../../api/haftalik-kapanis.api";
 import { fetchMe } from "../../../api/me.api";
 import { isApiRequestError, shouldPreferDemoApi } from "../../../api/api-client";
 import { LoadingState } from "../../../components/states/LoadingState";
 import { formatEksikGirisAttention } from "../../../lib/bildirim/gunluk-bildirim-timing-copy";
 import { useAuth } from "../../../state/auth.store";
+import {
+  fazlaMesaiUyariSeviyesi,
+  formatFazlaMesaiSure
+} from "../../../services/fazla-mesai-durum";
 import type { BirimAmiriGunlukDurum } from "../../../types/bildirim";
+import type { YillikFazlaCalismaKapsam } from "../../../types/haftalik-kapanis";
 import type { MeIdentity } from "../../../types/self-service";
 import { useRoleAccess } from "../../../hooks/use-role-access";
 import { OwnQrAttendanceBoxes } from "../components/OwnQrAttendanceBoxes";
@@ -30,6 +36,8 @@ export function BirimAmiriOperationalHomePage() {
   const [identity, setIdentity] = useState<MeIdentity | null>(null);
   const [unit, setUnit] = useState<BirimAmiriGunlukDurum | null>(null);
   const [unitError, setUnitError] = useState<string | null>(null);
+  const [fazlaMesai, setFazlaMesai] = useState<YillikFazlaCalismaKapsam | null>(null);
+  const [fazlaMesaiError, setFazlaMesaiError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -60,6 +68,18 @@ export function BirimAmiriOperationalHomePage() {
     } else {
       setIdentity(null);
       setToday(null);
+    }
+
+    const yil = Number(tarih.slice(0, 4));
+    if (Number.isFinite(yil) && yil > 0) {
+      try {
+        const kapsam = await fetchYillikFazlaCalismaKapsami(yil);
+        setFazlaMesai(kapsam);
+        setFazlaMesaiError(null);
+      } catch (cause) {
+        setFazlaMesai(null);
+        setFazlaMesaiError(cause instanceof Error ? cause.message : "Fazla mesai durumu yüklenemedi.");
+      }
     }
     setLoading(false);
   }, []);
@@ -277,6 +297,14 @@ export function BirimAmiriOperationalHomePage() {
             ))
           )}
         </ul>
+
+        <div data-testid="birim-amiri-fazla-mesai">
+          <h3 className="pm-section-title">Fazla Mesai Durumu</h3>
+          {fazlaMesaiError ? <p className="self-service-muted">{fazlaMesaiError}</p> : null}
+          {fazlaMesai ? (
+            <FazlaMesaiDurumuPanel kapsam={fazlaMesai} />
+          ) : null}
+        </div>
       </section>
 
       <footer className="pm-footer" data-testid="personel-mobile-footer">
@@ -285,5 +313,53 @@ export function BirimAmiriOperationalHomePage() {
         <div className="pm-footer-accent pm-footer-accent--right" aria-hidden="true" />
       </footer>
     </section>
+  );
+}
+
+function FazlaMesaiDurumuPanel({ kapsam }: { kapsam: YillikFazlaCalismaKapsam }) {
+  const rows = kapsam.personeller.map((personel) => ({
+    ...personel,
+    seviye: fazlaMesaiUyariSeviyesi(personel)
+  }));
+  const uyarilar = rows.filter((row) => row.seviye !== "normal");
+  const normalSayisi = rows.length - uyarilar.length;
+
+  return (
+    <div className="pm-fazla-mesai-list">
+      {normalSayisi > 0 ? (
+        <p className="self-service-muted" data-testid="fazla-mesai-normal">
+          {uyarilar.length === 0
+            ? `Limit içinde: ${normalSayisi} personel. Uyarı yok.`
+            : `Limit içinde: ${normalSayisi} personel.`}
+        </p>
+      ) : null}
+      {uyarilar.map((row) => (
+        <div
+          key={row.personel_id}
+          className={
+            row.seviye === "asildi" ? "pm-callout pm-callout--critical" : "pm-callout pm-callout--warning"
+          }
+          role="status"
+          data-testid={`fazla-mesai-${row.seviye}-${row.personel_id}`}
+        >
+          <p>
+            <strong>{row.ad_soyad || `Personel ${row.personel_id}`}</strong>
+            {" — "}
+            {row.seviye === "asildi"
+              ? "Yıllık fazla mesai limiti aşıldı."
+              : "Yıllık fazla mesai limitine yaklaşıldı."}{" "}
+            Kullanılan {formatFazlaMesaiSure(row.kullanilan_dakika)} / limit{" "}
+            {formatFazlaMesaiSure(row.yillik_limit_dakika)} / kalan{" "}
+            {formatFazlaMesaiSure(row.kalan_dakika)}.
+          </p>
+        </div>
+      ))}
+      {rows.length === 0 ? (
+        <p className="self-service-muted">Yetki kapsamınızda listelenecek personel yok.</p>
+      ) : null}
+      {kapsam.kapsam_kesildi_mi ? (
+        <p className="self-service-muted">Kapsam listesi üst sınıra ulaştı; kalan personel bu özette yok.</p>
+      ) : null}
+    </div>
   );
 }

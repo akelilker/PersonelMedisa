@@ -54,7 +54,9 @@ export type MePuantajOzet = {
   gec_kalma_dakika_toplam: number;
   erken_cikis_adet: number;
   erken_cikis_dakika_toplam: number;
-  fazla_calisma_dakika_toplam: number;
+    fazla_calisma_dakika_toplam: number;
+  /** Authoritative monthly net minutes. Null when the backend has no net figure. */
+  net_calisma_dakika_toplam: number | null;
 };
 
 export type MePuantajResponse = {

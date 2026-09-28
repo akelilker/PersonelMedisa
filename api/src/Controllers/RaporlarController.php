@@ -9,15 +9,40 @@ use Medisa\Api\Auth\RolePermissions;
 use Medisa\Api\Database\Connection;
 use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
+use Medisa\Api\Scope\OrgScope;
 use Medisa\Api\Scope\SubeScope;
 use Medisa\Api\Services\Organizasyon\SubeReadModel;
+use Medisa\Api\Services\Personel\PersonelOrgStructureSchema;
 use Medisa\Api\Services\Retention\PersonelArchiveGate;
 use Medisa\Api\Services\SgkPrimGunuService;
+use Medisa\Api\Support\SimpleXlsxWriter;
 use PDO;
 
 class RaporlarController
 {
   private const MAX_LIMIT = 100;
+
+  /**
+   * UI Puantaj Raporu column contract (rapor-column-contract.ts).
+   * Export reads mapPuantajRow; it does not calculate a second dataset.
+   *
+   * @var list<array{key:string,label:string}>
+   */
+  private const PUANTAJ_EXPORT_COLUMNS = [
+    ['key' => 'tarih', 'label' => 'Tarih'],
+    ['key' => 'personel_id', 'label' => 'Personel'],
+    ['key' => 'ad_soyad', 'label' => 'Ad Soyad'],
+    ['key' => 'sicil_no', 'label' => 'Sicil'],
+    ['key' => 'bolum', 'label' => 'Bölüm'],
+    ['key' => 'birim', 'label' => 'Birim'],
+    ['key' => 'giris_saati', 'label' => 'Giriş'],
+    ['key' => 'cikis_saati', 'label' => 'Çıkış'],
+    ['key' => 'net_calisma_dakika', 'label' => 'Net Çalışma (dk)'],
+    ['key' => 'gec_kalma_dakika', 'label' => 'Geç Kalma (dk)'],
+    ['key' => 'erken_cikis_dakika', 'label' => 'Erken Çıkış (dk)'],
+    ['key' => 'hareket_durumu', 'label' => 'Hareket'],
+    ['key' => 'dayanak', 'label' => 'İzin / Devamsızlık'],
+  ];
 
   /** @var array<string, string> */
   private static $allowedTips = [
@@ -29,6 +54,7 @@ class RaporlarController
     'tesvik' => 'tesvik',
     'ceza' => 'ceza',
     'ekstra-prim' => 'ekstra-prim',
+    'puantaj' => 'puantaj',
   ];
 
   public static function show(Request $request, $tip)
@@ -76,6 +102,11 @@ class RaporlarController
 
     if ($tip === 'bildirim') {
       self::showBildirim($request, $pdo, $scope, $allowedSubeIds);
+      return;
+    }
+
+    if ($tip === 'puantaj') {
+      self::showPuantaj($request, $pdo, $user, $scope, $allowedSubeIds);
       return;
     }
 
@@ -1391,6 +1422,305 @@ class RaporlarController
     }
 
     return self::$subeDisplayCache[$id];
+  }
+
+  /**
+   * Daily puantaj rows from the sealed snapshot or live gunluk_puantaj.
+   * Fazla mesai is not a daily column; it stays on the yearly aggregate.
+   *
+   * @param array<string, mixed> $user
+   * @param array<int, int> $allowedSubeIds
+   */
+  private static function showPuantaj(Request $request, PDO $pdo, array $user, $scope, array $allowedSubeIds)
+  {
+    $filters = self::parseReportFilters($request);
+    $resolved = self::resolveReportSource($pdo, $scope, $filters, $allowedSubeIds);
+
+    if ($resolved['kaynak'] === 'SNAPSHOT') {
+      $result = self::fetchPuantajSnapshot($pdo, $user, $resolved, $filters, $scope, $allowedSubeIds);
+    } else {
+      $result = self::fetchPuantajLive($pdo, $user, $filters, $scope, $resolved['donem'], $allowedSubeIds);
+    }
+
+    self::sendReportResponse($result['items'], $result['total'], $filters, $resolved, $scope);
+  }
+
+  /**
+   * Real .xlsx for the puantaj report. Same filters, OrgScope and row mapper as showPuantaj.
+   */
+  public static function exportPuantajXlsx(Request $request)
+  {
+    $user = AuthMiddleware::authenticate($request, true);
+    RolePermissions::assert($user, 'raporlar.view');
+
+    $scope = SubeScope::resolveScope($user, $request);
+    $allowedSubeIds = SubeScope::allowedSubeIds($user);
+
+    try {
+      $pdo = Connection::get();
+    } catch (\Throwable $e) {
+      JsonResponse::serverError('Veritabani baglantisi kurulamadi.');
+    }
+
+    $filters = self::parseReportFilters($request);
+    $resolved = self::resolveReportSource($pdo, $scope, $filters, $allowedSubeIds);
+    $items = self::collectPuantajRows($pdo, $user, $resolved, $filters, $scope, $allowedSubeIds);
+
+    $headers = [];
+    $rows = [];
+    foreach (self::PUANTAJ_EXPORT_COLUMNS as $column) {
+      $headers[] = $column['label'];
+    }
+    foreach ($items as $item) {
+      $line = [];
+      foreach (self::PUANTAJ_EXPORT_COLUMNS as $column) {
+        $value = $item[$column['key']] ?? null;
+        $line[] = $value === null ? '' : (string) $value;
+      }
+      $rows[] = $line;
+    }
+
+    try {
+      $writer = new SimpleXlsxWriter();
+      $writer->addSheet('Puantaj Raporu', $headers, $rows);
+      $binary = $writer->buildBinary();
+    } catch (\Throwable $e) {
+      JsonResponse::serverError('Puantaj raporu Excel dosyasi uretilemedi.');
+    }
+
+    $filename = self::puantajExportFilename($filters);
+    if (!headers_sent()) {
+      header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      header('Content-Disposition: attachment; filename="' . $filename . '"');
+      header('X-Puantaj-Rapor-Row-Count: ' . count($rows));
+      http_response_code(200);
+    }
+    echo $binary;
+    exit;
+  }
+
+  /**
+   * Walk the same paginated puantaj fetch used by the JSON report.
+   *
+   * @param array<string, mixed> $user
+   * @param array<string, mixed> $resolved
+   * @param array<string, mixed> $filters
+   * @param array<int, int> $allowedSubeIds
+   * @return array<int, array<string, mixed>>
+   */
+  private static function collectPuantajRows(PDO $pdo, array $user, array $resolved, array $filters, $scope, array $allowedSubeIds)
+  {
+    $pageFilters = $filters;
+    $pageFilters['limit'] = self::MAX_LIMIT;
+    $pageFilters['page'] = 1;
+    $items = [];
+    $total = 0;
+
+    do {
+      if ($resolved['kaynak'] === 'SNAPSHOT') {
+        $result = self::fetchPuantajSnapshot($pdo, $user, $resolved, $pageFilters, $scope, $allowedSubeIds);
+      } else {
+        $result = self::fetchPuantajLive($pdo, $user, $pageFilters, $scope, $resolved['donem'], $allowedSubeIds);
+      }
+      $total = (int) $result['total'];
+      foreach ($result['items'] as $item) {
+        $items[] = $item;
+      }
+      $pageFilters['page']++;
+    } while (count($items) < $total && count($result['items']) > 0 && $pageFilters['page'] <= 500);
+
+    return $items;
+  }
+
+  /** @param array<string, mixed> $filters */
+  private static function puantajExportFilename(array $filters)
+  {
+    $start = isset($filters['baslangic_tarihi']) ? (string) $filters['baslangic_tarihi'] : '';
+    $end = isset($filters['bitis_tarihi']) ? (string) $filters['bitis_tarihi'] : '';
+    if ($start !== '' && $end !== '') {
+      $donem = isset($filters['donem']) ? (string) $filters['donem'] : '';
+      if (preg_match('/^\d{4}-\d{2}$/', $donem) === 1) {
+        $first = $donem . '-01';
+        $last = date('Y-m-t', strtotime($first));
+        if ($start === $first && $end === $last) {
+          return 'puantaj-raporu-' . $donem . '.xlsx';
+        }
+      }
+
+      return 'puantaj-raporu-' . $start . '_' . $end . '.xlsx';
+    }
+
+    return 'puantaj-raporu.xlsx';
+  }
+
+  /**
+   * @param array<string, mixed> $user
+   * @param array<string, mixed> $resolved
+   * @param array<string, mixed> $filters
+   * @param array<int, int> $allowedSubeIds
+   * @return array{items: array<int, array<string, mixed>>, total: int}
+   */
+  private static function fetchPuantajSnapshot(PDO $pdo, array $user, array $resolved, array $filters, $scope, array $allowedSubeIds)
+  {
+    $where = ['1=1'];
+    $params = [];
+
+    if ($filters['muhur_id'] !== null) {
+      $where[] = 'snap.muhur_id = :muhur_id';
+      $params['muhur_id'] = (int) $filters['muhur_id'];
+    } else {
+      $where[] = 'm.donem = :donem';
+      $params['donem'] = (string) $resolved['donem'];
+      SubeScope::appendSubeFilter($where, $params, $scope, $allowedSubeIds, 'm.sube_id', 'muhur');
+    }
+
+    self::appendPersonelFilters($pdo, $where, $params, $filters, 'p');
+    OrgScope::appendPersonelOrgFilter($where, $params, $user, $scope, 'p', 'puantaj_org', $pdo);
+    self::appendSnapshotDateFilters($where, $params, $filters);
+
+    $org = self::puantajOrgSelect($pdo);
+    $whereSql = implode(' AND ', $where);
+    $fromSql = '
+      FROM puantaj_aylik_muhur_satirlari snap
+      INNER JOIN puantaj_aylik_muhurleri m ON m.id = snap.muhur_id
+      INNER JOIN personeller p ON p.id = snap.personel_id
+      ' . $org['joins'] . '
+      WHERE ' . $whereSql;
+
+    $total = self::countDevamsizlikRows($pdo, $fromSql, $params);
+    $offset = ($filters['page'] - 1) * $filters['limit'];
+    $sql = '
+      SELECT
+        snap.tarih AS tarih,
+        p.id AS personel_id,
+        TRIM(CONCAT(COALESCE(p.ad, \'\'), \' \', COALESCE(p.soyad, \'\'))) AS ad_soyad,
+        p.sicil_no,
+        ' . $org['bolum'] . ',
+        ' . $org['birim'] . ',
+        snap.giris_saati,
+        snap.cikis_saati,
+        snap.net_calisma_suresi_dakika,
+        snap.gec_kalma_dakika,
+        snap.erken_cikis_dakika,
+        snap.hareket_durumu,
+        snap.dayanak
+      ' . $fromSql . '
+      ORDER BY snap.tarih ASC, p.id ASC
+      LIMIT :limit OFFSET :offset
+    ';
+
+    $stmt = $pdo->prepare($sql);
+    self::bindParams($stmt, $params);
+    $stmt->bindValue(':limit', $filters['limit'], PDO::PARAM_INT);
+    $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+    $stmt->execute();
+
+    $items = [];
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+      $items[] = self::mapPuantajRow($row);
+    }
+
+    return ['items' => $items, 'total' => $total];
+  }
+
+  /**
+   * @param array<string, mixed> $user
+   * @param array<string, mixed> $filters
+   * @param array<int, int> $allowedSubeIds
+   * @return array{items: array<int, array<string, mixed>>, total: int}
+   */
+  private static function fetchPuantajLive(PDO $pdo, array $user, array $filters, $scope, $donem, array $allowedSubeIds)
+  {
+    $where = ['1=1'];
+    $params = [];
+
+    SubeScope::appendSubeFilter($where, $params, $scope, $allowedSubeIds, 'p.sube_id');
+    self::appendPersonelFilters($pdo, $where, $params, $filters, 'p');
+    OrgScope::appendPersonelOrgFilter($where, $params, $user, $scope, 'p', 'puantaj_org', $pdo);
+    self::appendLiveDateFilters($where, $params, $filters, $donem, 'gp.tarih');
+
+    $org = self::puantajOrgSelect($pdo);
+    $whereSql = implode(' AND ', $where);
+    $fromSql = '
+      FROM gunluk_puantaj gp
+      INNER JOIN personeller p ON p.id = gp.personel_id
+      ' . $org['joins'] . '
+      WHERE ' . $whereSql;
+
+    $total = self::countDevamsizlikRows($pdo, $fromSql, $params);
+    $offset = ($filters['page'] - 1) * $filters['limit'];
+    $sql = '
+      SELECT
+        gp.tarih AS tarih,
+        p.id AS personel_id,
+        TRIM(CONCAT(COALESCE(p.ad, \'\'), \' \', COALESCE(p.soyad, \'\'))) AS ad_soyad,
+        p.sicil_no,
+        ' . $org['bolum'] . ',
+        ' . $org['birim'] . ',
+        gp.giris_saati,
+        gp.cikis_saati,
+        gp.net_calisma_suresi_dakika,
+        gp.gec_kalma_dakika,
+        gp.erken_cikis_dakika,
+        gp.hareket_durumu,
+        gp.dayanak
+      ' . $fromSql . '
+      ORDER BY gp.tarih ASC, p.id ASC
+      LIMIT :limit OFFSET :offset
+    ';
+
+    $stmt = $pdo->prepare($sql);
+    self::bindParams($stmt, $params);
+    $stmt->bindValue(':limit', $filters['limit'], PDO::PARAM_INT);
+    $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+    $stmt->execute();
+
+    $items = [];
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+      $items[] = self::mapPuantajRow($row);
+    }
+
+    return ['items' => $items, 'total' => $total];
+  }
+
+  /** @return array{joins: string, bolum: string, birim: string} */
+  private static function puantajOrgSelect(PDO $pdo)
+  {
+    if (PersonelOrgStructureSchema::isReady($pdo)) {
+      return [
+        'joins' => 'LEFT JOIN bolumler bl ON bl.id = p.bolum_id
+          LEFT JOIN birimler br ON br.id = p.birim_id
+          LEFT JOIN departmanlar d ON d.id = p.departman_id',
+        'bolum' => 'COALESCE(bl.ad, d.ad) AS bolum',
+        'birim' => 'br.ad AS birim',
+      ];
+    }
+
+    return [
+      'joins' => 'LEFT JOIN departmanlar d ON d.id = p.departman_id',
+      'bolum' => 'd.ad AS bolum',
+      'birim' => 'NULL AS birim',
+    ];
+  }
+
+  /** @param array<string, mixed> $row @return array<string, mixed> */
+  private static function mapPuantajRow(array $row)
+  {
+    return [
+      'tarih' => (string) $row['tarih'],
+      'personel_id' => (int) $row['personel_id'],
+      'ad_soyad' => (string) $row['ad_soyad'],
+      'sicil_no' => $row['sicil_no'],
+      'bolum' => $row['bolum'] !== null ? (string) $row['bolum'] : null,
+      'birim' => $row['birim'] !== null ? (string) $row['birim'] : null,
+      'giris_saati' => $row['giris_saati'],
+      'cikis_saati' => $row['cikis_saati'],
+      'net_calisma_dakika' => $row['net_calisma_suresi_dakika'] !== null ? (int) $row['net_calisma_suresi_dakika'] : null,
+      'gec_kalma_dakika' => $row['gec_kalma_dakika'] !== null ? (int) $row['gec_kalma_dakika'] : null,
+      'erken_cikis_dakika' => $row['erken_cikis_dakika'] !== null ? (int) $row['erken_cikis_dakika'] : null,
+      'hareket_durumu' => $row['hareket_durumu'] !== null ? (string) $row['hareket_durumu'] : null,
+      'dayanak' => $row['dayanak'] !== null ? (string) $row['dayanak'] : null,
+    ];
   }
 
   /** @param array<string, mixed> $row @return array<string, mixed> */

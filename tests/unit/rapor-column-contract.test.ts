@@ -10,7 +10,8 @@ const RAPOR_TIPLERI: RaporTipi[] = [
   "ceza",
   "ekstra-prim",
   "is-kazasi",
-  "bildirim"
+  "bildirim",
+  "puantaj"
 ];
 
 describe("rapor-column-contract", () => {
@@ -23,6 +24,25 @@ describe("rapor-column-contract", () => {
     }
 
     expect(Object.keys(RAPOR_COLUMN_CONTRACT).sort()).toEqual([...RAPOR_TIPLERI].sort());
+  });
+
+  it("keeps puantaj columns on stored attendance fields", () => {
+    expect(getRaporColumns("puantaj").map((column) => column.key)).toEqual([
+      "tarih",
+      "personel_id",
+      "ad_soyad",
+      "sicil_no",
+      "bolum",
+      "birim",
+      "giris_saati",
+      "cikis_saati",
+      "net_calisma_dakika",
+      "gec_kalma_dakika",
+      "erken_cikis_dakika",
+      "hareket_durumu",
+      "dayanak"
+    ]);
+    expect(getRaporColumns("puantaj").some((column) => column.key.includes("fazla"))).toBe(false);
   });
 
   it("keeps personel summary columns in business order", () => {

@@ -30,6 +30,7 @@ use Medisa\Api\Controllers\FazlaCalismaOdemeTercihiController;
 use Medisa\Api\Controllers\SerbestZamanController;
 use Medisa\Api\Controllers\MaasHesaplamaController;
 use Medisa\Api\Controllers\MeController;
+use Medisa\Api\Controllers\PersonelSelfProductController;
 use Medisa\Api\Controllers\AttendanceMobileController;
 use Medisa\Api\Controllers\MevzuatParametreController;
 use Medisa\Api\Controllers\QrKioskController;
@@ -118,8 +119,47 @@ class Router
         if ($path === '/me/attendance/today' && $method === 'GET') {
             AttendanceMobileController::today($this->request);
         }
+        if ($path === '/me/attendance/correction-requests' && $method === 'GET') {
+            AttendanceMobileController::listCorrections($this->request);
+        }
         if ($path === '/me/attendance/correction-requests' && $method === 'POST') {
             AttendanceMobileController::createCorrection($this->request);
+        }
+        if ($path === '/me/izinler' && $method === 'GET') {
+            PersonelSelfProductController::izinler($this->request);
+        }
+        if ($path === '/me/izin-talepleri' && $method === 'POST') {
+            SureclerController::createSelfIzin($this->request);
+        }
+        if ($path === '/me/avans-talepleri' && $method === 'GET') {
+            PersonelSelfProductController::avansList($this->request);
+        }
+        if ($path === '/me/avans-talepleri' && $method === 'POST') {
+            PersonelSelfProductController::avansCreate($this->request);
+        }
+        if ($path === '/me/geri-bildirimler' && $method === 'GET') {
+            PersonelSelfProductController::geriBildirimList($this->request);
+        }
+        if ($path === '/me/geri-bildirimler' && $method === 'POST') {
+            PersonelSelfProductController::geriBildirimCreate($this->request);
+        }
+        if ($path === '/me/duyurular' && $method === 'GET') {
+            PersonelSelfProductController::duyurular($this->request);
+        }
+        if ($method === 'POST' && preg_match('#^/me/duyurular/(\d+)/okundu$#', $path, $matches)) {
+            PersonelSelfProductController::duyuruOkundu($this->request, $matches[1]);
+        }
+        if ($path === '/duyurular' && $method === 'POST') {
+            PersonelSelfProductController::duyuruCreate($this->request);
+        }
+        if ($path === '/me/profil-foto' && $method === 'GET') {
+            PersonelSelfProductController::selfProfilFoto($this->request);
+        }
+        if ($path === '/me/profil-foto' && $method === 'PUT') {
+            PersonelSelfProductController::selfProfilFoto($this->request);
+        }
+        if (($method === 'GET' || $method === 'PUT') && preg_match('#^/personeller/(\d+)/profil-foto$#', $path, $matches)) {
+            PersonelSelfProductController::managedProfilFoto($this->request, $matches[1]);
         }
         if ($path === '/me/inbox-notifications' && $method === 'GET') {
             AttendanceMobileController::inbox($this->request);
@@ -878,6 +918,9 @@ class Router
         if ($path === '/haftalik-kapanis/yillik-fazla-calisma' && $method === 'GET') {
             HaftalikKapanisController::yillikFazlaCalisma($this->request);
         }
+        if ($path === '/haftalik-kapanis/yillik-fazla-calisma-kapsam' && $method === 'GET') {
+            HaftalikKapanisController::yillikFazlaCalismaKapsam($this->request);
+        }
         if ($path === '/haftalik-kapanis' && $method === 'POST') {
             HaftalikKapanisController::create($this->request);
         }
@@ -1036,6 +1079,10 @@ class Router
         }
         if ($method === 'POST' && preg_match('#^/ek-odeme-kesinti/(\d+)/iptal$#', $path, $matches)) {
             EkOdemeKesintiController::cancel($this->request, $matches[1]);
+        }
+
+        if ($path === '/raporlar/puantaj/export.xlsx' && $method === 'GET') {
+            RaporlarController::exportPuantajXlsx($this->request);
         }
 
         if ($method === 'GET' && preg_match('#^/raporlar/([^/]+)$#', $path, $matches)) {

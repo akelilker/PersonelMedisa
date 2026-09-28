@@ -14,7 +14,11 @@ use Medisa\Api\Services\OfflineMutationIdempotencyService;
 use Medisa\Api\Services\Personel\PersonelIstenAyrilmaService;
 use Medisa\Api\Services\Personel\PersonelOrgStructureSchema;
 use Medisa\Api\Services\Personel\PersonelValidationException;
+use Medisa\Api\Services\Izin\YillikIzinKullanimService;
 use Medisa\Api\Services\PuantajDonemPeriodService;
+use Medisa\Api\Services\SelfService\PersonelMobileCapabilityException;
+use Medisa\Api\Services\SelfService\PersonelMobileCapabilityService;
+use Medisa\Api\Services\SelfService\SelfPersonelContext;
 use PDO;
 
 class SureclerController
@@ -1161,5 +1165,83 @@ class SureclerController
         $value = trim((string) $decoded['aciklama']);
 
         return $value === '' ? null : $value;
+    }
+
+    /**
+     * PERSONEL self-create of an IZIN surec on the existing owner.
+     * Client personel_id is ignored. izin_write is enforced for the bound personel.
+     */
+    public static function createSelfIzin(Request $request)
+    {
+        $user = AuthMiddleware::authenticate($request, true);
+        RolePermissions::assert($user, 'self_service.view');
+
+        try {
+            $pdo = Connection::get();
+        } catch (\Throwable $e) {
+            JsonResponse::serverError('Veritabani baglantisi kurulamadi.');
+        }
+
+        $ctx = SelfPersonelContext::resolveForSelfService($user, $pdo, true);
+        $caps = PersonelMobileCapabilityService::resolve($pdo, (int) $ctx['personel_id'], $ctx);
+        try {
+            PersonelMobileCapabilityService::assertBusinessCapability(
+                $caps,
+                PersonelMobileCapabilityService::CAP_IZIN_WRITE
+            );
+        } catch (PersonelMobileCapabilityException $e) {
+            JsonResponse::error($e->getHttpStatus(), $e->getErrorCode(), $e->getMessage());
+        }
+
+        $body = $request->getJsonBody();
+        if (!is_array($body)) {
+            $body = [];
+        }
+        $altTur = strtoupper(trim((string) (isset($body['alt_tur']) ? $body['alt_tur'] : (isset($body['izin_turu']) ? $body['izin_turu'] : ''))));
+        if (!in_array($altTur, ['YILLIK_IZIN', 'MAZERET_IZNI', 'UCRETSIZ_IZIN'], true)) {
+            self::validationError('izin_turu', 'Izin turu gecersiz.');
+        }
+        unset($body['personel_id'], $body['state'], $body['gun']);
+        $body['personel_id'] = (int) $ctx['personel_id'];
+        $body['surec_turu'] = 'IZIN';
+        $body['alt_tur'] = $altTur;
+        $body['ucretli_mi'] = $altTur !== 'UCRETSIZ_IZIN';
+        $body['tam_gun_mu'] = true;
+
+        $payload = self::normalizeAndValidateCreatePayload($body);
+        if ((int) $payload['personel_id'] !== (int) $ctx['personel_id'] || $payload['surec_turu'] !== 'IZIN') {
+            self::validationError('personel_id', 'Izin talebi yalniz kendi kaydiniz icin olusturulabilir.');
+        }
+        if ($payload['bitis_tarihi'] === null) {
+            self::validationError('bitis_tarihi', 'Bitis tarihi zorunludur.');
+        }
+
+        $personel = self::fetchPersonelForScope($pdo, $payload['personel_id']);
+        if (!$personel) {
+            self::validationError('personel_id', 'Personel bulunamadi.');
+        }
+        self::assertPeriodOpenForOperationalSurec($pdo, $personel, $payload);
+        self::assertNoCoveringAbsenceOverlap($pdo, $payload, null);
+
+        try {
+            $insertId = self::insertSurec($pdo, $payload);
+            $row = self::fetchSurecRowById($pdo, $insertId);
+            if (!$row) {
+                JsonResponse::serverError('Kayit olusturulamadi.');
+            }
+            $mapped = self::mapSurecRow($row);
+            $today = (new \DateTimeImmutable('now', new \DateTimeZone('Europe/Istanbul')))->format('Y-m-d');
+            $summary = YillikIzinKullanimService::summarizeWindow(
+                $pdo,
+                (int) $ctx['personel_id'],
+                (string) $mapped['baslangic_tarihi'],
+                (string) $mapped['bitis_tarihi'],
+                $today
+            );
+            $mapped['gun'] = $summary['gun'];
+            JsonResponse::success($mapped, [], 201);
+        } catch (\Throwable $e) {
+            JsonResponse::serverError('Izin talebi olusturulamadi.');
+        }
     }
 }

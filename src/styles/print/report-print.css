@@ -3,3 +3,56 @@
     display: none;
   }
 }
+
+@page puantaj-landscape {
+  size: A4 landscape;
+  margin: 10mm;
+}
+
+@media print {
+  body.puantaj-raporu-print,
+  body.puantaj-raporu-print * {
+    visibility: hidden;
+  }
+
+  body.puantaj-raporu-print .puantaj-raporu-print-sheet,
+  body.puantaj-raporu-print .puantaj-raporu-print-sheet * {
+    visibility: visible;
+  }
+
+  body.puantaj-raporu-print .puantaj-raporu-print-sheet {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    page: puantaj-landscape;
+  }
+
+  body.puantaj-raporu-print .puantaj-raporu-print-head {
+    display: block;
+    margin: 0 0 8pt;
+  }
+
+  body.puantaj-raporu-print .puantaj-raporu-print-head h3 {
+    margin: 0 0 4pt;
+    font-size: 14pt;
+  }
+
+  body.puantaj-raporu-print .puantaj-raporu-print-head p {
+    margin: 0;
+    font-size: 10pt;
+  }
+
+  body.puantaj-raporu-print .puantaj-raporu-print-sheet table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 8pt;
+  }
+
+  body.puantaj-raporu-print .puantaj-raporu-print-sheet th,
+  body.puantaj-raporu-print .puantaj-raporu-print-sheet td {
+    border: 1px solid #bbb;
+    padding: 2pt 3pt;
+    text-align: left;
+  }
+}

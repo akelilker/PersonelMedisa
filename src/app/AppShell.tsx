@@ -19,6 +19,7 @@ import { PersonelImportDryRunModal } from "../features/personeller/components/Pe
 import { PersonelImportHistoryModal } from "../features/personeller/components/PersonelImportHistoryModal";
 import { PersonelDetayPrintButton } from "../features/personeller/components/personel-dosya/PersonelDetayPrintButton";
 import { readPersonelKartBack } from "../features/personeller/personel-kart-nav";
+import { personelSelfProductModalTitle } from "../features/self-service/personel-self-service-menu";
 import { useRoleAccess } from "../hooks/use-role-access";
 
 export type AppShellOutletContext = {
@@ -151,6 +152,16 @@ function resolveModuleModal(
   if (pathname === "/self") {
     return { title: "Öz Servis", closeTo: "/" };
   }
+  const selfProductTitle = personelSelfProductModalTitle(pathname);
+  if (selfProductTitle) {
+    return {
+      title: selfProductTitle,
+      closeTo: "/",
+      className: "modal-container--self-product",
+      bodyClassName: "modal-body--self-product",
+      titleVariant: "premium"
+    };
+  }
 
   return { title: "Modül", closeTo: "/" };
 }
@@ -248,6 +259,7 @@ export function AppShell() {
     /^\/personeller\/\d+$/.test(pathname);
   const isSelfQrHistoryModalRoute = pathname === "/self/qr-hareketleri";
   const isSelfQrScanModalRoute = pathname === "/self/qr-okut";
+  const isSelfProductModalRoute = personelSelfProductModalTitle(pathname) !== null;
   const isPersonelDetayRoute = /^\/personeller\/\d+$/.test(pathname);
   const activeSubeLabel = useMemo(() => {
     const activeSubeId = session?.active_sube_id;
@@ -461,7 +473,7 @@ export function AppShell() {
           headerStart={
             isPersonelKartModalRoute ? (
               <PersonelKartHomeButton onClick={() => navigate("/")} />
-            ) : isSelfQrHistoryModalRoute || isSelfQrScanModalRoute ? (
+            ) : isSelfQrHistoryModalRoute || isSelfQrScanModalRoute || isSelfProductModalRoute ? (
               <SelfServiceModalHomeButton onClick={() => navigate(moduleModal.closeTo)} />
             ) : undefined
           }

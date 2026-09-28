@@ -118,6 +118,7 @@ class RolePermissions
             'retention.destruction.view',
             'qr.kiosk.display',
             'attendance.correction.decide',
+            'duyurular.manage',
         ],
         // Branch-level operational management, scoped by explicit user_subeler (fail-closed).
         // Enters and submits branch operational data; never central payroll finalization,
@@ -357,6 +358,7 @@ class RolePermissions
             'arsiv.view',
             'arsiv.download',
             'retention.view',
+            'duyurular.manage',
         ],
         // IT Müdürü: broad troubleshooting READ + yonetim-paneli.manage (users/roles/subeler).
         // Never business approver / policy owner / domain data writer.
@@ -448,6 +450,7 @@ class RolePermissions
         'personel_bordro_kapsam.manage',
         'maas_hesaplama.manage',
         'maas_hesaplama_adaylari.manage',
+        'duyurular.manage',
     ];
 
     /**

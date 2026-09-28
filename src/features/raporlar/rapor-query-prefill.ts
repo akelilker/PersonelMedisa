@@ -8,7 +8,8 @@ const RAPOR_TIPI_SET = new Set<RaporTipi>([
   "ceza",
   "ekstra-prim",
   "is-kazasi",
-  "bildirim"
+  "bildirim",
+  "puantaj"
 ]);
 
 export type RaporQueryExtraFilters = {

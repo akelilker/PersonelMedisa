@@ -66,6 +66,21 @@ export const RAPOR_COLUMN_CONTRACT: Record<RaporTipi, RaporKolonu[]> = {
     { key: "bildirim_turu", label: "Bildirim Türü" },
     { key: "aciklama", label: "Açıklama" },
     { key: "state", label: "Durum" }
+  ],
+  puantaj: [
+    { key: "tarih", label: "Tarih" },
+    { key: "personel_id", label: "Personel" },
+    { key: "ad_soyad", label: "Ad Soyad" },
+    { key: "sicil_no", label: "Sicil" },
+    { key: "bolum", label: "Bölüm" },
+    { key: "birim", label: "Birim" },
+    { key: "giris_saati", label: "Giriş" },
+    { key: "cikis_saati", label: "Çıkış" },
+    { key: "net_calisma_dakika", label: "Net Çalışma (dk)" },
+    { key: "gec_kalma_dakika", label: "Geç Kalma (dk)" },
+    { key: "erken_cikis_dakika", label: "Erken Çıkış (dk)" },
+    { key: "hareket_durumu", label: "Hareket" },
+    { key: "dayanak", label: "İzin / Devamsızlık" }
   ]
 };
 

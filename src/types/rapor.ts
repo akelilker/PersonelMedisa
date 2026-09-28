@@ -8,7 +8,8 @@ export type RaporTipi =
   | "ceza"
   | "ekstra-prim"
   | "is-kazasi"
-  | "bildirim";
+  | "bildirim"
+  | "puantaj";
 
 export type RaporAktiflik = "aktif" | "pasif" | "tum";
 

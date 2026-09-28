@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   createHaftalikKapanis,
   fetchHaftalikKapanisDetail,
+  fetchYillikFazlaCalismaKapsami,
   fetchYillikFazlaCalismaOzeti
 } from "../../src/api/haftalik-kapanis.api";
 import { ApiRequestError } from "../../src/api/api-client";
@@ -524,5 +525,43 @@ describe("haftalik-kapanis.api", () => {
       message: "Haftalik kapanis bulunamadi.",
       code: "NOT_FOUND"
     });
+  });
+
+  it("fetchYillikFazlaCalismaKapsami uses the scoped bulk endpoint", async () => {
+    const fetchMock = vi.fn(async () =>
+      createJsonResponse(
+        {
+          data: {
+            yil: 2026,
+            kapsam_kesildi_mi: false,
+            personeller: [
+              {
+                personel_id: 4,
+                ad_soyad: "Ayşe Yılmaz",
+                yil: 2026,
+                kullanilan_dakika: 100,
+                yillik_limit_dakika: 16200,
+                kalan_dakika: 16100,
+                limit_asildi_mi: false,
+                limit_yaklasiyor_mu: false
+              }
+            ]
+          },
+          meta: {},
+          errors: []
+        },
+        200
+      )
+    );
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await fetchYillikFazlaCalismaKapsami(2026);
+    const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("/api/haftalik-kapanis/yillik-fazla-calisma-kapsam?yil=2026");
+    expect(result.personeller).toHaveLength(1);
+    expect(result.personeller[0]?.ad_soyad).toBe("Ayşe Yılmaz");
+    expect(result.personeller[0]?.limit_yaklasiyor_mu).toBe(false);
+    expect(result.personeller[0]?.limit_asildi_mi).toBe(false);
   });
 });

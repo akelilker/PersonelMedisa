@@ -834,6 +834,31 @@ body.app-personel-shell.app-home-route .personel-mobile-shell.self-home-page > .
   min-width: 0;
 }
 
+.pm-attendance-box--idle-giris {
+  border-color: rgba(46, 125, 50, 0.38);
+}
+
+.pm-attendance-box--idle-cikis {
+  border-color: rgba(198, 40, 40, 0.38);
+}
+
+.pm-attendance-box--idle-giris:not(.pm-attendance-box--actionable),
+.pm-attendance-box--idle-cikis:not(.pm-attendance-box--actionable) {
+  opacity: 0.72;
+}
+
+.pm-box-countdown-title {
+  margin: 0;
+  max-width: 100%;
+  font-size: 0.62rem;
+  font-weight: 700;
+  line-height: 1.2;
+  text-align: center;
+  letter-spacing: 0.01em;
+  color: var(--txt-muted);
+  overflow-wrap: anywhere;
+}
+
 /* Shared correction-pencil surface (GİRİŞ/ÇIKIŞ cards + Geçmiş timeline rows). */
 .pm-box-pencil {
   display: inline-flex;

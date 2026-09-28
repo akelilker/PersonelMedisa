@@ -47,8 +47,11 @@ export type AttendanceTodayResponse = {
   can_scan_cikis: boolean;
   pending_giris_correction: { id: number; status: string; status_label: string; requested_local_time: string } | null;
   pending_cikis_correction: { id: number; status: string; status_label: string; requested_local_time: string } | null;
-  /** Human duration until planned exit when an open shift exists; null when unknown. */
-  mesai_bitimine_kalan_label?: string | null;
+  /** Planned shift window from gunluk_puantaj (LateEarlyInfoService::loadPlannedDay); client computes countdown. */
+  planned_shift?: {
+    beklenen_giris_saati: string | null;
+    beklenen_cikis_saati: string | null;
+  } | null;
 };
 
 export type InboxNotification = {

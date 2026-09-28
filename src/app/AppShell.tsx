@@ -143,7 +143,7 @@ function resolveModuleModal(
   }
   if (pathname === "/self/qr-hareketleri") {
     return {
-      title: "Giriş / Çıkış Geçmişim",
+      title: "Çalışma Geçmişi",
       closeTo: "/",
       className: "modal-container--self-qr-history",
       bodyClassName: "modal-body--self-qr-history",

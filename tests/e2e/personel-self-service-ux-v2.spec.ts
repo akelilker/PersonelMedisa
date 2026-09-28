@@ -534,7 +534,7 @@ test.describe("PERSONEL self-service UX v2 — mobile product", () => {
 
     await page.getByTestId("personel-menu-gecmis").click();
     await expect(page).toHaveURL(/\/self\/qr-hareketleri/);
-    await expect(page.locator(".modal-header h2").first()).toHaveText("Giriş / Çıkış Geçmişim");
+    await expect(page.locator(".modal-header h2").first()).toHaveText("Çalışma Geçmişi");
     await expect(page.getByTestId("personel-qr-history-page")).toBeVisible();
     await expect(page.getByTestId("qr-history-calendar")).toBeVisible();
     await expect(page.getByTestId("qr-history-month-prev")).toBeVisible();

@@ -106,7 +106,10 @@
 }
 
 .icons-row--minimal.icons-row--personel .pm-shell-duyurular-link {
-  padding-bottom: 2px;
+  display: grid;
+  place-items: center;
+  padding: 2px;
+  box-sizing: content-box;
 }
 
 .pm-shell-duyurular-link:hover,

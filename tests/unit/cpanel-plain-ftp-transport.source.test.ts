@@ -9,10 +9,6 @@ const CPANEL_FTP_WORKFLOWS = [
   '.github/workflows/apply-cpanel-migrations.yml',
   '.github/workflows/ops-migration-worker-diagnostics.yml',
   '.github/workflows/ops-organization-inventory.yml',
-  '.github/workflows/ops-personel-first-login-preflight.yml',
-  '.github/workflows/apply-organization-mapping.yml',
-  '.github/workflows/set-cpanel-app-public-url.yml',
-  '.github/workflows/cleanup-cpanel-junk.yml',
 ];
 
 const CPANEL_FTP_SCRIPTS = ['scripts/deploy/cpanel-ftp-readback-lib.sh'];

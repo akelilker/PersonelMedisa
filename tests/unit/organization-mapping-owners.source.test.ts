@@ -10,7 +10,6 @@ const mappingOwner = read('api/src/Services/Organizasyon/OrganizationInitialMapp
 const backupOwner = read('api/src/Database/MigrationBackupService.php');
 const worker = read('api/bin/cpanel-migration-cron.php');
 const inventoryWorkflow = read('.github/workflows/ops-organization-inventory.yml');
-const mappingWorkflow = read('.github/workflows/apply-organization-mapping.yml');
 const migrationsWorkflow = read('.github/workflows/apply-cpanel-migrations.yml');
 const diagnosticsWorkflow = read('.github/workflows/ops-migration-worker-diagnostics.yml');
 const publicService = read('api/src/Services/Organizasyon/OrganizasyonService.php');
@@ -366,7 +365,7 @@ describe('read-only organization inventory owner', () => {
     // jq's `a // b` alternative fires on `false` as well as on `null`, so the
     // old filter reported every proven-false boolean (id_3_present, data_ready,
     // branch_set_valid) as a missing field. The fallback must be null-only.
-    for (const workflow of [inventoryWorkflow, mappingWorkflow, diagnosticsWorkflow]) {
+    for (const workflow of [inventoryWorkflow, diagnosticsWorkflow]) {
       expect(workflow).toContain('if . == null then \\"NONE\\" else tostring end');
       expect(workflow).not.toMatch(/value="\$\(jq -r "\$\{filter\} \/\/ \\"NONE\\""/);
     }
@@ -754,60 +753,14 @@ describe('workflow separation', () => {
   });
 
   it('shares the single control-plane concurrency group', () => {
-    for (const workflow of [inventoryWorkflow, mappingWorkflow]) {
-      expect(workflow).toContain('group: cpanel-canonical-migration-control');
-      expect(workflow).toContain('cancel-in-progress: false');
-      expect(workflow).toContain('MIGRATION_CONTROL_PLANE_BUSY');
-    }
-  });
-
-  it('requires an explicit confirmation, sha, spec path and checksum to map', () => {
-    expect(mappingWorkflow).toContain('test "$CONFIRMATION" = "$MODE"');
-    expect(mappingWorkflow).toContain('DEPLOYED_SHA_INPUT_INVALID');
-    expect(mappingWorkflow).toContain('INVENTORY_CHECKSUM_INPUT_INVALID');
-    expect(mappingWorkflow).toContain('^ops/organization-mapping/[A-Za-z0-9._-]+\\.json$');
-    expect(mappingWorkflow).toContain('SPEC_PATH_NOT_ALLOWED');
-  });
-
-  it('cannot map unless the code is deployed and the pinned inventory matches', () => {
-    for (const reason of [
-      'DEPLOY_SHA_MISMATCH',
-      'REMOTE_WORKER_PARITY_MISMATCH',
-      'WORKER_MAPPING_BACKUP_STAGE_MISSING',
-      'INVENTORY_ARTIFACT_MISSING',
-      'INVENTORY_CHECKSUM_MISMATCH',
-      'INVENTORY_NOT_PASS',
-      'INVENTORY_SHA_MISMATCH',
-      'SPEC_DEPLOY_SHA_MISMATCH',
-      'SPEC_INVENTORY_CHECKSUM_MISMATCH',
-      'SPEC_FORBIDDEN_FIELD',
-      'SPEC_FORBIDDEN_BRANCH_ID',
-      'MAPPING_BACKUP_NOT_VERIFIED',
-      'MAPPING_POSTCHECK_NOT_PASS',
-    ]) {
-      expect(mappingWorkflow).toContain(reason);
-    }
-  });
-
-  it('proves the preflight mode mutates nothing', () => {
-    expect(mappingWorkflow).toContain('MAPPING_RESULT=PREFLIGHT_PASS');
-    expect(mappingWorkflow).toContain('PRODUCTION_MUTATION_COUNT=0');
-  });
-
-  it('never carries direct SQL or edits files on the server', () => {
-    expect(mappingWorkflow).not.toMatch(/\b(?:mysql|psql|sqlite3|phpmyadmin)\b/i);
-    expect(mappingWorkflow).not.toMatch(/put[^\n]*api\/migrations/);
-    expect(mappingWorkflow).not.toMatch(/put[^\n]*api\/src/);
+    expect(inventoryWorkflow).toContain('group: cpanel-canonical-migration-control');
+    expect(inventoryWorkflow).toContain('cancel-in-progress: false');
+    expect(inventoryWorkflow).toContain('MIGRATION_CONTROL_PLANE_BUSY');
   });
 });
 
 describe('first-party action runtime pins', () => {
-  const checkoutOwners = [
-    migrationsWorkflow,
-    diagnosticsWorkflow,
-    inventoryWorkflow,
-    mappingWorkflow,
-  ];
+  const checkoutOwners = [migrationsWorkflow, diagnosticsWorkflow, inventoryWorkflow];
 
   it('checks out with the Node 24 major on every control-plane workflow', () => {
     for (const workflow of checkoutOwners) {
@@ -817,11 +770,9 @@ describe('first-party action runtime pins', () => {
     }
   });
 
-  it('uploads artifacts with the Node 24 major on both publication owners', () => {
-    for (const workflow of [inventoryWorkflow, mappingWorkflow]) {
-      expect(workflow).toContain('uses: actions/upload-artifact@v6');
-      expect(workflow).not.toContain('actions/upload-artifact@v4');
-    }
+  it('uploads artifacts with the Node 24 major on the inventory publication owner', () => {
+    expect(inventoryWorkflow).toContain('uses: actions/upload-artifact@v6');
+    expect(inventoryWorkflow).not.toContain('actions/upload-artifact@v4');
   });
 });
 
@@ -832,14 +783,12 @@ describe('publication boundary (repository visibility)', () => {
   const guardCheck = 'if [ "${REPOSITORY_PRIVATE:-}" != "true" ]; then';
 
   it('reads the canonical repository visibility instead of an input or a hardcoded value', () => {
-    for (const workflow of [inventoryWorkflow, mappingWorkflow]) {
-      expect(workflow).toContain('REPOSITORY_PRIVATE: ${{ github.event.repository.private }}');
-      expect(workflow).toContain(guardCheck);
-      expect(workflow).not.toContain('inputs.repository_private');
-      expect(workflow).not.toContain('inputs.allow_public');
-      expect(workflow).not.toContain('accept_public_exposure');
-      expect(workflow).not.toMatch(/REPOSITORY_PRIVATE:\s*(?:"?true"?|"?false"?)\s*$/m);
-    }
+    expect(inventoryWorkflow).toContain('REPOSITORY_PRIVATE: ${{ github.event.repository.private }}');
+    expect(inventoryWorkflow).toContain(guardCheck);
+    expect(inventoryWorkflow).not.toContain('inputs.repository_private');
+    expect(inventoryWorkflow).not.toContain('inputs.allow_public');
+    expect(inventoryWorkflow).not.toContain('accept_public_exposure');
+    expect(inventoryWorkflow).not.toMatch(/REPOSITORY_PRIVATE:\s*(?:"?true"?|"?false"?)\s*$/m);
   });
 
   it('stops the whole inventory operation before any control-plane request', () => {
@@ -856,54 +805,28 @@ describe('publication boundary (repository visibility)', () => {
     }
   });
 
-  it('stops the whole mapping operation before the spec reaches production', () => {
-    const guardAt = mappingWorkflow.indexOf(guardStep);
-    expect(guardAt).toBeGreaterThan(-1);
-    expect(mappingWorkflow).toContain('MAPPING_REASON=PUBLIC_REPOSITORY_SPEC_TRANSPORT_UNSAFE');
-    for (const later of [
-      '- name: Checkout repository',
-      '- name: Verify the approved mapping spec',
-      'request.pending.${REQUEST_ID}.json',
-      'actions/upload-artifact@v6',
-    ]) {
-      expect(mappingWorkflow.indexOf(later)).toBeGreaterThan(guardAt);
-    }
-  });
-
   it('keeps the artifact upload unreachable once the boundary blocks', () => {
-    for (const workflow of [inventoryWorkflow, mappingWorkflow]) {
-      expect(workflow).toContain('if: always() && github.event.repository.private == true');
-      expect(workflow).not.toMatch(/^\s{8}if: always\(\)\s*$/m);
-    }
+    expect(inventoryWorkflow).toContain('if: always() && github.event.repository.private == true');
+    expect(inventoryWorkflow).not.toMatch(/^\s{8}if: always\(\)\s*$/m);
   });
 
   it('preserves the controlled artifact path for a private repository', () => {
     expect(inventoryWorkflow).toContain('name: organization-inventory');
     expect(inventoryWorkflow).toContain('retention-days: 7');
-    expect(mappingWorkflow).toContain('name: organization-mapping-evidence');
-    expect(mappingWorkflow).toContain('retention-days: 14');
   });
 
   it('does not treat retention as the security control', () => {
-    for (const workflow of [inventoryWorkflow, mappingWorkflow]) {
-      expect(workflow).not.toMatch(/retention-days: [01]\s*$/m);
-    }
+    expect(inventoryWorkflow).not.toMatch(/retention-days: [01]\s*$/m);
   });
 
   it('adds no raw row-data log fallback while blocking', () => {
-    for (const workflow of [inventoryWorkflow, mappingWorkflow]) {
-      expect(workflow).not.toContain('cat "$report"');
-      expect(workflow).not.toContain('cat "$SPEC_PATH"');
-      expect(workflow).not.toContain('.data.branches');
-      expect(workflow).not.toContain('.data.sgk_employers');
-      expect(workflow).not.toContain('.data.work_locations');
-    }
+    expect(inventoryWorkflow).not.toContain('cat "$report"');
+    expect(inventoryWorkflow).not.toContain('.data.branches');
+    expect(inventoryWorkflow).not.toContain('.data.sgk_employers');
+    expect(inventoryWorkflow).not.toContain('.data.work_locations');
   });
 
-  it('never publishes the backup dump or an absolute backup path', () => {
-    expect(mappingWorkflow).not.toMatch(/get[^\n]*\.sql/);
-    expect(mappingWorkflow).not.toContain('backup_path');
-    expect(mappingWorkflow).toContain("emit_scalar MAPPING_BACKUP_FILE \"$status_file\" '.backup_file' '^[A-Za-z0-9._-]{1,160}$'");
+  it('never publishes an absolute backup path from the backup owner', () => {
     expect(backupOwner).not.toContain("'path' => $absolutePath");
   });
 

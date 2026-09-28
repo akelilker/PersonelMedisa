@@ -26,7 +26,7 @@ Son çıktı: `CLOSED_PRODUCTION`
 | `.github/workflows/ops-migration-worker-diagnostics.yml` | Salt-okunur envanter + `READ_ONLY_MIGRATION_PREFLIGHT` |
 | `.github/workflows/apply-cpanel-migrations.yml` | Tek migration apply talebi (canonical worker) |
 | `.github/workflows/deploy-cpanel.yml` | main deploy (build + FTP + smoke) |
-| `.github/workflows/final-close.yml` + `scripts/ops/final-close-control.py` | Final close paketi (bu PR kapsamı DIŞI; yalnız atıf) |
+| ~~`.github/workflows/final-close.yml`~~ (kaldırıldı) + `scripts/ops/final-close-control.py` | Final close paketi (bu PR kapsamı DIŞI; yalnız atıf) |
 | `api/bin/migrate.php` | CLI runner (`--verify`) |
 | `api/bin/cpanel-migration-cron.php` | Cron migration worker (backup + apply) |
 
@@ -145,7 +145,7 @@ Son çıktı: `CLOSED_PRODUCTION`
 - Doğu / 125 rollout
 - QR yaka
 - İzmir–Sakarya A1
-- `final-close.yml` paketi (PERSONELMEDISA_FINAL_CLOSE) — yalnız atıf, tetiklenmez.
+- `final-close.yml` paketi (PERSONELMEDISA_FINAL_CLOSE) — workflow kaldırıldı; script/owner atıfı kalır.
 
 ## Kısa rapor (bu checklist üretilirken)
 

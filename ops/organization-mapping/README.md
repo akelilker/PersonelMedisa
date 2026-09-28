@@ -1,8 +1,8 @@
 # Production organization mapping specs
 
 Bu dizin, üretimdeki ilk şirket/şube/SGK/lokasyon eşlemesi için **onaylanmış**
-mapping spec dosyalarını tutar. `apply-organization-mapping.yml` yalnız bu
-dizindeki `*.json` dosyalarını kabul eder (`ops/organization-mapping/<ad>.json`).
+mapping spec dosyalarını tutar. Eski `apply-organization-mapping.yml` workflow'u
+kaldırıldı (tek seferlik apply tamamlandı); spec dosyaları historical preimage olarak kalır.
 
 ## Historical status (canlı truth değil)
 

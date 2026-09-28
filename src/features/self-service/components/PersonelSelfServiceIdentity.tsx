@@ -26,12 +26,18 @@ export function PersonelSelfServiceIdentity({
     <div className="pm-self-identity pm-self-identity--home" data-testid="personel-self-identity">
       <div className="pm-self-identity__text">
         <p className="pm-self-identity__name">{view.adSoyad}</p>
-        <p className="pm-self-identity__tenure" data-testid="personel-self-identity-tenure">
-          {view.tenureLine}
+        <p className="pm-self-identity__fact" data-testid="personel-self-identity-sicil">
+          Sicil No. {view.sicil}
         </p>
-        {view.organization.length > 0 ? (
+        <p className="pm-self-identity__fact" data-testid="personel-self-identity-ise-giris">
+          İşe Giriş {view.iseGiris}
+        </p>
+        <p className="pm-self-identity__fact" data-testid="personel-self-identity-kidem">
+          Çalışılan Süre {view.calismaSuresi}
+        </p>
+        {view.subeGorev ? (
           <p className="pm-self-identity__org" data-testid="personel-self-identity-org">
-            {view.organization.join(" · ")}
+            {view.subeGorev}
           </p>
         ) : null}
       </div>

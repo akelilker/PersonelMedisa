@@ -1,6 +1,7 @@
 import type { AttendanceTodayResponse } from "../../../api/attendance-mobile.api";
 import {
   hasPlannedShift,
+  isGirisSaatiGecti,
   mesaiBitimineKalanLabel,
   mesaiyeKalanLabel
 } from "../attendance-shift-countdown";
@@ -20,6 +21,7 @@ type OwnQrAttendanceBoxesProps = {
     | "pending_cikis_correction"
     | "capabilities"
     | "planned_shift"
+    | "izinli_bugun"
   >;
   /** Role-independent QR entitlement mirror (`self_service.qr.scan`). */
   qrEnabled: boolean;
@@ -119,6 +121,12 @@ export function OwnQrAttendanceBoxes({
       ? mesaiBitimineKalanLabel(planned?.beklenen_cikis_saati, now)
       : null;
 
+  // İşe geç kalındı (bilgilendirme): bugün giriş yok, planlı giriş saati geçmiş, izinli değil.
+  const girisGec =
+    !today.giris &&
+    isGirisSaatiGecti(planned?.beklenen_giris_saati, now) &&
+    !today.izinli_bugun;
+
   return (
     <div className="pm-attendance-grid" data-testid={testId}>
       <div
@@ -144,7 +152,11 @@ export function OwnQrAttendanceBoxes({
               onClick={girisActionable ? onScanGiris : undefined}
             >
               <span className="pm-box-label">GİRİŞ</span>
-              {girisCountdown ? (
+              {girisGec ? (
+                <p className="pm-box-late-warning" data-testid="giris-late-warning">
+                  İşe Geç Kaldınız.
+                </p>
+              ) : girisCountdown ? (
                 <CountdownBlock title="Mesaiye Kalan Süre" value={girisCountdown} />
               ) : (
                 <BoxClock event={today.giris} />

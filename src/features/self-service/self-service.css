@@ -393,7 +393,7 @@ body.app-personel-shell.app-home-route .personel-mobile-shell.self-home-page > .
   min-width: 0;
 }
 
-.pm-self-identity__tenure {
+.pm-self-identity__fact {
   margin: 2px 0 0;
   font-size: 0.78rem;
   font-weight: 600;
@@ -433,6 +433,16 @@ body.app-personel-shell.app-home-route .personel-mobile-shell.self-home-page > .
 .pm-self-identity--home .pm-self-portrait {
   width: 48px;
   height: 48px;
+}
+
+/*
+ * PERSONEL home kimlik foto dairesi: yatayda üstteki bildirim zili ile çıkış
+ * ikonunun merkezlerinin ortasına hizalı durur. Zil (22px) + çıkış (20px) + 14px
+ * boşluk; foto (48px) sağa yaslıyken merkezi çıkış ikonuna denk gelir, ~8px sola
+ * kaydırınca iki ikonun tam ortasına oturur. Dikeyde kimlik bloğu içinde kalır.
+ */
+.pm-self-identity--home .pm-self-identity__photo-btn {
+  margin-right: 8px;
 }
 
 .pm-self-identity__text {
@@ -856,6 +866,18 @@ body.app-personel-shell.app-home-route .personel-mobile-shell.self-home-page > .
   text-align: center;
   letter-spacing: 0.01em;
   color: var(--txt-muted);
+  overflow-wrap: anywhere;
+}
+
+/* Bilgilendirme amaçlı geç kalma metni: GİRİŞ butonunun içinde saat/sayaç yerini alır. */
+.pm-box-late-warning {
+  margin: 0;
+  max-width: 100%;
+  font-size: 0.8rem;
+  font-weight: 800;
+  line-height: 1.2;
+  text-align: center;
+  color: var(--danger);
   overflow-wrap: anywhere;
 }
 

@@ -4,10 +4,14 @@ import type { MeIdentity } from "../../types/self-service";
 
 export type PersonelSelfIdentityView = {
   adSoyad: string;
-  /** İşe giriş · sicil · kıdem value line (from GET /me). */
-  tenureLine: string;
-  /** Present organization names only. Missing şube/bölüm/birim/görev are omitted. */
-  organization: string[];
+  /** Sicil no (from GET /me), "-" when missing. */
+  sicil: string;
+  /** İşe giriş tarihi (tr-TR), "-" when missing. */
+  iseGiris: string;
+  /** Kıdem "X yıl Y ay", "-" when missing. */
+  calismaSuresi: string;
+  /** Yalnızca şube adı + " - " + görev adı. Değer yoksa o parça yazılmaz; ikisi de yoksa null. */
+  subeGorev: string | null;
 };
 
 function present(value: string | null | undefined): string | null {
@@ -22,7 +26,7 @@ function dash(value: string | null | undefined): string {
 
 function formatKidemCalisiyor(iseGiris: string): string {
   const kidem = hesaplaKidemYilAy(iseGiris);
-  return `${kidem.yil} yıl ${kidem.ay} aydır çalışıyor`;
+  return `${kidem.yil} yıl ${kidem.ay} ay`;
 }
 
 /**
@@ -34,7 +38,7 @@ export function buildPersonelSelfIdentityView(me: MeIdentity): PersonelSelfIdent
   if (!personel) {
     const fallback = present(me.ad_soyad);
     return fallback
-      ? { adSoyad: fallback, tenureLine: "- · - · -", organization: [] }
+      ? { adSoyad: fallback, sicil: "-", iseGiris: "-", calismaSuresi: "-", subeGorev: null }
       : null;
   }
   const adSoyad =
@@ -46,17 +50,13 @@ export function buildPersonelSelfIdentityView(me: MeIdentity): PersonelSelfIdent
   }
 
   const iseGirisRaw = present(personel.ise_giris_tarihi);
-  const iseGirisDisplay = iseGirisRaw ? formatIsoDateDetail(iseGirisRaw) : "-";
-  const sicilDisplay = dash(personel.sicil_no);
-  const kidemDisplay = iseGirisRaw ? formatKidemCalisiyor(iseGirisRaw) : "-";
-  const tenureLine = `${iseGirisDisplay} · ${sicilDisplay} · ${kidemDisplay}`;
+  const iseGiris = iseGirisRaw ? formatIsoDateDetail(iseGirisRaw) : "-";
+  const sicil = dash(personel.sicil_no);
+  const calismaSuresi = iseGirisRaw ? formatKidemCalisiyor(iseGirisRaw) : "-";
 
-  const organization = [
-    present(personel.sube_ad),
-    present(personel.bolum_ad),
-    present(personel.birim_ad),
-    present(personel.gorev_ad)
-  ].filter((item): item is string => item !== null);
+  const sube = present(personel.sube_ad);
+  const gorev = present(personel.gorev_ad);
+  const subeGorev = sube && gorev ? `${sube} - ${gorev}` : sube ?? gorev;
 
-  return { adSoyad, tenureLine, organization };
+  return { adSoyad, sicil, iseGiris, calismaSuresi, subeGorev };
 }

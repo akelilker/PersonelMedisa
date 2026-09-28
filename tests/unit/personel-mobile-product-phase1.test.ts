@@ -35,19 +35,20 @@ function identity(overrides: Partial<MeIdentity["personel"]> = {}): MeIdentity {
 }
 
 describe("PERSONEL mobile product phase 1 identity", () => {
-  it("uses name as primary and only present organization fields as secondary", () => {
+  it("splits identity facts and keeps only şube - görev on the organization line", () => {
     const view = buildPersonelSelfIdentityView(identity());
     expect(view?.adSoyad).toBe("Ayşe Yılmaz");
-    expect(view?.organization).toEqual(["Merkez", "Operasyon", "Saha", "Teknisyen"]);
-    expect(view?.tenureLine).toContain("P-007");
-    expect(view?.tenureLine).toContain("aydır çalışıyor");
+    expect(view?.sicil).toBe("P-007");
+    expect(view?.iseGiris).toBe("15.01.2020");
+    expect(view?.calismaSuresi).toMatch(/^\d+ yıl \d+ ay$/);
+    expect(view?.subeGorev).toBe("Merkez - Teknisyen");
   });
 
-  it("omits empty birim and görev instead of placeholders", () => {
+  it("omits empty görev/bölüm/birim parts instead of placeholders", () => {
     const view = buildPersonelSelfIdentityView(
       identity({ birim_ad: "  ", gorev_ad: null, bolum_ad: "" })
     );
-    expect(view?.organization).toEqual(["Merkez"]);
+    expect(view?.subeGorev).toBe("Merkez");
   });
 
   it("formats overtime minutes without recomputing a balance", () => {

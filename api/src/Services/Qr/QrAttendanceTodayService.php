@@ -167,7 +167,36 @@ class QrAttendanceTodayService
             'pending_giris_correction' => $pendingGirisCorrection,
             'pending_cikis_correction' => $pendingCikisCorrection,
             'planned_shift' => $plannedShift,
+            'izinli_bugun' => self::hasApprovedLeaveToday($pdo, $personelId, $today),
         ];
+    }
+
+    /**
+     * Bugünü kapsayan onaylı (AKTIF) bir IZIN süreci var mı.
+     * Surecler kaynağı, BugunPersonelDurumuService'in izinli belirlemesiyle aynıdır.
+     */
+    private static function hasApprovedLeaveToday(PDO $pdo, $personelId, $businessDateYmd)
+    {
+        try {
+            $stmt = $pdo->prepare(
+                "SELECT 1
+                 FROM surecler
+                 WHERE personel_id = :pid
+                   AND surec_turu = 'IZIN'
+                   AND state = 'AKTIF'
+                   AND baslangic_tarihi <= :tarih
+                   AND (bitis_tarihi IS NULL OR bitis_tarihi >= :tarih)
+                 LIMIT 1"
+            );
+            $stmt->execute([
+                'pid' => (int) $personelId,
+                'tarih' => (string) $businessDateYmd,
+            ]);
+
+            return $stmt->fetchColumn() !== false;
+        } catch (\Throwable $e) {
+            return false;
+        }
     }
 
     /**

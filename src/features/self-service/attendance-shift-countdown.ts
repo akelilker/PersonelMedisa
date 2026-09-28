@@ -91,3 +91,15 @@ export function mesaiyeKalanLabel(
   }
   return formatDurationHuman(delta);
 }
+
+/** Planned giriş saati İstanbul duvar saatine göre geçmiş mi (dakika tick'i ile). */
+export function isGirisSaatiGecti(
+  beklenenGiris: string | null | undefined,
+  at: Date = new Date()
+): boolean {
+  const entryMins = hhmmToMinutes(beklenenGiris);
+  if (entryMins === null) {
+    return false;
+  }
+  return istanbulWallClockMinutes(at) > entryMins;
+}

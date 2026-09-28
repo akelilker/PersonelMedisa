@@ -403,6 +403,7 @@ body.app-personel-shell.app-home-route .personel-mobile-shell.self-home-page > .
 .pm-self-identity--home .pm-self-identity__text {
   flex: 1 1 auto;
   min-width: 0;
+  padding-left: 4px;
 }
 
 .pm-self-identity--home .pm-self-identity__fact {
@@ -417,9 +418,11 @@ body.app-personel-shell.app-home-route .personel-mobile-shell.self-home-page > .
 }
 
 .pm-self-identity--home .pm-self-identity__org {
-  font-size: 0.7rem;
-  line-height: 1.25;
-  font-weight: 500;
+  margin: 2px 0 0;
+  font-size: calc(0.78rem + 1px);
+  font-weight: 600;
+  line-height: 1.3;
+  color: inherit;
 }
 
 .pm-self-identity__photo-btn {
@@ -477,10 +480,10 @@ body.app-personel-shell.app-home-route .personel-mobile-shell.self-home-page > .
   place-items: center;
   width: 16px;
   height: 16px;
-  border: 1.5px solid rgba(12, 16, 22, 0.92);
+  border: none;
   border-radius: 999px;
-  background: var(--brand-red, #c62828);
-  color: #fff;
+  background: transparent;
+  color: var(--brand-red, #c62828);
   font-size: 11px;
   font-weight: 800;
   line-height: 1;
@@ -508,7 +511,7 @@ body.app-personel-shell.app-home-route .personel-mobile-shell.self-home-page > .
 .pm-self-portrait--empty {
   display: grid;
   place-items: center;
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.16);
   color: inherit;
   font-size: 0.78rem;
   font-weight: 700;
@@ -957,19 +960,15 @@ body.app-personel-shell.app-home-route .personel-mobile-shell.self-home-page > .
   color: rgba(255, 255, 255, 0.96);
 }
 
-.pm-attendance-box--idle-giris:not(.pm-attendance-box--actionable) .pm-box-main-action--passive,
 .pm-attendance-box--idle-cikis:not(.pm-attendance-box--actionable) .pm-box-main-action--passive {
   color: rgba(235, 235, 235, 0.78);
 }
 
-.pm-attendance-box--idle-giris:not(.pm-attendance-box--actionable) .pm-box-main-action--passive .pm-box-label,
 .pm-attendance-box--idle-cikis:not(.pm-attendance-box--actionable) .pm-box-main-action--passive .pm-box-label {
   color: rgba(220, 220, 220, 0.72);
 }
 
-.pm-attendance-box--idle-giris:not(.pm-attendance-box--actionable) .pm-box-main-action--passive .pm-box-time,
 .pm-attendance-box--idle-cikis:not(.pm-attendance-box--actionable) .pm-box-main-action--passive .pm-box-time,
-.pm-attendance-box--idle-giris:not(.pm-attendance-box--actionable) .pm-box-main-action--passive .pm-box-countdown-title,
 .pm-attendance-box--idle-cikis:not(.pm-attendance-box--actionable) .pm-box-main-action--passive .pm-box-countdown-title {
   color: rgba(230, 230, 230, 0.76);
 }

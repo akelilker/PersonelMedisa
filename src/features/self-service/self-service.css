@@ -442,7 +442,11 @@ body.app-personel-shell.app-home-route .personel-mobile-shell.self-home-page > .
  * kaydırınca iki ikonun tam ortasına oturur. Dikeyde kimlik bloğu içinde kalır.
  */
 .pm-self-identity--home .pm-self-identity__photo-btn {
-  margin-right: 8px;
+  margin-right: 68px;
+}
+
+.pm-self-identity--home .pm-self-identity__name {
+  font-size: calc(1rem + 1px);
 }
 
 .pm-self-identity__text {

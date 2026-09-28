@@ -495,7 +495,7 @@ export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeade
         <div className="icons-row-left">
           <Link
             to="/self/duyurular"
-            className="pm-shell-duyurular-link"
+            className="pm-shell-duyurular-link icon-btn"
             data-testid="personel-shell-duyurular-link"
             aria-label="Duyurular"
             onClick={() => {

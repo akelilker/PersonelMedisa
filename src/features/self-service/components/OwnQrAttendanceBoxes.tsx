@@ -145,7 +145,13 @@ export function OwnQrAttendanceBoxes({
           <>
             <button
               type="button"
-              className="pm-box-main-action pm-box-main-action--with-time"
+              className={[
+                "pm-box-main-action",
+                "pm-box-main-action--with-time",
+                !girisActionable && "pm-box-main-action--passive"
+              ]
+                .filter(Boolean)
+                .join(" ")}
               data-testid="giris-scan"
               aria-label="Giriş için kiosk QR okut"
               disabled={!girisActionable}
@@ -207,7 +213,13 @@ export function OwnQrAttendanceBoxes({
           <>
             <button
               type="button"
-              className="pm-box-main-action pm-box-main-action--with-time"
+              className={[
+                "pm-box-main-action",
+                "pm-box-main-action--with-time",
+                !cikisActionable && "pm-box-main-action--passive"
+              ]
+                .filter(Boolean)
+                .join(" ")}
               data-testid="cikis-scan"
               aria-label="Çıkış için kiosk QR okut"
               disabled={!cikisActionable}

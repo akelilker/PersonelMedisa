@@ -852,9 +852,31 @@ body.app-personel-shell.app-home-route .personel-mobile-shell.self-home-page > .
   border-color: rgba(198, 40, 40, 0.38);
 }
 
-.pm-attendance-box--idle-giris:not(.pm-attendance-box--actionable),
+.pm-attendance-box--idle-giris:not(.pm-attendance-box--actionable) {
+  border-color: rgba(46, 125, 50, 0.52);
+  background: rgba(0, 0, 0, 0.14);
+}
+
 .pm-attendance-box--idle-cikis:not(.pm-attendance-box--actionable) {
-  opacity: 0.72;
+  border-color: rgba(198, 40, 40, 0.52);
+  background: rgba(0, 0, 0, 0.14);
+}
+
+.pm-attendance-box--idle-giris:not(.pm-attendance-box--actionable) .pm-box-main-action:disabled,
+.pm-attendance-box--idle-cikis:not(.pm-attendance-box--actionable) .pm-box-main-action:disabled {
+  opacity: 1;
+  cursor: default;
+  color: rgba(255, 255, 255, 0.94);
+}
+
+.pm-attendance-box--idle-giris:not(.pm-attendance-box--actionable) .pm-box-label,
+.pm-attendance-box--idle-cikis:not(.pm-attendance-box--actionable) .pm-box-label {
+  color: rgba(240, 240, 240, 0.9);
+}
+
+.pm-attendance-box--idle-giris:not(.pm-attendance-box--actionable) .pm-box-time,
+.pm-attendance-box--idle-cikis:not(.pm-attendance-box--actionable) .pm-box-time {
+  color: rgba(255, 255, 255, 0.96);
 }
 
 .pm-box-countdown-title {
@@ -904,8 +926,20 @@ body.app-personel-shell.app-home-route .personel-mobile-shell.self-home-page > .
  */
 .pm-attendance-box > .pm-box-pencil {
   position: absolute;
+  top: 4px;
   right: 4px;
-  bottom: 4px;
+  z-index: 1;
+}
+
+.pm-attendance-box:has(> .pm-box-pencil) .pm-box-status {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  padding-right: 46px;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
 }
 
 .pm-box-pencil:focus-visible {
@@ -988,8 +1022,7 @@ body.app-personel-shell.app-home-route .personel-mobile-shell.self-home-page > .
 }
 
 .pm-box-main-action:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
+  cursor: default;
 }
 
 .pm-box-pending {

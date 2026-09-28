@@ -22,6 +22,7 @@ type OwnQrAttendanceBoxesProps = {
     | "capabilities"
     | "planned_shift"
     | "bugun_calisma_beklentisi"
+    | "attendance_anomaly_live_warning"
   >;
   /** Role-independent QR entitlement mirror (`self_service.qr.scan`). */
   qrEnabled: boolean;
@@ -128,7 +129,15 @@ export function OwnQrAttendanceBoxes({
     isGirisSaatiGecti(planned?.beklenen_giris_saati, now) &&
     workExpected;
 
+  const liveWarning = today.attendance_anomaly_live_warning ?? null;
+
   return (
+    <div className="pm-attendance-stack">
+    {liveWarning ? (
+      <p className="pm-anomaly-live-warning" data-testid="attendance-anomaly-live-warning">
+        {liveWarning}
+      </p>
+    ) : null}
     <div className="pm-attendance-grid" data-testid={testId}>
       <div
         className={[
@@ -261,6 +270,7 @@ export function OwnQrAttendanceBoxes({
           </>
         )}
       </div>
+    </div>
     </div>
   );
 }

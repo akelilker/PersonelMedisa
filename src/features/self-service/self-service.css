@@ -1838,22 +1838,3 @@ body.modal-open .modal-container--self-product .modal-header {
   margin: 0;
   text-align: center;
 }
-
-/*
- * Desktop-only history layout: shrink calendar cells and tighten the top
- * summary rows so the selected day detail stays inside the modal without
- * scrolling. Mobile (max-width: 640px) keeps its current sizing.
- */
-@media (min-width: 641px) {
-  .qr-history-cell {
-    min-height: 34px;
-  }
-
-  .qr-history-cell--empty {
-    min-height: 34px;
-  }
-
-  .qr-history-page .pm-leave-detail {
-    gap: 4px;
-  }
-}

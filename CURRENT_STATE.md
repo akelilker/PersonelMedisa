@@ -1,8 +1,8 @@
 CODE_MIGRATION_TIP: 093
-PRODUCTION_MIGRATION_TIP: 091
-LAST_VERIFIED_PRODUCTION_MIGRATION_TIP: 091
-FRESH_PRODUCTION_MIGRATION_READBACK: ACTIONS_APPLY_EVIDENCE_2026_09_22
-PRODUCTION_MIGRATION_PENDING: 2
+PRODUCTION_MIGRATION_TIP: 092
+LAST_VERIFIED_PRODUCTION_MIGRATION_TIP: 092
+FRESH_PRODUCTION_MIGRATION_READBACK: ACTIONS_APPLY_36367311876
+PRODUCTION_MIGRATION_PENDING: 1
 PRODUCTION_DEPLOY_SHA: 5c6ae7734d394022ea1ff65c5683da91c095e0eb
 CODE_MAIN_SHA: 5c6ae7734d394022ea1ff65c5683da91c095e0eb
 LAST_MERGED_PR: 402
@@ -18,8 +18,8 @@ ACTIVE_BACKLOG_OWNER: docs/guncel/146-post-pr402-canonical-backlog.md
 
 | Alan | Değer | Kanıt |
 | --- | --- | --- |
-| CODE / PROD migration tip | **093 / 091** | Filesystem tip 093; production 092 and 093 not applied. Apply cPanel migrations `35781766535` (090) + `35791415567` (091) SUCCESS |
-| LAST_VERIFIED production tip | **091** | 091 run: preflight `GATE_PROD_TIP=090` then apply; backup `medisa-pre-091-…` VERIFIED |
+| CODE / PROD migration tip | **093 / 092** | Filesystem tip 093. Production tip 092 applied by Apply cPanel migrations `36367311876` (`092_personel_self_service_product.sql`; worker SUCCEEDED; backup VERIFIED; readback VERIFIED). Pending only 093. |
+| LAST_VERIFIED production tip | **092** | Apply run `36367311876`; backup VERIFIED; readback VERIFIED |
 | PRODUCTION_DEPLOY_SHA | `5c6ae773…` | Deploy cPanel run `36070333362` SUCCESS (#402) |
 | CODE_MAIN_SHA | `5c6ae773…` | `origin/main` == last merged PR #402 |
 | Migration 090 | **APPLIED** | Run `35781766535`; worker completed + backup VERIFIED |

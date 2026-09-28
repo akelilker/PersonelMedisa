@@ -10,9 +10,9 @@ declare(strict_types=1);
  *
  * Proposed production cPanel cron (NOT installed by this repository):
  *
- *   * * * * * cd /home/karmotor/public_html/personelmedisa && "$(command -v php)" api/bin/attendance-anomaly-scan.php
+ *   */5 * * * * cd /home/karmotor/public_html/personelmedisa && "$(command -v php)" api/bin/attendance-anomaly-scan.php
  *
- * Cadence is one minute. Expected delay after the threshold is 0–60 seconds.
+ * Cadence is 5 minutes. Expected delay after the threshold is 0-300 seconds.
  * Opening the PERSONEL app is not required. Today-read notification write is
  * only a backfill of this same owner.
  */

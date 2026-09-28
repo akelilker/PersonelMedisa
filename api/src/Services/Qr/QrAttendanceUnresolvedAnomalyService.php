@@ -19,12 +19,18 @@ use PDO;
  * resolution, and the one identity every surface reads:
  *   {anomaly_type}:{source_event_id}
  *
+ * LOOKBACK_DAYS bounds discovery of new raw events. It is not an expiry.
+ * An unpaired source event stays unresolved at any age until an ONAYLANDI
+ * correction closes it. A calendar day with no QR event has no source_event_id
+ * and is not represented here.
+ *
  * CLI notification, Talepler badge, anomaly card, correction prefill and
  * duplicate detection all consume listForPersonel(). No second calculator.
  */
 class QrAttendanceUnresolvedAnomalyService
 {
     public const THRESHOLD_MINUTES = 180;
+    /** Discovery window for new raw events. Previously unpaired events are not dropped when they age out of this window. */
     public const LOOKBACK_DAYS = 8;
     public const NOTIFICATION_KIND = 'ATTENDANCE_ANOMALY';
     public const AUDIENCE_PERSONEL = 'PERSONEL';
@@ -92,6 +98,21 @@ class QrAttendanceUnresolvedAnomalyService
             return $containing;
         }
 
+        // A GİRİŞ after planned exit still belongs to that shift (overtime
+        // re-entry). Binding stops at the threshold; now >= threshold is what
+        // makes the open shift stale. Early arrival of a later shift is below.
+        $afterExit = null;
+        foreach ($windows as $window) {
+            if ($entryLocal >= $window['exit'] && $entryLocal < $window['threshold']) {
+                if ($afterExit === null || $window['exit'] > $afterExit['exit']) {
+                    $afterExit = $window;
+                }
+            }
+        }
+        if ($afterExit !== null) {
+            return $afterExit;
+        }
+
         $entryDate = $entryLocal->format('Y-m-d');
         $early = null;
         foreach ($windows as $window) {
@@ -148,6 +169,8 @@ class QrAttendanceUnresolvedAnomalyService
         }
         $nowDt = self::resolveNow($now);
         $events = self::loadRecentEvents($pdo, $personelId, $nowDt);
+        // No raw QR event means there is no source_event_id. MISSING_GIRIS is an
+        // orphan ÇIKIŞ, not a day the person was expected to work and never scanned.
         if (count($events) === 0) {
             return [];
         }
@@ -305,16 +328,10 @@ class QrAttendanceUnresolvedAnomalyService
         }
         $nowDt = self::resolveNow($now);
         $since = $nowDt->setTimezone(new \DateTimeZone('UTC'))->modify('-' . self::LOOKBACK_DAYS . ' days');
-        $stmt = $pdo->prepare(
-            "SELECT DISTINCT personel_id
-             FROM qr_attendance_events
-             WHERE event_type = 'GIRIS'
-               AND occurred_at_utc >= :since"
-        );
-        $stmt->execute(['since' => $since->format('Y-m-d H:i:s.u')]);
+        $personelIds = self::scanPersonelIds($pdo, $since->format('Y-m-d H:i:s.u'));
         $created = 0;
         $count = 0;
-        while ($personelId = $stmt->fetchColumn()) {
+        foreach ($personelIds as $personelId) {
             $personelId = (int) $personelId;
             if ($personelId <= 0) {
                 continue;
@@ -424,11 +441,187 @@ class QrAttendanceUnresolvedAnomalyService
     }
 
     /**
+     * Personel with a GİRİŞ inside the discovery window, plus personel who still
+     * have an unpaired source event older than that window.
+     *
+     * @return list<int>
+     */
+    private static function scanPersonelIds(PDO $pdo, $sinceUtc)
+    {
+        $ids = [];
+        $stmt = $pdo->prepare(
+            "SELECT DISTINCT personel_id
+             FROM qr_attendance_events
+             WHERE event_type = 'GIRIS'
+               AND occurred_at_utc >= :since"
+        );
+        $stmt->execute(['since' => (string) $sinceUtc]);
+        while ($personelId = $stmt->fetchColumn()) {
+            $personelId = (int) $personelId;
+            if ($personelId > 0) {
+                $ids[$personelId] = true;
+            }
+        }
+        foreach (self::persistedUnresolvedRows($pdo, 0, (string) $sinceUtc) as $row) {
+            $personelId = (int) $row['personel_id'];
+            if ($personelId > 0) {
+                $ids[$personelId] = true;
+            }
+        }
+
+        return array_map('intval', array_keys($ids));
+    }
+
+    /**
+     * @return string|null
+     */
+    private static function oldestPersistedUnresolvedUtc(PDO $pdo, $personelId, $sinceUtc)
+    {
+        $oldest = null;
+        foreach (self::persistedUnresolvedRows($pdo, (int) $personelId, (string) $sinceUtc) as $row) {
+            $utc = (string) $row['occurred_at_utc'];
+            if ($oldest === null || $utc < $oldest) {
+                $oldest = $utc;
+            }
+        }
+
+        return $oldest;
+    }
+
+    /**
+     * The event immediately before the discovery window, when it is a GİRİŞ.
+     * Keeps a pair from being split into a false missing-entry when only the
+     * ÇIKIŞ falls inside the window.
+     *
+     * @return string|null
+     */
+    private static function boundaryPredecessorUtc(PDO $pdo, $personelId, $sinceUtc)
+    {
+        try {
+            $stmt = $pdo->prepare(
+                'SELECT event_type, occurred_at_utc
+                 FROM qr_attendance_events
+                 WHERE personel_id = :pid
+                   AND occurred_at_utc < :since
+                 ORDER BY occurred_at_utc DESC, id DESC
+                 LIMIT 1'
+            );
+            $stmt->execute([
+                'pid' => (int) $personelId,
+                'since' => (string) $sinceUtc,
+            ]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        } catch (\Throwable $e) {
+            return null;
+        }
+        if (!is_array($row) || strtoupper((string) ($row['event_type'] ?? '')) !== 'GIRIS') {
+            return null;
+        }
+        $utc = trim((string) ($row['occurred_at_utc'] ?? ''));
+
+        return $utc !== '' ? $utc : null;
+    }
+
+    /**
+     * Unpaired GİRİŞ (no immediate ÇIKIŞ, no approved ÇIKIŞ correction) and
+     * orphan ÇIKIŞ (no immediate GİRİŞ, no approved GİRİŞ correction) older
+     * than the discovery window. These rows are the persisted unresolved
+     * identity; age does not close them.
+     *
+     * @return list<array{personel_id:int,occurred_at_utc:string}>
+     */
+    private static function persistedUnresolvedRows(PDO $pdo, $personelId, $sinceUtc)
+    {
+        $personFilter = (int) $personelId > 0 ? ' AND g.personel_id = :pid' : '';
+        $cikisFilter = (int) $personelId > 0 ? ' AND c.personel_id = :pid' : '';
+        $params = ['since' => (string) $sinceUtc];
+        if ((int) $personelId > 0) {
+            $params['pid'] = (int) $personelId;
+        }
+        $girisSql = "SELECT g.personel_id, g.occurred_at_utc
+             FROM qr_attendance_events g
+             WHERE g.event_type = 'GIRIS'
+               AND g.occurred_at_utc < :since" . $personFilter . "
+               AND NOT EXISTS (
+                 SELECT 1 FROM qr_attendance_correction_requests r
+                 WHERE r.source_event_id = g.id
+                   AND r.status = 'ONAYLANDI'
+                   AND r.event_type = 'CIKIS'
+               )
+               AND NOT EXISTS (
+                 SELECT 1 FROM qr_attendance_events n
+                 WHERE n.personel_id = g.personel_id
+                   AND n.event_type = 'CIKIS'
+                   AND (n.occurred_at_utc > g.occurred_at_utc OR (n.occurred_at_utc = g.occurred_at_utc AND n.id > g.id))
+                   AND NOT EXISTS (
+                     SELECT 1 FROM qr_attendance_events m
+                     WHERE m.personel_id = g.personel_id
+                       AND (m.occurred_at_utc > g.occurred_at_utc OR (m.occurred_at_utc = g.occurred_at_utc AND m.id > g.id))
+                       AND (m.occurred_at_utc < n.occurred_at_utc OR (m.occurred_at_utc = n.occurred_at_utc AND m.id < n.id))
+                   )
+               )";
+        $cikisSql = "SELECT c.personel_id, c.occurred_at_utc
+             FROM qr_attendance_events c
+             WHERE c.event_type = 'CIKIS'
+               AND c.occurred_at_utc < :since" . $cikisFilter . "
+               AND NOT EXISTS (
+                 SELECT 1 FROM qr_attendance_correction_requests r
+                 WHERE r.source_event_id = c.id
+                   AND r.status = 'ONAYLANDI'
+                   AND r.event_type = 'GIRIS'
+               )
+               AND NOT EXISTS (
+                 SELECT 1 FROM qr_attendance_events p
+                 WHERE p.personel_id = c.personel_id
+                   AND p.event_type = 'GIRIS'
+                   AND (p.occurred_at_utc < c.occurred_at_utc OR (p.occurred_at_utc = c.occurred_at_utc AND p.id < c.id))
+                   AND NOT EXISTS (
+                     SELECT 1 FROM qr_attendance_events m
+                     WHERE m.personel_id = c.personel_id
+                       AND (m.occurred_at_utc > p.occurred_at_utc OR (m.occurred_at_utc = p.occurred_at_utc AND m.id > p.id))
+                       AND (m.occurred_at_utc < c.occurred_at_utc OR (m.occurred_at_utc = c.occurred_at_utc AND m.id < c.id))
+                   )
+               )";
+        try {
+            $rows = [];
+            foreach ([$girisSql, $cikisSql] as $sql) {
+                $stmt = $pdo->prepare($sql);
+                $stmt->execute($params);
+                while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                    if (!is_array($row)) {
+                        continue;
+                    }
+                    $rows[] = [
+                        'personel_id' => (int) ($row['personel_id'] ?? 0),
+                        'occurred_at_utc' => (string) ($row['occurred_at_utc'] ?? ''),
+                    ];
+                }
+            }
+
+            return $rows;
+        } catch (\Throwable $e) {
+            return [];
+        }
+    }
+
+    /**
      * @return list<array<string,mixed>>
      */
     private static function loadRecentEvents(PDO $pdo, $personelId, \DateTimeImmutable $nowLocal)
     {
-        $since = $nowLocal->setTimezone(new \DateTimeZone('UTC'))->modify('-' . self::LOOKBACK_DAYS . ' days');
+        $discoverySince = $nowLocal->setTimezone(new \DateTimeZone('UTC'))->modify('-' . self::LOOKBACK_DAYS . ' days');
+        $sinceUtc = $discoverySince->format('Y-m-d H:i:s.u');
+        $anchors = [$sinceUtc];
+        $persisted = self::oldestPersistedUnresolvedUtc($pdo, (int) $personelId, $sinceUtc);
+        if ($persisted !== null) {
+            $anchors[] = $persisted;
+        }
+        $predecessor = self::boundaryPredecessorUtc($pdo, (int) $personelId, $sinceUtc);
+        if ($predecessor !== null) {
+            $anchors[] = $predecessor;
+        }
+        sort($anchors, SORT_STRING);
+        $sinceUtc = $anchors[0];
         $stmt = $pdo->prepare(
             'SELECT id, event_type, occurred_at_utc, sube_id, user_id
              FROM qr_attendance_events
@@ -438,7 +631,7 @@ class QrAttendanceUnresolvedAnomalyService
         );
         $stmt->execute([
             'pid' => (int) $personelId,
-            'since' => $since->format('Y-m-d H:i:s.u'),
+            'since' => $sinceUtc,
         ]);
         $events = [];
         while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {

@@ -63,6 +63,17 @@ aaAssert($matched !== null && $matched['anchor_date'] === '2026-09-28', 'post-mi
 $early = aaIstanbul('2026-09-28 08:00:00');
 $earlyMatch = $svc::matchWindow($early, [$day]);
 aaAssert($earlyMatch !== null && $earlyMatch['anchor_date'] === '2026-09-28', 'early arrival still uses that day planned exit');
+$overtimeEntry = aaIstanbul('2026-09-28 18:00:00');
+$overtimeMatch = $svc::matchWindow($overtimeEntry, [$day]);
+aaAssert($overtimeMatch !== null && $overtimeMatch['anchor_date'] === '2026-09-28', 'entry after planned exit stays on that shift');
+aaAssert($overtimeMatch['threshold']->format('Y-m-d H:i') === '2026-09-28 20:40', 'after-exit entry uses planned exit + 180');
+$yesterday = $svc::buildWindow('2026-09-27', '08:30', '17:40');
+$nextMorning = $svc::matchWindow(aaIstanbul('2026-09-28 08:00:00'), [$yesterday, $day]);
+aaAssert($nextMorning !== null && $nextMorning['anchor_date'] === '2026-09-28', 'next-morning early arrival does not bind to the previous shift');
+$afterNightExit = $svc::matchWindow(aaIstanbul('2026-09-29 07:00:00'), [$night]);
+aaAssert($afterNightExit !== null && $afterNightExit['anchor_date'] === '2026-09-28', 'entry after night exit stays on the night shift');
+aaAssert($svc::isOperationalMissingCikis(aaIstanbul('2026-09-29 08:59:00'), $afterNightExit, true, false) === false, 'night overtime re-entry before threshold stays live');
+aaAssert($svc::isOperationalMissingCikis(aaIstanbul('2026-09-29 09:00:00'), $afterNightExit, true, false) === true, 'night overtime re-entry at threshold is an anomaly');
 $amirBody = $svc::amirBody(
     ['ad_soyad' => 'Ayşe Demir'],
     [
@@ -282,5 +293,47 @@ $pdo->exec("UPDATE surecler SET surec_turu = 'IS_KAZASI' WHERE id = 1");
 aaAssert(count($svc::listForPersonel($pdo, 7, aaIstanbul('2026-09-28 20:40:00'))) === 0, 'IS_KAZASI → no anomaly');
 $pdo->exec("UPDATE surecler SET surec_turu = 'DEVAMSIZLIK', alt_tur = 'IZINSIZ_GELMEDI' WHERE id = 1");
 aaAssert(count($svc::listForPersonel($pdo, 7, aaIstanbul('2026-09-28 20:40:00'))) === 0, 'GELMEDI → no anomaly');
+
+$pdo->exec('DELETE FROM surecler');
+$pdo->exec('DELETE FROM qr_attendance_events');
+$pdo->exec('DELETE FROM qr_attendance_correction_requests');
+$pdo->exec('DELETE FROM personel_inbox_notifications');
+$pdo->exec("INSERT INTO qr_attendance_events (id, personel_id, user_id, event_type, occurred_at_utc, sube_id) VALUES (601, 7, 15, 'GIRIS', '2026-09-28 05:30:00.000000', 1)");
+$pdo->exec("INSERT INTO qr_attendance_events (id, personel_id, user_id, event_type, occurred_at_utc, sube_id) VALUES (602, 7, 15, 'CIKIS', '2026-09-28 14:40:00.000000', 1)");
+$pdo->exec("INSERT INTO qr_attendance_events (id, personel_id, user_id, event_type, occurred_at_utc, sube_id) VALUES (603, 7, 15, 'GIRIS', '2026-09-28 15:00:00.000000', 1)");
+aaAssert(count($svc::listForPersonel($pdo, 7, aaIstanbul('2026-09-28 20:39:00'))) === 0, '18:00 re-entry at threshold -1 → no anomaly');
+aaAssert($svc::openGirisBlocksNextGiris($pdo, 7, '2026-09-28 15:00:00.000000', aaIstanbul('2026-09-28 20:39:00')) === true, '18:00 re-entry at threshold -1 still blocks');
+$overtimeAnomaly = $svc::listForPersonel($pdo, 7, aaIstanbul('2026-09-28 20:40:00'));
+aaAssert(count($overtimeAnomaly) === 1 && (int) $overtimeAnomaly[0]['source_event_id'] === 603, '18:00 re-entry at threshold → missing çıkış');
+aaAssert($svc::openGirisBlocksNextGiris($pdo, 7, '2026-09-28 15:00:00.000000', aaIstanbul('2026-09-28 20:40:00')) === false, '18:00 re-entry at threshold does not block the next giriş');
+aaAssert($svc::openGirisBlocksNextGiris($pdo, 7, '2026-09-28 15:00:00.000000', aaIstanbul('2026-09-29 08:30:00')) === false, 'stale 18:00 open shift does not block the next shift giriş');
+$pdo->exec("INSERT INTO qr_attendance_events (id, personel_id, user_id, event_type, occurred_at_utc, sube_id) VALUES (604, 7, 15, 'GIRIS', '2026-09-29 05:30:00.000000', 1)");
+$pdo->exec("INSERT INTO qr_attendance_events (id, personel_id, user_id, event_type, occurred_at_utc, sube_id) VALUES (605, 7, 15, 'CIKIS', '2026-09-29 14:40:00.000000', 1)");
+$closedOnNewShift = $svc::listForPersonel($pdo, 7, aaIstanbul('2026-09-29 20:40:00'));
+aaAssert(count($closedOnNewShift) === 1 && (int) $closedOnNewShift[0]['source_event_id'] === 603, 'next shift çıkış does not close the stale 18:00 giriş');
+
+$pdo->exec('DELETE FROM qr_attendance_events');
+$pdo->exec('DELETE FROM qr_attendance_correction_requests');
+$pdo->exec("INSERT INTO gunluk_puantaj (id, personel_id, tarih, beklenen_giris_saati, beklenen_cikis_saati) VALUES (9, 7, '2026-09-19', '08:30', '17:40')");
+$pdo->exec("INSERT INTO qr_attendance_events (id, personel_id, user_id, event_type, occurred_at_utc, sube_id) VALUES (701, 7, 15, 'GIRIS', '2026-09-19 05:30:00.000000', 1)");
+$agedNow = aaIstanbul('2026-09-28 20:40:00');
+$agedCutoff = $agedNow->setTimezone(new DateTimeZone('UTC'))->modify('-8 days');
+$agedEvent = new DateTimeImmutable('2026-09-19 05:30:00', new DateTimeZone('UTC'));
+aaAssert($agedEvent < $agedCutoff, 'aged fixture is outside the 8-day discovery window');
+aaAssert($svc::LOOKBACK_DAYS === 8, 'discovery window stays 8 days');
+$aged = $svc::listForPersonel($pdo, 7, $agedNow);
+aaAssert(count($aged) === 1 && (int) $aged[0]['source_event_id'] === 701, '9-day unresolved anomaly stays visible');
+$later = $svc::listForPersonel($pdo, 7, aaIstanbul('2026-10-05 20:40:00'));
+aaAssert(count($later) === 1 && (int) $later[0]['source_event_id'] === 701, 'time passing alone does not close an unresolved anomaly');
+$firstScan = $svc::scan($pdo, $agedNow);
+$secondScan = $svc::scan($pdo, aaIstanbul('2026-09-28 20:45:00'));
+aaAssert((int) $firstScan['created'] === 1, 'scan still notifies an unresolved anomaly outside the discovery window');
+aaAssert((int) $secondScan['created'] === 0, 'later scan does not duplicate the aged anomaly notification');
+$agedNotes = (int) $pdo->query("SELECT COUNT(*) FROM personel_inbox_notifications WHERE anomaly_source_event_id = 701")->fetchColumn();
+aaAssert($agedNotes === 1, 'aged anomaly still has one personel notification');
+$pdo->exec("INSERT INTO qr_attendance_correction_requests (id, personel_id, source_event_id, event_type, status) VALUES (9, 7, 701, 'CIKIS', 'ONAYLANDI')");
+aaAssert(count($svc::listForPersonel($pdo, 7, aaIstanbul('2026-10-05 20:40:00'))) === 0, 'approved correction closes the aged anomaly');
+$agedRaw = (int) $pdo->query("SELECT COUNT(*) FROM qr_attendance_events WHERE id = 701 AND event_type = 'GIRIS'")->fetchColumn();
+aaAssert($agedRaw === 1, 'closing an aged anomaly does not mutate the raw giriş');
 
 echo '[OK] AttendanceAnomalyFlowTestRunner' . PHP_EOL;

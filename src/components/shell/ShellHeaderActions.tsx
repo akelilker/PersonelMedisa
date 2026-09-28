@@ -497,13 +497,28 @@ export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeade
             to="/self/duyurular"
             className="pm-shell-duyurular-link"
             data-testid="personel-shell-duyurular-link"
+            aria-label="Duyurular"
             onClick={() => {
               setIsNotificationsOpen(false);
               setIsSettingsOpen(false);
               setIsSubeOpen(false);
             }}
           >
-            Duyurular
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="22"
+              height="22"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="m3 11 18-5v12L3 14v-3z" />
+              <path d="M11.6 16.8a3 3 0 1 1-5.8-1.6" />
+            </svg>
             {personelDuyuruUnread > 0 ? (
               <span className="pm-shell-duyurular-badge" data-testid="personel-shell-duyuru-badge">
                 {personelDuyuruUnread > 99 ? "99+" : personelDuyuruUnread}

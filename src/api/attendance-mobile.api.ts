@@ -52,6 +52,8 @@ export type AttendanceTodayResponse = {
     beklenen_giris_saati: string | null;
     beklenen_cikis_saati: string | null;
   } | null;
+  /** Bugün onaylı (AKTIF) bir izin süreci kapsıyor mu. */
+  izinli_bugun: boolean;
 };
 
 export type InboxNotification = {

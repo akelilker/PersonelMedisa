@@ -6,6 +6,7 @@ namespace Medisa\Api\Services\Qr;
 
 use Medisa\Api\Auth\RolePermissions;
 use Medisa\Api\Services\Attendance\LateEarlyInfoService;
+use Medisa\Api\Services\Bildirim\BugunPersonelDurumuService;
 use Medisa\Api\Services\SelfService\PersonelMobileCapabilityService;
 use Medisa\Api\Services\SelfService\SelfPersonelContext;
 use PDO;
@@ -147,6 +148,7 @@ class QrAttendanceTodayService
         }
 
         $plannedShift = self::plannedShiftPayload($pdo, $personelId, $today);
+        $beklenti = self::bugunCalismaBeklentisi($pdo, $personelId, $today);
 
         return [
             'business_date' => $today,
@@ -167,36 +169,31 @@ class QrAttendanceTodayService
             'pending_giris_correction' => $pendingGirisCorrection,
             'pending_cikis_correction' => $pendingCikisCorrection,
             'planned_shift' => $plannedShift,
-            'izinli_bugun' => self::hasApprovedLeaveToday($pdo, $personelId, $today),
+            'bugun_calisma_beklentisi' => $beklenti,
+            // DEPRECATED compatibility alias for cached clients that still do !izinli_bugun.
+            // Not "on leave": true when work is not positively expected (exception or unknown),
+            // so an old bundle does not show a false "İşe Geç Kaldınız."
+            'izinli_bugun' => $beklenti['bekleniyor'] !== true,
         ];
     }
 
     /**
-     * Bugünü kapsayan onaylı (AKTIF) bir IZIN süreci var mı.
-     * Surecler kaynağı, BugunPersonelDurumuService'in izinli belirlemesiyle aynıdır.
+     * @param PDO $pdo
+     * @param mixed $personelId
+     * @param string $businessDateYmd
+     * @return array{bekleniyor: bool|null, neden: string|null}
      */
-    private static function hasApprovedLeaveToday(PDO $pdo, $personelId, $businessDateYmd)
+    private static function bugunCalismaBeklentisi(PDO $pdo, $personelId, $businessDateYmd)
     {
-        try {
-            $stmt = $pdo->prepare(
-                "SELECT 1
-                 FROM surecler
-                 WHERE personel_id = :pid
-                   AND surec_turu = 'IZIN'
-                   AND state = 'AKTIF'
-                   AND baslangic_tarihi <= :tarih
-                   AND (bitis_tarihi IS NULL OR bitis_tarihi >= :tarih)
-                 LIMIT 1"
-            );
-            $stmt->execute([
-                'pid' => (int) $personelId,
-                'tarih' => (string) $businessDateYmd,
-            ]);
+        $cover = BugunPersonelDurumuService::fetchCoveringSurecExceptionMap(
+            $pdo,
+            [(int) $personelId],
+            (string) $businessDateYmd
+        );
+        $pid = (int) $personelId;
+        $exceptionTur = ($cover['resolved'] && isset($cover['map'][$pid])) ? $cover['map'][$pid] : null;
 
-            return $stmt->fetchColumn() !== false;
-        } catch (\Throwable $e) {
-            return false;
-        }
+        return BugunPersonelDurumuService::calismaBeklentisiFromCover($cover['resolved'], $exceptionTur);
     }
 
     /**

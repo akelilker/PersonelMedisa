@@ -106,7 +106,11 @@ describe("PERSONEL_SELF_SERVICE_PRODUCT_UX_V2 notification + policy owners", () 
     expect(today).toContain("planned_shift");
     expect(today).toContain("plannedShiftPayload");
     expect(today).not.toContain("mesai_bitimine_kalan_label");
+    expect(today).toContain("bugun_calisma_beklentisi");
     expect(today).toContain("izinli_bugun");
+    expect(today).toContain("DEPRECATED");
+    expect(today).not.toContain("hasApprovedLeaveToday");
+    expect(today).not.toContain("FROM surecler");
 
     const event = read("api/src/Services/Qr/QrAttendanceEventService.php");
     expect(event).toContain("resolveOpenShiftState");

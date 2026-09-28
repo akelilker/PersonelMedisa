@@ -64,7 +64,8 @@ import { buildCreatePersonelPayload } from "../../../features/personeller/person
 import { SurecFormFields } from "../../../features/surecler/components/SurecFormFields";
 import {
   buildCreateSurecPayload,
-  buildUpdateSurecPayload
+  buildUpdateSurecPayload,
+  toSurecFormState
 } from "../../../features/surecler/surec-form-utils";
 import { usePersonelFinansCreate } from "../../../hooks/useFinans";
 import { INITIAL_CREATE_PERSONEL_FORM, usePersonelZimmetCreate, type CreatePersonelFormState } from "../../../hooks/usePersoneller";
@@ -108,11 +109,12 @@ import {
   type PuantajSubdomainId
 } from "../kayit-surec-constants";
 import {
+  applyDevamsizlikAltTur,
   buildPersonelSelectLabels,
   formatPersonelLabel,
   normalizePersonelSearchText,
   resetSurecFormKeepingPersonel,
-  resolveDevamsizlikSurecTuru
+  resolveDevamsizlikEditSelection
 } from "../kayit-surec-utils";
 import { useAuth } from "../../../state/auth.store";
 import { canonicalizeUserRole } from "../../../lib/authorization/canonicalize-user-role";
@@ -560,6 +562,24 @@ export function KayitSurecWorkspace({
   }, [editingSurec, hasInitialSurecPersonel, surecForm.personelId]);
 
   useEffect(() => {
+    if (!editingSurec) {
+      return;
+    }
+    const selection = resolveDevamsizlikEditSelection(
+      editingSurec.surec_turu,
+      editingSurec.alt_tur ?? ""
+    );
+    if (!selection) {
+      return;
+    }
+    setActivePersonelTab("puantaj");
+    setDevamsizlikSubId(selection.cardId);
+    setPuantajSubdomain(selection.cardId);
+    setHakDuzeltmeOpen(false);
+    setSurecForm(toSurecFormState(editingSurec));
+  }, [editingSurec]);
+
+  useEffect(() => {
     setPozisyonForm(createOrganizasyonFormFromPersonel(selectedSurecPersonel));
     setPozisyonError(null);
     setPozisyonInfo(null);
@@ -666,14 +686,9 @@ export function KayitSurecWorkspace({
     setDevamsizlikSubId(id);
     setPuantajSubdomain(id);
     setHakDuzeltmeOpen(false);
-    const resolvedKey = resolveDevamsizlikSurecTuru(id, surecTuruOptions);
-    const altTurConfig = DEVAMSIZLIK_ALT_TUR_CONFIG[id];
+    const firstAlt = DEVAMSIZLIK_ALT_TUR_CONFIG[id].options[0]?.value ?? "";
 
-    setSurecForm((prev) => ({
-      ...prev,
-      surecTuru: resolvedKey ?? "",
-      altTur: altTurConfig.options[0]?.value ?? ""
-    }));
+    setSurecForm((prev) => applyDevamsizlikAltTur(prev, id, firstAlt, surecTuruOptions));
   }
 
   function openPuantajHakDuzeltme() {
@@ -1538,6 +1553,12 @@ export function KayitSurecWorkspace({
                                     showPersonelField={false}
                                     showSurecTuruField
                                     altTurField={activeDevamsizlikAltTurField}
+                                    onAltTurSelect={
+                                      devamsizlikSubId
+                                        ? (prev, altTur) =>
+                                            applyDevamsizlikAltTur(prev, devamsizlikSubId, altTur, surecTuruOptions)
+                                        : undefined
+                                    }
                                     useOperationControls
                                     errorMessage={surecError}
                                     referenceError={null}

@@ -14,7 +14,12 @@ export const KAYIT_SUREC_PERSONEL_HISTORY_LIMIT = 20;
 /** `useSurecler` liste sayfa boyutu ile uyumlu. */
 export const KAYIT_SUREC_LIST_PAGE_SIZE = 10;
 
-export type DevamsizlikSubId = "izin" | "rapor" | "is_kazasi" | "izinsiz" | "gec" | "erken";
+export type DevamsizlikSubId =
+  | "izin_ve_devamsizlik"
+  | "rapor"
+  | "is_kazasi"
+  | "gec"
+  | "erken";
 
 export type PersonelSurecTab =
   | "genel"
@@ -61,17 +66,24 @@ type DevamsizlikSubCard = {
   candidateKeys: string[];
 };
 
+export type DevamsizlikAltOption = {
+  value: string;
+  label: string;
+  /** Domain süreç türü. Combined card options carry their own; others inherit the card. */
+  surecTuru?: string;
+};
+
 type DevamsizlikAltTurConfig = {
   label: string;
-  options: Array<{ value: string; label: string }>;
+  options: DevamsizlikAltOption[];
 };
 
 export const DEVAMSIZLIK_SUB_CARDS: DevamsizlikSubCard[] = [
   {
-    id: "izin",
-    title: "İzin",
-    description: "Özlük süreç kaydı (Bugün’de İzinli görünür)",
-    candidateKeys: ["IZIN"]
+    id: "izin_ve_devamsizlik",
+    title: "İzin ve Devamsızlık",
+    description: "Yıllık, mazeret, ücretsiz izin ve izinsiz gelmedi",
+    candidateKeys: ["IZIN", "DEVAMSIZLIK"]
   },
   {
     id: "rapor",
@@ -84,12 +96,6 @@ export const DEVAMSIZLIK_SUB_CARDS: DevamsizlikSubCard[] = [
     title: "İş Kazası",
     description: "Özlük süreç kaydı (Bugün’de Raporlu görünür)",
     candidateKeys: ["IS_KAZASI"]
-  },
-  {
-    id: "izinsiz",
-    title: "İzinsiz Gelmedi",
-    description: "Özlük süreç kaydı (Bugün’de Gelmedi görünür)",
-    candidateKeys: ["DEVAMSIZLIK"]
   },
   {
     id: "gec",
@@ -211,12 +217,13 @@ export function resolvePersonelSurecTabForSurecTuru(surecTuru: string): Personel
 }
 
 export const DEVAMSIZLIK_ALT_TUR_CONFIG: Record<DevamsizlikSubId, DevamsizlikAltTurConfig> = {
-  izin: {
-    label: "İzin Türü",
+  izin_ve_devamsizlik: {
+    label: "Tür",
     options: [
-      { value: "YILLIK_IZIN", label: "Yıllık" },
-      { value: "MAZERET_IZNI", label: "Mazeret" },
-      { value: "UCRETSIZ_IZIN", label: "Ücretsiz" }
+      { value: "YILLIK_IZIN", label: "Yıllık İzin", surecTuru: "IZIN" },
+      { value: "MAZERET_IZNI", label: "Mazeret İzni", surecTuru: "IZIN" },
+      { value: "UCRETSIZ_IZIN", label: "Ücretsiz İzin", surecTuru: "IZIN" },
+      { value: "IZINSIZ_GELMEDI", label: "İzinsiz Gelmedi", surecTuru: "DEVAMSIZLIK" }
     ]
   },
   rapor: {
@@ -230,10 +237,6 @@ export const DEVAMSIZLIK_ALT_TUR_CONFIG: Record<DevamsizlikSubId, DevamsizlikAlt
   is_kazasi: {
     label: "Kayıt Türü",
     options: [{ value: "IS_KAZASI_BILDIRIMI", label: "İş kazası bildirimi" }]
-  },
-  izinsiz: {
-    label: "Gelmedi Türü",
-    options: [{ value: "IZINSIZ_GELMEDI", label: "İzinsiz gelmedi" }]
   },
   gec: {
     label: "Geç Kalma Türü",

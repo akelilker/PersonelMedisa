@@ -37,14 +37,17 @@ describe("personnel leave/report/absence operational close", () => {
 
   it("Puantaj tiles split formal surec vs Bugün daily owners", () => {
     const byId = Object.fromEntries(PUANTAJ_SUBDOMAIN_CARDS.map((c) => [c.id, c]));
-    expect(byId.izin?.kind).toBe("inline-devamsizlik");
+    expect(byId.izin_ve_devamsizlik?.kind).toBe("inline-devamsizlik");
+    expect(byId.izin_ve_devamsizlik?.title).toBe("İzin ve Devamsızlık");
+    expect(byId.izin).toBeUndefined();
+    expect(byId.izinsiz).toBeUndefined();
     expect(byId.rapor?.kind).toBe("inline-devamsizlik");
     expect(byId.is_kazasi?.kind).toBe("inline-devamsizlik");
-    expect(byId.izinsiz?.kind).toBe("inline-devamsizlik");
     expect(byId.gec?.kind).toBe("bugun-modal");
     expect(byId.erken?.kind).toBe("bugun-modal");
     expect(byId.gorev?.kind).toBe("bugun-modal");
-    expect(DEVAMSIZLIK_SUB_CARDS.some((c) => c.id === "izin")).toBe(true);
+    expect(DEVAMSIZLIK_SUB_CARDS.some((c) => c.id === "izin_ve_devamsizlik")).toBe(true);
+    expect(DEVAMSIZLIK_SUB_CARDS.some((c) => c.id === "izin" || c.id === "izinsiz")).toBe(false);
   });
 
   it("create payload rejects inverted date range", () => {

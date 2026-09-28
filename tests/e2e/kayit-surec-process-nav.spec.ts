@@ -55,7 +55,7 @@ test.describe("Kayit Surec selected-person process navigation", () => {
     await kayitModal.getByRole("tab", { name: "Puantaj" }).click();
 
     await expect(kayitModal.getByTestId("kayit-surec-puantaj-sub-gunluk-hareketler")).toBeVisible();
-    await expect(kayitModal.getByTestId("kayit-surec-puantaj-sub-izin")).toBeVisible();
+    await expect(kayitModal.getByTestId("kayit-surec-puantaj-sub-izin_ve_devamsizlik")).toBeVisible();
   });
 
   test("person switch clears stale puantaj inline form", async ({ page }) => {
@@ -68,7 +68,7 @@ test.describe("Kayit Surec selected-person process navigation", () => {
     await firstOption.click();
 
     await kayitModal.getByRole("tab", { name: "Puantaj" }).click();
-    await kayitModal.getByTestId("kayit-surec-puantaj-sub-izin").click();
+    await kayitModal.getByTestId("kayit-surec-puantaj-sub-izin_ve_devamsizlik").click();
     await expect(kayitModal.locator("[name='surec-create-bas']")).toBeVisible();
 
     await kayitModal.getByTestId("kayit-surec-personel-degistir").click();

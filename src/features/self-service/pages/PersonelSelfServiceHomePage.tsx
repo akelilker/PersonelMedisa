@@ -264,7 +264,7 @@ export function PersonelSelfServiceHomePage() {
         </section>
       </div>
 
-      <PersonelSelfServiceMenu />
+      <PersonelSelfServiceMenu anomalyCount={today.unresolved_attendance_anomalies?.length ?? 0} />
 
       {!qrEnabled ? (
         <div className="pm-callout" data-testid="personel-qr-closed-notice" role="status">

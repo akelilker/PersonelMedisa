@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import {
   fetchAttendanceToday,
+  type AttendanceAnomaly,
   type AttendanceBoxEvent,
   type AttendanceTodayResponse
 } from "../../../api/attendance-mobile.api";
@@ -64,6 +65,7 @@ export function PersonelSelfServiceTaleplerPage() {
   const [today, setToday] = useState<AttendanceTodayResponse | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [correctDraft, setCorrectDraft] = useState<CorrectDraft | null>(null);
+  const [anomalyDraft, setAnomalyDraft] = useState<AttendanceAnomaly | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [corrections, setCorrections] = useState<SelfCorrectionRequest[]>([]);
   const [leaves, setLeaves] = useState<SelfIzinKaydi[]>([]);
@@ -183,8 +185,40 @@ export function PersonelSelfServiceTaleplerPage() {
     }
   }
 
+  const anomalies = today?.unresolved_attendance_anomalies ?? [];
+
   return (
     <section className="personel-mobile-shell pm-self-subpage" data-testid="personel-talepler-page">
+      {anomalies.length > 0 ? (
+        <div className="pm-self-request-list">
+          {anomalies.map((anomaly) => (
+            <div
+              key={anomaly.identity}
+              className="pm-self-request"
+              data-testid="personel-talep-anomaly-card"
+            >
+              <p className="pm-self-request__title">Giriş/Çıkış Kaydı Düzeltme Gerekiyor</p>
+              <p>
+                {anomaly.business_date_label} — {anomaly.problem}
+              </p>
+              {anomaly.pending_request_id ? (
+                <p data-testid="personel-talep-anomaly-pending">
+                  Düzeltme talebiniz değerlendirme bekliyor.
+                </p>
+              ) : (
+                <button
+                  type="button"
+                  className="self-service-action"
+                  data-testid="personel-talep-anomaly-cta"
+                  onClick={() => setAnomalyDraft(anomaly)}
+                >
+                  Düzeltme Talebi Oluştur
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      ) : null}
       <ul className="pm-self-request-list">
         <li>
           <div className="pm-self-request" data-testid="personel-talep-duzeltme">
@@ -389,11 +423,21 @@ export function PersonelSelfServiceTaleplerPage() {
       </ul>
 
       <AttendanceCorrectionRequestModal
-        open={correctDraft !== null}
-        eventId={correctDraft?.eventId ?? 0}
-        eventType={correctDraft?.eventType ?? "GIRIS"}
-        initialTime={correctDraft?.currentTime ?? ""}
-        onClose={() => setCorrectDraft(null)}
+        open={correctDraft !== null || anomalyDraft !== null}
+        eventId={anomalyDraft?.source_event_id ?? correctDraft?.eventId ?? 0}
+        eventType={
+          anomalyDraft?.anomaly_type === "MISSING_GIRIS"
+            ? "GIRIS"
+            : anomalyDraft
+              ? "CIKIS"
+              : (correctDraft?.eventType ?? "GIRIS")
+        }
+        initialTime={anomalyDraft ? "" : (correctDraft?.currentTime ?? "")}
+        anomaly={anomalyDraft}
+        onClose={() => {
+          setCorrectDraft(null);
+          setAnomalyDraft(null);
+        }}
         onSuccess={(message) => {
           setNotice(message);
           void load();

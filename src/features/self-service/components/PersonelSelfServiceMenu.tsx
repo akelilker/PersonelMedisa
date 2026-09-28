@@ -57,8 +57,9 @@ function PersonelSelfDockIcon({ id }: { id: PersonelSelfMenuItem["id"] }) {
   }
 }
 
-export function PersonelSelfServiceMenu() {
+export function PersonelSelfServiceMenu({ anomalyCount = 0 }: { anomalyCount?: number }) {
   const { hasPermission } = useRoleAccess();
+  const unresolvedCount = anomalyCount > 0 ? anomalyCount : 0;
 
   return (
     <nav
@@ -72,6 +73,11 @@ export function PersonelSelfServiceMenu() {
           <>
             <span className="pm-self-dock__icon-wrap">
               <PersonelSelfDockIcon id={item.id} />
+              {item.id === "talepler" && unresolvedCount > 0 ? (
+                <span className="pm-self-dock__count" data-testid="personel-talepler-anomaly-count">
+                  {unresolvedCount}
+                </span>
+              ) : null}
             </span>
             <span className="pm-self-dock__label">{item.label}</span>
           </>

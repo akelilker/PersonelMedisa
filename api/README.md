@@ -16,7 +16,8 @@ api/
   .htaccess              # Apache rewrite -> public/index.php
   public/index.php       # Front controller
   bin/migrate.php        # CLI-only canonical migration runner
-  bin/cpanel-migration-cron.php # cPanel Cron CLI worker
+  bin/cpanel-migration-cron.php # cPanel Cron CLI worker (migration control plane only)
+  bin/attendance-anomaly-scan.php # attendance anomaly CLI; proposed cron is documented in the file, not installed here
   src/                   # PHP uygulama kodu
   migrations/            # SQL schema
   seeds/                 # Smoke seed template

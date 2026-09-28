@@ -573,12 +573,26 @@ body.app-personel-shell.app-home-route .personel-mobile-shell.self-home-page > .
 }
 
 .pm-self-dock__icon-wrap {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 28px;
   height: 28px;
   transition: transform 0.18s ease;
+}
+
+.pm-self-dock__count {
+  position: absolute;
+  top: -4px;
+  right: -8px;
+  color: var(--brand-red, #c62828);
+  background: none;
+  border: none;
+  box-shadow: none;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
 }
 
 .pm-self-dock__label {
@@ -899,6 +913,21 @@ body.app-personel-shell.app-home-route .personel-mobile-shell.self-home-page > .
   background: var(--brand-red, #c62828);
   font-size: 10px;
   line-height: 16px;
+}
+
+.pm-attendance-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pm-anomaly-live-warning {
+  margin: 0;
+  color: var(--brand-red, #c62828);
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.35;
+  text-align: center;
 }
 
 .pm-attendance-grid {
@@ -1808,4 +1837,23 @@ body.modal-open .modal-container--self-product .modal-header {
 .qr-history-hint {
   margin: 0;
   text-align: center;
+}
+
+/*
+ * Desktop-only history layout: shrink calendar cells and tighten the top
+ * summary rows so the selected day detail stays inside the modal without
+ * scrolling. Mobile (max-width: 640px) keeps its current sizing.
+ */
+@media (min-width: 641px) {
+  .qr-history-cell {
+    min-height: 34px;
+  }
+
+  .qr-history-cell--empty {
+    min-height: 34px;
+  }
+
+  .qr-history-page .pm-leave-detail {
+    gap: 4px;
+  }
 }

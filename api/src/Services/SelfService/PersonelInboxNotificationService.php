@@ -6,6 +6,7 @@ namespace Medisa\Api\Services\SelfService;
 
 use Medisa\Api\Database\Connection;
 use PDO;
+use PDOException;
 
 /**
  * Persistent personel/manager inbox + one-time popup delivery.
@@ -73,6 +74,77 @@ class PersonelInboxNotificationService
         ]);
 
         return (int) $pdo->lastInsertId();
+    }
+
+    /**
+     * Atomic insert for one anomaly audience. The unique key
+     * uq_pin_anomaly_dedupe (migration 093) is the race boundary: a second
+     * CLI tick receives a duplicate-key error and creates nothing.
+     *
+     * @param array<string, mixed>|null $payload
+     * @return int new id, or 0 when the anomaly notification already exists
+     */
+    public static function createAnomaly(
+        PDO $pdo,
+        $recipientUserId,
+        $kind,
+        $title,
+        $body,
+        $personelId,
+        $sourceEventId,
+        $audience,
+        array $payload = null
+    ) {
+        self::assertSchemaReady($pdo);
+        $sourceEventId = (int) $sourceEventId;
+        $audience = trim((string) $audience);
+        if ((int) $recipientUserId <= 0 || $sourceEventId <= 0 || $audience === '') {
+            return 0;
+        }
+        $now = self::utcNow();
+        try {
+            $stmt = $pdo->prepare(
+                'INSERT INTO personel_inbox_notifications
+                    (recipient_user_id, personel_id, kind, title, body, payload_json,
+                     anomaly_source_event_id, anomaly_audience,
+                     related_correction_id, status, popup_required, reminder_of_notification_id, created_at_utc)
+                 VALUES
+                    (:recipient_user_id, :personel_id, :kind, :title, :body, :payload_json,
+                     :anomaly_source_event_id, :anomaly_audience,
+                     NULL, \'ACTIVE\', 1, NULL, :created_at_utc)'
+            );
+            $stmt->execute([
+                'recipient_user_id' => (int) $recipientUserId,
+                'personel_id' => $personelId !== null && (int) $personelId > 0 ? (int) $personelId : null,
+                'kind' => (string) $kind,
+                'title' => (string) $title,
+                'body' => (string) $body,
+                'payload_json' => $payload !== null ? json_encode($payload, JSON_UNESCAPED_UNICODE) : null,
+                'anomaly_source_event_id' => $sourceEventId,
+                'anomaly_audience' => $audience,
+                'created_at_utc' => $now,
+            ]);
+        } catch (PDOException $e) {
+            if (self::isAnomalyDedupeViolation($e)) {
+                return 0;
+            }
+            throw $e;
+        }
+
+        return (int) $pdo->lastInsertId();
+    }
+
+    private static function isAnomalyDedupeViolation(PDOException $e)
+    {
+        $driverCode = isset($e->errorInfo[1]) ? (int) $e->errorInfo[1] : 0;
+        if ($driverCode === 1062 || $driverCode === 19) {
+            return true;
+        }
+        $message = $e->getMessage();
+
+        return stripos($message, 'uq_pin_anomaly_dedupe') !== false
+            || stripos($message, 'UNIQUE constraint failed') !== false
+            || stripos($message, 'Duplicate entry') !== false;
     }
 
     /**

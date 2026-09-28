@@ -78,18 +78,27 @@ class QrAttendanceCorrectionService
             throw new QrAttendanceException('NOT_FOUND', 'QR hareketi bulunamadi.', 404, 'source_event_id');
         }
 
-        $allowed = \Medisa\Api\Services\Attendance\AttendanceBusinessDayService::isCorrectionAllowedNow(
-            $pdo,
-            (int) $ctx['personel_id'],
-            (string) $event['occurred_at_utc']
-        );
-        if (!$allowed) {
-            throw new QrAttendanceException(
-                'CORRECTION_WINDOW_CLOSED',
-                'Bu Kayıt İçin Düzeltme Talebi Süresi Doldu. Amirinizle Görüşün.',
-                409,
-                'source_event_id'
+        $anomalyType = isset($body['anomaly_type']) ? strtoupper(trim((string) $body['anomaly_type'])) : '';
+        $anomaly = null;
+        if ($anomalyType !== '') {
+            if ($anomalyType !== 'MISSING_CIKIS' && $anomalyType !== 'MISSING_GIRIS') {
+                throw new QrAttendanceException('VALIDATION_ERROR', 'anomaly_type gecersiz.', 400, 'anomaly_type');
+            }
+            $anomaly = self::requireUnresolvedAnomaly($pdo, (int) $ctx['personel_id'], $sourceEventId, $anomalyType);
+        } else {
+            $allowed = \Medisa\Api\Services\Attendance\AttendanceBusinessDayService::isCorrectionAllowedNow(
+                $pdo,
+                (int) $ctx['personel_id'],
+                (string) $event['occurred_at_utc']
             );
+            if (!$allowed) {
+                throw new QrAttendanceException(
+                    'CORRECTION_WINDOW_CLOSED',
+                    'Bu Kayıt İçin Düzeltme Talebi Süresi Doldu. Amirinizle Görüşün.',
+                    409,
+                    'source_event_id'
+                );
+            }
         }
 
         $pending = $pdo->prepare(
@@ -127,8 +136,15 @@ class QrAttendanceCorrectionService
         }
 
         $originalUtc = (string) $event['occurred_at_utc'];
+        $storedEventType = (string) $event['event_type'];
         $businessDate = self::istanbulDate($originalUtc);
-        $requestedUtc = self::localTimeOnBusinessDateToUtc($businessDate, $requestedLocal);
+        $requestedDate = $businessDate;
+        if (is_array($anomaly)) {
+            $storedEventType = $anomalyType === 'MISSING_GIRIS' ? 'GIRIS' : 'CIKIS';
+            $businessDate = (string) $anomaly['business_date'];
+            $requestedDate = self::requestedClockDate($anomaly, $storedEventType);
+        }
+        $requestedUtc = self::localTimeOnBusinessDateToUtc($requestedDate, $requestedLocal);
         $nowUtc = self::utcNow();
         $reminderDue = (new \DateTimeImmutable($nowUtc, new \DateTimeZone('UTC')))
             ->modify('+' . self::REMINDER_MINUTES . ' minutes')
@@ -151,7 +167,7 @@ class QrAttendanceCorrectionService
                 'personel_id' => (int) $ctx['personel_id'],
                 'requester_user_id' => (int) $authUser['id'],
                 'source_event_id' => $sourceEventId,
-                'event_type' => (string) $event['event_type'],
+                'event_type' => $storedEventType,
                 'business_date' => $businessDate,
                 'original_occurred_at_utc' => $originalUtc,
                 'requested_local_time' => $requestedLocal,
@@ -177,14 +193,32 @@ class QrAttendanceCorrectionService
         $requestId = (int) $pdo->lastInsertId();
         $originalLocal = self::istanbulHhmm($originalUtc);
         $personelName = (string) $ctx['ad_soyad'];
-        $eventLabel = ((string) $event['event_type'] === 'CIKIS') ? 'çıkış' : 'giriş';
-        $body = sprintf(
-            '%s, %s olan %s saatini %s olarak güncellemek istiyor.',
-            $personelName,
-            $originalLocal,
-            $eventLabel,
-            $requestedLocal
-        );
+        if (is_array($anomaly) && $anomalyType === 'MISSING_CIKIS') {
+            $body = sprintf(
+                '%s, %s tarihinde saat %s girişinin çıkış kaydı yok. Talep edilen çıkış %s.',
+                $personelName,
+                (string) ($anomaly['business_date_label'] ?? $businessDate),
+                (string) ($anomaly['context_local_time'] ?? $originalLocal),
+                $requestedLocal
+            );
+        } elseif (is_array($anomaly) && $anomalyType === 'MISSING_GIRIS') {
+            $body = sprintf(
+                '%s, %s tarihinde saat %s çıkışının giriş kaydı yok. Talep edilen giriş %s.',
+                $personelName,
+                (string) ($anomaly['business_date_label'] ?? $businessDate),
+                (string) ($anomaly['context_local_time'] ?? $originalLocal),
+                $requestedLocal
+            );
+        } else {
+            $eventLabel = ((string) $event['event_type'] === 'CIKIS') ? 'çıkış' : 'giriş';
+            $body = sprintf(
+                '%s, %s olan %s saatini %s olarak güncellemek istiyor.',
+                $personelName,
+                $originalLocal,
+                $eventLabel,
+                $requestedLocal
+            );
+        }
 
         PersonelInboxNotificationService::create(
             $pdo,
@@ -196,7 +230,8 @@ class QrAttendanceCorrectionService
             $requestId,
             [
                 'source_event_id' => $sourceEventId,
-                'event_type' => (string) $event['event_type'],
+                'event_type' => $storedEventType,
+                'anomaly_type' => $anomalyType !== '' ? $anomalyType : null,
                 'original_local_time' => $originalLocal,
                 'requested_local_time' => $requestedLocal,
                 'personel_ad_soyad' => $personelName,
@@ -559,6 +594,58 @@ class QrAttendanceCorrectionService
                 : null,
             'message' => 'Düzeltme Talebiniz Amirinize İletildi.',
         ];
+    }
+
+    /**
+     * @return array<string,mixed>
+     */
+    private static function requireUnresolvedAnomaly(PDO $pdo, $personelId, $sourceEventId, $anomalyType)
+    {
+        $items = QrAttendanceUnresolvedAnomalyService::listForPersonel($pdo, (int) $personelId);
+        foreach ($items as $item) {
+            if ((int) ($item['source_event_id'] ?? 0) === (int) $sourceEventId
+                && (string) ($item['anomaly_type'] ?? '') === (string) $anomalyType
+            ) {
+                if (!empty($item['pending_request_id'])) {
+                    throw new QrAttendanceException(
+                        'CORRECTION_PENDING_EXISTS',
+                        'Bu hareket icin bekleyen duzeltme talebi var.',
+                        409,
+                        'source_event_id'
+                    );
+                }
+
+                return $item;
+            }
+        }
+
+        throw new QrAttendanceException(
+            'ANOMALY_NOT_UNRESOLVED',
+            'Bu kayit icin acik giris/cikis anomalisi yok.',
+            409,
+            'source_event_id'
+        );
+    }
+
+    /**
+     * Clock the personel typed is placed on the canonical planned-exit date.
+     * The clock itself is never invented.
+     *
+     * @param array<string,mixed> $anomaly
+     */
+    private static function requestedClockDate(array $anomaly, $storedEventType)
+    {
+        if ((string) $storedEventType === 'CIKIS' && !empty($anomaly['planned_exit_local'])) {
+            try {
+                return (new \DateTimeImmutable((string) $anomaly['planned_exit_local']))
+                    ->setTimezone(new \DateTimeZone('Europe/Istanbul'))
+                    ->format('Y-m-d');
+            } catch (\Throwable $e) {
+                // Fall through to the anomaly business date.
+            }
+        }
+
+        return (string) $anomaly['business_date'];
     }
 
     private static function statusLabel($status)

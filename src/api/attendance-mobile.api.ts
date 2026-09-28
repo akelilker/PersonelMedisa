@@ -65,6 +65,26 @@ export type AttendanceTodayResponse = {
    * true when work is not positively expected, so old `!izinli_bugun` does not show a false late warning.
    */
   izinli_bugun?: boolean;
+  /** Canonical unresolved attendance anomalies. Badge, card and prefill read this list. */
+  unresolved_attendance_anomalies?: AttendanceAnomaly[];
+  unresolved_attendance_anomaly_count?: number;
+  /** Home live warning. Distinct from the inbox notification body. */
+  attendance_anomaly_live_warning?: string | null;
+};
+
+export type AttendanceAnomaly = {
+  identity: string;
+  source_event_id: number;
+  anomaly_type: "MISSING_CIKIS" | "MISSING_GIRIS";
+  correction_hint: string;
+  business_date: string;
+  business_date_label: string;
+  problem: string;
+  context_event_type: "GIRIS" | "CIKIS";
+  context_local_time: string;
+  planned_exit_local: string | null;
+  planned_exit_label: string | null;
+  pending_request_id: number | null;
 };
 
 export type InboxNotification = {
@@ -104,6 +124,7 @@ export async function createAttendanceCorrection(payload: {
   source_event_id: number;
   requested_local_time: string;
   explanation?: string;
+  anomaly_type?: "MISSING_CIKIS" | "MISSING_GIRIS";
 }): Promise<{ id: number; message: string; status: string }> {
   const response = await apiRequest<ApiResponse<unknown>>(endpoints.me.attendanceCorrectionRequests, {
     method: "POST",

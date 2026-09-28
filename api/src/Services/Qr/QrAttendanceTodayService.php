@@ -149,6 +149,7 @@ class QrAttendanceTodayService
 
         $plannedShift = self::plannedShiftPayload($pdo, $personelId, $today);
         $beklenti = self::bugunCalismaBeklentisi($pdo, $personelId, $today);
+        $unresolvedAnomalies = self::unresolvedAnomalies($pdo, $personelId);
 
         return [
             'business_date' => $today,
@@ -170,6 +171,9 @@ class QrAttendanceTodayService
             'pending_cikis_correction' => $pendingCikisCorrection,
             'planned_shift' => $plannedShift,
             'bugun_calisma_beklentisi' => $beklenti,
+            'unresolved_attendance_anomalies' => $unresolvedAnomalies,
+            'unresolved_attendance_anomaly_count' => count($unresolvedAnomalies),
+            'attendance_anomaly_live_warning' => self::liveWarning($unresolvedAnomalies),
             // DEPRECATED compatibility alias for cached clients that still do !izinli_bugun.
             // Not "on leave": true when work is not positively expected (exception or unknown),
             // so an old bundle does not show a false "İşe Geç Kaldınız."
@@ -221,6 +225,38 @@ class QrAttendanceTodayService
         } catch (\Throwable $e) {
             return null;
         }
+    }
+
+    /**
+     * Same list the CLI, badge and Talepler card read. Notification write is
+     * backfill only; the primary trigger is the attendance anomaly CLI.
+     *
+     * @return list<array<string,mixed>>
+     */
+    private static function unresolvedAnomalies(PDO $pdo, $personelId)
+    {
+        try {
+            $items = QrAttendanceUnresolvedAnomalyService::listForPersonel($pdo, (int) $personelId);
+            QrAttendanceUnresolvedAnomalyService::ensureNotifications($pdo, (int) $personelId, $items);
+
+            return $items;
+        } catch (\Throwable $e) {
+            return [];
+        }
+    }
+
+    /**
+     * @param list<array<string,mixed>> $anomalies
+     */
+    private static function liveWarning(array $anomalies)
+    {
+        foreach ($anomalies as $anomaly) {
+            if ((string) ($anomaly['anomaly_type'] ?? '') === 'MISSING_CIKIS') {
+                return QrAttendanceUnresolvedAnomalyService::LIVE_WARNING;
+            }
+        }
+
+        return null;
     }
 
     private static function istanbulToday()

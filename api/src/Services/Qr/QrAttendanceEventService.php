@@ -330,14 +330,19 @@ class QrAttendanceEventService
     }
 
     /**
-     * Canonical open-shift / next-action for multi-cycle same-day operation.
+     * Canonical open-shift / next-action.
      *
-     * @return array{last_event_type:?string,next_action:string}
+     * A live open GİRİŞ (planned exit + 180 not yet reached, or planned exit
+     * unknown) still requires ÇIKIŞ before another GİRİŞ. A previous shift whose
+     * planned exit + 180 has passed is a stale missing-exit: it does not block
+     * the next shift's GİRİŞ and does not accept a ÇIKIŞ that would pair onto it.
+     *
+     * @return array{last_event_type:?string,next_action:string,stale_missing_cikis:bool}
      */
     public static function resolveOpenShiftState(PDO $pdo, $personelId)
     {
         $stmt = $pdo->prepare(
-            'SELECT event_type
+            'SELECT event_type, occurred_at_utc
              FROM qr_attendance_events
              WHERE personel_id = :pid
              ORDER BY occurred_at_utc DESC, id DESC
@@ -347,30 +352,38 @@ class QrAttendanceEventService
         $last = $stmt->fetch(PDO::FETCH_ASSOC);
         $lastType = is_array($last) ? strtoupper((string) ($last['event_type'] ?? '')) : '';
         if ($lastType === 'GIRIS') {
+            $blocks = QrAttendanceUnresolvedAnomalyService::openGirisBlocksNextGiris(
+                $pdo,
+                $personelId,
+                (string) ($last['occurred_at_utc'] ?? '')
+            );
+
             return [
                 'last_event_type' => 'GIRIS',
-                'next_action' => 'CIKIS',
+                'next_action' => $blocks ? 'CIKIS' : 'GIRIS',
+                'stale_missing_cikis' => !$blocks,
             ];
         }
 
         return [
             'last_event_type' => $lastType !== '' ? $lastType : null,
             'next_action' => 'GIRIS',
+            'stale_missing_cikis' => false,
         ];
     }
 
     /**
      * Fail-closed open-shift guard (explicit GIRIS/CIKIS still chosen by client).
-     * Open GIRIS without CIKIS → second GIRIS denied (incl. across days).
-     * No open GIRIS → CIKIS denied.
-     * Same-day multi-cycle GIRIS→CIKIS→GIRIS→CIKIS is allowed.
+     * Live open GIRIS → second GIRIS denied. Same-day GIRIS→CIKIS→GIRIS stays allowed.
+     * Stale previous-shift open GIRIS does not block the next GIRIS and does not
+     * accept a CIKIS onto that stale entry. No open GIRIS → CIKIS denied.
      */
     private static function assertOpenShiftTransition(PDO $pdo, $personelId, $eventType)
     {
         $state = self::resolveOpenShiftState($pdo, $personelId);
-        $lastType = (string) ($state['last_event_type'] ?? '');
+        $next = (string) ($state['next_action'] ?? '');
 
-        if ($eventType === 'GIRIS' && $lastType === 'GIRIS') {
+        if ($eventType === 'GIRIS' && $next !== 'GIRIS') {
             throw new QrAttendanceException(
                 'QR_OPEN_SHIFT_EXISTS',
                 'Acik giris kaydi varken yeni giris yapilamaz. Once cikis veya duzeltme gerekir.',
@@ -378,7 +391,15 @@ class QrAttendanceEventService
                 'event_type'
             );
         }
-        if ($eventType === 'CIKIS' && $lastType !== 'GIRIS') {
+        if ($eventType === 'CIKIS' && !empty($state['stale_missing_cikis'])) {
+            throw new QrAttendanceException(
+                'QR_STALE_OPEN_SHIFT',
+                'Onceki vardiyanin cikis kaydi eksik. Duzeltme talebi olusturun. Yeni vardiya icin giris yapabilirsiniz.',
+                409,
+                'event_type'
+            );
+        }
+        if ($eventType === 'CIKIS' && $next !== 'CIKIS') {
             throw new QrAttendanceException(
                 'QR_NO_OPEN_SHIFT',
                 'Acik giris olmadan cikis kaydedilemez.',

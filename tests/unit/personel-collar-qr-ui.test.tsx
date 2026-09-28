@@ -16,7 +16,7 @@
  */
 
 import "@testing-library/jest-dom/vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import type { AttendanceTodayResponse } from "../../src/api/attendance-mobile.api";
@@ -24,6 +24,7 @@ import type { AuthSession } from "../../src/types/auth";
 import { ProtectedRoute } from "../../src/router/ProtectedRoute";
 import { BirimAmiriOperationalHomePage } from "../../src/features/self-service/pages/BirimAmiriOperationalHomePage";
 import { PersonelSelfServiceHomePage } from "../../src/features/self-service/pages/PersonelSelfServiceHomePage";
+import { PersonelSelfServiceTaleplerPage } from "../../src/features/self-service/pages/PersonelSelfServiceTaleplerPage";
 import { SelfServiceQrShortcuts } from "../../src/features/self-service/components/SelfServiceQrShortcuts";
 
 const sessionState = vi.hoisted(() => ({ current: null as unknown }));
@@ -94,6 +95,20 @@ vi.mock("../../src/api/me.api", () => ({
   }))
 }));
 
+vi.mock("../../src/api/self-product.api", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../src/api/self-product.api")>();
+  return {
+    ...actual,
+    fetchSelfAvansTalepleri: vi.fn(async () => []),
+    fetchSelfCorrectionRequests: vi.fn(async () => []),
+    fetchSelfGeriBildirimler: vi.fn(async () => []),
+    fetchSelfIzinler: vi.fn(async () => null),
+    createSelfAvansTalebi: vi.fn(),
+    createSelfGeriBildirim: vi.fn(),
+    createSelfIzinTalebi: vi.fn()
+  };
+});
+
 vi.mock("../../src/api/bildirimler.api", () => ({
   fetchBirimGunlukDurum: vi.fn(async () => ({
     tarih: "2026-09-19",
@@ -126,9 +141,12 @@ function setSession(rol: string, personelTipiAd: string | null, personelId: numb
   } as unknown as AuthSession;
 }
 
-afterEach(() => {
+afterEach(async () => {
   cleanup();
   sessionState.current = null;
+  const { fetchAttendanceToday } = await import("../../src/api/attendance-mobile.api");
+  vi.mocked(fetchAttendanceToday).mockReset();
+  vi.mocked(fetchAttendanceToday).mockImplementation(async () => attendance);
 });
 
 async function renderHome() {
@@ -281,6 +299,104 @@ describe("PERSONEL collar → QR UI entitlement (render level)", () => {
     expect(screen.getByTestId("giris-scan")).toHaveTextContent("12:05");
     expect(screen.getByTestId("attendance-box-cikis")).toHaveTextContent("11:20");
     expect(screen.getByTestId("cikis-scan")).toBeDisabled();
+  });
+
+  it("shows a borderless red Talepler count and the live warning from the canonical anomaly list", async () => {
+    const { fetchAttendanceToday } = await import("../../src/api/attendance-mobile.api");
+    vi.mocked(fetchAttendanceToday).mockResolvedValue({
+      ...attendance,
+      can_scan_giris: true,
+      can_scan_cikis: false,
+      next_action: "GIRIS",
+      attendance_anomaly_live_warning:
+        "Günlük Çalışma Süresi Doldu. Çıkış Yapmanız Gerekmektedir. Amirinizle İrtibata Geçin.",
+      unresolved_attendance_anomalies: [
+        {
+          identity: "MISSING_CIKIS:41",
+          source_event_id: 41,
+          anomaly_type: "MISSING_CIKIS",
+          business_date_label: "28.09.2026",
+          problem: "Çıkış kaydı bulunamadı"
+        },
+        {
+          identity: "MISSING_CIKIS:42",
+          source_event_id: 42,
+          anomaly_type: "MISSING_CIKIS",
+          business_date_label: "27.09.2026",
+          problem: "Çıkış kaydı bulunamadı"
+        }
+      ]
+    } as unknown as AttendanceTodayResponse);
+
+    setSession("PERSONEL", "Mavi Yaka");
+    await renderHome();
+
+    const badge = screen.getByTestId("personel-talepler-anomaly-count");
+    expect(badge).toHaveTextContent("2");
+    expect(badge.className).toBe("pm-self-dock__count");
+    expect(badge.className).not.toContain("pm-bell-badge");
+    const warning = screen.getByTestId("attendance-anomaly-live-warning");
+    expect(warning).toHaveTextContent(
+      "Günlük Çalışma Süresi Doldu. Çıkış Yapmanız Gerekmektedir. Amirinizle İrtibata Geçin."
+    );
+    expect(warning).not.toHaveTextContent("Olağan Dışı Giriş/Çıkış Kaydı");
+  });
+
+  it("opens the existing correction request with prefill and blocks a second CTA while one is pending", async () => {
+    const { fetchAttendanceToday } = await import("../../src/api/attendance-mobile.api");
+    vi.mocked(fetchAttendanceToday).mockResolvedValue({
+      ...attendance,
+      unresolved_attendance_anomalies: [
+        {
+          identity: "MISSING_CIKIS:41",
+          source_event_id: 41,
+          anomaly_type: "MISSING_CIKIS",
+          correction_hint: "GIRIS_CIKIS_DUZELTME",
+          business_date: "2026-09-28",
+          business_date_label: "28.09.2026",
+          problem: "Çıkış kaydı bulunamadı",
+          context_event_type: "GIRIS",
+          context_local_time: "08:30",
+          planned_exit_local: "2026-09-28T17:40:00+03:00",
+          planned_exit_label: "17:40",
+          pending_request_id: null
+        },
+        {
+          identity: "MISSING_CIKIS:42",
+          source_event_id: 42,
+          anomaly_type: "MISSING_CIKIS",
+          correction_hint: "GIRIS_CIKIS_DUZELTME",
+          business_date: "2026-09-27",
+          business_date_label: "27.09.2026",
+          problem: "Çıkış kaydı bulunamadı",
+          context_event_type: "GIRIS",
+          context_local_time: "08:31",
+          planned_exit_local: null,
+          planned_exit_label: "17:40",
+          pending_request_id: 9
+        }
+      ]
+    } as unknown as AttendanceTodayResponse);
+
+    render(
+      <MemoryRouter>
+        <PersonelSelfServiceTaleplerPage />
+      </MemoryRouter>
+    );
+
+    expect(await screen.findAllByText("Giriş/Çıkış Kaydı Düzeltme Gerekiyor")).toHaveLength(2);
+    expect(screen.getAllByTestId("personel-talep-anomaly-card")).toHaveLength(2);
+    expect(screen.getAllByTestId("personel-talep-anomaly-cta")).toHaveLength(1);
+    expect(screen.getByTestId("personel-talep-anomaly-pending")).toHaveTextContent(
+      "Düzeltme talebiniz değerlendirme bekliyor."
+    );
+    fireEvent.click(screen.getByTestId("personel-talep-anomaly-cta"));
+    const prefill = screen.getByTestId("attendance-anomaly-prefill");
+    expect(prefill).toHaveTextContent("28.09.2026");
+    expect(prefill).toHaveTextContent("08:30");
+    expect(prefill).toHaveTextContent("Çıkış kaydı bulunamadı");
+    expect(screen.getByTestId("attendance-correct-time")).toHaveValue("");
+    cleanup();
   });
 });
 

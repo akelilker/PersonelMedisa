@@ -509,15 +509,45 @@ export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeade
               width="22"
               height="22"
               viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
               aria-hidden="true"
             >
-              <path d="m3 11 18-5v12L3 14v-3z" />
-              <path d="M11.6 16.8a3 3 0 1 1-5.8-1.6" />
+              <g transform="rotate(-14 12 12)">
+                <path
+                  fill="var(--brand-red, #c62828)"
+                  d="M7.2 14.6h2a1.1 1.1 0 0 1 1.1 1.1v3.1a.9.9 0 0 1-.9.9H7.6a.7.7 0 0 1-.7-.7v-3.5c0-.4.2-.7.3-.9z"
+                />
+                <path
+                  fill="var(--brand-red, #c62828)"
+                  d="M3.4 9.4 13.2 6.3c.5-.2 1 .2 1 .7v9.8c0 .5-.5.9-1 .7L3.4 14.4c-.4-.2-.7-.6-.7-1.1V10.5c0-.5.3-.9.7-1.1z"
+                />
+                <path
+                  fill="var(--brand-red, #c62828)"
+                  d="M13.8 5.8c1.6.3 2.8 1.8 2.8 3.6s-1.2 3.3-2.8 3.6V5.8z"
+                />
+                <ellipse cx="15.1" cy="9.4" rx="1.5" ry="2.4" fill="#fff" />
+                <circle cx="15.1" cy="9.4" r="0.55" fill="var(--brand-red, #c62828)" />
+                <path
+                  d="M17.2 7.4c1.4 1.2 1.4 3.2 0 4.4"
+                  fill="none"
+                  stroke="var(--brand-red, #c62828)"
+                  strokeWidth="1.15"
+                  strokeLinecap="round"
+                />
+                <path
+                  d="M18.6 6c2 1.7 2 4.7 0 6.4"
+                  fill="none"
+                  stroke="var(--brand-red, #c62828)"
+                  strokeWidth="1.15"
+                  strokeLinecap="round"
+                />
+                <path
+                  d="M20 4.6c2.6 2.2 2.6 6.2 0 8.4"
+                  fill="none"
+                  stroke="var(--brand-red, #c62828)"
+                  strokeWidth="1.15"
+                  strokeLinecap="round"
+                />
+              </g>
             </svg>
             {personelDuyuruUnread > 0 ? (
               <span className="pm-shell-duyurular-badge" data-testid="personel-shell-duyuru-badge">

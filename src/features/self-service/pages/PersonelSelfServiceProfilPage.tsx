@@ -1,11 +1,6 @@
 import { useEffect, useState } from "react";
 import { isApiRequestError, shouldPreferDemoApi } from "../../../api/api-client";
 import { fetchMe, fetchMeYillikIzinBakiye } from "../../../api/me.api";
-import {
-  fetchSelfProfilFoto,
-  selfProfilFotoSrc,
-  uploadSelfProfilFoto
-} from "../../../api/self-product.api";
 import { PersonelSelfPortrait } from "../components/PersonelSelfPortrait";
 import { LoadingState } from "../../../components/states/LoadingState";
 import { formatIsoDateDetail } from "../../../lib/display/iso-date-format";
@@ -13,6 +8,7 @@ import { useRoleAccess } from "../../../hooks/use-role-access";
 import type { MeIdentity } from "../../../types/self-service";
 import { SelfServiceFactList, type SelfServiceFact } from "../components/SelfServiceFactList";
 import { buildPersonelSelfIdentityView } from "../personel-self-identity-view";
+import { useSelfProfilFoto } from "../hooks/use-self-profil-foto";
 
 type Status =
   | { kind: "loading" }
@@ -44,7 +40,13 @@ function buildRows(me: MeIdentity, iseGiris: string | null): SelfServiceFact[] {
       rows.push({ label, value, testId });
     }
   }
-  if (iseGiris) {
+  const iseGirisFromMe = present(personel.ise_giris_tarihi);
+  if (iseGirisFromMe) {
+    const formatted = formatIsoDateDetail(iseGirisFromMe);
+    if (formatted !== "-") {
+      rows.push({ label: "İşe giriş", value: formatted, testId: "personel-profil-ise-giris" });
+    }
+  } else if (iseGiris) {
     const formatted = formatIsoDateDetail(iseGiris);
     if (formatted !== "-") {
       rows.push({ label: "İşe giriş", value: formatted, testId: "personel-profil-ise-giris" });
@@ -57,9 +59,8 @@ export function PersonelSelfServiceProfilPage() {
   const { hasPermission } = useRoleAccess();
   const canViewIseGiris = hasPermission("self_service.yillik_izin.view");
   const [status, setStatus] = useState<Status>({ kind: "loading" });
-  const [photoSrc, setPhotoSrc] = useState<string | null>(null);
   const [photoName, setPhotoName] = useState("");
-  const [photoMessage, setPhotoMessage] = useState<string | null>(null);
+  const { photoSrc, photoMessage, onPhotoSelected } = useSelfProfilFoto();
 
   useEffect(() => {
     if (shouldPreferDemoApi()) {
@@ -103,41 +104,6 @@ export function PersonelSelfServiceProfilPage() {
       cancelled = true;
     };
   }, [canViewIseGiris]);
-
-  useEffect(() => {
-    if (shouldPreferDemoApi()) {
-      setPhotoSrc(null);
-      return;
-    }
-    let cancelled = false;
-    void fetchSelfProfilFoto()
-      .then((photo) => {
-        if (!cancelled) setPhotoSrc(selfProfilFotoSrc(photo));
-      })
-      .catch(() => {
-        if (!cancelled) setPhotoSrc(null);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  async function onPhotoSelected(file: File | undefined) {
-    if (!file) return;
-    const bytes = await file.arrayBuffer();
-    const binary = new Uint8Array(bytes);
-    let raw = "";
-    for (let index = 0; index < binary.length; index += 1) {
-      raw += String.fromCharCode(binary[index]);
-    }
-    try {
-      const saved = await uploadSelfProfilFoto(btoa(raw));
-      setPhotoSrc(selfProfilFotoSrc(saved));
-      setPhotoMessage(saved.has_photo ? "Fotoğraf güncellendi." : "Fotoğraf kaydedilemedi.");
-    } catch {
-      setPhotoMessage("Fotoğraf kaydedilemedi.");
-    }
-  }
 
   return (
     <section className="personel-mobile-shell pm-self-subpage" data-testid="personel-profil-page">

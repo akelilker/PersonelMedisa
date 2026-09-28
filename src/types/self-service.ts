@@ -6,6 +6,8 @@ export type MePersonelSummary = {
   ad: string;
   soyad: string;
   ad_soyad: string;
+  sicil_no: string | null;
+  ise_giris_tarihi: string | null;
   sube_id: number;
   sube_ad: string;
   departman_id: number | null;

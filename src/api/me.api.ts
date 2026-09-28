@@ -109,6 +109,8 @@ function normalizePersonelSummary(value: unknown): MePersonelSummary {
     ad,
     soyad,
     ad_soyad: readString(record.ad_soyad) ?? `${ad} ${soyad}`.trim(),
+    sicil_no: readString(record.sicil_no),
+    ise_giris_tarihi: readString(record.ise_giris_tarihi),
     sube_id: readNumber(record.sube_id) ?? 0,
     sube_ad: readString(record.sube_ad) ?? "",
     departman_id: readNullableNumber(record.departman_id),

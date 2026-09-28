@@ -231,7 +231,7 @@ describe("login sonrasi rol ana ekrani", () => {
     expect(fetchBildirimTuruOptions).not.toHaveBeenCalled();
   });
 
-  it("PERSONEL izin bakiye hatasi ana ozet ekranini dusurmez", async () => {
+  it("PERSONEL ana ozet yillik izin bakiye hatasindan etkilenmez (home izin cagirmaz)", async () => {
     fetchMeYillikIzinBakiye.mockRejectedValueOnce(new Error("izin unavailable"));
     storeSession(buildSession({ rol: "PERSONEL", personelId: 158, personelTipiAd: "Mavi Yaka" }));
 
@@ -239,12 +239,9 @@ describe("login sonrasi rol ana ekrani", () => {
 
     await screen.findByTestId("personel-attendance-boxes");
     expect(screen.queryByTestId("personel-self-service-error")).toBeNull();
-    await waitFor(() => {
-      expect(fetchMeYillikIzinBakiye).toHaveBeenCalled();
-    });
-    await waitFor(() => {
-      expect(screen.queryByTestId("personel-leave-row")).toBeNull();
-    });
+    // Leave summary moved to İzinlerim; home must not depend on yıllık izin bakiye.
+    expect(fetchMeYillikIzinBakiye).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("personel-leave-row")).toBeNull();
   });
 
   it("bagli mavi yaka BOLUM_YONETICISI login → ana ekran + QR kisayolu erisilebilir", async () => {

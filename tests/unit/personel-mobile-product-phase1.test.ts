@@ -26,6 +26,8 @@ function identity(overrides: Partial<MeIdentity["personel"]> = {}): MeIdentity {
       birim_ad: "Saha",
       gorev_id: 4,
       gorev_ad: "Teknisyen",
+      sicil_no: "P-007",
+      ise_giris_tarihi: "2020-01-15",
       aktif_durum: "AKTIF",
       ...overrides
     }
@@ -37,6 +39,8 @@ describe("PERSONEL mobile product phase 1 identity", () => {
     const view = buildPersonelSelfIdentityView(identity());
     expect(view?.adSoyad).toBe("Ayşe Yılmaz");
     expect(view?.organization).toEqual(["Merkez", "Operasyon", "Saha", "Teknisyen"]);
+    expect(view?.tenureLine).toContain("P-007");
+    expect(view?.tenureLine).toContain("aydır çalışıyor");
   });
 
   it("omits empty birim and görev instead of placeholders", () => {

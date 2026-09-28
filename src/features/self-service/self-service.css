@@ -325,8 +325,7 @@
   min-height: 0;
   gap: var(--space-2);
   justify-content: flex-start;
-  overflow-x: hidden;
-  overflow-y: auto;
+  overflow: hidden;
   overscroll-behavior: contain;
 }
 
@@ -364,51 +363,6 @@
   flex: 0 0 auto;
 }
 
-.pm-self-home-info {
-  display: grid;
-  gap: var(--space-2);
-  flex: 0 1 auto;
-  min-height: 0;
-  padding: 8px 10px;
-  border: 1px solid var(--line-hero-card, rgba(255, 255, 255, 0.18));
-  border-radius: var(--radius-md);
-  background: rgba(255, 255, 255, 0.04);
-}
-
-.pm-self-home-info__rows {
-  display: grid;
-  gap: 6px;
-  margin: 0;
-}
-
-.pm-self-home-info__row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  align-items: baseline;
-  gap: 8px;
-}
-
-.pm-self-home-info__row dt {
-  margin: 0;
-  font-size: 0.78rem;
-  color: var(--txt-muted);
-  line-height: 1.25;
-}
-
-.pm-self-home-info__row dd {
-  margin: 0;
-  font-size: 0.82rem;
-  font-weight: 600;
-  text-align: right;
-  line-height: 1.25;
-  overflow-wrap: anywhere;
-}
-
-.pm-self-home-info__izin-row {
-  width: 100%;
-  margin-top: 2px;
-}
-
 .pm-self-identity {
   display: flex;
   align-items: center;
@@ -418,6 +372,67 @@
   border: 1px solid var(--line-hero-card, rgba(255, 255, 255, 0.18));
   border-radius: var(--radius-md);
   background: rgba(255, 255, 255, 0.04);
+}
+
+.pm-self-identity--home {
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+}
+
+body.app-personel-shell.app-home-route .personel-mobile-shell.self-home-page > .pm-self-identity--home {
+  margin-top: 6px;
+}
+
+.pm-self-identity--home .pm-self-identity__text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.pm-self-identity__tenure {
+  margin: 2px 0 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.pm-self-identity--home .pm-self-identity__org {
+  font-size: 0.7rem;
+  line-height: 1.25;
+  font-weight: 500;
+}
+
+.pm-self-identity__photo-btn {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  border-radius: 999px;
+}
+
+.pm-self-identity__photo-btn:focus-visible {
+  outline: 2px solid rgba(var(--theme-color-rgb), 0.85);
+  outline-offset: 2px;
+}
+
+.pm-self-identity__photo-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.pm-self-identity--home .pm-self-portrait {
+  width: 48px;
+  height: 48px;
 }
 
 .pm-self-identity__text {
@@ -617,12 +632,6 @@
     flex-direction: row;
     align-items: stretch;
     gap: var(--space-3);
-  }
-
-  .pm-self-home-info {
-    flex: 1 1 0;
-    min-width: 0;
-    align-self: stretch;
   }
 
   .self-home-main > .pm-section {

@@ -417,9 +417,11 @@ body.app-personel-shell.app-home-route .personel-mobile-shell.self-home-page > .
 }
 
 .pm-self-identity--home .pm-self-identity__org {
-  font-size: 0.7rem;
-  line-height: 1.25;
-  font-weight: 500;
+  margin: 2px 0 0;
+  font-size: calc(0.78rem + 1px);
+  font-weight: 600;
+  line-height: 1.3;
+  color: inherit;
 }
 
 .pm-self-identity__photo-btn {

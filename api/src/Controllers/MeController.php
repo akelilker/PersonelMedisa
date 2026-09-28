@@ -126,9 +126,14 @@ class MeController
         $from = $request->getQuery('from', $defaults['from']);
         $to = $request->getQuery('to', $defaults['to']);
 
-        JsonResponse::success(
-            SelfPuantajReadService::listForPersonel($pdo, (int) $ctx['personel_id'], $from, $to)
+        $result = SelfPuantajReadService::listForPersonel($pdo, (int) $ctx['personel_id'], $from, $to);
+        $result['ozet']['aylik_onayli_mi'] = SelfPuantajReadService::isAylikOnayli(
+            $pdo,
+            (int) $ctx['sube_id'],
+            $from
         );
+
+        JsonResponse::success($result);
     }
 
     public static function yillikIzinBakiye(Request $request)

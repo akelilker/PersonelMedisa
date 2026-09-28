@@ -162,6 +162,38 @@ class SelfPuantajReadService
     }
 
     /**
+     * Ay sonu amir onayı okuması (aylik_bildirim_onaylari, state TAMAMLANDI).
+     * Yalnız bağlı personelin kendi şubesi için sorgulanır; başka şube verisi sızmaz.
+     *
+     * @param mixed $subeId
+     * @param string $from YYYY-MM-DD; ay bu tarihten türetilir.
+     * @return bool
+     */
+    public static function isAylikOnayli(PDO $pdo, $subeId, $from)
+    {
+        $subeId = (int) $subeId;
+        if ($subeId <= 0) {
+            return false;
+        }
+        $ay = substr(trim((string) $from), 0, 7);
+        if (!preg_match('/^\d{4}-\d{2}$/', $ay)) {
+            return false;
+        }
+        try {
+            $stmt = $pdo->prepare(
+                "SELECT id FROM aylik_bildirim_onaylari
+                 WHERE sube_id = :sube_id AND ay = :ay AND state = 'TAMAMLANDI'
+                 LIMIT 1"
+            );
+            $stmt->execute(['sube_id' => $subeId, 'ay' => $ay]);
+
+            return $stmt->fetch(PDO::FETCH_ASSOC) !== false;
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    /**
      * @param mixed $value
      * @return string
      */

@@ -59,6 +59,8 @@ export type MePuantajOzet = {
     fazla_calisma_dakika_toplam: number;
   /** Authoritative monthly net minutes. Null when the backend has no net figure. */
   net_calisma_dakika_toplam: number | null;
+  /** Ay sonu amir onayı (aylik_bildirim_onaylari, state TAMAMLANDI) bu şube/ay için tamamlandıysa true. */
+  aylik_onayli_mi?: boolean;
 };
 
 export type MePuantajResponse = {

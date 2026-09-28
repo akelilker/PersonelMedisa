@@ -1809,3 +1809,17 @@ body.modal-open .modal-container--self-product .modal-header {
   margin: 0;
   text-align: center;
 }
+
+@media (min-width: 641px) {
+  .qr-history-cell {
+    min-height: 34px;
+  }
+
+  .qr-history-cell--empty {
+    min-height: 34px;
+  }
+
+  .qr-history-page .pm-leave-detail {
+    gap: 4px;
+  }
+}

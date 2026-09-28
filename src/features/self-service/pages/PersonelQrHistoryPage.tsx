@@ -180,6 +180,7 @@ export function PersonelQrHistoryPage() {
   const [notice, setNotice] = useState<{ title: string; body: string } | null>(null);
   const [monthFacts, setMonthFacts] = useState<SelfServiceFact[]>([]);
   const [puantajByDate, setPuantajByDate] = useState<Map<string, MePuantajGun>>(new Map());
+  const [aylikOnayliMi, setAylikOnayliMi] = useState(false);
 
   const loadMonth = useCallback(async (year: number, month: number) => {
     setStatus({ kind: "loading" });
@@ -194,10 +195,13 @@ export function PersonelQrHistoryPage() {
         fetchMePuantaj({ from, to }).catch(() => null),
         fetchMeFazlaCalisma({ from, to }).catch(() => null)
       ]);
+      setAylikOnayliMi(Boolean(puantaj?.ozet.aylik_onayli_mi));
       setMonthFacts(
         buildHistoryMonthSummary({
           ozet: puantaj?.ozet ?? null,
-          fazlaDonemDakika: fazla?.donem_ozet ? fazla.donem_ozet.fazla_calisma_dakika_toplam : null
+          fazlaDonemDakika: fazla?.donem_ozet ? fazla.donem_ozet.fazla_calisma_dakika_toplam : null,
+          puantajItems: puantaj?.items ?? [],
+          qrDays: days
         })
       );
       setPuantajByDate(new Map((puantaj?.items ?? []).map((item) => [item.tarih, item])));
@@ -214,6 +218,7 @@ export function PersonelQrHistoryPage() {
       });
       setMonthFacts([]);
       setPuantajByDate(new Map());
+      setAylikOnayliMi(false);
     }
   }, []);
 
@@ -244,7 +249,13 @@ export function PersonelQrHistoryPage() {
 
   const selectedDay = selectedDate ? daysByDate.get(selectedDate) ?? null : null;
   const selectedEvents = dayEvents(selectedDay);
-  const selectedWorkFacts = selectedDate ? buildHistoryDayWorkFacts(puantajByDate.get(selectedDate) ?? null) : [];
+  const selectedWorkFacts = selectedDate
+    ? buildHistoryDayWorkFacts(
+        puantajByDate.get(selectedDate) ?? null,
+        daysByDate.get(selectedDate) ?? null,
+        aylikOnayliMi
+      )
+    : [];
 
   function shiftMonth(delta: number) {
     const cursor = new Date(viewYear, viewMonth - 1 + delta, 1);

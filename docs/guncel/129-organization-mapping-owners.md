@@ -291,7 +291,7 @@ MariaDB testi bunu doğrudan doğrular (üç lokasyon eşlenmemişken `data_read
 | Workflow | Yetki |
 | --- | --- |
 | `.github/workflows/ops-organization-inventory.yml` | Yalnız envanter. Tek mod, mutation yetkisi yok, mapping request'i yazamaz. Satır verisi log'a değil artifact'a gider. |
-| `.github/workflows/apply-organization-mapping.yml` | Preflight veya apply. Explicit confirmation, exact authorized SHA, spec path allowlist'i, inventory checksum pin'i. Apply yolunda zorunlu backup + postcheck. |
+| ~~`.github/workflows/apply-organization-mapping.yml`~~ | **Kaldırıldı (2026-09):** tek seferlik production mapping apply tamamlandı; workflow artık repoda yok. Worker/API owner'ları geçmiş operasyon için dokümante kalır. |
 
 ### Publication boundary (repository visibility)
 
@@ -302,7 +302,7 @@ bir dosya olduğu için public repository'de spec'in taşıdığı satır preima
 da açıktır. Bu yüzden "artifact private'dır" mutlak bir iddia **değildir**;
 gizlilik tamamen repository visibility'sine bağlıdır.
 
-Her iki workflow da bunu fail-closed uygular. Guard, GitHub'ın canonical
+Envanter workflow'u bunu fail-closed uygular (mapping workflow kaldırıldı). Guard, GitHub'ın canonical
 repository context'ini (`github.event.repository.private`) okur — input'la
 override edilemez — ve repository private değilse operasyon checkout'tan,
 herhangi bir FTP temasından ve control-plane request'inden **önce** durur:
@@ -310,7 +310,7 @@ herhangi bir FTP temasından ve control-plane request'inden **önce** durur:
 | Workflow | Public repository davranışı | Reason code |
 | --- | --- | --- |
 | `ops-organization-inventory.yml` | Envanter operasyonu hiç başlamaz; production'dan satır verisi istenmez, artifact upload adımına erişilemez. | `PUBLIC_REPOSITORY_ARTIFACT_EXPOSURE` |
-| `apply-organization-mapping.yml` | Mapping operasyonu hiç başlamaz; spec preimage'ları production'a gitmez, evidence artifact yayınlanmaz. | `PUBLIC_REPOSITORY_SPEC_TRANSPORT_UNSAFE` |
+| ~~`apply-organization-mapping.yml`~~ (kaldırıldı) | Eski mapping workflow'u için: mapping operasyonu hiç başlamazdı; spec preimage'ları production'a gitmezdi. | `PUBLIC_REPOSITORY_SPEC_TRANSPORT_UNSAFE` |
 
 Guard yalnız upload adımını atlamaz, tüm operasyonu durdurur. `retention-days`
 düşürmek, artifact adını gizlemek veya yalnızca uyarmak güvenlik kontrolü olarak

@@ -9,7 +9,6 @@ const postcheck = read("api/src/Services/Operations/FinalClosePostcheck.php");
 const transport = read("api/src/Services/Operations/FinalCloseTransport.php");
 const service = read("api/src/Services/Operations/FinalCloseService.php");
 const control = read("scripts/ops/final-close-control.py");
-const workflow = read(".github/workflows/final-close.yml");
 
 /** The fail-closed guard the mutation path uses: first mismatch, generic token. */
 const guard = snapshot.slice(
@@ -288,7 +287,6 @@ describe("final-close preimage drift attribution", () => {
     expect(readIndex).toBeGreaterThan(-1);
     expect(raiseIndex).toBeGreaterThan(readIndex);
     expect(transport).toContain("/^[A-Z0-9_]{1,100}$/D");
-    expect(workflow).toContain("options: [FINAL_CLOSE_PREFLIGHT, FINAL_CLOSE_APPLY]");
   });
 
   it("leaves the apply-phase postcheck and the approved business values untouched", () => {

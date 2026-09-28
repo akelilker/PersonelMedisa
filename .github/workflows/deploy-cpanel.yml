@@ -15,7 +15,7 @@ on:
         default: false
 
 concurrency:
-  group: deploy-cpanel-production
+  group: deploy-cpanel
   cancel-in-progress: false
 
 # Ops: push to main retriggers this workflow when manual dispatch/rerun is unavailable.

@@ -75,6 +75,21 @@ describe("PERSONEL_SELF_SERVICE_PRODUCT_UX_V2 notification + policy owners", () 
     expect(shell).toContain('variant={isPersonelShellRole ? "personel-shell" : "default"}');
     expect(shell).toContain("app-personel-shell");
 
+    const hero = read("src/components/hero/Hero.tsx");
+    expect(hero).toContain('data-testid="hero-panel-subtitle"');
+    expect(hero).toContain("KULLANICI PANELİ");
+
+    const heroCss = read("src/styles/components/hero.css");
+    expect(heroCss).toMatch(
+      /body\.app-home-route \.hero\.hero--personel-shell \.hero-logo\s*\{[^}]*transform:\s*translate\(-3px,\s*0\)/s
+    );
+    expect(heroCss).toMatch(
+      /body\.app-home-route \.hero\.hero--personel-shell \.hero-title-stack \.hero-panel-subtitle\s*\{[^}]*letter-spacing:\s*4px/s
+    );
+    expect(heroCss).toMatch(
+      /body\.app-home-route \.hero\.hero--personel-shell \.hero-title-stack \.hero-panel-subtitle\s*\{[^}]*font-size:\s*calc\(17px - 0\.7pt - 0\.5pt\)/s
+    );
+
     const header = read("src/components/shell/ShellHeaderActions.tsx");
     expect(header).toContain('subeControl.kind === "multi" && !isPersonelRole');
     expect(header).toContain("showPersonelHomeLogout");

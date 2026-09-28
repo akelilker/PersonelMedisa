@@ -44,6 +44,11 @@ export function Hero({ title, userLabel, subeLabel, variant = "default" }: HeroP
       </div>
       <div className="hero-title-stack">
         <h1>{title}</h1>
+        {personelShell ? (
+          <p className="hero-panel-subtitle" data-testid="hero-panel-subtitle">
+            KULLANICI PANELİ
+          </p>
+        ) : null}
         <div className="animated-line" aria-hidden="true" />
       </div>
       {trimmedSubeLabel ? (

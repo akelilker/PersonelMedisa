@@ -74,8 +74,8 @@ export type AttendanceTodayResponse = {
 
 export type AttendanceAnomaly = {
   identity: string;
-  source_event_id: number;
-  anomaly_type: "MISSING_CIKIS" | "MISSING_GIRIS";
+  source_event_id: number | null;
+  anomaly_type: "MISSING_CIKIS" | "MISSING_GIRIS" | "NO_EVENT_DAY";
   correction_hint: string;
   business_date: string;
   business_date_label: string;
@@ -121,10 +121,11 @@ export async function fetchAttendanceToday(): Promise<AttendanceTodayResponse> {
 }
 
 export async function createAttendanceCorrection(payload: {
-  source_event_id: number;
+  source_event_id?: number | null;
+  business_date?: string;
   requested_local_time: string;
   explanation?: string;
-  anomaly_type?: "MISSING_CIKIS" | "MISSING_GIRIS";
+  anomaly_type?: "MISSING_CIKIS" | "MISSING_GIRIS" | "NO_EVENT_DAY";
 }): Promise<{ id: number; message: string; status: string }> {
   const response = await apiRequest<ApiResponse<unknown>>(endpoints.me.attendanceCorrectionRequests, {
     method: "POST",

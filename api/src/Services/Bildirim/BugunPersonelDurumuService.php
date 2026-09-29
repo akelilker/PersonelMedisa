@@ -6,6 +6,7 @@ namespace Medisa\Api\Services\Bildirim;
 
 use Medisa\Api\Http\Request;
 use Medisa\Api\Scope\OrgScope;
+use Medisa\Api\Services\Attendance\AttendanceBusinessDayService;
 use Medisa\Api\Services\Organizasyon\SubeReadModel;
 use Medisa\Api\Services\PuantajDonemPeriodService;
 use DateTimeImmutable;
@@ -897,6 +898,41 @@ class BugunPersonelDurumuService
         $tur = strtoupper(trim((string) $exceptionTur));
         if (in_array($tur, ['IZINLI', 'RAPORLU', 'GELMEDI'], true)) {
             return ['bekleniyor' => false, 'neden' => $tur];
+        }
+
+        return ['bekleniyor' => true, 'neden' => null];
+    }
+
+    /**
+     * Canonical "is this person expected to work on this business date?"
+     *
+     * Process state (izin / rapor / iş kazası / recorded absence) and the
+     * business-day calendar (hafta tatili, UBGT) are one tri-state answer.
+     * true = expected, false = not expected, null = unresolved (fail closed).
+     * A process exception stays false even when the calendar cannot be resolved.
+     * A positive process with an unresolved calendar stays null.
+     *
+     * @return array{bekleniyor: bool|null, neden: string|null}
+     */
+    public static function calismaBeklentisiForPersonelDate(PDO $pdo, $personelId, $ymd)
+    {
+        $ymd = (string) $ymd;
+        $personelId = (int) $personelId;
+        $cover = self::fetchCoveringSurecExceptionMap($pdo, [$personelId], $ymd);
+        $exceptionTur = ($cover['resolved'] && isset($cover['map'][$personelId]))
+            ? $cover['map'][$personelId]
+            : null;
+        $process = self::calismaBeklentisiFromCover($cover['resolved'], $exceptionTur);
+        if ($process['bekleniyor'] !== true) {
+            return $process;
+        }
+
+        $calendar = AttendanceBusinessDayService::resolveWorkDay($pdo, $ymd);
+        if ($calendar === false) {
+            return ['bekleniyor' => false, 'neden' => null];
+        }
+        if ($calendar !== true) {
+            return ['bekleniyor' => null, 'neden' => null];
         }
 
         return ['bekleniyor' => true, 'neden' => null];

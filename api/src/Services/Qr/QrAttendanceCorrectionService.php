@@ -46,10 +46,25 @@ class QrAttendanceCorrectionService
      */
     public static function createRequest(PDO $pdo, array $authUser, array $body)
     {
+        $anomalyType = isset($body['anomaly_type']) ? strtoupper(trim((string) $body['anomaly_type'])) : '';
+        if ($anomalyType === QrAttendanceUnresolvedAnomalyService::ANOMALY_NO_EVENT_DAY
+            && !QrAttendanceUnresolvedAnomalyService::dayKeySchemaReady($pdo)
+        ) {
+            throw new QrAttendanceException(
+                'NO_EVENT_DAY_SCHEMA_NOT_READY',
+                'Giris kaydi olmayan gun icin duzeltme semasi hazir degil.',
+                503,
+                'anomaly_type'
+            );
+        }
         self::assertSchemaReady($pdo);
         $ctx = SelfPersonelContext::resolveForSelfService($authUser, $pdo, true);
         $caps = PersonelMobileCapabilityService::resolve($pdo, (int) $ctx['personel_id'], $ctx);
         PersonelMobileCapabilityService::assertBusinessCapability($caps, PersonelMobileCapabilityService::CAP_ATTENDANCE_CORRECT);
+
+        if ($anomalyType === QrAttendanceUnresolvedAnomalyService::ANOMALY_NO_EVENT_DAY) {
+            return self::createNoEventDayRequest($pdo, $authUser, $ctx, $body);
+        }
 
         $sourceEventId = isset($body['source_event_id']) ? (int) $body['source_event_id'] : 0;
         $requestedLocal = isset($body['requested_local_time']) ? trim((string) $body['requested_local_time']) : '';
@@ -243,6 +258,197 @@ class QrAttendanceCorrectionService
     }
 
     /**
+     * Day-keyed correction for a business date with zero QR events.
+     * Does not insert a raw or synthetic QR event. Approval reuses applyEffectiveTime.
+     *
+     * @param array<string, mixed> $authUser
+     * @param array<string, mixed> $ctx
+     * @param array<string, mixed> $body
+     * @return array<string, mixed>
+     */
+    private static function createNoEventDayRequest(PDO $pdo, array $authUser, array $ctx, array $body)
+    {
+        if (!QrAttendanceUnresolvedAnomalyService::dayKeySchemaReady($pdo)) {
+            throw new QrAttendanceException(
+                'NO_EVENT_DAY_SCHEMA_NOT_READY',
+                'Giris kaydi olmayan gun icin duzeltme semasi hazir degil.',
+                503,
+                'anomaly_type'
+            );
+        }
+        $requestedLocal = isset($body['requested_local_time']) ? trim((string) $body['requested_local_time']) : '';
+        $explanation = isset($body['explanation']) ? trim((string) $body['explanation']) : '';
+        if ($explanation === '') {
+            $explanation = null;
+        } elseif (mb_strlen($explanation) > 500) {
+            throw new QrAttendanceException('VALIDATION_ERROR', 'Aciklama en fazla 500 karakter olabilir.', 400, 'explanation');
+        }
+        if (!preg_match('/^([01]\d|2[0-3]):([0-5]\d)$/', $requestedLocal)) {
+            throw new QrAttendanceException('VALIDATION_ERROR', 'requested_local_time HH:MM olmalidir.', 400, 'requested_local_time');
+        }
+        $businessDate = isset($body['business_date']) ? trim((string) $body['business_date']) : '';
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $businessDate)) {
+            throw new QrAttendanceException('VALIDATION_ERROR', 'business_date zorunludur.', 400, 'business_date');
+        }
+
+        $anomaly = self::requireUnresolvedNoEventDay($pdo, (int) $ctx['personel_id'], $businessDate);
+        $asOfUtc = self::noEventAsOfUtc($anomaly, $businessDate);
+        $historical = PersonelOperationalContextService::resolveAt($pdo, (int) $ctx['personel_id'], $asOfUtc);
+        $approverCtx = $ctx;
+        $approverCtx['sube_id'] = $historical['effective']['sube_id'] ?? 0;
+        $approverCtx['bolum_id'] = $historical['effective']['bolum_id'];
+        $approverCtx['birim_id'] = $historical['effective']['birim_id'];
+        $approverCtx['departman_id'] = $historical['effective']['departman_id'];
+        $approver = AttendanceCorrectionApproverResolver::resolve($pdo, $authUser, $approverCtx);
+        if ($approver === null) {
+            throw new QrAttendanceException(
+                'CORRECTION_NO_APPROVER',
+                'Uygun bagimsiz yonetici bulunamadi. Talep olusturulamadi.',
+                409
+            );
+        }
+
+        $requestedUtc = self::localTimeOnBusinessDateToUtc($businessDate, $requestedLocal);
+        $nowUtc = self::utcNow();
+        $reminderDue = (new \DateTimeImmutable($nowUtc, new \DateTimeZone('UTC')))
+            ->modify('+' . self::REMINDER_MINUTES . ' minutes')
+            ->format('Y-m-d H:i:s.u');
+
+        try {
+            $ins = $pdo->prepare(
+                'INSERT INTO qr_attendance_correction_requests
+                    (personel_id, requester_user_id, source_event_id, event_type, anomaly_type, business_date,
+                     original_occurred_at_utc, requested_local_time, requested_occurred_at_utc,
+                     explanation, status, assigned_approver_user_id, assigned_approver_role,
+                     reminder_due_at_utc)
+                 VALUES
+                    (:personel_id, :requester_user_id, NULL, \'GIRIS\', :anomaly_type, :business_date,
+                     NULL, :requested_local_time, :requested_occurred_at_utc,
+                     :explanation, \'BEKLIYOR\', :assigned_approver_user_id, :assigned_approver_role,
+                     :reminder_due_at_utc)'
+            );
+            $ins->execute([
+                'personel_id' => (int) $ctx['personel_id'],
+                'requester_user_id' => (int) $authUser['id'],
+                'anomaly_type' => QrAttendanceUnresolvedAnomalyService::ANOMALY_NO_EVENT_DAY,
+                'business_date' => $businessDate,
+                'requested_local_time' => $requestedLocal,
+                'requested_occurred_at_utc' => $requestedUtc,
+                'explanation' => $explanation,
+                'assigned_approver_user_id' => (int) $approver['user_id'],
+                'assigned_approver_role' => (string) $approver['rol'],
+                'reminder_due_at_utc' => $reminderDue,
+            ]);
+        } catch (PDOException $e) {
+            $code = isset($e->errorInfo[1]) ? (int) $e->errorInfo[1] : 0;
+            if ($code === 1062 || $code === 19) {
+                throw new QrAttendanceException(
+                    'CORRECTION_PENDING_EXISTS',
+                    'Bu hareket icin bekleyen duzeltme talebi var.',
+                    409,
+                    'business_date'
+                );
+            }
+            throw $e;
+        }
+
+        $requestId = (int) $pdo->lastInsertId();
+        $personelName = (string) $ctx['ad_soyad'];
+        $note = sprintf(
+            '%s, %s tarihinde giriş/çıkış kaydı yok. Talep edilen giriş %s.',
+            $personelName,
+            (string) ($anomaly['business_date_label'] ?? $businessDate),
+            $requestedLocal
+        );
+        if ($explanation !== null) {
+            $note .= ' ' . $explanation;
+        }
+        PersonelInboxNotificationService::create(
+            $pdo,
+            (int) $approver['user_id'],
+            'ATTENDANCE_CORRECTION_REQUEST',
+            'Puantaj Düzeltme Talebi',
+            $note,
+            (int) $ctx['personel_id'],
+            $requestId,
+            [
+                'source_event_id' => null,
+                'event_type' => 'GIRIS',
+                'anomaly_type' => QrAttendanceUnresolvedAnomalyService::ANOMALY_NO_EVENT_DAY,
+                'business_date' => $businessDate,
+                'original_local_time' => null,
+                'requested_local_time' => $requestedLocal,
+                'personel_ad_soyad' => $personelName,
+            ],
+            true
+        );
+
+        return self::publicRequest($pdo, $requestId);
+    }
+
+    /**
+     * Org as-of instant for a day with no QR event. Planned exit when present,
+     * otherwise noon on that business date. Never a fabricated scan.
+     *
+     * @param array<string,mixed> $anomaly
+     */
+    private static function noEventAsOfUtc(array $anomaly, $businessDate)
+    {
+        if (!empty($anomaly['planned_exit_local'])) {
+            try {
+                return (new \DateTimeImmutable((string) $anomaly['planned_exit_local']))
+                    ->setTimezone(new \DateTimeZone('UTC'))
+                    ->format('Y-m-d H:i:s.u');
+            } catch (\Throwable $e) {
+                // Fall through to noon on the business date.
+            }
+        }
+        $local = \DateTimeImmutable::createFromFormat(
+            'Y-m-d H:i:s',
+            (string) $businessDate . ' 12:00:00',
+            new \DateTimeZone('Europe/Istanbul')
+        );
+        if ($local === false) {
+            throw new QrAttendanceException('VALIDATION_ERROR', 'business_date zorunludur.', 400, 'business_date');
+        }
+
+        return $local->setTimezone(new \DateTimeZone('UTC'))->format('Y-m-d H:i:s.u');
+    }
+
+    /**
+     * @return array<string,mixed>
+     */
+    private static function requireUnresolvedNoEventDay(PDO $pdo, $personelId, $businessDate)
+    {
+        $items = QrAttendanceUnresolvedAnomalyService::listForPersonel($pdo, (int) $personelId);
+        foreach ($items as $item) {
+            if ((string) ($item['anomaly_type'] ?? '') !== QrAttendanceUnresolvedAnomalyService::ANOMALY_NO_EVENT_DAY) {
+                continue;
+            }
+            if ((string) ($item['business_date'] ?? '') !== (string) $businessDate) {
+                continue;
+            }
+            if (!empty($item['pending_request_id'])) {
+                throw new QrAttendanceException(
+                    'CORRECTION_PENDING_EXISTS',
+                    'Bu hareket icin bekleyen duzeltme talebi var.',
+                    409,
+                    'business_date'
+                );
+            }
+
+            return $item;
+        }
+
+        throw new QrAttendanceException(
+            'ANOMALY_NOT_UNRESOLVED',
+            'Bu kayit icin acik giris/cikis anomalisi yok.',
+            409,
+            'business_date'
+        );
+    }
+
+    /**
      * @param array<string, mixed> $authUser
      * @param array<string, mixed> $body
      * @return array<string, mixed>
@@ -416,7 +622,7 @@ class QrAttendanceCorrectionService
                 $requestId,
                 [
                     'status' => $action === 'ONAYLA' ? 'ONAYLANDI' : 'UYGUN_GORULMEDI',
-                    'original_local_time' => self::istanbulHhmm((string) $row['original_occurred_at_utc']),
+                    'original_local_time' => self::originalLocalTime($row['original_occurred_at_utc'] ?? null),
                     'requested_local_time' => (string) $row['requested_local_time'],
                     'event_type' => (string) $row['event_type'],
                 ],
@@ -464,16 +670,26 @@ class QrAttendanceCorrectionService
             if (!is_array($row)) {
                 continue;
             }
-            $originalLocal = self::istanbulHhmm((string) $row['original_occurred_at_utc']);
+            $originalLocal = self::originalLocalTime($row['original_occurred_at_utc'] ?? null);
             $personelName = self::loadPersonelName($pdo, (int) $row['personel_id']);
             $eventLabel = ((string) $row['event_type'] === 'CIKIS') ? 'çıkış' : 'giriş';
-            $body = sprintf(
-                '%s, %s olan %s saatini %s olarak güncellemek istiyor. (Hatırlatma)',
-                $personelName,
-                $originalLocal,
-                $eventLabel,
-                (string) $row['requested_local_time']
-            );
+            if ($originalLocal === null) {
+                $body = sprintf(
+                    '%s, %s tarihinde kaydı olmayan %s saatini %s olarak güncellemek istiyor. (Hatırlatma)',
+                    $personelName,
+                    (string) ($row['business_date'] ?? ''),
+                    $eventLabel,
+                    (string) $row['requested_local_time']
+                );
+            } else {
+                $body = sprintf(
+                    '%s, %s olan %s saatini %s olarak güncellemek istiyor. (Hatırlatma)',
+                    $personelName,
+                    $originalLocal,
+                    $eventLabel,
+                    (string) $row['requested_local_time']
+                );
+            }
             PersonelInboxNotificationService::create(
                 $pdo,
                 (int) $row['assigned_approver_user_id'],
@@ -512,9 +728,9 @@ class QrAttendanceCorrectionService
     private static function resolvePeriodLockContext(PDO $pdo, $requestId)
     {
         $stmt = $pdo->prepare(
-            'SELECT e.sube_id, r.business_date
+            'SELECT r.personel_id, r.business_date, r.source_event_id, e.sube_id AS event_sube_id
              FROM qr_attendance_correction_requests r
-             INNER JOIN qr_attendance_events e ON e.id = r.source_event_id
+             LEFT JOIN qr_attendance_events e ON e.id = r.source_event_id
              WHERE r.id = :id
              LIMIT 1'
         );
@@ -523,9 +739,25 @@ class QrAttendanceCorrectionService
         if (!is_array($row)) {
             throw new QrAttendanceException('NOT_FOUND', 'Duzeltme talebi bulunamadi.', 404);
         }
+        $subeId = (int) ($row['event_sube_id'] ?? 0);
+        if ($subeId <= 0) {
+            $asOf = \DateTimeImmutable::createFromFormat(
+                'Y-m-d H:i:s',
+                (string) $row['business_date'] . ' 12:00:00',
+                new \DateTimeZone('Europe/Istanbul')
+            );
+            $asOfUtc = $asOf === false
+                ? self::utcNow()
+                : $asOf->setTimezone(new \DateTimeZone('UTC'))->format('Y-m-d H:i:s.u');
+            $historical = PersonelOperationalContextService::resolveAt($pdo, (int) $row['personel_id'], $asOfUtc);
+            $subeId = (int) ($historical['effective']['sube_id'] ?? 0);
+        }
+        if ($subeId <= 0) {
+            throw new QrAttendanceException('NOT_FOUND', 'Duzeltme talebi bulunamadi.', 404);
+        }
 
         return [
-            'sube_id' => (int) $row['sube_id'],
+            'sube_id' => $subeId,
             'business_date' => (string) $row['business_date'],
         ];
     }
@@ -577,11 +809,13 @@ class QrAttendanceCorrectionService
         return [
             'id' => (int) $row['id'],
             'personel_id' => (int) $row['personel_id'],
-            'source_event_id' => (int) $row['source_event_id'],
+            'source_event_id' => $row['source_event_id'] !== null ? (int) $row['source_event_id'] : null,
             'event_type' => (string) $row['event_type'],
             'business_date' => (string) $row['business_date'],
-            'original_occurred_at' => self::formatClient((string) $row['original_occurred_at_utc']),
-            'original_local_time' => self::istanbulHhmm((string) $row['original_occurred_at_utc']),
+            'original_occurred_at' => $row['original_occurred_at_utc'] !== null
+                ? self::formatClient((string) $row['original_occurred_at_utc'])
+                : null,
+            'original_local_time' => self::originalLocalTime($row['original_occurred_at_utc'] ?? null),
             'requested_local_time' => (string) $row['requested_local_time'],
             'status' => (string) $row['status'],
             'status_label' => self::statusLabel((string) $row['status']),
@@ -670,6 +904,16 @@ class QrAttendanceCorrectionService
         }
 
         return trim((string) ($row['ad'] ?? '') . ' ' . (string) ($row['soyad'] ?? ''));
+    }
+
+    private static function originalLocalTime($utc)
+    {
+        $raw = $utc === null ? '' : trim((string) $utc);
+        if ($raw === '') {
+            return null;
+        }
+
+        return self::istanbulHhmm($raw);
     }
 
     private static function istanbulDate($utc)

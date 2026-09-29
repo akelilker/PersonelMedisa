@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Medisa\Api\Services\SelfService;
 
 use Medisa\Api\Database\Connection;
+use Medisa\Api\Services\Qr\QrAttendanceUnresolvedAnomalyService;
 use PDO;
 use PDOException;
 
@@ -82,6 +83,8 @@ class PersonelInboxNotificationService
      * CLI tick receives a duplicate-key error and creates nothing.
      *
      * @param array<string, mixed>|null $payload
+     * @param string|null $businessDate day-key identity; null keeps the event-key insert
+     * @param string|null $anomalyType day-key type; NO_EVENT_DAY does not store a source event id
      * @return int new id, or 0 when the anomaly notification already exists
      */
     public static function createAnomaly(
@@ -93,37 +96,70 @@ class PersonelInboxNotificationService
         $personelId,
         $sourceEventId,
         $audience,
-        array $payload = null
+        array $payload = null,
+        $businessDate = null,
+        $anomalyType = null
     ) {
-        self::assertSchemaReady($pdo);
         $sourceEventId = (int) $sourceEventId;
         $audience = trim((string) $audience);
-        if ((int) $recipientUserId <= 0 || $sourceEventId <= 0 || $audience === '') {
+        $businessDate = $businessDate !== null ? trim((string) $businessDate) : '';
+        $anomalyType = $anomalyType !== null ? trim((string) $anomalyType) : '';
+        $dayKeyed = $anomalyType !== '' && $businessDate !== '';
+        if ((int) $recipientUserId <= 0 || $audience === '' || (!$dayKeyed && $sourceEventId <= 0)) {
             return 0;
         }
+        if ($dayKeyed && !QrAttendanceUnresolvedAnomalyService::dayKeySchemaReady($pdo)) {
+            return 0;
+        }
+        self::assertSchemaReady($pdo);
         $now = self::utcNow();
         try {
-            $stmt = $pdo->prepare(
-                'INSERT INTO personel_inbox_notifications
-                    (recipient_user_id, personel_id, kind, title, body, payload_json,
-                     anomaly_source_event_id, anomaly_audience,
-                     related_correction_id, status, popup_required, reminder_of_notification_id, created_at_utc)
-                 VALUES
-                    (:recipient_user_id, :personel_id, :kind, :title, :body, :payload_json,
-                     :anomaly_source_event_id, :anomaly_audience,
-                     NULL, \'ACTIVE\', 1, NULL, :created_at_utc)'
-            );
-            $stmt->execute([
-                'recipient_user_id' => (int) $recipientUserId,
-                'personel_id' => $personelId !== null && (int) $personelId > 0 ? (int) $personelId : null,
-                'kind' => (string) $kind,
-                'title' => (string) $title,
-                'body' => (string) $body,
-                'payload_json' => $payload !== null ? json_encode($payload, JSON_UNESCAPED_UNICODE) : null,
-                'anomaly_source_event_id' => $sourceEventId,
-                'anomaly_audience' => $audience,
-                'created_at_utc' => $now,
-            ]);
+            if ($dayKeyed) {
+                $stmt = $pdo->prepare(
+                    'INSERT INTO personel_inbox_notifications
+                        (recipient_user_id, personel_id, kind, title, body, payload_json,
+                         anomaly_source_event_id, anomaly_audience, anomaly_type, anomaly_business_date,
+                         related_correction_id, status, popup_required, reminder_of_notification_id, created_at_utc)
+                     VALUES
+                        (:recipient_user_id, :personel_id, :kind, :title, :body, :payload_json,
+                         NULL, :anomaly_audience, :anomaly_type, :anomaly_business_date,
+                         NULL, \'ACTIVE\', 1, NULL, :created_at_utc)'
+                );
+                $stmt->execute([
+                    'recipient_user_id' => (int) $recipientUserId,
+                    'personel_id' => $personelId !== null && (int) $personelId > 0 ? (int) $personelId : null,
+                    'kind' => (string) $kind,
+                    'title' => (string) $title,
+                    'body' => (string) $body,
+                    'payload_json' => $payload !== null ? json_encode($payload, JSON_UNESCAPED_UNICODE) : null,
+                    'anomaly_audience' => $audience,
+                    'anomaly_type' => $anomalyType,
+                    'anomaly_business_date' => $businessDate,
+                    'created_at_utc' => $now,
+                ]);
+            } else {
+                $stmt = $pdo->prepare(
+                    'INSERT INTO personel_inbox_notifications
+                        (recipient_user_id, personel_id, kind, title, body, payload_json,
+                         anomaly_source_event_id, anomaly_audience,
+                         related_correction_id, status, popup_required, reminder_of_notification_id, created_at_utc)
+                     VALUES
+                        (:recipient_user_id, :personel_id, :kind, :title, :body, :payload_json,
+                         :anomaly_source_event_id, :anomaly_audience,
+                         NULL, \'ACTIVE\', 1, NULL, :created_at_utc)'
+                );
+                $stmt->execute([
+                    'recipient_user_id' => (int) $recipientUserId,
+                    'personel_id' => $personelId !== null && (int) $personelId > 0 ? (int) $personelId : null,
+                    'kind' => (string) $kind,
+                    'title' => (string) $title,
+                    'body' => (string) $body,
+                    'payload_json' => $payload !== null ? json_encode($payload, JSON_UNESCAPED_UNICODE) : null,
+                    'anomaly_source_event_id' => $sourceEventId,
+                    'anomaly_audience' => $audience,
+                    'created_at_utc' => $now,
+                ]);
+            }
         } catch (PDOException $e) {
             if (self::isAnomalyDedupeViolation($e)) {
                 return 0;

@@ -18,7 +18,7 @@ describe("SGK employer reporting-period canonical owner", () => {
     const migrations = readdirSync(resolve(root, "api/migrations"))
       .filter((name) => /^\d{3}_.+\.sql$/.test(name))
       .sort();
-    expect(migrations.at(-1)).toBe("093_attendance_anomaly_notification_dedupe.sql");
+    expect(migrations.at(-1)).toBe("094_attendance_no_event_day.sql");
     expect(migrations.filter((name) => name.startsWith("090_"))).toHaveLength(1);
     expect(migrations.filter((name) => name.startsWith("091_"))).toHaveLength(1);
 

@@ -71,12 +71,21 @@ export function AttendanceCorrectionRequestModal({
         void (async () => {
           setBusy(true);
           try {
-            const result = await createAttendanceCorrection({
-              source_event_id: eventId,
-              requested_local_time: correctTime,
-              explanation: explanation.trim() || undefined,
-              anomaly_type: anomaly?.anomaly_type
-            });
+            const result = await createAttendanceCorrection(
+              anomaly?.anomaly_type === "NO_EVENT_DAY"
+                ? {
+                    business_date: anomaly.business_date,
+                    requested_local_time: correctTime,
+                    explanation: explanation.trim() || undefined,
+                    anomaly_type: "NO_EVENT_DAY"
+                  }
+                : {
+                    source_event_id: eventId,
+                    requested_local_time: correctTime,
+                    explanation: explanation.trim() || undefined,
+                    anomaly_type: anomaly?.anomaly_type
+                  }
+            );
             onClose();
             onSuccess(result.message || "Düzeltme Talebiniz Amirinize İletildi.");
           } catch (cause) {
@@ -101,15 +110,17 @@ export function AttendanceCorrectionRequestModal({
       {anomaly ? (
         <div className="pm-correct-context" data-testid="attendance-anomaly-prefill">
           <p>Tarih: {anomaly.business_date_label}</p>
-          <p>
-            {anomaly.context_event_type === "GIRIS" ? "Mevcut giriş" : "Mevcut çıkış"}:{" "}
-            {anomaly.context_local_time}
-          </p>
+          {anomaly.anomaly_type === "NO_EVENT_DAY" ? null : (
+            <p>
+              {anomaly.context_event_type === "GIRIS" ? "Mevcut giriş" : "Mevcut çıkış"}:{" "}
+              {anomaly.context_local_time}
+            </p>
+          )}
           <p>Sorun: {anomaly.problem}</p>
         </div>
       ) : null}
       <label className="pm-correct-label">
-        {anomaly?.anomaly_type === "MISSING_GIRIS"
+        {anomaly?.anomaly_type === "MISSING_GIRIS" || anomaly?.anomaly_type === "NO_EVENT_DAY"
           ? "Talep edilen giriş"
           : anomaly
             ? "Talep edilen çıkış"

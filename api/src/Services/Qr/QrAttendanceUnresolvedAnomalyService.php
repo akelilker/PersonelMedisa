@@ -19,10 +19,11 @@ use PDO;
  * resolution, and the one identity every surface reads:
  *   {anomaly_type}:{source_event_id}
  *
- * LOOKBACK_DAYS bounds discovery of new raw events. It is not an expiry.
- * An unpaired source event stays unresolved at any age until an ONAYLANDI
- * correction closes it. A calendar day with no QR event has no source_event_id
- * and is not represented here.
+ * LOOKBACK_DAYS bounds discovery of new raw events and new zero-event days.
+ * It is not an expiry. An unpaired source event, and a NO_EVENT_DAY that has
+ * already been notified, stay unresolved at any age until an ONAYLANDI
+ * correction closes them. NO_EVENT_DAY has no source QR event. Its identity is
+ * personel + business date + NO_EVENT_DAY. Fake QR rows are never inserted.
  *
  * CLI notification, Talepler badge, anomaly card, correction prefill and
  * duplicate detection all consume listForPersonel(). No second calculator.
@@ -30,6 +31,13 @@ use PDO;
 class QrAttendanceUnresolvedAnomalyService
 {
     public const THRESHOLD_MINUTES = 180;
+    /**
+     * Zero-event finalization. Independent of THRESHOLD_MINUTES and of
+     * MEDISA_ATTENDANCE_ANOMALY_THRESHOLD_MINUTES (that env is the open
+     * GİRİŞ / missing ÇIKIŞ gate only).
+     */
+    public const NO_EVENT_DAY_FINALIZATION_MINUTES = 30;
+    public const ANOMALY_NO_EVENT_DAY = 'NO_EVENT_DAY';
     /** Discovery window for new raw events. Previously unpaired events are not dropped when they age out of this window. */
     public const LOOKBACK_DAYS = 8;
     public const NOTIFICATION_KIND = 'ATTENDANCE_ANOMALY';
@@ -38,6 +46,20 @@ class QrAttendanceUnresolvedAnomalyService
     public const PERSONEL_TITLE = 'Olağan Dışı Giriş/Çıkış Kaydı';
     public const PERSONEL_BODY = 'Talep oluşturarak amirinizle görüşebilirsiniz.';
     public const LIVE_WARNING = 'Günlük Çalışma Süresi Doldu. Çıkış Yapmanız Gerekmektedir. Amirinizle İrtibata Geçin.';
+    /**
+     * Race boundary added by migration 094. Event pending uniqueness stays on
+     * uq_qacr_pending_event and is not part of this capability.
+     */
+    private const NO_EVENT_PENDING_DAY_INDEX = 'uq_qacr_pending_day';
+
+    /**
+     * Positive readiness only. A false result is rechecked so migration 094
+     * becomes visible on the next request or cron tick without a new deploy.
+     * Keyed by connection so one process can see both schemas in tests.
+     *
+     * @var array<string, true>
+     */
+    private static $dayKeyReadyConnections = [];
 
     /**
      * Production default stays THRESHOLD_MINUTES. A positive integer env value
@@ -162,6 +184,57 @@ class QrAttendanceUnresolvedAnomalyService
     }
 
     /**
+     * Planned-exit snapshot for one business date. Same-day when çıkış is after
+     * giriş; next calendar day only when both clocks exist and çıkış <= giriş.
+     * Missing çıkış is unresolved. Does not copy another day's clock.
+     *
+     * @param string|null $girisHhmm
+     * @param string|null $cikisHhmm
+     * @return array{anchor_date:string,exit:\DateTimeImmutable,finalization:\DateTimeImmutable,exit_hhmm:string}|null
+     */
+    public static function buildNoEventFinalization($anchorYmd, $girisHhmm, $cikisHhmm)
+    {
+        $anchorYmd = trim((string) $anchorYmd);
+        $cikisMin = LateEarlyInfoService::hhmmToMinutes($cikisHhmm);
+        if ($cikisMin === null) {
+            return null;
+        }
+        $girisMin = LateEarlyInfoService::hhmmToMinutes($girisHhmm);
+        $tz = new \DateTimeZone('Europe/Istanbul');
+        $exit = \DateTimeImmutable::createFromFormat(
+            'Y-m-d H:i:s',
+            $anchorYmd . ' ' . self::minutesToHhmm($cikisMin) . ':00',
+            $tz
+        );
+        if (!$exit || $exit->format('Y-m-d') !== $anchorYmd) {
+            return null;
+        }
+        if ($girisMin !== null && $cikisMin <= $girisMin) {
+            $exit = $exit->modify('+1 day');
+        }
+
+        return [
+            'anchor_date' => $anchorYmd,
+            'exit' => $exit,
+            'finalization' => $exit->modify('+' . self::NO_EVENT_DAY_FINALIZATION_MINUTES . ' minutes'),
+            'exit_hhmm' => $exit->format('H:i'),
+        ];
+    }
+
+    /**
+     * @param array{finalization:\DateTimeImmutable}|null $finalization
+     * @param bool|null $workExpected
+     */
+    public static function isOperationalNoEventDay(\DateTimeImmutable $now, $finalization, $workExpected, $hasEvent, $resolved)
+    {
+        if ($resolved || $hasEvent || $workExpected !== true || !is_array($finalization)) {
+            return false;
+        }
+
+        return $now >= $finalization['finalization'];
+    }
+
+    /**
      * Live open GİRİŞ still blocks the next GİRİŞ. A previous shift whose
      * planned exit + 180 has passed does not. Missing planned exit stays blocking.
      */
@@ -190,12 +263,9 @@ class QrAttendanceUnresolvedAnomalyService
         }
         $nowDt = self::resolveNow($now);
         $events = self::loadRecentEvents($pdo, $personelId, $nowDt);
-        // No raw QR event means there is no source_event_id. MISSING_GIRIS is an
-        // orphan ÇIKIŞ, not a day the person was expected to work and never scanned.
-        if (count($events) === 0) {
-            return [];
-        }
-        $derived = QrAttendanceIntervalDerivationService::derive($events);
+        $derived = count($events) === 0
+            ? ['anomalies' => []]
+            : QrAttendanceIntervalDerivationService::derive($events);
         $corrections = self::loadCorrectionIndex($pdo, $personelId);
         $expectationCache = [];
         $items = [];
@@ -259,6 +329,10 @@ class QrAttendanceUnresolvedAnomalyService
             );
         }
 
+        foreach (self::collectNoEventDays($pdo, $personelId, $nowDt, $expectationCache) as $item) {
+            $items[] = $item;
+        }
+
         return $items;
     }
 
@@ -287,13 +361,19 @@ class QrAttendanceUnresolvedAnomalyService
             : 0;
 
         foreach ($anomalies as $anomaly) {
+            $type = (string) ($anomaly['anomaly_type'] ?? '');
             $sourceEventId = (int) ($anomaly['source_event_id'] ?? 0);
-            if ($sourceEventId <= 0) {
+            $businessDate = (string) ($anomaly['business_date'] ?? '');
+            if ($type === self::ANOMALY_NO_EVENT_DAY) {
+                if (!self::dayKeySchemaReady($pdo) || $businessDate === '') {
+                    continue;
+                }
+            } elseif ($sourceEventId <= 0) {
                 continue;
             }
             $payload = [
-                'source_event_id' => $sourceEventId,
-                'anomaly_type' => (string) ($anomaly['anomaly_type'] ?? ''),
+                'source_event_id' => $type === self::ANOMALY_NO_EVENT_DAY ? null : $sourceEventId,
+                'anomaly_type' => $type,
                 'business_date' => (string) ($anomaly['business_date'] ?? ''),
                 'giris_local_time' => (string) ($anomaly['context_local_time'] ?? ''),
                 'planned_exit' => $anomaly['planned_exit_local'] ?? null,
@@ -308,9 +388,11 @@ class QrAttendanceUnresolvedAnomalyService
                     self::PERSONEL_TITLE,
                     self::PERSONEL_BODY,
                     $personelId,
-                    $sourceEventId,
+                    $type === self::ANOMALY_NO_EVENT_DAY ? 0 : $sourceEventId,
                     self::AUDIENCE_PERSONEL,
-                    $payload
+                    $payload,
+                    $type === self::ANOMALY_NO_EVENT_DAY ? $businessDate : null,
+                    $type === self::ANOMALY_NO_EVENT_DAY ? self::ANOMALY_NO_EVENT_DAY : null
                 );
                 if ($id > 0) {
                     $created++;
@@ -327,9 +409,11 @@ class QrAttendanceUnresolvedAnomalyService
                 self::PERSONEL_TITLE,
                 $amirBody,
                 $personelId,
-                $sourceEventId,
+                $type === self::ANOMALY_NO_EVENT_DAY ? 0 : $sourceEventId,
                 self::AUDIENCE_AMIR,
-                $payload
+                $payload,
+                $type === self::ANOMALY_NO_EVENT_DAY ? $businessDate : null,
+                $type === self::ANOMALY_NO_EVENT_DAY ? self::ANOMALY_NO_EVENT_DAY : null
             );
             if ($id > 0) {
                 $created++;
@@ -350,6 +434,10 @@ class QrAttendanceUnresolvedAnomalyService
         $nowDt = self::resolveNow($now);
         $since = $nowDt->setTimezone(new \DateTimeZone('UTC'))->modify('-' . self::LOOKBACK_DAYS . ' days');
         $personelIds = self::scanPersonelIds($pdo, $since->format('Y-m-d H:i:s.u'));
+        foreach (self::scanNoEventPersonelIds($pdo, $nowDt) as $personelId) {
+            $personelIds[] = $personelId;
+        }
+        $personelIds = array_values(array_unique(array_map('intval', $personelIds)));
         $created = 0;
         $count = 0;
         foreach ($personelIds as $personelId) {
@@ -392,6 +480,122 @@ class QrAttendanceUnresolvedAnomalyService
     }
 
     /**
+     * NO_EVENT_DAY needs the day-key columns, a nullable correction source event,
+     * and the pending-day unique index. Event anomaly dedupe is a separate check.
+     * One SHOW COLUMNS / PRAGMA pass per table, plus the pending-day index.
+     * Not cached while false.
+     */
+    public static function dayKeySchemaReady(PDO $pdo)
+    {
+        $key = spl_object_hash($pdo);
+        if (isset(self::$dayKeyReadyConnections[$key])) {
+            return true;
+        }
+        if (!self::probeDayKeySchema($pdo)) {
+            return false;
+        }
+        self::$dayKeyReadyConnections[$key] = true;
+
+        return true;
+    }
+
+    private static function probeDayKeySchema(PDO $pdo)
+    {
+        try {
+            $inbox = self::columnMeta($pdo, 'personel_inbox_notifications');
+            $correction = self::columnMeta($pdo, 'qr_attendance_correction_requests');
+        } catch (\Throwable $e) {
+            return false;
+        }
+        if (!isset($inbox['anomaly_type'], $inbox['anomaly_business_date'], $correction['anomaly_type'], $correction['source_event_id'])) {
+            return false;
+        }
+        if (!empty($correction['source_event_id']['notnull'])) {
+            return false;
+        }
+
+        return self::hasNamedIndex($pdo, 'qr_attendance_correction_requests', self::NO_EVENT_PENDING_DAY_INDEX);
+    }
+
+    /**
+     * @return array<string, array{notnull:bool}>
+     */
+    private static function columnMeta(PDO $pdo, $table)
+    {
+        if ($table !== 'personel_inbox_notifications' && $table !== 'qr_attendance_correction_requests') {
+            return [];
+        }
+        $columns = [];
+        $driver = (string) $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+        if ($driver === 'sqlite') {
+            $stmt = $pdo->query('PRAGMA table_info(' . $table . ')');
+            if ($stmt === false) {
+                return [];
+            }
+            while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                if (!is_array($row)) {
+                    continue;
+                }
+                $name = (string) ($row['name'] ?? '');
+                if ($name === '') {
+                    continue;
+                }
+                $columns[$name] = ['notnull' => (int) ($row['notnull'] ?? 0) === 1];
+            }
+            $stmt->closeCursor();
+
+            return $columns;
+        }
+        $stmt = $pdo->query('SHOW COLUMNS FROM ' . $table);
+        if ($stmt === false) {
+            return [];
+        }
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $name = (string) ($row['Field'] ?? '');
+            if ($name === '') {
+                continue;
+            }
+            $columns[$name] = ['notnull' => strtoupper((string) ($row['Null'] ?? '')) !== 'YES'];
+        }
+        $stmt->closeCursor();
+
+        return $columns;
+    }
+
+    private static function hasNamedIndex(PDO $pdo, $table, $indexName)
+    {
+        if ($table !== 'qr_attendance_correction_requests' || $indexName !== self::NO_EVENT_PENDING_DAY_INDEX) {
+            return false;
+        }
+        $driver = (string) $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+        if ($driver === 'sqlite') {
+            $stmt = $pdo->prepare(
+                "SELECT 1 FROM sqlite_master WHERE type = 'index' AND tbl_name = :table AND name = :name LIMIT 1"
+            );
+            $stmt->execute(['table' => $table, 'name' => $indexName]);
+
+            return $stmt->fetchColumn() !== false;
+        }
+        $stmt = $pdo->query('SHOW INDEX FROM ' . $table);
+        if ($stmt === false) {
+            return false;
+        }
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            if (is_array($row) && (string) ($row['Key_name'] ?? '') === $indexName) {
+                $stmt->closeCursor();
+
+                return true;
+            }
+        }
+        $stmt->closeCursor();
+
+        return false;
+    }
+
+    /**
      * @param array<string,mixed>|null $personel
      * @param array<string,mixed> $anomaly
      */
@@ -408,6 +612,11 @@ class QrAttendanceUnresolvedAnomalyService
         $giris = (string) ($anomaly['context_local_time'] ?? '');
         $planned = (string) ($anomaly['planned_exit_label'] ?? '');
         $problem = (string) ($anomaly['problem'] ?? 'Çıkış kaydı bulunamadı');
+        if ((string) ($anomaly['anomaly_type'] ?? '') === self::ANOMALY_NO_EVENT_DAY) {
+            return $name . ', ' . $date . ' tarihinde giriş/çıkış kaydı yok. Planlanan çıkış '
+                . ($planned !== '' ? $planned : 'bilinmiyor')
+                . '. Giriş kaydı bulunamadı. Düzeltme gerekli.';
+        }
 
         return $name . ', ' . $date . ' tarihinde saat ' . $giris
             . ' ile açık giriş var. Planlanan çıkış ' . ($planned !== '' ? $planned : 'bilinmiyor')
@@ -452,10 +661,7 @@ class QrAttendanceUnresolvedAnomalyService
         if (array_key_exists($anchorYmd, $cache)) {
             return $cache[$anchorYmd];
         }
-        $cover = BugunPersonelDurumuService::fetchCoveringSurecExceptionMap($pdo, [(int) $personelId], $anchorYmd);
-        $pid = (int) $personelId;
-        $exceptionTur = ($cover['resolved'] && isset($cover['map'][$pid])) ? $cover['map'][$pid] : null;
-        $beklenti = BugunPersonelDurumuService::calismaBeklentisiFromCover($cover['resolved'], $exceptionTur);
+        $beklenti = BugunPersonelDurumuService::calismaBeklentisiForPersonelDate($pdo, (int) $personelId, $anchorYmd);
         $cache[$anchorYmd] = $beklenti['bekleniyor'];
 
         return $beklenti['bekleniyor'];
@@ -693,7 +899,10 @@ class QrAttendanceUnresolvedAnomalyService
             if (!is_array($row)) {
                 continue;
             }
-            $sourceId = (int) $row['source_event_id'];
+            $sourceId = (int) ($row['source_event_id'] ?? 0);
+            if ($sourceId <= 0) {
+                continue;
+            }
             $index[$sourceId][] = [
                 'id' => (int) $row['id'],
                 'status' => (string) $row['status'],
@@ -775,10 +984,11 @@ class QrAttendanceUnresolvedAnomalyService
             $plannedLocal = $window['exit']->format('c');
             $plannedLabel = $window['exit_hhmm'];
         }
+        $isDay = $type === self::ANOMALY_NO_EVENT_DAY;
 
         return [
-            'identity' => $type . ':' . (int) $sourceEventId,
-            'source_event_id' => (int) $sourceEventId,
+            'identity' => $isDay ? (self::ANOMALY_NO_EVENT_DAY . ':' . (string) $businessDate) : ($type . ':' . (int) $sourceEventId),
+            'source_event_id' => $isDay ? null : (int) $sourceEventId,
             'anomaly_type' => $type,
             'correction_hint' => QrAttendanceIntervalDerivationService::CORRECTION_HINT,
             'business_date' => (string) $businessDate,
@@ -891,6 +1101,237 @@ class QrAttendanceUnresolvedAnomalyService
         }
 
         return new \DateTimeImmutable('now', $tz);
+    }
+
+    /**
+     * @param array<string, bool|null> $expectationCache
+     * @return list<array<string,mixed>>
+     */
+    private static function collectNoEventDays(PDO $pdo, $personelId, \DateTimeImmutable $nowLocal, array &$expectationCache)
+    {
+        if (!self::dayKeySchemaReady($pdo)) {
+            return [];
+        }
+        $items = [];
+        $dayCorrections = self::loadDayCorrectionIndex($pdo, (int) $personelId);
+        foreach (self::noEventCandidateDates($pdo, (int) $personelId, $nowLocal) as $date) {
+            if (self::businessDateHasAttendanceEvent($pdo, (int) $personelId, $date)) {
+                continue;
+            }
+            $planned = LateEarlyInfoService::loadPlannedDay($pdo, (int) $personelId, $date);
+            if (!is_array($planned)) {
+                continue;
+            }
+            $finalization = self::buildNoEventFinalization(
+                $date,
+                isset($planned['beklenen_giris_saati']) ? (string) $planned['beklenen_giris_saati'] : null,
+                isset($planned['beklenen_cikis_saati']) ? (string) $planned['beklenen_cikis_saati'] : null
+            );
+            $workExpected = self::workExpected($pdo, (int) $personelId, $date, $expectationCache);
+            $bucket = $dayCorrections[$date][self::ANOMALY_NO_EVENT_DAY] ?? [];
+            $resolved = false;
+            $pendingId = null;
+            foreach ($bucket as $row) {
+                if ($row['status'] === 'ONAYLANDI' && $row['event_type'] === 'GIRIS') {
+                    $resolved = true;
+                }
+                if ($row['status'] === 'BEKLIYOR' && $pendingId === null) {
+                    $pendingId = (int) $row['id'];
+                }
+            }
+            if (!self::isOperationalNoEventDay($nowLocal, $finalization, $workExpected, false, $resolved)) {
+                continue;
+            }
+            $items[] = self::publicAnomaly(
+                self::ANOMALY_NO_EVENT_DAY,
+                0,
+                $date,
+                'Giriş kaydı bulunamadı',
+                'GIRIS',
+                '',
+                $finalization,
+                $pendingId,
+                0
+            );
+        }
+
+        return $items;
+    }
+
+    /**
+     * Lookback dates plus any already-notified NO_EVENT_DAY date. Age does not close it.
+     *
+     * @return list<string>
+     */
+    private static function noEventCandidateDates(PDO $pdo, $personelId, \DateTimeImmutable $nowLocal)
+    {
+        if (!self::dayKeySchemaReady($pdo)) {
+            return [];
+        }
+        $today = $nowLocal->format('Y-m-d');
+        $dates = [];
+        $cursor = $nowLocal->modify('-' . self::LOOKBACK_DAYS . ' days');
+        for ($i = 0; $i <= self::LOOKBACK_DAYS; $i++) {
+            $ymd = $cursor->modify('+' . $i . ' days')->format('Y-m-d');
+            if ($ymd <= $today) {
+                $dates[$ymd] = true;
+            }
+        }
+        try {
+            $stmt = $pdo->prepare(
+                "SELECT DISTINCT anomaly_business_date
+                 FROM personel_inbox_notifications
+                 WHERE personel_id = :pid
+                   AND kind = :kind
+                   AND anomaly_type = :type
+                   AND anomaly_business_date IS NOT NULL"
+            );
+            $stmt->execute([
+                'pid' => (int) $personelId,
+                'kind' => self::NOTIFICATION_KIND,
+                'type' => self::ANOMALY_NO_EVENT_DAY,
+            ]);
+            while ($value = $stmt->fetchColumn()) {
+                $ymd = substr((string) $value, 0, 10);
+                if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $ymd) === 1 && $ymd <= $today) {
+                    $dates[$ymd] = true;
+                }
+            }
+        } catch (\Throwable $e) {
+            return array_keys($dates);
+        }
+        $keys = array_keys($dates);
+        sort($keys, SORT_STRING);
+
+        return $keys;
+    }
+
+    /**
+     * Any real GİRİŞ or ÇIKIŞ whose Istanbul local date is $ymd.
+     * Query failure fails closed (treated as an event, so no NO_EVENT_DAY).
+     */
+    private static function businessDateHasAttendanceEvent(PDO $pdo, $personelId, $ymd)
+    {
+        $tz = new \DateTimeZone('Europe/Istanbul');
+        $start = \DateTimeImmutable::createFromFormat('Y-m-d H:i:s', (string) $ymd . ' 00:00:00', $tz);
+        if (!$start) {
+            return true;
+        }
+        $end = $start->modify('+1 day');
+        $utc = new \DateTimeZone('UTC');
+        try {
+            $stmt = $pdo->prepare(
+                'SELECT 1
+                 FROM qr_attendance_events
+                 WHERE personel_id = :pid
+                   AND occurred_at_utc >= :start
+                   AND occurred_at_utc < :end
+                 LIMIT 1'
+            );
+            $stmt->execute([
+                'pid' => (int) $personelId,
+                'start' => $start->setTimezone($utc)->format('Y-m-d H:i:s.u'),
+                'end' => $end->setTimezone($utc)->format('Y-m-d H:i:s.u'),
+            ]);
+
+            return $stmt->fetchColumn() !== false;
+        } catch (\Throwable $e) {
+            return true;
+        }
+    }
+
+    /**
+     * @return list<int>
+     */
+    private static function scanNoEventPersonelIds(PDO $pdo, \DateTimeImmutable $nowLocal)
+    {
+        if (!self::dayKeySchemaReady($pdo)) {
+            return [];
+        }
+        $ids = [];
+        $from = $nowLocal->modify('-' . self::LOOKBACK_DAYS . ' days')->format('Y-m-d');
+        $to = $nowLocal->format('Y-m-d');
+        try {
+            $stmt = $pdo->prepare(
+                "SELECT DISTINCT personel_id
+                 FROM gunluk_puantaj
+                 WHERE tarih >= :from
+                   AND tarih <= :to
+                   AND beklenen_cikis_saati IS NOT NULL
+                   AND TRIM(beklenen_cikis_saati) <> ''"
+            );
+            $stmt->execute(['from' => $from, 'to' => $to]);
+            while ($personelId = $stmt->fetchColumn()) {
+                $personelId = (int) $personelId;
+                if ($personelId > 0) {
+                    $ids[$personelId] = true;
+                }
+            }
+        } catch (\Throwable $e) {
+            // Planned snapshot unreadable → fail closed for discovery.
+        }
+        if (self::dayKeySchemaReady($pdo)) {
+            try {
+                $stmt = $pdo->prepare(
+                    "SELECT DISTINCT personel_id
+                     FROM personel_inbox_notifications
+                     WHERE kind = :kind
+                       AND anomaly_type = :type
+                       AND personel_id IS NOT NULL"
+                );
+                $stmt->execute([
+                    'kind' => self::NOTIFICATION_KIND,
+                    'type' => self::ANOMALY_NO_EVENT_DAY,
+                ]);
+                while ($personelId = $stmt->fetchColumn()) {
+                    $personelId = (int) $personelId;
+                    if ($personelId > 0) {
+                        $ids[$personelId] = true;
+                    }
+                }
+            } catch (\Throwable $e) {
+                // Persisted day key unreadable; lookback discovery still applies.
+            }
+        }
+
+        return array_map('intval', array_keys($ids));
+    }
+
+    /**
+     * @return array<string, array<string, list<array{id:int,status:string,event_type:string}>>>
+     */
+    private static function loadDayCorrectionIndex(PDO $pdo, $personelId)
+    {
+        try {
+            $stmt = $pdo->prepare(
+                "SELECT id, business_date, anomaly_type, event_type, status
+                 FROM qr_attendance_correction_requests
+                 WHERE personel_id = :pid
+                   AND source_event_id IS NULL
+                   AND status IN ('BEKLIYOR', 'ONAYLANDI')"
+            );
+            $stmt->execute(['pid' => (int) $personelId]);
+        } catch (\Throwable $e) {
+            return [];
+        }
+        $index = [];
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $date = substr((string) ($row['business_date'] ?? ''), 0, 10);
+            $type = strtoupper(trim((string) ($row['anomaly_type'] ?? '')));
+            if ($date === '' || $type === '') {
+                continue;
+            }
+            $index[$date][$type][] = [
+                'id' => (int) $row['id'],
+                'status' => (string) $row['status'],
+                'event_type' => (string) $row['event_type'],
+            ];
+        }
+
+        return $index;
     }
 
     private static function minutesToHhmm($minutes)

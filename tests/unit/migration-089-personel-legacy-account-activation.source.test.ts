@@ -14,7 +14,7 @@ describe("migration 089: PERSONEL legacy hesap canonical hizalamasi", () => {
     const migrations = readdirSync(resolve("api/migrations"))
       .filter((name) => /^\d+_.*\.sql$/.test(name))
       .sort();
-    expect(migrations.at(-1)).toBe("093_attendance_anomaly_notification_dedupe.sql");
+    expect(migrations.at(-1)).toBe("094_attendance_no_event_day.sql");
     expect(migrations.filter((name) => name.startsWith("089_"))).toHaveLength(1);
   });
 

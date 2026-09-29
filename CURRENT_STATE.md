@@ -50,7 +50,7 @@ PRODUCTION_MUTATION_THIS_PIN: 0 (docs/registry consolidation only).
 Do **not** track open work in this file. Open IDs live in 146:
 
 - C) `BL-NO-EVENT-DAY` (CODE_READY locally; pending PR + deploy + migration 094 apply — not production CLOSED)
-- D) `BL-POST-THRESHOLD-REENTRY` · form-hint · Karyapı/Şenay (DEFERRED) · device/offline/geofence/NFC non-goals
+- D) form-hint · Karyapı/Şenay (DEFERRED) · device/offline/geofence/NFC non-goals — `BL-POST-THRESHOLD-REENTRY` **CLOSED (code)**
 - E) `BL-QR-PILOT-OPS` (fiziksel pilot ticks) · `BL-CROSS-COMPANY` (defer)
 
 ## Historical note (2026-09-25 POST_PR402 pin — SUPERSEDED)

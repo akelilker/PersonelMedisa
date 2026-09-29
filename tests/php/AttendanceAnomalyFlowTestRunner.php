@@ -10,6 +10,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../api/src/bootstrap.php';
 
 use Medisa\Api\Services\Qr\QrAttendanceCorrectionService;
+use Medisa\Api\Services\Qr\QrAttendanceEventService;
 use Medisa\Api\Services\Qr\QrAttendanceException;
 use Medisa\Api\Services\Qr\QrAttendanceIntervalDerivationService;
 use Medisa\Api\Services\Qr\QrAttendanceUnresolvedAnomalyService;
@@ -565,6 +566,38 @@ $pdo->exec("UPDATE gunluk_puantaj SET giris_saati = '08:32' WHERE id = 26");
 aaAssert(!in_array('NO_EVENT_DAY:2026-09-26', aaIdentities($svc::listForPersonel($pdo, 8, aaIstanbul('2026-09-26 18:30:00'))), true), 'approved giriş correction clears NO_EVENT_DAY');
 aaAssert((int) $pdo->query("SELECT COUNT(*) FROM qr_attendance_events WHERE personel_id = 8")->fetchColumn() === 0, 'approved NO_EVENT_DAY correction creates no raw QR');
 aaAssert($svc::dayKeySchemaReady($pdo) === true, 'schema 094 day-key capability is ready');
+
+// BL-POST-THRESHOLD-REENTRY: canonical open-shift owner (QrAttendanceEventService::resolveOpenShiftState).
+$pdo->exec('DELETE FROM qr_attendance_events');
+$pdo->exec("INSERT INTO qr_attendance_events (id, personel_id, user_id, event_type, occurred_at_utc, sube_id) VALUES (901, 7, 15, 'GIRIS', '2026-09-28 05:30:00.000000', 1)");
+$pdo->exec("INSERT INTO qr_attendance_events (id, personel_id, user_id, event_type, occurred_at_utc, sube_id) VALUES (902, 7, 15, 'CIKIS', '2026-09-28 14:40:00.000000', 1)");
+$afterCompleted = QrAttendanceEventService::resolveOpenShiftState($pdo, 7, aaIstanbul('2026-09-28 22:00:00'));
+aaAssert(
+    $afterCompleted['next_action'] === 'GIRIS'
+        && ($afterCompleted['stale_missing_cikis'] ?? true) === false,
+    'completed GIRIS→CIKIS same day allows a new independent GIRIS (not continuation)'
+);
+$pdo->exec("INSERT INTO qr_attendance_events (id, personel_id, user_id, event_type, occurred_at_utc, sube_id) VALUES (903, 7, 15, 'GIRIS', '2026-09-28 15:00:00.000000', 1)");
+$liveOvertime = QrAttendanceEventService::resolveOpenShiftState($pdo, 7, aaIstanbul('2026-09-28 20:39:00'));
+aaAssert(
+    $liveOvertime['next_action'] === 'CIKIS'
+        && ($liveOvertime['stale_missing_cikis'] ?? false) === false,
+    'live open GIRIS before threshold still requires CIKIS first'
+);
+$staleOvertime = QrAttendanceEventService::resolveOpenShiftState($pdo, 7, aaIstanbul('2026-09-28 20:40:00'));
+aaAssert(
+    $staleOvertime['next_action'] === 'GIRIS'
+        && ($staleOvertime['stale_missing_cikis'] ?? false) === true,
+    'post-threshold stale open GIRIS does not block the next GIRIS'
+);
+$pdo->exec('DELETE FROM qr_attendance_events');
+$pdo->exec("INSERT INTO qr_attendance_events (id, personel_id, user_id, event_type, occurred_at_utc, sube_id) VALUES (904, 7, 15, 'GIRIS', '2026-09-28 05:30:00.000000', 1)");
+$stalePriorDay = QrAttendanceEventService::resolveOpenShiftState($pdo, 7, aaIstanbul('2026-09-29 08:00:00'));
+aaAssert(
+    $stalePriorDay['next_action'] === 'GIRIS'
+        && ($stalePriorDay['stale_missing_cikis'] ?? false) === true,
+    'prior-day missing exit past threshold releases next GIRIS'
+);
 
 aaRunSchema093($svc);
 

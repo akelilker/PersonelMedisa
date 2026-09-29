@@ -300,7 +300,7 @@ $todaySrc = file_get_contents($root . '/api/src/Services/Qr/QrAttendanceTodaySer
 bpdAssert(is_string($serviceSrc) && substr_count($serviceSrc, 'FROM surecler') === 1, 'one covering surecler SQL');
 bpdAssert(is_string($todaySrc) && strpos($todaySrc, 'hasApprovedLeaveToday') === false, 'leave-only SQL removed');
 bpdAssert(is_string($todaySrc) && strpos($todaySrc, 'FROM surecler') === false, 'today does not own a second SQL');
-bpdAssert(is_string($todaySrc) && strpos($todaySrc, 'fetchCoveringSurecExceptionMap') !== false, 'today uses shared core');
+bpdAssert(is_string($todaySrc) && strpos($todaySrc, 'calismaBeklentisiForPersonelDate') !== false, 'today uses shared core');
 
 $none = BugunPersonelDurumuService::calismaBeklentisiFromCover(true, null);
 bpdAssert($none['bekleniyor'] === true && $none['neden'] === null, 'resolved empty → expected');

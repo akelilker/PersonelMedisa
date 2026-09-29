@@ -20,6 +20,9 @@ Sınıflar: **A** CLOSED_ALREADY_LIVE · **B** SAFE_HOUSEKEEPING · **C** TECHNI
 | `BL-PR-439` | Attendance anomaly scan + unresolved anomaly UX + amir correction flow | PR #439 MERGED; cron `attendance-anomaly-scan.php` |
 | `BL-PR-440` | Çalışma Geçmişi aylık onaylı toplam saat / gün bazlı puantaj+QR toplamı | PR #440 MERGED |
 | `BL-PR-441` | `MEDISA_ATTENDANCE_ANOMALY_THRESHOLD_MINUTES` override (tests); prod default **180**; prod cron **no** env | PR #441 MERGED; deploy `36543499484` @ `0ef84447` |
+| `BL-PR-446` | Attendance anomaly cron docblock parse | PR #446 MERGED `c6fe3144588ba253aa1d471d66245da317c92d1b` |
+| `BL-SELF-HISTORY-APPROVAL-SCOPE` | Self-service aylık onay scope | **CLOSED** — PR #444 MERGED (`990d4d7e`). `aylik_onayli_mi` personel birim amiri scope. |
+| `BL-ATTENDANCE-CRON-OBSERVE` | Cron runtime tick | **CLOSED** — PR #446 + production tick `ATTENDANCE_ANOMALY_SCAN personel=1 created=0` EXIT=0 |
 | `BL-PR-326` | SGK bildirim dönemi owner → `SGK_ISVEREN` | PR #326 MERGED `8e137f2c` (2026-09-22) |
 | `BL-MIG-090` | Factual employer-period owner table | Apply run `35781766535` SUCCESS |
 | `BL-MIG-091` | Guarded legacy consensus reconcile | Apply run `35791415567` SUCCESS |
@@ -53,8 +56,7 @@ Sınıflar: **A** CLOSED_ALREADY_LIVE · **B** SAFE_HOUSEKEEPING · **C** TECHNI
 | ID | Konu | Not |
 | --- | --- | --- |
 | `BL-SOURCE-LOCK-DRIFT` | Pin testleri eski deploy/tip iddiaları | POST_PR441 + review turunda CURRENT_STATE + 110 + source-lock test hizalandı |
-| `BL-NO-EVENT-DAY` | Sıfır QR / expected-worker gün anomaly | **OPEN — TECHNICAL/SCHEMA GAP.** Ürün sonucu largely locked: beklenen çalışan + sıfır QR → anomaly oluştur; Talepler yolu; personel doğrudan puantaj düzenlemez; **sentetik QR yasak**; izin/rapor/iş kazası günlerinde false-positive’ten kaçın. Eksik: canonical **gün bazlı** anomaly kimliği + correction correlation. _(Opsiyonel alt not: sıfır-event kesinleşme zamanı hâlâ net değilse ayrıca ürün zamanlaması.)_ |
-| `BL-SELF-HISTORY-APPROVAL-SCOPE` | #440 self-service `aylik_onayli_mi` vs onay şeması | **OPEN — P1/P2 technical correctness.** `SelfPuantajReadService::isAylikOnayli`: `WHERE sube_id=:sube_id AND ay=:ay AND state='TAMAMLANDI' LIMIT 1` (birim amiri / personel filtresi yok). Canonical `aylik_bildirim_onaylari` unique: `(sube_id, birim_amiri_user_id, ay)`. **Risk:** bir birim amirinin şubede `TAMAMLANDI` kaydı, başka birimin personel self-service’inde “Onaylı” gösterebilir — approval scope mismatch; canonical olarak sessizce kabul edilmez. **Known behavior (ürün kararı sonra):** aylık toplam onaysız/QR fallback kullanıldığında geç/erken/fazla mesai satırları puantaj domain’inden gelmeye devam edebilir. |
+| `BL-NO-EVENT-DAY` | Sıfır QR / expected-worker gün anomaly | **CODE_READY / pending PR + deploy + migration 094 apply.** Local implementation on `feat/attendance-no-event-day`. Schema 093'te NO_EVENT_DAY fail-closed (event anomaly/+180/notification/correction sürer); 094 apply sonrası aynı kod day-key zincirini açar. Sentetik QR yok. Production'da yok — CLOSED/LIVE değil. |
 
 ---
 
@@ -84,7 +86,6 @@ E sınıfı: read-only verify · business truth · production write (write ayrı
 | ID | Konu | Not |
 | --- | --- | --- |
 | `BL-QR-PILOT-OPS` | QR pilot checklist — **sole owner** fiziksel saha ticks | Remote PASS (#405 CTA, HTTPS, kiosk mint). **Kalan (tek ID):** fiziksel iPhone kamera permission · gerçek kiosk QR **GİRİŞ** · gerçek kiosk QR **ÇIKIŞ** · anomaly correction smoke — `QR_ATTENDANCE_PILOT_READINESS_CHECKLIST.md` |
-| `BL-ATTENDANCE-CRON-OBSERVE` | Cron runtime tick | Installed `*/5` with **`ea-php81`** → `api/bin/attendance-anomaly-scan.php`; observe production ticks/logs (prod cron env yok; threshold default 180). **Ops diagnostics:** GitHub Actions `Cancelled` = not PASS; tek başına FAILURE değil; kanıt yoksa **INCONCLUSIVE** — server-side status/preflight/completion evidence gerekir. |
 | `BL-CROSS-COMPANY` | 120 / 158 / 219 | Valid defer — **UNTOUCHED** |
 
 ---
@@ -114,20 +115,19 @@ Open product: `BL-POST-THRESHOLD-REENTRY`.
 
 ## Technical gap registry (özet)
 
-C: `BL-NO-EVENT-DAY` · `BL-SELF-HISTORY-APPROVAL-SCOPE`.
+C: `BL-NO-EVENT-DAY` (CODE_READY, pending PR + deploy + migration 094 apply).
 
 ---
 
 ## Operational approval registry (özet)
 
-E (open only): `BL-QR-PILOT-OPS` · `BL-ATTENDANCE-CRON-OBSERVE` · `BL-CROSS-COMPANY` (defer).
+E (open only): `BL-QR-PILOT-OPS` · `BL-CROSS-COMPANY` (defer).
 
 ---
 
 ## Next gate
 
 1. `BL-QR-PILOT-OPS` — fiziksel iPhone permission + kiosk QR GİRİŞ/ÇIKIŞ + anomaly correction smoke.
-2. `BL-ATTENDANCE-CRON-OBSERVE` — `ea-php81` cron tick/log doğrulama.
-3. `BL-SELF-HISTORY-APPROVAL-SCOPE` · `BL-NO-EVENT-DAY` — technical correctness (C).
-4. `BL-POST-THRESHOLD-REENTRY` — ürün kararı (D).
-5. Karyapı/Şenay + 120/158/219 rollout **DEFERRED**.
+2. `BL-NO-EVENT-DAY` — PR, deploy, migration 094 apply (local CODE_READY; production'da yok).
+3. `BL-POST-THRESHOLD-REENTRY` — ürün kararı (D).
+4. Karyapı/Şenay + 120/158/219 rollout **DEFERRED**.

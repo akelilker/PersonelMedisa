@@ -129,10 +129,18 @@ describe("initial password owner", () => {
 
   it("adds no new migration for this change", () => {
     const migrations = readdirSync(resolve("api/migrations")).filter((name) => name.endsWith(".sql"));
-    const highest = migrations
-      .map((name) => Number.parseInt(name.slice(0, 3), 10))
-      .filter((value) => Number.isFinite(value))
-      .sort((left, right) => right - left)[0];
-    expect(highest).toBe(93);
+    const namePattern = /initial[-_ ]?password|standard[-_ ]?initial[-_ ]?password|shared[-_ ]?secret/i;
+    const contentMarkers = [
+      "standard_initial_password_hash",
+      "STANDARD_INITIAL_PASSWORD_HASH",
+      "StandardInitialPassword",
+    ];
+    for (const name of migrations) {
+      expect(name, name).not.toMatch(namePattern);
+      const sql = read(`api/migrations/${name}`);
+      for (const marker of contentMarkers) {
+        expect(sql, `${name} contains ${marker}`).not.toContain(marker);
+      }
+    }
   });
 });

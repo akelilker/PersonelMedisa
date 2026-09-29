@@ -426,10 +426,10 @@ export function PersonelSelfServiceTaleplerPage() {
         open={correctDraft !== null || anomalyDraft !== null}
         eventId={anomalyDraft?.source_event_id ?? correctDraft?.eventId ?? 0}
         eventType={
-          anomalyDraft?.anomaly_type === "MISSING_GIRIS"
-            ? "GIRIS"
+          anomalyDraft?.anomaly_type === "MISSING_CIKIS"
+            ? "CIKIS"
             : anomalyDraft
-              ? "CIKIS"
+              ? "GIRIS"
               : (correctDraft?.eventType ?? "GIRIS")
         }
         initialTime={anomalyDraft ? "" : (correctDraft?.currentTime ?? "")}

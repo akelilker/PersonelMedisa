@@ -189,15 +189,11 @@ class QrAttendanceTodayService
      */
     private static function bugunCalismaBeklentisi(PDO $pdo, $personelId, $businessDateYmd)
     {
-        $cover = BugunPersonelDurumuService::fetchCoveringSurecExceptionMap(
+        return BugunPersonelDurumuService::calismaBeklentisiForPersonelDate(
             $pdo,
-            [(int) $personelId],
+            (int) $personelId,
             (string) $businessDateYmd
         );
-        $pid = (int) $personelId;
-        $exceptionTur = ($cover['resolved'] && isset($cover['map'][$pid])) ? $cover['map'][$pid] : null;
-
-        return BugunPersonelDurumuService::calismaBeklentisiFromCover($cover['resolved'], $exceptionTur);
     }
 
     /**

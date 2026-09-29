@@ -818,6 +818,8 @@ body.login-page .hero .animated-line {
     margin-left: 0;
     padding-left: 2px;
     align-self: center;
+    position: relative;
+    z-index: 1;
     transform: translate(-3px, 8px);
   }
 
@@ -833,7 +835,8 @@ body.login-page .hero .animated-line {
   }
 
   body.app-home-route .hero.hero--personel-shell .hero-title-stack {
-    grid-column: 2;
+    /* Span full header width so titles center in the frame; overlay wordmark, not the M circle. */
+    grid-column: 1 / -1;
     grid-row: 1;
     align-self: center;
     align-items: center;
@@ -842,6 +845,22 @@ body.login-page .hero .animated-line {
     text-align: center;
     padding: 0;
     gap: 2px;
+    position: relative;
+    z-index: 2;
+    pointer-events: none;
+    transform: translateX(6px);
+  }
+
+  @media (max-width: 360px) {
+    body.app-home-route .hero.hero--personel-shell .hero-title-stack {
+      transform: translateX(10px);
+    }
+  }
+
+  @media (max-width: 320px) {
+    body.app-home-route .hero.hero--personel-shell .hero-title-stack {
+      transform: translateX(14px);
+    }
   }
 
   body.app-home-route .hero.hero--personel-shell .hero-title-stack > h1,
@@ -885,10 +904,11 @@ body.login-page .hero .animated-line {
 
   body.app-home-route .hero.hero--personel-shell .hero-title-stack .animated-line {
     position: static;
-    justify-self: start;
-    align-self: start;
-    width: calc(var(--hero-home-title-ink-w) * 0.82);
-    margin-left: calc(var(--hero-home-title-ink-w) * 0.09);
+    justify-self: center;
+    align-self: center;
+    width: 74%;
+    max-width: calc(100% - 12px);
+    margin-left: 0;
     height: 2.7px;
     opacity: 0.72;
     background: linear-gradient(

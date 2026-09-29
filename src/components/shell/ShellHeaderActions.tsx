@@ -20,6 +20,7 @@ import {
   REFRESH_BUGUN_PERSONEL_DURUMU_EVENT
 } from "../../lib/bildirim/bugun-personel-durumu-events";
 import { istanbulBusinessDate } from "../../features/self-service/birim-amiri-operational";
+import { BackgroundlessNoticeModal } from "../../features/self-service/components/BackgroundlessNoticeModal";
 
 type NotificationLevel = "neutral" | "warning" | "critical";
 
@@ -142,6 +143,7 @@ export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeade
   const [personelInboxItems, setPersonelInboxItems] = useState<InboxNotification[]>([]);
   const [personelInboxLoading, setPersonelInboxLoading] = useState(false);
   const [personelDuyuruUnread, setPersonelDuyuruUnread] = useState(0);
+  const [personelLogoutConfirmOpen, setPersonelLogoutConfirmOpen] = useState(false);
 
   const {
     items: headerTamamlamalar,
@@ -771,7 +773,7 @@ export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeade
             if (showPersonelHomeLogout) {
               setIsNotificationsOpen(false);
               setIsSubeOpen(false);
-              logout();
+              setPersonelLogoutConfirmOpen(true);
               return;
             }
             setIsSettingsOpen((prev) => !prev);
@@ -912,6 +914,22 @@ export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeade
             .then((data) => setBugunAttentionCount(Math.max(0, Number(data.attention_count) || 0)))
             .catch(() => undefined);
         }}
+      />
+    ) : null}
+    {showPersonelHomeLogout ? (
+      <BackgroundlessNoticeModal
+        open={personelLogoutConfirmOpen}
+        title="Çıkış"
+        body="Uygulamadan Çıkmak İstediğinize Emin misiniz?"
+        primaryLabel="Evet"
+        secondaryLabel="Hayır"
+        onPrimary={() => {
+          setPersonelLogoutConfirmOpen(false);
+          logout();
+        }}
+        onSecondary={() => setPersonelLogoutConfirmOpen(false)}
+        onClose={() => setPersonelLogoutConfirmOpen(false)}
+        testId="personel-logout-confirm-modal"
       />
     ) : null}
     </>

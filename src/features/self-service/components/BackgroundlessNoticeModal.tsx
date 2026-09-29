@@ -87,16 +87,26 @@ export function BackgroundlessNoticeModal({
         {children ? <div className="pm-notice-children">{children}</div> : null}
         <div className="pm-notice-actions">
           {secondaryLabel && onSecondary ? (
-            <button type="button" className="pm-notice-btn" onClick={onSecondary} data-testid={`${testId}-secondary`}>
+            <button
+              type="button"
+              className="universal-btn-cancel"
+              onClick={onSecondary}
+              data-testid={`${testId}-secondary`}
+            >
               {secondaryLabel}
             </button>
           ) : null}
           {primaryLabel && onPrimary ? (
-            <button type="button" className="pm-notice-btn pm-notice-btn--primary" onClick={onPrimary} data-testid={`${testId}-primary`}>
+            <button
+              type="button"
+              className="universal-btn-save"
+              onClick={onPrimary}
+              data-testid={`${testId}-primary`}
+            >
               {primaryLabel}
             </button>
           ) : (
-            <button type="button" className="pm-notice-btn pm-notice-btn--primary" onClick={onClose} data-testid={`${testId}-close`}>
+            <button type="button" className="universal-btn-save" onClick={onClose} data-testid={`${testId}-close`}>
               Tamam
             </button>
           )}

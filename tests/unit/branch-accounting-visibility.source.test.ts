@@ -106,19 +106,20 @@ describe("branch accounting visibility owners", () => {
     expect(parsed.muhasebe_user_subeler_targets.REMOVE).toEqual([]);
   });
 
-  it("pins CURRENT_STATE + registry to code tip 093 and production tip 092", () => {
+  it("pins CURRENT_STATE + registry to code tip 093 and production tip 093 (POST_PR441)", () => {
     const current = read("CURRENT_STATE.md");
     const registry = read("docs/guncel/110-master-closure-gap-registry.md");
     const backlog = read("docs/guncel/146-post-pr402-canonical-backlog.md");
     expect(current).toMatch(/^CODE_MIGRATION_TIP: 093$/m);
-    expect(current).toMatch(/^PRODUCTION_MIGRATION_TIP: 092$/m);
-    expect(current).toMatch(/^LAST_VERIFIED_PRODUCTION_MIGRATION_TIP: 092$/m);
+    expect(current).toMatch(/^PRODUCTION_MIGRATION_TIP: 093$/m);
+    expect(current).toMatch(/^LAST_VERIFIED_PRODUCTION_MIGRATION_TIP: 093$/m);
     expect(current).toMatch(
-      /^FRESH_PRODUCTION_MIGRATION_READBACK: ACTIONS_APPLY_36367311876$/m
+      /^FRESH_PRODUCTION_MIGRATION_READBACK: DEPLOY_CPANEL_36543499484$/m
     );
-    expect(current).toMatch(/^PRODUCTION_MIGRATION_PENDING: 1$/m);
+    expect(current).toMatch(/^PRODUCTION_MIGRATION_PENDING: 0$/m);
+    expect(current).toMatch(/^LAST_MERGED_PR: 441$/m);
     expect(current).toMatch(
-      /^PRODUCTION_DEPLOY_SHA: 5c6ae7734d394022ea1ff65c5683da91c095e0eb$/m
+      /^PRODUCTION_DEPLOY_SHA: 0ef844475a3523b3e54215994a053cd27534c575$/m
     );
     expect(current).toContain("ACTIVE_BACKLOG_OWNER: docs/guncel/146-post-pr402-canonical-backlog.md");
     expect(current).toContain("USER_SUBELER_SEMANTIC: ACCESS_SCOPE_ONLY");
@@ -130,14 +131,14 @@ describe("branch accounting visibility owners", () => {
     expect(registry).toContain("SUPERSEDED");
     expect(registry).not.toContain("BM model ALREADY_SUPPORTED");
     expect(registry).toMatch(/^CODE_MIGRATION_TIP: 093$/m);
-    expect(registry).toMatch(/^PRODUCTION_MIGRATION_TIP: 092$/m);
+    expect(registry).toMatch(/^PRODUCTION_MIGRATION_TIP: 093$/m);
     expect(registry).toContain("| Migration 087 | **APPLIED** |");
     expect(registry).toContain("| Migration 088 | **APPLIED** |");
     expect(registry).toContain("| Migration 089 | **APPLIED** |");
     expect(registry).toContain("| Migration 090 | **APPLIED**");
     expect(registry).toContain("| Migration 091 | **APPLIED**");
     expect(registry).toContain("| Migration 092 | **APPLIED**");
-    expect(registry).toContain("| Migration 093 | **NOT_APPLIED**");
+    expect(registry).toContain("| Migration 093 | **APPLIED**");
     expect(registry).not.toContain("CODE_ONLY_PENDING");
     expect(backlog).toContain("146 — Post-PR402 Canonical Backlog");
     expect(backlog).toContain("BL-FORM-HINT");

@@ -339,7 +339,7 @@ class QrAttendanceEventService
      *
      * @return array{last_event_type:?string,next_action:string,stale_missing_cikis:bool}
      */
-    public static function resolveOpenShiftState(PDO $pdo, $personelId)
+    public static function resolveOpenShiftState(PDO $pdo, $personelId, $now = null)
     {
         $stmt = $pdo->prepare(
             'SELECT event_type, occurred_at_utc
@@ -355,7 +355,8 @@ class QrAttendanceEventService
             $blocks = QrAttendanceUnresolvedAnomalyService::openGirisBlocksNextGiris(
                 $pdo,
                 $personelId,
-                (string) ($last['occurred_at_utc'] ?? '')
+                (string) ($last['occurred_at_utc'] ?? ''),
+                $now
             );
 
             return [

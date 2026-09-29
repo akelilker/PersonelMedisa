@@ -44,6 +44,8 @@ function mapScanError(error: unknown): string {
       return "İşlem zaten kaydedilmiş.";
     case "QR_OPEN_SHIFT_EXISTS":
       return "Açık giriş kaydı varken yeni giriş yapılamaz. Önce çıkış veya düzeltme gerekir.";
+    case "QR_STALE_OPEN_SHIFT":
+      return "Önceki vardiyanın çıkış kaydı eksik. Düzeltme talebi oluşturun. Yeni vardiya için giriş yapabilirsiniz.";
     case "QR_NO_OPEN_SHIFT":
       return "Açık giriş olmadan çıkış kaydedilemez. Önce giriş okutun.";
     case "MOBILE_CAPABILITY_PENDING_SCOPE":

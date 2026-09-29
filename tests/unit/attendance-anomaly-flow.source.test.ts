@@ -61,6 +61,14 @@ describe("attendance anomaly correction flow", () => {
     expect(inbox).toContain("dayKeySchemaReady");
     expect(correction).not.toContain("INSERT INTO qr_attendance_events");
     expect(event).toContain("openGirisBlocksNextGiris");
+    expect(event).toContain("QR_STALE_OPEN_SHIFT");
+    const migration094 = read("api/migrations/094_attendance_no_event_day.sql");
+    expect(migration094).toContain("pending_day_guard");
+    expect(migration094).not.toMatch(/GENERATED ALWAYS AS[\s\S]*DATE_FORMAT/i);
+    expect(migration094).toContain("CAST(business_date AS CHAR)");
+    expect(migration094).toContain("CAST(anomaly_business_date AS CHAR)");
+    const scanPage = read("src/features/self-service/pages/PersonelQrScanPage.tsx");
+    expect(scanPage).toContain("QR_STALE_OPEN_SHIFT");
     expect(migration).toContain("uq_pin_anomaly_dedupe");
     expect(limit).toContain("ROLLING_12_MONTH_ACTUAL_DATE_V1");
     expect(limit).toContain("16200");

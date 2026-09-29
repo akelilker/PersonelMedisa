@@ -73,7 +73,7 @@ POST_PR403 kullanıcı kararı (2026-09-25). **Non-goals** ve deferred rollout �
 | `BL-QR-NFC` | NFC / turnike | **NON-GOAL** | Out of scope (105 discovery) |
 | `BL-KARYAPI-SENAY` | Karyapı / Şenay rollout | **DEFERRED — daha sonra** | Grant/assignment uydurma |
 | `BL-SERHAN-MEDISA-ACCESS` | Serhan Köse Medisa şube erişimi | Sinem gibi Medisa aktif şubelerde `user_subeler`; Karyapı/Şenay dışı | Karar kaydı |
-| `BL-POST-THRESHOLD-REENTRY` | Planlanan çıkış sonrası threshold üstü yeniden giriş | **OPEN — ürün kararı bekliyor** | Teknik default 180 dk (#441); overtime re-entry semantics netleşecek |
+| `BL-POST-THRESHOLD-REENTRY` | Planlanan çıkış sonrası threshold üstü yeniden giriş | **CLOSED (code)** | Ürün kararı (2026-09-29): tamamlanmış GIRIS→CIKIS sonrası yeni GIRIS bağımsız oturum; canlı açık GIRIS ikinci GIRIS’i engeller; planned exit+180 geçmiş stale açık GIRIS engellemez ve CIKIS’e bağlanmaz; cross-midnight plan kazanır. Owner: `QrAttendanceEventService::resolveOpenShiftState` + `QrAttendanceUnresolvedAnomalyService::openGirisBlocksNextGiris` / `matchWindow`. +180 ve NO_EVENT +30 değişmedi. |
 
 `BL-QR-ANOMALY-REV` (POST_PR403): personel self-revision yok — **CLOSED as policy**; implementation = #439 (`BL-QR-ANOMALY`).
 
@@ -109,13 +109,13 @@ E sınıfı: read-only verify · business truth · production write (write ayrı
 ## Decision registry (özet)
 
 Non-goals / deferred: `BL-FORM-HINT` · `BL-QR-DEVICE-BIND` · `BL-QR-OFFLINE` · `BL-QR-GEOFENCE` · `BL-QR-NFC` · `BL-KARYAPI-SENAY` · `BL-SERHAN-MEDISA-ACCESS`.
-Open product: `BL-POST-THRESHOLD-REENTRY`.
+Open product: _(none in D — `BL-POST-THRESHOLD-REENTRY` CLOSED)_.
 
 ---
 
 ## Technical gap registry (özet)
 
-C: `BL-NO-EVENT-DAY` (CODE_READY, pending PR + deploy + migration 094 apply).
+C: `BL-NO-EVENT-DAY` (CODE_READY; migration **094** SQL düzeltildi — `DATE_FORMAT` generated column uyumsuzluğu; production tip **093**, 094 NOT APPLIED; re-apply ayrı onay).
 
 ---
 
@@ -129,5 +129,5 @@ E (open only): `BL-QR-PILOT-OPS` · `BL-CROSS-COMPANY` (defer).
 
 1. `BL-QR-PILOT-OPS` — fiziksel iPhone permission + kiosk QR GİRİŞ/ÇIKIŞ + anomaly correction smoke.
 2. `BL-NO-EVENT-DAY` — PR, deploy, migration 094 apply (local CODE_READY; production'da yok).
-3. `BL-POST-THRESHOLD-REENTRY` — ürün kararı (D).
+3. `BL-POST-THRESHOLD-REENTRY` — **CLOSED** (code track; merge/deploy ayrı onay).
 4. Karyapı/Şenay + 120/158/219 rollout **DEFERRED**.

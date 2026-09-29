@@ -14,7 +14,10 @@ import { useRoleAccess } from "../../../hooks/use-role-access";
 import type { MeIdentity } from "../../../types/self-service";
 import { AttendanceCorrectionRequestModal } from "../components/AttendanceCorrectionRequestModal";
 import { BackgroundlessNoticeModal } from "../components/BackgroundlessNoticeModal";
-import { OwnQrAttendanceBoxes } from "../components/OwnQrAttendanceBoxes";
+import {
+  OwnQrAttendanceBoxes,
+  PASSIVE_CIKIS_WITHOUT_GIRIS_NOTICE
+} from "../components/OwnQrAttendanceBoxes";
 import { PersonelSelfServiceIdentity } from "../components/PersonelSelfServiceIdentity";
 import { PersonelSelfServiceMenu } from "../components/PersonelSelfServiceMenu";
 import { useSelfProfilFoto } from "../hooks/use-self-profil-foto";
@@ -241,6 +244,9 @@ export function PersonelSelfServiceHomePage() {
                 primeQrCamera();
                 navigate("/self/qr-okut?event=CIKIS");
               })
+            }
+            onPassiveCikisWithoutGiris={() =>
+              setNotice({ title: "Bilgi", body: PASSIVE_CIKIS_WITHOUT_GIRIS_NOTICE })
             }
             onCorrectGiris={(event) =>
               guardOrRun("attendance_correct", () => {

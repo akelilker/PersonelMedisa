@@ -973,7 +973,8 @@ body.app-personel-shell.app-home-route .personel-mobile-shell.self-home-page > .
 }
 
 .pm-attendance-box--idle-giris:not(.pm-attendance-box--actionable) .pm-box-main-action:disabled,
-.pm-attendance-box--idle-cikis:not(.pm-attendance-box--actionable) .pm-box-main-action:disabled {
+.pm-attendance-box--idle-cikis:not(.pm-attendance-box--actionable) .pm-box-main-action:disabled,
+.pm-attendance-box--idle-cikis:not(.pm-attendance-box--actionable) .pm-box-main-action[aria-disabled="true"] {
   opacity: 1;
   cursor: default;
   color: rgba(255, 255, 255, 0.94);
@@ -1154,7 +1155,8 @@ body.app-personel-shell.app-home-route .personel-mobile-shell.self-home-page > .
   color: inherit;
 }
 
-.pm-box-main-action:disabled {
+.pm-box-main-action:disabled,
+.pm-box-main-action[aria-disabled="true"] {
   cursor: default;
 }
 

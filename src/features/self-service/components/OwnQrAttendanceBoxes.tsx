@@ -31,9 +31,14 @@ type OwnQrAttendanceBoxesProps = {
   allowCorrection?: boolean;
   onScanGiris: () => void;
   onScanCikis: () => void;
+  /** Pasif ÇIKIŞ (henüz giriş yok) tıklanınca kullanıcıya uyarı gösterilir. */
+  onPassiveCikisWithoutGiris?: () => void;
   onCorrectGiris?: (event: AttendanceEvent) => void;
   onCorrectCikis?: (event: AttendanceEvent) => void;
 };
+
+export const PASSIVE_CIKIS_WITHOUT_GIRIS_NOTICE =
+  "Henüz Giriş Yapmadınız. Giriş Yapmanıza Rağmen Sorun Yaşıyorsanız Amirinizle Görüşün.";
 
 function PencilIcon() {
   return (
@@ -102,6 +107,7 @@ export function OwnQrAttendanceBoxes({
   allowCorrection = false,
   onScanGiris,
   onScanCikis,
+  onPassiveCikisWithoutGiris,
   onCorrectGiris,
   onCorrectCikis
 }: OwnQrAttendanceBoxesProps) {
@@ -232,8 +238,16 @@ export function OwnQrAttendanceBoxes({
                 .join(" ")}
               data-testid="cikis-scan"
               aria-label="Çıkış için kiosk QR okut"
-              disabled={!cikisActionable}
-              onClick={cikisActionable ? onScanCikis : undefined}
+              aria-disabled={!cikisActionable}
+              onClick={() => {
+                if (cikisActionable) {
+                  onScanCikis();
+                  return;
+                }
+                if (!today.giris) {
+                  onPassiveCikisWithoutGiris?.();
+                }
+              }}
             >
               <span className="pm-box-label">ÇIKIŞ</span>
               {cikisCountdown ? (

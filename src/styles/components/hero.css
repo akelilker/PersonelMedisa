@@ -116,6 +116,11 @@
   object-fit: contain;
 }
 
+/* PERSONEL shell: ad/soyad kalktığında logo biraz aşağı (Taşıt driver-shell hizası). */
+.hero.hero--personel-shell .hero-logo {
+  transform: translateY(7px);
+}
+
 .hero-title-stack {
   grid-column: 2;
   grid-row: 1 / 3;
@@ -778,7 +783,7 @@ body.login-page .hero .animated-line {
     margin-left: 0;
     padding-left: 2px;
     align-self: center;
-    transform: translate(-3px, 0);
+    transform: translate(-3px, 8px);
   }
 
   body.app-home-route .hero.hero--personel-shell .hero-logo picture {

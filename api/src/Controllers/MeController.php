@@ -127,9 +127,11 @@ class MeController
         $to = $request->getQuery('to', $defaults['to']);
 
         $result = SelfPuantajReadService::listForPersonel($pdo, (int) $ctx['personel_id'], $from, $to);
+        $birimId = isset($ctx['birim_id']) && $ctx['birim_id'] !== null ? (int) $ctx['birim_id'] : 0;
         $result['ozet']['aylik_onayli_mi'] = SelfPuantajReadService::isAylikOnayli(
             $pdo,
             (int) $ctx['sube_id'],
+            $birimId,
             $from
         );
 

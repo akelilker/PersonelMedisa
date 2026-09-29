@@ -114,7 +114,7 @@ describe("branch accounting visibility owners", () => {
     expect(current).toMatch(/^PRODUCTION_MIGRATION_TIP: 093$/m);
     expect(current).toMatch(/^LAST_VERIFIED_PRODUCTION_MIGRATION_TIP: 093$/m);
     expect(current).toMatch(
-      /^FRESH_PRODUCTION_MIGRATION_READBACK: DEPLOY_CPANEL_36543499484$/m
+      /^FRESH_PRODUCTION_MIGRATION_READBACK: ACTIONS_APPLY_36491356202$/m
     );
     expect(current).toMatch(/^PRODUCTION_MIGRATION_PENDING: 0$/m);
     expect(current).toMatch(/^LAST_MERGED_PR: 441$/m);
@@ -142,6 +142,8 @@ describe("branch accounting visibility owners", () => {
     expect(registry).not.toContain("CODE_ONLY_PENDING");
     expect(backlog).toContain("146 — Post-PR402 Canonical Backlog");
     expect(backlog).toContain("BL-FORM-HINT");
-    expect(backlog).toContain("STALE_SAFE_TO_DELETE=YES");
+    expect(backlog).toContain("BL-SELF-HISTORY-APPROVAL-SCOPE");
+    expect(backlog).not.toContain("STALE_SAFE_TO_DELETE=YES");
+    expect(backlog).toContain("into `BL-QR-PILOT-OPS`");
   });
 });

@@ -1,7 +1,7 @@
 CODE_MIGRATION_TIP: 093
 PRODUCTION_MIGRATION_TIP: 093
 LAST_VERIFIED_PRODUCTION_MIGRATION_TIP: 093
-FRESH_PRODUCTION_MIGRATION_READBACK: DEPLOY_CPANEL_36543499484
+FRESH_PRODUCTION_MIGRATION_READBACK: ACTIONS_APPLY_36491356202
 
 # 110 — Master Closure / Gap Registry — SUPERSEDED
 
@@ -17,8 +17,8 @@ This file is retained as a **historical archive** of the 2026-09-20 SGK employer
 | PRODUCTION_MIGRATION_TIP | 089 (stale) | **093** APPLIED |
 | PRODUCTION_MIGRATION_PENDING | 2 (`090`+`091`) | **0** |
 | PR #326 | OPEN (stale) | **MERGED** |
-| PRODUCTION_DEPLOY_SHA | `d96182a2` (#301) | `0ef84447` (#441) |
-| FRESH_READBACK | BLOCKED_EXTERNAL_GITHUB_ACTIONS_BILLING | DEPLOY_CPANEL_36543499484 |
+| PRODUCTION_DEPLOY_SHA | `d96182a2` (#301) | `0ef84447` (#441); deploy run `36543499484` |
+| FRESH_READBACK | BLOCKED_EXTERNAL_GITHUB_ACTIONS_BILLING | ACTIONS_APPLY_36491356202 |
 
 ## Migration durumu (current — mirrored for sync tests)
 
@@ -27,7 +27,7 @@ This file is retained as a **historical archive** of the 2026-09-20 SGK employer
 | CODE_MIGRATION_TIP | **093** |
 | PRODUCTION_MIGRATION_TIP | **093** |
 | LAST_VERIFIED_PRODUCTION_MIGRATION_TIP | **093** |
-| FRESH_PRODUCTION_MIGRATION_READBACK | **DEPLOY_CPANEL_36543499484** |
+| FRESH_PRODUCTION_MIGRATION_READBACK | **ACTIONS_APPLY_36491356202** |
 | PRODUCTION_MIGRATION_PENDING | **0** |
 | Migration 087 | **APPLIED** |
 | Migration 088 | **APPLIED** |
@@ -35,8 +35,8 @@ This file is retained as a **historical archive** of the 2026-09-20 SGK employer
 | Migration 090 | **APPLIED** (Actions `35781766535`) |
 | Migration 091 | **APPLIED** (Actions `35791415567`) |
 | Migration 092 | **APPLIED** (Actions `36367311876`; backup VERIFIED; readback VERIFIED) |
-| Migration 093 | **APPLIED** (PR #439 rollout; attendance anomaly notification dedupe) |
-| CODE_MAIN_SHA / PRODUCTION_DEPLOY_SHA | `0ef844475a3523b3e54215994a053cd27534c575` |
+| Migration 093 | **APPLIED** (Apply `36491356202`; `093_attendance_anomaly_notification_dedupe.sql`; worker SUCCEEDED; backup `medisa-pre-093-36491356202-1-20260928-223004.sql`; readback VERIFIED) |
+| CODE_MAIN_SHA / PRODUCTION_DEPLOY_SHA | `0ef844475a3523b3e54215994a053cd27534c575` (deploy cPanel `36543499484`, #441) |
 | PR #326 | **MERGED** |
 | PR #402 | **MERGED / DEPLOYED** |
 | PR #439–#441 | **MERGED / DEPLOYED** |

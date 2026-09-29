@@ -404,6 +404,11 @@ body.app-personel-shell.app-home-route .personel-mobile-shell.self-home-page > .
   flex: 1 1 auto;
   min-width: 0;
   padding-left: 4px;
+  gap: 0;
+}
+
+.pm-self-identity--home .pm-self-identity__fact:first-of-type {
+  margin-top: 3px;
 }
 
 .pm-self-identity--home .pm-self-identity__fact {
@@ -473,18 +478,18 @@ body.app-personel-shell.app-home-route .personel-mobile-shell.self-home-page > .
 
 .pm-self-identity__photo-add-badge {
   position: absolute;
-  right: -1px;
-  bottom: -1px;
+  right: 2px;
+  bottom: 2px;
   box-sizing: border-box;
   display: grid;
   place-items: center;
-  width: 16px;
-  height: 16px;
+  width: 20px;
+  height: 20px;
   border: none;
   border-radius: 999px;
   background: transparent;
   color: var(--brand-red, #c62828);
-  font-size: 11px;
+  font-size: 14px;
   font-weight: 800;
   line-height: 1;
   pointer-events: none;
@@ -577,8 +582,8 @@ body.app-personel-shell.app-home-route .personel-mobile-shell.self-home-page > .
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   transition: transform 0.18s ease;
 }
 
@@ -1444,18 +1449,33 @@ body.app-personel-shell.app-home-route .personel-mobile-shell.self-home-page > .
   justify-content: flex-end;
 }
 
-.pm-notice-btn {
-  min-height: 44px;
-  padding: 0 14px;
-  border: 1px solid rgba(255, 255, 255, 0.35);
-  border-radius: var(--radius-md);
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
+.pm-notice-actions .universal-btn-save,
+.pm-notice-actions .universal-btn-cancel {
+  width: auto;
+  min-width: 88px;
+  height: 44px;
+  padding: 0 16px;
+  font-size: 13px;
+  transform-origin: center;
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease,
+    box-shadow 0.2s ease,
+    font-weight 0.2s ease,
+    transform 0.15s ease;
 }
 
-.pm-notice-btn--primary {
-  border-color: var(--brand-red, #c62828);
+.pm-notice-actions .universal-btn-save:hover:not([disabled]),
+.pm-notice-actions .universal-btn-save:focus-visible:not([disabled]),
+.pm-notice-actions .universal-btn-save:active:not([disabled]) {
+  transform: scale(1.03);
+}
+
+.pm-notice-actions .universal-btn-cancel:hover:not([disabled]),
+.pm-notice-actions .universal-btn-cancel:focus-visible:not([disabled]),
+.pm-notice-actions .universal-btn-cancel:active:not([disabled]) {
+  transform: scale(1.03);
 }
 
 .pm-info-icon {

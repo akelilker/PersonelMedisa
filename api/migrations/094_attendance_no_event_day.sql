@@ -30,7 +30,7 @@ ALTER TABLE qr_attendance_correction_requests
           AND source_event_id IS NULL
           AND anomaly_type IS NOT NULL
           AND anomaly_type <> ''
-          THEN CONCAT(personel_id, '#', DATE_FORMAT(business_date, '%Y-%m-%d'), '#', anomaly_type)
+          THEN CONCAT(personel_id, '#', CAST(business_date AS CHAR), '#', anomaly_type)
         ELSE NULL
       END
     ) STORED,
@@ -55,7 +55,7 @@ ALTER TABLE personel_inbox_notifications
           AND personel_id IS NOT NULL
           THEN CONCAT(
             kind, '#', anomaly_type, '#', personel_id, '#',
-            DATE_FORMAT(anomaly_business_date, '%Y-%m-%d'), '#', anomaly_audience
+            CAST(anomaly_business_date AS CHAR), '#', anomaly_audience
           )
         ELSE NULL
       END

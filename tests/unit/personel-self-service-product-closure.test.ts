@@ -120,7 +120,8 @@ describe("PERSONEL self-service product closure", () => {
     const puantaj = read("api/src/Services/SelfService/SelfPuantajReadService.php");
     expect(puantaj).toContain("'net_calisma_dakika_toplam' => $netCalismaToplam");
     expect(puantaj).toContain("aylik_bildirim_onaylari");
-    expect(puantaj).toContain("sube_id = :sube_id AND ay = :ay AND state = 'TAMAMLANDI'");
+    expect(puantaj).toContain("birim_amiri_user_id = :birim_amiri_user_id");
+    expect(puantaj).toContain("resolveBirimAmiriUserIdForPersonelScope");
 
     const me = read("api/src/Controllers/MeController.php");
     expect(me).toContain("aylik_onayli_mi");

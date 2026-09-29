@@ -163,16 +163,22 @@ class SelfPuantajReadService
 
     /**
      * Ay sonu amir onayı okuması (aylik_bildirim_onaylari, state TAMAMLANDI).
-     * Yalnız bağlı personelin kendi şubesi için sorgulanır; başka şube verisi sızmaz.
+     * Personelin birimine atanmış BIRIM_AMIRI (user_birimler) için şube+ay kaydı aranır;
+     * başka birim amirinin aynı şubedeki onayı bu personel için geçerli değildir.
      *
      * @param mixed $subeId
+     * @param mixed $birimId personel effective birim_id (SelfPersonelContext)
      * @param string $from YYYY-MM-DD; ay bu tarihten türetilir.
      * @return bool
      */
-    public static function isAylikOnayli(PDO $pdo, $subeId, $from)
+    public static function isAylikOnayli(PDO $pdo, $subeId, $birimId, $from)
     {
         $subeId = (int) $subeId;
         if ($subeId <= 0) {
+            return false;
+        }
+        $amirId = self::resolveBirimAmiriUserIdForPersonelScope($pdo, $birimId);
+        if ($amirId === null || $amirId <= 0) {
             return false;
         }
         $ay = substr(trim((string) $from), 0, 7);
@@ -182,14 +188,59 @@ class SelfPuantajReadService
         try {
             $stmt = $pdo->prepare(
                 "SELECT id FROM aylik_bildirim_onaylari
-                 WHERE sube_id = :sube_id AND ay = :ay AND state = 'TAMAMLANDI'
+                 WHERE sube_id = :sube_id
+                   AND birim_amiri_user_id = :birim_amiri_user_id
+                   AND ay = :ay
+                   AND state = 'TAMAMLANDI'
                  LIMIT 1"
             );
-            $stmt->execute(['sube_id' => $subeId, 'ay' => $ay]);
+            $stmt->execute([
+                'sube_id' => $subeId,
+                'birim_amiri_user_id' => $amirId,
+                'ay' => $ay,
+            ]);
 
             return $stmt->fetch(PDO::FETCH_ASSOC) !== false;
         } catch (\Throwable $e) {
             return false;
+        }
+    }
+
+    /**
+     * Canonical BIRIM_AMIRI for a personel birim (attendance-correction chain ile uyumlu).
+     *
+     * @param mixed $birimId
+     * @return int|null
+     */
+    public static function resolveBirimAmiriUserIdForPersonelScope(PDO $pdo, $birimId)
+    {
+        $birimId = (int) $birimId;
+        if ($birimId <= 0) {
+            return null;
+        }
+        try {
+            $stmt = $pdo->prepare(
+                "SELECT u.id
+                 FROM users u
+                 INNER JOIN user_birimler ub ON ub.user_id = u.id
+                 WHERE u.rol = :rol
+                   AND u.durum = 'AKTIF'
+                   AND ub.birim_id = :birim_id
+                 ORDER BY u.id ASC
+                 LIMIT 1"
+            );
+            $stmt->execute([
+                'rol' => 'BIRIM_AMIRI',
+                'birim_id' => $birimId,
+            ]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!is_array($row)) {
+                return null;
+            }
+
+            return (int) $row['id'];
+        } catch (\Throwable $e) {
+            return null;
         }
     }
 

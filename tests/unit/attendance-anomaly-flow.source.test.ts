@@ -32,6 +32,8 @@ describe("attendance anomaly correction flow", () => {
     expect(cli).toContain("PHP_SAPI !== 'cli'");
     expect(cli).toContain("http_response_code(404)");
     expect(cli).toContain("*/5 * * * * cd /home/karmotor/public_html/personelmedisa && \"$(command -v php)\" api/bin/attendance-anomaly-scan.php");
+    expect(cli).toContain("cd /home/karmotor/public_html/personelmedisa && MEDISA_ATTENDANCE_ANOMALY_THRESHOLD_MINUTES=5 \"$(command -v php)\" api/bin/attendance-anomaly-scan.php");
+    expect(cli).toContain("Do not put MEDISA_ATTENDANCE_ANOMALY_THRESHOLD_MINUTES on this cron");
     expect(cli).toContain("Cadence is 5 minutes. Expected delay after the threshold is 0-300 seconds.");
     expect(cli).not.toContain("one minute");
     expect(cli).not.toContain("* * * * * cd /home/karmotor/public_html/personelmedisa");
@@ -40,6 +42,9 @@ describe("attendance anomaly correction flow", () => {
     expect(anomaly).toContain("AttendanceCorrectionApproverResolver");
     expect(anomaly).not.toContain("resolveOperationalManagerRecipients");
     expect(anomaly).toContain("THRESHOLD_MINUTES = 180");
+    expect(anomaly).toContain("function thresholdMinutes()");
+    expect(anomaly).toContain("getenv('MEDISA_ATTENDANCE_ANOMALY_THRESHOLD_MINUTES')");
+    expect(anomaly).toContain("self::thresholdMinutes()");
     expect(today).toContain("QrAttendanceUnresolvedAnomalyService::listForPersonel");
     expect(correction).toContain("requireUnresolvedAnomaly");
     expect(correction).toContain("applyEffectiveTime");

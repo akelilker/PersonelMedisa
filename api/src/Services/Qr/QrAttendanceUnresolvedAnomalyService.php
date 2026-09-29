@@ -40,6 +40,27 @@ class QrAttendanceUnresolvedAnomalyService
     public const LIVE_WARNING = 'Günlük Çalışma Süresi Doldu. Çıkış Yapmanız Gerekmektedir. Amirinizle İrtibata Geçin.';
 
     /**
+     * Production default stays THRESHOLD_MINUTES. A positive integer env value
+     * is clamped to 1–1440 so tests can shorten the wait; anything else falls back.
+     */
+    public static function thresholdMinutes(): int
+    {
+        $raw = getenv('MEDISA_ATTENDANCE_ANOMALY_THRESHOLD_MINUTES');
+        if (!is_string($raw) || preg_match('/\A[0-9]+\z/', trim($raw)) !== 1) {
+            return self::THRESHOLD_MINUTES;
+        }
+        $minutes = (int) trim($raw);
+        if ($minutes < 1) {
+            return self::THRESHOLD_MINUTES;
+        }
+        if ($minutes > 1440) {
+            return 1440;
+        }
+
+        return $minutes;
+    }
+
+    /**
      * @param string|null $girisHhmm
      * @param string|null $cikisHhmm
      * @return array{anchor_date:string,start:\DateTimeImmutable,exit:\DateTimeImmutable,threshold:\DateTimeImmutable,exit_hhmm:string}|null
@@ -69,7 +90,7 @@ class QrAttendanceUnresolvedAnomalyService
         if ($cikisMin <= $girisMin) {
             $exit = $exit->modify('+1 day');
         }
-        $threshold = $exit->modify('+' . self::THRESHOLD_MINUTES . ' minutes');
+        $threshold = $exit->modify('+' . self::thresholdMinutes() . ' minutes');
 
         return [
             'anchor_date' => $anchorYmd,

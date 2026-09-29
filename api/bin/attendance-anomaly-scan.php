@@ -8,9 +8,15 @@ declare(strict_types=1);
  * Primary trigger for planned-exit + 180 minute missing ÇIKIŞ notifications.
  * Does not mutate QR events, puantaj, payroll, or the migration worker.
  *
- * Proposed production cPanel cron (NOT installed by this repository):
+ * Proposed production cPanel cron (NOT installed by this repository).
+ * Do not put MEDISA_ATTENDANCE_ANOMALY_THRESHOLD_MINUTES on this cron:
  *
  *   */5 * * * * cd /home/karmotor/public_html/personelmedisa && "$(command -v php)" api/bin/attendance-anomaly-scan.php
+ *
+ * Test-only cPanel command, same env prefix style as the migration worker.
+ * Do not install this on the production cron:
+ *
+ *   cd /home/karmotor/public_html/personelmedisa && MEDISA_ATTENDANCE_ANOMALY_THRESHOLD_MINUTES=5 "$(command -v php)" api/bin/attendance-anomaly-scan.php
  *
  * Cadence is 5 minutes. Expected delay after the threshold is 0-300 seconds.
  * Opening the PERSONEL app is not required. Today-read notification write is

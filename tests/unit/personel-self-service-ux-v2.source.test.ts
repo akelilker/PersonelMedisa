@@ -95,6 +95,12 @@ describe("PERSONEL_SELF_SERVICE_PRODUCT_UX_V2 notification + policy owners", () 
     expect(heroCss).toMatch(
       /body\.app-home-route \.hero\.hero--personel-shell \.hero-title-stack > h1,\s*\n\s*body\.app-home-route \.hero\.hero--personel-shell \.hero-title-stack \.hero-panel-subtitle\s*\{[^}]*letter-spacing:\s*clamp\(0px,\s*0\.03vw,\s*0\.3px\)/s
     );
+    expect(heroCss).toMatch(
+      /body\.app-home-route \.hero\.hero--personel-shell \.hero-title-stack\s*\{[^}]*text-align:\s*center/s
+    );
+    expect(heroCss).toMatch(
+      /body\.app-home-route \.hero\.hero--personel-shell \.hero-title-stack > h1,\s*\n\s*body\.app-home-route \.hero\.hero--personel-shell \.hero-title-stack \.hero-panel-subtitle\s*\{[^}]*text-align:\s*center/s
+    );
 
     const header = read("src/components/shell/ShellHeaderActions.tsx");
     expect(header).toContain('subeControl.kind === "multi" && !isPersonelRole');

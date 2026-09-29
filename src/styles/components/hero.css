@@ -836,9 +836,10 @@ body.login-page .hero .animated-line {
     grid-column: 2;
     grid-row: 1;
     align-self: center;
+    align-items: center;
     min-width: 0;
     justify-self: stretch;
-    text-align: left;
+    text-align: center;
     padding: 0;
     gap: 2px;
   }
@@ -846,10 +847,10 @@ body.login-page .hero .animated-line {
   body.app-home-route .hero.hero--personel-shell .hero-title-stack > h1,
   body.app-home-route .hero.hero--personel-shell .hero-title-stack .hero-panel-subtitle {
     margin: 0;
-    text-align: left;
+    text-align: center;
     background: var(--hero-title-gradient);
     background-size: 100% 100%;
-    background-position: 0% 50%;
+    background-position: 50% 50%;
     font-size: min(21.4px, calc(4.977vw - 0.12px));
     font-weight: 800;
     letter-spacing: clamp(0px, 0.03vw, 0.3px);
@@ -859,7 +860,7 @@ body.login-page .hero .animated-line {
     overflow: hidden;
     text-overflow: clip;
     white-space: nowrap;
-    padding: 0 3px 0 0;
+    padding: 0 3px;
     color: transparent;
     -webkit-background-clip: text;
     background-clip: text;
@@ -871,7 +872,7 @@ body.login-page .hero .animated-line {
   }
 
   body.app-home-route .hero.hero--personel-shell .hero-title-stack .hero-panel-subtitle {
-    align-self: stretch;
+    align-self: center;
     width: 100%;
   }
 

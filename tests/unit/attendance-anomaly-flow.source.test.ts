@@ -64,9 +64,11 @@ describe("attendance anomaly correction flow", () => {
     expect(event).toContain("QR_STALE_OPEN_SHIFT");
     const migration094 = read("api/migrations/094_attendance_no_event_day.sql");
     expect(migration094).toContain("pending_day_guard");
-    expect(migration094).not.toMatch(/GENERATED ALWAYS AS[\s\S]*DATE_FORMAT/i);
-    expect(migration094).toContain("CAST(business_date AS CHAR)");
-    expect(migration094).toContain("CAST(anomaly_business_date AS CHAR)");
+    expect(migration094).toContain("Recovery shape");
+    expect(migration094).not.toMatch(/DATE_FORMAT\s*\(/i);
+    expect(migration094).toContain("@qacr_day_rebuild");
+    expect(migration094).toContain("business_date, ''#'', anomaly_type");
+    expect(migration094).toContain("anomaly_business_date, ''#'', anomaly_audience");
     const scanPage = read("src/features/self-service/pages/PersonelQrScanPage.tsx");
     expect(scanPage).toContain("QR_STALE_OPEN_SHIFT");
     expect(migration).toContain("uq_pin_anomaly_dedupe");

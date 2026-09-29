@@ -19,7 +19,7 @@ describe("user access change audit: migration 082 and the fail-closed update own
 
     const stdout = String(result.stdout);
     for (const marker of [
-      "the canonical chain tip is migration 087",
+      "the canonical chain tip is migration 094",
       "migration 083 created the personnel organisation audit table",
       "migration 082 created the access change audit table",
       "actor and target both carry a foreign key to users",

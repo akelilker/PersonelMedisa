@@ -113,7 +113,7 @@ describe("OwnQrAttendanceBoxes countdown render", () => {
 
     expect(screen.getByText("Mesaiye Kalan Süre")).toBeInTheDocument();
     expect(screen.getByTestId("pm-box-countdown-value")).toHaveTextContent("1 Saat");
-    expect(screen.getByTestId("cikis-scan")).toBeDisabled();
+    expect(screen.getByTestId("cikis-scan")).toHaveAttribute("aria-disabled", "true");
   });
 
   it("shows 'İşe Geç Kaldınız.' when no entry, planned entry passed, not on leave", async () => {
@@ -202,7 +202,7 @@ describe("OwnQrAttendanceBoxes countdown render", () => {
     });
 
     expect(screen.getByText("Mesai Bitimine Kalan")).toBeInTheDocument();
-    expect(screen.getByTestId("cikis-scan")).toBeEnabled();
+    expect(screen.getByTestId("cikis-scan")).not.toHaveAttribute("aria-disabled", "true");
     expect(screen.queryByTestId("giris-late-warning")).not.toBeInTheDocument();
   });
 

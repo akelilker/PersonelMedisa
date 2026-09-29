@@ -81,7 +81,7 @@ describe("PERSONEL_SELF_SERVICE_PRODUCT_UX_V2 notification + policy owners", () 
 
     const heroCss = read("src/styles/components/hero.css");
     expect(heroCss).toMatch(
-      /body\.app-home-route \.hero\.hero--personel-shell \.hero-logo\s*\{[^}]*transform:\s*translate\(-3px,\s*0\)/s
+      /body\.app-home-route \.hero\.hero--personel-shell \.hero-logo\s*\{[^}]*transform:\s*translate\(-3px,\s*8px\)/s
     );
     expect(heroCss).toMatch(
       /body\.app-home-route \.hero\.hero--personel-shell \.hero-title-stack \.hero-panel-subtitle\s*\{[^}]*letter-spacing:\s*4px/s

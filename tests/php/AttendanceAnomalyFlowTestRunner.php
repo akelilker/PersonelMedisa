@@ -31,7 +31,19 @@ function aaIstanbul(string $local): DateTimeImmutable
 
 $svc = QrAttendanceUnresolvedAnomalyService::class;
 
+putenv('MEDISA_ATTENDANCE_ANOMALY_THRESHOLD_MINUTES');
 aaAssert($svc::THRESHOLD_MINUTES === 180, 'threshold is 180 minutes');
+aaAssert($svc::thresholdMinutes() === 180, 'default thresholdMinutes is 180');
+putenv('MEDISA_ATTENDANCE_ANOMALY_THRESHOLD_MINUTES=5');
+aaAssert($svc::thresholdMinutes() === 5, 'env override thresholdMinutes is 5');
+$overrideWindow = $svc::buildWindow('2026-09-28', '08:30', '17:40');
+aaAssert($overrideWindow !== null && $overrideWindow['threshold']->format('Y-m-d H:i') === '2026-09-28 17:45', 'env 5 builds exit + 5');
+putenv('MEDISA_ATTENDANCE_ANOMALY_THRESHOLD_MINUTES=2000');
+aaAssert($svc::thresholdMinutes() === 1440, 'env above 1440 clamps to 1440');
+putenv('MEDISA_ATTENDANCE_ANOMALY_THRESHOLD_MINUTES=0');
+aaAssert($svc::thresholdMinutes() === 180, 'non-positive env falls back to 180');
+putenv('MEDISA_ATTENDANCE_ANOMALY_THRESHOLD_MINUTES');
+aaAssert($svc::thresholdMinutes() === 180, 'cleared env restores 180');
 aaAssert(!str_contains(file_get_contents(__DIR__ . '/../../api/src/Services/Qr/QrAttendanceUnresolvedAnomalyService.php') ?: '', '20:40'), 'no hardcoded 20:40');
 aaAssert(QrAttendanceIntervalDerivationService::CORRECTION_HINT === 'GIRIS_CIKIS_DUZELTME', 'correction hint unchanged');
 

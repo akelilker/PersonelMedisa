@@ -31,10 +31,12 @@ describe("attendance anomaly correction flow", () => {
 
     expect(cli).toContain("PHP_SAPI !== 'cli'");
     expect(cli).toContain("http_response_code(404)");
-    expect(cli).toContain("*/5 * * * * cd /home/karmotor/public_html/personelmedisa && \"$(command -v php)\" api/bin/attendance-anomaly-scan.php");
+    expect(cli).toContain("Run every 5 minutes.");
+    expect(cli).toContain("cd /home/karmotor/public_html/personelmedisa && /usr/local/bin/ea-php81 api/bin/attendance-anomaly-scan.php");
     expect(cli).toContain("cd /home/karmotor/public_html/personelmedisa && MEDISA_ATTENDANCE_ANOMALY_THRESHOLD_MINUTES=5 \"$(command -v php)\" api/bin/attendance-anomaly-scan.php");
     expect(cli).toContain("Do not put MEDISA_ATTENDANCE_ANOMALY_THRESHOLD_MINUTES on this cron");
     expect(cli).toContain("Cadence is 5 minutes. Expected delay after the threshold is 0-300 seconds.");
+    expect(cli).not.toMatch(/\*\/\s*[0-9*]/);
     expect(cli).not.toContain("one minute");
     expect(cli).not.toContain("* * * * * cd /home/karmotor/public_html/personelmedisa");
     expect(cli).toContain("QrAttendanceUnresolvedAnomalyService::scan");

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { spawnSync } from "node:child_process";
 
 function read(path: string): string {
   return readFileSync(resolve(process.cwd(), path), "utf8");
@@ -17,8 +18,17 @@ describe("QR attendance pilot readiness contracts", () => {
     expect(body).toContain("otomatik `gunluk_puantaj`");
     expect(body).toContain("candidate → review → controlled apply");
     expect(body).toContain("Secret değeri yazma/okuma/loglama yok");
+    expect(body).toContain("CURRENT ATTENDANCE/QR PHASE");
+    expect(body).toContain("STATUS: CLOSED");
+    expect(body).toContain("EXPIRED_QR");
+    expect(body).toContain("CROSS_BRANCH");
+    expect(body).toContain("POST_094_CRON");
+    expect(body).toContain("ACCEPTED_EVIDENCE_LIMITATION");
+    expect(body).toContain("CrossBranchDenyScanTestRunner");
     expect(body).not.toMatch(/qr_signing_secret\s*=\s*['\"][^'\"]{8,}/);
     expect(body).not.toMatch(/CHANGE_ME_REAL_SECRET/);
+    expect(body).not.toContain("FIELD_DEVICE_SMOKE_PENDING");
+    expect(body).not.toMatch(/- \[ \] Yanlış şube QR/);
   });
 
   it("keeps scan path from auto-inserting gunluk_puantaj", () => {
@@ -70,6 +80,13 @@ describe("QR attendance pilot readiness contracts", () => {
     expect(scanner).toContain("Telefon Ayarlarınızdan Kamera Erişimine İzin Verin.");
     expect(scanner).toContain("BarcodeDetector");
     expect(scanner).toContain("jsqr");
+  });
+
+  it("runs CrossBranchDenyScanTestRunner for CROSS_BRANCH pilot gate", () => {
+    const runner = resolve(process.cwd(), "tests/php/CrossBranchDenyScanTestRunner.php");
+    const result = spawnSync("php", [runner], { cwd: process.cwd(), encoding: "utf8" });
+    expect(result.status, result.stderr || result.stdout).toBe(0);
+    expect(result.stdout).toContain("[OK] CrossBranchDenyScanTestRunner");
   });
 
   it("wires kiosk model note on amir home only (PERSONEL product home stays clean)", () => {

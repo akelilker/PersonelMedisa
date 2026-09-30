@@ -30,5 +30,7 @@ describe("QR surface ownership", () => {
     expect(source).toContain("istanbulDateDaysAgo(30)");
     expect(source).toContain("row.date_from");
     expect(source).toContain("Günlük puantaj");
+    expect(source).toContain("personel-qr-history-card-list");
+    expect(source).toContain('data-testid="personel-qr-history-cards"');
   });
 });

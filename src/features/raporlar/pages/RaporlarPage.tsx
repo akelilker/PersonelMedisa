@@ -823,14 +823,11 @@ export function RaporlarPage() {
 
   return (
     <section className="raporlar-page raporlar-page--premium">
-      <header className="raporlar-page-head">
-        <h2>Raporlar</h2>
-        <p className="raporlar-page-lead" data-testid="raporlar-page-lead">
-          {RAPORLAR_SURFACE_LEADS[activeSurface]}
-        </p>
-      </header>
-
       <RaporlarGroupedNav surface={activeSurface} visibility={navVisibility} />
+
+      <p className="raporlar-surface-lead" data-testid="raporlar-page-lead">
+        {RAPORLAR_SURFACE_LEADS[activeSurface]}
+      </p>
 
       {activePanel === "donem-kapanis" && canViewDonemKapanis ? <DonemKapanisMerkeziPage /> : null}
       {activePanel === "etki-adayi" && canViewEtkiAdayiRapor ? <EtkiAdayiRaporuPage /> : null}

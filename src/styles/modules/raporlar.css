@@ -15,25 +15,11 @@
   min-width: 0;
 }
 
-.raporlar-page-head {
-  display: grid;
-  gap: 0.35rem;
-  padding-bottom: var(--space-2);
-  border-bottom: 1px solid var(--line-soft);
-}
-
-.raporlar-page-head h2 {
+.raporlar-surface-lead {
   margin: 0;
-  font-size: 1.35rem;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-}
-
-.raporlar-page-lead {
-  margin: 0;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   color: var(--text-muted);
-  line-height: 1.45;
+  line-height: 1.4;
 }
 
 /* Ayl?k ?zet b?l?m? ? ba?l?k sadele?tirme */
@@ -243,71 +229,104 @@
   user-select: none;
 }
 
-.raporlar-panel-nav {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem 1rem;
-  padding: var(--space-2) 0;
+/* Compact two-level IA nav (module title lives in AppModal header only). */
+.raporlar-ia-nav {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+  padding-bottom: var(--space-2);
   border-bottom: 1px solid var(--line-soft);
 }
 
-.raporlar-panel-nav--grouped {
+.raporlar-ia-nav-groups {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-3) var(--space-4);
-  align-items: start;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0;
+  min-width: 0;
+  border-bottom: 1px solid var(--line-soft);
 }
 
-.raporlar-panel-nav-group {
-  display: grid;
+.raporlar-ia-nav-group-tab {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 6px 8px 8px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+  transition: color 0.18s ease, border-color 0.18s ease;
+  box-shadow: inset 1px 0 0 var(--line-soft);
+}
+
+.raporlar-ia-nav-groups > :first-child {
+  box-shadow: none;
+}
+
+.raporlar-ia-nav-group-tab:hover {
+  color: var(--text-primary);
+}
+
+.raporlar-ia-nav-group-tab.is-active {
+  color: var(--text-primary);
+  border-bottom-color: var(--theme-color);
+}
+
+.raporlar-ia-nav-surfaces {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 0.4rem;
   min-width: 0;
 }
 
-.raporlar-panel-nav-group-label {
-  margin: 0;
-  font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-}
-
-.raporlar-panel-nav-group-items {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.35rem;
-  min-width: 0;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.raporlar-panel-nav-group-items > li {
+.raporlar-ia-nav-surface-tab {
+  flex: 0 1 auto;
   max-width: 100%;
-}
-
-.raporlar-panel-nav a {
-  font-size: 0.9rem;
+  padding: 6px 10px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.02);
   color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.2;
+  text-align: center;
   text-decoration: none;
-  padding-bottom: 0.25rem;
-  border-bottom: 2px solid transparent;
-  max-width: 100%;
   word-break: break-word;
+  transition: color 0.18s ease, border-color 0.18s ease, background 0.18s ease;
 }
 
-.raporlar-panel-nav a[aria-current="page"],
-.raporlar-panel-nav a.is-active {
-  color: var(--text, inherit);
-  font-weight: 600;
-  border-bottom-color: var(--theme-color);
+.raporlar-ia-nav-surface-tab:hover {
+  color: var(--text-primary);
+  border-color: rgba(var(--theme-color-rgb), 0.45);
+}
+
+.raporlar-ia-nav-surface-tab.is-active,
+.raporlar-ia-nav-surface-tab[aria-current="page"] {
+  color: var(--text-primary);
+  font-weight: 700;
+  border-color: rgba(var(--theme-color-rgb), 0.72);
+  background: rgba(var(--theme-color-rgb), 0.1);
 }
 
 @media (max-width: 720px) {
-  .raporlar-panel-nav--grouped {
-    grid-template-columns: 1fr;
+  .raporlar-ia-nav-group-tab {
+    min-height: 44px;
+    font-size: 0.82rem;
+    padding-inline: 4px;
+  }
+
+  .raporlar-ia-nav-surface-tab {
+    font-size: 0.75rem;
+    padding: 7px 9px;
   }
 
   .raporlar-panel-heading,

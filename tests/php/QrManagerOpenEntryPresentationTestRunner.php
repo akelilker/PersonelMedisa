@@ -9,7 +9,8 @@ use Medisa\Api\Services\Qr\QrAttendanceIntervalReadService;
 function openEntryPresentationAssert(bool $condition, string $message): void
 {
     if (!$condition) {
-        throw new RuntimeException('[FAIL] ' . $message);
+        fwrite(STDERR, '[FAIL] ' . $message . PHP_EOL);
+        exit(1);
     }
     echo '[PASS] ' . $message . PHP_EOL;
 }
@@ -29,7 +30,7 @@ function openEntryPresentationMap(PDO $pdo, array $person, array $events, string
     $method->setAccessible(true);
 
     /** @var array<string,mixed>|null $row */
-    $row = $method->invoke($pdo, $person, $events, $businessDate, $today, false);
+    $row = $method->invoke(null, $pdo, $person, $events, $businessDate, $today, false);
 
     return $row;
 }

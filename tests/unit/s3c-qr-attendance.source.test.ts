@@ -10,6 +10,10 @@ const migrationRunner = resolve(
   "tests/php/S3C057QrAttendanceMysqlTestRunner.php"
 );
 const tokenRunner = resolve(process.cwd(), "tests/php/S3CQrTokenServiceTestRunner.php");
+const crossBranchRunner = resolve(
+  process.cwd(),
+  "tests/php/CrossBranchDenyScanTestRunner.php"
+);
 const businessDateRunner = resolve(
   process.cwd(),
   "tests/php/S3CQrBusinessDateRangeTestRunner.php"
@@ -34,6 +38,17 @@ function runPhpRunner(path: string) {
     env: process.env
   });
 }
+
+describe("S3C QR scan semantics (SQLite PHP runners)", () => {
+  it("denies cross-branch scan after verify with zero qr_attendance_events rows", () => {
+    const result = runPhpRunner(crossBranchRunner);
+    expect(result.status, result.stderr || result.stdout).toBe(0);
+    expect(result.stdout).toContain("[PASS] cross-branch error code");
+    expect(result.stdout).toContain("[PASS] cross-branch HTTP 403");
+    expect(result.stdout).toContain("[PASS] zero qr_attendance_events rows after deny");
+    expect(result.stdout).toContain("[OK] CrossBranchDenyScanTestRunner");
+  });
+});
 
 describe("S3C dynamic QR attendance foundation", () => {
   beforeAll(async () => {

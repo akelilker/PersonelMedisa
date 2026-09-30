@@ -70,11 +70,16 @@ describe("personel detay gorsel duzen paketi owners", () => {
     expect(qr).toMatch(/personel-dosya-section-head--with-action/);
     expect(qr).toMatch(/personel-qr-history-table-wrap/);
     expect(qr).toMatch(/raporlar-table-wrap/);
+    expect(qr).toMatch(/personel-qr-history-card-list/);
+    expect(qr).toMatch(/pm-self-request-list/);
+    expect(qr).toMatch(/data-testid="personel-qr-history-cards"/);
     expect(qr).not.toMatch(/personel-dossier-section/);
 
     const css = read("src/styles/modules/personeller.css");
     expect(css).toMatch(/\.personel-qr-history-table-wrap[\s\S]*overflow-x:\s*auto/s);
     expect(css).toMatch(/\.personel-qr-history[\s\S]*min-width:\s*0/s);
+    expect(css).toMatch(/@media \(max-width: 720px\)[\s\S]*\.personel-qr-history-table-wrap[\s\S]*display:\s*none/s);
+    expect(css).toMatch(/\.personel-qr-history-card-list[\s\S]*display:\s*grid/s);
   });
 
   it("scopes mobile mirror stack and notice styles to personel-detail-card", () => {

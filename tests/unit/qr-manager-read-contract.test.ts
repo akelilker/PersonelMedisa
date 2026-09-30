@@ -4,7 +4,7 @@ import {
   normalizeManagerQrAttendanceResponse
 } from "../../src/api/qr.api";
 import { resolveDemoApiResponse } from "../../src/api/mock-demo";
-import { qrAttendanceStatus } from "../../src/features/puantaj/qr-read-utils";
+import { qrAttendanceAnomalyDisplay, qrAttendanceStatus } from "../../src/features/puantaj/qr-read-utils";
 
 const item = {
   personel_id: 1,
@@ -125,5 +125,24 @@ describe("manager QR read contract", () => {
       missing_exit: false,
       anomalies: []
     }, "2026-08-15")).toBe("Tamamlandı");
+  });
+
+  it("presents today open GIRIS pre-threshold as inside without missing exit", () => {
+    const today = "2026-08-15";
+    const openInside = {
+      ...item,
+      date_from: today,
+      date_to: today,
+      missing_exit: false,
+      anomalies: [] as string[]
+    };
+    expect(qrAttendanceStatus(openInside, today)).toBe("İçeride");
+    expect(qrAttendanceAnomalyDisplay(openInside, today)).toBe("Yok");
+  });
+
+  it("presents today operational missing cikis as Eksik Çıkış", () => {
+    const today = "2026-08-15";
+    expect(qrAttendanceStatus({ ...item, date_from: today, date_to: today }, today)).toBe("Eksik Çıkış");
+    expect(qrAttendanceAnomalyDisplay({ ...item, date_from: today, date_to: today }, today)).toBe("MISSING_CIKIS");
   });
 });

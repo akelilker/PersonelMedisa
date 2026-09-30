@@ -6,6 +6,8 @@ import {
   RAPORLAR_PANEL_IDS,
   buildRaporlarNavHref,
   buildVisibleRaporlarNavGroups,
+  getVisibleRaporlarNavItemsInGroup,
+  resolveRaporlarGroupForSurface,
   parseRaporlarPanel,
   parseRaporlarStandartView,
   resolveRaporlarSurface,
@@ -124,5 +126,13 @@ describe("raporlar-ia", () => {
     expect(resolveRaporlarSurfaceFromSearch(params)).toBe("bordro-hazirlik");
     expect(params.get("tab")).toBe("personel-kapsam");
     expect(params.get("personelId")).toBe("1");
+  });
+
+  it("resolves active group and surfaces for compact two-level nav", () => {
+    expect(resolveRaporlarGroupForSurface("liste")).toBe("raporlar");
+    expect(resolveRaporlarGroupForSurface("donem-kapanis")).toBe("kapanis");
+    expect(resolveRaporlarGroupForSurface("maas-hesaplama")).toBe("bordro");
+    const kapanisItems = getVisibleRaporlarNavItemsInGroup("kapanis", FULL_VISIBILITY);
+    expect(kapanisItems.map((item) => item.id)).toEqual(["aylik-kapanis", "donem-kapanis"]);
   });
 });

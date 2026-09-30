@@ -249,6 +249,27 @@ export function buildVisibleRaporlarNavGroups(
     .filter((group) => group.items.length > 0);
 }
 
+export function resolveRaporlarGroupForSurface(surface: RaporlarSurfaceId): RaporlarNavGroupId {
+  const item = RAPORLAR_NAV_ITEMS.find((entry) => entry.id === surface);
+  return item?.group ?? "raporlar";
+}
+
+export function getVisibleRaporlarNavItemsInGroup(
+  groupId: RaporlarNavGroupId,
+  visibility: RaporlarNavVisibility
+): RaporlarNavItemDef[] {
+  return RAPORLAR_NAV_ITEMS.filter(
+    (item) => item.group === groupId && isRaporlarNavItemVisible(item, visibility)
+  );
+}
+
+export function getDefaultRaporlarNavItemForGroup(
+  groupId: RaporlarNavGroupId,
+  visibility: RaporlarNavVisibility
+): RaporlarNavItemDef | undefined {
+  return getVisibleRaporlarNavItemsInGroup(groupId, visibility)[0];
+}
+
 export function serbestZamanDeadlineStateLabel(state: string): string {
   switch (state) {
     case "YAKLASIYOR":

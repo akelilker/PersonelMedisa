@@ -40,12 +40,14 @@ describe("i11 raporlar IA source contracts", () => {
     expect(ia.includes("label: \"Liste ve aylık özet\"")).toBe(false);
 
     expect(nav).toContain("buildVisibleRaporlarNavGroups");
+    expect(nav).toContain("resolveRaporlarGroupForSurface");
+    expect(nav).toContain("getVisibleRaporlarNavItemsInGroup");
     expect(nav).toContain('data-testid="raporlar-panel-nav"');
+    expect(nav).toContain('data-testid="raporlar-ia-nav-groups"');
     expect(nav).not.toContain("Liste ve aylık özet");
-    expect(nav).toContain("<ul");
-    expect(nav).toContain("<li key={item.id}>");
-    expect(nav).not.toContain('role="listitem"');
-    expect(nav).not.toContain('role="list"');
+    expect(nav).toContain("raporlar-ia-nav-group-tab");
+    expect(nav).toContain("raporlar-ia-nav-surface-tab");
+    expect(page).not.toContain("<h2>Raporlar</h2>");
   });
 
   it("does not mount inactive panel owners together", () => {

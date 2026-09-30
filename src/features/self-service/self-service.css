@@ -454,9 +454,18 @@ body.app-personel-shell.app-home-route .personel-mobile-shell.self-home-page > .
   pointer-events: none;
 }
 
+/*
+ * Home kimlik foto dairesi. Masaüstünde 48px küçük kalıyordu; çap 80px (≈1.67×).
+ * Buton boyutu görselden türer, sağ kenar aşağıdaki margin-right ile sabit kalır.
+ * ≤640px önceki 48px daireyi korur — masaüstü ölçeği mobile taşınmaz.
+ */
 .pm-self-identity--home .pm-self-portrait {
-  width: 48px;
-  height: 48px;
+  width: 80px;
+  height: 80px;
+}
+
+.pm-self-identity--home .pm-self-portrait--empty {
+  font-size: 1.05rem;
 }
 
 /*
@@ -473,6 +482,15 @@ body.app-personel-shell.app-home-route .personel-mobile-shell.self-home-page > .
 @media (max-width: 640px) {
   .pm-self-identity--home .pm-self-identity__photo-btn {
     margin-right: 58px;
+  }
+
+  .pm-self-identity--home .pm-self-portrait {
+    width: 48px;
+    height: 48px;
+  }
+
+  .pm-self-identity--home .pm-self-portrait--empty {
+    font-size: 0.78rem;
   }
 }
 

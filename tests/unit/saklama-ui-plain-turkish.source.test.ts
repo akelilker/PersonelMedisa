@@ -54,14 +54,31 @@ describe("saklama UI plain Turkish redesign", () => {
 
   it("hides QR Kiosk outside kullanıcılar tab and shows Turkish QR label", () => {
     const page = read("src/features/yonetim/pages/YonetimPaneliPage.tsx");
-    expect(page).toContain('data-testid="yonetim-qr-kiosk-link"');
+    const kullanicilarGuard = '!isLoading && !errorMessage && activeTab === "kullanicilar" ? (';
+    const sectionTestId = 'data-testid="yonetim-section-kullanicilar"';
+    const kioskTestId = 'data-testid="yonetim-qr-kiosk-link"';
+
+    expect(page).toContain(kullanicilarGuard);
+    expect(page).toContain(sectionTestId);
+    expect(page).toContain(kioskTestId);
     expect(page).toContain('to="/qr-kiosk"');
     expect(page).toContain("QR Giriş Ekranı");
     expect(page).not.toContain(">QR Kiosk<");
     expect(page).not.toContain('"QR Kiosk"');
-    const kioskIdx = page.indexOf("yonetim-qr-kiosk-link");
-    const kioskBlock = page.slice(Math.max(0, kioskIdx - 160), kioskIdx + 220);
-    expect(kioskBlock).toContain('activeTab === "kullanicilar"');
+    expect(page.match(/data-testid="yonetim-qr-kiosk-link"/g)?.length).toBe(1);
+
+    const guardIdx = page.indexOf(kullanicilarGuard);
+    const sectionIdx = page.indexOf(sectionTestId);
+    const kioskIdx = page.indexOf(kioskTestId);
+    expect(guardIdx).toBeGreaterThanOrEqual(0);
+    expect(sectionIdx).toBeGreaterThan(guardIdx);
+    expect(kioskIdx).toBeGreaterThan(sectionIdx);
+
+    const sectionOpenIdx = page.indexOf("<section", sectionIdx);
+    const sectionCloseIdx = page.indexOf("</section>", sectionIdx);
+    expect(sectionOpenIdx).toBeGreaterThanOrEqual(0);
+    expect(sectionCloseIdx).toBeGreaterThan(kioskIdx);
+    expect(page.slice(0, guardIdx)).not.toContain(kioskTestId);
   });
 
   it("maps saklama modal title via shared helper", () => {

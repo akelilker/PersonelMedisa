@@ -1,0 +1,109 @@
+/* ==========================================================================
+   Kanonik ay seçici (AppMonthPicker)
+   --------------------------------------------------------------------------
+   Kontrat:
+   - Görsel dil AppDatePicker / AppSelect panel ailesiyle aynıdır.
+   - `.app-month-picker-native` görünmez DEĞER sahibidir (name/required/min/max).
+   - Ay paneli `.app-date-*` ızgara stillerini paylaşır (app-date-picker.css).
+   ========================================================================== */
+
+.app-month-picker {
+  position: relative;
+  display: block;
+  width: 100%;
+  min-width: 0;
+}
+
+.app-month-picker.is-open {
+  z-index: 10055;
+}
+
+.app-month-picker-native {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.app-month-picker-trigger {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  width: 100%;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.app-month-picker-trigger:hover {
+  border-color: var(--border-strong);
+}
+
+.app-month-picker.is-open .app-month-picker-trigger,
+.app-month-picker-trigger:focus-visible {
+  border-color: rgba(var(--theme-color-rgb), 0.62);
+  box-shadow:
+    inset 0 0 0 1px rgba(var(--theme-color-rgb), 0.16),
+    0 0 0 1px rgba(var(--theme-color-rgb), 0.08);
+  outline: none;
+}
+
+.app-month-picker.is-disabled .app-month-picker-trigger {
+  opacity: 0.58;
+  cursor: not-allowed;
+}
+
+.app-month-picker-value {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-month-picker-value.is-placeholder {
+  color: rgba(230, 234, 245, 0.5);
+}
+
+.app-month-picker-icon {
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
+  margin-left: 2px;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.app-month-picker-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 10050;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: rgba(5, 8, 12, 0.42);
+  cursor: default;
+}
+
+.app-month-picker.is-open .app-month-picker-trigger,
+.app-month-picker.is-open .app-picker-panel {
+  z-index: 10061;
+}
+
+.app-month-panel {
+  gap: 6px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-month-picker-trigger {
+    transition: none;
+  }
+}

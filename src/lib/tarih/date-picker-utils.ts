@@ -14,7 +14,11 @@
 /** Görünen boş değer metni (native `gg.aa.yyyy` replikası yerine kanonik placeholder). */
 export const DATE_DISPLAY_PLACEHOLDER = "gg.aa.yyyy";
 
+/** Görünen boş ay değeri (AppMonthPicker trigger placeholder). */
+export const MONTH_DISPLAY_PLACEHOLDER = "Ay Seçin";
+
 const ISO_DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
+const ISO_MONTH_PATTERN = /^(\d{4})-(\d{2})$/;
 const DISPLAY_DATE_PATTERN = /^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$/;
 
 export const TURKISH_MONTH_NAMES = [
@@ -240,6 +244,96 @@ export function buildYearRange(
 
 export function formatMonthYearLabel(year: number, month: number): string {
   return `${TURKISH_MONTH_NAMES[month] ?? ""} ${year}`.trim();
+}
+
+export type MonthParts = {
+  year: number;
+  /** 0 tabanlı ay (0 = Ocak). */
+  month: number;
+};
+
+function isValidMonthParts(parts: MonthParts): boolean {
+  if (!Number.isInteger(parts.year) || parts.year < 1000 || parts.year > 9999) {
+    return false;
+  }
+  if (!Number.isInteger(parts.month) || parts.month < 0 || parts.month > 11) {
+    return false;
+  }
+
+  return true;
+}
+
+/** ISO `yyyy-mm` → parça; geçersiz/eksik değerde null. */
+export function parseIsoMonth(value: string | null | undefined): MonthParts | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const match = ISO_MONTH_PATTERN.exec(value.trim());
+  if (!match) {
+    return null;
+  }
+
+  const monthIndex = Number.parseInt(match[2]!, 10) - 1;
+  const parts: MonthParts = {
+    year: Number.parseInt(match[1]!, 10),
+    month: monthIndex
+  };
+
+  return isValidMonthParts(parts) ? parts : null;
+}
+
+export function isIsoMonthString(value: string | null | undefined): boolean {
+  return parseIsoMonth(value) !== null;
+}
+
+export function toIsoMonth(parts: MonthParts): string | null {
+  if (!isValidMonthParts(parts)) {
+    return null;
+  }
+
+  return `${parts.year}-${pad2(parts.month + 1)}`;
+}
+
+/** ISO `yyyy-mm` → görünen `Eylül 2026` (boş/geçersizde ""). */
+export function formatIsoMonthToDisplay(value: string | null | undefined): string {
+  const parts = parseIsoMonth(value);
+  if (!parts) {
+    return "";
+  }
+
+  return formatMonthYearLabel(parts.year, parts.month);
+}
+
+export function currentMonthIso(): string {
+  const now = new Date();
+
+  return toIsoMonth({ year: now.getFullYear(), month: now.getMonth() }) ?? "1970-01";
+}
+
+/** Panel açılış ayı/yılı: değer varsa o, yoksa bu ay. */
+export function resolveInitialMonthPickerParts(value: string | null | undefined): MonthParts {
+  const parts = parseIsoMonth(value);
+  if (parts) {
+    return parts;
+  }
+
+  return parseIsoMonth(currentMonthIso()) ?? { year: 2000, month: 0 };
+}
+
+/** ISO ay değeri verilen sınırlar içinde mi (sınır yoksa serbest). */
+export function isMonthWithinRange(value: string, min?: string, max?: string): boolean {
+  if (!isIsoMonthString(value)) {
+    return false;
+  }
+  if (min && isIsoMonthString(min) && value < min) {
+    return false;
+  }
+  if (max && isIsoMonthString(max) && value > max) {
+    return false;
+  }
+
+  return true;
 }
 
 /** ISO değeri verilen sınırlar içinde mi (sınır yoksa serbest). */

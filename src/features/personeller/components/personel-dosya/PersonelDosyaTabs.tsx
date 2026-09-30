@@ -128,6 +128,8 @@ export function PersonelDosyaTabList({
     <div
       className={`personel-kart-tab-scroller${overflowState.hasOverflow ? " is-overflowing" : ""}`}
       data-testid="personel-kart-tab-scroller"
+      data-scroll-back={overflowState.hasOverflow && overflowState.canScrollBack ? "true" : undefined}
+      data-scroll-forward={overflowState.hasOverflow && overflowState.canScrollForward ? "true" : undefined}
     >
       {overflowState.hasOverflow ? (
         <button

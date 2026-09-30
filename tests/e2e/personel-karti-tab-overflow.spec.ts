@@ -11,6 +11,21 @@ async function openPersonelDetay(page: import("@playwright/test").Page, personel
 }
 
 test.describe("personel kartı sekme overflow", () => {
+  test("430px: overflow chrome, gizli scrollbar, kırmızı kenar ipucu", async ({ page }) => {
+    await page.setViewportSize({ width: 430, height: 932 });
+    await openPersonelDetay(page);
+
+    const scroller = page.getByTestId("personel-kart-tab-scroller");
+    await expect(scroller).toHaveClass(/is-overflowing/);
+    await expect(scroller).toHaveAttribute("data-scroll-forward", "true");
+
+    const scrollbarHidden = await page.getByTestId("personel-kart-tablist").evaluate((el) => {
+      const style = window.getComputedStyle(el);
+      return style.scrollbarWidth === "none" || style.msOverflowStyle === "none";
+    });
+    expect(scrollbarHidden).toBe(true);
+  });
+
   test("390px: yatay oklar görünür, scrollbar gizli, tüm sekmeler erişilebilir", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await openPersonelDetay(page);

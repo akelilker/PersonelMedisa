@@ -460,14 +460,14 @@ body.app-personel-shell.app-home-route .personel-mobile-shell.self-home-page > .
 }
 
 /*
- * PERSONEL home kimlik foto dairesi: yatayda üstteki bildirim zili ile çıkış
- * ikonunun merkezlerinin ortasına hizalı durur. Zil (22px) + çıkış (20px) + 14px
- * boşluk; foto (48px) sağa yaslıyken merkezi çıkış ikonuna denk gelir, ~8px sola
- * kaydırınca iki ikonun tam ortasına oturur. Dikeyde kimlik bloğu içinde kalır.
+ * PERSONEL home kimlik foto dairesi: yatayda üstteki bildirim zili / çıkış ikonu
+ * hattına sağdan boşlukla konumlanır. Masaüstünde talep üzerine 15px sağa
+ * kaydırıldı (68px → 53px). ≤640px mobil değeri (58px) değişmedi. Dikeyde
+ * kimlik bloğu içinde kalır.
  */
 .pm-self-identity--home .pm-self-identity__photo-btn {
   position: relative;
-  margin-right: 68px;
+  margin-right: 53px;
 }
 
 @media (max-width: 640px) {

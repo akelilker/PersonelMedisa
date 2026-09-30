@@ -105,16 +105,45 @@
   overflow: visible;
 }
 
+/*
+ * PERSONEL home: the megaphone sits flush against the shell frame (top-left).
+ * Nudge it 5px away from that frame — margin-left for the horizontal offset,
+ * `top` (owner already declares position: relative) for the vertical one — so
+ * the row geometry, the ≤640px .icons-row padding and the sibling controls
+ * stay untouched.
+ */
 .icons-row--minimal.icons-row--personel .pm-shell-duyurular-link {
   display: grid;
   place-items: center;
   padding: 2px;
   box-sizing: content-box;
+  margin-left: 5px;
+  top: 5px;
 }
 
 .pm-shell-duyurular-link:hover,
 .pm-shell-duyurular-link:focus-visible {
   color: #fff;
+}
+
+/*
+ * PERSONEL home exit (door) icon: red is the exit action's colour language on
+ * both desktop and mobile. Declared as plain `color` at .icon-btn[class]
+ * specificity and kept before .icon-btn:hover / .icon-btn:focus-visible so the
+ * existing hover/focus/active behaviour (text-inverse + glow) is preserved.
+ */
+.icon-btn.pm-shell-exit-btn {
+  color: var(--brand-red, #c62828);
+}
+
+/*
+ * PERSONEL home exit (door) icon: same 5px breathing from the shell frame as
+ * the megaphone — right for the horizontal offset, top for the vertical one.
+ */
+.icons-row--minimal.icons-row--personel .icon-btn.pm-shell-exit-btn {
+  position: relative;
+  margin-right: 5px;
+  top: 5px;
 }
 
 .pm-shell-duyurular-badge {

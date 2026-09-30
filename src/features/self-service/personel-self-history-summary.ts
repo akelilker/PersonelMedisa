@@ -45,19 +45,41 @@ function resolveDayMinutes(
   return null;
 }
 
+function monthDayKeys(items: MePuantajGun[], qrDays: MeQrHistoryDay[]): Set<string> {
+  const puantajByDate = new Map(items.map((item) => [item.tarih, item]));
+  const qrByDate = new Map(qrDays.map((day) => [day.date, day]));
+  return new Set<string>([...puantajByDate.keys(), ...qrByDate.keys()]);
+}
+
 /** Day-by-day monthly total across puantaj rows and QR days. Days without ÇIKIŞ stay out. */
 function computeMonthTotalMinutes(items: MePuantajGun[], qrDays: MeQrHistoryDay[]): number {
   const puantajByDate = new Map(items.map((item) => [item.tarih, item]));
   const qrByDate = new Map(qrDays.map((day) => [day.date, day]));
-  const dates = new Set<string>([...puantajByDate.keys(), ...qrByDate.keys()]);
   let total = 0;
-  for (const date of dates) {
+  for (const date of monthDayKeys(items, qrDays)) {
     const minutes = resolveDayMinutes(puantajByDate.get(date), qrByDate.get(date));
     if (typeof minutes === "number") {
       total += minutes;
     }
   }
   return total;
+}
+
+/**
+ * Worked-day count for unapproved months: same day set as {@link computeMonthTotalMinutes}
+ * (puantaj net when present, else completed QR GİRİŞ→ÇIKIŞ).
+ */
+function computeMonthWorkedDayCount(items: MePuantajGun[], qrDays: MeQrHistoryDay[]): number {
+  const puantajByDate = new Map(items.map((item) => [item.tarih, item]));
+  const qrByDate = new Map(qrDays.map((day) => [day.date, day]));
+  let count = 0;
+  for (const date of monthDayKeys(items, qrDays)) {
+    const minutes = resolveDayMinutes(puantajByDate.get(date), qrByDate.get(date));
+    if (typeof minutes === "number") {
+      count += 1;
+    }
+  }
+  return count;
 }
 
 /**
@@ -84,9 +106,12 @@ export function buildHistoryMonthSummary(input: HistoryMonthAuthoritativeInput):
     rows.push(minutesFact("Toplam fazla çalışma", input.fazlaDonemDakika, "qr-history-fazla-total"));
   }
   if (input.ozet) {
+    const workedDays = aylikOnayliMi
+      ? input.ozet.calisma_gun_adet
+      : computeMonthWorkedDayCount(input.puantajItems, input.qrDays);
     rows.push({
-      label: "Çalışılan gün",
-      value: `${input.ozet.calisma_gun_adet} gün`,
+      label: aylikOnayliMi ? "Çalışılan gün" : "Çalışılan gün (Onaylı Değil)",
+      value: `${workedDays} gün`,
       testId: "qr-history-workday-count"
     });
     rows.push(minutesFact("Toplam geç kalma", input.ozet.gec_kalma_dakika_toplam, "qr-history-late-total"));

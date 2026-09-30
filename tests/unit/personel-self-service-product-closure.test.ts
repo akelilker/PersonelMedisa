@@ -47,6 +47,9 @@ describe("PERSONEL self-service product closure", () => {
     expect(shown[0].label).toBe("Toplam saat (Aylık) (Onaylı Değil)");
     expect(shown[0].value).toBe("2 dk");
     expect(shown[0].testId).toBe("qr-history-monthly-total");
+    const workdays = shown.find((row) => row.testId === "qr-history-workday-count");
+    expect(workdays?.label).toBe("Çalışılan gün (Onaylı Değil)");
+    expect(workdays?.value).toBe("1 gün");
   });
 
   it("prefers puantaj net over QR for the same day (no double count)", () => {

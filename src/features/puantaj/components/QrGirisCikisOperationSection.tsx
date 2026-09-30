@@ -6,7 +6,7 @@ import { LoadingState } from "../../../components/states/LoadingState";
 import { useRoleAccess } from "../../../hooks/use-role-access";
 import { downloadReportCsv } from "../../../reports/export-report";
 import { useManagerQrAttendance } from "../hooks/useManagerQrAttendance";
-import { formatQrTime, qrAttendanceStatus, qrReadErrorMessage } from "../qr-read-utils";
+import { formatQrTime, qrAttendanceAnomalyDisplay, qrAttendanceStatus, qrReadErrorMessage } from "../qr-read-utils";
 
 export function QrGirisCikisOperationSection() {
   const { hasPermission } = useRoleAccess();
@@ -114,7 +114,7 @@ export function QrGirisCikisOperationSection() {
                   "İlk giriş": item.first_entry ?? "—",
                   "Son çıkış": item.last_exit ?? "—",
                   Durum: qrAttendanceStatus(item),
-                  Anomali: item.anomalies.join(", ") || "Yok"
+                  Anomali: qrAttendanceAnomalyDisplay(item)
                 }))
               )
             }
@@ -144,7 +144,7 @@ export function QrGirisCikisOperationSection() {
                   <td>{formatQrTime(item.first_entry)}</td><td>{formatQrTime(item.last_exit)}</td>
                   <td>{formatQrTime(item.last_movement)} {item.last_movement_type ? `(${item.last_movement_type})` : ""}</td>
                   <td>{qrAttendanceStatus(item)}</td><td>{item.interval_count}</td>
-                  <td>{item.anomalies.length ? item.anomalies.join(", ") : "Yok"}</td>
+                  <td>{qrAttendanceAnomalyDisplay(item)}</td>
                   <td className="table-actions">
                     <Link to={`/puantaj?personel_id=${item.personel_id}&tarih=${item.date_from}`}>Günlük Puantaja Git</Link>
                     <Link to={`/personeller/${item.personel_id}?tab=genel-bilgiler`}>Personel Kartını Aç</Link>

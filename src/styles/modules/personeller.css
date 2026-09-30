@@ -493,6 +493,14 @@
   -webkit-overflow-scrolling: touch;
   background: var(--modal-bg);
   scroll-padding-top: var(--space-2);
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.personel-dosya-tab-scroll::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
 }
 
 .personel-dosya-tab-nav {
@@ -800,8 +808,30 @@
 }
 
 .personel-kart-tab-scroller.is-overflowing {
+  position: relative;
   grid-template-columns: auto minmax(0, 1fr) auto;
   gap: 2px;
+}
+
+/* Yatay sekme kaydırması: native scrollbar yok; ince kırmızı çizgi yalnızca kaydırılabilir kenar varken. */
+.personel-kart-tab-scroller.is-overflowing[data-scroll-forward="true"]::after,
+.personel-kart-tab-scroller.is-overflowing[data-scroll-back="true"]::before {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  width: 22px;
+  height: 1px;
+  background: rgba(var(--theme-color-rgb), 0.62);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.personel-kart-tab-scroller.is-overflowing[data-scroll-forward="true"]::after {
+  right: 30px;
+}
+
+.personel-kart-tab-scroller.is-overflowing[data-scroll-back="true"]::before {
+  left: 30px;
 }
 
 .personel-kart-tab-scroll-btn {
@@ -839,12 +869,14 @@
   justify-content: flex-start;
   gap: 0;
   margin-bottom: 0;
-  padding-bottom: 0;
+  padding-bottom: 1px;
   min-width: 0;
   overflow-x: auto;
+  overflow-y: hidden;
   max-width: 100%;
   background: var(--modal-bg);
   -webkit-overflow-scrolling: touch;
+  touch-action: pan-x;
   scrollbar-width: none;
   -ms-overflow-style: none;
 }
@@ -854,6 +886,8 @@
 }
 
 .personel-kart-tablist::-webkit-scrollbar {
+  width: 0;
+  height: 0;
   display: none;
 }
 
@@ -1346,6 +1380,14 @@
   .personel-kart-tab-scroll-btn {
     width: 32px;
     min-width: 32px;
+  }
+
+  .personel-kart-tab-scroller.is-overflowing[data-scroll-forward="true"]::after {
+    right: 34px;
+  }
+
+  .personel-kart-tab-scroller.is-overflowing[data-scroll-back="true"]::before {
+    left: 34px;
   }
 
   .personel-kart-tab {

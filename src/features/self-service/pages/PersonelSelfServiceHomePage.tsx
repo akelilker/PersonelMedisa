@@ -16,7 +16,9 @@ import { AttendanceCorrectionRequestModal } from "../components/AttendanceCorrec
 import { BackgroundlessNoticeModal } from "../components/BackgroundlessNoticeModal";
 import {
   OwnQrAttendanceBoxes,
-  PASSIVE_CIKIS_WITHOUT_GIRIS_NOTICE
+  PASSIVE_CIKIS_AFTER_COMPLETED_PAIR_NOTICE,
+  PASSIVE_CIKIS_WITHOUT_GIRIS_NOTICE,
+  PASSIVE_GIRIS_WITH_OPEN_SHIFT_NOTICE
 } from "../components/OwnQrAttendanceBoxes";
 import { PersonelSelfServiceIdentity } from "../components/PersonelSelfServiceIdentity";
 import { PersonelSelfServiceMenu } from "../components/PersonelSelfServiceMenu";
@@ -245,8 +247,14 @@ export function PersonelSelfServiceHomePage() {
                 navigate("/self/qr-okut?event=CIKIS");
               })
             }
+            onPassiveGirisWithOpenShift={() =>
+              setNotice({ title: "Bilgi", body: PASSIVE_GIRIS_WITH_OPEN_SHIFT_NOTICE })
+            }
             onPassiveCikisWithoutGiris={() =>
               setNotice({ title: "Bilgi", body: PASSIVE_CIKIS_WITHOUT_GIRIS_NOTICE })
+            }
+            onPassiveCikisAfterCompletedPair={() =>
+              setNotice({ title: "Bilgi", body: PASSIVE_CIKIS_AFTER_COMPLETED_PAIR_NOTICE })
             }
             onCorrectGiris={(event) =>
               guardOrRun("attendance_correct", () => {

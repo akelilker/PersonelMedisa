@@ -767,7 +767,7 @@ export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeade
 
         <button
           type="button"
-          className="icon-btn"
+          className={`icon-btn${showPersonelHomeLogout ? " pm-shell-exit-btn" : ""}`}
           data-testid={showPersonelHomeLogout ? "header-logout-btn" : "header-settings-toggle"}
           onClick={() => {
             if (showPersonelHomeLogout) {

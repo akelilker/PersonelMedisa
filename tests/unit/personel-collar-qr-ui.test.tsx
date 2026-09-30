@@ -23,7 +23,7 @@ import type { AttendanceTodayResponse } from "../../src/api/attendance-mobile.ap
 import type { AuthSession } from "../../src/types/auth";
 import { ProtectedRoute } from "../../src/router/ProtectedRoute";
 import { BirimAmiriOperationalHomePage } from "../../src/features/self-service/pages/BirimAmiriOperationalHomePage";
-import { PASSIVE_CIKIS_WITHOUT_GIRIS_NOTICE } from "../../src/features/self-service/components/OwnQrAttendanceBoxes";
+import { PASSIVE_CIKIS_AFTER_COMPLETED_PAIR_NOTICE, PASSIVE_CIKIS_WITHOUT_GIRIS_NOTICE, PASSIVE_GIRIS_WITH_OPEN_SHIFT_NOTICE } from "../../src/features/self-service/components/OwnQrAttendanceBoxes";
 import { PersonelSelfServiceHomePage } from "../../src/features/self-service/pages/PersonelSelfServiceHomePage";
 import { PersonelSelfServiceTaleplerPage } from "../../src/features/self-service/pages/PersonelSelfServiceTaleplerPage";
 import { SelfServiceQrShortcuts } from "../../src/features/self-service/components/SelfServiceQrShortcuts";
@@ -272,7 +272,10 @@ describe("PERSONEL collar → QR UI entitlement (render level)", () => {
 
     expect(screen.getByTestId("attendance-box-giris")).toHaveTextContent("08:12");
     expect(screen.getByTestId("cikis-scan")).not.toHaveAttribute("aria-disabled", "true");
-    expect(screen.getByTestId("giris-scan")).toBeDisabled();
+    expect(screen.getByTestId("giris-scan")).toHaveAttribute("aria-disabled", "true");
+    fireEvent.click(screen.getByTestId("giris-scan"));
+    expect(screen.getByTestId("personel-notice-modal")).toBeInTheDocument();
+    expect(screen.getByText(PASSIVE_GIRIS_WITH_OPEN_SHIFT_NOTICE)).toBeInTheDocument();
     expect(screen.queryByTestId("personel-incomplete-day-warning")).toBeNull();
     expect(screen.queryByTestId("personel-today-empty")).toBeNull();
   });
@@ -304,7 +307,8 @@ describe("PERSONEL collar → QR UI entitlement (render level)", () => {
     expect(screen.getByTestId("attendance-box-cikis")).toHaveTextContent("11:20");
     expect(screen.getByTestId("cikis-scan")).toHaveAttribute("aria-disabled", "true");
     fireEvent.click(screen.getByTestId("cikis-scan"));
-    expect(screen.queryByTestId("personel-notice-modal")).not.toBeInTheDocument();
+    expect(screen.getByTestId("personel-notice-modal")).toBeInTheDocument();
+    expect(screen.getByText(PASSIVE_CIKIS_AFTER_COMPLETED_PAIR_NOTICE)).toBeInTheDocument();
   });
 
   it("shows a borderless red Talepler count and the live warning from the canonical anomaly list", async () => {

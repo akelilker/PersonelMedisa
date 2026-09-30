@@ -31,14 +31,24 @@ type OwnQrAttendanceBoxesProps = {
   allowCorrection?: boolean;
   onScanGiris: () => void;
   onScanCikis: () => void;
+  /** Pasif GİRİŞ (açık vardiya / next_action CIKIS) tıklanınca kullanıcıya uyarı gösterilir. */
+  onPassiveGirisWithOpenShift?: () => void;
   /** Pasif ÇIKIŞ (henüz giriş yok) tıklanınca kullanıcıya uyarı gösterilir. */
   onPassiveCikisWithoutGiris?: () => void;
+  /** Pasif ÇIKIŞ (tamamlanmış GİRİŞ→ÇIKIŞ, next_action GIRIS) tıklanınca uyarı gösterilir. */
+  onPassiveCikisAfterCompletedPair?: () => void;
   onCorrectGiris?: (event: AttendanceEvent) => void;
   onCorrectCikis?: (event: AttendanceEvent) => void;
 };
 
+export const PASSIVE_GIRIS_WITH_OPEN_SHIFT_NOTICE =
+  "Zaten Giriş Yaptınız. Çıkış Yapmadan Tekrar Giriş Yapamazsınız. Sorun Yaşıyorsanız Amirinizle Görüşün.";
+
 export const PASSIVE_CIKIS_WITHOUT_GIRIS_NOTICE =
   "Henüz Giriş Yapmadınız. Giriş Yapmanıza Rağmen Sorun Yaşıyorsanız Amirinizle Görüşün.";
+
+export const PASSIVE_CIKIS_AFTER_COMPLETED_PAIR_NOTICE =
+  "Çıkış İşleminiz Zaten Tamamlandı. Tekrar Giriş Yapmadan Yeni Bir Çıkış İşlemi Yapamazsınız. Sorun Yaşıyorsanız Amirinizle Görüşün.";
 
 function PencilIcon() {
   return (
@@ -107,7 +117,9 @@ export function OwnQrAttendanceBoxes({
   allowCorrection = false,
   onScanGiris,
   onScanCikis,
+  onPassiveGirisWithOpenShift,
   onPassiveCikisWithoutGiris,
+  onPassiveCikisAfterCompletedPair,
   onCorrectGiris,
   onCorrectCikis
 }: OwnQrAttendanceBoxesProps) {
@@ -170,8 +182,20 @@ export function OwnQrAttendanceBoxes({
                 .join(" ")}
               data-testid="giris-scan"
               aria-label="Giriş için kiosk QR okut"
-              disabled={!girisActionable}
-              onClick={girisActionable ? onScanGiris : undefined}
+              aria-disabled={!girisActionable}
+              onClick={() => {
+                if (girisActionable) {
+                  onScanGiris();
+                  return;
+                }
+                if (
+                  today.giris &&
+                  today.next_action === "CIKIS" &&
+                  !today.can_scan_giris
+                ) {
+                  onPassiveGirisWithOpenShift?.();
+                }
+              }}
             >
               <span className="pm-box-label">GİRİŞ</span>
               {girisGec ? (
@@ -246,6 +270,14 @@ export function OwnQrAttendanceBoxes({
                 }
                 if (!today.giris) {
                   onPassiveCikisWithoutGiris?.();
+                  return;
+                }
+                if (
+                  today.cikis &&
+                  today.next_action === "GIRIS" &&
+                  !today.can_scan_cikis
+                ) {
+                  onPassiveCikisAfterCompletedPair?.();
                 }
               }}
             >

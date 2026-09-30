@@ -6,6 +6,7 @@ import {
   formatQrTime,
   istanbulDateDaysAgo,
   istanbulToday,
+  qrAttendanceAnomalyDisplay,
   qrAttendanceStatus,
   qrReadErrorMessage
 } from "../../../puantaj/qr-read-utils";
@@ -62,7 +63,7 @@ export function PersonelQrHistorySection({ personel }: { personel: Personel }) {
                     {Math.floor((row.matched_seconds % 3600) / 60)}dk
                   </td>
                   <td>{qrAttendanceStatus(row)}</td>
-                  <td>{row.anomalies.length ? row.anomalies.join(", ") : "Yok"}</td>
+                  <td>{qrAttendanceAnomalyDisplay(row)}</td>
                   <td>
                     <Link to={`/puantaj?personel_id=${personel.id}&tarih=${row.date_from}`}>
                       Günlük puantaj

@@ -9,6 +9,7 @@ import {
   formatQrTime,
   istanbulDateDaysAgo,
   istanbulToday,
+  qrAttendanceAnomalyDisplay,
   qrAttendanceStatus,
   qrReadErrorMessage
 } from "../../puantaj/qr-read-utils";
@@ -94,7 +95,7 @@ export function QrGirisCikisReportSection() {
                   Giriş: item.first_entry ?? "—",
                   Çıkış: item.last_exit ?? "—",
                   Durum: qrAttendanceStatus(item),
-                  Anomali: item.anomalies.join(", ") || "Yok"
+                  Anomali: qrAttendanceAnomalyDisplay(item)
                 }))
               )
             }
@@ -127,7 +128,7 @@ export function QrGirisCikisReportSection() {
                   <td>{formatQrTime(item.last_movement)} {item.last_movement_type ? `(${item.last_movement_type})` : ""}</td>
                   <td>{qrAttendanceStatus(item)}</td>
                   <td>{item.interval_count}</td>
-                  <td>{item.anomalies.length ? item.anomalies.join(", ") : "Yok"}</td>
+                  <td>{qrAttendanceAnomalyDisplay(item)}</td>
                   <td className="table-actions">
                     <Link to={`/puantaj?personel_id=${item.personel_id}&tarih=${item.date_from}`}>Günlük Puantaja Git</Link>
                     <Link to={`/personeller/${item.personel_id}?tab=genel-bilgiler`}>Personel Kartını Aç</Link>

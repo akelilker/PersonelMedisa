@@ -19,6 +19,14 @@ export function formatQrTime(value: string | null): string {
   }).format(new Date(value));
 }
 
+export function qrAttendanceAnomalyDisplay(item: ManagerQrAttendanceItem, today = istanbulToday()): string {
+  const codes =
+    item.date_from === today && item.inside && !item.missing_exit
+      ? item.anomalies.filter((code) => code !== "MISSING_CIKIS")
+      : item.anomalies;
+  return codes.length ? codes.join(", ") : "Yok";
+}
+
 export function qrAttendanceStatus(item: ManagerQrAttendanceItem, today = istanbulToday()): string {
   if (item.anomalies.includes("NO_SCAN")) return "Henüz giriş yok";
   if (item.branch_mismatch) return "Şube uyuşmazlığı";
@@ -27,7 +35,8 @@ export function qrAttendanceStatus(item: ManagerQrAttendanceItem, today = istanb
     if (item.missing_exit) return "Eksik çıkış";
     return "Tamamlandı";
   }
-  if (item.missing_entry || item.missing_exit) return "Eksik okutma";
+  if (item.missing_entry) return "Eksik giriş";
+  if (item.missing_exit) return "Eksik Çıkış";
   return item.inside ? "İçeride" : "Çıktı";
 }
 

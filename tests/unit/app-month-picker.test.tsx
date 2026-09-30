@@ -9,6 +9,7 @@ import { FormField } from "../../src/components/form/FormField";
 import {
   APP_PICKER_BLUR_CLASS,
   APP_PICKER_BODY_ATTR,
+  PICKER_MONTH_PANEL_MIN_WIDTH,
   resetAppPickerOwner
 } from "../../src/components/form/app-picker-layer";
 import {
@@ -112,6 +113,43 @@ describe("AppMonthPicker kanonik ay seçici", () => {
     expect(document.querySelector(".modal-header")?.classList.contains(APP_PICKER_BLUR_CLASS)).toBe(true);
     expect(monthCell(2026, 8).getAttribute("aria-pressed")).toBe("true");
     expect(document.querySelector('[data-app-month-scrim="1"]')).not.toBeNull();
+  });
+
+  it("dar trigger'da ay paneli minimum okunabilir genişlikte açılır (trigger'dan geniş)", () => {
+    const onChange = vi.fn();
+    render(
+      <div className="modal-container" style={{ width: 1280 }}>
+        <div className="modal-body">
+          <div className="form-section" style={{ width: 96, maxWidth: 96 }}>
+            <AppMonthPicker name="donem" value="2026-09" onChange={onChange} />
+          </div>
+        </div>
+      </div>
+    );
+
+    const trigger = document.querySelector('[data-app-month-trigger="1"]') as HTMLElement;
+    Object.defineProperty(trigger, "getBoundingClientRect", {
+      configurable: true,
+      value: () => ({
+        width: 96,
+        height: 36,
+        top: 200,
+        left: 40,
+        right: 136,
+        bottom: 236,
+        x: 40,
+        y: 200,
+        toJSON: () => ({})
+      })
+    });
+
+    fireEvent.click(trigger);
+
+    const panel = monthPanel();
+    const appliedWidth = Number.parseFloat(panel.style.width);
+
+    expect(appliedWidth).toBeGreaterThanOrEqual(PICKER_MONTH_PANEL_MIN_WIDTH);
+    expect(appliedWidth).toBeGreaterThan(96);
   });
 
   it("ay seçimi yyyy-mm yayar ve paneli kapatır", () => {
@@ -226,8 +264,10 @@ describe("ay seçici tema kontratı", () => {
       "utf8"
     );
     expect(component).toContain('"app-picker-panel app-month-panel"');
-    expect(component).toContain("measurePickerPanel");
+    expect(component).toContain("measurePickerPanel(root, panel, {");
+    expect(component).toContain("PICKER_MONTH_PANEL_MIN_WIDTH");
     expect(component).toContain("applyPickerPanelGeometry");
     expect(css).not.toContain("!important");
+    expect(css).toMatch(/\.app-month-panel\s*\{[^}]*min-width:\s*252px/s);
   });
 });

@@ -1702,17 +1702,18 @@ export function YonetimPaneliPage() {
       {isLoading ? <LoadingState label="Yönetim paneli yükleniyor..." /> : null}
       {!isLoading && errorMessage ? <ErrorState message={errorMessage} onRetry={() => void loadPanel()} /> : null}
       {!isLoading && successMessage ? <p className="yonetim-success">{successMessage}</p> : null}
-      {!isLoading && !errorMessage && activeTab === "kullanicilar" && canOpenQrKiosk ? (
-        <p className="yonetim-kiosk-link">
-          <Link to="/qr-kiosk" data-testid="yonetim-qr-kiosk-link">
-            QR Giriş Ekranı
-          </Link>
-        </p>
-      ) : null}
-
       {!isLoading && !errorMessage && activeTab === "kullanicilar" ? (
         <section className="yonetim-list-surface" aria-label="Kullanıcı yönetimi" data-testid="yonetim-section-kullanicilar">
-          <div className="yonetim-list-header">
+          <div className="yonetim-kullanici-top-bar" data-testid="yonetim-kullanici-top-bar">
+            {canOpenQrKiosk ? (
+              <p className="yonetim-kiosk-link">
+                <Link to="/qr-kiosk" data-testid="yonetim-qr-kiosk-link">
+                  QR Giriş Ekranı
+                </Link>
+              </p>
+            ) : (
+              <span className="yonetim-kullanici-top-bar-spacer" aria-hidden="true" />
+            )}
             <div className="yonetim-list-actions">
               <YonetimViewToggle
                 label="Kullanıcılar görünümü"

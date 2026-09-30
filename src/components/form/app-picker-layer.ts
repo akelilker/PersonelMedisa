@@ -120,6 +120,17 @@ export const PICKER_PANEL_MARGIN = 8;
 export const PICKER_PANEL_MAX_HEIGHT = 320;
 export const PICKER_PANEL_MIN_HEIGHT = 120;
 
+/**
+ * Ay seçici (3 sütun TR ay adları): dar trigger'da panel trigger genişliğine
+ * sıkışmaz; Ağustos/Temmuz/Eylül okunabilir kalır. Viewport clamp üst sınırı
+ * `measurePickerPanel` içinde korunur.
+ */
+export const PICKER_MONTH_PANEL_MIN_WIDTH = 252;
+
+export type PickerPanelMeasureOptions = {
+  minPanelWidth?: number;
+};
+
 export type PickerVisibleClip = { top: number; bottom: number; left: number; right: number };
 
 function isClippingOverflow(value: string): boolean {
@@ -167,11 +178,34 @@ export function clampNumber(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
 
+/** Panel CSS genişliği trigger'a kilitli olduğunda gerçek içerik genişliğini ölçer. */
+function measurePanelContentWidth(panel: HTMLElement): number {
+  const previousWidth = panel.style.width;
+  const previousRight = panel.style.right;
+  const previousMaxWidth = panel.style.maxWidth;
+
+  panel.style.width = "max-content";
+  panel.style.right = "auto";
+  panel.style.maxWidth = "none";
+
+  const contentWidth = panel.scrollWidth;
+
+  panel.style.width = previousWidth;
+  panel.style.right = previousRight;
+  panel.style.maxWidth = previousMaxWidth;
+
+  return contentWidth;
+}
+
 /**
  * Panel geometrisini ölçer. `root` = picker'ın konumlandırma referansı
- * (`.app-select` / `.app-date-picker`).
+ * (`.app-select` / `.app-date-picker` / `.app-month-picker`).
  */
-export function measurePickerPanel(root: HTMLElement, panel: HTMLElement): PickerPanelGeometry {
+export function measurePickerPanel(
+  root: HTMLElement,
+  panel: HTMLElement,
+  options?: PickerPanelMeasureOptions
+): PickerPanelGeometry {
   const rect = root.getBoundingClientRect();
   const clip = resolvePickerVisibleClip(root);
   const naturalHeight = panel.scrollHeight || 0;
@@ -186,7 +220,10 @@ export function measurePickerPanel(root: HTMLElement, panel: HTMLElement): Picke
   );
 
   const availableWidth = Math.max(0, clip.right - clip.left - PICKER_PANEL_MARGIN * 2);
-  const naturalWidth = Math.max(rect.width, panel.scrollWidth || 0);
+  const minPanelWidth = options?.minPanelWidth ?? 0;
+  const contentWidth =
+    minPanelWidth > 0 ? measurePanelContentWidth(panel) : panel.scrollWidth || 0;
+  const naturalWidth = Math.max(rect.width, contentWidth, minPanelWidth);
   const width = Math.max(0, Math.min(naturalWidth, availableWidth || naturalWidth));
   // Tercih: trigger soluna hizalı. Sağ sınırı aşarsa sola kaydır, sol sınırı aşarsa geri clamp et.
   const preferredLeft = rect.left;

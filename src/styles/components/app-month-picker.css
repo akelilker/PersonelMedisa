@@ -100,6 +100,8 @@
 
 .app-month-panel {
   gap: 6px;
+  /* PICKER_MONTH_PANEL_MIN_WIDTH (app-picker-layer.ts) — ölçüm öncesi fallback */
+  min-width: 252px;
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -13,7 +13,8 @@ import {
   activateAppPicker,
   applyPickerPanelGeometry,
   deactivateAppPicker,
-  measurePickerPanel
+  measurePickerPanel,
+  PICKER_MONTH_PANEL_MIN_WIDTH
 } from "./app-picker-layer";
 import {
   MONTH_DISPLAY_PLACEHOLDER,
@@ -182,7 +183,9 @@ export function AppMonthPicker({
     }
 
     const measure = () => {
-      const geometry = measurePickerPanel(root, panel);
+      const geometry = measurePickerPanel(root, panel, {
+        minPanelWidth: PICKER_MONTH_PANEL_MIN_WIDTH
+      });
       panel.setAttribute("data-placement", geometry.placement);
       applyPickerPanelGeometry(panel, geometry);
     };

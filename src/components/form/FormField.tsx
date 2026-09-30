@@ -6,6 +6,7 @@ import type {
 } from "react";
 import { AppSelect } from "./AppSelect";
 import { AppDatePicker } from "./AppDatePicker";
+import { AppMonthPicker } from "./AppMonthPicker";
 
 export type FormFieldOption = { value: string; label: string };
 
@@ -35,6 +36,7 @@ type FormFieldAsInput = FormFieldBase & {
   maxLength?: number;
   dataTestId?: string;
   min?: number | string;
+  max?: number | string;
   step?: string;
   rows?: never;
   selectOptions?: never;
@@ -47,6 +49,7 @@ type FormFieldAsSelect = FormFieldBase & {
   placeholderOption?: FormFieldOption;
   type?: never;
   min?: never;
+  max?: never;
   step?: never;
   rows?: never;
 };
@@ -56,6 +59,7 @@ type FormFieldAsTextarea = FormFieldBase & {
   rows?: number;
   type?: never;
   min?: never;
+  max?: never;
   step?: never;
   selectOptions?: never;
   placeholderOption?: never;
@@ -116,6 +120,24 @@ export function FormField(props: FormFieldProps) {
         required={required}
         disabled={disabled}
         min={typeof props.min === "string" ? props.min : undefined}
+        dataTestId={props.dataTestId}
+        onInvalid={props.onInvalid}
+      />
+    );
+  } else if (props.type === "month") {
+    // Ay alanları kanonik AppMonthPicker owner'ından gelir; görünen TR ay adı,
+    // wire formatı `yyyy-mm` ve native month input form kontratı korunur.
+    control = (
+      <AppMonthPicker
+        name={name}
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+        required={required}
+        disabled={disabled}
+        min={typeof props.min === "string" ? props.min : undefined}
+        max={typeof props.max === "string" ? props.max : undefined}
+        step={props.step}
         dataTestId={props.dataTestId}
         onInvalid={props.onInvalid}
       />

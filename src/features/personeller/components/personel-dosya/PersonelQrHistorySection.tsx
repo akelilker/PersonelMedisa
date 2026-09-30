@@ -7,6 +7,7 @@ import {
   formatQrTime,
   istanbulDateDaysAgo,
   istanbulToday,
+  qrAttendanceAnomalyDisplay,
   qrAttendanceStatus,
   qrReadErrorMessage
 } from "../../../puantaj/qr-read-utils";
@@ -19,10 +20,6 @@ function formatMatchedDuration(seconds: number): string {
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
   return `${hours}s ${minutes}dk`;
-}
-
-function formatAnomalyLabel(anomalies: string[]): string {
-  return anomalies.length ? anomalies.join(", ") : "Yok";
 }
 
 export function PersonelQrHistorySection({ personel }: { personel: Personel }) {
@@ -73,7 +70,7 @@ export function PersonelQrHistorySection({ personel }: { personel: Personel }) {
                     <td>{formatQrTime(row.last_exit)}</td>
                     <td>{formatMatchedDuration(row.matched_seconds)}</td>
                     <td>{qrAttendanceStatus(row)}</td>
-                    <td>{formatAnomalyLabel(row.anomalies)}</td>
+                    <td>{qrAttendanceAnomalyDisplay(row)}</td>
                     <td>
                       <Link to={`/puantaj?personel_id=${personel.id}&tarih=${row.date_from}`}>
                         Günlük puantaj
@@ -97,7 +94,7 @@ export function PersonelQrHistorySection({ personel }: { personel: Personel }) {
                 </p>
                 <p className="personel-puantaj-summary-note">{formatMatchedDuration(row.matched_seconds)}</p>
                 <p className="personel-puantaj-summary-note">
-                  {qrAttendanceStatus(row)} · {formatAnomalyLabel(row.anomalies)}
+                  {qrAttendanceStatus(row)} · {qrAttendanceAnomalyDisplay(row)}
                 </p>
                 <div className="pm-self-request__actions">
                   <Link to={`/puantaj?personel_id=${personel.id}&tarih=${row.date_from}`}>

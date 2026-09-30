@@ -16,7 +16,13 @@ import type { BirimAmiriGunlukDurum } from "../../../types/bildirim";
 import type { YillikFazlaCalismaKapsam } from "../../../types/haftalik-kapanis";
 import type { MeIdentity } from "../../../types/self-service";
 import { useRoleAccess } from "../../../hooks/use-role-access";
-import { OwnQrAttendanceBoxes } from "../components/OwnQrAttendanceBoxes";
+import { BackgroundlessNoticeModal } from "../components/BackgroundlessNoticeModal";
+import {
+  OwnQrAttendanceBoxes,
+  PASSIVE_CIKIS_AFTER_COMPLETED_PAIR_NOTICE,
+  PASSIVE_CIKIS_WITHOUT_GIRIS_NOTICE,
+  PASSIVE_GIRIS_WITH_OPEN_SHIFT_NOTICE
+} from "../components/OwnQrAttendanceBoxes";
 import { QrKioskModelNote } from "../components/QrKioskModelNote";
 import { QrPuantajExpectationNote } from "../components/QrPuantajExpectationNote";
 import { SelfServiceQrShortcuts } from "../components/SelfServiceQrShortcuts";
@@ -38,6 +44,9 @@ export function BirimAmiriOperationalHomePage() {
   const [unitError, setUnitError] = useState<string | null>(null);
   const [fazlaMesai, setFazlaMesai] = useState<YillikFazlaCalismaKapsam | null>(null);
   const [fazlaMesaiError, setFazlaMesaiError] = useState<string | null>(null);
+  const [passiveNotice, setPassiveNotice] = useState<{ title: string; body: string } | null>(
+    null
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -147,6 +156,18 @@ export function BirimAmiriOperationalHomePage() {
             testId="birim-amiri-own-attendance"
             onScanGiris={() => navigate("/self/qr-okut?event=GIRIS")}
             onScanCikis={() => navigate("/self/qr-okut?event=CIKIS")}
+            onPassiveGirisWithOpenShift={() =>
+              setPassiveNotice({ title: "Bilgi", body: PASSIVE_GIRIS_WITH_OPEN_SHIFT_NOTICE })
+            }
+            onPassiveCikisWithoutGiris={() =>
+              setPassiveNotice({ title: "Bilgi", body: PASSIVE_CIKIS_WITHOUT_GIRIS_NOTICE })
+            }
+            onPassiveCikisAfterCompletedPair={() =>
+              setPassiveNotice({
+                title: "Bilgi",
+                body: PASSIVE_CIKIS_AFTER_COMPLETED_PAIR_NOTICE
+              })
+            }
           />
         ) : (
           <div
@@ -312,6 +333,14 @@ export function BirimAmiriOperationalHomePage() {
         <span>PersonelMedisa</span>
         <div className="pm-footer-accent pm-footer-accent--right" aria-hidden="true" />
       </footer>
+
+      <BackgroundlessNoticeModal
+        open={passiveNotice !== null}
+        title={passiveNotice?.title ?? ""}
+        body={passiveNotice?.body ?? ""}
+        onClose={() => setPassiveNotice(null)}
+        testId="birim-amiri-passive-notice-modal"
+      />
     </section>
   );
 }

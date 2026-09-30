@@ -250,6 +250,7 @@ class QrAttendanceIntervalReadService
         foreach ($people as $id => $person) {
             foreach ($businessDates as $businessDate) {
                 $row = self::mapManagerBusinessDateRow(
+                    $pdo,
                     $person,
                     $eventsByPersonel[$id] ?? [],
                     $businessDate,
@@ -301,7 +302,7 @@ class QrAttendanceIntervalReadService
     }
 
     /** @param list<array<string,mixed>> $events @return array<string,mixed>|null */
-    private static function mapManagerBusinessDateRow(array $person, array $events, string $businessDate, string $today, bool $includeAbsent = false): ?array
+    private static function mapManagerBusinessDateRow(PDO $pdo, array $person, array $events, string $businessDate, string $today, bool $includeAbsent = false): ?array
     {
         $windowStart = (new \DateTimeImmutable($businessDate, new \DateTimeZone('Europe/Istanbul')))
             ->modify('-1 day')
@@ -361,15 +362,25 @@ class QrAttendanceIntervalReadService
             strcmp((string) ($a['occurred_at_utc'] ?? ''), (string) ($b['occurred_at_utc'] ?? ''))
         );
         $stateLast = $stateEvents ? $stateEvents[count($stateEvents) - 1] : null;
+        $inside = $businessDate === $today && $stateLast !== null && $stateLast['event_type'] === 'GIRIS';
+        $anomalyTypes = self::managerPresentationAnomalies(
+            $pdo,
+            (int) ($person['personel_id'] ?? 0),
+            $businessDate,
+            $today,
+            $inside,
+            $anomalyTypes,
+            $stateLast
+        );
 
         return $person + [
             'date_from' => $businessDate,
             'date_to' => $businessDate,
-            'first_entry' => self::firstIntervalTime($derived['intervals']),
+            'first_entry' => self::managerFirstEntry($derived['intervals'], $localEvents),
             'last_exit' => self::lastIntervalTime($derived['intervals']),
             'last_movement' => $last ? self::eventLocalIso($last['occurred_at_utc']) : null,
             'last_movement_type' => $last['event_type'] ?? null,
-            'inside' => $businessDate === $today && $stateLast !== null && $stateLast['event_type'] === 'GIRIS',
+            'inside' => $inside,
             'interval_count' => count($derived['intervals']),
             'missing_entry' => in_array('MISSING_GIRIS', $anomalyTypes, true),
             'missing_exit' => in_array('MISSING_CIKIS', $anomalyTypes, true),
@@ -378,6 +389,61 @@ class QrAttendanceIntervalReadService
             'matched_seconds' => (int) ($derived['summary']['complete_duration_seconds'] ?? 0),
             'source_event_count' => count($localEvents),
         ];
+    }
+
+    /**
+     * @param list<array<string,mixed>> $intervals
+     * @param list<array<string,mixed>> $localEvents
+     */
+    private static function managerFirstEntry(array $intervals, array $localEvents): ?string
+    {
+        $fromInterval = self::firstIntervalTime($intervals);
+        if ($fromInterval !== null && $fromInterval !== '') {
+            return $fromInterval;
+        }
+        foreach ($localEvents as $event) {
+            if ((string) ($event['event_type'] ?? '') === 'GIRIS') {
+                return self::eventLocalIso($event['occurred_at_utc']);
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param list<string> $anomalyTypes
+     * @return list<string>
+     */
+    private static function managerPresentationAnomalies(
+        PDO $pdo,
+        int $personelId,
+        string $businessDate,
+        string $today,
+        bool $inside,
+        array $anomalyTypes,
+        ?array $stateLast
+    ): array {
+        if ($businessDate !== $today || !$inside || !in_array('MISSING_CIKIS', $anomalyTypes, true)) {
+            return $anomalyTypes;
+        }
+        if (!is_array($stateLast) || (string) ($stateLast['event_type'] ?? '') !== 'GIRIS') {
+            return $anomalyTypes;
+        }
+        if ($personelId <= 0) {
+            return $anomalyTypes;
+        }
+        if (QrAttendanceUnresolvedAnomalyService::openGirisBlocksNextGiris(
+            $pdo,
+            $personelId,
+            (string) ($stateLast['occurred_at_utc'] ?? '')
+        )) {
+            return array_values(array_filter(
+                $anomalyTypes,
+                static fn (string $type): bool => $type !== 'MISSING_CIKIS'
+            ));
+        }
+
+        return $anomalyTypes;
     }
 
     private static function resolveManagerRange($from, $to)

@@ -202,8 +202,8 @@ describe("credential onboarding owners (MG-CRED-ONBOARD-001)", () => {
     expect(bundleTest).toContain("checksum074");
     expect(bundleTest).toContain("checksum075");
     expect(bundleTest).toContain("checksum076");
-    expect(bundleTest).toContain("count($rows) !== 96");
-    expect(bundleTest).toContain("rows[95]['version'] !== '095'");
+    expect(bundleTest).toContain("count($rows) !== 97");
+    expect(bundleTest).toContain("rows[96]['version'] !== '096'");
     expect(bundleTest).toContain("rows[90]['version'] !== '090'");
     expect(bundleTest).toContain("rows[89]['version'] !== '089'");
     expect(bundleTest).toContain("rows[88]['version'] !== '088'");

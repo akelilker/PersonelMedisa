@@ -65,7 +65,7 @@ describe("app-home mobile footer wordmark", () => {
   it("bumps the centered MEDİSA mark slightly without touching version layout tokens", () => {
     const footer = read("src/styles/components/footer.css");
     expect(footer).toMatch(
-      /body\.app-home-route #app-footer \.brand img\s*\{[^}]*max-height:\s*calc\(14\.27px \+ 1\.5pt - 0\.5pt\)/s
+      /body\.app-home-route #app-footer \.brand img\s*\{[^}]*max-height:\s*calc\(14\.27px \+ 1\.5pt \+ 0\.5pt\)/s
     );
   });
 });

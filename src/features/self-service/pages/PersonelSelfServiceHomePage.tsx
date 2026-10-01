@@ -189,7 +189,7 @@ export function PersonelSelfServiceHomePage() {
       <section className="states-page" data-testid="personel-unbound-page">
         <h2>Personel bağlantısı yok</h2>
         <p>
-          Hesabınız bir personel kaydına bağlı değil. QR giriş/çıkış ve öz servis özeti bu yüzden
+          Hesabınız bir personel kaydına bağlı değil. QR giriş/çıkış ve kişisel özet bu yüzden
           kapalıdır. Yöneticiniz hesabınızı bağladıktan sonra bu ekran açılır.
         </p>
       </section>
@@ -200,7 +200,7 @@ export function PersonelSelfServiceHomePage() {
     return (
       <section className="states-page" data-testid="personel-inactive-page">
         <h2>Personel hesabınız aktif değil</h2>
-        <p>Aktif personel kaydı olmadan öz servis özeti ve QR giriş/çıkış kullanılamaz.</p>
+        <p>Aktif personel kaydı olmadan kişisel özet ve QR giriş/çıkış kullanılamaz.</p>
       </section>
     );
   }
@@ -228,9 +228,10 @@ export function PersonelSelfServiceHomePage() {
           onPhotoSelected={onPhotoSelected}
         />
       ) : null}
-      <div className="self-home-main" data-testid="personel-self-home-main">
-        <section className="pm-section" data-testid="personel-today-attendance-section">
-          <OwnQrAttendanceBoxes
+      {qrEnabled ? (
+        <div className="self-home-main" data-testid="personel-self-home-main">
+          <section className="pm-section" data-testid="personel-today-attendance-section">
+            <OwnQrAttendanceBoxes
             today={today}
             qrEnabled={qrEnabled}
             testId="personel-attendance-boxes"
@@ -275,18 +276,11 @@ export function PersonelSelfServiceHomePage() {
               })
             }
           />
-        </section>
-      </div>
-
-      <PersonelSelfServiceMenu anomalyCount={today.unresolved_attendance_anomalies?.length ?? 0} />
-
-      {!qrEnabled ? (
-        <div className="pm-callout" data-testid="personel-qr-closed-notice" role="status">
-          <p>
-            QR giriş/çıkış bu personel için henüz açık değil. Öz servis özetiniz görüntülenmeye devam eder.
-          </p>
+          </section>
         </div>
       ) : null}
+
+      <PersonelSelfServiceMenu anomalyCount={today.unresolved_attendance_anomalies?.length ?? 0} />
 
       <AttendanceCorrectionRequestModal
         open={correctDraft !== null}

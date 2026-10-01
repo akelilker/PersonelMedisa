@@ -21,7 +21,8 @@ describe("personel mobile field UX closure contracts", () => {
     expect(shell).toContain("modal-container--self-qr-scan");
     expect(shell).toContain("SelfServiceModalHomeButton");
     expect(shell).toMatch(/isSelfQrScanModalRoute[\s\S]*SelfServiceModalHomeButton/);
-    expect(shell).toContain('"Öz Servis"');
+    // Ayrı "Öz Servis" paneli/modal başlığı kaldırıldı; /self kanonik personel ekranını render eder.
+    expect(shell).not.toContain('"Öz Servis"');
     expect(shell).toContain('searchParams.get("event")');
     expect(shell).toContain('return { title: "Modül", closeTo: "/" };');
   });

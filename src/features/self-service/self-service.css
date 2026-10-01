@@ -370,10 +370,6 @@
   min-height: 0;
 }
 
-.self-home-page > .pm-callout {
-  flex: 0 0 auto;
-}
-
 .pm-self-identity {
   display: flex;
   align-items: center;
@@ -1894,8 +1890,9 @@ body.modal-open .modal-container--self-product .modal-header {
 }
 
 /*
- * Manager ana ekran: QR bağımsız /self geçidi (Taşıt uygulama geçişi ritmi).
- * Sabit footer üstünde, sağ alt; watermark ile çakışmaz.
+ * Bağlı çalışan / yönetici ana ekran: uygulamalar arası geçiş (Taşıt "Kullanıcı Paneli >" ritmi).
+ * Kutusuz, arka plansız, sade kırmızı metin; footer hemen üstünde sağ altta.
+ * Ayrı ürün / modal / FAB yok — yalnız /self geçiş kontrolü.
  */
 .home-self-service-gateway {
   position: fixed;
@@ -1904,40 +1901,33 @@ body.modal-open .modal-container--self-product .modal-header {
   bottom: calc(
     var(--app-footer-real-height) + var(--app-footer-gap) + env(safe-area-inset-bottom, 0px)
   );
-  color: rgba(232, 240, 248, 0.92);
-  text-decoration: none;
-  border: 1px solid rgba(140, 158, 176, 0.55);
-  border-radius: 999px;
-  background: linear-gradient(180deg, rgba(42, 52, 68, 0.96), rgba(28, 36, 50, 0.98));
-  box-shadow:
-    0 4px 14px rgba(0, 0, 0, 0.35),
-    0 0 0 1px rgba(var(--theme-color-rgb), 0.12),
-    inset 0 1px 0 rgba(255, 255, 255, 0.12);
-  min-width: 44px;
-  min-height: 44px;
-  padding: 10px;
-  box-sizing: border-box;
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease, color 0.2s ease;
+  gap: 3px;
+  min-height: 44px;
+  padding: 0 4px;
+  box-sizing: border-box;
+  border: none;
+  border-radius: 0;
+  background: none;
+  color: var(--brand-red, #e00000);
+  font-size: 0.86rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  text-decoration: none;
+  white-space: nowrap;
 }
 
-.home-self-service-gateway svg {
-  width: 22px;
-  height: 22px;
-  display: block;
+.home-self-service-gateway__chevron {
+  font-size: 1em;
+  line-height: 1;
 }
 
 .home-self-service-gateway:hover,
 .home-self-service-gateway:focus-visible {
-  border-color: rgba(var(--theme-color-rgb), 0.72);
-  color: var(--text-inverse);
+  color: var(--brand-red-hover, #f01a1a);
+  text-decoration: underline;
   outline: none;
-  box-shadow:
-    0 6px 16px rgba(0, 0, 0, 0.38),
-    0 0 0 1px rgba(var(--theme-color-rgb), 0.35),
-    inset 0 1px 0 rgba(255, 255, 255, 0.16);
 }
 
 .home-self-service-gateway:focus-visible {

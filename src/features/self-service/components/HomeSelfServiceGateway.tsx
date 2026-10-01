@@ -8,8 +8,9 @@ import { useAuth } from "../../../state/auth.store";
 import { canonicalizeUserRole } from "../../../lib/authorization/canonicalize-user-role";
 
 /**
- * Manager ana ekranı: bağlı personel + self_service.view → /self (QR bağımsız).
- * QR kısayolları SelfServiceQrShortcuts owner'ında kalır.
+ * Bağlı çalışan / yönetici ana ekranı: bağlı personel + self_service.view → /self (QR bağımsız).
+ * Taşıt "Kullanıcı Paneli >" ritmi: kutusuz, sade metin geçişi. Ayrı ürün / panel / FAB yok.
+ * PERSONEL zaten kendi ekranını kullanır; QR kısayolları SelfServiceQrShortcuts owner'ında kalır.
  */
 export function HomeSelfServiceGateway() {
   const { session } = useAuth();
@@ -18,7 +19,7 @@ export function HomeSelfServiceGateway() {
   const personelTipiAd = session?.user.personel_tipi_ad ?? null;
   const canonicalRole = canonicalizeUserRole(activeRole);
 
-  if (canonicalRole === "PERSONEL" || canonicalRole === "BIRIM_AMIRI") {
+  if (canonicalRole === "PERSONEL") {
     return null;
   }
 
@@ -37,12 +38,10 @@ export function HomeSelfServiceGateway() {
       data-testid="home-self-service-gateway"
       aria-label="Kendi Bilgilerime Geç"
     >
-      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-        <path
-          d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Zm0 2c-3.33 0-6 1.67-6 3.75V20h12v-2.25C18 15.67 15.33 14 12 14Z"
-          fill="currentColor"
-        />
-      </svg>
+      <span className="home-self-service-gateway__text">Kendi Bilgilerim</span>
+      <span className="home-self-service-gateway__chevron" aria-hidden="true">
+        {">"}
+      </span>
     </Link>
   );
 }

@@ -54,13 +54,16 @@ test.describe("personnel-linked self-service QR entitlement", () => {
     await page.getByTestId("home-self-service-gateway").click();
     await expect(page).toHaveURL(/\/self$/);
     await expect(page.getByText("Demo modda personel eşlemesi yok.")).toHaveCount(0);
+    // /self ayrı bir "Öz Servis" paneli değil: aynı kanonik personel ekranı render edilir.
     await expect(page.getByTestId("personel-self-service-page")).toBeVisible();
-    await expect(page.getByTestId("personel-self-home-main")).toBeVisible();
     await expect(page.getByTestId("personel-self-identity")).toBeVisible();
     await expect(page.getByTestId("personel-self-identity")).toContainText(linkedName);
+    // QR kapsamı dışı: QR alanı hiç mount edilmez, kapalı notu yok; kişisel menü kalır.
+    await expect(page.getByTestId("personel-self-home-main")).toHaveCount(0);
     await expect(page.getByTestId("giris-scan")).toHaveCount(0);
     await expect(page.getByTestId("cikis-scan")).toHaveCount(0);
-    await expect(page.getByTestId("personel-qr-closed-notice")).toBeVisible();
+    await expect(page.getByTestId("personel-qr-closed-notice")).toHaveCount(0);
+    await expect(page.getByTestId("personel-self-menu")).toBeVisible();
 
     await page.getByTestId("personel-menu-izinlerim").click();
     await expect(page).toHaveURL(/\/self\/izinlerim$/);

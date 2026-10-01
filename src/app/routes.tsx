@@ -62,7 +62,7 @@ function HomeIndexMainMenu() {
       {/* Yönetici rolü korunur; bağlı personeli kanonik QR kapsamındaysa
        * (BOLUM_YONETICISI vb.) kendi QR/kart yüzeyine normal navigasyonla ulaşır.
        * Yönetim yetkisi verilmez, rol düşürülmez. Hak yoksa hiç render edilmez. */}
-      <SelfServiceQrShortcuts title="Kendi QR / Kart Okutmam" showSelfServiceHomeLink />
+      <SelfServiceQrShortcuts title="Kendi QR / Kart Okutmam" />
     </>
   );
 }

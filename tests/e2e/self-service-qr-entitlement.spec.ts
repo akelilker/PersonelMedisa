@@ -22,11 +22,11 @@ test.describe("personnel-linked self-service QR entitlement", () => {
     await expect(page.getByTestId("menu-raporlar")).toBeVisible();
 
     // Normal navigasyonla kendi self-service/QR yüzeyine ulaşır.
-    await expect(page.getByTestId("self-service-home-link")).toBeVisible();
+    await expect(page.getByTestId("home-self-service-gateway")).toBeVisible();
     await expect(page.getByTestId("self-qr-scan-link")).toBeVisible();
     await expect(page.getByTestId("self-qr-history-link")).toBeVisible();
 
-    await page.getByTestId("self-service-home-link").click();
+    await page.getByTestId("home-self-service-gateway").click();
     await expect(page).toHaveURL(/\/self$/);
 
     await page.goto("/self/qr-okut");
@@ -42,7 +42,7 @@ test.describe("personnel-linked self-service QR entitlement", () => {
 
     await expect(page.locator("#main-menu .menu-btn")).toHaveCount(3);
     await expect(page.getByTestId("self-service-qr-section")).toHaveCount(0);
-    await expect(page.getByTestId("self-service-home-link")).toHaveCount(0);
+    await expect(page.getByTestId("home-self-service-gateway")).toBeVisible();
     await expect(page.getByTestId("self-qr-scan-link")).toHaveCount(0);
     await expect(page.getByTestId("self-qr-history-link")).toHaveCount(0);
 

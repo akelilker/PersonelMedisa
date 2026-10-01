@@ -19,6 +19,7 @@ import { PersonelImportDryRunModal } from "../features/personeller/components/Pe
 import { PersonelImportHistoryModal } from "../features/personeller/components/PersonelImportHistoryModal";
 import { PersonelDetayPrintButton } from "../features/personeller/components/personel-dosya/PersonelDetayPrintButton";
 import { readPersonelKartBack } from "../features/personeller/personel-kart-nav";
+import { HomeSelfServiceGateway } from "../features/self-service/components/HomeSelfServiceGateway";
 import { personelSelfProductModalTitle } from "../features/self-service/personel-self-service-menu";
 import { useRoleAccess } from "../hooks/use-role-access";
 import { canonicalizeUserRole } from "../lib/authorization/canonicalize-user-role";
@@ -506,6 +507,7 @@ export function AppShell() {
         </AppModal>
       ) : null}
 
+      {isHomeRoute && !isAuthSurfaceRoute ? <HomeSelfServiceGateway /> : null}
       <AppFooter loginFooter={isAuthSurfaceRoute} />
     </div>
   );

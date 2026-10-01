@@ -579,8 +579,10 @@ body.login-page .hero .animated-line {
     box-sizing: border-box;
     --hero-home-logo-footprint: calc(54px + 2px);
     --hero-home-right-track: 1px;
+    /* WebKit rounds subpixel layout; 3px token yields ~2px ink-to-ink in 390/430 DOM. */
+    --hero-home-logo-title-gap: 3px;
     --hero-home-title-ink-w: 338px;
-    column-gap: 2px;
+    column-gap: var(--hero-home-logo-title-gap);
     border-color: rgba(140, 158, 176, 0.6);
     box-shadow:
       0 4px 16px rgba(0, 0, 0, 0.4),
@@ -613,7 +615,7 @@ body.login-page .hero .animated-line {
   body.app-home-route .hero.hero-with-session .hero-logo picture {
     width: 54px;
     max-width: 54px;
-    margin-right: 2px;
+    margin-right: var(--hero-home-logo-title-gap);
     transform: translate(1px, 1px);
   }
 
@@ -660,7 +662,7 @@ body.login-page .hero .animated-line {
   body.app-home-route .hero.hero-with-session .hero-title-stack {
     grid-column: 2;
     grid-row: 1;
-    gap: 2px;
+    gap: var(--hero-home-logo-title-gap);
     align-self: center;
     align-items: center;
     justify-self: stretch;

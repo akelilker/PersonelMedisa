@@ -23,12 +23,20 @@ describe("home shell polish + self-service gateway owners", () => {
     expect(hero).toMatch(
       /body\.app-home-route \.hero\.hero-with-session\s*\{[^}]*--hero-home-logo-footprint/s
     );
-    expect(hero).toMatch(/body\.app-home-route \.hero\.hero-with-session\s*\{[^}]*column-gap:\s*2px/s);
     expect(hero).toMatch(
-      /body\.app-home-route \.hero\.hero-with-session \.hero-title-stack\s*\{[^}]*gap:\s*2px/s
+      /body\.app-home-route \.hero\.hero-with-session\s*\{[^}]*--hero-home-logo-title-gap:\s*3px/s
     );
     expect(hero).toMatch(
-      /body\.app-home-route \.hero\.hero-with-session \.hero-title-stack\s*\{[^}]*padding-right:\s*calc\(var\(--hero-home-logo-footprint\) - var\(--hero-home-right-track\)\)/s
+      /body\.app-home-route \.hero\.hero-with-session\s*\{[^}]*column-gap:\s*var\(--hero-home-logo-title-gap\)/s
+    );
+    expect(hero).toMatch(
+      /body\.app-home-route \.hero\.hero-with-session \.hero-title-stack\s*\{[^}]*gap:\s*var\(--hero-home-logo-title-gap\)/s
+    );
+    expect(hero).toMatch(
+      /body\.app-home-route \.hero\.hero-with-session \.hero-logo picture\s*\{[^}]*margin-right:\s*var\(--hero-home-logo-title-gap\)/s
+    );
+    expect(hero).toMatch(
+      /body\.app-home-route \.hero\.hero-with-session \.hero-title-stack\s*\{[^}]*padding-right:\s*calc\(\s*min\(clamp\(72px,\s*36vw,\s*132px\),\s*calc\(100vw - 152px\)\) - var\(--hero-home-right-track\)\s*\)/s
     );
     expect(hero).toMatch(
       /body\.app-home-route \.hero\.hero-with-session \.hero-title-stack > h1\s*\{[^}]*text-align:\s*center/s
@@ -42,7 +50,7 @@ describe("home shell polish + self-service gateway owners", () => {
       /body\.app-home-route #app-footer \.brand img\s*\{[^}]*max-height:\s*calc\(14\.27px \+ 1\.5pt - 0\.5pt\)/s
     );
     expect(footer).toMatch(
-      /#app-footer \.footer-content \.brand img\s*\{[^}]*height:\s*calc\(20px - 0\.5pt\)/s
+      /body:not\(\.login-page\):not\(\.admin-report-page\) #app-footer \.footer-content \.brand img\s*\{[^}]*height:\s*calc\(20px - 0\.5pt\)/s
     );
   });
 

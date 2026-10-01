@@ -36,23 +36,23 @@ describe("PersonelQrHistoryPage calendar product states", () => {
   it("shows day detail when a day with events is selected", async () => {
     const { fetchMeQrHareketleri } = await import("../../src/api/qr.api");
     vi.mocked(fetchMeQrHareketleri).mockResolvedValueOnce({
-      from: "2026-09-01",
-      to: "2026-09-30",
+      from: "2026-10-01",
+      to: "2026-10-31",
       items: [],
       days: [
         {
-          date: "2026-09-19",
+          date: "2026-10-19",
           has_events: true,
           giris: {
             id: 1,
             time: "08:12",
-            occurred_at: "2026-09-19T05:12:00.000Z",
+            occurred_at: "2026-10-19T05:12:00.000Z",
             status: { kind: "NORMAL", label: "Normal", delta_dakika: 0 }
           },
           cikis: {
             id: 2,
             time: "17:05",
-            occurred_at: "2026-09-19T14:05:00.000Z",
+            occurred_at: "2026-10-19T14:05:00.000Z",
             status: { kind: "NORMAL", label: "Normal", delta_dakika: 0 }
           },
           status_lines: ["Normal"]

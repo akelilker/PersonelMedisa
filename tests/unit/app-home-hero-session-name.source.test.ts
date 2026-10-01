@@ -64,16 +64,19 @@ describe("app-home hero session name under logo", () => {
     const block = appHomeHeroBlock(hero);
 
     expect(block).toMatch(
-      /body\.app-home-route \.hero\.hero-with-session\s*\{[^}]*column-gap:\s*2px/s
+      /body\.app-home-route \.hero\.hero-with-session\s*\{[^}]*--hero-home-logo-title-gap:\s*3px/s
     );
     expect(block).toMatch(
       /body\.app-home-route \.hero\.hero-with-session \.hero-title-stack\s*\{[^}]*grid-column:\s*2/s
     );
     expect(block).toMatch(
-      /body\.app-home-route \.hero\.hero-with-session \.hero-title-stack\s*\{[^}]*gap:\s*2px/s
+      /body\.app-home-route \.hero\.hero-with-session \.hero-title-stack\s*\{[^}]*gap:\s*var\(--hero-home-logo-title-gap\)/s
     );
     expect(block).toMatch(
-      /body\.app-home-route \.hero\.hero-with-session \.hero-title-stack\s*\{[^}]*padding-right:\s*calc\(var\(--hero-home-logo-footprint\) - var\(--hero-home-right-track\)\)/s
+      /body\.app-home-route \.hero\.hero-with-session \.hero-logo picture\s*\{[^}]*margin-right:\s*var\(--hero-home-logo-title-gap\)/s
+    );
+    expect(block).toMatch(
+      /body\.app-home-route \.hero\.hero-with-session \.hero-title-stack\s*\{[^}]*padding-right:\s*calc\(\s*min\(clamp\(72px,\s*36vw,\s*132px\),\s*calc\(100vw - 152px\)\) - var\(--hero-home-right-track\)\s*\)/s
     );
     expect(block).toMatch(
       /body\.app-home-route \.hero\.hero-with-session \.hero-title-stack > h1\s*\{[^}]*text-align:\s*center/s

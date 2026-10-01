@@ -92,6 +92,7 @@ class MeController
                 'dogum_tarihi' => $ctx['dogum_tarihi'] ?? null,
                 'telefon' => $ctx['telefon'] ?? null,
                 'kan_grubu' => $ctx['kan_grubu'] ?? null,
+                'cinsiyet' => $ctx['cinsiyet'] ?? null,
                 'ise_giris_tarihi' => $ctx['ise_giris_tarihi'] ?? null,
                 'sube_id' => (int) $ctx['sube_id'],
                 'sube_ad' => (string) $ctx['sube_ad'],

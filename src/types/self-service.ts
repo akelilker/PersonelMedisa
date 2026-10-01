@@ -13,7 +13,7 @@ export type MePersonelSummary = {
   dogum_tarihi?: string | null;
   telefon?: string | null;
   kan_grubu?: string | null;
-  /** No personeller.cinsiyet column yet; UI shows "-" until the API sends a real value. */
+  /** Stored on personeller.cinsiyet when present; absent/null → UI shows "-". */
   cinsiyet?: string | null;
   sube_id: number;
   sube_ad: string;

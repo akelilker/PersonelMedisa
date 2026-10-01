@@ -163,7 +163,7 @@ describe("credential onboarding owners (MG-CRED-ONBOARD-001)", () => {
     expect(migrations.at(-4)).toBe("091_sgk_isveren_bildirim_donemi_reconcile.sql");
     expect(migrations.at(-3)).toBe("092_personel_self_service_product.sql");
     expect(migrations.at(-2)).toBe("093_attendance_anomaly_notification_dedupe.sql");
-    expect(migrations.at(-1)).toBe("094_attendance_no_event_day.sql");
+    expect(migrations.at(-1)).toBe("095_personel_cinsiyet.sql");
 
     const migration069 = read("api/migrations/069_personel_credential_onboarding.sql");
     const checksum069 = createHash("sha256").update(migration069).digest("hex");

@@ -70,6 +70,15 @@ describe("PERSONEL mobile product phase 1 identity", () => {
     expect(view?.sicil).toBe("P-007");
   });
 
+  it("shows API-supplied gender without inventing missing values", () => {
+    const view = buildPersonelSelfIdentityView(
+      identity({
+        cinsiyet: "Erkek"
+      })
+    );
+    expect(view?.cinsiyet).toBe("Erkek");
+  });
+
   it("omits empty görev/bölüm/birim parts instead of placeholders", () => {
     const view = buildPersonelSelfIdentityView(
       identity({ birim_ad: "  ", gorev_ad: null, bolum_ad: "" })

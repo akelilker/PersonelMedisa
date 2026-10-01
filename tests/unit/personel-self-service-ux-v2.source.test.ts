@@ -78,6 +78,9 @@ describe("PERSONEL_SELF_SERVICE_PRODUCT_UX_V2 notification + policy owners", () 
     const hero = read("src/components/hero/Hero.tsx");
     expect(hero).toContain('data-testid="hero-panel-subtitle"');
     expect(hero).toContain("KULLANICI PANELİ");
+    expect(hero).toContain("PANEL_TITLE_DIM_DELAY_MS = 4000");
+    expect(hero).toContain("hero--titles-dimmed");
+    expect(shell).toContain("showPanelSubtitle={isPersonelShellRole || isSelfSurfaceRoute}");
 
     const heroCss = read("src/styles/components/hero.css");
     expect(heroCss).toMatch(
@@ -106,6 +109,14 @@ describe("PERSONEL_SELF_SERVICE_PRODUCT_UX_V2 notification + policy owners", () 
     );
     expect(heroCss).toMatch(
       /body\.app-home-route \.hero\.hero--personel-shell \.hero-title-stack\s*\{[^}]*transform:\s*translateX\(6px\)/s
+    );
+    expect(heroCss).toMatch(
+      /\.hero\.hero--personel-shell \.hero-title-stack \.hero-panel-subtitle\s*\{[^}]*margin:\s*12px 0 0/s
+    );
+    expect(heroCss).toContain("transition: color 0.2s, opacity 0.2s;");
+    expect(heroCss).toMatch(/\.hero--titles-dimmed[\s\S]*opacity:\s*0\.7/);
+    expect(heroCss).toMatch(
+      /\.hero-panel-subtitle:hover,\s*\n\s*\.hero\.hero--panel-subtitle\.hero--titles-dimmed \.hero-title-stack \.hero-panel-subtitle:focus,\s*\n\s*\.hero\.hero--panel-subtitle\.hero--titles-dimmed \.hero-title-stack \.hero-panel-subtitle:focus-visible\s*\{[^}]*opacity:\s*1/s
     );
 
     const header = read("src/components/shell/ShellHeaderActions.tsx");

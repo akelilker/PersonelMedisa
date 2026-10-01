@@ -45,6 +45,29 @@ describe("PERSONEL mobile product phase 1 identity", () => {
     expect(view?.iseGiris).toBe("15.01.2020");
     expect(view?.calismaSuresi).toMatch(/^\d+ yıl \d+ ay$/);
     expect(view?.subeGorev).toBe("Merkez - Teknisyen");
+    expect(view?.dogumTarihi).toBe("-");
+    expect(view?.cinsiyet).toBe("-");
+    expect(view?.telefon).toBe("-");
+    expect(view?.tcKimlikNo).toBe("-");
+    expect(view?.kanGrubu).toBe("-");
+  });
+
+  it("formats supplied identity facts and does not invent missing gender", () => {
+    const view = buildPersonelSelfIdentityView(
+      identity({
+        dogum_tarihi: "1992-03-14",
+        telefon: "0532 111 22 33",
+        tc_kimlik_no: "10000000146",
+        kan_grubu: "A Rh+",
+        cinsiyet: null
+      })
+    );
+    expect(view?.dogumTarihi).toBe("14.03.1992");
+    expect(view?.telefon).toBe("0532 111 22 33");
+    expect(view?.tcKimlikNo).toBe("10000000146");
+    expect(view?.kanGrubu).toBe("A Rh+");
+    expect(view?.cinsiyet).toBe("-");
+    expect(view?.sicil).toBe("P-007");
   });
 
   it("omits empty görev/bölüm/birim parts instead of placeholders", () => {

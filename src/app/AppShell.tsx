@@ -405,6 +405,7 @@ export function AppShell() {
             userLabel={isPersonelShellRole ? null : session?.user.ad_soyad}
             subeLabel={isPersonelShellRole ? null : activeSubeLabel}
             variant={isPersonelShellRole ? "personel-shell" : "default"}
+            showPanelSubtitle={isPersonelShellRole || isSelfSurfaceRoute}
           />
           {showShellHeaderActions ? (
             <ShellHeaderActions contextLabel="Ana panel" minimal={isPersonelSurfaceRoute} />

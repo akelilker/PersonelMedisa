@@ -382,7 +382,7 @@
 }
 
 .pm-self-identity--home {
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
   padding: 0;
@@ -403,8 +403,9 @@ body.app-personel-shell.app-home-route .personel-mobile-shell.self-home-page > .
   gap: 0;
 }
 
-.pm-self-identity--home .pm-self-identity__fact:first-of-type {
-  margin-top: 3px;
+.pm-self-identity--home .pm-self-identity__name + .pm-self-identity__fact {
+  /* One blank line under the name before the fact list. */
+  margin-top: 1.3em;
 }
 
 .pm-self-identity--home .pm-self-identity__fact {
@@ -461,41 +462,42 @@ body.app-personel-shell.app-home-route .personel-mobile-shell.self-home-page > .
 }
 
 /*
- * Home kimlik foto dairesi. Masaüstünde 48px küçük kalıyordu; çap 80px (≈1.67×).
- * Buton boyutu görselden türer, sağ kenar aşağıdaki margin-right ile sabit kalır.
- * ≤640px önceki 48px daireyi korur — masaüstü ölçeği mobile taşınmaz.
+ * Home kimlik foto dairesi. Masaüstü 104px, ≤640px 72px.
+ * Buton boyutu görselden türer; sağ kenar margin-right ile 8px daha sağdadır.
  */
 .pm-self-identity--home .pm-self-portrait {
-  width: 80px;
-  height: 80px;
+  width: 104px;
+  height: 104px;
 }
 
 .pm-self-identity--home .pm-self-portrait--empty {
-  font-size: 1.05rem;
+  font-size: 1.25rem;
 }
 
 /*
- * PERSONEL home kimlik foto dairesi: yatayda üstteki bildirim zili / çıkış ikonu
- * hattına sağdan boşlukla konumlanır. Masaüstünde 12px daha sağa (53px → 41px).
- * ≤640px mobil değeri (58px) değişmedi. Dikeyde kimlik bloğu içinde kalır.
+ * PERSONEL home kimlik foto dairesi: 8px daha sağa (margin-right 41px → 33px).
+ * Sol kimlik kolonu uzayınca foto, satırda dikey ortada kalır.
+ * ≤640px mobil sağ boşluk 58px → 50px.
  */
-.pm-self-identity--home .pm-self-identity__photo-btn {
+.pm-self-identity--home .pm-self-identity__photo-btn,
+.pm-self-identity--home > .pm-self-portrait {
   position: relative;
-  margin-right: 41px;
+  margin-right: 33px;
 }
 
 @media (max-width: 640px) {
-  .pm-self-identity--home .pm-self-identity__photo-btn {
-    margin-right: 58px;
+  .pm-self-identity--home .pm-self-identity__photo-btn,
+  .pm-self-identity--home > .pm-self-portrait {
+    margin-right: 50px;
   }
 
   .pm-self-identity--home .pm-self-portrait {
-    width: 48px;
-    height: 48px;
+    width: 72px;
+    height: 72px;
   }
 
   .pm-self-identity--home .pm-self-portrait--empty {
-    font-size: 0.78rem;
+    font-size: 1rem;
   }
 }
 
@@ -609,7 +611,28 @@ body.app-personel-shell.app-home-route .personel-mobile-shell.self-home-page > .
   /* +40% from the previous 32px box / 28px glyph. */
   width: 44.8px;
   height: 44.8px;
+  background: none;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
   transition: transform 0.18s ease;
+}
+
+/* Düz renkli glif: arkaplan, çerçeve ve daire yok. */
+.pm-self-dock__icon-wrap--gecmis {
+  color: #f0c14a;
+}
+
+.pm-self-dock__icon-wrap--izinlerim {
+  color: #5eb1ff;
+}
+
+.pm-self-dock__icon-wrap--talepler {
+  color: #7ddea0;
+}
+
+.pm-self-dock__icon-wrap--fazla-mesai {
+  color: #ff9a4a;
 }
 
 .pm-self-dock__icon-wrap svg {

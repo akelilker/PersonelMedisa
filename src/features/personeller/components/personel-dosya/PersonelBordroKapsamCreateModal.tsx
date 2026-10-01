@@ -142,6 +142,9 @@ export function PersonelBordroKapsamCreateModal({
     <AppModal
       title="Bordro Kapsam Kararı"
       onClose={handleClose}
+      backLabel="Bordro Kapsam"
+      onBack={handleClose}
+      backTestId="personel-bordro-kapsam-create-back"
       footer={
         <div className="universal-btn-group modal-footer-actions">
           <button

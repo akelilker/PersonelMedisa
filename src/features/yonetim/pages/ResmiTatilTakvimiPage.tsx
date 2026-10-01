@@ -596,6 +596,9 @@ export function ResmiTatilTakvimiPage() {
             formMode === "create" ? "Yeni taslak" : formMode === "edit" ? "Taslak düzenle" : "Aktif kaydı revize et"
           }
           onClose={closeForm}
+          backLabel="Resmî Tatil Takvimi"
+          onBack={closeForm}
+          backTestId="rtt-form-back"
           footer={
             <>
               <button type="button" className="universal-btn-cancel" onClick={closeForm}>
@@ -736,6 +739,16 @@ export function ResmiTatilTakvimiPage() {
             setCancelGerekce("");
             setCancelError(null);
           }}
+          backLabel="Resmî Tatil Takvimi"
+          onBack={() => {
+            if (isSubmitting) {
+              return;
+            }
+            setCancelTarget(null);
+            setCancelGerekce("");
+            setCancelError(null);
+          }}
+          backTestId="rtt-cancel-back"
           footer={
             <>
               <button
@@ -790,7 +803,14 @@ export function ResmiTatilTakvimiPage() {
       ) : null}
 
       {historyData ? (
-        <AppModal title="Revizyon geçmişi" onClose={() => setHistoryData(null)} footer={null}>
+        <AppModal
+          title="Revizyon geçmişi"
+          onClose={() => setHistoryData(null)}
+          backLabel="Resmî Tatil Takvimi"
+          onBack={() => setHistoryData(null)}
+          backTestId="rtt-history-back"
+          footer={null}
+        >
           <div data-testid="rtt-history-modal">
             <h3>Kayıt zinciri</h3>
             <ul>

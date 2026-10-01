@@ -56,6 +56,27 @@ describe("ui correction batch — modal back + missing info owners", () => {
     expect(policy).not.toMatch(/"Maaş"/);
   });
 
+  it("adds target-label header back on remaining Level 2+ modal owners", () => {
+    const qr = read("src/features/puantaj/components/QrPuantajAdayiSection.tsx");
+    expect(qr).toMatch(/backLabel="QR Puantaj Adayı"/);
+
+    const etki = read("src/features/puantaj/components/BildirimPuantajEtkiAdaylariSection.tsx");
+    expect(etki).toMatch(/etkiAdayListBackLabel/);
+    expect(etki).toMatch(/backLabel=\{etkiAdayListBackLabel\}/);
+
+    const kapanis = read("src/features/raporlar/components/donem-kapanis/KapanisPersonelDetayModal.tsx");
+    expect(kapanis).toMatch(/backLabel="Dönem Kapanış Kontrolleri"/);
+
+    const belgeler = read("src/features/personeller/components/personel-dosya/PersonelBelgelerPanel.tsx");
+    expect(belgeler).toMatch(/backLabel="Personel Belgeleri"/);
+
+    const ucret = read("src/features/personeller/components/personel-dosya/PersonelUcretCreateModal.tsx");
+    expect(ucret).toMatch(/backLabel="Ücret Geçmişi"/);
+
+    const rtt = read("src/features/yonetim/pages/ResmiTatilTakvimiPage.tsx");
+    expect(rtt).toMatch(/backLabel="Resmî Tatil Takvimi"/);
+  });
+
   it("tightens eksik bilgi banner vertical rhythm in tab scroll owner", () => {
     const missingCss = read("src/styles/modules/personel-missing-info.css");
     expect(missingCss).toMatch(/\.personel-dosya-missing-gateway-wrap\s*\{[^}]*margin:\s*0/s);

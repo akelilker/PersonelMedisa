@@ -29,7 +29,14 @@ export function KapanisPersonelDetayModal({ issue, params, onClose }: KapanisPer
   }
 
   return (
-    <AppModal title={issue.title} onClose={onClose} className="kapanis-detail-modal">
+    <AppModal
+      title={issue.title}
+      onClose={onClose}
+      backLabel="Dönem Kapanış Kontrolleri"
+      onBack={onClose}
+      backTestId="donem-kapanis-personel-detay-back"
+      className="kapanis-detail-modal"
+    >
       <div data-testid="donem-kapanis-personel-detay-modal">
         <p className={severityClassName(issue.severity)} data-testid="donem-kapanis-detail-severity">
           <span aria-hidden="true">{SEVERITY_ICONS[issue.severity]}</span>

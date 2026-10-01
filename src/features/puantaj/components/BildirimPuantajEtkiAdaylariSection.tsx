@@ -529,6 +529,9 @@ export function BildirimPuantajEtkiAdaylariSection() {
     return null;
   }
 
+  const etkiAdayListBackLabel = "Puantaj Etki Adayları";
+  const etkiAdayParentBackLabel = detailId !== null ? "Puantaj Etki Adayı Detayı" : etkiAdayListBackLabel;
+
   return (
     <div
       className="state-card bildirim-mutabakat-panel puantaj-etki-aday-panel"
@@ -785,7 +788,13 @@ export function BildirimPuantajEtkiAdaylariSection() {
       ) : null}
 
       {detailId !== null ? (
-        <AppModal title="Puantaj Etki Adayı Detayı" onClose={closeDetail}>
+        <AppModal
+          title="Puantaj Etki Adayı Detayı"
+          onClose={closeDetail}
+          backLabel={etkiAdayListBackLabel}
+          onBack={closeDetail}
+          backTestId="puantaj-etki-aday-detail-back"
+        >
           <div data-testid="puantaj-etki-aday-detail-modal">
             {isDetailLoading ? <LoadingState label="Detay yükleniyor..." /> : null}
             {!isDetailLoading && detailError ? (
@@ -862,7 +871,13 @@ export function BildirimPuantajEtkiAdaylariSection() {
       ) : null}
 
       {conflictTarget ? (
-        <AppModal title="Puantaj Çakışmasını Çöz" onClose={closeConflictModal}>
+        <AppModal
+          title="Puantaj Çakışmasını Çöz"
+          onClose={closeConflictModal}
+          backLabel={etkiAdayParentBackLabel}
+          onBack={closeConflictModal}
+          backTestId="puantaj-etki-aday-conflict-back"
+        >
           <div className="puantaj-etki-conflict-modal" data-testid="puantaj-etki-aday-conflict-modal">
             <p className="puantaj-etki-conflict-class" data-testid="puantaj-etki-conflict-class">
               {formatConflictClassDisplay(conflictTarget.conflict_class)}
@@ -981,7 +996,13 @@ export function BildirimPuantajEtkiAdaylariSection() {
       ) : null}
 
       {dismissTarget ? (
-        <AppModal title="Puantaj Etki Adayını Yok Say" onClose={closeDismissModal}>
+        <AppModal
+          title="Puantaj Etki Adayını Yok Say"
+          onClose={closeDismissModal}
+          backLabel={etkiAdayParentBackLabel}
+          onBack={closeDismissModal}
+          backTestId="puantaj-etki-aday-dismiss-back"
+        >
           <div data-testid="puantaj-etki-aday-dismiss-modal">
             <dl className="puantaj-etki-detail-grid">
               <div className="puantaj-etki-detail-row">
@@ -1057,7 +1078,13 @@ export function BildirimPuantajEtkiAdaylariSection() {
       ) : null}
 
       {applyTarget ? (
-        <AppModal title="Puantaj Etki Adayını Uygula" onClose={closeApplyModal}>
+        <AppModal
+          title="Puantaj Etki Adayını Uygula"
+          onClose={closeApplyModal}
+          backLabel={etkiAdayParentBackLabel}
+          onBack={closeApplyModal}
+          backTestId="puantaj-etki-aday-apply-back"
+        >
           <div data-testid="puantaj-etki-aday-apply-modal">
             <dl className="puantaj-etki-detail-grid">
               <div className="puantaj-etki-detail-row">
@@ -1125,7 +1152,13 @@ export function BildirimPuantajEtkiAdaylariSection() {
       ) : null}
 
       {manualTarget ? (
-        <AppModal title="Manuel İnceleme Kararı Uygula" onClose={closeManualApplyModal}>
+        <AppModal
+          title="Manuel İnceleme Kararı Uygula"
+          onClose={closeManualApplyModal}
+          backLabel={etkiAdayParentBackLabel}
+          onBack={closeManualApplyModal}
+          backTestId="puantaj-etki-aday-manual-apply-back"
+        >
           <div data-testid="puantaj-etki-aday-manual-apply-modal">
             <dl className="puantaj-etki-detail-grid">
               <div className="puantaj-etki-detail-row">

@@ -67,6 +67,10 @@ final class PersonelBasicUpdateService
 
         self::validateReferences($pdo, $payload, $personelId);
 
+        if (array_key_exists('cinsiyet', $payload)) {
+            PersonelCinsiyetSchema::assertReadyForWrite($pdo, $payload);
+        }
+
         if (count($payload) === 0) {
             return $current;
         }
@@ -75,6 +79,9 @@ final class PersonelBasicUpdateService
         $params = ['id' => $personelId];
         foreach ($payload as $column => $value) {
             if (!self::isAllowedColumn($column)) {
+                continue;
+            }
+            if ($column === 'cinsiyet' && !PersonelCinsiyetSchema::isReady($pdo)) {
                 continue;
             }
             $set[] = $column . ' = :' . $column;
@@ -111,6 +118,7 @@ final class PersonelBasicUpdateService
             'personel_tipi_id',
             'dogum_yeri',
             'kan_grubu',
+            'cinsiyet',
         ];
     }
 

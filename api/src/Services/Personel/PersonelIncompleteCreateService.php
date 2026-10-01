@@ -117,6 +117,14 @@ final class PersonelIncompleteCreateService
             throw new PersonelValidationException('kan_grubu', 'Gecersiz kan grubu.');
         }
 
+        if (array_key_exists('cinsiyet', $body)) {
+            $cinsiyet = PersonelCanonicalValidator::optionalTrimmedStringPublic($body, 'cinsiyet');
+            if ($cinsiyet !== null && !in_array($cinsiyet, PersonelCanonicalValidator::validCinsiyetValues(), true)) {
+                throw new PersonelValidationException('cinsiyet', 'Gecersiz cinsiyet.');
+            }
+            $payload['cinsiyet'] = $cinsiyet;
+        }
+
         return $payload;
     }
 

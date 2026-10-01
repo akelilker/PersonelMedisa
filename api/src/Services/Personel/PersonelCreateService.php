@@ -20,6 +20,7 @@ final class PersonelCreateService
         // Shared owner must not silently drop explicit org writes on pre-064 / pre-065 schema.
         PersonelOrgLocationSchema::assertReadyForOrgWrite($pdo, $payload);
         PersonelOrgStructureSchema::assertReadyForOrgStructureWrite($pdo, $payload);
+        PersonelCinsiyetSchema::assertReadyForWrite($pdo, $payload);
         $orgReady = PersonelOrgLocationSchema::isReady($pdo);
         $orgStructReady = PersonelOrgStructureSchema::isReady($pdo);
         // Missing/blank sicil means AUTO: the canonical allocator owns the number,
@@ -82,6 +83,10 @@ final class PersonelCreateService
         $params['aktif_durum'] = $payload['aktif_durum'];
         $params['dogum_yeri'] = $payload['dogum_yeri'];
         $params['kan_grubu'] = $payload['kan_grubu'];
+        if (PersonelCinsiyetSchema::isReady($pdo) && array_key_exists('cinsiyet', $payload)) {
+            $cols[] = 'cinsiyet';
+            $params['cinsiyet'] = $payload['cinsiyet'];
+        }
         $params['ucret_tipi_id'] = $payload['ucret_tipi_id'];
         $params['maas_tutari'] = $payload['maas_tutari'];
         $params['prim_kurali_id'] = $payload['prim_kurali_id'];

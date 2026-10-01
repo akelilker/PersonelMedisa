@@ -16,6 +16,12 @@ final class PersonelCanonicalValidator
         return ['A Rh+', 'A Rh-', 'B Rh+', 'B Rh-', 'AB Rh+', 'AB Rh-', '0 Rh+', '0 Rh-'];
     }
 
+    /** @return array<int, string> */
+    public static function validCinsiyetValues()
+    {
+        return ['Erkek', 'Kadın'];
+    }
+
     public static function maskTcKimlikNo($tcKimlikNo)
     {
         $digits = preg_replace('/\D+/', '', (string) $tcKimlikNo);
@@ -121,6 +127,8 @@ final class PersonelCanonicalValidator
             throw new PersonelValidationException('kan_grubu', 'Gecersiz kan grubu.');
         }
 
+        $payloadCinsiyet = self::normalizeOptionalCinsiyet($body);
+
         $bagliAmirId = self::optionalPositiveInt($body, 'bagli_amir_id');
         $ucretTipiId = self::optionalPositiveInt($body, 'ucret_tipi_id');
         if ($ucretTipiId !== null && !in_array($ucretTipiId, [1, 2, 3], true)) {
@@ -191,6 +199,10 @@ final class PersonelCanonicalValidator
         // SGK/bordro kaynağı ayrı bir eksendir: IC için zorunlu ve şube şirketiyle
         // aynı olmalıdır (PersonelCreateService), DIS için opsiyoneldir ve başka
         // şirketin AKTİF SGK işvereni olabilir. Burada değer sıfırlanmaz.
+        if ($payloadCinsiyet !== null) {
+            $payload = array_merge($payload, $payloadCinsiyet);
+        }
+
         return $payload;
     }
 
@@ -261,6 +273,11 @@ final class PersonelCanonicalValidator
 
         if (array_key_exists('kan_grubu', $payload) && $payload['kan_grubu'] !== null && !in_array($payload['kan_grubu'], self::validKanGruplari(), true)) {
             throw new PersonelValidationException('kan_grubu', 'Gecersiz kan grubu.');
+        }
+
+        $payloadCinsiyet = self::normalizeOptionalCinsiyet($body);
+        if ($payloadCinsiyet !== null) {
+            $payload = array_merge($payload, $payloadCinsiyet);
         }
 
         if (array_key_exists('sube_id', $body)) {
@@ -537,6 +554,23 @@ final class PersonelCanonicalValidator
             'field' => (string) $field,
             'message' => (string) $message,
         ];
+    }
+
+    /**
+     * @param array<string, mixed> $body
+     * @return array<string, string|null>|null
+     */
+    private static function normalizeOptionalCinsiyet(array $body)
+    {
+        if (!array_key_exists('cinsiyet', $body)) {
+            return null;
+        }
+        $cinsiyet = self::optionalTrimmedString($body, 'cinsiyet');
+        if ($cinsiyet !== null && !in_array($cinsiyet, self::validCinsiyetValues(), true)) {
+            throw new PersonelValidationException('cinsiyet', 'Gecersiz cinsiyet.');
+        }
+
+        return ['cinsiyet' => $cinsiyet];
     }
 
     /** @param array<string, mixed> $body */

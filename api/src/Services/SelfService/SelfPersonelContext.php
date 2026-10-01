@@ -7,6 +7,7 @@ namespace Medisa\Api\Services\SelfService;
 use Medisa\Api\Database\UsersSchema;
 use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Services\Organizasyon\SubeReadModel;
+use Medisa\Api\Services\Personel\PersonelCinsiyetSchema;
 use PDO;
 
 /**
@@ -171,6 +172,7 @@ class SelfPersonelContext
             'dogum_tarihi' => $personel['dogum_tarihi'] ?? null,
             'telefon' => $personel['telefon'] ?? null,
             'kan_grubu' => $personel['kan_grubu'] ?? null,
+            'cinsiyet' => array_key_exists('cinsiyet', $personel) ? ($personel['cinsiyet'] ?? null) : null,
             'ise_giris_tarihi' => $personel['ise_giris_tarihi'] ?? null,
             'personel_tipi_id' => $personelTipiId,
             'personel_tipi_ad' => $personelTipiAd === '' ? null : $personelTipiAd,
@@ -259,8 +261,9 @@ class SelfPersonelContext
     private static function loadPersonelRow(PDO $pdo, $personelId)
     {
         $personelId = (int) $personelId;
-        $queries = [
-            'SELECT
+        $cinsiyetReady = PersonelCinsiyetSchema::isReady($pdo);
+        $cinsiyetSelect = $cinsiyetReady ? "p.cinsiyet,\n                " : '';
+        $enrichedSql = 'SELECT
                 p.id AS personel_id,
                 p.ad,
                 p.soyad,
@@ -275,7 +278,7 @@ class SelfPersonelContext
                 p.dogum_tarihi,
                 p.telefon,
                 p.kan_grubu,
-                p.ise_giris_tarihi,
+                ' . $cinsiyetSelect . 'p.ise_giris_tarihi,
                 p.personel_tipi_id,
                 pt.ad AS personel_tipi_ad,
                 p.calisan_kapsami,
@@ -292,7 +295,9 @@ class SelfPersonelContext
              LEFT JOIN gorevler g ON g.id = p.gorev_id
              LEFT JOIN personel_tipleri pt ON pt.id = p.personel_tipi_id
              WHERE p.id = :id
-             LIMIT 1',
+             LIMIT 1';
+        $queries = [
+            $enrichedSql,
             'SELECT
                 p.id AS personel_id,
                 p.ad,

@@ -382,7 +382,7 @@
 }
 
 .pm-self-identity--home {
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
   padding: 0;
@@ -482,6 +482,8 @@ body.app-personel-shell.app-home-route .personel-mobile-shell.self-home-page > .
 .pm-self-identity--home .pm-self-identity__photo-btn,
 .pm-self-identity--home > .pm-self-portrait {
   position: relative;
+  align-self: flex-start;
+  margin-top: 0;
   margin-right: 33px;
 }
 

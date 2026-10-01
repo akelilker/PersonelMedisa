@@ -1,11 +1,12 @@
 import type { ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { Link, type To } from "react-router-dom";
 
 type BackBarProps = {
-  to: string;
+  to: To;
   label: string;
   testId?: string;
   endContent?: ReactNode;
+  state?: unknown;
 };
 
 export function BackBarChevronIcon() {
@@ -29,10 +30,16 @@ export function BackBarChevronIcon() {
   );
 }
 
-export function BackBar({ to, label, testId, endContent }: BackBarProps) {
+export function BackBar({ to, label, testId, endContent, state }: BackBarProps) {
   return (
     <div className={`universal-back-bar${endContent ? " has-end-content" : ""}`}>
-      <Link to={to} className="universal-back-btn" aria-label={label} data-testid={testId}>
+      <Link
+        to={to}
+        state={state}
+        className="universal-back-btn"
+        aria-label={label}
+        data-testid={testId}
+      >
         <BackBarChevronIcon />
         <span className="universal-back-label">{label}</span>
       </Link>

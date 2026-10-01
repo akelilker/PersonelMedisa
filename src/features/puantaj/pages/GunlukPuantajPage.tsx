@@ -317,9 +317,9 @@ export function GunlukPuantajPage() {
   return (
     <section className="puantaj-page">
       <QrGirisCikisOperationSection />
+      {kayitSurecReturn ? <KayitSurecReturnLink context={kayitSurecReturn} label="Puantaj" /> : null}
       <div className="puantaj-header-row">
         <h2>Günlük Kayıt ve Puantaj</h2>
-        {kayitSurecReturn ? <KayitSurecReturnLink context={kayitSurecReturn} /> : null}
       </div>
 
       <form className="form-filter-panel" onSubmit={handleQuerySubmit}>

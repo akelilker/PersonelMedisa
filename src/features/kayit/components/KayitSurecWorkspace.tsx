@@ -700,6 +700,13 @@ export function KayitSurecWorkspace({
     setHakDuzeltmeOpen(true);
   }
 
+  function backToPuantajHub() {
+    setDevamsizlikSubId(null);
+    setPuantajSubdomain(null);
+    setHakDuzeltmeOpen(false);
+    setSurecForm((prev) => resetSurecFormKeepingPersonel(prev.personelId));
+  }
+
   async function loadBootstrap() {
     setBootstrapLoading(true);
     setBootstrapError(null);
@@ -1169,6 +1176,10 @@ export function KayitSurecWorkspace({
     setPozisyonError(null);
     setPozisyonInfo(null);
     setOpenPozisyonPicker(null);
+    setYeniSubeId("");
+    setSubeGerekce("");
+    setSubeTransferError(null);
+    setSubeTransferInfo(null);
   }, [selectedSurecPersonel]);
 
   const footerModel = useMemo((): KayitModalFooterModel | null => {
@@ -1539,6 +1550,7 @@ export function KayitSurecWorkspace({
                             isPassive={isSelectedPersonelPasif}
                             onSelectDevamsizlikSub={selectDevamsizlikSubCard}
                             onOpenHakDuzeltme={openPuantajHakDuzeltme}
+                            onBackToPuantajHub={backToPuantajHub}
                           >
                             {hakDuzeltmeOpen ? (
                               <YillikIzinHakDuzeltmePanel

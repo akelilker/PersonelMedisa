@@ -84,4 +84,65 @@ describe("ui correction batch — modal back + missing info owners", () => {
     const personellerCss = read("src/styles/modules/personeller.css");
     expect(personellerCss).toMatch(/\.personel-dosya-tab-scroll\s*\{[^}]*gap:\s*var\(--space-2\)/s);
   });
+
+  it("kayit detour pages use KayitSurecBackBar with parent screen label and return state", () => {
+    const backBar = read("src/features/kayit/components/KayitSurecBackBar.tsx");
+    expect(backBar).toMatch(/buildKayitSurecReturnState/);
+    expect(backBar).toMatch(/label=\{label\}/);
+
+    const belge = read("src/features/personeller/pages/BelgeTakipPage.tsx");
+    expect(belge).toMatch(/KayitSurecReturnLink context=\{kayitSurecReturn\} label="Belge Takip"/);
+    expect(belge).not.toMatch(/Kayıt ve Süreç'e dön/);
+    expect(belge).not.toMatch(/Personellere dön/);
+
+    const gunluk = read("src/features/puantaj/pages/GunlukPuantajPage.tsx");
+    expect(gunluk).toMatch(/label="Puantaj"/);
+  });
+
+  it("puantaj inline child flows expose canonical back to Puantaj hub", () => {
+    const panel = read("src/features/kayit/components/KayitSurecPersonelPuantajPanel.tsx");
+    expect(panel).toMatch(/SurecInlineBackButton/);
+    expect(panel).toMatch(/label="Puantaj"/);
+
+    const workspace = read("src/features/kayit/components/KayitSurecWorkspace.tsx");
+    expect(workspace).toMatch(/backToPuantajHub/);
+    expect(workspace).toMatch(/onBackToPuantajHub=\{backToPuantajHub\}/);
+  });
+
+  it("görev/organizasyon Vazgeç resets extended sube transfer state", () => {
+    const workspace = read("src/features/kayit/components/KayitSurecWorkspace.tsx");
+    expect(workspace).toMatch(/setYeniSubeId\(""\)/);
+    expect(workspace).toMatch(/setSubeGerekce\(""\)/);
+    expect(workspace).toMatch(/setSubeTransferError\(null\)/);
+    expect(workspace).toMatch(/onSecondaryClick: resetPozisyonForm/);
+  });
+
+  it("/self reverse gateway and title hierarchy owners", () => {
+    const gateway = read("src/features/self-service/components/SelfAppReverseGateway.tsx");
+    expect(gateway).toMatch(/Personel Yönetim Sistemi/);
+    expect(gateway).toMatch(/home-self-service-gateway/);
+
+    const shell = read("src/app/AppShell.tsx");
+    expect(shell).toMatch(/SelfAppReverseGateway/);
+    expect(shell).toMatch(/isSelfSurfaceRoute/);
+
+    const heroCss = read("src/styles/components/hero.css");
+    expect(heroCss).toMatch(
+      /body\.app-home-route \.hero\.hero--personel-shell \.hero-title-stack \.hero-panel-subtitle[\s\S]*font-size: min\(17px/s
+    );
+    expect(heroCss).toMatch(
+      /body\.app-home-route \.hero\.hero-with-session\.hero--panel-subtitle \.hero-title-stack \.hero-panel-subtitle/
+    );
+
+    const selfCss = read("src/features/self-service/self-service.css");
+    expect(selfCss).toMatch(/\.pm-self-identity--home[\s\S]*align-items: flex-start/s);
+    expect(selfCss).toMatch(/align-self: flex-start/);
+  });
+
+  it("import history detail footer avoids duplicate list back CTA", () => {
+    const modal = read("src/features/personeller/components/PersonelImportHistoryModal.tsx");
+    expect(modal).toMatch(/backLabel="Personel Import Geçmişi"/);
+    expect(modal).not.toMatch(/Listeye dön/);
+    expect(modal).toMatch(/Kapat/);
+  });
 });

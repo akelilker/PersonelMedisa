@@ -202,14 +202,14 @@ export function PersonelImportHistoryModal({ open, onClose }: PersonelImportHist
               type="button"
               className="universal-btn-aux"
               data-modal-initial-focus="true"
-              data-testid="personel-import-history-detail-back"
+              data-testid="personel-import-history-detail-close"
               onClick={() => {
                 setDetail(null);
                 setDetailError(null);
                 setEvidenceError(null);
               }}
             >
-              Listeye dön
+              Kapat
             </button>
           </div>
         }

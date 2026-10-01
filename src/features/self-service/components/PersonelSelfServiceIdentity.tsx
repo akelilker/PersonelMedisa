@@ -27,13 +27,16 @@ export function PersonelSelfServiceIdentity({
       <div className="pm-self-identity__text">
         <p className="pm-self-identity__name">{view.adSoyad}</p>
         <p className="pm-self-identity__fact" data-testid="personel-self-identity-sicil">
-          Sicil No. {view.sicil}
+          <span className="pm-self-identity__label">Sicil No.</span>{" "}
+          <span className="pm-self-identity__value">{view.sicil}</span>
         </p>
         <p className="pm-self-identity__fact" data-testid="personel-self-identity-ise-giris">
-          İşe Giriş {view.iseGiris}
+          <span className="pm-self-identity__label">İşe Giriş</span>{" "}
+          <span className="pm-self-identity__value">{view.iseGiris}</span>
         </p>
         <p className="pm-self-identity__fact" data-testid="personel-self-identity-kidem">
-          Çalışılan Süre {view.calismaSuresi}
+          <span className="pm-self-identity__label">Çalışılan Süre</span>{" "}
+          <span className="pm-self-identity__value">{view.calismaSuresi}</span>
         </p>
         {view.subeGorev ? (
           <p className="pm-self-identity__org" data-testid="personel-self-identity-org">

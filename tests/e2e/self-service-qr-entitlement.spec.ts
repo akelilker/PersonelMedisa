@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { login, MOCK_ROLE_LOGIN } from "./helpers/auth";
+import { installLinkedManagerSelfMeMocks } from "./helpers/linked-manager-self-me-mocks";
 import { mockApi } from "./helpers/mock-api";
 
 /**
@@ -33,10 +34,14 @@ test.describe("personnel-linked self-service QR entitlement", () => {
     await expect(page).toHaveURL(/\/self\/qr-okut$/);
   });
 
-  test("bound Beyaz Yaka BOLUM_YONETICISI gets no QR surface but keeps manager + non-QR self", async ({ page }) => {
+  test("bound Beyaz Yaka BOLUM_YONETICISI: gateway without QR strip, linked /self + İzinlerim", async ({
+    page
+  }) => {
+    const linkedName = "Deniz Kaya";
     await mockApi(page, "BOLUM_YONETICISI", {
       personelBinding: { personel_id: 173, personel_tipi_ad: "Beyaz Yaka" }
     });
+    await installLinkedManagerSelfMeMocks(page, { personelAdSoyad: linkedName, personelId: 173 });
     await login(page, MOCK_ROLE_LOGIN.BOLUM_YONETICISI);
     await expect(page).toHaveURL(/\/$/);
 
@@ -46,13 +51,23 @@ test.describe("personnel-linked self-service QR entitlement", () => {
     await expect(page.getByTestId("self-qr-scan-link")).toHaveCount(0);
     await expect(page.getByTestId("self-qr-history-link")).toHaveCount(0);
 
-    // QR route guard permission-based: beyaz yaka yetkisiz sayfasına düşer.
+    await page.getByTestId("home-self-service-gateway").click();
+    await expect(page).toHaveURL(/\/self$/);
+    await expect(page.getByText("Demo modda personel eşlemesi yok.")).toHaveCount(0);
+    await expect(page.getByTestId("personel-self-service-page")).toBeVisible();
+    await expect(page.getByTestId("personel-self-home-main")).toBeVisible();
+    await expect(page.getByTestId("personel-self-identity")).toBeVisible();
+    await expect(page.getByTestId("personel-self-identity")).toContainText(linkedName);
+    await expect(page.getByTestId("giris-scan")).toHaveCount(0);
+    await expect(page.getByTestId("cikis-scan")).toHaveCount(0);
+    await expect(page.getByTestId("personel-qr-closed-notice")).toBeVisible();
+
+    await page.getByTestId("personel-menu-izinlerim").click();
+    await expect(page).toHaveURL(/\/self\/izinlerim$/);
+    await expect(page.getByRole("heading", { name: "İzinlerim" })).toBeVisible();
+
     await page.goto("/self/qr-okut");
     await expect(page).toHaveURL(/\/yetkisiz$/);
-
-    // Non-QR self-service yüzeyi (puantaj/izin) hâlâ erişilebilir.
-    await page.goto("/self");
-    await expect(page).toHaveURL(/\/self$/);
   });
 
   test("unbound manager never gets QR, even without a role change", async ({ page }) => {

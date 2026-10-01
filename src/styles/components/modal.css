@@ -140,6 +140,27 @@
   filter: brightness(1.01);
   text-shadow: var(--premium-title-shadow);
 }
+/*
+ * Kanonik header geometrisi (yalnızca back label varken): iki simetrik yan
+ * şerit (lane) rezerve edilir. Ortadaki title bu şeritlerin dışına taşamaz,
+ * uzun back label kendi şeridi içinde ellipsis olur ve title'a binmez.
+ * Back label olmayan header'larda davranış değişmez.
+ */
+.modal-header:has(> .modal-header-leading > .modal-back-btn) {
+  --modal-header-side-lane: min(24%, 180px);
+}
+
+.modal-header:has(> .modal-header-leading > .modal-back-btn) h2 {
+  max-width: calc(100% - 2 * var(--modal-header-side-lane) - 8px);
+}
+
+.modal-header:has(> .modal-header-leading > .modal-back-btn) .modal-header-leading {
+  /* Title'ın sol kenarından önce biter; uzun back label title'a taşamaz. */
+  max-width: calc(var(--modal-header-side-lane) - 12px);
+  overflow: hidden;
+}
+
+
 
 .modal-body {
   --modal-body-inline-pad: var(--space-4);
@@ -313,6 +334,8 @@
 .modal-header-leading .modal-back-btn {
   max-width: min(100%, 12rem);
   min-width: 0;
+  /* Lane içinde küçülebilsin: uzun label title'a taşmak yerine ellipsis olur. */
+  flex-shrink: 1;
 }
 
 .modal-header-leading .modal-back-btn.universal-back-btn {

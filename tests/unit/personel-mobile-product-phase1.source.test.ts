@@ -66,8 +66,9 @@ describe("PERSONEL mobile product phase 1 shell", () => {
     expect(css).toMatch(/\.pm-self-dock__icon-wrap\s*\{[^}]*background:\s*none/s);
     expect(css).toMatch(/\.pm-self-dock__icon-wrap\s*\{[^}]*border:\s*none/s);
     expect(css).toMatch(/\.pm-self-dock__icon-wrap\s*\{[^}]*border-radius:\s*0/s);
-    expect(css).toMatch(/\.pm-self-identity--home\s*\{[^}]*align-items:\s*center/s);
+    expect(css).toMatch(/\.pm-self-identity--home\s*\{[^}]*align-items:\s*flex-start/s);
     expect(css).toMatch(/\.pm-self-identity--home \.pm-self-portrait\s*\{[^}]*width:\s*104px/s);
+    expect(css).toMatch(/\.pm-self-identity--home > \.pm-self-portrait\s*\{[^}]*align-self:\s*flex-start/s);
     expect(css).toContain("margin-right: 33px");
     expect(css).toContain("margin-top: 1.3em");
     expect(css).toContain("color: #fff");

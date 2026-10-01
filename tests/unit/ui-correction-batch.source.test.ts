@@ -27,6 +27,25 @@ describe("ui correction batch — modal back + missing info owners", () => {
     expect(css).toMatch(/\.modal-close-btn[\s\S]*right:\s*8px/s);
   });
 
+  it("centered modal title stays inside symmetric side lanes (no back/close collision)", () => {
+    const css = read("src/styles/components/modal.css");
+    expect(css).toMatch(
+      /\.modal-header:has\(> \.modal-header-leading > \.modal-back-btn\)\s*\{[^}]*--modal-header-side-lane:\s*min\(24%,\s*180px\)/s
+    );
+    expect(css).toMatch(
+      /\.modal-header:has\(> \.modal-header-leading > \.modal-back-btn\) h2\s*\{[^}]*max-width:\s*calc\(100% - 2 \* var\(--modal-header-side-lane\)/s
+    );
+    expect(css).toMatch(
+      /\.modal-header:has\(> \.modal-header-leading > \.modal-back-btn\) \.modal-header-leading\s*\{[^}]*max-width:\s*calc\(var\(--modal-header-side-lane\) - 12px\)/s
+    );
+    expect(css).toMatch(
+      /\.modal-header:has\(> \.modal-header-leading > \.modal-back-btn\) \.modal-header-leading\s*\{[^}]*overflow:\s*hidden/s
+    );
+    expect(css).toMatch(/\.modal-header-leading \.modal-back-btn\s*\{[^}]*flex-shrink:\s*1/s);
+    // Back label yoksa title tam genişlikte kalır (davranış değişmez).
+    expect(css).toMatch(/\.modal-header h2\s*\{[^}]*max-width:\s*100%/s);
+  });
+
   it("Bugünkü Personel Durumu uses parent screen labels instead of Geri", () => {
     const bugun = read("src/features/bildirimler/components/BugunPersonelDurumuModal.tsx");
     expect(bugun).toMatch(/resolveBugunBackLabel/);

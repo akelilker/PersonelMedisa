@@ -149,6 +149,25 @@ function restoreNav(payload: BugunPersonelDurumu, anchor: NavAnchor | null): Nav
   return { kind: "units", branch };
 }
 
+function resolveBugunBackLabel(nav: NavLevel): string | undefined {
+  if (nav.kind === "branches") {
+    return undefined;
+  }
+  if (nav.kind === "units") {
+    return "Bugünkü Personel Durumu";
+  }
+  if (nav.kind === "unit_roster") {
+    return nav.branch.sube_adi;
+  }
+  if (nav.kind === "status") {
+    return nav.unit.birim_adi;
+  }
+  if (nav.statusKey) {
+    return BUGUN_STATUS_LABEL[nav.statusKey];
+  }
+  return nav.unit.birim_adi;
+}
+
 function navToAnchor(nav: NavLevel): NavAnchor | null {
   if (nav.kind === "branches") {
     return null;
@@ -417,15 +436,18 @@ export function BugunPersonelDurumuModal({ open, onClose }: BugunPersonelDurumuM
       titleTestId="bugun-personel-durumu-title"
       onClose={onClose}
       onBack={nav.kind === "branches" ? undefined : goBack}
-      backLabel={nav.kind === "branches" ? undefined : "Geri"}
+      backLabel={resolveBugunBackLabel(nav)}
       backTestId="bugun-personel-durumu-back"
       headerStart={
         <button
           type="button"
           className="modal-home-btn"
           onClick={() => {
+            if (nav.kind === "branches") {
+              onClose();
+              return;
+            }
             goHome();
-            onClose();
           }}
           aria-label="Ana sayfaya dön"
           data-testid="bugun-personel-durumu-home"

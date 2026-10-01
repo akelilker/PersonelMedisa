@@ -178,6 +178,13 @@ export function PersonelImportHistoryModal({ open, onClose }: PersonelImportHist
           setDetailError(null);
           setEvidenceError(null);
         }}
+        backLabel="Personel Import Geçmişi"
+        onBack={() => {
+          setDetail(null);
+          setDetailError(null);
+          setEvidenceError(null);
+        }}
+        backTestId="personel-import-history-detail-header-back"
         className="personel-import-history-modal"
         footer={
           <div className="universal-btn-group modal-footer-actions app-action-dialog-actions">

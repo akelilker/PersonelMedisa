@@ -142,6 +142,7 @@
 }
 
 .modal-body {
+  --modal-body-inline-pad: var(--space-4);
   flex: 1;
   min-height: 0;
   overflow-y: auto;
@@ -149,6 +150,7 @@
   display: grid;
   gap: var(--space-4);
   padding: var(--space-4);
+  padding-inline: var(--modal-body-inline-pad);
 }
 
 /* Fixed action footer overlays the body viewport; reserve scroll space on the body owner. */
@@ -285,30 +287,74 @@
   display: none;
 }
 
-.modal-back-btn {
+.modal-header-leading {
   position: absolute;
-  left: 15px;
+  left: 8px;
   top: 50%;
   transform: translateY(-50%);
   z-index: 30;
   display: inline-flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: 2px;
+  max-width: calc(50% - 28px);
+  min-width: 0;
+}
+
+.modal-header-leading .modal-home-btn,
+.modal-header-leading .modal-back-btn {
+  position: static;
+  top: auto;
+  left: auto;
+  transform: none;
+  flex-shrink: 0;
+}
+
+.modal-header-leading .modal-back-btn {
+  max-width: min(100%, 12rem);
+  min-width: 0;
+}
+
+.modal-header-leading .modal-back-btn.universal-back-btn {
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.modal-header-leading .modal-back-btn .back-icon-svg {
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.modal-header-leading .modal-back-btn:hover,
+.modal-header-leading .modal-back-btn:focus-visible {
+  color: var(--text-inverse);
+}
+
+.modal-header-leading .modal-back-btn:hover .back-icon-svg,
+.modal-header-leading .modal-back-btn:focus-visible .back-icon-svg {
+  color: var(--text-inverse);
+}
+
+.modal-body > .universal-back-bar {
+  margin-inline: calc(8px - var(--modal-body-inline-pad));
+  padding-inline: 8px;
+  box-sizing: border-box;
+}
+
+.modal-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   max-width: calc(50% - 24px);
   margin: 0;
   padding: 6px;
   border: none;
   background: transparent;
   color: rgba(255, 255, 255, 0.88);
-  font-size: 0.95rem;
-  font-weight: 500;
   cursor: pointer;
   transition: color 0.2s ease;
 }
 
 .modal-home-btn {
   position: absolute;
-  left: 15px;
+  left: 8px;
   top: 50%;
   transform: translateY(-50%);
   z-index: 30;
@@ -351,14 +397,9 @@
   }
 }
 
-.modal-back-btn:hover {
+.modal-header-leading .modal-back-btn:hover,
+.modal-header-leading .modal-back-btn:focus-visible {
   color: var(--text-inverse);
-}
-
-.modal-back-btn-icon {
-  flex: 0 0 auto;
-  font-size: 1rem;
-  line-height: 1;
 }
 
 .modal-back-btn-label {
@@ -370,7 +411,7 @@
 
 .modal-close-btn {
   position: absolute;
-  right: 15px;
+  right: 8px;
   top: 50%;
   transform: translateY(-50%);
   z-index: 30;

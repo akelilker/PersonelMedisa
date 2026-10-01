@@ -17,7 +17,8 @@ describe("PERSONEL_SELF_SERVICE_PRODUCT_UX_V2 notification + policy owners", () 
     expect(shell).not.toContain('data-testid="header-attendance-history"');
     expect(shell).not.toContain('aria-label="Giriş / Çıkış Geçmişim"');
     expect(shell).toContain('useBildirimlerHeaderPreview(canViewBildirimler && !isPersonelRole)');
-    expect(shell).toMatch(/if \(isPersonelRole\)[\s\S]*personelInboxItems/);
+    expect(shell).toContain("usesPersonelInbox");
+    expect(shell).toMatch(/usesPersonelInbox[\s\S]*personelInboxItems/);
     expect(shell).toMatch(/uiProfile === "birim_amiri" \|\| isPersonelRole/);
   });
 

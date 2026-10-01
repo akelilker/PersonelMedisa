@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import type { NavigateFunction } from "react-router-dom";
+import { useLocation, type NavigateFunction } from "react-router-dom";
 
 export function usePersonelKartGatewayReturn({
   navigate,
@@ -8,36 +8,40 @@ export function usePersonelKartGatewayReturn({
   navigate: NavigateFunction;
   parsedPersonelId: number;
 }) {
+  const location = useLocation();
+  const kartReturnPath = `/personeller/${parsedPersonelId}`;
+  const overlayPath = `${location.pathname}${location.search}`;
+
   const handleOpenSurecModal = useCallback(() => {
-    navigate("/", {
+    navigate(overlayPath, {
       state: {
         kayitModal: {
           tab: "surec",
           personelId: parsedPersonelId,
           targetTab: "puantaj",
           intent: "personel-surec-gateway",
-          returnTo: `/personeller/${parsedPersonelId}`
+          returnTo: kartReturnPath
         }
       }
     });
-  }, [navigate, parsedPersonelId]);
+  }, [navigate, overlayPath, parsedPersonelId, kartReturnPath]);
 
   const handleOpenMissingInfo = useCallback((targetTab: "genel" | "pozisyon" = "genel") => {
-    navigate("/", {
+    navigate(overlayPath, {
       state: {
         kayitModal: {
           tab: "surec",
           personelId: parsedPersonelId,
           targetTab,
           intent: "personel-missing-info-gateway",
-          returnTo: `/personeller/${parsedPersonelId}`
+          returnTo: kartReturnPath
         }
       }
     });
-  }, [navigate, parsedPersonelId]);
+  }, [navigate, overlayPath, parsedPersonelId, kartReturnPath]);
 
   const handleOpenYillikIzinHakDuzeltme = useCallback(() => {
-    navigate("/", {
+    navigate(overlayPath, {
       state: {
         kayitModal: {
           tab: "surec",
@@ -48,7 +52,7 @@ export function usePersonelKartGatewayReturn({
         }
       }
     });
-  }, [navigate, parsedPersonelId]);
+  }, [navigate, overlayPath, parsedPersonelId]);
 
   return {
     handleOpenSurecModal,

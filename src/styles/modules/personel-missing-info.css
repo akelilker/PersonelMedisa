@@ -31,8 +31,12 @@
 }
 
 .personel-dosya-missing-gateway-wrap {
-  margin: 6px 0 0;
+  margin: 0;
   padding: 0;
+}
+
+.personel-dosya-tab-scroll > .personel-dosya-missing-gateway-wrap {
+  margin-top: var(--space-1);
 }
 
 .personel-dosya-missing-gateway,

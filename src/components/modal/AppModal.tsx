@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { ModalBackButton } from "../BackBar";
 
 type AppModalProps = {
   title: string;
@@ -422,15 +423,13 @@ export function AppModal({
         tabIndex={-1}
       >
         <div className="modal-header">
-          {headerStart ? (
-            headerStart
-          ) : onBack && backLabel ? (
-            <button type="button" className="modal-back-btn" onClick={onBack} data-testid={backTestId}>
-              <span className="modal-back-btn-icon" aria-hidden="true">
-                ←
-              </span>
-              <span className="modal-back-btn-label">{backLabel}</span>
-            </button>
+          {headerStart || (onBack && backLabel) ? (
+            <div className="modal-header-leading">
+              {headerStart}
+              {onBack && backLabel ? (
+                <ModalBackButton label={backLabel} onClick={onBack} testId={backTestId} />
+              ) : null}
+            </div>
           ) : (
             <span className="modal-header-spacer" aria-hidden="true" />
           )}

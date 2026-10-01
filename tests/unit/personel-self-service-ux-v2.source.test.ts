@@ -87,13 +87,24 @@ describe("PERSONEL_SELF_SERVICE_PRODUCT_UX_V2 notification + policy owners", () 
       /body\.app-home-route \.hero\.hero--personel-shell \.hero-logo\s*\{[^}]*transform:\s*translate\(-3px,\s*8px\)/s
     );
     expect(heroCss).toMatch(
+      /\.hero\.hero--panel-subtitle:not\(\.hero--personel-shell\) \.hero-title-stack \.hero-panel-subtitle\s*\{[^}]*font-size:\s*clamp\(16px,\s*4\.5vw,\s*24px\)/s
+    );
+    // Hierarchy: PERSONEL shell subtitle is secondary to the main title, so it stays capped.
+    expect(heroCss).toMatch(
+      /\.hero\.hero--personel-shell \.hero-title-stack \.hero-panel-subtitle\s*\{[^}]*font-size:\s*clamp\(14px,\s*3\.85vw,\s*20px\)/s
+    );
+    expect(heroCss).not.toMatch(
       /\.hero\.hero--personel-shell \.hero-title-stack \.hero-panel-subtitle\s*\{[^}]*font-size:\s*clamp\(16px,\s*4\.5vw,\s*24px\)/s
     );
     expect(heroCss).toMatch(
       /\.hero\.hero--personel-shell \.hero-title-stack \.hero-panel-subtitle\s*\{\s*font-size:\s*19px;\s*letter-spacing:\s*1\.55px;/s
     );
     expect(heroCss).toMatch(
-      /body\.app-home-route \.hero\.hero--personel-shell \.hero-title-stack > h1,\s*\n\s*body\.app-home-route \.hero\.hero--personel-shell \.hero-title-stack \.hero-panel-subtitle\s*\{[^}]*font-size:\s*min\(21\.4px,\s*calc\(4\.977vw - 0\.12px\)\)/s
+      /body\.app-home-route \.hero\.hero--personel-shell \.hero-title-stack > h1\s*\{[^}]*font-size:\s*min\(21\.4px,\s*calc\(4\.977vw - 0\.12px\)\)/s
+    );
+    // Hierarchy: KULLANICI PANELİ subtitle stays smaller than the main h1 on the personel home.
+    expect(heroCss).toMatch(
+      /body\.app-home-route \.hero\.hero--personel-shell \.hero-title-stack \.hero-panel-subtitle\s*\{[^}]*font-size:\s*min\(17px,\s*calc\(4\.35vw - 0\.45px\)\)/s
     );
     expect(heroCss).toMatch(
       /body\.app-home-route \.hero\.hero--personel-shell \.hero-title-stack > h1,\s*\n\s*body\.app-home-route \.hero\.hero--personel-shell \.hero-title-stack \.hero-panel-subtitle\s*\{[^}]*letter-spacing:\s*clamp\(0px,\s*0\.03vw,\s*0\.3px\)/s

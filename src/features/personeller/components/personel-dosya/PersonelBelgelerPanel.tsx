@@ -760,6 +760,15 @@ export function PersonelBelgelerPanel({
             setIsCreateOpen(false);
             setCreateModalError(null);
           }}
+          backLabel="Personel Belgeleri"
+          onBack={() => {
+            if (isCreateSaving) {
+              return;
+            }
+            setIsCreateOpen(false);
+            setCreateModalError(null);
+          }}
+          backTestId="personel-belge-create-back"
         footer={
           <>
             <button
@@ -831,6 +840,15 @@ export function PersonelBelgelerPanel({
             setEditingKayit(null);
             setEditModalError(null);
           }}
+          backLabel="Personel Belgeleri"
+          onBack={() => {
+            if (isEditSaving) {
+              return;
+            }
+            setEditingKayit(null);
+            setEditModalError(null);
+          }}
+          backTestId="personel-belge-edit-back"
         footer={
           <>
             <button
@@ -880,6 +898,15 @@ export function PersonelBelgelerPanel({
             setReplaceKayit(null);
             setReplaceModalError(null);
           }}
+          backLabel="Personel Belgeleri"
+          onBack={() => {
+            if (isReplaceSaving) {
+              return;
+            }
+            setReplaceKayit(null);
+            setReplaceModalError(null);
+          }}
+          backTestId="personel-belge-replace-back"
         footer={
           <>
             <button
@@ -974,6 +1001,9 @@ export function PersonelBelgelerPanel({
         <AppModal
           title="Belge geçmişi"
           onClose={() => setHistoryKayit(null)}
+          backLabel="Personel Belgeleri"
+          onBack={() => setHistoryKayit(null)}
+          backTestId="personel-belge-history-back"
         footer={
           <button
             type="button"

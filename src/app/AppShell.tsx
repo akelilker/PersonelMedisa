@@ -20,6 +20,7 @@ import { PersonelImportHistoryModal } from "../features/personeller/components/P
 import { PersonelDetayPrintButton } from "../features/personeller/components/personel-dosya/PersonelDetayPrintButton";
 import { readPersonelKartBack } from "../features/personeller/personel-kart-nav";
 import { HomeSelfServiceGateway } from "../features/self-service/components/HomeSelfServiceGateway";
+import { SelfAppReverseGateway } from "../features/self-service/components/SelfAppReverseGateway";
 import { personelSelfProductModalTitle } from "../features/self-service/personel-self-service-menu";
 import { useRoleAccess } from "../hooks/use-role-access";
 import { canonicalizeUserRole } from "../lib/authorization/canonicalize-user-role";
@@ -242,7 +243,7 @@ export function AppShell() {
   const isHomeRoute = pathname === "/";
   // Canonical personel yüzeyi: "/" ve "/self" aynı kişisel ekranı ve shell ritmini paylaşır.
   // /self ayrı bir ürün paneli/modalı DEĞİLDİR; yalnızca aynı ekranın rotasıdır.
-  const isSelfSurfaceRoute = pathname === "/self";
+  const isSelfSurfaceRoute = pathname === "/self" || pathname.startsWith("/self/");
   const isPersonelSurfaceRoute = isHomeRoute || isSelfSurfaceRoute;
   const isYonetimRoute = pathname === "/yonetim-paneli";
   const moduleModal = useMemo(
@@ -280,6 +281,7 @@ export function AppShell() {
     kayitInitialSurecPersonelId,
     kayitInitialPersonelTab,
     kayitInitialOperation,
+    kayitIntent,
     kayitPrimaryLabel,
     kayitPrimaryFormId,
     openKayitModal,
@@ -471,6 +473,7 @@ export function AppShell() {
             initialSurecPersonelId={kayitInitialSurecPersonelId}
             initialPersonelTab={kayitInitialPersonelTab}
             initialOperation={kayitInitialOperation}
+            initialKayitIntent={kayitIntent}
             primaryActionLabel={kayitPrimaryLabel}
             primaryFormId={kayitPrimaryFormId}
             onFooterModelChange={handleKayitFooterModelChange}
@@ -512,6 +515,7 @@ export function AppShell() {
       ) : null}
 
       {isHomeRoute && !isAuthSurfaceRoute ? <HomeSelfServiceGateway /> : null}
+      {isSelfSurfaceRoute && !isAuthSurfaceRoute ? <SelfAppReverseGateway /> : null}
       <AppFooter loginFooter={isAuthSurfaceRoute} />
     </div>
   );

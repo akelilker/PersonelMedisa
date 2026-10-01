@@ -11,6 +11,7 @@ import {
   type PuantajSubdomainId
 } from "../kayit-surec-constants";
 import { buildKayitSurecRouteState } from "../kayit-surec-navigation";
+import { SurecInlineBackButton } from "./SurecInlineBackButton";
 
 type KayitSurecPersonelPuantajPanelProps = {
   personel: Personel;
@@ -20,6 +21,7 @@ type KayitSurecPersonelPuantajPanelProps = {
   isPassive: boolean;
   onSelectDevamsizlikSub: (id: DevamsizlikSubId) => void;
   onOpenHakDuzeltme: () => void;
+  onBackToPuantajHub?: () => void;
   children?: ReactNode;
 };
 
@@ -35,6 +37,7 @@ export function KayitSurecPersonelPuantajPanel({
   isPassive,
   onSelectDevamsizlikSub,
   onOpenHakDuzeltme,
+  onBackToPuantajHub,
   children
 }: KayitSurecPersonelPuantajPanelProps) {
   const navigate = useNavigate();
@@ -166,7 +169,18 @@ export function KayitSurecPersonelPuantajPanel({
         ) : null}
       </div>
 
-      {showInlineWorkspace ? children : null}
+      {showInlineWorkspace ? (
+        <>
+          {onBackToPuantajHub ? (
+            <SurecInlineBackButton
+              label="Puantaj"
+              onClick={onBackToPuantajHub}
+              testId="kayit-surec-puantaj-inline-back"
+            />
+          ) : null}
+          {children}
+        </>
+      ) : null}
     </div>
   );
 }

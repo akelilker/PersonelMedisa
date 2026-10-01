@@ -13,7 +13,13 @@ export function PersonelDosyaMissingInfoGateway({
     return null;
   }
 
-  const label = `${missingFields.length} Eksik Bilgi Mevcut. Tamamlamak İçin Tıklayınız.`;
+  const primaryField = missingFields[0];
+  const label =
+    missingFields.length === 1 && primaryField
+      ? `Eksik bilgi: ${primaryField.label}. Tamamlamak için tıklayınız.`
+      : primaryField
+        ? `${missingFields.length} eksik bilgi (ilk: ${primaryField.label}). Tamamlamak için tıklayınız.`
+        : `${missingFields.length} Eksik Bilgi Mevcut. Tamamlamak İçin Tıklayınız.`;
 
   if (!onOpenMissingInfo) {
     return (

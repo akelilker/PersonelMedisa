@@ -1,23 +1,33 @@
 /** @vitest-environment jsdom */
 import { renderHook } from "@testing-library/react";
-import { type NavigateFunction } from "react-router-dom";
+import { createElement } from "react";
+import { MemoryRouter, type NavigateFunction } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import { usePersonelKartGatewayReturn } from "../../src/features/personeller/hooks/usePersonelKartGatewayReturn";
 
-describe("usePersonelKartGatewayReturn", () => {
-  it("handleOpenSurecModal navigates with surec tab and personel preselect contract", () => {
-    const navigate = vi.fn() as NavigateFunction;
-
-    const { result } = renderHook(() =>
+function renderGatewayHook(parsedPersonelId: number, initialPath = `/personeller/${parsedPersonelId}`) {
+  const navigate = vi.fn() as NavigateFunction;
+  const view = renderHook(
+    () =>
       usePersonelKartGatewayReturn({
         navigate,
-        parsedPersonelId: 3
-      })
-    );
+        parsedPersonelId
+      }),
+    {
+      wrapper: ({ children }) =>
+        createElement(MemoryRouter, { initialEntries: [initialPath] }, children)
+    }
+  );
+  return { ...view, navigate };
+}
+
+describe("usePersonelKartGatewayReturn", () => {
+  it("handleOpenSurecModal navigates with surec tab and personel preselect contract", () => {
+    const { result, navigate } = renderGatewayHook(3);
 
     result.current.handleOpenSurecModal();
 
-    expect(navigate).toHaveBeenCalledWith("/", {
+    expect(navigate).toHaveBeenCalledWith("/personeller/3", {
       state: {
         kayitModal: {
           tab: "surec",
@@ -31,14 +41,7 @@ describe("usePersonelKartGatewayReturn", () => {
   });
 
   it("does not expose legacy edit/zimmet gateway emitters", () => {
-    const navigate = vi.fn() as NavigateFunction;
-
-    const { result } = renderHook(() =>
-      usePersonelKartGatewayReturn({
-        navigate,
-        parsedPersonelId: 1
-      })
-    );
+    const { result } = renderGatewayHook(1);
 
     expect(result.current).toEqual({
       handleOpenSurecModal: expect.any(Function),
@@ -50,18 +53,11 @@ describe("usePersonelKartGatewayReturn", () => {
   });
 
   it("handleOpenYillikIzinHakDuzeltme navigates with izin tab and hak-duzeltme operation", () => {
-    const navigate = vi.fn() as NavigateFunction;
-
-    const { result } = renderHook(() =>
-      usePersonelKartGatewayReturn({
-        navigate,
-        parsedPersonelId: 9
-      })
-    );
+    const { result, navigate } = renderGatewayHook(9);
 
     result.current.handleOpenYillikIzinHakDuzeltme();
 
-    expect(navigate).toHaveBeenCalledWith("/", {
+    expect(navigate).toHaveBeenCalledWith("/personeller/9", {
       state: {
         kayitModal: {
           tab: "surec",

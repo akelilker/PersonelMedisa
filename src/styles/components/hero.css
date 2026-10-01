@@ -128,7 +128,7 @@
   align-self: center;
   width: 100%;
   text-align: center;
-  font-size: clamp(16px, 4.5vw, 24px);
+  font-size: clamp(14px, 3.85vw, 20px);
   font-weight: 800;
   letter-spacing: clamp(1px, 0.5vw, 4px);
   text-transform: uppercase;
@@ -744,6 +744,15 @@ body.login-page .hero .animated-line {
     text-shadow: none;
   }
 
+  body.app-home-route .hero.hero-with-session.hero--panel-subtitle .hero-title-stack .hero-panel-subtitle {
+    align-self: center;
+    width: 100%;
+    margin-top: 8px;
+    font-size: min(17px, calc(4.35vw - 0.45px));
+    letter-spacing: clamp(0px, 0.02vw, 0.22px);
+    line-height: 1.15;
+  }
+
   body.app-home-route .hero.hero-with-session .hero-spacer {
     grid-column: 3;
     grid-row: 1;
@@ -931,7 +940,6 @@ body.login-page .hero .animated-line {
     background: var(--hero-title-gradient);
     background-size: 100% 100%;
     background-position: 50% 50%;
-    font-size: min(21.4px, calc(4.977vw - 0.12px));
     font-weight: 800;
     letter-spacing: clamp(0px, 0.03vw, 0.3px);
     text-transform: uppercase;
@@ -951,10 +959,16 @@ body.login-page .hero .animated-line {
     text-rendering: optimizeLegibility;
   }
 
+  body.app-home-route .hero.hero--personel-shell .hero-title-stack > h1 {
+    font-size: min(21.4px, calc(4.977vw - 0.12px));
+  }
+
   body.app-home-route .hero.hero--personel-shell .hero-title-stack .hero-panel-subtitle {
     align-self: center;
     width: 100%;
-    margin-top: 12px;
+    margin-top: 8px;
+    font-size: min(17px, calc(4.35vw - 0.45px));
+    letter-spacing: clamp(0px, 0.02vw, 0.22px);
   }
 
   body.app-home-route .hero.hero--personel-shell .hero-spacer {

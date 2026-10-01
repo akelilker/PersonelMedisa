@@ -290,7 +290,17 @@ export function QrPuantajAdayiSection({ personelId, tarih, personelLabel, onAppl
       ) : null}
 
       {applyOpen && item ? (
-        <AppModal title="QR Saatlerini Uygula" onClose={() => { if (!busy) setApplyOpen(false); }}>
+        <AppModal
+          title="QR Saatlerini Uygula"
+          onClose={() => {
+            if (!busy) setApplyOpen(false);
+          }}
+          backLabel="QR Puantaj Adayı"
+          onBack={() => {
+            if (!busy) setApplyOpen(false);
+          }}
+          backTestId="qr-puantaj-aday-apply-back"
+        >
           <div data-testid="qr-puantaj-aday-apply-modal">
             <p>
               Yalnızca giriş/çıkış saatleri değişecek. Diğer puantaj alanları (gün tipi, hareket, dayanak, hesap
@@ -346,7 +356,17 @@ export function QrPuantajAdayiSection({ personelId, tarih, personelLabel, onAppl
       ) : null}
 
       {keepOpen ? (
-        <AppModal title="Mevcut Puantajı Koru" onClose={() => { if (!busy) setKeepOpen(false); }}>
+        <AppModal
+          title="Mevcut Puantajı Koru"
+          onClose={() => {
+            if (!busy) setKeepOpen(false);
+          }}
+          backLabel="QR Puantaj Adayı"
+          onBack={() => {
+            if (!busy) setKeepOpen(false);
+          }}
+          backTestId="qr-puantaj-aday-keep-back"
+        >
           <div data-testid="qr-puantaj-aday-keep-modal">
             <p>QR kanıtı incelendi; mevcut puantaj saatleri korunacak. Puantaj yazılmaz.</p>
             <label className="form-label" htmlFor="qr-keep-reason">
@@ -377,7 +397,17 @@ export function QrPuantajAdayiSection({ personelId, tarih, personelLabel, onAppl
       ) : null}
 
       {reopenOpen ? (
-        <AppModal title="İncelemeyi Yeniden Aç" onClose={() => { if (!busy) setReopenOpen(false); }}>
+        <AppModal
+          title="İncelemeyi Yeniden Aç"
+          onClose={() => {
+            if (!busy) setReopenOpen(false);
+          }}
+          backLabel="QR Puantaj Adayı"
+          onBack={() => {
+            if (!busy) setReopenOpen(false);
+          }}
+          backTestId="qr-puantaj-aday-reopen-back"
+        >
           <div data-testid="qr-puantaj-aday-reopen-modal">
             <p>Aynı QR adayı için koruma kararı kaldırılır; puantaj yazılmaz.</p>
             <label className="form-label" htmlFor="qr-reopen-reason">

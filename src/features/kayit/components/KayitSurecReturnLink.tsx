@@ -1,16 +1,13 @@
-import { Link } from "react-router-dom";
 import type { KayitSurecReturnContext } from "../kayit-surec-navigation";
-import { buildKayitSurecReturnState } from "../kayit-surec-navigation";
+import { KayitSurecBackBar } from "./KayitSurecBackBar";
 
-export function KayitSurecReturnLink({ context }: { context: KayitSurecReturnContext }) {
-  return (
-    <Link
-      className="universal-btn-aux"
-      data-testid="kayit-surec-return-link"
-      to="/"
-      state={buildKayitSurecReturnState(context)}
-    >
-      Kayıt ve Süreç&apos;e dön
-    </Link>
-  );
+/** @deprecated Use KayitSurecBackBar with explicit parent label */
+export function KayitSurecReturnLink({
+  context,
+  label = "Kayıt ve Süreç"
+}: {
+  context: KayitSurecReturnContext;
+  label?: string;
+}) {
+  return <KayitSurecBackBar context={context} label={label} testId="kayit-surec-return-link" />;
 }

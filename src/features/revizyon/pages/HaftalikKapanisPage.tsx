@@ -117,9 +117,9 @@ export function HaftalikKapanisPage() {
 
   return (
     <section className="states-page" data-testid="haftalik-kapanis-page">
+      {kayitSurecReturn ? <KayitSurecReturnLink context={kayitSurecReturn} label="Haftalık Kapanış" /> : null}
       <div className="puantaj-header-row">
         <h2>Haftalık Kapanış</h2>
-        {kayitSurecReturn ? <KayitSurecReturnLink context={kayitSurecReturn} /> : null}
       </div>
       <p>
         Kapalı hafta kapanış kayıtları korunur. Revizyon talepleri ve düzeltme kayıtları burada yönetilir;

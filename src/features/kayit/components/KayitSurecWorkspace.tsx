@@ -215,6 +215,7 @@ type KayitSurecWorkspaceProps = {
   initialSurecPersonelId?: string | null;
   initialPersonelTab?: PersonelSurecTab | null;
   initialOperation?: "yillik-izin-hak-duzeltme" | null;
+  initialKayitIntent?: string | null;
   primaryActionLabel: string;
   primaryFormId: string;
   onFooterModelChange?: (model: KayitModalFooterModel | null) => void;
@@ -242,12 +243,14 @@ export function KayitSurecWorkspace({
   initialSurecPersonelId,
   initialPersonelTab = null,
   initialOperation = null,
+  initialKayitIntent = null,
   primaryActionLabel,
   primaryFormId,
   onFooterModelChange,
   onOpenBulkImport
 }: KayitSurecWorkspaceProps) {
   const navigate = useNavigate();
+  const [openPersonelEditFromMissingGateway, setOpenPersonelEditFromMissingGateway] = useState(false);
   const { session } = useAuth();
   const { hasPermission } = useRoleAccess();
   const actorRole = canonicalizeUserRole(session?.user.rol ?? null);
@@ -697,6 +700,13 @@ export function KayitSurecWorkspace({
     setHakDuzeltmeOpen(true);
   }
 
+  function backToPuantajHub() {
+    setDevamsizlikSubId(null);
+    setPuantajSubdomain(null);
+    setHakDuzeltmeOpen(false);
+    setSurecForm((prev) => resetSurecFormKeepingPersonel(prev.personelId));
+  }
+
   async function loadBootstrap() {
     setBootstrapLoading(true);
     setBootstrapError(null);
@@ -864,7 +874,8 @@ export function KayitSurecWorkspace({
       setDevamsizlikSubId(null);
       setPuantajSubdomain(null);
     }
-  }, [initialSurecPersonelId, initialPersonelTab, initialOperation]);
+    setOpenPersonelEditFromMissingGateway(initialKayitIntent === "personel-missing-info-gateway");
+  }, [initialSurecPersonelId, initialPersonelTab, initialOperation, initialKayitIntent]);
 
   async function handlePersonelSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -1165,6 +1176,10 @@ export function KayitSurecWorkspace({
     setPozisyonError(null);
     setPozisyonInfo(null);
     setOpenPozisyonPicker(null);
+    setYeniSubeId("");
+    setSubeGerekce("");
+    setSubeTransferError(null);
+    setSubeTransferInfo(null);
   }, [selectedSurecPersonel]);
 
   const footerModel = useMemo((): KayitModalFooterModel | null => {
@@ -1522,6 +1537,7 @@ export function KayitSurecWorkspace({
                             personelRefs={refs}
                             onBusyChange={setGenelMutating}
                             onPersonelUpdated={applyPersonelUpdateLocally}
+                            openEditOnMount={openPersonelEditFromMissingGateway}
                           />
                         ) : null}
 
@@ -1534,6 +1550,7 @@ export function KayitSurecWorkspace({
                             isPassive={isSelectedPersonelPasif}
                             onSelectDevamsizlikSub={selectDevamsizlikSubCard}
                             onOpenHakDuzeltme={openPuantajHakDuzeltme}
+                            onBackToPuantajHub={backToPuantajHub}
                           >
                             {hakDuzeltmeOpen ? (
                               <YillikIzinHakDuzeltmePanel

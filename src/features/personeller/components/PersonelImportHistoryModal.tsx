@@ -178,6 +178,13 @@ export function PersonelImportHistoryModal({ open, onClose }: PersonelImportHist
           setDetailError(null);
           setEvidenceError(null);
         }}
+        backLabel="Personel Import Geçmişi"
+        onBack={() => {
+          setDetail(null);
+          setDetailError(null);
+          setEvidenceError(null);
+        }}
+        backTestId="personel-import-history-detail-header-back"
         className="personel-import-history-modal"
         footer={
           <div className="universal-btn-group modal-footer-actions app-action-dialog-actions">
@@ -195,14 +202,14 @@ export function PersonelImportHistoryModal({ open, onClose }: PersonelImportHist
               type="button"
               className="universal-btn-aux"
               data-modal-initial-focus="true"
-              data-testid="personel-import-history-detail-back"
+              data-testid="personel-import-history-detail-close"
               onClick={() => {
                 setDetail(null);
                 setDetailError(null);
                 setEvidenceError(null);
               }}
             >
-              Listeye dön
+              Kapat
             </button>
           </div>
         }

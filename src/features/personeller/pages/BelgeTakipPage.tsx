@@ -188,16 +188,20 @@ export function BelgeTakipPage() {
 
   return (
     <section className="belge-takip-page" data-testid="belge-takip-page">
+      {kayitSurecReturn ? (
+        <KayitSurecReturnLink context={kayitSurecReturn} label="Belge Takip" />
+      ) : null}
       <div className="personel-belge-panel-head">
         <div>
           <h2>Belge Takip</h2>
           <p>Personel belge kayıtlarının süre, dosya ve eksiklik durumunu izleyin.</p>
         </div>
         <div className="personel-belge-panel-head-actions">
-          {kayitSurecReturn ? <KayitSurecReturnLink context={kayitSurecReturn} /> : null}
-          <Link className="universal-btn-aux" to="/personeller">
-            Personellere dön
-          </Link>
+          {!kayitSurecReturn ? (
+            <Link className="universal-btn-aux" to="/personeller">
+              Personel Listesi
+            </Link>
+          ) : null}
         </div>
       </div>
 

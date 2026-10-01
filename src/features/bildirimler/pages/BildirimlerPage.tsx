@@ -1057,10 +1057,10 @@ export function BildirimlerPage() {
 
   return (
     <section className="bildirimler-page">
+      {kayitSurecReturn ? <KayitSurecReturnLink context={kayitSurecReturn} label="Puantaj" /> : null}
       <div className="bildirimler-header-row">
         <h2>{pageTitle}</h2>
         <div className="bildirimler-header-actions">
-          {kayitSurecReturn ? <KayitSurecReturnLink context={kayitSurecReturn} /> : null}
           {canCreateBildirim ? (
             <button type="button" className="universal-btn-aux" onClick={openCreateModal}>
               {createButtonLabel}

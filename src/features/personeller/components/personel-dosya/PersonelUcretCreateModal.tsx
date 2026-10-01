@@ -82,6 +82,9 @@ export function PersonelUcretCreateModal({
     <AppModal
       title="Yeni Ücret Dönemi Başlat"
       onClose={handleClose}
+      backLabel="Ücret Geçmişi"
+      onBack={handleClose}
+      backTestId="personel-ucret-create-back"
       footer={
         <div className="universal-btn-group modal-footer-actions">
           <button

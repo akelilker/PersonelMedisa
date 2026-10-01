@@ -67,14 +67,6 @@ function HomeIndexMainMenu() {
   );
 }
 
-function SelfServiceHomeRoute() {
-  const { session } = useAuth();
-  if (session?.user.rol === "BIRIM_AMIRI") {
-    return <BirimAmiriOperationalHomePage />;
-  }
-  return <PersonelSelfServiceHomePage />;
-}
-
 function NotFoundPage() {
   return (
     <section className="states-page">
@@ -121,7 +113,7 @@ export function AppRoutes() {
           path="self"
           element={
             <ProtectedRoute requirePermission="self_service.view">
-              <SelfServiceHomeRoute />
+              <PersonelSelfServiceHomePage />
             </ProtectedRoute>
           }
         />

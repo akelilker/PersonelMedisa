@@ -7,8 +7,6 @@ type SelfServiceQrShortcutsProps = {
    * Yönetici ana ekranı gibi personel-mobile shell dışındaki yüzeylerde kullanılır.
    */
   title?: string;
-  /** Ana giriş kısayolu: tam self-service yüzeyine (/self) de link verir. */
-  showSelfServiceHomeLink?: boolean;
 };
 
 /**
@@ -21,10 +19,7 @@ type SelfServiceQrShortcutsProps = {
  * düşürülmeden, yönetim yetkilerini kaybetmeden kendi QR yüzeylerine ulaşır.
  * Backend 403 otoritedir; bu yalnız UX aynasıdır.
  */
-export function SelfServiceQrShortcuts({
-  title,
-  showSelfServiceHomeLink = false
-}: SelfServiceQrShortcutsProps) {
+export function SelfServiceQrShortcuts({ title }: SelfServiceQrShortcutsProps) {
   const { hasPermission } = useRoleAccess();
 
   if (!hasPermission("self_service.qr.scan")) {
@@ -33,11 +28,6 @@ export function SelfServiceQrShortcuts({
 
   const shortcuts = (
     <nav className="pm-secondary-nav" data-testid="self-qr-shortcuts" aria-label="Self-service kısayollar">
-      {showSelfServiceHomeLink ? (
-        <Link to="/self" data-testid="self-service-home-link">
-          Öz Servis
-        </Link>
-      ) : null}
       <Link to="/self/qr-okut" data-testid="self-qr-scan-link">
         QR Okut
       </Link>

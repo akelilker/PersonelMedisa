@@ -22,7 +22,9 @@ describe("personel mobile/PWA self-service productization", () => {
     expect(home).not.toContain('data-testid="self-last-qr-empty"');
     expect(home).not.toContain('data-testid="self-missing-info-warning"');
     expect(home).not.toContain("pm-context-bar");
-    expect(home).toContain('data-testid="personel-qr-closed-notice"');
+    // QR kapsamı dışında QR alanı hiç mount edilmez; kapalı callout'u yoktur.
+    expect(home).not.toContain('data-testid="personel-qr-closed-notice"');
+    expect(home).toContain("qrEnabled ? (");
     expect(home).toContain("personel-unbound-page");
     expect(home).toContain("QR giriş/çıkış");
     expect(home).not.toContain("<SelfServiceQrShortcuts />");
@@ -128,7 +130,7 @@ describe("personel mobile/PWA self-service productization", () => {
 
     const home = read("src/features/self-service/pages/PersonelSelfServiceHomePage.tsx");
     expect(home).toContain("Özet yüklenemedi. Tekrar deneyin.");
-    expect(home).toContain("QR giriş/çıkış bu personel için henüz açık değil");
+    expect(home).not.toContain("QR giriş/çıkış bu personel için henüz açık değil");
     expect(home).not.toMatch(/setError\(cause instanceof Error \? cause\.message/);
 
     const css = read("src/features/self-service/self-service.css");

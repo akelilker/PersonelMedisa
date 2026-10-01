@@ -156,7 +156,7 @@ async function renderHome() {
       <PersonelSelfServiceHomePage />
     </MemoryRouter>
   );
-  await screen.findByTestId("personel-attendance-boxes");
+  await screen.findByTestId("personel-self-service-page");
 }
 
 describe("PERSONEL collar → QR UI entitlement (render level)", () => {
@@ -185,11 +185,14 @@ describe("PERSONEL collar → QR UI entitlement (render level)", () => {
 
     expect(screen.queryByTestId("giris-scan")).toBeNull();
     expect(screen.queryByTestId("self-qr-scan-link")).toBeNull();
-    expect(screen.getByTestId("giris-scan-not-entitled")).toBeInTheDocument();
-    expect(screen.getByTestId("personel-qr-closed-notice")).toBeInTheDocument();
+    // QR kapsamı dışında QR alanı hiç mount edilmez; kapalı notu/callout yok.
+    expect(screen.queryByTestId("personel-attendance-boxes")).toBeNull();
+    expect(screen.queryByTestId("giris-scan-not-entitled")).toBeNull();
+    expect(screen.queryByTestId("personel-qr-closed-notice")).toBeNull();
     expect(screen.queryByTestId("qr-kiosk-model-note")).toBeNull();
     // G) non-QR own self-service surfaces stay available.
-    expect(screen.getByTestId("attendance-box-cikis")).toBeInTheDocument();
+    expect(screen.getByTestId("personel-self-service-page")).toBeInTheDocument();
+    expect(screen.getByTestId("personel-self-menu")).toBeInTheDocument();
     expect(screen.queryByTestId("personel-mobile-header")).toBeNull();
   });
 
@@ -199,8 +202,8 @@ describe("PERSONEL collar → QR UI entitlement (render level)", () => {
 
     expect(screen.queryByTestId("giris-scan")).toBeNull();
     expect(screen.queryByTestId("self-qr-scan-link")).toBeNull();
-    expect(screen.getByTestId("giris-scan-not-entitled")).toBeInTheDocument();
-    expect(screen.getByTestId("attendance-box-cikis")).toBeInTheDocument();
+    expect(screen.queryByTestId("personel-attendance-boxes")).toBeNull();
+    expect(screen.getByTestId("personel-self-menu")).toBeInTheDocument();
   });
 
   it("E) PERSONEL + null/unknown collar: QR fails closed", async () => {
@@ -209,8 +212,8 @@ describe("PERSONEL collar → QR UI entitlement (render level)", () => {
       await renderHome();
 
       expect(screen.queryByTestId("giris-scan"), `collar=${collar}`).toBeNull();
-      expect(screen.getByTestId("giris-scan-not-entitled")).toBeInTheDocument();
-      expect(screen.getByTestId("attendance-box-cikis")).toBeInTheDocument();
+      expect(screen.queryByTestId("personel-attendance-boxes"), `collar=${collar}`).toBeNull();
+      expect(screen.getByTestId("personel-self-menu")).toBeInTheDocument();
       cleanup();
     }
   });
@@ -237,9 +240,10 @@ describe("PERSONEL collar → QR UI entitlement (render level)", () => {
 
       expect(screen.queryByTestId("self-qr-scan-link"), role).toBeNull();
       expect(screen.queryByTestId("giris-scan"), role).toBeNull();
-      // G) non-QR own boxes remain (closed state).
-      expect(screen.getByTestId("giris-scan-not-entitled"), role).toBeInTheDocument();
-      expect(screen.getByTestId("personel-qr-closed-notice"), role).toBeInTheDocument();
+      // G) non-QR: QR alanı hiç render edilmez; kişisel yüzey (dock) kalır.
+      expect(screen.queryByTestId("personel-attendance-boxes"), role).toBeNull();
+      expect(screen.queryByTestId("personel-qr-closed-notice"), role).toBeNull();
+      expect(screen.getByTestId("personel-self-menu"), role).toBeInTheDocument();
       cleanup();
     }
   });
@@ -250,7 +254,7 @@ describe("PERSONEL collar → QR UI entitlement (render level)", () => {
 
     expect(screen.queryByTestId("self-qr-scan-link")).toBeNull();
     expect(screen.queryByTestId("giris-scan")).toBeNull();
-    expect(screen.getByTestId("giris-scan-not-entitled")).toBeInTheDocument();
+    expect(screen.queryByTestId("personel-attendance-boxes")).toBeNull();
   });
 
   it("open-shift day shows recorded giriş and enabled çıkış CTA without helper copy", async () => {
@@ -452,11 +456,10 @@ describe("H5) BOLUM_YONETICISI self-service/QR entry via the shared owner", () =
     setSession("BOLUM_YONETICISI", "Mavi Yaka");
     render(
       <MemoryRouter initialEntries={["/"]}>
-        <SelfServiceQrShortcuts title="Kendi QR / Kart Okutmam" showSelfServiceHomeLink />
+        <SelfServiceQrShortcuts title="Kendi QR / Kart Okutmam" />
       </MemoryRouter>
     );
 
-    expect(screen.getByTestId("self-service-home-link")).toHaveAttribute("href", "/self");
     expect(screen.getByTestId("self-qr-scan-link")).toHaveAttribute("href", "/self/qr-okut");
     expect(screen.getByTestId("self-qr-history-link")).toHaveAttribute("href", "/self/qr-hareketleri");
   });
@@ -465,7 +468,7 @@ describe("H5) BOLUM_YONETICISI self-service/QR entry via the shared owner", () =
     setSession("BOLUM_YONETICISI", "Beyaz Yaka");
     const { container } = render(
       <MemoryRouter initialEntries={["/"]}>
-        <SelfServiceQrShortcuts title="Kendi QR / Kart Okutmam" showSelfServiceHomeLink />
+        <SelfServiceQrShortcuts title="Kendi QR / Kart Okutmam" />
       </MemoryRouter>
     );
 

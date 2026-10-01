@@ -106,19 +106,23 @@
 }
 
 /*
- * PERSONEL home: the megaphone sits flush against the shell frame (top-left).
- * Nudge it 5px away from that frame — margin-left for the horizontal offset,
- * `top` (owner already declares position: relative) for the vertical one — so
- * the row geometry, the ≤640px .icons-row padding and the sibling controls
- * stay untouched.
+ * PERSONEL home: megaphone, bell and door share one horizontal baseline.
+ * Horizontal inset only (5px off the shell frame). No extra `top` — that
+ * dropped the megaphone below the bell.
  */
-.icons-row--minimal.icons-row--personel .pm-shell-duyurular-link {
+.icons-row--minimal.icons-row--personel .pm-shell-duyurular-link,
+.icons-row--minimal.icons-row--personel .notification-wrap > .icon-btn,
+.icons-row--minimal.icons-row--personel .icon-btn.pm-shell-exit-btn {
   display: grid;
   place-items: center;
+  align-self: center;
   padding: 2px;
+  line-height: 0;
+}
+
+.icons-row--minimal.icons-row--personel .pm-shell-duyurular-link {
   box-sizing: content-box;
   margin-left: 5px;
-  top: 5px;
 }
 
 .pm-shell-duyurular-link:hover,
@@ -137,13 +141,16 @@
 }
 
 /*
- * PERSONEL home exit (door) icon: same 5px breathing from the shell frame as
- * the megaphone — right for the horizontal offset, top for the vertical one.
+ * PERSONEL home exit (door): same row baseline as the bell. Horizontal inset
+ * only — `top` previously dropped the door below the bell.
  */
 .icons-row--minimal.icons-row--personel .icon-btn.pm-shell-exit-btn {
-  position: relative;
   margin-right: 5px;
-  top: 5px;
+}
+
+.icons-row--minimal.icons-row--personel .icon-btn.pm-shell-exit-btn svg {
+  width: 22px;
+  height: 22px;
 }
 
 .pm-shell-duyurular-badge {

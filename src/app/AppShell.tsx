@@ -75,7 +75,7 @@ function resolveModuleModal(
   tabParam: string | null,
   eventParam: string | null
 ): ModuleModalConfig | null {
-  if (pathname === "/") {
+  if (pathname === "/" || pathname === "/self") {
     return null;
   }
 
@@ -150,9 +150,6 @@ function resolveModuleModal(
       bodyClassName: "modal-body--self-qr-history",
       titleVariant: "premium"
     };
-  }
-  if (pathname === "/self") {
-    return { title: "Öz Servis", closeTo: "/" };
   }
   const selfProductTitle = personelSelfProductModalTitle(pathname);
   if (selfProductTitle) {
@@ -243,6 +240,10 @@ export function AppShell() {
   const isChangePasswordRoute = pathname === "/change-password";
   const isAuthSurfaceRoute = isLoginRoute || isChangePasswordRoute;
   const isHomeRoute = pathname === "/";
+  // Canonical personel yüzeyi: "/" ve "/self" aynı kişisel ekranı ve shell ritmini paylaşır.
+  // /self ayrı bir ürün paneli/modalı DEĞİLDİR; yalnızca aynı ekranın rotasıdır.
+  const isSelfSurfaceRoute = pathname === "/self";
+  const isPersonelSurfaceRoute = isHomeRoute || isSelfSurfaceRoute;
   const isYonetimRoute = pathname === "/yonetim-paneli";
   const moduleModal = useMemo(
     () =>
@@ -253,7 +254,7 @@ export function AppShell() {
   );
   const isModuleOverlayRoute = moduleModal !== null;
   const showShellHeaderActions = !isModuleOverlayRoute && !isAuthSurfaceRoute;
-  const showUserBar = !isAuthSurfaceRoute && !isModuleOverlayRoute && !isHomeRoute;
+  const showUserBar = !isAuthSurfaceRoute && !isModuleOverlayRoute && !isPersonelSurfaceRoute;
   const backBarTarget = resolveBackBar(pathname, state);
   const isPersonelKartModalRoute =
     pathname === "/personeller" ||
@@ -302,12 +303,12 @@ export function AppShell() {
   }, [isKayitModalOpen]);
 
   useEffect(() => {
-    document.body.classList.toggle("app-home-route", isHomeRoute && !isLoginRoute);
+    document.body.classList.toggle("app-home-route", isPersonelSurfaceRoute && !isLoginRoute);
 
     return () => {
       document.body.classList.remove("app-home-route");
     };
-  }, [isHomeRoute, isLoginRoute]);
+  }, [isPersonelSurfaceRoute, isLoginRoute]);
 
   useEffect(() => {
     document.body.classList.toggle("app-personel-shell", isPersonelShellRole && !isAuthSurfaceRoute);
@@ -405,7 +406,9 @@ export function AppShell() {
             subeLabel={isPersonelShellRole ? null : activeSubeLabel}
             variant={isPersonelShellRole ? "personel-shell" : "default"}
           />
-          {showShellHeaderActions ? <ShellHeaderActions contextLabel="Ana panel" minimal={isHomeRoute} /> : null}
+          {showShellHeaderActions ? (
+            <ShellHeaderActions contextLabel="Ana panel" minimal={isPersonelSurfaceRoute} />
+          ) : null}
         </div>
 
         {showUserBar ? (

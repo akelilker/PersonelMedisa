@@ -106,20 +106,20 @@ describe("branch accounting visibility owners", () => {
     expect(parsed.muhasebe_user_subeler_targets.REMOVE).toEqual([]);
   });
 
-  it("pins CURRENT_STATE + registry to code tip 095 and production tip 094", () => {
+  it("pins CURRENT_STATE + registry to code and production tip 095 (production caught up)", () => {
     const current = read("CURRENT_STATE.md");
     const registry = read("docs/guncel/110-master-closure-gap-registry.md");
     const backlog = read("docs/guncel/146-post-pr402-canonical-backlog.md");
     expect(current).toMatch(/^CODE_MIGRATION_TIP: 095$/m);
-    expect(current).toMatch(/^PRODUCTION_MIGRATION_TIP: 094$/m);
-    expect(current).toMatch(/^LAST_VERIFIED_PRODUCTION_MIGRATION_TIP: 094$/m);
+    expect(current).toMatch(/^PRODUCTION_MIGRATION_TIP: 095$/m);
+    expect(current).toMatch(/^LAST_VERIFIED_PRODUCTION_MIGRATION_TIP: 095$/m);
     expect(current).toMatch(
-      /^FRESH_PRODUCTION_MIGRATION_READBACK: ACTIONS_APPLY_36491356202$/m
+      /^FRESH_PRODUCTION_MIGRATION_READBACK: MIGRATION_095_APPLIED$/m
     );
     expect(current).toMatch(/^PRODUCTION_MIGRATION_PENDING: 0$/m);
-    expect(current).toMatch(/^LAST_MERGED_PR: 441$/m);
+    expect(current).toMatch(/^LAST_MERGED_PR: 470$/m);
     expect(current).toMatch(
-      /^PRODUCTION_DEPLOY_SHA: 0ef844475a3523b3e54215994a053cd27534c575$/m
+      /^PRODUCTION_DEPLOY_SHA: b01216d5e94a3269dc57eca0f316703aaf26d54c$/m
     );
     expect(current).toContain("ACTIVE_BACKLOG_OWNER: docs/guncel/146-post-pr402-canonical-backlog.md");
     expect(current).toContain("USER_SUBELER_SEMANTIC: ACCESS_SCOPE_ONLY");
@@ -131,7 +131,7 @@ describe("branch accounting visibility owners", () => {
     expect(registry).toContain("SUPERSEDED");
     expect(registry).not.toContain("BM model ALREADY_SUPPORTED");
     expect(registry).toMatch(/^CODE_MIGRATION_TIP: 095$/m);
-    expect(registry).toMatch(/^PRODUCTION_MIGRATION_TIP: 094$/m);
+    expect(registry).toMatch(/^PRODUCTION_MIGRATION_TIP: 095$/m);
     expect(registry).toContain("| Migration 087 | **APPLIED** |");
     expect(registry).toContain("| Migration 088 | **APPLIED** |");
     expect(registry).toContain("| Migration 089 | **APPLIED** |");

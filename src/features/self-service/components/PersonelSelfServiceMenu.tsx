@@ -23,25 +23,27 @@ function PersonelSelfDockIcon({ id }: { id: PersonelSelfMenuItem["id"] }) {
     case "gecmis":
       return (
         <svg {...DOCK_ICON_PROPS}>
-          <path d="M3 12a9 9 0 1 0 3-6.7" />
-          <path d="M3 4v5h5" />
-          <circle cx="12" cy="12" r="3" />
-          <path d="M12 10v2l1.2.8" />
+          <path d="M5 22h14" />
+          <path d="M5 2h14" />
+          <path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22" />
+          <path d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2" />
         </svg>
       );
     case "izinlerim":
       return (
         <svg {...DOCK_ICON_PROPS}>
-          <rect x="3" y="5" width="18" height="16" rx="2" />
-          <path d="M16 3v4M8 3v4M3 10h18" />
+          <path d="M16 20V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
+          <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
         </svg>
       );
     case "talepler":
       return (
         <svg {...DOCK_ICON_PROPS}>
-          <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" />
-          <rect x="9" y="3" width="6" height="4" rx="1" />
-          <path d="M9 12h6M9 16h6" />
+          <path d="M13 21H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7" />
+          <path d="M13 3v4h4" />
+          <path d="M8 8h4" />
+          <path d="M8 12h3" />
+          <path d="m14.5 13.5 5-5 2 2-5 5-3 1 1-3z" />
         </svg>
       );
     case "fazla-mesai":
@@ -71,7 +73,7 @@ export function PersonelSelfServiceMenu({ anomalyCount = 0 }: { anomalyCount?: n
         const enabled = hasPermission(item.permission);
         const content = (
           <>
-            <span className="pm-self-dock__icon-wrap">
+            <span className={`pm-self-dock__icon-wrap pm-self-dock__icon-wrap--${item.id}`}>
               <PersonelSelfDockIcon id={item.id} />
               {item.id === "talepler" && unresolvedCount > 0 ? (
                 <span className="pm-self-dock__count" data-testid="personel-talepler-anomaly-count">

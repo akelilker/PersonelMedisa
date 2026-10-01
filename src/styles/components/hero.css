@@ -123,7 +123,7 @@
 
 /* PERSONEL shell: second title line matches h1 character (desktop / >640px). */
 .hero.hero--personel-shell .hero-title-stack .hero-panel-subtitle {
-  margin: 0;
+  margin: 12px 0 0;
   min-width: 0;
   align-self: center;
   width: 100%;
@@ -149,6 +149,55 @@
   filter: none;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+}
+
+/*
+ * Üst şerit yazıları: açılışta opak, 4 sn sonra 0.7.
+ * Taşıt .user-panel-link: transition color 0.2s, opacity 0.2s. Hover/focus 1.
+ */
+.hero.hero--panel-subtitle .hero-title-stack > h1,
+.hero.hero--panel-subtitle .hero-title-stack .hero-panel-subtitle {
+  opacity: 1;
+  pointer-events: auto;
+  transition: color 0.2s, opacity 0.2s;
+}
+
+.hero.hero--panel-subtitle.hero--titles-dimmed .hero-title-stack > h1,
+.hero.hero--panel-subtitle.hero--titles-dimmed .hero-title-stack .hero-panel-subtitle {
+  opacity: 0.7;
+}
+
+.hero.hero--panel-subtitle.hero--titles-dimmed .hero-title-stack > h1:hover,
+.hero.hero--panel-subtitle.hero--titles-dimmed .hero-title-stack > h1:focus,
+.hero.hero--panel-subtitle.hero--titles-dimmed .hero-title-stack > h1:focus-visible,
+.hero.hero--panel-subtitle.hero--titles-dimmed .hero-title-stack .hero-panel-subtitle:hover,
+.hero.hero--panel-subtitle.hero--titles-dimmed .hero-title-stack .hero-panel-subtitle:focus,
+.hero.hero--panel-subtitle.hero--titles-dimmed .hero-title-stack .hero-panel-subtitle:focus-visible {
+  opacity: 1;
+}
+
+.hero.hero--panel-subtitle:not(.hero--personel-shell) .hero-title-stack .hero-panel-subtitle {
+  margin: 12px 0 0;
+  min-width: 0;
+  align-self: center;
+  width: 100%;
+  text-align: center;
+  font-size: clamp(16px, 4.5vw, 24px);
+  font-weight: 800;
+  letter-spacing: clamp(1px, 0.5vw, 4px);
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 0 4px;
+  line-height: 1.1;
+  color: transparent;
+  background: var(--hero-title-gradient);
+  background-size: 100% 100%;
+  background-position: 50% 50%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 .hero-title-stack {
@@ -905,6 +954,7 @@ body.login-page .hero .animated-line {
   body.app-home-route .hero.hero--personel-shell .hero-title-stack .hero-panel-subtitle {
     align-self: center;
     width: 100%;
+    margin-top: 12px;
   }
 
   body.app-home-route .hero.hero--personel-shell .hero-spacer {

@@ -26,9 +26,29 @@ export function PersonelSelfServiceIdentity({
     <div className="pm-self-identity pm-self-identity--home" data-testid="personel-self-identity">
       <div className="pm-self-identity__text">
         <p className="pm-self-identity__name">{view.adSoyad}</p>
+        <p className="pm-self-identity__fact" data-testid="personel-self-identity-dogum">
+          <span className="pm-self-identity__label">Doğum Tarihi</span>{" "}
+          <span className="pm-self-identity__value">{view.dogumTarihi}</span>
+        </p>
+        <p className="pm-self-identity__fact" data-testid="personel-self-identity-cinsiyet">
+          <span className="pm-self-identity__label">Cinsiyet</span>{" "}
+          <span className="pm-self-identity__value">{view.cinsiyet}</span>
+        </p>
+        <p className="pm-self-identity__fact" data-testid="personel-self-identity-telefon">
+          <span className="pm-self-identity__label">Telefon</span>{" "}
+          <span className="pm-self-identity__value">{view.telefon}</span>
+        </p>
         <p className="pm-self-identity__fact" data-testid="personel-self-identity-sicil">
           <span className="pm-self-identity__label">Sicil No.</span>{" "}
           <span className="pm-self-identity__value">{view.sicil}</span>
+        </p>
+        <p className="pm-self-identity__fact" data-testid="personel-self-identity-tc">
+          <span className="pm-self-identity__label">TC Kimlik No</span>{" "}
+          <span className="pm-self-identity__value">{view.tcKimlikNo}</span>
+        </p>
+        <p className="pm-self-identity__fact" data-testid="personel-self-identity-kan">
+          <span className="pm-self-identity__label">Kan Grubu</span>{" "}
+          <span className="pm-self-identity__value">{view.kanGrubu}</span>
         </p>
         <p className="pm-self-identity__fact" data-testid="personel-self-identity-ise-giris">
           <span className="pm-self-identity__label">İşe Giriş</span>{" "}

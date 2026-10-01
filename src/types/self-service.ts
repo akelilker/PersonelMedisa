@@ -8,6 +8,13 @@ export type MePersonelSummary = {
   ad_soyad: string;
   sicil_no: string | null;
   ise_giris_tarihi: string | null;
+  /** Canonical GET /me fields. Absent or empty renders as "-" — never invented. */
+  tc_kimlik_no?: string | null;
+  dogum_tarihi?: string | null;
+  telefon?: string | null;
+  kan_grubu?: string | null;
+  /** No personeller.cinsiyet column yet; UI shows "-" until the API sends a real value. */
+  cinsiyet?: string | null;
   sube_id: number;
   sube_ad: string;
   departman_id: number | null;

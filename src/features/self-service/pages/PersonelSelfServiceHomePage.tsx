@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   ackInboxPopup,
   decideAttendanceCorrection,
@@ -26,6 +26,7 @@ import { useSelfProfilFoto } from "../hooks/use-self-profil-foto";
 import { buildPersonelSelfIdentityView } from "../personel-self-identity-view";
 import { PersonelMobileCapabilityService } from "../personel-mobile-capability";
 import { primeQrCamera } from "../qr/qr-scanner";
+import { buildInboxActionNotice } from "../hooks/use-inbox-action-notice";
 
 type NoticeState =
   | null
@@ -51,8 +52,10 @@ const COMING_SOON = PersonelMobileCapabilityService.MESSAGE_COMING_SOON;
 
 export function PersonelSelfServiceHomePage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { hasPermission } = useRoleAccess();
   const qrEnabled = hasPermission("self_service.qr.scan");
+  const canDecideCorrection = hasPermission("attendance.correction.decide");
   const [loading, setLoading] = useState(true);
   const [today, setToday] = useState<AttendanceTodayResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -77,36 +80,22 @@ export function PersonelSelfServiceHomePage() {
       setToday(attendance);
       const popup = inbox.pending_popups[0] ?? null;
       if (popup) {
-        const isCorrection =
-          popup.kind === "ATTENDANCE_CORRECTION_REQUEST" || popup.kind === "ATTENDANCE_CORRECTION_REMINDER";
-        const correctionId = popup.related_correction_id;
+        const built = buildInboxActionNotice(popup, async () => {
+          setNotice(null);
+          await load();
+        });
         setNotice({
-          title: popup.title,
-          body: popup.body,
-          infoTooltip:
-            popup.kind === "LATE_ENTRY_INFO" || popup.kind === "EARLY_EXIT_INFO" ? "Bilgi Amaçlıdır." : undefined,
-          notificationId: popup.id,
-          kind: popup.kind,
-          primaryLabel: isCorrection ? "Onayla" : undefined,
-          secondaryLabel: isCorrection ? "Reddet" : undefined,
-          onPrimary:
-            isCorrection && correctionId
-              ? async () => {
-                  await decideAttendanceCorrection(correctionId, "ONAYLA");
-                  await ackInboxPopup(popup.id);
-                  setNotice(null);
-                  await load();
-                }
-              : undefined,
-          onSecondary:
-            isCorrection && correctionId
-              ? async () => {
-                  await decideAttendanceCorrection(correctionId, "REDDET");
-                  await ackInboxPopup(popup.id);
-                  setNotice(null);
-                  await load();
-                }
-              : undefined
+          ...built,
+          onPrimary: built.onPrimary
+            ? async () => {
+                await built.onPrimary?.();
+              }
+            : undefined,
+          onSecondary: built.onSecondary
+            ? async () => {
+                await built.onSecondary?.();
+              }
+            : undefined
         });
       }
       setError(null);
@@ -126,6 +115,43 @@ export function PersonelSelfServiceHomePage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const raw = params.get("inboxCorrection");
+    const correctionId = raw ? Number.parseInt(raw, 10) : NaN;
+    if (!Number.isFinite(correctionId) || correctionId <= 0 || !canDecideCorrection) {
+      return;
+    }
+    setNotice({
+      title: "Puantaj Düzeltme Talebi",
+      body: "Bildirimden gelen düzeltme talebini onaylayın veya reddedin.",
+      primaryLabel: "Onayla",
+      secondaryLabel: "Reddet",
+      onPrimary: async () => {
+        await decideAttendanceCorrection(correctionId, "ONAYLA");
+        setNotice(null);
+        params.delete("inboxCorrection");
+        const nextSearch = params.toString();
+        navigate(
+          { pathname: location.pathname, search: nextSearch ? `?${nextSearch}` : "" },
+          { replace: true }
+        );
+        await load();
+      },
+      onSecondary: async () => {
+        await decideAttendanceCorrection(correctionId, "REDDET");
+        setNotice(null);
+        params.delete("inboxCorrection");
+        const nextSearch = params.toString();
+        navigate(
+          { pathname: location.pathname, search: nextSearch ? `?${nextSearch}` : "" },
+          { replace: true }
+        );
+        await load();
+      }
+    });
+  }, [canDecideCorrection, load, location.pathname, location.search, navigate]);
 
   useEffect(() => {
     if (shouldPreferDemoApi()) {

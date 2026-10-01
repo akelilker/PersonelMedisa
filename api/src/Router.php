@@ -131,6 +131,18 @@ class Router
         if ($path === '/me/izin-talepleri' && $method === 'POST') {
             SureclerController::createSelfIzin($this->request);
         }
+        if ($path === '/me/rapor-talepleri' && $method === 'POST') {
+            SureclerController::createSelfRapor($this->request);
+        }
+        if ($path === '/me/raporlar' && $method === 'GET') {
+            PersonelSelfProductController::raporlar($this->request);
+        }
+        if ($path === '/me/bordrolar' && $method === 'GET') {
+            PersonelSelfProductController::bordrolar($this->request);
+        }
+        if ($method === 'POST' && preg_match('#^/me/bordrolar/(\d+)/okudum$#', $path, $matches)) {
+            PersonelSelfProductController::bordroOkudum($this->request, $matches[1]);
+        }
         if ($path === '/me/avans-talepleri' && $method === 'GET') {
             PersonelSelfProductController::avansList($this->request);
         }

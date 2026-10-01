@@ -12,11 +12,14 @@ use Medisa\Api\Http\Request;
 use Medisa\Api\Scope\SubeScope;
 use Medisa\Api\Services\SelfService\DuyuruService;
 use Medisa\Api\Services\SelfService\PersonelAvansTalepService;
+use Medisa\Api\Services\SelfService\PersonelBordroOkumaService;
 use Medisa\Api\Services\SelfService\PersonelGeriBildirimService;
 use Medisa\Api\Services\SelfService\PersonelProfilFotoService;
 use Medisa\Api\Services\SelfService\PersonelSelfProductException;
 use Medisa\Api\Services\SelfService\SelfIzinReadService;
 use Medisa\Api\Services\SelfService\SelfPersonelContext;
+use Medisa\Api\Services\SelfService\SelfRaporReadService;
+use Medisa\Api\Services\SelfService\SelfRequestInboxNotifier;
 use PDO;
 
 /**
@@ -54,11 +57,14 @@ class PersonelSelfProductController
         $body = self::body($request);
         unset($body['personel_id'], $body['durum'], $body['sonuc']);
         try {
-            JsonResponse::success(
-                PersonelAvansTalepService::create(self::pdo(), (int) $ctx['personel_id'], $body),
-                [],
-                201
-            );
+            $pdo = self::pdo();
+            $created = PersonelAvansTalepService::create($pdo, (int) $ctx['personel_id'], $body);
+            try {
+                SelfRequestInboxNotifier::notifyAvansRequest($pdo, $ctx, $created);
+            } catch (\Throwable $notifyError) {
+                // best-effort inbox
+            }
+            JsonResponse::success($created, [], 201);
         } catch (PersonelSelfProductException $e) {
             JsonResponse::error($e->getHttpStatus(), $e->getErrorCode(), $e->getMessage(), $e->getField());
         } catch (\Throwable $e) {
@@ -93,6 +99,59 @@ class PersonelSelfProductController
             JsonResponse::error($e->getHttpStatus(), $e->getErrorCode(), $e->getMessage(), $e->getField());
         } catch (\Throwable $e) {
             JsonResponse::serverError('Geri bildirim olusturulamadi.');
+        }
+    }
+
+    public static function bordrolar(Request $request)
+    {
+        $user = AuthMiddleware::authenticate($request, true);
+        RolePermissions::assert($user, 'self_service.view');
+        $ctx = SelfPersonelContext::resolveForSelfService($user, self::pdo(), true);
+        try {
+            JsonResponse::success(
+                PersonelBordroOkumaService::listForPersonel(
+                    self::pdo(),
+                    (int) $ctx['personel_id'],
+                    (int) $user['id']
+                )
+            );
+        } catch (PersonelSelfProductException $e) {
+            JsonResponse::error($e->getHttpStatus(), $e->getErrorCode(), $e->getMessage(), $e->getField());
+        } catch (\Throwable $e) {
+            JsonResponse::serverError('Bordro listesi yuklenemedi.');
+        }
+    }
+
+    public static function bordroOkudum(Request $request, $calistirmaId)
+    {
+        $user = AuthMiddleware::authenticate($request, true);
+        RolePermissions::assert($user, 'self_service.view');
+        $ctx = SelfPersonelContext::resolveForSelfService($user, self::pdo(), true);
+        try {
+            JsonResponse::success(
+                PersonelBordroOkumaService::acknowledge(
+                    self::pdo(),
+                    (int) $ctx['personel_id'],
+                    (int) $user['id'],
+                    $calistirmaId
+                )
+            );
+        } catch (PersonelSelfProductException $e) {
+            JsonResponse::error($e->getHttpStatus(), $e->getErrorCode(), $e->getMessage(), $e->getField());
+        } catch (\Throwable $e) {
+            JsonResponse::serverError('Bordro okundu isaretlenemedi.');
+        }
+    }
+
+    public static function raporlar(Request $request)
+    {
+        $ctx = self::selfContext($request, 'self_service.view');
+        try {
+            JsonResponse::success(SelfRaporReadService::listForPersonel(self::pdo(), (int) $ctx['personel_id']));
+        } catch (PersonelSelfProductException $e) {
+            JsonResponse::error($e->getHttpStatus(), $e->getErrorCode(), $e->getMessage(), $e->getField());
+        } catch (\Throwable $e) {
+            JsonResponse::serverError('Raporlar yuklenemedi.');
         }
     }
 

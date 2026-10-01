@@ -10,14 +10,17 @@ import {
   createSelfAvansTalebi,
   createSelfGeriBildirim,
   createSelfIzinTalebi,
+  createSelfRaporTalebi,
   fetchSelfAvansTalepleri,
   fetchSelfCorrectionRequests,
   fetchSelfGeriBildirimler,
   fetchSelfIzinler,
+  fetchSelfRaporlar,
   type SelfAvansTalep,
   type SelfCorrectionRequest,
   type SelfGeriBildirim,
-  type SelfIzinKaydi
+  type SelfIzinKaydi,
+  type SelfRaporKaydi
 } from "../../../api/self-product.api";
 import { LoadingState } from "../../../components/states/LoadingState";
 import { formatSurecStateLabel, formatSurecTuruLabel } from "../../../lib/display/enum-display";
@@ -71,6 +74,15 @@ export function PersonelSelfServiceTaleplerPage() {
   const [leaves, setLeaves] = useState<SelfIzinKaydi[]>([]);
   const [advances, setAdvances] = useState<SelfAvansTalep[]>([]);
   const [feedback, setFeedback] = useState<SelfGeriBildirim[]>([]);
+  const [raporlar, setRaporlar] = useState<SelfRaporKaydi[]>([]);
+  const [raporForm, setRaporForm] = useState({
+    baslangic_tarihi: "",
+    bitis_tarihi: "",
+    aciklama: "",
+    dosya_adi: "",
+    dosya_mime: "",
+    dosya_icerik_base64: ""
+  });
   const [leaveForm, setLeaveForm] = useState({
     izin_turu: "YILLIK_IZIN",
     baslangic_tarihi: "",
@@ -93,18 +105,20 @@ export function PersonelSelfServiceTaleplerPage() {
     }
     setLoading(true);
     try {
-      const [attendance, correctionList, izinList, avansList, feedbackList] = await Promise.all([
+      const [attendance, correctionList, izinList, avansList, feedbackList, raporList] = await Promise.all([
         fetchAttendanceToday(),
         fetchSelfCorrectionRequests().catch(() => []),
         fetchSelfIzinler().catch(() => null),
         fetchSelfAvansTalepleri().catch(() => []),
-        fetchSelfGeriBildirimler().catch(() => [])
+        fetchSelfGeriBildirimler().catch(() => []),
+        fetchSelfRaporlar().catch(() => [])
       ]);
       setToday(attendance);
       setCorrections(correctionList);
       setLeaves([...(izinList?.aktif ? [izinList.aktif] : []), ...(izinList?.gecmis ?? [])]);
       setAdvances(avansList);
       setFeedback(feedbackList);
+      setRaporlar(raporList);
       setLoadError(null);
     } catch (cause) {
       setToday(null);
@@ -158,6 +172,42 @@ export function PersonelSelfServiceTaleplerPage() {
       await load();
     } catch (cause) {
       setNotice(isApiRequestError(cause) ? cause.message : "İzin talebi gönderilemedi.");
+    }
+  }
+
+  async function submitRapor(event: FormEvent) {
+    event.preventDefault();
+    try {
+      const body: {
+        baslangic_tarihi: string;
+        bitis_tarihi?: string;
+        aciklama?: string;
+        dosya_adi?: string;
+        dosya_mime?: string;
+        dosya_icerik_base64?: string;
+      } = {
+        baslangic_tarihi: raporForm.baslangic_tarihi,
+        bitis_tarihi: raporForm.bitis_tarihi || raporForm.baslangic_tarihi,
+        aciklama: raporForm.aciklama || undefined
+      };
+      if (raporForm.dosya_icerik_base64) {
+        body.dosya_adi = raporForm.dosya_adi;
+        body.dosya_mime = raporForm.dosya_mime;
+        body.dosya_icerik_base64 = raporForm.dosya_icerik_base64;
+      }
+      await createSelfRaporTalebi(body);
+      setNotice("Sağlık raporu bildiriminiz alındı.");
+      setRaporForm({
+        baslangic_tarihi: "",
+        bitis_tarihi: "",
+        aciklama: "",
+        dosya_adi: "",
+        dosya_mime: "",
+        dosya_icerik_base64: ""
+      });
+      await load();
+    } catch (cause) {
+      setNotice(isApiRequestError(cause) ? cause.message : "Rapor bildirimi gönderilemedi.");
     }
   }
 
@@ -321,6 +371,80 @@ export function PersonelSelfServiceTaleplerPage() {
                     {formatSurecTuruLabel(item.izin_turu)} · {item.baslangic}
                     {item.bitis ? `–${item.bitis}` : ""}
                     {typeof item.gun === "number" ? ` · ${item.gun} gün` : ""} · {statusLabel(item.durum)}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </form>
+        </li>
+        <li>
+          <form className="pm-self-request" data-testid="personel-talep-rapor" onSubmit={(event) => void submitRapor(event)}>
+            <p className="pm-self-request__title">Sağlık Raporu</p>
+            <label>
+              Başlangıç
+              <input
+                type="date"
+                required
+                value={raporForm.baslangic_tarihi}
+                onChange={(event) =>
+                  setRaporForm((current) => ({ ...current, baslangic_tarihi: event.target.value }))
+                }
+              />
+            </label>
+            <label>
+              Bitiş
+              <input
+                type="date"
+                value={raporForm.bitis_tarihi}
+                onChange={(event) => setRaporForm((current) => ({ ...current, bitis_tarihi: event.target.value }))}
+              />
+            </label>
+            <label>
+              Açıklama
+              <textarea
+                value={raporForm.aciklama}
+                onChange={(event) => setRaporForm((current) => ({ ...current, aciklama: event.target.value }))}
+              />
+            </label>
+            <label>
+              Rapor dosyası (isteğe bağlı)
+              <input
+                type="file"
+                accept="application/pdf,image/jpeg,image/png,image/webp"
+                data-testid="personel-talep-rapor-dosya"
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (!file) {
+                    setRaporForm((current) => ({
+                      ...current,
+                      dosya_adi: "",
+                      dosya_mime: "",
+                      dosya_icerik_base64: ""
+                    }));
+                    return;
+                  }
+                  const reader = new FileReader();
+                  reader.onload = () => {
+                    const result = typeof reader.result === "string" ? reader.result : "";
+                    const base64 = result.includes(",") ? result.split(",")[1] ?? "" : result;
+                    setRaporForm((current) => ({
+                      ...current,
+                      dosya_adi: file.name,
+                      dosya_mime: file.type || "application/octet-stream",
+                      dosya_icerik_base64: base64
+                    }));
+                  };
+                  reader.readAsDataURL(file);
+                }}
+              />
+            </label>
+            <button type="submit" className="self-service-action">Rapor bildir</button>
+            {raporlar.length > 0 ? (
+              <ul data-testid="personel-talep-rapor-list">
+                {raporlar.map((item) => (
+                  <li key={item.id}>
+                    {item.baslangic_tarihi}
+                    {item.bitis_tarihi ? `–${item.bitis_tarihi}` : ""} · {statusLabel(item.state)}
                   </li>
                 ))}
               </ul>

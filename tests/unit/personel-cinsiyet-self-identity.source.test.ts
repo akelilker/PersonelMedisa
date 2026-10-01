@@ -13,9 +13,12 @@ describe("personel cinsiyet (095 + /me self identity)", () => {
       .filter((name) => /^\d{3}_.+\.sql$/.test(name))
       .sort();
     expect(migrations).toContain("094_attendance_no_event_day.sql");
-    expect(migrations.at(-1)).toBe("095_personel_cinsiyet.sql");
+    expect(migrations).toContain("095_personel_cinsiyet.sql");
+    expect(migrations.at(-1)).toBe("096_personel_bordro_okumalari.sql");
     const idx094 = migrations.indexOf("094_attendance_no_event_day.sql");
     expect(migrations[idx094 + 1]).toBe("095_personel_cinsiyet.sql");
+    const idx095 = migrations.indexOf("095_personel_cinsiyet.sql");
+    expect(migrations[idx095 + 1]).toBe("096_personel_bordro_okumalari.sql");
 
     const sql = read("api/migrations/095_personel_cinsiyet.sql");
     expect(sql).toContain("information_schema.COLUMNS");

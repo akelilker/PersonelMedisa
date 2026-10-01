@@ -1239,9 +1239,50 @@ class SureclerController
                 $today
             );
             $mapped['gun'] = $summary['gun'];
+            try {
+                \Medisa\Api\Services\SelfService\SelfRequestInboxNotifier::notifyIzinRequest(
+                    $pdo,
+                    $ctx,
+                    $insertId,
+                    $row
+                );
+            } catch (\Throwable $notifyError) {
+                // Inbox is best-effort; surec create remains authoritative.
+            }
             JsonResponse::success($mapped, [], 201);
         } catch (\Throwable $e) {
             JsonResponse::serverError('Izin talebi olusturulamadi.');
+        }
+    }
+
+    /**
+     * PERSONEL self-create of a health RAPOR surec (Raporlu_Hastalik). IS_KAZASI excluded.
+     */
+    public static function createSelfRapor(Request $request)
+    {
+        $user = AuthMiddleware::authenticate($request, true);
+        RolePermissions::assert($user, 'self_service.view');
+
+        try {
+            $pdo = Connection::get();
+        } catch (\Throwable $e) {
+            JsonResponse::serverError('Veritabani baglantisi kurulamadi.');
+        }
+
+        $ctx = SelfPersonelContext::resolveForSelfService($user, $pdo, true);
+        $body = $request->getJsonBody();
+        if (!is_array($body)) {
+            $body = [];
+        }
+        unset($body['personel_id'], $body['surec_turu'], $body['alt_tur'], $body['state']);
+
+        try {
+            $row = \Medisa\Api\Services\SelfService\SelfRaporTalepService::create($pdo, $ctx, $user, $body);
+            JsonResponse::success($row, [], 201);
+        } catch (\Medisa\Api\Services\SelfService\PersonelSelfProductException $e) {
+            JsonResponse::error($e->getHttpStatus(), $e->getErrorCode(), $e->getMessage(), $e->getField());
+        } catch (\Throwable $e) {
+            JsonResponse::serverError('Rapor talebi olusturulamadi.');
         }
     }
 }

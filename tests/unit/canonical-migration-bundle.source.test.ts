@@ -59,7 +59,7 @@ describe("canonical migration bundle", () => {
       expect(firstBytes.equals(readFileSync(second))).toBe(true);
 
       const bundle = firstBytes.toString("utf8");
-      expect((bundle.match(/'version' => '/g) ?? []).length).toBe(96);
+      expect((bundle.match(/'version' => '/g) ?? []).length).toBe(97);
       expect(bundle).toContain("'name' => 'migration_ledger.sql'");
       expect(bundle).toContain(
         "'name' => '067_personel_canonical_reference_gate.sql'",
@@ -138,6 +138,7 @@ describe("canonical migration bundle", () => {
       );
       expect(bundle).toContain("'name' => '094_attendance_no_event_day.sql'");
       expect(bundle).toContain("'name' => '095_personel_cinsiyet.sql'");
+      expect(bundle).toContain("'name' => '096_personel_bordro_okumalari.sql'");
 
       const checksum068 = createHash("sha256")
         .update(readFileSync(migration068))

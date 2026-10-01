@@ -256,6 +256,7 @@ describe("login sonrasi rol ana ekrani", () => {
     expect(qrLink).toHaveAttribute("href", "/self/qr-okut");
     expect(screen.getByTestId("self-qr-history-link")).toHaveAttribute("href", "/self/qr-hareketleri");
     expect(screen.getByTestId("home-self-service-gateway")).toHaveAttribute("href", "/self");
+    expect(screen.getByRole("link", { name: "Kullanıcı Paneli" })).toHaveAttribute("href", "/self");
     expect(screen.queryByTestId("yetkisiz-page")).toBeNull();
     expect(screen.queryByTestId("personel-self-service-page")).toBeNull();
   });

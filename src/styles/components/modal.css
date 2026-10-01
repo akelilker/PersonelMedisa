@@ -250,8 +250,9 @@
 
 /* Personel Detayı: üst ritim Taşıt detay ekranındaki hizada başlar. Body üst
    nefesi kalkar; header ile ilk satır arasındaki mesafeyi back-bar kendi
-   padding-top'u (8px omurga) taşır. Yatay padding değişmez. */
+   padding-top'u taşır. Level 2 back left-inset uses --modal-body-inline-pad=8px. */
 .modal-body:has(> .personel-detay-page) {
+  --modal-body-inline-pad: 8px;
   padding-top: 0;
   gap: 4px;
   display: flex;
@@ -332,9 +333,13 @@
   color: var(--text-inverse);
 }
 
+/* Level 2+ body BackBar: align control to 8px without negative margin. */
+.modal-body:has(> .universal-back-bar) {
+  --modal-body-inline-pad: 8px;
+}
+
 .modal-body > .universal-back-bar {
-  margin-inline: calc(8px - var(--modal-body-inline-pad));
-  padding-inline: 8px;
+  padding-inline: 0;
   box-sizing: border-box;
 }
 

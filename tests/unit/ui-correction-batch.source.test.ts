@@ -20,7 +20,10 @@ describe("ui correction batch — modal back + missing info owners", () => {
   it("canonical modal header inset is 8px and body back-bar aligns to 8px", () => {
     const css = read("src/styles/components/modal.css");
     expect(css).toMatch(/\.modal-header-leading\s*\{[^}]*left:\s*8px/s);
-    expect(css).toMatch(/\.modal-body > \.universal-back-bar[\s\S]*margin-inline:\s*calc\(8px - var\(--modal-body-inline-pad\)\)/s);
+    expect(css).toMatch(
+      /\.modal-body:has\(>\s*\.universal-back-bar\)\s*\{[^}]*--modal-body-inline-pad:\s*8px/s
+    );
+    expect(css).not.toMatch(/margin-inline:\s*calc\(8px - var\(--modal-body-inline-pad\)\)/);
     expect(css).toMatch(/\.modal-close-btn[\s\S]*right:\s*8px/s);
   });
 

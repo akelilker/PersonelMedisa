@@ -1,0 +1,66 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { describe, expect, it } from "vitest";
+
+const ROOT = path.resolve(__dirname, "../..");
+
+function read(rel: string) {
+  return readFileSync(path.join(ROOT, rel), "utf8");
+}
+
+describe("ui correction batch — modal back + missing info owners", () => {
+  it("AppModal renders headerStart and target back label together via modal-header-leading", () => {
+    const modal = read("src/components/modal/AppModal.tsx");
+    expect(modal).toMatch(/modal-header-leading/);
+    expect(modal).toMatch(/headerStart/);
+    expect(modal).toMatch(/ModalBackButton/);
+    expect(modal).not.toMatch(/headerStart \? \([\s\S]*\) : onBack && backLabel/);
+  });
+
+  it("canonical modal header inset is 8px and body back-bar aligns to 8px", () => {
+    const css = read("src/styles/components/modal.css");
+    expect(css).toMatch(/\.modal-header-leading\s*\{[^}]*left:\s*8px/s);
+    expect(css).toMatch(/\.modal-body > \.universal-back-bar[\s\S]*margin-inline:\s*calc\(8px - var\(--modal-body-inline-pad\)\)/s);
+    expect(css).toMatch(/\.modal-close-btn[\s\S]*right:\s*8px/s);
+  });
+
+  it("Bugünkü Personel Durumu uses parent screen labels instead of Geri", () => {
+    const bugun = read("src/features/bildirimler/components/BugunPersonelDurumuModal.tsx");
+    expect(bugun).toMatch(/resolveBugunBackLabel/);
+    expect(bugun).not.toMatch(/backLabel=\{nav\.kind === "branches" \? undefined : "Geri"\}/);
+    expect(bugun).not.toMatch(/goHome\(\);\s*onClose\(\)/);
+  });
+
+  it("missing-info gateway opens kayit overlay on current kart path and auto-edits", () => {
+    const hook = read("src/features/kayit/hooks/useKayitModalController.ts");
+    expect(hook).toMatch(/kayitIntent/);
+
+    const gateway = read("src/features/personeller/hooks/usePersonelKartGatewayReturn.ts");
+    expect(gateway).toMatch(/overlayPath/);
+    expect(gateway).not.toMatch(/navigate\("\/",\s*\{[\s\S]*personel-missing-info-gateway/s);
+
+    const workspace = read("src/features/kayit/components/KayitSurecWorkspace.tsx");
+    expect(workspace).toMatch(/personel-missing-info-gateway/);
+    expect(workspace).toMatch(/openEditOnMount/);
+
+    const panel = read("src/features/kayit/components/KayitSurecPersonelGenelPanel.tsx");
+    expect(panel).toMatch(/openEditOnMount/);
+  });
+
+  it("missing-info gateway copy names the first missing field; salary is not in completeness rules", () => {
+    const gatewayUi = read("src/features/personeller/components/personel-dosya/PersonelDosyaMissingInfoGateway.tsx");
+    expect(gatewayUi).toMatch(/primaryField\.label/);
+
+    const policy = read("src/features/personeller/personel-missing-info.ts");
+    expect(policy).not.toMatch(/maas_tutari/);
+    expect(policy).not.toMatch(/"Maaş"/);
+  });
+
+  it("tightens eksik bilgi banner vertical rhythm in tab scroll owner", () => {
+    const missingCss = read("src/styles/modules/personel-missing-info.css");
+    expect(missingCss).toMatch(/\.personel-dosya-missing-gateway-wrap\s*\{[^}]*margin:\s*0/s);
+
+    const personellerCss = read("src/styles/modules/personeller.css");
+    expect(personellerCss).toMatch(/\.personel-dosya-tab-scroll\s*\{[^}]*gap:\s*var\(--space-2\)/s);
+  });
+});

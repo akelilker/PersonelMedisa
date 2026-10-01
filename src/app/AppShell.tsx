@@ -280,6 +280,7 @@ export function AppShell() {
     kayitInitialSurecPersonelId,
     kayitInitialPersonelTab,
     kayitInitialOperation,
+    kayitIntent,
     kayitPrimaryLabel,
     kayitPrimaryFormId,
     openKayitModal,
@@ -471,6 +472,7 @@ export function AppShell() {
             initialSurecPersonelId={kayitInitialSurecPersonelId}
             initialPersonelTab={kayitInitialPersonelTab}
             initialOperation={kayitInitialOperation}
+            initialKayitIntent={kayitIntent}
             primaryActionLabel={kayitPrimaryLabel}
             primaryFormId={kayitPrimaryFormId}
             onFooterModelChange={handleKayitFooterModelChange}

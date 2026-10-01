@@ -22,6 +22,7 @@ type KayitSurecPersonelGenelPanelProps = {
   personelRefs: PersonelReferenceBundle;
   onBusyChange?: (busy: boolean) => void;
   onPersonelUpdated: (updated: Personel) => void;
+  openEditOnMount?: boolean;
 };
 
 export function KayitSurecPersonelGenelPanel({
@@ -30,7 +31,8 @@ export function KayitSurecPersonelGenelPanel({
   canViewUcret,
   personelRefs,
   onBusyChange,
-  onPersonelUpdated
+  onPersonelUpdated,
+  openEditOnMount = false
 }: KayitSurecPersonelGenelPanelProps) {
   const isPasif = personel.aktif_durum === "PASIF";
   const canEdit = canUpdatePersonel && !isPasif;
@@ -58,6 +60,15 @@ export function KayitSurecPersonelGenelPanel({
     setEditErrorMessage(null);
     setEditInfoMessage(null);
   }, [personel]);
+
+  useEffect(() => {
+    if (!openEditOnMount || !canEdit) {
+      return;
+    }
+    setEditErrorMessage(null);
+    setEditInfoMessage(null);
+    setIsEditing(true);
+  }, [openEditOnMount, canEdit, personel.id]);
 
   useEffect(() => {
     publishBusy(isSubmitting);

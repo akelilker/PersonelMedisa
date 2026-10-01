@@ -1915,7 +1915,7 @@ body.modal-open .modal-container--self-product .modal-header {
   z-index: calc(var(--z-footer) + 1);
   right: max(12px, calc((100vw - min(100vw, var(--app-shell-max-width))) / 2 + 12px));
   bottom: calc(
-    var(--app-footer-real-height) + var(--app-footer-gap) + env(safe-area-inset-bottom, 0px)
+    var(--app-footer-real-height) + var(--app-footer-gap) + env(safe-area-inset-bottom, 0px) - 12px
   );
   display: inline-flex;
   align-items: center;
@@ -1932,6 +1932,13 @@ body.modal-open .modal-container--self-product .modal-header {
   letter-spacing: 0.01em;
   text-decoration: none;
   white-space: nowrap;
+  opacity: 1;
+  /* Taşıt .user-panel-link: transition: color 0.2s, opacity 0.2s */
+  transition: color 0.2s, opacity 0.2s;
+}
+
+.home-self-service-gateway--dimmed {
+  opacity: 0.7;
 }
 
 .home-self-service-gateway__chevron {
@@ -1940,8 +1947,10 @@ body.modal-open .modal-container--self-product .modal-header {
 }
 
 .home-self-service-gateway:hover,
+.home-self-service-gateway:focus,
 .home-self-service-gateway:focus-visible {
   color: var(--brand-red-hover, #f01a1a);
+  opacity: 1;
   text-decoration: underline;
   outline: none;
 }
@@ -1955,6 +1964,6 @@ body.modal-open .modal-container--self-product .modal-header {
   .home-self-service-gateway {
     position: absolute;
     right: 12px;
-    bottom: calc(var(--app-footer-real-height) + var(--app-footer-gap) + 4px);
+    bottom: calc(var(--app-footer-real-height) + var(--app-footer-gap) + 4px - 12px);
   }
 }

@@ -1,9 +1,9 @@
 # 146 — Post-PR402 Canonical Backlog
 
-**Tür:** Aktif backlog otoritesi (POST_PR402 consolidation; **POST_PR441** pin refresh).
-**Baseline:** `origin/main` `0ef844475a3523b3e54215994a053cd27534c575` (PR **#441**); deploy cPanel run `36543499484` SUCCESS (deploy pin only).
-**Migration tip:** code **093** / production **093** (pending **0**); migration 093 APPLIED after PR #439 deploy via Apply cPanel migrations run **`36491356202`**; readback `ACTIONS_APPLY_36491356202`.
-**Yasaklar bu belgede:** app code · migration apply · production mutation · remote branch delete · #395–#441 reopen.
+**Tür:** Aktif backlog otoritesi (POST_PR402 consolidation; **POST_PR470** pin refresh).
+**Baseline:** `origin/main` `b01216d5e94a3269dc57eca0f316703aaf26d54c` (PR **#470**); Deploy cPanel **#1201** run `36913900426` SUCCESS.
+**Migration tip:** code **095** / production **095** (pending **0**); migration **095** (`095_personel_cinsiyet.sql`) **APPLIED**; migration **094** (`094_attendance_no_event_day.sql`) **APPLIED** (production'da geçmiş, sonrasında 095).
+**Yasaklar bu belgede:** app code · migration apply · production mutation · remote branch delete · #395–#470 reopen.
 
 **Süperseeded active sources:** `CURRENT_STATE.md` (tips/SHA pin only; residual detail → burada), `docs/guncel/110-master-closure-gap-registry.md` (**SUPERSEDED** for active backlog).
 
@@ -21,14 +21,19 @@ Sınıflar: **A** CLOSED_ALREADY_LIVE · **B** SAFE_HOUSEKEEPING · **C** TECHNI
 | `BL-PR-440` | Çalışma Geçmişi aylık onaylı toplam saat / gün bazlı puantaj+QR toplamı | PR #440 MERGED |
 | `BL-PR-441` | `MEDISA_ATTENDANCE_ANOMALY_THRESHOLD_MINUTES` override (tests); prod default **180**; prod cron **no** env | PR #441 MERGED; deploy `36543499484` @ `0ef84447` |
 | `BL-PR-446` | Attendance anomaly cron docblock parse | PR #446 MERGED `c6fe3144588ba253aa1d471d66245da317c92d1b` |
+| `BL-PR-470` | UI correction batch (Level 2+ back nav · Personel Kartı missing-info gateway · duplicate CTA cleanup · Görev/Organizasyon Vazgeç fix · /self title/photo/reverse gateway polish) | PR #470 MERGED `b01216d5e94a3269dc57eca0f316703aaf26d54c`; Deploy cPanel #1201 run `36913900426` SUCCESS |
 | `BL-SELF-HISTORY-APPROVAL-SCOPE` | Self-service aylık onay scope | **CLOSED** — PR #444 MERGED (`990d4d7e`). `aylik_onayli_mi` personel birim amiri scope. |
 | `BL-ATTENDANCE-CRON-OBSERVE` | Cron runtime tick | **CLOSED** — PR #446 + production tick `ATTENDANCE_ANOMALY_SCAN personel=1 created=0` EXIT=0 |
 | `BL-PR-326` | SGK bildirim dönemi owner → `SGK_ISVEREN` | PR #326 MERGED `8e137f2c` (2026-09-22) |
 | `BL-MIG-090` | Factual employer-period owner table | Apply run `35781766535` SUCCESS |
 | `BL-MIG-091` | Guarded legacy consensus reconcile | Apply run `35791415567` SUCCESS |
 | `BL-MIG-093` | Attendance anomaly notification dedupe (race-safe) | Apply `36491356202`; target `093_attendance_anomaly_notification_dedupe.sql`; worker SUCCEEDED; backup readback VERIFIED |
+| `BL-MIG-094` | NO_EVENT_DAY day-key identity schema | Migration **094** (`094_attendance_no_event_day.sql`) **APPLIED** — production'da geçmiş, sonrasında 095 |
+| `BL-MIG-095` | Personel cinsiyet | Migration **095** (`095_personel_cinsiyet.sql`) **APPLIED / SUCCESS** |
 | `BL-QR-CORE` | QR S3C–S3F + collar entitlement + pilot checklist | Docs 105–109 CLOSED; `docs/ops/QR_ATTENDANCE_PILOT_READINESS_CHECKLIST.md` |
 | `BL-QR-ANOMALY` | Hatalı/eksik/çift giriş-çıkış — **core shipped** | #439: live warning + correction request + cron scan + 093 dedupe; personel self-revision yok (amir düzeltir). **Residual gaps → C/D/E** |
+| `BL-NO-EVENT-DAY` | Sıfır QR / expected-worker gün anomaly | **CLOSED / LIVE** — migration **094** APPLIED (production'da geçmiş, sonrasında 095); day-key chain live |
+| `BL-QR-PILOT-OPS` | QR pilot checklist — fiziksel saha ticks | **PASS / CLOSED** — saha GİRİŞ/ÇIKIŞ/history FIELD_PASS; `PILOT_GATE_CLOSED`; phase CLOSED |
 | `BL-TERM-CANON` | User-facing Dahili/Harici + Statü + Mavi/Beyaz Yaka | Enum display + create/yonetim labels; source locks on main |
 | `BL-A1-12-13` | Branch-specific SGK period 12/13 | **SUPERSEDED_BY_SGK_EMPLOYER_PERIOD_OWNER_CORRECTION** |
 | `BL-LOC5-SET` | Fabrika/Karabük loc5 + 160/211 | APPLIED (historical CURRENT_STATE evidence) |
@@ -55,8 +60,7 @@ Sınıflar: **A** CLOSED_ALREADY_LIVE · **B** SAFE_HOUSEKEEPING · **C** TECHNI
 
 | ID | Konu | Not |
 | --- | --- | --- |
-| `BL-SOURCE-LOCK-DRIFT` | Pin testleri eski deploy/tip iddiaları | POST_PR441 + review turunda CURRENT_STATE + 110 + source-lock test hizalandı |
-| `BL-NO-EVENT-DAY` | Sıfır QR / expected-worker gün anomaly | **CODE_READY / pending PR + deploy + migration 094 apply.** Local implementation on `feat/attendance-no-event-day`. Schema 093'te NO_EVENT_DAY fail-closed (event anomaly/+180/notification/correction sürer); 094 apply sonrası aynı kod day-key zincirini açar. Sentetik QR yok. Production'da yok — CLOSED/LIVE değil. |
+| `BL-SOURCE-LOCK-DRIFT` | Pin testleri eski deploy/tip iddiaları | POST_PR470 refresh — CURRENT_STATE + 110 + source-lock test hizalandı |
 
 ---
 
@@ -85,7 +89,6 @@ E sınıfı: read-only verify · business truth · production write (write ayrı
 
 | ID | Konu | Not |
 | --- | --- | --- |
-| `BL-QR-PILOT-OPS` | QR pilot checklist — **sole owner** fiziksel saha ticks | Remote PASS (#405 CTA, HTTPS, kiosk mint). **Kalan (tek ID):** fiziksel iPhone kamera permission · gerçek kiosk QR **GİRİŞ** · gerçek kiosk QR **ÇIKIŞ** · anomaly correction smoke — `QR_ATTENDANCE_PILOT_READINESS_CHECKLIST.md` |
 | `BL-CROSS-COMPANY` | 120 / 158 / 219 | Valid defer — **UNTOUCHED** |
 
 ---
@@ -98,6 +101,8 @@ E sınıfı: read-only verify · business truth · production write (write ayrı
 | `BL-STALE-093-PENDING` | Production tip 092 / pending 1 | POST_PR441: prod **093**, pending **0** |
 | `BL-STALE-PR326-OPEN` | PR_326 OPEN | MERGED 2026-09-22 |
 | `BL-STALE-DEPLOY-5c6ae773` | DEPLOY pin #402 as current | Superseded by `0ef84447` / #441 deploy `36543499484` |
+| `BL-STALE-094-PENDING` | “migration 094 apply pending” | 094 APPLIED (production'da geçmiş, sonrasında 095) |
+| `BL-STALE-QR-PILOT-PENDING` | “fiziksel pilot tick bekleniyor” | PILOT_GATE_CLOSED — saha FIELD_PASS; phase CLOSED |
 | `BL-STALE-ANOMALY-NOT-CODED` | “Anomaly UX bu turda kodlanmaz” (D only) | #439 shipped — policy residual in C/D/E |
 | `BL-STALE-PERSONEL-HOME-CARDS-NOT-STARTED` | Next gate “NOT_STARTED” ek kartlar | **SUPERSEDED** → `BL-PERSONEL-HOME-INFO-CARDS` CLOSED |
 | `BL-STALE-110-AS-ACTIVE` | 110 “tek referans” | Active owner = bu belge (146) |
@@ -115,19 +120,20 @@ Open product: _(none in D — `BL-POST-THRESHOLD-REENTRY` CLOSED)_.
 
 ## Technical gap registry (özet)
 
-C: `BL-NO-EVENT-DAY` (CODE_READY; migration **094** SQL düzeltildi — `DATE_FORMAT` generated column uyumsuzluğu; production tip **093**, 094 NOT APPLIED; re-apply ayrı onay).
+C: _(none open)_ — `BL-NO-EVENT-DAY` **CLOSED / LIVE** (migration **094** APPLIED; production'da geçmiş, sonrasında 095).
 
 ---
 
 ## Operational approval registry (özet)
 
-E (open only): `BL-QR-PILOT-OPS` · `BL-CROSS-COMPANY` (defer).
+E (open only): `BL-CROSS-COMPANY` (defer). `BL-QR-PILOT-OPS` **PASS / CLOSED** (PILOT_GATE_CLOSED).
 
 ---
 
 ## Next gate
 
-1. `BL-QR-PILOT-OPS` — fiziksel iPhone permission + kiosk QR GİRİŞ/ÇIKIŞ + anomaly correction smoke.
-2. `BL-NO-EVENT-DAY` — PR, deploy, migration 094 apply (local CODE_READY; production'da yok).
-3. `BL-POST-THRESHOLD-REENTRY` — **CLOSED** (code track; merge/deploy ayrı onay).
-4. Karyapı/Şenay + 120/158/219 rollout **DEFERRED**.
+Attendance / QR phase **CLOSED** — no open gate (QR attendance + saha rollout + puantaj doğrulaması + personel go-live tamam).
+- `BL-NO-EVENT-DAY` **CLOSED / LIVE** (migration 094 APPLIED).
+- `BL-QR-PILOT-OPS` **PASS / CLOSED** (PILOT_GATE_CLOSED).
+- `BL-POST-THRESHOLD-REENTRY` **CLOSED** (code).
+- Karyapı/Şenay + 120/158/219 rollout **DEFERRED**.

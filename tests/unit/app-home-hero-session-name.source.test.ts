@@ -59,27 +59,30 @@ describe("app-home hero session name under logo", () => {
     );
   });
 
-  it("centers the PERSONEL title stack with WebKit ink sizing and accent line geometry", () => {
+  it("centers the PERSONEL title stack accounting for logo footprint and ~2px title-line gap", () => {
     const hero = read("src/styles/components/hero.css");
     const block = appHomeHeroBlock(hero);
 
     expect(block).toMatch(
+      /body\.app-home-route \.hero\.hero-with-session\s*\{[^}]*--hero-home-logo-title-gap:\s*3px/s
+    );
+    expect(block).toMatch(
       /body\.app-home-route \.hero\.hero-with-session \.hero-title-stack\s*\{[^}]*grid-column:\s*2/s
     );
     expect(block).toMatch(
-      /body\.app-home-route \.hero\.hero-with-session \.hero-title-stack\s*\{[^}]*gap:\s*4px/s
+      /body\.app-home-route \.hero\.hero-with-session \.hero-title-stack\s*\{[^}]*gap:\s*var\(--hero-home-logo-title-gap\)/s
     );
     expect(block).toMatch(
-      /body\.app-home-route \.hero\.hero-with-session \.hero-title-stack > h1\s*\{[^}]*min-width:\s*min-content/s
+      /body\.app-home-route \.hero\.hero-with-session \.hero-logo picture\s*\{[^}]*margin-right:\s*var\(--hero-home-logo-title-gap\)/s
     );
     expect(block).toMatch(
-      /body\.app-home-route \.hero\.hero-with-session \.hero-title-stack > h1\s*\{[^}]*width:\s*max-content/s
+      /body\.app-home-route \.hero\.hero-with-session \.hero-title-stack\s*\{[^}]*padding-right:\s*calc\(\s*min\(clamp\(72px,\s*36vw,\s*132px\),\s*calc\(100vw - 152px\)\) - var\(--hero-home-right-track\)\s*\)/s
     );
     expect(block).toMatch(
-      /body\.app-home-route \.hero\.hero-with-session \.hero-title-stack > h1\s*\{[^}]*text-align:\s*left/s
+      /body\.app-home-route \.hero\.hero-with-session \.hero-title-stack > h1\s*\{[^}]*text-align:\s*center/s
     );
     expect(block).toMatch(
-      /body\.app-home-route \.hero\.hero-with-session \.hero-title-stack \.animated-line\s*\{[^}]*margin-left:\s*calc\(var\(--hero-home-title-ink-w\) \* 0\.09\)/s
+      /body\.app-home-route \.hero\.hero-with-session \.hero-title-stack \.animated-line\s*\{[^}]*justify-self:\s*center/s
     );
   });
 

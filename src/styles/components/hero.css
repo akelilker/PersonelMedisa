@@ -273,6 +273,10 @@ body.login-page .hero .animated-line {
 }
 
 @media (min-width: 641px) {
+  body.app-home-route .hero.hero-with-session {
+    column-gap: 2px;
+  }
+
   .hero,
   body.login-page .hero {
     --hero-logo-width: 69px;
@@ -573,8 +577,12 @@ body.login-page .hero .animated-line {
     margin-right: auto;
     padding: 13px 12px 11px 6px;
     box-sizing: border-box;
-    /* Inter 800 ink width (WebKit-calibrated) for accent line centering under left-aligned title. */
+    --hero-home-logo-footprint: calc(54px + 2px);
+    --hero-home-right-track: 1px;
+    /* WebKit rounds subpixel layout; 3px token yields ~2px ink-to-ink in 390/430 DOM. */
+    --hero-home-logo-title-gap: 3px;
     --hero-home-title-ink-w: 338px;
+    column-gap: var(--hero-home-logo-title-gap);
     border-color: rgba(140, 158, 176, 0.6);
     box-shadow:
       0 4px 16px rgba(0, 0, 0, 0.4),
@@ -594,7 +602,7 @@ body.login-page .hero .animated-line {
     width: auto;
     min-width: 54px;
     max-width: clamp(70px, 19.2vw, 112px);
-    margin-right: 6px;
+    margin-right: 0;
     margin-left: 0;
     padding-left: 2px;
     gap: 4px;
@@ -607,6 +615,7 @@ body.login-page .hero .animated-line {
   body.app-home-route .hero.hero-with-session .hero-logo picture {
     width: 54px;
     max-width: 54px;
+    margin-right: var(--hero-home-logo-title-gap);
     transform: translate(1px, 1px);
   }
 
@@ -653,24 +662,26 @@ body.login-page .hero .animated-line {
   body.app-home-route .hero.hero-with-session .hero-title-stack {
     grid-column: 2;
     grid-row: 1;
-    gap: 4px;
+    gap: var(--hero-home-logo-title-gap);
     align-self: center;
+    align-items: center;
     justify-self: stretch;
     min-width: 0;
     width: 100%;
     box-sizing: border-box;
+    padding-right: calc(
+      min(clamp(72px, 36vw, 132px), calc(100vw - 152px)) - var(--hero-home-right-track)
+    );
   }
 
   body.app-home-route .hero.hero-with-session .hero-title-stack > h1 {
-    min-width: min-content;
-    width: max-content;
+    min-width: 0;
+    width: 100%;
     max-width: 100%;
-    justify-self: start;
+    justify-self: center;
     box-sizing: border-box;
-    /* Left-align ink after logo column + 6px margin; sizes from Inter 800 metrics (heroRight = vw−6). */
-    text-align: left;
-    background-position: 0% 50%;
-    /* WebKit-calibrated caps (inkLeft≈75, target inkRight=max−3); min(..., calc) stays on or below cap per vw. */
+    text-align: center;
+    background-position: 50% 50%;
     font-size: min(21.4px, calc(4.977vw - 0.12px));
     letter-spacing: clamp(0px, 0.03vw, 0.3px);
     line-height: 1.2;
@@ -678,7 +689,7 @@ body.login-page .hero .animated-line {
     overflow: hidden;
     text-overflow: clip;
     white-space: nowrap;
-    padding: 0 3px 0 0;
+    padding: 0 3px;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
     text-shadow: none;
@@ -698,10 +709,11 @@ body.login-page .hero .animated-line {
     top: auto;
     bottom: auto;
     transform: none;
-    justify-self: start;
+    justify-self: center;
     align-self: start;
-    width: calc(var(--hero-home-title-ink-w) * 0.82);
-    margin-left: calc(var(--hero-home-title-ink-w) * 0.09);
+    width: 74%;
+    max-width: calc(100% - var(--hero-home-logo-footprint) - 12px);
+    margin-left: 0;
     height: 2.7px;
     opacity: 0.72;
     background: linear-gradient(

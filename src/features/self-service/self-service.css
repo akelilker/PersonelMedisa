@@ -1892,3 +1892,63 @@ body.modal-open .modal-container--self-product .modal-header {
     gap: 4px;
   }
 }
+
+/*
+ * Manager ana ekran: QR bağımsız /self geçidi (Taşıt uygulama geçişi ritmi).
+ * Sabit footer üstünde, sağ alt; watermark ile çakışmaz.
+ */
+.home-self-service-gateway {
+  position: fixed;
+  z-index: calc(var(--z-footer) + 1);
+  right: max(12px, calc((100vw - min(100vw, var(--app-shell-max-width))) / 2 + 12px));
+  bottom: calc(
+    var(--app-footer-real-height) + var(--app-footer-gap) + env(safe-area-inset-bottom, 0px)
+  );
+  color: rgba(232, 240, 248, 0.92);
+  text-decoration: none;
+  border: 1px solid rgba(140, 158, 176, 0.55);
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(42, 52, 68, 0.96), rgba(28, 36, 50, 0.98));
+  box-shadow:
+    0 4px 14px rgba(0, 0, 0, 0.35),
+    0 0 0 1px rgba(var(--theme-color-rgb), 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  min-width: 44px;
+  min-height: 44px;
+  padding: 10px;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, color 0.2s ease;
+}
+
+.home-self-service-gateway svg {
+  width: 22px;
+  height: 22px;
+  display: block;
+}
+
+.home-self-service-gateway:hover,
+.home-self-service-gateway:focus-visible {
+  border-color: rgba(var(--theme-color-rgb), 0.72);
+  color: var(--text-inverse);
+  outline: none;
+  box-shadow:
+    0 6px 16px rgba(0, 0, 0, 0.38),
+    0 0 0 1px rgba(var(--theme-color-rgb), 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.16);
+}
+
+.home-self-service-gateway:focus-visible {
+  outline: 2px solid rgba(var(--theme-color-rgb), 0.85);
+  outline-offset: 2px;
+}
+
+@media (min-width: 641px) {
+  .home-self-service-gateway {
+    position: absolute;
+    right: 12px;
+    bottom: calc(var(--app-footer-real-height) + var(--app-footer-gap) + 4px);
+  }
+}

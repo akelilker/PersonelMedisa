@@ -301,18 +301,31 @@
   }
 }
 
+.settings-dropdown.sube-selector-dropdown {
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.settings-dropdown.sube-selector-dropdown::-webkit-scrollbar {
+  display: none;
+}
+
 .settings-dropdown.sube-selector-dropdown button {
-  min-height: 0;
-  padding: 8px 12px;
-  font-size: 13px;
-  line-height: 1.25;
-  text-align: left;
+  min-height: 44px;
+  padding: 9px 12px;
+  font-size: 13.5px;
+  line-height: 1.35;
+  text-align: center;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 @media (max-width: 640px) {
   .settings-dropdown.sube-selector-dropdown button {
-    padding: 7px 10px;
-    font-size: 12.5px;
+    min-height: 44px;
+    padding: 9px 10px;
+    font-size: 13px;
+    line-height: 1.35;
   }
 }
 

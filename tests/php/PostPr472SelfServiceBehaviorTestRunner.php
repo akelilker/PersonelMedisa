@@ -12,6 +12,7 @@ use Medisa\Api\Http\Request;
 use Medisa\Api\Http\ResponseCaptured;
 use Medisa\Api\Services\PersonelBelge\PersonelBelgeLinkedRaporAttachmentService;
 use Medisa\Api\Services\PersonelBelge\PersonelBelgeStorageService;
+use Medisa\Api\Services\Retention\PersonelArchiveGate;
 use Medisa\Api\Services\SelfService\PersonelBordroOkumaService;
 use Medisa\Api\Services\SelfService\PersonelInboxNotificationService;
 use Medisa\Api\Services\SelfService\PersonelSelfProductException;
@@ -284,6 +285,26 @@ $surecId = (int) ($ok['body']['data']['id'] ?? 0);
 pr472Assert($surecId > 0, 'RAPOR surec id');
 $isKazasi = (int) $raporPdo->query("SELECT COUNT(*) FROM surecler WHERE surec_turu = 'IS_KAZASI'")->fetchColumn();
 pr472Assert($isKazasi === 0, 'IS_KAZASI not created');
+$spoofIsKazasi = pr472CaptureRaporCreate($raporPdo, $personelUser, [
+    'baslangic_tarihi' => '2026-09-14',
+    'bitis_tarihi' => '2026-09-14',
+    'surec_turu' => 'IS_KAZASI',
+    'alt_tur' => 'IS_KAZASI_BILDIRIMI',
+]);
+pr472Assert($spoofIsKazasi['status'] === 201, 'spoof IS_KAZASI body still creates health RAPOR');
+pr472Assert(($spoofIsKazasi['body']['data']['surec_turu'] ?? '') === 'RAPOR', 'spoof body cannot force IS_KAZASI');
+pr472Assert(($spoofIsKazasi['body']['data']['alt_tur'] ?? '') === 'Raporlu_Hastalik', 'spoof body cannot force non-health alt_tur');
+
+JsonResponse::beginCapture();
+try {
+    PersonelArchiveGate::assertBusinessWriteAllowed($raporPdo, 6);
+} catch (ResponseCaptured $e) {
+    // expected
+} finally {
+    $archived = JsonResponse::capturedResponse();
+    JsonResponse::endCapture();
+}
+pr472Assert(($archived['errors'][0]['code'] ?? '') === 'ARCHIVED_PERSONEL_READ_ONLY', 'archive guard ARCHIVED_PERSONEL_READ_ONLY');
 $belgeSurecId = (int) ($ok['body']['data']['belge_surec_id'] ?? 0);
 pr472Assert($belgeSurecId > 0, 'belge surec linked');
 $versionCount = (int) $raporPdo->query('SELECT COUNT(*) FROM personel_belge_dosya_surumleri WHERE surec_id = ' . $belgeSurecId)->fetchColumn();
@@ -359,6 +380,8 @@ $beforeOrphan = pr472CaptureRaporCreate($orphanPdo, $personelUser, array_merge([
     'bitis_tarihi' => '2026-11-02',
 ], pr472PdfBody('orphan')));
 pr472Assert($beforeOrphan['status'] !== 201, 'audit failure blocks create');
+$orphanSurecCount = (int) $orphanPdo->query('SELECT COUNT(*) FROM surecler')->fetchColumn();
+pr472Assert($orphanSurecCount === 0, 'audit failure rolls back RAPOR surec');
 $diskFiles = array_values(array_filter(scandir($orphanRoot) ?: [], static fn ($f) => $f !== '.' && $f !== '..'));
 pr472Assert($diskFiles === [], 'orphan storage file cleaned after rollback');
 
@@ -372,6 +395,18 @@ SelfRequestInboxNotifier::notifyRaporRequest($dedupePdo, $ctx, $row);
 SelfRequestInboxNotifier::notifyRaporRequest($dedupePdo, $ctx, $row);
 $inboxCount = (int) $dedupePdo->query("SELECT COUNT(*) FROM personel_inbox_notifications WHERE kind = 'SELF_RAPOR_REQUEST'")->fetchColumn();
 pr472Assert($inboxCount === 1, 'SELF_RAPOR_REQUEST dedupe single inbox row');
+
+$izinRow = ['baslangic_tarihi' => '2026-12-03', 'bitis_tarihi' => '2026-12-04'];
+SelfRequestInboxNotifier::notifyIzinRequest($dedupePdo, $ctx, 901, $izinRow);
+SelfRequestInboxNotifier::notifyIzinRequest($dedupePdo, $ctx, 901, $izinRow);
+$izinInbox = (int) $dedupePdo->query("SELECT COUNT(*) FROM personel_inbox_notifications WHERE kind = 'SELF_IZIN_REQUEST'")->fetchColumn();
+pr472Assert($izinInbox === 1, 'SELF_IZIN_REQUEST dedupe single inbox row');
+
+$avansRow = ['id' => 902, 'talep_tarihi' => '2026-12-05', 'tutar' => '1000'];
+SelfRequestInboxNotifier::notifyAvansRequest($dedupePdo, $ctx, $avansRow);
+SelfRequestInboxNotifier::notifyAvansRequest($dedupePdo, $ctx, $avansRow);
+$avansInbox = (int) $dedupePdo->query("SELECT COUNT(*) FROM personel_inbox_notifications WHERE kind = 'SELF_AVANS_REQUEST'")->fetchColumn();
+pr472Assert($avansInbox === 1, 'SELF_AVANS_REQUEST dedupe single inbox row');
 
 @array_map(static fn ($f) => @unlink($storageRoot . DIRECTORY_SEPARATOR . $f), glob($storageRoot . '/*') ?: []);
 @rmdir($storageRoot);

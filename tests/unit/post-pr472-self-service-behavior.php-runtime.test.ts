@@ -13,6 +13,9 @@ describe("post-PR472 self-service behavior (PHP)", () => {
     expect(result.stdout).toContain("RAPOR create success 201");
     expect(result.stdout).toContain("orphan storage file cleaned after rollback");
     expect(result.stdout).toContain("SELF_RAPOR_REQUEST dedupe single inbox row");
+    expect(result.stdout).toContain("SELF_IZIN_REQUEST dedupe single inbox row");
+    expect(result.stdout).toContain("SELF_AVANS_REQUEST dedupe single inbox row");
+    expect(result.stdout).toContain("archive guard ARCHIVED_PERSONEL_READ_ONLY");
     expect(result.stdout).toContain("notifier exception still 201");
   });
 });

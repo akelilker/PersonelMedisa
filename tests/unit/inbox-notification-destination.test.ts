@@ -27,6 +27,16 @@ describe("resolveInboxNotificationDestination", () => {
     expect(path).toBe("/self?inboxCorrection=42");
   });
 
+  it("routes rapor requests to surec detail", () => {
+    const path = resolveInboxNotificationDestination(
+      inbox({
+        kind: "SELF_RAPOR_REQUEST",
+        payload: { entity_type: "RAPOR", surec_id: 12, personel_id: 3 }
+      })
+    );
+    expect(path).toBe("/surecler/12");
+  });
+
   it("routes izin requests to surec detail", () => {
     const path = resolveInboxNotificationDestination(
       inbox({

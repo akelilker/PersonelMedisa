@@ -35,6 +35,107 @@ class PersonelInboxNotificationService
     }
 
     /**
+     * Idempotent manager inbox for self-service request notifications (retry-safe).
+     *
+     * @param array<string, mixed> $payload
+     */
+    public static function createSelfServiceRequest(
+        PDO $pdo,
+        $recipientUserId,
+        $kind,
+        $title,
+        $body,
+        $personelId,
+        array $payload,
+        $popupRequired = true
+    ) {
+        $recipientUserId = (int) $recipientUserId;
+        $kind = (string) $kind;
+        $entityId = self::resolveSelfRequestEntityId($kind, $payload);
+        if ($recipientUserId > 0 && $entityId !== null && $entityId > 0) {
+            $existingId = self::findSelfServiceRequestNotificationId($pdo, $recipientUserId, $kind, $entityId);
+            if ($existingId !== null) {
+                return $existingId;
+            }
+        }
+
+        return self::create(
+            $pdo,
+            $recipientUserId,
+            $kind,
+            $title,
+            $body,
+            $personelId,
+            null,
+            $payload,
+            $popupRequired
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     */
+    private static function resolveSelfRequestEntityId($kind, array $payload)
+    {
+        $kind = (string) $kind;
+        if ($kind === 'SELF_AVANS_REQUEST') {
+            $id = (int) ($payload['entity_id'] ?? 0);
+
+            return $id > 0 ? $id : null;
+        }
+        if ($kind === 'SELF_IZIN_REQUEST' || $kind === 'SELF_RAPOR_REQUEST') {
+            $id = (int) ($payload['surec_id'] ?? $payload['entity_id'] ?? 0);
+
+            return $id > 0 ? $id : null;
+        }
+
+        return null;
+    }
+
+    private static function findSelfServiceRequestNotificationId(PDO $pdo, $recipientUserId, $kind, $entityId)
+    {
+        self::assertSchemaReady($pdo);
+        $recipientUserId = (int) $recipientUserId;
+        $entityId = (int) $entityId;
+        $kind = (string) $kind;
+        $jsonPath = $kind === 'SELF_AVANS_REQUEST' ? '$.entity_id' : '$.surec_id';
+        $driver = (string) $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+        if ($driver === 'sqlite') {
+            $stmt = $pdo->prepare(
+                "SELECT id FROM personel_inbox_notifications
+                 WHERE recipient_user_id = :rid AND kind = :kind AND status = 'ACTIVE'
+                   AND CAST(json_extract(payload_json, :path) AS INTEGER) = :eid
+                 LIMIT 1"
+            );
+            $stmt->execute([
+                'rid' => $recipientUserId,
+                'kind' => $kind,
+                'path' => $jsonPath,
+                'eid' => $entityId,
+            ]);
+        } else {
+            $stmt = $pdo->prepare(
+                "SELECT id FROM personel_inbox_notifications
+                 WHERE recipient_user_id = :rid AND kind = :kind AND status = 'ACTIVE'
+                   AND CAST(JSON_UNQUOTE(JSON_EXTRACT(payload_json, :path)) AS UNSIGNED) = :eid
+                 LIMIT 1"
+            );
+            $stmt->execute([
+                'rid' => $recipientUserId,
+                'kind' => $kind,
+                'path' => $jsonPath,
+                'eid' => $entityId,
+            ]);
+        }
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!is_array($row)) {
+            return null;
+        }
+
+        return (int) $row['id'];
+    }
+
+    /**
      * @param array<string, mixed>|null $payload
      */
     public static function create(

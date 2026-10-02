@@ -10,5 +10,9 @@ describe("post-PR472 self-service behavior (PHP)", () => {
     const result = spawnSync("php", [runner], { encoding: "utf8" });
     expect(result.status, result.stderr || result.stdout).toBe(0);
     expect(result.stdout).toContain("POST_PR472_SELF_SERVICE_BEHAVIOR=OK");
+    expect(result.stdout).toContain("RAPOR create success 201");
+    expect(result.stdout).toContain("orphan storage file cleaned after rollback");
+    expect(result.stdout).toContain("SELF_RAPOR_REQUEST dedupe single inbox row");
+    expect(result.stdout).toContain("notifier exception still 201");
   });
 });

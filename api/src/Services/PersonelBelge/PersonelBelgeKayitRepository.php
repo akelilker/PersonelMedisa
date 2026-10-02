@@ -14,6 +14,16 @@ final class PersonelBelgeKayitRepository
 {
     public static function tableExists(PDO $pdo, string $table): bool
     {
+        $driver = (string) $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+        if ($driver === 'sqlite') {
+            $stmt = $pdo->prepare(
+                "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = :t LIMIT 1"
+            );
+            $stmt->execute(['t' => $table]);
+
+            return $stmt->fetchColumn() !== false;
+        }
+
         $stmt = $pdo->prepare(
             'SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :t'
         );

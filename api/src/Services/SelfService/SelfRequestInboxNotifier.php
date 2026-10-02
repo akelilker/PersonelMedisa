@@ -24,14 +24,16 @@ class SelfRequestInboxNotifier
         $bas = (string) ($surecRow['baslangic_tarihi'] ?? '');
         $bit = (string) ($surecRow['bitis_tarihi'] ?? $bas);
         $body = sprintf('%s, %s – %s arasi izin talebi gonderdi.', $personelName, $bas, $bit);
-        PersonelInboxNotificationService::create(
+        if (getenv('MEDISA_TEST_SELF_NOTIFY_THROW') === '1') {
+            throw new \RuntimeException('MEDISA_TEST_SELF_NOTIFY_THROW');
+        }
+        PersonelInboxNotificationService::createSelfServiceRequest(
             $pdo,
             $approverId,
             'SELF_IZIN_REQUEST',
             'Izin Talebi',
             $body,
             (int) $ctx['personel_id'],
-            null,
             [
                 'entity_type' => 'IZIN',
                 'entity_id' => (int) $surecId,
@@ -60,14 +62,16 @@ class SelfRequestInboxNotifier
         $bas = (string) ($raporRow['baslangic_tarihi'] ?? '');
         $bit = (string) ($raporRow['bitis_tarihi'] ?? $bas);
         $body = sprintf('%s, %s – %s arasi saglik raporu bildirdi.', $personelName, $bas, $bit);
-        PersonelInboxNotificationService::create(
+        if (getenv('MEDISA_TEST_SELF_NOTIFY_THROW') === '1') {
+            throw new \RuntimeException('MEDISA_TEST_SELF_NOTIFY_THROW');
+        }
+        PersonelInboxNotificationService::createSelfServiceRequest(
             $pdo,
             $approverId,
             'SELF_RAPOR_REQUEST',
             'Saglik Raporu',
             $body,
             (int) $ctx['personel_id'],
-            null,
             [
                 'entity_type' => 'RAPOR',
                 'entity_id' => (int) ($raporRow['id'] ?? 0),
@@ -91,14 +95,16 @@ class SelfRequestInboxNotifier
             (string) ($avansRow['talep_tarihi'] ?? ''),
             (string) ($avansRow['tutar'] ?? '')
         );
-        PersonelInboxNotificationService::create(
+        if (getenv('MEDISA_TEST_SELF_NOTIFY_THROW') === '1') {
+            throw new \RuntimeException('MEDISA_TEST_SELF_NOTIFY_THROW');
+        }
+        PersonelInboxNotificationService::createSelfServiceRequest(
             $pdo,
             $approverId,
             'SELF_AVANS_REQUEST',
             'Avans Talebi',
             $body,
             (int) $ctx['personel_id'],
-            null,
             [
                 'entity_type' => 'AVANS',
                 'entity_id' => (int) ($avansRow['id'] ?? 0),

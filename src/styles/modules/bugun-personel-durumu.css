@@ -97,7 +97,6 @@
   outline-offset: 2px;
 }
 
-.bugun-personel-branch-list,
 .bugun-personel-unit-list,
 .bugun-personel-person-list {
   display: flex;
@@ -145,26 +144,79 @@
  * scroll'u ile erişilebilir kalır.
  */
 .bugun-personel-branch-list {
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
+  align-content: center;
   justify-content: center;
+  gap: 8px;
   width: 100%;
   min-height: 100%;
   flex-shrink: 0;
 }
 
+/*
+ * Şube kutusu: yalnız şube adı taşır (metrik yok). Personel Kartı şube (scope)
+ * kutularının modal yoğunluğuna uyarlanmış grid eşleniği; genişlikte 2 kolon,
+ * tek/artık kutular yatay ortada kalır.
+ */
 .bugun-personel-branch-card {
+  flex: 0 0 calc(50% - 4px);
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 56px;
   text-align: center;
 }
 
-.bugun-personel-branch-card .bugun-personel-stat {
-  text-align: center;
+.bugun-personel-branch-name {
+  font-size: 13.5px;
+  font-weight: 700;
+  line-height: 1.3;
+  color: #ffffff;
+  overflow-wrap: break-word;
 }
 
-.bugun-personel-branch-foot {
-  text-align: center;
+/* Şube detayı: 8 durum + Birim Bildirimi sade satır listesi (kutu/çerçeve yok). */
+.bugun-personel-branch-summary {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
 }
 
-.bugun-personel-branch-head,
+.bugun-personel-summary-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 2px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.bugun-personel-summary-row:last-child {
+  border-bottom: 0;
+}
+
+.bugun-personel-summary-label {
+  font-size: 13px;
+  color: #c9d4e5;
+}
+
+.bugun-personel-summary-value {
+  font-size: 13px;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.bugun-personel-summary-value.is-attention {
+  color: var(--danger);
+}
+
+.bugun-personel-summary-value.is-planned {
+  color: #c9d4e5;
+}
+
 .bugun-personel-unit-head {
   display: flex;
   align-items: baseline;
@@ -172,27 +224,17 @@
   gap: 8px;
 }
 
-.bugun-personel-branch-head strong,
 .bugun-personel-unit-head strong {
   font-size: 13.5px;
   font-weight: 700;
   color: #ffffff;
 }
 
-.bugun-personel-branch-head span,
 .bugun-personel-unit-head span,
-.bugun-personel-branch-foot,
 .bugun-personel-unit-bolum {
   margin: 0;
   font-size: 12px;
   color: #a0aec0;
-}
-
-/* Root görünümde şube kartı başlığı da ortalanır (temel space-between kuralından sonra). */
-.bugun-personel-branch-head {
-  justify-content: center;
-  flex-wrap: wrap;
-  text-align: center;
 }
 
 .bugun-personel-stat-grid {
@@ -201,7 +243,6 @@
   gap: 4px 8px;
 }
 
-.bugun-personel-stat,
 .bugun-personel-stat-btn {
   margin: 0;
   padding: 4px 6px;
@@ -223,13 +264,11 @@
   cursor: default;
 }
 
-.bugun-personel-stat.is-attention,
 .bugun-personel-stat-btn.is-attention {
   color: var(--danger);
   border-left: 2px solid var(--brand-red);
 }
 
-.bugun-personel-stat.is-planned,
 .bugun-personel-stat-btn.is-planned {
   color: #c9d4e5;
 }
@@ -483,7 +522,6 @@
 }
 
 @media (min-width: 641px) {
-  .bugun-personel-stat,
   .bugun-personel-stat-btn,
   .bugun-personel-person-row span {
     font-size: 13px;

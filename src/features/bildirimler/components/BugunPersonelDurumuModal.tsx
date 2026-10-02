@@ -517,24 +517,35 @@ export function BugunPersonelDurumuModal({ open, onClose }: BugunPersonelDurumuM
                   data-testid={`bugun-branch-${branch.sube_id}`}
                   onClick={() => setNav({ kind: "units", branch })}
                 >
-                  <div className="bugun-personel-branch-head">
-                    <strong>{branch.sube_adi}</strong>
-                    <span>Toplam {branch.counts.toplam}</span>
-                  </div>
-                  <div className="bugun-personel-stat-grid">
-                    {BUGUN_STATUS_KEYS.map((key) => (
-                      <span key={key} className={`bugun-personel-stat${countToneClass(key, branch.counts[key])}`}>
-                        {branch.counts[key]} {BUGUN_STATUS_LABEL[key]}
-                      </span>
-                    ))}
-                  </div>
-                  <div className="bugun-personel-branch-foot">
-                    Birim Bildirimi: {branch.birim_bildirim.tamamlanan} / {branch.birim_bildirim.toplam}{" "}
-                    Tamamlandı
-                  </div>
+                  <strong className="bugun-personel-branch-name">{branch.sube_adi}</strong>
                 </button>
               ))
             )}
+          </div>
+        ) : null}
+
+        {!loading && !error && nav.kind === "units" ? (
+          <div
+            className="bugun-personel-branch-summary"
+            role="list"
+            data-testid="bugun-branch-summary"
+          >
+            {BUGUN_STATUS_KEYS.map((key) => (
+              <div key={key} className="bugun-personel-summary-row" role="listitem">
+                <span className="bugun-personel-summary-label">{BUGUN_STATUS_LABEL[key]}</span>
+                <span
+                  className={`bugun-personel-summary-value${countToneClass(key, nav.branch.counts[key])}`}
+                >
+                  {nav.branch.counts[key]}
+                </span>
+              </div>
+            ))}
+            <div className="bugun-personel-summary-row" role="listitem">
+              <span className="bugun-personel-summary-label">Birim Bildirimi</span>
+              <span className="bugun-personel-summary-value">
+                {nav.branch.birim_bildirim.tamamlanan} / {nav.branch.birim_bildirim.toplam} Tamamlandı
+              </span>
+            </div>
           </div>
         ) : null}
 

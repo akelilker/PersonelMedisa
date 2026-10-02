@@ -88,21 +88,47 @@ class PersonelBordroOkumaService
             throw new PersonelSelfProductException('NOT_FOUND', 'Yayinlanan bordro bulunamadi.', 404);
         }
 
-        $ins = $pdo->prepare(
-            'INSERT INTO personel_bordro_okumalari
-                (personel_id, calistirma_id, yil, ay, okundu_by_user_id)
-             VALUES
-                (:pid, :cid, :yil, :ay, :uid)
-             ON DUPLICATE KEY UPDATE
-                okundu_at = okundu_at'
-        );
-        $ins->execute([
-            'pid' => $personelId,
-            'cid' => $calistirmaId,
-            'yil' => (int) $published['yil'],
-            'ay' => (int) $published['ay'],
-            'uid' => $userId,
-        ]);
+        $driver = (string) $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+        if ($driver === 'sqlite') {
+            $existing = $pdo->prepare(
+                'SELECT okundu_at, okundu_by_user_id FROM personel_bordro_okumalari
+                 WHERE personel_id = :pid AND calistirma_id = :cid LIMIT 1'
+            );
+            $existing->execute(['pid' => $personelId, 'cid' => $calistirmaId]);
+            $row = $existing->fetch(PDO::FETCH_ASSOC);
+            if (!is_array($row)) {
+                $ins = $pdo->prepare(
+                    'INSERT INTO personel_bordro_okumalari
+                        (personel_id, calistirma_id, yil, ay, okundu_by_user_id, okundu_at)
+                     VALUES
+                        (:pid, :cid, :yil, :ay, :uid, :okundu_at)'
+                );
+                $ins->execute([
+                    'pid' => $personelId,
+                    'cid' => $calistirmaId,
+                    'yil' => (int) $published['yil'],
+                    'ay' => (int) $published['ay'],
+                    'uid' => $userId,
+                    'okundu_at' => gmdate('Y-m-d H:i:s'),
+                ]);
+            }
+        } else {
+            $ins = $pdo->prepare(
+                'INSERT INTO personel_bordro_okumalari
+                    (personel_id, calistirma_id, yil, ay, okundu_by_user_id)
+                 VALUES
+                    (:pid, :cid, :yil, :ay, :uid)
+                 ON DUPLICATE KEY UPDATE
+                    okundu_at = okundu_at'
+            );
+            $ins->execute([
+                'pid' => $personelId,
+                'cid' => $calistirmaId,
+                'yil' => (int) $published['yil'],
+                'ay' => (int) $published['ay'],
+                'uid' => $userId,
+            ]);
+        }
 
         $read = $pdo->prepare(
             'SELECT okundu_at, okundu_by_user_id

@@ -167,39 +167,51 @@ export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeade
   const syncLabel = useMemo(() => formatSyncLabel(getAppData().updatedAt), [revision]);
 
   const notifications = useMemo(() => {
-    if (usesPersonelInbox) {
-      return personelInboxItems.map((item) => ({
-        id: `inbox-${item.id}`,
-        title: item.title,
-        subtitle: item.body,
-        level: "neutral" as const,
-        route: resolveInboxNotificationDestination(item, { selfServiceHome: isPersonelRole }),
-        unread: item.popup_required && !item.popup_consumed
-      }));
-    }
+    const inboxMapped = usesPersonelInbox
+      ? personelInboxItems.map((item) => ({
+          id: `inbox-${item.id}`,
+          title: item.title,
+          subtitle: item.body,
+          level: "neutral" as const,
+          route: resolveInboxNotificationDestination(item, { selfServiceHome: isPersonelRole }),
+          unread: item.popup_required && !item.popup_consumed
+        }))
+      : [];
 
     const reminderItems =
       uiProfile === "birim_amiri" || isPersonelRole
         ? []
         : buildReminderNotifications(new Date(), reminderRoute);
-    const apiItems: HeaderNotification[] = headerTamamlamalar.map((item) => {
-      const copy = formatHeaderGunlukTamamlamaCopy(item);
+    const apiItems: HeaderNotification[] =
+      canViewBildirimler && !isPersonelRole
+        ? headerTamamlamalar.map((item) => {
+            const copy = formatHeaderGunlukTamamlamaCopy(item);
 
-      return {
-        id: `tamamlama-${item.id}`,
-        title: copy.title,
-        subtitle: copy.subtitle,
-        level: "neutral" as const,
-        route: canViewBildirimDetay
-          ? `/bildirimler/gunluk/${item.id}`
-          : "/bildirimler",
-        unread: item.okundu_mi !== true
-      };
-    });
+            return {
+              id: `tamamlama-${item.id}`,
+              title: copy.title,
+              subtitle: copy.subtitle,
+              level: "neutral" as const,
+              route: canViewBildirimDetay
+                ? `/bildirimler/gunluk/${item.id}`
+                : "/bildirimler",
+              unread: item.okundu_mi !== true
+            };
+          })
+        : [];
+
+    if (isPersonelRole) {
+      return inboxMapped;
+    }
+
+    if (usesPersonelInbox) {
+      return [...inboxMapped, ...reminderItems, ...apiItems];
+    }
 
     return [...reminderItems, ...apiItems];
   }, [
     canViewBildirimDetay,
+    canViewBildirimler,
     headerTamamlamalar,
     isPersonelRole,
     usesPersonelInbox,

@@ -44,7 +44,11 @@ export function resolveInboxNotificationDestination(
   }
 
   if (kind === "ATTENDANCE_CORRECTION_APPROVED" || kind === "ATTENDANCE_CORRECTION_REJECTED") {
-    return "/self/talepler";
+    const correctionId = notification.related_correction_id ?? entityId;
+    if (correctionId) {
+      return `/self/talepler?correctionId=${correctionId}`;
+    }
+    return fallback;
   }
 
   const entityType = String(notification.payload?.entity_type ?? "").toUpperCase();

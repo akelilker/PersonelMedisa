@@ -19,6 +19,7 @@ describe("PERSONEL_SELF_SERVICE_PRODUCT_UX_V2 notification + policy owners", () 
     expect(shell).toContain('useBildirimlerHeaderPreview(canViewBildirimler && !isPersonelRole)');
     expect(shell).toContain("usesPersonelInbox");
     expect(shell).toMatch(/usesPersonelInbox[\s\S]*personelInboxItems/);
+    expect(shell).toMatch(/canViewBildirimler && !isPersonelRole/);
     expect(shell).toMatch(/uiProfile === "birim_amiri" \|\| isPersonelRole/);
   });
 

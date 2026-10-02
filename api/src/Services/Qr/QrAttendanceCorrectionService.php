@@ -244,6 +244,9 @@ class QrAttendanceCorrectionService
             (int) $ctx['personel_id'],
             $requestId,
             [
+                'entity_type' => 'ATTENDANCE_CORRECTION',
+                'entity_id' => $requestId,
+                'correction_id' => $requestId,
                 'source_event_id' => $sourceEventId,
                 'event_type' => $storedEventType,
                 'anomaly_type' => $anomalyType !== '' ? $anomalyType : null,
@@ -621,6 +624,9 @@ class QrAttendanceCorrectionService
                 (int) $row['personel_id'],
                 $requestId,
                 [
+                    'entity_type' => 'ATTENDANCE_CORRECTION',
+                    'entity_id' => $requestId,
+                    'correction_id' => $requestId,
                     'status' => $action === 'ONAYLA' ? 'ONAYLANDI' : 'UYGUN_GORULMEDI',
                     'original_local_time' => self::originalLocalTime($row['original_occurred_at_utc'] ?? null),
                     'requested_local_time' => (string) $row['requested_local_time'],

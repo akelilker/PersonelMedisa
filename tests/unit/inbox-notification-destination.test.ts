@@ -47,6 +47,16 @@ describe("resolveInboxNotificationDestination", () => {
     expect(path).toBe("/personeller/3");
   });
 
+  it("routes attendance correction results to talepler with correctionId", () => {
+    const path = resolveInboxNotificationDestination(
+      inbox({
+        kind: "ATTENDANCE_CORRECTION_APPROVED",
+        related_correction_id: 77
+      })
+    );
+    expect(path).toBe("/self/talepler?correctionId=77");
+  });
+
   it("falls back to /self for unknown kinds", () => {
     expect(resolveInboxNotificationDestination(inbox({ kind: "LATE_ENTRY_INFO" }))).toBe("/self");
   });

@@ -1270,19 +1270,94 @@ class SureclerController
         }
 
         $ctx = SelfPersonelContext::resolveForSelfService($user, $pdo, true);
+        $caps = PersonelMobileCapabilityService::resolve($pdo, (int) $ctx['personel_id'], $ctx);
+        try {
+            PersonelMobileCapabilityService::assertBusinessCapability(
+                $caps,
+                PersonelMobileCapabilityService::CAP_IZIN_WRITE
+            );
+        } catch (PersonelMobileCapabilityException $e) {
+            JsonResponse::error($e->getHttpStatus(), $e->getErrorCode(), $e->getMessage());
+        }
+
         $body = $request->getJsonBody();
         if (!is_array($body)) {
             $body = [];
         }
-        unset($body['personel_id'], $body['surec_turu'], $body['alt_tur'], $body['state']);
+        unset($body['personel_id'], $body['state']);
+        $body['personel_id'] = (int) $ctx['personel_id'];
+        $body['surec_turu'] = 'RAPOR';
+        $body['alt_tur'] = 'Raporlu_Hastalik';
+        $body['ucretli_mi'] = false;
+        $body['tam_gun_mu'] = true;
+
+        $payload = self::normalizeAndValidateCreatePayload($body);
+        if ((int) $payload['personel_id'] !== (int) $ctx['personel_id'] || $payload['surec_turu'] !== 'RAPOR') {
+            self::validationError('personel_id', 'Rapor talebi yalniz kendi kaydiniz icin olusturulabilir.');
+        }
+        if ((string) ($payload['alt_tur'] ?? '') !== 'Raporlu_Hastalik') {
+            self::validationError('alt_tur', 'Saglik raporu turu gecersiz.');
+        }
+        if ($payload['bitis_tarihi'] === null) {
+            $payload['bitis_tarihi'] = $payload['baslangic_tarihi'];
+        }
+
+        $personel = self::fetchPersonelForScope($pdo, $payload['personel_id']);
+        if (!$personel) {
+            self::validationError('personel_id', 'Personel bulunamadi.');
+        }
+        \Medisa\Api\Services\Retention\PersonelArchiveGate::assertBusinessWriteAllowed($pdo, (int) $personel['id']);
+        self::assertPeriodOpenForOperationalSurec($pdo, $personel, $payload);
+        self::assertNoCoveringAbsenceOverlap($pdo, $payload, null);
+
+        $fileBody = $body;
+        $userId = isset($user['id']) ? (int) $user['id'] : 0;
 
         try {
-            $row = \Medisa\Api\Services\SelfService\SelfRaporTalepService::create($pdo, $ctx, $user, $body);
-            JsonResponse::success($row, [], 201);
+            $pdo->beginTransaction();
+            $insertId = self::insertSurec($pdo, $payload);
+            $belgeSurecId = \Medisa\Api\Services\PersonelBelge\PersonelBelgeLinkedRaporAttachmentService::attachOptionalFile(
+                $pdo,
+                (int) $ctx['personel_id'],
+                $userId,
+                $insertId,
+                (string) $payload['baslangic_tarihi'],
+                (string) $payload['bitis_tarihi'],
+                $fileBody,
+                false
+            );
+            $pdo->commit();
         } catch (\Medisa\Api\Services\SelfService\PersonelSelfProductException $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
             JsonResponse::error($e->getHttpStatus(), $e->getErrorCode(), $e->getMessage(), $e->getField());
         } catch (\Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
             JsonResponse::serverError('Rapor talebi olusturulamadi.');
         }
+
+        $row = self::fetchSurecRowById($pdo, $insertId);
+        if (!$row) {
+            JsonResponse::serverError('Kayit olusturulamadi.');
+        }
+        $mapped = self::mapSurecRow($row);
+        if ($belgeSurecId !== null) {
+            $mapped['belge_surec_id'] = $belgeSurecId;
+        }
+
+        try {
+            \Medisa\Api\Services\SelfService\SelfRequestInboxNotifier::notifyRaporRequest(
+                $pdo,
+                $ctx,
+                array_merge($mapped, ['id' => $insertId])
+            );
+        } catch (\Throwable $notifyError) {
+            // Inbox is best-effort; surec create remains authoritative.
+        }
+
+        JsonResponse::success($mapped, [], 201);
     }
 }

@@ -22,9 +22,15 @@ describe("post-PR470 self-service gap closure sources", () => {
     expect(bordro).toContain("KESINLESTI");
     expect(bordro).toContain("ON DUPLICATE KEY UPDATE");
 
-    const rapor = read("api/src/Services/SelfService/SelfRaporTalepService.php");
-    expect(rapor).toContain("'Raporlu_Hastalik'");
-    expect(rapor).not.toContain("'IS_KAZASI'");
+    const raporOwner = read("api/src/Controllers/SureclerController.php");
+    expect(raporOwner).toContain("createSelfRapor");
+    expect(raporOwner).toContain("'Raporlu_Hastalik'");
+    expect(raporOwner).toContain("PersonelBelgeLinkedRaporAttachmentService");
+    expect(raporOwner).toContain("IS_KAZASI excluded");
+
+    const belgeLink = read("api/src/Services/PersonelBelge/PersonelBelgeLinkedRaporAttachmentService.php");
+    expect(belgeLink).toContain("PersonelBelgeKayitRepository::insertAudit");
+    expect(belgeLink).toContain("deleteKey");
 
     const notifier = read("api/src/Services/SelfService/SelfRequestInboxNotifier.php");
     expect(notifier).toContain("SELF_IZIN_REQUEST");

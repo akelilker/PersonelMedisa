@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useLocation } from "react-router-dom";
 import {
   fetchAttendanceToday,
   type AttendanceAnomaly,
@@ -64,6 +65,7 @@ function correctionKind(value: string): string {
 }
 
 export function PersonelSelfServiceTaleplerPage() {
+  const location = useLocation();
   const [loading, setLoading] = useState(true);
   const [today, setToday] = useState<AttendanceTodayResponse | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -90,6 +92,17 @@ export function PersonelSelfServiceTaleplerPage() {
     aciklama: ""
   });
   const [advanceForm, setAdvanceForm] = useState({ tutar: "", talep_tarihi: "", aciklama: "" });
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const raw = params.get("correctionId");
+    const id = raw ? Number.parseInt(raw, 10) : NaN;
+    if (!Number.isFinite(id) || id <= 0 || corrections.length === 0) {
+      return;
+    }
+    const el = document.getElementById(`personel-talep-correction-${id}`);
+    el?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, [corrections, location.search]);
   const [feedbackForm, setFeedbackForm] = useState({
     tur: "ONERI" as "ONERI" | "SIKAYET",
     konu: "",
@@ -310,7 +323,7 @@ export function PersonelSelfServiceTaleplerPage() {
             {corrections.length > 0 ? (
               <ul data-testid="personel-talep-duzeltme-list">
                 {corrections.map((item) => (
-                  <li key={item.id}>
+                  <li key={item.id} id={`personel-talep-correction-${item.id}`}>
                     {item.tarih} · {correctionKind(item.talep_turu)} · {statusLabel(item.durum)}
                     {item.aciklama ? ` · ${item.aciklama}` : ""}
                     {item.sonuc ? ` · ${item.sonuc}` : ""}

@@ -126,7 +126,14 @@ class PersonelBordroOkumaService
 
     private static function assertSchema(PDO $pdo)
     {
-        $stmt = $pdo->query("SHOW TABLES LIKE 'personel_bordro_okumalari'");
+        $driver = (string) $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+        if ($driver === 'sqlite') {
+            $stmt = $pdo->query(
+                "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'personel_bordro_okumalari' LIMIT 1"
+            );
+        } else {
+            $stmt = $pdo->query("SHOW TABLES LIKE 'personel_bordro_okumalari'");
+        }
         if ($stmt === false || $stmt->fetch(PDO::FETCH_NUM) === false) {
             throw new PersonelSelfProductException(
                 'BORDRO_OKUMA_SCHEMA_NOT_READY',

@@ -1,11 +1,11 @@
 CODE_MIGRATION_TIP: 096
-PRODUCTION_MIGRATION_TIP: 095
-LAST_VERIFIED_PRODUCTION_MIGRATION_TIP: 095
-FRESH_PRODUCTION_MIGRATION_READBACK: MIGRATION_095_APPLIED
+PRODUCTION_MIGRATION_TIP: 096
+LAST_VERIFIED_PRODUCTION_MIGRATION_TIP: 096
+FRESH_PRODUCTION_MIGRATION_READBACK: MIGRATION_096_APPLIED
 
 # 110 — Master Closure / Gap Registry — SUPERSEDED
 
-**STATUS: SUPERSEDED (2026-09-25 POST_PR402; tips/SHA refreshed POST_PR441)**
+**STATUS: SUPERSEDED (2026-09-25 POST_PR402; tips/SHA refreshed POST_PR472)**
 **Active backlog owner:** [`docs/guncel/146-post-pr402-canonical-backlog.md`](146-post-pr402-canonical-backlog.md)
 **Canonical tips/SHA pin:** [`CURRENT_STATE.md`](../../CURRENT_STATE.md)
 
@@ -13,21 +13,21 @@ This file is retained as a **historical archive** of the 2026-09-20 SGK employer
 
 | Alan | Archive value (2026-09-20) | Current truth (see CURRENT_STATE / 146) |
 | --- | --- | --- |
-| CODE_MIGRATION_TIP | 091 | **093** |
-| PRODUCTION_MIGRATION_TIP | 089 (stale) | **093** APPLIED |
+| CODE_MIGRATION_TIP | 091 | **096** |
+| PRODUCTION_MIGRATION_TIP | 089 (stale) | **096** APPLIED |
 | PRODUCTION_MIGRATION_PENDING | 2 (`090`+`091`) | **0** |
 | PR #326 | OPEN (stale) | **MERGED** |
-| PRODUCTION_DEPLOY_SHA | `d96182a2` (#301) | `0ef84447` (#441); deploy run `36543499484` |
-| FRESH_READBACK | BLOCKED_EXTERNAL_GITHUB_ACTIONS_BILLING | ACTIONS_APPLY_36491356202 |
+| PRODUCTION_DEPLOY_SHA | `d96182a2` (#301) | `6b7dbba6` (#472); deploy run `37018359986` |
+| FRESH_READBACK | BLOCKED_EXTERNAL_GITHUB_ACTIONS_BILLING | ACTIONS_APPLY_37021807281 |
 
 ## Migration durumu (current — mirrored for sync tests)
 
 | Alan | Değer |
 | --- | --- |
-| CODE_MIGRATION_TIP | **093** |
-| PRODUCTION_MIGRATION_TIP | **093** |
-| LAST_VERIFIED_PRODUCTION_MIGRATION_TIP | **093** |
-| FRESH_PRODUCTION_MIGRATION_READBACK | **ACTIONS_APPLY_36491356202** |
+| CODE_MIGRATION_TIP | **096** |
+| PRODUCTION_MIGRATION_TIP | **096** |
+| LAST_VERIFIED_PRODUCTION_MIGRATION_TIP | **096** |
+| FRESH_PRODUCTION_MIGRATION_READBACK | **ACTIONS_APPLY_37021807281** |
 | PRODUCTION_MIGRATION_PENDING | **0** |
 | Migration 087 | **APPLIED** |
 | Migration 088 | **APPLIED** |
@@ -36,10 +36,14 @@ This file is retained as a **historical archive** of the 2026-09-20 SGK employer
 | Migration 091 | **APPLIED** (Actions `35791415567`) |
 | Migration 092 | **APPLIED** (Actions `36367311876`; backup VERIFIED; readback VERIFIED) |
 | Migration 093 | **APPLIED** (Apply `36491356202`; `093_attendance_anomaly_notification_dedupe.sql`; worker SUCCEEDED; backup `medisa-pre-093-36491356202-1-20260928-223004.sql`; readback VERIFIED) |
-| CODE_MAIN_SHA / PRODUCTION_DEPLOY_SHA | `0ef844475a3523b3e54215994a053cd27534c575` (deploy cPanel `36543499484`, #441) |
+| Migration 094 | **APPLIED** (`094_attendance_no_event_day.sql`) |
+| Migration 095 | **APPLIED** (`095_personel_cinsiyet.sql`) |
+| Migration 096 | **APPLIED** (Apply `37021807281`; `096_personel_bordro_okumalari.sql`; worker SUCCEEDED; backup `medisa-pre-096-370***807281-1-20261002-144504.sql`; readback run `37022115475` VERIFIED) |
+| CODE_MAIN_SHA / PRODUCTION_DEPLOY_SHA | `6b7dbba6e54886c503c04438d9e4ecd60faae3e8` (last product deploy cPanel `37018359986`, #472; docs-only merges do not advance pin) |
 | PR #326 | **MERGED** |
 | PR #402 | **MERGED / DEPLOYED** |
 | PR #439–#441 | **MERGED / DEPLOYED** |
+| PR #470 / #472 | **MERGED / DEPLOYED** |
 
 ## Preserved business locks (still true; not reopen)
 

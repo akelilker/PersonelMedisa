@@ -21,6 +21,7 @@ import {
 } from "../../lib/bildirim/bugun-personel-durumu-events";
 import { istanbulBusinessDate } from "../../features/self-service/birim-amiri-operational";
 import { BackgroundlessNoticeModal } from "../../features/self-service/components/BackgroundlessNoticeModal";
+import { resolveInboxNotificationDestination } from "../../lib/self-service/inbox-notification-destination";
 
 type NotificationLevel = "neutral" | "warning" | "critical";
 
@@ -118,6 +119,8 @@ export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeade
   const activeSubeId = session?.active_sube_id ?? null;
   const role = canonicalizeUserRole(session?.user.rol);
   const isPersonelRole = role === "PERSONEL";
+  const canDecideAttendanceCorrection = hasPermission("attendance.correction.decide");
+  const usesPersonelInbox = isPersonelRole || canDecideAttendanceCorrection;
 
   const canViewBildirimler = hasPermission("bildirimler.view");
   const canViewBildirimDetay = hasPermission("bildirimler.detail.view");
@@ -164,41 +167,54 @@ export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeade
   const syncLabel = useMemo(() => formatSyncLabel(getAppData().updatedAt), [revision]);
 
   const notifications = useMemo(() => {
-    if (isPersonelRole) {
-      return personelInboxItems.map((item) => ({
-        id: `inbox-${item.id}`,
-        title: item.title,
-        subtitle: item.body,
-        level: "neutral" as const,
-        route: "/",
-        unread: item.popup_required && !item.popup_consumed
-      }));
-    }
+    const inboxMapped = usesPersonelInbox
+      ? personelInboxItems.map((item) => ({
+          id: `inbox-${item.id}`,
+          title: item.title,
+          subtitle: item.body,
+          level: "neutral" as const,
+          route: resolveInboxNotificationDestination(item, { selfServiceHome: isPersonelRole }),
+          unread: item.popup_required && !item.popup_consumed
+        }))
+      : [];
 
     const reminderItems =
       uiProfile === "birim_amiri" || isPersonelRole
         ? []
         : buildReminderNotifications(new Date(), reminderRoute);
-    const apiItems: HeaderNotification[] = headerTamamlamalar.map((item) => {
-      const copy = formatHeaderGunlukTamamlamaCopy(item);
+    const apiItems: HeaderNotification[] =
+      canViewBildirimler && !isPersonelRole
+        ? headerTamamlamalar.map((item) => {
+            const copy = formatHeaderGunlukTamamlamaCopy(item);
 
-      return {
-        id: `tamamlama-${item.id}`,
-        title: copy.title,
-        subtitle: copy.subtitle,
-        level: "neutral" as const,
-        route: canViewBildirimDetay
-          ? `/bildirimler/gunluk/${item.id}`
-          : "/bildirimler",
-        unread: item.okundu_mi !== true
-      };
-    });
+            return {
+              id: `tamamlama-${item.id}`,
+              title: copy.title,
+              subtitle: copy.subtitle,
+              level: "neutral" as const,
+              route: canViewBildirimDetay
+                ? `/bildirimler/gunluk/${item.id}`
+                : "/bildirimler",
+              unread: item.okundu_mi !== true
+            };
+          })
+        : [];
+
+    if (isPersonelRole) {
+      return inboxMapped;
+    }
+
+    if (usesPersonelInbox) {
+      return [...inboxMapped, ...reminderItems, ...apiItems];
+    }
 
     return [...reminderItems, ...apiItems];
   }, [
     canViewBildirimDetay,
+    canViewBildirimler,
     headerTamamlamalar,
     isPersonelRole,
+    usesPersonelInbox,
     personelInboxItems,
     reminderRoute,
     uiProfile
@@ -258,7 +274,7 @@ export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeade
   }, [location.pathname]);
 
   useEffect(() => {
-    if (!isPersonelRole || !minimal) {
+    if (!usesPersonelInbox || !minimal) {
       setPersonelInboxItems([]);
       return;
     }
@@ -283,7 +299,7 @@ export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeade
     return () => {
       cancelled = true;
     };
-  }, [isPersonelRole, minimal, location.pathname]);
+  }, [usesPersonelInbox, minimal, location.pathname]);
 
   useEffect(() => {
     if (!isPersonelRole || !minimal || shouldPreferDemoApi()) {
@@ -380,12 +396,14 @@ export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeade
     };
   }, []);
 
-  const isNotificationsLoading = isPersonelRole
+  const isNotificationsLoading = usesPersonelInbox
     ? personelInboxLoading
     : canViewBildirimler
       ? headerBildirimlerLoading
       : false;
-  const notificationError = isPersonelRole ? notificationActionError : notificationActionError ?? headerBildirimlerError;
+  const notificationError = usesPersonelInbox
+    ? notificationActionError
+    : notificationActionError ?? headerBildirimlerError;
 
   function navigateTo(path: string) {
     setIsNotificationsOpen(false);
@@ -397,14 +415,15 @@ export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeade
   function handleNotificationClick(notification: HeaderNotification) {
     if (notification.id.startsWith("inbox-")) {
       const numericId = Number.parseInt(notification.id.slice("inbox-".length), 10);
-      if (Number.isFinite(numericId)) {
+      const inboxItem = personelInboxItems.find((item) => item.id === numericId);
+      if (Number.isFinite(numericId) && inboxItem?.popup_required && !inboxItem.popup_consumed) {
         void ackInboxPopup(numericId).catch(() => undefined);
       }
       setReadNotificationIds((prev) => ({
         ...prev,
         [notification.id]: true
       }));
-      setIsNotificationsOpen(false);
+      navigateTo(notification.route);
       return;
     }
 

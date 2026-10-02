@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { isApiRequestError, shouldPreferDemoApi } from "../../../api/api-client";
 import { fetchMe, fetchMeYillikIzinBakiye } from "../../../api/me.api";
+import { acknowledgeSelfBordro, fetchSelfBordrolar, type SelfBordroSlip } from "../../../api/self-product.api";
 import { PersonelSelfPortrait } from "../components/PersonelSelfPortrait";
 import { LoadingState } from "../../../components/states/LoadingState";
 import { formatIsoDateDetail } from "../../../lib/display/iso-date-format";
@@ -60,6 +61,8 @@ export function PersonelSelfServiceProfilPage() {
   const canViewIseGiris = hasPermission("self_service.yillik_izin.view");
   const [status, setStatus] = useState<Status>({ kind: "loading" });
   const [photoName, setPhotoName] = useState("");
+  const [bordrolar, setBordrolar] = useState<SelfBordroSlip[]>([]);
+  const [bordroMessage, setBordroMessage] = useState<string | null>(null);
   const { photoSrc, photoMessage, onPhotoSelected } = useSelfProfilFoto();
 
   useEffect(() => {
@@ -80,9 +83,16 @@ export function PersonelSelfServiceProfilPage() {
             iseGiris = null;
           }
         }
+        let slips: SelfBordroSlip[] = [];
+        try {
+          slips = await fetchSelfBordrolar();
+        } catch {
+          slips = [];
+        }
         if (!cancelled) {
           const rows = buildRows(me, iseGiris);
           setPhotoName(me.personel.ad_soyad || me.ad_soyad);
+          setBordrolar(slips);
           setStatus(
             rows.length > 0
               ? { kind: "ready", rows }
@@ -125,6 +135,40 @@ export function PersonelSelfServiceProfilPage() {
       {status.kind === "ready" ? (
         <SelfServiceFactList rows={status.rows} testId="personel-profil-facts" />
       ) : null}
+      {bordrolar.length > 0 ? (
+        <section className="pm-self-bordro-okudum" data-testid="personel-bordro-okudum">
+          <h3>Yayınlanan Bordrolar</h3>
+          <ul>
+            {bordrolar.map((slip) => (
+              <li key={slip.calistirma_id} data-testid={`personel-bordro-row-${slip.calistirma_id}`}>
+                <span>{slip.donem_label}</span>
+                {slip.okundu ? (
+                  <span data-testid={`personel-bordro-okundu-${slip.calistirma_id}`}>Okudum</span>
+                ) : (
+                  <button
+                    type="button"
+                    className="self-service-action"
+                    data-testid={`personel-bordro-okudum-${slip.calistirma_id}`}
+                    onClick={() => {
+                      void acknowledgeSelfBordro(slip.calistirma_id)
+                        .then((updated) => {
+                          setBordrolar((current) =>
+                            current.map((row) => (row.calistirma_id === updated.calistirma_id ? updated : row))
+                          );
+                          setBordroMessage(null);
+                        })
+                        .catch(() => setBordroMessage("Bordro okundu işaretlenemedi."));
+                    }}
+                  >
+                    Okudum
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+      {bordroMessage ? <p className="self-service-muted">{bordroMessage}</p> : null}
       {status.kind === "error" ? (
         <p className="self-service-muted" data-testid="personel-profil-status">
           {status.message}

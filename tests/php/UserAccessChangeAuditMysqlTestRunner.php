@@ -33,7 +33,7 @@ const UACA_REVOKE_TABLE = 'user_erisim_kaldirma_auditleri';
 const UACA_ORG_AUDIT_TABLE = 'personel_organizasyon_degisiklik_auditleri';
 const UACA_MIGRATION_082 = '082_user_erisim_degisiklik_auditleri.sql';
 const UACA_MIGRATION_083 = '083_personel_organizasyon_degisiklik_auditleri.sql';
-const UACA_MIGRATION_TIP = '095_personel_cinsiyet.sql';
+const UACA_MIGRATION_TIP = '096_personel_bordro_okumalari.sql';
 
 function uacaAssert(bool $ok, string $name): void
 {

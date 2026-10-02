@@ -1,8 +1,8 @@
-CODE_MIGRATION_TIP: 095
+CODE_MIGRATION_TIP: 096
 PRODUCTION_MIGRATION_TIP: 095
 LAST_VERIFIED_PRODUCTION_MIGRATION_TIP: 095
 FRESH_PRODUCTION_MIGRATION_READBACK: MIGRATION_095_APPLIED
-PRODUCTION_MIGRATION_PENDING: 0
+PRODUCTION_MIGRATION_PENDING: 1
 PRODUCTION_DEPLOY_SHA: b01216d5e94a3269dc57eca0f316703aaf26d54c
 CODE_MAIN_SHA: b01216d5e94a3269dc57eca0f316703aaf26d54c
 LAST_MERGED_PR: 470
@@ -18,8 +18,9 @@ ACTIVE_BACKLOG_OWNER: docs/guncel/146-post-pr402-canonical-backlog.md
 
 | Alan | Değer | Kanıt |
 | --- | --- | --- |
-| CODE / PROD migration tip | **095 / 095** | Migration **095** (`095_personel_cinsiyet.sql`) **APPLIED / SUCCESS**. **PENDING: 0** |
+| CODE / PROD migration tip | **096 / 095** | Migration **096** (`096_personel_bordro_okumalari.sql`) **CODE READY / NOT APPLIED** (additive bordro okundu); migration **095** (`095_personel_cinsiyet.sql`) **APPLIED / SUCCESS**. **PENDING: 1** |
 | Migration 094 | **APPLIED** | `094_attendance_no_event_day.sql` production'da geçmiş; sonrasında 095 uygulanmış |
+| Migration 096 | **CODE READY / NOT APPLIED** | `096_personel_bordro_okumalari.sql` — additive, seed/backfill yok; production apply İlker açık onayı bekliyor |
 | LAST_VERIFIED production tip | **095** | Migration 095 production APPLIED |
 | PRODUCTION_DEPLOY_SHA | `b01216d5…` | Deploy cPanel **#1201** run **`36913900426`** SUCCESS (merge **#470**) |
 | CODE_MAIN_SHA | `b01216d5…` | `origin/main` == last merged PR **#470** |

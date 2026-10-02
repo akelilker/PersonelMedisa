@@ -64,6 +64,27 @@ export type SelfProfilFoto = {
   image_base64: string | null;
 };
 
+export type SelfBordroSlip = {
+  calistirma_id: number;
+  yil: number;
+  ay: number;
+  sube_id: number;
+  donem_label: string;
+  okundu: boolean;
+  okundu_at: string | null;
+  okundu_by_user_id: number | null;
+};
+
+export type SelfRaporKaydi = {
+  id: number;
+  surec_turu: string;
+  alt_tur: string | null;
+  baslangic_tarihi: string;
+  bitis_tarihi: string | null;
+  state: string;
+  aciklama: string | null;
+};
+
 function unwrap(response: unknown, fallback: string): Record<string, unknown> {
   if (typeof response !== "object" || response === null || !("data" in response)) {
     throw new ApiRequestError(fallback, 400, { code: "INVALID_RESPONSE" });
@@ -268,6 +289,78 @@ export async function fetchSelfProfilFoto(): Promise<SelfProfilFoto> {
     mime_type: readString(data.mime_type),
     image_base64: readString(data.image_base64)
   };
+}
+
+export async function fetchSelfBordrolar(): Promise<SelfBordroSlip[]> {
+  const data = unwrap(await apiRequest(endpoints.me.bordrolar), "Bordro listesi alınamadı.");
+  const items = Array.isArray(data.items) ? data.items : [];
+  return items.flatMap((item) => {
+    const row = asRecord(item);
+    const calistirmaId = row ? readNumber(row.calistirma_id) : null;
+    if (!row || calistirmaId === null) return [];
+    return [
+      {
+        calistirma_id: calistirmaId,
+        yil: readNumber(row.yil) ?? 0,
+        ay: readNumber(row.ay) ?? 0,
+        sube_id: readNumber(row.sube_id) ?? 0,
+        donem_label: readString(row.donem_label) ?? "",
+        okundu: row.okundu === true,
+        okundu_at: readString(row.okundu_at),
+        okundu_by_user_id: readNumber(row.okundu_by_user_id)
+      }
+    ];
+  });
+}
+
+export async function acknowledgeSelfBordro(calistirmaId: number): Promise<SelfBordroSlip> {
+  const data = unwrap(
+    await apiRequest(endpoints.me.bordroOkudum(calistirmaId), { method: "POST", body: "{}" }),
+    "Bordro okundu işaretlenemedi."
+  );
+  const calistirma_id = readNumber(data.calistirma_id) ?? calistirmaId;
+  return {
+    calistirma_id,
+    yil: readNumber(data.yil) ?? 0,
+    ay: readNumber(data.ay) ?? 0,
+    sube_id: 0,
+    donem_label: readString(data.donem_label) ?? "",
+    okundu: true,
+    okundu_at: readString(data.okundu_at),
+    okundu_by_user_id: readNumber(data.okundu_by_user_id)
+  };
+}
+
+export async function fetchSelfRaporlar(): Promise<SelfRaporKaydi[]> {
+  const data = unwrap(await apiRequest(endpoints.me.raporlar), "Raporlar alınamadı.");
+  const items = Array.isArray(data.items) ? data.items : [];
+  return items.flatMap((item) => {
+    const row = asRecord(item);
+    const id = row ? readNumber(row.id) : null;
+    if (!row || id === null) return [];
+    return [
+      {
+        id,
+        surec_turu: readString(row.surec_turu) ?? "RAPOR",
+        alt_tur: readString(row.alt_tur),
+        baslangic_tarihi: readString(row.baslangic_tarihi) ?? "",
+        bitis_tarihi: readString(row.bitis_tarihi),
+        state: readString(row.state) ?? "",
+        aciklama: readString(row.aciklama)
+      }
+    ];
+  });
+}
+
+export async function createSelfRaporTalebi(body: {
+  baslangic_tarihi: string;
+  bitis_tarihi?: string;
+  aciklama?: string;
+  dosya_adi?: string;
+  dosya_mime?: string;
+  dosya_icerik_base64?: string;
+}): Promise<void> {
+  await apiRequest(endpoints.me.raporTalepleri, { method: "POST", body: JSON.stringify(body) });
 }
 
 export async function uploadSelfProfilFoto(dosyaIcerikBase64: string): Promise<SelfProfilFoto> {

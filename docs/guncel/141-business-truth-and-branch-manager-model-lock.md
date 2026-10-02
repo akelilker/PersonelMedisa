@@ -141,7 +141,7 @@ Do not invent Kübra surname. Do not invent Sinem live account. Do not fake bran
 
 - Location targets above: BUSINESS_TRUTH_RESOLVED / NO_APPLY
 - 160/211: CLOSED_DO_NOT_REOPEN
-- 120/158/219: CROSS_COMPANY_SEMANTICALLY_VALID_DEFER
+- 120/158/219: **CLOSED** (2026-10-03 canlı readback) — business truth kayda geçti: 120/158 harici personel (şube **11 Şenay Mobilya** + SGK **3 Şenay Mobilya** + çalışma lokasyonu **5 Fabrika/Karabük**); 219 Medisa (şube **6 Medisa İstanbul** + SGK **1 Medisa** + lokasyon **3 İstanbul**). Cross-company kayıt problem/blocker DEĞİL. Detay: `docs/guncel/146-post-pr402-canonical-backlog.md` → `BL-BUSINESS-TRUTH-120-158-219` / `BL-CROSS-COMPANY`.
 - Kayseri Kübra surname: unresolved
 - Other PASIF/test/historical null locations: do not force loc5 unless explicitly covered
 

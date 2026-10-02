@@ -666,3 +666,34 @@ test.describe("PERSONEL self-service UX v2 — mobile product", () => {
     await expect(page.getByTestId("qr-scan-success")).toContainText("Girişiniz kaydedildi");
   });
 });
+
+test.describe("kişisel yüzey görsel shell — /self", () => {
+  test("bağlı yönetici /self ekranında PERSONEL görsel shell alır", async ({ page }) => {
+    const pageErrors: string[] = [];
+    page.on("pageerror", (error) => {
+      pageErrors.push(error.message);
+    });
+
+    await mockApi(page, "BOLUM_YONETICISI", {
+      personelBinding: { personel_id: 1, personel_tipi_ad: "Mavi Yaka" },
+      sessionAdSoyad: "Bağlı Yönetici"
+    });
+    await login(page, MOCK_ROLE_LOGIN.BOLUM_YONETICISI);
+
+    await page.goto("/self", { waitUntil: "domcontentloaded" });
+    await expect(page).toHaveURL(/\/self$/);
+
+    // "/" ile aynı kanonik kişisel yüzey: compact PERSONEL header + panel subtitle.
+    await expect(page.locator(".hero.hero--personel-shell")).toBeVisible();
+    await expect(page.getByTestId("hero-panel-subtitle")).toHaveText("KULLANICI PANELİ");
+    // personel-shell'de ad/soyad ve şube etiketi shell'den kalkar.
+    await expect(page.getByTestId("hero-session-user")).toHaveCount(0);
+    await expect(page.getByTestId("hero-session-sube")).toHaveCount(0);
+    expect(
+      await page.evaluate(() => document.body.classList.contains("app-personel-shell"))
+    ).toBe(true);
+
+    // Görsel shell değişikliği yeni bir runtime hatası üretmemeli (404'ler mock eksikleri).
+    expect(pageErrors).toEqual([]);
+  });
+});

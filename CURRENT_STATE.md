@@ -7,8 +7,10 @@ PRODUCTION_DEPLOY_SHA: 6b7dbba6e54886c503c04438d9e4ecd60faae3e8
 CODE_MAIN_SHA: 6b7dbba6e54886c503c04438d9e4ecd60faae3e8
 LAST_MERGED_PR: 472
 ACTIVE_BACKLOG_OWNER: docs/guncel/146-post-pr402-canonical-backlog.md
+PIN_SHA_BASELINE: LAST_PRODUCT_MERGE_DEPLOY
+DOCS_ONLY_CLOSURE_THIS_PIN: YES
 
-# PersonelMedisa — Canonical State Pin (POST_PR472)
+# PersonelMedisa — Canonical State Pin (POST_PR472 + migration 096 closure)
 
 **Aktif residual backlog otoritesi:** [`docs/guncel/146-post-pr402-canonical-backlog.md`](docs/guncel/146-post-pr402-canonical-backlog.md)
 **110:** SUPERSEDED for active backlog (historical archive only).
@@ -23,13 +25,13 @@ ACTIVE_BACKLOG_OWNER: docs/guncel/146-post-pr402-canonical-backlog.md
 | Migration 095 | **APPLIED** | `095_personel_cinsiyet.sql` production APPLIED |
 | Migration 096 | **APPLIED / SUCCESS** | `096_personel_bordro_okumalari.sql` — additive bordro "Okudum" audit (seed/backfill yok); canonical apply run `37021807281` SUCCESS; worker SUCCEEDED; backup `medisa-pre-096-370***807281-1-20261002-144504.sql` readback VERIFIED; post-apply readback run `37022115475` PROD_TIP **096** |
 | LAST_VERIFIED production tip | **096** | Post-apply readback run `37022115475` + worker diagnostics run `37023928949` (PROCESSING_COUNT=0, WORKER_BUSY=NO) |
-| PRODUCTION_DEPLOY_SHA | `6b7dbba6…` | Deploy cPanel **#1203** run **`37018359986`** SUCCESS (merge **#472**) |
-| CODE_MAIN_SHA | `6b7dbba6…` | `origin/main` == last merged PR **#472** |
+| PRODUCTION_DEPLOY_SHA | `6b7dbba6…` | Last **product** deploy marker — Deploy cPanel **#1203** run **`37018359986`** SUCCESS (merge **#472**); ops `deployed_sha` gate |
+| CODE_MAIN_SHA | `6b7dbba6…` | Same as **PRODUCTION_DEPLOY_SHA** — last **product** merge baseline (**#472**); docs-only state PRs (**#471**, **#473**) do **not** advance `LAST_MERGED_PR` / SHA pins |
 | PR #470 | **MERGED / DEPLOYED** | UI correction batch (Level 2+ back nav, Personel Kartı missing-info gateway, duplicate CTA cleanup, Vazgeç fix, /self gateway polish) |
 | PR #472 | **MERGED / DEPLOYED** | Self-service closure (PR470 follow-up) — `6b7dbba6…`; Deploy cPanel **#1203** run `37018359986` SUCCESS |
 | Attendance / QR phase | **CLOSED** | QR attendance + saha rollout + puantaj doğrulaması + personel go-live tamamlandı |
 
-PRODUCTION_MUTATION_THIS_PIN: 0 (docs-only closure; migration **096** apply ayrı canonical run `37021807281`).
+PRODUCTION_MUTATION_THIS_PIN: 0 (docs-only closure; migration **096** apply ayrı canonical run `37021807281`). Merge **#473** may retrigger Deploy cPanel on `main` without advancing SHA pins (POST_PR471 precedent).
 
 ## Hard-closed (do not reopen without new contradiction)
 

@@ -1,7 +1,7 @@
 # 146 — Post-PR402 Canonical Backlog
 
 **Tür:** Aktif backlog otoritesi (POST_PR402 consolidation; **POST_PR472** pin refresh).
-**Baseline:** `origin/main` `6b7dbba6e54886c503c04438d9e4ecd60faae3e8` (PR **#472**); Deploy cPanel **#1203** run `37018359986` SUCCESS.
+**Product baseline (SHA pin):** `6b7dbba6e54886c503c04438d9e4ecd60faae3e8` (PR **#472** last product merge+deploy); Deploy cPanel **#1203** run `37018359986` SUCCESS. Docs-only canonical PRs do not advance `LAST_MERGED_PR` / `CODE_MAIN_SHA` / `PRODUCTION_DEPLOY_SHA` (see `CURRENT_STATE.md` `PIN_SHA_BASELINE`).
 **Migration tip:** code **096** / production **096** (pending **0**); migration **096** (`096_personel_bordro_okumalari.sql`) **APPLIED** (canonical apply `37021807281`; readback `37022115475` PROD_TIP **096**); migration **095** (`095_personel_cinsiyet.sql`) **APPLIED**; migration **094** (`094_attendance_no_event_day.sql`) **APPLIED** (production'da geçmiş).
 **Yasaklar bu belgede:** app code · migration apply · production mutation · remote branch delete · #395–#470 reopen.
 

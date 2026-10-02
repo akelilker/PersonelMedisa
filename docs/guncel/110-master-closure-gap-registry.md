@@ -39,7 +39,7 @@ This file is retained as a **historical archive** of the 2026-09-20 SGK employer
 | Migration 094 | **APPLIED** (`094_attendance_no_event_day.sql`) |
 | Migration 095 | **APPLIED** (`095_personel_cinsiyet.sql`) |
 | Migration 096 | **APPLIED** (Apply `37021807281`; `096_personel_bordro_okumalari.sql`; worker SUCCEEDED; backup `medisa-pre-096-370***807281-1-20261002-144504.sql`; readback run `37022115475` VERIFIED) |
-| CODE_MAIN_SHA / PRODUCTION_DEPLOY_SHA | `6b7dbba6e54886c503c04438d9e4ecd60faae3e8` (deploy cPanel `37018359986`, #472) |
+| CODE_MAIN_SHA / PRODUCTION_DEPLOY_SHA | `6b7dbba6e54886c503c04438d9e4ecd60faae3e8` (last product deploy cPanel `37018359986`, #472; docs-only merges do not advance pin) |
 | PR #326 | **MERGED** |
 | PR #402 | **MERGED / DEPLOYED** |
 | PR #439–#441 | **MERGED / DEPLOYED** |

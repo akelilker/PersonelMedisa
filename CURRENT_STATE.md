@@ -1,33 +1,35 @@
 CODE_MIGRATION_TIP: 096
-PRODUCTION_MIGRATION_TIP: 095
-LAST_VERIFIED_PRODUCTION_MIGRATION_TIP: 095
-FRESH_PRODUCTION_MIGRATION_READBACK: MIGRATION_095_APPLIED
-PRODUCTION_MIGRATION_PENDING: 1
-PRODUCTION_DEPLOY_SHA: b01216d5e94a3269dc57eca0f316703aaf26d54c
-CODE_MAIN_SHA: b01216d5e94a3269dc57eca0f316703aaf26d54c
-LAST_MERGED_PR: 470
+PRODUCTION_MIGRATION_TIP: 096
+LAST_VERIFIED_PRODUCTION_MIGRATION_TIP: 096
+FRESH_PRODUCTION_MIGRATION_READBACK: MIGRATION_096_APPLIED
+PRODUCTION_MIGRATION_PENDING: 0
+PRODUCTION_DEPLOY_SHA: 6b7dbba6e54886c503c04438d9e4ecd60faae3e8
+CODE_MAIN_SHA: 6b7dbba6e54886c503c04438d9e4ecd60faae3e8
+LAST_MERGED_PR: 472
 ACTIVE_BACKLOG_OWNER: docs/guncel/146-post-pr402-canonical-backlog.md
 
-# PersonelMedisa — Canonical State Pin (POST_PR470)
+# PersonelMedisa — Canonical State Pin (POST_PR472)
 
 **Aktif residual backlog otoritesi:** [`docs/guncel/146-post-pr402-canonical-backlog.md`](docs/guncel/146-post-pr402-canonical-backlog.md)
 **110:** SUPERSEDED for active backlog (historical archive only).
 **Do not reopen** PRs #395–#402 without new concrete contradiction.
 
-## Live / code pin (2026-10-01 POST_PR470)
+## Live / code pin (2026-10-02 POST_PR472)
 
 | Alan | Değer | Kanıt |
 | --- | --- | --- |
-| CODE / PROD migration tip | **096 / 095** | Migration **096** (`096_personel_bordro_okumalari.sql`) **CODE READY / NOT APPLIED** (additive bordro okundu); migration **095** (`095_personel_cinsiyet.sql`) **APPLIED / SUCCESS**. **PENDING: 1** |
-| Migration 094 | **APPLIED** | `094_attendance_no_event_day.sql` production'da geçmiş; sonrasında 095 uygulanmış |
-| Migration 096 | **CODE READY / NOT APPLIED** | `096_personel_bordro_okumalari.sql` — additive, seed/backfill yok; production apply İlker açık onayı bekliyor |
-| LAST_VERIFIED production tip | **095** | Migration 095 production APPLIED |
-| PRODUCTION_DEPLOY_SHA | `b01216d5…` | Deploy cPanel **#1201** run **`36913900426`** SUCCESS (merge **#470**) |
-| CODE_MAIN_SHA | `b01216d5…` | `origin/main` == last merged PR **#470** |
+| CODE / PROD migration tip | **096 / 096** | Migration **096** (`096_personel_bordro_okumalari.sql`) **APPLIED / SUCCESS** (canonical apply run `37021807281`); production tip **096**. **PENDING: 0** |
+| Migration 094 | **APPLIED** | `094_attendance_no_event_day.sql` production'da geçmiş |
+| Migration 095 | **APPLIED** | `095_personel_cinsiyet.sql` production APPLIED |
+| Migration 096 | **APPLIED / SUCCESS** | `096_personel_bordro_okumalari.sql` — additive bordro "Okudum" audit (seed/backfill yok); canonical apply run `37021807281` SUCCESS; worker SUCCEEDED; backup `medisa-pre-096-370***807281-1-20261002-144504.sql` readback VERIFIED; post-apply readback run `37022115475` PROD_TIP **096** |
+| LAST_VERIFIED production tip | **096** | Post-apply readback run `37022115475` + worker diagnostics run `37023928949` (PROCESSING_COUNT=0, WORKER_BUSY=NO) |
+| PRODUCTION_DEPLOY_SHA | `6b7dbba6…` | Deploy cPanel **#1203** run **`37018359986`** SUCCESS (merge **#472**) |
+| CODE_MAIN_SHA | `6b7dbba6…` | `origin/main` == last merged PR **#472** |
 | PR #470 | **MERGED / DEPLOYED** | UI correction batch (Level 2+ back nav, Personel Kartı missing-info gateway, duplicate CTA cleanup, Vazgeç fix, /self gateway polish) |
+| PR #472 | **MERGED / DEPLOYED** | Self-service closure (PR470 follow-up) — `6b7dbba6…`; Deploy cPanel **#1203** run `37018359986` SUCCESS |
 | Attendance / QR phase | **CLOSED** | QR attendance + saha rollout + puantaj doğrulaması + personel go-live tamamlandı |
 
-PRODUCTION_MUTATION_THIS_PIN: 0 (docs-only sync).
+PRODUCTION_MUTATION_THIS_PIN: 0 (docs-only closure; migration **096** apply ayrı canonical run `37021807281`).
 
 ## Hard-closed (do not reopen without new contradiction)
 
@@ -36,6 +38,7 @@ PRODUCTION_MUTATION_THIS_PIN: 0 (docs-only sync).
 - PR #395–#402: MERGED / CI PASS / DEPLOYED as applicable — visual/QR pilot/self-service sweep CLOSED
 - PR #439–#441: MERGED / DEPLOYED — attendance anomaly/correction UX, çalışma geçmişi toplamları, anomaly threshold env override CLOSED
 - PR #470: MERGED / DEPLOYED (Deploy #1201) — UI correction batch CLOSED
+- PR #472: MERGED / DEPLOYED (Deploy #1203) — self-service closure CLOSED
 - A1 12/13 branch-specific SGK period: **SUPERSEDED_BY_SGK_EMPLOYER_PERIOD_OWNER_CORRECTION**
 - REPORTING_PERIOD_CANONICAL_AXIS: SGK_ISVEREN
 - BRANCH_SPECIFIC_PERIOD_REQUIRED: NO
@@ -44,7 +47,7 @@ PRODUCTION_MUTATION_THIS_PIN: 0 (docs-only sync).
 - Branch-manager product model: LOCKED (`USER_SUBELER_SEMANTIC: ACCESS_SCOPE_ONLY`; `BRANCH_MANAGER_OWNER: sube_sorumlu_yoneticiler`)
 - QR core S3C–S3F + pilot readiness doc: CLOSED
 - BL-QR-ANOMALY core (unresolved anomaly read + amir correction + cron scan + migration 093 dedupe): **CLOSED** (residuals → 146 only)
-- BL-NO-EVENT-DAY: **CLOSED / LIVE** — migration 094 APPLIED (production'da geçmiş, sonrasında 095)
+- BL-NO-EVENT-DAY: **CLOSED / LIVE** — migration 094 APPLIED (production'da geçmiş)
 - BL-QR-PILOT-OPS: **PASS / CLOSED** — fiziksel pilot + saha rollout tamam; Attendance/QR phase CLOSED
 
 ## Active residuals → 146 only
@@ -57,7 +60,7 @@ Do **not** track open work in this file. Open IDs live in 146:
 ## Historical note (2026-09-29 POST_PR441 pin — SUPERSEDED)
 
 Previous pin claimed: PRODUCTION tip **094**, PENDING **0**, DEPLOY `0ef84447…`, LAST_MERGED_PR **441**.
-Obsolete after #470 merge (SHA `b01216d5`), Deploy cPanel **#1201** run `36913900426`, migration **095** APPLIED (production tip **095**); migration **094** APPLIED (NO_EVENT_DAY live).
+Obsolete after #472 merge (SHA `6b7dbba6`), Deploy cPanel **#1203** run `37018359986`, migration **096** APPLIED (production tip **096**); migration **095** APPLIED; migration **094** APPLIED (NO_EVENT_DAY live).
 
 Archive identity strings (not current gates):
 PREPARER_HISTORICAL: sedanurB

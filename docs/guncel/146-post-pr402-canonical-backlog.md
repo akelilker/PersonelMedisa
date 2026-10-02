@@ -1,8 +1,8 @@
 # 146 — Post-PR402 Canonical Backlog
 
-**Tür:** Aktif backlog otoritesi (POST_PR402 consolidation; **POST_PR470** pin refresh).
-**Baseline:** `origin/main` `b01216d5e94a3269dc57eca0f316703aaf26d54c` (PR **#470**); Deploy cPanel **#1201** run `36913900426` SUCCESS.
-**Migration tip:** code **095** / production **095** (pending **0**); migration **095** (`095_personel_cinsiyet.sql`) **APPLIED**; migration **094** (`094_attendance_no_event_day.sql`) **APPLIED** (production'da geçmiş, sonrasında 095).
+**Tür:** Aktif backlog otoritesi (POST_PR402 consolidation; **POST_PR472** pin refresh).
+**Baseline:** `origin/main` `6b7dbba6e54886c503c04438d9e4ecd60faae3e8` (PR **#472**); Deploy cPanel **#1203** run `37018359986` SUCCESS.
+**Migration tip:** code **096** / production **096** (pending **0**); migration **096** (`096_personel_bordro_okumalari.sql`) **APPLIED** (canonical apply `37021807281`; readback `37022115475` PROD_TIP **096**); migration **095** (`095_personel_cinsiyet.sql`) **APPLIED**; migration **094** (`094_attendance_no_event_day.sql`) **APPLIED** (production'da geçmiş).
 **Yasaklar bu belgede:** app code · migration apply · production mutation · remote branch delete · #395–#470 reopen.
 
 **Süperseeded active sources:** `CURRENT_STATE.md` (tips/SHA pin only; residual detail → burada), `docs/guncel/110-master-closure-gap-registry.md` (**SUPERSEDED** for active backlog).
@@ -22,6 +22,7 @@ Sınıflar: **A** CLOSED_ALREADY_LIVE · **B** SAFE_HOUSEKEEPING · **C** TECHNI
 | `BL-PR-441` | `MEDISA_ATTENDANCE_ANOMALY_THRESHOLD_MINUTES` override (tests); prod default **180**; prod cron **no** env | PR #441 MERGED; deploy `36543499484` @ `0ef84447` |
 | `BL-PR-446` | Attendance anomaly cron docblock parse | PR #446 MERGED `c6fe3144588ba253aa1d471d66245da317c92d1b` |
 | `BL-PR-470` | UI correction batch (Level 2+ back nav · Personel Kartı missing-info gateway · duplicate CTA cleanup · Görev/Organizasyon Vazgeç fix · /self title/photo/reverse gateway polish) | PR #470 MERGED `b01216d5e94a3269dc57eca0f316703aaf26d54c`; Deploy cPanel #1201 run `36913900426` SUCCESS |
+| `BL-PR-472` | Self-service closure (PR470 follow-up; bordro okundu readiness) | PR #472 MERGED `6b7dbba6e54886c503c04438d9e4ecd60faae3e8`; Deploy cPanel #1203 run `37018359986` SUCCESS |
 | `BL-SELF-HISTORY-APPROVAL-SCOPE` | Self-service aylık onay scope | **CLOSED** — PR #444 MERGED (`990d4d7e`). `aylik_onayli_mi` personel birim amiri scope. |
 | `BL-ATTENDANCE-CRON-OBSERVE` | Cron runtime tick | **CLOSED** — PR #446 + production tick `ATTENDANCE_ANOMALY_SCAN personel=1 created=0` EXIT=0 |
 | `BL-PR-326` | SGK bildirim dönemi owner → `SGK_ISVEREN` | PR #326 MERGED `8e137f2c` (2026-09-22) |
@@ -30,6 +31,7 @@ Sınıflar: **A** CLOSED_ALREADY_LIVE · **B** SAFE_HOUSEKEEPING · **C** TECHNI
 | `BL-MIG-093` | Attendance anomaly notification dedupe (race-safe) | Apply `36491356202`; target `093_attendance_anomaly_notification_dedupe.sql`; worker SUCCEEDED; backup readback VERIFIED |
 | `BL-MIG-094` | NO_EVENT_DAY day-key identity schema | Migration **094** (`094_attendance_no_event_day.sql`) **APPLIED** — production'da geçmiş, sonrasında 095 |
 | `BL-MIG-095` | Personel cinsiyet | Migration **095** (`095_personel_cinsiyet.sql`) **APPLIED / SUCCESS** |
+| `BL-MIG-096` | Personel self-service bordro "Okudum" audit | Migration **096** (`096_personel_bordro_okumalari.sql`) **APPLIED / SUCCESS** — apply `37021807281`; backup readback VERIFIED; readback `37022115475` PROD_TIP **096** |
 | `BL-QR-CORE` | QR S3C–S3F + collar entitlement + pilot checklist | Docs 105–109 CLOSED; `docs/ops/QR_ATTENDANCE_PILOT_READINESS_CHECKLIST.md` |
 | `BL-QR-ANOMALY` | Hatalı/eksik/çift giriş-çıkış — **core shipped** | #439: live warning + correction request + cron scan + 093 dedupe; personel self-revision yok (amir düzeltir). **Residual gaps → C/D/E** |
 | `BL-NO-EVENT-DAY` | Sıfır QR / expected-worker gün anomaly | **CLOSED / LIVE** — migration **094** APPLIED (production'da geçmiş, sonrasında 095); day-key chain live |
@@ -102,6 +104,7 @@ E sınıfı: read-only verify · business truth · production write (write ayrı
 | `BL-STALE-PR326-OPEN` | PR_326 OPEN | MERGED 2026-09-22 |
 | `BL-STALE-DEPLOY-5c6ae773` | DEPLOY pin #402 as current | Superseded by `0ef84447` / #441 deploy `36543499484` |
 | `BL-STALE-094-PENDING` | “migration 094 apply pending” | 094 APPLIED (production'da geçmiş, sonrasında 095) |
+| `BL-STALE-096-PENDING` | “migration 096 apply pending / CODE_ONLY” | 096 APPLIED — canonical apply `37021807281`; production tip **096** |
 | `BL-STALE-QR-PILOT-PENDING` | “fiziksel pilot tick bekleniyor” | PILOT_GATE_CLOSED — saha FIELD_PASS; phase CLOSED |
 | `BL-STALE-ANOMALY-NOT-CODED` | “Anomaly UX bu turda kodlanmaz” (D only) | #439 shipped — policy residual in C/D/E |
 | `BL-STALE-PERSONEL-HOME-CARDS-NOT-STARTED` | Next gate “NOT_STARTED” ek kartlar | **SUPERSEDED** → `BL-PERSONEL-HOME-INFO-CARDS` CLOSED |

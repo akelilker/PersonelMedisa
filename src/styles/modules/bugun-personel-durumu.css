@@ -191,11 +191,6 @@
   justify-content: space-between;
   gap: 8px;
   padding: 6px 2px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.bugun-personel-summary-row:last-child {
-  border-bottom: 0;
 }
 
 .bugun-personel-summary-label {

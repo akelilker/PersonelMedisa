@@ -24,7 +24,7 @@ Sınıflar: **A** CLOSED_ALREADY_LIVE · **B** SAFE_HOUSEKEEPING · **C** TECHNI
 | `BL-PR-470` | UI correction batch (Level 2+ back nav · Personel Kartı missing-info gateway · duplicate CTA cleanup · Görev/Organizasyon Vazgeç fix · /self title/photo/reverse gateway polish) | PR #470 MERGED `b01216d5e94a3269dc57eca0f316703aaf26d54c`; Deploy cPanel #1201 run `36913900426` SUCCESS |
 | `BL-PR-472` | Self-service closure (PR470 follow-up; bordro okundu readiness) | PR #472 MERGED `6b7dbba6e54886c503c04438d9e4ecd60faae3e8`; Deploy cPanel #1203 run `37018359986` SUCCESS |
 | `BL-PR-475` | `bugun personel durumu` şube seçimi grid + sade şube detayı | PR #475 MERGED `939c5f87ec80fb5f742d81f23f0523ce8399c313`; Deploy cPanel #1206 run `37069634704` SUCCESS |
-| `BL-BUSINESS-TRUTH-120-158-219` | 120 / 158 harici personel + 219 Medisa transfer business truth | **CLOSED** — canlı readback 2026-10-03: 120/158 şube **11 Şenay Mobilya** + SGK **3 Şenay Mobilya** + çalışma lokasyonu **5 Fabrika/Karabük**; 219 şube **6 Medisa İstanbul** + SGK **1 Medisa** + lokasyon **3 İstanbul**. Production mutation = 0 |
+| `BL-BUSINESS-TRUTH-120-158-219` | 120 / 158 Harici Personel + 219 Medisa transfer business truth | **CLOSED** — canlı readback + mutation 2026-10-03: 120/158 canlı `calisan_kapsami` `IC_PERSONEL` idi → `DIS_KAYNAK` düzeltildi (readback doğrulandı); şube **11 Şenay Mobilya** + SGK **3 Şenay Mobilya** + çalışma lokasyonu **5 Fabrika/Karabük** korundu. 219 şube **6 Medisa İstanbul** + SGK **1 Medisa** + lokasyon **3 İstanbul** (mutation yok). Production mutation = **2** (120 + 158) |
 | `BL-SERHAN-KOSE-LIVE` | `serhan.kose` (user 9) canlı yetki | **CLOSED** — canlı readback 2026-10-03: `rol: GENEL_YONETICI` + `durum: AKTIF` (`sinemH` user 110 ile aynı model). Tek tek şube/company grant üretilmedi; mutation = 0 |
 | `BL-SELF-SHELL-PERSONEL` | `/self` yüzeyinde PERSONEL görsel shell (bağlı yönetici) | **CLOSED** — owner `src/app/AppShell.tsx`; `isPersonelShellVisual` (rol PERSONEL veya `/self` yüzeyi) ile `/self` + `/self/...` compact header/shell alır. Rol/izin/route/backend değişmedi; ayrı panel/helper/CSS override yok. Focused source test (`personel-self-service-ux-v2`) güncellendi |
 | `BL-SELF-HISTORY-APPROVAL-SCOPE` | Self-service aylık onay scope | **CLOSED** — PR #444 MERGED (`990d4d7e`). `aylik_onayli_mi` personel birim amiri scope. |
@@ -40,7 +40,7 @@ Sınıflar: **A** CLOSED_ALREADY_LIVE · **B** SAFE_HOUSEKEEPING · **C** TECHNI
 | `BL-QR-ANOMALY` | Hatalı/eksik/çift giriş-çıkış — **core shipped** | #439: live warning + correction request + cron scan + 093 dedupe; personel self-revision yok (amir düzeltir). **Residual gaps → C/D/E** |
 | `BL-NO-EVENT-DAY` | Sıfır QR / expected-worker gün anomaly | **CLOSED / LIVE** — migration **094** APPLIED (production'da geçmiş, sonrasında 095); day-key chain live |
 | `BL-QR-PILOT-OPS` | QR pilot checklist — fiziksel saha ticks | **PASS / CLOSED** — saha GİRİŞ/ÇIKIŞ/history FIELD_PASS; `PILOT_GATE_CLOSED`; phase CLOSED |
-| `BL-TERM-CANON` | User-facing Dahili/Harici + Statü + Mavi/Beyaz Yaka | Enum display + create/yonetim labels; source locks on main |
+| `BL-TERM-CANON` | User-facing Dahili/Harici + Statü + Mavi/Beyaz Yaka | Enum display + create/yonetim labels; source locks on main. **Tek canonical terim: Harici Personel** (karşılığı Dahili Personel); "Dış Kaynak" / "External Worker" kullanıcıya yansımaz; internal `DIS_KAYNAK` enum identifier uyumluluk için korunur |
 | `BL-A1-12-13` | Branch-specific SGK period 12/13 | **SUPERSEDED_BY_SGK_EMPLOYER_PERIOD_OWNER_CORRECTION** |
 | `BL-LOC5-SET` | Fabrika/Karabük loc5 + 160/211 | APPLIED (historical CURRENT_STATE evidence) |
 | `BL-BM-MODEL` | Branch manager ≠ `user_subeler` access | Product rule LOCKED; owner `sube_sorumlu_yoneticiler` (088 APPLIED) |
@@ -94,7 +94,7 @@ E sınıfı: read-only verify · business truth · production write (write ayrı
 
 | ID | Konu | Not |
 | --- | --- | --- |
-| `BL-CROSS-COMPANY` | 120 / 158 / 219 | **CLOSED (2026-10-03)** — canlı readback business truth'u karşılıyor (bkz. A `BL-BUSINESS-TRUTH-120-158-219`). Cross-company kayıt problem/blocker DEĞİL; active pending / next gate üretmez. History olarak kalır. |
+| `BL-CROSS-COMPANY` | 120 / 158 / 219 | **CLOSED (2026-10-03)** — 120/158 canlı `calisan_kapsami` `DIS_KAYNAK` olarak düzeltildi (bkz. A `BL-BUSINESS-TRUTH-120-158-219`); 219 transfer zaten yansımış. Cross-company kayıt problem/blocker DEĞİL; active pending / next gate üretmez. History olarak kalır. |
 
 ---
 
@@ -134,7 +134,7 @@ C: _(none open)_ — `BL-NO-EVENT-DAY` **CLOSED / LIVE** (migration **094** APPL
 
 ## Operational approval registry (özet)
 
-E: _(none open)_ — `BL-CROSS-COMPANY` **CLOSED** (canlı business truth 2026-10-03). `BL-QR-PILOT-OPS` **PASS / CLOSED** (PILOT_GATE_CLOSED).
+E: _(none open)_ — `BL-CROSS-COMPANY` **CLOSED** (120/158 canlı `DIS_KAYNAK` düzeltmesi 2026-10-03). `BL-QR-PILOT-OPS` **PASS / CLOSED** (PILOT_GATE_CLOSED).
 
 ---
 
@@ -145,4 +145,4 @@ Attendance / QR phase **CLOSED** — no open gate (QR attendance + saha rollout 
 - `BL-QR-PILOT-OPS` **PASS / CLOSED** (PILOT_GATE_CLOSED).
 - `BL-POST-THRESHOLD-REENTRY` **CLOSED** (code).
 - Karyapı/Şenay rollout **NOT OUR ROLLOUT** (firma sahipleri kendi kayıtlarını girer) — next gate değil.
-- 120/158/219 `BL-CROSS-COMPANY` **CLOSED** (canlı business truth 2026-10-03) — next gate değil.
+- 120/158/219 `BL-CROSS-COMPANY` **CLOSED** (120/158 canlı `DIS_KAYNAK` düzeltmesi 2026-10-03) — next gate değil.

@@ -32,7 +32,7 @@ DOCS_ONLY_CLOSURE_THIS_PIN: YES
 | PR #475 | **MERGED / DEPLOYED** | `fix(ui): bugun personel durumu sube secimi grid + sade sube detayi` — `939c5f87…`; Deploy cPanel **#1206** run `37069634704` SUCCESS |
 | Attendance / QR phase | **CLOSED** | QR attendance + saha rollout + puantaj doğrulaması + personel go-live tamamlandı |
 
-PRODUCTION_MUTATION_THIS_PIN: 0 (docs-only closure; migration **096** apply ayrı canonical run `37021807281`). Merge **#475** may retrigger Deploy cPanel on `main` without advancing SHA pins (POST_PR471 precedent).
+PRODUCTION_MUTATION_THIS_PIN: 2 (personel 120 + 158 `calisan_kapsami` `IC_PERSONEL` → `DIS_KAYNAK` canlı düzeltme; readback doğrulandı). Migration **096** apply ayrı canonical run `37021807281`. Merge **#475** may retrigger Deploy cPanel on `main` without advancing SHA pins (POST_PR471 precedent).
 
 ## Hard-closed (do not reopen without new contradiction)
 
@@ -67,12 +67,19 @@ Do **not** track open work in this file. Residual statuses are owned by 146:
 
 | Personel / kişi | Canlı sonuç | Karar |
 | --- | --- | --- |
-| 120 İsmail Özcan | Harici personel; şube **11 Şenay Mobilya** + SGK işveren **3 Şenay Mobilya** + çalışma lokasyonu **5 Fabrika/Karabük** | **NO ACTION** — business truth korunuyor, Medisa personeline dönüştürülmez |
-| 158 Salih Efe | Harici personel; şube **11 Şenay Mobilya** + SGK işveren **3 Şenay Mobilya** + çalışma lokasyonu **5 Fabrika/Karabük** | **NO ACTION** — business truth korunuyor, Medisa personeline dönüştürülmez |
+| 120 İsmail Özcan | Harici Personel; şube **11 Şenay Mobilya** + SGK işveren **3 Şenay Mobilya** + çalışma lokasyonu **5 Fabrika/Karabük** | **DÜZELTİLDİ** — canlı `calisan_kapsami` `IC_PERSONEL` idi; `DIS_KAYNAK` olarak düzeltildi (readback doğrulandı). Şube/SGK/lokasyon/AKTIF değişmedi |
+| 158 Salih Efe | Harici Personel; şube **11 Şenay Mobilya** + SGK işveren **3 Şenay Mobilya** + çalışma lokasyonu **5 Fabrika/Karabük** | **DÜZELTİLDİ** — canlı `calisan_kapsami` `IC_PERSONEL` idi; `DIS_KAYNAK` olarak düzeltildi (readback doğrulandı). Şube/SGK/lokasyon/AKTIF değişmedi |
 | 219 Doğu Berkan Atmaca | Medisa personeli; şube **6 Medisa İstanbul** + SGK işveren **1 Medisa** + çalışma lokasyonu **3 İstanbul** | **NO ACTION** — Karyapı'dan Medisa'ya transfer zaten yansımış; Karyapı state'i yok |
 | `serhan.kose` (user 9) | `rol: GENEL_YONETICI`, `durum: AKTIF` — `sinemH` (user 110) ile aynı yetki modeli | **NO ACTION** — hedef rol/seviye zaten canlıda; tek tek şube/company grant üretilmedi |
 
-Bu dört kalem "cross-company problem" / "eksik erişim" olarak bekleyen iş DEĞİLDİR; canlı doğrulama business truth'u zaten karşılıyor. Production mutation (personel/yetki) = **0**.
+219 ve `serhan.kose` "cross-company problem" / "eksik erişim" olarak bekleyen iş DEĞİLDİR; canlı doğrulama business truth'u zaten karşılıyor. 120/158 için canlı `calisan_kapsami` yanlıştı (`IC_PERSONEL`) ve canonical personel update owner (`PUT /personeller/{id}`) üzerinden `DIS_KAYNAK` olarak düzeltildi. Production mutation (personel/yetki) = **2** (120 + 158).
+
+## Terminology lock (2026-10-03)
+
+Personel sınıfı için **tek canonical Türkçe terim**: **Harici Personel** (karşılığı: **Dahili Personel**).
+"Dış Kaynak", "Dış Kaynak Çalışan", "External Worker", "External Personnel" kullanıcıya / canonical business truth'a **YANSITILMAZ**.
+Internal enum/storage identifier `DIS_KAYNAK` (ve `IC_PERSONEL`) geriye dönük uyumluluk için **DEĞİŞMEDEN** kalır; görünen ad daima "Harici Personel".
+Harici Personel olması Fabrika/Karabük'te görevli olmasına engel DEĞİLDİR; Fabrika'da çalışması da onu Dahili Personel yapmaz (iki ayrı eksen).
 
 ## Historical note (2026-10-02 POST_PR472 pin — SUPERSEDED)
 
@@ -84,4 +91,4 @@ PREPARER_HISTORICAL: sedanurB
 APPROVER_HISTORICAL: Sinem Hamaloğlu
 TECHNICAL_STATUS: TECHNICAL_GAP_LOCAL_FIXABLE _(historical BM gap label; code owner shipped — not an open tip)_
 
-NEXT_GATE: no open gate. D/E residual'lar CLOSED / NON-GOAL (146). 120/158/219 + `serhan.kose` business truth canlı readback ile hizalandı. No merge/deploy/migration apply in this turn.
+NEXT_GATE: no open gate. D/E residual'lar CLOSED / NON-GOAL (146). 120/158 `calisan_kapsami` `DIS_KAYNAK` olarak canlı düzeltildi; 219 + `serhan.kose` canlı readback ile doğrulandı (değişmedi). No merge/deploy/migration apply in this turn.

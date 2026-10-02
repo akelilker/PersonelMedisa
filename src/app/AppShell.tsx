@@ -294,6 +294,10 @@ export function AppShell() {
   const { hasPermission } = useRoleAccess();
   const canApplyPersonelImport = hasPermission("personeller.import.apply");
   const isPersonelShellRole = canonicalizeUserRole(session?.user.rol) === "PERSONEL";
+  // Kanonik kişisel yüzey ("/" ve "/self") PERSONEL görsel shell'ini paylaşır: bağlı yönetici
+  // /self ekranında da aynı compact header + shell ritmini alır. Bu yalnız görsel shell'dir;
+  // rol, izin, route ve backend davranışı değişmez ve ayrı panel/helper/CSS override kurulmaz.
+  const isPersonelShellVisual = isPersonelShellRole || isSelfSurfaceRoute;
   const handleKayitFooterModelChange = useCallback((model: KayitModalFooterModel | null) => {
     setKayitFooterModel(model);
   }, []);
@@ -313,12 +317,12 @@ export function AppShell() {
   }, [isPersonelSurfaceRoute, isLoginRoute]);
 
   useEffect(() => {
-    document.body.classList.toggle("app-personel-shell", isPersonelShellRole && !isAuthSurfaceRoute);
+    document.body.classList.toggle("app-personel-shell", isPersonelShellVisual && !isAuthSurfaceRoute);
 
     return () => {
       document.body.classList.remove("app-personel-shell");
     };
-  }, [isPersonelShellRole, isAuthSurfaceRoute]);
+  }, [isPersonelShellVisual, isAuthSurfaceRoute]);
 
   useEffect(() => {
     const resetDocumentScroll = () => {
@@ -404,10 +408,10 @@ export function AppShell() {
         <div className="shell-top-stack">
           <Hero
             title="Personel Yönetim Sistemi"
-            userLabel={isPersonelShellRole ? null : session?.user.ad_soyad}
-            subeLabel={isPersonelShellRole ? null : activeSubeLabel}
-            variant={isPersonelShellRole ? "personel-shell" : "default"}
-            showPanelSubtitle={isPersonelShellRole || isSelfSurfaceRoute}
+            userLabel={isPersonelShellVisual ? null : session?.user.ad_soyad}
+            subeLabel={isPersonelShellVisual ? null : activeSubeLabel}
+            variant={isPersonelShellVisual ? "personel-shell" : "default"}
+            showPanelSubtitle={isPersonelShellVisual}
           />
           {showShellHeaderActions ? (
             <ShellHeaderActions contextLabel="Ana panel" minimal={isPersonelSurfaceRoute} />

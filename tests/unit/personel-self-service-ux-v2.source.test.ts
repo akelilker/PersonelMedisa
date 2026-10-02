@@ -73,8 +73,17 @@ describe("PERSONEL_SELF_SERVICE_PRODUCT_UX_V2 notification + policy owners", () 
     expect(history).not.toContain('to="/"');
 
     const shell = read("src/app/AppShell.tsx");
-    expect(shell).toContain("isPersonelShellRole ? null : session?.user.ad_soyad");
-    expect(shell).toContain('variant={isPersonelShellRole ? "personel-shell" : "default"}');
+    // Kanonik kişisel yüzey ("/" ve "/self") tek PERSONEL görsel shell'ini paylaşır. Bağlı yönetici
+    // /self ekranında da compact header/shell alır; ayrı panel/helper/CSS override kurulmaz ve
+    // rol/izin/route/backend davranışı değişmez.
+    expect(shell).toContain(
+      'const isPersonelShellVisual = isPersonelShellRole || isSelfSurfaceRoute;'
+    );
+    expect(shell).toContain("isPersonelShellVisual ? null : session?.user.ad_soyad");
+    expect(shell).toContain('variant={isPersonelShellVisual ? "personel-shell" : "default"}');
+    expect(shell).toContain(
+      'document.body.classList.toggle("app-personel-shell", isPersonelShellVisual'
+    );
     expect(shell).toContain("app-personel-shell");
 
     const hero = read("src/components/hero/Hero.tsx");
@@ -82,7 +91,7 @@ describe("PERSONEL_SELF_SERVICE_PRODUCT_UX_V2 notification + policy owners", () 
     expect(hero).toContain("KULLANICI PANELİ");
     expect(hero).toContain("PANEL_TITLE_DIM_DELAY_MS = 4000");
     expect(hero).toContain("hero--titles-dimmed");
-    expect(shell).toContain("showPanelSubtitle={isPersonelShellRole || isSelfSurfaceRoute}");
+    expect(shell).toContain("showPanelSubtitle={isPersonelShellVisual}");
 
     const heroCss = read("src/styles/components/hero.css");
     expect(heroCss).toMatch(

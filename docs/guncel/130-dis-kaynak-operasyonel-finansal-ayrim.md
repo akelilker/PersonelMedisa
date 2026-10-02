@@ -85,7 +85,7 @@ IC davranışı değişmez.
 
 DIS: `shell` + `qr_scan` + `attendance_correct` = true.
 `izin_write` fail-closed.
-UI: "DIŞ KAYNAK — BİLGİ AMAÇLIDIR / ÜCRET VE SGK TAHAKKUKU OLUŞTURMAZ"
+UI: "HARİCİ PERSONEL — BİLGİ AMAÇLIDIR / ÜCRET VE SGK TAHAKKUKU OLUŞTURMAZ"
 
 ## Finansal kesin kapalı (assignment olsa bile)
 

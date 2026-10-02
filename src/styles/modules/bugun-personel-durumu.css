@@ -131,6 +131,39 @@
   outline: none;
 }
 
+/*
+ * Şube seçim (root) görünümü: kutular modal içinde yatay + dikey ortalanır.
+ * Yerleşim referansı Personel Kartı şube (scope) kartları
+ * (src/styles/modules/personeller.css → .personeller-scope-stage / .personeller-scope-card:
+ * stage center + kart içeriği center). Yalnız root görünümünü etkiler;
+ * birim/personel listeleri ve şube→detay→geri akışı değişmez.
+ *
+ * Dikey ortalama panelde `justify-content: center` yerine listenin kendi
+ * `min-height: 100%` + `justify-content: center` ikilisiyle yapılır. `flex-shrink: 0`
+ * ile liste içeriği panelden uzun olduğunda (çok şube) panel yüksekliğine
+ * sıkışmaz; içerik yüksekliğine büyür ve üstteki kutular kırpılmadan body
+ * scroll'u ile erişilebilir kalır.
+ */
+.bugun-personel-branch-list {
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 100%;
+  flex-shrink: 0;
+}
+
+.bugun-personel-branch-card {
+  text-align: center;
+}
+
+.bugun-personel-branch-card .bugun-personel-stat {
+  text-align: center;
+}
+
+.bugun-personel-branch-foot {
+  text-align: center;
+}
+
 .bugun-personel-branch-head,
 .bugun-personel-unit-head {
   display: flex;
@@ -153,6 +186,13 @@
   margin: 0;
   font-size: 12px;
   color: #a0aec0;
+}
+
+/* Root görünümde şube kartı başlığı da ortalanır (temel space-between kuralından sonra). */
+.bugun-personel-branch-head {
+  justify-content: center;
+  flex-wrap: wrap;
+  text-align: center;
 }
 
 .bugun-personel-stat-grid {

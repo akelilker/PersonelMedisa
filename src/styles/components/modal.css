@@ -83,6 +83,9 @@
 }
 
 .modal-header {
+  /* Ortak header ikon dikey ofseti: Home ve X/kapat kontrolünü mevcut
+     merkezlerine göre 6px aşağı alır. Başlık/header geometrisi etkilenmez. */
+  --modal-header-icon-shift-y: 6px;
   position: relative;
   z-index: 20;
   flex-shrink: 0;
@@ -331,6 +334,12 @@
   flex-shrink: 0;
 }
 
+/* Lane içindeki Home: mevcut `transform: none` konumuna 6px dikey kaydırma
+   compose edilir. Back butonu bu kaydırmadan etkilenmez (konumu korunur). */
+.modal-header-leading .modal-home-btn {
+  transform: translateY(var(--modal-header-icon-shift-y));
+}
+
 .modal-header-leading .modal-back-btn {
   max-width: min(100%, 12rem);
   min-width: 0;
@@ -384,7 +393,7 @@
   position: absolute;
   left: 8px;
   top: 50%;
-  transform: translateY(-50%);
+  transform: translateY(calc(-50% + var(--modal-header-icon-shift-y)));
   z-index: 30;
   display: inline-flex;
   align-items: center;
@@ -408,7 +417,7 @@
 
 .modal-home-btn:hover {
   color: #ffffff;
-  transform: translateY(-50%);
+  transform: translateY(calc(-50% + var(--modal-header-icon-shift-y)));
 }
 
 .modal-home-btn svg {
@@ -441,7 +450,7 @@
   position: absolute;
   right: 8px;
   top: 50%;
-  transform: translateY(-50%);
+  transform: translateY(calc(-50% + var(--modal-header-icon-shift-y)));
   z-index: 30;
   display: inline-flex;
   align-items: center;
@@ -470,7 +479,7 @@
 
 .modal-close-btn:hover {
   color: #ffffff;
-  transform: translateY(-50%);
+  transform: translateY(calc(-50% + var(--modal-header-icon-shift-y)));
 }
 
 body.modal-open {

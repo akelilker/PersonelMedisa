@@ -4,6 +4,18 @@
   "generated_at": "2026-09-07T21:10:00Z",
   "source_evidence": "Authoritative business lock + prior RO inventory; hosting blocks live re-probe (mutation=0)",
   "note": "Location truths below are locked but NOT APPLIED. Do not invent branch transfers. PASIF/test/historical null locations are not forced to loc5.",
+  "superseded": true,
+  "superseded_authority": ["CURRENT_STATE.md", "docs/guncel/146-post-pr402-canonical-backlog.md"],
+  "closure_2026_10_03": {
+    "status": "HISTORICAL / SUPERSEDED / DO NOT USE AS ACTIVE BACKLOG",
+    "cross_company_120_158_219": "CLOSED — 120/158 calisan_kapsami DIS_KAYNAK düzeltildi (readback doğrulandı); 219 Medisa transfer zaten yansımış",
+    "sinem_halil_live": "CLOSED — live certify OK",
+    "kayseri_kubra": "CLOSED / APPLIED — Kübra Güneş",
+    "karyapi_senay": "CLOSED — NOT OUR ROLLOUT",
+    "hosting": "RECOVERED — Deploy cPanel #1207 run 37077642885 SUCCESS",
+    "branch_manager": "LOCKED — migration 088 APPLIED",
+    "sgk_12_13": "SUPERSEDED_BY_SGK_EMPLOYER_PERIOD_OWNER_CORRECTION"
+  },
   "rows": [
     {
       "PERSONEL_ID": 120,
@@ -83,11 +95,11 @@
     "branch_manager": "ops/organization-mapping/branch-manager-assignment-no-apply-plan.json"
   },
   "residual_unresolved_after_lock": [
-    "120/158/219 CROSS_COMPANY_SEMANTICALLY_VALID_DEFER",
-    "Kayseri Kübra surname BUSINESS_IDENTITY_DECISION_REQUIRED",
-    "Sinem live account/role/actor/scopes VERIFY_LIVE_REQUIRED",
-    "Halil live managed-branch grants VERIFY_LIVE_REQUIRED",
-    "Other PASIF/test/historical null locations not in locked set"
+    "120/158/219 CROSS_COMPANY_SEMANTICALLY_VALID_DEFER — CLOSED (120/158 DIS_KAYNAK düzeltildi; 219 transfer zaten yansımış)",
+    "Kayseri Kübra surname BUSINESS_IDENTITY_DECISION_REQUIRED — CLOSED (Kübra Güneş APPLIED)",
+    "Sinem live account/role/actor/scopes VERIFY_LIVE_REQUIRED — CLOSED (live certify OK)",
+    "Halil live managed-branch grants VERIFY_LIVE_REQUIRED — CLOSED (live certify OK)",
+    "Other PASIF/test/historical null locations not in locked set — do not force loc5"
   ],
   "production_mutation": 0
 }

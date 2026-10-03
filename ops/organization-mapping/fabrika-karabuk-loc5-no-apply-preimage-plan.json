@@ -7,6 +7,9 @@
   "apply": "NONE",
   "production_mutation": 0,
   "hosting": "EXTERNAL_PROVIDER_INCIDENT_CONTROL_PLANE_DEGRADED",
+  "superseded": true,
+  "superseded_authority": ["CURRENT_STATE.md", "docs/guncel/146-post-pr402-canonical-backlog.md"],
+  "closure_2026_10_03": "HISTORICAL / SUPERSEDED / DO NOT USE AS ACTIVE BACKLOG — hosting RECOVERED (Deploy #1207 run 37077642885 SUCCESS); loc5 targets remain BUSINESS_TRUTH_RESOLVED_NO_APPLY (no apply needed; historical VERIFY_LIVE_REQUIRED preimage guards artık kapalı).",
   "preimage_guard_rule": "STOP_ON_ANY_DRIFT_VS_CAPTURED_LIVE_PREIMAGE",
   "required_preimage_fields": [
     "PERSONEL_ID",

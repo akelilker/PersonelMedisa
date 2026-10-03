@@ -71,7 +71,7 @@ export function validatePersonnelDecisionPack(pack) {
   if (!Array.isArray(classes.CROSS_COMPANY_SEMANTICALLY_VALID)) {
     return { ok: false, code: "CROSS_COMPANY_REQUIRED" };
   }
-  // Locked loc5 set must remain no-apply until hosting recovery + preimage.
+  // Locked loc5 set remains no-apply (BUSINESS_TRUTH_RESOLVED_NO_APPLY) — no apply needed; historical hosting-recovery gate CLOSED.
   const expectedLoc5 = [200, 201, 203, 204, 205, 206, 209, 210, 212, 217];
   const auto = classes.AUTO_RESOLVABLE_BY_CONFIRMED_TRUTH.map(Number);
   for (const id of expectedLoc5) {

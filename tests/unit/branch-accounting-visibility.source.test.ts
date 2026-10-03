@@ -115,11 +115,11 @@ describe("branch accounting visibility owners", () => {
     expect(current).toMatch(/^LAST_VERIFIED_PRODUCTION_MIGRATION_TIP: 096$/m);
     expect(current).toMatch(/^FRESH_PRODUCTION_MIGRATION_READBACK: MIGRATION_096_APPLIED$/m);
     expect(current).toMatch(/^PRODUCTION_MIGRATION_PENDING: 0$/m);
-    expect(current).toMatch(/^LAST_MERGED_PR: 475$/m);
-    expect(current).toMatch(/^CODE_MAIN_SHA: 939c5f87ec80fb5f742d81f23f0523ce8399c313$/m);
-    expect(current).toMatch(/^PRODUCTION_DEPLOY_SHA: 939c5f87ec80fb5f742d81f23f0523ce8399c313$/m);
+    expect(current).toMatch(/^LAST_MERGED_PR: 476$/m);
+    expect(current).toMatch(/^CODE_MAIN_SHA: 817a1e7230273878daa0e96a359b866671ad0711$/m);
+    expect(current).toMatch(/^PRODUCTION_DEPLOY_SHA: 817a1e7230273878daa0e96a359b866671ad0711$/m);
     expect(current).toMatch(/^PIN_SHA_BASELINE: LAST_PRODUCT_MERGE_DEPLOY$/m);
-    expect(current).toMatch(/^DOCS_ONLY_CLOSURE_THIS_PIN: YES$/m);
+    expect(current).toMatch(/^DOCS_ONLY_CLOSURE_THIS_PIN: NO$/m);
     expect(current).not.toMatch(/^LAST_MERGED_PR: 472$/m);
     expect(current).toContain("ACTIVE_BACKLOG_OWNER: docs/guncel/146-post-pr402-canonical-backlog.md");
     expect(current).toContain("USER_SUBELER_SEMANTIC: ACCESS_SCOPE_ONLY");

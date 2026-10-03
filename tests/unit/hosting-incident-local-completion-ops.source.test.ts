@@ -84,6 +84,13 @@ describe("personnel residual decision pack", () => {
         expect(row).toHaveProperty(col);
       }
     }
+    // Closure reality (2026-10-03): historical defer/unresolved etiketleri kapalı.
+    expect(pack.superseded).toBe(true);
+    expect(pack.superseded_authority).toContain("CURRENT_STATE.md");
+    expect(pack.closure_2026_10_03.status).toContain("SUPERSEDED");
+    expect(pack.closure_2026_10_03.cross_company_120_158_219).toContain("CLOSED");
+    expect(pack.closure_2026_10_03.kayseri_kubra).toContain("Güneş");
+    expect(pack.closure_2026_10_03.hosting).toContain("RECOVERED");
   });
 });
 
@@ -104,6 +111,7 @@ describe("no-apply location / name / branch-manager plans", () => {
     expect(plan.closed_do_not_reopen.map((t: { PERSONEL_ID: number }) => t.PERSONEL_ID)).toEqual([
       160, 211,
     ]);
+    expect(plan.superseded).toBe(true);
   });
 
   it("pins personel 203 name correction to ad/soyad only", () => {
@@ -117,9 +125,10 @@ describe("no-apply location / name / branch-manager plans", () => {
     expect(plan.PERSONEL_ID).toBe(203);
     expect(plan.correction).toEqual({ ad: "Muhammed", soyad: "Mahmud" });
     expect(plan.canonical_schema.fields).toEqual(["ad", "soyad"]);
+    expect(plan.superseded).toBe(true);
   });
 
-  it("locks branch-manager assignment model as already supported / no write", () => {
+  it("locks branch-manager assignment model as locked / no write", () => {
     const plan = JSON.parse(
       readFileSync(
         resolve(process.cwd(), "ops/organization-mapping/branch-manager-assignment-no-apply-plan.json"),
@@ -131,6 +140,7 @@ describe("no-apply location / name / branch-manager plans", () => {
     expect(plan.architecture.BRANCH_MANAGER_ASSIGNMENT_OWNER).toContain("sube_sorumlu_yoneticiler");
     expect(plan.architecture.TABLE_MODEL).toContain("sube_sorumlu_yoneticiler");
     expect(plan.architecture.MUST_NOT_ENCODE_MANAGERS_AS).toBe("user_subeler");
+    // Historical 2026-09-07 label — artık açık teknik gap DEĞİL (migration 088 APPLIED).
     expect(plan.architecture.BRANCH_MANAGER_TECHNICAL_STATUS).toBe(
       "TECHNICAL_GAP_LOCAL_FIXABLE"
     );
@@ -146,7 +156,14 @@ describe("no-apply location / name / branch-manager plans", () => {
       "Write only user_subeler grants for managed branches"
     );
     const kayseri = plan.medisa_map.find((r: { sube_id: number }) => r.sube_id === 4);
+    // Historical plan: surname tahmin edilmedi (do not guess). Closure: Kübra Güneş CLOSED / APPLIED.
     expect(kayseri.surname).toBe("UNKNOWN_DO_NOT_GUESS");
     expect(kayseri.identity_status).toBe("BUSINESS_IDENTITY_DECISION_REQUIRED");
+    expect(plan.superseded).toBe(true);
+    expect(plan.closure_2026_10_03.status).toContain("SUPERSEDED");
+    expect(plan.closure_2026_10_03.technical_fix).toContain("APPLIED");
+    expect(plan.closure_2026_10_03.branch_manager_technical_gap).toBe("CLOSED");
+    expect(plan.closure_2026_10_03.kayseri_kubra).toContain("Güneş");
+    expect(plan.closure_2026_10_03.hosting).toContain("RECOVERED");
   });
 });

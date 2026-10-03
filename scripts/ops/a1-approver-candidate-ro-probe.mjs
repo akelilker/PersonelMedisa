@@ -4,7 +4,8 @@
  * with TARGET_ENV + A1_RO_PROBE_EXECUTE=1 and a DSN. Default is dry checklist mode.
  *
  * Mutation: never. Forbidden SQL verbs are rejected if a statement is supplied.
- * Live username/role/scopes remain VERIFY_LIVE_REQUIRED until hosting recovery.
+ * Historical: Sinem live identity was VERIFY_LIVE_REQUIRED (2026-09-07 hosting-incident
+ * lock). CLOSED 2026-10-03 — live certify OK. Hosting recovered (Deploy #1207).
  */
 "use strict";
 
@@ -160,7 +161,7 @@ export function main(env = process.env, log = console.log) {
         ...plan,
         note:
           plan.mode === "CHECKLIST"
-            ? "Hosting recovery required before live execute; set TARGET_ENV + A1_RO_PROBE_EXECUTE=1 + RO DSN"
+            ? "Read-only checklist mode; set TARGET_ENV + A1_RO_PROBE_EXECUTE=1 + RO DSN to arm (Sinem live identity already CLOSED/certified 2026-10-03)"
             : "Execute path armed — caller must run SELECT via external RO client; this helper does not open sockets by default",
       }),
       null,

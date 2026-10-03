@@ -337,6 +337,19 @@ body.login-page .hero .animated-line {
     padding-inline: 16px;
   }
 
+  /*
+   * Login header vertical parity: the authenticated main-screen hero
+   * (`.hero-with-session`) renders ~84px tall on desktop because its logo
+   * column also carries the username line. Login intentionally shows no
+   * username, so reserve the same band height (and inner vertical padding)
+   * here instead of the shorter 60px base + 10px login padding.
+   */
+  body.login-page .hero {
+    min-height: 84px;
+    padding-top: 12px;
+    padding-bottom: 12px;
+  }
+
   .hero.hero-with-session {
     min-height: 64px;
     padding-top: 12px;

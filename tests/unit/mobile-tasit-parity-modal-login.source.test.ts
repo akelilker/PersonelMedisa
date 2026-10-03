@@ -65,6 +65,21 @@ describe("mobile Taşıt parity modal/login source guards", () => {
     expect(mobile).toMatch(/body\.login-page \.hero h1\s*\{[^}]*letter-spacing:\s*clamp\(/s);
   });
 
+  it("matches desktop login hero band to the authenticated session hero height", () => {
+    const hero = read("src/styles/components/hero.css");
+    const desktop = hero.match(/@media\s*\(min-width:\s*641px\)\s*\{([\s\S]*?)\n\}(?=\s*@media|\s*$)/)?.[1] ?? "";
+    // Authenticated main-screen hero (`.hero-with-session`) renders ~84px on desktop
+    // because its logo column also carries the username line. Login shows no username,
+    // so it must reserve the same band + inner vertical padding instead of the 60px base.
+    expect(desktop).toMatch(/body\.login-page \.hero\s*\{[^}]*min-height:\s*84px/s);
+    expect(desktop).toMatch(/body\.login-page \.hero\s*\{[^}]*padding-top:\s*12px/s);
+    expect(desktop).toMatch(/body\.login-page \.hero\s*\{[^}]*padding-bottom:\s*12px/s);
+    // Mobile login band is unchanged (separate ≤640 owner owns its 76px band).
+    expect(hero).toMatch(
+      /@media\s*\(max-width:\s*640px\)[\s\S]*body\.login-page \.hero\s*\{[^}]*min-height:\s*76px/s
+    );
+  });
+
   it("keeps authenticated session hero title visible without ellipsis clipping", () => {
     const hero = read("src/styles/components/hero.css");
     expect(hero).toMatch(/section\.hero\.hero-with-session \.hero-title-stack > h1\s*\{[^}]*overflow:\s*hidden/s);

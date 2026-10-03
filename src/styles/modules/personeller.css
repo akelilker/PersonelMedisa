@@ -2243,7 +2243,8 @@
 .kayit-bulk-import-hint {
   margin: 0;
   text-align: left;
-  font-size: 13px;
+  /* Bulk import uyarı metni + link bir kademe küçük (12px); link `font: inherit` ile aynı puntoyu alır. */
+  font-size: 12px;
   line-height: 1.35;
   color: var(--text-secondary, #a0aec0);
 }

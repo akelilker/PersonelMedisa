@@ -1,5 +1,8 @@
 # Production organization mapping specs
 
+> **STATUS: HISTORICAL / SUPERSEDED — DO NOT USE AS ACTIVE BACKLOG.**
+> Bu dizin ve spec dosyaları production mapping'in **historical preimage / apply artifact**'larıdır. Güncel authority: [`CURRENT_STATE.md`](../../CURRENT_STATE.md) + [`docs/guncel/146-post-pr402-canonical-backlog.md`](../../docs/guncel/146-post-pr402-canonical-backlog.md). Burada kalan `VERIFY_LIVE_REQUIRED` / `INTENTIONAL_DEFER` / `PAUSED_PENDING_HOST_RECOVERY` etiketleri tarihseldir; 2026-10-03 itibarıyla kapalıdır.
+
 Bu dizin, üretimdeki ilk şirket/şube/SGK/lokasyon eşlemesi için **onaylanmış**
 mapping spec dosyalarını tutar. Eski `apply-organization-mapping.yml` workflow'u
 kaldırıldı (tek seferlik apply tamamlandı); spec dosyaları historical preimage olarak kalır.
@@ -16,18 +19,20 @@ canlı şube adları / şirket bağları DB + `SubeReadModel` üzerinden okunur.
 Canlı özet (display modeli): `subeler.ad` = kısa ad; global görünen ad =
 `SubeReadModel.tam_ad` (DB kolonu değildir).
 
-**Live (2026-09-07):** CODE_MAIN `63f8c905` (PR #274 MERGED / CI PASS);
-LIVE deploy SHA `9b4aac79` (PR274 DEPLOY_HELD — hosting incident);
-migration tip **087** / pending EMPTY; Medisa work-location catalog mapping
-**APPLIED** (7/7); Medisa approved user company/SGK/branch grants **APPLIED**;
-A2 location 160/211 **CLOSED**; A1 SGK period 12/13
-**PAUSED_PENDING_HOST_RECOVERY_AND_SINEM_LIVE_VERIFY** (preparer `sedanurB`,
-approver Sinem Hamaloğlu — temporary business lock; live identity
-VERIFY_LIVE_REQUIRED); loc5 active-set + personel 203 name + branch-manager
-map are **BUSINESS_TRUTH_RESOLVED_NO_APPLY**; branch-manager product model
-**ALREADY_SUPPORTED** (assignment ≠ transfer). Karyapı/Şenay company rollout
-**INTENTIONAL_DEFER**. See `CURRENT_STATE.md`,
-`docs/guncel/141-business-truth-and-branch-manager-model-lock.md`, and
+**Historical live pin (2026-09-07) — SUPERSEDED (current truth: `CURRENT_STATE.md` + 146):**
+CODE_MAIN `63f8c905` (PR #274 MERGED / CI PASS); LIVE deploy SHA `9b4aac79`
+(PR274 DEPLOY_HELD — hosting incident); migration tip **087** / pending EMPTY;
+Medisa work-location catalog mapping **APPLIED** (7/7); Medisa approved user
+company/SGK/branch grants **APPLIED**; A2 location 160/211 **CLOSED**.
+A1 SGK period 12/13 → **SUPERSEDED_BY_SGK_EMPLOYER_PERIOD_OWNER_CORRECTION**
+(historical `PAUSED_PENDING_HOST_RECOVERY_AND_SINEM_LIVE_VERIFY` artık aktif
+değil; hosting recovered — Deploy #1207; Sinem live certify OK).
+loc5 active-set + personel 203 name + branch-manager map
+**BUSINESS_TRUTH_RESOLVED_NO_APPLY**; branch-manager product model
+**LOCKED** (migration 088 APPLIED; `USER_SUBELER_SEMANTIC: ACCESS_SCOPE_ONLY`).
+Karyapı/Şenay company rollout → **CLOSED — NOT OUR ROLLOUT** (historical
+`INTENTIONAL_DEFER` etiketi geçersiz). See `CURRENT_STATE.md`,
+`docs/guncel/146-post-pr402-canonical-backlog.md`, and
 `a1-a2-a3-no-apply-remediation-plan.json`.
 
 Historical note: early docs described location→şube and user şirket/SGK scope

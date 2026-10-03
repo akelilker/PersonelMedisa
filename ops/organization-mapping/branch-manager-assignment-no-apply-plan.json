@@ -6,6 +6,16 @@
   "apply": "NONE",
   "product_rule_doc": "docs/guncel/141-business-truth-and-branch-manager-model-lock.md",
   "semantics_doc": "docs/guncel/142-branch-manager-assignment-semantics.md",
+  "superseded": true,
+  "superseded_authority": ["CURRENT_STATE.md", "docs/guncel/146-post-pr402-canonical-backlog.md"],
+  "closure_2026_10_03": {
+    "status": "HISTORICAL / SUPERSEDED / DO NOT USE AS ACTIVE BACKLOG",
+    "technical_fix": "APPLIED — migration 088 sube_sorumlu_yoneticiler shipped (PR #278)",
+    "branch_manager_technical_gap": "CLOSED",
+    "sinem_halil_live": "CLOSED — live certify OK",
+    "kayseri_kubra": "CLOSED / APPLIED — Kübra Güneş",
+    "hosting": "RECOVERED — Deploy cPanel #1207 run 37077642885 SUCCESS"
+  },
   "architecture": {
     "USER_SUBELER_SEMANTIC": "ACCESS_SCOPE_ONLY",
     "BRANCH_MANAGER_ASSIGNMENT_OWNER": "OrganizasyonService.sorumlu_yonetici_user_ids → SubeSorumluYoneticiSchema → sube_sorumlu_yoneticiler",

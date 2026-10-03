@@ -11,6 +11,18 @@
     "hosting": "EXTERNAL_PROVIDER_INCIDENT_CONTROL_PLANE_DEGRADED",
     "mutation": 0
   },
+  "superseded": true,
+  "superseded_authority": ["CURRENT_STATE.md", "docs/guncel/146-post-pr402-canonical-backlog.md"],
+  "closure_2026_10_03": {
+    "status": "HISTORICAL / SUPERSEDED / DO NOT USE AS ACTIVE BACKLOG",
+    "sgk_12_13": "SUPERSEDED_BY_SGK_EMPLOYER_PERIOD_OWNER_CORRECTION",
+    "cross_company_120_158_219": "CLOSED — 120/158 DIS_KAYNAK düzeltildi; 219 transfer zaten yansımış",
+    "sinem_halil_live": "CLOSED — live certify OK",
+    "kayseri_kubra": "CLOSED / APPLIED — Kübra Güneş",
+    "karyapi_senay": "CLOSED — NOT OUR ROLLOUT",
+    "branch_manager": "LOCKED — migration 088 APPLIED",
+    "hosting": "RECOVERED — Deploy cPanel #1207 run 37077642885 SUCCESS"
+  },
   "owners": {
     "sgk_period_runtime": "SgkSirketPolitikaReadService::resolveForPeriod",
     "sgk_period_write": "SgkSirketPolitikaWriteService::import/submit/approve",
@@ -23,7 +35,7 @@
   },
   "a1_sgk_period": {
     "classification": "PRODUCTION_CONFIG_WAITING",
-    "status": "PAUSED_PENDING_HOST_RECOVERY_AND_SINEM_LIVE_VERIFY",
+    "status": "PAUSED_PENDING_HOST_RECOVERY_AND_SINEM_LIVE_VERIFY — CLOSED / SUPERSEDED_BY_SGK_EMPLOYER_PERIOD_OWNER_CORRECTION",
     "A1_CAN_BE_DONE_WITH_EXISTING_OWNER": true,
     "A1_PAIR_STATUS": "BUSINESS_LOCKED_TEMPORARY_ASSIGNMENT",
     "business_decision": "1_TO_MONTH_END / runtime AY_1_SON_GUN (already decided for Medisa)",
@@ -174,8 +186,8 @@
     "NOTE": "Physical location truth locked to loc5; home branch still live-verified at apply time; do not invent transfer"
   },
   "cross_company": {
-    "status": "CROSS_COMPANY_SEMANTICALLY_VALID_DEFER",
-    "reason": "Branch and work-location are independent axes. Karyapı/Şenay rollouts INTENTIONAL_DEFER. Not DATA_CONTRADICTION.",
+    "status": "CROSS_COMPANY_SEMANTICALLY_VALID_DEFER — CLOSED (2026-10-03)",
+    "reason": "Branch and work-location are independent axes. Karyapı/Şenay rollouts NOT OUR ROLLOUT (historical INTENTIONAL_DEFER). Not DATA_CONTRADICTION. 120/158 calisan_kapsami DIS_KAYNAK düzeltildi; 219 transfer zaten yansımış.",
     "rows": [
       { "PERSONEL_ID": 120, "SUBE_ID": 11, "SGK_ISVEREN_ID": 3, "CALISMA_LOKASYONU_ID": 5, "STATUS": "CROSS_COMPANY_SEMANTICALLY_VALID_DEFER", "CAN_APPLY": "NO" },
       { "PERSONEL_ID": 158, "SUBE_ID": 11, "SGK_ISVEREN_ID": 3, "CALISMA_LOKASYONU_ID": 5, "STATUS": "CROSS_COMPANY_SEMANTICALLY_VALID_DEFER", "CAN_APPLY": "NO" },
@@ -189,7 +201,7 @@
     "work_location_catalog": "7/7 APPLIED",
     "medisa_grants": "APPLIED",
     "sube_muhasebe_acl_rows": 0,
-    "karyapi_senay": "INTENTIONAL_DEFER",
+    "karyapi_senay": "NOT_OUR_ROLLOUT_CLOSED (historical INTENTIONAL_DEFER)",
     "pr271": "CLOSED",
     "pr272": "CLOSED",
     "pr274_code": "MERGED_DO_NOT_REOPEN_WITHOUT_REGRESSION",
@@ -197,5 +209,5 @@
   },
   "production_mutation": 0,
   "apply": "NONE",
-  "next_gate": "HOSTING_RECOVERY_THEN_LIVE_PREIMAGE_VERIFY_AND_USER_APPROVED_APPLY"
+  "next_gate": "NONE (historical HOSTING_RECOVERY_THEN_LIVE_PREIMAGE_VERIFY_AND_USER_APPROVED_APPLY — hosting recovered + live verify tamam)"
 }

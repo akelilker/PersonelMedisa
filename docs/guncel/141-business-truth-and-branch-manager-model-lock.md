@@ -1,10 +1,13 @@
 # 141 — Business truth & branch-manager model lock
 
-**Tür:** Bağlayıcı iş gerçeği + kanonik ürün kuralı (no-apply).
+> **STATUS: HISTORICAL / SUPERSEDED — DO NOT USE AS ACTIVE BACKLOG.**
+> Bu belge 2026-09-07 business-truth + branch-manager model lock'unun **historical plan kaydıdır**. Güncel authority: [`CURRENT_STATE.md`](../../CURRENT_STATE.md) + [`docs/guncel/146-post-pr402-canonical-backlog.md`](146-post-pr402-canonical-backlog.md). Burada kalan `VERIFY_LIVE_REQUIRED` / `BUSINESS_IDENTITY_DECISION_REQUIRED` / `HOSTING_RECOVERY` etiketleri tarihseldir; 2026-10-03 itibarıyla **kapalıdır** (Sinem/Halil canlı certify OK; Kübra = Kübra Güneş APPLIED; hosting recovered — Deploy #1207).
+
+**Tür:** Bağlayıcı iş gerçeği + kanonik ürün kuralı (no-apply) — **historical**.
 **Faz:** `BUSINESS_TRUTH_AND_BRANCH_MANAGER_MODEL_LOCK`
 **Tarih:** 2026-09-07
 **Mutation:** 0 — production write / deploy / apply yok.
-**Hosting:** EXTERNAL_PROVIDER_INCIDENT / CONTROL_PLANE_DEGRADED — live verify blocked.
+**Hosting:** RECOVERED — Deploy cPanel **#1207** run `37077642885` SUCCESS. Historical "live verify blocked" ifadesi artık geçerli değil.
 
 ## A1 formal SGK pair (temporary business assignment)
 
@@ -14,7 +17,7 @@
 | APPROVER | Sinem Hamaloğlu | intended formal SGK approver role/model = `BOLUM_YONETICISI` |
 
 Bu seçim geçici business assignment’tır; ileride değiştirilebilir.
-Sinem’in production username / user_id / personel_id / rol / actor / branch scope / bolum_ids değerleri hosting recovery olmadan tahmin edilmez → `VERIFY_LIVE_REQUIRED`.
+Sinem’in production username / user_id / personel_id / rol / actor / branch scope / bolum_ids değerleri (2026-09-07 tarihsel not) hosting recovery olmadan tahmin edilmez idi → `VERIFY_LIVE_REQUIRED` (**CLOSED** — live certify OK; hosting recovered).
 
 Local historical keys (not live-certified): `user_id=110`, `personel_id=173`, last closed username `sinemH`.
 
@@ -121,33 +124,35 @@ See also follow-on `docs/guncel/142-branch-manager-assignment-semantics.md` on P
 | --- | ---: | --- | --- |
 | Fabrika/Karabük | 1 | Sinem Hamaloğlu | managed-branch assignment |
 | Giresun | 2 | Halil Şenay | managed-branch assignment |
-| Kayseri | 4 | Kübra [SURNAME UNKNOWN] | BUSINESS_IDENTITY_DECISION_REQUIRED |
+| Kayseri | 4 | Kübra Güneş | **CLOSED / APPLIED** (historical "SURNAME UNKNOWN" etiketi geçersiz) |
 | İzmir | 12 | Halil Şenay | managed-branch assignment |
 | Ankara | 5 | temporary/central = Sinem Hamaloğlu | same canonical model if assigned |
 | İstanbul | 6 | temporary/central = Sinem Hamaloğlu | same canonical model if assigned |
 | Sakarya | 13 | temporary/central = Sinem Hamaloğlu | same canonical model if assigned |
 
-Do not invent Kübra surname. Do not invent Sinem live account. Do not fake branch transfer.
+Kübra surname artık çözümlü: **Kübra Güneş** (CLOSED / APPLIED). Sinem live account certify OK (CLOSED). Do not fake branch transfer.
 
 ## Local identity evidence class
 
-| Person | Local keys (historical) | Live |
-| --- | --- | --- |
-| Sinem Hamaloğlu | user 110 / personel 173 / username `sinemH` (last closeout) | VERIFY_LIVE_REQUIRED |
-| Halil Şenay | user 50 / username `040` / personel 112 / home Medisa(1) | VERIFY_LIVE_REQUIRED |
-| Kübra (Kayseri) | no deterministic manager identity | BUSINESS_IDENTITY_DECISION_REQUIRED |
+> Bu tablo 2026-09-07 tarihsel durumudur. **Güncel closure:** Sinem / Halil canlı certify OK (CLOSED); Kübra = **Kübra Güneş** (Kayseri) CLOSED / APPLIED.
+
+| Person | Local keys (historical) | 2026-09-07 status | Güncel |
+| --- | --- | --- | --- |
+| Sinem Hamaloğlu | user 110 / personel 173 / username `sinemH` (last closeout) | VERIFY_LIVE_REQUIRED | **CLOSED** — live certify OK |
+| Halil Şenay | user 50 / username `040` / personel 112 / home Medisa(1) | VERIFY_LIVE_REQUIRED | **CLOSED** — live certify OK |
+| Kübra (Kayseri) | no deterministic manager identity | BUSINESS_IDENTITY_DECISION_REQUIRED | **CLOSED / APPLIED** — Kübra Güneş |
 
 ## Residuals after this lock
 
 - Location targets above: BUSINESS_TRUTH_RESOLVED / NO_APPLY
 - 160/211: CLOSED_DO_NOT_REOPEN
 - 120/158/219: **CLOSED** (2026-10-03 canlı readback + mutation) — 120/158 **Harici Personel** (canlı `calisan_kapsami` `IC_PERSONEL` idi; `DIS_KAYNAK` olarak düzeltildi, readback doğrulandı). Şube **11 Şenay Mobilya** + SGK **3 Şenay Mobilya** + çalışma lokasyonu **5 Fabrika/Karabük** korundu. 219 Medisa (şube **6 Medisa İstanbul** + SGK **1 Medisa** + lokasyon **3 İstanbul**) — transfer zaten yansımış, mutation yok. Cross-company kayıt problem/blocker DEĞİL. Detay: `docs/guncel/146-post-pr402-canonical-backlog.md` → `BL-BUSINESS-TRUTH-120-158-219` / `BL-CROSS-COMPANY`.
-- Kayseri Kübra surname: unresolved
+- Kayseri Kübra surname: **RESOLVED** — Kübra Güneş (CLOSED / APPLIED; historical "unresolved" etiketi geçersiz)
 - Other PASIF/test/historical null locations: do not force loc5 unless explicitly covered
 
 ## Next gate
 
-`HOSTING_RECOVERY_THEN_LIVE_PREIMAGE_VERIFY_AND_USER_APPROVED_APPLY`
+**NONE** (kapalı). Historical next gate `HOSTING_RECOVERY_THEN_LIVE_PREIMAGE_VERIFY_AND_USER_APPROVED_APPLY` artık aktif değil — hosting recovered (Deploy #1207) + canlı verify tamam (Sinem/Halil CLOSED; Kübra = Güneş APPLIED).
 
 ## References
 

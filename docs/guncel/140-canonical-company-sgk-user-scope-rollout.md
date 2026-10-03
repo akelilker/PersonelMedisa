@@ -1,6 +1,9 @@
 # 140 — Canonical company / SGK user-scope rollout inventory
 
-**Tür:** Rollout inventory + live readback. Historical PLAN pins below are preserved; **current/live** values are explicit.
+> **STATUS: HISTORICAL / SUPERSEDED — DO NOT USE AS ACTIVE BACKLOG.**
+> Bu belge 2026-09-07 hosting-incident pin'ine ait rollout inventory + historical readback kaydıdır. Güncel authority: [`CURRENT_STATE.md`](../../CURRENT_STATE.md) + [`docs/guncel/146-post-pr402-canonical-backlog.md`](146-post-pr402-canonical-backlog.md). Historical PLAN pin'leri korunur; `INTENTIONAL_DEFER` / `VERIFY_LIVE_REQUIRED` etiketleri tarihseldir — Karyapı/Şenay rollout **NOT OUR ROLLOUT**, Sinem/Halil live certify **CLOSED**.
+
+**Tür:** Rollout inventory + live readback — **historical**. Historical PLAN pins below are preserved; **current/live** values are explicit.
 
 ## Canonical axes
 
@@ -27,7 +30,7 @@ Owner: `OrgScope` (+ `HrWriteScope` for `IK_PERSONELI` write companies). Session
 | `user_subeler` | **31** | MUHASEBE Medisa branch scope included |
 | Work locations mapped | **7/7** | Medisa catalog mapping APPLIED |
 | `sube_muhasebe_yetkilileri` | **0 rows** | ACL restriction DISABLED (intentional) |
-| Karyapı / Şenay operational rollout | **INTENTIONAL_DEFER** | do not invent grants |
+| Karyapı / Şenay operational rollout | **CLOSED — NOT OUR ROLLOUT** (historical `INTENTIONAL_DEFER` etiketi geçersiz) | do not invent grants; firma sahipleri kendi kullanıcı/personel/şube kayıtlarını girer |
 | A2 160/211 location | **CLOSED** | do not reopen |
 | A1 SGK period 12/13 | **SUPERSEDED_BY_SGK_EMPLOYER_PERIOD_OWNER_CORRECTION** | 12/13 branch-specific period rows are NOT the target fix; SGK bildirim donemi owner'i SGK_ISVEREN eksenidir. Historical evidence preserved (preparer `sedanurB` + approver Sinem Hamaloğlu locked; no apply). |
 

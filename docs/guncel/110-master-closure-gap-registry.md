@@ -5,7 +5,7 @@ FRESH_PRODUCTION_MIGRATION_READBACK: MIGRATION_096_APPLIED
 
 # 110 — Master Closure / Gap Registry — SUPERSEDED
 
-**STATUS: SUPERSEDED (2026-09-25 POST_PR402; tips/SHA refreshed POST_PR472)**
+**STATUS: SUPERSEDED (2026-09-25 POST_PR402; tips/SHA refreshed POST_PR476)**
 **Active backlog owner:** [`docs/guncel/146-post-pr402-canonical-backlog.md`](146-post-pr402-canonical-backlog.md)
 **Canonical tips/SHA pin:** [`CURRENT_STATE.md`](../../CURRENT_STATE.md)
 
@@ -17,7 +17,7 @@ This file is retained as a **historical archive** of the 2026-09-20 SGK employer
 | PRODUCTION_MIGRATION_TIP | 089 (stale) | **096** APPLIED |
 | PRODUCTION_MIGRATION_PENDING | 2 (`090`+`091`) | **0** |
 | PR #326 | OPEN (stale) | **MERGED** |
-| PRODUCTION_DEPLOY_SHA | `d96182a2` (#301) | `6b7dbba6` (#472); deploy run `37018359986` |
+| PRODUCTION_DEPLOY_SHA | `d96182a2` (#301) | `817a1e72` (#476); deploy run `37077642885` |
 | FRESH_READBACK | BLOCKED_EXTERNAL_GITHUB_ACTIONS_BILLING | ACTIONS_APPLY_37021807281 |
 
 ## Migration durumu (current — mirrored for sync tests)
@@ -39,11 +39,12 @@ This file is retained as a **historical archive** of the 2026-09-20 SGK employer
 | Migration 094 | **APPLIED** (`094_attendance_no_event_day.sql`) |
 | Migration 095 | **APPLIED** (`095_personel_cinsiyet.sql`) |
 | Migration 096 | **APPLIED** (Apply `37021807281`; `096_personel_bordro_okumalari.sql`; worker SUCCEEDED; backup `medisa-pre-096-370***807281-1-20261002-144504.sql`; readback run `37022115475` VERIFIED) |
-| CODE_MAIN_SHA / PRODUCTION_DEPLOY_SHA | `6b7dbba6e54886c503c04438d9e4ecd60faae3e8` (last product deploy cPanel `37018359986`, #472; docs-only merges do not advance pin) |
+| CODE_MAIN_SHA / PRODUCTION_DEPLOY_SHA | `817a1e7230273878daa0e96a359b866671ad0711` (last product deploy cPanel `37077642885`, #476; docs-only merges do not advance pin) |
 | PR #326 | **MERGED** |
 | PR #402 | **MERGED / DEPLOYED** |
 | PR #439–#441 | **MERGED / DEPLOYED** |
 | PR #470 / #472 | **MERGED / DEPLOYED** |
+| PR #475 / #476 | **MERGED / DEPLOYED** |
 
 ## Preserved business locks (still true; not reopen)
 

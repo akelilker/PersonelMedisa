@@ -58,8 +58,8 @@ describe("kayit modal flow actions + field surface parity", () => {
   it("uses semantic --bg-field for shared form-input surfaces", () => {
     const formCss = read(FORM_CSS);
     const colors = read(COLORS);
-    expect(colors).toMatch(/--bg-field:\s*#0f1418/);
-    expect(formCss).toMatch(/\.form-input\s*\{[^}]*background:\s*var\(--bg-field\)/s);
+    expect(colors).toMatch(/--bg-field:\s*var\(--bg-surface\)/);
+    expect(formCss).toMatch(/\.form-input\s*\{[^}]*background-color:\s*var\(--bg-field\)/s);
     expect(formCss).toMatch(/box-shadow:\s*0 0 0 1000px var\(--bg-field\) inset/);
     expect(formCss).not.toMatch(/\.form-input\s*\{[^}]*background:\s*var\(--bg-surface-elevated\)/s);
   });

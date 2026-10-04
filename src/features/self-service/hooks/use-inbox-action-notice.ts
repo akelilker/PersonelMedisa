@@ -1,11 +1,10 @@
-import { useCallback } from "react";
 import {
   ackInboxPopup,
   decideAttendanceCorrection,
   type InboxNotification
 } from "../../../api/attendance-mobile.api";
 
-export type InboxActionNotice = {
+type InboxActionNotice = {
   title: string;
   body: string;
   infoTooltip?: string;
@@ -51,22 +50,4 @@ export function buildInboxActionNotice(
           }
         : undefined
   };
-}
-
-export function useInboxCorrectionQueryParam(
-  search: string,
-  onOpenCorrection: (correctionId: number) => void
-) {
-  return useCallback(() => {
-    const params = new URLSearchParams(search);
-    const raw = params.get("inboxCorrection");
-    const id = raw ? Number.parseInt(raw, 10) : NaN;
-    if (Number.isFinite(id) && id > 0) {
-      onOpenCorrection(id);
-      params.delete("inboxCorrection");
-      const next = params.toString();
-      const path = `${window.location.pathname}${next ? `?${next}` : ""}`;
-      window.history.replaceState(null, "", path);
-    }
-  }, [onOpenCorrection, search]);
 }

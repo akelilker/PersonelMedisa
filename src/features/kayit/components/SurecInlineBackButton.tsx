@@ -10,7 +10,7 @@ type SurecInlineBackButtonProps = {
 /** In-modal süreç drill-in back (same visual contract as BackBar, button variant). */
 export function SurecInlineBackButton({ label, onClick, testId, disabled = false }: SurecInlineBackButtonProps) {
   return (
-    <div className="universal-back-bar surec-inline-back-bar">
+    <div className="universal-back-bar">
       <button
         type="button"
         className="universal-back-btn"

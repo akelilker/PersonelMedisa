@@ -46,10 +46,6 @@ class SelfRequestInboxNotifier
 
     /**
      * @param array<string, mixed> $ctx
-     * @param array<string, mixed> $avansRow
-     */
-    /**
-     * @param array<string, mixed> $ctx
      * @param array<string, mixed> $raporRow
      */
     public static function notifyRaporRequest(PDO $pdo, array $ctx, array $raporRow)

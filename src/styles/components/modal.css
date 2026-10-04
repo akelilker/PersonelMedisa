@@ -501,8 +501,8 @@ body.modal-open .modal-container {
     border-top-width: 1px;
     border-color: transparent;
     outline-color: transparent;
-    background: #0b111b;
-    background-color: #0b111b;
+    background: var(--modal-bg);
+    background-color: var(--modal-bg);
     box-shadow: none;
   }
 

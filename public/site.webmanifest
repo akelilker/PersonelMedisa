@@ -1,6 +1,6 @@
 {
-  "name": "Medisa Personel ve Puantaj",
-  "short_name": "Personel",
+  "name": "Personel Yönetim Sistemi",
+  "short_name": "Personel Yönetim",
   "description": "Medisa personel kayit, surec ve puantaj yonetim sistemi",
   "start_url": ".",
   "scope": ".",

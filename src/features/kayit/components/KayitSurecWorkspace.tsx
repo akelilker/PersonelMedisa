@@ -59,6 +59,7 @@ import { KayitSurecPersonelProcessNav } from "./KayitSurecPersonelProcessNav";
 import { KayitSurecPersonelPuantajPanel } from "./KayitSurecPersonelPuantajPanel";
 import { KayitSurecPersonelUcretPanel } from "./KayitSurecPersonelUcretPanel";
 import { KayitSurecTabHeader } from "./KayitSurecTabHeader";
+import { SurecInlineBackButton } from "./SurecInlineBackButton";
 import { YillikIzinHakDuzeltmePanel } from "./YillikIzinHakDuzeltmePanel";
 import { buildCreatePersonelPayload } from "../../../features/personeller/personel-create-utils";
 import { SurecFormFields } from "../../../features/surecler/components/SurecFormFields";
@@ -97,6 +98,7 @@ import {
   KAYIT_SUREC_CEZA_FORM_ID,
   KAYIT_SUREC_MALI_FORM_ID,
   KAYIT_SUREC_PERSONEL_FORM_ID,
+  KAYIT_SUREC_PERSONEL_PICKER_LABEL,
   KAYIT_SUREC_POZISYON_FORM_ID,
   KAYIT_SUREC_SUREC_FORM_ID,
   KAYIT_SUREC_ZIMMET_FORM_ID,
@@ -191,17 +193,12 @@ function KayitSurecPersonelContext({
           </div>
         </dl>
         <div className="kayit-personel-context-actions">
-          <button
-            type="button"
-            className="universal-btn-aux"
-            data-testid="kayit-surec-personel-degistir"
-            aria-label="Personeli değiştir"
-            title="Personeli değiştir"
-            disabled={changeDisabled}
+          <SurecInlineBackButton
+            label={KAYIT_SUREC_PERSONEL_PICKER_LABEL}
             onClick={onChangePerson}
-          >
-            Personeli Değiştir
-          </button>
+            testId="kayit-surec-personel-degistir"
+            disabled={changeDisabled}
+          />
         </div>
       </div>
     </section>
@@ -1494,7 +1491,7 @@ export function KayitSurecWorkspace({
                         <div data-testid="kayit-surec-personel-picker">
                           <AppSelectField
                             className="surec-personel-combobox"
-                            label="Personel"
+                            label={KAYIT_SUREC_PERSONEL_PICKER_LABEL}
                             id="surec-create-personel-picker"
                             dataTestId="surec-create-personel-select"
                             value={surecForm.personelId}

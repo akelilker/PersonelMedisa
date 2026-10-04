@@ -8,6 +8,8 @@ export const KAYIT_SUREC_MALI_FORM_ID = "kayit-surec-mali-form";
 export const KAYIT_SUREC_CEZA_FORM_ID = "kayit-surec-ceza-form";
 export const KAYIT_SUREC_BELGELER_FORM_ID = "kayit-surec-belgeler-form";
 export const KAYIT_SUREC_POZISYON_FORM_ID = "kayit-surec-pozisyon-form";
+/** Süreç personel seçimi (picker) yüzeyi canonical görünür başlığı; geri hedef etiketi de bunu kullanır. */
+export const KAYIT_SUREC_PERSONEL_PICKER_LABEL = "Personel";
 
 /** Personel kartı süreç geçmişi; `usePersonelDetail` ile aynı sayfa boyutu. */
 export const KAYIT_SUREC_PERSONEL_HISTORY_LIMIT = 20;

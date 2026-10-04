@@ -43,6 +43,11 @@
   color: var(--text-inverse);
 }
 
+.universal-back-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .universal-back-label {
   font-size: 13px;
   font-weight: 600;

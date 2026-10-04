@@ -166,28 +166,41 @@
   align-items: center;
   align-content: center;
   justify-content: center;
-  gap: 8px;
+  gap: 6px;
   width: 100%;
   min-height: 100%;
   flex-shrink: 0;
 }
 
 /*
- * Şube kutusu: yalnız şube adı taşır (metrik yok). Taşıt kutu mantığı:
- * kare/kareye yakın dengeli kart (aspect-ratio 1:1), yatay + dikey ortada.
+ * Şube kutusu: yalnız şube adı taşır (metrik yok). Kolon kontratı explicit ve
+ * yüzde tabanlı flex-basis ile garanti edilir (sabit kare/aspect-ratio yok):
+ *   - mobil (varsayılan, ≤640px): 3 eşit kolon → (100% - 2 * 6px) / 3
+ *   - masaüstü (≥641px): 5 eşit kolon → (100% - 4 * 6px) / 5
+ * `box-sizing: border-box` (global reset) sayesinde basis, padding + 1px border'ı
+ * içerir; gap ile toplam tam %100 olduğundan 5/3 kolon taşmadan sığar ve yatay
+ * scroll oluşmaz. Az kart varsa `justify-content: center` satırı ortalı tutar.
+ * Kompakt yükseklik: sabit kare yerine min-height + padding; uzun adlar sarar.
  * Normal durumda arka plansız/çerçevesiz (border-color + background şeffaf,
  * 1px border kutusu korunur → hover'da layout kaymaz).
  */
 .bugun-personel-branch-card {
-  flex: 0 0 calc(50% - 4px);
+  flex: 0 0 calc((100% - 12px) / 3);
   align-items: center;
   justify-content: center;
   min-width: 0;
-  aspect-ratio: 1 / 1;
+  min-height: 56px;
+  padding: 8px 6px;
   border-color: transparent;
   background: transparent;
   text-align: center;
   transition: border-color 0.2s ease;
+}
+
+@media (min-width: 641px) {
+  .bugun-personel-branch-card {
+    flex-basis: calc((100% - 24px) / 5);
+  }
 }
 
 .bugun-personel-branch-name {
@@ -195,6 +208,8 @@
   font-weight: 700;
   line-height: 1.3;
   color: #ffffff;
+  /* Kart içeriğine sığdır: uzun/bitişik adlar taşmasın, sarılsın. */
+  max-width: 100%;
   overflow-wrap: break-word;
   transform-origin: center;
   transition: transform 0.2s ease;

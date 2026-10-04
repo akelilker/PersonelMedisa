@@ -61,8 +61,8 @@ describe("home shell polish + self-service gateway owners", () => {
     expect(gateway).toContain("hasPersonnelLinkedSelfServiceEligibility");
     expect(gateway).toContain('aria-label="Kullanıcı Paneli"');
     expect(gateway).toContain("Kullanıcı Paneli");
-    expect(gateway).toContain("GATEWAY_DIM_DELAY_MS = 4000");
-    expect(gateway).toContain("home-self-service-gateway--dimmed");
+    expect(gateway).not.toContain("GATEWAY_DIM_DELAY_MS");
+    expect(gateway).not.toContain("home-self-service-gateway--dimmed");
     expect(gateway).not.toContain("Kendi Bilgilerim");
     expect(gateway).not.toContain("self_service.qr.scan");
 
@@ -72,7 +72,8 @@ describe("home shell polish + self-service gateway owners", () => {
     );
     expect(css).toContain("var(--app-footer-real-height) + var(--app-footer-gap) + 4px - 12px");
     expect(css).toContain("transition: color 0.2s, opacity 0.2s;");
-    expect(css).toMatch(/\.home-self-service-gateway--dimmed\s*\{[^}]*opacity:\s*0\.7/s);
+    expect(css).toMatch(/\.home-self-service-gateway\s*\{[^}]*opacity:\s*0\.7/s);
+    expect(css).not.toContain("home-self-service-gateway--dimmed");
     expect(css).toMatch(
       /\.home-self-service-gateway:hover,\s*\.home-self-service-gateway:focus,\s*\.home-self-service-gateway:focus-visible\s*\{[^}]*opacity:\s*1/s
     );

@@ -156,11 +156,6 @@ body {
    *   .settings-dropdown.sube-selector-dropdown → icons-row.css (viewport caps)
    */
 
-  .icons-row {
-    padding-left: max(6px, env(safe-area-inset-left, 0px));
-    padding-right: max(12px, env(safe-area-inset-right, 0px));
-  }
-
   /* Hero session chip: room for typical ad soyad; ellipsis only when still overflowing */
   .hero-with-session .hero-session-meta {
     transform: none;

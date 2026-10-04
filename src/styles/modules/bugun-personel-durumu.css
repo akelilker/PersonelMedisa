@@ -507,11 +507,6 @@
   position: relative;
 }
 
-.bugun-personel-header-btn:hover,
-.bugun-personel-header-btn:focus-visible {
-  filter: drop-shadow(0 0 6px rgba(var(--theme-color-rgb), 0.62));
-}
-
 .bugun-personel-header-badge {
   position: absolute;
   top: 2px;
@@ -522,19 +517,16 @@
   color: #d40000;
   line-height: 1;
   pointer-events: none;
-  transition:
-    color 0.2s ease,
-    transform 0.2s ease,
-    filter 0.2s ease,
-    text-shadow 0.2s ease;
+  transition: color 0.2s ease;
 }
 
+/*
+ * Sayaç yalnız hafif renk belirginleşmesi alır; scale/glow/text-shadow yok.
+ * Böylece dikkat ikonun ortak hover davranışında kalır, sayaç öne çıkmaz.
+ */
 .bugun-personel-header-btn:hover .bugun-personel-header-badge,
 .bugun-personel-header-btn:focus-visible .bugun-personel-header-badge {
   color: #ff4a4a;
-  transform: translate(55%, -35%) scale(1.08);
-  filter: drop-shadow(0 0 4px rgba(255, 74, 74, 0.85));
-  text-shadow: 0 0 6px rgba(212, 0, 0, 0.55);
 }
 
 @media (max-width: 640px) {

@@ -637,7 +637,9 @@ body.login-page .hero .animated-line {
     max-width: calc(100% - 4px);
     margin-left: auto;
     margin-right: auto;
-    padding: 13px 12px 11px 6px;
+    /* Mobil ana başlık çerçevesi: iç dikey yükseklik önceki 13/11'e göre 3px az
+       (toplam dikey padding 24px → 21px). Yatay padding ve içerik değişmedi. */
+    padding: 11px 12px 10px 6px;
     box-sizing: border-box;
     --hero-home-logo-footprint: calc(54px + 2px);
     --hero-home-right-track: 1px;

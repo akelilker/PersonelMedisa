@@ -12,12 +12,14 @@ describe("Kayit surec personel context dedup", () => {
     const genel = readOwner("src/features/kayit/components/KayitSurecPersonelGenelPanel.tsx");
 
     expect(workspace).toContain("data-testid=\"kayit-surec-personel-context\"");
-    expect(workspace).toContain("data-testid=\"kayit-surec-personel-degistir\"");
+    expect(workspace).toContain("SurecInlineBackButton");
+    expect(workspace).toContain("testId=\"kayit-surec-personel-degistir\"");
     expect(workspace).toContain("beginChangeSurecPersonel");
     expect(workspace).toContain("showSurecPersonelPickerSurface");
     expect(workspace).toContain("!selectedSurecPersonel || (surecPersonelPickerOpen && !personelContextLocked)");
     expect(workspace).toContain("changeDisabled={personelContextLocked}");
-    expect(workspace).toContain("Personeli Değiştir");
+    expect(workspace).not.toContain("Personeli Değiştir");
+    expect(workspace).not.toContain("Personel Seçimi");
 
     expect(genel).toContain("Genel bilgiler");
     expect(genel).toContain("data-testid=\"kayit-surec-personel-duzenle\"");
@@ -40,4 +42,15 @@ describe("Kayit surec personel context dedup", () => {
     expect(workspace).toMatch(/personelContextLocked\s*=\s*[\s\S]*belgeDurumSaving/);
     expect(workspace).toMatch(/personelContextLocked\s*=\s*[\s\S]*belgeFileMutating/);
   });
+  it("labels the personel-context back with the target picker surface's canonical title", () => {
+    const workspace = readOwner("src/features/kayit/components/KayitSurecWorkspace.tsx");
+    const constants = readOwner("src/features/kayit/kayit-surec-constants.ts");
+
+    expect(constants).toContain('export const KAYIT_SUREC_PERSONEL_PICKER_LABEL = "Personel"');
+    expect(workspace).toMatch(
+      /SurecInlineBackButton[\s\S]*?label=\{KAYIT_SUREC_PERSONEL_PICKER_LABEL\}/
+    );
+    expect(workspace).not.toContain('label="Personel Seçimi"');
+  });
+
 });

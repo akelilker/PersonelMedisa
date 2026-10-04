@@ -240,26 +240,12 @@
 .sube-selector-icon {
   display: block;
   flex-shrink: 0;
-  opacity: 0.78;
-  transition: opacity 0.2s ease;
 }
 
 .sube-selector-chevron {
   display: block;
   flex-shrink: 0;
   margin-top: 2px;
-  opacity: 0.78;
-  transition: opacity 0.2s ease;
-}
-
-.sube-selector-toggle:hover .sube-selector-icon,
-.sube-selector-toggle:focus-visible .sube-selector-icon {
-  opacity: 1;
-}
-
-.sube-selector-toggle:hover .sube-selector-chevron,
-.sube-selector-toggle:focus-visible .sube-selector-chevron {
-  opacity: 1;
 }
 
 /*
@@ -426,13 +412,13 @@
 .icons-row--minimal .icon-btn.notification-red:hover,
 .icons-row--minimal .icon-btn.notification-red:focus-visible {
   color: var(--brand-red);
-  filter: drop-shadow(0 0 7px rgba(212, 0, 0, 0.78));
+  filter: drop-shadow(0 0 6px rgba(212, 0, 0, 0.62));
 }
 
 .icons-row--minimal .icon-btn.notification-orange:hover,
 .icons-row--minimal .icon-btn.notification-orange:focus-visible {
   color: var(--warning);
-  filter: drop-shadow(0 0 7px rgba(255, 165, 0, 0.65));
+  filter: drop-shadow(0 0 6px rgba(255, 165, 0, 0.62));
 }
 
 /*
@@ -445,10 +431,12 @@
  */
 .icons-row--minimal:not(.icons-row--personel) .icon-btn:hover,
 .icons-row--minimal:not(.icons-row--personel) .icon-btn:focus-visible {
+  animation: none;
   transform: scale(1.06);
 }
 
 .icons-row--minimal:not(.icons-row--personel) .icon-btn:active {
+  animation: none;
   transform: scale(0.96);
 }
 

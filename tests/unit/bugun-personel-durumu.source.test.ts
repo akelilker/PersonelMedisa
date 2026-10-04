@@ -168,6 +168,19 @@ describe("bugun personel durumu owners", () => {
     expect(birimService).not.toContain("no open daily notification → GELDI");
   });
 
+  it("keeps branch cards visibly framed and scales card with its label on hover", () => {
+    const styles = read("src/styles/modules/bugun-personel-durumu.css");
+    expect(styles).toMatch(
+      /\.bugun-personel-branch-card\s*\{[^}]*border-color:\s*rgba\(196,\s*210,\s*228,\s*0\.46\)[^}]*transition:\s*border-color 0\.2s ease, transform 0\.2s ease/s
+    );
+    expect(styles).toMatch(
+      /\.bugun-personel-branch-card:hover\s*\{[^}]*border-color:\s*var\(--border-strong\)[^}]*transform:\s*scale\(1\.025\)/s
+    );
+    expect(styles).toMatch(
+      /\.bugun-personel-branch-card:hover \.bugun-personel-branch-name\s*\{[^}]*transform:\s*scale\(1\.05\)/s
+    );
+  });
+
   it("adds payroll close gate without migration", () => {
     const controller = read("api/src/Controllers/BildirimlerController.php");
     expect(controller).toContain("assertPeriodOpenForDate");

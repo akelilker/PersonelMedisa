@@ -22,16 +22,9 @@ describe("home shell header toolbar polish", () => {
     expect(shell).toMatch(/className="sube-selector-chevron"[\s\S]*?width="12"/);
   });
 
-  it("softens the branch selector icon until hover or focus", () => {
+  it("keeps branch glyphs at the shared icon opacity", () => {
     const icons = read("src/styles/components/icons-row.css");
-    expect(icons).toMatch(/\.sube-selector-icon\s*\{[^}]*opacity:\s*0\.78/s);
-    expect(icons).toMatch(/\.sube-selector-chevron\s*\{[^}]*opacity:\s*0\.78/s);
-    expect(icons).toMatch(
-      /\.sube-selector-toggle:hover \.sube-selector-icon,\s*\.sube-selector-toggle:focus-visible \.sube-selector-icon\s*\{[^}]*opacity:\s*1/s
-    );
-    expect(icons).toMatch(
-      /\.sube-selector-toggle:hover \.sube-selector-chevron,\s*\.sube-selector-toggle:focus-visible \.sube-selector-chevron\s*\{[^}]*opacity:\s*1/s
-    );
+    expect(icons).not.toMatch(/\.sube-selector-(?:icon|chevron)\s*\{[^}]*opacity:/s);
   });
 
   it("keeps the hero branch label readable but quieter than the title", () => {

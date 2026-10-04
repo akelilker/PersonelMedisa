@@ -22,7 +22,7 @@ import {
 } from "../../../types/personel-belge-kaydi";
 import { formatIsoDateDetail } from "../components/personel-dosya/personel-dosya-format-utils";
 import type { IdOption } from "../../../types/referans";
-import { KayitSurecReturnLink } from "../../kayit/components/KayitSurecReturnLink";
+import { KayitSurecBackBar } from "../../kayit/components/KayitSurecBackBar";
 import type { KayitSurecReturnContext } from "../../kayit/kayit-surec-navigation";
 
 type FilterDraft = {
@@ -189,7 +189,11 @@ export function BelgeTakipPage() {
   return (
     <section className="belge-takip-page" data-testid="belge-takip-page">
       {kayitSurecReturn ? (
-        <KayitSurecReturnLink context={kayitSurecReturn} label="Belge Takip" />
+        <KayitSurecBackBar
+          context={kayitSurecReturn}
+          label="Belge Takip"
+          testId="kayit-surec-return-link"
+        />
       ) : null}
       <div className="personel-belge-panel-head">
         <div>

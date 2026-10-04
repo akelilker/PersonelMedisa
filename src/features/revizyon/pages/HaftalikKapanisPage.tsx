@@ -9,7 +9,7 @@ import { LoadingState } from "../../../components/states/LoadingState";
 import { useRoleAccess } from "../../../hooks/use-role-access";
 import { ROUTE_PERMISSION } from "../../../lib/authorization/role-permissions";
 import type { Personel } from "../../../types/personel";
-import { KayitSurecReturnLink } from "../../kayit/components/KayitSurecReturnLink";
+import { KayitSurecBackBar } from "../../kayit/components/KayitSurecBackBar";
 import type { KayitSurecReturnContext } from "../../kayit/kayit-surec-navigation";
 import { HaftalikKapanisClosePanel } from "../components/HaftalikKapanisClosePanel";
 import {
@@ -117,7 +117,13 @@ export function HaftalikKapanisPage() {
 
   return (
     <section className="states-page" data-testid="haftalik-kapanis-page">
-      {kayitSurecReturn ? <KayitSurecReturnLink context={kayitSurecReturn} label="Haftalık Kapanış" /> : null}
+      {kayitSurecReturn ? (
+        <KayitSurecBackBar
+          context={kayitSurecReturn}
+          label="Haftalık Kapanış"
+          testId="kayit-surec-return-link"
+        />
+      ) : null}
       <div className="puantaj-header-row">
         <h2>Haftalık Kapanış</h2>
       </div>

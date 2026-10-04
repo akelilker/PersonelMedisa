@@ -22,7 +22,7 @@ import { BildirimPuantajEtkiAdaylariSection } from "../components/BildirimPuanta
 import { PuantajOlayKararPanel } from "../components/PuantajOlayKararPanel";
 import { QrPuantajAdayiSection } from "../components/QrPuantajAdayiSection";
 import { QrGirisCikisOperationSection } from "../components/QrGirisCikisOperationSection";
-import { KayitSurecReturnLink } from "../../kayit/components/KayitSurecReturnLink";
+import { KayitSurecBackBar } from "../../kayit/components/KayitSurecBackBar";
 import type { KayitSurecReturnContext } from "../../kayit/kayit-surec-navigation";
 import { formatComplianceLevelLabel } from "../../../lib/display/enum-display";
 import type {
@@ -317,7 +317,9 @@ export function GunlukPuantajPage() {
   return (
     <section className="puantaj-page">
       <QrGirisCikisOperationSection />
-      {kayitSurecReturn ? <KayitSurecReturnLink context={kayitSurecReturn} label="Puantaj" /> : null}
+      {kayitSurecReturn ? (
+        <KayitSurecBackBar context={kayitSurecReturn} label="Puantaj" testId="kayit-surec-return-link" />
+      ) : null}
       <div className="puantaj-header-row">
         <h2>Günlük Kayıt ve Puantaj</h2>
       </div>

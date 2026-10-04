@@ -1963,10 +1963,6 @@ body.modal-open .modal-container--self-product .modal-header {
   transition: color 0.2s, opacity 0.2s;
 }
 
-.home-self-service-gateway--dimmed {
-  opacity: 0.7;
-}
-
 .home-self-service-gateway__chevron {
   font-size: 1em;
   line-height: 1;
@@ -1984,6 +1980,17 @@ body.modal-open .modal-container--self-product .modal-header {
 .home-self-service-gateway:focus-visible {
   outline: 2px solid rgba(var(--theme-color-rgb), 0.85);
   outline-offset: 2px;
+}
+
+/*
+ * Mobil: "Kullanıcı Paneli" geçişi aynı soluk rest / belirgin hover-focus
+ * dilini (renk, opacity, weight, konum) korur; yalnız yazı boyutu Taşıt
+ * referans değerine göre +0.5pt büyür. Masaüstü (≥641px) değişmez.
+ */
+@media (max-width: 640px) {
+  .home-self-service-gateway {
+    font-size: calc(0.86rem + 0.5pt);
+  }
 }
 
 @media (min-width: 641px) {

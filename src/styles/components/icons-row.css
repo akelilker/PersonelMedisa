@@ -262,6 +262,52 @@
   opacity: 1;
 }
 
+/*
+ * Mobil (≤640px) ana ekran aksiyon satırı: takvim + şube/konum + bildirim +
+ * ayarlar aynı optik yatay hatta ve ortak glyph ölçüsünde durur.
+ *
+ * Kök neden: platform/mobile.css'teki `.icon-btn { display: inline-grid;
+ * place-items: center }` tek glyph'li butonlar için doğrudur; ancak iki glyph
+ * taşıyan şube toggle'ını (pin + chevron) grid satırlarına bölüp alt alta
+ * düşürüyordu. Toggle 44px slotu aşıp ~50px oluyor, pin satır merkezinin
+ * üstünde kalıyor ve 12px chevron nokta gibi görünüyordu. Bu blok toggle'ı
+ * tek satıra (yatay, pin + chevron) alır ve dört aksiyonun glyph ölçüsünü
+ * ortak değere çeker. Yalnız mobil; masaüstü/tablet ve personel shell
+ * (`icons-row--personel`) değişmez.
+ */
+@media (max-width: 640px) {
+  /* Şube/konum toggle'ı: mobile.css'teki tek-glyph grid'ini geçip tek satıra döner;
+     44px hit-area/min-width korunur (padding-inline düşer, tap target aynı kalır). */
+  .icons-row--minimal:not(.icons-row--personel) .icon-btn.sube-selector-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding-inline: 2px;
+  }
+
+  /* Ortak glyph ölçüsü: takvim (Bugünkü Personel Durumu) + ayarlar ikonu. */
+  .icons-row--minimal:not(.icons-row--personel) .icons-row-right > .icon-btn > svg,
+  /* Bildirim zili wrap içinde yaşadığı için aynı ölçü ayrı selector ile verilir. */
+  .icons-row--minimal:not(.icons-row--personel) .notification-wrap > .icon-btn > svg {
+    width: 24px;
+    height: 24px;
+  }
+
+  /* Şube/konum glyph'leri: pin diğer aksiyonlarla aynı optik ağırlıkta,
+     chevron nokta gibi görünmeyecek kadar okunur ve dikeyde ortalanmış. */
+  .icons-row--minimal:not(.icons-row--personel) .sube-selector-icon {
+    width: 22px;
+    height: 22px;
+  }
+
+  .icons-row--minimal:not(.icons-row--personel) .sube-selector-chevron {
+    width: 14px;
+    height: 14px;
+    margin-top: 0;
+  }
+}
+
 .sube-selector-dropdown {
   /* Module header: toggle sits on the trailing edge — anchor panel to right. */
   left: auto;
@@ -387,6 +433,23 @@
 .icons-row--minimal .icon-btn.notification-orange:focus-visible {
   color: var(--warning);
   filter: drop-shadow(0 0 7px rgba(255, 165, 0, 0.65));
+}
+
+/*
+ * Ortak header aksiyon interaction dili — Bugünkü Personel Durumu (takvim/sayaç),
+ * şube/konum, bildirim ve ayarlar aynı hafif büyüme + basma hissini paylaşır.
+ * Renk/parlaklık davranışı yukarıdaki .icon-btn:hover ve .notification-* kurallarından
+ * gelir; bu blok yalnız scale'i tek yerde tutar, böylece dördü de aynı ağırlıkta tepki
+ * verir. PERSONEL shell (.icons-row--personel) kendi kontratını korur, dışarıda kalır;
+ * dropdown containing-block kontratı bozulmaz (transform button'a, wrap'e değil).
+ */
+.icons-row--minimal:not(.icons-row--personel) .icon-btn:hover,
+.icons-row--minimal:not(.icons-row--personel) .icon-btn:focus-visible {
+  transform: scale(1.06);
+}
+
+.icons-row--minimal:not(.icons-row--personel) .icon-btn:active {
+  transform: scale(0.96);
 }
 
 .icon-btn.notification-red {

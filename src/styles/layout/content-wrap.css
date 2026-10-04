@@ -45,3 +45,15 @@ body.login-page .content-wrap {
 body.login-page .content-wrap::-webkit-scrollbar {
   display: none;
 }
+
+/*
+ * Mobil login: kırmızı üst dış çerçeve (app-shell border-top) ile login
+ * header/hero üst kenarı arasındaki dış yerleşim boşluğu +2px. Hero iç
+ * yüksekliği, iç padding'i ve logo/title ölçüleri değişmez; kimliği
+ * doğrulanmış ana ekran (`app-home-route`) bu selector'a girmez.
+ */
+@media (max-width: 640px) {
+  body.login-page .content-wrap {
+    padding-top: calc(max(4px, env(safe-area-inset-top, 0px)) + 2px);
+  }
+}

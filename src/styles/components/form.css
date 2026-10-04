@@ -18,8 +18,9 @@
   padding: 0 var(--space-3);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-control);
-  background: var(--bg-field);
+  background-color: var(--bg-field);
   color: var(--text-primary);
+  color-scheme: dark;
   box-shadow: none;
   font: inherit;
   transition: border-color 0.16s ease, background-color 0.16s ease, box-shadow 0.16s ease;
@@ -51,6 +52,7 @@ select.form-input {
 .form-input:focus-visible {
   outline: none;
   border-color: var(--brand-red);
+  background-color: var(--bg-field-focus);
   box-shadow: 0 0 0 2px rgba(var(--theme-color-rgb), 0.16);
 }
 
@@ -59,9 +61,19 @@ select.form-input {
   cursor: not-allowed;
 }
 
-.form-input:-webkit-autofill {
+.form-input:-webkit-autofill,
+.form-input:-webkit-autofill:hover,
+.form-input:-webkit-autofill:focus {
   -webkit-text-fill-color: var(--text-primary);
   box-shadow: 0 0 0 1000px var(--bg-field) inset;
+  -webkit-box-shadow: 0 0 0 1000px var(--bg-field) inset;
+  caret-color: var(--text-primary);
+  transition: background-color 9999s ease-out 0s;
+}
+
+select.form-input option {
+  background-color: var(--bg-field);
+  color: var(--text-primary);
 }
 
 .form-filter-panel {

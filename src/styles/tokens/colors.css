@@ -1,9 +1,11 @@
 :root {
+  color-scheme: dark;
   --bg-app: #080d16;
   --bg-surface: #0d131f;
   --bg-surface-elevated: #151515;
   --bg-panel: #10151f;
-  --bg-field: #0f1418;
+  --bg-field: var(--bg-surface);
+  --bg-field-focus: #0f1622;
   --border-default: rgba(255, 255, 255, 0.3);
   --border-strong: rgba(184, 192, 201, 0.77);
   --text-primary: #f2f5f7;
@@ -39,7 +41,7 @@
   --modal-header-red-gradient:
     linear-gradient(180deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.02) 5%, rgba(255, 255, 255, 0) 12%),
     linear-gradient(180deg, rgba(212, 0, 0, 0.36) 0%, rgba(212, 0, 0, 0.22) 18%, rgba(212, 0, 0, 0.08) 34%, rgba(212, 0, 0, 0) 48%),
-    linear-gradient(180deg, #790000 0%, #700000 30%, #580000 52%, #420205 72%, #32050a 82%, #20080f 90%, #120b14 96%, var(--modal-bg) 100%);
+    linear-gradient(180deg, #790000 0%, #700000 20%, #580000 38%, #420205 50%, #32050a 58%, #20080f 64%, #120b14 68%, var(--modal-bg) 72%);
   --modal-title-color: #ffffff;
   --modal-title-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
   --modal-title-weight: 700;

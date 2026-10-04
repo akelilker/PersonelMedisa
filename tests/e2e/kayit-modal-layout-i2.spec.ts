@@ -153,8 +153,8 @@ test.describe("I2 Kayit modal viewport layout", () => {
     expect(scrollOwnerCheck.scrollOverflowY).toMatch(/visible/);
     expect(scrollOwnerCheck.containerOverflow).toMatch(/hidden|clip/);
     expect(scrollOwnerCheck.footerInBody).toBe(true);
-    // --bg-field #0f1418 => rgb(15, 20, 24)
-    expect(scrollOwnerCheck.fieldBackground).toBe("rgb(15, 20, 24)");
+    // --bg-field / --bg-surface #0d131f => rgb(13, 19, 31)
+    expect(scrollOwnerCheck.fieldBackground).toBe("rgb(13, 19, 31)");
   });
 
   test("Süreç sekmesinde footer flow ve form association korunur", async ({ page }) => {

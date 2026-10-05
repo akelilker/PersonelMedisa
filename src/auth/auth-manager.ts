@@ -188,21 +188,6 @@ export function isAuthenticated(): boolean {
   return getSession() !== null;
 }
 
-export function setToken(nextToken: string): void {
-  const located = readRawFromStorages();
-  const current = located ? parseStored(located.raw) : null;
-  if (!current || !located) {
-    return;
-  }
-
-  const next = finalizeAuthSessionSube({ ...current, token: nextToken });
-  try {
-    located.storage.setItem(MEDISA_AUTH_SESSION_KEY, JSON.stringify(next));
-  } catch {
-    /* quota */
-  }
-}
-
 export function patchSession(patch: Partial<AuthSession>): AuthSession | null {
   const located = readRawFromStorages();
   const current = located ? parseStored(located.raw) : null;

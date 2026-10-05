@@ -87,7 +87,7 @@ class PersonelAccountOnboardingService
         ],
         201 => [
             'from' => ['ad' => 'SAIF TAREQ JASIM AL-GBURI', 'soyad' => null],
-            'to' => ['ad' => 'Saif Tareq Jasim', 'soyad' => 'Al-Gburi'],
+            'to' => ['ad' => 'Saıf Tareq Jasım', 'soyad' => 'Al-Gburı'],
         ],
         207 => [
             'from' => ['ad' => 'OKTAY ERSÖZ', 'soyad' => null],

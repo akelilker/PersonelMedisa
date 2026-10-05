@@ -177,23 +177,6 @@ export function addDaysIso(value: string, delta: number): string {
   );
 }
 
-export function addYearsIso(value: string, delta: number): string {
-  const parts = parseIsoDate(value);
-  if (!parts) {
-    return value;
-  }
-
-  return (
-    toIsoDate({ year: parts.year + delta, month: parts.month, day: parts.day }) ??
-    toIsoDate({
-      year: parts.year + delta,
-      month: parts.month,
-      day: daysInMonth(parts.year + delta, parts.month)
-    }) ??
-    value
-  );
-}
-
 export type MonthCell = { iso: string; day: number; inMonth: boolean };
 
 /** Pazartesi başlangıçlı 6x7 gün matrisi (sabit yükseklik → panel zıplamaz). */

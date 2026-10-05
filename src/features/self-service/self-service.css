@@ -214,30 +214,6 @@
   justify-content: center;
 }
 
-.qr-event-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: fit-content;
-  min-height: 28px;
-  padding: 0 10px;
-  border-radius: var(--radius-md);
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  font-size: 0.78rem;
-  font-weight: 800;
-  letter-spacing: 0.04em;
-}
-
-.qr-event-badge--giris {
-  border-color: rgba(34, 197, 94, 0.55);
-  color: #86efac;
-}
-
-.qr-event-badge--cikis {
-  border-color: rgba(251, 191, 36, 0.55);
-  color: #fde68a;
-}
-
 .qr-history-list {
   list-style: none;
   margin: 0;
@@ -1431,28 +1407,6 @@ body.app-personel-shell.app-home-route .personel-mobile-shell.self-home-page > .
   height: 18px;
   border-radius: 2px;
   background: var(--brand-red, #c62828);
-}
-
-.pm-inbox {
-  display: grid;
-  gap: 8px;
-}
-
-.pm-inbox-item {
-  padding: 10px 12px;
-  border: 1.15px solid rgba(255, 255, 255, 0.28);
-  border-radius: var(--radius-lg);
-  background: transparent;
-}
-
-.pm-inbox-item p,
-.pm-inbox-item strong {
-  margin: 0;
-}
-
-.pm-inbox-meta {
-  font-size: 0.75rem;
-  color: var(--txt-muted);
 }
 
 .pm-notice-backdrop {

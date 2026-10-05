@@ -127,18 +127,3 @@ function snapshotsEqual(left: LifecycleSnapshot, right: LifecycleSnapshot): bool
 export function computeHasLifecycleDiff(personel: Personel, form: LifecycleFormFields): boolean {
   return !snapshotsEqual(snapshotFromPersonel(personel), snapshotFromLifecycleForm(form));
 }
-
-export function lifecycleSnapshotToPersonelPatch(snap: LifecycleSnapshot): Partial<Personel> {
-  return {
-    departman_id: snap.departman_id ?? undefined,
-    bolum_id: snap.bolum_id,
-    birim_id: snap.birim_id,
-    gorev_id: snap.gorev_id ?? undefined,
-    pozisyon_id: snap.pozisyon_id,
-    bagli_amir_id: snap.bagli_amir_id ?? undefined,
-    ucret_tipi_id: snap.ucret_tipi_id ?? undefined,
-    maas_tutari: snap.maas_tutari ?? undefined,
-    net_maas_tutari: snap.maas_tutari ?? undefined,
-    prim_kurali_id: snap.prim_kurali_id ?? undefined
-  };
-}

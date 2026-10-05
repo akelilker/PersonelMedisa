@@ -328,7 +328,6 @@ export const FAZLA_SURELERLE_CALISMA_UCRET_CARPANI = 1.25;
  * 45 saat uzeri tamamen %50 FM. Dusuk sozlesme odeme bandi onizlemede kullanilabilir
  * ancak sirket politikasi odeme bantlarinda 2700 zorlar (PHP MaasHesaplamaEngine).
  */
-export const SIRKET_KARARI_HAFTALIK_NORMAL_CALISMA_DAKIKA = HAFTALIK_NORMAL_CALISMA_ESIK_DAKIKA;
 export const PAYROLL_ENGINE_VERSION = "S91C2_PAYROLL_ENGINE_V2";
 export const YARGITAY_HOLIDAY_OVERTIME_MODE = "YARGITAY_7_5_SAAT_AYRIMI";
 export const YARGITAY_HOLIDAY_SPLIT_MINUTES = 450;
@@ -338,11 +337,9 @@ export const TATIL_FSC_FM_CAKISMA_POLITIKASI_EKSIK =
 export const HOLIDAY_OVERTIME_POLICY_REQUIRED_MESSAGE =
   "Tatil çalışması ile fazla çalışma çakışma politikası yetkili onayı bekliyor";
 export const UBGT_DAY_SCOPE_ERROR_CODE = "UBGT_DAY_SCOPE_REQUIRED";
-export const UBGT_DAY_SCOPE_BLOCKER_CODE = "UBGT_GUN_KAPSAMI_EKSIK";
 export const UBGT_DAY_SCOPE_ERROR_MESSAGE =
   "Resmî tatilin tam gün veya yarım gün kapsamı doğrulanamadığı için otomatik hesaplama yapılamıyor";
 export const HALF_DAY_UBGT_POLICY_ERROR_CODE = "HALF_DAY_UBGT_POLICY_REQUIRED";
-export const HALF_DAY_UBGT_POLICY_BLOCKER_CODE = "YARIM_GUN_UBGT_HESAP_POLITIKASI_EKSIK";
 export const HALF_DAY_UBGT_POLICY_ERROR_MESSAGE =
   "Yarım günlük resmî tatil çalışma hesabı için tatil dönemi net çalışma süresi güvenilir çözülemedi";
 export const HALF_DAY_UBGT_PREMIUM_GUN = 0.5;
@@ -1843,42 +1840,6 @@ function parseDateOnly(value: string): Date | null {
     Number.parseInt(match[2], 10) - 1,
     Number.parseInt(match[3], 10)
   );
-}
-
-/** Parse policy HAFTA_TATILI_GUNLERI (CSV / legacy PAZAR). */
-export function parseHaftaTatiliGunleri(
-  raw: string | null | undefined
-): { ok: true; days: HaftaTatiliGunKodu[] } | { ok: false; error: string } {
-  const normalized = String(raw ?? "")
-    .trim()
-    .toUpperCase();
-  if (!normalized) {
-    return { ok: false, error: "HAFTA_TATILI_GUNLERI bos olamaz." };
-  }
-  if (
-    normalized === "PAZAR" ||
-    normalized === "HAFTA_TATILI_PAZAR" ||
-    normalized === "SUNDAY"
-  ) {
-    return { ok: true, days: [0] };
-  }
-  const parts = normalized.split(/[,\s;|]+/).filter(Boolean);
-  const days: HaftaTatiliGunKodu[] = [];
-  for (const part of parts) {
-    let day: number | null = null;
-    if (part === "PAZAR" || part === "SUNDAY") day = 0;
-    else if (part === "CUMARTESI" || part === "SATURDAY") day = 6;
-    else if (/^[0-6]$/.test(part)) day = Number.parseInt(part, 10);
-    else return { ok: false, error: `HAFTA_TATILI_GUNLERI gecersiz weekday: ${part}` };
-    if (days.includes(day as HaftaTatiliGunKodu)) {
-      return { ok: false, error: "HAFTA_TATILI_GUNLERI duplicate weekday." };
-    }
-    days.push(day as HaftaTatiliGunKodu);
-  }
-  if (days.length === 0) {
-    return { ok: false, error: "HAFTA_TATILI_GUNLERI en az bir dinlenme gunu icermelidir." };
-  }
-  return { ok: true, days: days.sort((a, b) => a - b) };
 }
 
 function normalizeRestDays(

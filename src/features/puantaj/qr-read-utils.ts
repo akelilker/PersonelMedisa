@@ -1,4 +1,4 @@
-import type { ManagerQrAttendanceItem } from "../../types/self-service";
+import type { ManagerQrAttendanceItem, ManagerQrLocationEvent } from "../../types/self-service";
 
 export function istanbulToday(): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Istanbul" }).format(new Date());
@@ -38,6 +38,22 @@ export function qrAttendanceStatus(item: ManagerQrAttendanceItem, today = istanb
   if (item.missing_entry) return "Eksik giriş";
   if (item.missing_exit) return "Eksik Çıkış";
   return item.inside ? "İçeride" : "Çıktı";
+}
+
+function formatLocationMetric(value: number | null, suffix: string): string {
+  if (value == null || !Number.isFinite(value)) return "";
+  return ` · ${Math.round(value)}${suffix}`;
+}
+
+export function formatManagerLocationEventLine(event: ManagerQrLocationEvent): string {
+  const typeLabel = event.event_type === "GIRIS" ? "Giriş" : "Çıkış";
+  return `${typeLabel}: ${event.status_label}${formatLocationMetric(event.distance_meters, "m")}${formatLocationMetric(event.accuracy_meters, "m GPS")}`;
+}
+
+export function formatManagerLocationEvents(item: ManagerQrAttendanceItem): string {
+  const events = item.location_events ?? [];
+  if (!events.length) return "—";
+  return events.map(formatManagerLocationEventLine).join(" · ");
 }
 
 export function qrReadErrorMessage(cause: unknown, historical = false): string {

@@ -14,7 +14,9 @@ import type {
   MeQrScanResponse,
   ManagerQrAttendanceItem,
   ManagerQrAttendanceResponse,
+  ManagerQrLocationEvent,
   QrEventType,
+  QrScanLocationCapture,
   QrKioskTokenResponse
 } from "../types/self-service";
 import { appendQueryParams } from "../utils/append-query-params";
@@ -201,6 +203,7 @@ export async function postMeQrScan(input: {
   event_type: QrEventType;
   request_nonce: string;
   early_exit_confirmed?: boolean;
+  location_capture?: QrScanLocationCapture;
 }): Promise<MeQrScanResponse> {
   if (shouldPreferDemoApi()) {
     demoUnavailable();
@@ -212,6 +215,9 @@ export async function postMeQrScan(input: {
   };
   if (input.early_exit_confirmed) {
     body.early_exit_confirmed = true;
+  }
+  if (input.location_capture) {
+    body.location_capture = input.location_capture;
   }
   const response = await apiRequest<ApiResponse<unknown>>(endpoints.me.qrScan, {
     method: "POST",
@@ -422,7 +428,44 @@ function normalizeManagerQrAttendanceItem(raw: unknown): ManagerQrAttendanceItem
     branch_mismatch: row.branch_mismatch,
     anomalies: row.anomalies.filter((value): value is string => typeof value === "string"),
     matched_seconds: matchedSeconds,
-    source_event_count: sourceEventCount
+    source_event_count: sourceEventCount,
+    ...(Array.isArray(row.location_events)
+      ? { location_events: row.location_events.map(normalizeManagerQrLocationEvent) }
+      : {})
+  };
+}
+
+function normalizeManagerQrLocationEvent(raw: unknown): ManagerQrLocationEvent {
+  const row = toRecord(raw);
+  if (!row) {
+    throw new ApiRequestError("QR konum satiri alanlari eksik.", 500, { code: "INVALID_RESPONSE" });
+  }
+  const eventType = row.event_type;
+  if (eventType !== "GIRIS" && eventType !== "CIKIS") {
+    throw new ApiRequestError("QR konum satiri alanlari eksik.", 500, { code: "INVALID_RESPONSE" });
+  }
+  const occurredAt = readString(row.occurred_at);
+  const statusCode = readString(row.status_code);
+  const statusLabel = readString(row.status_label);
+  if (!occurredAt || !statusCode || !statusLabel) {
+    throw new ApiRequestError("QR konum satiri alanlari eksik.", 500, { code: "INVALID_RESPONSE" });
+  }
+  const distance =
+    row.distance_meters === null || row.distance_meters === undefined
+      ? null
+      : readNumber(row.distance_meters);
+  const accuracy =
+    row.accuracy_meters === null || row.accuracy_meters === undefined
+      ? null
+      : readNumber(row.accuracy_meters);
+
+  return {
+    event_type: eventType,
+    occurred_at: occurredAt,
+    status_code: statusCode,
+    status_label: statusLabel,
+    distance_meters: distance,
+    accuracy_meters: accuracy
   };
 }
 

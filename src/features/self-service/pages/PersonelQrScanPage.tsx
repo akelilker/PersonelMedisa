@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { isApiRequestError } from "../../../api/api-client";
 import { createQrRequestNonce, postMeQrScan } from "../../../api/qr.api";
 import type { MeQrAttendanceEvent, MeQrEarlyExitConfirm, QrEventType } from "../../../types/self-service";
+import { captureQrScanLocation } from "../qr/qr-scan-location";
 import { BackgroundlessNoticeModal } from "../components/BackgroundlessNoticeModal";
 import {
   mapCameraError,
@@ -108,11 +109,13 @@ export function PersonelQrScanPage() {
     submittingRef.current = true;
     setPhase({ kind: "submitting", token, eventType });
     try {
+      const location_capture = await captureQrScanLocation();
       const response = await postMeQrScan({
         token,
         event_type: eventType,
         request_nonce: createQrRequestNonce(),
-        early_exit_confirmed: options?.earlyExitConfirmed
+        early_exit_confirmed: options?.earlyExitConfirmed,
+        location_capture
       });
       if (response.confirmation_required && response.early_exit_confirm) {
         setEarlyExitPending({

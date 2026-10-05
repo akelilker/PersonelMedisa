@@ -130,6 +130,14 @@ export type MeQrEarlyExitConfirm = {
   delta_dakika: number;
 };
 
+export type QrScanLocationCapture = {
+  available: boolean;
+  latitude?: number;
+  longitude?: number;
+  accuracy_meters?: number | null;
+  error_code?: string;
+};
+
 export type MeQrScanResponse = {
   event: MeQrAttendanceEvent | null;
   idempotent: boolean;
@@ -233,6 +241,15 @@ export type MeQrAraliklariResponse = {
   source_max_event_id: number | null;
 };
 
+export type ManagerQrLocationEvent = {
+  event_type: QrEventType;
+  occurred_at: string;
+  status_code: string;
+  status_label: string;
+  distance_meters: number | null;
+  accuracy_meters: number | null;
+};
+
 export type ManagerQrAttendanceItem = {
   personel_id: number;
   ad_soyad: string;
@@ -253,6 +270,7 @@ export type ManagerQrAttendanceItem = {
   anomalies: string[];
   matched_seconds: number;
   source_event_count: number;
+  location_events?: ManagerQrLocationEvent[];
 };
 
 export type ManagerQrAttendanceResponse = {

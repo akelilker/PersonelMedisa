@@ -6,7 +6,7 @@ import { LoadingState } from "../../../components/states/LoadingState";
 import { useRoleAccess } from "../../../hooks/use-role-access";
 import { downloadReportCsv } from "../../../reports/export-report";
 import { useManagerQrAttendance } from "../hooks/useManagerQrAttendance";
-import { formatQrTime, qrAttendanceAnomalyDisplay, qrAttendanceStatus, qrReadErrorMessage } from "../qr-read-utils";
+import { formatQrTime, qrAttendanceAnomalyDisplay, qrAttendanceStatus, qrReadErrorMessage, formatManagerLocationEvents } from "../qr-read-utils";
 
 export function QrGirisCikisOperationSection() {
   const { hasPermission } = useRoleAccess();
@@ -106,7 +106,7 @@ export function QrGirisCikisOperationSection() {
             onClick={() =>
               downloadReportCsv(
                 `qr-giris-cikis-${from}-${to}.csv`,
-                ["Personel", "Sicil", "Şube", "İlk giriş", "Son çıkış", "Durum", "Anomali"],
+                ["Personel", "Sicil", "Şube", "İlk giriş", "Son çıkış", "Durum", "Konum doğrulama", "Anomali"],
                 filteredItems.map((item) => ({
                   Personel: item.ad_soyad,
                   Sicil: item.sicil_no ?? "—",
@@ -114,6 +114,7 @@ export function QrGirisCikisOperationSection() {
                   "İlk giriş": item.first_entry ?? "—",
                   "Son çıkış": item.last_exit ?? "—",
                   Durum: qrAttendanceStatus(item),
+                  "Konum doğrulama": formatManagerLocationEvents(item),
                   Anomali: qrAttendanceAnomalyDisplay(item)
                 }))
               )
@@ -135,7 +136,7 @@ export function QrGirisCikisOperationSection() {
       {!loading && !error && filteredItems.length > 0 ? (
         <div className="raporlar-table-wrap puantaj-qr-table-wrap">
           <table className="raporlar-table" data-testid="puantaj-qr-table">
-            <thead><tr><th>Personel</th><th>Sicil</th><th>Şube</th><th>Tarih</th><th>İlk giriş</th><th>Son çıkış</th><th>Son hareket</th><th>Durum</th><th>Interval</th><th>Anomali</th><th>Aksiyon</th></tr></thead>
+            <thead><tr><th>Personel</th><th>Sicil</th><th>Şube</th><th>Tarih</th><th>İlk giriş</th><th>Son çıkış</th><th>Son hareket</th><th>Durum</th><th>Konum</th><th>Interval</th><th>Anomali</th><th>Aksiyon</th></tr></thead>
             <tbody>
               {filteredItems.map((item) => (
                 <tr key={`${item.personel_id}-${item.date_from}`}>
@@ -143,7 +144,9 @@ export function QrGirisCikisOperationSection() {
                   <td>{item.date_from === item.date_to ? item.date_from : `${item.date_from} – ${item.date_to}`}</td>
                   <td>{formatQrTime(item.first_entry)}</td><td>{formatQrTime(item.last_exit)}</td>
                   <td>{formatQrTime(item.last_movement)} {item.last_movement_type ? `(${item.last_movement_type})` : ""}</td>
-                  <td>{qrAttendanceStatus(item)}</td><td>{item.interval_count}</td>
+                  <td>{qrAttendanceStatus(item)}</td>
+                  <td>{formatManagerLocationEvents(item)}</td>
+                  <td>{item.interval_count}</td>
                   <td>{qrAttendanceAnomalyDisplay(item)}</td>
                   <td className="table-actions">
                     <Link to={`/puantaj?personel_id=${item.personel_id}&tarih=${item.date_from}`}>Günlük Puantaja Git</Link>

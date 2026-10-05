@@ -145,4 +145,34 @@ describe("manager QR read contract", () => {
     expect(qrAttendanceStatus({ ...item, date_from: today, date_to: today }, today)).toBe("Eksik Çıkış");
     expect(qrAttendanceAnomalyDisplay({ ...item, date_from: today, date_to: today }, today)).toBe("MISSING_CIKIS");
   });
+
+  it("normalizes optional manager location audit events", () => {
+    const result = normalizeManagerQrAttendanceResponse(
+      response({
+        from: "2026-08-15",
+        to: "2026-08-15",
+        items: [
+          {
+            ...item,
+            location_events: [
+              {
+                event_type: "GIRIS",
+                occurred_at: "2026-08-15T08:54:00+03:00",
+                status_code: "UNAVAILABLE",
+                status_label: "Konum Alınamadı",
+                distance_meters: null,
+                accuracy_meters: null
+              }
+            ]
+          }
+        ],
+        total: 1,
+        limit: 50,
+        offset: 0,
+        has_next: false,
+        algorithm_version: "QR_INTERVAL_V1"
+      })
+    );
+    expect(result.items[0].location_events?.[0]?.status_label).toBe("Konum Alınamadı");
+  });
 });

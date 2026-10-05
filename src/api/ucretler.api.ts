@@ -203,6 +203,25 @@ export async function createPersonelUcret(
   return created;
 }
 
+export async function updatePersonelUcret(
+  personelId: number | string,
+  ucretId: number | string,
+  payload: UpdatePersonelUcretPayload
+): Promise<PersonelUcretKaydi> {
+  const response = await apiRequest<ApiResponse<unknown>>(
+    endpoints.personelUcretleri.detail(personelId, ucretId),
+    {
+      method: "PUT",
+      body: JSON.stringify(payload)
+    }
+  );
+  assertNoUcretApiErrors(response, "Ücret kaydı güncellenemedi.");
+
+  const updated = normalizePersonelUcretKaydi(response.data);
+  logAction({ action: "UCRET_UPDATE", payload: { personel_id: personelId, ucret_id: updated.id } });
+  return updated;
+}
+
 export async function cancelPersonelUcret(
   personelId: number | string,
   ucretId: number | string

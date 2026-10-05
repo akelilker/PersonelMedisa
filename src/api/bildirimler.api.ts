@@ -245,6 +245,32 @@ export async function fetchBugunPersonelDurumu(params?: {
   return normalizeBugunPersonelDurumu(response.data);
 }
 
+export async function fetchGunlukTamamlama(params: {
+  tarih: string;
+  sube_id?: number;
+  birim_amiri_user_id?: number;
+}): Promise<{
+  tarih: string;
+  sube_id: number;
+  birim_amiri_user_id: number;
+  tamamlama: GunlukBildirimTamamlama | null;
+}> {
+  const path = appendQueryParams(endpoints.bildirimler.gunlukTamamlama, {
+    tarih: params.tarih,
+    sube_id: params.sube_id,
+    birim_amiri_user_id: params.birim_amiri_user_id
+  });
+  const response = await apiRequest<
+    ApiResponse<{
+      tarih: string;
+      sube_id: number;
+      birim_amiri_user_id: number;
+      tamamlama: GunlukBildirimTamamlama | null;
+    }>
+  >(path);
+  return response.data;
+}
+
 export async function completeGunlukTamamlama(
   payload: CompleteGunlukTamamlamaPayload
 ): Promise<GunlukBildirimTamamlama> {

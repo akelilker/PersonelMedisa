@@ -233,6 +233,36 @@ export async function fetchBordroHazirlikPreflight(params: {
   return unwrapData(response, "Bordro preflight alinamadi.");
 }
 
+export async function fetchBordroReadiness(params: {
+  yil: number;
+  ay: number;
+  subeId: number;
+}): Promise<BordroHazirlikPreflight> {
+  const path = appendQueryParams(endpoints.bordroHazirlik.readiness, {
+    sube_id: params.subeId,
+    yil: params.yil,
+    ay: params.ay
+  });
+  const response = await apiRequest<ApiResponse<BordroHazirlikPreflight> | BordroHazirlikPreflight>(path);
+  return unwrapData(response, "Bordro readiness alinamadi.");
+}
+
+export async function fetchBordroOperasyonelOzet(params: {
+  yil: number;
+  ay: number;
+  subeId: number;
+}): Promise<BordroOperasyonelHazirlikOzet> {
+  const path = appendQueryParams(endpoints.bordroHazirlik.operasyonelOzet, {
+    sube_id: params.subeId,
+    yil: params.yil,
+    ay: params.ay
+  });
+  const response = await apiRequest<ApiResponse<BordroOperasyonelHazirlikOzet> | BordroOperasyonelHazirlikOzet>(
+    path
+  );
+  return unwrapData(response, "Bordro operasyonel ozet alinamadi.");
+}
+
 export async function fetchBordroNetMaasEksikleri(params: {
   yil: number;
   ay: number;

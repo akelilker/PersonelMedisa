@@ -149,6 +149,17 @@ export async function fetchSgkKatalogTamlik(body?: Record<string, unknown>) {
   return unwrapData(response);
 }
 
+export async function fetchSgkSirketPolitikasi(params?: { sube_id?: number; yil?: number; ay?: number }) {
+  const response = await apiRequest<
+    ApiResponse<{
+      items: SgkSirketPolitikaReadItem[];
+      period: { baslangic: string; bitis: string };
+    }>
+  >(appendQueryParams(endpoints.sgkKatalogHazirlik.sirketPolitikasi, params ?? {}));
+
+  return unwrapData(response);
+}
+
 export async function fetchSgkSirketPolitikasiSurumler(params: {
   sube_id: number;
   baslangic?: string;

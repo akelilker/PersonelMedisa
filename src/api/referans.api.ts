@@ -204,6 +204,20 @@ export async function fetchPozisyonOptions(): Promise<IdOption[]> {
   }
 }
 
+export async function createGorevOption(ad: string): Promise<IdOption> {
+  const response = await apiRequest<ApiResponse<unknown>>(endpoints.referans.gorevler, {
+    method: "POST",
+    body: JSON.stringify({ ad })
+  });
+
+  const items = normalizeIdOptions(response.data);
+  if (items.length === 0) {
+    throw new Error("Görev kaydı oluşturuldu ama yanıt beklenen formatta değil.");
+  }
+
+  return items[0];
+}
+
 export async function fetchPersonelTipiOptions(): Promise<IdOption[]> {
   const response = await apiRequest<ApiResponse<unknown>>(endpoints.referans.personelTipleri);
   return normalizeIdOptions(response.data);

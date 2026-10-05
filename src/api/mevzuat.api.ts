@@ -143,6 +143,21 @@ export async function createMevzuatParametresi(
   return created;
 }
 
+export async function updateMevzuatParametresi(
+  id: number | string,
+  payload: UpdateMevzuatParametresiPayload
+): Promise<MevzuatParametresi> {
+  const response = await apiRequest<ApiResponse<unknown>>(endpoints.mevzuatParametreleri.detail(id), {
+    method: "PUT",
+    body: JSON.stringify(payload)
+  });
+  assertNoMevzuatApiErrors(response, "Mevzuat parametresi güncellenemedi.");
+
+  const updated = normalizeMevzuatParametresi(response.data);
+  logAction({ action: "MEVZUAT_PARAMETRE_UPDATE", payload: { mevzuat_parametre_id: updated.id } });
+  return updated;
+}
+
 export async function cancelMevzuatParametresi(id: number | string): Promise<void> {
   const response = await apiRequest<ApiResponse<unknown>>(endpoints.mevzuatParametreleri.cancel(id), {
     method: "POST"

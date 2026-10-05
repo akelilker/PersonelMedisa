@@ -671,3 +671,10 @@ export async function postQrPuantajAdayKarar(
   );
   return response.data;
 }
+
+export async function fetchQrPuantajAdayKararlar(personelId: number, candidateDate: string) {
+  const response = await apiRequest<
+    ApiResponse<{ personel_id: number; candidate_date: string; items: Array<Record<string, unknown>> }>
+  >(endpoints.puantaj.qrAdayKararlar(personelId, candidateDate), { method: "GET" });
+  return response.data;
+}

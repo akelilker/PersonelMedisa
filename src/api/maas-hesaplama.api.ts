@@ -220,6 +220,13 @@ export type MaasHesaplamaKalem = {
   metadata?: Record<string, unknown> | null;
 };
 
+export type MaasHesaplamaYasalKatalog = {
+  engine_version?: string;
+  contract_version?: string;
+  items?: Array<Record<string, unknown>>;
+  [key: string]: unknown;
+};
+
 export type MaasHesaplamaDevir = {
   id: number;
   personel_id: number;
@@ -499,6 +506,15 @@ export async function fetchMaasHesaplamaCalistirmalar(
   return unwrapData(response, "Calistirma listesi alinamadi.").items ?? [];
 }
 
+export async function fetchMaasHesaplamaCalistirmaDetail(
+  calistirmaId: number
+): Promise<MaasHesaplamaCalistirma> {
+  const response = await apiRequest<ApiResponse<MaasHesaplamaCalistirma> | MaasHesaplamaCalistirma>(
+    endpoints.maasHesaplama.calistirmaDetail(calistirmaId)
+  );
+  return unwrapData(response, "Calistirma detayi alinamadi.");
+}
+
 export async function fetchMaasHesaplamaCalistirmaAdaylari(
   calistirmaId: number
 ): Promise<MaasHesaplamaAday[]> {
@@ -506,6 +522,15 @@ export async function fetchMaasHesaplamaCalistirmaAdaylari(
     endpoints.maasHesaplama.calistirmaAdaylar(calistirmaId)
   );
   return unwrapData(response, "Aday listesi alinamadi.").items ?? [];
+}
+
+export async function fetchMaasHesaplamaCalistirmaAudit(
+  calistirmaId: number
+): Promise<MaasHesaplamaAudit[]> {
+  const response = await apiRequest<ApiResponse<{ items: MaasHesaplamaAudit[] }> | { items: MaasHesaplamaAudit[] }>(
+    endpoints.maasHesaplama.calistirmaAudit(calistirmaId)
+  );
+  return unwrapData(response, "Calistirma audit listesi alinamadi.").items ?? [];
 }
 
 export async function cancelMaasHesaplamaCalistirma(
@@ -534,6 +559,13 @@ export async function fetchMaasHesaplamaAdayKalemler(adayId: number): Promise<Ma
     endpoints.maasHesaplama.adayKalemler(adayId)
   );
   return unwrapData(response, "Aday kalemleri alinamadi.").items ?? [];
+}
+
+export async function fetchMaasHesaplamaYasalKatalog(): Promise<MaasHesaplamaYasalKatalog> {
+  const response = await apiRequest<ApiResponse<MaasHesaplamaYasalKatalog> | MaasHesaplamaYasalKatalog>(
+    endpoints.maasHesaplama.yasalKatalog
+  );
+  return unwrapData(response, "Yasal katalog alinamadi.");
 }
 
 export async function fetchMaasHesaplamaDevirler(params: MaasHesaplamaParams): Promise<MaasHesaplamaDevir[]> {

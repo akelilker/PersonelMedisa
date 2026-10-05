@@ -149,6 +149,18 @@ export async function createSirketPolitikaDraft(payload: SirketPolitikaDraftPayl
   return unwrapData(response, "Politika taslagı olusturulamadi.");
 }
 
+export async function updateSirketPolitikaDraft(id: number, payload: SirketPolitikaDraftPayload) {
+  const response = await apiRequest<ApiResponse<SirketCalismaPolitikasi> | SirketCalismaPolitikasi>(
+    endpoints.sirketCalismaPolitikalari.detail(id),
+    {
+      method: "PUT",
+      body: JSON.stringify(payload),
+      headers: { "Content-Type": "application/json" }
+    }
+  );
+  return unwrapData(response, "Politika guncellenemedi.");
+}
+
 export async function submitSirketPolitika(id: number) {
   const response = await apiRequest<ApiResponse<SirketCalismaPolitikasi> | SirketCalismaPolitikasi>(
     endpoints.sirketCalismaPolitikalari.submit(id),

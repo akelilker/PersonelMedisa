@@ -282,10 +282,10 @@ async function assertKayitModalGeometry(page: Page, kayitModal: ReturnType<typeo
   }
 
   const columnTracks = metrics.modalColumnsMobile.trim().split(/\s+/);
-  expect(columnTracks).toHaveLength(2);
-  expect(columnTracks[0]).toBe(columnTracks[1]);
+  expect(columnTracks).toHaveLength(1);
   if (metrics.minInputWidth != null) {
-    expect(metrics.minInputWidth).toBeGreaterThanOrEqual(72);
+    // Telefon: tek kolon → form alanları kullanılabilir genişliği alır.
+    expect(metrics.minInputWidth).toBeGreaterThanOrEqual(200);
   }
 
   expect(metrics.bodyOverflowY).toBe("auto");

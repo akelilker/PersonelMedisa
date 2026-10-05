@@ -127,7 +127,7 @@ export const PICKER_PANEL_MIN_HEIGHT = 120;
  */
 export const PICKER_MONTH_PANEL_MIN_WIDTH = 252;
 
-export type PickerPanelMeasureOptions = {
+type PickerPanelMeasureOptions = {
   minPanelWidth?: number;
 };
 

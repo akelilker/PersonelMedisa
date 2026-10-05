@@ -702,12 +702,10 @@
   }
 }
 
-/* Telefon: Kayıt İşlemleri formu tek kolona iner, orta ayırıcı gizlenir.
-   Detay kartındaki `.personel-dosya-kayit-mirror` mobil çöküşüyle aynı kanonik
-   davranış (personeller.css). Masaüstü/tablet (≥641px) iki kolonu korur. */
+/* Taşıt Kayıt İşlemleri mobile parity: keep 2 equal columns with center divider. */
 @media (max-width: 640px) {
   .personel-form-columns {
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     gap: clamp(8px, 2.8vw, 14px);
   }
 
@@ -722,7 +720,7 @@
   }
 
   .personel-form-columns::after {
-    display: none;
+    display: block;
   }
 
   .kayit-workspace-grid--personel-form .personel-form-columns {

@@ -151,9 +151,7 @@
 }
 
 /*
- * Şube seçim (root) görünümü: kutular modal içinde yatay + dikey ortalanır
- * (masaüstü/tablet sunumu; ≤640px telefon override'ı dosya sonunda listenin
- * dikey ortalanmasını kapatır — liste doğal akışla üstten başlar).
+ * Şube seçim (root) görünümü: kutular modal içinde yatay + dikey ortalanır.
  * Yerleşim referansı Personel Kartı şube (scope) kartları
  * (src/styles/modules/personeller.css → .personeller-scope-stage / .personeller-scope-card:
  * stage center + kart içeriği center). Yalnız root görünümünü etkiler;
@@ -535,17 +533,6 @@
 @media (max-width: 640px) {
   .modal-body--bugun-personel {
     padding: 10px 8px 14px;
-  }
-
-  /*
-   * Telefon: şube listesi modal gövdesini doldurup dikey ortalanmaz.
-   * `min-height: 100%` + `align-content: center` (masaüstü sunumu) yüksek
-   * telefon viewport'unda kartları ekranın ortasına itiyordu. Mobilde liste
-   * kendi içerik yüksekliğinde kalır ve başlığın altından doğal akışla başlar.
-   */
-  .bugun-personel-branch-list {
-    min-height: 0;
-    align-content: flex-start;
   }
 
   .bugun-personel-header-badge {

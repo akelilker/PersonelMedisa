@@ -12,9 +12,11 @@ use Medisa\Api\Http\Request;
 use Medisa\Api\Scope\HrWriteScope;
 use Medisa\Api\Scope\OrgScope;
 use Medisa\Api\Scope\SubeScope;
+use Medisa\Api\Services\Personel\PersonelBasicUpdateService;
 use Medisa\Api\Services\Personel\PersonelCalisanKapsamSchema;
 use Medisa\Api\Services\Personel\PersonelCalisanKapsamService;
 use Medisa\Api\Services\Personel\PersonelCanonicalValidator;
+use Medisa\Api\Services\Personel\PersonelCinsiyetSchema;
 use Medisa\Api\Services\Personel\PersonelCompletenessService;
 use Medisa\Api\Services\Personel\PersonelCreateService;
 use Medisa\Api\Services\Personel\PersonelGeciciGorevlendirmeService;
@@ -1488,35 +1490,36 @@ class PersonellerController
             return;
         }
 
-        $allowedColumns = [
-            'tc_kimlik_no',
-            'ad',
-            'soyad',
-            'dogum_tarihi',
-            'telefon',
-            'acil_durum_kisi',
-            'acil_durum_telefon',
-            'sicil_no',
-            'ise_giris_tarihi',
-            'sube_id',
-            'sgk_isveren_id',
-            'calisma_lokasyonu_id',
-            'departman_id',
-            'bolum_id',
-            'birim_id',
-            'gorev_id',
-            'pozisyon_id',
-            'personel_tipi_id',
-            'bagli_amir_id',
-            'aktif_durum',
-            'calisan_kapsami',
-            'dogum_yeri',
-            'kan_grubu',
-            'ucret_tipi_id',
-            'maas_tutari',
-            'prim_kurali_id',
-        ];
+        // Basic personel fields stay single-sourced in the canonical basic-update
+        // owner (which already accepts cinsiyet); this controller only appends the
+        // org/salary columns it owns. Keeping one source prevents a field accepted
+        // by the validator from silently dropping here.
+        $allowedColumns = array_values(array_unique(array_merge(
+            PersonelBasicUpdateService::allowedColumns(),
+            [
+                'sube_id',
+                'sgk_isveren_id',
+                'calisma_lokasyonu_id',
+                'departman_id',
+                'bolum_id',
+                'birim_id',
+                'gorev_id',
+                'pozisyon_id',
+                'aktif_durum',
+                'ucret_tipi_id',
+                'maas_tutari',
+                'prim_kurali_id',
+            ]
+        )));
 
+        if (!PersonelCinsiyetSchema::isReady($pdo)) {
+            $allowedColumns = array_values(array_filter(
+                $allowedColumns,
+                static function (string $c): bool {
+                    return $c !== 'cinsiyet';
+                }
+            ));
+        }
         if (!PersonelCalisanKapsamSchema::isReady($pdo)) {
             $allowedColumns = array_values(array_filter(
                 $allowedColumns,
@@ -1750,6 +1753,9 @@ class PersonellerController
             'sicil_no' => $row['sicil_no'],
             'dogum_yeri' => $row['dogum_yeri'],
             'kan_grubu' => $row['kan_grubu'],
+            'cinsiyet' => array_key_exists('cinsiyet', $row) && $row['cinsiyet'] !== null && $row['cinsiyet'] !== ''
+                ? (string) $row['cinsiyet']
+                : null,
             'ise_giris_tarihi' => $row['ise_giris_tarihi'],
             'acil_durum_kisi' => $row['acil_durum_kisi'],
             'acil_durum_telefon' => $row['acil_durum_telefon'],

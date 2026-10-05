@@ -29,11 +29,32 @@ describe("mobile Taşıt parity modal/login source guards", () => {
     expect(modal).toContain("@media (max-width: 640px)");
     expect(modal).toMatch(/\.modal-overlay\s*\{[^}]*transform:\s*none/s);
     expect(modal).toMatch(/\.modal-overlay\s*\{[^}]*max-width:\s*none/s);
+    expect(modal).toMatch(
+      /@media\s*\(max-width:\s*640px\)[\s\S]*\.modal-overlay\s*\{[^}]*top:\s*env\(safe-area-inset-top,\s*0px\)/s
+    );
     expect(modal).toContain("@media (max-width: 480px)");
     expect(modal).toMatch(
       /@media\s*\(max-width:\s*640px\)\s*\{[\s\S]*\.modal-container\s*\{[^}]*border-radius:\s*var\(--modal-radius,\s*10px\)/
     );
     expect(modal).not.toMatch(/\.modal-container\s*\{[^}]*border-radius:\s*0/s);
+  });
+
+  it("keeps Personel Kartı scope grid below toolbar on mobile (no vertical center overflow)", () => {
+    const personeller = read("src/styles/modules/personeller.css");
+    expect(personeller).toMatch(
+      /@media\s*\(max-width:\s*640px\)[\s\S]*\.personeller-page--kart \.personeller-scope-stage\s*\{[^}]*align-items:\s*flex-start/s
+    );
+    expect(personeller).toMatch(
+      /\.personeller-page--kart \.personeller-scope-stage\s*\{[^}]*overflow-y:\s*auto/s
+    );
+  });
+
+  it("does not expand modal header height into iOS status-bar safe area (standalone)", () => {
+    const iosPwa = read("src/styles/platform/ios-pwa.css");
+    expect(iosPwa).not.toMatch(
+      /\.modal-header\s*\{[^}]*height:\s*calc\(60px \+ env\(safe-area-inset-top/s
+    );
+    expect(iosPwa).not.toMatch(/\.modal-overlay\s*\{[^}]*top:\s*0;/s);
   });
 
   it("keeps Kayıt personel form 2-column grid on mobile", () => {

@@ -514,6 +514,12 @@ body.modal-open .modal-container {
 
 @media (max-width: 640px) {
   .modal-overlay {
+    /*
+     * iOS Safari (browser + PWA): viewport-fit=cover lets fixed layers paint under the
+     * status bar. Start the modal shell below the safe-area inset so the red header
+     * gradient does not read as bleeding into the system chrome (PR #490 inverted this).
+     */
+    top: env(safe-area-inset-top, 0px);
     left: 0;
     right: 0;
     width: auto;

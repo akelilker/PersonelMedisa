@@ -2193,6 +2193,19 @@
   }
 }
 
+@media (max-width: 640px) {
+  /*
+   * Dikey ortalama (align-items: center) kısa modal gövdelerinde grid'i yukarı taşır;
+   * üst sıra Ara/Arşiv toolbar'ının üstüne biner. Akış üstten başlar, taşma kayar.
+   */
+  .personeller-page--kart .personeller-scope-stage {
+    align-items: flex-start;
+    justify-content: flex-start;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
 @media (max-width: 720px) {
   .personeller-scope-grid {
     /* Canonical mobil kontrat: 3 eşit kolon (Şube/Kullanıcı kart listesi ile aynı). */

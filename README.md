@@ -18,7 +18,7 @@ React + Vite + TypeScript tabanlı PersonelMedisa uygulaması. Ana kapsam person
 - Ortak loading, error ve empty state bileşenleri kullanılır.
 - Vitest test altyapısı aktif.
 - Playwright E2E smoke hattı aktif.
-- GitHub Actions CI hattı push/PR'da `typecheck + unit test + build` doğrulaması yapar; full E2E ise Actions üzerinden manuel E2E workflow veya lokal Cursor hedefli E2E ile çalıştırılır.
+- GitHub Actions rutin PR hattı `typecheck + build + kritik Fast CI testleri` doğrulaması yapar. Geniş/full test paketi rutin PR gate'i değildir; gerektiğinde manuel çalıştırılır. Full E2E ise Actions üzerinden manuel E2E workflow veya lokal Cursor hedefli E2E ile çalıştırılır.
 
 ## Ana modüller
 
@@ -75,7 +75,13 @@ npm run build
 npm run typecheck
 ```
 
-## Unit test
+## Fast CI
+
+```bash
+npm run test:ci-fast
+```
+
+## Full test
 
 ```bash
 npm run test

@@ -434,11 +434,6 @@
   }
 }
 
-.modal-header-leading .modal-back-btn:hover,
-.modal-header-leading .modal-back-btn:focus-visible {
-  color: var(--text-inverse);
-}
-
 .modal-back-btn-label {
   min-width: 0;
   overflow: hidden;
@@ -502,7 +497,6 @@ body.modal-open .modal-container {
     border-color: transparent;
     outline-color: transparent;
     background: var(--modal-bg);
-    background-color: var(--modal-bg);
     box-shadow: none;
   }
 

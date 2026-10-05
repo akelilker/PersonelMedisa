@@ -40,4 +40,38 @@ class QrAttendanceSchema
 
         return false;
     }
+
+    public static function hasLocationAuditColumns(PDO $pdo)
+    {
+        try {
+            $stmt = $pdo->query(
+                "SELECT 1 AS ok FROM information_schema.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE()
+                   AND TABLE_NAME = 'qr_attendance_events'
+                   AND COLUMN_NAME = 'location_verification_status'
+                 LIMIT 1"
+            );
+            if ($stmt) {
+                $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+                return is_array($row);
+            }
+        } catch (\Throwable $e) {
+            // SQLite / focused runners.
+        }
+        try {
+            $stmt = $pdo->query('PRAGMA table_info(qr_attendance_events)');
+            if ($stmt) {
+                while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                    if (is_array($row) && ($row['name'] ?? '') === 'location_verification_status') {
+                        return true;
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            return false;
+        }
+
+        return false;
+    }
 }

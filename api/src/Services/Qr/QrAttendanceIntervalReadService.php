@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Medisa\Api\Services\Qr;
 
+use Medisa\Api\Database\QrAttendanceSchema;
 use Medisa\Api\Services\Organizasyon\SubeReadModel;
 use PDO;
 
@@ -17,6 +18,60 @@ class QrAttendanceIntervalReadService
 
     /** @var array<int, string> */
     private static $subeDisplayCache = [];
+
+    private static function eventLocationSelectSql(PDO $pdo): string
+    {
+        if (!QrAttendanceSchema::hasLocationAuditColumns($pdo)) {
+            return '';
+        }
+
+        return ', e.location_verification_status, e.location_accuracy_meters,
+            e.location_distance_meters, e.location_geofence_key';
+    }
+
+    /** @param array<string,mixed> $row */
+    private static function mapLoadedEvent(PDO $pdo, array $row): array
+    {
+        $mapped = [
+            'id' => (int) $row['id'],
+            'event_type' => (string) $row['event_type'],
+            'occurred_at_utc' => (string) $row['occurred_at_utc'],
+            'sube_id' => (int) $row['sube_id'],
+            'sube_ad' => self::displaySubeAd(
+                $pdo,
+                $row['sube_id'] ?? 0,
+                (string) ($row['event_sube_ad'] ?? $row['sube_ad'] ?? '')
+            ),
+            'user_id' => (int) ($row['user_id'] ?? 0),
+        ];
+        $location = QrAttendanceLocationVerificationService::managerEventPayload($row);
+        if ($location !== null) {
+            $mapped['location'] = $location;
+        }
+
+        return $mapped;
+    }
+
+    /** @param list<array<string,mixed>> $localEvents */
+    private static function managerLocationEvents(array $localEvents): array
+    {
+        $items = [];
+        foreach ($localEvents as $event) {
+            if (!isset($event['location']) || !is_array($event['location'])) {
+                continue;
+            }
+            $items[] = [
+                'event_type' => (string) ($event['event_type'] ?? ''),
+                'occurred_at' => self::eventLocalIso((string) ($event['occurred_at_utc'] ?? '')),
+                'status_code' => (string) ($event['location']['status_code'] ?? ''),
+                'status_label' => (string) ($event['location']['status_label'] ?? ''),
+                'distance_meters' => $event['location']['distance_meters'] ?? null,
+                'accuracy_meters' => $event['location']['accuracy_meters'] ?? null,
+            ];
+        }
+
+        return $items;
+    }
 
     /** Resolve global branch display via SubeReadModel (request-local cache). */
     private static function displaySubeAd(PDO $pdo, $subeId, $fallback = ''): string
@@ -205,8 +260,9 @@ class QrAttendanceIntervalReadService
             'SELECT e.id, e.personel_id, e.event_type, e.occurred_at_utc, e.sube_id,
                     e.user_id, event_s.ad AS event_sube_ad,
                     p.ad, p.soyad, p.sicil_no, p.sube_id AS personel_sube_id,
-                    personel_s.ad AS personel_sube_ad
-             ' . $baseSql . ' AND p.id IN (' . implode(', ', $personKeys) . ')
+                    personel_s.ad AS personel_sube_ad'
+                . self::eventLocationSelectSql($pdo)
+                . $baseSql . ' AND p.id IN (' . implode(', ', $personKeys) . ')
              ORDER BY e.personel_id ASC, e.occurred_at_utc ASC, e.id ASC'
         );
         foreach ($eventParams as $key => $value) {
@@ -230,18 +286,7 @@ class QrAttendanceIntervalReadService
                     (string) ($row['personel_sube_ad'] ?? '')
                 ),
             ];
-            $eventsByPersonel[$id][] = [
-                'id' => (int) $row['id'],
-                'event_type' => (string) $row['event_type'],
-                'occurred_at_utc' => (string) $row['occurred_at_utc'],
-                'sube_id' => (int) $row['sube_id'],
-                'sube_ad' => self::displaySubeAd(
-                    $pdo,
-                    $row['sube_id'] ?? 0,
-                    (string) ($row['event_sube_ad'] ?? '')
-                ),
-                'user_id' => (int) $row['user_id'],
-            ];
+            $eventsByPersonel[$id][] = self::mapLoadedEvent($pdo, $row);
         }
 
         $items = [];
@@ -344,6 +389,7 @@ class QrAttendanceIntervalReadService
                 'anomalies' => ['NO_SCAN'],
                 'matched_seconds' => 0,
                 'source_event_count' => 0,
+                'location_events' => [],
             ];
         }
 
@@ -388,6 +434,7 @@ class QrAttendanceIntervalReadService
             'anomalies' => $anomalyTypes,
             'matched_seconds' => (int) ($derived['summary']['complete_duration_seconds'] ?? 0),
             'source_event_count' => count($localEvents),
+            'location_events' => self::managerLocationEvents($localEvents),
         ];
     }
 

@@ -149,6 +149,16 @@ class QrAttendanceEventService
         $issuedAt = self::unixToUtcMicro((int) $claims['iat']);
         $expiresAt = self::unixToUtcMicro((int) $claims['exp']);
 
+        $locationCapture = isset($body['location_capture']) && is_array($body['location_capture'])
+            ? $body['location_capture']
+            : null;
+        $locationAudit = QrAttendanceLocationVerificationService::evaluateForScan(
+            $pdo,
+            $personelId,
+            $occurredAt,
+            $locationCapture
+        );
+
         $businessDateForScan = (new \DateTimeImmutable($occurredAt, new \DateTimeZone('UTC')))
             ->setTimezone(new \DateTimeZone('Europe/Istanbul'))
             ->format('Y-m-d');
@@ -184,15 +194,31 @@ class QrAttendanceEventService
         }
 
         try {
-            $stmt = $pdo->prepare(
-                'INSERT INTO qr_attendance_events
-                    (personel_id, user_id, sube_id, event_type, occurred_at_utc,
-                     qr_version, qr_jti, qr_issued_at_utc, qr_expires_at_utc, request_nonce)
-                 VALUES
-                    (:personel_id, :user_id, :sube_id, :event_type, :occurred_at_utc,
-                     :qr_version, :qr_jti, :qr_issued_at_utc, :qr_expires_at_utc, :request_nonce)'
-            );
-            $stmt->execute([
+            $insertColumns = [
+                'personel_id',
+                'user_id',
+                'sube_id',
+                'event_type',
+                'occurred_at_utc',
+                'qr_version',
+                'qr_jti',
+                'qr_issued_at_utc',
+                'qr_expires_at_utc',
+                'request_nonce',
+            ];
+            $insertPlaceholders = [
+                ':personel_id',
+                ':user_id',
+                ':sube_id',
+                ':event_type',
+                ':occurred_at_utc',
+                ':qr_version',
+                ':qr_jti',
+                ':qr_issued_at_utc',
+                ':qr_expires_at_utc',
+                ':request_nonce',
+            ];
+            $insertParams = [
                 'personel_id' => $personelId,
                 'user_id' => $userId,
                 'sube_id' => (int) $claims['sube_id'],
@@ -203,7 +229,19 @@ class QrAttendanceEventService
                 'qr_issued_at_utc' => $issuedAt,
                 'qr_expires_at_utc' => $expiresAt,
                 'request_nonce' => $nonce,
-            ]);
+            ];
+            QrAttendanceLocationVerificationService::appendInsertColumns(
+                $pdo,
+                $insertColumns,
+                $insertPlaceholders,
+                $insertParams,
+                $locationAudit
+            );
+            $stmt = $pdo->prepare(
+                'INSERT INTO qr_attendance_events (' . implode(', ', $insertColumns) . ')
+                 VALUES (' . implode(', ', $insertPlaceholders) . ')'
+            );
+            $stmt->execute($insertParams);
         } catch (PDOException $e) {
             $driverCode = isset($e->errorInfo[1]) ? (int) $e->errorInfo[1] : 0;
             if ($driverCode === 1062) {

@@ -95,7 +95,8 @@ describe("personel detay gorsel duzen paketi owners", () => {
     const kayitMobileBlock =
       kayitCss.match(/@media \(max-width: 640px\)[\s\S]*?\.personel-form-columns \{[^}]+\}/)?.[0] ??
       "";
-    expect(kayitMobileBlock).toMatch(/minmax\(0,\s*1fr\)\s*minmax\(0,\s*1fr\)/);
+    // Shared owner mobilde tek kolona iner (mirror aynı davranışı devralır).
+    expect(kayitMobileBlock).toMatch(/grid-template-columns:\s*minmax\(0,\s*1fr\)\s*;/);
 
     const missingCss = read("src/styles/modules/personel-missing-info.css");
     expect(missingCss).toMatch(

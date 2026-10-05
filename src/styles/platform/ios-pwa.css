@@ -24,12 +24,51 @@
     padding-right: max(0px, env(safe-area-inset-right, 0px));
   }
 
+  /*
+   * Installed PWA: overlay başlangıcı görsel üstten (0) başlar; böylece modalın
+   * kırmızı header zemini status-bar safe-area'sını doldurur (Safari parity).
+   * `top: env(safe-area-inset-top)` overlay'i aşağı itiyor ve üstte app-shell'in
+   * koyu zemini siyah bir bant olarak kalıyordu. Inset'i overlay'e değil,
+   * header'ın kendi yüksekliğine/padding'ine uygula — kontroller status bar
+   * altında kalsın, kırmızı zemin yukarı taşsın.
+   */
   .modal-overlay {
-    top: env(safe-area-inset-top, 0px);
+    top: 0;
     bottom: calc(
       var(--app-footer-real-height) + var(--modal-gap-above-footer) +
         env(safe-area-inset-bottom, 0px)
     );
+  }
+
+  .modal-header {
+    height: calc(60px + env(safe-area-inset-top, 0px));
+    min-height: calc(60px + env(safe-area-inset-top, 0px));
+    max-height: calc(60px + env(safe-area-inset-top, 0px));
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+
+  /*
+   * Header kontrolleri padding box'a göre konumlanır; header yüksekliği inset
+   * kadar büyüdüğü için `top: 50%` onları status bar'a kaydırırdı. Inset'in
+   * yarısı kadar telafi et — böylece kontroller inset'in altındaki 60px'lik
+   * içerik bandında, mevcut konumlarında kalır.
+   */
+  .modal-header-leading,
+  .modal-close-btn {
+    top: calc(50% + env(safe-area-inset-top, 0px) / 2);
+  }
+
+  @media (max-width: 640px) {
+    .modal-header {
+      /* modal.css mobil üst nefesi (12px) inset üstüne korunur. */
+      padding-top: calc(12px + env(safe-area-inset-top, 0px));
+    }
+
+    .modal-header-leading,
+    .modal-close-btn {
+      /* 12px mobil üst nefesinin yarısı kadar ek telafi (içerik bandı 48px). */
+      top: calc(50% + env(safe-area-inset-top, 0px) / 2 + 6px);
+    }
   }
 
   .modal-body,

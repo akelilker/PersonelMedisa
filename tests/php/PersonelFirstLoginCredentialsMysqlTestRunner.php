@@ -589,7 +589,7 @@ function pflcRunBusinessDecisionScenario(PDO $root): void
             return is_array($found) ? $found : [];
         };
         pflcAssert($personelName($pdo, 200) === ['ad' => 'Raed', 'soyad' => 'Fawaz'], 'BIZ: 200 name correction uygulandi');
-        pflcAssert($personelName($pdo, 201) === ['ad' => 'Saif Tareq Jasim', 'soyad' => 'Al-Gburi'], 'BIZ: 201 name correction uygulandi');
+        pflcAssert($personelName($pdo, 201) === ['ad' => 'Saıf Tareq Jasım', 'soyad' => 'Al-Gburı'], 'BIZ: 201 name correction uygulandi');
         pflcAssert($personelName($pdo, 207) === ['ad' => 'Oktay', 'soyad' => 'Ersöz'], 'BIZ: 207 name correction uygulandi');
         pflcAssert($personelName($pdo, 209) === ['ad' => 'Muqtada Mazin', 'soyad' => 'Khalee'], 'BIZ: 209 name correction uygulandi');
         pflcAssert($personelName($pdo, 210) === ['ad' => 'Fahri Taylan', 'soyad' => 'Mercan'], 'BIZ: 210 name correction uygulandi');

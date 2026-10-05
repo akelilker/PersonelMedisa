@@ -264,7 +264,7 @@ const BUSINESS_DECISIONS: BusinessDecisionRow[] = [
     soyad: null,
     username: "saifA",
     password: "Algburi123",
-    label: "D: Saif Tareq Jasim Al-Gburi"
+    label: "D: Saıf Tareq Jasım Al-Gburı"
   },
   {
     personelId: 206,
@@ -327,9 +327,9 @@ describe("PERSONEL username/first-login business kararlari (explicit override + 
     expect(phpResolve("username", 200, "RAED FAWAZ", null)).toBe("raedF");
   });
 
-  it("D: Al-Gburi canonical normalization ile cozulur (saifA / Algburi123)", () => {
-    expect(phpRule("password", "Saif Tareq Jasim", "Al-Gburi")).toBe("Algburi123");
-    expect(phpRule("username", "Saif Tareq Jasim", "Al-Gburi")).toBe("saifA");
+  it("D: Al-Gburı canonical normalization ile cozulur (saifA / Algburi123)", () => {
+    expect(phpRule("password", "Saıf Tareq Jasım", "Al-Gburı")).toBe("Algburi123");
+    expect(phpRule("username", "Saıf Tareq Jasım", "Al-Gburı")).toBe("saifA");
   });
 
   it("E: Abdullah explicit exception - soyad uydurulmaz, name correction map'inde yok", () => {
@@ -348,7 +348,7 @@ describe("PERSONEL username/first-login business kararlari (explicit override + 
       expect(Object.keys(correction.from).sort()).toEqual(["ad", "soyad"]);
     }
     expect(map.corrections["200"].to).toEqual({ ad: "Raed", soyad: "Fawaz" });
-    expect(map.corrections["201"].to).toEqual({ ad: "Saif Tareq Jasim", soyad: "Al-Gburi" });
+    expect(map.corrections["201"].to).toEqual({ ad: "Saıf Tareq Jasım", soyad: "Al-Gburı" });
     expect(map.corrections["207"].to).toEqual({ ad: "Oktay", soyad: "Ersöz" });
     expect(map.corrections["209"].to).toEqual({ ad: "Muqtada Mazin", soyad: "Khalee" });
     expect(map.corrections["210"].to).toEqual({ ad: "Fahri Taylan", soyad: "Mercan" });

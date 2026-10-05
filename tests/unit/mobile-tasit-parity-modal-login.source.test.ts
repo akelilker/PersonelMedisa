@@ -36,22 +36,15 @@ describe("mobile Taşıt parity modal/login source guards", () => {
     expect(modal).not.toMatch(/\.modal-container\s*\{[^}]*border-radius:\s*0/s);
   });
 
-  it("collapses Kayıt personel form to a single column on mobile", () => {
+  it("keeps Kayıt personel form 2-column grid on mobile", () => {
     const kayit = read("src/styles/modules/kayit-surec.css");
-    // Telefon: form tek kolon + orta ayırıcı gizli (detay kartı mirror çöküşüyle
-    // aynı kanonik davranış). Masaüstü/tablet iki kolonu korur.
     expect(kayit).toMatch(
-      /@media\s*\(max-width:\s*640px\)\s*\{[^}]*\.personel-form-columns\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\)\s*;/s
-    );
-    expect(kayit).toMatch(
-      /@media\s*\(max-width:\s*640px\)[\s\S]*?\.personel-form-columns::after\s*\{[^}]*display:\s*none/s
-    );
-    expect(kayit).toMatch(
-      /\.personel-form-columns\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\)\s*minmax\(0,\s*1fr\)/s
+      /@media\s*\(max-width:\s*640px\)\s*\{[^}]*\.personel-form-columns\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\)\s*minmax\(0,\s*1fr\)/s
     );
     expect(kayit).not.toMatch(
       /@media\s*\(max-width:\s*720px\)\s*\{[^}]*\.personel-form-columns\s*\{[^}]*grid-template-columns:\s*1fr/s
     );
+    expect(kayit).toMatch(/\.personel-form-columns::after\s*\{[^}]*display:\s*block/s);
   });
 
   it("keeps login hero title visible without ellipsis clipping", () => {

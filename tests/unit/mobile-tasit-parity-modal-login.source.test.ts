@@ -30,7 +30,10 @@ describe("mobile Taşıt parity modal/login source guards", () => {
     expect(modal).toMatch(/\.modal-overlay\s*\{[^}]*transform:\s*none/s);
     expect(modal).toMatch(/\.modal-overlay\s*\{[^}]*max-width:\s*none/s);
     expect(modal).toMatch(
-      /@media\s*\(max-width:\s*640px\)[\s\S]*\.modal-overlay\s*\{[^}]*top:\s*env\(safe-area-inset-top,\s*0px\)/s
+      /@media\s*\(max-width:\s*640px\)[\s\S]*\.modal-overlay\s*\{[^}]*padding-top:\s*env\(safe-area-inset-top,\s*0px\)/s
+    );
+    expect(modal).toMatch(
+      /@media\s*\(max-width:\s*640px\)[\s\S]*\.modal-overlay\.open[\s\S]*background-image:\s*linear-gradient/s
     );
     expect(modal).toContain("@media (max-width: 480px)");
     expect(modal).toMatch(
@@ -54,7 +57,19 @@ describe("mobile Taşıt parity modal/login source guards", () => {
     expect(iosPwa).not.toMatch(
       /\.modal-header\s*\{[^}]*height:\s*calc\(60px \+ env\(safe-area-inset-top/s
     );
-    expect(iosPwa).not.toMatch(/\.modal-overlay\s*\{[^}]*top:\s*0;/s);
+    expect(iosPwa).toMatch(
+      /\.modal-overlay\s*\{[^}]*padding-top:\s*env\(safe-area-inset-top,\s*0px\)/s
+    );
+  });
+
+  it("keeps AppSelect native layer from opening iOS system picker on touch (pointer-events swap)", () => {
+    const appSelect = read("src/styles/components/app-select.css");
+    expect(appSelect).toMatch(
+      /@media\s*\(hover:\s*none\)\s*and\s*\(pointer:\s*coarse\)\s*\{[\s\S]*\.app-select-native\s*\{[^}]*pointer-events:\s*none/s
+    );
+    expect(appSelect).toMatch(
+      /@media\s*\(hover:\s*none\)\s*and\s*\(pointer:\s*coarse\)\s*\{[\s\S]*\.app-select-trigger\s*\{[^}]*pointer-events:\s*auto/s
+    );
   });
 
   it("keeps Kayıt personel form 2-column grid on mobile", () => {

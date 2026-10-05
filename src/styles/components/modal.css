@@ -516,10 +516,13 @@ body.modal-open .modal-container {
   .modal-overlay {
     /*
      * iOS Safari (browser + PWA): viewport-fit=cover lets fixed layers paint under the
-     * status bar. Start the modal shell below the safe-area inset so the red header
-     * gradient does not read as bleeding into the system chrome (PR #490 inverted this).
+     * status bar. Overlay fills the viewport; padding-top reserves the safe area with
+     * opaque shell bg so the red header gradient never paints into system chrome
+     * (PR #490 inverted this — do not expand header height into the inset).
      */
-    top: env(safe-area-inset-top, 0px);
+    top: 0;
+    padding-top: constant(safe-area-inset-top, 0px);
+    padding-top: env(safe-area-inset-top, 0px);
     left: 0;
     right: 0;
     width: auto;
@@ -527,6 +530,19 @@ body.modal-open .modal-container {
     transform: none;
     margin: 0;
     box-sizing: border-box;
+  }
+
+  .modal-overlay.open,
+  .modal-overlay.active {
+    background-color: var(--bg);
+    background-image: linear-gradient(
+      to bottom,
+      var(--bg) 0,
+      var(--bg) constant(safe-area-inset-top, 0px),
+      var(--bg) env(safe-area-inset-top, 0px),
+      rgba(5, 8, 12, 0.72) constant(safe-area-inset-top, 0px),
+      rgba(5, 8, 12, 0.72) env(safe-area-inset-top, 0px)
+    );
   }
 
   .modal-container {

@@ -50,7 +50,7 @@ import type { Bildirim, BirimAmiriSecenegi, GunlukOzet } from "../../../types/bi
 import type { HaftalikBildirimMutabakatCounts } from "../../../types/haftalik-bildirim-mutabakat";
 import type { Personel } from "../../../types/personel";
 import type { IdOption } from "../../../types/referans";
-import { KayitSurecReturnLink } from "../../kayit/components/KayitSurecReturnLink";
+import { KayitSurecBackBar } from "../../kayit/components/KayitSurecBackBar";
 import type { KayitSurecReturnContext } from "../../kayit/kayit-surec-navigation";
 import {
   formatGunlukKayitDayanak,
@@ -1057,7 +1057,9 @@ export function BildirimlerPage() {
 
   return (
     <section className="bildirimler-page">
-      {kayitSurecReturn ? <KayitSurecReturnLink context={kayitSurecReturn} label="Puantaj" /> : null}
+      {kayitSurecReturn ? (
+        <KayitSurecBackBar context={kayitSurecReturn} label="Puantaj" testId="kayit-surec-return-link" />
+      ) : null}
       <div className="bildirimler-header-row">
         <h2>{pageTitle}</h2>
         <div className="bildirimler-header-actions">

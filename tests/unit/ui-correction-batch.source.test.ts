@@ -113,7 +113,8 @@ describe("ui correction batch — modal back + missing info owners", () => {
     expect(backBar).toMatch(/label=\{label\}/);
 
     const belge = read("src/features/personeller/pages/BelgeTakipPage.tsx");
-    expect(belge).toMatch(/KayitSurecReturnLink context=\{kayitSurecReturn\} label="Belge Takip"/);
+    expect(belge).toMatch(/KayitSurecBackBar[\s\S]*?context=\{kayitSurecReturn\}[\s\S]*?label="Belge Takip"/);
+    expect(belge).toMatch(/testId="kayit-surec-return-link"/);
     expect(belge).not.toMatch(/Kayıt ve Süreç'e dön/);
     expect(belge).not.toMatch(/Personellere dön/);
 

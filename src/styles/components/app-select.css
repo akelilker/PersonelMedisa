@@ -35,7 +35,8 @@
   border: 0;
   background: transparent;
   opacity: 0;
-  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
 }
 
 /* Native seçenek listesi hiç gösterilmez; görünür liste kanonik paneldir. */
@@ -54,8 +55,19 @@
   box-sizing: border-box;
   text-align: left;
   cursor: pointer;
-  /* Tıklama native select'e aittir. */
+  /* Tıklama native select'e aittir (masaüstü / fine pointer). */
   pointer-events: none;
+}
+
+/* Touch / coarse pointer: native select sistem listesini açar; görsel trigger owner olur. */
+@media (hover: none) and (pointer: coarse) {
+  .app-select-native {
+    pointer-events: none;
+  }
+
+  .app-select-trigger {
+    pointer-events: auto;
+  }
 }
 
 .app-select-trigger-text {

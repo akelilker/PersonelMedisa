@@ -384,6 +384,31 @@ export function AppSelect({
     [disabled]
   );
 
+  const blockNativeSelectTouch = useCallback(
+    (event: React.TouchEvent<HTMLSelectElement>) => {
+      if (disabled) {
+        return;
+      }
+
+      // iOS: mousedown preventDefault yetmez; touch hedefi native select kalırsa sistem picker açılır.
+      event.preventDefault();
+    },
+    [disabled]
+  );
+
+  const handleTriggerPointerDown = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>) => {
+      if (disabled) {
+        return;
+      }
+
+      // Görsel alan artık pointer owner; native select pointer-events:none.
+      event.preventDefault();
+      selectRef.current?.focus({ preventScroll: true });
+    },
+    [disabled]
+  );
+
   const handleSelectClick = useCallback(() => {
     if (disabled) {
       return;
@@ -536,6 +561,7 @@ export function AppSelect({
         aria-controls={isOpen ? panelId : undefined}
         aria-activedescendant={isOpen && activeIndex >= 0 ? optionElementId(panelId, activeIndex) : undefined}
         onMouseDown={handleSelectMouseDown}
+        onTouchStart={blockNativeSelectTouch}
         onClick={handleSelectClick}
         onKeyDown={handleSelectKeyDown}
         onChange={handleSelectChange}
@@ -547,7 +573,13 @@ export function AppSelect({
         ))}
       </select>
 
-      <div className="app-select-trigger form-input" data-app-select-trigger="1" aria-hidden="true">
+      <div
+        className="app-select-trigger form-input"
+        data-app-select-trigger="1"
+        aria-hidden="true"
+        onPointerDown={handleTriggerPointerDown}
+        onClick={handleSelectClick}
+      >
         <span className={`app-select-trigger-text${showsPlaceholderText ? " is-placeholder" : ""}`}>
           {selectedOption?.label ?? "Seçiniz"}
         </span>

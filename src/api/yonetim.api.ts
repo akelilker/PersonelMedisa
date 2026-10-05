@@ -575,12 +575,6 @@ export async function deleteYonetimSirket(sirketId: number | string): Promise<vo
   }
 }
 
-export async function fetchSirketSubeleri(sirketId: number | string): Promise<YonetimSube[]> {
-  const response = await apiRequest<ApiResponse<unknown>>(endpoints.yonetim.sirketSubeler(sirketId));
-  const record = toRecord(response.data);
-  return extractListItems(record?.items ?? response.data).map(normalizeYonetimSube);
-}
-
 export async function createSirketSube(
   sirketId: number | string,
   payload: UpsertYonetimSubePayload

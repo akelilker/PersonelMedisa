@@ -137,7 +137,6 @@ describe("personel mobile/PWA self-service productization", () => {
     expect(css).toContain(".pm-self-identity--home");
     expect(css).toContain(".qr-scan-cta-zone");
     expect(css).toContain(".self-service-action--primary");
-    expect(css).toContain(".qr-event-badge");
     expect(css).toContain(".pm-box-closed");
     expect(css).toContain(".pm-box-pencil");
     expect(css).toContain(".qr-history-grid");

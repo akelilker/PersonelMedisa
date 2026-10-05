@@ -46,19 +46,6 @@ export async function fetchDisiplinVakalarList(
   return items.map(normalizeDisiplinVaka);
 }
 
-export async function fetchDisiplinVakaDetail(
-  vakaId: number | string
-): Promise<{ item: DisiplinVaka; audits: DisiplinVakaAudit[] }> {
-  const response = await apiRequest<
-    ApiResponse<{ item?: unknown; audits?: unknown[] }>
-  >(endpoints.disiplinVakalar.detail(vakaId));
-  const item = normalizeDisiplinVaka(response.data?.item);
-  const audits = Array.isArray(response.data?.audits)
-    ? (response.data.audits as DisiplinVakaAudit[])
-    : [];
-  return { item, audits };
-}
-
 export async function generateDisiplinVakalar(payload: {
   ay: string;
   sube_id?: number;

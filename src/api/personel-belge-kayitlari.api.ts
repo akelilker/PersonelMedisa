@@ -268,11 +268,6 @@ export async function fetchPersonelBelgeKayitlari(
   };
 }
 
-export async function fetchPersonelBelgeKaydiDetail(id: number | string): Promise<PersonelBelgeKaydi> {
-  const response = await apiRequest<ApiResponse<unknown>>(endpoints.personelBelgeKayitlari.detail(id));
-  return normalizePersonelBelgeKaydi(response.data);
-}
-
 export async function createPersonelBelgeKaydi(
   personelId: number | string,
   payload: CreatePersonelBelgeKaydiPayload

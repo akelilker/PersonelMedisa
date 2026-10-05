@@ -138,13 +138,6 @@ export async function fetchResmiTatilTakvimiList(
   return unwrapData(response).items ?? [];
 }
 
-export async function fetchResmiTatilTakvimiDetail(id: number): Promise<ResmiTatilTakvimKaydi> {
-  const response = await apiRequest<ApiResponse<ResmiTatilTakvimKaydi> | ResmiTatilTakvimKaydi>(
-    endpoints.resmiTatilTakvimi.detail(id)
-  );
-  return unwrapData(response);
-}
-
 export async function createResmiTatilTakvimi(
   payload: ResmiTatilUpsertPayload
 ): Promise<ResmiTatilTakvimKaydi> {

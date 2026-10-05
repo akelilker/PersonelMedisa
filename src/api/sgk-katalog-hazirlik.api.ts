@@ -16,30 +16,13 @@ export type SgkKatalogBlocker = {
 
 /** S98 canonical catalog status (legacy boolean/enum remain temporary projections). */
 export type SgkAktiflikDurumu = "AKTIF" | "TARIHSEL" | "BAGLAMA_OZGUN" | "PORTAL_TEYIT_BEKLIYOR";
-export type SgkSifirGunDurumu = "IZINLI" | "YASAK" | "KOSULLU" | "TEYITSIZ";
-export type SgkBelgeSaklamaIbrazDurumu =
-  | "YOK"
-  | "ISVERENCE_SAKLA_TALEPTE_IBRAZ"
-  | "ELEKTRONIK_KAYNAKTAN"
-  | "KURUMA_GONDER"
-  | "KOSULLU"
-  | "TEYITSIZ";
-export type SgkYabanciKullanimDurumu = "IZINLI" | "YASAK" | "KOSULLU" | "TEYITSIZ";
-export type SgkPortalTeyitDurumu = "TEYIT_EDILDI" | "TEYIT_BEKLIYOR" | "TARIHSEL";
 
 export type SgkTamlikDurumu = "TASLAK" | "RESMI_KAYNAKLI_KISITLI" | "DOGRULANMIS_TAM";
-export type SgkGecerlilikTarihDurumu = "RESMI_YURURLUK" | "ILK_RESMI_KANIT" | "BELIRLENEMEDI";
 
 export const SGK_TAMLIK_DURUMU_LABEL: Record<SgkTamlikDurumu, string> = {
   TASLAK: "TASLAK",
   RESMI_KAYNAKLI_KISITLI: "RESMÎ KAYNAKLI KISITLI",
   DOGRULANMIS_TAM: "DOĞRULANMIŞ TAM"
-};
-
-export const SGK_GECERLILIK_TARIH_DURUMU_LABEL: Record<SgkGecerlilikTarihDurumu, string> = {
-  RESMI_YURURLUK: "Resmî yürürlük",
-  ILK_RESMI_KANIT: "İlk resmî kanıt",
-  BELIRLENEMEDI: "Belirlenemedi"
 };
 
 export const SGK_AKTIFLIK_DURUMU_LABEL: Record<SgkAktiflikDurumu, string> = {
@@ -163,17 +146,6 @@ export async function fetchSgkKatalogTamlik(body?: Record<string, unknown>) {
   const response = await apiRequest<ApiResponse<SgkKatalogTamlik> | SgkKatalogTamlik>(
     endpoints.sgkKatalogHazirlik.tamlik
   );
-  return unwrapData(response);
-}
-
-export async function fetchSgkSirketPolitikasi(params?: { sube_id?: number; yil?: number; ay?: number }) {
-  const response = await apiRequest<
-    ApiResponse<{
-      items: SgkSirketPolitikaReadItem[];
-      period: { baslangic: string; bitis: string };
-    }>
-  >(appendQueryParams(endpoints.sgkKatalogHazirlik.sirketPolitikasi, params ?? {}));
-
   return unwrapData(response);
 }
 

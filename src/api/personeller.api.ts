@@ -807,49 +807,6 @@ export async function downloadPersonelImportTemplateCsv(): Promise<void> {
   URL.revokeObjectURL(url);
 }
 
-export async function downloadPersonelExportXlsx(): Promise<void> {
-  const { ApiRequestError, buildApiUrl, shouldPreferDemoApi } = await import("./api-client");
-  const { getAuthTokenForApi } = await import("../auth/auth-token-provider");
-  const { getActiveSubeIdForApiHeader } = await import("../auth/auth-manager");
-  const filename = `personel-export-${new Date().toISOString().slice(0, 10)}.xlsx`;
-
-  if (shouldPreferDemoApi()) {
-    const { resolveDemoApiResponse } = await import("./mock-demo");
-    const demoResponse = resolveDemoApiResponse(endpoints.personeller.exportXlsx, { method: "GET" });
-    if (demoResponse !== null && demoResponse.data instanceof Blob) {
-      const url = URL.createObjectURL(demoResponse.data);
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = filename;
-      anchor.click();
-      URL.revokeObjectURL(url);
-      return;
-    }
-  }
-
-  const headers = new Headers();
-  const token = getAuthTokenForApi();
-  if (token) {
-    headers.set("Authorization", `Bearer ${token}`);
-  }
-  const activeSube = getActiveSubeIdForApiHeader();
-  if (activeSube) {
-    headers.set("X-Active-Sube-Id", activeSube);
-  }
-
-  const response = await fetch(buildApiUrl(endpoints.personeller.exportXlsx), { headers });
-  if (!response.ok) {
-    throw new ApiRequestError("Personel export indirilemedi.", response.status, { code: "EXPORT_FAILED" });
-  }
-  const blob = await response.blob();
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = filename;
-  anchor.click();
-  URL.revokeObjectURL(url);
-}
-
 export async function downloadPersonelImportReferencesCsv(): Promise<void> {
   const { ApiRequestError, buildApiUrl, shouldPreferDemoApi } = await import("./api-client");
   const { getAuthTokenForApi } = await import("../auth/auth-token-provider");

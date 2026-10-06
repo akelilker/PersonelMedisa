@@ -39,7 +39,7 @@ describe("DIS_KAYNAK minimal personel create", () => {
     const payload = buildCreatePersonelPayload(makeForm());
 
     expect(payload.ad).toBe("İlker");
-    expect(payload.soyad).toBe("AKEL");
+    expect(payload.soyad).toBe("Akel");
     expect(payload.calisan_kapsami).toBe("DIS_KAYNAK");
     expect(payload.ise_giris_tarihi).toBe("2026-01-01");
     expect(payload.aktif_durum).toBe("AKTIF");

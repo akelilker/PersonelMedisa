@@ -62,10 +62,11 @@ describe("app-home mobile shell inset (hero + menu)", () => {
 });
 
 describe("app-home mobile footer wordmark", () => {
-  it("bumps the centered MEDİSA mark slightly without touching version layout tokens", () => {
+  it("keeps #507 slightly reduced MEDİSA mark without restoring the old +0.5pt bump", () => {
     const footer = read("src/styles/components/footer.css");
     expect(footer).toMatch(
-      /body\.app-home-route #app-footer \.brand img\s*\{[^}]*max-height:\s*calc\(14\.27px \+ 1\.5pt \+ 0\.5pt\)/s
+      /body\.app-home-route #app-footer \.brand img\s*\{[^}]*max-height:\s*calc\(14\.27px \+ 1\.5pt\)/s
     );
+    expect(footer).not.toMatch(/14\.27px \+ 1\.5pt \+ 0\.5pt/);
   });
 });

@@ -17,7 +17,7 @@ This file is retained as a **historical archive** of the 2026-09-20 SGK employer
 | PRODUCTION_MIGRATION_TIP | 089 (stale) | **097** APPLIED |
 | PRODUCTION_MIGRATION_PENDING | 2 (`090`+`091`) | **0** |
 | PR #326 | OPEN (stale) | **MERGED** |
-| PRODUCTION_DEPLOY_SHA | `d96182a2` (#301) | `14dc7fa9` (#496); deploy run `37365978799` |
+| PRODUCTION_DEPLOY_SHA | `d96182a2` (#301) | `83a51701` (#507); Deploy cPanel #1240 SUCCESS |
 | FRESH_READBACK | BLOCKED_EXTERNAL_GITHUB_ACTIONS_BILLING | ACTIONS_APPLY_37391130248 |
 
 ## Migration durumu (current — mirrored for sync tests)
@@ -40,7 +40,7 @@ This file is retained as a **historical archive** of the 2026-09-20 SGK employer
 | Migration 095 | **APPLIED** (`095_personel_cinsiyet.sql`) |
 | Migration 096 | **APPLIED** (Apply `37021807281`; `096_personel_bordro_okumalari.sql`; worker SUCCEEDED; backup `medisa-pre-096-370***807281-1-20261002-144504.sql`; readback run `37022115475` VERIFIED) |
 | Migration 097 | **APPLIED** (Apply #56 `37391130248`; `097_qr_attendance_location_audit.sql`; worker completed; backup `medisa-pre-097-37391130248-1-20261006-000005.sql` readback VERIFIED; readback Ops #90 `37391796990` PROD_TIP 097, pending 0) |
-| CODE_MAIN_SHA / PRODUCTION_DEPLOY_SHA | `14dc7fa9bebe35533d6e1659eae795417ebea574` (last product deploy cPanel #1228 `37365978799`, #496; docs-only merges do not advance pin) |
+| CODE_MAIN_SHA / PRODUCTION_DEPLOY_SHA | `83a517011fcf32967adb87d4f44c1bcc833a45a8` (last product deploy cPanel #1240 SUCCESS, #507; docs-only merges do not advance pin) |
 | PR #326 | **MERGED** |
 | PR #402 | **MERGED / DEPLOYED** |
 | PR #439–#441 | **MERGED / DEPLOYED** |

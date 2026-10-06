@@ -34,6 +34,7 @@ function autoSicilPureBaseBody(): array
         'departman_id' => 1,
         'gorev_id' => 1,
         'personel_tipi_id' => 1,
+        'sgk_isveren_id' => 1,
         'aktif_durum' => 'AKTIF',
     ];
 }

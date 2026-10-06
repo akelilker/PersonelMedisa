@@ -3,20 +3,20 @@ PRODUCTION_MIGRATION_TIP: 097
 LAST_VERIFIED_PRODUCTION_MIGRATION_TIP: 097
 FRESH_PRODUCTION_MIGRATION_READBACK: MIGRATION_097_APPLIED
 PRODUCTION_MIGRATION_PENDING: 0
-PRODUCTION_DEPLOY_SHA: 14dc7fa9bebe35533d6e1659eae795417ebea574
-CODE_MAIN_SHA: 14dc7fa9bebe35533d6e1659eae795417ebea574
-LAST_MERGED_PR: 496
+PRODUCTION_DEPLOY_SHA: 83a517011fcf32967adb87d4f44c1bcc833a45a8
+CODE_MAIN_SHA: 83a517011fcf32967adb87d4f44c1bcc833a45a8
+LAST_MERGED_PR: 507
 ACTIVE_BACKLOG_OWNER: docs/guncel/146-post-pr402-canonical-backlog.md
 PIN_SHA_BASELINE: LAST_PRODUCT_MERGE_DEPLOY
 DOCS_ONLY_CLOSURE_THIS_PIN: NO
 
-# PersonelMedisa — Canonical State Pin (POST_PR496 + migration 097 closure)
+# PersonelMedisa — Canonical State Pin (POST_PR507 + migration 097 closure)
 
 **Aktif residual backlog otoritesi:** [`docs/guncel/146-post-pr402-canonical-backlog.md`](docs/guncel/146-post-pr402-canonical-backlog.md)
 **110:** SUPERSEDED for active backlog (historical archive only).
 **Do not reopen** PRs #395–#402 without new concrete contradiction.
 
-## Live / code pin (2026-10-06 POST_PR496)
+## Live / code pin (2026-10-06 POST_PR507)
 
 | Alan | Değer | Kanıt |
 | --- | --- | --- |
@@ -25,14 +25,15 @@ DOCS_ONLY_CLOSURE_THIS_PIN: NO
 | Migration 095 | **APPLIED** | `095_personel_cinsiyet.sql` production APPLIED |
 | Migration 096 | **APPLIED / SUCCESS** | `096_personel_bordro_okumalari.sql` — additive bordro "Okudum" audit (seed/backfill yok); canonical apply run `37021807281` SUCCESS; worker SUCCEEDED; backup `medisa-pre-096-370***807281-1-20261002-144504.sql` readback VERIFIED; post-apply readback run `37022115475` PROD_TIP **096** |
 | Migration 097 | **APPLIED / SUCCESS** | `097_qr_attendance_location_audit.sql` — `qr_attendance_events` konum denetim kolonları (#496); pre-apply preflight Ops migration worker diagnostics **#89** run `37389148523` PASS (PROD_TIP 096, pending 097); Apply cPanel migrations **#56** run `37391130248` SUCCESS; worker completed; backup `medisa-pre-097-37391130248-1-20261006-000005.sql` readback VERIFIED; post-apply readback Ops migration worker diagnostics **#90** run `37391796990` PROD_TIP **097**, `PREFLIGHT_BLOCKERS=NO_PENDING_MIGRATIONS` (beklenen: uygulanacak migration kalmadı) |
-| LAST_VERIFIED production tip | **097** | Post-apply readback Ops migration worker diagnostics **#90** run `37391796990` (PROD_TIP=097, PENDING_COUNT=0, PROCESSING_COUNT=0, WORKER_BUSY=NO, REMOTE_DEPLOY_SHA=`14dc7fa9…`) |
-| PRODUCTION_DEPLOY_SHA | `14dc7fa9…` | Last **product** deploy marker — Deploy cPanel **#1228** run **`37365978799`** SUCCESS (merge **#496**; attempt 2, `FINAL_SHA_GET=SUCCESS`, smoke OK); ops `deployed_sha` gate |
-| CODE_MAIN_SHA | `14dc7fa9…` | Same as **PRODUCTION_DEPLOY_SHA** — last **product** merge baseline (**#496**); docs-only state PRs do **not** advance `LAST_MERGED_PR` / SHA pins |
+| LAST_VERIFIED production tip | **097** | Post-apply readback Ops migration worker diagnostics **#90** run `37391796990` (PROD_TIP=097, PENDING_COUNT=0, PROCESSING_COUNT=0, WORKER_BUSY=NO, REMOTE_DEPLOY_SHA=`83a51701…`) |
+| PRODUCTION_DEPLOY_SHA | `83a51701…` | Last **product** deploy marker — Deploy cPanel **#1240** **SUCCESS** (merge **#507**; `FINAL_SHA_GET=SUCCESS`, smoke OK); ops `deployed_sha` gate |
+| CODE_MAIN_SHA | `83a51701…` | Same as **PRODUCTION_DEPLOY_SHA** — last **product** merge baseline (**#507**); docs-only state PRs do **not** advance `LAST_MERGED_PR` / SHA pins |
 | PR #470 | **MERGED / DEPLOYED** | UI correction batch (Level 2+ back nav, Personel Kartı missing-info gateway, duplicate CTA cleanup, Vazgeç fix, /self gateway polish) |
 | PR #472 | **MERGED / DEPLOYED** | Self-service closure (PR470 follow-up) — `6b7dbba6…`; Deploy cPanel **#1203** run `37018359986` SUCCESS |
 | PR #475 | **MERGED / DEPLOYED** | `fix(ui): bugun personel durumu sube secimi grid + sade sube detayi` — `939c5f87…`; Deploy cPanel **#1206** run `37069634704` SUCCESS |
 | PR #476 | **MERGED / DEPLOYED** | `/self` PERSONEL görsel shell (AppShell) + 120/158 `calisan_kapsami` `DIS_KAYNAK` canlı düzeltme + Harici Personel terminoloji + canonical kapanış — `817a1e72…`; Deploy cPanel **#1207** run `37077642885` SUCCESS |
 | PR #496 | **MERGED / DEPLOYED** | `feat(qr): GPS geofence audit on QR scan (v1, non-blocking)` + migration **097** — `14dc7fa9…`; Deploy cPanel **#1228** run `37365978799` SUCCESS |
+| PR #507 | **MERGED / DEPLOYED** | UX: Anlık personel durumu, şube çerçeveleri, tek süreç araması, footer — `83a51701…`; Deploy cPanel **#1240** SUCCESS |
 | Attendance / QR phase | **CLOSED** | QR attendance + saha rollout + puantaj doğrulaması + personel go-live tamamlandı |
 
 PRODUCTION_MUTATION_THIS_PIN: 0 (personel/yetki veri mutation yok). Migration **097** apply ayrı canonical run `37391130248`. Önceki POST_PR476 pin: 2 (personel 120 + 158 `calisan_kapsami` `IC_PERSONEL` → `DIS_KAYNAK` canlı düzeltme; readback doğrulandı) — aşağıdaki business truth tablosu geçerli.
@@ -92,6 +93,8 @@ Previous pin (POST_PR475) claimed: DEPLOY `939c5f87…` (#475 / Deploy #1206), L
 Obsolete after #476 merge (SHA `817a1e72…`), Deploy cPanel **#1207** run `37077642885` SUCCESS; migration **096** APPLIED (production tip **096**); migration **095** APPLIED; migration **094** APPLIED (NO_EVENT_DAY live).
 Previous pin (POST_PR476) claimed: CODE/PROD tip **096 / 096**, DEPLOY `817a1e72…` (#476 / Deploy #1207 run `37077642885`), LAST_MERGED_PR **476**.
 Obsolete after #496 merge (SHA `14dc7fa9…`), Deploy cPanel **#1228** run `37365978799` SUCCESS; migration **097** APPLIED (Apply #56 run `37391130248`; readback Ops #90 run `37391796990` PROD_TIP **097**).
+Previous pin (POST_PR496) claimed: DEPLOY `14dc7fa9…` (#496 / Deploy #1228), LAST_MERGED_PR **496**.
+Obsolete after #507 merge (SHA `83a51701…`), Deploy cPanel **#1240** SUCCESS; migration tip **097 / 097**, pending **0** (unchanged).
 
 Archive identity strings (not current gates):
 PREPARER_HISTORICAL: sedanurB

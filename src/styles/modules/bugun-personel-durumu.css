@@ -177,15 +177,15 @@
 
 /*
  * Şube kutusu: yalnız şube adı taşır (metrik yok). Kolon kontratı explicit ve
- * yüzde tabanlı flex-basis ile garanti edilir (sabit kare/aspect-ratio yok):
+ * yüzde tabanlı flex-basis ile garanti edilir; kare oran `aspect-ratio: 1 / 1` ile:
  *   - mobil (varsayılan, ≤640px): 3 eşit kolon → (100% - 2 * 6px) / 3
  *   - masaüstü (≥641px): 5 eşit kolon → (100% - 4 * 6px) / 5
  * `box-sizing: border-box` (global reset) sayesinde basis, padding + 1px border'ı
  * içerir; gap ile toplam tam %100 olduğundan 5/3 kolon taşmadan sığar ve yatay
  * scroll oluşmaz. Az kart varsa `justify-content: center` satırı ortalı tutar.
- * Kompakt yükseklik: sabit kare yerine min-height + padding; uzun adlar sarar.
- * Normal durumda ince görünür çerçeve vardır; hover'da kutu ve başlık birlikte
- * büyür. 1px border kutusu korunur, bu nedenle vurgu layout'u kaydırmaz.
+ * Kare kart (aspect-ratio 1:1); min-height alt sınır korunur; uzun adlar sarar.
+ * Normal durumda çerçeve görünmez (border-color transparent); hover/focus'ta çerçeve
+ * belirir. 1px border kutusu korunur, bu nedenle vurgu layout'u kaydırmaz.
  */
 .bugun-personel-branch-card {
   flex: 0 0 calc((100% - 12px) / 3);
@@ -193,8 +193,9 @@
   justify-content: center;
   min-width: 0;
   min-height: 56px;
+  aspect-ratio: 1 / 1;
   padding: 8px 6px;
-  border-color: rgba(196, 210, 228, 0.46);
+  border-color: transparent;
   background: transparent;
   text-align: center;
   transform-origin: center;

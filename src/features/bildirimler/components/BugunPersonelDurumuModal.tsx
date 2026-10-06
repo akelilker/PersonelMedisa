@@ -1,6 +1,7 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { AppSelect } from "../../../components/form/AppSelect";
 import { AppModal } from "../../../components/modal/AppModal";
+import { SurecInlineBackButton } from "../../kayit/components/SurecInlineBackButton";
 import {
   createBildirim,
   fetchBildirimDetail,
@@ -435,9 +436,6 @@ export function BugunPersonelDurumuModal({ open, onClose }: BugunPersonelDurumuM
       titleVariant="premium"
       titleTestId="bugun-personel-durumu-title"
       onClose={onClose}
-      onBack={nav.kind === "branches" ? undefined : goBack}
-      backLabel={resolveBugunBackLabel(nav)}
-      backTestId="bugun-personel-durumu-back"
       headerStart={
         <button
           type="button"
@@ -460,6 +458,13 @@ export function BugunPersonelDurumuModal({ open, onClose }: BugunPersonelDurumuM
       className="modal-container--bugun-personel"
       bodyClassName="modal-body--bugun-personel"
     >
+      {nav.kind !== "branches" ? (
+        <SurecInlineBackButton
+          label={resolveBugunBackLabel(nav) ?? "Geri"}
+          onClick={goBack}
+          testId="bugun-personel-durumu-back"
+        />
+      ) : null}
       <div className="bugun-personel-panel" data-testid="bugun-personel-durumu-panel">
         {crumb ? <p className="bugun-personel-crumb">{crumb}</p> : null}
         {loading ? <p className="bugun-personel-state">Yükleniyor…</p> : null}

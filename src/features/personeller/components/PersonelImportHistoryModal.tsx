@@ -301,7 +301,9 @@ export function PersonelImportHistoryModal({ open, onClose }: PersonelImportHist
                         <td>{row.row_status}</td>
                         <td>
                           {row.personel_id && row.personel_detail_path ? (
-                            <Link to={row.personel_detail_path}>#{row.personel_id}</Link>
+                            <Link to={row.personel_detail_path}>
+                              {row.personel_display_name || row.ad_soyad || row.sicil_no || "Kartı Aç"}
+                            </Link>
                           ) : (
                             "-"
                           )}

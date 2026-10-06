@@ -28,7 +28,7 @@ const TARGET_DOMAIN_PERSONEL = "personel";
 const DEFAULT_CATEGORY = "PERSONEL_OZLUK";
 
 function formatPersonelOptionLabel(personel: Personel): string {
-  const name = [personel.ad, personel.soyad].filter(Boolean).join(" ").trim() || `Personel #${personel.id}`;
+  const name = [personel.ad, personel.soyad].filter(Boolean).join(" ").trim() || "Personel";
   const sicil = personel.sicil_no?.trim();
   const place = [personel.sube_adi, personel.departman_adi].filter(Boolean).join(" / ");
   return [name, sicil || null, place || null].filter(Boolean).join(" • ");
@@ -273,7 +273,7 @@ export function SaklamaLegalHoldPanel() {
                   {holds.map((hold) => {
                     const personelLabel =
                       hold.personel_id != null
-                        ? personelLabelById.get(hold.personel_id) ?? `Personel #${hold.personel_id}`
+                        ? personelLabelById.get(hold.personel_id) ?? "Personel"
                         : "Personel seçilmemiş";
                     const createdAt = formatDisplayDate(hold.created_at);
                     return (
@@ -396,7 +396,7 @@ export function SaklamaLegalHoldPanel() {
                   {talepler.map((talep) => {
                     const personelLabel =
                       talep.personel_id != null
-                        ? personelLabelById.get(talep.personel_id) ?? `Personel #${talep.personel_id}`
+                        ? personelLabelById.get(talep.personel_id) ?? "Personel"
                         : null;
                     const until = formatDisplayDate(talep.retention_until_snapshot);
                     return (

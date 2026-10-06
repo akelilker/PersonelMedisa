@@ -17,6 +17,8 @@ const LATE_TOLERANCE_MAX_MINUTE = 35;
 
 type PuantajOlayKararPanelProps = {
   personelId: number;
+  /** Kullanıcıya gösterilecek görünür personel etiketi (internal ID gösterilmez). */
+  personelLabel?: string;
   tarih: string;
   puantaj: GunlukPuantaj | null;
 };
@@ -60,7 +62,7 @@ function availableActions(olayTuru: PuantajOlayTuru, rawDakika: number): Puantaj
   return ["KESINTI_UYGULA", "OFFICIAL_PROCESS_REQUIRED"];
 }
 
-export function PuantajOlayKararPanel({ personelId, tarih, puantaj }: PuantajOlayKararPanelProps) {
+export function PuantajOlayKararPanel({ personelId, personelLabel, tarih, puantaj }: PuantajOlayKararPanelProps) {
   const { hasPermission } = useRoleAccess();
   const canView = hasPermission("puantaj.olay_karar.view");
   const canDecide = hasPermission("puantaj.olay_karar.decide");
@@ -173,7 +175,7 @@ export function PuantajOlayKararPanel({ personelId, tarih, puantaj }: PuantajOla
             <div className="form-field-grid">
               <div className="form-field">
                 <span className="form-label">Personel</span>
-                <div className="form-input puantaj-readonly-value">{personelId}</div>
+                <div className="form-input puantaj-readonly-value">{personelLabel ?? "Personel"}</div>
               </div>
               <div className="form-field">
                 <span className="form-label">Tarih</span>

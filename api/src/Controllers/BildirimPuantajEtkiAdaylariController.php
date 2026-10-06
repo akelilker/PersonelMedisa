@@ -206,7 +206,6 @@ class BildirimPuantajEtkiAdaylariController
         );
         CsvResponse::send($filename, [
             'aday_id',
-            'personel_id',
             'sicil_no',
             'maskeli_ad_soyad',
             'departman',

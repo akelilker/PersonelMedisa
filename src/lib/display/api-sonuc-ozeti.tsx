@@ -51,7 +51,6 @@ const FIELD_LABELS: Record<string, string> = {
   yazma_endpoint_aktif_mi: "Yazma Uç Noktası Aktif",
   generated_at: "Oluşturulma",
   revision_no: "Revizyon No",
-  personel_id: "Personel No",
   source_changed: "Kaynak Değişti"
 };
 

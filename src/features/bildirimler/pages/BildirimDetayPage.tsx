@@ -45,7 +45,7 @@ export function BildirimDetayPage() {
           <p>
             <strong>Personel:</strong>{" "}
             {bildirim.personel_ad_soyad ??
-              (bildirim.personel_id != null ? `Personel #${bildirim.personel_id}` : "-")}
+              (bildirim.sicil_no ? `Sicil ${bildirim.sicil_no}` : "Personel")}
           </p>
           {bildirim.sicil_no ? (
             <p>

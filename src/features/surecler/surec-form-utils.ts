@@ -86,7 +86,7 @@ export function buildCreateSurecPayload(form: SurecFormState): CreateSurecPayloa
   return appendMazeretTamGunPayload(
     appendIlkIkiGunFirmaOderMiPayload(
     {
-      personel_id: parseRequiredPositiveInt(form.personelId, "Personel ID"),
+      personel_id: parseRequiredPositiveInt(form.personelId, "Personel"),
       surec_turu: parseRequiredSurecTuru(form.surecTuru),
       alt_tur: form.altTur.trim() || undefined,
       baslangic_tarihi: form.baslangicTarihi,
@@ -110,7 +110,7 @@ export function buildUpdateSurecPayload(form: SurecFormState): UpdateSurecPayloa
   return appendMazeretTamGunPayload(
     appendIlkIkiGunFirmaOderMiPayload(
     {
-      personel_id: parseRequiredPositiveInt(form.personelId, "Personel ID"),
+      personel_id: parseRequiredPositiveInt(form.personelId, "Personel"),
       surec_turu: parseRequiredSurecTuru(form.surecTuru),
       alt_tur: form.altTur.trim() || undefined,
       baslangic_tarihi: form.baslangicTarihi,

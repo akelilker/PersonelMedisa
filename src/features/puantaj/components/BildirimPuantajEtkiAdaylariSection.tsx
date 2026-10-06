@@ -7,6 +7,7 @@ import { LoadingState } from "../../../components/states/LoadingState";
 import { fetchBirimAmiriSecenekleri } from "../../../api/bildirimler.api";
 import { getApiErrorMessage } from "../../../api/api-client";
 import { useBildirimPuantajEtkiAdaylari } from "../../../hooks/useBildirimPuantajEtkiAdaylari";
+import { usePersonelSelectOptions } from "../../../hooks/usePersonelSelectOptions";
 import { useRoleAccess } from "../../../hooks/use-role-access";
 import { useAuth } from "../../../state/auth.store";
 import {
@@ -64,7 +65,7 @@ function resolvePersonelDisplayName(detail: BildirimPuantajEtkiAdayDetail): stri
       return personelAd.trim();
     }
   }
-  return String(detail.personel_id);
+  return "Personel";
 }
 
 const STATE_FILTER_OPTIONS = [
@@ -116,7 +117,7 @@ function buildDetailGroups(detail: BildirimPuantajEtkiAdayDetail): Array<{ title
       title: "Bildirim bilgileri",
       fields: [
         { label: "Tarih", value: detail.tarih },
-        { label: "Personel", value: String(detail.personel_id) },
+        { label: "Personel", value: resolvePersonelDisplayName(detail) },
         { label: "Bildirim türü", value: detail.bildirim_turu },
         { label: "Bildirim açıklaması", value: detail.bildirim_aciklama ?? snapshotAciklama ?? "—" },
         { label: "Bildirim alt tür", value: detail.bildirim_alt_tur ?? "—" },
@@ -227,6 +228,7 @@ function AdayRowActions({
 export function BildirimPuantajEtkiAdaylariSection() {
   const { hasPermission } = useRoleAccess();
   const { session } = useAuth();
+  const { options: personelOptions, labelById: personelLabelById } = usePersonelSelectOptions();
   const canView = hasPermission("puantaj.bildirim_etki.view");
   const canDismiss = hasPermission("puantaj.bildirim_etki.dismiss");
   const canApply = hasPermission("puantaj.bildirim_etki.apply");
@@ -592,12 +594,13 @@ export function BildirimPuantajEtkiAdaylariSection() {
         <form className="form-filter-panel" onSubmit={handleFilterSubmit}>
           <div className="form-field-grid">
             <FormField
-              label="Personel ID (filtre)"
+              as="select"
+              label="Personel (filtre)"
               name="puantaj-etki-aday-filter-personel"
-              type="number"
-              min={1}
               value={draftFilters.personelId}
               onChange={(value) => updateDraftFilters({ personelId: value })}
+              placeholderOption={{ value: "", label: "Tüm personel" }}
+              selectOptions={personelOptions}
             />
             <FormField
               label="Durum"
@@ -700,7 +703,7 @@ export function BildirimPuantajEtkiAdaylariSection() {
                 {items.map((item) => (
                   <tr key={item.id} data-testid={`puantaj-etki-aday-row-${item.id}`}>
                     <td>{item.tarih}</td>
-                    <td>{item.personel_id}</td>
+                    <td>{personelLabelById.get(item.personel_id) ?? "Personel"}</td>
                     <td>{item.bildirim_turu}</td>
                     <td>{formatProjectedEtkiLabel(item)}</td>
                     <td>
@@ -743,7 +746,7 @@ export function BildirimPuantajEtkiAdaylariSection() {
                     {formatBildirimPuantajEtkiAdayStateLabel(item.state)}
                   </span>
                 </div>
-                <p>Personel: {item.personel_id}</p>
+                <p>Personel: {personelLabelById.get(item.personel_id) ?? "Personel"}</p>
                 <p>Bildirim: {item.bildirim_turu}</p>
                 <p>Puantaj etkisi: {formatProjectedEtkiLabel(item)}</p>
                 <p>Çakışma: {formatConflictDisplay(item.conflict_code)}</p>
@@ -1007,7 +1010,7 @@ export function BildirimPuantajEtkiAdaylariSection() {
             <dl className="puantaj-etki-detail-grid">
               <div className="puantaj-etki-detail-row">
                 <dt>Personel</dt>
-                <dd>{dismissTarget.personel_id}</dd>
+                <dd>{personelLabelById.get(dismissTarget.personel_id) ?? "Personel"}</dd>
               </div>
               <div className="puantaj-etki-detail-row">
                 <dt>Tarih</dt>

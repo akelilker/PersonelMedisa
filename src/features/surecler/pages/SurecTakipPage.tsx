@@ -8,6 +8,7 @@ import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
 import { SubeDetailListNotice } from "../../../components/states/SubeDetailListNotice";
 import { useRoleAccess } from "../../../hooks/use-role-access";
+import { usePersonelSelectOptions } from "../../../hooks/usePersonelSelectOptions";
 import { useSurecler } from "../../../hooks/useSurecler";
 import { isSurecTuruCancelBlocked } from "../../../lib/surec-cancel-policy";
 import { formatSurecStateLabel, formatSurecTuruLabel } from "../../../lib/display/enum-display";
@@ -77,6 +78,7 @@ export function SurecTakipPage() {
 
   const { draft } = listQuery;
   const page = listQuery.page;
+  const { options: personelOptions, labelById: personelLabelById } = usePersonelSelectOptions();
 
   useEffect(() => {
     const currentState = (location.state ?? null) as Record<string, unknown> | null;
@@ -145,12 +147,13 @@ export function SurecTakipPage() {
       <form className="form-filter-panel" onSubmit={submitFilters}>
         <div className="form-field-grid">
           <FormField
-            label="Personel ID"
+            as="select"
+            label="Personel"
             name="surec-filter-personel"
-            type="number"
-            min={1}
             value={draft.personelId}
             onChange={(value) => updateDraft({ personelId: value })}
+            placeholderOption={{ value: "", label: "Tüm personel" }}
+            selectOptions={personelOptions}
           />
           {surecTuruOptions.length > 0 ? (
             <FormField
@@ -220,7 +223,7 @@ export function SurecTakipPage() {
             <li key={surec.id} className="surecler-item">
               <div>
                 <strong>{formatSurecTuruLabel(surec.surec_turu)}</strong>
-                <p>Personel: {surec.personel_id}</p>
+                <p>Personel: {personelLabelById.get(surec.personel_id) ?? "—"}</p>
                 <p>Durum: {formatSurecStateLabel(surec.state)}</p>
                 <p>
                   Tarih: {surec.baslangic_tarihi ?? "-"} / {surec.bitis_tarihi ?? "-"}
@@ -316,13 +319,14 @@ export function SurecTakipPage() {
         >
           <form id={SUREC_CREATE_FORM_ID} className="surec-form-grid" onSubmit={handleCreateSubmit}>
             <FormField
-              label="Personel ID"
+              as="select"
+              label="Personel"
               name="surec-create-personel"
-              type="number"
-              min={1}
               value={createForm.personelId}
               onChange={(value) => setCreateForm((prev) => ({ ...prev, personelId: value }))}
               required
+              placeholderOption={{ value: "", label: "Seçiniz" }}
+              selectOptions={personelOptions}
             />
             {surecTuruOptions.length > 0 ? (
               <SurecChoiceGroup
@@ -411,13 +415,14 @@ export function SurecTakipPage() {
         >
           <form id={SUREC_EDIT_FORM_ID} className="surec-form-grid" onSubmit={handleEditSubmit}>
             <FormField
-              label="Personel ID"
+              as="select"
+              label="Personel"
               name="surec-edit-personel"
-              type="number"
-              min={1}
               value={editForm.personelId}
               onChange={(value) => setEditForm((prev) => ({ ...prev, personelId: value }))}
               required
+              placeholderOption={{ value: "", label: "Seçiniz" }}
+              selectOptions={personelOptions}
             />
             {surecTuruOptions.length > 0 ? (
               <SurecChoiceGroup

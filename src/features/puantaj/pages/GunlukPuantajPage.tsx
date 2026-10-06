@@ -11,6 +11,7 @@ import { EmptyState } from "../../../components/states/EmptyState";
 import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
 import { useRoleAccess } from "../../../hooks/use-role-access";
+import { usePersonelSelectOptions } from "../../../hooks/usePersonelSelectOptions";
 import { usePuantaj } from "../../../hooks/usePuantaj";
 import { dispatchOpenBugunPersonelDurumu } from "../../../lib/bildirim/bugun-personel-durumu-events";
 import {
@@ -214,6 +215,12 @@ export function GunlukPuantajPage() {
     parasalEtkiOzeti,
     anaDetay
   } = usePuantaj();
+  const { options: personelOptions, labelById: personelLabelById } = usePersonelSelectOptions();
+  // Kullanıcıya internal personel ID'si gösterilmez (onaylı karar 2026-10-06):
+  // panellere görünür Ad Soyad etiketi geçilir, teknik ID yalnız payload'da kalır.
+  const activePersonelId = activeQuery ? Number(activeQuery.personelId) : 0;
+  const activePersonelLabel =
+    activePersonelId > 0 ? personelLabelById.get(activePersonelId) ?? "Personel" : undefined;
 
   const isMuhurlendi = puantaj?.state === "MUHURLENDI";
   const canEditForm = canUpdatePuantaj && !isMuhurlendi;
@@ -327,13 +334,14 @@ export function GunlukPuantajPage() {
       <form className="form-filter-panel" onSubmit={handleQuerySubmit}>
         <div className="form-field-grid">
           <FormField
-            label="Personel ID"
+            as="select"
+            label="Personel"
             name="puantaj-query-personel"
-            type="number"
-            min={1}
             value={formState.queryPersonelId}
             onChange={(value) => patchFormState({ queryPersonelId: value })}
             required
+            placeholderOption={{ value: "", label: "Seçiniz" }}
+            selectOptions={personelOptions}
           />
           <FormField
             label="Tarih"
@@ -901,15 +909,16 @@ export function GunlukPuantajPage() {
       ) : null}
 
       <PuantajOlayKararPanel
-        personelId={activeQuery ? Number(activeQuery.personelId) : 0}
+        personelId={activePersonelId}
+        personelLabel={activePersonelLabel}
         tarih={activeQuery?.tarih ?? ""}
         puantaj={puantaj}
       />
 
       <QrPuantajAdayiSection
-        personelId={activeQuery ? Number(activeQuery.personelId) : 0}
+        personelId={activePersonelId}
         tarih={activeQuery?.tarih ?? ""}
-        personelLabel={activeQuery?.personelId ? String(activeQuery.personelId) : undefined}
+        personelLabel={activePersonelLabel}
         onApplied={() => void refetchActive()}
       />
 

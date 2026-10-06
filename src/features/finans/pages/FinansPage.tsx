@@ -8,6 +8,7 @@ import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
 import { useRoleAccess } from "../../../hooks/use-role-access";
 import { useFinans } from "../../../hooks/useFinans";
+import { usePersonelSelectOptions } from "../../../hooks/usePersonelSelectOptions";
 import { formatFinansKalemTuruLabel, formatFinansStateLabel } from "../../../lib/display/enum-display";
 import type { FinansKalem } from "../../../types/finans";
 
@@ -58,6 +59,7 @@ export function FinansPage() {
 
   const { draft } = listQuery;
   const page = listQuery.page;
+  const { options: personelOptions, labelById: personelLabelById } = usePersonelSelectOptions();
 
   function handleCreateSubmit(event: FormEvent<HTMLFormElement>) {
     void createFinansHandler(event, canCreateFinans);
@@ -81,12 +83,13 @@ export function FinansPage() {
       <form className="form-filter-panel" onSubmit={submitFilters}>
         <div className="form-field-grid">
           <FormField
-            label="Personel ID"
+            as="select"
+            label="Personel"
             name="finans-filter-personel"
-            type="number"
-            min={1}
             value={draft.personelId}
             onChange={(value) => updateDraft({ personelId: value })}
+            placeholderOption={{ value: "", label: "Tüm personel" }}
+            selectOptions={personelOptions}
           />
           <FormField
             label="Dönem (YYYY-MM)"
@@ -135,7 +138,7 @@ export function FinansPage() {
             <li key={item.id} className="finans-item">
               <div>
                 <strong>{formatFinansKalemTuruLabel(item.kalem_turu)}</strong>
-                <p>Personel: {item.personel_id}</p>
+                <p>Personel: {personelLabelById.get(item.personel_id) ?? "—"}</p>
                 <p>Dönem: {item.donem}</p>
                 <p>Tutar: {item.tutar}</p>
                 <p>Durum: {formatFinansStateLabel(item.state)}</p>
@@ -225,13 +228,14 @@ export function FinansPage() {
         >
           <form id={FINANS_CREATE_FORM_ID} className="finans-form-grid" onSubmit={handleCreateSubmit}>
             <FormField
-              label="Personel ID"
+              as="select"
+              label="Personel"
               name="finans-create-personel"
-              type="number"
-              min={1}
               value={createForm.personelId}
               onChange={(value) => setCreateForm((prev) => ({ ...prev, personelId: value }))}
               required
+              placeholderOption={{ value: "", label: "Seçiniz" }}
+              selectOptions={personelOptions}
             />
             <FormField
               label="Dönem"
@@ -296,13 +300,14 @@ export function FinansPage() {
         >
           <form id={FINANS_EDIT_FORM_ID} className="finans-form-grid" onSubmit={handleEditSubmit}>
             <FormField
-              label="Personel ID"
+              as="select"
+              label="Personel"
               name="finans-edit-personel"
-              type="number"
-              min={1}
               value={editForm.personelId}
               onChange={(value) => setEditForm((prev) => ({ ...prev, personelId: value }))}
               required
+              placeholderOption={{ value: "", label: "Seçiniz" }}
+              selectOptions={personelOptions}
             />
             <FormField
               label="Dönem"

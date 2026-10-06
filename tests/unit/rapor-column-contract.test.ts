@@ -27,9 +27,9 @@ describe("rapor-column-contract", () => {
   });
 
   it("keeps puantaj columns on stored attendance fields", () => {
-    expect(getRaporColumns("puantaj").map((column) => column.key)).toEqual([
+    const puantajKeys = getRaporColumns("puantaj").map((column) => column.key);
+    expect(puantajKeys).toEqual([
       "tarih",
-      "personel_id",
       "ad_soyad",
       "sicil_no",
       "bolum",
@@ -42,12 +42,18 @@ describe("rapor-column-contract", () => {
       "hareket_durumu",
       "dayanak"
     ]);
-    expect(getRaporColumns("puantaj").some((column) => column.key.includes("fazla"))).toBe(false);
+    expect(puantajKeys.some((key) => key.includes("fazla"))).toBe(false);
+  });
+
+  it("internal personel_id hiçbir kullanıcı rapor kolonunda yer almaz", () => {
+    for (const raporTipi of RAPOR_TIPLERI) {
+      expect(getRaporColumns(raporTipi).some((column) => column.key === "personel_id")).toBe(false);
+      expect(getRaporColumns(raporTipi).some((column) => column.label === "Personel ID")).toBe(false);
+    }
   });
 
   it("keeps personel summary columns in business order", () => {
     expect(getRaporColumns("personel-ozet")).toEqual([
-      { key: "personel_id", label: "Personel ID" },
       { key: "ad_soyad", label: "Ad Soyad" },
       { key: "sicil_no", label: "Sicil No" },
       { key: "aktif_durum", label: "Durum" },

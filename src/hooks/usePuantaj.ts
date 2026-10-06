@@ -445,7 +445,6 @@ function toPuantajAnaDetayView(puantaj: GunlukPuantaj | null): PuantajAnaDetayVi
 
   return {
     fields: [
-      { label: "Personel ID", value: String(puantaj.personel_id) },
       { label: "Tarih", value: puantaj.tarih },
       { label: "Kayıt Durumu", value: formatPuantajStateLabel(puantaj.state) },
       { label: "Kontrol Durumu", value: formatKontrolDurumu(puantaj.kontrol_durumu) },
@@ -563,7 +562,7 @@ export function usePuantaj() {
       event.preventDefault();
 
       try {
-        const personelId = parseRequiredPositiveInt(formState.queryPersonelId, "Personel ID");
+        const personelId = parseRequiredPositiveInt(formState.queryPersonelId, "Personel");
         if (!formState.queryTarih) {
           throw new Error("Tarih zorunludur.");
         }

@@ -1,5 +1,6 @@
 import { type FormEvent } from "react";
 import { FormField } from "../../../../components/form/FormField";
+import { usePersonelSelectOptions } from "../../../../hooks/usePersonelSelectOptions";
 import type { BildirimPuantajEtkiAdayState } from "../../../../types/bildirim-puantaj-etki-aday";
 import type { IdOption } from "../../../../types/referans";
 
@@ -46,6 +47,8 @@ export function EtkiAdayiRaporFiltreleri({
   onSubmit,
   onExport
 }: EtkiAdayiRaporFiltreleriProps) {
+  const { options: personelOptions } = usePersonelSelectOptions();
+
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     onSubmit();
@@ -82,12 +85,13 @@ export function EtkiAdayiRaporFiltreleri({
           selectOptions={departmanOptions.map((item) => ({ value: String(item.id), label: item.label }))}
         />
         <FormField
-          label="Personel ID"
+          as="select"
+          label="Personel"
           name="etki-adayi-rapor-personel"
-          type="number"
-          min={1}
           value={filters.personelId}
           onChange={(value) => onChange({ personelId: value })}
+          placeholderOption={{ value: "", label: "Tüm personel" }}
+          selectOptions={personelOptions}
         />
         <FormField
           as="select"

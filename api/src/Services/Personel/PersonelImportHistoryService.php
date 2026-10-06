@@ -250,7 +250,6 @@ final class PersonelImportHistoryService
             'manifest_hash',
             'idempotency_fingerprint',
             'row_number',
-            'personel_id',
             'sicil_no',
             'ad_soyad',
             'tc_kimlik_no_masked',

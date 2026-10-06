@@ -124,7 +124,7 @@ export function RevizyonCorrectionDetailPage() {
         </div>
         <div>
           <dt>Personel</dt>
-          <dd>{correction.personel_ad_soyad ?? `#${correction.personel_id}`}</dd>
+          <dd>{correction.personel_ad_soyad ?? "—"}</dd>
         </div>
         <div>
           <dt>Hafta</dt>

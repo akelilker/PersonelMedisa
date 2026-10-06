@@ -245,7 +245,7 @@ export function RevizyonTalebiDetailPage() {
       <dl className="dossier-grid">
         <div>
           <dt>Personel</dt>
-          <dd>{talep.personel_ad_soyad ?? `#${talep.personel_id}`}</dd>
+          <dd>{talep.personel_ad_soyad ?? "—"}</dd>
         </div>
         <div>
           <dt>Sicil</dt>

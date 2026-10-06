@@ -8,6 +8,7 @@ import {
 import { FormField } from "../../../components/form/FormField";
 import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
+import { usePersonelSelectOptions } from "../../../hooks/usePersonelSelectOptions";
 import { useRoleAccess } from "../../../hooks/use-role-access";
 import type { DisiplinVaka } from "../../../types/disiplin-vaka";
 
@@ -37,6 +38,7 @@ const OLAY_TURU_LABELS: Record<string, string> = {
 
 export function DisiplinAdaylariSection() {
   const { hasPermission } = useRoleAccess();
+  const { labelById: personelLabelById } = usePersonelSelectOptions();
   const canGenerate = hasPermission("disiplin.review");
 
   const [items, setItems] = useState<DisiplinVaka[]>([]);
@@ -127,7 +129,7 @@ export function DisiplinAdaylariSection() {
           <tbody>
             {items.map((item) => (
               <tr key={item.id}>
-                <td>{item.personel_id}</td>
+                <td>{personelLabelById.get(item.personel_id) ?? "—"}</td>
                 <td>{item.tarih}</td>
                 <td>{OLAY_TURU_LABELS[item.olay_turu] ?? item.olay_turu}</td>
                 <td>{LIFECYCLE_LABELS[item.lifecycle_state] ?? item.lifecycle_state}</td>

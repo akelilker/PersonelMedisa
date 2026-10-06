@@ -106,7 +106,7 @@ function draftFinansFromPayload(payload: CreateFinansKalemPayload, tempId: numbe
 
 export function buildCreateFinansKalemPayload(form: FinansCreateFormInput): CreateFinansKalemPayload {
   return {
-    personel_id: parseRequiredPositiveInt(form.personelId, "Personel ID"),
+    personel_id: parseRequiredPositiveInt(form.personelId, "Personel"),
     donem: validateDonem(form.donem),
     kalem_turu: form.kalemTuru.trim(),
     tutar: parseRequiredPositiveNumber(form.tutar, "Tutar"),

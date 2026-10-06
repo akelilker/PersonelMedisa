@@ -23,6 +23,7 @@ import { AppActionDialog } from "../../../components/modal/AppActionDialog";
 import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
 import { useRoleAccess } from "../../../hooks/use-role-access";
+import { usePersonelSelectOptions } from "../../../hooks/usePersonelSelectOptions";
 import { GirdiOzetOzeti, KaynakOzetOzeti } from "../../../lib/display/api-sonuc-ozeti";
 import { formatSurecStateLabel } from "../../../lib/display/enum-display";
 import { useMaasHesaplama, type MaasHesaplamaFilterState } from "../../../hooks/useMaasHesaplama";
@@ -67,7 +68,7 @@ function firstNumber(...values: Array<number | null | undefined>): number | null
 }
 
 function adayName(aday: MaasHesaplamaAday): string {
-  return aday.personel_ad_soyad ?? aday.personel_adi ?? `Personel #${aday.personel_id}`;
+  return aday.personel_ad_soyad ?? aday.personel_adi ?? "Personel";
 }
 
 function calistirmaLabel(calistirma: MaasHesaplamaCalistirma): string {
@@ -88,6 +89,7 @@ export function MaasHesaplamaMerkeziPage(props?: {
   const canManage = hasPermission("maas_hesaplama.manage");
   const canViewAdaylari = hasPermission("maas_hesaplama_adaylari.view");
   const canManageAdaylari = hasPermission("maas_hesaplama_adaylari.manage");
+  const { options: personelOptions } = usePersonelSelectOptions();
 
   const [filters, setFilters] = useState<MaasHesaplamaFilterState>(() => ({
     ay: props?.lockedFilters?.ay || INITIAL_FILTERS.ay,
@@ -481,7 +483,7 @@ export function MaasHesaplamaMerkeziPage(props?: {
         onceki_kumulatif_gelir_vergisi: vergi,
         kaynak: "MANUEL"
       });
-      setActionMessage(`Devir kaydedildi (personel #${personelId}).`);
+      setActionMessage("Devir kaydedildi.");
       setDevirForm({ personelId: "", matrah: "", vergi: "" });
       await refetch();
     } catch (error) {
@@ -1019,7 +1021,7 @@ export function MaasHesaplamaMerkeziPage(props?: {
                     <tbody>
                       {devirler.map((devir) => (
                         <tr key={devir.id} data-testid={`maas-hesaplama-devir-row-${devir.id}`}>
-                          <td>{devir.personel_ad_soyad ?? `Personel #${devir.personel_id}`}</td>
+                          <td>{devir.personel_ad_soyad ?? "Personel"}</td>
                           <td>{formatMoney(devir.onceki_kumulatif_gelir_vergisi_matrahi)}</td>
                           <td>{formatMoney(devir.onceki_kumulatif_gelir_vergisi)}</td>
                           <td>{devir.kaynak ?? "—"}</td>
@@ -1040,12 +1042,13 @@ export function MaasHesaplamaMerkeziPage(props?: {
                   >
                     <div className="form-field-grid">
                       <FormField
-                        label="Personel ID"
+                        as="select"
+                        label="Personel"
                         name="maas-hesaplama-devir-personel"
-                        type="number"
-                        min={1}
                         value={devirForm.personelId}
                         onChange={(value) => setDevirForm((prev) => ({ ...prev, personelId: value }))}
+                        placeholderOption={{ value: "", label: "Seçiniz" }}
+                        selectOptions={personelOptions}
                       />
                       <FormField
                         label="Önceki GV matrahı"

@@ -202,6 +202,11 @@ export function KayitSurecPersonelGenelPanel({
     <div className="surec-person-general-panel" data-testid="kayit-surec-personel-genel-panel">
       <div className="surec-person-general-head">
         <h4 className="surec-shell-summary-kicker">Genel bilgiler</h4>
+        <div className="surec-person-photo-box" aria-label="Personel fotoğrafı">
+          <div className="surec-person-photo-avatar" aria-hidden="true">
+            {`${personel.ad?.[0] ?? ""}${personel.soyad?.[0] ?? ""}`.toUpperCase() || "P"}
+          </div>
+        </div>
       </div>
 
       {canEdit && !isEditing ? (

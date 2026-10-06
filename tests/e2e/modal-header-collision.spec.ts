@@ -92,8 +92,6 @@ async function openBugunRoot(page: Page): Promise<Locator> {
 
 type HeaderGeometry = {
   leadingRight: number;
-  backRight: number;
-  backLabelRight: number;
   titleLeft: number;
   titleRight: number;
   titleCenterOffset: number;
@@ -101,7 +99,8 @@ type HeaderGeometry = {
   closeRight: number;
   headerLeft: number;
   headerRight: number;
-  backLabelTruncated: boolean;
+  backTop: number;
+  headerBottom: number;
 };
 
 async function readHeaderGeometry(modal: Locator): Promise<HeaderGeometry> {
@@ -119,19 +118,15 @@ async function readHeaderGeometry(modal: Locator): Promise<HeaderGeometry> {
     const back = must('[data-testid="bugun-personel-durumu-back"]');
     const title = must('[data-testid="bugun-personel-durumu-title"]');
     const close = must(".modal-close-btn");
-    const backLabel = must('[data-testid="bugun-personel-durumu-back"] .modal-back-btn-label');
 
     const headerBox = header.getBoundingClientRect();
     const leadingBox = leading.getBoundingClientRect();
     const backBox = back.getBoundingClientRect();
-    const backLabelBox = backLabel.getBoundingClientRect();
     const titleBox = title.getBoundingClientRect();
     const closeBox = close.getBoundingClientRect();
 
     return {
       leadingRight: leadingBox.right,
-      backRight: backBox.right,
-      backLabelRight: backLabelBox.right,
       titleLeft: titleBox.left,
       titleRight: titleBox.right,
       titleCenterOffset: (titleBox.left + titleBox.right) / 2 - (headerBox.left + headerBox.right) / 2,
@@ -139,20 +134,16 @@ async function readHeaderGeometry(modal: Locator): Promise<HeaderGeometry> {
       closeRight: closeBox.right,
       headerLeft: headerBox.left,
       headerRight: headerBox.right,
-      backLabelTruncated: backLabel.scrollWidth > backLabel.clientWidth + 1
+      backTop: backBox.top,
+      headerBottom: headerBox.bottom
     };
   });
 }
 
-function assertNoOverlap(geometry: HeaderGeometry, label: string): void {
-  // Leading back lane vs centered title: no horizontal intersection.
-  expect(geometry.backRight, `${label}: back/title overlap`).toBeLessThanOrEqual(geometry.titleLeft + 0.5);
-  expect(geometry.leadingRight, `${label}: leading lane/title overlap`).toBeLessThanOrEqual(
+function assertHeaderGeometry(geometry: HeaderGeometry, label: string): void {
+  // Home (leading) lane vs centered title: no horizontal intersection.
+  expect(geometry.leadingRight, `${label}: home/title overlap`).toBeLessThanOrEqual(
     geometry.titleLeft + 0.5
-  );
-  // Long back label stays inside the leading lane (ellipsis) instead of bleeding under the title.
-  expect(geometry.backLabelRight, `${label}: back label escapes lane`).toBeLessThanOrEqual(
-    geometry.leadingRight + 0.5
   );
   // Centered title vs close lane.
   expect(geometry.titleRight, `${label}: title/close overlap`).toBeLessThanOrEqual(geometry.closeLeft + 0.5);
@@ -161,6 +152,10 @@ function assertNoOverlap(geometry: HeaderGeometry, label: string): void {
   // Close stays inside the header frame.
   expect(geometry.closeLeft).toBeGreaterThanOrEqual(geometry.headerLeft);
   expect(geometry.closeRight).toBeLessThanOrEqual(geometry.headerRight + 0.5);
+  // Back control lives in a separate row BELOW the header (not inside it).
+  expect(geometry.backTop, `${label}: back control not below header`).toBeGreaterThanOrEqual(
+    geometry.headerBottom - 0.5
+  );
 }
 
 
@@ -169,7 +164,7 @@ for (const viewport of [
   { width: 430, height: 932 },
   { width: 1280, height: 900 }
 ] as const) {
-  test(`Bugünkü Personel Durumu L2 header has zero back/title/close overlap @ ${viewport.width}x${viewport.height}`, async ({
+  test(`Bugünkü Personel Durumu L2 back row sits below header with zero home/title/close overlap @ ${viewport.width}x${viewport.height}`, async ({
     page
   }) => {
     mkdirSync(SHOT_DIR, { recursive: true });
@@ -183,14 +178,14 @@ for (const viewport of [
     await expect(modal.getByTestId("bugun-personel-durumu-back")).toBeVisible();
 
     const l2 = await readHeaderGeometry(modal);
-    assertNoOverlap(l2, `${viewport.width}x${viewport.height} L2`);
+    assertHeaderGeometry(l2, `${viewport.width}x${viewport.height} L2`);
     await page.screenshot({ path: `${SHOT_DIR}/bugun-l2-${viewport.width}x${viewport.height}.png` });
 
     // İkinci uzun-label L2: back label şube adı, centered title birim adı.
     await modal.getByTestId("bugun-unit-open-10").click();
     await expect(modal.getByTestId("bugun-personel-durumu-title")).toHaveText("Muhasebe");
     const l3 = await readHeaderGeometry(modal);
-    assertNoOverlap(l3, `${viewport.width}x${viewport.height} L3`);
+    assertHeaderGeometry(l3, `${viewport.width}x${viewport.height} L3`);
     await page.screenshot({ path: `${SHOT_DIR}/bugun-l3-${viewport.width}x${viewport.height}.png` });
   });
 }

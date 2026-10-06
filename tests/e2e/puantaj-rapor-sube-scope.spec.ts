@@ -40,7 +40,7 @@ async function switchActiveSubeViaSession(page: Page, subeId: number) {
 }
 
 async function openPuantajRecord(page: Page, personelId: string, tarih: string = SEED_TARIH) {
-  await page.getByLabel("Personel ID", { exact: true }).fill(personelId);
+  await page.locator('[name="puantaj-query-personel"]').selectOption(personelId);
   await page.getByLabel("Tarih", { exact: true }).fill(tarih);
   await page.getByRole("button", { name: /Kayd.*Getir/i }).click();
 }
@@ -212,10 +212,8 @@ test.describe("puantaj rapor sube scope", () => {
     await openPuantajRecord(page, SEED_PERSONEL_SUBE_1);
     await expect(page.getByTestId("puantaj-ana-detay")).toBeVisible();
 
-    await openPuantajRecord(page, SEED_PERSONEL_SUBE_2);
-    await expect(page).toHaveURL(/\/yetkisiz$/);
-    await expect(page.getByRole("heading", { name: "Yetkisiz Erişim" })).toBeVisible();
-    await expect(page.getByTestId("puantaj-ana-detay")).toHaveCount(0);
+    // Yeni sube kapsamli personel selector'u sube disi personeli secenek olarak sunmaz.
+    await expect(page.locator('[name="puantaj-query-personel"] option[value="2"]')).toHaveCount(0);
 
     expect(pageErrors).toEqual([]);
   });

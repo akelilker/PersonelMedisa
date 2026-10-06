@@ -71,7 +71,7 @@ test.describe("I11 raporlar information architecture", () => {
     await expect(page).toHaveURL(/panel=bordro-hazirlik/);
     await expect(page.getByTestId("bordro-hazirlik-merkezi")).toBeVisible();
     await expect(page.getByTestId("bordro-hazirlik-tab-personel-kapsam")).toHaveClass(/is-active/);
-    await expect(page.getByLabel("Personel ID")).toHaveValue("1");
+    await expect(page.locator('[name="bordro-kapsam-personel-id"]')).toHaveValue("1");
   });
 
   test("Scenario E — role without payroll permissions hides Bordro group", async ({ page }) => {

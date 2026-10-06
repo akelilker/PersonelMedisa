@@ -36,7 +36,7 @@ test.describe("Kayit Surec Mali finans", () => {
     await page.goto("/finans");
     await expect(page.locator(".modal-header h2").first()).toContainText("Finans");
     await expect(page.locator(".finans-list")).toContainText(uniqueTutar);
-    await expect(page.locator(".finans-list")).toContainText("Personel: 1");
+    await expect(page.locator(".finans-list")).toContainText("Personel: Ayşe Yılmaz");
     await expect(page.locator(".finans-list")).toContainText(uniqueDonem);
   });
 });

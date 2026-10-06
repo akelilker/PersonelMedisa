@@ -23,7 +23,7 @@ test.describe("e2e smoke", () => {
     await page.goto("/puantaj");
     await expect(page).toHaveURL(/\/puantaj$/);
 
-    await page.getByLabel("Personel ID", { exact: true }).fill("1");
+    await page.locator('[name="puantaj-query-personel"]').selectOption("1");
     await page.getByLabel("Tarih", { exact: true }).fill("2026-04-14");
     await page.getByRole("button", { name: /Kayd.*Getir/i }).click();
 
@@ -72,7 +72,7 @@ test.describe("e2e smoke", () => {
     await expect(page).toHaveURL(/\/puantaj$/);
     await expect(page.locator(".modal-header h2").first()).toContainText("Günlük Puantaj");
 
-    await page.getByLabel("Personel ID", { exact: true }).fill("1");
+    await page.locator('[name="puantaj-query-personel"]').selectOption("1");
     await page.getByLabel("Tarih", { exact: true }).fill("2026-04-12");
     await page.getByRole("button", { name: /Kayd.*Getir/i }).click();
 
@@ -176,7 +176,7 @@ test.describe("e2e smoke", () => {
     await page.getByRole("button", { name: /Yeni S.*re.*/i }).click();
     const surecCreateModal = page.locator(".modal-container").last();
     await expect(surecCreateModal).toBeVisible();
-    await surecCreateModal.locator("[name='surec-create-personel']").fill("1");
+    await surecCreateModal.locator("[name='surec-create-personel']").selectOption("1");
     if (await surecCreateModal.getByRole("group", { name: "Süreç Türü" }).count()) {
       await surecCreateModal.getByRole("group", { name: "Süreç Türü" }).getByRole("button", { name: "Rapor" }).click();
     } else {
@@ -220,7 +220,7 @@ test.describe("e2e smoke", () => {
     await page.getByRole("button", { name: /Yeni Finans Kalemi/i }).click();
     const finansCreateModal = page.locator(".modal-container").last();
     await expect(finansCreateModal).toBeVisible();
-    await finansCreateModal.locator("[name='finans-create-personel']").fill("1");
+    await finansCreateModal.locator("[name='finans-create-personel']").selectOption("1");
     await finansCreateModal.locator("[name='finans-create-donem']").fill("2026-04");
     await finansCreateModal.locator("[name='finans-create-kalem']").fill("PRIM");
     await finansCreateModal.locator("[name='finans-create-tutar']").fill("1500");

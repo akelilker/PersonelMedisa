@@ -68,7 +68,7 @@ test.describe("S77-C maas hesaplama merkezi", () => {
     await expect(page.getByTestId("maas-hesaplama-calc-ready")).toContainText("Hayır");
     await expect(page.getByTestId("maas-hesaplama-calc-issue-BUSINESS_POLICY_REQUIRED")).toBeVisible();
     await expect(page.getByTestId("maas-hesaplama-calc-run")).toBeDisabled();
-    await page.getByLabel("Personel ID").fill("7");
+    await page.locator('[name="maas-hesaplama-devir-personel"]').selectOption("1");
     await page.getByLabel("Önceki GV matrahı").fill("12345.67");
     await page.getByLabel("Önceki GV", { exact: true }).fill("987.65");
     const devir = page.waitForResponse(

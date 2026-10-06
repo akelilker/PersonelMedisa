@@ -51,6 +51,6 @@ test.describe("I12 duplicate cleanup regression", () => {
     await page.goto("/raporlar?panel=bordro-hazirlik&tab=personel-kapsam&personelId=1");
     await expect(page.getByTestId("bordro-hazirlik-merkezi")).toBeVisible();
     await expect(page.getByTestId("bordro-hazirlik-tab-personel-kapsam")).toHaveClass(/is-active/);
-    await expect(page.getByLabel("Personel ID")).toHaveValue("1");
+    await expect(page.locator('[name="bordro-kapsam-personel-id"]')).toHaveValue("1");
   });
 });

@@ -309,7 +309,7 @@ export function QrPuantajAdayiSection({ personelId, tarih, personelLabel, onAppl
             <dl className="puantaj-etki-detail-grid">
               <div className="puantaj-etki-detail-row">
                 <dt>Personel</dt>
-                <dd>{personelLabel ?? personelId}</dd>
+                <dd>{personelLabel ?? "Personel"}</dd>
               </div>
               <div className="puantaj-etki-detail-row">
                 <dt>Tarih</dt>

@@ -226,7 +226,7 @@ export function BugunPersonelDurumuModal({ open, onClose }: BugunPersonelDurumuM
       setPayload(data);
       setNav(restoreNav(data, preserve));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Bugünkü personel durumu yüklenemedi.");
+      setError(err instanceof Error ? err.message : "Anlık personel durumu yüklenemedi.");
       setPayload(null);
     } finally {
       setLoading(false);

@@ -102,13 +102,13 @@ export const DEVAMSIZLIK_SUB_CARDS: DevamsizlikSubCard[] = [
   {
     id: "gec",
     title: "Geç Geldi",
-    description: "Saatli günlük durum — Bugünkü Personel Durumu",
+    description: "Saatli günlük durum — Anlık Personel Durumu",
     candidateKeys: ["DEVAMSIZLIK"]
   },
   {
     id: "erken",
     title: "Erken Çıktı",
-    description: "Saatli günlük durum — Bugünkü Personel Durumu",
+    description: "Saatli günlük durum — Anlık Personel Durumu",
     candidateKeys: ["DEVAMSIZLIK"]
   }
 ];
@@ -163,7 +163,7 @@ export const PUANTAJ_SUBDOMAIN_CARDS: Array<{
   {
     id: "gorev",
     title: "Görevde",
-    description: "Bugünkü görev durumu — Bugünkü Personel Durumu",
+    description: "Bugünkü görev durumu — Anlık Personel Durumu",
     kind: "bugun-modal"
   },
   {

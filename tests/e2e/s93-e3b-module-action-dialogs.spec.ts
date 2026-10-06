@@ -61,7 +61,7 @@ test.describe("S93-E3B Süreç, Finans ve Bildirim action dialogs", () => {
     const nativeDialogs = trackNativeDialogs(page);
     await loginAsMockRole(page, "BIRIM_AMIRI");
     await page.goto("/bildirimler");
-    await expect(page.getByRole("heading", { name: "Bugünkü Personel Durumu" }).first()).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Anlık Personel Durumu" }).first()).toBeVisible();
 
     const cancelButton = page
       .locator(".bildirimler-item")

@@ -175,6 +175,20 @@ describe("bugun personel durumu owners", () => {
     expect(shell).toContain('title="Anlık Personel Durumu"');
   });
 
+  it("does not leave user-facing Bugünkü Personel Durumu copy in product src", () => {
+    const paths = [
+      "src/features/bildirimler/components/BugunPersonelDurumuModal.tsx",
+      "src/components/shell/ShellHeaderActions.tsx",
+      "src/features/kayit/components/KayitSurecPersonelPuantajPanel.tsx",
+      "src/features/kayit/kayit-surec-constants.ts",
+      "src/features/puantaj/pages/GunlukPuantajPage.tsx",
+      "src/features/bildirimler/pages/BildirimlerPage.tsx"
+    ];
+    for (const path of paths) {
+      expect(read(path)).not.toMatch(/Bugünkü Personel Durumu/);
+    }
+  });
+
   it("keeps branch cards square, lightly framed at rest, and stronger frame + scaled on hover", () => {
     const styles = read("src/styles/modules/bugun-personel-durumu.css");
     expect(styles).toMatch(

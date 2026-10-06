@@ -15,10 +15,10 @@ Bu dosya, kullanıcının onayladığı kalıcı görsel kararları her biri tek
 | /self | Ana uygulamaya geri geçiş bağlantısı | "Kullanıcı Paneli >" ile aynı görsel dil; yeni FAB/kutu/border/gölge yok; oturum ve QR yetkisi korunur | 2026-10-01 |
 | Mobil ana sayfa başlığı | İç yükseklik inceltme | mobil ana header iç yüksekliği 4px daha ince; login mobil header buna eşit; üst 4 ikon (takvim, konum, bildirim, ayarlar) hafif büyük; desktop header'a dokunulmaz | 2026-10-03 |
 | Ortak modal başlığı | Kırmızı geçiş #484 öncesi tam uzunluğa döner (şu anki %72'de biten görünüm istenmiyor; 2026-10-04 '%60–70' kararını geçersiz kılar) | --modal-header-red-gradient 3. katman: #790000 0%, #700000 30%, #580000 52%, #420205 72%, #32050a 82%, #20080f 90%, #120b14 96%, var(--modal-bg) 100% | 2026-10-06 |
-| Bugünkü Personel Durumu — şube kartı | Şube kartları kare oranlıdır (ürün kararı) | `aspect-ratio: 1 / 1`; içerik/istatistik/veri mantığı değişmez | 2026-10-06 |
-| Bugünkü Personel Durumu — şube kartı | Kolon düzeni | Mobil 3 kolon; masaüstü 5 kolon; son satır dengeli/ortalanmış kalır | 2026-10-06 |
+| Anlık Personel Durumu — şube kartı | Şube kartları kare oranlıdır (ürün kararı) | `aspect-ratio: 1 / 1`; içerik/istatistik/veri mantığı değişmez | 2026-10-06 |
+| Anlık Personel Durumu — şube kartı | Kolon düzeni | Mobil 3 kolon; masaüstü 5 kolon; son satır dengeli/ortalanmış kalır | 2026-10-06 |
 | Anlık Personel Durumu — şube kartı | Çerçeve davranışı | Normal durumda hafif görünür çerçeve vardır; hover/focus sırasında çerçeve daha belirgin olur; hover'da şube adı hafif büyüyebilir | 2026-10-06 |
-| Bugünkü Personel Durumu — şube detayı | Geri dönüş | Geri dönüş kırmızı başlığın ALTINDA ayrı geri satırında bulunur (başlığın içine sıkıştırılmaz); home ikonu başlıkta kendi yerinde kalır; başlık ortada kalır | 2026-10-06 |
+| Anlık Personel Durumu — şube detayı | Geri dönüş | Geri dönüş kırmızı başlığın ALTINDA ayrı geri satırında bulunur (başlığın içine sıkıştırılmaz); home ikonu başlıkta kendi yerinde kalır; başlık ortada kalır | 2026-10-06 |
 | Kayıt ve Süreç > Genel | Personel fotoğraf alanı | Sağ üst/sağ tarafta bulunur; gerçek fotoğraf yoksa placeholder/initial gösterilir; soldaki harf avatarı fotoğraf alanının yerine geçmez; yeni fotoğraf upload API'si icat edilmez | 2026-10-06 |
 | Kayıt ve Süreç > Genel | Geri dönüş | `← Personel` kartın içine gömülmez; ayrı geri satırında yer alır; kullanıcı seçim ekranına dönüş davranışı değişmez | 2026-10-06 |
 | Kayıt formu | Mobil 2 kolon | Mobilde 2 kolon korunur; orta ayırıcı korunur; PR #490'daki tek kolon davranışına dönülmez | 2026-10-06 |

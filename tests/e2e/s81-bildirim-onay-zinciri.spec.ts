@@ -7,7 +7,7 @@ test.describe("S81 Bildirim ve Onay Zinciri", () => {
   }) => {
     await loginAsMockRole(page, "BIRIM_AMIRI");
     await page.goto("/bildirimler");
-    await expect(page.getByRole("heading", { name: "Bugünkü Personel Durumu" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Anlık Personel Durumu" })).toBeVisible();
     await expect(page.getByTestId("gunluk-bildirim-ozet")).toBeVisible();
     await expect(page.getByTestId("haftalik-mutabakat-panel")).toBeVisible();
     await expect(page.getByLabel("Personel ID")).toHaveCount(0);

@@ -74,7 +74,7 @@ export function KayitSurecPersonelPuantajPanel({
     }
 
     if (card.kind === "puantaj-route") {
-      // IK without puantaj.update: daily correction owner is Bugünkü Personel Durumu.
+      // IK without puantaj.update: daily correction owner is Anlık Personel Durumu.
       if (!canUpdatePuantaj && canViewBugun) {
         dispatchOpenBugunPersonelDurumu();
         return;
@@ -96,18 +96,18 @@ export function KayitSurecPersonelPuantajPanel({
     <div className="surec-shell-panel" data-testid="kayit-surec-puantaj-panel">
       <p className="workspace-empty-hint" data-testid="kayit-surec-puantaj-owner-hint">
         <strong>Puantaj</strong> — İzin ve Devamsızlık / Rapor / İş Kazası = özlük süreç kaydı. Geç / Erken /
-        Görevde = Bugünkü Personel Durumu (saatli günlük durum).
+        Görevde = Anlık Personel Durumu (saatli günlük durum).
       </p>
 
       {canViewBugun ? (
         <div className="workspace-empty-hint" data-testid="kayit-surec-puantaj-open-items">
           <strong>Kontrol Gerekenler</strong>
           <p>
-            Henüz değerlendirilmedi, geç geldi, gelmedi ve eksik günlük kayıtlar Bugünkü Personel Durumu
+            Henüz değerlendirilmedi, geç geldi, gelmedi ve eksik günlük kayıtlar Anlık Personel Durumu
             üzerinden okunur
             {canCorrectScoped ? "; günlük düzeltme de orada yapılır" : ""}. İzin ve devamsızlık / rapor / iş
             kazası için aşağıdaki özlük kayıtlarını kullan. Puantaj satırı düzenleme yetkisi yoksa satır ekranı yerine
-            Bugün açılır.
+            Anlık Personel Durumu açılır.
           </p>
           <button
             type="button"

@@ -74,7 +74,7 @@ export function KayitSurecPersonelPuantajPanel({
     }
 
     if (card.kind === "puantaj-route") {
-      // IK without puantaj.update: daily correction owner is Bugünkü Personel Durumu.
+      // IK without puantaj.update: daily correction owner is Anlık Personel Durumu.
       if (!canUpdatePuantaj && canViewBugun) {
         dispatchOpenBugunPersonelDurumu();
         return;
@@ -96,18 +96,18 @@ export function KayitSurecPersonelPuantajPanel({
     <div className="surec-shell-panel" data-testid="kayit-surec-puantaj-panel">
       <p className="workspace-empty-hint" data-testid="kayit-surec-puantaj-owner-hint">
         <strong>Puantaj</strong> — İzin ve Devamsızlık / Rapor / İş Kazası = özlük süreç kaydı. Geç / Erken /
-        Görevde = Bugünkü Personel Durumu (saatli günlük durum).
+        Görevde = Anlık Personel Durumu (saatli günlük durum).
       </p>
 
       {canViewBugun ? (
         <div className="workspace-empty-hint" data-testid="kayit-surec-puantaj-open-items">
           <strong>Kontrol Gerekenler</strong>
           <p>
-            Henüz değerlendirilmedi, geç geldi, gelmedi ve eksik günlük kayıtlar Bugünkü Personel Durumu
+            Henüz değerlendirilmedi, geç geldi, gelmedi ve eksik günlük kayıtlar Anlık Personel Durumu
             üzerinden okunur
             {canCorrectScoped ? "; günlük düzeltme de orada yapılır" : ""}. İzin ve devamsızlık / rapor / iş
             kazası için aşağıdaki özlük kayıtlarını kullan. Puantaj satırı düzenleme yetkisi yoksa satır ekranı yerine
-            Bugün açılır.
+            Anlık Personel Durumu açılır.
           </p>
           <button
             type="button"
@@ -115,7 +115,7 @@ export function KayitSurecPersonelPuantajPanel({
             data-testid="kayit-surec-puantaj-open-bugun"
             onClick={() => dispatchOpenBugunPersonelDurumu()}
           >
-            Bugünkü Personel Durumu
+            Anlık Personel Durumu
           </button>
         </div>
       ) : null}
@@ -140,7 +140,7 @@ export function KayitSurecPersonelPuantajPanel({
               <span className="surec-devamsizlik-tile-title">{card.title}</span>
               <span className="surec-devamsizlik-tile-desc">
                 {card.kind === "puantaj-route" && !canUpdatePuantaj && canViewBugun
-                  ? "Günlük durum kontrolü — Bugünkü Personel Durumu"
+                  ? "Günlük durum kontrolü — Anlık Personel Durumu"
                   : card.description}
               </span>
               <span className="surec-devamsizlik-tile-status">

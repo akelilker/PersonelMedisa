@@ -570,10 +570,10 @@ export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeade
             data-testid="bugun-personel-durumu-entry"
             aria-label={
               bugunAttentionCount > 0
-                ? `Bugünkü Personel Durumu, ${bugunAttentionCount} dikkat`
-                : "Bugünkü Personel Durumu"
+                ? `Anlık Personel Durumu, ${bugunAttentionCount} dikkat`
+                : "Anlık Personel Durumu"
             }
-            title="Bugünkü Personel Durumu"
+            title="Anlık Personel Durumu"
             onClick={() => {
               setIsBugunModalOpen(true);
               setIsNotificationsOpen(false);

@@ -168,10 +168,34 @@ describe("bugun personel durumu owners", () => {
     expect(birimService).not.toContain("no open daily notification → GELDI");
   });
 
-  it("keeps branch cards square, frameless at rest, and framed + scaled on hover", () => {
+  it("uses Anlık Personel Durumu on user-facing modal and shell entry surfaces", () => {
+    const modal = read("src/features/bildirimler/components/BugunPersonelDurumuModal.tsx");
+    expect(modal).toContain('"Anlık Personel Durumu"');
+    const shell = read("src/components/shell/ShellHeaderActions.tsx");
+    expect(shell).toContain('title="Anlık Personel Durumu"');
+  });
+
+  it("does not leave user-facing Bugünkü Personel Durumu copy in product src", () => {
+    const paths = [
+      "src/features/bildirimler/components/BugunPersonelDurumuModal.tsx",
+      "src/components/shell/ShellHeaderActions.tsx",
+      "src/features/kayit/components/KayitSurecPersonelPuantajPanel.tsx",
+      "src/features/kayit/kayit-surec-constants.ts",
+      "src/features/puantaj/pages/GunlukPuantajPage.tsx",
+      "src/features/bildirimler/pages/BildirimlerPage.tsx"
+    ];
+    for (const path of paths) {
+      expect(read(path)).not.toMatch(/Bugünkü Personel Durumu/);
+    }
+  });
+
+  it("keeps branch cards square, lightly framed at rest, and stronger frame + scaled on hover", () => {
     const styles = read("src/styles/modules/bugun-personel-durumu.css");
     expect(styles).toMatch(
-      /\.bugun-personel-branch-card\s*\{[^}]*aspect-ratio:\s*1\s*\/\s*1[^}]*border-color:\s*transparent[^}]*transition:\s*border-color 0\.2s ease, transform 0\.2s ease/s
+      /\.bugun-personel-branch-card\s*\{[^}]*aspect-ratio:\s*1\s*\/\s*1[^}]*border-color:\s*rgba\(255,\s*255,\s*255,\s*0\.2\)[^}]*transition:\s*border-color 0\.2s ease, transform 0\.2s ease/s
+    );
+    expect(styles).toMatch(
+      /\.modal-body--bugun-personel:has\(> \.universal-back-bar\)\s*\{[^}]*padding-top:\s*0/s
     );
     expect(styles).toMatch(
       /\.bugun-personel-branch-card:hover\s*\{[^}]*border-color:\s*var\(--border-strong\)[^}]*transform:\s*scale\(1\.025\)/s

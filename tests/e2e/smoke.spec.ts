@@ -272,7 +272,7 @@ test.describe("e2e smoke", () => {
     await loginAsMockRole(page, "BIRIM_AMIRI");
 
     await page.goto("/bildirimler");
-    await expect(page.getByRole("heading", { name: "Bugünkü Personel Durumu" }).first()).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Anlık Personel Durumu" }).first()).toBeVisible();
 
     const taslakRow = page
       .locator(".bildirimler-item")

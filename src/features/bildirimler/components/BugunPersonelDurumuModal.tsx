@@ -155,7 +155,7 @@ function resolveBugunBackLabel(nav: NavLevel): string | undefined {
     return undefined;
   }
   if (nav.kind === "units") {
-    return "Bugünkü Personel Durumu";
+    return "Anlık Personel Durumu";
   }
   if (nav.kind === "unit_roster") {
     return nav.branch.sube_adi;
@@ -226,7 +226,7 @@ export function BugunPersonelDurumuModal({ open, onClose }: BugunPersonelDurumuM
       setPayload(data);
       setNav(restoreNav(data, preserve));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Bugünkü personel durumu yüklenemedi.");
+      setError(err instanceof Error ? err.message : "Anlık personel durumu yüklenemedi.");
       setPayload(null);
     } finally {
       setLoading(false);
@@ -285,7 +285,7 @@ export function BugunPersonelDurumuModal({ open, onClose }: BugunPersonelDurumuM
     if (nav.kind === "units") {
       return nav.branch.sube_adi;
     }
-    return "Bugünkü Personel Durumu";
+    return "Anlık Personel Durumu";
   }, [nav]);
 
   const crumb = useMemo(() => {
@@ -300,7 +300,7 @@ export function BugunPersonelDurumuModal({ open, onClose }: BugunPersonelDurumuM
       return nav.branch.sube_adi;
     }
     if (nav.kind === "units") {
-      return "Bugünkü Personel Durumu";
+      return null;
     }
     return null;
   }, [nav]);

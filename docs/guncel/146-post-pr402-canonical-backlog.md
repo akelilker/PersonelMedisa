@@ -1,8 +1,8 @@
 # 146 — Post-PR402 Canonical Backlog
 
-**Tür:** Aktif backlog otoritesi (POST_PR402 consolidation; **POST_PR476** pin refresh).
-**Product baseline (SHA pin):** `817a1e7230273878daa0e96a359b866671ad0711` (PR **#476** last product merge+deploy); Deploy cPanel **#1207** run `37077642885` SUCCESS. Docs-only canonical PRs do not advance `LAST_MERGED_PR` / `CODE_MAIN_SHA` / `PRODUCTION_DEPLOY_SHA` (see `CURRENT_STATE.md` `PIN_SHA_BASELINE`).
-**Migration tip:** code **096** / production **096** (pending **0**); migration **096** (`096_personel_bordro_okumalari.sql`) **APPLIED** (canonical apply `37021807281`; readback `37022115475` PROD_TIP **096**); migration **095** (`095_personel_cinsiyet.sql`) **APPLIED**; migration **094** (`094_attendance_no_event_day.sql`) **APPLIED** (production'da geçmiş).
+**Tür:** Aktif backlog otoritesi (POST_PR402 consolidation; **POST_PR496** pin refresh).
+**Product baseline (SHA pin):** `14dc7fa9bebe35533d6e1659eae795417ebea574` (PR **#496** last product merge+deploy); Deploy cPanel **#1228** run `37365978799` SUCCESS. Docs-only canonical PRs do not advance `LAST_MERGED_PR` / `CODE_MAIN_SHA` / `PRODUCTION_DEPLOY_SHA` (see `CURRENT_STATE.md` `PIN_SHA_BASELINE`).
+**Migration tip:** code **097** / production **097** (pending **0**); migration **097** (`097_qr_attendance_location_audit.sql`) **APPLIED** (Apply cPanel migrations **#56** run `37391130248`; readback Ops migration worker diagnostics **#90** run `37391796990` PROD_TIP **097**); migration **096** (`096_personel_bordro_okumalari.sql`) **APPLIED** (canonical apply `37021807281`; readback `37022115475` PROD_TIP **096**); migration **095** (`095_personel_cinsiyet.sql`) **APPLIED**; migration **094** (`094_attendance_no_event_day.sql`) **APPLIED** (production'da geçmiş).
 **Yasaklar bu belgede:** app code · migration apply · production mutation · remote branch delete · #395–#470 reopen.
 
 **Süperseeded active sources:** `CURRENT_STATE.md` (tips/SHA pin only; residual detail → burada), `docs/guncel/110-master-closure-gap-registry.md` (**SUPERSEDED** for active backlog).
@@ -25,6 +25,7 @@ Sınıflar: **A** CLOSED_ALREADY_LIVE · **B** SAFE_HOUSEKEEPING · **C** TECHNI
 | `BL-PR-472` | Self-service closure (PR470 follow-up; bordro okundu readiness) | PR #472 MERGED `6b7dbba6e54886c503c04438d9e4ecd60faae3e8`; Deploy cPanel #1203 run `37018359986` SUCCESS |
 | `BL-PR-475` | `bugun personel durumu` şube seçimi grid + sade şube detayı | PR #475 MERGED `939c5f87ec80fb5f742d81f23f0523ce8399c313`; Deploy cPanel #1206 run `37069634704` SUCCESS |
 | `BL-PR-476` | `/self` PERSONEL görsel shell (AppShell) + 120/158 `calisan_kapsami` `DIS_KAYNAK` canlı düzeltme + Harici Personel terminoloji + canonical kapanış | PR #476 MERGED `817a1e7230273878daa0e96a359b866671ad0711`; Deploy cPanel #1207 run `37077642885` SUCCESS |
+| `BL-PR-496` | QR taramada GPS geofence konum denetimi (v1, non-blocking; bilgi amaçlı, QR kaydını engellemez) + migration 097 | PR #496 MERGED `14dc7fa9bebe35533d6e1659eae795417ebea574`; Deploy cPanel #1228 run `37365978799` SUCCESS |
 | `BL-BUSINESS-TRUTH-120-158-219` | 120 / 158 Harici Personel + 219 Medisa transfer business truth | **CLOSED** — canlı readback + mutation 2026-10-03: 120/158 canlı `calisan_kapsami` `IC_PERSONEL` idi → `DIS_KAYNAK` düzeltildi (readback doğrulandı); şube **11 Şenay Mobilya** + SGK **3 Şenay Mobilya** + çalışma lokasyonu **5 Fabrika/Karabük** korundu. 219 şube **6 Medisa İstanbul** + SGK **1 Medisa** + lokasyon **3 İstanbul** (mutation yok). Production mutation = **2** (120 + 158) |
 | `BL-SERHAN-KOSE-LIVE` | `serhan.kose` (user 9) canlı yetki | **CLOSED** — canlı readback 2026-10-03: `rol: GENEL_YONETICI` + `durum: AKTIF` (`sinemH` user 110 ile aynı model). Tek tek şube/company grant üretilmedi; mutation = 0 |
 | `BL-SELF-SHELL-PERSONEL` | `/self` yüzeyinde PERSONEL görsel shell (bağlı yönetici) | **CLOSED** — owner `src/app/AppShell.tsx`; `isPersonelShellVisual` (rol PERSONEL veya `/self` yüzeyi) ile `/self` + `/self/...` compact header/shell alır. Rol/izin/route/backend değişmedi; ayrı panel/helper/CSS override yok. Focused source test (`personel-self-service-ux-v2`) güncellendi |
@@ -37,6 +38,7 @@ Sınıflar: **A** CLOSED_ALREADY_LIVE · **B** SAFE_HOUSEKEEPING · **C** TECHNI
 | `BL-MIG-094` | NO_EVENT_DAY day-key identity schema | Migration **094** (`094_attendance_no_event_day.sql`) **APPLIED** — production'da geçmiş, sonrasında 095 |
 | `BL-MIG-095` | Personel cinsiyet | Migration **095** (`095_personel_cinsiyet.sql`) **APPLIED / SUCCESS** |
 | `BL-MIG-096` | Personel self-service bordro "Okudum" audit | Migration **096** (`096_personel_bordro_okumalari.sql`) **APPLIED / SUCCESS** — apply `37021807281`; backup readback VERIFIED; readback `37022115475` PROD_TIP **096** |
+| `BL-MIG-097` | QR attendance konum denetim kolonları | Migration **097** (`097_qr_attendance_location_audit.sql`) **APPLIED / SUCCESS** — apply `37391130248` (#56); backup readback VERIFIED; readback `37391796990` (Ops #90) PROD_TIP **097**, pending 0 |
 | `BL-QR-CORE` | QR S3C–S3F + collar entitlement + pilot checklist | Docs 105–109 CLOSED; `docs/ops/QR_ATTENDANCE_PILOT_READINESS_CHECKLIST.md` |
 | `BL-QR-ANOMALY` | Hatalı/eksik/çift giriş-çıkış — **core shipped** | #439: live warning + correction request + cron scan + 093 dedupe; personel self-revision yok (amir düzeltir). **Residual gaps → C/D/E** |
 | `BL-NO-EVENT-DAY` | Sıfır QR / expected-worker gün anomaly | **CLOSED / LIVE** — migration **094** APPLIED (production'da geçmiş, sonrasında 095); day-key chain live |
@@ -71,7 +73,7 @@ Açık teknik gap: **NONE**.
 
 | ID | Konu | Not |
 | --- | --- | --- |
-| `BL-SOURCE-LOCK-DRIFT` | Pin testleri eski deploy/tip iddiaları | **CLOSED / HISTORICAL** — POST_PR476 refresh: CURRENT_STATE + source-lock test (`LAST_MERGED_PR: 476`, SHA `817a1e72…`, Deploy #1207, `DOCS_ONLY_CLOSURE_THIS_PIN: NO`) hizalandı; artık aktif teknik gap DEĞİL |
+| `BL-SOURCE-LOCK-DRIFT` | Pin testleri eski deploy/tip iddiaları | **CLOSED / HISTORICAL** — POST_PR496 refresh: CURRENT_STATE + source-lock test (`LAST_MERGED_PR: 496`, SHA `14dc7fa9…`, Deploy #1228, tip **097**, `DOCS_ONLY_CLOSURE_THIS_PIN: NO`) hizalandı; artık aktif teknik gap DEĞİL |
 
 ---
 
@@ -133,7 +135,7 @@ Product open = **NONE** (D bölümünde açık karar yok; `BL-POST-THRESHOLD-REE
 
 ## Technical gap registry (özet)
 
-Technical open = **NONE** — `BL-SOURCE-LOCK-DRIFT` **CLOSED / HISTORICAL** (POST_PR476); `BL-NO-EVENT-DAY` **CLOSED / LIVE** (migration **094** APPLIED; production'da geçmiş, sonrasında 095).
+Technical open = **NONE** — `BL-SOURCE-LOCK-DRIFT` **CLOSED / HISTORICAL** (POST_PR496); `BL-NO-EVENT-DAY` **CLOSED / LIVE** (migration **094** APPLIED; production'da geçmiş, sonrasında 095).
 
 ---
 

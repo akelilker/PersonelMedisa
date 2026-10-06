@@ -27,8 +27,16 @@ export function normalizePersonelAd(value: string) {
     .join(" ");
 }
 
+/**
+ * Personel soyadı WRITE normalizasyonu.
+ *
+ * Görünüm kuralı (SOYAD BÜYÜK) yalnız display/render katmanında uygulanır (personel
+ * kartı detayı ve liste görselleri). Canonical kayıt mutate edilmez: burada yalnız
+ * baştaki/sondaki ve çoklu iç boşluk temizlenir; kullanıcının girdiği canonical case
+ * (ör. "Al-Gburı") olduğu gibi korunur.
+ */
 export function normalizePersonelSoyad(value: string) {
-  return value.trim().toLocaleUpperCase("tr-TR");
+  return value.trim().replace(/\s+/g, " ");
 }
 
 export function normalizeTurkishMobilePhone(value: string, label: string) {

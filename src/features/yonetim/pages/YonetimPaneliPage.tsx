@@ -56,6 +56,7 @@ import {
   normalizeKullaniciSearchQuery
 } from "../../../lib/yonetim/kullanici-search";
 import { resolveBoundUserCanonicalUsernameView } from "../../../lib/yonetim/bound-user-canonical-username";
+import { normalizeKullaniciAdSoyadForWrite } from "../../../lib/yonetim/kullanici-ad-soyad";
 import type { UserRole } from "../../../types/auth";
 import { ASSIGNABLE_USER_ROLES, WRITE_COMPANY_SCOPED_ROLES } from "../../../types/auth";
 import type { Personel } from "../../../types/personel";
@@ -313,6 +314,11 @@ function formatNameToken(value: string) {
     .join("-");
 }
 
+/**
+ * Display-only formatter (Ad Türkçe Title Case + SOYAD BÜYÜK).
+ * Yalnız görünüm/arama katmanında kullanılır; canonical `ad_soyad` kaydına
+ * yazılacak değeri ASLA üretmez (bkz. `normalizeKullaniciAdSoyadForWrite`).
+ */
 function formatAdSoyad(value: string) {
   const parts = value
     .trim()
@@ -365,7 +371,7 @@ function userFormFromItem(item: YonetimKullanici): KullaniciFormState {
     username: item.username ?? "",
     kullaniciTipi: item.kullanici_tipi,
     personelId: item.personel_id != null ? String(item.personel_id) : "",
-    adSoyad: formatAdSoyad(item.ad_soyad),
+    adSoyad: normalizeKullaniciAdSoyadForWrite(item.ad_soyad),
     telefon: formatTelefon(item.telefon ?? ""),
     rol: item.rol,
     subeIds: item.sube_ids,
@@ -399,7 +405,7 @@ function toKullaniciPayload(
   effectiveVarsayilanSubeIds: number[] = form.subeIds
 ): UpsertYonetimKullaniciPayload {
   const realKullaniciApi = isRealYonetimKullaniciApi();
-  const adSoyad = formatAdSoyad(form.adSoyad);
+  const adSoyad = normalizeKullaniciAdSoyadForWrite(form.adSoyad);
   if (!adSoyad) {
     throw new Error("Ad soyad zorunludur.");
   }
@@ -1139,7 +1145,7 @@ export function YonetimPaneliPage() {
 
     setKullaniciForm((prev) => ({
       ...prev,
-      adSoyad: formatAdSoyad([linkedPersonel.ad, linkedPersonel.soyad].filter(Boolean).join(" ")),
+      adSoyad: normalizeKullaniciAdSoyadForWrite([linkedPersonel.ad, linkedPersonel.soyad].filter(Boolean).join(" ")),
       telefon: formatTelefon(linkedPersonel.telefon ?? prev.telefon)
     }));
   }, [kullaniciForm.kullaniciTipi, kullaniciForm.personelId, personeller]);

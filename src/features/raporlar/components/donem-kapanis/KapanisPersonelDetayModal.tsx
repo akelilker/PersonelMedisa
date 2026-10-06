@@ -5,6 +5,7 @@ import { ErrorState } from "../../../../components/states/ErrorState";
 import { LoadingState } from "../../../../components/states/LoadingState";
 import type { DonemKapanisIssue } from "../../../../api/donem-kapanis.api";
 import { useDonemKapanisItems } from "../../../../hooks/useDonemKapanisItems";
+import { usePersonelSelectOptions } from "../../../../hooks/usePersonelSelectOptions";
 import { severityClassName, SEVERITY_ICONS, formatSeverityLabel } from "../../../../lib/donem-kapanis/display";
 import type { DonemKapanisPreflightParams } from "../../../../api/donem-kapanis.api";
 
@@ -15,6 +16,7 @@ type KapanisPersonelDetayModalProps = {
 };
 
 export function KapanisPersonelDetayModal({ issue, params, onClose }: KapanisPersonelDetayModalProps) {
+  const { labelById: personelLabelById } = usePersonelSelectOptions();
   const { items, isLoading, errorMessage, currentPage, hasNextPage, hasPrevPage, refetch } = useDonemKapanisItems({
     enabled: Boolean(issue && params),
     params,
@@ -79,7 +81,9 @@ export function KapanisPersonelDetayModal({ issue, params, onClose }: KapanisPer
                       <td>{item.record_id ?? "-"}</td>
                       <td>
                         {item.personel_id ? (
-                          <Link to={`/personeller/${item.personel_id}`}>{item.personel_id}</Link>
+                          <Link to={`/personeller/${item.personel_id}`}>
+                            {personelLabelById.get(item.personel_id) ?? "Personel"}
+                          </Link>
                         ) : (
                           "-"
                         )}

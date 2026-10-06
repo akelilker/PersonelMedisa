@@ -3,6 +3,7 @@ import { FormField } from "../../../components/form/FormField";
 import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
 import { useRoleAccess } from "../../../hooks/use-role-access";
+import { usePersonelSelectOptions } from "../../../hooks/usePersonelSelectOptions";
 import { downloadReportCsv } from "../../../reports/export-report";
 import { useManagerQrAttendance } from "../../puantaj/hooks/useManagerQrAttendance";
 import {
@@ -38,6 +39,7 @@ export function QrGirisCikisReportSection() {
     initialTo: istanbulToday(),
     autoLoad: canView
   });
+  const { options: personelOptions } = usePersonelSelectOptions();
 
   if (!canView) return null;
 
@@ -61,7 +63,15 @@ export function QrGirisCikisReportSection() {
         <div className="form-field-grid">
           <FormField label="Başlangıç" name="qr-report-from" type="date" value={from} onChange={setFrom} required />
           <FormField label="Bitiş" name="qr-report-to" type="date" value={to} onChange={setTo} required />
-          <FormField label="Personel ID" name="qr-report-personel" type="number" min={1} value={personelId} onChange={setPersonelId} />
+          <FormField
+            as="select"
+            label="Personel"
+            name="qr-report-personel"
+            value={personelId}
+            onChange={setPersonelId}
+            placeholderOption={{ value: "", label: "Tüm personel" }}
+            selectOptions={personelOptions}
+          />
           <FormField label="Şube ID" name="qr-report-sube" type="number" min={1} value={subeId} onChange={setSubeId} />
           <FormField
             as="select"

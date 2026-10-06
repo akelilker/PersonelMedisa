@@ -83,7 +83,7 @@ export function EtkiAdayiRaporTablosu({
               <tr key={row.id} data-testid={`etki-adayi-rapor-row-${row.id}`}>
                 <td>
                   <div>{row.personel_ad_soyad}</div>
-                  <small>{row.sicil_no ?? `#${row.personel_id}`}</small>
+                  <small>{row.sicil_no ?? "—"}</small>
                 </td>
                 <td>{row.tarih}</td>
                 <td>{row.bildirim_turu}</td>

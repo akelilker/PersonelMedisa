@@ -110,7 +110,6 @@ class DonemKapanisController
             'domain',
             'title',
             'record_id',
-            'personel_id',
             'tarih',
             'state',
             'detail',

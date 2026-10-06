@@ -593,8 +593,7 @@ export function PersonelImportDryRunModal({
             <ul>
               {applyResult.created.map((row) => (
                 <li key={`${row.satir_no}-${row.personel_id}`}>
-                  #{row.satir_no} — {row.sicil_no} — {row.ad} {row.soyad} — {row.tc_kimlik_no_masked} — ID{" "}
-                  {row.personel_id}
+                  #{row.satir_no} — {row.sicil_no} — {row.ad} {row.soyad} — {row.tc_kimlik_no_masked}
                 </li>
               ))}
             </ul>

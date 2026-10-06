@@ -80,9 +80,9 @@ describe("Ücret Tipi Envanteri dağılımı (personeller.ucret_tipi_id)", () =>
     expect(sonuc.satirlar.map((satir) => satir.statu)).toEqual(["Mavi Yaka", "Beyaz Yaka"]);
   });
 
-  it("ad-soyad boşsa personel id ile okunabilir kalır", () => {
+  it("ad-soyad boşsa nötr personel etiketi kullanır, internal id göstermez", () => {
     const sonuc = buildUcretTipiEnvanteri([personel({ id: 42, ad: "", soyad: null })]);
-    expect(sonuc.satirlar[0].adSoyad).toBe("Personel #42");
+    expect(sonuc.satirlar[0].adSoyad).toBe("Personel");
   });
 });
 

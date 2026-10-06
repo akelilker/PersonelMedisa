@@ -8,6 +8,7 @@ import { EmptyState } from "../../../components/states/EmptyState";
 import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
 import { downloadReportCsv } from "../../../reports/export-report";
+import { usePersonelSelectOptions } from "../../../hooks/usePersonelSelectOptions";
 import type {
   PostSerbestZamanKullanimPayload,
   SerbestZamanDeadlineRow,
@@ -47,6 +48,7 @@ type KullanimFormState = {
 };
 
 export function SerbestZamanTakipPage() {
+  const { options: personelOptions } = usePersonelSelectOptions();
   const [referansTarih, setReferansTarih] = useState(todayYmd);
   const [durum, setDurum] = useState<"" | SerbestZamanDeadlineState>("");
   const [personelId, setPersonelId] = useState("");
@@ -136,7 +138,7 @@ aciklama: "Serbest zaman kullanımı."
         };
 
         if (!payload.personel_id || !payload.dakika) {
-          throw new Error("Personel ID ve Dakika alanları zorunludur.");
+          throw new Error("Personel ve Dakika alanları zorunludur.");
         }
 
         await postSerbestZamanKullanim(payload);
@@ -183,7 +185,6 @@ aciklama: "Serbest zaman kullanımı."
     downloadReportCsv(
       `serbest-zaman-takip-${referansTarih}.csv`,
       [
-        "personel_id",
         "ad_soyad",
         "sicil_no",
         "sube_ad",
@@ -196,7 +197,6 @@ aciklama: "Serbest zaman kullanımı."
         "compliance_action"
       ],
       items.map((row) => ({
-        personel_id: row.personel_id,
         ad_soyad: row.ad_soyad,
         sicil_no: row.sicil_no,
         sube_ad: row.sube_ad,
@@ -265,13 +265,13 @@ aciklama: "Serbest zaman kullanımı."
           />
         </label>
         <label>
-          Personel ID
-          <input
-            type="text"
-            inputMode="numeric"
+          Personel
+          <AppSelect
             value={personelId}
-            onChange={(event) => setPersonelId(event.target.value)}
-            data-testid="serbest-zaman-takip-personel"
+            onChange={setPersonelId}
+            dataTestId="serbest-zaman-takip-personel"
+            options={personelOptions}
+            placeholderOption={{ value: "", label: "Tüm personel" }}
           />
         </label>
         <button type="submit" data-testid="serbest-zaman-takip-submit">
@@ -310,7 +310,7 @@ aciklama: "Serbest zaman kullanımı."
             <tbody>
               {items.map((row, index) => (
                 <tr key={`${row.personel_id}-${row.olusum_event_id ?? "u"}-${index}`}>
-                  <td>{row.ad_soyad || row.personel_id}</td>
+                  <td>{row.ad_soyad || (row.sicil_no ? `Sicil ${row.sicil_no}` : "—")}</td>
                   <td>{row.sicil_no}</td>
                   <td>{row.sube_ad}</td>
                   <td>{row.allocation_state}</td>
@@ -376,15 +376,16 @@ aciklama: "Serbest zaman kullanımı."
             onSubmit={handleKullanimSubmit}
           >
             <FormField
-              label="Personel ID"
-              name="kullanim-personel-id"
-              type="number"
-              min={1}
+              as="select"
+              label="Personel"
+              name="kullanim-personel"
               value={kullanimForm.personel_id}
               onChange={(value) =>
                 setKullanimForm((prev) => ({ ...prev, personel_id: value }))
               }
               required
+              placeholderOption={{ value: "", label: "Seçiniz" }}
+              selectOptions={personelOptions}
             />
             <FormField
               label="Kullanım Tarihi"

@@ -311,7 +311,7 @@ export function useFinans() {
 
       const previousItem = editingItem;
       const body = {
-        personel_id: parseRequiredPositiveInt(editForm.personelId, "Personel ID"),
+        personel_id: parseRequiredPositiveInt(editForm.personelId, "Personel"),
         donem: validateDonem(editForm.donem),
         kalem_turu: editForm.kalemTuru.trim(),
         tutar: parseRequiredPositiveNumber(editForm.tutar, "Tutar"),

@@ -12175,13 +12175,12 @@ export function resolveDemoApiResponse(
     const adaylar = calistirma ? maasDemo.adaylar.filter((item) => item.calistirma_id === calistirma.id) : [];
     const canViewFinance = hasRolePermission(actor.role, "finans.view");
     const header =
-      "donem,sube_id,aday_id,personel_id,ad_soyad,sicil,departman_ad,bordro_onay_durumu,net_odenecek,brut_maas,toplam_ek_odeme,toplam_kesinti,aktif_correction_var_mi";
+      "donem,sube_id,aday_id,ad_soyad,sicil,departman_ad,bordro_onay_durumu,net_odenecek,brut_maas,toplam_ek_odeme,toplam_kesinti,aktif_correction_var_mi";
     const rows = adaylar.map((aday) =>
       [
         `${yil}-${String(ay).padStart(2, "0")}`,
         String(subeId),
         String(aday.id),
-        String(aday.personel_id),
         aday.personel_ad_soyad ?? "Demo Personel",
         "P-001",
         "Demo",
@@ -12203,7 +12202,6 @@ export function resolveDemoApiResponse(
       [
         `${yil}-${String(ay).padStart(2, "0")}`,
         String(subeId),
-        "",
         "",
         "TOPLAM",
         "",

@@ -171,7 +171,7 @@ export function RevizyonMerkeziPage() {
             <tbody>
               {talepler.map((talep) => (
                 <tr key={talep.id}>
-                  <td>{talep.personel_ad_soyad ?? `Personel #${talep.personel_id}`}</td>
+                  <td>{talep.personel_ad_soyad ?? "—"}</td>
                   <td>{talep.sicil_no ?? "—"}</td>
                   <td>{talep.sube_adi ?? "—"}</td>
                   <td>{talep.departman_adi ?? "—"}</td>
@@ -237,7 +237,7 @@ export function RevizyonMerkeziPage() {
                 <tr key={correction.id}>
                   <td>{correction.id}</td>
                   <td>{correction.revizyon_talebi_id}</td>
-                  <td>{correction.personel_ad_soyad ?? `Personel #${correction.personel_id}`}</td>
+                  <td>{correction.personel_ad_soyad ?? "—"}</td>
                   <td>
                     {correction.hafta_baslangic} → {correction.hafta_bitis}
                   </td>

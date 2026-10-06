@@ -165,7 +165,7 @@ function normalizeRow(data: unknown): BildirimEtkiRaporRow {
   return {
     id,
     personel_id: personelId,
-    personel_ad_soyad: toStringValue(record.personel_ad_soyad) ?? `Personel #${personelId}`,
+    personel_ad_soyad: toStringValue(record.personel_ad_soyad) ?? "Personel",
     sicil_no: toStringValue(record.sicil_no) ?? null,
     sube_ad: toStringValue(record.sube_ad) ?? null,
     departman_ad: toStringValue(record.departman_ad) ?? null,

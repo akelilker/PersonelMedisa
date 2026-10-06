@@ -189,7 +189,6 @@ class BordroHazirlikController
                 'donem',
                 'sube_id',
                 'aday_id',
-                'personel_id',
                 'ad_soyad',
                 'sicil',
                 'departman_ad',

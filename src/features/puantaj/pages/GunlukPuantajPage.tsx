@@ -11,6 +11,7 @@ import { EmptyState } from "../../../components/states/EmptyState";
 import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
 import { useRoleAccess } from "../../../hooks/use-role-access";
+import { usePersonelSelectOptions } from "../../../hooks/usePersonelSelectOptions";
 import { usePuantaj } from "../../../hooks/usePuantaj";
 import { dispatchOpenBugunPersonelDurumu } from "../../../lib/bildirim/bugun-personel-durumu-events";
 import {
@@ -214,6 +215,7 @@ export function GunlukPuantajPage() {
     parasalEtkiOzeti,
     anaDetay
   } = usePuantaj();
+  const { options: personelOptions } = usePersonelSelectOptions();
 
   const isMuhurlendi = puantaj?.state === "MUHURLENDI";
   const canEditForm = canUpdatePuantaj && !isMuhurlendi;
@@ -327,13 +329,14 @@ export function GunlukPuantajPage() {
       <form className="form-filter-panel" onSubmit={handleQuerySubmit}>
         <div className="form-field-grid">
           <FormField
-            label="Personel ID"
+            as="select"
+            label="Personel"
             name="puantaj-query-personel"
-            type="number"
-            min={1}
             value={formState.queryPersonelId}
             onChange={(value) => patchFormState({ queryPersonelId: value })}
             required
+            placeholderOption={{ value: "", label: "Seçiniz" }}
+            selectOptions={personelOptions}
           />
           <FormField
             label="Tarih"

@@ -357,7 +357,7 @@ class MaasHesaplamaController
         CsvResponse::send(
             sprintf('sgk-kontrol-%04d-%02d-sube-%d.csv', $yil, $ay, $subeId),
             [
-                'personel_id', 'sicil_no', 'ad', 'soyad', 'yil', 'ay', 'donem',
+                'sicil_no', 'ad', 'soyad', 'yil', 'ay', 'donem',
                 'hesaplanan_prim_gunu', 'eksik_gun_sayisi', 'eksik_gun_kodu', 'eksik_gun_aciklamasi',
                 'kaynak_surec_idleri', 'kaynak_puantaj_idleri', 'kaynak_belge_idleri',
                 'ucret_modeli', 'sirket_politika_surum_id', 'sgk_odenek_durumu',

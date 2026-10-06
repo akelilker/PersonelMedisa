@@ -30,7 +30,6 @@ class RaporlarController
    */
   private const PUANTAJ_EXPORT_COLUMNS = [
     ['key' => 'tarih', 'label' => 'Tarih'],
-    ['key' => 'personel_id', 'label' => 'Personel'],
     ['key' => 'ad_soyad', 'label' => 'Ad Soyad'],
     ['key' => 'sicil_no', 'label' => 'Sicil'],
     ['key' => 'bolum', 'label' => 'Bölüm'],

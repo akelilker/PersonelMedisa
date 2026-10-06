@@ -121,32 +121,22 @@ export function SurecFormFields({
   );
 
   const personelField = showPersonelField
-    ? personelOptions.length > 0
-      ? (
-          <FormField
-            as="select"
-            label="Personel"
-            name="surec-create-personel"
-            value={form.personelId}
-            onChange={(value) => setForm((prev) => ({ ...prev, personelId: value }))}
-            required
-            disabled={personelFieldDisabled}
-            placeholderOption={{ value: "", label: "Seçiniz" }}
-            selectOptions={personelOptions}
-          />
-        )
-      : (
-          <FormField
-            label="Personel ID"
-            name="surec-create-personel"
-            type="number"
-            min={1}
-            value={form.personelId}
-            onChange={(value) => setForm((prev) => ({ ...prev, personelId: value }))}
-            required
-            disabled={personelFieldDisabled}
-          />
-        )
+    ? (
+        <FormField
+          as="select"
+          label="Personel"
+          name="surec-create-personel"
+          value={form.personelId}
+          onChange={(value) => setForm((prev) => ({ ...prev, personelId: value }))}
+          required
+          disabled={personelFieldDisabled}
+          placeholderOption={{
+            value: "",
+            label: personelOptions.length > 0 ? "Seçiniz" : "Personel listesi yüklenemedi"
+          }}
+          selectOptions={personelOptions}
+        />
+      )
     : null;
 
   const surecTuruFieldNode = showSurecTuruField

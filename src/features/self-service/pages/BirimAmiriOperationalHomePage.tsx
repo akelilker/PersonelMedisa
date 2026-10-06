@@ -372,7 +372,7 @@ function FazlaMesaiDurumuPanel({ kapsam }: { kapsam: YillikFazlaCalismaKapsam })
           data-testid={`fazla-mesai-${row.seviye}-${row.personel_id}`}
         >
           <p>
-            <strong>{row.ad_soyad || `Personel ${row.personel_id}`}</strong>
+            <strong>{row.ad_soyad || "—"}</strong>
             {" — "}
             {row.seviye === "asildi"
               ? "Yıllık fazla mesai limiti aşıldı."

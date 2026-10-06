@@ -10,6 +10,13 @@ vi.mock("../../src/api/serbest-zaman.api", () => ({
   postSerbestZamanKullanim: vi.fn(),
 }));
 
+vi.mock("../../src/api/personeller.api", () => ({
+  fetchPersonellerList: vi.fn(async () => ({
+    items: [{ id: 1, ad: "Ahmet", soyad: "Yılmaz", sicil_no: "P-101" }],
+    pagination: { page: 1, limit: 250, total: 1, totalPages: 1, hasNextPage: false }
+  }))
+}));
+
 describe("SerbestZamanTakipPage UI", () => {
   beforeEach(() => {
     (fetchSerbestZamanDeadlineTakip as any).mockResolvedValue({
@@ -76,8 +83,8 @@ describe("SerbestZamanTakipPage UI", () => {
       expect(screen.getByText("Serbest Zaman Kullanımı Ekle", { selector: 'h2' })).toBeTruthy();
     });
     
-    const personelIdInput = document.getElementById("kullanim-personel-id") as HTMLInputElement;
-    expect(personelIdInput).toBeTruthy();
+    const personelInput = document.getElementById("kullanim-personel") as HTMLSelectElement;
+    expect(personelInput).toBeTruthy();
   });
 
   it("submits valid form and calls API correctly", async () => {
@@ -93,12 +100,12 @@ describe("SerbestZamanTakipPage UI", () => {
     fireEvent.click(openBtn);
 
     await waitFor(() => {
-      const personelIdInput = document.getElementById("kullanim-personel-id") as HTMLInputElement;
-    expect(personelIdInput).toBeTruthy();
+      const personelInput = document.getElementById("kullanim-personel") as HTMLSelectElement;
+      expect(personelInput).toBeTruthy();
     });
 
-    const personelIdInput = document.getElementById("kullanim-personel-id") as HTMLInputElement;
-    fireEvent.change(personelIdInput, { target: { value: "1" } });
+    const personelInput = document.getElementById("kullanim-personel") as HTMLSelectElement;
+    fireEvent.change(personelInput, { target: { value: "1" } });
     fireEvent.change(document.getElementById("kullanim-tarih") as HTMLInputElement, { target: { value: "2026-10-15" } });
     fireEvent.change(document.getElementById("kullanim-dakika") as HTMLInputElement, { target: { value: "60" } });
     fireEvent.change(document.getElementById("kullanim-aciklama") as HTMLInputElement, { target: { value: "Test kullanımı" } });
@@ -133,14 +140,14 @@ describe("SerbestZamanTakipPage UI", () => {
     fireEvent.click(openBtn);
 
     await waitFor(() => {
-      const personelIdInput = document.getElementById("kullanim-personel-id") as HTMLInputElement;
-    expect(personelIdInput).toBeTruthy();
+      const personelInput = document.getElementById("kullanim-personel") as HTMLSelectElement;
+      expect(personelInput).toBeTruthy();
     });
 
     // Submitting without filling required HTML5 fields will trigger form validation,
     // but we can test the component logic by forcing empty values
-    const personelIdInput = document.getElementById("kullanim-personel-id") as HTMLInputElement;
-    fireEvent.change(personelIdInput, { target: { value: "" } });
+    const personelInput = document.getElementById("kullanim-personel") as HTMLSelectElement;
+    fireEvent.change(personelInput, { target: { value: "" } });
     fireEvent.change(document.getElementById("kullanim-dakika") as HTMLInputElement, { target: { value: "" } });
 
     // Assuming we bypass HTML5 validation or we fire submit on form
@@ -148,7 +155,7 @@ describe("SerbestZamanTakipPage UI", () => {
     fireEvent.submit(form!);
 
     await waitFor(() => {
-      expect(screen.getByText(/Personel ID ve Dakika alanları zorunludur/i)).toBeTruthy();
+      expect(screen.getByText(/Personel ve Dakika alanları zorunludur/i)).toBeTruthy();
     });
 
     expect(postSerbestZamanKullanim).not.toHaveBeenCalled();

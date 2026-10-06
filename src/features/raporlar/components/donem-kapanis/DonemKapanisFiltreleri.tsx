@@ -1,5 +1,6 @@
 import { type FormEvent } from "react";
 import { FormField } from "../../../../components/form/FormField";
+import { usePersonelSelectOptions } from "../../../../hooks/usePersonelSelectOptions";
 import type { IdOption } from "../../../../types/referans";
 import type { DonemKapanisFilterState } from "../../../../hooks/useDonemKapanisPreflight";
 
@@ -26,6 +27,8 @@ export function DonemKapanisFiltreleri({
   onSubmit,
   onExport
 }: DonemKapanisFiltreleriProps) {
+  const { options: personelOptions } = usePersonelSelectOptions();
+
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     onSubmit();
@@ -62,12 +65,13 @@ export function DonemKapanisFiltreleri({
           selectOptions={departmanOptions.map((item) => ({ value: String(item.id), label: item.label }))}
         />
         <FormField
-          label="Personel ID"
+          as="select"
+          label="Personel"
           name="donem-kapanis-personel"
-          type="number"
-          min={1}
           value={filters.personelId}
           onChange={(value) => onChange({ personelId: value })}
+          placeholderOption={{ value: "", label: "Tüm personel" }}
+          selectOptions={personelOptions}
         />
       </div>
 

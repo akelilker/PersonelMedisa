@@ -5,6 +5,7 @@ import {
 } from "../../../api/fazla-calisma-odeme-tercihi.api";
 import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
+import { usePersonelSelectOptions } from "../../../hooks/usePersonelSelectOptions";
 import type {
   FazlaCalismaOdemeTercihi,
   OdemeTipi
@@ -30,6 +31,7 @@ export function FazlaCalismaOdemeTercihiPanel({
   fazlaCalismaDakika,
   canEdit
 }: FazlaCalismaOdemeTercihiPanelProps) {
+  const { labelById: personelLabelById } = usePersonelSelectOptions();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -105,6 +107,8 @@ export function FazlaCalismaOdemeTercihiPanel({
   }
 
   const displayPersonelId = personelId ?? record?.personel_id;
+  const displayPersonelAdi =
+    displayPersonelId !== undefined ? personelLabelById.get(displayPersonelId) ?? "Personel" : null;
   const displayFazlaDk = fazlaCalismaDakika ?? record?.fazla_calisma_dakika;
   const fieldsDisabled = !canEdit || saving;
 
@@ -119,10 +123,10 @@ export function FazlaCalismaOdemeTercihiPanel({
           <strong>Snapshot</strong>
           <p data-testid="fm-odeme-tercihi-snapshot-id">{snapshotId}</p>
         </div>
-        {displayPersonelId !== undefined ? (
+        {displayPersonelAdi !== null ? (
           <div>
             <strong>Personel</strong>
-            <p data-testid="fm-odeme-tercihi-personel-id">{displayPersonelId}</p>
+            <p data-testid="fm-odeme-tercihi-personel-id">{displayPersonelAdi}</p>
           </div>
         ) : null}
         {displayFazlaDk !== undefined ? (

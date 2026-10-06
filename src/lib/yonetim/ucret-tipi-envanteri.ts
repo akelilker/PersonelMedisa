@@ -64,7 +64,7 @@ function emptySayaclar(): Record<UcretTipiEnvanteriBucketKey, number> {
 
 function toAdSoyad(personel: Personel): string {
   const name = [personel.ad, personel.soyad].filter(Boolean).join(" ").trim();
-  return name || `Personel #${personel.id}`;
+  return name || "Personel";
 }
 
 function toOptionalId(value: number | undefined): number | null {

@@ -7,6 +7,7 @@ import {
   verifyYonetimActorIdentity
 } from "../../../api/yonetim.api";
 import type { YonetimActorIdentityRead } from "../../../types/yonetim";
+import { usePersonelSelectOptions } from "../../../hooks/usePersonelSelectOptions";
 
 const ACTOR_STATUS_LABELS: Record<string, string> = {
   PENDING: "Beklemede",
@@ -21,6 +22,7 @@ type KullaniciActorIdentityPanelProps = {
 };
 
 export function KullaniciActorIdentityPanel(props: KullaniciActorIdentityPanelProps) {
+  const { labelById: personelLabelById } = usePersonelSelectOptions();
   const [snapshot, setSnapshot] = useState<YonetimActorIdentityRead | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isWorking, setIsWorking] = useState(false);
@@ -106,7 +108,11 @@ export function KullaniciActorIdentityPanel(props: KullaniciActorIdentityPanelPr
           </div>
           <div>
             <dt>Bağlı personel</dt>
-            <dd>{snapshot?.personel_id ?? "—"}</dd>
+            <dd>
+              {snapshot?.personel_id != null
+                ? personelLabelById.get(snapshot.personel_id) ?? "Personel"
+                : "—"}
+            </dd>
           </div>
         </dl>
       ) : null}

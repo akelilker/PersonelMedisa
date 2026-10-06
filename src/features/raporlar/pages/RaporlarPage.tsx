@@ -14,6 +14,7 @@ import { EmptyState } from "../../../components/states/EmptyState";
 import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
 import { useRoleAccess } from "../../../hooks/use-role-access";
+import { usePersonelSelectOptions } from "../../../hooks/usePersonelSelectOptions";
 import { formatReportCellValue } from "../../../lib/display/enum-display";
 import {
   RAPOR_LIVE_KAYNAK_UYARI,
@@ -623,6 +624,7 @@ export function RaporlarPage() {
   };
 
   const [form, setForm] = useState<RaporFormState>(() => createInitialRaporFormState(searchParams));
+  const { options: personelOptions } = usePersonelSelectOptions();
   const [queryExtraFilters, setQueryExtraFilters] = useState<RaporQueryExtraFilters>(() =>
     createInitialQueryExtraFilters(searchParams)
   );
@@ -861,12 +863,13 @@ export function RaporlarPage() {
             selectOptions={RAPOR_OPTIONS}
           />
           <FormField
-            label="Personel ID"
+            as="select"
+            label="Personel"
             name="rapor-personel"
-            type="number"
-            min={1}
             value={form.personelId}
             onChange={(value) => setForm((prev) => ({ ...prev, personelId: value }))}
+            placeholderOption={{ value: "", label: "Tüm personel" }}
+            selectOptions={personelOptions}
           />
           <FormField
             label="Departman"

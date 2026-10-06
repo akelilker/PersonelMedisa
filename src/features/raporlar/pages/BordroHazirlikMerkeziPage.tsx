@@ -43,6 +43,7 @@ import { AppActionDialog } from "../../../components/modal/AppActionDialog";
 import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
 import { useRoleAccess } from "../../../hooks/use-role-access";
+import { usePersonelSelectOptions } from "../../../hooks/usePersonelSelectOptions";
 import { useMaasHesaplama } from "../../../hooks/useMaasHesaplama";
 import { currentMonthParts, parseAyValue } from "../../../lib/donem-kapanis/display";
 import { formatSurecStateLabel } from "../../../lib/display/enum-display";
@@ -152,6 +153,7 @@ export function BordroHazirlikMerkeziPage() {
   const canViewBordroKapsam = hasPermission("personel_bordro_kapsam.view");
   const canManageBordroKapsam = hasPermission("personel_bordro_kapsam.manage");
   const canApproveBordroKapsam = hasPermission("personel_bordro_kapsam.approve");
+  const { options: personelOptions } = usePersonelSelectOptions();
 
   const [filters, setFilters] = useState<FilterState>(INITIAL_FILTERS);
   const [subeOptions, setSubeOptions] = useState<IdOption[]>([]);
@@ -1521,21 +1523,15 @@ export function BordroHazirlikMerkeziPage() {
                 }}
               >
                 <div className="form-field-grid">
-                  <div className="form-section">
-                    <label className="form-label" htmlFor="bordro-kapsam-personel-id">
-                      Personel ID
-                    </label>
-                    <input
-                      id="bordro-kapsam-personel-id"
-                      name="bordro-kapsam-personel-id"
-                      type="number"
-                      className="form-input"
-                      min={1}
-                      value={kapsamPersonelIdInput}
-                      data-testid="bordro-kapsam-personel-id"
-                      onChange={(event) => setKapsamPersonelIdInput(event.target.value)}
-                    />
-                  </div>
+                  <FormField
+                    as="select"
+                    label="Personel"
+                    name="bordro-kapsam-personel-id"
+                    value={kapsamPersonelIdInput}
+                    onChange={setKapsamPersonelIdInput}
+                    placeholderOption={{ value: "", label: "Seçiniz" }}
+                    selectOptions={personelOptions}
+                  />
                 </div>
                 <div className="form-actions-row">
                   <button type="submit" className="universal-btn-save" data-testid="bordro-kapsam-personel-yukle">

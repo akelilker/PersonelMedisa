@@ -2,6 +2,7 @@ import { Link, useParams } from "react-router-dom";
 import { EmptyState } from "../../../components/states/EmptyState";
 import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
+import { usePersonelSelectOptions } from "../../../hooks/usePersonelSelectOptions";
 import { useSurecDetail } from "../../../hooks/useSurecler";
 import {
   formatSurecStateLabel,
@@ -16,6 +17,7 @@ export function SurecDetayPage() {
   const hasValidId = !Number.isNaN(parsedSurecId) && parsedSurecId > 0;
 
   const { surec, isLoading, errorMessage, refetch } = useSurecDetail(parsedSurecId, hasValidId);
+  const { labelById: personelLabelById } = usePersonelSelectOptions();
 
   return (
     <section className="surec-page surec-detay-page">
@@ -37,7 +39,7 @@ export function SurecDetayPage() {
             <strong>Süreç ID:</strong> {surec.id}
           </p>
           <p>
-            <strong>Personel ID:</strong> {surec.personel_id}
+            <strong>Personel:</strong> {personelLabelById.get(surec.personel_id) ?? "—"}
           </p>
           <p>
             <strong>Süreç Türü:</strong> {formatSurecTuruLabel(surec.surec_turu)}

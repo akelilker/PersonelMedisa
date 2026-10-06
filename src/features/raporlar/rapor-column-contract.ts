@@ -1,8 +1,14 @@
 import type { RaporKolonu, RaporTipi } from "../../types/rapor";
 
+/**
+ * Kullanıcıya dönük rapor kolon sözleşmesi.
+ *
+ * Internal personel kayıt ID'si (`personel_id`) bu sözleşmede kolon olarak yer
+ * almaz; kullanıcı personeli Ad Soyad + Sicil No ile tanır. Internal ID yalnız
+ * filtre/istek paramı ve backend ilişkilerinde teknik olarak kullanılır.
+ */
 export const RAPOR_COLUMN_CONTRACT: Record<RaporTipi, RaporKolonu[]> = {
   "personel-ozet": [
-    { key: "personel_id", label: "Personel ID" },
     { key: "ad_soyad", label: "Ad Soyad" },
     { key: "sicil_no", label: "Sicil No" },
     { key: "aktif_durum", label: "Durum" },
@@ -10,7 +16,6 @@ export const RAPOR_COLUMN_CONTRACT: Record<RaporTipi, RaporKolonu[]> = {
     { key: "sgk_prim_gun", label: "SGK Prim Gün" }
   ],
   izin: [
-    { key: "personel_id", label: "Personel ID" },
     { key: "ad_soyad", label: "Ad Soyad" },
     { key: "baslangic_tarihi", label: "Başlangıç" },
     { key: "bitis_tarihi", label: "Bitiş" },
@@ -19,7 +24,6 @@ export const RAPOR_COLUMN_CONTRACT: Record<RaporTipi, RaporKolonu[]> = {
     { key: "state", label: "Durum" }
   ],
   devamsizlik: [
-    { key: "personel_id", label: "Personel ID" },
     { key: "ad_soyad", label: "Ad Soyad" },
     { key: "baslangic_tarihi", label: "Başlangıç" },
     { key: "bitis_tarihi", label: "Bitiş" },
@@ -27,7 +31,6 @@ export const RAPOR_COLUMN_CONTRACT: Record<RaporTipi, RaporKolonu[]> = {
     { key: "state", label: "Durum" }
   ],
   tesvik: [
-    { key: "personel_id", label: "Personel ID" },
     { key: "ad_soyad", label: "Ad Soyad" },
     { key: "donem", label: "Dönem" },
     { key: "gun_sayisi", label: "Gün Sayısı" },
@@ -35,7 +38,6 @@ export const RAPOR_COLUMN_CONTRACT: Record<RaporTipi, RaporKolonu[]> = {
     { key: "state", label: "Durum" }
   ],
   ceza: [
-    { key: "personel_id", label: "Personel ID" },
     { key: "ad_soyad", label: "Ad Soyad" },
     { key: "donem", label: "Dönem" },
     { key: "tutar", label: "Tutar" },
@@ -43,7 +45,6 @@ export const RAPOR_COLUMN_CONTRACT: Record<RaporTipi, RaporKolonu[]> = {
     { key: "state", label: "Durum" }
   ],
   "ekstra-prim": [
-    { key: "personel_id", label: "Personel ID" },
     { key: "ad_soyad", label: "Ad Soyad" },
     { key: "donem", label: "Dönem" },
     { key: "tutar", label: "Tutar" },
@@ -51,7 +52,6 @@ export const RAPOR_COLUMN_CONTRACT: Record<RaporTipi, RaporKolonu[]> = {
     { key: "state", label: "Durum" }
   ],
   "is-kazasi": [
-    { key: "personel_id", label: "Personel ID" },
     { key: "ad_soyad", label: "Ad Soyad" },
     { key: "baslangic_tarihi", label: "Başlangıç" },
     { key: "bitis_tarihi", label: "Bitiş" },
@@ -61,7 +61,6 @@ export const RAPOR_COLUMN_CONTRACT: Record<RaporTipi, RaporKolonu[]> = {
   bildirim: [
     { key: "tarih", label: "Tarih" },
     { key: "departman_id", label: "Departman ID" },
-    { key: "personel_id", label: "Personel ID" },
     { key: "ad_soyad", label: "Ad Soyad" },
     { key: "bildirim_turu", label: "Bildirim Türü" },
     { key: "aciklama", label: "Açıklama" },
@@ -69,7 +68,6 @@ export const RAPOR_COLUMN_CONTRACT: Record<RaporTipi, RaporKolonu[]> = {
   ],
   puantaj: [
     { key: "tarih", label: "Tarih" },
-    { key: "personel_id", label: "Personel" },
     { key: "ad_soyad", label: "Ad Soyad" },
     { key: "sicil_no", label: "Sicil" },
     { key: "bolum", label: "Bölüm" },

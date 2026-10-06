@@ -864,12 +864,10 @@
     grid-template-columns: 1fr;
   }
 
+  /* Genel bilgiler başlığı ile personel foto slotu telefonda da yan yana kalır;
+     foto alanı sağ üstte korunur (onaylı karar 2026-10-06). */
   .surec-person-general-head {
-    grid-template-columns: 1fr;
-  }
-
-  .surec-person-photo-box {
-    justify-items: start;
+    grid-template-columns: minmax(0, 1fr) auto;
   }
 }
 

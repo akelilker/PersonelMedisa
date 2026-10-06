@@ -17,7 +17,7 @@ describe("Kayit surec personel context dedup", () => {
     expect(workspace).toContain("beginChangeSurecPersonel");
     expect(workspace).toContain("showSurecPersonelPickerSurface");
     expect(workspace).toContain("!selectedSurecPersonel || (surecPersonelPickerOpen && !personelContextLocked)");
-    expect(workspace).toContain("changeDisabled={personelContextLocked}");
+    expect(workspace).toContain("disabled={personelContextLocked}");
     expect(workspace).not.toContain("Personeli Değiştir");
     expect(workspace).not.toContain("Personel Seçimi");
 

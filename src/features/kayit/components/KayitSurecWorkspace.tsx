@@ -150,15 +150,7 @@ function IconSearch(props: { className?: string }) {
   );
 }
 
-function KayitSurecPersonelContext({
-  personel,
-  onChangePerson,
-  changeDisabled
-}: {
-  personel: Personel;
-  onChangePerson: () => void;
-  changeDisabled: boolean;
-}) {
+function KayitSurecPersonelContext({ personel }: { personel: Personel }) {
   const fullName = [personel.ad, personel.soyad].filter(Boolean).join(" ") || "Personel";
   const initials = `${personel.ad?.[0] ?? ""}${personel.soyad?.[0] ?? ""}`.toUpperCase() || "P";
   const isPassive = personel.aktif_durum === "PASIF";
@@ -192,14 +184,6 @@ function KayitSurecPersonelContext({
             <dd>{personel.ise_giris_tarihi ?? "-"}</dd>
           </div>
         </dl>
-        <div className="kayit-personel-context-actions">
-          <SurecInlineBackButton
-            label={KAYIT_SUREC_PERSONEL_PICKER_LABEL}
-            onClick={onChangePerson}
-            testId="kayit-surec-personel-degistir"
-            disabled={changeDisabled}
-          />
-        </div>
       </div>
     </section>
   );
@@ -1346,11 +1330,15 @@ export function KayitSurecWorkspace({
 
       <div className="kayit-workspace-scroll-body" data-testid="kayit-workspace-scroll-body">
       {activeTab === "surec" && selectedSurecPersonel ? (
-        <KayitSurecPersonelContext
-          personel={selectedSurecPersonel}
-          onChangePerson={beginChangeSurecPersonel}
-          changeDisabled={personelContextLocked}
+        <SurecInlineBackButton
+          label={KAYIT_SUREC_PERSONEL_PICKER_LABEL}
+          onClick={beginChangeSurecPersonel}
+          testId="kayit-surec-personel-degistir"
+          disabled={personelContextLocked}
         />
+      ) : null}
+      {activeTab === "surec" && selectedSurecPersonel ? (
+        <KayitSurecPersonelContext personel={selectedSurecPersonel} />
       ) : null}
       {activeTab === "surec" && selectedSurecPersonel ? (
         <KayitSurecPersonelProcessNav

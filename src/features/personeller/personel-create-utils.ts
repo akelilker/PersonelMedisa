@@ -5,26 +5,15 @@ export function digitsOnly(value: string) {
   return value.replace(/\D+/g, "");
 }
 
-function titleCaseWord(value: string) {
-  const lower = value.toLocaleLowerCase("tr-TR");
-  const firstLetterIndex = lower.search(/\p{L}/u);
-
-  if (firstLetterIndex < 0) {
-    return lower;
-  }
-
-  return `${lower.slice(0, firstLetterIndex)}${lower
-    .charAt(firstLetterIndex)
-    .toLocaleUpperCase("tr-TR")}${lower.slice(firstLetterIndex + 1)}`;
-}
-
+/**
+ * Personel adı WRITE normalizasyonu.
+ *
+ * Görünüm kuralı (Ad Türkçe Title Case) yalnız display/render katmanında uygulanır.
+ * Canonical kayıt mutate edilmez: yalnız baştaki/sondaki ve çoklu iç boşluk temizlenir;
+ * kullanıcının girdiği harf biçimi olduğu gibi korunur.
+ */
 export function normalizePersonelAd(value: string) {
-  return value
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((part) => part.split("-").map(titleCaseWord).join("-"))
-    .join(" ");
+  return value.trim().replace(/\s+/g, " ");
 }
 
 /**

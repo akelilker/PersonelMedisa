@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { fetchPersonellerList } from "../../../api/personeller.api";
+import { fetchPersonellerListForSelect } from "../../../api/personeller.api";
 import {
   approveRetentionImha,
   createLegalHold,
@@ -95,11 +95,11 @@ export function SaklamaLegalHoldPanel() {
       const [holdItems, talepItems, personelPage] = await Promise.all([
         fetchLegalHoldlar(true),
         fetchRetentionImhaTalepleri(),
-        fetchPersonellerList({ page: 1, limit: 250, aktiflik: "tum" })
+        fetchPersonellerListForSelect({ aktiflik: "tum" })
       ]);
       setHolds(holdItems);
       setTalepler(talepItems);
-      setPersoneller(personelPage.items);
+      setPersoneller(personelPage);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Saklama paneli yüklenemedi.");
     } finally {

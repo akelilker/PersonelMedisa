@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { ApiRequestError } from "../../../api/api-client";
-import { fetchPersonellerList } from "../../../api/personeller.api";
+import { fetchPersonellerListForSelect } from "../../../api/personeller.api";
 import { fetchRevizyonKaynaklar } from "../../../api/revizyon-talebi.api";
 import { ErrorState } from "../../../components/states/ErrorState";
 import { AppSelect } from "../../../components/form/AppSelect";
@@ -75,9 +75,9 @@ export function HaftalikKapanisPage() {
     }
     void (async () => {
       try {
-        const list = await fetchPersonellerList({ calisan_kapsami: "IC_PERSONEL", limit: 250 });
-        setPersoneller(list.items);
-        setPersonelId((current) => current || (list.items[0] ? String(list.items[0].id) : ""));
+        const items = await fetchPersonellerListForSelect({ calisan_kapsami: "IC_PERSONEL" });
+        setPersoneller(items);
+        setPersonelId((current) => current || (items[0] ? String(items[0].id) : ""));
       } catch (error) {
         setErrorMessage(error instanceof Error ? error.message : "Personel listesi yüklenemedi.");
       } finally {

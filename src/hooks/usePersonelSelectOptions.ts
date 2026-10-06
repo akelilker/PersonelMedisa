@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
-import { fetchPersonellerList } from "../api/personeller.api";
+import {
+  PERSONEL_LIST_PAGE_MAX,
+  fetchPersonellerListForSelect
+} from "../api/personeller.api";
 import { buildPersonelSelectLabels } from "../features/kayit/kayit-surec-utils";
 import type { Personel } from "../types/personel";
 
-/** Personel seçim listesi tek istekte alınır (Personel Kartı liste limiti ile aynı). */
-export const PERSONEL_SELECT_OPTIONS_LIMIT = 250;
+/** Sayfa boyutu: backend list üst sınırı (seçim listesi sayfalanarak tamamı alınır). */
+export const PERSONEL_SELECT_OPTIONS_LIMIT = PERSONEL_LIST_PAGE_MAX;
 
 export type PersonelSelectOption = { value: string; label: string };
 
@@ -31,13 +34,9 @@ export function usePersonelSelectOptions(): UsePersonelSelectOptionsResult {
 
     void (async () => {
       try {
-        const result = await fetchPersonellerList({
-          page: 1,
-          limit: PERSONEL_SELECT_OPTIONS_LIMIT,
-          aktiflik: "tum"
-        });
+        const items = await fetchPersonellerListForSelect({ aktiflik: "tum" });
         if (!cancelled) {
-          setPersoneller(result.items);
+          setPersoneller(items);
         }
       } catch {
         if (!cancelled) {

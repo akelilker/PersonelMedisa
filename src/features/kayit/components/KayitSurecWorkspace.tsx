@@ -26,7 +26,7 @@ import {
   applyPersonelKaliciSubeDegisikligi,
   applyPersonelOrganizasyonDegisikligi,
   createPersonel,
-  fetchPersonellerList
+  fetchPersonellerListForSelect
 } from "../../../api/personeller.api";
 import { fetchYonetimSubeleri } from "../../../api/yonetim.api";
 import {
@@ -693,7 +693,7 @@ export function KayitSurecWorkspace({
         fetchUcretTipiOptions(),
         fetchPrimKuraliOptions(),
         fetchSurecTuruOptions(),
-        fetchPersonellerList({ page: 1, limit: 250, aktiflik: "tum" }),
+        fetchPersonellerListForSelect({ aktiflik: "tum" }),
         fetchYonetimSubeleri()
       ]);
 
@@ -727,7 +727,7 @@ export function KayitSurecWorkspace({
         primKuraliOptions
       });
       setSurecTuruOptions(surecTurleri);
-      setPersoneller(personelList.items);
+      setPersoneller(personelList);
     } catch (error) {
       setBootstrapError(getApiErrorMessage(error, "Kayıt alanı yüklenemedi."));
       setSubeLoadError(getApiErrorMessage(error, "Şube listesi yüklenemedi."));

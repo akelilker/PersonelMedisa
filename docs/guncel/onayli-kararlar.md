@@ -25,3 +25,4 @@ Bu dosya, kullanıcının onayladığı kalıcı görsel kararları her biri tek
 | Ortak modal | iOS safe-area | #493 sonrası davranış korunur | 2026-10-06 |
 | Kullanıcı Paneli / Self | Geçiş bağlantısı | İlk açıldığında normal görünür; ~4 saniye sonra soluklaşır; baştan itibaren sürekli soluk görünüm doğru nihai davranış değildir | 2026-10-06 |
 | Mobil ana hero | #498 WebKit ölçümü | İlk #498 WebKit hatası tekrarlanmadı; hero regresyonu olarak kayıt açılmaz; yeni görsel kanıt olmadan değiştirilmez | 2026-10-06 |
+| Ortak — Personel Kimliği | Kullanıcıya internal personel kayıt ID'si gösterilmez. | Kullanıcıya dönük personel tanımı Ad Soyad + Sicil No'dur. Internal personel ID yalnız backend/endpoint/DB ilişkilerinde teknik olarak kullanılır; UI, Personel Kartı, arama sonucu, uyarı/metinler, export/rapor kullanıcı alanları ve teknik olmayan kullanıcı raporlarında gösterilmez. Örnek: Saıf Tareq Jasım Al-Gburı — Sicil 197. | 2026-10-06 |

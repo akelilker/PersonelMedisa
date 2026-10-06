@@ -572,6 +572,11 @@
   padding-left: calc(var(--space-2) + 18px);
 }
 
+.surec-personel-combobox .app-select-option {
+  justify-content: center;
+  text-align: center;
+}
+
 /* Personel bağlam seçici: kanonik owner (AppSelect searchable) — feature CSS yalnız yerleşim taşır. */
 
 .kayit-workspace .form-section {

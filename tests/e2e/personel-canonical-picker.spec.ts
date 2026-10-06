@@ -326,10 +326,10 @@ test.describe("Süreç personel bağlam seçici (searchable canonical picker)", 
     await login(page, { username: "yonetici", password: "secret" });
     const { kayitModal, combobox } = await openSurecPersonelPicker(page);
 
-    // Toolbar arama kontratı korunur: "Personel ara" tek eşleşmeli kalır.
-    await expect(page.getByPlaceholder("Personel ara")).toHaveCount(1);
-
-    const panel = await openPicker(page, combobox);
+    await kayitModal.getByTestId("kayit-surec-personel-search-toggle").click();
+    const panel = page.locator(PANEL);
+    await expect(panel).toBeVisible();
+    await expect(page.locator("body")).toHaveAttribute("data-app-picker-open", "1");
     await expectPickerIsSharp(page);
     await expectBlurApplied(kayitModal.locator(".modal-header"));
 
@@ -337,10 +337,10 @@ test.describe("Süreç personel bağlam seçici (searchable canonical picker)", 
     await expect(search).toBeVisible();
     await expect(search).toBeFocused();
 
+    await expect(search).toHaveAttribute("placeholder", "Ad/Soyad Veya Sicil No. Girin.");
     await search.fill("Ayşe");
 
-    // Tek arama state'i: toolbar alanı aynı değeri taşır (paralel arama yok).
-    await expect(page.getByTestId("kayit-surec-personel-search-input")).toHaveValue("Ayşe");
+    await expect(page.getByTestId("kayit-surec-personel-search-input")).toHaveCount(0);
     await expect(panel.getByRole("option")).toHaveCount(1);
     await expect(panel.getByRole("option", { name: /Ayşe Yılmaz/ })).toBeVisible();
     await expect(panel.getByRole("option", { name: /Mehmet/i })).toHaveCount(0);

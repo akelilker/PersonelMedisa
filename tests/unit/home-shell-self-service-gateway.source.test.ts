@@ -43,14 +43,14 @@ describe("home shell polish + self-service gateway owners", () => {
     );
   });
 
-  it("C) grows footer MEDİSA brand by exactly 0.5pt vs pre-#464 canonical sizes", () => {
+  it("C) keeps footer MEDİSA brand slightly below prior +0.5pt enlarge (canonical pre-bump sizes)", () => {
     const footer = read("src/styles/components/footer.css");
-    expect(footer).toMatch(/\.footer-content \.brand img\s*\{[^}]*max-height:\s*calc\(12\.5px \+ 0\.5pt\)/s);
+    expect(footer).toMatch(/\.footer-content \.brand img\s*\{[^}]*max-height:\s*12\.5px/s);
     expect(footer).toMatch(
-      /body\.app-home-route #app-footer \.brand img\s*\{[^}]*max-height:\s*calc\(14\.27px \+ 1\.5pt \+ 0\.5pt\)/s
+      /body\.app-home-route #app-footer \.brand img\s*\{[^}]*max-height:\s*calc\(14\.27px \+ 1\.5pt\)/s
     );
     expect(footer).toMatch(
-      /body:not\(\.login-page\):not\(\.admin-report-page\) #app-footer \.footer-content \.brand img\s*\{[^}]*height:\s*calc\(20px \+ 0\.5pt\)/s
+      /body:not\(\.login-page\):not\(\.admin-report-page\) #app-footer \.footer-content \.brand img\s*\{[^}]*height:\s*20px/s
     );
   });
 

@@ -792,7 +792,7 @@ export function GunlukPuantajPage() {
                     data-testid="puantaj-open-bugun-correction"
                     onClick={() => dispatchOpenBugunPersonelDurumu()}
                   >
-                    Bugünkü Personel Durumu
+                    Anlık Personel Durumu
                   </button>
                   {hasPermission("gunluk_bildirim.correct_scoped")
                     ? " (scoped correction owner)"

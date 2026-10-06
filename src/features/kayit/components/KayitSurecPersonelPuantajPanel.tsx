@@ -115,7 +115,7 @@ export function KayitSurecPersonelPuantajPanel({
             data-testid="kayit-surec-puantaj-open-bugun"
             onClick={() => dispatchOpenBugunPersonelDurumu()}
           >
-            Bugünkü Personel Durumu
+            Anlık Personel Durumu
           </button>
         </div>
       ) : null}
@@ -140,7 +140,7 @@ export function KayitSurecPersonelPuantajPanel({
               <span className="surec-devamsizlik-tile-title">{card.title}</span>
               <span className="surec-devamsizlik-tile-desc">
                 {card.kind === "puantaj-route" && !canUpdatePuantaj && canViewBugun
-                  ? "Günlük durum kontrolü — Bugünkü Personel Durumu"
+                  ? "Günlük durum kontrolü — Anlık Personel Durumu"
                   : card.description}
               </span>
               <span className="surec-devamsizlik-tile-status">

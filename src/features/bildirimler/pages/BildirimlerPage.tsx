@@ -1053,7 +1053,7 @@ export function BildirimlerPage() {
 
   const createTitle = "Günlük Kayıt Ekle";
   const createButtonLabel = "Günlük Kayıt Ekle";
-  const pageTitle = isBirimAmiri || canCreateBildirim ? "Bugünkü Personel Durumu" : "Günlük Kayıtlar";
+  const pageTitle = isBirimAmiri || canCreateBildirim ? "Anlık Personel Durumu" : "Günlük Kayıtlar";
 
   return (
     <section className="bildirimler-page">

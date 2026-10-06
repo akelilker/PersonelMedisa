@@ -85,7 +85,7 @@ POST_PR403 kullanıcı kararı (2026-09-25) + 2026-10-03 kapanış. **Non-goals*
 | --- | --- | --- | --- |
 | `BL-QR-DEVICE-BIND` | Device binding | **CLOSED NON-GOAL — YAPILMAYACAK** | Device binding yok; next gate'e çıkmaz |
 | `BL-QR-OFFLINE` | Offline QR write | **CLOSED NON-GOAL — YAPILMAYACAK** — online-only QR | Offline write yok; next gate'e çıkmaz |
-| `BL-QR-GEOFENCE` | GPS / geofence attendance | **CLOSED NON-GOAL — YAPILMAYACAK** | Out of scope; next gate'e çıkmaz |
+| `BL-QR-GEOFENCE` | GPS / geofence attendance | **Blocking geofence = CLOSED NON-GOAL — YAPILMAYACAK**; non-blocking GPS konum denetimi **#496** ile **CANLI** (v1, yarıçap **300 m**, `location_geofence_key = v1_factory_entrance_300m`); migration **097** APPLIED; raw lat/lng **persist edilmez** (yalnız durum / mesafe / accuracy / geofence key saklanır) | Blocking geofence out of scope; non-blocking audit live ve QR kaydını engellemez; next gate'e çıkmaz |
 | `BL-QR-NFC` | NFC / turnike | **CLOSED NON-GOAL — YAPILMAYACAK** | Out of scope (105 discovery); next gate'e çıkmaz |
 | `BL-KARYAPI-SENAY` | Karyapı / Şenay rollout | **NOT OUR ROLLOUT / CLOSED** — bizim bekleyen rollout işimiz değil; program teslim edildiğinde firma sahipleri kendi kullanıcı/personel/şube kayıtlarını kendileri girer | Grant/assignment uydurma; next gate üretmez |
 | `BL-SERHAN-MEDISA-ACCESS` | Serhan Köse canlı yetki | **CLOSED** — hedef `GENEL_YONETICI` / tam yetki; canlı readback 2026-10-03 ile doğrulandı (`sinemH` ile aynı model). `GENEL_YONETICI` için tek tek şube/company grant gerekmez | Karar kaydı; "daha sonra karar verilecek" YOK |

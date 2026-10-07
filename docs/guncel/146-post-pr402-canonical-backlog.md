@@ -1,7 +1,7 @@
 # 146 — Post-PR402 Canonical Backlog
 
-**Tür:** Aktif backlog otoritesi (POST_PR402 consolidation; **POST_PR507** pin refresh).
-**Product baseline (SHA pin):** `83a517011fcf32967adb87d4f44c1bcc833a45a8` (PR **#507** last product merge+deploy); Deploy cPanel **#1240** SUCCESS. Docs-only canonical PRs do not advance `LAST_MERGED_PR` / `CODE_MAIN_SHA` / `PRODUCTION_DEPLOY_SHA` (see `CURRENT_STATE.md` `PIN_SHA_BASELINE`).
+**Tür:** Aktif backlog otoritesi (POST_PR402 consolidation; **POST_PR512** pin refresh).
+**Product baseline (SHA pin):** `c23000544718e1b3bdfa06c133479c6ffbd6cbe3` (PR **#512** last product merge+deploy); Deploy cPanel **#1245** run `37677662532` SUCCESS. Docs-only canonical PRs do not advance `LAST_MERGED_PR` / `CODE_MAIN_SHA` / `PRODUCTION_DEPLOY_SHA` (see `CURRENT_STATE.md` `PIN_SHA_BASELINE`).
 **Migration tip:** code **097** / production **097** (pending **0**); migration **097** (`097_qr_attendance_location_audit.sql`) **APPLIED** (Apply cPanel migrations **#56** run `37391130248`; readback Ops migration worker diagnostics **#90** run `37391796990` PROD_TIP **097**); migration **096** (`096_personel_bordro_okumalari.sql`) **APPLIED** (canonical apply `37021807281`; readback `37022115475` PROD_TIP **096**); migration **095** (`095_personel_cinsiyet.sql`) **APPLIED**; migration **094** (`094_attendance_no_event_day.sql`) **APPLIED** (production'da geçmiş).
 **Yasaklar bu belgede:** app code · migration apply · production mutation · remote branch delete · #395–#470 reopen.
 
@@ -27,6 +27,11 @@ Sınıflar: **A** CLOSED_ALREADY_LIVE · **B** SAFE_HOUSEKEEPING · **C** TECHNI
 | `BL-PR-476` | `/self` PERSONEL görsel shell (AppShell) + 120/158 `calisan_kapsami` `DIS_KAYNAK` canlı düzeltme + Harici Personel terminoloji + canonical kapanış | PR #476 MERGED `817a1e7230273878daa0e96a359b866671ad0711`; Deploy cPanel #1207 run `37077642885` SUCCESS |
 | `BL-PR-496` | QR taramada GPS geofence konum denetimi (v1, non-blocking; bilgi amaçlı, QR kaydını engellemez) + migration 097 | PR #496 MERGED `14dc7fa9bebe35533d6e1659eae795417ebea574`; Deploy cPanel #1228 run `37365978799` SUCCESS |
 | `BL-PR-507` | Anlık personel durumu UX, şube kart çerçeveleri, tek süreç araması, footer MEDİSA ince ayarı (görsel kapanış) | PR #507 MERGED `83a517011fcf32967adb87d4f44c1bcc833a45a8`; Deploy cPanel #1240 SUCCESS |
+| `BL-PR-508` | Personel kapanış: ad kaydı yazıldığı gibi (yalnız trim + boşluk sadeleştirme) · personel seçim listesi 250 sınırı kaldırıldı (sayfalı çekim) · anlık durum sayımı doğrulandı (kod değişmedi) · Ankara Finans-Risk salt-okunur not | PR #508 MERGED `6c9498f1ae4716975695cf68bef8e97a4f715e59`; Deploy cPanel #1241 run `37556582165` SUCCESS |
+| `BL-PR-509` | iOS 27 PWA footer safe-area (login + ana ekran; Taşıt PR541 modeli) | PR #509 MERGED (squash) `719425021d9fabb1b904dc3ad99694c7eecc9472`; Deploy cPanel #1242 run `37587074563` SUCCESS |
+| `BL-PR-510` | Anlık Personel Durumu: birim adıyla aynı bölüm adı ikinci satır olarak tekrarlanmaz | PR #510 MERGED `ab3745eb6608a5b3bfa45a21db1fe4d697e005a8`; Deploy cPanel #1243 run `37594047570` SUCCESS |
+| `BL-PR-511` | Anlık Personel Durumu sadeleştirme: Toplam Personel / Gelen (Geldi + Geç Geldi + Erken Çıktı) / Gelmeyen (Gelmedi + İzinli + Raporlu + Görevde) / Henüz Değerlendirilmedi · Statü drill-down Mavi Yaka / Beyaz Yaka / Statüsüz (yalnız > 0 ise) · doğrudan kişi listesi "Ad SOYAD — Durum" · geri satırı geometri düzeltmesi · özet kartları yatay + dikey ortalı | PR #511 MERGED `7851d62401857950f32c40589be3a0bd40c05c24`; Deploy cPanel #1244 run `37676310896` SUCCESS |
+| `BL-PR-512` | CI: WebKit mobil layout regression Fast CI'dan ayrıldı → yalnız manuel (`workflow_dispatch`) **Visual WebKit Regression** (`.github/workflows/visual-webkit-regression.yml`); testler silinmedi | PR #512 MERGED `c23000544718e1b3bdfa06c133479c6ffbd6cbe3`; Deploy cPanel #1245 run `37677662532` SUCCESS |
 | `BL-BUSINESS-TRUTH-120-158-219` | 120 / 158 Harici Personel + 219 Medisa transfer business truth | **CLOSED** — canlı readback + mutation 2026-10-03: 120/158 canlı `calisan_kapsami` `IC_PERSONEL` idi → `DIS_KAYNAK` düzeltildi (readback doğrulandı); şube **11 Şenay Mobilya** + SGK **3 Şenay Mobilya** + çalışma lokasyonu **5 Fabrika/Karabük** korundu. 219 şube **6 Medisa İstanbul** + SGK **1 Medisa** + lokasyon **3 İstanbul** (mutation yok). Production mutation = **2** (120 + 158) |
 | `BL-SERHAN-KOSE-LIVE` | `serhan.kose` (user 9) canlı yetki | **CLOSED** — canlı readback 2026-10-03: `rol: GENEL_YONETICI` + `durum: AKTIF` (`sinemH` user 110 ile aynı model). Tek tek şube/company grant üretilmedi; mutation = 0 |
 | `BL-SELF-SHELL-PERSONEL` | `/self` yüzeyinde PERSONEL görsel shell (bağlı yönetici) | **CLOSED** — owner `src/app/AppShell.tsx`; `isPersonelShellVisual` (rol PERSONEL veya `/self` yüzeyi) ile `/self` + `/self/...` compact header/shell alır. Rol/izin/route/backend değişmedi; ayrı panel/helper/CSS override yok. Focused source test (`personel-self-service-ux-v2`) güncellendi |
@@ -74,7 +79,7 @@ Açık teknik gap: **NONE**.
 
 | ID | Konu | Not |
 | --- | --- | --- |
-| `BL-SOURCE-LOCK-DRIFT` | Pin testleri eski deploy/tip iddiaları | **CLOSED / HISTORICAL** — POST_PR507 refresh: CURRENT_STATE + source-lock test (`LAST_MERGED_PR: 507`, SHA `83a51701…`, Deploy #1240, tip **097**, `DOCS_ONLY_CLOSURE_THIS_PIN: NO`) hizalandı; artık aktif teknik gap DEĞİL |
+| `BL-SOURCE-LOCK-DRIFT` | Pin testleri eski deploy/tip iddiaları | **CLOSED / HISTORICAL** — POST_PR512 refresh: CURRENT_STATE + source-lock test (`LAST_MERGED_PR: 512`, SHA `c2300054…`, Deploy #1245, tip **097**, `DOCS_ONLY_CLOSURE_THIS_PIN: NO`) hizalandı; artık aktif teknik gap DEĞİL |
 
 ---
 
@@ -103,6 +108,9 @@ E sınıfı: read-only verify · business truth · production write (write ayrı
 | ID | Konu | Not |
 | --- | --- | --- |
 | `BL-CROSS-COMPANY` | 120 / 158 / 219 | **CLOSED (2026-10-03)** — 120/158 canlı `calisan_kapsami` `DIS_KAYNAK` olarak düzeltildi (bkz. A `BL-BUSINESS-TRUTH-120-158-219`); 219 transfer zaten yansımış. Cross-company kayıt problem/blocker DEĞİL; active pending / next gate üretmez. History olarak kalır. |
+| `BL-EKRAN-TURU` | Görsel ekran turu (ekran ekran ince ayar) | **DEVAM EDİYOR (2026-10-07)** — onaylı görseller dondurulmuş; tur bitince CURRENT_STATE + bu belge tek seferde güncellenir. Blocker değil |
+| `BL-VISUAL-WEBKIT-FIRST-RUN` | Visual WebKit Regression (`visual-webkit-regression.yml`, yalnız `workflow_dispatch`) | **OPEN (non-blocking)** — #512 ile oluşturuldu, henüz hiç çalıştırılmadı; ilk ciddi görsel PR'da bir kez manuel çalıştırılacak |
+| `BL-HARICI-STATU-BOS-SAYIM` | Harici Personel içinde Statü boş kayıt sayısı | **OPEN (read-only verify, non-blocking)** — canlı DB erişimi yok, sayı doğrulanmadı. Ekran mantığı hazır: "Statüsüz" grubu yalnız > 0 ise görünür (#511). Production write yok |
 
 ---
 
@@ -142,13 +150,14 @@ Technical open = **NONE** — `BL-SOURCE-LOCK-DRIFT` **CLOSED / HISTORICAL** (PO
 
 ## Operational approval registry (özet)
 
-Operational open = **NONE** — `BL-CROSS-COMPANY` **CLOSED** (120/158 canlı `DIS_KAYNAK` düzeltmesi 2026-10-03). `BL-QR-PILOT-OPS` **PASS / CLOSED** (PILOT_GATE_CLOSED).
+Operational open = **2 gözlem (non-blocking)** — `BL-VISUAL-WEBKIT-FIRST-RUN` · `BL-HARICI-STATU-BOS-SAYIM`; `BL-EKRAN-TURU` devam ediyor. `BL-CROSS-COMPANY` **CLOSED** (120/158 canlı `DIS_KAYNAK` düzeltmesi 2026-10-03). `BL-QR-PILOT-OPS` **PASS / CLOSED** (PILOT_GATE_CLOSED).
 
 ---
 
 ## Next gate
 
-Next gate = **NONE** — Attendance / QR phase **CLOSED** (QR attendance + saha rollout + puantaj doğrulaması + personel go-live tamam). Teknik / ürün / operasyonel açık kapı yok.
+Next gate = **NONE** (blocker yok) — Attendance / QR phase **CLOSED** (QR attendance + saha rollout + puantaj doğrulaması + personel go-live tamam). Teknik / ürün / operasyonel açık kapı yok.
+- `BL-EKRAN-TURU` **DEVAM EDİYOR** — sıradaki iş; bitince `BL-VISUAL-WEBKIT-FIRST-RUN` + `BL-HARICI-STATU-BOS-SAYIM` kapatılır (E).
 - `BL-NO-EVENT-DAY` **CLOSED / LIVE** (migration 094 APPLIED).
 - `BL-QR-PILOT-OPS` **PASS / CLOSED** (PILOT_GATE_CLOSED).
 - `BL-POST-THRESHOLD-REENTRY` **CLOSED** (code).

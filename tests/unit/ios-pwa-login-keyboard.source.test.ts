@@ -12,12 +12,18 @@ describe("iOS PWA shell viewport contract", () => {
   it("pins the app shell to the layout viewport in standalone mode (all routes)", () => {
     const iosPwa = read("src/styles/platform/ios-pwa.css");
     const standaloneBlock =
-      iosPwa.match(/@media\s*\(display-mode:\s*standalone\)\s*\{([\s\S]*)\}\s*$/m)?.[1] ?? "";
+      iosPwa.match(/@media\s*\(display-mode:\s*standalone\)\s*\{([\s\S]*?)\n\}/m)?.[1] ?? "";
 
     expect(standaloneBlock).toMatch(/body\s*\{[^}]*position:\s*fixed/s);
     expect(standaloneBlock).toMatch(/body\s*\{[^}]*inset:\s*0/s);
     expect(standaloneBlock).toMatch(/body #root\s*\{[^}]*height:\s*100%/s);
     expect(standaloneBlock).not.toMatch(/body\.login-page\s*\{[^}]*position:\s*fixed/s);
+  });
+
+  it("replaces layout-viewport body pin on iOS 27 PWA (html.medisa-ios27-pwa)", () => {
+    const iosPwa = read("src/styles/platform/ios-pwa.css");
+    expect(iosPwa).toMatch(/html\.medisa-ios27-pwa body\s*\{[^}]*position:\s*relative/s);
+    expect(iosPwa).toMatch(/html\.medisa-ios27-pwa body\s*\{[^}]*min-height:\s*100dvh/s);
   });
 
   it("keeps login auth surface content-wrap from document scroll drift", () => {

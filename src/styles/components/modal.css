@@ -78,10 +78,6 @@
   display: none;
 }
 
-.modal-container--yonetim .modal-body--yonetim {
-  padding-top: 8px;
-}
-
 .modal-header {
   /* Ortak header ikon dikey ofseti: Home ve X/kapat kontrolünü mevcut
      merkezlerine göre 6px aşağı alır. Başlık/header geometrisi etkilenmez. */
@@ -246,7 +242,6 @@
 
 .modal-body--yonetim {
   gap: 14px;
-  padding-top: 16px;
 }
 
 /* Module overlay: nested scroll only for personeller list surfaces. */
@@ -297,7 +292,6 @@
   align-self: stretch;
   width: 100%;
   margin: 0;
-  padding: 4px 0 4px;
   border-bottom: 1px solid rgba(160, 174, 192, 0.16);
   position: relative;
   z-index: 8;
@@ -365,13 +359,21 @@
   color: var(--text-inverse);
 }
 
-/* Level 2+ body BackBar: align control to 8px without negative margin. */
+/* Level 2+ body BackBar — geri satırının TEK sahibi (tüm modal ekranları).
+   Header'ın hemen altında, sola yaslı (#511 Anlık Personel ölçüsü): body üst
+   nefesi 0, yatay 8px; geri satırı grid serbest alanıyla uzamaz, 8px üst / 4px
+   alt iç boşlukla en fazla 40px yüksekliktedir. Negatif margin kullanılmaz. */
 .modal-body:has(> .universal-back-bar) {
   --modal-body-inline-pad: 8px;
+  padding-top: 0;
+  align-content: start;
 }
 
 .modal-body > .universal-back-bar {
-  padding-inline: 0;
+  align-self: start;
+  min-height: 32px;
+  max-height: 40px;
+  padding: var(--space-2) 0 var(--space-1);
   box-sizing: border-box;
 }
 
@@ -603,7 +605,9 @@ body.modal-open .modal-container {
   }
 
   .modal-body {
+    --modal-body-inline-pad: var(--space-3);
     padding: var(--space-3);
+    padding-inline: var(--modal-body-inline-pad);
   }
 
   .modal-container--fixed-footer > .modal-body {

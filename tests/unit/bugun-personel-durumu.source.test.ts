@@ -278,10 +278,19 @@ describe("bugun personel durumu owners", () => {
       /\.modal-body--bugun-personel:has\(> \.universal-back-bar\)\s*\{[^}]*padding-top:\s*0/s
     );
     expect(styles).toMatch(
-      /\.bugun-personel-branch-card:hover\s*\{[^}]*border-color:\s*var\(--border-strong\)[^}]*transform:\s*scale\(1\.025\)/s
+      /\.bugun-personel-branch-name\s*\{[^}]*color:\s*var\(--txt-muted\)/s
     );
     expect(styles).toMatch(
-      /\.bugun-personel-branch-card:hover \.bugun-personel-branch-name\s*\{[^}]*transform:\s*scale\(1\.05\)/s
+      /@media \(hover: hover\) and \(pointer: fine\)\s*\{[^}]*\.bugun-personel-branch-card:hover\s*\{[^}]*border-color:\s*var\(--border-strong\)[^}]*transform:\s*scale\(1\.05\)/s
+    );
+    expect(styles).toMatch(
+      /\.bugun-personel-branch-card:hover \.bugun-personel-branch-name\s*\{[^}]*color:\s*#ffffff/s
+    );
+    expect(styles).toMatch(
+      /\.bugun-personel-branch-card:focus-visible\s*\{[^}]*border-color:\s*var\(--border-strong\)/s
+    );
+    expect(styles).not.toMatch(
+      /\.bugun-personel-branch-card:focus-visible\s*\{[^}]*transform:\s*scale/s
     );
   });
 

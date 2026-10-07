@@ -1,0 +1,36 @@
+name: Visual WebKit Regression
+
+# Ağır görsel doğrulama (Playwright WebKit + mobil layout regression) Fast CI'den
+# ayrıldı. Görsel PR'larda gerektiğinde manuel (workflow_dispatch) çalıştırılır;
+# testler silinmedi, yalnızca çalışma yeri değişti.
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: webkit-regression-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  webkit-mobile-regression:
+    name: Mobile WebKit layout regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright WebKit
+        run: npx playwright install --with-deps webkit
+
+      - name: Run mobile WebKit layout regression
+        run: npx playwright test --project=webkit-mobile-regression

@@ -6,13 +6,15 @@ import {
   BUGUN_STATUS_TO_DURUM,
   branchToplamGelen,
   branchToplamGelmeyen,
+  countYakaSliceForGroup,
   countsSatisfyInvariant,
   emptyStatusCounts,
   filterPersonsByStatus,
   formatCompletionGlyph,
-  overviewCountsSatisfyEquality
+  overviewCountsSatisfyEquality,
+  resolveYakaKey
 } from "../../src/lib/bildirim/bugun-personel-durumu";
-import type { BugunPersonelDurumuPerson } from "../../src/types/bildirim";
+import type { BugunPersonelDurumuBranch, BugunPersonelDurumuPerson } from "../../src/types/bildirim";
 
 const root = resolve(__dirname, "../..");
 
@@ -43,6 +45,7 @@ describe("bugun personel durumu owners", () => {
     expect(router).toContain("/bildirimler/bugun-personel-durumu");
     expect(controller).toContain("bugunPersonelDurumu");
     expect(service).toContain("class BugunPersonelDurumuService");
+    expect(service).toContain("personel_tipi_ad");
     expect(service).toContain("WORKDAY_START = '08:30'");
     expect(service).toContain("ON_TIME_DEADLINE = '09:30'");
     expect(service).toContain("SUNDAY_REVIEW_DEADLINE = '12:00'");
@@ -101,6 +104,63 @@ describe("bugun personel durumu owners", () => {
     expect(BUGUN_STATUS_TO_DURUM.izinli).toBe("IZINLI");
     expect(BUGUN_STATUS_TO_DURUM.henuz_degerlendirilmedi).toBe("HENUZ_DEGERLENDIRILMEDI");
     expect(formatCompletionGlyph("SURESI_GECTI")).toBe("⚠");
+  });
+
+  it("maps canonical yaka from personel_tipi_ad only", () => {
+    const mavi: BugunPersonelDurumuPerson = {
+      personel_id: 1,
+      ad_soyad: "A",
+      personel_tipi_ad: "Mavi Yaka",
+      durum: "GELDI",
+      durum_label: "Geldi",
+      gec_kalma_dakika: null,
+      erken_cikis_dakika: null,
+      giris_saati: null,
+      cikis_saati: null,
+      aciklama: null,
+      alt_tur: null,
+      detail_line: "",
+      group: "ACTUAL"
+    };
+    expect(resolveYakaKey(mavi)).toBe("mavi");
+    expect(resolveYakaKey({ ...mavi, personel_tipi_ad: null })).toBe("statusuz");
+    const branch: BugunPersonelDurumuBranch = {
+      sube_id: 1,
+      sube_adi: "X",
+      counts: emptyStatusCounts(),
+      birim_bildirim: { tamamlanan: 0, toplam: 0 },
+      units: [
+        {
+          birim_id: 1,
+          birim_adi: "B",
+          bolum_id: null,
+          bolum_adi: null,
+          counts: emptyStatusCounts(),
+          bildirim: {
+            status: "BEKLENIYOR",
+            status_label: "Bekleniyor",
+            tamamlandi_mi: false,
+            tamamlandi_at: null,
+            tamamlayan_user_id: null,
+            completion_id: null
+          },
+          personeller: [
+            mavi,
+            {
+              ...mavi,
+              personel_id: 2,
+              personel_tipi_ad: "Beyaz Yaka",
+              durum: "IZINLI",
+              durum_label: "İzinli"
+            }
+          ]
+        }
+      ]
+    };
+    const gelmeyen = countYakaSliceForGroup(branch, "gelmeyen");
+    expect(gelmeyen.mavi + gelmeyen.beyaz + gelmeyen.statusuz).toBe(1);
+    const gelen = countYakaSliceForGroup(branch, "gelen");
+    expect(gelen.mavi).toBe(1);
   });
 
   it("groups branch overview totals without changing status semantics", () => {

@@ -7877,9 +7877,15 @@ export function resolveDemoApiResponse(
               : unitCompleted
                 ? "COMPLETION"
                 : "UNASSESSED";
+          const demoPerson = demoState.personeller.find((p) => p.id === row.personel_id);
+          const personelTipiAd =
+            demoPerson?.personel_tipi_id != null
+              ? DEMO_PERSONEL_TIPI_LABELS[demoPerson.personel_tipi_id] ?? null
+              : null;
           return {
             personel_id: row.personel_id,
             ad_soyad: row.ad_soyad,
+            personel_tipi_ad: personelTipiAd,
             bildirim_id: row.bildirim_id,
             bildirim_state: row.bildirim_state,
             created_by: row.created_by,

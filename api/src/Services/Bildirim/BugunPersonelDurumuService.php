@@ -585,6 +585,13 @@ class BugunPersonelDurumuService
             $subeSelect = 's.ad AS sube_ad';
         }
 
+        $tipJoin = '';
+        $tipSelect = 'NULL AS personel_tipi_ad';
+        if (self::hasTable($pdo, 'personel_tipleri') && self::hasColumn($pdo, 'personeller', 'personel_tipi_id')) {
+            $tipJoin = 'LEFT JOIN personel_tipleri pt ON pt.id = p.personel_tipi_id';
+            $tipSelect = 'pt.ad AS personel_tipi_ad';
+        }
+
         $sql = '
             SELECT
                 p.id AS personel_id,
@@ -596,12 +603,14 @@ class BugunPersonelDurumuService
                 ' . $subeSelect . ',
                 ' . $bolumSelect . ',
                 ' . $birimSelect . ',
+                ' . $tipSelect . ',
                 ' . $bildirimSelect . ',
                 ' . $puantajSelect . '
             FROM personeller p
             ' . $subeJoin . '
             ' . $bolumJoin . '
             ' . $birimJoin . '
+            ' . $tipJoin . '
             ' . $bildirimJoin . '
             ' . $puantajJoin . '
             WHERE ' . implode(' AND ', $where) . '
@@ -1045,6 +1054,7 @@ class BugunPersonelDurumuService
             'detail_line' => $detail,
             'evidence' => $evidence,
             'group' => self::statusGroup($durum),
+            'personel_tipi_ad' => self::nullableString(isset($row['personel_tipi_ad']) ? $row['personel_tipi_ad'] : null),
         ];
     }
 

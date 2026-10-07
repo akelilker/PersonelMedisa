@@ -27,9 +27,80 @@ export const BUGUN_GELMEYEN_STATUS_KEYS = ["gelmedi", "izinli", "raporlu", "gore
 export type BugunSummaryGroup = "gelen" | "gelmeyen";
 
 export const BUGUN_SUMMARY_GROUP_LABEL: Record<BugunSummaryGroup, string> = {
-  gelen: "Toplam Gelen",
-  gelmeyen: "Toplam Gelmeyen"
+  gelen: "Gelen",
+  gelmeyen: "Gelmeyen"
 };
+
+export type BugunYakaKey = "mavi" | "beyaz" | "statusuz";
+
+export const BUGUN_YAKA_KEYS: readonly BugunYakaKey[] = ["mavi", "beyaz", "statusuz"];
+
+export const BUGUN_YAKA_LABEL: Record<BugunYakaKey, string> = {
+  mavi: "Mavi Yaka",
+  beyaz: "Beyaz Yaka",
+  statusuz: "Statüsüz"
+};
+
+const MAVI_YAKA_CANONICAL = "mavi yaka";
+const BEYAZ_YAKA_CANONICAL = "beyaz yaka";
+
+/** Kanonik statü bucket (Harici/Dahili ve calisan_kapsami ayrı filtre üretmez). */
+export function resolveYakaKey(person: BugunPersonelDurumuPerson): BugunYakaKey {
+  const raw = (person.personel_tipi_ad ?? "").trim().replace(/\s+/g, " ").toLocaleLowerCase("tr");
+  if (raw === MAVI_YAKA_CANONICAL) {
+    return "mavi";
+  }
+  if (raw === BEYAZ_YAKA_CANONICAL) {
+    return "beyaz";
+  }
+  return "statusuz";
+}
+
+export function personMatchesSummaryGroup(person: BugunPersonelDurumuPerson, group: BugunSummaryGroup): boolean {
+  const durum = person.durum.toUpperCase();
+  const keys = statusKeysForSummaryGroup(group);
+  return keys.some((key) => BUGUN_STATUS_TO_DURUM[key] === durum);
+}
+
+export function collectBranchPersonsByGroupAndYaka(
+  branch: BugunPersonelDurumuBranch,
+  group: BugunSummaryGroup,
+  yaka: BugunYakaKey
+): BugunPersonelDurumuPerson[] {
+  const out: BugunPersonelDurumuPerson[] = [];
+  for (const unit of branch.units) {
+    for (const person of unit.personeller) {
+      if (personMatchesSummaryGroup(person, group) && resolveYakaKey(person) === yaka) {
+        out.push(person);
+      }
+    }
+  }
+  return out;
+}
+
+export function countYakaSliceForGroup(
+  branch: BugunPersonelDurumuBranch,
+  group: BugunSummaryGroup
+): Record<BugunYakaKey, number> {
+  const counts: Record<BugunYakaKey, number> = { mavi: 0, beyaz: 0, statusuz: 0 };
+  for (const unit of branch.units) {
+    for (const person of unit.personeller) {
+      if (!personMatchesSummaryGroup(person, group)) {
+        continue;
+      }
+      counts[resolveYakaKey(person)] += 1;
+    }
+  }
+  return counts;
+}
+
+export function formatBugunPersonListLine(person: BugunPersonelDurumuPerson): string {
+  return `${person.ad_soyad} — ${person.durum_label}`;
+}
+
+export function collectBranchPersonsPending(branch: BugunPersonelDurumuBranch): BugunPersonelDurumuPerson[] {
+  return collectBranchPersonsByStatus(branch, "henuz_degerlendirilmedi");
+}
 
 export function statusKeysForSummaryGroup(group: BugunSummaryGroup): readonly BugunStatusKey[] {
   return group === "gelen" ? BUGUN_GELEN_STATUS_KEYS : BUGUN_GELMEYEN_STATUS_KEYS;

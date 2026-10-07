@@ -14,16 +14,20 @@ import {
   BUGUN_STATUS_KEYS,
   BUGUN_STATUS_LABEL,
   BUGUN_SUMMARY_GROUP_LABEL,
+  BUGUN_YAKA_KEYS,
+  BUGUN_YAKA_LABEL,
   branchToplamGelen,
   branchToplamGelmeyen,
-  collectBranchPersonsByStatus,
+  collectBranchPersonsByGroupAndYaka,
+  collectBranchPersonsPending,
+  countYakaSliceForGroup,
   filterPersonsByStatus,
   findPersonUnitInBranch,
+  formatBugunPersonListLine,
   formatCompletionGlyph,
-  statusKeysForSummaryGroup,
-  summaryGroupForStatusKey,
   type BugunStatusKey,
-  type BugunSummaryGroup
+  type BugunSummaryGroup,
+  type BugunYakaKey
 } from "../../../lib/bildirim/bugun-personel-durumu";
 import {
   PAYROLL_LOCK_EDIT_MESSAGE,
@@ -53,8 +57,9 @@ type NavLevel =
   | { kind: "branches" }
   | { kind: "units"; branch: BugunPersonelDurumuBranch }
   | { kind: "branch_org"; branch: BugunPersonelDurumuBranch }
-  | { kind: "branch_group"; branch: BugunPersonelDurumuBranch; group: BugunSummaryGroup }
-  | { kind: "branch_status"; branch: BugunPersonelDurumuBranch; statusKey: BugunStatusKey }
+  | { kind: "branch_yaka"; branch: BugunPersonelDurumuBranch; group: BugunSummaryGroup }
+  | { kind: "branch_yaka_roster"; branch: BugunPersonelDurumuBranch; group: BugunSummaryGroup; yaka: BugunYakaKey }
+  | { kind: "branch_pending_roster"; branch: BugunPersonelDurumuBranch }
   | { kind: "unit_roster"; branch: BugunPersonelDurumuBranch; unit: BugunPersonelDurumuUnit }
   | { kind: "status"; branch: BugunPersonelDurumuBranch; unit: BugunPersonelDurumuUnit; statusKey: BugunStatusKey }
   | {
@@ -63,7 +68,9 @@ type NavLevel =
       unit: BugunPersonelDurumuUnit;
       statusKey: BugunStatusKey | null;
       person: BugunPersonelDurumuPerson;
-      fromBranchStatus?: boolean;
+      fromBranchRoster?:
+        | { kind: "yaka"; group: BugunSummaryGroup; yaka: BugunYakaKey }
+        | { kind: "pending" };
     };
 
 type EditFormState = {
@@ -81,14 +88,27 @@ type BugunPersonelDurumuModalProps = {
   onClose: () => void;
 };
 
+type BranchRosterOrigin =
+  | { kind: "yaka"; group: BugunSummaryGroup; yaka: BugunYakaKey }
+  | { kind: "pending" };
+
 type NavAnchor = {
   subeId: number;
   birimId: number | null;
   statusKey: BugunStatusKey | null;
   personelId: number | null;
   group: BugunSummaryGroup | null;
-  view: "units" | "branch_org" | "branch_group" | "branch_status" | "unit_roster" | "status" | "person";
-  fromBranchStatus?: boolean;
+  yaka: BugunYakaKey | null;
+  view:
+    | "units"
+    | "branch_org"
+    | "branch_yaka"
+    | "branch_yaka_roster"
+    | "branch_pending_roster"
+    | "unit_roster"
+    | "status"
+    | "person";
+  fromBranchRoster?: BranchRosterOrigin | null;
 };
 
 function countToneClass(key: BugunStatusKey, value: number): string {
@@ -137,11 +157,14 @@ function restoreNav(payload: BugunPersonelDurumu, anchor: NavAnchor | null): Nav
   if (anchor.view === "branch_org") {
     return { kind: "branch_org", branch };
   }
-  if (anchor.view === "branch_group" && anchor.group) {
-    return { kind: "branch_group", branch, group: anchor.group };
+  if (anchor.view === "branch_yaka" && anchor.group) {
+    return { kind: "branch_yaka", branch, group: anchor.group };
   }
-  if (anchor.view === "branch_status" && anchor.statusKey) {
-    return { kind: "branch_status", branch, statusKey: anchor.statusKey };
+  if (anchor.view === "branch_yaka_roster" && anchor.group && anchor.yaka) {
+    return { kind: "branch_yaka_roster", branch, group: anchor.group, yaka: anchor.yaka };
+  }
+  if (anchor.view === "branch_pending_roster") {
+    return { kind: "branch_pending_roster", branch };
   }
   const unit = findUnit(branch, anchor.birimId);
   if (!unit) {
@@ -168,7 +191,7 @@ function restoreNav(payload: BugunPersonelDurumu, anchor: NavAnchor | null): Nav
       unit,
       statusKey: anchor.statusKey,
       person,
-      fromBranchStatus: anchor.fromBranchStatus === true
+      fromBranchRoster: anchor.fromBranchRoster ?? undefined
     };
   }
   return { kind: "units", branch };
@@ -181,12 +204,11 @@ function resolveBugunBackLabel(nav: NavLevel): string | undefined {
   if (nav.kind === "units") {
     return "Anlık Personel Durumu";
   }
-  if (nav.kind === "branch_org" || nav.kind === "branch_group") {
+  if (nav.kind === "branch_org" || nav.kind === "branch_yaka" || nav.kind === "branch_pending_roster") {
     return nav.branch.sube_adi;
   }
-  if (nav.kind === "branch_status") {
-    const group = summaryGroupForStatusKey(nav.statusKey);
-    return group ? BUGUN_SUMMARY_GROUP_LABEL[group] : nav.branch.sube_adi;
+  if (nav.kind === "branch_yaka_roster") {
+    return BUGUN_SUMMARY_GROUP_LABEL[nav.group];
   }
   if (nav.kind === "unit_roster") {
     return nav.branch.sube_adi;
@@ -211,6 +233,7 @@ function navToAnchor(nav: NavLevel): NavAnchor | null {
       statusKey: null,
       personelId: null,
       group: null,
+      yaka: null,
       view: "units"
     };
   }
@@ -221,27 +244,41 @@ function navToAnchor(nav: NavLevel): NavAnchor | null {
       statusKey: null,
       personelId: null,
       group: null,
+      yaka: null,
       view: "branch_org"
     };
   }
-  if (nav.kind === "branch_group") {
+  if (nav.kind === "branch_yaka") {
     return {
       subeId: nav.branch.sube_id,
       birimId: null,
       statusKey: null,
       personelId: null,
       group: nav.group,
-      view: "branch_group"
+      yaka: null,
+      view: "branch_yaka"
     };
   }
-  if (nav.kind === "branch_status") {
+  if (nav.kind === "branch_yaka_roster") {
     return {
       subeId: nav.branch.sube_id,
       birimId: null,
-      statusKey: nav.statusKey,
+      statusKey: null,
       personelId: null,
-      group: summaryGroupForStatusKey(nav.statusKey),
-      view: "branch_status"
+      group: nav.group,
+      yaka: nav.yaka,
+      view: "branch_yaka_roster"
+    };
+  }
+  if (nav.kind === "branch_pending_roster") {
+    return {
+      subeId: nav.branch.sube_id,
+      birimId: null,
+      statusKey: null,
+      personelId: null,
+      group: null,
+      yaka: null,
+      view: "branch_pending_roster"
     };
   }
   if (nav.kind === "unit_roster") {
@@ -251,6 +288,7 @@ function navToAnchor(nav: NavLevel): NavAnchor | null {
       statusKey: null,
       personelId: null,
       group: null,
+      yaka: null,
       view: "unit_roster"
     };
   }
@@ -261,6 +299,7 @@ function navToAnchor(nav: NavLevel): NavAnchor | null {
       statusKey: nav.statusKey,
       personelId: null,
       group: null,
+      yaka: null,
       view: "status"
     };
   }
@@ -270,8 +309,9 @@ function navToAnchor(nav: NavLevel): NavAnchor | null {
     statusKey: nav.statusKey,
     personelId: nav.person.personel_id,
     group: null,
+    yaka: null,
     view: "person",
-    fromBranchStatus: nav.fromBranchStatus === true
+    fromBranchRoster: nav.fromBranchRoster ?? null
   };
 }
 
@@ -348,11 +388,17 @@ export function BugunPersonelDurumuModal({ open, onClose }: BugunPersonelDurumuM
     if (nav.kind === "person") {
       return nav.person.ad_soyad;
     }
-    if (nav.kind === "status" || nav.kind === "branch_status") {
+    if (nav.kind === "status") {
       return BUGUN_STATUS_LABEL[nav.statusKey];
     }
-    if (nav.kind === "branch_group") {
+    if (nav.kind === "branch_yaka") {
       return BUGUN_SUMMARY_GROUP_LABEL[nav.group];
+    }
+    if (nav.kind === "branch_yaka_roster") {
+      return BUGUN_YAKA_LABEL[nav.yaka];
+    }
+    if (nav.kind === "branch_pending_roster") {
+      return "Henüz Değerlendirilmedi";
     }
     if (nav.kind === "unit_roster") {
       return nav.unit.birim_adi;
@@ -364,30 +410,26 @@ export function BugunPersonelDurumuModal({ open, onClose }: BugunPersonelDurumuM
   }, [nav]);
 
   const crumb = useMemo(() => {
+    if (
+      nav.kind === "units" ||
+      nav.kind === "branch_yaka" ||
+      nav.kind === "branch_yaka_roster" ||
+      nav.kind === "branch_pending_roster"
+    ) {
+      return null;
+    }
     if (nav.kind === "person") {
-      if (nav.fromBranchStatus && nav.statusKey) {
-        return `${nav.branch.sube_adi} · ${BUGUN_STATUS_LABEL[nav.statusKey]}`;
+      if (nav.fromBranchRoster) {
+        return null;
       }
       const statusPart = nav.statusKey ? ` · ${BUGUN_STATUS_LABEL[nav.statusKey]}` : "";
       return `${nav.branch.sube_adi} · ${nav.unit.birim_adi}${statusPart}`;
-    }
-    if (nav.kind === "branch_status") {
-      const group = summaryGroupForStatusKey(nav.statusKey);
-      return group
-        ? `${nav.branch.sube_adi} · ${BUGUN_SUMMARY_GROUP_LABEL[group]}`
-        : nav.branch.sube_adi;
-    }
-    if (nav.kind === "branch_group") {
-      return nav.branch.sube_adi;
     }
     if (nav.kind === "status") {
       return `${nav.branch.sube_adi} · ${nav.unit.birim_adi}`;
     }
     if (nav.kind === "unit_roster" || nav.kind === "branch_org") {
       return nav.branch.sube_adi;
-    }
-    if (nav.kind === "units") {
-      return null;
     }
     return null;
   }, [nav]);
@@ -403,8 +445,17 @@ export function BugunPersonelDurumuModal({ open, onClose }: BugunPersonelDurumuM
     setEditForm(null);
     setEditError(null);
     if (nav.kind === "person") {
-      if (nav.fromBranchStatus && nav.statusKey) {
-        setNav({ kind: "branch_status", branch: nav.branch, statusKey: nav.statusKey });
+      if (nav.fromBranchRoster?.kind === "yaka") {
+        setNav({
+          kind: "branch_yaka_roster",
+          branch: nav.branch,
+          group: nav.fromBranchRoster.group,
+          yaka: nav.fromBranchRoster.yaka
+        });
+        return;
+      }
+      if (nav.fromBranchRoster?.kind === "pending") {
+        setNav({ kind: "branch_pending_roster", branch: nav.branch });
         return;
       }
       if (nav.statusKey) {
@@ -414,20 +465,11 @@ export function BugunPersonelDurumuModal({ open, onClose }: BugunPersonelDurumuM
       setNav({ kind: "unit_roster", branch: nav.branch, unit: nav.unit });
       return;
     }
-    if (nav.kind === "branch_status") {
-      if (nav.statusKey === "henuz_degerlendirilmedi") {
-        setNav({ kind: "units", branch: nav.branch });
-        return;
-      }
-      const group = summaryGroupForStatusKey(nav.statusKey);
-      if (group) {
-        setNav({ kind: "branch_group", branch: nav.branch, group });
-        return;
-      }
-      setNav({ kind: "units", branch: nav.branch });
+    if (nav.kind === "branch_yaka_roster") {
+      setNav({ kind: "branch_yaka", branch: nav.branch, group: nav.group });
       return;
     }
-    if (nav.kind === "branch_group") {
+    if (nav.kind === "branch_yaka" || nav.kind === "branch_pending_roster") {
       setNav({ kind: "units", branch: nav.branch });
       return;
     }
@@ -451,24 +493,24 @@ export function BugunPersonelDurumuModal({ open, onClose }: BugunPersonelDurumuM
     unit: BugunPersonelDurumuUnit,
     person: BugunPersonelDurumuPerson,
     statusKey: BugunStatusKey | null,
-    fromBranchStatus = false
+    fromBranchRoster?: BranchRosterOrigin
   ) {
     setEditing(false);
     setEditForm(null);
     setEditError(null);
-    setNav({ kind: "person", branch, unit, person, statusKey, fromBranchStatus });
+    setNav({ kind: "person", branch, unit, person, statusKey, fromBranchRoster });
   }
 
-  function openBranchPerson(
+  function openBranchRosterPerson(
     branch: BugunPersonelDurumuBranch,
     person: BugunPersonelDurumuPerson,
-    statusKey: BugunStatusKey
+    origin: BranchRosterOrigin
   ) {
     const unit = findPersonUnitInBranch(branch, person.personel_id);
     if (!unit) {
       return;
     }
-    openPerson(branch, unit, person, statusKey, true);
+    openPerson(branch, unit, person, null, origin);
   }
 
   function startEdit(person: BugunPersonelDurumuPerson) {
@@ -548,28 +590,36 @@ export function BugunPersonelDurumuModal({ open, onClose }: BugunPersonelDurumuM
   }
 
   const statusPersons: BugunPersonelDurumuPerson[] =
-    nav.kind === "status"
-      ? filterPersonsByStatus(nav.unit.personeller, nav.statusKey)
-      : nav.kind === "branch_status"
-        ? collectBranchPersonsByStatus(nav.branch, nav.statusKey)
+    nav.kind === "status" ? filterPersonsByStatus(nav.unit.personeller, nav.statusKey) : [];
+
+  const branchRosterPersons: BugunPersonelDurumuPerson[] =
+    nav.kind === "branch_yaka_roster"
+      ? collectBranchPersonsByGroupAndYaka(nav.branch, nav.group, nav.yaka)
+      : nav.kind === "branch_pending_roster"
+        ? collectBranchPersonsPending(nav.branch)
         : [];
+
+  const yakaCountsForGroup =
+    nav.kind === "branch_yaka" ? countYakaSliceForGroup(nav.branch, nav.group) : null;
 
   const periodWritable =
     nav.kind === "person" ||
     nav.kind === "status" ||
-    nav.kind === "branch_status" ||
+    nav.kind === "branch_yaka_roster" ||
+    nav.kind === "branch_pending_roster" ||
     nav.kind === "unit_roster" ||
     nav.kind === "units" ||
     nav.kind === "branch_org" ||
-    nav.kind === "branch_group"
+    nav.kind === "branch_yaka"
       ? nav.branch.period_writable !== false
       : true;
 
   const branchOverviewCounts =
     nav.kind === "units" ||
     nav.kind === "branch_org" ||
-    nav.kind === "branch_group" ||
-    nav.kind === "branch_status"
+    nav.kind === "branch_yaka" ||
+    nav.kind === "branch_yaka_roster" ||
+    nav.kind === "branch_pending_roster"
       ? nav.branch.counts
       : null;
 
@@ -674,20 +724,21 @@ export function BugunPersonelDurumuModal({ open, onClose }: BugunPersonelDurumuM
 
         {!loading && !error && nav.kind === "units" && branchOverviewCounts ? (
           <div className="bugun-personel-overview" data-testid="bugun-branch-overview">
-            <div
-              className="bugun-personel-overview-card bugun-personel-overview-card--static bugun-personel-overview-card--row"
-            >
-              <span className="bugun-personel-overview-label">Toplam Personel</span>
-              <span className="bugun-personel-overview-value" data-testid="bugun-toplam-personel">
-                {branchOverviewCounts.toplam}
-              </span>
-            </div>
-            <div className="bugun-personel-overview-duo">
+            <div className="bugun-personel-overview-trio" data-testid="bugun-overview-trio">
+              <div
+                className="bugun-personel-overview-card bugun-personel-overview-card--static bugun-personel-overview-card--tile"
+                data-testid="bugun-toplam-personel-card"
+              >
+                <span className="bugun-personel-overview-tile-label">Toplam Personel</span>
+                <span className="bugun-personel-overview-tile-value" data-testid="bugun-toplam-personel">
+                  {branchOverviewCounts.toplam}
+                </span>
+              </div>
               <button
                 type="button"
                 className="bugun-personel-overview-card bugun-personel-overview-card--btn bugun-personel-overview-card--tile"
                 data-testid="bugun-gelen"
-                onClick={() => setNav({ kind: "branch_group", branch: nav.branch, group: "gelen" })}
+                onClick={() => setNav({ kind: "branch_yaka", branch: nav.branch, group: "gelen" })}
               >
                 <span className="bugun-personel-overview-tile-label">Gelen</span>
                 <span className="bugun-personel-overview-tile-value" data-testid="bugun-gelen-count">
@@ -698,7 +749,7 @@ export function BugunPersonelDurumuModal({ open, onClose }: BugunPersonelDurumuM
                 type="button"
                 className="bugun-personel-overview-card bugun-personel-overview-card--btn bugun-personel-overview-card--tile"
                 data-testid="bugun-gelmeyen"
-                onClick={() => setNav({ kind: "branch_group", branch: nav.branch, group: "gelmeyen" })}
+                onClick={() => setNav({ kind: "branch_yaka", branch: nav.branch, group: "gelmeyen" })}
               >
                 <span className="bugun-personel-overview-tile-label">Gelmeyen</span>
                 <span className="bugun-personel-overview-tile-value" data-testid="bugun-gelmeyen-count">
@@ -711,13 +762,7 @@ export function BugunPersonelDurumuModal({ open, onClose }: BugunPersonelDurumuM
               className="bugun-personel-overview-card bugun-personel-overview-card--btn bugun-personel-overview-card--row"
               data-testid="bugun-henuz-degerlendirilmedi"
               disabled={branchOverviewCounts.henuz_degerlendirilmedi <= 0}
-              onClick={() =>
-                setNav({
-                  kind: "branch_status",
-                  branch: nav.branch,
-                  statusKey: "henuz_degerlendirilmedi"
-                })
-              }
+              onClick={() => setNav({ kind: "branch_pending_roster", branch: nav.branch })}
             >
               <span className="bugun-personel-overview-label">Henüz Değerlendirilmedi</span>
               <span
@@ -741,48 +786,53 @@ export function BugunPersonelDurumuModal({ open, onClose }: BugunPersonelDurumuM
           </div>
         ) : null}
 
-        {!loading && !error && nav.kind === "branch_group" ? (
-          <div className="bugun-personel-group-breakdown" data-testid="bugun-group-breakdown">
-            {statusKeysForSummaryGroup(nav.group)
-              .filter((key) => nav.branch.counts[key] > 0)
-              .map((key) => (
-                <button
-                  key={key}
-                  type="button"
-                  className={`bugun-personel-overview-card bugun-personel-overview-card--btn bugun-personel-overview-card--row bugun-personel-overview-card--compact${countToneClass(
-                    key,
-                    nav.branch.counts[key]
-                  )}`}
-                  data-testid={`bugun-group-status-${key}`}
-                  onClick={() =>
-                    setNav({ kind: "branch_status", branch: nav.branch, statusKey: key })
-                  }
-                >
-                  <span className="bugun-personel-overview-label">{BUGUN_STATUS_LABEL[key]}</span>
-                  <span className={`bugun-personel-overview-value${countToneClass(key, nav.branch.counts[key])}`}>
-                    {nav.branch.counts[key]}
-                  </span>
-                </button>
-              ))}
+        {!loading && !error && nav.kind === "branch_yaka" && yakaCountsForGroup ? (
+          <div className="bugun-personel-yaka-breakdown" data-testid="bugun-yaka-breakdown">
+            {BUGUN_YAKA_KEYS.filter((key) => yakaCountsForGroup[key] > 0).map((key) => (
+              <button
+                key={key}
+                type="button"
+                className="bugun-personel-overview-card bugun-personel-overview-card--btn bugun-personel-overview-card--row bugun-personel-overview-card--compact"
+                data-testid={`bugun-yaka-${key}`}
+                onClick={() =>
+                  setNav({
+                    kind: "branch_yaka_roster",
+                    branch: nav.branch,
+                    group: nav.group,
+                    yaka: key
+                  })
+                }
+              >
+                <span className="bugun-personel-overview-label">{BUGUN_YAKA_LABEL[key]}</span>
+                <span className="bugun-personel-overview-value">{yakaCountsForGroup[key]}</span>
+              </button>
+            ))}
           </div>
         ) : null}
 
-        {!loading && !error && nav.kind === "branch_status" ? (
-          <div className="bugun-personel-person-list" role="list" data-testid="bugun-branch-status-roster">
-            {statusPersons.length === 0 ? (
-              <p className="bugun-personel-state">Bu durumda personel yok.</p>
+        {!loading && !error && (nav.kind === "branch_yaka_roster" || nav.kind === "branch_pending_roster") ? (
+          <div className="bugun-personel-person-list" role="list" data-testid="bugun-branch-roster">
+            {branchRosterPersons.length === 0 ? (
+              <p className="bugun-personel-state">Bu grupta personel yok.</p>
             ) : (
-              statusPersons.map((person) => (
+              branchRosterPersons.map((person) => (
                 <button
                   key={person.personel_id}
                   type="button"
-                  className="bugun-personel-person-row bugun-personel-person-row--btn"
+                  className="bugun-personel-person-row bugun-personel-person-row--btn bugun-personel-person-row--inline-status"
                   role="listitem"
                   data-testid={`bugun-person-${person.personel_id}`}
-                  onClick={() => openBranchPerson(nav.branch, person, nav.statusKey)}
+                  onClick={() =>
+                    openBranchRosterPerson(
+                      nav.branch,
+                      person,
+                      nav.kind === "branch_pending_roster"
+                        ? { kind: "pending" }
+                        : { kind: "yaka", group: nav.group, yaka: nav.yaka }
+                    )
+                  }
                 >
-                  <strong>{person.ad_soyad}</strong>
-                  <span>{person.detail_line}</span>
+                  <span className="bugun-personel-person-inline">{formatBugunPersonListLine(person)}</span>
                 </button>
               ))
             )}

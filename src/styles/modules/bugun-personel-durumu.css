@@ -37,6 +37,10 @@
   margin-top: 0;
   min-height: 0;
   align-self: stretch;
+  height: 100%;
+  max-height: 100%;
+  overflow-y: auto;
+  box-sizing: border-box;
 }
 
 .bugun-personel-panel {
@@ -44,6 +48,19 @@
   flex-direction: column;
   gap: 10px;
   min-height: 0;
+}
+
+/* Şube özet + Gelen/Gelmeyen yaka: kart bloğu panel alanında yatay/dikey ortada (scroll güvenli). */
+.bugun-personel-panel:has([data-testid="bugun-branch-overview"]),
+.bugun-personel-panel:has([data-testid="bugun-yaka-breakdown"]) {
+  justify-content: center;
+  align-items: center;
+}
+
+.bugun-personel-panel:has([data-testid="bugun-branch-overview"]) [data-testid="bugun-branch-overview"],
+.bugun-personel-panel:has([data-testid="bugun-yaka-breakdown"]) [data-testid="bugun-yaka-breakdown"] {
+  margin: auto;
+  flex-shrink: 0;
 }
 
 .bugun-personel-crumb {
@@ -383,6 +400,8 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
+  width: 100%;
+  max-width: 100%;
 }
 
 .bugun-personel-person-row--inline-status {

@@ -104,6 +104,15 @@ type BackBarMetrics = {
   backLeftOffset: number;
 };
 
+type SummaryCenterMetrics = {
+  deltaX: number;
+  deltaY: number;
+  blockCenterX: number;
+  panelCenterX: number;
+  blockCenterY: number;
+  panelCenterY: number;
+};
+
 async function routeBugun(page: Page): Promise<void> {
   await page.route(
     (url) => url.pathname.startsWith("/api/bildirimler/bugun-personel-durumu"),
@@ -151,6 +160,32 @@ function assertBackBarMetrics(m: BackBarMetrics) {
   expect(m.backLeftOffset).toBeLessThanOrEqual(9);
 }
 
+async function measureSummaryBlockCenter(modal: Locator): Promise<SummaryCenterMetrics> {
+  const panel = modal.getByTestId("bugun-personel-durumu-panel");
+  const block = modal.getByTestId("bugun-branch-overview");
+  const [pBox, bBox] = await Promise.all([panel.boundingBox(), block.boundingBox()]);
+  if (!pBox || !bBox) {
+    throw new Error("Missing bounding box for summary center geometry");
+  }
+  const panelCenterX = pBox.x + pBox.width / 2;
+  const panelCenterY = pBox.y + pBox.height / 2;
+  const blockCenterX = bBox.x + bBox.width / 2;
+  const blockCenterY = bBox.y + bBox.height / 2;
+  return {
+    deltaX: Math.abs(blockCenterX - panelCenterX),
+    deltaY: Math.abs(blockCenterY - panelCenterY),
+    blockCenterX,
+    panelCenterX,
+    blockCenterY,
+    panelCenterY
+  };
+}
+
+function assertSummaryCentered(m: SummaryCenterMetrics) {
+  expect(m.deltaX).toBeLessThanOrEqual(4);
+  expect(m.deltaY).toBeLessThanOrEqual(8);
+}
+
 async function setupModal(page: Page, width: number, height: number) {
   await page.setViewportSize({ width, height });
   await mockApi(page, "GENEL_YONETICI");
@@ -168,13 +203,15 @@ test.describe("back bar header flush geometry", () => {
     const modal = await setupModal(page, 390, 844);
 
     const summary = await measureBackBar(modal);
+    const centerMobile = await measureSummaryBlockCenter(modal);
     writeFileSync(
       resolve("/opt/cursor/artifacts", "back-bar-metrics-summary-mobile.json"),
-      JSON.stringify(summary, null, 2)
+      JSON.stringify({ backBar: summary, center: centerMobile }, null, 2)
     );
     assertBackBarMetrics(summary);
+    assertSummaryCentered(centerMobile);
     await page.screenshot({
-      path: resolve(ARTIFACT_DIR, "back-bar-fix-mobil-fabrika-ozet.png"),
+      path: resolve(ARTIFACT_DIR, "summary-centered-mobil-390.png"),
       fullPage: true
     });
 
@@ -203,9 +240,15 @@ test.describe("back bar header flush geometry", () => {
   test("desktop 1280 — özet ölçüm", async ({ page }) => {
     const modal = await setupModal(page, 1280, 800);
     const m = await measureBackBar(modal);
+    const centerDesktop = await measureSummaryBlockCenter(modal);
+    writeFileSync(
+      resolve("/opt/cursor/artifacts", "summary-center-metrics-desktop.json"),
+      JSON.stringify({ backBar: m, center: centerDesktop }, null, 2)
+    );
     assertBackBarMetrics(m);
+    assertSummaryCentered(centerDesktop);
     await page.screenshot({
-      path: resolve(ARTIFACT_DIR, "back-bar-fix-desktop-ozet.png"),
+      path: resolve(ARTIFACT_DIR, "summary-centered-desktop-1280.png"),
       fullPage: true
     });
   });

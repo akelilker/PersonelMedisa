@@ -115,9 +115,9 @@ describe("branch accounting visibility owners", () => {
     expect(current).toMatch(/^LAST_VERIFIED_PRODUCTION_MIGRATION_TIP: 097$/m);
     expect(current).toMatch(/^FRESH_PRODUCTION_MIGRATION_READBACK: MIGRATION_097_APPLIED$/m);
     expect(current).toMatch(/^PRODUCTION_MIGRATION_PENDING: 0$/m);
-    expect(current).toMatch(/^LAST_MERGED_PR: 507$/m);
-    expect(current).toMatch(/^CODE_MAIN_SHA: 83a517011fcf32967adb87d4f44c1bcc833a45a8$/m);
-    expect(current).toMatch(/^PRODUCTION_DEPLOY_SHA: 83a517011fcf32967adb87d4f44c1bcc833a45a8$/m);
+    expect(current).toMatch(/^LAST_MERGED_PR: 512$/m);
+    expect(current).toMatch(/^CODE_MAIN_SHA: c23000544718e1b3bdfa06c133479c6ffbd6cbe3$/m);
+    expect(current).toMatch(/^PRODUCTION_DEPLOY_SHA: c23000544718e1b3bdfa06c133479c6ffbd6cbe3$/m);
     expect(current).toMatch(/^PIN_SHA_BASELINE: LAST_PRODUCT_MERGE_DEPLOY$/m);
     expect(current).toMatch(/^DOCS_ONLY_CLOSURE_THIS_PIN: NO$/m);
     expect(current).not.toMatch(/^LAST_MERGED_PR: 472$/m);

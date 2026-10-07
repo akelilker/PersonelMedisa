@@ -3,20 +3,20 @@ PRODUCTION_MIGRATION_TIP: 097
 LAST_VERIFIED_PRODUCTION_MIGRATION_TIP: 097
 FRESH_PRODUCTION_MIGRATION_READBACK: MIGRATION_097_APPLIED
 PRODUCTION_MIGRATION_PENDING: 0
-PRODUCTION_DEPLOY_SHA: 83a517011fcf32967adb87d4f44c1bcc833a45a8
-CODE_MAIN_SHA: 83a517011fcf32967adb87d4f44c1bcc833a45a8
-LAST_MERGED_PR: 507
+PRODUCTION_DEPLOY_SHA: c23000544718e1b3bdfa06c133479c6ffbd6cbe3
+CODE_MAIN_SHA: c23000544718e1b3bdfa06c133479c6ffbd6cbe3
+LAST_MERGED_PR: 512
 ACTIVE_BACKLOG_OWNER: docs/guncel/146-post-pr402-canonical-backlog.md
 PIN_SHA_BASELINE: LAST_PRODUCT_MERGE_DEPLOY
 DOCS_ONLY_CLOSURE_THIS_PIN: NO
 
-# PersonelMedisa — Canonical State Pin (POST_PR507 + migration 097 closure)
+# PersonelMedisa — Canonical State Pin (POST_PR512 + migration 097 closure)
 
 **Aktif residual backlog otoritesi:** [`docs/guncel/146-post-pr402-canonical-backlog.md`](docs/guncel/146-post-pr402-canonical-backlog.md)
 **110:** SUPERSEDED for active backlog (historical archive only).
 **Do not reopen** PRs #395–#402 without new concrete contradiction.
 
-## Live / code pin (2026-10-06 POST_PR507)
+## Live / code pin (2026-10-07 POST_PR512)
 
 | Alan | Değer | Kanıt |
 | --- | --- | --- |
@@ -26,14 +26,19 @@ DOCS_ONLY_CLOSURE_THIS_PIN: NO
 | Migration 096 | **APPLIED / SUCCESS** | `096_personel_bordro_okumalari.sql` — additive bordro "Okudum" audit (seed/backfill yok); canonical apply run `37021807281` SUCCESS; worker SUCCEEDED; backup `medisa-pre-096-370***807281-1-20261002-144504.sql` readback VERIFIED; post-apply readback run `37022115475` PROD_TIP **096** |
 | Migration 097 | **APPLIED / SUCCESS** | `097_qr_attendance_location_audit.sql` — `qr_attendance_events` konum denetim kolonları (#496); pre-apply preflight Ops migration worker diagnostics **#89** run `37389148523` PASS (PROD_TIP 096, pending 097); Apply cPanel migrations **#56** run `37391130248` SUCCESS; worker completed; backup `medisa-pre-097-37391130248-1-20261006-000005.sql` readback VERIFIED; post-apply readback Ops migration worker diagnostics **#90** run `37391796990` PROD_TIP **097**, `PREFLIGHT_BLOCKERS=NO_PENDING_MIGRATIONS` (beklenen: uygulanacak migration kalmadı) |
 | LAST_VERIFIED production tip | **097** | Post-apply readback Ops migration worker diagnostics **#90** run `37391796990` (PROD_TIP=097, PENDING_COUNT=0, PROCESSING_COUNT=0, WORKER_BUSY=NO, REMOTE_DEPLOY_SHA=`83a51701…`) |
-| PRODUCTION_DEPLOY_SHA | `83a51701…` | Last **product** deploy marker — Deploy cPanel **#1240** **SUCCESS** (merge **#507**; `FINAL_SHA_GET=SUCCESS`, smoke OK); ops `deployed_sha` gate |
-| CODE_MAIN_SHA | `83a51701…` | Same as **PRODUCTION_DEPLOY_SHA** — last **product** merge baseline (**#507**); docs-only state PRs do **not** advance `LAST_MERGED_PR` / SHA pins |
+| PRODUCTION_DEPLOY_SHA | `c2300054…` | Last **product** deploy marker — Deploy cPanel **#1245** run `37677662532` **SUCCESS** (merge **#512**); ops `deployed_sha` gate |
+| CODE_MAIN_SHA | `c2300054…` | Same as **PRODUCTION_DEPLOY_SHA** — last **product** merge baseline (**#512**); docs-only state PRs do **not** advance `LAST_MERGED_PR` / SHA pins |
 | PR #470 | **MERGED / DEPLOYED** | UI correction batch (Level 2+ back nav, Personel Kartı missing-info gateway, duplicate CTA cleanup, Vazgeç fix, /self gateway polish) |
 | PR #472 | **MERGED / DEPLOYED** | Self-service closure (PR470 follow-up) — `6b7dbba6…`; Deploy cPanel **#1203** run `37018359986` SUCCESS |
 | PR #475 | **MERGED / DEPLOYED** | `fix(ui): bugun personel durumu sube secimi grid + sade sube detayi` — `939c5f87…`; Deploy cPanel **#1206** run `37069634704` SUCCESS |
 | PR #476 | **MERGED / DEPLOYED** | `/self` PERSONEL görsel shell (AppShell) + 120/158 `calisan_kapsami` `DIS_KAYNAK` canlı düzeltme + Harici Personel terminoloji + canonical kapanış — `817a1e72…`; Deploy cPanel **#1207** run `37077642885` SUCCESS |
 | PR #496 | **MERGED / DEPLOYED** | `feat(qr): GPS geofence audit on QR scan (v1, non-blocking)` + migration **097** — `14dc7fa9…`; Deploy cPanel **#1228** run `37365978799` SUCCESS |
 | PR #507 | **MERGED / DEPLOYED** | UX: Anlık personel durumu, şube çerçeveleri, tek süreç araması, footer — `83a51701…`; Deploy cPanel **#1240** SUCCESS |
+| PR #508 | **MERGED / DEPLOYED** | Personel kapanış: ad kaydı yazıldığı gibi (yalnız trim + boşluk sadeleştirme), personel seçim listesi 250 sınırı kaldırıldı (sayfalı çekim), anlık durum sayımı doğrulandı (kod değişmedi), Ankara Finans-Risk salt-okunur not — `6c9498f1…`; Deploy cPanel **#1241** run `37556582165` SUCCESS |
+| PR #509 | **MERGED / DEPLOYED** | iOS 27 PWA footer safe-area (login + ana ekran; Taşıt PR541 modeli) — squash `71942502…`; Deploy cPanel **#1242** run `37587074563` SUCCESS |
+| PR #510 | **MERGED / DEPLOYED** | Anlık Personel Durumu: birim adıyla aynı bölüm adı ikinci satır olarak tekrarlanmaz — `ab3745eb…`; Deploy cPanel **#1243** run `37594047570` SUCCESS |
+| PR #511 | **MERGED / DEPLOYED** | Anlık Personel Durumu sadeleştirme: Toplam Personel / Gelen (Geldi + Geç Geldi + Erken Çıktı) / Gelmeyen (Gelmedi + İzinli + Raporlu + Görevde) / Henüz Değerlendirilmedi; Statü drill-down Mavi Yaka / Beyaz Yaka / Statüsüz (yalnız > 0 ise); doğrudan kişi listesi "Ad SOYAD — Durum"; geri satırı geometri düzeltmesi; özet kartları yatay + dikey ortalı — `7851d624…`; Deploy cPanel **#1244** run `37676310896` SUCCESS |
+| PR #512 | **MERGED / DEPLOYED** | CI: WebKit mobil layout regression Fast CI'dan ayrıldı → yalnız manuel (`workflow_dispatch`) **Visual WebKit Regression** (`.github/workflows/visual-webkit-regression.yml`); testler silinmedi — `c2300054…`; Deploy cPanel **#1245** run `37677662532` SUCCESS |
 | Attendance / QR phase | **CLOSED** | QR attendance + saha rollout + puantaj doğrulaması + personel go-live tamamlandı |
 
 PRODUCTION_MUTATION_THIS_PIN: 0 (personel/yetki veri mutation yok). Migration **097** apply ayrı canonical run `37391130248`. Önceki POST_PR476 pin: 2 (personel 120 + 158 `calisan_kapsami` `IC_PERSONEL` → `DIS_KAYNAK` canlı düzeltme; readback doğrulandı) — aşağıdaki business truth tablosu geçerli.
@@ -48,6 +53,7 @@ PRODUCTION_MUTATION_THIS_PIN: 0 (personel/yetki veri mutation yok). Migration **
 - PR #472: MERGED / DEPLOYED (Deploy #1203) — self-service closure CLOSED
 - PR #475: MERGED / DEPLOYED (Deploy #1206) — "bugun personel durumu" şube seçimi grid + sade şube detayı CLOSED
 - PR #476: MERGED / DEPLOYED (Deploy #1207) — `/self` PERSONEL görsel shell + 120/158 `DIS_KAYNAK` canlı düzeltme + Harici Personel terminoloji CLOSED
+- PR #507–#512: MERGED / DEPLOYED (Deploy #1240–#1245) — anlık personel durumu UX + sadeleştirme, personel kapanış, iOS 27 footer safe-area, WebKit regression ayrımı CLOSED
 - A1 12/13 branch-specific SGK period: **SUPERSEDED_BY_SGK_EMPLOYER_PERIOD_OWNER_CORRECTION**
 - REPORTING_PERIOD_CANONICAL_AXIS: SGK_ISVEREN
 - BRANCH_SPECIFIC_PERIOD_REQUIRED: NO
@@ -95,10 +101,12 @@ Previous pin (POST_PR476) claimed: CODE/PROD tip **096 / 096**, DEPLOY `817a1e72
 Obsolete after #496 merge (SHA `14dc7fa9…`), Deploy cPanel **#1228** run `37365978799` SUCCESS; migration **097** APPLIED (Apply #56 run `37391130248`; readback Ops #90 run `37391796990` PROD_TIP **097**).
 Previous pin (POST_PR496) claimed: DEPLOY `14dc7fa9…` (#496 / Deploy #1228), LAST_MERGED_PR **496**.
 Obsolete after #507 merge (SHA `83a51701…`), Deploy cPanel **#1240** SUCCESS; migration tip **097 / 097**, pending **0** (unchanged).
+Previous pin (POST_PR507) claimed: DEPLOY `83a51701…` (#507 / Deploy #1240), LAST_MERGED_PR **507**.
+Obsolete after #508–#512 merges (main `c2300054…`), Deploy cPanel **#1245** run `37677662532` SUCCESS; migration tip **097 / 097**, pending **0** (unchanged; #508–#512 migration eklemedi).
 
 Archive identity strings (not current gates):
 PREPARER_HISTORICAL: sedanurB
 APPROVER_HISTORICAL: Sinem Hamaloğlu
 TECHNICAL_STATUS: TECHNICAL_GAP_LOCAL_FIXABLE _(historical BM gap label; code owner shipped — not an open tip)_
 
-NEXT_GATE: NONE — no open technical / product / operational gate. D/E residual'lar CLOSED / NON-GOAL (146). 120/158 `calisan_kapsami` `DIS_KAYNAK` olarak canlı düzeltildi; 219 + `serhan.kose` canlı readback ile doğrulandı (değişmedi).
+NEXT_GATE: NONE — no open technical / product / operational gate (blocker yok). Açık gözlem kalemleri (ekran turu, Visual WebKit Regression ilk manuel koşu, Harici Personel boş Statü canlı sayımı) yalnız 146 E bölümünde izlenir. D/E residual'lar CLOSED / NON-GOAL (146). 120/158 `calisan_kapsami` `DIS_KAYNAK` olarak canlı düzeltildi; 219 + `serhan.kose` canlı readback ile doğrulandı (değişmedi).

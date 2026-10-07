@@ -100,6 +100,7 @@ vi.mock("../../src/api/me.api", () => ({
 }));
 
 vi.mock("../../src/api/personeller.api", () => ({
+  PERSONEL_LIST_PAGE_MAX: 250,
   fetchPersonellerList,
   createPersonel: vi.fn(),
   updatePersonel: vi.fn()

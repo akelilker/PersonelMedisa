@@ -132,7 +132,8 @@ function dvrMigrationFiles(): array
     $files = glob($dir . DIRECTORY_SEPARATOR . '*.sql') ?: [];
     $files = array_values(array_filter(
         $files,
-        static fn(string $file): bool => basename($file) !== '067_personel_canonical_reference_gate.sql'
+        static fn(string $file): bool => (int) substr(basename($file), 0, 3) <= 66
+            && basename($file) !== '067_personel_canonical_reference_gate.sql'
             && basename($file) !== '068_sgk_actor_identity_lifecycle_audit.sql'
             && basename($file) !== '069_personel_credential_onboarding.sql'
             && basename($file) !== '070_offline_mutation_idempotency.sql'

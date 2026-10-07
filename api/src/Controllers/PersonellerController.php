@@ -140,7 +140,7 @@ class PersonellerController
             }
         }
 
-        $includeOrgNames = PersonelOrgStructureSchema::hasPersonelScopeColumns($pdo);
+        $includeOrgNames = PersonelOrgStructureSchema::isReady($pdo);
         PersonelSearchPredicate::append($where, $params, $search, 'p', 'search', $pdo, $includeOrgNames);
         // TEST_FIXTURE personel is not a real employee: keep it out of the active/passive list,
         // its counts and every filter result through the canonical retention/archive owner.
@@ -148,7 +148,7 @@ class PersonellerController
 
         $missingPredicate = PersonelCompletenessService::sqlHasMissingPredicate(
             'p',
-            PersonelOrgStructureSchema::hasPersonelScopeColumns($pdo),
+            PersonelOrgStructureSchema::isReady($pdo),
             PersonelCalisanKapsamSchema::isReady($pdo),
             PersonelOrgLocationSchema::isReady($pdo)
         );

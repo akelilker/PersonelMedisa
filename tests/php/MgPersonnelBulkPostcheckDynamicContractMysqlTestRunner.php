@@ -212,7 +212,7 @@ function pcCreateRows(int $count, int $startIndex = 1): array
                 'soyad' => 'Person' . $n,
                 'ise_giris_tarihi' => '2026-08-01',
                 'aktif_durum' => 'AKTIF',
-                'calisan_kapsami' => 'IC_PERSONEL',
+                'calisan_kapsami' => 'DIS_KAYNAK',
                 'personel_tipi_id' => 1,
             ],
         ];
@@ -438,7 +438,7 @@ try {
             'soyad' => 'Create',
             'ise_giris_tarihi' => '2026-08-01',
             'aktif_durum' => 'AKTIF',
-            'calisan_kapsami' => 'IC_PERSONEL',
+            'calisan_kapsami' => 'DIS_KAYNAK',
             'personel_tipi_id' => 1,
         ],
     ];

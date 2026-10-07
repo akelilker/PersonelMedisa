@@ -1,7 +1,7 @@
 # 146 — Post-PR402 Canonical Backlog
 
-**Tür:** Aktif backlog otoritesi (POST_PR402 consolidation; **POST_PR496** pin refresh).
-**Product baseline (SHA pin):** `14dc7fa9bebe35533d6e1659eae795417ebea574` (PR **#496** last product merge+deploy); Deploy cPanel **#1228** run `37365978799` SUCCESS. Docs-only canonical PRs do not advance `LAST_MERGED_PR` / `CODE_MAIN_SHA` / `PRODUCTION_DEPLOY_SHA` (see `CURRENT_STATE.md` `PIN_SHA_BASELINE`).
+**Tür:** Aktif backlog otoritesi (POST_PR402 consolidation; **POST_PR507** pin refresh).
+**Product baseline (SHA pin):** `83a517011fcf32967adb87d4f44c1bcc833a45a8` (PR **#507** last product merge+deploy); Deploy cPanel **#1240** SUCCESS. Docs-only canonical PRs do not advance `LAST_MERGED_PR` / `CODE_MAIN_SHA` / `PRODUCTION_DEPLOY_SHA` (see `CURRENT_STATE.md` `PIN_SHA_BASELINE`).
 **Migration tip:** code **097** / production **097** (pending **0**); migration **097** (`097_qr_attendance_location_audit.sql`) **APPLIED** (Apply cPanel migrations **#56** run `37391130248`; readback Ops migration worker diagnostics **#90** run `37391796990` PROD_TIP **097**); migration **096** (`096_personel_bordro_okumalari.sql`) **APPLIED** (canonical apply `37021807281`; readback `37022115475` PROD_TIP **096**); migration **095** (`095_personel_cinsiyet.sql`) **APPLIED**; migration **094** (`094_attendance_no_event_day.sql`) **APPLIED** (production'da geçmiş).
 **Yasaklar bu belgede:** app code · migration apply · production mutation · remote branch delete · #395–#470 reopen.
 
@@ -26,6 +26,7 @@ Sınıflar: **A** CLOSED_ALREADY_LIVE · **B** SAFE_HOUSEKEEPING · **C** TECHNI
 | `BL-PR-475` | `bugun personel durumu` şube seçimi grid + sade şube detayı | PR #475 MERGED `939c5f87ec80fb5f742d81f23f0523ce8399c313`; Deploy cPanel #1206 run `37069634704` SUCCESS |
 | `BL-PR-476` | `/self` PERSONEL görsel shell (AppShell) + 120/158 `calisan_kapsami` `DIS_KAYNAK` canlı düzeltme + Harici Personel terminoloji + canonical kapanış | PR #476 MERGED `817a1e7230273878daa0e96a359b866671ad0711`; Deploy cPanel #1207 run `37077642885` SUCCESS |
 | `BL-PR-496` | QR taramada GPS geofence konum denetimi (v1, non-blocking; bilgi amaçlı, QR kaydını engellemez) + migration 097 | PR #496 MERGED `14dc7fa9bebe35533d6e1659eae795417ebea574`; Deploy cPanel #1228 run `37365978799` SUCCESS |
+| `BL-PR-507` | Anlık personel durumu UX, şube kart çerçeveleri, tek süreç araması, footer MEDİSA ince ayarı (görsel kapanış) | PR #507 MERGED `83a517011fcf32967adb87d4f44c1bcc833a45a8`; Deploy cPanel #1240 SUCCESS |
 | `BL-BUSINESS-TRUTH-120-158-219` | 120 / 158 Harici Personel + 219 Medisa transfer business truth | **CLOSED** — canlı readback + mutation 2026-10-03: 120/158 canlı `calisan_kapsami` `IC_PERSONEL` idi → `DIS_KAYNAK` düzeltildi (readback doğrulandı); şube **11 Şenay Mobilya** + SGK **3 Şenay Mobilya** + çalışma lokasyonu **5 Fabrika/Karabük** korundu. 219 şube **6 Medisa İstanbul** + SGK **1 Medisa** + lokasyon **3 İstanbul** (mutation yok). Production mutation = **2** (120 + 158) |
 | `BL-SERHAN-KOSE-LIVE` | `serhan.kose` (user 9) canlı yetki | **CLOSED** — canlı readback 2026-10-03: `rol: GENEL_YONETICI` + `durum: AKTIF` (`sinemH` user 110 ile aynı model). Tek tek şube/company grant üretilmedi; mutation = 0 |
 | `BL-SELF-SHELL-PERSONEL` | `/self` yüzeyinde PERSONEL görsel shell (bağlı yönetici) | **CLOSED** — owner `src/app/AppShell.tsx`; `isPersonelShellVisual` (rol PERSONEL veya `/self` yüzeyi) ile `/self` + `/self/...` compact header/shell alır. Rol/izin/route/backend değişmedi; ayrı panel/helper/CSS override yok. Focused source test (`personel-self-service-ux-v2`) güncellendi |
@@ -73,7 +74,7 @@ Açık teknik gap: **NONE**.
 
 | ID | Konu | Not |
 | --- | --- | --- |
-| `BL-SOURCE-LOCK-DRIFT` | Pin testleri eski deploy/tip iddiaları | **CLOSED / HISTORICAL** — POST_PR496 refresh: CURRENT_STATE + source-lock test (`LAST_MERGED_PR: 496`, SHA `14dc7fa9…`, Deploy #1228, tip **097**, `DOCS_ONLY_CLOSURE_THIS_PIN: NO`) hizalandı; artık aktif teknik gap DEĞİL |
+| `BL-SOURCE-LOCK-DRIFT` | Pin testleri eski deploy/tip iddiaları | **CLOSED / HISTORICAL** — POST_PR507 refresh: CURRENT_STATE + source-lock test (`LAST_MERGED_PR: 507`, SHA `83a51701…`, Deploy #1240, tip **097**, `DOCS_ONLY_CLOSURE_THIS_PIN: NO`) hizalandı; artık aktif teknik gap DEĞİL |
 
 ---
 

@@ -75,8 +75,15 @@ describe("personel soyad WRITE canonical case", () => {
     expect(payload.soyad).toBe(canonicalSoyad);
   });
 
-  it("normalizePersonelAd davranışı değişmez (Ad Türkçe Title Case)", () => {
-    expect(normalizePersonelAd("SAIF TAREQ JASIM")).toBe(canonicalAd);
+  it("normalizePersonelAd canonical case'i korur, yalnız boşluk temizler", () => {
+    expect(normalizePersonelAd(canonicalAd)).toBe(canonicalAd);
+    expect(normalizePersonelAd("  Saıf   Tareq  Jasım  ")).toBe(canonicalAd);
+    expect(normalizePersonelAd("SAIF TAREQ JASIM")).toBe("SAIF TAREQ JASIM");
+  });
+
+  it("buildCreatePersonelPayload adı uppercase/title case'e çevirmez", () => {
+    const payload = buildCreatePersonelPayload(validCreateForm);
+    expect(payload.ad).toBe(canonicalAd);
   });
 });
 

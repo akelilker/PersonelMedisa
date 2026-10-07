@@ -60,7 +60,7 @@ function autoSicilPayload(array $overrides = []): array
         'gorev_id' => 1,
         'personel_tipi_id' => null,
         'aktif_durum' => 'AKTIF',
-        'calisan_kapsami' => 'IC_PERSONEL',
+        'calisan_kapsami' => 'DIS_KAYNAK',
         'dogum_yeri' => null,
         'kan_grubu' => null,
         'bagli_amir_id' => null,
@@ -235,8 +235,8 @@ try {
     }));
     sort($chain, SORT_STRING);
     autoSicilAssert(
-        end($chain) === '082_user_erisim_degisiklik_auditleri.sql',
-        '082 canonical migration tip'
+        end($chain) === '097_qr_attendance_location_audit.sql',
+        '097 canonical migration tip'
     );
     autoSicilAssert(
         (int) $pdo->query(
@@ -396,6 +396,7 @@ try {
         'gorev_id' => 1,
         'personel_tipi_id' => 1,
         'aktif_durum' => 'AKTIF',
+        'calisan_kapsami' => 'DIS_KAYNAK',
     ]);
     autoSicilAssert($created['sicil_no'] === null, 'interactive create sicilsiz payload kabul ediyor');
 

@@ -482,6 +482,61 @@ export async function fetchPersonellerList(
   };
 }
 
+/** Backend (`PersonellerController::list`) tek sayfa üst sınırı. */
+export const PERSONEL_LIST_PAGE_MAX = 250;
+
+/** Güvenlik sınırı: 60 × 250 = 15.000 kayıt (personel seçim listeleri). */
+const PERSONEL_SELECT_LIST_MAX_PAGES = 60;
+
+export type FetchPersonellerListForSelectParams = Omit<PersonellerListParams, "page" | "limit">;
+
+/**
+ * Personel seçim listeleri için tüm sayfaları mevcut list API'si ile toplar.
+ * Yeni endpoint veya paralel liste sistemi kurulmaz.
+ */
+export async function fetchPersonellerListForSelect(
+  params?: FetchPersonellerListForSelectParams
+): Promise<Personel[]> {
+  const items: Personel[] = [];
+  let page = 1;
+
+  while (page <= PERSONEL_SELECT_LIST_MAX_PAGES) {
+    const result = await fetchPersonellerList({
+      ...params,
+      page,
+      limit: PERSONEL_LIST_PAGE_MAX
+    });
+
+    items.push(...result.items);
+
+    const totalPages = result.pagination?.totalPages ?? null;
+    const hasNextPage = result.pagination?.hasNextPage;
+
+    if (hasNextPage === false) {
+      break;
+    }
+    if (hasNextPage === true) {
+      if (page >= PERSONEL_SELECT_LIST_MAX_PAGES) {
+        break;
+      }
+      page += 1;
+      continue;
+    }
+
+    if (result.items.length < PERSONEL_LIST_PAGE_MAX || (totalPages != null && page >= totalPages)) {
+      break;
+    }
+
+    if (page >= PERSONEL_SELECT_LIST_MAX_PAGES) {
+      break;
+    }
+
+    page += 1;
+  }
+
+  return items;
+}
+
 export async function createPersonel(payload: CreatePersonelPayload, options?: { idempotencyKey?: string }): Promise<Personel> {
   const response = await apiRequest<ApiResponse<unknown>>(endpoints.personeller.list, {
     method: "POST",

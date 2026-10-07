@@ -8,7 +8,7 @@ import { EmptyState } from "../../../components/states/EmptyState";
 import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
 import { isApiRequestError } from "../../../api/api-client";
-import { fetchPersonellerList } from "../../../api/personeller.api";
+import { fetchPersonellerListForSelect } from "../../../api/personeller.api";
 import { createDepartmanOption, fetchBirimOptions, fetchBolumOptions, fetchDepartmanOptions, fetchSgkIsverenCatalog } from "../../../api/referans.api";
 import { createSurec, type CreateSurecPayload } from "../../../api/surecler.api";
 import {
@@ -1069,7 +1069,7 @@ export function YonetimPaneliPage() {
       const [kullaniciList, subeList, personelList, departmanList, bolumList, birimList] = await Promise.all([
         fetchYonetimKullanicilari(),
         fetchYonetimSubeleri(),
-        fetchPersonellerList({ page: 1, limit: 250, aktiflik: "tum" }),
+        fetchPersonellerListForSelect({ aktiflik: "tum" }),
         fetchDepartmanOptions(),
         fetchBolumOptions(),
         fetchBirimOptions()
@@ -1117,7 +1117,7 @@ export function YonetimPaneliPage() {
         setSgkIsverenleri([]);
         setIsSgkIsverenCatalogLoaded(false);
       }
-      setPersoneller(personelList.items);
+      setPersoneller(personelList);
       setDepartmanOptions(sortIdOptions(departmanList));
       setBolumOptions(sortIdOptions(bolumList));
       setBirimOptions(sortIdOptions(birimList));

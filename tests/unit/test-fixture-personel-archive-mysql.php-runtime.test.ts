@@ -104,32 +104,10 @@ describe("test fixture personel archive owner", () => {
     expect(archiveManifest).toContain("CODE_TERMINATION_DATE_MISSING");
     expect(sureclerSrc).toContain("ISTEN_AYRILMA");
 
-    // Tip-lock: post-Pack7F migrations remain excluded so filtered tip ends at 066.
-    expect(pack5Src).toContain("072_org_reference_short_codes.sql");
-    expect(pack5Src).toContain("073_test_fixture_personel_archive.sql");
-    expect(pack5Src).toContain("074_qr_attendance_correction_and_inbox.sql");
-    expect(pack5Src).toContain("075_personel_account_activation.sql");
-    expect(pack5Src).toContain("066_personel_calisan_kapsami.sql");
-    const excluded = [
-      "067_personel_canonical_reference_gate.sql",
-      "068_sgk_actor_identity_lifecycle_audit.sql",
-      "069_personel_credential_onboarding.sql",
-      "070_offline_mutation_idempotency.sql",
-      "071_org_hierarchy_authorization.sql",
-      "072_org_reference_short_codes.sql",
-      "073_test_fixture_personel_archive.sql",
-      "074_qr_attendance_correction_and_inbox.sql",
-      "075_personel_account_activation.sql",
-      "076_dis_kaynak_gecici_gorevlendirme.sql",
-      "077_legacy_role_enum_shrink.sql",
-      "078_personel_sicil_sequence.sql",
-      "079_sirket_sube_hiyerarsisi.sql",
-      "080_organizasyon_audit_owners.sql",
-      "081_ik_personeli_rolu.sql",
-      "083_personel_organizasyon_degisiklik_auditleri.sql",
-    ];
+    // Pack5 owns the historical 001→066 schema slice and must exclude later migrations.
+    expect(pack5Src).toContain("(int) substr((string) $name, 0, 3) <= 66");
     const migrations = readdirSync(resolve(root, "api/migrations"))
-      .filter((name) => /^\d{3}_.+\.sql$/.test(name) && !excluded.includes(name))
+      .filter((name) => /^\d{3}_.+\.sql$/.test(name) && Number(name.slice(0, 3)) <= 66)
       .sort();
     expect(migrations.at(-1)).toBe("066_personel_calisan_kapsami.sql");
   });

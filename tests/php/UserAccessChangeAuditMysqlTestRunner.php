@@ -33,7 +33,7 @@ const UACA_REVOKE_TABLE = 'user_erisim_kaldirma_auditleri';
 const UACA_ORG_AUDIT_TABLE = 'personel_organizasyon_degisiklik_auditleri';
 const UACA_MIGRATION_082 = '082_user_erisim_degisiklik_auditleri.sql';
 const UACA_MIGRATION_083 = '083_personel_organizasyon_degisiklik_auditleri.sql';
-const UACA_MIGRATION_TIP = '096_personel_bordro_okumalari.sql';
+const UACA_MIGRATION_TIP = '097_qr_attendance_location_audit.sql';
 
 function uacaAssert(bool $ok, string $name): void
 {
@@ -329,7 +329,7 @@ try {
             && $name !== '067_personel_canonical_reference_gate.sql'
     ));
     sort($chain, SORT_STRING);
-    uacaAssert(end($chain) === UACA_MIGRATION_TIP, 'the canonical chain tip is migration 095');
+    uacaAssert(end($chain) === UACA_MIGRATION_TIP, 'the canonical chain tip is migration 097');
     foreach ($chain as $migration) {
         uacaApplyFile($pdo, (string) $migration);
     }

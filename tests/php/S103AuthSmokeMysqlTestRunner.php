@@ -288,6 +288,7 @@ try {
     s103Assert(true, '051 ilk apply');
     s103ApplyFile($pdo, '051_users_varsayilan_sube_id.sql');
     s103Assert(true, '051 ikinci apply idempotent');
+    $pdo->exec('ALTER TABLE personeller ADD COLUMN pozisyon_id INT UNSIGNED NULL');
     s103Assert(
         (int) $pdo->query(
             "SELECT COUNT(*) FROM information_schema.COLUMNS

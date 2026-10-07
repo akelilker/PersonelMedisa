@@ -137,7 +137,7 @@ function prxInvoke(array $server, $user, string $path, array $headers = [], arra
     if ($bodyFile === false || $headerFile === false) {
         throw new RuntimeException('tempnam failed');
     }
-    $cmd = ['curl.exe', '-sS', '-D', $headerFile, '-o', $bodyFile, '-H', 'X-Test-Auth: ' . json_encode($user)];
+    $cmd = [PHP_OS_FAMILY === 'Windows' ? 'curl.exe' : 'curl', '-sS', '-D', $headerFile, '-o', $bodyFile, '-H', 'X-Test-Auth: ' . json_encode($user)];
     foreach ($headers as $name => $value) {
         $cmd[] = '-H';
         $cmd[] = $name . ': ' . $value;

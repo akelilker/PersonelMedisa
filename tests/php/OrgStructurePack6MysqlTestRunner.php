@@ -140,6 +140,7 @@ function p6MigrationFiles(): array
     $dir = __DIR__ . '/../../api/migrations';
     $files = array_values(array_filter(scandir($dir) ?: [], static function ($name) {
         return (bool) preg_match('/^\d{3}_.+\.sql$/', (string) $name)
+            && (int) substr((string) $name, 0, 3) <= 66
             && $name !== '067_personel_canonical_reference_gate.sql'
             && $name !== '068_sgk_actor_identity_lifecycle_audit.sql'
             && $name !== '069_personel_credential_onboarding.sql'
@@ -302,6 +303,7 @@ function p6CreatePayload(array $overrides = []): array
         'gorev_id' => 2,
         'personel_tipi_id' => 1,
         'aktif_durum' => 'AKTIF',
+        'calisan_kapsami' => 'DIS_KAYNAK',
     ];
 
     return array_merge($base, $overrides);
@@ -309,7 +311,7 @@ function p6CreatePayload(array $overrides = []): array
 
 function p6LegacyCsvHeader(): string
 {
-    return implode(';', PersonelImportDryRunService::TEMPLATE_COLUMNS);
+    return implode(';', array_merge(PersonelImportDryRunService::TEMPLATE_COLUMNS, ['calisan_kapsami']));
 }
 
 function p6LegacyCsvRow(array $overrides = []): string
@@ -330,9 +332,10 @@ function p6LegacyCsvRow(array $overrides = []): string
         'departman' => 'İdari İşler',
         'gorev' => 'Asistan',
         'personel_tipi' => 'Tam Zamanli',
+        'calisan_kapsami' => 'DIS_KAYNAK',
     ], $overrides);
     $ordered = [];
-    foreach (PersonelImportDryRunService::TEMPLATE_COLUMNS as $col) {
+    foreach (array_merge(PersonelImportDryRunService::TEMPLATE_COLUMNS, ['calisan_kapsami']) as $col) {
         $ordered[] = (string) ($row[$col] ?? '');
     }
 
@@ -343,7 +346,7 @@ function p6StructCsvHeader(): string
 {
     return implode(';', array_merge(
         PersonelImportDryRunService::TEMPLATE_COLUMNS,
-        ['bolum', 'birim', 'pozisyon']
+        ['bolum', 'birim', 'pozisyon', 'calisan_kapsami']
     ));
 }
 
@@ -368,9 +371,10 @@ function p6StructCsvRow(array $overrides = []): string
         'bolum' => 'Operasyon',
         'birim' => 'Saha',
         'pozisyon' => 'Kadro',
+        'calisan_kapsami' => 'DIS_KAYNAK',
     ], $overrides);
     $ordered = [];
-    foreach (array_merge(PersonelImportDryRunService::TEMPLATE_COLUMNS, ['bolum', 'birim', 'pozisyon']) as $col) {
+    foreach (array_merge(PersonelImportDryRunService::TEMPLATE_COLUMNS, ['bolum', 'birim', 'pozisyon', 'calisan_kapsami']) as $col) {
         $ordered[] = (string) ($row[$col] ?? '');
     }
 
@@ -575,6 +579,8 @@ $pdoPre = p6PdoForDb($dbPre);
 
 try {
     p6ApplyThrough($pdoPre, $files, '064_personel_org_location_model.sql');
+    // Keep the tested org schema absent while enabling the independent employee-scope contract.
+    p6Apply($pdoPre, '066_personel_calisan_kapsami.sql');
     p6Assert(!PersonelOrgStructureSchema::isReady($pdoPre), 'A4 pre-065 structure not ready');
     p6SeedBase($pdoPre);
     $pdoPre->exec("INSERT INTO sgk_isverenler (id, kod, ad, durum) VALUES (1, 'MEDISA', 'Medisa', 'AKTIF')");
@@ -771,7 +777,8 @@ try {
         'departman_id' => 2,
         'effective_date' => '2024-06-01',
     ]);
-    p6Assert($upd['status'] === 422, 'A12 stale child fail-closed status');
+    p6Assert($upd['status'] === 409, 'A12 direct org update fail-closed status');
+    p6Assert(($upd['payload']['errors'][0]['code'] ?? '') === 'PERSONEL_ORGANIZASYON_CANONICAL_OWNER_REQUIRED', 'A12 canonical org owner required');
 
     // A14/A15 SubeScope still sube_id
     $pdo->exec("UPDATE subeler SET sgk_isveren_id = 2 WHERE id = 1");

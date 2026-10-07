@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { ApiRequestError } from "../../../api/api-client";
-import { fetchPersonellerList } from "../../../api/personeller.api";
+import { fetchPersonellerListForSelect } from "../../../api/personeller.api";
 import {
   createRevizyonTalebi,
   fetchRevizyonKaynaklar,
@@ -84,8 +84,8 @@ export function RevizyonTalebiCreatePage() {
     }
     void (async () => {
       try {
-        const list = await fetchPersonellerList({ calisan_kapsami: "IC_PERSONEL", limit: 250 });
-        setPersoneller(list.items);
+        const items = await fetchPersonellerListForSelect({ calisan_kapsami: "IC_PERSONEL" });
+        setPersoneller(items);
       } catch (error) {
         setMetaError(error instanceof Error ? error.message : "Personel listesi yüklenemedi.");
       } finally {

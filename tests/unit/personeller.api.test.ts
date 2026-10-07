@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   fetchPersonelDetail,
   fetchPersonellerList,
+  fetchPersonellerListForSelect,
   updatePersonel
 } from "../../src/api/personeller.api";
 
@@ -18,6 +19,41 @@ describe("personeller.api", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
+  });
+
+  it("fetchPersonellerListForSelect walks pages until the list is complete", async () => {
+    const fetchMock = vi.fn(async (_url: string) => {
+      const callIndex = fetchMock.mock.calls.length;
+      if (callIndex === 1) {
+        return createJsonResponse(
+          {
+            data: {
+              items: [{ id: 1, tc_kimlik_no: "1", ad: "A", soyad: "B", aktif_durum: "AKTIF" }]
+            },
+            meta: { page: 1, limit: 250, total: 2, total_pages: 2, has_next_page: true },
+            errors: []
+          },
+          200
+        );
+      }
+      return createJsonResponse(
+        {
+          data: {
+            items: [{ id: 2, tc_kimlik_no: "2", ad: "C", soyad: "D", aktif_durum: "AKTIF" }]
+          },
+          meta: { page: 2, limit: 250, total: 2, total_pages: 2, has_next_page: false },
+          errors: []
+        },
+        200
+      );
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const items = await fetchPersonellerListForSelect({ aktiflik: "tum" });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(items).toHaveLength(2);
+    expect(items.map((p) => p.id)).toEqual([1, 2]);
   });
 
   it("sends the raw search text as a single query param and forwards the abort signal", async () => {

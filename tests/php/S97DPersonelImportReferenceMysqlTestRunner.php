@@ -129,10 +129,13 @@ try {
     $pdo->exec("
         CREATE TABLE personeller (
           id INT UNSIGNED NOT NULL AUTO_INCREMENT,
-          tc_kimlik_no CHAR(11) NOT NULL,
+          tc_kimlik_no CHAR(11) NULL,
           ad VARCHAR(80) NOT NULL,
-          soyad VARCHAR(80) NOT NULL,
+          soyad VARCHAR(80) NULL,
+          dogum_tarihi DATE NULL,
+          telefon VARCHAR(32) NULL,
           sicil_no VARCHAR(64) NOT NULL,
+          calisan_kapsami ENUM('IC_PERSONEL','DIS_KAYNAK') NOT NULL DEFAULT 'IC_PERSONEL',
           PRIMARY KEY (id),
           UNIQUE KEY uq_personeller_tc (tc_kimlik_no),
           UNIQUE KEY uq_personeller_sicil (sicil_no)
@@ -231,7 +234,7 @@ try {
     s97dAssert(CsvResponse::cell('hello;world', ',') === 'hello;world', 'comma CSV does not quote bare semicolon');
     s97dAssert(CsvResponse::cell('hello;world', ';') === '"hello;world"', 'semicolon CSV quotes delimiter');
 
-    // Hermetic parent parity: frozen golden from parent f9fd2af (no runtime VCS object lookup).
+    // Historical parent fixture stays frozen; current validation and template compatibility are checked below.
     $goldenPath = __DIR__ . '/../fixtures/s97d/personel-import-dry-run-parent-f9fd2af.golden.json';
     s97dAssert(is_file($goldenPath), 'frozen golden fixture present');
     $goldenRaw = file_get_contents($goldenPath);
@@ -261,47 +264,21 @@ try {
             'Tam Zamanli',
         ]) . "\r\n";
     $currentDry = PersonelImportDryRunService::analyze($pdo, $parityCsv, $gyUser, null);
-    if (($currentDry['satirlar'][0]['durum'] ?? '') !== 'GECERLI') {
-        fwrite(STDERR, 'parity debug hata=' . json_encode($currentDry['satirlar'][0]['hata_kodlari'] ?? [], JSON_UNESCAPED_UNICODE) . PHP_EOL);
-    }
-    s97dAssert(($currentDry['source_sha256'] ?? '') === (string) ($golden['source_sha256'] ?? ''), 'MANIFEST_PARITY source_sha256');
-    s97dAssert(($currentDry['manifest_hash'] ?? '') === (string) ($golden['manifest_hash'] ?? ''), 'MANIFEST_PARITY manifest_hash');
-    s97dAssert(($currentDry['schema_version'] ?? '') === (string) ($golden['schema_version'] ?? ''), 'MANIFEST_PARITY schema_version');
-    s97dAssert(($currentDry['headers'] ?? null) === ($golden['headers'] ?? null), 'MANIFEST_PARITY headers');
-    s97dAssert(($currentDry['allowed_sube_ids'] ?? null) === ($golden['allowed_sube_ids'] ?? null), 'MANIFEST_PARITY allowed_sube_ids');
-    s97dAssert(($currentDry['active_sube_id'] ?? null) === ($golden['active_sube_id'] ?? null), 'MANIFEST_PARITY active_sube_id');
-    s97dAssert(($currentDry['can_apply'] ?? null) === ($golden['can_apply'] ?? null), 'MANIFEST_PARITY can_apply');
-    s97dAssert(($currentDry['ozet'] ?? null) === ($golden['ozet'] ?? null), 'MANIFEST_PARITY ozet');
-    s97dAssert(count($currentDry['satirlar'] ?? []) === (int) ($golden['satir_count'] ?? -1), 'MANIFEST_PARITY satir count');
-    $c0 = $currentDry['satirlar'][0] ?? [];
-    $g0 = $golden['satirlar'][0] ?? [];
-    s97dAssert(($c0['durum'] ?? null) === ($g0['durum'] ?? null), 'MANIFEST_PARITY satir durum');
-    s97dAssert(($c0['hata_kodlari'] ?? null) === ($g0['hata_kodlari'] ?? null), 'MANIFEST_PARITY hata_kodlari');
-    s97dAssert(($c0['uyarilar'] ?? null) === ($g0['uyarilar'] ?? null), 'MANIFEST_PARITY uyarilar');
-    s97dAssert(($c0['durum'] ?? '') === 'GECERLI', 'MANIFEST_PARITY row GECERLI for golden fixture');
-    $cc = $currentDry['candidates'][0] ?? null;
-    s97dAssert($cc !== null, 'MANIFEST_PARITY candidates present');
-    $resolved = $golden['resolved'] ?? [];
+    // The historical fixture predates mandatory SGK for active internal personnel.
+    // Preserve its bytes; prove the current contract rejects it without writing.
+    s97dAssert(($currentDry['source_sha256'] ?? '') === (string) ($golden['source_sha256'] ?? ''), 'LEGACY_INPUT source sha unchanged');
+    s97dAssert(($currentDry['headers'] ?? null) === ($golden['headers'] ?? null), 'LEGACY_INPUT headers unchanged');
+    s97dAssert(($currentDry['schema_version'] ?? '') === ($golden['schema_version'] ?? ''), 'LEGACY_INPUT schema version unchanged');
+    s97dAssert(($currentDry['can_apply'] ?? true) === false, 'LEGACY_INPUT cannot apply without SGK');
     s97dAssert(
-        [
-            (int) ($cc['sube_id'] ?? 0),
-            (int) ($cc['departman_id'] ?? 0),
-            (int) ($cc['gorev_id'] ?? 0),
-            (int) ($cc['personel_tipi_id'] ?? 0),
-        ] === [
-            (int) ($resolved['sube_id'] ?? 0),
-            (int) ($resolved['departman_id'] ?? 0),
-            (int) ($resolved['gorev_id'] ?? 0),
-            (int) ($resolved['personel_tipi_id'] ?? 0),
-        ],
-        'MANIFEST_PARITY resolved reference IDs'
+        in_array('PERSONEL_SGK_ISVEREN_REQUIRED', $currentDry['satirlar'][0]['hata_kodlari'] ?? [], true),
+        'LEGACY_INPUT explicit SGK required'
     );
-    s97dAssert(($cc['payload'] ?? null) === ($golden['candidate_payload'] ?? null), 'MANIFEST_PARITY candidate payloads');
-    $payloadJson = json_encode($cc['payload'] ?? null, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-    s97dAssert(
-        hash('sha256', (string) $payloadJson) === (string) ($golden['candidate_payload_sha256'] ?? ''),
-        'MANIFEST_PARITY candidate payload sha'
-    );
+    s97dAssert(($currentDry['candidates'] ?? []) === [], 'LEGACY_INPUT has no write candidates');
+    $repeatDry = PersonelImportDryRunService::analyze($pdo, $parityCsv, $gyUser, null);
+    s97dAssert($currentDry['manifest_hash'] === $repeatDry['manifest_hash'], 'LEGACY_INPUT rejection manifest deterministic');
+    $frozenPayloadJson = json_encode($golden['candidate_payload'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    s97dAssert(hash('sha256', (string) $frozenPayloadJson) === $golden['candidate_payload_sha256'], 'frozen parent payload checksum preserved');
     $currentTemplate = PersonelImportDryRunService::buildTemplateCsv();
     s97dAssert(
         hash('sha256', $currentTemplate) === (string) ($golden['template_sha256'] ?? ''),
@@ -310,17 +287,17 @@ try {
     s97dAssert(strlen($currentTemplate) === (int) ($golden['template_byte_length'] ?? -1), 'MANIFEST_PARITY template length');
     $goldenTemplate = base64_decode((string) ($golden['template_bytes_base64'] ?? ''), true);
     s97dAssert(is_string($goldenTemplate) && $currentTemplate === $goldenTemplate, 'MANIFEST_PARITY template bytes');
-    echo '[PASS] MANIFEST_PARITY_WITH_PARENT = EXACT' . PHP_EOL;
-    echo '[PASS] PARENT_PARITY_RUNTIME = HERMETIC' . PHP_EOL;
+    echo '[PASS] LEGACY_INPUT_CURRENT_SGK_GUARD = PASS' . PHP_EOL;
+    echo '[PASS] LEGACY_FIXTURE_RUNTIME = HERMETIC' . PHP_EOL;
 
     // Prove PERSONELLER_TABLE_READ=NO from catalog SQL inventory (export never queries personeller).
     $catalogSrc = file_get_contents(__DIR__ . '/../../api/src/Services/Personel/PersonelImportReferenceCatalogService.php');
     s97dAssert(is_string($catalogSrc) && !preg_match('/\bFROM\s+personeller\b|\bJOIN\s+personeller\b/i', $catalogSrc), 'PERSONELLER_TABLE_READ = NO');
 
     $export1 = PersonelImportReferenceCatalogService::buildExport($pdo, $gyUser, null);
-    s97dAssert($export1['filename'] === 'personel-import-referanslari.csv', 'filename exact');
+    s97dAssert($export1['filename'] === 'yukleme-kilavuzu.csv', 'filename exact');
     s97dAssert(strncmp($export1['csv'], "\xEF\xBB\xBF", 3) === 0, 'UTF-8 BOM present');
-    s97dAssert(strpos($export1['body'], 'referans_turu;deger;bagli_sube;kullanilabilir;eslesme_sayisi;uyari_kodu;aciklama') === 0, 'semicolon header');
+    s97dAssert(strpos($export1['body'], 'bolum;baslik;deger;aciklama') === 0, 'semicolon header');
     s97dAssert(strlen($export1['sha256']) === 64 && ctype_xdigit($export1['sha256']), 'sha256 64 hex');
     s97dAssert($export1['sha256'] === hash('sha256', $export1['body']), 'sha256 is body hash without BOM');
 
@@ -329,8 +306,8 @@ try {
 
     $types = [];
     foreach ($parsed['rows'] as $row) {
-        $tur = $row['referans_turu'];
-        if (!in_array($tur, $types, true)) {
+        $tur = $row['baslik'];
+        if (in_array($tur, ['SUBE', 'DEPARTMAN', 'GOREV', 'PERSONEL_TIPI', 'CALISAN_KAPSAMI'], true) && !in_array($tur, $types, true)) {
             $types[] = $tur;
         }
     }
@@ -341,7 +318,7 @@ try {
 
     $usableSubeler = [];
     foreach ($parsed['rows'] as $row) {
-        if ($row['referans_turu'] === 'SUBE' && $row['kullanilabilir'] === 'EVET') {
+        if ($row['baslik'] === 'SUBE') {
             $usableSubeler[] = $row['deger'];
         }
     }
@@ -351,19 +328,16 @@ try {
 
     $cift = null;
     foreach ($parsed['rows'] as $row) {
-        if ($row['referans_turu'] === 'SUBE' && $row['deger'] === 'Cift Sube') {
+        if ($row['baslik'] === 'SUBE' && $row['deger'] === 'Cift Sube') {
             $cift = $row;
             break;
         }
     }
-    s97dAssert($cift !== null, 'ambiguous sube summary row exists');
-    s97dAssert($cift['kullanilabilir'] === 'HAYIR', 'ambiguous kullanilabilir HAYIR');
-    s97dAssert($cift['eslesme_sayisi'] === '2', 'ambiguous eslesme_sayisi 2');
-    s97dAssert($cift['uyari_kodu'] === 'PERSONEL_IMPORT_REFERANS_BELIRSIZ', 'ambiguous uyari kodu');
+    s97dAssert($cift === null, 'ambiguous branch omitted from usable guide');
 
     $formula = null;
     foreach ($parsed['rows'] as $row) {
-        if ($row['referans_turu'] === 'DEPARTMAN' && strpos($row['deger'], 'FormulaDept') !== false) {
+        if ($row['baslik'] === 'DEPARTMAN' && strpos($row['deger'], 'FormulaDept') !== false) {
             $formula = $row;
             break;
         }
@@ -375,7 +349,7 @@ try {
     $pazarlamaDept = null;
     $klinikDept = null;
     foreach ($parsed['rows'] as $row) {
-        if ($row['referans_turu'] !== 'DEPARTMAN') {
+        if ($row['baslik'] !== 'DEPARTMAN') {
             continue;
         }
         if ($row['deger'] === 'Idari') {
@@ -388,14 +362,14 @@ try {
             $klinikDept = $row;
         }
     }
-    s97dAssert($idariDept !== null && $idariDept['kullanilabilir'] === 'EVET', 'sparse matrix Idari usable');
-    s97dAssert($idariDept['bagli_sube'] === 'TUM_YETKILI_SUBELER', 'sparse matrix Idari open bagli_sube');
-    s97dAssert($pazarlamaDept !== null && $pazarlamaDept['kullanilabilir'] === 'EVET', 'unmapped Pazarlama still usable');
-    s97dAssert($pazarlamaDept['bagli_sube'] === 'TUM_YETKILI_SUBELER', 'unmapped Pazarlama open bagli_sube');
-    s97dAssert($klinikDept !== null && $klinikDept['bagli_sube'] === 'TUM_YETKILI_SUBELER', 'Klinik open not pair-scoped');
+    s97dAssert($idariDept !== null, 'sparse matrix Idari usable');
+    s97dAssert($idariDept['aciklama'] === '', 'sparse matrix Idari has no branch restriction');
+    s97dAssert($pazarlamaDept !== null, 'unmapped Pazarlama still usable');
+    s97dAssert($pazarlamaDept['aciklama'] === '', 'unmapped Pazarlama has no branch restriction');
+    s97dAssert($klinikDept !== null && $klinikDept['aciklama'] === '', 'Klinik open not pair-scoped');
     echo '[PASS] REFERENCE_EXPORT_OPEN_MODEL = PASS' . PHP_EOL;
 
-    $pazarlamaCsv = implode(';', PersonelImportDryRunService::TEMPLATE_COLUMNS) . "\r\n"
+    $pazarlamaCsv = implode(';', array_merge(PersonelImportDryRunService::TEMPLATE_COLUMNS, ['calisan_kapsami'])) . "\r\n"
         . implode(';', [
             '10000000250',
             'IMP-PAZ-001',
@@ -412,6 +386,7 @@ try {
             'Pazarlama',
             'Asistan',
             'Tam Zamanli',
+            'DIS_KAYNAK',
         ]) . "\r\n";
     $pazDry = PersonelImportDryRunService::dryRun($pdo, $pazarlamaCsv, $gyUser, null);
     s97dAssert(($pazDry['satirlar'][0]['durum'] ?? '') === 'GECERLI', 'dry-run accepts unmapped Pazarlama');
@@ -434,7 +409,7 @@ try {
     $export3 = PersonelImportReferenceCatalogService::buildExport($pdo, $gyUser, null);
     $gorevOrder = [];
     foreach (s97dParseCsvBody($export3['csv'])['rows'] as $row) {
-        if ($row['referans_turu'] === 'GOREV' && $row['kullanilabilir'] === 'EVET') {
+        if ($row['baslik'] === 'GOREV') {
             $gorevOrder[] = $row['deger'];
         }
     }
@@ -446,7 +421,7 @@ try {
     s97dAssert($scoped['sha256'] !== $export1['sha256'], 'scope change changes hash');
     $scopedSubeler = [];
     foreach (s97dParseCsvBody($scoped['csv'])['rows'] as $row) {
-        if ($row['referans_turu'] === 'SUBE' && $row['kullanilabilir'] === 'EVET') {
+        if ($row['baslik'] === 'SUBE') {
             $scopedSubeler[] = $row['deger'];
         }
     }
@@ -456,7 +431,7 @@ try {
     $activeOnly = PersonelImportReferenceCatalogService::buildExport($pdo, $gyUser, '1');
     $activeSubeler = [];
     foreach (s97dParseCsvBody($activeOnly['csv'])['rows'] as $row) {
-        if ($row['referans_turu'] === 'SUBE' && $row['kullanilabilir'] === 'EVET') {
+        if ($row['baslik'] === 'SUBE') {
             $activeSubeler[] = $row['deger'];
         }
     }
@@ -468,15 +443,12 @@ try {
     $crossExport = PersonelImportReferenceCatalogService::buildExport($pdo, $scopedUser, null);
     $crossMerkez = null;
     foreach (s97dParseCsvBody($crossExport['csv'])['rows'] as $row) {
-        if ($row['referans_turu'] === 'SUBE' && $row['deger'] === 'Merkez') {
+        if ($row['baslik'] === 'SUBE' && $row['deger'] === 'Merkez') {
             $crossMerkez = $row;
             break;
         }
     }
-    s97dAssert($crossMerkez !== null, 'cross-scope Merkez still visible in scope');
-    s97dAssert($crossMerkez['kullanilabilir'] === 'HAYIR', 'cross-scope export HAYIR matches dry-run');
-    s97dAssert($crossMerkez['eslesme_sayisi'] === '2', 'cross-scope eslesme uses global count');
-    s97dAssert($crossMerkez['uyari_kodu'] === 'PERSONEL_IMPORT_REFERANS_BELIRSIZ', 'cross-scope uyari BELIRSIZ');
+    s97dAssert($crossMerkez === null, 'cross-scope ambiguous branch omitted from usable guide');
     s97dAssert(strpos($crossExport['csv'], 'MRK2') === false, 'cross-scope does not leak out-of-scope kod');
     s97dAssert(!preg_match('/(^|;)10(;|$)/', $crossExport['csv']), 'cross-scope does not leak raw id');
     $crossCsv = implode(';', PersonelImportDryRunService::TEMPLATE_COLUMNS) . "\r\n"
@@ -517,27 +489,27 @@ try {
     $openExport = PersonelImportReferenceCatalogService::buildExport($pdo, $gyUser, null);
     $openDept = null;
     foreach (s97dParseCsvBody($openExport['csv'])['rows'] as $row) {
-        if ($row['referans_turu'] === 'DEPARTMAN' && $row['deger'] === 'Idari') {
+        if ($row['baslik'] === 'DEPARTMAN' && $row['deger'] === 'Idari') {
             $openDept = $row;
             break;
         }
     }
     s97dAssert($openDept !== null, 'open model Idari row');
-    s97dAssert($openDept['bagli_sube'] === 'TUM_YETKILI_SUBELER', 'open model bagli_sube sentinel');
+    s97dAssert($openDept['aciklama'] === '', 'open model has no branch restriction');
 
     // Import catalog must not depend on sube_departmanlar (sparse, empty, or missing table).
     $pdo->exec('RENAME TABLE sube_departmanlar TO sube_departmanlar_hidden');
     $hiddenExport = PersonelImportReferenceCatalogService::buildExport($pdo, $gyUser, null);
     $hiddenPazarlama = null;
     foreach (s97dParseCsvBody($hiddenExport['csv'])['rows'] as $row) {
-        if ($row['referans_turu'] === 'DEPARTMAN' && $row['deger'] === 'Pazarlama') {
+        if ($row['baslik'] === 'DEPARTMAN' && $row['deger'] === 'Pazarlama') {
             $hiddenPazarlama = $row;
             break;
         }
     }
-    s97dAssert($hiddenPazarlama !== null && $hiddenPazarlama['kullanilabilir'] === 'EVET', 'missing mapping table still exports Pazarlama');
-    s97dAssert($hiddenPazarlama['bagli_sube'] === 'TUM_YETKILI_SUBELER', 'missing mapping table still open bagli_sube');
-    $hiddenDry = PersonelImportDryRunService::dryRun($pdo, $parityCsv, $gyUser, null);
+    s97dAssert($hiddenPazarlama !== null, 'missing mapping table still exports Pazarlama');
+    s97dAssert($hiddenPazarlama['aciklama'] === '', 'missing mapping table still has no branch restriction');
+    $hiddenDry = PersonelImportDryRunService::dryRun($pdo, $pazarlamaCsv, $gyUser, null);
     s97dAssert(($hiddenDry['satirlar'][0]['durum'] ?? '') === 'GECERLI', 'missing mapping table dry-run still GECERLI');
     echo '[PASS] IMPORT_INDEPENDENT_OF_SUBE_DEPARTMANLAR = VERIFIED' . PHP_EOL;
     $pdo->exec('RENAME TABLE sube_departmanlar_hidden TO sube_departmanlar');

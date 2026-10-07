@@ -11,10 +11,10 @@ vi.mock("../../src/api/serbest-zaman.api", () => ({
 }));
 
 vi.mock("../../src/api/personeller.api", () => ({
-  fetchPersonellerList: vi.fn(async () => ({
-    items: [{ id: 1, ad: "Ahmet", soyad: "Yılmaz", sicil_no: "P-101" }],
-    pagination: { page: 1, limit: 250, total: 1, totalPages: 1, hasNextPage: false }
-  }))
+  PERSONEL_LIST_PAGE_MAX: 250,
+  fetchPersonellerListForSelect: vi.fn(async () => [
+    { id: 1, ad: "Ahmet", soyad: "Yılmaz", sicil_no: "P-101" }
+  ])
 }));
 
 describe("SerbestZamanTakipPage UI", () => {
@@ -101,7 +101,7 @@ describe("SerbestZamanTakipPage UI", () => {
 
     await waitFor(() => {
       const personelInput = document.getElementById("kullanim-personel") as HTMLSelectElement;
-      expect(personelInput).toBeTruthy();
+      expect(personelInput.options).toHaveLength(2);
     });
 
     const personelInput = document.getElementById("kullanim-personel") as HTMLSelectElement;

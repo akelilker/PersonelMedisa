@@ -106,7 +106,7 @@ function s97bCountOptional(PDO $pdo, string $table): int
 
 function s97bHeaderCsv(array $extra = []): string
 {
-    $cols = PersonelImportDryRunService::TEMPLATE_COLUMNS;
+    $cols = array_merge(PersonelImportDryRunService::TEMPLATE_COLUMNS, ['calisan_kapsami']);
     if (count($extra) > 0) {
         $cols = array_merge($cols, $extra);
     }
@@ -132,12 +132,13 @@ function s97bValidRow(array $overrides = []): string
         'departman' => 'İdari İşler',
         'gorev' => 'Asistan',
         'personel_tipi' => 'Tam Zamanli',
+        'calisan_kapsami' => 'DIS_KAYNAK',
     ];
     foreach ($overrides as $key => $value) {
         $row[$key] = $value;
     }
     $ordered = [];
-    foreach (PersonelImportDryRunService::TEMPLATE_COLUMNS as $col) {
+    foreach (array_merge(PersonelImportDryRunService::TEMPLATE_COLUMNS, ['calisan_kapsami']) as $col) {
         $ordered[] = (string) ($row[$col] ?? '');
     }
 
@@ -314,6 +315,7 @@ try {
     ');
 
     s97bApplyMigration($pdo, '046_personel_import_apply_owner.sql');
+    s97bApplyMigration($pdo, '066_personel_calisan_kapsami.sql');
 
     $pdo->exec("INSERT INTO subeler (id, kod, ad) VALUES (1, 'MRK', 'Merkez'), (2, 'SB2', 'Sube 2')");
     $pdo->exec("INSERT INTO departmanlar (id, ad) VALUES (1, 'İdari İşler'), (2, 'Klinik')");
@@ -713,6 +715,7 @@ try {
         'gorev_id' => 2,
         'personel_tipi_id' => 1,
         'aktif_durum' => 'AKTIF',
+        'calisan_kapsami' => 'DIS_KAYNAK',
     ]);
     PersonelCreateService::validateCreateReferences($pdo, $createPayload);
     s97bAssert(!PersonelCreateService::tcExists($pdo, '10000000218'), 'create regression TC free');

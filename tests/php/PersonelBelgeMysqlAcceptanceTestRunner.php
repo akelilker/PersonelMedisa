@@ -136,6 +136,7 @@ function pbMigrationFiles(): array
     $dir = __DIR__ . '/../../api/migrations';
     $files = array_values(array_filter(scandir($dir) ?: [], static function ($name) {
         return (bool) preg_match('/^\d{3}_.+\.sql$/', (string) $name)
+            && (int) substr((string) $name, 0, 3) <= 66
             && $name !== '067_personel_canonical_reference_gate.sql'
             && $name !== '068_sgk_actor_identity_lifecycle_audit.sql'
             && $name !== '069_personel_credential_onboarding.sql'

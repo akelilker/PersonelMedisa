@@ -95,12 +95,13 @@ function s97bConcValidRow(array $overrides = []): string
         'departman' => 'İdari İşler',
         'gorev' => 'Asistan',
         'personel_tipi' => 'Tam Zamanli',
+        'calisan_kapsami' => 'DIS_KAYNAK',
     ];
     foreach ($overrides as $key => $value) {
         $row[$key] = $value;
     }
     $ordered = [];
-    foreach (PersonelImportDryRunService::TEMPLATE_COLUMNS as $col) {
+    foreach (array_merge(PersonelImportDryRunService::TEMPLATE_COLUMNS, ['calisan_kapsami']) as $col) {
         $ordered[] = (string) ($row[$col] ?? '');
     }
 
@@ -109,7 +110,7 @@ function s97bConcValidRow(array $overrides = []): string
 
 function s97bConcTwoRowCsv(): string
 {
-    return implode(';', PersonelImportDryRunService::TEMPLATE_COLUMNS) . "\r\n"
+    return implode(';', array_merge(PersonelImportDryRunService::TEMPLATE_COLUMNS, ['calisan_kapsami'])) . "\r\n"
         . s97bConcValidRow(['tc_kimlik_no' => '10000000146', 'sicil_no' => 'CONC-001']) . "\r\n"
         . s97bConcValidRow(['tc_kimlik_no' => '10000000154', 'sicil_no' => 'CONC-002', 'ad' => 'Mehmet', 'soyad' => 'Demir']) . "\r\n";
 }
@@ -227,6 +228,7 @@ try {
     ");
 
     s97bConcApplyMigration($pdo, '046_personel_import_apply_owner.sql');
+    s97bConcApplyMigration($pdo, '066_personel_calisan_kapsami.sql');
 
     $pdo->exec("INSERT INTO subeler (id, kod, ad) VALUES (1, 'MRK', 'Merkez')");
     $pdo->exec("INSERT INTO departmanlar (id, ad) VALUES (1, 'İdari İşler')");
@@ -265,7 +267,7 @@ try {
 
     // 2) In-progress CLAIMED row blocks concurrent apply with same key
     $claimedKey = 's97b.conc.claimed01';
-    $claimedCsv = implode(';', PersonelImportDryRunService::TEMPLATE_COLUMNS) . "\r\n"
+    $claimedCsv = implode(';', array_merge(PersonelImportDryRunService::TEMPLATE_COLUMNS, ['calisan_kapsami'])) . "\r\n"
         . s97bConcValidRow(['tc_kimlik_no' => '10000000162', 'sicil_no' => 'CONC-C01']) . "\r\n";
     $claimedDry = PersonelImportDryRunService::dryRun($pdo, $claimedCsv, $gyUser, null);
     $claimedManifest = (string) $claimedDry['manifest_hash'];
@@ -314,7 +316,7 @@ try {
 
     // 3) Different keys, same TC CSV: first +1; second ALREADY_EXISTS; no duplicate personel
     $dupTc = '10000000170';
-    $dupCsv = implode(';', PersonelImportDryRunService::TEMPLATE_COLUMNS) . "\r\n"
+    $dupCsv = implode(';', array_merge(PersonelImportDryRunService::TEMPLATE_COLUMNS, ['calisan_kapsami'])) . "\r\n"
         . s97bConcValidRow(['tc_kimlik_no' => $dupTc, 'sicil_no' => 'CONC-D01']) . "\r\n";
     $dupDry = PersonelImportDryRunService::dryRun($pdo, $dupCsv, $gyUser, null);
     $dupManifest = (string) $dupDry['manifest_hash'];

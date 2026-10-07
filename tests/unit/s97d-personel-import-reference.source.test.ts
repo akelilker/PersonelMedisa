@@ -79,7 +79,7 @@ describe("S97-D personel import reference pack source locks", () => {
     expect(api).toContain("personel-import-referanslari.csv");
   });
 
-  it("keeps parent parity hermetic via frozen golden fixture", () => {
+  it("preserves the historical fixture and verifies the current SGK guard", () => {
     const runner = read("tests/php/S97DPersonelImportReferenceMysqlTestRunner.php");
     const golden = JSON.parse(
       read("tests/fixtures/s97d/personel-import-dry-run-parent-f9fd2af.golden.json")
@@ -92,8 +92,8 @@ describe("S97-D personel import reference pack source locks", () => {
     expect(runner).not.toMatch(/(?<![>-])\bexec\s*\(/);
     expect(runner).not.toMatch(/PersonelImportDryRunServiceParent/);
     expect(runner).toContain("personel-import-dry-run-parent-f9fd2af.golden.json");
-    expect(runner).toContain("PARENT_PARITY_RUNTIME = HERMETIC");
-    expect(runner).toContain("MANIFEST_PARITY_WITH_PARENT = EXACT");
+    expect(runner).toContain("LEGACY_FIXTURE_RUNTIME = HERMETIC");
+    expect(runner).toContain("LEGACY_INPUT_CURRENT_SGK_GUARD = PASS");
     expect(runner).toContain("candidate_payload");
     expect(runner).toContain("template_sha256");
     expect(runner).not.toMatch(/process\.env\.CI|CI\s*===\s*['\"]true['\"]|skipIf.*CI/i);

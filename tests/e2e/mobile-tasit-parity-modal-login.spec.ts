@@ -34,14 +34,13 @@ async function assertLoginTitleParity(page: Page) {
   await page.evaluate(async () => {
     await document.fonts.ready;
   });
-  // WebKit can resolve `document.fonts.ready` while `document.fonts.status` still
-  // reads "loading" (a known engine race). Poll for the webfont to be truly ready
-  // — bounded by the test timeout — so gutter/ink metrics are never measured
-  // mid-load. This keeps the parity intent without a flaky one-shot status read.
-  await page.waitForFunction(() => document.fonts.status === "loaded");
-
-  const titleMetrics = await title.evaluate((el) => {
+  const titleMetrics = await title.evaluate(async (el) => {
     const style = getComputedStyle(el);
+    const visualText = (el.textContent ?? "").toLocaleUpperCase("tr-TR");
+    const titleFont = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+    // Layout may discover another font after FontFaceSet.status was observed.
+    // Load the actual title glyphs before measuring and check that specific font.
+    await document.fonts.load(titleFont, visualText);
     const rect = el.getBoundingClientRect();
     const hero = el.closest(".hero");
     const heroRect = hero?.getBoundingClientRect();
@@ -51,7 +50,6 @@ async function assertLoginTitleParity(page: Page) {
     const range = document.createRange();
     range.selectNodeContents(el);
     const inkRect = range.getBoundingClientRect();
-    const visualText = (el.textContent ?? "").toLocaleUpperCase("tr-TR");
     return {
       textOverflow: style.textOverflow,
       overflow: style.overflow,
@@ -60,7 +58,7 @@ async function assertLoginTitleParity(page: Page) {
       fontSize: style.fontSize,
       paddingLeft: style.paddingLeft,
       paddingRight: style.paddingRight,
-      fontStatus: document.fonts.status,
+      titleFontLoaded: document.fonts.check(titleFont, visualText),
       devicePixelRatio: window.devicePixelRatio,
       viewportWidth: window.innerWidth,
       scrollWidth: el.scrollWidth,
@@ -82,7 +80,7 @@ async function assertLoginTitleParity(page: Page) {
   expect(titleMetrics.textOverflow).not.toBe("ellipsis");
   expect(titleMetrics.overflow).not.toBe("hidden");
   expect(titleMetrics.whiteSpace).toBe("nowrap");
-  expect(titleMetrics.fontStatus).toBe("loaded");
+  expect(titleMetrics.titleFontLoaded).toBe(true);
   expect(titleMetrics.heroLeft).not.toBeNull();
   expect(titleMetrics.heroRight).not.toBeNull();
   expect(titleMetrics.leftGutterPx).not.toBeNull();

@@ -9,6 +9,7 @@ Bu dosya, kullanıcının onayladığı kalıcı görsel kararları her biri tek
 | Ortak modal başlığı | Home ve X ikonları dikey merkezin biraz altında | `--modal-header-icon-shift-y: 6px` (translateY(-50%) ile birlikte), yatay 8px iç boşluk değişmez | 2026-10-03 |
 | Ortak modal başlığı | X üstündeki 1px inset parlaklık yok, başlık altında border yok | box-shadow inset yok, border-bottom yok | 2026-10-04 |
 | Footer | Görünür sürüm sabit | v78.2 (deploy ile değişmez) | 2026-10-05 |
+| Footer | MEDİSA wordmark boyutu (#507) | #507 sonrası çok az küçültülmüş boyut korunur; eski `+0.5pt` büyütme geri getirilmez; footer yüksekliği / Sistem Hazır / safe-area değişmez | 2026-10-06 |
 | Ad Soyad (tüm ekranlar) | Yalnız görünüm, veri değişmez | Personel Kartı detay: tamamı BÜYÜK; diğer her yer: Ad Türkçe Title Case + SOYAD BÜYÜK (ör. Berat GÜRBÜZ) | 2026-10-03 |
 | Kullanıcı Paneli | İkincil başlık birinciden büyük olamaz | KULLANICI PANELİ font-size ≤ PERSONEL YÖNETİM SİSTEMİ (desktop + mobil) | 2026-10-01 |
 | /self | Profil fotoğrafı hizası | fotoğrafın üst kenarı Ad Soyad satırının üstüyle hizalı (desktop öncelik, mobil bozulmaz) | 2026-10-01 |

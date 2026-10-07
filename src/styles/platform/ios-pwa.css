@@ -85,3 +85,114 @@
     overscroll-behavior: none;
   }
 }
+
+/*
+ * iOS standalone PWA chrome (html.medisa-ios27-pwa) — Taşıt style-core PR541 sahsicari model.
+ * Class is set in index.html (iOS + standalone only). Safe-area top/sides on .app-shell;
+ * footer band owns bottom inset once (footer.css). Overrides layout-viewport body pin
+ * (innerHeight < screen.height) so #app-footer sits on the physical bottom on login too.
+ */
+html.medisa-ios27-pwa {
+  background-color: var(--bg);
+  min-height: 100%;
+  box-sizing: border-box;
+}
+
+html.medisa-ios27-pwa body {
+  position: relative;
+  inset: auto;
+  width: 100%;
+  min-height: 100dvh;
+  height: auto;
+  overflow: hidden;
+  background-color: var(--bg);
+  box-sizing: border-box;
+}
+
+html.medisa-ios27-pwa body #root {
+  min-height: 100dvh;
+  height: auto;
+}
+
+html.medisa-ios27-pwa .app-shell {
+  margin-top: 0;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+  padding-bottom: var(--app-footer-real-height);
+  min-height: 100dvh;
+  height: 100dvh;
+  max-height: 100dvh;
+  box-sizing: border-box;
+}
+
+html.medisa-ios27-pwa .app-shell::before {
+  top: env(safe-area-inset-top, 0px);
+  bottom: calc(var(--app-footer-real-height) + env(safe-area-inset-bottom, 0px));
+}
+
+html.medisa-ios27-pwa body.modal-open .app-shell::before {
+  bottom: calc(
+    var(--app-footer-real-height) + var(--app-footer-gap) + env(safe-area-inset-bottom, 0px)
+  );
+}
+
+html.medisa-ios27-pwa body.app-home-route .app-shell-marker {
+  bottom: calc(var(--app-footer-real-height) + env(safe-area-inset-bottom, 0px) + 8px);
+}
+
+html.medisa-ios27-pwa .content-wrap {
+  padding-top: var(--shell-content-top-padding, 12px);
+  padding-left: 0;
+  padding-right: 0;
+}
+
+html.medisa-ios27-pwa body.login-page .content-wrap {
+  padding-top: 4px;
+}
+
+@media (max-width: 640px) {
+  html.medisa-ios27-pwa body.login-page .content-wrap {
+    padding-top: 6px;
+  }
+}
+
+html.medisa-ios27-pwa #app-footer {
+  bottom: 0;
+  height: calc(var(--app-footer-real-height) + env(safe-area-inset-bottom, 0px));
+  min-height: calc(var(--app-footer-real-height) + env(safe-area-inset-bottom, 0px));
+  padding-top: 2px;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+html.medisa-ios27-pwa #app-footer .footer-content {
+  width: 100%;
+  max-width: var(--app-shell-max-width);
+  height: auto;
+  min-height: 0;
+  max-height: none;
+  margin: 0 auto;
+  padding: 0 12px;
+  padding-bottom: 0;
+  box-sizing: border-box;
+  align-items: center;
+}
+
+@media (max-width: 768px) and (display-mode: standalone) {
+  html.medisa-ios27-pwa #app-footer {
+    align-items: center;
+    box-shadow:
+      0 -1px 0 var(--footer-top-highlight),
+      var(--footer-red-glow);
+  }
+
+  html.medisa-ios27-pwa body.app-personel-shell.app-home-route #app-footer {
+    box-shadow:
+      0 -1px 0 var(--footer-top-highlight),
+      var(--footer-red-glow);
+  }
+}

@@ -2,6 +2,18 @@
 <html lang="tr">
   <head>
     <meta charset="UTF-8" />
+    <script>
+      (function () {
+        var ua = navigator.userAgent || "";
+        var ios = /iPad|iPhone|iPod/.test(ua) && !window.MSStream;
+        if (!ios) return;
+        var pwa =
+          window.matchMedia("(display-mode: standalone)").matches ||
+          window.navigator.standalone === true;
+        if (!pwa) return;
+        document.documentElement.classList.add("medisa-ios27-pwa");
+      })();
+    </script>
     <meta
       name="viewport"
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
@@ -11,7 +23,7 @@
     <meta name="application-name" content="Personel Yönetim Sistemi" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
     <meta name="apple-mobile-web-app-title" content="Personel Yönetim Sistemi" />
     <meta name="msapplication-TileColor" content="#080d16" />
     <meta name="msapplication-TileImage" content="icons/icon-144x144.png" />

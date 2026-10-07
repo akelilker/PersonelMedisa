@@ -8,25 +8,35 @@
   padding: 12px 12px 18px;
 }
 
-/* Geri satırı kırmızı başlığın hemen altında; global .universal-back-bar dokunulmaz. */
+/*
+ * Geri satırı kırmızı header altında: global .modal-body grid serbest alanı satırlara
+ * dağıtıyor; yalnız bu modal gövdesinde ilk satır auto, ikinci satır içerik alanı.
+ */
 .modal-body--bugun-personel:has(> .universal-back-bar) {
   padding-top: 0;
   padding-left: 8px;
   padding-right: 8px;
+  grid-template-rows: auto minmax(0, 1fr);
+  align-content: start;
+  gap: 8px;
 }
 
 .modal-body--bugun-personel:has(> .universal-back-bar) > .universal-back-bar {
-  align-self: stretch;
+  align-self: start;
   justify-content: flex-start;
   width: 100%;
   padding-top: var(--space-2);
   padding-bottom: var(--space-1);
   padding-inline: 0;
   min-height: 32px;
+  max-height: 40px;
+  box-sizing: border-box;
 }
 
 .modal-body--bugun-personel:has(> .universal-back-bar) > .bugun-personel-panel {
   margin-top: 0;
+  min-height: 0;
+  align-self: stretch;
 }
 
 .bugun-personel-panel {

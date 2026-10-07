@@ -573,7 +573,10 @@ export function BugunPersonelDurumuModal({ open, onClose }: BugunPersonelDurumuM
                     <strong>{unit.birim_adi}</strong>
                     <span>Toplam {unit.counts.toplam}</span>
                   </div>
-                  {unit.bolum_adi ? <p className="bugun-personel-unit-bolum">{unit.bolum_adi}</p> : null}
+                  {/* Bölüm adı birim adıyla aynıysa tekrar gösterilmez (aynı metin iki satır olmaz). */}
+                  {unit.bolum_adi && unit.bolum_adi !== unit.birim_adi ? (
+                    <p className="bugun-personel-unit-bolum">{unit.bolum_adi}</p>
+                  ) : null}
                 </button>
                 <div className="bugun-personel-stat-grid">
                   {BUGUN_STATUS_KEYS.map((key) => {

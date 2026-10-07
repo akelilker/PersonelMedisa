@@ -8,19 +8,39 @@
   padding: 12px 12px 18px;
 }
 
-/* Geri satırı kırmızı başlığın hemen altında; global .universal-back-bar dokunulmaz. */
+/*
+ * Geri satırı kırmızı header altında: global .modal-body grid serbest alanı satırlara
+ * dağıtıyor; yalnız bu modal gövdesinde ilk satır auto, ikinci satır içerik alanı.
+ */
 .modal-body--bugun-personel:has(> .universal-back-bar) {
   padding-top: 0;
+  padding-left: 8px;
+  padding-right: 8px;
+  grid-template-rows: auto minmax(0, 1fr);
+  align-content: start;
+  gap: 8px;
 }
 
 .modal-body--bugun-personel:has(> .universal-back-bar) > .universal-back-bar {
-  padding-top: 4px;
-  padding-bottom: 2px;
-  min-height: 28px;
+  align-self: start;
+  justify-content: flex-start;
+  width: 100%;
+  padding-top: var(--space-2);
+  padding-bottom: var(--space-1);
+  padding-inline: 0;
+  min-height: 32px;
+  max-height: 40px;
+  box-sizing: border-box;
 }
 
 .modal-body--bugun-personel:has(> .universal-back-bar) > .bugun-personel-panel {
   margin-top: 0;
+  min-height: 0;
+  align-self: stretch;
+  height: 100%;
+  max-height: 100%;
+  overflow-y: auto;
+  box-sizing: border-box;
 }
 
 .bugun-personel-panel {
@@ -28,6 +48,19 @@
   flex-direction: column;
   gap: 10px;
   min-height: 0;
+}
+
+/* Şube özet + Gelen/Gelmeyen yaka: kart bloğu panel alanında yatay/dikey ortada (scroll güvenli). */
+.bugun-personel-panel:has([data-testid="bugun-branch-overview"]),
+.bugun-personel-panel:has([data-testid="bugun-yaka-breakdown"]) {
+  justify-content: center;
+  align-items: center;
+}
+
+.bugun-personel-panel:has([data-testid="bugun-branch-overview"]) [data-testid="bugun-branch-overview"],
+.bugun-personel-panel:has([data-testid="bugun-yaka-breakdown"]) [data-testid="bugun-yaka-breakdown"] {
+  margin: auto;
+  flex-shrink: 0;
 }
 
 .bugun-personel-crumb {
@@ -235,7 +268,154 @@
   transition: transform 0.2s ease;
 }
 
-/* Şube detayı: 8 durum + Birim Bildirimi sade satır listesi (kutu/çerçeve yok). */
+/* Şube detayı — ilk ekran: kompakt personel devam özeti (organizasyon ağacı değil). */
+.bugun-personel-overview {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0 auto;
+  padding: 0;
+  width: 100%;
+  max-width: 100%;
+}
+
+.bugun-personel-overview-card {
+  display: flex;
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  text-align: left;
+}
+
+.bugun-personel-overview-card--row {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.bugun-personel-overview-trio {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.bugun-personel-overview-card--tile {
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 72px;
+  padding: 12px 8px;
+  text-align: center;
+}
+
+.bugun-personel-overview-tile-label {
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.25;
+  color: #c9d4e5;
+  text-align: center;
+}
+
+.bugun-personel-overview-tile-value {
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.1;
+  color: #ffffff;
+  text-align: center;
+}
+
+.bugun-personel-overview-card--static {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.bugun-personel-overview-card--btn {
+  width: 100%;
+  color: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.bugun-personel-overview-card--btn:hover:not(:disabled),
+.bugun-personel-overview-card--btn:focus-visible:not(:disabled) {
+  border-color: var(--border-strong);
+  background: rgba(255, 255, 255, 0.07);
+  outline: none;
+}
+
+.bugun-personel-overview-card--btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.bugun-personel-overview-card--compact {
+  padding: 8px 12px;
+}
+
+.bugun-personel-overview-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #c9d4e5;
+}
+
+.bugun-personel-overview-value {
+  font-size: 15px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.bugun-personel-overview-value.is-attention {
+  color: var(--danger);
+}
+
+.bugun-personel-overview-value.is-planned {
+  color: #c9d4e5;
+}
+
+.bugun-personel-org-entry {
+  align-self: center;
+  margin: 6px 0 0;
+  padding: 8px 4px;
+  border: 0;
+  background: transparent;
+  color: #8aa0b8;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.bugun-personel-org-entry:hover,
+.bugun-personel-org-entry:focus-visible {
+  color: #c9d4e5;
+  outline: none;
+}
+
+.bugun-personel-yaka-breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  max-width: 100%;
+}
+
+.bugun-personel-person-row--inline-status {
+  flex-direction: row;
+  align-items: center;
+}
+
+.bugun-personel-person-inline {
+  font-size: 13px;
+  line-height: 1.35;
+  color: #e2e8f0;
+}
+
+/* Eski şube özet satır listesi (birim/org görünümünde kullanılmaz; test uyumu için sınıf kalır). */
 .bugun-personel-branch-summary {
   display: flex;
   flex-direction: column;

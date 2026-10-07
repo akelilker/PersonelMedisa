@@ -219,6 +219,8 @@ export type BugunPersonelDurumuStatusCounts = {
 export type BugunPersonelDurumuPerson = {
   personel_id: number;
   ad_soyad: string;
+  /** Kanonik statü: personeller.personel_tipi_id → personel_tipleri.ad */
+  personel_tipi_ad?: string | null;
   bildirim_id?: number | null;
   bildirim_state?: string | null;
   created_by?: number | null;

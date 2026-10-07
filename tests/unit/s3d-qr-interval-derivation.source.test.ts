@@ -67,8 +67,8 @@ describe("S3D QR interval derivation", () => {
 
     expect(endpoints).toContain('qrAraliklari: "/me/qr-araliklari"');
     expect(qrApi).toContain("fetchMeQrAraliklari");
-    expect(historyUi).toContain("QR Eşleşmeleri");
-    expect(historyUi).toContain("fetchMeQrAraliklari");
+    expect(historyUi).not.toContain("QR Eşleşmeleri");
+    expect(historyUi).toContain("fetchMeQrHareketleri");
 
     expect(hasRolePermission("PERSONEL", "self_service.qr.events.view")).toBe(true);
     expect(hasRolePermission("AUTH_SMOKE_READONLY", "self_service.qr.events.view")).toBe(

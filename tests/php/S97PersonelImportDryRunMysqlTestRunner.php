@@ -52,7 +52,7 @@ function s97CountAudit(PDO $pdo): int
 
 function s97HeaderCsv(array $extra = []): string
 {
-    $cols = PersonelImportDryRunService::TEMPLATE_COLUMNS;
+    $cols = array_merge(PersonelImportDryRunService::TEMPLATE_COLUMNS, ['calisan_kapsami']);
     if (count($extra) > 0) {
         $cols = array_merge($cols, $extra);
     }
@@ -78,12 +78,13 @@ function s97ValidRow(array $overrides = []): string
         'departman' => 'İdari İşler',
         'gorev' => 'Asistan',
         'personel_tipi' => 'Tam Zamanli',
+        'calisan_kapsami' => 'DIS_KAYNAK',
     ];
     foreach ($overrides as $key => $value) {
         $row[$key] = $value;
     }
     $ordered = [];
-    foreach (PersonelImportDryRunService::TEMPLATE_COLUMNS as $col) {
+    foreach (array_merge(PersonelImportDryRunService::TEMPLATE_COLUMNS, ['calisan_kapsami']) as $col) {
         $ordered[] = (string) ($row[$col] ?? '');
     }
 
@@ -237,29 +238,35 @@ try {
     s97Assert(($result['yazma']['salary_write'] ?? true) === false, 'salary_write false');
     s97Assert(($result['satirlar'][0]['tc_kimlik_no_masked'] ?? '') === '100******46', 'turkish/valid row masked TC');
 
-    // IC phone is a missing-info warning, not an import blocker.
+    // External personnel may omit phone; active internal personnel still require an explicit SGK employer.
     $missingPhoneCsv = s97HeaderCsv() . "\r\n" . s97ValidRow([
         'tc_kimlik_no' => '10000000276',
         'sicil_no' => 'PHONE-DEFER',
         'telefon' => '',
     ]) . "\r\n";
     $missingPhone = PersonelImportDryRunService::dryRun($pdo, $missingPhoneCsv, $gyUser, null);
-    s97Assert(($missingPhone['ozet']['gecerli_satir'] ?? 0) === 1, 'missing IC phone remains import-valid');
-    s97Assert(($missingPhone['ozet']['hatali_satir'] ?? 1) === 0, 'missing IC phone has no hard error');
-    s97Assert(($missingPhone['ozet']['warning_sayisi'] ?? 0) === 1, 'missing IC phone warning counted');
-    s97Assert(
-        in_array('PERSONEL_IMPORT_EKSIK_TELEFON', $missingPhone['satirlar'][0]['uyarilar'] ?? [], true),
-        'missing IC phone deferred warning'
-    );
-    s97Assert(($missingPhone['can_apply'] ?? false) === true, 'missing IC phone can_apply');
+    s97Assert(($missingPhone['ozet']['gecerli_satir'] ?? 0) === 1, 'missing external phone remains import-valid');
+    s97Assert(($missingPhone['ozet']['hatali_satir'] ?? 1) === 0, 'missing external phone has no hard error');
+    s97Assert(($missingPhone['ozet']['warning_sayisi'] ?? 0) === 0, 'missing external phone has no warning');
+    s97Assert(($missingPhone['can_apply'] ?? false) === true, 'missing external phone can_apply');
 
-    $nullableExternalCsv = s97HeaderCsv() . ";calisan_kapsami\r\n" . s97ValidRow([
+    $missingIcSgkCsv = s97HeaderCsv() . "\r\n" . s97ValidRow([
+        'calisan_kapsami' => 'IC_PERSONEL',
+    ]) . "\r\n";
+    $missingIcSgk = PersonelImportDryRunService::dryRun($pdo, $missingIcSgkCsv, $gyUser, null);
+    s97Assert(($missingIcSgk['can_apply'] ?? true) === false, 'active IC without explicit SGK cannot apply');
+    s97Assert(
+        in_array('PERSONEL_SGK_ISVEREN_REQUIRED', $missingIcSgk['satirlar'][0]['hata_kodlari'] ?? [], true),
+        'active IC reports explicit SGK requirement'
+    );
+
+    $nullableExternalCsv = s97HeaderCsv() . "\r\n" . s97ValidRow([
         'tc_kimlik_no' => '',
         'sicil_no' => 'DIS-NULLABLE',
         'soyad' => '',
         'dogum_tarihi' => '',
         'telefon' => '',
-    ]) . ";DIS_KAYNAK\r\n";
+    ]) . "\r\n";
     $nullableExternal = PersonelImportDryRunService::dryRun($pdo, $nullableExternalCsv, $gyUser, null);
     s97Assert(($nullableExternal['ozet']['gecerli_satir'] ?? 0) === 1, 'DIS_KAYNAK nullable phone remains valid');
     s97Assert(($nullableExternal['ozet']['warning_sayisi'] ?? 1) === 0, 'DIS_KAYNAK phone has no IC warning');
@@ -436,10 +443,10 @@ try {
     $jaggedResult = PersonelImportDryRunService::dryRun($pdo, $jagged, $gyUser, null);
     s97Assert(in_array('PERSONEL_IMPORT_SATIR_KOLON_UYUMSUZ', $jaggedResult['satirlar'][0]['hata_kodlari'], true), 'jagged row fail-closed');
 
-    // Turkish reference exact-only: ASCII lookalike must fail
+    // A unique Turkish reference accepts ASCII spelling through the canonical match owner.
     $asciiDept = s97HeaderCsv() . "\r\n" . s97ValidRow(['departman' => 'Idari Isler']) . "\r\n";
     $asciiDeptResult = PersonelImportDryRunService::dryRun($pdo, $asciiDept, $gyUser, null);
-    s97Assert(in_array('PERSONEL_IMPORT_REFERANS_BULUNAMADI', $asciiDeptResult['satirlar'][0]['hata_kodlari'], true), 'turkish reference exact match');
+    s97Assert(($asciiDeptResult['ozet']['gecerli_satir'] ?? 0) === 1, 'turkish reference normalized match');
 
     // 13) 500 row limit
     $lines = [s97HeaderCsv()];
@@ -493,6 +500,7 @@ try {
         'gorev_id' => 2,
         'personel_tipi_id' => 1,
         'aktif_durum' => 'AKTIF',
+        'calisan_kapsami' => 'DIS_KAYNAK',
     ]);
     s97Assert($createPayload['ad'] === 'Test', 'create validator regression');
 

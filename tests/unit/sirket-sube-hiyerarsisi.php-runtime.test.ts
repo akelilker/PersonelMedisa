@@ -45,7 +45,7 @@ describe("company/branch hierarchy: read model, API contract, scope and import (
       "branch code stays globally unique across companies",
       "tam_ad is rejected on write: it is a derived read field",
       "a payload sirket_id is refused instead of silently moving the branch",
-      "a payroll employer from another company cannot be attached to this branch",
+      "branch payroll employer may belong to another company",
       "branch code is immutable on edit",
       "company detail lists only its own branches",
       "the legacy flat endpoint still lists every branch",

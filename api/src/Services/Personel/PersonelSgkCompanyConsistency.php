@@ -126,6 +126,10 @@ final class PersonelSgkCompanyConsistency
      */
     public static function evaluateForKapsam(PDO $pdo, string $kapsam, $sgkIsverenId, $subeId): array
     {
+        if (self::isDisKaynakKapsam($kapsam)) {
+            return self::evaluateAgainstSirketForKapsam($pdo, $kapsam, $sgkIsverenId, null);
+        }
+
         return self::evaluateAgainstSirketForKapsam(
             $pdo,
             $kapsam,

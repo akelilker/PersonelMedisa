@@ -355,18 +355,18 @@ try {
         'a payload sirket_id is refused instead of silently moving the branch'
     );
 
-    $sgkMismatch = hierFailure(static function () use ($pdo, $medisa, $sgkKaryapi): void {
-        OrganizasyonService::createSube($pdo, [
-            'kod' => 'MED-BUR',
-            'ad' => 'Bursa',
-            'sgk_isveren_id' => $sgkKaryapi,
-            'departman_ids' => [1],
-        ], (int) $medisa['id']);
-    });
+    $crossCompanyBranch = OrganizasyonService::createSube($pdo, [
+        'kod' => 'MED-BUR',
+        'ad' => 'Bursa',
+        'sgk_isveren_id' => $sgkKaryapi,
+        'departman_ids' => [1],
+    ], (int) $medisa['id']);
     hierAssert(
-        $sgkMismatch !== null && $sgkMismatch['status'] === 409,
-        'a payroll employer from another company cannot be attached to this branch'
+        (int) ($crossCompanyBranch['sgk_isveren']['id'] ?? 0) === $sgkKaryapi,
+        'branch payroll employer may belong to another company'
     );
+
+    OrganizasyonService::deleteSube($pdo, $crossCompanyBranch['id'], (int) $medisa['id']);
 
     $branchKodChange = hierFailure(static function () use ($pdo, $medisa, $medisaAnkara): void {
         OrganizasyonService::updateSube($pdo, $medisaAnkara['id'], [

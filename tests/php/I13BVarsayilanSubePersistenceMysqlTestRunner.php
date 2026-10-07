@@ -416,7 +416,7 @@ try {
     i13bAssert($r['status'] === 200, 'F login 200');
     i13bAssert((int) ($r['payload']['data']['active_sube_id'] ?? 0) === 2, 'F active_sube_id=2');
 
-    // G) Login default NULL → ASC first
+    // G) Login default NULL → all authorized branches
     $r = i13bHttp($pdo, $gy, 'kullanici_update', [
         'id' => $userId,
         'varsayilan_sube_id' => null,
@@ -424,7 +424,7 @@ try {
     i13bAssert($r['status'] === 200, 'G clear default');
     $r = i13bHttp($pdo, null, 'login', ['username' => 'ba_scoped', 'password' => $pass]);
     i13bAssert($r['status'] === 200, 'G login 200');
-    i13bAssert((int) ($r['payload']['data']['active_sube_id'] ?? 0) === 1, 'G active_sube_id=1 ASC first');
+    i13bAssertNullField($r['payload']['data'], 'active_sube_id', 'G active_sube_id=NULL for all branches');
 
     // H) Login: one scope + NULL → sole sube
     $r = i13bHttp($pdo, $gy, 'kullanici_update', [

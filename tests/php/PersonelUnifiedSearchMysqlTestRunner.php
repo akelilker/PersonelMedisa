@@ -76,12 +76,16 @@ try {
             telefon VARCHAR(32) NULL,
             dogum_tarihi DATE NULL,
             sube_id INT UNSIGNED NULL,
+            gorev_id INT UNSIGNED NULL,
             departman_id INT UNSIGNED NULL,
             personel_tipi_id INT UNSIGNED NULL,
             aktif_durum ENUM('AKTIF','PASIF') NOT NULL DEFAULT 'AKTIF',
             calisan_kapsami ENUM('IC_PERSONEL','DIS_KAYNAK') NOT NULL DEFAULT 'IC_PERSONEL'
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
     );
+    $pdo->exec("CREATE TABLE gorevler (id INT UNSIGNED NOT NULL PRIMARY KEY, ad VARCHAR(120) NOT NULL DEFAULT '', departman_id INT UNSIGNED NULL, durum VARCHAR(16) NOT NULL DEFAULT 'AKTIF') ENGINE=InnoDB");
+    $pdo->exec("CREATE TABLE subeler (id INT UNSIGNED NOT NULL PRIMARY KEY, ad VARCHAR(120) NOT NULL DEFAULT '', sirket_id INT UNSIGNED NULL, durum VARCHAR(16) NOT NULL DEFAULT 'AKTIF') ENGINE=InnoDB");
+    $pdo->exec("INSERT INTO subeler (id) VALUES (1), (2)");
 
     $fixtures = [
         // id,  ad,        soyad,      sicil, tc,            telefon,      sube, kapsam
@@ -343,7 +347,7 @@ try {
     $where = ['1=1'];
     $params = [];
     PersonelSearchPredicate::append($where, $params, 'İlker Akel', 'p', 'search', $pdo);
-    pusAssert(count($params) === 8, 'every field/token pair is bound as its own placeholder');
+    pusAssert(count($params) === 12, 'every field/token pair is bound as its own placeholder');
     foreach ($params as $value) {
         pusAssert(is_string($value) && strpos($value, '%') === 0, 'each bound value is a LIKE pattern');
     }

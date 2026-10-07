@@ -141,6 +141,7 @@ function p5MigrationFiles(): array
     $dir = __DIR__ . '/../../api/migrations';
     $files = array_values(array_filter(scandir($dir) ?: [], static function ($name) {
         return (bool) preg_match('/^\d{3}_.+\.sql$/', (string) $name)
+            && (int) substr((string) $name, 0, 3) <= 66
             && $name !== '067_personel_canonical_reference_gate.sql'
             && $name !== '068_sgk_actor_identity_lifecycle_audit.sql'
             && $name !== '069_personel_credential_onboarding.sql'
@@ -268,6 +269,7 @@ function p5CreatePayload(array $overrides = []): array
         'gorev_id' => 2,
         'personel_tipi_id' => 1,
         'aktif_durum' => 'AKTIF',
+        'calisan_kapsami' => 'DIS_KAYNAK',
     ];
 
     return array_merge($base, $overrides);
@@ -276,7 +278,7 @@ function p5CreatePayload(array $overrides = []): array
 /** Legacy CSV headers without org-location optional columns. */
 function p5LegacyCsvHeader(): string
 {
-    return implode(';', [
+    return implode(';', array_merge([
         'tc_kimlik_no',
         'sicil_no',
         'ad',
@@ -292,7 +294,7 @@ function p5LegacyCsvHeader(): string
         'departman',
         'gorev',
         'personel_tipi',
-    ]);
+    ], ['calisan_kapsami']));
 }
 
 function p5LegacyCsvRow(array $overrides = []): string
@@ -313,13 +315,14 @@ function p5LegacyCsvRow(array $overrides = []): string
         'departman' => 'İdari İşler',
         'gorev' => 'Asistan',
         'personel_tipi' => 'Tam Zamanli',
+        'calisan_kapsami' => 'DIS_KAYNAK',
     ], $overrides);
 
     $ordered = [];
     foreach ([
         'tc_kimlik_no', 'sicil_no', 'ad', 'soyad', 'dogum_tarihi', 'dogum_yeri', 'telefon',
         'kan_grubu', 'acil_durum_kisi', 'acil_durum_telefon', 'ise_giris_tarihi',
-        'sube', 'departman', 'gorev', 'personel_tipi',
+        'sube', 'departman', 'gorev', 'personel_tipi', 'calisan_kapsami',
     ] as $col) {
         $ordered[] = (string) ($row[$col] ?? '');
     }
@@ -331,7 +334,7 @@ function p5OrgCsvHeader(): string
 {
     return implode(';', array_merge(
         PersonelImportDryRunService::TEMPLATE_COLUMNS,
-        ['sgk_isveren', 'calisma_lokasyonu']
+        ['sgk_isveren', 'calisma_lokasyonu', 'calisan_kapsami']
     ));
 }
 
@@ -355,10 +358,11 @@ function p5OrgCsvRow(array $overrides = []): string
         'personel_tipi' => 'Tam Zamanli',
         'sgk_isveren' => 'Isveren A',
         'calisma_lokasyonu' => 'Lokasyon A',
+        'calisan_kapsami' => 'DIS_KAYNAK',
     ], $overrides);
 
     $ordered = [];
-    foreach (array_merge(PersonelImportDryRunService::TEMPLATE_COLUMNS, ['sgk_isveren', 'calisma_lokasyonu']) as $col) {
+    foreach (array_merge(PersonelImportDryRunService::TEMPLATE_COLUMNS, ['sgk_isveren', 'calisma_lokasyonu', 'calisan_kapsami']) as $col) {
         $ordered[] = (string) ($row[$col] ?? '');
     }
 
@@ -670,6 +674,8 @@ $pdoPre = p5PdoForDb($dbPre);
 
 try {
     p5ApplyThrough($pdoPre, $files, '062_serbest_zaman_retention_destroy_gate.sql');
+    // Keep the tested org schema absent while enabling the independent employee-scope contract.
+    p5Apply($pdoPre, '066_personel_calisan_kapsami.sql');
     p5Assert(!PersonelOrgLocationSchema::isReady($pdoPre), 'pre-064 org schema not ready');
     p5Assert(!p5ColumnExists($pdoPre, 'haftalik_kapanis_satirlari', 'fazla_calisma_tarih_dagilimi_json'), '063 cols absent pre-064');
     p5SeedOrgRefs($pdoPre);
@@ -818,6 +824,7 @@ try {
         'sicil_no' => 'IMP-B3C',
         'sgk_isveren' => '',
         'calisma_lokasyonu' => 'Lokasyon A',
+        'calisan_kapsami' => 'DIS_KAYNAK',
     ]) . "\r\n";
     $caughtB3c = null;
     try {
@@ -1500,18 +1507,15 @@ try {
     $httpLokOnly = p5InvokeHttp($pdo, $gyUser, 'PUT', '/personeller/' . $idHttpB12, [
         'calisma_lokasyonu_id' => 2,
     ]);
-    p5Assert($httpLokOnly['status'] === 200, 'POST064 HTTP update location 200');
-    p5Assert((int) ($httpLokOnly['payload']['data']['calisma_lokasyonu_id'] ?? 0) === 2, 'POST064 HTTP lok updated');
-    p5Assert((int) ($httpLokOnly['payload']['data']['sgk_isveren_id'] ?? 0) === 2, 'POST064 HTTP employer unchanged');
-    p5Assert((int) ($httpLokOnly['payload']['data']['sube_id'] ?? 0) === 1, 'POST064 HTTP branch unchanged');
-
+    p5Assert($httpLokOnly['status'] === 409, 'POST064 direct location update rejected');
+    p5Assert(($httpLokOnly['payload']['errors'][0]['code'] ?? '') === 'PERSONEL_ORGANIZASYON_CANONICAL_OWNER_REQUIRED', 'POST064 location requires canonical org owner');
     $httpIsvOnly = p5InvokeHttp($pdo, $gyUser, 'PUT', '/personeller/' . $idHttpB12, [
         'sgk_isveren_id' => 1,
     ]);
-    p5Assert($httpIsvOnly['status'] === 200, 'POST064 HTTP update employer 200');
-    p5Assert((int) ($httpIsvOnly['payload']['data']['sgk_isveren_id'] ?? 0) === 1, 'POST064 HTTP employer updated');
-    p5Assert((int) ($httpIsvOnly['payload']['data']['calisma_lokasyonu_id'] ?? 0) === 2, 'POST064 HTTP location unchanged');
-    p5Assert((int) ($httpIsvOnly['payload']['data']['sube_id'] ?? 0) === 1, 'POST064 HTTP branch still unchanged');
+    p5Assert($httpIsvOnly['status'] === 409, 'POST064 direct employer update rejected');
+    p5Assert(($httpIsvOnly['payload']['errors'][0]['code'] ?? '') === 'PERSONEL_ORGANIZASYON_CANONICAL_OWNER_REQUIRED', 'POST064 employer requires canonical org owner');
+    $unchanged = $pdo->query('SELECT calisma_lokasyonu_id, sgk_isveren_id, sube_id FROM personeller WHERE id = ' . $idHttpB12)->fetch(PDO::FETCH_ASSOC);
+    p5Assert((int) $unchanged['calisma_lokasyonu_id'] === 1 && (int) $unchanged['sgk_isveren_id'] === 2 && (int) $unchanged['sube_id'] === 1, 'POST064 rejected direct updates leave org refs unchanged');
 
     // SubeScope list filter via controller (scoped user sees only sube 1)
     $httpScoped = p5InvokeHttp(

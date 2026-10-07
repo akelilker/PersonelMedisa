@@ -49,8 +49,7 @@ class PersonelCompletenessService
                 . " OR IFNULL({$a}.pozisyon_id, 0) <= 0"
             : " OR IFNULL({$a}.sube_id, 0) <= 0"
                 . " OR IFNULL({$a}.departman_id, 0) <= 0"
-                . " OR IFNULL({$a}.gorev_id, 0) <= 0"
-                . " OR IFNULL({$a}.pozisyon_id, 0) <= 0";
+                . " OR IFNULL({$a}.gorev_id, 0) <= 0";
 
         $icSgkPredicate = $hasOrgLocation
             ? " OR ("

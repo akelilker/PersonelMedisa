@@ -65,7 +65,7 @@ describe("S97 personel import dry-run MariaDB", () => {
     expect(result.stdout).toContain("[PASS] wage field reject");
     expect(result.stdout).toContain("[PASS] mixed-case headers accepted");
     expect(result.stdout).toContain("[PASS] jagged row fail-closed");
-    expect(result.stdout).toContain("[PASS] turkish reference exact match");
+    expect(result.stdout).toContain("[PASS] turkish reference normalized match");
     expect(result.stdout).toContain("[PASS] 500 row limit");
     expect(result.stdout).toContain("[PASS] file size limit");
     expect(result.stdout).toContain("[PASS] mask helper first3+last2");

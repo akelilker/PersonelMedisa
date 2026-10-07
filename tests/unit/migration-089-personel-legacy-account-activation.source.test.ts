@@ -14,7 +14,7 @@ describe("migration 089: PERSONEL legacy hesap canonical hizalamasi", () => {
     const migrations = readdirSync(resolve("api/migrations"))
       .filter((name) => /^\d+_.*\.sql$/.test(name))
       .sort();
-    expect(migrations.at(-1)).toBe("097_qr_attendance_location_audit.sql");
+    expect(migrations.at(-1)).toBe("098_birim_ad_duzeltme.sql");
     expect(migrations.filter((name) => name.startsWith("089_"))).toHaveLength(1);
   });
 

@@ -240,21 +240,56 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
-  margin: 0;
+  margin: 0 auto;
   padding: 0;
+  width: 100%;
+  max-width: 100%;
 }
 
 .bugun-personel-overview-card {
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 10px;
   margin: 0;
   padding: 10px 12px;
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.04);
   text-align: left;
+}
+
+.bugun-personel-overview-card--row {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.bugun-personel-overview-duo {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.bugun-personel-overview-card--tile {
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 72px;
+  padding: 12px 8px;
+  text-align: center;
+}
+
+.bugun-personel-overview-tile-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #c9d4e5;
+}
+
+.bugun-personel-overview-tile-value {
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.1;
+  color: #ffffff;
 }
 
 .bugun-personel-overview-card--static {
@@ -305,14 +340,15 @@
 }
 
 .bugun-personel-org-entry {
-  margin: 4px 0 0;
+  align-self: center;
+  margin: 6px 0 0;
   padding: 8px 4px;
   border: 0;
   background: transparent;
   color: #8aa0b8;
   font-size: 13px;
   font-weight: 600;
-  text-align: left;
+  text-align: center;
   text-decoration: underline;
   text-underline-offset: 3px;
   cursor: pointer;

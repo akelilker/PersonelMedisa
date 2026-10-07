@@ -674,37 +674,41 @@ export function BugunPersonelDurumuModal({ open, onClose }: BugunPersonelDurumuM
 
         {!loading && !error && nav.kind === "units" && branchOverviewCounts ? (
           <div className="bugun-personel-overview" data-testid="bugun-branch-overview">
-            <div className="bugun-personel-overview-card bugun-personel-overview-card--static">
+            <div
+              className="bugun-personel-overview-card bugun-personel-overview-card--static bugun-personel-overview-card--row"
+            >
               <span className="bugun-personel-overview-label">Toplam Personel</span>
               <span className="bugun-personel-overview-value" data-testid="bugun-toplam-personel">
                 {branchOverviewCounts.toplam}
               </span>
             </div>
+            <div className="bugun-personel-overview-duo">
+              <button
+                type="button"
+                className="bugun-personel-overview-card bugun-personel-overview-card--btn bugun-personel-overview-card--tile"
+                data-testid="bugun-gelen"
+                onClick={() => setNav({ kind: "branch_group", branch: nav.branch, group: "gelen" })}
+              >
+                <span className="bugun-personel-overview-tile-label">Gelen</span>
+                <span className="bugun-personel-overview-tile-value" data-testid="bugun-gelen-count">
+                  {branchToplamGelen(branchOverviewCounts)}
+                </span>
+              </button>
+              <button
+                type="button"
+                className="bugun-personel-overview-card bugun-personel-overview-card--btn bugun-personel-overview-card--tile"
+                data-testid="bugun-gelmeyen"
+                onClick={() => setNav({ kind: "branch_group", branch: nav.branch, group: "gelmeyen" })}
+              >
+                <span className="bugun-personel-overview-tile-label">Gelmeyen</span>
+                <span className="bugun-personel-overview-tile-value" data-testid="bugun-gelmeyen-count">
+                  {branchToplamGelmeyen(branchOverviewCounts)}
+                </span>
+              </button>
+            </div>
             <button
               type="button"
-              className="bugun-personel-overview-card bugun-personel-overview-card--btn"
-              data-testid="bugun-toplam-gelen"
-              onClick={() => setNav({ kind: "branch_group", branch: nav.branch, group: "gelen" })}
-            >
-              <span className="bugun-personel-overview-label">Toplam Gelen</span>
-              <span className="bugun-personel-overview-value">
-                {branchToplamGelen(branchOverviewCounts)}
-              </span>
-            </button>
-            <button
-              type="button"
-              className="bugun-personel-overview-card bugun-personel-overview-card--btn"
-              data-testid="bugun-toplam-gelmeyen"
-              onClick={() => setNav({ kind: "branch_group", branch: nav.branch, group: "gelmeyen" })}
-            >
-              <span className="bugun-personel-overview-label">Toplam Gelmeyen</span>
-              <span className="bugun-personel-overview-value">
-                {branchToplamGelmeyen(branchOverviewCounts)}
-              </span>
-            </button>
-            <button
-              type="button"
-              className="bugun-personel-overview-card bugun-personel-overview-card--btn"
+              className="bugun-personel-overview-card bugun-personel-overview-card--btn bugun-personel-overview-card--row"
               data-testid="bugun-henuz-degerlendirilmedi"
               disabled={branchOverviewCounts.henuz_degerlendirilmedi <= 0}
               onClick={() =>
@@ -721,6 +725,7 @@ export function BugunPersonelDurumuModal({ open, onClose }: BugunPersonelDurumuM
                   "henuz_degerlendirilmedi",
                   branchOverviewCounts.henuz_degerlendirilmedi
                 )}`}
+                data-testid="bugun-henuz-count"
               >
                 {branchOverviewCounts.henuz_degerlendirilmedi}
               </span>
@@ -744,7 +749,7 @@ export function BugunPersonelDurumuModal({ open, onClose }: BugunPersonelDurumuM
                 <button
                   key={key}
                   type="button"
-                  className={`bugun-personel-overview-card bugun-personel-overview-card--btn bugun-personel-overview-card--compact${countToneClass(
+                  className={`bugun-personel-overview-card bugun-personel-overview-card--btn bugun-personel-overview-card--row bugun-personel-overview-card--compact${countToneClass(
                     key,
                     nav.branch.counts[key]
                   )}`}

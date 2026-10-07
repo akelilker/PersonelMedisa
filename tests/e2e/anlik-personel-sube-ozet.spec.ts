@@ -168,13 +168,15 @@ test.describe("şube detayı sade personel özeti", () => {
     await expect(modal.getByTestId("bugun-branch-overview")).toBeVisible();
     await expect(modal.getByTestId("bugun-unit-101")).toHaveCount(0);
     await expect(modal.getByTestId("bugun-toplam-personel")).toHaveText("110");
-    await expect(modal.getByTestId("bugun-toplam-gelen")).toContainText("72");
-    await expect(modal.getByTestId("bugun-toplam-gelmeyen")).toContainText("25");
-    await expect(modal.getByTestId("bugun-henuz-degerlendirilmedi")).toContainText("13");
+    await expect(modal.getByTestId("bugun-gelen-count")).toHaveText("72");
+    await expect(modal.getByTestId("bugun-gelmeyen-count")).toHaveText("25");
+    await expect(modal.getByTestId("bugun-henuz-count")).toHaveText("13");
+    await expect(modal.getByTestId("bugun-gelen")).toContainText("Gelen");
+    await expect(modal.getByTestId("bugun-gelmeyen")).toContainText("Gelmeyen");
 
     await saveShot(page, "anlik-personel-ozet-mobil-fabrika.png");
 
-    await modal.getByTestId("bugun-toplam-gelmeyen").click();
+    await modal.getByTestId("bugun-gelmeyen").click();
     await expect(modal.getByTestId("bugun-group-breakdown")).toBeVisible();
     await expect(modal.getByTestId("bugun-group-status-izinli")).toContainText("10");
     await expect(modal.getByTestId("bugun-group-status-gelmedi")).toContainText("8");
@@ -189,7 +191,9 @@ test.describe("şube detayı sade personel özeti", () => {
     await modal.getByTestId("bugun-personel-durumu-back").click();
     await modal.getByTestId("bugun-personel-durumu-back").click();
 
-    await modal.getByTestId("bugun-toplam-gelen").click();
+    await modal.getByTestId("bugun-gelen").click();
+    await expect(modal.getByTestId("bugun-group-breakdown")).toBeVisible();
+    await saveShot(page, "anlik-personel-ozet-mobil-gelen-detay.png");
     await expect(modal.getByTestId("bugun-group-status-geldi")).toContainText("50");
     await expect(modal.getByTestId("bugun-group-status-gec_geldi")).toContainText("12");
     await expect(modal.getByTestId("bugun-group-status-erken_cikti")).toContainText("10");

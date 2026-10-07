@@ -107,6 +107,9 @@ test("birim adıyla aynı bölüm adı ikinci satır olarak tekrar gösterilmez"
   await expect(bugunModal.getByTestId("bugun-personel-durumu-title")).toHaveText("Anlık Personel Durumu");
 
   await bugunModal.getByTestId("bugun-branch-5").click();
+  await expect(bugunModal.getByTestId("bugun-branch-overview")).toBeVisible();
+  await expect(bugunModal.getByTestId("bugun-unit-16")).toHaveCount(0);
+  await bugunModal.getByTestId("bugun-org-detay").click();
 
   // 1) birim = bölüm → isim yalnız 1 kez görünür, ikinci satır yok.
   const duplicateUnit = bugunModal.getByTestId("bugun-unit-16");

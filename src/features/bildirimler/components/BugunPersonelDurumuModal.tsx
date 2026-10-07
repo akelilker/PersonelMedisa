@@ -13,9 +13,17 @@ import { useRoleAccess } from "../../../hooks/use-role-access";
 import {
   BUGUN_STATUS_KEYS,
   BUGUN_STATUS_LABEL,
+  BUGUN_SUMMARY_GROUP_LABEL,
+  branchToplamGelen,
+  branchToplamGelmeyen,
+  collectBranchPersonsByStatus,
   filterPersonsByStatus,
+  findPersonUnitInBranch,
   formatCompletionGlyph,
-  type BugunStatusKey
+  statusKeysForSummaryGroup,
+  summaryGroupForStatusKey,
+  type BugunStatusKey,
+  type BugunSummaryGroup
 } from "../../../lib/bildirim/bugun-personel-durumu";
 import {
   PAYROLL_LOCK_EDIT_MESSAGE,
@@ -44,6 +52,9 @@ import type {
 type NavLevel =
   | { kind: "branches" }
   | { kind: "units"; branch: BugunPersonelDurumuBranch }
+  | { kind: "branch_org"; branch: BugunPersonelDurumuBranch }
+  | { kind: "branch_group"; branch: BugunPersonelDurumuBranch; group: BugunSummaryGroup }
+  | { kind: "branch_status"; branch: BugunPersonelDurumuBranch; statusKey: BugunStatusKey }
   | { kind: "unit_roster"; branch: BugunPersonelDurumuBranch; unit: BugunPersonelDurumuUnit }
   | { kind: "status"; branch: BugunPersonelDurumuBranch; unit: BugunPersonelDurumuUnit; statusKey: BugunStatusKey }
   | {
@@ -52,6 +63,7 @@ type NavLevel =
       unit: BugunPersonelDurumuUnit;
       statusKey: BugunStatusKey | null;
       person: BugunPersonelDurumuPerson;
+      fromBranchStatus?: boolean;
     };
 
 type EditFormState = {
@@ -74,7 +86,9 @@ type NavAnchor = {
   birimId: number | null;
   statusKey: BugunStatusKey | null;
   personelId: number | null;
-  view: "units" | "unit_roster" | "status" | "person";
+  group: BugunSummaryGroup | null;
+  view: "units" | "branch_org" | "branch_group" | "branch_status" | "unit_roster" | "status" | "person";
+  fromBranchStatus?: boolean;
 };
 
 function countToneClass(key: BugunStatusKey, value: number): string {
@@ -120,6 +134,15 @@ function restoreNav(payload: BugunPersonelDurumu, anchor: NavAnchor | null): Nav
   if (anchor.view === "units") {
     return { kind: "units", branch };
   }
+  if (anchor.view === "branch_org") {
+    return { kind: "branch_org", branch };
+  }
+  if (anchor.view === "branch_group" && anchor.group) {
+    return { kind: "branch_group", branch, group: anchor.group };
+  }
+  if (anchor.view === "branch_status" && anchor.statusKey) {
+    return { kind: "branch_status", branch, statusKey: anchor.statusKey };
+  }
   const unit = findUnit(branch, anchor.birimId);
   if (!unit) {
     return { kind: "units", branch };
@@ -144,7 +167,8 @@ function restoreNav(payload: BugunPersonelDurumu, anchor: NavAnchor | null): Nav
       branch,
       unit,
       statusKey: anchor.statusKey,
-      person
+      person,
+      fromBranchStatus: anchor.fromBranchStatus === true
     };
   }
   return { kind: "units", branch };
@@ -156,6 +180,13 @@ function resolveBugunBackLabel(nav: NavLevel): string | undefined {
   }
   if (nav.kind === "units") {
     return "Anlık Personel Durumu";
+  }
+  if (nav.kind === "branch_org" || nav.kind === "branch_group") {
+    return nav.branch.sube_adi;
+  }
+  if (nav.kind === "branch_status") {
+    const group = summaryGroupForStatusKey(nav.statusKey);
+    return group ? BUGUN_SUMMARY_GROUP_LABEL[group] : nav.branch.sube_adi;
   }
   if (nav.kind === "unit_roster") {
     return nav.branch.sube_adi;
@@ -174,7 +205,44 @@ function navToAnchor(nav: NavLevel): NavAnchor | null {
     return null;
   }
   if (nav.kind === "units") {
-    return { subeId: nav.branch.sube_id, birimId: null, statusKey: null, personelId: null, view: "units" };
+    return {
+      subeId: nav.branch.sube_id,
+      birimId: null,
+      statusKey: null,
+      personelId: null,
+      group: null,
+      view: "units"
+    };
+  }
+  if (nav.kind === "branch_org") {
+    return {
+      subeId: nav.branch.sube_id,
+      birimId: null,
+      statusKey: null,
+      personelId: null,
+      group: null,
+      view: "branch_org"
+    };
+  }
+  if (nav.kind === "branch_group") {
+    return {
+      subeId: nav.branch.sube_id,
+      birimId: null,
+      statusKey: null,
+      personelId: null,
+      group: nav.group,
+      view: "branch_group"
+    };
+  }
+  if (nav.kind === "branch_status") {
+    return {
+      subeId: nav.branch.sube_id,
+      birimId: null,
+      statusKey: nav.statusKey,
+      personelId: null,
+      group: summaryGroupForStatusKey(nav.statusKey),
+      view: "branch_status"
+    };
   }
   if (nav.kind === "unit_roster") {
     return {
@@ -182,6 +250,7 @@ function navToAnchor(nav: NavLevel): NavAnchor | null {
       birimId: nav.unit.birim_id,
       statusKey: null,
       personelId: null,
+      group: null,
       view: "unit_roster"
     };
   }
@@ -191,6 +260,7 @@ function navToAnchor(nav: NavLevel): NavAnchor | null {
       birimId: nav.unit.birim_id,
       statusKey: nav.statusKey,
       personelId: null,
+      group: null,
       view: "status"
     };
   }
@@ -199,7 +269,9 @@ function navToAnchor(nav: NavLevel): NavAnchor | null {
     birimId: nav.unit.birim_id,
     statusKey: nav.statusKey,
     personelId: nav.person.personel_id,
-    view: "person"
+    group: null,
+    view: "person",
+    fromBranchStatus: nav.fromBranchStatus === true
   };
 }
 
@@ -276,13 +348,16 @@ export function BugunPersonelDurumuModal({ open, onClose }: BugunPersonelDurumuM
     if (nav.kind === "person") {
       return nav.person.ad_soyad;
     }
-    if (nav.kind === "status") {
+    if (nav.kind === "status" || nav.kind === "branch_status") {
       return BUGUN_STATUS_LABEL[nav.statusKey];
+    }
+    if (nav.kind === "branch_group") {
+      return BUGUN_SUMMARY_GROUP_LABEL[nav.group];
     }
     if (nav.kind === "unit_roster") {
       return nav.unit.birim_adi;
     }
-    if (nav.kind === "units") {
+    if (nav.kind === "units" || nav.kind === "branch_org") {
       return nav.branch.sube_adi;
     }
     return "Anlık Personel Durumu";
@@ -290,13 +365,25 @@ export function BugunPersonelDurumuModal({ open, onClose }: BugunPersonelDurumuM
 
   const crumb = useMemo(() => {
     if (nav.kind === "person") {
+      if (nav.fromBranchStatus && nav.statusKey) {
+        return `${nav.branch.sube_adi} · ${BUGUN_STATUS_LABEL[nav.statusKey]}`;
+      }
       const statusPart = nav.statusKey ? ` · ${BUGUN_STATUS_LABEL[nav.statusKey]}` : "";
       return `${nav.branch.sube_adi} · ${nav.unit.birim_adi}${statusPart}`;
+    }
+    if (nav.kind === "branch_status") {
+      const group = summaryGroupForStatusKey(nav.statusKey);
+      return group
+        ? `${nav.branch.sube_adi} · ${BUGUN_SUMMARY_GROUP_LABEL[group]}`
+        : nav.branch.sube_adi;
+    }
+    if (nav.kind === "branch_group") {
+      return nav.branch.sube_adi;
     }
     if (nav.kind === "status") {
       return `${nav.branch.sube_adi} · ${nav.unit.birim_adi}`;
     }
-    if (nav.kind === "unit_roster") {
+    if (nav.kind === "unit_roster" || nav.kind === "branch_org") {
       return nav.branch.sube_adi;
     }
     if (nav.kind === "units") {
@@ -316,6 +403,10 @@ export function BugunPersonelDurumuModal({ open, onClose }: BugunPersonelDurumuM
     setEditForm(null);
     setEditError(null);
     if (nav.kind === "person") {
+      if (nav.fromBranchStatus && nav.statusKey) {
+        setNav({ kind: "branch_status", branch: nav.branch, statusKey: nav.statusKey });
+        return;
+      }
       if (nav.statusKey) {
         setNav({ kind: "status", branch: nav.branch, unit: nav.unit, statusKey: nav.statusKey });
         return;
@@ -323,7 +414,28 @@ export function BugunPersonelDurumuModal({ open, onClose }: BugunPersonelDurumuM
       setNav({ kind: "unit_roster", branch: nav.branch, unit: nav.unit });
       return;
     }
+    if (nav.kind === "branch_status") {
+      if (nav.statusKey === "henuz_degerlendirilmedi") {
+        setNav({ kind: "units", branch: nav.branch });
+        return;
+      }
+      const group = summaryGroupForStatusKey(nav.statusKey);
+      if (group) {
+        setNav({ kind: "branch_group", branch: nav.branch, group });
+        return;
+      }
+      setNav({ kind: "units", branch: nav.branch });
+      return;
+    }
+    if (nav.kind === "branch_group") {
+      setNav({ kind: "units", branch: nav.branch });
+      return;
+    }
     if (nav.kind === "status" || nav.kind === "unit_roster") {
+      setNav({ kind: "branch_org", branch: nav.branch });
+      return;
+    }
+    if (nav.kind === "branch_org") {
       setNav({ kind: "units", branch: nav.branch });
       return;
     }
@@ -338,12 +450,25 @@ export function BugunPersonelDurumuModal({ open, onClose }: BugunPersonelDurumuM
     branch: BugunPersonelDurumuBranch,
     unit: BugunPersonelDurumuUnit,
     person: BugunPersonelDurumuPerson,
-    statusKey: BugunStatusKey | null
+    statusKey: BugunStatusKey | null,
+    fromBranchStatus = false
   ) {
     setEditing(false);
     setEditForm(null);
     setEditError(null);
-    setNav({ kind: "person", branch, unit, person, statusKey });
+    setNav({ kind: "person", branch, unit, person, statusKey, fromBranchStatus });
+  }
+
+  function openBranchPerson(
+    branch: BugunPersonelDurumuBranch,
+    person: BugunPersonelDurumuPerson,
+    statusKey: BugunStatusKey
+  ) {
+    const unit = findPersonUnitInBranch(branch, person.personel_id);
+    if (!unit) {
+      return;
+    }
+    openPerson(branch, unit, person, statusKey, true);
   }
 
   function startEdit(person: BugunPersonelDurumuPerson) {
@@ -423,12 +548,30 @@ export function BugunPersonelDurumuModal({ open, onClose }: BugunPersonelDurumuM
   }
 
   const statusPersons: BugunPersonelDurumuPerson[] =
-    nav.kind === "status" ? filterPersonsByStatus(nav.unit.personeller, nav.statusKey) : [];
+    nav.kind === "status"
+      ? filterPersonsByStatus(nav.unit.personeller, nav.statusKey)
+      : nav.kind === "branch_status"
+        ? collectBranchPersonsByStatus(nav.branch, nav.statusKey)
+        : [];
 
   const periodWritable =
-    nav.kind === "person" || nav.kind === "status" || nav.kind === "unit_roster" || nav.kind === "units"
+    nav.kind === "person" ||
+    nav.kind === "status" ||
+    nav.kind === "branch_status" ||
+    nav.kind === "unit_roster" ||
+    nav.kind === "units" ||
+    nav.kind === "branch_org" ||
+    nav.kind === "branch_group"
       ? nav.branch.period_writable !== false
       : true;
+
+  const branchOverviewCounts =
+    nav.kind === "units" ||
+    nav.kind === "branch_org" ||
+    nav.kind === "branch_group" ||
+    nav.kind === "branch_status"
+      ? nav.branch.counts
+      : null;
 
   return (
     <AppModal
@@ -529,33 +672,120 @@ export function BugunPersonelDurumuModal({ open, onClose }: BugunPersonelDurumuM
           </div>
         ) : null}
 
-        {!loading && !error && nav.kind === "units" ? (
-          <div
-            className="bugun-personel-branch-summary"
-            role="list"
-            data-testid="bugun-branch-summary"
-          >
-            {BUGUN_STATUS_KEYS.map((key) => (
-              <div key={key} className="bugun-personel-summary-row" role="listitem">
-                <span className="bugun-personel-summary-label">{BUGUN_STATUS_LABEL[key]}</span>
-                <span
-                  className={`bugun-personel-summary-value${countToneClass(key, nav.branch.counts[key])}`}
-                >
-                  {nav.branch.counts[key]}
-                </span>
-              </div>
-            ))}
-            <div className="bugun-personel-summary-row" role="listitem">
-              <span className="bugun-personel-summary-label">Birim Bildirimi</span>
-              <span className="bugun-personel-summary-value">
-                {nav.branch.birim_bildirim.tamamlanan} / {nav.branch.birim_bildirim.toplam} Tamamlandı
+        {!loading && !error && nav.kind === "units" && branchOverviewCounts ? (
+          <div className="bugun-personel-overview" data-testid="bugun-branch-overview">
+            <div className="bugun-personel-overview-card bugun-personel-overview-card--static">
+              <span className="bugun-personel-overview-label">Toplam Personel</span>
+              <span className="bugun-personel-overview-value" data-testid="bugun-toplam-personel">
+                {branchOverviewCounts.toplam}
               </span>
             </div>
+            <button
+              type="button"
+              className="bugun-personel-overview-card bugun-personel-overview-card--btn"
+              data-testid="bugun-toplam-gelen"
+              onClick={() => setNav({ kind: "branch_group", branch: nav.branch, group: "gelen" })}
+            >
+              <span className="bugun-personel-overview-label">Toplam Gelen</span>
+              <span className="bugun-personel-overview-value">
+                {branchToplamGelen(branchOverviewCounts)}
+              </span>
+            </button>
+            <button
+              type="button"
+              className="bugun-personel-overview-card bugun-personel-overview-card--btn"
+              data-testid="bugun-toplam-gelmeyen"
+              onClick={() => setNav({ kind: "branch_group", branch: nav.branch, group: "gelmeyen" })}
+            >
+              <span className="bugun-personel-overview-label">Toplam Gelmeyen</span>
+              <span className="bugun-personel-overview-value">
+                {branchToplamGelmeyen(branchOverviewCounts)}
+              </span>
+            </button>
+            <button
+              type="button"
+              className="bugun-personel-overview-card bugun-personel-overview-card--btn"
+              data-testid="bugun-henuz-degerlendirilmedi"
+              disabled={branchOverviewCounts.henuz_degerlendirilmedi <= 0}
+              onClick={() =>
+                setNav({
+                  kind: "branch_status",
+                  branch: nav.branch,
+                  statusKey: "henuz_degerlendirilmedi"
+                })
+              }
+            >
+              <span className="bugun-personel-overview-label">Henüz Değerlendirilmedi</span>
+              <span
+                className={`bugun-personel-overview-value${countToneClass(
+                  "henuz_degerlendirilmedi",
+                  branchOverviewCounts.henuz_degerlendirilmedi
+                )}`}
+              >
+                {branchOverviewCounts.henuz_degerlendirilmedi}
+              </span>
+            </button>
+            <button
+              type="button"
+              className="bugun-personel-org-entry"
+              data-testid="bugun-org-detay"
+              onClick={() => setNav({ kind: "branch_org", branch: nav.branch })}
+            >
+              Organizasyon Detayı
+            </button>
           </div>
         ) : null}
 
-        {!loading && !error && nav.kind === "units" ? (
-          <div className="bugun-personel-unit-list" role="list">
+        {!loading && !error && nav.kind === "branch_group" ? (
+          <div className="bugun-personel-group-breakdown" data-testid="bugun-group-breakdown">
+            {statusKeysForSummaryGroup(nav.group)
+              .filter((key) => nav.branch.counts[key] > 0)
+              .map((key) => (
+                <button
+                  key={key}
+                  type="button"
+                  className={`bugun-personel-overview-card bugun-personel-overview-card--btn bugun-personel-overview-card--compact${countToneClass(
+                    key,
+                    nav.branch.counts[key]
+                  )}`}
+                  data-testid={`bugun-group-status-${key}`}
+                  onClick={() =>
+                    setNav({ kind: "branch_status", branch: nav.branch, statusKey: key })
+                  }
+                >
+                  <span className="bugun-personel-overview-label">{BUGUN_STATUS_LABEL[key]}</span>
+                  <span className={`bugun-personel-overview-value${countToneClass(key, nav.branch.counts[key])}`}>
+                    {nav.branch.counts[key]}
+                  </span>
+                </button>
+              ))}
+          </div>
+        ) : null}
+
+        {!loading && !error && nav.kind === "branch_status" ? (
+          <div className="bugun-personel-person-list" role="list" data-testid="bugun-branch-status-roster">
+            {statusPersons.length === 0 ? (
+              <p className="bugun-personel-state">Bu durumda personel yok.</p>
+            ) : (
+              statusPersons.map((person) => (
+                <button
+                  key={person.personel_id}
+                  type="button"
+                  className="bugun-personel-person-row bugun-personel-person-row--btn"
+                  role="listitem"
+                  data-testid={`bugun-person-${person.personel_id}`}
+                  onClick={() => openBranchPerson(nav.branch, person, nav.statusKey)}
+                >
+                  <strong>{person.ad_soyad}</strong>
+                  <span>{person.detail_line}</span>
+                </button>
+              ))
+            )}
+          </div>
+        ) : null}
+
+        {!loading && !error && nav.kind === "branch_org" ? (
+          <div className="bugun-personel-unit-list" role="list" data-testid="bugun-org-unit-list">
             {nav.branch.units.map((unit) => (
               <div
                 key={`${unit.birim_id ?? "none"}-${unit.birim_adi}`}

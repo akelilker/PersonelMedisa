@@ -1,6 +1,8 @@
 import type {
+  BugunPersonelDurumuBranch,
   BugunPersonelDurumuPerson,
-  BugunPersonelDurumuStatusCounts
+  BugunPersonelDurumuStatusCounts,
+  BugunPersonelDurumuUnit
 } from "../../types/bildirim";
 
 export const BUGUN_STATUS_KEYS = [
@@ -15,6 +17,78 @@ export const BUGUN_STATUS_KEYS = [
 ] as const;
 
 export type BugunStatusKey = (typeof BUGUN_STATUS_KEYS)[number];
+
+/** Sunum gruplaması: gelen toplamı (durum motoru değişmez). */
+export const BUGUN_GELEN_STATUS_KEYS = ["geldi", "gec_geldi", "erken_cikti"] as const satisfies readonly BugunStatusKey[];
+
+/** Sunum gruplaması: gelmeyen toplamı (durum motoru değişmez). */
+export const BUGUN_GELMEYEN_STATUS_KEYS = ["gelmedi", "izinli", "raporlu", "gorevde"] as const satisfies readonly BugunStatusKey[];
+
+export type BugunSummaryGroup = "gelen" | "gelmeyen";
+
+export const BUGUN_SUMMARY_GROUP_LABEL: Record<BugunSummaryGroup, string> = {
+  gelen: "Toplam Gelen",
+  gelmeyen: "Toplam Gelmeyen"
+};
+
+export function statusKeysForSummaryGroup(group: BugunSummaryGroup): readonly BugunStatusKey[] {
+  return group === "gelen" ? BUGUN_GELEN_STATUS_KEYS : BUGUN_GELMEYEN_STATUS_KEYS;
+}
+
+export function summaryGroupForStatusKey(statusKey: BugunStatusKey): BugunSummaryGroup | null {
+  if ((BUGUN_GELEN_STATUS_KEYS as readonly string[]).includes(statusKey)) {
+    return "gelen";
+  }
+  if ((BUGUN_GELMEYEN_STATUS_KEYS as readonly string[]).includes(statusKey)) {
+    return "gelmeyen";
+  }
+  return null;
+}
+
+export function sumStatusSlice(
+  counts: BugunPersonelDurumuStatusCounts,
+  keys: readonly BugunStatusKey[]
+): number {
+  return keys.reduce((acc, key) => acc + counts[key], 0);
+}
+
+export function branchToplamGelen(counts: BugunPersonelDurumuStatusCounts): number {
+  return sumStatusSlice(counts, BUGUN_GELEN_STATUS_KEYS);
+}
+
+export function branchToplamGelmeyen(counts: BugunPersonelDurumuStatusCounts): number {
+  return sumStatusSlice(counts, BUGUN_GELMEYEN_STATUS_KEYS);
+}
+
+export function overviewCountsSatisfyEquality(counts: BugunPersonelDurumuStatusCounts): boolean {
+  return (
+    counts.toplam ===
+    branchToplamGelen(counts) + branchToplamGelmeyen(counts) + counts.henuz_degerlendirilmedi
+  );
+}
+
+export function collectBranchPersonsByStatus(
+  branch: BugunPersonelDurumuBranch,
+  statusKey: BugunStatusKey
+): BugunPersonelDurumuPerson[] {
+  const out: BugunPersonelDurumuPerson[] = [];
+  for (const unit of branch.units) {
+    out.push(...filterPersonsByStatus(unit.personeller, statusKey));
+  }
+  return out;
+}
+
+export function findPersonUnitInBranch(
+  branch: BugunPersonelDurumuBranch,
+  personelId: number
+): BugunPersonelDurumuUnit | null {
+  for (const unit of branch.units) {
+    if (unit.personeller.some((p) => p.personel_id === personelId)) {
+      return unit;
+    }
+  }
+  return null;
+}
 
 export const BUGUN_STATUS_TO_DURUM: Record<BugunStatusKey, string> = {
   geldi: "GELDI",

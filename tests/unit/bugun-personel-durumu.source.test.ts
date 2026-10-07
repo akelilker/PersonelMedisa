@@ -4,10 +4,13 @@ import { describe, expect, it } from "vitest";
 import { hasRolePermission } from "../../src/lib/authorization/role-permissions";
 import {
   BUGUN_STATUS_TO_DURUM,
+  branchToplamGelen,
+  branchToplamGelmeyen,
   countsSatisfyInvariant,
   emptyStatusCounts,
   filterPersonsByStatus,
-  formatCompletionGlyph
+  formatCompletionGlyph,
+  overviewCountsSatisfyEquality
 } from "../../src/lib/bildirim/bugun-personel-durumu";
 import type { BugunPersonelDurumuPerson } from "../../src/types/bildirim";
 
@@ -98,6 +101,23 @@ describe("bugun personel durumu owners", () => {
     expect(BUGUN_STATUS_TO_DURUM.izinli).toBe("IZINLI");
     expect(BUGUN_STATUS_TO_DURUM.henuz_degerlendirilmedi).toBe("HENUZ_DEGERLENDIRILMEDI");
     expect(formatCompletionGlyph("SURESI_GECTI")).toBe("⚠");
+  });
+
+  it("groups branch overview totals without changing status semantics", () => {
+    const counts = emptyStatusCounts();
+    counts.toplam = 110;
+    counts.geldi = 50;
+    counts.gec_geldi = 12;
+    counts.erken_cikti = 10;
+    counts.gelmedi = 8;
+    counts.izinli = 10;
+    counts.raporlu = 5;
+    counts.gorevde = 2;
+    counts.henuz_degerlendirilmedi = 13;
+    expect(branchToplamGelen(counts)).toBe(72);
+    expect(branchToplamGelmeyen(counts)).toBe(25);
+    expect(overviewCountsSatisfyEquality(counts)).toBe(true);
+    expect(countsSatisfyInvariant(counts)).toBe(true);
   });
 
   it("enforces branch/unit count invariant including henuz_degerlendirilmedi", () => {

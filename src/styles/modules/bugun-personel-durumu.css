@@ -235,7 +235,102 @@
   transition: transform 0.2s ease;
 }
 
-/* Şube detayı: 8 durum + Birim Bildirimi sade satır listesi (kutu/çerçeve yok). */
+/* Şube detayı — ilk ekran: kompakt personel devam özeti (organizasyon ağacı değil). */
+.bugun-personel-overview {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+}
+
+.bugun-personel-overview-card {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  text-align: left;
+}
+
+.bugun-personel-overview-card--static {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.bugun-personel-overview-card--btn {
+  width: 100%;
+  color: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.bugun-personel-overview-card--btn:hover:not(:disabled),
+.bugun-personel-overview-card--btn:focus-visible:not(:disabled) {
+  border-color: var(--border-strong);
+  background: rgba(255, 255, 255, 0.07);
+  outline: none;
+}
+
+.bugun-personel-overview-card--btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.bugun-personel-overview-card--compact {
+  padding: 8px 12px;
+}
+
+.bugun-personel-overview-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #c9d4e5;
+}
+
+.bugun-personel-overview-value {
+  font-size: 15px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.bugun-personel-overview-value.is-attention {
+  color: var(--danger);
+}
+
+.bugun-personel-overview-value.is-planned {
+  color: #c9d4e5;
+}
+
+.bugun-personel-org-entry {
+  margin: 4px 0 0;
+  padding: 8px 4px;
+  border: 0;
+  background: transparent;
+  color: #8aa0b8;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.bugun-personel-org-entry:hover,
+.bugun-personel-org-entry:focus-visible {
+  color: #c9d4e5;
+  outline: none;
+}
+
+.bugun-personel-group-breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Eski şube özet satır listesi (birim/org görünümünde kullanılmaz; test uyumu için sınıf kalır). */
 .bugun-personel-branch-summary {
   display: flex;
   flex-direction: column;

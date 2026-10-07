@@ -182,6 +182,7 @@ for (const viewport of [
     await page.screenshot({ path: `${SHOT_DIR}/bugun-l2-${viewport.width}x${viewport.height}.png` });
 
     // İkinci uzun-label L2: back label şube adı, centered title birim adı.
+    await modal.getByTestId("bugun-org-detay").click();
     await modal.getByTestId("bugun-unit-open-10").click();
     await expect(modal.getByTestId("bugun-personel-durumu-title")).toHaveText("Muhasebe");
     const l3 = await readHeaderGeometry(modal);

@@ -21,6 +21,7 @@ Bu dosya, kullanıcının onayladığı kalıcı görsel kararları her biri tek
 | Anlık Personel Durumu — şube kartı | Kolon düzeni | Mobil 3 kolon; masaüstü 5 kolon; son satır dengeli/ortalanmış kalır | 2026-10-06 |
 | Anlık Personel Durumu — şube kartı | Çerçeve davranışı | Normal durumda hafif görünür çerçeve vardır; hover/focus sırasında çerçeve daha belirgin olur; hover'da şube adı hafif büyüyebilir | 2026-10-06 |
 | Anlık Personel Durumu — şube detayı | Geri dönüş | Geri dönüş kırmızı başlığın ALTINDA ayrı geri satırında bulunur (başlığın içine sıkıştırılmaz); home ikonu başlıkta kendi yerinde kalır; başlık ortada kalır | 2026-10-06 |
+| Anlık Personel Durumu — Şube/Lokasyon Detayı | İlk görünüm organizasyon ağacı değil, personel devam özeti olur | Toplam Personel + Toplam Gelen (Geldi/Geç Geldi/Erken Çıktı) + Toplam Gelmeyen (Gelmedi/İzinli/Raporlu/Görevde) + Henüz Değerlendirilmedi. Alt nedenler yalnız ilgili toplam seçilince açılır; bölüm/birim ana ekrana otomatik dökülmez. | 2026-10-07 |
 | Kayıt ve Süreç > Genel | Personel fotoğraf alanı | Sağ üst/sağ tarafta bulunur; gerçek fotoğraf yoksa placeholder/initial gösterilir; soldaki harf avatarı fotoğraf alanının yerine geçmez; yeni fotoğraf upload API'si icat edilmez | 2026-10-06 |
 | Kayıt ve Süreç > Genel | Geri dönüş | `← Personel` kartın içine gömülmez; ayrı geri satırında yer alır; kullanıcı seçim ekranına dönüş davranışı değişmez | 2026-10-06 |
 | Kayıt formu | Mobil 2 kolon | Mobilde 2 kolon korunur; orta ayırıcı korunur; PR #490'daki tek kolon davranışına dönülmez | 2026-10-06 |

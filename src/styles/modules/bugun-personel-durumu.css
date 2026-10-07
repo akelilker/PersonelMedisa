@@ -9,8 +9,9 @@
 }
 
 /*
- * Geri satırı kırmızı header altında: global .modal-body grid serbest alanı satırlara
- * dağıtıyor; yalnız bu modal gövdesinde ilk satır auto, ikinci satır içerik alanı.
+ * Geri satırı geometrisinin sahibi modal.css `.modal-body > .universal-back-bar`.
+ * Burada yalnız bu gövdenin kendi iç boşluğu (12px → 8px) ve panel satırı:
+ * ilk satır auto (geri), ikinci satır içerik alanı.
  */
 .modal-body--bugun-personel:has(> .universal-back-bar) {
   padding-top: 0;
@@ -19,18 +20,6 @@
   grid-template-rows: auto minmax(0, 1fr);
   align-content: start;
   gap: 8px;
-}
-
-.modal-body--bugun-personel:has(> .universal-back-bar) > .universal-back-bar {
-  align-self: start;
-  justify-content: flex-start;
-  width: 100%;
-  padding-top: var(--space-2);
-  padding-bottom: var(--space-1);
-  padding-inline: 0;
-  min-height: 32px;
-  max-height: 40px;
-  box-sizing: border-box;
 }
 
 .modal-body--bugun-personel:has(> .universal-back-bar) > .bugun-personel-panel {

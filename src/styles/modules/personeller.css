@@ -1672,17 +1672,24 @@
   min-height: 0;
   flex: 1 1 auto;
   height: 100%;
+  /* Ortak geri satırı 8px sol hizası: sayfa kutusu (overflow: hidden) body'nin
+     8px sol iç boşluğuna kadar uzanır; içerik sol kenarı padding ile aynı kalır. */
+  margin-left: calc(var(--space-2) - var(--modal-body-inline-pad, var(--space-4)));
+  padding-left: calc(var(--modal-body-inline-pad, var(--space-4)) - var(--space-2));
 }
 
 .personeller-page--kart .personeller-toolbar--kart,
 .personeller-page--kart .vehicles-toolbar {
-  /* Action satırı ikon kutusu yüksekliğine iner (32px): 36px row'un ikon üstünde
-     bıraktığı 2px slack kalkar, ikon grubu header alt sınırına yaslanır. */
-  height: 32px;
-  min-height: 32px;
+  /* Action satırı ortak geri satırı ritmindedir (modal.css `.modal-body >
+     .universal-back-bar`): 8px üst / 4px alt, 40px; "← Şubeler" header altında
+     diğer ekranlarla aynı 8px sol hizada başlar (sayfanın sol iç boşluğuna
+     taşar). Sağ ikon hizası değişmez. */
+  height: 40px;
+  min-height: 40px;
   margin: 0;
   margin-bottom: 0;
-  padding: 0 16px;
+  margin-left: calc(var(--space-2) - var(--modal-body-inline-pad, var(--space-4)));
+  padding: var(--space-2) 16px var(--space-1) 0;
   border-bottom: none;
   border-top: none;
   background: transparent;
@@ -1696,8 +1703,8 @@
 
 .personeller-page--kart .personeller-toolbar-main {
   width: 100%;
-  min-height: 32px;
-  height: 32px;
+  min-height: 28px;
+  height: 28px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1736,7 +1743,6 @@
   /* Sol ok ile "Şubeler" etiketi arası kontrat: 4px. */
   gap: 4px;
   margin: 0;
-  padding: 0;
   border: none;
   background: transparent;
   color: inherit;
@@ -2184,6 +2190,11 @@
     min-height: 44px;
   }
 
+  .personeller-page--kart .personeller-toolbar--kart,
+  .personeller-page--kart .vehicles-toolbar {
+    padding-block: 0;
+  }
+
   .personeller-page--kart .personeller-icon-btn,
   .personeller-page--kart .vt-icon-btn {
     min-width: 40px;
@@ -2299,12 +2310,25 @@
   width: 100%;
 }
 
+/* Toplu Kayıt Aktarma: geri satırı layout sarmalayıcısında; ortak modal geri satırı
+   ölçüsü (modal.css `.modal-body > .universal-back-bar`) burada aynen uygulanır:
+   header'ın hemen altında, 8px sol hizada. */
+.modal-body:has(> .personel-import-layout) {
+  --modal-body-inline-pad: 8px;
+  padding-top: 0;
+}
+
+.personel-import-layout > .personel-import-back-bar {
+  min-height: 32px;
+  max-height: 40px;
+}
+
 .personel-import-back-bar {
   flex: 0 0 auto;
   align-self: stretch;
   width: 100%;
   margin: 0;
-  padding: 4px 0 4px;
+  padding: var(--space-2) 0 var(--space-1);
   border-bottom: none;
   position: static;
   z-index: auto;

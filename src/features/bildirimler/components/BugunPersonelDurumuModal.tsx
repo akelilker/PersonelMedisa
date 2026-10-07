@@ -428,7 +428,7 @@ export function BugunPersonelDurumuModal({ open, onClose }: BugunPersonelDurumuM
     if (nav.kind === "status") {
       return `${nav.branch.sube_adi} · ${nav.unit.birim_adi}`;
     }
-    if (nav.kind === "unit_roster" || nav.kind === "branch_org") {
+    if (nav.kind === "unit_roster") {
       return nav.branch.sube_adi;
     }
     return null;
@@ -759,7 +759,7 @@ export function BugunPersonelDurumuModal({ open, onClose }: BugunPersonelDurumuM
             </div>
             <button
               type="button"
-              className="bugun-personel-overview-card bugun-personel-overview-card--btn bugun-personel-overview-card--row"
+              className="bugun-personel-overview-card bugun-personel-overview-card--btn bugun-personel-overview-card--row bugun-personel-overview-card--pair-center"
               data-testid="bugun-henuz-degerlendirilmedi"
               disabled={branchOverviewCounts.henuz_degerlendirilmedi <= 0}
               onClick={() => setNav({ kind: "branch_pending_roster", branch: nav.branch })}

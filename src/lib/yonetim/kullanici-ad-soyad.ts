@@ -11,3 +11,14 @@ export function normalizeKullaniciAdSoyadForWrite(value: string) {
     .trim()
     .replace(/\s+/g, " ");
 }
+
+/**
+ * Retention imha / test-fixture tombstone placeholder'ı (backend
+ * PersonelOzlukDestructionHandler: ad='DESTROYED', soyad='PERSONEL').
+ * Bir kişinin adı değildir; Kullanıcı Yönetimi'nde görünen ad olarak gösterilmez.
+ */
+const TOMBSTONED_PERSONEL_AD_SOYAD = "DESTROYED PERSONEL";
+
+export function isTombstonedPersonelAdSoyad(value: string | null | undefined) {
+  return normalizeKullaniciAdSoyadForWrite(value ?? "").toUpperCase() === TOMBSTONED_PERSONEL_AD_SOYAD;
+}

@@ -27,11 +27,18 @@ use Medisa\Api\Services\Organizasyon\OrganizasyonAuditContext;
 use Medisa\Api\Services\Organizasyon\OrganizasyonAuditWriter;
 use Medisa\Api\Services\Organizasyon\OrganizasyonException;
 use Medisa\Api\Services\Organizasyon\OrganizasyonService;
+use Medisa\Api\Services\Retention\PersonelArchiveGate;
 use PDO;
 use PDOException;
 
 class YonetimController
 {
+    /**
+     * De-identified personel placeholder written by
+     * PersonelOzlukDestructionHandler::tombstonePersonelIdentity (ad='DESTROYED', soyad='PERSONEL').
+     * It is retention evidence, never a person's name, so it is not surfaced as a display name.
+     */
+    private const TOMBSTONED_PERSONEL_AD_SOYAD = 'DESTROYED PERSONEL';
 
     /** Reuses the canonical user projection without publishing the user directory. */
     public static function finalCloseRead(int $userId): array
@@ -929,7 +936,23 @@ class YonetimController
         if ($hasMustChangePassword) {
             $selectCols[] = 'must_change_password';
         }
-        $selectSql = 'SELECT ' . implode(', ', $selectCols) . ' FROM users ORDER BY id ASC';
+        // Default list hides accounts bound to an operationally hidden personel (AKTIF TEST_FIXTURE
+        // classification, incl. tombstoned fixtures) via the canonical PersonelArchiveGate predicate.
+        // Only this list (and the counters derived from it) is filtered; detail/revoke/audit by id
+        // stay unfiltered. include_hidden=1 is a diagnostics-only escape hatch (no UI).
+        $where = [];
+        $includeHidden = (string) $request->getQuery('include_hidden', '') === '1';
+        if ($hasPersonelId && !$includeHidden) {
+            PersonelArchiveGate::appendOperationalExclusion($pdo, $where, 'p');
+        }
+        $qualifiedCols = array_map(static function ($col) {
+            return 'u.' . $col;
+        }, $selectCols);
+        $selectSql = 'SELECT ' . implode(', ', $qualifiedCols) . ' FROM users u';
+        if ($where !== []) {
+            $selectSql .= ' LEFT JOIN personeller p ON p.id = u.personel_id WHERE ' . implode(' AND ', $where);
+        }
+        $selectSql .= ' ORDER BY u.id ASC';
         $stmt = $pdo->query($selectSql);
         $rows = $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
         $userIds = [];
@@ -1734,7 +1757,11 @@ class YonetimController
         $personelAdSoyad = null;
         if ($hasPersonelIdColumn) {
             $personelId = self::readStoredPersonelIdFromRow($row);
-            if ($personelId !== null && isset($personelAdById[$personelId])) {
+            if (
+                $personelId !== null
+                && isset($personelAdById[$personelId])
+                && !self::isTombstonedPersonelAdSoyad($personelAdById[$personelId])
+            ) {
                 $personelAdSoyad = $personelAdById[$personelId];
             }
         }
@@ -1763,6 +1790,14 @@ class YonetimController
         }
 
         return $mapped;
+    }
+
+    /** @param mixed $adSoyad */
+    private static function isTombstonedPersonelAdSoyad($adSoyad)
+    {
+        $normalized = strtoupper(trim((string) preg_replace('/\s+/', ' ', (string) $adSoyad)));
+
+        return $normalized === self::TOMBSTONED_PERSONEL_AD_SOYAD;
     }
 
     /** @param array<string, mixed> $row */

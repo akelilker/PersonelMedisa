@@ -56,7 +56,10 @@ import {
   normalizeKullaniciSearchQuery
 } from "../../../lib/yonetim/kullanici-search";
 import { resolveBoundUserCanonicalUsernameView } from "../../../lib/yonetim/bound-user-canonical-username";
-import { normalizeKullaniciAdSoyadForWrite } from "../../../lib/yonetim/kullanici-ad-soyad";
+import {
+  isTombstonedPersonelAdSoyad,
+  normalizeKullaniciAdSoyadForWrite
+} from "../../../lib/yonetim/kullanici-ad-soyad";
 import type { UserRole } from "../../../types/auth";
 import { ASSIGNABLE_USER_ROLES, WRITE_COMPANY_SCOPED_ROLES } from "../../../types/auth";
 import type { Personel } from "../../../types/personel";
@@ -1029,7 +1032,14 @@ export function YonetimPaneliPage() {
 
   function formatKullaniciDisplayName(item: YonetimKullanici) {
     if (item.kullanici_tipi === "IC_PERSONEL" && item.personel_id != null) {
-      return personelDisplayNameMap.get(item.personel_id) ?? formatAdSoyad(item.personel_ad_soyad ?? item.ad_soyad);
+      const mappedName = personelDisplayNameMap.get(item.personel_id);
+      if (mappedName && !isTombstonedPersonelAdSoyad(mappedName)) {
+        return mappedName;
+      }
+      if (isTombstonedPersonelAdSoyad(item.personel_ad_soyad)) {
+        return (item.username ?? "").trim() || formatUserRoleLabel(item.rol);
+      }
+      return formatAdSoyad(item.personel_ad_soyad ?? item.ad_soyad);
     }
 
     return formatAdSoyad(item.ad_soyad);
@@ -1040,9 +1050,13 @@ export function YonetimPaneliPage() {
       const linkedPersonel = personeller.find((personel) => personel.id === item.personel_id);
       if (linkedPersonel) {
         const personelLabel = [linkedPersonel.ad, linkedPersonel.soyad].filter(Boolean).join(" ");
-        if (personelLabel && !isCorruptedDisplayText(personelLabel)) {
+        if (personelLabel && !isCorruptedDisplayText(personelLabel) && !isTombstonedPersonelAdSoyad(personelLabel)) {
           return personelLabel;
         }
+      }
+
+      if (isTombstonedPersonelAdSoyad(item.personel_ad_soyad)) {
+        return (item.username ?? "").trim() || formatUserRoleLabel(item.rol);
       }
 
       const fallback = (item.personel_ad_soyad ?? item.ad_soyad ?? "").trim();

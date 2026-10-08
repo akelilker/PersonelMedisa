@@ -6,11 +6,11 @@ export type PersonelFirstLoginFilter = "all" | "pending" | "completed";
  *         (onboarding, eski hesap aktivasyonu veya "Başlangıç Şifresine Sıfırla");
  * false = zorunlu değişiklik bayrağı yok (kullanıcı kendi şifresini belirledi veya hiç
  *         istenmedi).
- * Giriş geçmişi bu alandan çıkarılmaz ("hiç giriş yapmadı" denmez). Kısa tutulur: kart
- * rozeti dar masaüstü kartında 2 satıra sığmalıdır.
+ * Giriş geçmişi bu alandan çıkarılmaz ("hiç giriş yapmadı" denmez). Dar masaüstü kartında
+ * rozet kendi owner CSS'iyle (yonetim.css) satır kırarak sığar.
  */
-export const PERSONEL_FIRST_LOGIN_PENDING_LABEL = "Geçici Şifre";
-export const PERSONEL_FIRST_LOGIN_COMPLETE_LABEL = "Kalıcı Şifre";
+export const PERSONEL_FIRST_LOGIN_PENDING_LABEL = "Şifre Değişimi Gerekli";
+export const PERSONEL_FIRST_LOGIN_COMPLETE_LABEL = "Şifre Değişimi Gerekmiyor";
 
 export type PersonelFirstLoginUserLike = {
   personel_id?: number | null;

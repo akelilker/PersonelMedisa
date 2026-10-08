@@ -7,8 +7,10 @@ import type { YonetimKullanici } from "../../src/types/yonetim";
 /**
  * Kullanıcı Yönetimi kartları: gerçek render ile görünen metin.
  * - Aynı kişiye ait iki ayrı hesap (yönetici + PERSONEL) iki ayrı kart kalır, birleşmez.
- * - Ad Soyad onaylı kurala göre (Ad Title Case + SOYAD BÜYÜK) iki kartta aynı biçimde.
- * - Boş şube ataması rol kuralına göre etiketlenir ("Tüm Şubeler" yalnız global rollerde).
+ * - Ad Soyad onaylı kurala göre (Ad Title Case + SOYAD BÜYÜK) iki kartta aynı biçimde;
+ *   kartlar görünür @kullanıcı adıyla ayırt edilir.
+ * - Kapsam etiketi backend'in etkin kapsamını söyler (OrgScope/AuthMiddleware/HrWriteScope):
+ *   "Tüm Şubeler" yalnız gerçekten sınırsız/organizasyon geneli rollerde.
  * - Şifre durumu yalnız must_change_password'ın kanıtladığını söyler.
  * Liste yalnız okunur; hiçbir yazma API'si çağrılmaz.
  */
@@ -65,11 +67,14 @@ const kullanicilar: YonetimKullanici[] = [
     durum: "AKTIF"
   },
   { id: 5, username: "birim", ad_soyad: "Birim Amir", kullanici_tipi: "IC_PERSONEL", rol: "BIRIM_AMIRI", personel_id: null, sube_ids: [], birim_ids: [7], varsayilan_sube_id: null, durum: "AKTIF" },
-  { id: 6, username: "bolum", ad_soyad: "Bolum Yonetici", kullanici_tipi: "IC_PERSONEL", rol: "BOLUM_YONETICISI", personel_id: null, sube_ids: [], bolum_ids: [], varsayilan_sube_id: null, durum: "AKTIF" },
+  { id: 6, username: "bolum", ad_soyad: "Bolum Yonetici", kullanici_tipi: "IC_PERSONEL", rol: "BOLUM_YONETICISI", personel_id: null, sube_ids: [1], bolum_ids: [], varsayilan_sube_id: null, durum: "AKTIF" },
   { id: 7, username: "muhasebe", ad_soyad: "Muhasebe Kisi", kullanici_tipi: "IC_PERSONEL", rol: "MUHASEBE", personel_id: null, sube_ids: [], sirket_ids: [1], varsayilan_sube_id: null, durum: "AKTIF" },
-  { id: 8, username: "ik", ad_soyad: "Ik Sorumlu", kullanici_tipi: "IC_PERSONEL", rol: "IK_SORUMLUSU", personel_id: null, sube_ids: [], varsayilan_sube_id: null, durum: "AKTIF" },
+  { id: 8, username: "ik", ad_soyad: "Ik Sorumlu", kullanici_tipi: "IC_PERSONEL", rol: "IK_SORUMLUSU", personel_id: null, sube_ids: [1], varsayilan_sube_id: null, durum: "AKTIF" },
   { id: 9, username: "sistem", ad_soyad: "Sistem Yonetici", kullanici_tipi: "IC_PERSONEL", rol: "SISTEM_YONETICISI", personel_id: null, sube_ids: [], varsayilan_sube_id: null, durum: "AKTIF" },
-  { id: 10, username: "sube", ad_soyad: "Sube Yonetici", kullanici_tipi: "IC_PERSONEL", rol: "SUBE_YONETICISI", personel_id: null, sube_ids: [], varsayilan_sube_id: null, durum: "AKTIF" }
+  { id: 10, username: "sube", ad_soyad: "Sube Yonetici", kullanici_tipi: "IC_PERSONEL", rol: "SUBE_YONETICISI", personel_id: null, sube_ids: [], varsayilan_sube_id: null, durum: "AKTIF" },
+  { id: 11, username: "ikpersonel", ad_soyad: "Ik Personel", kullanici_tipi: "IC_PERSONEL", rol: "IK_PERSONELI", personel_id: null, sube_ids: [2], sirket_ids: [1], varsayilan_sube_id: null, durum: "AKTIF" },
+  { id: 12, username: "muhasebe.sube", ad_soyad: "Muhasebe Sube", kullanici_tipi: "IC_PERSONEL", rol: "MUHASEBE", personel_id: null, sube_ids: [1], sirket_ids: [1], varsayilan_sube_id: null, durum: "AKTIF" },
+  { id: 13, username: "gy.global", ad_soyad: "Global Yonetici", kullanici_tipi: "HARICI", rol: "GENEL_YONETICI", personel_id: null, sube_ids: [], varsayilan_sube_id: null, durum: "AKTIF" }
 ];
 
 const yonetimApi = vi.hoisted(() => ({
@@ -115,7 +120,10 @@ import { YonetimPaneliPage } from "../../src/features/yonetim/pages/YonetimPanel
 function cardTexts(container: HTMLElement) {
   return Array.from(container.querySelectorAll(".yonetim-card-grid--users article")).map((card) => ({
     name: card.querySelector("strong")?.textContent ?? "",
-    lines: Array.from(card.querySelectorAll(".yonetim-card-meta > span")).map((span) => span.textContent ?? "")
+    username: card.querySelector(".yonetim-card-username")?.textContent ?? "",
+    lines: Array.from(card.querySelectorAll(".yonetim-card-meta > span:not(.yonetim-card-username)")).map(
+      (span) => span.textContent ?? ""
+    )
   }));
 }
 
@@ -147,16 +155,21 @@ describe("Kullanıcı Yönetimi kart etiketleri (gerçek render)", () => {
     const cards = cardTexts(container);
 
     expect(cards).toHaveLength(kullanicilar.length);
-    expect(cards[0]).toEqual({ name: "İlker AKEL", lines: ["Medisa Fabrika, Medisa Giresun"] });
+    expect(cards[0]).toEqual({ name: "İlker AKEL", username: "@ilkerA", lines: ["Medisa Fabrika, Medisa Giresun"] });
     expect(cards[1]).toEqual({
       name: "İlker AKEL",
-      lines: ["Kendi Kaydı", "Kalıcı Şifre"]
+      username: "@ilker.akel",
+      lines: ["Kendi Kaydı", "Şifre Değişimi Gerekmiyor"]
     });
-    expect(cards[2]).toEqual({ name: "Serhan KÖSE", lines: ["Medisa Fabrika, Medisa Giresun"] });
+    expect(cards[2]).toEqual({ name: "Serhan KÖSE", username: "@serhanK", lines: ["Medisa Fabrika, Medisa Giresun"] });
     expect(cards[3]).toEqual({
       name: "Serhan KÖSE",
-      lines: ["Kendi Kaydı", "Geçici Şifre"]
+      username: "@serhan.kose",
+      lines: ["Kendi Kaydı", "Şifre Değişimi Gerekli"]
     });
+    // Liste her kullanıcı id'si için tek kart üretir; aynı adlı kartlar farklı hesaplardır.
+    expect(new Set(cards.map((card) => card.username)).size).toBe(kullanicilar.length);
+    expect(screen.getByTestId("yonetim-kullanici-username-1").getAttribute("title")).toBe("@ilkerA");
 
     // Görünüm düzeltmesi hesaplara dokunmaz: yazma/sıfırlama API'si çağrılmaz.
     expect(yonetimApi.createYonetimKullanici).not.toHaveBeenCalled();
@@ -165,28 +178,35 @@ describe("Kullanıcı Yönetimi kart etiketleri (gerçek render)", () => {
     expect(yonetimApi.fixYonetimKullaniciCanonicalUsername).not.toHaveBeenCalled();
   });
 
-  it("boş şube atamasını rol kuralına göre etiketler", async () => {
+  it("kapsam etiketi rolün etkin kapsamını gösterir, açık şube atamasıyla karıştırmaz", async () => {
     const { container } = await renderPanel();
     const scopeByIndex = cardTexts(container).map((card) => card.lines[0]);
 
     expect(scopeByIndex.slice(4)).toEqual([
       "Birim Kapsamı",
+      // Bölüm yöneticisinde kapsam user_bolumler'dir; açık şube satırı erişim vermez.
       "Atama Yok",
       "Şirket Kapsamı",
+      // İK okuması rol kaynaklıdır; açık şube satırı okumayı daraltmaz.
       "Tüm Şubeler",
       "Tüm Şubeler",
-      "Atama Yok"
+      "Atama Yok",
+      // IK_PERSONELI her yeri okur ama yalnız atanmış şirkette yazar.
+      "Okuma: Tüm Şubeler",
+      "Medisa Fabrika + Şirket",
+      "Tüm Şubeler"
     ]);
-    expect(scopeByIndex.filter((label) => label === "Tüm Şubeler")).toHaveLength(2);
+    // Açık şube atanmış Genel Yönetici backend'de o şubelerle sınırlıdır: "Tüm Şubeler" denmez.
+    expect(scopeByIndex[0]).toBe("Medisa Fabrika, Medisa Giresun");
   });
 
   it("şifre durumu sayaç ve filtre metinleri yeni terminolojiyi kullanır", async () => {
     await renderPanel();
 
     const summary = screen.getByTestId("yonetim-kullanici-first-login-summary");
-    expect(summary.textContent).toContain("Geçici Şifre");
-    expect(summary.textContent).toContain("Kalıcı Şifre");
-    expect(summary.textContent).not.toContain("İlk Giriş");
+    expect(summary.textContent).toContain("Şifre Değişimi Gerekli");
+    expect(summary.textContent).toContain("Şifre Değişimi Gerekmiyor");
+    expect(summary.textContent).not.toMatch(/giriş/i);
     expect(screen.getByTestId("yonetim-kullanici-first-login-pending-count").textContent).toBe("1");
     expect(screen.getByTestId("yonetim-kullanici-first-login-completed-count").textContent).toBe("1");
     expect(screen.getByLabelText("Şifre Durumu")).toBeTruthy();

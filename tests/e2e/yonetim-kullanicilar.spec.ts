@@ -59,11 +59,13 @@ test.describe("yonetim kullanicilar API (S44)", () => {
     await expect(page.getByTestId("yonetim-section-kullanicilar")).toBeVisible();
     await expect(page.getByTestId("yonetim-kullanici-first-login-pending-count")).toHaveText("1");
     await expect(page.getByTestId("yonetim-kullanici-first-login-completed-count")).toHaveText("0");
-    await expect(page.getByTestId("yonetim-kullanici-first-login-badge-3")).toHaveText("Geçici Şifre");
+    await expect(page.getByTestId("yonetim-kullanici-first-login-badge-3")).toHaveText("Şifre Değişimi Gerekli");
+    // Aynı adlı ayrı hesaplar kartta kullanıcı adıyla ayırt edilir.
+    await expect(page.getByTestId("yonetim-kullanici-username-3")).toHaveText(/^@\S+$/);
     await expect(page.getByTestId("yonetim-kullanici-first-login-badge-1")).toHaveCount(0);
 
     await page.getByLabel("Şifre Durumu").selectOption("pending");
-    await expect(page.locator(".yonetim-card-grid--users")).toContainText("Geçici Şifre");
+    await expect(page.locator(".yonetim-card-grid--users")).toContainText("Şifre Değişimi Gerekli");
     await expect(page.locator(".yonetim-card-grid--users article")).toHaveCount(1);
 
     await page.getByLabel("Şifre Durumu").selectOption("completed");

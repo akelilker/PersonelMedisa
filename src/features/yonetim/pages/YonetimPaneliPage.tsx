@@ -591,18 +591,32 @@ function roleIn(roles: readonly UserRole[], role: UserRole) {
   return (roles as readonly string[]).includes(role);
 }
 
+function formatSubeNames(subeIds: number[], subeNameMap: Map<number, string>) {
+  return subeIds.map((subeId) => subeNameMap.get(subeId) ?? `Şube ${subeId}`).join(", ");
+}
+
 /**
- * Display-only. Boş `sube_ids` yalnız global kapsamlı rollerde "Tüm Şubeler" demektir
- * (OrgScope GLOBAL_ROLES + İK organizasyon geneli okuma). Diğer rollerde kapsam bölüm/birim
- * atamasından, şirket/SGK kapsamından veya personel bağlantısından gelir; atama yoksa
- * backend erişimi reddeder. Yetkiyi değiştirmez, yalnız gerçek kuralı metne çevirir.
+ * Display-only: kartta/tabloda görünen kapsam, backend'in *etkin* kapsam kuralını metne çevirir
+ * (OrgScope + AuthMiddleware + HrWriteScope). Yetkiyi değiştirmez. `sube_ids` listede yalnız açık
+ * user_subeler atamasıdır; rolün kapsamı ondan farklı olabildiği için rol önce gelir.
+ * - PERSONEL: yalnız bağlı personel kaydı.
+ * - İK: okuma rol kaynaklı, tüm organizasyon; açık şube satırları okumayı daraltmaz.
+ *   IK_SORUMLUSU her yerde yazar; IK_PERSONELI yalnız atanmış şirketlerde yazar → "Okuma:" niteliği.
+ * - BÖLÜM/BİRİM: kapsam user_bolumler/user_birimler'den gelir; atama yoksa erişim yok.
+ * - GENEL_YONETICI/SISTEM_YONETICISI: açık şube yoksa sınırsız; açık şube varsa o şubelerle sınırlı.
+ * - Diğerleri: açık şubeler, şirket ve SGK kapsamı birlikte; hiçbiri yoksa erişim yok.
+ * Kart metni 2 satır yüksekliğindedir ve kırpılır; etiketler bu yüzden kısa tutulur.
  */
-function formatEmptySubeScopeLabel(scope: KullaniciScopeContext) {
-  if (roleIn(GLOBAL_SCOPE_ROLES, scope.rol) || roleIn(ORGANIZATION_GLOBAL_READ_ROLES, scope.rol)) {
-    return "Tüm Şubeler";
-  }
+function formatKullaniciScopeLabel(
+  subeIds: number[],
+  subeNameMap: Map<number, string>,
+  scope: KullaniciScopeContext
+) {
   if (scope.rol === "PERSONEL") {
     return "Kendi Kaydı";
+  }
+  if (roleIn(ORGANIZATION_GLOBAL_READ_ROLES, scope.rol)) {
+    return roleIn(WRITE_COMPANY_SCOPED_ROLES, scope.rol) ? "Okuma: Tüm Şubeler" : "Tüm Şubeler";
   }
   if (roleIn(BOLUM_ASSIGNMENT_ROLES, scope.rol)) {
     return (scope.bolum_ids?.length ?? 0) > 0 ? "Bölüm Kapsamı" : "Atama Yok";
@@ -611,9 +625,17 @@ function formatEmptySubeScopeLabel(scope: KullaniciScopeContext) {
     return (scope.birim_ids?.length ?? 0) > 0 ? "Birim Kapsamı" : "Atama Yok";
   }
 
-  // Kart metni 2 satıra sığacak kadar kısa tutulur (kart yüksekliği sabit, metin kırpılır).
+  const subeLabel = subeIds.length > 0 ? formatSubeNames(subeIds, subeNameMap) : null;
+  if (roleIn(GLOBAL_SCOPE_ROLES, scope.rol)) {
+    return subeLabel ?? "Tüm Şubeler";
+  }
+
   const hasSirket = (scope.sirket_ids?.length ?? 0) > 0;
   const hasSgk = (scope.sgk_isveren_ids?.length ?? 0) > 0;
+  if (subeLabel) {
+    const extra = [hasSirket ? "Şirket" : null, hasSgk ? "SGK" : null].filter(Boolean);
+    return extra.length > 0 ? `${subeLabel} + ${extra.join(" + ")}` : subeLabel;
+  }
   if (hasSirket && hasSgk) {
     return "Şirket + SGK";
   }
@@ -631,12 +653,11 @@ function formatSubeScopeLabel(
   subeNameMap: Map<number, string>,
   scope?: KullaniciScopeContext
 ) {
-  if (subeIds.length === 0) {
-    // Rol bilgisi olmayan çağrı (süreç log metni) eski metni korur.
-    return scope ? formatEmptySubeScopeLabel(scope) : "Tüm Şubeler";
+  if (scope) {
+    return formatKullaniciScopeLabel(subeIds, subeNameMap, scope);
   }
-
-  return subeIds.map((subeId) => subeNameMap.get(subeId) ?? `Şube ${subeId}`).join(", ");
+  // Rol bilgisi olmayan çağrı (süreç log metni) eski metni korur.
+  return subeIds.length === 0 ? "Tüm Şubeler" : formatSubeNames(subeIds, subeNameMap);
 }
 
 function normalizeNumberArray(values: number[]) {
@@ -1903,6 +1924,15 @@ export function YonetimPaneliPage() {
                 >
                   <div className="yonetim-card-meta">
                     <strong>{formatKullaniciCardLabel(item)}</strong>
+                    {item.username ? (
+                      <span
+                        className="yonetim-card-username"
+                        title={`@${item.username}`}
+                        data-testid={`yonetim-kullanici-username-${item.id}`}
+                      >
+                        @{item.username}
+                      </span>
+                    ) : null}
                     <span>{formatSubeScopeLabel(item.sube_ids, subeNameMap, item)}</span>
                     {firstLoginLabel ? (
                       <span

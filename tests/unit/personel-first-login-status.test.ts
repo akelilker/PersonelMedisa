@@ -9,20 +9,20 @@ import {
 
 describe("personel first-login status visibility", () => {
   it("labels state only what must_change_password proves (no login-history claim)", () => {
-    expect(PERSONEL_FIRST_LOGIN_PENDING_LABEL).toBe("Geçici Şifre");
-    expect(PERSONEL_FIRST_LOGIN_COMPLETE_LABEL).toBe("Kalıcı Şifre");
+    expect(PERSONEL_FIRST_LOGIN_PENDING_LABEL).toBe("Şifre Değişimi Gerekli");
+    expect(PERSONEL_FIRST_LOGIN_COMPLETE_LABEL).toBe("Şifre Değişimi Gerekmiyor");
     for (const label of [PERSONEL_FIRST_LOGIN_PENDING_LABEL, PERSONEL_FIRST_LOGIN_COMPLETE_LABEL]) {
       expect(label).not.toMatch(/giriş/i);
     }
   });
 
-  it("E: PERSONEL-bound must_change_password=true → Geçici Şifre", () => {
+  it("E: PERSONEL-bound must_change_password=true → Şifre Değişimi Gerekli", () => {
     expect(
       resolvePersonelFirstLoginLabel({ personel_id: 12, must_change_password: true })
     ).toBe(PERSONEL_FIRST_LOGIN_PENDING_LABEL);
   });
 
-  it("F: PERSONEL-bound must_change_password=false → Kalıcı Şifre", () => {
+  it("F: PERSONEL-bound must_change_password=false → Şifre Değişimi Gerekmiyor", () => {
     expect(
       resolvePersonelFirstLoginLabel({ personel_id: 12, must_change_password: false })
     ).toBe(PERSONEL_FIRST_LOGIN_COMPLETE_LABEL);

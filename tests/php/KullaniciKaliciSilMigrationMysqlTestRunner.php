@@ -17,6 +17,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../api/src/bootstrap.php';
 
 use Medisa\Api\Database\FilesystemMigrationSourceProvider;
+use Medisa\Api\Database\MigrationBackupService;
 use Medisa\Api\Database\MigrationExecutionService;
 use Medisa\Api\Services\Auth\KullaniciKaliciSilMigrationFailure;
 use Medisa\Api\Services\Auth\KullaniciKaliciSilMigrationService;
@@ -41,6 +42,34 @@ const KSM_FK_REFERENCES = [
     'personel_test_fixture_siniflandirmalari.classified_by',
     'personel_test_fixture_siniflandirmalari.iptal_edildi_by',
     'retention_imha_auditleri.actor_user_id',
+];
+
+const KSM_FK_TABLES = [
+    'ek_odeme_kesinti',
+    'gunluk_bildirimler',
+    'legal_holdlar',
+    'legal_hold_auditleri',
+    'offline_mutation_idempotency',
+    'personel_gecici_gorevlendirmeler',
+    'personel_import_runs',
+    'personel_test_fixture_archive_kayitlari',
+    'personel_test_fixture_siniflandirmalari',
+    'retention_imha_auditleri',
+];
+
+const KSM_BACKED_UP_TABLES = [
+    'users',
+    'ek_odeme_kesinti',
+    'gunluk_bildirimler',
+    'legal_holdlar',
+    'legal_hold_auditleri',
+    'offline_mutation_idempotency',
+    'personel_gecici_gorevlendirmeler',
+    'personel_import_runs',
+    'personel_test_fixture_archive_kayitlari',
+    'personel_test_fixture_siniflandirmalari',
+    'retention_imha_auditleri',
+    'medisa_schema_migrations',
 ];
 
 function ksmAssert(bool $ok, string $name): void
@@ -89,6 +118,33 @@ function ksmTableExists(PDO $pdo, string $table): bool
     $statement->execute([':t' => $table]);
 
     return (int) $statement->fetchColumn() === 1;
+}
+
+function ksmColumnExists(PDO $pdo, string $table, string $column): bool
+{
+    $statement = $pdo->prepare(
+        'SELECT COUNT(*) FROM information_schema.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :t AND COLUMN_NAME = :c'
+    );
+    $statement->execute([':t' => $table, ':c' => $column]);
+
+    return (int) $statement->fetchColumn() === 1;
+}
+
+function ksmRemoveTree(string $path): void
+{
+    if (!is_dir($path)) {
+        @unlink($path);
+
+        return;
+    }
+    foreach (scandir($path) ?: [] as $entry) {
+        if ($entry === '.' || $entry === '..') {
+            continue;
+        }
+        ksmRemoveTree($path . DIRECTORY_SEPARATOR . $entry);
+    }
+    @rmdir($path);
 }
 
 /**
@@ -155,8 +211,11 @@ $root = ksmPdo($baseDsn);
 $source = new FilesystemMigrationSourceProvider($apiDirectory . '/migrations');
 $deployedSha = str_repeat('c', 40);
 
-$db = ksmNewDatabase($root, $baseDsn);
+    $db = ksmNewDatabase($root, $baseDsn);
 $partialDb = ksmNewDatabase($root, $baseDsn);
+$backupDb = ksmNewDatabase($root, $baseDsn);
+
+$backupDir = null;
 
 try {
     // ---------------------------------------------------------------------
@@ -300,8 +359,123 @@ try {
         'the partial-state report names the exact pre-existing constraint'
     );
 
+    // ---------------------------------------------------------------------
+    // Real worker backup: MigrationBackupService::createForKaliciSil must cover
+    // users + the ten FK tables + the ledger, capture the ten FK tables
+    // schema-only, and restore to the exact pre-099 image.
+    // ---------------------------------------------------------------------
+    $backupPdo = ksmPdo($baseDsn . ';dbname=' . $backupDb);
+    ksmBuildPreimage($backupPdo, $apiDirectory, $source);
+    $backupPdo->exec(
+        "INSERT INTO users (id, username, password_hash, ad_soyad, rol, durum) VALUES
+            (21, 'verified.one', 'x', 'Verified One', 'SISTEM_YONETICISI', 'AKTIF'),
+            (22, 'verified.two', 'x', 'Verified Two', 'SISTEM_YONETICISI', 'AKTIF')"
+    );
+
+    $backupDir = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'medisa-ksm-backup-' . bin2hex(random_bytes(5));
+    mkdir($backupDir, 0700, true);
+    putenv('MEDISA_MIGRATION_BACKUP_DIR=' . $backupDir);
+
+    $realBackup = MigrationBackupService::createForKaliciSil(
+        $backupPdo,
+        $apiDirectory,
+        'BACKUP-SCOPE-TEST',
+        KSM_MIGRATION_TIP
+    );
+    ksmAssert($realBackup['readback'] === 'VERIFIED', 'the 099 backup is read back and verified');
+    ksmAssert(
+        $realBackup['tables'] === KSM_BACKED_UP_TABLES,
+        'the 099 backup scope covers users, the ten FK tables and the ledger'
+    );
+    ksmAssert(
+        $realBackup['schema_only_tables'] === KSM_FK_TABLES,
+        'the 099 backup captures the ten FK tables schema-only'
+    );
+    ksmAssert(
+        $realBackup['row_counts']['users'] === ksmCount($backupPdo, 'SELECT COUNT(*) FROM users'),
+        'the 099 backup captures the full users row set'
+    );
+    ksmAssert(
+        $realBackup['row_counts']['medisa_schema_migrations']
+            === ksmCount($backupPdo, 'SELECT COUNT(*) FROM medisa_schema_migrations'),
+        'the 099 backup captures the full ledger preimage'
+    );
+    ksmAssert(
+        !array_key_exists('absolute_path', $realBackup),
+        'the 099 backup metadata never carries the server path'
+    );
+
+    $backupPath = $backupDir . DIRECTORY_SEPARATOR . $realBackup['file'];
+    ksmAssert(is_file($backupPath), 'the 099 dump exists on disk outside the webroot');
+    $backupSql = (string) file_get_contents($backupPath);
+    ksmAssert(
+        hash('sha256', $backupSql) === $realBackup['sha256'],
+        'the 099 dump on disk hashes to the published digest'
+    );
+    ksmAssert(
+        strpos($backupSql, 'INSERT INTO `users`') !== false,
+        'the 099 dump carries user rows'
+    );
+    ksmAssert(
+        strpos($backupSql, 'INSERT INTO `ek_odeme_kesinti`') === false,
+        'the 099 dump does not copy ek_odeme_kesinti rows (schema-only)'
+    );
+    foreach (KSM_FK_TABLES as $fkTable) {
+        ksmAssert(
+            strpos($backupSql, '-- schema-only(' . $fkTable . '): 1') !== false,
+            'the 099 dump marks ' . $fkTable . ' schema-only'
+        );
+        ksmAssert(
+            strpos($backupSql, 'CREATE TABLE `' . $fkTable . '`') !== false,
+            'the 099 dump carries the ' . $fkTable . ' preimage schema'
+        );
+    }
+
+    // Apply 099, then restore the real dump and prove the pre-099 image returns.
+    $applied099 = KullaniciKaliciSilMigrationService::apply(
+        $backupPdo,
+        $source,
+        $deployedSha,
+        21,
+        22,
+        $realBackup
+    );
+    ksmAssert($applied099['applied_versions'] === ['099'], 'the 099 backup preimage apply succeeds');
+    ksmAssert(
+        ksmColumnExists($backupPdo, 'users', 'silinmesi_korunur'),
+        '099 added the protected-account flag before restore'
+    );
+
+    $backupPdo->exec($backupSql);
+
+    ksmAssert(
+        !ksmColumnExists($backupPdo, 'users', 'silinmesi_korunur'),
+        'restoring the 099 backup removes the protected-account flag'
+    );
+    ksmAssert(
+        ksmCount(
+            $backupPdo,
+            "SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
+             WHERE CONSTRAINT_SCHEMA = DATABASE() AND CONSTRAINT_NAME LIKE 'fk_p099_%'"
+        ) === 0,
+        'restoring the 099 backup removes every fk_p099_* constraint'
+    );
+    ksmAssert(
+        ksmCount($backupPdo, "SELECT COUNT(*) FROM medisa_schema_migrations WHERE version = '099'") === 0,
+        'restoring the 099 backup removes the 099 ledger row'
+    );
+    ksmAssert(
+        ksmCount($backupPdo, 'SELECT COUNT(*) FROM users WHERE id IN (21, 22)') === 2,
+        'restoring the 099 backup returns the verified users'
+    );
+
     echo "verify-kullanici-kalici-sil-migration-mysql: OK\n";
 } finally {
+    if ($backupDir !== null) {
+        putenv('MEDISA_MIGRATION_BACKUP_DIR');
+        ksmRemoveTree($backupDir);
+    }
     $root->exec('DROP DATABASE IF EXISTS `' . $db . '`');
     $root->exec('DROP DATABASE IF EXISTS `' . $partialDb . '`');
+    $root->exec('DROP DATABASE IF EXISTS `' . $backupDb . '`');
 }

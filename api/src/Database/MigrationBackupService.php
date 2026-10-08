@@ -67,6 +67,53 @@ final class MigrationBackupService
         'medisa_schema_migrations',
     ];
 
+    /**
+     * Migration 099 rollback scope. The migration mutates `users` (adds the
+     * `silinmesi_korunur` column and flags the two protected accounts) and the
+     * migration ledger (adds the 099 row), and it adds FK constraints to the 10
+     * historically FK-less tables below. A 099 rollback restores exactly these
+     * owners; the two tables 099 creates are dropped, not restored.
+     *
+     * @var list<string>
+     */
+    private const KALICI_SIL_BACKED_UP_TABLES = [
+        'users',
+        'ek_odeme_kesinti',
+        'gunluk_bildirimler',
+        'legal_holdlar',
+        'legal_hold_auditleri',
+        'offline_mutation_idempotency',
+        'personel_gecici_gorevlendirmeler',
+        'personel_import_runs',
+        'personel_test_fixture_archive_kayitlari',
+        'personel_test_fixture_siniflandirmalari',
+        'retention_imha_auditleri',
+        'medisa_schema_migrations',
+    ];
+
+    /**
+     * Migration 099 only adds FK constraints (metadata) to these 10 tables; it
+     * never rewrites their rows. Dumping their full row sets would copy far more
+     * personal data than a rollback needs and could exceed a cron tick's memory,
+     * so they are captured schema-only (SHOW CREATE TABLE). A rollback drops the
+     * `fk_p099_*` constraints they gained; `users` and the ledger, whose rows 099
+     * mutates, are dumped with their rows.
+     *
+     * @var list<string>
+     */
+    private const KALICI_SIL_SCHEMA_ONLY_TABLES = [
+        'ek_odeme_kesinti',
+        'gunluk_bildirimler',
+        'legal_holdlar',
+        'legal_hold_auditleri',
+        'offline_mutation_idempotency',
+        'personel_gecici_gorevlendirmeler',
+        'personel_import_runs',
+        'personel_test_fixture_archive_kayitlari',
+        'personel_test_fixture_siniflandirmalari',
+        'retention_imha_auditleri',
+    ];
+
     private const DIRECTORY_NAME = 'medisa-migration-backups';
 
     /**
@@ -119,8 +166,40 @@ final class MigrationBackupService
     }
 
     /**
+     * Pre-099 backup for the protected-account migration.
+     *
+     * Same owner, same webroot-outside rule, same readback. The scope is the
+     * exact 099 rollback preimage: `users` and the ledger with their rows, plus
+     * the 10 FK tables schema-only (their rows are untouched by 099 and too
+     * large to copy inside a cron tick).
+     *
+     * @return array<string, mixed>
+     */
+    public static function createForKaliciSil(
+        PDO $pdo,
+        string $apiDirectory,
+        string $requestId,
+        string $migrationTip
+    ): array {
+        return self::write(
+            $pdo,
+            $apiDirectory,
+            'medisa-pre-kalicisil',
+            $requestId,
+            $migrationTip,
+            self::KALICI_SIL_BACKED_UP_TABLES,
+            [
+                'operation' => 'KALICI_SIL_MIGRATION',
+                'schema_objects' => self::schemaObjects($pdo, self::KALICI_SIL_BACKED_UP_TABLES),
+            ],
+            self::KALICI_SIL_SCHEMA_ONLY_TABLES
+        );
+    }
+
+    /**
      * @param list<string> $tables
      * @param array<string, mixed> $extraMetadata
+     * @param list<string> $schemaOnlyTables
      * @return array<string, mixed>
      */
     private static function write(
@@ -130,7 +209,8 @@ final class MigrationBackupService
         string $requestId,
         string $migrationTip,
         array $tables,
-        array $extraMetadata
+        array $extraMetadata,
+        array $schemaOnlyTables = []
     ): array {
         $directory = self::resolveDirectory($apiDirectory);
         $fileName = sprintf(
@@ -142,7 +222,7 @@ final class MigrationBackupService
         );
         $path = $directory . DIRECTORY_SEPARATOR . $fileName;
 
-        $dump = self::renderDump($pdo, $requestId, $migrationTip, $tables);
+        $dump = self::renderDump($pdo, $requestId, $migrationTip, $tables, $schemaOnlyTables);
         if (@file_put_contents($path, $dump['sql'], LOCK_EX) === false) {
             throw new RuntimeException('BACKUP_WRITE_FAILED');
         }
@@ -161,6 +241,7 @@ final class MigrationBackupService
             'sha256' => $readback['sha256'],
             'tables' => $dump['tables'],
             'row_counts' => $dump['row_counts'],
+            'schema_only_tables' => $dump['schema_only_tables'],
             'readback' => 'VERIFIED',
         ] + $extraMetadata;
 
@@ -263,10 +344,16 @@ final class MigrationBackupService
 
     /**
      * @param list<string> $tables
-     * @return array{sql: string, tables: list<string>, row_counts: array<string, int>}
+     * @param list<string> $schemaOnlyTables
+     * @return array{sql: string, tables: list<string>, row_counts: array<string, int|null>, schema_only_tables: list<string>}
      */
-    private static function renderDump(PDO $pdo, string $requestId, string $migrationTip, array $tables): array
-    {
+    private static function renderDump(
+        PDO $pdo,
+        string $requestId,
+        string $migrationTip,
+        array $tables,
+        array $schemaOnlyTables = []
+    ): array {
         $lines = [
             '-- Medisa pre-migration backup',
             '-- schema_version: ' . self::SCHEMA_VERSION,
@@ -279,22 +366,30 @@ final class MigrationBackupService
             '',
         ];
         $rowCounts = [];
+        $schemaOnly = [];
 
         foreach ($tables as $table) {
             $createStatement = self::showCreate($pdo, $table);
             if ($createStatement === null) {
                 throw new RuntimeException('BACKUP_SOURCE_INCOMPLETE');
             }
-            $lines[] = '-- table: ' . $table;
+            $isSchemaOnly = in_array($table, $schemaOnlyTables, true);
+            $lines[] = '-- table: ' . $table . ($isSchemaOnly ? ' (schema-only)' : '');
             $lines[] = 'DROP TABLE IF EXISTS `' . $table . '`;';
             $lines[] = $createStatement . ';';
 
-            $rows = $pdo->query('SELECT * FROM `' . $table . '`')->fetchAll(PDO::FETCH_ASSOC);
-            foreach ($rows as $row) {
-                $lines[] = self::renderInsert($pdo, $table, $row);
+            if ($isSchemaOnly) {
+                $schemaOnly[] = $table;
+                $rowCounts[$table] = null;
+                $lines[] = '-- schema-only(' . $table . '): 1';
+            } else {
+                $rows = $pdo->query('SELECT * FROM `' . $table . '`')->fetchAll(PDO::FETCH_ASSOC);
+                foreach ($rows as $row) {
+                    $lines[] = self::renderInsert($pdo, $table, $row);
+                }
+                $rowCounts[$table] = count($rows);
+                $lines[] = '-- rows(' . $table . '): ' . count($rows);
             }
-            $rowCounts[$table] = count($rows);
-            $lines[] = '-- rows(' . $table . '): ' . count($rows);
             $lines[] = '';
         }
 
@@ -305,6 +400,7 @@ final class MigrationBackupService
             'sql' => implode("\n", $lines),
             'tables' => array_values($tables),
             'row_counts' => $rowCounts,
+            'schema_only_tables' => $schemaOnly,
         ];
     }
 
@@ -393,9 +489,10 @@ final class MigrationBackupService
 
     /**
      * Readback: the file on disk, not the buffer in memory, must hash to the same
-     * digest and must still contain every required CREATE TABLE block.
+     * digest and must still contain every required CREATE TABLE block plus either
+     * the row-count marker or the schema-only marker for each table.
      *
-     * @param array{sql: string, tables: list<string>, row_counts: array<string, int>} $dump
+     * @param array{sql: string, tables: list<string>, row_counts: array<string, int|null>, schema_only_tables: list<string>} $dump
      * @return array{bytes: int, sha256: string}
      */
     private static function verify(string $path, array $dump): array
@@ -412,7 +509,10 @@ final class MigrationBackupService
             if (strpos($written, 'CREATE TABLE `' . $table . '`') === false) {
                 throw new RuntimeException('BACKUP_READBACK_INCOMPLETE');
             }
-            if (strpos($written, '-- rows(' . $table . '): ') === false) {
+            $marker = in_array($table, $dump['schema_only_tables'], true)
+                ? '-- schema-only(' . $table . '): '
+                : '-- rows(' . $table . '): ';
+            if (strpos($written, $marker) === false) {
                 throw new RuntimeException('BACKUP_READBACK_INCOMPLETE');
             }
         }

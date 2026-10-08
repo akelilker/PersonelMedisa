@@ -553,7 +553,7 @@ try {
 
             $stage = 'KALICI_SIL_MIGRATION_BACKUP';
             try {
-                $backup = MigrationBackupService::create(
+                $backup = MigrationBackupService::createForKaliciSil(
                     $pdo,
                     $apiDirectory,
                     $requestId,

@@ -90,3 +90,30 @@ BEFORE DELETE ON user_kalici_silme_auditleri
 FOR EACH ROW
 SIGNAL SQLSTATE '45000'
   SET MESSAGE_TEXT = 'KALICI_SIL_AUDIT_IMMUTABLE: kalici silme audit satiri silinemez';
+
+-- ---------------------------------------------------------------------------
+-- Stable protected-account flag for the safe Kalıcı Sil eligibility.
+-- ---------------------------------------------------------------------------
+-- ilkerA / serhan.kose must stay undeletable regardless of later username
+-- edits, and a missing personeller binding must never make a management
+-- account look like an orphan. `silinmesi_korunur` is the canonical, stable
+-- anchor; the one-time backfill below converts the two canonical usernames
+-- into the flag at apply time. No numeric identity is assumed.
+SET @p099_koruma_col := (
+  SELECT COUNT(*)
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'users'
+    AND COLUMN_NAME = 'silinmesi_korunur'
+);
+SET @p099_koruma_sql := IF(
+  @p099_koruma_col = 0,
+  'ALTER TABLE users ADD COLUMN silinmesi_korunur TINYINT(1) NOT NULL DEFAULT 0 AFTER durum',
+  'DO 0'
+);
+PREPARE p099_koruma_stmt FROM @p099_koruma_sql;
+EXECUTE p099_koruma_stmt;
+DEALLOCATE PREPARE p099_koruma_stmt;
+
+-- One-time backfill (idempotent): only the canonical protected usernames.
+UPDATE users SET silinmesi_korunur = 1 WHERE username IN ('ilkerA', 'serhan.kose');

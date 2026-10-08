@@ -58,6 +58,21 @@ class UsersSchema
         return false;
     }
 
+    public static function hasSilinmesiKorunur(PDO $pdo): bool
+    {
+        try {
+            $col = $pdo->query("SHOW COLUMNS FROM users LIKE 'silinmesi_korunur'");
+            $exists = $col !== false && $col->fetch(PDO::FETCH_ASSOC) !== false;
+            if ($col !== false) {
+                $col->closeCursor();
+            }
+
+            return $exists;
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
     public static function hasMustChangePassword(PDO $pdo): bool
     {
         try {

@@ -325,6 +325,14 @@ try {
         ) === 1,
         'migration 099 created the kalici silme audit table'
     );
+    ksaAssert(
+        ksaCount(
+            $pdo,
+            "SELECT COUNT(*) FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'silinmesi_korunur'"
+        ) === 1,
+        'migration 099 added the stable protected-account flag'
+    );
 
     // Structure: actor attribution stays a real FK (RESTRICT) while target fields
     // are data-only; append-only is enforced by BEFORE UPDATE / BEFORE DELETE.
@@ -375,6 +383,10 @@ try {
             (11, 'rollback', '{$hash}', 'Rollback Kullanici', 'SISTEM_YONETICISI', 'AKTIF')"
     );
     $pdo->exec('UPDATE users SET personel_id = 173 WHERE id = 7');
+    // Simulate the 099 one-time backfill: in production the canonical protected
+    // accounts pre-exist the migration; here the seed runs after the chain, so
+    // the flag is applied manually to mirror the applied state.
+    $pdo->exec("UPDATE users SET silinmesi_korunur = 1 WHERE username IN ('ilkerA', 'serhan.kose')");
     // Scope rows that must be cleaned on a successful delete and restored on rollback.
     $pdo->exec('INSERT INTO user_subeler (user_id, sube_id) VALUES (3, 1), (11, 1)');
 
@@ -615,6 +627,123 @@ try {
         'the revocation deactivated the account without deleting it'
     );
     ksaAssert(ksaUser($pdo, 2) !== null, 'the revoked account still exists (not deleted)');
+
+    // =====================================================================
+    // 9) FK-less dependency inventory (gap 2): the FK-less `legal_holdlar.
+    //    released_by` reference is inventoried, a FK-less candidate column with
+    //    a row blocks deletion, and a NEW unclassified user-reference column
+    //    fails closed to DOĞRULANAMADI.
+    // =====================================================================
+    $elig = ksaEligibility($pdo, $gy, 10);
+    $releasedBy = array_values(array_filter(
+        $elig['dependencies'] ?? [],
+        static fn (array $d): bool => $d['table'] === 'legal_holdlar' && $d['column'] === 'released_by'
+    ));
+    ksaAssert(
+        count($releasedBy) === 1 && (int) $releasedBy[0]['row_count'] === 0,
+        'the FK-less legal_holdlar.released_by reference is inventoried'
+    );
+
+    $pdo->exec("INSERT INTO users (id, username, password_hash, ad_soyad, rol, durum) VALUES (13, 'fkless', '{$hash}', 'Fkless Kullanici', 'SISTEM_YONETICISI', 'AKTIF')");
+    $pdo->exec(
+        "CREATE TABLE ks_test_fkless_block (
+            id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+            released_by INT UNSIGNED NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+    );
+    $pdo->exec('INSERT INTO ks_test_fkless_block (released_by) VALUES (13)');
+    $elig = ksaEligibility($pdo, $gy, 13);
+    ksaAssert($elig['verdict'] === 'ENGELLENDİ', 'a FK-less candidate reference blocks deletion');
+    ksaAssert(
+        ($elig['blockers'][0]['code'] ?? '') === 'DEPENDENCY_EXISTS',
+        'the FK-less candidate reference names DEPENDENCY_EXISTS'
+    );
+
+    $pdo->exec("INSERT INTO users (id, username, password_hash, ad_soyad, rol, durum) VALUES (14, 'uncat', '{$hash}', 'Uncat Kullanici', 'SISTEM_YONETICISI', 'AKTIF')");
+    $pdo->exec(
+        "CREATE TABLE ks_test_unclassified (
+            id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+            sorumlu_user_id INT UNSIGNED NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+    );
+    $elig = ksaEligibility($pdo, $gy, 14);
+    ksaAssert($elig['verdict'] === 'DOĞRULANAMADI', 'a new unclassified user-reference column resolves to DOĞRULANAMADI');
+    ksaAssert(
+        ($elig['unverified'][0]['code'] ?? '') === 'DEPENDENCY_UNVERIFIED',
+        'the unclassified column names DEPENDENCY_UNVERIFIED'
+    );
+
+    // =====================================================================
+    // 10) Protected accounts (gap 4): the stable flag survives username edits.
+    // =====================================================================
+    $pdo->exec("INSERT INTO users (id, username, password_hash, ad_soyad, rol, durum, silinmesi_korunur) VALUES (12, 'korunan.gecici', '{$hash}', 'Korunan Gecici', 'SISTEM_YONETICISI', 'AKTIF', 1)");
+    $elig = ksaEligibility($pdo, $gy, 12);
+    ksaAssert($elig['verdict'] === 'ENGELLENDİ', 'a flagged protected account is reported ENGELLENDİ');
+    ksaAssert(($elig['blockers'][0]['code'] ?? '') === 'PROTECTED_ACCOUNT', 'the flag names the protected account blocker');
+
+    $pdo->exec("UPDATE users SET username = 'korunan.renamed' WHERE id = 12");
+    $elig = ksaEligibility($pdo, $gy, 12);
+    ksaAssert($elig['verdict'] === 'ENGELLENDİ', 'a renamed protected account stays ENGELLENDİ');
+    ksaAssert(
+        ($elig['blockers'][0]['code'] ?? '') === 'PROTECTED_ACCOUNT',
+        'the renamed account still names the protected blocker via the stable flag'
+    );
+
+    // =====================================================================
+    // 11) Concurrency (gap 3): the advisory lock serializes concurrent deletes
+    //     and the READ COMMITTED re-verification observes a late FK-less commit.
+    // =====================================================================
+    $pdo->exec(
+        "CREATE TABLE ks_test_fkless (
+            id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+            released_by INT UNSIGNED NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+    );
+    $pdo->exec("INSERT INTO users (id, username, password_hash, ad_soyad, rol, durum) VALUES (15, 'race', '{$hash}', 'Race Kullanici', 'SISTEM_YONETICISI', 'AKTIF')");
+
+    $connA = ksaPdo($baseDsn . ';dbname=' . $db);
+    $connB = ksaPdo($baseDsn . ';dbname=' . $db);
+
+    $gotA = (int) $connA->query("SELECT GET_LOCK('medisa_kalici_sil_user_15', 5)")->fetchColumn();
+    ksaAssert($gotA === 1, 'the first delete acquires the advisory lock');
+    $gotB = (int) $connB->query("SELECT GET_LOCK('medisa_kalici_sil_user_15', 0)")->fetchColumn();
+    ksaAssert($gotB === 0, 'a concurrent delete cannot acquire the held advisory lock');
+    $connA->query("SELECT RELEASE_LOCK('medisa_kalici_sil_user_15')");
+
+    $connA->exec('SET TRANSACTION ISOLATION LEVEL READ COMMITTED');
+    $connA->beginTransaction();
+    $connA->query('SELECT id FROM users WHERE id = 15 FOR UPDATE')->fetch();
+    $initial = (int) $connA->query('SELECT COUNT(*) FROM ks_test_fkless WHERE released_by = 15')->fetchColumn();
+    ksaAssert($initial === 0, 'the initial check sees no FK-less reference');
+
+    $connB->exec('INSERT INTO ks_test_fkless (released_by) VALUES (15)');
+
+    $final = (int) $connA->query('SELECT COUNT(*) FROM ks_test_fkless WHERE released_by = 15')->fetchColumn();
+    ksaAssert($final === 1, 'the READ COMMITTED re-verification observes the late FK-less reference');
+    $connA->rollBack();
+    ksaAssert(ksaUser($pdo, 15) !== null, 'the raced account was not deleted (fail-closed)');
+
+    // =====================================================================
+    // 12) Missing audit schema (gap 1): eligibility fails closed to
+    //     DOĞRULANAMADI and the delete is refused with 409.
+    // =====================================================================
+    $pdo->exec('DROP TRIGGER IF EXISTS trg_ksa_no_update');
+    $elig = ksaEligibility($pdo, $gy, 10);
+    ksaAssert($elig['verdict'] === 'DOĞRULANAMADI', 'a missing audit trigger resolves eligibility to DOĞRULANAMADI');
+    ksaAssert(
+        ($elig['unverified'][0]['code'] ?? '') === 'AUDIT_SCHEMA_NOT_READY',
+        'the missing-trigger case names AUDIT_SCHEMA_NOT_READY'
+    );
+    $r = ksaHttp($pdo, $gy, 'kullanici_kalici_sil', ['id' => 10, 'confirm_username' => 'unverified', 'gerekce' => 'x']);
+    ksaAssert($r['status'] === 409, 'the missing-trigger deletion is refused with 409');
+    ksaAssert(ksaUser($pdo, 10) !== null, 'the missing-trigger refusal deleted nothing');
+
+    $pdo->exec('DROP TABLE ' . KSA_AUDIT_TABLE);
+    $elig = ksaEligibility($pdo, $gy, 10);
+    ksaAssert($elig['verdict'] === 'DOĞRULANAMADI', 'a missing audit table resolves eligibility to DOĞRULANAMADI');
+    $r = ksaHttp($pdo, $gy, 'kullanici_kalici_sil', ['id' => 10, 'confirm_username' => 'unverified', 'gerekce' => 'x']);
+    ksaAssert($r['status'] === 409, 'the missing-audit-table deletion is refused with 409');
+    ksaAssert(ksaUser($pdo, 10) !== null, 'the missing-audit-table refusal deleted nothing');
 
     echo "verify-kullanici-kalici-sil-mysql: OK\n";
 } finally {

@@ -37,6 +37,7 @@ final class KullaniciKaliciSilService
     public const CODE_PERSONEL_BINDING = 'PERSONEL_BINDING';
     public const CODE_DEPENDENCY_EXISTS = 'DEPENDENCY_EXISTS';
     public const CODE_DEPENDENCY_UNVERIFIED = 'DEPENDENCY_UNVERIFIED';
+    public const CODE_AUDIT_SCHEMA_NOT_READY = 'AUDIT_SCHEMA_NOT_READY';
 
     /**
      * Accounts that must never be treated as orphans merely because they lack a
@@ -80,6 +81,7 @@ final class KullaniciKaliciSilService
         'executed_by',
         'locked_by',
         'reopened_by',
+        'released_by',
         'corrected_by',
         'onaylayan_user_id',
         'onaylayan_id',
@@ -150,8 +152,24 @@ final class KullaniciKaliciSilService
 
         self::assertAuditReady($pdo);
 
+        // Serialize concurrent hard deletes of the same user with a namespaced
+        // advisory lock. It is also the coordination point a FK-less reference
+        // writer must respect; without the lock the final re-verification below
+        // still refuses the delete when a late reference is observed.
+        $lockName = 'medisa_kalici_sil_user_' . $userId;
+        $locked = (int) $pdo->query('SELECT GET_LOCK(' . $pdo->quote($lockName) . ', 10)')->fetchColumn();
+        if ($locked !== 1) {
+            throw KullaniciKaliciSilException::conflict(
+                'KALICI_SIL_KILIT_ALINAMADI',
+                'Silme için eşzamanlılık kilidi alınamadı; daha sonra tekrar deneyin.'
+            );
+        }
+
         $ownsTransaction = !$pdo->inTransaction();
         if ($ownsTransaction) {
+            // READ COMMITTED lets the final re-verification observe FK-less
+            // references committed by other connections after the first check.
+            $pdo->exec('SET TRANSACTION ISOLATION LEVEL READ COMMITTED');
             $pdo->beginTransaction();
         }
 
@@ -174,6 +192,11 @@ final class KullaniciKaliciSilService
             }
 
             $cleanedScope = self::deleteScopeRows($pdo, $userId);
+
+            // Final fail-closed re-verification immediately before the row is
+            // deleted: a FK-less reference committed between the initial check
+            // and now refuses the delete rather than leaving an orphan.
+            self::reverifyDependencies($pdo, $userId);
 
             $deleted = self::deleteUserRow($pdo, $userId);
             if ($deleted !== 1) {
@@ -201,6 +224,29 @@ final class KullaniciKaliciSilService
                 $pdo->rollBack();
             }
             throw $e;
+        } finally {
+            $pdo->query('SELECT RELEASE_LOCK(' . $pdo->quote($lockName) . ')');
+        }
+    }
+
+    /**
+     * Final fail-closed re-verification run immediately before the user row is
+     * deleted. Under READ COMMITTED this observes FK-less references committed
+     * by other connections after the initial eligibility check.
+     */
+    private static function reverifyDependencies(PDO $pdo, int $userId): void
+    {
+        foreach (self::inventoryDependencies($pdo, $userId) as $dep) {
+            $unverified = $dep['row_count'] === null;
+            $blocker = !$unverified
+                && (int) $dep['row_count'] > 0
+                && !in_array((string) $dep['table'], self::ALLOWED_SCOPE_TABLES, true);
+            if ($unverified || $blocker) {
+                throw KullaniciKaliciSilException::conflict(
+                    'KALICI_SIL_YARIS_KORUNDU',
+                    'Silme sırasında yeni veya doğrulanamayan bir bağımlılık oluştu; işlem reddedildi.'
+                );
+            }
         }
     }
 
@@ -212,6 +258,32 @@ final class KullaniciKaliciSilService
     private static function evaluateEligibility(PDO $pdo, array $target, array $actor): array
     {
         $userId = (int) $target['id'];
+        $targetInfo = [
+            'id' => (int) $target['id'],
+            'username' => (string) $target['username'],
+            'ad_soyad' => (string) $target['ad_soyad'],
+            'rol' => (string) $target['rol'],
+            'durum' => (string) $target['durum'],
+        ];
+
+        // Fail-closed: without the audit evidence table and its append-only
+        // triggers, eligibility must never report SİLİNEBİLİR.
+        if (!self::hasAuditReady($pdo)) {
+            return [
+                'verdict' => self::VERDICT_DOGRULANAMADI,
+                'target' => $targetInfo,
+                'blockers' => [],
+                'unverified' => [[
+                    'code' => self::CODE_AUDIT_SCHEMA_NOT_READY,
+                    'table' => self::AUDIT_TABLE,
+                    'column' => null,
+                    'reason' => 'audit_schema_not_ready',
+                ]],
+                'cleanable_scope' => [],
+                'dependencies' => [],
+            ];
+        }
+
         $blockers = [];
 
         $protected = self::protectedBlocker($target, $actor);
@@ -270,13 +342,7 @@ final class KullaniciKaliciSilService
 
         return [
             'verdict' => $verdict,
-            'target' => [
-                'id' => (int) $target['id'],
-                'username' => (string) $target['username'],
-                'ad_soyad' => (string) $target['ad_soyad'],
-                'rol' => (string) $target['rol'],
-                'durum' => (string) $target['durum'],
-            ],
+            'target' => $targetInfo,
             'blockers' => $blockers,
             'unverified' => $unverifiedBlockers,
             'cleanable_scope' => $cleanable,
@@ -298,6 +364,14 @@ final class KullaniciKaliciSilService
             return ['code' => self::CODE_SELF_DELETE, 'reason' => 'Kendi hesabınız silinemez.'];
         }
 
+        // Stable DB flag is the authoritative protection anchor: it survives
+        // later username edits (099 backfill converts the canonical usernames).
+        if (isset($target['silinmesi_korunur']) && (int) $target['silinmesi_korunur'] === 1) {
+            return ['code' => self::CODE_PROTECTED_ACCOUNT, 'reason' => 'Korunan yönetici hesabı.'];
+        }
+
+        // Canonical username is a secondary fail-closed hint, never the sole
+        // basis: it catches accounts not yet flagged by the 099 backfill.
         if (in_array((string) $target['username'], self::PROTECTED_USERNAMES, true)) {
             return ['code' => self::CODE_PROTECTED_ACCOUNT, 'reason' => 'Korunan yönetici hesabı.'];
         }
@@ -349,6 +423,14 @@ final class KullaniciKaliciSilService
                 'constraint' => $ref['constraint'],
                 'delete_rule' => (string) $ref['delete_rule'],
             ];
+
+            // A column whose name signals a user reference but that is neither
+            // FK-covered nor in CANDIDATE_COLUMNS is unclassified: its row count
+            // is irrelevant, it must fail closed.
+            if (($ref['classified'] ?? true) === false) {
+                $out[] = $base + ['row_count' => null, 'reason' => 'unclassified_reference'];
+                continue;
+            }
 
             $identifiersSafe = count($columns) > 0;
             foreach (array_merge([$table], $columns, $referencedColumns) as $identifier) {
@@ -483,6 +565,60 @@ final class KullaniciKaliciSilService
             ];
         }
 
+        // Fail-closed enumeration of UNCLASSIFIED references. Any integer or
+        // JSON/TEXT column whose name signals a user reference (user / kullanici
+        // / actor / aktor / _by), that is covered by no FK at all and is not in
+        // CANDIDATE_COLUMNS, is treated as an unverifiable dependency. JSON/TEXT
+        // columns are included because their content can embed user ids that a
+        // column scan cannot see. The audit table is excluded: its target_user_id
+        // records an already-deleted user by design and must never block.
+        $signal = "(
+            LOCATE('user', c.COLUMN_NAME) > 0
+            OR LOCATE('kullanici', c.COLUMN_NAME) > 0
+            OR LOCATE('actor', c.COLUMN_NAME) > 0
+            OR LOCATE('aktor', c.COLUMN_NAME) > 0
+            OR RIGHT(c.COLUMN_NAME, 3) = '_by'
+        )";
+        try {
+            $unclassified = $pdo->prepare(
+                "SELECT c.TABLE_NAME AS tbl, c.COLUMN_NAME AS col
+                 FROM information_schema.COLUMNS c
+                 WHERE c.TABLE_SCHEMA = DATABASE()
+                   AND c.TABLE_NAME <> 'users'
+                   AND c.TABLE_NAME <> :audit_table
+                   AND c.DATA_TYPE IN ('int','tinyint','smallint','mediumint','bigint','json','longtext','text','mediumtext')
+                   AND {$signal}
+                   AND NOT EXISTS (
+                       SELECT 1 FROM information_schema.KEY_COLUMN_USAGE kcu
+                       WHERE kcu.TABLE_SCHEMA = c.TABLE_SCHEMA
+                         AND kcu.TABLE_NAME = c.TABLE_NAME
+                         AND kcu.COLUMN_NAME = c.COLUMN_NAME
+                         AND kcu.REFERENCED_TABLE_NAME IS NOT NULL
+                   )"
+            );
+            $unclassified->execute(['audit_table' => self::AUDIT_TABLE]);
+        } catch (\Throwable $e) {
+            // Unable to enumerate unclassified references → fail closed.
+            return null;
+        }
+        foreach ($unclassified->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $table = (string) $row['tbl'];
+            $col = (string) $row['col'];
+            if (isset($covered[$table . '|' . $col]) || in_array($col, self::CANDIDATE_COLUMNS, true)) {
+                continue;
+            }
+            $covered[$table . '|' . $col] = true;
+            $refs[] = [
+                'table' => $table,
+                'column' => $col,
+                'columns' => [$col],
+                'referenced_columns' => ['id'],
+                'constraint' => null,
+                'delete_rule' => 'NONE',
+                'classified' => false,
+            ];
+        }
+
         usort($refs, static function (array $a, array $b) {
             return ($a['table'] <=> $b['table'])
                 ?: strcmp((string) ($a['column'] ?? ''), (string) ($b['column'] ?? ''));
@@ -510,6 +646,9 @@ final class KullaniciKaliciSilService
         if (UsersSchema::hasPersonelId($pdo)) {
             $cols[] = 'personel_id';
         }
+        if (UsersSchema::hasSilinmesiKorunur($pdo)) {
+            $cols[] = 'silinmesi_korunur';
+        }
         $sql = 'SELECT ' . implode(', ', $cols) . ' FROM users WHERE id = :id LIMIT 1';
         if ($forUpdate) {
             $sql .= ' FOR UPDATE';
@@ -524,6 +663,11 @@ final class KullaniciKaliciSilService
             $row['personel_id'] = null;
         }
         $row['personel_id'] = isset($row['personel_id']) && $row['personel_id'] !== null ? (int) $row['personel_id'] : null;
+
+        if (!array_key_exists('silinmesi_korunur', $row)) {
+            $row['silinmesi_korunur'] = 0;
+        }
+        $row['silinmesi_korunur'] = (int) $row['silinmesi_korunur'];
 
         return $row;
     }
@@ -609,8 +753,32 @@ final class KullaniciKaliciSilService
 
     private static function assertAuditReady(PDO $pdo): void
     {
-        if (!self::tableExists($pdo, self::AUDIT_TABLE)) {
+        if (!self::hasAuditReady($pdo)) {
             throw KullaniciKaliciSilException::auditSchemaNotReady();
         }
+    }
+
+    /**
+     * The audit evidence table (099) and its append-only triggers must all be
+     * present before any deletion decision; otherwise the delete is not
+     * auditable and must be refused / reported DOĞRULANAMADI.
+     */
+    private static function hasAuditReady(PDO $pdo): bool
+    {
+        if (!self::tableExists($pdo, self::AUDIT_TABLE)) {
+            return false;
+        }
+        foreach (['trg_ksa_no_update', 'trg_ksa_no_delete'] as $trigger) {
+            $stmt = $pdo->prepare(
+                "SELECT COUNT(*) FROM information_schema.TRIGGERS
+                 WHERE TRIGGER_SCHEMA = DATABASE() AND TRIGGER_NAME = :name"
+            );
+            $stmt->execute(['name' => $trigger]);
+            if ((int) $stmt->fetchColumn() === 0) {
+                return false;
+            }
+        }
+
+        return true;
     }
 }

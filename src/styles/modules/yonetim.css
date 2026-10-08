@@ -1303,3 +1303,37 @@
     flex-direction: column;
   }
 }
+
+/* Kalıcı Sil doğrulama modalı: hedef hesap özeti ve engel listesi. */
+.yonetim-kalici-sil-target {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.yonetim-kalici-sil-target strong {
+  color: rgba(239, 242, 247, 0.96);
+}
+
+.yonetim-kalici-sil-target .yonetim-card-username {
+  font-size: 0.8rem;
+  color: rgba(239, 242, 247, 0.6);
+  overflow-wrap: anywhere;
+}
+
+.yonetim-kalici-sil-blocked {
+  display: grid;
+  gap: 8px;
+}
+
+.yonetim-kalici-sil-blocked ul {
+  list-style: disc;
+  margin: 0;
+  padding-left: 20px;
+  color: rgba(239, 242, 247, 0.82);
+  font-size: 0.85rem;
+  line-height: 1.45;
+}

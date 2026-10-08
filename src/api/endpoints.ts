@@ -320,6 +320,9 @@ export const endpoints = {
   yonetim: {
     kullanicilar: "/yonetim/kullanicilar",
     kullaniciDetail: (id: number | string) => `/yonetim/kullanicilar/${id}`,
+    kullaniciSilinebilirlikKontrolu: (id: number | string) =>
+      `/yonetim/kullanicilar/${id}/silinebilirlik-kontrolu`,
+    kullaniciKaliciSil: (id: number | string) => `/yonetim/kullanicilar/${id}/kalici-sil`,
     personelHesapOnboarding: (id: number | string) => `/yonetim/personeller/${id}/hesap-onboarding`,
     actorIdentities: "/yonetim/actor-identities",
     actorIdentityDetail: (id: number | string) => `/yonetim/actor-identities/${id}`,

@@ -7,6 +7,12 @@ import type {
   AylikOzetRow,
   AylikOzetSummary,
   KayitDurumu,
+  KaliciSilinebilirlikKontrolu,
+  KaliciSilBlocker,
+  KaliciSilDependency,
+  KaliciSilResult,
+  KaliciSilUnverified,
+  KaliciSilVerdict,
   KullaniciTipi,
   PersonelHesapFirstLoginResult,
   PersonelHesapOnboardingUser,
@@ -754,4 +760,127 @@ export async function createPersonelHesapOnboarding(
     { method: "POST", body: JSON.stringify(body) }
   );
   return normalizePersonelHesapFirstLoginResult(response.data);
+}
+
+// ---------------------------------------------------------------------------
+// Kalıcı Sil (safe permanent delete)
+// ---------------------------------------------------------------------------
+
+function normalizeKaliciSilVerdict(value: unknown): KaliciSilVerdict {
+  if (value === "SİLİNEBİLİR" || value === "ENGELLENDİ" || value === "DOĞRULANAMADI") {
+    return value;
+  }
+  // Fail-closed: an unrecognised verdict must never be rendered as deletable.
+  return "DOĞRULANAMADI";
+}
+
+function normalizeKaliciSilBlocker(data: unknown): KaliciSilBlocker {
+  const record = toRecord(data) ?? {};
+  return {
+    code: readString(record.code) ?? "DEPENDENCY_EXISTS",
+    reason: readString(record.reason),
+    table: readString(record.table),
+    column: record.column === null || record.column === undefined ? null : readString(record.column) ?? null,
+    row_count: readNumber(record.row_count),
+    delete_rule: readString(record.delete_rule)
+  };
+}
+
+function normalizeKaliciSilUnverified(data: unknown): KaliciSilUnverified {
+  const record = toRecord(data) ?? {};
+  return {
+    code: readString(record.code) ?? "DEPENDENCY_UNVERIFIED",
+    table: readString(record.table) ?? "?",
+    column: record.column === null || record.column === undefined ? null : readString(record.column) ?? null,
+    reason: readString(record.reason)
+  };
+}
+
+function normalizeKaliciSilDependency(data: unknown): KaliciSilDependency {
+  const record = toRecord(data) ?? {};
+  return {
+    table: readString(record.table) ?? "?",
+    column: record.column === null || record.column === undefined ? null : readString(record.column) ?? null,
+    constraint: record.constraint === null || record.constraint === undefined ? null : readString(record.constraint) ?? null,
+    delete_rule: readString(record.delete_rule) ?? "NONE",
+    row_count: record.row_count === null || record.row_count === undefined ? null : readNumber(record.row_count) ?? null,
+    reason: readString(record.reason)
+  };
+}
+
+function normalizeKaliciSilinebilirlikKontrolu(data: unknown): KaliciSilinebilirlikKontrolu {
+  const record = toRecord(data);
+  if (!record) {
+    throw new Error("Silinebilirlik yanıtı beklenen formatta değil.");
+  }
+  const target = toRecord(record.target) ?? {};
+  return {
+    verdict: normalizeKaliciSilVerdict(record.verdict),
+    target: {
+      id: readNumber(target.id) ?? 0,
+      username: readString(target.username) ?? "",
+      ad_soyad: readString(target.ad_soyad) ?? "",
+      rol: readString(target.rol) ?? "",
+      durum: readString(target.durum) ?? ""
+    },
+    blockers: Array.isArray(record.blockers) ? record.blockers.map(normalizeKaliciSilBlocker) : [],
+    unverified: Array.isArray(record.unverified) ? record.unverified.map(normalizeKaliciSilUnverified) : [],
+    cleanable_scope: Array.isArray(record.cleanable_scope)
+      ? record.cleanable_scope.map(normalizeKaliciSilDependency)
+      : [],
+    dependencies: Array.isArray(record.dependencies) ? record.dependencies.map(normalizeKaliciSilDependency) : []
+  };
+}
+
+function normalizeKaliciSilResult(data: unknown): KaliciSilResult {
+  const record = toRecord(data);
+  if (!record) {
+    throw new Error("Kalıcı sil yanıtı beklenen formatta değil.");
+  }
+  return {
+    deleted: readBoolean(record.deleted),
+    target_user_id: readNumber(record.target_user_id) ?? 0,
+    target_username: readString(record.target_username) ?? "",
+    cleaned_scope_rows: Array.isArray(record.cleaned_scope_rows)
+      ? record.cleaned_scope_rows
+          .map((item) => {
+            const row = toRecord(item) ?? {};
+            return { table: readString(row.table) ?? "?", removed: readNumber(row.removed) ?? 0 };
+          })
+          .filter((item) => item.table !== "?")
+      : [],
+    audit_id: readNumber(record.audit_id) ?? 0
+  };
+}
+
+/** Fail-closed read-only eligibility probe; never triggers a write. */
+export async function fetchKullaniciSilinebilirlik(
+  kullaniciId: number | string
+): Promise<KaliciSilinebilirlikKontrolu> {
+  const response = await apiRequest<ApiResponse<unknown>>(
+    endpoints.yonetim.kullaniciSilinebilirlikKontrolu(kullaniciId)
+  );
+  return normalizeKaliciSilinebilirlikKontrolu(response.data);
+}
+
+/**
+ * Safe permanent delete. Requires exact username re-type and a mandatory
+ * justification; the backend re-verifies eligibility inside a transaction.
+ */
+export async function kaliciSilKullanici(
+  kullaniciId: number | string,
+  payload: { confirm_username: string; gerekce: string }
+): Promise<KaliciSilResult> {
+  const response = await apiRequest<ApiResponse<unknown>>(
+    endpoints.yonetim.kullaniciKaliciSil(kullaniciId),
+    { method: "POST", body: JSON.stringify(payload) }
+  );
+  if (Array.isArray(response.errors) && response.errors.length > 0) {
+    const first = response.errors[0];
+    const message =
+      typeof first?.message === "string" && first.message.trim() ? first.message : "Kalıcı sil işlemi reddedildi.";
+    const code = typeof first?.code === "string" ? first.code : undefined;
+    throw new ApiRequestError(message, 409, code ? { code } : undefined);
+  }
+  return normalizeKaliciSilResult(response.data);
 }

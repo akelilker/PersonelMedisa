@@ -21,6 +21,8 @@ use Medisa\Api\Scope\SubeScope;
 use Medisa\Api\Services\Auth\UserPersonelBindingService;
 use Medisa\Api\Services\Auth\PersonelAccountOnboardingService;
 use Medisa\Api\Services\Auth\BoundUserCanonicalUsernameReconciliationService;
+use Medisa\Api\Services\Auth\KullaniciKaliciSilException;
+use Medisa\Api\Services\Auth\KullaniciKaliciSilService;
 use Medisa\Api\Services\Auth\ActorIdentityException;
 use Medisa\Api\Services\Auth\ActorIdentityService;
 use Medisa\Api\Services\Organizasyon\OrganizasyonAuditContext;
@@ -1721,6 +1723,95 @@ class YonetimController
         }
 
         JsonResponse::success($updated);
+    }
+
+    /**
+     * GET /yonetim/kullanicilar/{id}/silinebilirlik-kontrolu
+     *
+     * Read-only, fail-closed eligibility probe for the safe Kalıcı Sil path.
+     * Never writes, never locks, never alters the Erişimi Kaldır behaviour.
+     */
+    public static function kullaniciSilinebilirlikKontrolu(Request $request, $kullaniciId)
+    {
+        $user = AuthMiddleware::authenticate($request, true);
+        RolePermissions::assert($user, 'kullanicilar.kalici_sil');
+
+        $kullaniciId = (int) $kullaniciId;
+        if ($kullaniciId <= 0) {
+            JsonResponse::badRequest('Gecersiz kullanici id.', 'VALIDATION_ERROR', 'id');
+        }
+
+        try {
+            $pdo = Connection::get();
+        } catch (\Throwable $e) {
+            JsonResponse::serverError('Veritabani baglantisi kurulamadi.');
+        }
+
+        try {
+            $result = KullaniciKaliciSilService::checkEligibility($pdo, $kullaniciId, $user);
+        } catch (KullaniciKaliciSilException $e) {
+            JsonResponse::error($e->httpStatus, $e->errorCode, $e->getMessage(), $e->field);
+        } catch (\Throwable $e) {
+            JsonResponse::serverError('Silinebilirlik kontrolu yapilamadi.');
+        }
+
+        JsonResponse::success($result);
+    }
+
+    /**
+     * POST /yonetim/kullanicilar/{id}/kalici-sil
+     *
+     * Safe permanent delete. Requires the mandatory gerekçe and the exact
+     * username re-type; re-checks eligibility inside the transaction with a
+     * row lock, cleans only the five org-scope link tables, deletes the user,
+     * and writes immutable audit evidence (099).
+     */
+    public static function kullaniciKaliciSil(Request $request, $kullaniciId)
+    {
+        $user = AuthMiddleware::authenticate($request, true);
+        RolePermissions::assert($user, 'kullanicilar.kalici_sil');
+
+        $kullaniciId = (int) $kullaniciId;
+        if ($kullaniciId <= 0) {
+            JsonResponse::badRequest('Gecersiz kullanici id.', 'VALIDATION_ERROR', 'id');
+        }
+
+        try {
+            $pdo = Connection::get();
+        } catch (\Throwable $e) {
+            JsonResponse::serverError('Veritabani baglantisi kurulamadi.');
+        }
+
+        $body = $request->getJsonBody();
+        $confirmUsername = isset($body['confirm_username']) && is_string($body['confirm_username'])
+            ? trim($body['confirm_username'])
+            : '';
+        $gerekce = isset($body['gerekce']) && is_string($body['gerekce'])
+            ? trim($body['gerekce'])
+            : '';
+
+        try {
+            $requestHash = OrganizasyonAuditContext::fromRequest($request, $user)->requestHash();
+        } catch (OrganizasyonException $e) {
+            JsonResponse::error($e->httpStatus, $e->errorCode, $e->getMessage(), $e->field);
+        }
+
+        try {
+            $result = KullaniciKaliciSilService::delete(
+                $pdo,
+                $kullaniciId,
+                $user,
+                $confirmUsername,
+                $gerekce,
+                $requestHash
+            );
+        } catch (KullaniciKaliciSilException $e) {
+            JsonResponse::error($e->httpStatus, $e->errorCode, $e->getMessage(), $e->field);
+        } catch (\Throwable $e) {
+            JsonResponse::serverError('Kullanici kalici olarak silinemedi.');
+        }
+
+        JsonResponse::success($result);
     }
 
     /** @param array<string, mixed> $user */

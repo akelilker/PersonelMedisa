@@ -21,11 +21,13 @@ import {
   deleteYonetimSgkIsveren,
   deleteYonetimSirket,
   deleteYonetimSube,
+  fetchKullaniciSilinebilirlik,
   fetchOrganizasyonReadiness,
   fetchYonetimKullanicilari,
   fetchYonetimSgkIsverenleri,
   fetchYonetimSirketleri,
   fetchYonetimSubeleri,
+  kaliciSilKullanici,
   resetYonetimKullaniciBaslangicSifresi,
   fixYonetimKullaniciCanonicalUsername,
   updateSirketSube,
@@ -74,6 +76,8 @@ import type { IdOption } from "../../../types/referans";
 import { formatSurecTuruLabel, formatUserRoleLabel } from "../../../lib/display/enum-display";
 import type {
   KayitDurumu,
+  KaliciSilinebilirlikKontrolu,
+  KaliciSilVerdict,
   KullaniciTipi,
   OrganizasyonReadiness,
   UpsertYonetimKullaniciPayload,
@@ -766,6 +770,7 @@ export function YonetimPaneliPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { hasPermission } = useRoleAccess();
   const canManageYonetimPanel = hasPermission("yonetim-paneli.manage");
+  const canKaliciSil = hasPermission("kullanicilar.kalici_sil");
   const canOpenQrKiosk = hasPermission("qr.kiosk.display");
   const canViewMevzuat = hasPermission("mevzuat_parametreleri.view");
   const canManageMevzuat = hasPermission("mevzuat_parametreleri.manage");
@@ -838,6 +843,14 @@ export function YonetimPaneliPage() {
   const [yeniDepartmanAdi, setYeniDepartmanAdi] = useState("");
   const [muhasebeYetkiliQuery, setMuhasebeYetkiliQuery] = useState("");
   const [sorumluYoneticiQuery, setSorumluYoneticiQuery] = useState("");
+
+  // Kalıcı Sil (safe permanent delete) flow state.
+  const [kaliciSilTarget, setKaliciSilTarget] = useState<YonetimKullanici | null>(null);
+  const [kaliciSilEligibility, setKaliciSilEligibility] = useState<KaliciSilinebilirlikKontrolu | null>(null);
+  const [kaliciSilEligibilityLoading, setKaliciSilEligibilityLoading] = useState(false);
+  const [kaliciSilConfirmUsername, setKaliciSilConfirmUsername] = useState("");
+  const [kaliciSilGerekce, setKaliciSilGerekce] = useState("");
+  const [kaliciSilError, setKaliciSilError] = useState<string | null>(null);
 
   const personelOptions = useMemo(
     () =>
@@ -1302,6 +1315,89 @@ export function YonetimPaneliPage() {
     setKullaniciForm(userFormFromItem(item));
     setIsKullaniciFormOpen(true);
     setSifreResetConfirmOpen(false);
+  }
+
+  function closeKaliciSilDialog() {
+    setKaliciSilTarget(null);
+    setKaliciSilEligibility(null);
+    setKaliciSilConfirmUsername("");
+    setKaliciSilGerekce("");
+    setKaliciSilError(null);
+  }
+
+  function cancelKaliciSilDialog() {
+    if (isSubmitting || kaliciSilEligibilityLoading) {
+      return;
+    }
+    closeKaliciSilDialog();
+  }
+
+  async function openKaliciSilDialog(item: YonetimKullanici) {
+    if (!canKaliciSil || isSubmitting) {
+      return;
+    }
+    setSuccessMessage(null);
+    setErrorMessage(null);
+    setKaliciSilTarget(item);
+    setKaliciSilEligibility(null);
+    setKaliciSilEligibilityLoading(true);
+    setKaliciSilConfirmUsername("");
+    setKaliciSilGerekce("");
+    setKaliciSilError(null);
+    try {
+      const result = await fetchKullaniciSilinebilirlik(item.id);
+      setKaliciSilEligibility(result);
+    } catch (error) {
+      // A failed probe is fail-closed: the dialog shows DOĞRULANAMADI and no
+      // confirm path is offered.
+      setKaliciSilEligibility({
+        verdict: "DOĞRULANAMADI",
+        target: {
+          id: item.id,
+          username: item.username ?? "",
+          ad_soyad: item.ad_soyad,
+          rol: item.rol,
+          durum: item.durum
+        },
+        blockers: [],
+        unverified: [{ code: "DEPENDENCY_UNVERIFIED", table: "?", reason: "Silinebilirlik kontrolü alınamadı." }],
+        cleanable_scope: [],
+        dependencies: []
+      });
+      setKaliciSilError(error instanceof Error ? error.message : "Silinebilirlik kontrolü alınamadı.");
+    } finally {
+      setKaliciSilEligibilityLoading(false);
+    }
+  }
+
+  const kaliciSilVerdict: KaliciSilVerdict = kaliciSilEligibility?.verdict ?? "DOĞRULANAMADI";
+  const kaliciSilUsername = kaliciSilTarget?.username?.trim() ?? "";
+  const kaliciSilCanSubmit =
+    kaliciSilVerdict === "SİLİNEBİLİR" &&
+    kaliciSilGerekce.trim() !== "" &&
+    kaliciSilConfirmUsername.trim() === kaliciSilUsername;
+
+  async function confirmKaliciSil() {
+    if (!kaliciSilTarget || !kaliciSilCanSubmit || isSubmitting) {
+      return;
+    }
+
+    setIsSubmitting(true);
+    setKaliciSilError(null);
+
+    try {
+      await kaliciSilKullanici(kaliciSilTarget.id, {
+        confirm_username: kaliciSilConfirmUsername.trim(),
+        gerekce: kaliciSilGerekce.trim()
+      });
+      setSuccessMessage("Kullanıcı kalıcı olarak silindi.");
+      closeKaliciSilDialog();
+      await loadPanel();
+    } catch (error) {
+      setKaliciSilError(error instanceof Error ? error.message : "Kullanıcı kalıcı olarak silinemedi.");
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   function openYeniSubeForm() {
@@ -2569,7 +2665,126 @@ export function YonetimPaneliPage() {
                 Vazgeç
               </button>
             </div>
+
+            {editingKullaniciId != null && canKaliciSil ? (
+              <div className="form-actions-row">
+                <button
+                  type="button"
+                  className="universal-btn-cancel"
+                  data-testid="yonetim-kullanici-kalici-sil"
+                  onClick={() => {
+                    const target = kullanicilar.find((k) => k.id === editingKullaniciId);
+                    if (target) {
+                      void openKaliciSilDialog(target);
+                    }
+                  }}
+                  disabled={isSubmitting}
+                >
+                  Kalıcı Sil
+                </button>
+              </div>
+            ) : null}
           </form>
+        </AppModal>
+      ) : null}
+
+      {kaliciSilTarget ? (
+        <AppModal
+          title="Kalıcı Sil"
+          backLabel="Kullanıcı Yönetimi"
+          onBack={cancelKaliciSilDialog}
+          onClose={cancelKaliciSilDialog}
+        >
+          <div className="yonetim-form-stack" data-testid="yonetim-kullanici-kalici-sil-dialog">
+            <div className="yonetim-kalici-sil-target">
+              <strong>{kaliciSilTarget.ad_soyad}</strong>
+              {kaliciSilUsername ? (
+                <span className="yonetim-card-username" title={`@${kaliciSilUsername}`}>
+                  {formatKullaniciUsernameWithBreaks(kaliciSilUsername)}
+                </span>
+              ) : null}
+            </div>
+
+            {kaliciSilEligibilityLoading ? (
+              <p className="yonetim-hint" data-testid="yonetim-kalici-sil-loading">
+                Silinebilirlik kontrol ediliyor…
+              </p>
+            ) : kaliciSilVerdict === "SİLİNEBİLİR" ? (
+              <>
+                <p className="yonetim-hint" data-testid="yonetim-kalici-sil-verdict">
+                  Bu hesap silinebilir durumda. İşlem geri alınamaz; yalnızca organizasyon kapsam
+                  satırları temizlenir, denetim kanıtı korunur.
+                </p>
+                <FormField
+                  as="textarea"
+                  label="Gerekçe"
+                  name="yonetim-kalici-sil-gerekce"
+                  value={kaliciSilGerekce}
+                  onChange={setKaliciSilGerekce}
+                  required
+                  placeholder="Silme gerekçesi (zorunlu)"
+                />
+                <FormField
+                  label="Onay için kullanıcı adını yazın"
+                  name="yonetim-kalici-sil-username"
+                  value={kaliciSilConfirmUsername}
+                  onChange={setKaliciSilConfirmUsername}
+                  required
+                  placeholder={kaliciSilUsername}
+                />
+                <p className="yonetim-hint">
+                  Onaylamak için kullanıcı adını <strong>{kaliciSilUsername}</strong> olarak yazın.
+                </p>
+              </>
+            ) : kaliciSilVerdict === "ENGELLENDİ" ? (
+              <div className="yonetim-kalici-sil-blocked" data-testid="yonetim-kalici-sil-verdict">
+                <p className="yonetim-inline-error">Bu hesap silinemez.</p>
+                <ul>
+                  {(kaliciSilEligibility?.blockers ?? []).map((blocker, index) => (
+                    <li key={`${blocker.code}-${index}`}>
+                      {blocker.reason ?? blocker.code}
+                      {blocker.table ? ` (${blocker.table}${blocker.column ? `.${blocker.column}` : ""})` : ""}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : (
+              <div className="yonetim-kalici-sil-blocked" data-testid="yonetim-kalici-sil-verdict">
+                <p className="yonetim-inline-error">Silinebilirlik doğrulanamadı; işlem reddedildi.</p>
+                <ul>
+                  {(kaliciSilEligibility?.unverified ?? []).map((item, index) => (
+                    <li key={`${item.table}-${index}`}>{item.reason ?? item.table}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {kaliciSilError ? (
+              <p className="yonetim-inline-error" role="alert" data-testid="yonetim-kalici-sil-error">
+                {kaliciSilError}
+              </p>
+            ) : null}
+
+            <div className="form-actions-row">
+              <button
+                type="button"
+                className="universal-btn-cancel"
+                data-testid="yonetim-kalici-sil-confirm"
+                disabled={isSubmitting || kaliciSilEligibilityLoading || !kaliciSilCanSubmit}
+                onClick={() => void confirmKaliciSil()}
+              >
+                {isSubmitting ? "Siliniyor…" : "Kalıcı Olarak Sil"}
+              </button>
+              <button
+                type="button"
+                className="universal-btn-aux"
+                disabled={isSubmitting || kaliciSilEligibilityLoading}
+                onClick={cancelKaliciSilDialog}
+              >
+                Vazgeç
+              </button>
+            </div>
+          </div>
         </AppModal>
       ) : null}
 

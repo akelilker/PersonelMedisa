@@ -94,20 +94,19 @@ SIGNAL SQLSTATE '45000'
 -- ---------------------------------------------------------------------------
 -- Stable protected-account flag for the safe Kalıcı Sil eligibility.
 -- ---------------------------------------------------------------------------
--- ilkerA / serhan.kose must stay undeletable regardless of later username
--- edits, and a missing personeller binding must never make a management
--- account look like an orphan. `silinmesi_korunur` is the canonical, stable
--- anchor; the one-time backfill below converts the two canonical usernames
--- into the flag at apply time. No numeric identity is assumed.
+-- `silinmesi_korunur` is the canonical, stable protection anchor. Username
+-- uniqueness is NOT treated as person identity: the two protected accounts
+-- must be explicitly identified by the migration operator on the same DB
+-- connection before applying this file:
 --
--- users.username is UNIQUE (001), so this backfill can only flag the current
--- holder of each canonical name: it cannot protect a different account and it
--- never unsets an existing flag. A rename that already happened before this
--- migration applies is not resolvable here without assuming an identity; the
--- operator must then set the flag on the renamed account manually. Until that
--- is done, the service's PROTECTED_USERNAMES list still guards the canonical
--- names, so the account is never silently deletable merely because the flag
--- was not backfilled.
+--   SET @p099_protected_ilker_user_id = <verified current users.id>;
+--   SET @p099_protected_serhan_user_id = <verified current users.id>;
+--
+-- No numeric value is baked into this migration. On a non-empty users table,
+-- absent, equal or unknown IDs abort the migration. On a fresh empty schema,
+-- the registry remains empty and Kalıcı Sil stays fail-closed until the same
+-- verified registration is completed; missing identity evidence never enables
+-- deletion.
 SET @p099_koruma_col := (
   SELECT COUNT(*)
   FROM information_schema.COLUMNS
@@ -124,5 +123,90 @@ PREPARE p099_koruma_stmt FROM @p099_koruma_sql;
 EXECUTE p099_koruma_stmt;
 DEALLOCATE PREPARE p099_koruma_stmt;
 
--- One-time backfill (idempotent): only the canonical protected usernames.
-UPDATE users SET silinmesi_korunur = 1 WHERE username IN ('ilkerA', 'serhan.kose');
+CREATE TABLE IF NOT EXISTS user_kalici_silme_korunan_hesaplar (
+  protection_key ENUM('ILKER_A', 'SERHAN_KOSE') NOT NULL,
+  user_id INT UNSIGNED NOT NULL,
+  verified_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (protection_key),
+  UNIQUE KEY uq_kskha_user (user_id),
+  CONSTRAINT fk_kskha_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE RESTRICT ON UPDATE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+SET @p099_users_count := (SELECT COUNT(*) FROM users);
+SET @p099_protected_ids_valid := (
+  SELECT COUNT(*) = 2
+  FROM users
+  WHERE id IN (@p099_protected_ilker_user_id, @p099_protected_serhan_user_id)
+);
+SET @p099_protection_precondition_sql := IF(
+  @p099_users_count = 0
+    OR (
+      @p099_protected_ilker_user_id IS NOT NULL
+      AND @p099_protected_serhan_user_id IS NOT NULL
+      AND @p099_protected_ilker_user_id <> @p099_protected_serhan_user_id
+      AND @p099_protected_ids_valid = 1
+    ),
+  'DO 0',
+  'SIGNAL SQLSTATE ''45000'' SET MESSAGE_TEXT = ''PACK099_BLOCKER: verified protected-account IDs are required'''
+);
+PREPARE p099_protection_precondition_stmt FROM @p099_protection_precondition_sql;
+EXECUTE p099_protection_precondition_stmt;
+DEALLOCATE PREPARE p099_protection_precondition_stmt;
+
+-- Explicitly operator-verified IDs only; never resolve people by username.
+INSERT INTO user_kalici_silme_korunan_hesaplar (protection_key, user_id)
+SELECT 'ILKER_A', @p099_protected_ilker_user_id
+WHERE @p099_users_count > 0
+ON DUPLICATE KEY UPDATE user_id = VALUES(user_id), verified_at = CURRENT_TIMESTAMP;
+
+INSERT INTO user_kalici_silme_korunan_hesaplar (protection_key, user_id)
+SELECT 'SERHAN_KOSE', @p099_protected_serhan_user_id
+WHERE @p099_users_count > 0
+ON DUPLICATE KEY UPDATE user_id = VALUES(user_id), verified_at = CURRENT_TIMESTAMP;
+
+UPDATE users u
+INNER JOIN user_kalici_silme_korunan_hesaplar p ON p.user_id = u.id
+SET u.silinmesi_korunur = 1;
+
+-- ---------------------------------------------------------------------------
+-- FK-less user references are not safe around hard delete. These are the
+-- current classified writer columns from the migration/source inventory.
+-- RESTRICT makes a late writer and the user DELETE mutually safe at InnoDB
+-- level; a future unclassified column is rejected by the application owner.
+-- Existing orphan data causes this migration to fail rather than silently
+-- permitting a hard delete.
+-- ---------------------------------------------------------------------------
+ALTER TABLE ek_odeme_kesinti
+  ADD CONSTRAINT fk_p099_eok_created_by FOREIGN KEY (created_by) REFERENCES users (id) ON DELETE RESTRICT ON UPDATE RESTRICT,
+  ADD CONSTRAINT fk_p099_eok_updated_by FOREIGN KEY (updated_by) REFERENCES users (id) ON DELETE RESTRICT ON UPDATE RESTRICT;
+
+ALTER TABLE gunluk_bildirimler
+  ADD CONSTRAINT fk_p099_gb_created_by FOREIGN KEY (created_by) REFERENCES users (id) ON DELETE RESTRICT ON UPDATE RESTRICT,
+  ADD CONSTRAINT fk_p099_gb_updated_by FOREIGN KEY (updated_by) REFERENCES users (id) ON DELETE RESTRICT ON UPDATE RESTRICT,
+  ADD CONSTRAINT fk_p099_gb_correction_requested_by FOREIGN KEY (correction_requested_by) REFERENCES users (id) ON DELETE RESTRICT ON UPDATE RESTRICT;
+
+ALTER TABLE legal_holdlar
+  ADD CONSTRAINT fk_p099_lh_released_by FOREIGN KEY (released_by) REFERENCES users (id) ON DELETE RESTRICT ON UPDATE RESTRICT;
+
+ALTER TABLE legal_hold_auditleri
+  ADD CONSTRAINT fk_p099_lha_actor_user FOREIGN KEY (actor_user_id) REFERENCES users (id) ON DELETE RESTRICT ON UPDATE RESTRICT;
+
+ALTER TABLE offline_mutation_idempotency
+  ADD CONSTRAINT fk_p099_omi_actor_user FOREIGN KEY (actor_user_id) REFERENCES users (id) ON DELETE RESTRICT ON UPDATE RESTRICT;
+
+ALTER TABLE personel_gecici_gorevlendirmeler
+  ADD CONSTRAINT fk_p099_pgg_olusturan_user FOREIGN KEY (olusturan_user_id) REFERENCES users (id) ON DELETE RESTRICT ON UPDATE RESTRICT,
+  ADD CONSTRAINT fk_p099_pgg_sonlandiran_user FOREIGN KEY (sonlandiran_user_id) REFERENCES users (id) ON DELETE RESTRICT ON UPDATE RESTRICT;
+
+ALTER TABLE personel_import_runs
+  ADD CONSTRAINT fk_p099_pir_actor FOREIGN KEY (actor_id) REFERENCES users (id) ON DELETE RESTRICT ON UPDATE RESTRICT;
+
+ALTER TABLE personel_test_fixture_archive_kayitlari
+  ADD CONSTRAINT fk_p099_ptfak_archived FOREIGN KEY (archived_by) REFERENCES users (id) ON DELETE RESTRICT ON UPDATE RESTRICT;
+
+ALTER TABLE personel_test_fixture_siniflandirmalari
+  ADD CONSTRAINT fk_p099_ptfs_classified FOREIGN KEY (classified_by) REFERENCES users (id) ON DELETE RESTRICT ON UPDATE RESTRICT,
+  ADD CONSTRAINT fk_p099_ptfs_iptal FOREIGN KEY (iptal_edildi_by) REFERENCES users (id) ON DELETE RESTRICT ON UPDATE RESTRICT;
+
+ALTER TABLE retention_imha_auditleri
+  ADD CONSTRAINT fk_p099_ria_actor FOREIGN KEY (actor_user_id) REFERENCES users (id) ON DELETE RESTRICT ON UPDATE RESTRICT;

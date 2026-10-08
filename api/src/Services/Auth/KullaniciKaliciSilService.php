@@ -30,6 +30,7 @@ final class KullaniciKaliciSilService
     public const VERDICT_DOGRULANAMADI = 'DOĞRULANAMADI';
 
     public const AUDIT_TABLE = 'user_kalici_silme_auditleri';
+    public const PROTECTED_ACCOUNTS_TABLE = 'user_kalici_silme_korunan_hesaplar';
 
     public const CODE_SELF_DELETE = 'SELF_DELETE_FORBIDDEN';
     public const CODE_PROTECTED_ACCOUNT = 'PROTECTED_ACCOUNT';
@@ -38,13 +39,6 @@ final class KullaniciKaliciSilService
     public const CODE_DEPENDENCY_EXISTS = 'DEPENDENCY_EXISTS';
     public const CODE_DEPENDENCY_UNVERIFIED = 'DEPENDENCY_UNVERIFIED';
     public const CODE_AUDIT_SCHEMA_NOT_READY = 'AUDIT_SCHEMA_NOT_READY';
-
-    /**
-     * Accounts that must never be treated as orphans merely because they lack a
-     * personeller binding. Explicit canonical usernames, plus the role guard
-     * below, keep live management identities safe.
-     */
-    public const PROTECTED_USERNAMES = ['ilkerA', 'serhan.kose'];
 
     /**
      * The only tables whose rows may be removed as part of a hard delete. Every
@@ -153,14 +147,11 @@ final class KullaniciKaliciSilService
         self::assertAuditReady($pdo);
 
         // Serialize concurrent hard deletes of the same user with a namespaced
-        // advisory lock. It coordinates ONLY other hard deletes of this user:
-        // FK-less writers (created_by / released_by / actor_user_id / ...) do
-        // NOT acquire this lock. The guard against a late FK-less reference is
-        // the READ COMMITTED re-verification below, which observes any reference
-        // committed before it runs. A reference committed in the narrow window
-        // between that re-check and the DELETE cannot be observed without an FK
-        // constraint or a table lock; that residual window is documented here
-        // as an accepted limitation of the FK-less schema.
+        // advisory lock. Classified user-reference writers are protected by
+        // 099 RESTRICT FKs: lockTarget() holds the parent row FOR UPDATE, so a
+        // late child write blocks and then fails if the DELETE commits. Any
+        // newly introduced unclassified user-reference column makes readiness
+        // fail closed before a delete can begin.
         $lockName = 'medisa_kalici_sil_user_' . $userId;
         $locked = (int) $pdo->query('SELECT GET_LOCK(' . $pdo->quote($lockName) . ', 10)')->fetchColumn();
         if ($locked !== 1) {
@@ -369,15 +360,10 @@ final class KullaniciKaliciSilService
             return ['code' => self::CODE_SELF_DELETE, 'reason' => 'Kendi hesabınız silinemez.'];
         }
 
-        // Stable DB flag is the authoritative protection anchor: it survives
-        // later username edits (099 backfill converts the canonical usernames).
+        // Stable DB flag is the authoritative protection anchor. The 099
+        // protected-account registry provides the verified identity mapping;
+        // usernames are intentionally not used as a proxy for a real person.
         if (isset($target['silinmesi_korunur']) && (int) $target['silinmesi_korunur'] === 1) {
-            return ['code' => self::CODE_PROTECTED_ACCOUNT, 'reason' => 'Korunan yönetici hesabı.'];
-        }
-
-        // Canonical username is a secondary fail-closed hint, never the sole
-        // basis: it catches accounts not yet flagged by the 099 backfill.
-        if (in_array((string) $target['username'], self::PROTECTED_USERNAMES, true)) {
             return ['code' => self::CODE_PROTECTED_ACCOUNT, 'reason' => 'Korunan yönetici hesabı.'];
         }
 
@@ -764,13 +750,17 @@ final class KullaniciKaliciSilService
     }
 
     /**
-     * The audit evidence table (099) and its append-only triggers must all be
-     * present before any deletion decision; otherwise the delete is not
-     * auditable and must be refused / reported DOĞRULANAMADI.
+     * The audit evidence table (099), append-only triggers, verified protected
+     * account registry and FK coverage for classified references must all be
+     * present before any deletion decision. Otherwise the delete is not safe
+     * or auditable and must be refused / reported DOĞRULANAMADI.
      */
     private static function hasAuditReady(PDO $pdo): bool
     {
         if (!self::tableExists($pdo, self::AUDIT_TABLE)) {
+            return false;
+        }
+        if (!UsersSchema::hasSilinmesiKorunur($pdo) || !self::hasProtectedAccountsReady($pdo)) {
             return false;
         }
         foreach (['trg_ksa_no_update', 'trg_ksa_no_delete'] as $trigger) {
@@ -784,6 +774,54 @@ final class KullaniciKaliciSilService
             }
         }
 
-        return true;
+        return self::hasClassifiedReferenceForeignKeys($pdo);
+    }
+
+    private static function hasProtectedAccountsReady(PDO $pdo): bool
+    {
+        if (!self::tableExists($pdo, self::PROTECTED_ACCOUNTS_TABLE)) {
+            return false;
+        }
+        try {
+            $stmt = $pdo->query(
+                "SELECT COUNT(*)
+                 FROM " . self::PROTECTED_ACCOUNTS_TABLE . " p
+                 INNER JOIN users u ON u.id = p.user_id
+                 WHERE p.protection_key IN ('ILKER_A', 'SERHAN_KOSE')
+                   AND u.silinmesi_korunur = 1"
+            );
+
+            return (int) $stmt->fetchColumn() === 2;
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    private static function hasClassifiedReferenceForeignKeys(PDO $pdo): bool
+    {
+        $placeholders = implode(',', array_fill(0, count(self::CANDIDATE_COLUMNS), '?'));
+        try {
+            $stmt = $pdo->prepare(
+                "SELECT COUNT(*)
+                 FROM information_schema.COLUMNS c
+                 WHERE c.TABLE_SCHEMA = DATABASE()
+                   AND c.TABLE_NAME <> 'users'
+                   AND c.TABLE_NAME <> ?
+                   AND c.COLUMN_NAME IN ($placeholders)
+                   AND NOT EXISTS (
+                       SELECT 1 FROM information_schema.KEY_COLUMN_USAGE kcu
+                       WHERE kcu.TABLE_SCHEMA = c.TABLE_SCHEMA
+                         AND kcu.TABLE_NAME = c.TABLE_NAME
+                         AND kcu.COLUMN_NAME = c.COLUMN_NAME
+                         AND kcu.REFERENCED_TABLE_NAME = 'users'
+                         AND kcu.REFERENCED_COLUMN_NAME = 'id'
+                   )"
+            );
+            $stmt->execute(array_merge([self::AUDIT_TABLE], self::CANDIDATE_COLUMNS));
+
+            return (int) $stmt->fetchColumn() === 0;
+        } catch (\Throwable $e) {
+            return false;
+        }
     }
 }

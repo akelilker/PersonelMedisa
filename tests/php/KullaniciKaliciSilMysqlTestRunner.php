@@ -313,6 +313,51 @@ try {
     ));
     sort($chain, SORT_STRING);
     ksaAssert(end($chain) === KSA_MIGRATION_TIP, 'the canonical chain tip is migration 099');
+
+    // 099 must never identify protected people from usernames. On a populated
+    // database it refuses to apply until the operator supplies two verified,
+    // distinct users.id values in the migration session; a fresh empty schema
+    // may apply but remains service-fail-closed until registered.
+    $preconditionDb = 'medisa_ksa_pre_' . bin2hex(random_bytes(4));
+    $root->exec('CREATE DATABASE `' . $preconditionDb . '` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
+    try {
+        $preconditionPdo = ksaPdo($baseDsn . ';dbname=' . $preconditionDb);
+        foreach (array_filter($chain, static fn (string $migration): bool => $migration !== KSA_MIGRATION_TIP) as $migration) {
+            ksaApplyFile($preconditionPdo, $migration);
+        }
+        $preconditionPdo->exec(
+            "INSERT INTO users (id, username, password_hash, ad_soyad, rol, durum) VALUES
+                (21, 'verified.one', 'x', 'Verified One', 'SISTEM_YONETICISI', 'AKTIF'),
+                (22, 'verified.two', 'x', 'Verified Two', 'SISTEM_YONETICISI', 'AKTIF')"
+        );
+        $withoutAttestationBlocked = false;
+        try {
+            ksaApplyFile($preconditionPdo, KSA_MIGRATION_TIP);
+        } catch (\Throwable $exception) {
+            $withoutAttestationBlocked = true;
+        }
+        ksaAssert(
+            $withoutAttestationBlocked,
+            'migration 099 refuses a populated database without verified protected-account IDs'
+        );
+        $preconditionPdo->exec('SET @p099_protected_ilker_user_id = 21');
+        $preconditionPdo->exec('SET @p099_protected_serhan_user_id = 22');
+        ksaApplyFile($preconditionPdo, KSA_MIGRATION_TIP);
+        ksaAssert(
+            ksaCount(
+                $preconditionPdo,
+                "SELECT COUNT(*) FROM user_kalici_silme_korunan_hesaplar
+                 WHERE protection_key IN ('ILKER_A', 'SERHAN_KOSE') AND user_id IN (21, 22)"
+            ) === 2,
+            'migration 099 records only the operator-verified protected-account IDs'
+        );
+        ksaAssert(
+            ksaCount($preconditionPdo, 'SELECT COUNT(*) FROM users WHERE id IN (21, 22) AND silinmesi_korunur = 1') === 2,
+            'migration 099 flags the verified protected accounts without username matching'
+        );
+    } finally {
+        $root->exec('DROP DATABASE IF EXISTS `' . $preconditionDb . '`');
+    }
     foreach ($chain as $migration) {
         ksaApplyFile($pdo, (string) $migration);
     }
@@ -333,6 +378,46 @@ try {
         ) === 1,
         'migration 099 added the stable protected-account flag'
     );
+    ksaAssert(
+        ksaCount(
+            $pdo,
+            "SELECT COUNT(*) FROM information_schema.TABLES
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'user_kalici_silme_korunan_hesaplar'"
+        ) === 1,
+        'migration 099 created the explicit protected-account registry'
+    );
+    foreach ([
+        'ek_odeme_kesinti.created_by',
+        'ek_odeme_kesinti.updated_by',
+        'gunluk_bildirimler.created_by',
+        'gunluk_bildirimler.updated_by',
+        'gunluk_bildirimler.correction_requested_by',
+        'legal_holdlar.released_by',
+        'legal_hold_auditleri.actor_user_id',
+        'offline_mutation_idempotency.actor_user_id',
+        'personel_gecici_gorevlendirmeler.olusturan_user_id',
+        'personel_gecici_gorevlendirmeler.sonlandiran_user_id',
+        'personel_import_runs.actor_id',
+        'personel_test_fixture_archive_kayitlari.archived_by',
+        'personel_test_fixture_siniflandirmalari.classified_by',
+        'personel_test_fixture_siniflandirmalari.iptal_edildi_by',
+        'retention_imha_auditleri.actor_user_id',
+    ] as $reference) {
+        [$table, $column] = explode('.', $reference, 2);
+        ksaAssert(
+            ksaCount(
+                $pdo,
+                "SELECT COUNT(*) FROM information_schema.KEY_COLUMN_USAGE
+                 WHERE TABLE_SCHEMA = DATABASE()
+                   AND TABLE_NAME = :table
+                   AND COLUMN_NAME = :column
+                   AND REFERENCED_TABLE_NAME = 'users'
+                   AND REFERENCED_COLUMN_NAME = 'id'",
+                [':table' => $table, ':column' => $column]
+            ) === 1,
+            'migration 099 protects the classified reference ' . $reference . ' with a users FK'
+        );
+    }
 
     // Structure: actor attribution stays a real FK (RESTRICT) while target fields
     // are data-only; append-only is enforced by BEFORE UPDATE / BEFORE DELETE.
@@ -383,10 +468,14 @@ try {
             (11, 'rollback', '{$hash}', 'Rollback Kullanici', 'SISTEM_YONETICISI', 'AKTIF')"
     );
     $pdo->exec('UPDATE users SET personel_id = 173 WHERE id = 7');
-    // Simulate the 099 one-time backfill: in production the canonical protected
-    // accounts pre-exist the migration; here the seed runs after the chain, so
-    // the flag is applied manually to mirror the applied state.
-    $pdo->exec("UPDATE users SET silinmesi_korunur = 1 WHERE username IN ('ilkerA', 'serhan.kose')");
+    // The canonical chain runs on an empty disposable schema. Mirror the
+    // production migration's explicit, operator-verified identity registry
+    // after fixture accounts exist; no username is used as identity evidence.
+    $pdo->exec('UPDATE users SET silinmesi_korunur = 1 WHERE id IN (4, 5)');
+    $pdo->exec(
+        "INSERT INTO user_kalici_silme_korunan_hesaplar (protection_key, user_id)
+         VALUES ('ILKER_A', 4), ('SERHAN_KOSE', 5)"
+    );
     // Scope rows that must be cleaned on a successful delete and restored on rollback.
     $pdo->exec('INSERT INTO user_subeler (user_id, sube_id) VALUES (3, 1), (11, 1)');
 
@@ -596,7 +685,7 @@ try {
     $pdo->exec(
         "CREATE TABLE `ks_unsafe-table` (
             id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
-            changed_by INT UNSIGNED NULL
+            sorumlu_user_id INT UNSIGNED NULL
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
     );
     $elig = ksaEligibility($pdo, $gy, 10);
@@ -629,10 +718,9 @@ try {
     ksaAssert(ksaUser($pdo, 2) !== null, 'the revoked account still exists (not deleted)');
 
     // =====================================================================
-    // 9) FK-less dependency inventory (gap 2): the FK-less `legal_holdlar.
-    //    released_by` reference is inventoried, a FK-less candidate column with
-    //    a row blocks deletion, and a NEW unclassified user-reference column
-    //    fails closed to DOĞRULANAMADI.
+    // 9) Classified-reference inventory (gap 2): legal_holdlar.released_by is
+    //    now a RESTRICT FK, a row blocks deletion, and a NEW unclassified
+    //    user-reference column still fails closed to DOĞRULANAMADI.
     // =====================================================================
     $elig = ksaEligibility($pdo, $gy, 10);
     $releasedBy = array_values(array_filter(
@@ -641,22 +729,20 @@ try {
     ));
     ksaAssert(
         count($releasedBy) === 1 && (int) $releasedBy[0]['row_count'] === 0,
-        'the FK-less legal_holdlar.released_by reference is inventoried'
+        'the classified legal_holdlar.released_by reference is inventoried'
     );
 
-    $pdo->exec("INSERT INTO users (id, username, password_hash, ad_soyad, rol, durum) VALUES (13, 'fkless', '{$hash}', 'Fkless Kullanici', 'SISTEM_YONETICISI', 'AKTIF')");
+    $pdo->exec("INSERT INTO users (id, username, password_hash, ad_soyad, rol, durum) VALUES (13, 'classified', '{$hash}', 'Classified Kullanici', 'SISTEM_YONETICISI', 'AKTIF')");
     $pdo->exec(
-        "CREATE TABLE ks_test_fkless_block (
-            id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
-            released_by INT UNSIGNED NULL
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+        "INSERT INTO legal_holdlar
+            (target_domain, reason, created_by, released_by)
+         VALUES ('KALICI_SIL', 'classified reference', 1, 13)"
     );
-    $pdo->exec('INSERT INTO ks_test_fkless_block (released_by) VALUES (13)');
     $elig = ksaEligibility($pdo, $gy, 13);
-    ksaAssert($elig['verdict'] === 'ENGELLENDİ', 'a FK-less candidate reference blocks deletion');
+    ksaAssert($elig['verdict'] === 'ENGELLENDİ', 'a classified reference blocks deletion');
     ksaAssert(
         ($elig['blockers'][0]['code'] ?? '') === 'DEPENDENCY_EXISTS',
-        'the FK-less candidate reference names DEPENDENCY_EXISTS'
+        'the classified reference names DEPENDENCY_EXISTS'
     );
 
     $pdo->exec("INSERT INTO users (id, username, password_hash, ad_soyad, rol, durum) VALUES (14, 'uncat', '{$hash}', 'Uncat Kullanici', 'SISTEM_YONETICISI', 'AKTIF')");
@@ -672,6 +758,7 @@ try {
         ($elig['unverified'][0]['code'] ?? '') === 'DEPENDENCY_UNVERIFIED',
         'the unclassified column names DEPENDENCY_UNVERIFIED'
     );
+    $pdo->exec('DROP TABLE ks_test_unclassified');
 
     // =====================================================================
     // 10) Protected accounts (gap 4): the stable flag survives username edits.
@@ -689,16 +776,26 @@ try {
         'the renamed account still names the protected blocker via the stable flag'
     );
 
-    // =====================================================================
-    // 11) Concurrency (gap 3): the advisory lock serializes concurrent deletes
-    //     and the READ COMMITTED re-verification observes a late FK-less commit.
-    // =====================================================================
+    // Missing verified identity registry must never make any account appear
+    // deletable, even though the stable flag column itself still exists.
+    $pdo->exec('DELETE FROM user_kalici_silme_korunan_hesaplar');
+    $elig = ksaEligibility($pdo, $gy, 10);
+    ksaAssert($elig['verdict'] === 'DOĞRULANAMADI', 'a missing protected-account registry resolves eligibility to DOĞRULANAMADI');
+    $r = ksaHttp($pdo, $gy, 'kullanici_kalici_sil', ['id' => 10, 'confirm_username' => 'unverified', 'gerekce' => 'x']);
+    ksaAssert($r['status'] === 409, 'the missing protected-account registry refuses deletion with 409');
+    ksaAssert(ksaUser($pdo, 10) !== null, 'the missing protected-account registry refusal deleted nothing');
     $pdo->exec(
-        "CREATE TABLE ks_test_fkless (
-            id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
-            released_by INT UNSIGNED NULL
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+        "INSERT INTO user_kalici_silme_korunan_hesaplar (protection_key, user_id)
+         VALUES ('ILKER_A', 4), ('SERHAN_KOSE', 5)"
     );
+
+    // =====================================================================
+    // 11) Concurrency (gap 3): the advisory lock serializes concurrent deletes.
+    //     More importantly, the classified FK on legal_holdlar.released_by
+    //     makes a new writer block on lockTarget() after the final dependency
+    //     check and before DELETE; after the delete commits it cannot insert an
+    //     orphan reference.
+    // =====================================================================
     $pdo->exec("INSERT INTO users (id, username, password_hash, ad_soyad, rol, durum) VALUES (15, 'race', '{$hash}', 'Race Kullanici', 'SISTEM_YONETICISI', 'AKTIF')");
 
     $connA = ksaPdo($baseDsn . ';dbname=' . $db);
@@ -713,15 +810,42 @@ try {
     $connA->exec('SET TRANSACTION ISOLATION LEVEL READ COMMITTED');
     $connA->beginTransaction();
     $connA->query('SELECT id FROM users WHERE id = 15 FOR UPDATE')->fetch();
-    $initial = (int) $connA->query('SELECT COUNT(*) FROM ks_test_fkless WHERE released_by = 15')->fetchColumn();
-    ksaAssert($initial === 0, 'the initial check sees no FK-less reference');
+    $initial = (int) $connA->query('SELECT COUNT(*) FROM legal_holdlar WHERE released_by = 15')->fetchColumn();
+    ksaAssert($initial === 0, 'the final dependency check sees no released_by reference');
 
-    $connB->exec('INSERT INTO ks_test_fkless (released_by) VALUES (15)');
+    $connB->exec('SET innodb_lock_wait_timeout = 1');
+    $lateWriterBlocked = false;
+    try {
+        $connB->exec(
+            "INSERT INTO legal_holdlar
+                (target_domain, reason, created_by, released_by)
+             VALUES ('KALICI_SIL_RACE', 'late writer', 1, 15)"
+        );
+    } catch (\Throwable $exception) {
+        $lateWriterBlocked = true;
+    }
+    ksaAssert(
+        $lateWriterBlocked,
+        'a classified late writer is blocked while the target row is locked after final verification'
+    );
+    $connA->exec('DELETE FROM users WHERE id = 15');
+    $connA->commit();
+    ksaAssert(ksaUser($pdo, 15) === null, 'the raced account was deleted only after the late writer was blocked');
 
-    $final = (int) $connA->query('SELECT COUNT(*) FROM ks_test_fkless WHERE released_by = 15')->fetchColumn();
-    ksaAssert($final === 1, 'the READ COMMITTED re-verification observes the late FK-less reference');
-    $connA->rollBack();
-    ksaAssert(ksaUser($pdo, 15) !== null, 'the raced account was not deleted (fail-closed)');
+    $lateWriterRejectedAfterDelete = false;
+    try {
+        $connB->exec(
+            "INSERT INTO legal_holdlar
+                (target_domain, reason, created_by, released_by)
+             VALUES ('KALICI_SIL_RACE', 'post delete writer', 1, 15)"
+        );
+    } catch (\Throwable $exception) {
+        $lateWriterRejectedAfterDelete = true;
+    }
+    ksaAssert(
+        $lateWriterRejectedAfterDelete,
+        'the classified late writer cannot create an orphan after the user DELETE'
+    );
 
     // =====================================================================
     // 12) Missing audit schema (gap 1): eligibility fails closed to

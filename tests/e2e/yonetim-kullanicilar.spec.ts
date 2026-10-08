@@ -85,7 +85,7 @@ test.describe("yonetim kullanicilar API (S44)", () => {
     await page.goto("/yonetim-paneli?tab=kullanicilar");
     await page.getByTestId("yonetim-kullanici-yeni").click();
     await expect(page.getByLabel("Kullanıcı Adı")).toBeVisible();
-    await expect(page.getByTestId("yonetim-standart-baslangic-sifresi-hint")).toBeVisible();
+    await expect(page.getByTestId("yonetim-baslangic-sifresi-hint")).toBeVisible();
 
     await page.getByLabel("Kullanıcı Tipi").selectOption("HARICI");
     await page.getByLabel("Rol").selectOption("MUHASEBE");
@@ -124,7 +124,7 @@ test.describe("yonetim kullanicilar API (S44)", () => {
     const role = page.getByLabel("Rol");
     await expect(role).toHaveValue("AUTH_SMOKE_READONLY");
     await expect(role).toBeDisabled();
-    await expect(role.locator('option[value="AUTH_SMOKE_READONLY"]')).toHaveText("Teknik Smoke — Salt Okuma");
+    await expect(role.locator('option[value="AUTH_SMOKE_READONLY"]')).toHaveText("Teknik doğrulama — Salt okuma");
   });
 
   test("duplicate username returns 409", async ({ page }) => {

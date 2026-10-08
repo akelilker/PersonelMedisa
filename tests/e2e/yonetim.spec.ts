@@ -13,7 +13,7 @@ test.describe("yonetim paneli ve aylik ozet", () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.getByTestId("header-settings-toggle").click();
     await expect(page.getByTestId("settings-yonetim-paneli")).toBeVisible();
-    await expect(page.getByTestId("settings-yonetim-paneli")).toHaveText("Kullanýcý Yönetimi");
+    await expect(page.getByTestId("settings-yonetim-paneli")).toHaveText("KullanÄ±cÄ± YÃ¶netimi");
     await expect(page.getByTestId("settings-sube-yonetimi")).toBeVisible();
     await expect(page.getByTestId("settings-aylik-ozet")).toHaveCount(0);
 
@@ -34,7 +34,7 @@ test.describe("yonetim paneli ve aylik ozet", () => {
 
     await page.getByTestId("settings-yonetim-paneli").click();
     await expect(page).toHaveURL(/\/yonetim-paneli\?tab=kullanicilar$/);
-    await expect(page.locator(".modal-header h2").first()).toContainText("KULLANICI YÖNETÝMÝ");
+    await expect(page.locator(".modal-header h2").first()).toContainText("KULLANICI YÃ–NETÄ°MÄ°");
     await expect(page.locator(".modal-header").getByTestId("yonetim-back-ayarlar")).toHaveCount(0);
     await expect(page.locator(".modal-header .modal-back-btn")).toHaveCount(0);
     await expect(page.getByTestId("yonetim-back-ayarlar")).toBeVisible();
@@ -48,7 +48,7 @@ test.describe("yonetim paneli ve aylik ozet", () => {
       const card = modal.querySelector(".yonetim-card-grid--users .yonetim-entity-card");
       const footer = document.querySelector("#app-footer");
       if (!(body instanceof HTMLElement) || !(pageRoot instanceof HTMLElement) || !(footer instanceof HTMLElement)) {
-        throw new Error("Missing yönetim modal geometry owners");
+        throw new Error("Missing yÃ¶netim modal geometry owners");
       }
       const modalBounds = modal.getBoundingClientRect();
       const bodyBounds = body.getBoundingClientRect();
@@ -86,36 +86,36 @@ test.describe("yonetim paneli ve aylik ozet", () => {
     await page.setViewportSize({ width: 1280, height: 800 });
 
     await page.getByTestId("yonetim-kullanici-yeni").click();
-    await expect(page.locator(".modal-header h2").last()).toContainText("Yeni Kullanýcý");
-    await page.getByLabel("Kullanýcý Tipi").selectOption("HARICI");
+    await expect(page.locator(".modal-header h2").last()).toContainText("Yeni KullanÄ±cÄ±");
+    await page.getByLabel("KullanÄ±cÄ± Tipi").selectOption("HARICI");
     await page.getByLabel("Rol").selectOption("GENEL_YONETICI");
-    await page.getByLabel("Kullanýcý Adý").fill("danisman_kullanici");
-    await page.getByLabel("Ad Soyad").fill("Danýþman Kullanýcý");
+    await page.getByLabel("KullanÄ±cÄ± AdÄ±").fill("danisman_kullanici");
+    await page.getByLabel("Ad Soyad").fill("DanÄ±ÅŸman KullanÄ±cÄ±");
     await page.getByLabel("Telefon").fill("05559998877");
-    await page.getByLabel("Notlar").fill("Dýþarýdan danýþman eriþimi");
+    await page.getByLabel("Notlar").fill("DÄ±ÅŸarÄ±dan danÄ±ÅŸman eriÅŸimi");
     await page.getByTestId("yonetim-kullanici-kaydet").click();
 
-    await expect(page.getByText("Kullanýcý kaydý oluþturuldu.")).toBeVisible();
+    await expect(page.getByText("KullanÄ±cÄ± kaydÄ± oluÅŸturuldu.")).toBeVisible();
     await expect(page.locator(".yonetim-card-grid--users")).toContainText(/KULLANICI/i);
-    await expect(page.locator(".yonetim-card-grid--users")).toContainText("Tüm Þubeler");
+    await expect(page.locator(".yonetim-card-grid--users")).toContainText("TÃ¼m Åžubeler");
 
     await page.goto("/yonetim-paneli?tab=subeler&sirket=1");
-    await expect(page.locator(".modal-header h2").first()).toContainText("ÞÝRKET VE ÞUBE YÖNETÝMÝ");
+    await expect(page.locator(".modal-header h2").first()).toContainText("ÅžÄ°RKET VE ÅžUBE YÃ–NETÄ°MÄ°");
     await expect(page.getByTestId("yonetim-section-subeler")).toBeVisible();
-    await expect(page.getByRole("button", { name: /\+ Yeni Þube/i })).toBeVisible();
+    await expect(page.getByRole("button", { name: /\+ Yeni Åžube/i })).toBeVisible();
     await expect(page.locator(".yonetim-card-grid--branches")).toContainText("Merkez");
 
     await page.getByTestId("yonetim-sube-yeni").click();
-    await page.getByLabel("Þube Kodu").fill("ANK");
-    await page.getByLabel(/Þube kýsa adý/i).fill("Ankara");
+    await page.getByLabel("Åžube Kodu").fill("ANK");
+    await page.getByLabel(/Åžube kÄ±sa adÄ±/i).fill("Ankara");
     await page.getByTestId("yonetim-sube-departman-panel").getByRole("button", { name: /\+ Yeni Departman/i }).click();
     await page.getByTestId("yonetim-sube-departman-panel").getByRole("button", { name: /^Depo$/i }).click();
-    await page.getByPlaceholder("Yeni departman adý").fill("Kalite");
+    await page.getByPlaceholder("Yeni departman adÄ±").fill("Kalite");
     await page.getByRole("button", { name: "Ekle" }).click();
     await expect(page.getByTestId("yonetim-sube-departman-panel")).toContainText("Kalite");
     await page.getByTestId("yonetim-sube-kaydet").click();
 
-    await expect(page.getByText("Þube tanýmý eklendi.")).toBeVisible();
+    await expect(page.getByText("Åžube tanÄ±mÄ± eklendi.")).toBeVisible();
     await expect(page.locator(".yonetim-card-grid--branches")).toContainText("Ankara");
     await expect(page.locator(".yonetim-card-grid--branches")).toContainText("Kalite");
   });
@@ -134,31 +134,31 @@ test.describe("yonetim paneli ve aylik ozet", () => {
     await page.getByTestId("menu-raporlar").click();
     await expect(page).toHaveURL(/\/raporlar$/);
     await expect(page.locator(".modal-header h2").first()).toContainText("Raporlar");
-    await page.getByRole("link", { name: "Aylýk Kapanýþ Özeti" }).click();
+    await page.getByRole("link", { name: "AylÄ±k KapanÄ±ÅŸ Ã–zeti" }).click();
     await expect(page).toHaveURL(/view=aylik-kapanis/);
 
     await expect(page.getByTestId("aylik-kapanis-ozeti-section")).toBeVisible();
-    await expect(page.getByTestId("aylik-kapanis-ozeti-section").locator("h2")).toContainText("Aylýk Kapanýþ Özeti");
+    await expect(page.getByTestId("aylik-kapanis-ozeti-section").locator("h2")).toContainText("AylÄ±k KapanÄ±ÅŸ Ã–zeti");
     const aylikSection = page.getByTestId("aylik-kapanis-ozeti-section");
     const aylikOzetTable = aylikSection.locator(".raporlar-table tbody");
     await expect(aylikOzetTable.locator("tr")).toHaveCount(1);
     await expect(aylikOzetTable).toContainText("Mehmet Kaya");
     await expect(aylikOzetTable).toContainText("Depolama");
-    await expect(aylikOzetTable).not.toContainText("Ayþe Yýlmaz");
+    await expect(aylikOzetTable).not.toContainText("AyÅŸe YÄ±lmaz");
     await expect(aylikOzetTable).not.toContainText("Merkez");
 
     const subeSelect = aylikSection.locator('[name="aylik-ozet-sube"]');
     const depolamaOption = subeSelect.locator("option").filter({ hasText: "Depolama" }).first();
     const depolamaValue = await depolamaOption.getAttribute("value");
     await subeSelect.selectOption(depolamaValue!);
-    await aylikSection.getByRole("button", { name: "Özeti Getir" }).click();
+    await aylikSection.getByRole("button", { name: "Ã–zeti Getir" }).click();
     await expect(aylikOzetTable.locator("tr")).toHaveCount(1);
     await expect(aylikOzetTable).toContainText("Mehmet Kaya");
     await expect(aylikOzetTable).toContainText("Depolama");
 
     await page.getByTestId("aylik-ozet-bolum-onay").click();
-    await expect(page.getByText("Seçili ay için bölüm onayý verildi.")).toBeVisible();
-    await expect(page.locator(".yonetim-summary-card").first()).toContainText(/Operasyonel Tamamlandý/i);
+    await expect(page.getByText("SeÃ§ili ay iÃ§in bÃ¶lÃ¼m onayÄ± verildi.")).toBeVisible();
+    await expect(page.locator(".yonetim-summary-card").first()).toContainText(/Operasyonel TamamlandÄ±/i);
 
     await page.goto("/yonetim-paneli");
     await expect(page).toHaveURL(/\/yetkisiz$/);
@@ -175,23 +175,23 @@ test.describe("yonetim paneli ve aylik ozet", () => {
     await page.getByTestId("settings-yonetim-paneli").click();
     await expect(page).toHaveURL(/\/yonetim-paneli\?tab=kullanicilar$/);
 
-    await page.locator(".yonetim-entity-card").filter({ hasText: /Ayþe/i }).click();
+    await page.locator(".yonetim-entity-card").filter({ hasText: /AyÅŸe/i }).click();
     const kullaniciModal = page.locator(".modal-container").last();
     await expect(kullaniciModal).toBeVisible();
-    await expect(kullaniciModal.locator(".modal-header h2")).toContainText("Kullanýcý Düzenle");
+    await expect(kullaniciModal.locator(".modal-header h2")).toContainText("KullanÄ±cÄ± DÃ¼zenle");
 
     await kullaniciModal.getByRole("button", { name: /Depolama/i }).click();
     await kullaniciModal.locator('[name="yonetim-kullanici-varsayilan-sube"]').selectOption("2");
     await kullaniciModal.getByTestId("yonetim-kullanici-kaydet").click();
 
-    await expect(page.getByText("Kullanýcý yetkileri güncellendi.")).toBeVisible();
+    await expect(page.getByText("KullanÄ±cÄ± yetkileri gÃ¼ncellendi.")).toBeVisible();
 
-    await page.locator(".yonetim-entity-card").filter({ hasText: /Ayþe/i }).click();
+    await page.locator(".yonetim-entity-card").filter({ hasText: /AyÅŸe/i }).click();
     await expect(kullaniciModal).toBeVisible();
     await kullaniciModal.locator('[name="yonetim-kullanici-rol"]').selectOption("MUHASEBE");
     await kullaniciModal.getByTestId("yonetim-kullanici-kaydet").click();
 
-    await expect(page.getByText("Kullanýcý yetkileri güncellendi.")).toBeVisible();
+    await expect(page.getByText("KullanÄ±cÄ± yetkileri gÃ¼ncellendi.")).toBeVisible();
 
     await page.locator(".yonetim-entity-card").filter({ hasText: /Adnan/i }).click();
     await expect(kullaniciModal).toBeVisible();
@@ -201,24 +201,24 @@ test.describe("yonetim paneli ve aylik ozet", () => {
     await kullaniciModal.locator('[name="yonetim-kullanici-varsayilan-sube"]').selectOption("2");
     await kullaniciModal.getByTestId("yonetim-kullanici-kaydet").click();
 
-    await expect(page.getByText("Kullanýcý yetkileri güncellendi.")).toBeVisible();
+    await expect(page.getByText("KullanÄ±cÄ± yetkileri gÃ¼ncellendi.")).toBeVisible();
 
     await page.goto("/personeller/1");
     await expect(page).toHaveURL(/\/personeller\/1$/);
-    await page.getByRole("tab", { name: "Süreç Geçmiþi" }).click();
+    await page.getByRole("tab", { name: "SÃ¼reÃ§ GeÃ§miÅŸi" }).click();
     const personelBirTimeline = page
       .locator("#personel-kart-panel-surec-gecmisi")
       .locator("[data-testid='personel-surec-timeline']");
-    await expect(personelBirTimeline).toContainText(/Baðlý Bölüm \/ Þube Yetkisi Deðiþti/i);
-    await expect(personelBirTimeline).toContainText(/Birim Amiri Atamasý Kaldýrýldý/i);
+    await expect(personelBirTimeline).toContainText(/BaÄŸlÄ± BÃ¶lÃ¼m \/ Åžube Yetkisi DeÄŸiÅŸti/i);
+    await expect(personelBirTimeline).toContainText(/Birim Amiri AtamasÄ± KaldÄ±rÄ±ldÄ±/i);
 
     await page.goto("/personeller/2");
     await expect(page).toHaveURL(/\/personeller\/2$/);
-    await page.getByRole("tab", { name: "Süreç Geçmiþi" }).click();
+    await page.getByRole("tab", { name: "SÃ¼reÃ§ GeÃ§miÅŸi" }).click();
     const personelIkiTimeline = page
       .locator("#personel-kart-panel-surec-gecmisi")
       .locator("[data-testid='personel-surec-timeline']");
-    await expect(personelIkiTimeline).toContainText(/Birim Amiri Olarak Atandý/i);
+    await expect(personelIkiTimeline).toContainText(/Birim Amiri Olarak AtandÄ±/i);
   });
 
   test("genel yonetici ayarlar menusunden sube yonetimine gider, bos subeyi siler ve personelli subeyi silemez", async ({
@@ -230,32 +230,32 @@ test.describe("yonetim paneli ve aylik ozet", () => {
     await page.getByTestId("header-settings-toggle").click();
     await page.getByTestId("settings-sube-yonetimi").click();
     await expect(page).toHaveURL(/\/yonetim-paneli\?tab=subeler$/);
-    await expect(page.locator(".modal-header h2").first()).toContainText("ÞÝRKET VE ÞUBE YÖNETÝMÝ");
+    await expect(page.locator(".modal-header h2").first()).toContainText("ÅžÄ°RKET VE ÅžUBE YÃ–NETÄ°MÄ°");
     await expect(page.getByTestId("yonetim-section-subeler")).toBeVisible();
 
     await page.getByTestId("yonetim-sirket-card-1").click();
     await expect(page.getByTestId("yonetim-sirket-breadcrumb")).toContainText("Medisa");
 
     await page.getByTestId("yonetim-sube-yeni").click();
-    await page.getByLabel("Þube Kodu").fill("BOS");
-    await page.getByLabel(/Þube kýsa adý/i).fill("Bos Sube");
+    await page.getByLabel("Åžube Kodu").fill("BOS");
+    await page.getByLabel(/Åžube kÄ±sa adÄ±/i).fill("Bos Sube");
     await page.getByTestId("yonetim-sube-departman-panel").getByRole("button", { name: /^Depo$/i }).click();
     await page.getByTestId("yonetim-sube-kaydet").click();
-    await expect(page.getByText("Þube tanýmý eklendi.")).toBeVisible();
+    await expect(page.getByText("Åžube tanÄ±mÄ± eklendi.")).toBeVisible();
     await expect(page.locator(".yonetim-card-grid--branches")).toContainText("Bos Sube");
 
     const bosSubeCard = page.locator(".yonetim-entity-card--branch-preview").filter({ hasText: "Bos Sube" });
     await bosSubeCard.click();
     const subeModal = page.locator(".modal-container").last();
     await expect(subeModal).toBeVisible();
-    await expect(subeModal.locator(".modal-header h2")).toContainText("Þube Düzenle");
+    await expect(subeModal.locator(".modal-header h2")).toContainText("Åžube DÃ¼zenle");
     await expect(subeModal.getByTestId("yonetim-sube-sil")).toBeVisible();
 
     await subeModal.getByTestId("yonetim-sube-sil").click();
     await expect(page.getByTestId("yonetim-sube-delete-dialog")).toBeVisible();
     await page.getByTestId("yonetim-sube-delete-dialog-confirm").click();
 
-    await expect(page.getByText("Þube tanýmý silindi.")).toBeVisible();
+    await expect(page.getByText("Åžube tanÄ±mÄ± silindi.")).toBeVisible();
     await expect(page.locator(".yonetim-card-grid--branches")).not.toContainText("Bos Sube");
 
     const merkezCard = page.locator(".yonetim-entity-card--branch-preview").filter({ hasText: "Merkez" });
@@ -283,18 +283,18 @@ test.describe("yonetim paneli ve aylik ozet", () => {
     await page.getByTestId("yonetim-sube-yeni").click();
     const panel = page.getByTestId("yonetim-sube-departman-panel");
     await panel.getByRole("button", { name: /\+ Yeni Departman/i }).click();
-    await panel.getByPlaceholder("Yeni departman adý").fill("  Kalite Kontrol  ");
+    await panel.getByPlaceholder("Yeni departman adÄ±").fill("  Kalite Kontrol  ");
     await page.getByRole("button", { name: "Ekle" }).click();
 
-    await expect(page.getByText(/"Kalite Kontrol" departmaný seçeneklere eklendi/i)).toBeVisible();
+    await expect(page.getByText(/"Kalite Kontrol" departmanÄ± seÃ§eneklere eklendi/i)).toBeVisible();
     await expect(panel).toContainText("Kalite Kontrol");
     await expect(panel.getByRole("button", { name: /^Kalite Kontrol$/i })).toBeVisible();
 
     await panel.getByRole("button", { name: /\+ Yeni Departman/i }).click();
-    await panel.getByPlaceholder("Yeni departman adý").fill("kalite kontrol");
+    await panel.getByPlaceholder("Yeni departman adÄ±").fill("kalite kontrol");
     await page.getByRole("button", { name: "Ekle" }).click();
 
-    await expect(page.getByText("Bu departman adý zaten kayýtlý.")).toBeVisible();
+    await expect(page.getByText("Bu departman adÄ± zaten kayÄ±tlÄ±.")).toBeVisible();
   });
 
   test("yonetim paneli tab query param ile dogru bolum acilir ve url senkron kalir", async ({ page }) => {
@@ -303,7 +303,7 @@ test.describe("yonetim paneli ve aylik ozet", () => {
 
     await page.goto("/yonetim-paneli?tab=subeler");
     await expect(page).toHaveURL(/\/yonetim-paneli\?tab=subeler$/);
-    await expect(page.locator(".modal-header h2").first()).toContainText("ÞÝRKET VE ÞUBE YÖNETÝMÝ");
+    await expect(page.locator(".modal-header h2").first()).toContainText("ÅžÄ°RKET VE ÅžUBE YÃ–NETÄ°MÄ°");
     await expect(page.getByTestId("yonetim-section-subeler")).toBeVisible();
     await expect(page.getByTestId("yonetim-section-kullanicilar")).toHaveCount(0);
     await expect(page.locator(".yonetim-card-grid--branches")).toBeVisible();
@@ -311,14 +311,14 @@ test.describe("yonetim paneli ve aylik ozet", () => {
 
     await page.goto("/yonetim-paneli?tab=kullanicilar");
     await expect(page).toHaveURL(/\/yonetim-paneli\?tab=kullanicilar$/);
-    await expect(page.locator(".modal-header h2").first()).toContainText("KULLANICI YÖNETÝMÝ");
+    await expect(page.locator(".modal-header h2").first()).toContainText("KULLANICI YÃ–NETÄ°MÄ°");
     await expect(page.getByTestId("yonetim-section-kullanicilar")).toBeVisible();
     await expect(page.locator(".yonetim-card-grid--users")).toBeVisible();
     await expect(page.locator(".yonetim-card-grid--branches")).toHaveCount(0);
 
     await page.goto("/yonetim-paneli");
     await expect(page).toHaveURL(/\/yonetim-paneli$/);
-    await expect(page.locator(".modal-header h2").first()).toContainText("KULLANICI YÖNETÝMÝ");
+    await expect(page.locator(".modal-header h2").first()).toContainText("KULLANICI YÃ–NETÄ°MÄ°");
     await expect(page.getByTestId("yonetim-section-kullanicilar")).toBeVisible();
     await expect(page.locator(".yonetim-card-grid--users")).toBeVisible();
     await expect(page.locator(".yonetim-card-grid--branches")).toHaveCount(0);

@@ -153,9 +153,14 @@ final class KullaniciKaliciSilService
         self::assertAuditReady($pdo);
 
         // Serialize concurrent hard deletes of the same user with a namespaced
-        // advisory lock. It is also the coordination point a FK-less reference
-        // writer must respect; without the lock the final re-verification below
-        // still refuses the delete when a late reference is observed.
+        // advisory lock. It coordinates ONLY other hard deletes of this user:
+        // FK-less writers (created_by / released_by / actor_user_id / ...) do
+        // NOT acquire this lock. The guard against a late FK-less reference is
+        // the READ COMMITTED re-verification below, which observes any reference
+        // committed before it runs. A reference committed in the narrow window
+        // between that re-check and the DELETE cannot be observed without an FK
+        // constraint or a table lock; that residual window is documented here
+        // as an accepted limitation of the FK-less schema.
         $lockName = 'medisa_kalici_sil_user_' . $userId;
         $locked = (int) $pdo->query('SELECT GET_LOCK(' . $pdo->quote($lockName) . ', 10)')->fetchColumn();
         if ($locked !== 1) {

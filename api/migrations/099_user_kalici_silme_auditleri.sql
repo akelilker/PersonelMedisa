@@ -99,6 +99,15 @@ SIGNAL SQLSTATE '45000'
 -- account look like an orphan. `silinmesi_korunur` is the canonical, stable
 -- anchor; the one-time backfill below converts the two canonical usernames
 -- into the flag at apply time. No numeric identity is assumed.
+--
+-- users.username is UNIQUE (001), so this backfill can only flag the current
+-- holder of each canonical name: it cannot protect a different account and it
+-- never unsets an existing flag. A rename that already happened before this
+-- migration applies is not resolvable here without assuming an identity; the
+-- operator must then set the flag on the renamed account manually. Until that
+-- is done, the service's PROTECTED_USERNAMES list still guards the canonical
+-- names, so the account is never silently deletable merely because the flag
+-- was not backfilled.
 SET @p099_koruma_col := (
   SELECT COUNT(*)
   FROM information_schema.COLUMNS

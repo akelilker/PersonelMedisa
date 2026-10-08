@@ -208,6 +208,31 @@
   font-weight: 600;
 }
 
+.kayit-personel-context-facts dd.kayit-personel-context-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.kayit-personel-context-status-dot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--success);
+  box-shadow: 0 0 0 2px rgba(74, 222, 128, 0.28);
+}
+
+.kayit-personel-context-status.is-passive .kayit-personel-context-status-dot {
+  background: var(--danger);
+  box-shadow: 0 0 0 2px rgba(248, 113, 113, 0.28);
+}
+
+.kayit-personel-context-status.is-unknown .kayit-personel-context-status-dot {
+  background: var(--text-muted);
+  box-shadow: none;
+}
+
 .kayit-personel-context-actions {
   display: flex;
   justify-content: flex-end;

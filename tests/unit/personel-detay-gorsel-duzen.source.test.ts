@@ -14,7 +14,8 @@ describe("personel detay gorsel duzen paketi owners", () => {
     expect(hero).toMatch(/data-testid="personel-dosya-hero"/);
     expect(hero).toMatch(/personel-dosya-hero-name/);
     expect(hero).toMatch(/data-testid="personel-dosya-hero-status"/);
-    expect(hero).toMatch(/personel-dosya-status-label/);
+    // #345: aktif personelde görünür durum metni yok (yalnız nokta); etiket yalnız aktif değilken render edilir.
+    expect(hero).toMatch(/isActive \? null : <span className="personel-dosya-status-label">/);
     expect(hero).toMatch(/data-testid="personel-dosya-hero-sicil"/);
     expect(hero).toMatch(/data-testid="personel-dosya-hero-kapsam"/);
     expect(hero).toMatch(/formatCalisanKapsamiLabel\(personel\.calisan_kapsami/);

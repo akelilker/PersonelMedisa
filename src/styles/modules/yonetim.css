@@ -845,15 +845,15 @@
   text-overflow: clip;
 }
 
-/* @kullanıcı adı: aynı adlı ayrı hesapları kartta ayırt eder. Tek satır; taşarsa üç nokta, tam değer title'da. */
+/* @kullanıcı adı: aynı adlı ayrı hesapları kartta ayırt eder. Dar masaüstü kartında (5 kolon) kesilmez,
+   en çok 2 satıra kırılır (ayraçlarda <wbr>, gerekirse herhangi bir yerde); kısa ad tek satır kalır. */
 .yonetim-card-grid--users .yonetim-card-meta .yonetim-card-username {
-  display: block;
   min-height: 1.25em;
-  max-height: 1.25em;
+  max-height: calc(2 * 1.25em);
   font-size: 0.64rem;
   color: rgba(239, 242, 247, 0.6);
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
+  word-break: normal;
 }
 
 /* Şifre durumu rozeti: dar masaüstü kartında (~69px) metin satır kırarak tam görünür (en çok 3 satır);

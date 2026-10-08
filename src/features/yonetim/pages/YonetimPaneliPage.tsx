@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent, type KeyboardEvent } from "react";
+import { Fragment, useEffect, useMemo, useState, type FormEvent, type KeyboardEvent } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { AppSelectField } from "../../../components/form/AppSelect";
 import { FormField } from "../../../components/form/FormField";
@@ -589,6 +589,25 @@ type KullaniciScopeContext = Pick<
 
 function roleIn(roles: readonly UserRole[], role: UserRole) {
   return (roles as readonly string[]).includes(role);
+}
+
+/** `@kullanici.adi` metnini ayraçlardan (. _ -) sonra kırılabilir yapar; metin değişmez. */
+function formatKullaniciUsernameWithBreaks(username: string) {
+  // Lookbehind kullanılmaz (eski iOS Safari uyumu): ayraçlar parçanın sonuna eklenir.
+  const parts: string[] = [];
+  for (const token of `@${username}`.split(/([._-])/)) {
+    if (/^[._-]$/.test(token) && parts.length > 0) {
+      parts[parts.length - 1] += token;
+    } else if (token !== "") {
+      parts.push(token);
+    }
+  }
+  return parts.map((part, index) => (
+    <Fragment key={index}>
+      {index > 0 ? <wbr /> : null}
+      {part}
+    </Fragment>
+  ));
 }
 
 function formatSubeNames(subeIds: number[], subeNameMap: Map<number, string>) {
@@ -1930,7 +1949,7 @@ export function YonetimPaneliPage() {
                         title={`@${item.username}`}
                         data-testid={`yonetim-kullanici-username-${item.id}`}
                       >
-                        @{item.username}
+                        {formatKullaniciUsernameWithBreaks(item.username)}
                       </span>
                     ) : null}
                     <span>{formatSubeScopeLabel(item.sube_ids, subeNameMap, item)}</span>

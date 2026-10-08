@@ -11,12 +11,18 @@ function metaPart(value: string): string | null {
 }
 
 export function PersonelDosyaHero({ personel }: { personel: Personel }) {
-  const durumLabel =
-    personel.aktif_durum === "PASIF"
-      ? formatDetailValue(personel.pasiflik_durumu_etiketi) !== "-"
-        ? formatDetailValue(personel.pasiflik_durumu_etiketi)
-        : formatAktifDurumLabel(personel.aktif_durum)
-      : formatAktifDurumLabel(personel.aktif_durum);
+  const isPassive = personel.aktif_durum === "PASIF";
+  // Yalnız açıkça AKTIF olan kayıt aktif sayılır; boş/bilinmeyen durum yeşil gösterilmez.
+  const isActive = personel.aktif_durum === "AKTIF";
+  const aktifDurumLabel = formatAktifDurumLabel(personel.aktif_durum);
+  const durumLabel = isPassive
+    ? formatDetailValue(personel.pasiflik_durumu_etiketi) !== "-"
+      ? formatDetailValue(personel.pasiflik_durumu_etiketi)
+      : aktifDurumLabel
+    : aktifDurumLabel !== "-"
+      ? aktifDurumLabel
+      : "Durum Bilinmiyor";
+  const statusClass = isPassive ? " is-passive" : isActive ? "" : " is-unknown";
   const fullName = [personel.ad, personel.soyad].filter(Boolean).join(" ");
   const kapsamLabel = formatCalisanKapsamiLabel(personel.calisan_kapsami ?? "IC_PERSONEL");
   const sicilLabel = formatDetailValue(personel.sicil_no);
@@ -30,14 +36,16 @@ export function PersonelDosyaHero({ personel }: { personel: Personel }) {
     <header className="personel-dosya-hero" data-testid="personel-dosya-hero">
       <div className="personel-dosya-hero-identity">
         <h3 className="personel-dosya-hero-name">{fullName}</h3>
+        {/* #345 kararı: aktif personelde yalnız yeşil nokta (görünür "Çalışıyor"/pill yok);
+            pasif/bilinmeyen durumda nokta + açıklama görünür. Erişilebilir ad her durumda korunur. */}
         <div
-          className={`personel-dosya-status${personel.aktif_durum === "PASIF" ? " is-passive" : ""}`}
+          className={`personel-dosya-status${statusClass}`}
           aria-label={durumLabel}
           title={durumLabel}
           data-testid="personel-dosya-hero-status"
         >
           <span className="personel-dosya-status-dot" aria-hidden="true" />
-          <span className="personel-dosya-status-label">{durumLabel}</span>
+          {isActive ? null : <span className="personel-dosya-status-label">{durumLabel}</span>}
         </div>
       </div>
 

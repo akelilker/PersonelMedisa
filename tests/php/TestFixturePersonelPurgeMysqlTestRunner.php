@@ -176,6 +176,59 @@ function tfpBlockersForTable(array $plan, string $table): array
     return $out;
 }
 
+/**
+ * Failure injection for the reference inventory: the COUNT(*) on one named table throws, the
+ * way a broken view, a missing grant or a dropped table would on a live schema.
+ */
+final class TfpCountFailPdo extends PDO
+{
+    /** @var string */
+    public $failTable = '';
+
+    #[\ReturnTypeWillChange]
+    public function prepare($query, $options = [])
+    {
+        if ($this->failTable !== ''
+            && stripos((string) $query, 'COUNT(*)') !== false
+            && strpos((string) $query, '`' . $this->failTable . '`') !== false
+        ) {
+            throw new PDOException('simulated dependency count failure: ' . $this->failTable);
+        }
+
+        return parent::prepare($query, $options);
+    }
+}
+
+/**
+ * @param array<string, mixed> $plan
+ * @return list<array<string, mixed>>
+ */
+function tfpDepsForTable(array $plan, string $table): array
+{
+    $out = [];
+    foreach (($plan['dependencies'] ?? []) as $dep) {
+        if ((string) ($dep['table'] ?? '') === $table) {
+            $out[] = $dep;
+        }
+    }
+
+    return $out;
+}
+
+/**
+ * @param list<array<string, mixed>> $rows
+ * @return array<string, array<string, mixed>>
+ */
+function tfpByColumn(array $rows): array
+{
+    $out = [];
+    foreach ($rows as $row) {
+        $out[(string) ($row['column'] ?? '')] = $row;
+    }
+
+    return $out;
+}
+
 $root = tfpRootPdo();
 $database = 'medisa_tfp_' . bin2hex(random_bytes(4));
 $root->exec('CREATE DATABASE `' . $database . '` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
@@ -596,6 +649,173 @@ try {
         PersonelArchiveGate::isOperationallyHidden($pdo, $tomb) === true
         && PersonelArchiveGate::isOperationallyHidden($pdo, $real) === false,
         'detail exclusion applies to fixture only'
+    );
+
+    // --- Reference inventory: one entry per independent reference, fail-closed counting --------
+    // Disposable schema only: a composite FK onto personeller (id, sube_id) needs this index.
+    $pdo->exec('ALTER TABLE personeller ADD KEY idx_tfp_id_sube (id, sube_id)');
+    $pdo->exec(
+        "CREATE TABLE tfp_dual_ref (
+            id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+            old_personel_id INT UNSIGNED NULL,
+            new_personel_id INT UNSIGNED NULL,
+            CONSTRAINT fk_tfp_dual_old FOREIGN KEY (old_personel_id) REFERENCES personeller (id) ON DELETE RESTRICT,
+            CONSTRAINT fk_tfp_dual_new FOREIGN KEY (new_personel_id) REFERENCES personeller (id) ON DELETE RESTRICT
+        )"
+    );
+    $pdo->exec(
+        "CREATE TABLE tfp_mixed_ref (
+            id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+            personel_id INT UNSIGNED NULL,
+            new_personel_id INT UNSIGNED NULL,
+            CONSTRAINT fk_tfp_mixed_personel FOREIGN KEY (personel_id) REFERENCES personeller (id) ON DELETE RESTRICT
+        )"
+    );
+    $pdo->exec(
+        "CREATE TABLE tfp_composite_ref (
+            id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+            personel_id INT UNSIGNED NOT NULL,
+            sube_id INT UNSIGNED NOT NULL,
+            CONSTRAINT fk_tfp_composite FOREIGN KEY (personel_id, sube_id)
+                REFERENCES personeller (id, sube_id) ON DELETE RESTRICT
+        )"
+    );
+    $pdo->exec(
+        "CREATE TABLE tfp_count_fail (
+            id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+            personel_id INT UNSIGNED NULL
+        )"
+    );
+
+    // Empty relations are real "no dependency": they must not block a safe fixture purge.
+    $emptyRefs = tfpInsertPersonel($pdo, '10000000020', 'REF-0');
+    tfpClassify($pdo, $emptyRefs, $gy);
+    $emptyPlan = TestFixturePersonelPurgeService::purge($pdo, $emptyRefs, $gy, true, null);
+    $emptyDual = tfpByColumn(tfpDepsForTable($emptyPlan, 'tfp_dual_ref'));
+    $emptyMixed = tfpByColumn(tfpDepsForTable($emptyPlan, 'tfp_mixed_ref'));
+    tfpAssert(
+        ($emptyPlan['purge_safe'] ?? false) === true && ($emptyPlan['blockers'] ?? [1]) === [],
+        'empty dependencies (row_count 0) do not block purge'
+    );
+    tfpAssert(
+        isset($emptyDual['old_personel_id'], $emptyDual['new_personel_id'])
+        && (int) $emptyDual['old_personel_id']['row_count'] === 0
+        && (int) $emptyDual['new_personel_id']['row_count'] === 0,
+        'both same-table FK references inventoried separately'
+    );
+    tfpAssert(
+        isset($emptyMixed['personel_id'], $emptyMixed['new_personel_id'])
+        && ($emptyMixed['new_personel_id']['delete_rule'] ?? '') === 'NONE',
+        'FK-less candidate column kept next to an FK on the same table'
+    );
+    $emptyComposite = tfpDepsForTable($emptyPlan, 'tfp_composite_ref');
+    tfpAssert(
+        count($emptyComposite) === 1
+        && ($emptyComposite[0]['columns'] ?? []) === ['personel_id', 'sube_id']
+        && ($emptyComposite[0]['constraint'] ?? '') === 'fk_tfp_composite',
+        'composite FK inventoried once with all of its columns'
+    );
+    $emptyDone = TestFixturePersonelPurgeService::purge(
+        $pdo,
+        $emptyRefs,
+        $gy,
+        false,
+        TestFixturePersonelPurgeService::CONFIRM_TOKEN
+    );
+    tfpAssert(
+        ($emptyDone['executed'] ?? false) === true
+        && (int) $pdo->query('SELECT COUNT(*) FROM personeller WHERE id = ' . $emptyRefs)->fetchColumn() === 0,
+        'safe fixture with empty extra relations still purges'
+    );
+
+    // A second reference column on the same table must be counted on its own, whichever it is.
+    foreach (['old_personel_id', 'new_personel_id'] as $index => $refColumn) {
+        $refPersonel = tfpInsertPersonel($pdo, '1000000003' . $index, 'REF-' . ($index + 1));
+        tfpClassify($pdo, $refPersonel, $gy);
+        $pdo->exec("INSERT INTO tfp_dual_ref (`{$refColumn}`) VALUES ({$refPersonel})");
+        $refPlan = TestFixturePersonelPurgeService::purge($pdo, $refPersonel, $gy, true, null);
+        $refDeps = tfpByColumn(tfpDepsForTable($refPlan, 'tfp_dual_ref'));
+        $refBlockers = tfpBlockersForTable($refPlan, 'tfp_dual_ref');
+        tfpAssert(
+            (int) ($refDeps[$refColumn]['row_count'] ?? 0) === 1
+            && ($refPlan['purge_safe'] ?? true) === false
+            && ($refPlan['delete_order'] ?? [1]) === [],
+            'same-table reference ' . $refColumn . ' counted and blocks'
+        );
+        tfpAssert(
+            ($refBlockers[0]['code'] ?? '') === TestFixturePersonelPurgeService::CODE_SHARED_OR_UNKNOWN
+            && ($refBlockers[0]['class'] ?? '') === TestFixturePersonelPurgeService::CLASS_UNKNOWN
+            && ($refBlockers[0]['column'] ?? '') === $refColumn,
+            'unknown dependency on ' . $refColumn . ' is an explicit SHARED_OR_UNKNOWN blocker'
+        );
+        tfpAssert(
+            (int) $pdo->query('SELECT COUNT(*) FROM personeller WHERE id = ' . $refPersonel)->fetchColumn() === 1,
+            'blocked fixture row preserved (' . $refColumn . ')'
+        );
+    }
+
+    $mixedPersonel = tfpInsertPersonel($pdo, '10000000040', 'REF-M');
+    tfpClassify($pdo, $mixedPersonel, $gy);
+    $pdo->exec("INSERT INTO tfp_mixed_ref (personel_id, new_personel_id) VALUES (NULL, {$mixedPersonel})");
+    $mixedPlan = TestFixturePersonelPurgeService::purge($pdo, $mixedPersonel, $gy, true, null);
+    $mixedDeps = tfpByColumn(tfpDepsForTable($mixedPlan, 'tfp_mixed_ref'));
+    tfpAssert(
+        (int) ($mixedDeps['new_personel_id']['row_count'] ?? 0) === 1
+        && ($mixedPlan['purge_safe'] ?? true) === false,
+        'FK-less candidate reference counted and blocks'
+    );
+
+    $compositePersonel = tfpInsertPersonel($pdo, '10000000050', 'REF-C');
+    tfpClassify($pdo, $compositePersonel, $gy);
+    $pdo->exec("INSERT INTO tfp_composite_ref (personel_id, sube_id) VALUES ({$compositePersonel}, 1)");
+    $compositePlan = TestFixturePersonelPurgeService::purge($pdo, $compositePersonel, $gy, true, null);
+    $compositeDeps = tfpDepsForTable($compositePlan, 'tfp_composite_ref');
+    tfpAssert(
+        count($compositeDeps) === 1
+        && (int) ($compositeDeps[0]['row_count'] ?? 0) === 1
+        && ($compositePlan['purge_safe'] ?? true) === false,
+        'composite FK reference counted and blocks'
+    );
+
+    // A dependency count that cannot be verified is never treated as an empty relation.
+    $countFailPdo = new TfpCountFailPdo(
+        (string) preg_replace('/dbname=[^;]+/', 'dbname=' . $database, (string) getenv('MEDISA_TEST_MYSQL_DSN')),
+        getenv('MEDISA_TEST_MYSQL_USER') ?: '',
+        getenv('MEDISA_TEST_MYSQL_PASSWORD') ?: '',
+        [
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+            PDO::ATTR_EMULATE_PREPARES => false,
+            PDO::MYSQL_ATTR_USE_BUFFERED_QUERY => true,
+        ]
+    );
+    $countFailPdo->failTable = 'tfp_count_fail';
+    $countFail = tfpInsertPersonel($pdo, '10000000060', 'REF-F');
+    tfpClassify($pdo, $countFail, $gy);
+    $countFailPlan = TestFixturePersonelPurgeService::purge(
+        $countFailPdo,
+        $countFail,
+        $gy,
+        false,
+        TestFixturePersonelPurgeService::CONFIRM_TOKEN
+    );
+    $countFailBlockers = tfpBlockersForTable($countFailPlan, 'tfp_count_fail');
+    tfpAssert(
+        ($countFailPlan['purge_safe'] ?? true) === false
+        && ($countFailPlan['status'] ?? '') === 'FAIL_CLOSED'
+        && ($countFailPlan['executed'] ?? true) === false
+        && ($countFailPlan['delete_order'] ?? [1]) === [],
+        'failed dependency count makes purge FAIL_CLOSED (no delete)'
+    );
+    tfpAssert(
+        ($countFailBlockers[0]['code'] ?? '') === TestFixturePersonelPurgeService::CODE_DEPENDENCY_UNVERIFIED
+        && ($countFailBlockers[0]['reason'] ?? '') === 'count_failed'
+        && ($countFailBlockers[0]['class'] ?? '') === TestFixturePersonelPurgeService::CLASS_UNKNOWN,
+        'failed dependency count reported as explicit DEPENDENCY_COUNT_UNVERIFIED blocker'
+    );
+    tfpAssert(
+        (int) $pdo->query('SELECT COUNT(*) FROM personeller WHERE id = ' . $countFail)->fetchColumn() === 1,
+        'failed-count fixture row preserved'
     );
 
     $svc = (string) file_get_contents(__DIR__ . '/../../api/src/Services/Personel/TestFixturePersonelPurgeService.php');

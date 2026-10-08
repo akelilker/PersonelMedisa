@@ -51,6 +51,9 @@ describe("test fixture personel purge owner", () => {
     expect(purgeSrc).toContain("REAL_EMPLOYEE_OR_UNCLASSIFIED");
     expect(purgeSrc).toContain("SHARED_OR_UNKNOWN_DEPENDENCY");
     expect(purgeSrc).toContain("USER_NOT_FIXTURE");
+    // Unverifiable dependency counts are FAIL_CLOSED with their own explicit blocker code.
+    expect(purgeSrc).toContain("DEPENDENCY_COUNT_UNVERIFIED");
+    expect(purgeSrc).not.toContain("$byTable[$table]");
     expect(purgeSrc).toContain("PURGE_TEST_FIXTURE");
     expect(purgeSrc).not.toMatch(/personel_id === 1/);
     // Owner-attributed relation classification (audit / sealed / closed period).
@@ -165,5 +168,23 @@ describe("test fixture personel purge owner", () => {
     expect(result.stdout).toContain("[PASS] unclassified personel NOT excluded from operational surfaces");
     expect(result.stdout).toContain("[PASS] tombstoned fixture missing from archive search");
     expect(result.stdout).toContain("[PASS] detail exclusion applies to fixture only");
+    // Reference inventory: one entry per independent reference, fail-closed counting.
+    expect(result.stdout).toContain("[PASS] empty dependencies (row_count 0) do not block purge");
+    expect(result.stdout).toContain("[PASS] both same-table FK references inventoried separately");
+    expect(result.stdout).toContain("[PASS] FK-less candidate column kept next to an FK on the same table");
+    expect(result.stdout).toContain("[PASS] composite FK inventoried once with all of its columns");
+    expect(result.stdout).toContain("[PASS] safe fixture with empty extra relations still purges");
+    expect(result.stdout).toContain("[PASS] same-table reference old_personel_id counted and blocks");
+    expect(result.stdout).toContain("[PASS] same-table reference new_personel_id counted and blocks");
+    expect(result.stdout).toContain(
+      "[PASS] unknown dependency on new_personel_id is an explicit SHARED_OR_UNKNOWN blocker",
+    );
+    expect(result.stdout).toContain("[PASS] FK-less candidate reference counted and blocks");
+    expect(result.stdout).toContain("[PASS] composite FK reference counted and blocks");
+    expect(result.stdout).toContain("[PASS] failed dependency count makes purge FAIL_CLOSED (no delete)");
+    expect(result.stdout).toContain(
+      "[PASS] failed dependency count reported as explicit DEPENDENCY_COUNT_UNVERIFIED blocker",
+    );
+    expect(result.stdout).toContain("[PASS] failed-count fixture row preserved");
   });
 });

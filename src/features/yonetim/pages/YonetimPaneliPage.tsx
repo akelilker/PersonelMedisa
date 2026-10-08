@@ -61,7 +61,14 @@ import {
   normalizeKullaniciAdSoyadForWrite
 } from "../../../lib/yonetim/kullanici-ad-soyad";
 import type { UserRole } from "../../../types/auth";
-import { ASSIGNABLE_USER_ROLES, WRITE_COMPANY_SCOPED_ROLES } from "../../../types/auth";
+import {
+  ASSIGNABLE_USER_ROLES,
+  BIRIM_ASSIGNMENT_ROLES,
+  BOLUM_ASSIGNMENT_ROLES,
+  GLOBAL_SCOPE_ROLES,
+  ORGANIZATION_GLOBAL_READ_ROLES,
+  WRITE_COMPANY_SCOPED_ROLES
+} from "../../../types/auth";
 import type { Personel } from "../../../types/personel";
 import type { IdOption } from "../../../types/referans";
 import { formatSurecTuruLabel, formatUserRoleLabel } from "../../../lib/display/enum-display";
@@ -575,9 +582,58 @@ function toSgkIsverenPayload(form: SgkIsverenFormState): UpsertYonetimSgkIsveren
   return { sirket_id: sirketId, kod, ad, durum: form.durum };
 }
 
-function formatSubeScopeLabel(subeIds: number[], subeNameMap: Map<number, string>) {
-  if (subeIds.length === 0) {
+type KullaniciScopeContext = Pick<
+  YonetimKullanici,
+  "rol" | "bolum_ids" | "birim_ids" | "sirket_ids" | "sgk_isveren_ids"
+>;
+
+function roleIn(roles: readonly UserRole[], role: UserRole) {
+  return (roles as readonly string[]).includes(role);
+}
+
+/**
+ * Display-only. Boş `sube_ids` yalnız global kapsamlı rollerde "Tüm Şubeler" demektir
+ * (OrgScope GLOBAL_ROLES + İK organizasyon geneli okuma). Diğer rollerde kapsam bölüm/birim
+ * atamasından, şirket/SGK kapsamından veya personel bağlantısından gelir; atama yoksa
+ * backend erişimi reddeder. Yetkiyi değiştirmez, yalnız gerçek kuralı metne çevirir.
+ */
+function formatEmptySubeScopeLabel(scope: KullaniciScopeContext) {
+  if (roleIn(GLOBAL_SCOPE_ROLES, scope.rol) || roleIn(ORGANIZATION_GLOBAL_READ_ROLES, scope.rol)) {
     return "Tüm Şubeler";
+  }
+  if (scope.rol === "PERSONEL") {
+    return "Kendi Kaydı";
+  }
+  if (roleIn(BOLUM_ASSIGNMENT_ROLES, scope.rol)) {
+    return (scope.bolum_ids?.length ?? 0) > 0 ? "Bölüm Kapsamı" : "Atama Yok";
+  }
+  if (roleIn(BIRIM_ASSIGNMENT_ROLES, scope.rol)) {
+    return (scope.birim_ids?.length ?? 0) > 0 ? "Birim Kapsamı" : "Atama Yok";
+  }
+
+  // Kart metni 2 satıra sığacak kadar kısa tutulur (kart yüksekliği sabit, metin kırpılır).
+  const hasSirket = (scope.sirket_ids?.length ?? 0) > 0;
+  const hasSgk = (scope.sgk_isveren_ids?.length ?? 0) > 0;
+  if (hasSirket && hasSgk) {
+    return "Şirket + SGK";
+  }
+  if (hasSirket) {
+    return "Şirket Kapsamı";
+  }
+  if (hasSgk) {
+    return "SGK Kapsamı";
+  }
+  return "Atama Yok";
+}
+
+function formatSubeScopeLabel(
+  subeIds: number[],
+  subeNameMap: Map<number, string>,
+  scope?: KullaniciScopeContext
+) {
+  if (subeIds.length === 0) {
+    // Rol bilgisi olmayan çağrı (süreç log metni) eski metni korur.
+    return scope ? formatEmptySubeScopeLabel(scope) : "Tüm Şubeler";
   }
 
   return subeIds.map((subeId) => subeNameMap.get(subeId) ?? `Şube ${subeId}`).join(", ");
@@ -1021,7 +1077,7 @@ export function YonetimPaneliPage() {
             personelAdSoyad: item.personel_ad_soyad,
             username: item.username,
             roleLabel: formatUserRoleLabel(item.rol),
-            subeScopeLabel: formatSubeScopeLabel(item.sube_ids, subeNameMap),
+            subeScopeLabel: formatSubeScopeLabel(item.sube_ids, subeNameMap, item),
             kullaniciTipiLabel: KULLANICI_TIPI_LABELS[item.kullanici_tipi]
           },
           trimmedKullaniciSearch
@@ -1051,7 +1107,7 @@ export function YonetimPaneliPage() {
       if (linkedPersonel) {
         const personelLabel = [linkedPersonel.ad, linkedPersonel.soyad].filter(Boolean).join(" ");
         if (personelLabel && !isCorruptedDisplayText(personelLabel) && !isTombstonedPersonelAdSoyad(personelLabel)) {
-          return personelLabel;
+          return formatAdSoyad(personelLabel);
         }
       }
 
@@ -1061,7 +1117,7 @@ export function YonetimPaneliPage() {
 
       const fallback = (item.personel_ad_soyad ?? item.ad_soyad ?? "").trim();
       if (fallback && !isCorruptedDisplayText(fallback)) {
-        return fallback;
+        return formatAdSoyad(fallback);
       }
 
       return formatUserRoleLabel(item.rol);
@@ -1069,7 +1125,8 @@ export function YonetimPaneliPage() {
 
     const adSoyad = (item.ad_soyad ?? "").trim();
     if (adSoyad && !isCorruptedDisplayText(adSoyad)) {
-      return adSoyad;
+      // Onaylı görünüm kuralı (Ad Title Case + SOYAD BÜYÜK); kayıtlı değer değişmez.
+      return formatAdSoyad(adSoyad);
     }
 
     return formatUserRoleLabel(item.rol);
@@ -1785,7 +1842,7 @@ export function YonetimPaneliPage() {
             >
               <FormField
                 as="select"
-                label="İlk giriş durumu"
+                label="Şifre Durumu"
                 name="yonetim-kullanici-first-login-filter"
                 value={firstLoginFilter}
                 onChange={(value) =>
@@ -1822,8 +1879,8 @@ export function YonetimPaneliPage() {
                 kullanicilar.length === 0
                   ? "İlk kullanıcı atamasını buradan oluşturabilirsin."
                   : kullaniciSearchActive
-                    ? "Arama metnini veya ilk giriş filtresini değiştirmeyi deneyin."
-                    : "İlk giriş filtresini değiştirerek diğer kullanıcıları görebilirsin."
+                    ? "Arama metnini veya Şifre Durumu filtresini değiştirmeyi deneyin."
+                    : "Şifre Durumu filtresini değiştirerek diğer kullanıcıları görebilirsin."
               }
             />
           ) : kullaniciViewMode === "card" ? (
@@ -1846,7 +1903,7 @@ export function YonetimPaneliPage() {
                 >
                   <div className="yonetim-card-meta">
                     <strong>{formatKullaniciCardLabel(item)}</strong>
-                    <span>{formatSubeScopeLabel(item.sube_ids, subeNameMap)}</span>
+                    <span>{formatSubeScopeLabel(item.sube_ids, subeNameMap, item)}</span>
                     {firstLoginLabel ? (
                       <span
                         className={
@@ -1875,7 +1932,7 @@ export function YonetimPaneliPage() {
                     <th>Şube Yetkisi</th>
                     <th>Varsayılan Şube</th>
                     <th>Durum</th>
-                    <th>İlk Giriş</th>
+                    <th>Şifre Durumu</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1898,8 +1955,8 @@ export function YonetimPaneliPage() {
                       <td className="yonetim-list-table-cell-strong">{formatKullaniciDisplayName(item)}</td>
                       <td>{KULLANICI_TIPI_LABELS[item.kullanici_tipi]}</td>
                       <td>{formatUserRoleLabel(item.rol)}</td>
-                      <td title={formatSubeScopeLabel(item.sube_ids, subeNameMap)}>
-                        {formatSubeScopeLabel(item.sube_ids, subeNameMap)}
+                      <td title={formatSubeScopeLabel(item.sube_ids, subeNameMap, item)}>
+                        {formatSubeScopeLabel(item.sube_ids, subeNameMap, item)}
                       </td>
                       <td>{formatVarsayilanSubeLabel(item.varsayilan_sube_id, subeNameMap)}</td>
                       <td>{DURUM_LABELS[item.durum]}</td>

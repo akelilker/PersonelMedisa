@@ -1,7 +1,16 @@
 export type PersonelFirstLoginFilter = "all" | "pending" | "completed";
 
-export const PERSONEL_FIRST_LOGIN_PENDING_LABEL = "İlk Giriş Bekliyor";
-export const PERSONEL_FIRST_LOGIN_COMPLETE_LABEL = "İlk Giriş Tamamlandı";
+/**
+ * Labels mirror exactly what `must_change_password` proves, nothing more:
+ * true  = hesap sistemin verdiği başlangıç (geçici) şifresinde; değiştirilmesi zorunlu
+ *         (onboarding, eski hesap aktivasyonu veya "Başlangıç Şifresine Sıfırla");
+ * false = zorunlu değişiklik bayrağı yok (kullanıcı kendi şifresini belirledi veya hiç
+ *         istenmedi).
+ * Giriş geçmişi bu alandan çıkarılmaz ("hiç giriş yapmadı" denmez). Kısa tutulur: kart
+ * rozeti dar masaüstü kartında 2 satıra sığmalıdır.
+ */
+export const PERSONEL_FIRST_LOGIN_PENDING_LABEL = "Geçici Şifre";
+export const PERSONEL_FIRST_LOGIN_COMPLETE_LABEL = "Kalıcı Şifre";
 
 export type PersonelFirstLoginUserLike = {
   personel_id?: number | null;

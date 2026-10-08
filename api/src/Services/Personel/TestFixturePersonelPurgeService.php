@@ -40,6 +40,10 @@ class TestFixturePersonelPurgeService
     public const CODE_CONFIRM_REQUIRED = 'PURGE_CONFIRM_REQUIRED';
     /** Tombstone is a different, non-destructive operation: it needs its own confirm token. */
     public const CODE_TOMBSTONE_CONFIRM_REQUIRED = 'TOMBSTONE_CONFIRM_REQUIRED';
+    /** A dependency whose row count could not be verified; never read as an empty relation. */
+    public const CODE_DEPENDENCY_UNVERIFIED = 'DEPENDENCY_COUNT_UNVERIFIED';
+    /** The personeller reference inventory itself could not be read. */
+    public const CODE_INVENTORY_FAILED = 'PURGE_INVENTORY_FAILED';
 
     public const CLASS_CONFIRMED_DEMO = 'CONFIRMED_DEMO_DEPENDENCY';
     public const CLASS_GENERATED_DEMO = 'GENERATED_FROM_DEMO';
@@ -423,7 +427,27 @@ class TestFixturePersonelPurgeService
         }
 
         foreach ($dependencies as $dep) {
-            if ((int) ($dep['row_count'] ?? 0) <= 0) {
+            // Only a verified count of 0 means "no dependency". A failed or missing count
+            // (row_count < 0, count_failed, unsafe identifier) is FAIL_CLOSED, never skipped.
+            $rowCount = self::verifiedRowCount($dep);
+            if ($rowCount === null) {
+                $blockers[] = [
+                    'code' => self::CODE_DEPENDENCY_UNVERIFIED,
+                    'table' => $dep['table'] ?? null,
+                    'column' => $dep['column'] ?? null,
+                    'constraint' => $dep['constraint'] ?? null,
+                    'row_count' => $dep['row_count'] ?? null,
+                    'class' => self::CLASS_UNKNOWN,
+                    'reason' => isset($dep['reason']) && (string) $dep['reason'] !== ''
+                        ? (string) $dep['reason']
+                        : 'count_unverified',
+                    'owner' => null,
+                    'retention_category' => null,
+                    'handoff' => null,
+                ];
+                continue;
+            }
+            if ($rowCount === 0) {
                 continue;
             }
             $class = (string) ($dep['class'] ?? self::CLASS_UNKNOWN);
@@ -434,6 +458,8 @@ class TestFixturePersonelPurgeService
             $blockers[] = [
                 'code' => $code,
                 'table' => $dep['table'],
+                'column' => $dep['column'] ?? null,
+                'constraint' => $dep['constraint'] ?? null,
                 'row_count' => $dep['row_count'],
                 'class' => $class,
                 'reason' => $dep['reason'] ?? ($class === self::CLASS_UNKNOWN ? 'unknown_dependency' : 'historical_or_shared'),
@@ -487,6 +513,29 @@ class TestFixturePersonelPurgeService
     }
 
     /**
+     * Verified dependency row count, or null when the count is missing/failed and therefore
+     * unverifiable (fail-closed input for buildPlan).
+     *
+     * @param array<string, mixed> $dep
+     * @return int|null
+     */
+    private static function verifiedRowCount(array $dep)
+    {
+        if (!array_key_exists('row_count', $dep)) {
+            return null;
+        }
+        $raw = $dep['row_count'];
+        if (is_int($raw)) {
+            return $raw >= 0 ? $raw : null;
+        }
+        if (is_string($raw) && preg_match('/^[0-9]+$/', $raw)) {
+            return (int) $raw;
+        }
+
+        return null;
+    }
+
+    /**
      * Canonical blocker mapping per relation class.
      * null = fixture-owned dependent (not a blocker).
      *
@@ -523,39 +572,61 @@ class TestFixturePersonelPurgeService
         $out = [];
         foreach ($refs as $ref) {
             $table = (string) $ref['table'];
-            $column = (string) $ref['column'];
-            if (!preg_match('/^[a-z0-9_]+$/', $table) || !preg_match('/^[a-z0-9_]+$/', $column)) {
+            $column = $ref['column'] !== null ? (string) $ref['column'] : null;
+            $columns = array_map('strval', $ref['columns']);
+            $referencedColumns = array_map('strval', $ref['referenced_columns']);
+            $base = [
+                'table' => $table,
+                'column' => $column,
+                'columns' => $columns,
+                'constraint' => $ref['constraint'],
+                'delete_rule' => $ref['delete_rule'],
+            ];
+
+            $identifiers = array_merge([$table], $columns, $referencedColumns);
+            $identifiersSafe = count($columns) > 0;
+            foreach ($identifiers as $identifier) {
+                if (!preg_match('/^[a-z0-9_]+$/', $identifier)) {
+                    $identifiersSafe = false;
+                }
+            }
+            if (!$identifiersSafe) {
+                // A reference that cannot be queried safely is unverified, not absent.
+                $out[] = self::unverifiedDependency($base, 'unsafe_identifier');
                 continue;
             }
+
             $count = 0;
             try {
-                $stmt = $pdo->prepare("SELECT COUNT(*) FROM `{$table}` WHERE `{$column}` = :pid");
+                if (count($columns) === 1 && $column !== null) {
+                    $stmt = $pdo->prepare("SELECT COUNT(*) FROM `{$table}` WHERE `{$column}` = :pid");
+                } else {
+                    // Composite FK: all columns are matched together against the referenced key.
+                    $on = [];
+                    foreach ($columns as $index => $refColumn) {
+                        $on[] = "c.`{$refColumn}` = p.`{$referencedColumns[$index]}`";
+                    }
+                    $stmt = $pdo->prepare(
+                        "SELECT COUNT(*) FROM `{$table}` c INNER JOIN `personeller` p ON "
+                        . implode(' AND ', $on) . ' WHERE p.`id` = :pid'
+                    );
+                }
                 $stmt->execute(['pid' => $personelId]);
                 $count = (int) $stmt->fetchColumn();
             } catch (\Throwable $e) {
-                $out[] = [
-                    'table' => $table,
-                    'column' => $column,
-                    'row_count' => -1,
-                    'delete_rule' => $ref['delete_rule'],
-                    'class' => self::CLASS_UNKNOWN,
-                    'reason' => 'count_failed',
-                    'owner' => null,
-                    'retention_category' => null,
-                    'handoff' => null,
-                    'shared_other_personel' => null,
-                    'historical_semantics' => false,
-                ];
+                $out[] = self::unverifiedDependency($base, 'count_failed');
                 continue;
             }
 
             $shared = self::sharedOtherPersonel($pdo, $table, $personelId);
             $classMeta = self::classifyDependency($pdo, $personelId, $table, $ref['delete_rule'], $count, $shared);
-            $out[] = [
-                'table' => $table,
-                'column' => $column,
+            if ($count > 0 && $column === null) {
+                // Rows exist but no column maps to personeller.id, so no delete step can target
+                // them: an unknown dependency, never a deletable fixture row.
+                $classMeta = self::classification(self::CLASS_UNKNOWN, 'fk_without_personel_id_column', false);
+            }
+            $out[] = $base + [
                 'row_count' => $count,
-                'delete_rule' => $ref['delete_rule'],
                 'class' => $classMeta['class'],
                 'reason' => $classMeta['reason'],
                 'owner' => $classMeta['owner'],
@@ -567,38 +638,100 @@ class TestFixturePersonelPurgeService
         }
 
         usort($out, static function (array $a, array $b) {
-            return strcmp((string) $a['table'], (string) $b['table']);
+            return self::compareReferences($a, $b);
         });
 
         return $out;
     }
 
     /**
+     * @param array<string, mixed> $base
+     * @return array<string, mixed>
+     */
+    private static function unverifiedDependency(array $base, $reason)
+    {
+        return $base + [
+            'row_count' => -1,
+            'class' => self::CLASS_UNKNOWN,
+            'reason' => (string) $reason,
+            'owner' => null,
+            'retention_category' => null,
+            'handoff' => null,
+            'shared_other_personel' => null,
+            'historical_semantics' => false,
+        ];
+    }
+
+    /**
+     * Deterministic order: table, then column, then constraint.
+     *
+     * @param array<string, mixed> $a
+     * @param array<string, mixed> $b
+     */
+    private static function compareReferences(array $a, array $b)
+    {
+        return strcmp((string) $a['table'], (string) $b['table'])
+            ?: strcmp((string) ($a['column'] ?? ''), (string) ($b['column'] ?? ''))
+            ?: strcmp((string) ($a['constraint'] ?? ''), (string) ($b['constraint'] ?? ''));
+    }
+
+    /**
+     * Every independent reference to personeller is kept on its own: one entry per FK
+     * constraint (all of its columns together, composite FKs included) plus one entry per
+     * FK-less candidate column that no FK already covers. Keying by table alone used to drop
+     * the second reference of a table (e.g. old_personel_id / new_personel_id).
+     *
      * @return list<array<string, mixed>>
      */
     private static function discoverPersonelReferences(PDO $pdo)
     {
-        $byTable = [];
         $fk = $pdo->query(
-            "SELECT kcu.TABLE_NAME AS tbl, kcu.COLUMN_NAME AS col, rc.DELETE_RULE AS delete_rule
+            "SELECT kcu.TABLE_NAME AS tbl, kcu.CONSTRAINT_NAME AS constraint_name, kcu.COLUMN_NAME AS col,
+                    kcu.REFERENCED_COLUMN_NAME AS ref_col, rc.DELETE_RULE AS delete_rule
              FROM information_schema.KEY_COLUMN_USAGE kcu
              INNER JOIN information_schema.REFERENTIAL_CONSTRAINTS rc
                ON rc.CONSTRAINT_SCHEMA = kcu.CONSTRAINT_SCHEMA
               AND rc.CONSTRAINT_NAME = kcu.CONSTRAINT_NAME
+              AND rc.TABLE_NAME = kcu.TABLE_NAME
              WHERE kcu.TABLE_SCHEMA = DATABASE()
                AND kcu.REFERENCED_TABLE_NAME = 'personeller'
-               AND kcu.REFERENCED_COLUMN_NAME = 'id'"
+             ORDER BY kcu.TABLE_NAME, kcu.CONSTRAINT_NAME, kcu.ORDINAL_POSITION"
         );
-        if ($fk) {
-            foreach ($fk->fetchAll(PDO::FETCH_ASSOC) as $row) {
-                $table = (string) $row['tbl'];
-                $byTable[$table] = [
+        if ($fk === false) {
+            throw new TestFixturePersonelArchiveException(
+                self::CODE_INVENTORY_FAILED,
+                'Personel FK envanteri okunamadi; purge fail-closed.',
+                500
+            );
+        }
+
+        $byConstraint = [];
+        $covered = [];
+        foreach ($fk->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $table = (string) $row['tbl'];
+            $constraint = (string) $row['constraint_name'];
+            $col = (string) $row['col'];
+            $refCol = (string) $row['ref_col'];
+            $key = $table . '|' . $constraint;
+            if (!isset($byConstraint[$key])) {
+                $byConstraint[$key] = [
                     'table' => $table,
-                    'column' => (string) $row['col'],
+                    'column' => null,
+                    'columns' => [],
+                    'referenced_columns' => [],
+                    'constraint' => $constraint,
                     'delete_rule' => strtoupper((string) $row['delete_rule']),
                 ];
             }
+            $byConstraint[$key]['columns'][] = $col;
+            $byConstraint[$key]['referenced_columns'][] = $refCol;
+            if ($refCol === 'id') {
+                $byConstraint[$key]['column'] = $col;
+            }
+            $covered[$table . '|' . $col] = true;
         }
+
+        $refs = array_values($byConstraint);
 
         $cols = $pdo->query(
             "SELECT TABLE_NAME AS tbl, COLUMN_NAME AS col
@@ -607,23 +740,35 @@ class TestFixturePersonelPurgeService
                AND COLUMN_NAME IN ('personel_id', 'old_personel_id', 'new_personel_id')
                AND TABLE_NAME <> 'personeller'"
         );
-        if ($cols) {
-            foreach ($cols->fetchAll(PDO::FETCH_ASSOC) as $row) {
-                $table = (string) $row['tbl'];
-                if (isset($byTable[$table])) {
-                    continue;
-                }
-                $byTable[$table] = [
-                    'table' => $table,
-                    'column' => (string) $row['col'],
-                    'delete_rule' => 'NONE',
-                ];
+        if ($cols === false) {
+            throw new TestFixturePersonelArchiveException(
+                self::CODE_INVENTORY_FAILED,
+                'Personel referans kolon envanteri okunamadi; purge fail-closed.',
+                500
+            );
+        }
+        foreach ($cols->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $table = (string) $row['tbl'];
+            $col = (string) $row['col'];
+            if (isset($covered[$table . '|' . $col])) {
+                continue;
             }
+            $covered[$table . '|' . $col] = true;
+            $refs[] = [
+                'table' => $table,
+                'column' => $col,
+                'columns' => [$col],
+                'referenced_columns' => ['id'],
+                'constraint' => null,
+                'delete_rule' => 'NONE',
+            ];
         }
 
-        ksort($byTable);
+        usort($refs, static function (array $a, array $b) {
+            return self::compareReferences($a, $b);
+        });
 
-        return array_values($byTable);
+        return $refs;
     }
 
     /**
@@ -944,15 +1089,22 @@ class TestFixturePersonelPurgeService
             if ($rule === 'CASCADE' || $rule === 'SET NULL') {
                 continue;
             }
-            $childTables[] = [
+            // One step per referencing column: two references of one table both get cleared.
+            $stepKey = $table . '|' . (string) $dep['column'];
+            if (isset($childTables[$stepKey])) {
+                continue;
+            }
+            $childTables[$stepKey] = [
                 'table' => $table,
                 'op' => 'DELETE_BY_PERSONEL',
                 'column' => (string) $dep['column'],
                 'personel_id' => (int) $personelId,
             ];
         }
+        $childTables = array_values($childTables);
         usort($childTables, static function (array $a, array $b) {
-            return strcmp((string) $a['table'], (string) $b['table']);
+            return strcmp((string) $a['table'], (string) $b['table'])
+                ?: strcmp((string) $a['column'], (string) $b['column']);
         });
         foreach ($childTables as $step) {
             $steps[] = $step;

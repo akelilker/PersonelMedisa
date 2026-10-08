@@ -818,6 +818,45 @@ try {
         'failed-count fixture row preserved'
     );
 
+    // --- Binding audit history (user_personel_binding_audit, migration 056) is never purge-deletable ---
+    // The real table name differs from the legacy service literal (user_personel_binding_auditleri);
+    // a fixture with binding history must stay FAIL_CLOSED and its audit row must survive.
+    $bound = tfpInsertPersonel($pdo, '10000000070', 'REF-B');
+    tfpClassify($pdo, $bound, $gy);
+    $pdo->prepare(
+        "INSERT INTO user_personel_binding_audit (user_id, old_personel_id, new_personel_id, action, changed_by)
+         VALUES (10, NULL, :pid, 'SET', 10)"
+    )->execute(['pid' => $bound]);
+    $bindingPlan = TestFixturePersonelPurgeService::purge(
+        $pdo,
+        $bound,
+        $gy,
+        false,
+        TestFixturePersonelPurgeService::CONFIRM_TOKEN
+    );
+    $bindingBlockers = tfpBlockersForTable($bindingPlan, 'user_personel_binding_audit');
+    echo 'INFO binding audit blocker class=' . (string) ($bindingBlockers[0]['class'] ?? '-')
+        . ' code=' . (string) ($bindingBlockers[0]['code'] ?? '-') . PHP_EOL;
+    tfpAssert(
+        ($bindingPlan['purge_safe'] ?? true) === false
+        && ($bindingPlan['status'] ?? '') === 'FAIL_CLOSED'
+        && ($bindingPlan['executed'] ?? true) === false
+        && count($bindingBlockers) > 0,
+        'binding audit history blocks purge (FAIL_CLOSED, no delete)'
+    );
+    tfpAssert(
+        (int) $pdo->query('SELECT COUNT(*) FROM user_personel_binding_audit WHERE new_personel_id = ' . $bound)->fetchColumn() === 1
+        && (int) $pdo->query('SELECT COUNT(*) FROM personeller WHERE id = ' . $bound)->fetchColumn() === 1,
+        'binding audit history row and fixture row preserved'
+    );
+    tfpAssert(
+        ($bindingBlockers[0]['class'] ?? '') === TestFixturePersonelPurgeService::CLASS_AUDIT_APPEND_ONLY
+        && ($bindingBlockers[0]['code'] ?? '') === TestFixturePersonelPurgeService::CODE_AUDIT_IMMUTABLE
+        && ($bindingBlockers[0]['column'] ?? '') === 'new_personel_id'
+        && ($bindingBlockers[0]['handoff'] ?? '') === TestFixturePersonelPurgeService::HANDOFF_USER_BINDING_AUDIT,
+        'binding audit classified as append-only audit retention blocker'
+    );
+
     $svc = (string) file_get_contents(__DIR__ . '/../../api/src/Services/Personel/TestFixturePersonelPurgeService.php');
     tfpAssert(strpos($svc, 'personel_id === 1') === false, 'no hardcoded personel id');
     tfpAssert(strpos($svc, 'DELETE FROM personeller') !== false, 'personel delete only inside fixture purge owner');

@@ -186,5 +186,9 @@ describe("test fixture personel purge owner", () => {
       "[PASS] failed dependency count reported as explicit DEPENDENCY_COUNT_UNVERIFIED blocker",
     );
     expect(result.stdout).toContain("[PASS] failed-count fixture row preserved");
+    // Binding audit history (user_personel_binding_audit) is append-only: never purge-deletable.
+    expect(result.stdout).toContain("[PASS] binding audit history blocks purge (FAIL_CLOSED, no delete)");
+    expect(result.stdout).toContain("[PASS] binding audit history row and fixture row preserved");
+    expect(result.stdout).toContain("[PASS] binding audit classified as append-only audit retention blocker");
   });
 });

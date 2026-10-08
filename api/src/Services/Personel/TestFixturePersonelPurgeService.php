@@ -59,12 +59,14 @@ class TestFixturePersonelPurgeService
     public const HANDOFF_RETENTION_IMHA = 'RETENTION_IMHA_OWNER';
     public const HANDOFF_ARCHIVE_ACCESS_AUDIT = 'ARCHIVE_ACCESS_AUDIT_OWNER';
     public const HANDOFF_AYLIK_KAPANIS = 'AYLIK_KAPANIS_OWNER';
+    public const HANDOFF_USER_BINDING_AUDIT = 'USER_BINDING_AUDIT_OWNER';
 
     /** Owner labels (service/controller that owns the row lifecycle). */
     public const OWNER_ARCHIVE_ACCESS_SERVICE = 'Medisa\\Api\\Services\\Retention\\ArchiveAccessService';
     public const OWNER_PUANTAJ_DESTRUCTION = 'Medisa\\Api\\Services\\Retention\\PhysicalDestruction\\Handlers\\PuantajDestructionHandler';
     public const OWNER_MAAS_SNAPSHOT_SERVICE = 'Medisa\\Api\\Services\\MaasHesaplamaSnapshotService';
     public const OWNER_AYLIK_KAPANIS = 'Medisa\\Api\\Controllers\\YonetimController';
+    public const OWNER_USER_PERSONEL_BINDING = 'Medisa\\Api\\Services\\Auth\\UserPersonelBindingService';
     /** PERSONEL_OZLUK de-identify primitive owner (ANONYMIZE_FIELDS tombstone). */
     public const OWNER_PERSONEL_OZLUK_TOMBSTONE = 'Medisa\\Api\\Services\\Retention\\PhysicalDestruction\\Handlers\\PersonelOzlukDestructionHandler';
 
@@ -868,6 +870,8 @@ class TestFixturePersonelPurgeService
      * Every entry names the canonical owner of the row lifecycle. Deletion for these relations
      * belongs to that owner's contract, never to the fixture purge:
      * - ArchiveAccessService writes the append-only archive access audit and never deletes.
+     * - UserPersonelBindingService::writeAudit writes the append-only user<->personel binding
+     *   history (user_personel_binding_audit, migration 056) and never deletes it.
      * - The PUANTAJ muhur lines are sealed period evidence (retention imha owner).
      * - The payroll personel snapshot is part of an immutable hashed period snapshot
      *   (BORDRO retention owner preserves period snapshots).
@@ -884,6 +888,14 @@ class TestFixturePersonelPurgeService
                 'owner' => self::OWNER_ARCHIVE_ACCESS_SERVICE,
                 'retention_category' => null,
                 'handoff' => self::HANDOFF_ARCHIVE_ACCESS_AUDIT,
+            ],
+            'user_personel_binding_audit' => [
+                'class' => self::CLASS_AUDIT_APPEND_ONLY,
+                'reason' => 'append_only_user_personel_binding_audit',
+                'historical' => true,
+                'owner' => self::OWNER_USER_PERSONEL_BINDING,
+                'retention_category' => null,
+                'handoff' => self::HANDOFF_USER_BINDING_AUDIT,
             ],
             'puantaj_aylik_muhur_satirlari' => [
                 'class' => self::CLASS_SEALED_HISTORICAL,

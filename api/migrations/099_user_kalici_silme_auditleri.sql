@@ -20,12 +20,14 @@
 -- triggers SIGNAL, matching 081 / 082. The table is only ever written by
 -- KullaniciKaliciSilService, inside the same transaction as the user DELETE.
 --
--- Fail-closed: aborts when the users table is missing. Idempotent:
--- CREATE TABLE IF NOT EXISTS plus DROP TRIGGER IF EXISTS.
--- MariaDB 10.6 / 11.4 + PHP 7.4 PDO compatible.
+-- Fail-closed ordering: every guard that can fail (users table present, the two
+-- operator-verified protected-account IDs, and the absence of orphaned
+-- references in the 15 FK-less columns) runs BEFORE the first DDL. A missing or
+-- invalid identity and an orphaned reference therefore leave the schema
+-- untouched instead of leaving a partially applied round.
 --
--- NO DATA WRITES and NO backfill: historical deletions were never tracked, so
--- no fabricated audit rows are inserted.
+-- NO fabricated audit rows and NO backfill: historical deletions were never
+-- tracked, so no synthetic audit data is inserted.
 
 SET NAMES utf8mb4;
 SET time_zone = '+00:00';
@@ -45,6 +47,87 @@ SET @p099_sql := IF(
   'DO 0'
 );
 PREPARE p099_stmt FROM @p099_sql; EXECUTE p099_stmt; DEALLOCATE PREPARE p099_stmt;
+
+-- ---------------------------------------------------------------------------
+-- Protected-account precondition. The two accounts must be explicitly
+-- identified by the migration operator on the same DB connection before this
+-- file runs:
+--
+--   SET @p099_protected_ilker_user_id = <verified current users.id>;
+--   SET @p099_protected_serhan_user_id = <verified current users.id>;
+--
+-- No numeric value is baked into this migration. On a non-empty users table,
+-- absent, equal or unknown IDs abort the migration before any DDL. On a fresh
+-- empty schema the registry stays empty and Kalıcı Sil remains fail-closed
+-- until the same verified registration is completed; missing identity evidence
+-- never enables deletion.
+-- ---------------------------------------------------------------------------
+SET @p099_users_count := (SELECT COUNT(*) FROM users);
+SET @p099_protected_ids_valid := (
+  SELECT COUNT(*) = 2
+  FROM users
+  WHERE id IN (@p099_protected_ilker_user_id, @p099_protected_serhan_user_id)
+);
+SET @p099_protection_precondition_sql := IF(
+  @p099_users_count = 0
+    OR (
+      @p099_protected_ilker_user_id IS NOT NULL
+      AND @p099_protected_serhan_user_id IS NOT NULL
+      AND @p099_protected_ilker_user_id <> @p099_protected_serhan_user_id
+      AND @p099_protected_ids_valid = 1
+    ),
+  'DO 0',
+  'SIGNAL SQLSTATE ''45000'' SET MESSAGE_TEXT = ''PACK099_BLOCKER: verified protected-account IDs are required'''
+);
+PREPARE p099_protection_precondition_stmt FROM @p099_protection_precondition_sql;
+EXECUTE p099_protection_precondition_stmt;
+DEALLOCATE PREPARE p099_protection_precondition_stmt;
+
+-- ---------------------------------------------------------------------------
+-- Orphan precheck (still before any DDL). The 15 columns below were
+-- historically FK-less; a value that does not resolve to a live users.id would
+-- make a later ADD CONSTRAINT fail (errno 1452) mid-way and leave a partial
+-- round. Refuse before the first DDL instead of after some of them.
+-- ---------------------------------------------------------------------------
+SET @p099_orphans := (
+  SELECT COUNT(*) FROM (
+    SELECT eok.created_by AS uid FROM ek_odeme_kesinti eok WHERE eok.created_by IS NOT NULL AND NOT EXISTS (SELECT 1 FROM users u WHERE u.id = eok.created_by)
+    UNION ALL
+    SELECT eok.updated_by FROM ek_odeme_kesinti eok WHERE eok.updated_by IS NOT NULL AND NOT EXISTS (SELECT 1 FROM users u WHERE u.id = eok.updated_by)
+    UNION ALL
+    SELECT gb.created_by FROM gunluk_bildirimler gb WHERE gb.created_by IS NOT NULL AND NOT EXISTS (SELECT 1 FROM users u WHERE u.id = gb.created_by)
+    UNION ALL
+    SELECT gb.updated_by FROM gunluk_bildirimler gb WHERE gb.updated_by IS NOT NULL AND NOT EXISTS (SELECT 1 FROM users u WHERE u.id = gb.updated_by)
+    UNION ALL
+    SELECT gb.correction_requested_by FROM gunluk_bildirimler gb WHERE gb.correction_requested_by IS NOT NULL AND NOT EXISTS (SELECT 1 FROM users u WHERE u.id = gb.correction_requested_by)
+    UNION ALL
+    SELECT lh.released_by FROM legal_holdlar lh WHERE lh.released_by IS NOT NULL AND NOT EXISTS (SELECT 1 FROM users u WHERE u.id = lh.released_by)
+    UNION ALL
+    SELECT lha.actor_user_id FROM legal_hold_auditleri lha WHERE lha.actor_user_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM users u WHERE u.id = lha.actor_user_id)
+    UNION ALL
+    SELECT omi.actor_user_id FROM offline_mutation_idempotency omi WHERE omi.actor_user_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM users u WHERE u.id = omi.actor_user_id)
+    UNION ALL
+    SELECT pgg.olusturan_user_id FROM personel_gecici_gorevlendirmeler pgg WHERE pgg.olusturan_user_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM users u WHERE u.id = pgg.olusturan_user_id)
+    UNION ALL
+    SELECT pgg.sonlandiran_user_id FROM personel_gecici_gorevlendirmeler pgg WHERE pgg.sonlandiran_user_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM users u WHERE u.id = pgg.sonlandiran_user_id)
+    UNION ALL
+    SELECT pir.actor_id FROM personel_import_runs pir WHERE pir.actor_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM users u WHERE u.id = pir.actor_id)
+    UNION ALL
+    SELECT ptfa.archived_by FROM personel_test_fixture_archive_kayitlari ptfa WHERE ptfa.archived_by IS NOT NULL AND NOT EXISTS (SELECT 1 FROM users u WHERE u.id = ptfa.archived_by)
+    UNION ALL
+    SELECT ptfs.classified_by FROM personel_test_fixture_siniflandirmalari ptfs WHERE ptfs.classified_by IS NOT NULL AND NOT EXISTS (SELECT 1 FROM users u WHERE u.id = ptfs.classified_by)
+    UNION ALL
+    SELECT ptfs.iptal_edildi_by FROM personel_test_fixture_siniflandirmalari ptfs WHERE ptfs.iptal_edildi_by IS NOT NULL AND NOT EXISTS (SELECT 1 FROM users u WHERE u.id = ptfs.iptal_edildi_by)
+    UNION ALL
+    SELECT ria.actor_user_id FROM retention_imha_auditleri ria WHERE ria.actor_user_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM users u WHERE u.id = ria.actor_user_id)
+  ) orphaned_refs
+);
+SET @p099_orphan_sql := IF(
+  @p099_orphans = 0,
+  'DO 0',
+  'SIGNAL SQLSTATE ''45000'' SET MESSAGE_TEXT = ''PACK099_BLOCKER: orphan user reference present'''
+);
+PREPARE p099_orphan_stmt FROM @p099_orphan_sql; EXECUTE p099_orphan_stmt; DEALLOCATE PREPARE p099_orphan_stmt;
 
 -- ---------------------------------------------------------------------------
 -- Hard-delete evidence. target_user_id / target_username / target_ad_soyad /
@@ -95,18 +178,9 @@ SIGNAL SQLSTATE '45000'
 -- Stable protected-account flag for the safe Kalıcı Sil eligibility.
 -- ---------------------------------------------------------------------------
 -- `silinmesi_korunur` is the canonical, stable protection anchor. Username
--- uniqueness is NOT treated as person identity: the two protected accounts
--- must be explicitly identified by the migration operator on the same DB
--- connection before applying this file:
---
---   SET @p099_protected_ilker_user_id = <verified current users.id>;
---   SET @p099_protected_serhan_user_id = <verified current users.id>;
---
--- No numeric value is baked into this migration. On a non-empty users table,
--- absent, equal or unknown IDs abort the migration. On a fresh empty schema,
--- the registry remains empty and Kalıcı Sil stays fail-closed until the same
--- verified registration is completed; missing identity evidence never enables
--- deletion.
+-- uniqueness is NOT treated as person identity: the two protected accounts are
+-- identified by the operator-verified ids captured above.
+-- ---------------------------------------------------------------------------
 SET @p099_koruma_col := (
   SELECT COUNT(*)
   FROM information_schema.COLUMNS
@@ -132,27 +206,6 @@ CREATE TABLE IF NOT EXISTS user_kalici_silme_korunan_hesaplar (
   CONSTRAINT fk_kskha_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE RESTRICT ON UPDATE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-SET @p099_users_count := (SELECT COUNT(*) FROM users);
-SET @p099_protected_ids_valid := (
-  SELECT COUNT(*) = 2
-  FROM users
-  WHERE id IN (@p099_protected_ilker_user_id, @p099_protected_serhan_user_id)
-);
-SET @p099_protection_precondition_sql := IF(
-  @p099_users_count = 0
-    OR (
-      @p099_protected_ilker_user_id IS NOT NULL
-      AND @p099_protected_serhan_user_id IS NOT NULL
-      AND @p099_protected_ilker_user_id <> @p099_protected_serhan_user_id
-      AND @p099_protected_ids_valid = 1
-    ),
-  'DO 0',
-  'SIGNAL SQLSTATE ''45000'' SET MESSAGE_TEXT = ''PACK099_BLOCKER: verified protected-account IDs are required'''
-);
-PREPARE p099_protection_precondition_stmt FROM @p099_protection_precondition_sql;
-EXECUTE p099_protection_precondition_stmt;
-DEALLOCATE PREPARE p099_protection_precondition_stmt;
-
 -- Explicitly operator-verified IDs only; never resolve people by username.
 INSERT INTO user_kalici_silme_korunan_hesaplar (protection_key, user_id)
 SELECT 'ILKER_A', @p099_protected_ilker_user_id
@@ -173,8 +226,8 @@ SET u.silinmesi_korunur = 1;
 -- current classified writer columns from the migration/source inventory.
 -- RESTRICT makes a late writer and the user DELETE mutually safe at InnoDB
 -- level; a future unclassified column is rejected by the application owner.
--- Existing orphan data causes this migration to fail rather than silently
--- permitting a hard delete.
+-- The orphan precheck above guarantees no existing orphan data reaches these
+-- statements.
 -- ---------------------------------------------------------------------------
 ALTER TABLE ek_odeme_kesinti
   ADD CONSTRAINT fk_p099_eok_created_by FOREIGN KEY (created_by) REFERENCES users (id) ON DELETE RESTRICT ON UPDATE RESTRICT,

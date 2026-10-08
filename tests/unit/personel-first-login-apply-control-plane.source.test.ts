@@ -34,7 +34,7 @@ const EXPECTED_USERNAMES = ['abdullah', 'fahriM', 'hakanAc', 'hakanAt', 'muqtada
 
 describe('personel first-login apply control-plane mode', () => {
   it('is allowlisted as its own mode beside the read-only preflight', () => {
-    expect(worker).toContain("|PERSONEL_FIRST_LOGIN_CREDENTIALS_PREFLIGHT|PERSONEL_FIRST_LOGIN_CREDENTIALS_APPLY)$/'");
+    expect(worker).toContain("|PERSONEL_FIRST_LOGIN_CREDENTIALS_PREFLIGHT|PERSONEL_FIRST_LOGIN_CREDENTIALS_APPLY|KALICI_SIL_MIGRATION_PREFLIGHT|KALICI_SIL_MIGRATION_APPLY)$/'");
     expect(worker).toContain(APPLY_BRANCH);
     expect(applyBlockCode.length).toBeGreaterThan(0);
   });

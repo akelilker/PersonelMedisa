@@ -44,7 +44,7 @@ const EXPECTED_USERNAMES = [
 
 describe('personel first-login read-only control-plane mode', () => {
   it('is allowlisted as its own read-only mode with a separate apply sibling', () => {
-    expect(worker).toContain("|PERSONEL_FIRST_LOGIN_CREDENTIALS_PREFLIGHT|PERSONEL_FIRST_LOGIN_CREDENTIALS_APPLY)$/'");
+    expect(worker).toContain("|PERSONEL_FIRST_LOGIN_CREDENTIALS_PREFLIGHT|PERSONEL_FIRST_LOGIN_CREDENTIALS_APPLY|KALICI_SIL_MIGRATION_PREFLIGHT|KALICI_SIL_MIGRATION_APPLY)$/'");
     // The apply sibling exists but is its own branch and its own owner; the read-only
     // block below never reaches it and never calls apply = true.
     expect(worker).toContain(APPLY_BRANCH);

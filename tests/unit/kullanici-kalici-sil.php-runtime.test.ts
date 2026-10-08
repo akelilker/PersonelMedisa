@@ -21,6 +21,11 @@ describe("kullanici kalıcı sil: the safe hard-delete owner and its fail-closed
     for (const marker of [
       "the canonical chain tip is migration 099",
       "migration 099 refuses a populated database without verified protected-account IDs",
+      "migration 099 leaves no partial audit table when the protected-account IDs are missing",
+      "migration 099 leaves no partial protected-account flag when the IDs are missing",
+      "migration 099 leaves no partial registry table when the IDs are missing",
+      "migration 099 refuses a populated database with an orphaned FK-less reference",
+      "migration 099 leaves no partial audit table when an orphan is present",
       "migration 099 records only the operator-verified protected-account IDs",
       "migration 099 flags the verified protected accounts without username matching",
       "migration 099 created the kalici silme audit table",

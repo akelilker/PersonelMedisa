@@ -6,6 +6,8 @@ use Medisa\Api\Database\Connection;
 use Medisa\Api\Database\MigrationBackupService;
 use Medisa\Api\Database\MigrationExecutionService;
 use Medisa\Api\Database\MigrationPreflightReport;
+use Medisa\Api\Services\Auth\KullaniciKaliciSilMigrationFailure;
+use Medisa\Api\Services\Auth\KullaniciKaliciSilMigrationService;
 use Medisa\Api\Services\Auth\PersonelFirstLoginCredentialsApplyReport;
 use Medisa\Api\Services\Auth\PersonelFirstLoginCredentialsPreflightReport;
 use Medisa\Api\Services\Organizasyon\OrganizationInitialMappingService;
@@ -108,7 +110,7 @@ try {
                 'mode',
                 '/^(APPLY|READ_ONLY_PREFLIGHT|READ_ONLY_ORGANIZATION_INVENTORY'
                 . '|ORGANIZATION_MAPPING_PREFLIGHT|ORGANIZATION_MAPPING_APPLY|FINAL_CLOSE_PREFLIGHT|FINAL_CLOSE_APPLY'
-                . '|PERSONEL_FIRST_LOGIN_CREDENTIALS_PREFLIGHT|PERSONEL_FIRST_LOGIN_CREDENTIALS_APPLY)$/'
+                . '|PERSONEL_FIRST_LOGIN_CREDENTIALS_PREFLIGHT|PERSONEL_FIRST_LOGIN_CREDENTIALS_APPLY|KALICI_SIL_MIGRATION_PREFLIGHT|KALICI_SIL_MIGRATION_APPLY)$/'
             )
             : 'APPLY';
         // Optional, and only meaningful for APPLY: the single migration version
@@ -117,6 +119,16 @@ try {
         $targetVersion = array_key_exists('target_version', $request)
             ? requireString($request, 'target_version', '/^\d{3}$/')
             : null;
+        // Only the protected-account migration modes carry operator-verified ids.
+        // Both are mandatory in those modes and parsed (positive ints) before any
+        // database stage, so a malformed request never reaches the apply stage.
+        $isKaliciSilMode = $mode === 'KALICI_SIL_MIGRATION_PREFLIGHT' || $mode === 'KALICI_SIL_MIGRATION_APPLY';
+        $protectedIlkerUserId = $isKaliciSilMode
+            ? requirePositiveInt($request, 'protected_ilker_user_id')
+            : 0;
+        $protectedSerhanUserId = $isKaliciSilMode
+            ? requirePositiveInt($request, 'protected_serhan_user_id')
+            : 0;
         // The personel first-login credential rollout apply mode is fingerprint-pinned:
         // the request must carry the exact plan fingerprint the operator read from the
         // read-only preflight artifact. It is validated here with the other request
@@ -463,6 +475,145 @@ try {
             exit(0);
         }
 
+        // 099 protected-account migration, read-only. Publishes the orphan/schema
+        // preimage and the operator-id validity so an operator can review the
+        // preimage before applying; this mode has no path to a mutation.
+        if ($mode === 'KALICI_SIL_MIGRATION_PREFLIGHT') {
+            $stage = 'KALICI_SIL_MIGRATION_PREFLIGHT';
+            try {
+                $migrationSource = MigrationExecutionService::sourceForRuntime($apiDirectory, true);
+                $pdo = Connection::get();
+                $report = KullaniciKaliciSilMigrationService::preflight(
+                    $pdo,
+                    $migrationSource,
+                    $deployedSha,
+                    $protectedIlkerUserId,
+                    $protectedSerhanUserId
+                );
+                $report['request_id'] = $requestId;
+                writeJsonAtomically($controlDirectory . '/kalici-sil-migration-preflight.json', $report);
+            } catch (\Throwable $exception) {
+                throw MigrationWorkerFailure::fromThrowable($stage, $exception);
+            }
+
+            $stage = 'STATUS_WRITE';
+            writeStatus($statusPath, [
+                'state' => 'SUCCEEDED',
+                'request_id' => $requestId,
+                'deployed_sha' => strtolower($deployedSha),
+                'mode' => $mode,
+                'kalici_sil_migration_preflight_result' => (string) $report['result'],
+            ]);
+            $stage = 'REQUEST_ARCHIVE';
+            archiveRequest(
+                $processingPath,
+                $controlDirectory . '/request.completed.' . safeId($requestId) . '.json'
+            );
+            exit(0);
+        }
+
+        // 099 protected-account migration apply. The two ids were already parsed
+        // and validated as positive ints; the service re-gates the live preimage
+        // and then runs the migration on the same connection the ids were set on.
+        // Backup and postcheck are stages, not checklist items.
+        if ($mode === 'KALICI_SIL_MIGRATION_APPLY') {
+            $stage = 'KALICI_SIL_MIGRATION_TARGET_RESOLVE';
+            try {
+                $migrationSource = MigrationExecutionService::sourceForRuntime($apiDirectory, true);
+                $pdo = Connection::get();
+                $ledger = MigrationExecutionService::ledgerFacts($pdo, $migrationSource);
+                $nextPending = $ledger['pending_versions'][0] ?? null;
+                if ($nextPending !== KullaniciKaliciSilMigrationService::MIGRATION_VERSION) {
+                    throw new RuntimeException('TARGET_NOT_NEXT_PENDING');
+                }
+            } catch (\Throwable $exception) {
+                throw MigrationWorkerFailure::fromThrowable($stage, $exception);
+            }
+
+            $stage = 'KALICI_SIL_MIGRATION_PREFLIGHT';
+            try {
+                $preflight = KullaniciKaliciSilMigrationService::preflight(
+                    $pdo,
+                    $migrationSource,
+                    $deployedSha,
+                    $protectedIlkerUserId,
+                    $protectedSerhanUserId
+                );
+                $preflight['request_id'] = $requestId;
+                writeJsonAtomically($controlDirectory . '/kalici-sil-migration-preflight.json', $preflight);
+                if ($preflight['result'] !== 'PASS') {
+                    throw KullaniciKaliciSilMigrationFailure::of(
+                        'KALICI_SIL_PREFLIGHT_BLOCKED',
+                        implode(',', $preflight['blockers'])
+                    );
+                }
+            } catch (\Throwable $exception) {
+                throw MigrationWorkerFailure::fromThrowable($stage, $exception);
+            }
+
+            $stage = 'KALICI_SIL_MIGRATION_BACKUP';
+            try {
+                $backup = MigrationBackupService::create(
+                    $pdo,
+                    $apiDirectory,
+                    $requestId,
+                    KullaniciKaliciSilMigrationService::MIGRATION_VERSION
+                );
+            } catch (\Throwable $exception) {
+                throw MigrationWorkerFailure::fromThrowable($stage, $exception);
+            }
+
+            $stage = 'KALICI_SIL_MIGRATION_APPLY';
+            try {
+                $applied = KullaniciKaliciSilMigrationService::apply(
+                    $pdo,
+                    $migrationSource,
+                    $deployedSha,
+                    $protectedIlkerUserId,
+                    $protectedSerhanUserId,
+                    $backup
+                );
+            } catch (\Throwable $exception) {
+                throw MigrationWorkerFailure::fromThrowable($stage, $exception);
+            }
+
+            $stage = 'KALICI_SIL_MIGRATION_POSTCHECK';
+            try {
+                $postcheck = KullaniciKaliciSilMigrationService::postcheck($pdo, $migrationSource, $backup);
+                $postcheck['request_id'] = $requestId;
+                writeJsonAtomically($controlDirectory . '/kalici-sil-migration-postcheck.json', $postcheck);
+                if (($postcheck['result'] ?? '') !== 'PASS') {
+                    throw KullaniciKaliciSilMigrationFailure::of(
+                        'KALICI_SIL_POSTCHECK_BLOCKED',
+                        implode(',', $postcheck['unexpected_deltas'])
+                    );
+                }
+            } catch (\Throwable $exception) {
+                throw MigrationWorkerFailure::fromThrowable($stage, $exception);
+            }
+
+            $stage = 'STATUS_WRITE';
+            writeStatus($statusPath, [
+                'state' => 'SUCCEEDED',
+                'request_id' => $requestId,
+                'deployed_sha' => strtolower($deployedSha),
+                'mode' => $mode,
+                'target_version' => KullaniciKaliciSilMigrationService::MIGRATION_VERSION,
+                'kalici_sil_migration_applied_versions' => implode(',', $applied['applied_versions']),
+                'kalici_sil_migration_postcheck_result' => (string) $postcheck['result'],
+                'backup_file' => (string) $backup['file'],
+                'backup_sha256' => (string) $backup['sha256'],
+                'backup_bytes' => (int) $backup['bytes'],
+                'backup_readback' => (string) $backup['readback'],
+            ]);
+            $stage = 'REQUEST_ARCHIVE';
+            archiveRequest(
+                $processingPath,
+                $controlDirectory . '/request.completed.' . safeId($requestId) . '.json'
+            );
+            exit(0);
+        }
+
         // Backup is a stage, not a checklist item: apply is unreachable unless a
         // dump for the two closing tables plus the ledger preimage has been
         // written outside the webroot and read back successfully.
@@ -586,6 +737,29 @@ function requireString(array $request, string $key, string $pattern): string
 }
 
 /**
+ * A positive integer request field. Accepts int or digit-string only, so a
+ * malformed or negative value is rejected during request parsing and never
+ * reaches a database stage.
+ *
+ * @param array<string, mixed> $request
+ */
+function requirePositiveInt(array $request, string $key): int
+{
+    $value = $request[$key] ?? null;
+    if (is_int($value)) {
+        if ($value > 0) {
+            return $value;
+        }
+        throw new RuntimeException('REQUEST_INVALID');
+    }
+    if (is_string($value) && preg_match('/^[1-9][0-9]{0,9}$/', $value) === 1) {
+        return (int) $value;
+    }
+
+    throw new RuntimeException('REQUEST_INVALID');
+}
+
+/**
  * Read back the inventory artifact the read-only inventory mode published.
  *
  * The mapping modes never collect their own inventory: the spec pins a checksum,
@@ -625,6 +799,9 @@ final class MigrationWorkerFailure extends RuntimeException
         // re-classifying it through the generic migration classifier would flatten
         // it into a much less useful UNKNOWN.
         if ($exception instanceof OrganizationMappingFailure) {
+            return new self($exception->reason, $stage, 1, $exception->detail);
+        }
+        if ($exception instanceof KullaniciKaliciSilMigrationFailure) {
             return new self($exception->reason, $stage, 1, $exception->detail);
         }
 
@@ -689,6 +866,21 @@ function classifyWorkerFailure(Throwable $exception, string $stage): string
     }
     if ($stage === 'ORGANIZATION_MAPPING_POSTCHECK') {
         return 'ORGANIZATION_MAPPING_POSTCHECK_FAILED';
+    }
+    if ($stage === 'KALICI_SIL_MIGRATION_PREFLIGHT') {
+        return 'KALICI_SIL_MIGRATION_PREFLIGHT_FAILED';
+    }
+    if ($stage === 'KALICI_SIL_MIGRATION_TARGET_RESOLVE') {
+        return 'KALICI_SIL_MIGRATION_TARGET_RESOLVE_FAILED';
+    }
+    if ($stage === 'KALICI_SIL_MIGRATION_BACKUP') {
+        return 'KALICI_SIL_MIGRATION_BACKUP_FAILED';
+    }
+    if ($stage === 'KALICI_SIL_MIGRATION_APPLY') {
+        return 'KALICI_SIL_MIGRATION_APPLY_FAILED';
+    }
+    if ($stage === 'KALICI_SIL_MIGRATION_POSTCHECK') {
+        return 'KALICI_SIL_MIGRATION_POSTCHECK_FAILED';
     }
     return $stage === 'VERIFY' ? 'SCHEMA_VERIFY_FAILED' : 'UNKNOWN_MIGRATION_FAILURE';
 }

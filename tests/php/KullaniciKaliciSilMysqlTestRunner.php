@@ -340,8 +340,60 @@ try {
             $withoutAttestationBlocked,
             'migration 099 refuses a populated database without verified protected-account IDs'
         );
+        // Missing identity must abort before the first DDL: nothing may exist.
+        ksaAssert(
+            ksaCount(
+                $preconditionPdo,
+                "SELECT COUNT(*) FROM information_schema.TABLES
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '" . KSA_AUDIT_TABLE . "'"
+            ) === 0,
+            'migration 099 leaves no partial audit table when the protected-account IDs are missing'
+        );
+        ksaAssert(
+            ksaCount(
+                $preconditionPdo,
+                "SELECT COUNT(*) FROM information_schema.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'silinmesi_korunur'"
+            ) === 0,
+            'migration 099 leaves no partial protected-account flag when the IDs are missing'
+        );
+        ksaAssert(
+            ksaCount(
+                $preconditionPdo,
+                "SELECT COUNT(*) FROM information_schema.TABLES
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'user_kalici_silme_korunan_hesaplar'"
+            ) === 0,
+            'migration 099 leaves no partial registry table when the IDs are missing'
+        );
+
+        // An orphaned reference in one of the 15 FK-less columns must also abort
+        // before the first DDL, not fail mid-way through the ADD CONSTRAINTs.
+        $preconditionPdo->exec(
+            "INSERT INTO offline_mutation_idempotency
+                (actor_user_id, operation_scope, idempotency_key, payload_hash, state, created_at)
+             VALUES (9999, 'orphan', 'orphan-key-1', '" . str_repeat('a', 64) . "', 'COMPLETED', NOW(3))"
+        );
         $preconditionPdo->exec('SET @p099_protected_ilker_user_id = 21');
         $preconditionPdo->exec('SET @p099_protected_serhan_user_id = 22');
+        $orphanBlocked = false;
+        try {
+            ksaApplyFile($preconditionPdo, KSA_MIGRATION_TIP);
+        } catch (\Throwable $exception) {
+            $orphanBlocked = true;
+        }
+        ksaAssert(
+            $orphanBlocked,
+            'migration 099 refuses a populated database with an orphaned FK-less reference'
+        );
+        ksaAssert(
+            ksaCount(
+                $preconditionPdo,
+                "SELECT COUNT(*) FROM information_schema.TABLES
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '" . KSA_AUDIT_TABLE . "'"
+            ) === 0,
+            'migration 099 leaves no partial audit table when an orphan is present'
+        );
+        $preconditionPdo->exec("DELETE FROM offline_mutation_idempotency WHERE idempotency_key = 'orphan-key-1'");
         ksaApplyFile($preconditionPdo, KSA_MIGRATION_TIP);
         ksaAssert(
             ksaCount(

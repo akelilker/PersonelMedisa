@@ -9,6 +9,12 @@ name: Ops migration worker diagnostics
 #                                      SADECE SELECT calistirip preflight.json
 #                                      uretir. INSERT/UPDATE/DELETE/DDL, migration
 #                                      apply ve ledger yazimi bu yolda yoktur.
+#   KALICI_SIL_MIGRATION_PREFLIGHT   - yalniz 099 icin. Operator tarafindan dogrulanmis
+#                                      iki users.id ile worker'in KALICI_SIL preflight'ini
+#                                      ister; worker SADECE SELECT calistirip
+#                                      kalici-sil-migration-preflight.json uretir. Backup,
+#                                      DDL ve ledger yazimi bu modda erisilemez
+#                                      (cpanel-migration-cron.php KALICI_SIL_MIGRATION_PREFLIGHT dali).
 #
 # Cikti sozlesmesi: yalniz sayilar, kolon/index adlari, migration versiyonlari,
 # checksum ve reason code. Personel/bordro satiri, isim, TCKN, ucret, token veya
@@ -25,12 +31,21 @@ on:
         options:
           - READONLY_WORKER_DIAGNOSTICS
           - READ_ONLY_MIGRATION_PREFLIGHT
+          - KALICI_SIL_MIGRATION_PREFLIGHT
       confirmation:
         description: Type the selected mode again to authorize it
         required: true
         type: string
       deployed_sha:
-        description: Exact deployed commit SHA (required for READ_ONLY_MIGRATION_PREFLIGHT)
+        description: Exact deployed commit SHA (required for READ_ONLY_MIGRATION_PREFLIGHT and KALICI_SIL_MIGRATION_PREFLIGHT)
+        required: false
+        type: string
+      protected_ilker_user_id:
+        description: Operator-verified users.id (KALICI_SIL_MIGRATION_PREFLIGHT only)
+        required: false
+        type: string
+      protected_serhan_user_id:
+        description: Operator-verified users.id (KALICI_SIL_MIGRATION_PREFLIGHT only)
         required: false
         type: string
 
@@ -51,6 +66,8 @@ jobs:
       CONFIRMATION: ${{ inputs.confirmation }}
       MODE: ${{ inputs.mode }}
       DEPLOYED_SHA: ${{ inputs.deployed_sha }}
+      PROTECTED_ILKER_USER_ID: ${{ inputs.protected_ilker_user_id }}
+      PROTECTED_SERHAN_USER_ID: ${{ inputs.protected_serhan_user_id }}
       POLL_ATTEMPTS: "91"
       POLL_INTERVAL_SECONDS: "10"
       TOTAL_POLL_WINDOW_SECONDS: "900"
@@ -59,19 +76,29 @@ jobs:
         run: |
           set -euo pipefail
           case "$MODE" in
-            READONLY_WORKER_DIAGNOSTICS|READ_ONLY_MIGRATION_PREFLIGHT) ;;
+            READONLY_WORKER_DIAGNOSTICS|READ_ONLY_MIGRATION_PREFLIGHT|KALICI_SIL_MIGRATION_PREFLIGHT) ;;
             *) echo "Unsupported diagnostics mode." && exit 1 ;;
           esac
           test "$CONFIRMATION" = "$MODE" || {
             echo "Explicit diagnostics confirmation must repeat the selected mode."
             exit 1
           }
-          if [[ "$MODE" == "READ_ONLY_MIGRATION_PREFLIGHT" ]]; then
+          if [[ "$MODE" == "READ_ONLY_MIGRATION_PREFLIGHT" || "$MODE" == "KALICI_SIL_MIGRATION_PREFLIGHT" ]]; then
             [[ "$DEPLOYED_SHA" =~ ^[0-9a-fA-F]{40}$ ]] || {
               echo "PREFLIGHT_RESULT=BLOCKED"
               echo "PREFLIGHT_REASON=DEPLOYED_SHA_INPUT_INVALID"
               exit 1
             }
+          fi
+          if [[ "$MODE" == "KALICI_SIL_MIGRATION_PREFLIGHT" ]]; then
+            # Mirrors requirePositiveInt() in the worker: digits only, no sign,
+            # no leading zero. Ids are never resolved from usernames here.
+            [[ "$PROTECTED_ILKER_USER_ID" =~ ^[1-9][0-9]{0,9}$ ]] || {
+              echo "PREFLIGHT_RESULT=BLOCKED"; echo "PREFLIGHT_REASON=PROTECTED_ID_INPUT_INVALID"; exit 1; }
+            [[ "$PROTECTED_SERHAN_USER_ID" =~ ^[1-9][0-9]{0,9}$ ]] || {
+              echo "PREFLIGHT_RESULT=BLOCKED"; echo "PREFLIGHT_REASON=PROTECTED_ID_INPUT_INVALID"; exit 1; }
+            [[ "$PROTECTED_ILKER_USER_ID" != "$PROTECTED_SERHAN_USER_ID" ]] || {
+              echo "PREFLIGHT_RESULT=BLOCKED"; echo "PREFLIGHT_REASON=PROTECTED_IDS_NOT_DISTINCT"; exit 1; }
           fi
           test -n "$FTP_SERVER" || (echo "FTP_SERVER secret is missing." && exit 1)
           test -n "$FTP_USERNAME" || (echo "FTP_USERNAME secret is missing." && exit 1)
@@ -470,3 +497,191 @@ jobs:
             exit 1
           fi
           echo "PREFLIGHT_APPLY_READY=YES"
+
+      # 099 only. Same control plane, same request/poll/readback pattern as the
+      # generic preflight above; the worker branch it reaches is SELECT-only and
+      # returns before the backup/apply stages exist.
+      - name: Run read-only KALICI_SIL 099 preflight on production
+        if: inputs.mode == 'KALICI_SIL_MIGRATION_PREFLIGHT'
+        env:
+          REQUEST_ID: kalici-preflight-${{ github.run_id }}-${{ github.run_attempt }}
+          TARGET_MIGRATION: 099_user_kalici_silme_auditleri.sql
+        run: |
+          set -euo pipefail
+
+          run_cpanel_plain_ftp() {
+            local ftp_commands="$1"
+
+            echo "Deploy transport mode: plain-ftp"
+            lftp -u "${FTP_USERNAME}","${FTP_PASSWORD}" -p "${FTP_PORT}" "ftp://${FTP_SERVER}" -e "
+              set cmd:fail-exit true;
+              set net:max-retries 2;
+              set net:timeout 20;
+              set net:reconnect-interval-base 5;
+              set net:reconnect-interval-max 10;
+              set xfer:clobber true;
+              set ssl:verify-certificate no;
+              set ssl:check-hostname no;
+              set ftp:passive-mode on;
+              set ftp:ssl-allow false;
+              set ftp:ssl-force false;
+              set ftp:ssl-protect-data false;
+              ${ftp_commands}
+              bye
+            "
+          }
+
+          run_cpanel_ftp() {
+            run_cpanel_plain_ftp "$1"
+          }
+
+          block() {
+            echo "KALICI_SIL_PREFLIGHT_RESULT=BLOCKED"
+            echo "KALICI_SIL_PREFLIGHT_REASON=$1"
+            exit 1
+          }
+
+          source "$GITHUB_WORKSPACE/scripts/deploy/cpanel-ftp-directory-lib.sh"
+
+          WORK="$RUNNER_TEMP/kalici-sil-preflight"
+          rm -rf "$WORK"
+          mkdir -p "$WORK"
+          expected_sha="$(echo "$DEPLOYED_SHA" | tr '[:upper:]' '[:lower:]')"
+
+          # The workflow must run on the deployed commit so the local 099 bytes and
+          # worker bytes are the ones the server is about to execute.
+          [[ "$(git rev-parse HEAD)" == "$expected_sha" ]] || block WORKFLOW_REF_NOT_DEPLOYED_SHA
+          test -f "api/migrations/${TARGET_MIGRATION}" || block TARGET_MIGRATION_NOT_IN_REF
+
+          if ! ensure_cpanel_remote_directory "api/runtime/migration-control"; then
+            block CONTROL_PLANE_UNREACHABLE
+          fi
+          if ! run_cpanel_ftp "
+            cls -1 api/runtime/migration-control > ${WORK}/control-listing.txt;
+            get api/.deploy-sha -o ${WORK}/deploy-sha.txt;
+            get api/bin/cpanel-migration-cron.php -o ${WORK}/remote-worker.php;
+            get api/runtime-build/canonical-migrations.php -o ${WORK}/remote-bundle.php;
+          " >/dev/null 2>&1; then
+            block CONTROL_PLANE_EVIDENCE_UNREADABLE
+          fi
+
+          remote_sha="$(tr -d '\r\n' < "${WORK}/deploy-sha.txt" | tr '[:upper:]' '[:lower:]')"
+          [[ "$remote_sha" == "$expected_sha" ]] || block DEPLOY_SHA_MISMATCH
+          echo "KALICI_SIL_GATE_DEPLOY_SHA_MATCH=YES"
+
+          local_worker_sha="$(sha256sum api/bin/cpanel-migration-cron.php | cut -d' ' -f1)"
+          remote_worker_sha="$(sha256sum "${WORK}/remote-worker.php" | cut -d' ' -f1)"
+          [[ "$local_worker_sha" == "$remote_worker_sha" ]] || block REMOTE_WORKER_PARITY_MISMATCH
+          grep -q 'KALICI_SIL_MIGRATION_PREFLIGHT' "${WORK}/remote-worker.php" || block WORKER_KALICI_SIL_MODE_MISSING
+          echo "KALICI_SIL_GATE_REMOTE_WORKER_PARITY=YES"
+
+          # The deployed bundle (what the worker executes) must carry exactly the
+          # 099 bytes of this ref. Checksum only; bundle content is never printed.
+          target_checksum="$(sha256sum "api/migrations/${TARGET_MIGRATION}" | cut -d' ' -f1)"
+          grep -q "'checksum' => '${target_checksum}'" "${WORK}/remote-bundle.php" || block BUNDLE_099_CHECKSUM_MISMATCH
+          echo "KALICI_SIL_TARGET_CHECKSUM=${target_checksum}"
+
+          # Busy guard. `cls -1` may list full remote paths or bare names (and CRLF
+          # line ends); both forms must match. A listed status.json that cannot be
+          # read or parsed fails closed: an unknown worker state is never "idle".
+          listing="${WORK}/control-listing.txt"
+          sed -i 's/\r$//' "$listing"
+          if grep -Eq '(^|/)request\.pending\.' "$listing"; then block MIGRATION_CONTROL_PLANE_BUSY; fi
+          if grep -Eq '(^|/)request\.processing\.' "$listing"; then block STALE_PROCESSING_REQUEST; fi
+          if grep -Eq '(^|/)status\.json$' "$listing"; then
+            if ! run_cpanel_ftp "get api/runtime/migration-control/status.json -o ${WORK}/status-before.json;" >/dev/null 2>&1; then
+              block WORKER_STATUS_UNREADABLE
+            fi
+            status_state="$(jq -er '.state | select(type == "string")' "${WORK}/status-before.json" 2>/dev/null || echo UNREADABLE)"
+            case "$status_state" in
+              SUCCEEDED|FAILED) ;;
+              RUNNING) block WORKER_BUSY ;;
+              *) block WORKER_STATUS_UNREADABLE ;;
+            esac
+          fi
+          echo "KALICI_SIL_GATE_WORKER_IDLE=YES"
+
+          request_dir="$WORK/request"
+          mkdir -p "$request_dir"
+          jq -n \
+            --arg request_id "$REQUEST_ID" \
+            --arg deployed_sha "$expected_sha" \
+            --arg requested_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --argjson ilker "$PROTECTED_ILKER_USER_ID" \
+            --argjson serhan "$PROTECTED_SERHAN_USER_ID" \
+            '{schema_version: 1, request_id: $request_id, deployed_sha: $deployed_sha, requested_at: $requested_at, mode: "KALICI_SIL_MIGRATION_PREFLIGHT", protected_ilker_user_id: $ilker, protected_serhan_user_id: $serhan}' \
+            > "$request_dir/request.${REQUEST_ID}.tmp"
+
+          run_cpanel_ftp "
+            lcd ${request_dir};
+            put -O api/runtime/migration-control request.${REQUEST_ID}.tmp;
+            mv api/runtime/migration-control/request.${REQUEST_ID}.tmp api/runtime/migration-control/request.pending.${REQUEST_ID}.json;
+          "
+          echo "KALICI_SIL_PREFLIGHT_REQUEST_ID=${REQUEST_ID}"
+
+          status_file="$WORK/poll-status.json"
+          deadline="$(( $(date +%s) + TOTAL_POLL_WINDOW_SECONDS ))"
+          worker_state="NONE"
+          for _ in $(seq 1 "$POLL_ATTEMPTS"); do
+            rm -f "$status_file"
+            if run_cpanel_ftp "get api/runtime/migration-control/status.json -o ${status_file};" >/dev/null 2>&1; then
+              if [[ "$(jq -r '.request_id // empty' "$status_file" 2>/dev/null || true)" == "$REQUEST_ID" ]]; then
+                worker_state="$(jq -r '.state // "NONE"' "$status_file" 2>/dev/null || echo NONE)"
+                if [[ "$worker_state" == "SUCCEEDED" || "$worker_state" == "FAILED" ]]; then
+                  break
+                fi
+              fi
+            fi
+            if (( $(date +%s) >= deadline )); then
+              break
+            fi
+            sleep "$POLL_INTERVAL_SECONDS"
+          done
+
+          echo "KALICI_SIL_PREFLIGHT_WORKER_STATE=${worker_state}"
+          if [[ "$worker_state" == "FAILED" ]]; then
+            reason="$(jq -r 'if (.reason | type) == "string" and (.reason | test("^[A-Z0-9_]+$")) then .reason else "UNKNOWN_PREFLIGHT_FAILURE" end' "$status_file" 2>/dev/null || echo UNKNOWN_PREFLIGHT_FAILURE)"
+            block "$reason"
+          fi
+          [[ "$worker_state" == "SUCCEEDED" ]] || block WAITING_FOR_CRON_TICK
+
+          report="$WORK/kalici-sil-migration-preflight.json"
+          run_cpanel_ftp "get api/runtime/migration-control/kalici-sil-migration-preflight.json -o ${report};" >/dev/null 2>&1 \
+            || block PREFLIGHT_REPORT_UNREADABLE
+          [[ "$(jq -r '.request_id // empty' "$report" 2>/dev/null || true)" == "$REQUEST_ID" ]] || block PREFLIGHT_REPORT_REQUEST_MISMATCH
+
+          # Bounded, allowlisted output: ids, versions, counts and reason codes only.
+          emit_scalar() {
+            local label="$1" filter="$2" pattern="$3" value
+            value="$(jq -r "${filter} | if . == null then \"NONE\" else tostring end" "$report" 2>/dev/null || echo NONE)"
+            [[ "$value" =~ $pattern ]] || value="NONE"
+            echo "${label}=${value}"
+          }
+          emit_list() {
+            local label="$1" filter="$2" value
+            value="$(jq -r "[${filter}[]? | tostring] | join(\",\")" "$report" 2>/dev/null || echo "")"
+            [[ "$value" =~ ^[A-Za-z0-9_,.-]{0,512}$ ]] || value="UNPRINTABLE"
+            echo "${label}=${value:-NONE}"
+          }
+          emit_scalar KALICI_SIL_PREFLIGHT_GENERATED_AT '.generated_at' '^[0-9TZ:.+-]{1,64}$'
+          emit_scalar KALICI_SIL_PREFLIGHT_DEPLOY_SHA '.deployed_sha' '^[0-9a-f]{40}$'
+          emit_scalar KALICI_SIL_MIGRATION_VERSION '.migration_version' '^[0-9]{3}$'
+          emit_scalar KALICI_SIL_PROD_TIP '.ledger.applied_tip' '^[0-9]{3}$'
+          emit_list KALICI_SIL_PENDING_VERSIONS '.ledger.pending_versions'
+          emit_scalar KALICI_SIL_PROTECTED_ILKER_ID '.protected_ids.ilker_id' '^[0-9]{1,10}$'
+          emit_scalar KALICI_SIL_PROTECTED_SERHAN_ID '.protected_ids.serhan_id' '^[0-9]{1,10}$'
+          emit_scalar KALICI_SIL_PROTECTED_DISTINCT '.protected_ids.distinct' '^(true|false)$'
+          emit_scalar KALICI_SIL_ORPHAN_TOTAL '[.orphans[]? // 0] | add' '^[0-9]{1,12}$'
+          emit_scalar KALICI_SIL_ORPHAN_COLUMNS_CHECKED '.orphans | length' '^[0-9]{1,3}$'
+          emit_scalar KALICI_SIL_PARTIAL_STATE_PRESENT '.partial_state.present' '^(true|false)$'
+          emit_list KALICI_SIL_PARTIAL_FK_CONSTRAINTS '.partial_state.fk_constraints'
+          emit_list KALICI_SIL_PREFLIGHT_BLOCKERS '.blockers'
+          emit_scalar KALICI_SIL_PREFLIGHT_RESULT '.result' '^(PASS|BLOCKED)$'
+          # The APPLY workflow pins this digest so it can only follow this exact report.
+          echo "KALICI_SIL_PREFLIGHT_REPORT_SHA256=$(sha256sum "$report" | cut -d' ' -f1)"
+
+          if [[ "$(jq -r '.result // "BLOCKED"' "$report" 2>/dev/null || echo BLOCKED)" != "PASS" ]]; then
+            echo "KALICI_SIL_APPLY_READY=NO"
+            exit 1
+          fi
+          echo "KALICI_SIL_APPLY_READY=YES"

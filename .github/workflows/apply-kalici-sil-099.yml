@@ -1,0 +1,359 @@
+name: Apply 099 kalici sil migration (protected accounts)
+
+# ONE-TIME, 099-ONLY mutation owner. Deliberately separate from both
+# `Apply cPanel migrations` (its APPLY mode cannot carry the two protected ids,
+# so 099 would fail closed there) and from the read-only diagnostics workflow,
+# so PREFLIGHT and APPLY are authorized by different dispatches, different
+# confirmations and a protected GitHub environment.
+#
+# The request reaches cpanel-migration-cron.php mode KALICI_SIL_MIGRATION_APPLY,
+# which re-runs the 099 gate, writes a verified backup, applies only 099 on the
+# same PDO session that carries the two ids, and runs the 099 postcheck.
+
+on:
+  workflow_dispatch:
+    inputs:
+      deployed_sha:
+        description: Exact deployed commit SHA (must equal the workflow ref)
+        required: true
+        type: string
+      protected_ilker_user_id:
+        description: Operator-verified users.id (must equal the PASS preflight)
+        required: true
+        type: string
+      protected_serhan_user_id:
+        description: Operator-verified users.id (must equal the PASS preflight)
+        required: true
+        type: string
+      preflight_request_id:
+        description: KALICI_SIL_PREFLIGHT_REQUEST_ID printed by the PASS preflight run
+        required: true
+        type: string
+      preflight_report_sha256:
+        description: KALICI_SIL_PREFLIGHT_REPORT_SHA256 printed by the PASS preflight run
+        required: true
+        type: string
+      confirmation:
+        description: Type APPLY_099_KALICI_SIL to authorize this one-time request
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cpanel-canonical-migration-control
+  cancel-in-progress: false
+
+jobs:
+  # GitHub silently auto-creates a missing environment WITHOUT protection the
+  # first time a job references it. This job runs before the environment job,
+  # carries no FTP secret, and fails closed unless the environment already
+  # exists with at least one required reviewer and a deployment branch policy.
+  environment-gate:
+    name: Verify protected environment and inputs
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      APPLY_ENVIRONMENT: kalici-sil-099-apply
+      DEPLOYED_SHA: ${{ inputs.deployed_sha }}
+      PROTECTED_ILKER_USER_ID: ${{ inputs.protected_ilker_user_id }}
+      PROTECTED_SERHAN_USER_ID: ${{ inputs.protected_serhan_user_id }}
+      PREFLIGHT_REQUEST_ID: ${{ inputs.preflight_request_id }}
+      PREFLIGHT_REPORT_SHA256: ${{ inputs.preflight_report_sha256 }}
+      CONFIRMATION: ${{ inputs.confirmation }}
+    steps:
+      - name: Validate explicit request
+        run: |
+          set -euo pipefail
+          test "$CONFIRMATION" = "APPLY_099_KALICI_SIL" || { echo "KALICI_SIL_APPLY_GATE_REASON=CONFIRMATION_INVALID"; exit 1; }
+          [[ "$DEPLOYED_SHA" =~ ^[0-9a-fA-F]{40}$ ]] || { echo "KALICI_SIL_APPLY_GATE_REASON=DEPLOYED_SHA_INPUT_INVALID"; exit 1; }
+          [[ "$PROTECTED_ILKER_USER_ID" =~ ^[1-9][0-9]{0,9}$ ]] || { echo "KALICI_SIL_APPLY_GATE_REASON=PROTECTED_ID_INPUT_INVALID"; exit 1; }
+          [[ "$PROTECTED_SERHAN_USER_ID" =~ ^[1-9][0-9]{0,9}$ ]] || { echo "KALICI_SIL_APPLY_GATE_REASON=PROTECTED_ID_INPUT_INVALID"; exit 1; }
+          [[ "$PROTECTED_ILKER_USER_ID" != "$PROTECTED_SERHAN_USER_ID" ]] || { echo "KALICI_SIL_APPLY_GATE_REASON=PROTECTED_IDS_NOT_DISTINCT"; exit 1; }
+          [[ "$PREFLIGHT_REQUEST_ID" =~ ^kalici-preflight-[0-9]+-[0-9]+$ ]] || { echo "KALICI_SIL_APPLY_GATE_REASON=PREFLIGHT_REQUEST_ID_INPUT_INVALID"; exit 1; }
+          [[ "$PREFLIGHT_REPORT_SHA256" =~ ^[0-9a-f]{64}$ ]] || { echo "KALICI_SIL_APPLY_GATE_REASON=PREFLIGHT_REPORT_SHA256_INPUT_INVALID"; exit 1; }
+          echo "KALICI_SIL_APPLY_INPUTS=VALID"
+
+      - name: Require protected apply environment
+        run: |
+          set -euo pipefail
+          block() {
+            echo "KALICI_SIL_ENVIRONMENT_GATE_RESULT=BLOCKED"
+            echo "KALICI_SIL_ENVIRONMENT_GATE_REASON=$1"
+            exit 1
+          }
+          [[ "${GITHUB_REF:-}" == "refs/heads/main" ]] || block WORKFLOW_REF_NOT_MAIN
+
+          env_json="$RUNNER_TEMP/apply-environment.json"
+          # Read-only GET. A token that cannot read the environment, a missing
+          # environment and an unprotected environment all fail closed alike.
+          if ! gh api "repos/${GITHUB_REPOSITORY}/environments/${APPLY_ENVIRONMENT}" > "$env_json" 2>/dev/null; then
+            block ENVIRONMENT_MISSING_OR_UNREADABLE
+          fi
+          [[ "$(jq -r '.name // ""' "$env_json" 2>/dev/null || true)" == "$APPLY_ENVIRONMENT" ]] || block ENVIRONMENT_MISSING_OR_UNREADABLE
+          reviewers="$(jq -r '[.protection_rules[]? | select(.type == "required_reviewers") | (.reviewers // []) | length] | max // 0' "$env_json" 2>/dev/null || echo 0)"
+          [[ "$reviewers" =~ ^[0-9]+$ ]] || reviewers=0
+          echo "KALICI_SIL_ENVIRONMENT_REQUIRED_REVIEWERS=${reviewers}"
+          (( reviewers >= 1 )) || block ENVIRONMENT_REQUIRED_REVIEWERS_MISSING
+          branch_policy="$(jq -c '.deployment_branch_policy' "$env_json" 2>/dev/null || echo null)"
+          [[ -n "$branch_policy" && "$branch_policy" != "null" ]] || block ENVIRONMENT_BRANCH_POLICY_MISSING
+          prevent_self_review="$(jq -r '[.protection_rules[]? | select(.type == "required_reviewers") | .prevent_self_review] | if length == 0 then "UNKNOWN" else (.[0] | tostring) end' "$env_json" 2>/dev/null || echo UNKNOWN)"
+          echo "KALICI_SIL_ENVIRONMENT_PREVENT_SELF_REVIEW=${prevent_self_review}"
+          echo "KALICI_SIL_ENVIRONMENT_GATE_RESULT=PASS"
+
+  request:
+    name: Request 099 KALICI_SIL apply
+    needs: environment-gate
+    runs-on: ubuntu-latest
+    # Protected by the environment-gate job above: it must exist with a required
+    # reviewer before this job may even be scheduled.
+    environment: kalici-sil-099-apply
+    timeout-minutes: 35
+    permissions:
+      contents: read
+    env:
+      FTP_SERVER: ${{ secrets.FTP_SERVER }}
+      FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+      FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+      FTP_PORT: ${{ secrets.FTP_PORT }}
+      DEPLOYED_SHA: ${{ inputs.deployed_sha }}
+      PROTECTED_ILKER_USER_ID: ${{ inputs.protected_ilker_user_id }}
+      PROTECTED_SERHAN_USER_ID: ${{ inputs.protected_serhan_user_id }}
+      PREFLIGHT_REQUEST_ID: ${{ inputs.preflight_request_id }}
+      PREFLIGHT_REPORT_SHA256: ${{ inputs.preflight_report_sha256 }}
+      CONFIRMATION: ${{ inputs.confirmation }}
+      TARGET_MIGRATION: 099_user_kalici_silme_auditleri.sql
+      REQUEST_ID: kalici-apply-${{ github.run_id }}-${{ github.run_attempt }}
+      MAX_PREFLIGHT_AGE_SECONDS: "21600"
+      MAX_HEARTBEAT_AGE_SECONDS: "1800"
+      POLL_ATTEMPTS: "151"
+      POLL_INTERVAL_SECONDS: "10"
+      TOTAL_POLL_WINDOW_SECONDS: "1500"
+    steps:
+      - name: Validate explicit request
+        run: |
+          set -euo pipefail
+          test "$CONFIRMATION" = "APPLY_099_KALICI_SIL" || { echo "Explicit 099 confirmation is required."; exit 1; }
+          [[ "$DEPLOYED_SHA" =~ ^[0-9a-fA-F]{40}$ ]] || { echo "deployed_sha must be a full SHA."; exit 1; }
+          [[ "$PROTECTED_ILKER_USER_ID" =~ ^[1-9][0-9]{0,9}$ ]] || { echo "protected_ilker_user_id invalid."; exit 1; }
+          [[ "$PROTECTED_SERHAN_USER_ID" =~ ^[1-9][0-9]{0,9}$ ]] || { echo "protected_serhan_user_id invalid."; exit 1; }
+          [[ "$PROTECTED_ILKER_USER_ID" != "$PROTECTED_SERHAN_USER_ID" ]] || { echo "Protected ids must be distinct."; exit 1; }
+          [[ "$PREFLIGHT_REQUEST_ID" =~ ^kalici-preflight-[0-9]+-[0-9]+$ ]] || { echo "preflight_request_id invalid."; exit 1; }
+          [[ "$PREFLIGHT_REPORT_SHA256" =~ ^[0-9a-f]{64}$ ]] || { echo "preflight_report_sha256 invalid."; exit 1; }
+          test -n "$FTP_SERVER" || (echo "FTP_SERVER secret is missing." && exit 1)
+          test -n "$FTP_USERNAME" || (echo "FTP_USERNAME secret is missing." && exit 1)
+          test -n "$FTP_PASSWORD" || (echo "FTP_PASSWORD secret is missing." && exit 1)
+          test "$FTP_PORT" = "21" || (echo "FTP_PORT must be 21 for this cPanel FTP deploy." && exit 1)
+
+      - name: Install FTP client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lftp
+
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Gate, upload one request, wait, verify postcheck
+        run: |
+          set -euo pipefail
+
+          run_cpanel_plain_ftp() {
+            local ftp_commands="$1"
+
+            echo "Deploy transport mode: plain-ftp"
+            lftp -u "${FTP_USERNAME}","${FTP_PASSWORD}" -p "${FTP_PORT}" "ftp://${FTP_SERVER}" -e "
+              set cmd:fail-exit true;
+              set net:max-retries 2;
+              set net:timeout 20;
+              set net:reconnect-interval-base 5;
+              set net:reconnect-interval-max 10;
+              set xfer:clobber true;
+              set ssl:verify-certificate no;
+              set ssl:check-hostname no;
+              set ftp:passive-mode on;
+              set ftp:ssl-allow false;
+              set ftp:ssl-force false;
+              set ftp:ssl-protect-data false;
+              ${ftp_commands}
+              bye
+            "
+          }
+
+          run_cpanel_ftp() {
+            run_cpanel_plain_ftp "$1"
+          }
+
+          block() {
+            echo "KALICI_SIL_APPLY_GATE_RESULT=BLOCKED"
+            echo "KALICI_SIL_APPLY_GATE_REASON=$1"
+            exit 1
+          }
+
+          source "$GITHUB_WORKSPACE/scripts/deploy/cpanel-ftp-directory-lib.sh"
+
+          WORK="$RUNNER_TEMP/kalici-sil-apply"
+          rm -rf "$WORK"
+          mkdir -p "$WORK"
+          expected_sha="$(echo "$DEPLOYED_SHA" | tr '[:upper:]' '[:lower:]')"
+
+          # ---------------- Gate (nothing is written before this passes) ----------------
+          [[ "$(git rev-parse HEAD)" == "$expected_sha" ]] || block WORKFLOW_REF_NOT_DEPLOYED_SHA
+          test -f "api/migrations/${TARGET_MIGRATION}" || block TARGET_MIGRATION_NOT_IN_REF
+
+          if ! ensure_cpanel_remote_directory "api/runtime/migration-control"; then
+            block CONTROL_PLANE_UNREACHABLE
+          fi
+          if ! run_cpanel_ftp "
+            cls -1 api/runtime/migration-control > ${WORK}/control-listing.txt;
+            get api/.deploy-sha -o ${WORK}/deploy-sha.txt;
+            get api/bin/cpanel-migration-cron.php -o ${WORK}/remote-worker.php;
+            get api/runtime-build/canonical-migrations.php -o ${WORK}/remote-bundle.php;
+            get api/runtime/migration-control/worker-heartbeat.json -o ${WORK}/heartbeat.json;
+            get api/runtime/migration-control/kalici-sil-migration-preflight.json -o ${WORK}/preflight.json;
+          " >/dev/null 2>&1; then
+            block CONTROL_PLANE_EVIDENCE_UNREADABLE
+          fi
+
+          remote_sha="$(tr -d '\r\n' < "${WORK}/deploy-sha.txt" | tr '[:upper:]' '[:lower:]')"
+          [[ "$remote_sha" == "$expected_sha" ]] || block DEPLOY_SHA_MISMATCH
+          heartbeat_sha="$(jq -r '.deployed_sha // "NONE"' "${WORK}/heartbeat.json" 2>/dev/null || echo NONE)"
+          [[ "$heartbeat_sha" == "$expected_sha" ]] || block HEARTBEAT_DEPLOY_SHA_MISMATCH
+          heartbeat_epoch="$(date -u -d "$(jq -r '.updated_at // "NONE"' "${WORK}/heartbeat.json" 2>/dev/null || echo NONE)" +%s 2>/dev/null || echo 0)"
+          (( heartbeat_epoch > 0 && $(date -u +%s) - heartbeat_epoch <= MAX_HEARTBEAT_AGE_SECONDS )) || block HEARTBEAT_STALE
+
+          local_worker_sha="$(sha256sum api/bin/cpanel-migration-cron.php | cut -d' ' -f1)"
+          remote_worker_sha="$(sha256sum "${WORK}/remote-worker.php" | cut -d' ' -f1)"
+          [[ "$local_worker_sha" == "$remote_worker_sha" ]] || block REMOTE_WORKER_PARITY_MISMATCH
+          grep -q 'KALICI_SIL_MIGRATION_BACKUP' "${WORK}/remote-worker.php" || block WORKER_BACKUP_STAGE_MISSING
+          target_checksum="$(sha256sum "api/migrations/${TARGET_MIGRATION}" | cut -d' ' -f1)"
+          grep -q "'checksum' => '${target_checksum}'" "${WORK}/remote-bundle.php" || block BUNDLE_099_CHECKSUM_MISMATCH
+          echo "KALICI_SIL_TARGET_CHECKSUM=${target_checksum}"
+
+          # Control plane idle, and no earlier 099 apply ever attempted: a failed or
+          # interrupted round is reconciled by hand, never blind-retried.
+          # Busy guard. `cls -1` may list full remote paths or bare names (and CRLF
+          # line ends); both forms must match. A listed status.json that cannot be
+          # read or parsed fails closed: an unknown worker state is never "idle".
+          listing="${WORK}/control-listing.txt"
+          sed -i 's/\r$//' "$listing"
+          if grep -Eq '(^|/)request\.pending\.' "$listing"; then block MIGRATION_CONTROL_PLANE_BUSY; fi
+          if grep -Eq '(^|/)request\.processing\.' "$listing"; then block STALE_PROCESSING_REQUEST; fi
+          if grep -q 'kalici-apply-' "$listing"; then block KALICI_SIL_APPLY_ALREADY_ATTEMPTED; fi
+          if grep -Eq '(^|/)status\.json$' "$listing"; then
+            if ! run_cpanel_ftp "get api/runtime/migration-control/status.json -o ${WORK}/status-before.json;" >/dev/null 2>&1; then
+              block WORKER_STATUS_UNREADABLE
+            fi
+            status_state="$(jq -er '.state | select(type == "string")' "${WORK}/status-before.json" 2>/dev/null || echo UNREADABLE)"
+            case "$status_state" in
+              SUCCEEDED|FAILED) ;;
+              RUNNING) block WORKER_BUSY ;;
+              *) block WORKER_STATUS_UNREADABLE ;;
+            esac
+          fi
+          echo "KALICI_SIL_GATE_WORKER_IDLE=YES"
+
+          # Bind to the exact PASS preflight report the operator reviewed.
+          pf="${WORK}/preflight.json"
+          [[ "$(sha256sum "$pf" | cut -d' ' -f1)" == "$PREFLIGHT_REPORT_SHA256" ]] || block PREFLIGHT_REPORT_DIGEST_MISMATCH
+          [[ "$(jq -r '.request_id // ""' "$pf")" == "$PREFLIGHT_REQUEST_ID" ]] || block PREFLIGHT_REQUEST_ID_MISMATCH
+          [[ "$(jq -r '.result // ""' "$pf")" == "PASS" ]] || block PREFLIGHT_NOT_PASS
+          [[ "$(jq -r '.deployed_sha // ""' "$pf")" == "$expected_sha" ]] || block PREFLIGHT_SHA_MISMATCH
+          [[ "$(jq -r '.migration_version // ""' "$pf")" == "099" ]] || block PREFLIGHT_TARGET_MISMATCH
+          [[ "$(jq -r '.ledger.applied_tip // ""' "$pf")" == "098" ]] || block PREFLIGHT_TIP_NOT_098
+          [[ "$(jq -c '.ledger.pending_versions // []' "$pf")" == '["099"]' ]] || block PREFLIGHT_PENDING_NOT_ONLY_099
+          [[ "$(jq -r '.protected_ids.ilker_id // ""' "$pf")" == "$PROTECTED_ILKER_USER_ID" ]] || block PROTECTED_ILKER_ID_MISMATCH
+          [[ "$(jq -r '.protected_ids.serhan_id // ""' "$pf")" == "$PROTECTED_SERHAN_USER_ID" ]] || block PROTECTED_SERHAN_ID_MISMATCH
+          [[ "$(jq -r '.partial_state.present' "$pf")" == "false" ]] || block PARTIAL_STATE_PRESENT
+          [[ "$(jq -r '[.blockers[]?] | length' "$pf")" == "0" ]] || block PREFLIGHT_BLOCKERS_PRESENT
+          pf_epoch="$(date -u -d "$(jq -r '.generated_at // "NONE"' "$pf")" +%s 2>/dev/null || echo 0)"
+          (( pf_epoch > 0 && $(date -u +%s) - pf_epoch <= MAX_PREFLIGHT_AGE_SECONDS )) || block PREFLIGHT_STALE
+          echo "KALICI_SIL_APPLY_GATE_RESULT=PASS"
+
+          # ---------------- One atomic request ----------------
+          request_dir="$WORK/request"
+          mkdir -p "$request_dir"
+          jq -n \
+            --arg request_id "$REQUEST_ID" \
+            --arg deployed_sha "$expected_sha" \
+            --arg requested_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --argjson ilker "$PROTECTED_ILKER_USER_ID" \
+            --argjson serhan "$PROTECTED_SERHAN_USER_ID" \
+            '{schema_version: 1, request_id: $request_id, deployed_sha: $deployed_sha, requested_at: $requested_at, mode: "KALICI_SIL_MIGRATION_APPLY", target_version: "099", protected_ilker_user_id: $ilker, protected_serhan_user_id: $serhan}' \
+            > "$request_dir/request.${REQUEST_ID}.tmp"
+          run_cpanel_ftp "
+            lcd ${request_dir};
+            put -O api/runtime/migration-control request.${REQUEST_ID}.tmp;
+            mv api/runtime/migration-control/request.${REQUEST_ID}.tmp api/runtime/migration-control/request.pending.${REQUEST_ID}.json;
+          "
+          echo "KALICI_SIL_APPLY_REQUEST_ID=${REQUEST_ID}"
+
+          # ---------------- Wait (never re-queues, never retries) ----------------
+          status_file="$WORK/status.json"
+          deadline="$(( $(date +%s) + TOTAL_POLL_WINDOW_SECONDS ))"
+          state="NONE"
+          for _ in $(seq 1 "$POLL_ATTEMPTS"); do
+            rm -f "$status_file"
+            if run_cpanel_ftp "get api/runtime/migration-control/status.json -o ${status_file};" >/dev/null 2>&1; then
+              if [[ "$(jq -r '.request_id // empty' "$status_file" 2>/dev/null || true)" == "$REQUEST_ID" ]]; then
+                state="$(jq -r '.state // "NONE"' "$status_file" 2>/dev/null || echo NONE)"
+                if [[ "$state" == "SUCCEEDED" || "$state" == "FAILED" ]]; then
+                  break
+                fi
+              fi
+            fi
+            if (( $(date +%s) >= deadline )); then
+              break
+            fi
+            sleep "$POLL_INTERVAL_SECONDS"
+          done
+          echo "KALICI_SIL_APPLY_WORKER_STATE=${state}"
+
+          if [[ "$state" == "FAILED" ]]; then
+            reason="$(jq -r 'if (.reason | type) == "string" and (.reason | test("^[A-Z0-9_]+$")) then .reason else "UNKNOWN" end' "$status_file" 2>/dev/null || echo UNKNOWN)"
+            stage="$(jq -r 'if (.stage | type) == "string" and (.stage | test("^[A-Z0-9_]+$")) then .stage else "UNKNOWN" end' "$status_file" 2>/dev/null || echo UNKNOWN)"
+            echo "KALICI_SIL_APPLY_REASON=${reason}"
+            echo "KALICI_SIL_APPLY_STAGE=${stage}"
+            echo "KALICI_SIL_APPLY_RESULT=FAILED"
+            echo "KALICI_SIL_NEXT_STEP=DO_NOT_RETRY_RUN_KALICI_SIL_MIGRATION_PREFLIGHT_READ_ONLY_AND_RECONCILE_MANUALLY"
+            exit 1
+          fi
+          if [[ "$state" != "SUCCEEDED" ]]; then
+            echo "KALICI_SIL_APPLY_RESULT=UNKNOWN_TIMEOUT"
+            echo "KALICI_SIL_NEXT_STEP=DO_NOT_RETRY_OBSERVE_WITH_READONLY_WORKER_DIAGNOSTICS"
+            exit 1
+          fi
+
+          # ---------------- Success must be proven, not assumed ----------------
+          ok="YES"
+          [[ "$(jq -r '.mode // ""' "$status_file")" == "KALICI_SIL_MIGRATION_APPLY" ]] || ok="NO"
+          [[ "$(jq -r '.target_version // ""' "$status_file")" == "099" ]] || ok="NO"
+          [[ "$(jq -r '.kalici_sil_migration_applied_versions // ""' "$status_file")" == "099" ]] || ok="NO"
+          [[ "$(jq -r '.kalici_sil_migration_postcheck_result // ""' "$status_file")" == "PASS" ]] || ok="NO"
+          [[ "$(jq -r '.backup_readback // ""' "$status_file")" == "VERIFIED" ]] || ok="NO"
+          [[ "$(jq -r '.backup_sha256 // ""' "$status_file")" =~ ^[0-9a-f]{64}$ ]] || ok="NO"
+          echo "KALICI_SIL_BACKUP_FILE=$(jq -r 'if (.backup_file|type)=="string" and (.backup_file|test("^[A-Za-z0-9._-]{1,160}$")) then .backup_file else "NONE" end' "$status_file")"
+          echo "KALICI_SIL_BACKUP_SHA256=$(jq -r '.backup_sha256 // "NONE"' "$status_file")"
+          echo "KALICI_SIL_BACKUP_READBACK=$(jq -r '.backup_readback // "NONE"' "$status_file")"
+
+          post="$WORK/postcheck.json"
+          if run_cpanel_ftp "get api/runtime/migration-control/kalici-sil-migration-postcheck.json -o ${post};" >/dev/null 2>&1; then
+            [[ "$(jq -r '.request_id // ""' "$post")" == "$REQUEST_ID" ]] || ok="NO"
+            [[ "$(jq -r '.result // ""' "$post")" == "PASS" ]] || ok="NO"
+            [[ "$(jq -r '[.fk_missing[]?] | length' "$post")" == "0" ]] || ok="NO"
+            [[ "$(jq -r '[.unexpected_deltas[]?] | length' "$post")" == "0" ]] || ok="NO"
+            echo "KALICI_SIL_POSTCHECK_RESULT=$(jq -r 'if (.result | type) == "string" and (.result | test("^[A-Z]{1,16}$")) then .result else "NONE" end' "$post" 2>/dev/null || echo NONE)"
+          else
+            ok="NO"
+            echo "KALICI_SIL_POSTCHECK_RESULT=UNREADABLE"
+          fi
+
+          if [[ "$ok" != "YES" ]]; then
+            echo "KALICI_SIL_APPLY_RESULT=UNPROVEN"
+            exit 1
+          fi
+          echo "KALICI_SIL_APPLY_RESULT=PASS"

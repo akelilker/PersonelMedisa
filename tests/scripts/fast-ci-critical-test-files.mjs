@@ -32,5 +32,10 @@ export const fastCiCriticalTestFiles = [
 
   // 5) Kimlik / oturum kontratı (giriş-çıkış köprüsü).
   "tests/unit/auth.api.test.ts",
-  "tests/unit/personeller.api.test.ts"
+  "tests/unit/personeller.api.test.ts",
+
+  // 6) Canlı DB mutasyon kapısı — 099 Kalıcı Sil PREFLIGHT/APPLY workflow gate'leri
+  //    meşgul/okunamayan worker, korumasız environment ve eşleşmeyen preflight'ta
+  //    sunucuya istek dosyası bırakmadan durmalı.
+  "tests/unit/kalici-sil-099-workflows.test.ts"
 ];

@@ -46,12 +46,16 @@ describe("kullanıcı kalıcı sil 099 migration owner: preflight + apply + reco
       "the 099 dump on disk hashes to the published digest",
       "the 099 dump carries user rows",
       "the 099 dump does not copy ek_odeme_kesinti rows (schema-only)",
+      "the 099 dump never drops the schema-only table offline_mutation_idempotency",
+      "the 099 dump carries the row-safe FK rollback for offline_mutation_idempotency",
       "the 099 backup preimage apply succeeds",
       "099 added the protected-account flag before restore",
       "restoring the 099 backup removes the protected-account flag",
       "restoring the 099 backup removes every fk_p099_* constraint",
       "restoring the 099 backup removes the 099 ledger row",
       "restoring the 099 backup returns the verified users",
+      "restoring the 099 backup preserves the offline_mutation_idempotency row",
+      "restoring the 099 backup keeps the retention_imha_auditleri table",
       "verify-kullanici-kalici-sil-migration-mysql: OK",
     ]) {
       expect(stdout, marker).toContain(marker);

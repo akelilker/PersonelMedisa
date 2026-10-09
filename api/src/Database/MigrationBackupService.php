@@ -114,6 +114,27 @@ final class MigrationBackupService
         'retention_imha_auditleri',
     ];
 
+    /**
+     * The exact FK constraint names migration 099 adds, keyed by table. A 099
+     * rollback drops only these (metadata), so the schema-only tables keep their
+     * rows. Restoring them via DROP/CREATE would destroy those rows, which is
+     * why this owner never emits a table drop for them.
+     *
+     * @var array<string, list<string>>
+     */
+    private const KALICI_SIL_FK_CONSTRAINTS = [
+        'ek_odeme_kesinti' => ['fk_p099_eok_created_by', 'fk_p099_eok_updated_by'],
+        'gunluk_bildirimler' => ['fk_p099_gb_created_by', 'fk_p099_gb_updated_by', 'fk_p099_gb_correction_requested_by'],
+        'legal_holdlar' => ['fk_p099_lh_released_by'],
+        'legal_hold_auditleri' => ['fk_p099_lha_actor_user'],
+        'offline_mutation_idempotency' => ['fk_p099_omi_actor_user'],
+        'personel_gecici_gorevlendirmeler' => ['fk_p099_pgg_olusturan_user', 'fk_p099_pgg_sonlandiran_user'],
+        'personel_import_runs' => ['fk_p099_pir_actor'],
+        'personel_test_fixture_archive_kayitlari' => ['fk_p099_ptfak_archived'],
+        'personel_test_fixture_siniflandirmalari' => ['fk_p099_ptfs_classified', 'fk_p099_ptfs_iptal'],
+        'retention_imha_auditleri' => ['fk_p099_ria_actor'],
+    ];
+
     private const DIRECTORY_NAME = 'medisa-migration-backups';
 
     /**
@@ -368,28 +389,49 @@ final class MigrationBackupService
         $rowCounts = [];
         $schemaOnly = [];
 
+        // Row-safe 099 FK rollback runs before any table is dropped: it removes
+        // only the fk_p099_* constraints, never a table, so the schema-only
+        // tables keep their rows.
+        if (array_intersect($tables, $schemaOnlyTables) !== []) {
+            $lines[] = '-- 099 FK rollback (metadata only: drops fk_p099_* constraints, keeps rows).';
+            foreach (self::KALICI_SIL_FK_CONSTRAINTS as $constraintTable => $constraints) {
+                foreach ($constraints as $constraint) {
+                    $lines[] = 'ALTER TABLE `' . $constraintTable . '` DROP FOREIGN KEY `' . $constraint . '`;';
+                }
+            }
+            $lines[] = '';
+        }
+
         foreach ($tables as $table) {
             $createStatement = self::showCreate($pdo, $table);
             if ($createStatement === null) {
                 throw new RuntimeException('BACKUP_SOURCE_INCOMPLETE');
             }
             $isSchemaOnly = in_array($table, $schemaOnlyTables, true);
-            $lines[] = '-- table: ' . $table . ($isSchemaOnly ? ' (schema-only)' : '');
-            $lines[] = 'DROP TABLE IF EXISTS `' . $table . '`;';
-            $lines[] = $createStatement . ';';
-
             if ($isSchemaOnly) {
                 $schemaOnly[] = $table;
                 $rowCounts[$table] = null;
-                $lines[] = '-- schema-only(' . $table . '): 1';
-            } else {
-                $rows = $pdo->query('SELECT * FROM `' . $table . '`')->fetchAll(PDO::FETCH_ASSOC);
-                foreach ($rows as $row) {
-                    $lines[] = self::renderInsert($pdo, $table, $row);
+                $lines[] = '-- table: ' . $table . ' (schema-only: rows preserved on restore)';
+                foreach (preg_split('/\R/', $createStatement) ?: [] as $schemaLine) {
+                    if ($schemaLine !== '') {
+                        $lines[] = '-- ' . $schemaLine;
+                    }
                 }
-                $rowCounts[$table] = count($rows);
-                $lines[] = '-- rows(' . $table . '): ' . count($rows);
+                $lines[] = '-- schema-only(' . $table . '): 1';
+                $lines[] = '';
+                continue;
             }
+
+            $lines[] = '-- table: ' . $table;
+            $lines[] = 'DROP TABLE IF EXISTS `' . $table . '`;';
+            $lines[] = $createStatement . ';';
+
+            $rows = $pdo->query('SELECT * FROM `' . $table . '`')->fetchAll(PDO::FETCH_ASSOC);
+            foreach ($rows as $row) {
+                $lines[] = self::renderInsert($pdo, $table, $row);
+            }
+            $rowCounts[$table] = count($rows);
+            $lines[] = '-- rows(' . $table . '): ' . count($rows);
             $lines[] = '';
         }
 
@@ -506,13 +548,21 @@ final class MigrationBackupService
             throw new RuntimeException('BACKUP_CHECKSUM_MISMATCH');
         }
         foreach ($dump['tables'] as $table) {
+            if (in_array($table, $dump['schema_only_tables'], true)) {
+                if (strpos($written, '-- schema-only(' . $table . '): 1') === false) {
+                    throw new RuntimeException('BACKUP_READBACK_INCOMPLETE');
+                }
+                // A schema-only table must never be dropped or recreated: doing so
+                // would destroy its rows. This is the data-loss guard.
+                if (strpos($written, 'DROP TABLE IF EXISTS `' . $table . '`') !== false) {
+                    throw new RuntimeException('BACKUP_READBACK_INCOMPLETE');
+                }
+                continue;
+            }
             if (strpos($written, 'CREATE TABLE `' . $table . '`') === false) {
                 throw new RuntimeException('BACKUP_READBACK_INCOMPLETE');
             }
-            $marker = in_array($table, $dump['schema_only_tables'], true)
-                ? '-- schema-only(' . $table . '): '
-                : '-- rows(' . $table . '): ';
-            if (strpos($written, $marker) === false) {
+            if (strpos($written, '-- rows(' . $table . '): ') === false) {
                 throw new RuntimeException('BACKUP_READBACK_INCOMPLETE');
             }
         }

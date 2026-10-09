@@ -371,6 +371,12 @@ try {
             (21, 'verified.one', 'x', 'Verified One', 'SISTEM_YONETICISI', 'AKTIF'),
             (22, 'verified.two', 'x', 'Verified Two', 'SISTEM_YONETICISI', 'AKTIF')"
     );
+    // A real row in a schema-only table: it must survive the 099 restore.
+    $backupPdo->exec(
+        "INSERT INTO offline_mutation_idempotency
+            (actor_user_id, operation_scope, idempotency_key, payload_hash, state, created_at)
+         VALUES (21, 'scope', 'backup-row-key', '" . str_repeat('b', 64) . "', 'COMPLETED', NOW(3))"
+    );
 
     $backupDir = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'medisa-ksm-backup-' . bin2hex(random_bytes(5));
     mkdir($backupDir, 0700, true);
@@ -429,6 +435,14 @@ try {
             strpos($backupSql, 'CREATE TABLE `' . $fkTable . '`') !== false,
             'the 099 dump carries the ' . $fkTable . ' preimage schema'
         );
+        ksmAssert(
+            strpos($backupSql, 'DROP TABLE IF EXISTS `' . $fkTable . '`') === false,
+            'the 099 dump never drops the schema-only table ' . $fkTable
+        );
+        ksmAssert(
+            strpos($backupSql, 'ALTER TABLE `' . $fkTable . '` DROP FOREIGN KEY') !== false,
+            'the 099 dump carries the row-safe FK rollback for ' . $fkTable
+        );
     }
 
     // Apply 099, then restore the real dump and prove the pre-099 image returns.
@@ -468,6 +482,19 @@ try {
         ksmCount($backupPdo, 'SELECT COUNT(*) FROM users WHERE id IN (21, 22)') === 2,
         'restoring the 099 backup returns the verified users'
     );
+    ksmAssert(
+        ksmCount(
+            $backupPdo,
+            "SELECT COUNT(*) FROM offline_mutation_idempotency WHERE idempotency_key = 'backup-row-key'"
+        ) === 1,
+        'restoring the 099 backup preserves the offline_mutation_idempotency row'
+    );
+    foreach (KSM_FK_TABLES as $fkTable) {
+        ksmAssert(
+            ksmTableExists($backupPdo, $fkTable),
+            'restoring the 099 backup keeps the ' . $fkTable . ' table'
+        );
+    }
 
     echo "verify-kullanici-kalici-sil-migration-mysql: OK\n";
 } finally {

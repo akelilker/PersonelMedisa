@@ -60,6 +60,20 @@ describe("kalıcı sil 099 backup owner", () => {
     expect(backupOwner).toContain("'schema_only_tables' =>");
   });
 
+  it("never drops a schema-only table, so a restore cannot lose its rows", () => {
+    // The 099 FK rollback is metadata-only: it drops fk_p099_* constraints, and
+    // the readback guard rejects any dump that would DROP a schema-only table.
+    expect(backupOwner).toContain('KALICI_SIL_FK_CONSTRAINTS');
+    expect(backupOwner).toContain('DROP FOREIGN KEY');
+    expect(backupOwner).toContain('rows preserved on restore');
+    expect(backupOwner).toContain('-- 099 FK rollback (metadata only');
+    // The readback data-loss guard must reject a schema-only table drop.
+    expect(backupOwner).toContain(
+      "strpos($written, 'DROP TABLE IF EXISTS `' . $table . '`') !== false",
+    );
+    expect(backupOwner).toContain('BACKUP_READBACK_INCOMPLETE');
+  });
+
   it("wires the 099 apply mode to the dedicated backup path instead of the 079 scope", () => {
     // The 099 apply stage must call the dedicated owner, never the default
     // create() whose table list stops at the organisation mapping tables.

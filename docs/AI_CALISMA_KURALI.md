@@ -77,7 +77,7 @@ AMAÇ: Programı bitirmek ve stabil tutmak. Kod tabanını “mükemmelleştirme
 
 33) TEK YÖNETİCİ: Repo, branch, PR, merge sonrası senkron ve agent dağıtımı tek yöneticidedir (personel prog). Başka bir araç iş yapacaksa yönetici önceden bilgilendirilir; yönetici o ekranda çalışan başka iş olmadığını doğrular.
 
-34) HER İŞ GÜNCEL MAIN'DEN BAŞLAR: Yeni iş her zaman o anki origin/main'den açılan yeni branch'te yapılır. Eski/merge edilmiş branch'e veya yerelde geride kalmış kopyaya devam edilmez. İşe başlamadan önce "branch tabanı = güncel origin/main" kontrol edilir; değilse iş başlamaz.
+34) HER İŞ GÜNCEL MAIN'DEN BAŞLAR: Yeni iş her zaman o anki origin/main'den açılan yeni branch'te yapılır. Eski/merge edilmiş branch'e veya yerelde geride kalmış kopyaya devam edilmez. İşe başlamadan önce "branch tabanı = güncel origin/main" kontrol edilir; değilse iş başlamaz. Bu kontrol her yeni görevin başında bir kez yapılır: GitHub'daki refs/heads/main SHA'sı doğrudan uzaktan (git ls-remote origin refs/heads/main) okunur, yerel origin/main bilgisinin güncel olduğu varsayılmaz; yerel main SHA'sı, aktif branch adı ve kaydedilmemiş kullanıcı değişiklikleri belirlenir. Fark varsa yalnız bildirilir; pull, checkout, reset veya merge otomatik yapılmaz, aktif çalışma ve kullanıcı değişiklikleri korunur. SHA hiçbir dosyada tutulmaz; kontrol görev içinde yalnız somut sürüm uyuşmazlığı şüphesinde tekrarlanır.
 
 35) MERGE SONRASI SENKRON: Her merge'den sonra yereldeki repo main'e geçirilir ve yalnız fast-forward ile origin/main'e getirilir; merge edilmiş branch yerelde açık bırakılmaz. Local main SHA = origin/main SHA doğrulanır.
 

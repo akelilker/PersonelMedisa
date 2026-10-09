@@ -25,6 +25,11 @@ describe("Kullanıcı Yönetimi — gizli test personeline bağlı hesaplar", ()
     const list = methodBody("kullanicilar");
     expect(list).toContain("PersonelArchiveGate::appendOperationalExclusion($pdo, $where, 'p')");
     expect(list).toContain("LEFT JOIN personeller p ON p.id = u.personel_id");
+    expect(list).toContain("u.username <> ");
+    expect(list).toContain("LISTEDEN_GIZLI_KULLANICI_ADI");
+    expect(controllerSrc).toContain("private const LISTEDEN_GIZLI_KULLANICI_ADI = 'pm_smoke_ro_production';");
+    expect(list).not.toContain("pm_smoke_ro_%");
+    expect(list).not.toContain("AUTH_SMOKE_READONLY");
     expect(list).not.toMatch(/sicil|ad\s*=\s*'DESTROYED'/);
     expect(methodBody("findKullaniciRowById")).toContain("FROM users WHERE id = :id LIMIT 1");
     expect(methodBody("findKullaniciRowById")).not.toContain("appendOperationalExclusion");
@@ -40,6 +45,10 @@ describe("Kullanıcı Yönetimi — gizli test personeline bağlı hesaplar", ()
     expect(result.stdout).toContain(
       "[PASS] 4 default list drops exactly the 2 hidden-fixture-bound accounts, order id ASC kept"
     );
+    expect(result.stdout).toContain(
+      "[PASS] 4b pm_smoke_ro_production absent from default and include_hidden lists"
+    );
+    expect(result.stdout).toContain("[PASS] 4c other pm_smoke_ro account stays listed");
     expect(result.stdout).toContain("[PASS] 10 counters drop by exactly the hidden accounts (3/1)");
     expect(result.stdout).toContain(
       "[PASS] 14 DESTROYED PERSONEL never surfaced, even with include_hidden=1"

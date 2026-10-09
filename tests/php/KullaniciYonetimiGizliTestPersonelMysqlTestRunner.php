@@ -322,6 +322,8 @@ try {
         [5, 'demo.fixture', 'Demo Fixture', 'MUHASEBE', $pFixtureLive, 0],
         [6, 'imha.edilmis', 'Imha Edilmis', 'MUHASEBE', $pRetentionTomb, 1],
         [7, 'iptal.sinif', 'Iptal Sinif', 'MUHASEBE', $pFixtureIptal, 1],
+        [8, 'pm_smoke_ro_e2e', 'Diger Smoke', 'MUHASEBE', null, 0],
+        [9, 'pm_smoke_ro_production', 'Otomatik Smoke TEST', 'MUHASEBE', null, 0],
     ] as [$id, $username, $adSoyad, $rol, $pid, $mcp]) {
         $insertUser->execute(['id' => $id, 'u' => $username, 'ad' => $adSoyad, 'rol' => $rol, 'pid' => $pid, 'mcp' => $mcp]);
     }
@@ -331,7 +333,7 @@ try {
     $all = kygHttp($pdo, $gy, 'kullanicilar_list', ['query' => ['include_hidden' => '1']]);
     kygAssert($all['status'] === 200, '1 include_hidden=1 diagnostics list 200');
     $allItems = $all['payload']['data']['items'] ?? [];
-    kygAssert(count($allItems) === 7, '2 include_hidden=1 returns every account (7)');
+    kygAssert(count($allItems) === 8, '2 include_hidden=1 returns every account except pm_smoke_ro_production (8)');
 
     $r = kygHttp($pdo, $gy, 'kullanicilar_list');
     kygAssert($r['status'] === 200, '3 default list 200');
@@ -340,8 +342,24 @@ try {
         return (string) ($item['username'] ?? '');
     }, $items);
     kygAssert(
-        $usernames === ['gy', 'gercek.calisan', 'tamam.calisan', 'imha.edilmis', 'iptal.sinif'],
+        $usernames === ['gy', 'gercek.calisan', 'tamam.calisan', 'imha.edilmis', 'iptal.sinif', 'pm_smoke_ro_e2e'],
         '4 default list drops exactly the 2 hidden-fixture-bound accounts, order id ASC kept'
+    );
+    $hiddenSmoke = 'pm_smoke_ro_production';
+    $allUsernames = array_map(static function ($item) {
+        return (string) ($item['username'] ?? '');
+    }, $allItems);
+    kygAssert(
+        !in_array($hiddenSmoke, $usernames, true) && !in_array($hiddenSmoke, $allUsernames, true),
+        '4b pm_smoke_ro_production absent from default and include_hidden lists'
+    );
+    kygAssert(
+        in_array('pm_smoke_ro_e2e', $usernames, true) && in_array('pm_smoke_ro_e2e', $allUsernames, true),
+        '4c other pm_smoke_ro account stays listed'
+    );
+    kygAssert(
+        (int) $pdo->query("SELECT COUNT(*) FROM users WHERE username = 'pm_smoke_ro_production'")->fetchColumn() === 1,
+        '4d pm_smoke_ro_production row remains in users'
     );
     kygAssert(kygFind($items, 'ayse.yilmaz') === null, '5 tombstoned TEST_FIXTURE-bound account hidden');
     kygAssert(kygFind($items, 'demo.fixture') === null, '6 live TEST_FIXTURE-bound account hidden');

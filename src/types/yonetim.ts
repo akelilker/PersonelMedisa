@@ -251,3 +251,54 @@ export type AylikOzetResponse = {
   items: AylikOzetRow[];
   pending_bolum_onayi: number;
 };
+
+/** Kalıcı Sil uygunluk kararı: fail-closed üçlü. */
+export type KaliciSilVerdict = "SİLİNEBİLİR" | "ENGELLENDİ" | "DOĞRULANAMADI";
+
+export type KaliciSilBlocker = {
+  code: string;
+  reason?: string;
+  table?: string;
+  column?: string | null;
+  row_count?: number;
+  delete_rule?: string;
+};
+
+export type KaliciSilUnverified = {
+  code: string;
+  table: string;
+  column?: string | null;
+  reason?: string;
+};
+
+export type KaliciSilDependency = {
+  table: string;
+  column?: string | null;
+  constraint?: string | null;
+  delete_rule: string;
+  row_count: number | null;
+  reason?: string;
+};
+
+export type KaliciSilinebilirlikKontrolu = {
+  verdict: KaliciSilVerdict;
+  target: {
+    id: number;
+    username: string;
+    ad_soyad: string;
+    rol: string;
+    durum: string;
+  };
+  blockers: KaliciSilBlocker[];
+  unverified: KaliciSilUnverified[];
+  cleanable_scope: KaliciSilDependency[];
+  dependencies: KaliciSilDependency[];
+};
+
+export type KaliciSilResult = {
+  deleted: boolean;
+  target_user_id: number;
+  target_username: string;
+  cleaned_scope_rows: { table: string; removed: number }[];
+  audit_id: number;
+};

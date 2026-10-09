@@ -845,6 +845,30 @@
   text-overflow: clip;
 }
 
+/* @kullanıcı adı: aynı adlı ayrı hesapları kartta ayırt eder. Dar masaüstü kartında (5 kolon) kesilmez,
+   en çok 2 satıra kırılır (ayraçlarda <wbr>, gerekirse herhangi bir yerde); kısa ad tek satır kalır. */
+.yonetim-card-grid--users .yonetim-card-meta .yonetim-card-username {
+  min-height: 1.25em;
+  max-height: calc(2 * 1.25em);
+  font-size: 0.64rem;
+  color: rgba(239, 242, 247, 0.6);
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+
+/* Şifre durumu rozeti: dar masaüstü kartında (~69px) metin satır kırarak tam görünür (en çok 3 satır);
+   geniş kartta tek satır kalır. max-height padding+border'ı da kapsar, alt satır kırpılmaz. */
+.yonetim-card-grid--users .yonetim-card-meta .yonetim-first-login-badge {
+  width: 100%;
+  max-height: calc(3 * 1.25em + 6px);
+  padding: 2px;
+  border-radius: 12px;
+  font-size: 0.68rem;
+  overflow-wrap: anywhere;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+}
+
 .yonetim-card-meta strong {
   color: var(--text-inverse);
   font-size: 1.02rem;
@@ -1278,4 +1302,38 @@
   .yonetim-saklama-list-item {
     flex-direction: column;
   }
+}
+
+/* Kalıcı Sil doğrulama modalı: hedef hesap özeti ve engel listesi. */
+.yonetim-kalici-sil-target {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.yonetim-kalici-sil-target strong {
+  color: rgba(239, 242, 247, 0.96);
+}
+
+.yonetim-kalici-sil-target .yonetim-card-username {
+  font-size: 0.8rem;
+  color: rgba(239, 242, 247, 0.6);
+  overflow-wrap: anywhere;
+}
+
+.yonetim-kalici-sil-blocked {
+  display: grid;
+  gap: 8px;
+}
+
+.yonetim-kalici-sil-blocked ul {
+  list-style: disc;
+  margin: 0;
+  padding-left: 20px;
+  color: rgba(239, 242, 247, 0.82);
+  font-size: 0.85rem;
+  line-height: 1.45;
 }

@@ -154,6 +154,15 @@ function KayitSurecPersonelContext({ personel }: { personel: Personel }) {
   const fullName = [personel.ad, personel.soyad].filter(Boolean).join(" ") || "Personel";
   const initials = `${personel.ad?.[0] ?? ""}${personel.soyad?.[0] ?? ""}`.toUpperCase() || "P";
   const isPassive = personel.aktif_durum === "PASIF";
+  // Yalnız açıkça AKTIF olan kayıt aktif sayılır; boş/bilinmeyen durum yeşil gösterilmez.
+  const isActive = personel.aktif_durum === "AKTIF";
+  const aktifDurumLabel = formatAktifDurumLabel(personel.aktif_durum);
+  const durumLabel = isPassive
+    ? personel.pasiflik_durumu_etiketi ?? "Pasif"
+    : aktifDurumLabel !== "-"
+      ? aktifDurumLabel
+      : "Durum Bilinmiyor";
+  const durumClass = isPassive ? " is-passive" : isActive ? "" : " is-unknown";
 
   return (
     <section
@@ -177,7 +186,16 @@ function KayitSurecPersonelContext({ personel }: { personel: Personel }) {
         <dl className="kayit-personel-context-facts">
           <div>
             <dt>Durum</dt>
-            <dd>{isPassive ? personel.pasiflik_durumu_etiketi ?? "Pasif" : formatAktifDurumLabel(personel.aktif_durum)}</dd>
+            {/* Aktif: yalnız yeşil nokta (görünür "Çalışıyor"/pill yok). Pasif: kırmızı nokta + ayrılış açıklaması. */}
+            <dd
+              className={`kayit-personel-context-status${durumClass}`}
+              aria-label={durumLabel}
+              title={durumLabel}
+              data-testid="kayit-surec-personel-durum"
+            >
+              <span className="kayit-personel-context-status-dot" aria-hidden="true" />
+              {isActive ? null : <span>{durumLabel}</span>}
+            </dd>
           </div>
           <div>
             <dt>İşe giriş</dt>

@@ -68,6 +68,7 @@ class RolePermissions
             'isg.view',
             'yonetim-paneli.view',
             'yonetim-paneli.manage',
+            'kullanicilar.kalici_sil',
             'aylik-ozet.view',
             'aylik-ozet.executive_ack',
             'gunluk_bildirim.correct_scoped',

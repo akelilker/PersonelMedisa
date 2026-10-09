@@ -65,7 +65,8 @@ describe("personel detay visual parity owners (tasit reference)", () => {
 
     const hero = read("src/features/personeller/components/personel-dosya/PersonelDosyaHero.tsx");
     expect(hero).toMatch(/personel-dosya-hero-chips/);
-    expect(hero).toMatch(/personel-dosya-status-label/);
+    // #345: aktif personelde görünür durum metni yok (yalnız nokta); etiket yalnız aktif değilken render edilir.
+    expect(hero).toMatch(/isActive \? null : <span className="personel-dosya-status-label">/);
   });
 
   it("aligns modal body rhythm for personel detay overlay", () => {

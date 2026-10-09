@@ -72,6 +72,7 @@ export type AppPermission =
   | "isg.view"
   | "yonetim-paneli.view"
   | "yonetim-paneli.manage"
+  | "kullanicilar.kalici_sil"
   | "aylik-ozet.view"
   | "aylik-ozet.review"
   | "aylik-ozet.executive_ack"
@@ -262,6 +263,7 @@ const BASE_ROLE_PERMISSIONS: Record<
     "isg.view",
     "yonetim-paneli.view",
     "yonetim-paneli.manage",
+    "kullanicilar.kalici_sil",
     "aylik-ozet.view",
     "aylik-ozet.executive_ack",
     "gunluk_bildirim.correct_scoped",

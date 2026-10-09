@@ -106,11 +106,11 @@ describe("branch accounting visibility owners", () => {
     expect(parsed.muhasebe_user_subeler_targets.REMOVE).toEqual([]);
   });
 
-  it("pins CURRENT_STATE + registry to code tip 098 and production tip 097", () => {
+  it("pins CURRENT_STATE + registry to code tip 099 and production tip 097", () => {
     const current = read("CURRENT_STATE.md");
     const registry = read("docs/guncel/110-master-closure-gap-registry.md");
     const backlog = read("docs/guncel/146-post-pr402-canonical-backlog.md");
-    expect(current).toMatch(/^CODE_MIGRATION_TIP: 098$/m);
+    expect(current).toMatch(/^CODE_MIGRATION_TIP: 099$/m);
     expect(current).toMatch(/^PRODUCTION_MIGRATION_TIP: 097$/m);
     expect(current).toMatch(/^LAST_VERIFIED_PRODUCTION_MIGRATION_TIP: 097$/m);
     expect(current).toMatch(/^FRESH_PRODUCTION_MIGRATION_READBACK: MIGRATION_097_APPLIED$/m);
@@ -131,7 +131,7 @@ describe("branch accounting visibility owners", () => {
     expect(registry).toContain("TECHNICAL_GAP_LOCAL_FIXABLE");
     expect(registry).toContain("SUPERSEDED");
     expect(registry).not.toContain("BM model ALREADY_SUPPORTED");
-    expect(registry).toMatch(/^CODE_MIGRATION_TIP: 098$/m);
+    expect(registry).toMatch(/^CODE_MIGRATION_TIP: 099$/m);
     expect(registry).toMatch(/^PRODUCTION_MIGRATION_TIP: 097$/m);
     expect(registry).toContain("| Migration 087 | **APPLIED** |");
     expect(registry).toContain("| Migration 088 | **APPLIED** |");

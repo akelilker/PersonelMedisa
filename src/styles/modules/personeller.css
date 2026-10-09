@@ -560,6 +560,14 @@
   box-shadow: 0 0 0 2px rgba(248, 113, 113, 0.28);
 }
 
+.personel-dosya-status.is-unknown {
+  color: var(--txt-muted);
+}
+
+.personel-dosya-status.is-unknown .personel-dosya-status-dot {
+  box-shadow: none;
+}
+
 .personel-dosya-status-dot {
   width: 8px;
   height: 8px;

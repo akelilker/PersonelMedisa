@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent, type KeyboardEvent } from "react";
+import { Fragment, useEffect, useMemo, useState, type FormEvent, type KeyboardEvent } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { AppSelectField } from "../../../components/form/AppSelect";
 import { FormField } from "../../../components/form/FormField";
@@ -21,11 +21,13 @@ import {
   deleteYonetimSgkIsveren,
   deleteYonetimSirket,
   deleteYonetimSube,
+  fetchKullaniciSilinebilirlik,
   fetchOrganizasyonReadiness,
   fetchYonetimKullanicilari,
   fetchYonetimSgkIsverenleri,
   fetchYonetimSirketleri,
   fetchYonetimSubeleri,
+  kaliciSilKullanici,
   resetYonetimKullaniciBaslangicSifresi,
   fixYonetimKullaniciCanonicalUsername,
   updateSirketSube,
@@ -61,12 +63,21 @@ import {
   normalizeKullaniciAdSoyadForWrite
 } from "../../../lib/yonetim/kullanici-ad-soyad";
 import type { UserRole } from "../../../types/auth";
-import { ASSIGNABLE_USER_ROLES, WRITE_COMPANY_SCOPED_ROLES } from "../../../types/auth";
+import {
+  ASSIGNABLE_USER_ROLES,
+  BIRIM_ASSIGNMENT_ROLES,
+  BOLUM_ASSIGNMENT_ROLES,
+  GLOBAL_SCOPE_ROLES,
+  ORGANIZATION_GLOBAL_READ_ROLES,
+  WRITE_COMPANY_SCOPED_ROLES
+} from "../../../types/auth";
 import type { Personel } from "../../../types/personel";
 import type { IdOption } from "../../../types/referans";
 import { formatSurecTuruLabel, formatUserRoleLabel } from "../../../lib/display/enum-display";
 import type {
   KayitDurumu,
+  KaliciSilinebilirlikKontrolu,
+  KaliciSilVerdict,
   KullaniciTipi,
   OrganizasyonReadiness,
   UpsertYonetimKullaniciPayload,
@@ -575,12 +586,101 @@ function toSgkIsverenPayload(form: SgkIsverenFormState): UpsertYonetimSgkIsveren
   return { sirket_id: sirketId, kod, ad, durum: form.durum };
 }
 
-function formatSubeScopeLabel(subeIds: number[], subeNameMap: Map<number, string>) {
-  if (subeIds.length === 0) {
-    return "Tüm Şubeler";
+type KullaniciScopeContext = Pick<
+  YonetimKullanici,
+  "rol" | "bolum_ids" | "birim_ids" | "sirket_ids" | "sgk_isveren_ids"
+>;
+
+function roleIn(roles: readonly UserRole[], role: UserRole) {
+  return (roles as readonly string[]).includes(role);
+}
+
+/** `@kullanici.adi` metnini ayraçlardan (. _ -) sonra kırılabilir yapar; metin değişmez. */
+function formatKullaniciUsernameWithBreaks(username: string) {
+  // Lookbehind kullanılmaz (eski iOS Safari uyumu): ayraçlar parçanın sonuna eklenir.
+  const parts: string[] = [];
+  for (const token of `@${username}`.split(/([._-])/)) {
+    if (/^[._-]$/.test(token) && parts.length > 0) {
+      parts[parts.length - 1] += token;
+    } else if (token !== "") {
+      parts.push(token);
+    }
+  }
+  return parts.map((part, index) => (
+    <Fragment key={index}>
+      {index > 0 ? <wbr /> : null}
+      {part}
+    </Fragment>
+  ));
+}
+
+function formatSubeNames(subeIds: number[], subeNameMap: Map<number, string>) {
+  return subeIds.map((subeId) => subeNameMap.get(subeId) ?? `Şube ${subeId}`).join(", ");
+}
+
+/**
+ * Display-only: kartta/tabloda görünen kapsam, backend'in *etkin* kapsam kuralını metne çevirir
+ * (OrgScope + AuthMiddleware + HrWriteScope). Yetkiyi değiştirmez. `sube_ids` listede yalnız açık
+ * user_subeler atamasıdır; rolün kapsamı ondan farklı olabildiği için rol önce gelir.
+ * - PERSONEL: yalnız bağlı personel kaydı.
+ * - İK: okuma rol kaynaklı, tüm organizasyon; açık şube satırları okumayı daraltmaz.
+ *   IK_SORUMLUSU her yerde yazar; IK_PERSONELI yalnız atanmış şirketlerde yazar → "Okuma:" niteliği.
+ * - BÖLÜM/BİRİM: kapsam user_bolumler/user_birimler'den gelir; atama yoksa erişim yok.
+ * - GENEL_YONETICI/SISTEM_YONETICISI: açık şube yoksa sınırsız; açık şube varsa o şubelerle sınırlı.
+ * - Diğerleri: açık şubeler, şirket ve SGK kapsamı birlikte; hiçbiri yoksa erişim yok.
+ * Kart metni 2 satır yüksekliğindedir ve kırpılır; etiketler bu yüzden kısa tutulur.
+ */
+function formatKullaniciScopeLabel(
+  subeIds: number[],
+  subeNameMap: Map<number, string>,
+  scope: KullaniciScopeContext
+) {
+  if (scope.rol === "PERSONEL") {
+    return "Kendi Kaydı";
+  }
+  if (roleIn(ORGANIZATION_GLOBAL_READ_ROLES, scope.rol)) {
+    return roleIn(WRITE_COMPANY_SCOPED_ROLES, scope.rol) ? "Okuma: Tüm Şubeler" : "Tüm Şubeler";
+  }
+  if (roleIn(BOLUM_ASSIGNMENT_ROLES, scope.rol)) {
+    return (scope.bolum_ids?.length ?? 0) > 0 ? "Bölüm Kapsamı" : "Atama Yok";
+  }
+  if (roleIn(BIRIM_ASSIGNMENT_ROLES, scope.rol)) {
+    return (scope.birim_ids?.length ?? 0) > 0 ? "Birim Kapsamı" : "Atama Yok";
   }
 
-  return subeIds.map((subeId) => subeNameMap.get(subeId) ?? `Şube ${subeId}`).join(", ");
+  const subeLabel = subeIds.length > 0 ? formatSubeNames(subeIds, subeNameMap) : null;
+  if (roleIn(GLOBAL_SCOPE_ROLES, scope.rol)) {
+    return subeLabel ?? "Tüm Şubeler";
+  }
+
+  const hasSirket = (scope.sirket_ids?.length ?? 0) > 0;
+  const hasSgk = (scope.sgk_isveren_ids?.length ?? 0) > 0;
+  if (subeLabel) {
+    const extra = [hasSirket ? "Şirket" : null, hasSgk ? "SGK" : null].filter(Boolean);
+    return extra.length > 0 ? `${subeLabel} + ${extra.join(" + ")}` : subeLabel;
+  }
+  if (hasSirket && hasSgk) {
+    return "Şirket + SGK";
+  }
+  if (hasSirket) {
+    return "Şirket Kapsamı";
+  }
+  if (hasSgk) {
+    return "SGK Kapsamı";
+  }
+  return "Atama Yok";
+}
+
+function formatSubeScopeLabel(
+  subeIds: number[],
+  subeNameMap: Map<number, string>,
+  scope?: KullaniciScopeContext
+) {
+  if (scope) {
+    return formatKullaniciScopeLabel(subeIds, subeNameMap, scope);
+  }
+  // Rol bilgisi olmayan çağrı (süreç log metni) eski metni korur.
+  return subeIds.length === 0 ? "Tüm Şubeler" : formatSubeNames(subeIds, subeNameMap);
 }
 
 function normalizeNumberArray(values: number[]) {
@@ -670,6 +770,7 @@ export function YonetimPaneliPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { hasPermission } = useRoleAccess();
   const canManageYonetimPanel = hasPermission("yonetim-paneli.manage");
+  const canKaliciSil = hasPermission("kullanicilar.kalici_sil");
   const canOpenQrKiosk = hasPermission("qr.kiosk.display");
   const canViewMevzuat = hasPermission("mevzuat_parametreleri.view");
   const canManageMevzuat = hasPermission("mevzuat_parametreleri.manage");
@@ -742,6 +843,14 @@ export function YonetimPaneliPage() {
   const [yeniDepartmanAdi, setYeniDepartmanAdi] = useState("");
   const [muhasebeYetkiliQuery, setMuhasebeYetkiliQuery] = useState("");
   const [sorumluYoneticiQuery, setSorumluYoneticiQuery] = useState("");
+
+  // Kalıcı Sil (safe permanent delete) flow state.
+  const [kaliciSilTarget, setKaliciSilTarget] = useState<YonetimKullanici | null>(null);
+  const [kaliciSilEligibility, setKaliciSilEligibility] = useState<KaliciSilinebilirlikKontrolu | null>(null);
+  const [kaliciSilEligibilityLoading, setKaliciSilEligibilityLoading] = useState(false);
+  const [kaliciSilConfirmUsername, setKaliciSilConfirmUsername] = useState("");
+  const [kaliciSilGerekce, setKaliciSilGerekce] = useState("");
+  const [kaliciSilError, setKaliciSilError] = useState<string | null>(null);
 
   const personelOptions = useMemo(
     () =>
@@ -1021,7 +1130,7 @@ export function YonetimPaneliPage() {
             personelAdSoyad: item.personel_ad_soyad,
             username: item.username,
             roleLabel: formatUserRoleLabel(item.rol),
-            subeScopeLabel: formatSubeScopeLabel(item.sube_ids, subeNameMap),
+            subeScopeLabel: formatSubeScopeLabel(item.sube_ids, subeNameMap, item),
             kullaniciTipiLabel: KULLANICI_TIPI_LABELS[item.kullanici_tipi]
           },
           trimmedKullaniciSearch
@@ -1051,7 +1160,7 @@ export function YonetimPaneliPage() {
       if (linkedPersonel) {
         const personelLabel = [linkedPersonel.ad, linkedPersonel.soyad].filter(Boolean).join(" ");
         if (personelLabel && !isCorruptedDisplayText(personelLabel) && !isTombstonedPersonelAdSoyad(personelLabel)) {
-          return personelLabel;
+          return formatAdSoyad(personelLabel);
         }
       }
 
@@ -1061,7 +1170,7 @@ export function YonetimPaneliPage() {
 
       const fallback = (item.personel_ad_soyad ?? item.ad_soyad ?? "").trim();
       if (fallback && !isCorruptedDisplayText(fallback)) {
-        return fallback;
+        return formatAdSoyad(fallback);
       }
 
       return formatUserRoleLabel(item.rol);
@@ -1069,7 +1178,8 @@ export function YonetimPaneliPage() {
 
     const adSoyad = (item.ad_soyad ?? "").trim();
     if (adSoyad && !isCorruptedDisplayText(adSoyad)) {
-      return adSoyad;
+      // Onaylı görünüm kuralı (Ad Title Case + SOYAD BÜYÜK); kayıtlı değer değişmez.
+      return formatAdSoyad(adSoyad);
     }
 
     return formatUserRoleLabel(item.rol);
@@ -1205,6 +1315,89 @@ export function YonetimPaneliPage() {
     setKullaniciForm(userFormFromItem(item));
     setIsKullaniciFormOpen(true);
     setSifreResetConfirmOpen(false);
+  }
+
+  function closeKaliciSilDialog() {
+    setKaliciSilTarget(null);
+    setKaliciSilEligibility(null);
+    setKaliciSilConfirmUsername("");
+    setKaliciSilGerekce("");
+    setKaliciSilError(null);
+  }
+
+  function cancelKaliciSilDialog() {
+    if (isSubmitting || kaliciSilEligibilityLoading) {
+      return;
+    }
+    closeKaliciSilDialog();
+  }
+
+  async function openKaliciSilDialog(item: YonetimKullanici) {
+    if (!canKaliciSil || isSubmitting) {
+      return;
+    }
+    setSuccessMessage(null);
+    setErrorMessage(null);
+    setKaliciSilTarget(item);
+    setKaliciSilEligibility(null);
+    setKaliciSilEligibilityLoading(true);
+    setKaliciSilConfirmUsername("");
+    setKaliciSilGerekce("");
+    setKaliciSilError(null);
+    try {
+      const result = await fetchKullaniciSilinebilirlik(item.id);
+      setKaliciSilEligibility(result);
+    } catch (error) {
+      // A failed probe is fail-closed: the dialog shows DOĞRULANAMADI and no
+      // confirm path is offered.
+      setKaliciSilEligibility({
+        verdict: "DOĞRULANAMADI",
+        target: {
+          id: item.id,
+          username: item.username ?? "",
+          ad_soyad: item.ad_soyad,
+          rol: item.rol,
+          durum: item.durum
+        },
+        blockers: [],
+        unverified: [{ code: "DEPENDENCY_UNVERIFIED", table: "?", reason: "Silinebilirlik kontrolü alınamadı." }],
+        cleanable_scope: [],
+        dependencies: []
+      });
+      setKaliciSilError(error instanceof Error ? error.message : "Silinebilirlik kontrolü alınamadı.");
+    } finally {
+      setKaliciSilEligibilityLoading(false);
+    }
+  }
+
+  const kaliciSilVerdict: KaliciSilVerdict = kaliciSilEligibility?.verdict ?? "DOĞRULANAMADI";
+  const kaliciSilUsername = kaliciSilTarget?.username?.trim() ?? "";
+  const kaliciSilCanSubmit =
+    kaliciSilVerdict === "SİLİNEBİLİR" &&
+    kaliciSilGerekce.trim() !== "" &&
+    kaliciSilConfirmUsername.trim() === kaliciSilUsername;
+
+  async function confirmKaliciSil() {
+    if (!kaliciSilTarget || !kaliciSilCanSubmit || isSubmitting) {
+      return;
+    }
+
+    setIsSubmitting(true);
+    setKaliciSilError(null);
+
+    try {
+      await kaliciSilKullanici(kaliciSilTarget.id, {
+        confirm_username: kaliciSilConfirmUsername.trim(),
+        gerekce: kaliciSilGerekce.trim()
+      });
+      setSuccessMessage("Kullanıcı kalıcı olarak silindi.");
+      closeKaliciSilDialog();
+      await loadPanel();
+    } catch (error) {
+      setKaliciSilError(error instanceof Error ? error.message : "Kullanıcı kalıcı olarak silinemedi.");
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   function openYeniSubeForm() {
@@ -1785,7 +1978,7 @@ export function YonetimPaneliPage() {
             >
               <FormField
                 as="select"
-                label="İlk giriş durumu"
+                label="Şifre Durumu"
                 name="yonetim-kullanici-first-login-filter"
                 value={firstLoginFilter}
                 onChange={(value) =>
@@ -1822,8 +2015,8 @@ export function YonetimPaneliPage() {
                 kullanicilar.length === 0
                   ? "İlk kullanıcı atamasını buradan oluşturabilirsin."
                   : kullaniciSearchActive
-                    ? "Arama metnini veya ilk giriş filtresini değiştirmeyi deneyin."
-                    : "İlk giriş filtresini değiştirerek diğer kullanıcıları görebilirsin."
+                    ? "Arama metnini veya Şifre Durumu filtresini değiştirmeyi deneyin."
+                    : "Şifre Durumu filtresini değiştirerek diğer kullanıcıları görebilirsin."
               }
             />
           ) : kullaniciViewMode === "card" ? (
@@ -1846,7 +2039,16 @@ export function YonetimPaneliPage() {
                 >
                   <div className="yonetim-card-meta">
                     <strong>{formatKullaniciCardLabel(item)}</strong>
-                    <span>{formatSubeScopeLabel(item.sube_ids, subeNameMap)}</span>
+                    {item.username ? (
+                      <span
+                        className="yonetim-card-username"
+                        title={`@${item.username}`}
+                        data-testid={`yonetim-kullanici-username-${item.id}`}
+                      >
+                        {formatKullaniciUsernameWithBreaks(item.username)}
+                      </span>
+                    ) : null}
+                    <span>{formatSubeScopeLabel(item.sube_ids, subeNameMap, item)}</span>
                     {firstLoginLabel ? (
                       <span
                         className={
@@ -1875,7 +2077,7 @@ export function YonetimPaneliPage() {
                     <th>Şube Yetkisi</th>
                     <th>Varsayılan Şube</th>
                     <th>Durum</th>
-                    <th>İlk Giriş</th>
+                    <th>Şifre Durumu</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1898,8 +2100,8 @@ export function YonetimPaneliPage() {
                       <td className="yonetim-list-table-cell-strong">{formatKullaniciDisplayName(item)}</td>
                       <td>{KULLANICI_TIPI_LABELS[item.kullanici_tipi]}</td>
                       <td>{formatUserRoleLabel(item.rol)}</td>
-                      <td title={formatSubeScopeLabel(item.sube_ids, subeNameMap)}>
-                        {formatSubeScopeLabel(item.sube_ids, subeNameMap)}
+                      <td title={formatSubeScopeLabel(item.sube_ids, subeNameMap, item)}>
+                        {formatSubeScopeLabel(item.sube_ids, subeNameMap, item)}
                       </td>
                       <td>{formatVarsayilanSubeLabel(item.varsayilan_sube_id, subeNameMap)}</td>
                       <td>{DURUM_LABELS[item.durum]}</td>
@@ -2463,7 +2665,126 @@ export function YonetimPaneliPage() {
                 Vazgeç
               </button>
             </div>
+
+            {editingKullaniciId != null && canKaliciSil ? (
+              <div className="form-actions-row">
+                <button
+                  type="button"
+                  className="universal-btn-cancel"
+                  data-testid="yonetim-kullanici-kalici-sil"
+                  onClick={() => {
+                    const target = kullanicilar.find((k) => k.id === editingKullaniciId);
+                    if (target) {
+                      void openKaliciSilDialog(target);
+                    }
+                  }}
+                  disabled={isSubmitting}
+                >
+                  Kalıcı Sil
+                </button>
+              </div>
+            ) : null}
           </form>
+        </AppModal>
+      ) : null}
+
+      {kaliciSilTarget ? (
+        <AppModal
+          title="Kalıcı Sil"
+          backLabel="Kullanıcı Yönetimi"
+          onBack={cancelKaliciSilDialog}
+          onClose={cancelKaliciSilDialog}
+        >
+          <div className="yonetim-form-stack" data-testid="yonetim-kullanici-kalici-sil-dialog">
+            <div className="yonetim-kalici-sil-target">
+              <strong>{kaliciSilTarget.ad_soyad}</strong>
+              {kaliciSilUsername ? (
+                <span className="yonetim-card-username" title={`@${kaliciSilUsername}`}>
+                  {formatKullaniciUsernameWithBreaks(kaliciSilUsername)}
+                </span>
+              ) : null}
+            </div>
+
+            {kaliciSilEligibilityLoading ? (
+              <p className="yonetim-hint" data-testid="yonetim-kalici-sil-loading">
+                Silinebilirlik kontrol ediliyor…
+              </p>
+            ) : kaliciSilVerdict === "SİLİNEBİLİR" ? (
+              <>
+                <p className="yonetim-hint" data-testid="yonetim-kalici-sil-verdict">
+                  Bu hesap silinebilir durumda. İşlem geri alınamaz; yalnızca organizasyon kapsam
+                  satırları temizlenir, denetim kanıtı korunur.
+                </p>
+                <FormField
+                  as="textarea"
+                  label="Gerekçe"
+                  name="yonetim-kalici-sil-gerekce"
+                  value={kaliciSilGerekce}
+                  onChange={setKaliciSilGerekce}
+                  required
+                  placeholder="Silme gerekçesi (zorunlu)"
+                />
+                <FormField
+                  label="Onay için kullanıcı adını yazın"
+                  name="yonetim-kalici-sil-username"
+                  value={kaliciSilConfirmUsername}
+                  onChange={setKaliciSilConfirmUsername}
+                  required
+                  placeholder={kaliciSilUsername}
+                />
+                <p className="yonetim-hint">
+                  Onaylamak için kullanıcı adını <strong>{kaliciSilUsername}</strong> olarak yazın.
+                </p>
+              </>
+            ) : kaliciSilVerdict === "ENGELLENDİ" ? (
+              <div className="yonetim-kalici-sil-blocked" data-testid="yonetim-kalici-sil-verdict">
+                <p className="yonetim-inline-error">Bu hesap silinemez.</p>
+                <ul>
+                  {(kaliciSilEligibility?.blockers ?? []).map((blocker, index) => (
+                    <li key={`${blocker.code}-${index}`}>
+                      {blocker.reason ?? blocker.code}
+                      {blocker.table ? ` (${blocker.table}${blocker.column ? `.${blocker.column}` : ""})` : ""}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : (
+              <div className="yonetim-kalici-sil-blocked" data-testid="yonetim-kalici-sil-verdict">
+                <p className="yonetim-inline-error">Silinebilirlik doğrulanamadı; işlem reddedildi.</p>
+                <ul>
+                  {(kaliciSilEligibility?.unverified ?? []).map((item, index) => (
+                    <li key={`${item.table}-${index}`}>{item.reason ?? item.table}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {kaliciSilError ? (
+              <p className="yonetim-inline-error" role="alert" data-testid="yonetim-kalici-sil-error">
+                {kaliciSilError}
+              </p>
+            ) : null}
+
+            <div className="form-actions-row">
+              <button
+                type="button"
+                className="universal-btn-cancel"
+                data-testid="yonetim-kalici-sil-confirm"
+                disabled={isSubmitting || kaliciSilEligibilityLoading || !kaliciSilCanSubmit}
+                onClick={() => void confirmKaliciSil()}
+              >
+                {isSubmitting ? "Siliniyor…" : "Kalıcı Olarak Sil"}
+              </button>
+              <button
+                type="button"
+                className="universal-btn-aux"
+                disabled={isSubmitting || kaliciSilEligibilityLoading}
+                onClick={cancelKaliciSilDialog}
+              >
+                Vazgeç
+              </button>
+            </div>
+          </div>
         </AppModal>
       ) : null}
 

@@ -1060,6 +1060,12 @@ class Router
         if ($method === 'DELETE' && preg_match('#^/yonetim/kullanicilar/(\d+)$#', $path, $matches)) {
             YonetimController::kullaniciErisimKaldir($this->request, $matches[1]);
         }
+        if ($method === 'GET' && preg_match('#^/yonetim/kullanicilar/(\d+)/silinebilirlik-kontrolu$#', $path, $matches)) {
+            YonetimController::kullaniciSilinebilirlikKontrolu($this->request, $matches[1]);
+        }
+        if ($method === 'POST' && preg_match('#^/yonetim/kullanicilar/(\d+)/kalici-sil$#', $path, $matches)) {
+            YonetimController::kullaniciKaliciSil($this->request, $matches[1]);
+        }
         if ($method === 'POST' && preg_match('#^/yonetim/personeller/(\d+)/hesap-onboarding$#', $path, $matches)) {
             PersonelAccountOnboardingController::onboard($this->request, $matches[1]);
         }

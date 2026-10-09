@@ -106,22 +106,23 @@ describe("branch accounting visibility owners", () => {
     expect(parsed.muhasebe_user_subeler_targets.REMOVE).toEqual([]);
   });
 
-  it("pins CURRENT_STATE + registry to code tip 099 and production tip 097", () => {
+  it("pins CURRENT_STATE + registry to code tip 099 and production tip 099", () => {
     const current = read("CURRENT_STATE.md");
     const registry = read("docs/guncel/110-master-closure-gap-registry.md");
     const backlog = read("docs/guncel/146-post-pr402-canonical-backlog.md");
     expect(current).toMatch(/^CODE_MIGRATION_TIP: 099$/m);
-    expect(current).toMatch(/^PRODUCTION_MIGRATION_TIP: 097$/m);
-    expect(current).toMatch(/^LAST_VERIFIED_PRODUCTION_MIGRATION_TIP: 097$/m);
-    expect(current).toMatch(/^FRESH_PRODUCTION_MIGRATION_READBACK: MIGRATION_097_APPLIED$/m);
+    expect(current).toMatch(/^PRODUCTION_MIGRATION_TIP: 099$/m);
+    expect(current).toMatch(/^LAST_VERIFIED_PRODUCTION_MIGRATION_TIP: 099$/m);
+    expect(current).toMatch(/^FRESH_PRODUCTION_MIGRATION_READBACK: MIGRATION_099_APPLY_POSTCHECK_PASS$/m);
     expect(current).toMatch(/^PRODUCTION_MIGRATION_PENDING: 0$/m);
-    expect(current).toMatch(/^LAST_MERGED_PR: 512$/m);
-    expect(current).toMatch(/^CODE_MAIN_SHA: c23000544718e1b3bdfa06c133479c6ffbd6cbe3$/m);
-    expect(current).toMatch(/^PRODUCTION_DEPLOY_SHA: c23000544718e1b3bdfa06c133479c6ffbd6cbe3$/m);
+    expect(current).toMatch(/^LAST_MERGED_PR: 520$/m);
+    expect(current).toMatch(/^CODE_MAIN_SHA: f14ddbe897bf8e64b35d9320cfac55cb427b1758$/m);
+    expect(current).toMatch(/^PRODUCTION_DEPLOY_SHA: f14ddbe897bf8e64b35d9320cfac55cb427b1758$/m);
     expect(current).toMatch(/^PIN_SHA_BASELINE: LAST_PRODUCT_MERGE_DEPLOY$/m);
     expect(current).toMatch(/^DOCS_ONLY_CLOSURE_THIS_PIN: NO$/m);
     expect(current).not.toMatch(/^LAST_MERGED_PR: 472$/m);
     expect(current).not.toMatch(/^LAST_MERGED_PR: 476$/m);
+    expect(current).not.toMatch(/^LAST_MERGED_PR: 512$/m);
     expect(current).toContain("ACTIVE_BACKLOG_OWNER: docs/guncel/146-post-pr402-canonical-backlog.md");
     expect(current).toContain("USER_SUBELER_SEMANTIC: ACCESS_SCOPE_ONLY");
     expect(current).toContain("BRANCH_MANAGER_OWNER: sube_sorumlu_yoneticiler");
@@ -132,7 +133,7 @@ describe("branch accounting visibility owners", () => {
     expect(registry).toContain("SUPERSEDED");
     expect(registry).not.toContain("BM model ALREADY_SUPPORTED");
     expect(registry).toMatch(/^CODE_MIGRATION_TIP: 099$/m);
-    expect(registry).toMatch(/^PRODUCTION_MIGRATION_TIP: 097$/m);
+    expect(registry).toMatch(/^PRODUCTION_MIGRATION_TIP: 099$/m);
     expect(registry).toContain("| Migration 087 | **APPLIED** |");
     expect(registry).toContain("| Migration 088 | **APPLIED** |");
     expect(registry).toContain("| Migration 089 | **APPLIED** |");

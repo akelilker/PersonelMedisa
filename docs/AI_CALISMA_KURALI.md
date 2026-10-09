@@ -1,4 +1,4 @@
-PERSONELMEDISA — BİTİRME ODAKLI AI ÇALIŞMA KURALI v2
+PERSONELMEDISA — BİTİRME ODAKLI AI ÇALIŞMA KURALI v3
 
 AMAÇ: Programı bitirmek ve stabil tutmak. Kod tabanını “mükemmelleştirmek”, yeniden tasarlamak veya gereksiz mühendislik yapmak amaç değildir.
 
@@ -50,7 +50,7 @@ AMAÇ: Programı bitirmek ve stabil tutmak. Kod tabanını “mükemmelleştirme
 
 22) Force push, rebase, hard reset, git clean, gizli stash, kullanıcı değişikliğini silme veya unrelated commit yok.
 
-23) Aktif agent işi bitmeden paralel agent/görev açma. Önce mevcut çıktıyı al ve değerlendir.
+23) Aktif agent işi bitmeden paralel agent/görev açma. Önce mevcut çıktıyı al ve değerlendir. Bu kural farklı araçları da kapsar (Cursor, ChatGPT/Codex, Cline): aynı ekran/aynı dosya üzerinde aynı anda yalnız TEK araç çalışır.
 
 24) Kullanıcıya terminal komutu ancak gerçekten kullanıcı erişimi gerekiyorsa ver. Agent repo/terminal/GitHub üzerinden yapabiliyorsa kullanıcıyı operatör yapma.
 
@@ -75,5 +75,19 @@ AMAÇ: Programı bitirmek ve stabil tutmak. Kod tabanını “mükemmelleştirme
 
 32) YAN ETKİ KONTROLÜ: Bir düzeltmeden sonra aynı ekrandaki daha önce onaylanmış öğeler (renk, boşluk, başlık, ikon, yükseklik) karar kaydına göre tekrar kontrol edilir. Düzeltme onaylı bir öğeyi değiştirdiyse iş kapanmaz.
 
+33) TEK YÖNETİCİ: Repo, branch, PR, merge sonrası senkron ve agent dağıtımı tek yöneticidedir (personel prog). Başka bir araç iş yapacaksa yönetici önceden bilgilendirilir; yönetici o ekranda çalışan başka iş olmadığını doğrular.
+
+34) HER İŞ GÜNCEL MAIN'DEN BAŞLAR: Yeni iş her zaman o anki origin/main'den açılan yeni branch'te yapılır. Eski/merge edilmiş branch'e veya yerelde geride kalmış kopyaya devam edilmez. İşe başlamadan önce "branch tabanı = güncel origin/main" kontrol edilir; değilse iş başlamaz.
+
+35) MERGE SONRASI SENKRON: Her merge'den sonra yereldeki repo main'e geçirilir ve yalnız fast-forward ile origin/main'e getirilir; merge edilmiş branch yerelde açık bırakılmaz. Local main SHA = origin/main SHA doğrulanır.
+
+36) AGENT RAPORU KANIT DEĞİLDİR: Bir agent'ın "PASS" demesi tek başına kapanış değildir. Yönetici ekran görüntülerini kendi gözüyle kontrol eder; yerleşim işinde ölçüm (ör. header ile geri satırı arası px) raporda verilir. Mock veriyle yapılan kontrol raporda "mock" diye, canlı veriyle doğrulanamayan kısım "doğrulanmadı" diye açıkça yazılır.
+
+37) SATIR SONU FARKI DEĞİŞİKLİK DEĞİLDİR: Yalnız CRLF/LF farkı olan dosya commit edilmez. Böyle bir fark görülürse önce gerçek içerik farkı olmadığı kanıtlanır, eski hali yedeklenir, sonra dosya repodaki haline döndürülür. İçerik farkı varsa hiçbir şey geri alınmaz, kullanıcıya sorulur.
+
+38) PR REVİZYONLARI CI HARCAMAZ: Aynı PR'da birden fazla görsel tur gerekecekse turlar local render ile kapatılır; push yalnız kullanıcı görüntüyü onayladıktan sonra veya tur başına tek sefer yapılır. Her push Fast CI çalıştırdığı için "küçük düzeltme push'u" yoktur.
+
+39) KAPANMIŞ İŞ YENİDEN AÇILMAZ: CLOSED / DONE kayıtlar yeni somut çelişki kanıtı olmadan yeniden açılmaz; geniş kapsamlı audit kullanıcı açıkça istemedikçe başlatılmaz.
+
 KISA MOTTO:
-ÇALIŞANI KORU. KARARI DEĞİŞTİRME. TEK EKRANI DÜZELT. GERÇEK GÖRÜNÜMÜ KONTROL ET. PROGRAMI BİTİR.
+ÇALIŞANI KORU. KARARI DEĞİŞTİRME. TEK EKRANI DÜZELT. GERÇEK GÖRÜNÜMÜ KONTROL ET. GÜNCEL MAIN'DEN BAŞLA. PROGRAMI BİTİR.

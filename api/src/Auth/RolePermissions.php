@@ -604,41 +604,57 @@ class RolePermissions
         return (int) $raw > 0;
     }
 
-    /** @param array<string, mixed> $user */
+    /**
+     * Etkin izin kararı. Tek sahip: EffectivePermissionResolver (bu metot yalnız
+     * geriye uyumlu giriş noktasıdır; 228 çağrı noktası değişmez).
+     *
+     * @param array<string, mixed> $user
+     */
     public static function has(array $user, $permission)
     {
-        $permission = trim((string) $permission);
-        if ($permission === '') {
-            return false;
-        }
+        return EffectivePermissionResolver::resolve($user, $permission);
+    }
 
-        // QR/kart okutma: rol bağımsız (bağlı personel + kanonik mavi yaka).
-        // Yönetici rolleri de kendi giriş/çıkışını okutabilir; rol bu kararı
-        // ne genişletir ne daraltır.
-        if (self::isQrSelfServicePermission($permission)) {
-            return self::hasQrSelfServiceEntitlement($user);
-        }
-
-        // personel_id binding → own self-service baseline (role-independent).
-        // Does not grant management permissions or expand org scope.
-        if (
-            self::hasPersonnelLinkedSelfServiceEligibility($user)
-            && in_array($permission, self::selfServiceBaselinePermissions(), true)
-        ) {
-            return true;
-        }
-
-        $role = self::normalizeRole(isset($user['rol']) ? (string) $user['rol'] : '');
-        if ($role === '') {
-            return false;
-        }
-
+    /**
+     * Normalize edilmiş rolün varsayılan izinleri (türetilmiş IK_PERSONELI dahil).
+     * Bilinmeyen rol → boş liste.
+     *
+     * @return array<int, string>
+     */
+    public static function roleDefaultPermissions(string $normalizedRole): array
+    {
         $matrix = self::matrix();
-        if (!isset($matrix[$role])) {
-            return false;
-        }
 
-        return in_array($permission, $matrix[$role], true);
+        return $matrix[$normalizedRole] ?? [];
+    }
+
+    /**
+     * İzin kataloğu: tüm rol varsayılanları + rolden bağımsız self-service izinleri.
+     *
+     * @return array<int, string>
+     */
+    public static function permissionCatalog(): array
+    {
+        $all = self::QR_SELF_SERVICE_PERMISSIONS;
+        foreach (self::matrix() as $permissions) {
+            foreach ($permissions as $permission) {
+                $all[] = $permission;
+            }
+        }
+        $all = array_values(array_unique($all));
+        sort($all, SORT_STRING);
+
+        return $all;
+    }
+
+    /**
+     * Matris rolleri (türetilmiş IK_PERSONELI dahil).
+     *
+     * @return array<int, string>
+     */
+    public static function roles(): array
+    {
+        return array_keys(self::matrix());
     }
 
     /** @param array<string, mixed> $user */

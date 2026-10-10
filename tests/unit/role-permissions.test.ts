@@ -327,7 +327,7 @@ describe("role permissions", () => {
 
   it("locks S74-B puantaj bildirim etki adaylari permission matrix", () => {
     expect(hasRolePermission("GENEL_YONETICI", "puantaj.bildirim_etki.view")).toBe(true);
-    expect(hasRolePermission("GENEL_YONETICI", "puantaj.bildirim_etki.generate")).toBe(false);
+    expect(hasRolePermission("GENEL_YONETICI", "puantaj.bildirim_etki.generate")).toBe(true);
 
     expect(hasRolePermission("BOLUM_YONETICISI", "puantaj.bildirim_etki.view")).toBe(true);
     expect(hasRolePermission("BOLUM_YONETICISI", "puantaj.bildirim_etki.generate")).toBe(false);
@@ -352,8 +352,8 @@ describe("role permissions", () => {
     expect(hasRolePermission("MUHASEBE", "puantaj.bildirim_etki.apply")).toBe(false);
     expect(hasRolePermission("MUHASEBE", "puantaj.bildirim_etki.dismiss")).toBe(false);
 
-    expect(hasRolePermission("GENEL_YONETICI", "puantaj.bildirim_etki.apply")).toBe(false);
-    expect(hasRolePermission("GENEL_YONETICI", "puantaj.bildirim_etki.dismiss")).toBe(false);
+    expect(hasRolePermission("GENEL_YONETICI", "puantaj.bildirim_etki.apply")).toBe(true);
+    expect(hasRolePermission("GENEL_YONETICI", "puantaj.bildirim_etki.dismiss")).toBe(true);
 
     expect(hasRolePermission("BOLUM_YONETICISI", "puantaj.bildirim_etki.apply")).toBe(false);
     expect(hasRolePermission("BOLUM_YONETICISI", "puantaj.bildirim_etki.dismiss")).toBe(false);

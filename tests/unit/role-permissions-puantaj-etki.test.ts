@@ -33,9 +33,9 @@ describe("puantaj bildirim etki permissions", () => {
     expect(hasRolePermission("PERSONEL", "puantaj.bildirim_etki.dismiss")).toBe(false);
   });
 
-  it("GENEL_YONETICI view gorur ancak dismiss yapamaz", () => {
+  it("GENEL_YONETICI IK operasyon kararlarini da verebilir (2026-10-10)", () => {
     expect(hasRolePermission("GENEL_YONETICI", "puantaj.bildirim_etki.view")).toBe(true);
-    expect(hasRolePermission("GENEL_YONETICI", "puantaj.bildirim_etki.dismiss")).toBe(false);
-    expect(hasRolePermission("GENEL_YONETICI", "puantaj.bildirim_etki.resolve_conflict")).toBe(false);
+    expect(hasRolePermission("GENEL_YONETICI", "puantaj.bildirim_etki.dismiss")).toBe(true);
+    expect(hasRolePermission("GENEL_YONETICI", "puantaj.bildirim_etki.resolve_conflict")).toBe(true);
   });
 });

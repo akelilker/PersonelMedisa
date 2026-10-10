@@ -41,5 +41,18 @@ export const fastCiCriticalTestFiles = [
 
   // 7) Görünür UI regresyon kilitleri — iOS çift liste (native select focus) ve
   //    kullanıcıya gösterilmeyecek Prim Kuralı (2026-10-10 tekrar eden regresyonlar).
-  "tests/unit/ui-regression-guards.test.tsx"
+  "tests/unit/ui-regression-guards.test.tsx",
+
+  // 8) Yönetici hesap korumaları (DB'siz kural matrisi + controller kaynak kilidi). MariaDB
+  //    eşzamanlılık senaryoları CI Full'de: genel-yonetici-korumasi-mysql.php-runtime.test.ts
+  "tests/unit/genel-yonetici-korumasi.php-runtime.test.ts",
+
+  // 9) GENEL_YONETICI IK operasyon izinleri: FE/BE matrisi + dört göz (kendi talebini onaylayamaz).
+  "tests/unit/genel-yonetici-ik-izinleri-dual-control.php-runtime.test.ts",
+
+  // 10) Kişiden bağımsız hesap koruması: kişi anahtarı yalnız tarihsel sahiplerde.
+  "tests/unit/kisiden-bagimsiz-koruma.source.test.ts",
+
+  // 11) Yeni şirket kurulumu: ilk Genel Yönetici CLI owner sözleşmesi.
+  "tests/unit/ilk-yonetici-kurulum.source.test.ts"
 ];

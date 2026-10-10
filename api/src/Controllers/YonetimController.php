@@ -21,6 +21,7 @@ use Medisa\Api\Scope\SubeScope;
 use Medisa\Api\Services\Auth\UserPersonelBindingService;
 use Medisa\Api\Services\Auth\PersonelAccountOnboardingService;
 use Medisa\Api\Services\Auth\BoundUserCanonicalUsernameReconciliationService;
+use Medisa\Api\Services\Auth\GenelYoneticiKorumasi;
 use Medisa\Api\Services\Auth\KullaniciKaliciSilException;
 use Medisa\Api\Services\Auth\KullaniciKaliciSilService;
 use Medisa\Api\Services\Auth\ActorIdentityException;
@@ -1031,6 +1032,9 @@ class YonetimController
         if ($durum !== 'AKTIF' && $durum !== 'PASIF') {
             JsonResponse::badRequest('Gecersiz durum.', 'VALIDATION_ERROR', 'durum');
         }
+        self::assertYoneticiKorumasi(static function () use ($user, $rol, $durum) {
+            GenelYoneticiKorumasi::assertActorMayAssign($user, null, null, null, $rol, $durum);
+        });
 
         // No plaintext password from the admin UI: new accounts get the initial
         // password derived from their own stored name and must change it on first
@@ -1290,6 +1294,16 @@ class YonetimController
         if ($username !== (string) $existing['username'] && self::usernameExists($pdo, $username, $kullaniciId)) {
             JsonResponse::error(409, 'DUPLICATE_USERNAME', 'Bu kullanici adi zaten kayitli.', 'username');
         }
+        self::assertYoneticiKorumasi(static function () use ($user, $kullaniciId, $existing, $rol, $durum) {
+            GenelYoneticiKorumasi::assertActorMayAssign(
+                $user,
+                $kullaniciId,
+                (string) $existing['rol'],
+                (string) $existing['durum'],
+                $rol,
+                $durum
+            );
+        });
 
         // Password writes stay one canonical owner: either the legacy explicit password
         // or the initial password reset intent, never both.
@@ -1452,6 +1466,9 @@ class YonetimController
 
         $pdo->beginTransaction();
         try {
+            // Son aktif Genel Yönetici: yazmayla aynı transaction, aktif GY satırları kilitli.
+            GenelYoneticiKorumasi::assertNotLastActiveAdminLocked($pdo, $kullaniciId, $rol, $durum);
+
             $params = [
                 'id' => $kullaniciId,
                 'username' => $username,
@@ -1544,6 +1561,11 @@ class YonetimController
                 );
             }
             JsonResponse::serverError('Kullanici kaydi guncellenemedi.');
+        } catch (OrganizasyonException $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            JsonResponse::error($e->httpStatus, $e->errorCode, $e->getMessage(), $e->field);
         } catch (\Throwable $e) {
             if ($pdo->inTransaction()) {
                 $pdo->rollBack();
@@ -1604,6 +1626,10 @@ class YonetimController
             JsonResponse::notFound('Kullanici bulunamadi.');
         }
 
+        self::assertYoneticiKorumasi(static function () use ($user, $existing) {
+            GenelYoneticiKorumasi::assertActorMayRevoke($user, (string) $existing['rol']);
+        });
+
         // An unauditable environment must not gain an account nobody can explain
         // the disappearance of. Asserted before any write, like the 080 owners.
         try {
@@ -1646,6 +1672,9 @@ class YonetimController
 
         $pdo->beginTransaction();
         try {
+            // Son aktif Genel Yönetici'nin erişimi kaldırılamaz (aynı transaction, kilitli sayım).
+            GenelYoneticiKorumasi::assertNotLastActiveAdminLocked($pdo, $kullaniciId, (string) $existing['rol'], 'PASIF');
+
             if ($korunanPersonelId !== null) {
                 // Clears the link only. The personeller row is not read for
                 // change and not written here.
@@ -1828,6 +1857,16 @@ class YonetimController
     private static function assertKullaniciYonetimi(array $user)
     {
         RolePermissions::assert($user, 'yonetim-paneli.manage');
+    }
+
+    /** Yönetici koruma kuralı ihlalini mevcut API hata sözleşmesine çevirir. */
+    private static function assertYoneticiKorumasi(callable $check)
+    {
+        try {
+            $check();
+        } catch (OrganizasyonException $e) {
+            JsonResponse::error($e->httpStatus, $e->errorCode, $e->getMessage(), $e->field);
+        }
     }
 
     /**

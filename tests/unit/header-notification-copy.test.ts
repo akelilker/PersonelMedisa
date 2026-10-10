@@ -13,7 +13,7 @@ describe("formatHeaderGunlukTamamlamaCopy", () => {
       tarih: "2026-09-04"
     });
     expect(copy.title).toBe("İlker Akel Devamsızlık Bildirimini Tamamladı.");
-    expect(copy.subtitle).toBe("04.09.2026 · Detayları Gör");
+    expect(copy.subtitle).toBe("04/09/2026 · Detayları Gör");
   });
 
   it("keeps Turkish characters and sentence case", () => {

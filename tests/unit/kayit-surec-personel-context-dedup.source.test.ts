@@ -11,7 +11,9 @@ describe("Kayit surec personel context dedup", () => {
     const workspace = readOwner("src/features/kayit/components/KayitSurecWorkspace.tsx");
     const genel = readOwner("src/features/kayit/components/KayitSurecPersonelGenelPanel.tsx");
 
-    expect(workspace).toContain("data-testid=\"kayit-surec-personel-context\"");
+    // Özet kartı kaldırıldı (2026-10-10): kimlik yalnız Genel panelinde (Ad SOYAD + durum).
+    expect(workspace).not.toContain("data-testid=\"kayit-surec-personel-context\"");
+    expect(workspace).not.toContain("İşlem yapılan personel");
     expect(workspace).toContain("SurecInlineBackButton");
     expect(workspace).toContain("testId=\"kayit-surec-personel-degistir\"");
     expect(workspace).toContain("beginChangeSurecPersonel");
@@ -21,12 +23,12 @@ describe("Kayit surec personel context dedup", () => {
     expect(workspace).not.toContain("Personeli Değiştir");
     expect(workspace).not.toContain("Personel Seçimi");
 
-    expect(genel).toContain("Genel bilgiler");
-    expect(genel).toContain("data-testid=\"kayit-surec-personel-duzenle\"");
+    expect(genel).not.toContain("Genel bilgiler");
+    expect(genel).toContain("<KayitSurecPersonelNameHeading");
+    // "Personeli Düzenle" metin düğmesi yok; kalem ikon (aria-label korunur) ad başlığında.
+    expect(genel).not.toContain("universal-btn-aux");
+    expect(genel).toContain("onEdit={canEdit && !isEditing ? openEdit : undefined}");
     expect(genel).not.toContain("surec-person-general-title");
-    expect(genel).not.toMatch(
-      /surec-shell-summary-kicker[\s\S]*\[personel\.ad,\s*personel\.soyad\]/
-    );
   });
 
   it("preserves picker engine and mutation lock owners", () => {

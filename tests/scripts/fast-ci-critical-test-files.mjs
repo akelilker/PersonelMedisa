@@ -37,5 +37,9 @@ export const fastCiCriticalTestFiles = [
   // 6) Canlı DB mutasyon kapısı — 099 Kalıcı Sil PREFLIGHT/APPLY workflow gate'leri
   //    meşgul/okunamayan worker, korumasız environment ve eşleşmeyen preflight'ta
   //    sunucuya istek dosyası bırakmadan durmalı.
-  "tests/unit/kalici-sil-099-workflows.test.ts"
+  "tests/unit/kalici-sil-099-workflows.test.ts",
+
+  // 7) Görünür UI regresyon kilitleri — iOS çift liste (native select focus) ve
+  //    kullanıcıya gösterilmeyecek Prim Kuralı (2026-10-10 tekrar eden regresyonlar).
+  "tests/unit/ui-regression-guards.test.tsx"
 ];

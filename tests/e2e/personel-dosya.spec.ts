@@ -362,7 +362,7 @@ test.describe("personel dosyasi surec akisi", () => {
     await expect(page).toHaveURL(/\/$/);
     await expect(surecModal.getByTestId("kayit-tab-surec")).toHaveAttribute("aria-selected", "true");
     await expect(surecModal.locator("[name='surec-create-personel']")).toHaveValue("1");
-    await expect(surecModal.locator(".workspace-personel-preview--compact strong")).toContainText(/Ayþe Yýlmaz/i, {
+    await expect(surecModal.getByTestId("kayit-surec-personel-ad-soyad")).toContainText("AyÅŸe YILMAZ", {
       timeout: 15_000
     });
 

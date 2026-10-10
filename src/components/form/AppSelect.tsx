@@ -72,6 +72,12 @@ export type AppSelectProps = {
   noResultsText?: string;
   /** Açılışta arama alanına odaklan (touch cihazlarda otomatik atlanır). */
   autoFocusSearch?: boolean;
+  /**
+   * Searchable varyant: arama alanı panelde ikinci bir input olarak değil, açıkken
+   * trigger'ın yerinde tek input olarak durur; kapalı/boş trigger `searchPlaceholder`
+   * metnini taşır (tek alan, çift input yok).
+   */
+  searchInTrigger?: boolean;
 };
 
 type PanelPlacement = "above" | "below";
@@ -112,6 +118,15 @@ function isTouchLikeDevice() {
     : false;
 }
 
+/**
+ * iOS/iPadOS (WebKit): bir kullanıcı jesti sırasında gizli native `<select>`'e focus()
+ * verilmesi sistem seçim listesini (popover/wheel) açar ve kanonik panelin ÜSTÜNE biner
+ * (çift liste). Dokunmatik cihazda native select hiç focus almaz; tek liste kanonik paneldir.
+ */
+function canFocusNativeSelect() {
+  return !isTouchLikeDevice();
+}
+
 function optionElementId(panelId: string, index: number) {
   return `${panelId}-option-${index}`;
 }
@@ -138,7 +153,8 @@ export function AppSelect({
   searchInputTestId,
   filterOptions,
   noResultsText,
-  autoFocusSearch = true
+  autoFocusSearch = true,
+  searchInTrigger = false
 }: AppSelectProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const selectRef = useRef<HTMLSelectElement>(null);
@@ -148,6 +164,14 @@ export function AppSelect({
   const panelId = `${controlId ?? "app-select"}-panel`;
 
   const [internalOpen, setInternalOpen] = useState(false);
+  // Dokunmatik mod: native select etkileşimsiz (tabIndex -1, aria-hidden, CSS ile görünmez),
+  // görsel trigger erişilebilir combobox owner'ı olur.
+  const [touchMode] = useState(isTouchLikeDevice);
+  const focusNativeSelect = useCallback(() => {
+    if (canFocusNativeSelect()) {
+      selectRef.current?.focus({ preventScroll: true });
+    }
+  }, []);
   const [internalSearch, setInternalSearch] = useState("");
   const isSearchControlled = searchValue !== undefined;
   const searchQuery = isSearchControlled ? searchValue : internalSearch;
@@ -235,7 +259,7 @@ export function AppSelect({
       setOpen(false);
 
       if (restoreFocus) {
-        selectRef.current?.focus({ preventScroll: true });
+        focusNativeSelect();
       }
     },
     [setOpen]
@@ -253,7 +277,7 @@ export function AppSelect({
     activePickerCloser = selfHandle.current;
     setActiveIndex(activeOptionIndex >= 0 ? activeOptionIndex : 0);
     setOpen(true);
-    selectRef.current?.focus({ preventScroll: true });
+    focusNativeSelect();
   }, [disabled, setOpen, activeOptionIndex]);
 
   const commit = useCallback(
@@ -379,7 +403,7 @@ export function AppSelect({
 
       // Native açılır listeyi engelle; kanonik panel owner olur.
       event.preventDefault();
-      selectRef.current?.focus({ preventScroll: true });
+      focusNativeSelect();
     },
     [disabled]
   );
@@ -404,7 +428,7 @@ export function AppSelect({
 
       // Görsel alan artık pointer owner; native select pointer-events:none.
       event.preventDefault();
-      selectRef.current?.focus({ preventScroll: true });
+      focusNativeSelect();
     },
     [disabled]
   );
@@ -542,6 +566,26 @@ export function AppSelect({
     [activeIndex, closePanel, commit, searchQuery, visibleOptions]
   );
 
+  const searchLivesInTrigger = searchable && searchInTrigger;
+  const triggerText =
+    showsPlaceholderText && searchLivesInTrigger && searchPlaceholder
+      ? searchPlaceholder
+      : selectedOption?.label ?? "Seçiniz";
+  const searchInput = searchable ? (
+    <input
+      ref={searchRef}
+      className={searchLivesInTrigger ? "app-select-trigger-search" : "form-input app-picker-search-input"}
+      type="search"
+      value={searchQuery ?? ""}
+      placeholder={searchPlaceholder}
+      aria-label={searchLabel ?? searchPlaceholder}
+      data-testid={searchInputTestId}
+      autoComplete="off"
+      onChange={(event) => setSearchQuery(event.target.value)}
+      onKeyDown={handleSearchKeyDown}
+    />
+  ) : null;
+
   const rootClassName = ["app-select", isOpen ? "is-open" : "", disabled ? "is-disabled" : "", className ?? ""]
     .filter(Boolean)
     .join(" ");
@@ -557,6 +601,8 @@ export function AppSelect({
         required={required}
         disabled={disabled}
         data-testid={dataTestId}
+        tabIndex={touchMode ? -1 : undefined}
+        aria-hidden={touchMode ? true : undefined}
         aria-expanded={isOpen}
         aria-controls={isOpen ? panelId : undefined}
         aria-activedescendant={isOpen && activeIndex >= 0 ? optionElementId(panelId, activeIndex) : undefined}
@@ -573,15 +619,24 @@ export function AppSelect({
         ))}
       </select>
 
+      {isOpen && searchLivesInTrigger ? (
+        <div className="app-select-trigger app-select-trigger--search form-input" data-app-select-trigger="1">
+          {searchInput}
+        </div>
+      ) : (
       <div
         className="app-select-trigger form-input"
         data-app-select-trigger="1"
-        aria-hidden="true"
+        aria-hidden={touchMode ? undefined : true}
+        role={touchMode ? "combobox" : undefined}
+        aria-label={touchMode ? ariaLabel : undefined}
+        aria-expanded={touchMode ? isOpen : undefined}
+        aria-controls={touchMode && isOpen ? panelId : undefined}
         onPointerDown={handleTriggerPointerDown}
         onClick={handleSelectClick}
       >
         <span className={`app-select-trigger-text${showsPlaceholderText ? " is-placeholder" : ""}`}>
-          {selectedOption?.label ?? "Seçiniz"}
+          {triggerText}
         </span>
         <svg
           className="app-select-chevron"
@@ -595,6 +650,7 @@ export function AppSelect({
           <path d="M6 9l6 6 6-6" />
         </svg>
       </div>
+      )}
 
       {isOpen ? (
         <div
@@ -607,20 +663,9 @@ export function AppSelect({
           aria-label={ariaLabel}
           onMouseDown={searchable ? undefined : (event) => event.preventDefault()}
         >
-          {searchable ? (
+          {searchable && !searchLivesInTrigger ? (
             <div className="app-picker-search" data-app-select-search="1">
-              <input
-                ref={searchRef}
-                className="form-input app-picker-search-input"
-                type="search"
-                value={searchQuery ?? ""}
-                placeholder={searchPlaceholder}
-                aria-label={searchLabel ?? searchPlaceholder}
-                data-testid={searchInputTestId}
-                autoComplete="off"
-                onChange={(event) => setSearchQuery(event.target.value)}
-                onKeyDown={handleSearchKeyDown}
-              />
+              {searchInput}
             </div>
           ) : null}
 

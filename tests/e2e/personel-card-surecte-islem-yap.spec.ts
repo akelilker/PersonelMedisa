@@ -28,7 +28,7 @@ async function openPersonelCardGateway(page: Page) {
   await expect(modal.getByRole("heading", { name: /Kayıt ve Süreç İşlemleri/i })).toBeVisible();
   await expect(modal.getByTestId("kayit-tab-surec")).toHaveAttribute("aria-selected", "true");
   await expect(modal.locator("[name='surec-create-personel']")).toHaveValue("1");
-  await expect(modal.locator(".workspace-personel-preview--compact strong")).toContainText(/Ayşe Yılmaz/i, {
+  await expect(modal.getByTestId("kayit-surec-personel-ad-soyad")).toContainText("Ayşe YILMAZ", {
     timeout: 15_000
   });
 

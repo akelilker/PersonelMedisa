@@ -3,6 +3,7 @@ import { getApiErrorMessage } from "../../../api/api-client";
 import { updatePersonel } from "../../../api/personeller.api";
 import type { PersonelReferenceBundle } from "../../../data/app-data.types";
 import { dataCacheKeys, deleteCacheEntry, getActiveSube } from "../../../data/data-manager";
+import { formatIsoDateDetail } from "../../../lib/display/iso-date-format";
 import { displayUcretTipiLabel } from "../../../lib/display/ucret-tipi-display";
 import { computeHasLifecycleDiff } from "../../../lib/personel-lifecycle-diff";
 import type { Personel } from "../../../types/personel";
@@ -14,6 +15,7 @@ import {
   type EditPersonelFormState
 } from "../../personeller/personel-edit-utils";
 import { formatGeneralField, formatMoneyField } from "../kayit-surec-utils";
+import { KayitSurecPersonelNameHeading } from "./KayitSurecPersonelNameHeading";
 
 type KayitSurecPersonelGenelPanelProps = {
   personel: Personel;
@@ -88,8 +90,8 @@ export function KayitSurecPersonelGenelPanel({
     () => [
       {
         items: [
-          { label: "T.C. Kimlik No", value: formatGeneralField(personel.tc_kimlik_no) },
-          { label: "Doğum Tarihi", value: formatGeneralField(personel.dogum_tarihi) },
+          { label: "T.C. Kimlik No.", value: formatGeneralField(personel.tc_kimlik_no) },
+          { label: "Doğum Tarihi", value: formatIsoDateDetail(personel.dogum_tarihi) },
           { label: "Doğum Yeri", value: formatGeneralField(personel.dogum_yeri) },
           { label: "Telefon", value: formatGeneralField(personel.telefon) },
           { label: "Kan Grubu", value: formatGeneralField(personel.kan_grubu) },
@@ -99,8 +101,8 @@ export function KayitSurecPersonelGenelPanel({
       },
       {
         items: [
-          { label: "Sicil No", value: formatGeneralField(personel.sicil_no) },
-          { label: "İşe Giriş Tarihi", value: formatGeneralField(personel.ise_giris_tarihi) },
+          { label: "Sicil No.", value: formatGeneralField(personel.sicil_no) },
+          { label: "İşe Giriş Tarihi", value: formatIsoDateDetail(personel.ise_giris_tarihi) },
           {
             label: "Ücret Tipi",
             value: formatGeneralField(
@@ -110,8 +112,8 @@ export function KayitSurecPersonelGenelPanel({
           {
             label: "Maaş (uyumluluk)",
             value: canViewUcret ? formatMoneyField(personel.maas_tutari) : "-"
-          },
-          { label: "Prim Kuralı", value: formatGeneralField(personel.prim_kurali_adi) }
+          }
+          // Prim Kuralı kullanıcıya gösterilmez (onaylı karar); veri/API değişmez.
         ]
       }
     ],
@@ -130,6 +132,12 @@ export function KayitSurecPersonelGenelPanel({
     ],
     [personel]
   );
+
+  function openEdit() {
+    setEditErrorMessage(null);
+    setEditInfoMessage(null);
+    setIsEditing(true);
+  }
 
   const discardEdit = useCallback(() => {
     setIsEditing(false);
@@ -201,31 +209,32 @@ export function KayitSurecPersonelGenelPanel({
   return (
     <div className="surec-person-general-panel" data-testid="kayit-surec-personel-genel-panel">
       <div className="surec-person-general-head">
-        <h4 className="surec-shell-summary-kicker">Genel bilgiler</h4>
+        {/* Aktif alt sekme zaten kırmızı vurgulu; başlık yerine personelin Ad SOYAD'ı + durum noktası. */}
+        <KayitSurecPersonelNameHeading
+          personel={personel}
+          onEdit={canEdit && !isEditing ? openEdit : undefined}
+          editDisabled={isSubmitting}
+        />
         <div className="surec-person-photo-box" aria-label="Personel fotoğrafı">
           <div className="surec-person-photo-avatar" aria-hidden="true">
-            {`${personel.ad?.[0] ?? ""}${personel.soyad?.[0] ?? ""}`.toUpperCase() || "P"}
+            {`${personel.ad?.[0] ?? ""}${personel.soyad?.[0] ?? ""}`.toLocaleUpperCase("tr-TR") || "P"}
           </div>
-        </div>
-      </div>
-
-      {canEdit && !isEditing ? (
-        <div className="workspace-inline-actions">
+          {/* Fotoğraf yükleme API'si yok (onaylı karar: yeni upload API icat edilmez); yalnız işaret. */}
           <button
             type="button"
-            className="universal-btn-aux"
-            data-testid="kayit-surec-personel-duzenle"
-            disabled={isSubmitting}
-            onClick={() => {
-              setEditErrorMessage(null);
-              setEditInfoMessage(null);
-              setIsEditing(true);
-            }}
+            className="surec-person-photo-edit"
+            aria-label="Fotoğraf yükleme yakında"
+            title="Fotoğraf yükleme yakında"
+            data-testid="kayit-surec-personel-foto-duzenle"
+            disabled
           >
-            Personeli Düzenle
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+              <path d="M12 20h9" />
+              <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z" />
+            </svg>
           </button>
         </div>
-      ) : null}
+      </div>
 
       {isPasif ? (
         <p className="workspace-empty-hint" data-testid="kayit-surec-personel-genel-pasif-hint">
@@ -263,9 +272,6 @@ export function KayitSurecPersonelGenelPanel({
             className="surec-person-general-column"
             data-testid="kayit-surec-personel-genel-org-readonly"
           >
-            <p className="personel-form-note personel-form-note--info">
-              Organizasyon özeti salt okunur. Değişiklik için Süreç → Görev / Organizasyon sekmesini kullanın.
-            </p>
             <div className="surec-shell-summary-grid">
               {orgSummaryItems.map((item) => (
                 <div key={`org-${item.label}`} className="surec-shell-summary-item">

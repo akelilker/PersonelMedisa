@@ -67,13 +67,15 @@ describe("PersonelDosyaHero durum", () => {
 });
 
 describe("Kayıt ve Süreç personel bağlamı durum (aynı karar)", () => {
-  const source = readFileSync("src/features/kayit/components/KayitSurecWorkspace.tsx", "utf8");
+  // Özet kartı kaldırıldı (2026-10-10); durum noktası Genel panelindeki Ad SOYAD başlığının sağında.
+  const source = readFileSync("src/features/kayit/components/KayitSurecPersonelNameHeading.tsx", "utf8");
 
   it("yalnız açıkça AKTIF aktif sayılır; aktifte görünür metin yok, aria-label korunur", () => {
-    expect(source).toMatch(/const isActive = personel\.aktif_durum === "AKTIF";/);
-    expect(source).toMatch(/isActive \? null : <span>\{durumLabel\}<\/span>/);
+    expect(source).toMatch(/const isAktif = personel\.aktif_durum === "AKTIF";/);
+    expect(source).toMatch(/isAktif \? null : <span aria-hidden="true">\{durumLabel\}<\/span>/);
     expect(source).toMatch(/aria-label=\{durumLabel\}/);
+    expect(source).toMatch(/title=\{durumLabel\}/);
     expect(source).toMatch(/data-testid="kayit-surec-personel-durum"/);
-    expect(source).toMatch(/isPassive \? " is-passive" : isActive \? "" : " is-unknown"/);
+    expect(source).toMatch(/isPasif \? " is-passive" : isAktif \? "" : " is-unknown"/);
   });
 });

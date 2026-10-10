@@ -92,6 +92,27 @@ const SCREENS: Screen[] = [
     }
   },
   {
+    name: "Kayıt ve Süreç — Süreç (personel seçili)",
+    open: async (page) => {
+      await page.goto("/");
+      await page.getByTestId("menu-kayit-surec").click();
+      const modal = page.locator(".modal-container--kayit-surec").last();
+      await modal.getByRole("button", { name: "Süreç" }).click();
+      await modal.getByRole("combobox", { name: "Personel" }).click();
+      await modal.getByRole("option", { name: /Ayşe Yılmaz/i }).click();
+      return modal.getByTestId("kayit-surec-personel-degistir");
+    }
+  },
+  {
+    name: "Kayıt ve Süreç — Puantaj alt işlemi",
+    open: async (page) => {
+      const modal = page.locator(".modal-container--kayit-surec").last();
+      await modal.getByTestId("kayit-surec-subtab-puantaj").click();
+      await modal.getByRole("button", { name: "İzin ve Devamsızlık" }).click();
+      return modal.getByTestId("kayit-surec-puantaj-inline-back");
+    }
+  },
+  {
     name: "Toplu Kayıt Aktarma",
     open: async (page) => {
       await page.goto("/");
@@ -132,14 +153,22 @@ for (const [label, width, height] of [
       expect(reference.top).toBeGreaterThanOrEqual(12);
       expect(reference.top).toBeLessThanOrEqual(14);
 
+      if (process.env.SHOT_DIR) {
+        await page.screenshot({ path: `${process.env.SHOT_DIR}/v2-backrow-${width}-anlik-personel-durumu.png` });
+      }
       const results: Record<string, ArrowGeometry> = { "Anlık Personel Durumu": reference };
       for (const screen of SCREENS) {
         const back = await screen.open(page);
         const geometry = await measureArrow(back);
         results[screen.name] = geometry;
+        if (process.env.SHOT_DIR) {
+          const slug = screen.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+          await page.screenshot({ path: `${process.env.SHOT_DIR}/v2-backrow-${width}-${slug}.png` });
+        }
         expect.soft(Math.abs(geometry.top - reference.top), `${screen.name} üst boşluk`).toBeLessThanOrEqual(1);
         expect.soft(Math.abs(geometry.left - reference.left), `${screen.name} sol x`).toBeLessThanOrEqual(1);
       }
+      console.log(`BACKBAR_GEOMETRY ${width} ${JSON.stringify(results)}`);
       test.info().attach("back-bar-geometry", {
         body: JSON.stringify(results, null, 2),
         contentType: "application/json"

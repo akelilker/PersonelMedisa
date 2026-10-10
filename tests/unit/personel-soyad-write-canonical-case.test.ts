@@ -104,9 +104,11 @@ describe("Yönetim kullanıcı ad_soyad WRITE canonical case", () => {
 describe("görünüm katmanı (SOYAD BÜYÜK) korunur", () => {
   it("YonetimPaneliPage display formatı soyadı hâlâ uppercase gösterir", () => {
     const source = readSource("src/features/yonetim/pages/YonetimPaneliPage.tsx");
+    const displayOwner = readSource("src/lib/display/ad-soyad-display.ts");
 
-    // Display formatter soyadı uppercase yapar.
-    expect(source).toContain('soyad.toLocaleUpperCase("tr-TR")');
+    // Display formatter (tek sahip: lib/display/ad-soyad-display) soyadı uppercase yapar.
+    expect(displayOwner).toContain('soyad.toLocaleUpperCase("tr-TR")');
+    expect(source).toContain('import { formatAdSoyad } from "../../../lib/display/ad-soyad-display";');
     // Display formatter list/card görünümünde kullanılmaya devam eder.
     expect(source).toContain("formatAdSoyad(item.ad_soyad)");
     // WRITE payload'ı artık display formatını değil write normalizasyonunu kullanır.

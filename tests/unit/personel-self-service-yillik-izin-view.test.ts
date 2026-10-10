@@ -49,7 +49,7 @@ describe("buildSelfServiceYillikIzinView", () => {
       })
     );
     expect(view?.hakBasladi).toBe(false);
-    expect(view?.rowText).toContain("11.08.2026");
+    expect(view?.rowText).toContain("11/08/2026");
     expect(view?.rowText).toContain("tarihinde başlar");
   });
 });

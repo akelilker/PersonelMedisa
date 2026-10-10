@@ -51,7 +51,12 @@ describe("kayit-surec selected-person process navigation", () => {
     const workspace = read("src/features/kayit/components/KayitSurecWorkspace.tsx");
     const processNav = read("src/features/kayit/components/KayitSurecPersonelProcessNav.tsx");
     expect(processNav).toContain('data-testid="kayit-surec-person-process-nav"');
-    expect(workspace).toMatch(/selectedSurecPersonel \?\s*\(\s*<KayitSurecPersonelProcessNav/);
+    // Geri satırı modal-body'nin doğrudan çocuğu (sekme satırının üstünde); alt sekmeler
+    // sabit üst blokta sekme satırının altında (yalnız personel seçiliyken).
+    expect(workspace).toMatch(/<SurecInlineBackButton[\s\S]*?<div\s+className=\{`kayit-workspace/);
+    expect(workspace).toMatch(
+      /selectedSurecPersonel \?\s*\(\s*<div className="kayit-surec-person-head"[^>]*>\s*<KayitSurecPersonelProcessNav/
+    );
   });
 
   it("resets puantaj subdomain state on person switch", () => {

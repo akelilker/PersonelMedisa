@@ -60,6 +60,7 @@ import { KayitSurecPersonelPuantajPanel } from "./KayitSurecPersonelPuantajPanel
 import { KayitSurecPersonelUcretPanel } from "./KayitSurecPersonelUcretPanel";
 import { KayitSurecTabHeader } from "./KayitSurecTabHeader";
 import { SurecInlineBackButton } from "./SurecInlineBackButton";
+import { KayitSurecPersonelNameHeading } from "./KayitSurecPersonelNameHeading";
 import { YillikIzinHakDuzeltmePanel } from "./YillikIzinHakDuzeltmePanel";
 import { buildCreatePersonelPayload } from "../../../features/personeller/personel-create-utils";
 import { SurecFormFields } from "../../../features/surecler/components/SurecFormFields";
@@ -73,7 +74,6 @@ import { INITIAL_CREATE_PERSONEL_FORM, usePersonelZimmetCreate, type CreatePerso
 import { INITIAL_SUREC_FORM, type SurecFormState } from "../../../hooks/useSurecler";
 import { useRoleAccess } from "../../../hooks/use-role-access";
 import { dispatchRefreshBugunPersonelDurumu } from "../../../lib/bildirim/bugun-personel-durumu-events";
-import { formatAktifDurumLabel } from "../../../lib/display/enum-display";
 import type { Personel } from "../../../types/personel";
 import type { IdOption, KeyOption } from "../../../types/referans";
 import type { Surec } from "../../../types/surec";
@@ -147,63 +147,6 @@ function IconSearch(props: { className?: string }) {
       <circle cx="11" cy="11" r="8" />
       <path d="m21 21-4.3-4.3" />
     </svg>
-  );
-}
-
-function KayitSurecPersonelContext({ personel }: { personel: Personel }) {
-  const fullName = [personel.ad, personel.soyad].filter(Boolean).join(" ") || "Personel";
-  const initials = `${personel.ad?.[0] ?? ""}${personel.soyad?.[0] ?? ""}`.toUpperCase() || "P";
-  const isPassive = personel.aktif_durum === "PASIF";
-  // Yalnız açıkça AKTIF olan kayıt aktif sayılır; boş/bilinmeyen durum yeşil gösterilmez.
-  const isActive = personel.aktif_durum === "AKTIF";
-  const aktifDurumLabel = formatAktifDurumLabel(personel.aktif_durum);
-  const durumLabel = isPassive
-    ? personel.pasiflik_durumu_etiketi ?? "Pasif"
-    : aktifDurumLabel !== "-"
-      ? aktifDurumLabel
-      : "Durum Bilinmiyor";
-  const durumClass = isPassive ? " is-passive" : isActive ? "" : " is-unknown";
-
-  return (
-    <section
-      className={`kayit-personel-context workspace-personel-preview--compact${isPassive ? " is-passive" : ""}`}
-      aria-label="Seçili personel bağlamı"
-      data-testid="kayit-surec-personel-context"
-    >
-      <div className="kayit-personel-context-avatar" aria-hidden="true">
-        {initials}
-      </div>
-      <div className="kayit-personel-context-copy">
-        <p className="kayit-personel-context-kicker">İşlem yapılan personel</p>
-        <h3>
-          <strong>{fullName}</strong>
-        </h3>
-        <p className="kayit-personel-context-meta">
-          Sicil {personel.sicil_no ?? "-"} · {personel.departman_adi ?? "-"} · {personel.gorev_adi ?? "-"}
-        </p>
-      </div>
-      <div className="kayit-personel-context-aside">
-        <dl className="kayit-personel-context-facts">
-          <div>
-            <dt>Durum</dt>
-            {/* Aktif: yalnız yeşil nokta (görünür "Çalışıyor"/pill yok). Pasif: kırmızı nokta + ayrılış açıklaması. */}
-            <dd
-              className={`kayit-personel-context-status${durumClass}`}
-              aria-label={durumLabel}
-              title={durumLabel}
-              data-testid="kayit-surec-personel-durum"
-            >
-              <span className="kayit-personel-context-status-dot" aria-hidden="true" />
-              {isActive ? null : <span>{durumLabel}</span>}
-            </dd>
-          </div>
-          <div>
-            <dt>İşe giriş</dt>
-            <dd>{personel.ise_giris_tarihi ?? "-"}</dd>
-          </div>
-        </dl>
-      </div>
-    </section>
   );
 }
 
@@ -1310,32 +1253,52 @@ export function KayitSurecWorkspace({
     };
   }, [onFooterModelChange]);
 
+  // Tek geri satırı (header-adjacent slot): Puantaj alt işlemi açıksa bir üst seviye
+  // "← Puantaj", aksi halde personel seçimine "← Personel".
+  const puantajInlineOpen =
+    activePersonelTab === "puantaj" && (Boolean(devamsizlikSubId) || hakDuzeltmeOpen);
+
   return (
+    <>
+      {/* Geri satırı modal-body'nin doğrudan çocuğu: tek sahip modal.css
+          `.modal-body > .universal-back-bar` ile kırmızı header'ın hemen altında, sola yaslı
+          (tüm ekranlarla aynı nokta); Kayıt/Süreç sekme satırının ÜSTÜNDE. */}
+      {activeTab === "surec" && selectedSurecPersonel ? (
+        puantajInlineOpen ? (
+          <SurecInlineBackButton
+            label="Puantaj"
+            onClick={backToPuantajHub}
+            testId="kayit-surec-puantaj-inline-back"
+          />
+        ) : (
+          <SurecInlineBackButton
+            label={KAYIT_SUREC_PERSONEL_PICKER_LABEL}
+            onClick={beginChangeSurecPersonel}
+            testId="kayit-surec-personel-degistir"
+            disabled={personelContextLocked}
+          />
+        )
+      ) : null}
     <div
       className={`kayit-workspace${activeTab === "yeni-kayit" ? " kayit-workspace--personel-kayit" : ""}`}
     >
-      <KayitSurecTabHeader activeTab={activeTab} onTabChange={onTabChange} />
+      {/* Sabit üst blok: Kayıt/Süreç sekmeleri + (personel seçiliyken) alt sekmeler.
+          İçerik kayarken birlikte yerinde kalır; özet kartı yoktur (bilgiler Genel panelinde). */}
+      <div className="kayit-workspace-sticky-top" data-testid="kayit-workspace-sticky-top">
+        <KayitSurecTabHeader activeTab={activeTab} onTabChange={onTabChange} />
+        {activeTab === "surec" && selectedSurecPersonel ? (
+          <div className="kayit-surec-person-head" data-testid="kayit-surec-person-head">
+            <KayitSurecPersonelProcessNav
+              tabs={visiblePersonelSurecTabs}
+              activeTab={activePersonelTab}
+              locked={personelContextLocked}
+              onSelect={selectPersonelTab}
+            />
+          </div>
+        ) : null}
+      </div>
 
       <div className="kayit-workspace-scroll-body" data-testid="kayit-workspace-scroll-body">
-      {activeTab === "surec" && selectedSurecPersonel ? (
-        <SurecInlineBackButton
-          label={KAYIT_SUREC_PERSONEL_PICKER_LABEL}
-          onClick={beginChangeSurecPersonel}
-          testId="kayit-surec-personel-degistir"
-          disabled={personelContextLocked}
-        />
-      ) : null}
-      {activeTab === "surec" && selectedSurecPersonel ? (
-        <KayitSurecPersonelContext personel={selectedSurecPersonel} />
-      ) : null}
-      {activeTab === "surec" && selectedSurecPersonel ? (
-        <KayitSurecPersonelProcessNav
-          tabs={visiblePersonelSurecTabs}
-          activeTab={activePersonelTab}
-          locked={personelContextLocked}
-          onSelect={selectPersonelTab}
-        />
-      ) : null}
       {activeTab === "surec" && showSurecPersonelPickerSurface ? (
         <div className="surec-workspace-toolbar" ref={surecSearchToolbarRef}>
           <button
@@ -1454,6 +1417,7 @@ export function KayitSurecWorkspace({
                             searchValue={surecPersonelSearch}
                             onSearchValueChange={setSurecPersonelSearch}
                             searchPlaceholder="Ad/Soyad Veya Sicil No. Girin."
+                            searchInTrigger
                             searchInputTestId="kayit-surec-personel-panel-search"
                             noResultsText="Aramaya uygun personel bulunamadı."
                             ariaLabel="Personel listesi"
@@ -1469,6 +1433,10 @@ export function KayitSurecWorkspace({
 
                     {selectedSurecPersonel ? (
                       <div className="surec-person-shell">
+                        {/* Genel dışı sekmelerde de hangi personelde çalışıldığı görünür (Genel'de panel başlığı). */}
+                        {activePersonelTab !== "genel" ? (
+                          <KayitSurecPersonelNameHeading personel={selectedSurecPersonel} />
+                        ) : null}
                         {activePersonelTab === "genel" ? (
                           <KayitSurecPersonelGenelPanel
                             personel={selectedSurecPersonel}
@@ -1490,7 +1458,6 @@ export function KayitSurecWorkspace({
                             isPassive={isSelectedPersonelPasif}
                             onSelectDevamsizlikSub={selectDevamsizlikSubCard}
                             onOpenHakDuzeltme={openPuantajHakDuzeltme}
-                            onBackToPuantajHub={backToPuantajHub}
                           >
                             {hakDuzeltmeOpen ? (
                               <YillikIzinHakDuzeltmePanel
@@ -1835,5 +1802,6 @@ export function KayitSurecWorkspace({
       )}
       </div>
     </div>
+    </>
   );
 }

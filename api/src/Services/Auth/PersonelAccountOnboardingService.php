@@ -41,6 +41,11 @@ class PersonelAccountOnboardingService
     /**
      * Canonical first-login gecisinde mutation cohort'undan HARIC tutulan rezerve kullanici adlari.
      * Bu hesaplarin username / password_hash / rol / durum / personel_id / scope alanlari degismez.
+     *
+     * TARIHSEL (Medisa tek seferlik rollout raporu, replay engelli): plan fingerprint ve
+     * rapor sozlesmesi (protected_usernames / ilkera_*) bu listeye baglidir; degistirilmez.
+     * Kisiden bagimsiz koruma: cohort yalniz rol = PERSONEL'dir ve `users.silinmesi_korunur = 1`
+     * olan her hesap da ayni dislama kovasina alinir (bkz. isProtectedCredentialRow).
      */
     public const PROTECTED_USERNAMES = ['ilkerA'];
 
@@ -533,7 +538,7 @@ class PersonelAccountOnboardingService
                 'personel_id' => $row['personel_id'] !== null ? (int) $row['personel_id'] : null,
             ];
 
-            if (isset($protected[strtolower($username)])) {
+            if (isset($protected[strtolower($username)]) || self::isProtectedCredentialRow($row)) {
                 $excluded['protected_username'][] = $entry;
                 continue;
             }
@@ -1255,11 +1260,23 @@ class PersonelAccountOnboardingService
     /**
      * @return array<int, array<string, mixed>>
      */
+    /**
+     * Kisiden bagimsiz koruma: silinmesi_korunur bayragi olan hesap credential
+     * gecisinde mutate edilmez (kolon yoksa bayrak yok sayilir).
+     *
+     * @param array<string, mixed> $row
+     */
+    private static function isProtectedCredentialRow(array $row): bool
+    {
+        return isset($row['silinmesi_korunur']) && (int) $row['silinmesi_korunur'] === 1;
+    }
+
     private static function loadPersonelCredentialRows(PDO $pdo)
     {
+        $korumaKolonu = UsersSchema::hasSilinmesiKorunur($pdo) ? ', u.silinmesi_korunur' : '';
         $stmt = $pdo->query(
             "SELECT u.id AS user_id, u.username, u.durum AS user_durum, u.personel_id,
-                    u.activation_required, u.must_change_password,
+                    u.activation_required, u.must_change_password{$korumaKolonu},
                     p.id AS personel_row_id, p.ad AS personel_ad, p.soyad AS personel_soyad,
                     p.aktif_durum AS personel_aktif_durum
                FROM users u

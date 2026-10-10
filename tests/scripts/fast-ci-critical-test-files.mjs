@@ -41,5 +41,8 @@ export const fastCiCriticalTestFiles = [
 
   // 7) Görünür UI regresyon kilitleri — iOS çift liste (native select focus) ve
   //    kullanıcıya gösterilmeyecek Prim Kuralı (2026-10-10 tekrar eden regresyonlar).
-  "tests/unit/ui-regression-guards.test.tsx"
+  "tests/unit/ui-regression-guards.test.tsx",
+
+  // 8) Kişiden bağımsız hesap koruması: kişi anahtarı yalnız tarihsel sahiplerde.
+  "tests/unit/kisiden-bagimsiz-koruma.source.test.ts"
 ];

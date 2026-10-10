@@ -782,16 +782,19 @@ final class KullaniciKaliciSilService
         if (!self::tableExists($pdo, self::PROTECTED_ACCOUNTS_TABLE)) {
             return false;
         }
+        // Kişiden bağımsız: koruma `users.silinmesi_korunur` bayrağı + rol kuralıyla
+        // (GENEL_YONETICI hedef engeli) sağlanır; belirli kayıt anahtarları/kişi sayısı
+        // aranmaz. Kayıt (099 registry) boş olabilir (yeni şirket kurulumu). Kayıttaki
+        // her hesap ise bayrağını taşımalıdır; bayrağı düşmüş kayıt = sapma, fail-closed.
         try {
             $stmt = $pdo->query(
                 "SELECT COUNT(*)
                  FROM " . self::PROTECTED_ACCOUNTS_TABLE . " p
-                 INNER JOIN users u ON u.id = p.user_id
-                 WHERE p.protection_key IN ('ILKER_A', 'SERHAN_KOSE')
-                   AND u.silinmesi_korunur = 1"
+                 LEFT JOIN users u ON u.id = p.user_id
+                 WHERE u.id IS NULL OR u.silinmesi_korunur <> 1"
             );
 
-            return (int) $stmt->fetchColumn() === 2;
+            return (int) $stmt->fetchColumn() === 0;
         } catch (\Throwable $e) {
             return false;
         }

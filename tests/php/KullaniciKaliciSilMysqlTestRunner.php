@@ -828,14 +828,25 @@ try {
         'the renamed account still names the protected blocker via the stable flag'
     );
 
-    // Missing verified identity registry must never make any account appear
-    // deletable, even though the stable flag column itself still exists.
+    // Kişiden bağımsız koruma: registry'de belirli kişi anahtarları aranmaz. Boş
+    // registry (yeni kurulum) Kalıcı Sil'i kapatmaz; koruma bayrak + rol kuralıyla sürer.
     $pdo->exec('DELETE FROM user_kalici_silme_korunan_hesaplar');
     $elig = ksaEligibility($pdo, $gy, 10);
-    ksaAssert($elig['verdict'] === 'DOĞRULANAMADI', 'a missing protected-account registry resolves eligibility to DOĞRULANAMADI');
+    ksaAssert($elig['verdict'] !== 'DOĞRULANAMADI', 'B1 an empty protected-account registry no longer disables eligibility (person-independent)');
+    $elig = ksaEligibility($pdo, $gy, 4);
+    ksaAssert($elig['verdict'] === 'ENGELLENDİ', 'B2 a silinmesi_korunur account stays protected without any registry row');
+    $r = ksaHttp($pdo, $gy, 'kullanici_kalici_sil', ['id' => 4, 'confirm_username' => (string) (ksaUser($pdo, 4)['username'] ?? ''), 'gerekce' => 'x']);
+    ksaAssert($r['status'] === 409 && ksaUser($pdo, 4) !== null, 'B3 the flag alone refuses deleting a protected account');
+    $elig = ksaEligibility($pdo, $gy, 6);
+    ksaAssert($elig['verdict'] === 'ENGELLENDİ', 'B4 a GENEL_YONETICI target stays blocked by role, independent of registry');
+    // Registry drift (registered account lost its flag) fails closed.
+    $pdo->exec("INSERT INTO user_kalici_silme_korunan_hesaplar (protection_key, user_id) VALUES ('ILKER_A', 10)");
+    $elig = ksaEligibility($pdo, $gy, 10);
+    ksaAssert($elig['verdict'] === 'DOĞRULANAMADI', 'B5 a registry row whose user lacks the flag resolves eligibility to DOĞRULANAMADI');
     $r = ksaHttp($pdo, $gy, 'kullanici_kalici_sil', ['id' => 10, 'confirm_username' => 'unverified', 'gerekce' => 'x']);
-    ksaAssert($r['status'] === 409, 'the missing protected-account registry refuses deletion with 409');
-    ksaAssert(ksaUser($pdo, 10) !== null, 'the missing protected-account registry refusal deleted nothing');
+    ksaAssert($r['status'] === 409, 'B6 registry drift refuses deletion with 409');
+    ksaAssert(ksaUser($pdo, 10) !== null, 'B7 the registry drift refusal deleted nothing');
+    $pdo->exec('DELETE FROM user_kalici_silme_korunan_hesaplar');
     $pdo->exec(
         "INSERT INTO user_kalici_silme_korunan_hesaplar (protection_key, user_id)
          VALUES ('ILKER_A', 4), ('SERHAN_KOSE', 5)"

@@ -25,7 +25,13 @@ function parseIsoDateOnly(value: string): IsoDateParts | null {
   return { y, m, d };
 }
 
-/** Formats a YYYY-MM-DD calendar date as zero-padded tr-TR (e.g. 15.07.2026). */
+/**
+ * Görünür takvim tarihi ayırıcısının TEK yeri (kullanıcı kararı: gg/aa/yyyy).
+ * Noktalı Türkçe biçime (gg.aa.yyyy) geçmek için yalnız bu sabit "." yapılır.
+ */
+export const DISPLAY_DATE_SEPARATOR = "/";
+
+/** Formats a YYYY-MM-DD calendar date as zero-padded gg/aa/yyyy (e.g. 15/07/2026). */
 export function formatIsoDateDetail(value: string | null | undefined): string {
   if (typeof value !== "string" || !value.trim()) {
     return "-";
@@ -36,10 +42,7 @@ export function formatIsoDateDetail(value: string | null | undefined): string {
     return "-";
   }
 
-  return new Intl.DateTimeFormat("tr-TR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    timeZone: "UTC"
-  }).format(new Date(Date.UTC(parts.y, parts.m - 1, parts.d)));
+  const dd = String(parts.d).padStart(2, "0");
+  const mm = String(parts.m).padStart(2, "0");
+  return [dd, mm, String(parts.y)].join(DISPLAY_DATE_SEPARATOR);
 }

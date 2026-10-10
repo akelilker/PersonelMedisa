@@ -352,7 +352,7 @@ test.describe("Süreç personel bağlam seçici (searchable canonical picker)", 
     await expect(page.locator("[name='surec-create-personel']")).toHaveValue("1");
     await expect(page.locator(PANEL)).toHaveCount(0);
     expect(await page.locator(".app-picker-blurred").count()).toBe(0);
-    await expect(kayitModal.getByTestId("kayit-surec-personel-context")).toContainText(/Ayşe Yılmaz/i);
+    await expect(kayitModal.getByTestId("kayit-surec-personel-ad-soyad")).toContainText("Ayşe YILMAZ");
 
     await page.screenshot({ path: join(OUT_DIR, "08-1280-SUREC-PERSONEL-SELECTED.png") });
   });
@@ -428,7 +428,8 @@ test.describe("Süreç personel bağlam seçici (searchable canonical picker)", 
       const geometry = await panel.evaluate((element) => {
         const rect = element.getBoundingClientRect();
         const option = element.querySelector(".app-select-option") as HTMLElement | null;
-        const searchInput = element.querySelector(".app-picker-search-input") as HTMLElement | null;
+        // Arama tek input olarak trigger'ın yerinde (searchInTrigger): panelde ikinci input yok.
+        const searchInput = document.querySelector("[data-testid='kayit-surec-personel-panel-search']") as HTMLElement | null;
         return {
           left: rect.left,
           right: rect.right,

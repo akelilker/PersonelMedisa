@@ -123,13 +123,13 @@ describe("ui correction batch — modal back + missing info owners", () => {
   });
 
   it("puantaj inline child flows expose canonical back to Puantaj hub", () => {
+    // 2026-10-10: tek geri satırı slotu (header altı) Puantaj alt işleminde "← Puantaj" olur;
+    // panel içinde ikinci (gömülü) geri satırı yoktur.
     const panel = read("src/features/kayit/components/KayitSurecPersonelPuantajPanel.tsx");
-    expect(panel).toMatch(/SurecInlineBackButton/);
-    expect(panel).toMatch(/label="Puantaj"/);
+    expect(panel).not.toMatch(/SurecInlineBackButton/);
 
     const workspace = read("src/features/kayit/components/KayitSurecWorkspace.tsx");
-    expect(workspace).toMatch(/backToPuantajHub/);
-    expect(workspace).toMatch(/onBackToPuantajHub=\{backToPuantajHub\}/);
+    expect(workspace).toMatch(/puantajInlineOpen \?\s*\(\s*<SurecInlineBackButton\s+label="Puantaj"\s+onClick=\{backToPuantajHub\}/);
   });
 
   it("görev/organizasyon Vazgeç resets extended sube transfer state", () => {

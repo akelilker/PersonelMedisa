@@ -98,9 +98,6 @@
   align-items: flex-end;
   flex: none;
   gap: 24px;
-  position: sticky;
-  top: 0;
-  z-index: 12;
   margin: 0;
   min-height: 60px;
   padding: 0 clamp(12px, 2vw, 18px);
@@ -120,101 +117,110 @@
   box-sizing: border-box;
 }
 
-.kayit-personel-context {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  gap: var(--space-3);
-  align-items: center;
-  padding: var(--space-3);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-md);
-  background: var(--bg-surface-elevated);
-}
-
-.kayit-personel-context-avatar {
-  display: grid;
-  place-items: center;
-  width: 44px;
-  height: 44px;
-  border: 1px solid rgba(var(--theme-color-rgb), 0.5);
-  border-radius: var(--radius-md);
-  background: rgba(var(--theme-color-rgb), 0.1);
-  color: var(--text-primary);
-  font-size: 14px;
-  font-weight: 700;
-}
-
-.kayit-personel-context-copy {
-  min-width: 0;
-}
-
-.kayit-personel-context-copy h3,
-.kayit-personel-context-copy p {
-  margin: 0;
-}
-
-.kayit-personel-context-kicker {
-  color: var(--text-muted);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.kayit-personel-context-copy h3 {
-  margin-top: 2px;
-  color: var(--text-primary);
-  font-size: 16px;
-  line-height: 1.25;
-}
-
-.kayit-personel-context-copy .kayit-personel-context-meta {
-  margin-top: 3px;
-  overflow: hidden;
-  color: var(--text-secondary);
-  font-size: 12px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.kayit-personel-context-aside {
-  display: grid;
-  gap: var(--space-2);
-  justify-items: end;
-  align-content: center;
-}
-
-.kayit-personel-context-facts {
+/* Sabit üst blok (tek sticky sahibi): Kayıt/Süreç sekme satırı + seçili personelde geri
+   satırı ve alt sekmeler. İçerik (scroll-body) kayarken birlikte yerinde kalır. */
+.kayit-workspace-sticky-top {
+  position: sticky;
+  top: 0;
+  z-index: 12;
   display: flex;
-  gap: var(--space-4);
+  flex-direction: column;
+  flex: none;
+  background: var(--bg-app);
+}
+
+/* Geri satırı geometrisi tek sahipten gelir (modal.css `.modal-body > .universal-back-bar`).
+   Bu gövdenin yatay iç boşluğu 0 olduğundan owner'ın 8px'ini satır kendisi taşır; içerik
+   kayarken header'ın hemen altında sabit kalır, sekmeler onun altına yapışır. */
+.modal-body--kayit-surec {
+  --kayit-back-bar-h: 40px;
+}
+
+.modal-body--kayit-surec > .universal-back-bar {
+  position: sticky;
+  top: 0;
+  z-index: 13;
+  flex: none;
+  /* Tam genişlik zemin: kayan içerik satırın sağından görünmez (sol x owner ile aynı). */
+  align-self: stretch;
+  height: var(--kayit-back-bar-h);
+  min-height: var(--kayit-back-bar-h);
+  padding-inline: var(--modal-body-inline-pad, 8px);
+  background: var(--bg-app);
+}
+
+.modal-body--kayit-surec:has(> .universal-back-bar) .kayit-workspace-sticky-top {
+  top: var(--kayit-back-bar-h);
+}
+
+.kayit-surec-person-head {
+  display: flex;
+  flex-direction: column;
+  padding-inline: clamp(12px, 2vw, 18px);
+  box-sizing: border-box;
+}
+
+/* Alt sekmelerle altındaki bölüm arası ≈ bir metin satırı: workspace gap (12px) + 4px. */
+.kayit-workspace:has(.kayit-surec-person-head) > .kayit-workspace-scroll-body {
+  padding-top: 4px;
+}
+
+/* Genel paneli başlığı: Ad SOYAD + hemen sağında durum noktası (çerçeve/arka plan yok). */
+.surec-person-name-heading {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
   margin: 0;
+  color: var(--text-inverse);
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
 }
 
-.kayit-personel-context-facts div {
-  display: grid;
-  gap: 2px;
-  min-width: 82px;
-}
-
-.kayit-personel-context-facts dt {
-  color: var(--text-muted);
-  font-size: 11px;
-}
-
-.kayit-personel-context-facts dd {
-  margin: 0;
-  color: var(--text-primary);
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.kayit-personel-context-facts dd.kayit-personel-context-status {
+.surec-person-name-status {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  flex: 0 0 auto;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
 }
 
-.kayit-personel-context-status-dot {
+/* Kalem (Personeli Düzenle): durum noktasının hemen sağında, çerçevesiz ikon düğmesi. */
+.surec-person-name-edit {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  margin: 0 0 0 -2px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: rgba(241, 243, 250, 0.72);
+  cursor: pointer;
+}
+
+.surec-person-name-edit:hover,
+.surec-person-name-edit:focus-visible {
+  color: var(--text-inverse);
+}
+
+.surec-person-name-edit:focus-visible {
+  outline: 2px solid rgba(var(--theme-color-rgb), 0.85);
+  outline-offset: 2px;
+}
+
+.surec-person-name-edit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.surec-person-name-status-dot {
   width: 8px;
   height: 8px;
   flex: 0 0 auto;
@@ -223,56 +229,14 @@
   box-shadow: 0 0 0 2px rgba(74, 222, 128, 0.28);
 }
 
-.kayit-personel-context-status.is-passive .kayit-personel-context-status-dot {
+.surec-person-name-status.is-passive .surec-person-name-status-dot {
   background: var(--danger);
   box-shadow: 0 0 0 2px rgba(248, 113, 113, 0.28);
 }
 
-.kayit-personel-context-status.is-unknown .kayit-personel-context-status-dot {
+.surec-person-name-status.is-unknown .surec-person-name-status-dot {
   background: var(--text-muted);
   box-shadow: none;
-}
-
-.kayit-personel-context-actions {
-  display: flex;
-  justify-content: flex-end;
-}
-
-.kayit-personel-context-actions .universal-btn-aux {
-  min-height: 32px;
-  padding: 6px 12px;
-  font-size: 12px;
-  white-space: nowrap;
-}
-
-.kayit-personel-context.is-passive {
-  border-color: rgba(248, 113, 113, 0.5);
-}
-
-@media (max-width: 560px) {
-  .kayit-personel-context {
-    grid-template-columns: auto minmax(0, 1fr);
-    align-items: start;
-  }
-
-  .kayit-personel-context-aside {
-    grid-column: 1 / -1;
-    justify-items: stretch;
-    padding-top: var(--space-2);
-    border-top: 1px solid var(--border-default);
-  }
-
-  .kayit-personel-context-facts {
-    justify-content: flex-start;
-  }
-
-  .kayit-personel-context-actions {
-    justify-content: stretch;
-  }
-
-  .kayit-personel-context-actions .universal-btn-aux {
-    width: 100%;
-  }
 }
 
 .kayit-workspace-tab {
@@ -602,6 +566,11 @@
   text-align: center;
 }
 
+/* Arama trigger'ın yerinde: yazı/placeholder kapalı trigger metniyle aynı ortada durur. */
+.surec-personel-combobox .app-select-trigger-search {
+  text-align: center;
+}
+
 /* Personel bağlam seçici: kanonik owner (AppSelect searchable) — feature CSS yalnız yerleşim taşır. */
 
 .kayit-workspace .form-section {
@@ -766,7 +735,8 @@
     padding-inline: clamp(10px, 2.5vw, 16px);
   }
 
-  .kayit-workspace-scroll-body {
+  .kayit-workspace-scroll-body,
+  .kayit-surec-person-head {
     padding-inline: clamp(8px, 2.2vw, 14px);
   }
 }
@@ -823,10 +793,32 @@
 }
 
 .surec-person-photo-box {
+  position: relative;
   display: grid;
   justify-items: center;
   gap: 7px;
   min-width: 96px;
+}
+
+/* Fotoğraf alanı kalem işareti (yükleme henüz yok: disabled + "yakında" ipucu). */
+.surec-person-photo-edit {
+  position: absolute;
+  right: 8px;
+  bottom: -6px;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid rgba(var(--theme-color-rgb), 0.55);
+  border-radius: 50%;
+  background: var(--bg-app);
+  color: rgba(241, 243, 250, 0.85);
+  cursor: not-allowed;
+}
+
+.surec-person-photo-edit:disabled {
+  opacity: 0.85;
 }
 
 .surec-person-photo-avatar {
@@ -886,8 +878,10 @@
 }
 
 @media (max-width: 560px) {
+  /* Mobil: detay ızgarası 2 kolon (masaüstü 3 kolon korunur). */
   .surec-person-general-columns {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px 16px;
   }
 
   .surec-shell-summary-grid {
@@ -923,7 +917,7 @@
 }
 
 .surec-person-process-nav {
-  margin: 0 0 var(--space-3);
+  margin: 0;
   padding: 0 0 10px;
 }
 

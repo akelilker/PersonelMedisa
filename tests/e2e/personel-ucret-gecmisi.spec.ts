@@ -258,7 +258,7 @@ test.describe("S77-B personel ücret geçmişi", () => {
     await expect(kayitModal.locator('[name="kayit-surec-ucret-tipi"]')).toBeDisabled();
     await savePromise;
     await expect(personelChange).toBeEnabled({ timeout: 5000 });
-    await expect(kayitModal.getByTestId("kayit-surec-personel-context")).toContainText(/Ucret Aday/i);
+    await expect(kayitModal.getByTestId("kayit-surec-person-head")).toBeVisible();
   });
 
   test("TEST C — ucret tipi PUT delay: salary actions + picker locked", async ({ page }) => {
@@ -362,7 +362,7 @@ test.describe("S77-B personel ücret geçmişi", () => {
     await expect(personelChange).toBeDisabled();
     await personelChange.click({ force: true }).catch(() => undefined);
     await expect(kayitModal.getByRole("combobox", { name: "Personel" })).toHaveCount(0);
-    await expect(kayitModal.getByTestId("kayit-surec-personel-context")).toContainText(/Ucret Aday/i);
+    await expect(kayitModal.getByTestId("kayit-surec-person-head")).toBeVisible();
     expect(createSalaryCount).toBe(1);
 
     await expect(personelChange).toBeEnabled({ timeout: 8000 });

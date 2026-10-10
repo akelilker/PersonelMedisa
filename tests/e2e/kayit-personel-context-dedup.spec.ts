@@ -12,29 +12,30 @@ test.describe("Kayit surec personel context dedup", () => {
     await kayitModal.getByRole("button", { name: "Süreç" }).click();
 
     await expect(kayitModal.getByRole("combobox", { name: "Personel" })).toBeVisible();
-    await expect(kayitModal.getByTestId("kayit-surec-personel-context")).toHaveCount(0);
+    await expect(kayitModal.getByTestId("kayit-surec-personel-ad-soyad")).toHaveCount(0);
 
     await kayitModal.getByRole("combobox", { name: "Personel" }).click();
-    await kayitModal.getByPlaceholder("Personel ara").fill("Ayşe");
+    await kayitModal.getByPlaceholder("Ad/Soyad Veya Sicil No. Girin.").fill("Ayşe");
     await kayitModal.getByRole("option", { name: /Ayşe Yılmaz/i }).click();
 
-    const context = kayitModal.getByTestId("kayit-surec-personel-context");
+    // Özet kartı yok; kimlik Genel panelindeki Ad SOYAD başlığında (aynı veri, tek yüzey).
+    await expect(kayitModal.getByTestId("kayit-surec-personel-context")).toHaveCount(0);
+    const context = kayitModal.getByTestId("kayit-surec-personel-ad-soyad");
     await expect(context).toBeVisible();
-    await expect(context).toContainText(/Ayşe Yılmaz/i);
+    await expect(context).toContainText("Ayşe YILMAZ");
     await expect(kayitModal.getByRole("combobox", { name: "Personel" })).toHaveCount(0);
     await expect(kayitModal.getByTestId("kayit-surec-personel-genel-panel")).toBeVisible();
-    await expect(kayitModal.getByTestId("kayit-surec-personel-genel-panel").getByRole("heading", { name: /Ayşe Yılmaz/i })).toHaveCount(0);
-    await expect(kayitModal.getByTestId("kayit-surec-personel-genel-panel").getByRole("heading", { name: /Genel bilgiler/i })).toBeVisible();
+    await expect(kayitModal.getByTestId("kayit-surec-personel-genel-panel").getByRole("heading", { name: /Genel bilgiler/i })).toHaveCount(0);
 
     await kayitModal.getByTestId("kayit-surec-personel-degistir").click();
     await expect(kayitModal.getByRole("combobox", { name: "Personel" })).toBeVisible();
     await expect(kayitModal.getByRole("listbox", { name: "Personel listesi" })).toBeVisible();
-    await expect(context).toBeVisible();
+    await expect(kayitModal.getByTestId("kayit-surec-person-head")).toBeVisible();
 
-    await kayitModal.getByPlaceholder("Personel ara").fill("Mehmet");
+    await kayitModal.getByPlaceholder("Ad/Soyad Veya Sicil No. Girin.").fill("Mehmet");
     await kayitModal.getByRole("option", { name: /Mehmet Kaya/i }).click();
 
-    await expect(context).toContainText(/Mehmet Kaya/i);
+    await expect(context).toContainText("Mehmet KAYA");
     await expect(kayitModal.getByRole("combobox", { name: "Personel" })).toHaveCount(0);
     await expect(kayitModal.getByTestId("kayit-surec-personel-degistir")).toBeEnabled();
 

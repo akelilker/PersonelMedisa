@@ -61,8 +61,11 @@
 
 /* Touch / coarse pointer: native select sistem listesini açar; görsel trigger owner olur. */
 @media (hover: none) and (pointer: coarse) {
+  /* iOS çift liste kökü: gizli select focus/tap alırsa sistem picker'ı açılır. Dokunmatikte
+     native select tamamen etkileşimsizdir (görünmez + odaklanamaz); tek liste kanonik panel. */
   .app-select-native {
     pointer-events: none;
+    visibility: hidden;
   }
 
   .app-select-trigger {
@@ -78,6 +81,32 @@
 }
 
 .app-select-trigger-text.is-placeholder {
+  color: rgba(230, 234, 245, 0.5);
+}
+
+/* `searchInTrigger`: açıkken arama alanı trigger'ın yerinde tek input olur (panelde ikinci
+   input yok). Görünmez native select'in üstüne çıkar ve yazmaya izin verir. */
+.app-select-trigger--search {
+  z-index: 3;
+  pointer-events: auto;
+  cursor: text;
+}
+
+.app-select-trigger-search {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: inherit;
+}
+
+.app-select-trigger-search::placeholder {
   color: rgba(230, 234, 245, 0.5);
 }
 

@@ -2,12 +2,7 @@ import { type Dispatch, type FormEvent, type SetStateAction } from "react";
 import { FormField } from "../../../../components/form/FormField";
 import { CALISAN_KAPSAMI_SELECT_OPTIONS } from "../../../../lib/display/enum-display";
 import type { PersonelReferenceBundle } from "../../../../data/app-data.types";
-import type { IdOption } from "../../../../types/referans";
 import type { EditPersonelFormState } from "../../personel-edit-utils";
-
-function idOptionsToSelectOptions(options: IdOption[]) {
-  return options.map((option) => ({ value: String(option.id), label: option.label }));
-}
 
 export type PersonelInlineEditFormProps = {
   editForm: EditPersonelFormState;
@@ -114,19 +109,8 @@ export function PersonelInlineEditForm({
         >
           Ücret tipi ve maaş Süreç → Mali İşlemler üzerinden yönetilir; Genel düzenleme ücret yazmaz.
         </p>
-        {personelRefs.primKuraliOptions.length > 0 ? (
-          <FormField
-            as="select"
-            label="Prim kuralı"
-            name="edit-prim-kurali-id"
-            value={editForm.primKuraliId}
-            onChange={(value) => setEditForm((prev) => ({ ...prev, primKuraliId: value }))}
-            placeholderOption={{ value: "", label: "Seçiniz" }}
-            selectOptions={idOptionsToSelectOptions(personelRefs.primKuraliOptions)}
-          />
-        ) : (
-          <p className="personel-create-error">Prim kuralı listesi yüklenemedi.</p>
-        )}
+        {/* Prim Kuralı kullanıcıya gösterilmez (onaylı karar); kayıtlı prim_kurali_id
+            düzenleme formunda olduğu gibi korunur (personelToEditForm), API değişmez. */}
       </div>
 
       {editErrorMessage ? <p className="personel-create-error">{editErrorMessage}</p> : null}

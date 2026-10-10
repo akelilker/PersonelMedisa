@@ -42,7 +42,7 @@ describe("PERSONEL mobile product phase 1 identity", () => {
     const view = buildPersonelSelfIdentityView(identity());
     expect(view?.adSoyad).toBe("Ayşe Yılmaz");
     expect(view?.sicil).toBe("P-007");
-    expect(view?.iseGiris).toBe("15.01.2020");
+    expect(view?.iseGiris).toBe("15/01/2020");
     expect(view?.calismaSuresi).toMatch(/^\d+ yıl \d+ ay$/);
     expect(view?.subeGorev).toBe("Merkez - Teknisyen");
     expect(view?.dogumTarihi).toBe("-");
@@ -62,7 +62,7 @@ describe("PERSONEL mobile product phase 1 identity", () => {
         cinsiyet: null
       })
     );
-    expect(view?.dogumTarihi).toBe("14.03.1992");
+    expect(view?.dogumTarihi).toBe("14/03/1992");
     expect(view?.telefon).toBe("0532 111 22 33");
     expect(view?.tcKimlikNo).toBe("10000000146");
     expect(view?.kanGrubu).toBe("A Rh+");

@@ -95,6 +95,7 @@ import {
   resolveSgkIsverenSelection,
   toSgkIsverenSelectOptions
 } from "../../../lib/yonetim/sgk-isveren-options";
+import { formatAdSoyad } from "../../../lib/display/ad-soyad-display";
 
 type ActiveTab = "kullanicilar" | "subeler" | "mevzuat" | "saklama" | "ucret-tipi-envanteri";
 type YonetimViewMode = "card" | "list";
@@ -309,47 +310,6 @@ function roleOptions(currentRole?: UserRole) {
     value,
     label: formatUserRoleLabel(value)
   }));
-}
-
-function formatNameToken(value: string) {
-  if (!value) {
-    return "";
-  }
-
-  return value
-    .split("-")
-    .map((part) => {
-      if (!part) {
-        return "";
-      }
-
-      return `${part.charAt(0).toLocaleUpperCase("tr-TR")}${part.slice(1).toLocaleLowerCase("tr-TR")}`;
-    })
-    .join("-");
-}
-
-/**
- * Display-only formatter (Ad Türkçe Title Case + SOYAD BÜYÜK).
- * Yalnız görünüm/arama katmanında kullanılır; canonical `ad_soyad` kaydına
- * yazılacak değeri ASLA üretmez (bkz. `normalizeKullaniciAdSoyadForWrite`).
- */
-function formatAdSoyad(value: string) {
-  const parts = value
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean);
-
-  if (parts.length === 0) {
-    return "";
-  }
-
-  if (parts.length === 1) {
-    return formatNameToken(parts[0]);
-  }
-
-  const soyad = parts.pop() ?? "";
-  const adlar = parts.map(formatNameToken).join(" ");
-  return `${adlar} ${soyad.toLocaleUpperCase("tr-TR")}`.trim();
 }
 
 function normalizeTelefonDigits(value: string) {

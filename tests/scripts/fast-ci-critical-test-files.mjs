@@ -54,5 +54,8 @@ export const fastCiCriticalTestFiles = [
   "tests/unit/kisiden-bagimsiz-koruma.source.test.ts",
 
   // 11) Yeni şirket kurulumu: ilk Genel Yönetici CLI owner sözleşmesi.
-  "tests/unit/ilk-yonetici-kurulum.source.test.ts"
+  "tests/unit/ilk-yonetici-kurulum.source.test.ts",
+
+  // 12) Etkin izin çözücüsü: eski karar == yeni çözücü (her rol × izin × bağlam).
+  "tests/unit/effective-permission-resolver.php-runtime.test.ts"
 ];

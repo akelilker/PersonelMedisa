@@ -45,5 +45,8 @@ export const fastCiCriticalTestFiles = [
 
   // 8) Yönetici hesap korumaları (DB'siz kural matrisi + controller kaynak kilidi). MariaDB
   //    eşzamanlılık senaryoları CI Full'de: genel-yonetici-korumasi-mysql.php-runtime.test.ts
-  "tests/unit/genel-yonetici-korumasi.php-runtime.test.ts"
+  "tests/unit/genel-yonetici-korumasi.php-runtime.test.ts",
+
+  // 9) GENEL_YONETICI IK operasyon izinleri: FE/BE matrisi + dört göz (kendi talebini onaylayamaz).
+  "tests/unit/genel-yonetici-ik-izinleri-dual-control.php-runtime.test.ts"
 ];

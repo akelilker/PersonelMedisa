@@ -245,6 +245,13 @@ const BASE_ROLE_PERMISSIONS: Record<
     "fazla_calisma_odeme_tercihi.manage",
     "serbest_zaman.manage",
     "puantaj.donem_reopen.approve",
+    // IK operasyon izinleri GY'de de (2026-10-10 karar); onaylar DualControl ile farklı aktör ister.
+    "puantaj.donem_reopen.request",
+    "puantaj.donem_reseal",
+    "puantaj.bildirim_etki.generate",
+    "puantaj.bildirim_etki.apply",
+    "puantaj.bildirim_etki.dismiss",
+    "puantaj.bildirim_etki.resolve_conflict",
     "puantaj.donem_seal.history",
     "puantaj.bildirim_etki.view",
     "puantaj.donem_kapanis.view",

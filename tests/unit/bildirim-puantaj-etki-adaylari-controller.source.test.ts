@@ -172,10 +172,10 @@ describe("S74-B backend permission matrix (RolePermissions.php)", () => {
     return rolePermissionsSource.slice(start, end);
   }
 
-  it("GENEL_YONETICI view yes / generate no", () => {
+  it("GENEL_YONETICI view yes / generate yes (2026-10-10 IK operasyon izinleri GY'de de)", () => {
     const block = roleBlock("GENEL_YONETICI");
     expect(block).toContain("'puantaj.bildirim_etki.view'");
-    expect(block).not.toContain("'puantaj.bildirim_etki.generate'");
+    expect(block).toContain("'puantaj.bildirim_etki.generate'");
   });
 
   it("BOLUM_YONETICISI view yes / generate no", () => {
@@ -229,10 +229,10 @@ describe("S74-C1 backend permission matrix (RolePermissions.php)", () => {
     expect(block).toContain("'puantaj.bildirim_etki.dismiss'");
   });
 
-  it("GENEL_YONETICI apply no / dismiss no", () => {
+  it("GENEL_YONETICI apply yes / dismiss yes (2026-10-10 IK operasyon izinleri GY'de de)", () => {
     const block = roleBlock("GENEL_YONETICI");
-    expect(block).not.toContain("'puantaj.bildirim_etki.apply'");
-    expect(block).not.toContain("'puantaj.bildirim_etki.dismiss'");
+    expect(block).toContain("'puantaj.bildirim_etki.apply'");
+    expect(block).toContain("'puantaj.bildirim_etki.dismiss'");
   });
 
   it("BOLUM_YONETICISI apply no / dismiss no", () => {

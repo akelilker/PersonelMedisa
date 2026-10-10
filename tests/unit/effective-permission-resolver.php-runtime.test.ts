@@ -1,5 +1,5 @@
 import { execFileSync, spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -7,6 +7,21 @@ import { describe, expect, it } from "vitest";
 const root = process.cwd();
 
 describe("EffectivePermissionResolver eşdeğerlik", () => {
+  it("P2: istisna yazan yol yok ve şube kapsamlı istisnalar kapalı", () => {
+    const read = (p: string) => readFileSync(resolve(root, p), "utf8");
+    expect(read("api/src/Auth/EffectivePermissionResolver.php")).toContain("public const SUBE_ISTISNALARI_ETKIN = false;");
+    const router = read("api/src/Router.php");
+    for (const line of router.split(/\r?\n/).filter((l) => /yetkiler|yetki-auditleri|KullaniciYetkiController/.test(l) && /\$method/.test(l))) {
+      expect(line).toContain("'GET'");
+    }
+    const writes = /(INSERT\s+(IGNORE\s+)?INTO|UPDATE|REPLACE\s+INTO|DELETE\s+FROM)\s+`?user_yetki_(istisnalari|auditleri)/i;
+    const scan = (dir: string): string[] =>
+      readdirSync(resolve(root, dir), { withFileTypes: true }).flatMap((e) =>
+        e.isDirectory() ? scan(`${dir}/${e.name}`) : /\.(php|sql)$/.test(e.name) ? [`${dir}/${e.name}`] : []
+      );
+    const offenders = ["api/src", "api/bin", "api/migrations"].flatMap(scan).filter((f) => writes.test(read(f)));
+    expect(offenders).toEqual([]);
+  });
   it("kişiye özel istisna kuralları (DENY > ALLOW, global DENY, süre, kapsam, kırmızı liste)", () => {
     const php = process.platform === "win32"
       ? execFileSync("where.exe", ["php"], { encoding: "utf8" }).split(/\r?\n/)[0].trim()

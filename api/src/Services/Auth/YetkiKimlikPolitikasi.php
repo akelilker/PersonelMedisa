@@ -11,9 +11,11 @@ use PDO;
  *
  * Mod kurulum düzeyindedir (`yetki_politikasi.K1_KIMLIK_MODU`):
  *  - Satır/tablo yok → UYARI (Medisa canlı; kimse kilitlenmez, eksik kimlik uyarı olur).
- *  - ZORUNLU yalnız iki yolla yazılır: (a) ilk-yönetici kurulumu (boş DB, yeni şirket),
- *    (b) Medisa için canlı doğrulama + İlker'in açık onayı + ayrı PR. Otomatik/zamanlı
- *    geçiş yoktur.
+ *  - Yeni kurulum (boş DB): ilk yönetici oluşturulurken ZORUNLU yazılır (ilk günden).
+ *  - Medisa (mevcut kurulum): satır yok → UYARI. ZORUNLU'ya geçiş yalnız canlı salt
+ *    okunur doğrulama + İlker'in açık onayı + ayrı PR ile; otomatik/zamanlı geçiş yok.
+ *  - Not: ilk yöneticinin VERIFIED kimliği kurulumcu beyanıdır (BOOTSTRAP_VERIFY),
+ *    bağımsız kimlik doğrulaması değildir.
  *
  * Kurallar (P3 yazma uçları bu değerlendirmeyi çağırır):
  *  - Kendine yetki verme: her modda ENGEL.

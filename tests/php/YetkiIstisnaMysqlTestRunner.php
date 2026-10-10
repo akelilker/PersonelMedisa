@@ -355,6 +355,12 @@ try {
     $pdo->exec('INSERT INTO user_subeler (user_id, sube_id) VALUES (5, 2), (5, 3)');
     $istisnaExec([5, 'personeller.ucret.manage', 'ALLOW', 2, '2026-01-01 00:00:00', null, 'IK_PERSONELI', 'Kayseri duzenleme']);
     $istisnaExec([5, 'personeller.view', 'DENY', 2, '2026-01-01 00:00:00', null, 'IK_PERSONELI', 'Kayseri goruntuleme kapali']);
+    yiAssert(!RolePermissions::hasForSube(['id' => 5, 'rol' => 'IK_PERSONELI', 'sube_ids' => [1, 2, 3], 'yetki_istisnalari' => UserYetkiIstisnaSchema::loadActive($pdo, 5)], 'personeller.ucret.manage', 2)
+        && RolePermissions::hasForSube(['id' => 5, 'rol' => 'IK_PERSONELI', 'sube_ids' => [1, 2, 3], 'yetki_istisnalari' => UserYetkiIstisnaSchema::loadActive($pdo, 5)], 'personeller.view', 2),
+        'şube istisnaları KAPALI: elle girilmiş Kayseri satırları kullanılmaz');
+    $kapaliOkuma = yiHttp($db, 'kullanici', ['token' => $gyToken, 'id' => 5]);
+    yiAssert(($kapaliOkuma['payload']['data']['sube_istisnalari_etkin'] ?? null) === false, 'okuma ucu sube_istisnalari_etkin=false döner');
+    EffectivePermissionResolver::setSubeIstisnalariForTests(true); // yalnız semantik testi
     $ikp = ['id' => 5, 'rol' => 'IK_PERSONELI', 'sube_ids' => [1, 2, 3], 'yetki_istisnalari' => UserYetkiIstisnaSchema::loadActive($pdo, 5)];
     yiAssert(!RolePermissions::has(['rol' => 'IK_PERSONELI'], 'personeller.ucret.manage'), 'personeller.ucret.manage IK_PERSONELI rol varsayılanı değil');
     yiAssert(RolePermissions::hasForSube($ikp, 'personeller.ucret.manage', 2), 'Kayseri ALLOW (düzenleme) Kayseri\'de geçerli');
@@ -364,6 +370,8 @@ try {
     yiAssert(!RolePermissions::hasForSube($ikp, 'personeller.view', 2), 'Kayseri DENY Kayseri\'yi kapatır');
     yiAssert(RolePermissions::hasForSube($ikp, 'personeller.view', 3) && RolePermissions::hasForSube($ikp, 'personeller.view', 1), 'Kayseri DENY diğer şubeleri engellemez');
     yiAssert(RolePermissions::has($ikp, 'personeller.view'), 'Kayseri DENY şubesiz kontrolü engellemez (kayıt düzeyinde uygulanır)');
+
+    EffectivePermissionResolver::setSubeIstisnalariForTests(null);
 
     // --- Kalıcı Sil: geçmiş korunur, aktif istisna engeller --------------------------
     $gyActor = ['id' => 1, 'username' => 'u1', 'rol' => 'GENEL_YONETICI', 'sube_ids' => []];

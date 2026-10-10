@@ -20,7 +20,8 @@ use Medisa\Api\Scope\OrgScope;
  *  6. Geçerli bir ALLOW → KABUL. ALLOW kapsamı genişletmez: şubeye özel ALLOW yalnız
  *     o şube bağlamında ve şube kullanıcının mevcut org kapsamındaysa geçerlidir.
  *
- * Şube kapsamlı istisna semantiği (iki karar türü):
+ * Şube kapsamlı istisnalar şu an KAPALI (SUBE_ISTISNALARI_ETKIN = false). Açıldığında
+ * semantik (iki karar türü):
  *  - Şube bağlamlı karar (resolveForSube / RolePermissions::hasForSube): şube DENY
  *    yalnız o şubeyi kapatır; şube ALLOW yalnız o şubede ve şube kullanıcının org
  *    kapsamındaysa izin verir.
@@ -73,6 +74,17 @@ final class EffectivePermissionResolver
         'kullanici_yetkileri.manage',
         'kullanici_yetkileri.audit.view',
     ];
+
+    /**
+     * Şube kapsamlı istisnalar (sube_id dolu) ilgili ekranlar şube bağlamına geçene
+     * kadar KAPALI: kapalıyken bu satırlar hiçbir kararda kullanılmaz (ne izin verir
+     * ne engeller). P2'de istisna yazan uç/CLI/seed yoktur; P3 yazma ucu da yalnız
+     * global istisna kabul eder. Açılış ayrı onaylı PR ile bu sabitin değişmesidir.
+     */
+    public const SUBE_ISTISNALARI_ETKIN = false;
+
+    /** @var bool|null yalnız testler: şube semantiğini doğrulamak için geçici açma */
+    private static $subeIstisnaOverride = null;
 
     /** @var string|null test saati (UTC 'Y-m-d H:i:s') */
     private static $nowOverride = null;
@@ -185,6 +197,17 @@ final class EffectivePermissionResolver
         self::$nowOverride = $nowUtc;
     }
 
+    /** Yalnız testler: şube kapsamlı istisna semantiğini açar/kapatır; null = sabit. */
+    public static function setSubeIstisnalariForTests(?bool $etkin): void
+    {
+        self::$subeIstisnaOverride = $etkin;
+    }
+
+    public static function subeIstisnalariEtkin(): bool
+    {
+        return self::$subeIstisnaOverride ?? self::SUBE_ISTISNALARI_ETKIN;
+    }
+
     private static function nowUtc(): string
     {
         return self::$nowOverride ?? gmdate('Y-m-d H:i:s');
@@ -217,6 +240,9 @@ final class EffectivePermissionResolver
             }
             if ($bitis !== null && $bitis !== '' && strcmp((string) $bitis, $now) <= 0) {
                 continue;
+            }
+            if (isset($row['sube_id']) && $row['sube_id'] !== null && $row['sube_id'] !== '' && !self::subeIstisnalariEtkin()) {
+                continue; // şube kapsamlı istisnalar kapalı (bkz. SUBE_ISTISNALARI_ETKIN)
             }
             $row['etki'] = $etki;
             $valid[] = $row;

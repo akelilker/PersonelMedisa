@@ -59,10 +59,24 @@ ayrıca `OrgScope` (okuma: `sube_ids`, kayıt filtreleri / `assertPersonelAccess
 ## Yeni kurulum (K1)
 - `yetki_politikasi` tablosu; satır yoksa mod UYARI (Medisa canlı, migration satır yazmaz).
 - `ilk-yonetici-olustur.php` (yalnız boş DB'de çalışır): ilk yöneticiye gerçek-kişi kimliği
-  (`actor_identities`, `USER-{id}`, VERIFIED, kurulum beyanı audit'i `BOOTSTRAP_VERIFY`) oluşturup
+  (`actor_identities`, `USER-{id}`, durum `VERIFIED`, audit `BOOTSTRAP_VERIFY`) oluşturup
   bağlar ve `K1_KIMLIK_MODU = ZORUNLU` yazar. İlk yönetici kilitlenmez; kimliği doğrulanmamış
   hesaplar başkasına kişiye özel yetki veremez (`YetkiKimlikPolitikasi::degerlendir`, P3 yazma
   uçları çağırır). Kendine yetki her modda yasak.
+
+- **Kimlik notu:** ilk yöneticinin `VERIFIED` durumu **kurulumcu/operatör beyanıdır**, bağımsız
+  kimlik doğrulaması değildir. Mevcut enum değerleri (`VERIFIED`, `HUMAN_CONFIRMED`) canlı şemaya
+  dokunmamak için değiştirilmedi; ayrım audit kaydında: `action = BOOTSTRAP_VERIFY`,
+  `details.dogrulama_turu = KURULUM_BEYANI`, `bagimsiz_dogrulama = false`.
+
+## Şube kapsamlı istisnalar — P2'de KAPALI
+- P2'de istisna yazan **hiçbir yol yok**: yazma ucu yok (yalnız 3 GET), CLI/seed yok, migration 100
+  satır yazmaz (kaynak testi bunu kilitler).
+- `EffectivePermissionResolver::SUBE_ISTISNALARI_ETKIN = false`: tabloya şube kapsamlı satır girse
+  bile (ör. elle SQL) hiçbir kararda kullanılmaz — ne izin verir ne engeller. Okuma uçları
+  `sube_istisnalari_etkin: false` döner.
+- Yukarıdaki Kayseri semantiği testlerde geçici açma ile doğrulanır; canlıda açılış ilgili ekranlar
+  `hasForSube`'a geçtikten sonra ayrı onaylı PR ile olur.
 
 ## Davranış değişmezliği
 Tablolar boşken (ya da 100 uygulanmamışken) her kullanıcının etkin izinleri PR #528 ile aynı:
@@ -71,11 +85,13 @@ Tablolar boşken (ya da 100 uygulanmamışken) her kullanıcının etkin izinler
 korunduğunu hash ile doğrular.
 
 ## K1 (kimlik kontrolü) modu — karar
-- Kod varsayılanı **UYARI**: kimse kilitlenmez; eksik `actor_identity` yalnız uyarı/audit üretir.
+- Politika satırı yoksa (Medisa canlı) mod **UYARI**: kimse kilitlenmez; eksik `actor_identity` yalnız uyarı/audit üretir.
 - **ZORUNLU'ya otomatik/zaman tabanlı geçiş YOK.** Geçiş yalnız şu sırayla olur:
   1. Canlıda salt okunur kontrol: her aktif GENEL_YONETICI'nin doğrulanmış `actor_identity` kaydı var.
   2. Sonuç İlker'e raporlanır, **açık onay** alınır.
   3. Bayrak değişikliği kendi PR'ı olarak (ayrı onay) yapılır.
-- Yeni kurulumlar da varsayılan UYARI ile başlar; ZORUNLU aynı doğrulama + açık onay ile açılır.
+- **Yeni kurulum:** ilk yönetici oluşturulurken (`ilk-yonetici-olustur.php`) `K1_KIMLIK_MODU = ZORUNLU`
+  yazılır; yeni kurulum ilk günden ZORUNLU'dur. Yukarıdaki doğrulama + onay sırası yalnız
+  **mevcut Medisa kurulumu** içindir (politika satırı yok → UYARI).
 - Kimliği eksik hesabın kilitlenmemesi için yönetim ekranında kimlik bağlama yolu (mevcut
   actor-identity ucu) korunur.

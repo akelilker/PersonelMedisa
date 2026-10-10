@@ -18,11 +18,15 @@ use PDO;
  * `FOR UPDATE` ile okunur. Hesap `silinmesi_korunur = 1` ile işaretlenir (kolon varsa).
  * Parola loglanmaz, sonuçta dönmez.
  *
- * Gerçek-kişi kimliği (dinamik yetki K1): kurulum CLI'ı sunucuda operatör tarafından
- * çalıştırılır; bu kurulum beyanı ilk yöneticinin actor_identity kaydını VERIFIED
- * olarak oluşturur ve bağlar (audit: BOOTSTRAP_VERIFY). Böylece yeni kurulumda
- * K1 = ZORUNLU yazılır ve ilk yönetici kilitlenmeden yetki verebilir. Medisa canlıda
- * bu servis hiç çalışmaz (GY varken reddeder), mod orada UYARI kalır.
+ * Gerçek-kişi kimliği (dinamik yetki K1): ilk yöneticinin actor_identity kaydı
+ * KURULUMCU/OPERATÖR BEYANIYLA oluşturulur ve bağlanır (audit: BOOTSTRAP_VERIFY,
+ * details.dogrulama_turu = KURULUM_BEYANI). Bu bağımsız bir kimlik doğrulaması
+ * DEĞİLDİR: CLI'ı sunucuda çalıştıran operatörün "bu hesap bu kişidir" beyanıdır.
+ * Tabloda status = 'VERIFIED' ve verification_source = 'HUMAN_CONFIRMED' mevcut enum
+ * değerleri korunarak yazılır (enum değiştirmek canlı şemaya dokunurdu); ayrım audit
+ * kaydındadır. Yeni kurulumda K1 = ZORUNLU ilk yönetici oluşturulurken yazılır.
+ * Medisa canlıda bu servis hiç çalışmaz (GY varken reddeder); politika satırı yoktur,
+ * mod UYARI kalır.
  */
 final class IlkYoneticiKurulumService
 {
@@ -123,7 +127,7 @@ final class IlkYoneticiKurulumService
         ];
     }
 
-    /** İlk yöneticinin gerçek-kişi kimliği: kurulum beyanıyla VERIFIED + bağlı. */
+    /** İlk yöneticinin gerçek-kişi kimliği: kurulumcu beyanıyla (bağımsız doğrulama değil) VERIFIED + bağlı. */
     private static function kimlikOlustur(PDO $pdo, int $userId, string $adSoyad): ?int
     {
         if (!self::tableExists($pdo, 'actor_identities')) {
@@ -148,7 +152,12 @@ final class IlkYoneticiKurulumService
                 'k' => $kimlikId,
                 'u' => $userId,
                 'u2' => $userId,
-                'd' => json_encode(['kaynak' => 'ILK_YONETICI_CLI', 'status' => 'VERIFIED'], JSON_UNESCAPED_UNICODE),
+                'd' => json_encode([
+                    'kaynak' => 'ILK_YONETICI_CLI',
+                    'status' => 'VERIFIED',
+                    'dogrulama_turu' => 'KURULUM_BEYANI',
+                    'bagimsiz_dogrulama' => false,
+                ], JSON_UNESCAPED_UNICODE),
             ]);
         }
 

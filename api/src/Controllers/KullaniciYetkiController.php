@@ -16,7 +16,8 @@ use Medisa\Api\Services\SelfService\SelfPersonelContext;
 use PDO;
 
 /**
- * Kullanıcı bazlı yetki — OKUMA uçları (dinamik yetki P2). Yazma uçları P3'tedir.
+ * Kullanıcı bazlı yetki — OKUMA uçları (dinamik yetki P2). P2'de yazma ucu YOKTUR (P3).
+ * Şube kapsamlı istisnalar kapalıdır; yanıt `sube_istisnalari_etkin: false` taşır.
  *
  *  GET /auth/yetkiler                         → oturum kullanıcısının etkin izinleri + kaynakları
  *  GET /yonetim/kullanicilar/{id}/yetkiler    → kullanici_yetkileri.view
@@ -37,6 +38,7 @@ final class KullaniciYetkiController
             'effective_permissions' => array_keys($kaynaklar),
             'kaynaklar' => $kaynaklar,
             'istisnalar' => array_values($user['yetki_istisnalari'] ?? []),
+            'sube_istisnalari_etkin' => EffectivePermissionResolver::subeIstisnalariEtkin(),
         ]);
     }
 
@@ -66,6 +68,7 @@ final class KullaniciYetkiController
             'istisnalar' => $history['rows'],
             'effective_permissions' => array_keys($kaynaklar),
             'kaynaklar' => $kaynaklar,
+            'sube_istisnalari_etkin' => EffectivePermissionResolver::subeIstisnalariEtkin(),
         ]);
     }
 

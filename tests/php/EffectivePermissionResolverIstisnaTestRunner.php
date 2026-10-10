@@ -28,6 +28,16 @@ function epiRow(string $perm, string $etki, ?int $sube = null, string $from = '2
 
 R::setNowForTests('2026-10-11 12:00:00');
 
+// Şube kapsamlı istisnalar P2'de KAPALI: satır olsa bile hiçbir kararda kullanılmaz.
+epiAssert(R::SUBE_ISTISNALARI_ETKIN === false && R::subeIstisnalariEtkin() === false, 'K0 şube kapsamlı istisnalar varsayılan KAPALI');
+$kapali = ['id' => 1, 'rol' => 'MUHASEBE', 'sube_ids' => [1], 'yetki_istisnalari' => [
+    epiRow('personeller.create', 'ALLOW', 1), epiRow('bordro_on_izleme.view', 'DENY', 1),
+]];
+epiAssert(!R::resolveForSube($kapali, 'personeller.create', 1) && R::resolveForSube($kapali, 'bordro_on_izleme.view', 1)
+    && R::resolve($kapali, 'bordro_on_izleme.view') && !R::resolve($kapali, 'personeller.create'), 'K1 kapalıyken şube ALLOW izin vermez, şube DENY engellemez (her kararda)');
+// Aşağıdaki şube semantiği testleri için geçici açma (yalnız test).
+R::setSubeIstisnalariForTests(true);
+
 $muh = ['id' => 5, 'rol' => 'MUHASEBE', 'sube_ids' => [1, 2]];
 $gy = ['id' => 6, 'rol' => 'GENEL_YONETICI', 'sube_ids' => []];
 $birim = ['id' => 7, 'rol' => 'BIRIM_AMIRI', 'sube_ids' => [1]];
@@ -88,4 +98,5 @@ $eff = R::effectivePermissions($muh + ['yetki_istisnalari' => [epiRow($perm, 'DE
 epiAssert(!in_array($perm, $eff, true) && in_array($extra, $eff, true), '21 effectivePermissions DENY/ALLOW\'u yansıtır');
 
 R::setNowForTests(null);
+R::setSubeIstisnalariForTests(null);
 echo "verify-effective-permission-resolver-istisna: OK\n";

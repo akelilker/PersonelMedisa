@@ -106,6 +106,13 @@ MEDISA_ILK_YONETICI_PAROLA='...' php api/bin/ilk-yonetici-olustur.php --kullanic
    Hesap `silinmesi_korunur = 1` ile olusur. Medisa'ya ozgu hesap gerekmez;
    Kalici Sil bos korunan-hesap kaydiyla calisir (koruma bayrak + rol kurali).
 
+   Ayni islemde ilk yoneticinin gercek-kisi kimligi (`actor_identities`, `USER-{id}`)
+   olusturulup baglanir ve `yetki_politikasi.K1_KIMLIK_MODU = ZORUNLU` yazilir: yeni
+   kurulum ilk yoneticiden itibaren ZORUNLU'dur. Kimlik durumu `VERIFIED` yazilir ama bu
+   **kurulumcu/operator beyanidir** (audit `BOOTSTRAP_VERIFY`, `dogrulama_turu =
+   KURULUM_BEYANI`), bagimsiz kimlik dogrulamasi degildir. Mevcut Medisa kurulumunda bu
+   komut calismaz (Genel Yonetici var), politika satiri yoktur ve mod UYARI kalir.
+
 Password hash uretimi:
 
 ```bash

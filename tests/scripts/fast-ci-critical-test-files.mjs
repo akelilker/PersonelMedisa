@@ -48,5 +48,8 @@ export const fastCiCriticalTestFiles = [
   "tests/unit/genel-yonetici-korumasi.php-runtime.test.ts",
 
   // 9) GENEL_YONETICI IK operasyon izinleri: FE/BE matrisi + dört göz (kendi talebini onaylayamaz).
-  "tests/unit/genel-yonetici-ik-izinleri-dual-control.php-runtime.test.ts"
+  "tests/unit/genel-yonetici-ik-izinleri-dual-control.php-runtime.test.ts",
+
+  // 10) Kişiden bağımsız hesap koruması: kişi anahtarı yalnız tarihsel sahiplerde.
+  "tests/unit/kisiden-bagimsiz-koruma.source.test.ts"
 ];

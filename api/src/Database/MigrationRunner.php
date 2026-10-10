@@ -13,6 +13,18 @@ final class MigrationRunner
     private const LOCK_NAME = 'medisa_canonical_migrations';
 
     /**
+     * Yalnız mevcut kurulum verisini düzelten (şirkete özgü katalog düzeltmesi) migration'lar.
+     * Hedef tabloların HEPSİ boşsa (yeni şirket kurulumu) düzeltilecek veri yoktur: dosya
+     * çalıştırılmaz, aynı checksum ile ledger'a kaydedilir. Tablolarda tek satır bile varsa
+     * migration normal çalışır ve kendi fail-closed kapılarını uygular. Dosya/checksum değişmez.
+     *
+     * @var array<string, list<string>>
+     */
+    private const DATA_CORRECTION_EMPTY_CATALOG_TABLES = [
+        '067' => ['departmanlar', 'bolumler', 'birimler', 'personeller'],
+    ];
+
+    /**
      * @param MigrationSourceProvider|string $source
      * @param string|null $baselineVersion
      * @param string|null $applyThroughVersion Highest version this run may apply.
@@ -84,6 +96,12 @@ final class MigrationRunner
                 }
 
                 $pending[] = $version;
+                if (self::isDataCorrectionOnEmptyCatalog($pdo, $version)) {
+                    self::recordWithoutExecution($pdo, $migration);
+                    $appliedRows[$version] = ['checksum' => $checksum];
+                    $applied[] = $version;
+                    continue;
+                }
                 self::applyOne($pdo, $migration);
                 $appliedRows[$version] = ['checksum' => $checksum];
                 $applied[] = $version;
@@ -156,6 +174,44 @@ final class MigrationRunner
                 $exception
             );
         }
+    }
+
+    private static function isDataCorrectionOnEmptyCatalog(PDO $pdo, string $version): bool
+    {
+        $tables = self::DATA_CORRECTION_EMPTY_CATALOG_TABLES[$version] ?? null;
+        if ($tables === null) {
+            return false;
+        }
+        foreach ($tables as $table) {
+            if (!self::tableExists($pdo, $table)) {
+                return false;
+            }
+            $row = $pdo->query('SELECT 1 FROM `' . $table . '` LIMIT 1');
+            $hasRow = $row !== false && $row->fetchColumn() !== false;
+            if ($row !== false) {
+                $row->closeCursor();
+            }
+            if ($hasRow) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * @param array{version: string, name: string, checksum: string, sql: string} $migration
+     */
+    private static function recordWithoutExecution(PDO $pdo, array $migration): void
+    {
+        $statement = $pdo->prepare(
+            'INSERT INTO medisa_schema_migrations (version, checksum, execution_ms) '
+            . 'VALUES (:version, :checksum, 0)'
+        );
+        $statement->execute([
+            ':version' => $migration['version'],
+            ':checksum' => $migration['checksum'],
+        ]);
     }
 
     /**

@@ -51,5 +51,8 @@ export const fastCiCriticalTestFiles = [
   "tests/unit/genel-yonetici-ik-izinleri-dual-control.php-runtime.test.ts",
 
   // 10) Kişiden bağımsız hesap koruması: kişi anahtarı yalnız tarihsel sahiplerde.
-  "tests/unit/kisiden-bagimsiz-koruma.source.test.ts"
+  "tests/unit/kisiden-bagimsiz-koruma.source.test.ts",
+
+  // 11) Yeni şirket kurulumu: ilk Genel Yönetici CLI owner sözleşmesi.
+  "tests/unit/ilk-yonetici-kurulum.source.test.ts"
 ];

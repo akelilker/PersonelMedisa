@@ -492,6 +492,69 @@ try {
         );
     }
 
+    // =====================================================================
+    // Aşama C: yeni şirket kurulumu (boş DB, Medisa'ya özgü hesap yok).
+    // Tam zincir → ilk Genel Yönetici CLI owner'ı → Kalıcı Sil çalışır.
+    // =====================================================================
+    $freshDb = 'medisa_ksa_fresh_' . bin2hex(random_bytes(4));
+    $root->exec('CREATE DATABASE `' . $freshDb . '` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
+    try {
+        $fresh = ksaPdo($baseDsn . ';dbname=' . $freshDb);
+        // Gerçek yeni kurulum yolu: canonical runner, ledger bootstrap + baseline 000
+        // (067 dahil tam zincir; şirkete özgü katalog düzeltmesi boş katalogda çalıştırılmaz).
+        $run = \Medisa\Api\Database\MigrationRunner::run($fresh, __DIR__ . '/../../api/migrations', '000');
+        ksaAssert(end($run['applied']) === '099' && in_array('067', $run['applied'], true), 'C0 the canonical runner drains the full chain (incl. 067) on an empty database');
+        ksaAssert(
+            ksaCount($fresh, "SELECT COUNT(*) FROM medisa_schema_migrations WHERE version = '067' AND execution_ms = 0") === 1,
+            'C0 067 (company-specific catalog correction) is ledgered without execution on an empty catalog'
+        );
+        $verify = \Medisa\Api\Database\MigrationRunner::verify($fresh, __DIR__ . '/../../api/migrations');
+        ksaAssert(($verify['pending'] ?? null) === [] && ($verify['latest'] ?? null) === '099', 'C0 the fresh ledger verifies against the canonical chain');
+        ksaAssert(ksaCount($fresh, 'SELECT COUNT(*) FROM users') === 0, 'C0 the full chain applies to an empty database without any company-specific account');
+        ksaAssert(ksaCount($fresh, 'SELECT COUNT(*) FROM user_kalici_silme_korunan_hesaplar') === 0, 'C0 the fresh protected-account registry is empty');
+
+        $weak = null;
+        try {
+            \Medisa\Api\Services\Auth\IlkYoneticiKurulumService::olustur($fresh, 'yonetici', 'Ilk YONETICI', 'kisa');
+        } catch (\Medisa\Api\Services\Auth\IlkYoneticiKurulumException $e) {
+            $weak = $e->errorCode;
+        }
+        ksaAssert($weak === 'VALIDATION_ERROR' && ksaCount($fresh, 'SELECT COUNT(*) FROM users') === 0, 'C1 a weak password is refused and nothing is written');
+
+        $first = \Medisa\Api\Services\Auth\IlkYoneticiKurulumService::olustur($fresh, 'yonetici', 'Ilk YONETICI', 'Kurulum-Parola-2026');
+        $firstRow = ksaRow($fresh, 'SELECT id, username, rol, durum, silinmesi_korunur, password_hash FROM users WHERE id = :id', [':id' => $first['user_id']]);
+        ksaAssert(
+            $firstRow !== null && $firstRow['rol'] === 'GENEL_YONETICI' && $firstRow['durum'] === 'AKTIF'
+                && (int) $firstRow['silinmesi_korunur'] === 1,
+            'C2 the first admin is an active GENEL_YONETICI flagged silinmesi_korunur'
+        );
+        ksaAssert(password_verify('Kurulum-Parola-2026', (string) $firstRow['password_hash']), 'C3 the first admin password is stored hashed and verifies');
+
+        $again = null;
+        try {
+            \Medisa\Api\Services\Auth\IlkYoneticiKurulumService::olustur($fresh, 'ikinci', 'Ikinci YONETICI', 'Kurulum-Parola-2026');
+        } catch (\Medisa\Api\Services\Auth\IlkYoneticiKurulumException $e) {
+            $again = $e->errorCode;
+        }
+        ksaAssert(
+            $again === 'GENEL_YONETICI_ZATEN_VAR' && ksaCount($fresh, 'SELECT COUNT(*) FROM users') === 1,
+            'C4 the bootstrap refuses once any GENEL_YONETICI exists (one-time, no second admin)'
+        );
+
+        $fresh->exec("INSERT INTO users (username, password_hash, ad_soyad, rol, durum) VALUES ('eski.hesap', 'x', 'Eski HESAP', 'SISTEM_YONETICISI', 'AKTIF')");
+        $eskiId = (int) $fresh->lastInsertId();
+        $firstActor = ['id' => $first['user_id'], 'username' => 'yonetici', 'ad_soyad' => 'Ilk YONETICI', 'rol' => 'GENEL_YONETICI', 'sube_ids' => []];
+        $elig = ksaEligibility($fresh, $firstActor, $eskiId);
+        ksaAssert($elig['verdict'] === 'SİLİNEBİLİR', 'C5 Kalıcı Sil eligibility works on a fresh install with an empty registry');
+        $elig = ksaEligibility($fresh, $firstActor, (int) $first['user_id']);
+        ksaAssert($elig['verdict'] === 'ENGELLENDİ', 'C6 the first admin cannot delete itself');
+        $r = ksaHttp($fresh, $firstActor, 'kullanici_kalici_sil', ['id' => $eskiId, 'confirm_username' => 'eski.hesap', 'gerekce' => 'Yeni kurulum temizligi.']);
+        ksaAssert($r['status'] === 200 && ksaRow($fresh, 'SELECT id FROM users WHERE id = :id', [':id' => $eskiId]) === null, 'C7 Kalıcı Sil deletes an independent old account on a fresh install');
+        ksaAssert(ksaCount($fresh, 'SELECT COUNT(*) FROM ' . KSA_AUDIT_TABLE) === 1, 'C8 the fresh-install delete is audited');
+    } finally {
+        $root->exec('DROP DATABASE IF EXISTS `' . $freshDb . '`');
+    }
+
     // Seed: actor, an unprivileged actor, and the full protected/blocked roster.
     $hash = password_hash('KsaSeedPass-24chars!!', PASSWORD_BCRYPT);
     $pdo->exec("INSERT INTO sirketler (id, kod, ad) VALUES (1, 'SRK-1', 'Sirket Bir')");

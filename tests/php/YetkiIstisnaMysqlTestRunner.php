@@ -200,6 +200,8 @@ $db = 'medisa_yi_' . bin2hex(random_bytes(4));
 $root->exec('CREATE DATABASE `' . $db . '` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
 $legacyDb = 'medisa_yi_legacy_' . bin2hex(random_bytes(4));
 $root->exec('CREATE DATABASE `' . $legacyDb . '` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
+$freshDb = 'medisa_yi_fresh_' . bin2hex(random_bytes(4));
+$root->exec('CREATE DATABASE `' . $freshDb . '` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
 
 function yiToken(int $userId, string $rol): string
 {
@@ -285,13 +287,16 @@ try {
     yiAssert($audit['status'] === 200 && $audit['payload']['data']['items'] === [] && $audit['payload']['data']['schema_ready'] === true, 'GY yetki audit listesini okur (boş)');
 
     // --- İstisnalar gerçek istekte ---------------------------------------------------
-    $istisna = $pdo->prepare('INSERT INTO user_yetki_istisnalari (user_id, permission, etki, sube_id, gecerlilik_baslangic, gecerlilik_bitis, veren_user_id, hedef_rol_snapshot, gerekce) VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)');
+    $istisna = $pdo->prepare("INSERT INTO user_yetki_istisnalari (user_id, hedef_username_snapshot, permission, etki, sube_id, gecerlilik_baslangic, gecerlilik_bitis, veren_user_id, veren_username_snapshot, hedef_rol_snapshot, gerekce) VALUES (?, CONCAT('u', ?), ?, ?, ?, ?, ?, 1, 'u1', ?, ?)");
+    $istisnaExec = static function (array $v) use ($istisna): void {
+        $istisna->execute(array_merge([$v[0], $v[0]], array_slice($v, 1)));
+    };
     // MUHASEBE (4): bordro_on_izleme.view DENY, personeller.create ALLOW, süresi dolmuş ALLOW, gelecekte ALLOW, iptal edilmiş DENY
-    $istisna->execute([4, 'bordro_on_izleme.view', 'DENY', null, '2026-01-01 00:00:00', null, 'MUHASEBE', 'test deny']);
-    $istisna->execute([4, 'personeller.create', 'ALLOW', null, '2026-01-01 00:00:00', null, 'MUHASEBE', 'test allow']);
-    $istisna->execute([4, 'personeller.update', 'ALLOW', null, '2026-01-01 00:00:00', '2026-01-02 00:00:00', 'MUHASEBE', 'expired']);
-    $istisna->execute([4, 'personeller.delete', 'ALLOW', null, '2099-01-01 00:00:00', null, 'MUHASEBE', 'future']);
-    $istisna->execute([4, 'finans.view', 'DENY', null, '2026-01-01 00:00:00', null, 'MUHASEBE', 'iptal edilecek']);
+    $istisnaExec([4, 'bordro_on_izleme.view', 'DENY', null, '2026-01-01 00:00:00', null, 'MUHASEBE', 'test deny']);
+    $istisnaExec([4, 'personeller.create', 'ALLOW', null, '2026-01-01 00:00:00', null, 'MUHASEBE', 'test allow']);
+    $istisnaExec([4, 'personeller.update', 'ALLOW', null, '2026-01-01 00:00:00', '2026-01-02 00:00:00', 'MUHASEBE', 'expired']);
+    $istisnaExec([4, 'personeller.delete', 'ALLOW', null, '2099-01-01 00:00:00', null, 'MUHASEBE', 'future']);
+    $istisnaExec([4, 'finans.view', 'DENY', null, '2026-01-01 00:00:00', null, 'MUHASEBE', 'iptal edilecek']);
     $revokedId = (int) $pdo->lastInsertId();
     $pdo->prepare("UPDATE user_yetki_istisnalari SET iptal_edildi_at = UTC_TIMESTAMP(), iptal_eden_user_id = 1, iptal_nedeni = 'MANUEL' WHERE id = ?")->execute([$revokedId]);
     yiAssert(true, 'istisna yalnız bir kez iptal edilebilir (ilk iptal kabul)');
@@ -311,9 +316,9 @@ try {
     yiAssert(yiSorted($login['payload']['data']['user']['effective_permissions']) === yiSorted($eff), 'login yanıtı /auth/yetkiler ile aynı etkin izinleri taşır');
 
     // Korunan uç: GY'ye yonetim-paneli.manage DENY yok sayılır (sistem hakkı); SISTEM_YONETICISI'ne DENY 403.
-    $istisna->execute([2, 'yonetim-paneli.manage', 'DENY', null, '2026-01-01 00:00:00', null, 'SISTEM_YONETICISI', 'kapat']);
+    $istisnaExec([2, 'yonetim-paneli.manage', 'DENY', null, '2026-01-01 00:00:00', null, 'SISTEM_YONETICISI', 'kapat']);
     yiAssert(yiHttp($db, 'yonetim_kullanicilar', ['token' => yiToken(2, 'SISTEM_YONETICISI')])['status'] === 403, 'gerçek uç: DENY edilen yonetim-paneli.manage 403');
-    $istisna->execute([1, 'yonetim-paneli.manage', 'DENY', null, '2026-01-01 00:00:00', null, 'GENEL_YONETICI', 'denenen']);
+    $istisnaExec([1, 'yonetim-paneli.manage', 'DENY', null, '2026-01-01 00:00:00', null, 'GENEL_YONETICI', 'denenen']);
     yiAssert(yiHttp($db, 'yonetim_kullanicilar', ['token' => $gyToken])['status'] === 200, 'gerçek uç: GY sistem hakkı DENY ile kapanmaz');
 
     $read = yiHttp($db, 'kullanici', ['token' => $gyToken, 'id' => 4]);
@@ -335,23 +340,74 @@ try {
     yiAssert($blocked("UPDATE user_yetki_istisnalari SET gecerlilik_bitis = '2099-01-01 00:00:00', iptal_edildi_at = UTC_TIMESTAMP(), iptal_nedeni = 'MANUEL' WHERE permission = 'personeller.create'"), 'iptal sırasında süre değiştirilemez');
     $chk = false;
     try {
-        $istisna->execute([4, 'x.y', 'ALLOW', null, '2026-02-01 00:00:00', '2026-01-01 00:00:00', 'MUHASEBE', 'ters']);
+        $istisnaExec([4, 'x.y', 'ALLOW', null, '2026-02-01 00:00:00', '2026-01-01 00:00:00', 'MUHASEBE', 'ters']);
     } catch (PDOException $e) {
         $chk = true;
     }
     yiAssert($chk, 'bitiş başlangıçtan önce olamaz (CHECK)');
-    $pdo->exec("INSERT INTO user_yetki_auditleri (aksiyon, aktor_user_id, hedef_user_id, hedef_rol, permission, etki, gerekce) VALUES ('VER', 1, 4, 'MUHASEBE', 'personeller.create', 'ALLOW', 'test')");
+    $pdo->exec("INSERT INTO user_yetki_auditleri (aksiyon, aktor_user_id, aktor_username_snapshot, hedef_user_id, hedef_username_snapshot, hedef_rol, permission, etki, gerekce) VALUES ('VER', 1, 'u1', 4, 'u4', 'MUHASEBE', 'personeller.create', 'ALLOW', 'test')");
     yiAssert($blocked('UPDATE user_yetki_auditleri SET gerekce = ?', ['x']), 'audit UPDATE engellenir');
     yiAssert($blocked('DELETE FROM user_yetki_auditleri'), 'audit DELETE engellenir');
     $audit = yiHttp($db, 'audit', ['token' => $gyToken, 'query' => ['kullanici_id' => '4']]);
     yiAssert(count($audit['payload']['data']['items']) === 1 && $audit['payload']['data']['items'][0]['hedef_user_id'] === 4, 'GY audit kaydını hedef kullanıcıya göre okur');
-    $fkBlocked = false;
+    // --- Şube kapsamlı istisna, gerçek yükleme ile (Kayseri = şube 2) ----------------
+    $pdo->exec("INSERT INTO subeler (id, kod, ad, sgk_isveren_id, sirket_id, durum) VALUES (2, 'SB-2', 'Kayseri', 1, 1, 'AKTIF'), (3, 'SB-3', 'Ankara', 1, 1, 'AKTIF')");
+    $pdo->exec('INSERT INTO user_subeler (user_id, sube_id) VALUES (5, 2), (5, 3)');
+    $istisnaExec([5, 'personeller.ucret.manage', 'ALLOW', 2, '2026-01-01 00:00:00', null, 'IK_PERSONELI', 'Kayseri duzenleme']);
+    $istisnaExec([5, 'personeller.view', 'DENY', 2, '2026-01-01 00:00:00', null, 'IK_PERSONELI', 'Kayseri goruntuleme kapali']);
+    $ikp = ['id' => 5, 'rol' => 'IK_PERSONELI', 'sube_ids' => [1, 2, 3], 'yetki_istisnalari' => UserYetkiIstisnaSchema::loadActive($pdo, 5)];
+    yiAssert(!RolePermissions::has(['rol' => 'IK_PERSONELI'], 'personeller.ucret.manage'), 'personeller.ucret.manage IK_PERSONELI rol varsayılanı değil');
+    yiAssert(RolePermissions::hasForSube($ikp, 'personeller.ucret.manage', 2), 'Kayseri ALLOW (düzenleme) Kayseri\'de geçerli');
+    yiAssert(!RolePermissions::hasForSube($ikp, 'personeller.ucret.manage', 3), 'Kayseri ALLOW Ankara\'da geçersiz');
+    yiAssert(!RolePermissions::has($ikp, 'personeller.ucret.manage'), 'Kayseri ALLOW şubesiz kontrolde izin vermez');
+    yiAssert(RolePermissions::has(['rol' => 'IK_PERSONELI'], 'personeller.view'), 'personeller.view IK_PERSONELI rol varsayılanı');
+    yiAssert(!RolePermissions::hasForSube($ikp, 'personeller.view', 2), 'Kayseri DENY Kayseri\'yi kapatır');
+    yiAssert(RolePermissions::hasForSube($ikp, 'personeller.view', 3) && RolePermissions::hasForSube($ikp, 'personeller.view', 1), 'Kayseri DENY diğer şubeleri engellemez');
+    yiAssert(RolePermissions::has($ikp, 'personeller.view'), 'Kayseri DENY şubesiz kontrolü engellemez (kayıt düzeyinde uygulanır)');
+
+    // --- Kalıcı Sil: geçmiş korunur, aktif istisna engeller --------------------------
+    $gyActor = ['id' => 1, 'username' => 'u1', 'rol' => 'GENEL_YONETICI', 'sube_ids' => []];
+    $ins->execute([20, 'gecmis.sahibi', $hash, 'Gecmis SAHIBI', 'IK_PERSONELI']);
+    $ins->execute([21, 'aktif.istisnali', $hash, 'Aktif ISTISNALI', 'IK_PERSONELI']);
+    $istisnaExec([20, 'personeller.create', 'ALLOW', null, '2026-01-01 00:00:00', '2026-02-01 00:00:00', 'IK_PERSONELI', 'suresi dolmus']);
+    $istisnaExec([20, 'finans.view', 'ALLOW', null, '2026-01-01 00:00:00', null, 'IK_PERSONELI', 'iptal edilecek']);
+    $pdo->exec("UPDATE user_yetki_istisnalari SET iptal_edildi_at = UTC_TIMESTAMP(), iptal_eden_user_id = 1, iptal_eden_username_snapshot = 'u1', iptal_nedeni = 'MANUEL' WHERE user_id = 20 AND permission = 'finans.view'");
+    // 20 aynı zamanda başkasına yetki vermiş ve audit'te aktör/hedef olarak geçiyor
+    $pdo->exec("INSERT INTO user_yetki_istisnalari (user_id, hedef_username_snapshot, permission, etki, sube_id, gecerlilik_baslangic, gecerlilik_bitis, veren_user_id, veren_username_snapshot, hedef_rol_snapshot, gerekce, iptal_edildi_at, iptal_eden_user_id, iptal_eden_username_snapshot, iptal_nedeni) VALUES (4, 'u4', 'personeller.delete', 'ALLOW', NULL, '2026-01-01 00:00:00', NULL, 20, 'gecmis.sahibi', 'MUHASEBE', 'verilmis', UTC_TIMESTAMP(), 20, 'gecmis.sahibi', 'MANUEL')");
+    $pdo->exec("INSERT INTO user_yetki_auditleri (aksiyon, aktor_user_id, aktor_username_snapshot, hedef_user_id, hedef_username_snapshot, hedef_rol, permission, etki, gerekce) VALUES ('VER', 1, 'u1', 20, 'gecmis.sahibi', 'IK_PERSONELI', 'finans.view', 'ALLOW', 'g'), ('KALDIR', 20, 'gecmis.sahibi', 4, 'u4', 'MUHASEBE', 'personeller.delete', 'ALLOW', 'g')");
+    $istisnaExec([21, 'personeller.create', 'ALLOW', null, '2026-01-01 00:00:00', null, 'IK_PERSONELI', 'aktif']);
+    $istisnaExec([21, 'personeller.update', 'ALLOW', null, '2099-01-01 00:00:00', null, 'IK_PERSONELI', 'ileri tarihli']);
+
+    $gecmisOnce = $count('SELECT COUNT(*) FROM user_yetki_istisnalari WHERE user_id = 20 OR veren_user_id = 20 OR iptal_eden_user_id = 20')
+        + $count('SELECT COUNT(*) FROM user_yetki_auditleri WHERE aktor_user_id = 20 OR hedef_user_id = 20');
+    $elig = \Medisa\Api\Services\Auth\KullaniciKaliciSilService::checkEligibility($pdo, 20, $gyActor);
+    yiAssert($elig['verdict'] === 'SİLİNEBİLİR', 'Kalıcı Sil: yalnız geçmiş (iptal/süresi dolmuş, veren, audit) olan hesap SİLİNEBİLİR');
+    $elig21 = \Medisa\Api\Services\Auth\KullaniciKaliciSilService::checkEligibility($pdo, 21, $gyActor);
+    $b21 = array_values(array_filter($elig21['blockers'], static fn ($b) => ($b['table'] ?? '') === 'user_yetki_istisnalari'));
+    yiAssert($elig21['verdict'] === 'ENGELLENDİ' && count($b21) === 1 && $b21[0]['row_count'] === 2, 'Kalıcı Sil: AKTİF (ileri tarihli dahil) istisnası olan hesap ENGELLENDİ');
+    $res = \Medisa\Api\Services\Auth\KullaniciKaliciSilService::delete($pdo, 20, $gyActor, 'gecmis.sahibi', 'P2 test', str_repeat('a', 64));
+    yiAssert($res['deleted'] === true && $count('SELECT COUNT(*) FROM users WHERE id = 20') === 0, 'Kalıcı Sil: hesap silindi');
+    $gecmisSonra = $count('SELECT COUNT(*) FROM user_yetki_istisnalari WHERE user_id = 20 OR veren_user_id = 20 OR iptal_eden_user_id = 20')
+        + $count('SELECT COUNT(*) FROM user_yetki_auditleri WHERE aktor_user_id = 20 OR hedef_user_id = 20');
+    yiAssert($gecmisOnce === 5 && $gecmisSonra === $gecmisOnce, 'Kalıcı Sil: yetki geçmişi silinmedi/yeniden atanmadı (' . $gecmisSonra . ' satır)');
+    yiAssert($count("SELECT COUNT(*) FROM user_yetki_istisnalari WHERE veren_user_id = 20 AND veren_username_snapshot = 'gecmis.sahibi'") === 1
+        && $count("SELECT COUNT(*) FROM user_yetki_auditleri WHERE aktor_user_id = 20 AND aktor_username_snapshot = 'gecmis.sahibi'") === 1, 'Kalıcı Sil: silinen kişi geçmişte kullanıcı adı anlık görüntüsüyle okunur');
+    $pdo->exec("UPDATE user_yetki_istisnalari SET iptal_edildi_at = UTC_TIMESTAMP(), iptal_eden_user_id = 1, iptal_eden_username_snapshot = 'u1', iptal_nedeni = 'MANUEL' WHERE user_id = 21");
+    yiAssert(\Medisa\Api\Services\Auth\KullaniciKaliciSilService::checkEligibility($pdo, 21, $gyActor)['verdict'] === 'SİLİNEBİLİR', 'Kalıcı Sil: istisnalar iptal edilince SİLİNEBİLİR');
+
+    // --- K1 politika: Medisa benzeri kurulum (satır yok) = UYARI, kilit yok -----------
+    $K = \Medisa\Api\Services\Auth\YetkiKimlikPolitikasi::class;
+    yiAssert($K::mod($pdo) === 'UYARI', 'K1: politika satırı yok → UYARI (Medisa canlı)');
+    $d = $K::degerlendir($pdo, 1, 4);
+    yiAssert($d['izin'] === true && $d['uyarilar'] === ['YETKI_VEREN_KIMLIK_DOGRULANMAMIS'], 'K1 UYARI: kimliksiz GY engellenmez, uyarı alır');
+    yiAssert($K::degerlendir($pdo, 1, 1)['izin'] === false, 'K1: kendine yetki her modda yasak');
+    $bootstrapRefused = false;
     try {
-        $pdo->exec('DELETE FROM users WHERE id = 4');
-    } catch (PDOException $e) {
-        $fkBlocked = true;
+        \Medisa\Api\Services\Auth\IlkYoneticiKurulumService::olustur($pdo, 'ikinci.ilk', 'Ikinci ILK', 'CokGucluParola-123');
+    } catch (\Medisa\Api\Services\Auth\IlkYoneticiKurulumException $e) {
+        $bootstrapRefused = true;
     }
-    yiAssert($fkBlocked, 'istisna/audit geçmişi olan kullanıcı satırı FK ile korunur');
+    yiAssert($bootstrapRefused && $K::mod($pdo) === 'UYARI', 'K1: GY varken kurulum reddeder, mod UYARI kalır');
 
     // --- Geri uyumluluk: 100 uygulanmamış şema ---------------------------------------
     $legacy = yiPdo($baseDsn . ';dbname=' . $legacyDb);
@@ -359,10 +415,38 @@ try {
     yiAssert(UserYetkiIstisnaSchema::loadActive($legacy, 4) === [], '100 öncesi şema: loadActive boş döner');
     yiAssert(UserYetkiIstisnaSchema::loadHistory($legacy, 4)['schema_ready'] === false && UserYetkiIstisnaSchema::loadAudit($legacy, null, 10)['schema_ready'] === false, '100 öncesi şema: okuma uçları schema_ready=false');
 
+    // --- Yeni kurulum (boş DB): ilk yönetici kimliği + K1 ZORUNLU + kilit yok --------
+    $freshPdo = yiPdo($baseDsn . ';dbname=' . $freshDb);
+    $run = \Medisa\Api\Database\MigrationRunner::run($freshPdo, __DIR__ . '/../../api/migrations', '000');
+    yiAssert(end($run['applied']) === '100', 'yeni kurulum: kanonik runner boş DB\'de 100\'e kadar uygular');
+    yiAssert($K::mod($freshPdo) === 'UYARI', 'yeni kurulum: kurulum öncesi mod UYARI');
+    $ilk = \Medisa\Api\Services\Auth\IlkYoneticiKurulumService::olustur($freshPdo, 'yonetici', 'Ilk YONETICI', 'CokGucluParola-123');
+    $kimlik = $freshPdo->query('SELECT ai.status, ai.identity_code, u.actor_identity_id FROM users u JOIN actor_identities ai ON ai.id = u.actor_identity_id WHERE u.id = ' . (int) $ilk['user_id'])->fetch(PDO::FETCH_ASSOC);
+    yiAssert($ilk['actor_identity_id'] !== null && $kimlik['status'] === 'VERIFIED' && $kimlik['identity_code'] === 'USER-' . $ilk['user_id'], 'yeni kurulum: ilk yönetici gerçek-kişi kimliği VERIFIED ve bağlı');
+    yiAssert((int) $freshPdo->query("SELECT COUNT(*) FROM actor_identity_audits WHERE action = 'BOOTSTRAP_VERIFY'")->fetchColumn() === 1, 'yeni kurulum: kimlik kurulum beyanı audit edildi');
+    yiAssert($ilk['k1_kimlik_modu'] === 'ZORUNLU' && $K::mod($freshPdo) === 'ZORUNLU', 'yeni kurulum: K1 = ZORUNLU');
+    $freshPdo->exec("INSERT INTO users (username, password_hash, ad_soyad, rol, durum) VALUES ('calisan', 'x', 'Calisan BIR', 'MUHASEBE', 'AKTIF'), ('ikinci.gy', 'x', 'Ikinci GY', 'GENEL_YONETICI', 'AKTIF')");
+    $calisan = (int) $freshPdo->query("SELECT id FROM users WHERE username = 'calisan'")->fetchColumn();
+    $gy2 = (int) $freshPdo->query("SELECT id FROM users WHERE username = 'ikinci.gy'")->fetchColumn();
+    $d = $K::degerlendir($freshPdo, (int) $ilk['user_id'], $calisan);
+    yiAssert($d['izin'] === true && $d['uyarilar'] === [], 'yeni kurulum: ilk yönetici kilitlenmeden yetki verebilir');
+    $d = $K::degerlendir($freshPdo, $gy2, $calisan);
+    yiAssert($d['izin'] === false && $d['engel'] === 'YETKI_VEREN_KIMLIK_DOGRULANMAMIS', 'yeni kurulum ZORUNLU: kimliği doğrulanmamış GY kişiye özel yetki veremez');
+    yiAssert($K::degerlendir($freshPdo, (int) $ilk['user_id'], (int) $ilk['user_id'])['engel'] === 'YETKI_KENDINE_VERILEMEZ', 'yeni kurulum: kendine yetki yasak');
+    $tekrar = false;
+    try {
+        \Medisa\Api\Services\Auth\IlkYoneticiKurulumService::olustur($freshPdo, 'baska', 'Baska KISI', 'CokGucluParola-123');
+    } catch (\Medisa\Api\Services\Auth\IlkYoneticiKurulumException $e) {
+        $tekrar = true;
+    }
+    yiAssert($tekrar, 'yeni kurulum: ikinci ilk-yönetici kurulumu reddedilir');
+    $freshPdo = null;
+
     echo "verify-yetki-istisna-mysql: OK\n";
 } finally {
     $pdo = null;
     $legacy = null;
     $root->exec('DROP DATABASE IF EXISTS `' . $db . '`');
     $root->exec('DROP DATABASE IF EXISTS `' . $legacyDb . '`');
+    $root->exec('DROP DATABASE IF EXISTS `' . $freshDb . '`');
 }

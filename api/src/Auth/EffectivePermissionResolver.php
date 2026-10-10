@@ -15,11 +15,20 @@ use Medisa\Api\Scope\OrgScope;
  *     (1 ve 2 kişiye özel istisnalardan etkilenmez.)
  *  3. Kanonik rol yoksa (bilinmeyen/eski rol) → RED (istisnalar da uygulanmaz).
  *  4. Geçerli bir DENY → RED. DENY her zaman ALLOW'u ve rol varsayılanını yener;
- *     global DENY (sube_id NULL) tüm şubeleri kapatır. Şube bağlamı bilinmeyen bir
- *     karar (has) şubeye özel DENY'ı da RED sayar (fail-closed).
+ *     global DENY (sube_id NULL) tüm şubeleri kapatır.
  *  5. Rol varsayılanı → KABUL.
  *  6. Geçerli bir ALLOW → KABUL. ALLOW kapsamı genişletmez: şubeye özel ALLOW yalnız
  *     o şube bağlamında ve şube kullanıcının mevcut org kapsamındaysa geçerlidir.
+ *
+ * Şube kapsamlı istisna semantiği (iki karar türü):
+ *  - Şube bağlamlı karar (resolveForSube / RolePermissions::hasForSube): şube DENY
+ *    yalnız o şubeyi kapatır; şube ALLOW yalnız o şubede ve şube kullanıcının org
+ *    kapsamındaysa izin verir.
+ *  - Şubesiz karar (resolve / has — bugünkü 232 çağrı yeri): şube ALLOW izin VERMEZ,
+ *    şube DENY ENGELLEMEZ. Şube kısıtı, kaydın şubesi bilinen kayıt düzeyi kontrolde
+ *    (hasForSube) uygulanır; çağrı yerlerinin şube bağlamına geçişi P3'tedir.
+ *    (Şubesiz kararda şube DENY'ı her yere yaymak Kayseri kısıtını tüm şubelere
+ *    taşırdı; yok saymak kapsamı genişletmez çünkü ALLOW da yok sayılır.)
  *
  * Geçerlilik (başlangıç/bitiş, UTC) değerlendirme anında kontrol edilir.
  * İstisnalar `$user['yetki_istisnalari']` içinden okunur (AuthMiddleware tek sorguyla
@@ -227,8 +236,8 @@ final class EffectivePermissionResolver
                 continue;
             }
             $rowSube = isset($row['sube_id']) && $row['sube_id'] !== null ? (int) $row['sube_id'] : null;
-            // Global DENY her şubeyi kapatır; şube bağlamı bilinmiyorsa şubeye özel DENY de kapatır.
-            if ($rowSube === null || $subeId === null || $rowSube === $subeId) {
+            // Global DENY her şubeyi kapatır; şube DENY yalnız şube bağlamı aynıysa.
+            if ($rowSube === null || ($subeId !== null && $rowSube === $subeId)) {
                 return true;
             }
         }

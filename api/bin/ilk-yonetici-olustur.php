@@ -51,5 +51,7 @@ try {
 }
 
 echo 'ILK_YONETICI_OLUSTURULDU id=' . $result['user_id'] . ' username=' . $result['username']
-    . ' silinmesi_korunur=' . ($result['silinmesi_korunur'] ? '1' : '0') . "\n";
+    . ' silinmesi_korunur=' . ($result['silinmesi_korunur'] ? '1' : '0')
+    . ' actor_identity_id=' . ($result['actor_identity_id'] ?? 'yok')
+    . ' k1_kimlik_modu=' . $result['k1_kimlik_modu'] . "\n";
 exit(0);

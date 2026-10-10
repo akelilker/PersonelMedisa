@@ -60,9 +60,9 @@ final class UserYetkiIstisnaSchema
     {
         try {
             $stmt = $pdo->prepare(
-                'SELECT id, user_id, permission, etki, sube_id, gecerlilik_baslangic, gecerlilik_bitis,
-                        veren_user_id, hedef_rol_snapshot, gerekce, created_at,
-                        iptal_edildi_at, iptal_eden_user_id, iptal_nedeni
+                'SELECT id, user_id, hedef_username_snapshot, permission, etki, sube_id, gecerlilik_baslangic, gecerlilik_bitis,
+                        veren_user_id, veren_username_snapshot, hedef_rol_snapshot, gerekce, created_at,
+                        iptal_edildi_at, iptal_eden_user_id, iptal_eden_username_snapshot, iptal_nedeni
                    FROM ' . self::TABLE . '
                   WHERE user_id = :user_id
                   ORDER BY id DESC'
@@ -76,7 +76,10 @@ final class UserYetkiIstisnaSchema
         return ['schema_ready' => true, 'rows' => array_map(static function (array $row): array {
             $mapped = self::mapRow($row);
             $mapped['user_id'] = (int) $row['user_id'];
+            $mapped['hedef_username_snapshot'] = (string) $row['hedef_username_snapshot'];
             $mapped['veren_user_id'] = (int) $row['veren_user_id'];
+            $mapped['veren_username_snapshot'] = (string) $row['veren_username_snapshot'];
+            $mapped['iptal_eden_username_snapshot'] = $row['iptal_eden_username_snapshot'] !== null ? (string) $row['iptal_eden_username_snapshot'] : null;
             $mapped['hedef_rol_snapshot'] = (string) $row['hedef_rol_snapshot'];
             $mapped['gerekce'] = (string) $row['gerekce'];
             $mapped['created_at'] = (string) $row['created_at'];
@@ -104,7 +107,8 @@ final class UserYetkiIstisnaSchema
         }
         try {
             $stmt = $pdo->prepare(
-                'SELECT a.id, a.aksiyon, a.aktor_user_id, a.hedef_user_id, a.hedef_rol, a.istisna_id,
+                'SELECT a.id, a.aksiyon, a.aktor_user_id, a.aktor_username_snapshot, a.aktor_actor_identity_id,
+                        a.hedef_user_id, a.hedef_username_snapshot, a.hedef_rol, a.istisna_id,
                         a.permission, a.etki, a.sube_id, a.gecerlilik_baslangic, a.gecerlilik_bitis,
                         a.gerekce, a.uyari_kodlari, a.created_at
                    FROM ' . self::AUDIT_TABLE . ' a ' . $where . '
@@ -118,7 +122,7 @@ final class UserYetkiIstisnaSchema
         }
 
         return ['schema_ready' => true, 'rows' => array_map(static function (array $row): array {
-            foreach (['id', 'aktor_user_id', 'hedef_user_id', 'istisna_id', 'sube_id'] as $key) {
+            foreach (['id', 'aktor_user_id', 'aktor_actor_identity_id', 'hedef_user_id', 'istisna_id', 'sube_id'] as $key) {
                 $row[$key] = $row[$key] !== null ? (int) $row[$key] : null;
             }
 

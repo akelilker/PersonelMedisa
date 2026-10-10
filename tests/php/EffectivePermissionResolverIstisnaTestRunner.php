@@ -41,7 +41,16 @@ epiAssert(!R::resolve($muh + ['yetki_istisnalari' => [epiRow($perm, 'DENY')]], $
 epiAssert(!R::resolveForSube($muh + ['yetki_istisnalari' => [epiRow($perm, 'DENY')]], $perm, 2), '2 global DENY tüm şubeleri kapatır');
 $subeDeny = $muh + ['yetki_istisnalari' => [epiRow($perm, 'DENY', 1)]];
 epiAssert(!R::resolveForSube($subeDeny, $perm, 1) && R::resolveForSube($subeDeny, $perm, 2), '3 şube DENY yalnız o şubeyi kapatır');
-epiAssert(!R::resolve($subeDeny, $perm), '4 şube bağlamı yokken şube DENY fail-closed');
+epiAssert(R::resolve($subeDeny, $perm), '4 şubesiz kontrolde şube DENY engellemez (kayıt düzeyinde uygulanır)');
+// Kayseri (şube 7) senaryosu: kapsam 7 + 8
+$kay = ['id' => 9, 'rol' => 'BIRIM_AMIRI', 'sube_ids' => [7, 8]];
+$kayAllow = $kay + ['yetki_istisnalari' => [epiRow($extra, 'ALLOW', 7)]];
+epiAssert(RolePermissions::hasForSube($kayAllow, $extra, 7) && !RolePermissions::hasForSube($kayAllow, $extra, 8) && !RolePermissions::has($kayAllow, $extra), '4a Kayseri ALLOW (düzenleme) yalnız Kayseri\'de');
+$kayDenyPerm = RolePermissions::roleDefaultPermissions('BIRIM_AMIRI')[0];
+$kayDeny = $kay + ['yetki_istisnalari' => [epiRow($kayDenyPerm, 'DENY', 7)]];
+epiAssert(!RolePermissions::hasForSube($kayDeny, $kayDenyPerm, 7) && RolePermissions::hasForSube($kayDeny, $kayDenyPerm, 8) && RolePermissions::has($kayDeny, $kayDenyPerm), '4b Kayseri DENY diğer şubeleri engellemez');
+$kayGlobalDeny = $kay + ['yetki_istisnalari' => [epiRow($kayDenyPerm, 'DENY')]];
+epiAssert(!RolePermissions::hasForSube($kayGlobalDeny, $kayDenyPerm, 8) && !RolePermissions::has($kayGlobalDeny, $kayDenyPerm), '4c global DENY her şubede ve şubesiz kontrolde engeller');
 epiAssert(!R::resolve($muh + ['yetki_istisnalari' => [epiRow($extra, 'ALLOW'), epiRow($extra, 'DENY')]], $extra), '5 DENY ALLOW\'u yener');
 epiAssert(!R::resolve($gy + ['yetki_istisnalari' => [epiRow('bordro_kesinlestirme.approve', 'DENY')]], 'bordro_kesinlestirme.approve'), '6 GY\'nin bordro kesinleştirme kullanımı DENY ile kapatılabilir');
 epiAssert(R::resolve($gy + ['yetki_istisnalari' => [epiRow('kullanici_yetkileri.manage', 'DENY'), epiRow('yonetim-paneli.manage', 'DENY'), epiRow('kullanicilar.kalici_sil', 'DENY')]], 'kullanici_yetkileri.manage')

@@ -8,30 +8,38 @@
 --    bir kez doldurulur; çekirdek alanlar hiçbir zaman güncellenmez).
 --  * user_yetki_auditleri: append-only (099 deseni: BEFORE UPDATE / DELETE SIGNAL).
 --  * Zaman alanları UTC'dir. gecerlilik_bitis NULL = kalıcı.
+--  * Kullanıcı kolonları (user_id / veren / iptal eden / aktör / hedef) BİLİNÇLİ
+--    olarak users'a FK DEĞİLDİR ve kullanıcı adı anlık görüntüsü taşır (099
+--    user_kalici_silme_auditleri deseni): geçmiş, hesap Kalıcı Sil ile silinse de
+--    silinmeden/yeniden atanmadan kalır. Kalıcı Sil bu iki tabloyu "geçmiş
+--    anlık görüntü" tablosu sayar; hedefte AKTİF istisna varsa silmeyi engeller.
+--  * yetki_politikasi: kurulum düzeyi ayar. Satır yoksa K1 kimlik modu = UYARI
+--    (Medisa canlı). Yalnız ilk-yönetici kurulumu (boş DB) ZORUNLU yazar.
 SET NAMES utf8mb4;
 
 CREATE TABLE IF NOT EXISTS user_yetki_istisnalari (
   id INT UNSIGNED NOT NULL AUTO_INCREMENT,
   user_id INT UNSIGNED NOT NULL,
+  hedef_username_snapshot VARCHAR(64) NOT NULL,
   permission VARCHAR(96) NOT NULL,
   etki ENUM('ALLOW', 'DENY') NOT NULL,
   sube_id INT UNSIGNED NULL,
   gecerlilik_baslangic DATETIME NOT NULL,
   gecerlilik_bitis DATETIME NULL,
   veren_user_id INT UNSIGNED NOT NULL,
+  veren_username_snapshot VARCHAR(64) NOT NULL,
   veren_actor_identity_id INT UNSIGNED NULL,
   hedef_rol_snapshot VARCHAR(64) NOT NULL,
   gerekce VARCHAR(500) NOT NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   iptal_edildi_at DATETIME NULL,
   iptal_eden_user_id INT UNSIGNED NULL,
+  iptal_eden_username_snapshot VARCHAR(64) NULL,
   iptal_nedeni ENUM('MANUEL', 'ROL_DEGISTI', 'SURE_DOLDU') NULL,
   PRIMARY KEY (id),
   KEY idx_uyi_user_aktif (user_id, iptal_edildi_at),
   KEY idx_uyi_permission (permission),
-  CONSTRAINT fk_uyi_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE RESTRICT ON UPDATE RESTRICT,
-  CONSTRAINT fk_uyi_veren FOREIGN KEY (veren_user_id) REFERENCES users (id) ON DELETE RESTRICT ON UPDATE RESTRICT,
-  CONSTRAINT fk_uyi_iptal_eden FOREIGN KEY (iptal_eden_user_id) REFERENCES users (id) ON DELETE RESTRICT ON UPDATE RESTRICT,
+  KEY idx_uyi_veren (veren_user_id),
   CONSTRAINT fk_uyi_sube FOREIGN KEY (sube_id) REFERENCES subeler (id) ON DELETE RESTRICT ON UPDATE RESTRICT,
   CONSTRAINT fk_uyi_veren_kimlik FOREIGN KEY (veren_actor_identity_id) REFERENCES actor_identities (id) ON DELETE RESTRICT ON UPDATE RESTRICT,
   CONSTRAINT chk_uyi_sure CHECK (gecerlilik_bitis IS NULL OR gecerlilik_bitis > gecerlilik_baslangic),
@@ -60,6 +68,8 @@ IF OLD.iptal_edildi_at IS NOT NULL
    OR NEW.iptal_nedeni IS NULL
    OR NOT (NEW.id <=> OLD.id)
    OR NOT (NEW.user_id <=> OLD.user_id)
+   OR NOT (NEW.hedef_username_snapshot <=> OLD.hedef_username_snapshot)
+   OR NOT (NEW.veren_username_snapshot <=> OLD.veren_username_snapshot)
    OR NOT (NEW.permission <=> OLD.permission)
    OR NOT (NEW.etki <=> OLD.etki)
    OR NOT (NEW.sube_id <=> OLD.sube_id)
@@ -79,8 +89,10 @@ CREATE TABLE IF NOT EXISTS user_yetki_auditleri (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   aksiyon ENUM('VER', 'KALDIR', 'ROL_DEGISTI_IPTAL', 'PROFIL_DEGISTI', 'REDDEDILDI') NOT NULL,
   aktor_user_id INT UNSIGNED NOT NULL,
+  aktor_username_snapshot VARCHAR(64) NOT NULL,
   aktor_actor_identity_id INT UNSIGNED NULL,
   hedef_user_id INT UNSIGNED NOT NULL,
+  hedef_username_snapshot VARCHAR(64) NOT NULL,
   hedef_rol VARCHAR(64) NOT NULL,
   istisna_id INT UNSIGNED NULL,
   permission VARCHAR(96) NULL,
@@ -97,8 +109,6 @@ CREATE TABLE IF NOT EXISTS user_yetki_auditleri (
   PRIMARY KEY (id),
   KEY idx_uya_hedef (hedef_user_id, created_at),
   KEY idx_uya_aktor (aktor_user_id, created_at),
-  CONSTRAINT fk_uya_aktor FOREIGN KEY (aktor_user_id) REFERENCES users (id) ON DELETE RESTRICT ON UPDATE RESTRICT,
-  CONSTRAINT fk_uya_hedef FOREIGN KEY (hedef_user_id) REFERENCES users (id) ON DELETE RESTRICT ON UPDATE RESTRICT,
   CONSTRAINT fk_uya_istisna FOREIGN KEY (istisna_id) REFERENCES user_yetki_istisnalari (id) ON DELETE RESTRICT ON UPDATE RESTRICT,
   CONSTRAINT fk_uya_aktor_kimlik FOREIGN KEY (aktor_actor_identity_id) REFERENCES actor_identities (id) ON DELETE RESTRICT ON UPDATE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -116,3 +126,13 @@ BEFORE DELETE ON user_yetki_auditleri
 FOR EACH ROW
 SIGNAL SQLSTATE '45000'
   SET MESSAGE_TEXT = 'YETKI_AUDIT_IMMUTABLE: yetki audit satiri silinemez';
+
+-- Kurulum düzeyi yetki politikası. Satır yok = varsayılan (K1 UYARI).
+CREATE TABLE IF NOT EXISTS yetki_politikasi (
+  anahtar VARCHAR(64) NOT NULL,
+  deger VARCHAR(64) NOT NULL,
+  kaynak VARCHAR(64) NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (anahtar),
+  CONSTRAINT chk_yp_k1 CHECK (anahtar <> 'K1_KIMLIK_MODU' OR deger IN ('UYARI', 'ZORUNLU'))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

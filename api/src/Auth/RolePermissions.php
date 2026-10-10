@@ -662,6 +662,27 @@ class RolePermissions
     }
 
     /** @param array<string, mixed> $user */
+    /**
+     * Kaydın şubesi bilinen kontrol: şube kapsamlı DENY/ALLOW istisnaları uygulanır.
+     * (Dinamik yetki P2; çağrı yerlerinin geçişi P3.)
+     *
+     * @param array<string, mixed> $user
+     */
+    public static function hasForSube(array $user, $permission, int $subeId): bool
+    {
+        return EffectivePermissionResolver::resolveForSube($user, $permission, $subeId);
+    }
+
+    /**
+     * @param array<string, mixed> $user
+     */
+    public static function assertForSube(array $user, $permission, int $subeId): void
+    {
+        if (!self::hasForSube($user, $permission, $subeId)) {
+            JsonResponse::forbidden();
+        }
+    }
+
     public static function assert(array $user, $permission)
     {
         if (!self::has($user, $permission)) {

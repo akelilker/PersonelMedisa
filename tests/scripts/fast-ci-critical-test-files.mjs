@@ -41,5 +41,9 @@ export const fastCiCriticalTestFiles = [
 
   // 7) Görünür UI regresyon kilitleri — iOS çift liste (native select focus) ve
   //    kullanıcıya gösterilmeyecek Prim Kuralı (2026-10-10 tekrar eden regresyonlar).
-  "tests/unit/ui-regression-guards.test.tsx"
+  "tests/unit/ui-regression-guards.test.tsx",
+
+  // 8) Yönetici hesap korumaları (DB'siz kural matrisi + controller kaynak kilidi). MariaDB
+  //    eşzamanlılık senaryoları CI Full'de: genel-yonetici-korumasi-mysql.php-runtime.test.ts
+  "tests/unit/genel-yonetici-korumasi.php-runtime.test.ts"
 ];

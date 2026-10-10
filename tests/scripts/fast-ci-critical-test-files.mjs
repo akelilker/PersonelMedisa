@@ -44,5 +44,7 @@ export const fastCiCriticalTestFiles = [
   "tests/unit/ui-regression-guards.test.tsx",
 
   // 8) Kişiden bağımsız hesap koruması: kişi anahtarı yalnız tarihsel sahiplerde.
-  "tests/unit/kisiden-bagimsiz-koruma.source.test.ts"
+  "tests/unit/kisiden-bagimsiz-koruma.source.test.ts",
+  // 9) Yeni şirket kurulumu: ilk Genel Yönetici CLI owner sözleşmesi.
+  "tests/unit/ilk-yonetici-kurulum.source.test.ts"
 ];

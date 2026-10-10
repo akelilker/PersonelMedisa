@@ -92,6 +92,20 @@ Ilk mevcut production kurulumu icin Cron command ortaminda
 runner bu surum ve oncekileri tekrar calistirmadan ledger'a kaydeder. Sonraki
 deploy'larda baseline etkisizdir. `seeds/` production deploy kapsaminda degildir.
 
+### Yeni sirket kurulumu (bos veritabani)
+
+1. Bos DB'de canonical runner baseline `000` ile tum zinciri uygular
+   (`MEDISA_MIGRATION_BASELINE=000`). Sirkete ozgu katalog duzeltmesi 067,
+   hedef tablolari bossa calistirilmadan ayni checksum ile ledger'a yazilir.
+2. Ilk Genel Yonetici (yalniz hic Genel Yonetici yokken, bir kez):
+
+```bash
+MEDISA_ILK_YONETICI_PAROLA='...' php api/bin/ilk-yonetici-olustur.php --kullanici-adi=yonetici --ad-soyad="Ad SOYAD"
+```
+
+   Hesap `silinmesi_korunur = 1` ile olusur. Medisa'ya ozgu hesap gerekmez;
+   Kalici Sil bos korunan-hesap kaydiyla calisir (koruma bayrak + rol kurali).
+
 Password hash uretimi:
 
 ```bash

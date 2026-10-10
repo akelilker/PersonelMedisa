@@ -76,6 +76,10 @@ class RolePermissions
             'isg.view',
             'yonetim-paneli.view',
             'yonetim-paneli.manage',
+            // Kullanici bazli yetki yonetimi (dinamik yetki P2): yalniz GENEL_YONETICI; ALLOW ile verilemez.
+            'kullanici_yetkileri.view',
+            'kullanici_yetkileri.manage',
+            'kullanici_yetkileri.audit.view',
             'kullanicilar.kalici_sil',
             'aylik-ozet.view',
             'aylik-ozet.executive_ack',

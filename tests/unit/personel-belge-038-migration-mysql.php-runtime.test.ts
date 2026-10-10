@@ -30,7 +30,7 @@ describe("S86 personel belge 038 MariaDB migration", () => {
       .filter((name) => /^\d{3}_.+\.sql$/.test(name))
       .sort();
     expect(migrations[0]).toBe("001_initial_schema.sql");
-    expect(migrations.at(-1)).toBe("099_user_kalici_silme_auditleri.sql");
+    expect(migrations.at(-1)).toBe("100_user_yetki_istisnalari.sql");
     expect(migrations.some((name) => name.startsWith("039_"))).toBe(true);
   });
 

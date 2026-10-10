@@ -50,6 +50,7 @@ use Medisa\Api\Controllers\ResmiTatilTakvimiController;
 use Medisa\Api\Controllers\RevizyonController;
 use Medisa\Api\Controllers\SureclerController;
 use Medisa\Api\Controllers\YillikIzinHakDuzeltmeController;
+use Medisa\Api\Controllers\KullaniciYetkiController;
 use Medisa\Api\Controllers\YonetimController;
 use Medisa\Api\Controllers\ZimmetlerController;
 use Medisa\Api\Http\JsonResponse;
@@ -89,6 +90,9 @@ class Router
         }
         if ($path === '/auth/smoke-read' && $method === 'GET') {
             AuthSmokeController::smokeRead($this->request);
+        }
+        if ($path === '/auth/yetkiler' && $method === 'GET') {
+            KullaniciYetkiController::benimYetkilerim($this->request);
         }
 
         if ($path === '/client-telemetry' && $method === 'POST') {
@@ -1068,6 +1072,12 @@ class Router
         }
         if ($method === 'POST' && preg_match('#^/yonetim/personeller/(\d+)/hesap-onboarding$#', $path, $matches)) {
             PersonelAccountOnboardingController::onboard($this->request, $matches[1]);
+        }
+        if ($method === 'GET' && preg_match('#^/yonetim/kullanicilar/(\d+)/yetkiler$#', $path, $matches)) {
+            KullaniciYetkiController::kullaniciYetkileri($this->request, $matches[1]);
+        }
+        if ($path === '/yonetim/yetki-auditleri' && $method === 'GET') {
+            KullaniciYetkiController::yetkiAuditleri($this->request);
         }
         if ($method === 'GET' && preg_match('#^/yonetim/kullanicilar/(\d+)/actor-identity$#', $path, $matches)) {
             YonetimController::actorIdentityRead($this->request, $matches[1]);

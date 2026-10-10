@@ -20,9 +20,15 @@ require_once __DIR__ . '/../../api/src/bootstrap.php';
 use Medisa\Api\Auth\EffectivePermissionResolver;
 use Medisa\Api\Auth\RolePermissions;
 
-/** origin/main 1f0513f1 rol matrisi anlık görüntüsü: [izin sayısı, sha256(sıralı, "\n")]. */
+/**
+ * Rol matrisi anlık görüntüsü: [izin sayısı, sha256(sıralı, "\n")].
+ * GENEL_YONETICI: 1f0513f1'de 108 (36607fa7…); dinamik yetki P2 ile BİLİNÇLİ olarak
+ * +3 (kullanici_yetkileri.view/.manage/.audit.view) = 111. Diğer roller değişmedi.
+ */
+const EPR_GY_P2_EKLENEN = ['kullanici_yetkileri.audit.view', 'kullanici_yetkileri.manage', 'kullanici_yetkileri.view'];
+const EPR_GY_1F0513F1_HASH = '36607fa7c55a01136a5c48e2882b5e28b247d13c9e9cf67d2e7f889688d20bb5';
 const EPR_SNAPSHOT = [
-    'GENEL_YONETICI' => [108, '36607fa7c55a01136a5c48e2882b5e28b247d13c9e9cf67d2e7f889688d20bb5'],
+    'GENEL_YONETICI' => [111, '63afe1e96011603dd2e7a13eac563202e4b611e65645b03efedd006e6d30e028'],
     'SUBE_YONETICISI' => [43, '27b96fb8fd46994424b9f2f1d963bdaf7684a8f4e3025a4730da00450d089319'],
     'BOLUM_YONETICISI' => [53, '19acbe2b53a077fe380f6f014e597c5cdfd2ac3a1a13013c23ed5424a46ffa17'],
     'MUHASEBE' => [26, '2cc71406aa8b0afa58c8a418d59daaa4198bbdef37f2cb6ac7b92dad0883154e'],
@@ -101,7 +107,38 @@ foreach (EPR_SNAPSHOT as $role => [$count, $hash]) {
     echo "[PASS] snapshot {$role} = {$count}\n";
 }
 
+// GY: P2 öncesi 108 izin aynen korunur, yalnız 3 yetki-yönetimi izni eklenir.
+$gyList = array_values(array_unique($matrix['GENEL_YONETICI']));
+$gyEski = array_values(array_diff($gyList, EPR_GY_P2_EKLENEN));
+sort($gyEski, SORT_STRING);
+if (count($gyEski) !== 108 || hash('sha256', implode("\n", $gyEski)) !== EPR_GY_1F0513F1_HASH
+    || count(array_intersect($gyList, EPR_GY_P2_EKLENEN)) !== 3
+) {
+    eprFail('GENEL_YONETICI P2 öncesi 108 izin korunmadı');
+}
+foreach ($matrix as $role => $list) {
+    if ($role !== 'GENEL_YONETICI' && array_intersect($list, EPR_GY_P2_EKLENEN) !== []) {
+        eprFail('yetki yönetimi izni GY dışı rolde: ' . $role);
+    }
+}
+echo "[PASS] GENEL_YONETICI 1f0513f1 108 izni korunur + 3 yetki yönetimi izni (111)\n";
+
 // --- 1) Eski karar == yeni karar ----------------------------------------------
+// İstisna listesi boş/etkisiz bağlamları: yok, boş, yalnız etkisiz satırlar
+// (gelecekte başlayan, süresi dolmuş, başka izin, bozuk etki). Hepsinde karar
+// PR #528 ile birebir aynı olmalı.
+\Medisa\Api\Auth\EffectivePermissionResolver::setNowForTests('2026-10-11 12:00:00');
+$emptyExceptionVariants = [
+    '__missing__',
+    [],
+    [
+        ['permission' => 'personeller.view', 'etki' => 'DENY', 'sube_id' => null, 'gecerlilik_baslangic' => '2026-11-01 00:00:00', 'gecerlilik_bitis' => null],
+        ['permission' => 'personeller.view', 'etki' => 'DENY', 'sube_id' => null, 'gecerlilik_baslangic' => '2025-01-01 00:00:00', 'gecerlilik_bitis' => '2026-10-11 12:00:00'],
+        ['permission' => 'bilinmeyen.izin.x', 'etki' => 'DENY', 'sube_id' => null, 'gecerlilik_baslangic' => '2025-01-01 00:00:00', 'gecerlilik_bitis' => null],
+        ['permission' => 'personeller.view', 'etki' => 'BELKI', 'sube_id' => null, 'gecerlilik_baslangic' => '2025-01-01 00:00:00', 'gecerlilik_bitis' => null],
+        ['permission' => 'personeller.view', 'etki' => 'DENY', 'sube_id' => null, 'gecerlilik_baslangic' => '', 'gecerlilik_bitis' => null],
+    ],
+];
 $catalog = RolePermissions::permissionCatalog();
 $permissions = array_merge($catalog, [
     '', '   ', 'bilinmeyen.izin', 'bildirimler.cancel', ' personeller.view ', "\tself_service.qr.scan\n",
@@ -124,7 +161,11 @@ $sources = [];
 foreach ($roleVariants as $rol) {
     foreach ($personelVariants as $personelId) {
         foreach ($collarVariants as $collar) {
+            foreach ($emptyExceptionVariants as $exceptionVariant) {
             $user = ['id' => 1];
+            if ($exceptionVariant !== '__missing__') {
+                $user['yetki_istisnalari'] = $exceptionVariant;
+            }
             if ($rol !== null) {
                 $user['rol'] = $rol;
             }
@@ -158,6 +199,7 @@ foreach ($roleVariants as $rol) {
             if (EffectivePermissionResolver::effectivePermissions($user) !== $effective) {
                 eprFail('effectivePermissions farklı: ' . json_encode($user, JSON_UNESCAPED_UNICODE));
             }
+            }
         }
     }
 }
@@ -179,6 +221,7 @@ if (!EffectivePermissionResolver::resolve($gyMavi, 'self_service.qr.scan')
 ) {
     eprFail('QR bağlam sözleşmesi');
 }
+echo '[PASS] boş/etkisiz istisna listesiyle karar değişmez (' . count($emptyExceptionVariants) . " varyant)\n";
 echo '[PASS] GY etkin: bağsız ' . count(EffectivePermissionResolver::effectivePermissions($gyBagsiz))
     . ', bağlı beyaz yaka ' . count(EffectivePermissionResolver::effectivePermissions($gyBeyaz))
     . ', bağlı mavi yaka ' . count(EffectivePermissionResolver::effectivePermissions($gyMavi)) . "\n";

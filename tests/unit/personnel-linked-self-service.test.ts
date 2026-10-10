@@ -25,8 +25,10 @@ describe("personnel-linked self-service authorization", () => {
     const php = readFileSync(rolePermissionsPhp, "utf8");
     expect(php).toContain("function selfServiceBaselinePermissions");
     expect(php).toContain("hasPersonnelLinkedSelfServiceEligibility");
-    expect(php).toContain("self::selfServiceBaselinePermissions()");
     expect(php).toContain("return self::$matrix['PERSONEL']");
+    // Karar sahibi PR #528'den beri EffectivePermissionResolver; temel liste yine RolePermissions'tan.
+    const resolver = readFileSync(resolve(root, "api/src/Auth/EffectivePermissionResolver.php"), "utf8");
+    expect(resolver).toContain("RolePermissions::selfServiceBaselinePermissions()");
   });
 
   it("PERSONEL + personel_id: self YES, management NO", () => {
@@ -323,7 +325,8 @@ describe("personnel-linked self-service authorization", () => {
     expect(perms).toContain("personel_tipi_ad");
     // Rol bağımsız tek karar noktası; PERSONEL-only kapı kalmadı.
     expect(perms).toContain("function hasQrSelfServiceEntitlement");
-    expect(perms).toContain("return self::hasQrSelfServiceEntitlement($user);");
+    const resolverPhp = readFileSync(resolve(root, "api/src/Auth/EffectivePermissionResolver.php"), "utf8");
+    expect(resolverPhp).toContain("return RolePermissions::hasQrSelfServiceEntitlement($user) ? self::SOURCE_QR_SELF_SERVICE : null;");
     expect(perms).not.toMatch(/normalizeRole\([^)]*\)\s*===\s*'PERSONEL'\s*\n\s*&&\s*self::isQrSelfServicePermission/);
     // ucret_tipi is documented as not a collar source and is never read.
     expect(perms).toContain("ucret_tipi` is intentionally NOT a collar source");

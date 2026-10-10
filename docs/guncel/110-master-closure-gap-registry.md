@@ -1,4 +1,4 @@
-CODE_MIGRATION_TIP: 099
+CODE_MIGRATION_TIP: 100
 PRODUCTION_MIGRATION_TIP: 099
 LAST_VERIFIED_PRODUCTION_MIGRATION_TIP: 099
 FRESH_PRODUCTION_MIGRATION_READBACK: MIGRATION_099_APPLY_POSTCHECK_PASS
@@ -13,9 +13,9 @@ This file is retained as a **historical archive** of the 2026-09-20 SGK employer
 
 | Alan | Archive value (2026-09-20) | Current truth (see CURRENT_STATE / 146) |
 | --- | --- | --- |
-| CODE_MIGRATION_TIP | 091 | **099** |
+| CODE_MIGRATION_TIP | 091 | **100** (`100_user_yetki_istisnalari.sql` yalnız kodda; canlıya uygulanmadı) |
 | PRODUCTION_MIGRATION_TIP | 089 (stale) | **099** APPLIED (postcheck kanıtı) |
-| PRODUCTION_MIGRATION_PENDING | 2 (`090`+`091`) | **0** |
+| PRODUCTION_MIGRATION_PENDING | 2 (`090`+`091`) | **1** (`100`, ayrı onaylı apply bekler) |
 | PR #326 | OPEN (stale) | **MERGED** |
 | PRODUCTION_DEPLOY_SHA | `d96182a2` (#301) | `f14ddbe8` (#520); Deploy cPanel #1253 run `37968702102` SUCCESS |
 | FRESH_READBACK | BLOCKED_EXTERNAL_GITHUB_ACTIONS_BILLING | ACTIONS_APPLY_099_37911294869 (postcheck PASS) |

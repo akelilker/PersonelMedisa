@@ -26,13 +26,13 @@ describe('canonical migration runner contract', () => {
     expect(runner).toContain('GET_LOCK');
   });
 
-  it('owns the contiguous 001→099 filesystem migration chain', () => {
+  it('owns the contiguous 001→100 filesystem migration chain', () => {
     const numbers = migrations.map((name) => Number.parseInt(name.slice(0, 3), 10));
     expect(migrations[0]).toBe('001_initial_schema.sql');
-    expect(migrations.at(-1)).toBe('099_user_kalici_silme_auditleri.sql');
-    expect(migrations).toHaveLength(99);
-    expect(new Set(numbers).size).toBe(99);
-    expect(numbers).toEqual(Array.from({ length: 99 }, (_, index) => index + 1));
+    expect(migrations.at(-1)).toBe('100_user_yetki_istisnalari.sql');
+    expect(migrations).toHaveLength(100);
+    expect(new Set(numbers).size).toBe(100);
+    expect(numbers).toEqual(Array.from({ length: 100 }, (_, index) => index + 1));
     expect(migrations).toContain('074_qr_attendance_correction_and_inbox.sql');
     expect(migrations.indexOf('074_qr_attendance_correction_and_inbox.sql')).toBe(
       migrations.indexOf('075_personel_account_activation.sql') - 1,
@@ -99,6 +99,9 @@ describe('canonical migration runner contract', () => {
     );
     expect(migrations.indexOf('098_birim_ad_duzeltme.sql')).toBe(
       migrations.indexOf('099_user_kalici_silme_auditleri.sql') - 1,
+    );
+    expect(migrations.indexOf('099_user_kalici_silme_auditleri.sql')).toBe(
+      migrations.indexOf('100_user_yetki_istisnalari.sql') - 1,
     );
     expect(migrations.filter((name) => name.startsWith('075_'))).toHaveLength(1);
     expect(migrations.filter((name) => name.startsWith('076_'))).toHaveLength(1);

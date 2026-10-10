@@ -11,6 +11,7 @@ export const heavyMariaDbTestFiles = [
   "tests/unit/donem-kapanis-concurrency.php-runtime.test.ts",
   "tests/unit/fazla-calisma-odeme-tercihi-mysql.php-runtime.test.ts",
   "tests/unit/final-code-gap-pack5-mysql.php-runtime.test.ts",
+  "tests/unit/genel-yonetici-korumasi-mysql.php-runtime.test.ts",
   "tests/unit/gunluk-bildirim-duplicate-completion.php-runtime.test.ts",
   "tests/unit/haftalik-kapanis-mysql.php-runtime.test.ts",
   "tests/unit/i13b-varsayilan-sube-persistence.php-runtime.test.ts",
@@ -86,6 +87,7 @@ export const heavyMariaDbTestFiles = [
   "tests/unit/test-fixture-personel-archive-mysql.php-runtime.test.ts",
   "tests/unit/test-fixture-personel-purge-mysql.php-runtime.test.ts",
   "tests/unit/user-access-change-audit.php-runtime.test.ts",
+  "tests/unit/yetki-istisna-mysql.php-runtime.test.ts",
   "tests/unit/yillik-fazla-calisma-kapsam-mysql.php-runtime.test.ts",
   "tests/unit/zimmetler-create-list-mysql.php-runtime.test.ts"
 ];

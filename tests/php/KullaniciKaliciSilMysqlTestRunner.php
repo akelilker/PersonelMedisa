@@ -28,6 +28,7 @@ use Medisa\Api\Http\Request;
 const KSA_AUDIT_TABLE = 'user_kalici_silme_auditleri';
 const KSA_REVOKE_TABLE = 'user_erisim_kaldirma_auditleri';
 const KSA_MIGRATION_TIP = '099_user_kalici_silme_auditleri.sql';
+const KSA_CHAIN_TIP = '100_user_yetki_istisnalari.sql';
 
 function ksaAssert(bool $ok, string $name): void
 {
@@ -312,7 +313,7 @@ try {
             && $name !== '067_personel_canonical_reference_gate.sql'
     ));
     sort($chain, SORT_STRING);
-    ksaAssert(end($chain) === KSA_MIGRATION_TIP, 'the canonical chain tip is migration 099');
+    ksaAssert(end($chain) === KSA_CHAIN_TIP && in_array(KSA_MIGRATION_TIP, $chain, true), 'the canonical chain contains 099 and its tip is migration 100');
 
     // 099 must never identify protected people from usernames. On a populated
     // database it refuses to apply until the operator supplies two verified,
@@ -322,7 +323,7 @@ try {
     $root->exec('CREATE DATABASE `' . $preconditionDb . '` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
     try {
         $preconditionPdo = ksaPdo($baseDsn . ';dbname=' . $preconditionDb);
-        foreach (array_filter($chain, static fn (string $migration): bool => $migration !== KSA_MIGRATION_TIP) as $migration) {
+        foreach (array_filter($chain, static fn (string $migration): bool => strcmp($migration, KSA_MIGRATION_TIP) < 0) as $migration) {
             ksaApplyFile($preconditionPdo, $migration);
         }
         $preconditionPdo->exec(
@@ -503,13 +504,13 @@ try {
         // Gerçek yeni kurulum yolu: canonical runner, ledger bootstrap + baseline 000
         // (067 dahil tam zincir; şirkete özgü katalog düzeltmesi boş katalogda çalıştırılmaz).
         $run = \Medisa\Api\Database\MigrationRunner::run($fresh, __DIR__ . '/../../api/migrations', '000');
-        ksaAssert(end($run['applied']) === '099' && in_array('067', $run['applied'], true), 'C0 the canonical runner drains the full chain (incl. 067) on an empty database');
+        ksaAssert(end($run['applied']) === '100' && in_array('067', $run['applied'], true), 'C0 the canonical runner drains the full chain (incl. 067) on an empty database');
         ksaAssert(
             ksaCount($fresh, "SELECT COUNT(*) FROM medisa_schema_migrations WHERE version = '067' AND execution_ms = 0") === 1,
             'C0 067 (company-specific catalog correction) is ledgered without execution on an empty catalog'
         );
         $verify = \Medisa\Api\Database\MigrationRunner::verify($fresh, __DIR__ . '/../../api/migrations');
-        ksaAssert(($verify['pending'] ?? null) === [] && ($verify['latest'] ?? null) === '099', 'C0 the fresh ledger verifies against the canonical chain');
+        ksaAssert(($verify['pending'] ?? null) === [] && ($verify['latest'] ?? null) === '100', 'C0 the fresh ledger verifies against the canonical chain');
         ksaAssert(ksaCount($fresh, 'SELECT COUNT(*) FROM users') === 0, 'C0 the full chain applies to an empty database without any company-specific account');
         ksaAssert(ksaCount($fresh, 'SELECT COUNT(*) FROM user_kalici_silme_korunan_hesaplar') === 0, 'C0 the fresh protected-account registry is empty');
 

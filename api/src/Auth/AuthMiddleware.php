@@ -6,6 +6,7 @@ namespace Medisa\Api\Auth;
 
 use Medisa\Api\Database\Connection;
 use Medisa\Api\Database\UserOrgAssignmentSchema;
+use Medisa\Api\Database\UserYetkiIstisnaSchema;
 use Medisa\Api\Database\UsersSchema;
 use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
@@ -152,6 +153,10 @@ class AuthMiddleware
         } else {
             self::$user['actor_identity_status'] = null;
         }
+
+        // Kişiye özel yetki istisnaları (migration 100): tek sorgu; tablo yoksa boş.
+        // Etkin izin kararı EffectivePermissionResolver'dadır.
+        self::$user['yetki_istisnalari'] = UserYetkiIstisnaSchema::loadActive($pdo, (int) self::$user['id']);
 
         if (array_key_exists('must_change_password', $row)) {
             self::$user['must_change_password'] = ((int) ($row['must_change_password'] ?? 0)) === 1;

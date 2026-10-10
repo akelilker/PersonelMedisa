@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../api/src/Http/JsonResponse.php';
 require_once __DIR__ . '/../../api/src/Auth/RolePermissions.php';
+require_once __DIR__ . '/../../api/src/Auth/EffectivePermissionResolver.php';
 require_once __DIR__ . '/../../api/src/Controllers/ReferansController.php';
 
 use Medisa\Api\Auth\RolePermissions;

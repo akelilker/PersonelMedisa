@@ -6,6 +6,7 @@ namespace Medisa\Api\Auth;
 
 use Medisa\Api\Database\Connection;
 use Medisa\Api\Database\UserOrgAssignmentSchema;
+use Medisa\Api\Database\UserYetkiIstisnaSchema;
 use Medisa\Api\Database\UsersSchema;
 use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
@@ -166,6 +167,17 @@ class LoginController
             $userPayload['personel_tipi_id'] = $collar['personel_tipi_id'];
             $userPayload['personel_tipi_ad'] = $collar['personel_tipi_ad'];
         }
+
+        // Etkin izinler (rol varsayılanı + self-service + kişiye özel istisnalar);
+        // frontend'in tek kaynağı olacak (P5). Karar sahibi EffectivePermissionResolver.
+        $userPayload['effective_permissions'] = EffectivePermissionResolver::effectivePermissions([
+            'id' => (int) $user['id'],
+            'rol' => $rol,
+            'personel_id' => $userPayload['personel_id'] ?? null,
+            'personel_tipi_ad' => $userPayload['personel_tipi_ad'] ?? null,
+            'sube_ids' => $subeIds,
+            'yetki_istisnalari' => UserYetkiIstisnaSchema::loadActive($pdo, (int) $user['id']),
+        ]);
 
         $response = [
             'token' => $token,

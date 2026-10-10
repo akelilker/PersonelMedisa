@@ -72,6 +72,9 @@ export type AppPermission =
   | "isg.view"
   | "yonetim-paneli.view"
   | "yonetim-paneli.manage"
+  | "kullanici_yetkileri.view"
+  | "kullanici_yetkileri.manage"
+  | "kullanici_yetkileri.audit.view"
   | "kullanicilar.kalici_sil"
   | "aylik-ozet.view"
   | "aylik-ozet.review"
@@ -270,6 +273,10 @@ const BASE_ROLE_PERMISSIONS: Record<
     "isg.view",
     "yonetim-paneli.view",
     "yonetim-paneli.manage",
+    // Kullanıcı bazlı yetki yönetimi (dinamik yetki P2): yalnız GENEL_YONETICI.
+    "kullanici_yetkileri.view",
+    "kullanici_yetkileri.manage",
+    "kullanici_yetkileri.audit.view",
     "kullanicilar.kalici_sil",
     "aylik-ozet.view",
     "aylik-ozet.executive_ack",

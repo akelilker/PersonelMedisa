@@ -12,16 +12,21 @@ use Medisa\Api\Database\UsersSchema;
 use Medisa\Api\Database\UserYetkiIstisnaSchema;
 use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
+use Medisa\Api\Services\Auth\KullaniciYetkiYazmaService;
+use Medisa\Api\Services\Organizasyon\OrganizasyonException;
 use Medisa\Api\Services\SelfService\SelfPersonelContext;
 use PDO;
 
 /**
- * Kullanıcı bazlı yetki — OKUMA uçları (dinamik yetki P2). P2'de yazma ucu YOKTUR (P3).
- * Şube kapsamlı istisnalar kapalıdır; yanıt `sube_istisnalari_etkin: false` taşır.
+ * Kullanıcı bazlı yetki uçları (dinamik yetki P2 okuma + P3 yazma).
+ * Yazma yalnız GLOBAL istisna kabul eder; şube kapsamlı istisnalar kapalıdır
+ * (`sube_istisnalari_etkin: false`). Kurallar KullaniciYetkiYazmaService'tedir.
  *
  *  GET /auth/yetkiler                         → oturum kullanıcısının etkin izinleri + kaynakları
  *  GET /yonetim/kullanicilar/{id}/yetkiler    → kullanici_yetkileri.view
  *  GET /yonetim/yetki-auditleri               → kullanici_yetkileri.audit.view (yalnız GENEL_YONETICI)
+ *  POST /yonetim/kullanicilar/{id}/yetkiler   → kullanici_yetkileri.manage (ALLOW/DENY ver)
+ *  POST /yonetim/kullanicilar/{id}/yetkiler/{istisnaId}/iptal → kullanici_yetkileri.manage
  */
 final class KullaniciYetkiController
 {
@@ -83,6 +88,43 @@ final class KullaniciYetkiController
             'schema_ready' => $audit['schema_ready'],
             'items' => $audit['rows'],
         ]);
+    }
+
+    public static function yetkiVer(Request $request, $kullaniciId)
+    {
+        $actor = AuthMiddleware::authenticate($request, true);
+        RolePermissions::assert($actor, KullaniciYetkiYazmaService::PERMISSION_MANAGE);
+        $body = $request->getJsonBody();
+        if (!is_array($body)) {
+            JsonResponse::badRequest('Gecersiz istek govdesi.', 'VALIDATION_ERROR', null);
+        }
+        try {
+            $sonuc = KullaniciYetkiYazmaService::ver(Connection::get(), $actor, (int) $kullaniciId, $body, self::requestId($request));
+        } catch (OrganizasyonException $e) {
+            JsonResponse::error($e->httpStatus, $e->errorCode, $e->getMessage(), $e->field);
+        }
+        JsonResponse::success($sonuc, [], 201);
+    }
+
+    public static function yetkiIptal(Request $request, $kullaniciId, $istisnaId)
+    {
+        $actor = AuthMiddleware::authenticate($request, true);
+        RolePermissions::assert($actor, KullaniciYetkiYazmaService::PERMISSION_MANAGE);
+        $body = $request->getJsonBody();
+        $gerekce = is_array($body) ? ($body['gerekce'] ?? null) : null;
+        try {
+            $sonuc = KullaniciYetkiYazmaService::iptal(Connection::get(), $actor, (int) $kullaniciId, (int) $istisnaId, $gerekce, self::requestId($request));
+        } catch (OrganizasyonException $e) {
+            JsonResponse::error($e->httpStatus, $e->errorCode, $e->getMessage(), $e->field);
+        }
+        JsonResponse::success($sonuc);
+    }
+
+    private static function requestId(Request $request): ?string
+    {
+        $id = $request->getHeader('X-Request-Id');
+
+        return is_string($id) && $id !== '' ? substr($id, 0, 64) : null;
     }
 
     /** @return array<string, mixed>|null */

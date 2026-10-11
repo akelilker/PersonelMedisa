@@ -22,6 +22,7 @@ use Medisa\Api\Services\Auth\UserPersonelBindingService;
 use Medisa\Api\Services\Auth\PersonelAccountOnboardingService;
 use Medisa\Api\Services\Auth\BoundUserCanonicalUsernameReconciliationService;
 use Medisa\Api\Services\Auth\GenelYoneticiKorumasi;
+use Medisa\Api\Services\Auth\KullaniciYetkiYazmaService;
 use Medisa\Api\Services\Auth\KullaniciKaliciSilException;
 use Medisa\Api\Services\Auth\KullaniciKaliciSilService;
 use Medisa\Api\Services\Auth\ActorIdentityException;
@@ -1143,6 +1144,8 @@ class YonetimController
             if ($hasPersonelId && $personelIdProvided) {
                 UserPersonelBindingService::applyBinding($pdo, $userId, $requestedPersonelId, $actorUserId);
             }
+            // Dinamik yetki K3: GY olarak oluşturma = atama; atayan yetki audit'ine yazılır (100 yoksa no-op).
+            KullaniciYetkiYazmaService::rolDegisti($pdo, $user, $userId, '', (string) $rol);
             $pdo->commit();
         } catch (PDOException $e) {
             if ($pdo->inTransaction()) {
@@ -1491,6 +1494,9 @@ class YonetimController
             $sql .= ' WHERE id = :id';
             $stmt = $pdo->prepare($sql);
             $stmt->execute($params);
+
+            // Dinamik yetki karar 8: rol değişince kişiye özel istisnalar aynı transaction'da iptal + audit.
+            KullaniciYetkiYazmaService::rolDegisti($pdo, $user, $kullaniciId, (string) $existing['rol'], (string) $rol);
 
             if ($subeIdsProvided) {
                 self::replaceUserSubeler($pdo, $kullaniciId, $finalSubeIds);

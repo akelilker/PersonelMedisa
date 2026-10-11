@@ -90,7 +90,8 @@ class UserPersonelBindingService
         $sql .= ' LIMIT 1';
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
-        if ($stmt->fetch(PDO::FETCH_ASSOC)) {
+        $haric = $excludeUserId !== null && (int) $excludeUserId > 0 ? (int) $excludeUserId : null;
+        if ($stmt->fetch(PDO::FETCH_ASSOC) || YetkiKimlikPolitikasi::mevcutHesap($pdo, $personelId, $haric) !== null) {
             JsonResponse::error(
                 409,
                 'PERSONEL_ALREADY_BOUND',

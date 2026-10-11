@@ -121,6 +121,10 @@ class PersonelAccountOnboardingService
     public const ERR_USERNAME_COLLISION = 'PERSONEL_USERNAME_COLLISION';
     public const ERR_USERNAME_INVALID = 'PERSONEL_USERNAME_INVALID';
     public const ERR_ALREADY_PROVISIONED = 'ALREADY_PROVISIONED';
+    /** Pasif hesap varken yeni hesap açılmaz; mevcut hesap incelenir. */
+    public const ERR_MEVCUT_PASIF_HESAP = 'MEVCUT_PASIF_HESAP_INCELENMELI';
+    /** Aynı kişi (T.C. veya doğrulanmış kimlik) için ikinci hesap açılmaz. T.C. mesaja konmaz. */
+    public const ERR_MUKERRER_KISI_HESABI = 'MUKERRER_KISI_HESABI';
     public const ERR_PERSONEL_INACTIVE = 'PERSONEL_INACTIVE';
     public const ERR_PERSONEL_ARCHIVED = 'PERSONEL_ARCHIVED_FIXTURE';
     public const ERR_USE_SECURE = 'PERSONEL_USE_SECURE_ONBOARDING';
@@ -192,16 +196,11 @@ class PersonelAccountOnboardingService
                 : $suggested;
             $usernameOverridden = $username !== $suggested;
 
-            $existing = self::findBoundUserForPersonel($pdo, $personelId);
+            $existing = YetkiKimlikPolitikasi::mevcutHesap($pdo, $personelId);
 
             if ($existing !== null) {
                 $pdo->commit();
-                JsonResponse::error(
-                    409,
-                    self::ERR_ALREADY_PROVISIONED,
-                    'Bu personelin hesabi zaten mevcut.',
-                    'personel_id'
-                );
+                self::rejectDuplicateAccount($existing);
             }
 
             // Business name correction (varsa) hesap create ile AYNI transaction icinde uygulanir.
@@ -1447,18 +1446,39 @@ class PersonelAccountOnboardingService
     }
 
     /**
-     * @return array<string, mixed>|null
+     * Yeni hesap açılmaz. Pasif kayıt varsa mevcut hesap incelenir.
+     * T.C. kimlik numarası mesaja, meta'ya ve günlüğe konmaz.
+     *
+     * @param array{id: int, username: string, durum: string, kaynak: string} $existing
      */
-    private static function findBoundUserForPersonel(PDO $pdo, $personelId)
+    private static function rejectDuplicateAccount(array $existing)
     {
-        $cols = 'id, username, rol, durum, personel_id';
-        $stmt = $pdo->prepare(
-            "SELECT $cols FROM users WHERE personel_id = :pid LIMIT 1 FOR UPDATE"
+        $pasif = strtoupper((string) ($existing['durum'] ?? '')) === 'PASIF';
+        $ayniKayit = (string) ($existing['kaynak'] ?? '') === 'PERSONEL_KAYDI';
+        if ($pasif) {
+            JsonResponse::error(
+                409,
+                self::ERR_MEVCUT_PASIF_HESAP,
+                'Bu kisiye ait pasif bir hesap var. Yeni hesap acilmaz; mevcut hesap incelenmelidir.',
+                'personel_id',
+                ['mevcut_kullanici_adi' => (string) ($existing['username'] ?? '')]
+            );
+        }
+        if ($ayniKayit) {
+            JsonResponse::error(
+                409,
+                self::ERR_ALREADY_PROVISIONED,
+                'Bu personelin hesabi zaten mevcut.',
+                'personel_id'
+            );
+        }
+        JsonResponse::error(
+            409,
+            self::ERR_MUKERRER_KISI_HESABI,
+            'Bu kisiye ait bir hesap zaten var. Ikinci hesap acilmaz.',
+            'personel_id',
+            ['mevcut_kullanici_adi' => (string) ($existing['username'] ?? '')]
         );
-        $stmt->execute(['pid' => (int) $personelId]);
-        $row = $stmt->fetch(PDO::FETCH_ASSOC);
-
-        return is_array($row) ? $row : null;
     }
 
     private static function assertUsernameAvailableForNewAccount(PDO $pdo, $username, $personelId, $suggestedUsername)

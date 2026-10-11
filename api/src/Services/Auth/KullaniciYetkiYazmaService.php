@@ -188,9 +188,10 @@ final class KullaniciYetkiYazmaService
      * (ROL_DEGISTI) ve her biri audit'lenir. GY'ye atama ise atayan PROFIL_DEGISTI ile kaydedilir (K3).
      * Migration 100 uygulanmamışsa sessizce 0 döner (davranış değişmez).
      *
-     * P4: şema varken, başka bir Genel Yönetici kaydı varken yapılan yeni atama operasyonel
-     * yazmaları DENY ile kapatır (okuma ve yetki yönetimi kalır). Şirketin ilk Genel Yöneticisi
-     * (başka GY satırı yok) tam kalır. Mevcut GY satırlarına geriye dönük DENY yazılmaz.
+     * P4: şema varken, başka aktif Genel Yönetici varken yapılan yeni atama operasyonel
+     * yazmaları DENY ile kapatır (okuma ve yetki yönetimi kalır). Başka aktif GY yoksa
+     * (ilk kurulum) tam kalır. Pasif GY bu hesabı kısıtlamaz. Mevcut satırlara geriye
+     * dönük DENY yazılmaz. GY şirket kapsamı alamaz; kontrol users tablosundaki aktif roldedir.
      *
      * @param array<string, mixed> $actor
      */
@@ -238,8 +239,9 @@ final class KullaniciYetkiYazmaService
             ]);
         }
         if ($yeni === self::ROL_GY && $eski !== self::ROL_GY) {
-            // İlk yönetici: sistemde bu hesaptan başka GY yok. Sonraki atamalar kısıtlı başlar.
-            $kisitli = self::baskaGenelYoneticiVar($pdo, $hedefId);
+            // İlk aktif yönetici tam başlar. Pasif GY sayılmaz (yoksa tek aktif hesap kilitlenir).
+            // Şirket ayrımı yok: bu rol şirket kapsamı alamaz, kontrol tüm aktif GY satırlarındadır.
+            $kisitli = self::baskaAktifGenelYoneticiVar($pdo, $hedefId);
             self::audit($pdo, 'PROFIL_DEGISTI', $aktor, $hedef, $yeni, [
                 'istisna_id' => null, 'permission' => null, 'etki' => null,
                 'gecerlilik_baslangic' => null, 'gecerlilik_bitis' => null,
@@ -259,11 +261,11 @@ final class KullaniciYetkiYazmaService
         return count($rows);
     }
 
-    /** Başka bir Genel Yönetici kaydı var mı (aktif/pasif). Hedefin kendi satırı sayılmaz. */
-    private static function baskaGenelYoneticiVar(PDO $pdo, int $hedefId): bool
+    /** Başka aktif Genel Yönetici var mı. Pasif satır ve hedefin kendisi sayılmaz. */
+    private static function baskaAktifGenelYoneticiVar(PDO $pdo, int $hedefId): bool
     {
         $stmt = $pdo->prepare(
-            "SELECT id FROM users WHERE rol = 'GENEL_YONETICI' AND id <> :id LIMIT 1" . self::forUpdate($pdo)
+            "SELECT id FROM users WHERE rol = 'GENEL_YONETICI' AND durum = 'AKTIF' AND id <> :id LIMIT 1" . self::forUpdate($pdo)
         );
         $stmt->execute(['id' => $hedefId]);
 

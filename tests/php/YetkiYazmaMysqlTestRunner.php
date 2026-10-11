@@ -287,8 +287,64 @@ try {
         && str_contains($ilkJson, 'TAM')
         && $eff(60, 'personeller.update') && $eff(60, 'bordro_kesinlestirme.approve') && $eff(60, 'sgk_karar_paketi.approve')
         && $eff(60, 'kullanici_yetkileri.manage'),
-        'P4: şirketin ilk Genel Yöneticisi tam yetkili');
+        'P4: başka aktif GY yokken atama tam yetkili');
     $pdo->rollBack();
+
+    // --- P4: pasif GY, tek aktif yöneticiyi kısıtlamaz --------------------------------
+    $pdo->beginTransaction();
+    $pdo->exec("UPDATE users SET durum='PASIF' WHERE rol='GENEL_YONETICI'");
+    $pdo->exec("INSERT INTO users (id, username, password_hash, ad_soyad, rol, durum) VALUES (61, 'tekAktif', '$hash', 'Tek Aktif', 'GENEL_YONETICI', 'AKTIF')");
+    Y::rolDegisti($pdo, $actor(4), 61, 'MUHASEBE', 'GENEL_YONETICI');
+    $pasifSay = (int) $one($pdo, "SELECT COUNT(*) FROM users WHERE rol='GENEL_YONETICI' AND durum='PASIF'");
+    ywAssert($pasifSay > 0
+        && (int) $one($pdo, 'SELECT COUNT(*) FROM user_yetki_istisnalari WHERE user_id=61 AND iptal_edildi_at IS NULL') === 0
+        && str_contains((string) $one($pdo, "SELECT sonraki_json FROM user_yetki_auditleri WHERE aksiyon='PROFIL_DEGISTI' AND hedef_user_id=61 ORDER BY id DESC LIMIT 1"), 'TAM')
+        && $eff(61, 'personeller.update'),
+        'P4: yalnız pasif GY varken ilk aktif yönetici tam yetkili');
+    $pdo->rollBack();
+
+    // --- P4: şirket bağları GY'yi ayırmaz (rol şirket kapsamı alamaz) ----------------
+    $pdo->beginTransaction();
+    $pdo->exec("INSERT INTO sirketler (id, kod, ad, durum) VALUES (1, 'MEDISA', 'Medisa', 'AKTIF'), (2, 'DIGER', 'Diger Sirket', 'AKTIF')");
+    $pdo->exec("INSERT INTO users (id, username, password_hash, ad_soyad, rol, durum) VALUES (62, 'digerIlk', '$hash', 'Diger Ilk', 'MUHASEBE', 'AKTIF')");
+    $pdo->exec('INSERT INTO user_sirketler (user_id, sirket_id) VALUES (62, 2)');
+    $pdo->exec("UPDATE users SET rol='GENEL_YONETICI' WHERE id=62");
+    Y::rolDegisti($pdo, $actor(1), 62, 'MUHASEBE', 'GENEL_YONETICI');
+    ywAssert(\Medisa\Api\Scope\OrgScope::isSirketScopeEligible('GENEL_YONETICI', [2]) === false
+        && (int) $one($pdo, 'SELECT COUNT(*) FROM user_sirketler WHERE user_id=62 AND sirket_id=2') === 1
+        && (int) $one($pdo, "SELECT COUNT(*) FROM users WHERE rol='GENEL_YONETICI' AND durum='AKTIF' AND id<>62") > 0
+        && !$eff(62, 'personeller.update')
+        && str_contains((string) $one($pdo, "SELECT sonraki_json FROM user_yetki_auditleri WHERE aksiyon='PROFIL_DEGISTI' AND hedef_user_id=62 ORDER BY id DESC LIMIT 1"), 'KISITLI'),
+        'P4: başka şirkete bağlanan yeni GY, sistemde aktif GY varken kısıtlı başlar');
+    $pdo->rollBack();
+
+    // --- P4: kırmızı liste DENY iptaliyle açılır; ALLOW hâlâ yasak --------------------
+    // ver/iptal kendi transaction'ını açar; dış transaction içinde çağrılmaz.
+    $hassasAcildi = [];
+    foreach (R::NON_GRANTABLE_PERMISSIONS as $hp) {
+        if (!in_array($hp, $yazma, true)) {
+            continue;
+        }
+        $hid = (int) $one($pdo, 'SELECT id FROM user_yetki_istisnalari WHERE user_id=2 AND permission=? AND etki=\'DENY\' AND iptal_edildi_at IS NULL', [$hp]);
+        if ($hid <= 0 || $eff(2, $hp)) {
+            $hassasAcildi[] = 'baslangic:' . $hp;
+            continue;
+        }
+        if (ywTry(fn () => Y::ver($pdo, $actor(6), 2, ['permission' => $hp, 'etki' => 'ALLOW', 'gerekce' => 'hassas'])) !== Y::CODE_VERILEMEZ) {
+            $hassasAcildi[] = 'allow:' . $hp;
+        }
+        if (!str_starts_with(ywTry(fn () => Y::iptal($pdo, $actor(6), 2, $hid, 'hassas ac')), 'OK:') || !$eff(2, $hp)) {
+            $hassasAcildi[] = 'iptal:' . $hp;
+        }
+    }
+    $ucretId = (int) $one($pdo, "SELECT id FROM user_yetki_istisnalari WHERE user_id=2 AND permission='personeller.ucret.manage' AND etki='DENY' AND iptal_edildi_at IS NULL");
+    ywAssert($hassasAcildi === []
+        && in_array('sgk_karar_paketi.approve', $yazma, true)
+        && in_array('bordro_kesinlestirme.approve', $yazma, true)
+        && $ucretId > 0
+        && str_starts_with(ywTry(fn () => Y::iptal($pdo, $actor(6), 2, $ucretId, 'ucret ac')), 'OK:')
+        && $eff(2, 'personeller.ucret.manage'),
+        'P4: operasyonel yazma açılır; kırmızı liste ALLOW ile verilmez ama DENY iptaliyle açılır. Sapma: ' . implode(',', $hassasAcildi));
 
     // --- karar 8: rol değişince aynı transaction'da iptal + audit ------------------------
     $aktifOnce = (int) $one($pdo, 'SELECT COUNT(*) FROM user_yetki_istisnalari WHERE user_id=4 AND iptal_edildi_at IS NULL');

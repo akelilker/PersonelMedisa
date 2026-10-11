@@ -42,7 +42,10 @@ describe("Dinamik yetki P3 — yazma kuralları (MariaDB)", () => {
       "[PASS] P4: yeni GY kendi operasyonel yetkisini genişletemez",
       "[PASS] P4: başka GY ek operasyonel izin açar; açılmayan yazma kapalı kalır",
       "[PASS] P4: rol değişince eski istisnalar kapanır; yeniden GY ataması yine kısıtlı başlar",
-      "[PASS] P4: şirketin ilk Genel Yöneticisi tam yetkili",
+      "[PASS] P4: başka aktif GY yokken atama tam yetkili",
+      "[PASS] P4: yalnız pasif GY varken ilk aktif yönetici tam yetkili",
+      "[PASS] P4: başka şirkete bağlanan yeni GY, sistemde aktif GY varken kısıtlı başlar",
+      "[PASS] P4: operasyonel yazma açılır; kırmızı liste ALLOW ile verilmez ama DENY iptaliyle açılır. Sapma: ",
       "[PASS] 100 uygulanmamış: mevcut GY işlemleri rol varsayılanıyla sürer, kısıt uygulanmaz"
     ]) {
       expect(result.stdout).toContain(line);

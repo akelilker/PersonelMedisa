@@ -230,6 +230,38 @@ jobs:
           (( user_rows >= 0 && user_rows == user_rows_after )) || block DATA_GUARD_USER_ROW_DELTA
           echo "GATE_DATA_GUARDS=PASS"
 
+          # A verified full backup is mandatory before any migration request is
+          # written. The evidence JSON is metadata only. The SQL dump is never
+          # fetched: this transport is plain FTP.
+          if ! run_cpanel_ftp "get api/runtime/migration-control/full-backup-evidence.json -o ${WORK}/full-backup-evidence.json;" >/dev/null 2>&1; then
+            block FULL_BACKUP_EVIDENCE_MISSING
+          fi
+          backup_result="$(jq -r '.result // "FAIL"' "${WORK}/full-backup-evidence.json" 2>/dev/null || echo FAIL)"
+          [[ "$backup_result" == "PASS" ]] || block FULL_BACKUP_NOT_PASS
+          backup_sha="$(jq -r '.deployed_sha // "NONE"' "${WORK}/full-backup-evidence.json" 2>/dev/null || echo NONE)"
+          [[ "$backup_sha" == "$expected_sha" ]] || block FULL_BACKUP_SHA_MISMATCH
+          backup_at="$(jq -r '.generated_at // "NONE"' "${WORK}/full-backup-evidence.json" 2>/dev/null || echo NONE)"
+          backup_epoch="$(date -u -d "$backup_at" +%s 2>/dev/null || echo 0)"
+          backup_age="$(( $(date -u +%s) - backup_epoch ))"
+          (( backup_epoch > 0 && backup_age <= 43200 )) || block FULL_BACKUP_STALE
+          restore_verified="$(jq -r '.restore_verified // false' "${WORK}/full-backup-evidence.json" 2>/dev/null || echo false)"
+          [[ "$restore_verified" == "true" ]] || block FULL_BACKUP_RESTORE_UNVERIFIED
+          dump_transferred="$(jq -r '.dump_transferred // true' "${WORK}/full-backup-evidence.json" 2>/dev/null || echo true)"
+          [[ "$dump_transferred" == "false" ]] || block FULL_BACKUP_TRANSFER_FORBIDDEN
+          dump_channel="$(jq -r '.dump_channel // "UNKNOWN"' "${WORK}/full-backup-evidence.json" 2>/dev/null || echo UNKNOWN)"
+          [[ "$dump_channel" == "NONE" ]] || block FULL_BACKUP_TRANSFER_FORBIDDEN
+          outside_webroot="$(jq -r '.outside_webroot // false' "${WORK}/full-backup-evidence.json" 2>/dev/null || echo false)"
+          [[ "$outside_webroot" == "true" ]] || block FULL_BACKUP_LOCATION_UNSAFE
+          readback="$(jq -r '.readback // "FAILED"' "${WORK}/full-backup-evidence.json" 2>/dev/null || echo FAILED)"
+          [[ "$readback" == "VERIFIED" ]] || block FULL_BACKUP_READBACK_FAILED
+          echo "GATE_FULL_BACKUP_AGE_SECONDS=${backup_age}"
+          echo "GATE_FULL_BACKUP=PASS"
+          if [[ "$TARGET_MIGRATION" == "100_user_yetki_istisnalari.sql" ]]; then
+            yetki_schema="$(jq -r '.yetki_schema // "UNKNOWN"' "${WORK}/full-backup-evidence.json" 2>/dev/null || echo UNKNOWN)"
+            [[ "$yetki_schema" == "ABSENT" ]] || block YETKI_SCHEMA_NOT_ABSENT
+            echo "GATE_YETKI_SCHEMA=ABSENT"
+          fi
+
           echo "MIGRATION_GATE_RESULT=PASS"
 
       - name: Upload one atomic migration request

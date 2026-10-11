@@ -10,6 +10,7 @@ const CPANEL_FTP_WORKFLOWS = [
   '.github/workflows/ops-migration-worker-diagnostics.yml',
   '.github/workflows/ops-organization-inventory.yml',
   '.github/workflows/apply-kalici-sil-099.yml',
+  '.github/workflows/ops-full-database-backup.yml',
 ];
 
 const CPANEL_FTP_SCRIPTS = ['scripts/deploy/cpanel-ftp-readback-lib.sh'];

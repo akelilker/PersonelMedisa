@@ -1,0 +1,216 @@
+name: Ops full database backup
+
+# Tam veritabanı yedeği. Worker dökümü web kökünün dışında üretir, kardeş
+# veritabanına geri yükler ve yalnız sayım/checksum kanıtı yayınlar.
+# Bu akış SQL dökümünü FTP ile taşımaz. Taşıma düz FTP'dir; döküm bu kanala girmez.
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: Type FULL_DATABASE_BACKUP to authorize this backup
+        required: true
+        type: string
+      deployed_sha:
+        description: Exact deployed commit SHA
+        required: true
+        type: string
+
+concurrency:
+  group: cpanel-canonical-migration-control
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    name: Full database backup and isolated restore
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      FTP_SERVER: ${{ secrets.FTP_SERVER }}
+      FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+      FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+      FTP_PORT: ${{ secrets.FTP_PORT }}
+      CONFIRMATION: ${{ inputs.confirmation }}
+      DEPLOYED_SHA: ${{ inputs.deployed_sha }}
+      MODE: FULL_DATABASE_BACKUP
+      POLL_ATTEMPTS: "151"
+      POLL_INTERVAL_SECONDS: "10"
+      TOTAL_POLL_WINDOW_SECONDS: "1500"
+    steps:
+      - name: Validate explicit request
+        run: |
+          set -euo pipefail
+          test "$CONFIRMATION" = "$MODE" || {
+            echo "Explicit backup confirmation must repeat FULL_DATABASE_BACKUP."
+            exit 1
+          }
+          [[ "$DEPLOYED_SHA" =~ ^[0-9a-fA-F]{40}$ ]] || {
+            echo "FULL_BACKUP_RESULT=BLOCKED"
+            echo "FULL_BACKUP_REASON=DEPLOYED_SHA_INPUT_INVALID"
+            exit 1
+          }
+          test -n "$FTP_SERVER" || (echo "FTP_SERVER secret is missing." && exit 1)
+          test -n "$FTP_USERNAME" || (echo "FTP_USERNAME secret is missing." && exit 1)
+          test -n "$FTP_PASSWORD" || (echo "FTP_PASSWORD secret is missing." && exit 1)
+          test "$FTP_PORT" = "21" || (echo "FTP_PORT must be 21 for this cPanel FTP deploy." && exit 1)
+
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Install FTP client
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y lftp
+
+      - name: Request full backup without transferring the dump
+        env:
+          REQUEST_ID: full-backup-${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          set -euo pipefail
+
+          run_cpanel_plain_ftp() {
+            local ftp_commands="$1"
+            # Refuse any command that would move a database dump across plain FTP.
+            if printf '%s' "$ftp_commands" | grep -Eq '(^|[^A-Za-z0-9_])(get|put|mget|mput)[[:space:]].*\.sql'; then
+              echo "FULL_BACKUP_RESULT=BLOCKED"
+              echo "FULL_BACKUP_REASON=DUMP_TRANSFER_FORBIDDEN"
+              exit 1
+            fi
+
+            echo "Deploy transport mode: plain-ftp"
+            lftp -u "${FTP_USERNAME}","${FTP_PASSWORD}" -p "${FTP_PORT}" "ftp://${FTP_SERVER}" -e "
+              set cmd:fail-exit true;
+              set net:max-retries 2;
+              set net:timeout 20;
+              set net:reconnect-interval-base 5;
+              set net:reconnect-interval-max 10;
+              set xfer:clobber true;
+              set ssl:verify-certificate no;
+              set ssl:check-hostname no;
+              set ftp:passive-mode on;
+              set ftp:ssl-allow false;
+              set ftp:ssl-force false;
+              set ftp:ssl-protect-data false;
+              ${ftp_commands}
+              bye
+            "
+          }
+
+          run_cpanel_ftp() {
+            run_cpanel_plain_ftp "$1"
+          }
+
+          source "$GITHUB_WORKSPACE/scripts/deploy/cpanel-ftp-directory-lib.sh"
+
+          WORK="$RUNNER_TEMP/full-database-backup"
+          rm -rf "$WORK"
+          mkdir -p "$WORK"
+          expected_sha="$(echo "$DEPLOYED_SHA" | tr '[:upper:]' '[:lower:]')"
+
+          [[ "$(git rev-parse HEAD)" == "$expected_sha" ]] || {
+            echo "FULL_BACKUP_RESULT=BLOCKED"
+            echo "FULL_BACKUP_REASON=WORKFLOW_REF_NOT_DEPLOYED_SHA"
+            exit 1
+          }
+
+          if ! ensure_cpanel_remote_directory "api/runtime/migration-control"; then
+            echo "FULL_BACKUP_RESULT=BLOCKED"
+            echo "FULL_BACKUP_REASON=CONTROL_PLANE_UNREACHABLE"
+            exit 1
+          fi
+          listing="$WORK/control-listing.txt"
+          if ! run_cpanel_ftp "cls -1 api/runtime/migration-control > ${listing};" >/dev/null 2>&1; then
+            echo "FULL_BACKUP_RESULT=BLOCKED"
+            echo "FULL_BACKUP_REASON=CONTROL_PLANE_UNREACHABLE"
+            exit 1
+          fi
+          busy="NO"
+          if grep -q 'request\.pending\.' "$listing"; then busy="YES"; fi
+          if grep -q 'request\.processing\.' "$listing"; then busy="YES"; fi
+          if [[ "$busy" == "YES" ]]; then
+            echo "FULL_BACKUP_RESULT=BLOCKED"
+            echo "FULL_BACKUP_REASON=MIGRATION_CONTROL_PLANE_BUSY"
+            exit 1
+          fi
+
+          request_dir="$WORK/request"
+          mkdir -p "$request_dir"
+          jq -n \
+            --arg request_id "$REQUEST_ID" \
+            --arg deployed_sha "$expected_sha" \
+            --arg requested_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            '{schema_version: 1, request_id: $request_id, deployed_sha: $deployed_sha, requested_at: $requested_at, mode: "FULL_DATABASE_BACKUP"}' \
+            > "$request_dir/request.${REQUEST_ID}.tmp"
+
+          run_cpanel_ftp "
+            lcd ${request_dir};
+            put -O api/runtime/migration-control request.${REQUEST_ID}.tmp;
+            mv api/runtime/migration-control/request.${REQUEST_ID}.tmp api/runtime/migration-control/request.pending.${REQUEST_ID}.json;
+          "
+
+          status_file="$WORK/status.json"
+          deadline="$(( $(date +%s) + TOTAL_POLL_WINDOW_SECONDS ))"
+          worker_state="NONE"
+          for _ in $(seq 1 "$POLL_ATTEMPTS"); do
+            rm -f "$status_file"
+            if run_cpanel_ftp "get api/runtime/migration-control/status.json -o ${status_file};" >/dev/null 2>&1; then
+              if [[ "$(jq -r '.request_id // empty' "$status_file" 2>/dev/null || true)" == "$REQUEST_ID" ]]; then
+                worker_state="$(jq -r '.state // "NONE"' "$status_file" 2>/dev/null || echo NONE)"
+                if [[ "$worker_state" == "SUCCEEDED" || "$worker_state" == "FAILED" ]]; then
+                  break
+                fi
+              fi
+            fi
+            if (( $(date +%s) >= deadline )); then
+              break
+            fi
+            sleep "$POLL_INTERVAL_SECONDS"
+          done
+
+          echo "FULL_BACKUP_WORKER_STATE=${worker_state}"
+          if [[ "$worker_state" != "SUCCEEDED" ]]; then
+            echo "FULL_BACKUP_RESULT=BLOCKED"
+            echo "FULL_BACKUP_REASON=BACKUP_WORKER_NOT_SUCCEEDED"
+            exit 1
+          fi
+
+          evidence="$WORK/full-backup-evidence.json"
+          if ! run_cpanel_ftp "get api/runtime/migration-control/full-backup-evidence.json -o ${evidence};" >/dev/null 2>&1; then
+            echo "FULL_BACKUP_RESULT=BLOCKED"
+            echo "FULL_BACKUP_REASON=EVIDENCE_UNREADABLE"
+            exit 1
+          fi
+
+          result="$(jq -r '.result // "FAIL"' "$evidence")"
+          restore="$(jq -r '.restore_verified // false' "$evidence")"
+          transferred="$(jq -r '.dump_transferred // true' "$evidence")"
+          channel="$(jq -r '.dump_channel // "UNKNOWN"' "$evidence")"
+          yetki="$(jq -r '.yetki_schema // "UNKNOWN"' "$evidence")"
+          tables="$(jq -r '.table_count // -1' "$evidence")"
+          rows="$(jq -r '.total_rows // -1' "$evidence")"
+          restored_tables="$(jq -r '.restore_table_count // -1' "$evidence")"
+          restored_rows="$(jq -r '.restore_total_rows // -1' "$evidence")"
+          sha="$(jq -r '.deployed_sha // "NONE"' "$evidence")"
+          privilege="$(jq -r '.restore_privilege // "ABSENT"' "$evidence")"
+          content_mismatches="$(jq -r '.content_mismatch_count // 1' "$evidence")"
+          definition_mismatches="$(jq -r '.definition_mismatch_count // 1' "$evidence")"
+          echo "FULL_BACKUP_RESULT=${result}"
+          echo "FULL_BACKUP_RESTORE_VERIFIED=${restore}"
+          echo "FULL_BACKUP_DUMP_TRANSFERRED=${transferred}"
+          echo "FULL_BACKUP_DUMP_CHANNEL=${channel}"
+          echo "FULL_BACKUP_YETKI_SCHEMA=${yetki}"
+          echo "FULL_BACKUP_TABLE_COUNT=${tables}"
+          echo "FULL_BACKUP_TOTAL_ROWS=${rows}"
+          echo "FULL_BACKUP_RESTORE_TABLE_COUNT=${restored_tables}"
+          echo "FULL_BACKUP_RESTORE_TOTAL_ROWS=${restored_rows}"
+          echo "FULL_BACKUP_DEPLOY_SHA=${sha}"
+          echo "FULL_BACKUP_RESTORE_PRIVILEGE=${privilege}"
+          if [[ "$result" != "PASS" || "$restore" != "true" || "$transferred" != "false" || "$channel" != "NONE" || "$sha" != "$expected_sha" || "$privilege" != "VERIFIED" || "$content_mismatches" != "0" || "$definition_mismatches" != "0" ]]; then
+            echo "FULL_BACKUP_REASON=EVIDENCE_NOT_PASS"
+            exit 1
+          fi
+          if [[ "$tables" != "$restored_tables" || "$rows" != "$restored_rows" ]]; then
+            echo "FULL_BACKUP_REASON=RESTORE_COUNT_MISMATCH"
+            exit 1
+          fi

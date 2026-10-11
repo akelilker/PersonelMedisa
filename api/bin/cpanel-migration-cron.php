@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Medisa\Api\Database\Connection;
+use Medisa\Api\Database\FullDatabaseBackupService;
 use Medisa\Api\Database\MigrationBackupService;
 use Medisa\Api\Database\MigrationExecutionService;
 use Medisa\Api\Database\MigrationPreflightReport;
@@ -110,7 +111,8 @@ try {
                 'mode',
                 '/^(APPLY|READ_ONLY_PREFLIGHT|READ_ONLY_ORGANIZATION_INVENTORY'
                 . '|ORGANIZATION_MAPPING_PREFLIGHT|ORGANIZATION_MAPPING_APPLY|FINAL_CLOSE_PREFLIGHT|FINAL_CLOSE_APPLY'
-                . '|PERSONEL_FIRST_LOGIN_CREDENTIALS_PREFLIGHT|PERSONEL_FIRST_LOGIN_CREDENTIALS_APPLY|KALICI_SIL_MIGRATION_PREFLIGHT|KALICI_SIL_MIGRATION_APPLY)$/'
+                . '|PERSONEL_FIRST_LOGIN_CREDENTIALS_PREFLIGHT|PERSONEL_FIRST_LOGIN_CREDENTIALS_APPLY|KALICI_SIL_MIGRATION_PREFLIGHT|KALICI_SIL_MIGRATION_APPLY'
+                . '|FULL_DATABASE_BACKUP)$/'
             )
             : 'APPLY';
         // Optional, and only meaningful for APPLY: the single migration version
@@ -291,6 +293,51 @@ try {
                 'mode' => $mode,
                 'preflight_result' => (string) $report['result'],
                 'preflight_generated_at' => (string) $report['generated_at'],
+            ]);
+            $stage = 'REQUEST_ARCHIVE';
+            archiveRequest(
+                $processingPath,
+                $controlDirectory . '/request.completed.' . safeId($requestId) . '.json'
+            );
+            exit(0);
+        }
+
+        // Full snapshot. Exits before mapping and APPLY. The SQL dump stays
+        // outside the webroot; plain FTP only ever sees the aggregate evidence.
+        if ($mode === 'FULL_DATABASE_BACKUP') {
+            $stage = 'FULL_DATABASE_BACKUP';
+            try {
+                $pdo = Connection::get();
+                $evidence = FullDatabaseBackupService::capture(
+                    $pdo,
+                    $apiDirectory,
+                    $requestId,
+                    $deployedSha,
+                    sprintf('mysql:host=%s;charset=utf8mb4', (string) medisa_config('db_host')),
+                    (string) medisa_config('db_user'),
+                    (string) medisa_config('db_password')
+                );
+                writeJsonAtomically($controlDirectory . '/full-backup-evidence.json', $evidence);
+                if (($evidence['result'] ?? '') !== 'PASS') {
+                    throw new RuntimeException((string) ($evidence['failure_reason'] ?? 'FULL_DATABASE_BACKUP_FAILED'));
+                }
+            } catch (\Throwable $exception) {
+                throw MigrationWorkerFailure::fromThrowable($stage, $exception);
+            }
+
+            $stage = 'STATUS_WRITE';
+            writeStatus($statusPath, [
+                'state' => 'SUCCEEDED',
+                'request_id' => $requestId,
+                'deployed_sha' => strtolower($deployedSha),
+                'mode' => $mode,
+                'full_backup_result' => (string) $evidence['result'],
+                'full_backup_sha256' => (string) $evidence['backup_sha256'],
+                'full_backup_bytes' => (int) $evidence['backup_bytes'],
+                'restore_verified' => ($evidence['restore_verified'] ?? false) === true,
+                'dump_transferred' => false,
+                'yetki_schema' => (string) $evidence['yetki_schema'],
+                'ledger_tip' => (string) $evidence['ledger_tip'],
             ]);
             $stage = 'REQUEST_ARCHIVE';
             archiveRequest(
@@ -652,6 +699,26 @@ try {
             throw MigrationWorkerFailure::fromThrowable($stage, $exception);
         }
 
+        // Migration 100 does not start unless this process, on this server, has
+        // re-checked the full backup file and the live yetki tables. The GitHub
+        // Actions gate is not a substitute for this stage.
+        $stage = 'FULL_BACKUP_GATE';
+        try {
+            $pendingVersions = $targetVersion !== null
+                ? [$targetVersion]
+                : MigrationExecutionService::ledgerFacts($pdo, $migrationSource)['pending_versions'];
+            if (in_array('100', $pendingVersions, true)) {
+                FullDatabaseBackupService::assertReadyForApply(
+                    $pdo,
+                    $apiDirectory,
+                    $controlDirectory,
+                    $deployedSha
+                );
+            }
+        } catch (\Throwable $exception) {
+            throw MigrationWorkerFailure::fromThrowable($stage, $exception);
+        }
+
         $stage = 'APPLY';
         try {
             $applyResult = MigrationExecutionService::apply($pdo, $migrationSource, $baseline, $targetVersion);
@@ -803,6 +870,12 @@ final class MigrationWorkerFailure extends RuntimeException
         }
         if ($exception instanceof KullaniciKaliciSilMigrationFailure) {
             return new self($exception->reason, $stage, 1, $exception->detail);
+        }
+        if (
+            $stage === 'FULL_BACKUP_GATE'
+            && preg_match('/^[A-Z][A-Z0-9_]{2,100}$/D', $exception->getMessage()) === 1
+        ) {
+            return new self($exception->getMessage(), $stage, 1, null);
         }
 
         return new self(

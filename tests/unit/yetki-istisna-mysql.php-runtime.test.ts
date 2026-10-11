@@ -34,6 +34,7 @@ describe("Dinamik yetki P2 — migration 100 + okuma uçları (MariaDB)", () => 
       "[PASS] Kalıcı Sil: yetki geçmişi silinmedi/yeniden atanmadı (5 satır)",
       "[PASS] K1: politika satırı yok → UYARI (Medisa canlı)",
       "[PASS] yeni kurulum: ilk yönetici gerçek-kişi kimliği VERIFIED ve bağlı",
+      "[PASS] yeni şirketin ilk Genel Yöneticisi tam yetkili",
       "[PASS] yeni kurulum: K1 = ZORUNLU",
       "[PASS] yeni kurulum: ilk yönetici kilitlenmeden yetki verebilir",
       "[PASS] yeni kurulum ZORUNLU: kimliği doğrulanmamış GY kişiye özel yetki veremez"

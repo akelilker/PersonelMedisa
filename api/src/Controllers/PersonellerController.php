@@ -1274,7 +1274,9 @@ class PersonellerController
             return;
         }
 
-        $legacyRoles = ['GENEL_YONETICI', 'BOLUM_YONETICISI', 'MUHASEBE'];
+        // GENEL_YONETICI burada yok: personel yazması etkin izne bağlıdır.
+        // Yeni atanan yönetici DENY ile yalnız görür; rol adı yazmayı açmaz.
+        $legacyRoles = ['BOLUM_YONETICISI', 'MUHASEBE'];
         if (in_array(OrgScope::normalizeRole($user), $legacyRoles, true)) {
             return;
         }

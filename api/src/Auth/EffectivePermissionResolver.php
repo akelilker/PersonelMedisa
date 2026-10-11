@@ -55,6 +55,7 @@ final class EffectivePermissionResolver
         'sgk_karar_paketi.approve',
         'bordro_kesinlestirme.approve',
         'genel_yonetici_onayi.approve',
+        'genel_yonetici_bildirim_onayi.approve',
         'legal_hold.manage',
         'retention.destruction.request',
         'retention.destruction.approve',

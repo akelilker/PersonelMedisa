@@ -431,6 +431,12 @@ try {
     $ilk = \Medisa\Api\Services\Auth\IlkYoneticiKurulumService::olustur($freshPdo, 'yonetici', 'Ilk YONETICI', 'CokGucluParola-123');
     $kimlik = $freshPdo->query('SELECT ai.status, ai.identity_code, u.actor_identity_id FROM users u JOIN actor_identities ai ON ai.id = u.actor_identity_id WHERE u.id = ' . (int) $ilk['user_id'])->fetch(PDO::FETCH_ASSOC);
     yiAssert($ilk['actor_identity_id'] !== null && $kimlik['status'] === 'VERIFIED' && $kimlik['identity_code'] === 'USER-' . $ilk['user_id'], 'yeni kurulum: ilk yönetici gerçek-kişi kimliği VERIFIED ve bağlı');
+    $ilkEtkin = ['id' => (int) $ilk['user_id'], 'rol' => 'GENEL_YONETICI', 'yetki_istisnalari' => UserYetkiIstisnaSchema::loadActive($freshPdo, (int) $ilk['user_id'])];
+    yiAssert((int) $freshPdo->query('SELECT COUNT(*) FROM user_yetki_istisnalari')->fetchColumn() === 0
+        && EffectivePermissionResolver::resolve($ilkEtkin, 'personeller.update')
+        && EffectivePermissionResolver::resolve($ilkEtkin, 'bordro_kesinlestirme.approve')
+        && EffectivePermissionResolver::resolve($ilkEtkin, 'kullanici_yetkileri.manage'),
+        'yeni şirketin ilk Genel Yöneticisi tam yetkili');
     yiAssert((int) $freshPdo->query("SELECT COUNT(*) FROM actor_identity_audits WHERE action = 'BOOTSTRAP_VERIFY'")->fetchColumn() === 1, 'yeni kurulum: kimlik kurulum beyanı audit edildi');
     yiAssert($ilk['k1_kimlik_modu'] === 'ZORUNLU' && $K::mod($freshPdo) === 'ZORUNLU', 'yeni kurulum: K1 = ZORUNLU');
     $freshPdo->exec("INSERT INTO users (username, password_hash, ad_soyad, rol, durum) VALUES ('calisan', 'x', 'Calisan BIR', 'MUHASEBE', 'AKTIF'), ('ikinci.gy', 'x', 'Ikinci GY', 'GENEL_YONETICI', 'AKTIF')");

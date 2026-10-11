@@ -37,7 +37,17 @@ describe("Dinamik yetki P3 — yazma kuralları (MariaDB)", () => {
       "[PASS] rol değişince istisnalar ROL_DEGISTI ile iptal + her biri audit",
       "[PASS] Kalıcı Sil hedefi kilitliyken yetki yazımı bekler ve yarım kayıt bırakmaz",
       "[PASS] K1 ZORUNLU: kimliksiz GY yetki veremez",
-      "[PASS] 100 uygulanmamış: yazma 503 YETKI_SEMASI_HAZIR_DEGIL"
+      "[PASS] 100 uygulanmamış: yazma 503 YETKI_SEMASI_HAZIR_DEGIL",
+      "[PASS] P4: mevcut GY tam kalır; yeni GY operasyonel yazamaz, okur ve yetki yönetir. Sapma: ",
+      "[PASS] P4: yeni GY kendi operasyonel yetkisini genişletemez",
+      "[PASS] P4: başka GY ek operasyonel izin açar; açılmayan yazma kapalı kalır",
+      "[PASS] P4: rol değişince eski istisnalar kapanır; yeniden GY ataması yine kısıtlı başlar",
+      "[PASS] P4: başka aktif GY yokken atama tam yetkili",
+      "[PASS] P4: yalnız pasif GY varken ilk aktif yönetici tam yetkili",
+      "[PASS] P4: başka şirkete bağlanan yeni GY, sistemde aktif GY varken kısıtlı başlar",
+      "[PASS] P4: genel yönetici bildirim onayı ALLOW ile verilmez ve başlangıç kısıtı kalkmaz",
+      "[PASS] P4: hassas başlangıç kısıtı kalkmaz; operasyonel yazma açılır; tam yetkili GY korunur. Sapma: ",
+      "[PASS] 100 uygulanmamış: mevcut GY işlemleri rol varsayılanıyla sürer, kısıt uygulanmaz"
     ]) {
       expect(result.stdout).toContain(line);
     }

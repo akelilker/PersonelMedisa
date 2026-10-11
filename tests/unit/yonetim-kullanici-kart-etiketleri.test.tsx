@@ -87,6 +87,10 @@ const yonetimApi = vi.hoisted(() => ({
   fixYonetimKullaniciCanonicalUsername: vi.fn()
 }));
 
+vi.mock("../../src/state/auth.store", () => ({
+  useAuth: () => ({ session: { user: { id: 9, rol: "GENEL_YONETICI" } } })
+}));
+
 vi.mock("../../src/hooks/use-role-access", () => ({
   useRoleAccess: () => ({
     hasPermission: (permission: string) =>

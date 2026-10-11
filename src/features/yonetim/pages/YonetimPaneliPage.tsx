@@ -39,11 +39,13 @@ import {
 import { useRoleAccess } from "../../../hooks/use-role-access";
 import { KullaniciActorIdentityPanel } from "../components/KullaniciActorIdentityPanel";
 import { KullaniciRoleSummaryPanel } from "../components/KullaniciRoleSummaryPanel";
+import { KullaniciYetkiPanel } from "../components/KullaniciYetkiPanel";
 import { MevzuatParametreleriPanel } from "../components/MevzuatParametreleriPanel";
 import { SaklamaLegalHoldPanel } from "../components/SaklamaLegalHoldPanel";
 import { UcretTipiEnvanteriPanel } from "../components/UcretTipiEnvanteriPanel";
 import { YonetimOrgScopeFields } from "../components/YonetimSubeScopeField";
 import { isRealYonetimKullaniciApi } from "../../../lib/yonetim/kullanici-api-contract";
+import { useAuth } from "../../../state/auth.store";
 import {
   PERSONEL_FIRST_LOGIN_COMPLETE_LABEL,
   PERSONEL_FIRST_LOGIN_PENDING_LABEL,
@@ -728,8 +730,12 @@ function isCorruptedDisplayText(value: string) {
 
 export function YonetimPaneliPage() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const { session } = useAuth();
   const { hasPermission } = useRoleAccess();
   const canManageYonetimPanel = hasPermission("yonetim-paneli.manage");
+  const canViewKullaniciYetkileri = hasPermission("kullanici_yetkileri.view");
+  const canManageKullaniciYetkileri = hasPermission("kullanici_yetkileri.manage");
+  const canViewKullaniciYetkiAudit = hasPermission("kullanici_yetkileri.audit.view");
   const canKaliciSil = hasPermission("kullanicilar.kalici_sil");
   const canOpenQrKiosk = hasPermission("qr.kiosk.display");
   const canViewMevzuat = hasPermission("mevzuat_parametreleri.view");
@@ -2645,6 +2651,14 @@ export function YonetimPaneliPage() {
               </div>
             ) : null}
           </form>
+          {editingKullaniciId != null && canViewKullaniciYetkileri ? (
+            <KullaniciYetkiPanel
+              userId={editingKullaniciId}
+              actorUserId={session?.user.id ?? null}
+              canManage={canManageKullaniciYetkileri}
+              canViewAudit={canViewKullaniciYetkiAudit}
+            />
+          ) : null}
         </AppModal>
       ) : null}
 

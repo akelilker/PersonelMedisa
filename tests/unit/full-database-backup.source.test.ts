@@ -31,6 +31,22 @@ describe("tam veritabanı yedeği kontrol düzlemi", () => {
     expect(workflow).toContain("restore_privilege");
   });
 
+  it("başarısız yedekte yalnız güvenli kanıt alanlarını yazar", () => {
+    const diagnostics = read(".github/workflows/ops-migration-worker-diagnostics.yml");
+    for (const owner of [workflow, diagnostics]) {
+      expect(owner).toContain("FULL_BACKUP_EVIDENCE_FAILURE_REASON");
+      expect(owner).toContain("get api/runtime/migration-control/full-backup-evidence.json");
+      expect(owner).not.toContain('cat "$evidence"');
+      expect(owner).not.toContain("cat ${WORK}/full-backup-evidence.json");
+    }
+    const failedBranch = workflow.slice(
+      workflow.indexOf('FULL_BACKUP_REASON=BACKUP_WORKER_NOT_SUCCEEDED'),
+      workflow.indexOf('FULL_BACKUP_REASON=EVIDENCE_UNREADABLE'),
+    );
+    expect(failedBranch).toContain("emit_full_backup_evidence_fields");
+    expect(failedBranch).not.toMatch(/\b(get|put|mget|mput)\s+[^\n]*\.sql/);
+  });
+
   it("migration 100 APPLY öncesinde yedeği sunucuda yeniden kontrol eder", () => {
     const backupStage = worker.indexOf("$stage = 'BACKUP';");
     const gate = worker.indexOf("$stage = 'FULL_BACKUP_GATE';");

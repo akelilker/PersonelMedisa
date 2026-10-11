@@ -1337,3 +1337,105 @@
   font-size: 0.85rem;
   line-height: 1.45;
 }
+
+.yonetim-yetki-panel {
+  display: grid;
+  gap: 14px;
+  margin-top: var(--space-5);
+}
+
+.yonetim-yetki-uyari,
+.yonetim-yetki-basari {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 12px;
+  line-height: 1.45;
+}
+
+.yonetim-yetki-uyari {
+  border: 1px solid rgba(251, 191, 36, 0.45);
+  background: rgba(120, 83, 9, 0.28);
+  color: rgba(254, 243, 199, 0.95);
+}
+
+.yonetim-yetki-basari {
+  border: 1px solid rgba(52, 211, 153, 0.35);
+  background: rgba(16, 77, 54, 0.22);
+  color: rgba(209, 250, 229, 0.95);
+}
+
+.yonetim-yetki-ozet {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.yonetim-yetki-ozet span,
+.yonetim-yetki-rozet {
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(244, 246, 250, 0.88);
+  font-size: 0.78rem;
+}
+
+.yonetim-yetki-rozet--kisit {
+  background: rgba(127, 29, 29, 0.45);
+}
+
+.yonetim-yetki-liste {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 280px;
+  overflow: auto;
+}
+
+.yonetim-yetki-satir {
+  display: grid;
+  gap: 4px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.yonetim-yetki-satir-ust {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
+}
+
+.yonetim-yetki-kod {
+  color: rgba(244, 246, 250, 0.55);
+  font-size: 0.75rem;
+  overflow-wrap: anywhere;
+}
+
+.yonetim-yetki-form {
+  display: grid;
+  gap: 10px;
+}
+
+.yonetim-yetki-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.yonetim-yetki-details {
+  display: grid;
+  gap: 10px;
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.yonetim-yetki-details summary {
+  cursor: pointer;
+  color: var(--text-inverse);
+  font-weight: 700;
+}

@@ -323,6 +323,10 @@ export const endpoints = {
     kullaniciSilinebilirlikKontrolu: (id: number | string) =>
       `/yonetim/kullanicilar/${id}/silinebilirlik-kontrolu`,
     kullaniciKaliciSil: (id: number | string) => `/yonetim/kullanicilar/${id}/kalici-sil`,
+    kullaniciYetkiler: (id: number | string) => `/yonetim/kullanicilar/${id}/yetkiler`,
+    kullaniciYetkiIptal: (id: number | string, istisnaId: number | string) =>
+      `/yonetim/kullanicilar/${id}/yetkiler/${istisnaId}/iptal`,
+    yetkiAuditleri: "/yonetim/yetki-auditleri",
     personelHesapOnboarding: (id: number | string) => `/yonetim/personeller/${id}/hesap-onboarding`,
     actorIdentities: "/yonetim/actor-identities",
     actorIdentityDetail: (id: number | string) => `/yonetim/actor-identities/${id}`,

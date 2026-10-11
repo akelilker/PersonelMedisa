@@ -32,6 +32,13 @@ import type { UserRole } from "../types/auth";
 import { canonicalizeUserRole } from "../lib/authorization/canonicalize-user-role";
 import { SUBE_DELETE_BLOCKED_ERROR_CODE } from "../lib/yonetim/sube-delete";
 import { sanitizeYonetimKullaniciPayloadForApi } from "../lib/yonetim/kullanici-api-contract";
+import type {
+  KullaniciYetkiAudit,
+  KullaniciYetkiIstisna,
+  KullaniciYetkiOkuma,
+  KullaniciYetkiYazmaSonucu,
+  YetkiEtki
+} from "../lib/yonetim/kullanici-yetki-ekrani";
 import { appendQueryParams } from "../utils/append-query-params";
 import { ApiRequestError, apiRequest } from "./api-client";
 import { endpoints } from "./endpoints";
@@ -883,4 +890,165 @@ export async function kaliciSilKullanici(
     throw new ApiRequestError(message, 409, code ? { code } : undefined);
   }
   return normalizeKaliciSilResult(response.data);
+}
+
+function throwYetkiApiError(response: ApiResponse<unknown>, fallbackMessage: string): never {
+  const first = Array.isArray(response.errors) ? response.errors[0] : null;
+  const message = typeof first?.message === "string" && first.message.trim() ? first.message : fallbackMessage;
+  const code = typeof first?.code === "string" ? first.code : undefined;
+  const field = typeof first?.field === "string" ? first.field : undefined;
+  if (code && field) {
+    throw new ApiRequestError(message, 400, { code, field });
+  }
+  if (code) {
+    throw new ApiRequestError(message, 400, { code });
+  }
+  if (field) {
+    throw new ApiRequestError(message, 400, { code: "UNKNOWN_ERROR", field });
+  }
+  throw new ApiRequestError(message, 400);
+}
+
+function readYetkiEtki(value: unknown): YetkiEtki | null {
+  const etki = readString(value)?.toUpperCase();
+  return etki === "ALLOW" || etki === "DENY" ? etki : null;
+}
+
+function normalizeYetkiIstisna(value: unknown): KullaniciYetkiIstisna | null {
+  const record = toRecord(value);
+  const id = record ? readNumber(record.id) : undefined;
+  const permission = record ? readString(record.permission) : undefined;
+  const etki = record ? readYetkiEtki(record.etki) : null;
+  if (!record || id == null || !permission || !etki) {
+    return null;
+  }
+  return {
+    id,
+    permission,
+    etki,
+    subeId: readNumber(record.sube_id) ?? null,
+    gecerlilikBaslangic: readString(record.gecerlilik_baslangic) ?? "",
+    gecerlilikBitis: readStringOrNull(record.gecerlilik_bitis),
+    gerekce: readString(record.gerekce) ?? "",
+    verenUsername: readString(record.veren_username_snapshot) ?? "",
+    createdAt: readString(record.created_at) ?? "",
+    iptalEdildiAt: readStringOrNull(record.iptal_edildi_at),
+    iptalNedeni: readStringOrNull(record.iptal_nedeni),
+    iptalEdenUsername: readStringOrNull(record.iptal_eden_username_snapshot)
+  };
+}
+
+function normalizeYetkiOkuma(value: unknown): KullaniciYetkiOkuma {
+  const record = toRecord(value) ?? {};
+  const kaynaklarRecord = toRecord(record.kaynaklar) ?? {};
+  const kaynaklar: Record<string, string> = {};
+  for (const [izin, kaynak] of Object.entries(kaynaklarRecord)) {
+    const metin = readString(kaynak);
+    if (metin) kaynaklar[izin] = metin;
+  }
+  const stringList = (raw: unknown) =>
+    Array.isArray(raw) ? raw.map((item) => readString(item)).filter((item): item is string => Boolean(item)) : [];
+  return {
+    userId: readNumber(record.user_id) ?? 0,
+    rol: readString(record.rol) ?? "",
+    schemaReady: record.schema_ready === true,
+    rolVarsayilanlari: stringList(record.rol_varsayilanlari),
+    istisnalar: Array.isArray(record.istisnalar)
+      ? record.istisnalar.map(normalizeYetkiIstisna).filter((item): item is KullaniciYetkiIstisna => item != null)
+      : [],
+    effectivePermissions: stringList(record.effective_permissions),
+    kaynaklar
+  };
+}
+
+function normalizeYetkiAudit(value: unknown): KullaniciYetkiAudit | null {
+  const record = toRecord(value);
+  const id = record ? readNumber(record.id) : undefined;
+  if (!record || id == null) return null;
+  return {
+    id,
+    aksiyon: readString(record.aksiyon) ?? "",
+    aktorUsername: readString(record.aktor_username_snapshot) ?? "",
+    permission: readStringOrNull(record.permission),
+    etki: readStringOrNull(record.etki),
+    gerekce: readStringOrNull(record.gerekce),
+    uyariKodlari: readStringOrNull(record.uyari_kodlari),
+    createdAt: readString(record.created_at) ?? ""
+  };
+}
+
+function normalizeYetkiYazma(value: unknown): KullaniciYetkiYazmaSonucu {
+  const record = toRecord(value);
+  const istisnaId = record ? readNumber(record.istisna_id) : undefined;
+  const auditId = record ? readNumber(record.audit_id) : undefined;
+  if (istisnaId == null || auditId == null) {
+    throw new ApiRequestError("Yetki kaydı doğrulanamadı.", 400, { code: "INVALID_RESPONSE" });
+  }
+  const uyarilar = Array.isArray(record?.uyarilar)
+    ? record.uyarilar.map((item) => readString(item)).filter((item): item is string => Boolean(item))
+    : [];
+  return { istisnaId, auditId, uyarilar };
+}
+
+export async function fetchKullaniciYetkileri(kullaniciId: number | string): Promise<KullaniciYetkiOkuma> {
+  const response = await apiRequest<ApiResponse<unknown>>(endpoints.yonetim.kullaniciYetkiler(kullaniciId));
+  if (Array.isArray(response.errors) && response.errors.length > 0) {
+    throwYetkiApiError(response, "Kullanıcı yetkileri okunamadı.");
+  }
+  return normalizeYetkiOkuma(response.data);
+}
+
+export async function fetchKullaniciYetkiAuditleri(
+  kullaniciId: number | string
+): Promise<{ schemaReady: boolean; items: KullaniciYetkiAudit[] }> {
+  const response = await apiRequest<ApiResponse<unknown>>(
+    `${endpoints.yonetim.yetkiAuditleri}?kullanici_id=${encodeURIComponent(String(kullaniciId))}&limit=100`
+  );
+  if (Array.isArray(response.errors) && response.errors.length > 0) {
+    throwYetkiApiError(response, "Yetki geçmişi okunamadı.");
+  }
+  const record = toRecord(response.data) ?? {};
+  return {
+    schemaReady: record.schema_ready === true,
+    items: Array.isArray(record.items)
+      ? record.items.map(normalizeYetkiAudit).filter((item): item is KullaniciYetkiAudit => item != null)
+      : []
+  };
+}
+
+export async function verKullaniciYetkisi(
+  kullaniciId: number | string,
+  payload: { permission: string; etki: YetkiEtki; gerekce: string; gecerlilikBitis?: string | null }
+): Promise<KullaniciYetkiYazmaSonucu> {
+  const body: Record<string, string> = {
+    permission: payload.permission,
+    etki: payload.etki,
+    gerekce: payload.gerekce
+  };
+  if (payload.gecerlilikBitis) {
+    body.gecerlilik_bitis = payload.gecerlilikBitis;
+  }
+  const response = await apiRequest<ApiResponse<unknown>>(endpoints.yonetim.kullaniciYetkiler(kullaniciId), {
+    method: "POST",
+    body: JSON.stringify(body)
+  });
+  if (Array.isArray(response.errors) && response.errors.length > 0) {
+    throwYetkiApiError(response, "Yetki kaydı alınamadı.");
+  }
+  return normalizeYetkiYazma(response.data);
+}
+
+export async function iptalKullaniciYetkisi(
+  kullaniciId: number | string,
+  istisnaId: number | string,
+  gerekce: string
+): Promise<KullaniciYetkiYazmaSonucu> {
+  const response = await apiRequest<ApiResponse<unknown>>(
+    endpoints.yonetim.kullaniciYetkiIptal(kullaniciId, istisnaId),
+    { method: "POST", body: JSON.stringify({ gerekce }) }
+  );
+  if (Array.isArray(response.errors) && response.errors.length > 0) {
+    throwYetkiApiError(response, "Yetki kaydı kaldırılamadı.");
+  }
+  return normalizeYetkiYazma(response.data);
 }

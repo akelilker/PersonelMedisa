@@ -11,6 +11,7 @@ import type { HaftalikBildirimMutabakat } from "../types/haftalik-bildirim-mutab
 import type { AylikBildirimOnay } from "../types/aylik-bildirim-onay";
 import type { GenelYoneticiBildirimOnayi } from "../types/genel-yonetici-bildirim-onayi";
 import { hasRolePermission, type AppPermission } from "../lib/authorization/role-permissions";
+import { resolveDemoKullaniciYetki } from "./kullanici-yetki.demo";
 import { evaluatePersonelCompleteness } from "../features/personeller/personel-missing-info";
 import { personelSearchMatches } from "../features/personeller/personel-search-query";
 import {
@@ -4913,6 +4914,17 @@ export function resolveDemoApiResponse(
   const pathname = requestUrl.pathname;
   const method = getMethod(init);
   const body = readBody(init);
+  const yetkiDemo = resolveDemoKullaniciYetki({
+    pathname,
+    method,
+    body,
+    searchParams: requestUrl.searchParams,
+    actor: readDemoApiActor(init),
+    kullanicilar: demoState.yonetimKullanicilari
+  });
+  if (yetkiDemo) {
+    return yetkiDemo;
+  }
 
   const mutabakatWeek = (value: unknown) => {
     if (typeof value !== "string" || !isMondayIsoDate(value)) return null;

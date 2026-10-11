@@ -29,9 +29,23 @@ Durum: PR (MERGE=NO). Migration yok; migration 100 canlıya uygulanmadan yazma u
 `YonetimController::kullaniciGuncelle` aynı transaction'da `rolDegisti()` çağırır: etkin istisnalar
 `ROL_DEGISTI` ile iptal + her biri audit. GY'ye atama (oluşturma dahil) `PROFIL_DEGISTI` yazar (K3 için).
 
+## K1 — aynı gerçek kişinin iki hesabı (isim eşleştirmesi yok)
+- `users.actor_identity_id` 048'den beri 1:1 (`uq_users_actor_identity_id`); SGK dört göz ve
+  `SgkKararPaketiAuthz` bu varsayıma dayandığı için **dokunulmadı** (unique kaldırılmadı).
+- Yeni tablo `user_gercek_kisi_baglari` (migration 100 içinde; 100 hiçbir ortamda uygulanmadı, 101 D2'ye ayrılmış):
+  bir EK hesabı açık `actor_identity_id` + gerekçe ile bir gerçek kişiye bağlar. Hesap başına tek satır,
+  değiştirilemez/silinemez (tetikleyici), `user_id` FK'sız (Kalıcı Sil'i kilitlemez). Audit `KISI_BAGLANDI`.
+- Kişi(hesap) = bağ ?? `users.actor_identity_id`. `YetkiKimlikPolitikasi` ve K3 bunu kullanır.
+- Uç: `POST /yonetim/kullanicilar/{id}/gercek-kisi` `{actor_identity_id, gerekce}` (kendine bağ yasak).
+- Neden: personel bağı (`uq_users_personel_id`) ve TC özeti de hesap başına tekil olduğundan iki hesabı
+  ilişkilendiremez; isim tabanlı eşleştirme güvenilir değil. Açık bağ deterministik ve geri uyumlu.
+- Testle kanıtlı: UYARI'da kabul + `YETKI_AYNI_GERCEK_KISI`; ZORUNLU'da engel; farklı kişi verebilir.
+- Sınır: bağ yalnız beyanla oluşur; bağlanmamış ikinci hesap tespit edilemez (UI P5'te bağ ekranı).
+
+## K5 alıcıları
+Hedef GY + aktör dışındaki tüm aktif GY'ler. Bildirim kullanıcı bazlıdır (`personel_id` NULL);
+`/me/inbox-notifications` GY'de `puantaj.view`/`attendance.correction.decide` ile açılır (personel gerekmez).
+Not: mevcut UI gelen kutusunu yalnız personel (minimal) kabuğunda gösteriyor; yönetici kabuğunda gösterim P5.
+
 ## Bilinen sınır
-- 048 `uq_users_actor_identity_id` iki hesabın aynı kimliği paylaşmasını engeller; bu yüzden
-  K1 "aynı gerçek kişinin ikinci hesabı" kontrolü bugün yalnız kimlik birleştirilirse tetiklenir.
-  Tespit için ek eşleştirme (ör. personel/normalize ad) ayrı karar ister.
-- K5 bildirimi gelen kutusu bileşeninin GY'de (personel bağı olmayan) görünürlüğü UI tarafında P5'te doğrulanacak.
-- UI (yetki düzenleme ekranı) P5.
+- UI (yetki ve gerçek kişi bağı ekranları, yönetici gelen kutusu) P5.

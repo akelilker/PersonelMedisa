@@ -1076,6 +1076,9 @@ class Router
         if ($method === 'GET' && preg_match('#^/yonetim/kullanicilar/(\d+)/yetkiler$#', $path, $matches)) {
             KullaniciYetkiController::kullaniciYetkileri($this->request, $matches[1]);
         }
+        if ($method === 'POST' && preg_match('#^/yonetim/kullanicilar/(\d+)/gercek-kisi$#', $path, $matches)) {
+            KullaniciYetkiController::gercekKisiBagla($this->request, $matches[1]);
+        }
         if ($method === 'POST' && preg_match('#^/yonetim/kullanicilar/(\d+)/yetkiler$#', $path, $matches)) {
             KullaniciYetkiController::yetkiVer($this->request, $matches[1]);
         }

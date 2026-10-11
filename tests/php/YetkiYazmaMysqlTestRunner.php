@@ -151,8 +151,13 @@ try {
     $r = ywTry(fn () => Y::ver($pdo, $actor(1), 6, ['permission' => 'personeller.create', 'etki' => 'DENY', 'gerekce' => 'kısıt']));
     $denyId = (int) json_decode(substr($r, 3), true)['istisna_id'];
     ywAssert(!$eff(6, 'personeller.create'), 'GY A, GY B\'ye kısıt koyar (etkin)');
-    ywAssert((int) $one($pdo, "SELECT COUNT(*) FROM personel_inbox_notifications WHERE kind='GY_YETKI_DEGISIKLIGI' AND recipient_user_id=7") === 1
-        && (int) $one($pdo, "SELECT COUNT(*) FROM personel_inbox_notifications WHERE kind='GY_YETKI_DEGISIKLIGI' AND recipient_user_id IN (1,6)") === 0, 'K5: bildirim yalnız diğer GY\'ye (aktöre ve hedefe değil)');
+    $bild = static fn (int $uid) => (int) $one($pdo, "SELECT COUNT(*) FROM personel_inbox_notifications WHERE kind='GY_YETKI_DEGISIKLIGI' AND recipient_user_id=?", [$uid]);
+    ywAssert($bild(6) === 1 && $bild(7) === 1 && $bild(1) === 0, 'K5 üç GY: hedef GY ve diğer aktif GY bildirim alır, aktör almaz');
+    ywAssert((int) $one($pdo, "SELECT COUNT(*) FROM personel_inbox_notifications WHERE kind='GY_YETKI_DEGISIKLIGI' AND personel_id IS NOT NULL") === 0
+        && (int) $one($pdo, 'SELECT COUNT(*) FROM users u LEFT JOIN personeller p ON p.id = u.personel_id WHERE u.id = 6 AND p.id IS NULL') === 1, 'K5: personel kaydı olmayan GY\'ye kullanıcı bazlı bildirim (personel_id NULL)');
+    $liste = \Medisa\Api\Services\SelfService\PersonelInboxNotificationService::listForUser($pdo, 6, 50);
+    ywAssert(count($liste) === 1 && $liste[0]['kind'] === 'GY_YETKI_DEGISIKLIGI'
+        && (R::resolve(['id' => 6, 'rol' => 'GENEL_YONETICI'], 'attendance.correction.decide') || R::resolve(['id' => 6, 'rol' => 'GENEL_YONETICI'], 'puantaj.view')), 'K5: personelsiz GY bildirimi /me/inbox-notifications okuma yolundan görür (yetki kapısı geçer)');
     ywAssert(ywTry(fn () => Y::iptal($pdo, $actor(6), 6, $denyId, 'kendim')) === Y::CODE_KENDI, 'hedef kendi kısıtını kaldıramaz');
     $pdo->exec("UPDATE users SET durum='PASIF' WHERE id=1");
     ywAssert(str_starts_with(ywTry(fn () => Y::iptal($pdo, $actor(7), 6, $denyId, 'kaldır')), 'OK:') && $eff(6, 'personeller.create'), 'koyan pasif olsa da başka GY kısıtı kaldırabilir');
@@ -182,6 +187,10 @@ try {
     ywAssert(str_starts_with($r, 'OK:'), 'K3 daraltma (ALLOW iptali) atayana açık');
     $r = ywTry(fn () => Y::ver($pdo, $actor(1), 2, ['permission' => $gyDisi, 'etki' => 'ALLOW', 'gerekce' => 'tek']));
     ywAssert(str_starts_with($r, 'OK:') && str_contains($r, Y::UYARI_K3), 'K3: uygun başka GY yokken atayan verir + K3_ISTISNA_TEK_YONETICI (iki yöneticili kurulum kilitlenmez)');
+    // iki GY'li kurulum (1 aktör + 2 hedef; 6,7 pasif): hedef bildirim alır
+    $aid = (int) json_decode(substr($r, 3), true)['audit_id'];
+    $alicilar = array_map('intval', $pdo->query("SELECT recipient_user_id FROM personel_inbox_notifications WHERE kind='GY_YETKI_DEGISIKLIGI' AND JSON_EXTRACT(payload_json, '$.yetki_audit_id') = $aid ORDER BY recipient_user_id")->fetchAll(PDO::FETCH_COLUMN));
+    ywAssert($alicilar === [2], 'K5 iki GY: aktör + hedef → yalnız hedef GY bildirim alır, aktör almaz');
     $pdo->exec("UPDATE users SET durum='AKTIF' WHERE id IN (6,7)");
 
     // --- karar 8: rol değişince aynı transaction'da iptal + audit ------------------------
@@ -220,6 +229,26 @@ try {
     ywAssert(ywTry(fn () => Y::ver($pdo, $actor(7), 5, ['permission' => $disi('IK_PERSONELI', 1), 'etki' => 'ALLOW', 'gerekce' => 'x'])) === 'YETKI_VEREN_KIMLIK_DOGRULANMAMIS', 'K1 ZORUNLU: kimliksiz GY yetki veremez');
     ywAssert(str_starts_with(ywTry(fn () => Y::ver($pdo, $actor(1), 5, ['permission' => $disi('IK_PERSONELI', 1), 'etki' => 'ALLOW', 'gerekce' => 'x'])), 'OK:'), 'K1 ZORUNLU: doğrulanmış kimlikli GY verebilir');
     $pdo->exec('UPDATE users SET actor_identity_id = 3 WHERE id = 7');
+    $pdo->exec("DELETE FROM yetki_politikasi WHERE anahtar='K1_KIMLIK_MODU'");
+
+    // --- K1 aynı gerçek kişinin iki hesabı (isimsiz, açık bağ) -----------------------
+    // 9 = gyB'nin (kimlik 2) ek MUHASEBE hesabı; bağ GY A tarafından beyanla kurulur.
+    $pdo->exec("INSERT INTO users (id, username, password_hash, ad_soyad, rol, durum) VALUES (9, 'gyB_ek', 'x', 'Ad gyB', 'MUHASEBE', 'AKTIF')");
+    ywAssert(ywTry(fn () => Y::kisiBagla($pdo, $actor(6), 6, 2, 'kendim')) === Y::CODE_KENDI, 'gerçek kişi bağı: kendi hesabına bağ kurulamaz');
+    ywAssert(str_starts_with(ywTry(fn () => Y::kisiBagla($pdo, $actor(1), 9, 2, 'B\'nin ek hesabı')), 'OK:')
+        && (int) $one($pdo, "SELECT COUNT(*) FROM user_yetki_auditleri WHERE aksiyon='KISI_BAGLANDI' AND hedef_user_id=9") === 1, 'gerçek kişi bağı kurulur + audit KISI_BAGLANDI');
+    ywAssert(ywTry(fn () => Y::kisiBagla($pdo, $actor(1), 9, 3, 'değiştir')) === 'GERCEK_KISI_BAGI_VAR', 'gerçek kişi bağı değiştirilemez (API)');
+    $engel = false;
+    try { $pdo->exec('DELETE FROM user_gercek_kisi_baglari WHERE user_id = 9'); } catch (PDOException $e) { $engel = str_contains($e->getMessage(), 'GERCEK_KISI_BAGI_IMMUTABLE'); }
+    ywAssert($engel, 'gerçek kişi bağı silinemez (tetikleyici)');
+    ywAssert((int) $one($pdo, 'SELECT actor_identity_id FROM users WHERE id = 6') === 2 && $one($pdo, 'SELECT actor_identity_id FROM users WHERE id = 9') === null, 'users.actor_identity_id 1:1 dokunulmadı (SGK/dört göz değişmez)');
+    $ikinci = $disi('MUHASEBE', 2);
+    $r = ywTry(fn () => Y::ver($pdo, $actor(6), 9, ['permission' => $ikinci, 'etki' => 'ALLOW', 'gerekce' => 'kendi ek hesabım']));
+    ywAssert(str_starts_with($r, 'OK:') && str_contains($r, 'YETKI_AYNI_GERCEK_KISI')
+        && (string) $one($pdo, 'SELECT uyari_kodlari FROM user_yetki_auditleri WHERE aksiyon=\'VER\' ORDER BY id DESC LIMIT 1') === 'YETKI_AYNI_GERCEK_KISI', 'K1 UYARI: aynı kişinin ikinci hesabına verme kabul + YETKI_AYNI_GERCEK_KISI uyarısı');
+    $pdo->exec("INSERT INTO yetki_politikasi (anahtar, deger, kaynak) VALUES ('K1_KIMLIK_MODU','ZORUNLU','TEST')");
+    ywAssert(ywTry(fn () => Y::ver($pdo, $actor(6), 9, ['permission' => $disi('MUHASEBE', 3), 'etki' => 'ALLOW', 'gerekce' => 'x'])) === 'YETKI_AYNI_GERCEK_KISI', 'K1 ZORUNLU: aynı kişinin ikinci hesabına verme ENGELLENDİ');
+    ywAssert(str_starts_with(ywTry(fn () => Y::ver($pdo, $actor(7), 9, ['permission' => $disi('MUHASEBE', 3), 'etki' => 'ALLOW', 'gerekce' => 'x'])), 'OK:'), 'K1 ZORUNLU: farklı kişi aynı hesaba verebilir');
     $pdo->exec("DELETE FROM yetki_politikasi WHERE anahtar='K1_KIMLIK_MODU'");
 
     // --- geri uyumluluk: 100 yoksa yazma 503, rol değişikliği no-op --------------------

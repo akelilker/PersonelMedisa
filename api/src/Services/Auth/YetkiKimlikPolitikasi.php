@@ -28,6 +28,7 @@ final class YetkiKimlikPolitikasi
     public const ANAHTAR_K1 = 'K1_KIMLIK_MODU';
     public const MOD_UYARI = 'UYARI';
     public const MOD_ZORUNLU = 'ZORUNLU';
+    public const BAG_TABLE = 'user_gercek_kisi_baglari';
 
     public const CODE_KENDINE = 'YETKI_KENDINE_VERILEMEZ';
     public const CODE_KIMLIK_YOK = 'YETKI_VEREN_KIMLIK_DOGRULANMAMIS';
@@ -94,16 +95,32 @@ final class YetkiKimlikPolitikasi
         return self::mod($pdo) === self::MOD_ZORUNLU;
     }
 
-    /** @return array{id: int|null, status: string|null} */
-    private static function kimlik(PDO $pdo, int $userId): array
+    /**
+     * Hesabın gerçek kişisi: ek hesap bağı (user_gercek_kisi_baglari) varsa o kimlik,
+     * yoksa users.actor_identity_id. Bağ tablosu yoksa (100 öncesi) yalnız users kolonu.
+     *
+     * @return array{id: int|null, status: string|null}
+     */
+    public static function kimlik(PDO $pdo, int $userId): array
     {
+        $bagli = null;
+        try {
+            $stmt = $pdo->prepare('SELECT actor_identity_id FROM ' . self::BAG_TABLE . ' WHERE user_id = :id LIMIT 1');
+            $stmt->execute(['id' => $userId]);
+            $v = $stmt->fetchColumn();
+            $bagli = $v !== false && $v !== null ? (int) $v : null;
+        } catch (\PDOException $e) {
+            if (!\Medisa\Api\Database\UserYetkiIstisnaSchema::isMissingTable($e)) {
+                throw $e;
+            }
+        }
         $stmt = $pdo->prepare(
-            'SELECT u.actor_identity_id AS id, ai.status
+            'SELECT COALESCE(:bagli, u.actor_identity_id) AS id, ai.status
                FROM users u
-               LEFT JOIN actor_identities ai ON ai.id = u.actor_identity_id
+               LEFT JOIN actor_identities ai ON ai.id = COALESCE(:bagli2, u.actor_identity_id)
               WHERE u.id = :id LIMIT 1'
         );
-        $stmt->execute(['id' => $userId]);
+        $stmt->execute(['bagli' => $bagli, 'bagli2' => $bagli, 'id' => $userId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$row || $row['id'] === null) {
             return ['id' => null, 'status' => null];

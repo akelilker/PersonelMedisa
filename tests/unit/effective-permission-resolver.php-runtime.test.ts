@@ -11,6 +11,7 @@ describe("EffectivePermissionResolver eşdeğerlik", () => {
     const read = (p: string) => readFileSync(resolve(root, p), "utf8");
     expect(read("api/src/Auth/EffectivePermissionResolver.php")).toContain("public const SUBE_ISTISNALARI_ETKIN = false;");
     const router = read("api/src/Router.php");
+    expect(router).not.toContain("/gercek-kisi");
     const yetkiRoutes = router.split(/\r?\n/).filter((l) => /yetkiler|yetki-auditleri/.test(l) && /\$method/.test(l));
     for (const line of yetkiRoutes.filter((l) => !l.includes("'GET'"))) {
       expect(line).toMatch(/'POST'.*(\/yetkiler\$#|\/yetkiler\/\(\\d\+\)\/iptal\$#)/);

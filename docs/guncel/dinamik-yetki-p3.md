@@ -13,7 +13,7 @@ Durum: PR (MERGE=NO). Migration yok; migration 100 canlıya uygulanmadan yazma u
 3. Yalnız GLOBAL istisna: `sube_id` gelirse `SUBE_ISTISNASI_KAPALI` (şube istisnaları kapalı kalır).
 4. Kırmızı liste: `NON_GRANTABLE_PERMISSIONS` ALLOW ile verilemez; GY hedefte `GY_NON_DENYABLE_PERMISSIONS` DENY'lanamaz.
 5. Süre: bitiş boş = kalıcı; doluysa > başlangıç, süreli ALLOW ≤ 365 gün. Geçmişe dönük başlangıç yok.
-6. K1 `YetkiKimlikPolitikasi`: Medisa (satır yok) UYARI → kabul + `uyari_kodlari`; ZORUNLU → kimliksiz veren reddedilir.
+6. K1 `YetkiKimlikPolitikasi`: Medisa (satır yok) UYARI → kimliksiz veren kabul + `uyari_kodlari` (eski hesap kilitlenmez); ZORUNLU → kimliksiz veren reddedilir. Güvenilir aynı kişi (dolu T.C. + personel bağlantısı veya doğrulanmış kimlik köprüsü) her modda reddedilir. İsim eşleştirmesi yok.
 7. K3: hedef GY ve işlem yetkiyi genişletiyorsa (ALLOW ver / DENY kaldır) ve aktör hedefin son GY atayanıysa:
    uygun başka GY (aktif GY, yetki yöneticisi, atayan ve hedef dışında; ZORUNLU'da farklı kimlik) varsa
    `ATAYAN_YETKI_VEREMEZ`; yoksa izin + `K3_ISTISNA_TEK_YONETICI`. Atayan: `user_yetki_auditleri.PROFIL_DEGISTI`
@@ -29,18 +29,20 @@ Durum: PR (MERGE=NO). Migration yok; migration 100 canlıya uygulanmadan yazma u
 `YonetimController::kullaniciGuncelle` aynı transaction'da `rolDegisti()` çağırır: etkin istisnalar
 `ROL_DEGISTI` ile iptal + her biri audit. GY'ye atama (oluşturma dahil) `PROFIL_DEGISTI` yazar (K3 için).
 
-## K1 — aynı gerçek kişinin iki hesabı (isim eşleştirmesi yok)
-- `users.actor_identity_id` 048'den beri 1:1 (`uq_users_actor_identity_id`); SGK dört göz ve
-  `SgkKararPaketiAuthz` bu varsayıma dayandığı için **dokunulmadı** (unique kaldırılmadı).
-- Yeni tablo `user_gercek_kisi_baglari` (migration 100 içinde; 100 hiçbir ortamda uygulanmadı, 101 D2'ye ayrılmış):
-  bir EK hesabı açık `actor_identity_id` + gerekçe ile bir gerçek kişiye bağlar. Hesap başına tek satır,
-  değiştirilemez/silinemez (tetikleyici), `user_id` FK'sız (Kalıcı Sil'i kilitlemez). Audit `KISI_BAGLANDI`.
-- Kişi(hesap) = bağ ?? `users.actor_identity_id`. `YetkiKimlikPolitikasi` ve K3 bunu kullanır.
-- Uç: `POST /yonetim/kullanicilar/{id}/gercek-kisi` `{actor_identity_id, gerekce}` (kendine bağ yasak).
-- Neden: personel bağı (`uq_users_personel_id`) ve TC özeti de hesap başına tekil olduğundan iki hesabı
-  ilişkilendiremez; isim tabanlı eşleştirme güvenilir değil. Açık bağ deterministik ve geri uyumlu.
-- Testle kanıtlı: UYARI'da kabul + `YETKI_AYNI_GERCEK_KISI`; ZORUNLU'da engel; farklı kişi verebilir.
-- Sınır: bağ yalnız beyanla oluşur; bağlanmamış ikinci hesap tespit edilemez (UI P5'te bağ ekranı).
+## K1 — bir kişi, bir hesap
+- Karar: bir kişinin farklı görevler için ikinci kullanıcı hesabı yoktur. Görev ve yetki tek hesaptan yönetilir.
+- `users.actor_identity_id` 048'den beri 1:1'dir. SGK dört göz ve kullanıcı kimliği kayıtları **dokunulmadı**.
+  Ek hesap bağ tablosu, ekranı ve ucu yoktur. Migration 100 şeması main ile aynıdır (canlıda uygulanmadı).
+- Aynı kişi yalnız güvenilir mevcut bilgiyle bilinir: personel kaydındaki dolu T.C. + `users.personel_id`,
+  veya personel kaydı olmayan yöneticide doğrulanmış `actor_identity` köprüsü (`status = VERIFIED` ve
+  `actor_identities.personel_id`). İsim/soyad eşleştirmesi yok. T.C. yeni tabloya kopyalanmaz; listede,
+  yetki ekranında, bildirimde, hata mesajında ve denetim kaydında gösterilmez.
+- Bu eşleşme varsa kendi lehine yetki verme ve kısıt kaldırma (her yetki yazımı) UYARI modunda da reddedilir.
+- Yeni personel hesabı açılırken eşleşme varsa ikinci hesap açılmaz. Pasif hesap varsa otomatik yeni hesap
+  yok; mevcut hesap incelenir (`MEVCUT_PASIF_HESAP_INCELENMELI`). Eski hesaplar birleştirilmez, geçmiş
+  kayıtları değiştirilmez, kimliği belirsiz hesap kilitlenmez.
+- Açık sınır: personel kaydı olmayan ve doğrulanmış kimliği o personele bağlı olmayan eski ikinci hesap
+  aynı kişi sayılamaz. Bu hesaplar kilitlenmez; aralarındaki yetki yazımı engellenmez. Koruma bu durumda eksiktir.
 
 ## K5 alıcıları
 Hedef GY + aktör dışındaki tüm aktif GY'ler. Bildirim kullanıcı bazlıdır (`personel_id` NULL);
@@ -48,4 +50,6 @@ Hedef GY + aktör dışındaki tüm aktif GY'ler. Bildirim kullanıcı bazlıdı
 Not: mevcut UI gelen kutusunu yalnız personel (minimal) kabuğunda gösteriyor; yönetici kabuğunda gösterim P5.
 
 ## Bilinen sınır
-- UI (yetki ve gerçek kişi bağı ekranları, yönetici gelen kutusu) P5.
+- UI (yetki ekranı, yönetici gelen kutusu) P5.
+- Kimliği personel kaydı veya doğrulanmış kimlik köprüsüyle belirlenemeyen eski ikinci hesaplar
+  otomatik birleştirilmez ve kilitlenmez. Bu hesaplarda aynı kişi koruması yoktur.

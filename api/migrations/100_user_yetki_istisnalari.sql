@@ -87,7 +87,7 @@ END IF;
 
 CREATE TABLE IF NOT EXISTS user_yetki_auditleri (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  aksiyon ENUM('VER', 'KALDIR', 'ROL_DEGISTI_IPTAL', 'PROFIL_DEGISTI', 'REDDEDILDI', 'KISI_BAGLANDI') NOT NULL,
+  aksiyon ENUM('VER', 'KALDIR', 'ROL_DEGISTI_IPTAL', 'PROFIL_DEGISTI', 'REDDEDILDI') NOT NULL,
   aktor_user_id INT UNSIGNED NOT NULL,
   aktor_username_snapshot VARCHAR(64) NOT NULL,
   aktor_actor_identity_id INT UNSIGNED NULL,
@@ -128,39 +128,6 @@ SIGNAL SQLSTATE '45000'
   SET MESSAGE_TEXT = 'YETKI_AUDIT_IMMUTABLE: yetki audit satiri silinemez';
 
 -- Kurulum düzeyi yetki politikası. Satır yok = varsayılan (K1 UYARI).
--- Gerçek kişi ↔ ek hesap eşlemesi (K1 "aynı kişinin ikinci hesabı").
--- users.actor_identity_id 048'den beri 1:1'dir (uq_users_actor_identity_id) ve SGK/dört göz
--- bu varsayıma dayanır; o yüzden ona dokunulmaz. Bir kişinin EK hesabı, operatör beyanıyla
--- buraya o kişinin actor_identity kaydına bağlanır. Kişi(hesap) = bu bağ ?? users.actor_identity_id.
--- Hesap başına tek satır; satır değiştirilemez/silinemez. user_id FK'sız (Kalıcı Sil'i kilitlemez).
-CREATE TABLE IF NOT EXISTS user_gercek_kisi_baglari (
-  user_id INT UNSIGNED NOT NULL,
-  username_snapshot VARCHAR(64) NOT NULL,
-  actor_identity_id INT UNSIGNED NOT NULL,
-  tanimlayan_user_id INT UNSIGNED NOT NULL,
-  tanimlayan_username_snapshot VARCHAR(64) NOT NULL,
-  gerekce VARCHAR(500) NOT NULL,
-  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (user_id),
-  KEY idx_ugkb_kimlik (actor_identity_id),
-  CONSTRAINT fk_ugkb_kimlik FOREIGN KEY (actor_identity_id) REFERENCES actor_identities (id) ON DELETE RESTRICT ON UPDATE RESTRICT,
-  CONSTRAINT chk_ugkb_gerekce CHECK (CHAR_LENGTH(gerekce) > 0)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-DROP TRIGGER IF EXISTS trg_ugkb_no_update;
-CREATE TRIGGER trg_ugkb_no_update
-BEFORE UPDATE ON user_gercek_kisi_baglari
-FOR EACH ROW
-SIGNAL SQLSTATE '45000'
-  SET MESSAGE_TEXT = 'GERCEK_KISI_BAGI_IMMUTABLE: gercek kisi bagi degistirilemez';
-
-DROP TRIGGER IF EXISTS trg_ugkb_no_delete;
-CREATE TRIGGER trg_ugkb_no_delete
-BEFORE DELETE ON user_gercek_kisi_baglari
-FOR EACH ROW
-SIGNAL SQLSTATE '45000'
-  SET MESSAGE_TEXT = 'GERCEK_KISI_BAGI_IMMUTABLE: gercek kisi bagi silinemez';
-
 CREATE TABLE IF NOT EXISTS yetki_politikasi (
   anahtar VARCHAR(64) NOT NULL,
   deger VARCHAR(64) NOT NULL,

@@ -45,7 +45,6 @@ final class KullaniciKaliciSilService
         self::AUDIT_TABLE,
         self::YETKI_ISTISNA_TABLE,
         'user_yetki_auditleri',
-        'user_gercek_kisi_baglari', // FK'sız, username snapshot'lı, değiştirilemez gerçek-kişi beyanı
     ];
 
     public const CODE_SELF_DELETE = 'SELF_DELETE_FORBIDDEN';

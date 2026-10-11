@@ -16,7 +16,7 @@ use PDO;
  *
  * Sıra: yetki (kullanici_yetkileri.manage) → hedef ≠ aktör → girdi (yalnız GLOBAL istisna;
  * şube kapsamı kapalı) → hedef satırı FOR UPDATE (Kalıcı Sil ile yarış yok) → kırmızı liste →
- * K1 (YetkiKimlikPolitikasi; Medisa UYARI) → K3 (atayan / uygun başka GY) → yaz + audit →
+ * K1 (YetkiKimlikPolitikasi; aynı kişi her modda engel, eksik kimlik Medisa'da UYARI) → K3 (atayan / uygun başka GY) → yaz + audit →
  * yetenek tabanlı son yetki yöneticisi → commit → K5 (hedef GY ise hedefe ve aktör dışındaki tüm aktif GY'lere bildirim).
  *
  * Tüm GY'ler eşit yetki yöneticisidir; kısıtı kimin koyduğu önemli değildir (v3, K2′ yok).
@@ -246,58 +246,6 @@ final class KullaniciYetkiYazmaService
         return count($rows);
     }
 
-    /**
-     * K1: bir hesabı, operatör/GY beyanıyla bir gerçek kişinin (actor_identity) EK hesabı olarak bağlar.
-     * İsim eşleştirmesi yok; açık kimlik id'si ve gerekçe gerekir. Bağ değiştirilemez/silinemez.
-     *
-     * @param array<string, mixed> $actor
-     * @return array{user_id: int, actor_identity_id: int, audit_id: int}
-     */
-    public static function kisiBagla(PDO $pdo, array $actor, int $hedefId, int $actorIdentityId, $gerekceRaw, ?string $requestId = null): array
-    {
-        $aktorId = self::assertAktor($actor, $hedefId);
-        $gerekce = self::gerekce(['gerekce' => $gerekceRaw]);
-        self::assertSema($pdo);
-        $pdo->beginTransaction();
-        try {
-            $hedef = self::lockHedef($pdo, $hedefId);
-            $stmt = $pdo->prepare('SELECT status FROM actor_identities WHERE id = :id');
-            $stmt->execute(['id' => $actorIdentityId]);
-            $status = $stmt->fetchColumn();
-            if ($status === false || strtoupper((string) $status) === 'REVOKED') {
-                throw new OrganizasyonException(422, 'GERCEK_KISI_GECERSIZ', 'Gerçek kişi kimliği bulunamadı veya iptal edilmiş.', 'actor_identity_id');
-            }
-            $stmt = $pdo->prepare('SELECT COUNT(*) FROM ' . YetkiKimlikPolitikasi::BAG_TABLE . ' WHERE user_id = :u');
-            $stmt->execute(['u' => $hedefId]);
-            if ((int) $stmt->fetchColumn() > 0) {
-                throw new OrganizasyonException(409, 'GERCEK_KISI_BAGI_VAR', 'Bu hesap zaten bir gerçek kişiye bağlı.', 'id');
-            }
-            $aktor = self::userRow($pdo, $aktorId);
-            $pdo->prepare(
-                'INSERT INTO ' . YetkiKimlikPolitikasi::BAG_TABLE . ' (user_id, username_snapshot, actor_identity_id,
-                    tanimlayan_user_id, tanimlayan_username_snapshot, gerekce) VALUES (:u, :us, :k, :t, :ts, :g)'
-            )->execute([
-                'u' => $hedefId, 'us' => (string) $hedef['username'], 'k' => $actorIdentityId,
-                't' => $aktorId, 'ts' => (string) $aktor['username'], 'g' => $gerekce,
-            ]);
-            $auditId = self::audit($pdo, 'KISI_BAGLANDI', $aktor, $hedef, RolePermissions::normalizeRole((string) $hedef['rol']), [
-                'istisna_id' => null, 'permission' => null, 'etki' => null,
-                'gecerlilik_baslangic' => null, 'gecerlilik_bitis' => null,
-                'onceki_json' => ['gercek_kisi' => $hedef['actor_identity_id'] !== null ? (int) $hedef['actor_identity_id'] : null],
-                'sonraki_json' => ['gercek_kisi' => $actorIdentityId, 'kaynak' => 'BEYAN'],
-                'gerekce' => $gerekce, 'uyarilar' => [], 'request_id' => $requestId,
-            ]);
-            $pdo->commit();
-        } catch (\Throwable $e) {
-            if ($pdo->inTransaction()) {
-                $pdo->rollBack();
-            }
-            throw $e;
-        }
-
-        return ['user_id' => $hedefId, 'actor_identity_id' => $actorIdentityId, 'audit_id' => $auditId];
-    }
-
     // ---- kurallar ----------------------------------------------------------------------
 
     /** @return array<int, string> uyarılar */
@@ -362,6 +310,10 @@ final class KullaniciYetkiYazmaService
         $atayanKimlik = YetkiKimlikPolitikasi::kimlik($pdo, $atayanId)['id'];
         foreach (self::aktifGyler($pdo, false) as $gy) {
             if ($gy['id'] === $atayanId || $gy['id'] === $hedefId) {
+                continue;
+            }
+            if (YetkiKimlikPolitikasi::ayniGuvenilirKisi($pdo, $atayanId, $gy['id'])
+                || YetkiKimlikPolitikasi::ayniGuvenilirKisi($pdo, $hedefId, $gy['id'])) {
                 continue;
             }
             if ($mod === YetkiKimlikPolitikasi::MOD_ZORUNLU && $atayanKimlik !== null

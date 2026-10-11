@@ -27,7 +27,6 @@ use PDO;
  *  GET /yonetim/yetki-auditleri               → kullanici_yetkileri.audit.view (yalnız GENEL_YONETICI)
  *  POST /yonetim/kullanicilar/{id}/yetkiler   → kullanici_yetkileri.manage (ALLOW/DENY ver)
  *  POST /yonetim/kullanicilar/{id}/yetkiler/{istisnaId}/iptal → kullanici_yetkileri.manage
- *  POST /yonetim/kullanicilar/{id}/gercek-kisi → kullanici_yetkileri.manage (ek hesabı gerçek kişiye bağla, K1)
  */
 final class KullaniciYetkiController
 {
@@ -119,22 +118,6 @@ final class KullaniciYetkiController
             JsonResponse::error($e->httpStatus, $e->errorCode, $e->getMessage(), $e->field);
         }
         JsonResponse::success($sonuc);
-    }
-
-    public static function gercekKisiBagla(Request $request, $kullaniciId)
-    {
-        $actor = AuthMiddleware::authenticate($request, true);
-        RolePermissions::assert($actor, KullaniciYetkiYazmaService::PERMISSION_MANAGE);
-        $body = $request->getJsonBody();
-        if (!is_array($body) || !isset($body['actor_identity_id']) || (int) $body['actor_identity_id'] <= 0) {
-            JsonResponse::badRequest('actor_identity_id zorunludur.', 'VALIDATION_ERROR', 'actor_identity_id');
-        }
-        try {
-            $sonuc = KullaniciYetkiYazmaService::kisiBagla(Connection::get(), $actor, (int) $kullaniciId, (int) $body['actor_identity_id'], $body['gerekce'] ?? null, self::requestId($request));
-        } catch (OrganizasyonException $e) {
-            JsonResponse::error($e->httpStatus, $e->errorCode, $e->getMessage(), $e->field);
-        }
-        JsonResponse::success($sonuc, [], 201);
     }
 
     private static function requestId(Request $request): ?string

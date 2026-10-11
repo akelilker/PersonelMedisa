@@ -21,7 +21,18 @@ describe("Tam veritabanı yedeği (MariaDB)", () => {
       "[PASS] tetikleyici geri yüklenen veritabanında silmeyi engelledi",
       "[PASS] canlı veritabanının üzerine geri yükleme reddedildi",
       "[PASS] tek yetki tablosu PARTIAL sayılır",
-      "[PASS] web köküne yazma reddedilir"
+      "[PASS] web köküne yazma reddedilir",
+      "[PASS] bozuk yedek geri yüklenmez",
+      "[PASS] hata kodu korunur RESTORE_PRIVILEGE_ABSENT",
+      "[PASS] genel CREATE ve DROP yetkisi olmayan hesap ayrılır",
+      "[PASS] olmayan hazır geri yükleme veritabanı reddedilir",
+      "[PASS] hedef canlı veritabanıyla aynıysa reddedilir",
+      "[PASS] hazır veritabanında yetersiz yetki reddedilir",
+      "[PASS] başka uygulama verisi silinmeden işlem durur",
+      "[PASS] genel yetki olmadan hazır veritabanına tam yedek PASS",
+      "[PASS] hazır veritabanı kalır ve test nesneleri temizlenir",
+      "[PASS] migration 100 kapısı hazır yedekte de yetki tablosunu durdurur",
+      "[PASS] temizlik başarısızsa test verisi kalır ve başarı sayılmaz"
     ]) {
       expect(result.stdout).toContain(line);
     }

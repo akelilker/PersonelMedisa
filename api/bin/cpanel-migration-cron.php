@@ -872,7 +872,7 @@ final class MigrationWorkerFailure extends RuntimeException
             return new self($exception->reason, $stage, 1, $exception->detail);
         }
         if (
-            $stage === 'FULL_BACKUP_GATE'
+            ($stage === 'FULL_BACKUP_GATE' || $stage === 'FULL_DATABASE_BACKUP')
             && preg_match('/^[A-Z][A-Z0-9_]{2,100}$/D', $exception->getMessage()) === 1
         ) {
             return new self($exception->getMessage(), $stage, 1, null);

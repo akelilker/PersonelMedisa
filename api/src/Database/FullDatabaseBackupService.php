@@ -17,14 +17,14 @@ use Throwable;
  *
  * The dump is not a download and it is not an off-server disaster-recovery
  * copy: it never leaves the machine that holds the live database. Plain FTP is
- * the only deploy transport and must never carry this file. Restore proof is a
- * sibling database on that same server, dropped before the method returns.
- * Losing the server disk loses this backup with it.
- *
- * The account in config is the only database account. A privilege that exists
- * only on the live database cannot create that sibling, and the live database
- * is never used as the restore target. There is no second administrative
- * account to fall back to. Without global CREATE and DROP the result is FAIL.
+ * the only deploy transport and must never carry this file. When the account
+ * has global CREATE and DROP, restore proof is a temporary sibling database
+ * that is dropped before the method returns. On shared hosting the proof is
+ * the empty database named by server config db_restore_name. That database is
+ * kept; only objects this run created are removed. The name is never taken
+ * from a request. The live database is never the target. A database that
+ * already holds data is left untouched and the run stops. Losing the server
+ * disk loses this backup with it.
  *
  * Framing is length-prefixed records (`S` + byte length + newline + SQL +
  * newline), not a mysql-client script. Replay goes through restoreInto().
@@ -95,11 +95,30 @@ final class FullDatabaseBackupService
         $failed = null;
         $cleanupFailed = false;
         $privilege = 'UNREADABLE';
+        $restoreTarget = 'NONE';
+        $tip = '000';
+        $dedicated = null;
+        $clearDedicated = false;
 
         try {
-            $privilege = self::readSiblingPrivilege($live);
-            if ($privilege === 'ABSENT') {
+            $liveName = self::currentDatabase($live);
+            $globalPrivilege = self::readSiblingPrivilege($live);
+            $configured = self::configuredRestoreName();
+            if ($globalPrivilege === 'PRESENT') {
+                $privilege = 'PRESENT';
+                $restoreTarget = 'TEMPORARY';
+            } elseif ($configured !== '') {
+                if ($configured === $liveName) {
+                    throw new RuntimeException('RESTORE_TARGET_REFUSED');
+                }
+                self::assertDedicatedReady($live, $configured, $liveName);
+                $privilege = 'DEDICATED';
+                $restoreTarget = 'DEDICATED';
+            } elseif ($globalPrivilege === 'ABSENT') {
                 throw new RuntimeException('RESTORE_PRIVILEGE_ABSENT');
+            } else {
+                $privilege = 'UNREADABLE';
+                $restoreTarget = 'TEMPORARY';
             }
             $directory = MigrationBackupService::operationsDirectory($apiDirectory);
             $liveName = self::currentDatabase($live);
@@ -122,12 +141,25 @@ final class FullDatabaseBackupService
             $snapshot = false;
 
             $readback = self::verifyFile($path);
-            $tempName = $liveName . '_r' . bin2hex(random_bytes(4));
-            self::assertRestoreName($tempName, $liveName);
-
-            $server = self::serverPdo($serverDsn, $username, $password);
-            self::createRestoreDatabase($server, $tempName);
-            $target = self::serverPdo($serverDsn . ';dbname=' . $tempName, $username, $password);
+            if ($restoreTarget === 'DEDICATED') {
+                $dedicated = self::serverPdo($serverDsn . ';dbname=' . $configured, $username, $password);
+                if (self::currentDatabase($dedicated) !== $configured || $configured === $liveName) {
+                    $dedicated = null;
+                    throw new RuntimeException('RESTORE_TARGET_REFUSED');
+                }
+                if (self::schemaObjectCount($dedicated, $configured) !== 0) {
+                    $dedicated = null;
+                    throw new RuntimeException('RESTORE_TARGET_OCCUPIED');
+                }
+                $clearDedicated = true;
+                $target = $dedicated;
+            } else {
+                $tempName = $liveName . '_r' . bin2hex(random_bytes(4));
+                self::assertRestoreName($tempName, $liveName);
+                $server = self::serverPdo($serverDsn, $username, $password);
+                self::createRestoreDatabase($server, $tempName);
+                $target = self::serverPdo($serverDsn . ';dbname=' . $tempName, $username, $password);
+            }
             self::restoreInto($target, $path, $liveName);
             $mismatches = self::compare($target, $inventory);
             $restored = self::inventory($target);
@@ -136,21 +168,28 @@ final class FullDatabaseBackupService
                 ? $exception->getMessage()
                 : 'FULL_DATABASE_BACKUP_FAILED';
             $tip = isset($tip) && is_string($tip) ? $tip : '000';
-            $failed = self::failure($deployedSha, $tip, $reason, $fileName, $path);
+            $failed = self::failure($deployedSha, $tip, $reason, $fileName, $path, [
+                'restore_target' => $restoreTarget,
+            ]);
         } finally {
             if ($snapshot && $live->inTransaction()) {
                 $live->rollBack();
+            }
+            if ($clearDedicated && $dedicated instanceof PDO && !self::clearDedicatedDatabase($dedicated, $liveName)) {
+                $cleanupFailed = true;
             }
             if ($server instanceof PDO && is_string($tempName) && !self::dropRestoreDatabase($server, $tempName, $liveName)) {
                 $cleanupFailed = true;
             }
         }
 
+        if ($cleanupFailed) {
+            return self::failure($deployedSha, $tip, 'RESTORE_DATABASE_CLEANUP_FAILED', $fileName, $path, [
+                'restore_target' => $restoreTarget,
+            ]);
+        }
         if ($failed !== null) {
             return $failed;
-        }
-        if ($cleanupFailed) {
-            return self::failure($deployedSha, $tip, 'RESTORE_DATABASE_CLEANUP_FAILED', $fileName, $path);
         }
 
         if ($mismatches !== []) {
@@ -158,6 +197,7 @@ final class FullDatabaseBackupService
                 'schema_mismatch_count' => count($mismatches),
                 'content_mismatch_count' => count(array_intersect($mismatches, ['CONTENT_HASH', 'VIEW_CONTENT'])),
                 'definition_mismatch_count' => count(array_intersect($mismatches, ['DEFINITION', 'TRIGGER_BODY', 'ROUTINE_BODY'])),
+                'restore_target' => $restoreTarget,
             ]);
         }
 
@@ -171,7 +211,7 @@ final class FullDatabaseBackupService
             $yetki,
             $inventory,
             $restored,
-            [],
+            ['restore_target' => $restoreTarget],
             $privilege
         );
         self::writeMeta($path, $evidence);
@@ -186,7 +226,7 @@ final class FullDatabaseBackupService
     public static function restoreInto(PDO $target, string $path, string $forbiddenDatabase): void
     {
         $current = self::currentDatabase($target);
-        self::assertRestoreName($current, $forbiddenDatabase);
+        self::assertReplayTarget($current, $forbiddenDatabase);
 
         $handle = fopen($path, 'rb');
         if ($handle === false) {
@@ -698,6 +738,7 @@ final class FullDatabaseBackupService
             'content_mismatch_count' => (int) ($extra['content_mismatch_count'] ?? 0),
             'definition_mismatch_count' => (int) ($extra['definition_mismatch_count'] ?? 0),
             'restore_privilege' => self::publishedPrivilege($result, $reason, $privilege),
+            'restore_target' => self::restoreTargetMode($extra),
             'yetki_schema' => $yetki['state'],
             'yetki_tables_present' => $yetki['tables_present'],
             'yetki_triggers_present' => $yetki['triggers_present'],
@@ -748,10 +789,14 @@ final class FullDatabaseBackupService
 
     private static function publishedPrivilege(string $result, ?string $reason, string $privilege): string
     {
-        if ($reason === 'RESTORE_PRIVILEGE_ABSENT' || $privilege === 'ABSENT') {
+        if (
+            $reason === 'RESTORE_PRIVILEGE_ABSENT'
+            || $reason === 'RESTORE_TARGET_PRIVILEGE_ABSENT'
+            || $privilege === 'ABSENT'
+        ) {
             return 'ABSENT';
         }
-        if ($result === 'PASS' && $privilege === 'PRESENT') {
+        if ($result === 'PASS' && ($privilege === 'PRESENT' || $privilege === 'DEDICATED')) {
             return 'VERIFIED';
         }
 
@@ -1075,6 +1120,242 @@ final class FullDatabaseBackupService
         }
         self::ident($name);
         self::ident($liveName);
+    }
+
+    private static function assertReplayTarget(string $current, string $liveName): void
+    {
+        if ($current === $liveName) {
+            throw new RuntimeException('RESTORE_TARGET_REFUSED');
+        }
+        $configured = self::configuredRestoreName();
+        if ($configured !== '' && $current === $configured) {
+            return;
+        }
+        self::assertRestoreName($current, $liveName);
+    }
+
+    private static function configuredRestoreName(): string
+    {
+        if (!function_exists('medisa_config')) {
+            return '';
+        }
+        $value = medisa_config('db_restore_name', '');
+        if (!is_string($value)) {
+            return '';
+        }
+        $value = trim($value);
+        if ($value === '') {
+            return '';
+        }
+
+        return self::bareIdent($value);
+    }
+
+    /**
+     * @param array<string, int|string> $extra
+     */
+    private static function restoreTargetMode(array $extra): string
+    {
+        $mode = (string) ($extra['restore_target'] ?? 'NONE');
+
+        return in_array($mode, ['TEMPORARY', 'DEDICATED', 'NONE'], true) ? $mode : 'NONE';
+    }
+
+    /** @var list<string> */
+    private const DEDICATED_PRIVILEGES = [
+        'SELECT',
+        'INSERT',
+        'UPDATE',
+        'DELETE',
+        'CREATE',
+        'DROP',
+        'INDEX',
+        'ALTER',
+        'REFERENCES',
+        'CREATE VIEW',
+        'SHOW VIEW',
+        'TRIGGER',
+        'CREATE ROUTINE',
+        'ALTER ROUTINE',
+        'EVENT',
+    ];
+
+    private static function assertDedicatedReady(PDO $account, string $name, string $liveName): void
+    {
+        if ($name === $liveName) {
+            throw new RuntimeException('RESTORE_TARGET_REFUSED');
+        }
+        $statement = $account->prepare(
+            'SELECT COUNT(*) FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = :name'
+        );
+        $statement->execute(['name' => $name]);
+        if ((int) $statement->fetchColumn() !== 1) {
+            throw new RuntimeException('RESTORE_DATABASE_UNAVAILABLE');
+        }
+        $lines = self::grantLines($account);
+        if ($lines === [] || !self::grantsAllowDedicatedDatabase($lines, $name)) {
+            throw new RuntimeException('RESTORE_TARGET_PRIVILEGE_ABSENT');
+        }
+        if (self::schemaObjectCount($account, $name) !== 0) {
+            throw new RuntimeException('RESTORE_TARGET_OCCUPIED');
+        }
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function grantLines(PDO $account): array
+    {
+        try {
+            $statement = $account->query('SHOW GRANTS FOR CURRENT_USER()');
+            if ($statement === false) {
+                return [];
+            }
+            $lines = $statement->fetchAll(PDO::FETCH_COLUMN);
+        } catch (Throwable $exception) {
+            return [];
+        }
+        $grants = [];
+        foreach ($lines as $line) {
+            if (is_string($line) && $line !== '') {
+                $grants[] = $line;
+            }
+        }
+
+        return $grants;
+    }
+
+    /**
+     * @param list<string> $lines
+     */
+    private static function grantsAllowDedicatedDatabase(array $lines, string $database): bool
+    {
+        foreach ($lines as $line) {
+            $tokens = self::privilegeTokensOnDatabase($line, $database);
+            if ($tokens === null) {
+                continue;
+            }
+            if (in_array('ALL PRIVILEGES', $tokens, true) || in_array('ALL', $tokens, true)) {
+                return true;
+            }
+            if (array_diff(self::DEDICATED_PRIVILEGES, $tokens) === []) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @return list<string>|null
+     */
+    private static function privilegeTokensOnDatabase(string $line, string $database): ?array
+    {
+        $patterns = [
+            '/^GRANT\s+(.+?)\s+ON\s+`([^`]+)`\.\*\s+TO\s+/i',
+            '/^GRANT\s+(.+?)\s+ON\s+([A-Za-z0-9_]+)\.\*\s+TO\s+/i',
+        ];
+        foreach ($patterns as $pattern) {
+            if (preg_match($pattern, $line, $match) === 1 && $match[2] === $database) {
+                return self::privilegeTokens($match[1]);
+            }
+        }
+
+        return null;
+    }
+
+    private static function schemaObjectCount(PDO $pdo, string $schema): int
+    {
+        $queries = [
+            'SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = :schema',
+            'SELECT COUNT(*) FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA = :schema',
+            'SELECT COUNT(*) FROM information_schema.ROUTINES WHERE ROUTINE_SCHEMA = :schema',
+            'SELECT COUNT(*) FROM information_schema.EVENTS WHERE EVENT_SCHEMA = :schema',
+        ];
+        $total = 0;
+        foreach ($queries as $sql) {
+            $statement = $pdo->prepare($sql);
+            $statement->execute(['schema' => $schema]);
+            $total += (int) $statement->fetchColumn();
+        }
+
+        return $total;
+    }
+
+    private static function clearDedicatedDatabase(PDO $target, string $liveName): bool
+    {
+        try {
+            $current = self::currentDatabase($target);
+            $configured = self::configuredRestoreName();
+            if ($configured === '' || $current !== $configured || $current === $liveName) {
+                return false;
+            }
+            $target->exec('SET FOREIGN_KEY_CHECKS=0');
+            self::dropIdentified(
+                $target,
+                'DROP TRIGGER %s',
+                self::schemaNames($target, 'SELECT TRIGGER_NAME FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA = :schema', $current)
+            );
+            self::dropIdentified(
+                $target,
+                'DROP VIEW %s',
+                self::schemaNames($target, "SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = :schema AND TABLE_TYPE = 'VIEW'", $current)
+            );
+            self::dropIdentified(
+                $target,
+                'DROP TABLE %s',
+                self::schemaNames($target, "SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = :schema AND TABLE_TYPE = 'BASE TABLE'", $current)
+            );
+            $routines = $target->prepare(
+                'SELECT ROUTINE_TYPE, ROUTINE_NAME FROM information_schema.ROUTINES WHERE ROUTINE_SCHEMA = :schema'
+            );
+            $routines->execute(['schema' => $current]);
+            foreach ($routines->fetchAll(PDO::FETCH_ASSOC) as $row) {
+                $type = (string) ($row['ROUTINE_TYPE'] ?? '');
+                if ($type !== 'PROCEDURE' && $type !== 'FUNCTION') {
+                    return false;
+                }
+                $target->exec('DROP ' . $type . ' ' . self::ident((string) $row['ROUTINE_NAME']));
+            }
+            self::dropIdentified(
+                $target,
+                'DROP EVENT %s',
+                self::schemaNames($target, 'SELECT EVENT_NAME FROM information_schema.EVENTS WHERE EVENT_SCHEMA = :schema', $current)
+            );
+            $target->exec('SET FOREIGN_KEY_CHECKS=1');
+
+            return self::schemaObjectCount($target, $current) === 0;
+        } catch (Throwable $exception) {
+            return false;
+        }
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function schemaNames(PDO $pdo, string $sql, string $schema): array
+    {
+        $statement = $pdo->prepare($sql);
+        $statement->execute(['schema' => $schema]);
+        $names = [];
+        foreach ($statement->fetchAll(PDO::FETCH_COLUMN) as $name) {
+            if (!is_string($name) || $name === '') {
+                throw new RuntimeException('BACKUP_IDENTIFIER_REJECTED');
+            }
+            $names[] = self::bareIdent($name);
+        }
+
+        return $names;
+    }
+
+    /**
+     * @param list<string> $names
+     */
+    private static function dropIdentified(PDO $pdo, string $template, array $names): void
+    {
+        foreach ($names as $name) {
+            $pdo->exec(sprintf($template, self::ident($name)));
+        }
     }
 
     private static function serverPdo(string $dsn, string $username, string $password): PDO

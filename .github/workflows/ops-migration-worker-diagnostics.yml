@@ -306,6 +306,49 @@ jobs:
             echo "API_ERROR_LOG_EXISTS=NO"
           fi
 
+          # 10) Full-backup evidence is counts and reason codes. The SQL dump
+          # stays on the server and is never fetched or printed.
+          emit_full_backup_evidence_fields() {
+            local evidence="$1"
+            emit_bounded() {
+              local label="$1"
+              local raw="$2"
+              local pattern="$3"
+              if [[ "$raw" =~ $pattern ]]; then
+                printf '%s=%s\n' "$label" "$raw"
+              else
+                printf '%s=REDACTED\n' "$label"
+              fi
+            }
+            emit_bounded FULL_BACKUP_EVIDENCE_RESULT "$(jq -r '.result // "NONE"' "$evidence" 2>/dev/null || echo NONE)" '^(PASS|FAIL)$'
+            emit_bounded FULL_BACKUP_EVIDENCE_FAILURE_REASON "$(jq -r 'if .failure_reason == null then "NONE" else .failure_reason end' "$evidence" 2>/dev/null || echo NONE)" '^(NONE|[A-Z][A-Z0-9_]{2,100})$'
+            emit_bounded FULL_BACKUP_EVIDENCE_RESTORE_PRIVILEGE "$(jq -r '.restore_privilege // "NONE"' "$evidence" 2>/dev/null || echo NONE)" '^(VERIFIED|ABSENT|UNPROVEN|UNREADABLE|PRESENT)$'
+            emit_bounded FULL_BACKUP_EVIDENCE_RESTORE_VERIFIED "$(jq -r 'if .restore_verified == true then "true" elif .restore_verified == false then "false" else "NONE" end' "$evidence" 2>/dev/null || echo NONE)" '^(true|false)$'
+            emit_bounded FULL_BACKUP_EVIDENCE_READBACK "$(jq -r '.readback // "NONE"' "$evidence" 2>/dev/null || echo NONE)" '^(VERIFIED|FAILED)$'
+            emit_bounded FULL_BACKUP_EVIDENCE_LEDGER_TIP "$(jq -r '.ledger_tip // "NONE"' "$evidence" 2>/dev/null || echo NONE)" '^[0-9]{3}$'
+            emit_bounded FULL_BACKUP_EVIDENCE_YETKI_SCHEMA "$(jq -r '.yetki_schema // "NONE"' "$evidence" 2>/dev/null || echo NONE)" '^(ABSENT|PRESENT|PARTIAL|UNKNOWN)$'
+            emit_bounded FULL_BACKUP_EVIDENCE_RESTORE_TARGET "$(jq -r '.restore_target // "NONE"' "$evidence" 2>/dev/null || echo NONE)" '^(TEMPORARY|DEDICATED|NONE)$'
+            emit_bounded FULL_BACKUP_EVIDENCE_SCHEMA_MISMATCH_COUNT "$(jq -r '.schema_mismatch_count // "NONE"' "$evidence" 2>/dev/null || echo NONE)" '^[0-9]{1,12}$'
+            emit_bounded FULL_BACKUP_EVIDENCE_CONTENT_MISMATCH_COUNT "$(jq -r '.content_mismatch_count // "NONE"' "$evidence" 2>/dev/null || echo NONE)" '^[0-9]{1,12}$'
+            emit_bounded FULL_BACKUP_EVIDENCE_DEFINITION_MISMATCH_COUNT "$(jq -r '.definition_mismatch_count // "NONE"' "$evidence" 2>/dev/null || echo NONE)" '^[0-9]{1,12}$'
+            emit_bounded FULL_BACKUP_EVIDENCE_GENERATED_AT "$(jq -r '.generated_at // "NONE"' "$evidence" 2>/dev/null || echo NONE)" '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$'
+            if jq -e 'has("request_id")' "$evidence" >/dev/null 2>&1; then
+              echo "FULL_BACKUP_EVIDENCE_REQUEST_ID_PRESENT=YES"
+            else
+              echo "FULL_BACKUP_EVIDENCE_REQUEST_ID_PRESENT=NO"
+            fi
+          }
+          if grep -q "/full-backup-evidence.json$" "${WORK}/control-dir.txt"; then
+            if run_cpanel_ftp "get api/runtime/migration-control/full-backup-evidence.json -o ${WORK}/full-backup-evidence.json;"; then
+              echo "FULL_BACKUP_EVIDENCE_EXISTS=YES"
+              emit_full_backup_evidence_fields "${WORK}/full-backup-evidence.json"
+            else
+              echo "FULL_BACKUP_EVIDENCE_EXISTS=UNREADABLE"
+            fi
+          else
+            echo "FULL_BACKUP_EVIDENCE_EXISTS=NO"
+          fi
+
           echo "DIAGNOSTICS_RESULT=COLLECTED"
 
       - name: Run read-only migration preflight on production

@@ -106,7 +106,7 @@ final class MigrationExecutionService
 
             // The backup and preflight owners already throw canonical reason codes;
             // re-deriving them from prose would lose which guard actually failed.
-            if (preg_match('/^(BACKUP|PREFLIGHT)_[A-Z0-9_]{1,48}$/', $e->getMessage()) === 1) {
+            if (preg_match('/^(BACKUP|PREFLIGHT|RESTORE|FULL_BACKUP|FULL_DATABASE)_[A-Z0-9_]{1,80}$/', $e->getMessage()) === 1) {
                 return $e->getMessage();
             }
             if (

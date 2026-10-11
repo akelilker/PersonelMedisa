@@ -337,6 +337,16 @@ try {
             $hassasKacak[] = 'iptal:' . $hp;
         }
     }
+    $bildirimOnay = 'genel_yonetici_bildirim_onayi.approve';
+    $bildirimId = (int) $one($pdo, 'SELECT id FROM user_yetki_istisnalari WHERE user_id=2 AND permission=? AND etki=\'DENY\' AND iptal_edildi_at IS NULL', [$bildirimOnay]);
+    ywAssert(in_array($bildirimOnay, R::NON_GRANTABLE_PERMISSIONS, true)
+        && $eff(1, $bildirimOnay)
+        && $bildirimId > 0
+        && !$eff(2, $bildirimOnay)
+        && ywTry(fn () => Y::ver($pdo, $actor(6), 2, ['permission' => $bildirimOnay, 'etki' => 'ALLOW', 'gerekce' => 'bildirim onay'])) === Y::CODE_VERILEMEZ
+        && ywTry(fn () => Y::iptal($pdo, $actor(6), 2, $bildirimId, 'bildirim onay ac')) === Y::CODE_HASSAS_BASLANGIC
+        && !$eff(2, $bildirimOnay),
+        'P4: genel yönetici bildirim onayı ALLOW ile verilmez ve başlangıç kısıtı kalkmaz');
     $ucretId = (int) $one($pdo, "SELECT id FROM user_yetki_istisnalari WHERE user_id=2 AND permission='personeller.ucret.manage' AND etki='DENY' AND iptal_edildi_at IS NULL");
     $manuel = ywTry(fn () => Y::ver($pdo, $actor(6), 1, ['permission' => 'sgk_karar_paketi.approve', 'etki' => 'DENY', 'gerekce' => 'gecici']));
     $manuelId = str_starts_with($manuel, 'OK:') ? (int) (json_decode(substr($manuel, 3), true)['istisna_id'] ?? 0) : 0;

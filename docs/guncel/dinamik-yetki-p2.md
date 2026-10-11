@@ -20,7 +20,7 @@ K1/K3/K5 kuralları ve son-yetki-yöneticisi koruması P3'tedir.
     mevcut org kapsamındaysa geçerli.
   - Süre değerlendirme anında kontrol edilir.
   - Kırmızı liste (kalıcı sil, yönetim paneli manage, yetki yönetimi, SGK/bordro final onayı,
-    GY onayı, legal hold, imha) ALLOW ile verilemez. GY sistem hakları DENY ile kapatılamaz.
+    GY onayı, GY bildirim onayı, legal hold, imha) ALLOW ile verilemez. GY sistem hakları DENY ile kapatılamaz.
 - Okuma uçları: `GET /auth/yetkiler`, `GET /yonetim/kullanicilar/{id}/yetkiler`
   (`kullanici_yetkileri.view`), `GET /yonetim/yetki-auditleri` (`kullanici_yetkileri.audit.view`).
   Login yanıtı `user.effective_permissions` taşır.

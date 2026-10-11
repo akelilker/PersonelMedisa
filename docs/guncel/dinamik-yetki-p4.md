@@ -25,4 +25,4 @@ Personel düzenleme, rol adına bakıp yazmayı açmaz. Etkin izin esastır. Bö
 - Yetki ekranı ve yönetici gelen kutusu P5.
 
 ## Hassas yetki
-Kırmızı listedeki izinler (SGK nihai onayı, bordro kesinleştirme, genel yönetici onayı, hukuki bekletme, imha) kişiye özel ALLOW ile verilemez (P2). Kısıtlı başlayan Genel Yöneticide bunlar başlangıç DENY kaydıdır. Normal iptal ucu bu kaydı kaldırmaz; yetki geri gelmez. Tam yetkili yöneticide sonradan konmuş aynı iznin DENY kaydı (başlangıç kaydı değil) iptal edilebilir. Rol değişince tüm istisnalar, başlangıç kayıtları dahil, eskisi gibi kapanır.
+Kırmızı listedeki izinler (SGK nihai onayı, bordro kesinleştirme, genel yönetici onayı, genel yönetici bildirim onayı, hukuki bekletme, imha) kişiye özel ALLOW ile verilemez (P2). Kısıtlı başlayan Genel Yöneticide bunlar başlangıç DENY kaydıdır. Normal iptal ucu bu kaydı kaldırmaz; yetki geri gelmez. Tam yetkili yöneticide sonradan konmuş aynı iznin DENY kaydı (başlangıç kaydı değil) iptal edilebilir. Rol değişince tüm istisnalar, başlangıç kayıtları dahil, eskisi gibi kapanır.

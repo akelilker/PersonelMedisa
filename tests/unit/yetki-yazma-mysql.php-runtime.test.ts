@@ -45,6 +45,7 @@ describe("Dinamik yetki P3 — yazma kuralları (MariaDB)", () => {
       "[PASS] P4: başka aktif GY yokken atama tam yetkili",
       "[PASS] P4: yalnız pasif GY varken ilk aktif yönetici tam yetkili",
       "[PASS] P4: başka şirkete bağlanan yeni GY, sistemde aktif GY varken kısıtlı başlar",
+      "[PASS] P4: genel yönetici bildirim onayı ALLOW ile verilmez ve başlangıç kısıtı kalkmaz",
       "[PASS] P4: hassas başlangıç kısıtı kalkmaz; operasyonel yazma açılır; tam yetkili GY korunur. Sapma: ",
       "[PASS] 100 uygulanmamış: mevcut GY işlemleri rol varsayılanıyla sürer, kısıt uygulanmaz"
     ]) {

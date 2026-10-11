@@ -76,10 +76,10 @@ epiAssert(R::resolveForSube($subeAllow, $extra, 1), '11 şube ALLOW kapsam için
 epiAssert(!R::resolveForSube($subeAllow, 'finans.view', 9), '12 ALLOW kapsamı genişletmez (kapsam dışı şube 9)');
 foreach (R::NON_GRANTABLE_PERMISSIONS as $red) {
     if (R::resolve($muh + ['yetki_istisnalari' => [epiRow($red, 'ALLOW')]], $red)) {
-        epiAssert(false, '13 kırmızı liste ALLOW yok sayılır: ' . $red);
+        epiAssert(false, 'kırmızı liste ALLOW yok sayılır: ' . $red);
     }
 }
-epiAssert(true, '13 kırmızı liste izinleri ALLOW ile verilemez (' . count(R::NON_GRANTABLE_PERMISSIONS) . ' izin)');
+epiAssert(true, 'kırmızı liste izinleri ALLOW ile verilemez (' . count(R::NON_GRANTABLE_PERMISSIONS) . ' izin)');
 
 // Süre (değerlendirme anında)
 epiAssert(!R::resolve($muh + ['yetki_istisnalari' => [epiRow($extra, 'ALLOW', null, '2026-01-01 00:00:00', '2026-10-11 12:00:00')]], $extra), '14 bitişi geçmiş ALLOW geçersiz (bitiş anı dahil)');

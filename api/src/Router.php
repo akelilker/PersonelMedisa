@@ -1076,6 +1076,12 @@ class Router
         if ($method === 'GET' && preg_match('#^/yonetim/kullanicilar/(\d+)/yetkiler$#', $path, $matches)) {
             KullaniciYetkiController::kullaniciYetkileri($this->request, $matches[1]);
         }
+        if ($method === 'POST' && preg_match('#^/yonetim/kullanicilar/(\d+)/yetkiler$#', $path, $matches)) {
+            KullaniciYetkiController::yetkiVer($this->request, $matches[1]);
+        }
+        if ($method === 'POST' && preg_match('#^/yonetim/kullanicilar/(\d+)/yetkiler/(\d+)/iptal$#', $path, $matches)) {
+            KullaniciYetkiController::yetkiIptal($this->request, $matches[1], $matches[2]);
+        }
         if ($path === '/yonetim/yetki-auditleri' && $method === 'GET') {
             KullaniciYetkiController::yetkiAuditleri($this->request);
         }

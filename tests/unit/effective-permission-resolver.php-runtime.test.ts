@@ -7,20 +7,24 @@ import { describe, expect, it } from "vitest";
 const root = process.cwd();
 
 describe("EffectivePermissionResolver eşdeğerlik", () => {
-  it("P2: istisna yazan yol yok ve şube kapsamlı istisnalar kapalı", () => {
+  it("P3: istisna yalnız KullaniciYetkiYazmaService ile yazılır, yalnız GLOBAL; şube istisnaları kapalı", () => {
     const read = (p: string) => readFileSync(resolve(root, p), "utf8");
     expect(read("api/src/Auth/EffectivePermissionResolver.php")).toContain("public const SUBE_ISTISNALARI_ETKIN = false;");
     const router = read("api/src/Router.php");
-    for (const line of router.split(/\r?\n/).filter((l) => /yetkiler|yetki-auditleri|KullaniciYetkiController/.test(l) && /\$method/.test(l))) {
-      expect(line).toContain("'GET'");
+    const yetkiRoutes = router.split(/\r?\n/).filter((l) => /yetkiler|yetki-auditleri/.test(l) && /\$method/.test(l));
+    for (const line of yetkiRoutes.filter((l) => !l.includes("'GET'"))) {
+      expect(line).toMatch(/'POST'.*(\/yetkiler\$#|\/yetkiler\/\(\\d\+\)\/iptal\$#)/);
     }
-    const writes = /(INSERT\s+(IGNORE\s+)?INTO|UPDATE|REPLACE\s+INTO|DELETE\s+FROM)\s+`?user_yetki_(istisnalari|auditleri)/i;
+    const writes = /(INSERT\s+(IGNORE\s+)?INTO|UPDATE|REPLACE\s+INTO|DELETE\s+FROM)\s+(`?user_yetki_(istisnalari|auditleri)|'\s*\.\s*UserYetkiIstisnaSchema::)/i;
     const scan = (dir: string): string[] =>
       readdirSync(resolve(root, dir), { withFileTypes: true }).flatMap((e) =>
         e.isDirectory() ? scan(`${dir}/${e.name}`) : /\.(php|sql)$/.test(e.name) ? [`${dir}/${e.name}`] : []
       );
-    const offenders = ["api/src", "api/bin", "api/migrations"].flatMap(scan).filter((f) => writes.test(read(f)));
-    expect(offenders).toEqual([]);
+    const writers = ["api/src", "api/bin", "api/migrations"].flatMap(scan).filter((f) => writes.test(read(f)));
+    expect(writers).toEqual(["api/src/Services/Auth/KullaniciYetkiYazmaService.php"]);
+    const service = read("api/src/Services/Auth/KullaniciYetkiYazmaService.php");
+    expect(service).toContain("VALUES (:u, :hu, :p, :e, NULL,");
+    expect(service).toContain("CODE_SUBE_KAPALI");
   });
   it("kişiye özel istisna kuralları (DENY > ALLOW, global DENY, süre, kapsam, kırmızı liste)", () => {
     const php = process.platform === "win32"

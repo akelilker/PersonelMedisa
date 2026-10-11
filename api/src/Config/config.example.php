@@ -6,6 +6,10 @@ return [
     'app_env' => 'production',
     'db_host' => 'localhost',
     'db_name' => 'karmotor_medisa',
+    // Empty keeps the temporary sibling database, which needs global CREATE and DROP.
+    // A name here is a pre-created empty restore database on this server only.
+    // It is never read from a request or a workflow parameter.
+    'db_restore_name' => '',
     'db_user' => 'CHANGE_ME_DB_USER',
     'db_password' => 'CHANGE_ME_DB_PASSWORD',
     'jwt_secret' => 'CHANGE_ME_JWT_SECRET_MIN_32_CHARS',

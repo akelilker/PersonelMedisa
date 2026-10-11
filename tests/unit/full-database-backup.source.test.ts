@@ -47,6 +47,25 @@ describe("tam veritabanı yedeği kontrol düzlemi", () => {
     expect(failedBranch).not.toMatch(/\b(get|put|mget|mput)\s+[^\n]*\.sql/);
   });
 
+  it("hazır geri yükleme adını istekten okumaz ve dolu hedefi silmez", () => {
+    const service = read("api/src/Database/FullDatabaseBackupService.php");
+    const worker = read("api/bin/cpanel-migration-cron.php");
+    expect(service).toContain("medisa_config('db_restore_name', '')");
+    expect(service).toContain("RESTORE_TARGET_OCCUPIED");
+    expect(service).toContain("clearDedicatedDatabase");
+    expect(service).not.toContain("DROP DATABASE " + "self::ident($configured)");
+    expect(workflow).not.toContain("db_restore_name");
+    expect(worker).toContain("\$stage === 'FULL_DATABASE_BACKUP'");
+    const classifier = read("api/src/Database/MigrationExecutionService.php");
+    expect(classifier).toContain("RESTORE|FULL_BACKUP|FULL_DATABASE");
+    const capture = service.slice(
+      service.indexOf("public static function capture"),
+      service.indexOf("public static function restoreInto")
+    );
+    expect(capture.indexOf("RESTORE_DATABASE_CLEANUP_FAILED")).toBeGreaterThan(0);
+    expect(capture.indexOf("RESTORE_DATABASE_CLEANUP_FAILED")).toBeLessThan(capture.indexOf("return $evidence"));
+  });
+
   it("migration 100 APPLY öncesinde yedeği sunucuda yeniden kontrol eder", () => {
     const backupStage = worker.indexOf("$stage = 'BACKUP';");
     const gate = worker.indexOf("$stage = 'FULL_BACKUP_GATE';");

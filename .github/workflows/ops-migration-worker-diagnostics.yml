@@ -327,6 +327,7 @@ jobs:
             emit_bounded FULL_BACKUP_EVIDENCE_READBACK "$(jq -r '.readback // "NONE"' "$evidence" 2>/dev/null || echo NONE)" '^(VERIFIED|FAILED)$'
             emit_bounded FULL_BACKUP_EVIDENCE_LEDGER_TIP "$(jq -r '.ledger_tip // "NONE"' "$evidence" 2>/dev/null || echo NONE)" '^[0-9]{3}$'
             emit_bounded FULL_BACKUP_EVIDENCE_YETKI_SCHEMA "$(jq -r '.yetki_schema // "NONE"' "$evidence" 2>/dev/null || echo NONE)" '^(ABSENT|PRESENT|PARTIAL|UNKNOWN)$'
+            emit_bounded FULL_BACKUP_EVIDENCE_RESTORE_TARGET "$(jq -r '.restore_target // "NONE"' "$evidence" 2>/dev/null || echo NONE)" '^(TEMPORARY|DEDICATED|NONE)$'
             emit_bounded FULL_BACKUP_EVIDENCE_SCHEMA_MISMATCH_COUNT "$(jq -r '.schema_mismatch_count // "NONE"' "$evidence" 2>/dev/null || echo NONE)" '^[0-9]{1,12}$'
             emit_bounded FULL_BACKUP_EVIDENCE_CONTENT_MISMATCH_COUNT "$(jq -r '.content_mismatch_count // "NONE"' "$evidence" 2>/dev/null || echo NONE)" '^[0-9]{1,12}$'
             emit_bounded FULL_BACKUP_EVIDENCE_DEFINITION_MISMATCH_COUNT "$(jq -r '.definition_mismatch_count // "NONE"' "$evidence" 2>/dev/null || echo NONE)" '^[0-9]{1,12}$'

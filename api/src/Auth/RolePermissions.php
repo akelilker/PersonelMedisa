@@ -620,6 +620,38 @@ class RolePermissions
     }
 
     /**
+     * Operasyonel okuma: kaydı değiştirmez. Yeni Genel Yönetici bu izinleri rolünden korur.
+     * view / view_* / history / export / download okumadır; manage, approve, create vb. değildir.
+     */
+    public static function isGenelYoneticiOkumaIzni(string $permission): bool
+    {
+        return (bool) preg_match('/(?:^|\.)view(?:$|[._])|\.history$|\.export$|\.download$/', $permission);
+    }
+
+    /**
+     * Sonradan atanan Genel Yöneticide kapatılan operasyonel yazmalar.
+     * Rol varsayılanından gelir; sistem/yetki yönetimi (GY_NON_DENYABLE) ve okuma hariç.
+     * Mevcut Genel Yöneticinin matrisi değişmez — kısıt yalnız atama anındaki DENY kaydıdır.
+     *
+     * @return array<int, string>
+     */
+    public static function genelYoneticiOperasyonelYazmaIzinleri(): array
+    {
+        $out = [];
+        foreach (self::roleDefaultPermissions('GENEL_YONETICI') as $permission) {
+            if (in_array($permission, EffectivePermissionResolver::GY_NON_DENYABLE_PERMISSIONS, true)) {
+                continue;
+            }
+            if (self::isGenelYoneticiOkumaIzni($permission)) {
+                continue;
+            }
+            $out[] = $permission;
+        }
+
+        return $out;
+    }
+
+    /**
      * Normalize edilmiş rolün varsayılan izinleri (türetilmiş IK_PERSONELI dahil).
      * Bilinmeyen rol → boş liste.
      *

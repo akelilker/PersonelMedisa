@@ -188,6 +188,10 @@ final class KullaniciYetkiYazmaService
      * (ROL_DEGISTI) ve her biri audit'lenir. GY'ye atama ise atayan PROFIL_DEGISTI ile kaydedilir (K3).
      * Migration 100 uygulanmamışsa sessizce 0 döner (davranış değişmez).
      *
+     * P4: şema varken, başka bir Genel Yönetici kaydı varken yapılan yeni atama operasyonel
+     * yazmaları DENY ile kapatır (okuma ve yetki yönetimi kalır). Şirketin ilk Genel Yöneticisi
+     * (başka GY satırı yok) tam kalır. Mevcut GY satırlarına geriye dönük DENY yazılmaz.
+     *
      * @param array<string, mixed> $actor
      */
     public static function rolDegisti(PDO $pdo, array $actor, int $hedefId, string $eskiRol, string $yeniRol): int
@@ -234,16 +238,85 @@ final class KullaniciYetkiYazmaService
             ]);
         }
         if ($yeni === self::ROL_GY && $eski !== self::ROL_GY) {
+            // İlk yönetici: sistemde bu hesaptan başka GY yok. Sonraki atamalar kısıtlı başlar.
+            $kisitli = self::baskaGenelYoneticiVar($pdo, $hedefId);
             self::audit($pdo, 'PROFIL_DEGISTI', $aktor, $hedef, $yeni, [
                 'istisna_id' => null, 'permission' => null, 'etki' => null,
                 'gecerlilik_baslangic' => null, 'gecerlilik_bitis' => null,
                 'onceki_json' => ['rol' => $eski !== '' ? $eski : null],
-                'sonraki_json' => ['rol' => $yeni, 'gy_atamasi' => true],
+                'sonraki_json' => [
+                    'rol' => $yeni,
+                    'gy_atamasi' => true,
+                    'operasyonel_profil' => $kisitli ? 'KISITLI' : 'TAM',
+                ],
                 'gerekce' => 'Genel Yönetici ataması', 'uyarilar' => [], 'request_id' => null,
             ]);
+            if ($kisitli) {
+                self::operasyonelBaslangicKisitlari($pdo, $aktor, $hedef);
+            }
         }
 
         return count($rows);
+    }
+
+    /** Başka bir Genel Yönetici kaydı var mı (aktif/pasif). Hedefin kendi satırı sayılmaz. */
+    private static function baskaGenelYoneticiVar(PDO $pdo, int $hedefId): bool
+    {
+        $stmt = $pdo->prepare(
+            "SELECT id FROM users WHERE rol = 'GENEL_YONETICI' AND id <> :id LIMIT 1" . self::forUpdate($pdo)
+        );
+        $stmt->execute(['id' => $hedefId]);
+
+        return $stmt->fetchColumn() !== false;
+    }
+
+    /**
+     * Yeni GY başlangıcı: operasyonel yazma izinlerine kalıcı global DENY.
+     * ALLOW ile verilmez; başka GY ilgili DENY kaydını iptal ederek açar.
+     *
+     * @param array{id: int, username: string, actor_identity_id: int|null} $aktor
+     * @param array{id: int, username: string, actor_identity_id?: int|null} $hedef
+     */
+    private static function operasyonelBaslangicKisitlari(PDO $pdo, array $aktor, array $hedef): void
+    {
+        $baslangic = gmdate('Y-m-d H:i:s');
+        $gerekce = 'Yeni Genel Yönetici başlangıcı: operasyonel işlemler yalnız görüntüleme. Ek yazma izni başka bir Genel Yönetici tarafından açılır.';
+        $ins = $pdo->prepare(
+            'INSERT INTO ' . UserYetkiIstisnaSchema::TABLE . ' (user_id, hedef_username_snapshot, permission, etki, sube_id,
+                gecerlilik_baslangic, gecerlilik_bitis, veren_user_id, veren_username_snapshot, veren_actor_identity_id,
+                hedef_rol_snapshot, gerekce)
+             VALUES (:u, :hu, :p, \'DENY\', NULL, :b, NULL, :v, :vu, :vk, :hr, :g)'
+        );
+        foreach (RolePermissions::genelYoneticiOperasyonelYazmaIzinleri() as $permission) {
+            $ins->execute([
+                'u' => (int) $hedef['id'],
+                'hu' => (string) $hedef['username'],
+                'p' => $permission,
+                'b' => $baslangic,
+                'v' => (int) $aktor['id'],
+                'vu' => (string) $aktor['username'],
+                'vk' => $aktor['actor_identity_id'] ?? null,
+                'hr' => self::ROL_GY,
+                'g' => $gerekce,
+            ]);
+            self::audit($pdo, 'VER', $aktor, $hedef, self::ROL_GY, [
+                'istisna_id' => (int) $pdo->lastInsertId(),
+                'permission' => $permission,
+                'etki' => 'DENY',
+                'gecerlilik_baslangic' => $baslangic,
+                'gecerlilik_bitis' => null,
+                'onceki_json' => null,
+                'sonraki_json' => [
+                    'permission' => $permission,
+                    'etki' => 'DENY',
+                    'kapsam' => 'GLOBAL',
+                    'kaynak' => 'GY_BASLANGIC_PROFILI',
+                ],
+                'gerekce' => $gerekce,
+                'uyarilar' => [],
+                'request_id' => null,
+            ]);
+        }
     }
 
     // ---- kurallar ----------------------------------------------------------------------

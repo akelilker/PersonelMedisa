@@ -496,10 +496,11 @@ final class RolePermissionsBridge
     /** @param array<string, mixed> $user */
     public static function canWritePersonel(array $user): bool
     {
+        // GENEL_YONETICI rol adı tek başına yazma açmaz; etkin izin (DENY dahil) esastır.
         return \Medisa\Api\Auth\RolePermissions::has($user, 'personeller.update')
             || in_array(
                 OrgScope::normalizeRole($user),
-                ['GENEL_YONETICI', 'BOLUM_YONETICISI', 'MUHASEBE'],
+                ['BOLUM_YONETICISI', 'MUHASEBE'],
                 true
             );
     }

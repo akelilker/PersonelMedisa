@@ -22,7 +22,8 @@ Durum: PR (MERGE=NO). Migration yok; migration 100 canlıya uygulanmadan yazma u
    (Kalıcı Sil aynı satırı kilitler → yarış yok).
 9. Yetenek tabanlı son yönetici: işlem sonrası en az bir aktif GY `kullanici_yetkileri.manage` + `yonetim-paneli.manage` taşımalı.
 10. Audit: her yazma tek satır (`VER`/`KALDIR`/`ROL_DEGISTI_IPTAL`/`PROFIL_DEGISTI`).
-11. K5: hedef GY ise commit sonrası diğer aktif GY'lere (aktör/hedef hariç) `personel_inbox_notifications`
+11. K5: hedef GY ise commit sonrası işlemi yapan hariç bütün aktif GY'lere bildirim gider;
+    yetkisi değiştirilen yönetici de alıcıdır. `personel_inbox_notifications`
     `kind = GY_YETKI_DEGISIKLIGI`, popup yok. Bildirim hatası işlemi geri almaz (loglanır).
 
 ## Karar 8 — rol değişikliği
@@ -45,7 +46,8 @@ Durum: PR (MERGE=NO). Migration yok; migration 100 canlıya uygulanmadan yazma u
   aynı kişi sayılamaz. Bu hesaplar kilitlenmez; aralarındaki yetki yazımı engellenmez. Koruma bu durumda eksiktir.
 
 ## K5 alıcıları
-Hedef GY + aktör dışındaki tüm aktif GY'ler. Bildirim kullanıcı bazlıdır (`personel_id` NULL);
+İşlemi yapan hariç bütün aktif Genel Yöneticiler. Yetkisi değiştirilen yönetici de alıcıdır.
+Bildirim kullanıcı bazlıdır (`personel_id` NULL);
 `/me/inbox-notifications` GY'de `puantaj.view`/`attendance.correction.decide` ile açılır (personel gerekmez).
 Not: mevcut UI gelen kutusunu yalnız personel (minimal) kabuğunda gösteriyor; yönetici kabuğunda gösterim P5.
 

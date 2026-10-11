@@ -15,16 +15,29 @@ use Throwable;
  * adds the durable snapshot used before a migration: every table, view, trigger,
  * routine and event in the current database, written outside the webroot.
  *
- * The dump is not a download. Plain FTP is the only deploy transport and must
- * never carry this file. Restore proof is an on-server sibling database, dropped
- * before the method returns. A failed restore is not a successful backup.
+ * The dump is not a download and it is not an off-server disaster-recovery
+ * copy: it never leaves the machine that holds the live database. Plain FTP is
+ * the only deploy transport and must never carry this file. Restore proof is a
+ * sibling database on that same server, dropped before the method returns.
+ * Losing the server disk loses this backup with it.
+ *
+ * The account in config is the only database account. A privilege that exists
+ * only on the live database cannot create that sibling, and the live database
+ * is never used as the restore target. There is no second administrative
+ * account to fall back to. Without global CREATE and DROP the result is FAIL.
+ *
+ * Framing is length-prefixed records (`S` + byte length + newline + SQL +
+ * newline), not a mysql-client script. Replay goes through restoreInto().
+ * See docs/guncel/tam-veritabani-yedegi.md.
  *
  * Published evidence is counts, checksums and reason codes. Row text stays in
  * the dump, which is mode 0600 and is never copied into the control-plane JSON.
  */
 final class FullDatabaseBackupService
 {
-    public const SCHEMA_VERSION = '1';
+    public const SCHEMA_VERSION = '2';
+
+    public const MAX_AGE_SECONDS = 43200;
 
     /** @var list<string> */
     private const YETKI_TABLES = [
@@ -81,8 +94,13 @@ final class FullDatabaseBackupService
         $liveName = '';
         $failed = null;
         $cleanupFailed = false;
+        $privilege = 'UNREADABLE';
 
         try {
+            $privilege = self::readSiblingPrivilege($live);
+            if ($privilege === 'ABSENT') {
+                throw new RuntimeException('RESTORE_PRIVILEGE_ABSENT');
+            }
             $directory = MigrationBackupService::operationsDirectory($apiDirectory);
             $liveName = self::currentDatabase($live);
             $tip = self::ledgerTip($live);
@@ -138,6 +156,8 @@ final class FullDatabaseBackupService
         if ($mismatches !== []) {
             return self::failure($deployedSha, $tip, 'FULL_BACKUP_RESTORE_MISMATCH', $fileName, $path, [
                 'schema_mismatch_count' => count($mismatches),
+                'content_mismatch_count' => count(array_intersect($mismatches, ['CONTENT_HASH', 'VIEW_CONTENT'])),
+                'definition_mismatch_count' => count(array_intersect($mismatches, ['DEFINITION', 'TRIGGER_BODY', 'ROUTINE_BODY'])),
             ]);
         }
 
@@ -150,7 +170,9 @@ final class FullDatabaseBackupService
             $readback,
             $yetki,
             $inventory,
-            $restored
+            $restored,
+            [],
+            $privilege
         );
         self::writeMeta($path, $evidence);
 
@@ -223,7 +245,9 @@ final class FullDatabaseBackupService
             '-- request_id: ' . self::safe($requestId),
             '-- migration_tip: ' . self::safe($tip),
             '-- created_at: ' . gmdate('Y-m-d\TH:i:s\Z'),
-            '-- framing: length-prefixed statements; not for the mysql client',
+            '-- scope: same-server verification only; not an off-server disaster-recovery copy',
+            '-- framing: length-prefixed statements; replay with FullDatabaseBackupService::restoreInto',
+            '-- restore-target: a sibling named {live}_r* ; the live database name is refused',
             '',
         ]) . "\n";
         if (fwrite($handle, $header) === false) {
@@ -352,12 +376,31 @@ final class FullDatabaseBackupService
         $rowCounts = [];
         $indexCounts = [];
         $foreignKeys = [];
+        $contentHashes = [];
+        $definitionHashes = [];
         foreach ($tables as $table) {
             $rowCounts[$table] = (int) $pdo->query('SELECT COUNT(*) FROM ' . self::ident($table))->fetchColumn();
             $indexCounts[$table] = self::countFor($pdo, 'SELECT COUNT(DISTINCT INDEX_NAME) FROM information_schema.STATISTICS
                 WHERE TABLE_SCHEMA = :schema AND TABLE_NAME = :name', $schema, $table);
             $foreignKeys[$table] = self::countFor($pdo, "SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
                 WHERE TABLE_SCHEMA = :schema AND TABLE_NAME = :name AND CONSTRAINT_TYPE = 'FOREIGN KEY'", $schema, $table);
+            $contentHashes[$table] = self::contentHash($pdo, $schema, $table);
+            $definitionHashes['TABLE:' . $table] = hash('sha256', self::showCreate($pdo, 'TABLE', $table));
+        }
+        $viewContentHashes = [];
+        foreach ($views as $view) {
+            $viewContentHashes[$view] = self::contentHash($pdo, $schema, $view);
+            $definitionHashes['VIEW:' . $view] = hash('sha256', self::showCreate($pdo, 'VIEW', $view));
+        }
+        foreach ($triggers as $trigger) {
+            $definitionHashes['TRIGGER:' . $trigger] = hash('sha256', self::showCreate($pdo, 'TRIGGER', $trigger));
+        }
+        foreach ($routines as $routine) {
+            $parts = explode(':', $routine, 2);
+            $definitionHashes['ROUTINE:' . $routine] = hash('sha256', self::showCreate($pdo, $parts[0], $parts[1]));
+        }
+        foreach ($events as $event) {
+            $definitionHashes['EVENT:' . $event] = hash('sha256', self::showCreate($pdo, 'EVENT', $event));
         }
 
         return [
@@ -369,6 +412,11 @@ final class FullDatabaseBackupService
             'row_counts' => $rowCounts,
             'index_counts' => $indexCounts,
             'foreign_key_counts' => $foreignKeys,
+            'content_hashes' => $contentHashes,
+            'view_content_hashes' => $viewContentHashes,
+            'definition_hashes' => $definitionHashes,
+            'trigger_bodies' => self::triggerBodies($pdo, $schema),
+            'routine_bodies' => self::routineBodies($pdo, $schema),
         ];
     }
 
@@ -394,8 +442,33 @@ final class FullDatabaseBackupService
         if ($actual['foreign_key_counts'] !== $inventory['foreign_key_counts']) {
             $mismatches[] = 'FOREIGN_KEY_COUNT';
         }
+        if (($actual['content_hashes'] ?? null) !== ($inventory['content_hashes'] ?? null)) {
+            $mismatches[] = 'CONTENT_HASH';
+        }
+        if (($actual['view_content_hashes'] ?? null) !== ($inventory['view_content_hashes'] ?? null)) {
+            $mismatches[] = 'VIEW_CONTENT';
+        }
+        if (($actual['definition_hashes'] ?? null) !== ($inventory['definition_hashes'] ?? null)) {
+            $mismatches[] = 'DEFINITION';
+        }
+        if (($actual['trigger_bodies'] ?? null) !== ($inventory['trigger_bodies'] ?? null)) {
+            $mismatches[] = 'TRIGGER_BODY';
+        }
+        if (($actual['routine_bodies'] ?? null) !== ($inventory['routine_bodies'] ?? null)) {
+            $mismatches[] = 'ROUTINE_BODY';
+        }
 
         return $mismatches;
+    }
+
+    /**
+     * Mismatch codes only. No row text and no object definitions.
+     *
+     * @return list<string>
+     */
+    public static function mismatchCodes(PDO $source, PDO $restored): array
+    {
+        return self::compare($restored, self::inventory($source));
     }
 
     /**
@@ -591,7 +664,8 @@ final class FullDatabaseBackupService
         array $yetki,
         array $source,
         array $restored,
-        array $extra = []
+        array $extra = [],
+        string $privilege = 'UNREADABLE'
     ): array {
         $sourceRows = array_sum($source['row_counts'] ?? []);
         $restoredRows = array_sum($restored['row_counts'] ?? []);
@@ -621,6 +695,9 @@ final class FullDatabaseBackupService
             'restore_table_count' => count($restored['tables'] ?? []),
             'restore_total_rows' => $restoredRows,
             'schema_mismatch_count' => (int) ($extra['schema_mismatch_count'] ?? 0),
+            'content_mismatch_count' => (int) ($extra['content_mismatch_count'] ?? 0),
+            'definition_mismatch_count' => (int) ($extra['definition_mismatch_count'] ?? 0),
+            'restore_privilege' => self::publishedPrivilege($result, $reason, $privilege),
             'yetki_schema' => $yetki['state'],
             'yetki_tables_present' => $yetki['tables_present'],
             'yetki_triggers_present' => $yetki['triggers_present'],
@@ -639,6 +716,332 @@ final class FullDatabaseBackupService
             LOCK_EX
         );
         @chmod($path . '.meta.json', 0600);
+    }
+
+    /**
+     * PRESENT only when SHOW GRANTS lists global CREATE and DROP.
+     * ABSENT is the cPanel-shaped account: rights on the live database, nothing global.
+     * UNREADABLE means the grant tables could not be asked; that is not VERIFIED.
+     */
+    private static function readSiblingPrivilege(PDO $account): string
+    {
+        try {
+            $statement = $account->query('SHOW GRANTS FOR CURRENT_USER()');
+            if ($statement === false) {
+                return 'UNREADABLE';
+            }
+            $lines = $statement->fetchAll(PDO::FETCH_COLUMN);
+        } catch (Throwable $exception) {
+            return 'UNREADABLE';
+        }
+
+        return self::classifyGrantLines($lines);
+    }
+
+    /**
+     * @param list<mixed> $lines
+     */
+    public static function classifyGrantLines(array $lines): string
+    {
+        return self::grantsAllowSiblingDatabase($lines) ? 'PRESENT' : 'ABSENT';
+    }
+
+    private static function publishedPrivilege(string $result, ?string $reason, string $privilege): string
+    {
+        if ($reason === 'RESTORE_PRIVILEGE_ABSENT' || $privilege === 'ABSENT') {
+            return 'ABSENT';
+        }
+        if ($result === 'PASS' && $privilege === 'PRESENT') {
+            return 'VERIFIED';
+        }
+
+        return 'UNPROVEN';
+    }
+
+    /**
+     * @param list<mixed> $lines
+     */
+    private static function grantsAllowSiblingDatabase(array $lines): bool
+    {
+        foreach ($lines as $line) {
+            if (!is_string($line)) {
+                continue;
+            }
+            if (preg_match('/^GRANT\s+(.+?)\s+ON\s+`?\*`?\.`?\*`?\s+TO\s+/i', $line, $match) !== 1) {
+                continue;
+            }
+            $tokens = self::privilegeTokens($match[1]);
+            if (in_array('ALL PRIVILEGES', $tokens, true) || in_array('ALL', $tokens, true)) {
+                return true;
+            }
+            if (in_array('CREATE', $tokens, true) && in_array('DROP', $tokens, true)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function privilegeTokens(string $clause): array
+    {
+        $clause = preg_replace('/\s+IDENTIFIED\s+BY\s+.*/i', '', $clause);
+        $parts = preg_split('/\s*,\s*/', strtoupper(trim(is_string($clause) ? $clause : '')));
+        if ($parts === false) {
+            return [];
+        }
+        $tokens = [];
+        foreach ($parts as $part) {
+            $token = trim($part);
+            if ($token !== '') {
+                $tokens[] = $token;
+            }
+        }
+
+        return $tokens;
+    }
+
+    /**
+     * Server-side gate for migration 100. GitHub's check is not this check.
+     * The dump must still be on disk, match its SHA-256, belong to this deploy
+     * and ledger tip, be inside the validity window, and the three yetki tables
+     * must still be absent at the moment APPLY would start.
+     */
+    public static function assertReadyForApply(
+        PDO $live,
+        string $apiDirectory,
+        string $controlDirectory,
+        string $deployedSha
+    ): void {
+        $evidencePath = $controlDirectory . DIRECTORY_SEPARATOR . 'full-backup-evidence.json';
+        if (!is_file($evidencePath)) {
+            throw new RuntimeException('FULL_BACKUP_EVIDENCE_MISSING');
+        }
+        $raw = file_get_contents($evidencePath);
+        $evidence = is_string($raw) ? json_decode($raw, true) : null;
+        if (!is_array($evidence)) {
+            throw new RuntimeException('FULL_BACKUP_EVIDENCE_UNREADABLE');
+        }
+        if (($evidence['schema_version'] ?? '') !== self::SCHEMA_VERSION) {
+            throw new RuntimeException('FULL_BACKUP_EVIDENCE_UNREADABLE');
+        }
+        if (($evidence['result'] ?? '') !== 'PASS') {
+            throw new RuntimeException('FULL_BACKUP_NOT_PASS');
+        }
+        if (($evidence['restore_verified'] ?? false) !== true || ($evidence['readback'] ?? '') !== 'VERIFIED') {
+            throw new RuntimeException('FULL_BACKUP_RESTORE_UNVERIFIED');
+        }
+        if (($evidence['restore_privilege'] ?? '') !== 'VERIFIED') {
+            throw new RuntimeException('RESTORE_PRIVILEGE_ABSENT');
+        }
+        if (($evidence['dump_transferred'] ?? true) !== false || ($evidence['dump_channel'] ?? '') !== 'NONE') {
+            throw new RuntimeException('FULL_BACKUP_TRANSFER_FORBIDDEN');
+        }
+        if (($evidence['outside_webroot'] ?? false) !== true) {
+            throw new RuntimeException('FULL_BACKUP_LOCATION_UNSAFE');
+        }
+        if (strtolower((string) ($evidence['deployed_sha'] ?? '')) !== strtolower($deployedSha)) {
+            throw new RuntimeException('FULL_BACKUP_DEPLOY_SHA_MISMATCH');
+        }
+        if ((string) ($evidence['ledger_tip'] ?? '') !== self::ledgerTip($live)) {
+            throw new RuntimeException('FULL_BACKUP_LEDGER_MISMATCH');
+        }
+        $generated = \DateTimeImmutable::createFromFormat(
+            '!Y-m-d\TH:i:s\Z',
+            (string) ($evidence['generated_at'] ?? ''),
+            new \DateTimeZone('UTC')
+        );
+        if (!$generated instanceof \DateTimeImmutable) {
+            throw new RuntimeException('FULL_BACKUP_STALE');
+        }
+        $age = time() - $generated->getTimestamp();
+        if ($age < 0 || $age > self::MAX_AGE_SECONDS) {
+            throw new RuntimeException('FULL_BACKUP_STALE');
+        }
+        if ((int) ($evidence['schema_mismatch_count'] ?? 1) !== 0
+            || (int) ($evidence['content_mismatch_count'] ?? 1) !== 0
+            || (int) ($evidence['definition_mismatch_count'] ?? 1) !== 0
+        ) {
+            throw new RuntimeException('FULL_BACKUP_RESTORE_MISMATCH');
+        }
+        if (($evidence['yetki_schema'] ?? '') !== 'ABSENT' || self::yetkiSchema($live)['state'] !== 'ABSENT') {
+            throw new RuntimeException('YETKI_SCHEMA_NOT_ABSENT');
+        }
+
+        $file = (string) ($evidence['backup_file'] ?? '');
+        if (preg_match('/^medisa-full-[A-Za-z0-9._-]+\.sql$/', $file) !== 1) {
+            throw new RuntimeException('FULL_BACKUP_FILE_MISSING');
+        }
+        $directory = MigrationBackupService::operationsDirectory($apiDirectory);
+        $dump = $directory . DIRECTORY_SEPARATOR . $file;
+        $realDirectory = realpath($directory);
+        $realDump = realpath($dump);
+        if ($realDirectory === false || $realDump === false || !self::pathInside($realDump, $realDirectory) || !is_file($realDump)) {
+            throw new RuntimeException('FULL_BACKUP_FILE_MISSING');
+        }
+        $hash = hash_file('sha256', $realDump);
+        $bytes = filesize($realDump);
+        $expectedHash = (string) ($evidence['backup_sha256'] ?? '');
+        if (!is_string($hash) || strlen($expectedHash) !== 64 || !hash_equals($expectedHash, $hash)) {
+            throw new RuntimeException('FULL_BACKUP_SHA_MISMATCH');
+        }
+        if ($bytes === false || $bytes !== (int) ($evidence['backup_bytes'] ?? -1)) {
+            throw new RuntimeException('FULL_BACKUP_SHA_MISMATCH');
+        }
+    }
+
+    private static function pathInside(string $file, string $directory): bool
+    {
+        $directory = rtrim(str_replace('\\', '/', $directory), '/');
+        $file = str_replace('\\', '/', $file);
+
+        return $file === $directory || strpos($file, $directory . '/') === 0;
+    }
+
+    private static function contentHash(PDO $pdo, string $schema, string $table): string
+    {
+        $columns = self::columnNames($pdo, $schema, $table);
+        if ($columns === []) {
+            throw new RuntimeException('BACKUP_SOURCE_INCOMPLETE');
+        }
+        $order = self::orderColumns($pdo, $schema, $table, $columns);
+        $sql = 'SELECT ' . implode(', ', array_map([self::class, 'ident'], $columns))
+            . ' FROM ' . self::ident($table)
+            . ' ORDER BY ' . implode(', ', array_map([self::class, 'ident'], $order));
+        $previous = $pdo->getAttribute(PDO::MYSQL_ATTR_USE_BUFFERED_QUERY);
+        $pdo->setAttribute(PDO::MYSQL_ATTR_USE_BUFFERED_QUERY, false);
+        $context = hash_init('sha256');
+        hash_update($context, implode("\x1f", $columns) . "\n");
+        try {
+            $statement = $pdo->query($sql);
+            if ($statement === false) {
+                throw new RuntimeException('BACKUP_SOURCE_INCOMPLETE');
+            }
+            while (($row = $statement->fetch(PDO::FETCH_ASSOC)) !== false) {
+                $parts = [];
+                foreach ($columns as $column) {
+                    $value = $row[$column] ?? null;
+                    if ($value === null) {
+                        $parts[] = "\\N";
+                        continue;
+                    }
+                    $quoted = $pdo->quote((string) $value);
+                    if ($quoted === false) {
+                        throw new RuntimeException('BACKUP_VALUE_UNQUOTABLE');
+                    }
+                    $parts[] = $quoted;
+                }
+                hash_update($context, implode("\x1e", $parts) . "\n");
+            }
+            $statement->closeCursor();
+        } finally {
+            $pdo->setAttribute(PDO::MYSQL_ATTR_USE_BUFFERED_QUERY, $previous);
+        }
+
+        return hash_final($context);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function columnNames(PDO $pdo, string $schema, string $table): array
+    {
+        $statement = $pdo->prepare(
+            'SELECT COLUMN_NAME FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = :schema AND TABLE_NAME = :name
+             ORDER BY ORDINAL_POSITION'
+        );
+        $statement->execute(['schema' => $schema, 'name' => $table]);
+        $names = [];
+        foreach ($statement->fetchAll(PDO::FETCH_COLUMN) as $name) {
+            if (!is_string($name) || $name === '') {
+                throw new RuntimeException('BACKUP_SOURCE_INCOMPLETE');
+            }
+            $names[] = self::bareIdent($name);
+        }
+
+        return $names;
+    }
+
+    /**
+     * @param list<string> $columns
+     * @return list<string>
+     */
+    private static function orderColumns(PDO $pdo, string $schema, string $table, array $columns): array
+    {
+        $statement = $pdo->prepare(
+            "SELECT COLUMN_NAME FROM information_schema.STATISTICS
+             WHERE TABLE_SCHEMA = :schema AND TABLE_NAME = :name AND INDEX_NAME = 'PRIMARY'
+             ORDER BY SEQ_IN_INDEX"
+        );
+        $statement->execute(['schema' => $schema, 'name' => $table]);
+        $primary = [];
+        foreach ($statement->fetchAll(PDO::FETCH_COLUMN) as $name) {
+            if (is_string($name) && $name !== '') {
+                $primary[] = self::bareIdent($name);
+            }
+        }
+
+        return $primary !== [] ? $primary : $columns;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private static function triggerBodies(PDO $pdo, string $schema): array
+    {
+        $statement = $pdo->prepare(
+            'SELECT TRIGGER_NAME, EVENT_MANIPULATION, ACTION_TIMING, ACTION_ORIENTATION, ACTION_STATEMENT
+             FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA = :schema ORDER BY TRIGGER_NAME'
+        );
+        $statement->execute(['schema' => $schema]);
+        $bodies = [];
+        foreach ($statement->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $statementText = (string) ($row['ACTION_STATEMENT'] ?? '');
+            if ($statementText === '') {
+                throw new RuntimeException('BACKUP_SOURCE_INCOMPLETE');
+            }
+            $name = self::bareIdent((string) $row['TRIGGER_NAME']);
+            $bodies[$name] = hash('sha256', implode('|', [
+                (string) $row['EVENT_MANIPULATION'],
+                (string) $row['ACTION_TIMING'],
+                (string) $row['ACTION_ORIENTATION'],
+                $statementText,
+            ]));
+        }
+
+        return $bodies;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private static function routineBodies(PDO $pdo, string $schema): array
+    {
+        $statement = $pdo->prepare(
+            'SELECT ROUTINE_TYPE, ROUTINE_NAME, ROUTINE_DEFINITION, DTD_IDENTIFIER, IS_DETERMINISTIC, SQL_DATA_ACCESS
+             FROM information_schema.ROUTINES WHERE ROUTINE_SCHEMA = :schema
+             ORDER BY ROUTINE_TYPE, ROUTINE_NAME'
+        );
+        $statement->execute(['schema' => $schema]);
+        $bodies = [];
+        foreach ($statement->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $definition = $row['ROUTINE_DEFINITION'] ?? null;
+            if (!is_string($definition) || $definition === '') {
+                throw new RuntimeException('BACKUP_SOURCE_INCOMPLETE');
+            }
+            $key = self::bareIdent((string) $row['ROUTINE_TYPE']) . ':' . self::bareIdent((string) $row['ROUTINE_NAME']);
+            $bodies[$key] = hash('sha256', implode('|', [
+                $definition,
+                (string) ($row['DTD_IDENTIFIER'] ?? ''),
+                (string) ($row['IS_DETERMINISTIC'] ?? ''),
+                (string) ($row['SQL_DATA_ACCESS'] ?? ''),
+            ]));
+        }
+
+        return $bodies;
     }
 
     private static function createRestoreDatabase(PDO $server, string $name): void

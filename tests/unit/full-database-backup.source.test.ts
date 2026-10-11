@@ -27,5 +27,23 @@ describe("tam veritabanı yedeği kontrol düzlemi", () => {
     expect(apply).not.toMatch(/\b(get|put|mget|mput)\s+[^\n]*\.sql/);
     expect(apply).toContain("FULL_BACKUP_TRANSFER_FORBIDDEN");
     expect(apply).toContain("YETKI_SCHEMA_NOT_ABSENT");
+    expect(apply).toContain("RESTORE_PRIVILEGE_ABSENT");
+    expect(workflow).toContain("restore_privilege");
+  });
+
+  it("migration 100 APPLY öncesinde yedeği sunucuda yeniden kontrol eder", () => {
+    const backupStage = worker.indexOf("$stage = 'BACKUP';");
+    const gate = worker.indexOf("$stage = 'FULL_BACKUP_GATE';");
+    const applyStage = worker.indexOf("$stage = 'APPLY';");
+    const applyCall = worker.indexOf("MigrationExecutionService::apply");
+    expect(backupStage).toBeGreaterThan(0);
+    expect(gate).toBeGreaterThan(backupStage);
+    expect(applyStage).toBeGreaterThan(gate);
+    expect(applyCall).toBeGreaterThan(applyStage);
+    const gateBlock = worker.slice(gate, applyStage);
+    expect(gateBlock).toContain("in_array('100', $pendingVersions, true)");
+    expect(gateBlock).toContain("FullDatabaseBackupService::assertReadyForApply");
+    expect(gateBlock).not.toContain("MigrationExecutionService::apply");
+    expect(worker).toContain("$stage === 'FULL_BACKUP_GATE'");
   });
 });

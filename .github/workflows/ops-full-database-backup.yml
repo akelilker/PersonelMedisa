@@ -192,6 +192,9 @@ jobs:
           restored_tables="$(jq -r '.restore_table_count // -1' "$evidence")"
           restored_rows="$(jq -r '.restore_total_rows // -1' "$evidence")"
           sha="$(jq -r '.deployed_sha // "NONE"' "$evidence")"
+          privilege="$(jq -r '.restore_privilege // "ABSENT"' "$evidence")"
+          content_mismatches="$(jq -r '.content_mismatch_count // 1' "$evidence")"
+          definition_mismatches="$(jq -r '.definition_mismatch_count // 1' "$evidence")"
           echo "FULL_BACKUP_RESULT=${result}"
           echo "FULL_BACKUP_RESTORE_VERIFIED=${restore}"
           echo "FULL_BACKUP_DUMP_TRANSFERRED=${transferred}"
@@ -202,7 +205,8 @@ jobs:
           echo "FULL_BACKUP_RESTORE_TABLE_COUNT=${restored_tables}"
           echo "FULL_BACKUP_RESTORE_TOTAL_ROWS=${restored_rows}"
           echo "FULL_BACKUP_DEPLOY_SHA=${sha}"
-          if [[ "$result" != "PASS" || "$restore" != "true" || "$transferred" != "false" || "$channel" != "NONE" || "$sha" != "$expected_sha" ]]; then
+          echo "FULL_BACKUP_RESTORE_PRIVILEGE=${privilege}"
+          if [[ "$result" != "PASS" || "$restore" != "true" || "$transferred" != "false" || "$channel" != "NONE" || "$sha" != "$expected_sha" || "$privilege" != "VERIFIED" || "$content_mismatches" != "0" || "$definition_mismatches" != "0" ]]; then
             echo "FULL_BACKUP_REASON=EVIDENCE_NOT_PASS"
             exit 1
           fi

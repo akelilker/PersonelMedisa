@@ -254,6 +254,11 @@ jobs:
           [[ "$outside_webroot" == "true" ]] || block FULL_BACKUP_LOCATION_UNSAFE
           readback="$(jq -r '.readback // "FAILED"' "${WORK}/full-backup-evidence.json" 2>/dev/null || echo FAILED)"
           [[ "$readback" == "VERIFIED" ]] || block FULL_BACKUP_READBACK_FAILED
+          restore_privilege="$(jq -r '.restore_privilege // "ABSENT"' "${WORK}/full-backup-evidence.json" 2>/dev/null || echo ABSENT)"
+          [[ "$restore_privilege" == "VERIFIED" ]] || block RESTORE_PRIVILEGE_ABSENT
+          content_mismatches="$(jq -r '.content_mismatch_count // 1' "${WORK}/full-backup-evidence.json" 2>/dev/null || echo 1)"
+          definition_mismatches="$(jq -r '.definition_mismatch_count // 1' "${WORK}/full-backup-evidence.json" 2>/dev/null || echo 1)"
+          [[ "$content_mismatches" == "0" && "$definition_mismatches" == "0" ]] || block FULL_BACKUP_RESTORE_MISMATCH
           echo "GATE_FULL_BACKUP_AGE_SECONDS=${backup_age}"
           echo "GATE_FULL_BACKUP=PASS"
           if [[ "$TARGET_MIGRATION" == "100_user_yetki_istisnalari.sql" ]]; then

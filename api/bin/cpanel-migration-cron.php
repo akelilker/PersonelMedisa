@@ -699,6 +699,26 @@ try {
             throw MigrationWorkerFailure::fromThrowable($stage, $exception);
         }
 
+        // Migration 100 does not start unless this process, on this server, has
+        // re-checked the full backup file and the live yetki tables. The GitHub
+        // Actions gate is not a substitute for this stage.
+        $stage = 'FULL_BACKUP_GATE';
+        try {
+            $pendingVersions = $targetVersion !== null
+                ? [$targetVersion]
+                : MigrationExecutionService::ledgerFacts($pdo, $migrationSource)['pending_versions'];
+            if (in_array('100', $pendingVersions, true)) {
+                FullDatabaseBackupService::assertReadyForApply(
+                    $pdo,
+                    $apiDirectory,
+                    $controlDirectory,
+                    $deployedSha
+                );
+            }
+        } catch (\Throwable $exception) {
+            throw MigrationWorkerFailure::fromThrowable($stage, $exception);
+        }
+
         $stage = 'APPLY';
         try {
             $applyResult = MigrationExecutionService::apply($pdo, $migrationSource, $baseline, $targetVersion);
@@ -850,6 +870,12 @@ final class MigrationWorkerFailure extends RuntimeException
         }
         if ($exception instanceof KullaniciKaliciSilMigrationFailure) {
             return new self($exception->reason, $stage, 1, $exception->detail);
+        }
+        if (
+            $stage === 'FULL_BACKUP_GATE'
+            && preg_match('/^[A-Z][A-Z0-9_]{2,100}$/D', $exception->getMessage()) === 1
+        ) {
+            return new self($exception->getMessage(), $stage, 1, null);
         }
 
         return new self(

@@ -76,6 +76,26 @@ fdbAssert(
 );
 fdbAssert(($evidence['yetki_schema'] ?? '') === 'ABSENT', 'üç yetki tablosu yokken sınıflama ABSENT');
 fdbAssert(($evidence['restore_verified'] ?? false) === true, 'geri yükleme doğrulandı');
+fdbAssert(
+    ($evidence['restore_privilege'] ?? '') === 'UNPROVEN',
+    'grant tablosu kapalı kök hesabı hosting yetkisi sayılmaz'
+);
+fdbAssert(
+    FullDatabaseBackupService::classifyGrantLines([
+        "GRANT USAGE ON *.* TO 'cpanel'@'localhost'",
+        "GRANT ALL PRIVILEGES ON `karmotor_medisa`.* TO 'cpanel'@'localhost'",
+    ]) === 'ABSENT',
+    'yalnız canlı veritabanındaki yetki kardeş veritabanı açamaz'
+);
+fdbAssert(
+    FullDatabaseBackupService::classifyGrantLines([
+        "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, INDEX, ALTER ON *.* TO 'ops'@'localhost'",
+    ]) === 'PRESENT',
+    'genel CREATE ve DROP yetkisi ayrılır'
+);
+fdbAssert(($evidence['schema_version'] ?? '') === '2', 'kanıt şema sürümü 2');
+fdbAssert(($evidence['content_mismatch_count'] ?? 1) === 0, 'içerik farkı yok');
+fdbAssert(($evidence['definition_mismatch_count'] ?? 1) === 0, 'tanım farkı yok');
 fdbAssert(($evidence['dump_transferred'] ?? true) === false, 'döküm aktarılmadı');
 fdbAssert(($evidence['dump_channel'] ?? '') === 'NONE', 'döküm kanalı yok');
 fdbAssert(($evidence['outside_webroot'] ?? false) === true, 'yedek web kökünün dışında');
@@ -107,6 +127,96 @@ try {
 }
 fdbAssert($triggerBlocked, 'tetikleyici geri yüklenen veritabanında silmeyi engelledi');
 fdbAssert((int) $manual->query('SELECT COUNT(*) FROM items')->fetchColumn() === 2, 'engellenen silme satırı düşürmedi');
+fdbAssert(FullDatabaseBackupService::mismatchCodes($live, $manual) === [], 'içerik ve tanım kaynakla aynı');
+$manual->exec("UPDATE items SET name = 'bozuk' WHERE id = 1");
+fdbAssert(
+    in_array('CONTENT_HASH', FullDatabaseBackupService::mismatchCodes($live, $manual), true),
+    'değişen satır içerik bütünlüğünde yakalanır'
+);
+FullDatabaseBackupService::restoreInto($manual, $dumpPath, $liveName);
+$manual->exec('DROP TRIGGER trg_items_no_delete');
+$manual->exec("CREATE TRIGGER trg_items_no_delete BEFORE DELETE ON items FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'farkli'");
+fdbAssert(
+    in_array('TRIGGER_BODY', FullDatabaseBackupService::mismatchCodes($live, $manual), true),
+    'değişen tetikleyici gövdesi yakalanır'
+);
+
+$control = $sandbox . '/control';
+mkdir($control);
+$evidencePath = $control . '/full-backup-evidence.json';
+file_put_contents($evidencePath, (string) json_encode($evidence));
+$unprovenBlocked = false;
+try {
+    FullDatabaseBackupService::assertReadyForApply($live, $apiDirectory, $control, $sha);
+} catch (Throwable $exception) {
+    $unprovenBlocked = $exception->getMessage() === 'RESTORE_PRIVILEGE_ABSENT';
+}
+fdbAssert($unprovenBlocked, 'yetkisi kanıtlanmamış yedek APPLY kapısını kapatır');
+
+$proven = $evidence;
+$proven['restore_privilege'] = 'VERIFIED';
+file_put_contents($evidencePath, (string) json_encode($proven));
+$gateOk = false;
+try {
+    FullDatabaseBackupService::assertReadyForApply($live, $apiDirectory, $control, $sha);
+    $gateOk = true;
+} catch (Throwable $exception) {
+    $gateOk = false;
+}
+fdbAssert($gateOk, 'dosyası ve özeti tutan yedek kapıdan geçer');
+$evidence = $proven;
+
+$tampered = $evidence;
+$tampered['backup_sha256'] = str_repeat('b', 64);
+file_put_contents($evidencePath, (string) json_encode($tampered));
+$shaBlocked = false;
+try {
+    FullDatabaseBackupService::assertReadyForApply($live, $apiDirectory, $control, $sha);
+} catch (Throwable $exception) {
+    $shaBlocked = $exception->getMessage() === 'FULL_BACKUP_SHA_MISMATCH';
+}
+fdbAssert($shaBlocked, 'bozuk SHA-256 APPLY kapısını kapatır');
+
+$stale = $evidence;
+$stale['generated_at'] = '2020-01-01T00:00:00Z';
+file_put_contents($evidencePath, (string) json_encode($stale));
+$staleBlocked = false;
+try {
+    FullDatabaseBackupService::assertReadyForApply($live, $apiDirectory, $control, $sha);
+} catch (Throwable $exception) {
+    $staleBlocked = $exception->getMessage() === 'FULL_BACKUP_STALE';
+}
+fdbAssert($staleBlocked, 'süresi geçmiş yedek APPLY kapısını kapatır');
+
+file_put_contents($evidencePath, (string) json_encode($evidence));
+$hiddenDump = $dumpPath . '.aside';
+rename($dumpPath, $hiddenDump);
+$fileBlocked = false;
+try {
+    FullDatabaseBackupService::assertReadyForApply($live, $apiDirectory, $control, $sha);
+} catch (Throwable $exception) {
+    $fileBlocked = $exception->getMessage() === 'FULL_BACKUP_FILE_MISSING';
+}
+rename($hiddenDump, $dumpPath);
+fdbAssert($fileBlocked, 'olmayan yedek dosyası APPLY kapısını kapatır');
+
+$deployBlocked = false;
+try {
+    FullDatabaseBackupService::assertReadyForApply($live, $apiDirectory, $control, str_repeat('c', 40));
+} catch (Throwable $exception) {
+    $deployBlocked = $exception->getMessage() === 'FULL_BACKUP_DEPLOY_SHA_MISMATCH';
+}
+fdbAssert($deployBlocked, 'uygulama sürümü uymayan yedek APPLY kapısını kapatır');
+
+$live->exec("INSERT INTO medisa_schema_migrations (version) VALUES ('100')");
+$ledgerBlocked = false;
+try {
+    FullDatabaseBackupService::assertReadyForApply($live, $apiDirectory, $control, $sha);
+} catch (Throwable $exception) {
+    $ledgerBlocked = $exception->getMessage() === 'FULL_BACKUP_LEDGER_MISMATCH';
+}
+$live->exec("DELETE FROM medisa_schema_migrations WHERE version = '100'");
+fdbAssert($ledgerBlocked, 'migration seviyesi uymayan yedek APPLY kapısını kapatır');
 
 $refused = false;
 try {
@@ -117,6 +227,14 @@ try {
 fdbAssert($refused, 'canlı veritabanının üzerine geri yükleme reddedildi');
 
 $live->exec('CREATE TABLE user_yetki_istisnalari (id INT NOT NULL PRIMARY KEY)');
+file_put_contents($evidencePath, (string) json_encode($evidence));
+$yetkiBlocked = false;
+try {
+    FullDatabaseBackupService::assertReadyForApply($live, $apiDirectory, $control, $sha);
+} catch (Throwable $exception) {
+    $yetkiBlocked = $exception->getMessage() === 'YETKI_SCHEMA_NOT_ABSENT';
+}
+fdbAssert($yetkiBlocked, 'işlem öncesi yetki tablosu APPLY kapısını kapatır');
 $partial = FullDatabaseBackupService::capture(
     $live,
     $apiDirectory,

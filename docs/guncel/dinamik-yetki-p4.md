@@ -6,10 +6,11 @@ Durum: PR (MERGE=NO). Migration yok. Migration 100 değiştirilmedi ve canlıya 
 - Mevcut Genel Yöneticiler aynen kalır. Geriye dönük DENY yazılmaz; rol matrisi değişmez.
 - Sonradan Genel Yönetici atanan hesap, operasyonel işlemlerde yalnız görür. Personel düzenleme, bordro, izin düzeltme ve diğer operasyonel yazmalar otomatik açılmaz.
 - Kullanıcı ve yetki yönetimi kalır (`yonetim-paneli`, `kullanici_yetkileri`, kalıcı sil). Bu haklar DENY ile kapatılamaz (P2).
-- Başka bir Genel Yönetici, ihtiyaç duyulan operasyonel yazmayı ilgili DENY kaydını iptal ederek açar. İzin rol varsayılanında durduğu için ALLOW gerekmez ve reddedilir.
+- Başka bir Genel Yönetici, normal operasyonel yazmayı ilgili DENY kaydını iptal ederek açar. İzin rol varsayılanında durduğu için ALLOW gerekmez ve reddedilir.
+- Kırmızı listedeki başlangıç DENY kayıtları normal iptal ucundan kalkmaz. Bu hassas yetkilerin devri ayrı karardır; devir yolu yoktur.
 - Kimse kendi operasyonel yetkisini genişletemez. Atayan, uygun başka Genel Yönetici varken de genişletemez (K3).
 - Başka aktif Genel Yönetici yokken yapılan atama tam yetkilidir. Pasif Genel Yönetici bu hesabı kısıtlamaz.
-- Genel Yönetici şirket kapsamı alamaz (`user_sirketler` bu rol için kapalı, rol tüm sisteme açıktır). Bu yüzden "şu şirketin ilk yöneticisi" mevcut bağlarla ayrılmaz. Şirket adına özel koşul yoktur.
+- İlk yönetici kuralı sistem genelinde çalışır: başka aktif Genel Yönetici yoksa atama tam yetkilidir. Genel Yönetici şirket kapsamı alamaz; rol tüm sisteme açıktır. Şirket bazında ilk Genel Yönetici bu aşamada karşılanmış sayılmaz. Yeni şirket/yönetici mimarisi kurulmadı.
 - Rol değişince eski istisnalar iptal edilir (P3). Yeniden Genel Yönetici ataması, başka yönetici varsa yine kısıtlı başlar.
 
 ## Nerede
@@ -23,5 +24,5 @@ Personel düzenleme, rol adına bakıp yazmayı açmaz. Etkin izin esastır. Bö
 - Şube kapsamlı istisna kapalı kalır.
 - Yetki ekranı ve yönetici gelen kutusu P5.
 
-## Açık karar — hassas izin
-Kırmızı listedeki izinler (SGK nihai onayı, bordro kesinleştirme, genel yönetici onayı, legal hold, imha) kişiye özel ALLOW ile verilemez (P2). P4 bu izinlere başlangıç DENY yazar. Başka Genel Yönetici o DENY kaydını iptal edince izin, rol varsayılanından geri gelir. Bu, ALLOW yasağını dolanır. Normal operasyonel yazma (personel ücreti vb.) iptalle açılmaya devam eder. Hassas izinlerin hiç açılamaması ayrı iş kuralıdır; uygulanmadı.
+## Hassas yetki
+Kırmızı listedeki izinler (SGK nihai onayı, bordro kesinleştirme, genel yönetici onayı, hukuki bekletme, imha) kişiye özel ALLOW ile verilemez (P2). Kısıtlı başlayan Genel Yöneticide bunlar başlangıç DENY kaydıdır. Normal iptal ucu bu kaydı kaldırmaz; yetki geri gelmez. Tam yetkili yöneticide sonradan konmuş aynı iznin DENY kaydı (başlangıç kaydı değil) iptal edilebilir. Rol değişince tüm istisnalar, başlangıç kayıtları dahil, eskisi gibi kapanır.

@@ -318,33 +318,41 @@ try {
         'P4: başka şirkete bağlanan yeni GY, sistemde aktif GY varken kısıtlı başlar');
     $pdo->rollBack();
 
-    // --- P4: kırmızı liste DENY iptaliyle açılır; ALLOW hâlâ yasak --------------------
+    // --- P4: hassas başlangıç DENY'si iptal ucundan açılmaz; operasyonel yazma açılır ---
     // ver/iptal kendi transaction'ını açar; dış transaction içinde çağrılmaz.
-    $hassasAcildi = [];
+    $hassasKacak = [];
     foreach (R::NON_GRANTABLE_PERMISSIONS as $hp) {
         if (!in_array($hp, $yazma, true)) {
             continue;
         }
         $hid = (int) $one($pdo, 'SELECT id FROM user_yetki_istisnalari WHERE user_id=2 AND permission=? AND etki=\'DENY\' AND iptal_edildi_at IS NULL', [$hp]);
         if ($hid <= 0 || $eff(2, $hp)) {
-            $hassasAcildi[] = 'baslangic:' . $hp;
+            $hassasKacak[] = 'baslangic:' . $hp;
             continue;
         }
         if (ywTry(fn () => Y::ver($pdo, $actor(6), 2, ['permission' => $hp, 'etki' => 'ALLOW', 'gerekce' => 'hassas'])) !== Y::CODE_VERILEMEZ) {
-            $hassasAcildi[] = 'allow:' . $hp;
+            $hassasKacak[] = 'allow:' . $hp;
         }
-        if (!str_starts_with(ywTry(fn () => Y::iptal($pdo, $actor(6), 2, $hid, 'hassas ac')), 'OK:') || !$eff(2, $hp)) {
-            $hassasAcildi[] = 'iptal:' . $hp;
+        if (ywTry(fn () => Y::iptal($pdo, $actor(6), 2, $hid, 'hassas ac')) !== Y::CODE_HASSAS_BASLANGIC || $eff(2, $hp)) {
+            $hassasKacak[] = 'iptal:' . $hp;
         }
     }
     $ucretId = (int) $one($pdo, "SELECT id FROM user_yetki_istisnalari WHERE user_id=2 AND permission='personeller.ucret.manage' AND etki='DENY' AND iptal_edildi_at IS NULL");
-    ywAssert($hassasAcildi === []
-        && in_array('sgk_karar_paketi.approve', $yazma, true)
-        && in_array('bordro_kesinlestirme.approve', $yazma, true)
+    $manuel = ywTry(fn () => Y::ver($pdo, $actor(6), 1, ['permission' => 'sgk_karar_paketi.approve', 'etki' => 'DENY', 'gerekce' => 'gecici']));
+    $manuelId = str_starts_with($manuel, 'OK:') ? (int) (json_decode(substr($manuel, 3), true)['istisna_id'] ?? 0) : 0;
+    ywAssert($hassasKacak === []
+        && $eff(1, 'sgk_karar_paketi.approve') === false
+        && $manuelId > 0
+        && str_starts_with(ywTry(fn () => Y::iptal($pdo, $actor(7), 1, $manuelId, 'geri al')), 'OK:')
+        && $eff(1, 'sgk_karar_paketi.approve')
+        && $eff(1, 'bordro_kesinlestirme.approve')
+        && $eff(1, 'legal_hold.manage')
         && $ucretId > 0
         && str_starts_with(ywTry(fn () => Y::iptal($pdo, $actor(6), 2, $ucretId, 'ucret ac')), 'OK:')
-        && $eff(2, 'personeller.ucret.manage'),
-        'P4: operasyonel yazma açılır; kırmızı liste ALLOW ile verilmez ama DENY iptaliyle açılır. Sapma: ' . implode(',', $hassasAcildi));
+        && $eff(2, 'personeller.ucret.manage')
+        && !$eff(2, 'sgk_karar_paketi.approve')
+        && !$eff(2, 'bordro_kesinlestirme.approve'),
+        'P4: hassas başlangıç kısıtı kalkmaz; operasyonel yazma açılır; tam yetkili GY korunur. Sapma: ' . implode(',', $hassasKacak));
 
     // --- karar 8: rol değişince aynı transaction'da iptal + audit ------------------------
     $aktifOnce = (int) $one($pdo, 'SELECT COUNT(*) FROM user_yetki_istisnalari WHERE user_id=4 AND iptal_edildi_at IS NULL');

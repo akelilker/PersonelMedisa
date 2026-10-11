@@ -39,6 +39,8 @@ final class KullaniciYetkiYazmaService
     public const CODE_ATAYAN = 'ATAYAN_YETKI_VEREMEZ';
     public const CODE_SON_YONETICI = 'SON_YETKI_YONETICISI';
     public const CODE_SEMA = 'YETKI_SEMASI_HAZIR_DEGIL';
+    public const CODE_HASSAS_BASLANGIC = 'YETKI_HASSAS_BASLANGIC_KALDIRILAMAZ';
+    public const KAYNAK_BASLANGIC = 'GY_BASLANGIC_PROFILI';
     public const UYARI_K3 = 'K3_ISTISNA_TEK_YONETICI';
 
     /**
@@ -152,6 +154,9 @@ final class KullaniciYetkiYazmaService
                 throw new OrganizasyonException(409, 'YETKI_ISTISNASI_ZATEN_IPTAL', 'Bu yetki istisnası zaten iptal edilmiş.', 'istisna_id');
             }
             $etki = strtoupper((string) $row['etki']);
+            if (self::baslangicHassasKilit($pdo, $istisnaId, (string) $row['permission'], $etki)) {
+                throw new OrganizasyonException(403, self::CODE_HASSAS_BASLANGIC, 'Bu hassas yetkinin başlangıç kısıtı kaldırılamaz.', 'istisna_id');
+            }
             // DENY kaldırmak yetkiyi genişletir: K3 bu durumda da uygulanır.
             $uyarilar = self::kurallar($pdo, $aktorId, $hedefId, $hedefGy, $etki === 'DENY');
 
@@ -261,6 +266,29 @@ final class KullaniciYetkiYazmaService
         return count($rows);
     }
 
+    /**
+     * P4 başlangıç DENY'si ve kırmızı listedeyse normal iptal ile açılamaz.
+     * Rol değişimindeki ROL_DEGISTI iptali bu kilide takılmaz.
+     */
+    private static function baslangicHassasKilit(PDO $pdo, int $istisnaId, string $permission, string $etki): bool
+    {
+        if ($etki !== 'DENY' || !in_array($permission, EffectivePermissionResolver::NON_GRANTABLE_PERMISSIONS, true)) {
+            return false;
+        }
+        $stmt = $pdo->prepare(
+            'SELECT sonraki_json FROM ' . UserYetkiIstisnaSchema::AUDIT_TABLE . "
+              WHERE istisna_id = :id AND aksiyon = 'VER' ORDER BY id ASC LIMIT 1"
+        );
+        $stmt->execute(['id' => $istisnaId]);
+        $json = $stmt->fetchColumn();
+        if (!is_string($json) || $json === '') {
+            return false;
+        }
+        $data = json_decode($json, true);
+
+        return is_array($data) && ($data['kaynak'] ?? '') === self::KAYNAK_BASLANGIC;
+    }
+
     /** Başka aktif Genel Yönetici var mı. Pasif satır ve hedefin kendisi sayılmaz. */
     private static function baskaAktifGenelYoneticiVar(PDO $pdo, int $hedefId): bool
     {
@@ -274,7 +302,8 @@ final class KullaniciYetkiYazmaService
 
     /**
      * Yeni GY başlangıcı: operasyonel yazma izinlerine kalıcı global DENY.
-     * ALLOW ile verilmez; başka GY ilgili DENY kaydını iptal ederek açar.
+     * Normal yazma, başka GY DENY kaydını iptal ederek açar.
+     * Kırmızı listedeki başlangıç DENY'si iptal ucundan kalkmaz.
      *
      * @param array{id: int, username: string, actor_identity_id: int|null} $aktor
      * @param array{id: int, username: string, actor_identity_id?: int|null} $hedef
@@ -312,7 +341,7 @@ final class KullaniciYetkiYazmaService
                     'permission' => $permission,
                     'etki' => 'DENY',
                     'kapsam' => 'GLOBAL',
-                    'kaynak' => 'GY_BASLANGIC_PROFILI',
+                    'kaynak' => self::KAYNAK_BASLANGIC,
                 ],
                 'gerekce' => $gerekce,
                 'uyarilar' => [],

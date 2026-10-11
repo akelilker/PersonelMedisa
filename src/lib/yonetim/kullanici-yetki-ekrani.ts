@@ -209,12 +209,49 @@ export function bilinenIzinler(): string[] {
   return [...set].sort((a, b) => a.localeCompare(b, "tr"));
 }
 
-export function aktifIstisnalar(istisnalar: readonly KullaniciYetkiIstisna[]): KullaniciYetkiIstisna[] {
-  return istisnalar.filter((istisna) => istisna.iptalEdildiAt == null);
+export type IstisnaZamani = "etkin" | "baslamadi" | "dolmus" | "iptal";
+
+/** Sunucu ile aynı UTC damgası: `Y-m-d H:i:s`. */
+export function utcZamanDamgasi(an: Date = new Date()): string {
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${an.getUTCFullYear()}-${pad(an.getUTCMonth() + 1)}-${pad(an.getUTCDate())} ${pad(an.getUTCHours())}:${pad(an.getUTCMinutes())}:${pad(an.getUTCSeconds())}`;
 }
 
-export function kapanmisIstisnalar(istisnalar: readonly KullaniciYetkiIstisna[]): KullaniciYetkiIstisna[] {
-  return istisnalar.filter((istisna) => istisna.iptalEdildiAt != null);
+/**
+ * Çözücü ile aynı sıra (UTC metin karşılaştırması):
+ * iptal, sonra bitiş ≤ şimdi (bitiş anı dahil dolmuş), sonra başlangıç boş veya > şimdi (henüz yok),
+ * aksi halde etkin. Bitiş boşsa kayıt kalıcıdır.
+ */
+export function istisnaZamani(istisna: KullaniciYetkiIstisna, simdiUtc = utcZamanDamgasi()): IstisnaZamani {
+  if (istisna.iptalEdildiAt != null) return "iptal";
+  const bitis = istisna.gecerlilikBitis;
+  if (bitis != null && bitis !== "" && bitis <= simdiUtc) return "dolmus";
+  const baslangic = istisna.gecerlilikBaslangic;
+  if (baslangic === "" || baslangic > simdiUtc) return "baslamadi";
+  return "etkin";
+}
+
+export function istisnaZamanEtiketi(zaman: IstisnaZamani): string | null {
+  if (zaman === "baslamadi") return "Henüz başlamadı";
+  if (zaman === "dolmus") return "Süresi doldu";
+  return null;
+}
+
+export function aktifIstisnalar(
+  istisnalar: readonly KullaniciYetkiIstisna[],
+  simdiUtc = utcZamanDamgasi()
+): KullaniciYetkiIstisna[] {
+  return istisnalar.filter((istisna) => istisnaZamani(istisna, simdiUtc) === "etkin");
+}
+
+export function kapanmisIstisnalar(
+  istisnalar: readonly KullaniciYetkiIstisna[],
+  simdiUtc = utcZamanDamgasi()
+): KullaniciYetkiIstisna[] {
+  return istisnalar.filter((istisna) => {
+    const zaman = istisnaZamani(istisna, simdiUtc);
+    return zaman === "iptal" || zaman === "dolmus";
+  });
 }
 
 export function istisnaKaldirilabilir(
@@ -254,10 +291,11 @@ export function secilebilirIzinler(input: {
   istisnalar: readonly KullaniciYetkiIstisna[];
   etki: YetkiEtki;
   arama: string;
+  simdiUtc?: string;
 }): string[] {
   const rolde = new Set(input.rolVarsayilanlari);
   const ayniEtki = new Set(
-    aktifIstisnalar(input.istisnalar)
+    aktifIstisnalar(input.istisnalar, input.simdiUtc)
       .filter((istisna) => istisna.etki === input.etki)
       .map((istisna) => istisna.permission)
   );

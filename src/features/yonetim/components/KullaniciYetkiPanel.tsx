@@ -9,12 +9,13 @@ import {
 import { FormField } from "../../../components/form/FormField";
 import {
   aksiyonEtiketi,
-  aktifIstisnalar,
   bitisApiDegeri,
   bitisHatasi,
   etkiEtiketi,
   hassasYetkiMi,
   istisnaKaldirilabilir,
+  istisnaZamani,
+  istisnaZamanEtiketi,
   kapanmisIstisnalar,
   kaynakEtiketi,
   kendiHesabiMi,
@@ -205,7 +206,12 @@ export function KullaniciYetkiPanel(props: KullaniciYetkiPanelProps) {
     }
   }
 
-  const aktif = okuma ? aktifIstisnalar(okuma.istisnalar) : [];
+  const acikKartlar = okuma
+    ? okuma.istisnalar.filter((istisna) => {
+        const zaman = istisnaZamani(istisna);
+        return zaman === "etkin" || zaman === "baslamadi";
+      })
+    : [];
   const kapanmis = okuma && semaHazir ? kapanmisIstisnalar(okuma.istisnalar) : [];
   const rolListesi = okuma ? izinAra(okuma.rolVarsayilanlari, listeArama) : [];
 
@@ -252,13 +258,15 @@ export function KullaniciYetkiPanel(props: KullaniciYetkiPanelProps) {
       {okuma && semaHazir ? (
         <div className="yonetim-workspace-panel">
           <p className="yonetim-workspace-panel-title">Kişisel istisnalar</p>
-          {aktif.length === 0 ? (
+          {acikKartlar.length === 0 ? (
             <p className="yonetim-hint" data-testid="yonetim-yetki-istisna-yok">
               Bu kullanıcıda etkin kişisel istisna yok. Etkin yetkiler rol varsayılanıyla aynıdır.
             </p>
           ) : (
             <ul className="yonetim-yetki-liste">
-              {aktif.map((istisna) => {
+              {acikKartlar.map((istisna) => {
+                const zaman = istisnaZamani(istisna);
+                const zamanEtiketi = istisnaZamanEtiketi(zaman);
                 const hassas = istisna.etki === "DENY" && hassasYetkiMi(istisna.permission);
                 const kaldirilabilir = istisnaKaldirilabilir(istisna, kendi, props.canManage);
                 return (
@@ -275,6 +283,11 @@ export function KullaniciYetkiPanel(props: KullaniciYetkiPanelProps) {
                       {istisna.verenUsername ? ` · ${istisna.verenUsername}` : ""}
                     </span>
                     {istisna.gerekce ? <span className="yonetim-hint">{istisna.gerekce}</span> : null}
+                    {zamanEtiketi ? (
+                      <span className="yonetim-hint" data-testid={`yonetim-yetki-zaman-${istisna.id}`}>
+                        {zamanEtiketi}
+                      </span>
+                    ) : null}
                     {hassas ? (
                       <span className="yonetim-hint" data-testid={`yonetim-yetki-hassas-${istisna.id}`}>
                         Bu hassas yetki bu ekrandan açılamaz.
@@ -334,16 +347,24 @@ export function KullaniciYetkiPanel(props: KullaniciYetkiPanelProps) {
           )}
           {kapanmis.length > 0 ? (
             <details className="yonetim-yetki-details">
-              <summary>Kapanmış kayıtlar ({kapanmis.length})</summary>
+              <summary>Geçmiş kayıtlar ({kapanmis.length})</summary>
               <ul className="yonetim-yetki-liste">
-                {kapanmis.map((istisna) => (
-                  <li key={istisna.id} className="yonetim-yetki-satir">
-                    <strong>{yetkiEtiketi(istisna.permission)}</strong>
-                    <span className="yonetim-hint">
-                      {etkiEtiketi(istisna.etki)} · kapanış {tarihMetni(istisna.iptalEdildiAt)}
-                    </span>
-                  </li>
-                ))}
+                {kapanmis.map((istisna) => {
+                  const zamanEtiketi = istisnaZamanEtiketi(istisnaZamani(istisna));
+                  return (
+                    <li key={istisna.id} className="yonetim-yetki-satir">
+                      <strong>{yetkiEtiketi(istisna.permission)}</strong>
+                      <span className="yonetim-hint">
+                        {etkiEtiketi(istisna.etki)}
+                        {istisna.iptalEdildiAt
+                          ? ` · kapanış ${tarihMetni(istisna.iptalEdildiAt)}`
+                          : zamanEtiketi
+                            ? ` · ${zamanEtiketi}`
+                            : ""}
+                      </span>
+                    </li>
+                  );
+                })}
               </ul>
             </details>
           ) : null}

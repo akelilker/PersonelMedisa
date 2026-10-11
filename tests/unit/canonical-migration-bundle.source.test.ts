@@ -59,7 +59,7 @@ describe("canonical migration bundle", () => {
       expect(firstBytes.equals(readFileSync(second))).toBe(true);
 
       const bundle = firstBytes.toString("utf8");
-      expect((bundle.match(/'version' => '/g) ?? []).length).toBe(100);
+      expect((bundle.match(/'version' => '/g) ?? []).length).toBe(101);
       expect(bundle).toContain("'name' => 'migration_ledger.sql'");
       expect(bundle).toContain(
         "'name' => '067_personel_canonical_reference_gate.sql'",
@@ -142,6 +142,7 @@ describe("canonical migration bundle", () => {
       expect(bundle).toContain("'name' => '097_qr_attendance_location_audit.sql'");
       expect(bundle).toContain("'name' => '098_birim_ad_duzeltme.sql'");
       expect(bundle).toContain("'name' => '099_user_kalici_silme_auditleri.sql'");
+      expect(bundle).toContain("'name' => '100_user_yetki_istisnalari.sql'");
 
       const checksum068 = createHash("sha256")
         .update(readFileSync(migration068))
@@ -257,7 +258,7 @@ describe("canonical migration bundle", () => {
           `require '${phpRoot}/api/src/bootstrap.php';`,
           `$provider = new Medisa\\Api\\Database\\BundledMigrationSourceProvider('${phpBundle}');`,
           `$rows = $provider->all();`,
-          `if (count($rows) !== 100 || $rows[0]['version'] !== '000' || $rows[70]['version'] !== '070' || $rows[71]['version'] !== '071' || $rows[72]['version'] !== '072' || $rows[73]['version'] !== '073' || $rows[74]['version'] !== '074' || $rows[75]['version'] !== '075' || $rows[76]['version'] !== '076' || $rows[77]['version'] !== '077' || $rows[78]['version'] !== '078' || $rows[79]['version'] !== '079' || $rows[80]['version'] !== '080' || $rows[81]['version'] !== '081' || $rows[82]['version'] !== '082' || $rows[83]['version'] !== '083' || $rows[84]['version'] !== '084' || $rows[85]['version'] !== '085' || $rows[86]['version'] !== '086' || $rows[87]['version'] !== '087' || $rows[88]['version'] !== '088' || $rows[89]['version'] !== '089' || $rows[90]['version'] !== '090' || $rows[91]['version'] !== '091' || $rows[92]['version'] !== '092' || $rows[93]['version'] !== '093' || $rows[94]['version'] !== '094' || $rows[95]['version'] !== '095' || $rows[96]['version'] !== '096' || $rows[97]['version'] !== '097' || $rows[98]['version'] !== '098' || $rows[99]['version'] !== '099') { exit(1); }`,
+          `if (count($rows) !== 101 || $rows[0]['version'] !== '000' || $rows[70]['version'] !== '070' || $rows[71]['version'] !== '071' || $rows[72]['version'] !== '072' || $rows[73]['version'] !== '073' || $rows[74]['version'] !== '074' || $rows[75]['version'] !== '075' || $rows[76]['version'] !== '076' || $rows[77]['version'] !== '077' || $rows[78]['version'] !== '078' || $rows[79]['version'] !== '079' || $rows[80]['version'] !== '080' || $rows[81]['version'] !== '081' || $rows[82]['version'] !== '082' || $rows[83]['version'] !== '083' || $rows[84]['version'] !== '084' || $rows[85]['version'] !== '085' || $rows[86]['version'] !== '086' || $rows[87]['version'] !== '087' || $rows[88]['version'] !== '088' || $rows[89]['version'] !== '089' || $rows[90]['version'] !== '090' || $rows[91]['version'] !== '091' || $rows[92]['version'] !== '092' || $rows[93]['version'] !== '093' || $rows[94]['version'] !== '094' || $rows[95]['version'] !== '095' || $rows[96]['version'] !== '096' || $rows[97]['version'] !== '097' || $rows[98]['version'] !== '098' || $rows[99]['version'] !== '099' || $rows[100]['version'] !== '100') { exit(1); }`,
           "echo 'RAW_SQL_MISSING_PRODUCTION_SIMULATION=PASS';",
         ].join(" ");
         const result = spawnSync("php", ["-r", script], {

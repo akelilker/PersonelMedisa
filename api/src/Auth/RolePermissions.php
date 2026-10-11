@@ -76,6 +76,10 @@ class RolePermissions
             'isg.view',
             'yonetim-paneli.view',
             'yonetim-paneli.manage',
+            // Kullanici bazli yetki yonetimi (dinamik yetki P2): yalniz GENEL_YONETICI; ALLOW ile verilemez.
+            'kullanici_yetkileri.view',
+            'kullanici_yetkileri.manage',
+            'kullanici_yetkileri.audit.view',
             'kullanicilar.kalici_sil',
             'aylik-ozet.view',
             'aylik-ozet.executive_ack',
@@ -658,6 +662,27 @@ class RolePermissions
     }
 
     /** @param array<string, mixed> $user */
+    /**
+     * Kaydın şubesi bilinen kontrol: şube kapsamlı DENY/ALLOW istisnaları uygulanır.
+     * (Dinamik yetki P2; çağrı yerlerinin geçişi P3.)
+     *
+     * @param array<string, mixed> $user
+     */
+    public static function hasForSube(array $user, $permission, int $subeId): bool
+    {
+        return EffectivePermissionResolver::resolveForSube($user, $permission, $subeId);
+    }
+
+    /**
+     * @param array<string, mixed> $user
+     */
+    public static function assertForSube(array $user, $permission, int $subeId): void
+    {
+        if (!self::hasForSube($user, $permission, $subeId)) {
+            JsonResponse::forbidden();
+        }
+    }
+
     public static function assert(array $user, $permission)
     {
         if (!self::has($user, $permission)) {

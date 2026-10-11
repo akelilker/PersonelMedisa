@@ -32,6 +32,21 @@ final class KullaniciKaliciSilService
     public const AUDIT_TABLE = 'user_kalici_silme_auditleri';
     public const PROTECTED_ACCOUNTS_TABLE = 'user_kalici_silme_korunan_hesaplar';
 
+    /** Dinamik yetki (migration 100) istisna tablosu. */
+    public const YETKI_ISTISNA_TABLE = 'user_yetki_istisnalari';
+
+    /**
+     * Geçmiş anlık görüntü tabloları: kullanıcı kolonları bilinçli olarak FK'sız ve
+     * kullanıcı adı anlık görüntüsü taşır; satırları silme sonrası da değişmeden
+     * kalır, bu yüzden bağımlılık envanterinde engel sayılmaz. Tek istisna: hedefin
+     * AKTİF yetki istisnası (iptal edilmemiş, süresi dolmamış) silmeyi engeller.
+     */
+    public const HISTORY_SNAPSHOT_TABLES = [
+        self::AUDIT_TABLE,
+        self::YETKI_ISTISNA_TABLE,
+        'user_yetki_auditleri',
+    ];
+
     public const CODE_SELF_DELETE = 'SELF_DELETE_FORBIDDEN';
     public const CODE_PROTECTED_ACCOUNT = 'PROTECTED_ACCOUNT';
     public const CODE_PROTECTED_ADMIN_ROLE = 'PROTECTED_ADMIN_ROLE';
@@ -461,7 +476,55 @@ final class KullaniciKaliciSilService
             ];
         }
 
+        $aktifIstisna = self::activeYetkiIstisnaDependency($pdo, $userId);
+        if ($aktifIstisna !== null) {
+            $out[] = $aktifIstisna;
+        }
+
         return $out;
+    }
+
+    /**
+     * Hedefin AKTİF yetki istisnaları (iptal edilmemiş, süresi dolmamış; ileri
+     * tarihli dahil) silmeyi engeller: önce iptal edilmelidir. İptal edilmiş /
+     * süresi dolmuş satırlar geçmiştir ve engellemez. Tablo yoksa (100 öncesi)
+     * bağımlılık yok; tablo var ama okunamıyorsa DOĞRULANAMADI (fail-closed).
+     *
+     * @return array<string, mixed>|null
+     */
+    private static function activeYetkiIstisnaDependency(PDO $pdo, int $userId): ?array
+    {
+        $count = null;
+        try {
+            if (!self::tableExists($pdo, self::YETKI_ISTISNA_TABLE)) {
+                return null;
+            }
+            $stmt = $pdo->prepare(
+                'SELECT COUNT(*) FROM `' . self::YETKI_ISTISNA_TABLE . '`
+                  WHERE user_id = :uid
+                    AND iptal_edildi_at IS NULL
+                    AND (gecerlilik_bitis IS NULL OR gecerlilik_bitis > UTC_TIMESTAMP())'
+            );
+            $stmt->execute(['uid' => $userId]);
+            $count = (int) $stmt->fetchColumn();
+        } catch (\Throwable $e) {
+            $count = null;
+        }
+
+        return [
+            'table' => self::YETKI_ISTISNA_TABLE,
+            'column' => 'user_id',
+            'columns' => ['user_id'],
+            'constraint' => null,
+            'delete_rule' => 'NONE',
+            'row_count' => $count,
+            'reason' => $count === null ? 'count_failed' : ($count > 0 ? 'active_permission_exceptions' : 'empty'),
+        ];
+    }
+
+    private static function historyPlaceholders(): string
+    {
+        return implode(',', array_fill(0, count(self::HISTORY_SNAPSHOT_TABLES), '?'));
     }
 
     /**
@@ -531,9 +594,10 @@ final class KullaniciKaliciSilService
                  FROM information_schema.COLUMNS
                  WHERE TABLE_SCHEMA = DATABASE()
                    AND COLUMN_NAME IN ($placeholders)
-                   AND TABLE_NAME <> 'users'"
+                   AND TABLE_NAME <> 'users'
+                   AND TABLE_NAME NOT IN (" . self::historyPlaceholders() . ")"
             );
-            $colQuery->execute(self::CANDIDATE_COLUMNS);
+            $colQuery->execute(array_merge(self::CANDIDATE_COLUMNS, self::HISTORY_SNAPSHOT_TABLES));
         } catch (\Throwable $e) {
             // A reference column we cannot enumerate is exactly the case where
             // the whole deletion must fail closed.
@@ -576,7 +640,7 @@ final class KullaniciKaliciSilService
                  FROM information_schema.COLUMNS c
                  WHERE c.TABLE_SCHEMA = DATABASE()
                    AND c.TABLE_NAME <> 'users'
-                   AND c.TABLE_NAME <> :audit_table
+                   AND c.TABLE_NAME NOT IN (" . self::historyPlaceholders() . ")
                    AND c.DATA_TYPE IN ('int','tinyint','smallint','mediumint','bigint','json','longtext','text','mediumtext')
                    AND {$signal}
                    AND NOT EXISTS (
@@ -587,7 +651,7 @@ final class KullaniciKaliciSilService
                          AND kcu.REFERENCED_TABLE_NAME IS NOT NULL
                    )"
             );
-            $unclassified->execute(['audit_table' => self::AUDIT_TABLE]);
+            $unclassified->execute(self::HISTORY_SNAPSHOT_TABLES);
         } catch (\Throwable $e) {
             // Unable to enumerate unclassified references → fail closed.
             return null;
@@ -809,7 +873,7 @@ final class KullaniciKaliciSilService
                  FROM information_schema.COLUMNS c
                  WHERE c.TABLE_SCHEMA = DATABASE()
                    AND c.TABLE_NAME <> 'users'
-                   AND c.TABLE_NAME <> ?
+                   AND c.TABLE_NAME NOT IN (" . self::historyPlaceholders() . ")
                    AND c.COLUMN_NAME IN ($placeholders)
                    AND NOT EXISTS (
                        SELECT 1 FROM information_schema.KEY_COLUMN_USAGE kcu
@@ -820,7 +884,7 @@ final class KullaniciKaliciSilService
                          AND kcu.REFERENCED_COLUMN_NAME = 'id'
                    )"
             );
-            $stmt->execute(array_merge([self::AUDIT_TABLE], self::CANDIDATE_COLUMNS));
+            $stmt->execute(array_merge(self::HISTORY_SNAPSHOT_TABLES, self::CANDIDATE_COLUMNS));
 
             return (int) $stmt->fetchColumn() === 0;
         } catch (\Throwable $e) {

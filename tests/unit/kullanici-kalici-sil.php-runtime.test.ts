@@ -19,7 +19,7 @@ describe("kullanici kalıcı sil: the safe hard-delete owner and its fail-closed
 
     const stdout = String(result.stdout);
     for (const marker of [
-      "the canonical chain tip is migration 099",
+      "the canonical chain contains 099 and its tip is migration 100",
       "migration 099 refuses a populated database without verified protected-account IDs",
       "migration 099 leaves no partial audit table when the protected-account IDs are missing",
       "migration 099 leaves no partial protected-account flag when the IDs are missing",

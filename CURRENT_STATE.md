@@ -1,9 +1,9 @@
-CODE_MIGRATION_TIP: 099
+CODE_MIGRATION_TIP: 100
 PRODUCTION_MIGRATION_TIP: 099
 LAST_VERIFIED_PRODUCTION_MIGRATION_TIP: 099
 LAST_VERIFIED_PRODUCTION_MIGRATION_EVIDENCE: APPLY_POSTCHECK_PASS_37911294869 (postcheck kanıtı; bağımsız ledger readback yapılmadı)
 FRESH_PRODUCTION_MIGRATION_READBACK: MIGRATION_099_APPLY_POSTCHECK_PASS
-PRODUCTION_MIGRATION_PENDING: 0
+PRODUCTION_MIGRATION_PENDING: 1
 PRODUCTION_DEPLOY_SHA: f14ddbe897bf8e64b35d9320cfac55cb427b1758
 CODE_MAIN_SHA: f14ddbe897bf8e64b35d9320cfac55cb427b1758
 LAST_MERGED_PR: 520
@@ -28,6 +28,7 @@ DOCS_ONLY_CLOSURE_THIS_PIN: NO
 | Migration 097 | **APPLIED / SUCCESS** | `097_qr_attendance_location_audit.sql` — `qr_attendance_events` konum denetim kolonları (#496); pre-apply preflight Ops migration worker diagnostics **#89** run `37389148523` PASS (PROD_TIP 096, pending 097); Apply cPanel migrations **#56** run `37391130248` SUCCESS; worker completed; backup `medisa-pre-097-37391130248-1-20261006-000005.sql` readback VERIFIED; post-apply readback Ops migration worker diagnostics **#90** run `37391796990` PROD_TIP **097**, `PREFLIGHT_BLOCKERS=NO_PENDING_MIGRATIONS` (beklenen: uygulanacak migration kalmadı) |
 | Migration 098 | **APPLIED / SUCCESS** | `098` birim 27/28 ad düzeltmesi (PR #515) — Apply cPanel migrations **#57** run `37686359952` SUCCESS (`098` — PR #515 birim 27/28 ad düzeltmesi @ `be6dc016…`); sonraki preflight run `37899949011` PROD_TIP **098** ile doğrulandı |
 | Migration 099 | **APPLIED / SUCCESS** | `099_user_kalici_silme_auditleri.sql` (Kalıcı Sil audit + korunan hesaplar 10/9) — APPLY run `37911294869` (Apply 099 kalici sil migration #1; environment `kalici-sil-099-apply` onayı akelilker) worker SUCCEEDED, backup `medisa-pre-kalicisil-099-kalici-apply-37911294869-1-20261009-094506.sql` readback VERIFIED, postcheck PASS; ön koşul preflight Ops migration worker diagnostics **#96** run `37899949011` PASS (PROD_TIP **098**, pending yalnız **099**); standart Apply cPanel migrations kullanılmadı |
+| Migration 100 | **CODE ONLY / NOT APPLIED** | `100_user_yetki_istisnalari.sql` — dinamik yetki P2 (kullanıcı bazlı ALLOW/DENY istisnaları + değiştirilemez audit); yalnız repoda, canlıya uygulanmadı; apply ayrı onay ister. Tablolar boşken etkin izinler rol matrisiyle aynı; tablo yoksa okuma boş döner |
 | LAST_VERIFIED production tip | **099** | **Postcheck kanıtı** — APPLY run `37911294869` `KALICI_SIL_POSTCHECK_RESULT=PASS`; **bağımsız ledger readback yapılmadı** (son bağımsız tip okuması: preflight run `37899949011` PROD_TIP **098**) |
 | PRODUCTION_DEPLOY_SHA | `f14ddbe8…` | Last **product** deploy marker — Deploy cPanel **#1253** run `37968702102` **SUCCESS** (merge **#520**); log `FINAL_SHA_GET=SUCCESS` + post-deploy smoke (anonim + kimlikli read-only) OK. Canlı `.deploy-sha` public okunamıyor (403); bağımsız canlı SHA readback yok |
 | CODE_MAIN_SHA | `f14ddbe8…` | GitHub `refs/heads/main` (`git ls-remote`) = **PRODUCTION_DEPLOY_SHA** — last **product** merge baseline (**#520**); docs-only state PRs do **not** advance `LAST_MERGED_PR` / SHA pins |

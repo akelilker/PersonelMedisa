@@ -17,6 +17,16 @@ use PDO;
  * iki "ilk" yönetici oluşturamaz: advisory lock + transaction içinde GY satırları
  * `FOR UPDATE` ile okunur. Hesap `silinmesi_korunur = 1` ile işaretlenir (kolon varsa).
  * Parola loglanmaz, sonuçta dönmez.
+ *
+ * Gerçek-kişi kimliği (dinamik yetki K1): ilk yöneticinin actor_identity kaydı
+ * KURULUMCU/OPERATÖR BEYANIYLA oluşturulur ve bağlanır (audit: BOOTSTRAP_VERIFY,
+ * details.dogrulama_turu = KURULUM_BEYANI). Bu bağımsız bir kimlik doğrulaması
+ * DEĞİLDİR: CLI'ı sunucuda çalıştıran operatörün "bu hesap bu kişidir" beyanıdır.
+ * Tabloda status = 'VERIFIED' ve verification_source = 'HUMAN_CONFIRMED' mevcut enum
+ * değerleri korunarak yazılır (enum değiştirmek canlı şemaya dokunurdu); ayrım audit
+ * kaydındadır. Yeni kurulumda K1 = ZORUNLU ilk yönetici oluşturulurken yazılır.
+ * Medisa canlıda bu servis hiç çalışmaz (GY varken reddeder); politika satırı yoktur,
+ * mod UYARI kalır.
  */
 final class IlkYoneticiKurulumService
 {
@@ -90,6 +100,11 @@ final class IlkYoneticiKurulumService
                     'ad_soyad' => $adSoyad,
                 ]);
                 $id = (int) $pdo->lastInsertId();
+                $kimlikId = self::kimlikOlustur($pdo, $id, $adSoyad);
+                $k1Mod = self::tableExists($pdo, YetkiKimlikPolitikasi::TABLE)
+                    && YetkiKimlikPolitikasi::yeniKurulumZorunluYaz($pdo, 'ILK_YONETICI_KURULUMU')
+                    ? YetkiKimlikPolitikasi::MOD_ZORUNLU
+                    : YetkiKimlikPolitikasi::MOD_UYARI;
                 $pdo->commit();
             } catch (\Throwable $e) {
                 if ($pdo->inTransaction()) {
@@ -107,6 +122,55 @@ final class IlkYoneticiKurulumService
             'username' => $username,
             'rol' => self::ROL,
             'silinmesi_korunur' => $koruma,
+            'actor_identity_id' => $kimlikId,
+            'k1_kimlik_modu' => $k1Mod,
         ];
+    }
+
+    /** İlk yöneticinin gerçek-kişi kimliği: kurulumcu beyanıyla (bağımsız doğrulama değil) VERIFIED + bağlı. */
+    private static function kimlikOlustur(PDO $pdo, int $userId, string $adSoyad): ?int
+    {
+        if (!self::tableExists($pdo, 'actor_identities')) {
+            return null;
+        }
+        $displayName = (string) preg_replace('/\s+/u', ' ', $adSoyad);
+        $pdo->prepare(
+            "INSERT INTO actor_identities (identity_code, display_name, normalized_name, status, verification_source, personel_id)
+             VALUES (:code, :display, :normalized, 'VERIFIED', 'HUMAN_CONFIRMED', NULL)"
+        )->execute([
+            'code' => 'USER-' . $userId,
+            'display' => $displayName,
+            'normalized' => mb_strtolower($displayName, 'UTF-8'),
+        ]);
+        $kimlikId = (int) $pdo->lastInsertId();
+        $pdo->prepare('UPDATE users SET actor_identity_id = :k WHERE id = :id')->execute(['k' => $kimlikId, 'id' => $userId]);
+        if (self::tableExists($pdo, 'actor_identity_audits')) {
+            $pdo->prepare(
+                "INSERT INTO actor_identity_audits (actor_identity_id, target_user_id, action, changed_by_user_id, details_json)
+                 VALUES (:k, :u, 'BOOTSTRAP_VERIFY', :u2, :d)"
+            )->execute([
+                'k' => $kimlikId,
+                'u' => $userId,
+                'u2' => $userId,
+                'd' => json_encode([
+                    'kaynak' => 'ILK_YONETICI_CLI',
+                    'status' => 'VERIFIED',
+                    'dogrulama_turu' => 'KURULUM_BEYANI',
+                    'bagimsiz_dogrulama' => false,
+                ], JSON_UNESCAPED_UNICODE),
+            ]);
+        }
+
+        return $kimlikId;
+    }
+
+    private static function tableExists(PDO $pdo, string $table): bool
+    {
+        $stmt = $pdo->prepare(
+            'SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :t'
+        );
+        $stmt->execute(['t' => $table]);
+
+        return (int) $stmt->fetchColumn() > 0;
     }
 }

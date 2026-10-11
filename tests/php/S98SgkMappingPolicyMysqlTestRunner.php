@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../../api/src/Auth/RolePermissions.php';
+require_once __DIR__ . '/../../api/src/Auth/EffectivePermissionResolver.php';
 require_once __DIR__ . '/../../api/src/Auth/DualControl.php';
 require_once __DIR__ . '/../../api/src/Services/Payroll/SgkKararPaketiAuthz.php';
 require_once __DIR__ . '/../../api/src/Services/Payroll/SgkKatalogContracts.php';

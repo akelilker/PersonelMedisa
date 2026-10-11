@@ -13,6 +13,7 @@ require_once __DIR__ . '/../../api/src/Services/Payroll/SgkPrimGunuEngine.php';
 require_once __DIR__ . '/../../api/src/Services/SgkPrimGunuService.php';
 require_once __DIR__ . '/../../api/src/Services/Payroll/PayrollComplianceGuard.php';
 require_once __DIR__ . '/../../api/src/Auth/RolePermissions.php';
+require_once __DIR__ . '/../../api/src/Auth/EffectivePermissionResolver.php';
 require_once __DIR__ . '/../../api/src/Services/Attendance/AttendanceDisciplineCatalog.php';
 require_once __DIR__ . '/../../api/src/Services/Attendance/AttendancePayrollEffectResolver.php';
 require_once __DIR__ . '/../../api/src/Services/Attendance/PuantajOlayKararService.php';

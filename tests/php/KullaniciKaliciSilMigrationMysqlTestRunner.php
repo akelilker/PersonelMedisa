@@ -185,7 +185,7 @@ function ksmBuildPreimage(PDO $pdo, string $apiDirectory, FilesystemMigrationSou
         scandir($apiDirectory . '/migrations') ?: [],
         static fn (string $name): bool => (bool) preg_match('/^\d{3}_.+\.sql$/', (string) $name)
             && $name !== '067_personel_canonical_reference_gate.sql'
-            && $name !== KSM_MIGRATION_TIP
+            && strcmp((string) $name, KSM_MIGRATION_TIP) < 0
     ));
     sort($chain, SORT_STRING);
     foreach ($chain as $migration) {
@@ -208,7 +208,19 @@ if (preg_match('/host=([^;]+)/i', $rootDsn, $hostMatch)
 $apiDirectory = dirname(__DIR__, 2) . '/api';
 $baseDsn = preg_replace('/;?dbname=[^;]*/i', '', $rootDsn) ?: $rootDsn;
 $root = ksmPdo($baseDsn);
-$source = new FilesystemMigrationSourceProvider($apiDirectory . '/migrations');
+// 099 apply sahibi tarihseldir (canlıda uygulandı): kaynak zinciri 099'da dondurulur;
+// sonraki migration'lar (100+) bu sahibin "yalnız 099 bekliyor" sözleşmesine girmez.
+$frozenRoot = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'medisa-ksm-chain-' . bin2hex(random_bytes(4));
+$frozenMigrations = $frozenRoot . DIRECTORY_SEPARATOR . 'migrations';
+mkdir($frozenMigrations, 0700, true);
+mkdir($frozenRoot . DIRECTORY_SEPARATOR . 'src' . DIRECTORY_SEPARATOR . 'Database', 0700, true);
+copy($apiDirectory . '/src/Database/migration_ledger.sql', $frozenRoot . '/src/Database/migration_ledger.sql');
+foreach (scandir($apiDirectory . '/migrations') ?: [] as $name) {
+    if (preg_match('/^\d{3}_.+\.sql$/', (string) $name) && strcmp((string) $name, KSM_MIGRATION_TIP) <= 0) {
+        copy($apiDirectory . '/migrations/' . $name, $frozenMigrations . DIRECTORY_SEPARATOR . $name);
+    }
+}
+$source = new FilesystemMigrationSourceProvider($frozenMigrations);
 $deployedSha = str_repeat('c', 40);
 
     $db = ksmNewDatabase($root, $baseDsn);

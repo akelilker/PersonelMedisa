@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { AppModal } from "../../../components/modal/AppModal";
+import { SurecInlineBackButton } from "../../kayit/components/SurecInlineBackButton";
 import { getApiErrorMessage } from "../../../api/api-client";
 import {
   createVeriYedegi,
@@ -84,12 +85,10 @@ export function VeriYedeklemeModal({ onClose, onBack }: VeriYedeklemeModalProps)
     <AppModal
       title="VERİ YEDEKLEME"
       titleTestId="veri-yedekleme-title"
-      backLabel="Ayarlar"
-      onBack={onBack}
-      backTestId="veri-yedekleme-back"
       onClose={onClose}
       className="veri-yedekleme-modal"
     >
+      <SurecInlineBackButton label="Ayarlar" onClick={onBack} testId="veri-yedekleme-back" />
       <div className="veri-yedekleme-body" data-testid="veri-yedekleme-modal">
         <div className="veri-yedekleme-actions">
           <button

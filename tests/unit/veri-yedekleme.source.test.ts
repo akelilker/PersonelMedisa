@@ -43,7 +43,9 @@ describe("Veri Yedekleme (Ayarlar)", () => {
 
   it("modal başlık, geri satırı ve metinler", () => {
     expect(modal).toContain('title="VERİ YEDEKLEME"');
-    expect(modal).toContain('backLabel="Ayarlar"');
+    // geri satırı: kırmızı header içinde değil, .modal-body > .universal-back-bar (onaylı karar)
+    expect(modal).toContain('<SurecInlineBackButton label="Ayarlar"');
+    expect(modal).not.toContain("backLabel=");
     expect(modal).toContain("Yedek Al");
     expect(modal).toContain("Yedekten Geri Yükle");
     expect(modal).toContain("Sunucudaki Son Yedekleme Dosyası:");

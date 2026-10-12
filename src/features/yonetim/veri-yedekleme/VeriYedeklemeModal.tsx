@@ -87,6 +87,7 @@ export function VeriYedeklemeModal({ onClose, onBack }: VeriYedeklemeModalProps)
       titleTestId="veri-yedekleme-title"
       onClose={onClose}
       className="veri-yedekleme-modal"
+      bodyClassName="modal-body--veri-yedekleme"
     >
       <SurecInlineBackButton label="Ayarlar" onClick={onBack} testId="veri-yedekleme-back" />
       <div className="veri-yedekleme-body" data-testid="veri-yedekleme-modal">

@@ -28,14 +28,13 @@ function extractCreateColumnLabels(source: string, columnIndex: number): string[
 }
 
 function extractMirrorColumnLabels(source: string, columnIndex: number): string[] {
-  const columnsBlock = source.match(
-    /<div className="personel-form-columns">([\s\S]*?)<\/div>\s*\n\s*<\/div>\s*\n\s*<\/div>/s
-  );
-  if (!columnsBlock) {
-    throw new Error("mirror personel-form-columns block not found");
+  // Dengeli satır-öncelikli ızgara: sol/sağ sıraları leftFields / rightFields bloklarında tutulur.
+  const start = source.indexOf(columnIndex === 0 ? "const leftFields" : "const rightFields");
+  const end = source.indexOf(columnIndex === 0 ? "const rightFields" : "const leftList");
+  if (start < 0 || end < 0) {
+    throw new Error("mirror leftFields/rightFields block not found");
   }
-  const columns = columnsBlock[1].split('<div className="personel-form-column">').slice(1);
-  const column = columns[columnIndex] ?? "";
+  const column = source.slice(start, end);
   const labels: string[] = [];
   const labelPattern = /label="([^"]+)"/g;
   let match = labelPattern.exec(column);

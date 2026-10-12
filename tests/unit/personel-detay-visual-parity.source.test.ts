@@ -46,7 +46,7 @@ describe("personel detay visual parity owners (tasit reference)", () => {
     expect(css).toMatch(/@media \(min-width: 641px\)[\s\S]*\.personel-dosya-hero-name[\s\S]*font-size:\s*16px/s);
     expect(css).toMatch(/\.personel-dosya-sticky-head[\s\S]*background:\s*var\(--modal-bg\)/s);
     expect(css).toMatch(/\.personel-kart-tablist[\s\S]*background:\s*var\(--modal-bg\)/s);
-    expect(css).toMatch(/\.personel-detail-card \.personel-dosya-kayit-mirror \.personel-form-column/s);
+    expect(css).toMatch(/\.personel-detail-card \.personel-dosya-kayit-mirror \.personel-dosya-kayit-grid/s);
 
     const mirror = read("src/features/personeller/components/personel-dosya/PersonelDosyaKayitMirrorFields.tsx");
     expect(mirror).toMatch(/personel-form-columns/);

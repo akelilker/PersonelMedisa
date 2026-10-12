@@ -1,3 +1,4 @@
+import { Children, isValidElement, type ReactNode } from "react";
 import type { Personel } from "../../../../types/personel";
 import {
   getPersonelMissingFields,
@@ -16,10 +17,10 @@ export function PersonelDosyaKayitMirrorFields({ personel }: { personel: Persone
     return missingKeys.has(key) ? MISSING_VALUE : value;
   }
 
-  return (
-    <div className="personel-dosya-kayit-mirror" data-testid="personel-dosya-kayit-mirror">
-      <div className="personel-form-columns">
-        <div className="personel-form-column">
+  /* Satır-öncelikli dengeli ızgara: sol/sağ alanlar sırayla tek grid'e akar (her satır sol|sağ);
+     kolonlar hiçbir zaman dengesizleşmez (onaylı karar: mobil + masaüstü 2 kolon, #392 öncesi denge). */
+  const leftFields = (
+    <>
           <DossierField
             label="T.C. Kimlik No."
             value={fieldValue("tc_kimlik_no", formatDetailValue(personel.tc_kimlik_no))}
@@ -55,14 +56,10 @@ export function PersonelDosyaKayitMirrorFields({ personel }: { personel: Persone
               }
             />
           ) : null}
-          {personel.info_only_notice ? (
-            <p className="personel-dosya-info-notice" role="status" data-testid="personel-dosya-info-notice">
-              {personel.info_only_notice}
-            </p>
-          ) : null}
-        </div>
-
-        <div className="personel-form-column">
+          </>
+  );
+  const rightFields = (
+    <>
           <DossierField
             label="İşe Giriş Tarihi"
             value={fieldValue("ise_giris_tarihi", formatIsoDateDetail(personel.ise_giris_tarihi))}
@@ -104,7 +101,25 @@ export function PersonelDosyaKayitMirrorFields({ personel }: { personel: Persone
             )}
             missing={missingKeys.has("personel_tipi_id")}
           />
-        </div>
+        </>
+  );
+  const leftList = Children.toArray(leftFields.props.children).filter(isValidElement);
+  const rightList = Children.toArray(rightFields.props.children).filter(isValidElement);
+  const rowMajor: ReactNode[] = [];
+  for (let i = 0; i < Math.max(leftList.length, rightList.length); i += 1) {
+    rowMajor.push(leftList[i] ?? <div key={`bos-sol-${i}`} className="personel-dosya-field personel-dosya-field--empty" aria-hidden="true" />);
+    if (rightList[i]) rowMajor.push(rightList[i]);
+  }
+
+  return (
+    <div className="personel-dosya-kayit-mirror" data-testid="personel-dosya-kayit-mirror">
+      <div className="personel-form-columns personel-dosya-kayit-grid">
+        {rowMajor}
+        {personel.info_only_notice ? (
+            <p className="personel-dosya-info-notice" role="status" data-testid="personel-dosya-info-notice">
+              {personel.info_only_notice}
+            </p>
+          ) : null}
       </div>
     </div>
   );

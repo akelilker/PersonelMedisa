@@ -271,3 +271,24 @@ describe("J) Ortak modal başlığı ve footer sabitleri", () => {
     expect(readSrc("src/styles/components/modal.css")).toMatch(/\.modal-body > \.universal-back-bar/);
   });
 });
+
+describe("F2) Personel Kartı > Genel kayıt aynası dengeli (satır-öncelikli) 2 kolon", () => {
+  it("alanlar tek grid'in doğrudan çocukları; sol/sağ sayısı farkı ≤ 1; ilk satır TC | İşe Giriş", async () => {
+    const { PersonelDosyaKayitMirrorFields } = await import(
+      "../../src/features/personeller/components/personel-dosya/PersonelDosyaKayitMirrorFields"
+    );
+    const personel = { id: 1, ad: "Ali", soyad: "Veli", aktif_durum: "AKTIF", calisan_kapsami: "DIS_KAYNAK" } as never;
+    const { container } = render(<PersonelDosyaKayitMirrorFields personel={personel} />);
+    const grid = container.querySelector(".personel-form-columns");
+    expect(grid).not.toBeNull();
+    expect(container.querySelector(".personel-form-column")).toBeNull();
+    const cells = Array.from(grid!.children).filter((el) => !el.classList.contains("personel-dosya-info-notice"));
+    const left = cells.filter((_, i) => i % 2 === 0).length;
+    const right = cells.filter((_, i) => i % 2 === 1).length;
+    expect(Math.abs(left - right)).toBeLessThanOrEqual(1);
+    expect(cells[0].textContent).toContain("T.C. Kimlik No.");
+    expect(cells[1].textContent).toContain("İşe Giriş Tarihi");
+    const css = readFileSync(resolve("src/styles/modules/personeller.css"), "utf8");
+    expect(css).toMatch(/\.personel-dosya-kayit-grid\s*\{[^}]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/s);
+  });
+});

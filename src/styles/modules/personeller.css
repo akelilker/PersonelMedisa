@@ -330,9 +330,15 @@
 
 /* Personel Kartı Genel: Kayıt formu ile aynı iki kolon (personel-form-columns owner kayit-surec.css).
    Global kayit-surec mobil kuralına dokunulmaz; yalnız detay kartında dar ekranda tek kolon. */
-.personel-detail-card .personel-dosya-kayit-mirror .personel-form-column {
-  justify-content: flex-start;
-  gap: var(--space-3);
+/* Satır-öncelikli dengeli 2 kolon (mobil + masaüstü): alanlar doğrudan grid hücresi. */
+.personel-detail-card .personel-dosya-kayit-mirror .personel-dosya-kayit-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  row-gap: var(--space-3);
+  align-items: start;
+}
+
+.personel-detail-card .personel-dosya-kayit-mirror .personel-dosya-kayit-grid > .personel-dosya-info-notice {
+  grid-column: 1 / -1;
 }
 
 .personel-detail-card .personel-dosya-kayit-mirror .personel-dosya-field {

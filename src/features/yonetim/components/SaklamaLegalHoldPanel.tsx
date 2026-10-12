@@ -23,6 +23,7 @@ import {
   RETENTION_CATEGORY_SELECT_OPTIONS
 } from "../../../lib/display/enum-display";
 import type { Personel } from "../../../types/personel";
+import { formatDisplayDate as formatSharedDisplayDate } from "../../../lib/display/iso-date-format";
 
 const TARGET_DOMAIN_PERSONEL = "personel";
 const DEFAULT_CATEGORY = "PERSONEL_OZLUK";
@@ -42,7 +43,7 @@ function formatDisplayDate(value: string | null | undefined): string | null {
   if (Number.isNaN(parsed.getTime())) {
     return value;
   }
-  return parsed.toLocaleDateString("tr-TR");
+  return formatSharedDisplayDate(parsed);
 }
 
 /**

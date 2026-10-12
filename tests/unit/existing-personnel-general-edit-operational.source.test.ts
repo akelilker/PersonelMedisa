@@ -141,7 +141,7 @@ describe("existing personnel general edit operational close", () => {
     const apiClient = read("src/api/api-client.ts");
     expect(apiClient).toContain("DUPLICATE_TC_KIMLIK_NO");
     expect(apiClient).toContain("DUPLICATE_SICIL_NO");
-    expect(apiClient).toContain("Bu T.C. Kimlik No ile kayıt açılamaz.");
+    expect(apiClient).toContain("Bu T.C. Kimlik No. ile kayıt açılamaz.");
     expect(apiClient).toContain("Bu sicil no ile kayıt açılamaz.");
   });
 

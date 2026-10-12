@@ -728,13 +728,13 @@ describe("api error helpers", () => {
   });
 
   it("getApiErrorDetail preserves DUPLICATE_TC_KIMLIK_NO metadata", () => {
-    const error = new ApiRequestError("Bu T.C. Kimlik No ile kayıt açılamaz.", 409, {
+    const error = new ApiRequestError("Bu T.C. Kimlik No. ile kayıt açılamaz.", 409, {
       code: "DUPLICATE_TC_KIMLIK_NO",
       field: "tc_kimlik_no"
     });
 
     expect(getApiErrorDetail(error, "Personel kaydı oluşturulamadı.")).toEqual({
-      message: "Bu T.C. Kimlik No ile kayıt açılamaz.",
+      message: "Bu T.C. Kimlik No. ile kayıt açılamaz.",
       status: 409,
       code: "DUPLICATE_TC_KIMLIK_NO",
       field: "tc_kimlik_no"

@@ -5,7 +5,7 @@ import { RAPOR_COLUMN_CONTRACT } from "../../src/features/raporlar/rapor-column-
 
 /**
  * #504 kararı: kullanıcıya internal personel kayıt ID'si hiçbir user-facing
- * alanda gösterilmez. Kullanıcı personeli Ad Soyad + Sicil No ile tanır.
+ * alanda gösterilmez. Kullanıcı personeli Ad Soyad + Sicil No. ile tanır.
  * Internal ID yalnız teknik backend/API/route/state ilişkilerinde kalır.
  *
  * Bu test user-facing kaynakların internal ID sızdırmadığını ve personel

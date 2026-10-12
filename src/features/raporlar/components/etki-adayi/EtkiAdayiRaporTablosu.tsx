@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import type { BildirimEtkiRaporRow, BildirimEtkiRaporSummary } from "../../../../api/bildirim-etki-rapor.api";
 import { formatBildirimPuantajEtkiAdayStateLabel } from "../../../../lib/bildirim-puantaj-etki-aday/display";
+import { formatDisplayDateTime } from "../../../../lib/display/iso-date-format";
 
 type EtkiAdayiRaporTablosuProps = {
   rows: BildirimEtkiRaporRow[];
@@ -102,7 +103,7 @@ export function EtkiAdayiRaporTablosu({
                   {row.karar_zamani ? (
                     <>
                       <br />
-                      <small>{new Date(row.karar_zamani).toLocaleString("tr-TR")}</small>
+                      <small>{formatDisplayDateTime(row.karar_zamani)}</small>
                     </>
                   ) : null}
                 </td>

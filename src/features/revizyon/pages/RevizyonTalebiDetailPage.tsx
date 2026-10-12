@@ -25,6 +25,7 @@ import {
   formatRevizyonTipiLabel,
   revizyonUserMessage
 } from "../revizyon-display";
+import { formatDisplayDateTime } from "../../../lib/display/iso-date-format";
 
 type PendingRevizyonAction =
   | { type: "approve" }
@@ -330,7 +331,7 @@ export function RevizyonTalebiDetailPage() {
           <dt>Talep eden</dt>
           <dd>
             {talep.talep_eden_kullanici_adi ?? "—"} ·{" "}
-            {new Date(talep.talep_zamani).toLocaleString("tr-TR")}
+            {formatDisplayDateTime(talep.talep_zamani)}
           </dd>
         </div>
         <div>
@@ -338,7 +339,7 @@ export function RevizyonTalebiDetailPage() {
           <dd>
             {talep.karar_veren_kullanici_adi ?? "—"}
             {talep.karar_zamani
-              ? ` · ${new Date(talep.karar_zamani).toLocaleString("tr-TR")}`
+              ? ` · ${formatDisplayDateTime(talep.karar_zamani)}`
               : ""}
           </dd>
         </div>
@@ -356,7 +357,7 @@ export function RevizyonTalebiDetailPage() {
               <li key={`${item.islem_zamani}-${index}`}>
                 {item.aksiyon}: {item.onceki_durum ?? "—"} → {item.sonraki_durum} (
                 {item.islem_yapan_kullanici_adi ?? "kullanıcı"} ·{" "}
-                {new Date(item.islem_zamani).toLocaleString("tr-TR")})
+                {formatDisplayDateTime(item.islem_zamani)})
                 {item.aciklama ? ` — ${item.aciklama}` : ""}
               </li>
             ))}

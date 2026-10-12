@@ -1,3 +1,4 @@
+import { formatDisplayDateTime } from "../display/iso-date-format";
 import type { GenelYoneticiBildirimOnayiOzet } from "../../types/genel-yonetici-bildirim-onayi";
 
 const BLOCK_MESSAGES: Record<string, string> = {
@@ -35,5 +36,5 @@ export function formatGenelYoneticiBildirimOnayiDate(value: string | null | unde
   if (!value) return "—";
   const parsed = new Date(value.includes("T") ? value : value.replace(" ", "T"));
   if (Number.isNaN(parsed.getTime())) return "—";
-  return new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium", timeStyle: "short" }).format(parsed);
+  return formatDisplayDateTime(parsed);
 }

@@ -30,6 +30,7 @@ import {
   formatResmiTatilTuruLabel
 } from "../../../lib/display/enum-display";
 import { useRoleAccess } from "../../../hooks/use-role-access";
+import { formatDisplayDate } from "../../../lib/display/iso-date-format";
 
 const FORM_ID = "resmi-tatil-takvimi-form";
 const IPTAL_FORM_ID = "resmi-tatil-iptal-form";
@@ -70,7 +71,7 @@ function formatDateOnly(value: string | null | undefined): string {
   if (!value) return "-";
   const parsed = Date.parse(`${value.slice(0, 10)}T00:00:00Z`);
   if (!Number.isFinite(parsed)) return value;
-  return new Intl.DateTimeFormat("tr-TR", { dateStyle: "short", timeZone: "UTC" }).format(parsed);
+  return formatDisplayDate(value.slice(0, 10));
 }
 
 function formatTime(value: string | null | undefined): string {

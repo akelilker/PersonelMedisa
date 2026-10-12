@@ -353,7 +353,7 @@ function AylikKapanisOzetiSection() {
     () =>
       (result?.items ?? []).map((item) => ({
         "Ad Soyad": item.ad_soyad,
-        "Sicil No": item.sicil_no ?? "-",
+        "Sicil No.": item.sicil_no ?? "-",
         Şube: item.sube,
         Bölüm: item.bolum,
         "Bağlı Amir": item.bagli_amir_adi,

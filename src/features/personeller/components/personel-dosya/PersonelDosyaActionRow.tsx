@@ -63,7 +63,7 @@ export function PersonelDosyaActionRow({
           onClick={onToggleActionMenu}
           aria-expanded={isActionMenuOpen}
         >
-          Islemler
+          İşlemler
         </button>
         <div className={`settings-dropdown personel-dosya-action-menu${isActionMenuOpen ? " open" : ""}`}>
           {actionItems.map((item) => (

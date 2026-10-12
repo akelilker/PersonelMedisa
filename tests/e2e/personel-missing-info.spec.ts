@@ -39,7 +39,7 @@ test.describe("personel eksik bilgi UX", () => {
     await expect(kayitModal.getByText("Ayşe Yılmaz", { exact: false }).first()).toBeVisible();
 
     await kayitModal.getByTestId("kayit-surec-personel-duzenle").click();
-    await expect(kayitModal.getByLabel("Sicil No")).toBeVisible();
+    await expect(kayitModal.getByLabel("Sicil No.")).toBeVisible();
     await expect(kayitModal.getByLabel("İşe Giriş Tarihi")).toBeVisible();
 
     await kayitModal.getByRole("button", { name: "Kapat" }).click();

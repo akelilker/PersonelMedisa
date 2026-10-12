@@ -28,7 +28,7 @@ describe("PERSONEL mobile product phase 1 shell", () => {
     expect(identity).toContain("Cinsiyet");
     expect(identity).toContain("Telefon");
     expect(identity).toContain("Sicil No.");
-    expect(identity).toContain("TC Kimlik No");
+    expect(identity).toContain("T.C. Kimlik No.");
     expect(identity).toContain("Kan Grubu");
     expect(identity).toContain("İşe Giriş");
     expect(identity).toContain("Çalışılan Süre");
@@ -37,8 +37,8 @@ describe("PERSONEL mobile product phase 1 shell", () => {
     expect(identity.indexOf("Doğum Tarihi")).toBeLessThan(identity.indexOf("Cinsiyet"));
     expect(identity.indexOf("Cinsiyet")).toBeLessThan(identity.indexOf("Telefon"));
     expect(identity.indexOf("Telefon")).toBeLessThan(identity.indexOf("Sicil No."));
-    expect(identity.indexOf("Sicil No.")).toBeLessThan(identity.indexOf("TC Kimlik No"));
-    expect(identity.indexOf("TC Kimlik No")).toBeLessThan(identity.indexOf("Kan Grubu"));
+    expect(identity.indexOf("Sicil No.")).toBeLessThan(identity.indexOf("T.C. Kimlik No."));
+    expect(identity.indexOf("T.C. Kimlik No.")).toBeLessThan(identity.indexOf("Kan Grubu"));
     expect(identity.indexOf("Kan Grubu")).toBeLessThan(identity.indexOf("İşe Giriş"));
     expect(identity.indexOf("İşe Giriş")).toBeLessThan(identity.indexOf("Çalışılan Süre"));
 

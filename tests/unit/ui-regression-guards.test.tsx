@@ -150,3 +150,124 @@ describe("C) Dış uygulama kimliği (sekme / link önizleme / PWA) — 42c4dd5b
     expect(manifest.short_name).toBe("Personel Yönetim");
   });
 });
+
+/* ---------------- Onaylı kararlar (docs/guncel/onayli-kararlar.md) — sistemik kilitler ---------------- */
+
+function listSources(dir: string, pattern: RegExp, out: string[] = []): string[] {
+  for (const name of readdirSync(dir)) {
+    const full = join(dir, name);
+    if (statSync(full).isDirectory()) {
+      listSources(full, pattern, out);
+    } else if (pattern.test(name) && !/\.test\./.test(name)) {
+      out.push(full);
+    }
+  }
+  return out;
+}
+
+const readSrc = (path: string) => readFileSync(resolve(path), "utf8");
+
+describe("D) Tarih görünümü gg/aa/yyyy (tek biçimleyici)", () => {
+  it("UI kodunda ham tr-TR tarih biçimlemesi yok (gg.aa.yyyy üretir)", () => {
+    const offenders = listSources(resolve("src"), /\.(ts|tsx)$/)
+      .filter((file) => !/mock-demo\.ts$/.test(file))
+      .filter((file) => {
+        const source = readFileSync(file, "utf8");
+        return (
+          /toLocale(Date)?String\(\s*["']tr-TR["']/.test(source) ||
+          /Intl\.DateTimeFormat\(\s*["']tr-TR["']\s*,\s*\{[^}]*(dateStyle|month:\s*["'](2-digit|numeric)["'])/s.test(source)
+        );
+      });
+    expect(offenders).toEqual([]);
+  });
+
+  it("formatDisplayDateTime / formatDisplayDate gg/aa/yyyy döndürür", async () => {
+    const mod = await import("../../src/lib/display/iso-date-format");
+    expect(mod.formatDisplayDate("1992-03-14")).toBe("14/03/1992");
+    expect(mod.formatDisplayDateTime("2026-10-12T07:07:12Z")).toBe("12/10/2026 10:07");
+    expect(mod.formatDisplayDateTime("2026-10-12 07:07:12Z", { seconds: true })).toBe("12/10/2026 10:07:12");
+  });
+});
+
+describe('E) "No" kısaltması noktalı ("T.C. Kimlik No.", "Sicil No.")', () => {
+  it("görünür metinlerde noktasız Kimlik No / Sicil No yok", () => {
+    const offenders: string[] = [];
+    for (const file of listSources(resolve("src"), /\.(ts|tsx)$/)) {
+      readFileSync(file, "utf8")
+        .split("\n")
+        .forEach((line, i) => {
+          if (/^\s*(\/\/|\*|\/\*)/.test(line)) return;
+          if (/["'>`]\s*[^"'<`]*\b(Kimlik|Sicil) No(?![.\w])/.test(line)) offenders.push(`${file}:${i + 1}`);
+        });
+    }
+    expect(offenders).toEqual([]);
+  });
+});
+
+describe("F) Personel Kartı > Genel (Özlük / Kayıt Özeti) mobilde 2 kolon", () => {
+  it("kayıt aynası mobilde tek kolona zorlanmaz; Kayıt formu 2 kolon sahibi korunur", () => {
+    const css = readSrc("src/styles/modules/personeller.css");
+    expect(css).not.toMatch(
+      /\.personel-dosya-kayit-mirror \.personel-form-columns\s*\{[^}]*grid-template-columns:\s*(minmax\(0,\s*1fr\)|1fr)\s*;/s
+    );
+    expect(css).not.toMatch(/\.personel-dosya-kayit-mirror \.personel-form-columns::after\s*\{[^}]*display:\s*none/s);
+  });
+});
+
+describe("G) Kayıt ve Süreç > Genel detay ızgarası mobil 2 / masaüstü 3", () => {
+  it("mobil kırılımlarda 2 kolon kalır", () => {
+    const css = readSrc("src/styles/modules/kayit-surec.css");
+    const mobileBlocks = css
+      .split("@media (max-width: 560px)")
+      .slice(1)
+      .map((chunk) => chunk.slice(0, chunk.indexOf("\n}\n")));
+    expect(
+      mobileBlocks.some((block) => /\.surec-person-general-columns\s*\{[^}]*grid-template-columns:\s*repeat\(2,/.test(block))
+    ).toBe(true);
+    expect(readSrc("src/features/kayit/components/KayitSurecPersonelGenelPanel.tsx")).not.toMatch(/Organizasyon özeti salt okunur/);
+  });
+});
+
+describe("H) Aktif durum: yalnız yeşil nokta; kalem ile düzenleme", () => {
+  it("görünür Çalışıyor pill'i yok, aktifte etiket render edilmez", () => {
+    const hero = readSrc("src/features/personeller/components/personel-dosya/PersonelDosyaHero.tsx");
+    expect(hero).toMatch(/isActive \? null :/);
+    const offenders = listUiSources(resolve("src")).filter((file) =>
+      /^(?!\s*(\/\/|\*|\{\/\*)).*>\s*Çalışıyor\s*</m.test(readFileSync(file, "utf8"))
+    );
+    expect(offenders).toEqual([]);
+  });
+
+  it("Süreç Genel başlığında kalem (Personeli Düzenle) var, ayrı metin düğmesi yok", () => {
+    const heading = readSrc("src/features/kayit/components/KayitSurecPersonelNameHeading.tsx");
+    expect(heading).toMatch(/aria-label="Personeli Düzenle"/);
+    const offenders = listUiSources(resolve("src/features/kayit")).filter((file) =>
+      />\s*Personeli Düzenle\s*</.test(readFileSync(file, "utf8"))
+    );
+    expect(offenders).toEqual([]);
+  });
+});
+
+describe("I) Türkçe karakter: İşlemler", () => {
+  it("görünür 'Islemler' yok", () => {
+    const offenders = listUiSources(resolve("src")).filter((file) => />\s*Islemler\s*</.test(readFileSync(file, "utf8")) || /^\s*Islemler\s*$/m.test(readFileSync(file, "utf8")));
+    expect(offenders).toEqual([]);
+  });
+});
+
+describe("J) Ortak modal başlığı ve footer sabitleri", () => {
+  it("kırmızı gradyan tam uzunluk + ikon kaydırma 6px", () => {
+    expect(readSrc("src/styles/tokens/colors.css")).toContain(
+      "linear-gradient(180deg, #790000 0%, #700000 30%, #580000 52%, #420205 72%, #32050a 82%, #20080f 90%, #120b14 96%, var(--modal-bg) 100%)"
+    );
+    expect(readSrc("src/styles/components/modal.css")).toMatch(/--modal-header-icon-shift-y:\s*6px/);
+  });
+
+  it("footer görünür sürüm v78.2", () => {
+    expect(readSrc("src/config/app-env.ts")).toMatch(/MEDISA_UI_VERSION = "v78\.2"/);
+  });
+
+  it("geri satırı tek sahip: modal.css .modal-body > .universal-back-bar", () => {
+    expect(readSrc("src/styles/components/modal.css")).toMatch(/\.modal-body > \.universal-back-bar/);
+  });
+});

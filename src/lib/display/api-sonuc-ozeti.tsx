@@ -1,3 +1,4 @@
+import { formatDisplayDateTime } from "./iso-date-format";
 import type { SgkKatalogBlocker } from "../../api/sgk-katalog-hazirlik.api";
 import { formatSurecStateLabel } from "./enum-display";
 import {
@@ -122,7 +123,7 @@ function formatScalarValue(key: string, value: unknown): string {
     }
     if (key === "generated_at") {
       const date = new Date(value);
-      return Number.isNaN(date.getTime()) ? value : date.toLocaleString("tr-TR");
+      return Number.isNaN(date.getTime()) ? value : formatDisplayDateTime(date);
     }
     return value.trim() || "—";
   }

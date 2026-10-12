@@ -28,7 +28,7 @@ test("Ana akış smoke", async ({ page }) => {
   await expect(homeFlowModal.getByRole("heading", { name: /Kayıt ve Süreç İşlemleri/i })).toBeVisible();
   await expect(homeFlowModal.getByRole("button", { name: "Kayıt" })).toBeVisible();
   await expect(homeFlowModal.getByRole("button", { name: "Süreç" })).toBeVisible();
-  await expect(homeFlowModal.getByLabel("T.C. Kimlik No")).toBeVisible();
+  await expect(homeFlowModal.getByLabel("T.C. Kimlik No.")).toBeVisible();
 
   await homeFlowModal.getByRole("button", { name: "Süreç" }).click();
   await expect(homeFlowModal.getByRole("combobox", { name: "Personel" })).toBeVisible();

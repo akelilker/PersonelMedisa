@@ -73,3 +73,52 @@ export function formatIsoDateTimeDetail(value: string | null | undefined): strin
   const datePart = [pick("day"), pick("month"), pick("year")].join(DISPLAY_DATE_SEPARATOR);
   return `${datePart} ${pick("hour")}:${pick("minute")}:${pick("second")}`;
 }
+
+/**
+ * Tek görünür tarih/saat biçimleyici (onaylı karar: gg/aa/yyyy).
+ * Tarih-only (YYYY-MM-DD…) değerler takvim tarihi olarak, diğerleri İstanbul saatiyle
+ * biçimlenir. `time: false` → yalnız tarih; `seconds: true` → HH:MM:SS.
+ * Ham tr-TR toLocale*String / sayısal tr-TR Intl biçimlemesi kullanılmaz
+ * (gg.aa.yyyy üretir) — tests/unit/ui-regression-guards.test.tsx bunu yakalar.
+ */
+export function formatDisplayDateTime(
+  value: string | number | Date | null | undefined,
+  options: { time?: boolean; seconds?: boolean } = {}
+): string {
+  if (value === null || value === undefined || value === "") {
+    return "-";
+  }
+  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value.trim())) {
+    return formatIsoDateDetail(value.trim());
+  }
+  const date =
+    value instanceof Date ? value : new Date(typeof value === "string" ? value.trim().replace(" ", "T") : value);
+  if (Number.isNaN(date.getTime())) {
+    return typeof value === "string" ? value : "-";
+  }
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Europe/Istanbul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23"
+  }).formatToParts(date);
+  const pick = (type: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === type)?.value ?? "00";
+  const datePart = [pick("day"), pick("month"), pick("year")].join(DISPLAY_DATE_SEPARATOR);
+  if (options.time === false) {
+    return datePart;
+  }
+  const timePart = options.seconds ? `${pick("hour")}:${pick("minute")}:${pick("second")}` : `${pick("hour")}:${pick("minute")}`;
+  return `${datePart} ${timePart}`;
+}
+
+/** Yalnız tarih: gg/aa/yyyy. */
+export function formatDisplayDate(value: string | number | Date | null | undefined): string {
+  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}/.test(value.trim()) && value.trim().length <= 10) {
+    return formatIsoDateDetail(value.trim().slice(0, 10));
+  }
+  return formatDisplayDateTime(value, { time: false });
+}

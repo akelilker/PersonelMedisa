@@ -11,6 +11,7 @@ import { LoadingState } from "../../../components/states/LoadingState";
 import { useRoleAccess } from "../../../hooks/use-role-access";
 import type { RevizyonCorrectionEvent } from "../../../types/revizyon-correction";
 import { formatRevizyonDeger, formatRevizyonCorrectionTipiLabel, revizyonUserMessage } from "../revizyon-display";
+import { formatDisplayDateTime } from "../../../lib/display/iso-date-format";
 
 export function RevizyonCorrectionDetailPage() {
   const { correctionId } = useParams();
@@ -173,7 +174,7 @@ export function RevizyonCorrectionDetailPage() {
         </div>
         <div>
           <dt>Oluşturma</dt>
-          <dd>{new Date(correction.olusturma_zamani).toLocaleString("tr-TR")}</dd>
+          <dd>{formatDisplayDateTime(correction.olusturma_zamani)}</dd>
         </div>
       </dl>
 

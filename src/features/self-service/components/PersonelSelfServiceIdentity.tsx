@@ -43,7 +43,7 @@ export function PersonelSelfServiceIdentity({
           <span className="pm-self-identity__value">{view.sicil}</span>
         </p>
         <p className="pm-self-identity__fact" data-testid="personel-self-identity-tc">
-          <span className="pm-self-identity__label">TC Kimlik No</span>{" "}
+          <span className="pm-self-identity__label">T.C. Kimlik No.</span>{" "}
           <span className="pm-self-identity__value">{view.tcKimlikNo}</span>
         </p>
         <p className="pm-self-identity__fact" data-testid="personel-self-identity-kan">

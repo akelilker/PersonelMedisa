@@ -32,12 +32,12 @@ test("Genel kayıt: sticky kimlik, mobil tek kolon, sekme kromu opak", async ({ 
     .getByTestId("personel-dosya-kayit-mirror")
     .locator(".personel-form-columns")
     .evaluate((el) => window.getComputedStyle(el).gridTemplateColumns);
-  expect(columnsTemplate.split(" ").filter(Boolean).length).toBe(1);
+  expect(columnsTemplate.split(" ").filter(Boolean).length).toBe(2);
 
   const mirror = page.getByTestId("personel-dosya-kayit-mirror");
   const columns = mirror.locator(".personel-form-column");
   await expect(columns).toHaveCount(2);
-  await expect(columns.nth(0).getByText("T.C. Kimlik No", { exact: true })).toBeVisible();
+  await expect(columns.nth(0).getByText("T.C. Kimlik No.", { exact: true })).toBeVisible();
   await expect(columns.nth(1).getByText("İşe Giriş Tarihi", { exact: true })).toBeVisible();
 
   await page.setViewportSize({ width: 1100, height: 844 });

@@ -13,6 +13,7 @@ import { AppSelect } from "../../../components/form/AppSelect";
 import { AppDatePicker } from "../../../components/form/AppDatePicker";
 import { AppModal } from "../../../components/modal/AppModal";
 import { useAuth } from "../../../state/auth.store";
+import { formatDisplayDateTime } from "../../../lib/display/iso-date-format";
 
 const IMPORT_HISTORY_STATUS_OPTIONS = [
   { value: "", label: "Tümü" },
@@ -38,7 +39,7 @@ function formatDateTime(value: string | null): string {
   if (Number.isNaN(date.getTime())) {
     return value;
   }
-  return date.toLocaleString("tr-TR");
+  return formatDisplayDateTime(date);
 }
 
 function formatDuration(ms: number | null): string {

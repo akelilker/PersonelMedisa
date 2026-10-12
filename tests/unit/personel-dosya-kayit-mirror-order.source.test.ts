@@ -54,7 +54,7 @@ const HERO_OWNED_MIRROR_LABELS = new Set([
   "Şube",
   "Departman",
   "Görev / Unvan",
-  "Sicil No",
+  "Sicil No.",
   "Çalışma Durumu"
 ]);
 

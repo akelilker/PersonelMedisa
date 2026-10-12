@@ -2546,3 +2546,54 @@
   width: 100%;
   max-width: 100%;
 }
+
+/* t849 kararı — masaüstü kompakt liste: tablo modal kenarlarına 6px yakın, hücre iç boşluğu
+   daraltıldı, Bölüm/Birim + Görev kırpılmadan sarılır (ellipsis yok), kolon oranları dengelendi. */
+@media (min-width: 721px) {
+  .personeller-page--kart .personeller-table-scroll-shell {
+    margin-inline: -6px;
+  }
+
+  .personeller-page--kart .personeller-table--dense thead th {
+    padding: 4px 2px;
+  }
+
+  .personeller-page--kart .personeller-table--dense tbody td {
+    padding: 3px 3px;
+    line-height: 1.25;
+  }
+
+  .personeller-page--kart .personeller-table--dense .personeller-tc-value {
+    letter-spacing: 0;
+  }
+
+  .personeller-page--kart .personeller-table--dense tbody td.personeller-cell-wrap > span {
+    display: block;
+    -webkit-line-clamp: unset;
+    line-clamp: none;
+    overflow: visible;
+    overflow-wrap: normal;
+    word-break: normal;
+    hyphens: manual;
+    font-size: 11px;
+    letter-spacing: -0.01em;
+  }
+
+  .personeller-page--kart .personeller-table--dense td.personeller-tc-cell {
+    padding-inline: 2px;
+    font-size: 11.5px;
+  }
+
+  .personeller-page--kart .personeller-table--scope .personeller-col-kimlik { width: 18.5%; }
+  .personeller-page--kart .personeller-table--scope .personeller-col-ad { width: 21%; }
+  .personeller-page--kart .personeller-table--scope .personeller-col-sube { width: 12%; }
+  .personeller-page--kart .personeller-table--scope .personeller-col-bolum { width: 20%; }
+  .personeller-page--kart .personeller-table--scope .personeller-col-gorev { width: 19.5%; }
+  .personeller-page--kart .personeller-table--scope .personeller-col-statu { width: 9%; }
+
+  .personeller-page--kart .personeller-table:not(.personeller-table--scope) .personeller-col-kimlik { width: 21%; }
+  .personeller-page--kart .personeller-table:not(.personeller-table--scope) .personeller-col-ad { width: 23%; }
+  .personeller-page--kart .personeller-table:not(.personeller-table--scope) .personeller-col-bolum { width: 22%; }
+  .personeller-page--kart .personeller-table:not(.personeller-table--scope) .personeller-col-gorev { width: 22%; }
+  .personeller-page--kart .personeller-table:not(.personeller-table--scope) .personeller-col-statu { width: 12%; }
+}

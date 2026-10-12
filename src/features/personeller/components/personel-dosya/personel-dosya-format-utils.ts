@@ -1,3 +1,4 @@
+import { formatDisplayDateTime } from "../../../../lib/display/iso-date-format";
 export { formatIsoDateDetail } from "../../../../lib/display/iso-date-format";
 
 export function formatDetailValue(value: string | null | undefined) {
@@ -39,10 +40,7 @@ export function formatDateTimeDetail(value: string | null | undefined) {
     return fallback;
   }
 
-  return new Intl.DateTimeFormat("tr-TR", {
-    dateStyle: "short",
-    timeStyle: "short"
-  }).format(new Date(parsed));
+  return formatDisplayDateTime(parsed);
 }
 
 export function timestampValue(value: string | null | undefined) {

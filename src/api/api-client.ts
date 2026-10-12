@@ -151,7 +151,7 @@ export function isApiRequestError(error: unknown): error is ApiRequestError {
   return error instanceof ApiRequestError;
 }
 
-const DUPLICATE_TC_MESSAGE = "Bu T.C. Kimlik No ile kayıt açılamaz.";
+const DUPLICATE_TC_MESSAGE = "Bu T.C. Kimlik No. ile kayıt açılamaz.";
 const DUPLICATE_SICIL_MESSAGE = "Bu sicil no ile kayıt açılamaz.";
 const PERSONEL_CREATE_FORBIDDEN_SUBE_YETKI_MESSAGE = "Seçili şube için yetkiniz yok.";
 const PERSONEL_CREATE_FORBIDDEN_SUBE_SCOPE_MESSAGE =

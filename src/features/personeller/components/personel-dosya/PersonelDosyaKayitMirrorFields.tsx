@@ -21,7 +21,7 @@ export function PersonelDosyaKayitMirrorFields({ personel }: { personel: Persone
       <div className="personel-form-columns">
         <div className="personel-form-column">
           <DossierField
-            label="T.C. Kimlik No"
+            label="T.C. Kimlik No."
             value={fieldValue("tc_kimlik_no", formatDetailValue(personel.tc_kimlik_no))}
             missing={missingKeys.has("tc_kimlik_no")}
           />

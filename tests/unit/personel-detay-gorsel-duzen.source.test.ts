@@ -85,8 +85,9 @@ describe("personel detay gorsel duzen paketi owners", () => {
 
   it("scopes mobile mirror stack and notice styles to personel-detail-card", () => {
     const css = read("src/styles/modules/personeller.css");
-    expect(css).toMatch(
-      /@media \(max-width: 640px\)[\s\S]*\.personel-detail-card \.personel-dosya-kayit-mirror \.personel-form-columns[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\)/s
+    // Onaylı karar: mobilde de 2 kolon; tek kolon override'ı geri gelmez.
+    expect(css).not.toMatch(
+      /\.personel-dosya-kayit-mirror \.personel-form-columns\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\)\s*;/s
     );
     expect(css).toMatch(/\.personel-archive-banner/);
     expect(css).toMatch(/\.personel-write-scope-notice/);

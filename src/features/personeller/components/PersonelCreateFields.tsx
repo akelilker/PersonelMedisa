@@ -223,7 +223,7 @@ export function PersonelCreateFields({
             </p>
           ) : null}
           <FormField
-            label="T.C. Kimlik No"
+            label="T.C. Kimlik No."
             name="create-tc"
             value={form.tcKimlikNo}
             onChange={(value) => {

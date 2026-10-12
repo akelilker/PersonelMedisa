@@ -12,6 +12,7 @@ import type { Personel } from "../../../../types/personel";
 import type { Surec } from "../../../../types/surec";
 import type { Zimmet } from "../../../../types/zimmet";
 import { formatDetailValue } from "./personel-dosya-format-utils";
+import { formatDisplayDateTime } from "../../../../lib/display/iso-date-format";
 
 export type PersonelTimelineEventTone = "default" | "danger";
 
@@ -181,7 +182,7 @@ function formatSurecKayitZamani(value: string | undefined): string | null {
     return null;
   }
 
-  return new Intl.DateTimeFormat("tr-TR", { dateStyle: "short", timeStyle: "short" }).format(new Date(parsed));
+  return formatDisplayDateTime(parsed);
 }
 
 function joinTimelineOzetParts(parts: Array<string | null | undefined>) {

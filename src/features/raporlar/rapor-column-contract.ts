@@ -4,13 +4,13 @@ import type { RaporKolonu, RaporTipi } from "../../types/rapor";
  * Kullanıcıya dönük rapor kolon sözleşmesi.
  *
  * Internal personel kayıt ID'si (`personel_id`) bu sözleşmede kolon olarak yer
- * almaz; kullanıcı personeli Ad Soyad + Sicil No ile tanır. Internal ID yalnız
+ * almaz; kullanıcı personeli Ad Soyad + Sicil No. ile tanır. Internal ID yalnız
  * filtre/istek paramı ve backend ilişkilerinde teknik olarak kullanılır.
  */
 export const RAPOR_COLUMN_CONTRACT: Record<RaporTipi, RaporKolonu[]> = {
   "personel-ozet": [
     { key: "ad_soyad", label: "Ad Soyad" },
-    { key: "sicil_no", label: "Sicil No" },
+    { key: "sicil_no", label: "Sicil No." },
     { key: "aktif_durum", label: "Durum" },
     { key: "net_calisma_dakika", label: "Net Çalışma (dk)" },
     { key: "sgk_prim_gun", label: "SGK Prim Gün" }

@@ -16,6 +16,7 @@ import {
   formatRevizyonTipiLabel,
   revizyonUserMessage
 } from "../revizyon-display";
+import { formatDisplayDateTime } from "../../../lib/display/iso-date-format";
 
 type Gorunum = "talepler" | "onay" | "corrections";
 
@@ -194,7 +195,7 @@ export function RevizyonMerkeziPage() {
                         : "—"}
                   </td>
                   <td>{talep.talep_eden_kullanici_adi ?? "—"}</td>
-                  <td>{new Date(talep.talep_zamani).toLocaleString("tr-TR")}</td>
+                  <td>{formatDisplayDateTime(talep.talep_zamani)}</td>
                   <td>
                     <button
                       type="button"
@@ -251,7 +252,7 @@ export function RevizyonMerkeziPage() {
                     <td>{correction.bordro_etki_var_mi ? "Var" : "Yok"}</td>
                   ) : null}
                   <td>{correction.iptal_edildi_mi ? "İptal" : "Aktif"}</td>
-                  <td>{new Date(correction.olusturma_zamani).toLocaleString("tr-TR")}</td>
+                  <td>{formatDisplayDateTime(correction.olusturma_zamani)}</td>
                   <td>
                     <button
                       type="button"

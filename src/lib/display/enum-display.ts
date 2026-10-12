@@ -2,6 +2,7 @@ import type { UiProfile, UserRole } from "../../types/auth";
 import type { FinansDurum } from "../../types/finans";
 import type { PersonelCalisanKapsami } from "../../types/personel";
 import type { ComplianceUyariSeviye, GunlukPuantajState } from "../../types/puantaj";
+import { formatDisplayDate } from "./iso-date-format";
 
 const TR_LOCALE = "tr-TR";
 
@@ -400,7 +401,7 @@ export function formatRetentionEligibilitySummary(eligibility: {
     const parsed = new Date(untilRaw);
     const untilLabel = Number.isNaN(parsed.getTime())
       ? untilRaw
-      : parsed.toLocaleDateString("tr-TR");
+      : formatDisplayDate(parsed);
     return `Bu kayıt henüz imha edilemez. En erken değerlendirme tarihi: ${untilLabel}`;
   }
 

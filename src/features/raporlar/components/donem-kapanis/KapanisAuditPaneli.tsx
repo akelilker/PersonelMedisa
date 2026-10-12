@@ -1,6 +1,7 @@
 import { LoadingState } from "../../../../components/states/LoadingState";
 import { ErrorState } from "../../../../components/states/ErrorState";
 import type { DonemKapanisAudit } from "../../../../api/donem-kapanis.api";
+import { formatDisplayDateTime } from "../../../../lib/display/iso-date-format";
 
 type KapanisAuditPaneliProps = {
   audits: DonemKapanisAudit[];
@@ -55,7 +56,7 @@ export function KapanisAuditPaneli({ audits, isLoading, errorMessage, onRetry }:
             <tbody>
               {audits.map((audit) => (
                 <tr key={audit.id} data-testid={`donem-kapanis-audit-row-${audit.id}`}>
-                  <td>{audit.created_at ? new Date(audit.created_at).toLocaleString("tr-TR") : "-"}</td>
+                  <td>{audit.created_at ? formatDisplayDateTime(audit.created_at) : "-"}</td>
                   <td>{formatActionLabel(audit.action)}</td>
                   <td>{formatResultLabel(audit.result_state)}</td>
                   <td>{audit.blocker_count}</td>

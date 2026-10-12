@@ -45,7 +45,7 @@ export function PersonelInlineEditForm({
           selectOptions={CALISAN_KAPSAMI_SELECT_OPTIONS}
         />
         <FormField
-          label="T.C. Kimlik No"
+          label="T.C. Kimlik No."
           name="edit-tc-kimlik-no"
           value={editForm.tcKimlikNo}
           onChange={(value) => setEditForm((prev) => ({ ...prev, tcKimlikNo: value }))}
@@ -82,7 +82,7 @@ export function PersonelInlineEditForm({
           required={editForm.calisanKapsami === "IC_PERSONEL"}
         />
         <FormField
-          label="Sicil No"
+          label="Sicil No."
           name="edit-sicil-no"
           value={editForm.sicilNo ?? ""}
           onChange={(value) => setEditForm((prev) => ({ ...prev, sicilNo: value }))}

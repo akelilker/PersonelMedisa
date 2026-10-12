@@ -16,6 +16,7 @@ import type {
   MevzuatDegerTipi,
   MevzuatParametresi
 } from "../../../types/mevzuat";
+import { formatDisplayDate } from "../../../lib/display/iso-date-format";
 
 const MEVZUAT_FORM_ID = "yonetim-mevzuat-form";
 const MEVZUAT_IPTAL_ONAY_MESAJI = "Bu mevzuat parametresini iptal etmek istediğinize emin misiniz?";
@@ -73,7 +74,7 @@ function formatMevzuatTarih(value: string | null): string {
   if (!Number.isFinite(parsed)) {
     return value;
   }
-  return new Intl.DateTimeFormat("tr-TR", { dateStyle: "short", timeZone: "UTC" }).format(parsed);
+  return formatDisplayDate(value.slice(0, 10));
 }
 
 export function MevzuatParametreleriPanel({ canManage }: { canManage: boolean }) {

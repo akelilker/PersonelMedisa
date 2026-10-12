@@ -1,4 +1,5 @@
 import type { DonemKapanisPreflightSummary } from "../../../../api/donem-kapanis.api";
+import { formatDisplayDateTime } from "../../../../lib/display/iso-date-format";
 
 type DonemDurumBandiProps = {
   summary: DonemKapanisPreflightSummary | null;
@@ -46,7 +47,7 @@ export function DonemDurumBandi({ summary }: DonemDurumBandiProps) {
         {summary.muhur_state === "MUHURLENDI" ? `#${summary.muhur_id ?? "-"}` : "Açık"}
       </span>
       {summary.generated_at ? (
-        <span className="donem-durum-bandi-meta">Güncelleme: {new Date(summary.generated_at).toLocaleString("tr-TR")}</span>
+        <span className="donem-durum-bandi-meta">Güncelleme: {formatDisplayDateTime(summary.generated_at)}</span>
       ) : null}
     </div>
   );

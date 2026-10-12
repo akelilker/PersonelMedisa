@@ -65,7 +65,7 @@ function hasPositiveId(value: unknown): boolean {
 const PERSONEL_MISSING_FIELD_RULES: readonly PersonelMissingFieldRule[] = [
   {
     key: "tc_kimlik_no",
-    label: "T.C. Kimlik No",
+    label: "T.C. Kimlik No.",
     category: "KIMLIK",
     severity: "CRITICAL",
     editTarget: "genel",
@@ -74,7 +74,7 @@ const PERSONEL_MISSING_FIELD_RULES: readonly PersonelMissingFieldRule[] = [
   },
   {
     key: "sicil_no",
-    label: "Sicil No",
+    label: "Sicil No.",
     category: "ISTIHDAM",
     severity: "CRITICAL",
     editTarget: "genel",

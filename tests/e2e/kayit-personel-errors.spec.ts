@@ -3,7 +3,7 @@ import { login } from "./helpers/auth";
 import { expectThreeButtonMainMenu } from "./helpers/main-menu";
 import { mockApi } from "./helpers/mock-api";
 
-const DUPLICATE_TC_MESSAGE = "Bu T.C. Kimlik No ile kayıt açılamaz.";
+const DUPLICATE_TC_MESSAGE = "Bu T.C. Kimlik No. ile kayıt açılamaz.";
 const SUBE_MISMATCH_MESSAGE = "Seçilen şube aktif şube filtresiyle uyuşmuyor.";
 
 async function openKayitModal(page: Page) {

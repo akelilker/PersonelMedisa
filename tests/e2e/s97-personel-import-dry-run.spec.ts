@@ -35,7 +35,7 @@ test.describe("S97 personel import dry-run UI", () => {
     await expect(page.getByTestId("personel-import-dry-run-summary")).toBeVisible();
     await expect(page.getByTestId("personel-import-dry-run-errors")).toBeVisible();
     await expect(page.getByText("*23").first()).toBeVisible();
-    await expect(page.getByText("T.C. Kimlik No geçersiz.")).toBeVisible();
+    await expect(page.getByText("T.C. Kimlik No. geçersiz.")).toBeVisible();
 
     // HARD ERROR: apply kapali, hata dosyasi indirilebilir.
     await expect(page.getByTestId("personel-import-dry-run-blocking")).toContainText("hatalı kayıt bulundu");

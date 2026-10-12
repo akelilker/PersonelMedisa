@@ -69,7 +69,7 @@ export function parseOptionalPositiveInt(value: string | null | undefined) {
 
 export function validateTcKimlikNo(value: string) {
   if (!/^\d{11}$/.test(value)) {
-    throw new Error("T.C. Kimlik No 11 hane ve yalnızca rakamlardan oluşmalıdır.");
+    throw new Error("T.C. Kimlik No. 11 hane ve yalnızca rakamlardan oluşmalıdır.");
   }
 }
 

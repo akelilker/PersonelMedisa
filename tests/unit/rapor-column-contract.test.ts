@@ -55,7 +55,7 @@ describe("rapor-column-contract", () => {
   it("keeps personel summary columns in business order", () => {
     expect(getRaporColumns("personel-ozet")).toEqual([
       { key: "ad_soyad", label: "Ad Soyad" },
-      { key: "sicil_no", label: "Sicil No" },
+      { key: "sicil_no", label: "Sicil No." },
       { key: "aktif_durum", label: "Durum" },
       { key: "net_calisma_dakika", label: "Net Çalışma (dk)" },
       { key: "sgk_prim_gun", label: "SGK Prim Gün" }

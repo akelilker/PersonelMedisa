@@ -339,16 +339,7 @@
   min-width: 0;
 }
 
-@media (max-width: 640px) {
-  .personel-detail-card .personel-dosya-kayit-mirror .personel-form-columns {
-    grid-template-columns: minmax(0, 1fr);
-    gap: var(--space-3);
-  }
-
-  .personel-detail-card .personel-dosya-kayit-mirror .personel-form-columns::after {
-    display: none;
-  }
-}
+/* Mobilde de 2 kolon + orta ayırıcı korunur (onaylı karar 2026-10-06 / 2026-10-10; #392 tek-kolon regresyonu kaldırıldı). */
 
 .personel-archive-banner,
 .personel-write-scope-notice,

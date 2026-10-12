@@ -4926,6 +4926,27 @@ export function resolveDemoApiResponse(
     return yetkiDemo;
   }
 
+  if (pathname === "/yonetim/veri-yedekleme" && method === "GET") {
+    return {
+      data: {
+        son_yedek: {
+          file: "medisa-yedek-20261012-001200-a1b2c3.sql",
+          sha256: "0".repeat(64),
+          bytes: 1048576,
+          created_at: "2026-10-12T00:12:00Z",
+          ledger_tip: "099",
+          table_count: 148,
+          total_rows: 0
+        },
+        yedekler: [],
+        saklanan_adet: 7,
+        geri_yukleme_etkin: false
+      },
+      meta: {},
+      errors: []
+    };
+  }
+
   const mutabakatWeek = (value: unknown) => {
     if (typeof value !== "string" || !isMondayIsoDate(value)) return null;
     const end = new Date(`${value}T00:00:00Z`);

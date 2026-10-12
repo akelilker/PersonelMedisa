@@ -1447,4 +1447,119 @@ final class FullDatabaseBackupService
 
         return is_string($safe) && $safe !== '' ? $safe : 'unknown';
     }
+
+    /** Uygulama içi "Yedek Al" dosya öneki; migration kanıt dosyalarından (medisa-full-*) ayrıdır. */
+    public const APP_BACKUP_PREFIX = 'medisa-yedek-';
+    public const APP_BACKUP_KEEP = 7;
+
+    /**
+     * Uygulama içi tam mantıksal yedek (Ayarlar > Veri Yedekleme > Yedek Al).
+     * Tutarlı anlık görüntü + web kökü dışında dosya + sha256 okuma doğrulaması.
+     * Geri yükleme yapmaz, ikinci veritabanı veya CREATE/DROP DATABASE gerektirmez.
+     * Migration 100 kapısının kanıt dosyasına (full-backup-evidence.json) dokunmaz.
+     *
+     * @return array{file: string, sha256: string, bytes: int, created_at: string, ledger_tip: string, table_count: int, total_rows: int}
+     */
+    public static function createAppBackup(PDO $live, string $apiDirectory, string $requestId): array
+    {
+        $directory = MigrationBackupService::operationsDirectory($apiDirectory);
+        $tip = self::ledgerTip($live);
+        $fileName = self::APP_BACKUP_PREFIX . gmdate('Ymd-His') . '-' . bin2hex(random_bytes(3)) . '.sql';
+        $path = $directory . DIRECTORY_SEPARATOR . $fileName;
+        $snapshot = false;
+        try {
+            $live->exec('SET SESSION TRANSACTION ISOLATION LEVEL REPEATABLE READ');
+            $live->exec('START TRANSACTION WITH CONSISTENT SNAPSHOT');
+            $snapshot = true;
+            $inventory = self::inventory($live);
+            self::writeDump($live, $path, $requestId, $tip, $inventory);
+            $live->commit();
+            $snapshot = false;
+            $readback = self::verifyFile($path);
+        } catch (Throwable $exception) {
+            if ($snapshot && $live->inTransaction()) {
+                $live->rollBack();
+            }
+            if (is_file($path)) {
+                @unlink($path);
+            }
+            throw $exception instanceof RuntimeException ? $exception : new RuntimeException('APP_BACKUP_FAILED');
+        }
+
+        $meta = [
+            'file' => $fileName,
+            'sha256' => $readback['sha256'],
+            'bytes' => $readback['bytes'],
+            'created_at' => gmdate('Y-m-d\\TH:i:s\\Z'),
+            'ledger_tip' => $tip,
+            'table_count' => count($inventory['tables']),
+            'total_rows' => array_sum($inventory['row_counts']),
+        ];
+        @file_put_contents($path . '.meta.json', json_encode($meta, JSON_UNESCAPED_SLASHES) . PHP_EOL, LOCK_EX);
+        @chmod($path . '.meta.json', 0600);
+        self::pruneAppBackups($directory, self::APP_BACKUP_KEEP);
+
+        return $meta;
+    }
+
+    /** @return list<array<string, mixed>> en yeni önce */
+    public static function listAppBackups(string $apiDirectory): array
+    {
+        $directory = MigrationBackupService::operationsDirectory($apiDirectory);
+        $items = [];
+        foreach (glob($directory . DIRECTORY_SEPARATOR . self::APP_BACKUP_PREFIX . '*.sql.meta.json') ?: [] as $metaPath) {
+            $raw = @file_get_contents($metaPath);
+            $meta = is_string($raw) ? json_decode($raw, true) : null;
+            if (!is_array($meta) || !self::isAppBackupName((string) ($meta['file'] ?? ''))) {
+                continue;
+            }
+            if (!is_file($directory . DIRECTORY_SEPARATOR . $meta['file'])) {
+                continue;
+            }
+            $items[] = $meta;
+        }
+        usort($items, static fn (array $a, array $b): int => strcmp((string) $b['file'], (string) $a['file']));
+
+        return $items;
+    }
+
+    public static function isAppBackupName(string $name): bool
+    {
+        return preg_match('/^medisa-yedek-\d{8}-\d{6}-[0-9a-f]{6}\.sql$/', $name) === 1;
+    }
+
+    /**
+     * İndirilecek yedeğin mutlak yolu; ad kalıbı, dizin içi olma ve sha256 eşleşmesi zorunlu.
+     */
+    public static function resolveAppBackupForDownload(string $apiDirectory, string $name): string
+    {
+        if (!self::isAppBackupName($name)) {
+            throw new RuntimeException('APP_BACKUP_NOT_FOUND');
+        }
+        $directory = MigrationBackupService::operationsDirectory($apiDirectory);
+        $realDirectory = realpath($directory);
+        $realFile = realpath($directory . DIRECTORY_SEPARATOR . $name);
+        if ($realDirectory === false || $realFile === false || !self::pathInside($realFile, $realDirectory) || !is_file($realFile)) {
+            throw new RuntimeException('APP_BACKUP_NOT_FOUND');
+        }
+        $raw = @file_get_contents($realFile . '.meta.json');
+        $meta = is_string($raw) ? json_decode($raw, true) : null;
+        $hash = hash_file('sha256', $realFile);
+        if (!is_array($meta) || !is_string($hash) || !hash_equals((string) ($meta['sha256'] ?? ''), $hash)) {
+            throw new RuntimeException('APP_BACKUP_SHA_MISMATCH');
+        }
+
+        return $realFile;
+    }
+
+    private static function pruneAppBackups(string $directory, int $keep): void
+    {
+        $files = glob($directory . DIRECTORY_SEPARATOR . self::APP_BACKUP_PREFIX . '*.sql') ?: [];
+        $files = array_values(array_filter($files, static fn (string $f): bool => self::isAppBackupName(basename($f))));
+        rsort($files, SORT_STRING);
+        foreach (array_slice($files, $keep) as $old) {
+            @unlink($old);
+            @unlink($old . '.meta.json');
+        }
+    }
 }

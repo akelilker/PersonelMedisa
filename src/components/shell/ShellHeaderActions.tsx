@@ -22,6 +22,7 @@ import {
 import { istanbulBusinessDate } from "../../features/self-service/birim-amiri-operational";
 import { BackgroundlessNoticeModal } from "../../features/self-service/components/BackgroundlessNoticeModal";
 import { resolveInboxNotificationDestination } from "../../lib/self-service/inbox-notification-destination";
+import { VeriYedeklemeModal } from "../../features/yonetim/veri-yedekleme/VeriYedeklemeModal";
 
 type NotificationLevel = "neutral" | "warning" | "critical";
 
@@ -135,11 +136,13 @@ export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeade
     hasPermission("retention.destruction.approve") ||
     (hasPermission("retention.view") && canViewYonetimPanel);
   const canViewResmiTatilTakvimi = hasPermission("resmi_tatil_takvimi.view");
+  const canManageVeriYedekleme = role === "GENEL_YONETICI";
 
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isSubeOpen, setIsSubeOpen] = useState(false);
   const [isBugunModalOpen, setIsBugunModalOpen] = useState(false);
+  const [isVeriYedeklemeOpen, setIsVeriYedeklemeOpen] = useState(false);
   const [bugunAttentionCount, setBugunAttentionCount] = useState(0);
   const [notificationActionError, setNotificationActionError] = useState<string | null>(null);
   const [readNotificationIds, setReadNotificationIds] = useState<Record<string, true>>({});
@@ -910,6 +913,18 @@ export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeade
               Resmî Tatil Takvimi
             </button>
           ) : null}
+          {canManageVeriYedekleme ? (
+            <button
+              type="button"
+              data-testid="settings-veri-yedekleme"
+              onClick={() => {
+                setIsSettingsOpen(false);
+                setIsVeriYedeklemeOpen(true);
+              }}
+            >
+              Veri Yedekleme
+            </button>
+          ) : null}
           <button
             type="button"
             className="settings-logout-btn"
@@ -932,6 +947,15 @@ export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeade
           void fetchBugunPersonelDurumu({ tarih: istanbulBusinessDate() })
             .then((data) => setBugunAttentionCount(Math.max(0, Number(data.attention_count) || 0)))
             .catch(() => undefined);
+        }}
+      />
+    ) : null}
+    {canManageVeriYedekleme && isVeriYedeklemeOpen ? (
+      <VeriYedeklemeModal
+        onClose={() => setIsVeriYedeklemeOpen(false)}
+        onBack={() => {
+          setIsVeriYedeklemeOpen(false);
+          setIsSettingsOpen(true);
         }}
       />
     ) : null}

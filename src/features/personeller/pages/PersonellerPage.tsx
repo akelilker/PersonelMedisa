@@ -8,7 +8,7 @@ import { SubeDetailListNotice } from "../../../components/states/SubeDetailListN
 import { useRoleAccess } from "../../../hooks/use-role-access";
 import { usePersoneller } from "../../../hooks/usePersoneller";
 import { useAuth } from "../../../state/auth.store";
-import { CALISAN_KAPSAMI_SELECT_OPTIONS, formatCalisanKapsamiLabel } from "../../../lib/display/enum-display";
+import { CALISAN_KAPSAMI_SELECT_OPTIONS } from "../../../lib/display/enum-display";
 import type { Personel } from "../../../types/personel";
 import type { IdOption } from "../../../types/referans";
 import { formatReferenceValue } from "../components/personel-dosya/personel-dosya-format-utils";
@@ -672,9 +672,6 @@ export function PersonellerPage() {
                             </span>
                             {phase === "search" ? (
                               <span className="personeller-name-secondary">{orgSecondaryLine(personel)}</span>
-                            ) : null}
-                            {personel.calisan_kapsami === "DIS_KAYNAK" ? (
-                              <span className="status-badge">{formatCalisanKapsamiLabel("DIS_KAYNAK")}</span>
                             ) : null}
                           </div>
                         </td>

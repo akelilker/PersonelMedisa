@@ -29,7 +29,9 @@ test.describe("yonetim paneli ve aylik ozet", () => {
     });
     expect(settingsGeometry.left).toBeGreaterThanOrEqual(-1);
     expect(settingsGeometry.right).toBeLessThanOrEqual(settingsGeometry.viewportWidth + 1);
-    expect(settingsGeometry.width).toBeGreaterThanOrEqual(220);
+    expect(settingsGeometry.width).toBeGreaterThanOrEqual(140);
+    expect(settingsGeometry.width).toBeLessThanOrEqual(260);
+    expect(settingsGeometry.right).toBeGreaterThanOrEqual(settingsGeometry.viewportWidth - 40);
     expect(settingsGeometry.maxWidth).not.toMatch(/^calc\(100%/);
 
     await page.getByTestId("settings-yonetim-paneli").click();

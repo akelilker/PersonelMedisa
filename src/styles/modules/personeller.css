@@ -2585,11 +2585,11 @@
   }
 
   .personeller-page--kart .personeller-table--scope .personeller-col-kimlik { width: 18.5%; }
-  .personeller-page--kart .personeller-table--scope .personeller-col-ad { width: 21%; }
+  .personeller-page--kart .personeller-table--scope .personeller-col-ad { width: 19.5%; }
   .personeller-page--kart .personeller-table--scope .personeller-col-sube { width: 12%; }
-  .personeller-page--kart .personeller-table--scope .personeller-col-bolum { width: 20%; }
-  .personeller-page--kart .personeller-table--scope .personeller-col-gorev { width: 19.5%; }
-  .personeller-page--kart .personeller-table--scope .personeller-col-statu { width: 9%; }
+  .personeller-page--kart .personeller-table--scope .personeller-col-bolum { width: 21.5%; }
+  .personeller-page--kart .personeller-table--scope .personeller-col-gorev { width: 18%; }
+  .personeller-page--kart .personeller-table--scope .personeller-col-statu { width: 10.5%; }
 
   .personeller-page--kart .personeller-table:not(.personeller-table--scope) .personeller-col-kimlik { width: 21%; }
   .personeller-page--kart .personeller-table:not(.personeller-table--scope) .personeller-col-ad { width: 23%; }

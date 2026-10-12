@@ -96,3 +96,21 @@
     font-size: 13px;
   }
 }
+
+/*
+ * Onaylı karar (t863): mobilde ayarlar (çark) menüsü içerik kadar geniş olur,
+ * ekran genişliğine yayılmaz; çarkın altında sağa hizalı. Masaüstü değişmez.
+ */
+@media (max-width: 720px) {
+  .settings-dropdown.settings-menu-dropdown {
+    right: 0;
+    left: auto;
+    width: max-content;
+    min-width: 168px;
+    max-width: min(260px, calc(100vw - 24px));
+  }
+
+  .settings-dropdown.settings-menu-dropdown button {
+    white-space: nowrap;
+  }
+}

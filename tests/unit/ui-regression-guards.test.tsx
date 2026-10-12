@@ -301,3 +301,13 @@ describe("K) Personel Listesi satırlarında kapsam rozeti yok (t862)", () => {
     expect(page).toContain("CALISAN_KAPSAMI_SELECT_OPTIONS");
   });
 });
+
+describe("L) Mobil ayarlar (çark) menüsü içerik kadar geniş (t863)", () => {
+  it("≤720px'te settings-menu-dropdown max-content + dar üst sınır, sağa hizalı", () => {
+    const css = readFileSync(resolve("src/styles/components/dropdown.css"), "utf8");
+    const block = css.slice(css.lastIndexOf("@media (max-width: 720px)"));
+    expect(block).toMatch(/\.settings-dropdown\.settings-menu-dropdown\s*\{[^}]*width:\s*max-content/s);
+    expect(block).toMatch(/max-width:\s*min\(260px/);
+    expect(block).toMatch(/right:\s*0/);
+  });
+});

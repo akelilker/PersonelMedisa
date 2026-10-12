@@ -62,6 +62,11 @@ function orgSecondaryLine(personel: Personel) {
   return gorev;
 }
 
+/** Liste görünümü kısaltması (yalnız görünüm, t852): sondaki "Yardımcısı" → "Yrd."; tam metin title'da. */
+export function listGorevDisplay(gorev: string): string {
+  return gorev.replace(/\s+Yard[ıi]mc[ıi]s[ıi]\s*$/u, " Yrd.");
+}
+
 function bolumBirimLine(personel: Personel) {
   const bolum = formatReferenceValue(personel.bolum_adi, personel.bolum_id);
   const birim = formatReferenceValue(personel.birim_adi, personel.birim_id);
@@ -633,7 +638,7 @@ export function PersonellerPage() {
                           <span>{bolumText}</span>
                         </td>
                         <td className="personeller-cell-wrap" title={gorevText}>
-                          <span>{gorevText}</span>
+                          <span>{listGorevDisplay(gorevText)}</span>
                         </td>
                         <td className="personeller-cell-wrap" title={tip}>
                           <span>{tip}</span>

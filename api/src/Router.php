@@ -51,6 +51,7 @@ use Medisa\Api\Controllers\RevizyonController;
 use Medisa\Api\Controllers\SureclerController;
 use Medisa\Api\Controllers\YillikIzinHakDuzeltmeController;
 use Medisa\Api\Controllers\KullaniciYetkiController;
+use Medisa\Api\Controllers\VeriYedeklemeController;
 use Medisa\Api\Controllers\YonetimController;
 use Medisa\Api\Controllers\ZimmetlerController;
 use Medisa\Api\Http\JsonResponse;
@@ -1051,6 +1052,15 @@ class Router
         }
         if ($method === 'POST' && preg_match('#^/yonetim/actor-identities/(\d+)/verify$#', $path, $matches)) {
             YonetimController::actorIdentityVerify($this->request, $matches[1]);
+        }
+        if ($path === '/yonetim/veri-yedekleme' && $method === 'GET') {
+            VeriYedeklemeController::durum($this->request);
+        }
+        if ($path === '/yonetim/veri-yedekleme' && $method === 'POST') {
+            VeriYedeklemeController::olustur($this->request);
+        }
+        if ($path === '/yonetim/veri-yedekleme/indir' && $method === 'GET') {
+            VeriYedeklemeController::indir($this->request);
         }
         if ($path === '/yonetim/kullanicilar' && $method === 'GET') {
             YonetimController::kullanicilar($this->request);

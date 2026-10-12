@@ -46,3 +46,30 @@ export function formatIsoDateDetail(value: string | null | undefined): string {
   const mm = String(parts.m).padStart(2, "0");
   return [dd, mm, String(parts.y)].join(DISPLAY_DATE_SEPARATOR);
 }
+
+/**
+ * Formats an ISO-8601 instant (e.g. 2026-10-12T00:30:05Z) as Istanbul local
+ * gg/aa/yyyy HH:MM:SS using the shared separator.
+ */
+export function formatIsoDateTimeDetail(value: string | null | undefined): string {
+  if (typeof value !== "string" || !value.trim()) {
+    return "-";
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "-";
+  }
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Europe/Istanbul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23"
+  }).formatToParts(date);
+  const pick = (type: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === type)?.value ?? "00";
+  const datePart = [pick("day"), pick("month"), pick("year")].join(DISPLAY_DATE_SEPARATOR);
+  return `${datePart} ${pick("hour")}:${pick("minute")}:${pick("second")}`;
+}

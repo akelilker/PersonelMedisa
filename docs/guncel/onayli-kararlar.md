@@ -42,3 +42,4 @@ Bu dosya, kullanıcının onayladığı kalıcı görsel kararları her biri tek
 | Footer | MEDİSA wordmark boyutu (#507 boyutunun yerine) | Minimal: varsayılan 10.5px, mobil ana sayfa 12px, masaüstü 14px; v78.2 ve "Sistem Hazır" değişmez | 2026-10-10 |
 | Tüm uygulama | Tarih görünümü | gg/aa/yyyy (ör. 14/03/1992); ayırıcı tek yerde (`DISPLAY_DATE_SEPARATOR`); kayıt/API biçimi değişmez | 2026-10-10 |
 | Tüm uygulama | "No" kısaltması | Noktalı yazılır: "T.C. Kimlik No.", "Sicil No." | 2026-10-10 |
+| Tüm uygulama | Kaydırma yönü | Ekranlar yalnız dikey kayar; yatay kaydırma yok (mobil + masaüstü). Personel Listesi mobilde tüm kolonlar ekrana sığar (kenar boşlukları optimize, Ad/Soyad iki satır, görünümde kısaltma serbest) | 2026-10-12 |

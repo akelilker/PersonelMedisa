@@ -63,6 +63,11 @@ function orgSecondaryLine(personel: Personel) {
 }
 
 /** Liste görünümü kısaltması (yalnız görünüm, t852): sondaki "Yardımcısı" → "Yrd."; tam metin title'da. */
+/** Mobil liste kısaltmaları (yalnız görünüm, t855): Yönetimi → Yön., Satış Sonrası Hizmetler → S.S.H. */
+export function mobilListeKisalt(text: string): string {
+  return text.replace(/\bY[öo]netimi\b/gu, "Yön.").replace(/Satış Sonrası Hizmetler(?![\p{L}])/gu, "S.S.H.");
+}
+
 export function listGorevDisplay(gorev: string): string {
   return gorev.replace(/\s+Yard[ıi]mc[ıi]s[ıi]\s*$/u, " Yrd.");
 }
@@ -166,6 +171,46 @@ export function PersonellerPage() {
 
   const tableShellRef = useRef<HTMLDivElement | null>(null);
   const tableWrapRef = useRef<HTMLDivElement | null>(null);
+
+  /**
+   * Mobil (≤720px): Soyad tek satırda kalır; sığmazsa yalnız o hücrede yazı küçülür (min 8.5px).
+   * Masaüstünde hiçbir şey yapılmaz (inline stil temizlenir).
+   */
+  useEffect(() => {
+    const wrap = tableWrapRef.current;
+    if (!wrap || typeof window.matchMedia !== "function") {
+      return;
+    }
+    const mobile = window.matchMedia("(max-width: 720px)");
+    const fit = () => {
+      const items = Array.from(wrap.querySelectorAll<HTMLElement>(".personeller-name-soyad"));
+      for (const el of items) {
+        el.style.fontSize = "";
+        el.style.letterSpacing = "";
+        if (!mobile.matches) continue;
+        const cell = el.closest("td");
+        if (!cell) continue;
+        const cs = getComputedStyle(cell);
+        const avail = cell.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+        let size = parseFloat(getComputedStyle(el).fontSize);
+        while (el.scrollWidth > avail + 0.5 && size > 8.5) {
+          size = Math.max(8.5, size - 0.5);
+          el.style.fontSize = `${size}px`;
+        }
+        if (el.scrollWidth > avail + 0.5) {
+          el.style.letterSpacing = "-0.04em";
+        }
+      }
+    };
+    fit();
+    const resizeObserver = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(() => fit());
+    resizeObserver?.observe(wrap);
+    mobile.addEventListener?.("change", fit);
+    return () => {
+      resizeObserver?.disconnect();
+      mobile.removeEventListener?.("change", fit);
+    };
+  }, [personeller]);
 
   /**
    * Mobilde tablo yatay kaydırılabilir: sağda devam eden kolon olduğunu
@@ -620,7 +665,11 @@ export function PersonellerPage() {
                         </td>
                         <td className="personeller-table-cell-strong" title={name}>
                           <div className="personeller-name-stack">
-                            <span className="personeller-name-primary">{name}</span>
+                            <span className="personeller-name-primary">
+                              {/* Mobil: Ad 1. satır, Soyad 2. satır (masaüstünde aynı satır, görünüm değişmez). */}
+                              <span className="personeller-name-ad">{String(personel.ad ?? "").trim()}</span>{" "}
+                              <span className="personeller-name-soyad">{String(personel.soyad ?? "").trim()}</span>
+                            </span>
                             {phase === "search" ? (
                               <span className="personeller-name-secondary">{orgSecondaryLine(personel)}</span>
                             ) : null}
@@ -631,11 +680,26 @@ export function PersonellerPage() {
                         </td>
                         {showScopeColumn ? (
                           <td className="personeller-cell-wrap" title={subeText}>
-                            <span>{subeText}</span>
+                            <span>
+                              {/^Medisa\s+/i.test(subeText) ? (
+                                <span className="personeller-mobil-gizli">{subeText.match(/^Medisa\s+/i)![0]}</span>
+                              ) : null}
+                              {subeText.replace(/^Medisa\s+/i, "")}
+                            </span>
                           </td>
                         ) : null}
                         <td className="personeller-cell-wrap" title={bolumText}>
-                          <span>{bolumText}</span>
+                          <span>
+                            {mobilListeKisalt(bolumText) !== bolumText ? (
+                              <>
+                                <span className="personeller-masaustu-metin">{bolumText}</span>
+                                <span className="personeller-mobil-metin">{mobilListeKisalt(bolumText)}</span>
+                              </>
+                            ) : (
+                              bolumText
+                            )}
+                            <span className="personeller-mobil-gorev">{mobilListeKisalt(listGorevDisplay(gorevText))}</span>
+                          </span>
                         </td>
                         <td className="personeller-cell-wrap" title={gorevText}>
                           <span>{listGorevDisplay(gorevText)}</span>

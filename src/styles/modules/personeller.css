@@ -2597,3 +2597,123 @@
   .personeller-page--kart .personeller-table:not(.personeller-table--scope) .personeller-col-gorev { width: 22%; }
   .personeller-page--kart .personeller-table:not(.personeller-table--scope) .personeller-col-statu { width: 12%; }
 }
+
+/* t853–t856 — mobil liste yalnız dikey kayar (yatay kaydırma yok). Masaüstü (≥721px) değişmez:
+   yardımcı span'ler masaüstünde görünmez/aynı satırda kalır. */
+.personeller-page--kart .personeller-mobil-gorev,
+.personeller-page--kart .personeller-mobil-metin {
+  display: none;
+}
+
+/* Sağ kenar sol ile simetrik (masaüstü + mobil): sayfa kutusu (overflow: hidden) sağda body'nin
+   iç boşluğuna uzanır; içerik sağ kenarı (padding) aynı kalır. Aksi halde negatif margin'li liste
+   kabuğu sağdan kırpılır ve görünen sağ boşluk soldan büyük olur (#541/#542 regresyonu). */
+.personeller-page--kart {
+  margin-right: calc(5px - var(--modal-body-inline-pad, var(--space-4)));
+  padding-right: calc(var(--modal-body-inline-pad, var(--space-4)) - 5px);
+}
+
+@media (max-width: 720px) {
+  .personeller-page--kart .personeller-table-scroll-shell {
+    margin-inline: -7px;
+  }
+
+  .personeller-page--kart .personeller-table--dense {
+    min-width: 0;
+    font-size: 10.5px;
+  }
+
+  .personeller-page--kart .personeller-table--dense thead th {
+    padding: 4px 1px;
+    font-size: 9.5px;
+    letter-spacing: 0;
+  }
+
+  .personeller-page--kart .personeller-table--dense tbody td {
+    padding: 2px;
+    font-size: 10.5px;
+    line-height: 1.25;
+  }
+
+  .personeller-page--kart .personeller-table--dense td.personeller-tc-cell {
+    padding: 2px;
+    font-size: 10.5px;
+    white-space: normal;
+  }
+
+  /* T.C. uyarısı (!) numaranın altında: T.C. kolonu yalnız 11 hane kadar geniş kalır. */
+  .personeller-page--kart .personeller-table--dense td.personeller-tc-cell .personeller-missing-bang {
+    display: block;
+    margin: 1px auto 0;
+  }
+
+  .personeller-page--kart .personeller-table--dense .personeller-tc-value {
+    letter-spacing: -0.01em;
+  }
+
+  .personeller-page--kart .personeller-mobil-gizli {
+    display: none;
+  }
+
+  .personeller-page--kart .personeller-table--dense .personeller-name-primary {
+    display: block;
+    -webkit-line-clamp: unset;
+    line-clamp: none;
+    overflow: visible;
+    overflow-wrap: normal;
+    word-break: normal;
+  }
+
+  .personeller-page--kart .personeller-name-soyad {
+    display: block;
+    white-space: nowrap;
+    overflow-wrap: normal;
+    word-break: keep-all;
+  }
+
+  .personeller-page--kart .personeller-masaustu-metin {
+    display: none;
+  }
+
+  .personeller-page--kart .personeller-mobil-metin {
+    display: inline;
+  }
+
+  .personeller-page--kart .personeller-table--dense tbody td.personeller-cell-wrap > span {
+    display: block;
+    -webkit-line-clamp: unset;
+    line-clamp: none;
+    overflow: visible;
+    overflow-wrap: normal;
+    word-break: normal;
+    hyphens: manual;
+  }
+
+  .personeller-page--kart .personeller-table-scroll-shell[data-scroll-more="true"]::after {
+    display: none;
+  }
+
+  /* Görev, Bölüm/Birim hücresinde ikinci (soluk) satır olarak gösterilir; Görev hücresi gizlenir.
+     Gizli hücre sonrası Statü hücresi Görev kolonuna kayar: Görev <col> Statü genişliğini taşır,
+     Statü <col> kaldırılır. */
+  .personeller-page--kart .personeller-table--scope .personeller-col-kimlik { width: 21.5%; }
+  .personeller-page--kart .personeller-table--scope .personeller-col-ad { width: 21.5%; }
+  .personeller-page--kart .personeller-table--scope .personeller-col-sube { width: 14%; }
+  .personeller-page--kart .personeller-table--scope .personeller-col-bolum { width: 30.5%; }
+  .personeller-page--kart .personeller-table--scope .personeller-col-gorev { width: 12.5%; }
+  .personeller-page--kart .personeller-table--scope .personeller-col-statu { display: none; }
+  .personeller-page--kart .personeller-table--scope tr > :nth-child(5) { display: none; }
+
+  .personeller-page--kart .personeller-table:not(.personeller-table--scope) .personeller-col-kimlik { width: 22%; }
+  .personeller-page--kart .personeller-table:not(.personeller-table--scope) .personeller-col-ad { width: 24%; }
+  .personeller-page--kart .personeller-table:not(.personeller-table--scope) .personeller-col-bolum { width: 40%; }
+  .personeller-page--kart .personeller-table:not(.personeller-table--scope) .personeller-col-gorev { width: 14%; }
+  .personeller-page--kart .personeller-table:not(.personeller-table--scope) .personeller-col-statu { display: none; }
+  .personeller-page--kart .personeller-table:not(.personeller-table--scope) tr > :nth-child(4) { display: none; }
+
+  .personeller-page--kart .personeller-mobil-gorev {
+    display: block;
+    margin-top: 2px;
+    color: var(--txt-muted, #a0aec0);
+  }
+}

@@ -141,100 +141,58 @@ async function readAffordance(page: Page): Promise<Affordance> {
   });
 }
 
-async function scrollToEnd(page: Page) {
-  await page.locator(DENSE_WRAP).evaluate((el) => {
-    el.scrollLeft = el.scrollWidth - el.clientWidth;
+/**
+ * Onaylı karar (2026-10-12, t853–t856): ekranlar yalnız dikey kayar. Mobilde tüm kolonlar ekrana
+ * sığar; yatay kaydırma ve "devam var" fade'i yoktur. Görev, Bölüm/Birim hücresinde ikinci satırdır.
+ * Soyad hiçbir zaman bölünmez/sarılmaz.
+ */
+async function expectNoHorizontalScroll(page: Page, label: string) {
+  const affordance = await readAffordance(page);
+  expect(affordance.scrollWidth, `${label}: tablo yatay taşıyor`).toBeLessThanOrEqual(affordance.clientWidth + 1);
+  expect(affordance.scrollMore, `${label}: sağ devam bayrağı true`).toBe("false");
+  expect(affordance.afterContent, `${label}: fade görünmemeli`).toBe("none");
+  const fit = await page.getByTestId("personeller-dense-list").evaluate((el) => {
+    const wrap = el.getBoundingClientRect();
+    const page = el.closest(".personeller-page")!.getBoundingClientRect();
+    const visibleRight = Math.min(wrap.right, page.right);
+    const cells = Array.from(el.querySelectorAll<HTMLElement>("thead th, tbody td")).filter(
+      (c) => getComputedStyle(c).display !== "none"
+    );
+    const overflowing = cells.filter((c) => c.getBoundingClientRect().right > visibleRight + 0.5).length;
+    const soyad = Array.from(el.querySelectorAll<HTMLElement>(".personeller-name-soyad")).filter((s) => {
+      const lh = parseFloat(getComputedStyle(s).lineHeight) || parseFloat(getComputedStyle(s).fontSize) * 1.3;
+      return s.getBoundingClientRect().height > lh * 1.5;
+    }).length;
+    const gorevInBolum = el.querySelectorAll(".personeller-mobil-gorev").length;
+    const visibleGorev = Array.from(el.querySelectorAll<HTMLElement>(".personeller-mobil-gorev")).filter(
+      (g) => getComputedStyle(g).display !== "none"
+    ).length;
+    return { overflowing, soyad, gorevInBolum, visibleGorev };
   });
+  expect(fit.overflowing, `${label}: görünür alanın dışında kalan hücre var`).toBe(0);
+  expect(fit.soyad, `${label}: Soyad sarıldı`).toBe(0);
+  expect(fit.visibleGorev, `${label}: Görev, Bölüm/Birim hücresinde görünmüyor`).toBe(fit.gorevInBolum);
 }
 
-async function fadeAreaHitIsInsideTable(page: Page): Promise<boolean> {
-  const box = await page.locator(SHELL).boundingBox();
-  if (!box) {
-    return false;
+test.describe("personel listesi mobil: yalnız dikey kaydırma", () => {
+  for (const viewport of [
+    { width: 390, height: 844 },
+    { width: 375, height: 667 },
+    { width: 430, height: 932 }
+  ] as const) {
+    test(`${viewport.width} TÜMÜ: yatay kaydırma yok, tüm kolonlar sığar, Soyad tek satır`, async ({ page }) => {
+      await page.setViewportSize(viewport);
+      await mockApi(page, "GENEL_YONETICI");
+      await installFixture(page);
+      await login(page, { username: "yonetici", password: "secret" });
+
+      const wrap = await openList(page, { scopeAll: true });
+      await expectNoHorizontalScroll(page, `${viewport.width} TÜMÜ`);
+      await expect(wrap.locator(".personeller-tc-value").first()).toHaveText("10012345678");
+    });
   }
-  return page.evaluate(
-    ({ x, y }) => {
-      const hit = document.elementFromPoint(x, y);
-      const wrap = document.querySelector('[data-testid="personeller-dense-list"]');
-      return Boolean(hit && wrap && wrap.contains(hit));
-    },
-    { x: box.x + box.width - 12, y: box.y + box.height / 2 }
-  );
-}
 
-async function expectFadeVisible(page: Page, label: string) {
-  const affordance = await readAffordance(page);
-  expect(affordance.scrollWidth, `${label}: tablo yatay kaydırılabilir değil`).toBeGreaterThan(
-    affordance.clientWidth
-  );
-  expect(affordance.scrollMore, `${label}: sağda devam bilgisi yok`).toBe("true");
-  expect(affordance.afterContent, `${label}: fade render edilmedi`).not.toBe("none");
-  expect(affordance.afterBackgroundImage, `${label}: fade gradient yok`).toContain("linear-gradient");
-  expect(affordance.afterPointerEvents, `${label}: fade pointer olaylarını yakalıyor`).toBe("none");
-  expect(affordance.afterWidth, `${label}: fade genişliği yok`).toBe("40px");
-  expect(await fadeAreaHitIsInsideTable(page), `${label}: fade tabloya erişimi engelliyor`).toBe(true);
-}
-
-async function expectFadeHidden(page: Page, label: string) {
-  const affordance = await readAffordance(page);
-  expect(affordance.scrollMore, `${label}: sağda devam yokken bayrak true`).toBe("false");
-  expect(affordance.afterContent, `${label}: fade hâlâ görünür`).toBe("none");
-}
-
-
-test.describe("personel listesi mobil scroll discoverability", () => {
-  test("390 TÜMÜ initial: solda başlar, sağda devam göstergesi görünür", async ({ page }) => {
-    await page.setViewportSize({ width: 390, height: 844 });
-    await mockApi(page, "GENEL_YONETICI");
-    await installFixture(page);
-    await login(page, { username: "yonetici", password: "secret" });
-
-    await openList(page, { scopeAll: true });
-    await expectFadeVisible(page, "390 initial");
-
-    const affordance = await readAffordance(page);
-    expect(affordance.scrollLeft).toBe(0);
-  });
-
-  test("390 TÜMÜ scroll-end: sağ fade kaybolur", async ({ page }) => {
-    await page.setViewportSize({ width: 390, height: 844 });
-    await mockApi(page, "GENEL_YONETICI");
-    await installFixture(page);
-    await login(page, { username: "yonetici", password: "secret" });
-
-    await openList(page, { scopeAll: true });
-    await expectFadeVisible(page, "390 initial");
-
-    await scrollToEnd(page);
-    await expect(page.locator(SHELL)).toHaveAttribute("data-scroll-more", "false");
-    await expectFadeHidden(page, "390 scroll-end");
-  });
-
-  test("430 TÜMÜ initial: sağda devam göstergesi görünür", async ({ page }) => {
-    await page.setViewportSize({ width: 430, height: 932 });
-    await mockApi(page, "GENEL_YONETICI");
-    await installFixture(page);
-    await login(page, { username: "yonetici", password: "secret" });
-
-    await openList(page, { scopeAll: true });
-    await expectFadeVisible(page, "430 initial");
-  });
-
-  test("430 TÜMÜ scroll-end: sağ fade kaybolur", async ({ page }) => {
-    await page.setViewportSize({ width: 430, height: 932 });
-    await mockApi(page, "GENEL_YONETICI");
-    await installFixture(page);
-    await login(page, { username: "yonetici", password: "secret" });
-
-    await openList(page, { scopeAll: true });
-    await expectFadeVisible(page, "430 initial");
-
-    await scrollToEnd(page);
-    await expect(page.locator(SHELL)).toHaveAttribute("data-scroll-more", "false");
-    await expectFadeHidden(page, "430 scroll-end");
-  });
-
-  test("390 ŞUBE: Şube kolonu yok, aynı scroll davranışı", async ({ page }) => {
+  test("390 ŞUBE: Şube kolonu yok, yatay kaydırma yok", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await mockApi(page, "GENEL_YONETICI");
     await installFixture(page);
@@ -242,33 +200,7 @@ test.describe("personel listesi mobil scroll discoverability", () => {
 
     const wrap = await openList(page, { scopeAll: false, subeId: 1 });
     await expect(wrap.locator("thead th")).toHaveCount(5);
-    await expectFadeVisible(page, "390 ŞUBE initial");
-
-    await scrollToEnd(page);
-    await expect(page.locator(SHELL)).toHaveAttribute("data-scroll-more", "false");
-    await expectFadeHidden(page, "390 ŞUBE scroll-end");
-  });
-
-  test("390: tekerlek/touch scroll ve tablo erişimi bozulmaz", async ({ page }) => {
-    await page.setViewportSize({ width: 390, height: 844 });
-    await mockApi(page, "GENEL_YONETICI");
-    await installFixture(page);
-    await login(page, { username: "yonetici", password: "secret" });
-
-    const wrap = await openList(page, { scopeAll: true });
-    await expectFadeVisible(page, "390 initial");
-
-    await wrap.hover();
-    await page.mouse.wheel(40, 0);
-    await expect.poll(() => wrap.evaluate((el) => el.scrollLeft)).toBeGreaterThan(0);
-
-    const mid = await readAffordance(page);
-    expect(mid.scrollLeft, "390: tekerlek kaydırması sağ sona atladı").toBeLessThan(
-      mid.scrollWidth - mid.clientWidth
-    );
-    await expect(page.locator(SHELL)).toHaveAttribute("data-scroll-more", "true");
-    expect(mid.afterContent, "390: sağda içerik varken fade kayboldu").not.toBe("none");
-    await expect(wrap.locator(".personeller-tc-value").first()).toHaveText("10012345678");
+    await expectNoHorizontalScroll(page, "390 ŞUBE");
   });
 
   test("1280 regression: fade yok, tablo görünümü değişmemiş", async ({ page }) => {

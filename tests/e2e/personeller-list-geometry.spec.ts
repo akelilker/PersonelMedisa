@@ -268,7 +268,7 @@ const TUMU_EXPECTATIONS: CellExpectation[][] = [
   ["readable", "readable", "readable", "clamped", "clamped", "readable"]
 ];
 
-/** Masaüstü (≥721px, t849 kararı): Bölüm/Birim ve Görev kırpılmaz; tam metin sarılarak görünür. */
+/** Masaüstü (t849) ve mobil (t853–t856): Bölüm/Birim ve Görev kırpılmaz; tam metin sarılarak görünür. */
 const DESKTOP_TUMU_EXPECTATIONS: CellExpectation[][] = TUMU_EXPECTATIONS.map((row) => row.map(() => "readable"));
 
 const BRANCH_EXPECTATIONS: CellExpectation[][] = [
@@ -515,15 +515,14 @@ test.describe("personel listesi tablo geometrisi (Taşıt parity)", () => {
         expect(header.textAlign, `${viewport.width}: header "${header.text}" center değil`).toBe("center");
       });
       geometry.rows.forEach((row, index) => {
-        assertCenteredRow(row, geometry.headers, `${viewport.width} satır ${index + 1}`, TUMU_EXPECTATIONS[index] ?? []);
+        assertCenteredRow(row, geometry.headers, `${viewport.width} satır ${index + 1}`, DESKTOP_TUMU_EXPECTATIONS[index] ?? []);
       });
 
-      // Mobil kontrat: tablo doğal genişliğinde + sarmalayıcı yatay kaydırır; T.C. 11 hane tam.
-      expect(geometry.tableWidth, `${viewport.width}: tablo sıkıştırılmış`).toBeGreaterThanOrEqual(519);
+      // Mobil kontrat (2026-10-12): yalnız dikey kaydırma; tablo sarmalayıcıya sığar; T.C. 11 hane tam.
       expect(
         geometry.wrapScrollWidth,
-        `${viewport.width}: yatay kaydırma yok`
-      ).toBeGreaterThan(geometry.wrapClientWidth);
+        `${viewport.width}: yatay kaydırma var`
+      ).toBeLessThanOrEqual(geometry.wrapClientWidth + 1);
 
       const tcValue = wrap.locator("tbody tr").first().locator(".personeller-tc-value");
       await expect(tcValue).toHaveText("10012345678");

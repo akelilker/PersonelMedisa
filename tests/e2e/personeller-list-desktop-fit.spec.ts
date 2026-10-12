@@ -20,7 +20,7 @@ const D: [string, string, string, string, string, string, string][] = [
 ];
 const rows = D.map((r, i) => ({ id: 700 + i, tc_kimlik_no: r[0], ad: r[1], soyad: r[2], aktif_durum: "AKTIF", sube_id: 1 + (i % 4), sube_adi: r[3], bolum_id: i + 1, bolum_adi: r[4], birim_id: i + 1, birim_adi: r[5], gorev_id: i + 1, gorev_adi: r[6], personel_tipi_id: 1 + (i % 2), personel_tipi_adi: i % 2 ? "Mavi Yaka" : "Beyaz Yaka" }));
 
-for (const [w, h] of [[1024, 505], [1280, 800]] as const) {
+for (const [w, h] of [[1024, 505], [1280, 800], [1440, 900]] as const) {
   test(`${w}: tablo modal içine sığar, STATÜ tam görünür, hücre en çok 3 satır`, async ({ page }) => {
     await mockApi(page, "GENEL_YONETICI");
     await page.route(/\/api\/personeller(\?.*)?$/, async (route) => {
@@ -44,7 +44,10 @@ for (const [w, h] of [[1024, 505], [1280, 800]] as const) {
         .map((s) => ({ t: s.textContent, lines: Math.round(s.getBoundingClientRect().height / parseFloat(getComputedStyle(s).lineHeight)) }))
         .filter((x) => x.lines > 3);
       return {
-        sw: el.scrollWidth, cw: el.clientWidth, gl: b.left - modal.left, gr: modal.right - b.right,
+        // Görünen kırpma kutusu: liste sarmalayıcısı ∩ sayfa kutusu (overflow: hidden).
+        sw: el.scrollWidth, cw: el.clientWidth,
+        gl: Math.max(b.left, el.closest(".personeller-page")!.getBoundingClientRect().left) - modal.left,
+        gr: modal.right - Math.min(b.right, el.closest(".personeller-page")!.getBoundingClientRect().right),
         thTextRight: text.right, thRight: lastTh.getBoundingClientRect().right, wrapRight: b.right,
         lastCellMaxRight: Math.max(...lastCells), tall
       };

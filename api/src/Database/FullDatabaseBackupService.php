@@ -1588,4 +1588,57 @@ final class FullDatabaseBackupService
             @unlink($old . '.meta.json');
         }
     }
+
+    /**
+     * Migration 100 kapısının sunucu dışı (off-server) geri yükleme kanıtı yolu.
+     * Hosting ikinci veritabanı açamadığında, "Yedek Al" ile alınmış ve HTTPS ile
+     * indirilmiş yedek bağımsız bir MariaDB'de geri yüklenip sayılır; operatör o
+     * dosyanın adını, sha256'sını ve geri yüklemede sayılan tablo/satır sayısını
+     * istekle gönderir. Bu kapı sunucuda yeniden doğrular:
+     *  - dosya web kökü dışındaki yedek dizininde var ve sha256'sı meta + istekle aynı,
+     *  - geri yüklemede sayılan tablo/satır sayısı dökümün kendi meta sayılarıyla aynı,
+     *  - dökümün migration defteri canlıdaki uçla aynı, yaş <= MAX_AGE_SECONDS,
+     *  - canlıda yetki tabloları hiç yok (ABSENT).
+     * Mevcut sunucu içi kapı (assertReadyForApply) değişmedi.
+     */
+    public static function assertReadyForApplyOffServer(
+        PDO $live,
+        string $apiDirectory,
+        string $file,
+        string $sha256,
+        int $restoredTables,
+        int $restoredRows
+    ): void {
+        if (preg_match('/^[a-f0-9]{64}$/', $sha256) !== 1) {
+            throw new RuntimeException('OFFSERVER_EVIDENCE_INVALID');
+        }
+        try {
+            $path = self::resolveAppBackupForDownload($apiDirectory, $file);
+        } catch (Throwable $exception) {
+            throw new RuntimeException('OFFSERVER_BACKUP_FILE_MISSING');
+        }
+        $hash = hash_file('sha256', $path);
+        if (!is_string($hash) || !hash_equals($sha256, $hash)) {
+            throw new RuntimeException('OFFSERVER_BACKUP_SHA_MISMATCH');
+        }
+        $raw = file_get_contents($path . '.meta.json');
+        $meta = is_string($raw) ? json_decode($raw, true) : null;
+        if (!is_array($meta)) {
+            throw new RuntimeException('OFFSERVER_BACKUP_FILE_MISSING');
+        }
+        if ((int) ($meta['table_count'] ?? -1) !== $restoredTables || (int) ($meta['total_rows'] ?? -1) !== $restoredRows) {
+            throw new RuntimeException('OFFSERVER_RESTORE_COUNT_MISMATCH');
+        }
+        if ((string) ($meta['ledger_tip'] ?? '') !== self::ledgerTip($live)) {
+            throw new RuntimeException('FULL_BACKUP_LEDGER_MISMATCH');
+        }
+        $created = \DateTimeImmutable::createFromFormat('!Y-m-d\\TH:i:s\\Z', (string) ($meta['created_at'] ?? ''), new \DateTimeZone('UTC'));
+        $age = $created instanceof \DateTimeImmutable ? time() - $created->getTimestamp() : -1;
+        if ($age < 0 || $age > self::MAX_AGE_SECONDS) {
+            throw new RuntimeException('FULL_BACKUP_STALE');
+        }
+        if (self::yetkiSchema($live)['state'] !== 'ABSENT') {
+            throw new RuntimeException('YETKI_SCHEMA_NOT_ABSENT');
+        }
+    }
 }

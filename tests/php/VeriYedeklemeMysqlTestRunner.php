@@ -53,12 +53,16 @@ try {
     $live->exec('CREATE TABLE bordro (id INT NOT NULL PRIMARY KEY, personel_id INT NOT NULL,
         CONSTRAINT fk_bordro_p FOREIGN KEY (personel_id) REFERENCES personel (id))');
     $live->exec('INSERT INTO bordro VALUES (1, 1), (2, 2), (3, 1)');
+    $live->exec("CREATE TABLE snapshot_ornek (id INT NOT NULL PRIMARY KEY, durum VARCHAR(16) NOT NULL,
+        aktif_snapshot TINYINT AS (IF(durum = 'AKTIF', 1, NULL)) VIRTUAL,
+        kalici_kod VARCHAR(40) AS (CONCAT('K-', id)) STORED)");
+    $live->exec("INSERT INTO snapshot_ornek (id, durum) VALUES (1, 'AKTIF'), (2, 'PASIF')");
     $live->exec("CREATE TRIGGER trg_personel_no_delete BEFORE DELETE ON personel FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'no'");
 
     $meta = FullDatabaseBackupService::createAppBackup($live, $apiDirectory, 'app-test-1');
     vyAssert(FullDatabaseBackupService::isAppBackupName($meta['file']), 'dosya adı kalıba uyar');
     vyAssert(strlen($meta['sha256']) === 64 && $meta['ledger_tip'] === '099', 'sha256 ve migration defteri yazıldı');
-    vyAssert($meta['table_count'] === 3 && $meta['total_rows'] === 6, 'tablo ve satır sayısı doğru');
+    vyAssert($meta['table_count'] === 4 && $meta['total_rows'] === 8, 'tablo ve satır sayısı doğru');
     vyAssert(!$live->inTransaction(), 'anlık görüntü işlemi kapandı');
     vyAssert(strpos($meta['file'], '/') === false && !isset($meta['absolute_path']), 'mutlak yol dışarı verilmez');
 
@@ -71,6 +75,10 @@ try {
     vyAssert(FullDatabaseBackupService::mismatchCodes($live, $restored) === [], 'geri yükleme: şema, satır sayısı ve içerik checksum farkı yok');
     $row = $restored->query('SELECT ad, notlar, tutar FROM personel WHERE id = 1')->fetch();
     vyAssert($row['ad'] === 'Şükrü Öztürk' && $row['notlar'] === "satır;\nikinci" && $row['tutar'] === '1234.56', 'Türkçe karakter, çok satır ve ondalık korunur');
+
+    $gen = $restored->query('SELECT aktif_snapshot, kalici_kod FROM snapshot_ornek ORDER BY id')->fetchAll();
+    vyAssert((int) $gen[0]['aktif_snapshot'] === 1 && $gen[1]['aktif_snapshot'] === null && $gen[1]['kalici_kod'] === 'K-2', 'generated (VIRTUAL/STORED) kolonlar yazılmaz, geri yüklemede yeniden hesaplanır');
+    vyAssert(preg_match('/INSERT INTO `snapshot_ornek` \\([^)]*(aktif_snapshot|kalici_kod)/', (string) file_get_contents($path)) === 0, 'dökümde generated kolon değeri yok');
 
     $listed = FullDatabaseBackupService::listAppBackups($apiDirectory);
     vyAssert(count($listed) === 1 && $listed[0]['file'] === $meta['file'], 'durum son yedeği gösterir');

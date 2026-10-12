@@ -708,12 +708,27 @@ try {
                 ? [$targetVersion]
                 : MigrationExecutionService::ledgerFacts($pdo, $migrationSource)['pending_versions'];
             if (in_array('100', $pendingVersions, true)) {
-                FullDatabaseBackupService::assertReadyForApply(
-                    $pdo,
-                    $apiDirectory,
-                    $controlDirectory,
-                    $deployedSha
-                );
+                if (array_key_exists('offserver_backup_file', $request)) {
+                    // Sunucu dışı geri yükleme kanıtı: yalnız hedefli 100 isteğinde kabul edilir.
+                    if ($targetVersion !== '100') {
+                        throw new RuntimeException('OFFSERVER_EVIDENCE_INVALID');
+                    }
+                    FullDatabaseBackupService::assertReadyForApplyOffServer(
+                        $pdo,
+                        $apiDirectory,
+                        requireString($request, 'offserver_backup_file', '/^medisa-yedek-\d{8}-\d{6}-[0-9a-f]{6}\.sql$/'),
+                        requireString($request, 'offserver_backup_sha256', '/^[a-f0-9]{64}$/'),
+                        requirePositiveInt($request, 'offserver_restore_tables'),
+                        requirePositiveInt($request, 'offserver_restore_rows')
+                    );
+                } else {
+                    FullDatabaseBackupService::assertReadyForApply(
+                        $pdo,
+                        $apiDirectory,
+                        $controlDirectory,
+                        $deployedSha
+                    );
+                }
             }
         } catch (\Throwable $exception) {
             throw MigrationWorkerFailure::fromThrowable($stage, $exception);

@@ -15,6 +15,8 @@ describe("Veri Yedekleme (MariaDB)", () => {
     expect(result.stdout).toContain("verify-veri-yedekleme-mysql: OK");
     expect(result.stdout).toContain("[PASS] geri yükleme: şema, satır sayısı ve içerik checksum farkı yok");
     expect(result.stdout).toContain("[PASS] değiştirilmiş yedek indirilmez");
+    expect(result.stdout).toContain("[PASS] sunucu dışı kanıt: dosya + sha + sayım + defter + yetki ABSENT ise kapı geçer");
+    expect(result.stdout).toContain("[PASS] yetki tablosu varsa sunucu dışı kapı durur");
     expect(result.stdout).toContain("[PASS] generated (VIRTUAL/STORED) kolonlar yazılmaz, geri yüklemede yeniden hesaplanır");
     expect(result.stdout).toContain("[PASS] yalnız son 7 yedek saklanır");
   }, 120_000);

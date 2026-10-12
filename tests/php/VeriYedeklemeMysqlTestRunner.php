@@ -80,6 +80,32 @@ try {
     vyAssert((int) $gen[0]['aktif_snapshot'] === 1 && $gen[1]['aktif_snapshot'] === null && $gen[1]['kalici_kod'] === 'K-2', 'generated (VIRTUAL/STORED) kolonlar yazılmaz, geri yüklemede yeniden hesaplanır');
     vyAssert(preg_match('/INSERT INTO `snapshot_ornek` \\([^)]*(aktif_snapshot|kalici_kod)/', (string) file_get_contents($path)) === 0, 'dökümde generated kolon değeri yok');
 
+    FullDatabaseBackupService::assertReadyForApplyOffServer($live, $apiDirectory, $meta['file'], $meta['sha256'], 4, 8);
+    vyAssert(true, 'sunucu dışı kanıt: dosya + sha + sayım + defter + yetki ABSENT ise kapı geçer');
+    foreach ([
+        'OFFSERVER_BACKUP_SHA_MISMATCH' => [$meta['file'], str_repeat('a', 64), 4, 8],
+        'OFFSERVER_RESTORE_COUNT_MISMATCH' => [$meta['file'], $meta['sha256'], 4, 7],
+        'OFFSERVER_BACKUP_FILE_MISSING' => ['medisa-yedek-20260101-000000-abcdef.sql', $meta['sha256'], 4, 8],
+        'OFFSERVER_EVIDENCE_INVALID' => [$meta['file'], 'xyz', 4, 8],
+    ] as $code => $args) {
+        $got = '';
+        try {
+            FullDatabaseBackupService::assertReadyForApplyOffServer($live, $apiDirectory, ...$args);
+        } catch (RuntimeException $e) {
+            $got = $e->getMessage();
+        }
+        vyAssert($got === $code, 'sunucu dışı kapı reddeder ' . $code);
+    }
+    $live->exec('CREATE TABLE user_yetki_istisnalari (id INT PRIMARY KEY)');
+    $got = '';
+    try {
+        FullDatabaseBackupService::assertReadyForApplyOffServer($live, $apiDirectory, $meta['file'], $meta['sha256'], 4, 8);
+    } catch (RuntimeException $e) {
+        $got = $e->getMessage();
+    }
+    vyAssert($got === 'YETKI_SCHEMA_NOT_ABSENT', 'yetki tablosu varsa sunucu dışı kapı durur');
+    $live->exec('DROP TABLE user_yetki_istisnalari');
+
     $listed = FullDatabaseBackupService::listAppBackups($apiDirectory);
     vyAssert(count($listed) === 1 && $listed[0]['file'] === $meta['file'], 'durum son yedeği gösterir');
 

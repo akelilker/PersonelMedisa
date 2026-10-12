@@ -268,6 +268,9 @@ const TUMU_EXPECTATIONS: CellExpectation[][] = [
   ["readable", "readable", "readable", "clamped", "clamped", "readable"]
 ];
 
+/** Masaüstü (≥721px, t849 kararı): Bölüm/Birim ve Görev kırpılmaz; tam metin sarılarak görünür. */
+const DESKTOP_TUMU_EXPECTATIONS: CellExpectation[][] = TUMU_EXPECTATIONS.map((row) => row.map(() => "readable"));
+
 const BRANCH_EXPECTATIONS: CellExpectation[][] = [
   ["readable", "readable", "readable", "readable", "readable"],
   ["readable", "readable", "readable", "readable", "readable"],
@@ -328,6 +331,21 @@ test.describe("personel listesi tablo geometrisi (Taşıt parity)", () => {
     const wrap = await openDenseList(page, true);
     const geometry = await measure(wrap);
 
+    // t849: masaüstünde tablo modal kenarlarına 11px (önceki 17px'ten 6px yakın).
+    const gutter = await wrap.evaluate((el) => {
+      const b = el.getBoundingClientRect();
+      const m = el.closest(".modal-container")!.getBoundingClientRect();
+      return { left: b.left - m.left, right: m.right - b.right };
+    });
+    expect(Math.abs(gutter.left - 11), `sol kenar boşluğu ${gutter.left}`).toBeLessThanOrEqual(1);
+    expect(Math.abs(gutter.right - 11), `sağ kenar boşluğu ${gutter.right}`).toBeLessThanOrEqual(1);
+    const ellipsized = await wrap.evaluate((el) =>
+      Array.from(el.querySelectorAll<HTMLElement>("tbody td.personeller-cell-wrap > span")).filter(
+        (s) => s.scrollHeight > s.clientHeight + 1 || getComputedStyle(s).webkitLineClamp !== "none"
+      ).length
+    );
+    expect(ellipsized, "masaüstünde Bölüm/Görev hücresi kırpılıyor").toBe(0);
+
     test.info().annotations.push({
       type: "geometry",
       description: JSON.stringify({
@@ -363,7 +381,7 @@ test.describe("personel listesi tablo geometrisi (Taşıt parity)", () => {
     // Body: tüm satırlar Taşıt ritminde ve hücreler kendi kolonlarında center.
     expect(geometry.rows).toHaveLength(3);
     geometry.rows.forEach((row, index) =>
-      assertCenteredRow(row, geometry.headers, `satır ${index + 1}`, TUMU_EXPECTATIONS[index] ?? [])
+      assertCenteredRow(row, geometry.headers, `satır ${index + 1}`, DESKTOP_TUMU_EXPECTATIONS[index] ?? [])
     );
 
     // T.C. 11 hane tam okunuyor (maskeli gösterim yok).
@@ -472,7 +490,7 @@ test.describe("personel listesi tablo geometrisi (Taşıt parity)", () => {
     ]);
     geometry.rows.forEach((row, index) => {
       expect(row.cells).toHaveLength(5);
-      assertCenteredRow(row, geometry.headers, "branch satırı", BRANCH_EXPECTATIONS[index] ?? []);
+      assertCenteredRow(row, geometry.headers, "branch satırı", (BRANCH_EXPECTATIONS[index] ?? []).map(() => "readable"));
     });
     // Kolonlar genişleyen alanı kullanıyor: tablo tam genişlik, yatay taşma yok.
     expect(geometry.tableWidth).toBeGreaterThanOrEqual(geometry.wrapClientWidth - 1);

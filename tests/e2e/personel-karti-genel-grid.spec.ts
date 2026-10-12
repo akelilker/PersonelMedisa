@@ -35,10 +35,15 @@ test("Genel kayıt: sticky kimlik, mobil tek kolon, sekme kromu opak", async ({ 
   expect(columnsTemplate.split(" ").filter(Boolean).length).toBe(2);
 
   const mirror = page.getByTestId("personel-dosya-kayit-mirror");
-  const columns = mirror.locator(".personel-form-column");
-  await expect(columns).toHaveCount(2);
-  await expect(columns.nth(0).getByText("T.C. Kimlik No.", { exact: true })).toBeVisible();
-  await expect(columns.nth(1).getByText("İşe Giriş Tarihi", { exact: true })).toBeVisible();
+  // Dengeli satır-öncelikli ızgara: sol/sağ hücre sayısı farkı ≤ 1.
+  const lefts = await mirror.locator(".personel-dosya-kayit-grid > .personel-dosya-field").evaluateAll((els) => {
+    const xs = els.map((el) => Math.round(el.getBoundingClientRect().left));
+    const min = Math.min(...xs);
+    return { left: xs.filter((x) => x === min).length, right: xs.filter((x) => x !== min).length };
+  });
+  expect(Math.abs(lefts.left - lefts.right)).toBeLessThanOrEqual(1);
+  await expect(mirror.getByText("T.C. Kimlik No.", { exact: true })).toBeVisible();
+  await expect(mirror.getByText("İşe Giriş Tarihi", { exact: true })).toBeVisible();
 
   await page.setViewportSize({ width: 1100, height: 844 });
   const desktopColumnsTemplate = await page

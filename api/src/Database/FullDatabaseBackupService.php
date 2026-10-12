@@ -348,12 +348,13 @@ final class FullDatabaseBackupService
         $previous = $live->getAttribute(PDO::MYSQL_ATTR_USE_BUFFERED_QUERY);
         $live->setAttribute(PDO::MYSQL_ATTR_USE_BUFFERED_QUERY, false);
         try {
+            $generated = self::generatedColumns($live, $table);
             $statement = $live->query('SELECT * FROM ' . self::ident($table));
             if ($statement === false) {
                 throw new RuntimeException('BACKUP_SOURCE_INCOMPLETE');
             }
             while (($row = $statement->fetch(PDO::FETCH_ASSOC)) !== false) {
-                $payload = rtrim(self::renderInsert($live, $table, $row), "\r\n") . "\n";
+                $payload = rtrim(self::renderInsert($live, $table, array_diff_key($row, $generated)), "\r\n") . "\n";
                 $record = 'S' . strlen($payload) . "\n" . $payload;
                 if (fwrite($handle, $record) === false) {
                     throw new RuntimeException('BACKUP_WRITE_FAILED');
@@ -617,6 +618,31 @@ final class FullDatabaseBackupService
     /**
      * @param array<string, mixed> $row
      */
+    /**
+     * VIRTUAL/STORED (generated) kolonlar INSERT'e yazılmaz; MariaDB değeri reddeder (1906)
+     * ve geri yüklemede ifadeden yeniden hesaplanır.
+     *
+     * @return array<string, true>
+     */
+    private static function generatedColumns(PDO $pdo, string $table): array
+    {
+        $statement = $pdo->prepare(
+            "SELECT COLUMN_NAME FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :name
+               AND (UPPER(EXTRA) LIKE '%GENERATED%' OR UPPER(EXTRA) LIKE '%VIRTUAL%'
+                    OR UPPER(EXTRA) LIKE '%STORED%' OR UPPER(EXTRA) LIKE '%PERSISTENT%')"
+        );
+        $statement->execute(['name' => $table]);
+        $names = [];
+        foreach ($statement->fetchAll(PDO::FETCH_COLUMN) as $name) {
+            if (is_string($name) && $name !== '') {
+                $names[$name] = true;
+            }
+        }
+
+        return $names;
+    }
+
     private static function renderInsert(PDO $pdo, string $table, array $row): string
     {
         $columns = [];

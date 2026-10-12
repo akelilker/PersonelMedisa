@@ -292,3 +292,12 @@ describe("F2) Personel Kartı > Genel kayıt aynası dengeli (satır-öncelikli)
     expect(css).toMatch(/\.personel-dosya-kayit-grid\s*\{[^}]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/s);
   });
 });
+
+describe("K) Personel Listesi satırlarında kapsam rozeti yok (t862)", () => {
+  it("liste satırı Harici Personel rozeti render etmez; filtre korunur", () => {
+    const page = readFileSync(resolve("src/features/personeller/pages/PersonellerPage.tsx"), "utf8");
+    const tbody = page.slice(page.indexOf("<tbody>"), page.indexOf("</tbody>"));
+    expect(tbody).not.toMatch(/status-badge|formatCalisanKapsamiLabel|Harici Personel|DIS_KAYNAK/);
+    expect(page).toContain("CALISAN_KAPSAMI_SELECT_OPTIONS");
+  });
+});

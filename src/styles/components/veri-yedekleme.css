@@ -1,11 +1,14 @@
-.veri-yedekleme-body { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 18px 8px 22px; text-align: center; }
-.veri-yedekleme-actions { display: flex; justify-content: center; gap: 28px; flex-wrap: wrap; }
-.veri-yedekleme-btn { display: flex; flex-direction: column; align-items: center; gap: 8px; min-width: 128px; padding: 14px 12px; border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 12px; background: rgba(255, 255, 255, 0.04); color: inherit; font: inherit; font-weight: 600; cursor: pointer; }
-.veri-yedekleme-btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.09); }
+/* Geri satırı (.universal-back-bar) modal.css'te kalır; içerik kalan alanda yatay + dikey ortalanır. */
+.modal-body--veri-yedekleme { grid-template-rows: auto minmax(0, 1fr); }
+.veri-yedekleme-body { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 8px; text-align: center; min-height: 0; }
+.veri-yedekleme-actions { display: flex; flex-direction: column; align-items: center; gap: 28px; margin-bottom: 16px; }
+.veri-yedekleme-btn { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 6px 12px; border: 0; border-radius: 10px; background: none; color: inherit; font: inherit; font-size: 1.15rem; font-weight: 600; cursor: pointer; }
+.veri-yedekleme-btn:hover:not(:disabled) { opacity: 0.85; }
+.veri-yedekleme-btn:focus-visible { outline: 2px solid currentColor; outline-offset: 4px; }
 .veri-yedekleme-btn:disabled { opacity: 0.45; cursor: not-allowed; }
-.veri-yedekleme-icon { width: 48px; height: 48px; }
-.veri-yedekleme-son { margin: 6px 0 0; }
-.veri-yedekleme-ipucu { margin: 0; opacity: 0.8; }
+.veri-yedekleme-icon { width: 44px; height: 44px; }
+.veri-yedekleme-son { margin: 0; }
+.veri-yedekleme-ipucu { margin: 0; opacity: 0.8; font-size: 0.9em; }
 .veri-yedekleme-ok { margin: 0; color: #4ade80; }
 .veri-yedekleme-hata { margin: 0; color: #f87171; }
 @media (max-width: 480px) {

@@ -52,13 +52,14 @@ test.describe("personel kartı sekme overflow", () => {
     await expect(surecTab).toHaveAttribute("aria-selected", "true");
   });
 
-  test("1280px: tüm sekmeler sığdığında oklar görünmez", async ({ page }) => {
+  test("1280px: Puantaj sekmesi eklendikten sonra (t873) sekmeler kaydırılabilir, son sekmeye ulaşılır", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await openPersonelDetay(page);
 
-    const scroller = page.getByTestId("personel-kart-tab-scroller");
-    await expect(scroller).not.toHaveClass(/is-overflowing/);
-    await expect(page.getByTestId("personel-kart-tab-scroll-next")).toHaveCount(0);
-    await expect(page.getByTestId("personel-kart-tab-scroll-prev")).toHaveCount(0);
+    await expect(page.getByRole("tab", { name: "Puantaj" })).toBeVisible();
+    const surecTab = page.getByRole("tab", { name: "Süreç Geçmişi" });
+    await surecTab.scrollIntoViewIfNeeded();
+    await surecTab.click();
+    await expect(surecTab).toHaveAttribute("aria-selected", "true");
   });
 });

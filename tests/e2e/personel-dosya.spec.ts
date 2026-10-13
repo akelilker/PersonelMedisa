@@ -229,6 +229,7 @@ test.describe("personel dosyasi surec akisi", () => {
 
     await page.goto("/personeller/4");
     await expect(page).toHaveURL(/\/personeller\/4$/);
+    await page.getByRole("tab", { name: "Puantaj" }).click(); // t873: puantaj sekmesi
 
     const finansCard = page.getByTestId("personel-finans-adaylari-card");
     await expect(finansCard).toBeVisible();
@@ -245,6 +246,7 @@ test.describe("personel dosyasi surec akisi", () => {
 
     await page.goto("/personeller/1");
     await expect(page).toHaveURL(/\/personeller\/1$/);
+    await page.getByRole("tab", { name: "Puantaj" }).click(); // t873: puantaj sekmesi
 
     const finansCard = page.getByTestId("personel-finans-adaylari-card");
     await expect(finansCard).toBeVisible();
@@ -266,6 +268,7 @@ test.describe("personel dosyasi surec akisi", () => {
 
     await page.goto("/personeller/2");
     await expect(page).toHaveURL(/\/personeller\/2$/);
+    await page.getByRole("tab", { name: "Puantaj" }).click(); // t873: puantaj sekmesi
     await expect(page.locator(".personel-dosya-hero")).toContainText(/Mehmet Kaya/i);
 
     const finansCard = page.getByTestId("personel-finans-adaylari-card");
@@ -309,6 +312,7 @@ test.describe("personel dosyasi surec akisi", () => {
 
     await page.goto("/personeller/1");
     await expect(page).toHaveURL(/\/personeller\/1$/);
+    await page.getByRole("tab", { name: "Puantaj" }).click(); // t873: puantaj sekmesi
 
     const bordroCard = page.getByTestId("personel-bordro-aday-ozet-card");
     await expect(bordroCard).toBeVisible();

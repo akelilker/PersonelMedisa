@@ -135,3 +135,13 @@ select.form-input option {
   border-color: #d93025;
   box-shadow: 0 0 0 1px #d93025;
 }
+
+/* t879 onaylı karar: boş/geçersiz gönderimde alan adlı Title Case mesaj (empty-form-guard.ts). */
+.field-has-error[data-field-error-text]::after {
+  content: attr(data-field-error-text);
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #d93025;
+}

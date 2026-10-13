@@ -2,12 +2,15 @@ import { StrictMode } from "react";
 import ReactDOM from "react-dom/client";
 import { App } from "./app/App";
 import { attachConnectivityListeners, initAppDataFromStorage } from "./data/data-manager";
+import { installFormValidationGuard } from "./lib/forms/empty-form-guard";
 import { initPwaInstallCapture } from "./lib/shell/pwa-install";
 import { registerServiceWorkerOnce } from "./lib/shell/register-service-worker";
 import "./styles/index.css";
 
 initAppDataFromStorage();
 attachConnectivityListeners();
+// t879: tarayıcının İngilizce doğrulama balonu yerine alan adlı Türkçe mesaj + kırmızı çerçeve.
+installFormValidationGuard();
 
 // PWA install yüzeyi: `beforeinstallprompt` React mount'undan önce ve yalnızca
 // bir kez tetiklendiği için yakalama bootstrap'ta yapılır. Service worker

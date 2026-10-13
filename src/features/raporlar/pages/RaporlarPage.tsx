@@ -1,3 +1,4 @@
+import { userErrorText } from "../../../lib/display/user-error";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { Link, Navigate, useSearchParams } from "react-router-dom";
 import { fetchDepartmanOptions } from "../../../api/referans.api";
@@ -271,7 +272,7 @@ function AylikKapanisOzetiSection() {
       });
       setResult(next);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Aylık özet yüklenemedi.");
+      setErrorMessage(userErrorText(error instanceof Error ? error.message : "Aylık özet yüklenemedi."));
       setResult(null);
     } finally {
       setIsLoading(false);
@@ -287,7 +288,7 @@ function AylikKapanisOzetiSection() {
         await loadBaseData();
         await loadSummary(filters);
       } catch (error) {
-        setErrorMessage(error instanceof Error ? error.message : "Aylık özet yüklenemedi.");
+        setErrorMessage(userErrorText(error instanceof Error ? error.message : "Aylık özet yüklenemedi."));
         setIsLoading(false);
       }
     })();
@@ -318,7 +319,7 @@ function AylikKapanisOzetiSection() {
       setResult(next);
       setInfoMessage("Seçili ay için bölüm onayı verildi.");
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Bölüm onayı tamamlanamadı.");
+      setErrorMessage(userErrorText(error instanceof Error ? error.message : "Bölüm onayı tamamlanamadı."));
     } finally {
       setIsActing(false);
     }
@@ -343,7 +344,7 @@ function AylikKapanisOzetiSection() {
       setResult(next);
       setInfoMessage("Üst kontrol onayı kaydedildi.");
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Üst onay tamamlanamadı.");
+      setErrorMessage(userErrorText(error instanceof Error ? error.message : "Üst onay tamamlanamadı."));
     } finally {
       setIsActing(false);
     }
@@ -709,7 +710,7 @@ export function RaporlarPage() {
       setReportMeta(result.reportMeta ?? null);
       setHasSearched(true);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Rapor verisi alınamadı.");
+      setErrorMessage(userErrorText(error instanceof Error ? error.message : "Rapor verisi alınamadı."));
       setRows([]);
       setTotal(null);
       setReportMeta(null);
@@ -764,7 +765,7 @@ export function RaporlarPage() {
           : "tum";
       downloadReportCsv(`puantaj-raporu-${stamp}.csv`, headers, exportRows);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Puantaj raporu dışa aktarılamadı.");
+      setErrorMessage(userErrorText(error instanceof Error ? error.message : "Puantaj raporu dışa aktarılamadı."));
     }
   }
 
@@ -792,7 +793,7 @@ export function RaporlarPage() {
       }
       await downloadPuantajRaporXlsx(filters);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Puantaj raporu Excel dosyası indirilemedi.");
+      setErrorMessage(userErrorText(error instanceof Error ? error.message : "Puantaj raporu Excel dosyası indirilemedi."));
     }
   }
 

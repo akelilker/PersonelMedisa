@@ -1,3 +1,4 @@
+import { userErrorText } from "../../../../lib/display/user-error";
 import { useState, type FormEvent } from "react";
 import { FormField } from "../../../../components/form/FormField";
 import { AppModal } from "../../../../components/modal/AppModal";
@@ -81,15 +82,15 @@ export function PersonelBordroKapsamCreateModal({
 
   function buildPayloadBase(): Omit<CreatePersonelBordroKapsamPayload, "dry_run_hash"> | null {
     if (!form.gecerlilikBaslangic) {
-      setValidationMessage("Geçerlilik başlangıç tarihi zorunludur.");
+      setValidationMessage(userErrorText("Geçerlilik başlangıç tarihi zorunludur."));
       return null;
     }
     if (form.gecerlilikBitis && form.gecerlilikBitis < form.gecerlilikBaslangic) {
-      setValidationMessage("Bitiş tarihi başlangıçtan önce olamaz.");
+      setValidationMessage(userErrorText("Bitiş tarihi başlangıçtan önce olamaz."));
       return null;
     }
     if (form.aciklama.trim().length < 3) {
-      setValidationMessage("Açıklama en az 3 karakter olmalıdır.");
+      setValidationMessage(userErrorText("Açıklama en az 3 karakter olmalıdır."));
       return null;
     }
     const yil = Number.parseInt(form.yil, 10);
@@ -130,7 +131,7 @@ export function PersonelBordroKapsamCreateModal({
       hash = preview?.dry_run_hash;
     }
     if (!hash) {
-      setValidationMessage("Önce ön kontrol çalıştırılmalıdır.");
+      setValidationMessage(userErrorText("Önce ön kontrol çalıştırılmalıdır."));
       return;
     }
     const ok = await onCreate({ ...base, dry_run_hash: hash });

@@ -86,7 +86,7 @@ test.describe("S74-D1-D1 günlük bildirim tarih kontratı", () => {
 
     await expect(dateInput).toHaveAttribute("data-native-invalid-fired", "true");
     await expect(createForm).not.toHaveAttribute("data-native-submit-fired", "true");
-    await expect(modal.getByText("Tarih zorunludur.")).toBeVisible();
+    await expect(modal.getByText("Bu Alan Boş Bırakılamaz.")).toBeVisible();
     expect(createPostCount).toBe(0);
     await expect(modal).toBeVisible();
     await expect(modal.getByLabel("Tarih")).toHaveValue("");
@@ -114,18 +114,18 @@ test.describe("S74-D1-D1 günlük bildirim tarih kontratı", () => {
     });
 
     await modal.getByRole("button", { name: "Kaydet" }).click();
-    await expect(modal.getByText("Tarih zorunludur.")).toBeVisible();
+    await expect(modal.getByText("Bu Alan Boş Bırakılamaz.")).toBeVisible();
 
     await modal.getByLabel("Tarih").fill(SELECTED_OPERATION_DATE);
 
-    await expect(modal.getByText("Tarih zorunludur.")).toHaveCount(0);
+    await expect(modal.getByText("Bu Alan Boş Bırakılamaz.")).toHaveCount(0);
     await expect(modal.getByLabel("Tarih")).toHaveValue(SELECTED_OPERATION_DATE);
     expect(createPostCount).toBe(0);
 
     await modal.getByRole("button", { name: "Vazgeç" }).click();
     await page.getByRole("button", { name: /Günlük Kayıt Ekle|Günlük Kayıt Gir|Yeni Günlük Kayıt/i }).first().click();
     const reopenedModal = page.locator(".modal-container").last();
-    await expect(reopenedModal.getByText("Tarih zorunludur.")).toHaveCount(0);
+    await expect(reopenedModal.getByText("Bu Alan Boş Bırakılamaz.")).toHaveCount(0);
     await expect(reopenedModal.getByLabel("Tarih")).not.toHaveValue("");
     expect(createPostCount).toBe(0);
   });

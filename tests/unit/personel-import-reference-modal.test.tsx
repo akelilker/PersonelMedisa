@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import { userErrorText } from "../../src/lib/display/user-error";
 import "@testing-library/jest-dom/vitest";
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { cleanup, render, screen, fireEvent, waitFor } from "@testing-library/react";
@@ -109,7 +110,7 @@ describe("PersonelImportDryRunModal reference pack", () => {
     fireEvent.click(screen.getByTestId("personel-import-references-download"));
     await waitFor(() =>
       expect(screen.getByTestId("personel-import-dry-run-error")).toHaveTextContent(
-        "Referans paketi hazır değil."
+        userErrorText("Referans paketi hazır değil.", undefined, 409)
       )
     );
   });

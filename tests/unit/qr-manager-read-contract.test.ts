@@ -1,3 +1,4 @@
+import { userErrorText } from "../../src/lib/display/user-error";
 import { describe, expect, it } from "vitest";
 import type { ApiResponse } from "../../src/types/api";
 import {
@@ -75,7 +76,7 @@ describe("manager QR read contract", () => {
 
   it("rejects an invalid response shape", () => {
     expect(() => normalizeManagerQrAttendanceResponse(response({ items: [] }))).toThrow(
-      "/puantaj/qr-hareketleri yaniti gecersiz."
+      userErrorText("/puantaj/qr-hareketleri yaniti gecersiz.", "INVALID_RESPONSE", 500)
     );
   });
 

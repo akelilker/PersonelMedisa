@@ -1,3 +1,4 @@
+import { userErrorText } from "../../../lib/display/user-error";
 import { useMemo, useRef, useState } from "react";
 import { AppModal } from "../../../components/modal/AppModal";
 import { AppActionDialog } from "../../../components/modal/AppActionDialog";
@@ -227,7 +228,7 @@ export function PersonelImportDryRunModal({
     try {
       await downloadPersonelImportTemplateCsv();
     } catch (error) {
-      setErrorMessage(visibleImportError(error, "Şablon indirilemedi."));
+      setErrorMessage(userErrorText(visibleImportError(error, "Şablon indirilemedi.")));
     }
   }
 
@@ -241,7 +242,7 @@ export function PersonelImportDryRunModal({
     try {
       await downloadPersonelImportReferencesCsv();
     } catch (error) {
-      setErrorMessage(visibleImportError(error, "Yükleme kılavuzu indirilemedi."));
+      setErrorMessage(userErrorText(visibleImportError(error, "Yükleme kılavuzu indirilemedi.")));
     } finally {
       setIsDownloadingReferences(false);
       referencesDownloadGuardRef.current = false;
@@ -261,7 +262,7 @@ export function PersonelImportDryRunModal({
       setResult(dryRunResult);
       setIdempotencyKey(createIdempotencyKey());
     } catch (error) {
-      setErrorMessage(visibleImportError(error, "Dosya kontrolü tamamlanamadı."));
+      setErrorMessage(userErrorText(visibleImportError(error, "Dosya kontrolü tamamlanamadı.")));
       setResult(null);
       setIdempotencyKey(null);
     } finally {
@@ -274,7 +275,7 @@ export function PersonelImportDryRunModal({
       return;
     }
     if (confirmText.trim() !== CONFIRMATION_TOKEN) {
-      setErrorMessage("Onay metni PERSONEL_IMPORT_ONAYLIYORUM olmalıdır.");
+      setErrorMessage(userErrorText("Onay metni PERSONEL_IMPORT_ONAYLIYORUM olmalıdır."));
       return;
     }
 
@@ -292,7 +293,7 @@ export function PersonelImportDryRunModal({
       setConfirmText("");
       onApplied?.();
     } catch (error) {
-      setErrorMessage(visibleImportError(error, "Personel aktarımı yapılamadı."));
+      setErrorMessage(userErrorText(visibleImportError(error, "Personel aktarımı yapılamadı.")));
     } finally {
       setIsApplying(false);
     }

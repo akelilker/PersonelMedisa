@@ -1,3 +1,4 @@
+import { userErrorText } from "../../../../lib/display/user-error";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { AppActionDialog } from "../../../../components/modal/AppActionDialog";
@@ -298,7 +299,7 @@ export function PersonelBelgelerPanel({
 
     const ad = createDraft.ad.trim();
     if (!ad) {
-      setCreateModalError("Ad alanı zorunludur.");
+      setCreateModalError(userErrorText("Ad alanı zorunludur."));
       return;
     }
 
@@ -350,7 +351,7 @@ export function PersonelBelgelerPanel({
 
     const ad = editDraft.ad.trim();
     if (!ad) {
-      setEditModalError("Ad alanı zorunludur.");
+      setEditModalError(userErrorText("Ad alanı zorunludur."));
       return;
     }
 
@@ -436,7 +437,7 @@ export function PersonelBelgelerPanel({
 
     const reason = cancelReason.trim();
     if (!reason) {
-      setCancelFieldError("İptal nedeni zorunludur.");
+      setCancelFieldError(userErrorText("İptal nedeni zorunludur."));
       return;
     }
 
@@ -516,12 +517,12 @@ export function PersonelBelgelerPanel({
 
   function handleCreateFileChange(file: File | null) {
     setCreateFile(file);
-    setCreateFileError(file ? validatePersonelBelgeFileSelection(file) : null);
+    setCreateFileError(userErrorText(file ? validatePersonelBelgeFileSelection(file) : null));
   }
 
   function handleReplaceFileChange(file: File | null) {
     setReplaceFile(file);
-    setReplaceFileError(file ? validatePersonelBelgeFileSelection(file) : null);
+    setReplaceFileError(userErrorText(file ? validatePersonelBelgeFileSelection(file) : null));
   }
 
   return (

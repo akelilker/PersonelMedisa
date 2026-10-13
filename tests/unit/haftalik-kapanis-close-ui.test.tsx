@@ -1,4 +1,5 @@
 /** @vitest-environment jsdom */
+import { userErrorText } from "../../src/lib/display/user-error";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
@@ -228,8 +229,8 @@ describe("HaftalikKapanisClosePanel UI", () => {
     await fillValidMondayAndOpenConfirm();
     fireEvent.click(screen.getByTestId("hk-close-confirm-dialog-confirm"));
     await waitFor(() => {
-      expect(screen.getByTestId("hk-close-confirm-error").textContent).toMatch(
-        /mutabakat tamamlanmamis/i
+      expect(screen.getByTestId("hk-close-confirm-error").textContent).toBe(
+        userErrorText("Haftalik mutabakat tamamlanmamis.", "STATE_CONFLICT", 409)
       );
     });
     expect(screen.queryByTestId("hk-close-success")).toBeNull();
@@ -248,7 +249,7 @@ describe("HaftalikKapanisClosePanel UI", () => {
     await fillValidMondayAndOpenConfirm();
     fireEvent.click(screen.getByTestId("hk-close-confirm-dialog-confirm"));
     await waitFor(() => {
-      expect(screen.getByTestId("hk-close-confirm-error").textContent).toMatch(/zaten olusturulmus/i);
+      expect(screen.getByTestId("hk-close-confirm-error").textContent).toBe(userErrorText("Bu sube, hafta ve departman kapsami icin haftalik kapanis zaten olusturulmus.", "STATE_CONFLICT", 409));
     });
     expect(screen.queryByTestId("hk-close-success")).toBeNull();
   });

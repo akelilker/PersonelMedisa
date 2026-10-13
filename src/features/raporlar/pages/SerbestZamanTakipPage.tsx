@@ -1,3 +1,4 @@
+import { userErrorText } from "../../../lib/display/user-error";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   fetchSerbestZamanDeadlineTakip,
@@ -113,9 +114,7 @@ aciklama: "Serbest zaman kullanımı."
         setPage(result.page);
         setHasSearched(true);
       } catch (error) {
-        setErrorMessage(
-          error instanceof Error ? error.message : "Serbest zaman takip yüklenemedi."
-        );
+        setErrorMessage(userErrorText(error instanceof Error ? error.message : "Serbest zaman takip yüklenemedi."));
       } finally {
         setIsLoading(false);
       }

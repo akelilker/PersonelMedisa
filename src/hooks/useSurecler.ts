@@ -1,3 +1,4 @@
+import { userErrorText } from "../lib/display/user-error";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { getApiErrorMessage, shouldQueueOfflineMutation } from "../api/api-client";
@@ -224,7 +225,7 @@ export function useSurecler() {
         );
       } catch {
         if (!getCacheEntry<PaginatedResult<Surec>>(listKey)) {
-      setErrorMessage("Süreç listesi şu an güncellenemiyor.");
+      setErrorMessage(userErrorText("Süreç listesi şu an güncellenemiyor."));
         }
       } finally {
         if (!cancelled) {
@@ -249,7 +250,7 @@ export function useSurecler() {
         );
       } catch {
         if (!cancelled) {
-      setReferenceError("Süreç türleri şu an güncellenemiyor, manuel giriş kullanılabilir.");
+      setReferenceError(userErrorText("Süreç türleri şu an güncellenemiyor, manuel giriş kullanılabilir."));
         }
       }
     })();
@@ -337,7 +338,7 @@ export function useSurecler() {
         return;
       }
       if (!canCreate) {
-      setCreateErrorMessage("Bu işlem için yetkin bulunmuyor.");
+      setCreateErrorMessage(userErrorText("Bu işlem için yetkin bulunmuyor."));
         return;
       }
 
@@ -391,7 +392,7 @@ export function useSurecler() {
 
   const openEditModal = useCallback((surec: Surec, canEdit: boolean) => {
     if (!canEdit) {
-      setErrorMessage("Bu süreci düzenlemek için yetkin bulunmuyor.");
+      setErrorMessage(userErrorText("Bu süreci düzenlemek için yetkin bulunmuyor."));
       return;
     }
     setEditErrorMessage(null);
@@ -410,7 +411,7 @@ export function useSurecler() {
         return;
       }
       if (!canEdit) {
-        setEditErrorMessage("Bu süreci düzenlemek için yetkin bulunmuyor.");
+        setEditErrorMessage(userErrorText("Bu süreci düzenlemek için yetkin bulunmuyor."));
         return;
       }
 
@@ -466,12 +467,12 @@ export function useSurecler() {
         return;
       }
       if (!canCancel) {
-        setErrorMessage("Bu süreci iptal etmek için yetkin bulunmuyor.");
+        setErrorMessage(userErrorText("Bu süreci iptal etmek için yetkin bulunmuyor."));
         return;
       }
       if (isSurecTuruCancelBlocked(surec.surec_turu)) {
         // Fail-closed: ISTEN_AYRILMA generic iptal edilemez (backend 409 ile de reddeder).
-        setErrorMessage(ISTEN_AYRILMA_CANCEL_NOT_ALLOWED_MESSAGE);
+        setErrorMessage(userErrorText(ISTEN_AYRILMA_CANCEL_NOT_ALLOWED_MESSAGE));
         return;
       }
       setCancelDialogError(null);
@@ -496,7 +497,7 @@ export function useSurecler() {
 
     // Defense in depth: yalnız ISTEN_AYRILMA engellenir, diğer türler etkilenmez.
     if (isSurecTuruCancelBlocked(surec.surec_turu)) {
-      setCancelDialogError(ISTEN_AYRILMA_CANCEL_NOT_ALLOWED_MESSAGE);
+      setCancelDialogError(userErrorText(ISTEN_AYRILMA_CANCEL_NOT_ALLOWED_MESSAGE));
       setPendingCancelSurec(null);
       return;
     }
@@ -609,7 +610,7 @@ export function useSurecDetail(parsedSurecId: number, hasValidId: boolean) {
   const refetch = useCallback(async () => {
     if (!hasValidId) {
       setIsLoading(false);
-      setErrorMessage("Geçerli bir süreç ID verilmedi.");
+      setErrorMessage(userErrorText("Geçerli bir süreç ID verilmedi."));
       return;
     }
 
@@ -631,7 +632,7 @@ export function useSurecDetail(parsedSurecId: number, hasValidId: boolean) {
         return;
       }
       if (!getCacheEntry<Surec>(detailKey)) {
-        setErrorMessage("Süreç detayı şu an güncellenemiyor.");
+        setErrorMessage(userErrorText("Süreç detayı şu an güncellenemiyor."));
       }
     } finally {
       setIsLoading(false);

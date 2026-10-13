@@ -1,3 +1,4 @@
+import { userErrorText } from "../lib/display/user-error";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getApiErrorDetail } from "../api/api-client";
 import {
@@ -62,7 +63,7 @@ export function useMaasHesaplama(options: UseMaasHesaplamaOptions) {
       setCalculationPreflight(null);
       setCalistirmalar([]);
       setDevirler([]);
-      setErrorMessage("Maaş hesaplama için şube seçilmelidir.");
+      setErrorMessage(userErrorText("Maaş hesaplama için şube seçilmelidir."));
       setCalculationErrorMessage(null);
       return;
     }
@@ -110,9 +111,7 @@ export function useMaasHesaplama(options: UseMaasHesaplamaOptions) {
         setCalculationPreflight(null);
         setCalistirmalar([]);
         setDevirler([]);
-        setCalculationErrorMessage(
-          getApiErrorDetail(caught, "Maaş hesaplama aday/devir verisi alınamadı.").message
-        );
+        setCalculationErrorMessage(userErrorText(getApiErrorDetail(caught, "Maaş hesaplama aday/devir verisi alınamadı.").message));
       }
     } catch (caught) {
       if (requestId !== requestIdRef.current) {
@@ -124,7 +123,7 @@ export function useMaasHesaplama(options: UseMaasHesaplamaOptions) {
       setCalculationPreflight(null);
       setCalistirmalar([]);
       setDevirler([]);
-      setErrorMessage(getApiErrorDetail(caught, "Maaş hesaplama verisi alınamadı.").message);
+      setErrorMessage(userErrorText(getApiErrorDetail(caught, "Maaş hesaplama verisi alınamadı.").message));
     } finally {
       if (requestId === requestIdRef.current) {
         setIsLoading(false);

@@ -1,3 +1,4 @@
+import { userErrorText } from "../../../lib/display/user-error";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { ApiRequestError } from "../../../api/api-client";
@@ -66,9 +67,7 @@ export function RevizyonMerkeziPage() {
       }
     } catch (error) {
       const code = error instanceof ApiRequestError ? error.code : undefined;
-      setErrorMessage(
-        revizyonUserMessage(code, error instanceof Error ? error.message : "Liste yüklenemedi.")
-      );
+      setErrorMessage(userErrorText(revizyonUserMessage(code, error instanceof Error ? error.message : "Liste yüklenemedi.")));
     } finally {
       setIsLoading(false);
     }

@@ -1,3 +1,4 @@
+import { userErrorText } from "../lib/display/user-error";
 import { getApiMode, isDemoApiFallbackEnabled } from "../config/app-env";
 import { getAppPublicPath } from "../config/public-base";
 import { shouldEmitGlobalAuthForbidden } from "../lib/api-forbidden-policy";
@@ -105,8 +106,12 @@ export class ApiRequestError extends Error {
   code?: string;
   field?: string;
 
+  /** Sunucunun ham metni; kullanıcıya gösterilmez (yalnız tanılama). */
+  rawMessage: string;
+
   constructor(message: string, status: number, detail?: Pick<ApiError, "code" | "field">) {
-    super(message);
+    super(userErrorText(message, detail?.code, status));
+    this.rawMessage = message;
     this.name = "ApiRequestError";
     this.status = status;
     this.code = detail?.code;
@@ -230,7 +235,8 @@ export function getApiErrorDetail(
   fallbackMessage: string,
   options?: GetApiErrorMessageOptions
 ): ApiErrorDetail {
-  return resolveApiErrorDetail(error, fallbackMessage, options);
+  const detail = resolveApiErrorDetail(error, fallbackMessage, options);
+  return { ...detail, message: userErrorText(detail.message, detail.code, detail.status) };
 }
 
 export function getApiErrorMessage(

@@ -1,3 +1,4 @@
+import { userErrorText } from "../../../lib/display/user-error";
 import { useEffect, useMemo, useState } from "react";
 import { ApiRequestError } from "../../../api/api-client";
 import {
@@ -261,7 +262,7 @@ export function MaasHesaplamaMerkeziPage(props?: {
       .catch((error) => {
         if (!cancelled) {
           setAdaylar([]);
-          setActionError(error instanceof Error ? error.message : "Aday listesi alınamadı.");
+          setActionError(userErrorText(error instanceof Error ? error.message : "Aday listesi alınamadı."));
         }
       })
       .finally(() => {
@@ -326,8 +327,8 @@ export function MaasHesaplamaMerkeziPage(props?: {
           : error instanceof Error
             ? error.message
             : "Snapshot oluşturulamadı.";
-      setCreateDialogError(readableMessage);
-      setActionError(readableMessage);
+      setCreateDialogError(userErrorText(readableMessage));
+      setActionError(userErrorText(readableMessage));
       await refetch();
     } finally {
       setIsCreating(false);
@@ -336,7 +337,7 @@ export function MaasHesaplamaMerkeziPage(props?: {
 
   async function handleCancel() {
     if (!activeSnapshot || !canManage || !cancelNeden.trim()) {
-      setActionError("İptal için neden zorunludur.");
+      setActionError(userErrorText("İptal için neden zorunludur."));
       return;
     }
     setIsCancelling(true);
@@ -354,9 +355,9 @@ export function MaasHesaplamaMerkeziPage(props?: {
       await refetch();
     } catch (error) {
       if (error instanceof ApiRequestError) {
-        setActionError(`${error.code}: ${error.message}`);
+        setActionError(userErrorText(`${error.code}: ${error.message}`));
       } else {
-        setActionError(error instanceof Error ? error.message : "Snapshot iptal edilemedi.");
+        setActionError(userErrorText(error instanceof Error ? error.message : "Snapshot iptal edilemedi."));
       }
     } finally {
       setIsCancelling(false);
@@ -369,7 +370,7 @@ export function MaasHesaplamaMerkeziPage(props?: {
       const detail = await fetchMaasHesaplamaSnapshotDetail(snapshotId, canManage);
       setSelectedDetail(detail);
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : "Snapshot detayı alınamadı.");
+      setActionError(userErrorText(error instanceof Error ? error.message : "Snapshot detayı alınamadı."));
     }
   }
 
@@ -417,8 +418,8 @@ export function MaasHesaplamaMerkeziPage(props?: {
           : error instanceof Error
             ? error.message
             : "Hesaplama çalıştırılamadı.";
-      setCalculateDialogError(readableMessage);
-      setActionError(readableMessage);
+      setCalculateDialogError(userErrorText(readableMessage));
+      setActionError(userErrorText(readableMessage));
       await refetch();
     } finally {
       setIsCalculating(false);
@@ -427,7 +428,7 @@ export function MaasHesaplamaMerkeziPage(props?: {
 
   async function handleCancelCalistirma() {
     if (!activeCalistirma || !canManageAdaylari || !cancelCalistirmaNeden.trim()) {
-      setActionError("Çalıştırma iptali için neden zorunludur.");
+      setActionError(userErrorText("Çalıştırma iptali için neden zorunludur."));
       return;
     }
     setIsCancellingCalistirma(true);
@@ -439,7 +440,7 @@ export function MaasHesaplamaMerkeziPage(props?: {
       setCancelCalistirmaNeden("");
       await refetch();
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : "Çalıştırma iptal edilemedi.");
+      setActionError(userErrorText(error instanceof Error ? error.message : "Çalıştırma iptal edilemedi."));
     } finally {
       setIsCancellingCalistirma(false);
     }
@@ -455,7 +456,7 @@ export function MaasHesaplamaMerkeziPage(props?: {
       setSelectedAday(detail);
       setSelectedAdayKalemler(kalemler);
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : "Aday kalemleri alınamadı.");
+      setActionError(userErrorText(error instanceof Error ? error.message : "Aday kalemleri alınamadı."));
     }
   }
 
@@ -467,7 +468,7 @@ export function MaasHesaplamaMerkeziPage(props?: {
     const matrah = parseDecimal(devirForm.matrah);
     const vergi = parseDecimal(devirForm.vergi);
     if (!Number.isFinite(personelId) || personelId <= 0 || matrah === null || vergi === null) {
-      setActionError("Devir için personel, matrah ve vergi sayısal olmalıdır.");
+      setActionError(userErrorText("Devir için personel, matrah ve vergi sayısal olmalıdır."));
       return;
     }
     setIsSavingDevir(true);
@@ -487,7 +488,7 @@ export function MaasHesaplamaMerkeziPage(props?: {
       setDevirForm({ personelId: "", matrah: "", vergi: "" });
       await refetch();
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : "Devir kaydedilemedi.");
+      setActionError(userErrorText(error instanceof Error ? error.message : "Devir kaydedilemedi."));
     } finally {
       setIsSavingDevir(false);
     }
@@ -495,7 +496,7 @@ export function MaasHesaplamaMerkeziPage(props?: {
 
   async function handleDownloadSgkCsv() {
     if (!parsedAy || !Number.isFinite(subeId)) {
-      setActionError("SGK CSV için ay ve şube seçilmelidir.");
+      setActionError(userErrorText("SGK CSV için ay ve şube seçilmelidir."));
       return;
     }
     setIsExportingSgk(true);
@@ -509,7 +510,7 @@ export function MaasHesaplamaMerkeziPage(props?: {
       });
       setActionMessage("Kesin SGK CSV indirildi.");
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : "SGK CSV indirilemedi.");
+      setActionError(userErrorText(error instanceof Error ? error.message : "SGK CSV indirilemedi."));
     } finally {
       setIsExportingSgk(false);
     }

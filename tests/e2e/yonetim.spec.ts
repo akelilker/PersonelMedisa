@@ -1,7 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { login } from "./helpers/auth";
 import { mockApi } from "./helpers/mock-api";
-import { SUBE_DELETE_BLOCKED_MESSAGE } from "../../src/lib/yonetim/sube-delete";
 
 test.describe("yonetim paneli ve aylik ozet", () => {
   test("genel yonetici ayarlar menusunden yonetim paneline gider, kullanici ekler ve sube tanimlar", async ({
@@ -270,7 +269,7 @@ test.describe("yonetim paneli ve aylik ozet", () => {
     await page.getByTestId("yonetim-sube-delete-dialog-confirm").click();
 
     await expect(page.getByTestId("yonetim-sube-delete-dialog").getByRole("alert")).toContainText(
-      SUBE_DELETE_BLOCKED_MESSAGE
+      "Bu Kayıt Mevcut Durumunda Bu İşleme Uygun Değil."
     );
     await expect(page.locator(".yonetim-card-grid--branches")).toContainText("Merkez");
   });
@@ -296,7 +295,7 @@ test.describe("yonetim paneli ve aylik ozet", () => {
     await panel.getByPlaceholder("Yeni departman adı").fill("kalite kontrol");
     await page.getByRole("button", { name: "Ekle" }).click();
 
-    await expect(page.getByText("Bu departman adı zaten kayıtlı.")).toBeVisible();
+    await expect(page.getByText("Bu Kayıt Zaten Var.")).toBeVisible();
   });
 
   test("yonetim paneli tab query param ile dogru bolum acilir ve url senkron kalir", async ({ page }) => {

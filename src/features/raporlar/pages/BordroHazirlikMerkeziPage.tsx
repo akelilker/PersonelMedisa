@@ -1,3 +1,4 @@
+import { userErrorText } from "../../../lib/display/user-error";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import {
@@ -255,7 +256,7 @@ export function BordroHazirlikMerkeziPage() {
       const parsed = Number.parseInt(rawId.trim(), 10);
       if (!Number.isFinite(parsed) || parsed < 1) {
         setKapsamPersonel(null);
-        setKapsamPersonelError("Geçerli bir personel ID girin.");
+        setKapsamPersonelError(userErrorText("Geçerli bir personel ID girin."));
         return;
       }
 
@@ -329,7 +330,7 @@ export function BordroHazirlikMerkeziPage() {
       if (requestId !== loadRequestIdRef.current) {
         return;
       }
-      setErrorMessage(error instanceof Error ? error.message : "Bordro hazırlık verisi yüklenemedi.");
+      setErrorMessage(userErrorText(error instanceof Error ? error.message : "Bordro hazırlık verisi yüklenemedi."));
     } finally {
       if (requestId === loadRequestIdRef.current) {
         setIsLoading(false);
@@ -372,7 +373,7 @@ export function BordroHazirlikMerkeziPage() {
       const detail = await fetchSirketPolitikaDetail(id);
       setSelectedPolitikaDetail(detail);
     } catch (error) {
-      setPolitikaDetailError(error instanceof Error ? error.message : "Politika detayı yüklenemedi.");
+      setPolitikaDetailError(userErrorText(error instanceof Error ? error.message : "Politika detayı yüklenemedi."));
     } finally {
       setPolitikaDetailLoading(false);
     }
@@ -384,7 +385,7 @@ export function BordroHazirlikMerkeziPage() {
     setPolicyEvidenceError(null);
     const evidence = normalizePolitikaEvidenceInput(policyBelgeId, policyBelgeSha256);
     if (!evidence.ok) {
-      setPolicyEvidenceError(evidence.error);
+      setPolicyEvidenceError(userErrorText(evidence.error));
       return;
     }
     try {
@@ -407,16 +408,14 @@ export function BordroHazirlikMerkeziPage() {
       await loadData();
       setActiveTab("politika");
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Politika taslağı oluşturulamadı.");
+      setErrorMessage(userErrorText(error instanceof Error ? error.message : "Politika taslağı oluşturulamadı."));
     }
   }
 
   async function handleSubmitPolicy(id: number) {
     const politika = politikalar.find((item) => item.id === id);
     if (politika && politika.evidence_status !== "PRESENT_VALID") {
-      setErrorMessage(
-        `Onaya göndermek için karar belgesi kanıtı zorunludur (durum: ${evidenceStatusLabel(politika.evidence_status)}).`
-      );
+      setErrorMessage(userErrorText(`Onaya göndermek için karar belgesi kanıtı zorunludur (durum: ${evidenceStatusLabel(politika.evidence_status)}).`));
       return;
     }
     try {
@@ -424,7 +423,7 @@ export function BordroHazirlikMerkeziPage() {
       setActionMessage("Politika onaya gönderildi.");
       await loadData();
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Politika onaya gönderilemedi.");
+      setErrorMessage(userErrorText(error instanceof Error ? error.message : "Politika onaya gönderilemedi."));
     }
   }
 
@@ -432,14 +431,14 @@ export function BordroHazirlikMerkeziPage() {
     const politika = politikalar.find((item) => item.id === id);
     const currentUserId = session?.user?.id ?? null;
     if (politika?.evidence_status !== "PRESENT_VALID" && kararOzeti?.evidence_status !== "PRESENT_VALID") {
-      setErrorMessage("Kanıt geçerli değil; onay kapalı.");
+      setErrorMessage(userErrorText("Kanıt geçerli değil; onay kapalı."));
       return;
     }
     if (
       currentUserId != null &&
       (politika?.hazirlayan_id === currentUserId || kararOzeti?.hazirlayan_id === currentUserId)
     ) {
-      setErrorMessage("Hazırlayan kullanıcı politikayı onaylayamaz.");
+      setErrorMessage(userErrorText("Hazırlayan kullanıcı politikayı onaylayamaz."));
       return;
     }
     try {
@@ -447,7 +446,7 @@ export function BordroHazirlikMerkeziPage() {
       setActionMessage("Politika onaylandı.");
       await loadData();
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Politika onaylanamadı.");
+      setErrorMessage(userErrorText(error instanceof Error ? error.message : "Politika onaylanamadı."));
     }
   }
 
@@ -463,7 +462,7 @@ export function BordroHazirlikMerkeziPage() {
       await Promise.all([loadData(), refetchMaas()]);
       setActiveTab("on-izleme");
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Maaş adayı üretilemedi.");
+      setErrorMessage(userErrorText(error instanceof Error ? error.message : "Maaş adayı üretilemedi."));
     }
   }
 
@@ -512,8 +511,8 @@ export function BordroHazirlikMerkeziPage() {
       await loadData();
     } catch (error) {
       const message = error instanceof Error ? error.message : "Bordro kesinleştirilemedi.";
-      setKesinlestirDialogError(message);
-      setErrorMessage(message);
+      setKesinlestirDialogError(userErrorText(message));
+      setErrorMessage(userErrorText(message));
     } finally {
       setIsKesinlestirSubmitting(false);
     }
@@ -560,7 +559,7 @@ export function BordroHazirlikMerkeziPage() {
     try {
       await downloadBordroDevirSablonCsv({ yil, ay, subeId, eksik: true });
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Devir şablonu indirilemedi.");
+      setErrorMessage(userErrorText(error instanceof Error ? error.message : "Devir şablonu indirilemedi."));
     }
   }
 
@@ -570,7 +569,7 @@ export function BordroHazirlikMerkeziPage() {
       await downloadBordroReadinessCsv({ yil, ay, subeId });
       setActionMessage("Hazırlık CSV indirildi.");
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Hazırlık CSV indirilemedi.");
+      setErrorMessage(userErrorText(error instanceof Error ? error.message : "Hazırlık CSV indirilemedi."));
     }
   }
 
@@ -580,7 +579,7 @@ export function BordroHazirlikMerkeziPage() {
       await downloadBordroOnIzlemeCsv({ yil, ay, subeId });
       setActionMessage("Ön izleme CSV indirildi (ekrandaki personel ve toplamlarla aynı kapsam).");
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Ön izleme CSV indirilemedi.");
+      setErrorMessage(userErrorText(error instanceof Error ? error.message : "Ön izleme CSV indirilemedi."));
     }
   }
 

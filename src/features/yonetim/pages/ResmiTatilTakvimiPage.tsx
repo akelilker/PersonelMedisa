@@ -1,3 +1,4 @@
+import { userErrorText } from "../../../lib/display/user-error";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { ApiRequestError } from "../../../api/api-client";
 import {
@@ -183,7 +184,7 @@ export function ResmiTatilTakvimiPage() {
       setEnvanter(ozet);
       setPreview(prev);
     } catch (error) {
-      setErrorMessage(apiErrorMessage(error, "Resmî tatil takvimi yüklenemedi."));
+      setErrorMessage(userErrorText(apiErrorMessage(error, "Resmî tatil takvimi yüklenemedi.")));
     } finally {
       setIsLoading(false);
     }
@@ -237,16 +238,16 @@ export function ResmiTatilTakvimiPage() {
     if (!canManage || !formMode) return;
     if (form.gun_kapsami === "YARIM_GUN") {
       if (!form.tatil_interval_baslangic || !form.tatil_interval_bitis) {
-        setSubmitError("Yarım gün için başlangıç ve bitiş saati zorunludur.");
+        setSubmitError(userErrorText("Yarım gün için başlangıç ve bitiş saati zorunludur."));
         return;
       }
       if (form.tatil_interval_baslangic >= form.tatil_interval_bitis) {
-        setSubmitError("Bitiş saati başlangıçtan sonra olmalıdır.");
+        setSubmitError(userErrorText("Bitiş saati başlangıçtan sonra olmalıdır."));
         return;
       }
     }
     if (formMode === "revise" && !form.iptal_gerekcesi.trim()) {
-      setSubmitError("Revizyon gerekçesi zorunludur.");
+      setSubmitError(userErrorText("Revizyon gerekçesi zorunludur."));
       return;
     }
 
@@ -271,7 +272,7 @@ export function ResmiTatilTakvimiPage() {
       closeForm();
       await load();
     } catch (error) {
-      setSubmitError(apiErrorMessage(error, "Kayıt kaydedilemedi."));
+      setSubmitError(userErrorText(apiErrorMessage(error, "Kayıt kaydedilemedi.")));
     } finally {
       setIsSubmitting(false);
     }
@@ -285,7 +286,7 @@ export function ResmiTatilTakvimiPage() {
       setActionMessage(`${item.tatil_adi} aktifleştirildi.`);
       await load();
     } catch (error) {
-      setActionError(apiErrorMessage(error, "Aktifleştirme başarısız."));
+      setActionError(userErrorText(apiErrorMessage(error, "Aktifleştirme başarısız.")));
     }
   }
 
@@ -295,7 +296,7 @@ export function ResmiTatilTakvimiPage() {
       return;
     }
     if (!cancelGerekce.trim()) {
-      setCancelError("İptal gerekçesi zorunludur.");
+      setCancelError(userErrorText("İptal gerekçesi zorunludur."));
       return;
     }
     setIsSubmitting(true);
@@ -309,7 +310,7 @@ export function ResmiTatilTakvimiPage() {
       setActionMessage("Kayıt iptal edildi.");
       await load();
     } catch (error) {
-      setCancelError(apiErrorMessage(error, "İptal başarısız."));
+      setCancelError(userErrorText(apiErrorMessage(error, "İptal başarısız.")));
     } finally {
       setIsSubmitting(false);
     }
@@ -320,7 +321,7 @@ export function ResmiTatilTakvimiPage() {
     try {
       setHistoryData(await fetchResmiTatilHistory(item.id));
     } catch (error) {
-      setActionError(apiErrorMessage(error, "Geçmiş yüklenemedi."));
+      setActionError(userErrorText(apiErrorMessage(error, "Geçmiş yüklenemedi.")));
     }
   }
 

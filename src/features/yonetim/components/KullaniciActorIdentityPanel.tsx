@@ -1,3 +1,4 @@
+import { userErrorText } from "../../../lib/display/user-error";
 import { useCallback, useEffect, useState } from "react";
 import { isApiRequestError } from "../../../api/api-client";
 import {
@@ -41,7 +42,7 @@ export function KullaniciActorIdentityPanel(props: KullaniciActorIdentityPanelPr
       ) {
         setSnapshot(null);
       } else {
-        setErrorMessage(error instanceof Error ? error.message : "SGK yetkili kimliği okunamadı.");
+        setErrorMessage(userErrorText(error instanceof Error ? error.message : "SGK yetkili kimliği okunamadı."));
       }
     } finally {
       setIsLoading(false);
@@ -63,7 +64,7 @@ export function KullaniciActorIdentityPanel(props: KullaniciActorIdentityPanelPr
       const read = await action();
       setSnapshot(read);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "SGK yetkili kimliği işlemi başarısız.");
+      setErrorMessage(userErrorText(error instanceof Error ? error.message : "SGK yetkili kimliği işlemi başarısız."));
     } finally {
       setIsWorking(false);
     }

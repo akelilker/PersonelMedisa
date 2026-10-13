@@ -108,7 +108,7 @@ describe("auth.api login", () => {
     );
 
     await expect(login({ username: "bad", password: "bad" })).rejects.toMatchObject({
-      message: "Kullanici adi veya sifre hatali."
+      rawMessage: "Kullanici adi veya sifre hatali."
     });
   });
 
@@ -176,7 +176,7 @@ describe("auth.api login", () => {
 
       await expect(login({ username: "any", password: "user" })).rejects.toMatchObject({
         status: 404,
-        message: error.message
+        rawMessage: error.message
       });
     });
 
@@ -186,7 +186,7 @@ describe("auth.api login", () => {
 
       await expect(login({ username: "any", password: "user" })).rejects.toMatchObject({
         status: 503,
-        message: error.message
+        rawMessage: error.message
       });
     });
 
@@ -204,7 +204,7 @@ describe("auth.api login", () => {
       );
 
       await expect(login({ username: "any", password: "user" })).rejects.toMatchObject({
-        message: "Login yanıtı beklenen oturum formatında değil."
+        rawMessage: "Login yanıtı beklenen oturum formatında değil."
       });
     });
   });
@@ -248,7 +248,7 @@ describe("auth.api login", () => {
     );
 
     await expect(login({ username: "hazirlayan", password: "secret" })).rejects.toMatchObject({
-      message: "Login yanıtı beklenen oturum formatında değil."
+      rawMessage: "Login yanıtı beklenen oturum formatında değil."
     });
   });
 
@@ -266,7 +266,7 @@ describe("auth.api login", () => {
     );
 
     await expect(login({ username: "onaylayan", password: "secret" })).rejects.toMatchObject({
-      message: "Login yanıtı beklenen oturum formatında değil."
+      rawMessage: "Login yanıtı beklenen oturum formatında değil."
     });
   });
 
@@ -284,7 +284,7 @@ describe("auth.api login", () => {
     );
 
     await expect(login({ username: "x", password: "y" })).rejects.toMatchObject({
-      message: "Login yanıtı beklenen oturum formatında değil."
+      rawMessage: "Login yanıtı beklenen oturum formatında değil."
     });
   });
 });

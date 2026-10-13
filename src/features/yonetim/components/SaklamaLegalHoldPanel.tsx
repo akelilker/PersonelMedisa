@@ -1,3 +1,4 @@
+import { userErrorText } from "../../../lib/display/user-error";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { fetchPersonellerListForSelect } from "../../../api/personeller.api";
 import {
@@ -102,7 +103,7 @@ export function SaklamaLegalHoldPanel() {
       setTalepler(talepItems);
       setPersoneller(personelPage);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Saklama paneli yüklenemedi.");
+      setErrorMessage(userErrorText(error instanceof Error ? error.message : "Saklama paneli yüklenemedi."));
     } finally {
       setIsLoading(false);
     }
@@ -129,7 +130,7 @@ export function SaklamaLegalHoldPanel() {
       setSuccessMessage("Kayıt koruma altına alındı.");
       await reload();
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Kayıt koruma altına alınamadı.");
+      setErrorMessage(userErrorText(error instanceof Error ? error.message : "Kayıt koruma altına alınamadı."));
     }
   }
 
@@ -145,7 +146,7 @@ export function SaklamaLegalHoldPanel() {
       setSuccessMessage("Kayıt üzerindeki koruma kaldırıldı. Kayıt silinmedi.");
       await reload();
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Koruma kaldırılamadı.");
+      setErrorMessage(userErrorText(error instanceof Error ? error.message : "Koruma kaldırılamadı."));
     }
   }
 
@@ -164,7 +165,7 @@ export function SaklamaLegalHoldPanel() {
       });
       setEligibility(result);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Saklama süresi değerlendirilemedi.");
+      setErrorMessage(userErrorText(error instanceof Error ? error.message : "Saklama süresi değerlendirilemedi."));
     }
   }
 
@@ -187,7 +188,7 @@ export function SaklamaLegalHoldPanel() {
       setSuccessMessage("İmha talebi kaydedildi.");
       await reload();
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "İmha talebi oluşturulamadı.");
+      setErrorMessage(userErrorText(error instanceof Error ? error.message : "İmha talebi oluşturulamadı."));
     }
   }
 
@@ -205,7 +206,7 @@ export function SaklamaLegalHoldPanel() {
       );
       await reload();
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "İmha onayı işlenemedi.");
+      setErrorMessage(userErrorText(error instanceof Error ? error.message : "İmha onayı işlenemedi."));
     }
   }
 

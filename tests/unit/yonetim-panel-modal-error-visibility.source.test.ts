@@ -1,3 +1,4 @@
+import { userErrorText } from "../../src/lib/display/user-error";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -36,19 +37,19 @@ describe("yonetim panel modal error visibility", () => {
   it("routes user editor submit failures to the in-modal error", () => {
     const body = functionBody(page, "handleKullaniciSubmit");
     expect(body).toContain("setFormErrorMessage(null)");
-    expect(body).toContain('setFormErrorMessage("Bu personel kaydı başka bir kullanıcıya bağlı.")');
-    expect(body).toContain('setFormErrorMessage(error instanceof Error ? error.message : "Kullanıcı kaydı kaydedilemedi.")');
+    expect(body).toContain('setFormErrorMessage(userErrorText("Bu personel kaydı başka bir kullanıcıya bağlı."))');
+    expect(body).toContain('setFormErrorMessage(userErrorText(error instanceof Error ? error.message : "Kullanıcı kaydı kaydedilemedi."))');
     expect(body).not.toContain("setErrorMessage(");
   });
 
   it("routes branch editor and inline departman failures to the in-modal error", () => {
     const sube = functionBody(page, "handleSubeSubmit");
     expect(sube).toContain("setFormErrorMessage(null)");
-    expect(sube).toContain('setFormErrorMessage(error instanceof Error ? error.message : "Şube tanımı kaydedilemedi.")');
+    expect(sube).toContain('setFormErrorMessage(userErrorText(error instanceof Error ? error.message : "Şube tanımı kaydedilemedi."))');
     expect(sube).not.toContain("setErrorMessage(");
 
     const departman = functionBody(page, "handleDepartmanAdd");
-    expect(departman).toContain('setFormErrorMessage(error instanceof Error ? error.message : "Departman eklenemedi.")');
+    expect(departman).toContain('setFormErrorMessage(userErrorText(error instanceof Error ? error.message : "Departman eklenemedi."))');
     expect(departman).not.toContain("setErrorMessage(");
   });
 

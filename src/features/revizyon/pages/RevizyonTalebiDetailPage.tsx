@@ -1,3 +1,4 @@
+import { userErrorText } from "../../../lib/display/user-error";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ApiRequestError } from "../../../api/api-client";
@@ -99,9 +100,7 @@ export function RevizyonTalebiDetailPage() {
       setTalep(await fetchRevizyonTalebiDetail(revizyonId));
     } catch (error) {
       const code = error instanceof ApiRequestError ? error.code : undefined;
-      setErrorMessage(
-        revizyonUserMessage(code, error instanceof Error ? error.message : "Detay yüklenemedi.")
-      );
+      setErrorMessage(userErrorText(revizyonUserMessage(code, error instanceof Error ? error.message : "Detay yüklenemedi.")));
     } finally {
       setIsLoading(false);
     }
@@ -137,9 +136,7 @@ export function RevizyonTalebiDetailPage() {
       return true;
     } catch (error) {
       const code = error instanceof ApiRequestError ? error.code : undefined;
-      setActionError(
-          revizyonUserMessage(code, error instanceof Error ? error.message : "İşlem başarısız.")
-      );
+      setActionError(userErrorText(revizyonUserMessage(code, error instanceof Error ? error.message : "İşlem başarısız.")));
       return false;
     } finally {
       isActingRef.current = false;
@@ -408,7 +405,7 @@ export function RevizyonTalebiDetailPage() {
             data-testid="revizyon-reddet"
             onClick={() => {
               if (!kararNotu.trim()) {
-                setActionError("Red için karar notu zorunludur.");
+                setActionError(userErrorText("Red için karar notu zorunludur."));
                 document.getElementById("karar_notu")?.focus();
                 return;
               }

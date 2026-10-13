@@ -1,3 +1,4 @@
+import { userErrorText } from "../../../lib/display/user-error";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { ApiRequestError } from "../../../api/api-client";
@@ -80,7 +81,7 @@ export function HaftalikKapanisPage() {
         setPersoneller(items);
         setPersonelId((current) => current || (items[0] ? String(items[0].id) : ""));
       } catch (error) {
-        setErrorMessage(error instanceof Error ? error.message : "Personel listesi yüklenemedi.");
+        setErrorMessage(userErrorText(error instanceof Error ? error.message : "Personel listesi yüklenemedi."));
       } finally {
         setIsLoadingMeta(false);
       }
@@ -103,9 +104,7 @@ export function HaftalikKapanisPage() {
       setKaynaklar(items);
     } catch (error) {
       const code = error instanceof ApiRequestError ? error.code : undefined;
-      setErrorMessage(
-        revizyonUserMessage(code, error instanceof Error ? error.message : "Kaynaklar yüklenemedi.")
-      );
+      setErrorMessage(userErrorText(revizyonUserMessage(code, error instanceof Error ? error.message : "Kaynaklar yüklenemedi.")));
       setKaynaklar([]);
     } finally {
       setIsLoadingKaynak(false);

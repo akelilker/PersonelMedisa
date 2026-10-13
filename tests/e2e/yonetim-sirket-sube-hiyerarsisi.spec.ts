@@ -77,7 +77,7 @@ test.describe("yonetim paneli sirket -> sube hiyerarsisi", () => {
     await subeModal.getByTestId("yonetim-sube-kaydet").click();
 
     await expect(page.getByTestId("yonetim-sube-form-error")).toContainText(
-      /ayni kisa ada sahip|aynı kısa ada sahip/i
+      "Bu Kayıt Zaten Var."
     );
 
     await page.goto("/yonetim-paneli?tab=subeler&sirket=2");
@@ -103,6 +103,6 @@ test.describe("yonetim paneli sirket -> sube hiyerarsisi", () => {
     await sirketModal.getByTestId("yonetim-sirket-sil").click();
     await page.getByTestId("yonetim-sirket-delete-dialog-confirm").click();
 
-    await expect(page.getByTestId("yonetim-sirket-delete-dialog-error")).toContainText(/bagli sube|bağlı şube/i);
+    await expect(page.getByTestId("yonetim-sirket-delete-dialog-error")).toContainText("Bu Kayıt Mevcut Durumunda Bu İşleme Uygun Değil.");
   });
 });

@@ -75,7 +75,7 @@ describe("createZimmet demo error envelope parity", () => {
       status: 422,
       code: "VALIDATION_ERROR",
       field: "urun_turu",
-      message: "Ürün türü zorunludur."
+      rawMessage: "Ürün türü zorunludur."
     });
   });
 
@@ -117,7 +117,7 @@ describe("createZimmet demo error envelope parity", () => {
       status: 422,
       code: "VALIDATION_ERROR",
       field: "urun_turu",
-      message: "Zimmet kaydı yapılamadı."
+      rawMessage: "Zimmet kaydı yapılamadı."
     });
   });
 
@@ -140,7 +140,7 @@ describe("createZimmet demo error envelope parity", () => {
       status: 422,
       code: "VALIDATION_ERROR",
       field: "teslim_tarihi",
-      message: "Teslim tarihi zorunludur."
+      rawMessage: "Teslim tarihi zorunludur."
     });
   });
 

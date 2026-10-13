@@ -1,3 +1,4 @@
+import { userErrorText } from "../lib/display/user-error";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { getApiErrorMessage } from "../api/api-client";
 import { createZimmet } from "../api/zimmetler.api";
@@ -140,7 +141,7 @@ export function usePersonelZimmetCreate(
       }
 
       if (!canCreateZimmet) {
-        setZimmetCreateErrorMessage("Bu işlem için yetkin bulunmuyor.");
+        setZimmetCreateErrorMessage(userErrorText("Bu işlem için yetkin bulunmuyor."));
         return;
       }
 

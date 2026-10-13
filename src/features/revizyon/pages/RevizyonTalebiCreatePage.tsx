@@ -1,3 +1,4 @@
+import { userErrorText } from "../../../lib/display/user-error";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { ApiRequestError } from "../../../api/api-client";
@@ -88,7 +89,7 @@ export function RevizyonTalebiCreatePage() {
         const items = await fetchPersonellerListForSelect({ calisan_kapsami: "IC_PERSONEL" });
         setPersoneller(items);
       } catch (error) {
-        setMetaError(error instanceof Error ? error.message : "Personel listesi yüklenemedi.");
+        setMetaError(userErrorText(error instanceof Error ? error.message : "Personel listesi yüklenemedi."));
       } finally {
         setIsLoadingMeta(false);
       }
@@ -121,9 +122,7 @@ export function RevizyonTalebiCreatePage() {
       }
     } catch (error) {
       const code = error instanceof ApiRequestError ? error.code : undefined;
-      setErrorMessage(
-        revizyonUserMessage(code, error instanceof Error ? error.message : "Kaynaklar yüklenemedi.")
-      );
+      setErrorMessage(userErrorText(revizyonUserMessage(code, error instanceof Error ? error.message : "Kaynaklar yüklenemedi.")));
       setKaynaklar([]);
     } finally {
       setIsLoadingKaynak(false);
@@ -155,7 +154,7 @@ export function RevizyonTalebiCreatePage() {
   async function handleSubmit(event: FormEvent, andSubmit: boolean) {
     event.preventDefault();
     if (isSaving || !selectedKaynak || !revizyonTipi || !gerekce.trim()) {
-      setErrorMessage("Zorunlu alanları doldurun.");
+      setErrorMessage(userErrorText("Zorunlu alanları doldurun."));
       return;
     }
 
@@ -165,7 +164,7 @@ export function RevizyonTalebiCreatePage() {
         talepEdilen = JSON.parse(yeniDegerText);
       }
     } catch {
-      setErrorMessage("Talep edilen değer geçerli JSON değil.");
+      setErrorMessage(userErrorText("Talep edilen değer geçerli JSON değil."));
       return;
     }
 
@@ -191,12 +190,10 @@ export function RevizyonTalebiCreatePage() {
       navigate(`/haftalik-kapanis/revizyonlar/${created.id}`);
     } catch (error) {
       const code = error instanceof ApiRequestError ? error.code : undefined;
-      setErrorMessage(
-        revizyonUserMessage(
+      setErrorMessage(userErrorText(revizyonUserMessage(
           code,
           error instanceof Error ? error.message : "Talep oluşturulamadı."
-        )
-      );
+        )));
     } finally {
       setIsSaving(false);
     }

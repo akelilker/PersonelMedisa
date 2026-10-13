@@ -1,3 +1,4 @@
+import { userErrorText } from "../../../lib/display/user-error";
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
@@ -106,9 +107,9 @@ export function PersonelImportHistoryModal({ open, onClose }: PersonelImportHist
           setSchemaNotReady(true);
           setItems([]);
           setNextCursor(null);
-          setErrorMessage("Personel import şeması henüz hazır değil.");
+          setErrorMessage(userErrorText("Personel import şeması henüz hazır değil."));
         } else {
-          setErrorMessage(visibleImportError(error, "Personel import geçmişi yüklenemedi."));
+          setErrorMessage(userErrorText(visibleImportError(error, "Personel import geçmişi yüklenemedi.")));
         }
       } finally {
         setIsLoading(false);
@@ -147,7 +148,7 @@ export function PersonelImportHistoryModal({ open, onClose }: PersonelImportHist
       setDetail(result);
     } catch (error) {
       setDetail(null);
-      setDetailError(visibleImportError(error, "Aktarım detayı yüklenemedi."));
+      setDetailError(userErrorText(visibleImportError(error, "Aktarım detayı yüklenemedi.")));
     } finally {
       setDetailLoading(false);
     }
@@ -161,7 +162,7 @@ export function PersonelImportHistoryModal({ open, onClose }: PersonelImportHist
     try {
       await downloadPersonelImportEvidenceCsv(detail.import_id);
     } catch (error) {
-      setEvidenceError(visibleImportError(error, "Kanıt CSV indirilemedi."));
+      setEvidenceError(userErrorText(visibleImportError(error, "Kanıt CSV indirilemedi.")));
     }
   }
 

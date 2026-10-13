@@ -1,3 +1,4 @@
+import { userErrorText } from "../../../lib/display/user-error";
 import { useEffect, useMemo, useState } from "react";
 import { ApiRequestError } from "../../../api/api-client";
 import { AppSelect } from "../../../components/form/AppSelect";
@@ -260,7 +261,7 @@ export function SgkKatalogHazirlikPanel() {
         setBlockerRapor(b);
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : "SGK katalog hazırlık yüklenemedi.");
+          setError(userErrorText(err instanceof Error ? err.message : "SGK katalog hazırlık yüklenemedi."));
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -306,7 +307,7 @@ export function SgkKatalogHazirlikPanel() {
     try {
       setImportResult(await dryRunSgkKatalogImport({ format: "JSON", rows: [] }));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "İçe aktarım denemesi başarısız.");
+      setError(userErrorText(err instanceof Error ? err.message : "İçe aktarım denemesi başarısız."));
     }
   }
 
@@ -317,7 +318,7 @@ export function SgkKatalogHazirlikPanel() {
         await validateSgkSurecEsleme({ surec_turu: "RAPOR", alt_tur: "Raporlu_Hastalik", mappings: [] })
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Eşleme doğrulaması başarısız.");
+      setError(userErrorText(err instanceof Error ? err.message : "Eşleme doğrulaması başarısız."));
     }
   }
 
@@ -325,7 +326,7 @@ export function SgkKatalogHazirlikPanel() {
     if (!canMevzuat) return;
     const body = parseJsonPackage(eslemePackageText);
     if (!body) {
-      setError("Süreç eşleme paketi geçerli JSON olmalı.");
+      setError(userErrorText("Süreç eşleme paketi geçerli JSON olmalı."));
       return;
     }
     setError(null);
@@ -338,7 +339,7 @@ export function SgkKatalogHazirlikPanel() {
         setEslemeSuccessorKodu(successor);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Süreç eşleme ön kontrolü başarısız.");
+      setError(userErrorText(err instanceof Error ? err.message : "Süreç eşleme ön kontrolü başarısız."));
     }
   }
 
@@ -346,7 +347,7 @@ export function SgkKatalogHazirlikPanel() {
     if (!canMevzuat) return;
     const body = parseJsonPackage(politikaPackageText);
     if (!body) {
-      setError("Politika paketi geçerli JSON olmalı.");
+      setError(userErrorText("Politika paketi geçerli JSON olmalı."));
       return;
     }
     setError(null);
@@ -360,7 +361,7 @@ export function SgkKatalogHazirlikPanel() {
         setPolitikaSurumKodu(surumKodu);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Politika ön kontrolü başarısız.");
+      setError(userErrorText(err instanceof Error ? err.message : "Politika ön kontrolü başarısız."));
     }
   }
 
@@ -368,7 +369,7 @@ export function SgkKatalogHazirlikPanel() {
     const text = await file.text();
     const parsed = parseJsonPackage(text);
     if (!parsed) {
-      setError("Yüklenen dosya geçerli JSON paketi olmalı.");
+      setError(userErrorText("Yüklenen dosya geçerli JSON paketi olmalı."));
       return;
     }
     setEslemePackageText(JSON.stringify(parsed, null, 2));
@@ -379,7 +380,7 @@ export function SgkKatalogHazirlikPanel() {
     const text = await file.text();
     const parsed = parseJsonPackage(text);
     if (!parsed) {
-      setError("Yüklenen dosya geçerli JSON paketi olmalı.");
+      setError(userErrorText("Yüklenen dosya geçerli JSON paketi olmalı."));
       return;
     }
     setPolitikaPackageText(JSON.stringify(parsed, null, 2));
@@ -393,12 +394,12 @@ export function SgkKatalogHazirlikPanel() {
     try {
       if (dialog === "esleme-draft") {
         if (dialogFieldValue.trim() !== ESLEME_DRAFT_CONFIRM) {
-          setDialogError(`Onay metni tam olarak ${ESLEME_DRAFT_CONFIRM} olmalıdır.`);
+          setDialogError(userErrorText(`Onay metni tam olarak ${ESLEME_DRAFT_CONFIRM} olmalıdır.`));
           return;
         }
         const body = parseJsonPackage(eslemePackageText);
         if (!body || !eslemeDryRun) {
-          setDialogError("Önce geçerli ön kontrol sonucu alın.");
+          setDialogError(userErrorText("Önce geçerli ön kontrol sonucu alın."));
           return;
         }
         const result = await importSgkSurecEsleme({
@@ -415,7 +416,7 @@ export function SgkKatalogHazirlikPanel() {
       } else if (dialog === "esleme-submit") {
         const kod = eslemeSuccessorKodu.trim();
         if (!kod) {
-          setDialogError("Halef sürüm kodu gerekli.");
+          setDialogError(userErrorText("Halef sürüm kodu gerekli."));
           return;
         }
         const result = await submitSgkKatalog({ surum_kodu: kod });
@@ -425,7 +426,7 @@ export function SgkKatalogHazirlikPanel() {
       } else if (dialog === "esleme-approve") {
         const kod = eslemeSuccessorKodu.trim();
         if (!kod) {
-          setDialogError("Halef sürüm kodu gerekli.");
+          setDialogError(userErrorText("Halef sürüm kodu gerekli."));
           return;
         }
         const result = await approveSgkKatalog({
@@ -439,7 +440,7 @@ export function SgkKatalogHazirlikPanel() {
         closeDialog();
       } else if (dialog === "katalog-import") {
         if (!importResult?.import_yapilabilir_mi) {
-          setDialogError("İçe aktarma ön kontrolü uygun değil.");
+          setDialogError(userErrorText("İçe aktarma ön kontrolü uygun değil."));
           return;
         }
         const result = await importSgkKatalog({
@@ -452,12 +453,12 @@ export function SgkKatalogHazirlikPanel() {
         closeDialog();
       } else if (dialog === "politika-draft") {
         if (dialogFieldValue.trim() !== POLITIKA_DRAFT_CONFIRM) {
-          setDialogError(`Onay metni tam olarak ${POLITIKA_DRAFT_CONFIRM} olmalıdır.`);
+          setDialogError(userErrorText(`Onay metni tam olarak ${POLITIKA_DRAFT_CONFIRM} olmalıdır.`));
           return;
         }
         const body = parseJsonPackage(politikaPackageText);
         if (!body || !politikaDryRun) {
-          setDialogError("Önce geçerli ön kontrol sonucu alın.");
+          setDialogError(userErrorText("Önce geçerli ön kontrol sonucu alın."));
           return;
         }
         const result = await importSgkSirketPolitikasi({
@@ -473,7 +474,7 @@ export function SgkKatalogHazirlikPanel() {
       } else if (dialog === "politika-submit") {
         const kod = politikaSurumKodu.trim();
         if (!kod) {
-          setDialogError("Politika sürüm kodu gerekli.");
+          setDialogError(userErrorText("Politika sürüm kodu gerekli."));
           return;
         }
         const result = await submitSgkSirketPolitikasi({
@@ -486,7 +487,7 @@ export function SgkKatalogHazirlikPanel() {
       } else if (dialog === "politika-approve") {
         const kod = politikaSurumKodu.trim();
         if (!kod) {
-          setDialogError("Politika sürüm kodu gerekli.");
+          setDialogError(userErrorText("Politika sürüm kodu gerekli."));
           return;
         }
         const result = await approveSgkSirketPolitikasi({
@@ -501,7 +502,7 @@ export function SgkKatalogHazirlikPanel() {
         const targetId = Number.parseInt(overrideTargetId, 10);
         const belgeId = Number.parseInt(overrideBelgeId, 10);
         if (!personelId || !targetId || !belgeId || !overrideTarih || !overrideYeniKod.trim() || !overrideGerekce.trim()) {
-          setDialogError("Tüm zorunlu alanları doldurun.");
+          setDialogError(userErrorText("Tüm zorunlu alanları doldurun."));
           return;
         }
         const idempotencyKey = `sgk-mko-${overrideTargetType}-${targetId}-${Date.now()}`;
@@ -525,7 +526,7 @@ export function SgkKatalogHazirlikPanel() {
           : err instanceof Error
             ? err.message
             : "İşlem başarısız.";
-      setDialogError(message);
+      setDialogError(userErrorText(message));
     } finally {
       setDialogSubmitting(false);
     }
@@ -536,7 +537,7 @@ export function SgkKatalogHazirlikPanel() {
     try {
       setCoklu(await validateSgkCokluNeden({ kodlar: ["15", "01"], kurallar: [] }));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Çoklu neden doğrulaması başarısız.");
+      setError(userErrorText(err instanceof Error ? err.message : "Çoklu neden doğrulaması başarısız."));
     }
   }
 
@@ -553,7 +554,7 @@ export function SgkKatalogHazirlikPanel() {
         })
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Operasyonel kanıt doğrulaması başarısız.");
+      setError(userErrorText(err instanceof Error ? err.message : "Operasyonel kanıt doğrulaması başarısız."));
     }
   }
 
@@ -562,7 +563,7 @@ export function SgkKatalogHazirlikPanel() {
     try {
       setKismi(await previewSgkKismiSureli({ yazili_kismi_sureli_sozlesme_var_mi: false }));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Kısmi süreli preview başarısız.");
+      setError(userErrorText(err instanceof Error ? err.message : "Kısmi süreli preview başarısız."));
     }
   }
 
@@ -571,7 +572,7 @@ export function SgkKatalogHazirlikPanel() {
     try {
       setBildirim(await previewSgkBildirimDonemi({ bildirim_donem_tipi: "AY_15_SONRAKI_AY_14" }));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Bildirim dönemi preview başarısız.");
+      setError(userErrorText(err instanceof Error ? err.message : "Bildirim dönemi preview başarısız."));
     }
   }
 
@@ -590,7 +591,7 @@ export function SgkKatalogHazirlikPanel() {
         })
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Onay doğrulaması başarısız.");
+      setError(userErrorText(err instanceof Error ? err.message : "Onay doğrulaması başarısız."));
     }
   }
 
@@ -753,7 +754,7 @@ export function SgkKatalogHazirlikPanel() {
               className="universal-btn-aux"
               data-testid="sgk-esleme-sablon-download"
               disabled={!canMevzuat}
-              onClick={() => void downloadSgkSurecEslemeSablonCsv().catch((err) => setError(err instanceof Error ? err.message : "Şablon indirilemedi."))}
+              onClick={() => void downloadSgkSurecEslemeSablonCsv().catch((err) => setError(userErrorText(err instanceof Error ? err.message : "Şablon indirilemedi.")))}
             >
               Süreç Eşleme Şablonunu İndir
             </button>
@@ -879,7 +880,7 @@ export function SgkKatalogHazirlikPanel() {
               disabled={!canMevzuat}
               onClick={() =>
                 void downloadSgkSirketPolitikasiSablonCsv().catch((err) =>
-                  setError(err instanceof Error ? err.message : "Şablon indirilemedi.")
+                  setError(userErrorText(err instanceof Error ? err.message : "Şablon indirilemedi."))
                 )
               }
             >

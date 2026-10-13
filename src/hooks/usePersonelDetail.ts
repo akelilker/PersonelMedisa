@@ -1,3 +1,4 @@
+import { userErrorText } from "../lib/display/user-error";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { getApiErrorMessage, shouldQueueOfflineMutation } from "../api/api-client";
@@ -237,7 +238,7 @@ function usePersonelDetailData(
 
     if (!hasValidId) {
       setIsLoading(false);
-      setErrorMessage("Geçerli bir personel ID verilmedi.");
+      setErrorMessage(userErrorText("Geçerli bir personel ID verilmedi."));
       return;
     }
 
@@ -265,7 +266,7 @@ function usePersonelDetailData(
         return;
       }
       if (!getCacheEntry<Personel>(detailKey)) {
-        setErrorMessage("Personel detayi su an guncellenemiyor.");
+        setErrorMessage(userErrorText("Personel detayi su an guncellenemiyor."));
       }
     } finally {
       if (isCurrentRequest()) {
@@ -309,7 +310,7 @@ function usePersonelDetailData(
         );
       } catch {
         if (!getCacheEntry<PaginatedResult<Surec>>(surecHistoryKey)) {
-          setSurecHistoryErrorMessage("Surec gecmisi su an guncellenemiyor.");
+          setSurecHistoryErrorMessage(userErrorText("Surec gecmisi su an guncellenemiyor."));
         }
       } finally {
         if (!cancelled) {
@@ -349,7 +350,7 @@ function usePersonelDetailData(
         );
       } catch {
         if (!getCacheEntry<PaginatedResult<Zimmet>>(zimmetHistoryKey)) {
-          setZimmetHistoryErrorMessage("Zimmet kayitlari su an guncellenemiyor.");
+          setZimmetHistoryErrorMessage(userErrorText("Zimmet kayitlari su an guncellenemiyor."));
         }
       } finally {
         if (!cancelled) {
@@ -634,7 +635,7 @@ function usePersonelDetailEdit(
         return;
       }
       if (!canEdit) {
-        setEditErrorMessage("Bu kaydı güncellemek için yetkin bulunmuyor.");
+        setEditErrorMessage(userErrorText("Bu kaydı güncellemek için yetkin bulunmuyor."));
         return;
       }
 
@@ -644,7 +645,7 @@ function usePersonelDetailEdit(
       const previousPersonel = personel;
 
       if (hasLifecycleDiff && !editForm.effectiveDate.trim()) {
-        setEditErrorMessage("Geçerlilik tarihi zorunludur.");
+        setEditErrorMessage(userErrorText("Geçerlilik tarihi zorunludur."));
         setIsSubmitting(false);
         return;
       }
@@ -810,7 +811,7 @@ function usePersonelDetailZimmetModal(
 
   const openZimmetModal = useCallback(() => {
     if (!canCreateZimmet) {
-      setZimmetCreateErrorMessage("Bu işlem için yetkin bulunmuyor.");
+      setZimmetCreateErrorMessage(userErrorText("Bu işlem için yetkin bulunmuyor."));
       return;
     }
 

@@ -1,3 +1,4 @@
+import { userErrorText } from "../../../../lib/display/user-error";
 import { useState, type FormEvent } from "react";
 import { FormField } from "../../../../components/form/FormField";
 import { AppModal } from "../../../../components/modal/AppModal";
@@ -65,7 +66,7 @@ export function PersonelUcretCreateModal({
 
     const built = buildPersonelUcretCreatePayload(form);
     if (!built.ok) {
-      setValidationMessage(built.message);
+      setValidationMessage(userErrorText(built.message));
       return;
     }
 

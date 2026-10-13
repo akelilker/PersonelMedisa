@@ -1,3 +1,4 @@
+import { userErrorText } from "../../../lib/display/user-error";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { getApiErrorMessage, isApiRequestError } from "../../../api/api-client";
 import {
@@ -128,18 +129,18 @@ export function KullaniciYetkiPanel(props: KullaniciYetkiPanelProps) {
     const temizGerekce = gerekce.trim();
     if (!izin) {
       setBasari(null);
-      setActionError("Bir yetki seçin.");
+      setActionError(userErrorText("Bir yetki seçin."));
       return;
     }
     if (!temizGerekce) {
       setBasari(null);
-      setActionError("Gerekçe zorunludur.");
+      setActionError(userErrorText("Gerekçe zorunludur."));
       return;
     }
     const sureHatasi = bitisHatasi(bitis, etki);
     if (sureHatasi) {
       setBasari(null);
-      setActionError(sureHatasi);
+      setActionError(userErrorText(sureHatasi));
       return;
     }
     setIsSaving(true);
@@ -181,7 +182,7 @@ export function KullaniciYetkiPanel(props: KullaniciYetkiPanelProps) {
     const temiz = iptalGerekce.trim();
     if (!temiz) {
       setBasari(null);
-      setActionError("Kaldırma gerekçesi zorunludur.");
+      setActionError(userErrorText("Kaldırma gerekçesi zorunludur."));
       return;
     }
     setIsSaving(true);

@@ -1,3 +1,4 @@
+import { userErrorText } from "../../../lib/display/user-error";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useLocation } from "react-router-dom";
 import {
@@ -114,7 +115,7 @@ export function PersonelSelfServiceTaleplerPage() {
     if (shouldPreferDemoApi()) {
       setLoading(false);
       setToday(null);
-      setLoadError("Demo modda düzeltme talebi yok.");
+      setLoadError(userErrorText("Demo modda düzeltme talebi yok."));
       return;
     }
     setLoading(true);
@@ -136,11 +137,9 @@ export function PersonelSelfServiceTaleplerPage() {
       setLoadError(null);
     } catch (cause) {
       setToday(null);
-      setLoadError(
-        isApiRequestError(cause) && cause.code === "SELF_SERVICE_BINDING_REQUIRED"
+      setLoadError(userErrorText(isApiRequestError(cause) && cause.code === "SELF_SERVICE_BINDING_REQUIRED"
           ? "Personel bağlantınız yok."
-          : "Talepler yüklenemedi. Tekrar deneyin."
-      );
+          : "Talepler yüklenemedi. Tekrar deneyin."));
     } finally {
       setLoading(false);
     }

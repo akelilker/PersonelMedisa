@@ -1,3 +1,4 @@
+import { userErrorText } from "../../../lib/display/user-error";
 import {
   useCallback,
   useEffect,
@@ -797,7 +798,7 @@ export function KayitSurecWorkspace({
       return;
     }
     if (!canCreatePersonel) {
-      setPersonelError("Bu işlem için yetkin bulunmuyor.");
+      setPersonelError(userErrorText("Bu işlem için yetkin bulunmuyor."));
       return;
     }
 
@@ -827,7 +828,7 @@ export function KayitSurecWorkspace({
       const detail = getApiErrorDetail(error, "Personel kaydı oluşturulamadı.", {
         context: "personel-create"
       });
-      setPersonelError(detail.message);
+      setPersonelError(userErrorText(detail.message));
       if (detail.code === "DUPLICATE_TC_KIMLIK_NO") {
         setPersonelFieldErrors({ tcKimlikNo: detail.message });
       } else if (
@@ -849,21 +850,19 @@ export function KayitSurecWorkspace({
       return;
     }
     if (!editingSurec && !canCreateSurec) {
-      setSurecError("Bu işlem için yetkin bulunmuyor.");
+      setSurecError(userErrorText("Bu işlem için yetkin bulunmuyor."));
       return;
     }
     if (editingSurec && !canEditSurec) {
-      setSurecError("Bu süreci düzenlemek için yetkin bulunmuyor.");
+      setSurecError(userErrorText("Bu süreci düzenlemek için yetkin bulunmuyor."));
       return;
     }
     if (!editingSurec && selectedSurecPersonel?.aktif_durum === "PASIF") {
-      setSurecError(
-        activePersonelTab === "ayrilma"
+      setSurecError(userErrorText(activePersonelTab === "ayrilma"
           ? "Bu personel pasif; ayrılma kaydı eklenmez."
           : activePersonelTab === "puantaj"
             ? "Bu personel pasif; puantaj/izin kaydı eklenmez."
-            : "Bu personel pasif; süreç kaydı eklenmez."
-      );
+            : "Bu personel pasif; süreç kaydı eklenmez."));
       return;
     }
 
@@ -934,7 +933,7 @@ export function KayitSurecWorkspace({
 
     if (!canSubmitPozisyon) {
       setPozisyonInfo(null);
-      setPozisyonError("Bu işlem için yetkin bulunmuyor.");
+      setPozisyonError(userErrorText("Bu işlem için yetkin bulunmuyor."));
       return;
     }
 
@@ -973,7 +972,7 @@ export function KayitSurecWorkspace({
       if (result.status === "validation_error") {
         if (isCurrentSelection) {
           setPozisyonInfo(null);
-          setPozisyonError(result.message);
+          setPozisyonError(userErrorText(result.message));
         }
         return;
       }
@@ -1012,7 +1011,7 @@ export function KayitSurecWorkspace({
     }
     if (!canTransferSube) {
       setSubeTransferInfo(null);
-      setSubeTransferError("Kalıcı şube değişikliği için yetkin bulunmuyor.");
+      setSubeTransferError(userErrorText("Kalıcı şube değişikliği için yetkin bulunmuyor."));
       return;
     }
 
@@ -1036,7 +1035,7 @@ export function KayitSurecWorkspace({
 
       if (result.status === "validation_error") {
         if (isCurrentSelection) {
-          setSubeTransferError(result.message);
+          setSubeTransferError(userErrorText(result.message));
         }
         return;
       }

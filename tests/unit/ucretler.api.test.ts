@@ -1,3 +1,4 @@
+import { userErrorText } from "../../src/lib/display/user-error";
 import { describe, expect, it } from "vitest";
 import { ApiRequestError } from "../../src/api/api-client";
 import {
@@ -103,10 +104,10 @@ describe("getUcretApiErrorMessage", () => {
       code: "SALARY_AMOUNT_INVALID"
     });
     expect(getUcretApiErrorMessage(error, "Ücret kaydı oluşturulamadı.")).toBe(
-      "Ücret tutarı sıfırdan büyük olmalıdır."
+      userErrorText("Ücret tutarı sıfırdan büyük olmalıdır.", "SALARY_AMOUNT_INVALID", 400)
     );
     expect(getUcretApiErrorMessage(new Error(""), "Ücret geçmişi yüklenemedi.")).toBe(
-      "Ücret geçmişi yüklenemedi."
+      userErrorText("Ücret geçmişi yüklenemedi.")
     );
   });
 });

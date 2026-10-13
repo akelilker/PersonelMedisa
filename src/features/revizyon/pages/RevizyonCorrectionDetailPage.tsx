@@ -1,3 +1,4 @@
+import { userErrorText } from "../../../lib/display/user-error";
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ApiRequestError } from "../../../api/api-client";
@@ -40,9 +41,7 @@ export function RevizyonCorrectionDetailPage() {
       setCorrection(await fetchRevizyonCorrectionDetail(correctionId));
     } catch (error) {
       const code = error instanceof ApiRequestError ? error.code : undefined;
-      setErrorMessage(
-        revizyonUserMessage(code, error instanceof Error ? error.message : "Detay yüklenemedi.")
-      );
+      setErrorMessage(userErrorText(revizyonUserMessage(code, error instanceof Error ? error.message : "Detay yüklenemedi.")));
     } finally {
       setIsLoading(false);
     }
@@ -93,9 +92,7 @@ export function RevizyonCorrectionDetailPage() {
       setCancelReason("");
     } catch (error) {
       const code = error instanceof ApiRequestError ? error.code : undefined;
-      setActionError(
-        revizyonUserMessage(code, error instanceof Error ? error.message : "İptal başarısız.")
-      );
+      setActionError(userErrorText(revizyonUserMessage(code, error instanceof Error ? error.message : "İptal başarısız.")));
     } finally {
       setIsActing(false);
     }

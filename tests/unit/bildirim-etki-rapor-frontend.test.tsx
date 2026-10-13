@@ -1,4 +1,5 @@
 /** @vitest-environment jsdom */
+import { userErrorText } from "../../src/lib/display/user-error";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
@@ -144,7 +145,7 @@ describe("EtkiAdayiRaporuPage frontend", () => {
         <EtkiAdayiRaporuPage />
       </MemoryRouter>
     );
-    expect(screen.getByText("Rapor yuklenemedi")).toBeTruthy();
+    expect(screen.getByText(userErrorText("Rapor yuklenemedi"))).toBeTruthy();
   });
 
   it("shows empty state when no rows match filters", () => {

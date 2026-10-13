@@ -1,3 +1,4 @@
+import { userErrorText } from "../../../lib/display/user-error";
 import { useEffect, useState } from "react";
 import { fetchPersonellerList } from "../../../api/personeller.api";
 import { ErrorState } from "../../../components/states/ErrorState";
@@ -96,7 +97,7 @@ export function UcretTipiEnvanteriPanel() {
         if (cancelled) {
           return;
         }
-        setErrorMessage(error instanceof Error ? error.message : "Ücret tipi envanteri yüklenemedi.");
+        setErrorMessage(userErrorText(error instanceof Error ? error.message : "Ücret tipi envanteri yüklenemedi."));
       } finally {
         if (!cancelled) {
           setIsLoading(false);

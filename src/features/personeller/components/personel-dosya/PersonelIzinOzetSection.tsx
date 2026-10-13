@@ -1,3 +1,4 @@
+import { userErrorText } from "../../../../lib/display/user-error";
 import { useEffect, useMemo, useState } from "react";
 import { fetchYillikIzinBakiye } from "../../../../api/yillik-izin-hak-duzeltme.api";
 import { formatSurecStateLabel, formatSurecTuruLabel } from "../../../../lib/display/enum-display";
@@ -37,7 +38,7 @@ export function PersonelIzinOzetSection({
       .catch(() => {
         if (!cancelled) {
           setBakiye(null);
-          setError("İzin bakiyesi sunucudan alınamadı.");
+          setError(userErrorText("İzin bakiyesi sunucudan alınamadı."));
         }
       })
       .finally(() => {

@@ -1,3 +1,4 @@
+import { userErrorText } from "../../../../lib/display/user-error";
 import { useEffect, useState } from "react";
 import {
   approvePersonelBordroKapsam,
@@ -59,7 +60,7 @@ export function usePersonelBordroKapsam({
       .catch((err) => {
         if (!cancelled) {
           setKayitlar([]);
-          setErrorMessage(getBordroKapsamApiErrorMessage(err, "Bordro kapsam listesi yüklenemedi."));
+          setErrorMessage(userErrorText(getBordroKapsamApiErrorMessage(err, "Bordro kapsam listesi yüklenemedi.")));
         }
       })
       .finally(() => {
@@ -92,7 +93,7 @@ export function usePersonelBordroKapsam({
       return result;
     } catch (err) {
       setDryRunResult(null);
-      setSubmitErrorMessage(getBordroKapsamApiErrorMessage(err, "Dry-run başarısız."));
+      setSubmitErrorMessage(userErrorText(getBordroKapsamApiErrorMessage(err, "Dry-run başarısız.")));
       return null;
     }
   }
@@ -109,7 +110,7 @@ export function usePersonelBordroKapsam({
       refetch();
       return true;
     } catch (err) {
-      setSubmitErrorMessage(getBordroKapsamApiErrorMessage(err, "Kapsam kaydı oluşturulamadı."));
+      setSubmitErrorMessage(userErrorText(getBordroKapsamApiErrorMessage(err, "Kapsam kaydı oluşturulamadı.")));
       return false;
     } finally {
       setIsSubmitting(false);
@@ -122,7 +123,7 @@ export function usePersonelBordroKapsam({
       await submitPersonelBordroKapsam(personel.id, kapsamId);
       refetch();
     } catch (err) {
-      setActionErrorMessage(getBordroKapsamApiErrorMessage(err, "Onaya gönderilemedi."));
+      setActionErrorMessage(userErrorText(getBordroKapsamApiErrorMessage(err, "Onaya gönderilemedi.")));
     }
   }
 
@@ -132,7 +133,7 @@ export function usePersonelBordroKapsam({
       await approvePersonelBordroKapsam(personel.id, kapsamId);
       refetch();
     } catch (err) {
-      setActionErrorMessage(getBordroKapsamApiErrorMessage(err, "Onaylanamadı."));
+      setActionErrorMessage(userErrorText(getBordroKapsamApiErrorMessage(err, "Onaylanamadı.")));
     }
   }
 
@@ -143,7 +144,7 @@ export function usePersonelBordroKapsam({
       refetch();
       return true;
     } catch (err) {
-      setActionErrorMessage(getBordroKapsamApiErrorMessage(err, "İptal edilemedi."));
+      setActionErrorMessage(userErrorText(getBordroKapsamApiErrorMessage(err, "İptal edilemedi.")));
       return false;
     }
   }

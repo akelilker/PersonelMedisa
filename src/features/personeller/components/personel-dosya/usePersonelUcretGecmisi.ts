@@ -1,3 +1,4 @@
+import { userErrorText } from "../../../../lib/display/user-error";
 import { useEffect, useState } from "react";
 import {
   cancelPersonelUcret,
@@ -77,7 +78,7 @@ export function usePersonelUcretGecmisi({
         }
         setUcretler([]);
         setAktifUcret(null);
-        setErrorMessage(getUcretApiErrorMessage(err, "Ücret geçmişi yüklenemedi."));
+        setErrorMessage(userErrorText(getUcretApiErrorMessage(err, "Ücret geçmişi yüklenemedi.")));
       })
       .finally(() => {
         if (!isCancelled) {
@@ -130,7 +131,7 @@ export function usePersonelUcretGecmisi({
       refetch();
       return true;
     } catch (err) {
-      setSubmitErrorMessage(getUcretApiErrorMessage(err, "Ücret kaydı oluşturulamadı."));
+      setSubmitErrorMessage(userErrorText(getUcretApiErrorMessage(err, "Ücret kaydı oluşturulamadı.")));
       return false;
     } finally {
       setIsSubmitting(false);
@@ -157,7 +158,7 @@ export function usePersonelUcretGecmisi({
       refetch();
       return true;
     } catch (err) {
-      setCancelErrorMessage(getUcretApiErrorMessage(err, "Ücret kaydı iptal edilemedi."));
+      setCancelErrorMessage(userErrorText(getUcretApiErrorMessage(err, "Ücret kaydı iptal edilemedi.")));
       return false;
     } finally {
       setCancellingUcretId(null);

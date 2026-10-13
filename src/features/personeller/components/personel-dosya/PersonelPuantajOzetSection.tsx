@@ -1,3 +1,4 @@
+import { userErrorText } from "../../../../lib/display/user-error";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { fetchRevizyonCorrections } from "../../../../api/revizyon-correction.api";
@@ -344,7 +345,7 @@ export function PersonelPuantajOzetSection({
 
         setRevizyonTalepleri([]);
         setRevizyonCorrections([]);
-        setRevizyonErrorMessage("Revizyon ve düzeltme kayıtları yüklenemedi.");
+        setRevizyonErrorMessage(userErrorText("Revizyon ve düzeltme kayıtları yüklenemedi."));
       })
       .finally(() => {
         if (!isCancelled) {

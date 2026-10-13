@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import { userErrorText } from "../../src/lib/display/user-error";
 import "@testing-library/jest-dom/vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -162,7 +163,7 @@ describe("S93-E3C cancel dialog behavior", () => {
 
     await waitFor(() =>
       expect(screen.getByTestId("mevzuat-action-dialog-error")).toHaveTextContent(
-        "Mevzuat parametresi iptal edilemedi."
+        userErrorText("Mevzuat parametresi iptal edilemedi.")
       )
     );
     expect(screen.getByTestId("mevzuat-action-dialog")).toBeVisible();

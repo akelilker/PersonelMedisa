@@ -1,3 +1,4 @@
+import { userErrorText } from "../../../../lib/display/user-error";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { fetchManagerQrAttendance } from "../../../../api/qr.api";
@@ -32,7 +33,7 @@ export function PersonelQrHistorySection({ personel }: { personel: Personel }) {
     const to = istanbulToday();
     void fetchManagerQrAttendance({ personel_id: personel.id, from, to, limit: 100 })
       .then((result) => setRows(result.items))
-      .catch((cause) => setError(qrReadErrorMessage(cause, true)));
+      .catch((cause) => setError(userErrorText(qrReadErrorMessage(cause, true))));
   }, [personel.id]);
 
   return (

@@ -1,3 +1,4 @@
+import { userErrorText } from "../lib/display/user-error";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { getApiErrorMessage, shouldQueueOfflineMutation } from "../api/api-client";
 import {
@@ -161,7 +162,7 @@ export function useFinans() {
         );
       } catch {
         if (!getCacheEntry<PaginatedResult<FinansKalem>>(listKey)) {
-          setErrorMessage("Finans kayıtları şu an güncellenemiyor.");
+          setErrorMessage(userErrorText("Finans kayıtları şu an güncellenemiyor."));
         }
       } finally {
         if (!cancelled) {
@@ -244,7 +245,7 @@ export function useFinans() {
         return;
       }
       if (!canCreate) {
-        setCreateErrorMessage("Bu işlem için yetkin bulunmuyor.");
+        setCreateErrorMessage(userErrorText("Bu işlem için yetkin bulunmuyor."));
         return;
       }
 
@@ -267,7 +268,7 @@ export function useFinans() {
         });
 
         if (result.outcome === "error") {
-          setCreateErrorMessage(result.message);
+          setCreateErrorMessage(userErrorText(result.message));
           return;
         }
 
@@ -283,7 +284,7 @@ export function useFinans() {
 
   const openEditModal = useCallback((item: FinansKalem, canEdit: boolean) => {
     if (!canEdit) {
-      setErrorMessage("Bu kaydı düzenlemek için yetkin bulunmuyor.");
+      setErrorMessage(userErrorText("Bu kaydı düzenlemek için yetkin bulunmuyor."));
       return;
     }
     setEditingItem(item);
@@ -302,7 +303,7 @@ export function useFinans() {
         return;
       }
       if (!canEdit) {
-        setEditErrorMessage("Bu kaydı düzenlemek için yetkin bulunmuyor.");
+        setEditErrorMessage(userErrorText("Bu kaydı düzenlemek için yetkin bulunmuyor."));
         return;
       }
 
@@ -364,7 +365,7 @@ export function useFinans() {
         return;
       }
       if (!canCancel) {
-        setErrorMessage("Bu kaydı iptal etmek için yetkin bulunmuyor.");
+        setErrorMessage(userErrorText("Bu kaydı iptal etmek için yetkin bulunmuyor."));
         return;
       }
       setCancelDialogError(null);
@@ -511,7 +512,7 @@ export function usePersonelFinansCreate(
         return;
       }
       if (!canCreateFinans) {
-        setFinansCreateErrorMessage("Bu işlem için yetkin bulunmuyor.");
+        setFinansCreateErrorMessage(userErrorText("Bu işlem için yetkin bulunmuyor."));
         return;
       }
 
@@ -537,7 +538,7 @@ export function usePersonelFinansCreate(
         });
 
         if (result.outcome === "error") {
-          setFinansCreateErrorMessage(result.message);
+          setFinansCreateErrorMessage(userErrorText(result.message));
           return;
         }
 

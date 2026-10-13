@@ -1,3 +1,4 @@
+import { userErrorText } from "../../../lib/display/user-error";
 import { useCallback, useEffect, useState } from "react";
 import { isApiRequestError, shouldPreferDemoApi } from "../../../api/api-client";
 import { fetchSelfDuyurular, markSelfDuyuruRead, type SelfDuyuru } from "../../../api/self-product.api";
@@ -23,11 +24,9 @@ export function PersonelSelfServiceDuyurularPage() {
       setError(null);
     } catch (cause) {
       setItems([]);
-      setError(
-        isApiRequestError(cause) && cause.code === "DUYURU_SCHEMA_NOT_READY"
+      setError(userErrorText(isApiRequestError(cause) && cause.code === "DUYURU_SCHEMA_NOT_READY"
           ? "Duyurular henüz hazır değil."
-          : "Duyurular yüklenemedi. Tekrar deneyin."
-      );
+          : "Duyurular yüklenemedi. Tekrar deneyin."));
     } finally {
       setLoading(false);
     }
@@ -43,7 +42,7 @@ export function PersonelSelfServiceDuyurularPage() {
       await markSelfDuyuruRead(item.id);
       setItems((current) => current.map((row) => (row.id === item.id ? { ...row, okundu: true } : row)));
     } catch {
-      setError("Okundu işaretlenemedi.");
+      setError(userErrorText("Okundu işaretlenemedi."));
     }
   }
 

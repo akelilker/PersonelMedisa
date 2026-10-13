@@ -1,3 +1,4 @@
+import { userErrorText } from "../../../lib/display/user-error";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { PwaInstallBar } from "../../../components/shell/PwaInstallBar";
@@ -52,7 +53,7 @@ export function LoginPage() {
       });
       navigate(redirectPath, { replace: true });
     } catch (error) {
-      setFormError(error instanceof Error ? error.message : "Giriş sırasında bir hata oluştu.");
+      setFormError(userErrorText(error instanceof Error ? error.message : "Giriş sırasında bir hata oluştu."));
     } finally {
       setIsSubmitting(false);
     }

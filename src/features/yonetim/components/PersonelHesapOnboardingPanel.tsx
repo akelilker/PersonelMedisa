@@ -1,3 +1,4 @@
+import { userErrorText } from "../../../lib/display/user-error";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { isApiRequestError } from "../../../api/api-client";
 import { createPersonelHesapOnboarding, fetchYonetimKullanicilari } from "../../../api/yonetim.api";
@@ -55,7 +56,7 @@ export function PersonelHesapOnboardingPanel({
       setBoundUser(match ? { id: match.id, must_change_password: match.must_change_password, username: match.username } : null);
       setHasBoundUser(match !== null);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Bağlı hesap bilgisi okunamadı.");
+      setErrorMessage(userErrorText(error instanceof Error ? error.message : "Bağlı hesap bilgisi okunamadı."));
       setHasBoundUser(undefined);
     } finally {
       setIsLoadingBound(false);
@@ -89,15 +90,13 @@ export function PersonelHesapOnboardingPanel({
       if (isApiRequestError(error) && error.code === "PERSONEL_USERNAME_COLLISION") {
         setUsernameCollision(true);
         setUsernameOverride((prev) => (prev.trim() !== "" ? prev : suggestedUsername));
-        setErrorMessage(error.message || "Bu kullanıcı adı zaten kullanılıyor. Farklı bir kullanıcı adı belirleyin.");
+        setErrorMessage(userErrorText(error.message || "Bu kullanıcı adı zaten kullanılıyor. Farklı bir kullanıcı adı belirleyin."));
       } else {
-        setErrorMessage(
-          isApiRequestError(error)
+        setErrorMessage(userErrorText(isApiRequestError(error)
             ? error.message
             : error instanceof Error
               ? error.message
-              : "Personel hesabı oluşturulamadı."
-        );
+              : "Personel hesabı oluşturulamadı."));
       }
     } finally {
       setIsWorking(false);

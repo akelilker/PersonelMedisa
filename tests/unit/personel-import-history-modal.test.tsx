@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import { userErrorText } from "../../src/lib/display/user-error";
 import "@testing-library/jest-dom/vitest";
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { cleanup, render, screen, fireEvent, waitFor } from "@testing-library/react";
@@ -205,7 +206,7 @@ describe("PersonelImportHistoryModal", () => {
     await waitFor(() => {
       expect(screen.getByTestId("personel-import-history-error")).toBeInTheDocument();
     });
-    expect(screen.getByText(/şeması henüz hazır değil/i)).toBeInTheDocument();
+    expect(screen.getByText(userErrorText("Personel import şeması henüz hazır değil.", "SCHEMA_NOT_READY", 409))).toBeInTheDocument();
     expect(screen.queryByTestId("personel-import-history-retry")).toBeNull();
   });
 });

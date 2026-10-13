@@ -1,3 +1,4 @@
+import { userErrorText } from "../../../lib/display/user-error";
 import { useCallback, useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
@@ -101,11 +102,11 @@ export function PersonelSelfServiceHomePage() {
       setError(null);
     } catch (cause) {
       if (isApiRequestError(cause) && cause.code === "SELF_SERVICE_BINDING_REQUIRED") {
-        setError("unbound");
+        setError(userErrorText("unbound"));
       } else if (isApiRequestError(cause) && cause.code === "SELF_SERVICE_PERSONEL_INACTIVE") {
-        setError("inactive");
+        setError(userErrorText("inactive"));
       } else {
-        setError("Özet yüklenemedi. Tekrar deneyin.");
+        setError(userErrorText("Özet yüklenemedi. Tekrar deneyin."));
       }
     } finally {
       setLoading(false);

@@ -1,3 +1,4 @@
+import { userErrorText } from "../../../lib/display/user-error";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { muhurleAylikPuantaj } from "../../../api/puantaj.api";
@@ -240,7 +241,7 @@ export function GunlukPuantajPage() {
   const handleMuhurleConfirm = useCallback(async () => {
     const match = /^(\d{4})-(\d{2})$/.exec(muhurDonem);
     if (!match) {
-      setMuhurHata("Geçerli bir dönem seçiniz (YYYY-AA).");
+      setMuhurHata(userErrorText("Geçerli bir dönem seçiniz (YYYY-AA)."));
       return;
     }
 
@@ -262,7 +263,7 @@ export function GunlukPuantajPage() {
         void refetchActive();
       }
     } catch {
-      setMuhurHata("Mühürleme işlemi başarısız oldu. Lütfen tekrar deneyin.");
+      setMuhurHata(userErrorText("Mühürleme işlemi başarısız oldu. Lütfen tekrar deneyin."));
     } finally {
       setIsMuhurlemeSending(false);
     }

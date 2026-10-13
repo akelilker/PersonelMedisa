@@ -1,3 +1,4 @@
+import { userErrorText } from "../../../lib/display/user-error";
 import { useEffect, useMemo, useState } from "react";
 import { ApiRequestError } from "../../../api/api-client";
 import { downloadDonemKapanisPreflightCsv } from "../../../api/donem-kapanis.api";
@@ -132,7 +133,7 @@ export function DonemKapanisMerkeziPage() {
     try {
       await downloadDonemKapanisPreflightCsv(params);
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : "CSV indirilemedi.");
+      setActionError(userErrorText(error instanceof Error ? error.message : "CSV indirilemedi."));
     } finally {
       setIsExporting(false);
     }
@@ -179,8 +180,8 @@ export function DonemKapanisMerkeziPage() {
           : error instanceof Error
             ? error.message
             : "Dönem mühürlenemedi.";
-      setSealDialogError(message);
-      setActionError(message);
+      setSealDialogError(userErrorText(message));
+      setActionError(userErrorText(message));
       await refetch();
       await refetchAudits();
     } finally {

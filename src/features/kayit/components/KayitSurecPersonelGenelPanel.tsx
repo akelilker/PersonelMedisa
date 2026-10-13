@@ -1,3 +1,4 @@
+import { userErrorText } from "../../../lib/display/user-error";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { getApiErrorMessage } from "../../../api/api-client";
 import { updatePersonel } from "../../../api/personeller.api";
@@ -155,7 +156,7 @@ export function KayitSurecPersonelGenelPanel({
     setEditInfoMessage(null);
 
     if (hasLifecycleDiff && !editForm.effectiveDate.trim()) {
-      setEditErrorMessage("Geçerlilik tarihi zorunludur.");
+      setEditErrorMessage(userErrorText("Geçerlilik tarihi zorunludur."));
       return;
     }
 

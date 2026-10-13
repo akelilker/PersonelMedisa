@@ -1,3 +1,4 @@
+import { userErrorText } from "../../../../lib/display/user-error";
 import { useCallback, useEffect, useState } from "react";
 import { ApiRequestError } from "../../../../api/api-client";
 import {
@@ -43,7 +44,7 @@ export function DonemSealReopenPanel({ yil, ay, enabled, onChanged }: Props) {
     try {
       setHistory(await fetchDonemSealHistory(yil, ay));
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Seal history yuklenemedi.");
+      setError(userErrorText(e instanceof Error ? e.message : "Seal history yuklenemedi."));
     }
   }, [enabled, canHistory, yil, ay]);
 
@@ -86,7 +87,7 @@ export function DonemSealReopenPanel({ yil, ay, enabled, onChanged }: Props) {
           : e instanceof Error
             ? e.message
             : "Islem basarisiz.";
-      setDialogError(message);
+      setDialogError(userErrorText(message));
     } finally {
       setSubmitting(false);
     }

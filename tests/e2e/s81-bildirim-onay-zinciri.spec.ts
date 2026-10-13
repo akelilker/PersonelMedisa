@@ -39,7 +39,7 @@ test.describe("S81 Bildirim ve Onay Zinciri", () => {
     await createTwice();
     await createTwice();
     await expect(page.locator(".bildirim-form-error, .form-error, [class*='error']").first()).toContainText(
-      /açık bildirim|acik bildirim/i,
+      "Bu Kayıt Zaten Var.",
       { timeout: 10_000 }
     );
   });

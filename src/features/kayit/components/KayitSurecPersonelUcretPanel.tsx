@@ -1,3 +1,4 @@
+import { userErrorText } from "../../../lib/display/user-error";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { FormField } from "../../../components/form/FormField";
 import { dataCacheKeys, deleteCacheEntry, getActiveSube } from "../../../data/data-manager";
@@ -78,7 +79,7 @@ export function KayitSurecPersonelUcretPanel({
 
     if (!ucretTipiId) {
       setTipiInfo(null);
-      setTipiError("Ücret tipi seçilmelidir.");
+      setTipiError(userErrorText("Ücret tipi seçilmelidir."));
       return;
     }
 

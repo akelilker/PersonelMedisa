@@ -1,3 +1,4 @@
+import { userErrorText } from "../../../../lib/display/user-error";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import type { Personel } from "../../../../types/personel";
@@ -103,7 +104,7 @@ export function PersonelBordroKapsamSection({
     }
     const neden = cancelReason.trim();
     if (neden.length < 3) {
-      setCancelFieldError("İptal nedeni en az 3 karakter olmalıdır.");
+      setCancelFieldError(userErrorText("İptal nedeni en az 3 karakter olmalıdır."));
       return;
     }
 
@@ -117,7 +118,7 @@ export function PersonelBordroKapsamSection({
       setCancelReason("");
       return;
     }
-    setCancelDialogError("İptal edilemedi.");
+    setCancelDialogError(userErrorText("İptal edilemedi."));
   }
 
   return (

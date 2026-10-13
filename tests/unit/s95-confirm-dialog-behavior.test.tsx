@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import { userErrorText } from "../../src/lib/display/user-error";
 import "@testing-library/jest-dom/vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -139,7 +140,7 @@ describe("S95 dönem mühür confirm dialog behavior", () => {
     fireEvent.click(await screen.findByTestId("donem-kapanis-muhur-action-dialog-confirm"));
     await waitFor(() =>
       expect(screen.getByTestId("donem-kapanis-muhur-action-dialog-error")).toHaveTextContent(
-        "Mühürleme reddedildi."
+        userErrorText("Mühürleme reddedildi.")
       )
     );
     expect(screen.getByTestId("donem-kapanis-muhur-action-dialog")).toBeVisible();

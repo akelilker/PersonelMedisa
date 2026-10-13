@@ -1,3 +1,4 @@
+import { userErrorText } from "../lib/display/user-error";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getApiErrorDetail } from "../api/api-client";
 import {
@@ -72,7 +73,7 @@ export function useBildirimEtkiRapor(options: UseBildirimEtkiRaporOptions) {
         }
         setRows([]);
         setSummary(EMPTY_SUMMARY);
-        setErrorMessage(getApiErrorDetail(caught, "Etki adayı raporu yüklenemedi.").message);
+        setErrorMessage(userErrorText(getApiErrorDetail(caught, "Etki adayı raporu yüklenemedi.").message));
         return null;
       } finally {
         if (requestId === requestIdRef.current) {

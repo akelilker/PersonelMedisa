@@ -1,3 +1,4 @@
+import { userErrorText } from "../lib/display/user-error";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { getApiErrorMessage, isAbortedRequestError, shouldQueueOfflineMutation } from "../api/api-client";
 import {
@@ -346,7 +347,7 @@ export function usePersoneller() {
         if (
           !getCacheEntry<PaginatedResult<Personel> & { missingPersonelTotal?: number | null }>(listKey)
         ) {
-          setErrorMessage("Personel listesi su an guncellenemiyor.");
+          setErrorMessage(userErrorText("Personel listesi su an guncellenemiyor."));
         }
       } finally {
         if (requestId === listRequestSeqRef.current && isMountedRef.current) {
@@ -410,7 +411,7 @@ export function usePersoneller() {
         );
       } catch {
         if (!cancelled) {
-          setReferenceError("Referans listeleri yÃ¼klenemedi. LÃ¼tfen sayfayÄ± yenileyin.");
+          setReferenceError(userErrorText("Referans listeleri yÃ¼klenemedi. LÃ¼tfen sayfayÄ± yenileyin."));
         }
       }
     })();
@@ -652,7 +653,7 @@ export function usePersoneller() {
         return;
       }
       if (!canCreate) {
-      setCreateErrorMessage("Bu iÅŸlem iÃ§in yetkin bulunmuyor.");
+      setCreateErrorMessage(userErrorText("Bu iÅŸlem iÃ§in yetkin bulunmuyor."));
         return;
       }
 

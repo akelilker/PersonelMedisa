@@ -1,3 +1,4 @@
+import { userErrorText } from "../lib/display/user-error";
 import { useEffect, useMemo, useState } from "react";
 import {
   fetchSgkPrimGunuSonuclari,
@@ -220,7 +221,7 @@ export function usePuantajEksikGunOzeti(
       .catch((error: unknown) => {
         if (!cancelled) {
           setRow(null);
-          setErrorMessage(error instanceof Error ? error.message : "SGK sonucu yüklenemedi.");
+          setErrorMessage(userErrorText(error instanceof Error ? error.message : "SGK sonucu yüklenemedi."));
         }
       })
       .finally(() => {

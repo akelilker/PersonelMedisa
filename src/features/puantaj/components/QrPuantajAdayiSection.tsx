@@ -1,3 +1,4 @@
+import { userErrorText } from "../../../lib/display/user-error";
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
@@ -78,7 +79,7 @@ export function QrPuantajAdayiSection({ personelId, tarih, personelLabel, onAppl
       const found = (data.items ?? []).find((row) => row.candidate_date === tarih) ?? null;
       setItem(found);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "QR puantaj adayı yüklenemedi.");
+      setError(userErrorText(e instanceof Error ? e.message : "QR puantaj adayı yüklenemedi."));
       setItem(null);
     } finally {
       setLoading(false);
@@ -109,7 +110,7 @@ export function QrPuantajAdayiSection({ personelId, tarih, personelLabel, onAppl
       return;
     }
     if (action !== "APPLY_EXISTING" && reason.trim().length < 5) {
-      setActionError("Gerekçe en az 5 karakter olmalıdır.");
+      setActionError(userErrorText("Gerekçe en az 5 karakter olmalıdır."));
       return;
     }
     if (action === "APPLY_EXISTING" && reason.trim().length < 5) {
@@ -138,7 +139,7 @@ export function QrPuantajAdayiSection({ personelId, tarih, personelLabel, onAppl
         onApplied?.();
       }
     } catch (e) {
-      setActionError(e instanceof Error ? e.message : "Karar kaydedilemedi.");
+      setActionError(userErrorText(e instanceof Error ? e.message : "Karar kaydedilemedi."));
     } finally {
       setBusy(false);
     }

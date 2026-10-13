@@ -1,3 +1,4 @@
+import { userErrorText } from "../lib/display/user-error";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { getApiErrorMessage, shouldQueueOfflineMutation } from "../api/api-client";
@@ -301,7 +302,7 @@ export function useBildirimler() {
         );
       } catch {
         if (!getCacheEntry<PaginatedResult<Bildirim>>(listKey)) {
-        setErrorMessage("Günlük kayıt listesi şu an güncellenemiyor.");
+        setErrorMessage(userErrorText("Günlük kayıt listesi şu an güncellenemiyor."));
         }
       } finally {
         if (!cancelled) {
@@ -339,7 +340,7 @@ export function useBildirimler() {
         );
       } catch {
         if (!cancelled) {
-          setReferenceError("Kayıt senaryosu seçenekleri şu an güncellenemiyor; manuel giriş kullanılabilir.");
+          setReferenceError(userErrorText("Kayıt senaryosu seçenekleri şu an güncellenemiyor; manuel giriş kullanılabilir."));
         }
       }
     })();
@@ -417,14 +418,13 @@ export function useBildirimler() {
     setCreateForm((prev) => ({ ...prev, tarih: value }));
     if (value.trim()) {
       setCreateErrorMessage((current) =>
-        current === "Tarih zorunludur." ? null : current
-      );
+        current === userErrorText("Tarih zorunludur.") ? null : current);
     }
   }, []);
 
   const handleCreateDateInvalid = useCallback((event: FormEvent<HTMLInputElement>) => {
     event.preventDefault();
-    setCreateErrorMessage("Tarih zorunludur.");
+    setCreateErrorMessage(userErrorText("Tarih zorunludur."));
   }, []);
 
   const refreshPageOne = useCallback(async () => {
@@ -458,11 +458,11 @@ export function useBildirimler() {
         return;
       }
       if (!canCreate) {
-        setCreateErrorMessage("Bu işlem için yetkin bulunmuyor.");
+        setCreateErrorMessage(userErrorText("Bu işlem için yetkin bulunmuyor."));
         return;
       }
       if (!createForm.tarih.trim()) {
-        setCreateErrorMessage("Tarih zorunludur.");
+        setCreateErrorMessage(userErrorText("Tarih zorunludur."));
         return;
       }
 
@@ -527,7 +527,7 @@ export function useBildirimler() {
 
   const openEditModal = useCallback((bildirim: Bildirim, canEdit: boolean) => {
     if (!canEdit) {
-      setErrorMessage("Bu günlük kaydı düzenlemek için yetkin bulunmuyor.");
+      setErrorMessage(userErrorText("Bu günlük kaydı düzenlemek için yetkin bulunmuyor."));
       return;
     }
     setEditErrorMessage(null);
@@ -548,7 +548,7 @@ export function useBildirimler() {
         return;
       }
       if (!canEdit) {
-        setEditErrorMessage("Bu günlük kaydı düzenlemek için yetkin bulunmuyor.");
+        setEditErrorMessage(userErrorText("Bu günlük kaydı düzenlemek için yetkin bulunmuyor."));
         return;
       }
 
@@ -609,7 +609,7 @@ export function useBildirimler() {
         return;
       }
       if (!canCancel) {
-        setErrorMessage("Bu günlük kaydı iptal etmek için yetkin bulunmuyor.");
+        setErrorMessage(userErrorText("Bu günlük kaydı iptal etmek için yetkin bulunmuyor."));
         return;
       }
       setCancelDialogError(null);
@@ -732,7 +732,7 @@ export function useBildirimler() {
 
       const reason = correctionReason.trim();
       if (!reason) {
-        setCorrectionErrorMessage("Düzeltme nedeni zorunludur.");
+        setCorrectionErrorMessage(userErrorText("Düzeltme nedeni zorunludur."));
         return;
       }
 
@@ -941,7 +941,7 @@ export function useBildirimDetail(parsedBildirimId: number, hasValidId: boolean)
   const refetch = useCallback(async () => {
     if (!hasValidId) {
       setIsLoading(false);
-      setErrorMessage("Geçerli bir günlük kayıt ID verilmedi.");
+      setErrorMessage(userErrorText("Geçerli bir günlük kayıt ID verilmedi."));
       return;
     }
 
@@ -963,7 +963,7 @@ export function useBildirimDetail(parsedBildirimId: number, hasValidId: boolean)
         return;
       }
       if (!getCacheEntry<Bildirim>(detailKey)) {
-        setErrorMessage("Günlük kayıt detayı şu an güncellenemiyor.");
+        setErrorMessage(userErrorText("Günlük kayıt detayı şu an güncellenemiyor."));
       }
     } finally {
       setIsLoading(false);

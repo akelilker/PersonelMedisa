@@ -1,3 +1,4 @@
+import { userErrorText } from "../lib/display/user-error";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { getApiErrorMessage, shouldQueueOfflineMutation } from "../api/api-client";
 import { fetchPersonelDetail } from "../api/personeller.api";
@@ -534,7 +535,7 @@ export function usePuantaj() {
         setPuantaj(data);
         patchFormState(toPuantajFormState(data, query.tarih));
       } catch {
-        setErrorMessage("Günlük puantaj kaydı şu an güncellenemiyor.");
+        setErrorMessage(userErrorText("Günlük puantaj kaydı şu an güncellenemiyor."));
         const cached = getCacheEntry<GunlukPuantaj | null>(key);
         if (cached !== undefined) {
           setPuantaj(cached);
@@ -576,7 +577,7 @@ export function usePuantaj() {
         setSubmitErrorMessage(null);
         await loadPuantaj(nextQuery);
       } catch (error) {
-        setErrorMessage(error instanceof Error ? error.message : "Puantaj sorgusu geçersiz.");
+        setErrorMessage(userErrorText(error instanceof Error ? error.message : "Puantaj sorgusu geçersiz."));
       }
     },
     [formState.queryPersonelId, formState.queryTarih, loadPuantaj]
@@ -998,12 +999,12 @@ export function usePuantaj() {
       }
 
       if (!activeQuery) {
-        setSubmitErrorMessage("Kaydı güncellemek için önce personel ve tarih seç.");
+        setSubmitErrorMessage(userErrorText("Kaydı güncellemek için önce personel ve tarih seç."));
         return;
       }
 
       if (!canUpdate) {
-        setSubmitErrorMessage("Bu işlem için yetkin bulunmuyor.");
+        setSubmitErrorMessage(userErrorText("Bu işlem için yetkin bulunmuyor."));
         return;
       }
 

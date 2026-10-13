@@ -150,7 +150,7 @@ test.describe("I5 haftalik kapanis close UI", () => {
     await expect(page.getByTestId("hk-close-open")).toBeEnabled();
     await page.getByTestId("hk-close-open").click();
     await page.getByTestId("hk-close-confirm-dialog-confirm").click();
-    await expect(page.getByTestId("hk-close-confirm-error")).toContainText("zaten olusturulmus");
+    await expect(page.getByTestId("hk-close-confirm-error")).toContainText("Bu Kayıt Zaten Var.");
     await expect(page.getByTestId("hk-close-success")).toHaveCount(0);
   });
 

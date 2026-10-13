@@ -1,3 +1,4 @@
+import { userErrorText } from "../../../lib/display/user-error";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createHaftalikKapanis } from "../../../api/haftalik-kapanis.api";
 import { getApiErrorMessage } from "../../../api/api-client";
@@ -236,8 +237,8 @@ export function HaftalikKapanisClosePanel() {
         setConfirmOpen(false);
         return;
       }
-      setDialogError(message);
-      setPanelError(message);
+      setDialogError(userErrorText(message));
+      setPanelError(userErrorText(message));
       setSuccessResult(null);
       setSuccessScopeLabel("");
       setClosedSelectionKey(null);

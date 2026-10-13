@@ -1,3 +1,4 @@
+import { userErrorText } from "../../../lib/display/user-error";
 import { useEffect, useMemo, useState } from "react";
 import { downloadBildirimEtkiRaporCsv } from "../../../api/bildirim-etki-rapor.api";
 import { fetchDepartmanOptions } from "../../../api/referans.api";
@@ -121,7 +122,7 @@ export function EtkiAdayiRaporuPage() {
     try {
       await downloadBildirimEtkiRaporCsv(apiFilters);
     } catch (error) {
-      setExportError(error instanceof Error ? error.message : "CSV indirilemedi.");
+      setExportError(userErrorText(error instanceof Error ? error.message : "CSV indirilemedi."));
     } finally {
       setIsExporting(false);
     }

@@ -1,3 +1,4 @@
+import { userErrorText } from "../../../../lib/display/user-error";
 import { useState } from "react";
 import type { Personel } from "../../../../types/personel";
 import { AppActionDialog } from "../../../../components/modal/AppActionDialog";
@@ -98,7 +99,7 @@ export function PersonelUcretGecmisiSection({
       setPendingCancelUcretId(null);
       return;
     }
-    setCancelDialogError("Ücret kaydı iptal edilemedi.");
+    setCancelDialogError(userErrorText("Ücret kaydı iptal edilemedi."));
   }
 
   async function handleCreate(payload: Parameters<typeof submitUcret>[0]) {

@@ -382,3 +382,47 @@ describe("P) Görünen tarihler gg/aa/yyyy (t865 b)", () => {
     for (const [file, raw] of checks) expect(readFileSync(resolve(file), "utf8")).not.toMatch(raw);
   });
 });
+
+describe("Q) Hata metinleri tek tablodan ve Her Kelime Büyük Harfle (t865 HATA-KARAR)", () => {
+  it("tablo metinleri Title Case (Türkçe), teknik terim/API yolu yok", async () => {
+    const mod = await import("../../src/lib/display/user-error");
+    const rows = Object.values(mod.USER_ERROR_TABLOSU);
+    expect(rows.length).toBe(30);
+    for (const row of rows) {
+      for (const text of [row.mesaj, row.aciklama].filter(Boolean) as string[]) {
+        for (const word of text.split(/\s+/)) {
+          const first = word.replace(/^[^A-Za-zÇĞİÖŞÜçğıöşü]+/, "").charAt(0);
+          if (first) expect(first, `${text} → ${word}`).toBe(first.toLocaleUpperCase("tr-TR"));
+        }
+        expect(text).not.toMatch(/\/api\/|snapshot|preflight|hash|canonical|[A-Z]{3,}_[A-Z]/i);
+      }
+    }
+    expect(mod.toTitleCaseTr("işlem ılık ve SGK T.C. no")).toBe("İşlem Ilık Ve SGK T.C. No");
+  });
+
+  it("ham sunucu/teknik metin daima tablo metnine çevrilir", async () => {
+    const mod = await import("../../src/lib/display/user-error");
+    for (const raw of ["GET /api/legal-holdlar", "Snapshot bulunamadi.", "SCHEMA_NOT_READY: x", "Gerekce zorunludur.", "Talep onaylanamadi (yaris).", "", "anlamsız"]) {
+      expect(mod.isUserErrorTableText(mod.userErrorText(raw))).toBe(true);
+    }
+    expect(mod.userErrorText("x", "FORBIDDEN", 403)).toContain("Yetkiniz Yok");
+    expect(mod.userErrorText("x", undefined, 401)).toContain("Oturumunuz");
+  });
+
+  it("ön yüzde hata setter'ları, ApiRequestError ve ErrorState tablodan geçer", () => {
+    const offenders = listSources(resolve("src"), /\.(ts|tsx)$/)
+      .filter((file) => !/\.test\.|mock|user-error\.ts$/.test(file))
+      .flatMap((file) =>
+        readFileSync(file, "utf8")
+          .split("\n")
+          .map((line, i) => ({ line, at: `${file}:${i + 1}` }))
+          .filter(({ line }) => /\bset\w*(Error|Hata|Validation)\w*\(\s*["`]/.test(line))
+          .map(({ at }) => at)
+      );
+    expect(offenders).toEqual([]);
+    expect(readSrc("src/api/api-client.ts")).toMatch(/super\(userErrorText\(message/);
+    expect(readSrc("src/api/api-client.ts")).toMatch(/message: userErrorText\(detail\.message/);
+    expect(readSrc("src/components/states/ErrorState.tsx")).toMatch(/userErrorText\(message\)/);
+    expect(readSrc("api/src/Http/JsonResponse.php")).toMatch(/'user_message' => UserErrorMessages::forError/);
+  });
+});

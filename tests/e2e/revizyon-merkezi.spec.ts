@@ -324,7 +324,7 @@ test.describe("S80 Revizyon Merkezi final UI kabul", () => {
     await page.getByTestId("revizyon-reddet").click();
     await expect(page.getByTestId("revizyon-action-dialog")).toHaveCount(0);
     await expect(page.getByTestId("revizyon-action-error")).toContainText(
-      "Red için karar notu zorunludur."
+      "Bu Alan Boş Bırakılamaz."
     );
     await expect(kararNotu).toBeFocused();
     await kararNotu.fill("S80 red gerekçesi");

@@ -1,3 +1,4 @@
+import { userErrorText } from "../../../lib/display/user-error";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { AppSelect } from "../../../components/form/AppSelect";
 import { AppModal } from "../../../components/modal/AppModal";
@@ -338,7 +339,7 @@ export function BugunPersonelDurumuModal({ open, onClose }: BugunPersonelDurumuM
       setPayload(data);
       setNav(restoreNav(data, preserve));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Anlık personel durumu yüklenemedi.");
+      setError(userErrorText(err instanceof Error ? err.message : "Anlık personel durumu yüklenemedi."));
       setPayload(null);
     } finally {
       setLoading(false);
@@ -527,11 +528,11 @@ export function BugunPersonelDurumuModal({ open, onClose }: BugunPersonelDurumuM
     const tur = editForm.bildirimTuru;
     const reason = editForm.correctionReason.trim();
     if (!reason) {
-      setEditError("Düzeltme nedeni zorunludur.");
+      setEditError(userErrorText("Düzeltme nedeni zorunludur."));
       return;
     }
     if (turRequiresAciklama(tur) && !editForm.aciklama.trim()) {
-      setEditError("Diğer türü için açıklama zorunludur.");
+      setEditError(userErrorText("Diğer türü için açıklama zorunludur."));
       return;
     }
 
@@ -548,7 +549,7 @@ export function BugunPersonelDurumuModal({ open, onClose }: BugunPersonelDurumuM
       correction_reason: reason
     };
     if (bodyBase.dakika != null && Number.isNaN(bodyBase.dakika)) {
-      setEditError("Dakika geçerli bir sayı olmalıdır.");
+      setEditError(userErrorText("Dakika geçerli bir sayı olmalıdır."));
       return;
     }
 
@@ -576,9 +577,9 @@ export function BugunPersonelDurumuModal({ open, onClose }: BugunPersonelDurumuM
         err && typeof err === "object" && "code" in err ? String((err as { code?: string }).code) : "";
       const message = getApiErrorMessage(err, "Durum kaydedilemedi.");
       if (code === "PERIOD_LOCKED" || message.toLowerCase().includes("donem") || message.toLowerCase().includes("dönem")) {
-        setEditError(PAYROLL_LOCK_EDIT_MESSAGE);
+        setEditError(userErrorText(PAYROLL_LOCK_EDIT_MESSAGE));
       } else {
-        setEditError(message);
+        setEditError(userErrorText(message));
       }
     } finally {
       setEditSubmitting(false);

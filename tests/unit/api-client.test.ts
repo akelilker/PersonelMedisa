@@ -1,3 +1,4 @@
+import { userErrorText } from "../../src/lib/display/user-error";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AUTH_FORBIDDEN_EVENT, AUTH_UNAUTHORIZED_EVENT } from "../../src/lib/storage/auth-events";
 import { shouldEmitGlobalAuthForbidden } from "../../src/lib/api-forbidden-policy";
@@ -318,7 +319,7 @@ describe("apiRequest", () => {
     await expect(apiRequest("/personeller", { timeoutMs: 5 })).rejects.toMatchObject({
       status: 0,
       code: "REQUEST_TIMEOUT",
-      message: "İstek zaman aşımına uğradı."
+      rawMessage: "İstek zaman aşımına uğradı."
     });
   });
 
@@ -370,7 +371,7 @@ describe("apiRequest", () => {
 
     await expect(apiRequest("/personeller")).rejects.toMatchObject({
       status: 401,
-      message: "Oturum suresi doldu.",
+      rawMessage: "Oturum suresi doldu.",
       code: "UNAUTHORIZED"
     });
 
@@ -424,7 +425,7 @@ describe("apiRequest", () => {
 
     await expect(apiRequest("/yonetim/kullanicilar")).rejects.toMatchObject({
       status: 403,
-      message: "Bu kaynak icin yetkin yok.",
+      rawMessage: "Bu kaynak icin yetkin yok.",
       code: "FORBIDDEN"
     });
 
@@ -459,7 +460,7 @@ describe("apiRequest", () => {
       })
     ).rejects.toMatchObject({
       status: 403,
-      message: "Secili sube icin yetkiniz yok.",
+      rawMessage: "Secili sube icin yetkiniz yok.",
       code: "FORBIDDEN"
     });
 
@@ -486,7 +487,7 @@ describe("apiRequest", () => {
 
     await expect(apiRequest("/personeller/2")).rejects.toMatchObject({
       status: 403,
-      message: "Bu kayit aktif sube baglaminda goruntulenemiyor.",
+      rawMessage: "Bu kayit aktif sube baglaminda goruntulenemiyor.",
       code: "FORBIDDEN"
     });
 
@@ -513,7 +514,7 @@ describe("apiRequest", () => {
 
     await expect(apiRequest("/surecler?personel_id=2&sube_id=1")).rejects.toMatchObject({
       status: 403,
-      message: "Bu kayit aktif sube baglaminda goruntulenemiyor.",
+      rawMessage: "Bu kayit aktif sube baglaminda goruntulenemiyor.",
       code: "FORBIDDEN"
     });
 
@@ -734,7 +735,7 @@ describe("api error helpers", () => {
     });
 
     expect(getApiErrorDetail(error, "Personel kaydı oluşturulamadı.")).toEqual({
-      message: "Bu T.C. Kimlik No. ile kayıt açılamaz.",
+      message: userErrorText("Bu T.C. Kimlik No. ile kayıt açılamaz.", "DUPLICATE_TC_KIMLIK_NO", 409),
       status: 409,
       code: "DUPLICATE_TC_KIMLIK_NO",
       field: "tc_kimlik_no"
@@ -747,7 +748,7 @@ describe("api error helpers", () => {
     expect(
       getApiErrorDetail(error, "Personel kaydı oluşturulamadı.", { context: "personel-create" })
     ).toEqual({
-      message: "Seçili şube için yetkiniz yok.",
+      message: userErrorText("Seçili şube için yetkiniz yok.", "FORBIDDEN", 403),
       status: 403,
       code: "FORBIDDEN",
       field: undefined
@@ -762,7 +763,7 @@ describe("api error helpers", () => {
     expect(
       getApiErrorDetail(error, "Personel kaydı oluşturulamadı.", { context: "personel-create" })
     ).toEqual({
-      message: "Seçilen şube aktif şube filtresiyle uyuşmuyor.",
+      message: userErrorText("Seçilen şube aktif şube filtresiyle uyuşmuyor.", "FORBIDDEN", 403),
       status: 403,
       code: "FORBIDDEN",
       field: undefined
@@ -773,7 +774,7 @@ describe("api error helpers", () => {
     const error = new ApiRequestError("Bu kaynak icin yetkin yok.", 403, { code: "FORBIDDEN" });
 
     expect(getApiErrorDetail(error, "Islem basarisiz.")).toEqual({
-      message: "Bu kaynak icin yetkin yok.",
+      message: userErrorText("Bu kaynak icin yetkin yok.", "FORBIDDEN", 403),
       status: 403,
       code: "FORBIDDEN",
       field: undefined
@@ -787,7 +788,7 @@ describe("api error helpers", () => {
     });
 
     expect(getApiErrorDetail(error, "Personel kaydı oluşturulamadı.")).toEqual({
-      message: "Sube secilmelidir.",
+      message: userErrorText("Sube secilmelidir.", "VALIDATION_ERROR", 422),
       status: 422,
       code: "VALIDATION_ERROR",
       field: "sube_id"
@@ -796,16 +797,16 @@ describe("api error helpers", () => {
 
   it("returns generic Error message and fallback for unknown values", () => {
     expect(getApiErrorDetail(new Error("Client validation failed"), "Fallback")).toEqual({
-      message: "Client validation failed"
+      message: userErrorText("Client validation failed", undefined, undefined)
     });
-    expect(getApiErrorDetail(null, "Fallback")).toEqual({ message: "Fallback" });
+    expect(getApiErrorDetail(null, "Fallback")).toEqual({ message: userErrorText("Fallback") });
   });
 
   it("uses fallback for empty ApiRequestError message", () => {
     const error = new ApiRequestError("   ", 500, { code: "INTERNAL_ERROR" });
 
     expect(getApiErrorDetail(error, "Sunucu hatasi.")).toEqual({
-      message: "Sunucu hatasi.",
+      message: userErrorText("Sunucu hatasi.", "INTERNAL_ERROR", 500),
       status: 500,
       code: "INTERNAL_ERROR",
       field: undefined
@@ -816,9 +817,9 @@ describe("api error helpers", () => {
     const error = new ApiRequestError("Secili sube icin yetkiniz yok.", 403, { code: "FORBIDDEN" });
 
     expect(getApiErrorMessage(error, "Personel kaydı oluşturulamadı.", { context: "personel-create" })).toBe(
-      "Seçili şube için yetkiniz yok."
+      userErrorText("Seçili şube için yetkiniz yok.", "FORBIDDEN", 403)
     );
-    expect(getApiErrorMessage(error, "Personel kaydı oluşturulamadı.")).toBe("Secili sube icin yetkiniz yok.");
+    expect(getApiErrorMessage(error, "Personel kaydı oluşturulamadı.")).toBe(userErrorText("Secili sube icin yetkiniz yok.", error.code, error.status));
   });
 });
 

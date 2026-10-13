@@ -1,3 +1,4 @@
+import { userErrorText } from "../lib/display/user-error";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getApiErrorDetail } from "../api/api-client";
 import {
@@ -60,7 +61,7 @@ export function useDonemKapanisPreflight(options: UseDonemKapanisPreflightOption
     const params = buildParams();
     if (!params) {
       setSummary(null);
-      setErrorMessage("Dönem kapanış özeti için şube seçilmelidir.");
+      setErrorMessage(userErrorText("Dönem kapanış özeti için şube seçilmelidir."));
       return;
     }
 
@@ -79,7 +80,7 @@ export function useDonemKapanisPreflight(options: UseDonemKapanisPreflightOption
         return;
       }
       setSummary(null);
-      setErrorMessage(getApiErrorDetail(caught, "Dönem kapanış özeti yüklenemedi.").message);
+      setErrorMessage(userErrorText(getApiErrorDetail(caught, "Dönem kapanış özeti yüklenemedi.").message));
     } finally {
       if (requestId === requestIdRef.current) {
         setIsLoading(false);
@@ -112,7 +113,7 @@ export function useDonemKapanisPreflight(options: UseDonemKapanisPreflightOption
       setAudits(result.items);
     } catch (caught) {
       setAudits([]);
-      setAuditsErrorMessage(getApiErrorDetail(caught, "Kapanış audit kayıtları yüklenemedi.").message);
+      setAuditsErrorMessage(userErrorText(getApiErrorDetail(caught, "Kapanış audit kayıtları yüklenemedi.").message));
     } finally {
       setIsAuditsLoading(false);
     }

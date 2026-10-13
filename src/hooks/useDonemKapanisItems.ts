@@ -1,3 +1,4 @@
+import { userErrorText } from "../lib/display/user-error";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getApiErrorDetail } from "../api/api-client";
 import {
@@ -61,7 +62,7 @@ export function useDonemKapanisItems(options: UseDonemKapanisItemsOptions) {
           return;
         }
         setItems([]);
-        setErrorMessage(getApiErrorDetail(caught, "Kapanış detay listesi yüklenemedi.").message);
+        setErrorMessage(userErrorText(getApiErrorDetail(caught, "Kapanış detay listesi yüklenemedi.").message));
       } finally {
         if (requestId === requestIdRef.current) {
           setIsLoading(false);

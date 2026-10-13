@@ -1,3 +1,4 @@
+import { userErrorText } from "../../../lib/display/user-error";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { FormField } from "../../../components/form/FormField";
 import {
@@ -85,7 +86,7 @@ export function YillikIzinHakDuzeltmePanel({
       setBakiye(nextBakiye);
       setHistory(nextHistory);
     } catch (error) {
-      setLoadError(getYillikIzinHakDuzeltmeApiErrorMessage(error, "İzin hak özeti yüklenemedi."));
+      setLoadError(userErrorText(getYillikIzinHakDuzeltmeApiErrorMessage(error, "İzin hak özeti yüklenemedi.")));
     } finally {
       setLoading(false);
     }
@@ -107,15 +108,15 @@ export function YillikIzinHakDuzeltmePanel({
 
     const gunAbs = Number.parseInt(form.gun.trim(), 10);
     if (!Number.isInteger(gunAbs) || gunAbs <= 0) {
-      setSubmitError("Gün değişimi pozitif tam sayı olmalıdır.");
+      setSubmitError(userErrorText("Gün değişimi pozitif tam sayı olmalıdır."));
       return;
     }
     if (!form.effectiveDate) {
-      setSubmitError("Etki tarihi zorunludur.");
+      setSubmitError(userErrorText("Etki tarihi zorunludur."));
       return;
     }
     if (form.aciklama.trim().length < 3) {
-      setSubmitError("Açıklama en az 3 karakter olmalıdır.");
+      setSubmitError(userErrorText("Açıklama en az 3 karakter olmalıdır."));
       return;
     }
 
@@ -133,7 +134,7 @@ export function YillikIzinHakDuzeltmePanel({
       setSubmitInfo("İzin hak düzeltmesi kaydedildi.");
       await reload();
     } catch (error) {
-      setSubmitError(getYillikIzinHakDuzeltmeApiErrorMessage(error, "Kayıt oluşturulamadı."));
+      setSubmitError(userErrorText(getYillikIzinHakDuzeltmeApiErrorMessage(error, "Kayıt oluşturulamadı.")));
     } finally {
       setSubmitting(false);
     }
@@ -142,7 +143,7 @@ export function YillikIzinHakDuzeltmePanel({
   async function handleReverse(targetId: number) {
     if (reversing) return;
     if (reverseReason.trim().length < 3) {
-      setSubmitError("Ters kayıt açıklaması en az 3 karakter olmalıdır.");
+      setSubmitError(userErrorText("Ters kayıt açıklaması en az 3 karakter olmalıdır."));
       return;
     }
     setReversing(true);
@@ -154,7 +155,7 @@ export function YillikIzinHakDuzeltmePanel({
       setSubmitInfo("Ters kayıt oluşturuldu.");
       await reload();
     } catch (error) {
-      setSubmitError(getYillikIzinHakDuzeltmeApiErrorMessage(error, "Ters kayıt oluşturulamadı."));
+      setSubmitError(userErrorText(getYillikIzinHakDuzeltmeApiErrorMessage(error, "Ters kayıt oluşturulamadı.")));
     } finally {
       setReversing(false);
     }

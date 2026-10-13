@@ -1,4 +1,5 @@
 /** @vitest-environment jsdom */
+import { userErrorText } from "../../src/lib/display/user-error";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
@@ -155,7 +156,7 @@ describe("SerbestZamanTakipPage UI", () => {
     fireEvent.submit(form!);
 
     await waitFor(() => {
-      expect(screen.getByText(/Personel ve Dakika alanları zorunludur/i)).toBeTruthy();
+      expect(screen.getByText(userErrorText("Personel ve Dakika alanları zorunludur."))).toBeTruthy();
     });
 
     expect(postSerbestZamanKullanim).not.toHaveBeenCalled();

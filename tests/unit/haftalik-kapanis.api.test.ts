@@ -522,7 +522,7 @@ describe("haftalik-kapanis.api", () => {
 
     await expect(fetchHaftalikKapanisDetail(9999)).rejects.toMatchObject({
       status: 404,
-      message: "Haftalik kapanis bulunamadi.",
+      rawMessage: "Haftalik kapanis bulunamadi.",
       code: "NOT_FOUND"
     });
   });

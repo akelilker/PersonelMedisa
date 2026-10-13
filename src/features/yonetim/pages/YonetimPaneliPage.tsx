@@ -1,3 +1,4 @@
+import { userErrorText } from "../../../lib/display/user-error";
 import { Fragment, useEffect, useMemo, useState, type FormEvent, type KeyboardEvent } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { AppSelectField } from "../../../components/form/AppSelect";
@@ -1212,7 +1213,7 @@ export function YonetimPaneliPage() {
       setBolumOptions(sortIdOptions(bolumList));
       setBirimOptions(sortIdOptions(birimList));
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Yönetim paneli yüklenemedi.");
+      setErrorMessage(userErrorText(error instanceof Error ? error.message : "Yönetim paneli yüklenemedi."));
       setIsSgkIsverenCatalogLoaded(false);
     } finally {
       setIsLoading(false);
@@ -1330,7 +1331,7 @@ export function YonetimPaneliPage() {
         cleanable_scope: [],
         dependencies: []
       });
-      setKaliciSilError(error instanceof Error ? error.message : "Silinebilirlik kontrolü alınamadı.");
+      setKaliciSilError(userErrorText(error instanceof Error ? error.message : "Silinebilirlik kontrolü alınamadı."));
     } finally {
       setKaliciSilEligibilityLoading(false);
     }
@@ -1360,7 +1361,7 @@ export function YonetimPaneliPage() {
       closeKaliciSilDialog();
       await loadPanel();
     } catch (error) {
-      setKaliciSilError(error instanceof Error ? error.message : "Kullanıcı kalıcı olarak silinemedi.");
+      setKaliciSilError(userErrorText(error instanceof Error ? error.message : "Kullanıcı kalıcı olarak silinemedi."));
     } finally {
       setIsSubmitting(false);
     }
@@ -1428,7 +1429,7 @@ export function YonetimPaneliPage() {
       resetSirketEditor();
       await loadPanel();
     } catch (error) {
-      setFormErrorMessage(error instanceof Error ? error.message : "Şirket tanımı kaydedilemedi.");
+      setFormErrorMessage(userErrorText(error instanceof Error ? error.message : "Şirket tanımı kaydedilemedi."));
     } finally {
       setIsSubmitting(false);
     }
@@ -1452,7 +1453,7 @@ export function YonetimPaneliPage() {
       setSuccessMessage("Şirket tanımı silindi.");
       await loadPanel();
     } catch (error) {
-      setSirketDeleteDialogError(error instanceof Error ? error.message : "Şirket silinemedi.");
+      setSirketDeleteDialogError(userErrorText(error instanceof Error ? error.message : "Şirket silinemedi."));
     } finally {
       setIsSubmitting(false);
     }
@@ -1515,7 +1516,7 @@ export function YonetimPaneliPage() {
       resetSgkIsverenEditor();
       await loadPanel();
     } catch (error) {
-      setFormErrorMessage(error instanceof Error ? error.message : "SGK işvereni kaydedilemedi.");
+      setFormErrorMessage(userErrorText(error instanceof Error ? error.message : "SGK işvereni kaydedilemedi."));
     } finally {
       setIsSubmitting(false);
     }
@@ -1548,8 +1549,8 @@ export function YonetimPaneliPage() {
       await loadPanel();
     } catch (error) {
       const message = error instanceof Error ? error.message : "SGK işvereni silinemedi.";
-      setSgkIsverenDeleteError(message);
-      setSgkIsverenDeleteDialogError(message);
+      setSgkIsverenDeleteError(userErrorText(message));
+      setSgkIsverenDeleteDialogError(userErrorText(message));
     } finally {
       setIsSubmitting(false);
     }
@@ -1681,9 +1682,9 @@ export function YonetimPaneliPage() {
       await loadPanel();
     } catch (error) {
       if (isApiRequestError(error) && error.code === "PERSONEL_ALREADY_BOUND") {
-        setFormErrorMessage("Bu personel kaydı başka bir kullanıcıya bağlı.");
+        setFormErrorMessage(userErrorText("Bu personel kaydı başka bir kullanıcıya bağlı."));
       } else {
-        setFormErrorMessage(error instanceof Error ? error.message : "Kullanıcı kaydı kaydedilemedi.");
+        setFormErrorMessage(userErrorText(error instanceof Error ? error.message : "Kullanıcı kaydı kaydedilemedi."));
       }
     } finally {
       setIsSubmitting(false);
@@ -1696,9 +1697,7 @@ export function YonetimPaneliPage() {
     }
 
     if (boundCanonicalUsernameView?.mismatch) {
-      setFormErrorMessage(
-        "Kullanıcı adı canonical personel şablonuyla uyuşmuyor. Önce kullanıcı adını canonical şablona düzeltin."
-      );
+      setFormErrorMessage(userErrorText("Kullanıcı adı canonical personel şablonuyla uyuşmuyor. Önce kullanıcı adını canonical şablona düzeltin."));
       setSifreResetConfirmOpen(false);
       return;
     }
@@ -1714,9 +1713,7 @@ export function YonetimPaneliPage() {
       resetKullaniciEditor();
       await loadPanel();
     } catch (error) {
-      setFormErrorMessage(
-        error instanceof Error ? error.message : "Başlangıç şifresine sıfırlama yapılamadı."
-      );
+      setFormErrorMessage(userErrorText(error instanceof Error ? error.message : "Başlangıç şifresine sıfırlama yapılamadı."));
     } finally {
       setIsSubmitting(false);
     }
@@ -1727,11 +1724,9 @@ export function YonetimPaneliPage() {
       return;
     }
     if (!boundCanonicalUsernameView?.canOfferFix) {
-      setFormErrorMessage(
-        boundCanonicalUsernameView && !boundCanonicalUsernameView.personelActive
+      setFormErrorMessage(userErrorText(boundCanonicalUsernameView && !boundCanonicalUsernameView.personelActive
           ? "Bağlı personel aktif değil; kullanıcı adı düzeltilmez."
-          : "Canonical kullanıcı adı düzeltmesi bu hesap için uygun değil."
-      );
+          : "Canonical kullanıcı adı düzeltmesi bu hesap için uygun değil."));
       return;
     }
 
@@ -1750,9 +1745,7 @@ export function YonetimPaneliPage() {
       setSuccessMessage("Kullanıcı adı geçerli personel şablonuna düzeltildi. Şifre değişmedi.");
       await loadPanel();
     } catch (error) {
-      setFormErrorMessage(
-        error instanceof Error ? error.message : "Canonical kullanıcı adı düzeltilemedi."
-      );
+      setFormErrorMessage(userErrorText(error instanceof Error ? error.message : "Canonical kullanıcı adı düzeltilemedi."));
     } finally {
       setIsSubmitting(false);
     }
@@ -1797,7 +1790,7 @@ export function YonetimPaneliPage() {
       resetSubeEditor();
       await loadPanel();
     } catch (error) {
-      setFormErrorMessage(error instanceof Error ? error.message : "Şube tanımı kaydedilemedi.");
+      setFormErrorMessage(userErrorText(error instanceof Error ? error.message : "Şube tanımı kaydedilemedi."));
     } finally {
       setIsSubmitting(false);
     }
@@ -1842,8 +1835,8 @@ export function YonetimPaneliPage() {
       await loadPanel();
     } catch (error) {
       const message = error instanceof Error ? error.message : "Şube silinemedi.";
-      setSubeDeleteError(message);
-      setSubeDeleteDialogError(message);
+      setSubeDeleteError(userErrorText(message));
+      setSubeDeleteDialogError(userErrorText(message));
     } finally {
       setIsSubmitting(false);
     }
@@ -1870,7 +1863,7 @@ export function YonetimPaneliPage() {
       setIsDepartmanCreateOpen(false);
       setSuccessMessage(`"${created.label}" departmanı seçeneklere eklendi.`);
     } catch (error) {
-      setFormErrorMessage(error instanceof Error ? error.message : "Departman eklenemedi.");
+      setFormErrorMessage(userErrorText(error instanceof Error ? error.message : "Departman eklenemedi."));
     } finally {
       setIsAddingDepartman(false);
     }

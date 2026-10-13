@@ -1,3 +1,4 @@
+import { userErrorText } from "../../../lib/display/user-error";
 import { FormEvent, useEffect, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { changePassword } from "../../../api/auth.api";
@@ -33,11 +34,11 @@ export function ChangePasswordPage() {
     event.preventDefault();
     setError(null);
     if (newPassword.length < 8) {
-      setError("Yeni şifre en az 8 karakter olmalıdır.");
+      setError(userErrorText("Yeni şifre en az 8 karakter olmalıdır."));
       return;
     }
     if (newPassword !== confirmPassword) {
-      setError("Yeni şifre tekrarı eşleşmiyor.");
+      setError(userErrorText("Yeni şifre tekrarı eşleşmiyor."));
       return;
     }
     setSubmitting(true);
@@ -52,7 +53,7 @@ export function ChangePasswordPage() {
           : err instanceof Error
             ? err.message
             : "Şifre güncellenemedi.";
-      setError(message);
+      setError(userErrorText(message));
     } finally {
       setSubmitting(false);
     }

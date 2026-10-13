@@ -1,3 +1,4 @@
+import { userErrorText } from "../../src/lib/display/user-error";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -14,7 +15,7 @@ const migrationSource = readFileSync(
 
 describe("S74-D1-D1 frontend günlük bildirim tarih kontratı", () => {
   it("boş tarihi açıkça reddeder ve submit sırasında bugüne fallback yapmaz", () => {
-    expect(hookSource).toContain('setCreateErrorMessage("Tarih zorunludur.")');
+    expect(hookSource).toContain('setCreateErrorMessage(userErrorText("Tarih zorunludur."))');
     expect(hookSource).toContain("tarih: createForm.tarih");
     expect(hookSource).not.toContain("tarih: createForm.tarih || getTodayIsoDate()");
   });

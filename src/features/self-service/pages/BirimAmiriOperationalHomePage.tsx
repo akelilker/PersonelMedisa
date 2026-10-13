@@ -1,3 +1,4 @@
+import { userErrorText } from "../../../lib/display/user-error";
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { fetchAttendanceToday, type AttendanceTodayResponse } from "../../../api/attendance-mobile.api";
@@ -57,7 +58,7 @@ export function BirimAmiriOperationalHomePage() {
       setUnitError(null);
     } catch (cause) {
       setUnit(null);
-      setUnitError(cause instanceof Error ? cause.message : "Birim özeti yüklenemedi.");
+      setUnitError(userErrorText(cause instanceof Error ? cause.message : "Birim özeti yüklenemedi."));
     }
 
     if (!shouldPreferDemoApi()) {
@@ -87,7 +88,7 @@ export function BirimAmiriOperationalHomePage() {
         setFazlaMesaiError(null);
       } catch (cause) {
         setFazlaMesai(null);
-        setFazlaMesaiError(cause instanceof Error ? cause.message : "Fazla mesai durumu yüklenemedi.");
+        setFazlaMesaiError(userErrorText(cause instanceof Error ? cause.message : "Fazla mesai durumu yüklenemedi."));
       }
     }
     setLoading(false);

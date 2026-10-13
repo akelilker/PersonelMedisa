@@ -1,3 +1,4 @@
+import { userErrorText } from "../lib/display/user-error";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getApiErrorDetail } from "../api/api-client";
 import {
@@ -277,7 +278,7 @@ export function useBildirimPuantajEtkiAdaylari(options: UseBildirimPuantajEtkiAd
       } catch (caught) {
         if (requestId === ozetRequestIdRef.current) {
           setOzet(null);
-          setOzetError(getApiErrorDetail(caught, "Puantaj etki adayı özeti yüklenemedi.").message);
+          setOzetError(userErrorText(getApiErrorDetail(caught, "Puantaj etki adayı özeti yüklenemedi.").message));
         }
       } finally {
         if (requestId === ozetRequestIdRef.current) {
@@ -345,7 +346,7 @@ export function useBildirimPuantajEtkiAdaylari(options: UseBildirimPuantajEtkiAd
         setPagination(EMPTY_PAGINATION);
         setOzet(null);
         resolvedGyIdRef.current = null;
-        setListError(getApiErrorDetail(caught, "Puantaj etki adayları yüklenemedi.").message);
+        setListError(userErrorText(getApiErrorDetail(caught, "Puantaj etki adayları yüklenemedi.").message));
       }
     } finally {
       if (requestId === listRequestIdRef.current) {
@@ -370,7 +371,7 @@ export function useBildirimPuantajEtkiAdaylari(options: UseBildirimPuantajEtkiAd
       } catch (caught) {
         if (requestId === detailRequestIdRef.current) {
           setDetail(null);
-          setDetailError(getApiErrorDetail(caught, "Puantaj etki adayı detayı yüklenemedi.").message);
+          setDetailError(userErrorText(getApiErrorDetail(caught, "Puantaj etki adayı detayı yüklenemedi.").message));
         }
       } finally {
         if (requestId === detailRequestIdRef.current) {
@@ -539,16 +540,16 @@ export function useBildirimPuantajEtkiAdaylari(options: UseBildirimPuantajEtkiAd
     } catch (caught) {
       const detail = getApiErrorDetail(caught, "Puantaj etki adayı yok sayılamadı.");
       if (detail.code === "VALIDATION_ERROR" && detail.field === "gerekce") {
-        setDismissFieldError(detail.message);
+        setDismissFieldError(userErrorText(detail.message));
       } else if (detail.code === "STATE_STALE") {
         closeDismissModal();
         setInfoMessage("Aday durumu değişmiş. Liste yenilendi.");
         await refreshAll();
       } else if (detail.code === "STATE_CONFLICT") {
-        setDismissError(detail.message);
+        setDismissError(userErrorText(detail.message));
         await refreshAll();
       } else {
-        setDismissError(detail.message);
+        setDismissError(userErrorText(detail.message));
       }
     } finally {
       dismissingRef.current = false;
@@ -654,16 +655,16 @@ export function useBildirimPuantajEtkiAdaylari(options: UseBildirimPuantajEtkiAd
     } catch (caught) {
       const errorDetail = getApiErrorDetail(caught, "Puantaj çakışması çözülemedi.");
       if (errorDetail.code === "VALIDATION_ERROR" && errorDetail.field) {
-        setConflictFieldError(errorDetail.message);
+        setConflictFieldError(userErrorText(errorDetail.message));
       } else if (errorDetail.code && REFETCH_CONFLICT_CODES.has(errorDetail.code)) {
-        setConflictError(errorDetail.message);
+        setConflictError(userErrorText(errorDetail.message));
         const refreshed = await maybeOpenConflictFromDetail(conflictTarget.id);
         if (!refreshed || !canResolveConflictForDetail(refreshed)) {
           closeConflictModal();
         }
         await refreshAll();
       } else {
-        setConflictError(errorDetail.message);
+        setConflictError(userErrorText(errorDetail.message));
         if (errorDetail.code === "PERIOD_LOCKED" || errorDetail.code === "PUANTAJ_SOURCE_PROTECTED") {
           await refreshAll();
         }
@@ -733,11 +734,11 @@ export function useBildirimPuantajEtkiAdaylari(options: UseBildirimPuantajEtkiAd
           closeApplyModal();
           await maybeOpenConflictFromDetail(applyTarget.id);
         } else {
-          setApplyError(detail.message);
+          setApplyError(userErrorText(detail.message));
         }
         await refreshAll();
       } else {
-        setApplyError(detail.message);
+        setApplyError(userErrorText(detail.message));
       }
     } finally {
       applyingRef.current = false;
@@ -798,7 +799,7 @@ export function useBildirimPuantajEtkiAdaylari(options: UseBildirimPuantajEtkiAd
     } catch (caught) {
       const detail = getApiErrorDetail(caught, "Manuel inceleme kararı uygulanamadı.");
       if (detail.code === "VALIDATION_ERROR" && detail.field) {
-        setManualFieldError(detail.message);
+        setManualFieldError(userErrorText(detail.message));
       } else if (detail.code === "STATE_STALE") {
         closeManualApplyModal();
         setInfoMessage("Adayın durumu başka bir işlemle değişti. Kayıt yenileniyor.");
@@ -812,24 +813,24 @@ export function useBildirimPuantajEtkiAdaylari(options: UseBildirimPuantajEtkiAd
         detail.code === "APPLY_INTEGRITY_CONFLICT"
       ) {
         if (detail.code === "SOURCE_INTEGRITY_FAILED") {
-          setManualError("Adayın kaynak verisi doğrulanamadı. Kayıt uygulanmadan yenilendi.");
+          setManualError(userErrorText("Adayın kaynak verisi doğrulanamadı. Kayıt uygulanmadan yenilendi."));
         } else if (detail.code === "MANUAL_DECISION_CONFLICT") {
-          setManualError("Bu aday daha önce farklı bir manuel kararla uygulanmış.");
+          setManualError(userErrorText("Bu aday daha önce farklı bir manuel kararla uygulanmış."));
         } else if (detail.code === "PUANTAJ_OLUSTU") {
           if (canResolveConflict) {
             closeManualApplyModal();
             await maybeOpenConflictFromDetail(manualTarget.id);
           } else {
-            setManualError("Bu personel ve tarih için puantaj kaydı zaten oluşmuş. Mevcut kayıt değiştirilmedi.");
+            setManualError(userErrorText("Bu personel ve tarih için puantaj kaydı zaten oluşmuş. Mevcut kayıt değiştirilmedi."));
           }
         } else if (detail.code === "PERIOD_LOCKED") {
-          setManualError("Bu dönem mühürlendiği için manuel karar uygulanamaz.");
+          setManualError(userErrorText("Bu dönem mühürlendiği için manuel karar uygulanamaz."));
         } else {
-          setManualError(detail.message);
+          setManualError(userErrorText(detail.message));
         }
         await refreshAll();
       } else {
-        setManualError(detail.message);
+        setManualError(userErrorText(detail.message));
       }
     } finally {
       manualApplyingRef.current = false;
@@ -872,7 +873,7 @@ export function useBildirimPuantajEtkiAdaylari(options: UseBildirimPuantajEtkiAd
       setSuccessMessage("Puantaj etki adayları hazırlandı.");
       await refreshAll();
     } catch (caught) {
-      setGenerateError(getApiErrorDetail(caught, "Puantaj etki adayları hazırlanamadı.").message);
+      setGenerateError(userErrorText(getApiErrorDetail(caught, "Puantaj etki adayları hazırlanamadı.").message));
     } finally {
       generatingRef.current = false;
       setIsGenerating(false);

@@ -1,3 +1,4 @@
+import { userErrorText } from "../../lib/display/user-error";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { shouldPreferDemoApi } from "../../api/api-client";
@@ -439,9 +440,7 @@ export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeade
             void reloadHeaderBildirimler();
           })
           .catch((error) => {
-            setNotificationActionError(
-              error instanceof Error ? error.message : "Bildirim okundu işaretlenemedi."
-            );
+            setNotificationActionError(userErrorText(error instanceof Error ? error.message : "Bildirim okundu işaretlenemedi."));
           });
       }
     } else {
@@ -476,9 +475,7 @@ export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeade
           void reloadHeaderBildirimler();
         })
         .catch((error) => {
-          setNotificationActionError(
-            error instanceof Error ? error.message : "Bildirimler okundu işaretlenemedi."
-          );
+          setNotificationActionError(userErrorText(error instanceof Error ? error.message : "Bildirimler okundu işaretlenemedi."));
         });
     }
 

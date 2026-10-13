@@ -1,3 +1,4 @@
+import { userErrorText } from "../lib/display/user-error";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   approveGenelYoneticiBildirimOnayi,
@@ -56,7 +57,7 @@ export function useGenelYoneticiBildirimOnayi({
     } catch {
       if (requestId === requestIdRef.current) {
         setOzet(null);
-        setError("Genel Yönetici bildirim onayı özeti yüklenemedi.");
+        setError(userErrorText("Genel Yönetici bildirim onayı özeti yüklenemedi."));
       }
     } finally {
       if (requestId === requestIdRef.current) setIsLoading(false);
@@ -99,7 +100,7 @@ export function useGenelYoneticiBildirimOnayi({
       if (detail.status === 409) {
         await refreshOzet();
       } else {
-        setError("Genel Yönetici bildirim onayı tamamlanamadı.");
+        setError(userErrorText("Genel Yönetici bildirim onayı tamamlanamadı."));
       }
     } finally {
       approvingRef.current = false;

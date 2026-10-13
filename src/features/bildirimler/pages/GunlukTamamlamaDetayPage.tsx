@@ -1,3 +1,4 @@
+import { userErrorText } from "../../../lib/display/user-error";
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { fetchGunlukTamamlamaDetail } from "../../../api/bildirimler.api";
@@ -23,7 +24,7 @@ export function GunlukTamamlamaDetayPage() {
   const refetch = useCallback(async () => {
     if (!hasValidId) {
       setIsLoading(false);
-      setErrorMessage("Geçerli bir bildirim özeti ID verilmedi.");
+      setErrorMessage(userErrorText("Geçerli bir bildirim özeti ID verilmedi."));
       setDetail(null);
       return;
     }

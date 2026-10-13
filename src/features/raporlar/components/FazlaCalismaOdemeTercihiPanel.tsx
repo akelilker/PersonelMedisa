@@ -1,3 +1,4 @@
+import { userErrorText } from "../../../lib/display/user-error";
 import { useCallback, useEffect, useState } from "react";
 import {
   fetchFazlaCalismaOdemeTercihi,
@@ -56,7 +57,7 @@ export function FazlaCalismaOdemeTercihiPanel({
       );
       setGerekce(data.gerekce ?? "");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Ödeme tercihi yüklenemedi.");
+      setError(userErrorText(err instanceof Error ? err.message : "Ödeme tercihi yüklenemedi."));
       setRecord(null);
     } finally {
       setLoading(false);
@@ -92,7 +93,7 @@ export function FazlaCalismaOdemeTercihiPanel({
       setGerekce(saved.gerekce ?? "");
       setSuccess("Ödeme tercihi kaydedildi.");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Ödeme tercihi kaydedilemedi.");
+      setError(userErrorText(err instanceof Error ? err.message : "Ödeme tercihi kaydedilemedi."));
     } finally {
       setSaving(false);
     }

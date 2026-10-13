@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import { userErrorText } from "../../src/lib/display/user-error";
 import "@testing-library/jest-dom/vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -122,7 +123,7 @@ describe("S93-E3D cancel dialog behavior", () => {
 
     await waitFor(() =>
       expect(screen.getByTestId("personel-ucret-action-dialog-error")).toHaveTextContent(
-        "Ücret kaydı iptal edilemedi."
+        userErrorText("Ücret kaydı iptal edilemedi.")
       )
     );
     expect(screen.getByTestId("personel-ucret-action-dialog")).toBeVisible();
@@ -164,7 +165,7 @@ describe("S93-E3D cancel dialog behavior", () => {
     fireEvent.change(screen.getByLabelText(/İptal nedeni/i), { target: { value: "ab" } });
     fireEvent.click(screen.getByTestId("personel-bordro-kapsam-action-dialog-confirm"));
 
-    expect(await screen.findByText("İptal nedeni en az 3 karakter olmalıdır.")).toBeVisible();
+    expect(await screen.findByText(userErrorText("İptal nedeni en az 3 karakter olmalıdır."))).toBeVisible();
     expect(cancelPersonelBordroKapsamMock).not.toHaveBeenCalled();
     expect(screen.getByTestId("personel-bordro-kapsam-action-dialog")).toBeVisible();
   });

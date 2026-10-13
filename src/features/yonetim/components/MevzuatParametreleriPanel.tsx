@@ -1,3 +1,4 @@
+import { userErrorText } from "../../../lib/display/user-error";
 import { useEffect, useState, type FormEvent } from "react";
 import {
   cancelMevzuatParametresi,
@@ -97,7 +98,7 @@ export function MevzuatParametreleriPanel({ canManage }: { canManage: boolean })
     try {
       setItems(await fetchMevzuatParametreleri());
     } catch (error) {
-      setErrorMessage(getMevzuatApiErrorMessage(error, "Mevzuat parametreleri yüklenemedi."));
+      setErrorMessage(userErrorText(getMevzuatApiErrorMessage(error, "Mevzuat parametreleri yüklenemedi.")));
     } finally {
       setIsLoading(false);
     }
@@ -128,12 +129,12 @@ export function MevzuatParametreleriPanel({ canManage }: { canManage: boolean })
 
     const kod = form.parametreKodu.trim().toUpperCase();
     if (!kod) {
-      setSubmitErrorMessage("Parametre kodu zorunludur.");
+      setSubmitErrorMessage(userErrorText("Parametre kodu zorunludur."));
       return;
     }
 
     if (!form.gecerlilikBaslangic) {
-      setSubmitErrorMessage("Geçerlilik başlangıç tarihi zorunludur.");
+      setSubmitErrorMessage(userErrorText("Geçerlilik başlangıç tarihi zorunludur."));
       return;
     }
 
@@ -147,14 +148,14 @@ export function MevzuatParametreleriPanel({ canManage }: { canManage: boolean })
     if (form.degerTipi === "SAYISAL") {
       const sayisal = Number.parseFloat(form.sayisalDeger.replace(",", "."));
       if (!Number.isFinite(sayisal)) {
-        setSubmitErrorMessage("Sayısal parametre için geçerli bir değer girilmelidir.");
+        setSubmitErrorMessage(userErrorText("Sayısal parametre için geçerli bir değer girilmelidir."));
         return;
       }
       payload.sayisal_deger = sayisal;
     } else {
       const metin = form.metinDeger.trim();
       if (!metin) {
-        setSubmitErrorMessage("Metin parametresi için değer girilmelidir.");
+        setSubmitErrorMessage(userErrorText("Metin parametresi için değer girilmelidir."));
         return;
       }
       payload.metin_deger = metin;
@@ -181,7 +182,7 @@ export function MevzuatParametreleriPanel({ canManage }: { canManage: boolean })
       closeCreateForm();
       await loadItems();
     } catch (error) {
-      setSubmitErrorMessage(getMevzuatApiErrorMessage(error, "Mevzuat parametresi kaydedilemedi."));
+      setSubmitErrorMessage(userErrorText(getMevzuatApiErrorMessage(error, "Mevzuat parametresi kaydedilemedi.")));
     } finally {
       setIsSubmitting(false);
     }
@@ -220,8 +221,8 @@ export function MevzuatParametreleriPanel({ canManage }: { canManage: boolean })
       await loadItems();
     } catch (error) {
       const message = getMevzuatApiErrorMessage(error, "Mevzuat parametresi iptal edilemedi.");
-      setActionErrorMessage(message);
-      setCancelDialogError(message);
+      setActionErrorMessage(userErrorText(message));
+      setCancelDialogError(userErrorText(message));
     } finally {
       setCancellingId(null);
     }

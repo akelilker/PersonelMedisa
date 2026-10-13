@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import { userErrorText } from "../../src/lib/display/user-error";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { APP_DATA_SCHEMA_VERSION } from "../../src/data/app-data.types";
@@ -211,7 +212,7 @@ describe("S93-E3B cancel dialog hooks", () => {
     });
 
     expect(result.current.pendingCancelSurec).toBeNull();
-    expect(result.current.errorMessage).toContain("Yeniden aktif akışı");
+    expect(result.current.errorMessage).toBe(userErrorText("İşten ayrılma süreci manuel iptal edilemez. Yeniden aktif akışı kullanılmalıdır."));
 
     await act(async () => {
       await result.current.confirmCancelSurec();
@@ -249,7 +250,7 @@ describe("S93-E3B cancel dialog hooks", () => {
     });
 
     expect(result.current.pendingCancelItem).toBeNull();
-    expect(result.current.errorMessage).toContain("yetkin");
+    expect(result.current.errorMessage).toBe(userErrorText("Bu kaydı iptal etmek için yetkin bulunmuyor."));
   });
 
   it("useBildirimler: dialog açar ve confirm tek cancelBildirim çağırır", async () => {

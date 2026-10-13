@@ -1,3 +1,4 @@
+import { userErrorText } from "../../../lib/display/user-error";
 import { useCallback, useEffect, useState } from "react";
 import {
   fetchPuantajOlayKararlariList,
@@ -119,7 +120,7 @@ export function PuantajOlayKararPanel({ personelId, personelLabel, tarih, puanta
     }
     const reason = gerekce.trim();
     if (!reason) {
-      setErrorMessage("Karar gerekçesi zorunludur.");
+      setErrorMessage(userErrorText("Karar gerekçesi zorunludur."));
       return;
     }
     setIsSaving(true);

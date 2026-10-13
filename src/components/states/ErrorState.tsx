@@ -1,3 +1,4 @@
+import { userErrorText } from "../../lib/display/user-error";
 type ErrorStateProps = {
   message: string;
   onRetry?: () => void;
@@ -6,7 +7,7 @@ type ErrorStateProps = {
 export function ErrorState({ message, onRetry }: ErrorStateProps) {
   return (
     <div className="state-card state-error">
-      <p>{message}</p>
+      <p>{userErrorText(message)}</p>
       {onRetry ? (
         <button type="button" className="universal-btn-aux" onClick={onRetry}>
           Tekrar Dene

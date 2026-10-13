@@ -55,6 +55,7 @@ class JsonResponse
         $error = [
             'code' => $code,
             'message' => $message,
+            'user_message' => UserErrorMessages::forError((int) $status, (string) $code),
         ];
         if ($field !== null && $field !== '') {
             $error['field'] = $field;

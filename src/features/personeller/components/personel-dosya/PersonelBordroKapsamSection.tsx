@@ -128,8 +128,8 @@ export function PersonelBordroKapsamSection({
       <span className="personel-puantaj-summary-kicker">Bordro Kapsam</span>
       <p className="personel-puantaj-summary-note">
         {isReadOnlySurface
-          ? "Bordro kapsam kararları burada salt okunur izlenir; yönetim Raporlar → Bordro Hazırlık üzerinden yapılır."
-          : "Personelin tarih aralığında maaş/bordro hesaplama kapsamına dahil veya hariç olduğu kararlar burada yönetilir. Mevcut snapshot satırları değiştirilmez."}
+          ? "Yönetim: Raporlar → Bordro Hazırlık."
+          : "Personelin tarih aralığında maaş/bordro hesaplama kapsamına dahil veya hariç olduğu kararlar burada yönetilir."}
       </p>
 
       <p className="personel-puantaj-summary-note" data-testid="personel-bordro-kapsam-ozet">

@@ -11,6 +11,7 @@ import { useFinans } from "../../../hooks/useFinans";
 import { usePersonelSelectOptions } from "../../../hooks/usePersonelSelectOptions";
 import { formatFinansKalemTuruLabel, formatFinansStateLabel } from "../../../lib/display/enum-display";
 import type { FinansKalem } from "../../../types/finans";
+import { formatDisplayDateOrText } from "../../../lib/display/iso-date-format";
 
 const FINANS_CREATE_FORM_ID = "finans-create-form";
 const FINANS_EDIT_FORM_ID = "finans-edit-form";
@@ -99,7 +100,7 @@ export function FinansPage() {
             onChange={(value) => updateDraft({ donem: value })}
           />
           <FormField
-            label="Kalem Turu"
+            label="Kalem Türü"
             name="finans-filter-kalem"
             placeholder="AVANS, PRİM..."
             value={draft.kalemTuru}
@@ -139,7 +140,7 @@ export function FinansPage() {
               <div>
                 <strong>{formatFinansKalemTuruLabel(item.kalem_turu)}</strong>
                 <p>Personel: {personelLabelById.get(item.personel_id) ?? "—"}</p>
-                <p>Dönem: {item.donem}</p>
+                <p>Dönem: {formatDisplayDateOrText(item.donem)}</p>
                 <p>Tutar: {item.tutar}</p>
                 <p>Durum: {formatFinansStateLabel(item.state)}</p>
               </div>
@@ -246,7 +247,7 @@ export function FinansPage() {
               required
             />
             <FormField
-              label="Kalem Turu"
+              label="Kalem Türü"
               name="finans-create-kalem"
               value={createForm.kalemTuru}
               onChange={(value) => setCreateForm((prev) => ({ ...prev, kalemTuru: value }))}
@@ -318,7 +319,7 @@ export function FinansPage() {
               required
             />
             <FormField
-              label="Kalem Turu"
+              label="Kalem Türü"
               name="finans-edit-kalem"
               value={editForm.kalemTuru}
               onChange={(value) => setEditForm((prev) => ({ ...prev, kalemTuru: value }))}

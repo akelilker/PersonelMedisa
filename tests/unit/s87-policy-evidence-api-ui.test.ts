@@ -75,7 +75,7 @@ describe("S87 policy evidence API/UI contract", () => {
     expect(page).toContain("bordro-politika-detay-bos");
     expect(page).toContain("bordro-politika-detay-degerler-bos");
     expect(page).toContain("handleViewPolitika");
-    expect(page).toContain("Politika detayı (salt okunur)");
+    expect(page).toContain("Politika detayı");
     // Read-only view must not auto-fill the draft form from detail values.
     expect(page).not.toMatch(/setPolicyForm\([^)]*selectedPolitikaDetail/);
     expect(page).not.toMatch(/setPolicyForm\([^)]*degerler/);

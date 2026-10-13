@@ -40,6 +40,7 @@ import type {
   BildirimPuantajEtkiManualKararTuru
 } from "../../../types/bildirim-puantaj-etki-aday";
 import type { BirimAmiriSecenegi } from "../../../types/bildirim";
+import { formatDisplayDateOrText } from "../../../lib/display/iso-date-format";
 
 const APPLY_CONFIRM_WARNING =
   "Bu işlem aday etkisini günlük puantaja uygulayacak ve adayı UYGULANDI durumuna geçirecektir. Mevcut bir puantaj kaydı varsa üzerine yazılmaz.";
@@ -135,7 +136,7 @@ function buildDetailGroups(detail: BildirimPuantajEtkiAdayDetail): Array<{ title
               ? `${detail.etki_miktari}${detail.etki_birimi ? ` ${detail.etki_birimi}` : ""}`
               : "—"
         },
-        { label: "Projection sürümü", value: detail.projection_version ?? "—" }
+        { label: "Öngörü sürümü", value: detail.projection_version ?? "—" }
       ]
     },
     {
@@ -702,7 +703,7 @@ export function BildirimPuantajEtkiAdaylariSection() {
               <tbody>
                 {items.map((item) => (
                   <tr key={item.id} data-testid={`puantaj-etki-aday-row-${item.id}`}>
-                    <td>{item.tarih}</td>
+                    <td>{formatDisplayDateOrText(item.tarih)}</td>
                     <td>{personelLabelById.get(item.personel_id) ?? "Personel"}</td>
                     <td>{item.bildirim_turu}</td>
                     <td>{formatProjectedEtkiLabel(item)}</td>
@@ -741,7 +742,7 @@ export function BildirimPuantajEtkiAdaylariSection() {
             {items.map((item) => (
               <li key={`card-${item.id}`} className="puantaj-etki-aday-card" data-testid={`puantaj-etki-aday-card-${item.id}`}>
                 <div className="puantaj-etki-aday-card-head">
-                  <strong>{item.tarih}</strong>
+                  <strong>{formatDisplayDateOrText(item.tarih)}</strong>
                   <span className={getBildirimPuantajEtkiAdayStateBadgeClass(item.state)}>
                     {formatBildirimPuantajEtkiAdayStateLabel(item.state)}
                   </span>
@@ -910,7 +911,7 @@ export function BildirimPuantajEtkiAdaylariSection() {
               </div>
               <div className="puantaj-etki-detail-row">
                 <dt>Tarih</dt>
-                <dd>{conflictTarget.tarih}</dd>
+                <dd>{formatDisplayDateOrText(conflictTarget.tarih)}</dd>
               </div>
               <div className="puantaj-etki-detail-row">
                 <dt>Mevcut kaynak</dt>
@@ -1014,7 +1015,7 @@ export function BildirimPuantajEtkiAdaylariSection() {
               </div>
               <div className="puantaj-etki-detail-row">
                 <dt>Tarih</dt>
-                <dd>{dismissTarget.tarih}</dd>
+                <dd>{formatDisplayDateOrText(dismissTarget.tarih)}</dd>
               </div>
               <div className="puantaj-etki-detail-row">
                 <dt>Bildirim türü</dt>
@@ -1096,7 +1097,7 @@ export function BildirimPuantajEtkiAdaylariSection() {
               </div>
               <div className="puantaj-etki-detail-row">
                 <dt>Tarih</dt>
-                <dd>{applyTarget.tarih}</dd>
+                <dd>{formatDisplayDateOrText(applyTarget.tarih)}</dd>
               </div>
               <div className="puantaj-etki-detail-row">
                 <dt>Bildirim türü</dt>
@@ -1170,7 +1171,7 @@ export function BildirimPuantajEtkiAdaylariSection() {
               </div>
               <div className="puantaj-etki-detail-row">
                 <dt>Tarih</dt>
-                <dd>{manualTarget.tarih}</dd>
+                <dd>{formatDisplayDateOrText(manualTarget.tarih)}</dd>
               </div>
               <div className="puantaj-etki-detail-row">
                 <dt>Şube</dt>

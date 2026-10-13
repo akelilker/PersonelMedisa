@@ -29,7 +29,7 @@ export function PersonelZimmetEnvanterPanel({
           <p>
             {canCreateZimmet
               ? "Kullanıcıya teslim edilen ekipmanlar ve geri alınmış kayıtlar bu listede izlenir."
-              : "Zimmet kayıtları burada salt okunur izlenir; ekleme ve iade Süreç → Zimmet üzerinden yönetilir."}
+              : "Ekleme ve iade: Süreç → Zimmet."}
           </p>
         </div>
         {canCreateZimmet && onOpenCreateModal ? (

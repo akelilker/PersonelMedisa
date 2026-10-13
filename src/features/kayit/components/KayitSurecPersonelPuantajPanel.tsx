@@ -47,7 +47,7 @@ export function KayitSurecPersonelPuantajPanel({
     return (
       <div className="surec-person-placeholder" data-testid="kayit-surec-puantaj-panel">
         <strong>Puantaj</strong>
-        <p>Bu personel pasif; puantaj ve izin/devamsızlık kaydı eklenmez. Geçmiş kayıtlar salt okunur kalır.</p>
+        <p>Bu personel pasif; puantaj ve izin/devamsızlık kaydı eklenmez.</p>
       </div>
     );
   }

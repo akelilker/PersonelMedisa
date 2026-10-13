@@ -243,7 +243,7 @@ export function KullaniciYetkiPanel(props: KullaniciYetkiPanelProps) {
       ) : null}
 
       {okuma && semaHazir && !props.canManage && !kendi ? (
-        <p className="yonetim-hint">Bu hesabın yetkisini değiştirmek için yetki yönetimi izni gerekir. Liste salt okunur.</p>
+        <p className="yonetim-hint">Bu hesabın yetkisini değiştirmek için yetki yönetimi izni gerekir.</p>
       ) : null}
 
       {ozet ? (

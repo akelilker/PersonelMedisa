@@ -258,7 +258,7 @@ export function PersonelImportHistoryModal({ open, onClose }: PersonelImportHist
                 <strong>Kaynak SHA:</strong> {detail.source_sha256}
               </p>
               <p>
-                <strong>Manifest:</strong> {detail.manifest_hash}
+                <strong>Dosya doğrulama kodu:</strong> {detail.manifest_hash}
               </p>
               <p>
                 <strong>Idempotency:</strong> {detail.idempotency_fingerprint}
@@ -432,7 +432,7 @@ export function PersonelImportHistoryModal({ open, onClose }: PersonelImportHist
                 <th>Toplam</th>
                 <th>Oluşturulan</th>
                 <th>Süre</th>
-                <th>Manifest</th>
+                <th>Dosya doğrulama kodu</th>
                 <th>Detay</th>
               </tr>
             </thead>

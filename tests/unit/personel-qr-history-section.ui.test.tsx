@@ -61,7 +61,7 @@ describe("PersonelQrHistorySection mobile card list", () => {
     const cards = await screen.findByTestId("personel-qr-history-cards");
     expect(cards).toBeInTheDocument();
     expect(screen.getByTestId("personel-qr-history-card-2026-09-19")).toBeInTheDocument();
-    expect(screen.getAllByText("2026-09-19").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("19/09/2026").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByRole("link", { name: "Günlük puantaj" }).length).toBe(2);
     const card = screen.getByTestId("personel-qr-history-card-2026-09-19");
     expect(card).toHaveTextContent("08:12 · 17:05");

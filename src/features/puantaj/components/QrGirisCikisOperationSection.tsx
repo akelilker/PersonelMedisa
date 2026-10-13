@@ -8,6 +8,7 @@ import { usePersonelSelectOptions } from "../../../hooks/usePersonelSelectOption
 import { downloadReportCsv } from "../../../reports/export-report";
 import { useManagerQrAttendance } from "../hooks/useManagerQrAttendance";
 import { formatQrTime, qrAttendanceAnomalyDisplay, qrAttendanceStatus, qrReadErrorMessage, formatManagerLocationEvents } from "../qr-read-utils";
+import { formatDisplayDateOrText } from "../../../lib/display/iso-date-format";
 
 export function QrGirisCikisOperationSection() {
   const { hasPermission } = useRoleAccess();
@@ -58,7 +59,6 @@ export function QrGirisCikisOperationSection() {
         <div>
           <p className="puantaj-section-eyebrow">Günlük operasyon / kontrol</p>
           <h2>QR Giriş / Çıkış</h2>
-          <p>QR hareketleri salt okunur kanıt görünümüdür; puantaj adayı kararını değiştirmez.</p>
         </div>
         {canOpenKiosk ? (
           <Link className="universal-btn-aux" to="/qr-kiosk" data-testid="puantaj-qr-kiosk-link">
@@ -151,7 +151,7 @@ export function QrGirisCikisOperationSection() {
               {filteredItems.map((item) => (
                 <tr key={`${item.personel_id}-${item.date_from}`}>
                   <td>{item.ad_soyad}</td><td>{item.sicil_no ?? "—"}</td><td>{item.sube || item.sube_id}</td>
-                  <td>{item.date_from === item.date_to ? item.date_from : `${item.date_from} – ${item.date_to}`}</td>
+                  <td>{item.date_from === item.date_to ? formatDisplayDateOrText(item.date_from) : `${formatDisplayDateOrText(item.date_from)} – ${formatDisplayDateOrText(item.date_to)}`}</td>
                   <td>{formatQrTime(item.first_entry)}</td><td>{formatQrTime(item.last_exit)}</td>
                   <td>{formatQrTime(item.last_movement)} {item.last_movement_type ? `(${item.last_movement_type})` : ""}</td>
                   <td>{qrAttendanceStatus(item)}</td>

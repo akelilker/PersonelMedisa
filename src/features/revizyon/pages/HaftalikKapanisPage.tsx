@@ -17,6 +17,7 @@ import {
   formatRevizyonDeger,
   revizyonUserMessage
 } from "../revizyon-display";
+import { formatDisplayDateOrText, formatIsoDatesInText } from "../../../lib/display/iso-date-format";
 
 type KaynakOption = Awaited<ReturnType<typeof fetchRevizyonKaynaklar>>[number];
 
@@ -128,8 +129,7 @@ export function HaftalikKapanisPage() {
         <h2>Haftalık Kapanış</h2>
       </div>
       <p>
-        Kapalı hafta kapanış kayıtları korunur. Revizyon talepleri ve düzeltme kayıtları burada yönetilir;
-        rapor/bordro motoru otomatik yeniden hesaplanmaz.
+        Revizyon talepleri ve düzeltme kayıtları burada yönetilir.
       </p>
 
       {!canViewRevizyon ? (
@@ -220,7 +220,7 @@ export function HaftalikKapanisPage() {
                   setHaftaBaslangic(monday);
                 }}
               />
-              <p className="form-hint">Hafta bitişi: {haftaBitis || "—"}</p>
+              <p className="form-hint">Hafta bitişi: {formatDisplayDateOrText(haftaBitis, "—")}</p>
 
               {isLoadingKaynak ? <LoadingState label="Kaynak satırları yükleniyor..." /> : null}
               {errorMessage ? <ErrorState message={errorMessage} onRetry={() => void loadKaynaklar()} /> : null}
@@ -247,8 +247,8 @@ export function HaftalikKapanisPage() {
                         key={`${kaynak.kaynak_tipi}:${kaynak.kaynak_id}`}
                         data-testid={`hk-kaynak-row-${kaynak.kaynak_tipi}-${kaynak.kaynak_id}`}
                       >
-                        <td>{kaynak.etkilenen_tarih}</td>
-                        <td>{kaynak.goruntuleme_etiketi}</td>
+                        <td>{formatDisplayDateOrText(kaynak.etkilenen_tarih)}</td>
+                        <td>{formatIsoDatesInText(kaynak.goruntuleme_etiketi)}</td>
                         <td>{formatRevizyonDeger(kaynak.mevcut_deger)}</td>
                         <td>
                           <Link
@@ -276,10 +276,6 @@ export function HaftalikKapanisPage() {
         </>
       )}
 
-      <p className="form-hint hk-overlay-uyari" data-testid="hk-overlay-uyari">
-        Aktif düzeltme kaydı görünürlüğü, rapor satırlarında gerçek katman etkisi anlamına gelmez. Ham
-        kapanış kaydı değişmez.
-      </p>
     </section>
   );
 }

@@ -1,18 +1,24 @@
 import type { RevizyonCorrectionTipi } from "../../types/revizyon-correction";
 import type { RevizyonJsonDeger, RevizyonTipi } from "../../types/revizyon-talebi";
+import { formatDisplayDateOrText } from "../../lib/display/iso-date-format";
+
+const REVIZYON_GIZLI_ALANLAR = new Set(["server_owned"]);
 
 export function formatRevizyonDeger(value: RevizyonJsonDeger | undefined | null): string {
   if (value === null || value === undefined) {
     return "—";
   }
-  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+  if (typeof value === "string") {
+    return formatDisplayDateOrText(value, "—");
+  }
+  if (typeof value === "number" || typeof value === "boolean") {
     return String(value);
   }
   if (Array.isArray(value)) {
     return value.map((item) => formatRevizyonDeger(item)).join(", ");
   }
 
-  const entries = Object.entries(value);
+  const entries = Object.entries(value).filter(([key]) => !REVIZYON_GIZLI_ALANLAR.has(key));
   if (entries.length === 0) {
     return "—";
   }

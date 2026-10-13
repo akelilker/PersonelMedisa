@@ -17,6 +17,7 @@ import {
   revizyonUserMessage
 } from "../revizyon-display";
 import { formatDisplayDateTime } from "../../../lib/display/iso-date-format";
+import { formatDisplayDateOrText } from "../../../lib/display/iso-date-format";
 
 type Gorunum = "talepler" | "onay" | "corrections";
 
@@ -179,7 +180,7 @@ export function RevizyonMerkeziPage() {
                   <td>
                     {talep.hafta_baslangic} → {talep.hafta_bitis}
                   </td>
-                  <td>{talep.etkilenen_tarih}</td>
+                  <td>{formatDisplayDateOrText(talep.etkilenen_tarih)}</td>
                   <td>{formatRevizyonTipiLabel(talep.revizyon_tipi)}</td>
                   <td>
                     <span className="status-badge">{formatRevizyonDurumLabel(talep.durum)}</span>
@@ -242,7 +243,7 @@ export function RevizyonMerkeziPage() {
                   <td>
                     {correction.hafta_baslangic} → {correction.hafta_bitis}
                   </td>
-                  <td>{correction.etkilenen_tarih}</td>
+                  <td>{formatDisplayDateOrText(correction.etkilenen_tarih)}</td>
                   <td>{formatRevizyonCorrectionTipiLabel(correction.correction_tipi)}</td>
                   <td>{formatRevizyonDeger(correction.onceki_deger as never)}</td>
                   <td>{formatRevizyonDeger(correction.yeni_deger as never)}</td>

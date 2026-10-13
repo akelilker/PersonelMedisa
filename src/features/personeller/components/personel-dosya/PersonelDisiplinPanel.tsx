@@ -85,15 +85,6 @@ export function PersonelDisiplinPanel({
 
   return (
     <div className="personel-dosya-sections" data-testid="personel-disiplin-panel">
-      <DossierSection
-        title="Disiplin Özeti"
-        description="Ceza ve disiplin kayıtları salt okunur izlenir; yeni kayıt kayıt ve süreç ekranından veya finans modülünden yönetilir."
-      >
-        <DossierRecord
-          label="Kart Davranışı"
-          value="Bu sekmeden ceza veya disiplin kaydı oluşturulmaz."
-        />
-      </DossierSection>
 
       <DossierSection
         title="Finans CEZA Kayıtları"

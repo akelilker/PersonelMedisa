@@ -108,7 +108,7 @@ const INITIAL_FILTERS: FilterState = {
 
 const TAB_LABELS: Record<TabKey, string> = {
   "veri-hazirlik": "Veri Hazırlık Durumu",
-  preflight: "Preflight",
+  preflight: "Ön kontrol",
   politika: "Şirket Politikası",
   devir: "Devir Verileri",
   "on-izleme": "Bordro Ön İzleme",
@@ -591,7 +591,7 @@ export function BordroHazirlikMerkeziPage() {
     <section className="yonetim-page donem-kapanis-page" data-testid="bordro-hazirlik-merkezi">
       <header className="yonetim-page-header">
         <h2>Bordro Hazırlık Merkezi</h2>
-        <p>İş verisi hazırlık durumu, mevzuat/politika ayrımı, devir, preflight ve bordro ön izleme.</p>
+        <p>İş verisi hazırlık durumu, mevzuat/politika ayrımı, devir, ön kontrol ve bordro ön izleme.</p>
       </header>
 
       <form
@@ -676,7 +676,7 @@ export function BordroHazirlikMerkeziPage() {
               <p className="personel-puantaj-summary-note" data-testid="bordro-operasyonel-period-state">
                 Dönem durumu: {formatPeriodStateLabel(operasyonel.period_state)}
                 {operasyonel.read_only
-                  ? " · Salt okunur (mühürlü / yeniden açma bekliyor)"
+                  ? " · Mühürlü (yeniden açma bekliyor)"
                   : " · Düzeltme yolları açık"}
                 {" · "}Kesim tarihi: {operasyonel.as_of}
               </p>
@@ -792,7 +792,7 @@ export function BordroHazirlikMerkeziPage() {
               <p data-testid="bordro-hazirlik-hesaplanabilir">{preflight.hesaplanabilir_mi ? "Evet" : "Hayır"}</p>
             </div>
             <div>
-              <strong>Blocker</strong>
+              <strong>Engel</strong>
               <p data-testid="bordro-hazirlik-blocker-count">{preflight.blocker_count}</p>
             </div>
             <div>
@@ -1109,7 +1109,7 @@ export function BordroHazirlikMerkeziPage() {
           </table>
 
           <section className="kapanis-issue-section" data-testid="bordro-politika-detay">
-            <h3>Politika detayı (salt okunur)</h3>
+            <h3>Politika detayı</h3>
             {politikaDetailLoading ? (
               <LoadingState label="Politika detayı yükleniyor..." />
             ) : null}
@@ -1288,7 +1288,7 @@ export function BordroHazirlikMerkeziPage() {
               <p>{onIzleme.toplam_personel}</p>
             </div>
             <div>
-              <strong>Blocker</strong>
+              <strong>Engel</strong>
               <p>{onIzleme.blocker_bulunan}</p>
             </div>
             {canViewFinance ? (
@@ -1343,7 +1343,7 @@ export function BordroHazirlikMerkeziPage() {
                 disabled={kesinlestirBlockedByPreflight || isKesinlestirSubmitting}
                 title={
                   kesinlestirBlockedByPreflight
-                    ? "Kesinleştirme engelli: preflight blocker’ları (operasyonel açık kayıtlar dahil) giderilmelidir."
+                    ? "Kesinleştirme engelli: ön kontrol engelleri (operasyonel açık kayıtlar dahil) giderilmelidir."
                     : undefined
                 }
                 onClick={openKesinlestirDialog}
@@ -1480,7 +1480,7 @@ export function BordroHazirlikMerkeziPage() {
             <div className="form-field-grid">
               <div className="form-section">
                 <label className="form-label" htmlFor="fm-snapshot-id-input">
-                  Snapshot ID
+                  Sabit kayıt ID
                 </label>
                 <input
                   id="fm-snapshot-id-input"
@@ -1496,7 +1496,7 @@ export function BordroHazirlikMerkeziPage() {
             </div>
             <div className="form-actions-row">
               <button type="submit" className="universal-btn-save" data-testid="fm-snapshot-yukle">
-                Snapshot yükle
+                Sabit kayıt yükle
               </button>
             </div>
           </form>

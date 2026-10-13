@@ -46,7 +46,7 @@ export function KayitSurecPersonelFinansPanel({
         />
         {isKalemLocked ? (
           <FormField
-            label="Kalem Turu"
+            label="Kalem Türü"
             name={`${fieldNamePrefix}-kalem-display`}
             value="CEZA"
             onChange={() => undefined}
@@ -54,7 +54,7 @@ export function KayitSurecPersonelFinansPanel({
           />
         ) : (
           <FormField
-            label="Kalem Turu"
+            label="Kalem Türü"
             name={`${fieldNamePrefix}-kalem`}
             value={fields.kalemTuru}
             onChange={(value) => setFields((prev) => ({ ...prev, kalemTuru: value }))}

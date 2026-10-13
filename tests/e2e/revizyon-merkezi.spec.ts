@@ -542,7 +542,7 @@ test.describe("S80 Revizyon Merkezi final UI kabul", () => {
   test("server-owned onceki_deger: UI canonical + sahte payload reddedilir", async ({ page }) => {
     await loginAsMockRole(page, "BIRIM_AMIRI");
     await openCreateFromKaynakRow(page, "1");
-    await expect(page.getByTestId("revizyon-onceki-deger-readonly")).toContainText("server_owned");
+    await expect(page.getByTestId("revizyon-onceki-deger-readonly")).not.toContainText("server_owned");
 
     const forged = await page.evaluate(async () => {
       const keys = ["medisa.auth.session.v1", "medisa_auth_session"];

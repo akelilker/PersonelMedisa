@@ -120,7 +120,7 @@ export function FazlaCalismaOdemeTercihiPanel({
     >
       <div className="kapanis-ozet-grid">
         <div>
-          <strong>Snapshot</strong>
+          <strong>Sabit kayıt</strong>
           <p data-testid="fm-odeme-tercihi-snapshot-id">{snapshotId}</p>
         </div>
         {displayPersonelAdi !== null ? (

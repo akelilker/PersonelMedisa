@@ -529,10 +529,10 @@ export function PersonelBelgelerPanel({
       {showBelgeDurumu ? (
         <DossierSection
           title="Belge Durumu"
-          description="Personel dosyasındaki zorunlu belgeler salt okunur izlenir; düzenleme kayıt ve süreç ekranından yapılır."
+          description="Düzenleme: Kayıt ve Süreç ekranı."
         >
           {isPasif ? (
-            <DossierRecord label="Durum" value="Bu personel pasif; belge durumu salt okunur gösterilir." />
+            <DossierRecord label="Durum" value="Bu personel pasif." />
           ) : null}
 
           {isLoading ? <DossierRecord label="Durum" value="Belgeler yükleniyor..." /> : null}
@@ -564,7 +564,7 @@ export function PersonelBelgelerPanel({
         description={
           allowMutations
             ? "Eğitim, sertifika ve resmi belge kayıtları bu bölümde yönetilir."
-            : "Belge kayıtları burada salt okunur izlenir; ekleme ve değişiklik Süreç → Belgeler üzerinden yapılır."
+            : "Ekleme ve değişiklik: Süreç → Belgeler."
         }
       >
         <div className="personel-belge-panel-head">
@@ -593,7 +593,7 @@ export function PersonelBelgelerPanel({
             label="Yetki"
             value={
               !allowMutations
-                ? "Belge kayıtları Personel Kartında salt okunur; düzenleme Süreç → Belgeler üzerinden yapılır."
+                ? "Düzenleme: Süreç → Belgeler."
                 : "Bu personel için belge düzenleme yetkiniz yok."
             }
           />
@@ -715,7 +715,7 @@ export function PersonelBelgelerPanel({
       {showIptalBelgeKayitlariSection ? (
         <DossierSection
           title="İptal edilen belge kayıtları"
-          description="İptal edilmiş belge kayıtları salt okunur geçmiş olarak gösterilir."
+          description="İptal edilmiş belge kayıtları."
         >
           <div className="personel-belge-kayit-table-wrap" data-testid="personel-belge-kayit-iptal-list">
             <table className="personel-belge-kayit-table">

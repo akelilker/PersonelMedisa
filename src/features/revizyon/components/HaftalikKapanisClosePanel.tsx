@@ -12,6 +12,7 @@ import {
 import { useAuth } from "../../../state/auth.store";
 import type { HaftalikKapanisPayload, HaftalikKapanisSonuc } from "../../../types/haftalik-kapanis";
 import type { IdOption } from "../../../types/referans";
+import { formatDisplayDateOrText } from "../../../lib/display/iso-date-format";
 
 type CloseScopeMode = "sube" | "departman";
 
@@ -248,10 +249,10 @@ export function HaftalikKapanisClosePanel() {
 
   const confirmDescription = [
     `Hafta başlangıcı: ${closeHaftaBaslangic}.`,
-    `Hafta bitişi: ${weekEnd ?? "—"}.`,
+    `Hafta bitişi: ${formatDisplayDateOrText(weekEnd, "—")}.`,
     `Kapsam: ${selectedDepartmanLabel}.`,
     activeSubeLabel ? `Aktif şube: ${activeSubeLabel}.` : null,
-    "Bu işlem geri alınamaz; ham kapanış snapshot'ı korunur. Sonraki düzeltmeler Revizyon Merkezi üzerinden yürür."
+    "Bu işlem geri alınamaz; ham kapanış sabit kaydı korunur. Sonraki düzeltmeler Revizyon Merkezi üzerinden yürür."
   ]
     .filter(Boolean)
     .join(" ");
@@ -297,7 +298,7 @@ export function HaftalikKapanisClosePanel() {
         </p>
       ) : null}
       <p className="form-hint" data-testid="hk-close-hafta-bitis">
-        Hafta bitişi: {weekEnd ?? "—"}
+        Hafta bitişi: {formatDisplayDateOrText(weekEnd, "—")}
       </p>
 
       <fieldset className="hk-close-scope-fieldset">

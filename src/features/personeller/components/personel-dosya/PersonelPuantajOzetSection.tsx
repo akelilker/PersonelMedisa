@@ -36,9 +36,10 @@ import {
   buildRevizyonTalebiCreatePath,
   formatRevizyonCorrectionTipiLabel
 } from "../../../revizyon/revizyon-display";
+import { formatDisplayDateOrText } from "../../../../lib/display/iso-date-format";
 
 const BORDRO_ADAY_OZETI_HENUZ_OLUSMADI =
-  "Bu dönem için immutable SGK snapshot sonucu henüz oluşmadı.";
+  "Bu dönem için kesinleşmiş SGK sonucu henüz oluşmadı.";
 const BORDRO_ADAY_KALEM_GORMUNUYOR = "Bu ay bordroya yansıyacak aday kalem görünmüyor.";
 
 function hasMesaiFinansKaydi(kayitlar: { kalem_turu: string; tutar: number; state?: string }[]): boolean {
@@ -169,7 +170,7 @@ function PersonelRevizyonCorrectionPanel({
   return (
     <DossierSection
       title="Revizyon ve Düzeltme Kayıtları"
-      description="Kapalı dönem düzeltme talepleri ve üretilen düzeltme kaydı etkileri. Ham kapanış kaydı değişmez; düzeltme kaydı görünürlüğü rapor motoru katman etkisi değildir."
+      description="Kapalı dönem düzeltme talepleri ve üretilen düzeltme kaydı etkileri."
     >
       {!canViewRevizyon ? (
         <DossierRecord label="Yetki" value="Revizyon kayıtlarını görüntüleme yetkiniz yok." />
@@ -363,9 +364,6 @@ export function PersonelPuantajOzetSection({
         <strong className="personel-puantaj-summary-value" data-testid="personel-sgk-prim-gun">
           {sgkPrimGunu}
         </strong>
-        <p className="personel-puantaj-summary-note">
-          Immutable backend snapshot sonucudur; frontend SGK hesabı veya tahmini üretmez.
-        </p>
       </section>
 
       {devamPrimiOzeti ? (
@@ -453,12 +451,11 @@ export function PersonelPuantajOzetSection({
               </div>
             </div>
             <p className="personel-puantaj-summary-note">
-              Snapshot #{puantajEksikGunOzeti.snapshotId} rev {puantajEksikGunOzeti.snapshotRevisionNo};
-              kaynak süreç ve belgeler backend owner tarafından mühürlenmiştir.
+              Kaynak süreç ve belgeler mühürlenmiştir.
             </p>
             {puantajEksikGunOzeti.blockerEtiketleri.length > 0 ? (
               <p className="personel-devam-primi-scope-note">
-                Blocker: {puantajEksikGunOzeti.blockerEtiketleri.join(", ")}
+                Engel: {puantajEksikGunOzeti.blockerEtiketleri.join(", ")}
               </p>
             ) : null}
           </>
@@ -540,7 +537,7 @@ export function PersonelPuantajOzetSection({
         title="Aylık Puantaj Özeti"
         description="Bu dosya SGK prim günü, eksik gün ve hesaplama modunu tek bakışta gösterir."
       >
-        <DossierRecord label="Dönem" value={donem} />
+        <DossierRecord label="Dönem" value={formatDisplayDateOrText(donem)} />
         <DossierRecord label="SGK Prim Günü" value={sgkPrimGunu} />
         <DossierRecord label="Eksik Gün" value={eksikGun} />
         <DossierRecord label="Eksik Gün Nedeni" value={eksikGunNedeni} />
@@ -548,7 +545,7 @@ export function PersonelPuantajOzetSection({
         <DossierRecord label="Hesaplama Modu" value={hesaplamaModu} />
         {puantajEksikGunOzeti ? (
           <>
-            <DossierRecord label="Authoritative Durum" value={puantajEksikGunOzeti.durumLabel} />
+            <DossierRecord label="Kesin Durum" value={puantajEksikGunOzeti.durumLabel} />
             <DossierRecord
               label="Kaynak Süreç / Puantaj / Belge"
               value={`${puantajEksikGunOzeti.kaynakSurecIdleri.join(", ") || "-"} / ${puantajEksikGunOzeti.kaynakPuantajIdleri.join(", ") || "-"} / ${puantajEksikGunOzeti.kaynakBelgeIdleri.join(", ") || "-"}`}
@@ -562,16 +559,9 @@ export function PersonelPuantajOzetSection({
               value={puantajEksikGunOzeti.sgkOdenekDurumuLabel ?? "-"}
             />
             <DossierRecord
-              label="Blocker"
+              label="Engel"
               value={puantajEksikGunOzeti.blockerEtiketleri.join(", ") || "Yok"}
             />
-            <DossierRecord
-              label="Snapshot / Revision"
-              value={puantajEksikGunOzeti.snapshotId == null ? "-" : `#${puantajEksikGunOzeti.snapshotId} / ${puantajEksikGunOzeti.snapshotRevisionNo}`}
-            />
-            <DossierRecord label="SGK Hesap Hash" value={puantajEksikGunOzeti.sgkHesapHash ?? "-"} />
-            <DossierRecord label="Katalog Sürümü" value={puantajEksikGunOzeti.katalogSurumu ?? "-"} />
-            <DossierRecord label="Mevzuat Manifest Hash" value={puantajEksikGunOzeti.kaynakManifestHash ?? "-"} />
           </>
         ) : null}
       </DossierSection>

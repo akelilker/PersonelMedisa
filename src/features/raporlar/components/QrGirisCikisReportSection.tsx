@@ -14,6 +14,7 @@ import {
   qrAttendanceStatus,
   qrReadErrorMessage
 } from "../../puantaj/qr-read-utils";
+import { formatDisplayDateOrText } from "../../../lib/display/iso-date-format";
 
 export function QrGirisCikisReportSection() {
   const { hasPermission } = useRoleAccess();
@@ -132,7 +133,7 @@ export function QrGirisCikisReportSection() {
                   <td>{item.ad_soyad}</td>
                   <td>{item.sicil_no ?? "—"}</td>
                   <td>{item.sube || item.sube_id}</td>
-                  <td>{item.date_from}</td>
+                  <td>{formatDisplayDateOrText(item.date_from)}</td>
                   <td>{formatQrTime(item.first_entry)}</td>
                   <td>{formatQrTime(item.last_exit)}</td>
                   <td>{formatQrTime(item.last_movement)} {item.last_movement_type ? `(${item.last_movement_type})` : ""}</td>

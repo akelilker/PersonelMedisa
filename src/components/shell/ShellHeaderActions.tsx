@@ -866,7 +866,7 @@ export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeade
                 navigateTo("/yonetim-paneli?tab=subeler");
               }}
             >
-              Şube Yönetimi
+              Şirket ve Şube Yönetimi
             </button>
           ) : null}
           {canViewYonetimPanel && canViewMevzuat ? (

@@ -126,7 +126,7 @@ test.describe("S88 resmi tatil takvimi", () => {
     await page.getByTestId("rtt-cancel-submit").click();
     await expect(page.getByTestId("rtt-action-message")).toContainText(/iptal/i);
 
-    await expect(page.getByTestId("rtt-preview-readonly")).toContainText(/read-only/i);
+    await expect(page.getByTestId("rtt-preview-readonly")).toHaveCount(0);
     await expect(page.getByTestId("rtt-card-policy")).toBeVisible();
   });
 });

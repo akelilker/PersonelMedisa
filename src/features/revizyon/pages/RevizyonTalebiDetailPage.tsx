@@ -26,6 +26,7 @@ import {
   revizyonUserMessage
 } from "../revizyon-display";
 import { formatDisplayDateTime } from "../../../lib/display/iso-date-format";
+import { formatDisplayDateOrText } from "../../../lib/display/iso-date-format";
 
 type PendingRevizyonAction =
   | { type: "approve" }
@@ -268,7 +269,7 @@ export function RevizyonTalebiDetailPage() {
         </div>
         <div>
           <dt>Etkilenen tarih</dt>
-          <dd>{talep.etkilenen_tarih}</dd>
+          <dd>{formatDisplayDateOrText(talep.etkilenen_tarih)}</dd>
         </div>
         <div>
           <dt>Kaynak türü</dt>

@@ -63,7 +63,7 @@ test.describe("S77-C maas hesaplama merkezi", () => {
     await expect(page.getByTestId(/^maas-hesaplama-snapshot-\d+$/).first()).toBeVisible();
     await page.getByTestId(/^maas-hesaplama-snapshot-\d+$/).first().click();
     await expect(page.getByTestId("maas-hesaplama-snapshot-detail")).toBeVisible();
-    await expect(page.getByTestId("maas-hesaplama-hash-dogrulama")).toContainText("OK");
+    await expect(page.getByTestId("maas-hesaplama-hash-dogrulama")).toContainText("Doğru");
     await expect(page.getByTestId("maas-hesaplama-calc-preflight")).toBeVisible();
     await expect(page.getByTestId("maas-hesaplama-calc-ready")).toContainText("Hayır");
     await expect(page.getByTestId("maas-hesaplama-calc-issue-BUSINESS_POLICY_REQUIRED")).toBeVisible();

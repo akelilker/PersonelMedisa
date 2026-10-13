@@ -59,3 +59,9 @@ Bu dosya, kullanıcının onayladığı kalıcı görsel kararları her biri tek
 | Personel Kartı | İşlemler düğmesi | Yetkiyle yalnız tek işlem varsa açılır menü yoktur; süreç oluşturma yetkisinde düğme "Süreçte İşlem Yap" etiketiyle o işlemi doğrudan açar. Birden fazla işlem varsa mevcut "İşlemler" menüsü kalır. (t876) | 2026-10-13 |
 | Personel Kartı | Eksik bilgi uyarısı satırı | Başlığın altında tek satır (en fazla 28px), üst/alt boşluk yok; uzun liste tek satırda kısaltılır. Alan adları tıklanınca doğru sekme ve kırmızı alan odağı (t869) korunur. (t876) | 2026-10-13 |
 | Personel Kartı | Masaüstü fotoğraf | Masaüstünde kartta personel fotoğrafı yuvarlak gösterilir; fotoğraf yoksa baş harfler. Mobil kart düzeni aynı kalır. Yeni yükleme akışı eklenmez. (t876) | 2026-10-13 |
+| Kullanıcı Paneli — alt ekranlar | Ev simgesi hover'da yerinde kalır | Hover, odak ve basılı durumda konum değişmez; simge çerçevesiz ve arka plansız; açıklama düzeni kaydırmaz | 2026-10-13 |
+| Kullanıcı Paneli — alt ekranlar | Geri satırı | Kırmızı başlığın hemen altında, sola yaslı "← Kullanıcı Paneli"; QR okutma ekranında yok | 2026-10-13 |
+| Kullanıcı Paneli — ana ekran (masaüstü) | Alt simge satırı | Simgeler ve etiketleri tam görünür; çerçevesiz, simge üstte etiket altta, yatayda ortalı ve eşit aralıklı | 2026-10-13 |
+| Kullanıcı Paneli — ana ekran (masaüstü) | Giriş ve Çıkış | Dikeyde biraz daha kısa, yatayda yaklaşık iki kat geniş; iki düğme birlikte yatayda ortada; renk dili aynı | 2026-10-13 |
+| Kullanıcı Paneli — ana ekran (masaüstü) | Kullanıcı fotoğrafı | 88px yuvarlak; sağ kenar aynı yerde. Bilgi bloğu ve gg/aa/yyyy değişmez | 2026-10-13 |
+| Kullanıcı Paneli — başlık çerçevesi (masaüstü) | Çerçeve 4px kısa, logo dikey ortada | PERSONEL YÖNETİM SİSTEMİ ve KULLANICI PANELİ yazıları yerinde kalır; logo başlıktan bağımsız ortalanır. Mobil başlık değişmez | 2026-10-13 |

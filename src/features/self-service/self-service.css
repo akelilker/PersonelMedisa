@@ -649,16 +649,11 @@ body.app-personel-shell.app-home-route .personel-mobile-shell.self-home-page > .
 }
 
 @media (min-width: 641px) {
+  /* Alt dock etiketleri masaüstünde her zaman görünür (kesilme/gizlenme yok);
+     simgeler çerçevesiz/arka plansız, simge üstte etiket altta kalır. */
   .pm-self-dock__label {
-    opacity: 0;
-    transform: translateY(4px);
-    transition: opacity 0.18s ease, transform 0.18s ease;
-  }
-
-  .pm-self-dock__item:hover .pm-self-dock__label,
-  .pm-self-dock__item:focus-visible .pm-self-dock__label {
     opacity: 1;
-    transform: translateY(0);
+    transform: none;
   }
 
   .pm-self-dock__item:hover .pm-self-dock__icon-wrap,
@@ -768,15 +763,16 @@ body.app-personel-shell.app-home-route .personel-mobile-shell.self-home-page > .
   padding: 0 4px 2px;
 }
 
-@media (min-width: 720px) {
+@media (min-width: 721px) {
   .self-home-main {
-    flex-direction: row;
-    align-items: stretch;
-    gap: var(--space-3);
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-2);
   }
 
   .self-home-main > .pm-section {
-    flex: 0 0 min(42%, 320px);
+    flex: 0 0 auto;
+    width: min(100%, 400px);
     display: flex;
     align-items: stretch;
   }
@@ -784,8 +780,24 @@ body.app-personel-shell.app-home-route .personel-mobile-shell.self-home-page > .
   .self-home-page .pm-attendance-grid {
     width: 100%;
     max-width: none;
-    height: 100%;
+    height: auto;
     align-content: stretch;
+  }
+
+  /* GİRİŞ/ÇIKIŞ: dikey ~%15-20 daha kısa, yatay ~2 kat; grup yatayda ortalanır. */
+  .self-home-page .pm-attendance-box {
+    min-height: 58px;
+  }
+
+  .self-home-page .pm-box-main-action {
+    min-height: 58px;
+    padding: 6px 12px;
+  }
+
+  /* Kullanıcı fotoğrafı ~%15 küçülür (104px -> 88px); yuvarlak, sağ kenar aynı. */
+  .pm-self-identity--home .pm-self-portrait {
+    width: 88px;
+    height: 88px;
   }
 }
 

@@ -87,6 +87,13 @@ function resolveBackBar(
   if (/^\/bildirimler\/\d+$/.test(pathname)) {
     return { to: "/bildirimler", label: "Günlük kayıt listesine dön" };
   }
+  // Kullanıcı Paneli alt ekranları: kırmızı header gradyanının bittiği yerin
+  // hemen altında sola yaslı "← Kullanıcı Paneli" geri satırı (dondurulmuş
+  // universal-back-bar kuralı). Kamera (/self/qr-okut) geçici aksiyon modalıdır;
+  // geri satırı almaz.
+  if (pathname.startsWith("/self/") && pathname !== "/self/qr-okut") {
+    return { to: "/self", label: "Kullanıcı Paneli" };
+  }
   return null;
 }
 

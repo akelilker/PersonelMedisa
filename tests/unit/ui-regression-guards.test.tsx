@@ -793,3 +793,18 @@ describe("X) Personel Kartı ve Belge Takip (t876)", () => {
     expect(css).toMatch(/@media \(min-width: 721px\)[\s\S]*\.personel-dosya-hero-photo\s*\{[^}]*display:\s*flex/);
   });
 });
+
+describe("Z) Personel Kartı hero fotoğrafı masaüstünde sağda, ~72px; mobilde gizli (t889)", () => {
+  it("fotoğraf ad satırının içinde değil, hero'nun son çocuğu; CSS sağ sütun + dikey orta", () => {
+    const hero = readSrc("src/features/personeller/components/personel-dosya/PersonelDosyaHero.tsx");
+    const identity = hero.slice(hero.indexOf('className="personel-dosya-hero-identity"'), hero.indexOf("personel-dosya-hero-chips"));
+    expect(identity).not.toContain("PersonelDosyaHeroPhoto");
+    expect(hero.lastIndexOf("<PersonelDosyaHeroPhoto")).toBeGreaterThan(hero.indexOf("personel-dosya-hero-org"));
+    const css = readSrc("src/styles/modules/personeller.css");
+    const m = /@media \(min-width: 721px\) \{([\s\S]*?)\n\}/.exec(css.slice(css.indexOf("t889")  - 40))?.[1] ?? "";
+    expect(m).toMatch(/\.personel-dosya-hero \{[^}]*grid-template-columns: minmax\(0, 1fr\) auto/);
+    expect(m).toMatch(/\.personel-dosya-hero-photo \{[^}]*grid-column: 2[^}]*align-self: center[^}]*justify-self: end/);
+    expect(m).toMatch(/\.personel-dosya-hero-photo \.pm-self-portrait \{[^}]*width: 72px[^}]*height: 72px/);
+    expect(css).toMatch(/\.personel-dosya-hero-photo\s*\{\s*display:\s*none/);
+  });
+});

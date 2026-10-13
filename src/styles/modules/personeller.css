@@ -390,21 +390,34 @@
 }
 
 @media (min-width: 721px) {
+  /* t889: ad/sicil/kapsam solda, fotoğraf sağda ve bu blokla dikey ortalı. */
+  .personel-dosya-hero {
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: var(--space-3, 12px);
+  }
+
+  .personel-dosya-hero > :not(.personel-dosya-hero-photo) {
+    grid-column: 1;
+  }
+
   .personel-dosya-hero-photo {
     display: flex;
-    flex: 0 0 auto;
+    grid-column: 2;
+    grid-row: 1 / span 3;
+    align-self: center;
+    justify-self: end;
     align-items: center;
   }
 
   .personel-dosya-hero-photo .pm-self-portrait {
-    width: 48px;
-    height: 48px;
+    width: 72px;
+    height: 72px;
   }
 
   .personel-dosya-hero-photo .pm-self-portrait--empty {
     background: rgba(var(--theme-color-rgb), 0.12);
     color: var(--txt);
-    font-size: 14px;
+    font-size: 22px;
   }
 }
 

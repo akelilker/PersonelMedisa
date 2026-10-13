@@ -28,6 +28,18 @@ const BAGLI_AMIR_ATANDI_SUREC_TURU = "BAGLI_AMIR_ATANDI";
 const BAGLI_AMIR_DEGISTI_SUREC_TURU = "BAGLI_AMIR_DEGISTI";
 const BAGLI_AMIR_ATAMASI_KALDIRILDI_SUREC_TURU = "BAGLI_AMIR_ATAMASI_KALDIRILDI";
 
+/** t885: Kan Grubu seçenekleri (backend PersonelCanonicalValidator::validKanGruplari ile aynı değerler). */
+export const KAN_GRUBU_SELECT_OPTIONS = [
+  { value: "0 Rh+", label: "0 Rh+" },
+  { value: "0 Rh-", label: "0 Rh-" },
+  { value: "A Rh+", label: "A Rh+" },
+  { value: "A Rh-", label: "A Rh-" },
+  { value: "B Rh+", label: "B Rh+" },
+  { value: "B Rh-", label: "B Rh-" },
+  { value: "AB Rh+", label: "AB Rh+" },
+  { value: "AB Rh-", label: "AB Rh-" }
+] as const;
+
 export type EditPersonelFormState = {
   calisanKapsami: "IC_PERSONEL" | "DIS_KAYNAK";
   tcKimlikNo: string;
@@ -37,6 +49,11 @@ export type EditPersonelFormState = {
   telefon: string;
   sicilNo?: string;
   iseGirisTarihi?: string;
+  /** t885: Genel düzenlemede özlük alanları (backend allowlist'te; önceden düzenlenemiyordu). */
+  dogumYeri?: string;
+  kanGrubu?: string;
+  acilDurumKisi?: string;
+  acilDurumTelefon?: string;
   departmanId: string;
   bolumId: string;
   birimId: string;
@@ -208,6 +225,10 @@ export function personelToEditForm(personel: Personel): EditPersonelFormState {
     telefon: personel.telefon ?? "",
     sicilNo: personel.sicil_no ?? "",
     iseGirisTarihi: personel.ise_giris_tarihi ?? "",
+    dogumYeri: personel.dogum_yeri ?? "",
+    kanGrubu: personel.kan_grubu ?? "",
+    acilDurumKisi: personel.acil_durum_kisi ?? "",
+    acilDurumTelefon: personel.acil_durum_telefon ?? "",
     departmanId: personel.departman_id != null ? String(personel.departman_id) : "",
     bolumId: personel.bolum_id != null ? String(personel.bolum_id) : "",
     birimId: personel.birim_id != null ? String(personel.birim_id) : "",
@@ -268,6 +289,23 @@ export function buildPersonelUpdatePayload(
     }
     if (iseGirisTarihi !== currentIseGirisTarihi) {
       payload.ise_giris_tarihi = iseGirisTarihi;
+    }
+    // t885: yalnız değişen özlük alanları gönderilir; boşaltılan alan null olur.
+    const cur = options.currentPersonel;
+    const changed = (formValue: string | undefined, current: string | null | undefined) =>
+      formValue !== undefined && formValue.trim() !== String(current ?? "").trim();
+    if (changed(editForm.dogumYeri, cur.dogum_yeri)) {
+      payload.dogum_yeri = editForm.dogumYeri!.trim() || null;
+    }
+    if (changed(editForm.kanGrubu, cur.kan_grubu)) {
+      payload.kan_grubu = editForm.kanGrubu!.trim() || null;
+    }
+    if (changed(editForm.acilDurumKisi, cur.acil_durum_kisi)) {
+      payload.acil_durum_kisi = editForm.acilDurumKisi!.trim() || null;
+    }
+    if (changed(editForm.acilDurumTelefon, cur.acil_durum_telefon)) {
+      const raw = editForm.acilDurumTelefon!.trim();
+      payload.acil_durum_telefon = raw ? normalizeTurkishMobilePhone(raw, "Acil Durum Telefonu") : null;
     }
   }
 

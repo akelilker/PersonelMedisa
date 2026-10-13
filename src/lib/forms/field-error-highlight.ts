@@ -15,6 +15,10 @@ export const FIELD_INPUT_ALIASES: Record<string, readonly string[]> = {
   sicil_no: ["edit-sicil-no", "sicil-no", "sicilNo"],
   dogum_tarihi: ["create-dogum", "edit-dogum-tarihi", "dogum-tarihi", "dogumTarihi"],
   telefon: ["create-telefon", "edit-telefon"],
+  dogum_yeri: ["create-dogum-yeri", "edit-dogum-yeri"],
+  kan_grubu: ["create-kan", "edit-kan-grubu"],
+  acil_durum_kisi: ["create-acil-kisi", "edit-acil-durum-kisi"],
+  acil_durum_telefon: ["create-acil-tel", "edit-acil-durum-telefon"],
   ad: ["create-ad", "edit-ad"],
   soyad: ["create-soyad", "edit-soyad"],
   ise_giris_tarihi: ["create-ise-giris", "edit-ise-giris-tarihi", "ise-giris-tarihi", "iseGirisTarihi"],
@@ -29,7 +33,6 @@ export const FIELD_INPUT_ALIASES: Record<string, readonly string[]> = {
   pozisyon_id: ["create-pozisyon", "pozisyon-pozisyon", "pozisyon-id", "pozisyonId"],
   maas_tutari: ["create-maas"],
   ucret_tipi_id: ["create-ucret-tipi"],
-  kan_grubu: ["create-kan"],
   personel_tipi_id: ["create-personel-tipi", "pozisyon-personel-tipi", "personel-tipi-id", "personelTipiId"]
 };
 

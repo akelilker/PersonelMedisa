@@ -2,7 +2,7 @@ import { type Dispatch, type FormEvent, type SetStateAction } from "react";
 import { FormField } from "../../../../components/form/FormField";
 import { CALISAN_KAPSAMI_SELECT_OPTIONS } from "../../../../lib/display/enum-display";
 import type { PersonelReferenceBundle } from "../../../../data/app-data.types";
-import type { EditPersonelFormState } from "../../personel-edit-utils";
+import { KAN_GRUBU_SELECT_OPTIONS, type EditPersonelFormState } from "../../personel-edit-utils";
 
 export type PersonelInlineEditFormProps = {
   editForm: EditPersonelFormState;
@@ -95,6 +95,34 @@ export function PersonelInlineEditForm({
           value={editForm.iseGirisTarihi ?? ""}
           onChange={(value) => setEditForm((prev) => ({ ...prev, iseGirisTarihi: value }))}
           required
+        />
+        <FormField
+          label="Doğum Yeri"
+          name="edit-dogum-yeri"
+          value={editForm.dogumYeri ?? ""}
+          onChange={(value) => setEditForm((prev) => ({ ...prev, dogumYeri: value }))}
+        />
+        <FormField
+          as="select"
+          label="Kan Grubu"
+          name="edit-kan-grubu"
+          value={editForm.kanGrubu ?? ""}
+          onChange={(value) => setEditForm((prev) => ({ ...prev, kanGrubu: value }))}
+          selectOptions={[{ value: "", label: "Seçiniz" }, ...KAN_GRUBU_SELECT_OPTIONS]}
+        />
+        <FormField
+          label="Acil Durum Kişisi"
+          name="edit-acil-durum-kisi"
+          value={editForm.acilDurumKisi ?? ""}
+          onChange={(value) => setEditForm((prev) => ({ ...prev, acilDurumKisi: value }))}
+        />
+        <FormField
+          label="Acil Durum Telefonu"
+          name="edit-acil-durum-telefon"
+          type="tel"
+          placeholder="05XX XXX XX XX"
+          value={editForm.acilDurumTelefon ?? ""}
+          onChange={(value) => setEditForm((prev) => ({ ...prev, acilDurumTelefon: value }))}
         />
         <p
           className="personel-form-note personel-form-note--info"

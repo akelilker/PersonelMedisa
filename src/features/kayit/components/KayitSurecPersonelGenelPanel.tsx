@@ -173,16 +173,24 @@ export function KayitSurecPersonelGenelPanel({
       return;
     }
 
+    // t885: istemci doğrulaması (ör. telefon 05XX) gönderimden önce; hata alan adıyla gösterilir ve alan işaretlenir.
+    let body: ReturnType<typeof buildPersonelUpdatePayload>;
+    try {
+      body = buildPersonelUpdatePayload(editForm, hasLifecycleDiff, {
+        includeWageFields: false,
+        includeBagliAmir: false,
+        currentPersonel: personel
+      });
+    } catch (error) {
+      setEditErrorMessage(userErrorText(error instanceof Error ? error.message : String(error), "VALIDATION_ERROR", 422));
+      return;
+    }
+
     const requestPersonelId = personel.id;
     setIsSubmitting(true);
     publishBusy(true);
 
     const previousPersonel = personel;
-    const body = buildPersonelUpdatePayload(editForm, hasLifecycleDiff, {
-      includeWageFields: false,
-      includeBagliAmir: false,
-      currentPersonel: personel
-    });
     const optimistic: Personel = {
       ...personel,
       calisan_kapsami: body.calisan_kapsami ?? personel.calisan_kapsami,
@@ -193,6 +201,11 @@ export function KayitSurecPersonelGenelPanel({
       telefon: body.telefon !== undefined ? body.telefon : personel.telefon,
       sicil_no: body.sicil_no ?? personel.sicil_no,
       ise_giris_tarihi: body.ise_giris_tarihi ?? personel.ise_giris_tarihi,
+      dogum_yeri: body.dogum_yeri !== undefined ? (body.dogum_yeri ?? "") : personel.dogum_yeri,
+      kan_grubu: body.kan_grubu !== undefined ? (body.kan_grubu ?? "") : personel.kan_grubu,
+      acil_durum_kisi: body.acil_durum_kisi !== undefined ? (body.acil_durum_kisi ?? "") : personel.acil_durum_kisi,
+      acil_durum_telefon:
+        body.acil_durum_telefon !== undefined ? (body.acil_durum_telefon ?? "") : personel.acil_durum_telefon,
       prim_kurali_id: body.prim_kurali_id !== undefined ? body.prim_kurali_id : personel.prim_kurali_id
     };
     onPersonelUpdated(optimistic);

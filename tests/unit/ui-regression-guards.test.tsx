@@ -311,3 +311,14 @@ describe("L) Mobil ayarlar (çark) menüsü içerik kadar geniş (t863)", () => 
     expect(block).toMatch(/right:\s*0/);
   });
 });
+
+describe("M) Masaüstü ayarlar menüsü yazıları ortalı, dokunmatik mobil sağa hizalı (t864)", () => {
+  it("fine pointer'da center, ≤640 tabanı right kalır", () => {
+    const css = readFileSync(resolve("src/styles/components/dropdown.css"), "utf8");
+    const fine = css.slice(css.lastIndexOf("@media (hover: hover) and (pointer: fine)"));
+    expect(fine).toMatch(/\.settings-dropdown\.settings-menu-dropdown button\s*\{[^}]*text-align:\s*center/s);
+    const mobile = css.slice(css.indexOf("@media (max-width: 640px)"));
+    expect(mobile).toMatch(/\.settings-dropdown button\s*\{[^}]*text-align:\s*right/s);
+    expect(css.lastIndexOf("pointer: fine")).toBeGreaterThan(css.indexOf("@media (max-width: 640px)"));
+  });
+});

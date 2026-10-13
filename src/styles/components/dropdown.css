@@ -114,3 +114,13 @@
     white-space: nowrap;
   }
 }
+
+/*
+ * Onaylı karar (t864): masaüstünde (fare/ince işaretçi) ayarlar menüsü yazıları
+ * kutunun ortasında; dar pencere/yüksek zoom'da da. Dokunmatik mobil sağa hizalı kalır.
+ */
+@media (hover: hover) and (pointer: fine) {
+  .settings-dropdown.settings-menu-dropdown button {
+    text-align: center;
+  }
+}

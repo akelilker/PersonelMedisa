@@ -111,6 +111,11 @@ export function shouldEmitGlobalAuthForbidden(path: string, method?: string, cod
     return false;
   }
 
+  // Kart fotoğrafı: güncelleme yetkisi olmayan rolde 403 beklenir; baş harf yer tutucusu kalır.
+  if (normalizedMethod === "GET" && /^\/personeller\/\d+\/profil-foto$/.test(normalizedPath)) {
+    return false;
+  }
+
   // Scoped roller oturumdaki sube_list ile calisir; yonetim listesi 403 beklenen bir fallback'tir.
   if (normalizedMethod === "GET" && normalizedPath === "/yonetim/subeler") {
     return false;

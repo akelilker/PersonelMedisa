@@ -82,7 +82,6 @@ test.describe("S77-B personel ücret geçmişi", () => {
     await expect(page.getByTestId("personel-ucret-bos")).toBeVisible();
     await expect(page.getByTestId("personel-ucret-yeni-donem")).toHaveCount(0);
 
-    await page.getByRole("button", { name: "Islemler" }).click();
     await page.getByTestId("personel-dosya-action-surecte-islem-yap").click();
     const kayitModal = page.locator(".modal-container--kayit-surec");
     await expect(kayitModal.getByRole("heading", { name: /Kayıt ve Süreç İşlemleri/i })).toBeVisible();

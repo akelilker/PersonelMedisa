@@ -37,6 +37,7 @@ export const endpoints = {
   personeller: {
     list: "/personeller",
     detail: (id: number | string) => `/personeller/${id}`,
+    profilFoto: (id: number | string) => `/personeller/${id}/profil-foto`,
     belgeDurumu: (id: number | string) => `/personeller/${id}/belge-durumu`,
     importTemplate: "/personeller/import/template.csv",
     importReferences: "/personeller/import/references.csv",

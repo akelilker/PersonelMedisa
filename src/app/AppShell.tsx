@@ -41,7 +41,36 @@ type ModuleModalConfig = {
   titleVariant?: "default" | "premium";
 };
 
-function resolveBackBar(pathname: string, state?: unknown): { to: string; label: string } | null {
+function readPositiveIdParam(raw: string | null): number | null {
+  if (!raw) {
+    return null;
+  }
+  const id = Number.parseInt(raw, 10);
+  if (!Number.isFinite(id) || id <= 0 || String(id) !== raw) {
+    return null;
+  }
+  return id;
+}
+
+function hasKayitSurecReturn(state: unknown): boolean {
+  if (!state || typeof state !== "object") {
+    return false;
+  }
+  const record = state as { kayitSurecReturn?: unknown };
+  return record.kayitSurecReturn != null;
+}
+
+function resolveBackBar(
+  pathname: string,
+  state: unknown,
+  searchParams: URLSearchParams
+): { to: string; label: string } | null {
+  if (pathname === "/personeller/belge-takip" && !hasKayitSurecReturn(state)) {
+    const personelId = readPositiveIdParam(searchParams.get("personel_id"));
+    if (personelId != null) {
+      return { to: `/personeller/${personelId}?tab=egitim-belgeler`, label: "Personel Kartı" };
+    }
+  }
   if (/^\/personeller\/\d+$/.test(pathname)) {
     const fromState = readPersonelKartBack(state);
     if (fromState) {
@@ -256,7 +285,7 @@ export function AppShell() {
   const isModuleOverlayRoute = moduleModal !== null;
   const showShellHeaderActions = !isModuleOverlayRoute && !isAuthSurfaceRoute;
   const showUserBar = !isAuthSurfaceRoute && !isModuleOverlayRoute && !isPersonelSurfaceRoute;
-  const backBarTarget = resolveBackBar(pathname, state);
+  const backBarTarget = resolveBackBar(pathname, state, searchParams);
   const isPersonelKartModalRoute =
     pathname === "/personeller" ||
     pathname === "/arsiv/personeller" ||

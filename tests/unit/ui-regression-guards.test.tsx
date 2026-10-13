@@ -747,3 +747,49 @@ describe("W) Genel düzenleme: Doğum Yeri, Kan Grubu, Acil Durum Kişisi/Telefo
     }
   });
 });
+
+describe("X) Personel Kartı ve Belge Takip (t876)", () => {
+  it("(a) personel_id görünümünde filtre yok, geri satırı Personel Kartı", () => {
+    const page = readSrc("src/features/personeller/pages/BelgeTakipPage.tsx");
+    expect(page).toMatch(/scopedPersonelId == null \? \([\s\S]*belge-takip-filter-panel/);
+    expect(page).toContain('data-testid="belge-takip-personel-adi"');
+    const shell = readSrc("src/app/AppShell.tsx");
+    expect(shell).toMatch(/\/personeller\/belge-takip/);
+    expect(shell).toContain('label: "Personel Kartı"');
+    expect(shell).toContain("?tab=egitim-belgeler");
+    const link = readSrc("src/features/personeller/components/personel-dosya/PersonelBelgelerPanel.tsx");
+    expect(link).toContain("/personeller/belge-takip?personel_id=");
+  });
+
+  it("(b) tek işlemde menü yok; birden fazla işlemde İşlemler menüsü kalır", () => {
+    const row = readSrc("src/features/personeller/components/personel-dosya/PersonelDosyaActionRow.tsx");
+    expect(row).toMatch(/items\.length === 1/);
+    expect(row).toContain('label: "Süreçte İşlem Yap"');
+    expect(row).toMatch(/aria-haspopup="menu"/);
+    const singleStart = row.indexOf("if (items.length === 1)");
+    const menuStart = row.indexOf('aria-haspopup="menu"');
+    expect(singleStart).toBeGreaterThan(-1);
+    expect(menuStart).toBeGreaterThan(singleStart);
+    expect(row.slice(singleStart, menuStart)).not.toMatch(/aria-haspopup/);
+  });
+
+  it("(c) eksik bilgi uyarısı tek satır sınıfı", () => {
+    const gateway = readSrc("src/features/personeller/components/personel-dosya/PersonelDosyaMissingInfoGateway.tsx");
+    expect(gateway).toContain("personel-dosya-missing-gateway--tek-satir");
+    expect(gateway).toContain("personel-eksik-bilgi-alan-");
+    const css = readSrc("src/styles/modules/personel-missing-info.css");
+    expect(css).toMatch(/\.personel-dosya-missing-gateway--tek-satir[\s\S]*white-space:\s*nowrap/);
+    expect(css).toMatch(/\.personel-dosya-missing-gateway--tek-satir[\s\S]*max-height:\s*28px/);
+    expect(css).not.toMatch(/!important/);
+  });
+
+  it("(d) masaüstü hero foto bileşeni; mobil akışta gizli", () => {
+    const hero = readSrc("src/features/personeller/components/personel-dosya/PersonelDosyaHero.tsx");
+    expect(hero).toContain("<PersonelDosyaHeroPhoto");
+    const photo = readSrc("src/features/personeller/components/personel-dosya/PersonelDosyaHeroPhoto.tsx");
+    expect(photo).toContain("<PersonelSelfPortrait");
+    const css = readSrc("src/styles/modules/personeller.css");
+    expect(css).toMatch(/\.personel-dosya-hero-photo\s*\{[^}]*display:\s*none/);
+    expect(css).toMatch(/@media \(min-width: 721px\)[\s\S]*\.personel-dosya-hero-photo\s*\{[^}]*display:\s*flex/);
+  });
+});

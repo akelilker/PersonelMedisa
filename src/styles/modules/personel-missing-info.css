@@ -35,10 +35,6 @@
   padding: 0;
 }
 
-.personel-dosya-tab-scroll > .personel-dosya-missing-gateway-wrap {
-  margin-top: var(--space-1);
-}
-
 .personel-dosya-missing-gateway,
 .personel-dosya-missing-gateway.is-readonly {
   display: block;
@@ -175,4 +171,21 @@ p.personel-dosya-missing-gateway:not(.is-readonly) {
 
 .personel-dosya-missing-gateway-hint {
   font-weight: 400;
+}
+
+/* t876: başlığın altında tek satır; uzun liste kısaltılır, ekstra dikey boşluk yok. */
+.personel-dosya-missing-gateway--tek-satir,
+.personel-dosya-missing-gateway.personel-dosya-missing-gateway--tek-satir,
+.personel-dosya-missing-gateway.personel-dosya-missing-gateway--tek-satir.is-readonly,
+.personel-detail-card .personel-dosya-missing-gateway.personel-dosya-missing-gateway--tek-satir,
+.personel-detail-card .personel-dosya-missing-gateway.personel-dosya-missing-gateway--tek-satir.is-readonly {
+  display: block;
+  max-height: 28px;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  line-height: 20px;
+  font-size: 12px;
 }

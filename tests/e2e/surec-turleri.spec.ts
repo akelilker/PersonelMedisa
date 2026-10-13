@@ -77,7 +77,6 @@ async function openSurecCreateFromPersonelKart(page: Page) {
   await expect(page).toHaveURL(/\/personeller\/1$/);
   await expect(page.locator(".personel-dosya-hero")).toContainText(/Ayşe Yılmaz/i);
 
-  await page.getByRole("button", { name: "Islemler" }).click();
   await page.getByRole("button", { name: "Süreçte İşlem Yap" }).click();
 
   const modal = kayitSurecModal(page);

@@ -19,10 +19,12 @@ async function openPersonelCardGateway(page: Page) {
     }
   });
 
-  await page.getByRole("button", { name: "Islemler" }).click();
+  const action = page.getByRole("button", { name: "Süreçte İşlem Yap" });
   await expect(page.getByRole("button", { name: "Süreç Ekle" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Süreçte İşlem Yap" })).toHaveCount(1);
-  await page.getByRole("button", { name: "Süreçte İşlem Yap" }).click();
+  await expect(page.getByRole("button", { name: "İşlemler" })).toHaveCount(0);
+  await expect(action).toHaveCount(1);
+  await expect(action).not.toHaveAttribute("aria-haspopup");
+  await action.click();
 
   const modal = page.locator(".modal-container--kayit-surec").last();
   await expect(modal.getByRole("heading", { name: /Kayıt ve Süreç İşlemleri/i })).toBeVisible();

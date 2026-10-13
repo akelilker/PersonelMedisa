@@ -167,6 +167,12 @@ export function PersonelDetayPage() {
 
           <div className="personel-dosya-sticky-head" data-testid="personel-dosya-sticky-head">
             <PersonelDosyaHero personel={personel} />
+            <PersonelDosyaMissingInfoGateway
+              personel={personel}
+              onOpenMissingInfo={
+                canUpdatePersonel && !isArchived && canWriteOnPersonel ? handleOpenMissingInfo : undefined
+              }
+            />
 
             <div className="personel-dosya-tab-nav">
               <PersonelDosyaTabList
@@ -183,13 +189,6 @@ export function PersonelDetayPage() {
             className="personel-dosya-tab-scroll"
             data-testid="personel-dosya-tab-scroll"
           >
-            <PersonelDosyaMissingInfoGateway
-              personel={personel}
-              onOpenMissingInfo={
-                canUpdatePersonel && !isArchived && canWriteOnPersonel ? handleOpenMissingInfo : undefined
-              }
-            />
-
             {!canWriteOnPersonel ? (
               <p className="personel-write-scope-notice" role="status" data-testid="personel-write-scope-notice">
                 Bu işlem İK sorumlusu tarafından gerçekleştirilmelidir.

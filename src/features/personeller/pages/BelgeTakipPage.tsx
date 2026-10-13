@@ -6,7 +6,8 @@ import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
 import { fetchBelgeTakip } from "../../../api/personel-belge-kayitlari.api";
 import { getApiErrorMessage } from "../../../api/api-client";
-import { fetchPersonellerList } from "../../../api/personeller.api";
+import { fetchPersonelDetail, fetchPersonellerList } from "../../../api/personeller.api";
+import { formatPersonelAdSoyadDisplay } from "../../../lib/display/ad-soyad-display";
 import { fetchDepartmanOptions } from "../../../api/referans.api";
 import {
   formatPersonelBelgeKayitTipiLabel,
@@ -59,6 +60,17 @@ function toSelectOptions(options: IdOption[]) {
   return options.map((option) => ({ value: String(option.id), label: option.label }));
 }
 
+function readScopedPersonelId(raw: string | null): number | null {
+  if (!raw) {
+    return null;
+  }
+  const personelId = Number.parseInt(raw, 10);
+  if (!Number.isFinite(personelId) || personelId <= 0 || String(personelId) !== raw) {
+    return null;
+  }
+  return personelId;
+}
+
 export function BelgeTakipPage() {
   const [searchParams] = useSearchParams();
   const location = useLocation();
@@ -72,8 +84,35 @@ export function BelgeTakipPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [departmanOptions, setDepartmanOptions] = useState<IdOption[]>([]);
   const [personelOptions, setPersonelOptions] = useState<Array<{ id: number; label: string }>>([]);
+  const [personelAdSoyad, setPersonelAdSoyad] = useState("");
+  const scopedPersonelId = readScopedPersonelId(searchParams.get("personel_id"));
 
   useEffect(() => {
+    if (scopedPersonelId == null) {
+      return;
+    }
+    let cancelled = false;
+    setPersonelAdSoyad("");
+    fetchPersonelDetail(scopedPersonelId)
+      .then((personel) => {
+        if (!cancelled) {
+          setPersonelAdSoyad(formatPersonelAdSoyadDisplay(personel));
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setPersonelAdSoyad("");
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [scopedPersonelId]);
+
+  useEffect(() => {
+    if (scopedPersonelId != null) {
+      return;
+    }
     let cancelled = false;
     fetchDepartmanOptions()
       .then((options) => {
@@ -107,7 +146,7 @@ export function BelgeTakipPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [scopedPersonelId]);
 
   useEffect(() => {
     const personelId = searchParams.get("personel_id");
@@ -115,24 +154,12 @@ export function BelgeTakipPage() {
       return;
     }
 
-    const nextFilters = { ...EMPTY_FILTERS, personelId };
+    const nextFilters = { ...EMPTY_FILTERS, personelId, personelAktiflik: "tum" as const };
     setDraft(nextFilters);
     setApplied(nextFilters);
   }, [searchParams]);
 
-  const kayitSurecReturn =
-    kayitSurecReturnFromState ??
-    (() => {
-      const raw = searchParams.get("personel_id");
-      if (!raw) {
-        return null;
-      }
-      const personelId = Number.parseInt(raw, 10);
-      if (!Number.isFinite(personelId)) {
-        return null;
-      }
-      return { personelId, personelTab: "belge-takip" as const } satisfies KayitSurecReturnContext;
-    })();
+  const kayitSurecReturn = kayitSurecReturnFromState ?? null;
 
   const loadData = useCallback(async (filters: FilterDraft) => {
     setIsLoading(true);
@@ -198,10 +225,16 @@ export function BelgeTakipPage() {
       <div className="personel-belge-panel-head">
         <div>
           <h2>Belge Takip</h2>
-          <p>Personel belge kayıtlarının süre, dosya ve eksiklik durumunu izleyin.</p>
+          {scopedPersonelId != null ? (
+            <p className="belge-takip-personel-adi" data-testid="belge-takip-personel-adi">
+              {personelAdSoyad}
+            </p>
+          ) : (
+            <p>Personel belge kayıtlarının süre, dosya ve eksiklik durumunu izleyin.</p>
+          )}
         </div>
         <div className="personel-belge-panel-head-actions">
-          {!kayitSurecReturn ? (
+          {!kayitSurecReturn && scopedPersonelId == null ? (
             <Link className="universal-btn-aux" to="/personeller">
               Personel Listesi
             </Link>
@@ -209,6 +242,7 @@ export function BelgeTakipPage() {
         </div>
       </div>
 
+      {scopedPersonelId == null ? (
       <form className="belge-takip-filter-panel workspace-form" onSubmit={handleSubmit}>
         <div className="form-field-grid">
           <FormField
@@ -299,6 +333,7 @@ export function BelgeTakipPage() {
           </button>
         </div>
       </form>
+      ) : null}
 
       <div className="belge-takip-summary-grid">
         {summaryCards.map((card) => (

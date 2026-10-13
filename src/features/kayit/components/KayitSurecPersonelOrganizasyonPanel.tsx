@@ -81,8 +81,7 @@ export function KayitSurecPersonelOrganizasyonPanel({
       <div className="surec-person-placeholder surec-org-section-lead">
         <strong>Görev ve Organizasyon Değişikliği</strong>
         <p>
-          Değişiklik anında personel kaydına uygulanır. Structured audit canonical owner üzerinden tutulur;
-          gelecek tarihli planlama yoktur.
+          Değişiklik anında personel kaydına uygulanır.
         </p>
       </div>
 

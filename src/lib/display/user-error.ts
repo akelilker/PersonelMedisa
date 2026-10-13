@@ -1,4 +1,5 @@
-import { FIELD_LABELS, fieldKeyOfLabel, fieldLabelFromRaw, fieldLabelOf } from "./field-labels";
+import { parseFieldError } from "./field-labels";
+import { OZEL_METINLER, isYuklenemediMetni, ozelMesaj } from "./ozel-mesajlar";
 import { highlightFieldErrors } from "../forms/field-error-highlight";
 /**
  * Onaylı karar (t865/HATA-KARAR.md): kullanıcıya görünen tüm hata metinleri bu
@@ -64,6 +65,7 @@ export const USER_ERROR_TABLOSU: Record<UserErrorKategori, UserErrorSatiri> = {
 };
 
 const KURALLAR: [UserErrorKategori, RegExp][] = [
+  ["yanit_yok", /yan[ıi]t[ıi]? (beklenen|zorunlu alanlar)|beklenen formatta de[gğ]il|yan[ıi]t beklenen/i],
   ["altyapi", /SCHEMA|[sş]emas[ıi]|haz[ıi]r de[gğ]il|NOT_READY|migration|altyap/i],
   ["oturum", /UNAUTHORIZED|SESSION_EXPIRED|oturum gerekli|oturum(unuz)? (sona|sonlan|d[uü][sş])|CSRF/i],
   ["giris_hatali", /INVALID_CREDENTIALS|kullan[ıi]c[ıi] ad[ıi] veya [sş]ifre|mevcut [sş]ifre hatal/i],
@@ -113,25 +115,20 @@ export function classifyUserError(raw: string | null | undefined, code?: string 
   return "islem_tamamlanamadi";
 }
 
-const ALAN_ZORUNLU_SONEK = " Boş Bırakılamaz.";
-const ALAN_GECERSIZ_SONEK = " Geçerli Değil. Lütfen Kontrol Edin.";
-
-/** "T.C. Kimlik No. Boş Bırakılamaz." gibi alan adlı tablo metni mi? */
+/** Alan adlı hata metni mi? (ör. "T.C. Kimlik No. Boş Bırakılamaz.", "Gerekçe En Az 5 Karakter Olmalıdır.") */
 export function isFieldErrorText(text: string): boolean {
   const t = text.trim();
-  for (const sonek of [ALAN_ZORUNLU_SONEK, ALAN_GECERSIZ_SONEK]) {
-    if (t.endsWith(sonek)) {
-      const label = t.slice(0, -sonek.length);
-      if (label === "Bu Alan" || Object.values(FIELD_LABELS).includes(label)) return true;
-    }
-  }
-  return false;
+  if (!t || toTitleCaseTr(t) !== t) return false;
+  if (/^Bu Alan (Boş Bırakılamaz\.|Geçerli Değil\. Lütfen Kontrol Edin\.)$/.test(t)) return true;
+  return parseFieldError(t)?.text === t;
 }
 
+const ALAN_KATEGORILERI = new Set<UserErrorKategori>(["zorunlu", "gecersiz", "tarih"]);
+
 /**
- * Kullanıcıya gösterilecek tek satır (mesaj + varsa açıklama). Zaten tablo metniyse aynen döner.
- * t869: zorunlu/geçersiz alan hatalarında alan adı yazılır ("T.C. Kimlik No. Boş Bırakılamaz.")
- * ve ekrandaki ilgili alan kırmızı çerçeveyle işaretlenip odaklanır.
+ * Kullanıcıya gösterilecek tek satır. Sıra: (1) zaten eşlenmiş metin aynen döner, (2) onaylı özel
+ * durum mesajı (ozel-mesajlar.ts, t871), (3) alan hatası alan adıyla yazılır ve alan kırmızı
+ * işaretlenir (t869), (4) 30 satırlık tablo.
  */
 export function userErrorText(
   raw: string | null | undefined,
@@ -139,17 +136,26 @@ export function userErrorText(
   status?: number,
   field?: string | null
 ): string {
-  if (typeof raw === "string" && (TABLO_METINLERI.has(raw.trim()) || isFieldErrorText(raw))) return raw.trim();
+  const trimmed = typeof raw === "string" ? raw.trim() : "";
+  if (trimmed && (TABLO_METINLERI.has(trimmed) || OZEL_METINLER.has(trimmed) || isYuklenemediMetni(trimmed) || isFieldErrorText(trimmed))) return trimmed;
+  const ozel = ozelMesaj(raw, code);
+  if (ozel) return ozel;
   const kategori = classifyUserError(raw, code, status);
-  if (kategori === "zorunlu" || kategori === "gecersiz") {
-    const label = fieldLabelOf(field) ?? fieldLabelFromRaw(raw);
-    if (label) {
-      const target = field && FIELD_LABELS[field] ? field : (fieldKeyOfLabel(label) ?? label);
-      void highlightFieldErrors([target]);
-      return `${label}${kategori === "zorunlu" ? ALAN_ZORUNLU_SONEK : ALAN_GECERSIZ_SONEK}`;
+  if (
+    ALAN_KATEGORILERI.has(kategori) ||
+    (field && (status === 400 || status === 422)) ||
+    (kategori === "islem_tamamlanamadi" && !(status && status >= 500))
+  ) {
+    const parsed = parseFieldError(raw, field);
+    if (parsed) {
+      if (parsed.keys.length > 0) void highlightFieldErrors(parsed.keys);
+      return parsed.text;
     }
   }
-  const satir = USER_ERROR_TABLOSU[kategori];
+  // t871: alanı tanınmayan doğrulama metinleri iç/teknik kontrollerdir (ör. referans tablosu,
+  // ham dakika eşleşmesi); kullanıcıya "Bu Alan" yerine genel işlem metni gösterilir.
+  const sonKategori = ALAN_KATEGORILERI.has(kategori) && !field ? "islem_tamamlanamadi" : kategori;
+  const satir = USER_ERROR_TABLOSU[sonKategori];
   return satir.aciklama ? `${satir.mesaj} ${satir.aciklama}` : satir.mesaj;
 }
 

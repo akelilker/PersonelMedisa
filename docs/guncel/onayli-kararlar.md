@@ -45,3 +45,4 @@ Bu dosya, kullanıcının onayladığı kalıcı görsel kararları her biri tek
 | Tüm uygulama | Kaydırma yönü | Ekranlar yalnız dikey kayar; yatay kaydırma yok (mobil + masaüstü). Personel Listesi mobilde tüm kolonlar ekrana sığar (kenar boşlukları optimize, Ad/Soyad iki satır, görünümde kısaltma serbest) | 2026-10-12 |
 | Personel Listesi (mobil + masaüstü) | Satırlarda kapsam rozeti yok | Ad Soyad altında "Harici Personel" rozeti/etiketi gösterilmez; veri, filtre (Çalışan Kapsamı) ve Personel Kartı kapsam gösterimi değişmez; ileride tek harfli işaret değerlendirilebilir | 2026-10-12 |
 | Üst bar — Ayarlar (çark) menüsü (mobil ≤720) | Menü genişliği | İçerik kadar geniş (max-content, min 168px, max 260px), çarkın altında sağa hizalı; ekrana yayılmaz. Masaüstü değişmez | 2026-10-12 |
+| Üst bar — Ayarlar (çark) menüsü | Yazı hizası | Masaüstünde (fare/ince işaretçi; dar pencere/zoom dahil) yazılar kutuda ortalı; dokunmatik mobilde sağa hizalı | 2026-10-13 |

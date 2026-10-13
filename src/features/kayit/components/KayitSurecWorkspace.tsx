@@ -1,3 +1,4 @@
+import { highlightFieldErrors } from "../../../lib/forms/field-error-highlight";
 import { userErrorText } from "../../../lib/display/user-error";
 import {
   useCallback,
@@ -159,6 +160,8 @@ type KayitSurecWorkspaceProps = {
   initialPersonelTab?: PersonelSurecTab | null;
   initialOperation?: "yillik-izin-hak-duzeltme" | null;
   initialKayitIntent?: string | null;
+  /** t869: eksik bilgi gateway'inden gelen alan; sekme açılınca kırmızı işaretlenip odaklanır. */
+  initialFocusField?: string | null;
   primaryActionLabel: string;
   primaryFormId: string;
   onFooterModelChange?: (model: KayitModalFooterModel | null) => void;
@@ -187,6 +190,7 @@ export function KayitSurecWorkspace({
   initialPersonelTab = null,
   initialOperation = null,
   initialKayitIntent = null,
+  initialFocusField = null,
   primaryActionLabel,
   primaryFormId,
   onFooterModelChange,
@@ -789,8 +793,15 @@ export function KayitSurecWorkspace({
       setDevamsizlikSubId(null);
       setPuantajSubdomain(null);
     }
-    setOpenPersonelEditFromMissingGateway(initialKayitIntent === "personel-missing-info-gateway");
-  }, [initialSurecPersonelId, initialPersonelTab, initialOperation, initialKayitIntent]);
+    const fromMissingGateway = initialKayitIntent === "personel-missing-info-gateway";
+    // Genel düzenleme formu yalnız Genel hedefli eksik alanlarda açılır (org alanları Görev / Organizasyon'da).
+    setOpenPersonelEditFromMissingGateway(
+      fromMissingGateway && normalizePersonelSurecTab(initialPersonelTab ?? "genel") === "genel"
+    );
+    if (fromMissingGateway && initialFocusField) {
+      void highlightFieldErrors([initialFocusField], { timeoutMs: 4000 });
+    }
+  }, [initialSurecPersonelId, initialPersonelTab, initialOperation, initialKayitIntent, initialFocusField]);
 
   async function handlePersonelSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

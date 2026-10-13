@@ -1,3 +1,5 @@
+import { FIELD_LABELS, fieldKeyOfLabel, fieldLabelFromRaw, fieldLabelOf } from "./field-labels";
+import { highlightFieldErrors } from "../forms/field-error-highlight";
 /**
  * Onaylı karar (t865/HATA-KARAR.md): kullanıcıya görünen tüm hata metinleri bu
  * tablodan gelir. Ham sunucu metni, hata kodu, API yolu veya teknik terim gösterilmez.
@@ -111,10 +113,43 @@ export function classifyUserError(raw: string | null | undefined, code?: string 
   return "islem_tamamlanamadi";
 }
 
-/** Kullanıcıya gösterilecek tek satır (mesaj + varsa açıklama). Zaten tablo metniyse aynen döner. */
-export function userErrorText(raw: string | null | undefined, code?: string | null, status?: number): string {
-  if (typeof raw === "string" && TABLO_METINLERI.has(raw.trim())) return raw.trim();
-  const satir = USER_ERROR_TABLOSU[classifyUserError(raw, code, status)];
+const ALAN_ZORUNLU_SONEK = " Boş Bırakılamaz.";
+const ALAN_GECERSIZ_SONEK = " Geçerli Değil. Lütfen Kontrol Edin.";
+
+/** "T.C. Kimlik No. Boş Bırakılamaz." gibi alan adlı tablo metni mi? */
+export function isFieldErrorText(text: string): boolean {
+  const t = text.trim();
+  for (const sonek of [ALAN_ZORUNLU_SONEK, ALAN_GECERSIZ_SONEK]) {
+    if (t.endsWith(sonek)) {
+      const label = t.slice(0, -sonek.length);
+      if (label === "Bu Alan" || Object.values(FIELD_LABELS).includes(label)) return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Kullanıcıya gösterilecek tek satır (mesaj + varsa açıklama). Zaten tablo metniyse aynen döner.
+ * t869: zorunlu/geçersiz alan hatalarında alan adı yazılır ("T.C. Kimlik No. Boş Bırakılamaz.")
+ * ve ekrandaki ilgili alan kırmızı çerçeveyle işaretlenip odaklanır.
+ */
+export function userErrorText(
+  raw: string | null | undefined,
+  code?: string | null,
+  status?: number,
+  field?: string | null
+): string {
+  if (typeof raw === "string" && (TABLO_METINLERI.has(raw.trim()) || isFieldErrorText(raw))) return raw.trim();
+  const kategori = classifyUserError(raw, code, status);
+  if (kategori === "zorunlu" || kategori === "gecersiz") {
+    const label = fieldLabelOf(field) ?? fieldLabelFromRaw(raw);
+    if (label) {
+      const target = field && FIELD_LABELS[field] ? field : (fieldKeyOfLabel(label) ?? label);
+      void highlightFieldErrors([target]);
+      return `${label}${kategori === "zorunlu" ? ALAN_ZORUNLU_SONEK : ALAN_GECERSIZ_SONEK}`;
+    }
+  }
+  const satir = USER_ERROR_TABLOSU[kategori];
   return satir.aciklama ? `${satir.mesaj} ${satir.aciklama}` : satir.mesaj;
 }
 

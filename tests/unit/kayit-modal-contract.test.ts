@@ -24,7 +24,8 @@ describe("resolveKayitModalRouteConfig", () => {
       intent: null,
       recordId: null,
       returnTo: null,
-      operation: null
+      operation: null,
+      focusField: null
     });
   });
 
@@ -46,7 +47,8 @@ describe("resolveKayitModalRouteConfig", () => {
       intent: null,
       recordId: null,
       returnTo: null,
-      operation: "yillik-izin-hak-duzeltme"
+      operation: "yillik-izin-hak-duzeltme",
+      focusField: null
     });
   });
 
@@ -67,7 +69,8 @@ describe("resolveKayitModalRouteConfig", () => {
       intent: "personel-edit-gateway",
       recordId: null,
       returnTo: "/personeller/7",
-      operation: null
+      operation: null,
+      focusField: null
     });
   });
 });

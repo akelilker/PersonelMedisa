@@ -28,6 +28,29 @@ export type PersonelMissingField = {
   editTarget: "genel" | "pozisyon";
 };
 
+/**
+ * t869: eksik alanın düzenlendiği sekme. Organizasyon alanları (şube, SGK, lokasyon, amir,
+ * departman/bölüm/birim, görev, pozisyon, statü) Genel formunda yoktur; Görev / Organizasyon
+ * sekmesindedir. Genel yalnız kimlik/iletişim/sicil/işe giriş alanlarını düzenler.
+ */
+export const PERSONEL_MISSING_FIELD_EDIT_TARGET: Readonly<Record<PersonelMissingFieldKey, "genel" | "pozisyon">> = {
+  tc_kimlik_no: "genel",
+  sicil_no: "genel",
+  dogum_tarihi: "genel",
+  telefon: "genel",
+  ise_giris_tarihi: "genel",
+  sube_id: "pozisyon",
+  sgk_isveren_id: "pozisyon",
+  calisma_lokasyonu_id: "pozisyon",
+  bagli_amir_id: "pozisyon",
+  departman_id: "pozisyon",
+  bolum_id: "pozisyon",
+  birim_id: "pozisyon",
+  gorev_id: "pozisyon",
+  pozisyon_id: "pozisyon",
+  personel_tipi_id: "pozisyon"
+};
+
 type PersonelMissingFieldRule = PersonelMissingField & {
   scopes: readonly PersonelCalisanKapsami[];
   isMissing: (personel: Personel) => boolean;
@@ -113,7 +136,7 @@ const PERSONEL_MISSING_FIELD_RULES: readonly PersonelMissingFieldRule[] = [
     label: "Şube",
     category: "ISTIHDAM",
     severity: "CRITICAL",
-    editTarget: "genel",
+    editTarget: "pozisyon",
     scopes: BOTH_SCOPES,
     isMissing: (personel) => !hasPositiveId(personel.sube_id)
   },
@@ -122,7 +145,7 @@ const PERSONEL_MISSING_FIELD_RULES: readonly PersonelMissingFieldRule[] = [
     label: "SGK İşveren",
     category: "ISTIHDAM",
     severity: "CRITICAL",
-    editTarget: "genel",
+    editTarget: "pozisyon",
     scopes: IC_ONLY,
     isMissing: (personel) => !hasPositiveId(personel.sgk_isveren_id)
   },
@@ -131,7 +154,7 @@ const PERSONEL_MISSING_FIELD_RULES: readonly PersonelMissingFieldRule[] = [
     label: "Çalışma Lokasyonu",
     category: "ISTIHDAM",
     severity: "CRITICAL",
-    editTarget: "genel",
+    editTarget: "pozisyon",
     scopes: BOTH_SCOPES,
     isMissing: (personel) => !hasPositiveId(personel.calisma_lokasyonu_id)
   },
@@ -140,7 +163,7 @@ const PERSONEL_MISSING_FIELD_RULES: readonly PersonelMissingFieldRule[] = [
     label: "Yönetici",
     category: "ISTIHDAM",
     severity: "CRITICAL",
-    editTarget: "genel",
+    editTarget: "pozisyon",
     scopes: BOTH_SCOPES,
     isMissing: (personel) => !hasPositiveId(personel.bagli_amir_id)
   },
@@ -149,7 +172,7 @@ const PERSONEL_MISSING_FIELD_RULES: readonly PersonelMissingFieldRule[] = [
     label: "Departman",
     category: "ISTIHDAM",
     severity: "CRITICAL",
-    editTarget: "genel",
+    editTarget: "pozisyon",
     scopes: BOTH_SCOPES,
     isMissing: (personel) => !hasPositiveId(personel.departman_id)
   },
@@ -158,7 +181,7 @@ const PERSONEL_MISSING_FIELD_RULES: readonly PersonelMissingFieldRule[] = [
     label: "Bölüm",
     category: "ISTIHDAM",
     severity: "CRITICAL",
-    editTarget: "genel",
+    editTarget: "pozisyon",
     scopes: BOTH_SCOPES,
     isMissing: (personel) => !hasPositiveId(personel.bolum_id)
   },
@@ -167,7 +190,7 @@ const PERSONEL_MISSING_FIELD_RULES: readonly PersonelMissingFieldRule[] = [
     label: "Birim",
     category: "ISTIHDAM",
     severity: "CRITICAL",
-    editTarget: "genel",
+    editTarget: "pozisyon",
     scopes: BOTH_SCOPES,
     isMissing: (personel) => !hasPositiveId(personel.birim_id)
   },
@@ -176,7 +199,7 @@ const PERSONEL_MISSING_FIELD_RULES: readonly PersonelMissingFieldRule[] = [
     label: "Unvan / Görev",
     category: "ISTIHDAM",
     severity: "CRITICAL",
-    editTarget: "genel",
+    editTarget: "pozisyon",
     scopes: BOTH_SCOPES,
     isMissing: (personel) => !hasPositiveId(personel.gorev_id)
   },
@@ -185,7 +208,7 @@ const PERSONEL_MISSING_FIELD_RULES: readonly PersonelMissingFieldRule[] = [
     label: "Pozisyon",
     category: "ISTIHDAM",
     severity: "CRITICAL",
-    editTarget: "genel",
+    editTarget: "pozisyon",
     scopes: BOTH_SCOPES,
     isMissing: (personel) => !hasPositiveId(personel.pozisyon_id)
   },
@@ -274,7 +297,7 @@ export function getPersonelMissingFields(personel: Personel): PersonelMissingFie
       label: field.label,
       category: (field.category as PersonelMissingFieldCategory) || "ISTIHDAM",
       severity: (field.severity as PersonelMissingFieldSeverity) || "CRITICAL",
-      editTarget: field.edit_target === "pozisyon" ? ("pozisyon" as const) : ("genel" as const)
+      editTarget: PERSONEL_MISSING_FIELD_EDIT_TARGET[field.key as PersonelMissingFieldKey] ?? "genel"
     }));
   }
 
@@ -298,7 +321,7 @@ export function getPersonelMissingFields(personel: Personel): PersonelMissingFie
     label: field.label,
     category: (field.category as PersonelMissingFieldCategory) || "ISTIHDAM",
     severity: (field.severity as PersonelMissingFieldSeverity) || "CRITICAL",
-    editTarget: field.edit_target === "pozisyon" ? ("pozisyon" as const) : ("genel" as const)
+    editTarget: PERSONEL_MISSING_FIELD_EDIT_TARGET[field.key as PersonelMissingFieldKey] ?? "genel"
   }));
 }
 

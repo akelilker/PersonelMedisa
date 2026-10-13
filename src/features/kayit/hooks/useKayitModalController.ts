@@ -19,6 +19,7 @@ export function useKayitModalController(pathname: string, locationState: unknown
   >(null);
   const [kayitReturnTo, setKayitReturnTo] = useState<string | null>(null);
   const [kayitIntent, setKayitIntent] = useState<string | null>(null);
+  const [kayitFocusField, setKayitFocusField] = useState<string | null>(null);
 
   const kayitRouteConfig = useMemo(() => resolveKayitModalRouteConfig(locationState), [locationState]);
 
@@ -33,6 +34,7 @@ export function useKayitModalController(pathname: string, locationState: unknown
     setKayitInitialOperation(kayitRouteConfig.operation);
     setKayitReturnTo(kayitRouteConfig.returnTo);
     setKayitIntent(kayitRouteConfig.intent);
+    setKayitFocusField(kayitRouteConfig.focusField);
     setIsKayitModalOpen(true);
     navigate(pathname, { replace: true, state: null });
   }, [kayitRouteConfig, navigate, pathname]);
@@ -43,6 +45,7 @@ export function useKayitModalController(pathname: string, locationState: unknown
     setKayitInitialOperation(null);
     setKayitReturnTo(null);
     setKayitIntent(null);
+    setKayitFocusField(null);
   }, []);
 
   const closeKayitModal = useCallback(() => {
@@ -74,6 +77,7 @@ export function useKayitModalController(pathname: string, locationState: unknown
     kayitInitialPersonelTab,
     kayitInitialOperation,
     kayitIntent,
+    kayitFocusField,
     kayitPrimaryLabel,
     kayitPrimaryFormId,
     openKayitModal,

@@ -187,7 +187,7 @@ class PersonelCompletenessService
                 'label' => 'Şube',
                 'category' => self::CATEGORY_ISTIHDAM,
                 'severity' => self::SEVERITY_CRITICAL,
-                'edit_target' => 'genel',
+                'edit_target' => 'pozisyon',
                 'scopes' => $both,
             ],
             [
@@ -195,7 +195,7 @@ class PersonelCompletenessService
                 'label' => 'SGK İşveren',
                 'category' => self::CATEGORY_ISTIHDAM,
                 'severity' => self::SEVERITY_CRITICAL,
-                'edit_target' => 'genel',
+                'edit_target' => 'pozisyon',
                 'scopes' => $icOnly,
             ],
             [
@@ -203,7 +203,7 @@ class PersonelCompletenessService
                 'label' => 'Çalışma Lokasyonu',
                 'category' => self::CATEGORY_ISTIHDAM,
                 'severity' => self::SEVERITY_CRITICAL,
-                'edit_target' => 'genel',
+                'edit_target' => 'pozisyon',
                 'scopes' => $both,
             ],
             [
@@ -211,7 +211,7 @@ class PersonelCompletenessService
                 'label' => 'Yönetici',
                 'category' => self::CATEGORY_ISTIHDAM,
                 'severity' => self::SEVERITY_CRITICAL,
-                'edit_target' => 'genel',
+                'edit_target' => 'pozisyon',
                 'scopes' => $both,
             ],
             [
@@ -219,7 +219,7 @@ class PersonelCompletenessService
                 'label' => 'Departman',
                 'category' => self::CATEGORY_ISTIHDAM,
                 'severity' => self::SEVERITY_CRITICAL,
-                'edit_target' => 'genel',
+                'edit_target' => 'pozisyon',
                 'scopes' => $both,
             ],
             [
@@ -227,7 +227,7 @@ class PersonelCompletenessService
                 'label' => 'Bölüm',
                 'category' => self::CATEGORY_ISTIHDAM,
                 'severity' => self::SEVERITY_CRITICAL,
-                'edit_target' => 'genel',
+                'edit_target' => 'pozisyon',
                 'scopes' => $both,
             ],
             [
@@ -235,7 +235,7 @@ class PersonelCompletenessService
                 'label' => 'Birim',
                 'category' => self::CATEGORY_ISTIHDAM,
                 'severity' => self::SEVERITY_CRITICAL,
-                'edit_target' => 'genel',
+                'edit_target' => 'pozisyon',
                 'scopes' => $both,
             ],
             [
@@ -243,7 +243,7 @@ class PersonelCompletenessService
                 'label' => 'Unvan / Görev',
                 'category' => self::CATEGORY_ISTIHDAM,
                 'severity' => self::SEVERITY_CRITICAL,
-                'edit_target' => 'genel',
+                'edit_target' => 'pozisyon',
                 'scopes' => $both,
             ],
             [
@@ -251,7 +251,7 @@ class PersonelCompletenessService
                 'label' => 'Pozisyon',
                 'category' => self::CATEGORY_ISTIHDAM,
                 'severity' => self::SEVERITY_CRITICAL,
-                'edit_target' => 'genel',
+                'edit_target' => 'pozisyon',
                 'scopes' => $both,
             ],
             [

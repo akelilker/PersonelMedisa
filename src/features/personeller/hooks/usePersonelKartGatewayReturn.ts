@@ -26,7 +26,7 @@ export function usePersonelKartGatewayReturn({
     });
   }, [navigate, overlayPath, parsedPersonelId, kartReturnPath]);
 
-  const handleOpenMissingInfo = useCallback((targetTab: "genel" | "pozisyon" = "genel") => {
+  const handleOpenMissingInfo = useCallback((targetTab: "genel" | "pozisyon" = "genel", focusField?: string) => {
     navigate(overlayPath, {
       state: {
         kayitModal: {
@@ -34,6 +34,7 @@ export function usePersonelKartGatewayReturn({
           personelId: parsedPersonelId,
           targetTab,
           intent: "personel-missing-info-gateway",
+          ...(focusField ? { focusField } : {}),
           returnTo: kartReturnPath
         }
       }

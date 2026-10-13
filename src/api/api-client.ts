@@ -110,7 +110,7 @@ export class ApiRequestError extends Error {
   rawMessage: string;
 
   constructor(message: string, status: number, detail?: Pick<ApiError, "code" | "field">) {
-    super(userErrorText(message, detail?.code, status));
+    super(userErrorText(message, detail?.code, status, detail?.field));
     this.rawMessage = message;
     this.name = "ApiRequestError";
     this.status = status;
@@ -236,7 +236,7 @@ export function getApiErrorDetail(
   options?: GetApiErrorMessageOptions
 ): ApiErrorDetail {
   const detail = resolveApiErrorDetail(error, fallbackMessage, options);
-  return { ...detail, message: userErrorText(detail.message, detail.code, detail.status) };
+  return { ...detail, message: userErrorText(detail.message, detail.code, detail.status, detail.field) };
 }
 
 export function getApiErrorMessage(

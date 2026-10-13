@@ -642,3 +642,47 @@ describe("U) Personel Kartı Puantaj sekmesi, kişi kartında QR yok, Talepler i
     expect(css).toMatch(/@media \(min-width: 720px\)[^@]*\.pm-talep-turleri \{[^}]*auto-fit/);
   });
 });
+
+describe("V) Boş form: tarayıcı balonu yok, alan adlı Title Case mesaj + kırmızı çerçeve + odak (t879)", () => {
+  it("main.tsx guard'ı kurar; mesaj CSS ::after ile gösterilir", () => {
+    expect(readSrc("src/main.tsx")).toContain("installFormValidationGuard();");
+    expect(readSrc("src/styles/components/form.css")).toMatch(
+      /\.field-has-error\[data-field-error-text\]::after \{[^}]*content: attr\(data-field-error-text\)/
+    );
+  });
+
+  it("boş zorunlu alan: noValidate, gönderim engellenir, 'T.C. Kimlik No. Boş Bırakılamaz.', odak ilk alanda, düzenleyince kalkar", async () => {
+    const { installFormValidationGuard, __resetFormValidationGuardForTests } = await import(
+      "../../src/lib/forms/empty-form-guard"
+    );
+    __resetFormValidationGuardForTests();
+    installFormValidationGuard();
+    const onSubmit = vi.fn((e: Event) => e.preventDefault());
+    document.body.innerHTML = `
+      <form id="f">
+        <div class="form-section"><label for="tc">T.C. Kimlik No.</label><input id="tc" name="edit-tc-kimlik-no" required /></div>
+        <div class="form-section"><label for="x">Konu *</label><input id="x" name="konu_serbest" required /></div>
+        <button type="submit">Kaydet</button>
+      </form>`;
+    await new Promise((r) => setTimeout(r, 0));
+    const form = document.getElementById("f") as HTMLFormElement;
+    expect(form.noValidate).toBe(true);
+    form.addEventListener("submit", onSubmit);
+    form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    expect(onSubmit).not.toHaveBeenCalled();
+    const tc = document.getElementById("tc") as HTMLInputElement;
+    const w1 = tc.closest(".form-section")!;
+    expect(w1.classList.contains("field-has-error")).toBe(true);
+    expect(w1.getAttribute("data-field-error-text")).toBe("T.C. Kimlik No. Boş Bırakılamaz.");
+    expect(document.getElementById("x")!.closest(".form-section")!.getAttribute("data-field-error-text")).toBe(
+      "Konu Boş Bırakılamaz."
+    );
+    expect(tc.getAttribute("aria-invalid")).toBe("true");
+    expect(document.activeElement).toBe(tc);
+    tc.value = "1";
+    tc.dispatchEvent(new Event("input", { bubbles: true }));
+    expect(w1.classList.contains("field-has-error")).toBe(false);
+    expect(w1.hasAttribute("data-field-error-text")).toBe(false);
+    document.body.innerHTML = "";
+  });
+});

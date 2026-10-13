@@ -793,3 +793,45 @@ describe("X) Personel Kartı ve Belge Takip (t876)", () => {
     expect(css).toMatch(/@media \(min-width: 721px\)[\s\S]*\.personel-dosya-hero-photo\s*\{[^}]*display:\s*flex/);
   });
 });
+
+describe("Y) Kullanıcı Paneli masaüstü düzenleri", () => {
+  it("ev simgesi hover/focus/active durumunda kaymaz ve çerçevesiz kalır", () => {
+    const css = readSrc("src/styles/components/modal.css");
+    const lane = css.slice(css.indexOf(".modal-header-leading .modal-home-btn,"));
+    expect(lane).toMatch(
+      /\.modal-header-leading \.modal-home-btn:hover,\s*\.modal-header-leading \.modal-home-btn:focus-visible,\s*\.modal-header-leading \.modal-home-btn:active\s*\{[^}]*transform:\s*translateY\(var\(--modal-header-icon-shift-y\)\)/
+    );
+    expect(css).toMatch(/\.modal-home-btn\s*\{[^}]*border:\s*none/);
+    expect(css).toMatch(/\.modal-home-btn\s*\{[^}]*background:\s*transparent/);
+    expect(css).not.toMatch(/!important/);
+  });
+
+  it("alt ekranlarda geri satırı Kullanıcı Paneli; QR okutma hariç", () => {
+    const shell = readSrc("src/app/AppShell.tsx");
+    expect(shell).toMatch(/pathname\.startsWith\("\/self\/"\) && pathname !== "\/self\/qr-okut"/);
+    expect(shell).toContain('label: "Kullanıcı Paneli"');
+  });
+
+  it("masaüstünde alt simgeler etiketli, GİRİŞ/ÇIKIŞ ortalı ve fotoğraf 88px", () => {
+    const css = readSrc("src/features/self-service/self-service.css");
+    expect(css).toMatch(/@media \(min-width: 641px\)[\s\S]*\.pm-self-dock__label\s*\{[^}]*opacity:\s*1/);
+    const desktop = css.slice(css.indexOf("@media (min-width: 721px)"));
+    expect(desktop).toMatch(/\.self-home-main\s*\{[^}]*align-items:\s*center/);
+    expect(desktop).toMatch(/\.self-home-main > \.pm-section\s*\{[^}]*width:\s*min\(100%, 400px\)/);
+    expect(desktop).toMatch(/\.self-home-page \.pm-box-main-action\s*\{[^}]*min-height:\s*58px/);
+    expect(desktop).toMatch(/\.pm-self-identity--home \.pm-self-portrait\s*\{[^}]*width:\s*88px/);
+    expect(desktop).toMatch(/\.pm-self-identity--home \.pm-self-portrait\s*\{[^}]*height:\s*88px/);
+    expect(css).not.toMatch(/!important/);
+  });
+
+  it("masaüstü header 4px kısa, logo dikey ortada, başlık kuralları ayrı", () => {
+    const css = readSrc("src/styles/components/hero.css");
+    const desktop = css.slice(css.lastIndexOf("@media (min-width: 721px)"));
+    expect(desktop).toMatch(/\.hero\.hero--personel-shell\s*\{[^}]*padding-bottom:\s*8px/);
+    expect(desktop).toMatch(
+      /\.hero\.hero--personel-shell \.hero-logo\s*\{[^}]*position:\s*absolute[^}]*top:\s*50%[^}]*transform:\s*translateY\(-50%\)/
+    );
+    expect(desktop).not.toMatch(/hero-title-stack|\.hero h1|hero-panel-subtitle/);
+    expect(css).not.toMatch(/!important/);
+  });
+});

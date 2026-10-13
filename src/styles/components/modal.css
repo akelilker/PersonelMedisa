@@ -329,8 +329,14 @@
 }
 
 /* Lane içindeki Home: mevcut `transform: none` konumuna 6px dikey kaydırma
-   compose edilir. Back butonu bu kaydırmadan etkilenmez (konumu korunur). */
-.modal-header-leading .modal-home-btn {
+   compose edilir. Back butonu bu kaydırmadan etkilenmez (konumu korunur).
+   Hover/focus/active'te de aynı transform korunur: bağımsız `.modal-home-btn:hover`
+   kuralı (absolute konum için -50% taşır) lane içindeki statik ikonu yukarı
+   kaçırmasın. Simge çerçevesiz/arka plansız kalır (kalıcı kural). */
+.modal-header-leading .modal-home-btn,
+.modal-header-leading .modal-home-btn:hover,
+.modal-header-leading .modal-home-btn:focus-visible,
+.modal-header-leading .modal-home-btn:active {
   transform: translateY(var(--modal-header-icon-shift-y));
 }
 

@@ -1012,3 +1012,31 @@ body.login-page .hero .animated-line {
   }
 
 }
+
+/*
+ * Kullanıcı Paneli masaüstü header: çerçeve 4px kısalır (alt iç boşluk 12px → 8px).
+ * Başlık metinleri grid kolon 2'de kaldığı için piksel olarak yerinde kalır.
+ * MEDISA logosu absolute + top:50% ile header içinde dikeyde ortalanır; yatay
+ * konum (border-edge 12px = padding-edge 11px) korunur, başlık etkilenmez.
+ */
+@media (min-width: 721px) {
+  .hero.hero--personel-shell {
+    padding-bottom: 8px;
+  }
+
+  /*
+   * Grid hücresine bağlanırsa containing block içerik kutusu olur ve logo
+   * sağa/aşağı kaçar. auto yerleşim containing block'u header padding kutusuna
+   * alır: yatay eski kenar (11px), dikey header merkezi.
+   */
+  .hero.hero--personel-shell .hero-logo {
+    position: absolute;
+    grid-column: auto;
+    grid-row: auto;
+    top: 50%;
+    left: 11px;
+    width: var(--hero-logo-width);
+    margin: 0;
+    transform: translateY(-50%);
+  }
+}

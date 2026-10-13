@@ -1,0 +1,716 @@
+[
+  {
+    "raw": "Pasif personel arsiv erisimi icin arsiv.view yetkisi gerekir.",
+    "code": "ARCHIVE_ACCESS_REQUIRED",
+    "status": 403,
+    "beklenen": "Pasif Personelin Arşiv Bilgilerini Görmek İçin Arşiv Yetkisi Gerekir. Sistem Yöneticinize Başvurun."
+  },
+  {
+    "raw": "Disiplin aday vakasi olusturulamadi.",
+    "code": null,
+    "status": null,
+    "beklenen": "Disiplin Vakası Oluşturulamadı. Bilgileri Kontrol Edip Tekrar Deneyin."
+  },
+  {
+    "raw": "Savunma belgesi bu asamada eklenemez.",
+    "code": null,
+    "status": null,
+    "beklenen": "Savunma Belgesi Bu Aşamada Eklenemez. Önce Savunma Talebini Tamamlayın."
+  },
+  {
+    "raw": "Vaka bu asamada islemsiz kapatilamaz.",
+    "code": null,
+    "status": null,
+    "beklenen": "Vaka Bu Aşamada İşlem Yapılmadan Kapatılamaz. Önce Karar Verin."
+  },
+  {
+    "raw": "Belge sureci personel ile uyusmuyor.",
+    "code": null,
+    "status": null,
+    "beklenen": "Seçilen Belge Bu Personele Ait Değil. Doğru Belgeyi Seçin."
+  },
+  {
+    "raw": "Bitis tarihi yayin tarihinden once olamaz.",
+    "code": "VALIDATION_ERROR",
+    "status": null,
+    "beklenen": "Tarih Aralığı Uygun Değil: Bitiş Tarihi Başlangıçtan Önce Olamaz."
+  },
+  {
+    "raw": "Kullanici rolu canonical modele cozulemedi. Manuel rol eslemesi gerekir.",
+    "code": "ROLE_UNRESOLVED",
+    "status": 403,
+    "beklenen": "Hesabınızın Rolü Tanımlı Değil. Sistem Yöneticinizden Rolünüzü Düzenlemesini İsteyin."
+  },
+  {
+    "raw": "Aktif snapshot sonrasi kaynaklar degisti; once iptal edip explicit revision olusturun.",
+    "code": "PAYROLL_SNAPSHOT_SOURCE_CHANGED",
+    "status": null,
+    "beklenen": "Hesap Kaydından Sonra Puantaj Veya Ücret Bilgileri Değişti. Önce Mevcut Hesabı İptal Edip Yeniden Hesaplayın."
+  },
+  {
+    "raw": "SGK işvereni kaydı oluşturulamadı.",
+    "code": "INTERNAL_ERROR",
+    "status": 500,
+    "beklenen": "SGK İşvereni Kaydedilemedi. Bilgileri Kontrol Edip Tekrar Deneyin."
+  },
+  {
+    "raw": "SGK işvereni kaydı güncellenemedi.",
+    "code": "INTERNAL_ERROR",
+    "status": 500,
+    "beklenen": "SGK İşvereni Kaydedilemedi. Bilgileri Kontrol Edip Tekrar Deneyin."
+  },
+  {
+    "raw": "SGK işvereni kaydı silinemedi.",
+    "code": "INTERNAL_ERROR",
+    "status": 500,
+    "beklenen": "SGK İşvereni Silinemedi. Bağlı Kayıt Olup Olmadığını Kontrol Edip Tekrar Deneyin."
+  },
+  {
+    "raw": "Şube kaydı oluşturulamadı.",
+    "code": "INTERNAL_ERROR",
+    "status": 500,
+    "beklenen": "Şube Kaydedilemedi. Bilgileri Kontrol Edip Tekrar Deneyin."
+  },
+  {
+    "raw": "Şube kaydı güncellenemedi.",
+    "code": "INTERNAL_ERROR",
+    "status": 500,
+    "beklenen": "Şube Kaydedilemedi. Bilgileri Kontrol Edip Tekrar Deneyin."
+  },
+  {
+    "raw": "Şube kaydı silinemedi.",
+    "code": "INTERNAL_ERROR",
+    "status": 500,
+    "beklenen": "Şube Silinemedi. Bağlı Kayıt Olup Olmadığını Kontrol Edip Tekrar Deneyin."
+  },
+  {
+    "raw": "Canonical first-login credential gecisi uygulanamadi.",
+    "code": "FIRST_LOGIN_CREDENTIALS_APPLY_FAILED",
+    "status": 500,
+    "beklenen": "Giriş Yapılamadı. Bilgilerinizi Kontrol Edip Tekrar Deneyin."
+  },
+  {
+    "raw": "Pasif personel belge indirme icin arsiv.download yetkisi gerekir.",
+    "code": "ARCHIVE_DOWNLOAD_REQUIRED",
+    "status": 403,
+    "beklenen": "Pasif Personelin Arşiv Bilgilerini Görmek İçin Arşiv Yetkisi Gerekir. Sistem Yöneticinize Başvurun."
+  },
+  {
+    "raw": "DEMO_TEST_VERISI yalniz GENEL_YONETICI tarafindan secilebilir.",
+    "code": "FORBIDDEN",
+    "status": 403,
+    "beklenen": "Demo Test Verisi Seçeneğini Yalnızca Genel Yönetici Kullanabilir."
+  },
+  {
+    "raw": "DEMO_TEST_VERISI onayi yalniz GENEL_YONETICI.",
+    "code": "FORBIDDEN",
+    "status": 403,
+    "beklenen": "Demo Test Verisi Seçeneğini Yalnızca Genel Yönetici Kullanabilir."
+  },
+  {
+    "raw": "gecerlilik_bitis baslangictan once olamaz.",
+    "code": "VALIDATION_ERROR",
+    "status": 422,
+    "beklenen": "Tarih Aralığı Uygun Değil: Bitiş Tarihi Başlangıçtan Önce Olamaz."
+  },
+  {
+    "raw": "Kapanis tarihi kayit baslangicindan once olamaz.",
+    "code": "DATE_RANGE_INVALID",
+    "status": null,
+    "beklenen": "Tarih Aralığı Uygun Değil: Bitiş Tarihi Başlangıçtan Önce Olamaz."
+  },
+  {
+    "raw": "Bitis tarihi baslangic tarihinden once olamaz.",
+    "code": "DATE_RANGE_INVALID",
+    "status": null,
+    "beklenen": "Tarih Aralığı Uygun Değil: Bitiş Tarihi Başlangıçtan Önce Olamaz."
+  },
+  {
+    "raw": "Kaynak muhur degismis.",
+    "code": "REOPEN_SOURCE_SEAL_CHANGED",
+    "status": null,
+    "beklenen": "Dönem Mühürlenemedi; Dönem Bilgileri Bu Arada Değişmiş Olabilir. Sayfayı Yenileyip Tekrar Deneyin."
+  },
+  {
+    "raw": "Olay karari kaydedilemedi.",
+    "code": null,
+    "status": null,
+    "beklenen": "Olay Kararı Kaydedilemedi. Sayfayı Yenileyip Tekrar Deneyin."
+  },
+  {
+    "raw": "Bu Kayıt İçin Düzeltme Talebi Süresi Doldu. Amirinizle Görüşün.",
+    "code": "CORRECTION_WINDOW_CLOSED",
+    "status": null,
+    "beklenen": "Düzeltme Talebi Açılamadı: Talep Süresi Doldu. Amirinizle Görüşün."
+  },
+  {
+    "raw": "Bu hareket icin bekleyen duzeltme talebi var.",
+    "code": "CORRECTION_PENDING_EXISTS",
+    "status": null,
+    "beklenen": "Düzeltme Talebi Açılamadı: Bu Hareket İçin Bekleyen Talep Var."
+  },
+  {
+    "raw": "Uygun bagimsiz yonetici bulunamadi. Talep olusturulamadi.",
+    "code": "CORRECTION_NO_APPROVER",
+    "status": null,
+    "beklenen": "Düzeltme Talebi Açılamadı: Onaylayacak Yönetici Bulunamadı. Amirinizle Görüşün."
+  },
+  {
+    "raw": "Bu kayit icin acik giris/cikis anomalisi yok.",
+    "code": "ANOMALY_NOT_UNRESOLVED",
+    "status": null,
+    "beklenen": "Düzeltme Talebi Açılamadı: Düzeltilecek Açık Kayıt Yok."
+  },
+  {
+    "raw": "Acik giris kaydi varken yeni giris yapilamaz. Once cikis veya duzeltme gerekir.",
+    "code": "QR_OPEN_SHIFT_EXISTS",
+    "status": null,
+    "beklenen": "Açık Bir Giriş Kaydınız Var. Önce Çıkış Okutun Veya Düzeltme Talebi Açın."
+  },
+  {
+    "raw": "Acik giris olmadan cikis kaydedilemez.",
+    "code": "QR_NO_OPEN_SHIFT",
+    "status": null,
+    "beklenen": "Giriş Kaydınız Yok. Önce Giriş Okutun."
+  },
+  {
+    "raw": "Tarih penceresi en fazla 366 gun (dahil) olabilir.",
+    "code": "VALIDATION_ERROR",
+    "status": null,
+    "beklenen": "Tarih Aralığı Uygun Değil: Aralık En Fazla 366 Gün Olabilir."
+  },
+  {
+    "raw": "QR tarih araligi en fazla 31 gun olabilir.",
+    "code": null,
+    "status": null,
+    "beklenen": "Tarih Aralığı Uygun Değil: Aralık En Fazla 31 Gün Olabilir."
+  },
+  {
+    "raw": "QR token surumu desteklenmiyor.",
+    "code": "QR_TOKEN_VERSION_UNSUPPORTED",
+    "status": null,
+    "beklenen": "QR Kod Okunamadı Ya Da Süresi Doldu. Ekrandaki Güncel QR Kodu Tekrar Okutun."
+  },
+  {
+    "raw": "QR suresi doldu, tekrar okutun.",
+    "code": "QR_TOKEN_EXPIRED",
+    "status": null,
+    "beklenen": "QR Kod Okunamadı Ya Da Süresi Doldu. Ekrandaki Güncel QR Kodu Tekrar Okutun."
+  },
+  {
+    "raw": "belge_id ve belge_sha256 birlikte verilmelidir.",
+    "code": "POLICY_EVIDENCE_INCOMPLETE",
+    "status": null,
+    "beklenen": "Belge Ve Belge Doğrulama Bilgisi Birlikte Girilmelidir."
+  },
+  {
+    "raw": "Giriş sırasında bir hata oluştu.",
+    "code": null,
+    "status": null,
+    "beklenen": "Giriş Yapılamadı. Bilgilerinizi Kontrol Edip Tekrar Deneyin."
+  },
+  {
+    "raw": "Geçerli bir bildirim özeti ID verilmedi.",
+    "code": null,
+    "status": null,
+    "beklenen": "Açılmak İstenen Kayıt Bulunamadı. Listeden Kaydı Seçerek Tekrar Açın."
+  },
+  {
+    "raw": "Kayıt koruma altına alınamadı.",
+    "code": null,
+    "status": null,
+    "beklenen": "Koruma Altına Alma Yapılamadı. Kayıt Değişmedi; Tekrar Deneyin."
+  },
+  {
+    "raw": "Koruma kaldırılamadı.",
+    "code": null,
+    "status": null,
+    "beklenen": "Koruma Kaldırma Yapılamadı. Kayıt Değişmedi; Tekrar Deneyin."
+  },
+  {
+    "raw": "Saklama süresi bilgisi alınamadı.",
+    "code": null,
+    "status": null,
+    "beklenen": "Saklama Süresi Sorgusu Yapılamadı. Kayıt Değişmedi; Tekrar Deneyin."
+  },
+  {
+    "raw": "İmha talebi oluşturulamadı.",
+    "code": null,
+    "status": null,
+    "beklenen": "İmha Talebi Yapılamadı. Kayıt Değişmedi; Tekrar Deneyin."
+  },
+  {
+    "raw": "İmha onayı işlenemedi.",
+    "code": null,
+    "status": null,
+    "beklenen": "İmha Onayı Yapılamadı. Kayıt Değişmedi; Tekrar Deneyin."
+  },
+  {
+    "raw": "Bildirim okundu işaretlenemedi.",
+    "code": null,
+    "status": null,
+    "beklenen": "Okundu Olarak İşaretlenemedi. Biraz Sonra Tekrar Deneyin."
+  },
+  {
+    "raw": "Bildirimler okundu işaretlenemedi.",
+    "code": null,
+    "status": null,
+    "beklenen": "Okundu Olarak İşaretlenemedi. Biraz Sonra Tekrar Deneyin."
+  },
+  {
+    "raw": "Adayın kaynak verisi doğrulanamadı. Kayıt uygulanmadan yenilendi.",
+    "code": null,
+    "status": null,
+    "beklenen": "Bu Aday Bu Arada Değişti Veya Başka Bir Kararla Uygulandı. Liste Yenilendi; Kontrol Edip Tekrar Karar Verin."
+  },
+  {
+    "raw": "Bu aday daha önce farklı bir manuel kararla uygulanmış.",
+    "code": null,
+    "status": null,
+    "beklenen": "Bu Aday Bu Arada Değişti Veya Başka Bir Kararla Uygulandı. Liste Yenilendi; Kontrol Edip Tekrar Karar Verin."
+  },
+  {
+    "raw": "Günlük kayıt listesi şu an güncellenemiyor.",
+    "code": null,
+    "status": null,
+    "beklenen": "Liste Şu An Güncellenemiyor; Son Kaydedilen Bilgiler Gösteriliyor. Biraz Sonra Sayfayı Yenileyin."
+  },
+  {
+    "raw": "Kayıt senaryosu seçenekleri şu an güncellenemiyor; manuel giriş kullanılabilir.",
+    "code": null,
+    "status": null,
+    "beklenen": "Seçenekler Yüklenemedi. Bilgiyi Elle Girerek Devam Edebilirsiniz."
+  },
+  {
+    "raw": "Geçerli bir günlük kayıt ID verilmedi.",
+    "code": null,
+    "status": null,
+    "beklenen": "Açılmak İstenen Kayıt Bulunamadı. Listeden Kaydı Seçerek Tekrar Açın."
+  },
+  {
+    "raw": "Günlük kayıt detayı şu an güncellenemiyor.",
+    "code": null,
+    "status": null,
+    "beklenen": "Liste Şu An Güncellenemiyor; Son Kaydedilen Bilgiler Gösteriliyor. Biraz Sonra Sayfayı Yenileyin."
+  },
+  {
+    "raw": "Finans kayıtları şu an güncellenemiyor.",
+    "code": null,
+    "status": null,
+    "beklenen": "Liste Şu An Güncellenemiyor; Son Kaydedilen Bilgiler Gösteriliyor. Biraz Sonra Sayfayı Yenileyin."
+  },
+  {
+    "raw": "Genel Yönetici bildirim onayı tamamlanamadı.",
+    "code": null,
+    "status": null,
+    "beklenen": "Onay Kaydedilemedi. Sayfayı Yenileyip Tekrar Deneyin."
+  },
+  {
+    "raw": "Geçerli bir personel ID verilmedi.",
+    "code": null,
+    "status": null,
+    "beklenen": "Açılmak İstenen Kayıt Bulunamadı. Listeden Kaydı Seçerek Tekrar Açın."
+  },
+  {
+    "raw": "Personel detayi su an guncellenemiyor.",
+    "code": null,
+    "status": null,
+    "beklenen": "Liste Şu An Güncellenemiyor; Son Kaydedilen Bilgiler Gösteriliyor. Biraz Sonra Sayfayı Yenileyin."
+  },
+  {
+    "raw": "Surec gecmisi su an guncellenemiyor.",
+    "code": null,
+    "status": null,
+    "beklenen": "Liste Şu An Güncellenemiyor; Son Kaydedilen Bilgiler Gösteriliyor. Biraz Sonra Sayfayı Yenileyin."
+  },
+  {
+    "raw": "Zimmet kayitlari su an guncellenemiyor.",
+    "code": null,
+    "status": null,
+    "beklenen": "Liste Şu An Güncellenemiyor; Son Kaydedilen Bilgiler Gösteriliyor. Biraz Sonra Sayfayı Yenileyin."
+  },
+  {
+    "raw": "Personel listesi su an guncellenemiyor.",
+    "code": null,
+    "status": null,
+    "beklenen": "Liste Şu An Güncellenemiyor; Son Kaydedilen Bilgiler Gösteriliyor. Biraz Sonra Sayfayı Yenileyin."
+  },
+  {
+    "raw": "Günlük puantaj kaydı şu an güncellenemiyor.",
+    "code": null,
+    "status": null,
+    "beklenen": "Liste Şu An Güncellenemiyor; Son Kaydedilen Bilgiler Gösteriliyor. Biraz Sonra Sayfayı Yenileyin."
+  },
+  {
+    "raw": "Kaydı güncellemek için önce personel ve tarih seç.",
+    "code": null,
+    "status": null,
+    "beklenen": "Kaydı Güncellemek İçin Önce Personel Ve Tarih Seçin."
+  },
+  {
+    "raw": "Süreç listesi şu an güncellenemiyor.",
+    "code": null,
+    "status": null,
+    "beklenen": "Liste Şu An Güncellenemiyor; Son Kaydedilen Bilgiler Gösteriliyor. Biraz Sonra Sayfayı Yenileyin."
+  },
+  {
+    "raw": "Süreç türleri şu an güncellenemiyor, manuel giriş kullanılabilir.",
+    "code": null,
+    "status": null,
+    "beklenen": "Seçenekler Yüklenemedi. Bilgiyi Elle Girerek Devam Edebilirsiniz."
+  },
+  {
+    "raw": "Geçerli bir süreç ID verilmedi.",
+    "code": null,
+    "status": null,
+    "beklenen": "Açılmak İstenen Kayıt Bulunamadı. Listeden Kaydı Seçerek Tekrar Açın."
+  },
+  {
+    "raw": "Süreç detayı şu an güncellenemiyor.",
+    "code": null,
+    "status": null,
+    "beklenen": "Liste Şu An Güncellenemiyor; Son Kaydedilen Bilgiler Gösteriliyor. Biraz Sonra Sayfayı Yenileyin."
+  },
+  {
+    "raw": "Bitiş tarihi başlangıçtan önce olamaz.",
+    "code": null,
+    "status": null,
+    "beklenen": "Tarih Aralığı Uygun Değil: Bitiş Tarihi Başlangıçtan Önce Olamaz."
+  },
+  {
+    "raw": "Önce ön kontrol çalıştırılmalıdır.",
+    "code": null,
+    "status": null,
+    "beklenen": "Önce Ön Kontrolü Çalıştırın Ve Hataları Giderin, Sonra Devam Edin."
+  },
+  {
+    "raw": "İptal edilemedi.",
+    "code": null,
+    "status": null,
+    "beklenen": "İptal Yapılamadı, Kayıt Olduğu Gibi Duruyor. Sayfayı Yenileyip Tekrar Deneyin."
+  },
+  {
+    "raw": "Ücret kaydı iptal edilemedi.",
+    "code": null,
+    "status": null,
+    "beklenen": "İptal Yapılamadı, Kayıt Olduğu Gibi Duruyor. Sayfayı Yenileyip Tekrar Deneyin."
+  },
+  {
+    "raw": "T.C. Kimlik No. 11 hane ve yalnızca rakamlardan oluşmalıdır.",
+    "code": null,
+    "status": null,
+    "beklenen": "T.C. Kimlik No. 11 Haneli Ve Yalnızca Rakam Olmalıdır."
+  },
+  {
+    "raw": "Mühürleme işlemi başarısız oldu. Lütfen tekrar deneyin.",
+    "code": null,
+    "status": null,
+    "beklenen": "Dönem Mühürlenemedi; Dönem Bilgileri Bu Arada Değişmiş Olabilir. Sayfayı Yenileyip Tekrar Deneyin."
+  },
+  {
+    "raw": "Önce geçerli ön kontrol sonucu alın.",
+    "code": null,
+    "status": null,
+    "beklenen": "Önce Ön Kontrolü Çalıştırın Ve Hataları Giderin, Sonra Devam Edin."
+  },
+  {
+    "raw": "İçe aktarma ön kontrolü uygun değil.",
+    "code": null,
+    "status": null,
+    "beklenen": "Önce Ön Kontrolü Çalıştırın Ve Hataları Giderin, Sonra Devam Edin."
+  },
+  {
+    "raw": "SGK Katalog Hazırlık için bordro ön izleme yetkisi gerekir.",
+    "code": null,
+    "status": null,
+    "beklenen": "Bu Ekran İçin Bordro Ön İzleme Yetkisi Gerekir. Sistem Yöneticinize Başvurun."
+  },
+  {
+    "raw": "Bordro hazırlık verisi yüklenemedi.",
+    "code": null,
+    "status": null,
+    "beklenen": "Maaş Hesaplama Bilgileri Yüklenemedi. Sayfayı Yenileyip Tekrar Deneyin."
+  },
+  {
+    "raw": "Politika taslağı oluşturulamadı.",
+    "code": null,
+    "status": null,
+    "beklenen": "Politika Taslağı Oluşturulamadı. Tekrar Deneyin."
+  },
+  {
+    "raw": "Politika onaya gönderilemedi.",
+    "code": null,
+    "status": null,
+    "beklenen": "Politika Onaya Gönderilemedi. Tekrar Deneyin."
+  },
+  {
+    "raw": "Kanıt geçerli değil; onay kapalı.",
+    "code": null,
+    "status": null,
+    "beklenen": "Kanıt Belgesi Geçerli Değil, Bu Yüzden Onay Verilemiyor. Belgeyi Yenileyip Tekrar Deneyin."
+  },
+  {
+    "raw": "Hazırlayan kullanıcı politikayı onaylayamaz.",
+    "code": null,
+    "status": null,
+    "beklenen": "Politikayı Hazırlayan Kişi Onaylayamaz. Onayı Başka Bir Yetkili Vermelidir."
+  },
+  {
+    "raw": "Politika onaylanamadı.",
+    "code": null,
+    "status": null,
+    "beklenen": "Politika Onaylanamadı. Tekrar Deneyin."
+  },
+  {
+    "raw": "Maaş adayı üretilemedi.",
+    "code": null,
+    "status": null,
+    "beklenen": "Maaş İşlemi Tamamlanamadı, Hiçbir Değişiklik Kaydedilmedi. Ön Kontrolü Yeniden Çalıştırıp Tekrar Deneyin."
+  },
+  {
+    "raw": "Bordro kesinleştirilemedi.",
+    "code": null,
+    "status": null,
+    "beklenen": "Maaş İşlemi Tamamlanamadı, Hiçbir Değişiklik Kaydedilmedi. Ön Kontrolü Yeniden Çalıştırıp Tekrar Deneyin."
+  },
+  {
+    "raw": "Devir şablonu indirilemedi.",
+    "code": null,
+    "status": null,
+    "beklenen": "Maaş Hesaplama Bilgileri Yüklenemedi. Sayfayı Yenileyip Tekrar Deneyin."
+  },
+  {
+    "raw": "Aday listesi alınamadı.",
+    "code": null,
+    "status": null,
+    "beklenen": "Maaş Hesaplama Bilgileri Yüklenemedi. Sayfayı Yenileyip Tekrar Deneyin."
+  },
+  {
+    "raw": "Snapshot iptal edilemedi.",
+    "code": null,
+    "status": null,
+    "beklenen": "İptal Yapılamadı, Kayıt Olduğu Gibi Duruyor. Sayfayı Yenileyip Tekrar Deneyin."
+  },
+  {
+    "raw": "Snapshot detayı alınamadı.",
+    "code": null,
+    "status": null,
+    "beklenen": "Maaş Hesaplama Bilgileri Yüklenemedi. Sayfayı Yenileyip Tekrar Deneyin."
+  },
+  {
+    "raw": "Çalıştırma iptal edilemedi.",
+    "code": null,
+    "status": null,
+    "beklenen": "İptal Yapılamadı, Kayıt Olduğu Gibi Duruyor. Sayfayı Yenileyip Tekrar Deneyin."
+  },
+  {
+    "raw": "Aday kalemleri alınamadı.",
+    "code": null,
+    "status": null,
+    "beklenen": "Maaş Hesaplama Bilgileri Yüklenemedi. Sayfayı Yenileyip Tekrar Deneyin."
+  },
+  {
+    "raw": "Devir kaydedilemedi.",
+    "code": null,
+    "status": null,
+    "beklenen": "Maaş İşlemi Tamamlanamadı, Hiçbir Değişiklik Kaydedilmedi. Ön Kontrolü Yeniden Çalıştırıp Tekrar Deneyin."
+  },
+  {
+    "raw": "SGK CSV için ay ve şube seçilmelidir.",
+    "code": null,
+    "status": null,
+    "beklenen": "SGK Dosyası İçin Önce Ay Ve Şube Seçin."
+  },
+  {
+    "raw": "Aylık özet yüklenemedi.",
+    "code": null,
+    "status": null,
+    "beklenen": "Rapor Hazırlanamadı. Filtreleri Kontrol Edip Tekrar Deneyin."
+  },
+  {
+    "raw": "Bölüm onayı tamamlanamadı.",
+    "code": null,
+    "status": null,
+    "beklenen": "Onay Kaydedilemedi. Sayfayı Yenileyip Tekrar Deneyin."
+  },
+  {
+    "raw": "Üst onay tamamlanamadı.",
+    "code": null,
+    "status": null,
+    "beklenen": "Onay Kaydedilemedi. Sayfayı Yenileyip Tekrar Deneyin."
+  },
+  {
+    "raw": "Rapor verisi alınamadı.",
+    "code": null,
+    "status": null,
+    "beklenen": "Rapor Hazırlanamadı. Filtreleri Kontrol Edip Tekrar Deneyin."
+  },
+  {
+    "raw": "Puantaj raporu dışa aktarılamadı.",
+    "code": null,
+    "status": null,
+    "beklenen": "Rapor Hazırlanamadı. Filtreleri Kontrol Edip Tekrar Deneyin."
+  },
+  {
+    "raw": "Serbest zaman takip yüklenemedi.",
+    "code": null,
+    "status": null,
+    "beklenen": "Rapor Hazırlanamadı. Filtreleri Kontrol Edip Tekrar Deneyin."
+  },
+  {
+    "raw": "İptal başarısız.",
+    "code": null,
+    "status": null,
+    "beklenen": "İptal Yapılamadı, Kayıt Olduğu Gibi Duruyor. Sayfayı Yenileyip Tekrar Deneyin."
+  },
+  {
+    "raw": "Talep oluşturulamadı.",
+    "code": null,
+    "status": null,
+    "beklenen": "Talep Oluşturulamadı. Bilgileri Kontrol Edip Tekrar Deneyin."
+  },
+  {
+    "raw": "Okundu işaretlenemedi.",
+    "code": null,
+    "status": null,
+    "beklenen": "Okundu Olarak İşaretlenemedi. Biraz Sonra Tekrar Deneyin."
+  },
+  {
+    "raw": "Kamera için güvenli bağlantı (HTTPS) gerekir.",
+    "code": null,
+    "status": null,
+    "beklenen": "Kamera Açılamadı. Uygulamayı Güvenli Bağlantıyla (HTTPS) Açın Veya Kamerası Olan Bir Cihaz Kullanın."
+  },
+  {
+    "raw": "Bu cihaz kamera erişimini desteklemiyor.",
+    "code": null,
+    "status": null,
+    "beklenen": "Kamera Açılamadı. Uygulamayı Güvenli Bağlantıyla (HTTPS) Açın Veya Kamerası Olan Bir Cihaz Kullanın."
+  },
+  {
+    "raw": "QR okuma hatasi.",
+    "code": null,
+    "status": null,
+    "beklenen": "QR Kod Okunamadı Ya Da Süresi Doldu. Ekrandaki Güncel QR Kodu Tekrar Okutun."
+  },
+  {
+    "raw": "Bitiş tarihi başlangıç tarihinden önce olamaz.",
+    "code": null,
+    "status": null,
+    "beklenen": "Tarih Aralığı Uygun Değil: Bitiş Tarihi Başlangıçtan Önce Olamaz."
+  },
+  {
+    "raw": "Saklama paneli yüklenemedi.",
+    "code": null,
+    "status": null,
+    "beklenen": "Saklama Paneli Yüklenemedi. Sayfayı Yenileyip Tekrar Deneyin."
+  },
+  {
+    "raw": "Saklama süresi değerlendirilemedi.",
+    "code": null,
+    "status": null,
+    "beklenen": "Saklama Süresi Hesaplanamadı. Sayfayı Yenileyip Tekrar Deneyin."
+  },
+  {
+    "raw": "Ücret tipi envanteri yüklenemedi.",
+    "code": null,
+    "status": null,
+    "beklenen": "Ücret Tipi Listesi Yüklenemedi. Sayfayı Yenileyip Tekrar Deneyin."
+  },
+  {
+    "raw": "PERSONEL hesapları Yönetim Paneli üzerinden oluşturulamaz. Personel kartındaki güvenli hesap onboarding akışını kullanın.",
+    "code": null,
+    "status": null,
+    "beklenen": "Personel Hesabı Buradan Açılamaz. Personel Kartındaki Hesap Oluşturma Adımını Kullanın."
+  },
+  {
+    "raw": "Yönetim paneli yüklenemedi.",
+    "code": null,
+    "status": null,
+    "beklenen": "Yönetim Paneli Yüklenemedi. Sayfayı Yenileyip Tekrar Deneyin."
+  },
+  {
+    "raw": "Silinebilirlik kontrolü alınamadı.",
+    "code": null,
+    "status": null,
+    "beklenen": "Bu Kaydın Silinip Silinemeyeceği Kontrol Edilemedi. Sayfayı Yenileyip Tekrar Deneyin."
+  },
+  {
+    "raw": "Kullanıcı kalıcı olarak silinemedi.",
+    "code": null,
+    "status": null,
+    "beklenen": "Kullanıcı Silinemedi. Bağlı Kayıt Olup Olmadığını Kontrol Edip Tekrar Deneyin."
+  },
+  {
+    "raw": "Şirket tanımı kaydedilemedi.",
+    "code": null,
+    "status": null,
+    "beklenen": "Şirket Kaydedilemedi. Bilgileri Kontrol Edip Tekrar Deneyin."
+  },
+  {
+    "raw": "Şirket silinemedi.",
+    "code": null,
+    "status": null,
+    "beklenen": "Şirket Silinemedi. Bağlı Kayıt Olup Olmadığını Kontrol Edip Tekrar Deneyin."
+  },
+  {
+    "raw": "SGK işvereni kaydedilemedi.",
+    "code": null,
+    "status": null,
+    "beklenen": "SGK İşvereni Kaydedilemedi. Bilgileri Kontrol Edip Tekrar Deneyin."
+  },
+  {
+    "raw": "SGK işvereni silinemedi.",
+    "code": null,
+    "status": null,
+    "beklenen": "SGK İşvereni Silinemedi. Bağlı Kayıt Olup Olmadığını Kontrol Edip Tekrar Deneyin."
+  },
+  {
+    "raw": "Bu personel kaydı başka bir kullanıcıya bağlı.",
+    "code": null,
+    "status": null,
+    "beklenen": "Bu Personel Başka Bir Kullanıcı Hesabına Bağlı. Farklı Bir Personel Seçin."
+  },
+  {
+    "raw": "Kullanıcı kaydı kaydedilemedi.",
+    "code": null,
+    "status": null,
+    "beklenen": "Kullanıcı Kaydedilemedi. Bilgileri Kontrol Edip Tekrar Deneyin."
+  },
+  {
+    "raw": "Kullanıcı adı canonical personel şablonuyla uyuşmuyor. Önce kullanıcı adını canonical şablona düzeltin.",
+    "code": null,
+    "status": null,
+    "beklenen": "Kullanıcı Adı Personelin Adı Ve Soyadıyla Uyuşmuyor. Önce Kullanıcı Adını Düzeltin."
+  },
+  {
+    "raw": "Canonical kullanıcı adı düzeltilemedi.",
+    "code": null,
+    "status": null,
+    "beklenen": "Kullanıcı Adı Personelin Adı Ve Soyadıyla Uyuşmuyor. Önce Kullanıcı Adını Düzeltin."
+  },
+  {
+    "raw": "Şube tanımı kaydedilemedi.",
+    "code": null,
+    "status": null,
+    "beklenen": "Şube Kaydedilemedi. Bilgileri Kontrol Edip Tekrar Deneyin."
+  },
+  {
+    "raw": "Şube silinemedi.",
+    "code": null,
+    "status": null,
+    "beklenen": "Şube Silinemedi. Bağlı Kayıt Olup Olmadığını Kontrol Edip Tekrar Deneyin."
+  },
+  {
+    "raw": "Departman eklenemedi.",
+    "code": null,
+    "status": null,
+    "beklenen": "Departman Kaydedilemedi. Bilgileri Kontrol Edip Tekrar Deneyin."
+  },
+  {
+    "raw": "İşten ayrılma süreci manuel iptal edilemez. Yeniden aktif akışı kullanılmalıdır.",
+    "code": null,
+    "status": null,
+    "beklenen": "İşten Ayrılma Süreci İptal Edilemez. Personeli Geri Almak İçin Yeniden Aktif İşlemini Kullanın."
+  }
+]

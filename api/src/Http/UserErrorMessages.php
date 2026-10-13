@@ -26,6 +26,11 @@ final class UserErrorMessages
 
     public static function forError(int $status, string $code, ?string $field = null, string $message = ''): string
     {
+        // t871: duruma özel onaylı mesajlar (OzelMesajlar, 39 satır) genel metinden önce gelir.
+        $ozel = OzelMesajlar::forMessage($message, $code);
+        if ($ozel !== null) {
+            return $ozel;
+        }
         $label = FieldLabels::labelOf($field);
         if ($label !== null && ($status === 400 || $status === 422)) {
             $c0 = strtoupper($code);

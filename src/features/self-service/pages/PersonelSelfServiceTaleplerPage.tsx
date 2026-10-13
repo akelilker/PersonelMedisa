@@ -115,7 +115,7 @@ export function PersonelSelfServiceTaleplerPage() {
     if (shouldPreferDemoApi()) {
       setLoading(false);
       setToday(null);
-      setLoadError(userErrorText("Demo modda düzeltme talebi yok."));
+      setLoadError(null);
       return;
     }
     setLoading(true);

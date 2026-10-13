@@ -5,6 +5,8 @@
  * Formlar tek tek değişmez: alan `name`/`id`/`data-field` veya görünen etiket ile bulunur.
  */
 
+import { fieldLabelOf } from "../display/field-labels";
+
 export const FIELD_ERROR_CLASS = "field-has-error";
 
 /** API alan anahtarı → ekrandaki form kontrolü adı (anahtar ile aynı değilse). */
@@ -63,9 +65,13 @@ export function findFieldControl(fieldOrLabel: string, root: ParentNode = search
     if (el) break;
   }
   if (!el) {
-    const want = foldTr(fieldOrLabel.replace(/_id$/, "").replace(/_/g, " "));
+    // t871: yeni alan anahtarları için ortak etiket haritası (FIELD_LABELS) da takma ad sayılır.
+    const wants = new Set([
+      foldTr(fieldOrLabel.replace(/_id$/, "").replace(/_/g, " ")),
+      foldTr(fieldLabelOf(fieldOrLabel) ?? fieldOrLabel)
+    ]);
     const labels = Array.from(root.querySelectorAll<HTMLLabelElement>("label"));
-    const label = labels.find((l) => foldTr(l.textContent ?? "").replace(/\s*\*$/, "") === want);
+    const label = labels.find((l) => wants.has(foldTr(l.textContent ?? "").replace(/\s*\*$/, "")));
     if (label) {
       el = label.htmlFor ? document.getElementById(label.htmlFor) : null;
       el = el ?? label.closest(".form-section")?.querySelector("input, select, textarea, button") ?? null;

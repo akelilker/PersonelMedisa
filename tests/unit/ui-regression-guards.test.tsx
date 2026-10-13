@@ -12,6 +12,9 @@ import { cleanup, fireEvent, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AppSelect } from "../../src/components/form/AppSelect";
 import { resetAppPickerOwner } from "../../src/components/form/app-picker-layer";
+import { OZEL_MESAJ_KURALLARI } from "../../src/lib/display/ozel-mesajlar";
+import { toTitleCaseTr, userErrorText } from "../../src/lib/display/user-error";
+import { fieldLabelsPhp, ozelMesajlarPhp } from "../../scripts/gen-ozel-mesajlar-php";
 
 const OPTIONS = [
   { value: "1", label: "Ayşe Yılmaz" },
@@ -525,5 +528,85 @@ describe("S) Personel Kartı eksik bilgi: alan adları, doğru sekme, alan odağ
     ).toBe("bolum_id");
     expect(readSrc("src/features/personeller/hooks/usePersonelKartGatewayReturn.ts")).toContain("focusField");
     expect(readSrc("src/features/kayit/components/KayitSurecWorkspace.tsx")).toMatch(/highlightFieldErrors\(\[initialFocusField\]/);
+  });
+});
+
+describe("T) Duruma özel hata mesajları (t871, OZEL-MESAJLAR-KISA 39 satır) + alan adı kapsamı", () => {
+  const ozelOrnekler = JSON.parse(readSrc("tests/unit/fixtures/ozel-mesajlar-ornek.json")) as {
+    raw: string;
+    code: string | null;
+    status: number | null;
+    beklenen: string;
+  }[];
+  const alanHatalari = JSON.parse(readSrc("tests/unit/fixtures/alan-hatalari-196.json")) as string[];
+  const GENEL = /^(İşlem Tamamlanamadı|Bilgiler Yüklenemedi|Bu Alan )/;
+  // Bilinçli olarak genel kalan iç/teknik hatalar (onaylı: "iç hatalar genel kalır").
+  const IC_HATALAR = new Set([
+    "Savunma belgesi BELGE surec turu olmalidir.",
+    "Gecersiz istek.",
+    "Invalid reference table.",
+    "Invalid hierarchical reference table.",
+    "Multi-axis plan geçersiz.",
+    "En fazla ",
+    "Lifecycle apply icin rows dizisi zorunludur.",
+    "Gecersiz olay karar payload.",
+    "VALIDATION_ERROR: BEKLIYOR manager decision olarak yazilamaz.",
+    "VALIDATION_ERROR: ilgili olay icin canonical raw dakika yok.",
+    "VALIDATION_ERROR: raw_dakika canonical degerle eslesmiyor.",
+    "VALIDATION_ERROR: ERKEN_CIKIS icin TOLERANS_UYGULA gecersiz.",
+    "VALIDATION_ERROR: TOLERANS_UYGULA yalniz raw <= ",
+    "Kayit olusturulamadi.",
+    "ZipArchive extension required for XLSX export.",
+    "AUTH_SMOKE_READONLY kullanici adi pm_smoke_ro_ ile baslamalidir."
+  ]);
+  const YANIT_BICIMI = /beklenen formatta|zorunlu alanlar[ıi] i[cç]ermiyor/i;
+
+  it("39 satırın tüm metinleri Türkçe Title Case", () => {
+    const satirlar = new Set(OZEL_MESAJ_KURALLARI.map((k) => k.satir));
+    for (let i = 1; i <= 39; i += 1) expect(satirlar.has(i), `satır ${i}`).toBe(true);
+    for (const k of OZEL_MESAJ_KURALLARI) expect(toTitleCaseTr(k.metin), k.metin).toBe(k.metin);
+  });
+
+  it("her satırın gerçek ham mesajı kendi metnine eşlenir, genel metne düşmez", () => {
+    const kapsanan = new Set<number>();
+    for (const o of ozelOrnekler) {
+      const t = userErrorText(o.raw, o.code, o.status);
+      expect(t, o.raw).toBe(o.beklenen);
+      expect(t).not.toMatch(GENEL);
+      for (const k of OZEL_MESAJ_KURALLARI) if (k.metin === t) kapsanan.add(k.satir);
+    }
+    expect(kapsanan.size).toBeGreaterThanOrEqual(30);
+    // [Kayıt] ekran varlık adıyla değişir
+    expect(userErrorText("Sube kaydedilemedi.", null, 500)).toBe("Şube Kaydedilemedi. Bilgileri Kontrol Edip Tekrar Deneyin.");
+    expect(userErrorText("Departman silinemedi.", null, 500)).toBe(
+      "Departman Silinemedi. Bağlı Kayıt Olup Olmadığını Kontrol Edip Tekrar Deneyin."
+    );
+    expect(userErrorText("T.C. Kimlik No 11 haneli olmalidir.", "VALIDATION_ERROR", 422)).toBe(
+      "T.C. Kimlik No. 11 Haneli Ve Yalnızca Rakam Olmalıdır."
+    );
+  });
+
+  it("196 alan hatası alan adıyla gösterilir (iç hatalar ve yanıt biçimi hariç)", () => {
+    for (const raw of alanHatalari) {
+      const t = userErrorText(raw, null, 422);
+      if (IC_HATALAR.has(raw) || YANIT_BICIMI.test(raw)) {
+        expect(t, raw).toMatch(GENEL);
+        continue;
+      }
+      expect(t, raw).not.toMatch(GENEL);
+      expect(toTitleCaseTr(t), raw).toBe(t);
+    }
+  });
+
+  it("backend aynaları (OzelMesajlar.php, FieldLabels.php) ön yüz kaynağıyla birebir", () => {
+    expect(readSrc("api/src/Http/OzelMesajlar.php")).toBe(ozelMesajlarPhp());
+    expect(readSrc("api/src/Http/FieldLabels.php")).toBe(fieldLabelsPhp());
+    expect(readSrc("api/src/Http/UserErrorMessages.php")).toContain("OzelMesajlar::forMessage($message, $code)");
+  });
+
+  it("Görev/Organizasyon sekmesinde teknik 'canonical' metni görünmez", () => {
+    expect(readSrc("src/features/kayit/components/KayitSurecPersonelOrganizasyonPanel.tsx")).not.toMatch(
+      /canonical|Structured audit/i
+    );
   });
 });

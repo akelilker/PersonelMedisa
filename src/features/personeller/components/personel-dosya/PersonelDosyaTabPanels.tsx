@@ -7,6 +7,7 @@ import { PersonelDosyaActionRow } from "./PersonelDosyaActionRow";
 import { PersonelDosyaGenelUst } from "./PersonelDosyaGenelUst";
 import type { PersonelDosyaTabId } from "./PersonelDosyaTabs";
 import { PersonelKartPanelGenelBilgiler } from "./PersonelKartPanelGenelBilgiler";
+import { PersonelKartPanelPuantaj } from "./PersonelKartPanelPuantaj";
 import { PersonelSurecGecmisiPanel } from "./PersonelSurecGecmisiPanel";
 import { PersonelZimmetEnvanterPanel } from "./PersonelZimmetEnvanterPanel";
 
@@ -106,19 +107,34 @@ export function PersonelDosyaTabPanels({
           <PersonelKartPanelGenelBilgiler
             personel={personel}
             surecler={surecler}
+            canViewUcret={canViewUcret}
+            canManageUcret={canManageUcret}
+            canManageAccountOnboarding={canManageAccountOnboarding}
+            isActive={activeTab === "genel-bilgiler"}
+            onOpenSurecHistory={handleOpenSurecHistory}
+          />
+        </div>
+      ) : null}
+
+      {!directoryOnly ? (
+        <div
+          id="personel-kart-panel-puantaj"
+          role="tabpanel"
+          className="personel-kart-panel"
+          aria-labelledby="personel-kart-tab-puantaj"
+          hidden={activeTab !== "puantaj"}
+        >
+          <PersonelKartPanelPuantaj
+            personel={personel}
             canViewPuantaj={canViewPuantaj}
             canViewRevizyon={canViewRevizyon}
             canCreateRevizyon={canCreateRevizyon}
             canViewFinans={canViewFinans}
             canViewBordro={canViewBordro}
-            canViewUcret={canViewUcret}
-            canManageUcret={canManageUcret}
             canViewBordroKapsam={canViewBordroKapsam}
             canManageBordroKapsam={canManageBordroKapsam}
             canApproveBordroKapsam={canApproveBordroKapsam}
-            canManageAccountOnboarding={canManageAccountOnboarding}
-            isActive={activeTab === "genel-bilgiler"}
-            onOpenSurecHistory={handleOpenSurecHistory}
+            isActive={activeTab === "puantaj"}
           />
         </div>
       ) : null}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 
 function read(path: string): string {
   return readFileSync(path, "utf8");
@@ -24,13 +24,8 @@ describe("QR surface ownership", () => {
     expect(source).toContain("CSV");
   });
 
-  it("keeps Personel Kartı history at daily row grain", () => {
-    const source = read("src/features/personeller/components/personel-dosya/PersonelQrHistorySection.tsx");
-    expect(source).toContain("Giriş / Çıkış — Son 30 gün");
-    expect(source).toContain("istanbulDateDaysAgo(30)");
-    expect(source).toContain("row.date_from");
-    expect(source).toContain("Günlük puantaj");
-    expect(source).toContain("personel-qr-history-card-list");
-    expect(source).toContain('data-testid="personel-qr-history-cards"');
+  it("Personel Kartı'nda QR hareketi gösterilmez (t873)", () => {
+    expect(existsSync("src/features/personeller/components/personel-dosya/PersonelQrHistorySection.tsx")).toBe(false);
+    expect(read("src/features/personeller/components/personel-dosya/PersonelKartPanelGenelBilgiler.tsx")).not.toMatch(/Qr/);
   });
 });

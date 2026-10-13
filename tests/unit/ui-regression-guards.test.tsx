@@ -610,3 +610,34 @@ describe("T) Duruma özel hata mesajları (t871, OZEL-MESAJLAR-KISA 39 satır) +
     );
   });
 });
+
+describe("U) Personel Kartı Puantaj sekmesi, kişi kartında QR yok, Talepler ikon seçimi (t873)", () => {
+  const dir = "src/features/personeller/components/personel-dosya/";
+  it("Puantaj ayrı sekme; puantaj/bordro blokları orada, Genel'de değil", () => {
+    expect(readSrc(dir + "PersonelDosyaTabs.tsx")).toMatch(/\{ id: "puantaj", label: "Puantaj" \}/);
+    const puantaj = readSrc(dir + "PersonelKartPanelPuantaj.tsx");
+    expect(puantaj).toContain("<PersonelPuantajOzetSection");
+    expect(puantaj).toContain("<PersonelBordroKapsamSection");
+    const genel = readSrc(dir + "PersonelKartPanelGenelBilgiler.tsx");
+    expect(genel).not.toMatch(/PersonelPuantajOzetSection|PersonelBordroKapsamSection/);
+    expect(readSrc(dir + "PersonelDosyaTabPanels.tsx")).toMatch(/id="personel-kart-panel-puantaj"/);
+  });
+
+  it("kişi kartında QR giriş/çıkış hareketi gösterilmez (veri/backend korunur)", () => {
+    const files = readdirSync(dir).filter((f) => f.endsWith(".tsx"));
+    for (const f of files) expect(readSrc(dir + f), f).not.toMatch(/QrHistory|qr-hareket|fetchPersonelQr/i);
+    expect(readSrc("src/api/qr.api.ts")).toContain("fetchMeQrHareketleri");
+  });
+
+  it("Talepler: tür seçimi ikon + etiket, çerçevesiz; seçilince yalnız o form", () => {
+    const page = readSrc("src/features/self-service/pages/PersonelSelfServiceTaleplerPage.tsx");
+    for (const label of ["Giriş/Çıkış Düzeltme", "İzin", "Sağlık Raporu"]) expect(page).toContain(`label: "${label}"`);
+    for (const id of ["duzeltme", "izin", "rapor", "avans", "oneri"]) expect(page).toContain(`{secili === "${id}" ? (`);
+    const css = readSrc("src/features/self-service/self-service.css");
+    const blok = /\.pm-talep-turu \{([^}]*)\}/.exec(css)?.[1] ?? "";
+    expect(blok).toMatch(/border:\s*0/);
+    expect(blok).toMatch(/background:\s*none/);
+    expect(css).toMatch(/\.pm-talep-turleri \{[^}]*justify-items:\s*center/);
+    expect(css).toMatch(/\.pm-talep-turleri \{[^}]*auto-fit/);
+  });
+});

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 
 export const PERSONEL_DOSYA_TABS = [
   { id: "genel-bilgiler", label: "Genel" },
+  { id: "puantaj", label: "Puantaj" },
   { id: "egitim-belgeler", label: "Eğitim / Belgeler" },
   { id: "disiplin", label: "Disiplin" },
   { id: "zimmet-envanter", label: "Zimmet" },

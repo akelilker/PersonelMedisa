@@ -686,3 +686,64 @@ describe("V) Boş form: tarayıcı balonu yok, alan adlı Title Case mesaj + kı
     document.body.innerHTML = "";
   });
 });
+
+describe("W) Genel düzenleme: Doğum Yeri, Kan Grubu, Acil Durum Kişisi/Telefonu (t885)", () => {
+  it("formda dört alan var; Kan Grubu seçimli ve backend değerleriyle aynı", async () => {
+    const form = readSrc("src/features/personeller/components/personel-dosya/PersonelInlineEditForm.tsx");
+    for (const n of ["edit-dogum-yeri", "edit-kan-grubu", "edit-acil-durum-kisi", "edit-acil-durum-telefon"]) {
+      expect(form).toContain(`name="${n}"`);
+    }
+    const { KAN_GRUBU_SELECT_OPTIONS } = await import("../../src/features/personeller/personel-edit-utils");
+    const php = readSrc("api/src/Services/Personel/PersonelCanonicalValidator.php");
+    for (const o of KAN_GRUBU_SELECT_OPTIONS) expect(php).toContain(`'${o.value}'`);
+    expect(KAN_GRUBU_SELECT_OPTIONS[0]!.value).toBe("0 Rh+");
+    expect(KAN_GRUBU_SELECT_OPTIONS[KAN_GRUBU_SELECT_OPTIONS.length - 1]!.value).toBe("AB Rh-");
+    const allow = readSrc("api/src/Services/Personel/PersonelBasicUpdateService.php");
+    for (const c of ["dogum_yeri", "kan_grubu", "acil_durum_kisi", "acil_durum_telefon"]) expect(allow).toContain(`'${c}'`);
+  });
+
+  it("yalnız değişen alanlar gönderilir; boşaltma null; acil telefon 05XX kuralı", async () => {
+    const { buildPersonelUpdatePayload, personelToEditForm } = await import(
+      "../../src/features/personeller/personel-edit-utils"
+    );
+    const personel = {
+      id: 1,
+      ad: "Ayşe",
+      soyad: "Yılmaz",
+      calisan_kapsami: "IC_PERSONEL",
+      dogum_yeri: "İzmir",
+      kan_grubu: "A Rh+",
+      acil_durum_kisi: "Ali",
+      acil_durum_telefon: "0555 111 22 33"
+    } as unknown as Parameters<typeof personelToEditForm>[0];
+    const form = personelToEditForm(personel);
+    const same = buildPersonelUpdatePayload(form, false, { currentPersonel: personel });
+    for (const k of ["dogum_yeri", "kan_grubu", "acil_durum_kisi", "acil_durum_telefon"]) expect(same).not.toHaveProperty(k);
+    const changed = buildPersonelUpdatePayload(
+      { ...form, dogumYeri: "Ankara", kanGrubu: "0 Rh-", acilDurumKisi: "", acilDurumTelefon: "5321234567" },
+      false,
+      { currentPersonel: personel }
+    );
+    expect(changed).toMatchObject({
+      dogum_yeri: "Ankara",
+      kan_grubu: "0 Rh-",
+      acil_durum_kisi: null,
+      acil_durum_telefon: "0532 123 45 67"
+    });
+    expect(() =>
+      buildPersonelUpdatePayload({ ...form, acilDurumTelefon: "123" }, false, { currentPersonel: personel })
+    ).toThrow(/Acil Durum Telefonu 05xx/);
+    expect(userErrorText("Acil Durum Telefonu 05xx xxx xx xx formatında olmalıdır.", "VALIDATION_ERROR", 422)).toBe(
+      "Acil Durum Telefonu 05XX XXX XX XX Biçiminde Olmalıdır."
+    );
+  });
+
+  it("Genel panel istemci doğrulama hatasını yakalar (gönderim kilitlenmez); alan işaretleme takma adları", () => {
+    const panel = readSrc("src/features/kayit/components/KayitSurecPersonelGenelPanel.tsx");
+    expect(panel).toMatch(/try \{\s*body = buildPersonelUpdatePayload/);
+    const hl = readSrc("src/lib/forms/field-error-highlight.ts");
+    for (const n of ["edit-dogum-yeri", "edit-kan-grubu", "edit-acil-durum-kisi", "edit-acil-durum-telefon"]) {
+      expect(hl).toContain(`"${n}"`);
+    }
+  });
+});

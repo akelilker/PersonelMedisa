@@ -69,8 +69,10 @@ export type CreatePersonelPayload = {
 
 export type UpdatePersonelPayload = Omit<
   Partial<CreatePersonelPayload>,
-  "departman_id" | "gorev_id" | "bagli_amir_id" | "bolum_id" | "birim_id" | "pozisyon_id"
+  "dogum_yeri" | "kan_grubu" | "departman_id" | "gorev_id" | "bagli_amir_id" | "bolum_id" | "birim_id" | "pozisyon_id"
 > & {
+  dogum_yeri?: string | null;
+  kan_grubu?: string | null;
   departman_id?: number | null;
   gorev_id?: number | null;
   bagli_amir_id?: number | null;

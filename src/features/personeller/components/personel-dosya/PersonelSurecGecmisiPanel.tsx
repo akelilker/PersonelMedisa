@@ -10,7 +10,6 @@ export function PersonelSurecGecmisiPanel({
   isLoading,
   errorMessage,
   surecler,
-  surecHistoryHasMore,
   zimmetler
 }: {
   personel: Personel;
@@ -40,16 +39,9 @@ export function PersonelSurecGecmisiPanel({
       <div className="personel-surec-history-head">
         <div>
           <h3>Süreç Geçmişi</h3>
-          <p>Süreç kayıtları ve zimmet hareketleri tek akışta, en yeniden eskiye sıralanır.</p>
         </div>
       </div>
 
-      {!isLoading && !errorMessage && surecHistoryHasMore ? (
-        <p className="personel-form-note personel-form-note--info" data-testid="personel-surec-history-scope-notice">
-          Bu listede yalnızca en güncel 20 süreç kaydı gösterilir. Daha eski kayıtlar için Süreç Takip veya
-          Raporlar modülünü kullanın.
-        </p>
-      ) : null}
 
       {isLoading ? <p className="personel-kart-placeholder-note">Süreç geçmişi yükleniyor...</p> : null}
       {!isLoading && errorMessage ? <p className="personel-create-error">{errorMessage}</p> : null}

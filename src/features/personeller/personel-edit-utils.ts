@@ -29,6 +29,12 @@ const BAGLI_AMIR_DEGISTI_SUREC_TURU = "BAGLI_AMIR_DEGISTI";
 const BAGLI_AMIR_ATAMASI_KALDIRILDI_SUREC_TURU = "BAGLI_AMIR_ATAMASI_KALDIRILDI";
 
 /** t885: Kan Grubu seçenekleri (backend PersonelCanonicalValidator::validKanGruplari ile aynı değerler). */
+/** t890: backend PersonelCanonicalValidator::validCinsiyetValues ile aynı. */
+export const CINSIYET_SELECT_OPTIONS = [
+  { value: "Erkek", label: "Erkek" },
+  { value: "Kadın", label: "Kadın" }
+];
+
 export const KAN_GRUBU_SELECT_OPTIONS = [
   { value: "0 Rh+", label: "0 Rh+" },
   { value: "0 Rh-", label: "0 Rh-" },
@@ -52,6 +58,7 @@ export type EditPersonelFormState = {
   /** t885: Genel düzenlemede özlük alanları (backend allowlist'te; önceden düzenlenemiyordu). */
   dogumYeri?: string;
   kanGrubu?: string;
+  cinsiyet?: string;
   acilDurumKisi?: string;
   acilDurumTelefon?: string;
   departmanId: string;
@@ -227,6 +234,7 @@ export function personelToEditForm(personel: Personel): EditPersonelFormState {
     iseGirisTarihi: personel.ise_giris_tarihi ?? "",
     dogumYeri: personel.dogum_yeri ?? "",
     kanGrubu: personel.kan_grubu ?? "",
+    cinsiyet: personel.cinsiyet ?? "",
     acilDurumKisi: personel.acil_durum_kisi ?? "",
     acilDurumTelefon: personel.acil_durum_telefon ?? "",
     departmanId: personel.departman_id != null ? String(personel.departman_id) : "",
@@ -296,6 +304,9 @@ export function buildPersonelUpdatePayload(
       formValue !== undefined && formValue.trim() !== String(current ?? "").trim();
     if (changed(editForm.dogumYeri, cur.dogum_yeri)) {
       payload.dogum_yeri = editForm.dogumYeri!.trim() || null;
+    }
+    if (changed(editForm.cinsiyet, cur.cinsiyet)) {
+      payload.cinsiyet = editForm.cinsiyet!.trim() || null;
     }
     if (changed(editForm.kanGrubu, cur.kan_grubu)) {
       payload.kan_grubu = editForm.kanGrubu!.trim() || null;

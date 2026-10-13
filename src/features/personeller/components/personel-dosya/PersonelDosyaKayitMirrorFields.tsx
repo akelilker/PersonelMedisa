@@ -44,6 +44,7 @@ export function PersonelDosyaKayitMirrorFields({ personel }: { personel: Persone
             label="Çalışma Lokasyonu"
             value={formatReferenceValue(personel.calisma_lokasyonu_adi, personel.calisma_lokasyonu_id)}
           />
+          <DossierField label="Cinsiyet" value={formatDetailValue(personel.cinsiyet)} />
           {personel.calisan_kapsami === "DIS_KAYNAK" ? (
             <DossierField
               label="Organizasyon durumu"

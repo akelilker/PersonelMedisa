@@ -30,7 +30,7 @@ describe("personel kapsam display labels (user-facing only)", () => {
     const envanter = read("src/features/yonetim/components/UcretTipiEnvanteriPanel.tsx");
     expect(envanter).toContain("Aktif Dahili Personel");
     expect(envanter).toContain("Aktif Dahili Personel bulunamadı.");
-    expect(envanter).toContain("Harici Personel ücret tipi kapsamı dışındadır");
+    expect(envanter).not.toContain("Harici Personel ücret tipi kapsamı dışındadır");
     expect(envanter).not.toContain("Aktif iç personel");
     expect(envanter).not.toContain("Dış kaynak");
     expect(envanter).not.toContain("(DIS_KAYNAK)");

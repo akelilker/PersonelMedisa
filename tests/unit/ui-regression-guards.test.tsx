@@ -850,3 +850,52 @@ describe("Z) Personel Kartı hero fotoğrafı masaüstünde sağda, ~72px; mobil
     expect(css).toMatch(/\.personel-dosya-hero-photo\s*\{\s*display:\s*none/);
   });
 });
+
+describe("AA) Kullanıcı ekranında açıklama/meta/yol notu yok; Cinsiyet Genel düzenlemede (t890)", () => {
+  const walk = (dir: string): string[] =>
+    readdirSync(resolve(dir), { withFileTypes: true }).flatMap((e) =>
+      e.isDirectory() ? walk(`${dir}/${e.name}`) : e.name.endsWith(".tsx") ? [`${dir}/${e.name}`] : []
+    );
+  const stripComments = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  const YASAK = [
+    /CRUD/,
+    /senkron tutulur/,
+    /atomik olarak/,
+    /(Süreç|Raporlar|Yönetim) →/,
+    /(burada|bu bölümde|buradan) yönetilir/,
+    /özlük süreç kaydı/,
+    /sunucu modelinden okunur/,
+    /ekranından yönet/,
+    /sekmesinden yapılır/,
+    /üzerinden okunur/,
+    /Canonical (takvim|kullanıcı|çalışma)/,
+    /Ücret geçmişi ve ücret tipi/,
+    /Değişiklik (anında personel kaydına|hemen) uygulanır/
+  ];
+  it("src/features (self-service hariç) kullanıcıya görünen metinde yasak ifade yok", () => {
+    const files = walk("src/features").filter((f) => !f.includes("/self-service/"));
+    const hits: string[] = [];
+    for (const f of files) {
+      const s = stripComments(readFileSync(resolve(f), "utf8"));
+      for (const re of YASAK) if (re.test(s)) hits.push(`${f}: ${re}`);
+    }
+    expect(hits).toEqual([]);
+  });
+  it("Kayıt ve Süreç sekmelerinde açıklama paragrafları kaldırıldı", () => {
+    const puantaj = readFileSync(resolve("src/features/kayit/components/KayitSurecPersonelPuantajPanel.tsx"), "utf8");
+    expect(puantaj).not.toContain("kayit-surec-puantaj-owner-hint");
+    expect(puantaj).not.toContain("Henüz değerlendirilmedi, geç geldi");
+    const form = readFileSync(resolve("src/features/personeller/components/personel-dosya/PersonelInlineEditForm.tsx"), "utf8");
+    expect(form).not.toContain("personel-edit-org-yonlendirme");
+    expect(form).not.toContain("personel-edit-ucret-yonlendirme");
+  });
+  it("Cinsiyet: Genel düzenleme formu + değişen alan payload + Kayıt görünümü", () => {
+    const form = readFileSync(resolve("src/features/personeller/components/personel-dosya/PersonelInlineEditForm.tsx"), "utf8");
+    expect(form).toContain('name="edit-cinsiyet"');
+    const utils = readFileSync(resolve("src/features/personeller/personel-edit-utils.ts"), "utf8");
+    expect(utils).toMatch(/CINSIYET_SELECT_OPTIONS[\s\S]*"Erkek"[\s\S]*"Kadın"/);
+    expect(utils).toMatch(/changed\(editForm\.cinsiyet, cur\.cinsiyet\)/);
+    const genel = readFileSync(resolve("src/features/kayit/components/KayitSurecPersonelGenelPanel.tsx"), "utf8");
+    expect(genel).toContain('label: "Cinsiyet"');
+  });
+});

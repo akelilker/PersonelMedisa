@@ -109,7 +109,6 @@ export function KayitSurecPersonelUcretPanel({
       <div className="surec-person-general-head">
         <div>
           <p className="surec-shell-summary-kicker">Ücret Bilgisi</p>
-          <h4 className="surec-person-general-title">Ücret geçmişi ve ücret tipi</h4>
         </div>
       </div>
 

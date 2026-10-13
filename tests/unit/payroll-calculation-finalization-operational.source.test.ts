@@ -87,7 +87,7 @@ describe("Payroll calculation finalization operational close", () => {
     const maas = read("src/features/raporlar/pages/MaasHesaplamaMerkeziPage.tsx");
     const bordro = read("src/features/raporlar/pages/BordroHazirlikMerkeziPage.tsx");
     expect(maas).toContain("lockedFilters");
-    expect(maas).toContain("maas-hesaplama-period-locked-note");
+    expect(maas).not.toContain("maas-hesaplama-period-locked-note");
     expect(bordro).toContain("lockedFilters={{ ay: filters.ay, subeId: filters.subeId }}");
   });
 

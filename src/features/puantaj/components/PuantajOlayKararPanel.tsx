@@ -148,10 +148,6 @@ export function PuantajOlayKararPanel({ personelId, personelLabel, tarih, puanta
   return (
     <div className="puantaj-detail-card" data-testid="puantaj-olay-karar-panel">
       <h3>Puantaj Olay Kararı</h3>
-      <p className="form-hint">
-        Ham dakika canonical puantaj kaydından okunur. Tolerans yalnız geç kalmada ve en fazla{" "}
-        {LATE_TOLERANCE_MAX_MINUTE} dakika için geçerlidir; erken çıkışta tolerans yoktur.
-      </p>
 
       {isLoading ? <p>Kararlar yükleniyor...</p> : null}
       {errorMessage ? (

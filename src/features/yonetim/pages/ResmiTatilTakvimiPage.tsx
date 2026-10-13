@@ -356,9 +356,6 @@ export function ResmiTatilTakvimiPage() {
       <header className="yonetim-page-header">
         <div>
           <h1>Resmî Tatil Takvimi</h1>
-          <p className="muted">
-            UBGT gün kapsamı sahibi. Canlı ödeme politikası henüz aktif değildir.
-          </p>
         </div>
         {canManage ? (
           <button type="button" className="universal-btn-save" data-testid="rtt-create-btn" onClick={openCreate}>

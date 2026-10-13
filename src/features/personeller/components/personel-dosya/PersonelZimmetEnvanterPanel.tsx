@@ -11,7 +11,6 @@ export function PersonelZimmetEnvanterPanel({
   isLoading,
   errorMessage,
   zimmetler,
-  zimmetHistoryHasMore,
   onOpenCreateModal
 }: {
   canCreateZimmet: boolean;
@@ -26,11 +25,6 @@ export function PersonelZimmetEnvanterPanel({
       <div className="personel-zimmet-head">
         <div>
           <h3>Zimmet ve Envanter Kayıtları</h3>
-          <p>
-            {canCreateZimmet
-              ? "Kullanıcıya teslim edilen ekipmanlar ve geri alınmış kayıtlar bu listede izlenir."
-              : "Ekleme ve iade: Süreç → Zimmet."}
-          </p>
         </div>
         {canCreateZimmet && onOpenCreateModal ? (
           <button type="button" className="universal-btn-aux" onClick={onOpenCreateModal}>
@@ -39,12 +33,6 @@ export function PersonelZimmetEnvanterPanel({
         ) : null}
       </div>
 
-      {!isLoading && !errorMessage && zimmetHistoryHasMore ? (
-        <p className="personel-form-note personel-form-note--info" data-testid="personel-zimmet-scope-notice">
-          Bu listede yalnızca en güncel 20 zimmet kaydı gösterilir. Tüm kayıtlar için ilgili modül veya rapor
-          ekranını kullanın.
-        </p>
-      ) : null}
 
       {isLoading ? <p className="personel-kart-placeholder-note">Zimmet kayıtları yükleniyor...</p> : null}
       {!isLoading && errorMessage ? <p className="personel-create-error">{errorMessage}</p> : null}

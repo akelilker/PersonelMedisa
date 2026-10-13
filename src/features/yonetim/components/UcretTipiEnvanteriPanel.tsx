@@ -125,9 +125,6 @@ export function UcretTipiEnvanteriPanel() {
 
       {!isLoading && !errorMessage && envanter ? (
         <>
-          <p className="yonetim-hint">
-            Harici Personel ücret tipi kapsamı dışındadır; bu envantere dahil edilmez.
-          </p>
 
           <div className="yonetim-summary-grid" data-testid="ucret-tipi-envanteri-sayaclar">
             <article className="yonetim-summary-card" data-testid="ucret-tipi-envanteri-toplam">

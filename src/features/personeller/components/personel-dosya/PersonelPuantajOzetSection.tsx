@@ -43,15 +43,6 @@ const BORDRO_ADAY_OZETI_HENUZ_OLUSMADI =
   "Bu dönem için kesinleşmiş SGK sonucu henüz oluşmadı.";
 const BORDRO_ADAY_KALEM_GORMUNUYOR = "Bu ay bordroya yansıyacak aday kalem görünmüyor.";
 
-function hasMesaiFinansKaydi(kayitlar: { kalem_turu: string; tutar: number; state?: string }[]): boolean {
-  return kayitlar.some(
-    (item) =>
-      item.kalem_turu.trim().toUpperCase() === "MESAI" &&
-      item.tutar > 0 &&
-      (!item.state?.trim() || item.state.trim().toUpperCase() === "AKTIF")
-  );
-}
-
 const REVIZYON_DURUM_LABELS: Record<RevizyonTalebiDurumu, string> = {
   TASLAK: "Taslak",
   ONAY_BEKLIYOR: "Onay bekliyor",
@@ -171,7 +162,6 @@ function PersonelRevizyonCorrectionPanel({
   return (
     <DossierSection
       title="Revizyon ve Düzeltme Kayıtları"
-      description="Kapalı dönem düzeltme talepleri ve üretilen düzeltme kaydı etkileri."
     >
       {!canViewRevizyon ? (
         <DossierRecord label="Yetki" value="Revizyon kayıtlarını görüntüleme yetkiniz yok." />
@@ -294,7 +284,6 @@ export function PersonelPuantajOzetSection({
     !showFinansAdayToplamlari &&
     !showBordroAdayFinansLoading &&
     (!canFetchFinans || finansFetchResolved);
-  const showMesaiFinansNotu = showFinansAdayToplamlari && hasMesaiFinansKaydi(finansKayitlari);
   const [revizyonTalepleri, setRevizyonTalepleri] = useState<RevizyonTalebi[]>([]);
   const [revizyonCorrections, setRevizyonCorrections] = useState<RevizyonCorrectionEvent[]>([]);
   const [isRevizyonLoading, setIsRevizyonLoading] = useState(false);
@@ -509,15 +498,6 @@ export function PersonelPuantajOzetSection({
                 </span>
               </div>
             ) : null}
-            <p className="personel-puantaj-summary-note">
-              Finans aday tutarları kayıtlı tutarların toplamıdır; bordro hesabı veya kesin ödeme
-              sonucu değildir. Detaylar aşağıdaki finans kayıtlarında listelenir.
-            </p>
-            {showMesaiFinansNotu ? (
-              <p className="personel-devam-primi-scope-note">
-                Mesai kalemi manuel finans kaydıdır; puantaj fazla mesai hesabı değildir.
-              </p>
-            ) : null}
           </div>
         ) : null}
       </section>
@@ -536,7 +516,6 @@ export function PersonelPuantajOzetSection({
 
       <DossierSection
         title="Aylık Puantaj Özeti"
-        description="Bu dosya SGK prim günü, eksik gün ve hesaplama modunu tek bakışta gösterir."
       >
         <DossierRecord label="Dönem" value={formatDisplayDateOrText(donem)} />
         <DossierRecord label="SGK Prim Günü" value={sgkPrimGunu} />
@@ -579,7 +558,6 @@ export function PersonelPuantajOzetSection({
 
       <div className="personel-kart-placeholder">
         <h3>Günlük Puantaj Dosyası</h3>
-        <p>Günlük giriş-çıkış kayıtları ve detaylı puantaj düzenleme akışı ayrı puantaj ekranında kalır.</p>
         {canViewPuantaj ? (
           <Link to="/puantaj" state={{ prefillPersonelId: personel.id }} className="universal-btn-aux">
             Puantaj ekranına git

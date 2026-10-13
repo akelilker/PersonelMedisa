@@ -46,7 +46,7 @@ describe("S87 policy evidence API/UI contract", () => {
     );
     expect(page).toContain("bordro-politika-belge-id");
     expect(page).toContain("bordro-politika-belge-sha256");
-    expect(page).toContain("bordro-politika-evidence-help");
+    expect(page).not.toContain("bordro-politika-evidence-help");
     expect(page).toContain("normalizePolitikaEvidenceInput");
     expect(page).toContain("evidenceStatusLabel");
     expect(page).toContain("bordro-politika-karar-belge-id");
@@ -72,7 +72,7 @@ describe("S87 policy evidence API/UI contract", () => {
     expect(page).toContain("bordro-politika-detay-meta");
     expect(page).toContain("bordro-politika-detay-degerler");
     expect(page).toContain("bordro-politika-detay-hata");
-    expect(page).toContain("bordro-politika-detay-bos");
+    expect(page).not.toContain("bordro-politika-detay-bos");
     expect(page).toContain("bordro-politika-detay-degerler-bos");
     expect(page).toContain("handleViewPolitika");
     expect(page).toContain("Politika detayı");

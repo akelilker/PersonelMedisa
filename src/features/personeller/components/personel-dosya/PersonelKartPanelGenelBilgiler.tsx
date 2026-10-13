@@ -35,7 +35,6 @@ export function PersonelKartPanelGenelBilgiler({
       {canManageAccountOnboarding ? (
         <DossierSection
           title="Personel hesabı"
-          description="Başlangıç şifresiyle hesap oluşturma ve zorunlu ilk giriş şifre değişimi Yönetici / İK tarafından buradan yönetilir."
         >
           <PersonelHesapOnboardingPanel
             personelId={personel.id}

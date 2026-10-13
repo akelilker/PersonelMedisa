@@ -74,8 +74,8 @@ describe("I10 review fix — Genel ücret owner + payload", () => {
     );
     expect(source).not.toContain('name="edit-ucret-tipi-id"');
     expect(source).not.toContain("canManageUcret");
-    expect(source).toContain("personel-edit-ucret-yonlendirme");
-    expect(source).toContain("personel-edit-org-yonlendirme");
+    expect(source).not.toContain("personel-edit-ucret-yonlendirme");
+    expect(source).not.toContain("personel-edit-org-yonlendirme");
   });
 
   it("Genel panel locks person context and guards stale PUT responses", () => {

@@ -106,6 +106,7 @@ type DemoPersonel = {
   sicil_no?: string;
   dogum_yeri?: string;
   kan_grubu?: string;
+  cinsiyet?: string | null;
   ise_giris_tarihi?: string;
   acil_durum_kisi?: string;
   acil_durum_telefon?: string;
@@ -619,6 +620,7 @@ const demoState: {
       sicil_no: "P-001",
       dogum_yeri: "İstanbul",
       kan_grubu: "A Rh+",
+      cinsiyet: "Erkek",
       ise_giris_tarihi: "2023-02-01",
       acil_durum_kisi: "Fatma Yılmaz",
       acil_durum_telefon: "05553334455",

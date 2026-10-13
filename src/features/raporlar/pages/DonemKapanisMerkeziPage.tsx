@@ -193,9 +193,6 @@ export function DonemKapanisMerkeziPage() {
     <section className="yonetim-page donem-kapanis-page" data-testid="donem-kapanis-merkezi">
       <div className="yonetim-header-row">
         <h2>Dönem Kapanış Merkezi</h2>
-        <p className="raporlar-aylik-lead">
-          Ay sonu ön kontrol, engelleyici/uyarı listesi, audit geçmişi ve mühürleme.
-        </p>
       </div>
 
       <DonemKapanisFiltreleri

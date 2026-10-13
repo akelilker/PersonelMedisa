@@ -237,7 +237,6 @@ export function MevzuatParametreleriPanel({ canManage }: { canManage: boolean })
       <div className="yonetim-list-header">
         <div className="yonetim-card-meta">
           <strong>Mevzuat Parametreleri</strong>
-          <span>Asgari ücret, SGK tavanı gibi yasal parametrelerin tarihli kayıtları burada yönetilir.</span>
         </div>
       </div>
 

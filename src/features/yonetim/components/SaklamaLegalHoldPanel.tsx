@@ -231,9 +231,6 @@ export function SaklamaLegalHoldPanel() {
     >
       <div className="yonetim-saklama-policy-banner" role="status">
         <strong>Saklama Politikası</strong>
-        <p>
-          Personel kayıtları Medisa politikasına göre en az 10 takvim yılı saklanır.
-        </p>
       </div>
 
       {isLoading ? <LoadingState label="Saklama paneli yükleniyor..." /> : null}
@@ -246,10 +243,6 @@ export function SaklamaLegalHoldPanel() {
             <section className="yonetim-saklama-section" aria-labelledby="saklama-koruma-title">
               <div className="yonetim-saklama-section-copy">
                 <h3 id="saklama-koruma-title">Kayıt Koruma</h3>
-                <p>
-                  Dava, denetim veya inceleme gibi nedenlerle silinmemesi gereken personel kayıtlarını
-                  koruma altına alabilirsiniz.
-                </p>
               </div>
               <form className="yonetim-saklama-form" onSubmit={handleCreateHold}>
                 {personelSelect}
@@ -311,14 +304,9 @@ export function SaklamaLegalHoldPanel() {
             <section className="yonetim-saklama-section" aria-labelledby="saklama-sure-title">
               <div className="yonetim-saklama-section-copy">
                 <h3 id="saklama-sure-title">İmha İçin Süre Kontrolü</h3>
-                <p>Bir personel kaydının saklama süresinin dolup dolmadığını kontrol eder.</p>
               </div>
               <form className="yonetim-saklama-form" onSubmit={handleEligibility}>
-                {canManageHold ? (
-                  <p className="yonetim-hint" data-testid="saklama-shared-personel-hint">
-                    Seçili personel yukarıdaki Personel alanından kullanılır.
-                  </p>
-                ) : (
+                {canManageHold ? null : (
                   personelSelect
                 )}
                 <FormField
@@ -352,9 +340,6 @@ export function SaklamaLegalHoldPanel() {
             <section className="yonetim-saklama-section" aria-labelledby="saklama-imha-title">
               <div className="yonetim-saklama-section-copy">
                 <h3 id="saklama-imha-title">İmha Talepleri</h3>
-                <p>
-                  Saklama süresi tamamlanan kayıtlar için kontrollü imha talebi oluşturulur.
-                </p>
               </div>
 
               {canRequest ? (

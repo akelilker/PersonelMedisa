@@ -65,3 +65,5 @@ Bu dosya, kullanıcının onayladığı kalıcı görsel kararları her biri tek
 | Kullanıcı Paneli — ana ekran (masaüstü) | Giriş ve Çıkış | Dikeyde biraz daha kısa, yatayda yaklaşık iki kat geniş; iki düğme birlikte yatayda ortada; renk dili aynı | 2026-10-13 |
 | Kullanıcı Paneli — ana ekran (masaüstü) | Kullanıcı fotoğrafı | 88px yuvarlak; sağ kenar aynı yerde. Bilgi bloğu ve gg/aa/yyyy değişmez | 2026-10-13 |
 | Kullanıcı Paneli — başlık çerçevesi (masaüstü) | Çerçeve 4px kısa, logo dikey ortada | PERSONEL YÖNETİM SİSTEMİ ve KULLANICI PANELİ yazıları yerinde kalır; logo başlıktan bağımsız ortalanır. Mobil başlık değişmez | 2026-10-13 |
+| Tüm uygulama (Kullanıcı Paneli hariç) | Açıklama / meta / yol notları | Kullanıcı ekranında yalnız başlık, alan etiketi, buton, veri ve boş-durum/yetki/yükleniyor satırları kalır. "X burada yönetilir", "Süreç → …", "CRUD", "senkron", "atomik", "okunur" türü açıklamalar kaldırıldı; guard AA yeniden eklenmesini engeller. (t890) | 2026-10-13 |
+| Kayıt ve Süreç | Cinsiyet | Kayıt Genel ve Personel Kartı'nda görünür; Süreç → Genel düzenlemede Erkek/Kadın seçilir, yalnız değişirse gönderilir. (t890) | 2026-10-13 |

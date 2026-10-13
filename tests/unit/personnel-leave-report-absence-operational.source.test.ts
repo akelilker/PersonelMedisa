@@ -82,7 +82,7 @@ describe("personnel leave/report/absence operational close", () => {
     expect(bugun).toContain("'IZINLI'");
 
     expect(panel).toContain("dispatchOpenBugunPersonelDurumu");
-    expect(panel).toContain("kayit-surec-puantaj-owner-hint");
+    expect(panel).not.toContain("kayit-surec-puantaj-owner-hint");
     expect(shell).toContain("OPEN_BUGUN_PERSONEL_DURUMU_EVENT");
     expect(workspace).toContain("dispatchRefreshBugunPersonelDurumu");
   });

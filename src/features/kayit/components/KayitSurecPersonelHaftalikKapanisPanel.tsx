@@ -13,10 +13,6 @@ export function KayitSurecPersonelHaftalikKapanisPanel({ personel }: KayitSurecP
 
   return (
     <div className="surec-shell-panel" data-testid="kayit-surec-haftalik-kapanis-panel">
-      <p className="workspace-empty-hint">
-        <strong>Haftalık Kapanış</strong> — haftalık mutabakat, önkoşul kontrolleri ve kapanış yaşam döngüsü
-        personel bağlamında yönetilir. Kapanmış hafta snapshot&apos;ları değiştirilemez.
-      </p>
 
       <div className="workspace-inline-actions">
         <button
@@ -41,10 +37,6 @@ export function KayitSurecPersonelHaftalikKapanisPanel({ personel }: KayitSurecP
         </Link>
       </div>
 
-      <p className="workspace-empty-hint">
-        Revizyon Merkezi, kapanmış hafta düzeltmeleri için Haftalık Kapanış yaşam döngüsünün parçasıdır; bağımsız
-        bir üst süreç değildir.
-      </p>
     </div>
   );
 }

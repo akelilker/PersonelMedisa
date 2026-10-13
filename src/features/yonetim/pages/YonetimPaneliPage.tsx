@@ -1697,7 +1697,7 @@ export function YonetimPaneliPage() {
     }
 
     if (boundCanonicalUsernameView?.mismatch) {
-      setFormErrorMessage(userErrorText("Kullanıcı adı canonical personel şablonuyla uyuşmuyor. Önce kullanıcı adını canonical şablona düzeltin."));
+      setFormErrorMessage(userErrorText("Kullanıcı adı personel şablonuyla uyuşmuyor. Önce kullanıcı adını şablona göre düzeltin."));
       setSifreResetConfirmOpen(false);
       return;
     }
@@ -1726,7 +1726,7 @@ export function YonetimPaneliPage() {
     if (!boundCanonicalUsernameView?.canOfferFix) {
       setFormErrorMessage(userErrorText(boundCanonicalUsernameView && !boundCanonicalUsernameView.personelActive
           ? "Bağlı personel aktif değil; kullanıcı adı düzeltilmez."
-          : "Canonical kullanıcı adı düzeltmesi bu hesap için uygun değil."));
+          : "Kullanıcı adı düzeltmesi bu hesap için uygun değil."));
       return;
     }
 
@@ -1745,7 +1745,7 @@ export function YonetimPaneliPage() {
       setSuccessMessage("Kullanıcı adı geçerli personel şablonuna düzeltildi. Şifre değişmedi.");
       await loadPanel();
     } catch (error) {
-      setFormErrorMessage(userErrorText(error instanceof Error ? error.message : "Canonical kullanıcı adı düzeltilemedi."));
+      setFormErrorMessage(userErrorText(error instanceof Error ? error.message : "Kullanıcı adı düzeltilemedi."));
     } finally {
       setIsSubmitting(false);
     }
@@ -2262,10 +2262,6 @@ export function YonetimPaneliPage() {
             >
               <div className="yonetim-departman-section-head">
                 <p className="yonetim-checkbox-title">SGK İşverenleri</p>
-                <p className="yonetim-hint">
-                  Şirket bazlı SGK işvereni kataloğu. Şube–SGK eşlemesi yalnız bu kayıtlar üzerinden
-                  kurulur; şube adından, ilden veya lokasyondan türetilmez.
-                </p>
               </div>
               <div className="yonetim-create-row">
                 <button
@@ -2414,17 +2410,8 @@ export function YonetimPaneliPage() {
                 </div>
               ) : null}
               {!isSecurePersonelCreatePath ? (
-                editingKullaniciId == null ? (
-                  <p className="yonetim-hint" data-testid="yonetim-baslangic-sifresi-hint">
-                    Yeni hesabın başlangıç şifresi, girdiğiniz ad soyad bilgisinden şirket kuralıyla
-                    otomatik üretilir. Kullanıcı ilk girişte bu şifreyi kendi kalıcı şifresiyle değiştirir.
-                  </p>
-                ) : (
+                editingKullaniciId == null ? null : (
                   <div className="yonetim-form-stack" data-testid="yonetim-baslangic-sifresi-reset">
-                    <p className="yonetim-hint">
-                      Şifre bu formdan belirlenmez. Gerekiyorsa hesabı ilk giriş durumuna alın; kullanıcı
-                      ad soyadından üretilen başlangıç şifresiyle girip kendi kalıcı şifresini belirler.
-                    </p>
                     {boundCanonicalUsernameView?.mismatch ? (
                       <p className="yonetim-hint" data-testid="yonetim-baslangic-sifresi-username-guard">
                         Başlangıç şifresine sıfırlamadan önce kullanıcı adını geçerli şablona düzeltin.
@@ -2472,13 +2459,7 @@ export function YonetimPaneliPage() {
                     )}
                   </div>
                 )
-              ) : (
-                <p className="yonetim-hint" data-testid="yonetim-personel-secure-onboarding-hint">
-                  PERSONEL rolü için şifre buradan atanmaz. Personel hesabını ilgili personel kartındaki
-                  &quot;Personel Hesabı Oluştur&quot; akışı ile oluşturun; personel şifresini aktivasyon
-                  bağlantısı üzerinden kendisi belirler.
-                </p>
-              )}
+              ) : null}
               {!realKullaniciApi ? (
                 <FormField
                   as="select"

@@ -8,7 +8,7 @@ function read(path: string): string {
 describe("QR surface ownership", () => {
   it("keeps daily operation ownership in Puantaj", () => {
     const source = read("src/features/puantaj/components/QrGirisCikisOperationSection.tsx");
-    expect(source).toContain("Günlük operasyon / kontrol");
+    expect(source).not.toContain("Günlük operasyon / kontrol");
     expect(source).toContain("QR Ekranını Aç");
     expect(source).toContain("Günlük Puantaja Git");
     expect(source).toContain('hasPermission("qr.kiosk.display")');

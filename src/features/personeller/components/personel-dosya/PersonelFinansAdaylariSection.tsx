@@ -39,9 +39,6 @@ export function PersonelFinansAdaylariSection({
       data-testid="personel-finans-adaylari-card"
     >
       <span className="personel-puantaj-summary-kicker">Bu Dönem Finans Kayıtları</span>
-      <p className="personel-puantaj-summary-note">
-        Bu kayıtlar bordroda dikkate alınacak finans kalemleridir; bordro kesinliği taşımaz.
-      </p>
 
       {!canViewFinans ? (
         <p className="personel-puantaj-summary-note" data-testid="personel-finans-adaylari-yetki-yok">

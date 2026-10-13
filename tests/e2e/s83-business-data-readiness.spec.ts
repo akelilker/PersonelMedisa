@@ -38,7 +38,7 @@ test.describe("S83 Business Data Readiness", () => {
     await expect(page.getByTestId("bordro-candidate-gate-aktif")).toHaveText("Kapalı");
     await expect(page.getByTestId("bordro-candidate-gate-nedenleri")).toBeVisible();
     await expect(page.getByTestId("bordro-net-maas-row-0")).toBeVisible();
-    await expect(page.getByTestId("bordro-mevzuat-link")).toBeVisible();
+    await expect(page.getByTestId("bordro-mevzuat-link")).toHaveCount(0);
 
     await page.getByTestId("bordro-hazirlik-tab-devir").click();
     await expect(page.getByTestId("bordro-devir-sablon-indir")).toBeVisible();

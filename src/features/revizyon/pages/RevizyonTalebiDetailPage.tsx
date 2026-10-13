@@ -303,10 +303,6 @@ export function RevizyonTalebiDetailPage() {
           </dd>
         </div>
       </dl>
-      <p className="form-hint" data-testid="revizyon-overlay-uyari">
-        Düzeltme kaydı görünürlüğü ile gerçek rapor/bordro etkisi aynı şey değildir. Ham kapanış kaydı
-        değişmez.
-      </p>
 
       <dl className="dossier-grid">
         <div>

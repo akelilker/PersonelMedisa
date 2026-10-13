@@ -530,7 +530,6 @@ export function PersonelBelgelerPanel({
       {showBelgeDurumu ? (
         <DossierSection
           title="Belge Durumu"
-          description="Düzenleme: Kayıt ve Süreç ekranı."
         >
           {isPasif ? (
             <DossierRecord label="Durum" value="Bu personel pasif." />
@@ -562,11 +561,6 @@ export function PersonelBelgelerPanel({
 
       <DossierSection
         title="Personel Belgeleri"
-        description={
-          allowMutations
-            ? "Eğitim, sertifika ve resmi belge kayıtları bu bölümde yönetilir."
-            : "Ekleme ve değişiklik: Süreç → Belgeler."
-        }
       >
         <div className="personel-belge-panel-head">
           {showBelgeTakipLink ? (
@@ -598,7 +592,7 @@ export function PersonelBelgelerPanel({
             label="Yetki"
             value={
               !allowMutations
-                ? "Düzenleme: Süreç → Belgeler."
+                ? "Belge düzenleme yetkiniz yok."
                 : "Bu personel için belge düzenleme yetkiniz yok."
             }
           />
@@ -720,7 +714,6 @@ export function PersonelBelgelerPanel({
       {showIptalBelgeKayitlariSection ? (
         <DossierSection
           title="İptal edilen belge kayıtları"
-          description="İptal edilmiş belge kayıtları."
         >
           <div className="personel-belge-kayit-table-wrap" data-testid="personel-belge-kayit-iptal-list">
             <table className="personel-belge-kayit-table">

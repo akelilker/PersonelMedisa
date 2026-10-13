@@ -80,9 +80,6 @@ export function KayitSurecPersonelOrganizasyonPanel({
     <div className="surec-position-panel" data-testid="kayit-surec-organizasyon-panel">
       <div className="surec-person-placeholder surec-org-section-lead">
         <strong>Görev ve Organizasyon Değişikliği</strong>
-        <p>
-          Değişiklik anında personel kaydına uygulanır.
-        </p>
       </div>
 
       {canSubmitOrg ? (
@@ -176,10 +173,6 @@ export function KayitSurecPersonelOrganizasyonPanel({
 
           <div className="surec-person-placeholder surec-org-section-mid">
             <strong>Çalışma Bilgileri</strong>
-            <p>
-              Bağlı amir ve Statü (Mavi Yaka / Beyaz Yaka), organizasyon alanlarıyla aynı kaydet işleminde
-              atomik olarak uygulanır.
-            </p>
           </div>
 
           <div className="surec-position-grid">
@@ -205,7 +198,7 @@ export function KayitSurecPersonelOrganizasyonPanel({
           </div>
           {statuUnset ? (
             <p className="personel-form-note personel-form-note--warning" role="status" data-testid="org-statu-qr-hint">
-              Personel Statüsü belirlenmedi. QR kullanımı Mavi Yaka Statüsünde açılır.
+              Personel Statüsü belirlenmedi.
             </p>
           ) : null}
 
@@ -237,9 +230,6 @@ export function KayitSurecPersonelOrganizasyonPanel({
               setForm((prev) => ({ ...prev, degisiklikTarihi: value, effectiveDate: value }))
             }
           />
-          <p className="personel-form-note personel-form-note--info">
-            Değişiklik hemen uygulanır. Bu tarih yalnızca süreç geçmişi notu içindir; gelecek tarih planlamaz.
-          </p>
 
           <FormField
             label="Açıklama / Değişiklik Nedeni"

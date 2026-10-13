@@ -395,7 +395,6 @@ function AylikKapanisOzetiSection() {
     >
       <div className="yonetim-header-row raporlar-aylik-head">
         <h2>Aylık Kapanış Özeti</h2>
-        <p className="raporlar-aylik-lead">Ay sonu puantaj ve onay durumunu görüntüleyin; gerekirse Excel/CSV ile aktarın.</p>
       </div>
 
       <form className="form-filter-panel raporlar-aylik-filters" onSubmit={handleAylikFilterSubmit}>
@@ -851,7 +850,6 @@ export function RaporlarPage() {
             <p className="raporlar-panel-eyebrow">Filtrele ve çalıştır</p>
             <h3 className="raporlar-panel-title">Liste Raporları</h3>
           </div>
-          <p className="raporlar-panel-hint">Filtreleri seçerek sonuçları aşağıda inceleyin.</p>
         </div>
         <form className="form-filter-panel raporlar-standart-form" onSubmit={handleSubmit}>
         <div className="form-field-grid raporlar-standart-grid">

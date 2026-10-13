@@ -127,11 +127,6 @@ export function PersonelBordroKapsamSection({
       data-testid="personel-bordro-kapsam-card"
     >
       <span className="personel-puantaj-summary-kicker">Bordro Kapsam</span>
-      <p className="personel-puantaj-summary-note">
-        {isReadOnlySurface
-          ? "Yönetim: Raporlar → Bordro Hazırlık."
-          : "Personelin tarih aralığında maaş/bordro hesaplama kapsamına dahil veya hariç olduğu kararlar burada yönetilir."}
-      </p>
 
       <p className="personel-puantaj-summary-note" data-testid="personel-bordro-kapsam-ozet">
         Güncel durum:{" "}

@@ -770,11 +770,6 @@ export function GunlukPuantajPage() {
             </div>
           ) : null}
 
-          {!entryRequiresSaatBilgisi ? (
-            <p className="puantaj-form-readonly">
-              Bu hareket durumu için saat bilgisi zorunlu değil. Sistem puantajı gün tipi ve dayanakla okur.
-            </p>
-          ) : null}
 
           {submitErrorMessage ? <p className="puantaj-form-error">{submitErrorMessage}</p> : null}
           {isMuhurlendi ? (

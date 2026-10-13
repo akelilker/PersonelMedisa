@@ -2,7 +2,7 @@ import { type Dispatch, type FormEvent, type SetStateAction } from "react";
 import { FormField } from "../../../../components/form/FormField";
 import { CALISAN_KAPSAMI_SELECT_OPTIONS } from "../../../../lib/display/enum-display";
 import type { PersonelReferenceBundle } from "../../../../data/app-data.types";
-import { KAN_GRUBU_SELECT_OPTIONS, type EditPersonelFormState } from "../../personel-edit-utils";
+import { CINSIYET_SELECT_OPTIONS, KAN_GRUBU_SELECT_OPTIONS, type EditPersonelFormState } from "../../personel-edit-utils";
 
 export type PersonelInlineEditFormProps = {
   editForm: EditPersonelFormState;
@@ -104,6 +104,14 @@ export function PersonelInlineEditForm({
         />
         <FormField
           as="select"
+          label="Cinsiyet"
+          name="edit-cinsiyet"
+          value={editForm.cinsiyet ?? ""}
+          onChange={(value) => setEditForm((prev) => ({ ...prev, cinsiyet: value }))}
+          selectOptions={[{ value: "", label: "Seçiniz" }, ...CINSIYET_SELECT_OPTIONS]}
+        />
+        <FormField
+          as="select"
           label="Kan Grubu"
           name="edit-kan-grubu"
           value={editForm.kanGrubu ?? ""}
@@ -124,19 +132,6 @@ export function PersonelInlineEditForm({
           value={editForm.acilDurumTelefon ?? ""}
           onChange={(value) => setEditForm((prev) => ({ ...prev, acilDurumTelefon: value }))}
         />
-        <p
-          className="personel-form-note personel-form-note--info"
-          data-testid="personel-edit-org-yonlendirme"
-        >
-          Departman, bölüm, birim, görev/unvan, pozisyon, bağlı amir, Statü, çalışma lokasyonu ve SGK
-          değişiklikleri Süreç → Görev / Organizasyon sekmesinden yapılır.
-        </p>
-        <p
-          className="personel-form-note personel-form-note--info"
-          data-testid="personel-edit-ucret-yonlendirme"
-        >
-          Ücret tipi ve maaş Süreç → Mali İşlemler üzerinden yönetilir; Genel düzenleme ücret yazmaz.
-        </p>
         {/* Prim Kuralı kullanıcıya gösterilmez (onaylı karar); kayıtlı prim_kurali_id
             düzenleme formunda olduğu gibi korunur (personelToEditForm), API değişmez. */}
       </div>

@@ -17,6 +17,7 @@ export const FIELD_INPUT_ALIASES: Record<string, readonly string[]> = {
   telefon: ["create-telefon", "edit-telefon"],
   dogum_yeri: ["create-dogum-yeri", "edit-dogum-yeri"],
   kan_grubu: ["create-kan", "edit-kan-grubu"],
+  cinsiyet: ["edit-cinsiyet"],
   acil_durum_kisi: ["create-acil-kisi", "edit-acil-durum-kisi"],
   acil_durum_telefon: ["create-acil-tel", "edit-acil-durum-telefon"],
   ad: ["create-ad", "edit-ad"],

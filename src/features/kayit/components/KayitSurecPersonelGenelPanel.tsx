@@ -107,6 +107,7 @@ export function KayitSurecPersonelGenelPanel({
           { label: "T.C. Kimlik No.", value: formatGeneralField(personel.tc_kimlik_no) },
           { label: "Doğum Tarihi", value: formatIsoDateDetail(personel.dogum_tarihi) },
           { label: "Doğum Yeri", value: formatGeneralField(personel.dogum_yeri) },
+          { label: "Cinsiyet", value: formatGeneralField(personel.cinsiyet) },
           { label: "Telefon", value: formatGeneralField(personel.telefon) },
           { label: "Kan Grubu", value: formatGeneralField(personel.kan_grubu) },
           { label: "Acil Durum Kişisi", value: formatGeneralField(personel.acil_durum_kisi) },
@@ -202,6 +203,7 @@ export function KayitSurecPersonelGenelPanel({
       sicil_no: body.sicil_no ?? personel.sicil_no,
       ise_giris_tarihi: body.ise_giris_tarihi ?? personel.ise_giris_tarihi,
       dogum_yeri: body.dogum_yeri !== undefined ? (body.dogum_yeri ?? "") : personel.dogum_yeri,
+      cinsiyet: body.cinsiyet !== undefined ? (body.cinsiyet ?? null) : personel.cinsiyet,
       kan_grubu: body.kan_grubu !== undefined ? (body.kan_grubu ?? "") : personel.kan_grubu,
       acil_durum_kisi: body.acil_durum_kisi !== undefined ? (body.acil_durum_kisi ?? "") : personel.acil_durum_kisi,
       acil_durum_telefon:

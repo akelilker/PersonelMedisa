@@ -2,7 +2,6 @@ import { type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { useRoleAccess } from "../../../hooks/use-role-access";
 import { dispatchOpenBugunPersonelDurumu } from "../../../lib/bildirim/bugun-personel-durumu-events";
-import { canCorrectScopedGunlukBildirim } from "../../../lib/bildirim/gunluk-bildirim-correct-scoped";
 import type { Personel } from "../../../types/personel";
 import {
   DEVAMSIZLIK_SUB_CARDS,
@@ -40,7 +39,6 @@ export function KayitSurecPersonelPuantajPanel({
   const navigate = useNavigate();
   const { hasPermission } = useRoleAccess();
   const canViewBugun = hasPermission("bugun_personel_durumu.view");
-  const canCorrectScoped = canCorrectScopedGunlukBildirim(hasPermission);
   const canUpdatePuantaj = hasPermission("puantaj.update");
 
   if (isPassive) {
@@ -91,21 +89,10 @@ export function KayitSurecPersonelPuantajPanel({
 
   return (
     <div className="surec-shell-panel" data-testid="kayit-surec-puantaj-panel">
-      <p className="workspace-empty-hint" data-testid="kayit-surec-puantaj-owner-hint">
-        <strong>Puantaj</strong> — İzin ve Devamsızlık / Rapor / İş Kazası = özlük süreç kaydı. Geç / Erken /
-        Görevde = Anlık Personel Durumu (saatli günlük durum).
-      </p>
 
       {canViewBugun ? (
         <div className="workspace-empty-hint" data-testid="kayit-surec-puantaj-open-items">
           <strong>Kontrol Gerekenler</strong>
-          <p>
-            Henüz değerlendirilmedi, geç geldi, gelmedi ve eksik günlük kayıtlar Anlık Personel Durumu
-            üzerinden okunur
-            {canCorrectScoped ? "; günlük düzeltme de orada yapılır" : ""}. İzin ve devamsızlık / rapor / iş
-            kazası için aşağıdaki özlük kayıtlarını kullan. Puantaj satırı düzenleme yetkisi yoksa satır ekranı yerine
-            Anlık Personel Durumu açılır.
-          </p>
           <button
             type="button"
             className="universal-btn-aux"

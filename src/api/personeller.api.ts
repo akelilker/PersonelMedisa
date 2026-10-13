@@ -69,10 +69,11 @@ export type CreatePersonelPayload = {
 
 export type UpdatePersonelPayload = Omit<
   Partial<CreatePersonelPayload>,
-  "dogum_yeri" | "kan_grubu" | "departman_id" | "gorev_id" | "bagli_amir_id" | "bolum_id" | "birim_id" | "pozisyon_id"
+  "dogum_yeri" | "kan_grubu" | "cinsiyet" | "departman_id" | "gorev_id" | "bagli_amir_id" | "bolum_id" | "birim_id" | "pozisyon_id"
 > & {
   dogum_yeri?: string | null;
   kan_grubu?: string | null;
+  cinsiyet?: string | null;
   departman_id?: number | null;
   gorev_id?: number | null;
   bagli_amir_id?: number | null;
@@ -273,6 +274,7 @@ function normalizePersonel(data: unknown): Personel {
     sicil_no: readString(baseSources, "sicil_no"),
     dogum_yeri: readString(baseSources, "dogum_yeri"),
     kan_grubu: readString(baseSources, "kan_grubu"),
+    cinsiyet: readString(baseSources, "cinsiyet") ?? null,
     ise_giris_tarihi: readString(baseSources, "ise_giris_tarihi"),
     acil_durum_kisi: readString(baseSources, "acil_durum_kisi"),
     acil_durum_telefon: readString(baseSources, "acil_durum_telefon"),

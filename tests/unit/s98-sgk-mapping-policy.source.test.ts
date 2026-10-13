@@ -223,9 +223,9 @@ describe("S98 SGK mapping + policy source guards", () => {
     expect(panel).toContain("importSgkSirketPolitikasi");
     expect(panel).toContain("submitSgkSirketPolitikasi");
     expect(panel).toContain("approveSgkSirketPolitikasi");
-    expect(panel).toContain('data-testid="sgk-esleme-decision-rules-note"');
-    expect(panel).toContain("Kod kullanılmaz");
-    expect(panel).toContain("Ücret modeline göre");
+    expect(panel).not.toContain('data-testid="sgk-esleme-decision-rules-note"');
+    expect(panel).not.toContain("Kod kullanılmaz");
+    expect(panel).not.toContain("Ücret modeline göre");
     expect(api).toContain("downloadSgkSurecEslemeSablonCsv");
     expect(api).toContain("downloadSgkSirketPolitikasiSablonCsv");
     expect(api).toContain("surecEslemeSablonCsv");

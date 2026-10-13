@@ -788,7 +788,7 @@ describe("api error helpers", () => {
     });
 
     expect(getApiErrorDetail(error, "Personel kaydı oluşturulamadı.")).toEqual({
-      message: userErrorText("Sube secilmelidir.", "VALIDATION_ERROR", 422),
+      message: "Şube Boş Bırakılamaz.",
       status: 422,
       code: "VALIDATION_ERROR",
       field: "sube_id"

@@ -59,7 +59,9 @@ describe("personel-missing-info", () => {
     expect(getPersonelMissingFieldKeys({ ...completePersonel, sgk_isveren_id: null }).has("sgk_isveren_id")).toBe(
       true
     );
-    expect(missing.every((field) => field.editTarget === "genel")).toBe(true);
+    // t869: org alanları (bölüm/birim) Görev / Organizasyon sekmesinde düzenlenir.
+    expect(missing.filter((field) => ["bolum_id", "birim_id"].includes(field.key)).every((field) => field.editTarget === "pozisyon")).toBe(true);
+    expect(missing.filter((field) => !["bolum_id", "birim_id"].includes(field.key)).every((field) => field.editTarget === "genel")).toBe(true);
     expect(missing.every((field) => field.severity === "CRITICAL")).toBe(true);
     expect(missing.find((field) => field.key === "telefon")?.category).toBe("ILETISIM");
   });

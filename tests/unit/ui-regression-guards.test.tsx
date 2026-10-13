@@ -403,7 +403,8 @@ describe("Q) Hata metinleri tek tablodan ve Her Kelime Büyük Harfle (t865 HATA
   it("ham sunucu/teknik metin daima tablo metnine çevrilir", async () => {
     const mod = await import("../../src/lib/display/user-error");
     for (const raw of ["GET /api/legal-holdlar", "Snapshot bulunamadi.", "SCHEMA_NOT_READY: x", "Gerekce zorunludur.", "Talep onaylanamadi (yaris).", "", "anlamsız"]) {
-      expect(mod.isUserErrorTableText(mod.userErrorText(raw))).toBe(true);
+      const text = mod.userErrorText(raw);
+      expect(mod.isUserErrorTableText(text) || mod.isFieldErrorText(text)).toBe(true);
     }
     expect(mod.userErrorText("x", "FORBIDDEN", 403)).toContain("Yetkiniz Yok");
     expect(mod.userErrorText("x", undefined, 401)).toContain("Oturumunuz");
@@ -424,5 +425,105 @@ describe("Q) Hata metinleri tek tablodan ve Her Kelime Büyük Harfle (t865 HATA
     expect(readSrc("src/api/api-client.ts")).toMatch(/message: userErrorText\(detail\.message/);
     expect(readSrc("src/components/states/ErrorState.tsx")).toMatch(/userErrorText\(message\)/);
     expect(readSrc("api/src/Http/JsonResponse.php")).toMatch(/'user_message' => UserErrorMessages::forError/);
+  });
+});
+
+describe("R) Doğrulama hatası alanı adıyla yazılır ve alan kırmızı işaretlenir (t869)", () => {
+  it("alan adlı Title Case metin (alan bilgisi veya ham metinden)", async () => {
+    const { userErrorText, toTitleCaseTr } = await import("../../src/lib/display/user-error");
+    const { FIELD_LABELS } = await import("../../src/lib/display/field-labels");
+    expect(userErrorText("tc_kimlik_no zorunludur.", "VALIDATION_ERROR", 422, "tc_kimlik_no")).toBe(
+      "T.C. Kimlik No. Boş Bırakılamaz."
+    );
+    expect(userErrorText("Gecersiz deger.", "VALIDATION_ERROR", 422, "sicil_no")).toBe(
+      "Sicil No. Geçerli Değil. Lütfen Kontrol Edin."
+    );
+    expect(userErrorText("Gerekce zorunludur.")).toBe("Gerekçe Boş Bırakılamaz.");
+    expect(userErrorText("Tarih zorunludur.")).toBe("Tarih Boş Bırakılamaz.");
+    // Zaten alan adlı metin ikinci kez değişmez.
+    expect(userErrorText("T.C. Kimlik No. Boş Bırakılamaz.")).toBe("T.C. Kimlik No. Boş Bırakılamaz.");
+    for (const label of Object.values(FIELD_LABELS)) {
+      expect(toTitleCaseTr(label)).toBe(label);
+    }
+  });
+
+  it("backend user_message aynı alan adlarını kullanır (PHP eşlemesi ön yüzle aynı)", async () => {
+    const { FIELD_LABELS } = await import("../../src/lib/display/field-labels");
+    const php = readSrc("api/src/Http/FieldLabels.php");
+    for (const [key, label] of Object.entries(FIELD_LABELS)) {
+      expect(php).toContain(`'${key}' => '${label}',`);
+    }
+    expect(readSrc("api/src/Http/JsonResponse.php")).toMatch(/UserErrorMessages::forError\(\(int\) \$status, \(string\) \$code, \$field/);
+    const msgs = readSrc("api/src/Http/UserErrorMessages.php");
+    expect(msgs).toContain("FieldLabels::labelOf($field)");
+    expect(msgs).toContain("' Boş Bırakılamaz.'");
+    expect(msgs).toContain("' Geçerli Değil. Lütfen Kontrol Edin.'");
+    expect(readSrc("src/api/api-client.ts")).toMatch(/userErrorText\(message, detail\?\.code, status, detail\?\.field\)/);
+  });
+
+  it("ortak mekanizma: alan kırmızı çerçeve + odak, düzenleyince temizlenir", async () => {
+    const { highlightFieldErrors, FIELD_ERROR_CLASS } = await import("../../src/lib/forms/field-error-highlight");
+    const host = document.createElement("div");
+    host.innerHTML =
+      '<div class="form-section"><label for="edit-tc-kimlik-no">T.C. Kimlik No.</label><input id="edit-tc-kimlik-no" name="edit-tc-kimlik-no" /></div>';
+    document.body.appendChild(host);
+    const input = host.querySelector("input")!;
+    input.getClientRects = () => [{} as DOMRect] as unknown as DOMRectList;
+    expect(await highlightFieldErrors(["tc_kimlik_no"], { timeoutMs: 200 })).toBe(true);
+    expect(host.querySelector(".form-section")!.classList.contains(FIELD_ERROR_CLASS)).toBe(true);
+    expect(input.getAttribute("aria-invalid")).toBe("true");
+    expect(document.activeElement).toBe(input);
+    fireEvent.input(input, { target: { value: "1" } });
+    expect(host.querySelector(".form-section")!.classList.contains(FIELD_ERROR_CLASS)).toBe(false);
+    expect(input.hasAttribute("aria-invalid")).toBe(false);
+    host.remove();
+    expect(readSrc("src/styles/components/form.css")).toMatch(/\.field-has-error[\s\S]*border-color: #d93025/);
+  });
+});
+
+describe("S) Personel Kartı eksik bilgi: alan adları, doğru sekme, alan odağı (t869)", () => {
+  it("organizasyon alanları Görev / Organizasyon sekmesine, kimlik alanları Genel'e gider (TS + PHP)", async () => {
+    const { PERSONEL_MISSING_FIELD_EDIT_TARGET } = await import("../../src/features/personeller/personel-missing-info");
+    const php = readSrc("api/src/Services/Personel/PersonelCompletenessService.php");
+    for (const [key, target] of Object.entries(PERSONEL_MISSING_FIELD_EDIT_TARGET)) {
+      expect(php).toMatch(new RegExp(`'key' => '${key}',[\\s\\S]*?'edit_target' => '${target}'`));
+    }
+    expect(PERSONEL_MISSING_FIELD_EDIT_TARGET.bolum_id).toBe("pozisyon");
+    expect(PERSONEL_MISSING_FIELD_EDIT_TARGET.tc_kimlik_no).toBe("genel");
+    // Genel düzenleme formu org alanlarını içermez → org hedefi Genel olamaz.
+    const genelForm = readSrc("src/features/personeller/components/personel-dosya/PersonelInlineEditForm.tsx");
+    expect(genelForm).not.toMatch(/name="edit-(bolum|birim|departman|sube)/);
+  });
+
+  it("uyarı eksik alanları adıyla listeler; tıklayınca sekme + alan anahtarı iletilir", async () => {
+    const { PersonelDosyaMissingInfoGateway } = await import(
+      "../../src/features/personeller/components/personel-dosya/PersonelDosyaMissingInfoGateway"
+    );
+    const onOpen = vi.fn();
+    const personel = {
+      id: 1, ad: "Ayşe", soyad: "Yılmaz", calisan_kapsami: "IC_PERSONEL",
+      completeness: {
+        is_complete: false, missing_count: 2, critical_missing_labels: ["Bölüm", "Sicil No."],
+        missing_fields: [
+          { key: "bolum_id", label: "Bölüm", category: "ISTIHDAM", severity: "CRITICAL", edit_target: "genel" },
+          { key: "sicil_no", label: "Sicil No.", category: "ISTIHDAM", severity: "CRITICAL", edit_target: "genel" }
+        ]
+      }
+    } as never;
+    const view = render(<PersonelDosyaMissingInfoGateway personel={personel} onOpenMissingInfo={onOpen} />);
+    expect(view.getByTestId("personel-eksik-bilgi-ozeti").textContent).toContain("2 Eksik Bilgi:");
+    fireEvent.click(view.getByTestId("personel-eksik-bilgi-alan-bolum_id"));
+    expect(onOpen).toHaveBeenLastCalledWith("pozisyon", "bolum_id");
+    fireEvent.click(view.getByTestId("personel-eksik-bilgi-alan-sicil_no"));
+    expect(onOpen).toHaveBeenLastCalledWith("genel", "sicil_no");
+  });
+
+  it("alan anahtarı Kayıt modalına taşınır ve ortak işaretleme ile odaklanır", async () => {
+    const { resolveKayitModalRouteConfig } = await import("../../src/features/kayit/kayit-modal-contract");
+    expect(
+      resolveKayitModalRouteConfig({ kayitModal: { tab: "surec", targetTab: "pozisyon", focusField: "bolum_id" } })?.focusField
+    ).toBe("bolum_id");
+    expect(readSrc("src/features/personeller/hooks/usePersonelKartGatewayReturn.ts")).toContain("focusField");
+    expect(readSrc("src/features/kayit/components/KayitSurecWorkspace.tsx")).toMatch(/highlightFieldErrors\(\[initialFocusField\]/);
   });
 });

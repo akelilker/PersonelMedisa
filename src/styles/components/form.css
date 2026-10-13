@@ -127,3 +127,11 @@ select.form-input option {
   opacity: 0.82;
   cursor: default;
 }
+
+/* t869 onaylı karar: hata duran alan kırmızı çerçeve alır; düzenleyince kalkar (field-error-highlight.ts).
+   Özgüllük odak stillerinin üstünde kalacak şekilde çift sınıf/öznitelik. */
+.field-has-error.field-has-error :is(input:not([type="hidden"]), select, textarea, .form-input, .app-select-trigger, [role="combobox"]),
+[data-field-error="true"][aria-invalid="true"][aria-invalid="true"] {
+  border-color: #d93025;
+  box-shadow: 0 0 0 1px #d93025;
+}

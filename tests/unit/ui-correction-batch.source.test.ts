@@ -69,9 +69,9 @@ describe("ui correction batch — modal back + missing info owners", () => {
     expect(panel).toMatch(/openEditOnMount/);
   });
 
-  it("missing-info gateway copy names the first missing field; salary is not in completeness rules", () => {
+  it("missing-info gateway lists every missing field by name; salary is not in completeness rules", () => {
     const gatewayUi = read("src/features/personeller/components/personel-dosya/PersonelDosyaMissingInfoGateway.tsx");
-    expect(gatewayUi).toMatch(/primaryField\.label/);
+    expect(gatewayUi).toMatch(/missingFields\.map\(\(field, index\)/);
 
     const policy = read("src/features/personeller/personel-missing-info.ts");
     expect(policy).not.toMatch(/maas_tutari/);

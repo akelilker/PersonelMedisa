@@ -24,8 +24,16 @@ final class UserErrorMessages
     public const ALTYAPI = 'Bu Özellik Şu Anda Kullanılamıyor. Lütfen Sistem Yöneticisine Bildirin.';
     public const ISLEM_TAMAMLANAMADI = 'İşlem Tamamlanamadı, Hiçbir Değişiklik Kaydedilmedi. Tekrar Deneyin. Sorun Sürerse Sistem Yöneticisine Bildirin.';
 
-    public static function forError(int $status, string $code): string
+    public static function forError(int $status, string $code, ?string $field = null, string $message = ''): string
     {
+        $label = FieldLabels::labelOf($field);
+        if ($label !== null && ($status === 400 || $status === 422)) {
+            $c0 = strtoupper($code);
+            $m = function_exists('mb_strtolower') ? mb_strtolower($message, 'UTF-8') : strtolower($message);
+            $zorunlu = str_contains($c0, 'REQUIRED')
+                || preg_match('/zorunlu|bo[sş] olamaz|bo[sş] b[ıi]rak[ıi]lamaz|girilmeli|se[cç]ilmeli/u', $m) === 1;
+            return $label . ($zorunlu ? ' Boş Bırakılamaz.' : ' Geçerli Değil. Lütfen Kontrol Edin.');
+        }
         $c = strtoupper($code);
         if ($status === 401 || str_contains($c, 'UNAUTHORIZED')) {
             return self::OTURUM;

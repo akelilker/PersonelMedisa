@@ -14,6 +14,8 @@ export type KayitModalRouteConfig = {
   recordId: string | null;
   returnTo: string | null;
   operation: "yillik-izin-hak-duzeltme" | null;
+  /** t869: eksik bilgi gateway'inden gelen, odaklanıp kırmızı işaretlenecek alan anahtarı. */
+  focusField: string | null;
 };
 
 export function resolveKayitModalRouteConfig(state: unknown): KayitModalRouteConfig | null {
@@ -34,6 +36,7 @@ export function resolveKayitModalRouteConfig(state: unknown): KayitModalRouteCon
   const rawRecordId = (kayitModal as { recordId?: unknown }).recordId;
   const rawReturnTo = (kayitModal as { returnTo?: unknown }).returnTo;
   const rawOperation = (kayitModal as { operation?: unknown }).operation;
+  const rawFocusField = (kayitModal as { focusField?: unknown }).focusField;
   const targetTab = isIncomingPersonelSurecTab(rawTargetTab)
     ? normalizePersonelSurecTab(rawTargetTab)
     : isIncomingPersonelSurecTab(rawPersonelTab)
@@ -48,6 +51,7 @@ export function resolveKayitModalRouteConfig(state: unknown): KayitModalRouteCon
     intent: typeof rawIntent === "string" ? rawIntent : null,
     recordId: rawRecordId === undefined || rawRecordId === null ? null : String(rawRecordId),
     returnTo: typeof rawReturnTo === "string" ? rawReturnTo : null,
-    operation: rawOperation === "yillik-izin-hak-duzeltme" ? "yillik-izin-hak-duzeltme" : null
+    operation: rawOperation === "yillik-izin-hak-duzeltme" ? "yillik-izin-hak-duzeltme" : null,
+    focusField: typeof rawFocusField === "string" && /^[a-z_]+$/.test(rawFocusField) ? rawFocusField : null
   };
 }

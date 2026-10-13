@@ -282,6 +282,7 @@ export function AppShell() {
     kayitInitialPersonelTab,
     kayitInitialOperation,
     kayitIntent,
+    kayitFocusField,
     kayitPrimaryLabel,
     kayitPrimaryFormId,
     openKayitModal,
@@ -478,6 +479,7 @@ export function AppShell() {
             initialPersonelTab={kayitInitialPersonelTab}
             initialOperation={kayitInitialOperation}
             initialKayitIntent={kayitIntent}
+            initialFocusField={kayitFocusField}
             primaryActionLabel={kayitPrimaryLabel}
             primaryFormId={kayitPrimaryFormId}
             onFooterModelChange={handleKayitFooterModelChange}

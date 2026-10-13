@@ -47,6 +47,8 @@ export function KayitSurecPersonelGenelPanel({
   const [editForm, setEditForm] = useState<EditPersonelFormState>(() => personelToEditForm(personel));
 
   const personelIdRef = useRef(personel.id);
+  const personelRef = useRef(personel);
+  personelRef.current = personel;
   personelIdRef.current = personel.id;
   const isSubmittingRef = useRef(false);
   const onBusyChangeRef = useRef(onBusyChange);
@@ -57,12 +59,23 @@ export function KayitSurecPersonelGenelPanel({
     onBusyChangeRef.current?.(next);
   }
 
+  const isEditingRef = useRef(false);
+  isEditingRef.current = isEditing;
+
+  // t869: aynı personelin nesnesi değişince (iyimser güncelleme/geri alma) açık düzenleme ve
+  // hata mesajı silinmez; aksi halde doğrulama hatası hiç görünmüyordu. Personel değişince sıfırlanır.
   useEffect(() => {
-    setEditForm(personelToEditForm(personel));
+    if (!isEditingRef.current && !isSubmittingRef.current) {
+      setEditForm(personelToEditForm(personel));
+    }
+  }, [personel]);
+
+  useEffect(() => {
+    setEditForm(personelToEditForm(personelRef.current));
     setIsEditing(false);
     setEditErrorMessage(null);
     setEditInfoMessage(null);
-  }, [personel]);
+  }, [personel.id]);
 
   useEffect(() => {
     if (!openEditOnMount || !canEdit) {

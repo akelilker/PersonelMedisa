@@ -22,15 +22,15 @@ export function PersonelDosyaMissingInfoGateway({
 
   if (!onOpenMissingInfo) {
     return (
-      <p className="personel-dosya-missing-gateway is-readonly" data-testid="personel-eksik-bilgi-ozeti" role="status">
+      <p className="personel-dosya-missing-gateway personel-dosya-missing-gateway--tek-satir is-readonly" data-testid="personel-eksik-bilgi-ozeti" role="status">
         {heading} {missingFields.map((field) => field.label).join(", ")}
       </p>
     );
   }
 
   return (
-    <div className="personel-dosya-missing-gateway-wrap" data-testid="personel-eksik-bilgi-ozeti">
-      <p className="personel-dosya-missing-gateway" data-testid="personel-eksik-bilgi-tamamla">
+    <div className="personel-dosya-missing-gateway-wrap personel-dosya-missing-gateway--tek-satir" data-testid="personel-eksik-bilgi-ozeti">
+      <p className="personel-dosya-missing-gateway personel-dosya-missing-gateway--tek-satir" data-testid="personel-eksik-bilgi-tamamla">
         <span>{heading} </span>
         {missingFields.map((field, index) => (
           <span key={field.key}>

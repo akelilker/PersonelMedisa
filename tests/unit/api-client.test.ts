@@ -829,6 +829,7 @@ describe("shouldEmitGlobalAuthForbidden", () => {
     expect(shouldEmitGlobalAuthForbidden("/personeller/2", "GET")).toBe(false);
     expect(shouldEmitGlobalAuthForbidden("/personeller/2", "PUT")).toBe(false);
     expect(shouldEmitGlobalAuthForbidden("/personeller/2/belge-durumu", "GET")).toBe(false);
+    expect(shouldEmitGlobalAuthForbidden("/personeller/2/profil-foto", "GET")).toBe(false);
     expect(shouldEmitGlobalAuthForbidden("/personeller/2/belge-durumu", "PUT")).toBe(false);
     expect(shouldEmitGlobalAuthForbidden("/personeller/3/belge-kayitlari", "GET")).toBe(false);
     expect(shouldEmitGlobalAuthForbidden("/personeller/3/belge-kayitlari", "POST")).toBe(false);

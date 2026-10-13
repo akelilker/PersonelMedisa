@@ -1,5 +1,71 @@
 import { useMemo } from "react";
 
+type PersonelDosyaActionItem = {
+  id: string;
+  label: string;
+  onSelect: () => void;
+};
+
+export function PersonelDosyaActionControls({
+  items,
+  isActionMenuOpen,
+  onToggleActionMenu
+}: {
+  items: PersonelDosyaActionItem[];
+  isActionMenuOpen: boolean;
+  onToggleActionMenu: () => void;
+}) {
+  if (items.length === 0) {
+    return null;
+  }
+
+  if (items.length === 1) {
+    const item = items[0];
+    return (
+      <div className="personel-dosya-actions-row" data-testid="personel-dosya-actions-row">
+        <div className="personel-dosya-actions-spacer" aria-hidden="true" />
+        <button
+          type="button"
+          className="universal-btn-aux"
+          data-testid={`personel-dosya-action-${item.id}`}
+          onClick={item.onSelect}
+        >
+          {item.label}
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="personel-dosya-actions-row" data-testid="personel-dosya-actions-row">
+      <div className="personel-dosya-actions-spacer" aria-hidden="true" />
+      <div className="personel-dosya-action-host">
+        <button
+          type="button"
+          className="universal-btn-aux"
+          onClick={onToggleActionMenu}
+          aria-haspopup="menu"
+          aria-expanded={isActionMenuOpen}
+        >
+          İşlemler
+        </button>
+        <div className={`settings-dropdown personel-dosya-action-menu${isActionMenuOpen ? " open" : ""}`}>
+          {items.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              data-testid={`personel-dosya-action-${item.id}`}
+              onClick={item.onSelect}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function PersonelDosyaActionRow({
   canAccessSurecler,
   canCreateSurec,
@@ -18,7 +84,7 @@ export function PersonelDosyaActionRow({
   onOpenSurecHistory: () => void;
 }) {
   const actionItems = useMemo(() => {
-    const items: Array<{ id: string; label: string; onSelect: () => void }> = [];
+    const items: PersonelDosyaActionItem[] = [];
 
     if (canCreateSurec) {
       items.push({
@@ -49,35 +115,11 @@ export function PersonelDosyaActionRow({
     onOpenSurecModal
   ]);
 
-  if (actionItems.length === 0) {
-    return null;
-  }
-
   return (
-    <div className="personel-dosya-actions-row" data-testid="personel-dosya-actions-row">
-      <div className="personel-dosya-actions-spacer" aria-hidden="true" />
-      <div className="personel-dosya-action-host">
-        <button
-          type="button"
-          className="universal-btn-aux"
-          onClick={onToggleActionMenu}
-          aria-expanded={isActionMenuOpen}
-        >
-          İşlemler
-        </button>
-        <div className={`settings-dropdown personel-dosya-action-menu${isActionMenuOpen ? " open" : ""}`}>
-          {actionItems.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              data-testid={`personel-dosya-action-${item.id}`}
-              onClick={item.onSelect}
-            >
-              {item.label}
-            </button>
-          ))}
-        </div>
-      </div>
-    </div>
+    <PersonelDosyaActionControls
+      items={actionItems}
+      isActionMenuOpen={isActionMenuOpen}
+      onToggleActionMenu={onToggleActionMenu}
+    />
   );
 }

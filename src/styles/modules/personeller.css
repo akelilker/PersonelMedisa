@@ -384,6 +384,30 @@
   min-width: 0;
 }
 
+/* Mobil kart düzeni aynı kalır; fotoğraf yalnız masaüstünde. */
+.personel-dosya-hero-photo {
+  display: none;
+}
+
+@media (min-width: 721px) {
+  .personel-dosya-hero-photo {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+  }
+
+  .personel-dosya-hero-photo .pm-self-portrait {
+    width: 48px;
+    height: 48px;
+  }
+
+  .personel-dosya-hero-photo .pm-self-portrait--empty {
+    background: rgba(var(--theme-color-rgb), 0.12);
+    color: var(--txt);
+    font-size: 14px;
+  }
+}
+
 /* Kimlik satırı Taşıt detay plaka/marka tonuna iner (15px mobil, 16px masaüstü). */
 .personel-dosya-hero-name {
   margin: 0;
@@ -1512,6 +1536,14 @@
 .belge-takip-filter-panel {
   display: grid;
   gap: var(--space-2);
+}
+
+.belge-takip-personel-adi {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--txt);
 }
 
 .belge-takip-table-wrap {

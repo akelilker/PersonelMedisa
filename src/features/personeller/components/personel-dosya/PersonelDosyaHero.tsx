@@ -1,6 +1,7 @@
 import { formatAktifDurumLabel, formatCalisanKapsamiLabel } from "../../../../lib/display/enum-display";
 import type { Personel } from "../../../../types/personel";
 import { formatDetailValue, formatReferenceValue } from "./personel-dosya-format-utils";
+import { PersonelDosyaHeroPhoto } from "./PersonelDosyaHeroPhoto";
 
 function metaPart(value: string): string | null {
   const trimmed = value.trim();
@@ -35,6 +36,7 @@ export function PersonelDosyaHero({ personel }: { personel: Personel }) {
   return (
     <header className="personel-dosya-hero" data-testid="personel-dosya-hero">
       <div className="personel-dosya-hero-identity">
+        <PersonelDosyaHeroPhoto personelId={personel.id} name={fullName} />
         <h3 className="personel-dosya-hero-name">{fullName}</h3>
         {/* #345 kararı: aktif personelde yalnız yeşil nokta (görünür "Çalışıyor"/pill yok);
             pasif/bilinmeyen durumda nokta + açıklama görünür. Erişilebilir ad her durumda korunur. */}

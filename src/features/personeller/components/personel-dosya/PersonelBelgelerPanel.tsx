@@ -570,7 +570,11 @@ export function PersonelBelgelerPanel({
       >
         <div className="personel-belge-panel-head">
           {showBelgeTakipLink ? (
-            <Link className="personeller-toolbar-module-link" to="/personeller/belge-takip" data-testid="personel-belge-takip-link">
+            <Link
+              className="personeller-toolbar-module-link"
+              to={`/personeller/belge-takip?personel_id=${personel.id}`}
+              data-testid="personel-belge-takip-link"
+            >
               Belge Takip
             </Link>
           ) : (

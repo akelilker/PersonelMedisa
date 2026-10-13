@@ -282,6 +282,18 @@ export function selfProfilFotoSrc(photo: SelfProfilFoto | null): string | null {
   return `data:${photo.mime_type};base64,${photo.image_base64}`;
 }
 
+export async function fetchPersonelProfilFoto(personelId: number | string): Promise<string | null> {
+  const data = unwrap(
+    await apiRequest(endpoints.personeller.profilFoto(personelId)),
+    "Profil fotoğrafı alınamadı."
+  );
+  return selfProfilFotoSrc({
+    has_photo: data.has_photo === true,
+    mime_type: readString(data.mime_type),
+    image_base64: readString(data.image_base64)
+  });
+}
+
 export async function fetchSelfProfilFoto(): Promise<SelfProfilFoto> {
   const data = unwrap(await apiRequest(endpoints.me.profilFoto), "Profil fotoğrafı alınamadı.");
   return {

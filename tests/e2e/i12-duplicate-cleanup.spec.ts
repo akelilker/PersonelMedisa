@@ -14,7 +14,6 @@ test.describe("I12 duplicate cleanup regression", () => {
 
     await loginAsMockRole(page, "GENEL_YONETICI");
     await page.goto("/personeller/1");
-    await page.getByRole("button", { name: "Islemler" }).click();
     await page.getByTestId("personel-dosya-action-surecte-islem-yap").click();
 
     const modal = page.locator(".modal-container--kayit-surec, .modal-container").filter({

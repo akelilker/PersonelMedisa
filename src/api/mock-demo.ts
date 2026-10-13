@@ -10778,6 +10778,16 @@ export function resolveDemoApiResponse(
     return buildDemoBelgeTakipResponse(requestUrl);
   }
 
+  const profilFotoMatch = pathname.match(/^\/personeller\/(\d+)\/profil-foto$/);
+  if (profilFotoMatch && method === "GET") {
+    const personelId = Number.parseInt(profilFotoMatch[1] ?? "0", 10);
+    const exists = demoState.personeller.some((item) => item.id === personelId);
+    if (!exists) {
+      return null;
+    }
+    return ok({ has_photo: false, mime_type: null, image_base64: null });
+  }
+
   const belgeDurumMatch = pathname.match(/^\/personeller\/(\d+)\/belge-durumu$/);
   if (belgeDurumMatch && method === "GET") {
     const personelId = Number.parseInt(belgeDurumMatch[1] ?? "0", 10);

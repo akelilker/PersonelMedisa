@@ -11,9 +11,10 @@ import {
   qrAttendanceStatus,
   qrReadErrorMessage
 } from "../../../puantaj/qr-read-utils";
+import { formatDisplayDateOrText } from "../../../../lib/display/iso-date-format";
 
 function formatQrHistoryDateLabel(row: ManagerQrAttendanceItem): string {
-  return row.date_from === row.date_to ? row.date_from : `${row.date_from} – ${row.date_to}`;
+  return row.date_from === row.date_to ? formatDisplayDateOrText(row.date_from) : `${formatDisplayDateOrText(row.date_from)} – ${formatDisplayDateOrText(row.date_to)}`;
 }
 
 function formatMatchedDuration(seconds: number): string {
@@ -39,7 +40,7 @@ export function PersonelQrHistorySection({ personel }: { personel: Personel }) {
       <div className="personel-dosya-section-head personel-dosya-section-head--with-action">
         <div>
           <h3>Giriş / Çıkış — Son 30 gün</h3>
-          <p>Son 30 günün QR giriş/çıkış geçmişi salt okunur gösterilir.</p>
+          <p>Son 30 günün QR giriş/çıkış geçmişi.</p>
         </div>
         <Link to={`/puantaj?personel_id=${personel.id}`} className="universal-btn-aux">
           Puantajda İncele

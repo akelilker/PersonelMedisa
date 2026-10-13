@@ -7,6 +7,7 @@ import type {
   CreatePersonelBordroKapsamPayload,
   PersonelBordroKapsamDryRunResult
 } from "../../../../types/personel-bordro-kapsam";
+import { formatDisplayDateOrText } from "../../../../lib/display/iso-date-format";
 
 const FORM_ID = "personel-bordro-kapsam-form";
 
@@ -264,7 +265,7 @@ export function PersonelBordroKapsamCreateModal({
               Sicil {dryRunResult.personel.sicil_no} — {dryRunResult.personel.ad_soyad}
             </p>
             <p>
-              Dönem: {dryRunResult.donem.baslangic} → {dryRunResult.donem.bitis}
+              Dönem: {formatDisplayDateOrText(dryRunResult.donem.baslangic)} → {formatDisplayDateOrText(dryRunResult.donem.bitis)}
             </p>
             <p>
               Yeni snapshot setinden çıkarılır:{" "}

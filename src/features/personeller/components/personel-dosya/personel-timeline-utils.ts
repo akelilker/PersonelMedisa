@@ -12,7 +12,7 @@ import type { Personel } from "../../../../types/personel";
 import type { Surec } from "../../../../types/surec";
 import type { Zimmet } from "../../../../types/zimmet";
 import { formatDetailValue } from "./personel-dosya-format-utils";
-import { formatDisplayDateTime } from "../../../../lib/display/iso-date-format";
+import { formatDisplayDateOrText, formatDisplayDateTime } from "../../../../lib/display/iso-date-format";
 
 export type PersonelTimelineEventTone = "default" | "danger";
 
@@ -198,23 +198,23 @@ function buildSurecTimelinePrimaryDate(surec: Surec): string | null {
   const bit = normalizeTimelineText(surec.bitis_tarihi);
 
   if (eff) {
-    return `Geçerlilik: ${eff}`;
+    return `Geçerlilik: ${formatDisplayDateOrText(eff)}`;
   }
 
   if (bas && bit) {
     if (bas === bit) {
-      return `Tarih: ${bas}`;
+      return `Tarih: ${formatDisplayDateOrText(bas)}`;
     }
 
-    return `Başlangıç: ${bas} · Bitiş: ${bit}`;
+    return `Başlangıç: ${formatDisplayDateOrText(bas)} · Bitiş: ${formatDisplayDateOrText(bit)}`;
   }
 
   if (bas) {
-    return `Tarih: ${bas}`;
+    return `Tarih: ${formatDisplayDateOrText(bas)}`;
   }
 
   if (bit) {
-    return `Tarih: ${bit}`;
+    return `Tarih: ${formatDisplayDateOrText(bit)}`;
   }
 
   return null;
@@ -297,7 +297,7 @@ export function buildPersonelTimeline(
 
     events.push({
       id: `personel-ise-giris-${personel.id}`,
-      tarih: iseGirisTarihi,
+      tarih: formatDisplayDateOrText(iseGirisTarihi),
       baslik: "İşe Giriş",
       kaynak: "Personel kartı",
       ozet: iseGirisOzeti || "Kuruma giriş kaydı.",
@@ -336,7 +336,7 @@ export function buildPersonelTimeline(
       const teslimOzet = [urun, teslimDurumu, teslimEden].filter((part): part is string => Boolean(part)).join(" · ");
       events.push({
         id: `zimmet-teslim-${zimmet.id}`,
-        tarih: `Teslim: ${teslimTarihi}`,
+        tarih: `Teslim: ${formatDisplayDateOrText(teslimTarihi)}`,
         baslik: "Zimmet teslimi",
         kaynak: "Zimmet",
         ozet: teslimOzet || "Teslim edilen ürün kaydı.",
@@ -352,7 +352,7 @@ export function buildPersonelTimeline(
       const iadeOzet = [urun, teslimEden].filter((part): part is string => Boolean(part)).join(" · ");
       events.push({
         id: `zimmet-iade-${zimmet.id}`,
-        tarih: `İade: ${iadeTarihi}`,
+        tarih: `İade: ${formatDisplayDateOrText(iadeTarihi)}`,
         baslik: "Zimmet iadesi",
         kaynak: "Zimmet",
         ozet: iadeOzet || "Ürün iade kaydı.",

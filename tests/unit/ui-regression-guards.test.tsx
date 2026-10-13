@@ -322,3 +322,63 @@ describe("M) Masaüstü ayarlar menüsü yazıları ortalı, dokunmatik mobil sa
     expect(css.lastIndexOf("pointer: fine")).toBeGreaterThan(css.indexOf("@media (max-width: 640px)"));
   });
 });
+
+const userVisibleTexts = (line: string): string[] => {
+  const texts = [
+    ...Array.from(line.matchAll(/>([^<>{}]+)</g), (m) => m[1]),
+    ...Array.from(line.matchAll(/"([^"]* [^"]*)"/g), (m) => m[1]),
+    ...Array.from(line.matchAll(/`([^`]* [^`]*)`/g), (m) => m[1])
+  ];
+  if (/^\s*[A-ZÇĞİÖŞÜa-zçğıöşü][^=;(){}<>]*$/.test(line) && !/^\s*\w+[,:]?$/.test(line)) texts.push(line);
+  return texts;
+};
+const scanTsxVisibleText = (banned: RegExp) =>
+  listSources(resolve("src"), /\.tsx$/)
+    .filter((file) => !/\.test\./.test(file))
+    .flatMap((file) =>
+      readFileSync(file, "utf8")
+        .split("\n")
+        .map((line, i) => ({ file, i: i + 1, line }))
+        .filter(({ line }) => !/^\s*(\/\/|\*|\/\*|import)/.test(line) && !/[Ee]rror|catch/.test(line))
+        .filter(({ line }) =>
+          userVisibleTexts(line).some((t) => banned.test(t) && !/(amadı|emedi)\.?\s*$/.test(t.trim()))
+        )
+        .map(({ file, i }) => `${file}:${i}`)
+    );
+
+describe("N) Kullanıcıya teknik terim gösterilmez (t865 a)", () => {
+  it("Immutable / Authoritative / Blocker / Preflight / Hash / Snapshot / Manifest / Projection / read-only yok", () => {
+    expect(
+      scanTsxVisibleText(
+        /\b(Immutable|immutable|Authoritative|AUTHORITATIVE|Blocker|BLOCKER|Preflight|PREFLIGHT|Hash|HASH|Snapshot|read-only|Manifest|Projection)\b/
+      )
+    ).toEqual([]);
+  });
+});
+
+describe("O) Kullanıcıya meta not gösterilmez (t865 c)", () => {
+  it("'salt okunur' / 'otomatik silme' / 'kendiliğinden silmez' yok", () => {
+    expect(scanTsxVisibleText(/salt okunur|otomatik silme|kendiliğinden silmez/i)).toEqual([]);
+  });
+});
+
+describe("P) Görünen tarihler gg/aa/yyyy (t865 b)", () => {
+  it("ortak biçimleyici ISO tarih/dönem/metin içi tarihleri çevirir", async () => {
+    const mod = await import("../../src/lib/display/iso-date-format");
+    expect(mod.formatDisplayDateOrText("2026-04-10")).toBe("10/04/2026");
+    expect(mod.formatDisplayDateOrText("2026-04")).toBe("04/2026");
+    expect(mod.formatDisplayDateOrText(null)).toBe("-");
+    expect(mod.formatDisplayDateOrText("Serbest")).toBe("Serbest");
+    expect(mod.formatIsoDatesInText("2024-01-01 — Puantaj")).toBe("01/01/2024 — Puantaj");
+  });
+  it("bilinen ekranlarda ham ISO tarih basılmaz", () => {
+    const checks: [string, RegExp][] = [
+      ["src/features/surecler/pages/SurecTakipPage.tsx", /Tarih: \{surec\.baslangic_tarihi/],
+      ["src/features/finans/pages/FinansPage.tsx", /Dönem: \{item\.donem\}/],
+      ["src/features/bildirimler/pages/BildirimlerPage.tsx", /Tarih: \{bildirim\.tarih/],
+      ["src/features/revizyon/pages/HaftalikKapanisPage.tsx", /<td>\{kaynak\.etkilenen_tarih\}<\/td>/],
+      ["src/features/personeller/components/personel-dosya/personel-timeline-utils.ts", /`(Geçerlilik|Teslim|İade|Tarih): \$\{(eff|bas|bit|teslimTarihi|iadeTarihi)\}`/]
+    ];
+    for (const [file, raw] of checks) expect(readFileSync(resolve(file), "utf8")).not.toMatch(raw);
+  });
+});

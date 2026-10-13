@@ -16,6 +16,7 @@ import type { KeyOption } from "../../../types/referans";
 import type { Surec } from "../../../types/surec";
 import { SurecChoiceGroup, UCRETLI_SELECT_OPTIONS } from "../components/SurecFormFields";
 import { DisiplinAdaylariSection } from "../components/DisiplinAdaylariSection";
+import { formatDisplayDateOrText } from "../../../lib/display/iso-date-format";
 
 const SUREC_CREATE_FORM_ID = "surec-create-form";
 const SUREC_EDIT_FORM_ID = "surec-edit-form";
@@ -226,7 +227,7 @@ export function SurecTakipPage() {
                 <p>Personel: {personelLabelById.get(surec.personel_id) ?? "—"}</p>
                 <p>Durum: {formatSurecStateLabel(surec.state)}</p>
                 <p>
-                  Tarih: {surec.baslangic_tarihi ?? "-"} / {surec.bitis_tarihi ?? "-"}
+                  Tarih: {formatDisplayDateOrText(surec.baslangic_tarihi)} / {formatDisplayDateOrText(surec.bitis_tarihi)}
                 </p>
               </div>
               {canOpenSurecDetail || canEditSurec || canCancelThisSurec(surec) ? (

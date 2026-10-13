@@ -50,7 +50,7 @@ export function KapanisAuditPaneli({ audits, isLoading, errorMessage, onRetry }:
                 <th>Engelleyici</th>
                 <th>Uyarı</th>
                 <th>Mühür</th>
-                <th>Preflight hash</th>
+                <th>Ön kontrol kodu</th>
               </tr>
             </thead>
             <tbody>

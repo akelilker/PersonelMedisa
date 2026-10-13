@@ -1747,7 +1747,7 @@ export function YonetimPaneliPage() {
         ...prev,
         username: nextUsername
       }));
-      setSuccessMessage("Kullanıcı adı canonical personel şablonuna düzeltildi. Şifre değişmedi.");
+      setSuccessMessage("Kullanıcı adı geçerli personel şablonuna düzeltildi. Şifre değişmedi.");
       await loadPanel();
     } catch (error) {
       setFormErrorMessage(
@@ -2372,7 +2372,7 @@ export function YonetimPaneliPage() {
                   </p>
                   {boundCanonicalUsernameView.mismatch ? (
                     <p className="yonetim-hint" data-testid="yonetim-canonical-username-mismatch">
-                      Bu kullanıcı adı canonical personel şablonuyla uyuşmuyor.
+                      Bu kullanıcı adı geçerli personel şablonuyla uyuşmuyor.
                     </p>
                   ) : null}
                   {boundCanonicalUsernameView.canOfferFix ? (
@@ -2387,7 +2387,7 @@ export function YonetimPaneliPage() {
                           setCanonicalUsernameFixConfirmOpen(true);
                         }}
                       >
-                        Kullanıcı adını canonical şablona düzelt
+                        Kullanıcı adını geçerli şablona düzelt
                       </button>
                     ) : (
                       <div
@@ -2434,7 +2434,7 @@ export function YonetimPaneliPage() {
                     </p>
                     {boundCanonicalUsernameView?.mismatch ? (
                       <p className="yonetim-hint" data-testid="yonetim-baslangic-sifresi-username-guard">
-                        Başlangıç şifresine sıfırlamadan önce kullanıcı adını canonical şablona düzeltin.
+                        Başlangıç şifresine sıfırlamadan önce kullanıcı adını geçerli şablona düzeltin.
                         Bu işlem kullanıcı adını sessizce değiştirmez.
                       </p>
                     ) : null}
@@ -2765,7 +2765,7 @@ export function YonetimPaneliPage() {
       {isSubeFormOpen ? (
         <AppModal
           title={editingSubeId != null ? "Şube Düzenle" : "Yeni Şube"}
-          backLabel="Şube Yönetimi"
+          backLabel="Şirket ve Şube Yönetimi"
           onBack={resetSubeEditor}
           onClose={resetSubeEditor}
         >

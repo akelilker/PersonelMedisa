@@ -11,6 +11,7 @@ import { LoadingState } from "../../../components/states/LoadingState";
 import { usePersonelSelectOptions } from "../../../hooks/usePersonelSelectOptions";
 import { useRoleAccess } from "../../../hooks/use-role-access";
 import type { DisiplinVaka } from "../../../types/disiplin-vaka";
+import { formatDisplayDateOrText } from "../../../lib/display/iso-date-format";
 
 function currentYearMonth() {
   const now = new Date();
@@ -130,7 +131,7 @@ export function DisiplinAdaylariSection() {
             {items.map((item) => (
               <tr key={item.id}>
                 <td>{personelLabelById.get(item.personel_id) ?? "—"}</td>
-                <td>{item.tarih}</td>
+                <td>{formatDisplayDateOrText(item.tarih)}</td>
                 <td>{OLAY_TURU_LABELS[item.olay_turu] ?? item.olay_turu}</td>
                 <td>{LIFECYCLE_LABELS[item.lifecycle_state] ?? item.lifecycle_state}</td>
                 <td>

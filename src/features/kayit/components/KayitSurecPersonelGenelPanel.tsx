@@ -238,7 +238,7 @@ export function KayitSurecPersonelGenelPanel({
 
       {isPasif ? (
         <p className="workspace-empty-hint" data-testid="kayit-surec-personel-genel-pasif-hint">
-          Bu personel pasif; genel bilgiler salt okunur izlenir.
+          Bu personel pasif.
         </p>
       ) : null}
 

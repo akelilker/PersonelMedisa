@@ -122,3 +122,26 @@ export function formatDisplayDate(value: string | number | Date | null | undefin
   }
   return formatDisplayDateTime(value, { time: false });
 }
+
+/** ISO tarih (yyyy-aa-gg) ise gg/aa/yyyy; değilse metni olduğu gibi döndürür (boş → fallback). */
+export function formatDisplayDateOrText(value: string | null | undefined, fallback = "-"): string {
+  if (typeof value !== "string" || !value.trim()) return fallback;
+  const v = value.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return formatIsoDateDetail(v);
+  if (/^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/.test(v)) return formatDisplayDateTime(v);
+  if (/^\d{4}-\d{2}$/.test(v)) return formatDisplayMonth(v);
+  return v;
+}
+
+/** Dönem (yyyy-aa) → aa/yyyy. */
+export function formatDisplayMonth(value: string | null | undefined): string {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}$/.test(value.trim())) return value?.trim() || "-";
+  const [y, m] = value.trim().split("-");
+  return `${m}${DISPLAY_DATE_SEPARATOR}${y}`;
+}
+
+/** Serbest metin içindeki ISO tarihleri (yyyy-aa-gg) gg/aa/yyyy yapar. */
+export function formatIsoDatesInText(value: string | null | undefined): string {
+  if (typeof value !== "string") return "";
+  return value.replace(/\b(\d{4})-(\d{2})-(\d{2})\b/g, (_m, y, m, d) => `${d}${DISPLAY_DATE_SEPARATOR}${m}${DISPLAY_DATE_SEPARATOR}${y}`);
+}

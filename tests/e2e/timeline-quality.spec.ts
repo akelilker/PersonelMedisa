@@ -45,7 +45,7 @@ test.describe("timeline quality", () => {
     const belgeItem = timeline.locator("li").filter({ hasText: "Belge / Sertifika" }).first();
     const itemText = await belgeItem.innerText();
     expect(itemText.match(/Başlangıç:/g)?.length ?? 0).toBeLessThanOrEqual(1);
-    expect(itemText).toContain("Tarih: 2026-06-30");
+    expect(itemText).toContain("Tarih: 30/06/2026");
     expect(itemText).toContain("S29 timeline kalite belge");
 
     await page.getByRole("tab", { name: "Eğitim / Belgeler" }).click();

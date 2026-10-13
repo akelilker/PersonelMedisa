@@ -12,6 +12,7 @@ import { useRoleAccess } from "../../../hooks/use-role-access";
 import type { RevizyonCorrectionEvent } from "../../../types/revizyon-correction";
 import { formatRevizyonDeger, formatRevizyonCorrectionTipiLabel, revizyonUserMessage } from "../revizyon-display";
 import { formatDisplayDateTime } from "../../../lib/display/iso-date-format";
+import { formatDisplayDateOrText } from "../../../lib/display/iso-date-format";
 
 export function RevizyonCorrectionDetailPage() {
   const { correctionId } = useParams();
@@ -135,7 +136,7 @@ export function RevizyonCorrectionDetailPage() {
         </div>
         <div>
           <dt>Etkilenen tarih</dt>
-          <dd>{correction.etkilenen_tarih}</dd>
+          <dd>{formatDisplayDateOrText(correction.etkilenen_tarih)}</dd>
         </div>
         <div>
           <dt>Tip</dt>

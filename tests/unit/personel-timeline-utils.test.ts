@@ -56,7 +56,7 @@ describe("personel-timeline-utils", () => {
     ], []);
 
     const text = renderTimelineItem(timeline[0]!);
-    expect(text).toContain("Tarih: 2026-06-30");
+    expect(text).toContain("Tarih: 30/06/2026");
     expect(text.match(/Başlangıç:/g) ?? []).toHaveLength(0);
   });
 
@@ -72,7 +72,7 @@ describe("personel-timeline-utils", () => {
     ], []);
 
     expect(timeline[0]?.baslik).toBe("İzin / Yıllık İzin");
-    expect(timeline[0]?.tarih).toBe("Başlangıç: 2026-06-10 · Bitiş: 2026-06-15");
+    expect(timeline[0]?.tarih).toBe("Başlangıç: 10/06/2026 · Bitiş: 15/06/2026");
     expect(timeline[0]?.ozet).not.toContain("Başlangıç:");
   });
 
@@ -88,7 +88,7 @@ describe("personel-timeline-utils", () => {
     ], []);
 
     expect(timeline[0]?.baslik).toBe("Devamsızlık / İzinsiz Gelmedi");
-    expect(timeline[0]?.tarih).toBe("Tarih: 2026-06-30");
+    expect(timeline[0]?.tarih).toBe("Tarih: 30/06/2026");
   });
 
   it("raw json aciklama sizintisini gostermez", () => {

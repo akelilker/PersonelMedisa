@@ -66,7 +66,7 @@ async function fillValidMondayAndOpenConfirm() {
   const weekInput = screen.getByTestId("hk-close-hafta-baslangic");
   fireEvent.change(weekInput, { target: { value: "2026-04-06" } });
   await waitFor(() => {
-    expect(screen.getByTestId("hk-close-hafta-bitis").textContent).toContain("2026-04-12");
+    expect(screen.getByTestId("hk-close-hafta-bitis").textContent).toContain("12/04/2026");
   });
   fireEvent.click(screen.getByTestId("hk-close-open"));
   await waitFor(() => {
@@ -161,7 +161,7 @@ describe("HaftalikKapanisClosePanel UI", () => {
       target: { value: "2026-04-06" }
     });
     await waitFor(() => {
-      expect(screen.getByTestId("hk-close-hafta-bitis").textContent).toContain("2026-04-12");
+      expect(screen.getByTestId("hk-close-hafta-bitis").textContent).toContain("12/04/2026");
     });
     expect((screen.getByTestId("hk-close-open") as HTMLButtonElement).disabled).toBe(false);
   });

@@ -124,10 +124,6 @@ export function UcretTipiEnvanteriPanel() {
 
       {!isLoading && !errorMessage && envanter ? (
         <>
-          <p className="yonetim-hint" role="status">
-            Salt okunur envanter: dağılım yalnız aktif Dahili Personelin kanonik ücret tipi alanından okunur.
-            Bu ekran hiçbir kaydı değiştirmez ve ücret tipi atamaz.
-          </p>
           <p className="yonetim-hint">
             Harici Personel ücret tipi kapsamı dışındadır; bu envantere dahil edilmez.
           </p>

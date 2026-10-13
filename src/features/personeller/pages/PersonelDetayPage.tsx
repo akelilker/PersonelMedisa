@@ -156,7 +156,7 @@ export function PersonelDetayPage() {
         <div className="personel-detail-card">
           {isArchived ? (
             <div className="personel-archive-banner" data-testid="personel-arsiv-badge" role="status">
-              <strong>Arşiv (salt okunur)</strong>
+              <strong>Arşiv</strong>
               <span> — Medisa saklama politikası</span>
               {personel.legal_hold_active ? <span> — Kayıt koruma altında</span> : null}
               {earliestReview ? (

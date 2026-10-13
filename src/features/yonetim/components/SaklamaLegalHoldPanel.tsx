@@ -184,7 +184,7 @@ export function SaklamaLegalHoldPanel() {
         reason: imhaReason.trim()
       });
       setImhaReason("");
-      setSuccessMessage("İmha talebi kaydedildi. Otomatik silme yapılmaz.");
+      setSuccessMessage("İmha talebi kaydedildi.");
       await reload();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "İmha talebi oluşturulamadı.");
@@ -231,8 +231,7 @@ export function SaklamaLegalHoldPanel() {
       <div className="yonetim-saklama-policy-banner" role="status">
         <strong>Saklama Politikası</strong>
         <p>
-          Personel kayıtları Medisa politikasına göre en az 10 takvim yılı saklanır. Sistem kayıtları
-          kendiliğinden silmez. Otomatik silme yoktur.
+          Personel kayıtları Medisa politikasına göre en az 10 takvim yılı saklanır.
         </p>
       </div>
 
@@ -353,8 +352,7 @@ export function SaklamaLegalHoldPanel() {
               <div className="yonetim-saklama-section-copy">
                 <h3 id="saklama-imha-title">İmha Talepleri</h3>
                 <p>
-                  Saklama süresi tamamlanan kayıtlar için kontrollü imha talebi oluşturulur. Sistem
-                  otomatik silme yapmaz.
+                  Saklama süresi tamamlanan kayıtlar için kontrollü imha talebi oluşturulur.
                 </p>
               </div>
 

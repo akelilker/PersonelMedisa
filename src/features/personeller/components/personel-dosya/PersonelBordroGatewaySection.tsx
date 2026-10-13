@@ -35,7 +35,7 @@ export function PersonelBordroGatewaySection({
           Eksik Devir Verisini Tamamla
         </Link>
         <Link to={buildBordroHref("preflight", donemAy)} data-testid="personel-bordro-gateway-preflight">
-          Preflight Sorununu Gör
+          Ön Kontrol Sorununu Gör
         </Link>
       </div>
     </section>

@@ -61,6 +61,7 @@ import {
   type GunlukKayitOption,
   type GunlukKayitPreset
 } from "../gunluk-kayit-presets";
+import { formatDisplayDateOrText } from "../../../lib/display/iso-date-format";
 
 const GUNLUK_KAYIT_CREATE_FORM_ID = "gunluk-kayit-create-form";
 const GUNLUK_KAYIT_EDIT_FORM_ID = "gunluk-kayit-edit-form";
@@ -306,7 +307,7 @@ function HaftalikMutabakatPanel({
       <div className="bildirim-mutabakat-panel-head">
         <h3>Haftalık Mutabakat</h3>
         {displayedWeekEnd ? (
-          <p className="bildirim-mutabakat-meta">Hafta bitişi: {displayedWeekEnd}</p>
+          <p className="bildirim-mutabakat-meta">Hafta bitişi: {formatDisplayDateOrText(displayedWeekEnd)}</p>
         ) : null}
       </div>
 
@@ -361,12 +362,12 @@ function HaftalikMutabakatPanel({
                         onClick={() => onBlokBildirimClick(blok.bildirim_id!)}
                       >
                         {blok.mesaj}
-                        {blok.tarih ? ` (${blok.tarih})` : ""}
+                        {blok.tarih ? ` (${formatDisplayDateOrText(blok.tarih)})` : ""}
                       </button>
                     ) : (
                       <p>
                         {blok.mesaj}
-                        {blok.tarih ? ` (${blok.tarih})` : ""}
+                        {blok.tarih ? ` (${formatDisplayDateOrText(blok.tarih)})` : ""}
                       </p>
                     )}
                   </li>
@@ -1391,7 +1392,7 @@ export function BildirimlerPage() {
                 <div className="bildirimler-item-content">
                   <strong>{preset.label}</strong>
                   <p>Kayıt Durumu: {formatBildirimStateLabel(bildirim.state)}</p>
-                  <p>Tarih: {bildirim.tarih ?? "-"}</p>
+                  <p>Tarih: {formatDisplayDateOrText(bildirim.tarih)}</p>
                   <p>
                     Personel:{" "}
                     {bildirim.personel_ad_soyad ??

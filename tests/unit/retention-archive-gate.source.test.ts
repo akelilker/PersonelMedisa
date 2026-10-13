@@ -161,7 +161,7 @@ describe("retention archive gate source contract", () => {
       "utf8"
     );
     expect(panel).toMatch(/Medisa politikasına göre/);
-    expect(panel).toContain("Otomatik silme yoktur");
+    expect(panel).not.toContain("Otomatik silme yoktur");
     expect(panel).toMatch(/10 takvim yılı/);
     expect(panel).toContain("Korumaya Al");
     expect(panel).not.toMatch(/Legal hold/i);

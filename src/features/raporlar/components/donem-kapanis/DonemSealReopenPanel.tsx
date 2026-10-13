@@ -94,10 +94,10 @@ export function DonemSealReopenPanel({ yil, ay, enabled, onChanged }: Props) {
 
   return (
     <section className="kapanis-audit-panel" data-testid="donem-seal-reopen-panel">
-      <h3>Mühür Revizyon / Reopen</h3>
+      <h3>Mühür Revizyon / Yeniden Açma</h3>
       <p className="raporlar-aylik-lead">
-        Eski mühür ve snapshot silinmez. Reopen sırasında maaş hesaplama kapalıdır. Aktif snapshot iptal
-        edilmeden canonical düzeltme yapılamaz. Reseal yeni revision üretir.
+        Eski mühür ve sabit kayıt silinmez. Yeniden açma sırasında maaş hesaplama kapalıdır. Aktif sabit kayıt iptal
+        edilmeden geçerli düzeltme yapılamaz. Yeniden mühürleme yeni revizyon üretir.
       </p>
 
       {error ? <p className="yonetim-error">{error}</p> : null}
@@ -111,7 +111,7 @@ export function DonemSealReopenPanel({ yil, ay, enabled, onChanged }: Props) {
                 <td data-testid="donem-seal-period-state">{history.period_state}</td>
               </tr>
               <tr>
-                <th>Effective revision</th>
+                <th>Geçerli revizyon</th>
                 <td data-testid="donem-seal-effective-rev">
                   {history.effective_revision_no ?? "—"} (id {history.effective_seal_id ?? "—"})
                 </td>
@@ -125,7 +125,7 @@ export function DonemSealReopenPanel({ yil, ay, enabled, onChanged }: Props) {
                 </td>
               </tr>
               <tr>
-                <th>Aktif snapshot</th>
+                <th>Aktif sabit kayıt</th>
                 <td data-testid="donem-seal-active-snapshot">
                   {activeSnapshot
                     ? `#${activeSnapshot.id} rev ${activeSnapshot.revision_no} — iptal gerekli`
@@ -213,21 +213,21 @@ export function DonemSealReopenPanel({ yil, ay, enabled, onChanged }: Props) {
           testId={`donem-seal-${dialog}-dialog`}
           title={
             dialog === "request"
-              ? "Reopen Talebi"
+              ? "Yeniden Açma Talebi"
               : dialog === "approve"
-                ? "Reopen Onayı"
+                ? "Yeniden Açma Onayı"
                 : dialog === "reject"
-                  ? "Reopen Reddi"
+                  ? "Yeniden Açma Reddi"
                   : "Yeniden Mühürle"
           }
           description={
             dialog === "request"
-              ? "Eski mühür ve snapshot silinmeyecek. Onay sonrası aktif snapshot iptal edilmeden canonical değişiklik yapılamaz."
+              ? "Eski mühür ve sabit kayıt silinmeyecek. Onay sonrası aktif sabit kayıt iptal edilmeden geçerli değişiklik yapılamaz."
               : dialog === "approve"
-                ? "Onaylayan talep sahibinden farklı olmalıdır. Reopen sırasında maaş snapshot/hesaplama kapalıdır."
+                ? "Onaylayan talep sahibinden farklı olmalıdır. Yeniden açma sırasında maaş sabit kayıt/hesaplama kapalıdır."
                 : dialog === "reject"
-                  ? "Red sonrası dönem kilitli kalır; canonical write açılmaz."
-                  : "Reseal yeni mühür revision üretir. Aktif snapshot olmamalı; canonical takvim tam olmalıdır."
+                  ? "Red sonrası dönem kilitli kalır; kayıt değişikliği açılmaz."
+                  : "Yeniden mühürleme yeni mühür revizyonu üretir. Aktif sabit kayıt olmamalı; geçerli takvim tam olmalıdır."
           }
           confirmLabel={
             dialog === "request"

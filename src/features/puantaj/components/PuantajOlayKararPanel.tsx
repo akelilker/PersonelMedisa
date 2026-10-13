@@ -12,6 +12,7 @@ import type {
   PuantajOlayKararDegeri,
   PuantajOlayTuru
 } from "../../../types/puantaj-olay-karar";
+import { formatDisplayDateOrText } from "../../../lib/display/iso-date-format";
 
 const LATE_TOLERANCE_MAX_MINUTE = 35;
 
@@ -179,7 +180,7 @@ export function PuantajOlayKararPanel({ personelId, personelLabel, tarih, puanta
               </div>
               <div className="form-field">
                 <span className="form-label">Tarih</span>
-                <div className="form-input puantaj-readonly-value">{tarih}</div>
+                <div className="form-input puantaj-readonly-value">{formatDisplayDateOrText(tarih)}</div>
               </div>
               <div className="form-field">
                 <span className="form-label">Olay</span>

@@ -308,8 +308,8 @@ export function MaasHesaplamaMerkeziPage(props?: {
       });
       setActionMessage(
         result.idempotent
-          ? `Mevcut snapshot döndürüldü (#${result.snapshot.id}).`
-          : `Snapshot oluşturuldu (#${result.snapshot.id}, rev ${result.snapshot.revision_no}).`
+          ? `Mevcut sabit kayıt döndürüldü (#${result.snapshot.id}).`
+          : `Sabit kayıt oluşturuldu (#${result.snapshot.id}, rev ${result.snapshot.revision_no}).`
       );
       setPendingCreateConfirm(false);
       await refetch();
@@ -346,8 +346,8 @@ export function MaasHesaplamaMerkeziPage(props?: {
       const result = await cancelMaasHesaplamaSnapshot(activeSnapshot.id, cancelNeden.trim());
       setActionMessage(
         result.idempotent
-          ? `Snapshot zaten iptaldi (#${result.snapshot.id}).`
-          : `Snapshot iptal edildi (#${result.snapshot.id}).`
+          ? `Sabit kayıt zaten iptaldi (#${result.snapshot.id}).`
+          : `Sabit kayıt iptal edildi (#${result.snapshot.id}).`
       );
       setCancelNeden("");
       setSelectedDetail(null);
@@ -507,7 +507,7 @@ export function MaasHesaplamaMerkeziPage(props?: {
         yil: parsedAy.yil,
         ay: parsedAy.ay
       });
-      setActionMessage("Authoritative SGK CSV indirildi.");
+      setActionMessage("Kesin SGK CSV indirildi.");
     } catch (error) {
       setActionError(error instanceof Error ? error.message : "SGK CSV indirilemedi.");
     } finally {
@@ -520,7 +520,7 @@ export function MaasHesaplamaMerkeziPage(props?: {
       <div className="yonetim-header-row">
         <h2>Maaş Hesaplama Merkezi</h2>
         <p className="raporlar-aylik-lead">
-          Mühürlü dönem için kaynak preflight’ı, değişmez snapshot, hesaplama adayları ve devir yönetimi.
+          Mühürlü dönem için kaynak ön kontrolü, değişmez sabit kayıt, hesaplama adayları ve devir yönetimi.
           Muhasebe onayı ve PDF üretimi bu ekranda yoktur.
         </p>
       </div>
@@ -562,7 +562,7 @@ export function MaasHesaplamaMerkeziPage(props?: {
         ) : null}
         <div className="form-actions-row">
           <button type="submit" className="universal-btn-save" data-testid="maas-hesaplama-submit">
-            Preflight getir
+            Ön kontrol getir
           </button>
           {canViewAdaylari ? (
             <button
@@ -586,7 +586,7 @@ export function MaasHesaplamaMerkeziPage(props?: {
             disabled={createDisabled}
             onClick={openCreateDialog}
           >
-            {isCreating ? "Snapshot oluşturuluyor…" : "Snapshot oluştur"}
+            {isCreating ? "Sabit kayıt oluşturuluyor…" : "Sabit kayıt oluştur"}
           </button>
         </div>
       ) : null}
@@ -602,7 +602,7 @@ export function MaasHesaplamaMerkeziPage(props?: {
         </p>
       ) : null}
 
-      {isLoading ? <LoadingState label="Maaş hesaplama preflight yükleniyor…" /> : null}
+      {isLoading ? <LoadingState label="Maaş hesaplama ön kontrol yükleniyor…" /> : null}
       {!isLoading && errorMessage ? <ErrorState message={errorMessage} /> : null}
 
       {!isLoading && preflight ? (
@@ -619,20 +619,20 @@ export function MaasHesaplamaMerkeziPage(props?: {
             <article className="kapanis-ozet-card">
               <h3>Hazırlık</h3>
               <p>
-                Blocker {preflight.blocker_count} · Warning {preflight.warning_count} · Info{" "}
+                Engel {preflight.blocker_count} · Uyarı {preflight.warning_count} · Bilgi{" "}
                 {preflight.info_count}
               </p>
               <p data-testid="maas-hesaplama-olusturulabilir">
-                Snapshot oluşturulabilir: {preflight.snapshot_olusturulabilir_mi ? "Evet" : "Hayır"}
+                Sabit kayıt oluşturulabilir: {preflight.snapshot_olusturulabilir_mi ? "Evet" : "Hayır"}
               </p>
             </article>
             <article className="kapanis-ozet-card">
-              <h3>Hash</h3>
+              <h3>Doğrulama kodu</h3>
               <p data-testid="maas-hesaplama-preflight-hash">{shortHash(preflight.preflight_hash)}</p>
               <p data-testid="maas-hesaplama-source-hash">{shortHash(preflight.source_hash)}</p>
             </article>
             <article className="kapanis-ozet-card">
-              <h3>Mevcut snapshot</h3>
+              <h3>Mevcut sabit kayıt</h3>
               <p data-testid="maas-hesaplama-existing-snapshot">
                 {preflight.existing_snapshot
                   ? `#${preflight.existing_snapshot.id} rev ${preflight.existing_snapshot.revision_no}${
@@ -644,7 +644,7 @@ export function MaasHesaplamaMerkeziPage(props?: {
           </div>
 
           <section className="kapanis-issue-section" data-testid="maas-hesaplama-issues">
-            <h3>Preflight maddeleri</h3>
+            <h3>Ön kontrol maddeleri</h3>
             {[...blockers, ...warnings, ...infos].map((item) => (
               <article
                 key={`${item.severity}-${item.code}-${item.personel_id ?? "x"}-${item.record_id ?? "y"}`}
@@ -674,7 +674,7 @@ export function MaasHesaplamaMerkeziPage(props?: {
                     <th>SGK Prim / Eksik</th>
                     <th>SGK Kod / Model</th>
                     <th>Hazırlık</th>
-                    <th>Blocker/Warning</th>
+                    <th>Engel/Uyarı</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -722,8 +722,8 @@ export function MaasHesaplamaMerkeziPage(props?: {
           </section>
 
           <section data-testid="maas-hesaplama-snapshots">
-            <h3>Snapshot / revision</h3>
-            {snapshots.length === 0 ? <p>Bu dönem için snapshot yok.</p> : null}
+            <h3>Sabit kayıt / revizyon</h3>
+            {snapshots.length === 0 ? <p>Bu dönem için sabit kayıt yok.</p> : null}
             <ul>
               {snapshots.map((snapshot) => (
                 <li key={snapshot.id}>
@@ -757,7 +757,7 @@ export function MaasHesaplamaMerkeziPage(props?: {
                     disabled={isCancelling || !cancelNeden.trim()}
                     onClick={() => void handleCancel()}
                   >
-                    {isCancelling ? "İptal ediliyor…" : "Aktif snapshot’ı iptal et"}
+                    {isCancelling ? "İptal ediliyor…" : "Aktif sabit kaydı iptal et"}
                   </button>
                 </div>
               </div>
@@ -779,20 +779,19 @@ export function MaasHesaplamaMerkeziPage(props?: {
               </p>
               {selectedDetail.hash_dogrulama ? (
                 <p data-testid="maas-hesaplama-hash-dogrulama">
-                  Hash doğrulama: {selectedDetail.hash_dogrulama.dogrulandi ? "OK" : "FAIL"}
+                  Doğrulama: {selectedDetail.hash_dogrulama.dogrulandi ? "Doğru" : "Hatalı"}
                 </p>
               ) : null}
               {selectedDetail.girdi_ozet ? (
                 <GirdiOzetOzeti data={selectedDetail.girdi_ozet} testId="maas-hesaplama-girdi-ozet" />
               ) : null}
-              <p className="muted-note">Snapshot payload düzenleme API’si yoktur; değerler salt okunur.</p>
             </section>
           ) : null}
 
           {activeSnapshot && canViewAdaylari ? (
             <>
               <section data-testid="maas-hesaplama-calc-preflight">
-                <h3>Hesaplama preflight</h3>
+                <h3>Hesaplama ön kontrolü</h3>
                 {calculationErrorMessage ? (
                   <p className="yonetim-error" data-testid="maas-hesaplama-calc-error">
                     {calculationErrorMessage}
@@ -807,26 +806,21 @@ export function MaasHesaplamaMerkeziPage(props?: {
                           {calculationPreflight.hesaplanabilir_mi ? "Evet" : "Hayır"}
                         </p>
                         <p>
-                          Blocker {calculationPreflight.blocker_count} · Warning{" "}
-                          {calculationPreflight.warning_count} · Info {calculationPreflight.info_count}
+                          Engel {calculationPreflight.blocker_count} · Uyarı{" "}
+                          {calculationPreflight.warning_count} · Bilgi {calculationPreflight.info_count}
                         </p>
                       </article>
                       <article className="kapanis-ozet-card">
-                        <h3>Girdi hash</h3>
+                        <h3>Girdi doğrulama kodu</h3>
                         <p data-testid="maas-hesaplama-calc-input-hash">
                           {shortHash(calculationPreflight.calculation_input_hash)}
                         </p>
                         <p>Kaynak: {shortHash(calculationPreflight.source_hash)}</p>
                       </article>
                       <article className="kapanis-ozet-card">
-                        <h3>Set hash</h3>
+                        <h3>Set doğrulama kodu</h3>
                         <p>Parametre: {shortHash(calculationPreflight.parameter_set_hash)}</p>
                         <p>Devir: {shortHash(calculationPreflight.carryover_set_hash)}</p>
-                      </article>
-                      <article className="kapanis-ozet-card">
-                        <h3>Motor</h3>
-                        <p>{calculationPreflight.engine_version}</p>
-                        <p>{calculationPreflight.contract_version}</p>
                       </article>
                     </div>
 
@@ -874,7 +868,7 @@ export function MaasHesaplamaMerkeziPage(props?: {
                         <th>Aday</th>
                         <th>Net</th>
                         <th>Brüt</th>
-                        <th>Hash</th>
+                        <th>Doğrulama kodu</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1094,7 +1088,7 @@ export function MaasHesaplamaMerkeziPage(props?: {
                     <th>Actor</th>
                     <th>Rol</th>
                     <th>Tarih</th>
-                    <th>Hash</th>
+                    <th>Doğrulama kodu</th>
                     <th>B/W</th>
                   </tr>
                 </thead>
@@ -1123,10 +1117,10 @@ export function MaasHesaplamaMerkeziPage(props?: {
         <AppActionDialog
           open
           testId="maas-hesaplama-create-dialog"
-          title="Snapshot Oluştur"
-          description="Bu işlem hesaplama girdilerini değişmez snapshot olarak kaydeder. Devam edilsin mi?"
+          title="Sabit Kayıt Oluştur"
+          description="Bu işlem hesaplama girdilerini değişmez sabit kayıt olarak kaydeder. Devam edilsin mi?"
           confirmLabel="Oluştur"
-          submitLabel="Snapshot oluşturuluyor…"
+          submitLabel="Sabit kayıt oluşturuluyor…"
           isSubmitting={isCreating}
           errorMessage={createDialogError}
           onConfirm={confirmCreate}
@@ -1139,7 +1133,7 @@ export function MaasHesaplamaMerkeziPage(props?: {
           open
           testId="maas-hesaplama-calc-dialog"
           title="Maaş Hesaplama Çalıştır"
-          description="Aktif snapshot için maaş hesaplama adayları üretilecek. Devam edilsin mi?"
+          description="Aktif sabit kayıt için maaş hesaplama adayları üretilecek. Devam edilsin mi?"
           confirmLabel="Hesapla"
           submitLabel="Hesaplanıyor…"
           isSubmitting={isCalculating}

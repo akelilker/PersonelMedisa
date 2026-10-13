@@ -16,6 +16,7 @@ import type { Personel } from "../../../types/personel";
 import type { RevizyonTipi } from "../../../types/revizyon-talebi";
 import { REVIZYON_TIPLERI } from "../../../types/revizyon-talebi";
 import { formatRevizyonDeger, formatRevizyonTipiLabel, revizyonUserMessage } from "../revizyon-display";
+import { formatDisplayDateOrText } from "../../../lib/display/iso-date-format";
 
 type KaynakOption = Awaited<ReturnType<typeof fetchRevizyonKaynaklar>>[number];
 
@@ -238,7 +239,7 @@ export function RevizyonTalebiCreatePage() {
           }}
           required
         />
-        <p className="form-hint">Hafta bitişi: {haftaBitis || "—"}</p>
+        <p className="form-hint">Hafta bitişi: {formatDisplayDateOrText(haftaBitis, "—")}</p>
 
         {isLoadingKaynak ? <LoadingState label="Kaynaklar yükleniyor..." /> : null}
 

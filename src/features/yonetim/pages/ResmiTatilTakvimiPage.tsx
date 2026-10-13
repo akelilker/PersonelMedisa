@@ -833,9 +833,6 @@ export function ResmiTatilTakvimiPage() {
         </AppModal>
       ) : null}
 
-      <p className="muted" data-testid="rtt-preview-readonly">
-        Projection preview read-only · puantaj/mühür yazılmaz
-      </p>
     </section>
   );
 }

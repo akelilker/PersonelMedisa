@@ -7,6 +7,7 @@ import {
 } from "../../../api/puantaj.api";
 import { AppModal } from "../../../components/modal/AppModal";
 import { useRoleAccess } from "../../../hooks/use-role-access";
+import { formatDisplayDateOrText } from "../../../lib/display/iso-date-format";
 
 type Props = {
   personelId: number;
@@ -313,7 +314,7 @@ export function QrPuantajAdayiSection({ personelId, tarih, personelLabel, onAppl
               </div>
               <div className="puantaj-etki-detail-row">
                 <dt>Tarih</dt>
-                <dd>{tarih}</dd>
+                <dd>{formatDisplayDateOrText(tarih)}</dd>
               </div>
               <div className="puantaj-etki-detail-row">
                 <dt>Mevcut</dt>

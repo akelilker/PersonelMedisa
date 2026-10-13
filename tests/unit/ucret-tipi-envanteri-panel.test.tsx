@@ -127,9 +127,7 @@ describe("Ücret Tipi Envanteri paneli (salt okunur)", () => {
     render(<UcretTipiEnvanteriPanel />);
     await screen.findByTestId("ucret-tipi-envanteri-sayaclar");
 
-    expect(screen.getByTestId("yonetim-section-ucret-tipi-envanteri")).toHaveTextContent(
-      "Bu ekran hiçbir kaydı değiştirmez ve ücret tipi atamaz."
-    );
+    expect(screen.getByTestId("yonetim-section-ucret-tipi-envanteri")).not.toHaveTextContent(/salt okunur/i);
     expect(listMock).toHaveBeenCalledTimes(1);
   });
 

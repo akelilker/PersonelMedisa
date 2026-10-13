@@ -28,6 +28,7 @@ import { formatSurecStateLabel, formatSurecTuruLabel } from "../../../lib/displa
 import { AttendanceCorrectionRequestModal } from "../components/AttendanceCorrectionRequestModal";
 import { BackgroundlessNoticeModal } from "../components/BackgroundlessNoticeModal";
 import { PersonelMobileCapabilityService } from "../personel-mobile-capability";
+import { formatDisplayDateOrText } from "../../../lib/display/iso-date-format";
 
 type CorrectDraft = {
   eventId: number;
@@ -324,7 +325,7 @@ export function PersonelSelfServiceTaleplerPage() {
               <ul data-testid="personel-talep-duzeltme-list">
                 {corrections.map((item) => (
                   <li key={item.id} id={`personel-talep-correction-${item.id}`}>
-                    {item.tarih} · {correctionKind(item.talep_turu)} · {statusLabel(item.durum)}
+                    {formatDisplayDateOrText(item.tarih)} · {correctionKind(item.talep_turu)} · {statusLabel(item.durum)}
                     {item.aciklama ? ` · ${item.aciklama}` : ""}
                     {item.sonuc ? ` · ${item.sonuc}` : ""}
                   </li>
@@ -548,7 +549,7 @@ export function PersonelSelfServiceTaleplerPage() {
               <ul data-testid="personel-talep-oneri-list">
                 {feedback.map((item) => (
                   <li key={item.id}>
-                    {item.tarih} · {item.tur === "SIKAYET" ? "Şikâyet" : "Öneri"} · {item.konu} ·{" "}
+                    {formatDisplayDateOrText(item.tarih)} · {item.tur === "SIKAYET" ? "Şikâyet" : "Öneri"} · {item.konu} ·{" "}
                     {statusLabel(item.durum)}
                     {item.sonuc ? ` · ${item.sonuc}` : ""}
                   </li>

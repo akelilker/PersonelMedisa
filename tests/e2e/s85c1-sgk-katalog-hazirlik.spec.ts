@@ -26,6 +26,6 @@ test.describe("S85-C1 SGK Katalog Hazirlik", () => {
     await page.getByTestId("sgk-katalog-subtab-onay").click();
     await expect(page.getByTestId("sgk-katalog-approve")).toBeDisabled();
     await page.getByTestId("sgk-katalog-subtab-operasyonel").click();
-    await expect(page.getByTestId("sgk-katalog-operasyonel-ayrim")).toContainText("Mevzuat kaynağı değildir");
+    await expect(page.getByTestId("sgk-katalog-operasyonel-ayrim")).toHaveCount(0);
   });
 });

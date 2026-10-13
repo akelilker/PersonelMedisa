@@ -590,7 +590,6 @@ export function BordroHazirlikMerkeziPage() {
     <section className="yonetim-page donem-kapanis-page" data-testid="bordro-hazirlik-merkezi">
       <header className="yonetim-page-header">
         <h2>Bordro Hazırlık Merkezi</h2>
-        <p>İş verisi hazırlık durumu, mevzuat/politika ayrımı, devir, ön kontrol ve bordro ön izleme.</p>
       </header>
 
       <form
@@ -854,12 +853,6 @@ export function BordroHazirlikMerkeziPage() {
 
           <section data-testid="bordro-net-maas-eksik-list">
             <h3>Net maaş / ücret eksikleri</h3>
-            <p className="personel-puantaj-summary-note">
-              Mevzuat parametreleri buradan yönetilmez.{" "}
-              <Link to="/yonetim-paneli?tab=mevzuat" data-testid="bordro-mevzuat-link">
-                Yönetim → Mevzuat
-              </Link>
-            </p>
             <table className="yonetim-table">
               <thead>
                 <tr>
@@ -930,10 +923,6 @@ export function BordroHazirlikMerkeziPage() {
 
       {activeTab === "politika" ? (
         <section data-testid="bordro-hazirlik-politika">
-          <p className="personel-puantaj-summary-note">
-            Mevzuat parametreleri yönetim panelinde kalır; burada yalnız şirket çalışma politikası yönetilir.{" "}
-            <Link to="/yonetim-paneli?tab=mevzuat">Mevzuat paneli</Link>
-          </p>
           {canManagePolicy ? (
             <div data-testid="bordro-politika-form">
               <p data-testid="bordro-politika-ornek-bicim">
@@ -952,10 +941,6 @@ export function BordroHazirlikMerkeziPage() {
                   />
                 </label>
               ))}
-              <p className="personel-puantaj-summary-note" data-testid="bordro-politika-evidence-help">
-                İmzalı veya e-imzalı karar belgesinin değişmez referans numarası ve dosyanın SHA256 özeti. Belge dosyası
-                bu alana yüklenmez.
-              </p>
               <label>
                 Karar Belge ID
                 <input
@@ -1115,12 +1100,6 @@ export function BordroHazirlikMerkeziPage() {
             {politikaDetailError ? (
               <p className="yonetim-error" data-testid="bordro-politika-detay-hata">
                 {politikaDetailError}
-              </p>
-            ) : null}
-            {!politikaDetailLoading && !politikaDetailError && !selectedPolitikaDetail ? (
-              <p className="personel-puantaj-summary-note" data-testid="bordro-politika-detay-bos">
-                Onaylı veya listedeki bir politikanın parametre değerlerini görmek için satırdaki Görüntüle
-                aksiyonunu kullanın. Taslak formu otomatik doldurulmaz.
               </p>
             ) : null}
             {!politikaDetailLoading && selectedPolitikaDetail ? (
@@ -1463,11 +1442,6 @@ export function BordroHazirlikMerkeziPage() {
 
       {activeTab === "fm-odeme-tercihi" ? (
         <section data-testid="bordro-fm-odeme-tercihi">
-          <p className="personel-puantaj-summary-note">
-            Haftalık kapanış sonrası İK / idari birim, fazla çalışma ödeme tercihini (ücret veya
-            serbest zaman) burada girer. Serbest zaman için imzalı talep belgesi ve talep tarihi
-            zorunludur.
-          </p>
           <form
             className="form-filter-panel"
             onSubmit={(event) => {

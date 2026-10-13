@@ -123,10 +123,6 @@ export function YonetimOrgScopeFields(props: YonetimOrgScopeFieldsProps) {
       {showCompanyVisibility && (
         <div className="yonetim-checkbox-section" data-testid="yonetim-sirket-visibility-scope-field">
           <p className="yonetim-checkbox-title">Şirket kapsamı</p>
-          <p className="yonetim-hint">
-            Seçilen şirketin mevcut ve sonradan açılan şubeleri otomatik kapsama girer; her yeni şube
-            için ayrı şube ataması gerekmez. Şube ve/veya SGK kapsamı ile birlikte kullanılabilir.
-          </p>
           <div className="yonetim-selection-grid">
             {sirketler.map((sirket) => (
               <button

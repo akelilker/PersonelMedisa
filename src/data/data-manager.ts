@@ -1321,6 +1321,7 @@ function parsePersonelRealtimePayload(p: unknown): Personel | null {
     sicil_no: readOptionalString(p, "sicil_no"),
     dogum_yeri: readOptionalString(p, "dogum_yeri"),
     kan_grubu: readOptionalString(p, "kan_grubu"),
+    cinsiyet: readOptionalString(p, "cinsiyet") ?? null,
     ise_giris_tarihi: readOptionalString(p, "ise_giris_tarihi"),
     acil_durum_kisi: readOptionalString(p, "acil_durum_kisi"),
     acil_durum_telefon: readOptionalString(p, "acil_durum_telefon"),

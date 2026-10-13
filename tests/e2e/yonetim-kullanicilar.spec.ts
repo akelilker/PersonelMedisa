@@ -85,7 +85,7 @@ test.describe("yonetim kullanicilar API (S44)", () => {
     await page.goto("/yonetim-paneli?tab=kullanicilar");
     await page.getByTestId("yonetim-kullanici-yeni").click();
     await expect(page.getByLabel("Kullanıcı Adı")).toBeVisible();
-    await expect(page.getByTestId("yonetim-baslangic-sifresi-hint")).toBeVisible();
+    await expect(page.getByTestId("yonetim-baslangic-sifresi-hint")).toHaveCount(0);
 
     await page.getByLabel("Kullanıcı Tipi").selectOption("HARICI");
     await page.getByLabel("Rol").selectOption("MUHASEBE");

@@ -88,7 +88,6 @@ export function PersonelDisiplinPanel({
 
       <DossierSection
         title="Finans CEZA Kayıtları"
-        description="Personel için tanımlı finans CEZA kalemleri burada özetlenir."
       >
         <div data-testid="personel-disiplin-ceza-section">
           {!canViewFinans ? (
@@ -124,7 +123,6 @@ export function PersonelDisiplinPanel({
 
       <DossierSection
         title="Süreç Disiplin Sinyalleri"
-        description="Süreç geçmişindeki devamsızlık, geç gelme ve benzeri disiplin sinyalleri burada özetlenir."
       >
         <div data-testid="personel-disiplin-surec-signals">
           {!canAccessSurecler ? (

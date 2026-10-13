@@ -38,8 +38,8 @@ describe("yonetim user modal: derived initial password model", () => {
 
   it("tells the user on create that the password comes from the name", () => {
     const page = read(PAGE);
-    expect(page).toContain("yonetim-baslangic-sifresi-hint");
-    expect(page).toContain("ad soyad bilgisinden şirket kuralıyla");
+    expect(page).not.toContain("yonetim-baslangic-sifresi-hint");
+    expect(page).not.toContain("ad soyad bilgisinden şirket kuralıyla");
   });
 
   it("offers a confirmed reset action on the existing-user editor", () => {

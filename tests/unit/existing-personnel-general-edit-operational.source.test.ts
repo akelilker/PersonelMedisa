@@ -115,7 +115,7 @@ describe("existing personnel general edit operational close", () => {
     expect(genel).not.toContain("handleEditDepartmanChange");
     expect(genel).not.toContain("fetchPersonelDetail");
 
-    expect(inline).toContain("personel-edit-org-yonlendirme");
+    expect(inline).not.toContain("personel-edit-org-yonlendirme");
     expect(inline).not.toContain("handleEditBagliAmirChange");
     expect(inline).not.toContain('name="edit-departman"');
     expect(inline).not.toContain('name="edit-bagli-amir"');

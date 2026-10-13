@@ -21,9 +21,6 @@ export function PersonelBordroGatewaySection({
   return (
     <section className="personel-puantaj-summary-card personel-devam-primi-card" data-testid="personel-bordro-gateway-card">
       <span className="personel-puantaj-summary-kicker">Bordro Hazırlık Geçişleri</span>
-      <p className="personel-puantaj-summary-note">
-        Personel kartı özetinden bordro hazırlık merkezine hızlı geçiş sağlar.
-      </p>
       <div className="personel-bordro-gateway-links">
         <Link to={buildBordroHref("on-izleme", donemAy)} data-testid="personel-bordro-gateway-on-izleme">
           Bordro Ön İzlemesine Git

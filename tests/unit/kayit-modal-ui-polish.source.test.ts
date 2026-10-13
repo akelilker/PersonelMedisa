@@ -57,7 +57,7 @@ describe("Kayıt modal UI polish source locks", () => {
     const panel = read("src/features/kayit/components/YillikIzinHakDuzeltmePanel.tsx");
 
     expect(panel).toContain('className="surec-shell-summary-kicker"');
-    expect(panel).toContain('className="personel-form-note personel-form-note--info"');
+    expect(panel).not.toContain('className="personel-form-note personel-form-note--info"');
     expect(panel).not.toContain("surec-shell-panel-title");
     expect(panel).not.toContain("surec-shell-panel-desc");
 

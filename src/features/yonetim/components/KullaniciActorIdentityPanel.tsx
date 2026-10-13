@@ -82,9 +82,6 @@ export function KullaniciActorIdentityPanel(props: KullaniciActorIdentityPanelPr
   return (
     <div className="yonetim-workspace-panel" data-testid="yonetim-kullanici-actor-identity">
       <p className="yonetim-workspace-panel-title">SGK yetkili kimliği</p>
-      <p className="yonetim-hint">
-        Personel bağlantısından ayrıdır. Oluşturma, doğrulama ve bağlama işlemleri mevcut sistem üzerinden yürütülür.
-      </p>
 
       {isLoading ? <p className="yonetim-hint">Yetkili kimlik durumu yükleniyor…</p> : null}
       {!isLoading && errorMessage ? <p className="yonetim-inline-error">{errorMessage}</p> : null}

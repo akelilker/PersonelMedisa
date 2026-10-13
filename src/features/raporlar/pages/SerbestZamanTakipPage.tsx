@@ -214,11 +214,6 @@ aciklama: "Serbest zaman kullanımı."
     <section className="raporlar-panel" data-testid="serbest-zaman-takip-page">
       <header className="raporlar-panel__header">
         <h2>Serbest Zaman Takibi</h2>
-        <p>
-          6 aylık kullanım deadline takibi operasyonel uyarıdır. &quot;Süresi dolmuş&quot; otomatik
-          ücret/bordro blokajı anlamına gelmez. &quot;İnceleme gerekli&quot; tahsis geçmişi
-          belirsiz personeller içindir; sahte dakika üretilmez.
-        </p>
       </header>
 
       <div className="raporlar-summary-cards" data-testid="serbest-zaman-takip-summary">

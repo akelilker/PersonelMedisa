@@ -34,6 +34,8 @@ export type Personel = {
   sicil_no?: string;
   dogum_yeri?: string;
   kan_grubu?: string;
+  /** t890: personeller.cinsiyet (Erkek / Kadın). */
+  cinsiyet?: string | null;
   ise_giris_tarihi?: string;
   acil_durum_kisi?: string;
   acil_durum_telefon?: string;

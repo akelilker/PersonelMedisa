@@ -622,12 +622,6 @@ export function SgkKatalogHazirlikPanel() {
             Teyitsiz ve tarihsel kodlar güncel kayıt ekranında seçilemez.
           </p>
         )}
-        {kisitliOnayli ? (
-          <p data-testid="sgk-katalog-kisitli-tarih-uyari" className="muted">
-            Geçerlilik başlangıcı yoksa: Belirlenemedi. Teyitsiz/koşullu alanlar otomatik izin sayılmaz; belirsiz
-            kuralda manuel inceleme uygulanır.
-          </p>
-        ) : null}
         <p data-testid="sgk-katalog-aktiflik-etiketleri" className="muted">
           Aktiflik: {Object.values(SGK_AKTIFLIK_DURUMU_LABEL).join(" · ")}
         </p>
@@ -689,10 +683,6 @@ export function SgkKatalogHazirlikPanel() {
 
       {subTab === "operasyonel" ? (
         <div data-testid="sgk-katalog-operasyonel">
-          <p data-testid="sgk-katalog-operasyonel-ayrim">
-            Operasyonel kanıt sınıfı: operasyonel doğrulama kanıtı. Mevzuat kaynağı değildir; tek başına katalog
-            tamlığını geçirmez.
-          </p>
           <button type="button" className="universal-btn-save" data-testid="sgk-katalog-operasyonel-validate" onClick={() => void runOperasyonel()} disabled={!canMevzuat}>
             Metadata doğrula (yalnız doğrulama)
           </button>
@@ -733,21 +723,11 @@ export function SgkKatalogHazirlikPanel() {
 
       {subTab === "esleme" ? (
         <div data-testid="sgk-katalog-esleme">
-          <p data-testid="sgk-esleme-immutable-note" className="muted">
-            Onaylanmış katalog sürümü (üst sürüm) değiştirilemez; eşleme yalnızca halef taslak sürümüne yazılır.
-          </p>
-          <p data-testid="sgk-esleme-decision-rules-note" className="muted">
-            Karar kuralları: Kod kullanılmaz (dahil) · Ücret modeline göre · Ücret kesilsin mi seçimine göre ·
-            Olay nedeninden türet · Yazılı kısmi sözleşme gerekli. Düşür için kod zorunlu; dahil ile kod çelişki.
-          </p>
           {eslemePreflightBlocker ? (
             <p data-testid="sgk-esleme-preflight-note" className="yonetim-error">
               Ön kontrol: {eslemePreflightBlocker.message}
             </p>
           ) : null}
-          <p data-testid="sgk-esleme-dual-control-note" className="muted">
-            Onay adımında hazırlayan farklı olmalı; aynı kullanıcı kendi halef sürümünü onaylayamaz.
-          </p>
           <div className="form-actions-row">
             <button
               type="button"
@@ -868,10 +848,6 @@ export function SgkKatalogHazirlikPanel() {
 
       {subTab === "politika" ? (
         <div data-testid="sgk-katalog-politika">
-          <p data-testid="sgk-politika-scope-note" className="muted">
-            Şirket SGK politikası şube kapsamında yönetilir; sayfa açılışında otomatik yazma yapılmaz. Onaylı politika
-            sürümü değiştirilemez.
-          </p>
           <div className="form-actions-row">
             <button
               type="button"

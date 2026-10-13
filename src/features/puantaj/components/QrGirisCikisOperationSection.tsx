@@ -57,7 +57,6 @@ export function QrGirisCikisOperationSection() {
     <section className="puantaj-qr-operation" data-testid="puantaj-qr-operation">
       <header className="puantaj-qr-operation-head">
         <div>
-          <p className="puantaj-section-eyebrow">Günlük operasyon / kontrol</p>
           <h2>QR Giriş / Çıkış</h2>
         </div>
         {canOpenKiosk ? (

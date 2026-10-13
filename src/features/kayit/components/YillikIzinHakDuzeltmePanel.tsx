@@ -164,9 +164,6 @@ export function YillikIzinHakDuzeltmePanel({
   return (
     <div className="surec-shell-panel" data-testid="yillik-izin-hak-duzeltme-panel">
       <h3 className="surec-shell-summary-kicker">İzin Hak Düzeltmesi</h3>
-      <p className="personel-form-note personel-form-note--info">
-        Bu işlem yasal hak formülünü değiştirmez; izin hak geçmişine imzalı gün hareketi ekler.
-      </p>
 
       {loading ? <p data-testid="yillik-izin-hak-loading">Bakiye yükleniyor…</p> : null}
       {loadError ? <p className="surec-form-error">{loadError}</p> : null}
@@ -190,7 +187,7 @@ export function YillikIzinHakDuzeltmePanel({
           </p>
           {!bakiye.takvim_dogrulandi_mi ? (
             <p data-testid="yillik-izin-hak-takvim-uyari">
-              Canonical takvim eksik/belirsiz olduğu için kullanılan ve kalan kesinleştirilemedi.
+              Takvim eksik/belirsiz olduğu için kullanılan ve kalan kesinleştirilemedi.
             </p>
           ) : null}
         </div>

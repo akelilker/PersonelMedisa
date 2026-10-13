@@ -64,9 +64,6 @@ export function ChangePasswordPage() {
       <div className="auth-login-stage">
         <div className="auth-login-container">
           <h1 className="auth-change-password-title">Şifre Belirleme</h1>
-          <p className="auth-muted auth-change-password-lead">
-            Devam etmek için yeni şifrenizi belirleyin.
-          </p>
           <form className="auth-login-form auth-change-password-form" onSubmit={(e) => void handleSubmit(e)}>
             <label className="auth-field-row">
               <span>Mevcut / geçici şifre</span>

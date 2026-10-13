@@ -78,8 +78,8 @@ test.describe("S98 SGK mapping + policy preflight", () => {
     await page.getByTestId("bordro-hazirlik-tab-sgk-katalog").click();
     await page.getByTestId("sgk-katalog-subtab-esleme").click();
 
-    await expect(page.getByTestId("sgk-esleme-dual-control-note")).toContainText("hazırlayan farklı olmalı");
-    await expect(page.getByTestId("sgk-esleme-immutable-note")).toContainText("değiştirilemez");
+    await expect(page.getByTestId("sgk-esleme-dual-control-note")).toHaveCount(0);
+    await expect(page.getByTestId("sgk-esleme-immutable-note")).toHaveCount(0);
   });
 
   test("policy tab template + dry-run + draft flow", async ({ page }) => {
@@ -89,7 +89,7 @@ test.describe("S98 SGK mapping + policy preflight", () => {
     await page.getByTestId("bordro-hazirlik-tab-sgk-katalog").click();
     await page.getByTestId("sgk-katalog-subtab-politika").click();
 
-    await expect(page.getByTestId("sgk-politika-scope-note")).toContainText("otomatik yazma yapılmaz");
+    await expect(page.getByTestId("sgk-politika-scope-note")).toHaveCount(0);
 
     const downloadPromise = page.waitForEvent("download");
     await page.getByTestId("sgk-politika-sablon-download").click();

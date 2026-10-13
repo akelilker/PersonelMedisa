@@ -51,7 +51,7 @@ test.describe("S84-R2 payroll scope", () => {
       has: page.getByRole("heading", { name: /Bordro Kapsam Kararı/i })
     }).last();
     await expect(modal.getByTestId("personel-bordro-kapsam-direkt-onay")).toHaveCount(0);
-    await expect(modal.getByTestId("personel-bordro-kapsam-dual-control-note")).toBeVisible();
+    await expect(modal.getByTestId("personel-bordro-kapsam-dual-control-note")).toHaveCount(0);
 
     await modal.locator('[name="pbk-aciklama"]').fill("GY onayli kapsam karari");
     await modal.locator('[name="pbk-baslangic"]').fill("2026-04-01");

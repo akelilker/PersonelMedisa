@@ -229,9 +229,7 @@ export function BelgeTakipPage() {
             <p className="belge-takip-personel-adi" data-testid="belge-takip-personel-adi">
               {personelAdSoyad}
             </p>
-          ) : (
-            <p>Personel belge kayıtlarının süre, dosya ve eksiklik durumunu izleyin.</p>
-          )}
+          ) : null}
         </div>
         <div className="personel-belge-panel-head-actions">
           {!kayitSurecReturn && scopedPersonelId == null ? (

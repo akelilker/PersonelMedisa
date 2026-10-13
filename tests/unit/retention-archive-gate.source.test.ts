@@ -160,9 +160,9 @@ describe("retention archive gate source contract", () => {
       resolve(root, "src/features/yonetim/components/SaklamaLegalHoldPanel.tsx"),
       "utf8"
     );
-    expect(panel).toMatch(/Medisa politikasına göre/);
+    expect(panel).not.toMatch(/Medisa politikasına göre/);
     expect(panel).not.toContain("Otomatik silme yoktur");
-    expect(panel).toMatch(/10 takvim yılı/);
+    expect(panel).not.toMatch(/10 takvim yılı/);
     expect(panel).toContain("Korumaya Al");
     expect(panel).not.toMatch(/Legal hold/i);
     expect(panel).not.toContain("Hedef domain");

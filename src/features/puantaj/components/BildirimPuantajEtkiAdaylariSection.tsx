@@ -543,9 +543,6 @@ export function BildirimPuantajEtkiAdaylariSection() {
       <div className="bildirim-mutabakat-panel-head">
         <div>
           <h3>Onaylı Bildirim Puantaj Etki Adayları</h3>
-          <p className="bildirim-mutabakat-meta">
-            Genel Yönetici onayından geçen bildirimlerin puantaja yansıtılmadan önceki inceleme kayıtları.
-          </p>
         </div>
       </div>
 

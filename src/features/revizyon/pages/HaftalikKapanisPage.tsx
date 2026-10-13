@@ -127,9 +127,6 @@ export function HaftalikKapanisPage() {
       <div className="puantaj-header-row">
         <h2>Haftalık Kapanış</h2>
       </div>
-      <p>
-        Revizyon talepleri ve düzeltme kayıtları burada yönetilir.
-      </p>
 
       {!canViewRevizyon ? (
         <p role="alert">Revizyon Merkezi görüntüleme yetkiniz yok.</p>
@@ -183,10 +180,6 @@ export function HaftalikKapanisPage() {
           {canCreate ? (
             <div className="hk-kaynak-prefill-panel" data-testid="hk-kaynak-prefill-panel">
               <h3>Kapalı hafta kaynak satırları</h3>
-              <p className="form-hint">
-                Satırdaki “Revizyon Talebi Aç” create formunu personel, hafta ve kaynak ile doldurur.
-                Eski değer sunucudan gelir.
-              </p>
 
               {isLoadingMeta ? <LoadingState label="Personeller yükleniyor..." /> : null}
 

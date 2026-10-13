@@ -123,9 +123,6 @@ export function PersonelHesapOnboardingPanel({
 
       {eligible && confirmOpen ? (
         <div className="yonetim-form-stack" data-testid="personel-hesap-onboarding-confirm">
-          <p className="yonetim-hint">
-            Hesap oluşturulduğunda personel, şirket kuralına göre belirlenen başlangıç şifresi ile ilk girişini yapar ve şifresini değiştirmesi gerekir.
-          </p>
           <label className="form-field">
             <span>Kullanıcı adı</span>
             <input type="text" value={usernameCollision ? usernameOverride : suggestedUsername} readOnly={!usernameCollision} onChange={(event) => setUsernameOverride(event.target.value)} data-testid="personel-hesap-username" />
@@ -144,7 +141,7 @@ export function PersonelHesapOnboardingPanel({
         <div className="yonetim-form-stack" data-testid="personel-hesap-onboarding-first-login">
           <p>Kullanıcı adı: <strong>{created.user.username}</strong></p>
           <p data-testid="personel-hesap-ilk-giris-hazir"><strong>Hesap ilk girişe hazır</strong></p>
-          <p className="yonetim-hint" role="status">İlk girişte şifresini değiştirmesi gerekir. Başlangıç şifresi şirket kuralına göre oluşturulur ve ilk girişte değiştirilir.</p>
+          <p className="yonetim-hint" role="status">İlk girişte şifresini değiştirmesi gerekir.</p>
         </div>
       ) : null}
 

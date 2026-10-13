@@ -1330,7 +1330,6 @@ export function KayitSurecWorkspace({
           <section className="workspace-surface-card">
             <div className="workspace-surface-header">
               <h3>Kayıt İşlemleri</h3>
-              <p>Personel kartının ana kaydını burada oluştur, ardından süreç sekmesine geç.</p>
             </div>
 
             {bootstrapLoading ? <LoadingState label="Kayıt alanı yükleniyor..." /> : null}
@@ -1367,7 +1366,6 @@ export function KayitSurecWorkspace({
                 {personelInfo ? <p className="workspace-success">{personelInfo}</p> : null}
                 {createdPersonelIdForOnboarding != null && canManageAccountOnboarding ? (
                   <div className="workspace-success" data-testid="personel-create-hesap-onboarding-cta">
-                    <p>İsterseniz personel hesabını güvenli aktivasyon ile oluşturabilirsiniz.</p>
                     <button
                       type="button"
                       className="universal-btn-save"
@@ -1390,7 +1388,6 @@ export function KayitSurecWorkspace({
           <section className="workspace-surface-card">
             <div className="workspace-surface-header">
               <h3>{editingSurec ? `Süreç Düzenle #${editingSurec.id}` : "Süreç İşlemleri"}</h3>
-              <p>İzin, rapor ve diğer süreç kayıtlarını bu sekmeden yönet.</p>
             </div>
 
             {bootstrapLoading ? <LoadingState label="Süreç alanı yükleniyor..." /> : null}
@@ -1589,7 +1586,7 @@ export function KayitSurecWorkspace({
                             ) : (
                               <div className="surec-person-placeholder">
                                 <strong>Finans</strong>
-                                <p>Bu işlem için yetkin yok. Mali kayıtları Finans ekranından yönet.</p>
+                                <p>Bu işlem için yetkin yok.</p>
                               </div>
                             )
                           ) : (
@@ -1696,7 +1693,7 @@ export function KayitSurecWorkspace({
                             ) : (
                               <div className="surec-person-placeholder">
                                 <strong>Ceza</strong>
-                                <p>Bu işlem için yetkin yok. Ceza kayıtlarını Finans ekranından yönet.</p>
+                                <p>Bu işlem için yetkin yok.</p>
                               </div>
                             )
                           ) : (

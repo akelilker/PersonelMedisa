@@ -132,9 +132,6 @@ export function EtkiAdayiRaporuPage() {
     <section className="yonetim-page etki-adayi-rapor-page" data-testid="etki-adayi-rapor-page">
       <div className="yonetim-header-row">
         <h2>Etki Adayı Raporu</h2>
-        <p className="raporlar-aylik-lead">
-          Onaylı bildirim puantaj etki adaylarının dönem raporu; Koru/Revize kararları puantaj ekranından yönetilir.
-        </p>
       </div>
 
       <EtkiAdayiRaporFiltreleri

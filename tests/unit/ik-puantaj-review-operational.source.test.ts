@@ -39,7 +39,7 @@ describe("IK puantaj review operational close", () => {
     expect(panel).toContain("dispatchOpenBugunPersonelDurumu");
     expect(panel).toContain("!canUpdatePuantaj && canViewBugun");
     expect(panel).toContain("bugun_personel_durumu.view");
-    expect(panel).toContain("canCorrectScopedGunlukBildirim");
+    expect(panel).not.toContain("canCorrectScopedGunlukBildirim");
   });
 
   it("Bugün correction refreshes header attention and puantaj page points IK to Bugün", () => {

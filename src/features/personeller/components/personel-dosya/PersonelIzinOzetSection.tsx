@@ -66,7 +66,6 @@ export function PersonelIzinOzetSection({
   return (
     <DossierSection
       title="İzin Özeti"
-      description="Yıllık izin bakiyesi sunucu modelinden okunur; detaylı izin geçmişi Süreç Geçmişi sekmesindedir."
     >
       <div data-testid="personel-izin-ozet-section">
         {loading ? <p data-testid="izin-bakiye-loading">İzin bakiyesi yükleniyor…</p> : null}
@@ -103,7 +102,7 @@ export function PersonelIzinOzetSection({
             </p>
             {!bakiye.takvim_dogrulandi_mi ? (
               <p data-testid="izin-takvim-eksik-uyarisi">
-                Canonical çalışma takviminde {bakiye.eksik_takvim_tarihleri.length} tarih
+                Çalışma takviminde {bakiye.eksik_takvim_tarihleri.length} tarih
                 sınıflandırılmadığı için kullanılan ve kalan izin kesinleştirilemedi.
               </p>
             ) : null}

@@ -520,10 +520,6 @@ export function MaasHesaplamaMerkeziPage(props?: {
     <section className="yonetim-page donem-kapanis-page" data-testid="maas-hesaplama-merkezi">
       <div className="yonetim-header-row">
         <h2>Maaş Hesaplama Merkezi</h2>
-        <p className="raporlar-aylik-lead">
-          Mühürlü dönem için kaynak ön kontrolü, değişmez sabit kayıt, hesaplama adayları ve devir yönetimi.
-          Muhasebe onayı ve PDF üretimi bu ekranda yoktur.
-        </p>
       </div>
 
       <form
@@ -556,11 +552,6 @@ export function MaasHesaplamaMerkeziPage(props?: {
             ]}
           />
         </div>
-        {filtersLocked ? (
-          <p className="personel-puantaj-summary-note" data-testid="maas-hesaplama-period-locked-note">
-            Dönem ve şube Bordro Hazırlık Merkezi seçimiyle kilitli (aynı yıl/ay/şube).
-          </p>
-        ) : null}
         <div className="form-actions-row">
           <button type="submit" className="universal-btn-save" data-testid="maas-hesaplama-submit">
             Ön kontrol getir

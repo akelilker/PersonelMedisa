@@ -239,7 +239,7 @@ test.describe("S80 Revizyon Merkezi final UI kabul", () => {
     await expect(page.getByTestId("revizyon-ham-deger")).toBeVisible();
     await expect(page.getByTestId("revizyon-talep-deger")).toBeVisible();
     await expect(page.getByTestId("revizyon-corrected-deger")).toContainText("Aktif düzeltme kaydı yok");
-    await expect(page.getByTestId("revizyon-overlay-uyari")).toContainText("rapor/bordro");
+    await expect(page.getByTestId("revizyon-overlay-uyari")).toHaveCount(0);
     await expect(page.getByTestId("revizyon-audit-gecmisi")).toBeVisible();
 
     await page.getByTestId("revizyon-correction-uret").click();

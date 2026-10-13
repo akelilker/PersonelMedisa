@@ -29,7 +29,7 @@ describe("PR402 terminology + Statü/QR productization closure", () => {
 
     const createFields = read("src/features/personeller/components/PersonelCreateFields.tsx");
     expect(createFields).toContain("CALISAN_KAPSAMI_SELECT_OPTIONS");
-    expect(createFields).toContain("Harici Personel — Medisa ücret/SGK tahakkukuna dahil değildir");
+    expect(createFields).not.toContain("Harici Personel — Medisa ücret/SGK tahakkukuna dahil değildir");
     expect(createFields).not.toContain("İç Personel");
     expect(createFields).not.toContain("Dış Personel");
     expect(createFields).not.toContain("Dış Kaynak Personel");
@@ -79,7 +79,7 @@ describe("PR402 terminology + Statü/QR productization closure", () => {
     expect(orgPanel).toContain('label="Statü"');
     expect(orgPanel).not.toContain('label="Çalışma Tipi"');
     expect(orgPanel).toContain("filterStatuOptionsForCreate");
-    expect(orgPanel).toContain("Personel Statüsü belirlenmedi. QR kullanımı Mavi Yaka Statüsünde açılır.");
+    expect(orgPanel).not.toContain("Personel Statüsü belirlenmedi. QR kullanımı Mavi Yaka Statüsünde açılır.");
     expect(orgPanel).toContain("required={!isDisKaynak}");
   });
 

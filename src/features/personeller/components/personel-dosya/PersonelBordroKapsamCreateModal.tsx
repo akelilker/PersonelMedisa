@@ -60,7 +60,6 @@ export type PersonelBordroKapsamCreateModalProps = {
 export function PersonelBordroKapsamCreateModal({
   isOpen,
   onClose,
-  canApprove,
   isSubmitting,
   submitErrorMessage,
   dryRunResult,
@@ -237,15 +236,6 @@ export function PersonelBordroKapsamCreateModal({
           />
         </div>
 
-        {canApprove ? (
-          <p
-            className="personel-puantaj-summary-note"
-            data-testid="personel-bordro-kapsam-dual-control-note"
-          >
-            Kayıt taslak olarak oluşturulur. Görevler ayrılığı gereği kaydı hazırlayan
-            kullanıcı aynı kaydı onaylayamaz; onayı farklı bir yetkili vermelidir.
-          </p>
-        ) : null}
 
         <button
           type="button"

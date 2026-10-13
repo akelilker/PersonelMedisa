@@ -67,7 +67,7 @@ describe("göreve başlama tarihi default", () => {
       "utf8"
     );
     expect(panel).toContain('label="Değişiklik Tarihi"');
-    expect(panel).toContain("Değişiklik hemen uygulanır");
+    expect(panel).not.toContain("Değişiklik hemen uygulanır");
     expect(panel).not.toContain("Geçerlilik Tarihi");
   });
 

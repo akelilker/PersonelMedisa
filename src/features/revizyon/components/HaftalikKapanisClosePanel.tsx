@@ -261,12 +261,6 @@ export function HaftalikKapanisClosePanel() {
   return (
     <div className="hk-close-panel" data-testid="hk-close-panel">
       <h3>Haftayı Kapat</h3>
-      <p className="form-hint">
-        Haftalık kapanış, yalnızca ilgili şube ve hafta için tamamlanmış haftalık mutabakat sonrası
-        yapılabilir. Kapanış için haftalık mutabakat tamamlanmış olmalıdır. Sunucu önkoşulları
-        karşılanmazsa kapanış reddedilir. Ham kapanış snapshot&apos;ı korunur; sonraki düzeltmeler
-        Revizyon Merkezi üzerinden yürür.
-      </p>
 
       {activeSubeId == null ? (
         <p className="workspace-error" role="alert" data-testid="hk-close-active-sube-required">

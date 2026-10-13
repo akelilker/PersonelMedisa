@@ -176,10 +176,6 @@ export function RevizyonCorrectionDetailPage() {
         </div>
       </dl>
 
-      <p className="form-hint">
-        Bu düzeltme kaydı görünürlük amaçlıdır; puantaj/rapor/bordro motorunu otomatik yeniden
-        hesaplamaz. Ham kapanış kaydı değişmez.
-      </p>
 
       {canCancel && !correction.iptal_edildi_mi ? (
         <button

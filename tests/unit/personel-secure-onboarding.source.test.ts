@@ -41,7 +41,7 @@ describe("PERSONEL first-login onboarding surfaces", () => {
     expect(panel).toContain("İlk girişte şifresini değiştirmesi gerekir");
     expect(panel).not.toMatch(/aktivasyon|activation|Bağlantıyı Kopyala/i);
     expect(detail).toContain('title="Personel hesabı"');
-    expect(detail).toContain("zorunlu ilk giriş şifre değişimi");
+    expect(detail).not.toContain("zorunlu ilk giriş şifre değişimi");
   });
 
   it("removes the public activation application surface", () => {

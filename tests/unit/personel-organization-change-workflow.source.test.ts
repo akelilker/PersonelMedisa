@@ -47,7 +47,7 @@ describe("personel organization change workflow closeout", () => {
     expect(editUtils).not.toMatch(/setOptionalId\("gorev_id"/);
     expect(genel).toContain("includeBagliAmir: false");
     expect(genel).not.toContain("includeOrgStructureFields");
-    expect(inline).toContain("personel-edit-org-yonlendirme");
+    expect(inline).not.toContain("personel-edit-org-yonlendirme");
     expect(inline).not.toContain('name="edit-departman"');
     expect(inline).not.toContain('name="edit-gorev"');
   });

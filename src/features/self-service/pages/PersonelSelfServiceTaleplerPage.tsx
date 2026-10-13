@@ -66,6 +66,40 @@ function correctionKind(value: string): string {
   return value;
 }
 
+/** Onaylı karar (t873): Talepler ekranı tür seçimi — ikon + etiket, çerçevesiz; dokununca yalnız o form açılır. */
+type TalepTuruId = "duzeltme" | "izin" | "rapor" | "avans" | "oneri";
+
+const TALEP_TURLERI: readonly { id: TalepTuruId; label: string }[] = [
+  { id: "duzeltme", label: "Giriş/Çıkış Düzeltme" },
+  { id: "izin", label: "İzin" },
+  { id: "rapor", label: "Sağlık Raporu" },
+  { id: "avans", label: "Avans" },
+  { id: "oneri", label: "Öneri / Şikâyet" }
+];
+
+const IKON_YOLLARI: Record<TalepTuruId, string> = {
+  duzeltme: "M12 7v5l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z",
+  izin: "M8 3v3M16 3v3M4 9h16M5 5h14a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Z",
+  rapor: "M12 8v8M8 12h8M6 3h12a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z",
+  avans: "M3 7h18v10H3zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z",
+  oneri: "M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12Z"
+};
+
+function TalepIkon({ id }: { id: TalepTuruId }) {
+  return (
+    <svg viewBox="0 0 24 24" width="40" height="40" aria-hidden="true" focusable="false">
+      <path
+        d={IKON_YOLLARI[id]}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 export function PersonelSelfServiceTaleplerPage() {
   const location = useLocation();
   const [loading, setLoading] = useState(true);
@@ -110,6 +144,8 @@ export function PersonelSelfServiceTaleplerPage() {
     konu: "",
     aciklama: ""
   });
+
+  const [secili, setSecili] = useState<TalepTuruId | null>(null);
 
   const load = useCallback(async () => {
     if (shouldPreferDemoApi()) {
@@ -252,7 +288,29 @@ export function PersonelSelfServiceTaleplerPage() {
 
   return (
     <section className="personel-mobile-shell pm-self-subpage" data-testid="personel-talepler-page">
-      {anomalies.length > 0 ? (
+      {secili === null ? (
+        <nav className="pm-talep-turleri" data-testid="personel-talep-turleri" aria-label="Talep türleri">
+          {TALEP_TURLERI.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              className="pm-talep-turu"
+              data-testid={`personel-talep-turu-${t.id}`}
+              onClick={() => setSecili(t.id)}
+            >
+              <span className="pm-talep-turu__ikon" aria-hidden="true">
+                <TalepIkon id={t.id} />
+              </span>
+              <span className="pm-talep-turu__etiket">{t.label}</span>
+            </button>
+          ))}
+        </nav>
+      ) : (
+        <button type="button" className="pm-talep-geri" data-testid="personel-talep-geri" onClick={() => setSecili(null)}>
+          ‹ Talep Türleri
+        </button>
+      )}
+      {secili === null && anomalies.length > 0 ? (
         <div className="pm-self-request-list">
           {anomalies.map((anomaly) => (
             <div
@@ -282,7 +340,9 @@ export function PersonelSelfServiceTaleplerPage() {
           ))}
         </div>
       ) : null}
+      {secili !== null ? (
       <ul className="pm-self-request-list">
+        {secili === "duzeltme" ? (
         <li>
           <div className="pm-self-request" data-testid="personel-talep-duzeltme">
             <p className="pm-self-request__title">Giriş/Çıkış Düzeltme Talebi</p>
@@ -333,6 +393,8 @@ export function PersonelSelfServiceTaleplerPage() {
             ) : null}
           </div>
         </li>
+        ) : null}
+        {secili === "izin" ? (
         <li>
           <form className="pm-self-request" data-testid="personel-talep-izin" onSubmit={(event) => void submitLeave(event)}>
             <p className="pm-self-request__title">İzin Talebi</p>
@@ -390,6 +452,8 @@ export function PersonelSelfServiceTaleplerPage() {
             ) : null}
           </form>
         </li>
+        ) : null}
+        {secili === "rapor" ? (
         <li>
           <form className="pm-self-request" data-testid="personel-talep-rapor" onSubmit={(event) => void submitRapor(event)}>
             <p className="pm-self-request__title">Sağlık Raporu</p>
@@ -464,6 +528,8 @@ export function PersonelSelfServiceTaleplerPage() {
             ) : null}
           </form>
         </li>
+        ) : null}
+        {secili === "avans" ? (
         <li>
           <form className="pm-self-request" data-testid="personel-talep-avans" onSubmit={(event) => void submitAdvance(event)}>
             <p className="pm-self-request__title">Avans Talebi</p>
@@ -507,6 +573,8 @@ export function PersonelSelfServiceTaleplerPage() {
             ) : null}
           </form>
         </li>
+        ) : null}
+        {secili === "oneri" ? (
         <li>
           <form className="pm-self-request" data-testid="personel-talep-oneri" onSubmit={(event) => void submitFeedback(event)}>
             <p className="pm-self-request__title">Öneri / Şikâyet</p>
@@ -557,7 +625,9 @@ export function PersonelSelfServiceTaleplerPage() {
             ) : null}
           </form>
         </li>
+        ) : null}
       </ul>
+      ) : null}
 
       <AttendanceCorrectionRequestModal
         open={correctDraft !== null || anomalyDraft !== null}

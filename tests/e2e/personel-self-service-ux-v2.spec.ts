@@ -609,10 +609,18 @@ test.describe("PERSONEL self-service UX v2 — mobile product", () => {
     await page.getByRole("button", { name: "Ana sayfaya dön" }).click();
 
     await page.getByTestId("personel-menu-talepler").click();
+    // t873: önce tür seçimi (ikon + etiket); dokununca yalnız o form açılır.
+    await expect(page.getByTestId("personel-talep-turleri")).toBeVisible();
+    await expect(page.getByTestId("personel-talep-izin")).toHaveCount(0);
+    await page.getByTestId("personel-talep-turu-duzeltme").click();
     await expect(page.getByTestId("personel-talep-duzeltme-giris")).toBeVisible();
-    await expect(page.getByTestId("personel-talep-izin")).toBeVisible();
-    await expect(page.getByTestId("personel-talep-avans")).toBeVisible();
-    await expect(page.getByTestId("personel-talep-oneri")).toBeVisible();
+    await expect(page.getByTestId("personel-talep-izin")).toHaveCount(0);
+    for (const tur of ["izin", "avans", "oneri"] as const) {
+      await page.getByTestId("personel-talep-geri").click();
+      await page.getByTestId(`personel-talep-turu-${tur}`).click();
+      await expect(page.getByTestId(`personel-talep-${tur}`)).toBeVisible();
+      await expect(page.getByTestId("personel-talep-duzeltme")).toHaveCount(0);
+    }
     await expect(page.getByTestId("personel-talepler-page")).not.toContainText("Yakında");
     await page.getByRole("button", { name: "Ana sayfaya dön" }).click();
 

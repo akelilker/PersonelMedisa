@@ -1963,7 +1963,7 @@ body.modal-open .modal-container--self-product .modal-header {
 /* Onaylı karar (t873): Talepler — tür seçimi ikon + etiket, çerçevesiz/arka plansız, ortalı, ekrana sığar. */
 .pm-talep-turleri {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   justify-items: center;
   align-content: center;
   gap: 1.25rem 0.75rem;
@@ -1972,6 +1972,13 @@ body.modal-open .modal-container--self-product .modal-header {
   margin: 1rem auto;
   padding: 0 0.5rem;
   box-sizing: border-box;
+  overflow-wrap: anywhere;
+}
+
+@media (min-width: 720px) {
+  .pm-talep-turleri {
+    grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+  }
 }
 
 .pm-talep-turu {

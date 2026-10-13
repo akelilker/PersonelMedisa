@@ -638,6 +638,7 @@ describe("U) Personel Kartı Puantaj sekmesi, kişi kartında QR yok, Talepler i
     expect(blok).toMatch(/border:\s*0/);
     expect(blok).toMatch(/background:\s*none/);
     expect(css).toMatch(/\.pm-talep-turleri \{[^}]*justify-items:\s*center/);
-    expect(css).toMatch(/\.pm-talep-turleri \{[^}]*auto-fit/);
+    expect(css).toMatch(/\.pm-talep-turleri \{[^}]*repeat\(2, minmax\(0, 1fr\)\)/);
+    expect(css).toMatch(/@media \(min-width: 720px\)[^@]*\.pm-talep-turleri \{[^}]*auto-fit/);
   });
 });

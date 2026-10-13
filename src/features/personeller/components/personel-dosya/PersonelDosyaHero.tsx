@@ -36,7 +36,6 @@ export function PersonelDosyaHero({ personel }: { personel: Personel }) {
   return (
     <header className="personel-dosya-hero" data-testid="personel-dosya-hero">
       <div className="personel-dosya-hero-identity">
-        <PersonelDosyaHeroPhoto personelId={personel.id} name={fullName} />
         <h3 className="personel-dosya-hero-name">{fullName}</h3>
         {/* #345 kararı: aktif personelde yalnız yeşil nokta (görünür "Çalışıyor"/pill yok);
             pasif/bilinmeyen durumda nokta + açıklama görünür. Erişilebilir ad her durumda korunur. */}
@@ -67,6 +66,9 @@ export function PersonelDosyaHero({ personel }: { personel: Personel }) {
           {orgMeta.join(" · ")}
         </p>
       ) : null}
+
+      {/* t889: masaüstünde fotoğraf hero bloğunun sağında (Kullanıcı Paneli gibi); mobilde gizli. */}
+      <PersonelDosyaHeroPhoto personelId={personel.id} name={fullName} />
     </header>
   );
 }

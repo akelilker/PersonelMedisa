@@ -1,3 +1,4 @@
+import { isRealBackendOnlyMode } from "../../config/app-env";
 import type { AuthSession, UserRole } from "../../types/auth";
 import {
   ORGANIZATION_GLOBAL_READ_ROLES,
@@ -696,6 +697,34 @@ export function hasUserPermission(
     return true;
   }
   return hasRolePermission(role, permission);
+}
+
+/**
+ * Ekran ve route kararı. Hidrate liste varsa yalnız o liste geçerlidir
+ * (ek ALLOW açar, DENY kapatır). Liste yokken production fail-closed kalır.
+ * Yenileme hatası hidrate listeyi rol matrisine çevirmez.
+ * Eksik alan ile gerçek boş liste aynı değildir.
+ */
+export function hasSessionPermission(
+  session: AuthSession | null | undefined,
+  permission: AppPermission
+): boolean {
+  if (!session) {
+    return false;
+  }
+  if (session.permissions_hydrated === true) {
+    const list = session.user.effective_permissions;
+    return Array.isArray(list) && list.includes(permission);
+  }
+  if (session.permissions_stale === true || isRealBackendOnlyMode()) {
+    return false;
+  }
+  return hasUserPermission(
+    session.user.rol,
+    permission,
+    session.user.personel_id,
+    session.user.personel_tipi_ad
+  );
 }
 
 export function getEffectivePermissions(

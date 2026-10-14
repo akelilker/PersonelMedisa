@@ -1,9 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import {
-  hasPersonnelLinkedSelfServiceEligibility,
-  hasUserPermission
-} from "../../../lib/authorization/role-permissions";
+import { hasPersonnelLinkedSelfServiceEligibility } from "../../../lib/authorization/role-permissions";
 import { useRoleAccess } from "../../../hooks/use-role-access";
 import { useAuth } from "../../../state/auth.store";
 import { canonicalizeUserRole } from "../../../lib/authorization/canonicalize-user-role";
@@ -18,10 +15,9 @@ const GATEWAY_DIM_DELAY_MS = 4000;
  */
 export function HomeSelfServiceGateway() {
   const { session } = useAuth();
-  const { activeRole } = useRoleAccess();
+  const { activeRole, hasPermission } = useRoleAccess();
   const [dimmed, setDimmed] = useState(false);
   const personelId = session?.user.personel_id ?? null;
-  const personelTipiAd = session?.user.personel_tipi_ad ?? null;
   const canonicalRole = canonicalizeUserRole(activeRole);
 
   useEffect(() => {
@@ -34,8 +30,7 @@ export function HomeSelfServiceGateway() {
   }
 
   const eligible =
-    hasPersonnelLinkedSelfServiceEligibility(personelId) &&
-    hasUserPermission(activeRole, "self_service.view", personelId, personelTipiAd);
+    hasPersonnelLinkedSelfServiceEligibility(personelId) && hasPermission("self_service.view");
 
   if (!eligible) {
     return null;

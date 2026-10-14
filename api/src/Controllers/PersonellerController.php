@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Medisa\Api\Controllers;
 
 use Medisa\Api\Auth\AuthMiddleware;
+use Medisa\Api\Auth\EffectivePermissionResolver;
 use Medisa\Api\Auth\RolePermissions;
 use Medisa\Api\Database\Connection;
 use Medisa\Api\Http\JsonResponse;
@@ -1257,13 +1258,12 @@ class PersonellerController
     }
 
     /**
-     * Personnel write gate.
+     * Personnel write gate for create, update and organization change.
      *
-     * The permission matrix is the primary answer, so a role that holds
-     * personeller.create/update — such as the İK roles — is no longer excluded by
-     * a role list that predates the matrix. The historical role list is kept as
-     * an additional allowance so no role that could write before this pack loses
-     * access here.
+     * Etkin izin varsa geçilir. Açık ve geçerli kişisel DENY, rolde izin olmasa
+     * bile legacy köprüden üstündür (süre/iptal çözücüdedir). DENY yoksa
+     * Bölüm Yöneticisi ve Muhasebe eski yazma köprüsünü korur; Muhasebe rol
+     * matrisinde bu izin olmadığı için köprü silinmez ve matrise eklenmez.
      *
      * @param array<string, mixed> $user
      * @param string $permission
@@ -1272,6 +1272,10 @@ class PersonellerController
     {
         if (RolePermissions::has($user, $permission)) {
             return;
+        }
+
+        if (EffectivePermissionResolver::hasActiveDeny($user, $permission)) {
+            JsonResponse::forbidden('Bu personel islemi icin yetkiniz yok.');
         }
 
         // GENEL_YONETICI burada yok: personel yazması etkin izne bağlıdır.

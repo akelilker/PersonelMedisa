@@ -118,7 +118,7 @@ E sınıfı: read-only verify · business truth · production write (write ayrı
 | --- | --- | --- |
 | `BL-CROSS-COMPANY` | 120 / 158 / 219 | **CLOSED (2026-10-03)** — 120/158 canlı `calisan_kapsami` `DIS_KAYNAK` olarak düzeltildi (bkz. A `BL-BUSINESS-TRUTH-120-158-219`); 219 transfer zaten yansımış. Cross-company kayıt problem/blocker DEĞİL; active pending / next gate üretmez. History olarak kalır. |
 | `BL-EKRAN-TURU` | Görsel ekran turu (ekran ekran ince ayar) | **DEVAM EDİYOR (2026-10-07)** — onaylı görseller dondurulmuş; tur bitince CURRENT_STATE + bu belge tek seferde güncellenir. Blocker değil |
-| `BL-VISUAL-WEBKIT-FIRST-RUN` | Visual WebKit Regression (`visual-webkit-regression.yml`, yalnız `workflow_dispatch`) | **OPEN (non-blocking)** — #512 ile oluşturuldu, henüz hiç çalıştırılmadı; ilk ciddi görsel PR'da bir kez manuel çalıştırılacak |
+| `BL-VISUAL-WEBKIT-FIRST-RUN` | Visual WebKit Regression (`visual-webkit-regression.yml`, yalnız `workflow_dispatch`) | **CLOSED** — ilk manuel koşu run `37699163785` SUCCESS (2026-10-07T22:55:08Z, TR 2026-10-08, SHA `bbaddbd179ea6c3dc4ecb32079c5d52e654bb174`) |
 | `BL-HARICI-STATU-BOS-SAYIM` | Harici Personel içinde Statü boş kayıt sayısı | **OPEN (read-only verify, non-blocking)** — canlı DB erişimi yok, sayı doğrulanmadı. Ekran mantığı hazır: "Statüsüz" grubu yalnız > 0 ise görünür (#511). Production write yok |
 
 ---
@@ -159,14 +159,16 @@ Technical open = **NONE** — `BL-SOURCE-LOCK-DRIFT` **CLOSED / HISTORICAL** (PO
 
 ## Operational approval registry (özet)
 
-Operational open = **2 gözlem (non-blocking)** — `BL-VISUAL-WEBKIT-FIRST-RUN` · `BL-HARICI-STATU-BOS-SAYIM`; `BL-EKRAN-TURU` devam ediyor. `BL-CROSS-COMPANY` **CLOSED** (120/158 canlı `DIS_KAYNAK` düzeltmesi 2026-10-03). `BL-QR-PILOT-OPS` **PASS / CLOSED** (PILOT_GATE_CLOSED).
+Operational open = **1 gözlem (non-blocking)** — `BL-HARICI-STATU-BOS-SAYIM`; `BL-EKRAN-TURU` devam ediyor. `BL-VISUAL-WEBKIT-FIRST-RUN` **CLOSED** (run `37699163785`). `BL-CROSS-COMPANY` **CLOSED** (120/158 canlı `DIS_KAYNAK` düzeltmesi 2026-10-03). `BL-QR-PILOT-OPS` **PASS / CLOSED** (PILOT_GATE_CLOSED).
 
 ---
 
 ## Next gate
 
 Next gate = **NONE** (blocker yok) — Attendance / QR phase **CLOSED** (QR attendance + saha rollout + puantaj doğrulaması + personel go-live tamam). Teknik / ürün / operasyonel açık kapı yok.
-- `BL-EKRAN-TURU` **DEVAM EDİYOR** — sıradaki iş; bitince `BL-VISUAL-WEBKIT-FIRST-RUN` + `BL-HARICI-STATU-BOS-SAYIM` kapatılır (E).
+- `BL-EKRAN-TURU` **DEVAM EDİYOR**.
+- `BL-VISUAL-WEBKIT-FIRST-RUN` **CLOSED** (run `37699163785`).
+- `BL-HARICI-STATU-BOS-SAYIM` **OPEN** — canlı sayım doğrulanmadı; veri uydurulmadı.
 - `BL-NO-EVENT-DAY` **CLOSED / LIVE** (migration 094 APPLIED).
 - `BL-QR-PILOT-OPS` **PASS / CLOSED** (PILOT_GATE_CLOSED).
 - `BL-POST-THRESHOLD-REENTRY` **CLOSED** (code).

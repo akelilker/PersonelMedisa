@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { Navigate, useLocation } from "react-router-dom";
-import { hasUserPermission, type AppPermission } from "../lib/authorization/role-permissions";
+import { hasSessionPermission, type AppPermission } from "../lib/authorization/role-permissions";
 import { useAuth } from "../state/auth.store";
 
 type ProtectedRouteProps = {
@@ -24,15 +24,10 @@ export function ProtectedRoute({ children, requirePermission, requireAll, requir
     return <Navigate to="/change-password" replace />;
   }
 
-  const personelId = session.user.personel_id ?? null;
-  // Canonical QR/kart mirror: rol bağımsız (bağlı personel + kanonik mavi yaka).
-  // The backend 403 remains the authority; this is the fail-closed UX denial.
-  const personelTipiAd = session.user.personel_tipi_ad ?? null;
-
+  // Etkin izin listesi oturumdadır. QR ve self-service temeli sunucu listesinde
+  // gelir; backend 403 güvenlik sahibi olmaya devam eder.
   if (requireAny && requireAny.length > 0) {
-    const allowed = requireAny.some((p) =>
-      hasUserPermission(session.user.rol, p, personelId, personelTipiAd)
-    );
+    const allowed = requireAny.some((p) => hasSessionPermission(session, p));
     if (!allowed) {
       return <Navigate to="/yetkisiz" replace />;
     }
@@ -44,9 +39,7 @@ export function ProtectedRoute({ children, requirePermission, requireAll, requir
   ];
 
   if (permissions.length > 0) {
-    const allowed = permissions.every((p) =>
-      hasUserPermission(session.user.rol, p, personelId, personelTipiAd)
-    );
+    const allowed = permissions.every((p) => hasSessionPermission(session, p));
     if (!allowed) {
       return <Navigate to="/yetkisiz" replace />;
     }

@@ -248,10 +248,11 @@ describe("personnel-linked self-service authorization", () => {
     const route = readFileSync(resolve(root, "src/router/ProtectedRoute.tsx"), "utf8");
     const menu = readFileSync(resolve(root, "src/components/main-menu/MainMenu.tsx"), "utf8");
     const routes = readFileSync(resolve(root, "src/app/routes.tsx"), "utf8");
-    expect(hook).toContain("hasUserPermission");
-    expect(hook).toContain("personel_id");
-    expect(route).toContain("hasUserPermission");
-    expect(route).toContain("personel_id");
+    expect(hook).toContain("hasSessionPermission");
+    expect(readFileSync(resolve(root, "src/lib/authorization/role-permissions.ts"), "utf8")).toContain(
+      "personel_id"
+    );
+    expect(route).toContain("hasSessionPermission");
     // Manager MainMenu must not surface self-service; /self stays route-gated.
     expect(menu).not.toContain("menu-self-service");
     expect(menu).not.toContain("self_service.view");
@@ -309,12 +310,14 @@ describe("personnel-linked self-service authorization", () => {
 
     // Direct route access is denied by the shared, permission-based route guard.
     const route = readFileSync(resolve(root, "src/router/ProtectedRoute.tsx"), "utf8");
-    expect(route).toContain("session.user.personel_tipi_ad");
-    expect(route).toContain("personelId, personelTipiAd");
+    expect(route).toContain("hasSessionPermission(session, p)");
     // QR route guard must never re-introduce a role condition.
     expect(route).not.toMatch(/rol\s*===?\s*"PERSONEL"/);
     const hook = readFileSync(resolve(root, "src/hooks/use-role-access.ts"), "utf8");
-    expect(hook).toContain("personelTipiAd");
+    expect(hook).toContain("hasSessionPermission(session, permission)");
+    const sessionPerm = readFileSync(resolve(root, "src/lib/authorization/role-permissions.ts"), "utf8");
+    expect(sessionPerm).toContain("session.user.personel_tipi_ad");
+    expect(sessionPerm).toContain("hasUserPermission(");
     const authApi = readFileSync(resolve(root, "src/api/auth.api.ts"), "utf8");
     expect(authApi).toContain("personel_tipi_ad");
   });

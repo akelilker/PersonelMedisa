@@ -103,6 +103,8 @@ export type KullaniciYetkiIstisna = {
   iptalEdildiAt: string | null;
   iptalNedeni: string | null;
   iptalEdenUsername: string | null;
+  /** Sunucunun ilk VER auditinden yazdığı kilit. İzin adından tahmin edilmez. */
+  baslangicHassasKilit: boolean;
 };
 
 export type KullaniciYetkiAudit = {
@@ -262,7 +264,7 @@ export function istisnaKaldirilabilir(
   if (!canManage || kendi || istisna.iptalEdildiAt != null) {
     return false;
   }
-  if (istisna.etki === "DENY" && hassasYetkiMi(istisna.permission)) {
+  if (istisna.baslangicHassasKilit) {
     return false;
   }
   return true;

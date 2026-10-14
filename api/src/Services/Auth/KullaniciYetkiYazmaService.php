@@ -269,24 +269,112 @@ final class KullaniciYetkiYazmaService
     /**
      * P4 başlangıç DENY'si ve kırmızı listedeyse normal iptal ile açılamaz.
      * Rol değişimindeki ROL_DEGISTI iptali bu kilide takılmaz.
+     * Karar tek sahip: kilitKaydiMi (ilk VER auditindeki kaynak).
      */
     private static function baslangicHassasKilit(PDO $pdo, int $istisnaId, string $permission, string $etki): bool
     {
-        if ($etki !== 'DENY' || !in_array($permission, EffectivePermissionResolver::NON_GRANTABLE_PERMISSIONS, true)) {
-            return false;
-        }
         $stmt = $pdo->prepare(
             'SELECT sonraki_json FROM ' . UserYetkiIstisnaSchema::AUDIT_TABLE . "
               WHERE istisna_id = :id AND aksiyon = 'VER' ORDER BY id ASC LIMIT 1"
         );
         $stmt->execute(['id' => $istisnaId]);
         $json = $stmt->fetchColumn();
-        if (!is_string($json) || $json === '') {
+
+        return self::kilitKaydiMi($permission, $etki, $json === false ? null : $json);
+    }
+
+    /**
+     * Okuma modeli ile iptal ucunun aynı kararı. Kaynak metni veya izin adından
+     * tahmin edilmez: yalnız ilk VER kaydının sonraki_json.kaynak değeri.
+     *
+     * @param mixed $sonrakiJson string JSON, dizi veya null
+     */
+    public static function kilitKaydiMi(string $permission, string $etki, $sonrakiJson): bool
+    {
+        if (strtoupper($etki) !== 'DENY' || !in_array($permission, EffectivePermissionResolver::NON_GRANTABLE_PERMISSIONS, true)) {
             return false;
         }
-        $data = json_decode($json, true);
+        if (is_string($sonrakiJson)) {
+            if ($sonrakiJson === '') {
+                return false;
+            }
+            $sonrakiJson = json_decode($sonrakiJson, true);
+        }
 
-        return is_array($data) && ($data['kaynak'] ?? '') === self::KAYNAK_BASLANGIC;
+        return is_array($sonrakiJson) && ($sonrakiJson['kaynak'] ?? '') === self::KAYNAK_BASLANGIC;
+    }
+
+    /**
+     * Geçmiş satırlarına sunucunun kaldırılabilirlik kararını yazar.
+     * Audit okunamazsa (tablo yok) kilit false kalır; şema zaten hazır değildir.
+     *
+     * @param array<int, array<string, mixed>> $rows
+     * @return array<int, array<string, mixed>>
+     */
+    public static function withBaslangicHassasKilit(PDO $pdo, array $rows): array
+    {
+        $ids = [];
+        foreach ($rows as $row) {
+            $id = (int) ($row['id'] ?? 0);
+            if ($id > 0) {
+                $ids[$id] = $id;
+            }
+        }
+        $jsonById = self::ilkVerSonrakiJson($pdo, array_values($ids));
+        $out = [];
+        foreach ($rows as $row) {
+            $id = (int) ($row['id'] ?? 0);
+            $row['baslangic_hassas_kilit'] = self::kilitKaydiMi(
+                (string) ($row['permission'] ?? ''),
+                (string) ($row['etki'] ?? ''),
+                $jsonById[$id] ?? null
+            );
+            $out[] = $row;
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param array<int, int> $istisnaIds
+     * @return array<int, string|null>
+     */
+    private static function ilkVerSonrakiJson(PDO $pdo, array $istisnaIds): array
+    {
+        if ($istisnaIds === []) {
+            return [];
+        }
+        $placeholders = [];
+        $params = [];
+        foreach (array_values($istisnaIds) as $index => $id) {
+            $key = 'i' . $index;
+            $placeholders[] = ':' . $key;
+            $params[$key] = $id;
+        }
+        try {
+            $stmt = $pdo->prepare(
+                'SELECT a.istisna_id, a.sonraki_json
+                   FROM ' . UserYetkiIstisnaSchema::AUDIT_TABLE . ' a
+                   INNER JOIN (
+                     SELECT istisna_id, MIN(id) AS min_id
+                       FROM ' . UserYetkiIstisnaSchema::AUDIT_TABLE . '
+                      WHERE aksiyon = \'VER\' AND istisna_id IN (' . implode(',', $placeholders) . ')
+                      GROUP BY istisna_id
+                   ) ilk ON a.id = ilk.min_id'
+            );
+            $stmt->execute($params);
+            $found = [];
+            foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) ?: [] as $row) {
+                $found[(int) $row['istisna_id']] = $row['sonraki_json'] !== null ? (string) $row['sonraki_json'] : null;
+            }
+
+            return $found;
+        } catch (\PDOException $e) {
+            if (UserYetkiIstisnaSchema::isMissingTable($e)) {
+                return [];
+            }
+            throw $e;
+        }
     }
 
     /** Başka aktif Genel Yönetici var mı. Pasif satır ve hedefin kendisi sayılmaz. */

@@ -60,6 +60,9 @@ final class KullaniciYetkiController
         }
         $target['yetki_istisnalari'] = UserYetkiIstisnaSchema::loadActive($pdo, $kullaniciId);
         $history = UserYetkiIstisnaSchema::loadHistory($pdo, $kullaniciId);
+        $istisnalar = $history['schema_ready']
+            ? KullaniciYetkiYazmaService::withBaslangicHassasKilit($pdo, $history['rows'])
+            : $history['rows'];
         $rol = RolePermissions::normalizeRole((string) $target['rol']);
         $kaynaklar = EffectivePermissionResolver::effectivePermissionSources($target);
         $varsayilan = RolePermissions::roleDefaultPermissions($rol);
@@ -70,7 +73,7 @@ final class KullaniciYetkiController
             'rol' => $rol !== '' ? $rol : (string) $target['rol'],
             'schema_ready' => $history['schema_ready'],
             'rol_varsayilanlari' => $varsayilan,
-            'istisnalar' => $history['rows'],
+            'istisnalar' => $istisnalar,
             'effective_permissions' => array_keys($kaynaklar),
             'kaynaklar' => $kaynaklar,
             'sube_istisnalari_etkin' => EffectivePermissionResolver::subeIstisnalariEtkin(),

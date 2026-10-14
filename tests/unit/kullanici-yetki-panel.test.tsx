@@ -33,7 +33,23 @@ const hazirOkuma = {
       createdAt: "2026-10-01 09:00:00",
       iptalEdildiAt: null,
       iptalNedeni: null,
-      iptalEdenUsername: null
+      iptalEdenUsername: null,
+      baslangicHassasKilit: true
+    },
+    {
+      id: 8,
+      permission: "bordro_kesinlestirme.approve",
+      etki: "DENY" as const,
+      subeId: null,
+      gecerlilikBaslangic: "2026-10-03 09:00:00",
+      gecerlilikBitis: "2026-12-01 09:00:00",
+      gerekce: "Geçici hassas kısıt",
+      verenUsername: "İlker Akel",
+      createdAt: "2026-10-03 09:00:00",
+      iptalEdildiAt: null,
+      iptalNedeni: null,
+      iptalEdenUsername: null,
+      baslangicHassasKilit: false
     }
   ],
   effectivePermissions: ["personeller.update"],
@@ -66,7 +82,7 @@ describe("Kullanıcı yetki paneli", () => {
     expect(api.verKullaniciYetkisi).not.toHaveBeenCalled();
   });
 
-  it("hassas kısıtı kaldırma düğmesi sunmaz ve kendi hesabında form açmaz", async () => {
+  it("başlangıç hassas kilidini gizler, sonradan konan hassas kısıtı kaldırır, kendi hesabında form açmaz", async () => {
     api.fetchKullaniciYetkileri.mockResolvedValue(hazirOkuma);
     api.fetchKullaniciYetkiAuditleri.mockResolvedValue({ schemaReady: true, items: [] });
 
@@ -75,6 +91,8 @@ describe("Kullanıcı yetki paneli", () => {
     );
     expect(await screen.findByTestId("yonetim-yetki-hassas-7")).toBeTruthy();
     expect(screen.queryByTestId("yonetim-yetki-kaldir-7")).toBeNull();
+    expect(screen.queryByTestId("yonetim-yetki-hassas-8")).toBeNull();
+    expect(screen.getByTestId("yonetim-yetki-kaldir-8")).toBeTruthy();
     expect(screen.getByTestId("yonetim-yetki-form")).toBeTruthy();
     unmount();
 

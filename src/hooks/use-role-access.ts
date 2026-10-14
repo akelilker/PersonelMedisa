@@ -1,5 +1,5 @@
 import {
-  hasUserPermission,
+  hasSessionPermission,
   sessionAllowsSubeWrite,
   type AppPermission
 } from "../lib/authorization/role-permissions";
@@ -9,8 +9,6 @@ import { useAuth } from "../state/auth.store";
 export function useRoleAccess() {
   const { session } = useAuth();
   const activeRole = session?.user.rol;
-  const personelId = session?.user.personel_id ?? null;
-  const personelTipiAd = session?.user.personel_tipi_ad ?? null;
   const uiProfile = session?.ui_profile ?? null;
 
   function hasRole(role: UserRole) {
@@ -26,13 +24,11 @@ export function useRoleAccess() {
   }
 
   function hasPermission(permission: AppPermission) {
-    return hasUserPermission(activeRole, permission, personelId, personelTipiAd);
+    return hasSessionPermission(session, permission);
   }
 
   function hasAnyPermission(permissions: AppPermission[]) {
-    return permissions.some((permission) =>
-      hasUserPermission(activeRole, permission, personelId, personelTipiAd)
-    );
+    return permissions.some((permission) => hasSessionPermission(session, permission));
   }
 
   /**

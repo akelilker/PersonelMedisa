@@ -934,7 +934,8 @@ function normalizeYetkiIstisna(value: unknown): KullaniciYetkiIstisna | null {
     createdAt: readString(record.created_at) ?? "",
     iptalEdildiAt: readStringOrNull(record.iptal_edildi_at),
     iptalNedeni: readStringOrNull(record.iptal_nedeni),
-    iptalEdenUsername: readStringOrNull(record.iptal_eden_username_snapshot)
+    iptalEdenUsername: readStringOrNull(record.iptal_eden_username_snapshot),
+    baslangicHassasKilit: record.baslangic_hassas_kilit === true
   };
 }
 

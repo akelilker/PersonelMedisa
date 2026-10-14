@@ -378,9 +378,14 @@ function normalizeAuthSession(payload: unknown): AuthSession | null {
   const permissions = permissionKeyPresent ? readPermissionList(permissionSource) : null;
   if (permissions) {
     draft.user.effective_permissions = permissions;
-    draft.permissions_hydrated = true;
+    // Liste tek başına süreli ALLOW'ın bitişini kanıtlamaz. Eski/eksik login
+    // yanıtı ilk tam snapshot okunana kadar production'da kapalı kalır.
+    draft.permissions_hydrated = toRecord(userSource.kaynaklar) !== null && Array.isArray(userSource.istisnalar);
     draft.permissions_stale = false;
     draft.permissions_source = "server";
+    if (draft.permissions_hydrated) {
+      draft.expiring_allows = readExpiringAllows(userSource);
+    }
   } else if (permissionKeyPresent && Array.isArray(permissionSource) && permissionSource.length === 0) {
     draft.user.effective_permissions = [];
     draft.permissions_hydrated = true;

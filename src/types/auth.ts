@@ -86,7 +86,7 @@ export type AuthSession = {
   sube_list?: SubeInfo[];
   /** Admin geçici şifre sonrası kullanıcının kendi şifresini belirlemesi gerekir. */
   must_change_password?: boolean;
-  /** true: effective_permissions sunucudan veya demo oturumundan yazıldı. */
+  /** true: kaynak/süre bilgili etkin izin snapshot'ı veya demo oturumu hazır. */
   permissions_hydrated?: boolean;
   /** Son yenileme başarısız. Hidrate liste durur; rol matrisine dönülmez. */
   permissions_stale?: boolean;

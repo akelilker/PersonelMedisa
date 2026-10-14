@@ -145,7 +145,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       if (atMs == null) {
         return;
       }
-      const delay = atMs - Date.now() + 1000;
+      const delay = atMs - Date.now();
       if (delay > 0 && delay < 24 * 60 * 60 * 1000) {
         expiryId = window.setTimeout(() => {
           void refresh();
@@ -181,6 +181,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
         const current = getSession();
         if (!current) {
           return;
+        }
+        // Yanıt uçuş halindeyken biten ALLOW yeniden açılmasın.
+        const expired = dropExpiredAllows({
+          ...current,
+          permissions_hydrated: true,
+          expiring_allows: snapshot.expiringAllows,
+          user: { ...current.user, effective_permissions: snapshot.permissions }
+        }, Date.now());
+        if (expired) {
+          snapshot.permissions = expired.user.effective_permissions ?? [];
+          snapshot.expiringAllows = expired.expiring_allows ?? [];
         }
         const unchanged =
           current.permissions_hydrated === true &&
@@ -230,6 +241,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
     };
 
+    // Login zaten tam snapshot taşıyorsa ilk isteğin sonuçlanmasını bekleme.
+    const firstExpiry = (session.expiring_allows ?? []).reduce<number | null>((soonest, item) =>
+      soonest === null || item.ends_at_ms < soonest ? item.ends_at_ms : soonest, null);
+    scheduleExpiry(firstExpiry);
     void refresh();
     const onFocus = () => {
       void refresh();

@@ -170,6 +170,33 @@ describe("auth.api login", () => {
       mockIsRealBackendOnlyMode.mockReturnValue(true);
     });
 
+    it("keeps login ALLOW expiry before the first separate permission read", async () => {
+      vi.stubGlobal("fetch", vi.fn(async () => createJsonResponse({ data: {
+        token: "expiry-token",
+        user: {
+          id: 3, ad_soyad: "Test", rol: "BIRIM_AMIRI",
+          effective_permissions: ["puantaj.view", "finans.view"],
+          kaynaklar: { "puantaj.view": "ROLE_DEFAULT", "finans.view": "USER_ALLOW" },
+          istisnalar: [{ permission: "finans.view", etki: "ALLOW", gecerlilik_bitis: "2026-10-14 12:00:00" }]
+        }
+      } })));
+      const session = await login({ username: "test", password: "secret" });
+      expect(session.permissions_hydrated).toBe(true);
+      expect(session.expiring_allows).toEqual([
+        { permission: "finans.view", ends_at_ms: Date.parse("2026-10-14T12:00:00Z") }
+      ]);
+    });
+
+    it("does not hydrate a login list whose expiry metadata is missing", async () => {
+      vi.stubGlobal("fetch", vi.fn(async () => createJsonResponse({ data: {
+        token: "legacy-token",
+        user: { id: 3, ad_soyad: "Test", rol: "BIRIM_AMIRI", effective_permissions: ["finans.view"] }
+      } })));
+      const session = await login({ username: "test", password: "secret" });
+      expect(session.permissions_hydrated).toBe(false);
+      expect(session.expiring_allows).toBeUndefined();
+    });
+
     it("fails closed when login endpoint returns 404", async () => {
       const error = { code: "NOT_FOUND", message: "Endpoint bulunamadi." };
       vi.stubGlobal("fetch", vi.fn(async () => createJsonResponse({ errors: [error] }, 404)));

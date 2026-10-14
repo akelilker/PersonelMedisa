@@ -136,7 +136,7 @@ try {
         }
         throw new RuntimeException('izin yok');
     };
-    $gecerli = ['permission' => 'personeller.create', 'etki' => 'ALLOW', 'gerekce' => 'test'];
+    $gecerli = ['permission' => 'isg.view', 'etki' => 'ALLOW', 'gerekce' => 'test'];
 
     // --- yetki kapısı ve kendine yasak -------------------------------------------------
     ywAssert(ywTry(fn () => Y::ver($pdo, $actor(2), 4, $gecerli)) === 'FORBIDDEN', 'yetki yöneticisi olmayan (SISTEM_YONETICISI) yetki veremez');
@@ -163,7 +163,7 @@ try {
     ywAssert(ywTry(fn () => Y::ver($pdo, $actor(1), 4, $gecerli + ['gecerlilik_bitis' => $g(366)])) === Y::CODE_SURE, 'süreli ALLOW > 365 gün reddedilir');
     ywAssert(ywTry(fn () => Y::ver($pdo, $actor(1), 4, $gecerli + ['gecerlilik_bitis' => $g(-1)])) === Y::CODE_SURE, 'bitiş başlangıçtan önce reddedilir');
     $r = ywTry(fn () => Y::ver($pdo, $actor(1), 4, $gecerli + ['gecerlilik_bitis' => $g(364)]));
-    ywAssert(str_starts_with($r, 'OK:') && $eff(4, 'personeller.create'), 'süreli ALLOW (≤365 gün) verilir ve etkin olur');
+    ywAssert(str_starts_with($r, 'OK:') && $eff(4, 'isg.view'), 'süreli ALLOW (≤365 gün) verilir ve etkin olur');
     ywAssert(ywTry(fn () => Y::ver($pdo, $actor(6), 4, $gecerli)) === Y::CODE_ZATEN, 'aynı etkin istisna ikinci kez verilemez');
     $r2 = ywTry(fn () => Y::ver($pdo, $actor(1), 5, ['permission' => $disi('IK_PERSONELI'), 'etki' => 'ALLOW', 'gerekce' => 'kalıcı']));
     ywAssert(str_starts_with($r2, 'OK:') && $one($pdo, "SELECT gecerlilik_bitis FROM user_yetki_istisnalari WHERE user_id=5") === null, 'kalıcı ALLOW (bitiş boş) verilir');
@@ -174,7 +174,7 @@ try {
 
     // --- K1 UYARI (Medisa: politika satırı yok) ---------------------------------------
     $pdo->exec('UPDATE users SET actor_identity_id = NULL WHERE id = 7');
-    $r = ywTry(fn () => Y::ver($pdo, $actor(7), 8, ['permission' => 'personeller.create', 'etki' => 'ALLOW', 'gerekce' => 'x']));
+    $r = ywTry(fn () => Y::ver($pdo, $actor(7), 8, ['permission' => 'isg.view', 'etki' => 'ALLOW', 'gerekce' => 'x']));
     ywAssert(str_starts_with($r, 'OK:') && str_contains($r, 'YETKI_VEREN_KIMLIK_DOGRULANMAMIS')
         && (string) $one($pdo, 'SELECT uyari_kodlari FROM user_yetki_auditleri ORDER BY id DESC LIMIT 1') === 'YETKI_VEREN_KIMLIK_DOGRULANMAMIS', 'K1 UYARI (Medisa): kimliksiz GY kilitlenmez, uyarı audit\'te');
     $pdo->exec('UPDATE users SET actor_identity_id = 3 WHERE id = 7');

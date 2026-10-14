@@ -1278,15 +1278,7 @@ class PersonellerController
             JsonResponse::forbidden('Bu personel islemi icin yetkiniz yok.');
         }
 
-        // GENEL_YONETICI burada yok: personel yazması etkin izne bağlıdır.
-        // Yeni atanan yönetici DENY ile yalnız görür; rol adı yazmayı açmaz.
-        // BOLUM_YONETICISI rol varsayılanında personeller.create/update var; ad tabanlı açılım
-        // yalnız MUHASEBE için kalır (rol varsayılanında yazma izni yok, mevcut erişim korunur).
-        $legacyRoles = ['MUHASEBE'];
-        if (in_array(OrgScope::normalizeRole($user), $legacyRoles, true)) {
-            return;
-        }
-
+        // Personel yazması yalnız etkin izne bağlıdır (rol adı açılımı yok; t900).
         JsonResponse::forbidden();
     }
 

@@ -532,6 +532,17 @@ type DemoAylikDurum = {
   kapanis_durumu: "ACIK" | "KAPANDI";
 };
 
+const demoDuyurular: Array<{
+  id: number;
+  baslik: string;
+  aciklama: string;
+  yayin_tarihi: string;
+  bitis_tarihi: string | null;
+  aktif: boolean;
+  sube_id: number | null;
+  okuma_sayisi: number;
+}> = [];
+
 const demoState: {
   personeller: DemoPersonel[];
   surecler: DemoSurec[];
@@ -6317,6 +6328,24 @@ export function resolveDemoApiResponse(
     }
     personel.sube_id = yeni;
     return ok(buildDemoPersonelDetail(personel));
+  }
+
+  if (pathname === "/duyurular" && method === "GET") {
+    return ok({ items: demoDuyurular });
+  }
+  if (pathname === "/duyurular" && method === "POST") {
+    const row = {
+      id: demoDuyurular.length + 1,
+      baslik: String(body.baslik ?? ""),
+      aciklama: String(body.aciklama ?? ""),
+      yayin_tarihi: String(body.yayin_tarihi ?? ""),
+      bitis_tarihi: body.bitis_tarihi ? String(body.bitis_tarihi) : null,
+      aktif: true,
+      sube_id: null,
+      okuma_sayisi: 0
+    };
+    demoDuyurular.unshift(row);
+    return ok(row);
   }
 
   const personelReaktifMatch = pathname.match(/^\/personeller\/(\d+)\/yeniden-aktif$/);

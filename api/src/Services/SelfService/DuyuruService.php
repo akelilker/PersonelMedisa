@@ -38,6 +38,40 @@ class DuyuruService
     }
 
     /**
+     * Yönetim listesi (salt okuma): son 100 duyuru, okunma sayısıyla.
+     *
+     * @return array{items:array<int, array<string, mixed>>}
+     */
+    public static function listManaged(PDO $pdo)
+    {
+        self::assertSchema($pdo);
+        $stmt = $pdo->query(
+            'SELECT d.id, d.baslik, d.aciklama, d.yayin_tarihi, d.bitis_tarihi, d.aktif,
+                    d.sube_id, d.created_at,
+                    (SELECT COUNT(*) FROM duyuru_okumalari o WHERE o.duyuru_id = d.id) AS okuma_sayisi
+             FROM duyurular d
+             ORDER BY d.yayin_tarihi DESC, d.id DESC
+             LIMIT 100'
+        );
+        $rows = $stmt !== false ? ($stmt->fetchAll(PDO::FETCH_ASSOC) ?: []) : [];
+        $items = [];
+        foreach ($rows as $row) {
+            $items[] = [
+                'id' => (int) $row['id'],
+                'baslik' => (string) $row['baslik'],
+                'aciklama' => (string) $row['aciklama'],
+                'yayin_tarihi' => (string) $row['yayin_tarihi'],
+                'bitis_tarihi' => $row['bitis_tarihi'] !== null ? (string) $row['bitis_tarihi'] : null,
+                'aktif' => (int) $row['aktif'] === 1,
+                'sube_id' => $row['sube_id'] !== null ? (int) $row['sube_id'] : null,
+                'okuma_sayisi' => (int) $row['okuma_sayisi'],
+            ];
+        }
+
+        return ['items' => $items];
+    }
+
+    /**
      * @param array<string, mixed> $ctx
      * @return array<string, mixed>
      */

@@ -32,9 +32,11 @@ describe("personel yazma kapısında kişisel DENY", () => {
     });
     expect(result.status, result.stderr || result.stdout).toBe(0);
     expect(result.stdout).toContain("verify-dinamik-yetki-tamamlama: OK");
-    expect(result.stdout).toContain("[PASS] Muhasebe geçerli DENY legacy köprüyü kapatır: personeller.update");
+    expect(result.stdout).toContain("[PASS] Muhasebe kişisel DENY yazmayı kapatır: personeller.update");
     expect(result.stdout).toContain("[PASS] Bölüm Yöneticisi geçerli DENY yazmayı kapatır: personeller.create");
     expect(result.stdout).toContain("[PASS] Sonradan konan hassas DENY kilitli değildir");
+    expect(result.stdout).toContain("[PASS] Muhasebe rol varsayılanıyla yazar (t900 kararı): personeller.create");
+    expect(result.stdout).toContain("[PASS] assertWriteRole içinde rol adı açılımı yok");
     expect(result.stdout).not.toContain("[FAIL]");
   });
 });

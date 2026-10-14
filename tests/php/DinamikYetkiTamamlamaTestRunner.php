@@ -70,15 +70,15 @@ $ik = ['id' => 8, 'rol' => 'IK_SORUMLUSU'];
 $birim = ['id' => 9, 'rol' => 'BIRIM_AMIRI'];
 
 foreach (['personeller.create', 'personeller.update'] as $permission) {
-    dyAssert(dyGate($bolum, $permission) === 'ALLOW', 'Bölüm Yöneticisi legacy/rol erişimi durur: ' . $permission);
-    dyAssert(dyGate($muhasebe, $permission) === 'ALLOW', 'Muhasebe legacy erişimi durur, matrise izin eklenmez: ' . $permission);
+    dyAssert(dyGate($bolum, $permission) === 'ALLOW', 'Bölüm Yöneticisi rol varsayılanıyla yazar: ' . $permission);
+    dyAssert(dyGate($muhasebe, $permission) === 'ALLOW', 'Muhasebe rol varsayılanıyla yazar (t900 kararı): ' . $permission);
     dyAssert(
         dyGate($bolum + ['yetki_istisnalari' => [dyDeny($permission)]], $permission) === 'FORBIDDEN',
         'Bölüm Yöneticisi geçerli DENY yazmayı kapatır: ' . $permission
     );
     dyAssert(
         dyGate($muhasebe + ['yetki_istisnalari' => [dyDeny($permission)]], $permission) === 'FORBIDDEN',
-        'Muhasebe geçerli DENY legacy köprüyü kapatır: ' . $permission
+        'Muhasebe kişisel DENY yazmayı kapatır: ' . $permission
     );
     dyAssert(
         dyGate($bolum + ['yetki_istisnalari' => [dyDeny($permission, '2026-01-01 00:00:00', '2026-10-01 00:00:00')]], $permission) === 'ALLOW',
@@ -86,7 +86,7 @@ foreach (['personeller.create', 'personeller.update'] as $permission) {
     );
     dyAssert(
         dyGate($muhasebe + ['yetki_istisnalari' => [dyDeny($permission, '2027-01-01 00:00:00')]], $permission) === 'ALLOW',
-        'Henüz başlamamış DENY legacy erişimi kapatmaz: ' . $permission
+        'Henüz başlamamış DENY erişimi kapatmaz: ' . $permission
     );
     dyAssert(dyGate($bolum, $permission) === 'ALLOW', 'İptal edilmiş kayıt listede yoksa erişim durur: ' . $permission);
 }
@@ -94,14 +94,23 @@ foreach (['personeller.create', 'personeller.update'] as $permission) {
 dyAssert(dyGate($gy, 'personeller.update') === 'ALLOW', 'Genel Yönetici etkin izinle yazar');
 dyAssert(
     dyGate($gy + ['yetki_istisnalari' => [dyDeny('personeller.update')]], 'personeller.update') === 'FORBIDDEN',
-    'Genel Yönetici DENY legacy listesinde değildir'
+    'Genel Yönetici kişisel DENY yazmayı kapatır'
 );
 dyAssert(dyGate($ik, 'personeller.update') === 'ALLOW', 'İK rol izniyle yazar');
 dyAssert(
     dyGate($ik + ['yetki_istisnalari' => [dyDeny('personeller.update')]], 'personeller.update') === 'FORBIDDEN',
     'İK kişisel DENY yazmayı kapatır'
 );
-dyAssert(dyGate($birim, 'personeller.update') === 'FORBIDDEN', 'Köprüde olmayan ve izni olmayan rol yazamaz');
+dyAssert(dyGate($birim, 'personeller.update') === 'FORBIDDEN', 'İzni olmayan rol yazamaz');
+foreach (['personeller.create', 'personeller.update'] as $permission) {
+    dyAssert(
+        \Medisa\Api\Auth\RolePermissions::has($muhasebe, $permission)
+            && R::source($muhasebe, $permission) === R::SOURCE_ROLE_DEFAULT,
+        'Muhasebe yazma izni rol varsayılanından gelir (ad tabanlı köprü yok): ' . $permission
+    );
+}
+$controller = (string) file_get_contents(__DIR__ . '/../../api/src/Controllers/PersonellerController.php');
+dyAssert(strpos($controller, '$legacyRoles') === false, 'assertWriteRole içinde rol adı açılımı yok');
 dyAssert(
     !R::hasActiveDeny($muhasebe, 'personeller.update') && R::hasActiveDeny($muhasebe + ['yetki_istisnalari' => [dyDeny('personeller.update')]], 'personeller.update'),
     'İzin yokluğu ile açık DENY ayrıdır'

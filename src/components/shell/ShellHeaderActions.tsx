@@ -24,6 +24,7 @@ import { istanbulBusinessDate } from "../../features/self-service/birim-amiri-op
 import { BackgroundlessNoticeModal } from "../../features/self-service/components/BackgroundlessNoticeModal";
 import { resolveInboxNotificationDestination } from "../../lib/self-service/inbox-notification-destination";
 import { VeriYedeklemeModal } from "../../features/yonetim/veri-yedekleme/VeriYedeklemeModal";
+import { DuyuruYonetimModal } from "../../features/yonetim/duyurular/DuyuruYonetimModal";
 
 type NotificationLevel = "neutral" | "warning" | "critical";
 
@@ -138,6 +139,8 @@ export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeade
     (hasPermission("retention.view") && canViewYonetimPanel);
   const canViewResmiTatilTakvimi = hasPermission("resmi_tatil_takvimi.view");
   const canManageVeriYedekleme = role === "GENEL_YONETICI";
+  const canManageDuyurular = hasPermission("duyurular.manage");
+  const [isDuyuruYonetimOpen, setIsDuyuruYonetimOpen] = useState(false);
 
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -910,6 +913,18 @@ export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeade
               Resmî Tatil Takvimi
             </button>
           ) : null}
+          {canManageDuyurular ? (
+            <button
+              type="button"
+              data-testid="settings-duyurular"
+              onClick={() => {
+                setIsSettingsOpen(false);
+                setIsDuyuruYonetimOpen(true);
+              }}
+            >
+              Duyurular
+            </button>
+          ) : null}
           {canManageVeriYedekleme ? (
             <button
               type="button"
@@ -944,6 +959,15 @@ export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeade
           void fetchBugunPersonelDurumu({ tarih: istanbulBusinessDate() })
             .then((data) => setBugunAttentionCount(Math.max(0, Number(data.attention_count) || 0)))
             .catch(() => undefined);
+        }}
+      />
+    ) : null}
+    {canManageDuyurular && isDuyuruYonetimOpen ? (
+      <DuyuruYonetimModal
+        onClose={() => setIsDuyuruYonetimOpen(false)}
+        onBack={() => {
+          setIsDuyuruYonetimOpen(false);
+          setIsSettingsOpen(true);
         }}
       />
     ) : null}

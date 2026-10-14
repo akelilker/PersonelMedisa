@@ -147,7 +147,7 @@ describe("new personnel registration operational close", () => {
     expect(hasRolePermission("IK_SORUMLUSU", "personeller.create")).toBe(true);
     expect(hasRolePermission("IK_PERSONELI", "personeller.create")).toBe(true);
     expect(hasRolePermission("BIRIM_AMIRI", "personeller.create")).toBe(false);
-    expect(hasRolePermission("MUHASEBE", "personeller.create")).toBe(false);
+    expect(hasRolePermission("MUHASEBE", "personeller.create")).toBe(true);
     expect(hasRolePermission("PERSONEL", "personeller.create")).toBe(false);
   });
 

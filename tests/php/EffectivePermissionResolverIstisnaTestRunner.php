@@ -31,10 +31,10 @@ R::setNowForTests('2026-10-11 12:00:00');
 // Şube kapsamlı istisnalar P2'de KAPALI: satır olsa bile hiçbir kararda kullanılmaz.
 epiAssert(R::SUBE_ISTISNALARI_ETKIN === false && R::subeIstisnalariEtkin() === false, 'K0 şube kapsamlı istisnalar varsayılan KAPALI');
 $kapali = ['id' => 1, 'rol' => 'MUHASEBE', 'sube_ids' => [1], 'yetki_istisnalari' => [
-    epiRow('personeller.create', 'ALLOW', 1), epiRow('bordro_on_izleme.view', 'DENY', 1),
+    epiRow('personeller.import.apply', 'ALLOW', 1), epiRow('bordro_on_izleme.view', 'DENY', 1),
 ]];
-epiAssert(!R::resolveForSube($kapali, 'personeller.create', 1) && R::resolveForSube($kapali, 'bordro_on_izleme.view', 1)
-    && R::resolve($kapali, 'bordro_on_izleme.view') && !R::resolve($kapali, 'personeller.create'), 'K1 kapalıyken şube ALLOW izin vermez, şube DENY engellemez (her kararda)');
+epiAssert(!R::resolveForSube($kapali, 'personeller.import.apply', 1) && R::resolveForSube($kapali, 'bordro_on_izleme.view', 1)
+    && R::resolve($kapali, 'bordro_on_izleme.view') && !R::resolve($kapali, 'personeller.import.apply'), 'K1 kapalıyken şube ALLOW izin vermez, şube DENY engellemez (her kararda)');
 // Aşağıdaki şube semantiği testleri için geçici açma (yalnız test).
 R::setSubeIstisnalariForTests(true);
 
@@ -42,7 +42,7 @@ $muh = ['id' => 5, 'rol' => 'MUHASEBE', 'sube_ids' => [1, 2]];
 $gy = ['id' => 6, 'rol' => 'GENEL_YONETICI', 'sube_ids' => []];
 $birim = ['id' => 7, 'rol' => 'BIRIM_AMIRI', 'sube_ids' => [1]];
 $perm = 'bordro_on_izleme.view';           // MUHASEBE varsayılanı
-$extra = 'personeller.create';              // MUHASEBE varsayılanı değil
+$extra = 'personeller.import.apply';        // MUHASEBE / BIRIM_AMIRI varsayılanı değil
 
 epiAssert(RolePermissions::has($muh, $perm) && !RolePermissions::has($muh, $extra), '0 başlangıç: rol varsayılanı');
 

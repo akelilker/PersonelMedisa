@@ -389,3 +389,30 @@ export async function uploadSelfProfilFoto(dosyaIcerikBase64: string): Promise<S
     image_base64: readString(data.image_base64)
   };
 }
+
+export type YonetimDuyuru = {
+  id: number;
+  baslik: string;
+  aciklama: string;
+  yayin_tarihi: string;
+  bitis_tarihi: string | null;
+  aktif: boolean;
+  sube_id: number | null;
+  okuma_sayisi: number;
+};
+
+export type DuyuruCreatePayload = {
+  baslik: string;
+  aciklama: string;
+  yayin_tarihi: string;
+  bitis_tarihi?: string | null;
+};
+
+export async function fetchYonetimDuyurular(): Promise<YonetimDuyuru[]> {
+  const data = unwrap(await apiRequest(endpoints.me.duyuruYonetim), "Duyurular alınamadı.");
+  return Array.isArray(data.items) ? (data.items as YonetimDuyuru[]) : [];
+}
+
+export async function createYonetimDuyuru(payload: DuyuruCreatePayload): Promise<void> {
+  await apiRequest(endpoints.me.duyuruYonetim, { method: "POST", body: JSON.stringify(payload) });
+}

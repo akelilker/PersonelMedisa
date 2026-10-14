@@ -625,7 +625,7 @@ test.describe("PERSONEL self-service UX v2 — mobile product", () => {
     await page.getByRole("button", { name: "Ana sayfaya dön" }).click();
 
     await page.getByTestId("personel-shell-duyurular-link").click();
-    await expect(page.getByTestId("personel-duyurular-empty")).toHaveText("Henüz duyuru bulunmuyor");
+    await expect(page.getByTestId("personel-duyurular-empty")).toHaveText("Henüz Duyuru Yok.");
     await page.getByRole("button", { name: "Ana sayfaya dön" }).click();
 
     await page.getByTestId("personel-menu-fazla-mesai").click();

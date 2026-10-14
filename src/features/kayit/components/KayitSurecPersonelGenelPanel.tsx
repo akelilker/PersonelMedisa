@@ -16,6 +16,7 @@ import {
   type EditPersonelFormState
 } from "../../personeller/personel-edit-utils";
 import { formatGeneralField, formatMoneyField } from "../kayit-surec-utils";
+import { PersonelYenidenAktifAction } from "../../personeller/components/yeniden-aktif/PersonelYenidenAktifAction";
 import { KayitSurecPersonelNameHeading } from "./KayitSurecPersonelNameHeading";
 
 type KayitSurecPersonelGenelPanelProps = {
@@ -270,6 +271,11 @@ export function KayitSurecPersonelGenelPanel({
           Bu personel pasif.
         </p>
       ) : null}
+      <PersonelYenidenAktifAction
+        personel={personel}
+        testId="kayit-surec-yeniden-aktif"
+        onReactivated={onPersonelUpdated}
+      />
 
       {editInfoMessage ? <p className="workspace-success">{editInfoMessage}</p> : null}
 

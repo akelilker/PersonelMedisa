@@ -1,7 +1,7 @@
 # Dinamik kullanıcı yetkisi — P3 (yazma + kurallar + bildirim)
 
 Durum: kod main'de (PR #530). Migration 100 canlıda uygulandı (Apply `38222514124`). Şema hazır değilse yazma uçları
-`503 YETKI_SEMASI_HAZIR_DEGIL` döner ve rol değişikliği yolu eskisi gibi çalışır. Personel yazma köprüsünde DENY önceliği ve ekran oturum hizası PR #560 ile merge edildi; Deploy cPanel run `38519660078` SHA `fb1e3708…` smoke OK. Canlıda yetki veya personel verisi değiştirilmedi.
+`503 YETKI_SEMASI_HAZIR_DEGIL` döner ve rol değişikliği yolu eskisi gibi çalışır. Personel yazma köprüsünde DENY önceliği ve ekran oturum hizası PR #560 ile merge edildi; Deploy cPanel run `38519660078` SHA `fb1e3708…` smoke OK. İlk yetki yenilemesinden önce login ALLOW süresi PR #562 ile kapandı; Deploy cPanel run `38559772162` SHA `b3e84c61…` SUCCESS. Migration 100 canlıda APPLIED (tip **100 / 100**). Canlıda yetki veya personel verisi değiştirilmedi.
 
 ## Uçlar (`kullanici_yetkileri.manage`, yalnız GENEL_YONETICI)
 - `POST /yonetim/kullanicilar/{id}/yetkiler` — `{permission, etki: ALLOW|DENY, gerekce, gecerlilik_baslangic?, gecerlilik_bitis?}`

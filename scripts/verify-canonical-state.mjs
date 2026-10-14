@@ -70,6 +70,53 @@ async function parseDocVersion(filePath, keyName) {
   }
 }
 
+async function parseDocLine(filePath, keyName, pattern) {
+  const checker = `DOCS:${path.basename(filePath)} (${keyName})`;
+  try {
+    const content = await fs.readFile(path.resolve(process.cwd(), filePath), "utf-8");
+    const match = content.match(new RegExp(`^${keyName}:\\s*(${pattern})\\s*$`, "im"));
+    if (!match) {
+      reportError(checker, `Değer bulunamadı veya beklenen biçimde değil.`);
+      return null;
+    }
+    reportSuccess(checker, `Okunan değer: ${match[1]}`);
+    return { value: match[1], content };
+  } catch (error) {
+    reportError(checker, `Dosya okunamadı/bulunamadı: ${error.message}`);
+    return null;
+  }
+}
+
+/** SHA, son PR ve tablo satırlarının başlıkla aynı olduğunu doğrular. */
+async function verifyPinRows(currentStatePath, codeTip, prodTip) {
+  const mainSha = await parseDocLine(currentStatePath, "CODE_MAIN_SHA", "[0-9a-f]{40}");
+  const deploySha = await parseDocLine(currentStatePath, "PRODUCTION_DEPLOY_SHA", "[0-9a-f]{40}");
+  const lastPr = await parseDocLine(currentStatePath, "LAST_MERGED_PR", "\\d+");
+  if (!mainSha || !deploySha || !lastPr) return;
+  const content = mainSha.content;
+  const baseline = content.match(/^PIN_SHA_BASELINE:\s*(\S+)\s*$/m)?.[1];
+  if (baseline === "LAST_PRODUCT_MERGE_DEPLOY" && mainSha.value !== deploySha.value) {
+    reportError("SHA_SYNC", `CODE_MAIN_SHA (${mainSha.value.slice(0, 8)}) != PRODUCTION_DEPLOY_SHA (${deploySha.value.slice(0, 8)})`);
+  } else {
+    reportSuccess("SHA_SYNC", "CODE_MAIN_SHA ve PRODUCTION_DEPLOY_SHA tutarlı");
+  }
+  const short = mainSha.value.slice(0, 8);
+  const rowChecks = [
+    ["ROW:PRODUCTION_DEPLOY_SHA", new RegExp(`^\\| PRODUCTION_DEPLOY_SHA \\| \`${deploySha.value.slice(0, 8)}`, "m")],
+    ["ROW:CODE_MAIN_SHA", new RegExp(`^\\| CODE_MAIN_SHA \\| \`${short}`, "m")],
+    ["ROW:LAST_MERGED_PR", new RegExp(`^\\| PR #${lastPr.value} \\| \\*\\*MERGED`, "m")],
+    ["ROW:MIGRATION_TIP", new RegExp(`^\\| CODE / PROD migration tip \\| \\*\\*${Number(codeTip)} / ${Number(prodTip)}\\*\\*`, "m")],
+    ["TITLE:LAST_MERGED_PR", new RegExp(`^# .*POST_PR${lastPr.value}\\b`, "m")]
+  ];
+  for (const [checker, regex] of rowChecks) {
+    if (regex.test(content)) {
+      reportSuccess(checker, "Tablo satırı başlıkla tutarlı");
+    } else {
+      reportError(checker, `Tablo satırı başlıkla uyuşmuyor (${regex})`);
+    }
+  }
+}
+
 async function main() {
   console.log("Canonical State Verification Başlıyor...\n");
 
@@ -120,6 +167,8 @@ async function main() {
   } else {
     reportSuccess("INVARIANT", "PROD TIP <= CODE TIP");
   }
+
+  await verifyPinRows(currentStatePath, currentStateCodeTip, currentStateProdTip);
 
   if (hasError) {
     console.error(`\n${ANSI_RED}‼️  Canonical state doğrulama BAŞARISIZ.${ANSI_RESET}`);

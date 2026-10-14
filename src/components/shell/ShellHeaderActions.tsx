@@ -278,7 +278,7 @@ export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeade
   }, [location.pathname]);
 
   useEffect(() => {
-    if (!usesPersonelInbox || !minimal) {
+    if (!usesPersonelInbox) {
       setPersonelInboxItems([]);
       return;
     }
@@ -303,7 +303,7 @@ export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeade
     return () => {
       cancelled = true;
     };
-  }, [usesPersonelInbox, minimal, location.pathname]);
+  }, [usesPersonelInbox, location.pathname]);
 
   useEffect(() => {
     if (!isPersonelRole || !minimal || shouldPreferDemoApi()) {

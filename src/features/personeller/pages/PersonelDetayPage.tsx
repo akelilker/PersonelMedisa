@@ -16,6 +16,7 @@ import {
   personelTabQueryValue,
   resolvePersonelTab
 } from "../components/personel-dosya/personel-dosya-tab-query";
+import { PersonelYenidenAktifAction, YENIDEN_AKTIF_BASARI } from "../components/yeniden-aktif/PersonelYenidenAktifAction";
 import { usePersonelKartGatewayReturn } from "../hooks/usePersonelKartGatewayReturn";
 import { getPersonelMissingFields } from "../personel-missing-info";
 
@@ -44,6 +45,8 @@ export function PersonelDetayPage() {
   const [isActionMenuOpen, setIsActionMenuOpen] = useState(false);
   const tabScrollRef = useRef<HTMLDivElement | null>(null);
 
+  const [yenidenAktifEdildi, setYenidenAktifEdildi] = useState(false);
+  useEffect(() => setYenidenAktifEdildi(false), [parsedPersonelId]);
   const detail = usePersonelDetail(parsedPersonelId, hasValidId, {
     canViewSurecler,
     canCreateSurec,
@@ -189,6 +192,21 @@ export function PersonelDetayPage() {
             className="personel-dosya-tab-scroll"
             data-testid="personel-dosya-tab-scroll"
           >
+            {yenidenAktifEdildi ? (
+              <p className="workspace-success" data-testid="personel-kart-yeniden-aktif-success">
+                {YENIDEN_AKTIF_BASARI}
+              </p>
+            ) : null}
+            <PersonelYenidenAktifAction
+              personel={personel}
+              testId="personel-kart-yeniden-aktif"
+              successInline={false}
+              onReactivated={(updated) => {
+                setYenidenAktifEdildi(true);
+                detail.setPersonel(updated);
+                void refetch();
+              }}
+            />
             {!canWriteOnPersonel ? (
               <p className="personel-write-scope-notice" role="status" data-testid="personel-write-scope-notice">
                 Bu işlem İK sorumlusu tarafından gerçekleştirilmelidir.

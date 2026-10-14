@@ -928,3 +928,38 @@ describe("AB) Kullanıcı Paneli: açıklama/meta notları yok; Giriş / Çıkı
     expect(all).toContain("Giriş / Çıkış Geçmişim");
   });
 });
+
+describe("AC) Yeniden Aktif, yazma rolü, yetkisiz sayfası, gelen kutusu, durum pin'i (t900 A)", () => {
+  const read = (p: string) => readFileSync(resolve(p), "utf8");
+  it("Yeniden Aktif: Kart + Süreç Genel panelinde, izin + PASIF koşulu, onay ve zorunlu gerekçe", () => {
+    const action = read("src/features/personeller/components/yeniden-aktif/PersonelYenidenAktifAction.tsx");
+    expect(action).toContain('personel.aktif_durum !== "PASIF"');
+    expect(action).toContain('hasPermission("personeller.reaktif")');
+    expect(action).toContain("AppActionDialog");
+    expect(action).toMatch(/required: true/);
+    expect(action).toContain("Gerekçe En Az 10 Karakter Olmalıdır.");
+    expect(action).toContain('"Personel Yeniden Aktif Edildi."');
+    expect(read("src/api/endpoints.ts")).toContain("/yeniden-aktif");
+    expect(read("src/features/personeller/pages/PersonelDetayPage.tsx")).toContain("<PersonelYenidenAktifAction");
+    expect(read("src/features/kayit/components/KayitSurecPersonelGenelPanel.tsx")).toContain("<PersonelYenidenAktifAction");
+  });
+  it("assertWriteRole ad tabanlı açılımda BOLUM_YONETICISI yok", () => {
+    const c = read("api/src/Controllers/PersonellerController.php");
+    expect(c).toContain("$legacyRoles = ['MUHASEBE'];");
+    expect(read("api/src/Services/Personel/PersonelOrganizasyonDegisikligiService.php")).not.toMatch(/\['BOLUM_YONETICISI', 'MUHASEBE'\]/);
+  });
+  it("Yetkisiz sayfasında QR notu yok", () => {
+    expect(read("src/app/routes.tsx")).not.toMatch(/QR giriş\/çıkış yalnızca/);
+  });
+  it("Gelen kutusu modül sayfalarında da yüklenir (minimal koşulu yok)", () => {
+    const s = read("src/components/shell/ShellHeaderActions.tsx");
+    expect(s).toContain("if (!usesPersonelInbox) {");
+    expect(s).not.toContain("if (!usesPersonelInbox || !minimal) {");
+  });
+  it("verify-canonical-state SHA, PR ve tablo satırlarını kontrol eder", () => {
+    const v = read("scripts/verify-canonical-state.mjs");
+    for (const k of ["SHA_SYNC", "ROW:CODE_MAIN_SHA", "ROW:LAST_MERGED_PR", "ROW:MIGRATION_TIP", "TITLE:LAST_MERGED_PR"]) {
+      expect(v).toContain(k);
+    }
+  });
+});

@@ -523,7 +523,7 @@ $baEmptyGlobal = invokeZimmetHttp($pdo, $baEmpty, 'GET', '/zimmetler', [], [], [
 zimmetAssert($baEmptyGlobal['status'] === 403, 'BA empty allowedSubeIds global list → 403');
 
 $muhCreate = invokeZimmetHttp($pdo, $muhasebe, 'POST', '/zimmetler', array_merge($createPayload, ['personel_id' => 20]));
-zimmetAssert($muhCreate['status'] === 403, 'MUHASEBE create → 403 (operational write narrowed)');
+zimmetAssert($muhCreate['status'] !== 403, 'MUHASEBE create yetkili (t900: personeller.update rol varsayılanında)');
 
 $ikCreate = invokeZimmetHttp($pdo, $ik, 'POST', '/zimmetler', array_merge($createPayload, ['personel_id' => 20]));
 zimmetAssert($ikCreate['status'] === 201, 'IK_SORUMLUSU create → 201');

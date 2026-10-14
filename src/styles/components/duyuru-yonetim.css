@@ -1,0 +1,10 @@
+/* t900 B: Ayarlar > Duyurular (oluştur + liste). Yalnız dikey kaydırma. */
+.duyuru-yonetim-body { display: flex; flex-direction: column; gap: 16px; padding: 8px; overflow-x: hidden; }
+.duyuru-yonetim-form { display: flex; flex-direction: column; gap: 10px; }
+.duyuru-yonetim-dates { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.duyuru-yonetim-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.duyuru-yonetim-item { display: flex; flex-direction: column; gap: 2px; padding: 8px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.08); }
+.duyuru-yonetim-item span { opacity: 0.75; font-size: 0.85rem; }
+@media (max-width: 640px) {
+  .duyuru-yonetim-dates { grid-template-columns: minmax(0, 1fr); }
+}

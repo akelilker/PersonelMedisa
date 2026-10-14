@@ -56,7 +56,7 @@ export function PersonelSelfServiceDuyurularPage() {
       ) : null}
       {!loading && !error && items.length === 0 ? (
         <p className="self-service-muted" data-testid="personel-duyurular-empty">
-          Henüz duyuru bulunmuyor
+          Henüz Duyuru Yok.
         </p>
       ) : null}
       {!loading && items.length > 0 ? (

@@ -139,9 +139,8 @@ describe("S1 canonical role consolidation", () => {
   });
 
   it("narrows MUHASEBE operational writes", () => {
+    // t900: İlker kararı — MUHASEBE personel oluşturma/güncelleme yetkisini rol varsayılanında tutar.
     const denied = [
-      "personeller.create",
-      "personeller.update",
       "personeller.import.apply",
       "personeller.test_fixture.classify",
       "personeller.test_fixture.archive",

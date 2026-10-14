@@ -254,6 +254,8 @@ class RolePermissions
         'MUHASEBE' => [
             'personeller.view',
             'personeller.view.sube',
+            'personeller.create',
+            'personeller.update',
             'personeller.detail.view',
             'personeller.ucret.view',
             'maas_hesaplama.view',

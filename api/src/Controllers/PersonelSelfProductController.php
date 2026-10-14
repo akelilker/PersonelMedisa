@@ -179,6 +179,19 @@ class PersonelSelfProductController
         }
     }
 
+    public static function duyuruList(Request $request)
+    {
+        $user = AuthMiddleware::authenticate($request, true);
+        RolePermissions::assert($user, 'duyurular.manage');
+        try {
+            JsonResponse::success(DuyuruService::listManaged(self::pdo()));
+        } catch (PersonelSelfProductException $e) {
+            JsonResponse::error($e->getHttpStatus(), $e->getErrorCode(), $e->getMessage(), $e->getField());
+        } catch (\Throwable $e) {
+            JsonResponse::serverError('Duyurular yuklenemedi.');
+        }
+    }
+
     public static function duyuruCreate(Request $request)
     {
         $user = AuthMiddleware::authenticate($request, true);

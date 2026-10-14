@@ -25,6 +25,7 @@ export const endpoints = {
     geriBildirimler: "/me/geri-bildirimler",
     duyurular: "/me/duyurular",
     duyuruOkundu: (id: number | string) => `/me/duyurular/${id}/okundu`,
+    duyuruYonetim: "/duyurular",
     profilFoto: "/me/profil-foto",
     inboxNotifications: "/me/inbox-notifications",
     ackInboxPopup: (id: number | string) => `/me/inbox-notifications/${id}/ack-popup`

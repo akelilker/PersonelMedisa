@@ -943,10 +943,10 @@ describe("AC) Yeniden Aktif, yazma rolü, yetkisiz sayfası, gelen kutusu, durum
     expect(read("src/features/personeller/pages/PersonelDetayPage.tsx")).toContain("<PersonelYenidenAktifAction");
     expect(read("src/features/kayit/components/KayitSurecPersonelGenelPanel.tsx")).toContain("<PersonelYenidenAktifAction");
   });
-  it("assertWriteRole ad tabanlı açılımda BOLUM_YONETICISI yok", () => {
+  it("assertWriteRole ad tabanlı açılım yok (t900 B: tamamen kaldırıldı)", () => {
     const c = read("api/src/Controllers/PersonellerController.php");
-    expect(c).toContain("$legacyRoles = ['MUHASEBE'];");
-    expect(read("api/src/Services/Personel/PersonelOrganizasyonDegisikligiService.php")).not.toMatch(/\['BOLUM_YONETICISI', 'MUHASEBE'\]/);
+    expect(c).not.toContain("$legacyRoles");
+    expect(read("api/src/Services/Personel/PersonelOrganizasyonDegisikligiService.php")).not.toMatch(/'MUHASEBE'/);
   });
   it("Yetkisiz sayfasında QR notu yok", () => {
     expect(read("src/app/routes.tsx")).not.toMatch(/QR giriş\/çıkış yalnızca/);
@@ -961,5 +961,40 @@ describe("AC) Yeniden Aktif, yazma rolü, yetkisiz sayfası, gelen kutusu, durum
     for (const k of ["SHA_SYNC", "ROW:CODE_MAIN_SHA", "ROW:LAST_MERGED_PR", "ROW:MIGRATION_TIP", "TITLE:LAST_MERGED_PR"]) {
       expect(v).toContain(k);
     }
+  });
+});
+
+describe("AD) Duyuru yönetimi, Muhasebe yazma varsayılanı, mükerrer hesap raporu, harici havuz kararı (t900 B)", () => {
+  const read = (p: string) => readFileSync(resolve(p), "utf8");
+  it("Ayarlar > Duyurular yalnız duyurular.manage ile; modal geri satırı ve form alanları", () => {
+    const shell = read("src/components/shell/ShellHeaderActions.tsx");
+    expect(shell).toContain('hasPermission("duyurular.manage")');
+    expect(shell).toContain('data-testid="settings-duyurular"');
+    const modal = read("src/features/yonetim/duyurular/DuyuruYonetimModal.tsx");
+    expect(modal).toContain("SurecInlineBackButton");
+    for (const name of ["duyuru-baslik", "duyuru-aciklama", "duyuru-yayin", "duyuru-bitis"]) expect(modal).toContain(`name="${name}"`);
+    expect(modal).toContain("highlightFieldErrors");
+    expect(modal).toContain("formatIsoDateDetail");
+    expect(read("api/src/Router.php")).toMatch(/'\/duyurular' && \$method === 'GET'/);
+    expect(read("api/src/Controllers/PersonelSelfProductController.php")).toMatch(/function duyuruList[\s\S]*?duyurular\.manage/);
+  });
+  it("Personel duyuru boş metni Title Case", () => {
+    expect(read("src/features/self-service/pages/PersonelSelfServiceDuyurularPage.tsx")).toContain("Henüz Duyuru Yok.");
+  });
+  it("MUHASEBE personel oluşturma/güncelleme rol varsayılanında (backend + ön yüz)", () => {
+    const php = read("api/src/Auth/RolePermissions.php");
+    const muh = php.slice(php.indexOf("'MUHASEBE' => ["), php.indexOf("'BIRIM_AMIRI' => ["));
+    expect(muh).toContain("'personeller.create'");
+    expect(muh).toContain("'personeller.update'");
+    const ts = read("src/lib/authorization/role-permissions.ts");
+    const muhTs = ts.slice(ts.indexOf("  MUHASEBE: ["), ts.indexOf("]", ts.indexOf("  MUHASEBE: [")));
+    expect(muhTs).toContain('"personeller.create"');
+    expect(muhTs).toContain('"personeller.update"');
+  });
+  it("mükerrer hesap raporu salt okuma; harici havuz kararı belgede", () => {
+    expect(read("api/bin/mukerrer-hesap-raporu.php")).toContain("SET SESSION TRANSACTION READ ONLY");
+    const backlog = read("docs/guncel/146-post-pr402-canonical-backlog.md");
+    expect(backlog).toContain("BL-HARICI-HAVUZ-UI");
+    expect(backlog).toContain("BL-MUKERRER-HESAP");
   });
 });

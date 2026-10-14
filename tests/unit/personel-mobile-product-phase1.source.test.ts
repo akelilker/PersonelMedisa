@@ -123,7 +123,7 @@ describe("PERSONEL mobile product phase 1 shell", () => {
     expect(talepler).not.toContain("fetchInboxNotifications");
 
     const duyurular = read("src/features/self-service/pages/PersonelSelfServiceDuyurularPage.tsx");
-    expect(duyurular).toContain("Henüz duyuru bulunmuyor");
+    expect(duyurular).toContain("Henüz Duyuru Yok.");
     expect(duyurular).toContain("fetchSelfDuyurular");
     expect(duyurular).not.toContain("fetchInboxNotifications");
 

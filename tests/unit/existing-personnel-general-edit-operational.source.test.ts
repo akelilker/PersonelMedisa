@@ -69,11 +69,11 @@ const PROTECTED_ORG_KEYS = [
 ] as const;
 
 describe("existing personnel general edit operational close", () => {
-  it("IK has personeller.update; BIRIM_AMIRI / MUHASEBE / PERSONEL do not", () => {
+  it("IK / MUHASEBE have personeller.update; BIRIM_AMIRI / PERSONEL do not", () => {
     expect(hasRolePermission("IK_SORUMLUSU", "personeller.update")).toBe(true);
     expect(hasRolePermission("IK_PERSONELI", "personeller.update")).toBe(true);
     expect(hasRolePermission("BIRIM_AMIRI", "personeller.update")).toBe(false);
-    expect(hasRolePermission("MUHASEBE", "personeller.update")).toBe(false);
+    expect(hasRolePermission("MUHASEBE", "personeller.update")).toBe(true);
     expect(hasRolePermission("PERSONEL", "personeller.update")).toBe(false);
   });
 

@@ -441,6 +441,8 @@ const BASE_ROLE_PERMISSIONS: Record<
   MUHASEBE: [
     "personeller.view",
     "personeller.view.sube",
+    "personeller.create",
+    "personeller.update",
     "personeller.detail.view",
     "personeller.ucret.view",
     "mevzuat_parametreleri.view",

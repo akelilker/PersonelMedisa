@@ -497,11 +497,6 @@ final class RolePermissionsBridge
     public static function canWritePersonel(array $user): bool
     {
         // GENEL_YONETICI rol adı tek başına yazma açmaz; etkin izin (DENY dahil) esastır.
-        return \Medisa\Api\Auth\RolePermissions::has($user, 'personeller.update')
-            || in_array(
-                OrgScope::normalizeRole($user),
-                ['MUHASEBE'],
-                true
-            );
+        return \Medisa\Api\Auth\RolePermissions::has($user, 'personeller.update');
     }
 }

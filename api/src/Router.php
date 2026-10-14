@@ -166,6 +166,9 @@ class Router
         if ($method === 'POST' && preg_match('#^/me/duyurular/(\d+)/okundu$#', $path, $matches)) {
             PersonelSelfProductController::duyuruOkundu($this->request, $matches[1]);
         }
+        if ($path === '/duyurular' && $method === 'GET') {
+            PersonelSelfProductController::duyuruList($this->request);
+        }
         if ($path === '/duyurular' && $method === 'POST') {
             PersonelSelfProductController::duyuruCreate($this->request);
         }

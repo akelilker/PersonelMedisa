@@ -291,10 +291,10 @@ try {
     $istisnaExec = static function (array $v) use ($istisna): void {
         $istisna->execute(array_merge([$v[0], $v[0]], array_slice($v, 1)));
     };
-    // MUHASEBE (4): bordro_on_izleme.view DENY, personeller.create ALLOW, süresi dolmuş ALLOW, gelecekte ALLOW, iptal edilmiş DENY
+    // MUHASEBE (4): bordro_on_izleme.view DENY, isg.view ALLOW, süresi dolmuş ALLOW, gelecekte ALLOW, iptal edilmiş DENY
     $istisnaExec([4, 'bordro_on_izleme.view', 'DENY', null, '2026-01-01 00:00:00', null, 'MUHASEBE', 'test deny']);
-    $istisnaExec([4, 'personeller.create', 'ALLOW', null, '2026-01-01 00:00:00', null, 'MUHASEBE', 'test allow']);
-    $istisnaExec([4, 'personeller.update', 'ALLOW', null, '2026-01-01 00:00:00', '2026-01-02 00:00:00', 'MUHASEBE', 'expired']);
+    $istisnaExec([4, 'isg.view', 'ALLOW', null, '2026-01-01 00:00:00', null, 'MUHASEBE', 'test allow']);
+    $istisnaExec([4, 'personeller.reaktif', 'ALLOW', null, '2026-01-01 00:00:00', '2026-01-02 00:00:00', 'MUHASEBE', 'expired']);
     $istisnaExec([4, 'personeller.delete', 'ALLOW', null, '2099-01-01 00:00:00', null, 'MUHASEBE', 'future']);
     $istisnaExec([4, 'finans.view', 'DENY', null, '2026-01-01 00:00:00', null, 'MUHASEBE', 'iptal edilecek']);
     $revokedId = (int) $pdo->lastInsertId();
@@ -302,15 +302,15 @@ try {
     yiAssert(true, 'istisna yalnız bir kez iptal edilebilir (ilk iptal kabul)');
 
     $loaded = UserYetkiIstisnaSchema::loadActive($pdo, 4);
-    yiAssert(count($loaded) === 3 && array_column($loaded, 'permission') === ['bordro_on_izleme.view', 'personeller.create', 'personeller.delete'],
+    yiAssert(count($loaded) === 3 && array_column($loaded, 'permission') === ['bordro_on_izleme.view', 'isg.view', 'personeller.delete'],
         'tek sorgu yüklemesi: iptal edilen ve süresi dolan satır gelmez');
 
     $muhToken = yiToken(4, 'MUHASEBE');
     $me = yiHttp($db, 'benim', ['token' => $muhToken]);
     $eff = $me['payload']['data']['effective_permissions'];
     yiAssert(!in_array('bordro_on_izleme.view', $eff, true), 'gerçek istek: DENY rol varsayılanını kapatır');
-    yiAssert(in_array('personeller.create', $eff, true) && ($me['payload']['data']['kaynaklar']['personeller.create'] ?? '') === EffectivePermissionResolver::SOURCE_USER_ALLOW, 'gerçek istek: ALLOW izin verir (USER_ALLOW)');
-    yiAssert(!in_array('personeller.update', $eff, true) && !in_array('personeller.delete', $eff, true), 'gerçek istek: süresi dolmuş / başlamamış ALLOW yok');
+    yiAssert(in_array('isg.view', $eff, true) && ($me['payload']['data']['kaynaklar']['isg.view'] ?? '') === EffectivePermissionResolver::SOURCE_USER_ALLOW, 'gerçek istek: ALLOW izin verir (USER_ALLOW)');
+    yiAssert(!in_array('personeller.reaktif', $eff, true) && !in_array('personeller.delete', $eff, true), 'gerçek istek: süresi dolmuş / başlamamış ALLOW yok');
     yiAssert(in_array('finans.view', $eff, true) === RolePermissions::has(['rol' => 'MUHASEBE'], 'finans.view'), 'gerçek istek: iptal edilmiş DENY etkisiz');
     $login = yiHttp($db, 'login', ['username' => 'u4', 'password' => 'YiSeedPass-24chars!!']);
     yiAssert(yiSorted($login['payload']['data']['user']['effective_permissions']) === yiSorted($eff), 'login yanıtı /auth/yetkiler ile aynı etkin izinleri taşır');
@@ -337,7 +337,7 @@ try {
     yiAssert($blocked('DELETE FROM user_yetki_istisnalari WHERE id = ?', [$revokedId]), 'istisna DELETE engellenir');
     yiAssert($blocked("UPDATE user_yetki_istisnalari SET iptal_edildi_at = UTC_TIMESTAMP(), iptal_eden_user_id = 1, iptal_nedeni = 'SURE_DOLDU' WHERE id = ?", [$revokedId]), 'iptal edilmiş istisna ikinci kez güncellenemez');
     yiAssert($blocked("UPDATE user_yetki_istisnalari SET etki = 'ALLOW' WHERE permission = 'bordro_on_izleme.view'"), 'istisna çekirdek alanı (etki) değişmez');
-    yiAssert($blocked("UPDATE user_yetki_istisnalari SET gecerlilik_bitis = '2099-01-01 00:00:00', iptal_edildi_at = UTC_TIMESTAMP(), iptal_nedeni = 'MANUEL' WHERE permission = 'personeller.create'"), 'iptal sırasında süre değiştirilemez');
+    yiAssert($blocked("UPDATE user_yetki_istisnalari SET gecerlilik_bitis = '2099-01-01 00:00:00', iptal_edildi_at = UTC_TIMESTAMP(), iptal_nedeni = 'MANUEL' WHERE permission = 'isg.view'"), 'iptal sırasında süre değiştirilemez');
     $chk = false;
     try {
         $istisnaExec([4, 'x.y', 'ALLOW', null, '2026-02-01 00:00:00', '2026-01-01 00:00:00', 'MUHASEBE', 'ters']);
@@ -345,7 +345,7 @@ try {
         $chk = true;
     }
     yiAssert($chk, 'bitiş başlangıçtan önce olamaz (CHECK)');
-    $pdo->exec("INSERT INTO user_yetki_auditleri (aksiyon, aktor_user_id, aktor_username_snapshot, hedef_user_id, hedef_username_snapshot, hedef_rol, permission, etki, gerekce) VALUES ('VER', 1, 'u1', 4, 'u4', 'MUHASEBE', 'personeller.create', 'ALLOW', 'test')");
+    $pdo->exec("INSERT INTO user_yetki_auditleri (aksiyon, aktor_user_id, aktor_username_snapshot, hedef_user_id, hedef_username_snapshot, hedef_rol, permission, etki, gerekce) VALUES ('VER', 1, 'u1', 4, 'u4', 'MUHASEBE', 'isg.view', 'ALLOW', 'test')");
     yiAssert($blocked('UPDATE user_yetki_auditleri SET gerekce = ?', ['x']), 'audit UPDATE engellenir');
     yiAssert($blocked('DELETE FROM user_yetki_auditleri'), 'audit DELETE engellenir');
     $audit = yiHttp($db, 'audit', ['token' => $gyToken, 'query' => ['kullanici_id' => '4']]);

@@ -713,6 +713,11 @@ export function hasSessionPermission(
     return false;
   }
   if (session.permissions_hydrated === true) {
+    // Önceki sürümde yalnız login listesiyle saklanan oturumda süre bilgisi
+    // olmayabilir. İlk tam snapshot gelmeden bu listeye production'da güvenme.
+    if (session.permissions_source === "server" && !Array.isArray(session.expiring_allows) && isRealBackendOnlyMode()) {
+      return false;
+    }
     const list = session.user.effective_permissions;
     return Array.isArray(list) && list.includes(permission);
   }

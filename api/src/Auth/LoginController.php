@@ -170,14 +170,20 @@ class LoginController
 
         // Etkin izinler (rol varsayılanı + self-service + kişiye özel istisnalar);
         // frontend'in tek kaynağı olacak (P5). Karar sahibi EffectivePermissionResolver.
-        $userPayload['effective_permissions'] = EffectivePermissionResolver::effectivePermissions([
+        $permissionUser = [
             'id' => (int) $user['id'],
             'rol' => $rol,
             'personel_id' => $userPayload['personel_id'] ?? null,
             'personel_tipi_ad' => $userPayload['personel_tipi_ad'] ?? null,
             'sube_ids' => $subeIds,
             'yetki_istisnalari' => UserYetkiIstisnaSchema::loadActive($pdo, (int) $user['id']),
-        ]);
+        ];
+        // Login ve /auth/yetkiler aynı kaynak/süre bilgisini taşır. İlk ayrı
+        // okuma başarısız olsa da süreli ALLOW istemcide zamanında kapanır.
+        $kaynaklar = EffectivePermissionResolver::effectivePermissionSources($permissionUser);
+        $userPayload['effective_permissions'] = array_keys($kaynaklar);
+        $userPayload['kaynaklar'] = $kaynaklar;
+        $userPayload['istisnalar'] = $permissionUser['yetki_istisnalari'];
 
         $response = [
             'token' => $token,

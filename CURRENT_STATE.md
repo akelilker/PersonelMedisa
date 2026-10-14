@@ -4,9 +4,9 @@ LAST_VERIFIED_PRODUCTION_MIGRATION_TIP: 100
 LAST_VERIFIED_PRODUCTION_MIGRATION_EVIDENCE: APPLY_100_38222514124 backup readback VERIFIED; diagnostics 38226423992 ledger PROD_TIP=100 PENDING=NONE (preflight job NO_PENDING_MIGRATIONS yüzünden kırmızı; tip okuması 100)
 FRESH_PRODUCTION_MIGRATION_READBACK: MIGRATION_100_APPLY_38222514124_LEDGER_PROD_TIP_100
 PRODUCTION_MIGRATION_PENDING: 0
-PRODUCTION_DEPLOY_SHA: f14ddbe897bf8e64b35d9320cfac55cb427b1758
-CODE_MAIN_SHA: f14ddbe897bf8e64b35d9320cfac55cb427b1758
-LAST_MERGED_PR: 520
+PRODUCTION_DEPLOY_SHA: fb1e3708e44b304700ead79895fe9a46df8ee1e0
+CODE_MAIN_SHA: fb1e3708e44b304700ead79895fe9a46df8ee1e0
+LAST_MERGED_PR: 560
 ACTIVE_BACKLOG_OWNER: docs/guncel/146-post-pr402-canonical-backlog.md
 PIN_SHA_BASELINE: LAST_PRODUCT_MERGE_DEPLOY
 DOCS_ONLY_CLOSURE_THIS_PIN: NO
@@ -30,8 +30,8 @@ DOCS_ONLY_CLOSURE_THIS_PIN: NO
 | Migration 099 | **APPLIED / SUCCESS** | `099_user_kalici_silme_auditleri.sql` (Kalıcı Sil audit + korunan hesaplar 10/9) — APPLY run `37911294869` (Apply 099 kalici sil migration #1; environment `kalici-sil-099-apply` onayı akelilker) worker SUCCEEDED, backup `medisa-pre-kalicisil-099-kalici-apply-37911294869-1-20261009-094506.sql` readback VERIFIED, postcheck PASS; ön koşul preflight Ops migration worker diagnostics **#96** run `37899949011` PASS (PROD_TIP **098**, pending yalnız **099**); standart Apply cPanel migrations kullanılmadı |
 | Migration 100 | **APPLIED** | `100_user_yetki_istisnalari.sql` — Apply run `38222514124` SUCCESS, backup readback VERIFIED; diagnostics `38226423992` ledger PROD_TIP **100**, pending NONE. Tablo yoksa okuma hâlâ boş döner; bu kurulumda tablo uygulanmış durumda. |
 | LAST_VERIFIED production tip | **100** | Apply `38222514124` + diagnostics `38226423992` ledger `PROD_TIP=100`. Diagnostics workflow sonucu BLOCKED / exit 1: uygulanacak migration kalmadığı için (`NO_PENDING_MIGRATIONS`). Ayrı yeşil postcheck job'ı yok. |
-| PRODUCTION_DEPLOY_SHA | `f14ddbe8…` | Last **product** deploy marker — Deploy cPanel **#1253** run `37968702102` **SUCCESS** (merge **#520**); log `FINAL_SHA_GET=SUCCESS` + post-deploy smoke (anonim + kimlikli read-only) OK. Canlı `.deploy-sha` public okunamıyor (403); bağımsız canlı SHA readback yok |
-| CODE_MAIN_SHA | `f14ddbe8…` | GitHub `refs/heads/main` (`git ls-remote`) = **PRODUCTION_DEPLOY_SHA** — last **product** merge baseline (**#520**); docs-only state PRs do **not** advance `LAST_MERGED_PR` / SHA pins |
+| PRODUCTION_DEPLOY_SHA | `fb1e3708…` | Last **product** deploy marker — Deploy cPanel run `38519660078` **SUCCESS** (merge **#560**); log `CURRENT_DEPLOY_SHA=fb1e3708…`, `FINAL_SHA_GET=SUCCESS`, `Deploy SHA finalization verified`, `API_UPLOAD_PARITY=SUCCESS`. Smoke: API health, auth guard, frontend, assets, kimlikli `GET /api/auth/smoke-read` (yazma yok). Canlı `.deploy-sha` public okunamıyor (403) |
+| CODE_MAIN_SHA | `fb1e3708…` | GitHub `refs/heads/main` merge **#560** = doğrulanan **PRODUCTION_DEPLOY_SHA**. Docs-only pin güncellemesi bu ürün SHA'sını değiştirmez |
 | PR #470 | **MERGED / DEPLOYED** | UI correction batch (Level 2+ back nav, Personel Kartı missing-info gateway, duplicate CTA cleanup, Vazgeç fix, /self gateway polish) |
 | PR #472 | **MERGED / DEPLOYED** | Self-service closure (PR470 follow-up) — `6b7dbba6…`; Deploy cPanel **#1203** run `37018359986` SUCCESS |
 | PR #475 | **MERGED / DEPLOYED** | `fix(ui): bugun personel durumu sube secimi grid + sade sube detayi` — `939c5f87…`; Deploy cPanel **#1206** run `37069634704` SUCCESS |
@@ -51,6 +51,7 @@ DOCS_ONLY_CLOSURE_THIS_PIN: NO
 | PR #518 | **MERGED / DEPLOYED** | Kalıcı Sil + 099 migration hazırlığı ve Kullanıcı Yönetimi düzeltmeleri — `9d921d7e…`; Deploy cPanel **#1251** run `37871444030` SUCCESS |
 | PR #519 | **MERGED / DEPLOYED** | ops: 099 Kalıcı Sil PREFLIGHT/APPLY workflow'ları — `1a151fee…`; Deploy cPanel **#1252** run `37896873521` SUCCESS; 099 preflight run `37899949011` + APPLY run `37911294869` bu SHA üzerinde |
 | PR #520 | **MERGED / DEPLOYED** | `fix(yonetim): pm_smoke_ro_production hesabini listeden cikar` — `f14ddbe8…`; Deploy cPanel **#1253** run `37968702102` SUCCESS (`FINAL_SHA_GET=SUCCESS`, smoke OK) |
+| PR #560 | **MERGED / DEPLOYED** | Kişisel DENY personel yazma kapısı ve açık oturum etkin izinleri — `fb1e3708…`; Deploy cPanel run `38519660078` SUCCESS (`FINAL_SHA_GET=SUCCESS`, smoke OK) |
 | Attendance / QR phase | **CLOSED** | QR attendance + saha rollout + puantaj doğrulaması + personel go-live tamamlandı |
 
 PRODUCTION_MUTATION_THIS_PIN: migration-only — **098** (Apply #57 run `37686359952`, birim 27/28 ad düzeltmesi) ve **099** (APPLY run `37911294869`; şema + korunan hesap kaydı 10/9) ayrı onaylı run'larla; bu pin kapsamında kayıtlı başka personel/yetki veri mutation yok. Önceki POST_PR512 pin: 0. Önceki POST_PR476 pin: 2 (personel 120 + 158 `calisan_kapsami` `IC_PERSONEL` → `DIS_KAYNAK` canlı düzeltme; readback doğrulandı) — aşağıdaki business truth tablosu geçerli.

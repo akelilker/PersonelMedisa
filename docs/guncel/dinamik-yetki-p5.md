@@ -1,6 +1,6 @@
 # Dinamik kullanıcı yetkisi — P5 (yetki ekranı)
 
-Durum: kod main'de (PR #532). Migration 100 canlıda uygulandı (Apply `38222514124`). Hassas kilit alanının ekrana bağlanması ve etkin izinlerin oturuma alınması bu çalışma ağacında yereldir; commit/merge/deploy yoktur.
+Durum: kod main'de (PR #532). Migration 100 canlıda uygulandı (Apply `38222514124`). Hassas kilit alanının ekrana bağlanması ve etkin izinlerin oturuma alınması PR #560 ile yayında (Deploy run `38519660078`, SHA `fb1e3708…`). Canlı yazma yapılmadı.
 
 ## Ne
 Genel Yönetici, mevcut Kullanıcı Yönetimi ekranında bir kullanıcıyı açınca o hesabın yetkisini görür ve değiştirir. Ayrı bir yetki uygulaması yoktur.

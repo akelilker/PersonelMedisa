@@ -1,6 +1,6 @@
 # Dinamik kullanıcı yetkisi — P4 (yeni Genel Yönetici başlangıcı)
 
-Durum: kod main'de (PR #531). Migration 100 canlıda uygulandı (Apply `38222514124`). Bu dosyadaki başlangıç profili o PR ile geldi. Ekranın kilit alanı ve personel DENY önceliği bu çalışma ağacında yereldir; commit/merge/deploy yoktur.
+Durum: kod main'de (PR #531). Migration 100 canlıda uygulandı (Apply `38222514124`). Bu dosyadaki başlangıç profili o PR ile geldi. Ekranın kilit alanı ve personel DENY önceliği PR #560 ile yayında (Deploy run `38519660078`, SHA `fb1e3708…`). Canlı yazma yapılmadı.
 
 ## Karar
 - Mevcut Genel Yöneticiler aynen kalır. Geriye dönük DENY yazılmaz; rol matrisi değişmez.

@@ -149,15 +149,11 @@ describe("personel yeniden aktif (PASIF -> AKTIF canonical lifecycle) source con
     }
   });
 
-  it("ships no new UI, modal or parallel form for reactivation", () => {
-    const ui = [
-      "src/features/personeller/pages/PersonellerPage.tsx",
-      "src/features/personeller/pages/PersonelDetayPage.tsx"
-    ];
-    for (const file of ui) {
-      const source = read(file);
-      expect(source).not.toContain("yeniden-aktif");
-      expect(source).not.toContain("reaktif");
-    }
+  it("reactivation UI is one shared action (t900): Kart + Süreç Genel, no parallel form", () => {
+    const action = read("src/features/personeller/components/yeniden-aktif/PersonelYenidenAktifAction.tsx");
+    expect(action).toContain("applyPersonelYenidenAktif");
+    expect(action).toContain('hasPermission("personeller.reaktif")');
+    expect(read("src/features/personeller/pages/PersonelDetayPage.tsx")).not.toContain("applyPersonelYenidenAktif");
+    expect(read("src/features/personeller/pages/PersonellerPage.tsx")).not.toContain("yeniden-aktif");
   });
 });

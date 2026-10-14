@@ -51,7 +51,8 @@ export const endpoints = {
     lifecycleBulkDryRun: "/personeller/lifecycle-bulk/dry-run",
     lifecycleBulkApply: "/personeller/lifecycle-bulk/apply",
     organizasyonDegisikligi: (id: number | string) => `/personeller/${id}/organizasyon-degisikligi`,
-    kaliciSubeDegisikligi: (id: number | string) => `/personeller/${id}/kalici-sube-degisikligi`
+    kaliciSubeDegisikligi: (id: number | string) => `/personeller/${id}/kalici-sube-degisikligi`,
+    yenidenAktif: (id: number | string) => `/personeller/${id}/yeniden-aktif`
   },
   personelUcretleri: {
     list: (personelId: number | string) => `/personeller/${personelId}/ucretler`,

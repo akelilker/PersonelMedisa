@@ -1280,7 +1280,9 @@ class PersonellerController
 
         // GENEL_YONETICI burada yok: personel yazması etkin izne bağlıdır.
         // Yeni atanan yönetici DENY ile yalnız görür; rol adı yazmayı açmaz.
-        $legacyRoles = ['BOLUM_YONETICISI', 'MUHASEBE'];
+        // BOLUM_YONETICISI rol varsayılanında personeller.create/update var; ad tabanlı açılım
+        // yalnız MUHASEBE için kalır (rol varsayılanında yazma izni yok, mevcut erişim korunur).
+        $legacyRoles = ['MUHASEBE'];
         if (in_array(OrgScope::normalizeRole($user), $legacyRoles, true)) {
             return;
         }

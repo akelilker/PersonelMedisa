@@ -1,7 +1,7 @@
 # 146 — Post-PR402 Canonical Backlog
 
-**Tür:** Aktif backlog otoritesi (POST_PR402 consolidation; **POST_PR520** pin refresh).
-**Product baseline (SHA pin):** `fb1e3708e44b304700ead79895fe9a46df8ee1e0` (PR **#560** last verified product merge+deploy); Deploy cPanel run `38519660078` SUCCESS (`FINAL_SHA_GET=SUCCESS`, `Deploy SHA finalization verified`, smoke OK). Docs-only pin commits do not replace this SHA.
+**Tür:** Aktif backlog otoritesi (POST_PR402 consolidation; **POST_PR562** pin refresh).
+**Product baseline (SHA pin):** `b3e84c61afb39a82497029fbeed27452dbedb182` (PR **#562** last verified product merge+deploy); Deploy cPanel run `38559772162` SUCCESS. Docs-only pin commits do not replace this SHA.
 **Migration tip:** code **100** / production **100** (pending **0**; Apply `38222514124` SUCCESS, diagnostics `38226423992` ledger PROD_TIP=100); historical: migration **099** (`099_user_kalici_silme_auditleri.sql`) **APPLIED** (APPLY run `37911294869` postcheck PASS; preflight run `37899949011` PROD_TIP **098**); migration **098** **APPLIED** (Apply cPanel migrations **#57** run `37686359952`); migration **097** (`097_qr_attendance_location_audit.sql`) **APPLIED** (Apply cPanel migrations **#56** run `37391130248`; readback Ops migration worker diagnostics **#90** run `37391796990` PROD_TIP **097**); migration **096** (`096_personel_bordro_okumalari.sql`) **APPLIED** (canonical apply `37021807281`; readback `37022115475` PROD_TIP **096**); migration **095** (`095_personel_cinsiyet.sql`) **APPLIED**; migration **094** (`094_attendance_no_event_day.sql`) **APPLIED** (production'da geçmiş).
 **Yasaklar bu belgede:** app code · migration apply · production mutation · remote branch delete · #395–#470 reopen.
 
@@ -88,7 +88,7 @@ Açık teknik gap: **NONE**.
 
 | ID | Konu | Not |
 | --- | --- | --- |
-| `BL-SOURCE-LOCK-DRIFT` | Pin testleri eski deploy/tip iddiaları | **CLOSED / HISTORICAL** — POST_PR520 refresh: CURRENT_STATE + 110 + source-lock test (`LAST_MERGED_PR: 520`, SHA `f14ddbe8…`, Deploy #1253, tip **099 / 099**, `DOCS_ONLY_CLOSURE_THIS_PIN: NO`) hizalandı; artık aktif teknik gap DEĞİL |
+| `BL-SOURCE-LOCK-DRIFT` | Pin testleri eski deploy/tip iddiaları | **CLOSED / HISTORICAL** — POST_PR562 refresh: CURRENT_STATE + 110 + source-lock test (`LAST_MERGED_PR: 562`, SHA `b3e84c61…`, Deploy run `38559772162`, tip **100 / 100**, `DOCS_ONLY_CLOSURE_THIS_PIN: NO`) hizalandı; artık aktif teknik gap DEĞİL |
 
 ---
 

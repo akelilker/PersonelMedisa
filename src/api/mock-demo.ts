@@ -6319,6 +6319,17 @@ export function resolveDemoApiResponse(
     return ok(buildDemoPersonelDetail(personel));
   }
 
+  const personelReaktifMatch = pathname.match(/^\/personeller\/(\d+)\/yeniden-aktif$/);
+  if (personelReaktifMatch && method === "POST") {
+    const id = Number.parseInt(personelReaktifMatch[1], 10);
+    const personel = demoState.personeller.find((item) => item.id === id);
+    if (!personel) {
+      return null;
+    }
+    personel.aktif_durum = "AKTIF";
+    return ok(buildDemoPersonelDetail(personel));
+  }
+
   if (pathname === "/referans/calisma-lokasyonlari" && method === "GET") {
     return ok({
       items: [

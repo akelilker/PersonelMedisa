@@ -81,10 +81,7 @@ function UnauthorizedPage() {
   return (
     <section className="states-page" data-testid="yetkisiz-page">
       <h2>Yetkisiz Erişim</h2>
-      <p>
-        Bu ekranı görmek için yeterli yetkin yok. QR giriş/çıkış yalnızca bağlı ve uygun personel
-        hesabında açılır.
-      </p>
+      <p>Bu Ekranı Görmek İçin Yetkin Yok.</p>
       <Link to="/">Ana ekrana dön</Link>
     </section>
   );

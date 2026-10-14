@@ -143,7 +143,7 @@ describe("personel mobile/PWA self-service productization", () => {
   it("keeps yetkisiz fail-closed route copy consistent with QR entitlement", () => {
     const routes = read("src/app/routes.tsx");
     expect(routes).toContain('data-testid="yetkisiz-page"');
-    expect(routes).toContain("QR giriş/çıkış yalnızca bağlı ve uygun personel");
+    expect(routes).not.toContain("QR giriş/çıkış yalnızca");
     expect(routes).toContain('requirePermission="self_service.qr.scan"');
     expect(routes).toContain('requirePermission="self_service.qr.events.view"');
   });

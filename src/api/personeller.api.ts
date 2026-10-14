@@ -673,6 +673,24 @@ export async function applyPersonelKaliciSubeDegisikligi(
   return updated;
 }
 
+export async function applyPersonelYenidenAktif(
+  personelId: number | string,
+  payload: { gerekce: string },
+  options?: { idempotencyKey?: string }
+): Promise<Personel> {
+  const response = await apiRequest<ApiResponse<unknown>>(endpoints.personeller.yenidenAktif(personelId), {
+    method: "POST",
+    body: JSON.stringify(payload),
+    idempotencyKey: options?.idempotencyKey
+  });
+  const updated = normalizePersonel(response.data);
+  logAction({
+    action: "PERSONEL_UPDATE",
+    payload: { personel_id: updated.id, yeniden_aktif: true }
+  });
+  return updated;
+}
+
 export type PersonelImportDryRunRow = {
   satir_no: number;
   sicil_no: string;

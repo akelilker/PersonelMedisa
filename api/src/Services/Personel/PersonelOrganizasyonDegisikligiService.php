@@ -500,7 +500,7 @@ final class RolePermissionsBridge
         return \Medisa\Api\Auth\RolePermissions::has($user, 'personeller.update')
             || in_array(
                 OrgScope::normalizeRole($user),
-                ['BOLUM_YONETICISI', 'MUHASEBE'],
+                ['MUHASEBE'],
                 true
             );
     }

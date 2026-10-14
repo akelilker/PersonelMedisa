@@ -215,10 +215,7 @@ export function PersonelSelfServiceHomePage() {
     return (
       <section className="states-page" data-testid="personel-unbound-page">
         <h2>Personel bağlantısı yok</h2>
-        <p>
-          Hesabınız bir personel kaydına bağlı değil. QR giriş/çıkış ve kişisel özet bu yüzden
-          kapalıdır. Yöneticiniz hesabınızı bağladıktan sonra bu ekran açılır.
-        </p>
+        <p>Hesabınız bir personel kaydına bağlı değil.</p>
       </section>
     );
   }

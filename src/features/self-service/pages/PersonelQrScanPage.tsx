@@ -61,7 +61,7 @@ function mapScanError(error: unknown): string {
       return "Personel hesabınız aktif değil.";
     case "FORBIDDEN":
     case "UNAUTHORIZED":
-      return "Bu işlem için yetkiniz yok. QR okutma yalnızca uygun personel hesabında açılır.";
+      return "Bu işlem için yetkiniz yok.";
     case "QR_CONFIG_NOT_READY":
     case "QR_SCHEMA_NOT_READY":
       return "Şu an işlem yapılamıyor. Yöneticinize bildirin.";

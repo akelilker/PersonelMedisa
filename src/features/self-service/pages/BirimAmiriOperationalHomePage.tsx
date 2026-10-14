@@ -24,8 +24,6 @@ import {
   PASSIVE_CIKIS_WITHOUT_GIRIS_NOTICE,
   PASSIVE_GIRIS_WITH_OPEN_SHIFT_NOTICE
 } from "../components/OwnQrAttendanceBoxes";
-import { QrKioskModelNote } from "../components/QrKioskModelNote";
-import { QrPuantajExpectationNote } from "../components/QrPuantajExpectationNote";
 import { SelfServiceQrShortcuts } from "../components/SelfServiceQrShortcuts";
 import {
   formatBirimAmiriPersonelStatusLine,
@@ -185,12 +183,6 @@ export function BirimAmiriOperationalHomePage() {
             </div>
           </div>
         )}
-        {qrEnabled ? (
-          <>
-            <QrKioskModelNote />
-            <QrPuantajExpectationNote />
-          </>
-        ) : null}
       </section>
 
       {/* Rol bağımsız QR/kart hakkı: bağlı mavi yaka personeli olan BIRIM_AMIRI

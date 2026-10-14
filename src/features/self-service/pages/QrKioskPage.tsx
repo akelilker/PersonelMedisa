@@ -124,7 +124,7 @@ export function QrKioskPage() {
       <section className="qr-kiosk" data-testid="qr-kiosk-page">
         <header className="qr-kiosk__header">
           <h1>QR Giriş Ekranı</h1>
-          <p>Token için şube seçin. Bu seçim oturumdaki aktif şubeyi değiştirmez.</p>
+          <p>Şube seçin.</p>
         </header>
         <label htmlFor="qr-kiosk-local-sube">
           Şube
@@ -184,7 +184,6 @@ export function QrKioskPage() {
     <section className="qr-kiosk" data-testid="qr-kiosk-page">
       <header className="qr-kiosk__header">
         <h1>{status.token.sube.ad || "Şube"}</h1>
-        <p>Personel QR okutarak giriş/çıkış kaydı oluşturur.</p>
       </header>
       <div className="qr-kiosk__frame">
         <img src={status.dataUrl} alt="Şube QR kodu" width={420} height={420} />

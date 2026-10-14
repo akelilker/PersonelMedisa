@@ -899,3 +899,32 @@ describe("AA) Kullanıcı ekranında açıklama/meta/yol notu yok; Cinsiyet Gene
     expect(genel).toContain('label: "Cinsiyet"');
   });
 });
+
+describe("AB) Kullanıcı Paneli: açıklama/meta notları yok; Giriş / Çıkış Geçmişim kalır (t894)", () => {
+  const walk = (dir: string): string[] =>
+    readdirSync(resolve(dir), { withFileTypes: true }).flatMap((e) =>
+      e.isDirectory() ? walk(`${dir}/${e.name}`) : e.name.endsWith(".tsx") ? [`${dir}/${e.name}`] : []
+    );
+  const YASAK = [
+    /bağladıktan sonra bu ekran açılır/,
+    /QR giriş\/çıkış ve kişisel özet bu yüzden/,
+    /aktif şubeyi değiştirmez/,
+    /Personel QR okutarak giriş\/çıkış kaydı oluşturur/,
+    /QR okutma yalnızca uygun personel hesabında/,
+    /puantaja işlenir/,
+    /Kendi kimlik QR/,
+    /QrKioskModelNote|QrPuantajExpectationNote/
+  ];
+  it("self-service kaynaklarında yasak ifade yok", () => {
+    const hits: string[] = [];
+    for (const f of walk("src/features/self-service")) {
+      const s = readFileSync(resolve(f), "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+      for (const re of YASAK) if (re.test(s)) hits.push(`${f}: ${re}`);
+    }
+    expect(hits).toEqual([]);
+  });
+  it("Giriş / Çıkış Geçmişim bağlantısı korunur", () => {
+    const all = walk("src/features/self-service").map((f) => readFileSync(resolve(f), "utf8")).join("\n");
+    expect(all).toContain("Giriş / Çıkış Geçmişim");
+  });
+});

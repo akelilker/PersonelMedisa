@@ -4,7 +4,7 @@ Plan: dinamik kullanıcı bazlı yetki yönetimi v3. Bu aşama **yazma yapmaz**;
 K1/K3/K5 kuralları ve son-yetki-yöneticisi koruması P3'tedir.
 
 ## Kapsam
-- `api/migrations/100_user_yetki_istisnalari.sql` — **yalnız repoda; canlıya uygulanmadı.**
+- `api/migrations/100_user_yetki_istisnalari.sql` — **canlıda uygulandı** (Apply run `38222514124`, 2026-10-12, backup readback VERIFIED; diagnostics `38226423992` ledger PROD_TIP=100, pending NONE).
   - `user_yetki_istisnalari`: ALLOW/DENY, `sube_id` (NULL = global), `gecerlilik_baslangic`,
     `gecerlilik_bitis` (NULL = kalıcı), `veren_user_id`, `veren_actor_identity_id`,
     `hedef_rol_snapshot`, `gerekce`. Kayıt **silinmez**; yalnız bir kez iptal edilir

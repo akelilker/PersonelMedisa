@@ -1,6 +1,6 @@
 # Dinamik kullanıcı yetkisi — P4 (yeni Genel Yönetici başlangıcı)
 
-Durum: PR (MERGE=NO). Migration yok. Migration 100 değiştirilmedi ve canlıya uygulanmadı.
+Durum: kod main'de (PR #531). Migration 100 canlıda uygulandı (Apply `38222514124`). Bu dosyadaki başlangıç profili o PR ile geldi. Ekranın kilit alanı ve personel DENY önceliği bu çalışma ağacında yereldir; commit/merge/deploy yoktur.
 
 ## Karar
 - Mevcut Genel Yöneticiler aynen kalır. Geriye dönük DENY yazılmaz; rol matrisi değişmez.
@@ -16,9 +16,9 @@ Durum: PR (MERGE=NO). Migration yok. Migration 100 değiştirilmedi ve canlıya 
 ## Nerede
 `KullaniciYetkiYazmaService::rolDegisti`. Şema yoksa (migration 100 uygulanmamış) eskisi gibi 0 döner; kısıt yazılmaz, mevcut işlemler rol varsayılanıyla sürer.
 
-Kısıt, atama şema hazırken yapılır. Migration 100 canlıda yokken yeni atama bugünkü gibi tam yetkiyle oluşur ve sonradan kendiliğinden kısıtlanmaz. Kısıt, 100 uygulandıktan sonraki atamalarda başlar.
+Kısıt, atama şema hazırken yapılır. Migration 100 canlıda uygulandı (Apply `38222514124`). Şema olmayan bir kurulumda yeni atama tam yetkiyle oluşur ve sonradan kendiliğinden kısıtlanmaz. Kısıt, şema varken yapılan atamalarda başlar.
 
-Personel düzenleme, rol adına bakıp yazmayı açmaz. Etkin izin esastır. Bölüm yöneticisi ve muhasebe için eski yazma köprüsü durur.
+Personel düzenleme, rol adına bakıp yazmayı açmaz. Etkin izin esastır. Bölüm yöneticisi ve muhasebe için eski yazma köprüsü durur; açık ve geçerli kişisel DENY bu köprüden üstündür. Köprü silinmedi, muhasebe rol matrisine yazma izni eklenmedi.
 
 ## Bilinçli sınır
 - Şube kapsamlı istisna kapalı kalır.

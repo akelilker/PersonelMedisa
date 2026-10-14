@@ -1,9 +1,10 @@
 import { finalizeAuthSessionSube } from "../auth/auth-session-sube";
 import { isRealBackendOnlyMode } from "../config/app-env";
 import { canonicalizeUserRole } from "../lib/authorization/canonicalize-user-role";
+import { getEffectivePermissions } from "../lib/authorization/role-permissions";
 import { resolveSubeDisplayLabels } from "../lib/organizasyon/sube-display-label";
 import { flushPreAuthTelemetry } from "../logging/client-telemetry";
-import type { AuthSession, LoginCredentials } from "../types/auth";
+import type { AuthSession, ExpiringPermissionAllow, LoginCredentials } from "../types/auth";
 import { apiRequest, ApiRequestError } from "./api-client";
 import { endpoints } from "./endpoints";
 
@@ -131,6 +132,130 @@ function readSubeList(record: Record<string, unknown>): AuthSession["sube_list"]
   return out.map((item) => ({ ...item, ad: labels.get(item.id) ?? item.ad }));
 }
 
+function readPermissionList(value: unknown): string[] | null {
+  if (!Array.isArray(value)) {
+    return null;
+  }
+  const list: string[] = [];
+  for (const item of value) {
+    if (typeof item !== "string") {
+      continue;
+    }
+    const trimmed = item.trim();
+    if (trimmed) {
+      list.push(trimmed);
+    }
+  }
+  return list;
+}
+
+function earliestPermissionExpiryMs(value: unknown): number | null {
+  if (!Array.isArray(value)) {
+    return null;
+  }
+  let earliest: number | null = null;
+  for (const item of value) {
+    const record = toRecord(item);
+    const bitis = record ? readString(record.gecerlilik_bitis) : null;
+    if (!bitis) {
+      continue;
+    }
+    const parsed = permissionInstantMs(bitis);
+    if (parsed === null) {
+      continue;
+    }
+    if (earliest === null || parsed < earliest) {
+      earliest = parsed;
+    }
+  }
+  return earliest;
+}
+
+export type SessionPermissionSnapshot = {
+  permissions: string[];
+  refreshAtMs: number | null;
+  expiringAllows: ExpiringPermissionAllow[];
+};
+
+function permissionInstantMs(value: string): number | null {
+  const parsed = Date.parse(value.includes("T") ? value : `${value.replace(" ", "T")}Z`);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+/** Son okumada yalnız USER_ALLOW ve bitişi belli olan izinler. Kaynak yoksa tahmin edilmez. */
+export function readExpiringAllows(source: Record<string, unknown>): ExpiringPermissionAllow[] {
+  const kaynaklar = toRecord(source.kaynaklar);
+  const rows = source.istisnalar;
+  if (!kaynaklar || !Array.isArray(rows)) {
+    return [];
+  }
+  const out: ExpiringPermissionAllow[] = [];
+  for (const item of rows) {
+    const record = toRecord(item);
+    if (!record || readString(record.etki) !== "ALLOW") {
+      continue;
+    }
+    const permission = readString(record.permission);
+    const bitis = readString(record.gecerlilik_bitis);
+    if (!permission || !bitis || kaynaklar[permission] !== "USER_ALLOW") {
+      continue;
+    }
+    const endsAtMs = permissionInstantMs(bitis);
+    if (endsAtMs === null) {
+      continue;
+    }
+    out.push({ permission, ends_at_ms: endsAtMs });
+  }
+  return out;
+}
+
+/**
+ * Süresi dolmuş kişisel ALLOW'ı listeden çıkarır.
+ * Rol izni eklemez; DENY ile kapanmış izin geri açılmaz.
+ * Değişiklik yoksa null.
+ */
+export function dropExpiredAllows(session: AuthSession, nowMs: number): AuthSession | null {
+  if (session.permissions_hydrated !== true) {
+    return null;
+  }
+  const expiring = session.expiring_allows;
+  const list = session.user.effective_permissions;
+  if (!Array.isArray(expiring) || expiring.length === 0 || !Array.isArray(list)) {
+    return null;
+  }
+  const due = new Set(expiring.filter((item) => item.ends_at_ms <= nowMs).map((item) => item.permission));
+  if (due.size === 0) {
+    return null;
+  }
+  return {
+    ...session,
+    expiring_allows: expiring.filter((item) => item.ends_at_ms > nowMs),
+    user: {
+      ...session.user,
+      effective_permissions: list.filter((permission) => !due.has(permission))
+    }
+  };
+}
+
+/** GET /auth/yetkiler. Anahtar yoksa boş liste sayılmaz. */
+export async function fetchSessionPermissions(): Promise<SessionPermissionSnapshot> {
+  const response = await apiRequest<unknown>(endpoints.auth.yetkiler);
+  const root = toRecord(response);
+  const source = toRecord(root?.data) ?? root;
+  if (!source || !Object.prototype.hasOwnProperty.call(source, "effective_permissions")) {
+    throw new ApiRequestError("Etkin izin listesi doğrulanamadı.", 200, { code: "INVALID_RESPONSE" });
+  }
+  const permissions = readPermissionList(source.effective_permissions);
+  if (!permissions) {
+    throw new ApiRequestError("Etkin izin listesi doğrulanamadı.", 200, { code: "INVALID_RESPONSE" });
+  }
+  return {
+    permissions,
+    refreshAtMs: earliestPermissionExpiryMs(source.istisnalar),
+    expiringAllows: readExpiringAllows(source)
+  };
+}
+
 function extractErrorMessage(payload: unknown): string | null {
   const record = toRecord(payload);
   if (!record) {
@@ -246,6 +371,23 @@ function normalizeAuthSession(payload: unknown): AuthSession | null {
     }
   };
 
+  const permissionSource = userSource.effective_permissions ?? userSource.effectivePermissions;
+  const permissionKeyPresent =
+    Object.prototype.hasOwnProperty.call(userSource, "effective_permissions") ||
+    Object.prototype.hasOwnProperty.call(userSource, "effectivePermissions");
+  const permissions = permissionKeyPresent ? readPermissionList(permissionSource) : null;
+  if (permissions) {
+    draft.user.effective_permissions = permissions;
+    draft.permissions_hydrated = true;
+    draft.permissions_stale = false;
+    draft.permissions_source = "server";
+  } else if (permissionKeyPresent && Array.isArray(permissionSource) && permissionSource.length === 0) {
+    draft.user.effective_permissions = [];
+    draft.permissions_hydrated = true;
+    draft.permissions_stale = false;
+    draft.permissions_source = "server";
+  }
+
   return finalizeAuthSessionSube(draft);
 }
 
@@ -304,11 +446,15 @@ function createDemoSession(credentials: LoginCredentials): AuthSession {
     ui_profile: deriveUiProfile(role),
     sube_list: sube_list.length ? sube_list : undefined,
     active_sube_id: null,
+    permissions_hydrated: true,
+    permissions_stale: false,
+    permissions_source: "demo",
     user: {
       id: userId,
       ad_soyad: toDisplayName(credentials.username),
       rol: role,
-      sube_ids
+      sube_ids,
+      effective_permissions: [...getEffectivePermissions(role)]
     }
   });
 }

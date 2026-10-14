@@ -8,6 +8,7 @@ import {
   useState,
   type ReactNode
 } from "react";
+import { dropExpiredAllows, fetchSessionPermissions } from "../api/auth.api";
 import {
   login as loginWithStorage,
   clearSession as clearAuthEverywhere,
@@ -35,6 +36,26 @@ type AuthProviderProps = {
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
+
+function samePermissionList(left: string[] | undefined, right: string[]): boolean {
+  if (!left || left.length !== right.length) {
+    return false;
+  }
+  const seen = new Set(right);
+  return left.every((item) => seen.has(item));
+}
+
+function sameExpiringAllows(
+  left: AuthSession["expiring_allows"],
+  right: AuthSession["expiring_allows"]
+): boolean {
+  const a = left ?? [];
+  const b = right ?? [];
+  if (a.length !== b.length) {
+    return false;
+  }
+  return a.every((item) => b.some((other) => other.permission === item.permission && other.ends_at_ms === item.ends_at_ms));
+}
 
 export function AuthProvider({ children }: AuthProviderProps) {
   const [session, setSession] = useState<AuthSession | null>(() => getSession());
@@ -110,6 +131,120 @@ export function AuthProvider({ children }: AuthProviderProps) {
       forceLogout();
     });
   }, [forceLogout]);
+
+  useEffect(() => {
+    if (!session?.token || session.permissions_source === "demo") {
+      return;
+    }
+    let cancelled = false;
+    let intervalId = 0;
+    let expiryId = 0;
+
+    const scheduleExpiry = (atMs: number | null) => {
+      window.clearTimeout(expiryId);
+      if (atMs == null) {
+        return;
+      }
+      const delay = atMs - Date.now() + 1000;
+      if (delay > 0 && delay < 24 * 60 * 60 * 1000) {
+        expiryId = window.setTimeout(() => {
+          void refresh();
+        }, delay);
+      }
+    };
+
+    const applyExpiredAllows = () => {
+      const current = getSession();
+      if (!current) {
+        return;
+      }
+      const dropped = dropExpiredAllows(current, Date.now());
+      if (!dropped) {
+        return;
+      }
+      const next = patchSession({
+        expiring_allows: dropped.expiring_allows,
+        user: { ...current.user, effective_permissions: dropped.user.effective_permissions }
+      });
+      if (next) {
+        setSession(next);
+      }
+    };
+
+    const refresh = async () => {
+      applyExpiredAllows();
+      try {
+        const snapshot = await fetchSessionPermissions();
+        if (cancelled) {
+          return;
+        }
+        const current = getSession();
+        if (!current) {
+          return;
+        }
+        const unchanged =
+          current.permissions_hydrated === true &&
+          current.permissions_stale !== true &&
+          current.permissions_source === "server" &&
+          samePermissionList(current.user.effective_permissions, snapshot.permissions) &&
+          sameExpiringAllows(current.expiring_allows, snapshot.expiringAllows);
+        if (!unchanged) {
+          const next = patchSession({
+            permissions_hydrated: true,
+            permissions_stale: false,
+            permissions_source: "server",
+            expiring_allows: snapshot.expiringAllows,
+            user: { ...current.user, effective_permissions: snapshot.permissions }
+          });
+          if (next) {
+            setSession(next);
+          }
+        }
+        scheduleExpiry(snapshot.refreshAtMs);
+      } catch {
+        if (cancelled) {
+          return;
+        }
+        applyExpiredAllows();
+        const current = getSession();
+        // Hidrate liste yoksa bu bir kısıt değil, eksik/eski oturumdur.
+        // Production zaten fail-closed; demo ve eski oturum rol matrisinde kalır.
+        // Hidrate liste varken hata listeyi silmez ve süresi dolmuş ALLOW'ı geri açmaz.
+        if (!current || current.permissions_hydrated !== true) {
+          return;
+        }
+        if (current.permissions_stale !== true) {
+          const next = patchSession({ permissions_stale: true });
+          if (next) {
+            setSession(next);
+          }
+        }
+        const now = Date.now();
+        const remaining = (getSession()?.expiring_allows ?? []).reduce<number | null>((soonest, item) => {
+          if (item.ends_at_ms <= now) {
+            return soonest;
+          }
+          return soonest === null || item.ends_at_ms < soonest ? item.ends_at_ms : soonest;
+        }, null);
+        scheduleExpiry(remaining);
+      }
+    };
+
+    void refresh();
+    const onFocus = () => {
+      void refresh();
+    };
+    window.addEventListener("focus", onFocus);
+    intervalId = window.setInterval(() => {
+      void refresh();
+    }, 60_000);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("focus", onFocus);
+      window.clearInterval(intervalId);
+      window.clearTimeout(expiryId);
+    };
+  }, [session?.permissions_source, session?.token]);
 
   const clearMustChangePassword = useCallback(() => {
     const next = patchSession({ must_change_password: false });

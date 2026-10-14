@@ -100,6 +100,44 @@ final class EffectivePermissionResolver
     }
 
     /**
+     * Şubesiz kararda geçerli bir kişisel DENY var mı.
+     *
+     * İzin yokluğu ile açık kısıt ayrıdır: rolde olmayan bir izin burada false
+     * döner. QR ve personele bağlı self-service temeli istisnadan etkilenmez
+     * (resolve ile aynı sıra). Süre ve iptal, validExceptions sahibindedir;
+     * bu metot ikinci bir süre hesabı kurmaz.
+     *
+     * @param array<string, mixed> $user
+     * @param mixed $permission
+     */
+    public static function hasActiveDeny(array $user, $permission): bool
+    {
+        $permission = trim((string) $permission);
+        if ($permission === '') {
+            return false;
+        }
+        if (RolePermissions::isQrSelfServicePermission($permission)) {
+            return false;
+        }
+        if (
+            RolePermissions::hasPersonnelLinkedSelfServiceEligibility($user)
+            && in_array($permission, RolePermissions::selfServiceBaselinePermissions(), true)
+        ) {
+            return false;
+        }
+        $role = RolePermissions::normalizeRole(isset($user['rol']) ? (string) $user['rol'] : '');
+        if ($role === '') {
+            return false;
+        }
+        $istisnalar = self::validExceptions($user, $permission);
+        if ($istisnalar === []) {
+            return false;
+        }
+
+        return self::isDenied($istisnalar, $role, $permission, null);
+    }
+
+    /**
      * Şube bağlamında karar (şubeye özel DENY/ALLOW için).
      *
      * @param array<string, mixed> $user

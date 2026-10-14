@@ -66,6 +66,11 @@ export type AuthUser = {
    * PERSONEL self-service QR is only effective for "Mavi Yaka".
    */
   personel_tipi_ad?: string | null;
+  /**
+   * Sunucunun etkin izin listesi. Alan yoksa liste henüz gelmemiştir; boş dizi
+   * sunucunun gerçekten hiç izin vermediği oturumdur.
+   */
+  effective_permissions?: string[];
 };
 
 export type AuthSession = {
@@ -81,6 +86,22 @@ export type AuthSession = {
   sube_list?: SubeInfo[];
   /** Admin geçici şifre sonrası kullanıcının kendi şifresini belirlemesi gerekir. */
   must_change_password?: boolean;
+  /** true: effective_permissions sunucudan veya demo oturumundan yazıldı. */
+  permissions_hydrated?: boolean;
+  /** Son yenileme başarısız. Hidrate liste durur; rol matrisine dönülmez. */
+  permissions_stale?: boolean;
+  /** demo: yerel matris. server: login veya GET /auth/yetkiler. */
+  permissions_source?: "demo" | "server";
+  /**
+   * Son başarılı okumada kaynağı USER_ALLOW olup bitişi yazılmış izinler.
+   * Süre dolunca listeden düşer; yenileme hatası bunları rol matrisinden geri açmaz.
+   */
+  expiring_allows?: ExpiringPermissionAllow[];
+};
+
+export type ExpiringPermissionAllow = {
+  permission: string;
+  ends_at_ms: number;
 };
 
 export type LoginCredentials = {

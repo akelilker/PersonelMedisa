@@ -1,7 +1,7 @@
 # Dinamik kullanıcı yetkisi — P3 (yazma + kurallar + bildirim)
 
-Durum: PR (MERGE=NO). Migration yok; migration 100 canlıya uygulanmadan yazma uçları
-`503 YETKI_SEMASI_HAZIR_DEGIL` döner ve rol değişikliği yolu eskisi gibi çalışır.
+Durum: kod main'de (PR #530). Migration 100 canlıda uygulandı (Apply `38222514124`). Şema hazır değilse yazma uçları
+`503 YETKI_SEMASI_HAZIR_DEGIL` döner ve rol değişikliği yolu eskisi gibi çalışır. Personel yazma köprüsünde DENY önceliği ve ekran oturum hizası bu çalışma ağacında yereldir; commit/merge/deploy yoktur.
 
 ## Uçlar (`kullanici_yetkileri.manage`, yalnız GENEL_YONETICI)
 - `POST /yonetim/kullanicilar/{id}/yetkiler` — `{permission, etki: ALLOW|DENY, gerekce, gecerlilik_baslangic?, gecerlilik_bitis?}`

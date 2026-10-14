@@ -24,6 +24,7 @@ function istisna(partial: Partial<KullaniciYetkiIstisna> & Pick<KullaniciYetkiIs
     iptalEdildiAt: null,
     iptalNedeni: null,
     iptalEdenUsername: null,
+    baslangicHassasKilit: false,
     ...partial
   };
 }
@@ -55,7 +56,7 @@ describe("kullanıcı yetki ekranı kuralları", () => {
     expect(secenekler).not.toContain("yonetim-paneli.manage");
   });
 
-  it("rolde olan yetkiye yeniden izin vermez; kısıtı kaldırmayı hassas kayıtta kapalı tutar", () => {
+  it("rolde olan yetkiye yeniden izin vermez; yalnız başlangıç hassas kilidini kapatır", () => {
     const izin = secilebilirIzinler({
       rol: "BOLUM_YONETICISI",
       rolVarsayilanlari: ["personeller.update"],
@@ -65,9 +66,16 @@ describe("kullanıcı yetki ekranı kuralları", () => {
     });
     expect(izin).not.toContain("personeller.update");
 
-    const hassas = istisna({ id: 2, permission: "sgk_karar_paketi.approve", etki: "DENY" });
+    const sonradanHassas = istisna({ id: 2, permission: "sgk_karar_paketi.approve", etki: "DENY" });
+    const baslangicHassas = istisna({
+      id: 3,
+      permission: "sgk_karar_paketi.approve",
+      etki: "DENY",
+      baslangicHassasKilit: true
+    });
     const normal = istisna({ id: 1, permission: "personeller.update", etki: "DENY" });
-    expect(istisnaKaldirilabilir(hassas, false, true)).toBe(false);
+    expect(istisnaKaldirilabilir(sonradanHassas, false, true)).toBe(true);
+    expect(istisnaKaldirilabilir(baslangicHassas, false, true)).toBe(false);
     expect(istisnaKaldirilabilir(normal, false, true)).toBe(true);
     expect(istisnaKaldirilabilir(normal, true, true)).toBe(false);
   });

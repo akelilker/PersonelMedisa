@@ -13,7 +13,6 @@ import {
   bitisApiDegeri,
   bitisHatasi,
   etkiEtiketi,
-  hassasYetkiMi,
   istisnaKaldirilabilir,
   istisnaZamani,
   istisnaZamanEtiketi,
@@ -268,7 +267,6 @@ export function KullaniciYetkiPanel(props: KullaniciYetkiPanelProps) {
               {acikKartlar.map((istisna) => {
                 const zaman = istisnaZamani(istisna);
                 const zamanEtiketi = istisnaZamanEtiketi(zaman);
-                const hassas = istisna.etki === "DENY" && hassasYetkiMi(istisna.permission);
                 const kaldirilabilir = istisnaKaldirilabilir(istisna, kendi, props.canManage);
                 return (
                   <li key={istisna.id} className="yonetim-yetki-satir" data-testid={`yonetim-yetki-istisna-${istisna.id}`}>
@@ -289,9 +287,9 @@ export function KullaniciYetkiPanel(props: KullaniciYetkiPanelProps) {
                         {zamanEtiketi}
                       </span>
                     ) : null}
-                    {hassas ? (
+                    {istisna.baslangicHassasKilit ? (
                       <span className="yonetim-hint" data-testid={`yonetim-yetki-hassas-${istisna.id}`}>
-                        Bu hassas yetki bu ekrandan açılamaz.
+                        Bu hassas yetkinin başlangıç kısıtı kaldırılamaz.
                       </span>
                     ) : null}
                     {kaldirilabilir && iptalId !== istisna.id ? (

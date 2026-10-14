@@ -1,7 +1,8 @@
 export const endpoints = {
   auth: {
     login: "/auth/login",
-    changePassword: "/auth/change-password"
+    changePassword: "/auth/change-password",
+    yetkiler: "/auth/yetkiler"
   },
   clientTelemetry: "/client-telemetry",
   me: {

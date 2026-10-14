@@ -83,6 +83,23 @@ const istisnalar: DemoIstisna[] = [
     hassas_baslangic: true
   },
   {
+    id: 4,
+    user_id: 2,
+    permission: "bordro_kesinlestirme.approve",
+    etki: "DENY",
+    gerekce: "Geçici hassas kısıt. Başlangıç kaydı değil.",
+    veren_username_snapshot: "İlker Akel",
+    hedef_username_snapshot: "Adnan Bulut",
+    hedef_rol_snapshot: "BOLUM_YONETICISI",
+    gecerlilik_baslangic: "2026-10-03 09:00:00",
+    gecerlilik_bitis: "2026-12-01 09:00:00",
+    created_at: "2026-10-03 09:00:00",
+    iptal_edildi_at: null,
+    iptal_nedeni: null,
+    iptal_eden_username_snapshot: null,
+    hassas_baslangic: false
+  },
+  {
     id: 3,
     user_id: 2,
     permission: "maas_hesaplama.view",
@@ -143,7 +160,7 @@ const auditler: DemoAudit[] = [
   }
 ];
 
-let nextIstisnaId = 4;
+let nextIstisnaId = 5;
 let nextAuditId = 4;
 
 function ok<T>(data: T): ApiResponse<T> {
@@ -192,7 +209,8 @@ function istisnaSatiri(row: DemoIstisna) {
     iptal_edildi_at: row.iptal_edildi_at,
     iptal_eden_user_id: row.iptal_edildi_at ? 1 : null,
     iptal_eden_username_snapshot: row.iptal_eden_username_snapshot,
-    iptal_nedeni: row.iptal_nedeni
+    iptal_nedeni: row.iptal_nedeni,
+    baslangic_hassas_kilit: row.hassas_baslangic === true && row.etki === "DENY"
   };
 }
 
@@ -205,6 +223,19 @@ export function resolveDemoKullaniciYetki(input: {
   kullanicilar: readonly DemoKullanici[];
 }): ApiResponse<unknown> | null {
   const { pathname, method, body, actor, kullanicilar } = input;
+  if (pathname === "/auth/yetkiler" && method === "GET") {
+    const etkin = etkinIzinler(actor.role, actor.userId);
+    return ok({
+      user_id: actor.userId,
+      rol: actor.role,
+      effective_permissions: etkin.permissions,
+      kaynaklar: etkin.kaynaklar,
+      istisnalar: istisnalar
+        .filter((row) => row.user_id === actor.userId && row.iptal_edildi_at == null)
+        .map(istisnaSatiri),
+      sube_istisnalari_etkin: false
+    });
+  }
   const yetkiMatch = pathname.match(/^\/yonetim\/kullanicilar\/(\d+)\/yetkiler$/);
   const iptalMatch = pathname.match(/^\/yonetim\/kullanicilar\/(\d+)\/yetkiler\/(\d+)\/iptal$/);
   const auditPath = pathname === "/yonetim/yetki-auditleri";

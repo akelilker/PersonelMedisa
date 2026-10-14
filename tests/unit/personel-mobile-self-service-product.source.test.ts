@@ -52,8 +52,8 @@ describe("personel mobile/PWA self-service productization", () => {
 
     const amir = read("src/features/self-service/pages/BirimAmiriOperationalHomePage.tsx");
     expect(amir).toContain("OwnQrAttendanceBoxes");
-    expect(amir).toContain("QrKioskModelNote");
-    expect(amir).toContain("QrPuantajExpectationNote");
+    expect(amir).not.toContain("QrKioskModelNote");
+    expect(amir).not.toContain("QrPuantajExpectationNote");
     expect(amir).toContain("<SelfServiceQrShortcuts");
     expect(amir).toContain("birim-amiri-edit-daily");
     expect(amir).toContain('hasPermission("self_service.qr.scan")');
@@ -118,15 +118,7 @@ describe("personel mobile/PWA self-service productization", () => {
   });
 
   it("locks kiosk model note + CSS owner without parallel style system", () => {
-    const note = read("src/features/self-service/components/QrKioskModelNote.tsx");
-    expect(note).toContain("qr-kiosk-model-note");
-    expect(note).toContain("Şube kiosk QR");
-    expect(note).toContain("Kendi kimlik QR");
-
-    const expectation = read("src/features/self-service/components/QrPuantajExpectationNote.tsx");
-    expect(expectation).toContain("QR kaydı kontrol sonrası puantaja işlenir.");
-    expect(expectation).not.toContain("candidate / apply");
-    expect(expectation).not.toContain("aday uygulaması");
+    // t894: kiosk/beklenti notları kaldırıldı.
 
     const home = read("src/features/self-service/pages/PersonelSelfServiceHomePage.tsx");
     expect(home).toContain("Özet yüklenemedi. Tekrar deneyin.");

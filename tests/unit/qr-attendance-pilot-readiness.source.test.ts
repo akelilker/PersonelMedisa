@@ -47,9 +47,6 @@ describe("QR attendance pilot readiness contracts", () => {
     expect(boxes).toContain("cikis-scan");
     expect(boxes).toContain("data-testid=\"giris-scan-not-entitled\"");
 
-    const note = read("src/features/self-service/components/QrPuantajExpectationNote.tsx");
-    expect(note).toContain("qr-puantaj-expectation-note");
-    expect(note).toContain("puantaja işlenir");
 
     const personel = read("src/features/self-service/pages/PersonelSelfServiceHomePage.tsx");
     expect(personel).toContain("OwnQrAttendanceBoxes");
@@ -59,7 +56,7 @@ describe("QR attendance pilot readiness contracts", () => {
 
     const amir = read("src/features/self-service/pages/BirimAmiriOperationalHomePage.tsx");
     expect(amir).toContain("OwnQrAttendanceBoxes");
-    expect(amir).toContain("QrPuantajExpectationNote");
+    expect(amir).not.toContain("QrPuantajExpectationNote");
     expect(amir).toContain('testId="birim-amiri-own-attendance"');
     expect(amir).toContain('navigate("/self/qr-okut?event=GIRIS")');
     expect(amir).toContain('navigate("/self/qr-okut?event=CIKIS")');
@@ -90,11 +87,9 @@ describe("QR attendance pilot readiness contracts", () => {
   });
 
   it("wires kiosk model note on amir home only (PERSONEL product home stays clean)", () => {
-    const note = read("src/features/self-service/components/QrKioskModelNote.tsx");
-    expect(note).toContain("qr-kiosk-model-note");
     const personel = read("src/features/self-service/pages/PersonelSelfServiceHomePage.tsx");
     expect(personel).not.toContain("QrKioskModelNote");
     const amir = read("src/features/self-service/pages/BirimAmiriOperationalHomePage.tsx");
-    expect(amir).toContain("QrKioskModelNote");
+    expect(amir).not.toContain("QrKioskModelNote");
   });
 });

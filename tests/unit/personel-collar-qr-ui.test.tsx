@@ -434,8 +434,8 @@ describe("H4) BIRIM_AMIRI operational home QR reachability (render level)", () =
     // Pilot UX parity: amir home own boxes expose the same GİRİŞ CTA as PERSONEL.
     expect(screen.getByTestId("birim-amiri-own-attendance")).toBeInTheDocument();
     expect(screen.getByTestId("giris-scan")).toBeInTheDocument();
-    expect(screen.getByTestId("qr-kiosk-model-note")).toBeInTheDocument();
-    expect(screen.getByTestId("qr-puantaj-expectation-note")).toBeInTheDocument();
+    expect(screen.queryByTestId("qr-kiosk-model-note")).toBeNull();
+    expect(screen.queryByTestId("qr-puantaj-expectation-note")).toBeNull();
     // Yönetim yüzeyi kaybolmaz.
     expect(screen.getByTestId("birim-amiri-edit-daily")).toBeInTheDocument();
   });

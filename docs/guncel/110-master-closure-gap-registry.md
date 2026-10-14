@@ -17,7 +17,7 @@ This file is retained as a **historical archive** of the 2026-09-20 SGK employer
 | PRODUCTION_MIGRATION_TIP | 089 (stale) | **100** (diagnostics `38226423992` ledger PROD_TIP=100) |
 | PRODUCTION_MIGRATION_PENDING | 2 (`090`+`091`) | **0** |
 | PR #326 | OPEN (stale) | **MERGED** |
-| PRODUCTION_DEPLOY_SHA | `d96182a2` (#301) | `f14ddbe8` (#520); Deploy cPanel #1253 run `37968702102` SUCCESS |
+| PRODUCTION_DEPLOY_SHA | `d96182a2` (#301) | `fb1e3708` (#560); Deploy cPanel run `38519660078` SUCCESS |
 | FRESH_READBACK | BLOCKED_EXTERNAL_GITHUB_ACTIONS_BILLING | ACTIONS_APPLY_099_37911294869 (postcheck PASS) |
 
 ## Migration durumu (current — mirrored for sync tests)
@@ -42,7 +42,7 @@ This file is retained as a **historical archive** of the 2026-09-20 SGK employer
 | Migration 097 | **APPLIED** (Apply #56 `37391130248`; `097_qr_attendance_location_audit.sql`; worker completed; backup `medisa-pre-097-37391130248-1-20261006-000005.sql` readback VERIFIED; readback Ops #90 `37391796990` PROD_TIP 097, pending 0) |
 | Migration 098 | **APPLIED** (Apply #57 `37686359952`; preflight `37899949011` PROD_TIP 098) |
 | Migration 099 | **APPLIED** (APPLY `37911294869`; `099_user_kalici_silme_auditleri.sql`; worker SUCCEEDED; backup readback VERIFIED; postcheck PASS) |
-| CODE_MAIN_SHA / PRODUCTION_DEPLOY_SHA | `f14ddbe897bf8e64b35d9320cfac55cb427b1758` (last product deploy cPanel #1253 SUCCESS, #520; docs-only merges do not advance pin) |
+| CODE_MAIN_SHA / PRODUCTION_DEPLOY_SHA | `fb1e3708e44b304700ead79895fe9a46df8ee1e0` (product deploy cPanel run `38519660078` SUCCESS, #560; docs-only pin commit does not replace this SHA) |
 | PR #326 | **MERGED** |
 | PR #402 | **MERGED / DEPLOYED** |
 | PR #439–#441 | **MERGED / DEPLOYED** |

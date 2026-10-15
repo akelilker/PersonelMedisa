@@ -998,3 +998,36 @@ describe("AD) Duyuru yönetimi, Muhasebe yazma varsayılanı, mükerrer hesap ra
     expect(backlog).toContain("BL-MUKERRER-HESAP");
   });
 });
+
+describe("AE) Örneklenmiş onaylı kararlar: modal ikon hizası, şube kartı kare, mobil ayarlar menüsü, tarih biçimi, geri yükleme kapalı (t900 D)", () => {
+  const read = (p: string) => readFileSync(resolve(p), "utf8");
+  it("modal başlık ikonu kayması token üzerinden 6px", () => {
+    const css = read("src/styles/components/modal.css");
+    expect(css).toContain("--modal-header-icon-shift-y: 6px;");
+    expect(css).toContain("translateY(var(--modal-header-icon-shift-y))");
+  });
+  it("Bugün personel şube kartı kare (aspect-ratio 1 / 1)", () => {
+    const css = read("src/styles/modules/bugun-personel-durumu.css");
+    const bloklar = css.split(".bugun-personel-branch-card {").slice(1).map((b) => b.slice(0, b.indexOf("}")));
+    expect(bloklar.some((b) => b.includes("aspect-ratio: 1 / 1;"))).toBe(true);
+  });
+  it("mobil ayarlar menüsü içerik genişliğinde, min 168px; yalnız mobil medya sorgusunda", () => {
+    const css = read("src/styles/components/dropdown.css");
+    const m = css.indexOf("@media (max-width: 720px)", css.indexOf("t863"));
+    expect(m).toBeGreaterThan(-1);
+    const blok = css.slice(m, css.indexOf("}", css.indexOf(".settings-dropdown.settings-menu-dropdown", m)));
+    expect(blok).toContain("width: max-content;");
+    expect(blok).toContain("min-width: 168px;");
+  });
+  it("tarih detay biçimi gg/aa/yyyy", async () => {
+    const { formatIsoDateDetail } = await import("../../src/lib/display/iso-date-format");
+    expect(formatIsoDateDetail("2026-10-05")).toBe("05/10/2026");
+  });
+  it("Yedekten Geri Yükle kapalı; canlı veritabanı geri yükleme hedefi değil", () => {
+    const modal = read("src/features/yonetim/veri-yedekleme/VeriYedeklemeModal.tsx");
+    const i = modal.indexOf('data-testid="veri-yedekleme-geri-yukle"');
+    expect(modal.slice(i, modal.indexOf(">", i))).toContain("disabled");
+    expect(read("docs/guncel/tam-veritabani-yedegi.md")).toContain("UYGULANMADI");
+    expect(read("docs/guncel/onayli-kararlar.md")).toContain("Muhasebe");
+  });
+});
